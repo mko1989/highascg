@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.deploy
+.module-state.json
+.module-state.json.tmp
+.highascg-state.json
+.highascg-state.json.tmp
+highascg.config.json
+go2rtc.yaml
+
+# Local reference clones (nested git); fetch upstream if needed
+.reference/

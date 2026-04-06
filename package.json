@@ -1,0 +1,26 @@
+{
+	"name": "highascg",
+	"version": "0.1.0",
+	"description": "HighAsCG — standalone CasparCG control server (migrated from companion-module-casparcg-server)",
+	"type": "commonjs",
+	"main": "index.js",
+	"scripts": {
+		"start": "node index.js",
+		"dev": "node --watch index.js",
+		"deploy:dev": "bash scripts/dev-push.sh",
+		"smoke": "node scripts/http-smoke.js",
+		"smoke:caspar": "node scripts/smoke-caspar.js"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"dependencies": {
+		"busboy": "^1.6.0",
+		"go2rtc-static": "^1.9.4",
+		"osc": "^2.4.5",
+		"unzipper": "^0.12.3",
+		"wetransfert": "^2.4.0",
+		"ws": "^8.18.0",
+		"xml2js": "^0.6.2"
+	}
+}

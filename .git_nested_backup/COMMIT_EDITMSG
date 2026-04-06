@@ -1,0 +1,9 @@
+Sync app: OSC/audio routing, WebRTC compose preview, graceful shutdown, UI
+
+- Dual PRV/PGM WebRTC preview; muted-first play for autoplay policy
+- Remove compose cell channel labels; sources/media and settings updates
+- API: logs, host stats, LED test card, caspar config routes; log buffer
+- AMCP/HTTP/streaming teardown and connection handling
+- Templates, work notes, Caspar OSC Monitor reference tree
+
+Made-with: Cursor

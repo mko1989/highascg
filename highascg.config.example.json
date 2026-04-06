@@ -1,0 +1,60 @@
+{
+  "caspar": {
+    "host": "127.0.0.1",
+    "port": 5250
+  },
+  "offline_mode": false,
+  "casparServer": {
+    "screen_count": 1,
+    "screen_1_mode": "1080p5000",
+    "multiview_enabled": true,
+    "decklink_input_count": 0,
+    "configPath": "/opt/casparcg/config/casparcg.config"
+  },
+  "server": {
+    "httpPort": 8080,
+    "wsPort": 8080,
+    "bindAddress": "0.0.0.0"
+  },
+  "osc": {
+    "enabled": true,
+    "listenPort": 6250,
+    "listenAddress": "0.0.0.0",
+    "peakHoldMs": 2000,
+    "emitIntervalMs": 50,
+    "staleTimeoutMs": 5000,
+    "wsDeltaBroadcast": false
+  },
+  "ui": {
+    "oscFooterVu": true,
+    "rundownPlaybackTimer": true
+  },
+  "audioRouting": {
+    "programLayout": "stereo",
+    "programOutput": "default",
+    "programAlsaDevice": "",
+    "programFfmpegPath": "",
+    "programFfmpegArgs": "",
+    "monitorOutput": "default",
+    "monitorAlsaDevice": "",
+    "monitorFfmpegPath": "",
+    "monitorFfmpegArgs": "",
+    "browserMonitor": "pgm"
+  },
+  "streaming": {
+    "enabled": true,
+    "go2rtcPort": 1984,
+    "webrtcPort": 8555,
+    "protocol": "SRT",
+    "quality": "medium",
+    "basePort": 10000,
+    "hardwareAccel": true,
+    "maxBitrate": 2000,
+    "resolution": "540p",
+    "fps": 25,
+    "hardware_accel": true
+  },
+  "periodic_sync_interval_sec": null,
+  "periodic_sync_interval_sec_osc": null,
+  "osc_info_supplement_ms": null
+}

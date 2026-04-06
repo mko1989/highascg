@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>HighAsCG — Server setup</title>
+	<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+	<link rel="stylesheet" href="styles.css">
+	<style>
+		.setup-page { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+		.setup-page h1 { font-size: 1.35rem; margin-bottom: 0.5rem; }
+		.setup-page .setup-sub { opacity: 0.85; margin-bottom: 1.5rem; font-size: 0.95rem; }
+		.setup-grid { display: grid; gap: 1rem; }
+		.setup-card { border: 1px solid var(--border-subtle, #333); border-radius: 8px; padding: 1rem 1.1rem; background: var(--panel-bg, #1a1a1a); }
+		.setup-card h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+		.setup-card dl { margin: 0; font-size: 0.9rem; }
+		.setup-card dt { opacity: 0.75; margin-top: 0.5rem; }
+		.setup-card dt:first-child { margin-top: 0; }
+		.setup-card dd { margin: 0.15rem 0 0 0; word-break: break-all; }
+		.setup-card a { color: var(--accent, #6cf); }
+		.setup-card code { font-size: 0.85rem; display: block; margin-top: 0.35rem; padding: 0.5rem; background: rgba(0,0,0,0.35); border-radius: 4px; }
+		.setup-back { display: inline-block; margin-bottom: 1rem; opacity: 0.9; }
+		.setup-warn { font-size: 0.88rem; opacity: 0.9; margin-top: 0.5rem; }
+	</style>
+</head>
+<body>
+	<div class="setup-page">
+		<a class="setup-back" href="index.html">← Back to app</a>
+		<h1>Server setup</h1>
+		<p class="setup-sub">Reach this host from another machine on your LAN or Tailnet. Firewall allows private ranges and Tailscale only.</p>
+		<div id="setup-root" class="setup-grid">
+			<p>Loading…</p>
+		</div>
+	</div>
+	<script type="module">
+		const root = document.getElementById('setup-root')
+		async function load() {
+			try {
+				const api = new URL('api/system/setup', window.location.href).href
+				const r = await fetch(api)
+				const d = await r.json()
+				if (!r.ok) throw new Error(d.error || r.statusText)
+				const rows = (d.interfaces || []).map((i) => `<dt>${escapeHtml(i.name)}</dt><dd>${escapeHtml(i.address)}</dd>`).join('')
+				const ts = d.tailscale?.ipv4
+					? `${escapeHtml(d.tailscale.ipv4)}`
+					: '<em>Not connected — run on server: <code>sudo tailscale up</code></em>'
+				root.innerHTML = `
+					<div class="setup-card">
+						<h2>Network interfaces</h2>
+						<dl>${rows || '<dd>No IPv4 found</dd>'}</dl>
+						<p class="setup-warn">Display mode: <strong>${escapeHtml(d.displayMode || 'normal')}</strong> — use <code>sudo highascg-display-mode normal|x11-only</code> then <code>sudo systemctl restart nodm</code> (X11-only skips CasparCG for DeckLink GUI setup).</p>
+					</div>
+					<div class="setup-card">
+						<h2>Tailscale</h2>
+						<dl>
+							<dt>Tailscale IPv4</dt><dd>${ts}</dd>
+							<dt>Admin (machines)</dt><dd><a href="${escapeHtml(d.tailscaleInstructions?.webAdmin || 'https://login.tailscale.com/admin/machines')}" target="_blank" rel="noopener">login.tailscale.com/admin</a></dd>
+						</dl>
+						<code>${escapeHtml(d.tailscaleInstructions?.cliLogin || 'sudo tailscale up')}</code>
+						<p class="setup-warn">There is no local Tailscale web UI — the CLI prints a login URL, or use the admin link after the node joins your tailnet.</p>
+					</div>
+					<div class="setup-card">
+						<h2>Syncthing</h2>
+						<p class="setup-warn">Folders and devices are <strong>not</strong> pre-configured. Open the GUI, add a remote device ID, accept on both sides, then choose folders to share.</p>
+						<dl>
+							<dt>Web GUI</dt><dd><a href="${escapeHtml(d.syncthing?.guiUrl || '#')}" target="_blank" rel="noopener">${escapeHtml(d.syncthing?.guiUrl || '')}</a></dd>
+						</dl>
+					</div>
+					<div class="setup-card">
+						<h2>Quick links</h2>
+						<dl>
+							<dt>HighAsCG</dt><dd><a href="${escapeHtml(d.adminUrls?.highascg || '/')}">${escapeHtml(d.adminUrls?.highascg || '')}</a></dd>
+							<dt>This page</dt><dd><a href="${escapeHtml(d.adminUrls?.setupPage || '/setup.html')}">${escapeHtml(d.adminUrls?.setupPage || '')}</a></dd>
+						</dl>
+					</div>
+				`
+			} catch (e) {
+				root.innerHTML = `<p class="setup-warn">Could not load setup data: ${escapeHtml(e.message)}</p>`
+			}
+		}
+		function escapeHtml(s) {
+			const t = document.createElement('div')
+			t.textContent = s
+			return t.innerHTML
+		}
+		load()
+	</script>
+</body>
+</html>

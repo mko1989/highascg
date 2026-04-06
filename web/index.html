@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>HighAsCG — Direct Playout</title>
+	<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div id="app" class="app">
+		<header class="header">
+			<div class="header__title">
+				<img src="assets/logo.svg" alt="" class="header__logo">
+				HighAsCG
+			</div>
+			<div class="header__status" id="ws-status" aria-label="Connection status">
+				<div id="connection-eye-container"></div>
+			</div>
+		</header>
+
+		<div class="layout">
+			<aside class="panel panel-sources" id="panel-sources">
+				<div class="panel__header">
+					<h2>Sources</h2>
+				</div>
+				<div class="panel__body" id="sources-panel-body"></div>
+			</aside>
+			<div class="resize-handle resize-handle--sources" id="resize-sources" title="Drag to resize"></div>
+
+			<main class="workspace">
+				<div class="workspace__tabs">
+					<button class="tab active" data-tab="scenes">Scenes / Looks</button>
+					<button class="tab" data-tab="timeline">Timeline Editor</button>
+					<button class="tab" data-tab="multiview">Multiview Editor</button>
+				</div>
+				<div class="workspace__content">
+					<div class="offline-watermark">Offline Draft</div>
+					<div class="tab-pane active" id="tab-scenes"></div>
+					<div class="tab-pane" id="tab-timeline"></div>
+					<div class="tab-pane" id="tab-multiview"></div>
+				</div>
+			</main>
+
+			<aside class="panel panel-inspector" id="panel-inspector">
+				<div class="panel__header">
+					<h2>Inspector</h2>
+				</div>
+				<div class="panel__body" id="panel-inspector-body">
+					<p class="placeholder">Select an item</p>
+				</div>
+			</aside>
+		</div>
+
+		<footer id="app-footer-osc" class="app-footer-osc" aria-label="OSC program audio levels"></footer>
+	</div>
+
+	<script type="module" src="app.js"></script>
+</body>
+</html>

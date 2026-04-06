@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<!--
+  HighAsCG — LED wall grid test pattern (CasparCG HTML template)
+
+  Store this file and both_open.svg / left_closed.svg / right_closed.svg under Caspar’s
+  **template-path** (not media-path), so they are not listed as media (CLS). In highascg.config.json
+  set **local_template_path** to that absolute folder; HighAsCG will copy these files on connect.
+
+  Center “character”: same blink idea as the app connection eyes — both_open → left_closed →
+  right_closed (SVGs next to this file: both_open.svg, left_closed.svg, right_closed.svg).
+
+  Pass JSON via CG UPDATE (same string rules as multiview_overlay.html):
+
+  {
+    "cols": 20,
+    "rows": 10,
+    "panelWidth": 192,
+    "panelHeight": 108,
+    "centerLabel": "HighAsCG",
+    "showCenterCharacter": true,
+    "showPanelLabels": true,
+    "showSpecLine": true
+  }
+
+  • showCenterCharacter — hide center eyes + caption when false (default true)
+-->
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>LED grid test</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #050508;
+			font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+		}
+		#root {
+			position: absolute;
+			inset: 0;
+			display: grid;
+			gap: 0;
+			background: #0a0a0f;
+		}
+		.panel {
+			position: relative;
+			border: 2px solid #2d3140;
+			background:
+				linear-gradient(145deg, rgba(255,255,255,0.04) 0%, transparent 40%),
+				linear-gradient(180deg, #12141c 0%, #0c0e14 100%);
+			box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+		}
+		.panel:nth-child(4n+1) { background-color: rgba(30, 32, 44, 0.35); }
+		.panel:nth-child(4n+3) { background-color: rgba(22, 24, 34, 0.35); }
+		.panel__idx {
+			position: absolute;
+			top: 6px;
+			left: 8px;
+			font-size: clamp(10px, 1.1vw, 14px);
+			font-weight: 600;
+			color: rgba(200, 210, 255, 0.45);
+			letter-spacing: 0.04em;
+			pointer-events: none;
+		}
+		.panel__cross {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			opacity: 0.12;
+			background:
+				linear-gradient(to right, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%),
+				linear-gradient(to bottom, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%);
+		}
+		#center {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			display: none;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			text-align: center;
+			pointer-events: none;
+			z-index: 10;
+			padding: 0.75em 1.2em 1em;
+			border-radius: 8px;
+			background: rgba(0, 0, 0, 0.42);
+			border: 1px solid rgba(255, 255, 255, 0.12);
+			backdrop-filter: blur(4px);
+			max-width: 96vw;
+		}
+		.led-test-eye {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 80px;
+			min-height: 40px;
+		}
+		.led-test-eye__img {
+			display: block;
+			max-width: min(50vw, 420px);
+			max-height: min(35vh, 360px);
+			width: auto;
+			height: auto;
+			object-fit: contain;
+			object-position: center;
+		}
+		.led-test-eye__caption {
+			margin-top: 0.5rem;
+			font-size: clamp(0.75rem, 2.2vw, 1.05rem);
+			font-weight: 600;
+			letter-spacing: 0.08em;
+			color: rgba(240, 244, 255, 0.95);
+			text-shadow: 0 0 20px rgba(100, 160, 255, 0.25), 0 2px 8px rgba(0,0,0,0.75);
+		}
+		#spec {
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			padding: 8px 12px;
+			text-align: center;
+			font-size: clamp(10px, 1vw, 13px);
+			color: rgba(180, 190, 220, 0.55);
+			background: linear-gradient(0deg, rgba(0,0,0,0.55), transparent);
+			pointer-events: none;
+			z-index: 5;
+		}
+	</style>
+</head>
+<body>
+	<div id="root"></div>
+	<div id="center">
+		<div id="ledTestEye" class="led-test-eye" role="img" aria-label="HighAsCG">
+			<img id="ledTestEyeImg" class="led-test-eye__img" alt="" decoding="async" />
+		</div>
+		<p id="centerCaption" class="led-test-eye__caption"></p>
+	</div>
+	<div id="spec" style="display: none;"></div>
+	<script>
+		window.play = function () {}
+		window.stop = function () {}
+
+		/** Same timing as web/components/connection-eye.js */
+		var BLINK_PHASE_MS = 250
+		var BLINK_INTERVAL_MS = 30000
+		var ASSETS = {
+			open: 'both_open.svg',
+			left: 'left_closed.svg',
+			right: 'right_closed.svg'
+		}
+		var blinkInterval = null
+
+		function parsePayload(raw) {
+			if (raw == null) return null
+			try {
+				if (typeof raw === 'string') {
+					var s = raw.trim()
+					if (!s) return null
+					if (s.indexOf('\\"') !== -1) s = s.replace(/\\"/g, '"')
+					if (s.charAt(0) === '"' && s.length > 1 && s.charAt(s.length - 1) === '"') s = s.slice(1, -1)
+					if (s.charAt(0) === '"') { s = s.slice(1).replace(/\\"/g, '"'); s = s.replace(/"\s*$/, '') }
+					return JSON.parse(s)
+				}
+				if (typeof raw === 'object') return raw
+			} catch (e) {}
+			return null
+		}
+
+		function stopEyeBlink() {
+			if (blinkInterval) {
+				clearInterval(blinkInterval)
+				blinkInterval = null
+			}
+		}
+
+		function startEyeBlink() {
+			stopEyeBlink()
+			var eyeWrap = document.getElementById('ledTestEye')
+			var img = document.getElementById('ledTestEyeImg')
+			if (!eyeWrap || !img) return
+
+			function resolveSrc() {
+				var blinkL = eyeWrap.classList.contains('blink-l')
+				var blinkR = eyeWrap.classList.contains('blink-r')
+				if (blinkL) return ASSETS.left
+				if (blinkR) return ASSETS.right
+				return ASSETS.open
+			}
+
+			function updateImgSrc() {
+				var next = resolveSrc()
+				if (img.getAttribute('src') !== next) img.setAttribute('src', next)
+			}
+
+			function triggerBlink() {
+				if (eyeWrap.classList.contains('blink-l') || eyeWrap.classList.contains('blink-r')) return
+				eyeWrap.classList.add('blink-l')
+				updateImgSrc()
+				setTimeout(function () {
+					eyeWrap.classList.remove('blink-l')
+					eyeWrap.classList.add('blink-r')
+					updateImgSrc()
+					setTimeout(function () {
+						eyeWrap.classList.remove('blink-r')
+						updateImgSrc()
+					}, BLINK_PHASE_MS)
+				}, BLINK_PHASE_MS)
+			}
+
+			updateImgSrc()
+			blinkInterval = setInterval(triggerBlink, BLINK_INTERVAL_MS)
+		}
+
+		function build(data) {
+			var cols = Math.max(1, parseInt(data.cols, 10) || 4)
+			var rows = Math.max(1, parseInt(data.rows, 10) || 3)
+			var pw = Math.max(0, parseInt(data.panelWidth, 10) || 0)
+			var ph = Math.max(0, parseInt(data.panelHeight, 10) || 0)
+			var centerLabel = data.centerLabel != null ? String(data.centerLabel) : 'HighAsCG'
+			var showCenter = data.showCenterCharacter !== false
+			var showLabels = data.showPanelLabels !== false
+			var showSpec = data.showSpecLine !== false
+
+			var root = document.getElementById('root')
+			root.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
+			root.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)'
+			root.innerHTML = ''
+
+			var r, c, panel, idx, cross
+			for (r = 1; r <= rows; r++) {
+				for (c = 1; c <= cols; c++) {
+					panel = document.createElement('div')
+					panel.className = 'panel'
+					if (showLabels) {
+						idx = document.createElement('div')
+						idx.className = 'panel__idx'
+						idx.textContent = 'R' + r + '×C' + c
+						panel.appendChild(idx)
+					}
+					cross = document.createElement('div')
+					cross.className = 'panel__cross'
+					panel.appendChild(cross)
+					root.appendChild(panel)
+				}
+			}
+
+			var center = document.getElementById('center')
+			var cap = document.getElementById('centerCaption')
+			if (showCenter) {
+				center.style.display = 'flex'
+				cap.textContent = centerLabel || ''
+				cap.style.display = centerLabel ? 'block' : 'none'
+				stopEyeBlink()
+				startEyeBlink()
+			} else {
+				center.style.display = 'none'
+				stopEyeBlink()
+			}
+
+			var spec = document.getElementById('spec')
+			if (showSpec && pw > 0 && ph > 0) {
+				var tw = cols * pw
+				var th = rows * ph
+				spec.textContent = tw + '×' + th + ' px  ·  ' + cols + '×' + rows + ' panels  ·  ' + pw + '×' + ph + ' px each'
+				spec.style.display = 'block'
+			} else if (showSpec) {
+				spec.textContent = cols + '×' + rows + ' panels' + (pw && ph ? '  ·  ' + pw + '×' + ph + ' px (set both for total)' : '')
+				spec.style.display = 'block'
+			} else {
+				spec.style.display = 'none'
+			}
+		}
+
+		function update(raw) {
+			var data = parsePayload(raw)
+			if (!data) data = {}
+			build(data)
+		}
+
+		window.update = update
+		build({ cols: 4, rows: 3, panelWidth: 192, panelHeight: 108, centerLabel: 'HighAsCG' })
+	</script>
+</body>
+</html>
