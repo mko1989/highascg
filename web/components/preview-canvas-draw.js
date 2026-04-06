@@ -5,6 +5,9 @@
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
 
+/** Match `.preview-panel--compose-dual` cell background in styles.css (letterbox around video). */
+const COMPOSE_DUAL_PREVIEW_BG = '#e8eaed'
+
 /**
  * Draw a clear outer frame for the program output rectangle (full WxH), on top of layer content.
  * @param {CanvasRenderingContext2D} ctx
@@ -315,7 +318,7 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 	if (isLive) {
 		ctx.clearRect(0, 0, W, H)
 	} else {
-		ctx.fillStyle = '#0d1117'
+		ctx.fillStyle = composeDualStreamPreview ? COMPOSE_DUAL_PREVIEW_BG : '#0d1117'
 		ctx.fillRect(0, 0, W, H)
 	}
 
@@ -323,8 +326,10 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		ctx.fillStyle = '#6e7681'
 		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
 		ctx.fillText('Add layers and assign sources', 16, Math.round(H / 2))
-		drawOutputCanvasBounds(ctx, W, H)
-		if (!composeDualStreamPreview) drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+		if (!composeDualStreamPreview) {
+			drawOutputCanvasBounds(ctx, W, H)
+			drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+		}
 		return
 	}
 
@@ -354,14 +359,16 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		ctx.rotate(rot)
 		ctx.translate(-cx, -cy)
 
-		// Live WebRTC under canvas: layer borders + labels (not solid fills). Dual PRV/PGM: CSS cell borders;
-		// skip strokes — first layer color is red and looked like a wrong PGM border.
+		// Live WebRTC under canvas: layer borders + L# labels (not solid fills). Dual PRV/PGM: skip those
+		// layer overlays; dashed frame + PRV/PGM edge bars are omitted in dual compose.
 		if (isLive) {
-			if (!composeDualStreamPreview) {
-				ctx.strokeStyle = isSel ? '#58a6ff' : color
-				ctx.lineWidth = isSel ? lw * 2 : lw
-				ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
+			if (composeDualStreamPreview) {
+				ctx.restore()
+				continue
 			}
+			ctx.strokeStyle = isSel ? '#58a6ff' : color
+			ctx.lineWidth = isSel ? lw * 2 : lw
+			ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
 			ctx.fillStyle = color
 			ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
 			ctx.fillText(`L${layer.layerNumber}`, x + 6, y + Math.max(14, Math.round(H / 70)))
@@ -411,8 +418,10 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		ctx.restore()
 	}
 
-	drawOutputCanvasBounds(ctx, W, H)
-	if (!composeDualStreamPreview) drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	if (!composeDualStreamPreview) {
+		drawOutputCanvasBounds(ctx, W, H)
+		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	}
 }
 
 /**
@@ -443,7 +452,7 @@ export function drawTimelineStack(ctx, W, H, opts) {
 	if (isLive) {
 		ctx.clearRect(0, 0, W, H)
 	} else {
-		ctx.fillStyle = '#0d1117'
+		ctx.fillStyle = composeDualStreamPreview ? COMPOSE_DUAL_PREVIEW_BG : '#0d1117'
 		ctx.fillRect(0, 0, W, H)
 	}
 
@@ -452,8 +461,10 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.fillStyle = '#6e7681'
 		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
 		ctx.fillText('No timeline', 16, Math.round(H / 2))
-		drawOutputCanvasBounds(ctx, W, H)
-		if (!composeDualStreamPreview) drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+		if (!composeDualStreamPreview) {
+			drawOutputCanvasBounds(ctx, W, H)
+			drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+		}
 		return
 	}
 
@@ -476,13 +487,15 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.save()
 		ctx.globalAlpha = Math.max(0, Math.min(1, op))
 
-		/* Live WebRTC under canvas: no solid placeholder fills (they looked like a wrong overlay on PRV compose). */
+		/* Live WebRTC: dual PRV/PGM — skip L# layer strokes/labels only (see drawSceneComposeStack). */
 		if (isLive) {
-			if (!composeDualStreamPreview) {
-				ctx.strokeStyle = color
-				ctx.lineWidth = lw
-				ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
+			if (composeDualStreamPreview) {
+				ctx.restore()
+				continue
 			}
+			ctx.strokeStyle = color
+			ctx.lineWidth = lw
+			ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
 			ctx.fillStyle = color
 			ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
 			ctx.fillText(`L${li + 1}`, x + 6, y + Math.max(14, Math.round(H / 70)))
@@ -524,6 +537,8 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.restore()
 	}
 
-	drawOutputCanvasBounds(ctx, W, H)
-	if (!composeDualStreamPreview) drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	if (!composeDualStreamPreview) {
+		drawOutputCanvasBounds(ctx, W, H)
+		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	}
 }

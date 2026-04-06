@@ -38,6 +38,8 @@ export function initTimelineCanvas(container, opts) {
 		onMoveKeyframe,
 		onSelectFlag,
 		onMoveFlagTime,
+		getClipSelection,
+		getFlagSelection,
 	} = opts
 
 	const thumbCache = new Map() // url -> HTMLImageElement (or 'loading' | 'error')
@@ -93,7 +95,7 @@ export function initTimelineCanvas(container, opts) {
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
 		drawBackground(tl)
 		drawRuler(tl, pb)
-		if (tl) drawFlags(tl)
+		if (tl) drawFlags(tl, getFlagSelection)
 		if (tl) drawTracks(tl)
 		drawPlayhead(pb)
 		drawHeaders(tl)
@@ -178,16 +180,18 @@ export function initTimelineCanvas(container, opts) {
 		}
 	}
 
-	function drawFlags(tl) {
+	function drawFlags(tl, getFlagSel) {
 		const flags = tl.flags
 		if (!flags?.length) return
+		const sel = getFlagSel?.()
 		for (const f of flags) {
 			const x = xAt(f.timeMs)
 			if (x < HEADER_W - 2 || x > canvas.width + 2) continue
 			const t = f.type || 'pause'
 			const color = t === 'play' ? '#3fb950' : t === 'jump' ? '#a371f7' : '#f85149'
-			ctx.strokeStyle = color
-			ctx.lineWidth = 1
+			const isSel = sel && sel.timelineId === tl.id && sel.flagId === f.id
+			ctx.strokeStyle = isSel ? '#58a6ff' : color
+			ctx.lineWidth = isSel ? 2 : 1
 			ctx.beginPath()
 			ctx.moveTo(x, 0)
 			ctx.lineTo(x, RULER_H - 14)
@@ -199,6 +203,11 @@ export function initTimelineCanvas(container, opts) {
 			ctx.closePath()
 			ctx.fillStyle = color
 			ctx.fill()
+			if (isSel) {
+				ctx.strokeStyle = '#58a6ff'
+				ctx.lineWidth = 2
+				ctx.stroke()
+			}
 		}
 	}
 
@@ -229,6 +238,8 @@ export function initTimelineCanvas(container, opts) {
 					getWaveformUrl,
 					drag,
 					pxPerMs,
+					selection: getClipSelection?.(),
+					activeTimelineId: tl.id,
 				})
 			}
 		}

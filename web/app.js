@@ -16,7 +16,6 @@ import { initInspectorPanel } from './components/inspector-panel.js'
 import { initMultiviewEditor } from './components/multiview-editor.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
-import { initOscFooterStrip } from './components/osc-footer-strip.js'
 import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
 import { dashboardState } from './lib/dashboard-state.js'
 import { settingsState } from './lib/settings-state.js'
@@ -332,7 +331,6 @@ async function init() {
 	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore)
 	initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
 	initInspectorPanel(document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
-	initOscFooterStrip(() => _oscClient, stateStore)
 
 	settingsState.subscribe((s) => {
 		applyBrowserMonitorFromSettings(s)

@@ -25,7 +25,7 @@ export function showSettingsModal() {
 			<div class="modal-body settings-body">
 				<div class="settings-tabs">
 					<button class="settings-tab active" data-tab="connection">Connection</button>
-					<button class="settings-tab" data-tab="streaming">Streaming</button>
+					<button class="settings-tab" data-tab="streaming">Preview streaming</button>
 					<button class="settings-tab" data-tab="audio">Audio / OSC</button>
 					<button class="settings-tab" data-tab="screens">Screens</button>
 					<button class="settings-tab" data-tab="system">System</button>
@@ -104,23 +104,6 @@ export function showSettingsModal() {
 						</div>
 					</div>
 					<div class="settings-pane" id="settings-pane-audio">
-						<p class="settings-note">
-							OSC from CasparCG to HighAsCG is <strong>required</strong> for mixer, layers, playback, VU, and timers. The UDP listener is always on unless the server was started with
-							<code>--no-osc</code> (development only).
-						</p>
-						<div class="settings-group">
-							<label>OSC listen port</label>
-							<input type="number" id="set-osc-port" placeholder="6250" min="1" max="65535">
-						</div>
-						<div class="settings-group">
-							<label>UDP bind address</label>
-							<input type="text" id="set-osc-bind" placeholder="0.0.0.0">
-						</div>
-						<div class="settings-group">
-							<label>Peak hold (ms)</label>
-							<input type="number" id="set-osc-peak" placeholder="2000" min="100" max="30000">
-						</div>
-						<p class="settings-note">With OSC enabled, the app subscribes automatically: <strong>footer VU meters</strong> (program audio), <strong>header PGM timer</strong> (elapsed / total / remaining from the topmost playing layer), and the <strong>Scenes rundown</strong> timer use the same OSC stream — no extra toggles.</p>
 						<p class="settings-note"><strong>Audio output (Caspar)</strong> — used when generating Caspar config. Master is the main program mix; monitor adds a second FFmpeg consumer on the same channel (e.g. headphones). Refresh the device list on this machine after plugging hardware.</p>
 						<p class="settings-note"><strong>Master output</strong></p>
 						<div class="settings-group">
@@ -179,6 +162,24 @@ export function showSettingsModal() {
 								<option value="off">Off</option>
 							</select>
 						</div>
+						<p class="settings-note"><strong>OSC</strong> (incoming from CasparCG)</p>
+						<p class="settings-note">
+							OSC from CasparCG to HighAsCG is <strong>required</strong> for mixer, layers, playback, VU, and timers. The UDP listener is always on unless the server was started with
+							<code>--no-osc</code> (development only).
+						</p>
+						<div class="settings-group">
+							<label>OSC listen port</label>
+							<input type="number" id="set-osc-port" placeholder="6250" min="1" max="65535">
+						</div>
+						<div class="settings-group">
+							<label>UDP bind address</label>
+							<input type="text" id="set-osc-bind" placeholder="0.0.0.0">
+						</div>
+						<div class="settings-group">
+							<label>Peak hold (ms)</label>
+							<input type="number" id="set-osc-peak" placeholder="2000" min="100" max="30000">
+						</div>
+						<p class="settings-note">With OSC enabled, the app subscribes automatically: <strong>header PGM timer</strong> (elapsed / total / remaining from the topmost playing layer) and the <strong>Scenes rundown</strong> timer use the same OSC stream — no extra toggles. Use the floating <strong>Audio</strong> control for program master levels.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-screens">
 						<p class="settings-note">These values feed the <strong>generated CasparCG configuration</strong> (channels, consumers, Decklink/NDI, multiview, OSC block). <strong>Audio / OSC</strong> tab settings (master/monitor routing) and <strong>OSC listen port</strong> are merged into the same file. <strong>Same machine as Caspar:</strong> set the config path and use <em>Write &amp; restart</em>. <strong>Offline preparation</strong> (no server): design here, <em>Download</em> the file, and install it when you have access to the playout machine.</p>

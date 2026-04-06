@@ -508,21 +508,50 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			return this._channelsFor(this._pb?.sendTo)
 		},
 
+		/** Layer index from Caspar layer number (100+ for timeline stacks). */
+		_timelineLayerIndex(caspLayer) {
+			const li = caspLayer - TIMELINE_LAYER_BASE
+			return li >= 0 ? li : -1
+		},
+
+		/**
+		 * Pause every timeline layer that had output, except layers whose active clip uses loopAlways
+		 * (those keep playing in Caspar while transport is paused).
+		 */
 		_pauseAll() {
 			const self = this.self
 			if (!self?.amcp) return
+			const tl = this.timelines.get(this._pb?.timelineId)
+			if (!tl) return
+			const ms = this._nowMs()
 			for (const key of this._prevKey.keys()) {
 				const [ch, caspLayer] = key.split('-').map(Number)
-				if (!isNaN(ch) && !isNaN(caspLayer)) self.amcp.pause(ch, caspLayer).catch(() => {})
+				if (isNaN(ch) || isNaN(caspLayer)) continue
+				const li = this._timelineLayerIndex(caspLayer)
+				if (li >= 0 && li < tl.layers.length) {
+					const clip = this._clipAt(tl.layers[li], ms)
+					if (clip?.loopAlways) continue
+				}
+				self.amcp.pause(ch, caspLayer).catch(() => {})
 			}
 		},
 
+		/** Resume only layers we would have paused (same loopAlways exception). */
 		_resumeAll() {
 			const self = this.self
 			if (!self?.amcp) return
+			const tl = this.timelines.get(this._pb?.timelineId)
+			if (!tl) return
+			const ms = this._nowMs()
 			for (const key of this._prevKey.keys()) {
 				const [ch, caspLayer] = key.split('-').map(Number)
-				if (!isNaN(ch) && !isNaN(caspLayer)) self.amcp.resume(ch, caspLayer).catch(() => {})
+				if (isNaN(ch) || isNaN(caspLayer)) continue
+				const li = this._timelineLayerIndex(caspLayer)
+				if (li >= 0 && li < tl.layers.length) {
+					const clip = this._clipAt(tl.layers[li], ms)
+					if (clip?.loopAlways) continue
+				}
+				self.amcp.resume(ch, caspLayer).catch(() => {})
 			}
 		},
 

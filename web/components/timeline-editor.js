@@ -20,6 +20,11 @@ export function initTimelineEditor(root, stateStore) {
 	let redrawTimelineView = () => {}
 	let playback = { playing: false, position: 0, timelineId: null, loop: false }
 	let selectedClip = null  // { layerIdx, clipId, timelineId, clip }
+	let selectedFlagDetail = null // { timelineId, flagId, flag }
+	/** @type {{ layerIdx: number, clip: object } | null} */
+	let _clipBoard = null
+	/** @type {object | null} */
+	let _flagBoard = null
 	let _seekThrottleLast = 0
 	let _seekThrottleId = null
 	// sendTo.screenIdx: 0-based screen index, null = all screens
@@ -76,6 +81,8 @@ export function initTimelineEditor(root, stateStore) {
 	const previewHost = root.querySelector('#tl-preview-host')
 	const transportEl = root.querySelector('#tl-transport')
 	const bodyEl = root.querySelector('#tl-body')
+	bodyEl.tabIndex = -1
+	bodyEl.addEventListener('mousedown', () => bodyEl.focus())
 
 	// ── Canvas ────────────────────────────────────────────────────────────────
 
@@ -118,11 +125,13 @@ export function initTimelineEditor(root, stateStore) {
 		},
 		onSelectClip(info) {
 			selectedClip = info
-			if (!info) window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
+			selectedFlagDetail = null
+			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: info }))
 		},
 		onSelectFlag(info) {
 			selectedClip = null
+			selectedFlagDetail = info
 			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: info }))
 		},
 		onMoveFlagTime(timelineId, flagId, timeMs) {
@@ -179,6 +188,7 @@ export function initTimelineEditor(root, stateStore) {
 		},
 		onLayerClick(timelineId, layerIdx, layer) {
 			selectedClip = null
+			selectedFlagDetail = null
 			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-layer-select', { detail: { timelineId, layerIdx, layer } }))
@@ -189,6 +199,14 @@ export function initTimelineEditor(root, stateStore) {
 		onMoveKeyframe(timelineId, layerIdx, clipId, keyframeIdx, newTime) {
 			timelineState.updateKeyframeTime(timelineId, layerIdx, clipId, keyframeIdx, newTime)
 		},
+		getClipSelection: () =>
+			selectedClip?.clipId && selectedClip?.timelineId
+				? { timelineId: selectedClip.timelineId, layerIdx: selectedClip.layerIdx, clipId: selectedClip.clipId }
+				: null,
+		getFlagSelection: () =>
+			selectedFlagDetail?.flagId && selectedFlagDetail?.timelineId
+				? { timelineId: selectedFlagDetail.timelineId, flagId: selectedFlagDetail.flagId }
+				: null,
 	})
 
 	let previewPanel = null
@@ -326,6 +344,74 @@ export function initTimelineEditor(root, stateStore) {
 
 	root.setAttribute('tabindex', '-1')
 	root.addEventListener('keydown', (e) => {
+		const inField = e.target.closest('input, textarea, select')
+		const mod = (e.ctrlKey || e.metaKey) && !e.altKey
+		const k = e.key.toLowerCase()
+
+		if (!inField && mod && k === 'c') {
+			if (selectedClip?.clip) {
+				e.preventDefault()
+				_clipBoard = { layerIdx: selectedClip.layerIdx, clip: JSON.parse(JSON.stringify(selectedClip.clip)) }
+				_flagBoard = null
+				return
+			}
+			if (selectedFlagDetail?.flag) {
+				e.preventDefault()
+				_flagBoard = JSON.parse(JSON.stringify(selectedFlagDetail.flag))
+				_clipBoard = null
+				return
+			}
+		}
+		if (!inField && mod && k === 'v') {
+			const tl = timelineState.getActive()
+			if (tl && _clipBoard?.clip) {
+				const li = Math.min(_clipBoard.layerIdx, tl.layers.length - 1)
+				if (li >= 0) {
+					e.preventDefault()
+					const start = Math.round(playback.position)
+					const dur = _clipBoard.clip.duration || 5000
+					if (start + dur > tl.duration) {
+						timelineState.updateTimeline(tl.id, { duration: start + dur + 2000 })
+					}
+					const newClip = timelineState.insertClipClone(tl.id, li, _clipBoard.clip, start)
+					if (newClip) {
+						selectedClip = { timelineId: tl.id, layerIdx: li, clipId: newClip.id, clip: newClip }
+						selectedFlagDetail = null
+						window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
+						window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: selectedClip }))
+						syncToServer(timelineState.getActive())
+						redrawTimelineView()
+						void (async () => {
+							await applyTimelineClipLayoutFromMedia(newClip, timelineState, tl.id, li, newClip.id, stateStore, sceneState)
+							syncToServer(timelineState.getActive())
+							redrawTimelineView()
+						})()
+					}
+				}
+			} else if (tl && _flagBoard) {
+				e.preventDefault()
+				const nf = timelineState.duplicateFlag(tl.id, _flagBoard, Math.round(playback.position))
+				if (nf) {
+					selectedClip = null
+					selectedFlagDetail = { timelineId: tl.id, flagId: nf.id, flag: nf }
+					window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: null }))
+					window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: selectedFlagDetail }))
+					syncToServer(timelineState.getActive())
+					redrawTimelineView()
+				}
+			}
+		}
+
+		if (!inField && (e.key === 'Delete' || e.key === 'Backspace') && selectedFlagDetail?.flagId) {
+			e.preventDefault()
+			timelineState.removeFlag(selectedFlagDetail.timelineId, selectedFlagDetail.flagId)
+			selectedFlagDetail = null
+			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
+			syncToServer(timelineState.getActive())
+			redrawTimelineView()
+			return
+		}
+
 		// Spacebar = play/pause regardless of selection
 		if (e.key === ' ') {
 			e.preventDefault()

@@ -208,6 +208,38 @@ class TimelineStateManager {
 		return clip
 	}
 
+	/**
+	 * Deep-clone a clip object, assign a new id, set startTime, append to layer.
+	 * @param {object} clip — plain clip object (e.g. from JSON clone)
+	 */
+	insertClipClone(timelineId, layerIdx, clip, startTime) {
+		const tl = this.getTimeline(timelineId)
+		if (!tl?.layers[layerIdx] || !clip) return null
+		const c = JSON.parse(JSON.stringify(clip))
+		c.id = uid()
+		c.startTime = Math.max(0, startTime)
+		tl.layers[layerIdx].clips.push(c)
+		this._save()
+		return c
+	}
+
+	/** Clone flag fields with a new id and time (jumpFlagId cleared — re-link in UI if needed). */
+	duplicateFlag(timelineId, flag, timeMs) {
+		const tl = this.getTimeline(timelineId)
+		if (!tl || !flag) return null
+		if (!Array.isArray(tl.flags)) tl.flags = []
+		const f = {
+			...JSON.parse(JSON.stringify(flag)),
+			id: flagUid(),
+			timeMs: Math.max(0, timeMs),
+			jumpFlagId: undefined,
+		}
+		tl.flags.push(f)
+		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
+		this._save()
+		return f
+	}
+
 	removeClip(id, layerIdx, clipId) {
 		const tl = this.getTimeline(id)
 		if (!tl?.layers[layerIdx]) return
@@ -367,5 +399,5 @@ class TimelineStateManager {
 }
 
 export const timelineState = new TimelineStateManager()
-export { defaultClip, defaultLayer, defaultTimeline, flagUid }
+export { defaultClip, defaultLayer, defaultTimeline, flagUid, uid }
 export default TimelineStateManager

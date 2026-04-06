@@ -65,7 +65,7 @@ export function initAudioMixerPanel(stateStore) {
 					<div class="audio-mixer__meter" aria-hidden="true"><div class="audio-mixer__meter-fill"></div></div>
 				</div>
 				<div class="audio-mixer__fader-col">
-					<input type="range" class="audio-mixer__fader" min="0" max="100" value="${Math.round(r.v * 100)}" data-ch="${r.ch}" data-key="${escapeAttr(r.key)}" />
+					<input type="range" class="audio-mixer__fader" min="0" max="100" value="${Math.round(r.v * 100)}" orient="vertical" aria-orientation="vertical" data-ch="${r.ch}" data-key="${escapeAttr(r.key)}" />
 					<span class="audio-mixer__fader-val">${Math.round(r.v * 100)}%</span>
 				</div>
 			`

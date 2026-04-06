@@ -27,6 +27,8 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 		getThumbnailUrl,
 		getWaveformUrl,
 		drag,
+		selection,
+		activeTimelineId,
 	} = env
 
 	if (!clip.source?.value) return
@@ -41,19 +43,22 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 	const visW = Math.min(x + w, canvas.width) - visX
 
 	const col = CLIP_PALETTE[layerIdx % CLIP_PALETTE.length]
-	const isSelected = drag?.type === 'clip-move' && drag.clipId === clip.id
-		|| drag?.type === 'clip-resize' && drag.clipId === clip.id
+	const isDragSelected =
+		(drag?.type === 'clip-move' && drag.clipId === clip.id) ||
+		(drag?.type === 'clip-resize' && drag.clipId === clip.id)
+	const isSelStatic =
+		selection &&
+		activeTimelineId &&
+		selection.timelineId === activeTimelineId &&
+		selection.clipId === clip.id &&
+		selection.layerIdx === layerIdx
+	const isSelected = isDragSelected || isSelStatic
 
 	ctx.save()
 	ctx.beginPath()
 	roundRect(ctx, x, y, w, h, 3)
 	ctx.fillStyle = col
 	ctx.fill()
-	if (isSelected) {
-		ctx.strokeStyle = '#58a6ff'
-		ctx.lineWidth = 2
-		ctx.stroke()
-	}
 	ctx.restore()
 
 	const hasAudio = clip.hasAudio ?? (clip.source?.type === 'media')
@@ -153,4 +158,14 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 	ctx.fillStyle = 'rgba(255,255,255,0.25)'
 	ctx.fillRect(x, y, 4, h)
 	ctx.fillRect(x + w - 4, y, 4, h)
+
+	if (isSelected) {
+		ctx.save()
+		ctx.beginPath()
+		roundRect(ctx, x, y, w, h, 3)
+		ctx.strokeStyle = '#58a6ff'
+		ctx.lineWidth = 2
+		ctx.stroke()
+		ctx.restore()
+	}
 }
