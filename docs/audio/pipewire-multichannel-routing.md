@@ -2,7 +2,7 @@
 
 [PipeWire](https://pipewire.org/) is the default audio server on **Ubuntu 24.04+** (with **WirePlumber** as the session/policy manager). Use it to route **multi-channel** CasparCG output (FFmpeg → Pulse/PipeWire, or system default sink) to HDMI, USB, or other devices with flexible graph routing.
 
-**Companion doc:** [ALSA device enumeration](./alsa-device-enumeration.md) · [WO-06](../../06_WO_AUDIO_PLAYOUT.md)
+**Companion doc:** [ALSA device enumeration](./alsa-device-enumeration.md) · WO-06
 
 ---
 
@@ -148,4 +148,4 @@ For a **single** fixed device, ALSA `hw:N,M` is often simpler. For **flexible** 
 - [JACK audio routing](./jack-audio-routing.md) (separate low-latency graph stack)
 - [Caspar outputs: NVIDIA, 3.5 mm stereo, USB](./caspar-outputs-nvidia-stereo-usb.md)
 - [ALSA device enumeration](./alsa-device-enumeration.md)
-- [WO-06 Phase 1](../../06_WO_AUDIO_PLAYOUT.md) — JACK alternative (**T1.3**), NVIDIA (**T1.4**), USB (**T1.5**)
+- WO-06 Phase 1 — JACK alternative (**T1.3**), NVIDIA (**T1.4**), USB (**T1.5**)

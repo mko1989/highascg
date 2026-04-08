@@ -173,6 +173,7 @@ cp /usr/lib/x86_64-linux-gnu/libndi.so.6 /opt/casparcg/ 2>/dev/null || true
 chown "$USER_CASPAR:$USER_CASPAR" /opt/casparcg/libndi.so.6 2>/dev/null || true
 
 # 3.4 Openbox Autostart (normal = CasparCG; x11-only = DeckLink GUI without Caspar)
+# Keep in sync with openbox_autostart.md at repo root ("Recommended autostart" block) + optional NVIDIA line.
 mkdir -p "/home/$USER_CASPAR/.config/openbox"
 cat <<'AST' > "/home/$USER_CASPAR/.config/openbox/autostart"
 #!/bin/bash
@@ -182,8 +183,8 @@ export XAUTHORITY=/home/__CASPAR_USER__/.Xauthority
 xset s off
 xset s noblank
 xset -dpms
-[ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
 unclutter -idle 1 -root &
+[ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
 
 if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only$' /etc/highascg/display-mode; then
   if command -v desktopvideo_setup >/dev/null 2>&1; then
@@ -193,15 +194,26 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only$' /etc/highascg/displ
     (xterm -e 'bash -c "echo X11-only: CasparCG not started.; echo Open Desktop Video Setup from the menu.; echo Resume: sudo highascg-display-mode normal; read"') &
   fi
 else
-  cd /opt/casparcg
-  /usr/bin/casparcg-scanner &
-  while true; do
-    cd /opt/casparcg
-    rm -f /opt/casparcg/cef-cache/Singleton*
-    /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
-    while ss -tlnp | grep -q 5250; do sleep 1; done
-    sleep 2
-  done &
+  # --- Single instance: second autostart exits immediately (nodm/X restart, duplicate runs) ---
+  (
+    exec 9>/tmp/caspar-openbox-autostart.lock
+    if ! flock -n 9; then
+      exit 0
+    fi
+
+    cd /opt/casparcg || exit 1
+    /usr/bin/casparcg-scanner &
+
+    while true; do
+      cd /opt/casparcg || exit 1
+      mkdir -p /opt/casparcg/cef-cache
+      find /opt/casparcg/cef-cache -mindepth 1 -delete 2>/dev/null || true
+      /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
+      # Wait until nothing listens on AMCP (adjust port if your config differs)
+      while ss -tlnp 2>/dev/null | grep -qE ':5250\b'; do sleep 1; done
+      sleep 2
+    done
+  ) &
 fi
 AST
 sed -i "s|__CASPAR_USER__|$USER_CASPAR|g" "/home/$USER_CASPAR/.config/openbox/autostart"

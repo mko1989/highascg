@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compares HighAsCG tree to Work Order 02 target paths (files that should exist post-migration).
- * Run: node scripts/verify-w02-structure.js
+ * Run: node tools/verify-w02-structure.js
  * Exit 0 always; prints missing paths to stdout for human review.
  */
 

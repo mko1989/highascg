@@ -52,7 +52,8 @@ log "Ready file present; starting CasparCG supervisor loop"
 while true; do
 	cd "$CASPAR_BASE" || { log "Cannot cd to $CASPAR_BASE"; sleep 10; continue; }
 
-	rm -f "$CASPAR_BASE/cef-cache/Singleton"* 2>/dev/null || true
+	mkdir -p "$CASPAR_BASE/cef-cache"
+	find "$CASPAR_BASE/cef-cache" -mindepth 1 -delete 2>/dev/null || true
 	rm -rf /tmp/.org.chromium.Chromium.* 2>/dev/null || true
 	rm -rf /tmp/.com.google.* 2>/dev/null || true
 

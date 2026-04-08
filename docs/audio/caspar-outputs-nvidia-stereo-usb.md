@@ -8,7 +8,7 @@ Practical guide for the three most common **local** playout paths on Ubuntu:
 
 **Prerequisite:** know how to read `aplay -l` and map **`hw:N,M`** — see [ALSA device enumeration](./alsa-device-enumeration.md). For PipeWire routing, see [PipeWire multi-channel routing](./pipewire-multichannel-routing.md).
 
-**WO:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md)
+**Context:** WO-06 Audio playout
 
 ---
 

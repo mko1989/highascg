@@ -1,6 +1,6 @@
 # ALSA device enumeration (Linux)
 
-This guide explains how to **list and interpret** ALSA playback devices on Ubuntu (and similar distributions). Use it when wiring CasparCG **FFmpeg** or **system-audio** consumers to specific hardware (HDMI, USB interfaces, onboard jack) for [multi-channel audio playout](../../06_WO_AUDIO_PLAYOUT.md).
+This guide explains how to **list and interpret** ALSA playback devices on Ubuntu (and similar distributions). Use it when wiring CasparCG **FFmpeg** or **system-audio** consumers to specific hardware (HDMI, USB interfaces, onboard jack) for multi-channel audio playout (WO-06).
 
 **Package:** `alsa-utils` (`aplay`, `arecord`). Install if needed: `sudo apt install alsa-utils`.
 
@@ -98,7 +98,7 @@ That same HDMI/DP output is often used as the **main** multi-channel program fee
    ```bash
    cat /proc/asound/cards
    ```
-4. For PipeWire, use `pw-cli`, `pw-dump`, or `wpctl status` to see **node** channel counts (see [WO-06 Phase 1 T1.2](../../06_WO_AUDIO_PLAYOUT.md) PipeWire section).
+4. For PipeWire, use `pw-cli`, `pw-dump`, or `wpctl status` to see **node** channel counts (see WO-06 Phase 1 T1.2 PipeWire section).
 
 **Caspar:** match channel **layout** (`stereo`, `8ch`, custom `live-8ch`, etc.) to **consumer** `ac` / device capability.
 
@@ -129,6 +129,6 @@ That same HDMI/DP output is often used as the **main** multi-channel program fee
 
 - [JACK audio routing](./jack-audio-routing.md)
 - [Caspar outputs: NVIDIA, 3.5 mm stereo, USB](./caspar-outputs-nvidia-stereo-usb.md)
-- [Work Order 06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md)
+- Work Order 06 — Audio playout (internal WO, optional local `work/` copy)
 - Caspar wiki: FFmpeg consumer, system-audio consumer
 - `.reference/` in repo (if present) for Caspar audio consumer XML

@@ -55,31 +55,43 @@ if [ "$HAS_NVIDIA_GPU" = true ]; then
         nvidia-smi -pm 1 || true
     fi
 
-    # Persistent: OpenGL sync-to-vblank off + “Prefer maximum performance” (PowerMizer), applied each X session.
-    echo -e "${CYAN}→ NVIDIA: persist VSync off + Prefer Max Performance (nvidia-settings + GL env)…${NC}"
+    # Persistent: OpenGL max performance + sync-to-vblank off + PowerMizer “Prefer Consistent Performance” (fallback: Prefer Maximum Performance).
+    echo -e "${CYAN}→ NVIDIA: VSync off + high performance GL + PowerMizer consistent/ max (nvidia-settings + GL env)…${NC}"
     apt install -y nvidia-settings 2>/dev/null || true
 
     mkdir -p /etc/X11/Xsession.d
     cat <<'HS_NV_XSE' > /etc/X11/Xsession.d/99-highascg-nvidia-gl
 #!/bin/sh
-# HighAsCG — OpenGL: do not sync to vertical retrace (lower latency for Caspar/CEF).
+# HighAsCG — OpenGL: no sync to vblank; allow driver max performance path (Caspar/CEF).
 export __GL_SYNC_TO_VBLANK=0
+export __GL_ALLOW_MAXIMUM_PERFORMANCE=1
 HS_NV_XSE
     chmod 644 /etc/X11/Xsession.d/99-highascg-nvidia-gl
 
     cat <<'HS_NV_PROF' > /etc/profile.d/99-highascg-nvidia-gl.sh
-# HighAsCG — same GL hint for non-X login shells (harmless if unused).
+# HighAsCG — same GL hints for non-X login shells (harmless if unused).
 export __GL_SYNC_TO_VBLANK=0
+export __GL_ALLOW_MAXIMUM_PERFORMANCE=1
 HS_NV_PROF
     chmod 644 /etc/profile.d/99-highascg-nvidia-gl.sh
 
     cat <<'HS_NV_APPLY' > /usr/local/bin/highascg-nvidia-x-apply.sh
 #!/bin/bash
-# Apply NVIDIA control panel settings once per X session (nodm + openbox).
+# Apply NVIDIA settings once per X session (nodm + openbox). See scripts/install-phase2.sh.
 command -v nvidia-settings &>/dev/null || exit 0
-# Prefer maximum performance (vs adaptive power saving)
-nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" 2>/dev/null || nvidia-settings -a "GPUPowerMizerMode=1" 2>/dev/null || true
+# PowerMizer: 0=Adaptive, 1=Prefer Maximum Performance, 2=Prefer Consistent Performance (stable clocks; not all GPUs expose 2).
+for _g in 0 1 2 3; do
+	nvidia-settings -q "[gpu:${_g}]/GPUPowerMizerMode" &>/dev/null || continue
+	if ! nvidia-settings -a "[gpu:${_g}]/GPUPowerMizerMode=2" 2>/dev/null; then
+		nvidia-settings -a "[gpu:${_g}]/GPUPowerMizerMode=1" 2>/dev/null || true
+	fi
+done
+nvidia-settings -a "GPUPowerMizerMode=2" 2>/dev/null || nvidia-settings -a "GPUPowerMizerMode=1" 2>/dev/null || true
 # Sync to VBlank off (GPU / screen when exposed by driver)
+for _g in 0 1 2 3; do
+	nvidia-settings -q "[gpu:${_g}]/SyncToVBlank" &>/dev/null || continue
+	nvidia-settings -a "[gpu:${_g}]/SyncToVBlank=0" 2>/dev/null || true
+done
 nvidia-settings -a "[gpu:0]/SyncToVBlank=0" 2>/dev/null || true
 nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true
 nvidia-settings -a "[gpu:0]/XVideoSyncToVBlank=0" 2>/dev/null || true

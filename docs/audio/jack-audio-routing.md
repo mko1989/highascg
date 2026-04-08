@@ -2,7 +2,7 @@
 
 **JACK** (JACK Audio Connection Kit) is a low-latency audio server with a patchable **client graph**. It fits when you want **deterministic** routing between apps, **multiple ALSA devices** via bridges, or **JACK-native** clients/plugins. On many desktops **PipeWire** already covers similar use cases and exposes a **JACK-compatible API**; see [PipeWire multi-channel routing](./pipewire-multichannel-routing.md) first.
 
-**WO:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md) · **T1.3**
+**Context:** WO-06 Audio playout · **T1.3**
 
 ---
 

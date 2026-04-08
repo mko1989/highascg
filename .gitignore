@@ -14,3 +14,6 @@ go2rtc.yaml
 
 # Local reference clones (nested git); fetch upstream if needed
 .reference/
+
+# Internal work orders / notes (local only; not published)
+work/

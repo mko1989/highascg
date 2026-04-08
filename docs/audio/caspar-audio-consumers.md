@@ -4,7 +4,7 @@ How to declare **audio outputs** in `casparcg.config`: system default sink, FFmp
 
 **Consolidated:** [Audio setup guide](./audio-setup-guide.md) · [Audio routing reference](./audio-routing-reference.md) (MIXER, buses, FFmpeg `AF`).
 
-**WO:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md) · Phase 2 (T2.1–T2.5)
+**Context:** WO-06 Audio playout · Phase 2 (T2.1–T2.5)
 
 ---
 
@@ -138,5 +138,5 @@ HighAsCG **config generator** can emit `live-8ch` and other layouts when needed 
 ## See also
 
 - [Network audio protocols (AES67/Dante, NDI, NetJACK, ROC)](./network-audio-protocols.md)
-- [WO-06 Phase 4 & 5](../../06_WO_AUDIO_PLAYOUT.md) — HighAsCG settings API / config generator integration when implemented
+- WO-06 Phase 4 & 5 — HighAsCG settings API / config generator integration when implemented
 - [Caspar wiki / server docs](https://github.com/CasparCG/help/wiki) (consumer syntax varies slightly by version)

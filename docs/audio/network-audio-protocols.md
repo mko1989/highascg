@@ -2,7 +2,7 @@
 
 Options for moving **audio over the network** or bridging **Dante / AES67** to Linux. Use with local I/O guides: [ALSA](./alsa-device-enumeration.md), [Caspar audio consumers](./caspar-audio-consumers.md), [PipeWire](./pipewire-multichannel-routing.md).
 
-**WO:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md) · Phase 3 (T3.1–T3.4)
+**Context:** WO-06 Audio playout · Phase 3 (T3.1–T3.4)
 
 ---
 
@@ -74,4 +74,4 @@ This is **orthogonal** to Caspar: you would still take audio from Caspar **FFmpe
 
 - [Caspar audio consumers](./caspar-audio-consumers.md) (NDI, FFmpeg)
 - [JACK audio routing](./jack-audio-routing.md) (local graph)
-- [WO-06 Important Notes](../../06_WO_AUDIO_PLAYOUT.md#important-notes)
+- WO-06 Important Notes

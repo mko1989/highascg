@@ -34,6 +34,8 @@ xset s off
 xset s noblank
 xset -dpms
 unclutter -idle 1 -root &
+# Optional (production installer): see install-phase3.sh
+# [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
 
 if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only$' /etc/highascg/display-mode; then
   if command -v desktopvideo_setup >/dev/null 2>&1; then
@@ -55,7 +57,8 @@ else
 
     while true; do
       cd /opt/casparcg || exit 1
-      rm -f /opt/casparcg/cef-cache/SingletonLock /opt/casparcg/cef-cache/SingletonSocket /opt/casparcg/cef-cache/SingletonCookie 2>/dev/null
+      mkdir -p /opt/casparcg/cef-cache
+      find /opt/casparcg/cef-cache -mindepth 1 -delete 2>/dev/null || true
       /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
       # Wait until nothing listens on AMCP (adjust port if your config differs)
       while ss -tlnp 2>/dev/null | grep -qE ':5250\b'; do sleep 1; done
@@ -65,10 +68,12 @@ else
 fi
 ```
 
+**Installer:** `scripts/install-phase3.sh` writes this logic to `~/.config/openbox/autostart` for the Caspar user (with `XAUTHORITY=/home/<user>/.Xauthority`). It inserts the **NVIDIA** line above after `unclutter` when `/usr/local/bin/highascg-nvidia-x-apply.sh` exists (Phase 2).
+
 Notes:
 
 - **`flock -n`** — If another session already holds `/tmp/caspar-openbox-autostart.lock`, this autostart **does nothing** (no second Caspar loop).
-- **`Singleton*`** — Only remove the usual Singleton files your Caspar version uses; listing three names is safer than `rm -f …Singleton*` glob if you want to avoid surprises.
+- **CEF cache** — Each restart clears **everything** under `/opt/casparcg/cef-cache` (`find … -mindepth 1 -delete`) so stale Chromium profile data does not accumulate.
 - **Port check** — `grep -qE ':5250\b'` is a bit stricter than `grep 5250`.
 
 ---
@@ -109,7 +114,8 @@ else
   /usr/bin/casparcg-scanner &
   while true; do
     cd /opt/casparcg
-    rm -f /opt/casparcg/cef-cache/Singleton*
+    mkdir -p /opt/casparcg/cef-cache
+    find /opt/casparcg/cef-cache -mindepth 1 -delete 2>/dev/null || true
     /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
     while ss -tlnp | grep -q 5250; do sleep 1; done
     sleep 2

@@ -2,7 +2,7 @@
 
 CasparCG exposes rich state in two ways: **AMCP** (TCP, request/response) and **OSC** (UDP, push). HighAsCG uses OSC for real-time mixer, layer, playback, profiler, and output data where implemented, and keeps AMCP for commands and for **fallback** when OSC is off or incomplete.
 
-**Related:** [osc-integration.md](./osc-integration.md) · [`09_WO_OSC_PROTOCOL.md`](../09_WO_OSC_PROTOCOL.md)
+**Related:** [osc-integration.md](./osc-integration.md)
 
 ---
 

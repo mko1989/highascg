@@ -2,7 +2,7 @@
 
 Single entry point for **multi-channel playout**: follow one path below, then use [Audio routing reference](./audio-routing-reference.md) for MIXER / `route://` / FFmpeg mapping details.
 
-**Related:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md) · Phase 5 (T5.1)
+**Related:** WO-06 Audio playout · Phase 5 (T5.1)
 
 | Topic | Deep dive |
 |-------|-----------|

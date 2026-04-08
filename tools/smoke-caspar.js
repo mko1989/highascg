@@ -4,7 +4,7 @@
  * Verifies unknown route → 404 and AMCP passthrough via POST /api/raw.
  *
  * Usage: start HighAsCG with Caspar reachable, then:
- *   node scripts/smoke-caspar.js 8080
+ *   node tools/smoke-caspar.js 8080
  *
  * Exits 0 on success, 1 on failure or if Caspar is not connected (503 on /api/state).
  */
@@ -49,7 +49,7 @@ async function main() {
 
 	let r = await req('GET', '/api/state')
 	if (r.status === 503) {
-		console.error('[smoke-caspar] Caspar not connected (GET /api/state → 503). Skip or use scripts/http-smoke.js without Caspar.')
+		console.error('[smoke-caspar] Caspar not connected (GET /api/state → 503). Skip or use tools/http-smoke.js without Caspar.')
 		process.exit(1)
 	}
 	if (r.status !== 200) fail(`GET /api/state expected 200, got ${r.status}`)

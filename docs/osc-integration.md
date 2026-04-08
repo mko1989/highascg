@@ -2,7 +2,7 @@
 
 HighAsCG listens for **Open Sound Control (OSC)** over **UDP** from CasparCG Server. **Production setups assume Caspar sends OSC to HighAsCG**; the UDP listener is always on except when the server is started with **`--no-osc`** (development or emergency). Caspar pushes channel mixer levels, stage/layer state, FFmpeg file timing, profiler timings, and output consumer status at frame rate. The Node app aggregates this in `OscState`, merges it into the main state manager, exposes **REST** and **WebSocket** APIs, and drives the web UI (VU strip, playback timer, etc.).
 
-**Related:** [polling-vs-osc.md](./polling-vs-osc.md) · Work order: [`09_WO_OSC_PROTOCOL.md`](../09_WO_OSC_PROTOCOL.md)
+**Related:** [polling-vs-osc.md](./polling-vs-osc.md)
 
 ---
 

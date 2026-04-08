@@ -2,7 +2,7 @@
 
 Quick reference for **layer/channel audio levels**, **layouts**, **routing between channels**, and **FFmpeg audio filters**. For Linux device setup, see [Audio setup guide](./audio-setup-guide.md).
 
-**Related:** [06 — Audio playout](../../06_WO_AUDIO_PLAYOUT.md) · Phase 5 (T5.2) · [Caspar audio consumers](./caspar-audio-consumers.md)
+**Related:** WO-06 Audio playout · Phase 5 (T5.2) · [Caspar audio consumers](./caspar-audio-consumers.md)
 
 ---
 
@@ -84,4 +84,4 @@ Always validate filter graphs against **FFmpeg** docs for your deployed version;
 
 ## OSC
 
-Real-time meters and transport feedback use **OSC** from Caspar to clients (see [09 — OSC protocol](../../09_WO_OSC_PROTOCOL.md)). This does not replace MIXER for level control unless you add automation that sends AMCP in response.
+Real-time meters and transport feedback use **OSC** from Caspar to clients (see **`docs/osc-integration.md`**). This does not replace MIXER for level control unless you add automation that sends AMCP in response.
