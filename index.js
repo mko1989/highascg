@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict'
 
+const os = require('os')
 const path = require('path')
 const defaults = require('./config/default')
 const { createLogger } = require('./src/utils/logger')
@@ -19,6 +20,7 @@ const { applyOscSnapshotToVariables, clearOscVariables } = require('./src/osc/os
 const { resolveStreamingConfig } = require('./src/streaming/stream-config')
 const { go2rtcManager, resolveCaptureTier } = require('./src/streaming/go2rtc-manager')
 const { addStreamingConsumers, removeStreamingConsumers } = require('./src/streaming/caspar-ffmpeg-setup')
+const { resolveFreeStreamingBasePort } = require('./src/streaming/streaming-udp-ports')
 const { prepareNdiStreaming } = require('./src/streaming/ndi-resolve')
 const {
 	startPeriodicSync,
@@ -80,6 +82,11 @@ function buildConfig(cli, configManager) {
 	}
 
 	cfg.streaming = resolveStreamingConfig(cfg.streaming || {})
+	if (process.env.HIGHASCG_STREAMING_AUTO_RELOCATE === '0') {
+		cfg.streaming.autoRelocateBasePort = false
+	} else if (process.env.HIGHASCG_STREAMING_AUTO_RELOCATE === '1') {
+		cfg.streaming.autoRelocateBasePort = true
+	}
 
 	return cfg
 }
@@ -105,6 +112,7 @@ Options:
 
 Environment:
   HIGHASCG_CONFIG_PATH   Absolute path to highascg.config.json (default: next to index.js)
+  HIGHASCG_STREAMING_AUTO_RELOCATE  Set to 0 to disable auto-relocation when preview UDP ports are busy
 `)
 }
 
@@ -123,6 +131,14 @@ function main() {
 
 	const config = buildConfig(cli, configManager)
 	logger.info('Config: ' + JSON.stringify(config, null, 2))
+	try {
+		const u = os.userInfo()
+		logger.info(
+			`[Process] uid=${process.getuid()} gid=${process.getgid()} user=${u.username} — default ALSA is written to ~/.asoundrc (no sudo). For /etc/asound.conf, install /etc/sudoers.d/highascg-asound (NOPASSWD tee) or run as root.`,
+		)
+	} catch {
+		logger.info(`[Process] uid=${process.getuid()} gid=${process.getgid()}`)
+	}
 
 	if (cli.noHttp) {
 		logger.info('Exiting (--no-http).')
@@ -173,6 +189,8 @@ function main() {
 			port: config.caspar.port,
 		},
 		configManager,
+		/** False until Caspar UDP/NDI consumers are up (UDP tier: after ADD STREAM). Stops WebRTC before MPEG-TS flows. */
+		streamingPipelineReady: false,
 	}
 	appCtx.timelineEngine = new TimelineEngine(appCtx)
 	appCtx.getState = () => getState(appCtx)
@@ -211,16 +229,21 @@ function main() {
 	const systemVarsInterval = setInterval(updateSystemVariables, 5000)
 	updateSystemVariables()
 
-	const streamingTargets = [
-		{ name: 'pgm_1', channel: 1, port: config.streaming.basePort + 1 },
-		{ name: 'prv_1', channel: 2, port: config.streaming.basePort + 2 },
-		{ name: 'multiview', channel: 3, port: config.streaming.basePort + 5 }
-	]
+	function buildStreamingTargets(basePort) {
+		return [
+			{ name: 'pgm_1', channel: 1, port: basePort + 1 },
+			{ name: 'prv_1', channel: 2, port: basePort + 2 },
+			{ name: 'multiview', channel: 3, port: basePort + 5 },
+		]
+	}
+	/** Updated each `startStreamingSubsystem` (UDP tier may relocate base if ports are busy). */
+	let streamingTargets = buildStreamingTargets(config.streaming.basePort)
 
 	/** NDI only: Caspar must register NDI before go2rtc receive; if AMCP was down at start, restart go2rtc after first connect. */
 	let needGo2rtcRestartAfterCaspar = false
 
 	async function startStreamingSubsystem() {
+		appCtx.streamingPipelineReady = false
 		try {
 			config.streaming._casparHost = config.caspar.host
 			const tier = resolveCaptureTier(config.streaming.captureMode || 'auto', config.caspar.host)
@@ -228,6 +251,20 @@ function main() {
 				'info',
 				`[Streaming] startStreamingSubsystem tier=${tier} caspar=${config.caspar.host} amcpConnected=${!!appCtx.amcp?.isConnected}`
 			)
+
+			if (tier === 'srt') {
+				const r = await resolveFreeStreamingBasePort(config.streaming.basePort, {
+					autoRelocate: config.streaming.autoRelocateBasePort !== false,
+					maxScan: 500,
+					log: (level, msg) => appCtx.log(level, msg),
+				})
+				config.streaming._effectiveBasePort = r.basePort
+				streamingTargets = buildStreamingTargets(r.basePort)
+			} else {
+				delete config.streaming._effectiveBasePort
+				streamingTargets = buildStreamingTargets(config.streaming.basePort)
+			}
+
 			if (tier === 'ndi') prepareNdiStreaming(config.streaming, streamingTargets)
 
 			if (tier === 'ndi') {
@@ -239,13 +276,18 @@ function main() {
 					appCtx.log('warn', '[Streaming] NDI: Caspar AMCP not connected yet — will register NDI after connect')
 				}
 				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
+				appCtx.streamingPipelineReady = !!appCtx.amcp?.isConnected
 			} else if (tier === 'srt') {
-				// UDP MPEG-TS: go2rtc binds the UDP receiver first; then Caspar STREAM pushes to 127.0.0.1:port.
+				// UDP MPEG-TS: go2rtc first, then Caspar ADD STREAM. Do not expose pipelineReady until ADD completes
+				// or the browser negotiates WebRTC before MPEG-TS exists → ffmpeg 500 / version banner on stderr.
 				appCtx.log('info', '[Streaming] UDP tier: starting go2rtc first, then Caspar ADD STREAM')
 				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
 				needGo2rtcRestartAfterCaspar = false
 				if (appCtx.amcp?.isConnected) {
 					await addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
+					// HTTP push ingest: wait until go2rtc lists producers so WebRTC is not offered on empty streams.
+					await go2rtcManager.waitForPushIngestReady(streamingTargets, config.streaming, { log: appCtx.log })
+					appCtx.streamingPipelineReady = true
 				} else {
 					appCtx.log('warn', '[Streaming] UDP tier: AMCP not connected — skip ADD STREAM until Caspar connects')
 				}
@@ -255,21 +297,39 @@ function main() {
 				if (tier === 'local' && appCtx.amcp) {
 					await addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
 				}
+				appCtx.streamingPipelineReady = true
 			}
 			appCtx.log('info', '[Streaming] startStreamingSubsystem finished')
 		} catch (e) {
+			appCtx.streamingPipelineReady = false
 			appCtx.log('error', `Streaming start failed: ${e.message}`)
 		}
 	}
 
 	async function stopStreamingSubsystem() {
 		try {
+			appCtx.streamingPipelineReady = false
 			appCtx.log('info', '[Streaming] stopStreamingSubsystem (remove Caspar consumers, stop go2rtc)')
 			if (appCtx.amcp) await removeStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
 			await go2rtcManager.stop()
 		} catch (e) {
 			appCtx.log('warn', `[Streaming] stopStreamingSubsystem: ${e?.message || e}`)
 		}
+	}
+
+	/**
+	 * Stop preview stack, release UDP listeners, then start again.
+	 * Must run before `resolveFreeStreamingBasePort` — otherwise our own ffmpeg/go2rtc still bind base+1/+2/+5
+	 * and the probe falsely reports “busy”, relocates base, and breaks Caspar STREAM + go2rtc alignment.
+	 */
+	async function runStreamingRestart() {
+		await stopStreamingSubsystem()
+		const delayMs = Math.max(
+			0,
+			parseInt(process.env.HIGHASCG_STREAMING_RESTART_DELAY_MS || '500', 10) || 500
+		)
+		if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
+		await startStreamingSubsystem()
 	}
 
 	/** Serialize start/stop so overlapping config + Caspar events cannot double-spawn go2rtc (SIGKILL storms). */
@@ -284,17 +344,12 @@ function main() {
 	appCtx.toggleStreaming = (enabled) => {
 		config.streaming.enabled = enabled
 		return enqueueStreaming(async () => {
-			if (enabled) await startStreamingSubsystem()
+			if (enabled) await runStreamingRestart()
 			else await stopStreamingSubsystem()
 		})
 	}
 
-	appCtx.restartStreaming = () =>
-		enqueueStreaming(async () => {
-			await stopStreamingSubsystem()
-			await new Promise((r) => setTimeout(r, 500))
-			await startStreamingSubsystem()
-		})
+	appCtx.restartStreaming = () => enqueueStreaming(runStreamingRestart)
 
 	// T1.3: Live reload — debounce streaming so double-save / OSC + save does not restart go2rtc twice in one tick.
 	let streamingReloadTimer = null
@@ -304,7 +359,12 @@ function main() {
 		if (appCtx.restartOscSubsystem) appCtx.restartOscSubsystem()
 		clearTimeout(streamingReloadTimer)
 		streamingReloadTimer = setTimeout(() => {
-			if (appCtx.toggleStreaming) void appCtx.toggleStreaming(config.streaming.enabled)
+			// When streaming stays enabled, full restart (not start-only): otherwise UDP probe sees our own ports as “stale”.
+			if (config.streaming.enabled) {
+				if (appCtx.restartStreaming) void appCtx.restartStreaming()
+			} else if (appCtx.toggleStreaming) {
+				void appCtx.toggleStreaming(false)
+			}
 		}, 400)
 	})
 
@@ -388,6 +448,7 @@ function main() {
 					if (go2rtcManager.process) {
 						addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
 							.then(async () => {
+								appCtx.streamingPipelineReady = true
 								if (
 									needGo2rtcRestartAfterCaspar &&
 									typeof appCtx.restartStreaming === 'function'

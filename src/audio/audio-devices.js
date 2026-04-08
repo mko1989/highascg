@@ -4,6 +4,7 @@
  */
 'use strict'
 
+const path = require('path')
 const { execSync } = require('child_process')
 
 const CACHE_TTL_MS = 30000
@@ -107,4 +108,74 @@ function listAudioDevices(opts = {}) {
 	return payload
 }
 
-module.exports = { listAudioDevices, parseAplayList }
+/**
+ * Write ALSA default PCM/CTL. Default is per-user `~/.asoundrc` (no sudo) so the Caspar user’s session picks it up.
+ * Use `scope: 'system'` for `/etc/asound.conf` (root or passwordless sudo tee).
+ *
+ * @param {number} card
+ * @param {number} device
+ * @param {{ scope?: 'user' | 'system' }} [opts]
+ * @returns {{ ok: boolean, scope?: string, path?: string, error?: string }}
+ */
+function setDefaultAlsaDevice(card, device, opts = {}) {
+	const { spawnSync } = require('child_process')
+	const fs = require('fs')
+	const os = require('os')
+	let runAs = `uid=${typeof process.getuid === 'function' ? process.getuid() : '?'}`
+	try {
+		runAs = `${os.userInfo().username} (${runAs})`
+	} catch {
+		/* ignore */
+	}
+
+	const scope = opts.scope === 'system' ? 'system' : 'user'
+	const content = `defaults.pcm.card ${card}\ndefaults.pcm.device ${device}\ndefaults.ctl.card ${card}\n`
+
+	if (scope === 'user') {
+		try {
+			const home = os.userInfo().homedir
+			if (!home || typeof home !== 'string') {
+				return { ok: false, error: 'No user home directory (cannot write ~/.asoundrc)' }
+			}
+			const target = path.join(home, '.asoundrc')
+			fs.writeFileSync(target, content, 'utf8')
+			return { ok: true, scope: 'user', path: target }
+		} catch (e) {
+			return { ok: false, error: e instanceof Error ? e.message : String(e) }
+		}
+	}
+
+	// system: /etc/asound.conf
+	if (typeof process.getuid === 'function' && process.getuid() === 0) {
+		try {
+			fs.writeFileSync('/etc/asound.conf', content, 'utf8')
+			return { ok: true, scope: 'system', path: '/etc/asound.conf' }
+		} catch (e) {
+			return { ok: false, error: e instanceof Error ? e.message : String(e) }
+		}
+	}
+	const teeCandidates = ['/usr/bin/tee', '/bin/tee'].filter((p) => fs.existsSync(p))
+	if (teeCandidates.length === 0) {
+		return { ok: false, error: 'Neither /usr/bin/tee nor /bin/tee found' }
+	}
+
+	let lastErr = ''
+	for (const tee of teeCandidates) {
+		const r = spawnSync('sudo', ['-n', tee, '/etc/asound.conf'], {
+			input: Buffer.from(content, 'utf8'),
+			encoding: 'utf8',
+			maxBuffer: 256 * 1024,
+		})
+		if (r.error) {
+			lastErr = r.error.message
+			continue
+		}
+		if (r.status === 0) return { ok: true, scope: 'system', path: '/etc/asound.conf' }
+		lastErr = (r.stderr || r.stdout || '').trim() || `exit code ${r.status}`
+	}
+	const hint =
+		`sudo needs NOPASSWD for /usr/bin/tee and /bin/tee (see install-phase3.sh). Process runs as ${runAs}; /etc/sudoers.d/highascg-asound must list that user (typically casparcg). Or run manually: sudo tee /etc/asound.conf`
+	return { ok: false, error: `${lastErr}. ${hint}` }
+}
+
+module.exports = { listAudioDevices, parseAplayList, setDefaultAlsaDevice }

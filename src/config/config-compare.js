@@ -65,7 +65,8 @@ function buildModuleChannelExpectation(config) {
 	}
 	if (map.multiviewCh != null) {
 		const mvMode = String(cfg.multiview_mode || '1080p5000')
-		list.push({ index: map.multiviewCh, role: 'Multiview', videoMode: mvMode, hasScreen: true })
+		const mvHasScreen = cfg.multiview_screen_consumer !== false && cfg.multiview_screen_consumer !== 'false'
+		list.push({ index: map.multiviewCh, role: 'Multiview', videoMode: mvMode, hasScreen: mvHasScreen })
 	}
 	if (map.inputsCh != null) {
 		const inMode = String(cfg.inputs_channel_mode || '1080p5000')

@@ -59,6 +59,8 @@ async function handlePost(path, body, ctx) {
 		}
 		await amcp.cg.cgAdd(channel, TEST_LAYER, HOST_LAYER, TEMPLATE, 1, data)
 		await amcp.cg.cgPlay(channel, TEST_LAYER, HOST_LAYER)
+		// Some builds do not deliver CG ADD data to window.update(); UPDATE forces the payload (center character, grid).
+		await amcp.cg.cgUpdate(channel, TEST_LAYER, HOST_LAYER, data)
 		await amcp.mixer.mixerFill(channel, TEST_LAYER, 0, 0, 1, 1)
 		await amcp.mixer.mixerCommit(channel)
 

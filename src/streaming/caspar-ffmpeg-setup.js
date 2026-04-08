@@ -18,6 +18,28 @@ function truncate(s, max) {
 }
 
 /**
+ * FFmpeg UDP output URL for Caspar → go2rtc. `localport` is the **source** port Caspar binds for sending;
+ * without it, some Caspar/ffmpeg builds bind the same port as the destination and collide with go2rtc's
+ * listener on udp://0.0.0.0:destPort (bind failed: Address already in use).
+ * @param {number} port - destination UDP port (e.g. basePort+1)
+ */
+function casparUdpStreamUri(port) {
+	const localport = port + 10000
+	return `udp://127.0.0.1:${port}?localport=${localport}`
+}
+
+function casparUdpStreamUriVariantsForRemove(port) {
+	const dest = `udp://127.0.0.1:${port}`
+	const localport = port + 10000
+	return [
+		`udp://127.0.0.1:${port}?connect=1&localport=${localport}`,
+		`udp://127.0.0.1:${port}?localport=${localport}`,
+		`udp://127.0.0.1:${port}?connect=1`,
+		dest,
+	]
+}
+
+/**
  * Caspar can stop replying to AMCP while shutting down; unbounded waits block SIGTERM shutdown.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {string} cmd
@@ -71,7 +93,8 @@ function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
  *
  * We use **UDP** to 127.0.0.1:port (not srt://): many Caspar 2.5 builds cannot open srt:// output
  * ("Unable to choose an output format") when libsrt is missing or SRT mux is not wired for STREAM.
- * go2rtc reads matching `ffmpeg:udp://127.0.0.1:port#…` on the same host.
+ * go2rtc listens on `udp://0.0.0.0:port`; Caspar must send to `127.0.0.1:port` with a **different** local bind
+ * (`?localport=`, see `casparUdpStreamUri`) so the ports do not collide.
  *
  * Caspar’s ffmpeg consumer only forwards **`-name:stream`** style options (`-filter:v`, `-preset:v`, …).
  * **`-vf`**, **`-g`**, **`-r`** are ignored (“Unused option”) — then **yuv420p** / keyframes / headers are wrong
@@ -81,13 +104,18 @@ function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
  * (Caspar logs showed **`-x264-params`** without **`:v`** and **`-ac`** as unused — they must use **`-name:stream`**).
  * Audio: **`-filter:a`** downmix to stereo (Caspar’s own client uses **`-filter:a pan=…`**); **`-ac`** / mux flags are not forwarded.
  */
+/** Dynamic downscale: half of Caspar channel size (e.g. 3840×768 → 1920×384). Fast preview default. */
+const SCALE_HALF_VF = 'scale=w=iw/2:h=ih/2'
+
 function buildFfmpegArgs(config) {
 	const fps =
 		config.fps && config.fps !== 'native' ? Math.max(1, parseInt(String(config.fps), 10) || 25) : 25
 	const resMap = { '720p': '1280:720', '540p': '960:540', '360p': '640:360' }
 
 	let filterV = `format=yuv420p,fps=${fps}`
-	if (config.resolution && config.resolution !== 'native' && resMap[config.resolution]) {
+	if (config.resolution === 'half') {
+		filterV = `${SCALE_HALF_VF},format=yuv420p,fps=${fps}`
+	} else if (config.resolution && config.resolution !== 'native' && resMap[config.resolution]) {
 		filterV = `scale=${resMap[config.resolution]},format=yuv420p,fps=${fps}`
 	}
 
@@ -159,19 +187,19 @@ async function addStreamingConsumers(amcp, targets, config) {
 		return
 	}
 
-	// MPEG-TS over UDP to localhost (go2rtc listens on same port). See buildFfmpegArgs / go2rtc buildSrtSource.
+	// MPEG-TS over UDP to localhost. go2rtc ingests with `ffmpeg:udp://0.0.0.0:port` (see go2rtc-manager).
 	const ffmpegArgs = buildFfmpegArgs(config)
 
 	for (const t of targets) {
-		const uri = `udp://127.0.0.1:${t.port}`
+		const uri = casparUdpStreamUri(t.port)
 
-		// Always REMOVE then ADD: INFO may still contain `udp://127.0.0.1:port` from layout/examples while no active
-		// STREAM exists, or we skip ADD and Caspar logs show no ADD after HighAsCG restart (consumers left from last run).
-		try {
-			await amcp.raw(`REMOVE ${t.channel} STREAM ${uri}`)
-			console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} STREAM ${uri}`)
-		} catch (e) {
-			console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} (ok if none): ${e?.message || e}`)
+		for (const u of casparUdpStreamUriVariantsForRemove(t.port)) {
+			try {
+				await amcp.raw(`REMOVE ${t.channel} STREAM ${u}`)
+				console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} STREAM ${u}`)
+			} catch (e) {
+				console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} (ok if none): ${e?.message || e}`)
+			}
 		}
 		await new Promise((r) => setTimeout(r, 150))
 
@@ -215,13 +243,14 @@ async function removeStreamingConsumers(amcp, targets, config) {
 				console.warn(`[Streaming] REMOVE NDI ch${t.channel}:`, e?.message || e)
 			}
 		} else if (tier === 'srt') {
-			const uri = `udp://127.0.0.1:${t.port}`
-			try {
-				console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${uri}`)
-				await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} STREAM ${uri}`)
-				await new Promise((r) => setTimeout(r, 100))
-			} catch (e) {
-				console.warn(`[Streaming] REMOVE STREAM ch${t.channel}:`, e?.message || e)
+			for (const u of casparUdpStreamUriVariantsForRemove(t.port)) {
+				try {
+					console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
+					await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} STREAM ${u}`)
+					await new Promise((r) => setTimeout(r, 100))
+				} catch (e) {
+					console.warn(`[Streaming] REMOVE STREAM ch${t.channel} ${u}:`, e?.message || e)
+				}
 			}
 		}
 		// local mode: nothing to remove
@@ -229,6 +258,7 @@ async function removeStreamingConsumers(amcp, targets, config) {
 }
 
 module.exports = {
+	SCALE_HALF_VF,
 	buildFfmpegArgs,
 	addStreamingConsumers,
 	removeStreamingConsumers,

@@ -4,7 +4,7 @@
  */
 
 import { projectState } from '../lib/project-state.js'
-import { sceneState } from '../lib/scene-state.js'
+import { sceneState, defaultTransition } from '../lib/scene-state.js'
 import { dashboardState } from '../lib/dashboard-state.js'
 import { timelineState } from '../lib/timeline-state.js'
 import { multiviewState } from '../lib/multiview-state.js'
@@ -123,6 +123,32 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		else fileInput.click()
 	})
 	loadBtn.title = 'Load: click = upload file, Shift+click = load from server'
+
+	const newProjectBtn = document.createElement('button')
+	newProjectBtn.className = 'header-btn'
+	newProjectBtn.textContent = 'New project'
+	newProjectBtn.title = 'Discard the current project in memory and start empty (save first if you need a file)'
+	function startFreshProject() {
+		if (!confirm('Start a fresh project? Unsaved changes in memory will be lost.')) return
+		projectState.setProjectName('Untitled')
+		sceneState.loadFromData({
+			scenes: [],
+			liveSceneId: null,
+			previewSceneId: null,
+			activeScreenIndex: 0,
+			globalDefaultTransition: { ...defaultTransition() },
+		})
+		sceneState.setEditingScene(null)
+		timelineState.loadFromData({ timelines: [], activeId: null })
+		multiviewState.clearLayout()
+		dashboardState.resetForNewProject()
+		nameInp.value = projectState.getProjectName()
+		window.dispatchEvent(new Event('project-loaded'))
+	}
+	newProjectBtn.addEventListener('click', (e) => {
+		e.preventDefault()
+		startFreshProject()
+	})
 
 	// Sync button (for offline-to-local-caspar push)
 	const syncBtn = document.createElement('button')
@@ -436,10 +462,10 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		apply()
 	}
 
-	// Layout: [title] [project · save · load · sync] [server · settings] … [headphones · eyes]
+	// Layout: [title] [project · save · load · new · sync] [server · settings] … [headphones · eyes]
 	const leftWrap = document.createElement('div')
 	leftWrap.className = 'header-left'
-	leftWrap.append(nameWrap, saveBtn, loadBtn, syncBtn, publishBtn)
+	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn, syncBtn, publishBtn)
 
 	const midWrap = document.createElement('div')
 	midWrap.className = 'header-mid'

@@ -297,6 +297,17 @@ export class DashboardState {
 		}
 	}
 
+	/** Single empty column + default layer names/settings for the active screen (new project). */
+	resetForNewProject() {
+		this.columns = [defaultColumn(0)]
+		this.activeColumnIndex = -1
+		this.layerNames = Array.from({ length: DEFAULT_LAYER_COUNT }, (_, i) => `Layer ${i + 1}`)
+		const res = this._getCanvasResolution(this.activeScreenIndex)
+		this.layerSettings = Array.from({ length: DEFAULT_LAYER_COUNT }, () => defaultLayerSetting(res))
+		this._applyCanvasSizeToUnsetDefaults(this.activeScreenIndex)
+		this._save()
+	}
+
 	/** Load from project data (replaces state, persists to localStorage). */
 	loadFromData(data) {
 		if (!data || !Array.isArray(data.columns)) return

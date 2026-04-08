@@ -19,6 +19,23 @@ const execFileAsync = promisify(execFile)
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { getMediaIngestBasePath } = require('../media/local-media')
 
+/**
+ * @returns {{ uid: number, gid: number, username: string | null, homedir?: string }}
+ */
+function getProcessIdentity() {
+	try {
+		const u = os.userInfo()
+		return {
+			uid: process.getuid(),
+			gid: process.getgid(),
+			username: u.username || null,
+			homedir: u.homedir,
+		}
+	} catch {
+		return { uid: process.getuid(), gid: process.getgid(), username: null }
+	}
+}
+
 /** @type {{ text: string|null, at: number, utilizationPct?: number|null, source?: string|null }} */
 let _gpuCache = { text: null, at: 0, utilizationPct: null, source: null }
 /** @type {{ text: string|null, at: number }} */
@@ -211,6 +228,7 @@ async function handleGet(ctx) {
 		headers: JSON_HEADERS,
 		body: jsonBody({
 			mode: 'production',
+			process: getProcessIdentity(),
 			cpu: {
 				load1: load[0],
 				load5: load[1],

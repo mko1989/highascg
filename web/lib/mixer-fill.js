@@ -7,6 +7,30 @@ import { fillToPixelRect } from './fill-math.js'
 import { api } from './api-client.js'
 
 /**
+ * Layer fills are authored in program compose pixels; PRV may differ (letterbox / pillarbox).
+ * Map a pixel rect from program space into the AMCP target channel output (uniform scale, centered).
+ * @param {{ x: number, y: number, w: number, h: number }} px
+ */
+export function mapProgramPixelRectToTargetOutput(px, progW, progH, outW, outH) {
+	const pw = Math.max(1, progW)
+	const ph = Math.max(1, progH)
+	const ow = Math.max(1, outW)
+	const oh = Math.max(1, outH)
+	if (Math.abs(pw - ow) < 0.5 && Math.abs(ph - oh) < 0.5) {
+		return { x: px.x, y: px.y, w: px.w, h: px.h }
+	}
+	const k = Math.min(ow / pw, oh / ph)
+	const ox = (ow - pw * k) / 2
+	const oy = (oh - ph * k) / 2
+	return {
+		x: px.x * k + ox,
+		y: px.y * k + oy,
+		w: px.w * k,
+		h: px.h * k,
+	}
+}
+
+/**
  * Compute MIXER FILL {x, y, xScale, yScale} for a layer.
  * CasparCG MIXER FILL semantics: xScale/yScale = 1 means source fills the entire channel.
  * So to show a 960px source on a 1920px channel at native 1:1 pixels, xScale = 960/1920 = 0.5.
@@ -194,8 +218,10 @@ export function mapContentFitToStretch(layer) {
 
 /**
  * MIXER FILL for scene preview / AMCP: layer rectangle + content fit (fit / fill-h / fill-v / stretch).
+ * Normalized fill is relative to the **program** compose canvas; `targetOutputCanvas` is the channel
+ * receiving the command (usually PRV — map into that pixel space when it differs from program).
  */
-export async function resolveLayerFillForAmcp(layer, stateStore, screenIdx, canvas, fetchMediaList) {
+export async function resolveLayerFillForAmcp(layer, stateStore, screenIdx, targetOutputCanvas, fetchMediaList) {
 	const raw = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const f = {
 		x: raw.x ?? 0,
@@ -212,11 +238,19 @@ export async function resolveLayerFillForAmcp(layer, stateStore, screenIdx, canv
 	if (stretchMode === 'stretch') return f
 
 	const contentRes = await fetchMediaContentResolution(src, stateStore, screenIdx, fetchMediaList)
-	const resW = canvas.width > 0 ? canvas.width : 1920
-	const resH = canvas.height > 0 ? canvas.height : 1080
-	const px = fillToPixelRect(f, { width: resW, height: resH })
-	const ls = { x: px.x, y: px.y, w: px.w, h: px.h, stretch: stretchMode }
-	const out = calcMixerFill(ls, { w: resW, h: resH }, contentRes)
+	const state = stateStore?.getState?.() || {}
+	const cm = state.channelMap || {}
+	const s = screenIdx ?? 0
+	const prog = cm.programResolutions?.[s]
+	const progW = prog?.w > 0 ? prog.w : 1920
+	const progH = prog?.h > 0 ? prog.h : 1080
+	const outW = targetOutputCanvas?.width > 0 ? targetOutputCanvas.width : progW
+	const outH = targetOutputCanvas?.height > 0 ? targetOutputCanvas.height : progH
+
+	const px = fillToPixelRect(f, { width: progW, height: progH })
+	const mapped = mapProgramPixelRectToTargetOutput(px, progW, progH, outW, outH)
+	const ls = { x: mapped.x, y: mapped.y, w: mapped.w, h: mapped.h, stretch: stretchMode }
+	const out = calcMixerFill(ls, { w: outW, h: outH }, contentRes)
 	return { x: out.x, y: out.y, scaleX: out.xScale, scaleY: out.yScale }
 }
 

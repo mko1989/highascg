@@ -134,7 +134,57 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		document.addEventListener('pointerup', onUp)
 	}
 
-	return { startDrag, startRotate, startScale }
+	/**
+	 * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
+	 */
+	function startEdgeResize(edge, e, layerIndex, scene, aspectEl) {
+		const rect = aspectEl.getBoundingClientRect()
+		const layer = scene.layers[layerIndex]
+		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
+		const sx0 = e.clientX
+		const sy0 = e.clientY
+		const minS = 0.02
+
+		function onMove(ev) {
+			const dx = (ev.clientX - sx0) / rect.width
+			const dy = (ev.clientY - sy0) / rect.height
+			let x = startFill.x
+			let y = startFill.y
+			let sx = startFill.scaleX
+			let sy = startFill.scaleY
+
+			if (edge.includes('e')) sx = startFill.scaleX + dx
+			if (edge.includes('w')) {
+				x = startFill.x + dx
+				sx = startFill.scaleX - dx
+			}
+			if (edge.includes('s')) sy = startFill.scaleY + dy
+			if (edge.includes('n')) {
+				y = startFill.y + dy
+				sy = startFill.scaleY - dy
+			}
+
+			sx = Math.max(minS, sx)
+			sy = Math.max(minS, sy)
+			x = Math.max(0, Math.min(1 - sx, x))
+			y = Math.max(0, Math.min(1 - sy, y))
+			if (x + sx > 1) sx = 1 - x
+			if (y + sy > 1) sy = 1 - y
+
+			sceneState.patchLayer(scene.id, layerIndex, {
+				fill: { ...startFill, x, y, scaleX: sx, scaleY: sy },
+			})
+			schedulePreviewPush()
+		}
+		function onUp() {
+			document.removeEventListener('pointermove', onMove)
+			document.removeEventListener('pointerup', onUp)
+		}
+		document.addEventListener('pointermove', onMove)
+		document.addEventListener('pointerup', onUp)
+	}
+
+	return { startDrag, startRotate, startScale, startEdgeResize }
 }
 
 /** @param {object} scene @param {Record<string, unknown>} opts */
@@ -150,11 +200,13 @@ export function renderComposeScene(scene, opts) {
 		startDrag,
 		startRotate,
 		startScale,
+		startEdgeResize,
 	} = opts
 
 	const res = getResolution()
+	const aspectRatio = res.h > 0 ? res.w / res.h : 1
 	const wrap = document.createElement('div')
-	wrap.className = 'scenes-compose-wrap'
+	wrap.className = 'scenes-compose-wrap' + (aspectRatio >= 2.2 ? ' scenes-compose-wrap--ultrawide' : '')
 
 	const dropHint = document.createElement('p')
 	dropHint.className = 'scenes-compose-hint'
@@ -271,10 +323,38 @@ export function renderComposeScene(scene, opts) {
 				<button type="button" class="scenes-layer__handle scenes-layer__handle--scale" title="Drag to scale"></button>
 			`
 		inner.appendChild(handles)
+
+		const edges = document.createElement('div')
+		edges.className = 'scenes-layer__edges'
+		edges.setAttribute('aria-hidden', 'true')
+		edges.innerHTML = `
+			<span class="scenes-layer__edge scenes-layer__edge--n" data-edge="n" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--s" data-edge="s" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--e" data-edge="e" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--w" data-edge="w" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--ne" data-edge="ne" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--nw" data-edge="nw" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--se" data-edge="se" title="Resize"></span>
+			<span class="scenes-layer__edge scenes-layer__edge--sw" data-edge="sw" title="Resize"></span>
+		`
+
 		el.appendChild(inner)
+		el.appendChild(edges)
+
+		edges.querySelectorAll('.scenes-layer__edge').forEach((zone) => {
+			zone.addEventListener('pointerdown', (e) => {
+				const ed = zone.getAttribute('data-edge')
+				if (!ed) return
+				e.stopPropagation()
+				e.preventDefault()
+				dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+				startEdgeResize(ed, e, realIdx, scene, aspect)
+			})
+		})
 
 		el.addEventListener('pointerdown', (e) => {
 			if (e.target.closest('.scenes-layer__handle')) return
+			if (e.target.closest('.scenes-layer__edge')) return
 			e.preventDefault()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
 			startDrag(e, realIdx, scene, aspect)

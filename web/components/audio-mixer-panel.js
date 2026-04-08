@@ -18,7 +18,7 @@ export function initAudioMixerPanel(stateStore) {
 			<div class="audio-mixer__head">
 				<span class="audio-mixer__title">Program</span>
 				<p class="audio-mixer__hint">Faders: <code>MIXER MASTERVOLUME</code> on each program channel. Route each layer to a stereo pair (e.g. ch 1+2, 3+4) in the layer inspector.</p>
-				<p class="audio-mixer__hint audio-mixer__hint--warn">Meters show relative level from faders — not measured loudness (Caspar has no AMCP VU).</p>
+				<p class="audio-mixer__hint">Meters: when OSC sends channel levels, the bar is that level scaled by this fader; otherwise the bar follows the fader (applied gain).</p>
 			</div>
 			<div class="audio-mixer__buses"></div>
 		</div>
@@ -65,7 +65,7 @@ export function initAudioMixerPanel(stateStore) {
 					<div class="audio-mixer__meter" aria-hidden="true"><div class="audio-mixer__meter-fill"></div></div>
 				</div>
 				<div class="audio-mixer__fader-col">
-					<input type="range" class="audio-mixer__fader" min="0" max="100" value="${Math.round(r.v * 100)}" orient="vertical" aria-orientation="vertical" data-ch="${r.ch}" data-key="${escapeAttr(r.key)}" />
+					<input type="range" class="audio-mixer__fader" min="0" max="100" value="${Math.round(r.v * 100)}" aria-orientation="vertical" data-ch="${r.ch}" data-key="${escapeAttr(r.key)}" />
 					<span class="audio-mixer__fader-val">${Math.round(r.v * 100)}%</span>
 				</div>
 			`
@@ -98,7 +98,6 @@ export function initAudioMixerPanel(stateStore) {
 		if (raf) return
 		const vars = getVariableStore(ws)
 		const tick = () => {
-			const t = performance.now() / 1000
 			for (const [key, fill] of meterFills) {
 				const [, ch] = key.split(':') // 'pgm:1'
 				const faderVal = meterTargets.get(key) ?? 0
@@ -115,14 +114,12 @@ export function initAudioMixerPanel(stateStore) {
 				let aim = 0
 
 				if (level > -90) {
-					// Real data: map -60..0 dBFS to 0..1
-					aim = Math.max(0, Math.min(1, (level + 60) / 60))
+					// OSC dBFS → 0..1, then apply master fader (same staging as the mix)
+					const raw = Math.max(0, Math.min(1, (level + 60) / 60))
+					aim = raw * faderVal
 				} else {
-					// Simulated motion if silent or no data (subtle breathing)
-					const wobble = 0.04 * Math.sin(t * 6.2 + key.length)
-					aim = Math.max(0, Math.min(1, faderVal * (0.88 + 0.12 * Math.sin(t * 2.1)) + wobble * faderVal))
-					// If fader is 0, stay at 0
-					if (faderVal <= 0.01) aim = 0
+					// No OSC: show applied gain (fader position)
+					aim = faderVal
 				}
 
 				s += (aim - s) * 0.35 // Smooth ease

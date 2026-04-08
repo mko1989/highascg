@@ -8,8 +8,11 @@
     "screen_count": 1,
     "screen_1_mode": "1080p5000",
     "multiview_enabled": true,
+    "multiview_screen_consumer": true,
     "decklink_input_count": 0,
-    "configPath": "/opt/casparcg/config/casparcg.config"
+    "configPath": "/opt/casparcg/config/casparcg.config",
+    "default_alsa_card": "",
+    "default_alsa_device": ""
   },
   "server": {
     "httpPort": 8080,

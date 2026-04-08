@@ -61,16 +61,16 @@ export function showLedTestModal(onApplied) {
 				<button type="button" class="modal-close" id="led-test-close" aria-label="Close">&times;</button>
 			</div>
 			<div class="modal-body led-test-modal__body">
-				<p class="led-test-modal__hint">Template <code>led_grid_test</code> on PGM layer 999 (above timeline layers 10+). Center uses the same eye blink as the app (<code>both_open.svg</code> …). Total size = columns×rows × panel size.</p>
+				<p class="led-test-modal__hint">Template <code>led_grid_test</code> on PGM layer 999 (above timeline layers 10+). Center uses the full character frames in <code>templates/</code> (<code>both_open.svg</code> …) — not the header status sprites; blink timing matches the status indicator. Total size = columns×rows × panel size.</p>
 				<div class="led-test-modal__grid">
 					<label>Columns <input type="number" id="led-test-cols" min="1" max="256" step="1" /></label>
 					<label>Rows <input type="number" id="led-test-rows" min="1" max="256" step="1" /></label>
 					<label>Panel width (px) <input type="number" id="led-test-pw" min="1" max="16384" step="1" /></label>
 					<label>Panel height (px) <input type="number" id="led-test-ph" min="1" max="16384" step="1" /></label>
 				</div>
-				<label class="led-test-modal__full">Center label (under eyes) <input type="text" id="led-test-label" /></label>
+				<label class="led-test-modal__full">Center label (under character) <input type="text" id="led-test-label" /></label>
 				<div class="led-test-modal__checks">
-					<label><input type="checkbox" id="led-test-center-char" /> Show center character (eyes + label)</label>
+					<label><input type="checkbox" id="led-test-center-char" /> Show center character (graphic + label)</label>
 					<label><input type="checkbox" id="led-test-panel-idx" /> Panel R×C labels</label>
 					<label><input type="checkbox" id="led-test-spec" /> Resolution line</label>
 				</div>

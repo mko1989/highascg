@@ -6,8 +6,9 @@
   **template-path** (not media-path), so they are not listed as media (CLS). In highascg.config.json
   set **local_template_path** to that absolute folder; HighAsCG will copy these files on connect.
 
-  Center “character”: same blink idea as the app connection eyes — both_open → left_closed →
-  right_closed (SVGs next to this file: both_open.svg, left_closed.svg, right_closed.svg).
+  Center graphic: full HighAsCG **character** (artwork in both_open.svg / left_closed.svg /
+  right_closed.svg next to this file — not the small header status-eye sprites). Blink **timing**
+  matches the connection indicator (left → right → open); the **art** is separate.
 
   Pass JSON via CG UPDATE (same string rules as multiview_overlay.html):
 
@@ -22,7 +23,7 @@
     "showSpecLine": true
   }
 
-  • showCenterCharacter — hide center eyes + caption when false (default true)
+  • showCenterCharacter — hide center character + caption when false (default true)
 -->
 <html lang="en">
 <head>
@@ -41,6 +42,7 @@
 		#root {
 			position: absolute;
 			inset: 0;
+			z-index: 1;
 			display: grid;
 			gap: 0;
 			background: #0a0a0f;
@@ -85,7 +87,7 @@
 			justify-content: center;
 			text-align: center;
 			pointer-events: none;
-			z-index: 10;
+			z-index: 100;
 			padding: 0.75em 1.2em 1em;
 			border-radius: 8px;
 			background: rgba(0, 0, 0, 0.42);
@@ -145,13 +147,19 @@
 		window.play = function () {}
 		window.stop = function () {}
 
-		/** Same timing as web/components/connection-eye.js */
+		/** Blink phase/interval timing matches web/components/connection-eye.js (artwork differs). */
 		var BLINK_PHASE_MS = 250
 		var BLINK_INTERVAL_MS = 30000
-		var ASSETS = {
-			open: 'both_open.svg',
-			left: 'left_closed.svg',
-			right: 'right_closed.svg'
+		/** Resolve next to this HTML file — bare filenames often 404 in Caspar CEF */
+		function ledTestAssetUrl(filename) {
+			try {
+				var base = window.location.href || ''
+				var i = base.lastIndexOf('/')
+				var dir = i >= 0 ? base.slice(0, i + 1) : base
+				return new URL(filename, dir).href
+			} catch (e) {
+				return filename
+			}
 		}
 		var blinkInterval = null
 
@@ -187,14 +195,26 @@
 			function resolveSrc() {
 				var blinkL = eyeWrap.classList.contains('blink-l')
 				var blinkR = eyeWrap.classList.contains('blink-r')
-				if (blinkL) return ASSETS.left
-				if (blinkR) return ASSETS.right
-				return ASSETS.open
+				if (blinkL) return ledTestAssetUrl('left_closed.svg')
+				if (blinkR) return ledTestAssetUrl('right_closed.svg')
+				return ledTestAssetUrl('both_open.svg')
 			}
 
 			function updateImgSrc() {
 				var next = resolveSrc()
 				if (img.getAttribute('src') !== next) img.setAttribute('src', next)
+			}
+			img.onerror = function () {
+				img.onerror = null
+				img.alt = 'HighAsCG'
+				img.style.display = 'none'
+				if (!eyeWrap.querySelector('.led-test-eye__fallback')) {
+					var fb = document.createElement('span')
+					fb.className = 'led-test-eye__fallback'
+					fb.style.cssText = 'font-size:clamp(2rem,8vw,4rem);font-weight:800;letter-spacing:0.12em;color:rgba(200,220,255,0.95);text-shadow:0 0 24px rgba(100,160,255,0.35)'
+					fb.textContent = 'H'
+					eyeWrap.appendChild(fb)
+				}
 			}
 
 			function triggerBlink() {
@@ -216,13 +236,19 @@
 			blinkInterval = setInterval(triggerBlink, BLINK_INTERVAL_MS)
 		}
 
+		function showCenterWanted(data) {
+			var v = data.showCenterCharacter
+			if (v === false || v === 'false') return false
+			return true
+		}
+
 		function build(data) {
 			var cols = Math.max(1, parseInt(data.cols, 10) || 4)
 			var rows = Math.max(1, parseInt(data.rows, 10) || 3)
 			var pw = Math.max(0, parseInt(data.panelWidth, 10) || 0)
 			var ph = Math.max(0, parseInt(data.panelHeight, 10) || 0)
 			var centerLabel = data.centerLabel != null ? String(data.centerLabel) : 'HighAsCG'
-			var showCenter = data.showCenterCharacter !== false
+			var showCenter = showCenterWanted(data)
 			var showLabels = data.showPanelLabels !== false
 			var showSpec = data.showSpecLine !== false
 
@@ -256,6 +282,13 @@
 				cap.textContent = centerLabel || ''
 				cap.style.display = centerLabel ? 'block' : 'none'
 				stopEyeBlink()
+				var img = document.getElementById('ledTestEyeImg')
+				var fb = document.querySelector('#ledTestEye .led-test-eye__fallback')
+				if (fb) fb.remove()
+				if (img) {
+					img.style.display = ''
+					img.alt = ''
+				}
 				startEyeBlink()
 			} else {
 				center.style.display = 'none'

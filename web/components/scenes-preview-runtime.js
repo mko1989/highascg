@@ -257,6 +257,22 @@ export function createScenesPreviewRuntime(opts) {
 		lastPreviewContentSnapshot = null
 	}
 
+	/**
+	 * After take, `applySceneFromTakePayload` replaces layers from the server — the next debounced push
+	 * would otherwise see a "content change" vs the pre-take snapshot and run a full STOP/CLEAR sweep on PRV.
+	 * Prime the snapshot from the current scene so the next push is geometry-only (mixer updates).
+	 */
+	function primePreviewSnapshotFromScene(sceneId) {
+		const scene = sceneState.getScene(sceneId)
+		if (!scene || !sceneId) return
+		lastPreviewContentSnapshot = buildPreviewContentSnapshot(sceneId, scene)
+		const used = new Set()
+		for (const l of scene.layers || []) {
+			if (l?.source?.value) used.add(Number(l.layerNumber))
+		}
+		lastPreviewLayers = used
+	}
+
 	return {
 		pushSceneToPreview,
 		schedulePreviewPush,
@@ -265,5 +281,6 @@ export function createScenesPreviewRuntime(opts) {
 		drainPreviewPushQueue,
 		sendSceneToPreviewCard,
 		clearLastPreviewLayers,
+		primePreviewSnapshotFromScene,
 	}
 }

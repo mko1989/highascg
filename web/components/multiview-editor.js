@@ -1,6 +1,6 @@
 /**
  * Multiview editor — canvas with draggable/resizable boxes for PGM, PRV, Decklink.
- * Apply sends routes + MIXER FILL to CasparCG.
+ * Layout changes are applied live (debounced); presets 1–4 save/recall from localStorage (Shift+click clears a slot).
  * @see main_plan.md Prompt 15
  */
 
@@ -32,19 +32,31 @@ export function initMultiviewEditor(root, stateStore) {
 		return stateStore.getState()?.channelMap || {}
 	}
 
-	/** Only auto-create PGM/PRV cells once when storage is empty — not on every state/WebSocket refresh (fixes reset on reconnect). */
-	let didAutoBuildDefault = false
-	function ensureLayout() {
-		const cm = getChannelMap()
-		const hasChannels = (cm.programChannels?.length || cm.previewChannels?.length)
-		if (!hasChannels) return
-		if (multiviewState.getCells().length > 0) {
-			didAutoBuildDefault = true
-			return
+	let applyDebounceTimer = null
+	const APPLY_DEBOUNCE_MS = 400
+
+	function scheduleApplyLayout() {
+		if (applyDebounceTimer) clearTimeout(applyDebounceTimer)
+		applyDebounceTimer = setTimeout(() => {
+			applyDebounceTimer = null
+			void applyLayout({ silent: true })
+		}, APPLY_DEBOUNCE_MS)
+	}
+
+	function flushApplyLayout() {
+		if (applyDebounceTimer) {
+			clearTimeout(applyDebounceTimer)
+			applyDebounceTimer = null
 		}
-		if (didAutoBuildDefault) return
-		multiviewState.buildDefault(cm)
-		didAutoBuildDefault = true
+		void applyLayout({ silent: true })
+	}
+
+	function updatePresetButtonStyles() {
+		const slots = multiviewState.getPresetSlots()
+		for (let i = 0; i < 4; i++) {
+			const btn = root.querySelector(`.mv-preset[data-slot="${i}"]`)
+			if (btn) btn.classList.toggle('mv-preset--stored', slots[i] != null)
+		}
 	}
 
 	let wrap = null
@@ -82,6 +94,20 @@ export function initMultiviewEditor(root, stateStore) {
 			if (canvasX >= c.x && canvasX <= c.x + c.w && canvasY >= c.y && canvasY <= c.y + c.h) return c
 		}
 		return null
+	}
+
+	function cursorForResizeHandle(h) {
+		const map = {
+			n: 'ns-resize',
+			s: 'ns-resize',
+			e: 'ew-resize',
+			w: 'ew-resize',
+			ne: 'nesw-resize',
+			sw: 'nesw-resize',
+			nw: 'nwse-resize',
+			se: 'nwse-resize',
+		}
+		return map[h] || 'default'
 	}
 
 	function getResizeHandle(cell, canvasX, canvasY) {
@@ -217,9 +243,14 @@ export function initMultiviewEditor(root, stateStore) {
 		const toolbar = document.createElement('div')
 		toolbar.className = 'mv-toolbar'
 		toolbar.innerHTML = `
-			<button class="mv-btn" id="mv-apply">Apply Layout</button>
-			<button class="mv-btn" id="mv-reset">Reset Layout</button>
+			<button type="button" class="mv-btn" id="mv-reset">Reset Layout</button>
 			<label class="mv-chk"><input type="checkbox" id="mv-overlay" ${multiviewState.showOverlay ? 'checked' : ''}> Show borders/labels</label>
+			<span class="mv-toolbar__sep" aria-hidden="true"></span>
+			<span class="mv-toolbar__label">Presets</span>
+			<button type="button" class="mv-btn mv-preset" data-slot="0" title="1 — first click saves; later recalls · Shift+click: clear slot">1</button>
+			<button type="button" class="mv-btn mv-preset" data-slot="1" title="2 — first click saves; later recalls · Shift+click: clear slot">2</button>
+			<button type="button" class="mv-btn mv-preset" data-slot="2" title="3 — first click saves; later recalls · Shift+click: clear slot">3</button>
+			<button type="button" class="mv-btn mv-preset" data-slot="3" title="4 — first click saves; later recalls · Shift+click: clear slot">4</button>
 		`
 		root.appendChild(toolbar)
 
@@ -260,7 +291,6 @@ export function initMultiviewEditor(root, stateStore) {
 		updateLiveView()
 
 		ctx = canvas.getContext('2d')
-		ensureLayout()
 		fitInContainer()
 
 		// Recalc when container gets a real size (e.g. user switches to this tab)
@@ -270,15 +300,52 @@ export function initMultiviewEditor(root, stateStore) {
 		})
 		if (wrap) resizeObs.observe(wrap)
 		window.addEventListener('resize', () => { fitInContainer(); draw() })
-		document.addEventListener('mv-tab-activated', () => {
+		function refreshLayoutVisualOnly() {
 			void streamState.refreshStreams().finally(() => {
 				updateLiveView()
 				fitInContainer()
 				draw()
 			})
+		}
+		document.addEventListener('mv-layout-refresh', refreshLayoutVisualOnly)
+		/** AMCP TCP just came up (see app.js) — push multiview to Caspar once, not on periodic VERSION / WS churn. */
+		document.addEventListener('mv-caspar-amcp-connected', () => {
+			void streamState.refreshStreams().finally(() => {
+				updateLiveView()
+				fitInContainer()
+				draw()
+				flushApplyLayout()
+			})
+		})
+		document.addEventListener('mv-tab-activated', () => {
+			void streamState.refreshStreams().finally(() => {
+				updateLiveView()
+				fitInContainer()
+				draw()
+				flushApplyLayout()
+			})
 		})
 
-		root.querySelector('#mv-apply').addEventListener('click', () => applyLayout())
+		for (const presetBtn of root.querySelectorAll('.mv-preset')) {
+			presetBtn.addEventListener('click', (e) => {
+				const slot = parseInt(e.currentTarget.getAttribute('data-slot') || '0', 10)
+				if (slot < 0 || slot > 3) return
+				const slots = multiviewState.getPresetSlots()
+				if (e.shiftKey) {
+					multiviewState.clearPresetSlot(slot)
+					updatePresetButtonStyles()
+					return
+				}
+				if (slots[slot] == null) {
+					multiviewState.savePresetSlot(slot, multiviewState.snapshotForPreset())
+				} else {
+					multiviewState.applyPresetSnapshot(slots[slot])
+				}
+				updatePresetButtonStyles()
+			})
+		}
+		updatePresetButtonStyles()
+
 		root.querySelector('#mv-reset').addEventListener('click', () => {
 			multiviewState.clearLayout()
 			selectedId = null
@@ -299,13 +366,16 @@ export function initMultiviewEditor(root, stateStore) {
 				if (handle) {
 					dragMode = 'resize-' + handle
 					dragStart = { mouseX: cx, mouseY: cy, cell: { ...cell } }
+					canvas.style.cursor = cursorForResizeHandle(handle)
 				} else {
 					dragMode = 'move'
 					dragStart = { x: cx, y: cy, cell: { ...cell } }
+					canvas.style.cursor = 'grabbing'
 				}
 				window.dispatchEvent(new CustomEvent('multiview-select', { detail: { cellId: selectedId } }))
 			} else {
 				selectedId = null
+				canvas.style.cursor = ''
 				window.dispatchEvent(new CustomEvent('multiview-select', { detail: {} }))
 			}
 		})
@@ -336,46 +406,65 @@ export function initMultiviewEditor(root, stateStore) {
 			}
 		})
 		canvas.addEventListener('mousemove', (e) => {
-			if (!dragMode || !dragStart.cell) return
 			const rect = canvas.getBoundingClientRect()
 			const { x: cx, y: cy } = toCanvas(e.clientX - rect.left, e.clientY - rect.top)
-			const cell = multiviewState.getCell(dragStart.cell.id)
-			if (!cell) return
-			if (dragMode === 'move') {
-				const dx = cx - dragStart.x
-				const dy = cy - dragStart.y
-				multiviewState.setCell(cell.id, { x: dragStart.cell.x + dx, y: dragStart.cell.y + dy })
-				dragStart.x = cx
-				dragStart.y = cy
-				dragStart.cell = { ...cell }
-			} else {
-				const handle = dragMode.replace('resize-', '')
-				const dx = cx - dragStart.mouseX
-				const dy = cy - dragStart.mouseY
-				let { x, y, w, h } = { ...dragStart.cell }
-				const aspectLocked = !!cell.aspectLocked
-				const ratio = (dragStart.cell.w && dragStart.cell.h) ? dragStart.cell.w / dragStart.cell.h : 16 / 9
-				if (handle.includes('e')) w = Math.max(60, dragStart.cell.w + dx)
-				if (handle.includes('w')) {
-					const nw = Math.max(60, dragStart.cell.w - dx)
-					x = dragStart.cell.x + dragStart.cell.w - nw
-					w = nw
+			if (dragMode && dragStart.cell) {
+				const cell = multiviewState.getCell(dragStart.cell.id)
+				if (!cell) return
+				if (dragMode === 'move') {
+					canvas.style.cursor = 'grabbing'
+					const dx = cx - dragStart.x
+					const dy = cy - dragStart.y
+					multiviewState.setCell(cell.id, { x: dragStart.cell.x + dx, y: dragStart.cell.y + dy })
+					dragStart.x = cx
+					dragStart.y = cy
+					dragStart.cell = { ...cell }
+				} else {
+					const handle = dragMode.replace('resize-', '')
+					canvas.style.cursor = cursorForResizeHandle(handle)
+					const dx = cx - dragStart.mouseX
+					const dy = cy - dragStart.mouseY
+					let { x, y, w, h } = { ...dragStart.cell }
+					const aspectLocked = !!cell.aspectLocked
+					const ratio = (dragStart.cell.w && dragStart.cell.h) ? dragStart.cell.w / dragStart.cell.h : 16 / 9
+					if (handle.includes('e')) w = Math.max(60, dragStart.cell.w + dx)
+					if (handle.includes('w')) {
+						const nw = Math.max(60, dragStart.cell.w - dx)
+						x = dragStart.cell.x + dragStart.cell.w - nw
+						w = nw
+					}
+					if (handle.includes('s')) h = Math.max(40, dragStart.cell.h + dy)
+					if (handle.includes('n')) {
+						const nh = Math.max(40, dragStart.cell.h - dy)
+						y = dragStart.cell.y + dragStart.cell.h - nh
+						h = nh
+					}
+					if (aspectLocked) {
+						if (handle.includes('e') || handle.includes('w')) h = Math.max(40, Math.round(w / ratio))
+						else if (handle.includes('s') || handle.includes('n')) w = Math.max(60, Math.round(h * ratio))
+					}
+					multiviewState.setCell(cell.id, { x, y, w, h })
 				}
-				if (handle.includes('s')) h = Math.max(40, dragStart.cell.h + dy)
-				if (handle.includes('n')) {
-					const nh = Math.max(40, dragStart.cell.h - dy)
-					y = dragStart.cell.y + dragStart.cell.h - nh
-					h = nh
-				}
-				if (aspectLocked) {
-					if (handle.includes('e') || handle.includes('w')) h = Math.max(40, Math.round(w / ratio))
-					else if (handle.includes('s') || handle.includes('n')) w = Math.max(60, Math.round(h * ratio))
-				}
-				multiviewState.setCell(cell.id, { x, y, w, h })
+				return
 			}
+			const cell = getCellAt(cx, cy)
+			if (!cell) {
+				canvas.style.cursor = ''
+				return
+			}
+			const h = getResizeHandle(cell, cx, cy)
+			if (h) canvas.style.cursor = cursorForResizeHandle(h)
+			else canvas.style.cursor = 'move'
 		})
-		canvas.addEventListener('mouseup', () => { dragMode = null; dragStart = { cell: null } })
-		canvas.addEventListener('mouseleave', () => { dragMode = null })
+		canvas.addEventListener('mouseup', () => {
+			dragMode = null
+			dragStart = { cell: null }
+			flushApplyLayout()
+		})
+		canvas.addEventListener('mouseleave', () => {
+			dragMode = null
+			canvas.style.cursor = ''
+		})
 
 		// Accept sources dragged from the Sources panel
 		canvas.addEventListener('dragover', (e) => {
@@ -454,16 +543,19 @@ export function initMultiviewEditor(root, stateStore) {
 				multiviewState.setCellSource(cell.id, { value: data.value, type: data.type || 'media', label: data.label || data.value })
 			}
 			draw()
+			flushApplyLayout()
 		})
 
-		multiviewState.on('change', draw)
+		multiviewState.on('change', () => {
+			draw()
+			scheduleApplyLayout()
+		})
 		multiviewState.on('audio-change', () => {
 			draw()
 			applyAudioFocus()
 		})
 		let storeCoalesceRaf = null
 		stateStore.on('*', () => {
-			ensureLayout()
 			fitInContainer()
 			if (storeCoalesceRaf) return
 			storeCoalesceRaf = requestAnimationFrame(() => {
@@ -472,6 +564,7 @@ export function initMultiviewEditor(root, stateStore) {
 			})
 		})
 		draw()
+		flushApplyLayout()
 	}
 
 	async function applyAudioFocus() {
@@ -497,51 +590,38 @@ export function initMultiviewEditor(root, stateStore) {
 				const L = i + 1
 				cmds.push(`MIXER ${MV_CH} VOLUME ${L} ${L === layer ? 1 : 0}`)
 			})
-			await api.post('/api/amcp', { commands: cmds })
+			await api.post('/api/amcp/batch', { commands: cmds })
 		} catch (e) {
 			console.error('Audio focus AMCP failed:', e)
 		}
 	}
 
-	async function applyLayout() {
+	/**
+	 * @param {{ silent?: boolean }} [opts] — silent: no alert on error (live updates)
+	 */
+	async function applyLayout(opts = {}) {
+		const silent = !!opts.silent
 		const cm = getChannelMap()
 		const mvCh = cm.multiviewCh
 		if (mvCh == null) {
-			alert('Multiview is not enabled. Enable it in module settings.')
+			if (!silent) alert('Multiview is not enabled. Enable it in module settings.')
 			return
 		}
 		const layout = multiviewState.toApiLayout()
-		if (layout.length === 0) {
-			alert('No layout to apply. Add cells (Reset Layout) or drag sources onto the canvas.')
-			return
-		}
 		try {
 			await api.post('/api/multiview/apply', {
 				layout,
 				showOverlay: multiviewState.showOverlay,
 			})
-			showApplyFeedback(true)
 		} catch (e) {
 			console.error('Multiview apply failed:', e)
+			if (silent) return
 			const msg = String(e?.message ?? e ?? '')
 			const hint = (msg.toLowerCase().includes('not connected') || msg.includes('503'))
 				? 'CasparCG is not connected. Check module Settings → Connection and ensure CasparCG server is running.'
 				: msg
-			alert('Apply failed: ' + hint)
-			showApplyFeedback(false)
+			alert('Multiview output failed: ' + hint)
 		}
-	}
-
-	function showApplyFeedback(success) {
-		const btn = root.querySelector('#mv-apply')
-		if (!btn) return
-		const orig = btn.textContent
-		btn.textContent = success ? 'Applied ✓' : 'Failed'
-		btn.disabled = true
-		setTimeout(() => {
-			btn.textContent = orig
-			btn.disabled = false
-		}, 1500)
 	}
 
 	render()

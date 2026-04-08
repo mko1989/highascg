@@ -34,11 +34,11 @@ export function setGo2rtcApiPort(_port) {}
 /**
  * Creates a WebRTC connection to go2rtc for a specific stream name,
  * and attaches it to a newly created <video> element inside `containerEl`.
- * 
+ *
  * @param {string} streamName e.g. "pgm_1"
- * @param {HTMLElement} containerEl 
- * @param {Object} opts 
- * @param {boolean} [opts.audioEnabled=false] 
+ * @param {HTMLElement} containerEl
+ * @param {Object} opts
+ * @param {boolean} [opts.audioEnabled=false]
  * @returns {Object} { video, destroy, setAudioEnabled }
  */
 export function createLiveView(streamName, containerEl, opts = {}) {

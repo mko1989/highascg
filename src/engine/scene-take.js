@@ -206,6 +206,19 @@ async function runSceneTake(amcp, opts) {
 
 	await amcp.mixerCommit(channel)
 
+	/** If crossfade is skipped but layers loaded at opacity 0, they would stay invisible (edge case). */
+	if (!shouldRunBankCrossfade && !isFirstTake && layerBatches.length > 0) {
+		const fixLines = []
+		for (const b of layerBatches) {
+			const pIn = phys(Number(b.layer.layerNumber), inactiveBank)
+			fixLines.push(mixerOpacityLine(channel, pIn, b.layer.opacity ?? 1, 0, undefined))
+		}
+		if (fixLines.length > 0) {
+			await amcp.batchSend(fixLines, { force: true })
+			await amcp.mixerCommit(channel)
+		}
+	}
+
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
 	const fadeTw = fadeDur > 0 ? globalT.tween : undefined
 

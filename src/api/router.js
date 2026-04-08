@@ -63,7 +63,7 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 
 	if (method === 'POST' && p === '/api/caspar-config/apply') {
-		return routesCasparConfig.handlePost(p, body, ctx)
+		return await routesCasparConfig.handlePost(p, body, ctx)
 	}
 
 	if (method === 'GET' && p === '/api/logs') {
@@ -97,6 +97,11 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	if (method === 'GET' && p === '/api/audio/devices') {
 		const ar = routesAudio.handleGet(p, query)
+		if (ar) return ar
+	}
+
+	if (method === 'POST' && p === '/api/audio/default-device') {
+		const ar = await routesAudio.handlePost(p, body, ctx)
 		if (ar) return ar
 	}
 

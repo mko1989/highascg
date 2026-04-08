@@ -15,6 +15,7 @@ const {
 	getStandardModeChoices,
 } = require('./config-modes')
 const { buildFfmpegArgs } = require('../streaming/caspar-ffmpeg-setup')
+const defaults = require('../../config/default')
 
 /**
  * Parse optional pixel position from module config. Empty string uses fallback (auto layout or 0).
@@ -52,66 +53,67 @@ function ffmpegPathFromAlsaId(id) {
 }
 
 /**
+ * Merge defaults, coerce stale `alsa`/`custom` without a sink to `default` (avoids ghost FFmpeg consumers).
+ * @param {Record<string, unknown> | undefined} ar
+ * @returns {Record<string, unknown>}
+ */
+function normalizeAudioRouting(ar) {
+	const d = defaults.audioRouting || {}
+	const base = { ...d, ...(ar && typeof ar === 'object' ? ar : {}) }
+	let po = String(base.programOutput || 'default').toLowerCase()
+	if (po === 'alsa') {
+		const p = ffmpegPathFromAlsaId(base.programAlsaDevice)
+		const custom = String(base.programFfmpegPath || '').trim()
+		if (!p && !custom) base.programOutput = 'default'
+	} else if (po === 'custom') {
+		if (!String(base.programFfmpegPath || '').trim()) base.programOutput = 'default'
+	}
+	let mo = String(base.monitorOutput || 'default').toLowerCase()
+	if (mo === 'alsa') {
+		const p = ffmpegPathFromAlsaId(base.monitorAlsaDevice)
+		const custom = String(base.monitorFfmpegPath || '').trim()
+		if (!p && !custom) base.monitorOutput = 'default'
+	} else if (mo === 'custom') {
+		if (!String(base.monitorFfmpegPath || '').trim()) base.monitorOutput = 'default'
+	}
+	return base
+}
+
+/**
  * Flatten `config.audioRouting` (Settings UI) into generator keys used by this file.
  * @param {Record<string, unknown>} config
  * @returns {Record<string, unknown>}
  */
 function mergeAudioRoutingIntoConfig(config) {
 	const base = config && typeof config === 'object' ? config : {}
-	const ar = base.audioRouting
-	if (!ar || typeof ar !== 'object') return base
-	const out = { ...base }
+	const mergedAr = normalizeAudioRouting(base.audioRouting)
+	const out = { ...base, audioRouting: mergedAr }
+	const ar = mergedAr
 	const layoutMap = { stereo: 'stereo', '4ch': '4ch', '8ch': '8ch', '16ch': '16ch' }
 	const pl = String(ar.programLayout || 'stereo').toLowerCase()
 	out.screen_1_audio_layout = layoutMap[pl] || 'stereo'
 
+	/**
+	 * PGM audio: **only** `<system-audio>` (channel layout from programLayout / stereo in XML).
+	 * OS default output comes from `/etc/asound.conf` (Settings → System). We never emit
+	 * `<ffmpeg-consumer>` for program/monitor on this channel — it duplicated ALSA routing and
+	 * ignored the Web UI default device.
+	 */
 	out.screen_1_ffmpeg_audio_enabled = false
 	out.screen_1_ffmpeg_audio_path = ''
 	out.screen_1_ffmpeg_audio_args = ''
-	out.screen_1_system_audio_enabled = false
+	out.screen_1_ffmpeg_audio_path_2 = ''
+	out.screen_1_ffmpeg_audio_args_2 = ''
+	out.screen_1_system_audio_enabled = true
 	out.screen_1_ndi_enabled = false
 
 	const po = String(ar.programOutput || 'default').toLowerCase()
-	if (po === 'system_audio') {
-		out.screen_1_system_audio_enabled = true
-	} else if (po === 'ndi') {
+	if (po === 'ndi') {
 		out.screen_1_ndi_enabled = true
-	} else if (po === 'alsa') {
-		const p = ffmpegPathFromAlsaId(ar.programAlsaDevice)
-		if (p) {
-			out.screen_1_ffmpeg_audio_enabled = true
-			out.screen_1_ffmpeg_audio_path = p
-		}
-	} else if (po === 'custom') {
-		const path = String(ar.programFfmpegPath || '').trim()
-		if (path) {
-			out.screen_1_ffmpeg_audio_enabled = true
-			out.screen_1_ffmpeg_audio_path = path
-			if (ar.programFfmpegArgs) out.screen_1_ffmpeg_audio_args = String(ar.programFfmpegArgs)
-		}
 	}
 
 	// Extra Caspar audio-only channels removed from Settings UI — always zero for generated config.
 	out.extra_audio_channel_count = 0
-
-	// Monitor / headphones: second FFmpeg consumer on the program channel (path_2).
-	out.screen_1_ffmpeg_audio_path_2 = ''
-	out.screen_1_ffmpeg_audio_args_2 = ''
-	const mo = String(ar.monitorOutput || 'default').toLowerCase()
-	if (mo === 'alsa') {
-		const p = ffmpegPathFromAlsaId(ar.monitorAlsaDevice)
-		if (p) out.screen_1_ffmpeg_audio_path_2 = p
-	} else if (mo === 'custom') {
-		const path = String(ar.monitorFfmpegPath || '').trim()
-		if (path) {
-			out.screen_1_ffmpeg_audio_path_2 = path
-			if (ar.monitorFfmpegArgs) out.screen_1_ffmpeg_audio_args_2 = String(ar.monitorFfmpegArgs)
-		}
-	}
-
-	const path1 = String(out.screen_1_ffmpeg_audio_path || '').trim()
-	const path2 = String(out.screen_1_ffmpeg_audio_path_2 || '').trim()
-	if (path1 || path2) out.screen_1_ffmpeg_audio_enabled = true
 
 	return out
 }
@@ -394,7 +396,7 @@ function buildConfigXml(config) {
 		const ffmpegXml = buildScreenFfmpegConsumersXml(config, n)
 		const screenSystemAudioXml =
 			config[`screen_${n}_system_audio_enabled`] === true || config[`screen_${n}_system_audio_enabled`] === 'true'
-				? '\n                <system-audio/>'
+				? `\n                <system-audio>\n                    <channel-layout>stereo</channel-layout>\n                </system-audio>`
 				: ''
 
 		// Professional consumers (T3.2)
@@ -425,6 +427,9 @@ function buildConfigXml(config) {
                     ${screenXml}
                 </screen>${screenSystemAudioXml}${ffmpegXml}${pgmStreamingXml}${profConsumersXml}
             </consumers>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
         </channel>`
 		)
 		cumulativeX += dims.width
@@ -437,6 +442,9 @@ function buildConfigXml(config) {
 			`        <channel>
             <video-mode>${dims.modeId}</video-mode>
             <consumers>${prvStreamingXml}</consumers>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
         </channel>`
 		)
 
@@ -463,9 +471,10 @@ function buildConfigXml(config) {
 		const dims = STANDARD_VIDEO_MODES[mode] || { width: 1920, height: 1080, fps: 50 }
 		const modeId = mode
 		const stretch = 'none'
-		const windowed = true
-		const vsync = true
-		const borderless = false
+		const windowed = config.multiview_windowed !== false && config.multiview_windowed !== 'false'
+		const vsync = config.multiview_vsync !== false && config.multiview_vsync !== 'false'
+		const alwaysOnTop = config.multiview_always_on_top !== false && config.multiview_always_on_top !== 'false'
+		const borderless = config.multiview_borderless === true || config.multiview_borderless === 'true'
 		const mvX = parseOptionalPixel(config.multiview_x, cumulativeX)
 		const mvY = parseOptionalPixel(config.multiview_y, 0)
 		const screenXml = [
@@ -475,22 +484,48 @@ function buildConfigXml(config) {
 			`<stretch>${stretch}</stretch>`,
 			`<windowed>${windowed}</windowed>`,
 			`<vsync>${vsync}</vsync>`,
+			`<always-on-top>${alwaysOnTop}</always-on-top>`,
 			`<borderless>${borderless}</borderless>`,
 		].join('\n                    ')
-		
+		/** false = stream-only multiview (no &lt;screen&gt;); requires preview streaming FFmpeg consumer for WebRTC. */
+		const mvScreen =
+			config.multiview_screen_consumer !== false && config.multiview_screen_consumer !== 'false'
+
 		const streamingBasePort = parseInt(String(config.streaming?.basePort || '10000'), 10) || 10000
 		const mvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + 3)
-
-		channelsXml.push(
-			`        <channel>
+		const screenBlock = mvScreen
+			? `
+                <screen>
+                    ${screenXml}
+                </screen>`
+			: ''
+		if (!mvScreen && !mvStreamingXml.trim()) {
+			// Avoid empty <consumers/> when stream-only but preview streaming is off — keep screen so channel is valid.
+			channelsXml.push(
+				`        <channel>
             <video-mode>${modeId}</video-mode>
             <consumers>
                 <screen>
                     ${screenXml}
-                </screen>${mvStreamingXml}
+                </screen>
             </consumers>
+            <mixer>
+                <audio-osc>false</audio-osc>
+            </mixer>
         </channel>`
-		)
+			)
+		} else {
+			channelsXml.push(
+				`        <channel>
+            <video-mode>${modeId}</video-mode>
+            <consumers>${screenBlock}${mvStreamingXml}
+            </consumers>
+            <mixer>
+                <audio-osc>false</audio-osc>
+            </mixer>
+        </channel>`
+			)
+		}
 	}
 
 	if (decklinkCount > 0) {
@@ -500,6 +535,9 @@ function buildConfigXml(config) {
 			`        <channel>
             <video-mode>${modeId}</video-mode>
             <consumers/>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
         </channel>`
 		)
 	}
@@ -532,6 +570,9 @@ function buildConfigXml(config) {
 			`        <channel>
             <video-mode>${dims.modeId}</video-mode>${layoutXml}
             ${consumersBlock}
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
         </channel>`
 		)
 	}
@@ -596,6 +637,7 @@ ${oscXml}
 module.exports = {
 	buildConfigXml,
 	mergeAudioRoutingIntoConfig,
+	normalizeAudioRouting,
 	buildOscConfigurationXml,
 	getStandardModeChoices,
 	STANDARD_VIDEO_MODES,

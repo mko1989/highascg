@@ -1,10 +1,14 @@
 'use strict'
 
 const fs = require('fs')
+const http = require('http')
 const path = require('path')
 const { spawn, execSync } = require('child_process')
 const go2rtcBinary = require('go2rtc-static')
 const { resolveNdiSourceName, validateFfmpegNdiInput } = require('./ndi-resolve')
+
+/** Same expression as `caspar-ffmpeg-setup` `SCALE_HALF_VF` (avoid circular require). */
+const SCALE_HALF_VF = 'scale=w=iw/2:h=ih/2'
 
 /**
  * Detect the effective capture mode based on environment.
@@ -93,6 +97,8 @@ class Go2rtcManager {
 		this.streams = {} // map of name -> target
 		this.config = null
 		this.activeTier = 'srt'
+		/** @type {import('child_process').ChildProcess[]} — SRT tier only; UDP→HTTP push (go2rtc must not exec-bind Caspar ports). */
+		this._udpBridgeProcs = []
 
 		this.bindLifecycle()
 	}
@@ -128,8 +134,12 @@ class Go2rtcManager {
 		const hw = config.hardwareAccel !== false
 
 		const resMap = { '720p': '1280:720', '540p': '960:540', '360p': '640:360' }
-		const scale = resMap[config.resolution] || ''
-		const scaleFilter = scale ? `-vf scale=${scale}` : ''
+		let scaleFilter = ''
+		if (config.resolution === 'half') {
+			scaleFilter = `-vf ${SCALE_HALF_VF}`
+		} else if (resMap[config.resolution]) {
+			scaleFilter = `-vf scale=${resMap[config.resolution]}`
+		}
 
 		if (device === 'kmsgrab') {
 			// kmsgrab: needs -device before -f kmsgrab (see ffmpeg-devices). `-i -` uses that device.
@@ -155,8 +165,12 @@ class Go2rtcManager {
 		const encoder = hw ? 'h264_nvenc -preset p1 -tune ll' : 'libx264 -preset ultrafast -tune zerolatency'
 
 		const resMap = { '720p': '1280:720', '540p': '960:540', '360p': '640:360' }
-		const scale = resMap[config.resolution] || ''
-		const scaleFilter = scale ? `-vf scale=${scale}` : ''
+		let scaleFilter = ''
+		if (config.resolution === 'half') {
+			scaleFilter = `-vf ${SCALE_HALF_VF}`
+		} else if (resMap[config.resolution]) {
+			scaleFilter = `-vf scale=${resMap[config.resolution]}`
+		}
 
 		return `exec:ffmpeg -f libndi_newtek_input -i "${ndiName}" ${scaleFilter} -c:v ${encoder} -b:v ${br}k -g ${fps * 2} -c:a aac -b:a 64k -f rtsp {output}`
 	}
@@ -165,13 +179,155 @@ class Go2rtcManager {
 	 * Build MPEG-TS bridge from Caspar STREAM consumer (UDP to localhost:port).
 	 * Settings UI may still say "SRT"; Caspar→go2rtc uses UDP MPEG-TS because many Caspar builds lack working srt:// output.
 	 *
-	 * Do **not** append go2rtc's `#hardware` here: that requests HW **decode**, which often hangs on headless Linux
-	 * (no VAAPI/NVDEC). SW decode is cheap for preview; `hardware_accel` still applies to NDI/local **encode** paths.
+	 * Caspar → HighAsCG uses **one** ffmpeg per UDP port, **outside** go2rtc: `udp://…` in → `http://…/api/stream.ts?dst=…`.
+	 * Any **go2rtc** `exec:` / `ffmpeg:udp` on the same port collides (bind failed) or races (exec/pipe EOF) when WebRTC
+	 * dials producers; **multiview** often “works first” because it uses **basePort+5** (e.g. 10005), not 10001/10002.
+	 *
+	 * YAML uses **empty** streams for push ingest; {@link waitForPushIngestReady} runs after Caspar ADD STREAM so
+	 * `pipelineReady` is not set until go2rtc lists **producers** (avoids `streams: unknown error` on early WebRTC).
 	 */
-	buildSrtSource(_config, port, casparHost) {
-		const bind = casparHost === '127.0.0.1' || casparHost === 'localhost' ? '127.0.0.1' : casparHost
+	udpListenUrlForCaspar(port, casparHost) {
+		const isLocal =
+			casparHost === '127.0.0.1' || casparHost === 'localhost' || casparHost === '0.0.0.0'
+		const bind = isLocal ? '127.0.0.1' : casparHost
 		const q = 'fifo_size=50000000&overrun_nonfatal=1'
-		return `ffmpeg:udp://${bind}:${port}?${q}#video=h264#audio=opus`
+		return `udp://${bind}:${port}?${q}`
+	}
+
+	_stopUdpPushBridges() {
+		for (const p of this._udpBridgeProcs) {
+			try {
+				if (p.exitCode === null) p.kill('SIGTERM')
+			} catch {
+				/* ignore */
+			}
+		}
+		this._udpBridgeProcs = []
+	}
+
+	/**
+	 * @param {Array<{name: string}>} targets
+	 * @param {Object} config
+	 * @param {string} casparHost
+	 * @param {number} myGeneration
+	 */
+	_startUdpPushBridges(targets, config, casparHost, myGeneration) {
+		if (this.activeTier !== 'srt') return
+
+		this._stopUdpPushBridges()
+
+		const ffmpegBin = config.ffmpeg_path || process.env.FFMPEG_PATH || 'ffmpeg'
+		const apiPort = config.go2rtcPort
+		const base = `http://127.0.0.1:${apiPort}`
+
+		for (const t of targets) {
+			const input = this.udpListenUrlForCaspar(t.port, casparHost)
+			const pushUrl = `${base}/api/stream.ts?dst=${encodeURIComponent(t.name)}`
+			const args = [
+				'-hide_banner',
+				'-loglevel',
+				'warning',
+				'-nostats',
+				'-i',
+				input,
+				'-c',
+				'copy',
+				'-f',
+				'mpegts',
+				pushUrl,
+			]
+			const child = spawn(ffmpegBin, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+			this._udpBridgeProcs.push(child)
+			const tag = `[udp-bridge ${t.name}]`
+			child.stderr.on('data', (d) => {
+				process.stderr.write(`${tag} ${d}`)
+			})
+			child.on('close', (code, signal) => {
+				if (myGeneration !== this._startGeneration) return
+				if (code !== 0 && code !== null) {
+					console.warn(`${tag} exited code=${code} signal=${signal || 'none'}`)
+				}
+			})
+			child.on('error', (err) => {
+				console.error(`${tag} spawn error:`, err.message)
+			})
+		}
+
+		console.log(
+			`[go2rtc] UDP→HTTP MPEG-TS bridge(s) started (${targets.length}) → ${base}/api/stream.ts?dst=…`
+		)
+	}
+
+	/**
+	 * After Caspar ADD STREAM, poll go2rtc until each stream has at least one producer (HTTP push connected).
+	 * @param {Array<{name: string}>} targets
+	 * @param {Object} config
+	 * @param {{ log?: (level: string, msg: string) => void }} [ctx]
+	 */
+	async waitForPushIngestReady(targets, config, ctx = {}) {
+		if (this.activeTier !== 'srt') return
+
+		const names = targets.map((t) => t.name)
+		const port = config.go2rtcPort
+		const timeoutMs = 20000
+		const intervalMs = 250
+		const deadline = Date.now() + timeoutMs
+		const log = ctx.log || (() => {})
+
+		while (Date.now() < deadline) {
+			const ok = await this._streamsHaveProducers(port, names)
+			if (ok) {
+				log('info', '[Streaming] go2rtc: push ingest active (producers present) for all preview streams')
+				return
+			}
+			await new Promise((r) => setTimeout(r, intervalMs))
+		}
+
+		log(
+			'warn',
+			'[Streaming] go2rtc: push ingest not confirmed in time — preview may work after MPEG-TS arrives'
+		)
+	}
+
+	/**
+	 * @param {number} apiPort
+	 * @param {string[]} names
+	 * @returns {Promise<boolean>}
+	 */
+	_streamsHaveProducers(apiPort, names) {
+		return new Promise((resolve) => {
+			const req = http.get(
+				{
+					hostname: '127.0.0.1',
+					port: apiPort,
+					path: '/api/streams',
+					timeout: 3000,
+				},
+				(res) => {
+					let data = ''
+					res.on('data', (c) => {
+						data += c
+					})
+					res.on('end', () => {
+						try {
+							const json = JSON.parse(data)
+							const ok = names.every((n) => {
+								const s = json[n]
+								return s && Array.isArray(s.producers) && s.producers.length > 0
+							})
+							resolve(ok)
+						} catch {
+							resolve(false)
+						}
+					})
+				}
+			)
+			req.on('error', () => resolve(false))
+			req.on('timeout', () => {
+				req.destroy()
+				resolve(false)
+			})
+		})
 	}
 
 	/**
@@ -189,8 +345,12 @@ class Go2rtcManager {
 
 		for (const t of targets) {
 			this.streams[t.name] = t
-			let source
+			if (tier === 'srt') {
+				yamlLines.push(`  ${t.name}: null`)
+				continue
+			}
 
+			let source
 			switch (tier) {
 				case 'local':
 					source = this.buildLocalSource(config)
@@ -198,10 +358,8 @@ class Go2rtcManager {
 				case 'ndi':
 					source = this.buildNdiSource(config, t.channel)
 					break
-				case 'srt':
 				default:
-					source = this.buildSrtSource(config, t.port, casparHost)
-					break
+					throw new Error(`go2rtc generateYaml: unexpected tier ${tier}`)
 			}
 
 			yamlLines.push(`  ${t.name}:`)
@@ -226,6 +384,8 @@ class Go2rtcManager {
 	async start(targets, config, casparHost = '127.0.0.1') {
 		this._startGeneration += 1
 		const myGeneration = this._startGeneration
+
+		this._stopUdpPushBridges()
 
 		if (this.process) {
 			await this.stop()
@@ -252,7 +412,11 @@ class Go2rtcManager {
 			`[go2rtc] Wrote ${this.yamlPath} (${yaml.length} bytes) streams=${targets.map((t) => t.name).join(', ')}`
 		)
 		for (const t of targets) {
-			console.log(`[go2rtc]   ${t.name}: Caspar channel ${t.channel} → UDP ${t.port} (go2rtc ingest)`)
+			const via =
+				this.activeTier === 'srt'
+					? `UDP ${t.port} (external ffmpeg → go2rtc HTTP push)`
+					: 'go2rtc ingest'
+			console.log(`[go2rtc]   ${t.name}: Caspar channel ${t.channel} → ${via}`)
 		}
 
 		return new Promise((resolve, reject) => {
@@ -267,6 +431,7 @@ class Go2rtcManager {
 				if (myGeneration !== this._startGeneration) return
 				if (!isStarted) {
 					isStarted = true
+					this._startUdpPushBridges(targets, config, casparHost, myGeneration)
 					resolve()
 				}
 			}
@@ -275,6 +440,10 @@ class Go2rtcManager {
 				const s = d.toString()
 				if (!isStarted && s.includes('go2rtc version')) {
 					setTimeout(onReady, 500)
+				}
+				// go2rtc often logs to stdout (including `log: level: debug`); forward so systemd/journal sees it.
+				if (s.trim()) {
+					process.stdout.write(`[go2rtc] ${s}`)
 				}
 			})
 
@@ -335,21 +504,32 @@ class Go2rtcManager {
 	}
 
 	async stop() {
+		this._stopUdpPushBridges()
+
 		if (!this.process) return
 
 		return new Promise((resolve) => {
-			this.process.on('close', resolve)
-			this.process.kill('SIGTERM')
-
-			setTimeout(() => {
-				if (this.process) {
-					this.process.kill('SIGKILL')
-					this.process = null
-				}
+			const proc = this.process
+			let settled = false
+			const finish = () => {
+				if (settled) return
+				settled = true
+				this.process = null
 				resolve()
-			}, 5000)
-		}).then(() => {
-			this.process = null
+			}
+			proc.once('close', finish)
+			proc.kill('SIGTERM')
+			/** Orphan ffmpeg UDP listeners survive if SIGKILL is delayed — 1.5s then SIGKILL frees basePort+1..N sooner. */
+			setTimeout(() => {
+				if (this.process && this.process.exitCode === null) {
+					try {
+						this.process.kill('SIGKILL')
+					} catch {
+						/* ignore */
+					}
+				}
+				finish()
+			}, 1500)
 		})
 	}
 

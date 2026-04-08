@@ -4,26 +4,45 @@ const { execSync } = require('child_process')
 const logger = require('./logger').defaultLogger
 
 /**
+ * @param {string} mode
+ * @returns {string} xrandr mode name e.g. 1920x1080
+ */
+function mapCasparModeToXrandrRes(mode) {
+	if (!mode) return '1920x1080'
+	const s = String(mode)
+	if (s === '1080p5000' || s === '1080p50') return '1920x1080'
+	if (s === '720p5000' || s === '720p50') return '1280x720'
+	const m = s.match(/^(\d+)x(\d+)/)
+	return m ? `${m[1]}x${m[2]}` : '1920x1080'
+}
+
+/**
  * Applies X11 screen positioning using xrandr.
  * Maps screen_N_system_id (e.g. HDMI-0) to its target resolution and position.
+ * Optional screen_N_os_mode / screen_N_os_rate set OS output mode; otherwise derived from casparServer.screen_N_mode.
  * @param {object} config - Unified app config
  */
 function applyX11Layout(config) {
-	const screenCount = Math.min(4, Math.max(1, parseInt(String(config.screen_count || 1), 10) || 1))
+	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : {}
+	const screenCount = Math.min(
+		4,
+		Math.max(1, parseInt(String(config.screen_count ?? cs.screen_count ?? 1), 10) || 1),
+	)
 	let cumulativeX = 0
 
 	for (let n = 1; n <= screenCount; n++) {
 		const sysId = config[`screen_${n}_system_id`]
-		const mode = config[`screen_${n}_mode`] || '1920x1080' // default fallback if not in caspar format
-		
-		// Map Caspar-style "1080p5000" to xrandr-style "1920x1080" if needed
-		// For now we assume the setup CLI or user saves xrandr-compatible modes
-		let res = mode
-		if (mode === '1080p5000' || mode === '1080p50') res = '1920x1080'
-		else if (mode === '720p5000' || mode === '720p50') res = '1280x720'
+		const osMode = config[`screen_${n}_os_mode`]
+		const osRate = config[`screen_${n}_os_rate`]
+		const casparMode = cs[`screen_${n}_mode`]
+		let res = (osMode && String(osMode).trim()) || mapCasparModeToXrandrRes(casparMode)
 
 		if (sysId) {
-			const cmd = `xrandr --display :0 --output ${sysId} --mode ${res} --pos ${cumulativeX}x0`
+			let cmd = `xrandr --display :0 --output ${sysId} --mode ${res} --pos ${cumulativeX}x0`
+			const r = typeof osRate === 'number' ? osRate : parseFloat(String(osRate || ''))
+			if (Number.isFinite(r) && r > 0) {
+				cmd += ` --rate ${r}`
+			}
 			logger.info(`[OS-Config] Applying: ${cmd}`)
 			try {
 				execSync(cmd, { stdio: 'inherit' })
@@ -32,8 +51,6 @@ function applyX11Layout(config) {
 			}
 		}
 
-		// Calculate next X position (naively assuming horizontal stacking)
-		// Try to parse width from resolution string
 		const resMatch = res.match(/^(\d+)x(\d+)/)
 		const width = resMatch ? parseInt(resMatch[1], 10) : 1920
 		cumulativeX += width
@@ -58,5 +75,5 @@ function restartDisplayManager() {
 
 module.exports = {
 	applyX11Layout,
-	restartDisplayManager
+	restartDisplayManager,
 }

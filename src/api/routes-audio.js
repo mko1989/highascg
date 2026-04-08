@@ -6,8 +6,18 @@
 'use strict'
 
 const defaults = require('../../config/default')
+const { normalizeAudioRouting } = require('../config/config-generator')
 const { listAudioDevices } = require('../audio/audio-devices')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+
+/**
+ * @param {object} ctx
+ * @param {'info'|'warn'|'error'|'debug'} level
+ * @param {string} msg
+ */
+function apiLog(ctx, level, msg) {
+	if (ctx && typeof ctx.log === 'function') ctx.log(level, msg)
+}
 
 /**
  * @param {string} path
@@ -36,7 +46,7 @@ async function handlePost(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Expected { audioRouting: { ... } }' }) }
 		}
 		const base = defaults.audioRouting || {}
-		ctx.config.audioRouting = { ...base, ...(ctx.config.audioRouting || {}), ...ar }
+		ctx.config.audioRouting = normalizeAudioRouting({ ...base, ...(ctx.config.audioRouting || {}), ...ar })
 		if (ctx.configManager) {
 			const newConfig = {
 				...ctx.configManager.get(),
@@ -79,6 +89,44 @@ async function handlePost(path, body, ctx) {
 				error:
 					'Channel routing is not exposed via AMCP in this build. Configure audio buses in Caspar config / HighAsCG config generator.',
 			}),
+		}
+	}
+
+	if (path === '/api/audio/default-device') {
+		const b = parseBody(body)
+		if (!b || typeof b !== 'object') {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
+		}
+		if (b.card == null || b.device == null) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing card or device' }) }
+		}
+		const card = parseInt(b.card, 10)
+		const device = parseInt(b.device, 10)
+		const scope = b.scope === 'system' ? 'system' : 'user'
+		apiLog(
+			ctx,
+			'info',
+			`[Audio] POST /api/audio/default-device card=${card} device=${device} scope=${scope} (user=~/.asoundrc, system=/etc/asound.conf)`
+		)
+		const { setDefaultAlsaDevice } = require('../audio/audio-devices')
+		const res = setDefaultAlsaDevice(card, device, { scope })
+		if (!res.ok) {
+			apiLog(ctx, 'error', `[Audio] ALSA default write failed (${scope}): ${res.error || 'unknown'}`)
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					ok: false,
+					scope,
+					error: res.error || 'Failed to write ALSA default',
+				}),
+			}
+		}
+		apiLog(ctx, 'info', `[Audio] ALSA default updated (${res.scope || scope}) → ${res.path || '?'}`)
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: true, scope: res.scope || scope, path: res.path }),
 		}
 	}
 

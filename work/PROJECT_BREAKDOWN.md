@@ -63,6 +63,11 @@ The entry point. It initializes all subsystems, loads configuration, manages the
     - `routes-scene.js`: Scene-based production logic.
     - `routes-streaming.js`: Controls for the go2rtc preview engine.
     - `routes-ingest.js`: Client-server synchronization and file management.
+    - `routes-audio.js`: System-wide ALSA default device and multi-channel routing.
+
+### `src/audio/` (Hardware Integration)
+- **`audio-devices.js`**: Enumerates ALSA and PipeWire hardware; manages `/etc/asound.conf` for system-wide default output (Yamaha DM3 integration).
+- **`config-generator.js`**: Generates `casparcg.config` XML with mapped audio layouts and `<system-audio>` stereo downmixes.
 
 ### `src/caspar/` (AMCP Communication)
 - **`connection-manager.js`**: Manages the TCP connection to CasparCG, including reconnection logic and health checks.

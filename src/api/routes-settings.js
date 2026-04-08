@@ -6,10 +6,12 @@
 'use strict'
 
 const defaults = require('../../config/default')
+const { normalizeAudioRouting } = require('../config/config-generator')
+const { normalizeCasparServerConfigPath } = require('./routes-caspar-config')
 const { normalizeOscConfig } = require('../osc/osc-config')
 const { startOscPlaybackInfoSupplement } = require('../utils/periodic-sync')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { getConnectedDisplayNames } = require('../utils/hardware-info')
+const { getDisplayDetails } = require('../utils/hardware-info')
 const { applyX11Layout, restartDisplayManager } = require('../utils/os-config')
 
 function pickOscForPersistence(o) {
@@ -44,7 +46,14 @@ async function handleGet(path, ctx) {
 			streaming: {
 				enabled: ctx.config.streaming.enabled,
 				quality: ctx.config.streaming.quality,
+				/** Effective values after {@link resolveStreamingConfig} (preset expands quality → resolution/fps/bitrate). */
+				resolution: ctx.config.streaming.resolution,
+				fps: ctx.config.streaming.fps,
+				maxBitrate: ctx.config.streaming.maxBitrate,
 				basePort: ctx.config.streaming.basePort,
+				/** Runtime: UDP tier may relocate if configured ports are busy (see `_effectiveBasePort`). */
+				autoRelocateBasePort: ctx.config.streaming.autoRelocateBasePort !== false,
+				effectiveBasePort: ctx.config.streaming._effectiveBasePort ?? ctx.config.streaming.basePort,
 				ffmpeg_path: ctx.config.streaming.ffmpeg_path,
 				hardware_accel: ctx.config.streaming.hardware_accel,
 				captureMode: ctx.config.streaming.captureMode || 'auto',
@@ -54,6 +63,7 @@ async function handleGet(path, ctx) {
 				localCaptureDevice: ctx.config.streaming.localCaptureDevice || 'auto',
 				x11Display: ctx.config.streaming.x11Display || ':0',
 				drmDevice: ctx.config.streaming.drmDevice || '/dev/dri/card0',
+				go2rtcLogLevel: ctx.config.streaming.go2rtcLogLevel || '',
 			},
 			server: {
 				httpPort: ctx.config.server.httpPort,
@@ -69,13 +79,30 @@ async function handleGet(path, ctx) {
 				wsDeltaBroadcast: ctx.config.osc.wsDeltaBroadcast,
 			},
 			ui: ctx.config.ui || defaults.ui,
-			audioRouting: { ...(defaults.audioRouting || {}), ...(ctx.config.audioRouting || {}) },
+			audioRouting: normalizeAudioRouting({ ...(defaults.audioRouting || {}), ...(ctx.config.audioRouting || {}) }),
 			periodic_sync_interval_sec: ctx.config.periodic_sync_interval_sec,
 			periodic_sync_interval_sec_osc: ctx.config.periodic_sync_interval_sec_osc,
 			osc_info_supplement_ms: ctx.config.osc_info_supplement_ms ?? defaults.osc_info_supplement_ms,
 			channelMap: ctx.getState().channelMap, // Includes programChannels, previewChannels, etc.
 			offline_mode: !!ctx.config.offline_mode,
-			casparServer: { ...(defaults.casparServer || {}), ...(ctx.config.casparServer || {}) },
+			casparServer: (() => {
+				const cs = { ...(defaults.casparServer || {}), ...(ctx.config.casparServer || {}) }
+				normalizeCasparServerConfigPath(cs)
+				return cs
+			})(),
+			screen_count: ctx.config.screen_count ?? ctx.config.casparServer?.screen_count ?? 1,
+			screen_1_system_id: ctx.config.screen_1_system_id ?? '',
+			screen_2_system_id: ctx.config.screen_2_system_id ?? '',
+			screen_3_system_id: ctx.config.screen_3_system_id ?? '',
+			screen_4_system_id: ctx.config.screen_4_system_id ?? '',
+			screen_1_os_mode: ctx.config.screen_1_os_mode ?? '',
+			screen_2_os_mode: ctx.config.screen_2_os_mode ?? '',
+			screen_3_os_mode: ctx.config.screen_3_os_mode ?? '',
+			screen_4_os_mode: ctx.config.screen_4_os_mode ?? '',
+			screen_1_os_rate: ctx.config.screen_1_os_rate ?? '',
+			screen_2_os_rate: ctx.config.screen_2_os_rate ?? '',
+			screen_3_os_rate: ctx.config.screen_3_os_rate ?? '',
+			screen_4_os_rate: ctx.config.screen_4_os_rate ?? '',
 		}),
 	}
 }
@@ -86,7 +113,7 @@ async function handleGet(path, ctx) {
  */
 async function handleHardwareGet(path) {
 	if (path === '/api/hardware/displays') {
-		const displays = getConnectedDisplayNames()
+		const displays = getDisplayDetails()
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ displays }) }
 	}
 	return null
@@ -134,6 +161,14 @@ async function handlePost(path, body, ctx) {
 		if (s.drmDevice !== undefined && s.drmDevice !== '') {
 			ctx.config.streaming.drmDevice = s.drmDevice
 		}
+		if (s.go2rtcLogLevel !== undefined) {
+			const t = String(s.go2rtcLogLevel).trim().toLowerCase()
+			if (!t) delete ctx.config.streaming.go2rtcLogLevel
+			else ctx.config.streaming.go2rtcLogLevel = t
+		}
+		if (s.autoRelocateBasePort !== undefined) {
+			ctx.config.streaming.autoRelocateBasePort = !!s.autoRelocateBasePort
+		}
 	}
 	if (settings.periodic_sync_interval_sec !== undefined) {
 		ctx.config.periodic_sync_interval_sec = parseInt(settings.periodic_sync_interval_sec, 10)
@@ -168,7 +203,11 @@ async function handlePost(path, body, ctx) {
 	}
 
 	if (settings.audioRouting && typeof settings.audioRouting === 'object') {
-		ctx.config.audioRouting = { ...(defaults.audioRouting || {}), ...(ctx.config.audioRouting || {}), ...settings.audioRouting }
+		ctx.config.audioRouting = normalizeAudioRouting({
+			...(defaults.audioRouting || {}),
+			...(ctx.config.audioRouting || {}),
+			...settings.audioRouting,
+		})
 	}
 
 	if (settings.offline_mode !== undefined) {
@@ -181,14 +220,40 @@ async function handlePost(path, body, ctx) {
 			...(ctx.config.casparServer || {}),
 			...settings.casparServer,
 		}
+		normalizeCasparServerConfigPath(ctx.config.casparServer)
+	}
+
+	// System tab: physical displays → X11 layout (persisted next to casparServer)
+	if (settings.screen_count !== undefined && settings.screen_count !== null) {
+		const n = parseInt(String(settings.screen_count), 10)
+		if (Number.isFinite(n) && n >= 1 && n <= 4) ctx.config.screen_count = n
+	}
+	for (let n = 1; n <= 4; n++) {
+		const sid = `screen_${n}_system_id`
+		if (settings[sid] !== undefined) ctx.config[sid] = String(settings[sid] ?? '').trim()
+		const om = `screen_${n}_os_mode`
+		if (settings[om] !== undefined) ctx.config[om] = String(settings[om] ?? '').trim()
+		const or = `screen_${n}_os_rate`
+		if (settings[or] !== undefined) {
+			const t = String(settings[or] ?? '').trim()
+			if (t === '') delete ctx.config[or]
+			else {
+				const r = parseFloat(t)
+				if (Number.isFinite(r) && r > 0) ctx.config[or] = r
+				else delete ctx.config[or]
+			}
+		}
 	}
 
 	// Persist to file (Refactored T1.2)
 	if (ctx.configManager) {
+		const streamingForDisk = { ...ctx.config.streaming }
+		delete streamingForDisk._effectiveBasePort
+		delete streamingForDisk._casparHost
 		const newConfig = {
 			...ctx.configManager.get(),
 			caspar: ctx.config.caspar,
-			streaming: ctx.config.streaming,
+			streaming: streamingForDisk,
 			periodic_sync_interval_sec: ctx.config.periodic_sync_interval_sec,
 			periodic_sync_interval_sec_osc: ctx.config.periodic_sync_interval_sec_osc,
 			osc_info_supplement_ms: ctx.config.osc_info_supplement_ms,
@@ -197,6 +262,26 @@ async function handlePost(path, body, ctx) {
 			audioRouting: ctx.config.audioRouting || defaults.audioRouting,
 			offline_mode: ctx.config.offline_mode,
 			casparServer: ctx.config.casparServer || defaults.casparServer,
+		}
+		const SYS_KEYS = [
+			'screen_count',
+			'screen_1_system_id',
+			'screen_2_system_id',
+			'screen_3_system_id',
+			'screen_4_system_id',
+			'screen_1_os_mode',
+			'screen_2_os_mode',
+			'screen_3_os_mode',
+			'screen_4_os_mode',
+			'screen_1_os_rate',
+			'screen_2_os_rate',
+			'screen_3_os_rate',
+			'screen_4_os_rate',
+		]
+		for (const k of SYS_KEYS) {
+			if (settings[k] === undefined) continue
+			if (ctx.config[k] !== undefined) newConfig[k] = ctx.config[k]
+			else delete newConfig[k]
 		}
 		ctx.configManager.save(newConfig)
 	}
@@ -230,7 +315,9 @@ async function handlePost(path, body, ctx) {
 		JSON.stringify(oldStreaming.ndiChannelNames || {}) !== JSON.stringify(ctx.config.streaming.ndiChannelNames || {}) ||
 		oldStreaming.localCaptureDevice !== ctx.config.streaming.localCaptureDevice ||
 		oldStreaming.x11Display !== ctx.config.streaming.x11Display ||
-		oldStreaming.drmDevice !== ctx.config.streaming.drmDevice
+		oldStreaming.drmDevice !== ctx.config.streaming.drmDevice ||
+		(oldStreaming.go2rtcLogLevel || '') !== (ctx.config.streaming.go2rtcLogLevel || '') ||
+		oldStreaming.autoRelocateBasePort !== ctx.config.streaming.autoRelocateBasePort
 	)
 	if (streamingChanged) {
 		sideEffects.push('Applying streaming changes…')

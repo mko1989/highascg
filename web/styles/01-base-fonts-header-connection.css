@@ -1,0 +1,494 @@
+/**
+ * CasparCG web client — base styles.
+ * Dark theme, broadcast-oriented UI.
+ * @see main_plan.md Prompt 11
+ */
+
+@font-face {
+	font-family: 'Rewir';
+	src:
+		url('../fonts/Rewir-Light.woff') format('woff'),
+		url('../fonts/Rewir-Light.ttf') format('truetype');
+	font-weight: 300;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--font-ui: 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--bg-dark: #0d1117;
+	--bg-panel: #161b22;
+	--bg-elevated: #21262d;
+	--border: #30363d;
+	--text: #e6edf3;
+	--text-muted: #8b949e;
+	--accent: #58a6ff;
+	--accent-hover: #79b8ff;
+	--success: #3fb950;
+	--warn: #d29922;
+	--error: #f85149;
+	--radius: 6px;
+	--header-h: 48px;
+	--panel-w: 260px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-ui);
+	background: var(--bg-dark);
+	color: var(--text);
+	line-height: 1.5;
+	height: 100vh;
+	overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea,
+optgroup {
+	font-family: inherit;
+}
+
+.app {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+
+/* Header */
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	flex-wrap: nowrap;
+	gap: 0;
+	height: var(--header-h);
+	padding: 0 16px;
+	background: var(--bg-panel);
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+.header__title {
+	margin: 0;
+	font-size: 1.1rem;
+	font-weight: 600;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.header-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: 12px;
+	min-width: 0;
+	flex: 0 1 auto;
+}
+
+.header-mid {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: 1.5rem;
+	flex-shrink: 0;
+}
+
+.header-led-test {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 4px;
+	padding-left: 10px;
+	border-left: 1px solid var(--border);
+}
+
+.header-led-test__label {
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.header-btn--led-setup {
+	padding: 2px 8px;
+	font-size: 0.75rem;
+	margin-right: 0;
+}
+
+.header-led-test .header-btn--ftb {
+	padding: 2px 10px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	background: #9b1c1c !important;
+	border-color: #c53030 !important;
+	color: #fff !important;
+}
+
+.header-led-test .header-btn--ftb:hover {
+	background: #b22222 !important;
+	border-color: #e85a5a !important;
+	color: #fff !important;
+}
+
+.header-right {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-left: auto;
+	/* Allow shrinking so a long PGM title does not push the whole block off-screen (body overflow:hidden clips the left). */
+	flex: 0 1 auto;
+	min-width: 0;
+	position: relative;
+	z-index: 50;
+}
+
+.header-project {
+	display: flex;
+	align-items: center;
+	min-width: 100px;
+	max-width: 200px;
+	margin: 0;
+}
+
+.header-project__name {
+	width: 140px;
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.9rem;
+}
+
+.header-project__name:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.header-project__name::placeholder {
+	color: var(--text-muted);
+}
+
+.header-btn {
+	padding: 4px 12px;
+	margin-right: 0;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+
+.header-btn:hover {
+	background: var(--accent);
+	color: var(--bg-dark);
+	border-color: var(--accent);
+}
+
+.header__status {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.5rem;
+	flex: 1 1 0;
+	min-width: 0;
+	margin: 0;
+	flex-wrap: nowrap;
+	overflow: hidden;
+}
+
+/* PGM clip time (OSC, topmost layer) — left of connection eye */
+.header-pgm-timer-wrap {
+	flex: 1 1 0;
+	min-width: 0;
+	max-width: min(100%, 18rem);
+	overflow: hidden;
+	text-align: right;
+}
+
+/* Beats injected .playback-timer { min-width: 8em } from playback-timer.js */
+.header__status .playback-timer.header-pgm-timer {
+	font-size: 11px;
+	line-height: 1.25;
+	min-width: 0;
+	width: 100%;
+	max-width: 100%;
+}
+
+.header__status .header-pgm-timer .playback-timer__row {
+	min-width: 0;
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Headphones + menu stay visible when the timer competes for width */
+.header-right .header-audio {
+	flex-shrink: 0;
+}
+
+.header__status .connection-eye-wrap {
+	flex-shrink: 0;
+	position: relative;
+	z-index: 20;
+}
+
+.header__status .connection-eye {
+	flex-shrink: 0;
+	min-width: 72px;
+	min-height: 28px;
+}
+
+.header__status .connection-eye__img {
+	width: 72px;
+	height: 28px;
+}
+
+/* Server config vs module (FEAT-1) */
+.server-config-strip {
+	background: var(--bg-elevated);
+	border-bottom: 1px solid var(--border);
+	padding: 10px 16px 12px;
+	font-size: 0.8rem;
+	max-height: 50vh;
+	overflow: auto;
+}
+
+.server-config-strip__summary {
+	font-weight: 600;
+	margin-bottom: 8px;
+}
+
+.server-config-strip__summary--ok {
+	color: var(--accent, #58a6ff);
+}
+
+.server-config-strip__summary--warn {
+	color: #e6a23c;
+}
+
+.server-config-strip__table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 8px;
+	font-size: 0.75rem;
+}
+
+.server-config-strip__table th,
+.server-config-strip__table td {
+	border: 1px solid var(--border);
+	padding: 4px 8px;
+	text-align: left;
+}
+
+.server-config-strip__table th {
+	background: var(--bg-dark);
+}
+
+.server-config-strip__issues {
+	margin: 0 0 8px 1.2em;
+	padding: 0;
+	color: #e6a23c;
+}
+
+.server-config-strip__hint {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 0.75rem;
+}
+
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	animation: pulse 1.5s infinite;
+}
+
+.status-dot.connected {
+	background: var(--success);
+	animation: none;
+}
+
+.status-dot.disconnected {
+	background: var(--error);
+	animation: none;
+}
+
+/* Connection Eye — eye-only SVGs (see connection-eye.js).
+   Fixed box: blink frames have wider aspect than open; avoids layout jump on src swap. */
+.connection-eye {
+	min-width: 120px;
+	min-height: 44px;
+	cursor: help;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.connection-eye__img {
+	display: block;
+	box-sizing: border-box;
+	width: 120px;
+	height: 44px;
+	object-fit: contain;
+	object-position: center;
+}
+
+/* Offline draft mode: green eyes with a blue tint */
+.connection-eye.offline .connection-eye__img {
+	filter: brightness(0) saturate(100%) invert(40%) sepia(1) saturate(3) hue-rotate(175deg) brightness(1.05);
+}
+
+/* Position (fixed) and placement are set in connection-eye.js so the header does not reflow. */
+.connection-eye-tooltip {
+	min-width: 14rem;
+	max-width: min(28rem, calc(100vw - 16px));
+	max-height: min(70vh, 28rem);
+	overflow: auto;
+	padding: 10px 12px;
+	box-sizing: border-box;
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	font-variant-numeric: tabular-nums;
+	color: var(--text, #e6edf3);
+	background: var(--bg-elevated, #21262d);
+	border: 1px solid var(--border, #30363d);
+	border-radius: 8px;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+	z-index: 10050;
+}
+
+.connection-eye-tooltip[hidden] {
+	display: none !important;
+}
+
+@keyframes pulse {
+	50% { opacity: 0.5; }
+}
+
+/* Three-panel layout */
+.layout {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.panel {
+	width: var(--panel-w);
+	min-width: var(--panel-w);
+	background: var(--bg-panel);
+	border-right: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.panel:last-of-type {
+	border-right: none;
+	border-left: 1px solid var(--border);
+}
+
+.panel-sources {
+	width: var(--sources-panel-w, 300px);
+	min-width: 220px;
+	max-width: 520px;
+	flex-shrink: 0;
+}
+
+/* Resize handle between sources panel and workspace */
+.resize-handle {
+	flex-shrink: 0;
+	width: 6px;
+	cursor: col-resize;
+	background: transparent;
+	position: relative;
+}
+.resize-handle::after {
+	content: '';
+	position: absolute;
+	left: 2px;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: var(--border);
+	border-radius: 1px;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+.resize-handle:hover::after,
+.resize-handle:active::after {
+	opacity: 1;
+	background: var(--accent);
+}
+
+/* Resize handle between sources and workspace */
+.resize-handle {
+	flex-shrink: 0;
+	width: 6px;
+	background: transparent;
+	cursor: col-resize;
+	position: relative;
+}
+.resize-handle:hover,
+.resize-handle:active {
+	background: var(--border);
+}
+.resize-handle::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -2px;
+	right: -2px;
+}
+
+.panel__header {
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border);
+}
+
+.panel__header h2 {
+	margin: 0;
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.panel__body {
+	flex: 1;
+	overflow: auto;
+	padding: 16px;
+}
+
+/* Sources panel: flex layout so media list fills and scrolls internally */
+#panel-sources .panel__body {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+}
+
+/* Center workspace */
+.workspace {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	background: var(--bg-dark);
+}
+

@@ -1,6 +1,7 @@
 /**
  * Scene layer MIXER FILL — same “contain / original aspect” math as web nativeFill.
- * Channel pixel size from `getModeDimensions` / screen_*_mode (see config-modes).
+ * Channel pixel size: prefer live INFO CONFIG (`channelMap` from GET /state or `buildChannelMap(appCtx)`),
+ * else `getModeDimensions` / screen_*_mode.
  * @see companion-module-casparcg-server/src/scene-native-fill.js
  */
 
@@ -9,6 +10,25 @@
 const { parseCinfMedia } = require('../media/cinf-parse')
 const { getChannelMap } = require('../config/routing')
 const { getModeDimensions } = require('../config/config-modes')
+const { buildChannelMap } = require('../config/channel-map-from-ctx')
+
+/**
+ * HTTP GET /state includes channelMap; engine StateManager.getState() does not.
+ * Always derive live resolutions from config + Caspar INFO CONFIG when channelMap is absent.
+ */
+function getMergedChannelMap(self) {
+	let st = null
+	try {
+		if (self?.state && typeof self.state.getState === 'function') st = self.state.getState()
+	} catch (_) {}
+	if (st?.channelMap) return st.channelMap
+	if (self && typeof self === 'object' && self.config) {
+		try {
+			return buildChannelMap(self)
+		} catch (_) {}
+	}
+	return null
+}
 
 function parseResolutionString(s) {
 	if (!s || typeof s !== 'string') return null
@@ -50,12 +70,38 @@ function nativeFillNorm(contentW, contentH, channelW, channelH) {
 	return { x, y, scaleX, scaleY }
 }
 
-function getChannelResolutionForChannel(config, channel) {
+/**
+ * Pixel size of a Caspar channel for scene FILL math.
+ * Prefer live INFO CONFIG via HTTP state (`channelMap`) so PGM/PRV match running outputs;
+ * fall back to config screen_*_mode when state is missing.
+ * @param {object} config
+ * @param {string|number} channel
+ * @param {object} [self] — app ctx (`config`, `gatheredInfo`) or `state.getState()` with channelMap
+ */
+function getChannelResolutionForChannel(config, channel, self) {
 	const map = getChannelMap(config || {})
 	const n = parseInt(channel, 10)
 	const cfg = config || {}
+	const cm = getMergedChannelMap(self)
+
 	for (let i = 0; i < map.screenCount; i++) {
-		if (map.programCh(i + 1) === n || map.previewCh(i + 1) === n) {
+		const progCh = map.programCh(i + 1)
+		const prvCh = map.previewCh(i + 1)
+		if (progCh === n || prvCh === n) {
+			if (cm) {
+				const byCh = cm.channelResolutionsByChannel && cm.channelResolutionsByChannel[n]
+				if (byCh && byCh.w > 0 && byCh.h > 0) {
+					return { w: byCh.w, h: byCh.h }
+				}
+				if (progCh === n) {
+					const pr = cm.programResolutions?.[i]
+					if (pr?.w > 0 && pr?.h > 0) return { w: pr.w, h: pr.h }
+				}
+				if (prvCh === n) {
+					const pr = cm.previewResolutions?.[i]
+					if (pr?.w > 0 && pr?.h > 0) return { w: pr.w, h: pr.h }
+				}
+			}
 			const modeKey = cfg[`screen_${i + 1}_mode`] || cfg.screen_mode || '1080p5000'
 			const dims = getModeDimensions(modeKey, cfg, i + 1)
 			return dims ? { w: dims.width, h: dims.height } : { w: 1920, h: 1080 }
@@ -64,6 +110,52 @@ function getChannelResolutionForChannel(config, channel) {
 	const modeKey = cfg.screen_mode || '1080p5000'
 	const dims = getModeDimensions(modeKey, cfg, 1)
 	return dims ? { w: dims.width, h: dims.height } : { w: 1920, h: 1080 }
+}
+
+function getScreenIndexForChannel(config, channel) {
+	const map = getChannelMap(config || {})
+	const n = parseInt(channel, 10)
+	for (let i = 0; i < map.screenCount; i++) {
+		if (map.programCh(i + 1) === n || map.previewCh(i + 1) === n) return i
+	}
+	return 0
+}
+
+/**
+ * Scene fill is normalized to the **program** compose canvas (`channelMap.programResolutions[screen]`),
+ * not necessarily to the Caspar channel pixel size. Map authoring pixels → target channel (same as web
+ * `mapProgramPixelRectToTargetOutput`).
+ */
+function mapProgramPixelRectToTargetOutput(px, progW, progH, outW, outH) {
+	const pw = Math.max(1, progW)
+	const ph = Math.max(1, progH)
+	const ow = Math.max(1, outW)
+	const oh = Math.max(1, outH)
+	if (Math.abs(pw - ow) < 0.5 && Math.abs(ph - oh) < 0.5) {
+		return { x: px.x, y: px.y, w: px.w, h: px.h }
+	}
+	const k = Math.min(ow / pw, oh / ph)
+	const ox = (ow - pw * k) / 2
+	const oy = (oh - ph * k) / 2
+	return {
+		x: px.x * k + ox,
+		y: px.y * k + oy,
+		w: px.w * k,
+		h: px.h * k,
+	}
+}
+
+/**
+ * @returns {{ w: number, h: number }}
+ */
+function getProgramAuthoringResolution(self, config, channel) {
+	const screenIdx = getScreenIndexForChannel(config, channel)
+	const cm = getMergedChannelMap(self)
+	const pr = cm?.programResolutions?.[screenIdx]
+	if (pr?.w > 0 && pr?.h > 0) return { w: pr.w, h: pr.h }
+	const map = getChannelMap(config || {})
+	const progCh = map.programCh(screenIdx + 1)
+	return getChannelResolutionForChannel(config, progCh, self)
 }
 
 function resolutionFromProbeEntry(p) {
@@ -211,7 +303,13 @@ function calcMixerFill(ls, res, contentRes) {
 	return { x: nx, y: ny, xScale: lw / res.w, yScale: lh / res.h }
 }
 
-function resolveSceneLayerFill(layer, channelW, channelH, mediaRes) {
+/**
+ * @param {number} authoringW - program compose width (layer fill is normalized to this)
+ * @param {number} authoringH
+ * @param {number} targetW - Caspar channel receiving MIXER (PGM or PRV)
+ * @param {number} targetH
+ */
+function resolveSceneLayerFill(layer, authoringW, authoringH, targetW, targetH, mediaRes) {
 	const raw = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const srcType = layer.source && layer.source.type
 	if (srcType === 'timeline') return raw
@@ -223,27 +321,33 @@ function resolveSceneLayerFill(layer, channelW, channelH, mediaRes) {
 	const stretchMode = mapContentFitToStretch(layer)
 	if (stretchMode === 'stretch') return raw
 
+	const aw = authoringW > 0 ? authoringW : 1920
+	const ah = authoringH > 0 ? authoringH : 1080
+	const tw = targetW > 0 ? targetW : aw
+	const th = targetH > 0 ? targetH : ah
+
 	const px = {
-		x: raw.x * channelW,
-		y: raw.y * channelH,
-		w: raw.scaleX * channelW,
-		h: raw.scaleY * channelH,
+		x: raw.x * aw,
+		y: raw.y * ah,
+		w: raw.scaleX * aw,
+		h: raw.scaleY * ah,
 	}
-	const ls = { x: px.x, y: px.y, w: px.w, h: px.h, stretch: stretchMode }
-	const res = { w: channelW, h: channelH }
-	const out = calcMixerFill(ls, res, mediaRes)
+	const mapped = mapProgramPixelRectToTargetOutput(px, aw, ah, tw, th)
+	const ls = { x: mapped.x, y: mapped.y, w: mapped.w, h: mapped.h, stretch: stretchMode }
+	const out = calcMixerFill(ls, { w: tw, h: th }, mediaRes)
 	return { x: out.x, y: out.y, scaleX: out.xScale, scaleY: out.yScale }
 }
 
 async function getResolvedFillForSceneLayer(self, layer, channel) {
-	const { w, h } = getChannelResolutionForChannel(self?.config, channel)
+	const { w: authW, h: authH } = getProgramAuthoringResolution(self, self?.config, channel)
+	const { w: targetW, h: targetH } = getChannelResolutionForChannel(self?.config, channel, self)
 	const clip = clipPath(layer)
 	let mediaRes = getMediaResolutionFromSelf(self, clip)
 	if ((!mediaRes || !(mediaRes.w > 0 && mediaRes.h > 0)) && clip) {
 		const fromAmcp = await fetchCinfResolutionFromAmcp(self, clip)
 		if (fromAmcp) mediaRes = fromAmcp
 	}
-	return resolveSceneLayerFill(layer, w, h, mediaRes)
+	return resolveSceneLayerFill(layer, authW, authH, targetW, targetH, mediaRes)
 }
 
 module.exports = {

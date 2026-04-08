@@ -4,61 +4,17 @@
 
 'use strict'
 
-const { getChannelMap } = require('../config/routing')
 const liveSceneState = require('../state/live-scene-state')
 const playbackTracker = require('../state/playback-tracker')
 const { parseCinfMedia } = require('../media/cinf-parse')
-const { buildChannelResolutionMap } = require('../config/server-info-config')
+const { buildChannelMap } = require('../config/channel-map-from-ctx')
 
 /**
  * @param {object} ctx — app context (state, config, gatheredInfo, …)
  */
 function getState(ctx) {
 	const cfg = ctx.config || {}
-	const map = getChannelMap(cfg)
-	const defaultRes = { w: 1920, h: 1080, fps: 50 }
-	const infoXml = (ctx.gatheredInfo && ctx.gatheredInfo.infoConfig) || ''
-	const serverByCh = infoXml.trim() ? buildChannelResolutionMap(infoXml) : {}
-
-	function pickRes(channelNum) {
-		const r = serverByCh[channelNum]
-		if (r && r.w > 0 && r.h > 0) return { w: r.w, h: r.h, fps: r.fps }
-		return { ...defaultRes }
-	}
-
-	const programResolutions = (map.programChannels || []).map((ch) => pickRes(ch))
-	const previewResolutions = (map.previewChannels || []).map((ch) => pickRes(ch))
-	const dlFromConfig = ctx.gatheredInfo?.decklinkFromConfig || {}
-	const cfgDlExplicitZero = cfg.decklink_input_count != null && String(cfg.decklink_input_count) === '0'
-	const decklinkCount = map.decklinkCount > 0 ? map.decklinkCount : cfgDlExplicitZero ? 0 : (dlFromConfig.decklinkCount ?? 0)
-	const inputsCh = map.decklinkCount > 0 ? map.inputsCh : cfgDlExplicitZero ? null : (dlFromConfig.inputsCh ?? null)
-	const inputsResolution = dlFromConfig.inputsResolution ?? null
-
-	/** Per Caspar channel index (1-based), from INFO CONFIG when available */
-	const channelResolutionsByChannel = {}
-	for (const k of Object.keys(serverByCh)) {
-		const n = parseInt(k, 10)
-		if (Number.isFinite(n)) channelResolutionsByChannel[n] = { ...serverByCh[n] }
-	}
-
-	const audioOnlyResolutions = (map.audioOnlyChannels || []).map((ch) => pickRes(ch))
-
-	const channelMap = {
-		screenCount: map.screenCount,
-		decklinkCount,
-		programChannels: Array.from({ length: map.screenCount }, (_, i) => map.programCh(i + 1)),
-		previewChannels: Array.from({ length: map.screenCount }, (_, i) => map.previewCh(i + 1)),
-		multiviewCh: map.multiviewCh,
-		inputsCh,
-		programResolutions,
-		previewResolutions,
-		inputsResolution,
-		channelResolutionsByChannel,
-		programAudioLayouts: [],
-		audioOnlyChannels: map.audioOnlyChannels,
-		audioOnlyLayouts: [],
-		audioOnlyResolutions: audioOnlyResolutions,
-	}
+	const channelMap = buildChannelMap(ctx)
 
 	let base
 	if (ctx.state && typeof ctx.state.getState === 'function') {

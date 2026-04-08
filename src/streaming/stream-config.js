@@ -19,31 +19,57 @@ const STREAMING_DEFAULTS = {
 	ndiSourcePattern: 'CasparCG Channel {ch}', // {ch} replaced with channel number
 	/** @type {Record<string, string>} channel number string -> exact NDI source name (ndiNamingMode === 'custom') */
 	ndiChannelNames: {},
-	quality: 'medium', // low, medium, high, custom
-	basePort: 10000,
+	quality: 'medium', // low | medium | high | native | ultrafast (see QUALITY_PRESETS)
+	basePort: 40000,
 	hardwareAccel: true,
 	maxBitrate: 2000,
-	resolution: '540p', // native, 720p, 540p, 360p
+	/** Effective output: `half` = width/2 × height/2 (dynamic). `native` = full canvas. Fixed: 720p | 540p | 360p. */
+	resolution: 'half',
 	fps: 25, // native, 25, 15, 10
 	/** DRM device for `kmsgrab` local capture (Linux). */
 	drmDevice: '/dev/dri/card0',
+	/**
+	 * Optional: `trace` | `debug` | `info` | `warn` | `error` — merged into generated `go2rtc.yaml` (`log:`).
+	 * Env `HIGHASCG_GO2RTC_LOG_LEVEL` overrides when this is unset. Do not edit `go2rtc.yaml` by hand; it is overwritten when go2rtc starts.
+	 */
+	go2rtcLogLevel: null,
+	/**
+	 * When true (default), UDP tier probes base+1 / +2 / +5 before starting bridges; if busy (e.g. stale Caspar STREAM),
+	 * scans upward for a free block and uses that runtime base (`_effectiveBasePort`). Set false to fail fast instead.
+	 */
+	autoRelocateBasePort: true,
 }
 
 const QUALITY_PRESETS = {
+	/** ½ resolution, low fps/bitrate — fastest. */
 	low: {
-		resolution: '360p',
+		resolution: 'half',
 		fps: 15,
-		maxBitrate: 500,
+		maxBitrate: 800,
 	},
+	/** Default: ½ resolution (e.g. 3840×768 → 1920×384). */
 	medium: {
-		resolution: '540p',
+		resolution: 'half',
 		fps: 25,
 		maxBitrate: 2000,
 	},
+	/** ½ resolution, higher bitrate. */
 	high: {
-		resolution: '720p',
+		resolution: 'half',
 		fps: 25,
 		maxBitrate: 4000,
+	},
+	/** Full Caspar resolution (no half-scale). Heavier. */
+	native: {
+		resolution: 'native',
+		fps: 25,
+		maxBitrate: 15000,
+	},
+	/** Same idea as low — minimal bitrate. */
+	ultrafast: {
+		resolution: 'half',
+		fps: 15,
+		maxBitrate: 500,
 	},
 }
 

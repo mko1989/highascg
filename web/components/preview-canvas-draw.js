@@ -323,6 +323,9 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 	}
 
 	if (!scene?.layers?.length) {
+		if (isLive && composeDualStreamPreview) {
+			return
+		}
 		ctx.fillStyle = '#6e7681'
 		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
 		ctx.fillText('Add layers and assign sources', 16, Math.round(H / 2))
@@ -458,6 +461,9 @@ export function drawTimelineStack(ctx, W, H, opts) {
 
 	const tl = timelineState.getActive()
 	if (!tl) {
+		if (isLive && composeDualStreamPreview) {
+			return
+		}
 		ctx.fillStyle = '#6e7681'
 		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
 		ctx.fillText('No timeline', 16, Math.round(H / 2))

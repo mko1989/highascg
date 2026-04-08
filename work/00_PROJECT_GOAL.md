@@ -109,6 +109,8 @@ The `companion-module-casparcg-server` module (~17,744 lines across 64 files) is
 | 12 | [12_WO_PRODUCTION_INSTALLER.md](./12_WO_PRODUCTION_INSTALLER.md) | Production Installer: Automated bash script, service setup, firewall hardening |
 | 13 | [13_WO_FINAL_POLISH_AND_HARDENING.md](./13_WO_FINAL_POLISH_AND_HARDENING.md) | Final Polish & Hardening: API batching, security restricts, Looks workflow |
 | 14 | [14_WO_OFFLINE_PREPARATION_MODE.md](./14_WO_OFFLINE_PREPARATION_MODE.md) | Offline Preparation Mode: Metadata caching, simulated client, draft sync |
+| 15 | [15_WO_CLIENT_SERVER_SYNC.md](./15_WO_CLIENT_SERVER_SYNC.md) | Client-Server Sync: Sequential differential media sync to production |
+| 16 | [16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md](./16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md) | Yamaha DM3 Integration: ALSA default, stereo downmix, OSC metering |
 
 ---
 *Created: 2026-04-04 | Project: HighAsCG Migration*

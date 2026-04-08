@@ -244,12 +244,13 @@ async function setupAllRouting(self) {
 			fs.copyFileSync(ledSrc, ledDest)
 			self.log('info', `Deployed led_grid_test.html to ${ledDest} (${label})`)
 		}
-		for (const eyeSvg of ['both_open.svg', 'left_closed.svg', 'right_closed.svg']) {
-			const eyeSrc = path.join(templatesDir(), eyeSvg)
-			const eyeDest = path.join(destDir, eyeSvg)
-			if (fs.existsSync(eyeSrc) && !fs.existsSync(eyeDest)) {
-				fs.copyFileSync(eyeSrc, eyeDest)
-				self.log('info', `Deployed ${eyeSvg} to ${eyeDest} (${label})`)
+		/** Full character frames for led_grid_test (not the header status-eye assets). */
+		for (const name of ['both_open.svg', 'left_closed.svg', 'right_closed.svg']) {
+			const src = path.join(templatesDir(), name)
+			const dest = path.join(destDir, name)
+			if (fs.existsSync(src) && !fs.existsSync(dest)) {
+				fs.copyFileSync(src, dest)
+				self.log('info', `Deployed ${name} to ${dest} (${label})`)
 			}
 		}
 	}

@@ -5,6 +5,8 @@
  */
 
 const STORAGE_KEY = 'casparcg_multiview_layout'
+/** Four quick-save slots (localStorage); first click saves, later clicks recall (see multiview-editor). */
+const PRESETS_STORAGE_KEY = 'casparcg_multiview_presets_v1'
 const DEFAULT_WIDTH = 1920
 const DEFAULT_HEIGHT = 1080
 
@@ -271,6 +273,60 @@ export class MultiviewState {
 			h: clamp(c.h / ch),
 			source: c.source?.value || null,
 		}))
+	}
+
+	/** Deep snapshot for preset slots 1–4. */
+	snapshotForPreset() {
+		return {
+			cells: JSON.parse(JSON.stringify(this.cells)),
+			canvasWidth: this.canvasWidth,
+			canvasHeight: this.canvasHeight,
+			showOverlay: this.showOverlay,
+			audioActiveCellId: this.audioActiveCellId,
+		}
+	}
+
+	/** Replace layout from a preset snapshot (persists + emits change). */
+	applyPresetSnapshot(snapshot) {
+		if (!snapshot || !Array.isArray(snapshot.cells)) return
+		this.cells = migratePreviewRouteSources(JSON.parse(JSON.stringify(snapshot.cells)))
+		this.canvasWidth = snapshot.canvasWidth ?? this.canvasWidth
+		this.canvasHeight = snapshot.canvasHeight ?? this.canvasHeight
+		this.showOverlay = snapshot.showOverlay !== false
+		this.audioActiveCellId = snapshot.audioActiveCellId ?? null
+		this._save()
+	}
+
+	/** @returns {(object | null)[]} length 4 — null = slot never saved */
+	getPresetSlots() {
+		try {
+			const raw = localStorage.getItem(PRESETS_STORAGE_KEY)
+			if (raw) {
+				const arr = JSON.parse(raw)
+				if (Array.isArray(arr) && arr.length === 4) return arr
+			}
+		} catch {}
+		return [null, null, null, null]
+	}
+
+	/** @param {number} index 0–3 */
+	savePresetSlot(index, snapshot) {
+		if (index < 0 || index > 3 || !snapshot) return
+		const slots = this.getPresetSlots()
+		slots[index] = snapshot
+		try {
+			localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(slots))
+		} catch {}
+	}
+
+	/** Clear a preset slot (Shift+click in multiview editor). */
+	clearPresetSlot(index) {
+		if (index < 0 || index > 3) return
+		const slots = this.getPresetSlots()
+		slots[index] = null
+		try {
+			localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(slots))
+		} catch {}
 	}
 }
 

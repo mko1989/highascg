@@ -29,6 +29,8 @@ export async function apiGet(path) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				if (j?.path) detail += '\n' + j.path
+				if (j?.hint) detail += '\n\n' + j.hint
 			}
 		} catch {}
 		throw new Error(`HTTP ${res.status}: ${detail}`)
@@ -63,6 +65,8 @@ export async function apiPost(path, body = {}) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				if (j?.path) detail += '\n' + j.path
+				if (j?.hint) detail += '\n\n' + j.hint
 			}
 		} catch {}
 		throw new Error(`HTTP ${res.status}: ${detail}`)
@@ -91,6 +95,8 @@ export async function apiPut(path, body = {}) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				if (j?.path) detail += '\n' + j.path
+				if (j?.hint) detail += '\n\n' + j.hint
 			}
 		} catch {}
 		throw new Error(`HTTP ${res.status}: ${detail}`)

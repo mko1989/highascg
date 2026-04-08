@@ -17,9 +17,10 @@ async function handleMultiviewApply(body, ctx) {
 	const b = parseBody(body)
 	const layout = b.layout
 	const showOverlay = !!b.showOverlay
-	if (!Array.isArray(layout) || layout.length === 0) {
+	if (!Array.isArray(layout)) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'layout array required' }) }
 	}
+	const MAX_MV_LAYERS = 48
 	const map = getChannelMap(ctx.config || {})
 	if (!map.multiviewEnabled || map.multiviewCh == null) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Multiview not enabled' }) }
@@ -133,7 +134,10 @@ async function handleMultiviewApply(body, ctx) {
 	}
 
 	const doApply = async () => {
-		const layersToClear = [...Array(layout.length).keys()].map((i) => i + 1)
+		const layersToClear =
+			layout.length > 0
+				? [...Array(layout.length).keys()].map((i) => i + 1)
+				: Array.from({ length: MAX_MV_LAYERS }, (_, i) => i + 1)
 		if (showOverlay) layersToClear.push(OVERLAY_LAYER)
 		for (const L of layersToClear) {
 			try {

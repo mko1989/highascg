@@ -9,6 +9,47 @@ const { listNdiSources } = require('../streaming/ndi-resolve')
 const GO2RTC_ERROR_BODY_LOG_MAX = 4096
 
 /**
+ * go2rtc spawns ffmpeg on WebRTC offers; concurrent POSTs (even for different `src`,
+ * e.g. prv_1 + pgm_1 a few ms apart) can race inside go2rtc and hit
+ * "bind failed: Address already in use" on UDP ingest. Per-src queues are not enough.
+ * Serialize **all** proxy forwards to go2rtc one at a time.
+ * @type {Promise<unknown>}
+ */
+let webrtcProxyGlobalTail = Promise.resolve()
+
+/**
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function runGo2rtcWebrtcProxyGlobal(fn) {
+	const prev = webrtcProxyGlobalTail
+	const result = prev.then(() => fn())
+	webrtcProxyGlobalTail = result.catch(() => {})
+	return result
+}
+
+/**
+ * Same `src` can still be requested twice quickly (retry / two UI surfaces). Chain per src
+ * inside the global queue so duplicate offers for one stream never overlap.
+ * @type {Map<string, Promise<unknown>>}
+ */
+const webrtcProxyTailBySrc = new Map()
+
+/**
+ * @template T
+ * @param {string} src
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function runGo2rtcWebrtcProxySerial(src, fn) {
+	const prev = webrtcProxyTailBySrc.get(src) || Promise.resolve()
+	const result = prev.then(() => fn())
+	webrtcProxyTailBySrc.set(src, result.catch(() => {}))
+	return result
+}
+
+/**
  * @param {Buffer} raw
  * @returns {string}
  */
@@ -33,6 +74,20 @@ async function proxyGo2rtcWebrtc(query, body, ctx) {
 	if (!src) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'missing src query parameter' }) }
 	}
+	if (ctx?.streamingPipelineReady === false) {
+		return {
+			status: 503,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Streaming pipeline not ready (Caspar outputs not up yet)' }),
+		}
+	}
+	return runGo2rtcWebrtcProxyGlobal(() =>
+		runGo2rtcWebrtcProxySerial(src, () => proxyGo2rtcWebrtcOnce(query, body, ctx))
+	)
+}
+
+async function proxyGo2rtcWebrtcOnce(query, body, ctx) {
+	const src = query.src
 	const port = ctx?.config?.streaming?.go2rtcPort ?? 1984
 	const pathQ = `/api/webrtc?src=${encodeURIComponent(src)}`
 	const buf = Buffer.from(typeof body === 'string' ? body : '', 'utf8')
@@ -116,13 +171,18 @@ async function handleGet(path, ctx) {
 		}
 	}
 	if (path === '/api/streams') {
+		const pipelineReady = !!ctx?.streamingPipelineReady
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				streams: go2rtcManager.availableStreams,
 				isRunning: !!go2rtcManager.process,
-				config: go2rtcManager.config || {}
+				/** Caspar UDP/NDI consumers registered — safe to negotiate WebRTC (MPEG-TS flowing). */
+				pipelineReady,
+				config: go2rtcManager.config || {},
+				effectiveBasePort:
+					ctx?.config?.streaming?._effectiveBasePort ?? ctx?.config?.streaming?.basePort,
 			})
 		}
 	}

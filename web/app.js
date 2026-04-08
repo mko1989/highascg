@@ -34,6 +34,25 @@ let _oscClient = null
 /** Set after successful GET /api/state bootstrap. */
 let httpConnected = false
 
+/** Tracks AMCP TCP up so we only fire {@link CustomEvent} `mv-caspar-amcp-connected` on false→true (not on periodic VERSION health lines). */
+let _casparAmcpConnected = false
+
+function casparAmcpConnectedFromState(st) {
+	const raw = st?.caspar
+	const conn =
+		raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
+	const skipped = !!(conn && conn.skipped)
+	return !!(conn && conn.connected) && !skipped
+}
+
+function emitMultiviewApplyIfCasparJustConnected(st) {
+	const now = casparAmcpConnectedFromState(st)
+	if (now && !_casparAmcpConnected) {
+		document.dispatchEvent(new CustomEvent('mv-caspar-amcp-connected'))
+	}
+	_casparAmcpConnected = now
+}
+
 const statusDot = document.getElementById('status-dot')
 const statusText = document.getElementById('status-text')
 const statusNet = document.getElementById('status-net')
@@ -70,6 +89,16 @@ function syncMultiviewCanvasFromChannelMap(cm) {
 	if (w > 0 && h > 0 && (multiviewState.canvasWidth !== w || multiviewState.canvasHeight !== h)) {
 		multiviewState.setCanvasSize(w, h)
 	}
+}
+
+/** Redraw multiview (streams + fit + draw) without pushing layout to Caspar — used after channel map / Caspar reconnect. */
+let mvLayoutRefreshTimer = null
+function scheduleMultiviewLayoutRefresh() {
+	clearTimeout(mvLayoutRefreshTimer)
+	mvLayoutRefreshTimer = setTimeout(() => {
+		mvLayoutRefreshTimer = null
+		document.dispatchEvent(new CustomEvent('mv-layout-refresh'))
+	}, 120)
 }
 
 /** Eye indicator: Caspar AMCP TCP (not browser↔HighAsCG). Reads flat `caspar` or nested `caspar.connection` from WS merges. */
@@ -222,6 +251,8 @@ async function init() {
 		if (data?.channelMap?.programResolutions)
 			sceneState.setCanvasResolutions(data.channelMap.programResolutions)
 		syncMultiviewCanvasFromChannelMap(data?.channelMap)
+		scheduleMultiviewLayoutRefresh()
+		emitMultiviewApplyIfCasparJustConnected(data)
 		if (data?.scene?.live) sceneState.applyServerLiveChannels(data.scene.live, data.channelMap)
 		updateConnectionStatus(true, null, true)
 		refreshStatusLine()
@@ -232,6 +263,11 @@ async function init() {
 			stateStore.applyChange(data.path, data.value)
 			if (data.path === 'scene.live' && data.value) {
 				sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
+			}
+			if (data.path === 'channelMap') scheduleMultiviewLayoutRefresh()
+			if (data.path === 'caspar.connection') {
+				scheduleMultiviewLayoutRefresh()
+				emitMultiviewApplyIfCasparJustConnected(stateStore.getState())
 			}
 			if (
 				data.path === 'caspar.connection' ||
@@ -254,9 +290,8 @@ async function init() {
 	ws.on('connect', () => {
 		updateConnectionStatus(true, null, true)
 		refreshCasparConnectionEye()
-		// Do not sync multiview layout to the module on every WS connect — that persisted browser
-		// defaults and caused Caspar to receive a full multiview apply on next TCP reconnect. Use
-		// Multiview tab → Apply to push layout to the server explicitly.
+		// Multiview APPLY runs on `mv-caspar-amcp-connected` (AMCP false→true), not on browser WS connect.
+		scheduleMultiviewLayoutRefresh()
 		settingsState.load().catch(() => {})
 		streamState.refreshStreams()
 		applyBrowserMonitorFromSettings(settingsState.getSettings())
@@ -366,6 +401,8 @@ async function init() {
 			stateStore.setState(state)
 			sceneState.setCanvasResolutions(state.channelMap?.programResolutions)
 			syncMultiviewCanvasFromChannelMap(state.channelMap)
+			scheduleMultiviewLayoutRefresh()
+			emitMultiviewApplyIfCasparJustConnected(state)
 			if (state.scene?.live) sceneState.applyServerLiveChannels(state.scene.live, state.channelMap)
 			httpConnected = true
 			updateConnectionStatus(true)

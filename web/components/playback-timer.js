@@ -55,7 +55,7 @@ export function playbackFileLabel(f) {
 }
 
 /** @param {string} s */
-function truncatePlaybackLabel(s, max = 48) {
+function truncatePlaybackLabel(s, max = 32) {
 	if (s.length <= max) return s
 	return s.slice(0, Math.max(0, max - 1)) + '…'
 }

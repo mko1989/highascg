@@ -90,6 +90,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		scheduleFlushPreviewFromInspector,
 		sendSceneToPreviewCard,
 		clearLastPreviewLayers,
+		primePreviewSnapshotFromScene,
 	} = createScenesPreviewRuntime({
 		sceneState,
 		stateStore,
@@ -142,6 +143,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			} else {
 				sceneState.applySceneFromTakePayload(sceneId, incomingJson)
 			}
+			primePreviewSnapshotFromScene(sceneId)
 		} catch (e) {
 			showToast(e?.message || String(e), 'error')
 		} finally {
@@ -181,7 +183,10 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 
 	const applyNativeFillForSource = createApplyNativeFillForSource({ sceneState, getCanvas, stateStore })
-	const { startDrag, startRotate, startScale } = createComposeDragHandlers(sceneState, schedulePreviewPush)
+	const { startDrag, startRotate, startScale, startEdgeResize } = createComposeDragHandlers(
+		sceneState,
+		schedulePreviewPush,
+	)
 
 	root.innerHTML = ''
 	const rundownPlaybackSlot = document.createElement('div')
@@ -324,6 +329,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			startDrag,
 			startRotate,
 			startScale,
+			startEdgeResize,
 		})
 	}
 
