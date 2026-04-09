@@ -264,44 +264,59 @@
 	cursor: nwse-resize;
 }
 
-/* Floating audio mixer (buses + layer routing) */
-.audio-mixer {
-	position: fixed;
-	top: calc(var(--header-h) + 8px);
-	right: 12px;
-	z-index: 1000;
+/* Program audio — bottom of Inspector (collapsible section) */
+.audio-mixer--inspector {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-end;
+	align-items: stretch;
 	gap: 0;
 	font-size: 0.8rem;
+	width: 100%;
 }
 
-.audio-mixer__tab {
-	padding: 6px 12px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
+.audio-mixer__section-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	margin: 0;
+	padding: 10px 16px;
+	border: none;
+	border-top: 1px solid var(--border);
 	background: var(--bg-elevated);
-	color: var(--text);
+	color: var(--text-muted);
 	cursor: pointer;
 	font-size: 0.8rem;
 	font-weight: 600;
+	text-align: left;
 }
-.audio-mixer__tab:hover {
-	border-color: var(--accent);
-	color: var(--accent-hover);
+.audio-mixer__section-toggle:hover {
+	color: var(--text);
+	background: var(--bg-3, #21262d);
+}
+.audio-mixer__section-chevron {
+	display: inline-block;
+	width: 1em;
+	flex-shrink: 0;
+	font-size: 0.65rem;
+	opacity: 0.85;
+}
+.audio-mixer__section-label {
+	flex: 1;
+	min-width: 0;
 }
 
-.audio-mixer__panel {
-	margin-top: 6px;
-	width: min(360px, calc(100vw - 24px));
-	max-height: min(70vh, 520px);
+.audio-mixer--inspector .audio-mixer__panel {
+	margin-top: 0;
+	width: 100%;
+	max-height: min(50vh, 360px);
 	overflow: auto;
 	padding: 12px;
 	background: var(--bg-panel);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	border: none;
+	border-top: 1px solid var(--border);
+	border-radius: 0;
+	box-shadow: none;
 }
 
 .audio-mixer__title {

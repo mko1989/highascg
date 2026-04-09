@@ -102,3 +102,7 @@ This document maps out the CasparCG TCP AMCP commands, their respective HighAsCG
 | `THUMBNAIL RETRIEVE`  | `thumbnailRetrieve`      | `GET /api/thumbnail/:filename` |
 | `THUMBNAIL GENERATE`  | `thumbnailGenerate`      | `POST /api/thumbnails/generate` |
 | `THUMBNAIL GENERATE_ALL` | `thumbnailGenerateAll`| `POST /api/thumbnails/generate-all` |
+
+## Scene take (`POST /api/scene/take`)
+
+Default look take uses dual-bank mixer opacity crossfades (`runSceneTake`). Optional **`takeMode: "lbg"`** runs **`runSceneTakeLbg`**: per layer, `LOADBG` with the look’s transition (e.g. `MIX` + frames + tween), then mixer setup, then `PLAY` with no clip (FG/BG swap). Timeline-only looks ignore `takeMode` and use the timeline engine.

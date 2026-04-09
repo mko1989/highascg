@@ -151,6 +151,7 @@ function renderMediaBrowser(container, media, filter) {
 		`
 		makeDraggable(el, 'media', id, label, {
 			resolution: item.resolution || '',
+			...(item.durationMs != null && item.durationMs > 0 ? { durationMs: item.durationMs } : {}),
 		})
 		container.appendChild(el)
 	})

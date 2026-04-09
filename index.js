@@ -155,6 +155,13 @@ function main() {
 			? { ...persistedBanks }
 			: {}
 	const persistedMv = persistence.get('multiviewLayout')
+	const persistedSceneDeck = persistence.get('scene_deck')
+	const sceneDeck =
+		persistedSceneDeck &&
+		typeof persistedSceneDeck === 'object' &&
+		Array.isArray(persistedSceneDeck.looks)
+			? { looks: persistedSceneDeck.looks }
+			: { looks: [] }
 	const appCtx = {
 		config,
 		state,
@@ -173,6 +180,8 @@ function main() {
 		mediaDetails: {},
 		programLayerBankByChannel,
 		_multiviewLayout: persistedMv && typeof persistedMv === 'object' ? persistedMv : null,
+		/** Live look id/name list from web UI (WS `scene_deck_sync`); persisted for Companion before browser connects. */
+		sceneDeck,
 		persistence,
 		log: (level, msg) => {
 			if (level === 'error') logger.error(msg)
@@ -246,13 +255,13 @@ function main() {
 		appCtx.streamingPipelineReady = false
 		try {
 			config.streaming._casparHost = config.caspar.host
-			const tier = resolveCaptureTier(config.streaming.captureMode || 'auto', config.caspar.host)
+			const tier = resolveCaptureTier(config.streaming.captureMode || 'udp', config.caspar.host)
 			appCtx.log(
 				'info',
 				`[Streaming] startStreamingSubsystem tier=${tier} caspar=${config.caspar.host} amcpConnected=${!!appCtx.amcp?.isConnected}`
 			)
 
-			if (tier === 'srt') {
+			if (tier === 'udp') {
 				const r = await resolveFreeStreamingBasePort(config.streaming.basePort, {
 					autoRelocate: config.streaming.autoRelocateBasePort !== false,
 					maxScan: 500,
@@ -277,7 +286,7 @@ function main() {
 				}
 				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
 				appCtx.streamingPipelineReady = !!appCtx.amcp?.isConnected
-			} else if (tier === 'srt') {
+			} else if (tier === 'udp') {
 				// UDP MPEG-TS: go2rtc first, then Caspar ADD STREAM. Do not expose pipelineReady until ADD completes
 				// or the browser negotiates WebRTC before MPEG-TS exists → ffmpeg 500 / version banner on stderr.
 				appCtx.log('info', '[Streaming] UDP tier: starting go2rtc first, then Caspar ADD STREAM')

@@ -26,7 +26,7 @@ function validateFfmpegNdiInput() {
 		return {
 			ok: false,
 			error:
-				'ffmpeg has no libndi_newtek_input demuxer (see ffmpeg -formats). Install NDI-enabled FFmpeg or use captureMode "srt".',
+				'ffmpeg has no libndi_newtek_input demuxer (see ffmpeg -formats). Install NDI-enabled FFmpeg or use captureMode "udp".',
 		}
 	}
 	return { ok: true }

@@ -21,12 +21,13 @@
 
 		<div class="layout">
 			<aside class="panel panel-sources" id="panel-sources">
-				<div class="panel__header">
+				<div class="panel__header panel__header--with-actions">
+					<button type="button" class="panel__collapse-btn" id="panel-sources-collapse" aria-expanded="true" aria-label="Collapse Sources" title="Collapse Sources">«</button>
 					<h2>Sources</h2>
 				</div>
 				<div class="panel__body" id="sources-panel-body"></div>
 			</aside>
-			<div class="resize-handle resize-handle--sources" id="resize-sources" title="Drag to resize"></div>
+			<div class="resize-handle resize-handle--sources" id="resize-sources" title="Drag to resize Sources" aria-hidden="true"></div>
 
 			<main class="workspace">
 				<div class="workspace__tabs">
@@ -42,12 +43,15 @@
 				</div>
 			</main>
 
+			<div class="resize-handle resize-handle--inspector" id="resize-inspector" title="Drag to resize Inspector" aria-hidden="true"></div>
 			<aside class="panel panel-inspector" id="panel-inspector">
-				<div class="panel__header">
+				<div class="panel__header panel__header--with-actions">
 					<h2>Inspector</h2>
+					<button type="button" class="panel__collapse-btn" id="panel-inspector-collapse" aria-expanded="true" aria-label="Collapse Inspector" title="Collapse Inspector">»</button>
 				</div>
-				<div class="panel__body" id="panel-inspector-body">
-					<p class="placeholder">Select an item</p>
+				<div class="panel__body panel-inspector__body" id="panel-inspector-body">
+					<div class="panel-inspector__scroll" id="panel-inspector-scroll"></div>
+					<div class="panel-inspector__audio" id="panel-inspector-audio-mount" aria-label="Program audio section"></div>
 				</div>
 			</aside>
 		</div>

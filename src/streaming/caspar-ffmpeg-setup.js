@@ -150,7 +150,7 @@ async function addStreamingConsumers(amcp, targets, config) {
 		return
 	}
 
-	const tier = resolveCaptureTier(config.captureMode || 'auto', config._casparHost || '127.0.0.1')
+	const tier = resolveCaptureTier(config.captureMode || 'udp', config._casparHost || '127.0.0.1')
 	console.log(`[Streaming] addStreamingConsumers: tier=${tier} targets=${targets.map((t) => `ch${t.channel}:${t.port}`).join(', ')}`)
 
 	if (tier === 'local') {
@@ -229,7 +229,7 @@ async function removeStreamingConsumers(amcp, targets, config) {
 		return
 	}
 
-	const tier = config ? resolveCaptureTier(config.captureMode || 'auto', config._casparHost || '127.0.0.1') : 'srt'
+	const tier = config ? resolveCaptureTier(config.captureMode || 'udp', config._casparHost || '127.0.0.1') : 'udp'
 	console.log(`[Streaming] removeStreamingConsumers: tier=${tier}`)
 
 	for (const t of targets) {
@@ -242,7 +242,7 @@ async function removeStreamingConsumers(amcp, targets, config) {
 			} catch (e) {
 				console.warn(`[Streaming] REMOVE NDI ch${t.channel}:`, e?.message || e)
 			}
-		} else if (tier === 'srt') {
+		} else if (tier === 'udp') {
 			for (const u of casparUdpStreamUriVariantsForRemove(t.port)) {
 				try {
 					console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
@@ -260,6 +260,7 @@ async function removeStreamingConsumers(amcp, targets, config) {
 module.exports = {
 	SCALE_HALF_VF,
 	buildFfmpegArgs,
+	casparUdpStreamUri,
 	addStreamingConsumers,
 	removeStreamingConsumers,
 }

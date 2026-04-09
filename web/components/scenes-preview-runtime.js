@@ -12,10 +12,12 @@ const PREVIEW_PUSH_DEBOUNCE_MS = 300
 
 /** Scene content on PRV uses the same layer numbers as PGM (L9 = black CG; looks use L10+). */
 const PREVIEW_SCENE_LAYER_MIN = 10
-/** Always clear at least through this layer so stale clips from earlier sessions are removed. */
-const PREVIEW_SCENE_LAYER_CLEAR_MIN_SPAN = 48
+/** Layers above max(used) to clear so stray frames from nudged geometry don’t linger (was a fixed 10–48 sweep). */
+const PREVIEW_CLEAR_LAYER_BUFFER = 4
 /** Safety cap — very deep stacks only. */
 const PREVIEW_SCENE_LAYER_CLEAR_CAP = 128
+/** Must match server {@link ../../src/caspar/amcp-batch.js MAX_BATCH_COMMANDS} for BEGIN…COMMIT chunks. */
+const AMCP_BATCH_MAX_COMMANDS = 96
 
 /** @param {{ sceneState: object, stateStore: object, getPreviewChannel: () => number, getPreviewOutputResolution: () => { w: number, h: number, fps?: number } }} opts */
 export function createScenesPreviewRuntime(opts) {
@@ -160,7 +162,11 @@ export function createScenesPreviewRuntime(opts) {
 						: 0
 				const clearThrough = Math.min(
 					PREVIEW_SCENE_LAYER_CLEAR_CAP,
-					Math.max(PREVIEW_SCENE_LAYER_CLEAR_MIN_SPAN, sceneMaxLayer, lastMaxLayer)
+					Math.max(
+						PREVIEW_SCENE_LAYER_MIN,
+						sceneMaxLayer + PREVIEW_CLEAR_LAYER_BUFFER,
+						lastMaxLayer + PREVIEW_CLEAR_LAYER_BUFFER
+					)
 				)
 				/** @type {string[]} */
 				const clearCmds = []
@@ -169,10 +175,11 @@ export function createScenesPreviewRuntime(opts) {
 					clearCmds.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`)
 				}
 				clearCmds.push(`MIXER ${Number(previewCh)} COMMIT`)
-				const chunkSize = 40
-				for (let i = 0; i < clearCmds.length; i += chunkSize) {
+				for (let i = 0; i < clearCmds.length; i += AMCP_BATCH_MAX_COMMANDS) {
 					try {
-						await api.post('/api/amcp/batch', { commands: clearCmds.slice(i, i + chunkSize) })
+						await api.post('/api/amcp/batch', {
+							commands: clearCmds.slice(i, i + AMCP_BATCH_MAX_COMMANDS),
+						})
 					} catch {
 						/* ignore */
 					}

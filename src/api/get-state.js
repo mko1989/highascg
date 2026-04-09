@@ -43,6 +43,11 @@ function getState(ctx) {
 		port: cfg.caspar?.port,
 	}
 
+	const timelineEngine = ctx.timelineEngine
+	const timelines = timelineEngine && typeof timelineEngine.getAll === 'function' ? timelineEngine.getAll() : []
+	const timelinePlayback =
+		timelineEngine && typeof timelineEngine.getPlayback === 'function' ? timelineEngine.getPlayback() : null
+
 	return {
 		...base,
 		caspar: casparConn,
@@ -50,6 +55,14 @@ function getState(ctx) {
 		scene: {
 			live: liveSceneState.getAll(),
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
+			deck:
+				ctx.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks)
+					? ctx.sceneDeck
+					: { looks: [] },
+		},
+		timeline: {
+			list: timelines,
+			playback: timelinePlayback,
 		},
 		playback: {
 			matrix: playbackTracker.getMatrixForState(ctx),

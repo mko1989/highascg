@@ -14,6 +14,7 @@ import { initScenesEditor } from './components/scenes-editor.js'
 import { initTimelineEditor } from './components/timeline-editor.js'
 import { initInspectorPanel } from './components/inspector-panel.js'
 import { initMultiviewEditor } from './components/multiview-editor.js'
+import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
@@ -161,36 +162,6 @@ function updateConnectionStatus(connected, error, isLive = false) {
 	}
 }
 
-function initPanelResize() {
-	const handle = document.getElementById('resize-sources')
-	const panel = document.getElementById('panel-sources')
-	if (!handle || !panel) return
-	const root = document.documentElement
-	const minW = 220
-	const maxW = 520
-	handle.addEventListener('mousedown', (e) => {
-		if (e.button !== 0) return
-		e.preventDefault()
-		const startX = e.clientX
-		const startW = panel.getBoundingClientRect().width
-		const onMove = (ev) => {
-			const dx = ev.clientX - startX
-			const w = Math.max(minW, Math.min(maxW, startW + dx))
-			root.style.setProperty('--sources-panel-w', `${w}px`)
-		}
-		const onUp = () => {
-			document.removeEventListener('mousemove', onMove)
-			document.removeEventListener('mouseup', onUp)
-			document.body.style.cursor = ''
-			document.body.style.userSelect = ''
-		}
-		document.body.style.cursor = 'col-resize'
-		document.body.style.userSelect = 'none'
-		document.addEventListener('mousemove', onMove)
-		document.addEventListener('mouseup', onUp)
-	})
-}
-
 function initTabs() {
 	const tabs = document.querySelectorAll('.tab')
 	const panes = document.querySelectorAll('.tab-pane')
@@ -242,7 +213,7 @@ async function init() {
 	})
 
 	initTabs()
-	initPanelResize()
+	initWorkspaceLayout()
 
 	// WebSocket + OSC fan-out (standalone server). Companion HTTP-only: WS may fail; HTTP still works.
 	_oscClient = new OscClient({ wsClient: ws })
@@ -287,11 +258,37 @@ async function init() {
 	})
 	ws.on('timeline.tick', (data) => stateStore.applyChange('timeline.tick', data))
 	ws.on('timeline.playback', (pb) => stateStore.applyChange('timeline.playback', pb))
+
+	/** Push look id/name list to server for Companion / GET /api/state (live; no project save required). */
+	function buildSceneDeckPayload() {
+		return {
+			looks: sceneState.scenes.map((s) => ({
+				id: String(s.id),
+				name: String(s.name || 'Untitled look'),
+			})),
+		}
+	}
+	let sceneDeckSyncTimer = null
+	function scheduleSceneDeckSync() {
+		if (sceneDeckSyncTimer) clearTimeout(sceneDeckSyncTimer)
+		sceneDeckSyncTimer = setTimeout(() => {
+			sceneDeckSyncTimer = null
+			try {
+				ws.send({ type: 'scene_deck_sync', data: buildSceneDeckPayload() })
+			} catch {
+				/* WS not ready */
+			}
+		}, 100)
+	}
+	sceneState.on('change', scheduleSceneDeckSync)
+	sceneState.on('imported', scheduleSceneDeckSync)
+
 	ws.on('connect', () => {
 		updateConnectionStatus(true, null, true)
 		refreshCasparConnectionEye()
 		// Multiview APPLY runs on `mv-caspar-amcp-connected` (AMCP false→true), not on browser WS connect.
 		scheduleMultiviewLayoutRefresh()
+		scheduleSceneDeckSync()
 		settingsState.load().catch(() => {})
 		streamState.refreshStreams()
 		applyBrowserMonitorFromSettings(settingsState.getSettings())
@@ -360,12 +357,16 @@ async function init() {
 		if (path === 'channelMap' || path === 'channels' || path == null) pgmHeaderTimerDestroy?.refresh()
 	})
 
-	initAudioMixerPanel(stateStore)
 	initSourcesPanel(document.querySelector('#panel-sources .panel__body'), stateStore)
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, { getOscClient: () => _oscClient })
 	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore)
 	initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
-	initInspectorPanel(document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
+	const inspectorScroll =
+		document.getElementById('panel-inspector-scroll') ||
+		document.getElementById('panel-inspector-body') ||
+		document.querySelector('#panel-inspector .panel__body')
+	initInspectorPanel(inspectorScroll, stateStore)
+	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
 
 	settingsState.subscribe((s) => {
 		applyBrowserMonitorFromSettings(s)

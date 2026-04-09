@@ -12,6 +12,9 @@ npm-debug.log*
 highascg.config.json
 go2rtc.yaml
 
+# FFmpeg waveform JSON cache (GET /api/local-media/.../waveform)
+data/waveforms/
+
 # Local reference clones (nested git); fetch upstream if needed
 .reference/
 

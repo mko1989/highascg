@@ -409,7 +409,16 @@ optgroup {
 	flex-shrink: 0;
 }
 
-/* Resize handle between sources panel and workspace */
+.panel-inspector {
+	width: var(--inspector-panel-w, 280px);
+	min-width: 220px;
+	max-width: 640px;
+	flex-shrink: 0;
+	border-right: none;
+	border-left: 1px solid var(--border);
+}
+
+/* Side resize handles: 6px hit target, 1px subtle line (hover brightens) */
 .resize-handle {
 	flex-shrink: 0;
 	width: 6px;
@@ -423,11 +432,11 @@ optgroup {
 	left: 2px;
 	top: 0;
 	bottom: 0;
-	width: 2px;
+	width: 1px;
 	background: var(--border);
 	border-radius: 1px;
-	opacity: 0;
-	transition: opacity 0.15s;
+	opacity: 0.5;
+	transition: opacity 0.15s, background 0.15s;
 }
 .resize-handle:hover::after,
 .resize-handle:active::after {
@@ -435,25 +444,56 @@ optgroup {
 	background: var(--accent);
 }
 
-/* Resize handle between sources and workspace */
-.resize-handle {
+.panel.panel--collapsed {
+	width: 36px !important;
+	min-width: 36px !important;
+	max-width: 36px !important;
+	overflow: hidden;
+}
+
+.panel.panel--collapsed .panel__header {
+	padding: 10px 4px;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+}
+
+.panel.panel--collapsed .panel__header h2 {
+	display: none;
+}
+
+.panel.panel--collapsed .panel__body {
+	display: none;
+}
+
+.panel__header--with-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.panel__header--with-actions h2 {
+	flex: 1;
+	min-width: 0;
+}
+
+.panel__collapse-btn {
 	flex-shrink: 0;
-	width: 6px;
-	background: transparent;
-	cursor: col-resize;
-	position: relative;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg-elevated);
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
 }
-.resize-handle:hover,
-.resize-handle:active {
-	background: var(--border);
-}
-.resize-handle::after {
-	content: '';
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	left: -2px;
-	right: -2px;
+
+.panel__collapse-btn:hover {
+	color: var(--text);
+	border-color: var(--accent);
 }
 
 .panel__header {
@@ -472,6 +512,25 @@ optgroup {
 	flex: 1;
 	overflow: auto;
 	padding: 16px;
+}
+
+/* Inspector: main content scrolls; footer holds collapsible program audio */
+#panel-inspector .panel-inspector__body {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	padding: 0;
+}
+#panel-inspector .panel-inspector__scroll {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	padding: 16px;
+}
+#panel-inspector .panel-inspector__audio {
+	flex-shrink: 0;
+	min-height: 0;
 }
 
 /* Sources panel: flex layout so media list fills and scrolls internally */

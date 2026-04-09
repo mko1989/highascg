@@ -95,6 +95,8 @@ module.exports = {
 		multiview_always_on_top: true,
 		decklink_input_count: 0,
 		inputs_channel_mode: '1080p5000',
+		/** CasparCG global `<ndi><auto-load>` in generated casparcg.config (NDI SDK load at startup). */
+		ndi_auto_load: true,
 		configPath: '/opt/casparcg/config/casparcg.config',
 		/** Persisted ALSA default (card/device index). Applied to ~/.asoundrc when set from Settings → System (optional scope=system → /etc/asound.conf). */
 		default_alsa_card: '',
@@ -115,7 +117,8 @@ module.exports = {
 	/** CasparCG OSC (UDP) — see `src/osc/osc-config.js` for runtime env tweaks */
 	osc: {
 		enabled: true,
-		listenPort: 6250,
+		/** Caspar→HighAsCG; 6251 avoids clashing with Caspar `<default-port>` (6250). */
+		listenPort: 6251,
 		listenAddress: '0.0.0.0',
 		peakHoldMs: 2000,
 		emitIntervalMs: 50,

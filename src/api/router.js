@@ -190,15 +190,30 @@ async function routeRequest(method, path, body, ctx, req) {
 	if (method === 'GET' && p === '/api/ingest/preview') return await routesIngest.handleIngestPreview(query, ctx)
 
 	// Media list + local ffprobe — must work when AMCP is down (same folder as ingest / offline)
+	// Project JSON — works without Caspar (disk mirror from web UI Save)
+	if (method === 'POST' && (p === '/api/project/save' || p === '/api/project/load')) {
+		const r = await routesData.handleProject(p, body, ctx)
+		if (r) return r
+	}
+	if (method === 'GET' && p === '/api/project') {
+		const r = await routesData.handleProjectGet(ctx)
+		if (r) return r
+	}
+
 	if (method === 'GET' && p === '/api/media') {
 		const r = await routesState.handleGet(p, ctx, query)
+		if (r) return r
+	}
+	// Duration for timeline drop: CINF + ffprobe fallback — must work when AMCP is down if files are on disk
+	if (method === 'POST' && p === '/api/media/cinf') {
+		const r = await routesMedia.handlePost(p, body, ctx)
 		if (r) return r
 	}
 
 	if (method === 'GET') {
 		const tr = await routesMedia.handleThumbnail(p, query, ctx)
 		if (tr) return tr
-		const lr = await routesMedia.handleLocalMedia(p, ctx)
+		const lr = await routesMedia.handleLocalMedia(p, query, ctx)
 		if (lr) return lr
 	}
 

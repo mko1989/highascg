@@ -5,9 +5,22 @@
 
 'use strict'
 
-const { JSON_HEADERS, jsonBody } = require('./response')
-const { tryLocalThumbnailPng, handleLocalMedia: serveLocalMedia } = require('../media/local-media')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { parseCinfMedia } = require('../media/cinf-parse')
+const {
+	tryLocalThumbnailPng,
+	handleLocalMedia: serveLocalMedia,
+	resolveSafe,
+	probeMedia,
+	getMediaIngestBasePath,
+} = require('../media/local-media')
 const { runMediaClsTlsRefresh } = require('../utils/periodic-sync')
+
+function cinfResponseToStr(data) {
+	if (data == null) return ''
+	if (Array.isArray(data)) return data.join('\n')
+	return String(data)
+}
 
 async function handleThumbnail(path, query, ctx) {
 	if (path === '/api/thumbnails') {
@@ -62,8 +75,26 @@ async function handleThumbnail(path, query, ctx) {
 	}
 }
 
-async function handleLocalMedia(path, ctx) {
-	return serveLocalMedia(path, ctx.config || {})
+async function handleLocalMedia(path, query, ctx) {
+	return serveLocalMedia(path, ctx.config || {}, query || {})
+}
+
+/**
+ * @param {object} ctx
+ * @param {string} id - media id / relative path
+ * @returns {Promise<number>}
+ */
+async function probeDurationMsFromLocalFiles(ctx, id) {
+	const cfg = ctx.config || {}
+	const bases = [String(cfg.local_media_path || '').trim(), getMediaIngestBasePath(cfg)].filter(Boolean)
+	const idNorm = String(id).replace(/\\/g, '/')
+	for (const base of bases) {
+		const fp = resolveSafe(base, idNorm)
+		if (!fp) continue
+		const probed = await probeMedia(fp)
+		if (probed?.durationMs > 0) return probed.durationMs
+	}
+	return 0
 }
 
 async function handleMediaRefresh(body, ctx) {
@@ -83,6 +114,62 @@ async function handleMediaRefresh(body, ctx) {
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/media/refresh') return handleMediaRefresh(body, ctx)
+	if (path === '/api/media/cinf') {
+		const b = parseBody(body)
+		const id = (b.id || b.filename || '').trim()
+		if (!id) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id or filename required' }) }
+		}
+		if (!ctx.amcp?.query?.cinf) {
+			const durationMs = await probeDurationMsFromLocalFiles(ctx, id)
+			if (durationMs > 0) {
+				return {
+					status: 200,
+					headers: JSON_HEADERS,
+					body: jsonBody({ ok: true, id, durationMs, cinf: '', source: 'ffprobe' }),
+				}
+			}
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
+		}
+		try {
+			const res = await ctx.amcp.query.cinf(id)
+			const cinf = cinfResponseToStr(res?.data)
+			const parsed = parseCinfMedia(cinf)
+			let durationMs = parsed.durationMs
+			if (!durationMs || durationMs <= 0) {
+				durationMs = await probeDurationMsFromLocalFiles(ctx, id)
+			}
+			if (ctx.mediaDetails && typeof ctx.mediaDetails === 'object') {
+				ctx.mediaDetails[id] = cinf
+			}
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, id, cinf, ...parsed, ...(durationMs > 0 ? { durationMs } : {}) }),
+			}
+		} catch (e) {
+			const durationMs = await probeDurationMsFromLocalFiles(ctx, id)
+			if (durationMs > 0) {
+				return {
+					status: 200,
+					headers: JSON_HEADERS,
+					body: jsonBody({
+						ok: true,
+						id,
+						durationMs,
+						cinf: '',
+						source: 'ffprobe',
+						warn: String(e?.message || 'CINF failed'),
+					}),
+				}
+			}
+			return {
+				status: 502,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: e?.message || 'CINF failed' }),
+			}
+		}
+	}
 	if (path === '/api/thumbnails/generate') {
 		if (!ctx.amcp) return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		const b = typeof body === 'object' ? body : JSON.parse(body || '{}') // body is usually parsed by caller, wait... parseBody is in response.js

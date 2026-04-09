@@ -8,8 +8,8 @@ const STREAMING_DEFAULTS = {
 	enabled: false,
 	go2rtcPort: 1984,
 	webrtcPort: 8555,
-	protocol: 'SRT',
-	captureMode: 'auto', // auto | local | ndi | srt
+	protocol: 'UDP',
+	captureMode: 'udp', // auto | local | ndi | udp (legacy config value "srt" = same as udp)
 	/** When captureMode is local: auto (prefer kmsgrab if listed), kmsgrab, or x11grab */
 	localCaptureDevice: 'auto',
 	/** X11 display for x11grab (e.g. :0). systemd jobs often need this. */

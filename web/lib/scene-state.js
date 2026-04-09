@@ -226,6 +226,23 @@ export class SceneState {
 	}
 
 	/**
+	 * Unique name for a duplicated look: "Name (copy)", "Name (copy 2)", …
+	 * @param {string} baseName
+	 * @returns {string}
+	 */
+	_uniqueNameForDuplicate(baseName) {
+		const base = String(baseName || '').trim() || 'Look'
+		const stem = `${base} (copy)`
+		const taken = new Set(this.scenes.map((x) => String(x.name || '').trim().toLowerCase()))
+		if (!taken.has(stem.toLowerCase())) return stem
+		for (let n = 2; n < 1000; n++) {
+			const candidate = `${base} (copy ${n})`
+			if (!taken.has(candidate.toLowerCase())) return candidate
+		}
+		return `${base} (copy ${Date.now()})`
+	}
+
+	/**
 	 * Duplicate a look (new id, layers deep-cloned).
 	 * @param {string} id
 	 * @returns {string | null} new scene id
@@ -235,7 +252,7 @@ export class SceneState {
 		if (!s) return null
 		const dupe = this._migrateScene({
 			id: newId(),
-			name: `${s.name} (copy)`,
+			name: this._uniqueNameForDuplicate(s.name),
 			layers: JSON.parse(JSON.stringify(s.layers || [])),
 			defaultTransition: s.defaultTransition,
 		})

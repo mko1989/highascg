@@ -24,7 +24,7 @@ function normalizeOscConfig(cfg) {
 		env.HIGHASCG_OSC_WS_DELTA === 'true'
 	return {
 		enabled: true,
-		listenPort: num(o.listenPort ?? env.OSC_LISTEN_PORT, 6250),
+		listenPort: num(o.listenPort ?? env.OSC_LISTEN_PORT, 6251),
 		listenAddress: String(o.listenAddress || env.OSC_BIND_ADDRESS || '0.0.0.0'),
 		peakHoldMs: num(o.peakHoldMs, 2000),
 		emitIntervalMs: Math.max(10, num(o.emitIntervalMs, 50)),

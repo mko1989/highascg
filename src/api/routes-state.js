@@ -19,6 +19,7 @@ function getPersistence(ctx) {
 	return ctx.persistence || filePersistence
 }
 const { getState } = require('./get-state')
+const { parseCinfMedia } = require('../media/cinf-parse')
 const {
 	resolveSafe,
 	probeMedia,
@@ -138,6 +139,13 @@ async function handleGet(path, ctx, query = {}) {
 				media = media.map((m) => ({ ...m, ...(ctx._mediaProbeCache[m.id] || {}) }))
 			}
 			media = dedupeMediaList(media)
+			// Same enrichment as GET /api/state — CINF duration/resolution for Caspar library items
+			media = media.map((m) => {
+				const cinf = m.cinf || (ctx.mediaDetails || {})[m.id] || ''
+				const parsed = parseCinfMedia(cinf)
+				const probed = (ctx._mediaProbeCache || {})[m.id] || {}
+				return { ...m, ...parsed, ...probed }
+			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(media) }
 		}
 		case '/api/templates':

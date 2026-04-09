@@ -32,7 +32,7 @@ function handleGet(p, ctx) {
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				listenerEnabled: cfg.enabled !== false,
-				listenPort: cfg.listenPort != null ? Number(cfg.listenPort) : 6250,
+				listenPort: cfg.listenPort != null ? Number(cfg.listenPort) : 6251,
 				listenAddress: cfg.listenAddress || '0.0.0.0',
 				udpPacketsReceived: stats?.received ?? 0,
 				lastUdpAt: stats?.lastAt ?? null,
@@ -123,7 +123,8 @@ function handleGet(p, ctx) {
  * Caspar <default-port> (Caspar bind) must differ from <predefined-client> port (HighAsCG bind) on one host.
  */
 function casparDefaultPortForHint(listenPort) {
-	const t = Number(listenPort) || 6250
+	const t = Number(listenPort) || 6251
+	/** Caspar’s own OSC server (`<default-port>`); HighAsCG listens on `listenPort` (default 6251). */
 	let d = 6250
 	if (d === t) d = t + 1
 	if (d > 65535) d = Math.max(1024, t - 1)
@@ -137,7 +138,7 @@ function casparDefaultPortForHint(listenPort) {
 function buildConfigHintXml(ctx) {
 	const cfg = ctx.config || {}
 	const osc = cfg.osc || {}
-	const targetPort = osc.listenPort != null ? Number(osc.listenPort) : 6250
+	const targetPort = osc.listenPort != null ? Number(osc.listenPort) : 6251
 	const defaultPort = casparDefaultPortForHint(targetPort)
 	let addr = String(osc.listenAddress || '127.0.0.1')
 	if (addr === '0.0.0.0') addr = '127.0.0.1'

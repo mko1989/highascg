@@ -1,5 +1,5 @@
 /**
- * Collapsible audio mixer: program master faders (MIXER MASTERVOLUME).
+ * Program master faders (MIXER MASTERVOLUME) — collapsible section at the bottom of the Inspector.
  * Per-layer output pairs (ch 1+2, 3+4, …) are set in the layer inspector (dashboard / scenes).
  */
 
@@ -8,12 +8,19 @@ import * as audioMixerState from '../lib/audio-mixer-state.js'
 import { getVariableStore } from '../lib/variable-state.js'
 import { ws } from '../app.js'
 
+const LS_EXPANDED = 'highascg_inspector_program_audio_expanded'
+
 /** @param {import('../lib/state-store.js').StateStore} stateStore */
-export function initAudioMixerPanel(stateStore) {
+export function initAudioMixerPanel(stateStore, mountEl) {
+	if (!mountEl) return
+
 	const root = document.createElement('div')
-	root.className = 'audio-mixer'
+	root.className = 'audio-mixer audio-mixer--inspector'
 	root.innerHTML = `
-		<button type="button" class="audio-mixer__tab" aria-expanded="false" title="Program audio (MASTERVOLUME)">Audio</button>
+		<button type="button" class="audio-mixer__section-toggle" aria-expanded="false" title="Program audio (MASTERVOLUME)">
+			<span class="audio-mixer__section-chevron" aria-hidden="true">▶</span>
+			<span class="audio-mixer__section-label">Program audio</span>
+		</button>
 		<div class="audio-mixer__panel" hidden>
 			<div class="audio-mixer__head">
 				<span class="audio-mixer__title">Program</span>
@@ -23,10 +30,11 @@ export function initAudioMixerPanel(stateStore) {
 			<div class="audio-mixer__buses"></div>
 		</div>
 	`
-	document.body.appendChild(root)
+	mountEl.appendChild(root)
 
-	const tab = root.querySelector('.audio-mixer__tab')
+	const toggle = root.querySelector('.audio-mixer__section-toggle')
 	const panel = root.querySelector('.audio-mixer__panel')
+	const chevron = root.querySelector('.audio-mixer__section-chevron')
 	const busesEl = root.querySelector('.audio-mixer__buses')
 	/** @type {ReturnType<typeof requestAnimationFrame> | null} */
 	let raf = null
@@ -37,11 +45,19 @@ export function initAudioMixerPanel(stateStore) {
 	/** @type {Map<string, number>} smoothed meter */
 	const meterSmooth = new Map()
 
+	function stopMeterLoop() {
+		if (raf) {
+			cancelAnimationFrame(raf)
+			raf = null
+		}
+	}
+
 	function getChannelMap() {
 		return stateStore.getState()?.channelMap || {}
 	}
 
 	function renderBuses() {
+		stopMeterLoop()
 		meterFills.clear()
 		meterSmooth.clear()
 		meterTargets.clear()
@@ -91,7 +107,7 @@ export function initAudioMixerPanel(stateStore) {
 			meterTargets.set(r.key, r.v)
 		}
 
-		if (!raf && meterFills.size) startMeterLoop()
+		if (meterFills.size) startMeterLoop()
 	}
 
 	function startMeterLoop() {
@@ -101,7 +117,7 @@ export function initAudioMixerPanel(stateStore) {
 			for (const [key, fill] of meterFills) {
 				const [, ch] = key.split(':') // 'pgm:1'
 				const faderVal = meterTargets.get(key) ?? 0
-				
+
 				// Try real OSC data first
 				const vL = parseFloat(vars.get(`osc_ch${ch}_audio_L`))
 				const vR = parseFloat(vars.get(`osc_ch${ch}_audio_R`))
@@ -125,7 +141,7 @@ export function initAudioMixerPanel(stateStore) {
 				s += (aim - s) * 0.35 // Smooth ease
 				meterSmooth.set(key, s)
 				fill.style.height = `${Math.round(s * 100)}%`
-				
+
 				// Optional: Set clipping color if > -1dB
 				if (level > -1) fill.style.background = 'var(--accent-red)'
 				else fill.style.background = 'var(--accent-green)'
@@ -135,13 +151,33 @@ export function initAudioMixerPanel(stateStore) {
 		raf = requestAnimationFrame(tick)
 	}
 
-	tab.addEventListener('click', () => {
-		const open = panel.hidden
-		panel.hidden = !open
-		tab.setAttribute('aria-expanded', open ? 'true' : 'false')
-		if (open) {
+	function applyExpanded(expanded) {
+		panel.hidden = !expanded
+		toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+		if (chevron) chevron.textContent = expanded ? '▼' : '▶'
+		if (expanded) {
 			renderBuses()
+		} else {
+			stopMeterLoop()
 		}
+	}
+
+	let initialExpanded = false
+	try {
+		initialExpanded = localStorage.getItem(LS_EXPANDED) === '1'
+	} catch {
+		/* ignore */
+	}
+	applyExpanded(initialExpanded)
+
+	toggle.addEventListener('click', () => {
+		const next = panel.hidden
+		try {
+			localStorage.setItem(LS_EXPANDED, next ? '1' : '0')
+		} catch {
+			/* ignore */
+		}
+		applyExpanded(next)
 	})
 
 	stateStore.on('*', () => {

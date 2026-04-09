@@ -10,11 +10,13 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { sceneState } from '../lib/scene-state.js'
 import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
+import { findMediaRow } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { initTimelineCanvas, fmtSmpte, parseTcInput } from './timeline-canvas.js'
 import { initPreviewPanel, drawTimelineStack } from './preview-canvas.js'
 import { createTimelineTransport } from './timeline-transport.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
+import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
 
 export function initTimelineEditor(root, stateStore) {
 	let redrawTimelineView = () => {}
@@ -27,6 +29,8 @@ export function initTimelineEditor(root, stateStore) {
 	let _flagBoard = null
 	let _seekThrottleLast = 0
 	let _seekThrottleId = null
+	let _timelineSeekFailToastAt = 0
+	let previewPanel = null
 	// sendTo.screenIdx: 0-based screen index, null = all screens
 	// Default to both PGM and PRV; timeline uses Caspar layers 100+ (separate from looks / black on 9)
 	const view = {
@@ -72,6 +76,7 @@ export function initTimelineEditor(root, stateStore) {
 	root.innerHTML = `
 		<div class="tl-editor-root">
 			<div id="tl-preview-host" class="tl-preview-host"></div>
+			<div class="tl-split-handle" id="tl-split-handle" title="Drag to resize preview" aria-hidden="true"></div>
 			<div class="tl-editor">
 				<div class="tl-transport" id="tl-transport"></div>
 				<div class="tl-body" id="tl-body"></div>
@@ -79,10 +84,83 @@ export function initTimelineEditor(root, stateStore) {
 		</div>
 	`
 	const previewHost = root.querySelector('#tl-preview-host')
+	const tlSplitHandle = root.querySelector('#tl-split-handle')
 	const transportEl = root.querySelector('#tl-transport')
 	const bodyEl = root.querySelector('#tl-body')
+
+	const TL_SPLIT_LS = 'casparcg_timeline_preview_split_px'
+	let tlSplitPx = 220
+	try {
+		const n = parseInt(localStorage.getItem(TL_SPLIT_LS) || '', 10)
+		if (!Number.isNaN(n) && n >= 120 && n <= 1200) tlSplitPx = n
+	} catch {
+		/* ignore */
+	}
+	previewHost.style.flex = `0 0 ${tlSplitPx}px`
+	previewHost.style.minHeight = '0'
+
+	if (tlSplitHandle) {
+		tlSplitHandle.addEventListener('mousedown', (e) => {
+			if (e.button !== 0) return
+			e.preventDefault()
+			const startY = e.clientY
+			const startH = previewHost.getBoundingClientRect().height
+			const onMove = (ev) => {
+				const dy = ev.clientY - startY
+				const nh = Math.max(120, Math.min(1000, startH + dy))
+				previewHost.style.flex = `0 0 ${nh}px`
+				previewPanel?.scheduleDraw?.()
+			}
+			const onUp = () => {
+				document.removeEventListener('mousemove', onMove)
+				document.removeEventListener('mouseup', onUp)
+				document.body.style.cursor = ''
+				document.body.style.userSelect = ''
+				const h = previewHost.getBoundingClientRect().height
+				tlSplitPx = Math.round(h)
+				try {
+					localStorage.setItem(TL_SPLIT_LS, String(tlSplitPx))
+				} catch {
+					/* ignore */
+				}
+			}
+			document.body.style.cursor = 'row-resize'
+			document.body.style.userSelect = 'none'
+			document.addEventListener('mousemove', onMove)
+			document.addEventListener('mouseup', onUp)
+		})
+	}
+
 	bodyEl.tabIndex = -1
 	bodyEl.addEventListener('mousedown', () => bodyEl.focus())
+
+	function showTimelineToast(msg, type = 'info') {
+		let container = document.getElementById('tl-toast-container')
+		if (!container) {
+			container = document.createElement('div')
+			container.id = 'tl-toast-container'
+			container.style.cssText =
+				'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10020;display:flex;flex-direction:column;gap:8px;pointer-events:none;'
+			document.body.appendChild(container)
+		}
+		const toast = document.createElement('div')
+		const bg = type === 'error' ? '#b91c1c' : '#1d4ed8'
+		toast.style.cssText = `padding:10px 16px;border-radius:6px;font-size:13px;font-family:${UI_FONT_FAMILY};max-width:380px;word-break:break-word;box-shadow:0 2px 10px rgba(0,0,0,.4);background:${bg};color:#fff;pointer-events:auto;`
+		toast.setAttribute('role', 'status')
+		toast.textContent = msg
+		container.appendChild(toast)
+		setTimeout(() => toast.remove(), type === 'error' ? 6000 : 4000)
+	}
+
+	function notifyTimelineSeekFailed() {
+		const t = Date.now()
+		if (t - _timelineSeekFailToastAt < 5000) return
+		_timelineSeekFailToastAt = t
+		showTimelineToast('Timeline seek failed — server may be offline or timeline not synced.', 'error')
+	}
+
+	/** Set after transport init; used by canvas layer-height drag end sync. */
+	let syncTimelineToServer = async () => {}
 
 	// ── Canvas ────────────────────────────────────────────────────────────────
 
@@ -102,13 +180,13 @@ export function initTimelineEditor(root, stateStore) {
 				_seekThrottleLast = now
 				if (_seekThrottleId) clearTimeout(_seekThrottleId)
 				_seekThrottleId = null
-				api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(() => {})
+				api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
 			} else if (!_seekThrottleId) {
 				_seekThrottleId = setTimeout(() => {
 					_seekThrottleId = null
 					_seekThrottleLast = Date.now()
 					const t = timelineState.getActive()
-					if (t) api.post(`/api/timelines/${t.id}/seek`, { ms: playback.position }).catch(() => {})
+					if (t) api.post(`/api/timelines/${t.id}/seek`, { ms: playback.position }).catch(notifyTimelineSeekFailed)
 				}, 100)
 			}
 			redrawTimelineView()
@@ -120,7 +198,7 @@ export function initTimelineEditor(root, stateStore) {
 			const clamped = Math.max(0, Math.min(ms ?? playback.position, tl.duration))
 			playback.position = clamped
 			updateTimecode()
-			api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(() => {})
+			api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
 			redrawTimelineView()
 		},
 		onSelectClip(info) {
@@ -138,30 +216,45 @@ export function initTimelineEditor(root, stateStore) {
 			timelineState.updateFlag(timelineId, flagId, { timeMs: timeMs })
 		},
 		onDropSource(source, layerIdx, startTime) {
-			const tl = timelineState.getActive()
-			if (!tl) return
-			let duration = 5000
-			if (source?.type === 'media' && source?.value) {
-				const mediaList = stateStore.getState()?.media || []
-				const match = mediaList.find((m) => m.id === source.value)
-				if (match?.durationMs > 0) duration = match.durationMs
-			}
-			if (startTime + duration > tl.duration) {
-				timelineState.updateTimeline(tl.id, { duration: startTime + duration + 2000 })
-			}
-			while (tl.layers.length <= layerIdx) {
-				timelineState.addLayer(tl.id)
-			}
-			const clip = timelineState.addClip(tl.id, layerIdx, source, startTime, duration)
-			syncToServer(timelineState.getActive())
-			redrawTimelineView()
-			if (clip) {
-				void (async () => {
+			const tl0 = timelineState.getActive()
+			if (!tl0) return
+			void (async () => {
+				let duration = 5000
+				if (source?.type === 'media' && source?.value) {
+					if (Number(source.durationMs) > 0) {
+						duration = Number(source.durationMs)
+					} else {
+						const mediaList = stateStore.getState()?.media || []
+						const match = findMediaRow(mediaList, source.value)
+						if (match?.durationMs > 0) {
+							duration = match.durationMs
+						} else {
+							try {
+								const j = await api.post('/api/media/cinf', { id: source.value })
+								if (j?.durationMs > 0) duration = j.durationMs
+							} catch {
+								/* fallback 5s */
+							}
+						}
+					}
+				}
+				const tl = timelineState.getActive()
+				if (!tl || tl.id !== tl0.id) return
+				if (startTime + duration > tl.duration) {
+					timelineState.updateTimeline(tl.id, { duration: startTime + duration + 2000 })
+				}
+				while (tl.layers.length <= layerIdx) {
+					timelineState.addLayer(tl.id)
+				}
+				const clip = timelineState.addClip(tl.id, layerIdx, source, startTime, duration)
+				syncToServer(timelineState.getActive())
+				redrawTimelineView()
+				if (clip) {
 					await applyTimelineClipLayoutFromMedia(clip, timelineState, tl.id, layerIdx, clip.id, stateStore, sceneState)
 					syncToServer(timelineState.getActive())
 					redrawTimelineView()
-				})()
-			}
+				}
+			})()
 		},
 		onMoveClip(layerIdx, clipId, newStartTime) {
 			const tl = timelineState.getActive()
@@ -174,15 +267,47 @@ export function initTimelineEditor(root, stateStore) {
 			if (!tl) return
 			timelineState.updateClip(tl.id, layerIdx, clipId, changes)
 		},
+		onClipResizePreview({ timelineMs }) {
+			const tl = timelineState.getActive()
+			if (!tl) return
+			const clamped = Math.max(0, Math.min(timelineMs, tl.duration))
+			playback.position = clamped
+			updateTimecode()
+			const now = Date.now()
+			if (!_seekThrottleLast || now - _seekThrottleLast >= 100) {
+				_seekThrottleLast = now
+				if (_seekThrottleId) clearTimeout(_seekThrottleId)
+				_seekThrottleId = null
+				api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
+			} else if (!_seekThrottleId) {
+				_seekThrottleId = setTimeout(() => {
+					_seekThrottleId = null
+					_seekThrottleLast = Date.now()
+					const t = timelineState.getActive()
+					if (t) api.post(`/api/timelines/${t.id}/seek`, { ms: playback.position }).catch(notifyTimelineSeekFailed)
+				}, 100)
+			}
+			redrawTimelineView()
+			previewPanel?.scheduleDraw?.()
+		},
 		getThumbnailUrl: (source) => source?.type === 'media' && source?.value
 			? `${getApiBase()}/api/thumbnail/${encodeURIComponent(source.value)}`
 			: null,
-		// Prompt 28: when local_media_path configured, use real waveform API; else synthetic
+		// Real waveform from same tree as thumbnails (GET /api/local-media/.../waveform); server ffprobe path
 		getWaveformUrl: (source) => {
 			if (source?.type !== 'media' || !source?.value) return null
-			if (!stateStore.getState()?.localMediaEnabled) return null
-			return `${getApiBase()}/api/local-media/${encodeURIComponent(source.value)}/waveform`
+			return `${getApiBase()}/api/local-media/${encodeURIComponent(source.value)}/waveform?bars=128`
 		},
+		getSourceDurationMs: (source) => {
+			if (source?.type !== 'media' || !source?.value) return null
+			if (Number(source.durationMs) > 0) return Number(source.durationMs)
+			const mediaList = stateStore.getState()?.media || []
+			const match = findMediaRow(mediaList, source.value)
+			if (match?.durationMs > 0) return match.durationMs
+			return null
+		},
+		isAudioOnlySource: (source) =>
+			isLikelyAudioOnlySource(source, stateStore.getState()?.media || []),
 		onLayerContextMenu(timelineId, layerIdx, layer, clientX, clientY) {
 			showLayerContextMenu(clientX, clientY, timelineId, layerIdx, layer)
 		},
@@ -207,9 +332,16 @@ export function initTimelineEditor(root, stateStore) {
 			selectedFlagDetail?.flagId && selectedFlagDetail?.timelineId
 				? { timelineId: selectedFlagDetail.timelineId, flagId: selectedFlagDetail.flagId }
 				: null,
+		onLayerHeightsChange(timelineId, heights, isFinal) {
+			timelineState.updateTimeline(timelineId, { layerHeights: heights })
+			redrawTimelineView()
+			if (isFinal) {
+				const tl = timelineState.getTimeline(timelineId)
+				void syncTimelineToServer(tl)
+			}
+		},
 	})
 
-	let previewPanel = null
 	redrawTimelineView = () => {
 		canvas.redraw()
 		previewPanel?.scheduleDraw?.()
@@ -230,6 +362,7 @@ export function initTimelineEditor(root, stateStore) {
 		},
 	})
 	const { buildTransport, updateTimecode, doSeek, syncToServer, updateSendTo, togglePlay, doStop } = transportApi
+	syncTimelineToServer = syncToServer
 
 	/** Align Dest PRV/PGM with server playback (fixes missing `program` in sendTo defaulting to no PGM). */
 	async function syncPlaybackFromServer() {
@@ -267,6 +400,7 @@ export function initTimelineEditor(root, stateStore) {
 	previewPanel = initPreviewPanel(previewHost, {
 		title: 'Timeline output',
 		storageKeyPrefix: 'casparcg_preview_timeline',
+		fillParentHeight: true,
 		getOutputResolution: () => {
 			const s = view.sendTo.screenIdx ?? 0
 			const pr = stateStore.getState()?.channelMap?.programResolutions?.[s]

@@ -13,7 +13,7 @@ CasparCG Server
 │
 ├── AMCP (TCP :5250)          commands / replies
 │
-└── OSC (UDP)  ──────────►  HighAsCG :listenPort (default 6250)
+└── OSC (UDP)  ──────────►  HighAsCG :listenPort (default **6251**; Caspar `<default-port>` stays **6250**)
          │
          ▼
     src/osc/osc-listener.js     UDP receive, parse bundles/messages
@@ -55,11 +55,11 @@ HighAsCG can emit a full `<osc>` block from the config generator (`buildOscConfi
 
 - `<default-port>` — Port Caspar uses for **its own** OSC server (incoming control). **Must not be the same UDP port** as HighAsCG’s listener on the **same machine**, or one process will fail to bind and you will see **no** OSC in the UI (`udpPacketsReceived` stays 0 in diagnostics).
 - `<disable-send-to-amcp-clients>` — `false` if you want OSC mirrored to AMCP clients as well.
-- `<predefined-clients><predefined-client>` — `<address>` must be the **IP** of the HighAsCG host (hostnames are not reliable per Caspar docs). `<port>` must equal HighAsCG **`osc.listenPort`** (where this app’s UDP listener binds — default 6250).
+- `<predefined-clients><predefined-client>` — `<address>` must be the **IP** of the HighAsCG host (hostnames are not reliable per Caspar docs). `<port>` must equal HighAsCG **`osc.listenPort`** (where this app’s UDP listener binds — default **6251**).
 
 Use **`GET /api/osc/config-hint`** for an XML fragment where `default-port` and predefined `port` are **split** correctly. Use **`GET /api/osc/diagnostics`** to confirm `udpPacketsReceived` increases while Caspar is running.
 
-**Common mistake:** setting Caspar `<default-port>` and `<predefined-client><port>` both to **6250** while HighAsCG also listens on **6250** — two programs cannot bind the same UDP port on one host.
+**Common mistake:** using the **same** UDP port for Caspar’s `<default-port>` (Caspar’s OSC server, typically **6250**) and HighAsCG’s listener — they must differ on one host. Defaults: Caspar **6250**, HighAsCG **6251**.
 
 ### Firewall
 
@@ -75,7 +75,7 @@ Defined in `config/default.js`, overridden by persisted `appSettings`, environme
 | Setting (concept) | Env / notes |
 |-------------------|-------------|
 | Listener on/off | **On by default.** Only **`--no-osc`** disables the UDP bind (not configurable via env/UI) |
-| Listen port | `OSC_LISTEN_PORT` (default 6250) |
+| Listen port | `OSC_LISTEN_PORT` (default 6251) |
 | Bind address | `OSC_BIND_ADDRESS` (default `0.0.0.0`) |
 | Peak hold | `peakHoldMs` in config (UI) |
 | WS delta mode | `HIGHASCG_OSC_WS_DELTA` / `config.osc.wsDeltaBroadcast` — partial channel updates on WS |

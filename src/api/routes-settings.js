@@ -56,7 +56,7 @@ async function handleGet(path, ctx) {
 				effectiveBasePort: ctx.config.streaming._effectiveBasePort ?? ctx.config.streaming.basePort,
 				ffmpeg_path: ctx.config.streaming.ffmpeg_path,
 				hardware_accel: ctx.config.streaming.hardware_accel,
-				captureMode: ctx.config.streaming.captureMode || 'auto',
+				captureMode: ctx.config.streaming.captureMode || 'udp',
 				ndiNamingMode: ctx.config.streaming.ndiNamingMode || 'auto',
 				ndiSourcePattern: ctx.config.streaming.ndiSourcePattern || 'CasparCG Channel {ch}',
 				ndiChannelNames: ctx.config.streaming.ndiChannelNames || {},

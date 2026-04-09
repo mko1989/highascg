@@ -12,14 +12,15 @@ const SCALE_HALF_VF = 'scale=w=iw/2:h=ih/2'
 
 /**
  * Detect the effective capture mode based on environment.
- * @param {string} requestedMode - 'auto' | 'local' | 'ndi' | 'srt'
+ * @param {string} requestedMode - 'auto' | 'local' | 'ndi' | 'udp' | 'srt' (legacy alias for udp)
  * @param {string} casparHost
- * @returns {'local' | 'ndi' | 'srt'}
+ * @returns {'local' | 'ndi' | 'udp'}
  */
 function resolveCaptureTier(requestedMode, casparHost) {
 	if (requestedMode === 'local') return 'local'
 	if (requestedMode === 'ndi') return 'ndi'
-	if (requestedMode === 'srt') return 'srt'
+	/** Caspar STREAM uses MPEG-TS over UDP to go2rtc; older configs used the mislabel "srt". */
+	if (requestedMode === 'udp' || requestedMode === 'srt') return 'udp'
 
 	// Auto-detect
 	const isLocal = casparHost === '127.0.0.1' || casparHost === 'localhost' || casparHost === '0.0.0.0'
@@ -41,7 +42,7 @@ function resolveCaptureTier(requestedMode, casparHost) {
 		}
 	} catch { /* fallthrough */ }
 
-	return 'srt'
+	return 'udp'
 }
 
 /**
@@ -96,8 +97,8 @@ class Go2rtcManager {
 		this.yamlPath = path.join(process.cwd(), 'go2rtc.yaml')
 		this.streams = {} // map of name -> target
 		this.config = null
-		this.activeTier = 'srt'
-		/** @type {import('child_process').ChildProcess[]} — SRT tier only; UDP→HTTP push (go2rtc must not exec-bind Caspar ports). */
+		this.activeTier = 'udp'
+		/** @type {import('child_process').ChildProcess[]} — UDP tier only; UDP→HTTP push (go2rtc must not exec-bind Caspar ports). */
 		this._udpBridgeProcs = []
 
 		this.bindLifecycle()
@@ -212,7 +213,7 @@ class Go2rtcManager {
 	 * @param {number} myGeneration
 	 */
 	_startUdpPushBridges(targets, config, casparHost, myGeneration) {
-		if (this.activeTier !== 'srt') return
+		if (this.activeTier !== 'udp') return
 
 		this._stopUdpPushBridges()
 
@@ -265,7 +266,7 @@ class Go2rtcManager {
 	 * @param {{ log?: (level: string, msg: string) => void }} [ctx]
 	 */
 	async waitForPushIngestReady(targets, config, ctx = {}) {
-		if (this.activeTier !== 'srt') return
+		if (this.activeTier !== 'udp') return
 
 		const names = targets.map((t) => t.name)
 		const port = config.go2rtcPort
@@ -336,16 +337,16 @@ class Go2rtcManager {
 	 * @param {string} casparHost
 	 */
 	generateYaml(targets, config, casparHost = '127.0.0.1') {
-		const tier = resolveCaptureTier(config.captureMode || 'auto', casparHost)
+		const tier = resolveCaptureTier(config.captureMode || 'udp', casparHost)
 		this.activeTier = tier
-		console.log(`[go2rtc] Capture tier resolved: ${tier} (requested: ${config.captureMode || 'auto'})`)
+		console.log(`[go2rtc] Capture tier resolved: ${tier} (requested: ${config.captureMode || 'udp'})`)
 
 		let yamlLines = ['streams:']
 		this.streams = {}
 
 		for (const t of targets) {
 			this.streams[t.name] = t
-			if (tier === 'srt') {
+			if (tier === 'udp') {
 				yamlLines.push(`  ${t.name}: null`)
 				continue
 			}
@@ -413,7 +414,7 @@ class Go2rtcManager {
 		)
 		for (const t of targets) {
 			const via =
-				this.activeTier === 'srt'
+				this.activeTier === 'udp'
 					? `UDP ${t.port} (external ffmpeg → go2rtc HTTP push)`
 					: 'go2rtc ingest'
 			console.log(`[go2rtc]   ${t.name}: Caspar channel ${t.channel} → ${via}`)

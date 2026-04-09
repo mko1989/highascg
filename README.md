@@ -25,7 +25,7 @@ Defaults live in `config/default.js`. Override with environment variables:
 | `HTTP_PORT` or `PORT` | HTTP server port (default `8080`) |
 | `BIND_ADDRESS` | Listen address (default `0.0.0.0`) |
 | `HIGHASCG_WS_BROADCAST_MS` | Optional periodic WebSocket state push (ms; `0` = off) |
-| `OSC_LISTEN_PORT` | OSC UDP port (default `6250`) |
+| `OSC_LISTEN_PORT` | OSC UDP port (default `6251`; Caspar `<default-port>` is typically `6250`) |
 | `OSC_BIND_ADDRESS` | OSC bind address (default `0.0.0.0`) |
 | `HIGHASCG_OSC_WS_DELTA` | `1` / `true` — WebSocket `osc` messages send partial `{ delta: true, channels: { … } }` per throttle (merge client-side); default full snapshot each emit |
 | `CASPAR_ARM_FILE` | Path touched when “arming” staged Caspar startup (default `/opt/casparcg/data/caspar-armed`; same path as `tools/casparcg-staged-start.sh`) |
@@ -48,7 +48,7 @@ Caspar still required for playout, mixer (`/api/mixer/*` except audio volume wra
 
 ### OSC (CasparCG → HighAsCG)
 
-CasparCG should send OSC over UDP (see **`docs/osc-integration.md`**). HighAsCG listens on **`OSC_LISTEN_PORT`** (default **6250**) and aggregates messages into **`appCtx.oscState`**. Use **`--no-osc`** only to skip the UDP listener (e.g. development).
+CasparCG should send OSC over UDP (see **`docs/osc-integration.md`**). HighAsCG listens on **`OSC_LISTEN_PORT`** (default **6251**) and aggregates messages into **`appCtx.oscState`**. Use **`--no-osc`** only to skip the UDP listener (e.g. development).
 
 ### Staged Caspar startup (production)
 

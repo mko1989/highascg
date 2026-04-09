@@ -8,8 +8,12 @@
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
+const crypto = require('crypto')
 const { spawn } = require('child_process')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
+
+/** Bump when peak algorithm / bar semantics change (invalidates on-disk cache). */
+const WAVEFORM_VERSION = 1
 
 function resolveSafe(basePath, filename) {
 	if (!basePath || typeof basePath !== 'string') return null
@@ -52,6 +56,8 @@ async function probeMedia(filePath) {
 				if (json.format?.size != null) {
 					out2.fileSize = parseInt(json.format.size, 10) || 0
 				}
+				const aud = (json.streams || []).find((s) => s.codec_type === 'audio')
+				out2.hasAudio = !!aud
 				const vid = (json.streams || []).find((s) => s.codec_type === 'video')
 				if (vid?.width && vid?.height) {
 					out2.resolution = `${vid.width}×${vid.height}`
@@ -114,10 +120,102 @@ async function extractWaveform(filePath, bars = 24) {
 	})
 }
 
+function parseWaveformBars(query) {
+	const raw = query && typeof query === 'object' ? query.bars : undefined
+	const n = parseInt(String(raw ?? ''), 10)
+	if (!Number.isFinite(n) || n < 1) return 128
+	return Math.min(512, Math.max(8, Math.floor(n)))
+}
+
+/**
+ * @param {string} filePath
+ * @param {import('fs').Stats} stat
+ * @param {number} bars
+ */
+function waveformCacheKey(filePath, stat, bars) {
+	const h = crypto.createHash('sha256')
+	h.update(String(filePath).replace(/\\/g, '/'))
+	h.update('\0')
+	h.update(String(stat.mtimeMs))
+	h.update('\0')
+	h.update(String(stat.size))
+	h.update('\0')
+	h.update(String(bars))
+	h.update('\0')
+	h.update(String(WAVEFORM_VERSION))
+	return h.digest('hex')
+}
+
+/**
+ * @param {object} [config]
+ * @returns {string}
+ */
+function getWaveformCacheDir(config) {
+	const raw = (config?.waveform_cache_path || '').trim()
+	if (raw) return path.resolve(raw)
+	return path.join(process.cwd(), 'data', 'waveforms')
+}
+
+/**
+ * @param {string} cacheDir
+ * @param {string} key
+ * @param {import('fs').Stats} stat
+ * @param {number} bars
+ * @returns {{ peaks: number[], hasAudio: boolean } | null}
+ */
+function readWaveformCacheFile(cacheDir, key, stat, bars) {
+	const fp = path.join(cacheDir, `${key}.json`)
+	if (!fs.existsSync(fp)) return null
+	try {
+		const j = JSON.parse(fs.readFileSync(fp, 'utf8'))
+		if (j.v !== WAVEFORM_VERSION) return null
+		if (j.mtimeMs !== stat.mtimeMs || j.size !== stat.size || j.bars !== bars) return null
+		if (j.hasAudio === false) return { peaks: [], hasAudio: false }
+		if (!Array.isArray(j.peaks)) return null
+		return { peaks: j.peaks, hasAudio: true }
+	} catch {
+		return null
+	}
+}
+
+/**
+ * @param {string} cacheDir
+ * @param {string} key
+ * @param {import('fs').Stats} stat
+ * @param {number} bars
+ * @param {{ peaks: number[], hasAudio: boolean }} data
+ */
+function writeWaveformCacheFile(cacheDir, key, stat, bars, data) {
+	fs.mkdirSync(cacheDir, { recursive: true })
+	const fp = path.join(cacheDir, `${key}.json`)
+	const payload = {
+		v: WAVEFORM_VERSION,
+		mtimeMs: stat.mtimeMs,
+		size: stat.size,
+		bars,
+		hasAudio: data.hasAudio,
+		peaks: data.peaks,
+	}
+	fs.writeFileSync(fp, JSON.stringify(payload))
+}
+
 const HANDLERS = {
-	waveform: async (filePath) => {
-		const peaks = await extractWaveform(filePath, 24)
-		return { peaks }
+	waveform: async (filePath, query, config) => {
+		const bars = parseWaveformBars(query)
+		const stat = fs.statSync(filePath)
+		const cacheDir = getWaveformCacheDir(config)
+		const key = waveformCacheKey(filePath, stat, bars)
+		const hit = readWaveformCacheFile(cacheDir, key, stat, bars)
+		if (hit) return hit
+
+		const probe = await probeMedia(filePath)
+		if (!probe.hasAudio) {
+			writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks: [], hasAudio: false })
+			return { peaks: [], hasAudio: false }
+		}
+		const peaks = await extractWaveform(filePath, bars)
+		writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks, hasAudio: true })
+		return { peaks, hasAudio: true }
 	},
 	probe: async (filePath) => probeMedia(filePath),
 }
@@ -125,7 +223,7 @@ const HANDLERS = {
 /**
  * GET /api/local-media/:filenameEnc/:type — filename may include slashes (encoded).
  */
-async function handleLocalMedia(path, config) {
+async function handleLocalMedia(path, config, query) {
 	const m = path.match(/^\/api\/local-media\/(.+)\/([^/]+)$/)
 	if (!m) return null
 	const [, filenameEnc, type] = m
@@ -148,7 +246,7 @@ async function handleLocalMedia(path, config) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'File not found' }) }
 	}
 	try {
-		const data = await handler(filePath)
+		const data = await handler(filePath, query || {}, config)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
 	} catch (e) {
 		return {
@@ -302,6 +400,8 @@ module.exports = {
 	tryLocalThumbnailPng,
 	extractWaveform,
 	getMediaIngestBasePath,
+	getWaveformCacheDir,
 	scanMediaRecursiveForBrowser,
 	normalizeMediaIdKey,
+	WAVEFORM_VERSION,
 }

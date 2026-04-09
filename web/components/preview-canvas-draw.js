@@ -4,6 +4,7 @@
 
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
+import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
 
 /** Match `.preview-panel--compose-dual` cell background in styles.css (letterbox around video). */
 const COMPOSE_DUAL_PREVIEW_BG = '#e8eaed'
@@ -439,6 +440,57 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
  * @param {import('../lib/state-store.js').StateStore} [opts.stateStore]
  * @param {number} [opts.screenIdx]
  */
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {string} [label]
+ */
+function drawAudioOnlyPreviewFill(ctx, x, y, w, h, label = 'Audio') {
+	const g = ctx.createLinearGradient(x, y, x, y + h)
+	g.addColorStop(0, '#1e2a3a')
+	g.addColorStop(1, '#0d1117')
+	ctx.fillStyle = g
+	ctx.fillRect(x, y, w, h)
+	ctx.fillStyle = 'rgba(255,255,255,0.82)'
+	const fs = Math.max(10, Math.round(Math.min(w, h) / 14))
+	ctx.font = `600 ${fs}px ${UI_FONT_FAMILY}`
+	ctx.textAlign = 'left'
+	ctx.textBaseline = 'top'
+	ctx.fillText(label, x + 6, y + 6)
+	const cy = y + h * 0.55
+	const n = Math.min(40, Math.max(4, Math.floor((w - 24) / 3)))
+	const barW = Math.max(1, (w - 20 - (n - 1)) / n)
+	ctx.fillStyle = 'rgba(129, 182, 255, 0.55)'
+	for (let i = 0; i < n; i++) {
+		const ph = (0.25 + 0.55 * Math.abs(Math.sin(i * 0.7))) * (h * 0.22)
+		ctx.fillRect(x + 10 + i * (barW + 1), cy - ph / 2, barW, ph)
+	}
+}
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {string} text
+ */
+function drawPreviewStatusText(ctx, x, y, w, h, text) {
+	ctx.fillStyle = 'rgba(48, 54, 61, 0.92)'
+	ctx.fillRect(x, y, w, h)
+	ctx.fillStyle = '#8b949e'
+	const fs = Math.max(10, Math.round(Math.min(w, h) / 16))
+	ctx.font = `${fs}px ${UI_FONT_FAMILY}`
+	ctx.textAlign = 'center'
+	ctx.textBaseline = 'middle'
+	ctx.fillText(text, x + w / 2, y + h / 2)
+	ctx.textAlign = 'left'
+	ctx.textBaseline = 'alphabetic'
+}
+
 export function drawTimelineStack(ctx, W, H, opts) {
 	const {
 		timelineState,
@@ -458,6 +510,8 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.fillStyle = composeDualStreamPreview ? COMPOSE_DUAL_PREVIEW_BG : '#0d1117'
 		ctx.fillRect(0, 0, W, H)
 	}
+
+	const mediaList = stateStore?.getState?.()?.media || []
 
 	const tl = timelineState.getActive()
 	if (!tl) {
@@ -509,8 +563,18 @@ export function drawTimelineStack(ctx, W, H, opts) {
 			continue
 		}
 
-		const url = getThumbUrl ? getThumbUrl(clip.source) : null
-		if (url) {
+		const audioOnly = isLikelyAudioOnlySource(clip.source, mediaList)
+		const url = !audioOnly && getThumbUrl ? getThumbUrl(clip.source) : null
+		if (audioOnly) {
+			drawAudioOnlyPreviewFill(
+				ctx,
+				x,
+				y,
+				w,
+				h,
+				(clip.source.label || clip.source.value || 'Audio').slice(0, 28),
+			)
+		} else if (url) {
 			const { img, ready, failed } = getThumbnailEntry(url, onThumbLoaded)
 			if (ready && !failed) {
 				ctx.save()
@@ -519,9 +583,10 @@ export function drawTimelineStack(ctx, W, H, opts) {
 				ctx.clip()
 				drawImageCover(ctx, img, x, y, w, h)
 				ctx.restore()
+			} else if (failed) {
+				drawPreviewStatusText(ctx, x, y, w, h, 'No preview')
 			} else {
-				ctx.fillStyle = 'rgba(48, 54, 61, 0.9)'
-				ctx.fillRect(x, y, w, h)
+				drawPreviewStatusText(ctx, x, y, w, h, 'Loading…')
 			}
 		} else {
 			ctx.fillStyle = 'rgba(48, 54, 61, 0.85)'

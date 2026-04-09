@@ -54,10 +54,10 @@ export function showSettingsModal() {
 						<div class="settings-group">
 							<label>Capture tier</label>
 							<select id="set-stream-capture-mode">
-								<option value="auto">Auto (local NDI → SRT)</option>
+								<option value="auto">Auto (local NDI → UDP)</option>
 								<option value="local">Local (kmsgrab / x11grab)</option>
 								<option value="ndi">NDI (FFmpeg receiver)</option>
-								<option value="srt">SRT (CasparCG consumer)</option>
+								<option value="udp">UDP (Caspar MPEG-TS → go2rtc) — recommended</option>
 							</select>
 							<p class="settings-note">Local prefers <strong>kmsgrab</strong> (DRM) and falls back to <strong>x11grab</strong> on the same machine.</p>
 						</div>
@@ -141,7 +141,7 @@ export function showSettingsModal() {
 						</p>
 						<div class="settings-group">
 							<label>OSC listen port</label>
-							<input type="number" id="set-osc-port" placeholder="6250" min="1" max="65535">
+							<input type="number" id="set-osc-port" placeholder="6251" min="1" max="65535">
 						</div>
 						<div class="settings-group">
 							<label>UDP bind address</label>
@@ -218,6 +218,10 @@ export function showSettingsModal() {
 								<label>Caspar config path on <strong>this</strong> machine</label>
 								<input type="text" id="set-caspar-config-path" placeholder="/opt/casparcg/config/casparcg.config">
 								<p class="settings-note">Saved path here is used first. If empty, <code>CASPAR_CONFIG_PATH</code> on the HighAsCG process is used; otherwise default <code>/opt/casparcg/config/casparcg.config</code>. The file is overwritten; then <code>RESTART</code> is sent over AMCP.</p>
+							</div>
+							<div class="settings-group checkbox">
+								<label><input type="checkbox" id="set-caspar-ndi-auto-load" checked /> <strong>Enable NDI auto-load</strong></label>
+								<p class="settings-note">Sets <code>&lt;ndi&gt;&lt;auto-load&gt;true/false&lt;/auto-load&gt;&lt;/ndi&gt;</code> in the generated Caspar config (load NDI at startup). Disable if you do not use NDI and want to avoid loading the NDI runtime.</p>
 							</div>
 							<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
 								<button type="button" class="btn btn--secondary" id="set-caspar-download">Download casparcg.config</button>
@@ -400,6 +404,8 @@ export function showSettingsModal() {
 		cs.decklink_input_count = parseInt(modal.querySelector('#set-caspar-dl-inputs').value, 10) || 0
 		cs.inputs_channel_mode = modal.querySelector('#set-caspar-inputs-mode').value
 		cs.configPath = modal.querySelector('#set-caspar-config-path').value.trim()
+		const ndiAl = modal.querySelector('#set-caspar-ndi-auto-load')
+		if (ndiAl) cs.ndi_auto_load = ndiAl.checked
 		for (let n = 1; n <= 4; n++) {
 			const modeEl = modal.querySelector(`#set-caspar-screen-${n}-mode`)
 			if (!modeEl) continue
@@ -690,11 +696,17 @@ export function showSettingsModal() {
 			const inSel = modal.querySelector('#set-caspar-inputs-mode')
 			if ([...inSel.options].some((o) => o.value === im)) inSel.value = im
 			modal.querySelector('#set-caspar-config-path').value = cs.configPath || ''
+			const ndiAlEl = modal.querySelector('#set-caspar-ndi-auto-load')
+			if (ndiAlEl) ndiAlEl.checked = cs.ndi_auto_load !== false && cs.ndi_auto_load !== 'false'
 			renderCasparScreenRows(cs)
 			modal.querySelector('#set-caspar-host').value = cfg.caspar.host
 			modal.querySelector('#set-caspar-port').value = cfg.caspar.port
 			modal.querySelector('#set-stream-enabled').checked = cfg.streaming.enabled
-			modal.querySelector('#set-stream-capture-mode').value = cfg.streaming.captureMode || 'auto'
+			{
+				let cap = cfg.streaming.captureMode || 'udp'
+				if (cap === 'srt') cap = 'udp'
+				modal.querySelector('#set-stream-capture-mode').value = cap
+			}
 			modal.querySelector('#set-stream-ndi-naming').value = cfg.streaming.ndiNamingMode || 'auto'
 			modal.querySelector('#set-stream-ndi-pattern').value = cfg.streaming.ndiSourcePattern || 'CasparCG Channel {ch}'
 			const ndiN = cfg.streaming.ndiChannelNames || {}
@@ -715,7 +727,7 @@ export function showSettingsModal() {
 			modal.querySelector('#set-offline-mode').checked = !!cfg.offline_mode
 			updateCasparApplyHint()
 			const osc = cfg.osc || {}
-			modal.querySelector('#set-osc-port').value = osc.listenPort ?? 6250
+			modal.querySelector('#set-osc-port').value = osc.listenPort ?? 6251
 			modal.querySelector('#set-osc-bind').value = osc.listenAddress || '0.0.0.0'
 			modal.querySelector('#set-osc-peak').value = osc.peakHoldMs ?? 2000
 			const ui = cfg.ui || {}

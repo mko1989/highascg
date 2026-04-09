@@ -2,9 +2,10 @@
 <!--
   HighAsCG — LED wall grid test pattern (CasparCG HTML template)
 
-  Store this file and both_open.svg / left_closed.svg / right_closed.svg under Caspar’s
-  **template-path** (not media-path), so they are not listed as media (CLS). In highascg.config.json
-  set **local_template_path** to that absolute folder; HighAsCG will copy these files on connect.
+  Store this file and both_open.svg / left_closed.svg / right_closed.svg in the **same folder** on the
+  server — Caspar’s **template-path** (not media-path), so they are not listed as media (CLS).
+  Typical layout: `/opt/casparcg/template/` or the path in casparcg.config `<paths><template-path>…</template-path>`.
+  In highascg.config.json set **local_template_path** to that absolute folder; HighAsCG copies these on connect.
 
   Center graphic: full HighAsCG **character** (artwork in both_open.svg / left_closed.svg /
   right_closed.svg next to this file — not the small header status-eye sprites). Blink **timing**
@@ -76,6 +77,7 @@
 				linear-gradient(to right, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%),
 				linear-gradient(to bottom, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%);
 		}
+		/* Character + caption only — no dimmed box over the grid (keeps test pattern clean). */
 		#center {
 			position: absolute;
 			left: 50%;
@@ -88,11 +90,11 @@
 			text-align: center;
 			pointer-events: none;
 			z-index: 100;
-			padding: 0.75em 1.2em 1em;
-			border-radius: 8px;
-			background: rgba(0, 0, 0, 0.42);
-			border: 1px solid rgba(255, 255, 255, 0.12);
-			backdrop-filter: blur(4px);
+			padding: 0;
+			margin: 0;
+			background: transparent;
+			border: none;
+			backdrop-filter: none;
 			max-width: 96vw;
 		}
 		.led-test-eye {

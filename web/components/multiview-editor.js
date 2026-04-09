@@ -12,7 +12,9 @@ import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 
 const HANDLE_SIZE = 8
-const CELL_COLORS = { pgm: '#e63946', prv: '#2a9d8f', decklink: '#457b9d', ndi: '#e9c46a' }
+const CELL_COLORS = { pgm: '#e63946', prv: '#2a9d8f', decklink: '#457b9d', ndi: '#457b9d' }
+/** Solid label bar under tile (preview=green, program=red, other=blue) — no transparency over video */
+const LABEL_BAR_BG = { pgm: '#c92a2a', prv: '#0d9488', decklink: '#2563eb', ndi: '#2563eb', route: '#2563eb' }
 
 /**
  * @param {HTMLElement} root - Multiview tab container
@@ -191,12 +193,13 @@ export function initMultiviewEditor(root, stateStore) {
 				ctx.setLineDash([])
 				ctx.restore()
 			}
-			// Label bar below cell (matches multiview_overlay.html: 50px height, extends below MIXER FILL area)
+			// Label bar below cell (matches multiview_overlay.html — solid color, not over video)
 			const OVERLAY_LABEL_H = 50
 			const OVERLAY_BORDER = 3
 			const labelH = OVERLAY_LABEL_H
 			const labelY = c.y + c.h + OVERLAY_BORDER
-			ctx.fillStyle = 'rgba(0,0,0,0.72)'
+			const labelBg = LABEL_BAR_BG[c.type] || LABEL_BAR_BG.route
+			ctx.fillStyle = labelBg
 			ctx.fillRect(c.x - OVERLAY_BORDER, labelY, c.w + OVERLAY_BORDER * 2, labelH)
 			ctx.strokeStyle = borderColor
 			ctx.lineWidth = 2
@@ -355,6 +358,40 @@ export function initMultiviewEditor(root, stateStore) {
 		root.querySelector('#mv-overlay').addEventListener('change', (e) => {
 			multiviewState.setShowOverlay(e.target.checked)
 		})
+
+		function multiviewTypingTarget(el) {
+			if (!el) return false
+			if (el.isContentEditable) return true
+			const tag = (el.tagName || '').toUpperCase()
+			return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+		}
+
+		document.addEventListener(
+			'keydown',
+			(e) => {
+				if (e.key !== 'Delete' && e.key !== 'Backspace') return
+				if (!root.classList.contains('active')) return
+				if (!selectedId) return
+				if (multiviewTypingTarget(e.target)) return
+				if (e.target?.closest?.('#settings-modal')) return
+				const cell = multiviewState.getCell(selectedId)
+				if (!cell) {
+					selectedId = null
+					return
+				}
+				e.preventDefault()
+				if (cell.source) {
+					multiviewState.setCellSource(cell.id, null)
+				} else {
+					multiviewState.removeCell(cell.id)
+					selectedId = null
+					window.dispatchEvent(new CustomEvent('multiview-select', { detail: {} }))
+				}
+				draw()
+				flushApplyLayout()
+			},
+			true
+		)
 
 		canvas.addEventListener('mousedown', (e) => {
 			const rect = canvas.getBoundingClientRect()

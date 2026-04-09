@@ -9,6 +9,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
 const { runSceneTake, runTimelineOnlyTake, isTimelineOnlyScene, layerHasContent } = require('../engine/scene-transition')
+const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 
 const TAKE_TIMEOUT_MS = 120000
 
@@ -64,10 +65,13 @@ async function handleSceneTake(body, ctx) {
 		framerate: b.framerate,
 		forceCut: !!b.forceCut,
 	}
+	const useLbgTake = b.takeMode === 'lbg' || b.takeMethod === 'lbg'
 
 	const runTake = async () => {
 		if (isTimelineOnlyScene(inc)) {
 			await runTimelineOnlyTake(ctx, takeOpts)
+		} else if (useLbgTake) {
+			await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
 		} else {
 			await runSceneTake(ctx.amcp, { ...takeOpts, self: ctx })
 		}

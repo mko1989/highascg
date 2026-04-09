@@ -14,7 +14,7 @@ const {
 	getExtraAudioModeDimensions,
 	getStandardModeChoices,
 } = require('./config-modes')
-const { buildFfmpegArgs } = require('../streaming/caspar-ffmpeg-setup')
+const { buildFfmpegArgs, casparUdpStreamUri } = require('../streaming/caspar-ffmpeg-setup')
 const defaults = require('../../config/default')
 
 /**
@@ -105,9 +105,11 @@ function mergeAudioRoutingIntoConfig(config) {
 	out.screen_1_ffmpeg_audio_path_2 = ''
 	out.screen_1_ffmpeg_audio_args_2 = ''
 	out.screen_1_system_audio_enabled = true
-	out.screen_1_ndi_enabled = false
 
 	const po = String(ar.programOutput || 'default').toLowerCase()
+	// Do not reset screen_1_ndi_enabled: Settings → Screens persists per-screen NDI flags in
+	// casparServer; those are already on `out` from `base`. Only auto-enable when program
+	// audio output is explicitly NDI (legacy coupling).
 	if (po === 'ndi') {
 		out.screen_1_ndi_enabled = true
 	}
@@ -262,15 +264,15 @@ function buildScreenFfmpegConsumersXml(config, screenIdx1) {
 
 /**
  * @param {Record<string, unknown>} config - App config
- * @param {number} port - SRT port
+ * @param {number} port - UDP destination port (same URI as AMCP ADD STREAM — MPEG-TS to go2rtc)
  * @returns {string} XML for an <ffmpeg> consumer
  */
 function buildStreamingFfmpegConsumerXml(config, port) {
 	if (!config.streaming || (config.streaming.enabled === false || config.streaming.enabled === 'false')) return ''
 	
 	const args = buildFfmpegArgs(config.streaming)
-	const path = `srt://0.0.0.0:${port}?mode=listener`
-	
+	const path = casparUdpStreamUri(port)
+
 	return `
                 <ffmpeg>
                     <path>${escapeXml(path)}</path>
@@ -415,7 +417,7 @@ function buildConfigXml(config) {
                 </ndi>`
 		}
 
-		// SRT Streaming for PGM (Ch 1, 4, 7, 10...)
+		// UDP preview streaming for PGM (Ch 1, 4, 7, 10...)
 		const streamingBasePort = parseInt(String(config.streaming?.basePort || '10000'), 10) || 10000
 		const pgmStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 1)
 
@@ -435,7 +437,7 @@ function buildConfigXml(config) {
 		cumulativeX += dims.width
 		nextDevice++
 
-		// SRT Streaming for PRV (Ch 2, 5, 8, 11...)
+		// UDP preview streaming for PRV (Ch 2, 5, 8, 11...)
 		const prvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 2)
 
 		channelsXml.push(
@@ -612,13 +614,15 @@ ${customVideoModes.join('\n')}
     </controllers>`
 
 	const audioSectionXml = buildAudioLayoutsXml(config, screenCount)
+	const ndiAutoLoad =
+		config.ndi_auto_load === false || config.ndi_auto_load === 'false' ? 'false' : 'true'
 
 	return `<configuration>
     <paths>
         <media-path>media/</media-path>
         <log-path disable="false">log/</log-path>
-        <data-path>media/</data-path>
-        <template-path>media/</template-path>
+        <data-path>data/</data-path>
+        <template-path>template/</template-path>
     </paths>
     <lock-clear-phrase>secret</lock-clear-phrase>
 ${audioSectionXml}    <channels>
@@ -628,7 +632,7 @@ ${finalVideoModesXml}
 ${controllersXml}
 ${oscXml}
     <amcp><media-server><host>localhost</host><port>8000</port></media-server></amcp>
-    <ndi><auto-load>false</auto-load></ndi>
+    <ndi><auto-load>${ndiAutoLoad}</auto-load></ndi>
     <decklink/>
     <html><enable-gpu>false</enable-gpu></html>
 </configuration>`

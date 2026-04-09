@@ -4,6 +4,8 @@
  * @see main_plan.md Prompt 16
  */
 
+import { ensureLayerHeights, DEFAULT_LAYER_H } from './timeline-track-heights.js'
+
 const STORAGE_KEY = 'casparcg_timelines_v1'
 
 function uid() {
@@ -60,6 +62,7 @@ class TimelineStateManager {
 		this._load()
 		if (this.timelines.length === 0) {
 			const tl = defaultTimeline()
+			ensureLayerHeights(tl)
 			this.timelines.push(tl)
 			this.activeId = tl.id
 		}
@@ -69,6 +72,7 @@ class TimelineStateManager {
 
 	createTimeline(opts) {
 		const tl = defaultTimeline(opts)
+		ensureLayerHeights(tl)
 		this.timelines.push(tl)
 		this.activeId = tl.id
 		this._save()
@@ -90,6 +94,7 @@ class TimelineStateManager {
 		if (this.activeId === id) this.activeId = this.timelines[0]?.id || null
 		if (this.timelines.length === 0) {
 			const tl = defaultTimeline()
+			ensureLayerHeights(tl)
 			this.timelines.push(tl)
 			this.activeId = tl.id
 		}
@@ -161,6 +166,7 @@ class TimelineStateManager {
 		if (!tl) return null
 		const layer = defaultLayer(name || `Layer ${tl.layers.length + 1}`)
 		tl.layers.push(layer)
+		ensureLayerHeights(tl)
 		this._save()
 		return layer
 	}
@@ -169,7 +175,10 @@ class TimelineStateManager {
 		const tl = this.getTimeline(id)
 		if (!tl) return null
 		const layer = defaultLayer(name || `Layer ${afterIdx + 2}`)
+		ensureLayerHeights(tl)
 		tl.layers.splice(afterIdx + 1, 0, layer)
+		tl.layerHeights.splice(afterIdx + 1, 0, DEFAULT_LAYER_H)
+		ensureLayerHeights(tl)
 		this._save()
 		return layer
 	}
@@ -178,6 +187,8 @@ class TimelineStateManager {
 		const tl = this.getTimeline(id)
 		if (!tl || layerIdx < 0 || layerIdx >= tl.layers.length) return
 		tl.layers.splice(layerIdx, 1)
+		if (Array.isArray(tl.layerHeights) && tl.layerHeights.length > layerIdx) tl.layerHeights.splice(layerIdx, 1)
+		ensureLayerHeights(tl)
 		this._save()
 	}
 
@@ -356,6 +367,7 @@ class TimelineStateManager {
 		this.timelines = data.timelines.length ? data.timelines : [defaultTimeline()]
 		for (const tl of this.timelines) {
 			if (!Array.isArray(tl.flags)) tl.flags = []
+			ensureLayerHeights(tl)
 		}
 		this.activeId = data.activeId || this.timelines[0]?.id || null
 		this._save()
@@ -371,6 +383,7 @@ class TimelineStateManager {
 					this.activeId = data.activeId || data.timelines[0]?.id || null
 					for (const tl of this.timelines) {
 						if (!Array.isArray(tl.flags)) tl.flags = []
+						ensureLayerHeights(tl)
 					}
 				}
 			}

@@ -14,7 +14,7 @@ export const settingsState = {
 		periodic_sync_interval_sec_osc: 1,
 		osc: {
 			enabled: true,
-			listenPort: 6250,
+			listenPort: 6251,
 			listenAddress: '0.0.0.0',
 			peakHoldMs: 2000,
 		},

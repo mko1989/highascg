@@ -21,7 +21,7 @@
   },
   "osc": {
     "enabled": true,
-    "listenPort": 6250,
+    "listenPort": 6251,
     "listenAddress": "0.0.0.0",
     "peakHoldMs": 2000,
     "emitIntervalMs": 50,
@@ -48,7 +48,8 @@
     "enabled": true,
     "go2rtcPort": 1984,
     "webrtcPort": 8555,
-    "protocol": "SRT",
+    "protocol": "UDP",
+    "captureMode": "udp",
     "quality": "medium",
     "basePort": 10000,
     "hardwareAccel": true,

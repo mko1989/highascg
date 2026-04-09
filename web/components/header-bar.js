@@ -9,6 +9,7 @@ import { dashboardState } from '../lib/dashboard-state.js'
 import { timelineState } from '../lib/timeline-state.js'
 import { multiviewState } from '../lib/multiview-state.js'
 import { api } from '../lib/api-client.js'
+import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { showSettingsModal } from './settings-modal.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
@@ -61,13 +62,32 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	fileInput.accept = '.json,application/json'
 	fileInput.style.display = 'none'
 
+	function showHeaderToast(msg, type = 'info') {
+		let container = document.getElementById('header-toast-container')
+		if (!container) {
+			container = document.createElement('div')
+			container.id = 'header-toast-container'
+			container.style.cssText =
+				'position:fixed;bottom:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;'
+			document.body.appendChild(container)
+		}
+		const toast = document.createElement('div')
+		const bg =
+			type === 'error' ? '#b91c1c' : type === 'success' ? '#15803d' : '#1d4ed8'
+		toast.style.cssText = `padding:8px 14px;border-radius:6px;font-size:13px;font-family:${UI_FONT_FAMILY};max-width:320px;word-break:break-word;box-shadow:0 2px 10px rgba(0,0,0,.35);background:${bg};color:#fff;pointer-events:auto;`
+		toast.textContent = msg
+		toast.setAttribute('role', 'status')
+		container.appendChild(toast)
+		setTimeout(() => toast.remove(), type === 'error' ? 6500 : 3800)
+	}
+
 	async function saveToServer() {
 		const project = projectState.exportProject(sceneState, timelineState, multiviewState, dashboardState)
 		try {
 			await api.post('/api/project/save', { project })
-			alert('Saved to server')
+			showHeaderToast('Saved', 'success')
 		} catch (e) {
-			alert('Save failed: ' + (e?.message || e))
+			showHeaderToast('Save failed: ' + (e?.message || e), 'error')
 		}
 	}
 
@@ -91,9 +111,9 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 			projectState.importProject(project, sceneState, timelineState, multiviewState, dashboardState)
 			nameInp.value = projectState.getProjectName()
 			window.dispatchEvent(new Event('project-loaded'))
-			alert('Loaded from server')
+			showHeaderToast('Loaded', 'success')
 		} catch (e) {
-			alert('Load failed: ' + (e?.message || e))
+			showHeaderToast('Load failed: ' + (e?.message || e), 'error')
 		}
 	}
 
@@ -106,23 +126,23 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 				nameInp.value = projectState.getProjectName()
 				window.dispatchEvent(new Event('project-loaded'))
 			} catch (e) {
-				alert('Invalid project file: ' + (e?.message || e))
+				showHeaderToast('Invalid project file: ' + (e?.message || e), 'error')
 			}
 		}
 		r.readAsText(file)
 	}
 
 	saveBtn.addEventListener('click', (e) => {
-		if (e.shiftKey) saveToServer()
-		else saveToFile()
+		if (e.shiftKey) saveToFile()
+		else void saveToServer()
 	})
-	saveBtn.title = 'Save: click = download file, Shift+click = save to server'
+	saveBtn.title = 'Save: click = save to server (and Caspar DATA), Shift+click = download JSON file'
 
 	loadBtn.addEventListener('click', (e) => {
-		if (e.shiftKey) loadFromServer()
-		else fileInput.click()
+		if (e.shiftKey) fileInput.click()
+		else void loadFromServer()
 	})
-	loadBtn.title = 'Load: click = upload file, Shift+click = load from server'
+	loadBtn.title = 'Load: click = load from server, Shift+click = upload JSON file'
 
 	const newProjectBtn = document.createElement('button')
 	newProjectBtn.className = 'header-btn'

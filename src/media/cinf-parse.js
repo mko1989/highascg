@@ -22,6 +22,14 @@ function parseCinfMedia(cinf) {
 			break
 		}
 	}
+	/** Some Caspar builds / scanners expose duration in seconds in the CINF line. */
+	if (!out.durationMs || out.durationMs <= 0) {
+		const secM = cinf.match(/\b(\d+(?:\.\d+)?)\s*(?:s(?:ec(?:onds?)?)?)\b/i)
+		if (secM) {
+			const s = parseFloat(secM[1])
+			if (s > 0) out.durationMs = Math.round(s * 1000)
+		}
+	}
 	return out
 }
 

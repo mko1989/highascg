@@ -107,6 +107,24 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					if (typeof ctx.log === 'function') ctx.log('debug', 'Multiview layout synced from web UI')
 				} else if (msg.type === 'selection_sync' && msg.data) {
 					if (typeof ctx.setUiSelection === 'function') ctx.setUiSelection(ctx, msg.data)
+				} else if (msg.type === 'scene_deck_sync' && msg.data) {
+					const raw = msg.data.looks
+					const looks = Array.isArray(raw)
+						? raw
+								.map((x) => ({
+									id: String(x?.id != null ? x.id : ''),
+									name: String(x?.name != null ? x.name : ''),
+								}))
+								.filter((x) => x.id)
+						: []
+					ctx.sceneDeck = { looks }
+					const persistence = ctx.persistence || require('../utils/persistence')
+					try {
+						persistence.set('scene_deck', ctx.sceneDeck)
+					} catch (e) {
+						if (typeof ctx.log === 'function') ctx.log('warn', 'scene_deck persist: ' + (e?.message || e))
+					}
+					broadcast('change', { path: 'scene.deck', value: ctx.sceneDeck })
 				}
 			} catch (e) {
 				const m = e instanceof Error ? e.message : String(e)

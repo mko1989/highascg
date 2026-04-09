@@ -16,8 +16,8 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 		audioRouting: { ...(defaults.audioRouting || {}), ...((appConfig && appConfig.audioRouting) || {}) },
 		streaming: (appConfig && appConfig.streaming) || {},
 	})
-	const lp = appConfig && appConfig.osc && appConfig.osc.listenPort != null ? Number(appConfig.osc.listenPort) : 6250
-	const port = Number.isFinite(lp) ? lp : 6250
+	const lp = appConfig && appConfig.osc && appConfig.osc.listenPort != null ? Number(appConfig.osc.listenPort) : 6251
+	const port = Number.isFinite(lp) ? lp : 6251
 	merged.osc_port = port
 	if (merged.osc_target_port == null || merged.osc_target_port === '') merged.osc_target_port = port
 	else merged.osc_target_port = parseInt(String(merged.osc_target_port), 10) || port

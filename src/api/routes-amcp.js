@@ -9,6 +9,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter } = require('../engine/audio-route')
+const { MAX_BATCH_COMMANDS } = require('../caspar/amcp-batch')
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
 	const matrix = playbackTracker.getMatrixForState(ctx)
@@ -42,8 +43,14 @@ async function handlePost(path, body, ctx) {
 					body: jsonBody({ error: 'commands: non-empty array of AMCP lines required (no BEGIN/COMMIT)' }),
 				}
 			}
-			const r = await amcp.batchSend(cmds.map(String))
-			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
+			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
+			/** One Caspar BEGIN…COMMIT per chunk — avoids N sequential round-trips when amcp_batch is off in config. */
+			let last = null
+			for (let i = 0; i < lines.length; i += MAX_BATCH_COMMANDS) {
+				const chunk = lines.slice(i, i + MAX_BATCH_COMMANDS)
+				last = await amcp.batchSend(chunk, { force: chunk.length > 1 })
+			}
+			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
 		case '/api/play': {
 			const { clip, transition, duration, tween, loop, auto, parameters, audioFilter, audioRoute } = b
