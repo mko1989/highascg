@@ -10,6 +10,8 @@ export const settingsState = {
 	settings: {
 		caspar: { host: '127.0.0.1', port: 5250 },
 		streaming: { enabled: true, quality: 'medium', basePort: 10000, hardware_accel: true },
+		/** Mirrors server defaults so subscribers (e.g. DMX) see shape before GET /api/settings completes. */
+		dmx: { enabled: false, debugLogDmx: false, fps: 25, fixtures: [] },
 		periodic_sync_interval_sec: 10,
 		periodic_sync_interval_sec_osc: 1,
 		osc: {
@@ -30,20 +32,32 @@ export const settingsState = {
 			monitorFfmpegPath: '',
 			monitorFfmpegArgs: '',
 			browserMonitor: 'pgm',
+			programSystemAudioDevices: ['', '', '', ''],
+			previewSystemAudioEnabled: [false, false, false, false],
+			previewSystemAudioDevices: ['', '', '', ''],
 		},
 	},
 	listeners: new Set(),
 
+	/** @type {Promise<void> | null} */
+	_loadPromise: null,
+
 	async load() {
-		try {
-			const cfg = await api.get('/api/settings')
-			if (cfg && typeof cfg === 'object') {
-				this.settings = cfg
-				this.notify()
+		if (this._loadPromise) return this._loadPromise
+		this._loadPromise = (async () => {
+			try {
+				const cfg = await api.get('/api/settings')
+				if (cfg && typeof cfg === 'object') {
+					this.settings = cfg
+					this.notify()
+				}
+			} catch (e) {
+				console.warn('[SettingsState] Failed to load settings:', e)
+			} finally {
+				this._loadPromise = null
 			}
-		} catch (e) {
-			console.warn('[SettingsState] Failed to load settings:', e)
-		}
+		})()
+		return this._loadPromise
 	},
 
 	getSettings() {
@@ -52,6 +66,11 @@ export const settingsState = {
 
 	subscribe(fn) {
 		this.listeners.add(fn)
+		try {
+			fn(this.settings)
+		} catch (e) {
+			console.error('Settings state listener error:', e)
+		}
 		return () => this.listeners.delete(fn)
 	},
 
@@ -59,7 +78,24 @@ export const settingsState = {
 		for (const fn of this.listeners) {
 			try { fn(this.settings) } catch (e) { console.error('Settings state listener error:', e) }
 		}
-	}
+	},
+
+	/**
+	 * Persist full settings to the server (highascg.config.json). Call after mutating `getSettings()` in place.
+	 * @param {object} [partial] - Optional object merged onto `this.settings` (same reference as getSettings() is fine).
+	 */
+	async save(partial) {
+		if (partial && typeof partial === 'object' && partial !== this.settings) {
+			Object.assign(this.settings, partial)
+		}
+		try {
+			await api.post('/api/settings', this.settings)
+		} catch (e) {
+			console.error('[SettingsState] Save failed:', e)
+			throw e
+		}
+		this.notify()
+	},
 }
 
 // Initial load

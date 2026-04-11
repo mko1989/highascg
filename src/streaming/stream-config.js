@@ -19,7 +19,7 @@ const STREAMING_DEFAULTS = {
 	ndiSourcePattern: 'CasparCG Channel {ch}', // {ch} replaced with channel number
 	/** @type {Record<string, string>} channel number string -> exact NDI source name (ndiNamingMode === 'custom') */
 	ndiChannelNames: {},
-	quality: 'medium', // low | medium | high | native | ultrafast (see QUALITY_PRESETS)
+	quality: 'medium', // low | medium | high | native | ultrafast | preview (see QUALITY_PRESETS)
 	basePort: 40000,
 	hardwareAccel: true,
 	maxBitrate: 2000,
@@ -70,6 +70,14 @@ const QUALITY_PRESETS = {
 		resolution: 'half',
 		fps: 15,
 		maxBitrate: 500,
+	},
+	/**
+	 * Light server load: half canvas, 1 fps H.264 — enough to see layout/motion in the browser without full WebRTC cost.
+	 */
+	preview: {
+		resolution: 'half',
+		fps: 1,
+		maxBitrate: 400,
 	},
 }
 

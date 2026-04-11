@@ -119,8 +119,9 @@ function buildFfmpegArgs(config) {
 		filterV = `scale=${resMap[config.resolution]},format=yuv420p,fps=${fps}`
 	}
 
-	const keyint = Math.max(2 * fps, 24)
-	const minKeyint = fps
+	// At very low fps (e.g. preview preset = 1), keep GOP short so the first decodable frame is not ~24s away.
+	const keyint = fps <= 5 ? 1 : Math.max(2 * fps, 24)
+	const minKeyint = fps <= 5 ? 1 : fps
 	// `-g:v` sets GOP; `repeat-headers` must be in x264-params (two tokens: `-x264-params:v` then value).
 	const x264opts = `min-keyint=${minKeyint}:scenecut=0:repeat-headers=1`
 
@@ -261,6 +262,9 @@ module.exports = {
 	SCALE_HALF_VF,
 	buildFfmpegArgs,
 	casparUdpStreamUri,
+	casparUdpStreamUriVariantsForRemove,
+	amcpInfoText,
+	truncate,
 	addStreamingConsumers,
 	removeStreamingConsumers,
 }

@@ -25,6 +25,57 @@ function interpolatePeaks(peaks, targetCount) {
 }
 
 /**
+ * Sample peaks along the timeline clip so extended duration repeats the waveform (tiles in time),
+ * instead of stretching one file-length cycle across the clip width.
+ * @param {number[]} peaks
+ * @param {object} clip
+ * @param {number} fps
+ * @param {number} sourceDurationMs
+ * @param {number} barCount
+ */
+function samplePeaksForTimelineClip(peaks, clip, fps, sourceDurationMs, barCount) {
+	if (!Array.isArray(peaks) || peaks.length === 0 || !sourceDurationMs || sourceDurationMs <= 0 || barCount < 1) {
+		return []
+	}
+	const fpsN = Math.max(1, fps || 25)
+	const inFrames = Number(clip.inPoint) || 0
+	const startMs = (inFrames / fpsN) * 1000
+	const oneCycleMs = Math.max(1, sourceDurationMs - startMs)
+	const clipDur = Math.max(0, clip.duration || 0)
+	const n = peaks.length
+	const out = []
+	for (let i = 0; i < barCount; i++) {
+		const t = barCount <= 1 ? 0 : (i / (barCount - 1)) * clipDur
+		const tInCycle = oneCycleMs > 0 ? t % oneCycleMs : 0
+		const tInSource = startMs + tInCycle
+		const ratio = Math.max(0, Math.min(1, tInSource / sourceDurationMs))
+		const tPeak = ratio * (n - 1)
+		const i0 = Math.floor(tPeak)
+		const i1 = Math.min(i0 + 1, n - 1)
+		const f = tPeak - i0
+		out.push((peaks[i0] ?? 0) * (1 - f) + (peaks[i1] ?? 0) * f)
+	}
+	return out
+}
+
+/**
+ * Timeline ms for one play-through of the file after inPoint (matches server `spanFrames` / implicit loop).
+ * @param {object} clip
+ * @param {number} fps
+ * @param {number} sourceDurationMs
+ * @returns {number | null}
+ */
+function oneCycleMsForPlayback(clip, fps, sourceDurationMs) {
+	if (!sourceDurationMs || sourceDurationMs <= 0) return null
+	const fpsN = Math.max(1, fps || 25)
+	const inF = Number(clip.inPoint) || 0
+	const totalFrames = Math.max(1, Math.floor((sourceDurationMs * fpsN) / 1000))
+	if (inF >= totalFrames) return null
+	const spanFrames = totalFrames - inF
+	return (spanFrames * 1000) / fpsN
+}
+
+/**
  * Map full-file peaks to the clip's visible source window (trim / inPoint).
  * Peaks are assumed uniformly spaced over [0, sourceDurationMs].
  * `inPoint` is in frames at timeline fps (same convention as server playback).
@@ -203,7 +254,10 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 						if (d?.hasAudio === false) {
 							waveformCache.set(waveformUrl, 'no-audio')
 						} else if (Array.isArray(d?.peaks)) {
-							waveformCache.set(waveformUrl, d.peaks)
+							waveformCache.set(waveformUrl, {
+								peaks: d.peaks,
+								durationMs: typeof d?.durationMs === 'number' && d.durationMs > 0 ? d.durationMs : null,
+							})
 						} else {
 							waveformCache.set(waveformUrl, 'error')
 						}
@@ -217,18 +271,22 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 		}
 
 		if (wf !== 'loading' && wf !== undefined && wf !== 'no-audio') {
-			const peaks = Array.isArray(wf) ? wf : null
-			const useSynthetic = wf === 'error' || (Array.isArray(wf) && wf.length === 0)
+			const peaks = Array.isArray(wf) ? wf : wf?.peaks != null ? wf.peaks : null
+			const wfDurationMs =
+				wf && typeof wf === 'object' && !Array.isArray(wf) && typeof wf.durationMs === 'number' && wf.durationMs > 0
+					? wf.durationMs
+					: null
+			const useSynthetic = wf === 'error' || (Array.isArray(peaks) && peaks.length === 0)
 			const barCount = Math.min(200, Math.max(16, Math.floor(w / 3)))
-			const sourceDur = getSourceDurationMs?.(clip.source)
+			const sourceDur = getSourceDurationMs?.(clip.source) ?? wfDurationMs
 			const trimmed =
-				!useSynthetic && peaks?.length
+				!useSynthetic && peaks?.length && sourceDur
 					? slicePeaksToTrim(peaks, clip, _fps, sourceDur)
 					: null
-			const bars = interpolatePeaks(
-				trimmed?.length ? trimmed : peaks || [],
-				barCount,
-			)
+			const bars =
+				!useSynthetic && peaks?.length && sourceDur
+					? samplePeaksForTimelineClip(peaks, clip, _fps, sourceDur, barCount)
+					: interpolatePeaks(trimmed?.length ? trimmed : peaks || [], barCount)
 			const nBars = bars.length || barCount
 			const padX = 3
 			const innerW = Math.max(1, w - padX * 2)
@@ -283,6 +341,36 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 			ctx.lineTo(kx, ky + 5); ctx.lineTo(kx - 4, ky)
 			ctx.closePath(); ctx.fill()
 		}
+	}
+
+	// Repeat boundaries: stretched clip (timeline longer than one source play) — subtle vertical lines.
+	const waveUrlForDur = getWaveformUrl?.(clip.source)
+	const wfForDur = waveUrlForDur ? waveformCache.get(waveUrlForDur) : undefined
+	const wfDurMs =
+		wfForDur && typeof wfForDur === 'object' && !Array.isArray(wfForDur) && wfForDur.durationMs > 0
+			? wfForDur.durationMs
+			: null
+	const sourceDurRepeat = getSourceDurationMs?.(clip.source) ?? wfDurMs
+	const cycleMs = oneCycleMsForPlayback(clip, _fps, sourceDurRepeat)
+	if (cycleMs != null && cycleMs > 80 && clip.duration > cycleMs + 40 && w >= 24 && h >= 10) {
+		ctx.save()
+		ctx.beginPath()
+		roundRect(ctx, x, y, w, h, 3)
+		ctx.clip()
+		ctx.strokeStyle = 'rgba(255,255,255,0.32)'
+		ctx.lineWidth = 1
+		ctx.setLineDash([3, 5])
+		for (let k = 1; k * cycleMs < clip.duration - 0.5; k++) {
+			const rx = x + k * cycleMs * env.pxPerMs
+			if (rx < x + 2 || rx > x + w - 2) continue
+			if (rx < visX || rx > visX + visW) continue
+			ctx.beginPath()
+			ctx.moveTo(rx + 0.5, y + 3)
+			ctx.lineTo(rx + 0.5, y + h - 3)
+			ctx.stroke()
+		}
+		ctx.setLineDash([])
+		ctx.restore()
 	}
 
 	ctx.fillStyle = 'rgba(255,255,255,0.25)'

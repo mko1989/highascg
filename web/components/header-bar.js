@@ -301,6 +301,57 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	ledTestWrap.appendChild(ledTestBtn)
 	ledTestWrap.appendChild(ftbBtn)
 
+	const pgmRecBtn = document.createElement('button')
+	pgmRecBtn.type = 'button'
+	pgmRecBtn.className = 'header-btn header-btn--pgm-rec'
+	pgmRecBtn.textContent = 'Rec PGM'
+	const pgmRecTitleIdle =
+		'Record PGM on the Caspar host into the media folder (H.264 + AAC). Path comes from INFO PATHS or Local media path in Settings. Toggle to stop.'
+	pgmRecBtn.title = pgmRecTitleIdle
+	ledTestWrap.appendChild(pgmRecBtn)
+
+	let pgmRecBusy = false
+	async function syncPgmRecButton() {
+		try {
+			const st = await api.get('/api/pgm-record')
+			const on = !!(st && st.recording)
+			pgmRecBtn.textContent = on ? 'Stop rec' : 'Rec PGM'
+			pgmRecBtn.classList.toggle('header-btn--pgm-rec--on', on)
+			pgmRecBtn.title = on
+				? `Recording to ${st.path || '…'} — click to stop (file is on the Caspar machine)`
+				: pgmRecTitleIdle
+		} catch {
+			/* offline / 503 — leave button idle */
+		}
+	}
+	void syncPgmRecButton()
+
+	pgmRecBtn.addEventListener('click', () => {
+		void (async () => {
+			if (pgmRecBusy) return
+			pgmRecBusy = true
+			pgmRecBtn.disabled = true
+			try {
+				const st = await api.get('/api/pgm-record').catch(() => ({ recording: false }))
+				const on = !!(st && st.recording)
+				const res = await api.post('/api/pgm-record', { action: on ? 'stop' : 'start' })
+				if (res?.path) {
+					showHeaderToast(
+						res.recording ? 'Recording → ' + res.path : 'Saved: ' + res.path,
+						'success'
+					)
+				}
+				await syncPgmRecButton()
+			} catch (e) {
+				alert('PGM record: ' + (e?.message || e))
+				await syncPgmRecButton()
+			} finally {
+				pgmRecBusy = false
+				pgmRecBtn.disabled = false
+			}
+		})()
+	})
+
 	async function applyLedTest(enabled) {
 		try {
 			const payload = { enabled, ...getLedTestSettings() }

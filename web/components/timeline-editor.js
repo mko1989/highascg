@@ -17,6 +17,8 @@ import { initPreviewPanel, drawTimelineStack } from './preview-canvas.js'
 import { createTimelineTransport } from './timeline-transport.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
+import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
+import { settingsState } from '../lib/settings-state.js'
 
 export function initTimelineEditor(root, stateStore) {
 	let redrawTimelineView = () => {}
@@ -427,6 +429,17 @@ export function initTimelineEditor(root, stateStore) {
 		},
 	})
 
+	function syncTimelinePreviewVisibility() {
+		const live = shouldShowLiveVideo()
+		previewHost.style.display = live ? '' : 'none'
+		if (tlSplitHandle) tlSplitHandle.style.display = live ? '' : 'none'
+		root.classList.toggle('tl-editor-root--no-preview', !live)
+		if (live) previewPanel?.scheduleDraw?.()
+	}
+	streamState.subscribe(syncTimelinePreviewVisibility)
+	settingsState.subscribe(syncTimelinePreviewVisibility)
+	syncTimelinePreviewVisibility()
+
 	function showLayerContextMenu(clientX, clientY, timelineId, layerIdx, layer) {
 		const existing = document.getElementById('tl-layer-menu')
 		if (existing) existing.remove()
@@ -666,6 +679,7 @@ export function initTimelineEditor(root, stateStore) {
 	stateStore.on('timeline.tick', (data) => onTick(data))
 	stateStore.on('timeline.playback', (pb) => onPlayback(pb))
 	timelineState.on('change', () => {
+		updateTimecode()
 		redrawTimelineView()
 	})
 	window.addEventListener('project-loaded', () => {

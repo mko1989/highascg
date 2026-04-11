@@ -348,7 +348,7 @@ export function initInspectorPanel(root, stateStore) {
 				() => api.get('/api/media'),
 			)
 			if (!cr?.w || !cr.h) return
-			const fit = c.contentFit || 'horizontal'
+			const fit = c.contentFit || 'native'
 			const rect = sceneLayerPixelRectForContentFit(cw, ch, cr.w, cr.h, fit)
 			timelineState.updateClip(timelineId, layerIdx, clipId, {
 				fillPx: { x: rect.x, y: rect.y, w: rect.w, h: rect.h },
@@ -466,7 +466,7 @@ export function initInspectorPanel(root, stateStore) {
 		const fitSel = document.createElement('select')
 		fitSel.className = 'inspector-field__select'
 		fitSel.setAttribute('aria-label', 'Content sizing')
-		const curFit = freshClip().contentFit || 'horizontal'
+		const curFit = freshClip().contentFit || 'native'
 		for (const o of SCENE_CONTENT_FIT_OPTIONS) {
 			const opt = document.createElement('option')
 			opt.value = o.value
@@ -476,7 +476,7 @@ export function initInspectorPanel(root, stateStore) {
 		}
 		fitSel.addEventListener('change', () => {
 			timelineState.updateClip(timelineId, layerIdx, clipId, {
-				contentFit: /** @type {'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */ (fitSel.value),
+				contentFit: /** @type {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */ (fitSel.value),
 			})
 			syncTimelineToServer()
 			void reapplyClipFrameForContentFit()
@@ -493,6 +493,41 @@ export function initInspectorPanel(root, stateStore) {
 			'Applies to the whole clip (program canvas pixels). Use keyframes below only when you need motion over time.'
 		transGrp.appendChild(tfHint)
 		root.appendChild(transGrp)
+
+		const takeGrp = document.createElement('div')
+		takeGrp.className = 'inspector-group'
+		takeGrp.innerHTML = '<div class="inspector-group__title">Look take (playback)</div>'
+		const startWrap = document.createElement('div')
+		startWrap.className = 'inspector-field'
+		const startLab = document.createElement('label')
+		startLab.className = 'inspector-field__label'
+		startLab.textContent = 'Start behaviour'
+		const startSel = document.createElement('select')
+		startSel.className = 'inspector-field__select'
+		startSel.setAttribute('aria-label', 'Media start when taking this look to program')
+		startSel.innerHTML =
+			'<option value="beginning">Start from beginning (trim)</option>' +
+			'<option value="relativeToPrevious">Relative to timeline (layer)</option>'
+		const sbClip = freshClip().startBehaviour || 'beginning'
+		startSel.value = sbClip === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
+		startSel.addEventListener('change', () => {
+			timelineState.updateClip(timelineId, layerIdx, clipId, {
+				startBehaviour: startSel.value === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
+			})
+			syncTimelineToServer()
+			redrawClipInspector()
+		})
+		startLab.appendChild(startSel)
+		startWrap.appendChild(startLab)
+		const startHint = document.createElement('p')
+		startHint.className = 'inspector-field inspector-field--hint'
+		startHint.style.fontSize = '0.78rem'
+		startHint.style.color = 'var(--text-muted)'
+		startHint.textContent =
+			'Relative: on take, seek to the same position in the file as the timeline playhead on this layer (in-point + elapsed).'
+		startWrap.appendChild(startHint)
+		takeGrp.appendChild(startWrap)
+		root.appendChild(takeGrp)
 
 		appendTimelineClipKeyframes(root, {
 			timelineId, layerIdx, clipId, clip,
@@ -587,6 +622,47 @@ export function initInspectorPanel(root, stateStore) {
 			stateStore,
 		})
 		appendSceneLayerMixerGroup(root, { sceneId, layerIndex, layer })
+
+		const takeGrp = document.createElement('div')
+		takeGrp.className = 'inspector-group'
+		takeGrp.innerHTML = '<div class="inspector-group__title">Look take (playback)</div>'
+		const startWrap = document.createElement('div')
+		startWrap.className = 'inspector-field'
+		const startLab = document.createElement('label')
+		startLab.className = 'inspector-field__label'
+		startLab.textContent = 'Start behaviour override'
+		const startSel = document.createElement('select')
+		startSel.className = 'inspector-field__select'
+		startSel.setAttribute('aria-label', 'Override timeline clip start behaviour for this layer')
+		startSel.innerHTML =
+			'<option value="inherit">Same as timeline clip</option>' +
+			'<option value="beginning">Start from beginning (trim)</option>' +
+			'<option value="relativeToPrevious">Relative to timeline (layer)</option>'
+		const rawSb = layer.startBehaviour
+		startSel.value =
+			rawSb === 'relativeToPrevious'
+				? 'relativeToPrevious'
+				: rawSb === 'beginning'
+					? 'beginning'
+					: 'inherit'
+		startSel.addEventListener('change', () => {
+			const v = startSel.value
+			sceneState.patchLayer(sceneId, layerIndex, {
+				startBehaviour: v === 'inherit' ? null : v === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
+			})
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		})
+		startLab.appendChild(startSel)
+		startWrap.appendChild(startLab)
+		const startHint = document.createElement('p')
+		startHint.className = 'inspector-field inspector-field--hint'
+		startHint.style.fontSize = '0.78rem'
+		startHint.style.color = 'var(--text-muted)'
+		startHint.textContent =
+			'Optional: override the timeline clip’s setting for this layer index when taking the look. “Same as timeline” uses the clip inspector value.'
+		startWrap.appendChild(startHint)
+		takeGrp.appendChild(startWrap)
+		root.appendChild(takeGrp)
 	}
 
 	async function applyLayerSettings(layerIdx, ls) {
@@ -786,6 +862,13 @@ export function initInspectorPanel(root, stateStore) {
 			const tl = timelineState.getTimeline(selection.timelineId)
 			const f = tl?.flags?.find((x) => x.id === selection.flagId)
 			if (f) renderTimelineFlagInspector(selection.timelineId, selection.flagId)
+			else update(null)
+		}
+		if (selection?.type === 'timelineClip' && selection.timelineId && selection.clipId != null) {
+			const tl = timelineState.getTimeline(selection.timelineId)
+			const layer = tl?.layers?.[selection.layerIdx]
+			const c = layer?.clips?.find((x) => x.id === selection.clipId)
+			if (c) renderTimelineClipInspector(selection.timelineId, selection.layerIdx, selection.clipId, c)
 			else update(null)
 		}
 	})

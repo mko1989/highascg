@@ -32,7 +32,7 @@ export function createApplyNativeFillForSource(opts) {
 		const canvas = getCanvas()
 		const source = sourcePayloadForFill(data)
 		const layer = scene.layers[layerIndex]
-		const contentFit = layer.contentFit || 'horizontal'
+		const contentFit = layer.contentFit || 'native'
 		const contentRes = await fetchMediaContentResolution(source, stateStore, sceneState.activeScreenIndex, () =>
 			api.get('/api/media'),
 		)

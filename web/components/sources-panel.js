@@ -12,6 +12,30 @@ import { normalizeMediaIdForMatch } from '../lib/mixer-fill.js'
 import { showLiveInputModal } from './live-input-modal.js'
 
 
+/**
+ * Ctrl+click / ⌘+click: download file from server media folder (GET /api/local-media/…/file).
+ * @param {HTMLElement} el
+ * @param {string} id - media id (Caspar path)
+ * @param {string} label
+ */
+function attachMediaDownloadOnModifierClick(el, id, label) {
+	const hint = 'Ctrl+click or ⌘+click: download to this computer'
+	el.title = `${label} — ${hint}`
+	el.addEventListener('click', (e) => {
+		if (!(e.ctrlKey || e.metaKey)) return
+		e.preventDefault()
+		e.stopPropagation()
+		const url = `${getApiBase()}/api/local-media/${encodeURIComponent(id)}/file`
+		const a = document.createElement('a')
+		a.href = url
+		a.download = String(label || id).replace(/^.*[/\\]/, '') || 'download'
+		a.rel = 'noopener'
+		document.body.appendChild(a)
+		a.click()
+		a.remove()
+	})
+}
+
 function makeDraggable(el, sourceType, sourceValue, label, extra = {}) {
 	el.draggable = true
 	el.dataset.sourceType = sourceType
@@ -146,13 +170,14 @@ function renderMediaBrowser(container, media, filter) {
 		el.dataset.sourceValue = id
 		el.innerHTML = `
 			<span class="source-item__kind-pill" title="${escapeHtml(KIND_TITLE[kind] || 'Media')}">${KIND_PILL[kind] || 'MED'}</span>
-			<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+			<span class="source-item__label">${escapeHtml(label)}</span>
 			${metaStr ? `<span class="source-item__meta-inline">${escapeHtml(metaStr)}</span>` : ''}
 		`
 		makeDraggable(el, 'media', id, label, {
 			resolution: item.resolution || '',
 			...(item.durationMs != null && item.durationMs > 0 ? { durationMs: item.durationMs } : {}),
 		})
+		attachMediaDownloadOnModifierClick(el, id, label)
 		container.appendChild(el)
 	})
 }

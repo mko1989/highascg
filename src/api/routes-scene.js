@@ -8,10 +8,23 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
-const { runSceneTake, runTimelineOnlyTake, isTimelineOnlyScene, layerHasContent } = require('../engine/scene-transition')
+const { runTimelineOnlyTake, isTimelineOnlyScene, layerHasContent } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 
 const TAKE_TIMEOUT_MS = 120000
+
+/** Remove take-only fields from stored live scene JSON. */
+function stripEphemeralTakeFields(scene) {
+	if (!scene || typeof scene !== 'object') return scene
+	const layers = Array.isArray(scene.layers)
+		? scene.layers.map((L) => {
+				if (!L || typeof L !== 'object') return L
+				const { playSeekFrames, ...rest } = L
+				return rest
+			})
+		: scene.layers
+	return { ...scene, layers }
+}
 
 /**
  * @param {string} body
@@ -65,18 +78,14 @@ async function handleSceneTake(body, ctx) {
 		framerate: b.framerate,
 		forceCut: !!b.forceCut,
 	}
-	const useLbgTake = b.takeMode === 'lbg' || b.takeMethod === 'lbg'
-
 	const runTake = async () => {
 		if (isTimelineOnlyScene(inc)) {
 			await runTimelineOnlyTake(ctx, takeOpts)
-		} else if (useLbgTake) {
-			await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
 		} else {
-			await runSceneTake(ctx.amcp, { ...takeOpts, self: ctx })
+			await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
 		}
 		if (inc && typeof inc === 'object' && inc.id) {
-			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: inc })
+			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 		}
 		liveSceneState.broadcastSceneLive(ctx)
 	}

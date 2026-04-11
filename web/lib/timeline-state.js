@@ -8,6 +8,9 @@ import { ensureLayerHeights, DEFAULT_LAYER_H } from './timeline-track-heights.js
 
 const STORAGE_KEY = 'casparcg_timelines_v1'
 
+/** Ms after last clip/flag end when auto-growing `timeline.duration`. */
+const CONTENT_END_PADDING_MS = 2000
+
 function uid() {
 	return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 }
@@ -26,8 +29,13 @@ function defaultClip(source, startTime, duration) {
 		volume: 1,
 		/** When true (default), changing W or H keeps media aspect when known — same as look editor. */
 		aspectLocked: true,
-		/** @type {'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */
-		contentFit: 'horizontal',
+		/** @type {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */
+		contentFit: 'native',
+		/**
+		 * When taking a look to program: seek media from trim start, or match timeline playhead on this layer.
+		 * @type {'beginning' | 'relativeToPrevious'}
+		 */
+		startBehaviour: 'beginning',
 	}
 }
 
@@ -52,6 +60,24 @@ function defaultTimeline(opts) {
 			defaultLayer('Layer 3'),
 		],
 	}
+}
+
+/**
+ * Latest end time of any clip or flag (ms).
+ * @param {object} tl
+ */
+function computeContentEndMs(tl) {
+	let end = 0
+	for (const layer of tl.layers || []) {
+		for (const c of layer.clips || []) {
+			const e = (c.startTime || 0) + (c.duration || 0)
+			if (e > end) end = e
+		}
+	}
+	for (const f of tl.flags || []) {
+		if (typeof f.timeMs === 'number' && f.timeMs > end) end = f.timeMs
+	}
+	return end
 }
 
 class TimelineStateManager {
@@ -85,6 +111,23 @@ class TimelineStateManager {
 		Object.assign(tl, changes)
 		this._save()
 		return tl
+	}
+
+	/**
+	 * If clips/flags extend past `tl.duration`, grow duration (same padding as drop/paste).
+	 * @param {string} timelineId
+	 * @returns {boolean} True if duration was increased
+	 */
+	expandDurationToContent(timelineId) {
+		const tl = this.getTimeline(timelineId)
+		if (!tl) return false
+		const contentEnd = computeContentEndMs(tl)
+		const target = Math.ceil(contentEnd + CONTENT_END_PADDING_MS)
+		if (target > tl.duration) {
+			tl.duration = target
+			return true
+		}
+		return false
 	}
 
 	deleteTimeline(id) {
@@ -136,6 +179,7 @@ class TimelineStateManager {
 		}
 		tl.flags.push(flag)
 		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
+		this.expandDurationToContent(timelineId)
 		this._save()
 		return flag
 	}
@@ -148,6 +192,7 @@ class TimelineStateManager {
 		Object.assign(f, changes)
 		if (f.type && !['pause', 'play', 'jump'].includes(f.type)) f.type = 'pause'
 		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
+		this.expandDurationToContent(timelineId)
 		this._save()
 		return f
 	}
@@ -207,6 +252,7 @@ class TimelineStateManager {
 		if (!tl || !tl.layers[layerIdx]) return null
 		const clip = defaultClip(source, startTime, duration)
 		tl.layers[layerIdx].clips.push(clip)
+		this.expandDurationToContent(id)
 		this._save()
 		return clip
 	}
@@ -215,6 +261,7 @@ class TimelineStateManager {
 		const clip = this._findClip(id, layerIdx, clipId)
 		if (!clip) return null
 		Object.assign(clip, changes)
+		this.expandDurationToContent(id)
 		this._save()
 		return clip
 	}
@@ -230,6 +277,7 @@ class TimelineStateManager {
 		c.id = uid()
 		c.startTime = Math.max(0, startTime)
 		tl.layers[layerIdx].clips.push(c)
+		this.expandDurationToContent(timelineId)
 		this._save()
 		return c
 	}
@@ -247,6 +295,7 @@ class TimelineStateManager {
 		}
 		tl.flags.push(f)
 		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
+		this.expandDurationToContent(timelineId)
 		this._save()
 		return f
 	}
@@ -368,6 +417,11 @@ class TimelineStateManager {
 		for (const tl of this.timelines) {
 			if (!Array.isArray(tl.flags)) tl.flags = []
 			ensureLayerHeights(tl)
+			for (const layer of tl.layers || []) {
+				for (const c of layer.clips || []) {
+					if (c.startBehaviour == null) c.startBehaviour = 'beginning'
+				}
+			}
 		}
 		this.activeId = data.activeId || this.timelines[0]?.id || null
 		this._save()
@@ -384,6 +438,11 @@ class TimelineStateManager {
 					for (const tl of this.timelines) {
 						if (!Array.isArray(tl.flags)) tl.flags = []
 						ensureLayerHeights(tl)
+						for (const layer of tl.layers || []) {
+							for (const c of layer.clips || []) {
+								if (c.startBehaviour == null) c.startBehaviour = 'beginning'
+							}
+						}
 					}
 				}
 			}

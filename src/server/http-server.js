@@ -128,7 +128,7 @@ async function defaultRouteApi(method, reqPath, body, _req) {
  *   bindAddress?: string,
  *   webDir: string,
  *   templatesDir?: string,
- *   routeApi?: (method: string, path: string, body: string, req: import('http').IncomingMessage) => Promise<{ status?: number, headers?: Record<string, string>, body?: string | Buffer }>,
+ *   routeApi?: (method: string, path: string, body: string, req: import('http').IncomingMessage) => Promise<{ status?: number, headers?: Record<string, string>, body?: string | Buffer, stream?: import('fs').ReadStream }>,
  *   log?: (msg: string) => void,
  * }} options
  * @returns {import('http').Server}
@@ -172,6 +172,17 @@ function startHttpServer(options) {
 			}
 			const headers = mergeCors(result.headers)
 			res.writeHead(result.status ?? 200, headers)
+			if (result.stream && typeof result.stream.pipe === 'function') {
+				result.stream.on('error', (err) => {
+					try {
+						if (!res.writableEnded) res.destroy(err)
+					} catch (_) {
+						/* ignore */
+					}
+				})
+				result.stream.pipe(res)
+				return
+			}
 			res.end(result.body ?? '')
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e)

@@ -6,7 +6,26 @@ function mergeChannel(a, b) {
 	const o = { ...a, ...b }
 	if (b.layers || a.layers) {
 		o.layers = { ...(a.layers || {}) }
-		for (const k of Object.keys(b.layers || {})) o.layers[k] = { ...(a.layers && a.layers[k] ? a.layers[k] : {}), ...b.layers[k] }
+		for (const k of Object.keys(b.layers || {})) {
+			const aL = a.layers && a.layers[k] ? a.layers[k] : {}
+			const bL = b.layers[k]
+			const merged = { ...aL, ...bL }
+			// Shallow layer merge overwrites nested `file` entirely; preserve fields (e.g. duration) across delta ticks.
+			if (aL.file && bL.file && typeof aL.file === 'object' && typeof bL.file === 'object') {
+				merged.file = { ...aL.file, ...bL.file }
+			}
+			o.layers[k] = merged
+		}
+	}
+	// Merge mixer meter slots so a delta with fresh dBFS (-120) updates instead of keeping stale peaks from `a`.
+	if (b.audio && typeof b.audio === 'object' && Array.isArray(b.audio.levels)) {
+		const al = a.audio?.levels
+		const bl = b.audio.levels
+		o.audio = {
+			...(a.audio || {}),
+			...b.audio,
+			levels: bl.map((slot, i) => ({ ...(Array.isArray(al) && al[i] ? al[i] : {}), ...(slot || {}) })),
+		}
 	}
 	return o
 }
@@ -37,8 +56,11 @@ export class OscClient {
 			this._un.push(this._ws.on('osc', (d) => this._ingest(d)))
 			this._un.push(
 				this._ws.on('state', (data) => {
-					if (data?.osc?.channels && !Object.keys(this._ch).length) {
-						this._ch = { ...data.osc.channels }
+					// Authoritative full mirror from StateManager — always sync (not only when _ch was empty).
+					// Fixes partial WS delta state + missed hydrate when first `state` had osc: null at boot.
+					const ch = data?.osc?.channels
+					if (ch && typeof ch === 'object') {
+						this._ch = { ...ch }
 						this._run()
 					}
 				}),
@@ -99,9 +121,12 @@ export class OscClient {
 			try {
 				const m = JSON.parse(ev.data)
 				if (m.type === 'osc') this._ingest(m.data)
-				if (m.type === 'state' && m.data?.osc?.channels && !Object.keys(this._ch).length) {
-					this._ch = { ...m.data.osc.channels }
-					this._run()
+				if (m.type === 'state') {
+					const ch = m.data?.osc?.channels
+					if (ch && typeof ch === 'object') {
+						this._ch = { ...ch }
+						this._run()
+					}
 				}
 			} catch {}
 		}

@@ -270,10 +270,25 @@ class Go2rtcManager {
 
 		const names = targets.map((t) => t.name)
 		const port = config.go2rtcPort
-		const timeoutMs = 20000
+		/** Default 10s (was 20s) — deploy restarts faster; raise if preview races WebRTC. Set 0 to skip wait. */
+		const raw = process.env.HIGHASCG_GO2RTC_PUSH_WAIT_MS
+		let timeoutMs = 10000
+		if (raw !== undefined && raw !== '') {
+			const n = parseInt(String(raw), 10)
+			if (Number.isFinite(n)) timeoutMs = Math.max(0, n)
+		}
 		const intervalMs = 250
-		const deadline = Date.now() + timeoutMs
 		const log = ctx.log || (() => {})
+
+		if (timeoutMs === 0) {
+			log(
+				'info',
+				'[Streaming] go2rtc: push-ingest wait skipped (HIGHASCG_GO2RTC_PUSH_WAIT_MS=0) — preview may connect slightly later'
+			)
+			return
+		}
+
+		const deadline = Date.now() + timeoutMs
 
 		while (Date.now() < deadline) {
 			const ok = await this._streamsHaveProducers(port, names)
@@ -286,7 +301,7 @@ class Go2rtcManager {
 
 		log(
 			'warn',
-			'[Streaming] go2rtc: push ingest not confirmed in time — preview may work after MPEG-TS arrives'
+			`[Streaming] go2rtc: push ingest not confirmed within ${timeoutMs}ms — preview may work after MPEG-TS arrives (set HIGHASCG_GO2RTC_PUSH_WAIT_MS to wait longer)`
 		)
 	}
 
@@ -520,7 +535,11 @@ class Go2rtcManager {
 			}
 			proc.once('close', finish)
 			proc.kill('SIGTERM')
-			/** Orphan ffmpeg UDP listeners survive if SIGKILL is delayed — 1.5s then SIGKILL frees basePort+1..N sooner. */
+			const killAfterMs = Math.max(
+				200,
+				parseInt(process.env.HIGHASCG_GO2RTC_STOP_KILL_MS || '1000', 10) || 1000
+			)
+			/** Orphan ffmpeg UDP listeners survive if SIGKILL is delayed — then SIGKILL frees basePort+1..N for the next start. */
 			setTimeout(() => {
 				if (this.process && this.process.exitCode === null) {
 					try {
@@ -530,7 +549,7 @@ class Go2rtcManager {
 					}
 				}
 				finish()
-			}, 1500)
+			}, killAfterMs)
 		})
 	}
 

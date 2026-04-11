@@ -13,7 +13,7 @@ const { spawn } = require('child_process')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
 
 /** Bump when peak algorithm / bar semantics change (invalidates on-disk cache). */
-const WAVEFORM_VERSION = 1
+const WAVEFORM_VERSION = 2
 
 function resolveSafe(basePath, filename) {
 	if (!basePath || typeof basePath !== 'string') return null
@@ -161,7 +161,7 @@ function getWaveformCacheDir(config) {
  * @param {string} key
  * @param {import('fs').Stats} stat
  * @param {number} bars
- * @returns {{ peaks: number[], hasAudio: boolean } | null}
+ * @returns {{ peaks: number[], hasAudio: boolean, durationMs?: number } | null}
  */
 function readWaveformCacheFile(cacheDir, key, stat, bars) {
 	const fp = path.join(cacheDir, `${key}.json`)
@@ -170,9 +170,10 @@ function readWaveformCacheFile(cacheDir, key, stat, bars) {
 		const j = JSON.parse(fs.readFileSync(fp, 'utf8'))
 		if (j.v !== WAVEFORM_VERSION) return null
 		if (j.mtimeMs !== stat.mtimeMs || j.size !== stat.size || j.bars !== bars) return null
-		if (j.hasAudio === false) return { peaks: [], hasAudio: false }
+		const durationMs = typeof j.durationMs === 'number' && j.durationMs > 0 ? j.durationMs : undefined
+		if (j.hasAudio === false) return { peaks: [], hasAudio: false, durationMs }
 		if (!Array.isArray(j.peaks)) return null
-		return { peaks: j.peaks, hasAudio: true }
+		return { peaks: j.peaks, hasAudio: true, durationMs }
 	} catch {
 		return null
 	}
@@ -183,7 +184,7 @@ function readWaveformCacheFile(cacheDir, key, stat, bars) {
  * @param {string} key
  * @param {import('fs').Stats} stat
  * @param {number} bars
- * @param {{ peaks: number[], hasAudio: boolean }} data
+ * @param {{ peaks: number[], hasAudio: boolean, durationMs?: number }} data
  */
 function writeWaveformCacheFile(cacheDir, key, stat, bars, data) {
 	fs.mkdirSync(cacheDir, { recursive: true })
@@ -195,8 +196,48 @@ function writeWaveformCacheFile(cacheDir, key, stat, bars, data) {
 		bars,
 		hasAudio: data.hasAudio,
 		peaks: data.peaks,
+		...(typeof data.durationMs === 'number' && data.durationMs > 0 ? { durationMs: data.durationMs } : {}),
 	}
 	fs.writeFileSync(fp, JSON.stringify(payload))
+}
+
+/**
+ * @param {string} filename - relative media id / path
+ * @returns {string}
+ */
+function contentTypeForFilename(filename) {
+	const ext = path.extname(filename).toLowerCase()
+	const M = {
+		'.mp4': 'video/mp4',
+		'.mov': 'video/quicktime',
+		'.mxf': 'application/mxf',
+		'.mkv': 'video/x-matroska',
+		'.webm': 'video/webm',
+		'.avi': 'video/x-msvideo',
+		'.m4v': 'video/x-m4v',
+		'.mpg': 'video/mpeg',
+		'.mpeg': 'video/mpeg',
+		'.png': 'image/png',
+		'.jpg': 'image/jpeg',
+		'.jpeg': 'image/jpeg',
+		'.gif': 'image/gif',
+		'.webp': 'image/webp',
+		'.bmp': 'image/bmp',
+		'.svg': 'image/svg+xml',
+		'.tga': 'image/tga',
+		'.wav': 'audio/wav',
+		'.mp3': 'audio/mpeg',
+		'.aac': 'audio/aac',
+		'.m4a': 'audio/mp4',
+		'.flac': 'audio/flac',
+	}
+	return M[ext] || 'application/octet-stream'
+}
+
+/** ASCII-only filename for Content-Disposition (avoid header injection). */
+function contentDispositionBasename(filename) {
+	const base = path.basename(String(filename || 'download'))
+	return base.replace(/[\r\n"]/g, '_').replace(/[^\x20-\x7E]/g, '_') || 'download'
 }
 
 const HANDLERS = {
@@ -209,13 +250,14 @@ const HANDLERS = {
 		if (hit) return hit
 
 		const probe = await probeMedia(filePath)
+		const durationMs = probe.durationMs > 0 ? probe.durationMs : undefined
 		if (!probe.hasAudio) {
-			writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks: [], hasAudio: false })
-			return { peaks: [], hasAudio: false }
+			writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks: [], hasAudio: false, durationMs })
+			return { peaks: [], hasAudio: false, ...(durationMs ? { durationMs } : {}) }
 		}
 		const peaks = await extractWaveform(filePath, bars)
-		writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks, hasAudio: true })
-		return { peaks, hasAudio: true }
+		writeWaveformCacheFile(cacheDir, key, stat, bars, { peaks, hasAudio: true, durationMs })
+		return { peaks, hasAudio: true, ...(durationMs ? { durationMs } : {}) }
 	},
 	probe: async (filePath) => probeMedia(filePath),
 }
@@ -234,16 +276,34 @@ async function handleLocalMedia(path, config, query) {
 	// Same default as ingest / GET /api/media disk scan — ffprobe works without explicit config on Linux.
 	const basePathRaw = (config?.local_media_path || '').trim()
 	const basePath = basePathRaw || getMediaIngestBasePath(config)
-	const handler = HANDLERS[type]
-	if (!handler) {
-		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown type: ${type}` }) }
-	}
 	const filePath = resolveSafe(basePath, filename)
 	if (!filePath) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid path' }) }
 	}
 	if (!fs.existsSync(filePath)) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'File not found' }) }
+	}
+	/** Binary download to the browser (same tree as CLS / media browser). Must run before HANDLERS[type]. */
+	if (type === 'file') {
+		const stat = await fs.promises.stat(filePath)
+		if (!stat.isFile()) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Not a file' }) }
+		}
+		const stream = fs.createReadStream(filePath)
+		const disp = contentDispositionBasename(filename)
+		return {
+			status: 200,
+			headers: {
+				'Content-Type': contentTypeForFilename(filename),
+				'Content-Disposition': `attachment; filename="${disp}"`,
+				'Content-Length': String(stat.size),
+			},
+			stream,
+		}
+	}
+	const handler = HANDLERS[type]
+	if (!handler) {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown type: ${type}` }) }
 	}
 	try {
 		const data = await handler(filePath, query || {}, config)

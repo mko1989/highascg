@@ -105,4 +105,4 @@ This document maps out the CasparCG TCP AMCP commands, their respective HighAsCG
 
 ## Scene take (`POST /api/scene/take`)
 
-Default look take uses dual-bank mixer opacity crossfades (`runSceneTake`). Optional **`takeMode: "lbg"`** runs **`runSceneTakeLbg`**: per layer, `LOADBG` with the look’s transition (e.g. `MIX` + frames + tween), then mixer setup, then `PLAY` with no clip (FG/BG swap). Timeline-only looks ignore `takeMode` and use the timeline engine.
+Look takes use **`runSceneTakeLbg`**: per layer, `LOADBG` with the look’s transition (e.g. `MIX` + frames + tween), then mixer setup, then `PLAY` with no clip (FG/BG swap). Timeline-only looks use the timeline engine instead.

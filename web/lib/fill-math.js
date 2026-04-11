@@ -74,7 +74,7 @@ export function pixelRectToFill(rect, canvas) {
  * @param {number} ch
  * @param {number} mediaW
  * @param {number} mediaH
- * @param {'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} contentFit
+ * @param {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} contentFit
  * @returns {{ x: number, y: number, w: number, h: number }}
  */
 export function sceneLayerPixelRectForContentFit(cw, ch, mediaW, mediaH, contentFit) {
@@ -84,6 +84,15 @@ export function sceneLayerPixelRectForContentFit(cw, ch, mediaW, mediaH, content
 		return { x: 0, y: 0, w: cw0, h: ch0 }
 	}
 	const ar = mediaW / mediaH
+
+	/** One source pixel maps to one program pixel; layer box is media size, centered. */
+	if (contentFit === 'native') {
+		const w = Math.max(1, Math.round(mediaW))
+		const h = Math.max(1, Math.round(mediaH))
+		const x = Math.round((cw0 - w) / 2)
+		const y = Math.round((ch0 - h) / 2)
+		return { x, y, w, h }
+	}
 
 	if (contentFit === 'stretch') {
 		return { x: 0, y: 0, w: cw0, h: ch0 }

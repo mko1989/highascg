@@ -29,8 +29,15 @@ export const streamState = {
 
 	/**
 	 * Fetch current stream configuration and availability from server.
+	 * Skips network when Application Settings → streaming is disabled (lighter dev machines).
 	 */
 	async refreshStreams() {
+		if (settingsState.getSettings()?.streaming?.enabled === false) {
+			this.availableStreams = []
+			this.isStreamingEnabled = false
+			this.notify()
+			return
+		}
 		try {
 			const res = await fetch(`${getApiBase()}/api/streams`)
 			if (!res.ok) throw new Error('Fetch failed')
@@ -93,16 +100,13 @@ export function applyBrowserMonitorFromSettings(settings) {
 	streamState.setAudioSource('pgm_1')
 }
 
-// Initial fetch
-streamState.refreshStreams()
-
-/** After Application Settings save (streaming / go2rtc), refresh immediately so WebRTC preview + header audio controls update. */
-document.addEventListener('highascg-settings-applied', () => {
+/** When settings load or change (notify), refresh stream list (no-op while streaming disabled). */
+settingsState.subscribe(() => {
 	streamState.refreshStreams()
 })
 
 setInterval(() => {
-	if (document.visibilityState === 'visible') {
-		streamState.refreshStreams()
-	}
+	if (document.visibilityState !== 'visible') return
+	if (settingsState.getSettings()?.streaming?.enabled === false) return
+	streamState.refreshStreams()
 }, 10000)

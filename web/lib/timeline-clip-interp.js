@@ -48,7 +48,7 @@ export function getClipBasePixelRect(clip, W, H, stateStore, screenIdx) {
 	if (stateStore) {
 		const idx = screenIdx ?? 0
 		const cr = clip.source ? getContentResolution(clip.source, stateStore, idx) : null
-		const cf = clip.contentFit || 'horizontal'
+		const cf = clip.contentFit || 'native'
 		if (cr && cr.w > 0 && cr.h > 0) {
 			return sceneLayerPixelRectForContentFit(w, h, cr.w, cr.h, cf)
 		}

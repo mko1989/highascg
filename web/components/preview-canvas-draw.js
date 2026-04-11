@@ -388,7 +388,7 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 				ctx.beginPath()
 				ctx.rect(x, y, w, h)
 				ctx.clip()
-				if (layer.contentFit === 'stretch' || layer.fillNativeAspect === false) {
+				if (layer.contentFit === 'stretch' || layer.contentFit === 'native' || layer.fillNativeAspect === false) {
 					ctx.drawImage(img, x, y, w, h)
 				} else {
 					/* Contain within layer rect — approximates fit / fill-canvas MIXER FILL. */
@@ -581,7 +581,12 @@ export function drawTimelineStack(ctx, W, H, opts) {
 				ctx.beginPath()
 				ctx.rect(x, y, w, h)
 				ctx.clip()
-				drawImageCover(ctx, img, x, y, w, h)
+				const cf = clip.contentFit || 'native'
+				if (cf === 'stretch' || cf === 'native') {
+					ctx.drawImage(img, x, y, w, h)
+				} else {
+					drawImageCover(ctx, img, x, y, w, h)
+				}
 				ctx.restore()
 			} else if (failed) {
 				drawPreviewStatusText(ctx, x, y, w, h, 'No preview')

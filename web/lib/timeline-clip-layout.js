@@ -28,7 +28,7 @@ export async function applyTimelineClipLayoutFromMedia(
 	const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 	const cw = canvas.width > 0 ? canvas.width : 1920
 	const ch = canvas.height > 0 ? canvas.height : 1080
-	const cf = clip.contentFit || 'horizontal'
+	const cf = clip.contentFit || 'native'
 	const cr = await fetchMediaContentResolution(
 		clip.source,
 		stateStore,

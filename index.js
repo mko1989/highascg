@@ -32,6 +32,8 @@ const { ConfigManager } = require('./src/config/config-manager')
 const { refreshConfigComparison } = require('./src/config/config-compare')
 const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-config')
 const { responseToStr } = require('./src/utils/query-cycle')
+const { SamplingManager } = require('./src/sampling/dmx-sampling')
+const { getChannelMap } = require('./src/config/routing')
 
 {
 	const n = parseInt(process.env.HIGHASCG_LOG_BUFFER_LINES || '4000', 10)
@@ -113,6 +115,9 @@ Options:
 Environment:
   HIGHASCG_CONFIG_PATH   Absolute path to highascg.config.json (default: next to index.js)
   HIGHASCG_STREAMING_AUTO_RELOCATE  Set to 0 to disable auto-relocation when preview UDP ports are busy
+  HIGHASCG_GO2RTC_PUSH_WAIT_MS  Max wait (ms) for go2rtc MPEG-TS producers after start (default 10000; 0=skip)
+  HIGHASCG_GO2RTC_STOP_KILL_MS  SIGKILL go2rtc if still running after this many ms on stop (default 1000)
+  HIGHASCG_STREAMING_RESTART_DELAY_MS  Pause between stop and start on preview restart (default 500)
 `)
 }
 
@@ -200,11 +205,16 @@ function main() {
 		configManager,
 		/** False until Caspar UDP/NDI consumers are up (UDP tier: after ADD STREAM). Stops WebRTC before MPEG-TS flows. */
 		streamingPipelineReady: false,
+		samplingManager: null,
 	}
 	appCtx.timelineEngine = new TimelineEngine(appCtx)
 	appCtx.getState = () => getState(appCtx)
 	appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 	appCtx.refreshConfigComparison = refreshConfigComparison
+	appCtx.samplingManager = new SamplingManager(appCtx)
+
+	/** Debounce DMX refresh so INFO CONFIG + connect/save do not stop/start sampling twice in one burst. */
+	let dmxAfterInfoConfigTimer = null
 
 	async function fetchServerInfoConfigAndBroadcast() {
 		if (!appCtx.amcp?.query?.infoConfig) return
@@ -220,6 +230,14 @@ function main() {
 			}
 			if (typeof appCtx._wsBroadcast === 'function') {
 				appCtx._wsBroadcast('state', appCtx.getState())
+			}
+			if (appCtx.samplingManager && config.dmx?.enabled) {
+				clearTimeout(dmxAfterInfoConfigTimer)
+				dmxAfterInfoConfigTimer = setTimeout(() => {
+					appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
+						appCtx.log('error', '[DMX] Config refresh after INFO CONFIG: ' + (e?.message || e))
+					})
+				}, 650)
 			}
 			appCtx.log('info', '[Caspar] INFO CONFIG loaded — channel resolutions match running server')
 		} catch (e) {
@@ -238,12 +256,26 @@ function main() {
 	const systemVarsInterval = setInterval(updateSystemVariables, 5000)
 	updateSystemVariables()
 
+	/**
+	 * Map logical WebRTC names (pgm_1, prv_1, multiview) to real Caspar channels from screen/multiview layout.
+	 * Hardcoding 1/2/3 was wrong for multi-screen configs (e.g. multiview on ch 5, ch 3 = second PGM).
+	 */
 	function buildStreamingTargets(basePort) {
-		return [
-			{ name: 'pgm_1', channel: 1, port: basePort + 1 },
-			{ name: 'prv_1', channel: 2, port: basePort + 2 },
-			{ name: 'multiview', channel: 3, port: basePort + 5 },
-		]
+		const cm = getChannelMap(config)
+		const targets = []
+		const pgmCh = cm.programChannels?.[0] ?? 1
+		const prvCh = cm.previewChannels?.[0] ?? 2
+		targets.push({ name: 'pgm_1', channel: pgmCh, port: basePort + 1 })
+		targets.push({ name: 'prv_1', channel: prvCh, port: basePort + 2 })
+		if (cm.multiviewCh != null) {
+			targets.push({ name: 'multiview', channel: cm.multiviewCh, port: basePort + 5 })
+		}
+		appCtx.log(
+			'info',
+			`[Streaming] targets: PGM ch${pgmCh}→${basePort + 1}, PRV ch${prvCh}→${basePort + 2}` +
+				(cm.multiviewCh != null ? `, MV ch${cm.multiviewCh}→${basePort + 5}` : ' (no multiview channel)')
+		)
+		return targets
 	}
 	/** Updated each `startStreamingSubsystem` (UDP tier may relocate base if ports are busy). */
 	let streamingTargets = buildStreamingTargets(config.streaming.basePort)
@@ -360,21 +392,63 @@ function main() {
 
 	appCtx.restartStreaming = () => enqueueStreaming(runStreamingRestart)
 
+	/**
+	 * Only preview/streaming (Caspar ADD STREAM / go2rtc) depends on these fields. Saving unrelated keys
+	 * (e.g. `dmx` / pixel map) must not restart streaming — each restart issues many REMOVE STREAM lines on Caspar.
+	 */
+	function streamingRestartSignature(cfg) {
+		const s = cfg.streaming || {}
+		return JSON.stringify({
+			casparHost: cfg.caspar?.host,
+			casparPort: cfg.caspar?.port,
+			enabled: !!s.enabled,
+			quality: s.quality,
+			basePort: s.basePort,
+			hardware_accel: s.hardware_accel,
+			captureMode: s.captureMode || 'udp',
+			ndiNamingMode: s.ndiNamingMode,
+			ndiSourcePattern: s.ndiSourcePattern,
+			ndiChannelNames: s.ndiChannelNames,
+			localCaptureDevice: s.localCaptureDevice,
+			x11Display: s.x11Display,
+			drmDevice: s.drmDevice,
+			go2rtcLogLevel: s.go2rtcLogLevel,
+			autoRelocateBasePort: s.autoRelocateBasePort,
+			resolution: s.resolution,
+			fps: s.fps,
+			maxBitrate: s.maxBitrate,
+		})
+	}
+	let lastStreamingRestartSig = streamingRestartSignature(config)
+
 	// T1.3: Live reload — debounce streaming so double-save / OSC + save does not restart go2rtc twice in one tick.
 	let streamingReloadTimer = null
 	configManager.on('change', () => {
 		logger.info('[Config] Reloading subsystems...')
 		Object.assign(config, buildConfig(cli, configManager))
 		if (appCtx.restartOscSubsystem) appCtx.restartOscSubsystem()
-		clearTimeout(streamingReloadTimer)
-		streamingReloadTimer = setTimeout(() => {
-			// When streaming stays enabled, full restart (not start-only): otherwise UDP probe sees our own ports as “stale”.
-			if (config.streaming.enabled) {
-				if (appCtx.restartStreaming) void appCtx.restartStreaming()
-			} else if (appCtx.toggleStreaming) {
-				void appCtx.toggleStreaming(false)
-			}
-		}, 400)
+
+		const nextSig = streamingRestartSignature(config)
+		const streamingChanged = nextSig !== lastStreamingRestartSig
+		lastStreamingRestartSig = nextSig
+
+		if (streamingChanged) {
+			clearTimeout(streamingReloadTimer)
+			streamingReloadTimer = setTimeout(() => {
+				// When streaming stays enabled, full restart (not start-only): otherwise UDP probe sees our own ports as “stale”.
+				if (config.streaming.enabled) {
+					if (appCtx.restartStreaming) void appCtx.restartStreaming()
+				} else if (appCtx.toggleStreaming) {
+					void appCtx.toggleStreaming(false)
+				}
+			}, 400)
+		}
+
+		if (appCtx.samplingManager) {
+			appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
+				appCtx.log('error', '[DMX] Config update failed: ' + (e?.message || e))
+			})
+		}
 	})
 
 	/** @type {InstanceType<typeof ConnectionManager> | null} */
@@ -473,6 +547,11 @@ function main() {
 						startStreamingSubsystem()
 					}
 				}
+				if (appCtx.samplingManager) {
+					appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
+						appCtx.log('error', '[DMX] Initial connect start failed: ' + (e?.message || e))
+					})
+				}
 			} else if (payload.connected === false) {
 				wasConnected = false
 				clearPeriodicSyncTimer(appCtx)
@@ -527,6 +606,10 @@ function main() {
 			applyOscSnapshotToVariables(appCtx, snap)
 		}
 		pushOscToState()
+		// Full snapshot so browsers never rely only on delta WS + first `state` (which may have had osc: null before OSC started).
+		if (typeof appCtx._wsBroadcast === 'function') {
+			appCtx._wsBroadcast('osc', appCtx.oscState.getSnapshot())
+		}
 		appCtx.oscState.on('change', (snapshot) => {
 			pushOscToState()
 			if (typeof appCtx._wsBroadcast === 'function') {
@@ -600,7 +683,10 @@ function main() {
 				} catch (e) {
 					appCtx.log('warn', `[Shutdown] stopStreamingSubsystem: ${e?.message || e}`)
 				}
-				appCtx.log('info', '[Shutdown] Streaming stopped — OSC, WebSocket, AMCP, HTTP…')
+				appCtx.log('info', '[Shutdown] Streaming stopped — OSC, Sampling, WebSocket, AMCP, HTTP…')
+				if (appCtx.samplingManager) {
+					await appCtx.samplingManager.stop()
+				}
 				stopOscSubsystem()
 				wsHandle.stop()
 				if (casparConnection) {

@@ -1,7 +1,6 @@
 /**
- * Alternative program take: LOADBG … MIX … then PLAY per layer (Caspar FG/BG swap).
- * Avoids the dual-bank mixer opacity crossfade (two sources both at ~50% mid-transition).
- * @see scene-take.js (bank crossfade) · dashboard LOADBG+PLAY pattern
+ * Standard program take: LOADBG … MIX … then PLAY per layer (Caspar FG/BG swap).
+ * Replaces the former dual-bank mixer opacity crossfade (`scene-take.js`).
  */
 
 'use strict'
@@ -92,6 +91,9 @@ async function runSceneTakeLbg(amcp, opts) {
 
 		const loadOpts = { loop: !!layer.loop }
 		if (af) loadOpts.audioFilter = af
+		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
+			loadOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
+		}
 		if (!forceCut && globalT.duration > 0 && globalT.type && String(globalT.type).toUpperCase() !== 'CUT') {
 			loadOpts.transition = globalT.type
 			loadOpts.duration = globalT.duration
@@ -114,6 +116,9 @@ async function runSceneTakeLbg(amcp, opts) {
 
 		const playOpts = {}
 		if (af) playOpts.audioFilter = af
+		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
+			playOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
+		}
 		await amcp.play(channel, pLayer, undefined, playOpts)
 		await amcp.mixerCommit(channel)
 

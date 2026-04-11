@@ -2,9 +2,43 @@
  * @file webrtc-client.js
  * Client-side WebRTC (WHEP-style): POST SDP to **same origin** `/api/go2rtc/webrtc?src=…`
  * (HighAsCG proxies to local go2rtc). Direct calls to port 1984 fail CORS from the web UI origin.
+ *
+ * **Dev / remote (e.g. Tailscale):** in the browser console:
+ *   `localStorage.setItem('highascg_dev_remote_preview', '1')` then reload.
+ *   (`setItem` returns `undefined` — that is normal. Confirm with `getItem` or the startup log below.)
+ * Uses a longer reconnect delay and slightly richer `RTCPeerConnection` options.
+ * Disable: `localStorage.removeItem('highascg_dev_remote_preview')`
  */
 
 import { getApiBase } from './api-client.js'
+
+function devRemotePreviewEnabled() {
+	try {
+		return typeof localStorage !== 'undefined' && localStorage.getItem('highascg_dev_remote_preview') === '1'
+	} catch {
+		return false
+	}
+}
+
+function createPeerConnection() {
+	const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }]
+	if (devRemotePreviewEnabled()) {
+		return new RTCPeerConnection({
+			iceServers,
+			iceCandidatePoolSize: 10,
+			bundlePolicy: 'max-bundle',
+			rtcpMuxPolicy: 'require',
+		})
+	}
+	return new RTCPeerConnection({ iceServers })
+}
+
+function reconnectDelayMs() {
+	return devRemotePreviewEnabled() ? 6500 : 3000
+}
+
+/** Log once per page load when dev remote mode is on (setItem returns undefined — this confirms it worked). */
+let devRemotePreviewLogged = false
 
 /** Poll until go2rtc is up (Caspar ADD STREAM may finish slightly after go2rtc starts). */
 async function waitForGo2rtcRunning(maxMs = 20000) {
@@ -42,6 +76,12 @@ export function setGo2rtcApiPort(_port) {}
  * @returns {Object} { video, destroy, setAudioEnabled }
  */
 export function createLiveView(streamName, containerEl, opts = {}) {
+	if (devRemotePreviewEnabled() && !devRemotePreviewLogged) {
+		devRemotePreviewLogged = true
+		console.info(
+			'[WebRTC] Dev remote preview enabled (localStorage highascg_dev_remote_preview=1). Longer reconnect, extra ICE options.',
+		)
+	}
 	/** Mutable: updated by setAudioEnabled + initLiveView streamState subscription */
 	let audioEnabled = !!opts.audioEnabled
 	const video = document.createElement('video')
@@ -78,9 +118,7 @@ export function createLiveView(streamName, containerEl, opts = {}) {
 		attachRemoteStream(event.streams[0])
 	}
 
-	let pc = new RTCPeerConnection({
-		iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-	})
+	let pc = createPeerConnection()
 	let reconnectTimer = null
 
 	pc.addTransceiver('video', { direction: 'recvonly' })
@@ -127,16 +165,14 @@ export function createLiveView(streamName, containerEl, opts = {}) {
 		reconnectTimer = setTimeout(() => {
 			reconnectTimer = null
 			renegotiate()
-		}, 3000)
+		}, reconnectDelayMs())
 	}
 
 	function renegotiate() {
 		if (!pc) return
 		console.log(`[WebRTC] Renegotiating ${streamName}...`)
 		pc.close()
-		pc = new RTCPeerConnection({
-			iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-		})
+		pc = createPeerConnection()
 		pc.addTransceiver('video', { direction: 'recvonly' })
 		pc.addTransceiver('audio', { direction: 'recvonly' })
 		pc.ontrack = onTrack

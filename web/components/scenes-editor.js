@@ -7,6 +7,7 @@ import { sceneState, defaultTransition as defaultTransitionDef } from '../lib/sc
 import { api, getApiBase } from '../lib/api-client.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
 import { mountLookTransitionControls, buildIncomingScenePayload, isMediaOrFileSource } from './scenes-shared.js'
+import { timelineState } from '../lib/timeline-state.js'
 import { renderSceneDeck } from './scene-list.js'
 import { appendSceneLayerStripRows } from './scene-layer-row.js'
 import { createScenesPreviewRuntime } from './scenes-preview-runtime.js'
@@ -85,7 +86,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 
 	const {
-		pushSceneToPreview,
 		schedulePreviewPush,
 		scheduleFlushPreviewFromInspector,
 		sendSceneToPreviewCard,
@@ -98,9 +98,14 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		getPreviewOutputResolution,
 	})
 
+	function getTimelinePositionMsForTake() {
+		const st = stateStore.getState()
+		const p = st?.timeline?.playback?.position ?? st?.timeline?.tick?.position
+		return typeof p === 'number' && Number.isFinite(p) ? p : 0
+	}
+
 	let takeBusy = false
-	/** @param {{ takeMode?: 'lbg' }} [opts] — `takeMode: 'lbg'` uses LOADBG+MIX then PLAY (test; avoids bank crossfade). */
-	async function takeSceneToProgram(sceneId, forceCut, opts = {}) {
+	async function takeSceneToProgram(sceneId, forceCut) {
 		if (takeBusy) return
 		const scene = sceneState.getScene(sceneId)
 		if (!scene) return
@@ -113,8 +118,11 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		try {
 			const programCh = getProgramChannel()
 			const fps = getChannelMap().programResolutions?.[sceneState.activeScreenIndex]?.fps ?? 50
-			const incomingJson = buildIncomingScenePayload(scene)
-			await pushSceneToPreview(sceneId)
+			const scenePayloadForState = buildIncomingScenePayload(scene)
+			const incomingJson = buildIncomingScenePayload(scene, {
+				timeline: timelineState.getActive(),
+				positionMs: getTimelinePositionMsForTake(),
+			})
 			const body = {
 				channel: programCh,
 				incomingScene: incomingJson,
@@ -122,7 +130,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				forceCut,
 				useServerLive: true,
 			}
-			if (opts.takeMode === 'lbg') body.takeMode = 'lbg'
 			const takeRes = await api.post('/api/scene/take', body)
 			sceneState.setLiveSceneId(sceneId)
 			const prevLive = stateStore.getState()?.scene?.live || {}
@@ -144,7 +151,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			if (liveSnap?.scene && liveSnap.sceneId === scene.id) {
 				sceneState.applySceneFromTakePayload(sceneId, liveSnap.scene)
 			} else {
-				sceneState.applySceneFromTakePayload(sceneId, incomingJson)
+				sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState)
 			}
 			primePreviewSnapshotFromScene(sceneId)
 		} catch (e) {
@@ -363,15 +370,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		takeSceneToProgram(id, true)
 	}
 
-	function globalTakeLbgFromPreview() {
-		const id = sceneState.previewSceneId
-		if (!id) {
-			showToast('Send a look to preview first (tap the thumbnail).', 'error')
-			return
-		}
-		takeSceneToProgram(id, false, { takeMode: 'lbg' })
-	}
-
 	function renderDeck() {
 		renderSceneDeck({
 			mainHost,
@@ -388,7 +386,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			selectedLayerIndexRef,
 			globalTakeFromPreview,
 			globalCutFromPreview,
-			globalTakeLbgFromPreview,
 		})
 	}
 
@@ -406,9 +403,8 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		bar.innerHTML = `
 			<button type="button" class="scenes-btn scenes-btn--icon" id="scenes-back" title="Back to looks" aria-label="Back to looks">←</button>
 			<input type="text" class="scenes-edit-name" id="scenes-name" value="${escapeHtml(scene.name)}" placeholder="Look name" />
-			<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-take-live" title="Take live" aria-label="Take live">▶</button>
+			<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-take-live" title="Take live (LOADBG + transition + PLAY)" aria-label="Take live">▶</button>
 			<button type="button" class="scenes-btn scenes-btn--icon" id="scenes-take-cut" title="Hard cut (no transition fades)" aria-label="Hard cut">✂</button>
-			<button type="button" class="scenes-btn scenes-btn--sm" id="scenes-take-lbg" title="LBG take: LOADBG + MIX then PLAY (test)" aria-label="LBG take">LBG</button>
 			<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-layer" title="Add layer" aria-label="Add layer">＋</button>
 			<span class="scenes-edit-bar__hint">PGM ${getProgramChannel()}</span>
 		`
@@ -416,7 +412,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 
 		bar.querySelector('#scenes-take-live').addEventListener('click', () => takeSceneToProgram(scene.id, false))
 		bar.querySelector('#scenes-take-cut').addEventListener('click', () => takeSceneToProgram(scene.id, true))
-		bar.querySelector('#scenes-take-lbg')?.addEventListener('click', () => takeSceneToProgram(scene.id, false, { takeMode: 'lbg' }))
 
 		bar.querySelector('#scenes-back').addEventListener('click', () => {
 			sceneState.setEditingScene(null)

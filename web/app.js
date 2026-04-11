@@ -25,9 +25,14 @@ import { showSettingsModal } from './components/settings-modal.js'
 import { createConnectionEye } from './components/connection-eye.js'
 import { showLogsModal } from './components/logs-modal.js'
 import { multiviewState } from './lib/multiview-state.js'
+import { dmxState } from './lib/dmx-state.js'
+import { initPixelMapEditor } from './components/pixel-map-editor.js'
+import { getVariableStore } from './lib/variable-state.js'
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()
+/** Subscribe before any async work so the first WS `state` (variables) is not missed. */
+getVariableStore(ws)
 
 /** OSC WebSocket fan-out; shares socket with {@link WsClient}. */
 let _oscClient = null
@@ -179,6 +184,9 @@ function initTabs() {
 			if (target === 'multiview') {
 				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('mv-tab-activated')))
 			}
+			if (target === 'pixelmap') {
+				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('px-tab-activated')))
+			}
 			if (target === 'timeline') {
 				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('timeline-tab-activated')))
 			}
@@ -217,6 +225,14 @@ async function init() {
 
 	// WebSocket + OSC fan-out (standalone server). Companion HTTP-only: WS may fail; HTTP still works.
 	_oscClient = new OscClient({ wsClient: ws })
+	// Legacy hook for components that read live OSC channel state (e.g. inspector); prefer getOscClient().
+	window.highascg_osc_client = _oscClient
+	ws.on('variable_update', (changed) => {
+		if (!changed || typeof changed !== 'object') return
+		const cur = stateStore.getState()?.variables
+		const merged = { ...(cur && typeof cur === 'object' ? cur : {}), ...changed }
+		stateStore.applyChange('variables', merged)
+	})
 	ws.on('state', (data) => {
 		stateStore.setState(data)
 		if (data?.channelMap?.programResolutions)
@@ -228,6 +244,9 @@ async function init() {
 		updateConnectionStatus(true, null, true)
 		refreshStatusLine()
 		refreshCasparConnectionEye()
+	})
+	ws.on('dmx:colors', (data) => {
+		dmxState.setLiveColors(data)
 	})
 	ws.on('change', (data) => {
 		if (data && data.path != null) {
@@ -292,6 +311,9 @@ async function init() {
 		settingsState.load().catch(() => {})
 		streamState.refreshStreams()
 		applyBrowserMonitorFromSettings(settingsState.getSettings())
+	})
+	ws.on('server_error', (data) => {
+		console.warn('[HighAsCG] Server reported an error over WebSocket:', data)
 	})
 	ws.on('disconnect', async () => {
 		if (httpConnected) {
@@ -361,6 +383,7 @@ async function init() {
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, { getOscClient: () => _oscClient })
 	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore)
 	initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
+	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore)
 	const inspectorScroll =
 		document.getElementById('panel-inspector-scroll') ||
 		document.getElementById('panel-inspector-body') ||
@@ -388,6 +411,10 @@ async function init() {
 	// Bootstrap state from API (works with Companion HTTP when api_port=0)
 	try {
 		const settings = await api.get('/api/settings')
+		if (settings && typeof settings === 'object') {
+			Object.assign(settingsState.settings, settings)
+			settingsState.notify()
+		}
 		const isOffline = !!settings?.offline_mode
 		stateStore.setOffline(isOffline)
 		if (connectionEye) connectionEye.setOffline(isOffline)
@@ -400,6 +427,9 @@ async function init() {
 		const state = await api.get('/api/state')
 		if (state && typeof state === 'object') {
 			stateStore.setState(state)
+			if (state.variables && typeof state.variables === 'object') {
+				getVariableStore(ws)?.mergeFromServer(state.variables)
+			}
 			sceneState.setCanvasResolutions(state.channelMap?.programResolutions)
 			syncMultiviewCanvasFromChannelMap(state.channelMap)
 			scheduleMultiviewLayoutRefresh()
@@ -410,8 +440,14 @@ async function init() {
 			refreshStatusLine()
 			refreshCasparConnectionEye()
 		}
+		/* settingsState.notify() above already triggers streamState.refreshStreams via subscribe */
 		window.dispatchEvent(new CustomEvent('highascg-bootstrap-complete'))
-	} catch {
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err)
+		console.warn('[HighAsCG] HTTP bootstrap failed (/api/settings or /api/state):', msg)
+		console.warn(
+			'[HighAsCG] Open DevTools → Network: confirm requests go to this origin (not file://). WebSocket may still work.',
+		)
 		// API not available, state remains empty or hydrated from cache
 	}
 

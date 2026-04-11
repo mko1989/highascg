@@ -56,7 +56,7 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 		}
 
 		const audio = ch.audio
-		if (audio && Array.isArray(audio.levels)) {
+		if (audio && Array.isArray(audio.levels) && audio.levels.length > 0) {
 			const L = audio.levels[0]
 			const R = audio.levels[1]
 			state.setVariable(`${prefix}_audio_L`, L && Number.isFinite(L.dBFS) ? _fmt(L.dBFS, 1) : '')
@@ -64,6 +64,10 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 				`${prefix}_audio_R`,
 				R && Number.isFinite(R.dBFS) ? _fmt(R.dBFS, 1) : L && Number.isFinite(L.dBFS) ? _fmt(L.dBFS, 1) : ''
 			)
+		} else {
+			// Clear stale L/R when snapshot has no meter data (otherwise Companion + UI keep last loud value)
+			state.setVariable(`${prefix}_audio_L`, '')
+			state.setVariable(`${prefix}_audio_R`, '')
 		}
 
 		const layers = ch.layers || {}

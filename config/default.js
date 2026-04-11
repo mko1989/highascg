@@ -144,5 +144,18 @@ module.exports = {
 		monitorFfmpegPath: '',
 		monitorFfmpegArgs: '',
 		browserMonitor: 'pgm',
+		/** Per main screen (index 0 = screen 1): OpenAL device name for Caspar `<system-audio>`. Empty = default device (`<system-audio />`). */
+		programSystemAudioDevices: ['', '', '', ''],
+		/** Per screen: route preview (PRV) channel to system audio (OpenAL). */
+		previewSystemAudioEnabled: [false, false, false, false],
+		/** Per screen: OpenAL device for PRV when previewSystemAudioEnabled; empty = default. */
+		previewSystemAudioDevices: ['', '', '', ''],
+	},
+	/** Pixel-map / DMX sampling (persisted; used by Node samplingManager) */
+	dmx: {
+		enabled: false,
+		debugLogDmx: false,
+		fps: 25,
+		fixtures: [],
 	},
 }

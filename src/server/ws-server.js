@@ -33,6 +33,18 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const clients = new Set()
 	const wss = new WebSocket.Server({ noServer: true })
 
+	function safeStringify(payload) {
+		try {
+			return JSON.stringify(payload)
+		} catch (e) {
+			log('ws JSON.stringify failed: ' + (e?.message || e))
+			return JSON.stringify({
+				type: 'error',
+				data: 'State serialization failed — check server logs',
+			})
+		}
+	}
+
 	function getSnapshot() {
 		if (typeof ctx.getState === 'function') return ctx.getState()
 		if (ctx.state && typeof ctx.state.getState === 'function') return ctx.state.getState()
@@ -50,7 +62,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	 * @param {unknown} data
 	 */
 	function broadcast(event, data) {
-		const msg = JSON.stringify({ type: event, data })
+		const msg = safeStringify({ type: event, data })
 		for (const ws of clients) {
 			if (ws.readyState === WebSocket.OPEN) ws.send(msg)
 		}
@@ -84,22 +96,36 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 
 	wss.on('connection', (ws) => {
 		clients.add(ws)
+		log('[WS] client connected')
 		try {
-			ws.send(JSON.stringify({ type: 'state', data: getSnapshot() }))
+			const snap = getSnapshot()
+			ws.send(safeStringify({ type: 'state', data: snap }))
 		} catch (e) {
 			log('ws initial state: ' + (e?.message || e))
+			try {
+				ws.send(
+					safeStringify({
+						type: 'state',
+						data: { error: 'initial_state_failed', message: String(e?.message || e) },
+					}),
+				)
+			} catch (_) {}
 		}
 
 		ws.on('message', async (raw) => {
 			try {
-				const msg = JSON.parse(String(raw))
+				const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw)
+				const trimmed = text.trim()
+				if (!trimmed) return
+				if (trimmed[0] !== '{' && trimmed[0] !== '[') return
+				const msg = JSON.parse(trimmed)
 				if (msg.type === 'amcp' && msg.cmd) {
 					if (!ctx.amcp) {
-						ws.send(JSON.stringify({ type: 'error', data: 'AMCP not connected' }))
+						ws.send(safeStringify({ type: 'error', data: 'AMCP not connected', id: msg.id }))
 						return
 					}
 					const r = await ctx.amcp.raw(msg.cmd)
-					ws.send(JSON.stringify({ type: 'amcp_result', data: r }))
+					ws.send(safeStringify({ type: 'amcp_result', data: r, id: msg.id }))
 				} else if (msg.type === 'multiview_sync' && msg.data) {
 					ctx._multiviewLayout = msg.data
 					const persistence = ctx.persistence || require('../utils/persistence')
@@ -128,7 +154,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				}
 			} catch (e) {
 				const m = e instanceof Error ? e.message : String(e)
-				ws.send(JSON.stringify({ type: 'error', data: m }))
+				ws.send(safeStringify({ type: 'error', data: m }))
 			}
 		})
 

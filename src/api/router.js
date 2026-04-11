@@ -29,6 +29,7 @@ const routesAudio = require('./routes-audio')
 const routesProject = require('./routes-project')
 const routesLedTestCard = require('./routes-led-test-card')
 const routesFtb = require('./routes-ftb')
+const routesPgmRecord = require('./routes-pgm-record')
 const routesSystemStaged = require('./routes-system-staged')
 const routesIngest = require('./routes-ingest')
 const routesSystemSetup = require('./routes-system-setup')
@@ -215,6 +216,13 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (tr) return tr
 		const lr = await routesMedia.handleLocalMedia(p, query, ctx)
 		if (lr) return lr
+	}
+
+	if (method === 'GET' && p === '/api/pgm-record') {
+		return routesPgmRecord.handleGet(ctx)
+	}
+	if (method === 'POST' && p === '/api/pgm-record') {
+		return await routesPgmRecord.handlePost(body, ctx)
 	}
 
 	if (!ctx.amcp) {

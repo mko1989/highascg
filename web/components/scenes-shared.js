@@ -84,32 +84,92 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 }
 
 /**
- * @param {import('../lib/scene-state.js').Scene} scene
+ * Timeline clip active on a layer at playhead `ms` (exclusive end).
+ * @param {{ clips?: object[] } | null | undefined} layer
+ * @param {number} ms
  */
-export function buildIncomingScenePayload(scene) {
+export function clipAtTimelineMs(layer, ms) {
+	if (!layer?.clips?.length) return null
+	for (const c of layer.clips) {
+		const st = c.startTime || 0
+		const dur = c.duration || 0
+		if (ms >= st && ms < st + dur) return c
+	}
+	return null
+}
+
+/**
+ * Caspar SEEK frame for a program look take — from the timeline clip on the same layer index.
+ * @param {object} timeline
+ * @param {number} layerIdx
+ * @param {number} positionMs
+ * @param {'beginning' | 'relativeToPrevious' | undefined} [sceneLayerBehaviour] — look layer override (takes precedence over clip).
+ * @returns {number | null} Frame index, or null to omit SEEK (use Caspar default).
+ */
+export function playSeekFramesForSceneLayerFromTimeline(timeline, layerIdx, positionMs, sceneLayerBehaviour) {
+	const layer = timeline?.layers?.[layerIdx]
+	const clip = clipAtTimelineMs(layer, positionMs)
+	if (!clip) return null
+	const src = String(clip.source?.value || '')
+	if (src.startsWith('route://')) return null
+	const fps = Math.max(1, timeline.fps || 25)
+	const inFrames = Number(clip.inPoint) || 0
+	const sb =
+		sceneLayerBehaviour === 'beginning' || sceneLayerBehaviour === 'relativeToPrevious'
+			? sceneLayerBehaviour
+			: (clip.startBehaviour || 'beginning')
+	if (sb === 'relativeToPrevious') {
+		const localMs = Math.max(0, positionMs - (clip.startTime || 0))
+		const relativeFrame = Math.floor((localMs * fps) / 1000)
+		return inFrames + relativeFrame
+	}
+	return inFrames
+}
+
+/**
+ * @param {import('../lib/scene-state.js').Scene} scene
+ * @param {{ timeline: object, positionMs: number }} [timelineSeekOpts] — when set, adds `playSeekFrames` per layer from the active timeline clip (same layer index).
+ */
+export function buildIncomingScenePayload(scene, timelineSeekOpts) {
+	const layers = (scene.layers || []).map((l) => ({
+		layerNumber: l.layerNumber,
+		source: l.source
+			? {
+					type: l.source.type,
+					value: l.source.value,
+					...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
+				}
+			: null,
+		loop: !!l.loop,
+		straightAlpha: !!l.straightAlpha,
+		contentFit: l.contentFit || (l.fillNativeAspect === false ? 'stretch' : 'native'),
+		aspectLocked: l.aspectLocked !== false,
+		fill: l.fill ? { ...l.fill } : undefined,
+		opacity: l.opacity ?? 1,
+		rotation: l.rotation ?? 0,
+		transition: l.transition ? { ...l.transition } : null,
+	}))
+
+	if (
+		timelineSeekOpts?.timeline &&
+		typeof timelineSeekOpts.positionMs === 'number' &&
+		Number.isFinite(timelineSeekOpts.positionMs)
+	) {
+		const tl = timelineSeekOpts.timeline
+		const pos = timelineSeekOpts.positionMs
+		const sceneLayers = scene.layers || []
+		for (let i = 0; i < layers.length; i++) {
+			const frames = playSeekFramesForSceneLayerFromTimeline(tl, i, pos, sceneLayers[i]?.startBehaviour)
+			if (frames != null) layers[i] = { ...layers[i], playSeekFrames: frames }
+		}
+	}
+
 	return {
 		id: scene.id,
 		name: scene.name || 'Untitled look',
 		defaultTransition: scene.defaultTransition
 			? { ...scene.defaultTransition }
 			: { type: 'CUT', duration: 0, tween: 'linear' },
-		layers: (scene.layers || []).map((l) => ({
-			layerNumber: l.layerNumber,
-			source: l.source
-				? {
-						type: l.source.type,
-						value: l.source.value,
-						...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
-					}
-				: null,
-			loop: !!l.loop,
-			straightAlpha: !!l.straightAlpha,
-			contentFit: l.contentFit || (l.fillNativeAspect === false ? 'stretch' : 'horizontal'),
-			aspectLocked: l.aspectLocked !== false,
-			fill: l.fill ? { ...l.fill } : undefined,
-			opacity: l.opacity ?? 1,
-			rotation: l.rotation ?? 0,
-			transition: l.transition ? { ...l.transition } : null,
-		})),
+		layers,
 	}
 }

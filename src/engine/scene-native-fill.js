@@ -248,6 +248,7 @@ function clipPath(layer) {
 /** Same mapping as web/lib/mixer-fill.js mapContentFitToStretch */
 function mapContentFitToStretch(layer) {
 	const cf = layer.contentFit
+	if (cf === 'native') return 'none'
 	if (cf === 'horizontal') return 'fill-h'
 	if (cf === 'vertical') return 'fill-v'
 	if (cf === 'stretch') return 'stretch'

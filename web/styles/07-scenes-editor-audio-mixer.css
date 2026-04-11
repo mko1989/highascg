@@ -378,6 +378,7 @@
 	bottom: 0;
 	left: 0;
 	right: 0;
+	z-index: 1;
 	height: 0%;
 	background: linear-gradient(to top, #166534, #4ade80, #facc15);
 	transition: height 0.05s linear;

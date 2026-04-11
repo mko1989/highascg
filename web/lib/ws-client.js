@@ -71,13 +71,25 @@ export class WsClient {
 			this.emit('connect')
 		}
 
-		this.ws.onmessage = (ev) => {
+		this.ws.onmessage = async (ev) => {
 			try {
-				const msg = JSON.parse(ev.data)
+				let text = ''
+				const d = ev.data
+				if (typeof d === 'string') text = d
+				else if (d instanceof Blob) text = await d.text()
+				else if (d instanceof ArrayBuffer) text = new TextDecoder().decode(d)
+				else return
+				const t = text.trim()
+				if (!t || (t[0] !== '{' && t[0] !== '[')) return
+				const msg = JSON.parse(t)
 				this.emit('message', msg)
-				if (msg.type) this.emit(msg.type, msg.data)
-			} catch {
-				// ignore non-JSON
+				if (msg.type) {
+					// Avoid colliding with transport `error` (this.emit('error', err) from ws.onerror).
+					if (msg.type === 'error') this.emit('server_error', msg.data)
+					else this.emit(msg.type, msg.data)
+				}
+			} catch (e) {
+				console.warn('[WsClient] bad WebSocket message (proxy must support WS upgrade):', e?.message || e)
 			}
 		}
 

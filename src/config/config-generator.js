@@ -40,6 +40,20 @@ function escapeXml(s) {
 		.replace(/"/g, '&quot;')
 }
 
+/** @param {unknown} arr @param {number} len */
+function padStringArray(arr, len) {
+	const a = Array.isArray(arr) ? arr.map((x) => String(x ?? '').trim()) : []
+	while (a.length < len) a.push('')
+	return a.slice(0, len)
+}
+
+/** @param {unknown} arr @param {number} len */
+function padBoolArray(arr, len) {
+	const a = Array.isArray(arr) ? arr.map((x) => x === true || x === 'true') : []
+	while (a.length < len) a.push(false)
+	return a.slice(0, len)
+}
+
 /**
  * @param {unknown} id
  * @returns {string}
@@ -60,6 +74,10 @@ function ffmpegPathFromAlsaId(id) {
 function normalizeAudioRouting(ar) {
 	const d = defaults.audioRouting || {}
 	const base = { ...d, ...(ar && typeof ar === 'object' ? ar : {}) }
+	const PAD = 4
+	base.programSystemAudioDevices = padStringArray(base.programSystemAudioDevices, PAD)
+	base.previewSystemAudioEnabled = padBoolArray(base.previewSystemAudioEnabled, PAD)
+	base.previewSystemAudioDevices = padStringArray(base.previewSystemAudioDevices, PAD)
 	let po = String(base.programOutput || 'default').toLowerCase()
 	if (po === 'alsa') {
 		const p = ffmpegPathFromAlsaId(base.programAlsaDevice)
@@ -91,20 +109,29 @@ function mergeAudioRoutingIntoConfig(config) {
 	const ar = mergedAr
 	const layoutMap = { stereo: 'stereo', '4ch': '4ch', '8ch': '8ch', '16ch': '16ch' }
 	const pl = String(ar.programLayout || 'stereo').toLowerCase()
-	out.screen_1_audio_layout = layoutMap[pl] || 'stereo'
+	const layoutId = layoutMap[pl] || 'stereo'
+	const screenCount = Math.min(4, Math.max(1, parseInt(String(out.screen_count || 1), 10) || 1))
+	const progDev = ar.programSystemAudioDevices
+	const prevEn = ar.previewSystemAudioEnabled
+	const prevDev = ar.previewSystemAudioDevices
 
 	/**
-	 * PGM audio: **only** `<system-audio>` (channel layout from programLayout / stereo in XML).
-	 * OS default output comes from `/etc/asound.conf` (Settings → System). We never emit
-	 * `<ffmpeg-consumer>` for program/monitor on this channel — it duplicated ALSA routing and
-	 * ignored the Web UI default device.
+	 * PGM audio: **only** `<system-audio>` (OpenAL). Empty device name → `<system-audio />` (default);
+	 * non-empty → `<device-name>…</device-name>`. We never emit `<ffmpeg-consumer>` for program/monitor
+	 * on these channels when routing is default — it duplicated ALSA routing.
 	 */
-	out.screen_1_ffmpeg_audio_enabled = false
-	out.screen_1_ffmpeg_audio_path = ''
-	out.screen_1_ffmpeg_audio_args = ''
-	out.screen_1_ffmpeg_audio_path_2 = ''
-	out.screen_1_ffmpeg_audio_args_2 = ''
-	out.screen_1_system_audio_enabled = true
+	for (let n = 1; n <= screenCount; n++) {
+		out[`screen_${n}_audio_layout`] = layoutId
+		out[`screen_${n}_ffmpeg_audio_enabled`] = false
+		out[`screen_${n}_ffmpeg_audio_path`] = ''
+		out[`screen_${n}_ffmpeg_audio_args`] = ''
+		out[`screen_${n}_ffmpeg_audio_path_2`] = ''
+		out[`screen_${n}_ffmpeg_audio_args_2`] = ''
+		out[`screen_${n}_system_audio_enabled`] = true
+		out[`screen_${n}_system_audio_device_name`] = progDev[n - 1] || ''
+		out[`screen_${n}_preview_system_audio_enabled`] = prevEn[n - 1] === true
+		out[`screen_${n}_preview_system_audio_device_name`] = prevDev[n - 1] || ''
+	}
 
 	const po = String(ar.programOutput || 'default').toLowerCase()
 	// Do not reset screen_1_ndi_enabled: Settings → Screens persists per-screen NDI flags in
@@ -327,6 +354,37 @@ function channelLayoutElementXml(layoutId) {
 }
 
 /**
+ * Caspar `<system-audio>` for program channels (OpenAL). Empty device → minimal self-closing tag.
+ * @param {Record<string, unknown>} config
+ * @param {number} screenIdx1 - 1-based screen index
+ */
+function buildProgramSystemAudioXml(config, screenIdx1) {
+	const n = screenIdx1
+	const enabled =
+		config[`screen_${n}_system_audio_enabled`] === true || config[`screen_${n}_system_audio_enabled`] === 'true'
+	if (!enabled) return ''
+	const dev = String(config[`screen_${n}_system_audio_device_name`] || '').trim()
+	if (!dev) return '\n                <system-audio />'
+	return `\n                <system-audio>\n                    <device-name>${escapeXml(dev)}</device-name>\n                </system-audio>`
+}
+
+/**
+ * Optional `<system-audio>` on preview (PRV) channels — same OpenAL rules as program.
+ * @param {Record<string, unknown>} config
+ * @param {number} screenIdx1
+ */
+function buildPreviewSystemAudioXml(config, screenIdx1) {
+	const n = screenIdx1
+	const enabled =
+		config[`screen_${n}_preview_system_audio_enabled`] === true ||
+		config[`screen_${n}_preview_system_audio_enabled`] === 'true'
+	if (!enabled) return ''
+	const dev = String(config[`screen_${n}_preview_system_audio_device_name`] || '').trim()
+	if (!dev) return '\n                <system-audio />'
+	return `\n                <system-audio>\n                    <device-name>${escapeXml(dev)}</device-name>\n                </system-audio>`
+}
+
+/**
  * @param {Record<string, unknown>} config
  * @returns {string[]}
  */
@@ -396,10 +454,7 @@ function buildConfigXml(config) {
 		const audioLayoutId = String(config[`screen_${n}_audio_layout`] || 'default')
 		const layoutXml = channelLayoutElementXml(audioLayoutId)
 		const ffmpegXml = buildScreenFfmpegConsumersXml(config, n)
-		const screenSystemAudioXml =
-			config[`screen_${n}_system_audio_enabled`] === true || config[`screen_${n}_system_audio_enabled`] === 'true'
-				? `\n                <system-audio>\n                    <channel-layout>stereo</channel-layout>\n                </system-audio>`
-				: ''
+		const screenSystemAudioXml = buildProgramSystemAudioXml(config, n)
 
 		// Professional consumers (T3.2)
 		let profConsumersXml = ''
@@ -439,11 +494,12 @@ function buildConfigXml(config) {
 
 		// UDP preview streaming for PRV (Ch 2, 5, 8, 11...)
 		const prvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 2)
+		const prvSystemAudioXml = buildPreviewSystemAudioXml(config, n)
 
 		channelsXml.push(
 			`        <channel>
             <video-mode>${dims.modeId}</video-mode>
-            <consumers>${prvStreamingXml}</consumers>
+            <consumers>${prvStreamingXml}${prvSystemAudioXml}</consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>

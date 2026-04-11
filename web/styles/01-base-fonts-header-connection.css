@@ -24,6 +24,9 @@
 	--text-muted: #8b949e;
 	--accent: #58a6ff;
 	--accent-hover: #79b8ff;
+	/* Used by audio meter + status dots (inline style references these names) */
+	--accent-green: #2ecc71;
+	--accent-red: #e74c3c;
 	--success: #3fb950;
 	--warn: #d29922;
 	--error: #f85149;
@@ -137,6 +140,20 @@ optgroup {
 	background: #b22222 !important;
 	border-color: #e85a5a !important;
 	color: #fff !important;
+}
+
+.header-led-test .header-btn--pgm-rec {
+	padding: 2px 10px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	margin-right: 0;
+}
+
+.header-led-test .header-btn--pgm-rec--on {
+	background: #7f1d1d !important;
+	border-color: #b91c1c !important;
+	color: #fecaca !important;
+	box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.45);
 }
 
 .header-right {

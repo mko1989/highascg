@@ -97,7 +97,7 @@ export function createScenesPreviewRuntime(opts) {
 				value: String(l.source.value),
 				loop: !!l.loop,
 				straightAlpha: !!l.straightAlpha,
-				contentFit: l.contentFit || 'horizontal',
+				contentFit: l.contentFit || 'native',
 				audioRoute: l.audioRoute || '1+2',
 				volume: l.volume != null ? l.volume : 1,
 				muted: !!l.muted,

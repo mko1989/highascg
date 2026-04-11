@@ -216,6 +216,11 @@ async function runPeriodicInfoConfigRefresh(self) {
 		const tpMatch = xmlStr.match(/<template-path>\s*(.*?)\s*<\/template-path>/i)
 		if (tpMatch?.[1]) self._resolvedTemplatePath = tpMatch[1].replace(/[\\/]+$/, '')
 		if (typeof self.refreshConfigComparison === 'function') self.refreshConfigComparison(self)
+		if (typeof self.samplingManager?.updateConfig === 'function' && self.config?.dmx?.enabled) {
+			self.samplingManager.updateConfig(self.config.dmx).catch((err) => {
+				if (typeof self.log === 'function') self.log('debug', '[DMX] Periodic INFO CONFIG: ' + (err?.message || err))
+			})
+		}
 	} catch (e) {
 		if (typeof self.log === 'function') self.log('debug', 'Periodic INFO CONFIG: ' + (e?.message || e))
 	}

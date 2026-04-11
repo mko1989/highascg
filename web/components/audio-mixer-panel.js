@@ -6,7 +6,51 @@
 import { api } from '../lib/api-client.js'
 import * as audioMixerState from '../lib/audio-mixer-state.js'
 import { getVariableStore } from '../lib/variable-state.js'
-import { ws } from '../app.js'
+import { getOscClient, ws } from '../app.js'
+
+/** @param {unknown[]} [levels] */
+function peakDbfsFromLevels(levels) {
+	if (!Array.isArray(levels) || levels.length === 0) return NaN
+	const L = levels[0]?.dBFS
+	const R = levels[1]?.dBFS
+	if (!Number.isFinite(L) && !Number.isFinite(R)) return NaN
+	return Math.max(Number.isFinite(L) ? L : -99, Number.isFinite(R) ? R : -99)
+}
+
+/** @param {Record<string, string> | undefined} obj */
+function peakDbfsFromVarStrings(obj, chNum) {
+	if (!obj || typeof obj !== 'object') return NaN
+	const fromStr = (s) => {
+		const t = String(s ?? '').trim()
+		if (t === '') return NaN
+		const n = parseFloat(t)
+		return Number.isFinite(n) ? n : NaN
+	}
+	const vL = fromStr(obj[`osc_ch${chNum}_audio_L`])
+	const vR = fromStr(obj[`osc_ch${chNum}_audio_R`])
+	if (!Number.isFinite(vL) && !Number.isFinite(vR)) return NaN
+	return Math.max(Number.isFinite(vL) ? vL : -99, Number.isFinite(vR) ? vR : -99)
+}
+
+/**
+ * Peak dBFS: merge OscClient + state variables + VariableStore.
+ * Use Math.min across sources so a fresh quiet reading (-120) wins over a stale high peak
+ * (WS delta merge can keep old `audio.levels` when a tick omits `audio`).
+ * @param {number} chNum
+ * @param {import('../lib/variable-state.js').VariableStore | null} vars
+ * @param {import('../lib/osc-client.js').OscClient | null} oscClient
+ * @param {import('../lib/state-store.js').StateStore} stateStore
+ */
+function readBusPeakDbfs(chNum, vars, oscClient, stateStore) {
+	const key = String(chNum)
+	const chState = oscClient?.channels?.[key] ?? oscClient?.channels?.[chNum]
+	const pOsc = peakDbfsFromLevels(chState?.audio?.levels)
+	const pSt = peakDbfsFromVarStrings(stateStore?.getState?.()?.variables, chNum)
+	const pVs = vars ? peakDbfsFromVarStrings(vars.variables, chNum) : NaN
+	const cands = [pOsc, pSt, pVs].filter((x) => Number.isFinite(x))
+	if (cands.length === 0) return -99
+	return Math.min(...cands)
+}
 
 const LS_EXPANDED = 'highascg_inspector_program_audio_expanded'
 
@@ -25,7 +69,7 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			<div class="audio-mixer__head">
 				<span class="audio-mixer__title">Program</span>
 				<p class="audio-mixer__hint">Faders: <code>MIXER MASTERVOLUME</code> on each program channel. Route each layer to a stereo pair (e.g. ch 1+2, 3+4) in the layer inspector.</p>
-				<p class="audio-mixer__hint">Meters: when OSC sends channel levels, the bar is that level scaled by this fader; otherwise the bar follows the fader (applied gain).</p>
+				<p class="audio-mixer__hint">Meters: incoming level (dBFS) when OSC reports above ~−90 dBFS; silence or no OSC shows an empty bar. Fader sets Caspar MASTERVOLUME only.</p>
 			</div>
 			<div class="audio-mixer__buses"></div>
 		</div>
@@ -40,8 +84,6 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 	let raf = null
 	/** @type {Map<string, HTMLDivElement>} */
 	const meterFills = new Map()
-	/** @type {Map<string, number>} fader position 0..1 (visual meter target) */
-	const meterTargets = new Map()
 	/** @type {Map<string, number>} smoothed meter */
 	const meterSmooth = new Map()
 
@@ -60,9 +102,10 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 		stopMeterLoop()
 		meterFills.clear()
 		meterSmooth.clear()
-		meterTargets.clear()
 		const cm = getChannelMap()
-		const programChannels = cm.programChannels || [1]
+		// `[]` is truthy — without length check we render zero buses and never start the meter loop.
+		const programChannels =
+			Array.isArray(cm.programChannels) && cm.programChannels.length > 0 ? cm.programChannels : [1]
 		busesEl.innerHTML = ''
 
 		const rows = []
@@ -94,7 +137,6 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 				const x = parseInt(fader.value, 10) / 100
 				valEl.textContent = `${fader.value}%`
 				audioMixerState.setMasterVolume(r.key, x)
-				meterTargets.set(r.key, x)
 			})
 			fader.addEventListener('change', async () => {
 				const x = parseInt(fader.value, 10) / 100
@@ -104,7 +146,6 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 					console.warn('MASTERVOLUME failed:', e?.message || e)
 				}
 			})
-			meterTargets.set(r.key, r.v)
 		}
 
 		if (meterFills.size) startMeterLoop()
@@ -114,37 +155,36 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 		if (raf) return
 		const vars = getVariableStore(ws)
 		const tick = () => {
+			const oscClient = getOscClient()
 			for (const [key, fill] of meterFills) {
-				const [, ch] = key.split(':') // 'pgm:1'
-				const faderVal = meterTargets.get(key) ?? 0
+				const [, chStr] = key.split(':') // 'pgm:1'
+				const chNum = parseInt(chStr, 10)
 
-				// Try real OSC data first
-				const vL = parseFloat(vars.get(`osc_ch${ch}_audio_L`))
-				const vR = parseFloat(vars.get(`osc_ch${ch}_audio_R`))
-				let level = -99
-				if (Number.isFinite(vL) || Number.isFinite(vR)) {
-					level = Math.max(Number.isFinite(vL) ? vL : -99, Number.isFinite(vR) ? vR : -99)
-				}
+				const level = Number.isFinite(chNum) ? readBusPeakDbfs(chNum, vars, oscClient, stateStore) : -99
 
 				let s = meterSmooth.get(key) ?? 0
 				let aim = 0
 
 				if (level > -90) {
-					// OSC dBFS → 0..1, then apply master fader (same staging as the mix)
+					// dBFS → 0..1 bar height (noise floor ~-90; below that treated as silence)
 					const raw = Math.max(0, Math.min(1, (level + 60) / 60))
-					aim = raw * faderVal
+					aim = raw
 				} else {
-					// No OSC: show applied gain (fader position)
-					aim = faderVal
+					// No signal / no meter: empty bar (fader is separate; mirroring it read as “full + clipping” when silent)
+					aim = 0
 				}
 
 				s += (aim - s) * 0.35 // Smooth ease
 				meterSmooth.set(key, s)
 				fill.style.height = `${Math.round(s * 100)}%`
 
-				// Optional: Set clipping color if > -1dB
-				if (level > -1) fill.style.background = 'var(--accent-red)'
-				else fill.style.background = 'var(--accent-green)'
+				if (level > -90) {
+					// Clip only when we have a real meter reading above ~full-scale
+					if (level > -1) fill.style.background = 'var(--accent-red)'
+					else fill.style.background = 'var(--accent-green)'
+				} else {
+					fill.style.removeProperty('background')
+				}
 			}
 			raf = requestAnimationFrame(tick)
 		}
@@ -162,9 +202,12 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 		}
 	}
 
-	let initialExpanded = false
+	// Default expanded so users see buses/meters; collapse only if explicitly saved off
+	let initialExpanded = true
 	try {
-		initialExpanded = localStorage.getItem(LS_EXPANDED) === '1'
+		const v = localStorage.getItem(LS_EXPANDED)
+		if (v === '0') initialExpanded = false
+		else if (v === '1') initialExpanded = true
 	} catch {
 		/* ignore */
 	}
@@ -180,10 +223,11 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 		applyExpanded(next)
 	})
 
-	stateStore.on('*', () => {
-		if (!panel.hidden) {
-			renderBuses()
-		}
+	stateStore.on('*', (path) => {
+		if (panel.hidden) return
+		// setState emits path '*'. Do not re-DOM on every variables merge (live meter reads state in rAF).
+		if (path === 'variables') return
+		if (path === '*' || path == null || path === 'channelMap' || path === 'channels') renderBuses()
 	})
 }
 

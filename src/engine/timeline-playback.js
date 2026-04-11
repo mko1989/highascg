@@ -8,6 +8,7 @@ const { getChannelMap } = require('../config/routing')
 const { audioRouteToAudioFilter } = require('./audio-route')
 const { clipParamForPlay, param } = require('../caspar/amcp-utils')
 const { getProgramResolutionForScreen } = require('../utils/program-resolution')
+const { resolveClipDurationMs } = require('../state/playback-tracker')
 
 /** @param {object} clip */
 function playAfSuffix(clip) {
@@ -387,9 +388,26 @@ function applyPlaybackMixin(TimelineEngineClass) {
 						const newClip = !prev || prev.clipId !== clip.id
 						const playing = this._pb?.playing ?? false
 						const loopClip = clip.loopAlways || clip.loop
-						const frame = !isRoute
-							? Math.floor(((ms - clip.startTime) * tl.fps) / 1000) + (clip.inPoint || 0)
-							: 0
+						const fps = Math.max(1, tl.fps || 25)
+						const inFrames = Number(clip.inPoint) || 0
+						const localMs = Math.max(0, ms - clip.startTime)
+						const relativeFrame = Math.floor((localMs * fps) / 1000)
+						let frame = !isRoute ? relativeFrame + inFrames : 0
+						let implicitLoop = false
+						if (!isRoute && src) {
+							const durMs = resolveClipDurationMs(self, src)
+							if (durMs != null && durMs > 0) {
+								const totalFrames = Math.max(1, Math.floor((durMs * fps) / 1000))
+								if (inFrames < totalFrames) {
+									const spanFrames = totalFrames - inFrames
+									const spanMs = (spanFrames * 1000) / fps
+									if (clip.duration > spanMs + 0.5) {
+										implicitLoop = true
+										frame = inFrames + (relativeFrame % spanFrames)
+									}
+								}
+							}
+						}
 						if (clip.loopAlways) {
 							if (newClip) {
 								self.amcp
@@ -400,6 +418,8 @@ function applyPlaybackMixin(TimelineEngineClass) {
 							if (isRoute) {
 								self.amcp.raw(`PLAY ${ch}-${caspLayer} ${srcQ}${playAfSuffix(clip)}`).catch(() => {})
 							} else if (playing || loopClip) {
+								// Only user clip.loop / loopAlways uses Caspar LOOP. Stretched (implicit) clips rely on
+								// SEEK each tick while playing — PLAY LOOP would keep decoding in a loop and ignore pause.
 								const loopStr = loopClip ? ' LOOP' : ''
 								self.amcp
 									.raw(`PLAY ${ch}-${caspLayer} ${srcQ}${loopStr} SEEK ${frame}${playAfSuffix(clip)}`)
@@ -409,8 +429,12 @@ function applyPlaybackMixin(TimelineEngineClass) {
 									.raw(`LOAD ${ch}-${caspLayer} ${srcQ} SEEK ${frame}${playAfSuffix(clip)}`)
 									.catch(() => {})
 							}
-						} else if (force && !isRoute && prev?.clipId === clip.id) {
-							self.amcp.call(ch, caspLayer, 'SEEK', String(frame)).catch(() => {})
+						} else if (!isRoute && prev?.clipId === clip.id) {
+							// Stretched clip: keep Caspar frame locked to timeline (decoder would otherwise drift past file end).
+							// Normal clip: only SEEK on scrub (force); let the layer play forward at 1×.
+							if (force || (playing && implicitLoop)) {
+								self.amcp.call(ch, caspLayer, 'SEEK', String(frame)).catch(() => {})
+							}
 						}
 						if (force || newClip) {
 							for (const pk of this._lastKfValues.keys()) {

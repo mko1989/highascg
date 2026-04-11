@@ -24,6 +24,36 @@ function producerSignatureFromVals(vals) {
 }
 
 /**
+ * `/channel/N/mixer/audio/volume` bundles linear or packed **amplitude** samples (not dBFS).
+ * Map one sample to dBFS for `levels[].dBFS`. Amplitude **0** is true silence → ~−120 dBFS.
+ * Do **not** use this for `/M/dBFS` floats: there **0** means **0 dBFS** (digital full scale).
+ * @param {number} raw
+ * @returns {number}
+ */
+function intMeterSampleToDbfs(raw) {
+	const n = Number(raw)
+	if (!Number.isFinite(n)) return -120
+	// Linear amplitude 0 — no signal (not the same semantic as 0 dBFS on the float meter path).
+	if (n === 0) return -120
+	if (n >= -120 && n < 0) return n
+	// Fixed-point dBFS (negative millibels / millidecibels)
+	if (n < 0 && n >= -120000) return n / 1000
+	if (n < 0 && n >= -12000) return n / 100
+	if (n < 0) return Math.max(-120, n / 1000)
+	// Linear amplitude 0..32767 (common packed meter) → dBFS
+	if (n > 0 && n <= 65535) {
+		const lin = Math.min(1, Math.max(1e-10, n / 32767))
+		return 20 * Math.log10(lin)
+	}
+	// Large positive int32 (e.g. unsigned linear packed) — avoid falling through to -120
+	if (n > 65535 && n <= 0x7fffffff) {
+		const lin = Math.min(1, Math.max(1e-10, n / 2147483647))
+		return 20 * Math.log10(lin)
+	}
+	return -120
+}
+
+/**
  * @typedef {object} OscRuntimeConfig
  * @property {boolean} enabled
  * @property {number} listenPort
@@ -58,6 +88,7 @@ class OscState extends EventEmitter {
 		return {
 			format: null,
 			profiler: { actual: null, expected: null, healthy: true },
+			/** @type {{ nbChannels: number, levels: Array<{ dBFS: number, peak: number, peakAge: number }>, _meterIndexBase?: 0 | 1 }} */
 			audio: { nbChannels: 0, levels: [] },
 			outputs: {},
 			layers: {},
@@ -89,14 +120,25 @@ class OscState extends EventEmitter {
 	}
 
 	/**
-	 * @param {unknown[]} rawArgs
+	 * Normalize osc.js packet args to a numeric/string array.
+	 * osc.js defaults to `unpackSingleArgs: true`, so a one-argument message becomes a scalar (not `[x]`).
+	 * Our code assumes `vals[0]` etc.; without this, single-arg dBFS/volume messages yield `vals = []` and meters stay at -120.
+	 * @param {unknown} rawArgs
+	 * @returns {unknown[]}
 	 */
 	_argValues(rawArgs) {
-		if (!rawArgs || !rawArgs.length) return []
-		return rawArgs.map((a) => {
-			if (a && typeof a === 'object' && 'value' in a) return a.value
-			return a
-		})
+		if (rawArgs == null) return []
+		if (Array.isArray(rawArgs)) {
+			return rawArgs.map((a) => {
+				if (a && typeof a === 'object' && 'value' in a) return a.value
+				return a
+			})
+		}
+		// Single-arg messages unpacked to scalar (see osc.js readMessageContents + unpackSingleArgs)
+		if (typeof rawArgs === 'number' || typeof rawArgs === 'string' || typeof rawArgs === 'boolean') {
+			return [rawArgs]
+		}
+		return []
 	}
 
 	/**
@@ -168,16 +210,44 @@ class OscState extends EventEmitter {
 			if (c.audio.levels.length > n) c.audio.levels.length = n
 			return
 		}
+		// Forks may emit bundled int meters (e.g. 16× int32) instead of per-index …/M/dBFS messages.
+		if (sub === 'volume' && vals.length > 0) {
+			const a = c.audio
+			const n = vals.length
+			if (!a.nbChannels || a.nbChannels < n) a.nbChannels = n
+			const now = Date.now()
+			for (let i = 0; i < n; i++) {
+				const db = intMeterSampleToDbfs(vals[i])
+				while (a.levels.length <= i) {
+					a.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
+				}
+				const slot = a.levels[i]
+				slot.dBFS = db
+				if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
+					slot.peak = db
+					slot.peakAge = now
+				}
+			}
+			return
+		}
 		const dm = sub.match(/^(\d+)\/dBFS$/)
 		if (dm) {
-			const idx = parseInt(dm[1], 10)
-			const db = Number(vals[0])
-			while (c.audio.levels.length <= idx) {
-				c.audio.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
+			const rawIdx = parseInt(dm[1], 10)
+			const a = c.audio
+			// Caspar builds differ: some use /mixer/audio/0/dBFS (0-based), some /mixer/audio/1/dBFS (1-based) for the first meter.
+			if (a._meterIndexBase === undefined) {
+				a._meterIndexBase = rawIdx === 0 ? 0 : 1
 			}
-			const slot = c.audio.levels[idx]
+			const idx = a._meterIndexBase === 1 ? rawIdx - 1 : rawIdx
+			if (idx < 0 || !Number.isFinite(idx)) return
+			const rawDb = Number(vals[0])
+			while (a.levels.length <= idx) {
+				a.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
+			}
+			const slot = a.levels[idx]
 			const now = Date.now()
-			slot.dBFS = Number.isFinite(db) ? db : slot.dBFS
+			const db = Number.isFinite(rawDb) ? rawDb : slot.dBFS
+			slot.dBFS = db
 			if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
 				slot.peak = db
 				slot.peakAge = now

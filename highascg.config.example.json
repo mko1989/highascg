@@ -60,5 +60,24 @@
   },
   "periodic_sync_interval_sec": null,
   "periodic_sync_interval_sec_osc": null,
-  "osc_info_supplement_ms": null
+  "osc_info_supplement_ms": null,
+  "dmx": {
+    "enabled": false,
+    "debugLogDmx": false,
+    "fps": 25,
+    "fixtures": [
+      {
+        "id": "bar1",
+        "sample": { "x": 100, "y": 100, "w": 38, "h": 205 },
+        "grid": { "cols": 1, "rows": 8 },
+        "colorOrder": "rgb",
+        "universe": 1,
+        "startChannel": 1,
+        "protocol": "artnet",
+        "destination": "127.0.0.1",
+        "gamma": 2.2,
+        "brightness": 1.0
+      }
+    ]
+  }
 }

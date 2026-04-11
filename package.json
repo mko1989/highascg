@@ -16,8 +16,10 @@
 	},
 	"dependencies": {
 		"busboy": "^1.6.0",
+		"dmxnet": "^0.9.0",
 		"go2rtc-static": "^1.9.4",
 		"osc": "^2.4.5",
+		"sacn": "^4.6.2",
 		"unzipper": "^0.12.3",
 		"wetransfert": "^2.4.0",
 		"ws": "^8.18.0",

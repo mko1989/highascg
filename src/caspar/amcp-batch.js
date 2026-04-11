@@ -41,6 +41,22 @@ function sequentialRaw(lines, client) {
  * @param {string[]} lines
  * @returns {Promise<{ ok: boolean, batched: boolean, rawLines: string[], innerCount: number }>}
  */
+/**
+ * True when this line acknowledges the closing COMMIT of a BEGIN…COMMIT batch.
+ * Caspar normally sends `202 COMMIT OK`; some forks omit the trailing `OK` (`202 COMMIT` only).
+ * REQ/RES mode may look like `RES uid 202 COMMIT OK`.
+ * @param {string} line
+ */
+function isBatchCommitAckLine(line) {
+	const s = String(line).trim()
+	if (!s) return false
+	// Standard + REQ-prefixed: must contain both tokens
+	if (/\bCOMMIT\b/i.test(s) && /\bOK\b/i.test(s)) return true
+	// Success code 202 with COMMIT but no separate OK token (still a successful commit)
+	if (/^202\s+COMMIT\b/i.test(s)) return true
+	return false
+}
+
 function runBeginCommitBatch(client, lines) {
 	const connection = client._context
 	const payload = ['BEGIN', ...lines, 'COMMIT'].join('\r\n') + '\r\n'
@@ -54,12 +70,19 @@ function runBeginCommitBatch(client, lines) {
 			lines: [],
 			timeout: setTimeout(() => {
 				if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
-				reject(new Error('AMCP batch timeout'))
+				const tail = drain.lines.slice(-12).join(' | ')
+				reject(
+					new Error(
+						tail
+							? `AMCP batch timeout (${drain.lines.length} response line(s); last: ${tail})`
+							: 'AMCP batch timeout (no response lines — check Caspar TCP / AMCP)',
+					),
+				)
 			}, 20000),
 			/** @param {string} line */
 			onLine(line) {
 				this.lines.push(line)
-				if (/\bCOMMIT\b/i.test(line) && /\bOK\b/i.test(line)) {
+				if (isBatchCommitAckLine(line)) {
 					clearTimeout(this.timeout)
 					if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
 					resolve({

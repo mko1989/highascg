@@ -3,12 +3,30 @@
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 }
 
 /**
+ * Local time like Caspar: `2026-04-09 20:40:36.262` (no trailing Z).
+ * @returns {string}
+ */
+function formatTimestampCasparStyle() {
+	const d = new Date()
+	const pad = (n, w = 2) => String(n).padStart(w, '0')
+	const Y = d.getFullYear()
+	const M = pad(d.getMonth() + 1)
+	const D = pad(d.getDate())
+	const h = pad(d.getHours())
+	const mi = pad(d.getMinutes())
+	const s = pad(d.getSeconds())
+	const ms = pad(d.getMilliseconds(), 3)
+	return `${Y}-${M}-${D} ${h}:${mi}:${s}.${ms}`
+}
+
+/**
  * @param {string} level
  * @param {string} msg
  */
 function formatLine(level, msg) {
-	const ts = new Date().toISOString()
-	return `[${ts}] [${String(level).toUpperCase()}] ${msg}`
+	const ts = formatTimestampCasparStyle()
+	const lvl = String(level).toLowerCase()
+	return `[${ts}] (HACG) [${lvl}] ${msg}`
 }
 
 /**
@@ -37,4 +55,4 @@ function createLogger(options = {}) {
 /** Default logger (debug and up) */
 const defaultLogger = createLogger()
 
-module.exports = { createLogger, defaultLogger, formatLine }
+module.exports = { createLogger, defaultLogger, formatLine, formatTimestampCasparStyle }

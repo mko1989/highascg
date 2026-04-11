@@ -11,10 +11,11 @@ import { createMathInput, parseNumberInput } from '../lib/math-input.js'
 import { dashboardState } from '../lib/dashboard-state.js'
 import { createDragInput, KF_PROPERTIES, KF_PROP_MAP } from './inspector-common.js'
 
-/** @typedef {'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} SceneContentFit */
+/** @typedef {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} SceneContentFit */
 
 /** Same labels/values as look editor — also used by timeline clip inspector. */
 export const SCENE_CONTENT_FIT_OPTIONS = /** @type {const} */ ([
+	{ value: 'native', label: 'Native (1:1 px)' },
 	{ value: 'fill-canvas', label: 'Fit canvas' },
 	{ value: 'horizontal', label: 'Fill width' },
 	{ value: 'vertical', label: 'Fill height' },
@@ -49,7 +50,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 			() => api.get('/api/media'),
 		)
 		if (!cr?.w || !cr?.h) return
-		const fit = L.contentFit || 'horizontal'
+		const fit = L.contentFit || 'native'
 		const rect = sceneLayerPixelRectForContentFit(canvas.width, canvas.height, cr.w, cr.h, fit)
 		sceneState.patchLayer(sceneId, layerIndex, { fill: pixelRectToFill(rect, canvas) })
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
@@ -146,7 +147,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 	const fitSel = document.createElement('select')
 	fitSel.className = 'inspector-field__select'
 	fitSel.setAttribute('aria-label', 'Content sizing')
-	const curFit = layer.contentFit || 'horizontal'
+	const curFit = layer.contentFit || 'native'
 	for (const o of SCENE_CONTENT_FIT_OPTIONS) {
 		const opt = document.createElement('option')
 		opt.value = o.value

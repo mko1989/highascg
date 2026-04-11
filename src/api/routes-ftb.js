@@ -28,6 +28,16 @@ async function handlePost(path, body, ctx) {
 	}
 
 	try {
+		// Stop timeline transport first so the ticker cannot PLAY layers again during the fade.
+		if (ctx.timelineEngine) {
+			const pb = ctx.timelineEngine.getPlayback()
+			if (pb?.timelineId) {
+				try {
+					ctx.timelineEngine.stop(pb.timelineId, { skipAmcp: true })
+				} catch (_) {}
+			}
+		}
+
 		const result = await runFadeToBlackAllLayers(
 			ctx.amcp,
 			channels,
@@ -38,15 +48,6 @@ async function handlePost(path, body, ctx) {
 			},
 			ctx
 		)
-
-		if (ctx.timelineEngine) {
-			const pb = ctx.timelineEngine.getPlayback()
-			if (pb?.timelineId) {
-				try {
-					ctx.timelineEngine.stop(pb.timelineId, { skipAmcp: true })
-				} catch (_) {}
-			}
-		}
 
 		for (const ch of map.programChannels) {
 			liveSceneState.clearChannel(ch)

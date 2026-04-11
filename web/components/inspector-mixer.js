@@ -3,6 +3,8 @@
  */
 
 import { api } from '../lib/api-client.js'
+import { ws } from '../app.js'
+import { getVariableStore } from '../lib/variable-state.js'
 import { sceneState } from '../lib/scene-state.js'
 import { sourceSupportsLoopPlayback } from '../lib/media-ext.js'
 import { dashboardState, dashboardCasparLayer, STRETCH_MODES } from '../lib/dashboard-state.js'
@@ -260,16 +262,19 @@ export function appendDashboardLayerMixerAndStretch(root, { layerIdx, ls, applyL
 		orientation: 'horizontal',
 		label: 'Live Lvl',
 		getLevels: () => {
-			const oc = window.highascg_osc_client // Need to ensure this is globally accessible or passed in
+			const vars = getVariableStore(ws)
 			const channelMap = stateStore.getState()?.channelMap || {}
-			const ch = channelMap.programChannels?.[layerIdx] || (layerIdx + 1)
-			const c = oc?.channels?.[String(ch)] || oc?.channels?.[ch]
-			const lv = c?.audio?.levels
+			const programChannels = channelMap.programChannels || [1]
+			const screenIdx = dashboardState.activeScreenIndex ?? 0
+			const ch =
+				programChannels[Math.min(screenIdx, Math.max(0, programChannels.length - 1))] ?? 1
+			const vL = parseFloat(vars.get(`osc_ch${ch}_audio_L`))
+			const vR = parseFloat(vars.get(`osc_ch${ch}_audio_R`))
 			return {
-				l: lv?.[0]?.dBFS ?? -60,
-				r: lv?.[1]?.dBFS ?? lv?.[0]?.dBFS ?? -60
+				l: Number.isFinite(vL) ? vL : -60,
+				r: Number.isFinite(vR) ? vR : Number.isFinite(vL) ? vL : -60,
 			}
-		}
+		},
 	})
 
 	const blendWrap = document.createElement('div')

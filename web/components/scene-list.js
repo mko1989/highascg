@@ -12,7 +12,7 @@ import { mountLookTransitionControls } from './scenes-shared.js'
  * @param {() => number} ctx.getProgramChannel
  * @param {() => number} ctx.getPreviewChannel
  * @param {(sc: import('../lib/scene-state.js').Scene) => string | null} ctx.thumbnailUrlForScene
- * @param {(sceneId: string, forceCut: boolean, opts?: { takeMode?: 'lbg' }) => Promise<void>} ctx.takeSceneToProgram
+ * @param {(sceneId: string, forceCut: boolean) => Promise<void>} ctx.takeSceneToProgram
  * @param {(msg: string, type?: string) => void} ctx.showToast
  * @param {(detail: object | null) => void} ctx.dispatchLayerSelect
  * @param {{ scheduleDraw: () => void }} ctx.previewPanel
@@ -20,7 +20,6 @@ import { mountLookTransitionControls } from './scenes-shared.js'
  * @param {{ current: number | null }} ctx.selectedLayerIndexRef
  * @param {() => void} ctx.globalTakeFromPreview
  * @param {() => void} ctx.globalCutFromPreview
- * @param {() => void} [ctx.globalTakeLbgFromPreview]
  */
 export function renderSceneDeck(ctx) {
 	const {
@@ -38,7 +37,6 @@ export function renderSceneDeck(ctx) {
 		selectedLayerIndexRef,
 		globalTakeFromPreview,
 		globalCutFromPreview,
-		globalTakeLbgFromPreview,
 	} = ctx
 
 	mainHost.innerHTML = ''
@@ -57,9 +55,8 @@ export function renderSceneDeck(ctx) {
 		${screenCount > 1 ? `<div class="scenes-screen-tabs">${screenTabs}</div>` : ''}
 		<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-look" title="New look" aria-label="New look">＋</button>
 		<div class="scenes-toolbar__global-take">
-			<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-global-take" title="Take preview to program" aria-label="Take preview to program">▶</button>
+			<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-global-take" title="Take preview to program (LOADBG + transition + PLAY)" aria-label="Take preview to program">▶</button>
 			<button type="button" class="scenes-btn scenes-btn--icon" id="scenes-global-cut" title="Hard cut preview to program" aria-label="Hard cut preview to program">✂</button>
-			<button type="button" class="scenes-btn scenes-btn--sm" id="scenes-global-take-lbg" title="LBG take: LOADBG + MIX then PLAY (test)" aria-label="LBG take">LBG</button>
 		</div>
 		<span class="scenes-toolbar__hint">PRV → PGM · PGM ch ${getProgramChannel()} · PRV ch ${getPreviewChannel()}</span>
 	`
@@ -101,7 +98,6 @@ export function renderSceneDeck(ctx) {
 	})
 	toolbar.querySelector('#scenes-global-take')?.addEventListener('click', () => globalTakeFromPreview())
 	toolbar.querySelector('#scenes-global-cut')?.addEventListener('click', () => globalCutFromPreview())
-	toolbar.querySelector('#scenes-global-take-lbg')?.addEventListener('click', () => globalTakeLbgFromPreview?.())
 	toolbar.querySelectorAll('.scenes-screen-tab').forEach((btn) => {
 		btn.addEventListener('click', () => {
 			sceneState.switchScreen(parseInt(btn.dataset.screen, 10))
@@ -143,9 +139,8 @@ export function renderSceneDeck(ctx) {
 				}
 			</button>
 			<div class="scenes-card__footer">
-				<button type="button" class="scenes-btn scenes-btn--take scenes-btn--sm scenes-btn--icon" data-action="take" title="Take live" aria-label="Take live">▶</button>
+				<button type="button" class="scenes-btn scenes-btn--take scenes-btn--sm scenes-btn--icon" data-action="take" title="Take live (LOADBG + transition + PLAY)" aria-label="Take live">▶</button>
 				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-action="cut" title="Hard cut" aria-label="Hard cut">✂</button>
-				<button type="button" class="scenes-btn scenes-btn--sm" data-action="take-lbg" title="LBG take (LOADBG+MIX then PLAY)" aria-label="LBG take">LBG</button>
 				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-action="edit" title="Edit look" aria-label="Edit look">⚙</button>
 			</div>
 		`
@@ -187,12 +182,9 @@ export function renderSceneDeck(ctx) {
 			e.stopPropagation()
 			takeSceneToProgram(sc.id, true)
 		})
-		card.querySelector('[data-action="take-lbg"]')?.addEventListener('click', (e) => {
-			e.stopPropagation()
-			takeSceneToProgram(sc.id, false, { takeMode: 'lbg' })
-		})
 		card.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
 			e.stopPropagation()
+			if (sceneState.previewSceneId !== sc.id) sendSceneToPreviewCard(sc.id)
 			sceneState.setEditingScene(sc.id)
 			selectedLayerIndexRef.current = null
 			dispatchLayerSelect(null)
@@ -211,6 +203,22 @@ export function renderSceneDeck(ctx) {
 		})
 		grid.appendChild(card)
 	})
+
+	if (sceneState.scenes.length > 0) {
+		const addTile = document.createElement('button')
+		addTile.type = 'button'
+		addTile.className = 'scenes-deck__add-look'
+		addTile.title = 'New look'
+		addTile.setAttribute('aria-label', 'New look')
+		addTile.textContent = '＋'
+		addTile.addEventListener('click', () => {
+			const id = sceneState.addScene()
+			sceneState.setEditingScene(id)
+			selectedLayerIndexRef.current = null
+			dispatchLayerSelect(null)
+		})
+		grid.appendChild(addTile)
+	}
 
 	mainHost.appendChild(grid)
 	previewPanel.scheduleDraw()

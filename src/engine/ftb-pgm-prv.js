@@ -119,8 +119,9 @@ async function runFadeToBlackAllLayers(amcp, channels, opts, self) {
 		}
 	}
 
+	// Wait until mixer opacity tweens finish, then a short buffer so CLEAR runs after transitions complete.
 	if (maxFadeMs > 0) {
-		await new Promise((r) => setTimeout(r, maxFadeMs + 50))
+		await new Promise((r) => setTimeout(r, Math.ceil(maxFadeMs) + 200))
 	}
 
 	for (const ch of uniq) {

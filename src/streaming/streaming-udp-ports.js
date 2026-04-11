@@ -44,11 +44,11 @@ function streamingUdpPortsForBase(basePort) {
  * @returns {Promise<number[]>} Ports that could not be bound (busy).
  */
 async function listBusyStreamingPorts(basePort, address = '127.0.0.1') {
-	const busy = []
-	for (const p of streamingUdpPortsForBase(basePort)) {
-		if (!(await probeUdpPortFree(p, address))) busy.push(p)
-	}
-	return busy
+	const ports = streamingUdpPortsForBase(basePort)
+	const results = await Promise.all(
+		ports.map(async (p) => ((await probeUdpPortFree(p, address)) ? null : p))
+	)
+	return results.filter((p) => p != null)
 }
 
 /**

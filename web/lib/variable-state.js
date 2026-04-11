@@ -46,6 +46,13 @@ export class VariableStore {
 	getAll() {
 		return this.variables
 	}
+
+	/** Merge server snapshot (e.g. GET /api/state or missed WS state) without replacing unrelated keys. */
+	mergeFromServer(vars) {
+		if (!vars || typeof vars !== 'object') return
+		Object.assign(this.variables, vars)
+		this._notify()
+	}
 }
 
 // Global instance for convenience

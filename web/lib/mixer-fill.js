@@ -204,10 +204,11 @@ export async function fetchMediaContentResolution(source, stateStore, screenIdx,
 /**
  * Map scene layer content fit UI to calcMixerFill stretch mode.
  * @param {{ contentFit?: string, fillNativeAspect?: boolean }} layer
- * @returns {'fit' | 'fill-h' | 'fill-v' | 'stretch'}
+ * @returns {'none' | 'fit' | 'fill-h' | 'fill-v' | 'stretch'}
  */
 export function mapContentFitToStretch(layer) {
 	const cf = layer.contentFit
+	if (cf === 'native') return 'none'
 	if (cf === 'horizontal') return 'fill-h'
 	if (cf === 'vertical') return 'fill-v'
 	if (cf === 'stretch') return 'stretch'

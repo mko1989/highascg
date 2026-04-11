@@ -29,7 +29,12 @@ const HEADER_W = 112
 /** Minimum zoom: px per ms (lower = more zoomed out). 0.0001 ≈ 100px per 1000s. */
 const MIN_PX_MS = 0.0001
 const MAX_PX_MS = 5.0   // 5000px/s
-const ZOOM_FACTOR = 1.35
+/** Toolbar zoom +/- buttons */
+const ZOOM_FACTOR = 1.18
+/** Per wheel “step” (smaller than old 1.35 — trackpads emit many events) */
+const WHEEL_ZOOM_STEP = 1.1
+/** Accumulate this much delta (px, mode 0) or lines before applying one zoom step */
+const WHEEL_ZOOM_ACCUM_THRESHOLD = 50
 
 export function initTimelineCanvas(container, opts) {
 	const {
@@ -76,6 +81,8 @@ export function initTimelineCanvas(container, opts) {
 	let lastSeekMs = 0    // last seek position (for onSeekEnd flush)
 	let hoverClip = null  // { layerIdx, clipId } — for cursor changes
 	let raf = null
+	let wheelZoomAccum = 0
+	let wheelZoomLastSign = 0
 
 	// ── Coordinate helpers ────────────────────────────────────────────────────
 
@@ -615,6 +622,8 @@ export function initTimelineCanvas(container, opts) {
 
 		// Alt + vertical wheel = pan layers up/down
 		if (e.altKey && Math.abs(dy) >= Math.abs(dx)) {
+			wheelZoomAccum = 0
+			wheelZoomLastSign = 0
 			const maxY = maxScrollY(tl)
 			scrollY = Math.max(0, Math.min(maxY, scrollY + dy * 0.5))
 			schedDraw()
@@ -623,6 +632,8 @@ export function initTimelineCanvas(container, opts) {
 
 		// Shift + vertical wheel = horizontal time pan (wheel-only mice)
 		if (e.shiftKey && !e.altKey && Math.abs(dy) >= Math.abs(dx)) {
+			wheelZoomAccum = 0
+			wheelZoomLastSign = 0
 			scrollX = Math.max(0, scrollX + dy / pxPerMs * 0.5)
 			schedDraw()
 			return
@@ -630,14 +641,27 @@ export function initTimelineCanvas(container, opts) {
 
 		// Dominant horizontal delta = pan time axis (trackpad two-finger horizontal, etc.)
 		if (Math.abs(dx) > Math.abs(dy)) {
+			wheelZoomAccum = 0
+			wheelZoomLastSign = 0
 			scrollX = Math.max(0, scrollX + dx / pxPerMs * 0.5)
 			schedDraw()
 			return
 		}
 
-		// Vertical wheel (incl. pinch-zoom with Ctrl on macOS) = zoom centred on cursor X
+		// Vertical wheel (incl. pinch-zoom with Ctrl on macOS) = zoom centred on cursor X.
+		// Accumulate delta so one physical scroll gesture ≈ one step (trackpads fire many events).
+		const dyNorm = e.deltaMode === 1 ? dy * 16 : e.deltaMode === 2 ? dy * 400 : dy
+		const sign = Math.sign(dyNorm)
+		if (sign !== 0 && sign !== wheelZoomLastSign) wheelZoomAccum = 0
+		wheelZoomLastSign = sign || wheelZoomLastSign
+		wheelZoomAccum += dyNorm
+		if (Math.abs(wheelZoomAccum) < WHEEL_ZOOM_ACCUM_THRESHOLD) {
+			schedDraw()
+			return
+		}
+		wheelZoomAccum = 0
 		const msUnder = msAt(cx)
-		const factor = dy > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
+		const factor = dyNorm > 0 ? 1 / WHEEL_ZOOM_STEP : WHEEL_ZOOM_STEP
 		pxPerMs = Math.max(MIN_PX_MS, Math.min(MAX_PX_MS, pxPerMs * factor))
 		scrollX = Math.max(0, msUnder - (cx - HEADER_W) / pxPerMs)
 		schedDraw()

@@ -52,43 +52,15 @@ export function showSettingsModal() {
 							<label><input type="checkbox" id="set-stream-enabled"> Enable Live Preview (WebRTC)</label>
 						</div>
 						<div class="settings-group">
-							<label>Capture tier</label>
-							<select id="set-stream-capture-mode">
-								<option value="auto">Auto (local NDI → UDP)</option>
-								<option value="local">Local (kmsgrab / x11grab)</option>
-								<option value="ndi">NDI (FFmpeg receiver)</option>
-								<option value="udp">UDP (Caspar MPEG-TS → go2rtc) — recommended</option>
-							</select>
-							<p class="settings-note">Local prefers <strong>kmsgrab</strong> (DRM) and falls back to <strong>x11grab</strong> on the same machine.</p>
-						</div>
-						<div class="settings-group">
-							<label>NDI source names</label>
-							<select id="set-stream-ndi-naming">
-								<option value="auto">Auto — discover &amp; match “CasparCG Channel N”</option>
-								<option value="pattern">Pattern only</option>
-								<option value="custom">Custom per channel</option>
-							</select>
-						</div>
-						<div class="settings-group" id="set-stream-ndi-pattern-wrap">
-							<label>NDI name pattern</label>
-							<input type="text" id="set-stream-ndi-pattern" placeholder="CasparCG Channel {ch}">
-							<p class="settings-note"><code>{ch}</code> is replaced with the Caspar channel number (1, 2, 3…).</p>
-						</div>
-						<div class="settings-group" id="set-stream-ndi-custom-wrap" style="display:none">
-							<label>PGM (ch 1)</label>
-							<input type="text" id="set-stream-ndi-ch1" placeholder="CasparCG Channel 1">
-							<label style="margin-top:0.5rem">Preview (ch 2)</label>
-							<input type="text" id="set-stream-ndi-ch2" placeholder="CasparCG Channel 2">
-							<label style="margin-top:0.5rem">Multiview (ch 3)</label>
-							<input type="text" id="set-stream-ndi-ch3" placeholder="CasparCG Channel 3">
-						</div>
-						<div class="settings-group">
-							<button type="button" class="btn btn--secondary" id="set-stream-ndi-discover">Discover NDI sources (this server)</button>
-							<pre id="set-stream-ndi-discover-out" class="settings-note" style="white-space:pre-wrap;max-height:8rem;overflow:auto;display:none;margin-top:0.5rem"></pre>
+							<p class="settings-note" style="margin-top:0">
+								Preview uses <strong>CasparCG STREAM</strong> (MPEG-TS over UDP on localhost) into <strong>go2rtc</strong>, then WebRTC in the browser.
+								Channel numbers follow <strong>Screens</strong> (PGM / PRV / multiview) — they are not hardcoded to 1/2/3.
+							</p>
 						</div>
 						<div class="settings-group">
 							<label>Quality Preset</label>
 							<select id="set-stream-quality">
+								<option value="preview">Preview (½ res, 1 fps — lowest load)</option>
 								<option value="low">Low (½ res, 15 fps)</option>
 								<option value="medium">Medium (½ res — default)</option>
 								<option value="high">High (½ res, higher bitrate)</option>
@@ -96,7 +68,7 @@ export function showSettingsModal() {
 								<option value="ultrafast">Ultrafast (½ res, minimal bitrate)</option>
 							</select>
 							<p class="settings-note">
-								<strong>Default presets</strong> encode at <strong>half</strong> width and height of each channel (e.g. 3840×768 → 1920×384) for faster preview. Choose <strong>Native</strong> only if you need full-size WebRTC.
+								<strong>Preview</strong> is meant for monitoring layout with minimal CPU/bitrate (1&nbsp;fps). <strong>Default presets</strong> encode at <strong>half</strong> width and height of each channel (e.g. 3840×768 → 1920×384). Choose <strong>Native</strong> only if you need full-size WebRTC.
 							</p>
 						</div>
 						<div class="settings-group checkbox">
@@ -276,14 +248,6 @@ export function showSettingsModal() {
 
 
 
-	function syncNdiNamingVisibility() {
-		const mode = modal.querySelector('#set-stream-ndi-naming').value
-		modal.querySelector('#set-stream-ndi-custom-wrap').style.display = mode === 'custom' ? 'block' : 'none'
-		modal.querySelector('#set-stream-ndi-pattern-wrap').style.display = mode === 'custom' ? 'none' : 'block'
-	}
-
-	modal.querySelector('#set-stream-ndi-naming').addEventListener('change', syncNdiNamingVisibility)
-
 	let casparModeChoices = []
 
 	function fillModeSelect(sel) {
@@ -297,7 +261,15 @@ export function showSettingsModal() {
 		}
 	}
 
-	function renderCasparScreenRows(cs) {
+	/**
+	 * @param {Record<string, unknown>} cs - casparServer slice
+	 * @param {Record<string, unknown>} [audioAr] - audioRouting slice (OpenAL fields); defaults from settingsState
+	 */
+	function renderCasparScreenRows(cs, audioAr) {
+		const ar = audioAr || settingsState.getSettings()?.audioRouting || {}
+		const prog = ar.programSystemAudioDevices || []
+		const prevEn = ar.previewSystemAudioEnabled || []
+		const prevDev = ar.previewSystemAudioDevices || []
 		const count = Math.min(4, Math.max(1, parseInt(String(cs?.screen_count || 1), 10) || 1))
 		const wrap = modal.querySelector('#set-caspar-screen-rows')
 		wrap.innerHTML = ''
@@ -353,7 +325,15 @@ export function showSettingsModal() {
 				`<label style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.35rem">` +
 				`<input type="checkbox" id="set-caspar-screen-${n}-ndi"> NDI output</label>` +
 				`<label style="margin-top:0.5rem">NDI name</label>` +
-				`<input type="text" id="set-caspar-screen-${n}-ndi-name">`
+				`<input type="text" id="set-caspar-screen-${n}-ndi-name">` +
+				`<p class="settings-note" style="margin-top:0.75rem;margin-bottom:0.35rem">` +
+				`Caspar <code>&lt;system-audio&gt;</code> (OpenAL). Empty device = default output for that channel.</p>` +
+				`<label>PGM OpenAL device name</label>` +
+				`<input type="text" id="set-caspar-screen-${n}-pgm-openal" placeholder="e.g. Built-in Audio Analog Stereo" autocomplete="off">` +
+				`<label style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.35rem">` +
+				`<input type="checkbox" id="set-caspar-screen-${n}-prv-openal-en"> Preview (PRV) → system audio</label>` +
+				`<label style="margin-top:0.5rem">PRV OpenAL device name (when enabled)</label>` +
+				`<input type="text" id="set-caspar-screen-${n}-prv-openal" placeholder="empty = default device" autocomplete="off">`
 			wrap.appendChild(div)
 			div.querySelector(`#set-caspar-screen-${n}-ndi-name`).value = ndiName
 			const sel = div.querySelector(`#set-caspar-screen-${n}-mode`)
@@ -376,8 +356,29 @@ export function showSettingsModal() {
 			}
 			syncCustomVisibility()
 			sel.addEventListener('change', syncCustomVisibility)
+			const pgmOpenal = div.querySelector(`#set-caspar-screen-${n}-pgm-openal`)
+			const prvOpenalEn = div.querySelector(`#set-caspar-screen-${n}-prv-openal-en`)
+			const prvOpenal = div.querySelector(`#set-caspar-screen-${n}-prv-openal`)
+			if (pgmOpenal) pgmOpenal.value = String(prog[n - 1] ?? '')
+			if (prvOpenalEn) prvOpenalEn.checked = prevEn[n - 1] === true
+			if (prvOpenal) prvOpenal.value = String(prevDev[n - 1] ?? '')
 		}
 		modal.querySelector('#set-caspar-screen-count').value = String(count)
+	}
+
+	function collectOpenalAudioRoutingFromModal() {
+		const programSystemAudioDevices = []
+		const previewSystemAudioEnabled = []
+		const previewSystemAudioDevices = []
+		for (let n = 1; n <= 4; n++) {
+			const pgmIn = modal.querySelector(`#set-caspar-screen-${n}-pgm-openal`)
+			const prvEn = modal.querySelector(`#set-caspar-screen-${n}-prv-openal-en`)
+			const prvIn = modal.querySelector(`#set-caspar-screen-${n}-prv-openal`)
+			programSystemAudioDevices.push(pgmIn ? pgmIn.value.trim() : '')
+			previewSystemAudioEnabled.push(!!(prvEn && prvEn.checked))
+			previewSystemAudioDevices.push(prvIn ? prvIn.value.trim() : '')
+		}
+		return { programSystemAudioDevices, previewSystemAudioEnabled, previewSystemAudioDevices }
 	}
 
 	function collectCasparServerFromUI() {
@@ -459,26 +460,18 @@ export function showSettingsModal() {
 	}
 
 	function buildSettingsPayload() {
+		const prevAr = settingsState.getSettings()?.audioRouting || {}
+		const openalAr = collectOpenalAudioRoutingFromModal()
+		const prevStream = settingsState.getSettings()?.streaming || {}
 		const settings = {
 			caspar: {
 				host: modal.querySelector('#set-caspar-host').value,
 				port: modal.querySelector('#set-caspar-port').value,
 			},
 			streaming: {
+				...prevStream,
 				enabled: modal.querySelector('#set-stream-enabled').checked,
-				captureMode: modal.querySelector('#set-stream-capture-mode').value,
-				ndiNamingMode: modal.querySelector('#set-stream-ndi-naming').value,
-				ndiSourcePattern: modal.querySelector('#set-stream-ndi-pattern').value,
-				ndiChannelNames: (() => {
-					const o = {}
-					const a = modal.querySelector('#set-stream-ndi-ch1').value.trim()
-					const b = modal.querySelector('#set-stream-ndi-ch2').value.trim()
-					const c = modal.querySelector('#set-stream-ndi-ch3').value.trim()
-					if (a) o['1'] = a
-					if (b) o['2'] = b
-					if (c) o['3'] = c
-					return o
-				})(),
+				captureMode: 'udp',
 				quality: modal.querySelector('#set-stream-quality').value,
 				basePort: modal.querySelector('#set-stream-port').value,
 				hardware_accel: modal.querySelector('#set-stream-hw').checked,
@@ -497,7 +490,17 @@ export function showSettingsModal() {
 				oscFooterVu: true,
 				rundownPlaybackTimer: true,
 			},
-			audioRouting: settingsState.getSettings()?.audioRouting || {},
+			audioRouting: { ...prevAr, ...openalAr },
+			dmx: JSON.parse(
+				JSON.stringify(
+					settingsState.getSettings()?.dmx || {
+						enabled: false,
+						debugLogDmx: false,
+						fps: 25,
+						fixtures: [],
+					}
+				)
+			),
 			casparServer: buildCasparServerPayload(),
 		}
 		if (systemSettingsHost.getSystemSettings) Object.assign(settings, systemSettingsHost.getSystemSettings())
@@ -592,8 +595,10 @@ export function showSettingsModal() {
 
 	modal.querySelector('#set-caspar-screen-count').addEventListener('change', () => {
 		const cur = collectCasparServerFromUI()
+		const openalAr = collectOpenalAudioRoutingFromModal()
 		cur.screen_count = parseInt(modal.querySelector('#set-caspar-screen-count').value, 10) || 1
-		renderCasparScreenRows(cur)
+		const ar = { ...(settingsState.getSettings()?.audioRouting || {}), ...openalAr }
+		renderCasparScreenRows(cur, ar)
 	})
 
 	modal.querySelector('#set-offline-mode').addEventListener('change', updateCasparApplyHint)
@@ -638,7 +643,10 @@ export function showSettingsModal() {
 		if (!confirm('Overwrite the Caspar config file on this machine and send RESTART? Caspar will reload.')) return
 		try {
 			const casparServer = buildCasparServerPayload()
-			const audioRouting = settingsState.getSettings()?.audioRouting || {}
+			const audioRouting = {
+				...(settingsState.getSettings()?.audioRouting || {}),
+				...collectOpenalAudioRoutingFromModal(),
+			}
 			const res = await api.post('/api/caspar-config/apply', { casparServer, audioRouting })
 			const extra = res.path ? `\n\n${res.path}` : ''
 			alert((res.message || 'OK') + extra)
@@ -646,20 +654,6 @@ export function showSettingsModal() {
 			alert('Apply failed: ' + e.message)
 		}
 	})
-
-	modal.querySelector('#set-stream-ndi-discover').addEventListener('click', async () => {
-		const pre = modal.querySelector('#set-stream-ndi-discover-out')
-		pre.style.display = 'block'
-		pre.textContent = 'Scanning…'
-		try {
-			const r = await api.get('/api/streaming/ndi-sources')
-			if (r.sources && r.sources.length) pre.textContent = r.sources.join('\n')
-			else pre.textContent = r.error || 'No sources found. Ensure FFmpeg has NDI (libndi) and sources are on the network.'
-		} catch (e) {
-			pre.textContent = e.message || String(e)
-		}
-	})
-
 
 	async function load() {
 		try {
@@ -698,23 +692,10 @@ export function showSettingsModal() {
 			modal.querySelector('#set-caspar-config-path').value = cs.configPath || ''
 			const ndiAlEl = modal.querySelector('#set-caspar-ndi-auto-load')
 			if (ndiAlEl) ndiAlEl.checked = cs.ndi_auto_load !== false && cs.ndi_auto_load !== 'false'
-			renderCasparScreenRows(cs)
+			renderCasparScreenRows(cs, cfg.audioRouting || {})
 			modal.querySelector('#set-caspar-host').value = cfg.caspar.host
 			modal.querySelector('#set-caspar-port').value = cfg.caspar.port
 			modal.querySelector('#set-stream-enabled').checked = cfg.streaming.enabled
-			{
-				let cap = cfg.streaming.captureMode || 'udp'
-				if (cap === 'srt') cap = 'udp'
-				modal.querySelector('#set-stream-capture-mode').value = cap
-			}
-			modal.querySelector('#set-stream-ndi-naming').value = cfg.streaming.ndiNamingMode || 'auto'
-			modal.querySelector('#set-stream-ndi-pattern').value = cfg.streaming.ndiSourcePattern || 'CasparCG Channel {ch}'
-			const ndiN = cfg.streaming.ndiChannelNames || {}
-			modal.querySelector('#set-stream-ndi-ch1').value = ndiN['1'] || ndiN[1] || ''
-			modal.querySelector('#set-stream-ndi-ch2').value = ndiN['2'] || ndiN[2] || ''
-			modal.querySelector('#set-stream-ndi-ch3').value = ndiN['3'] || ndiN[3] || ''
-			syncNdiNamingVisibility()
-			modal.querySelector('#set-stream-ndi-discover-out').style.display = 'none'
 			modal.querySelector('#set-stream-quality').value = cfg.streaming.quality
 			modal.querySelector('#set-stream-hw').checked = cfg.streaming.hardware_accel
 			modal.querySelector('#set-stream-port').value = cfg.streaming.basePort

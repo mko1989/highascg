@@ -44,8 +44,8 @@ export function defaultLayerConfig(layerNumber) {
 		muted: false,
 		/** Straight alpha: MIXER KEYER on layer (PNG/ProRes with alpha, etc.) */
 		straightAlpha: false,
-		/** 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch' — how media fits the layer rect (see layer inspector). */
-		contentFit: 'horizontal',
+		/** 'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch' — how media fits the layer rect (see layer inspector). */
+		contentFit: 'native',
 		/** When true (default), changing W or H in the inspector keeps content aspect (from media resolution when known). */
 		aspectLocked: true,
 		fill: defaultFill(),
@@ -148,7 +148,7 @@ export class SceneState {
 						transition: l.transition ?? null,
 					}
 					if (base.contentFit == null) {
-						base.contentFit = l.fillNativeAspect === false ? 'stretch' : 'horizontal'
+						base.contentFit = l.fillNativeAspect === false ? 'stretch' : 'native'
 					}
 					if (base.aspectLocked == null) base.aspectLocked = true
 					return base
@@ -449,8 +449,12 @@ export class SceneState {
 		if (!s || !s.layers[layerIndex]) return
 		const L = s.layers[layerIndex]
 		if (patch.fill) L.fill = { ...L.fill, ...patch.fill }
-		const { fill, ...rest } = patch
+		const { fill, startBehaviour, ...rest } = patch
 		Object.assign(L, rest)
+		if ('startBehaviour' in patch) {
+			if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour
+			else L.startBehaviour = startBehaviour
+		}
 		this._softSave()
 	}
 

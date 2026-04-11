@@ -6,7 +6,8 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
-const { runSceneTake, layerHasContent } = require('../engine/scene-transition')
+const { layerHasContent } = require('../engine/scene-transition')
+const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const fs = require('fs')
 const path = require('path')
 const { getMediaIngestBasePath, scanMediaRecursiveForBrowser } = require('../media/local-media')
@@ -103,12 +104,12 @@ async function handleSyncPush(ctx) {
 		if (!channel || !entry?.scene) continue
 
 		try {
-			await runSceneTake(ctx.amcp, {
+			await runSceneTakeLbg(ctx.amcp, {
 				channel,
 				self: ctx,
 				currentScene: null, // Force full refresh
 				incomingScene: entry.scene,
-				forceCut: true
+				forceCut: true,
 			})
 			results.push({ channel, ok: true })
 		} catch (e) {

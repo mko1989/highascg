@@ -85,6 +85,10 @@ async function handleGet(path, ctx) {
 			osc_info_supplement_ms: ctx.config.osc_info_supplement_ms ?? defaults.osc_info_supplement_ms,
 			channelMap: ctx.getState().channelMap, // Includes programChannels, previewChannels, etc.
 			offline_mode: !!ctx.config.offline_mode,
+			dmx: (() => {
+				const d = ctx.config.dmx && typeof ctx.config.dmx === 'object' ? ctx.config.dmx : {}
+				return { ...defaults.dmx, ...d }
+			})(),
 			casparServer: (() => {
 				const cs = { ...(defaults.casparServer || {}), ...(ctx.config.casparServer || {}) }
 				normalizeCasparServerConfigPath(cs)
@@ -223,6 +227,10 @@ async function handlePost(path, body, ctx) {
 		normalizeCasparServerConfigPath(ctx.config.casparServer)
 	}
 
+	if (settings.dmx !== undefined && settings.dmx !== null && typeof settings.dmx === 'object') {
+		ctx.config.dmx = { ...defaults.dmx, ...settings.dmx }
+	}
+
 	// System tab: physical displays → X11 layout (persisted next to casparServer)
 	if (settings.screen_count !== undefined && settings.screen_count !== null) {
 		const n = parseInt(String(settings.screen_count), 10)
@@ -250,6 +258,10 @@ async function handlePost(path, body, ctx) {
 		const streamingForDisk = { ...ctx.config.streaming }
 		delete streamingForDisk._effectiveBasePort
 		delete streamingForDisk._casparHost
+		const dmxForDisk =
+			ctx.config.dmx !== undefined
+				? { ...defaults.dmx, ...ctx.config.dmx }
+				: { ...defaults.dmx, ...(ctx.configManager.get().dmx || {}) }
 		const newConfig = {
 			...ctx.configManager.get(),
 			caspar: ctx.config.caspar,
@@ -261,6 +273,7 @@ async function handlePost(path, body, ctx) {
 			ui: ctx.config.ui || defaults.ui,
 			audioRouting: ctx.config.audioRouting || defaults.audioRouting,
 			offline_mode: ctx.config.offline_mode,
+			dmx: dmxForDisk,
 			casparServer: ctx.config.casparServer || defaults.casparServer,
 		}
 		const SYS_KEYS = [
