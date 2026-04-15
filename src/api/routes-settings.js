@@ -95,6 +95,7 @@ async function handleGet(path, ctx) {
 				return cs
 			})(),
 			screen_count: ctx.config.screen_count ?? ctx.config.casparServer?.screen_count ?? 1,
+			companion: ctx.config.companion || { host: '127.0.0.1', port: 8000 },
 			screen_1_system_id: ctx.config.screen_1_system_id ?? '',
 			screen_2_system_id: ctx.config.screen_2_system_id ?? '',
 			screen_3_system_id: ctx.config.screen_3_system_id ?? '',
@@ -231,6 +232,15 @@ async function handlePost(path, body, ctx) {
 		ctx.config.dmx = { ...defaults.dmx, ...settings.dmx }
 	}
 
+	// Companion settings (WO-24)
+	if (settings.companion && typeof settings.companion === 'object') {
+		const c = settings.companion
+		ctx.config.companion = {
+			host: String(c.host || '127.0.0.1').trim(),
+			port: parseInt(String(c.port || 8000), 10) || 8000,
+		}
+	}
+
 	// System tab: physical displays → X11 layout (persisted next to casparServer)
 	if (settings.screen_count !== undefined && settings.screen_count !== null) {
 		const n = parseInt(String(settings.screen_count), 10)
@@ -275,6 +285,7 @@ async function handlePost(path, body, ctx) {
 			offline_mode: ctx.config.offline_mode,
 			dmx: dmxForDisk,
 			casparServer: ctx.config.casparServer || defaults.casparServer,
+			companion: ctx.config.companion || { host: '127.0.0.1', port: 8000 },
 		}
 		const SYS_KEYS = [
 			'screen_count',

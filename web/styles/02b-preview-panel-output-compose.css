@@ -1,0 +1,293 @@
+/**
+ * Output preview panel, WebRTC compose PRV/PGM, canvas overlay, offline letterbox.
+ */
+
+/* Output preview (Dashboard + Timeline) */
+.preview-panel {
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--bg-panel, #161b22);
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.preview-panel__header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	background: var(--bg-elevated, #21262d);
+	border-bottom: 1px solid var(--border);
+}
+
+.preview-panel__toggle {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg-panel);
+	color: var(--text);
+	cursor: pointer;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.preview-panel__toggle:hover {
+	background: var(--border);
+}
+
+.preview-panel__title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.preview-panel__compose-layout {
+	padding: 4px 8px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg-panel);
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.preview-panel__compose-layout:hover {
+	background: var(--border);
+	color: var(--text);
+}
+
+.preview-panel__compose-layout[aria-pressed="true"] {
+	border-color: rgba(88, 166, 255, 0.45);
+	color: var(--text);
+}
+
+.preview-panel__res {
+	margin-left: auto;
+	font-size: 11px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.preview-panel__body {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 80px;
+	box-sizing: border-box;
+}
+
+.preview-panel--collapsed .preview-panel__body {
+	display: none !important;
+}
+
+.preview-panel__resize {
+	height: 8px;
+	cursor: row-resize;
+	flex-shrink: 0;
+	background: linear-gradient(to bottom, var(--border), transparent);
+	border-top: 1px solid var(--border);
+}
+
+.preview-panel__canvas-outer {
+	flex: 1;
+	min-height: 72px;
+	padding: 8px 10px 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+}
+
+.preview-panel__canvas-wrap {
+	width: 100%;
+	height: 100%;
+	min-height: 64px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	background: #000;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.preview-panel--compose-dual .preview-panel__canvas-outer {
+	align-items: stretch;
+	justify-content: flex-start;
+}
+
+.preview-panel--compose-dual .preview-panel__canvas-wrap {
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+}
+
+/* Pair is sized in JS to match output aspect; centered in the wrap */
+.preview-panel--compose-dual .preview-panel__canvas-wrap > .preview-panel__compose-pair {
+	flex: 0 0 auto;
+	min-width: 0;
+	min-height: 0;
+	align-self: center;
+}
+
+/* Single-channel preview only — do not target compose PRV/PGM cells (absolute here stacks both feeds on the pair). */
+.preview-panel:not(.preview-panel--compose-dual) .preview-panel__video-container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+}
+
+/* Compose / timeline preview: PRV + PGM — flex splits width/height reliably (grid 1fr could collapse to 0 in some flex parents). */
+.preview-panel__compose-pair {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	align-self: center;
+	width: auto;
+	height: auto;
+	min-height: 64px;
+	min-width: 0;
+	gap: 0;
+	background: #000;
+	box-sizing: border-box;
+	isolation: isolate;
+	position: relative;
+}
+
+/* Dark letterboxing — match COMPOSE_DUAL_PREVIEW_BG in preview-canvas-draw-base.js */
+.preview-panel--compose-dual .preview-panel__compose-pair {
+	background: #0d1117;
+}
+.preview-panel__compose-pair--lr {
+	flex-direction: row;
+}
+.preview-panel__compose-pair--lr .preview-panel__compose-cell {
+	min-width: 0;
+}
+
+.preview-panel__compose-pair--tb {
+	flex-direction: column;
+}
+.preview-panel__compose-pair--tb .preview-panel__compose-cell {
+	min-height: 0;
+	max-height: none;
+	width: 100%;
+	max-width: none;
+}
+/* PGM on top, gutter, PRV on bottom (DOM: PRV, gutter, PGM) */
+.preview-panel__compose-pair--tb .preview-panel__compose-cell--pgm {
+	order: -1;
+}
+.preview-panel__compose-pair--tb .preview-panel__compose-gutter {
+	order: 0;
+}
+.preview-panel__compose-pair--tb .preview-panel__compose-cell--prv {
+	order: 1;
+}
+
+.preview-panel__compose-gutter {
+	flex-shrink: 0;
+	box-sizing: border-box;
+	background: rgba(48, 54, 61, 0.95);
+	border: 1px solid rgba(88, 166, 255, 0.35);
+	border-radius: 2px;
+	transition: opacity 0.4s ease, border-color 0.4s ease, background-color 0.4s ease;
+}
+.preview-panel--compose-border-fade-out .preview-panel__compose-gutter {
+	opacity: 0;
+}
+.preview-panel__compose-pair--lr .preview-panel__compose-gutter {
+	width: 6px;
+	min-width: 6px;
+	align-self: stretch;
+	cursor: col-resize;
+}
+.preview-panel__compose-pair--tb .preview-panel__compose-gutter {
+	width: 100%;
+	height: 6px;
+	min-height: 6px;
+	cursor: row-resize;
+}
+
+.preview-panel__compose-cell {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #0d1117;
+	overflow: hidden;
+	min-width: 0;
+	min-height: 0;
+	isolation: isolate;
+}
+
+/* Dual WebRTC: light cell bg shows letterboxing; borders show PRV vs PGM. */
+.preview-panel--compose-dual .preview-panel__compose-cell {
+	box-sizing: border-box;
+	background: #e8eaed;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	min-height: 0;
+}
+/* PRV green / PGM red — offline thumbnails and live WebRTC */
+.preview-panel--compose-dual .preview-panel__compose-cell--prv {
+	border: 2px solid rgba(39, 174, 96, 0.95);
+	transition: border-color 0.4s ease;
+}
+.preview-panel--compose-dual .preview-panel__compose-cell--pgm {
+	border: 2px solid rgba(192, 57, 43, 0.95);
+	transition: border-color 0.4s ease;
+}
+
+/* In-flow container per cell (no absolute on the wrapper — avoids anchoring to the pair). */
+.preview-panel--compose-dual .preview-panel__compose-cell .preview-panel__video-container {
+	position: relative;
+	box-sizing: border-box;
+	flex: 1 1 0;
+	width: 100%;
+	min-width: 0;
+	min-height: 0;
+	z-index: 1;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.preview-panel--compose-dual .preview-panel__compose-cell .preview-panel__video-container video {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.preview-panel__canvas {
+	position: relative;
+	z-index: 2;
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+	pointer-events: none; /* Let clicks pass through if needed, though usually we want interactions on canvas */
+}
+
+/* PRV/PGM: offline thumbnails + live edge labels — one surface per cell */
+.preview-panel--compose-dual .preview-panel__canvas--compose-cell {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+}

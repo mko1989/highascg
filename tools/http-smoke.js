@@ -145,6 +145,9 @@ async function main() {
 	r = await httpGet('/api/audio/devices')
 	if (r.status !== 200) fail(`GET /api/audio/devices expected 200, got ${r.status}`)
 
+	r = await httpGet('/api/audio/portaudio-devices')
+	if (r.status !== 200) fail(`GET /api/audio/portaudio-devices expected 200, got ${r.status}`)
+
 	// Companion-style API paths (same inst as static tests above)
 	r = await httpGet(`${inst}/api/settings`)
 	if (r.status !== 200) fail(`GET ${inst}/api/settings expected 200, got ${r.status}`)

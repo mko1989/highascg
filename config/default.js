@@ -28,6 +28,12 @@ module.exports = {
 		host: '127.0.0.1',
 		port: 5250,
 	},
+	/**
+	 * When true, collapse multi-command AMCP sends into BEGIN…COMMIT batches (fewer round-trips).
+	 * False by default — sequential sends are safer on some Caspar builds (stack depth / crashes).
+	 * Override at runtime: env `HIGHASCG_AMCP_BATCH=1` or set this key in `highascg.config.json`.
+	 */
+	amcp_batch: false,
 	offline_mode: false,
 	/**
 	 * Eyes hover: CPU/RAM (os), free disk (statfs), optional Caspar GL. Keep off in preshow (offline_mode).
@@ -48,6 +54,12 @@ module.exports = {
 	 * `configPath`: main server XML (separate from media-scanner config under `/opt/casparcg`). When set (non-empty), it wins over `CASPAR_CONFIG_PATH`; when empty, env then this default are used (see `resolveCasparConfigWritePath`).
 	 */
 	casparServer: {
+		/**
+		 * `stock` — vanilla CasparCG 2.5 XML (no PortAudio / enhanced screen tags).
+		 * `custom_live` — custom server build with PRs #1718–#1720: emit `<portaudio>`, optional `<aspect-ratio>` / `<enable-mipmaps>` inside `<screen>`.
+		 * @see docs/CASPAR_CUSTOM_BUILD.md
+		 */
+		caspar_build_profile: 'stock',
 		screen_count: 1,
 		screen_1_mode: '1080p5000',
 		screen_1_stretch: 'none',
@@ -58,6 +70,17 @@ module.exports = {
 		screen_1_decklink_device: 0,
 		screen_1_ndi_enabled: false,
 		screen_1_ndi_name: 'HighAsCG-CH1',
+		/** custom_live: optional `<aspect-ratio>` inside `<screen>` (e.g. 16:9, 3840:1080) */
+		screen_1_aspect_ratio: '',
+		screen_1_enable_mipmaps: false,
+		/** custom_live: ASIO multi-channel audio via PortAudio consumer (disables OpenAL PGM `<system-audio>` for this screen) */
+		screen_1_portaudio_enabled: false,
+		screen_1_portaudio_device_name: '',
+		screen_1_portaudio_output_channels: 2,
+		screen_1_portaudio_buffer_frames: 128,
+		screen_1_portaudio_latency_ms: 40,
+		screen_1_portaudio_fifo_ms: 50,
+		screen_1_portaudio_auto_tune: true,
 		screen_2_mode: '1080p5000',
 		screen_2_stretch: 'none',
 		screen_2_windowed: true,
@@ -67,6 +90,15 @@ module.exports = {
 		screen_2_decklink_device: 0,
 		screen_2_ndi_enabled: false,
 		screen_2_ndi_name: 'HighAsCG-CH2',
+		screen_2_aspect_ratio: '',
+		screen_2_enable_mipmaps: false,
+		screen_2_portaudio_enabled: false,
+		screen_2_portaudio_device_name: '',
+		screen_2_portaudio_output_channels: 2,
+		screen_2_portaudio_buffer_frames: 128,
+		screen_2_portaudio_latency_ms: 40,
+		screen_2_portaudio_fifo_ms: 50,
+		screen_2_portaudio_auto_tune: true,
 		screen_3_mode: '1080p5000',
 		screen_3_stretch: 'none',
 		screen_3_windowed: true,
@@ -76,6 +108,15 @@ module.exports = {
 		screen_3_decklink_device: 0,
 		screen_3_ndi_enabled: false,
 		screen_3_ndi_name: 'HighAsCG-CH3',
+		screen_3_aspect_ratio: '',
+		screen_3_enable_mipmaps: false,
+		screen_3_portaudio_enabled: false,
+		screen_3_portaudio_device_name: '',
+		screen_3_portaudio_output_channels: 2,
+		screen_3_portaudio_buffer_frames: 128,
+		screen_3_portaudio_latency_ms: 40,
+		screen_3_portaudio_fifo_ms: 50,
+		screen_3_portaudio_auto_tune: true,
 		screen_4_mode: '1080p5000',
 		screen_4_stretch: 'none',
 		screen_4_windowed: true,
@@ -85,6 +126,15 @@ module.exports = {
 		screen_4_decklink_device: 0,
 		screen_4_ndi_enabled: false,
 		screen_4_ndi_name: 'HighAsCG-CH4',
+		screen_4_aspect_ratio: '',
+		screen_4_enable_mipmaps: false,
+		screen_4_portaudio_enabled: false,
+		screen_4_portaudio_device_name: '',
+		screen_4_portaudio_output_channels: 2,
+		screen_4_portaudio_buffer_frames: 128,
+		screen_4_portaudio_latency_ms: 40,
+		screen_4_portaudio_fifo_ms: 50,
+		screen_4_portaudio_auto_tune: true,
 		multiview_enabled: true,
 		/** false = multiview channel has FFmpeg/SRT only (no Caspar screen window in generated config). */
 		multiview_screen_consumer: true,

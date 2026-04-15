@@ -27,21 +27,39 @@ export function createDragInput(opts) {
 	wrap.appendChild(lab)
 
 	let startX = 0
-	let startVal = parseFloat(inp.value) || 0
+	let startVal = 0
 	const sensitivity = 0.5
+	/** Last value we committed — restore on blur when the field is empty or not parseable. */
+	let lastCommitted =
+		typeof value === 'number' && !Number.isNaN(value) ? value : min !== -Infinity ? min : 0
 
-	function parseVal() {
-		const v = parseNumberInput(inp.value, NaN)
-		return !isNaN(v) ? v : min !== -Infinity ? min : 0
+	function parseRaw() {
+		return parseNumberInput(inp.value, NaN)
+	}
+	/** For drag/wheel: fall back to last committed if the field is empty. */
+	function parseValOrLast() {
+		const v = parseRaw()
+		if (!Number.isNaN(v)) return v
+		return lastCommitted
 	}
 	function formatVal(v) {
 		return decimals >= 0 ? Number(v).toFixed(decimals) : String(v)
 	}
-	function apply(v) {
-		let n = typeof v === 'number' ? v : parseVal()
-		n = Math.max(min, Math.min(max, n))
-		inp.value = formatVal(n)
-		onChange?.(n)
+	function commitNumber(n) {
+		const clamped = Math.max(min, Math.min(max, n))
+		inp.value = formatVal(clamped)
+		if (clamped !== lastCommitted) {
+			lastCommitted = clamped
+			onChange?.(clamped)
+		}
+	}
+	function commitFromField() {
+		const raw = parseRaw()
+		if (Number.isNaN(raw)) {
+			inp.value = formatVal(lastCommitted)
+			return
+		}
+		commitNumber(raw)
 	}
 
 	const DRAG_THRESHOLD = 5
@@ -49,7 +67,7 @@ export function createDragInput(opts) {
 	inp.addEventListener('mousedown', (e) => {
 		if (e.button !== 0) return
 		startX = e.clientX
-		startVal = parseVal()
+		startVal = parseValOrLast()
 		dragging = false
 		const onMove = (ev) => {
 			if (!dragging) {
@@ -62,7 +80,10 @@ export function createDragInput(opts) {
 			startX = ev.clientX
 			startVal = Math.max(min, Math.min(max, startVal + dx))
 			inp.value = formatVal(startVal)
-			onChange?.(startVal)
+			if (startVal !== lastCommitted) {
+				lastCommitted = startVal
+				onChange?.(startVal)
+			}
 		}
 		const onUp = () => {
 			document.removeEventListener('mousemove', onMove)
@@ -71,18 +92,24 @@ export function createDragInput(opts) {
 		document.addEventListener('mousemove', onMove)
 		document.addEventListener('mouseup', onUp)
 	})
-	inp.addEventListener('change', () => apply(parseVal()))
-	inp.addEventListener('blur', () => apply(parseVal()))
+	inp.addEventListener('change', commitFromField)
+	inp.addEventListener('blur', commitFromField)
 
 	inp.addEventListener('wheel', (e) => {
 		e.preventDefault()
 		const dir = e.deltaY < 0 ? 1 : -1
 		const mult = e.shiftKey ? 10 : 1
-		const cur = parseVal()
-		apply(Math.max(min, Math.min(max, cur + dir * step * mult)))
+		const cur = parseValOrLast()
+		commitNumber(cur + dir * step * mult)
 	}, { passive: false })
 
-	return { wrap, input: inp, setValue: (v) => { inp.value = formatVal(v); apply(v) } }
+	return {
+		wrap,
+		input: inp,
+		setValue: (v) => {
+			commitNumber(v)
+		},
+	}
 }
 
 export const KF_PROPERTIES = [

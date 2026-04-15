@@ -1,0 +1,187 @@
+/**
+ * Workspace tabs, tab panes, scenes split, preview host fill helpers.
+ */
+
+.workspace__tabs {
+	display: flex;
+	gap: 0;
+	background: var(--bg-panel);
+	border-bottom: 1px solid var(--border);
+	padding: 0 12px;
+}
+
+.tab {
+	padding: 10px 16px;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+
+.tab:hover {
+	color: var(--text);
+}
+
+.tab.active {
+	color: var(--accent);
+	border-bottom-color: var(--accent);
+}
+
+.workspace__content {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+}
+
+.tab-pane {
+	display: none;
+}
+
+.tab-pane.active {
+	display: block;
+	flex: 1;
+}
+
+/* Timeline tab fills the workspace without padding */
+#tab-timeline.active {
+	display: flex;
+	flex-direction: column;
+	margin: -24px;
+	overflow: hidden;
+}
+
+/* Dashboard: preview panel + scrollable grid */
+#tab-scenes.active {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	flex: 1;
+	min-height: 0;
+	height: 100%;
+	align-self: stretch;
+	width: 100%;
+}
+
+#tab-scenes.active > .scenes-split {
+	flex: 1 1 0;
+	min-height: 0;
+	min-width: 0;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.dashboard-main {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Scenes: resizable split — compose preview (top) vs deck / editor (bottom) */
+.scenes-split {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.scenes-split__handle {
+	width: 100%;
+	height: 5px;
+	cursor: row-resize;
+	flex-shrink: 0;
+	background: transparent;
+	border-top: 1px solid rgba(48, 54, 61, 0.65);
+}
+
+.scenes-split__handle:hover {
+	border-top-color: rgba(88, 166, 255, 0.45);
+	background: rgba(88, 166, 255, 0.06);
+}
+
+.scenes-split__main {
+	flex: 1;
+	min-height: 120px;
+	overflow: auto;
+}
+
+.preview-host {
+	flex-shrink: 0;
+}
+
+.preview-host.scenes-preview-host {
+	display: flex;
+	flex-direction: column;
+	min-height: 200px;
+	width: 100%;
+	align-self: stretch;
+	/* Let the split handle height; a max here was capping usable preview area */
+	max-height: none;
+}
+
+/* Collapsed preview: only header row — drop min-height so we don’t reserve 200px of empty gray */
+.preview-host.scenes-preview-host.preview-host--collapsed {
+	min-height: 0;
+}
+
+.preview-host.scenes-preview-host.preview-host--collapsed > .preview-panel.preview-panel--fill {
+	flex: 0 0 auto;
+	min-height: 0;
+	height: auto !important;
+}
+
+/* Scenes split: preview column has explicit height — panel + canvas chain must consume it */
+.preview-host.scenes-preview-host > .preview-panel.preview-panel--fill {
+	flex: 1 1 0;
+	min-height: 0;
+	height: 100%;
+	max-height: 100%;
+}
+
+.preview-panel.preview-panel--fill {
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.preview-panel--fill .preview-panel__body--fill {
+	flex: 1;
+	min-height: 0;
+	height: auto !important;
+}
+
+.preview-panel--fill .preview-panel__canvas-outer {
+	flex: 1 1 0;
+	min-height: 0;
+	align-self: stretch;
+	align-items: stretch;
+	justify-content: stretch;
+}
+
+.preview-panel--fill .preview-panel__canvas-wrap {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 0;
+	width: 100%;
+	height: 100%;
+	align-self: stretch;
+}
+
+/* Scenes split: reserve preview column height so first paint isn’t 0×0 before flex settles */
+.preview-host.scenes-preview-host .preview-panel--fill.preview-panel--compose-dual .preview-panel__canvas-wrap {
+	min-height: 120px;
+}
+
+/* Compose PRV+PGM: pair aspect-fitted and centered in the preview column */
+.preview-panel--fill.preview-panel--compose-dual .preview-panel__canvas-wrap {
+	align-items: center;
+	justify-content: center;
+}

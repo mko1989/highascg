@@ -10,9 +10,10 @@ const { parseCinfMedia } = require('../media/cinf-parse')
 const {
 	tryLocalThumbnailPng,
 	handleLocalMedia: serveLocalMedia,
-	resolveSafe,
+	handleDeleteLocalMedia: deleteLocalMediaFile,
+	unlinkMediaById,
+	resolveMediaFileOnDisk,
 	probeMedia,
-	getMediaIngestBasePath,
 } = require('../media/local-media')
 const { runMediaClsTlsRefresh } = require('../utils/periodic-sync')
 
@@ -51,8 +52,9 @@ async function handleThumbnail(path, query, ctx) {
 
 	if (filename == null || filename === '') return null
 
-	const maxW = Math.min(1920, Math.max(64, parseInt(String(query.w ?? ''), 10) || 720))
-	const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW)
+	const maxW = Math.min(1920, Math.max(64, parseInt(String(query.w ?? ''), 10) || 960))
+	const seekSec = Math.max(0, parseFloat(String(query.t ?? '')) || 2)
+	const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
 	if (localBuf && localBuf.length) {
 		return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
 	}
@@ -80,21 +82,27 @@ async function handleLocalMedia(path, query, ctx) {
 }
 
 /**
+ * DELETE /api/local-media/:encodedId
+ * @param {string} path
+ * @param {object} ctx
+ */
+async function handleDeleteLocalMedia(path, ctx) {
+	const r = await deleteLocalMediaFile(path, ctx.config || {})
+	if (!r) return null
+	if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
+	return r
+}
+
+/**
  * @param {object} ctx
  * @param {string} id - media id / relative path
  * @returns {Promise<number>}
  */
 async function probeDurationMsFromLocalFiles(ctx, id) {
-	const cfg = ctx.config || {}
-	const bases = [String(cfg.local_media_path || '').trim(), getMediaIngestBasePath(cfg)].filter(Boolean)
-	const idNorm = String(id).replace(/\\/g, '/')
-	for (const base of bases) {
-		const fp = resolveSafe(base, idNorm)
-		if (!fp) continue
-		const probed = await probeMedia(fp)
-		if (probed?.durationMs > 0) return probed.durationMs
-	}
-	return 0
+	const fp = resolveMediaFileOnDisk(ctx.config || {}, id)
+	if (!fp) return 0
+	const probed = await probeMedia(fp)
+	return probed?.durationMs > 0 ? probed.durationMs : 0
 }
 
 async function handleMediaRefresh(body, ctx) {
@@ -113,6 +121,14 @@ async function handleMediaRefresh(body, ctx) {
 }
 
 async function handlePost(path, body, ctx) {
+	if (path === '/api/media/delete') {
+		const b = parseBody(body)
+		const id = (b.id || '').trim()
+		if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
+		const r = await unlinkMediaById(ctx.config || {}, id)
+		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
+		return r
+	}
 	if (path === '/api/media/refresh') return handleMediaRefresh(body, ctx)
 	if (path === '/api/media/cinf') {
 		const b = parseBody(body)
@@ -187,4 +203,4 @@ async function handlePost(path, body, ctx) {
 	return null
 }
 
-module.exports = { handleThumbnail, handleLocalMedia, handlePost, handleMediaRefresh }
+module.exports = { handleThumbnail, handleLocalMedia, handleDeleteLocalMedia, handlePost, handleMediaRefresh }

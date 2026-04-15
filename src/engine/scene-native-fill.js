@@ -148,7 +148,11 @@ function mapProgramPixelRectToTargetOutput(px, progW, progH, outW, outH) {
 /**
  * @returns {{ w: number, h: number }}
  */
-function getProgramAuthoringResolution(self, config, channel) {
+function getProgramAuthoringResolution(self, config, channel, incomingScene) {
+	const cc = incomingScene && incomingScene.composeCanvas
+	if (cc && cc.w > 0 && cc.h > 0) {
+		return { w: cc.w, h: cc.h }
+	}
 	const screenIdx = getScreenIndexForChannel(config, channel)
 	const cm = getMergedChannelMap(self)
 	const pr = cm?.programResolutions?.[screenIdx]
@@ -277,7 +281,8 @@ function calcMixerFill(ls, res, contentRes) {
 
 	if (stretch === 'none') {
 		if (cw && ch) {
-			return { x: nx, y: ny, xScale: cw / res.w, yScale: ch / res.h }
+			const fitScale = Math.min(lw / cw, lh / ch)
+			return { x: nx, y: ny, xScale: (cw * fitScale) / res.w, yScale: (ch * fitScale) / res.h }
 		}
 		return { x: nx, y: ny, xScale: lw / res.w, yScale: lh / res.h }
 	}
@@ -339,8 +344,8 @@ function resolveSceneLayerFill(layer, authoringW, authoringH, targetW, targetH, 
 	return { x: out.x, y: out.y, scaleX: out.xScale, scaleY: out.yScale }
 }
 
-async function getResolvedFillForSceneLayer(self, layer, channel) {
-	const { w: authW, h: authH } = getProgramAuthoringResolution(self, self?.config, channel)
+async function getResolvedFillForSceneLayer(self, layer, channel, incomingScene) {
+	const { w: authW, h: authH } = getProgramAuthoringResolution(self, self?.config, channel, incomingScene)
 	const { w: targetW, h: targetH } = getChannelResolutionForChannel(self?.config, channel, self)
 	const clip = clipPath(layer)
 	let mediaRes = getMediaResolutionFromSelf(self, clip)

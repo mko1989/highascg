@@ -44,6 +44,13 @@ function joinCasparMediaFile(dir, file) {
 	return path.posix.join(d.replace(/\\/g, '/'), file.replace(/\\/g, '/'))
 }
 
+/** Filename-safe local date/time (not UTC) — matches operator wall clock on the Caspar host. */
+function localDateTimeStampForFilename() {
+	const d = new Date()
+	const pad = (n, z = 2) => String(n).padStart(z, '0')
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}-${pad(d.getMilliseconds(), 3)}`
+}
+
 /**
  * Directory on the **CasparCG host** to write recordings into (same tree as CLS / media).
  * Override with env HIGHASCG_PGM_RECORD_DIR; otherwise INFO PATHS, then absolute media-path in INFO CONFIG, then config.local_media_path.
@@ -167,10 +174,12 @@ async function handlePost(body, ctx) {
 				}),
 			}
 		}
-		const base = `highascg_pgm_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`
-		const absPath = joinCasparMediaFile(dir, base)
+		const base = `HIGHASCG_PGM_${localDateTimeStampForFilename()}`
+		const fileName = `${base}.mp4`
+		const absPath = joinCasparMediaFile(dir, fileName)
 		const args = buildFfmpegArgs(crf)
-		const paramsAfterPath = `${param(absPath)} ${args}`
+		/* Path after FILE must include a known extension — ffmpeg picks muxer from it (see Caspar log: "use a standard extension"). */
+		const paramsAfterPath = `${param(fileName)} ${args}`
 		try {
 			const res = await ctx.amcp.basic.add(channel, 'FILE', paramsAfterPath, PGM_RECORD_CONSUMER_INDEX)
 			ctx.pgmRecord = { active: true, path: absPath, channel, mediaDir: dir }

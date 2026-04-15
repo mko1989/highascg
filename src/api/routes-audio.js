@@ -7,7 +7,7 @@
 
 const defaults = require('../../config/default')
 const { normalizeAudioRouting } = require('../config/config-generator')
-const { listAudioDevices } = require('../audio/audio-devices')
+const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -24,10 +24,18 @@ function apiLog(ctx, level, msg) {
  * @param {string} query
  */
 function handleGet(path, query) {
-	if (path !== '/api/audio/devices') return null
-	const refresh = query.refresh === '1' || query.refresh === 'true'
-	const data = listAudioDevices({ refresh })
-	return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	if (path === '/api/audio/devices') {
+		const refresh = query.refresh === '1' || query.refresh === 'true'
+		const data = listAudioDevices({ refresh })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	}
+	if (path === '/api/audio/portaudio-devices') {
+		const refresh = query.refresh === '1' || query.refresh === 'true'
+		const outputsOnly = query.outputsOnly !== '0' && query.outputsOnly !== 'false'
+		const data = listPortAudioDevices({ refresh, outputsOnly })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	}
+	return null
 }
 
 /**

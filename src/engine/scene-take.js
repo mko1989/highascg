@@ -161,7 +161,7 @@ async function runSceneTake(amcp, opts) {
 		const clip = clipPath(layer)
 		if (!clip) continue
 		const pLayer = phys(Number(layer.layerNumber), inactiveBank)
-		const f = await getResolvedFillForSceneLayer(self, layer, channel)
+		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const targetOp = layer.opacity ?? 1
 		const opStart = isFirstTake ? targetOp : 0
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
@@ -189,10 +189,10 @@ async function runSceneTake(amcp, opts) {
 	const loadLineCount = layerBatches.reduce((n, b) => n + b.buildLines.length, 0)
 	if (loadLineCount > 0) {
 		if (loadLineCount <= MAX_BATCH_COMMANDS) {
-			await amcp.batchSend(layerBatches.flatMap((b) => b.buildLines), { force: true })
+			await amcp.batchSend(layerBatches.flatMap((b) => b.buildLines))
 		} else {
 			for (const b of layerBatches) {
-				await amcp.batchSend(b.buildLines, { force: true })
+				await amcp.batchSend(b.buildLines)
 			}
 		}
 		for (const b of layerBatches) {
@@ -214,7 +214,7 @@ async function runSceneTake(amcp, opts) {
 			fixLines.push(mixerOpacityLine(channel, pIn, b.layer.opacity ?? 1, 0, undefined))
 		}
 		if (fixLines.length > 0) {
-			await amcp.batchSend(fixLines, { force: true })
+			await amcp.batchSend(fixLines)
 			await amcp.mixerCommit(channel)
 		}
 	}
@@ -233,7 +233,7 @@ async function runSceneTake(amcp, opts) {
 			crossfadeLines.push(mixerOpacityLine(channel, pIn, layer.opacity ?? 1, fadeDur, fadeTw))
 		}
 		if (crossfadeLines.length > 0) {
-			await amcp.batchSend(crossfadeLines, { force: true })
+			await amcp.batchSend(crossfadeLines)
 		}
 		await amcp.mixerCommit(channel)
 

@@ -8,6 +8,53 @@
 const playbackTracker = require('../state/playback-tracker')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
+const { mixerEffectNeutralLines } = require('./timeline-playback-helpers')
+const { buildPipOverlayAmcpLines, buildPipOverlayRemoveLines, sendPipOverlayLinesSerial } = require('./pip-overlay')
+
+/**
+ * Build raw AMCP mixer command lines for a single effect (WO-22).
+ * Server-side version — mirrors web/lib/effect-registry.js effectToAmcpLines().
+ * @param {string} type - Effect type key
+ * @param {object} params - Effect params
+ * @param {string} cl - "channel-layer" string (e.g. "1-10")
+ * @returns {string[]|null}
+ */
+function buildEffectAmcpLines(type, params, cl) {
+	const p = params || {}
+	switch (type) {
+		case 'blend_mode':
+			return [`MIXER ${cl} BLEND ${String(p.mode || 'Normal').toUpperCase()}`]
+		case 'brightness':
+			return [`MIXER ${cl} BRIGHTNESS ${p.value ?? 1} 0`]
+		case 'contrast':
+			return [`MIXER ${cl} CONTRAST ${p.value ?? 1} 0`]
+		case 'saturation':
+			return [`MIXER ${cl} SATURATION ${p.value ?? 1} 0`]
+		case 'levels':
+			return [`MIXER ${cl} LEVELS ${p.minIn ?? 0} ${p.maxIn ?? 1} ${p.gamma ?? 1} ${p.minOut ?? 0} ${p.maxOut ?? 1} 0`]
+		case 'chroma_key':
+			return [`MIXER ${cl} CHROMA ${p.key || 'None'} ${p.threshold ?? 0.34} ${p.softness ?? 0.44} ${p.spill ?? 1} ${p.blur ?? 0}`]
+		case 'crop':
+			return [`MIXER ${cl} CROP ${p.left ?? 0} ${p.top ?? 0} ${p.right ?? 1} ${p.bottom ?? 1} 0`]
+		case 'clip_mask':
+			return [`MIXER ${cl} CLIP ${p.left ?? 0} ${p.top ?? 0} ${p.width ?? 1} ${p.height ?? 1} 0`]
+		case 'perspective':
+			return [`MIXER ${cl} PERSPECTIVE ${p.ulX ?? 0} ${p.ulY ?? 0} ${p.urX ?? 1} ${p.urY ?? 0} ${p.lrX ?? 1} ${p.lrY ?? 1} ${p.llX ?? 0} ${p.llY ?? 1} 0`]
+		case 'grid':
+			return [`MIXER ${cl} GRID ${p.resolution ?? 2} 0`]
+		case 'keyer':
+			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
+		case 'rotation':
+			// Rotation is already handled by the base mixerLines (layer.rotation).
+			// Only apply if this effect's degrees differs from 0 (i.e. used as an additive effect).
+			return [`MIXER ${cl} ROTATION ${p.degrees ?? 0} 0`]
+		case 'anchor':
+			// Anchor is already handled by base mixerLines as ANCHOR 0 0; effect overrides it.
+			return [`MIXER ${cl} ANCHOR ${p.x ?? 0} ${p.y ?? 0} 0`]
+		default:
+			return null
+	}
+}
 
 function clipPath(layer) {
 	const v = layer.source && layer.source.value
@@ -46,6 +93,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		physicalProgramLayer,
 		normalizeProgramLayerBank,
 		layerVisuallyEqual,
+		resolveChannelFramerateForMixerTween,
 	} = require('./scene-transition')
 
 	const self = opts.self
@@ -72,6 +120,10 @@ async function runSceneTakeLbg(amcp, opts) {
 	const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
 	const phys = (sceneLn, bank) => physicalProgramLayer(sceneLn, bank)
 
+	const fadeWatcher = self.clipEndFadeWatcher || null
+	if (fadeWatcher) fadeWatcher.cancelChannel(channel)
+
+	const framerate = resolveChannelFramerateForMixerTween(self, channel, opts.framerate)
 	const incomingSorted = [...layersWithContent].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 
 	for (const layer of incomingSorted) {
@@ -85,7 +137,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		if (layerVisuallyEqual(cur, layer)) continue
 
 		const pLayer = phys(Number(layer.layerNumber), activeBank)
-		const f = await getResolvedFillForSceneLayer(self, layer, channel)
+		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const cl = chLayerAmcp(channel, pLayer)
 		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
 
@@ -104,7 +156,9 @@ async function runSceneTakeLbg(amcp, opts) {
 
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
 		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
+		// Reset WO-22 mixer transforms that persist on the layer (crop, color, etc.); omitted effects must not linger.
 		const mixerLines = [
+			...mixerEffectNeutralLines(cl),
 			`MIXER ${cl} ANCHOR 0 0`,
 			`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`,
 			`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0`,
@@ -112,7 +166,16 @@ async function runSceneTakeLbg(amcp, opts) {
 			`MIXER ${cl} KEYER ${keyer}`,
 			`MIXER ${cl} VOLUME ${vol}`,
 		]
-		await amcp.batchSend(mixerLines, { force: true })
+
+		// Append mixer effect commands from layer.effects[] (WO-22)
+		if (Array.isArray(layer.effects)) {
+			for (const fx of layer.effects) {
+				const lines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
+				if (lines) mixerLines.push(...lines)
+			}
+		}
+
+		await amcp.batchSend(mixerLines)
 
 		const playOpts = {}
 		if (af) playOpts.audioFilter = af
@@ -122,9 +185,45 @@ async function runSceneTakeLbg(amcp, opts) {
 		await amcp.play(channel, pLayer, undefined, playOpts)
 		await amcp.mixerCommit(channel)
 
+		// PIP overlay: apply HTML template on overlay layer (WO-25)
+		if (layer.pipOverlay?.type) {
+			try {
+				const overlayLines = buildPipOverlayAmcpLines(layer.pipOverlay, channel, pLayer, f, self)
+				if (overlayLines.length > 0) {
+					await sendPipOverlayLinesSerial(amcp, overlayLines)
+					await amcp.mixerCommit(channel)
+				}
+			} catch (e) {
+				self.log?.('warn', `PIP overlay layer ${pLayer}: ${e?.message || e}`)
+			}
+		} else {
+			// No overlay requested — clear any leftover from previous take
+			try {
+				const removeLines = buildPipOverlayRemoveLines(channel, pLayer)
+				await sendPipOverlayLinesSerial(amcp, removeLines)
+			} catch (_) {}
+		}
+
 		try {
 			playbackTracker.recordPlay(self, channel, pLayer, clip, { loop: !!layer.loop })
 		} catch (_) {}
+
+		// WO-25: schedule fade-out before clip end (duration from CLS/CINF/cache, else ffprobe on media disk path)
+		const foe = layer.fadeOnEnd
+		if (fadeWatcher && foe?.enabled && !layer.loop) {
+			let durationMs = playbackTracker.resolveClipDurationMs(self, clip)
+			if (!durationMs || durationMs <= 0) {
+				durationMs = await playbackTracker.resolveClipDurationMsWithDiskProbe(self, clip)
+			}
+			if (durationMs && durationMs > 0) {
+				fadeWatcher.schedule(channel, pLayer, durationMs, foe.frames || 12, framerate)
+			} else if (self.log) {
+				self.log(
+					'warn',
+					`[ClipEndFade] no duration for "${String(clip).slice(0, 80)}" — fade-on-end skipped (CINF + cache + state media + disk probe all missed; check Caspar id vs library)`,
+				)
+			}
+		}
 	}
 
 	for (const layer of diff.exit) {
@@ -132,6 +231,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		const t = String(layer.source?.type || '')
 		if (t === 'timeline') continue
 		const pOut = phys(Number(layer.layerNumber), activeBank)
+		if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
 		try {
 			await amcp.stop(channel, pOut)
 			try {
@@ -140,6 +240,11 @@ async function runSceneTakeLbg(amcp, opts) {
 		} catch (_) {}
 		try {
 			await amcp.mixerClear(channel, pOut)
+		} catch (_) {}
+		// Clean up PIP overlay layer if it existed (WO-25)
+		try {
+			const removeLines = buildPipOverlayRemoveLines(channel, pOut)
+			await sendPipOverlayLinesSerial(amcp, removeLines)
 		} catch (_) {}
 	}
 	await amcp.mixerCommit(channel)

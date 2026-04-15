@@ -54,8 +54,10 @@ export function calcMixerFill(ls, res, contentRes) {
 	const contentAR = cw && ch ? cw / ch : 16 / 9
 
 	if (stretch === 'none') {
+		/* Native: preserve aspect ratio but scale with the layer box (same as "fit" when resolution is known). */
 		if (cw && ch) {
-			return { x: nx, y: ny, xScale: cw / res.w, yScale: ch / res.h }
+			const fitScale = Math.min(lw / cw, lh / ch)
+			return { x: nx, y: ny, xScale: (cw * fitScale) / res.w, yScale: (ch * fitScale) / res.h }
 		}
 		return { x: nx, y: ny, xScale: lw / res.w, yScale: lh / res.h }
 	}
@@ -219,10 +221,18 @@ export function mapContentFitToStretch(layer) {
 
 /**
  * MIXER FILL for scene preview / AMCP: layer rectangle + content fit (fit / fill-h / fill-v / stretch).
- * Normalized fill is relative to the **program** compose canvas; `targetOutputCanvas` is the channel
- * receiving the command (usually PRV — map into that pixel space when it differs from program).
+ * Normalized fill is relative to the **compose** canvas (see sceneState.getCanvasForScreen).
+ * `authoringCanvas` should match that; if omitted, channelMap program resolution is used (legacy).
+ * `targetOutputCanvas` is the channel receiving the command (e.g. PRV — map into that pixel space when it differs).
  */
-export async function resolveLayerFillForAmcp(layer, stateStore, screenIdx, targetOutputCanvas, fetchMediaList) {
+export async function resolveLayerFillForAmcp(
+	layer,
+	stateStore,
+	screenIdx,
+	targetOutputCanvas,
+	fetchMediaList,
+	authoringCanvas = null
+) {
 	const raw = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const f = {
 		x: raw.x ?? 0,
@@ -245,11 +255,13 @@ export async function resolveLayerFillForAmcp(layer, stateStore, screenIdx, targ
 	const prog = cm.programResolutions?.[s]
 	const progW = prog?.w > 0 ? prog.w : 1920
 	const progH = prog?.h > 0 ? prog.h : 1080
+	const authW = authoringCanvas?.width > 0 ? authoringCanvas.width : progW
+	const authH = authoringCanvas?.height > 0 ? authoringCanvas.height : progH
 	const outW = targetOutputCanvas?.width > 0 ? targetOutputCanvas.width : progW
 	const outH = targetOutputCanvas?.height > 0 ? targetOutputCanvas.height : progH
 
-	const px = fillToPixelRect(f, { width: progW, height: progH })
-	const mapped = mapProgramPixelRectToTargetOutput(px, progW, progH, outW, outH)
+	const px = fillToPixelRect(f, { width: authW, height: authH })
+	const mapped = mapProgramPixelRectToTargetOutput(px, authW, authH, outW, outH)
 	const ls = { x: mapped.x, y: mapped.y, w: mapped.w, h: mapped.h, stretch: stretchMode }
 	const out = calcMixerFill(ls, { w: outW, h: outH }, contentRes)
 	return { x: out.x, y: out.y, scaleX: out.xScale, scaleY: out.yScale }

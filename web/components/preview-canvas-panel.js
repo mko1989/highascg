@@ -2,6 +2,63 @@ import { initLiveView, initDualComposeLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 
+/** Space between PRV and PGM (px); drag handle sits here. */
+const COMPOSE_GUTTER_PX = 6
+/** Live→offline: border fades out before the pair is hidden. */
+const COMPOSE_BORDER_FADE_MS = 400
+
+/**
+ * Size the PRV+PGM pair so each cell can match program output aspect (two W×H cells side-by-side or stacked).
+ * @param {number} w
+ * @param {number} h
+ * @param {'lr'|'tb'} layout
+ * @param {number} cw
+ * @param {number} ch
+ */
+function fitComposePairRect(w, h, layout, cw, ch) {
+	const w2 = Math.max(1, w)
+	const h2 = Math.max(1, h)
+	const cw2 = Math.max(1, cw)
+	const ch2 = Math.max(1, ch)
+	if (layout === 'lr') {
+		const ar = (2 * w2) / h2
+		let fitW = cw2
+		let fitH = fitW / ar
+		if (fitH > ch2) {
+			fitH = ch2
+			fitW = fitH * ar
+		}
+		return { fitW: Math.round(fitW), fitH: Math.round(Math.max(64, fitH)) }
+	}
+	const ar = w2 / (2 * h2)
+	let fitW = cw2
+	let fitH = fitW / ar
+	if (fitH > ch2) {
+		fitH = ch2
+		fitW = fitH * ar
+	}
+	return { fitW: Math.round(Math.max(64, fitW)), fitH: Math.round(fitH) }
+}
+
+/**
+ * Logical size of each PRV/PGM cell in the same units as program ww×hh so canvas bitmap aspect
+ * matches the on-screen cell when the gutter split is not 50/50.
+ */
+function composeCellLogicalDimensions(layout, ww, hh, fitW, fitH, prvSize, pgmSize) {
+	const ps = Math.max(1, prvSize)
+	const pgs = Math.max(1, pgmSize)
+	if (layout === 'lr') {
+		return {
+			prv: { w: ww, h: ww * (fitH / ps) },
+			pgm: { w: ww, h: ww * (fitH / pgs) },
+		}
+	}
+	return {
+		prv: { w: hh * (fitW / ps), h: hh },
+		pgm: { w: hh * (fitW / pgs), h: hh },
+	}
+}
+
 /**
  * @param {HTMLElement} host
  * @param {object} options
@@ -33,11 +90,19 @@ export function initPreviewPanel(host, options) {
 	const kCollapsed = `${storageKeyPrefix}_collapsed`
 	const kHeight = `${storageKeyPrefix}_height`
 	const kComposeLayout = `${storageKeyPrefix}_compose_prv_pgm_layout`
+	const kPrvPgmSplit = `${storageKeyPrefix}_compose_prv_pgm_split`
 
 	let composePrvPgmLayout = 'lr'
 	try {
 		const v = localStorage.getItem(kComposeLayout)
 		if (v === 'tb' || v === 'lr') composePrvPgmLayout = v
+	} catch {}
+
+	/** Fraction of PRV+PGM inner span (excluding gutter) for PRV: ~0.15–0.85 */
+	let prvPct = 0.5
+	try {
+		const p = parseFloat(localStorage.getItem(kPrvPgmSplit) || '')
+		if (!Number.isNaN(p) && p >= 0.15 && p <= 0.85) prvPct = p
 	} catch {}
 
 	let collapsed = false
@@ -61,12 +126,14 @@ export function initPreviewPanel(host, options) {
 				<div class="preview-panel__compose-pair ${composePairClass}">
 					<div class="preview-panel__compose-cell preview-panel__compose-cell--prv">
 						<div class="preview-panel__video-container" data-preview-webrtc="prv"></div>
+						<canvas class="preview-panel__canvas preview-panel__canvas--compose-cell" data-compose-canvas="prv" aria-hidden="true"></canvas>
 					</div>
+					<div class="preview-panel__compose-gutter" title="Drag to resize PRV vs PGM" aria-hidden="true"></div>
 					<div class="preview-panel__compose-cell preview-panel__compose-cell--pgm">
 						<div class="preview-panel__video-container" data-preview-webrtc="pgm"></div>
+						<canvas class="preview-panel__canvas preview-panel__canvas--compose-cell" data-compose-canvas="pgm" aria-hidden="true"></canvas>
 					</div>
 				</div>
-				<canvas class="preview-panel__canvas preview-panel__canvas--compose-overlay" aria-hidden="true"></canvas>
 			</div>
 		`
 		: `
@@ -141,7 +208,9 @@ export function initPreviewPanel(host, options) {
 		resizeHandle.style.display = 'none'
 	}
 	const wrap = root.querySelector('.preview-panel__canvas-wrap')
+	const canvasOuter = root.querySelector('.preview-panel__canvas-outer')
 	const composePairEl = composePrvPgmLayoutToggle ? root.querySelector('.preview-panel__compose-pair') : null
+	const composeGutter = composePrvPgmLayoutToggle ? root.querySelector('.preview-panel__compose-gutter') : null
 	const prvVideoContainer = composePrvPgmLayoutToggle
 		? root.querySelector('.preview-panel__video-container[data-preview-webrtc="prv"]')
 		: null
@@ -149,8 +218,12 @@ export function initPreviewPanel(host, options) {
 		? root.querySelector('.preview-panel__video-container[data-preview-webrtc="pgm"]')
 		: null
 	const videoContainer = composePrvPgmLayoutToggle ? null : root.querySelector('.preview-panel__video-container')
-	const canvas = root.querySelector('.preview-panel__canvas')
-	const ctx = canvas.getContext('2d', { alpha: true })
+	const canvasPrv = composePrvPgmLayoutToggle ? root.querySelector('[data-compose-canvas="prv"]') : null
+	const canvasPgm = composePrvPgmLayoutToggle ? root.querySelector('[data-compose-canvas="pgm"]') : null
+	const canvas = composePrvPgmLayoutToggle ? null : root.querySelector('.preview-panel__canvas')
+	const ctxPrv = canvasPrv ? canvasPrv.getContext('2d', { alpha: true }) : null
+	const ctxPgm = canvasPgm ? canvasPgm.getContext('2d', { alpha: true }) : null
+	const ctx = canvas ? canvas.getContext('2d', { alpha: true }) : null
 
 	if (composePrvPgmLayoutToggle) {
 		syncComposeLayoutPair()
@@ -160,6 +233,8 @@ export function initPreviewPanel(host, options) {
 
 	let rafDraw = null
 	let ro = null
+	let prevComposeStreamLive = false
+	let composeOfflineDelayTimer = null
 
 	function scheduleDraw() {
 		if (rafDraw != null) return
@@ -177,24 +252,161 @@ export function initPreviewPanel(host, options) {
 		if (resEl) resEl.textContent = `${ww}×${hh}`
 
 		const dpr = Math.min(window.devicePixelRatio || 1, 2)
-		/* Full wrap size: overlay canvas is a sibling of compose-pair, not a third flex child */
 		const sizeHost = wrap
-		const cw = sizeHost.clientWidth || 320
-		const ch = sizeHost.clientHeight || 160
-		const scale = Math.min(cw / ww, ch / hh, 1) || 1
+		let cw = sizeHost.clientWidth
+		let ch = sizeHost.clientHeight
+		if (canvasOuter && (cw < 16 || ch < 16)) {
+			cw = Math.max(cw, canvasOuter.clientWidth)
+			ch = Math.max(ch, canvasOuter.clientHeight)
+		}
+		if (composePrvPgmLayoutToggle && fillParentHeight && (ch < 8 || cw < 8)) {
+			requestAnimationFrame(() => scheduleDraw())
+			return
+		}
+		if (!cw) cw = 320
+		if (!ch) ch = 160
+		const scale = Math.min(cw / ww, ch / hh) || 1
 		const dispW = Math.floor(ww * scale)
 		const dispH = Math.floor(hh * scale)
-		canvas.style.width = `${dispW}px`
-		canvas.style.height = `${dispH}px`
-		canvas.width = Math.round(ww * dpr)
-		canvas.height = Math.round(hh * dpr)
-		ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-		
+
 		const isLive = !!(streamName && shouldShowLiveVideo())
-		const meta = composePrvPgmLayoutToggle
-			? { composePrvPgmLayout, composeDualStreamPreview: true }
-			: {}
-		draw(ctx, ww, hh, isLive, meta)
+
+		if (!composePrvPgmLayoutToggle) {
+			canvas.width = Math.round(ww * dpr)
+			canvas.height = Math.round(hh * dpr)
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+			canvas.style.width = `${dispW}px`
+			canvas.style.height = `${dispH}px`
+			draw(ctx, ww, hh, isLive, {})
+			return
+		}
+
+		/* Dual PRV/PGM: one canvas per cell; stream on/off timing (offline class + border fade). */
+		if (isLive) {
+			if (composeOfflineDelayTimer != null) {
+				clearTimeout(composeOfflineDelayTimer)
+				composeOfflineDelayTimer = null
+			}
+			root.classList.remove('preview-panel--compose-offline')
+			root.classList.remove('preview-panel--compose-border-fade-out')
+			prevComposeStreamLive = true
+		} else {
+			if (prevComposeStreamLive) {
+				root.classList.remove('preview-panel--compose-offline')
+				root.classList.add('preview-panel--compose-border-fade-out')
+				composeOfflineDelayTimer = setTimeout(() => {
+					root.classList.add('preview-panel--compose-offline')
+					root.classList.remove('preview-panel--compose-border-fade-out')
+					composeOfflineDelayTimer = null
+					scheduleDraw()
+				}, COMPOSE_BORDER_FADE_MS)
+			} else if (composeOfflineDelayTimer == null) {
+				root.classList.add('preview-panel--compose-offline')
+			}
+			prevComposeStreamLive = false
+		}
+
+		const prvCell = root.querySelector('.preview-panel__compose-cell--prv')
+		const pgmCell = root.querySelector('.preview-panel__compose-cell--pgm')
+		const g = COMPOSE_GUTTER_PX
+		let fitW = 0
+		let fitH = 0
+		let prvSize = 0
+		let pgmSize = 0
+		if (prvCell && pgmCell && composePairEl) {
+			const fit = fitComposePairRect(ww, hh, composePrvPgmLayout, cw, ch)
+			fitW = fit.fitW
+			fitH = fit.fitH
+			composePairEl.style.width = `${fitW}px`
+			composePairEl.style.height = `${fitH}px`
+			composePairEl.style.flexShrink = '0'
+			composePairEl.style.alignSelf = 'center'
+			composePairEl.style.maxWidth = '100%'
+			composePairEl.style.maxHeight = '100%'
+
+			const inner = Math.max(0, (composePrvPgmLayout === 'lr' ? fitW : fitH) - g)
+			prvSize = inner > 0 ? Math.floor(inner * prvPct) : 0
+			if (inner >= 64) {
+				prvSize = Math.max(32, Math.min(inner - 32, prvSize))
+			} else if (inner > 0) {
+				prvSize = Math.max(1, Math.min(inner - 1, prvSize))
+			}
+			pgmSize = inner - prvSize
+
+			if (composePrvPgmLayout === 'tb') {
+				prvCell.style.cssText = `flex:0 0 ${prvSize}px;height:${prvSize}px;min-height:0;width:100%;max-width:100%`
+				pgmCell.style.cssText = `flex:0 0 ${pgmSize}px;height:${pgmSize}px;min-height:0;width:100%;max-width:100%`
+			} else {
+				prvCell.style.cssText = `flex:0 0 ${prvSize}px;width:${prvSize}px;min-width:0;max-width:${prvSize}px;height:100%;align-self:stretch`
+				pgmCell.style.cssText = `flex:0 0 ${pgmSize}px;width:${pgmSize}px;min-width:0;max-width:${pgmSize}px;height:100%;align-self:stretch`
+			}
+		}
+
+		const layout = composePrvPgmLayout === 'tb' ? 'tb' : 'lr'
+		let prvVp = { w: layout === 'lr' ? ww / 2 : ww, h: layout === 'tb' ? hh / 2 : hh }
+		let pgmVp = { w: layout === 'lr' ? ww / 2 : ww, h: layout === 'tb' ? hh / 2 : hh }
+		if (fitW > 0 && fitH > 0 && prvSize > 0 && pgmSize > 0) {
+			const dim = composeCellLogicalDimensions(layout, ww, hh, fitW, fitH, prvSize, pgmSize)
+			prvVp = dim.prv
+			pgmVp = dim.pgm
+		}
+
+		canvasPrv.width = Math.max(1, Math.round(prvVp.w * dpr))
+		canvasPrv.height = Math.max(1, Math.round(prvVp.h * dpr))
+		ctxPrv.setTransform(dpr, 0, 0, dpr, 0, 0)
+		canvasPgm.width = Math.max(1, Math.round(pgmVp.w * dpr))
+		canvasPgm.height = Math.max(1, Math.round(pgmVp.h * dpr))
+		ctxPgm.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+		canvasPrv.style.width = '100%'
+		canvasPrv.style.height = '100%'
+		canvasPgm.style.width = '100%'
+		canvasPgm.style.height = '100%'
+
+		const meta = {
+			composePrvPgmLayout,
+			composeDualStreamPreview: isLive,
+			composePrvPgmLayoutToggle: true,
+		}
+		draw(ctxPrv, ww, hh, isLive, { ...meta, composeCell: 'prv', composeCellViewport: prvVp })
+		draw(ctxPgm, ww, hh, isLive, { ...meta, composeCell: 'pgm', composeCellViewport: pgmVp })
+	}
+
+	if (composePrvPgmLayoutToggle && composeGutter) {
+		composeGutter.addEventListener('mousedown', (e) => {
+			if (e.button !== 0 || collapsed) return
+			e.preventDefault()
+			const onMove = (ev) => {
+				if (!composePairEl) return
+				const r = composePairEl.getBoundingClientRect()
+				let next
+				if (composePrvPgmLayout === 'lr') {
+					next = (ev.clientX - r.left) / r.width
+				} else {
+					next = (r.bottom - ev.clientY) / r.height
+				}
+				next = Math.max(0.15, Math.min(0.85, next))
+				if (Math.abs(next - prvPct) > 1e-6) {
+					prvPct = next
+					try {
+						localStorage.setItem(kPrvPgmSplit, String(prvPct))
+					} catch {
+						/* ignore */
+					}
+					scheduleDraw()
+				}
+			}
+			const onUp = () => {
+				document.removeEventListener('mousemove', onMove)
+				document.removeEventListener('mouseup', onUp)
+				document.body.style.cursor = ''
+				document.body.style.userSelect = ''
+			}
+			document.body.style.cursor = composePrvPgmLayout === 'lr' ? 'col-resize' : 'row-resize'
+			document.body.style.userSelect = 'none'
+			document.addEventListener('mousemove', onMove)
+			document.addEventListener('mouseup', onUp)
+		})
 	}
 
 	let liveView = null
@@ -299,6 +511,7 @@ export function initPreviewPanel(host, options) {
 	if (typeof ResizeObserver !== 'undefined') {
 		ro = new ResizeObserver(() => scheduleDraw())
 		ro.observe(wrap)
+		if (canvasOuter) ro.observe(canvasOuter)
 	}
 	window.addEventListener('resize', scheduleDraw)
 
@@ -327,6 +540,10 @@ export function initPreviewPanel(host, options) {
 		scheduleDraw,
 		destroy() {
 			if (rafDraw != null) cancelAnimationFrame(rafDraw)
+			if (composeOfflineDelayTimer != null) {
+				clearTimeout(composeOfflineDelayTimer)
+				composeOfflineDelayTimer = null
+			}
 			if (ro) ro.disconnect()
 			window.removeEventListener('resize', scheduleDraw)
 			if (unsubState) unsubState()

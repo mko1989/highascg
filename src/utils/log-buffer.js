@@ -5,6 +5,8 @@ const _lines = []
 const DEFAULT_MAX = 4000
 
 let _maxLines = DEFAULT_MAX
+/** @type {((line: string) => void) | null} */
+let _onNewLine = null
 
 /**
  * @param {number} [n]
@@ -15,12 +17,28 @@ function setMaxLines(n) {
 }
 
 /**
+ * Register a callback invoked synchronously for every new line appended.
+ * Used to push log lines to WebSocket clients in real time.
+ * @param {((line: string) => void) | null} fn
+ */
+function setOnNewLine(fn) {
+	_onNewLine = typeof fn === 'function' ? fn : null
+}
+
+/**
  * @param {string} line
  */
 function appendHighasLine(line) {
 	if (typeof line !== 'string' || !line) return
 	_lines.push(line)
 	while (_lines.length > _maxLines) _lines.shift()
+	if (_onNewLine) {
+		try {
+			_onNewLine(line)
+		} catch (_) {
+			/* non-fatal */
+		}
+	}
 }
 
 function clearHighasLines() {
@@ -41,4 +59,5 @@ module.exports = {
 	clearHighasLines,
 	getHighasLines,
 	setMaxLines,
+	setOnNewLine,
 }

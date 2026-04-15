@@ -44,11 +44,11 @@ async function handlePost(path, body, ctx) {
 				}
 			}
 			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
-			/** One Caspar BEGIN…COMMIT per chunk — avoids N sequential round-trips when amcp_batch is off in config. */
+			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT only when config.amcp_batch is true. */
 			let last = null
 			for (let i = 0; i < lines.length; i += MAX_BATCH_COMMANDS) {
 				const chunk = lines.slice(i, i + MAX_BATCH_COMMANDS)
-				last = await amcp.batchSend(chunk, { force: chunk.length > 1 })
+				last = await amcp.batchSend(chunk)
 			}
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}

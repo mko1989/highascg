@@ -143,10 +143,22 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 								}))
 								.filter((x) => x.id)
 						: []
-					ctx.sceneDeck = { looks }
+					const prvRaw = msg.data.previewSceneId
+					const previewSceneId =
+						prvRaw != null && String(prvRaw).trim() ? String(prvRaw).trim() : null
+					/** Full scene JSON per look (browser-only until project Save) — for Companion take without disk project. */
+					const snapRaw = msg.data.sceneSnapshots
+					const sceneSnapshots = Array.isArray(snapRaw)
+						? snapRaw.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
+						: null
+					ctx.sceneDeck = {
+						looks,
+						previewSceneId,
+						...(sceneSnapshots && sceneSnapshots.length ? { sceneSnapshots } : {}),
+					}
 					const persistence = ctx.persistence || require('../utils/persistence')
 					try {
-						persistence.set('scene_deck', ctx.sceneDeck)
+						persistence.set('scene_deck', { looks, previewSceneId })
 					} catch (e) {
 						if (typeof ctx.log === 'function') ctx.log('warn', 'scene_deck persist: ' + (e?.message || e))
 					}

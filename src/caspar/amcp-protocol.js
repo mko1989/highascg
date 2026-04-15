@@ -35,6 +35,7 @@ const RETCODE2TYPE = swapObj(RETCODE)
  * @property {string|undefined} [_pendingResponseKey]
  * @property {{ onLine: (line: string) => void } | null | undefined} [_amcpBatchDrain]
  * @property {Promise<void>} [_amcpSendQueue]
+ * @property {(() => void) | undefined} [_resetAmcpProtocol]
  * @property {(() => void) | undefined} [runCommandQueue]
  * @property {{ amcp_batch?: boolean }} [config]
  * @property {(level: string, msg: string) => void} [log]
@@ -70,6 +71,12 @@ class AmcpProtocol {
 	}
 
 	/**
+	 * AMCP response keywords whose status lines are too high-frequency to be useful in the log.
+	 * Must stay in sync with {@link AmcpClient.QUIET_CMDS}.
+	 */
+	static QUIET_RESP = new Set(['CLS', 'TLS', 'THUMBNAIL', 'VERSION', 'DIAG'])
+
+	/**
 	 * @param {string} line - One AMCP line without trailing CRLF
 	 */
 	handleLine(line) {
@@ -91,6 +98,11 @@ class AmcpProtocol {
 			if (codeMatch && codeMatch.length > 1) {
 				if (codeMatch.length > 2) status = codeMatch[2]
 				const code = parseInt(codeMatch[1], 10)
+
+				// Log successful responses (errors are logged with detail inside the switch).
+				if (code < 400 && !AmcpProtocol.QUIET_RESP.has((status || '').toUpperCase())) {
+					this.log('debug', `AMCP ← ${line}`)
+				}
 
 				switch (code) {
 					case RETCODE.INVALID_CHANNEL:

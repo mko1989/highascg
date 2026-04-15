@@ -106,7 +106,7 @@ async function runFadeToBlackAllLayers(amcp, channels, opts, self) {
 			for (let i = 0; i < lines.length; i += MAX_BATCH_COMMANDS) {
 				const chunk = lines.slice(i, i + MAX_BATCH_COMMANDS)
 				try {
-					await amcp.batchSend(chunk, { force: true })
+					await amcp.batchSend(chunk)
 				} catch {
 					for (const line of chunk) {
 						try {

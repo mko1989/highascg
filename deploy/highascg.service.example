@@ -1,0 +1,27 @@
+# Copy to /etc/systemd/system/highascg.service and adjust paths/user.
+# After editing: sudo systemctl daemon-reload && sudo systemctl enable --now highascg
+#
+# Logs: journalctl -u highascg -f
+# Last errors: journalctl -u highascg -n 80 --no-pager
+
+[Unit]
+Description=HighAsCG Playout Control Server
+After=network.target
+
+[Service]
+Type=simple
+User=casparcg
+Group=casparcg
+WorkingDirectory=/opt/highascg
+ExecStart=/usr/bin/node /opt/highascg/index.js
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+# Optional: config outside the install tree
+# Environment=HIGHASCG_CONFIG_PATH=/etc/highascg/highascg.config.json
+
+# Hardening (optional)
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

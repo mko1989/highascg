@@ -24,5 +24,8 @@
 		"wetransfert": "^2.4.0",
 		"ws": "^8.18.0",
 		"xml2js": "^0.6.2"
+	},
+	"optionalDependencies": {
+		"naudiodon": "^2.3.6"
 	}
 }

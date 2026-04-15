@@ -39,6 +39,17 @@ class ConnectionManager extends EventEmitter {
 		this._log = options.log || ((level, msg) => level === 'error' && console.error(msg))
 		/** 0 = disable periodic VERSION (default; version still set once on connect + query cycle) */
 		this._healthIntervalMs = options.healthIntervalMs ?? 0
+		/**
+		 * Delay before the first `VERSION` after TCP connect (ms). Caspar often will not answer
+		 * `VERSION` for ~1s while the AMCP session settles after disconnect/reconnect (e.g. systemd restart).
+		 * 0 = previous behavior (immediate). Env: HIGHASCG_AMCP_CONNECT_SETTLE_MS (see index.js).
+		 */
+		this._healthConnectDelayMs =
+			typeof options.healthConnectDelayMs === 'number' &&
+			Number.isFinite(options.healthConnectDelayMs) &&
+			options.healthConnectDelayMs >= 0
+				? options.healthConnectDelayMs
+				: 600
 
 		this._tcp = new TcpClient({
 			host: this._host,
@@ -62,6 +73,9 @@ class ConnectionManager extends EventEmitter {
 		})
 
 		this._amcp = new AmcpClient(this._context)
+
+		/** After a send timeout, reset parser so late/partial multiline data cannot desync the next command. */
+		this._context._resetAmcpProtocol = () => this._protocol.reset()
 
 		/** @type {ReturnType<typeof setInterval> | null} */
 		this._healthTimer = null
@@ -119,11 +133,18 @@ class ConnectionManager extends EventEmitter {
 		const payload = { connected: true, host: this._host, port: this._port, at: Date.now() }
 		this.emit('status', payload)
 		this._startHealthTimer()
-		this._runHealthCheck().catch(() => {})
+		const d = this._healthConnectDelayMs
+		if (d > 0) {
+			setTimeout(() => this._runHealthCheck().catch(() => {}), d)
+		} else {
+			this._runHealthCheck().catch(() => {})
+		}
 	}
 
 	_handleDisconnected() {
 		this._clearHealthTimer()
+		rejectAllPendingAmcpCallbacks(this._context)
+		this._protocol.reset()
 		this.emit('status', { connected: false, host: this._host, port: this._port, at: Date.now() })
 	}
 

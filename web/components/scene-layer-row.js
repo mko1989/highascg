@@ -40,11 +40,17 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 			const canPaste = sceneState.hasLayerStyleClipboard()
 			row.innerHTML = `
 				<span class="scenes-layer-row__drag" draggable="true" title="Drag to change stack order (Z)" aria-grabbed="false" aria-label="Drag to reorder layer">⋮⋮</span>
-				<span class="scenes-layer-row__num">${l.layerNumber}</span>
-				<span class="scenes-layer-row__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-copy-style="${realIdx}" title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">⎘</button>
-				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋</button>
-				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">🗑</button>
+				<div class="scenes-layer-row__col">
+					<div class="scenes-layer-row__line1">
+						<span class="scenes-layer-row__num">${l.layerNumber}</span>
+						<span class="scenes-layer-row__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+					</div>
+					<div class="scenes-layer-row__line2">
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-copy-style="${realIdx}" title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">⎘</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">🗑</button>
+					</div>
+				</div>
 			`
 			const dragEl = row.querySelector('.scenes-layer-row__drag')
 			if (dragEl) {

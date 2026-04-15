@@ -4,6 +4,7 @@
 
 import { TRANSITION_TYPES, TRANSITION_TWEENS } from '../lib/dashboard-state.js'
 import { parseNumberInput } from '../lib/math-input.js'
+import { sceneState } from '../lib/scene-state.js'
 
 export function amcpParam(str) {
 	if (str == null || str === '') return ''
@@ -131,24 +132,40 @@ export function playSeekFramesForSceneLayerFromTimeline(timeline, layerIdx, posi
  * @param {{ timeline: object, positionMs: number }} [timelineSeekOpts] — when set, adds `playSeekFrames` per layer from the active timeline clip (same layer index).
  */
 export function buildIncomingScenePayload(scene, timelineSeekOpts) {
-	const layers = (scene.layers || []).map((l) => ({
-		layerNumber: l.layerNumber,
-		source: l.source
-			? {
-					type: l.source.type,
-					value: l.source.value,
-					...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
-				}
-			: null,
-		loop: !!l.loop,
-		straightAlpha: !!l.straightAlpha,
-		contentFit: l.contentFit || (l.fillNativeAspect === false ? 'stretch' : 'native'),
-		aspectLocked: l.aspectLocked !== false,
-		fill: l.fill ? { ...l.fill } : undefined,
-		opacity: l.opacity ?? 1,
-		rotation: l.rotation ?? 0,
-		transition: l.transition ? { ...l.transition } : null,
-	}))
+	const layers = (scene.layers || []).map((l) => {
+		const row = {
+			layerNumber: l.layerNumber,
+			source: l.source
+				? {
+						type: l.source.type,
+						value: l.source.value,
+						...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
+					}
+				: null,
+			loop: !!l.loop,
+			straightAlpha: !!l.straightAlpha,
+			contentFit: l.contentFit || (l.fillNativeAspect === false ? 'stretch' : 'native'),
+			aspectLocked: l.aspectLocked !== false,
+			fill: l.fill ? { ...l.fill } : undefined,
+			opacity: l.opacity ?? 1,
+			rotation: l.rotation ?? 0,
+			transition: l.transition ? { ...l.transition } : null,
+			audioRoute: l.audioRoute || '1+2',
+			muted: !!l.muted,
+			volume: l.volume != null ? l.volume : 1,
+			fadeOnEnd:
+				l.fadeOnEnd && typeof l.fadeOnEnd === 'object'
+					? { enabled: !!l.fadeOnEnd.enabled, frames: l.fadeOnEnd.frames ?? 12 }
+					: { enabled: false, frames: 12 },
+		}
+		if (Array.isArray(l.effects) && l.effects.length > 0) {
+			row.effects = JSON.parse(JSON.stringify(l.effects))
+		}
+		if (l.pipOverlay != null && typeof l.pipOverlay === 'object') {
+			row.pipOverlay = JSON.parse(JSON.stringify(l.pipOverlay))
+		}
+		return row
+	})
 
 	if (
 		timelineSeekOpts?.timeline &&
@@ -164,12 +181,15 @@ export function buildIncomingScenePayload(scene, timelineSeekOpts) {
 		}
 	}
 
+	const cv = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 	return {
 		id: scene.id,
 		name: scene.name || 'Untitled look',
 		defaultTransition: scene.defaultTransition
 			? { ...scene.defaultTransition }
 			: { type: 'CUT', duration: 0, tween: 'linear' },
+		/** Matches layer.fill normalization in the inspector (same as getCanvasForScreen). */
+		composeCanvas: { w: cv.width, h: cv.height },
 		layers,
 	}
 }

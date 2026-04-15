@@ -1,0 +1,113 @@
+/**
+ * Inspector effects, PIP overlay, buttons.
+ */
+
+/* ─── Inspector Effects ─── */
+.inspector-effects-group {
+	border-left: 2px solid rgba(139, 92, 246, 0.35);
+}
+.inspector-effects-dropzone {
+	padding: 10px 12px;
+	border: 1px dashed rgba(139, 92, 246, 0.4);
+	border-radius: 6px;
+	text-align: center;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	cursor: default;
+	transition: border-color 0.12s, background 0.12s, color 0.12s;
+	margin-bottom: 6px;
+}
+.inspector-effects-dropzone--active {
+	border-color: #a78bfa;
+	background: rgba(139, 92, 246, 0.08);
+	color: #a78bfa;
+}
+.inspector-effect-card {
+	background: rgba(139, 92, 246, 0.04);
+	border: 1px solid rgba(139, 92, 246, 0.18);
+	border-left: 3px solid rgba(139, 92, 246, 0.5);
+	border-radius: 4px;
+	padding: 6px 8px;
+	margin-bottom: 4px;
+}
+.inspector-effect-card__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	margin-bottom: 4px;
+}
+.inspector-effect-card__title {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text);
+}
+.inspector-effect-card__remove {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 0.85rem;
+	line-height: 1;
+	padding: 2px 4px;
+	border-radius: 3px;
+	transition: color 0.1s, background 0.1s;
+}
+.inspector-effect-card__remove:hover {
+	color: #f85149;
+	background: rgba(248, 81, 73, 0.12);
+}
+.inspector-effect-card__params {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.inspector-effect-card__params .inspector-field {
+	padding: 2px 0;
+}
+
+/* PIP overlay inspector (WO-25) */
+.inspector-pip-overlay-group {
+	border-top: 1px solid var(--border, #30363d);
+	padding-top: 8px;
+}
+.inspector-pip-overlay-params {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 4px;
+}
+.inspector-pip-overlay-params .inspector-field {
+	padding: 2px 0;
+}
+.inspector-field__color {
+	width: 28px;
+	height: 22px;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 3px;
+	padding: 0;
+	margin-left: 6px;
+	cursor: pointer;
+	background: transparent;
+	vertical-align: middle;
+}
+.inspector-btn {
+	display: inline-block;
+	padding: 4px 10px;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 4px;
+	background: var(--bg-2, #21262d);
+	color: var(--text, #c9d1d9);
+	font-size: 0.78rem;
+	cursor: pointer;
+	transition: background 0.12s, border-color 0.12s;
+}
+.inspector-btn:hover { background: var(--bg-3, #30363d); }
+.inspector-btn--danger {
+	color: #f85149;
+	border-color: rgba(248, 81, 73, 0.3);
+}
+.inspector-btn--danger:hover {
+	background: rgba(248, 81, 73, 0.12);
+	border-color: #f85149;
+}

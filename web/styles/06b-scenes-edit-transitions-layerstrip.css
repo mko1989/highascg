@@ -1,0 +1,187 @@
+/**
+ * Scene edit bar, transitions, layer strip.
+ */
+
+.scenes-edit-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--border);
+	flex-wrap: wrap;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.scenes-edit-name {
+	flex: 1;
+	min-width: 120px;
+	max-width: 280px;
+	padding: 6px 10px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.9rem;
+}
+
+.scenes-edit-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	gap: 12px;
+	padding: 12px;
+	align-items: flex-start;
+}
+
+.scenes-edit-body--stacked {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.scenes-edit-main {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	gap: 12px;
+	align-items: flex-start;
+	width: 100%;
+}
+
+.scenes-look-transition {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 14px;
+	padding: 10px 12px;
+	margin: -4px 0 4px;
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	font-size: 0.85rem;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.scenes-look-transition__label {
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-right: 4px;
+}
+
+.scenes-look-transition__select {
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 0.85rem;
+}
+
+.scenes-look-transition__dur {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.scenes-look-transition__dur span:first-child {
+	color: var(--text-muted);
+}
+
+.scenes-look-transition__num {
+	width: 64px;
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 0.85rem;
+}
+
+.scenes-look-transition__unit {
+	color: var(--text-muted);
+	font-size: 0.8rem;
+}
+
+.scenes-look-transition__hint {
+	flex: 1 1 200px;
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	line-height: 1.35;
+}
+
+.scenes-layer-strip {
+	width: 228px;
+	flex-shrink: 0;
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 8px;
+	max-height: min(70vh, 560px);
+	overflow: auto;
+}
+
+.scenes-layer-strip__title {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: 8px;
+}
+
+.scenes-layer-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+
+.scenes-layer-row__col {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.scenes-layer-row__line1 {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	min-width: 0;
+}
+
+.scenes-layer-row__line1 .scenes-layer-row__label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.82rem;
+}
+
+.scenes-layer-row__line2 {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+	padding-left: 2px;
+}
+
+.scenes-layer-row__line2 .scenes-btn {
+	font-size: 0.72rem;
+	min-width: 1.5rem;
+	padding: 2px 5px;
+}
+
+.scenes-layer-row:hover {
+	background: var(--bg-elevated);
+}
+
+.scenes-layer-row--selected {
+	outline: 1px solid var(--accent);
+	background: rgba(88, 166, 255, 0.08);
+}

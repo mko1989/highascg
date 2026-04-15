@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIP Edge Strip Overlay</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+		background-color: rgba(0,0,0,0) !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	.lane {
+		position: absolute;
+		overflow: hidden;
+	}
+	.lane--top { top: 0; left: 0; right: 0; height: var(--lane-top, var(--thick, 3px)); }
+	.lane--bottom { bottom: 0; left: 0; right: 0; height: var(--lane-bottom, var(--thick, 3px)); }
+	.lane--left { top: var(--lane-left-top, 0); left: 0; width: var(--lane-left-w, var(--thick, 3px)); height: var(--lane-left-h, 100%); }
+	.lane--right { top: var(--lane-right-top, 0); right: 0; width: var(--lane-right-w, var(--thick, 3px)); height: var(--lane-right-h, 100%); }
+	.pes-one {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	.pes-one svg {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+	.strip--h {
+		position: absolute;
+		top: 0;
+		height: 100%;
+		width: var(--slen, 28%);
+	}
+	.strip--v {
+		position: absolute;
+		left: 0;
+		width: 100%;
+		height: var(--slen, 28%);
+	}
+</style>
+<style id="pip-edge-strip-keyframes"></style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+	var root = document.getElementById('root')
+	var kfEl = document.getElementById('pip-edge-strip-keyframes')
+	var kfSeq = 0
+
+	var state = {
+		direction: 'cw',
+		count: 3,
+		thickness: 3,
+		color: '#e63946',
+		speed: 2,
+		length: 28,
+		glow: true,
+		glowColor: '#ff6b6b',
+		inner: null,
+	}
+
+	function clamp01(x) {
+		var n = Number(x)
+		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+	}
+
+	function readInner(d) {
+		if (!d || !d.inner || typeof d.inner !== 'object') return null
+		return { l: clamp01(d.inner.l), t: clamp01(d.inner.t), w: clamp01(d.inner.w), h: clamp01(d.inner.h) }
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		return inn.t > 1e-4 || inn.l > 1e-4 || inn.l + inn.w < 1 - 1e-4 || inn.t + inn.h < 1 - 1e-4
+	}
+
+	/** Same px outset as server outsetPxForPipOverlay edge_strip: max(1, thickness) */
+	function resolveEffectiveInner() {
+		var inn = state.inner
+		if (inn && hasMargin(inn)) return inn
+		var th = state.thickness || 3
+		var outp = Math.max(1, th)
+		var rw = Math.max(1, root.clientWidth)
+		var rh = Math.max(1, root.clientHeight)
+		var l = outp / rw
+		var t = outp / rh
+		var w = 1 - 2 * l
+		var h = 1 - 2 * t
+		if (!(w > 1e-6 && h > 1e-6)) return null
+		return { l: l, t: t, w: w, h: h }
+	}
+
+	function applyLaneLayout() {
+		var inn = resolveEffectiveInner()
+		if (!inn || !hasMargin(inn)) {
+			root.style.removeProperty('--lane-top')
+			root.style.removeProperty('--lane-bottom')
+			root.style.removeProperty('--lane-left-top')
+			root.style.removeProperty('--lane-left-w')
+			root.style.removeProperty('--lane-left-h')
+			root.style.removeProperty('--lane-right-top')
+			root.style.removeProperty('--lane-right-w')
+			root.style.removeProperty('--lane-right-h')
+			return
+		}
+		root.style.setProperty('--il', String(inn.l))
+		root.style.setProperty('--it', String(inn.t))
+		root.style.setProperty('--iw', String(inn.w))
+		root.style.setProperty('--ih', String(inn.h))
+		root.style.setProperty('--lane-top', 'calc(var(--it) * 100%)')
+		root.style.setProperty('--lane-bottom', 'calc((1 - var(--it) - var(--ih)) * 100%)')
+		root.style.setProperty('--lane-left-top', 'calc(var(--it) * 100%)')
+		root.style.setProperty('--lane-left-w', 'calc(var(--il) * 100%)')
+		root.style.setProperty('--lane-left-h', 'calc(var(--ih) * 100%)')
+		root.style.setProperty('--lane-right-top', 'calc(var(--it) * 100%)')
+		root.style.setProperty('--lane-right-w', 'calc((1 - var(--il) - var(--iw)) * 100%)')
+		root.style.setProperty('--lane-right-h', 'calc(var(--ih) * 100%)')
+	}
+
+	function injectKeyframes(edge, cw) {
+		var L = state.length
+		var name = 'pes_' + (++kfSeq)
+		var css = ''
+		if (edge === 'top') {
+			if (cw) css = '@keyframes ' + name + ' { from { left: -' + L + '%; } to { left: 100%; } }'
+			else css = '@keyframes ' + name + ' { from { left: 100%; } to { left: -' + L + '%; } }'
+		} else if (edge === 'bottom') {
+			if (cw) css = '@keyframes ' + name + ' { from { left: 100%; } to { left: -' + L + '%; } }'
+			else css = '@keyframes ' + name + ' { from { left: -' + L + '%; } to { left: 100%; } }'
+		} else if (edge === 'right') {
+			if (cw) css = '@keyframes ' + name + ' { from { top: -' + L + '%; } to { top: 100%; } }'
+			else css = '@keyframes ' + name + ' { from { top: 100%; } to { top: -' + L + '%; } }'
+		} else {
+			if (cw) css = '@keyframes ' + name + ' { from { top: 100%; } to { top: -' + L + '%; } }'
+			else css = '@keyframes ' + name + ' { from { top: -' + L + '%; } to { top: 100%; } }'
+		}
+		kfEl.textContent += css + '\n'
+		return name
+	}
+
+	function render() {
+		root.innerHTML = ''
+		kfEl.textContent = ''
+		kfSeq = 0
+
+		applyLaneLayout()
+
+		var cw = state.direction !== 'ccw'
+		root.style.setProperty('--thick', state.thickness + 'px')
+		root.style.setProperty('--slen', state.length + '%')
+
+		var dur = Math.max(0.1, state.speed)
+		var n = Math.max(1, Math.min(12, Math.round(Number(state.count))))
+
+		if (n === 1) {
+			var th = Math.max(1, Math.min(64, state.thickness))
+			var sw = Math.max(0.12, Math.min(2.4, th / 4.2))
+			var L = Math.max(2, Math.min(98, state.length))
+			var gap = Math.max(2, 100 - L)
+			var name = 'pes_one_' + (++kfSeq)
+			var offEnd = cw ? '-100' : '100'
+			kfEl.textContent =
+				'@keyframes ' + name + ' { from { stroke-dashoffset: 0; } to { stroke-dashoffset: ' + offEnd + '; } }\n'
+
+			var wrap = document.createElement('div')
+			wrap.className = 'pes-one'
+			var NS = 'http://www.w3.org/2000/svg'
+			var svg = document.createElementNS(NS, 'svg')
+			svg.setAttribute('viewBox', '0 0 100 100')
+			svg.setAttribute('preserveAspectRatio', 'none')
+			var layerG = document.createElementNS(NS, 'g')
+
+			function addStrokeRect(stroke, width, opacity) {
+				var r = document.createElementNS(NS, 'rect')
+				r.setAttribute('x', '0')
+				r.setAttribute('y', '0')
+				r.setAttribute('width', '100')
+				r.setAttribute('height', '100')
+				r.setAttribute('fill', 'none')
+				r.setAttribute('stroke', stroke)
+				r.setAttribute('stroke-width', String(width))
+				if (opacity != null && opacity < 1) r.setAttribute('opacity', String(opacity))
+				r.setAttribute('pathLength', '100')
+				r.setAttribute('stroke-linecap', 'butt')
+				r.setAttribute('stroke-linejoin', 'round')
+				r.setAttribute('stroke-dasharray', L + ' ' + gap)
+				r.setAttribute('stroke-dashoffset', '0')
+				r.style.animation = name + ' ' + dur + 's linear infinite'
+				return r
+			}
+
+			if (state.glow) {
+				var glowR = addStrokeRect(state.glowColor, sw * 3.2, 0.4)
+				var gblur = Math.max(2, sw * 6)
+				glowR.style.filter = 'drop-shadow(0 0 ' + gblur + 'px ' + state.glowColor + ')'
+				layerG.appendChild(glowR)
+			}
+			layerG.appendChild(addStrokeRect(state.color, sw, 1))
+
+			svg.appendChild(layerG)
+			wrap.appendChild(svg)
+			root.appendChild(wrap)
+			return
+		}
+
+		var edges = ['top', 'right', 'bottom', 'left']
+
+		for (var e = 0; e < edges.length; e++) {
+			var edge = edges[e]
+			var lane = document.createElement('div')
+			lane.className = 'lane lane--' + edge
+			var isH = edge === 'top' || edge === 'bottom'
+			var anim = injectKeyframes(edge, cw)
+
+			/* Symmetric glow — directional offsets looked like two separate shadows and doubled at lane corners. */
+			var th = Math.max(1, state.thickness || 3)
+			var blur = Math.max(2, Math.round(th * 3))
+			var spread = Math.max(0, Math.round(th * 0.35))
+			var gc = state.glowColor
+			var glowShadow = state.glow ? '0 0 ' + blur + 'px ' + spread + 'px ' + gc : ''
+			for (var i = 0; i < n; i++) {
+				var s = document.createElement('div')
+				s.className = isH ? 'strip--h' : 'strip--v'
+				s.style.background = state.color
+				if (glowShadow) s.style.boxShadow = glowShadow
+				s.style.animation = anim + ' ' + dur + 's linear infinite'
+				s.style.animationDelay = (-(i / n) * dur).toFixed(3) + 's'
+				lane.appendChild(s)
+			}
+			root.appendChild(lane)
+		}
+	}
+
+	function scheduleRender() {
+		if (typeof requestAnimationFrame === 'function') {
+			requestAnimationFrame(function () { render() })
+		} else {
+			setTimeout(render, 0)
+		}
+	}
+
+	if (typeof ResizeObserver !== 'undefined') {
+		try {
+			new ResizeObserver(scheduleRender).observe(root)
+		} catch (err) {}
+	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (!d) return
+			if (d.direction != null) state.direction = String(d.direction) === 'ccw' ? 'ccw' : 'cw'
+			if (d.count != null) state.count = Math.round(parseFloat(d.count)) || 3
+			if (d.thickness != null) state.thickness = parseFloat(d.thickness) || 3
+			if (d.color != null) state.color = String(d.color)
+			if (d.speed != null) state.speed = parseFloat(d.speed) || 2
+			if (d.length != null) state.length = parseFloat(d.length) || 28
+			if (d.glow != null) state.glow = !!d.glow
+			if (d.glowColor != null) state.glowColor = String(d.glowColor)
+			state.inner = readInner(d)
+			render()
+			scheduleRender()
+		} catch (e) { console.warn('pip_edge_strip update:', e) }
+	}
+
+	render()
+	scheduleRender()
+})()
+</script>
+</body>
+</html>

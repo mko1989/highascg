@@ -28,6 +28,9 @@ import { multiviewState } from './lib/multiview-state.js'
 import { dmxState } from './lib/dmx-state.js'
 import { initPixelMapEditor } from './components/pixel-map-editor.js'
 import { getVariableStore } from './lib/variable-state.js'
+import { projectState } from './lib/project-state.js'
+import { timelineState } from './lib/timeline-state.js'
+import { consumeSkipRemoteProjectSync } from './lib/project-remote-sync.js'
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()
@@ -278,13 +281,30 @@ async function init() {
 	ws.on('timeline.tick', (data) => stateStore.applyChange('timeline.tick', data))
 	ws.on('timeline.playback', (pb) => stateStore.applyChange('timeline.playback', pb))
 
+	ws.on('project_sync', (project) => {
+		if (!project || typeof project !== 'object' || project.error) return
+		if (!project.version) return
+		if (consumeSkipRemoteProjectSync()) return
+		try {
+			projectState.importProject(project, sceneState, timelineState, multiviewState, dashboardState)
+			window.dispatchEvent(new Event('project-loaded'))
+		} catch (e) {
+			console.warn('[HighAsCG] project_sync import failed:', e?.message || e)
+		}
+	})
+
 	/** Push look id/name list to server for Companion / GET /api/state (live; no project save required). */
 	function buildSceneDeckPayload() {
+		const prv = sceneState.previewSceneId
+		const scenes = Array.isArray(sceneState.scenes) ? sceneState.scenes : []
 		return {
-			looks: sceneState.scenes.map((s) => ({
+			looks: scenes.map((s) => ({
 				id: String(s.id),
 				name: String(s.name || 'Untitled look'),
 			})),
+			/** Full look payloads so Companion can POST /api/scene/take before the project is saved to disk/Caspar DATA. */
+			sceneSnapshots: scenes.map((s) => JSON.parse(JSON.stringify(s))),
+			...(prv ? { previewSceneId: String(prv) } : { previewSceneId: null }),
 		}
 	}
 	let sceneDeckSyncTimer = null
@@ -301,6 +321,7 @@ async function init() {
 	}
 	sceneState.on('change', scheduleSceneDeckSync)
 	sceneState.on('imported', scheduleSceneDeckSync)
+	sceneState.on('previewScene', scheduleSceneDeckSync)
 
 	ws.on('connect', () => {
 		updateConnectionStatus(true, null, true)
@@ -439,6 +460,19 @@ async function init() {
 			updateConnectionStatus(true)
 			refreshStatusLine()
 			refreshCasparConnectionEye()
+		}
+
+		/* Same project for every browser tab / machine: server disk + Caspar DATA mirror */
+		if (!settings?.offline_mode) {
+			try {
+				const proj = await api.get('/api/project')
+				if (proj && typeof proj === 'object' && proj.version && !proj.error) {
+					projectState.importProject(proj, sceneState, timelineState, multiviewState, dashboardState)
+					window.dispatchEvent(new Event('project-loaded'))
+				}
+			} catch {
+				/* 404 = no project saved yet */
+			}
 		}
 		/* settingsState.notify() above already triggers streamState.refreshStreams via subscribe */
 		window.dispatchEvent(new CustomEvent('highascg-bootstrap-complete'))

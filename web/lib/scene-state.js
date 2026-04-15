@@ -3,62 +3,18 @@
  * @see docs/scene-system-plan.md
  */
 
-import { fullFill } from './fill-math.js'
+import {
+	defaultTransition,
+	defaultLayerConfig,
+	migrateScene,
+	newId,
+	defaultFill,
+} from './scene-state-helpers.js'
+
+export { defaultTransition, previewChannelLayerForSceneLayer, defaultLayerConfig } from './scene-state-helpers.js'
 
 const STORAGE_KEY = 'casparcg_scenes_v1'
 const FALLBACK_RESOLUTION = { w: 1920, h: 1080, fps: 50 }
-
-/** @returns {import('./fill-math.js').FillLike} */
-function defaultFill() {
-	return { ...fullFill() }
-}
-
-/** @returns {object} */
-export function defaultTransition() {
-	// MIX + frames ≈ fade to program when taking a look (Caspar load transition).
-	return { type: 'MIX', duration: 12, tween: 'linear' }
-}
-
-/**
- * @returns {import('./scene-state.js').LayerConfig}
- */
-/**
- * PRV uses the same Caspar layer numbers as PGM (layer 9 = black CG; content uses scene layerNumber).
- * @param {import('./scene-state.js').Scene | null | undefined} scene
- * @param {number} layerIndex
- */
-export function previewChannelLayerForSceneLayer(scene, layerIndex) {
-	const L = scene?.layers?.[layerIndex]
-	return L?.layerNumber ?? 10
-}
-
-export function defaultLayerConfig(layerNumber) {
-	return {
-		layerNumber,
-		source: null,
-		loop: false,
-		/** Output bus stereo pair — same options as timeline clip inspector. */
-		audioRoute: '1+2',
-		/** 0–1; use with {@link muted} */
-		volume: 1,
-		muted: false,
-		/** Straight alpha: MIXER KEYER on layer (PNG/ProRes with alpha, etc.) */
-		straightAlpha: false,
-		/** 'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch' — how media fits the layer rect (see layer inspector). */
-		contentFit: 'native',
-		/** When true (default), changing W or H in the inspector keeps content aspect (from media resolution when known). */
-		aspectLocked: true,
-		fill: defaultFill(),
-		opacity: 1,
-		rotation: 0,
-		transition: null,
-	}
-}
-
-function newId() {
-	if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-	return `sc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-}
 
 export class SceneState {
 	constructor() {
@@ -118,7 +74,7 @@ export class SceneState {
 			if (raw) {
 				const data = JSON.parse(raw)
 				if (Array.isArray(data.scenes)) {
-					this.scenes = data.scenes.map((s) => this._migrateScene(s))
+					this.scenes = data.scenes.map((s) => migrateScene(s))
 					this.liveSceneId = data.liveSceneId ?? null
 					this.previewSceneId = data.previewSceneId ?? null
 					this.activeScreenIndex = typeof data.activeScreenIndex === 'number' ? data.activeScreenIndex : 0
@@ -135,31 +91,6 @@ export class SceneState {
 		this.scenes = []
 		this.liveSceneId = null
 		this.previewSceneId = null
-	}
-
-	_migrateScene(s) {
-		const id = s.id || newId()
-		const layers = Array.isArray(s.layers)
-			? s.layers.map((l, i) => {
-					const base = {
-						...defaultLayerConfig(l.layerNumber ?? 10 + i),
-						...l,
-						fill: { ...defaultFill(), ...(l.fill || {}) },
-						transition: l.transition ?? null,
-					}
-					if (base.contentFit == null) {
-						base.contentFit = l.fillNativeAspect === false ? 'stretch' : 'native'
-					}
-					if (base.aspectLocked == null) base.aspectLocked = true
-					return base
-				})
-			: []
-		return {
-			id,
-			name: s.name || 'Untitled look',
-			layers,
-			defaultTransition: { ...defaultTransition(), ...(s.defaultTransition || {}) },
-		}
 	}
 
 	_persist() {
@@ -250,7 +181,7 @@ export class SceneState {
 	duplicateScene(id) {
 		const s = this.getScene(id)
 		if (!s) return null
-		const dupe = this._migrateScene({
+		const dupe = migrateScene({
 			id: newId(),
 			name: this._uniqueNameForDuplicate(s.name),
 			layers: JSON.parse(JSON.stringify(s.layers || [])),
@@ -285,6 +216,8 @@ export class SceneState {
 			contentFit: l.contentFit,
 			aspectLocked: l.aspectLocked,
 			transition: l.transition ? { ...l.transition } : null,
+			fadeOnEnd: l.fadeOnEnd ? { ...l.fadeOnEnd } : { enabled: false, frames: 12 },
+			pipOverlay: l.pipOverlay ? JSON.parse(JSON.stringify(l.pipOverlay)) : null,
 		}
 		return true
 	}
@@ -311,6 +244,8 @@ export class SceneState {
 		if (c.contentFit != null) L.contentFit = c.contentFit
 		if (c.aspectLocked != null) L.aspectLocked = c.aspectLocked
 		L.transition = c.transition
+		if (c.fadeOnEnd) L.fadeOnEnd = { ...c.fadeOnEnd }
+		if (c.pipOverlay !== undefined) L.pipOverlay = c.pipOverlay ? JSON.parse(JSON.stringify(c.pipOverlay)) : null
 		this._softSave()
 		return true
 	}
@@ -378,7 +313,9 @@ export class SceneState {
 	}
 
 	getScene(id) {
-		return this.scenes.find((s) => s.id === id) || null
+		if (id == null) return null
+		const key = String(id)
+		return this.scenes.find((s) => String(s.id) === key) || null
 	}
 
 	setEditingScene(id) {
@@ -449,7 +386,8 @@ export class SceneState {
 		if (!s || !s.layers[layerIndex]) return
 		const L = s.layers[layerIndex]
 		if (patch.fill) L.fill = { ...L.fill, ...patch.fill }
-		const { fill, startBehaviour, ...rest } = patch
+		if (patch.fadeOnEnd) L.fadeOnEnd = { ...(L.fadeOnEnd || { enabled: false, frames: 12 }), ...patch.fadeOnEnd }
+		const { fill, fadeOnEnd, startBehaviour, ...rest } = patch
 		Object.assign(L, rest)
 		if ('startBehaviour' in patch) {
 			if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour
@@ -494,7 +432,7 @@ export class SceneState {
 
 	loadFromData(data) {
 		if (!data || !Array.isArray(data.scenes)) return
-		this.scenes = data.scenes.map((s) => this._migrateScene(s))
+		this.scenes = data.scenes.map((s) => migrateScene(s))
 		this.liveSceneId = data.liveSceneId ?? null
 		this.previewSceneId = data.previewSceneId ?? null
 		this.activeScreenIndex = typeof data.activeScreenIndex === 'number' ? data.activeScreenIndex : 0

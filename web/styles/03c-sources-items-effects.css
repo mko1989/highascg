@@ -1,0 +1,247 @@
+/**
+ * Source list rows, media compact, effects tab.
+ */
+
+.source-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--bg-elevated);
+	border: 1px solid transparent;
+	border-radius: var(--radius);
+	font-size: 0.85rem;
+	cursor: pointer;
+	transition: border-color 0.15s, background 0.15s;
+}
+
+.source-item:hover {
+	background: var(--bg-dark);
+	border-color: var(--border);
+}
+/* Compact media rows: hover without border flash (border stays transparent) */
+.source-item--media-compact:hover {
+	border-color: transparent;
+	background: rgba(88, 166, 255, 0.07);
+}
+
+.source-item:hover .source-item__preview {
+	opacity: 1;
+}
+
+.source-item.dragging {
+	opacity: 0.5;
+	cursor: grabbing;
+}
+
+.source-item.draggable {
+	cursor: grab;
+}
+
+.source-item--previewing {
+	border-color: var(--success) !important;
+	background: rgba(63, 185, 80, 0.1) !important;
+}
+
+.source-item__icon {
+	font-size: 1rem;
+	flex-shrink: 0;
+}
+
+.source-item__label {
+	flex: 1;
+	min-width: 0; /* allow shrink for ellipsis */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.source-item__meta {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: 0.72rem;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Media meta columns — ext | res | codec | dur | size; tight for label readability */
+.source-item__meta--cols {
+	display: flex;
+	gap: 4px;
+	margin-left: auto;
+	flex-shrink: 0;
+}
+.source-item__meta--cols .source-item__meta-ext { min-width: 20px; text-align: right; }
+.source-item__meta--cols .source-item__meta-res { min-width: 44px; text-align: right; }
+.source-item__meta--cols .source-item__meta-codec { min-width: 28px; text-align: right; }
+.source-item__meta--cols .source-item__meta-dur { min-width: 32px; text-align: right; }
+.source-item__meta--cols .source-item__meta-size { min-width: 28px; text-align: right; }
+
+/* Media rows — two lines: name + duration | resolution + fps */
+.source-item--media-compact {
+	padding: 4px 6px;
+	font-size: 0.75rem;
+	gap: 6px;
+	display: flex;
+	align-items: flex-start;
+}
+.source-item__media-col {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.source-item__media-line1 {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	min-width: 0;
+}
+.source-item__duration {
+	flex-shrink: 0;
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+.source-item__media-line2 {
+	font-size: 0.62rem;
+	color: var(--text-muted);
+	line-height: 1.25;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.02em;
+}
+.source-item__kind-pill {
+	flex-shrink: 0;
+	min-width: 1.75rem;
+	padding: 1px 4px;
+	text-align: center;
+	font-size: 0.58rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	line-height: 1.2;
+	border-radius: 3px;
+	border: 1px solid var(--border);
+	background: var(--bg-elevated);
+	color: var(--text-muted);
+}
+.source-item--kind-video .source-item__kind-pill {
+	color: #58a6ff;
+	border-color: rgba(88, 166, 255, 0.45);
+}
+.source-item--kind-still .source-item__kind-pill {
+	color: #d2a8ff;
+	border-color: rgba(210, 168, 255, 0.4);
+}
+.source-item--kind-audio .source-item__kind-pill {
+	color: #3fb950;
+	border-color: rgba(63, 185, 80, 0.45);
+}
+.source-item--kind-unknown .source-item__kind-pill {
+	color: var(--text-muted);
+}
+.source-item--media-compact .source-item__label {
+	font-size: 0.78rem;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+}
+.source-item__meta-inline {
+	font-size: 0.62rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	flex-shrink: 0;
+	margin-left: 8px;
+	letter-spacing: 0.02em;
+	font-variant-numeric: tabular-nums;
+}
+.sources-media-list .source-item--media-compact + .source-item--media-compact { margin-top: 0; }
+
+.source-item__preview {
+	flex-shrink: 0;
+	padding: 2px 6px;
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 3px;
+	color: var(--text-muted);
+	font-size: 0.65rem;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.1s, color 0.1s;
+}
+
+.source-item__preview:hover {
+	color: var(--success);
+	border-color: var(--success);
+}
+
+.sources-empty {
+	color: var(--text-muted);
+	font-size: 0.85rem;
+	margin: 12px 0 0;
+}
+
+/* Media browser — detailed list (Explorer/Finder style) */
+.sources-list.sources-media-list {
+	padding: 0;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+/* ─── Effects tab ─── */
+.sources-effects-category {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	padding: 10px 8px 4px;
+	font-weight: 700;
+}
+.sources-effects-category:first-child {
+	padding-top: 4px;
+}
+/* Live tab — two lines, no leading icon */
+.source-item--live-stacked {
+	align-items: flex-start;
+	padding: 6px 10px;
+}
+.source-item__live-col {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.source-item__live-line1 .source-item__label {
+	white-space: normal;
+	word-break: break-word;
+}
+.source-item__live-line2 {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+.source-item--effect {
+	border-left: 3px solid rgba(139, 92, 246, 0.55);
+	margin: 1px 0;
+	padding: 5px 8px;
+	gap: 6px;
+	background: rgba(139, 92, 246, 0.04);
+	transition: border-color 0.12s, background 0.12s;
+}
+.source-item--effect:hover {
+	border-left-color: #a78bfa;
+	background: rgba(139, 92, 246, 0.1);
+}
+.source-item--effect.dragging {
+	border-left-color: var(--accent);
+}
+.source-item__icon--effect {
+	font-size: 0.95rem;
+	min-width: 1.2rem;
+	text-align: center;
+}

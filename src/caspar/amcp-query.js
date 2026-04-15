@@ -35,17 +35,13 @@ class AmcpQuery {
 		return this._send(cmd, 'VERSION')
 	}
 
-	info() {
-		return this._send('INFO', 'INFO')
-	}
-
 	/**
 	 * @param {number|string} [channel]
 	 * @param {number|string} [layer]
 	 */
 	info(channel, layer) {
 		if (channel != null && channel !== '') return this.infoChannel(channel, layer)
-		return this.info()
+		return this._send('INFO', 'INFO')
 	}
 
 	infoChannel(channel, layer) {

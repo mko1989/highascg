@@ -98,7 +98,7 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 		}
 		if (lines.length === 0) continue
 		try {
-			await amcp.batchSend(lines, { force: true })
+			await amcp.batchSend(lines)
 			if (self) {
 				for (const L of chunk) {
 					try {

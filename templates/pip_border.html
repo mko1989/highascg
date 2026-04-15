@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIP Border Overlay</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+		background-color: rgba(0,0,0,0) !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	/* Chrome only in mat bands outside inner {l,t,w,h} — never box-shadow on a full-frame div (Caspar clips outward spread, so it paints on top of the picture). */
+	#chrome-margins {
+		display: none;
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	#chrome-margins .cm {
+		position: absolute;
+		background: var(--c, #e63946);
+		opacity: var(--o, 1);
+	}
+	#chrome-margins .cm-t { top: 0; left: 0; right: 0; height: calc(var(--it) * 100%); border-radius: var(--r, 0) var(--r, 0) 0 0; }
+	#chrome-margins .cm-b { bottom: 0; left: 0; right: 0; height: calc((1 - var(--it) - var(--ih)) * 100%); border-radius: 0 0 var(--r, 0) var(--r, 0); }
+	#chrome-margins .cm-l { left: 0; top: calc(var(--it) * 100%); width: calc(var(--il) * 100%); height: calc(var(--ih) * 100%); }
+	#chrome-margins .cm-r { right: 0; top: calc(var(--it) * 100%); width: calc((1 - var(--il) - var(--iw)) * 100%); height: calc(var(--ih) * 100%); }
+	.pip-edges { position: absolute; inset: 0; overflow: visible; }
+	.pip-edge {
+		position: absolute;
+		background: var(--c, #e63946);
+		opacity: var(--o, 1);
+	}
+	#root.pip-root--chrome .pip-edge-t { top: 0; left: 0; right: 0; height: calc(var(--it) * 100%); border-radius: var(--r, 0) var(--r, 0) 0 0; }
+	#root.pip-root--chrome .pip-edge-b { bottom: 0; left: 0; right: 0; height: calc((1 - var(--it) - var(--ih)) * 100%); border-radius: 0 0 var(--r, 0) var(--r, 0); }
+	#root.pip-root--chrome .pip-edge-l { left: 0; top: calc(var(--it) * 100%); width: calc(var(--il) * 100%); height: calc(var(--ih) * 100%); border-radius: var(--r, 0) 0 0 var(--r, 0); }
+	#root.pip-root--chrome .pip-edge-r { right: 0; top: calc(var(--it) * 100%); width: calc((1 - var(--il) - var(--iw)) * 100%); height: calc(var(--ih) * 100%); border-radius: 0 var(--r, 0) var(--r, 0) 0; }
+	.pip-edge.grad {
+		background: linear-gradient(135deg, var(--c, #e63946), var(--g, #457b9d));
+	}
+</style>
+</head>
+<body>
+<div id="root" class="">
+	<div id="chrome-margins">
+		<div class="cm cm-t"></div>
+		<div class="cm cm-b"></div>
+		<div class="cm cm-l"></div>
+		<div class="cm cm-r"></div>
+	</div>
+	<div class="pip-edges" id="edges" hidden>
+		<div class="pip-edge pip-edge-t"></div>
+		<div class="pip-edge pip-edge-b"></div>
+		<div class="pip-edge pip-edge-l"></div>
+		<div class="pip-edge pip-edge-r"></div>
+	</div>
+</div>
+<script>
+(function () {
+	var root = document.getElementById('root')
+	var chromeM = document.getElementById('chrome-margins')
+	var edges = document.getElementById('edges')
+	var edgeEls = edges.querySelectorAll('.pip-edge')
+	var state = {
+		width: 4,
+		color: '#e63946',
+		radius: 0,
+		opacity: 1,
+		style: 'solid',
+		gradientEnd: '#457b9d',
+		inner: null,
+	}
+
+	function clamp01(x) {
+		var n = Number(x)
+		if (!isFinite(n)) return 0
+		return Math.max(0, Math.min(1, n))
+	}
+
+	function readInner(d) {
+		if (!d || !d.inner || typeof d.inner !== 'object') return null
+		return {
+			l: clamp01(d.inner.l),
+			t: clamp01(d.inner.t),
+			w: clamp01(d.inner.w),
+			h: clamp01(d.inner.h),
+		}
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		return inn.t > 1e-4 || inn.l > 1e-4 || inn.l + inn.w < 1 - 1e-4 || inn.t + inn.h < 1 - 1e-4
+	}
+
+	/**
+	 * Prefer server inner (Hole over video in overlay-local 0–1). If missing or full-rect, derive
+	 * the same mat from border width (px) vs layer size so chrome stays outside the picture even when
+	 * CG JSON omits inner.
+	 */
+	function resolveEffectiveInner() {
+		var inn = state.inner
+		if (inn && hasMargin(inn)) return inn
+		var wp = Math.max(0, state.width)
+		if (wp <= 0) return null
+		var rw = Math.max(1, root.clientWidth)
+		var rh = Math.max(1, root.clientHeight)
+		var l = wp / rw
+		var t = wp / rh
+		var w = 1 - 2 * l
+		var h = 1 - 2 * t
+		if (!(w > 1e-6 && h > 1e-6)) return null
+		return { l: l, t: t, w: w, h: h }
+	}
+
+	function applyInnerCss(inn) {
+		if (!inn) return
+		root.style.setProperty('--il', String(inn.l))
+		root.style.setProperty('--it', String(inn.t))
+		root.style.setProperty('--iw', String(inn.w))
+		root.style.setProperty('--ih', String(inn.h))
+	}
+
+	function applyStyle() {
+		var st = state.style
+		var isGrad = st === 'gradient'
+		var isLine = st === 'dashed' || st === 'dotted'
+		var eff = resolveEffectiveInner()
+		var show = eff && hasMargin(eff) && state.width > 0
+
+		root.classList.toggle('pip-root--chrome', show)
+		applyInnerCss(eff)
+
+		for (var gi = 0; gi < edgeEls.length; gi++) {
+			edgeEls[gi].classList.remove('grad')
+		}
+
+		if (!show) {
+			chromeM.style.display = 'none'
+			edges.hidden = true
+			edges.style.display = 'none'
+			return
+		}
+
+		if (isGrad) {
+			chromeM.style.display = 'none'
+			edges.hidden = false
+			edges.style.display = 'block'
+			root.style.setProperty('--w', state.width + 'px')
+			root.style.setProperty('--c', state.color)
+			root.style.setProperty('--g', state.gradientEnd)
+			root.style.setProperty('--o', String(state.opacity))
+			root.style.setProperty('--r', state.radius + 'px')
+			for (var j = 0; j < edgeEls.length; j++) {
+				edgeEls[j].classList.add('grad')
+			}
+			return
+		}
+
+		edges.hidden = true
+		edges.style.display = 'none'
+
+		chromeM.style.display = 'block'
+		root.style.setProperty('--c', state.color)
+		root.style.setProperty('--o', String(state.opacity))
+		root.style.setProperty('--r', state.radius ? state.radius + 'px' : '0')
+		var wBorder = Math.max(0, state.width)
+		var cms = chromeM.querySelectorAll('.cm')
+		var a
+		for (a = 0; a < cms.length; a++) {
+			cms[a].style.boxShadow = 'none'
+			cms[a].style.outline = 'none'
+		}
+		if (st === 'double' && wBorder > 0) {
+			var innerL = Math.max(1, Math.floor(wBorder / 2.2))
+			for (a = 0; a < cms.length; a++) {
+				cms[a].style.background = 'transparent'
+				cms[a].style.boxShadow =
+					'inset 0 0 0 ' + innerL + 'px ' + state.color + ', inset 0 0 0 ' + wBorder + 'px ' + state.color
+			}
+		} else if ((st === 'solid' || !isLine) && wBorder >= 0) {
+			for (a = 0; a < cms.length; a++) {
+				cms[a].style.background = state.color
+			}
+		} else if (isLine && wBorder > 0) {
+			for (a = 0; a < cms.length; a++) {
+				cms[a].style.background = 'transparent'
+				cms[a].style.outline = wBorder + 'px ' + st + ' ' + state.color
+			}
+		}
+	}
+
+	function scheduleLayout() {
+		if (typeof requestAnimationFrame === 'function') {
+			requestAnimationFrame(function () { applyStyle() })
+		} else {
+			setTimeout(applyStyle, 0)
+		}
+	}
+
+	if (typeof ResizeObserver !== 'undefined') {
+		try {
+			new ResizeObserver(scheduleLayout).observe(root)
+		} catch (e) {}
+	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (!d) return
+			if (d.width != null) state.width = parseFloat(d.width) || 0
+			if (d.color != null) state.color = String(d.color)
+			if (d.radius != null) state.radius = parseFloat(d.radius) || 0
+			if (d.opacity != null) state.opacity = parseFloat(d.opacity)
+			if (d.style != null) state.style = String(d.style)
+			if (d.gradientEnd != null) state.gradientEnd = String(d.gradientEnd)
+			state.inner = readInner(d)
+			applyStyle()
+			scheduleLayout()
+		} catch (e) {
+			console.warn('pip_border update:', e)
+		}
+	}
+
+	applyStyle()
+	scheduleLayout()
+})()
+</script>
+</body>
+</html>

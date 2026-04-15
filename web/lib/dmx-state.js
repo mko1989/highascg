@@ -15,6 +15,8 @@ export class DmxState {
 		
 		// Map of fixtureId -> data (Array of 0-255 values)
 		this.liveColors = new Map()
+		/** Selected fixture in Pixel Map tab — drives main Inspector when tab is active */
+		this.selectedFixtureId = null
 		/** Debounce writes to disk/API — dragging fixtures must not save on every mousemove. */
 		this._saveDebounceMs = 450
 		this._saveTimer = null
@@ -25,6 +27,10 @@ export class DmxState {
 			this.enabled = !!d.enabled
 			this.debugLogDmx = !!d.debugLogDmx
 			this.fps = typeof d.fps === 'number' && d.fps > 0 ? d.fps : 25
+			if (this.selectedFixtureId && !this.getFixture(this.selectedFixtureId)) {
+				this.selectedFixtureId = null
+				this._emit('selection')
+			}
 			this._emit('change')
 		})
 	}
@@ -87,6 +93,7 @@ export class DmxState {
 		const idx = this.fixtures.findIndex(f => f.id === id)
 		if (idx >= 0) {
 			this.fixtures.splice(idx, 1)
+			if (this.selectedFixtureId === id) this.setSelectedFixtureId(null)
 			this._save()
 		}
 	}
@@ -175,6 +182,16 @@ export class DmxState {
 	setDebugLogDmx(v) {
 		this.debugLogDmx = !!v
 		this._save()
+	}
+
+	/**
+	 * @param {string | null} id
+	 */
+	setSelectedFixtureId(id) {
+		const next = id == null || id === '' ? null : String(id)
+		if (this.selectedFixtureId === next) return
+		this.selectedFixtureId = next
+		this._emit('selection')
 	}
 }
 

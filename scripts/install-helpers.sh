@@ -296,3 +296,57 @@ fetch_ndi_sdk_tarball() {
     fi
     return 0
 }
+
+# Copy CasparCG .deb CEF build into the system Chromium CEF layout (/usr/lib/cef/<ver>/…).
+# Otherwise the loader may pick generic distro CEF instead of the Caspar-patched libs.
+# Optional: HIGHASCG_CEF_TRIPLET (e.g. x86_64-linux-gnu) if uname-based guess is wrong.
+sync_caspar_cef_into_system() {
+    local caspar_src cef_ver triplet cef_sys f
+    caspar_src=$(ls -d /usr/lib/casparcg-cef-* 2>/dev/null | sort -V | tail -1)
+    if [ -z "$caspar_src" ] || [ ! -d "$caspar_src" ]; then
+        echo -e "  ${YELLOW}○${NC} No /usr/lib/casparcg-cef-* — skip CEF → system layout sync"
+        return 0
+    fi
+    cef_ver=$(basename "$caspar_src" | sed -n 's/^casparcg-cef-//p')
+    if [ -z "$cef_ver" ]; then
+        echo -e "  ${YELLOW}○${NC} Could not parse CEF version from $caspar_src — skip"
+        return 0
+    fi
+
+    triplet="${HIGHASCG_CEF_TRIPLET:-}"
+    if [ -z "$triplet" ]; then
+        case "$(uname -m)" in
+            x86_64) triplet="x86_64-linux-gnu" ;;
+            aarch64) triplet="aarch64-linux-gnu" ;;
+            *) triplet="$(uname -m)-linux-gnu" ;;
+        esac
+    fi
+
+    cef_sys="/usr/lib/cef/${cef_ver}/${triplet}"
+    if [ ! -d "$cef_sys" ] && [ -d "/usr/lib/cef/${cef_ver}" ]; then
+        cef_sys=$(find "/usr/lib/cef/${cef_ver}" -maxdepth 1 -type d -name '*linux-gnu' 2>/dev/null | head -1)
+    fi
+    if [ -z "$cef_sys" ] || [ ! -d "$cef_sys" ]; then
+        echo -e "  ${YELLOW}○${NC} No system CEF dir for Chromium ${cef_ver} (tried /usr/lib/cef/${cef_ver}/${triplet}) — skip CEF sync (install a package that provides /usr/lib/cef/…)"
+        return 0
+    fi
+
+    echo -e "${CYAN}→ Sync CasparCG-patched CEF into ${cef_sys}${NC}"
+    for f in libcef.so libEGL.so libGLESv2.so v8_context_snapshot.bin; do
+        if [ ! -f "${caspar_src}/${f}" ]; then
+            echo -e "  ${YELLOW}○${NC} Missing ${caspar_src}/${f} — skip this file"
+            continue
+        fi
+        if [ -f "${cef_sys}/${f}" ] && [ ! -f "${cef_sys}/${f}.bak" ]; then
+            cp -a "${cef_sys}/${f}" "${cef_sys}/${f}.bak"
+            echo -e "  ${GREEN}✓${NC} backed up ${f} → ${f}.bak"
+        fi
+        cp -a "${caspar_src}/${f}" "${cef_sys}/${f}"
+        echo -e "  ${GREEN}✓${NC} installed ${f}"
+    done
+    if command -v ldconfig >/dev/null 2>&1; then
+        ldconfig
+        echo -e "  ${GREEN}✓${NC} ldconfig"
+    fi
+    return 0
+}

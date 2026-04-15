@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIP Glow Overlay</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+		background-color: rgba(0,0,0,0) !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	/* Glow only in the mat — never a box-shadow on the inner (video) rect (bleeds onto picture when clipped). */
+	.gm {
+		position: absolute;
+		pointer-events: none;
+		opacity: var(--go, 1);
+		animation: glow-pulse 2s ease-in-out infinite alternate;
+	}
+	@keyframes glow-pulse {
+		0% { opacity: var(--gmin, 0.4); }
+		100% { opacity: var(--go, 1); }
+	}
+	.gm-t {
+		top: 0; left: 0; right: 0;
+		height: calc(var(--it) * 100%);
+		background: linear-gradient(to bottom, var(--gc), var(--g0));
+	}
+	.gm-b {
+		bottom: 0; left: 0; right: 0;
+		height: calc((1 - var(--it) - var(--ih)) * 100%);
+		background: linear-gradient(to top, var(--gc), var(--g0));
+	}
+	.gm-l {
+		left: 0; top: calc(var(--it) * 100%);
+		width: calc(var(--il) * 100%);
+		height: calc(var(--ih) * 100%);
+		background: linear-gradient(to right, var(--gc), var(--g0));
+	}
+	.gm-r {
+		right: 0; top: calc(var(--it) * 100%);
+		width: calc((1 - var(--il) - var(--iw)) * 100%);
+		height: calc(var(--ih) * 100%);
+		background: linear-gradient(to left, var(--gc), var(--g0));
+	}
+</style>
+</head>
+<body>
+<div id="root" style="visibility:hidden">
+	<div class="gm gm-t"></div>
+	<div class="gm gm-b"></div>
+	<div class="gm gm-l"></div>
+	<div class="gm gm-r"></div>
+</div>
+<script>
+(function () {
+	var root = document.getElementById('root')
+	var state = {
+		color: '#e63946',
+		intensity: 15,
+		pulse: true,
+		pulseSpeed: 2,
+		minOpacity: 0.4,
+		inner: null,
+	}
+
+	function clamp01(x) {
+		var n = Number(x)
+		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+	}
+
+	function readInner(d) {
+		if (!d || !d.inner || typeof d.inner !== 'object') return null
+		return { l: clamp01(d.inner.l), t: clamp01(d.inner.t), w: clamp01(d.inner.w), h: clamp01(d.inner.h) }
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		return inn.t > 1e-4 || inn.l > 1e-4 || inn.l + inn.w < 1 - 1e-4 || inn.t + inn.h < 1 - 1e-4
+	}
+
+	/** Match server outsetPxForPipOverlay glow: Math.max(6, intensity) */
+	function resolveEffectiveInner() {
+		var inn = state.inner
+		if (inn && hasMargin(inn)) return inn
+		var outp = Math.max(6, state.intensity || 15)
+		var rw = Math.max(1, root.clientWidth)
+		var rh = Math.max(1, root.clientHeight)
+		var l = outp / rw
+		var t = outp / rh
+		var w = 1 - 2 * l
+		var h = 1 - 2 * t
+		if (!(w > 1e-6 && h > 1e-6)) return null
+		return { l: l, t: t, w: w, h: h }
+	}
+
+	function colorToRgba(hex, a) {
+		var c = String(hex || '#e63946').trim()
+		if (c.indexOf('rgb') === 0) return c
+		var m = c.replace(/^#/, '')
+		if (m.length === 3) {
+			m = m[0] + m[0] + m[1] + m[1] + m[2] + m[2]
+		}
+		if (m.length !== 6) return 'rgba(230,57,70,' + a + ')'
+		var r = parseInt(m.slice(0, 2), 16)
+		var g = parseInt(m.slice(2, 4), 16)
+		var b = parseInt(m.slice(4, 6), 16)
+		return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')'
+	}
+
+	function apply() {
+		var eff = resolveEffectiveInner()
+		if (!eff || !hasMargin(eff) || state.intensity <= 0) {
+			root.style.visibility = 'hidden'
+			return
+		}
+		root.style.visibility = 'visible'
+		root.style.setProperty('--il', String(eff.l))
+		root.style.setProperty('--it', String(eff.t))
+		root.style.setProperty('--iw', String(eff.w))
+		root.style.setProperty('--ih', String(eff.h))
+
+		var peak = Math.min(0.95, 0.35 + state.intensity / 120)
+		var gc = colorToRgba(state.color, peak)
+		var g0 = colorToRgba(state.color, 0)
+		root.style.setProperty('--gc', gc)
+		root.style.setProperty('--g0', g0)
+		root.style.setProperty('--gmin', String(state.minOpacity))
+		root.style.setProperty('--go', '1')
+
+		var gms = root.querySelectorAll('.gm')
+		for (var i = 0; i < gms.length; i++) {
+			if (state.pulse) {
+				gms[i].style.animation = 'glow-pulse ' + state.pulseSpeed + 's ease-in-out infinite alternate'
+			} else {
+				gms[i].style.animation = 'none'
+			}
+		}
+	}
+
+	function scheduleLayout() {
+		if (typeof requestAnimationFrame === 'function') {
+			requestAnimationFrame(function () { apply() })
+		} else {
+			setTimeout(apply, 0)
+		}
+	}
+
+	if (typeof ResizeObserver !== 'undefined') {
+		try {
+			new ResizeObserver(scheduleLayout).observe(root)
+		} catch (e) {}
+	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (!d) return
+			if (d.color != null) state.color = String(d.color)
+			if (d.intensity != null) state.intensity = parseFloat(d.intensity) || 15
+			if (d.pulse != null) state.pulse = !!d.pulse
+			if (d.pulseSpeed != null) state.pulseSpeed = parseFloat(d.pulseSpeed) || 2
+			if (d.minOpacity != null) state.minOpacity = parseFloat(d.minOpacity)
+			state.inner = readInner(d)
+			apply()
+			scheduleLayout()
+		} catch (e) {
+			console.warn('pip_glow update:', e)
+		}
+	}
+
+	apply()
+	scheduleLayout()
+})()
+</script>
+</body>
+</html>

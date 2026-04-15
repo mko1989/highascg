@@ -7,6 +7,7 @@
 'use strict'
 
 import { api } from '../lib/api-client.js'
+import { postFormDataWithProgress } from '../lib/form-upload.js'
 
 const TARGET_STORAGE_KEY = 'highascg_publish_target'
 
@@ -59,6 +60,7 @@ export async function showPublishModal() {
 						<div class="progress-bar-wrap" style="margin: 8px 0 4px">
 							<div class="progress-bar" id="upload-progress-bar" style="width: 0%"></div>
 						</div>
+						<div id="upload-percent" class="publish-upload-percent" aria-live="polite"></div>
 						<div id="current-file" class="current-file-text"></div>
 					</div>
 					<div class="publish-step" id="step-apply" data-status="pending">
@@ -188,9 +190,11 @@ async function runPublishWorkflow(targetUrl, modal) {
 	const countTotal = requiredMedia.length
 	const countEl = modal.querySelector('#upload-count')
 	const barEl = modal.querySelector('#upload-progress-bar')
+	const pctEl = modal.querySelector('#upload-percent')
 	const currentFileEl = modal.querySelector('#current-file')
 	
 	if (countTotal === 0) {
+		if (pctEl) pctEl.textContent = ''
 		updateStep('upload', 'done', 'Media is already up to date')
 	} else {
 		for (let i = 0; i < countTotal; i++) {
@@ -200,6 +204,7 @@ async function runPublishWorkflow(targetUrl, modal) {
 			
 			const progress = (i / countTotal) * 100
 			barEl.style.width = `${progress}%`
+			if (pctEl) pctEl.textContent = `${Math.round(progress)}%`
 
 			// Fetch original file bits from LOCAL server to pipe to REMOTE server.
 			// Path is relative to CasparCG media folder.
@@ -214,16 +219,15 @@ async function runPublishWorkflow(targetUrl, modal) {
 			formData.append('file', blob, relPath) 
 			formData.append('path', pathDir(relPath)) // Folder segment
 
-			const upRes = await fetch(`${targetUrl}/api/ingest/upload`, {
-				method: 'POST',
-				body: formData
+			await postFormDataWithProgress(`${targetUrl}/api/ingest/upload`, formData, (loaded, total) => {
+				const fileFrac = total > 0 ? loaded / total : 0
+				const overall = ((i + fileFrac) / countTotal) * 100
+				barEl.style.width = `${Math.min(100, overall)}%`
+				if (pctEl) pctEl.textContent = total > 0 ? `${Math.round(overall)}%` : '…'
 			})
-			if (!upRes.ok) {
-				const upErr = await upRes.json().catch(() => ({}))
-				throw new Error(`Upload failed for ${relPath}: ${upErr.error || upRes.statusText}`)
-			}
 		}
 		barEl.style.width = '100%'
+		if (pctEl) pctEl.textContent = '100%'
 		currentFileEl.textContent = 'All assets uploaded'
 		updateStep('upload', 'done', `Synced ${countTotal} media files`)
 	}

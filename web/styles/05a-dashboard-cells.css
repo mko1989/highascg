@@ -1,0 +1,87 @@
+/**
+ * Dashboard grid cells, drag/drop, labels, clear.
+ */
+
+.dashboard-cell__live-info {
+	position: absolute;
+	top: 2px;
+	left: 4px;
+	right: 4px;
+	font-size: 10px;
+	font-weight: 600;
+	color: #fff;
+	text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+	z-index: 6;
+	pointer-events: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0.8;
+}
+
+.dashboard-cell__preview img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.dashboard-cell__preview-empty {
+	color: var(--text-muted);
+	font-size: 0.7rem;
+}
+
+.dashboard-cell__label {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.7rem;
+	margin-top: 4px;
+	color: var(--text-muted);
+}
+
+.dashboard-cell.dashboard-cell-drop.has-source .dashboard-cell__label {
+	color: var(--text);
+}
+
+.dashboard-cell.dashboard-cell-drop.drag-over {
+	border-color: var(--accent);
+	background: rgba(88, 166, 255, 0.1);
+}
+
+.dashboard-cell.dashboard-cell-drop.has-source {
+	background: var(--bg-elevated);
+}
+
+.dashboard-cell.dashboard-cell-drop.selected {
+	border-color: var(--accent);
+	box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.dashboard-cell__placeholder {
+	color: var(--text-muted);
+	font-size: 0.7rem;
+}
+
+.dashboard-cell__clear {
+	position: absolute;
+	top: 2px;
+	right: 4px;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: 50%;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.dashboard-cell__clear:hover {
+	background: var(--error);
+	color: white;
+	border-color: var(--error);
+}
+

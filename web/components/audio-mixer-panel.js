@@ -66,11 +66,6 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			<span class="audio-mixer__section-label">Program audio</span>
 		</button>
 		<div class="audio-mixer__panel" hidden>
-			<div class="audio-mixer__head">
-				<span class="audio-mixer__title">Program</span>
-				<p class="audio-mixer__hint">Faders: <code>MIXER MASTERVOLUME</code> on each program channel. Route each layer to a stereo pair (e.g. ch 1+2, 3+4) in the layer inspector.</p>
-				<p class="audio-mixer__hint">Meters: incoming level (dBFS) when OSC reports above ~−90 dBFS; silence or no OSC shows an empty bar. Fader sets Caspar MASTERVOLUME only.</p>
-			</div>
 			<div class="audio-mixer__buses"></div>
 		</div>
 	`
@@ -119,8 +114,8 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			const row = document.createElement('div')
 			row.className = 'audio-mixer__bus'
 			row.innerHTML = `
-				<div class="audio-mixer__bus-label">${escapeHtml(r.label)}</div>
-				<div class="audio-mixer__meter-col">
+				<div class="audio-mixer__meter-stack">
+					<div class="audio-mixer__bus-label">${escapeHtml(r.label)}</div>
 					<div class="audio-mixer__meter" aria-hidden="true"><div class="audio-mixer__meter-fill"></div></div>
 				</div>
 				<div class="audio-mixer__fader-col">

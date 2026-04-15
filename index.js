@@ -12,6 +12,7 @@ const { attachWebSocketServer } = require('./src/server/ws-server')
 const { routeRequest, getState } = require('./src/api/router')
 const persistence = require('./src/utils/persistence')
 const { TimelineEngine } = require('./src/engine/timeline-engine')
+const { ClipEndFadeWatcher } = require('./src/engine/clip-end-fade')
 const { ConnectionManager } = require('./src/caspar/connection-manager')
 const { normalizeOscConfig } = require('./src/osc/osc-config')
 const { OscState } = require('./src/osc/osc-state')
@@ -31,9 +32,11 @@ const {
 const { ConfigManager } = require('./src/config/config-manager')
 const { refreshConfigComparison } = require('./src/config/config-compare')
 const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-config')
-const { responseToStr } = require('./src/utils/query-cycle')
 const { SamplingManager } = require('./src/sampling/dmx-sampling')
 const { getChannelMap } = require('./src/config/routing')
+const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
+const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle')
+const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 
 {
 	const n = parseInt(process.env.HIGHASCG_LOG_BUFFER_LINES || '4000', 10)
@@ -90,6 +93,10 @@ function buildConfig(cli, configManager) {
 		cfg.streaming.autoRelocateBasePort = true
 	}
 
+	const batchEnv = process.env.HIGHASCG_AMCP_BATCH
+	if (batchEnv === '1' || String(batchEnv).toLowerCase() === 'true') cfg.amcp_batch = true
+	else if (batchEnv === '0' || String(batchEnv).toLowerCase() === 'false') cfg.amcp_batch = false
+
 	return cfg
 }
 
@@ -118,6 +125,11 @@ Environment:
   HIGHASCG_GO2RTC_PUSH_WAIT_MS  Max wait (ms) for go2rtc MPEG-TS producers after start (default 10000; 0=skip)
   HIGHASCG_GO2RTC_STOP_KILL_MS  SIGKILL go2rtc if still running after this many ms on stop (default 1000)
   HIGHASCG_STREAMING_RESTART_DELAY_MS  Pause between stop and start on preview restart (default 500)
+  HIGHASCG_AMCP_SEND_TIMEOUT_MS  Per-command AMCP timeout for short replies (default 15000)
+  HIGHASCG_AMCP_LONG_RESPONSE_MS  Timeout for INFO/CLS/TLS/thumbnail/CINF (default 120000)
+  HIGHASCG_AMCP_CONNECT_SETTLE_MS  Wait this long before first VERSION after TCP connect (default 600; 0 = immediate)
+  HIGHASCG_AMCP_HEALTH_MS  Periodic VERSION health probe in ms (default 0 = off; set e.g. 30000 to enable)
+  HIGHASCG_AMCP_BATCH      Set to 1 to enable AMCP BEGIN…COMMIT batching (default off; safer for Caspar stability)
 `)
 }
 
@@ -165,8 +177,14 @@ function main() {
 		persistedSceneDeck &&
 		typeof persistedSceneDeck === 'object' &&
 		Array.isArray(persistedSceneDeck.looks)
-			? { looks: persistedSceneDeck.looks }
-			: { looks: [] }
+			? {
+					looks: persistedSceneDeck.looks,
+					previewSceneId:
+						persistedSceneDeck.previewSceneId != null && String(persistedSceneDeck.previewSceneId).trim()
+							? String(persistedSceneDeck.previewSceneId).trim()
+							: null,
+				}
+			: { looks: [], previewSceneId: null }
 	const appCtx = {
 		config,
 		state,
@@ -208,42 +226,13 @@ function main() {
 		samplingManager: null,
 	}
 	appCtx.timelineEngine = new TimelineEngine(appCtx)
+	appCtx.clipEndFadeWatcher = new ClipEndFadeWatcher(appCtx)
 	appCtx.getState = () => getState(appCtx)
 	appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 	appCtx.refreshConfigComparison = refreshConfigComparison
 	appCtx.samplingManager = new SamplingManager(appCtx)
 
-	/** Debounce DMX refresh so INFO CONFIG + connect/save do not stop/start sampling twice in one burst. */
-	let dmxAfterInfoConfigTimer = null
-
-	async function fetchServerInfoConfigAndBroadcast() {
-		if (!appCtx.amcp?.query?.infoConfig) return
-		try {
-			const res = await appCtx.amcp.query.infoConfig()
-			const xmlStr = responseToStr(res?.data)
-			if (!xmlStr || !String(xmlStr).trim()) return
-			appCtx.gatheredInfo.infoConfig = xmlStr
-			try {
-				refreshConfigComparison(appCtx)
-			} catch (e) {
-				appCtx.log('debug', 'configComparison: ' + (e?.message || e))
-			}
-			if (typeof appCtx._wsBroadcast === 'function') {
-				appCtx._wsBroadcast('state', appCtx.getState())
-			}
-			if (appCtx.samplingManager && config.dmx?.enabled) {
-				clearTimeout(dmxAfterInfoConfigTimer)
-				dmxAfterInfoConfigTimer = setTimeout(() => {
-					appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
-						appCtx.log('error', '[DMX] Config refresh after INFO CONFIG: ' + (e?.message || e))
-					})
-				}, 650)
-			}
-			appCtx.log('info', '[Caspar] INFO CONFIG loaded — channel resolutions match running server')
-		} catch (e) {
-			appCtx.log('warn', 'INFO CONFIG: ' + (e?.message || e))
-		}
-	}
+	const fetchServerInfoConfigAndBroadcast = createFetchServerInfoConfigAndBroadcast({ appCtx, config })
 
 	// --- PHASE 1: SYSTEM VARIABLES ---
 	const startTime = Date.now()
@@ -256,193 +245,33 @@ function main() {
 	const systemVarsInterval = setInterval(updateSystemVariables, 5000)
 	updateSystemVariables()
 
-	/**
-	 * Map logical WebRTC names (pgm_1, prv_1, multiview) to real Caspar channels from screen/multiview layout.
-	 * Hardcoding 1/2/3 was wrong for multi-screen configs (e.g. multiview on ch 5, ch 3 = second PGM).
-	 */
-	function buildStreamingTargets(basePort) {
-		const cm = getChannelMap(config)
-		const targets = []
-		const pgmCh = cm.programChannels?.[0] ?? 1
-		const prvCh = cm.previewChannels?.[0] ?? 2
-		targets.push({ name: 'pgm_1', channel: pgmCh, port: basePort + 1 })
-		targets.push({ name: 'prv_1', channel: prvCh, port: basePort + 2 })
-		if (cm.multiviewCh != null) {
-			targets.push({ name: 'multiview', channel: cm.multiviewCh, port: basePort + 5 })
-		}
-		appCtx.log(
-			'info',
-			`[Streaming] targets: PGM ch${pgmCh}→${basePort + 1}, PRV ch${prvCh}→${basePort + 2}` +
-				(cm.multiviewCh != null ? `, MV ch${cm.multiviewCh}→${basePort + 5}` : ' (no multiview channel)')
-		)
-		return targets
-	}
-	/** Updated each `startStreamingSubsystem` (UDP tier may relocate base if ports are busy). */
-	let streamingTargets = buildStreamingTargets(config.streaming.basePort)
+	const {
+		stopStreamingSubsystem,
+		toggleStreaming,
+		restartStreaming,
+		handleCasparConnected,
+		handleConfigReload,
+	} = createStreamingLifecycle({
+		appCtx,
+		config,
+		logger,
+		getChannelMap,
+		go2rtcManager,
+		addStreamingConsumers,
+		removeStreamingConsumers,
+		resolveFreeStreamingBasePort,
+		prepareNdiStreaming,
+		resolveCaptureTier,
+	})
+	appCtx.toggleStreaming = toggleStreaming
+	appCtx.restartStreaming = restartStreaming
 
-	/** NDI only: Caspar must register NDI before go2rtc receive; if AMCP was down at start, restart go2rtc after first connect. */
-	let needGo2rtcRestartAfterCaspar = false
-
-	async function startStreamingSubsystem() {
-		appCtx.streamingPipelineReady = false
-		try {
-			config.streaming._casparHost = config.caspar.host
-			const tier = resolveCaptureTier(config.streaming.captureMode || 'udp', config.caspar.host)
-			appCtx.log(
-				'info',
-				`[Streaming] startStreamingSubsystem tier=${tier} caspar=${config.caspar.host} amcpConnected=${!!appCtx.amcp?.isConnected}`
-			)
-
-			if (tier === 'udp') {
-				const r = await resolveFreeStreamingBasePort(config.streaming.basePort, {
-					autoRelocate: config.streaming.autoRelocateBasePort !== false,
-					maxScan: 500,
-					log: (level, msg) => appCtx.log(level, msg),
-				})
-				config.streaming._effectiveBasePort = r.basePort
-				streamingTargets = buildStreamingTargets(r.basePort)
-			} else {
-				delete config.streaming._effectiveBasePort
-				streamingTargets = buildStreamingTargets(config.streaming.basePort)
-			}
-
-			if (tier === 'ndi') prepareNdiStreaming(config.streaming, streamingTargets)
-
-			if (tier === 'ndi') {
-				if (appCtx.amcp?.isConnected) {
-					await addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-					needGo2rtcRestartAfterCaspar = false
-				} else {
-					needGo2rtcRestartAfterCaspar = true
-					appCtx.log('warn', '[Streaming] NDI: Caspar AMCP not connected yet — will register NDI after connect')
-				}
-				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
-				appCtx.streamingPipelineReady = !!appCtx.amcp?.isConnected
-			} else if (tier === 'udp') {
-				// UDP MPEG-TS: go2rtc first, then Caspar ADD STREAM. Do not expose pipelineReady until ADD completes
-				// or the browser negotiates WebRTC before MPEG-TS exists → ffmpeg 500 / version banner on stderr.
-				appCtx.log('info', '[Streaming] UDP tier: starting go2rtc first, then Caspar ADD STREAM')
-				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
-				needGo2rtcRestartAfterCaspar = false
-				if (appCtx.amcp?.isConnected) {
-					await addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-					// HTTP push ingest: wait until go2rtc lists producers so WebRTC is not offered on empty streams.
-					await go2rtcManager.waitForPushIngestReady(streamingTargets, config.streaming, { log: appCtx.log })
-					appCtx.streamingPipelineReady = true
-				} else {
-					appCtx.log('warn', '[Streaming] UDP tier: AMCP not connected — skip ADD STREAM until Caspar connects')
-				}
-			} else {
-				needGo2rtcRestartAfterCaspar = false
-				await go2rtcManager.start(streamingTargets, config.streaming, config.caspar.host)
-				if (tier === 'local' && appCtx.amcp) {
-					await addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-				}
-				appCtx.streamingPipelineReady = true
-			}
-			appCtx.log('info', '[Streaming] startStreamingSubsystem finished')
-		} catch (e) {
-			appCtx.streamingPipelineReady = false
-			appCtx.log('error', `Streaming start failed: ${e.message}`)
-		}
-	}
-
-	async function stopStreamingSubsystem() {
-		try {
-			appCtx.streamingPipelineReady = false
-			appCtx.log('info', '[Streaming] stopStreamingSubsystem (remove Caspar consumers, stop go2rtc)')
-			if (appCtx.amcp) await removeStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-			await go2rtcManager.stop()
-		} catch (e) {
-			appCtx.log('warn', `[Streaming] stopStreamingSubsystem: ${e?.message || e}`)
-		}
-	}
-
-	/**
-	 * Stop preview stack, release UDP listeners, then start again.
-	 * Must run before `resolveFreeStreamingBasePort` — otherwise our own ffmpeg/go2rtc still bind base+1/+2/+5
-	 * and the probe falsely reports “busy”, relocates base, and breaks Caspar STREAM + go2rtc alignment.
-	 */
-	async function runStreamingRestart() {
-		await stopStreamingSubsystem()
-		const delayMs = Math.max(
-			0,
-			parseInt(process.env.HIGHASCG_STREAMING_RESTART_DELAY_MS || '500', 10) || 500
-		)
-		if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
-		await startStreamingSubsystem()
-	}
-
-	/** Serialize start/stop so overlapping config + Caspar events cannot double-spawn go2rtc (SIGKILL storms). */
-	let streamingChain = Promise.resolve()
-	function enqueueStreaming(fn) {
-		streamingChain = streamingChain.then(fn).catch((e) => {
-			appCtx.log('error', `Streaming: ${e?.message || e}`)
-		})
-		return streamingChain
-	}
-
-	appCtx.toggleStreaming = (enabled) => {
-		config.streaming.enabled = enabled
-		return enqueueStreaming(async () => {
-			if (enabled) await runStreamingRestart()
-			else await stopStreamingSubsystem()
-		})
-	}
-
-	appCtx.restartStreaming = () => enqueueStreaming(runStreamingRestart)
-
-	/**
-	 * Only preview/streaming (Caspar ADD STREAM / go2rtc) depends on these fields. Saving unrelated keys
-	 * (e.g. `dmx` / pixel map) must not restart streaming — each restart issues many REMOVE STREAM lines on Caspar.
-	 */
-	function streamingRestartSignature(cfg) {
-		const s = cfg.streaming || {}
-		return JSON.stringify({
-			casparHost: cfg.caspar?.host,
-			casparPort: cfg.caspar?.port,
-			enabled: !!s.enabled,
-			quality: s.quality,
-			basePort: s.basePort,
-			hardware_accel: s.hardware_accel,
-			captureMode: s.captureMode || 'udp',
-			ndiNamingMode: s.ndiNamingMode,
-			ndiSourcePattern: s.ndiSourcePattern,
-			ndiChannelNames: s.ndiChannelNames,
-			localCaptureDevice: s.localCaptureDevice,
-			x11Display: s.x11Display,
-			drmDevice: s.drmDevice,
-			go2rtcLogLevel: s.go2rtcLogLevel,
-			autoRelocateBasePort: s.autoRelocateBasePort,
-			resolution: s.resolution,
-			fps: s.fps,
-			maxBitrate: s.maxBitrate,
-		})
-	}
-	let lastStreamingRestartSig = streamingRestartSignature(config)
-
-	// T1.3: Live reload — debounce streaming so double-save / OSC + save does not restart go2rtc twice in one tick.
-	let streamingReloadTimer = null
 	configManager.on('change', () => {
 		logger.info('[Config] Reloading subsystems...')
 		Object.assign(config, buildConfig(cli, configManager))
 		if (appCtx.restartOscSubsystem) appCtx.restartOscSubsystem()
 
-		const nextSig = streamingRestartSignature(config)
-		const streamingChanged = nextSig !== lastStreamingRestartSig
-		lastStreamingRestartSig = nextSig
-
-		if (streamingChanged) {
-			clearTimeout(streamingReloadTimer)
-			streamingReloadTimer = setTimeout(() => {
-				// When streaming stays enabled, full restart (not start-only): otherwise UDP probe sees our own ports as “stale”.
-				if (config.streaming.enabled) {
-					if (appCtx.restartStreaming) void appCtx.restartStreaming()
-				} else if (appCtx.toggleStreaming) {
-					void appCtx.toggleStreaming(false)
-				}
-			}, 400)
-		}
+		handleConfigReload()
 
 		if (appCtx.samplingManager) {
 			appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
@@ -453,17 +282,25 @@ function main() {
 
 	/** @type {InstanceType<typeof ConnectionManager> | null} */
 	let casparConnection = null
+	/** First VERSION + INFO CONFIG timing (ms) — see ConnectionManager `_healthConnectDelayMs`. */
+	let amcpConnectSettleMs = 600
 	if (!cli.noCaspar) {
-		/** Default 30s VERSION when unset — catches half-open TCP; set HIGHASCG_AMCP_HEALTH_MS=0 to disable. */
+		/** Default off — periodic VERSION can stress Caspar; set HIGHASCG_AMCP_HEALTH_MS=30000 to enable half-open TCP checks. */
 		const rawHealth = process.env.HIGHASCG_AMCP_HEALTH_MS
 		const amcpHealthMs =
-			rawHealth === undefined || rawHealth === '' ? 30000 : parseInt(String(rawHealth), 10)
+			rawHealth === undefined || rawHealth === '' ? 0 : parseInt(String(rawHealth), 10)
+		const rawSettle = process.env.HIGHASCG_AMCP_CONNECT_SETTLE_MS
+		const parsedSettle =
+			rawSettle === undefined || rawSettle === '' ? 600 : parseInt(String(rawSettle), 10)
+		amcpConnectSettleMs =
+			Number.isFinite(parsedSettle) && parsedSettle >= 0 ? parsedSettle : 600
 		casparConnection = new ConnectionManager({
 			host: config.caspar.host,
 			port: config.caspar.port,
 			config,
 			log: appCtx.log,
 			healthIntervalMs: Number.isFinite(amcpHealthMs) && amcpHealthMs >= 0 ? amcpHealthMs : 0,
+			healthConnectDelayMs: amcpConnectSettleMs,
 		})
 		appCtx.amcp = casparConnection.amcp
 		appCtx.casparConnection = casparConnection
@@ -496,6 +333,17 @@ function main() {
 		stateBroadcastIntervalMs: wsBroadcastMs,
 	})
 
+	// Push every new HighAsCG log line to all connected WebSocket clients in real time.
+	logBuffer.setOnNewLine((line) => {
+		if (typeof appCtx._wsBroadcast === 'function') {
+			try {
+				appCtx._wsBroadcast('log_line', line)
+			} catch (_) {
+				/* non-fatal */
+			}
+		}
+	})
+
 	appCtx.timelineEngine.on('playback', (pb) => {
 		if (typeof appCtx._wsBroadcast === 'function') {
 			appCtx._wsBroadcast('timeline.playback', pb)
@@ -520,33 +368,15 @@ function main() {
 			}
 			if (payload.connected === true && !wasConnected) {
 				wasConnected = true
-				void fetchServerInfoConfigAndBroadcast()
+				// After reconnect, defer first VERSION by `amcpConnectSettleMs` (Caspar often ignores immediate VERSION).
+				// Queue INFO CONFIG after that window so it never runs before the first VERSION is sent (AMCP serial queue).
+				const infoDelay = amcpConnectSettleMs > 0 ? amcpConnectSettleMs + 200 : 0
+				setTimeout(() => void fetchServerInfoConfigAndBroadcast(), infoDelay)
 				if (typeof appCtx.startPeriodicSync === 'function') {
 					appCtx.startPeriodicSync(appCtx)
 				}
 				startOscPlaybackInfoSupplement(appCtx)
-				if (config.streaming.enabled) {
-					config.streaming._casparHost = config.caspar.host
-					// Avoid a second full go2rtc start if settings reload already spawned it (races with Caspar connect).
-					if (go2rtcManager.process) {
-						addStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-							.then(async () => {
-								appCtx.streamingPipelineReady = true
-								if (
-									needGo2rtcRestartAfterCaspar &&
-									typeof appCtx.restartStreaming === 'function'
-								) {
-									needGo2rtcRestartAfterCaspar = false
-									await appCtx.restartStreaming()
-								}
-							})
-							.catch((e) => {
-								appCtx.log('error', `Streaming consumers: ${e?.message || e}`)
-							})
-					} else {
-						startStreamingSubsystem()
-					}
-				}
+				handleCasparConnected()
 				if (appCtx.samplingManager) {
 					appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
 						appCtx.log('error', '[DMX] Initial connect start failed: ' + (e?.message || e))
@@ -555,6 +385,7 @@ function main() {
 			} else if (payload.connected === false) {
 				wasConnected = false
 				clearPeriodicSyncTimer(appCtx)
+				if (appCtx.clipEndFadeWatcher) appCtx.clipEndFadeWatcher.cancelAll()
 			}
 		})
 		casparConnection.on('error', (err) => {
@@ -568,66 +399,26 @@ function main() {
 		logger.info('Caspar AMCP disabled (--no-caspar).')
 	}
 
-	/** @type {OscListener | null} */
-	let oscListener = null
-
-	function stopOscSubsystem() {
-		if (oscListener) {
-			oscListener.stop()
-			oscListener = null
-		}
-		if (appCtx.oscState) {
-			if (typeof appCtx.state.clearOscMirror === 'function') {
-				appCtx.state.clearOscMirror()
-			}
-			clearOscVariables(appCtx)
-			appCtx.oscState.destroy()
-			appCtx.oscState = null
-		}
-	}
-
-	function startOscSubsystem() {
-		config.osc = normalizeOscConfig(config)
-		if (cli.noOsc) config.osc.enabled = false
-		if (!config.osc.enabled) {
-			logger.info('OSC UDP listener off (--no-osc). Caspar→HighAsCG OSC is expected in normal operation.')
-			return
-		}
-		const oscState = new OscState(appCtx.log, config.osc)
-		appCtx.oscState = oscState
-		oscListener = new OscListener(config.osc, appCtx.log, oscState)
-		oscListener.start()
-
-		const pushOscToState = () => {
-			const snap = appCtx.oscState.getSnapshot()
-			if (typeof appCtx.state.updateFromOscSnapshot === 'function') {
-				appCtx.state.updateFromOscSnapshot(snap)
-			}
-			applyOscSnapshotToVariables(appCtx, snap)
-		}
-		pushOscToState()
-		// Full snapshot so browsers never rely only on delta WS + first `state` (which may have had osc: null before OSC started).
-		if (typeof appCtx._wsBroadcast === 'function') {
-			appCtx._wsBroadcast('osc', appCtx.oscState.getSnapshot())
-		}
-		appCtx.oscState.on('change', (snapshot) => {
-			pushOscToState()
-			if (typeof appCtx._wsBroadcast === 'function') {
-				appCtx._wsBroadcast('osc', snapshot)
-			}
-		})
-	}
-
+	const {
+		startOscSubsystem,
+		stopOscSubsystem,
+		restartOscSubsystem,
+		getOscReceiverStats,
+	} = createOscLifecycle({
+		appCtx,
+		config,
+		cli,
+		logger,
+		normalizeOscConfig,
+		OscState,
+		OscListener,
+		applyOscSnapshotToVariables,
+		clearOscVariables,
+		startOscPlaybackInfoSupplement,
+	})
 	startOscSubsystem()
-
-	/** UDP receive stats (for /api/osc/diagnostics). */
-	appCtx.getOscReceiverStats = () => (oscListener && typeof oscListener.getStats === 'function' ? oscListener.getStats() : null)
-
-	appCtx.restartOscSubsystem = () => {
-		stopOscSubsystem()
-		startOscSubsystem()
-		startOscPlaybackInfoSupplement(appCtx)
-	}
+	appCtx.restartOscSubsystem = restartOscSubsystem
+	appCtx.getOscReceiverStats = getOscReceiverStats
 
 	appCtx.applyServerConfigAndRestart = () => {
 		void applyCasparConfigToDiskAndRestart(appCtx).then((r) => {

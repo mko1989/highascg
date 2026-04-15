@@ -71,6 +71,15 @@ async function handleProject(path, body, ctx) {
 				}
 			}
 		}
+		if (typeof ctx._wsBroadcast === 'function') {
+			try {
+				ctx._wsBroadcast('project_sync', project)
+			} catch (e) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', '[project] WebSocket broadcast failed: ' + (e?.message || e))
+				}
+			}
+		}
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 	}
 	if (path === '/api/project/load') {

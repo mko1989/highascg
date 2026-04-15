@@ -150,6 +150,9 @@ if [ "$SHOULD_INSTALL_SCANNER" = true ]; then
     fi
 fi
 
+# Replace generic system CEF libs with the CasparCG .deb build (same paths Caspar loads at runtime).
+sync_caspar_cef_into_system
+
 # Disable stock CasparCG service (we use Openbox autostart)
 systemctl stop casparcg-server 2>/dev/null || true
 systemctl disable casparcg-server 2>/dev/null || true

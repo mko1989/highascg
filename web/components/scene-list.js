@@ -1,5 +1,5 @@
 /**
- * Scenes deck — toolbar, default transition row, grid of look cards.
+ * Scenes deck — toolbar (+ take/cut + default transition + apply to all), grid of look cards.
  */
 
 import { mountLookTransitionControls } from './scenes-shared.js'
@@ -9,9 +9,8 @@ import { mountLookTransitionControls } from './scenes-shared.js'
  * @param {HTMLElement} ctx.mainHost
  * @param {import('../lib/scene-state.js').SceneStateManager} ctx.sceneState
  * @param {() => number} ctx.getScreenCount
- * @param {() => number} ctx.getProgramChannel
- * @param {() => number} ctx.getPreviewChannel
- * @param {(sc: import('../lib/scene-state.js').Scene) => string | null} ctx.thumbnailUrlForScene
+ * @param {number} [ctx.outputAspect] - program width/height for look card thumb framing
+ * @param {(canvas: HTMLCanvasElement) => void} ctx.paintDeckThumb
  * @param {(sceneId: string, forceCut: boolean) => Promise<void>} ctx.takeSceneToProgram
  * @param {(msg: string, type?: string) => void} ctx.showToast
  * @param {(detail: object | null) => void} ctx.dispatchLayerSelect
@@ -26,9 +25,8 @@ export function renderSceneDeck(ctx) {
 		mainHost,
 		sceneState,
 		getScreenCount,
-		getProgramChannel,
-		getPreviewChannel,
-		thumbnailUrlForScene,
+		outputAspect,
+		paintDeckThumb,
 		takeSceneToProgram,
 		showToast,
 		dispatchLayerSelect,
@@ -58,36 +56,31 @@ export function renderSceneDeck(ctx) {
 			<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-global-take" title="Take preview to program (LOADBG + transition + PLAY)" aria-label="Take preview to program">▶</button>
 			<button type="button" class="scenes-btn scenes-btn--icon" id="scenes-global-cut" title="Hard cut preview to program" aria-label="Hard cut preview to program">✂</button>
 		</div>
-		<span class="scenes-toolbar__hint">PRV → PGM · PGM ch ${getProgramChannel()} · PRV ch ${getPreviewChannel()}</span>
+		<div class="scenes-toolbar__transition-group" id="scenes-deck-transition-mount"></div>
 	`
 	deckWrap.appendChild(toolbar)
 
-	const transitionDeckRow = document.createElement('div')
-	transitionDeckRow.className = 'scenes-deck-transition-row'
-	const transitionDeckInner = document.createElement('div')
-	transitionDeckInner.className = 'scenes-deck-transition-row__controls'
+	const transMount = toolbar.querySelector('#scenes-deck-transition-mount')
 	mountLookTransitionControls(
-		transitionDeckInner,
+		transMount,
 		sceneState.globalDefaultTransition,
 		(t) => sceneState.setGlobalDefaultTransition(t),
 		'scenes-deck-dt',
 		{
-			label: 'Default look transition',
-			hint: 'Used when you create a new look. Apply to all copies this to every look below.',
+			label: 'Default transition',
+			hint: '',
 		}
 	)
 	const applyAllBtn = document.createElement('button')
 	applyAllBtn.type = 'button'
-	applyAllBtn.className = 'scenes-btn scenes-btn--sm'
+	applyAllBtn.className = 'scenes-btn scenes-btn--sm scenes-toolbar__apply-all-looks'
 	applyAllBtn.textContent = 'Apply to all looks'
 	applyAllBtn.title = 'Set every look’s transition to match the default above'
 	applyAllBtn.addEventListener('click', () => {
 		sceneState.applyGlobalDefaultToAllLooks()
 		showToast('Default transition applied to all looks.', 'info')
 	})
-	transitionDeckRow.appendChild(transitionDeckInner)
-	transitionDeckRow.appendChild(applyAllBtn)
-	deckWrap.appendChild(transitionDeckRow)
+	transMount.appendChild(applyAllBtn)
 	mainHost.appendChild(deckWrap)
 
 	toolbar.querySelector('#scenes-add-look')?.addEventListener('click', () => {
@@ -106,6 +99,9 @@ export function renderSceneDeck(ctx) {
 
 	const grid = document.createElement('div')
 	grid.className = 'scenes-deck'
+	if (typeof outputAspect === 'number' && outputAspect > 0 && Number.isFinite(outputAspect)) {
+		grid.style.setProperty('--scene-thumb-aspect', String(outputAspect))
+	}
 
 	if (sceneState.scenes.length === 0) {
 		const empty = document.createElement('div')
@@ -116,15 +112,19 @@ export function renderSceneDeck(ctx) {
 	}
 
 	sceneState.scenes.forEach((sc) => {
-		const thumbUrl = thumbnailUrlForScene(sc)
 		const onPreview = sceneState.previewSceneId === sc.id
+		const onPgm = sceneState.liveSceneId === sc.id
 		const card = document.createElement('div')
 		card.className =
 			'scenes-card' +
-			(sceneState.liveSceneId === sc.id ? ' scenes-card--live' : '') +
+			(onPgm ? ' scenes-card--live' : '') +
 			(onPreview ? ' scenes-card--preview' : '')
 		card.innerHTML = `
 			<div class="scenes-card__header">
+				<div class="scenes-card__badges" aria-hidden="true">
+					${onPgm ? '<span class="scenes-card__badge scenes-card__badge--pgm">PGM</span>' : ''}
+					${onPreview ? '<span class="scenes-card__badge scenes-card__badge--prv">PRV</span>' : ''}
+				</div>
 				<input type="text" class="scenes-card__name-input" maxlength="120" spellcheck="false" aria-label="Look name" />
 				<div class="scenes-card__header-actions">
 					<button type="button" class="scenes-card__icon-btn" data-action="duplicate" title="Duplicate look" aria-label="Duplicate look">⧉</button>
@@ -132,11 +132,7 @@ export function renderSceneDeck(ctx) {
 				</div>
 			</div>
 			<button type="button" class="scenes-card__thumb" data-action="prv" aria-label="Send to preview">
-				${
-					thumbUrl
-						? `<img src="${thumbUrl}" alt="" />`
-						: `<div class="scenes-card__thumb-empty">${sc.layers.length} layer(s) — add media for thumbnail</div>`
-				}
+				<canvas class="scenes-card__thumb-canvas"></canvas>
 			</button>
 			<div class="scenes-card__footer">
 				<button type="button" class="scenes-btn scenes-btn--take scenes-btn--sm scenes-btn--icon" data-action="take" title="Take live (LOADBG + transition + PLAY)" aria-label="Take live">▶</button>
@@ -201,6 +197,11 @@ export function renderSceneDeck(ctx) {
 				if (sceneState.editingSceneId === sc.id) sceneState.setEditingScene(null)
 			}
 		})
+		const thumbCanvas = card.querySelector('.scenes-card__thumb-canvas')
+		if (thumbCanvas) {
+			thumbCanvas.dataset.sceneId = sc.id
+			paintDeckThumb(thumbCanvas)
+		}
 		grid.appendChild(card)
 	})
 

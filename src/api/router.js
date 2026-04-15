@@ -36,6 +36,7 @@ const routesSystemSetup = require('./routes-system-setup')
 const routesCasparConfig = require('./routes-caspar-config')
 const routesLogs = require('./routes-logs')
 const routesHostStats = require('./routes-host-stats')
+const routesPipOverlay = require('./routes-pip-overlay')
 
 /**
  * @param {string} method
@@ -96,7 +97,7 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (or) return or
 	}
 
-	if (method === 'GET' && p === '/api/audio/devices') {
+	if (method === 'GET' && (p === '/api/audio/devices' || p === '/api/audio/portaudio-devices')) {
 		const ar = routesAudio.handleGet(p, query)
 		if (ar) return ar
 	}
@@ -205,6 +206,15 @@ async function routeRequest(method, path, body, ctx, req) {
 		const r = await routesState.handleGet(p, ctx, query)
 		if (r) return r
 	}
+	if (method === 'DELETE' && p.startsWith('/api/local-media/')) {
+		const r = await routesMedia.handleDeleteLocalMedia(p, ctx)
+		if (r) return r
+	}
+	// Body { id } avoids URL-encoding issues with slashes in paths (some stacks mishandle %2F in DELETE URLs).
+	if (method === 'POST' && p === '/api/media/delete') {
+		const r = await routesMedia.handlePost(p, body, ctx)
+		if (r) return r
+	}
 	// Duration for timeline drop: CINF + ffprobe fallback — must work when AMCP is down if files are on disk
 	if (method === 'POST' && p === '/api/media/cinf') {
 		const r = await routesMedia.handlePost(p, body, ctx)
@@ -231,7 +241,9 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	try {
 		if (method === 'GET') {
-			let r = await routesState.handleGet(p, ctx, query)
+			let r = await routesPipOverlay.handleGet(p, ctx)
+			if (r) return r
+			r = await routesState.handleGet(p, ctx, query)
 			if (r) return r
 			r = await routesMixer.handleGet(p, query, ctx)
 			if (r) return r
@@ -245,6 +257,8 @@ async function routeRequest(method, path, body, ctx, req) {
 			r = await routesLedTestCard.handlePost(p, body, ctx)
 			if (r) return r
 			r = await routesFtb.handlePost(p, body, ctx)
+			if (r) return r
+			r = await routesPipOverlay.handlePost(p, body, ctx)
 			if (r) return r
 			r = await routesCg.handlePost(p, body, ctx)
 			if (r) return r

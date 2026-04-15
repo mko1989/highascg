@@ -31,8 +31,22 @@ DEPLOY_USER="${DEPLOY_USER:-casparcg}"
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/highascg}"
 REMOTE="${DEPLOY_USER}@${DEPLOY_HOST}"
 
+# macOS OpenSSH sets DSCP (CS1) on bulk transfers; many LAN/Wi‑Fi paths mishandle it and
+# scp/rsync then stalls at a fixed byte offset. Clearing QoS fixes that without needing Tailscale.
+SSH_BASE_OPTS=(
+	-o ServerAliveInterval=30
+	-o ServerAliveCountMax=6
+	-o TCPKeepAlive=yes
+	-o IPQoS=none
+)
+
 TMP="$(mktemp /tmp/highascg-dev.XXXXXX.tgz)"
 trap 'rm -f "$TMP"' EXIT
+
+# macOS tar uses copyfile(3) and embeds xattrs (com.apple.provenance, etc.). That spams Linux
+# extract with LIBARCHIVE.* warnings and can error with "Could not pack extended attributes"
+# when the temp archive path does not support storing those metadata records.
+export COPYFILE_DISABLE=1
 
 echo "→ tar (exclude node_modules, .git, work, env, live server config) → $TMP"
 tar czf "$TMP" \
@@ -45,10 +59,19 @@ tar czf "$TMP" \
 	--exclude=highascg.config.json \
 	.
 
-echo "→ scp → ${REMOTE}:/tmp/highascg-dev.tgz"
-scp "$TMP" "${REMOTE}:/tmp/highascg-dev.tgz"
+# rsync over ssh is more resilient than scp for large blobs; tarball is already gzip — no -z.
+echo "→ upload → ${REMOTE}:/tmp/highascg-dev.tgz"
+if command -v rsync >/dev/null 2>&1; then
+	rsync -av --progress --partial --inplace \
+		-e "ssh ${SSH_BASE_OPTS[*]}" \
+		"$TMP" "${REMOTE}:/tmp/highascg-dev.tgz"
+else
+	scp "${SSH_BASE_OPTS[@]}" \
+		"$TMP" "${REMOTE}:/tmp/highascg-dev.tgz"
+fi
 
 echo "→ ssh: mkdir -p ${DEPLOY_PATH} && tar xzf … -C ${DEPLOY_PATH}"
-ssh "$REMOTE" "set -e; mkdir -p '${DEPLOY_PATH}'; tar xzf /tmp/highascg-dev.tgz -C '${DEPLOY_PATH}'; rm -f /tmp/highascg-dev.tgz"
+ssh "${SSH_BASE_OPTS[@]}" \
+	"$REMOTE" "set -e; mkdir -p '${DEPLOY_PATH}'; tar xzf /tmp/highascg-dev.tgz -C '${DEPLOY_PATH}'; rm -f /tmp/highascg-dev.tgz"
 
 echo "→ done: ${REMOTE}:${DEPLOY_PATH}"

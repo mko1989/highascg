@@ -5,7 +5,7 @@
 
 /* Server logs (connection eye) */
 .logs-modal {
-	max-width: min(96vw, 920px);
+	max-width: min(96vw, 1100px);
 	width: 96%;
 }
 .logs-modal__body {
@@ -41,6 +41,42 @@
 	gap: 0.35rem;
 	margin-left: 0.15rem;
 }
+
+/* Two-pane layout: HighAsCG | CasparCG side by side */
+.logs-modal__panes {
+	display: flex;
+	gap: 10px;
+	min-height: 0;
+}
+.logs-modal__pane {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.logs-modal__pane-header {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 2px;
+}
+.logs-modal__live-badge {
+	font-size: 9px;
+	font-weight: 700;
+	color: #3fb950;
+	letter-spacing: 0.04em;
+	animation: logs-live-pulse 2s ease-in-out infinite;
+}
+@keyframes logs-live-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.45; }
+}
 .live-input-modal {
 	max-width: min(96vw, 520px);
 	width: 96%;
@@ -55,7 +91,8 @@
 	line-height: 1.35;
 	white-space: pre-wrap;
 	word-break: break-word;
-	max-height: min(60vh, 520px);
+	flex: 1;
+	height: min(58vh, 500px);
 	overflow: auto;
 	margin: 0;
 	padding: 0.75rem;
@@ -151,16 +188,26 @@
 	justify-content: flex-start;
 }
 
-/* Settings Specific */
-.settings-modal {
-	width: 650px;
+/* Settings — viewport-sized shell; inner pane scrolls so tab switches don’t resize the modal */
+.modal-content.settings-modal {
+	width: min(94vw, 52rem) !important;
+	max-width: min(94vw, 52rem) !important;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 }
 
 .settings-body {
 	display: flex;
 	gap: 20px;
 	padding: 0;
-	min-height: 350px;
+	min-height: min(70vh, 52rem);
+	height: min(70vh, 52rem);
+	max-height: min(76vh, 56rem);
+	overflow: hidden;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .settings-tabs {
@@ -197,7 +244,12 @@
 
 .settings-panes {
 	flex: 1;
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
 	padding: 20px;
+	-webkit-overflow-scrolling: touch;
 }
 
 .settings-pane {

@@ -63,8 +63,23 @@ function fillEqual(f1, f2) {
 	return numClose(a.x, b.x) && numClose(a.y, b.y) && numClose(a.scaleX, b.scaleX) && numClose(a.scaleY, b.scaleY)
 }
 
+function jsonStable(v) {
+	try {
+		return JSON.stringify(v ?? null)
+	} catch {
+		return String(v)
+	}
+}
+
+function fadeOnEndEqual(a, b) {
+	const x = a && typeof a === 'object' ? a : { enabled: false, frames: 12 }
+	const y = b && typeof b === 'object' ? b : { enabled: false, frames: 12 }
+	return !!x.enabled === !!y.enabled && Number(x.frames ?? 12) === Number(y.frames ?? 12)
+}
+
 /**
  * Same source and same layout — no PLAY / no mixer tweens on take (see runSceneTake unchanged path).
+ * Must include every layer field that runSceneTakeLbg turns into AMCP (effects, fade schedule, PIP, etc.).
  */
 function layerVisuallyEqual(cur, incoming) {
 	if (!cur || !incoming) return false
@@ -74,7 +89,14 @@ function layerVisuallyEqual(cur, incoming) {
 	if (!numClose(cur.opacity ?? 1, incoming.opacity ?? 1)) return false
 	if (!!cur.straightAlpha !== !!incoming.straightAlpha) return false
 	if ((cur.audioRoute || '1+2') !== (incoming.audioRoute || '1+2')) return false
-	return !!cur.loop === !!incoming.loop
+	if (!!cur.loop !== !!incoming.loop) return false
+	if ((cur.contentFit || 'native') !== (incoming.contentFit || 'native')) return false
+	if (!numClose(cur.volume ?? 1, incoming.volume ?? 1)) return false
+	if (!!cur.muted !== !!incoming.muted) return false
+	if (!fadeOnEndEqual(cur.fadeOnEnd, incoming.fadeOnEnd)) return false
+	if (jsonStable(cur.effects) !== jsonStable(incoming.effects)) return false
+	if (jsonStable(cur.pipOverlay) !== jsonStable(incoming.pipOverlay)) return false
+	return true
 }
 
 function layerHasContent(l) {

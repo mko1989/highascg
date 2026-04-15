@@ -41,6 +41,49 @@ class AmcpClient extends EventEmitter {
 	}
 
 	/**
+	 * AMCP commands whose outbound + inbound lines are too high-frequency to be useful in the
+	 * activity log (media list polling, thumbnail fetching, version checks).
+	 */
+	static QUIET_CMDS = new Set(['CLS', 'TLS', 'THUMBNAIL', 'VERSION', 'DIAG'])
+
+	/** Default timeout for short replies (PLAY, VERSION, etc.). Env: HIGHASCG_AMCP_SEND_TIMEOUT_MS */
+	static SEND_TIMEOUT_MS = 15_000
+
+	/** Longer timeout for INFO CONFIG, CLS, TLS, channel INFO XML, thumbnails — Caspar can block seconds on I/O. Env: HIGHASCG_AMCP_LONG_RESPONSE_MS */
+	static LONG_RESPONSE_TIMEOUT_MS = 120_000
+
+	/**
+	 * @param {string} trimmed
+	 * @returns {number}
+	 */
+	static resolveSendTimeoutMs(trimmed) {
+		const rawDef = process.env.HIGHASCG_AMCP_SEND_TIMEOUT_MS
+		const rawLong = process.env.HIGHASCG_AMCP_LONG_RESPONSE_MS
+		const def =
+			rawDef === undefined || rawDef === ''
+				? AmcpClient.SEND_TIMEOUT_MS
+				: parseInt(String(rawDef), 10)
+		const longT =
+			rawLong === undefined || rawLong === ''
+				? AmcpClient.LONG_RESPONSE_TIMEOUT_MS
+				: parseInt(String(rawLong), 10)
+		const n = Number.isFinite(def) && def > 0 ? def : AmcpClient.SEND_TIMEOUT_MS
+		const longN = Number.isFinite(longT) && longT > 0 ? longT : AmcpClient.LONG_RESPONSE_TIMEOUT_MS
+		const u = trimmed.toUpperCase()
+		if (
+			u.startsWith('INFO ') ||
+			u.startsWith('CLS') ||
+			u.startsWith('TLS') ||
+			u.startsWith('THUMBNAIL') ||
+			u.startsWith('CINF') ||
+			u.startsWith('FLS')
+		) {
+			return longN
+		}
+		return n
+	}
+
+	/**
 	 * Send raw AMCP command and return Promise.
 	 * @param {string} cmd - Full AMCP command
 	 * @param {string} [responseKey] - Key for callback queue. Default: first word of cmd.
@@ -48,7 +91,9 @@ class AmcpClient extends EventEmitter {
 	 */
 	_send(cmd, responseKey) {
 		const self = this._context
-		const key = (responseKey || cmd.trim().split(/\s+/)[0]).toUpperCase()
+		const trimmed = cmd.trim()
+		const key = (responseKey || trimmed.split(/\s+/)[0]).toUpperCase()
+		const timeoutMs = AmcpClient.resolveSendTimeoutMs(trimmed)
 
 		if (this.isOffline) {
 			return this._simulated.send(cmd)
@@ -57,23 +102,74 @@ class AmcpClient extends EventEmitter {
 		if (!self.socket || !self.socket.isConnected) {
 			return Promise.reject(new Error('Not connected'))
 		}
-		let rejectP
+
+		let resolveP, rejectP, settled = false
+		/** @type {ReturnType<typeof setTimeout> | null} */
+		let timeoutHandle = null
+
+		const cb = (a, b) => {
+			if (settled) return
+			settled = true
+			if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+			if (a instanceof Error) return rejectP(a)
+			const data = b !== undefined ? b : a
+			resolveP({ ok: true, data })
+		}
+
 		const p = new Promise((resolve, reject) => {
+			resolveP = resolve
 			rejectP = reject
 			if (self.response_callback[key] === undefined) self.response_callback[key] = []
-			self.response_callback[key].push((a, b) => {
-				if (a instanceof Error) return reject(a)
-				const data = b !== undefined ? b : a
-				resolve({ ok: true, data })
-			})
+			self.response_callback[key].push(cb)
 		})
+
 		self._amcpSendQueue = (self._amcpSendQueue || Promise.resolve())
 			.then(() => {
 				try {
+					if (settled) return
+					if (!self.socket || !self.socket.isConnected) {
+						throw new Error('Not connected')
+					}
 					self._pendingResponseKey = key
-					self.socket.send(cmd.trim() + '\r\n')
+					if (typeof self.log === 'function' && !AmcpClient.QUIET_CMDS.has(key)) {
+						self.log('debug', `AMCP → ${trimmed}`)
+					}
+					self.socket.send(trimmed + '\r\n')
+
+					timeoutHandle = setTimeout(() => {
+						if (settled) return
+						settled = true
+						timeoutHandle = null
+						const arr = self.response_callback[key]
+						if (arr) {
+							const idx = arr.indexOf(cb)
+							if (idx !== -1) arr.splice(idx, 1)
+						}
+						if (self._pendingResponseKey === key) self._pendingResponseKey = undefined
+						try {
+							if (typeof self._resetAmcpProtocol === 'function') self._resetAmcpProtocol()
+						} catch (_) {
+							/* non-fatal */
+						}
+						if (typeof self.log === 'function') {
+							const isVersion = key === 'VERSION' || trimmed.toUpperCase().startsWith('VERSION')
+							const hint = isVersion
+								? ' — Caspar did not reply in time; AMCP is often blocked by a producer/GPU/thumbnail. Check casparcg-server log, restart Caspar if stuck. Optional env: HIGHASCG_AMCP_SEND_TIMEOUT_MS, HIGHASCG_AMCP_HEALTH_MS=0 (disable periodic VERSION).'
+								: ''
+							self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${trimmed}${hint}`)
+						}
+						rejectP(new Error(`AMCP response timeout: ${trimmed}`))
+					}, timeoutMs)
+
 					return p
 				} catch (e) {
+					const arr = self.response_callback[key]
+					if (arr) {
+						const idx = arr.indexOf(cb)
+						if (idx !== -1) arr.splice(idx, 1)
+					}
+					if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+					settled = true
 					const err = e instanceof Error ? e : new Error(String(e))
 					rejectP(err)
 					throw err
@@ -195,8 +291,8 @@ class AmcpClient extends EventEmitter {
 	 * @param {string[]} commandLines
 	 * @param {{ force?: boolean }} [opts]
 	 */
-	batchSend(commandLines, opts) {
-		return this.batch.batchSend(commandLines, opts)
+	batchSend(commandLines) {
+		return this.batch.batchSend(commandLines)
 	}
 }
 

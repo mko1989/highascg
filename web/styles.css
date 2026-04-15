@@ -1,11 +1,22 @@
 /**
- * HighAsCG UI — composed from ./styles/*.css (≤500 lines each).
+ * HighAsCG UI — composed from ./styles/*.css (target ≤500 lines per file).
  */
-@import url('./styles/01-base-fonts-header-connection.css');
-@import url('./styles/02-layout-workspace-tabs-preview.css');
-@import url('./styles/03-sources-ingest-offline-sync.css');
+@import url('./styles/01a-base-theme-header-connection.css');
+@import url('./styles/01b-layout-panels-workspace.css');
+@import url('./styles/02a-workspace-tabs-scenes-preview-host.css');
+@import url('./styles/02b-preview-panel-output-compose.css');
+@import url('./styles/02c-timeline-multiview-sources-sidebar.css');
+@import url('./styles/03a-offline-sync-publish-ingest-menu.css');
+@import url('./styles/03b-ingest-drag-upload-progress.css');
+@import url('./styles/03c-sources-items-effects.css');
 @import url('./styles/04-media-lists-drag-dashboard.css');
-@import url('./styles/05-dashboard-cells-layers.css');
-@import url('./styles/06-inspector-mixer-context.css');
-@import url('./styles/07-scenes-editor-audio-mixer.css');
+@import url('./styles/05a-dashboard-cells.css');
+@import url('./styles/05b-timeline-editor.css');
+@import url('./styles/05c-multiview-editor.css');
+@import url('./styles/05d-inspector-fields-dashboard.css');
+@import url('./styles/06a-scenes-deck-cards.css');
+@import url('./styles/06b-scenes-edit-transitions-layerstrip.css');
+@import url('./styles/06c-inspector-effects-pip.css');
+@import url('./styles/07a-scenes-compose-canvas.css');
+@import url('./styles/07b-audio-mixer-modal-shell.css');
 @import url('./styles/08-modals-settings-logs-misc.css');

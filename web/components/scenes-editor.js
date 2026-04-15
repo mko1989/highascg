@@ -4,19 +4,28 @@
  */
 
 import { sceneState, defaultTransition as defaultTransitionDef } from '../lib/scene-state.js'
-import { api, getApiBase } from '../lib/api-client.js'
+import { getApiBase } from '../lib/api-client.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
-import { mountLookTransitionControls, buildIncomingScenePayload, isMediaOrFileSource } from './scenes-shared.js'
-import { timelineState } from '../lib/timeline-state.js'
+import {
+	drawComposePrvPgmCellEdgeBar,
+	drawDualComposeCellPreview,
+	drawOutputCanvasBounds,
+} from './preview-canvas-draw-base.js'
+import { mountLookTransitionControls, isMediaOrFileSource } from './scenes-shared.js'
 import { renderSceneDeck } from './scene-list.js'
 import { appendSceneLayerStripRows } from './scene-layer-row.js'
 import { createScenesPreviewRuntime } from './scenes-preview-runtime.js'
 import { createApplyNativeFillForSource, createComposeDragHandlers, renderComposeScene } from './scenes-compose.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
-import { UI_FONT_FAMILY } from '../lib/ui-font.js'
-
-/** Thumbnail width for API (local ffmpeg or Caspar fallback) */
-const SCENE_THUMB_MAX_W = 720
+import {
+	SCENE_THUMB_MAX_W,
+	SCENE_CARD_THUMB_W,
+	showScenesToast,
+	escapeHtml,
+	appendScenesEditorShell,
+	bindScenesPreviewSplitDrag,
+	createTakeSceneToProgram,
+} from './scenes-editor-support.js'
 
 /**
  * @param {HTMLElement} root - #tab-scenes
@@ -50,9 +59,22 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		const s = sceneState.activeScreenIndex
 		const res = getChannelMap().programResolutions?.[s]
 		const fallback = { w: 1920, h: 1080 }
-		if (!res || res.w <= 0 || res.h <= 0) return fallback
-		const w = Math.min(16384, Math.max(160, Math.round(res.w)))
-		const h = Math.min(16384, Math.max(90, Math.round(res.h)))
+		let rw
+		let rh
+		if (res && res.w > 0 && res.h > 0) {
+			rw = res.w
+			rh = res.h
+		} else {
+			const cv = sceneState.getCanvasForScreen(s)
+			if (cv.width > 0 && cv.height > 0) {
+				rw = cv.width
+				rh = cv.height
+			} else {
+				return fallback
+			}
+		}
+		const w = Math.min(16384, Math.max(160, Math.round(rw)))
+		const h = Math.min(16384, Math.max(90, Math.round(rh)))
 		return { w, h }
 	}
 
@@ -65,24 +87,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 
 	function getCanvas() {
 		return sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
-	}
-
-	function showToast(msg, type = 'info') {
-		let container = document.getElementById('scenes-toast-container')
-		if (!container) {
-			container = document.createElement('div')
-			container.id = 'scenes-toast-container'
-			container.style.cssText =
-				'position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;'
-			document.body.appendChild(container)
-		}
-		const toast = document.createElement('div')
-		toast.style.cssText = `padding:10px 16px;border-radius:6px;font-size:13px;font-family:${UI_FONT_FAMILY};max-width:360px;word-break:break-word;box-shadow:0 2px 8px rgba(0,0,0,.4);background:${
-			type === 'error' ? '#b91c1c' : '#1d4ed8'
-		};color:#fff;`
-		toast.textContent = msg
-		container.appendChild(toast)
-		setTimeout(() => toast.remove(), 6000)
 	}
 
 	const {
@@ -104,62 +108,14 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		return typeof p === 'number' && Number.isFinite(p) ? p : 0
 	}
 
-	let takeBusy = false
-	async function takeSceneToProgram(sceneId, forceCut) {
-		if (takeBusy) return
-		const scene = sceneState.getScene(sceneId)
-		if (!scene) return
-		const hasContent = (scene.layers || []).some((l) => l?.source?.value)
-		if (!hasContent) {
-			showToast('Add at least one layer with a source before taking live.', 'error')
-			return
-		}
-		takeBusy = true
-		try {
-			const programCh = getProgramChannel()
-			const fps = getChannelMap().programResolutions?.[sceneState.activeScreenIndex]?.fps ?? 50
-			const scenePayloadForState = buildIncomingScenePayload(scene)
-			const incomingJson = buildIncomingScenePayload(scene, {
-				timeline: timelineState.getActive(),
-				positionMs: getTimelinePositionMsForTake(),
-			})
-			const body = {
-				channel: programCh,
-				incomingScene: incomingJson,
-				framerate: fps,
-				forceCut,
-				useServerLive: true,
-			}
-			const takeRes = await api.post('/api/scene/take', body)
-			sceneState.setLiveSceneId(sceneId)
-			const prevLive = stateStore.getState()?.scene?.live || {}
-			if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {
-				const merged = { ...prevLive }
-				for (const [k, v] of Object.entries(takeRes.sceneLive)) {
-					if (v && typeof v === 'object' && v.sceneId != null && v.scene) {
-						merged[k] = { sceneId: v.sceneId, scene: v.scene }
-					}
-				}
-				stateStore.applyChange('scene.live', merged)
-			} else {
-				stateStore.applyChange('scene.live', {
-					...prevLive,
-					[String(programCh)]: { sceneId: scene.id, scene: incomingJson },
-				})
-			}
-			const liveSnap = takeRes?.sceneLive?.[String(programCh)]
-			if (liveSnap?.scene && liveSnap.sceneId === scene.id) {
-				sceneState.applySceneFromTakePayload(sceneId, liveSnap.scene)
-			} else {
-				sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState)
-			}
-			primePreviewSnapshotFromScene(sceneId)
-		} catch (e) {
-			showToast(e?.message || String(e), 'error')
-		} finally {
-			takeBusy = false
-		}
-	}
+	const takeSceneToProgram = createTakeSceneToProgram({
+		stateStore,
+		getChannelMap,
+		getProgramChannel,
+		getTimelinePositionMsForTake,
+		showToast: showScenesToast,
+		primePreviewSnapshotFromScene,
+	})
 
 	/** Keep compose DOM (.scenes-layer) in sync when scene state changes without full render(). */
 	let composeSyncRaf = null
@@ -199,33 +155,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	)
 
 	root.innerHTML = ''
-	const rundownPlaybackSlot = document.createElement('div')
-	rundownPlaybackSlot.id = 'scenes-rundown-playback-slot'
-	rundownPlaybackSlot.className = 'scenes-rundown-playback'
-	const scenesSplit = document.createElement('div')
-	scenesSplit.className = 'scenes-split'
-	const splitHandle = document.createElement('div')
-	splitHandle.className = 'resize-handle scenes-split__handle'
-	splitHandle.title = 'Drag to resize compose preview'
-	const previewHost = document.createElement('div')
-	previewHost.className = 'preview-host scenes-preview-host'
-	const mainHost = document.createElement('div')
-	mainHost.className = 'scenes-main dashboard-main scenes-split__main'
-
-	const SPLIT_LS = 'casparcg_scenes_preview_split_px'
-	let splitPx = 280
-	try {
-		const n = parseInt(localStorage.getItem(SPLIT_LS) || '', 10)
-		if (!Number.isNaN(n) && n >= 140 && n <= 2000) splitPx = n
-	} catch {}
-	previewHost.style.flex = `0 0 ${splitPx}px`
-	previewHost.style.minHeight = '0'
-
-	root.appendChild(rundownPlaybackSlot)
-	root.appendChild(scenesSplit)
-	scenesSplit.appendChild(previewHost)
-	scenesSplit.appendChild(splitHandle)
-	scenesSplit.appendChild(mainHost)
+	const { rundownPlaybackSlot, splitHandle, previewHost, mainHost, splitPx } = appendScenesEditorShell(root)
 
 	let rundownTimerDestroy = null
 	function applyRundownPlaybackTimer() {
@@ -269,21 +199,61 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		fillParentHeight: true,
 		hideInnerResize: true,
 		onCollapsedChange: (isCollapsed) => {
+			previewHost.classList.toggle('preview-host--collapsed', !!isCollapsed)
 			if (isCollapsed) {
 				previewHost.style.flex = '0 0 auto'
 			} else {
-				previewHost.style.flex = `0 0 ${splitPx}px`
+				previewHost.style.flex = `0 0 ${splitPx.current}px`
 			}
 		},
 		draw(ctx, W, H, isLive, meta = {}) {
+			const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'
+			const isDual = meta.composePrvPgmLayoutToggle
+
+			/* One canvas per PRV/PGM cell — same letterbox math as before, split across two surfaces. */
+			if (isDual && meta.composeCell) {
+				const v = meta.composeCellViewport
+				const cellW = v?.w > 0 && v?.h > 0 ? v.w : layout === 'lr' ? W / 2 : W
+				const cellH = v?.w > 0 && v?.h > 0 ? v.h : layout === 'tb' ? H / 2 : H
+				if (isLive) {
+					ctx.clearRect(0, 0, cellW, cellH)
+					drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
+					return
+				}
+				const prvId = sceneState.previewSceneId || sceneState.editingSceneId
+				const pgmId = sceneState.liveSceneId
+				const prvScene = prvId ? sceneState.getScene(prvId) : null
+				const pgmScene = pgmId ? sceneState.getScene(pgmId) : null
+				const scene = meta.composeCell === 'prv' ? prvScene : pgmScene
+				drawDualComposeCellPreview(ctx, W, H, cellW, cellH, (c) => {
+					drawSceneComposeStack(c, W, H, {
+						scene: scene || { layers: [] },
+						selectedLayerIndex: scene?.id === sceneState.editingSceneId ? selectedLayerIndex : null,
+						isLive: false,
+						skipBg: true,
+						composePrvPgmLayout: layout,
+						composeDualStreamPreview: true,
+						getThumbUrl: (src) =>
+							isMediaOrFileSource(src)
+								? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}?w=${SCENE_THUMB_MAX_W}`
+								: null,
+						onThumbLoaded: () => previewPanel.scheduleDraw(),
+					})
+					drawOutputCanvasBounds(c, W, H)
+				})
+				drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
+				return
+			}
+
+			// Original single-view or Live WebRTC mode
 			const id = sceneState.editingSceneId || sceneState.previewSceneId
 			const scene = id ? sceneState.getScene(id) : null
 			drawSceneComposeStack(ctx, W, H, {
 				scene: scene || { layers: [] },
 				selectedLayerIndex,
 				isLive,
-				composePrvPgmLayout: meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr',
-				composeDualStreamPreview: meta.composeDualStreamPreview === true,
+				composePrvPgmLayout: layout,
+				composeDualStreamPreview: isDual,
 				getThumbUrl: (src) =>
 					isMediaOrFileSource(src)
 						? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}?w=${SCENE_THUMB_MAX_W}`
@@ -293,33 +263,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		},
 	})
 
-	splitHandle.addEventListener('mousedown', (e) => {
-		if (e.button !== 0) return
-		e.preventDefault()
-		const splitDragStartY = e.clientY
-		const splitStartH = previewHost.getBoundingClientRect().height
-		const onMove = (ev) => {
-			const dy = ev.clientY - splitDragStartY
-			const maxH = Math.min(2000, Math.floor(window.innerHeight * 0.9))
-			const nh = Math.max(140, Math.min(maxH, splitStartH + dy))
-			previewHost.style.flex = `0 0 ${nh}px`
-			previewPanel.scheduleDraw()
-		}
-		const onUp = () => {
-			document.removeEventListener('mousemove', onMove)
-			document.removeEventListener('mouseup', onUp)
-			document.body.style.cursor = ''
-			document.body.style.userSelect = ''
-			splitPx = Math.round(previewHost.getBoundingClientRect().height)
-			try {
-				localStorage.setItem(SPLIT_LS, String(splitPx))
-			} catch {}
-		}
-		document.body.style.cursor = 'row-resize'
-		document.body.style.userSelect = 'none'
-		document.addEventListener('mousemove', onMove)
-		document.addEventListener('mouseup', onUp)
-	})
+	bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPanel, splitPx })
 
 	function dispatchLayerSelect(detail) {
 		selectedLayerIndex = detail?.layerIndex ?? null
@@ -335,7 +279,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			dispatchLayerSelect,
 			schedulePreviewPush,
 			applyNativeFillForSource,
-			SCENE_THUMB_MAX_W,
+			SCENE_THUMB_MAX_W: SCENE_CARD_THUMB_W,
 			startDrag,
 			startRotate,
 			startScale,
@@ -343,19 +287,46 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		})
 	}
 
-	function thumbnailUrlForScene(sc) {
-		for (const layer of sc.layers || []) {
-			if (isMediaOrFileSource(layer?.source)) {
-				return `${getApiBase()}/api/thumbnail/${encodeURIComponent(layer.source.value)}?w=${SCENE_THUMB_MAX_W}`
-			}
+	let deckThumbRaf = null
+	function scheduleDeckThumbsRedraw() {
+		if (deckThumbRaf != null) return
+		deckThumbRaf = requestAnimationFrame(() => {
+			deckThumbRaf = null
+			mainHost.querySelectorAll('.scenes-card__thumb-canvas').forEach((c) => paintDeckThumb(c))
+		})
+	}
+
+	function paintDeckThumb(canvas) {
+		const id = canvas.dataset.sceneId
+		if (!id) return
+		const scene = sceneState.getScene(id)
+		if (!scene) return
+		const res = getResolution()
+		const rw = Math.max(1, res.w)
+		const rh = Math.max(1, res.h)
+		const cw = SCENE_CARD_THUMB_W
+		const ch = Math.round((cw * rh) / rw)
+		if (canvas.width !== cw || canvas.height !== ch) {
+			canvas.width = cw
+			canvas.height = ch
 		}
-		return null
+		const ctx = canvas.getContext('2d')
+		drawSceneComposeStack(ctx, cw, ch, {
+			scene,
+			selectedLayerIndex: null,
+			getThumbUrl: (src) =>
+				isMediaOrFileSource(src)
+					? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}?w=${SCENE_THUMB_MAX_W}`
+					: null,
+			onThumbLoaded: scheduleDeckThumbsRedraw,
+			deckThumbnailMode: true,
+		})
 	}
 
 	function globalTakeFromPreview() {
 		const id = sceneState.previewSceneId
 		if (!id) {
-			showToast('Send a look to preview first (tap the thumbnail).', 'error')
+			showScenesToast('Send a look to preview first (tap the thumbnail).', 'error')
 			return
 		}
 		takeSceneToProgram(id, false)
@@ -364,22 +335,23 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	function globalCutFromPreview() {
 		const id = sceneState.previewSceneId
 		if (!id) {
-			showToast('Send a look to preview first (tap the thumbnail).', 'error')
+			showScenesToast('Send a look to preview first (tap the thumbnail).', 'error')
 			return
 		}
 		takeSceneToProgram(id, true)
 	}
 
 	function renderDeck() {
+		const res = getResolution()
+		const outputAspect = res.w / Math.max(1, res.h)
 		renderSceneDeck({
 			mainHost,
 			sceneState,
 			getScreenCount,
-			getProgramChannel,
-			getPreviewChannel,
-			thumbnailUrlForScene,
+			outputAspect,
+			paintDeckThumb,
 			takeSceneToProgram,
-			showToast,
+			showToast: showScenesToast,
 			dispatchLayerSelect,
 			previewPanel,
 			sendSceneToPreviewCard,
@@ -441,7 +413,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			scene,
 			dispatchLayerSelect,
 			render,
-			showToast,
+			showToast: showScenesToast,
 			schedulePreviewPush,
 			selectedLayerIndexRef,
 			sceneState,
@@ -470,12 +442,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	function render() {
 		if (sceneState.editingSceneId) renderEdit()
 		else renderDeck()
-	}
-
-	function escapeHtml(s) {
-		const div = document.createElement('div')
-		div.textContent = s
-		return div.innerHTML
 	}
 
 	sceneState.on('softChange', () => {
@@ -516,6 +482,11 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	})
 
 	sceneState.on('editingChange', () => render())
+
+	sceneState.on('screenChange', () => {
+		previewPanel.scheduleDraw()
+		if (!sceneState.editingSceneId) render()
+	})
 
 	document.addEventListener('scenes-tab-activated', () => {
 		previewPanel.scheduleDraw()

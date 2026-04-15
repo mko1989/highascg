@@ -3,9 +3,13 @@
 /**
  * AMCP BEGIN … COMMIT batching for CasparCG Server (see AMCP wiki “Batching Commands”).
  * All sends still go through the connection’s _amcpSendQueue so ordering matches single-command mode.
+ *
+ * Large batches have been associated with server instability / stack issues on some Caspar builds.
+ * Batching is **opt-in** via `config.amcp_batch === true`. Otherwise commands are sent sequentially.
+ * Keep chunks modest when enabling batching.
  */
 
-const MAX_BATCH_COMMANDS = 96
+const MAX_BATCH_COMMANDS = 16
 
 /**
  * @param {string} line
@@ -45,6 +49,8 @@ function sequentialRaw(lines, client) {
  * True when this line acknowledges the closing COMMIT of a BEGIN…COMMIT batch.
  * Caspar normally sends `202 COMMIT OK`; some forks omit the trailing `OK` (`202 COMMIT` only).
  * REQ/RES mode may look like `RES uid 202 COMMIT OK`.
+ * Do not put `MIXER [channel] COMMIT` (mixer subsystem) in the same BEGIN…COMMIT as other MIXER/STOP
+ * lines — Caspar may never emit the AMCP `202 COMMIT OK`, and the client will hit the batch timeout.
  * @param {string} line
  */
 function isBatchCommitAckLine(line) {
@@ -137,10 +143,9 @@ class AmcpBatch {
 
 	/**
 	 * @param {string[]} commandLines - raw AMCP lines (no BEGIN/COMMIT)
-	 * @param {{ force?: boolean }} [opts] - force: use BEGIN…COMMIT even when amcp_batch is off
 	 * @returns {Promise<object>}
 	 */
-	batchSend(commandLines, opts = {}) {
+	batchSend(commandLines) {
 		const client = this._client
 		const connection = client._context
 		const clean = []
@@ -157,7 +162,7 @@ class AmcpBatch {
 			return Promise.reject(new Error(`batch: max ${MAX_BATCH_COMMANDS} commands`))
 		}
 
-		const useBatch = clean.length > 1 && (opts.force === true || connection.config?.amcp_batch === true)
+		const useBatch = clean.length > 1 && connection.config?.amcp_batch === true
 		if (!useBatch) {
 			return sequentialRaw(clean, client)
 		}

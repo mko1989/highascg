@@ -1,235 +1,25 @@
 /**
- * Sources panel — Media, Templates, Live sources, Timelines.
+ * Sources panel — Media, Effects, Live sources, Timelines.
  * Each source is draggable for use in dashboard columns/layers.
- * Media tab: detailed list with extension, resolution, duration (no thumbnails).
+ * Media tab: two-line rows (name + duration; resolution + fps).
+ * Effects tab: CasparCG mixer effects (blend, crop, chroma, levels, etc.).
  * @see main_plan.md Prompt 12, Prompt 18
+ * @see 22_WO_MIXER_EFFECTS.md
  */
 
 import { timelineState } from '../lib/timeline-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
-import { classifyMediaItem } from '../lib/media-ext.js'
-import { normalizeMediaIdForMatch } from '../lib/mixer-fill.js'
+import { postFormDataWithProgress } from '../lib/form-upload.js'
 import { showLiveInputModal } from './live-input-modal.js'
-
-
-/**
- * Ctrl+click / ⌘+click: download file from server media folder (GET /api/local-media/…/file).
- * @param {HTMLElement} el
- * @param {string} id - media id (Caspar path)
- * @param {string} label
- */
-function attachMediaDownloadOnModifierClick(el, id, label) {
-	const hint = 'Ctrl+click or ⌘+click: download to this computer'
-	el.title = `${label} — ${hint}`
-	el.addEventListener('click', (e) => {
-		if (!(e.ctrlKey || e.metaKey)) return
-		e.preventDefault()
-		e.stopPropagation()
-		const url = `${getApiBase()}/api/local-media/${encodeURIComponent(id)}/file`
-		const a = document.createElement('a')
-		a.href = url
-		a.download = String(label || id).replace(/^.*[/\\]/, '') || 'download'
-		a.rel = 'noopener'
-		document.body.appendChild(a)
-		a.click()
-		a.remove()
-	})
-}
-
-function makeDraggable(el, sourceType, sourceValue, label, extra = {}) {
-	el.draggable = true
-	el.dataset.sourceType = sourceType
-	el.dataset.sourceValue = sourceValue
-	el.dataset.sourceLabel = label || sourceValue
-	el.classList.add('source-item', 'draggable')
-	el.addEventListener('dragstart', (e) => {
-		e.dataTransfer.effectAllowed = 'copy'
-		e.dataTransfer.setData('application/json', JSON.stringify({ type: sourceType, value: sourceValue, label: label || sourceValue, ...extra }))
-		e.dataTransfer.setData('text/plain', sourceValue)
-		e.target.classList.add('dragging')
-	})
-	el.addEventListener('dragend', (e) => {
-		e.target.classList.remove('dragging')
-	})
-}
-
-function renderSourceList(container, items, sourceType, filter, onPreview) {
-	container.innerHTML = ''
-	if (!items || items.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No items</p>'
-		return
-	}
-	const filtered = filter ? items.filter((i) => (i.label || i.id || i).toLowerCase().includes(filter.toLowerCase())) : items
-	filtered.forEach((item) => {
-		const id = item.id ?? item
-		const label = item.label ?? String(id)
-		const el = document.createElement('div')
-		el.className = 'source-item'
-		el.dataset.sourceValue = id
-		el.innerHTML = `
-			<span class="source-item__icon">${iconFor(sourceType)}</span>
-			<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 32))}</span>
-		`
-		makeDraggable(el, sourceType, id, label)
-		container.appendChild(el)
-	})
-}
-
-function iconFor(type) {
-	const icons = { media: '🎬', template: '📄', route: '📺', timeline: '⏱' }
-	return icons[type] || '•'
-}
-
-function escapeHtml(s) {
-	const div = document.createElement('div')
-	div.textContent = s
-	return div.innerHTML
-}
-
-function truncate(s, len) {
-	if (!s || s.length <= len) return s
-	return s.slice(0, len - 1) + '…'
-}
-
-function getExtension(filename) {
-	if (!filename || typeof filename !== 'string') return ''
-	const m = filename.match(/\.([a-zA-Z0-9]+)$/)
-	return m ? m[1].toLowerCase() : ''
-}
-
-function formatDuration(ms) {
-	if (ms == null || ms < 0) return '—'
-	const s = Math.floor(ms / 1000)
-	const m = Math.floor(s / 60)
-	const h = Math.floor(m / 60)
-	if (h > 0) return `${h}:${String(m % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-	return `${m}:${String(s % 60).padStart(2, '0')}`
-}
-
-function formatFps(fps) {
-	if (fps == null || fps <= 0 || isNaN(fps)) return ''
-	const n = Math.round(fps * 100) / 100
-	return Number.isInteger(n) ? String(n) : n.toFixed(2)
-}
-
-function formatFileSize(bytes) {
-	if (bytes == null || bytes < 0 || !Number.isFinite(bytes)) return ''
-	if (bytes < 1024) return bytes + ' B'
-	if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-	return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-/**
- * Combine WebSocket `state.media` (CINF metadata after server flush) with last GET /api/media
- * (ffprobe + disk merge). Dedupe by basename without extension (same key as findMediaRow / scene fill).
- */
-function mergeMediaProbeOverlay(stateMedia, probeList) {
-	const sm = stateMedia || []
-	const pl = probeList || []
-	if (!pl.length) return sm
-	if (!sm.length) return pl
-	const byKey = new Map()
-	function addRow(item) {
-		const key = normalizeMediaIdForMatch(item.id)
-		const prev = byKey.get(key)
-		if (!prev) {
-			byKey.set(key, { ...item })
-			return
-		}
-		byKey.set(key, { ...prev, ...item, id: prev.id })
-	}
-	for (const m of sm) addRow(m)
-	for (const p of pl) addRow(p)
-	return [...byKey.values()]
-}
-
-/** Super minimal media browser for synced media folder scenario. Columns: ext | res | codec | dur | size */
-function renderMediaBrowser(container, media, filter) {
-	container.innerHTML = ''
-	const filtered = filter
-		? media.filter((i) => (i.label || i.id || i).toLowerCase().includes(filter.toLowerCase()))
-		: media
-	if (filtered.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No media files</p>'
-		return
-	}
-	const KIND_TITLE = { still: 'Still image', video: 'Video', audio: 'Audio', unknown: 'Media' }
-	const KIND_PILL = { still: 'IMG', video: 'VID', audio: 'AUD', unknown: 'MED' }
-	filtered.forEach((item) => {
-		const id = item.id ?? item
-		const label = item.label ?? String(id)
-		const resolution = item.resolution || ''
-		const duration = formatDuration(item.durationMs)
-		const kind = classifyMediaItem(item)
-		const metaParts = []
-		if (resolution) metaParts.push(resolution)
-		if (duration !== '—') metaParts.push(duration)
-		const metaStr = metaParts.join('  ')
-		const el = document.createElement('div')
-		el.className = `source-item source-item--media source-item--media-compact source-item--kind-${kind}`
-		el.dataset.sourceValue = id
-		el.innerHTML = `
-			<span class="source-item__kind-pill" title="${escapeHtml(KIND_TITLE[kind] || 'Media')}">${KIND_PILL[kind] || 'MED'}</span>
-			<span class="source-item__label">${escapeHtml(label)}</span>
-			${metaStr ? `<span class="source-item__meta-inline">${escapeHtml(metaStr)}</span>` : ''}
-		`
-		makeDraggable(el, 'media', id, label, {
-			resolution: item.resolution || '',
-			...(item.durationMs != null && item.durationMs > 0 ? { durationMs: item.durationMs } : {}),
-		})
-		attachMediaDownloadOnModifierClick(el, id, label)
-		container.appendChild(el)
-	})
-}
-
-function buildLiveSources(channelMap) {
-	const sources = []
-	if (!channelMap) return sources
-	const {
-		programChannels = [],
-		previewChannels = [],
-		inputsCh,
-		decklinkCount = 0,
-		programResolutions = [],
-		audioOnlyChannels = [],
-		audioOnlyResolutions = [],
-	} = channelMap
-	programChannels.forEach((ch, i) => {
-		const res = programResolutions[i]
-		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
-		const fps = res?.fps != null ? formatFps(res.fps) : ''
-		sources.push({ type: 'route', routeType: 'pgm', value: `route://${ch}`, label: `Program ${i + 1}`, resolution, fps })
-	})
-	previewChannels.forEach((ch, i) => {
-		const res = programResolutions[i]
-		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
-		const fps = res?.fps != null ? formatFps(res.fps) : ''
-		// Full channel composite (black L9 + content L10+). Do not use route://N-11 — layer numbers match PGM now.
-		sources.push({ type: 'route', routeType: 'prv', value: `route://${ch}`, label: `Preview ${i + 1}`, resolution, fps })
-	})
-	if (inputsCh != null && decklinkCount > 0) {
-		const inputsRes = channelMap.inputsResolution
-		const resolution = inputsRes?.w && inputsRes?.h ? `${inputsRes.w}×${inputsRes.h}` : ''
-		const fps = inputsRes?.fps != null ? formatFps(inputsRes.fps) : ''
-		for (let i = 1; i <= decklinkCount; i++) {
-			sources.push({ type: 'route', routeType: 'decklink', value: `route://${inputsCh}-${i}`, label: `Decklink ${i}`, resolution, fps })
-		}
-	}
-	audioOnlyChannels.forEach((ch, i) => {
-		const res = audioOnlyResolutions[i]
-		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
-		const fps = res?.fps != null ? formatFps(res.fps) : ''
-		sources.push({
-			type: 'route',
-			routeType: 'audio_zone',
-			value: `route://${ch}`,
-			label: `Audio zone ${i + 1}`,
-			resolution,
-			fps,
-		})
-	})
-	return sources
-}
+import {
+	buildLiveSources,
+	escapeHtml,
+	makeDraggable,
+	mergeMediaProbeOverlay,
+	renderEffectsTab,
+	renderMediaBrowser,
+	renderSourceList,
+} from './sources-panel-helpers.js'
 
 /**
  * @param {HTMLElement} root - Panel body element
@@ -258,7 +48,7 @@ export function initSourcesPanel(root, stateStore) {
 	root.innerHTML = `
 		<div class="sources-tabs">
 			<button class="sources-tab active" data-src-tab="media">Media</button>
-			<button class="sources-tab" data-src-tab="templates">Templates</button>
+			<button class="sources-tab" data-src-tab="effects">Effects</button>
 			<button class="sources-tab" data-src-tab="live">Live</button>
 			<button class="sources-tab" data-src-tab="timelines">Timelines</button>
 		</div>
@@ -283,7 +73,15 @@ export function initSourcesPanel(root, stateStore) {
 					</div>
 				</div>
 			</div>
-			<div class="ingest-status" id="ingest-status"></div>
+			<div class="ingest-status-col">
+				<div class="ingest-status" id="ingest-status"></div>
+				<div class="ingest-upload-progress" id="ingest-upload-progress" style="display:none">
+					<div class="ingest-upload-progress__track">
+						<div class="ingest-upload-progress__bar" id="ingest-upload-progress-bar" style="width:0%"></div>
+					</div>
+					<span class="ingest-upload-progress__pct" id="ingest-upload-progress-pct">0%</span>
+				</div>
+			</div>
 		</div>
 		<div id="sources-drag-overlay" class="sources-drag-overlay" style="display:none">
 			<div class="sources-drag-overlay__content">
@@ -306,6 +104,9 @@ export function initSourcesPanel(root, stateStore) {
 	const ingestUrlInput = root.querySelector('#ingest-url')
 	const ingestUrlBtn = root.querySelector('#ingest-url-btn')
 	const ingestStatus = root.querySelector('#ingest-status')
+	const ingestProgressWrap = root.querySelector('#ingest-upload-progress')
+	const ingestProgressBar = root.querySelector('#ingest-upload-progress-bar')
+	const ingestProgressPct = root.querySelector('#ingest-upload-progress-pct')
 	const dragOverlay = root.querySelector('#sources-drag-overlay')
 	const liveFooter = root.querySelector('#sources-live-footer')
 
@@ -353,13 +154,16 @@ export function initSourcesPanel(root, stateStore) {
 		if (currentTab === 'media') {
 			searchWrap.style.display = 'block'
 			listEl.classList.add('sources-media-list')
-			renderMediaBrowser(listEl, mergeMediaProbeOverlay(media, mediaWithProbe), filter)
+			renderMediaBrowser(listEl, mergeMediaProbeOverlay(media, mediaWithProbe), filter, () => {
+				showIngestStatus('✓ Removed from server', 'ok')
+				void refreshMediaList()
+			})
 			if (mediaFooter) mediaFooter.style.display = 'flex'
-		} else if (currentTab === 'templates') {
+		} else if (currentTab === 'effects') {
 			searchWrap.style.display = 'block'
 			listEl.classList.remove('sources-media-list')
 			if (mediaFooter) mediaFooter.style.display = 'none'
-			renderSourceList(listEl, templates, 'template', filter, sendToPreview)
+			renderEffectsTab(listEl, filter)
 		} else if (currentTab === 'live') {
 			searchWrap.style.display = 'none'
 			listEl.classList.remove('sources-media-list')
@@ -372,15 +176,18 @@ export function initSourcesPanel(root, stateStore) {
 				liveSources.forEach((s) => {
 					const metaParts = []
 					if (s.resolution) metaParts.push(s.resolution)
-					if (s.fps) metaParts.push(`${s.fps}fps`)
+					if (s.fps) metaParts.push(`${s.fps} fps`)
 					const meta = metaParts.join(' · ')
 					const el = document.createElement('div')
-					el.className = 'source-item source-item--live'
+					el.className = 'source-item source-item--live source-item--live-stacked'
 					el.dataset.sourceValue = s.value
 					el.innerHTML = `
-						<span class="source-item__icon">${iconFor('route')}</span>
-						<span class="source-item__label" title="${escapeHtml(s.label + (meta ? ' — ' + meta : ''))}">${escapeHtml(s.label)}</span>
-						${meta ? `<span class="source-item__meta">${escapeHtml(meta)}</span>` : ''}
+						<div class="source-item__live-col">
+							<div class="source-item__live-line1">
+								<span class="source-item__label" title="${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>
+							</div>
+							${meta ? `<div class="source-item__live-line2">${escapeHtml(meta)}</div>` : ''}
+						</div>
 					`
 					const dragExtra = {}
 					if (s.resolution) dragExtra.resolution = s.resolution
@@ -420,8 +227,15 @@ export function initSourcesPanel(root, stateStore) {
 	refreshBtn?.addEventListener('click', () => void refreshMediaList())
 
 	// ─── Ingest: Drag & Drop ───
+	function hideIngestUploadProgress() {
+		if (ingestProgressWrap) ingestProgressWrap.style.display = 'none'
+		if (ingestProgressBar) ingestProgressBar.style.width = '0%'
+		if (ingestProgressPct) ingestProgressPct.textContent = '0%'
+	}
+
 	function showIngestStatus(msg, type = 'info') {
 		if (!ingestStatus) return
+		hideIngestUploadProgress()
 		ingestStatus.textContent = msg
 		ingestStatus.className = `ingest-status ingest-status--${type}`
 		if (type === 'ok') setTimeout(() => { ingestStatus.textContent = ''; ingestStatus.className = 'ingest-status' }, 4000)
@@ -431,17 +245,26 @@ export function initSourcesPanel(root, stateStore) {
 		if (!files || files.length === 0) return
 		const formData = new FormData()
 		for (const f of files) formData.append('file', f, f.name)
-		showIngestStatus(`Uploading ${files.length} file(s)…`, 'info')
+		if (ingestStatus) {
+			ingestStatus.textContent = `Uploading ${files.length} file(s)…`
+			ingestStatus.className = 'ingest-status ingest-status--info'
+		}
+		if (ingestProgressWrap) ingestProgressWrap.style.display = 'flex'
+		if (ingestProgressBar) ingestProgressBar.style.width = '0%'
+		if (ingestProgressPct) ingestProgressPct.textContent = '0%'
 		try {
-			const resp = await fetch(getApiBase() + '/api/ingest/upload', { method: 'POST', body: formData })
-			const ct = resp.headers.get('content-type') || ''
-			if (!ct.includes('application/json')) {
-				const text = await resp.text()
-				throw new Error(text.startsWith('<') ? `HTTP ${resp.status}: server returned HTML (not JSON)` : `HTTP ${resp.status}: ${text.slice(0, 120)}`)
-			}
-			const json = await resp.json()
-			if (!resp.ok || !json.ok) {
-				showIngestStatus(`✗ ${json.error || resp.statusText || 'Upload failed'}`, 'error')
+			const json = await postFormDataWithProgress(getApiBase() + '/api/ingest/upload', formData, (loaded, total) => {
+				if (!ingestProgressBar || !ingestProgressPct) return
+				if (total > 0) {
+					const pct = Math.min(100, Math.round((loaded / total) * 100))
+					ingestProgressBar.style.width = `${pct}%`
+					ingestProgressPct.textContent = `${pct}%`
+				} else {
+					ingestProgressPct.textContent = '…'
+				}
+			})
+			if (!json.ok) {
+				showIngestStatus(`✗ ${json.error || 'Upload failed'}`, 'error')
 				return
 			}
 			showIngestStatus(`✓ Uploaded ${json.count || files.length} file(s)`, 'ok')
@@ -571,7 +394,32 @@ export function initSourcesPanel(root, stateStore) {
 		})
 	}
 
-	stateStore.on('*', () => render())
+	/* Only re-render when data this panel actually displays changes — not timeline.tick / playback (causes list flicker). */
+	stateStore.on('*', (path) => {
+		/* setState emits _emit('*',null); wildcard listeners may get null or '*' as path */
+		if (path == null || path === '*') {
+			render()
+			return
+		}
+		if (
+			path === 'timeline.tick' ||
+			path === 'timeline.playback' ||
+			path === 'playback.matrix' ||
+			path === 'variables'
+		) {
+			return
+		}
+		if (currentTab === 'media') {
+			if (path !== 'media' && path !== 'mediaProbe') return
+		} else if (currentTab === 'live') {
+			if (path !== 'channelMap') return
+		} else if (currentTab === 'effects') {
+			return
+		} else if (currentTab === 'timelines') {
+			return
+		}
+		render()
+	})
 	timelineState.on('change', () => render())
 	render()
 	if (currentTab === 'media') void refreshMediaList()

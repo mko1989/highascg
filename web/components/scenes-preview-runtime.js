@@ -17,7 +17,29 @@ const PREVIEW_CLEAR_LAYER_BUFFER = 4
 /** Safety cap — very deep stacks only. */
 const PREVIEW_SCENE_LAYER_CLEAR_CAP = 128
 /** Must match server {@link ../../src/caspar/amcp-batch.js MAX_BATCH_COMMANDS} for BEGIN…COMMIT chunks. */
-const AMCP_BATCH_MAX_COMMANDS = 96
+const AMCP_BATCH_MAX_COMMANDS = 16
+
+/**
+ * `MIXER [channel] COMMIT` must not share a BEGIN…COMMIT batch with STOP / per-layer MIXER commands —
+ * Caspar can then omit the final `202 COMMIT OK`, so the client waits until batch timeout (~20s).
+ */
+async function postMixerChannelCommit(previewCh) {
+	try {
+		await api.post('/api/amcp/batch', { commands: [`MIXER ${Number(previewCh)} COMMIT`] })
+	} catch {
+		/* ignore */
+	}
+}
+
+async function postAmcpBatchChunks(commands) {
+	for (let i = 0; i < commands.length; i += AMCP_BATCH_MAX_COMMANDS) {
+		try {
+			await api.post('/api/amcp/batch', { commands: commands.slice(i, i + AMCP_BATCH_MAX_COMMANDS) })
+		} catch {
+			/* ignore */
+		}
+	}
+}
 
 /** @param {{ sceneState: object, stateStore: object, getPreviewChannel: () => number, getPreviewOutputResolution: () => { w: number, h: number, fps?: number } }} opts */
 export function createScenesPreviewRuntime(opts) {
@@ -137,8 +159,9 @@ export function createScenesPreviewRuntime(opts) {
 
 		const previewCh = getPreviewChannel()
 		const used = new Set()
-		const prvRes = getPreviewOutputResolution()
+			const prvRes = getPreviewOutputResolution()
 		const previewCanvas = { width: prvRes.w, height: prvRes.h, framerate: prvRes.fps ?? 50 }
+		const authoringCanvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 
 		try {
 			const sortedLayers = [...(scene.layers || [])].sort(
@@ -174,16 +197,8 @@ export function createScenesPreviewRuntime(opts) {
 					const dl = chLayerAmcp(previewCh, ln)
 					clearCmds.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`)
 				}
-				clearCmds.push(`MIXER ${Number(previewCh)} COMMIT`)
-				for (let i = 0; i < clearCmds.length; i += AMCP_BATCH_MAX_COMMANDS) {
-					try {
-						await api.post('/api/amcp/batch', {
-							commands: clearCmds.slice(i, i + AMCP_BATCH_MAX_COMMANDS),
-						})
-					} catch {
-						/* ignore */
-					}
-				}
+				await postAmcpBatchChunks(clearCmds)
+				await postMixerChannelCommit(previewCh)
 			}
 
 			async function applyOneLayer(layer, opts) {
@@ -208,7 +223,8 @@ export function createScenesPreviewRuntime(opts) {
 						stateStore,
 						sceneState.activeScreenIndex,
 						previewCanvas,
-						getMediaListOnce
+						getMediaListOnce,
+						authoringCanvas
 					)
 					const clip = layer.source.value
 					const wantLoop = !!layer.loop
@@ -228,10 +244,10 @@ export function createScenesPreviewRuntime(opts) {
 							shouldApplyStraightAlphaKeyer(!!layer.straightAlpha, layer.source?.value) ? 1 : 0
 						}`,
 						`MIXER ${cl} VOLUME ${vol}`,
-						`MIXER ${Number(previewCh)} COMMIT`,
 					]
 					const cmds = mixerOnly ? mixerPart : [playCmd, ...mixerPart]
 					await api.post('/api/amcp/batch', { commands: cmds })
+					await postMixerChannelCommit(previewCh)
 					return prvL
 				} catch (e) {
 					console.warn(`Scene preview layer ${ln} failed:`, e?.message || e)

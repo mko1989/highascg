@@ -78,7 +78,7 @@ Open the printed URL (e.g. `http://127.0.0.1:8080/`). WebSocket clients use the 
 - `web/` — static SPA (dashboard, editors)
 - `scripts/` — production installer (`install.sh` + phases), dev deploy, smoke tests, staged Caspar helpers — see **`scripts/README.md`**
 
-See `01_WO_ANALYZE_MODULE.md` and `02_WO_MIGRATE_TO_HIGHASCG.md` in this repo for migration notes and file mapping.
+See `01_WO_ANALYZE_MODULE.md` and `02_WO_MIGRATE_TO_HIGHASCG.md` in this repo for migration notes and file mapping. Additional work orders: **`docs/WO-07_CasparCG_Server_PRs_1718-1720_Consumers_Audio.md`** (upstream PRs 1718–1720), **`docs/WO-08_Install_CEF_CasparOnly_Pinning_Symlinks.md`** (CEF install policy).
 
 ## Verify
 

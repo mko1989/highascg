@@ -226,9 +226,14 @@ function templatesDir() {
 /**
  * Inputs channel, preview black CG per screen, restore persisted multiview if any.
  * Call after Caspar connect when `self.amcp` and `self.log` exist (**T10**).
+ *
+ * NOTE: `pip-overlay` must be required **lazily** here — a top-level require creates a cycle
+ * (`routing` → `pip-overlay` → `scene-native-fill` → `routing`) and `getChannelMap` is undefined
+ * on the incomplete `routing` export (breaks GET /api/settings, scene take, etc.).
  * @param {object} self - app context
  */
 async function setupAllRouting(self) {
+	const { PIP_OVERLAY_TEMPLATE_FILES } = require('../engine/pip-overlay')
 	const map = getChannelMap(self.config)
 
 	const templateBase = (self.config?.local_template_path || '').trim()
@@ -298,6 +303,44 @@ async function setupAllRouting(self) {
 			}
 		} catch (e) {
 			self.log('debug', 'Auto-deploy templates: ' + (e?.message || e))
+		}
+	}
+
+	// Deploy PIP overlay HTML templates to Caspar's template folder
+	const pipDeployDir = templateBase || basePath
+	if (pipDeployDir) {
+		try {
+			const fs = require('fs')
+			for (const tplFile of PIP_OVERLAY_TEMPLATE_FILES) {
+				const src = path.join(templatesDir(), tplFile)
+				const dest = path.join(pipDeployDir, tplFile)
+				if (fs.existsSync(src) && !fs.existsSync(dest)) {
+					fs.copyFileSync(src, dest)
+					self.log('info', `Deployed PIP overlay template ${tplFile} to ${dest}`)
+				}
+			}
+		} catch (e) {
+			self.log('debug', 'PIP overlay template deploy: ' + (e?.message || e))
+		}
+	}
+
+	// Verify PIP overlay templates are reachable via TLS (async, non-blocking)
+	if (self.amcp) {
+		try {
+			const tls = await self.amcp.raw('TLS')
+			const tlsData = Array.isArray(tls?.data) ? tls.data.join('\n') : String(tls?.data || '')
+			for (const tplFile of PIP_OVERLAY_TEMPLATE_FILES) {
+				const tplName = tplFile.replace(/\.html$/, '')
+				if (!tlsData.toLowerCase().includes(tplName.toLowerCase())) {
+					self.log(
+						'warn',
+						`PIP overlay template "${tplName}" not found in CasparCG TLS list. ` +
+						`Deploy ${tplFile} to the CasparCG template folder (e.g. /opt/casparcg/template/).`
+					)
+				}
+			}
+		} catch (e) {
+			self.log('debug', 'PIP overlay TLS verify: ' + (e?.message || e))
 		}
 	}
 

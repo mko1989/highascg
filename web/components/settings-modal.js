@@ -4,10 +4,18 @@
  * @see 09_WO_OSC_PROTOCOL.md T5.2 (Audio / OSC)
  */
 
-import { api, getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
-import { mountSystemSettings } from './system-settings.js'
+import { mountSystemSettings, refreshSystemTabOpenal } from './system-settings.js'
 import { mountVariablesPanel } from './variables-panel.js'
+import {
+	buildCasparServerPayload,
+	collectOpenalAudioRoutingFromModal,
+	hydrateCasparSettingsFromConfig,
+	loadCasparModes,
+	updateCasparApplyHint,
+	wireCasparSettingsModal,
+} from './settings-modal-caspar-ui.js'
 
 export function showSettingsModal() {
 	const existing = document.getElementById('settings-modal')
@@ -28,9 +36,9 @@ export function showSettingsModal() {
 					<button class="settings-tab" data-tab="streaming">Preview streaming</button>
 					<button class="settings-tab" data-tab="audio">OSC</button>
 					<button class="settings-tab" data-tab="screens">Screens</button>
+					<button class="settings-tab" data-tab="companion">Companion</button>
 					<button class="settings-tab" data-tab="system">System</button>
 					<button class="settings-tab" data-tab="variables">Variables</button>
-					<button class="settings-tab" data-tab="advanced">Advanced</button>
 				</div>
 				<div class="settings-panes">
 					<div class="settings-pane active" id="settings-pane-connection">
@@ -106,11 +114,6 @@ export function showSettingsModal() {
 						</div>
 					</div>
 					<div class="settings-pane" id="settings-pane-audio">
-						<p class="settings-note"><strong>OSC</strong> (incoming from CasparCG)</p>
-						<p class="settings-note">
-							OSC from CasparCG to HighAsCG is <strong>required</strong> for mixer, layers, playback, VU, and timers. The UDP listener is always on unless the server was started with
-							<code>--no-osc</code> (development only).
-						</p>
 						<div class="settings-group">
 							<label>OSC listen port</label>
 							<input type="number" id="set-osc-port" placeholder="6251" min="1" max="65535">
@@ -123,7 +126,6 @@ export function showSettingsModal() {
 							<label>Peak hold (ms)</label>
 							<input type="number" id="set-osc-peak" placeholder="2000" min="100" max="30000">
 						</div>
-						<p class="settings-note">With OSC enabled, the app subscribes automatically: <strong>header PGM timer</strong> (elapsed / total / remaining from the topmost playing layer) and the <strong>Scenes rundown</strong> timer use the same OSC stream — no extra toggles. Use the floating <strong>Audio</strong> control for program master levels.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-screens">
 						<p class="settings-note">These values feed the <strong>generated CasparCG configuration</strong> (channels, consumers, Decklink/NDI, multiview, OSC block). <strong>Audio / OSC</strong> tab settings (master/monitor routing) and <strong>OSC listen port</strong> are merged into the same file. <strong>Same machine as Caspar:</strong> set the config path and use <em>Write &amp; restart</em>. <strong>Offline preparation</strong> (no server): design here, <em>Download</em> the file, and install it when you have access to the playout machine.</p>
@@ -136,6 +138,9 @@ export function showSettingsModal() {
 								<option value="4">4 pairs (8 channels)</option>
 							</select>
 						</div>
+						<p class="settings-note" style="margin-top:-0.25rem">
+							<strong>Caspar server build</strong> (stock vs custom PR binary) lives under <strong>System</strong> → Caspar config deploy — same control, easier to find.
+						</p>
 						<div id="set-caspar-screen-rows"></div>
 						<div class="settings-group">
 							<label><input type="checkbox" id="set-caspar-mv-enabled"> Extra multiview output channel</label>
@@ -181,13 +186,33 @@ export function showSettingsModal() {
 							<label>Input channel video mode (when inputs &gt; 0)</label>
 							<select id="set-caspar-inputs-mode"></select>
 						</div>
-						<p class="settings-note">To <strong>write</strong> <code>casparcg.config</code> on this machine and restart Caspar, use <strong>System</strong> → Write &amp; restart. Use <strong>Download</strong> there for a file copy.</p>
+						<p class="settings-note">To <strong>write</strong> <code>casparcg.config</code> on the server and restart Caspar, use <strong>System</strong> → Write &amp; restart. Use <strong>Download</strong> there for a file copy.</p>
+					</div>
+					<div class="settings-pane" id="settings-pane-companion">
+						<p class="settings-note">Configure the <strong>Companion</strong> instance that HighAsCG connects to for button press actions triggered by timeline flags. Companion must be running with its HTTP API enabled at the configured address.</p>
+						<div class="settings-group">
+							<label>Companion Host</label>
+							<input type="text" id="set-companion-host" placeholder="127.0.0.1">
+						</div>
+						<div class="settings-group">
+							<label>Companion Port</label>
+							<input type="number" id="set-companion-port" placeholder="8000" min="1" max="65535">
+						</div>
+						<p class="settings-note">Uses Companion v3's HTTP API: <code>POST /api/location/&lt;page&gt;/&lt;row&gt;/&lt;column&gt;/press</code>. No authentication required for local connections.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-system">
 						<div id="settings-caspar-deploy" class="settings-caspar-deploy" style="margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border-muted,#30363d)">
 							<p class="settings-note">Deploy the <strong>generated</strong> Caspar config (screens / multiview / OSC merged from this app). HighAsCG-specific options auto-save from other tabs; this writes the XML file and restarts Caspar.</p>
+							<div class="settings-group" id="set-caspar-build-profile-wrap">
+								<label>Caspar server build</label>
+								<select id="set-caspar-build-profile">
+									<option value="stock">Stock CasparCG 2.5 (release)</option>
+									<option value="custom_live">Custom build (PRs #1718–#1720)</option>
+								</select>
+								<p class="settings-note">Use <strong>Custom</strong> only with a matching <code>casparcg-server</code> binary. Generated XML adds <code>&lt;portaudio&gt;</code> (ASIO) and optional <code>&lt;aspect-ratio&gt;</code> / <code>&lt;enable-mipmaps&gt;</code> inside <code>&lt;screen&gt;</code>. Stock Caspar will not accept those tags. Per-screen PortAudio and aspect options are on the <strong>Screens</strong> tab.</p>
+							</div>
 							<div class="settings-group">
-								<label>Caspar config path on <strong>this</strong> machine</label>
+								<label>Caspar config path on the <strong>server</strong></label>
 								<input type="text" id="set-caspar-config-path" placeholder="/opt/casparcg/config/casparcg.config">
 								<p class="settings-note">Saved path here is used first. If empty, <code>CASPAR_CONFIG_PATH</code> on the HighAsCG process is used; otherwise default <code>/opt/casparcg/config/casparcg.config</code>. The file is overwritten; then <code>RESTART</code> is sent over AMCP.</p>
 							</div>
@@ -204,16 +229,6 @@ export function showSettingsModal() {
 						<div id="system-settings-mount"></div>
 					</div>
 					<div class="settings-pane" id="settings-pane-variables"></div>
-					<div class="settings-pane" id="settings-pane-advanced">
-						<div class="settings-group">
-							<label>Periodic Sync Interval (sec)</label>
-							<input type="number" id="set-sync-sec" placeholder="10">
-						</div>
-						<div class="settings-group">
-							<label>Sync Interval when OSC active (sec)</label>
-							<input type="number" id="set-sync-osc-sec" placeholder="1">
-						</div>
-					</div>
 				</div>
 			</div>
 			<div class="modal-footer">
@@ -239,6 +254,8 @@ export function showSettingsModal() {
 		}
 	})
 
+	wireCasparSettingsModal(modal)
+
 	const systemPane = modal.querySelector('#settings-pane-system')
 	const systemMount = modal.querySelector('#system-settings-mount')
 	const systemSettingsHost = systemMount || systemPane
@@ -246,223 +263,11 @@ export function showSettingsModal() {
 
 	const varPane = modal.querySelector('#settings-pane-variables')
 
-
-
-	let casparModeChoices = []
-
-	function fillModeSelect(sel) {
-		if (!sel) return
-		sel.innerHTML = ''
-		for (const m of casparModeChoices) {
-			const opt = document.createElement('option')
-			opt.value = m.id
-			opt.textContent = m.label
-			sel.appendChild(opt)
-		}
-	}
-
-	/**
-	 * @param {Record<string, unknown>} cs - casparServer slice
-	 * @param {Record<string, unknown>} [audioAr] - audioRouting slice (OpenAL fields); defaults from settingsState
-	 */
-	function renderCasparScreenRows(cs, audioAr) {
-		const ar = audioAr || settingsState.getSettings()?.audioRouting || {}
-		const prog = ar.programSystemAudioDevices || []
-		const prevEn = ar.previewSystemAudioEnabled || []
-		const prevDev = ar.previewSystemAudioDevices || []
-		const count = Math.min(4, Math.max(1, parseInt(String(cs?.screen_count || 1), 10) || 1))
-		const wrap = modal.querySelector('#set-caspar-screen-rows')
-		wrap.innerHTML = ''
-		for (let n = 1; n <= count; n++) {
-			const mode = cs[`screen_${n}_mode`] || '1080p5000'
-			const cw = cs[`screen_${n}_custom_width`] ?? 1920
-			const ch = cs[`screen_${n}_custom_height`] ?? 1080
-			const cfps = cs[`screen_${n}_custom_fps`] ?? 50
-			const deck = cs[`screen_${n}_decklink_device`] ?? 0
-			const ndi = cs[`screen_${n}_ndi_enabled`] === true || cs[`screen_${n}_ndi_enabled`] === 'true'
-			const ndiName = String(cs[`screen_${n}_ndi_name`] || `HighAsCG-CH${n}`)
-			const windowed =
-				cs[`screen_${n}_windowed`] !== false && cs[`screen_${n}_windowed`] !== 'false'
-			const vsync = cs[`screen_${n}_vsync`] !== false && cs[`screen_${n}_vsync`] !== 'false'
-			const borderless =
-				cs[`screen_${n}_borderless`] === true || cs[`screen_${n}_borderless`] === 'true'
-			const alwaysOnTop =
-				cs[`screen_${n}_always_on_top`] !== false && cs[`screen_${n}_always_on_top`] !== 'false'
-			const posX = cs[`screen_${n}_x`]
-			const posY = cs[`screen_${n}_y`]
-			const div = document.createElement('div')
-			div.className = 'settings-group'
-			div.style.borderLeft = '3px solid #444'
-			div.style.paddingLeft = '0.75rem'
-			div.style.marginBottom = '0.75rem'
-			div.innerHTML =
-				`<h4 style="margin:0 0 0.4rem;font-size:13px">Screen ${n} (PGM output)</h4>` +
-				`<label>Video mode</label>` +
-				`<select id="set-caspar-screen-${n}-mode"></select>` +
-				`<div id="set-caspar-screen-${n}-custom-wrap" style="display:none;margin-top:0.5rem">` +
-				`<label>Custom width (px)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-cw" min="1" max="16384" step="1" value="${cw}">` +
-				`<label style="margin-top:0.5rem">Custom height (px)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-ch" min="1" max="16384" step="1" value="${ch}">` +
-				`<label style="margin-top:0.5rem">Frame rate (fps)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-cfps" min="1" max="240" step="0.01" value="${cfps}">` +
-				`</div>` +
-				`<label style="margin-top:0.5rem">Decklink device index (0 = none)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-decklink" min="0" max="8" value="${deck}">` +
-				`<p class="settings-note" style="margin-top:0.5rem;margin-bottom:0.35rem">Screen consumer (Caspar <code>&lt;screen&gt;</code>)</p>` +
-				`<label style="display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-windowed"> Windowed</label>` +
-				`<label style="margin-top:0.35rem;display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-vsync"> V-sync</label>` +
-				`<label style="margin-top:0.35rem;display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-borderless"> Borderless</label>` +
-				`<label style="margin-top:0.35rem;display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-aot"> Always on top</label>` +
-				`<label style="margin-top:0.5rem">Window X (px, empty = auto)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-px" step="1" placeholder="auto">` +
-				`<label style="margin-top:0.5rem">Window Y (px, empty = auto)</label>` +
-				`<input type="number" id="set-caspar-screen-${n}-py" step="1" placeholder="auto">` +
-				`<label style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-ndi"> NDI output</label>` +
-				`<label style="margin-top:0.5rem">NDI name</label>` +
-				`<input type="text" id="set-caspar-screen-${n}-ndi-name">` +
-				`<p class="settings-note" style="margin-top:0.75rem;margin-bottom:0.35rem">` +
-				`Caspar <code>&lt;system-audio&gt;</code> (OpenAL). Empty device = default output for that channel.</p>` +
-				`<label>PGM OpenAL device name</label>` +
-				`<input type="text" id="set-caspar-screen-${n}-pgm-openal" placeholder="e.g. Built-in Audio Analog Stereo" autocomplete="off">` +
-				`<label style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.35rem">` +
-				`<input type="checkbox" id="set-caspar-screen-${n}-prv-openal-en"> Preview (PRV) → system audio</label>` +
-				`<label style="margin-top:0.5rem">PRV OpenAL device name (when enabled)</label>` +
-				`<input type="text" id="set-caspar-screen-${n}-prv-openal" placeholder="empty = default device" autocomplete="off">`
-			wrap.appendChild(div)
-			div.querySelector(`#set-caspar-screen-${n}-ndi-name`).value = ndiName
-			const sel = div.querySelector(`#set-caspar-screen-${n}-mode`)
-			fillModeSelect(sel)
-			if ([...sel.options].some((o) => o.value === mode)) sel.value = mode
-			else sel.value = '1080p5000'
-			div.querySelector(`#set-caspar-screen-${n}-ndi`).checked = ndi
-			div.querySelector(`#set-caspar-screen-${n}-windowed`).checked = windowed
-			div.querySelector(`#set-caspar-screen-${n}-vsync`).checked = vsync
-			div.querySelector(`#set-caspar-screen-${n}-borderless`).checked = borderless
-			div.querySelector(`#set-caspar-screen-${n}-aot`).checked = alwaysOnTop
-			const pxEl = div.querySelector(`#set-caspar-screen-${n}-px`)
-			const pyEl = div.querySelector(`#set-caspar-screen-${n}-py`)
-			if (pxEl && posX != null && posX !== '') pxEl.value = String(posX)
-			if (pyEl && posY != null && posY !== '') pyEl.value = String(posY)
-			const customWrap = div.querySelector(`#set-caspar-screen-${n}-custom-wrap`)
-			function syncCustomVisibility() {
-				const show = sel.value === 'custom'
-				if (customWrap) customWrap.style.display = show ? 'block' : 'none'
-			}
-			syncCustomVisibility()
-			sel.addEventListener('change', syncCustomVisibility)
-			const pgmOpenal = div.querySelector(`#set-caspar-screen-${n}-pgm-openal`)
-			const prvOpenalEn = div.querySelector(`#set-caspar-screen-${n}-prv-openal-en`)
-			const prvOpenal = div.querySelector(`#set-caspar-screen-${n}-prv-openal`)
-			if (pgmOpenal) pgmOpenal.value = String(prog[n - 1] ?? '')
-			if (prvOpenalEn) prvOpenalEn.checked = prevEn[n - 1] === true
-			if (prvOpenal) prvOpenal.value = String(prevDev[n - 1] ?? '')
-		}
-		modal.querySelector('#set-caspar-screen-count').value = String(count)
-	}
-
-	function collectOpenalAudioRoutingFromModal() {
-		const programSystemAudioDevices = []
-		const previewSystemAudioEnabled = []
-		const previewSystemAudioDevices = []
-		for (let n = 1; n <= 4; n++) {
-			const pgmIn = modal.querySelector(`#set-caspar-screen-${n}-pgm-openal`)
-			const prvEn = modal.querySelector(`#set-caspar-screen-${n}-prv-openal-en`)
-			const prvIn = modal.querySelector(`#set-caspar-screen-${n}-prv-openal`)
-			programSystemAudioDevices.push(pgmIn ? pgmIn.value.trim() : '')
-			previewSystemAudioEnabled.push(!!(prvEn && prvEn.checked))
-			previewSystemAudioDevices.push(prvIn ? prvIn.value.trim() : '')
-		}
-		return { programSystemAudioDevices, previewSystemAudioEnabled, previewSystemAudioDevices }
-	}
-
-	function collectCasparServerFromUI() {
-		const cs = {}
-		cs.screen_count = parseInt(modal.querySelector('#set-caspar-screen-count').value, 10) || 1
-		cs.multiview_enabled = modal.querySelector('#set-caspar-mv-enabled').checked
-		const mvOut = modal.querySelector('#set-caspar-mv-output')
-		cs.multiview_screen_consumer = !mvOut || mvOut.value !== 'stream_only'
-		cs.multiview_mode = modal.querySelector('#set-caspar-mv-mode').value
-		cs.multiview_windowed = modal.querySelector('#set-caspar-mv-windowed').checked
-		cs.multiview_vsync = modal.querySelector('#set-caspar-mv-vsync').checked
-		cs.multiview_borderless = modal.querySelector('#set-caspar-mv-borderless').checked
-		cs.multiview_always_on_top = modal.querySelector('#set-caspar-mv-aot').checked
-		const mvPx = modal.querySelector('#set-caspar-mv-px')
-		const mvPy = modal.querySelector('#set-caspar-mv-py')
-		if (mvPx) {
-			const t = mvPx.value.trim()
-			cs.multiview_x = t === '' ? '' : parseInt(t, 10) || 0
-		}
-		if (mvPy) {
-			const t = mvPy.value.trim()
-			cs.multiview_y = t === '' ? '' : parseInt(t, 10) || 0
-		}
-		cs.decklink_input_count = parseInt(modal.querySelector('#set-caspar-dl-inputs').value, 10) || 0
-		cs.inputs_channel_mode = modal.querySelector('#set-caspar-inputs-mode').value
-		cs.configPath = modal.querySelector('#set-caspar-config-path').value.trim()
-		const ndiAl = modal.querySelector('#set-caspar-ndi-auto-load')
-		if (ndiAl) cs.ndi_auto_load = ndiAl.checked
-		for (let n = 1; n <= 4; n++) {
-			const modeEl = modal.querySelector(`#set-caspar-screen-${n}-mode`)
-			if (!modeEl) continue
-			cs[`screen_${n}_mode`] = modeEl.value
-			const cwEl = modal.querySelector(`#set-caspar-screen-${n}-cw`)
-			const chEl = modal.querySelector(`#set-caspar-screen-${n}-ch`)
-			const cfpsEl = modal.querySelector(`#set-caspar-screen-${n}-cfps`)
-			if (cwEl) cs[`screen_${n}_custom_width`] = parseInt(String(cwEl.value), 10) || 1920
-			if (chEl) cs[`screen_${n}_custom_height`] = parseInt(String(chEl.value), 10) || 1080
-			if (cfpsEl) cs[`screen_${n}_custom_fps`] = parseFloat(String(cfpsEl.value)) || 50
-			cs[`screen_${n}_decklink_device`] = parseInt(
-				modal.querySelector(`#set-caspar-screen-${n}-decklink`).value,
-				10
-			) || 0
-			cs[`screen_${n}_windowed`] = modal.querySelector(`#set-caspar-screen-${n}-windowed`).checked
-			cs[`screen_${n}_vsync`] = modal.querySelector(`#set-caspar-screen-${n}-vsync`).checked
-			cs[`screen_${n}_borderless`] = modal.querySelector(`#set-caspar-screen-${n}-borderless`).checked
-			cs[`screen_${n}_always_on_top`] = modal.querySelector(`#set-caspar-screen-${n}-aot`).checked
-			const pxIn = modal.querySelector(`#set-caspar-screen-${n}-px`)
-			const pyIn = modal.querySelector(`#set-caspar-screen-${n}-py`)
-			if (pxIn) {
-				const t = pxIn.value.trim()
-				cs[`screen_${n}_x`] = t === '' ? '' : parseInt(t, 10) || 0
-			}
-			if (pyIn) {
-				const t = pyIn.value.trim()
-				cs[`screen_${n}_y`] = t === '' ? '' : parseInt(t, 10) || 0
-			}
-			cs[`screen_${n}_ndi_enabled`] = modal.querySelector(`#set-caspar-screen-${n}-ndi`).checked
-			cs[`screen_${n}_ndi_name`] =
-				modal.querySelector(`#set-caspar-screen-${n}-ndi-name`).value.trim() || `HighAsCG-CH${n}`
-		}
-		return cs
-	}
-
-	function buildCasparServerPayload() {
-		const cs = collectCasparServerFromUI()
-		const sel = modal.querySelector('#sys-audio-device')
-		if (sel) {
-			const v = sel.value.trim()
-			if (!v) {
-				cs.default_alsa_card = ''
-				cs.default_alsa_device = ''
-			} else {
-				const parts = v.split(',')
-				cs.default_alsa_card = parts[0] ?? ''
-				cs.default_alsa_device = parts[1] ?? ''
-			}
-		}
-		return cs
-	}
-
 	function buildSettingsPayload() {
 		const prevAr = settingsState.getSettings()?.audioRouting || {}
-		const openalAr = collectOpenalAudioRoutingFromModal()
+		const openalAr = collectOpenalAudioRoutingFromModal(modal)
 		const prevStream = settingsState.getSettings()?.streaming || {}
+		const prevAll = settingsState.getSettings() || {}
 		const settings = {
 			caspar: {
 				host: modal.querySelector('#set-caspar-host').value,
@@ -478,8 +283,8 @@ export function showSettingsModal() {
 				go2rtcLogLevel: (modal.querySelector('#set-stream-go2rtc-log') || {}).value ?? '',
 				autoRelocateBasePort: (modal.querySelector('#set-stream-auto-relocate') || {}).checked ?? true,
 			},
-			periodic_sync_interval_sec: modal.querySelector('#set-sync-sec').value,
-			periodic_sync_interval_sec_osc: modal.querySelector('#set-sync-osc-sec').value,
+			periodic_sync_interval_sec: prevAll.periodic_sync_interval_sec ?? '',
+			periodic_sync_interval_sec_osc: prevAll.periodic_sync_interval_sec_osc ?? '',
 			offline_mode: modal.querySelector('#set-offline-mode').checked,
 			osc: {
 				listenPort: modal.querySelector('#set-osc-port').value,
@@ -489,6 +294,10 @@ export function showSettingsModal() {
 			ui: {
 				oscFooterVu: true,
 				rundownPlaybackTimer: true,
+			},
+			companion: {
+				host: modal.querySelector('#set-companion-host').value || '127.0.0.1',
+				port: parseInt(modal.querySelector('#set-companion-port').value, 10) || 8000,
 			},
 			audioRouting: { ...prevAr, ...openalAr },
 			dmx: JSON.parse(
@@ -501,7 +310,7 @@ export function showSettingsModal() {
 					}
 				)
 			),
-			casparServer: buildCasparServerPayload(),
+			casparServer: buildCasparServerPayload(modal),
 		}
 		if (systemSettingsHost.getSystemSettings) Object.assign(settings, systemSettingsHost.getSystemSettings())
 		return settings
@@ -576,123 +385,11 @@ export function showSettingsModal() {
 		scheduleAutoSave()
 	})
 
-	async function loadCasparModes() {
-		try {
-			const r = await api.get('/api/caspar-config/mode-choices')
-			casparModeChoices = r.modes || []
-		} catch (e) {
-			console.warn('[Settings] caspar modes', e)
-			casparModeChoices = [{ id: '1080p5000', label: '1080p5000' }]
-		}
-		fillModeSelect(modal.querySelector('#set-caspar-mv-mode'))
-		fillModeSelect(modal.querySelector('#set-caspar-inputs-mode'))
-	}
-
-	function updateCasparApplyHint() {
-		const offline = modal.querySelector('#set-offline-mode').checked
-		modal.querySelector('#set-caspar-apply-hint').style.display = offline ? 'block' : 'none'
-	}
-
-	modal.querySelector('#set-caspar-screen-count').addEventListener('change', () => {
-		const cur = collectCasparServerFromUI()
-		const openalAr = collectOpenalAudioRoutingFromModal()
-		cur.screen_count = parseInt(modal.querySelector('#set-caspar-screen-count').value, 10) || 1
-		const ar = { ...(settingsState.getSettings()?.audioRouting || {}), ...openalAr }
-		renderCasparScreenRows(cur, ar)
-	})
-
-	modal.querySelector('#set-offline-mode').addEventListener('change', updateCasparApplyHint)
-
-	function syncMultiviewConsumerVisibility() {
-		const on = modal.querySelector('#set-caspar-mv-enabled').checked
-		const mvOut = modal.querySelector('#set-caspar-mv-output')
-		const streamOnly = mvOut && mvOut.value === 'stream_only'
-		const wrap = modal.querySelector('#set-caspar-mv-consumer-wrap')
-		if (wrap) wrap.style.display = on && !streamOnly ? '' : 'none'
-		const outWrap = modal.querySelector('#set-caspar-mv-output-wrap')
-		if (outWrap) outWrap.style.display = on ? '' : 'none'
-	}
-	modal.querySelector('#set-caspar-mv-enabled').addEventListener('change', syncMultiviewConsumerVisibility)
-	const mvOutEl = modal.querySelector('#set-caspar-mv-output')
-	if (mvOutEl) mvOutEl.addEventListener('change', syncMultiviewConsumerVisibility)
-
-	modal.querySelector('#set-caspar-download').addEventListener('click', async () => {
-		try {
-			const url = getApiBase() + '/api/caspar-config/generate?download=1'
-			const res = await fetch(url)
-			if (!res.ok) {
-				let detail = res.statusText
-				try {
-					const j = await res.json()
-					if (j.error) detail = j.error
-				} catch {}
-				throw new Error(detail)
-			}
-			const blob = await res.blob()
-			const a = document.createElement('a')
-			a.href = URL.createObjectURL(blob)
-			a.download = 'casparcg.config'
-			a.click()
-			URL.revokeObjectURL(a.href)
-		} catch (e) {
-			alert('Download failed: ' + e.message)
-		}
-	})
-
-	modal.querySelector('#set-caspar-apply').addEventListener('click', async () => {
-		if (!confirm('Overwrite the Caspar config file on this machine and send RESTART? Caspar will reload.')) return
-		try {
-			const casparServer = buildCasparServerPayload()
-			const audioRouting = {
-				...(settingsState.getSettings()?.audioRouting || {}),
-				...collectOpenalAudioRoutingFromModal(),
-			}
-			const res = await api.post('/api/caspar-config/apply', { casparServer, audioRouting })
-			const extra = res.path ? `\n\n${res.path}` : ''
-			alert((res.message || 'OK') + extra)
-		} catch (e) {
-			alert('Apply failed: ' + e.message)
-		}
-	})
-
 	async function load() {
 		try {
 			const cfg = await api.get('/api/settings')
-			await loadCasparModes()
-			const cs = cfg.casparServer || {}
-			modal.querySelector('#set-caspar-mv-enabled').checked =
-				cs.multiview_enabled !== false && cs.multiview_enabled !== 'false'
-			const mvOut = modal.querySelector('#set-caspar-mv-output')
-			if (mvOut) {
-				const streamOnly = cs.multiview_screen_consumer === false || cs.multiview_screen_consumer === 'false'
-				mvOut.value = streamOnly ? 'stream_only' : 'screen_stream'
-			}
-			const mv = cs.multiview_mode || '1080p5000'
-			const mvSel = modal.querySelector('#set-caspar-mv-mode')
-			if ([...mvSel.options].some((o) => o.value === mv)) mvSel.value = mv
-			modal.querySelector('#set-caspar-mv-windowed').checked =
-				cs.multiview_windowed !== false && cs.multiview_windowed !== 'false'
-			modal.querySelector('#set-caspar-mv-vsync').checked =
-				cs.multiview_vsync !== false && cs.multiview_vsync !== 'false'
-			modal.querySelector('#set-caspar-mv-borderless').checked =
-				cs.multiview_borderless === true || cs.multiview_borderless === 'true'
-			modal.querySelector('#set-caspar-mv-aot').checked =
-				cs.multiview_always_on_top !== false && cs.multiview_always_on_top !== 'false'
-			const mvPxEl = modal.querySelector('#set-caspar-mv-px')
-			const mvPyEl = modal.querySelector('#set-caspar-mv-py')
-			const mvx = cs.multiview_x
-			const mvy = cs.multiview_y
-			if (mvPxEl) mvPxEl.value = mvx != null && mvx !== '' ? String(mvx) : ''
-			if (mvPyEl) mvPyEl.value = mvy != null && mvy !== '' ? String(mvy) : ''
-			syncMultiviewConsumerVisibility()
-			modal.querySelector('#set-caspar-dl-inputs').value = String(cs.decklink_input_count ?? 0)
-			const im = cs.inputs_channel_mode || '1080p5000'
-			const inSel = modal.querySelector('#set-caspar-inputs-mode')
-			if ([...inSel.options].some((o) => o.value === im)) inSel.value = im
-			modal.querySelector('#set-caspar-config-path').value = cs.configPath || ''
-			const ndiAlEl = modal.querySelector('#set-caspar-ndi-auto-load')
-			if (ndiAlEl) ndiAlEl.checked = cs.ndi_auto_load !== false && cs.ndi_auto_load !== 'false'
-			renderCasparScreenRows(cs, cfg.audioRouting || {})
+			await loadCasparModes(modal)
+			hydrateCasparSettingsFromConfig(modal, cfg)
 			modal.querySelector('#set-caspar-host').value = cfg.caspar.host
 			modal.querySelector('#set-caspar-port').value = cfg.caspar.port
 			modal.querySelector('#set-stream-enabled').checked = cfg.streaming.enabled
@@ -703,15 +400,15 @@ export function showSettingsModal() {
 			if (g2l) g2l.value = cfg.streaming.go2rtcLogLevel || ''
 			const arEl = modal.querySelector('#set-stream-auto-relocate')
 			if (arEl) arEl.checked = cfg.streaming.autoRelocateBasePort !== false
-			modal.querySelector('#set-sync-sec').value = cfg.periodic_sync_interval_sec || ''
-			modal.querySelector('#set-sync-osc-sec').value = cfg.periodic_sync_interval_sec_osc || ''
 			modal.querySelector('#set-offline-mode').checked = !!cfg.offline_mode
-			updateCasparApplyHint()
+			updateCasparApplyHint(modal)
 			const osc = cfg.osc || {}
 			modal.querySelector('#set-osc-port').value = osc.listenPort ?? 6251
 			modal.querySelector('#set-osc-bind').value = osc.listenAddress || '0.0.0.0'
 			modal.querySelector('#set-osc-peak').value = osc.peakHoldMs ?? 2000
-			const ui = cfg.ui || {}
+			const comp = cfg.companion || {}
+			modal.querySelector('#set-companion-host').value = comp.host || '127.0.0.1'
+			modal.querySelector('#set-companion-port').value = comp.port || 8000
 		} catch (e) {
 			console.error('Failed to load settings:', e)
 		}

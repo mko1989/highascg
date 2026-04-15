@@ -154,6 +154,50 @@ export function appendSceneLayerMixerGroup(root, { sceneId, layerIndex, layer })
 
 	root.appendChild(mixGrp)
 
+	const foe = layer.fadeOnEnd || { enabled: false, frames: 12 }
+	const fadeGrp = document.createElement('div')
+	fadeGrp.className = 'inspector-group'
+	fadeGrp.innerHTML = '<div class="inspector-group__title">Fade on end</div>'
+
+	const fadeEnWrap = document.createElement('div')
+	fadeEnWrap.className = 'inspector-field inspector-row'
+	const fadeEnCb = document.createElement('input')
+	fadeEnCb.type = 'checkbox'
+	fadeEnCb.checked = !!foe.enabled
+	fadeEnCb.id = 'inspector-scene-fade-on-end'
+	const fadeEnLab = document.createElement('label')
+	fadeEnLab.htmlFor = 'inspector-scene-fade-on-end'
+	fadeEnLab.textContent = 'Fade out when clip ends'
+	fadeEnCb.addEventListener('change', () => {
+		sceneState.patchLayer(sceneId, layerIndex, { fadeOnEnd: { enabled: fadeEnCb.checked } })
+		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+	})
+	fadeEnWrap.appendChild(fadeEnCb)
+	fadeEnWrap.appendChild(fadeEnLab)
+	fadeGrp.appendChild(fadeEnWrap)
+
+	const fadeFrInp = createDragInput({
+		label: 'Duration (frames)',
+		value: foe.frames ?? 12,
+		min: 1,
+		max: 250,
+		step: 1,
+		decimals: 0,
+		onChange: (v) => {
+			sceneState.patchLayer(sceneId, layerIndex, { fadeOnEnd: { frames: Math.max(1, Math.min(250, Math.round(v))) } })
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		},
+	})
+	fadeGrp.appendChild(fadeFrInp.wrap)
+
+	const fadeHint = document.createElement('p')
+	fadeHint.className = 'inspector-field inspector-field--hint'
+	fadeHint.style.fontSize = '0.78rem'
+	fadeHint.style.color = 'var(--text-muted)'
+	fadeHint.textContent = 'When enabled, the layer opacity fades to 0 over this many frames before a non-looping clip finishes. Ignored when loop is on.'
+	fadeGrp.appendChild(fadeHint)
+	root.appendChild(fadeGrp)
+
 	appendAudioInspectorGroup(root, {
 		getAudio: () => {
 			const L = sceneState.getScene(sceneId)?.layers?.[layerIndex]
