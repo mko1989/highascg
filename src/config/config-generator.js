@@ -317,7 +317,10 @@ ${oscXml}
     <amcp><media-server><host>localhost</host><port>8000</port></media-server></amcp>
     <ndi><auto-load>${ndiAutoLoad}</auto-load></ndi>
     <decklink/>
-    <html><enable-gpu>false</enable-gpu></html>
+    <html>
+        <enable-gpu>true</enable-gpu>
+        <command-line-args>--disable-gpu --disable-gpu-compositing --disable-gpu-vsync --disable-features=Vulkan,UseSkiaRenderer</command-line-args>
+    </html>
 </configuration>`
 }
 
