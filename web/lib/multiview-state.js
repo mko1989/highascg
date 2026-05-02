@@ -4,9 +4,9 @@
  * @see main_plan.md Prompt 15, HOW_TO_ACHIVE_MULTIVIEWER.MD
  */
 
-const STORAGE_KEY = 'casparcg_multiview_layout'
+const STORAGE_KEY_BASE = 'casparcg_multiview_layout'
 /** Four quick-save slots (localStorage); first click saves, later clicks recall (see multiview-editor). */
-const PRESETS_STORAGE_KEY = 'casparcg_multiview_presets_v1'
+const PRESETS_STORAGE_KEY_BASE = 'casparcg_multiview_presets_v1'
 const DEFAULT_WIDTH = 1920
 const DEFAULT_HEIGHT = 1080
 
@@ -85,18 +85,29 @@ function defaultLayout(channelMap, cw = DEFAULT_WIDTH, ch = DEFAULT_HEIGHT) {
 
 export class MultiviewState {
 	constructor() {
+		this.currentIndex = 1
 		this.canvasWidth = DEFAULT_WIDTH
 		this.canvasHeight = DEFAULT_HEIGHT
 		this.cells = []
 		this.showOverlay = true
+		this.bgColor = '#000000'
 		this.audioActiveCellId = null
 		this._listeners = new Map()
 		this._load()
 	}
 
+	switchTo(index) {
+		const next = Math.max(1, parseInt(index, 10) || 1)
+		if (this.currentIndex === next) return
+		this.currentIndex = next
+		this._load()
+		this._emit('change')
+	}
+
 	_load() {
+		const key = this.currentIndex === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
-			const raw = localStorage.getItem(STORAGE_KEY)
+			const raw = localStorage.getItem(key)
 			if (raw) {
 				const data = JSON.parse(raw)
 				if (Array.isArray(data.cells) && data.cells.length > 0) {
@@ -105,9 +116,11 @@ export class MultiviewState {
 					this.canvasWidth = data.canvasWidth ?? DEFAULT_WIDTH
 					this.canvasHeight = data.canvasHeight ?? DEFAULT_HEIGHT
 					this.showOverlay = data.showOverlay !== false
+					this.bgColor = data.bgColor || '#000000'
 					this.audioActiveCellId = data.audioActiveCellId || null
 					if (JSON.stringify(this.cells) !== JSON.stringify(prev)) {
-						queueMicrotask(() => this._save())
+						// Route migration only — do not re-push the full multiview to Caspar on refresh
+						queueMicrotask(() => this._save(false))
 					}
 					return
 				}
@@ -116,20 +129,26 @@ export class MultiviewState {
 		this.cells = []
 	}
 
-	_save() {
+	/**
+	 * @param {boolean} [applyToCaspar] - when false, persist + redraw clients only; skip `/api/multiview/apply` (server sync, project load, audio focus, canvas size).
+	 */
+	_save(applyToCaspar = true) {
+		const key = this.currentIndex === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
 			localStorage.setItem(
-				STORAGE_KEY,
+				key,
 				JSON.stringify({
 					cells: this.cells,
 					canvasWidth: this.canvasWidth,
 					canvasHeight: this.canvasHeight,
 					showOverlay: this.showOverlay,
+					bgColor: this.bgColor,
 					audioActiveCellId: this.audioActiveCellId,
 				})
 			)
 		} catch {}
 		this._emit('change')
+		if (applyToCaspar) this._emit('apply-request')
 	}
 
 	_emit(key) {
@@ -207,9 +226,12 @@ export class MultiviewState {
 	}
 
 	setCanvasSize(w, h) {
-		this.canvasWidth = w
-		this.canvasHeight = h
-		this._save()
+		const nw = Math.max(1, Math.floor(Number(w)) || 0)
+		const nh = Math.max(1, Math.floor(Number(h)) || 0)
+		if (nw === this.canvasWidth && nh === this.canvasHeight) return
+		this.canvasWidth = nw
+		this.canvasHeight = nh
+		this._save(false)
 	}
 
 	setShowOverlay(v) {
@@ -217,9 +239,15 @@ export class MultiviewState {
 		this._save()
 	}
 
+	/** Set multiview background color (layer 10). */
+	setBgColor(color) {
+		this.bgColor = typeof color === 'string' && color.trim() ? color.trim() : '#000000'
+		this._save()
+	}
+
 	setAudioActiveCell(id) {
 		this.audioActiveCellId = id
-		this._save()
+		this._save(false)
 		this._emit('audio-change')
 	}
 
@@ -230,6 +258,7 @@ export class MultiviewState {
 			canvasWidth: this.canvasWidth,
 			canvasHeight: this.canvasHeight,
 			showOverlay: this.showOverlay,
+			bgColor: this.bgColor,
 		}
 	}
 
@@ -240,7 +269,9 @@ export class MultiviewState {
 		this.canvasWidth = data.canvasWidth ?? DEFAULT_WIDTH
 		this.canvasHeight = data.canvasHeight ?? DEFAULT_HEIGHT
 		this.showOverlay = data.showOverlay !== false
-		this._save()
+		this.bgColor = data.bgColor || '#000000'
+		// Do not re-apply the whole layout to Caspar on every WebUI refresh / project hydrate
+		this._save(false)
 	}
 
 	/**
@@ -282,6 +313,7 @@ export class MultiviewState {
 			canvasWidth: this.canvasWidth,
 			canvasHeight: this.canvasHeight,
 			showOverlay: this.showOverlay,
+			bgColor: this.bgColor,
 			audioActiveCellId: this.audioActiveCellId,
 		}
 	}
@@ -293,14 +325,16 @@ export class MultiviewState {
 		this.canvasWidth = snapshot.canvasWidth ?? this.canvasWidth
 		this.canvasHeight = snapshot.canvasHeight ?? this.canvasHeight
 		this.showOverlay = snapshot.showOverlay !== false
+		this.bgColor = snapshot.bgColor || this.bgColor
 		this.audioActiveCellId = snapshot.audioActiveCellId ?? null
 		this._save()
 	}
 
 	/** @returns {(object | null)[]} length 4 — null = slot never saved */
 	getPresetSlots() {
+		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
-			const raw = localStorage.getItem(PRESETS_STORAGE_KEY)
+			const raw = localStorage.getItem(key)
 			if (raw) {
 				const arr = JSON.parse(raw)
 				if (Array.isArray(arr) && arr.length === 4) return arr
@@ -314,8 +348,9 @@ export class MultiviewState {
 		if (index < 0 || index > 3 || !snapshot) return
 		const slots = this.getPresetSlots()
 		slots[index] = snapshot
+		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
-			localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(slots))
+			localStorage.setItem(key, JSON.stringify(slots))
 		} catch {}
 	}
 
@@ -324,8 +359,9 @@ export class MultiviewState {
 		if (index < 0 || index > 3) return
 		const slots = this.getPresetSlots()
 		slots[index] = null
+		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
-			localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(slots))
+			localStorage.setItem(key, JSON.stringify(slots))
 		} catch {}
 	}
 }

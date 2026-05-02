@@ -43,6 +43,10 @@ function createStreamingLifecycle({
 	let needGo2rtcRestartAfterCaspar = false
 
 	async function startStreamingSubsystem() {
+		if (!config.streaming.enabled) {
+			appCtx.log('debug', '[Streaming] startStreamingSubsystem skipped — streaming.enabled is false')
+			return
+		}
 		appCtx.streamingPipelineReady = false
 		try {
 			config.streaming._casparHost = config.caspar.host

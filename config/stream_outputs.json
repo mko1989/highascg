@@ -1,0 +1,18 @@
+[
+  {
+    "id": "str_1",
+    "label": "Str1",
+    "enabled": true,
+    "type": "rtmp",
+    "name": "Str1",
+    "quality": "medium",
+    "rtmpServerUrl": "rtmp://x.rtmp.youtube.com/live2",
+    "streamKey": "aek2-2g0j-jvr0-qca4-9j89",
+    "srtUrl": "",
+    "videoCodec": "h264",
+    "videoBitrateKbps": 4500,
+    "encoderPreset": "veryfast",
+    "audioCodec": "aac",
+    "audioBitrateKbps": 128
+  }
+]

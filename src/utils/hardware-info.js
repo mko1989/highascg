@@ -8,6 +8,44 @@ function drmShort(name) {
 	return String(name || '').replace(/^card\d+-/i, '')
 }
 
+function isGpuConnectorPseudoName(name) {
+	const s = String(name || '').trim().toLowerCase()
+	if (!s) return true
+	if (/^card\d+$/.test(s)) return true
+	if (/^renderd\d+$/.test(s)) return true
+	if (/^renderd\d+-/.test(s)) return true
+	return false
+}
+
+function connectorSortKey(name) {
+	const short = drmShort(String(name || '').trim())
+	const up = short.toUpperCase()
+	const m = up.match(/^(DP|HDMI|DVI|VGA|E-?DP|USBC|USB-C)-?(\d+)?(?:-(\d+))?/)
+	let typeRank = 99
+	let a = 999
+	let b = 0
+	if (m) {
+		const t = m[1].replace('-', '')
+		if (t === 'DP' || t === 'EDP') typeRank = 1
+		else if (t === 'HDMI') typeRank = 2
+		else if (t === 'DVI') typeRank = 3
+		else if (t === 'VGA') typeRank = 4
+		else if (t === 'USBC') typeRank = 5
+		if (m[2]) a = parseInt(m[2], 10)
+		if (m[3]) b = parseInt(m[3], 10)
+	}
+	return { typeRank, a, b, short: up }
+}
+
+function compareConnectorNames(a, b) {
+	const ka = connectorSortKey(a)
+	const kb = connectorSortKey(b)
+	if (ka.typeRank !== kb.typeRank) return ka.typeRank - kb.typeRank
+	if (ka.a !== kb.a) return ka.a - kb.a
+	if (ka.b !== kb.b) return ka.b - kb.b
+	return ka.short.localeCompare(kb.short)
+}
+
 /**
  * xrandr often reports `DP-1` while sysfs uses `card0-DP-1` — resolve the directory that has `modes`.
  * @param {string} name
@@ -182,7 +220,47 @@ function getDisplaysSysfs() {
 	} catch (e) {
 		// ignore
 	}
-	return displays
+	return displays.sort((a, b) => compareConnectorNames(a?.name, b?.name))
+}
+
+function inferConnectorType(name) {
+	const s = String(name || '').toUpperCase()
+	if (s.includes('HDMI')) return 'hdmi'
+	if (s.includes('DISPLAYPORT') || s.includes('DP-') || s.includes('-DP') || s.includes('E-DP') || s.includes('EDP')) return 'displayport'
+	if (s.includes('DVI')) return 'dvi'
+	if (s.includes('VGA')) return 'vga'
+	if (s.includes('USB-C') || s.includes('USBC') || s.includes('TYPEC')) return 'usb-c'
+	return 'unknown'
+}
+
+/**
+ * Enumerate DRM connectors (connected and disconnected) with inferred type.
+ * @returns {Array<{name: string, shortName: string, connected: boolean, type: string}>}
+ */
+function getGpuConnectorInventory() {
+	const drmPath = '/sys/class/drm'
+	if (!fs.existsSync(drmPath)) return []
+	const out = []
+	try {
+		const files = fs.readdirSync(drmPath)
+		for (const file of files) {
+			if (!file.includes('-')) continue
+			const statusPath = path.join(drmPath, file, 'status')
+			if (!fs.existsSync(statusPath)) continue
+			const status = String(fs.readFileSync(statusPath, 'utf8') || '').trim().toLowerCase()
+			const short = drmShort(file)
+			if (isGpuConnectorPseudoName(short) || isGpuConnectorPseudoName(file)) continue
+			out.push({
+				name: file,
+				shortName: short,
+				connected: status === 'connected',
+				type: inferConnectorType(short),
+			})
+		}
+	} catch {
+		return []
+	}
+	return out.sort((a, b) => compareConnectorNames(a?.shortName || a?.name, b?.shortName || b?.name))
 }
 
 /**
@@ -213,6 +291,16 @@ function getDisplayDetails() {
 		}
 	}
 	return displays
+		.filter((d) => !isGpuConnectorPseudoName(d?.name))
+		.sort((a, b) => {
+			const ax = Number(a?.x)
+			const bx = Number(b?.x)
+			const ay = Number(a?.y)
+			const by = Number(b?.y)
+			const posKnown = Number.isFinite(ax) && Number.isFinite(bx) && Number.isFinite(ay) && Number.isFinite(by)
+			if (posKnown && (ax !== bx || ay !== by)) return ax !== bx ? ax - bx : ay - by
+			return compareConnectorNames(a?.name, b?.name)
+		})
 }
 
 /**
@@ -230,6 +318,7 @@ module.exports = {
 	getDisplaysXrandr,
 	getDisplaysXrandrDetailed,
 	getDisplaysSysfs,
+	getGpuConnectorInventory,
 	getConnectedDisplayNames,
 	getDisplayDetails,
 }

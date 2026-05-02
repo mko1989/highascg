@@ -1,0 +1,30 @@
+{
+  "programLayout": "stereo",
+  "programOutput": "default",
+  "programAlsaDevice": "",
+  "programFfmpegPath": "",
+  "programFfmpegArgs": "",
+  "monitorOutput": "default",
+  "monitorAlsaDevice": "",
+  "monitorFfmpegPath": "",
+  "monitorFfmpegArgs": "",
+  "browserMonitor": "pgm",
+  "programSystemAudioDevices": [
+    "",
+    "",
+    "",
+    ""
+  ],
+  "previewSystemAudioEnabled": [
+    false,
+    false,
+    false,
+    false
+  ],
+  "previewSystemAudioDevices": [
+    "",
+    "",
+    "",
+    ""
+  ]
+}

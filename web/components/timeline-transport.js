@@ -120,10 +120,15 @@ export function createTimelineTransport(deps) {
 		).join('')
 
 		const state = stateStore.getState()
-		const screenCount = state?.channelMap?.screenCount || 1
-		const screenOpts = Array.from({ length: screenCount }, (_, i) =>
-			`<option value="${i}" ${view.sendTo.screenIdx === i ? 'selected' : ''}>Screen ${i + 1}</option>`
-		).join('')
+		const cm = state?.channelMap || {}
+		const screenCount = cm.screenCount || 1
+		const screenOpts = Array.from({ length: screenCount }, (_, i) => {
+			const label = cm.virtualMainChannels?.[i]?.name || `Screen ${i + 1}`
+			return `<option value="${i}" ${view.sendTo.screenIdx === i ? 'selected' : ''}>${label}</option>`
+		}).join('')
+		const allSelected = view.sendTo.screenIdx === null
+		const allOpt = screenCount > 1 ? `<option value="all" ${allSelected ? 'selected' : ''}>All screens</option>` : ''
+		const screenSel = `<select class="tl-select tl-select-sm" id="tl-screen">${allOpt}${screenOpts}</select>`
 
 		transportEl.innerHTML = `
 			<div class="tl-tb">
@@ -154,7 +159,7 @@ export function createTimelineTransport(deps) {
 				</div>
 				<div class="tl-tb-group tl-tb-dest">
 					<span class="tl-tb-label">Dest:</span>
-					<select class="tl-select tl-select-sm" id="tl-screen">${screenOpts}</select>
+					${screenSel}
 					<label class="tl-chk"><input type="checkbox" id="tl-s-prev" ${view.sendTo.preview ? 'checked' : ''}> PRV</label>
 					<label class="tl-chk"><input type="checkbox" id="tl-s-pgm" ${view.sendTo.program ? 'checked' : ''}> PGM</label>
 				</div>
@@ -221,7 +226,8 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-zf')?.addEventListener('click', () => canvas.zoomFit())
 		transportEl.querySelector('#tl-follow')?.addEventListener('click', () => { view.follow = !view.follow; buildTransport() })
 		transportEl.querySelector('#tl-screen')?.addEventListener('change', (e) => {
-			view.sendTo.screenIdx = parseInt(e.target.value, 10)
+			const v = e.target.value
+			view.sendTo.screenIdx = v === 'all' ? null : parseInt(v, 10)
 			updateSendTo()
 			redrawTimelineView()
 		})
@@ -240,7 +246,7 @@ export function createTimelineTransport(deps) {
 					transition: trans.type || 'CUT',
 					duration: trans.duration ?? 12,
 					tween: trans.tween || 'linear',
-					screenIdx: view.sendTo.screenIdx ?? 0,
+					screenIdx: view.sendTo.screenIdx,
 				}).catch(() => {})
 			}
 		})

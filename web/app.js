@@ -1,9 +1,6 @@
 /**
  * CasparCG Web Client — main app entry.
- * Connects via WebSocket for real-time state, shows layout shell.
- * @see main_plan.md Prompt 11
  */
-
 import { WsClient } from './lib/ws-client.js'
 import { OscClient } from './lib/osc-client.js'
 import { api } from './lib/api-client.js'
@@ -27,477 +24,207 @@ import { showLogsModal } from './components/logs-modal.js'
 import { multiviewState } from './lib/multiview-state.js'
 import { dmxState } from './lib/dmx-state.js'
 import { initPixelMapEditor } from './components/pixel-map-editor.js'
+import { initStreamingPanel } from './components/streaming-panel.js'
 import { getVariableStore } from './lib/variable-state.js'
 import { projectState } from './lib/project-state.js'
 import { timelineState } from './lib/timeline-state.js'
-import { consumeSkipRemoteProjectSync } from './lib/project-remote-sync.js'
+import { initOptionalModules } from './lib/optional-modules.js'
+import { initDeviceView } from './components/device-view.js'
+import { placeholderState } from './lib/placeholder-state.js'
+
+import * as Status from './lib/app-status.js'
+import * as Handlers from './lib/app-ws-handlers.js'
+import * as SceneDeck from './lib/app-scene-deck.js'
+import * as MvSync from './lib/app-multiview-sync.js'
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()
-/** Subscribe before any async work so the first WS `state` (variables) is not missed. */
+window.placeholderState = placeholderState
 getVariableStore(ws)
 
-/** OSC WebSocket fan-out; shares socket with {@link WsClient}. */
-let _oscClient = null
+let _oscClient = null; let httpConnected = false; let _casparAmcpConnected = false; let connectionEye = null
 
-/** Set after successful GET /api/state bootstrap. */
-let httpConnected = false
-
-/** Tracks AMCP TCP up so we only fire {@link CustomEvent} `mv-caspar-amcp-connected` on false→true (not on periodic VERSION health lines). */
-let _casparAmcpConnected = false
-
-function casparAmcpConnectedFromState(st) {
-	const raw = st?.caspar
-	const conn =
-		raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
-	const skipped = !!(conn && conn.skipped)
-	return !!(conn && conn.connected) && !skipped
-}
-
-function emitMultiviewApplyIfCasparJustConnected(st) {
-	const now = casparAmcpConnectedFromState(st)
-	if (now && !_casparAmcpConnected) {
-		document.dispatchEvent(new CustomEvent('mv-caspar-amcp-connected'))
-	}
-	_casparAmcpConnected = now
-}
-
-const statusDot = document.getElementById('status-dot')
-const statusText = document.getElementById('status-text')
-const statusNet = document.getElementById('status-net')
-let connectionEye = null
-
-function updateNetworkInfo() {
-	if (!statusNet) return
-	const host = window.location.hostname
-	let type = 'WAN'
-	if (host === 'localhost' || host === '127.0.0.1') type = 'Local'
-	else if (host.startsWith('192.168.') || host.startsWith('10.') || host.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) type = 'LAN'
-	else if (host.startsWith('100.')) type = 'Tailscale'
-	
-	statusNet.textContent = `[${type}]`
-	statusNet.className = 'status-net status-net--' + type.toLowerCase()
-}
-
-/**
- * Size multiview editor canvas from Caspar INFO CONFIG (multiview channel, else first program).
- */
-function syncMultiviewCanvasFromChannelMap(cm) {
-	if (!cm) return
-	const by = cm.channelResolutionsByChannel || {}
-	const mvCh = cm.multiviewCh
-	let w
-	let h
-	if (mvCh != null && by[mvCh]) {
-		w = by[mvCh].w
-		h = by[mvCh].h
-	} else if (cm.programResolutions?.[0]) {
-		w = cm.programResolutions[0].w
-		h = cm.programResolutions[0].h
-	}
-	if (w > 0 && h > 0 && (multiviewState.canvasWidth !== w || multiviewState.canvasHeight !== h)) {
-		multiviewState.setCanvasSize(w, h)
-	}
-}
-
-/** Redraw multiview (streams + fit + draw) without pushing layout to Caspar — used after channel map / Caspar reconnect. */
-let mvLayoutRefreshTimer = null
-function scheduleMultiviewLayoutRefresh() {
-	clearTimeout(mvLayoutRefreshTimer)
-	mvLayoutRefreshTimer = setTimeout(() => {
-		mvLayoutRefreshTimer = null
-		document.dispatchEvent(new CustomEvent('mv-layout-refresh'))
-	}, 120)
-}
-
-/** Eye indicator: Caspar AMCP TCP (not browser↔HighAsCG). Reads flat `caspar` or nested `caspar.connection` from WS merges. */
-function refreshCasparConnectionEye() {
-	if (!connectionEye) return
-	const st = stateStore.getState()
-	const raw = st?.caspar
-	const conn =
-		raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
-	const skipped = !!(conn && conn.skipped)
-	const amcpUp = !!(conn && conn.connected) && !skipped
-	connectionEye.setConnected(amcpUp)
-}
-
-function refreshStatusLine() {
-	if (!statusText) return
-	const st = stateStore.getState()
-	const raw = st?.caspar
-	const c =
-		raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
-	const skipped = !!(c && c.skipped)
-	const casparOk = !!(c && c.connected)
-	let line = ''
-	if (ws.connected) line = 'Live'
-	else if (httpConnected) line = 'HTTP'
-	else line = 'Connecting…'
-	if (skipped) line += ' · no AMCP'
-	else if (casparOk) line += ' · Caspar'
-	else if (ws.connected || httpConnected) line += ' · Caspar offline'
-
-	const cc = st?.configComparison
-	if (casparOk && cc?.serverPhysicalScreens?.length) {
-		const n = cc.serverPhysicalScreens.length
-		const idx = cc.serverPhysicalScreens.map((s) => s.index).join(', ')
-		const m = cc.moduleScreenCount
-		if (typeof m === 'number' && m !== n) line += ` · Screens ${n} (ch ${idx}) ≠ app ${m}`
-		else line += ` · Screens ${n} (ch ${idx})`
-	}
-
-	statusText.textContent = line
-	updateNetworkInfo()
-}
-
-function updateConnectionStatus(connected, error, isLive = false) {
-	updateNetworkInfo()
-	if (error) {
-		statusDot?.classList.remove('connected', 'disconnected')
-		statusDot?.classList.add('error')
-		if (statusText) statusText.textContent = error
-		return
-	}
-	if (connected) {
-		statusDot?.classList.remove('disconnected', 'error')
-		statusDot?.classList.add('connected')
-		refreshStatusLine()
-	} else {
-		statusDot?.classList.remove('connected', 'error')
-		statusDot?.classList.add('disconnected')
-		if (statusText) statusText.textContent = 'Connecting…'
+const appLogic = {
+	syncMultiviewCanvas: (cm) => MvSync.syncMultiviewCanvasFromChannelMap(cm, multiviewState),
+	scheduleMultiviewRefresh: () => MvSync.scheduleMultiviewLayoutRefresh(),
+	scheduleSceneDeckSync: () => SceneDeck.scheduleSceneDeckSync(ws, sceneState),
+	emitCasparConnectedIfNeeded: (st) => {
+		const now = Status.casparAmcpConnectedFromState(st)
+		if (now && !_casparAmcpConnected) document.dispatchEvent(new CustomEvent('mv-caspar-amcp-connected'))
+		_casparAmcpConnected = now
+	},
+	refreshEye: () => Status.refreshCasparConnectionEye(connectionEye, stateStore),
+	refreshStatusLine: () => Status.refreshStatusLine(stateStore, ws, httpConnected),
+	updateStatus: (connected, error) => Status.updateConnectionStatus(connected, error, { ws, httpConnected, stateStore }),
+	onConnect: () => {
+		settingsState.load().catch(() => {})
+		streamState.refreshStreams()
+		applyBrowserMonitorFromSettings(settingsState.getSettings())
+	},
+	handleWsDisconnect: async (reason) => {
+		if (httpConnected) {
+			try { const st = await api.get('/api/state'); if (st) stateStore.setState(st) } catch {}
+			appLogic.updateStatus(true)
+		} else appLogic.updateStatus(false, reason)
+		appLogic.refreshEye()
 	}
 }
 
 function initTabs() {
-	const tabs = document.querySelectorAll('.tab')
-	const panes = document.querySelectorAll('.tab-pane')
-	tabs.forEach((tab) => {
-		tab.addEventListener('click', () => {
-			const target = tab.dataset.tab
-			tabs.forEach((t) => t.classList.remove('active'))
-			panes.forEach((p) => {
-				p.classList.toggle('active', p.id === `tab-${target}`)
-			})
-			tab.classList.add('active')
-			if (target === 'scenes') {
-				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('scenes-tab-activated')))
-			}
-			if (target === 'multiview') {
-				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('mv-tab-activated')))
-			}
-			if (target === 'pixelmap') {
-				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('px-tab-activated')))
-			}
-			if (target === 'timeline') {
-				requestAnimationFrame(() => document.dispatchEvent(new CustomEvent('timeline-tab-activated')))
-			}
-		})
+	const tabs = document.querySelectorAll('.tab'); const panes = document.querySelectorAll('.tab-pane')
+	const tabStorageKey = 'highascg_active_tab'
+	const activateTab = (target) => {
+		tabs.forEach(t => t.classList.remove('active'))
+		panes.forEach(p => p.classList.toggle('active', p.id === `tab-${target}`))
+		const tab = Array.from(tabs).find((t) => t.dataset.tab === target)
+		if (tab) tab.classList.add('active')
+		try { localStorage.setItem(tabStorageKey, target) } catch { /* ignore */ }
+		if (target !== 'pixelmap') {
+			window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: false } }))
+		}
+		if (['scenes', 'multiview', 'pixelmap', 'timeline'].includes(target)) requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(`${target === 'pixelmap' ? 'px' : (target === 'multiview' ? 'mv' : target)}-tab-activated`)))
+		if (target === 'streaming') initStreamingPanel(document.getElementById('tab-streaming'))
+		if (target === 'device-view') initDeviceView(document.getElementById('tab-device-view'))
+	}
+	tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)))
+	
+	window.addEventListener('highascg-open-pixel-mapping', (ev) => {
+		const nodeId = ev.detail?.nodeId
+		activateTab('pixelmap')
+		// The pixelmap editor itself might need the nodeId, handled via dmxState or similar.
+		window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: true, activate: true, nodeId } }))
 	})
+
+	let initial = ''
+	try { initial = localStorage.getItem(tabStorageKey) || '' } catch { /* ignore */ }
+	if (!initial || !document.querySelector(`.tab[data-tab="${initial}"]`)) {
+		initial = document.querySelector('.tab.active')?.dataset.tab || tabs[0]?.dataset.tab || ''
+	}
+	if (initial) activateTab(initial)
 }
 
 async function init() {
 	const eyeContainer = document.getElementById('connection-eye-container')
 	if (eyeContainer) {
-		connectionEye = createConnectionEye(eyeContainer)
-		connectionEye.el.style.cursor = 'pointer'
-		connectionEye.el.addEventListener('click', (e) => {
-			e.preventDefault()
-			e.stopPropagation()
-			showLogsModal()
-		})
+		connectionEye = createConnectionEye(eyeContainer); connectionEye.el.style.cursor = 'pointer'
+		connectionEye.el.addEventListener('click', () => showLogsModal())
 	}
+	window.addEventListener('keydown', e => {
+		if (!(e.ctrlKey || e.metaKey) || e.key !== ',' || e.target.closest('input, textarea, select, [contenteditable="true"]')) return
+		e.preventDefault(); showSettingsModal()
+	})
+	initTabs(); initWorkspaceLayout()
+	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState })
+	_oscClient = new OscClient({ wsClient: ws }); window.highascg_osc_client = _oscClient
 
-	window.addEventListener('keydown', (e) => {
-		if (!(e.ctrlKey || e.metaKey) || e.key !== ',') return
-		const t = e.target
-		if (
-			t &&
-			(t.isContentEditable ||
-				(typeof t.closest === 'function' && t.closest('input, textarea, select, [contenteditable="true"]')))
-		) {
-			return
-		}
-		e.preventDefault()
-		showSettingsModal()
-	})
+	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, dashboardState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
+	sceneState.on('change', () => appLogic.scheduleSceneDeckSync())
+	sceneState.on('imported', () => appLogic.scheduleSceneDeckSync())
+	sceneState.on('previewScene', () => appLogic.scheduleSceneDeckSync())
 
-	initTabs()
-	initWorkspaceLayout()
-
-	// WebSocket + OSC fan-out (standalone server). Companion HTTP-only: WS may fail; HTTP still works.
-	_oscClient = new OscClient({ wsClient: ws })
-	// Legacy hook for components that read live OSC channel state (e.g. inspector); prefer getOscClient().
-	window.highascg_osc_client = _oscClient
-	ws.on('variable_update', (changed) => {
-		if (!changed || typeof changed !== 'object') return
-		const cur = stateStore.getState()?.variables
-		const merged = { ...(cur && typeof cur === 'object' ? cur : {}), ...changed }
-		stateStore.applyChange('variables', merged)
-	})
-	ws.on('state', (data) => {
-		stateStore.setState(data)
-		if (data?.channelMap?.programResolutions)
-			sceneState.setCanvasResolutions(data.channelMap.programResolutions)
-		syncMultiviewCanvasFromChannelMap(data?.channelMap)
-		scheduleMultiviewLayoutRefresh()
-		emitMultiviewApplyIfCasparJustConnected(data)
-		if (data?.scene?.live) sceneState.applyServerLiveChannels(data.scene.live, data.channelMap)
-		updateConnectionStatus(true, null, true)
-		refreshStatusLine()
-		refreshCasparConnectionEye()
-	})
-	ws.on('dmx:colors', (data) => {
-		dmxState.setLiveColors(data)
-	})
-	ws.on('change', (data) => {
-		if (data && data.path != null) {
-			stateStore.applyChange(data.path, data.value)
-			if (data.path === 'scene.live' && data.value) {
-				sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
-			}
-			if (data.path === 'channelMap') scheduleMultiviewLayoutRefresh()
-			if (data.path === 'caspar.connection') {
-				scheduleMultiviewLayoutRefresh()
-				emitMultiviewApplyIfCasparJustConnected(stateStore.getState())
-			}
-			if (
-				data.path === 'caspar.connection' ||
-				String(data.path || '').startsWith('caspar.') ||
-				data.path === 'configComparison'
-			) {
-				refreshStatusLine()
-				refreshCasparConnectionEye()
-			}
-		}
-	})
-
-	window.addEventListener('casparcg-playback-matrix', (ev) => {
-		if (ev?.detail && typeof ev.detail === 'object') {
-			stateStore.applyChange('playback.matrix', ev.detail)
-		}
-	})
-	ws.on('timeline.tick', (data) => stateStore.applyChange('timeline.tick', data))
-	ws.on('timeline.playback', (pb) => stateStore.applyChange('timeline.playback', pb))
-
-	ws.on('project_sync', (project) => {
-		if (!project || typeof project !== 'object' || project.error) return
-		if (!project.version) return
-		if (consumeSkipRemoteProjectSync()) return
-		try {
-			projectState.importProject(project, sceneState, timelineState, multiviewState, dashboardState)
-			window.dispatchEvent(new Event('project-loaded'))
-		} catch (e) {
-			console.warn('[HighAsCG] project_sync import failed:', e?.message || e)
-		}
-	})
-
-	/** Push look id/name list to server for Companion / GET /api/state (live; no project save required). */
-	function buildSceneDeckPayload() {
-		const prv = sceneState.previewSceneId
-		const scenes = Array.isArray(sceneState.scenes) ? sceneState.scenes : []
-		return {
-			looks: scenes.map((s) => ({
-				id: String(s.id),
-				name: String(s.name || 'Untitled look'),
-			})),
-			/** Full look payloads so Companion can POST /api/scene/take before the project is saved to disk/Caspar DATA. */
-			sceneSnapshots: scenes.map((s) => JSON.parse(JSON.stringify(s))),
-			...(prv ? { previewSceneId: String(prv) } : { previewSceneId: null }),
-		}
-	}
-	let sceneDeckSyncTimer = null
-	function scheduleSceneDeckSync() {
-		if (sceneDeckSyncTimer) clearTimeout(sceneDeckSyncTimer)
-		sceneDeckSyncTimer = setTimeout(() => {
-			sceneDeckSyncTimer = null
-			try {
-				ws.send({ type: 'scene_deck_sync', data: buildSceneDeckPayload() })
-			} catch {
-				/* WS not ready */
-			}
-		}, 100)
-	}
-	sceneState.on('change', scheduleSceneDeckSync)
-	sceneState.on('imported', scheduleSceneDeckSync)
-	sceneState.on('previewScene', scheduleSceneDeckSync)
-
-	ws.on('connect', () => {
-		updateConnectionStatus(true, null, true)
-		refreshCasparConnectionEye()
-		// Multiview APPLY runs on `mv-caspar-amcp-connected` (AMCP false→true), not on browser WS connect.
-		scheduleMultiviewLayoutRefresh()
-		scheduleSceneDeckSync()
-		settingsState.load().catch(() => {})
-		streamState.refreshStreams()
-		applyBrowserMonitorFromSettings(settingsState.getSettings())
-	})
-	ws.on('server_error', (data) => {
-		console.warn('[HighAsCG] Server reported an error over WebSocket:', data)
-	})
-	ws.on('disconnect', async () => {
-		if (httpConnected) {
-			try {
-				const st = await api.get('/api/state')
-				if (st && typeof st === 'object') stateStore.setState(st)
-			} catch {
-				// keep last state
-			}
-			updateConnectionStatus(true)
-		} else {
-			updateConnectionStatus(false)
-		}
-		refreshCasparConnectionEye()
-	})
-	ws.on('error', async () => {
-		if (httpConnected) {
-			try {
-				const st = await api.get('/api/state')
-				if (st && typeof st === 'object') stateStore.setState(st)
-			} catch {
-				// keep last state
-			}
-			updateConnectionStatus(true)
-		} else {
-			updateConnectionStatus(false, 'WebSocket error')
-		}
-		refreshCasparConnectionEye()
-	})
-
-	const header = document.querySelector('.header')
-	const statusEl = document.querySelector('.header__status')
+	const header = document.querySelector('.header'); const statusEl = document.querySelector('.header__status')
 	if (header && statusEl) initHeaderBar(header, statusEl, stateStore)
 
-	/** PGM clip time from OSC — topmost layer with file/time on the active program channel. */
 	let pgmHeaderTimerDestroy = null
-	function mountHeaderPgmPlaybackTimer() {
-		if (!statusEl || !_oscClient) return
-		let slot = document.getElementById('header-pgm-timer')
-		if (!slot) {
-			slot = document.createElement('div')
-			slot.id = 'header-pgm-timer'
-			slot.className = 'header-pgm-timer-wrap'
-			statusEl.insertBefore(slot, statusEl.firstChild)
-		}
-		if (pgmHeaderTimerDestroy) pgmHeaderTimerDestroy.destroy()
-		pgmHeaderTimerDestroy = mountPgmTopLayerPlaybackTimer(slot, {
-			oscClient: _oscClient,
-			getChannel: () => {
-				const cm = stateStore.getState()?.channelMap || {}
-				const list = cm.programChannels || [1]
-				const screenIdx = dashboardState.activeScreenIndex ?? sceneState.activeScreenIndex ?? 0
-				const idx = Math.min(Math.max(0, screenIdx), list.length - 1)
-				return list[idx] ?? 1
-			},
-			getState: () => stateStore.getState(),
+	let selectedPlaybackChannel = null
+	const playbackChannelStorageKey = 'highascg_header_playback_channel'
+	try {
+		const saved = parseInt(String(localStorage.getItem(playbackChannelStorageKey) || ''), 10)
+		if (Number.isFinite(saved) && saved > 0) selectedPlaybackChannel = saved
+	} catch {
+		// ignore storage failures
+	}
+	const getProgramChannels = () => {
+		const cm = stateStore.getState()?.channelMap || {}
+		const list = cm.playbackChannels || cm.programChannels
+		return Array.isArray(list) && list.length ? list.map((v) => parseInt(String(v), 10)).filter((v) => Number.isFinite(v) && v > 0) : [1]
+	}
+	const ensureSelectedPlaybackChannel = () => {
+		const list = getProgramChannels()
+		if (!list.includes(selectedPlaybackChannel)) selectedPlaybackChannel = list[0] ?? 1
+		return selectedPlaybackChannel
+	}
+	const persistSelectedPlaybackChannel = () => {
+		try { localStorage.setItem(playbackChannelStorageKey, String(selectedPlaybackChannel || '')) } catch { /* ignore */ }
+	}
+	const renderPlaybackChannelChips = () => {
+		const slot = document.getElementById('header-pgm-timer')
+		if (!slot) return
+		const chips = slot.querySelector('.header-pgm-timer-chips')
+		if (!chips) return
+		ensureSelectedPlaybackChannel()
+		const list = getProgramChannels()
+		chips.innerHTML = ''
+		list.forEach((ch, idx) => {
+			const b = document.createElement('button')
+			b.type = 'button'
+			b.className = 'header-pgm-timer-chip' + (ch === selectedPlaybackChannel ? ' header-pgm-timer-chip--active' : '')
+			b.textContent = `P${idx + 1}`
+			b.title = `Show playback timer for channel ${ch}`
+			b.addEventListener('click', () => {
+				selectedPlaybackChannel = ch
+				persistSelectedPlaybackChannel()
+				renderPlaybackChannelChips()
+				pgmHeaderTimerDestroy?.refresh()
+			})
+			chips.appendChild(b)
 		})
 	}
-	mountHeaderPgmPlaybackTimer()
-	dashboardState.on('screenChange', () => pgmHeaderTimerDestroy?.refresh())
-	sceneState.on('screenChange', () => pgmHeaderTimerDestroy?.refresh())
+	const mountTimer = () => {
+		if (!statusEl || !_oscClient) return
+		let slot = document.getElementById('header-pgm-timer') || document.createElement('div')
+		if (!slot.id) { slot.id = 'header-pgm-timer'; slot.className = 'header-pgm-timer-wrap'; statusEl.insertBefore(slot, statusEl.firstChild) }
+		let chips = slot.querySelector('.header-pgm-timer-chips')
+		let timerHost = slot.querySelector('.header-pgm-timer-host')
+		if (!chips || !timerHost) {
+			slot.innerHTML = ''
+			chips = document.createElement('div')
+			chips.className = 'header-pgm-timer-chips'
+			timerHost = document.createElement('div')
+			timerHost.className = 'header-pgm-timer-host'
+			slot.append(chips, timerHost)
+		}
+		if (pgmHeaderTimerDestroy) pgmHeaderTimerDestroy.destroy()
+		pgmHeaderTimerDestroy = mountPgmTopLayerPlaybackTimer(timerHost, {
+			oscClient: _oscClient, getState: () => stateStore.getState(),
+			getChannel: () => ensureSelectedPlaybackChannel(),
+		})
+		renderPlaybackChannelChips()
+	}
+	mountTimer(); dashboardState.on('screenChange', () => pgmHeaderTimerDestroy?.refresh()); sceneState.on('screenChange', () => pgmHeaderTimerDestroy?.refresh())
 	stateStore.on('*', (path) => {
-		if (path === 'channelMap' || path === 'channels' || path == null) pgmHeaderTimerDestroy?.refresh()
+		if (path === 'channelMap') renderPlaybackChannelChips()
+		if (['channelMap', 'channels', null].includes(path)) pgmHeaderTimerDestroy?.refresh()
 	})
 
-	initSourcesPanel(document.querySelector('#panel-sources .panel__body'), stateStore)
+	initSourcesPanel(document.querySelector('#panel-sources .panel__body'), stateStore, { wsClient: ws })
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, { getOscClient: () => _oscClient })
-	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore)
-	initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
-	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore)
-	const inspectorScroll =
-		document.getElementById('panel-inspector-scroll') ||
-		document.getElementById('panel-inspector-body') ||
-		document.querySelector('#panel-inspector .panel__body')
-	initInspectorPanel(inspectorScroll, stateStore)
+	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore); initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
+	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore); initInspectorPanel(document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
 	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
 
-	settingsState.subscribe((s) => {
-		applyBrowserMonitorFromSettings(s)
-		const isOffline = !!s.offline_mode
-		document.body.classList.toggle('offline-mode', isOffline)
-		if (connectionEye) connectionEye.setOffline(isOffline)
-		stateStore.setOffline(isOffline)
+	settingsState.subscribe(s => {
+		applyBrowserMonitorFromSettings(s); const isOffline = !!s.offline_mode
+		document.body.classList.toggle('offline-mode', isOffline); if (connectionEye) connectionEye.setOffline(isOffline); stateStore.setOffline(isOffline)
 	})
-	document.addEventListener('highascg-settings-applied', (ev) => {
-		const s = settingsState.getSettings()
-		applyBrowserMonitorFromSettings(s)
-		const isOffline = !!s.offline_mode
-		document.body.classList.toggle('offline-mode', isOffline)
-		if (connectionEye) connectionEye.setOffline(isOffline)
-		stateStore.setOffline(isOffline)
-	})
-	applyBrowserMonitorFromSettings(settingsState.getSettings())
 
-	// Bootstrap state from API (works with Companion HTTP when api_port=0)
 	try {
-		const settings = await api.get('/api/settings')
-		if (settings && typeof settings === 'object') {
-			Object.assign(settingsState.settings, settings)
-			settingsState.notify()
-		}
-		const isOffline = !!settings?.offline_mode
-		stateStore.setOffline(isOffline)
-		if (connectionEye) connectionEye.setOffline(isOffline)
-		document.body.classList.toggle('offline-mode', isOffline)
-
-		if (isOffline) {
-			await stateStore.hydrateFromCache()
-		}
-
-		const state = await api.get('/api/state')
-		if (state && typeof state === 'object') {
-			stateStore.setState(state)
-			if (state.variables && typeof state.variables === 'object') {
-				getVariableStore(ws)?.mergeFromServer(state.variables)
-			}
-			sceneState.setCanvasResolutions(state.channelMap?.programResolutions)
-			syncMultiviewCanvasFromChannelMap(state.channelMap)
-			scheduleMultiviewLayoutRefresh()
-			emitMultiviewApplyIfCasparJustConnected(state)
+		const settings = await api.get('/api/settings'); if (settings) { Object.assign(settingsState.settings, settings); settingsState.notify() }
+		if (settings?.offline_mode) await stateStore.hydrateFromCache()
+		const state = await api.get('/api/state'); if (state) {
+			stateStore.setState(state); if (state.variables) getVariableStore(ws)?.mergeFromServer(state.variables)
+			sceneState.setCanvasResolutions(state.channelMap?.programResolutions); appLogic.syncMultiviewCanvas(state.channelMap)
+			appLogic.scheduleMultiviewRefresh(); appLogic.emitCasparConnectedIfNeeded(state)
 			if (state.scene?.live) sceneState.applyServerLiveChannels(state.scene.live, state.channelMap)
-			httpConnected = true
-			updateConnectionStatus(true)
-			refreshStatusLine()
-			refreshCasparConnectionEye()
+			httpConnected = true; appLogic.updateStatus(true); appLogic.refreshEye()
 		}
-
-		/* Same project for every browser tab / machine: server disk + Caspar DATA mirror */
 		if (!settings?.offline_mode) {
 			try {
-				const proj = await api.get('/api/project')
-				if (proj && typeof proj === 'object' && proj.version && !proj.error) {
-					projectState.importProject(proj, sceneState, timelineState, multiviewState, dashboardState)
-					window.dispatchEvent(new Event('project-loaded'))
-				}
-			} catch {
-				/* 404 = no project saved yet */
-			}
+				const proj = await api.get('/api/project'); if (proj?.version) { projectState.importProject(proj, sceneState, timelineState, multiviewState, dashboardState); window.dispatchEvent(new Event('project-loaded')) }
+			} catch {}
 		}
-		/* settingsState.notify() above already triggers streamState.refreshStreams via subscribe */
-		window.dispatchEvent(new CustomEvent('highascg-bootstrap-complete'))
-	} catch (err) {
-		const msg = err instanceof Error ? err.message : String(err)
-		console.warn('[HighAsCG] HTTP bootstrap failed (/api/settings or /api/state):', msg)
-		console.warn(
-			'[HighAsCG] Open DevTools → Network: confirm requests go to this origin (not file://). WebSocket may still work.',
-		)
-		// API not available, state remains empty or hydrated from cache
-	}
-
-	window.addEventListener('project-loaded', async () => {
-		try {
-			const st = await api.get('/api/state')
-			if (st?.scene?.live) sceneState.applyServerLiveChannels(st.scene.live, st.channelMap)
-		} catch {
-			// ignore
-		}
-	})
+	} catch (err) { console.warn('[HighAsCG] Bootstrap failed:', err.message) }
 }
 
-/** @returns {import('./lib/osc-client.js').OscClient | null} */
-export function getOscClient() {
-	return _oscClient
-}
-
+export function getOscClient() { return _oscClient }
 init()

@@ -169,10 +169,58 @@ async function unlinkMediaById(config, rawId) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'File not found' }) }
 	}
 	try {
-		await fs.promises.unlink(filePath)
+		const stat = await fs.promises.stat(filePath)
+		if (stat.isDirectory()) {
+			await fs.promises.rm(filePath, { recursive: true, force: true })
+		} else {
+			await fs.promises.unlink(filePath)
+		}
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, id: normalizeMediaIdKey(String(rawId)).trim() }) }
 	} catch (e) {
 		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Delete failed' }) }
+	}
+}
+
+/**
+ * @param {object} config
+ * @param {string} rawPath
+ */
+async function createMediaFolder(config, rawPath) {
+	const base = getMediaIngestBasePath(config)
+	const full = resolveSafe(base, rawPath)
+	if (!full) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid folder path' }) }
+	try {
+		await fs.promises.mkdir(full, { recursive: true })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, path: normalizeMediaIdKey(rawPath) }) }
+	} catch (e) {
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Mkdir failed' }) }
+	}
+}
+
+/**
+ * @param {object} config
+ * @param {string} sourceId
+ * @param {string} targetId - can be a new filename or a folder (if folder, file is moved into it)
+ */
+async function moveMediaFile(config, sourceId, targetId) {
+	const base = getMediaIngestBasePath(config)
+	const src = resolveMediaFileOnDisk(config, sourceId)
+	if (!src) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Source not found' }) }
+	
+	let dest = resolveSafe(base, targetId)
+	if (!dest) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid target path' }) }
+
+	try {
+		// If dest exists and is a directory, append src filename
+		if (fs.existsSync(dest) && fs.statSync(dest).isDirectory()) {
+			dest = path.join(dest, path.basename(src))
+		}
+		// Ensure parent dir exists
+		await fs.promises.mkdir(path.dirname(dest), { recursive: true })
+		await fs.promises.rename(src, dest)
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, source: sourceId, target: targetId }) }
+	} catch (e) {
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Move failed' }) }
 	}
 }
 
@@ -366,7 +414,7 @@ function findFileByStemUnderDir(dir, stemHint) {
  * Skips dotfiles / dotdirs. Caps file count for very large trees.
  * @param {string} basePath
  * @param {number} [maxFiles]
- * @returns {string[]}
+ * @returns {Array<{ id: string, isDir: boolean }>}
  */
 function scanMediaRecursiveForBrowser(basePath, maxFiles = 2500) {
 	const out = []
@@ -387,17 +435,18 @@ function scanMediaRecursiveForBrowser(basePath, maxFiles = 2500) {
 			if (out.length >= maxFiles) return
 			const name = ent.name
 			if (name.startsWith('.')) continue
-			const rel = relDir ? `${relDir}/${name}` : name
+			const rel = (relDir ? `${relDir}/${name}` : name).replace(/\\/g, '/')
 			if (ent.isDirectory()) {
+				out.push({ id: rel, isDir: true })
 				walk(rel)
 			} else {
 				const ext = path.extname(name).toLowerCase()
-				if (_SCAN_EXT.has(ext)) out.push(rel.replace(/\\/g, '/'))
+				if (_SCAN_EXT.has(ext)) out.push({ id: rel, isDir: false })
 			}
 		}
 	}
 	walk('')
-	return out.sort((a, b) => a.localeCompare(b))
+	return out.sort((a, b) => a.id.localeCompare(b.id))
 }
 
 /**
@@ -414,6 +463,8 @@ module.exports = {
 	handleLocalMedia,
 	handleDeleteLocalMedia,
 	unlinkMediaById,
+	createMediaFolder,
+	moveMediaFile,
 	resolveMediaFileOnDisk,
 	probeMedia,
 	resolveSafe,

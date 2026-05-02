@@ -11,6 +11,8 @@
     "multiview_enabled": true,
     "multiview_screen_consumer": true,
     "decklink_input_count": 0,
+    "decklink_input_1_device": 0,
+    "decklink_input_2_device": 0,
     "configPath": "/opt/casparcg/config/casparcg.config",
     "default_alsa_card": "",
     "default_alsa_device": ""
@@ -80,5 +82,19 @@
         "brightness": 1.0
       }
     ]
+  },
+  "pixelhue": {
+    "enabled": false,
+    "host": "",
+    "unicoPort": 19998,
+    "apiPort": null,
+    "targetSerial": ""
+  },
+  "deviceGraph": {
+    "version": 1,
+    "devices": [{ "id": "caspar_host", "role": "caspar_host", "label": "Caspar / HighAsCG host" }],
+    "connectors": [],
+    "edges": [],
+    "layout": {}
   }
 }

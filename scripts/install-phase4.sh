@@ -51,6 +51,31 @@ SYNGUI
 systemctl daemon-reload
 systemctl restart "syncthing@$USER_CASPAR" 2>/dev/null || systemctl start "syncthing@$USER_CASPAR" 2>/dev/null || true
 
+# 4.3b USB media ingest — udisks2 + polkit (WO-29; headless safe eject)
+echo -e "${CYAN}→ USB ingest dependencies (udisks2, polkit)…${NC}"
+apt install -y udisks2 policykit-1
+POLKIT_SRC="$SCRIPT_DIR/scripts/polkit/50-highascg-udisks.rules"
+if [ -f "$POLKIT_SRC" ]; then
+	cp "$POLKIT_SRC" /etc/polkit-1/rules.d/50-highascg-udisks.rules
+	chmod 644 /etc/polkit-1/rules.d/50-highascg-udisks.rules
+	echo -e "  ${GREEN}✓${NC} polkit rule installed (plugdev may mount/unmount USB)"
+else
+	echo -e "  ${YELLOW}○${NC} polkit rule missing at $POLKIT_SRC — copy manually if USB eject fails"
+fi
+POLKIT_HEADLESS="$SCRIPT_DIR/scripts/polkit/51-highascg-udisks-casparcg-headless.rules"
+if [ -f "$POLKIT_HEADLESS" ]; then
+	cp "$POLKIT_HEADLESS" /etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules
+	chmod 644 /etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules
+	sed -i "s/casparcg/${USER_CASPAR}/g" /etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules
+	echo -e "  ${GREEN}✓${NC} polkit headless rule for $USER_CASPAR (udisks without active session)"
+else
+	echo -e "  ${YELLOW}○${NC} optional headless polkit rule missing at $POLKIT_HEADLESS"
+fi
+if [ -f /etc/polkit-1/rules.d/50-highascg-udisks.rules ] || [ -f /etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules ]; then
+	systemctl try-restart polkit.service 2>/dev/null || true
+fi
+usermod -aG plugdev "$USER_CASPAR" 2>/dev/null || true
+
 # Tailscale daemon (login is still: sudo tailscale up — opens auth URL)
 systemctl enable tailscaled 2>/dev/null || true
 systemctl start tailscaled 2>/dev/null || true
@@ -189,7 +214,7 @@ User=$USER_CASPAR
 Group=$USER_CASPAR
 UMask=002
 WorkingDirectory=/opt/highascg
-ExecStart=/usr/bin/node index.js
+ExecStart=/usr/bin/node /opt/highascg/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

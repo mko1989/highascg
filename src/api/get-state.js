@@ -48,17 +48,35 @@ function getState(ctx) {
 	const timelinePlayback =
 		timelineEngine && typeof timelineEngine.getPlayback === 'function' ? timelineEngine.getPlayback() : null
 
+	/**
+	 * Live deck mirror (WS `scene_deck_sync` from web UI) + same preset arrays as the browser’s `sceneState`
+	 * (`layerPresets` / `lookPresets` — named mix shortcuts and look bookmarks). Always includes arrays
+	 * so Companion can rely on the shape. Optional: `sceneSnapshots` (full look JSON) when the browser
+	 * is connected, `previewSceneId`, `looks` (id + name + mainScope).
+	 */
+	const rawDeck =
+		ctx.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks) ? ctx.sceneDeck : { looks: [] }
+	const sceneDeck = {
+		...rawDeck,
+		looks: Array.isArray(rawDeck.looks) ? rawDeck.looks : [],
+		previewSceneId:
+			rawDeck.previewSceneId != null && String(rawDeck.previewSceneId).trim()
+				? String(rawDeck.previewSceneId).trim()
+				: null,
+		layerPresets: Array.isArray(rawDeck.layerPresets) ? rawDeck.layerPresets : [],
+		lookPresets: Array.isArray(rawDeck.lookPresets) ? rawDeck.lookPresets : [],
+	}
+
 	return {
 		...base,
 		caspar: casparConn,
+		/** Last DeckLink input PLAY summary after AMCP connect (WO-28); null until first routing setup. */
+		decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
 		channelMap,
 		scene: {
 			live: liveSceneState.getAll(),
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
-			deck:
-				ctx.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks)
-					? ctx.sceneDeck
-					: { looks: [] },
+			deck: sceneDeck,
 		},
 		timeline: {
 			list: timelines,
@@ -70,6 +88,7 @@ function getState(ctx) {
 		localMediaEnabled: !!(cfg.local_media_path || '').trim(),
 		configComparison: ctx._configComparison || null,
 		ui: cfg.ui || {},
+		extraLiveSources: Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [],
 		osc:
 			base.osc !== undefined
 				? base.osc

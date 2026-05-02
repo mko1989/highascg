@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "host": "",
+  "unicoPort": 19998,
+  "apiPort": null,
+  "targetSerial": ""
+}

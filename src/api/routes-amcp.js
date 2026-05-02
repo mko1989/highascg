@@ -9,7 +9,6 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter } = require('../engine/audio-route')
-const { MAX_BATCH_COMMANDS } = require('../caspar/amcp-batch')
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
 	const matrix = playbackTracker.getMatrixForState(ctx)
@@ -43,14 +42,48 @@ async function handlePost(path, body, ctx) {
 					body: jsonBody({ error: 'commands: non-empty array of AMCP lines required (no BEGIN/COMMIT)' }),
 				}
 			}
-			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
-			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT only when config.amcp_batch is true. */
-			let last = null
-			for (let i = 0; i < lines.length; i += MAX_BATCH_COMMANDS) {
-				const chunk = lines.slice(i, i + MAX_BATCH_COMMANDS)
-				last = await amcp.batchSend(chunk)
+			// Keep TCP batch flag in sync with latest persisted config (same object as startup, but UI may
+			// toggle amcp_batch without recreating the connection — merge from ctx.config every request).
+			if (ctx.config && amcp?._context?.config) {
+				amcp._context.config.amcp_batch = ctx.config.amcp_batch
+				if (ctx.config.amcp_max_batch_commands != null) {
+					amcp._context.config.amcp_max_batch_commands = ctx.config.amcp_max_batch_commands
+				}
+				if (ctx.config.amcp_mixer_commit_before_amcp_batch != null) {
+					amcp._context.config.amcp_mixer_commit_before_amcp_batch = ctx.config.amcp_mixer_commit_before_amcp_batch
+				}
 			}
+			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
+			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
+			const last = await amcp.batchSendChunked(lines)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
+		}
+		case '/api/amcp/raw-batch': {
+			const cmds = b.commands
+			if (!Array.isArray(cmds) || cmds.length === 0) {
+				return {
+					status: 400,
+					headers: JSON_HEADERS,
+					body: jsonBody({ error: 'commands: non-empty array of AMCP lines required' }),
+				}
+			}
+			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
+			const MAX = 4000
+			if (lines.length > MAX) {
+				return {
+					status: 400,
+					headers: JSON_HEADERS,
+					body: jsonBody({ error: `commands: at most ${MAX} lines per raw-batch` }),
+				}
+			}
+			for (const line of lines) {
+				await amcp.raw(line)
+			}
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonPlaybackBody(ctx, { ok: true, rawBatch: true, count: lines.length }),
+			}
 		}
 		case '/api/play': {
 			const { clip, transition, duration, tween, loop, auto, parameters, audioFilter, audioRoute } = b
@@ -141,7 +174,8 @@ async function handlePost(path, body, ctx) {
 			const r = await amcp.basic.remove(channel, consumer, index)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
-		case '/api/print': {
+		case '/api/print':
+		case '/api/amcp/print': {
 			const r = await amcp.basic.print(channel)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}

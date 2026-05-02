@@ -80,8 +80,11 @@ function parseResolutionAspect(s) {
 	return w / h
 }
 
-/** Caspar layers for timeline (per stack index). Keep separate from scene/looks (typically 1–20) and black CG (9). */
-const TIMELINE_LAYER_BASE = 100
+/**
+ * Caspar layers for timeline (per stack index). Must sit **above** look bank B (110–199) so fills/CG from looks
+ * do not cover timeline output; keep separate from bank A (1–99) and black CG (9).
+ */
+const TIMELINE_LAYER_BASE = 200
 
 const TICK_MS = 40
 /** WS `timeline.tick` throttle — client extrapolates between ticks; ~150–180ms reduces jitter over high-latency links. */

@@ -1,0 +1,3318 @@
+[
+  {
+    "file": "companion-module-pixelhue-switcher-main 2/pkg/main.js",
+    "lines": 2,
+    "connections": [
+      "buffer",
+      "fs/promises",
+      "stream",
+      "assert",
+      "zlib",
+      "events",
+      "tls",
+      "http2",
+      "https",
+      "ajv/dist/runtime/equal",
+      "path",
+      "crypto",
+      "url",
+      "dgram",
+      "http",
+      "util",
+      "net",
+      "node:timers/promises",
+      "node:events",
+      "node:process",
+      "node:buffer",
+      "node:stream",
+      "node:http",
+      "node:url",
+      "node:crypto",
+      "node:util",
+      "node:net",
+      "node:tls",
+      "node:https",
+      "node:dns",
+      "node:os"
+    ],
+    "flag": false
+  },
+  {
+    "file": "config/default.js",
+    "lines": 457,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "index.js",
+    "lines": 111,
+    "connections": [
+      "path",
+      "os",
+      "./src/utils/logger",
+      "./src/utils/log-buffer",
+      "./src/state/state-manager",
+      "./src/server/http-server",
+      "./src/server/ws-server",
+      "./src/media/usb-drives",
+      "./src/api/router",
+      "./src/utils/persistence",
+      "./src/engine/timeline-engine",
+      "./src/engine/clip-end-fade",
+      "./src/caspar/connection-manager",
+      "./src/osc/osc-config",
+      "./src/osc/osc-state",
+      "./src/osc/osc-listener",
+      "./src/osc/osc-variables",
+      "./src/streaming/go2rtc-manager",
+      "./src/streaming/caspar-ffmpeg-setup",
+      "./src/streaming/streaming-udp-ports",
+      "./src/streaming/ndi-resolve",
+      "./src/utils/periodic-sync",
+      "./src/config/config-manager",
+      "./src/config/config-compare",
+      "./src/api/routes-caspar-config",
+      "./src/sampling/dmx-sampling",
+      "./src/config/routing",
+      "./src/bootstrap/streaming-lifecycle",
+      "./src/bootstrap/osc-lifecycle",
+      "./src/bootstrap/fetch-server-info-config",
+      "./src/bootstrap/startup-led-test-pattern",
+      "./src/bootstrap/system-inventory-file",
+      "./src/module-registry",
+      "./src/bootstrap/args",
+      "./src/bootstrap/config",
+      "./src/bootstrap/modules",
+      "./src/bootstrap/shutdown"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/device-view-apply.js",
+    "lines": 69,
+    "connections": [
+      "../pixelhue/client",
+      "./routes-caspar-config",
+      "../config/device-graph",
+      "../config/tandem-topology",
+      "../config/routing",
+      "../config/tandem-from-device-cable"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/device-view-crud.js",
+    "lines": 63,
+    "connections": [
+      "../config/device-graph",
+      "../config/tandem-topology",
+      "../config/tandem-from-device-cable"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/device-view-snapshot.js",
+    "lines": 104,
+    "connections": [
+      "os",
+      "../utils/hardware-info",
+      "../bootstrap/system-inventory-file",
+      "./routes-tandem-device",
+      "../config/routing",
+      "../pixelhue/client"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/get-state.js",
+    "lines": 101,
+    "connections": [
+      "../state/live-scene-state",
+      "../state/playback-tracker",
+      "../media/cinf-parse",
+      "../config/channel-map-from-ctx"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/response.js",
+    "lines": 39,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/api/router.js",
+    "lines": 343,
+    "connections": [
+      "../state/live-scene-state",
+      "./response",
+      "./get-state",
+      "./routes-state",
+      "./routes-media",
+      "./routes-amcp",
+      "./routes-mixer",
+      "./routes-cg",
+      "./routes-data",
+      "./routes-config",
+      "./routes-multiview",
+      "./routes-scene",
+      "./routes-misc",
+      "./routes-timeline",
+      "./routes-streaming",
+      "./routes-osc",
+      "./routes-settings",
+      "./routes-audio",
+      "./routes-project",
+      "./routes-led-test-card",
+      "./routes-ftb",
+      "./routes-pgm-record",
+      "./routes-system-staged",
+      "./routes-ingest",
+      "./routes-usb-ingest",
+      "./routes-streaming-channel",
+      "./routes-system-setup",
+      "./routes-caspar-config",
+      "./routes-logs",
+      "./routes-host-stats",
+      "./routes-pip-overlay",
+      "./routes-modules",
+      "./routes-pixelhue",
+      "./routes-tandem-device",
+      "./routes-device-view",
+      "../module-registry"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-amcp.js",
+    "lines": 228,
+    "connections": [
+      "./response",
+      "../state/playback-tracker",
+      "../state/live-scene-state",
+      "../engine/audio-route"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-audio.js",
+    "lines": 145,
+    "connections": [
+      "../../config/default",
+      "../config/config-generator",
+      "../audio/audio-devices",
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-caspar-config.js",
+    "lines": 333,
+    "connections": [
+      "fs",
+      "path",
+      "../../config/default",
+      "../config/config-generator",
+      "../config/build-caspar-generator-config",
+      "../config/config-modes",
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-cg.js",
+    "lines": 66,
+    "connections": [
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-config.js",
+    "lines": 42,
+    "connections": [
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-data.js",
+    "lines": 136,
+    "connections": [
+      "./response",
+      "../utils/persistence"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-device-view.js",
+    "lines": 68,
+    "connections": [
+      "./response",
+      "../config/device-graph",
+      "../config/tandem-topology",
+      "./device-view-snapshot",
+      "./device-view-apply",
+      "./device-view-crud"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-ftb.js",
+    "lines": 65,
+    "connections": [
+      "./response",
+      "../config/routing",
+      "../state/live-scene-state",
+      "../engine/ftb-pgm-prv"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-host-stats.js",
+    "lines": 262,
+    "connections": [
+      "os",
+      "fs",
+      "child_process",
+      "util",
+      "./response",
+      "../media/local-media"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-ingest.js",
+    "lines": 416,
+    "connections": [
+      "fs",
+      "path",
+      "child_process",
+      "busboy",
+      "unzipper",
+      "./response",
+      "../media/local-media",
+      "wetransfert"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-led-test-card.js",
+    "lines": 137,
+    "connections": [
+      "./response",
+      "../utils/lan-ipv4"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-logs.js",
+    "lines": 92,
+    "connections": [
+      "fs",
+      "./response",
+      "../utils/log-buffer"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-media.js",
+    "lines": 207,
+    "connections": [
+      "./response",
+      "../media/cinf-parse",
+      "../media/local-media",
+      "../utils/periodic-sync"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-misc.js",
+    "lines": 9,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-mixer.js",
+    "lines": 231,
+    "connections": [
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-modules.js",
+    "lines": 32,
+    "connections": [
+      "./response",
+      "../module-registry"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-multiview.js",
+    "lines": 386,
+    "connections": [
+      "fs",
+      "path",
+      "./response",
+      "../config/routing",
+      "../utils/persistence",
+      "../caspar/channel-info-xml"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-osc.js",
+    "lines": 170,
+    "connections": [
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-pgm-record.js",
+    "lines": 247,
+    "connections": [
+      "path",
+      "./response",
+      "../config/routing",
+      "../caspar/amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-pip-overlay.js",
+    "lines": 132,
+    "connections": [
+      "./response",
+      "../engine/pip-overlay"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-pixelhue.js",
+    "lines": 275,
+    "connections": [
+      "../../config/default",
+      "./response",
+      "../pixelhue/client"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-project.js",
+    "lines": 286,
+    "connections": [
+      "./response",
+      "../state/live-scene-state",
+      "../engine/scene-transition",
+      "../engine/scene-take-lbg",
+      "fs",
+      "path",
+      "../media/local-media",
+      "../utils/persistence",
+      "../config/config-generator",
+      "./routes-caspar-config"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-scene.js",
+    "lines": 135,
+    "connections": [
+      "./response",
+      "../state/playback-tracker",
+      "../state/live-scene-state",
+      "../engine/scene-transition",
+      "../engine/scene-take-lbg"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-settings.js",
+    "lines": 32,
+    "connections": [
+      "./response",
+      "../utils/hardware-info",
+      "./settings-get",
+      "./settings-post",
+      "./settings-os"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-state.js",
+    "lines": 276,
+    "connections": [
+      "./response",
+      "../utils/persistence",
+      "./get-state",
+      "../media/cinf-parse",
+      "../media/local-media",
+      "../utils/media-browser-dedupe"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-streaming-channel.js",
+    "lines": 239,
+    "connections": [
+      "./response",
+      "../config/routing",
+      "./routes-pgm-record",
+      "../streaming/streaming-channel-ffmpeg",
+      "../caspar/amcp-utils",
+      "path"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-streaming.js",
+    "lines": 217,
+    "connections": [
+      "http",
+      "./response",
+      "../streaming/go2rtc-manager",
+      "../streaming/ndi-resolve"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-system-setup.js",
+    "lines": 111,
+    "connections": [
+      "os",
+      "fs",
+      "child_process",
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-system-staged.js",
+    "lines": 77,
+    "connections": [
+      "fs",
+      "path",
+      "./response"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-tandem-device.js",
+    "lines": 182,
+    "connections": [
+      "./response",
+      "../config/channel-map-from-ctx",
+      "../config/tandem-topology",
+      "../pixelhue/client"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-timeline.js",
+    "lines": 134,
+    "connections": [
+      "./response",
+      "../config/routing",
+      "../state/live-scene-state",
+      "../engine/scene-exit-layers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/routes-usb-ingest.js",
+    "lines": 310,
+    "connections": [
+      "../../config/default",
+      "./response",
+      "../media/usb-drives"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/settings-get.js",
+    "lines": 35,
+    "connections": [
+      "../../config/default",
+      "../config/config-generator",
+      "./routes-caspar-config",
+      "./response",
+      "../config/rtmp-output",
+      "../config/routing",
+      "../config/tandem-topology",
+      "../config/device-graph"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/settings-os.js",
+    "lines": 60,
+    "connections": [
+      "./response",
+      "../utils/os-config",
+      "../config/routing",
+      "./routes-caspar-config",
+      "../config/tandem-topology",
+      "../config/device-graph",
+      "../config/rtmp-output",
+      "../../config/default"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/api/settings-post.js",
+    "lines": 78,
+    "connections": [
+      "../../config/default",
+      "../config/config-generator",
+      "./routes-caspar-config",
+      "../osc/osc-config",
+      "../utils/periodic-sync",
+      "./response",
+      "../config/rtmp-output",
+      "../config/decklink-config-validate",
+      "../config/routing",
+      "../pixelhue/client",
+      "../config/tandem-topology",
+      "../config/device-graph",
+      "./settings-os"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/audio/audio-devices.js",
+    "lines": 329,
+    "connections": [
+      "os",
+      "path",
+      "child_process",
+      "fs",
+      "naudiodon"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/autofollow/register.js",
+    "lines": 61,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/args.js",
+    "lines": 48,
+    "connections": [
+      "../../config/default"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/config.js",
+    "lines": 50,
+    "connections": [
+      "../osc/osc-config",
+      "../streaming/stream-config"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/fetch-server-info-config.js",
+    "lines": 72,
+    "connections": [
+      "../config/config-compare",
+      "../utils/query-cycle",
+      "./startup-led-test-pattern"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/modules.js",
+    "lines": 40,
+    "connections": [
+      "fs",
+      "path",
+      "../module-registry"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/osc-lifecycle.js",
+    "lines": 79,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/shutdown.js",
+    "lines": 57,
+    "connections": [
+      "../utils/periodic-sync",
+      "../server/http-server"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/startup-led-test-pattern.js",
+    "lines": 318,
+    "connections": [
+      "fs",
+      "../utils/lan-ipv4",
+      "../config/config-compare",
+      "../utils/query-cycle",
+      "../utils/persistence",
+      "child_process"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/streaming-lifecycle.js",
+    "lines": 259,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/bootstrap/system-inventory-file.js",
+    "lines": 95,
+    "connections": [
+      "fs",
+      "os",
+      "../utils/hardware-info"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-basic.js",
+    "lines": 165,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-batch.js",
+    "lines": 334,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-cg.js",
+    "lines": 66,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-client.js",
+    "lines": 369,
+    "connections": [
+      "events",
+      "./amcp-basic",
+      "./amcp-mixer",
+      "./amcp-cg",
+      "./amcp-data",
+      "./amcp-query",
+      "./amcp-thumbnail",
+      "./amcp-batch",
+      "./amcp-simulated",
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-constants.js",
+    "lines": 163,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-data.js",
+    "lines": 49,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-mixer.js",
+    "lines": 215,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-parsers.js",
+    "lines": 134,
+    "connections": [
+      "xml2js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-protocol.js",
+    "lines": 276,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-query.js",
+    "lines": 129,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-simulated.js",
+    "lines": 34,
+    "connections": [
+      "events"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-thumbnail.js",
+    "lines": 37,
+    "connections": [
+      "./amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-types.js",
+    "lines": 43,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/amcp-utils.js",
+    "lines": 50,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/channel-info-xml.js",
+    "lines": 60,
+    "connections": [
+      "xml2js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/connection-manager.js",
+    "lines": 249,
+    "connections": [
+      "events",
+      "./tcp-client",
+      "./amcp-protocol",
+      "./amcp-client"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/caspar/tcp-client.js",
+    "lines": 160,
+    "connections": [
+      "net",
+      "events"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/channel-map-from-ctx.js",
+    "lines": 73,
+    "connections": [
+      "./routing",
+      "./server-info-config"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-compare.js",
+    "lines": 245,
+    "connections": [
+      "xml2js",
+      "./routing",
+      "./config-generator",
+      "./config-modes",
+      "./multiview-helpers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator-channel-plan.js",
+    "lines": 38,
+    "connections": [
+      "./config-modes",
+      "./config-generator-mode-helpers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator-channels.js",
+    "lines": 69,
+    "connections": [
+      "./config-modes",
+      "./config-generator-custom-modes",
+      "./config-generator-channel-plan",
+      "./config-generator-consumer-attach"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator-consumer-attach.js",
+    "lines": 307,
+    "connections": [
+      "./config-modes",
+      "./config-generator-mode-helpers",
+      "./config-generator-builders",
+      "./rtmp-output"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator-custom-modes.js",
+    "lines": 29,
+    "connections": [
+      "./config-modes"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator-mode-helpers.js",
+    "lines": 28,
+    "connections": [
+      "./config-modes"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-generator.js",
+    "lines": 119,
+    "connections": [
+      "./config-modes",
+      "./config-generator-builders",
+      "./routing",
+      "./config-generator-channels"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-manager.js",
+    "lines": 112,
+    "connections": [
+      "fs",
+      "path",
+      "events",
+      "../../config/default"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/config-modes.js",
+    "lines": 168,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/config/decklink-config-validate.js",
+    "lines": 44,
+    "connections": [
+      "./routing"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/device-graph.js",
+    "lines": 430,
+    "connections": [
+      "../../config/default",
+      "./tandem-topology"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/multiview-helpers.js",
+    "lines": 25,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/config/routing-map.js",
+    "lines": 120,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/config/routing-setup.js",
+    "lines": 116,
+    "connections": [
+      "fs",
+      "path",
+      "./routing-map",
+      "../engine/pip-overlay",
+      "../api/routes-multiview"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/routing.js",
+    "lines": 35,
+    "connections": [
+      "./routing-map",
+      "./routing-setup"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/rtmp-output.js",
+    "lines": 153,
+    "connections": [
+      "../../config/default",
+      "./routing",
+      "./config-generator-builders"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/server-info-config.js",
+    "lines": 64,
+    "connections": [
+      "./config-modes"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/tandem-from-device-cable.js",
+    "lines": 100,
+    "connections": [
+      "./tandem-topology",
+      "./device-graph"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/config/tandem-topology.js",
+    "lines": 97,
+    "connections": [
+      "../../config/default"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/audio-route.js",
+    "lines": 40,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/engine/clip-end-fade.js",
+    "lines": 240,
+    "connections": [
+      "../state/playback-tracker",
+      "./pip-overlay"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/ftb-pgm-prv.js",
+    "lines": 144,
+    "connections": [
+      "../caspar/amcp-utils",
+      "../config/routing",
+      "../state/playback-tracker",
+      "./scene-transition",
+      "./timeline-playback-helpers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/pip-overlay.js",
+    "lines": 475,
+    "connections": [
+      "./scene-native-fill",
+      "../caspar/amcp-batch"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/program-layer-bank.js",
+    "lines": 15,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/engine/scene-exit-layers.js",
+    "lines": 199,
+    "connections": [
+      "../caspar/amcp-batch",
+      "../caspar/amcp-utils",
+      "../config/routing",
+      "../state/live-scene-state",
+      "./program-layer-bank",
+      "../state/playback-tracker"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/scene-native-fill.js",
+    "lines": 367,
+    "connections": [
+      "../media/cinf-parse",
+      "../config/routing",
+      "../config/config-modes",
+      "../config/channel-map-from-ctx"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/scene-take-lbg.js",
+    "lines": 436,
+    "connections": [
+      "../state/playback-tracker",
+      "../caspar/amcp-utils",
+      "./scene-native-fill",
+      "./audio-route",
+      "./timeline-playback-helpers",
+      "./pip-overlay",
+      "./scene-transition"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/scene-take.js",
+    "lines": 271,
+    "connections": [
+      "../state/playback-tracker",
+      "./scene-native-fill",
+      "./audio-route",
+      "./scene-transition"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/scene-transition.js",
+    "lines": 280,
+    "connections": [
+      "../config/routing",
+      "./program-layer-bank",
+      "./scene-exit-layers",
+      "./pip-overlay",
+      "../utils/persistence",
+      "./scene-take"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/timeline-engine.js",
+    "lines": 137,
+    "connections": [
+      "events",
+      "./timeline-playback",
+      "../utils/program-resolution"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/timeline-playback-amcp.js",
+    "lines": 267,
+    "connections": [
+      "../config/routing",
+      "../caspar/amcp-utils",
+      "../state/playback-tracker",
+      "./timeline-playback-helpers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/timeline-playback-helpers.js",
+    "lines": 102,
+    "connections": [
+      "./audio-route",
+      "../caspar/amcp-utils"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/engine/timeline-playback.js",
+    "lines": 370,
+    "connections": [
+      "../utils/program-resolution",
+      "./timeline-playback-helpers",
+      "./timeline-playback-amcp"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/media/cinf-parse.js",
+    "lines": 37,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/media/local-media-ffmpeg.js",
+    "lines": 337,
+    "connections": [
+      "path",
+      "fs",
+      "crypto",
+      "child_process",
+      "./local-media"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/media/local-media.js",
+    "lines": 429,
+    "connections": [
+      "path",
+      "fs",
+      "os",
+      "../api/response",
+      "./local-media-ffmpeg"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/media/usb-drives-copy.js",
+    "lines": 104,
+    "connections": [
+      "fs",
+      "path",
+      "crypto",
+      "./local-media"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/media/usb-drives-discovery.js",
+    "lines": 96,
+    "connections": [
+      "fs",
+      "path",
+      "child_process"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/media/usb-drives.js",
+    "lines": 85,
+    "connections": [
+      "fs",
+      "path",
+      "child_process",
+      "util",
+      "./usb-drives-discovery",
+      "./usb-drives-copy"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/module-registry.js",
+    "lines": 177,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/osc/osc-config.js",
+    "lines": 38,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/osc/osc-listener.js",
+    "lines": 98,
+    "connections": [
+      "osc",
+      "./osc-state"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/osc/osc-state.js",
+    "lines": 426,
+    "connections": [
+      "events"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/osc/osc-variables.js",
+    "lines": 115,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/pixelhue/client.js",
+    "lines": 272,
+    "connections": [
+      "../../config/default",
+      "https",
+      "http",
+      "url",
+      "jsonwebtoken"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/previs/register.js",
+    "lines": 75,
+    "connections": [
+      "./routes-models"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/previs/routes-models.js",
+    "lines": 270,
+    "connections": [
+      "fs",
+      "path",
+      "crypto",
+      "busboy",
+      "../utils/persistence"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/previs/types.js",
+    "lines": 108,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/sampling/dmx-output.js",
+    "lines": 106,
+    "connections": [
+      "dmxnet",
+      "sacn"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/sampling/dmx-sampling-ingress.js",
+    "lines": 258,
+    "connections": [
+      "fs",
+      "child_process",
+      "../caspar/amcp-utils",
+      "../streaming/go2rtc-manager",
+      "../streaming/caspar-ffmpeg-setup"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/sampling/dmx-sampling.js",
+    "lines": 374,
+    "connections": [
+      "fs",
+      "path",
+      "worker_threads",
+      "./dmx-output",
+      "../config/channel-map-from-ctx",
+      "./dmx-sampling-ingress"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/server/cors.js",
+    "lines": 20,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/server/http-server.js",
+    "lines": 289,
+    "connections": [
+      "http",
+      "fs",
+      "path",
+      "os",
+      "./cors"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/server/ws-amcp-dispatch.js",
+    "lines": 135,
+    "connections": [
+      "../api/routes-amcp",
+      "../api/routes-mixer",
+      "../api/routes-cg"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/server/ws-server.js",
+    "lines": 235,
+    "connections": [
+      "ws",
+      "./ws-amcp-dispatch",
+      "../utils/persistence"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/state/live-scene-reconcile.js",
+    "lines": 187,
+    "connections": [
+      "util",
+      "xml2js",
+      "../config/routing",
+      "./live-scene-state",
+      "../engine/program-layer-bank",
+      "../engine/scene-transition"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/state/live-scene-state.js",
+    "lines": 116,
+    "connections": [
+      "../utils/persistence",
+      "../config/routing"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/state/playback-tracker.js",
+    "lines": 499,
+    "connections": [
+      "../media/cinf-parse",
+      "../utils/media-browser-dedupe",
+      "../media/local-media",
+      "./live-scene-reconcile"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/state/state-manager.js",
+    "lines": 392,
+    "connections": [
+      "events",
+      "xml2js",
+      "../media/cinf-parse",
+      "../utils/media-browser-dedupe",
+      "../utils/logger"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/caspar-ffmpeg-setup.js",
+    "lines": 271,
+    "connections": [
+      "./go2rtc-manager",
+      "./ndi-resolve"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/go2rtc-config.js",
+    "lines": 92,
+    "connections": [
+      "child_process"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/go2rtc-manager.js",
+    "lines": 85,
+    "connections": [
+      "fs",
+      "path",
+      "child_process",
+      "./ndi-resolve",
+      "./go2rtc-config",
+      "./go2rtc-source-logic",
+      "./go2rtc-status-logic",
+      "go2rtc-static"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/go2rtc-source-logic.js",
+    "lines": 37,
+    "connections": [
+      "./ndi-resolve",
+      "./go2rtc-config"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/go2rtc-status-logic.js",
+    "lines": 35,
+    "connections": [
+      "http"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/ndi-resolve.js",
+    "lines": 222,
+    "connections": [
+      "child_process"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/stream-config.js",
+    "lines": 104,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/streaming-channel-ffmpeg.js",
+    "lines": 40,
+    "connections": [
+      "../config/rtmp-output"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/streaming/streaming-udp-ports.js",
+    "lines": 114,
+    "connections": [
+      "dgram"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/tracking/register.js",
+    "lines": 61,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/utils/handlers.js",
+    "lines": 51,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/utils/hardware-info.js",
+    "lines": 236,
+    "connections": [
+      "child_process",
+      "fs",
+      "path"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/lan-ipv4.js",
+    "lines": 20,
+    "connections": [
+      "os"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/log-buffer.js",
+    "lines": 64,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/utils/logger.js",
+    "lines": 59,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/utils/media-browser-dedupe.js",
+    "lines": 114,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "src/utils/os-config.js",
+    "lines": 149,
+    "connections": [
+      "child_process",
+      "../config/multiview-helpers",
+      "./logger"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/periodic-sync.js",
+    "lines": 325,
+    "connections": [
+      "../config/routing",
+      "../state/live-scene-reconcile",
+      "../state/playback-tracker",
+      "./query-cycle",
+      "./handlers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/persistence.js",
+    "lines": 61,
+    "connections": [
+      "fs",
+      "path"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/program-resolution.js",
+    "lines": 26,
+    "connections": [
+      "../config/routing",
+      "../config/server-info-config"
+    ],
+    "flag": false
+  },
+  {
+    "file": "src/utils/query-cycle.js",
+    "lines": 361,
+    "connections": [
+      "xml2js",
+      "./handlers"
+    ],
+    "flag": false
+  },
+  {
+    "file": "templates/black.html",
+    "lines": 16,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/color_bg.html",
+    "lines": 24,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/host_ip_splash.html",
+    "lines": 63,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/led_grid_test.html",
+    "lines": 500,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/multiview_overlay.html",
+    "lines": 82,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/pip_border.html",
+    "lines": 242,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/pip_edge_strip.html",
+    "lines": 288,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/pip_glow.html",
+    "lines": 189,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "templates/pip_shadow.html",
+    "lines": 212,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "tools/boot-orchestrator.js",
+    "lines": 198,
+    "connections": [
+      "os",
+      "readline",
+      "child_process",
+      "../src/utils/hardware-info",
+      "../src/config/config-manager",
+      "../src/utils/os-config",
+      "path"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/http-smoke.js",
+    "lines": 246,
+    "connections": [
+      "http",
+      "ws"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-caspar.js",
+    "lines": 77,
+    "connections": [
+      "http"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-config-generator-routing.js",
+    "lines": 169,
+    "connections": [
+      "node:test",
+      "node:assert/strict",
+      "../config/default",
+      "../src/config/config-generator",
+      "../src/config/build-caspar-generator-config",
+      "../src/config/routing"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-device-graph.js",
+    "lines": 115,
+    "connections": [
+      "node:test",
+      "node:assert/strict",
+      "../src/config/device-graph"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-dmx-adv.js",
+    "lines": 110,
+    "connections": [
+      "fs",
+      "path",
+      "../src/sampling/dmx-sampling"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-dmx.js",
+    "lines": 100,
+    "connections": [
+      "fs",
+      "path",
+      "../src/sampling/dmx-sampling"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-tandem-cable.js",
+    "lines": 46,
+    "connections": [
+      "node:test",
+      "node:assert/strict",
+      "../src/config/device-graph",
+      "../src/config/tandem-from-device-cable",
+      "../src/config/tandem-topology"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/smoke-usb-lsblk.js",
+    "lines": 20,
+    "connections": [
+      "fs",
+      "path",
+      "node:test",
+      "node:assert/strict",
+      "../src/media/usb-drives"
+    ],
+    "flag": false
+  },
+  {
+    "file": "tools/verify-w02-structure.js",
+    "lines": 68,
+    "connections": [
+      "fs",
+      "path"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/app.js",
+    "lines": 154,
+    "connections": [
+      "./lib/ws-client.js",
+      "./lib/osc-client.js",
+      "./lib/api-client.js",
+      "./lib/state-store.js",
+      "./components/sources-panel.js",
+      "./lib/scene-state.js",
+      "./components/scenes-editor.js",
+      "./components/timeline-editor.js",
+      "./components/inspector-panel.js",
+      "./components/multiview-editor.js",
+      "./lib/workspace-layout.js",
+      "./components/header-bar.js",
+      "./components/audio-mixer-panel.js",
+      "./components/playback-timer.js",
+      "./lib/dashboard-state.js",
+      "./lib/settings-state.js",
+      "./lib/stream-state.js",
+      "./components/settings-modal.js",
+      "./components/connection-eye.js",
+      "./components/logs-modal.js",
+      "./lib/multiview-state.js",
+      "./lib/dmx-state.js",
+      "./components/pixel-map-editor.js",
+      "./components/streaming-panel.js",
+      "./lib/variable-state.js",
+      "./lib/project-state.js",
+      "./lib/timeline-state.js",
+      "./lib/optional-modules.js",
+      "./components/device-view.js",
+      "./lib/app-status.js",
+      "./lib/app-ws-handlers.js",
+      "./lib/app-scene-deck.js",
+      "./lib/app-multiview-sync.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/assets/modules/autofollow/entry.js",
+    "lines": 30,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/assets/modules/previs/entry.js",
+    "lines": 141,
+    "connections": [
+      "/components/previs-pgm-3d.js",
+      "/lib/previs-state.js",
+      "/lib/optional-modules.js",
+      "/components/previs-settings-modal-pane.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/assets/modules/tracking/entry.js",
+    "lines": 29,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/audio-mixer-panel.js",
+    "lines": 239,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/audio-mixer-state.js",
+      "../lib/variable-state.js",
+      "../app.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/connection-eye.js",
+    "lines": 338,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/dashboard-cell.js",
+    "lines": 115,
+    "connections": [
+      "../lib/dashboard-state.js",
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/dashboard.js",
+    "lines": 486,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/api-client.js",
+      "../lib/mixer-fill.js",
+      "./preview-canvas.js",
+      "./dashboard-cell.js",
+      "../lib/variable-state.js",
+      "../app.js",
+      "../lib/ui-font.js",
+      "../lib/math-input.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-actions.js",
+    "lines": 177,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/pixelhue-api.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-bands-render.js",
+    "lines": 245,
+    "connections": [
+      "./device-view-helpers.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-cables.js",
+    "lines": 72,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-destinations-ui.js",
+    "lines": 236,
+    "connections": [
+      "./device-view-ui-utils.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-helpers.js",
+    "lines": 81,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-inspector-render.js",
+    "lines": 182,
+    "connections": [
+      "./device-view-helpers.js",
+      "./device-view-ui-utils.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-pixelhue-controls.js",
+    "lines": 111,
+    "connections": [
+      "./device-view-actions.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view-ui-utils.js",
+    "lines": 60,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/device-view.js",
+    "lines": 83,
+    "connections": [
+      "./settings-modal.js",
+      "./device-view-helpers.js",
+      "./device-view-ui-utils.js",
+      "./device-view-cables.js",
+      "./device-view-destinations-ui.js",
+      "./device-view-bands-render.js",
+      "./device-view-inspector-render.js",
+      "./device-view-actions.js",
+      "./device-view-pixelhue-controls.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/fixture-inspector.js",
+    "lines": 111,
+    "connections": [
+      "../lib/dmx-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/header-bar-audio.js",
+    "lines": 146,
+    "connections": [
+      "../lib/stream-state.js",
+      "../lib/settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/header-bar.js",
+    "lines": 450,
+    "connections": [
+      "../lib/project-state.js",
+      "../lib/scene-state.js",
+      "../lib/dashboard-state.js",
+      "../lib/timeline-state.js",
+      "../lib/multiview-state.js",
+      "../lib/api-client.js",
+      "../lib/ui-font.js",
+      "./settings-modal.js",
+      "../lib/settings-state.js",
+      "./sync-modal.js",
+      "./publish-modal.js",
+      "./led-test-modal.js",
+      "./header-bar-audio.js",
+      "../lib/project-remote-sync.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-common.js",
+    "lines": 122,
+    "connections": [
+      "../lib/math-input.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-effects.js",
+    "lines": 197,
+    "connections": [
+      "./inspector-common.js",
+      "../lib/effect-registry.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-fill-timeline.js",
+    "lines": 240,
+    "connections": [
+      "../lib/math-input.js",
+      "../lib/timeline-state.js",
+      "./inspector-common.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-fill.js",
+    "lines": 296,
+    "connections": [
+      "../lib/fill-math.js",
+      "../lib/mixer-fill.js",
+      "../lib/api-client.js",
+      "../lib/multiview-state.js",
+      "../lib/math-input.js",
+      "../lib/dashboard-state.js",
+      "./inspector-common.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-html-template.js",
+    "lines": 85,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-mixer.js",
+    "lines": 464,
+    "connections": [
+      "../lib/api-client.js",
+      "../app.js",
+      "../lib/variable-state.js",
+      "../lib/scene-state.js",
+      "../lib/media-ext.js",
+      "../lib/dashboard-state.js",
+      "../lib/audio-routes.js",
+      "../lib/settings-state.js",
+      "../lib/timeline-state.js",
+      "../lib/selection-sync.js",
+      "./inspector-common.js",
+      "./vu-meter.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-panel-presets-modes.js",
+    "lines": 350,
+    "connections": [
+      "../lib/scene-state.js",
+      "./scene-layer-row.js",
+      "./scenes-editor-support.js",
+      "../lib/look-preset-events.js",
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-panel-timeline.js",
+    "lines": 488,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/api-client.js",
+      "../lib/math-input.js",
+      "./inspector-common.js",
+      "../lib/scene-state.js",
+      "../lib/timeline-clip-interp.js",
+      "../lib/fill-math.js",
+      "../lib/mixer-fill.js",
+      "./inspector-mixer.js",
+      "./inspector-effects.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-panel-views.js",
+    "lines": 388,
+    "connections": [
+      "../lib/dashboard-state.js",
+      "../lib/scene-state.js",
+      "../lib/fill-math.js",
+      "../lib/api-client.js",
+      "../lib/multiview-state.js",
+      "../lib/mixer-fill.js",
+      "./inspector-common.js",
+      "./inspector-transition.js",
+      "./inspector-effects.js",
+      "./inspector-pip-overlay.js",
+      "./inspector-html-template.js",
+      "../lib/pip-overlay-registry.js",
+      "./scenes-editor-support.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-panel.js",
+    "lines": 461,
+    "connections": [
+      "../lib/dashboard-state.js",
+      "../lib/scene-state.js",
+      "../lib/api-client.js",
+      "../lib/multiview-state.js",
+      "../lib/mixer-fill.js",
+      "../lib/selection-sync.js",
+      "./inspector-mixer.js",
+      "../lib/settings-state.js",
+      "../lib/dmx-state.js",
+      "./fixture-inspector.js",
+      "../lib/timeline-state.js",
+      "./inspector-panel-presets-modes.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-pip-overlay.js",
+    "lines": 436,
+    "connections": [
+      "./inspector-common.js",
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/inspector-transition.js",
+    "lines": 87,
+    "connections": [
+      "../lib/math-input.js",
+      "../lib/dashboard-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/led-test-modal.js",
+    "lines": 219,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/live-input-modal.js",
+    "lines": 233,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/live-view.js",
+    "lines": 73,
+    "connections": [
+      "../lib/webrtc-client.js",
+      "../lib/stream-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/logs-modal.js",
+    "lines": 268,
+    "connections": [
+      "../lib/api-client.js",
+      "../app.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/multiview-editor-canvas.js",
+    "lines": 256,
+    "connections": [
+      "../lib/ui-font.js",
+      "../lib/multiview-state.js",
+      "../lib/api-client.js",
+      "../lib/stream-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/multiview-editor.js",
+    "lines": 57,
+    "connections": [
+      "../lib/multiview-state.js",
+      "./live-view.js",
+      "../lib/stream-state.js",
+      "../lib/settings-state.js",
+      "./multiview-editor-canvas.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/now-playing.js",
+    "lines": 110,
+    "connections": [
+      "./playback-timer.js",
+      "../lib/api-client.js",
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/output-status.js",
+    "lines": 74,
+    "connections": [
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/pixel-map-editor.js",
+    "lines": 341,
+    "connections": [
+      "../lib/ui-font.js",
+      "../lib/dmx-state.js",
+      "../lib/api-client.js",
+      "./live-view.js",
+      "../lib/stream-state.js",
+      "../lib/settings-state.js",
+      "../lib/dashboard-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/playback-timer.js",
+    "lines": 357,
+    "connections": [
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-canvas-draw-base.js",
+    "lines": 377,
+    "connections": [
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-canvas-draw-stacks.js",
+    "lines": 459,
+    "connections": [
+      "../lib/ui-font.js",
+      "../lib/fill-math.js",
+      "../lib/timeline-clip-interp.js",
+      "../lib/media-audio-kind.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-canvas-draw.js",
+    "lines": 16,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-canvas-panel.js",
+    "lines": 74,
+    "connections": [
+      "./live-view.js",
+      "../lib/stream-state.js",
+      "../lib/settings-state.js",
+      "../lib/api-client.js",
+      "./preview-panel-math.js",
+      "./preview-panel-resize.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-canvas.js",
+    "lines": 17,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-panel-math.js",
+    "lines": 18,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/preview-panel-resize.js",
+    "lines": 39,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-inspector-mapping.js",
+    "lines": 27,
+    "connections": [
+      "../lib/previs-uv-mapper.js",
+      "./previs-uv-editor.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-inspector-sections.js",
+    "lines": 64,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-mesh-inspector.js",
+    "lines": 33,
+    "connections": [
+      "../lib/previs-state.js",
+      "./previs-inspector-sections.js",
+      "./previs-inspector-mapping.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-pgm-3d-dropzone.js",
+    "lines": 175,
+    "connections": [
+      "../lib/previs-model-loader.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-pgm-3d-inspector-binder.js",
+    "lines": 353,
+    "connections": [
+      "./previs-mesh-inspector.js",
+      "./previs-settings-panel.js",
+      "../lib/previs-model-loader.js",
+      "../lib/previs-mesh-info.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-pgm-3d-keyboard.js",
+    "lines": 143,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-pgm-3d-toolbar.js",
+    "lines": 151,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-pgm-3d.js",
+    "lines": 459,
+    "connections": [
+      "../lib/previs-scene.js",
+      "../lib/previs-video-texture.js",
+      "../lib/previs-stream-sources.js",
+      "../lib/previs-scene-model.js",
+      "../lib/previs-state.js",
+      "./previs-pgm-3d-toolbar.js",
+      "./previs-pgm-3d-inspector-binder.js",
+      "./previs-pgm-3d-keyboard.js",
+      "./previs-pgm-3d-dropzone.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-settings-modal-pane.js",
+    "lines": 38,
+    "connections": [
+      "../lib/previs-state.js",
+      "./previs-settings-panel.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-settings-panel.js",
+    "lines": 237,
+    "connections": [
+      "../lib/previs-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/previs-uv-editor.js",
+    "lines": 212,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/profiler-display.js",
+    "lines": 73,
+    "connections": [
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/publish-modal.js",
+    "lines": 257,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/form-upload.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scene-layer-row.js",
+    "lines": 297,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/scene-list.js",
+    "lines": 346,
+    "connections": [
+      "./scenes-shared.js",
+      "./scenes-editor-support.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-compose.js",
+    "lines": 412,
+    "connections": [
+      "../lib/fill-math.js",
+      "../lib/mixer-fill.js",
+      "../lib/api-client.js",
+      "./scenes-shared.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-editor-edit.js",
+    "lines": 67,
+    "connections": [
+      "../lib/scene-state.js",
+      "./scenes-shared.js",
+      "./scene-layer-row.js",
+      "./scenes-editor-support.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-editor-logic.js",
+    "lines": 22,
+    "connections": [
+      "../lib/pixelhue-tandem.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-editor-support.js",
+    "lines": 223,
+    "connections": [
+      "../lib/scene-state.js",
+      "../lib/api-client.js",
+      "./scenes-shared.js",
+      "../lib/timeline-state.js",
+      "../lib/ui-font.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-editor.js",
+    "lines": 99,
+    "connections": [
+      "../lib/scene-state.js",
+      "../lib/api-client.js",
+      "./preview-canvas.js",
+      "./preview-canvas-draw-base.js",
+      "./scenes-shared.js",
+      "./scene-list.js",
+      "./scenes-preview-runtime.js",
+      "./scenes-compose.js",
+      "./playback-timer.js",
+      "./scenes-editor-support.js",
+      "../lib/look-preset-events.js",
+      "./scenes-editor-logic.js",
+      "./scenes-editor-edit.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-preview-runtime.js",
+    "lines": 367,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/audio-routes.js",
+      "../lib/mixer-fill.js",
+      "../lib/media-ext.js",
+      "../lib/pip-overlay-amcp.js",
+      "../lib/pip-overlay-registry.js",
+      "./scenes-shared.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/scenes-shared.js",
+    "lines": 198,
+    "connections": [
+      "../lib/dashboard-state.js",
+      "../lib/math-input.js",
+      "../lib/scene-state.js",
+      "../lib/pip-overlay-registry.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-caspar-collect.js",
+    "lines": 152,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-caspar-render.js",
+    "lines": 150,
+    "connections": [
+      "../lib/settings-state.js",
+      "./system-settings.js",
+      "./settings-modal-caspar-utils.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-caspar-sync.js",
+    "lines": 108,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-caspar-ui.js",
+    "lines": 89,
+    "connections": [
+      "../lib/settings-state.js",
+      "./settings-modal-caspar-utils.js",
+      "./settings-modal-caspar-sync.js",
+      "./settings-modal-caspar-render.js",
+      "./settings-modal-caspar-collect.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-caspar-utils.js",
+    "lines": 88,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-logic.js",
+    "lines": 124,
+    "connections": [
+      "../lib/settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-rtmp.js",
+    "lines": 153,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal-templates.js",
+    "lines": 221,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/settings-modal.js",
+    "lines": 117,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/settings-state.js",
+      "./system-settings.js",
+      "./variables-panel.js",
+      "../lib/optional-modules.js",
+      "./tandem-device-panel.js",
+      "./settings-modal-templates.js",
+      "./settings-modal-logic.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/sources-panel-helpers.js",
+    "lines": 411,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/media-ext.js",
+      "../lib/mixer-fill.js",
+      "../lib/effect-registry.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/sources-panel-ingest-logic.js",
+    "lines": 29,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/form-upload.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/sources-panel-live-render.js",
+    "lines": 25,
+    "connections": [
+      "../lib/api-client.js",
+      "./sources-panel-helpers.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/sources-panel.js",
+    "lines": 51,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/api-client.js",
+      "./live-input-modal.js",
+      "./sources-panel-helpers.js",
+      "./usb-import-modal.js",
+      "./sources-panel-ingest-logic.js",
+      "./sources-panel-live-render.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/streaming-panel.js",
+    "lines": 161,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/sync-modal.js",
+    "lines": 125,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/system-settings.js",
+    "lines": 476,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/variable-state.js",
+      "../app.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/tandem-device-panel.js",
+    "lines": 296,
+    "connections": [
+      "../lib/api-client.js",
+      "../lib/settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-canvas-clip.js",
+    "lines": 390,
+    "connections": [
+      "../lib/ui-font.js",
+      "../lib/waveform-fetch-queue.js",
+      "./timeline-canvas-utils.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-canvas-render.js",
+    "lines": 356,
+    "connections": [
+      "../lib/ui-font.js",
+      "./timeline-canvas-utils.js",
+      "./timeline-canvas-clip.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-canvas-utils.js",
+    "lines": 83,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-canvas.js",
+    "lines": 478,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-editor-handlers.js",
+    "lines": 495,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/timeline-clip-layout.js",
+      "../lib/mixer-fill.js",
+      "../lib/api-client.js",
+      "../lib/effect-registry.js",
+      "../lib/ui-font.js",
+      "../lib/media-audio-kind.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-editor.js",
+    "lines": 373,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/scene-state.js",
+      "../lib/api-client.js",
+      "./timeline-canvas.js",
+      "./preview-canvas.js",
+      "./timeline-transport.js",
+      "../lib/stream-state.js",
+      "../lib/settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/timeline-transport.js",
+    "lines": 302,
+    "connections": [
+      "../lib/timeline-state.js",
+      "../lib/dashboard-state.js",
+      "../lib/api-client.js",
+      "./timeline-canvas.js",
+      "../lib/math-input.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/usb-import-modal.js",
+    "lines": 464,
+    "connections": [
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/variables-panel.js",
+    "lines": 142,
+    "connections": [
+      "../lib/variable-state.js",
+      "../app.js",
+      "../lib/api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/components/vu-meter.js",
+    "lines": 63,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/index.html",
+    "lines": 90,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/api-client.js",
+    "lines": 117,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/app-multiview-sync.js",
+    "lines": 23,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/app-scene-deck.js",
+    "lines": 27,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/app-status.js",
+    "lines": 60,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/app-ws-handlers.js",
+    "lines": 61,
+    "connections": [
+      "./project-remote-sync.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/audio-mixer-state.js",
+    "lines": 66,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/audio-routes.js",
+    "lines": 83,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/dashboard-state.js",
+    "lines": 375,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/dmx-state.js",
+    "lines": 200,
+    "connections": [
+      "./settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/effect-registry.js",
+    "lines": 340,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/fill-math.js",
+    "lines": 120,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/form-upload.js",
+    "lines": 45,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/look-preset-events.js",
+    "lines": 8,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/math-input.js",
+    "lines": 138,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/media-audio-kind.js",
+    "lines": 24,
+    "connections": [
+      "./mixer-fill.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/media-ext.js",
+    "lines": 129,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/mixer-fill.js",
+    "lines": 308,
+    "connections": [
+      "./fill-math.js",
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/multiview-state.js",
+    "lines": 348,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/offline-storage.js",
+    "lines": 73,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/optional-modules.js",
+    "lines": 128,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/osc-client.js",
+    "lines": 186,
+    "connections": [
+      "./ws-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/pip-overlay-amcp.js",
+    "lines": 243,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/pip-overlay-registry.js",
+    "lines": 189,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/pixelhue-api.js",
+    "lines": 104,
+    "connections": [
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/pixelhue-tandem.js",
+    "lines": 118,
+    "connections": [
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/playback-clock.js",
+    "lines": 26,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-mesh-info.js",
+    "lines": 301,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-model-loader.js",
+    "lines": 275,
+    "connections": [
+      "./previs-mesh-info.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-scene-materials.js",
+    "lines": 24,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-scene-model.js",
+    "lines": 67,
+    "connections": [
+      "./previs-mesh-info.js",
+      "./previs-model-loader.js",
+      "./previs-texture-crop.js",
+      "./previs-scene-materials.js",
+      "./previs-scene-utils.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-scene-utils.js",
+    "lines": 23,
+    "connections": [
+      "./previs-mesh-info.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-scene.js",
+    "lines": 367,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-state.js",
+    "lines": 435,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-stream-sources.js",
+    "lines": 147,
+    "connections": [
+      "./previs-video-texture.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-texture-crop.js",
+    "lines": 84,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-uv-mapper.js",
+    "lines": 383,
+    "connections": [
+      "./web/lib/previs-uv-mapper.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/previs-video-texture.js",
+    "lines": 345,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/program-layer-bank.js",
+    "lines": 10,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/project-remote-sync.js",
+    "lines": 16,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/project-state.js",
+    "lines": 105,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-live-match.js",
+    "lines": 77,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-state-helpers.js",
+    "lines": 147,
+    "connections": [
+      "./fill-math.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-state-layer-logic.js",
+    "lines": 90,
+    "connections": [
+      "./scene-state-helpers.js",
+      "./pip-overlay-registry.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-state-look-logic.js",
+    "lines": 81,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-state-persistence-logic.js",
+    "lines": 129,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/scene-state.js",
+    "lines": 345,
+    "connections": [
+      "./scene-state-persistence-logic.js",
+      "./scene-state-layer-logic.js",
+      "./scene-state-look-logic.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/selection-sync.js",
+    "lines": 154,
+    "connections": [
+      "./api-client.js",
+      "./dashboard-state.js",
+      "./scene-state.js",
+      "./multiview-state.js",
+      "./mixer-fill.js",
+      "./timeline-clip-interp.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/settings-state.js",
+    "lines": 105,
+    "connections": [
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/state-store.js",
+    "lines": 110,
+    "connections": [
+      "./offline-storage.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/stream-state.js",
+    "lines": 113,
+    "connections": [
+      "./api-client.js",
+      "./webrtc-client.js",
+      "./settings-state.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/timeline-clip-interp.js",
+    "lines": 79,
+    "connections": [
+      "./fill-math.js",
+      "./mixer-fill.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/timeline-clip-layout.js",
+    "lines": 49,
+    "connections": [
+      "./fill-math.js",
+      "./mixer-fill.js",
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/timeline-state.js",
+    "lines": 476,
+    "connections": [
+      "./timeline-track-heights.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/timeline-track-heights.js",
+    "lines": 98,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/ui-font.js",
+    "lines": 6,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/variable-state.js",
+    "lines": 64,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/waveform-fetch-queue.js",
+    "lines": 31,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/lib/webrtc-client.js",
+    "lines": 210,
+    "connections": [
+      "./api-client.js"
+    ],
+    "flag": false
+  },
+  {
+    "file": "web/lib/ws-client.js",
+    "lines": 157,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/setup.html",
+    "lines": 90,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/01a-base-theme-header-connection.css",
+    "lines": 399,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/02b-preview-panel-output-compose.css",
+    "lines": 294,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/02c-timeline-multiview-sources-sidebar.css",
+    "lines": 287,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/03a-offline-sync-publish-ingest-menu.css",
+    "lines": 291,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/03b-ingest-drag-upload-progress.css",
+    "lines": 140,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/03c-sources-items-effects.css",
+    "lines": 297,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/04-media-lists-drag-dashboard.css",
+    "lines": 486,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/05a-dashboard-cells.css",
+    "lines": 88,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/05b-timeline-editor.css",
+    "lines": 188,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/05c-multiview-editor.css",
+    "lines": 91,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/05d-inspector-fields-dashboard.css",
+    "lines": 153,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/06a1-scenes-deck-toolbar.css",
+    "lines": 167,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/06a2-scenes-deck-cards.css",
+    "lines": 266,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/06a3-scenes-deck-multi.css",
+    "lines": 136,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/06b-scenes-edit-transitions-layerstrip.css",
+    "lines": 249,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/06c-inspector-effects-pip.css",
+    "lines": 241,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/07a-scenes-compose-canvas.css",
+    "lines": 271,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/07b-audio-mixer-modal-shell.css",
+    "lines": 259,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/08a-modals-logs.css",
+    "lines": 104,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/08b-modals-settings.css",
+    "lines": 145,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/08c-modals-misc.css",
+    "lines": 385,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/09-device-view.css",
+    "lines": 416,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/previs-hud.css",
+    "lines": 125,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/previs-inspector.css",
+    "lines": 256,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles/previs-settings.css",
+    "lines": 139,
+    "connections": [],
+    "flag": false
+  },
+  {
+    "file": "web/styles.css",
+    "lines": 28,
+    "connections": [],
+    "flag": false
+  }
+]

@@ -69,9 +69,11 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 			case 'take': {
 				const map = getChannelMap(ctx?.config || {})
-				const screenIdx = Math.max(0, parseInt(b.screenIdx, 10) || 0)
-				const programCh = map?.programCh?.(screenIdx + 1) ?? 1
-				const previewCh = map?.previewCh?.(screenIdx + 1) ?? 2
+				const screenCount = map?.screenCount || 1
+				const targetIdxs = (b.screenIdx === null || b.screenIdx === 'all')
+					? Array.from({ length: screenCount }, (_, i) => i)
+					: [Math.max(0, parseInt(b.screenIdx, 10) || 0)]
+				
 				if (!ctx.amcp) {
 					return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 				}
@@ -79,18 +81,23 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!tl) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
-				// Strip look stacks (1–99, 110–199) so timeline output (100+) is not covered by higher PGM layers.
-				await clearSceneProgramLookStackLayers(ctx.amcp, programCh, ctx)
-				await clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx)
+
+				for (const sIdx of targetIdxs) {
+					const programCh = map?.programCh?.(sIdx + 1) ?? 1
+					const previewCh = map?.previewCh?.(sIdx + 1) ?? 2
+					// Strip look stacks (1–99, 110–199) so timeline output (200+) is not covered by look/CG layers.
+					await clearSceneProgramLookStackLayers(ctx.amcp, programCh, ctx)
+					await clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx)
+					await ctx.amcp.mixerCommit(programCh)
+					await ctx.amcp.mixerCommit(previewCh)
+					liveSceneState.clearChannel(programCh)
+				}
 
 				const pb = eng.getPlayback()
 				const pos = pb?.timelineId === id ? pb.position ?? 0 : 0
-				eng.setSendTo({ preview: true, program: true, screenIdx })
+				eng.setSendTo({ preview: true, program: true, screenIdx: b.screenIdx === 'all' ? null : b.screenIdx })
 				eng.setLoop(id, !!pb?.loop)
 				eng.play(id, pos)
-				await ctx.amcp.mixerCommit(programCh)
-				await ctx.amcp.mixerCommit(previewCh)
-				liveSceneState.clearChannel(programCh)
 				liveSceneState.broadcastSceneLive(ctx)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 			}

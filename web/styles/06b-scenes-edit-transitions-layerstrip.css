@@ -13,6 +13,28 @@
 	box-sizing: border-box;
 }
 
+.scenes-edit-bar__scope {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
+.scenes-edit-bar__scope-label {
+	white-space: nowrap;
+}
+
+.scenes-edit-bar__scope-select {
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 0.8rem;
+	max-width: 220px;
+}
+
 .scenes-edit-name {
 	flex: 1;
 	min-width: 120px;
@@ -184,4 +206,43 @@
 .scenes-layer-row--selected {
 	outline: 1px solid var(--accent);
 	background: rgba(88, 166, 255, 0.08);
+}
+
+.scenes-layer-presets {
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid var(--border);
+}
+
+.scenes-layer-presets__title {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: 6px;
+}
+
+.scenes-layer-presets__row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+
+.scenes-layer-presets__sel {
+	flex: 1 1 120px;
+	min-width: 0;
+	font-size: 0.75rem;
+	padding: 3px 6px;
+	background: var(--bg-elevated);
+	color: var(--text);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+.scenes-layer-presets__hint {
+	margin-top: 6px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	line-height: 1.3;
 }

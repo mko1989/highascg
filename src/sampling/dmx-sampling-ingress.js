@@ -8,6 +8,7 @@ const {
 	buildFfmpegArgs,
 	casparUdpStreamUri,
 	casparUdpStreamUriVariantsForRemove,
+	getActiveStreamUris,
 	amcpInfoText,
 	truncate,
 } = require('../streaming/caspar-ffmpeg-setup')
@@ -93,11 +94,15 @@ const ingressMethods = {
 		const streamCfg = { ...(cfg.streaming || {}), fps: this.fps }
 		const ffmpegArgs = buildFfmpegArgs(streamCfg)
 		const uri = casparUdpStreamUri(port)
-		for (const u of casparUdpStreamUriVariantsForRemove(port)) {
-			try {
-				await amcp.raw(`REMOVE ${ch} STREAM ${u}`)
-			} catch {
-				/* ok */
+		const active = await getActiveStreamUris(amcp, ch)
+		const variants = casparUdpStreamUriVariantsForRemove(port)
+		for (const u of active) {
+			if (variants.includes(u) || u.includes(`:${port}`)) {
+				try {
+					await amcp.raw(`REMOVE ${ch} STREAM ${u}`)
+				} catch {
+					/* ok */
+				}
 			}
 		}
 		await delay(150)
@@ -116,11 +121,15 @@ const ingressMethods = {
 	async _removeDmxUdpStream(ch, port) {
 		const amcp = this.appCtx.amcp
 		if (!amcp?.isConnected) return
-		for (const u of casparUdpStreamUriVariantsForRemove(port)) {
-			try {
-				await amcp.raw(`REMOVE ${ch} STREAM ${u}`)
-			} catch (e) {
-				this.log('debug', `[DMX] REMOVE STREAM ch${ch} (ok if none): ${e.message}`)
+		const active = await getActiveStreamUris(amcp, ch)
+		const variants = casparUdpStreamUriVariantsForRemove(port)
+		for (const u of active) {
+			if (variants.includes(u) || u.includes(`:${port}`)) {
+				try {
+					await amcp.raw(`REMOVE ${ch} STREAM ${u}`)
+				} catch (e) {
+					this.log('debug', `[DMX] REMOVE STREAM ch${ch} (ok if none): ${e.message}`)
+				}
 			}
 		}
 	},

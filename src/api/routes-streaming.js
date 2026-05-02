@@ -193,12 +193,13 @@ async function handlePost(path, body, ctx) {
 	const b = parseBody(body)
 
 	if (path === '/api/streaming/toggle') {
-		// ctx should have a method to handle the async cascade of starting caspar/go2rtc
+		// Normal startup: `index.js` assigns `ctx.toggleStreaming` from `streaming-lifecycle.js`.
+		// This error only appears if context was built without those hooks (tests / minimal harness).
 		if (ctx.toggleStreaming) {
 			await ctx.toggleStreaming(!!b.enabled)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: !!b.enabled }) }
 		}
-		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'toggleStreaming not implemented' }) }
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'toggleStreaming not available on server context' }) }
 	}
 
 	if (path === '/api/streaming/restart') {
@@ -206,7 +207,7 @@ async function handlePost(path, body, ctx) {
 			await ctx.restartStreaming()
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 		}
-		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'restartStreaming not implemented' }) }
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'restartStreaming not available on server context' }) }
 	}
 
 	return null

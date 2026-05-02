@@ -1,0 +1,56 @@
+{
+   "blockdevices": [
+      {
+         "name": "sda",
+         "type": "disk",
+         "size": "500G",
+         "mountpoint": null,
+         "label": null,
+         "rm": false,
+         "hotplug": false,
+         "ro": false,
+         "tran": "sata",
+         "fstype": null,
+         "children": [
+            {
+               "name": "sda1",
+               "type": "part",
+               "size": "500G",
+               "mountpoint": "/",
+               "label": "root",
+               "rm": false,
+               "hotplug": false,
+               "ro": false,
+               "tran": "sata",
+               "fstype": "ext4"
+            }
+         ]
+      },
+      {
+         "name": "sdb",
+         "type": "disk",
+         "size": "28.9G",
+         "mountpoint": null,
+         "label": null,
+         "rm": true,
+         "hotplug": true,
+         "ro": false,
+         "tran": "usb",
+         "fstype": null,
+         "children": [
+            {
+               "name": "sdb1",
+               "type": "part",
+               "size": "28.9G",
+               "mountpoint": "/media/operator/STICK",
+               "label": "STICK",
+               "rm": true,
+               "hotplug": true,
+               "ro": false,
+               "tran": "usb",
+               "fstype": "vfat"
+            }
+         ]
+      }
+   ]
+}

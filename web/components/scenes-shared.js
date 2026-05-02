@@ -5,6 +5,7 @@
 import { TRANSITION_TYPES, TRANSITION_TWEENS } from '../lib/dashboard-state.js'
 import { parseNumberInput } from '../lib/math-input.js'
 import { sceneState } from '../lib/scene-state.js'
+import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
 
 export function amcpParam(str) {
 	if (str == null || str === '') return ''
@@ -17,6 +18,7 @@ export function chLayerAmcp(ch, ln) {
 }
 
 export function isMediaOrFileSource(src) {
+	if (src?.isPlaceholder || src?.type === 'placeholder') return false
 	const t = (src?.type || '').toLowerCase()
 	return (t === 'media' || t === 'file') && !!src?.value
 }
@@ -139,6 +141,8 @@ export function buildIncomingScenePayload(scene, timelineSeekOpts) {
 				? {
 						type: l.source.type,
 						value: l.source.value,
+						isPlaceholder: !!l.source.isPlaceholder,
+						template: l.source.template,
 						...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
 					}
 				: null,
@@ -161,8 +165,9 @@ export function buildIncomingScenePayload(scene, timelineSeekOpts) {
 		if (Array.isArray(l.effects) && l.effects.length > 0) {
 			row.effects = JSON.parse(JSON.stringify(l.effects))
 		}
-		if (l.pipOverlay != null && typeof l.pipOverlay === 'object') {
-			row.pipOverlay = JSON.parse(JSON.stringify(l.pipOverlay))
+		const pipOverlays = getPipOverlaysFromLayer(l)
+		if (pipOverlays.length > 0) {
+			row.pipOverlays = JSON.parse(JSON.stringify(pipOverlays))
 		}
 		return row
 	})

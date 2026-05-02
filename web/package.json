@@ -1,0 +1,6 @@
+{
+	"//": "Scope marker — tells Node.js to parse the ES module `.js` files under web/ as ESM (matches the <script type=\"module\"> loading used by the browser). Browsers ignore this file. Do not add dependencies here.",
+	"name": "highascg-web",
+	"private": true,
+	"type": "module"
+}

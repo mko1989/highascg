@@ -1,0 +1,60 @@
+{
+  "enabled": false,
+  "programOutputsEnabled": true,
+  "previewOutputsEnabled": false,
+  "multiviewOutputEnabled": true,
+  "destinations": [
+    {
+      "enabled": false,
+      "label": "Encoder 1",
+      "rtmpServerUrl": "",
+      "streamKey": "",
+      "rtmpUrl": "",
+      "inputTarget": "program_1",
+      "videoCodec": "h264",
+      "videoBitrateKbps": 4500,
+      "encoderPreset": "veryfast",
+      "audioSource": "muxed",
+      "audioBitrateKbps": 128
+    },
+    {
+      "enabled": false,
+      "label": "Encoder 2",
+      "rtmpServerUrl": "",
+      "streamKey": "",
+      "rtmpUrl": "",
+      "inputTarget": "program_1",
+      "videoCodec": "h264",
+      "videoBitrateKbps": 4500,
+      "encoderPreset": "veryfast",
+      "audioSource": "muxed",
+      "audioBitrateKbps": 128
+    },
+    {
+      "enabled": false,
+      "label": "Encoder 3",
+      "rtmpServerUrl": "",
+      "streamKey": "",
+      "rtmpUrl": "",
+      "inputTarget": "multiview",
+      "videoCodec": "h264",
+      "videoBitrateKbps": 4500,
+      "encoderPreset": "veryfast",
+      "audioSource": "muxed",
+      "audioBitrateKbps": 128
+    },
+    {
+      "enabled": false,
+      "label": "Encoder 4",
+      "rtmpServerUrl": "",
+      "streamKey": "",
+      "rtmpUrl": "",
+      "inputTarget": "program_1",
+      "videoCodec": "h264",
+      "videoBitrateKbps": 4500,
+      "encoderPreset": "veryfast",
+      "audioSource": "muxed",
+      "audioBitrateKbps": 128
+    }
+  ]
+}

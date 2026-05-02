@@ -6,6 +6,7 @@
 'use strict'
 
 const WebSocket = require('ws')
+const { dispatchStructuredAmcp, isStructuredAmcpMessage } = require('./ws-amcp-dispatch')
 
 /**
  * @typedef {object} WsAppContext
@@ -95,8 +96,16 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	httpServer.on('upgrade', onUpgrade)
 
 	wss.on('connection', (ws) => {
+		const firstClient = clients.size === 0
 		clients.add(ws)
 		log('[WS] client connected')
+		if (firstClient && typeof ctx.onFirstWebSocketClient === 'function') {
+			try {
+				Promise.resolve(ctx.onFirstWebSocketClient(ctx)).catch((e) => log('onFirstWebSocketClient: ' + (e?.message || e)))
+			} catch (e) {
+				log('onFirstWebSocketClient: ' + (e?.message || e))
+			}
+		}
 		try {
 			const snap = getSnapshot()
 			ws.send(safeStringify({ type: 'state', data: snap }))
@@ -126,6 +135,13 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					}
 					const r = await ctx.amcp.raw(msg.cmd)
 					ws.send(safeStringify({ type: 'amcp_result', data: r, id: msg.id }))
+				} else if (isStructuredAmcpMessage(msg)) {
+					if (!ctx.amcp) {
+						ws.send(safeStringify({ type: 'error', data: 'AMCP not connected', id: msg.id }))
+						return
+					}
+					const data = await dispatchStructuredAmcp(ctx, msg)
+					ws.send(safeStringify({ type: 'amcp_result', data, id: msg.id }))
 				} else if (msg.type === 'multiview_sync' && msg.data) {
 					ctx._multiviewLayout = msg.data
 					const persistence = ctx.persistence || require('../utils/persistence')
@@ -151,14 +167,18 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					const sceneSnapshots = Array.isArray(snapRaw)
 						? snapRaw.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
 						: null
+					const layerPresets = Array.isArray(msg.data.layerPresets) ? msg.data.layerPresets : []
+					const lookPresets = Array.isArray(msg.data.lookPresets) ? msg.data.lookPresets : []
 					ctx.sceneDeck = {
 						looks,
 						previewSceneId,
 						...(sceneSnapshots && sceneSnapshots.length ? { sceneSnapshots } : {}),
+						layerPresets,
+						lookPresets,
 					}
 					const persistence = ctx.persistence || require('../utils/persistence')
 					try {
-						persistence.set('scene_deck', { looks, previewSceneId })
+						persistence.set('scene_deck', { looks, previewSceneId, layerPresets, lookPresets })
 					} catch (e) {
 						if (typeof ctx.log === 'function') ctx.log('warn', 'scene_deck persist: ' + (e?.message || e))
 					}

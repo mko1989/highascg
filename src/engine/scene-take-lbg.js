@@ -1,15 +1,34 @@
 /**
  * Standard program take: LOADBG … MIX … then PLAY per layer (Caspar FG/BG swap).
  * Replaces the former dual-bank mixer opacity crossfade (`scene-take.js`).
+ *
+ * Pipeline order (smooth look→look):
+ * 1) Build takeJobs + exit list (no AMCP).
+ * 2) Exit layers: batched MIXER OPACITY→0 DEFER + channel COMMIT (starts outgoing fade). Chunks use
+ *    `skipMixerPreCommit` so pre-batch channel COMMIT cannot flush a subset of DEFER lines.
+ * 3) Incoming: LOADBG → batched MIXER … DEFER for all layers (fill/effects) → clear old PIP → new PIP (MIXER … DEFER) →
+ *    PLAY → one channel COMMIT (atomic incoming look).
+ * 4) Wait only remaining time until exit-fade window completes, then batched STOP/CLEAR/PIP + COMMIT.
+ * LOADBG/PLAY stay `_send` (not inside BEGIN…COMMIT) so Caspar can resolve each layer reliably.
  */
 
 'use strict'
 
 const playbackTracker = require('../state/playback-tracker')
+const { param, deferMixerAmcpLine } = require('../caspar/amcp-utils')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
 const { mixerEffectNeutralLines } = require('./timeline-playback-helpers')
-const { buildPipOverlayAmcpLines, buildPipOverlayRemoveLines, sendPipOverlayLinesSerial } = require('./pip-overlay')
+const {
+	buildPipOverlayAmcpLinesAll,
+	buildPipOverlayOpacityFadeDeferLines,
+	buildPipOverlayRemoveLines,
+	buildPipOverlayRemoveLinesForTakeJobSet,
+	nextPipContentLayerInScene,
+	nextPipContentLayerInTake,
+	pipOverlaysFromLayer,
+	sendPipOverlayLinesSerial,
+} = require('./pip-overlay')
 
 /**
  * Build raw AMCP mixer command lines for a single effect (WO-22).
@@ -94,6 +113,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		normalizeProgramLayerBank,
 		layerVisuallyEqual,
 		resolveChannelFramerateForMixerTween,
+		persistProgramLayerBanks,
 	} = require('./scene-transition')
 
 	const self = opts.self
@@ -118,6 +138,7 @@ async function runSceneTakeLbg(amcp, opts) {
 	const chKey = String(channel)
 	if (!self.programLayerBankByChannel) self.programLayerBankByChannel = {}
 	const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
+	const inactiveBank = activeBank === 'a' ? 'b' : 'a'
 	const phys = (sceneLn, bank) => physicalProgramLayer(sceneLn, bank)
 
 	const fadeWatcher = self.clipEndFadeWatcher || null
@@ -126,9 +147,55 @@ async function runSceneTakeLbg(amcp, opts) {
 	const framerate = resolveChannelFramerateForMixerTween(self, channel, opts.framerate)
 	const incomingSorted = [...layersWithContent].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 
+	// Outgoing media must include both:
+	// - layers removed from incoming look (diff.exit)
+	// - layers whose source changed (diff.update -> previous/current layer on active bank)
+	// Otherwise old clips on the active bank survive and stack with the new look.
+	const exitCandidates = [...(diff.exit || [])]
+	for (const updatedIncoming of diff.update || []) {
+		const prev = currentMap.get(updatedIncoming.layerNumber)
+		if (layerHasContent(prev)) exitCandidates.push(prev)
+	}
+	const seenExitLayerNums = new Set()
+	const exitMedia = exitCandidates.filter((l) => {
+		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline') return false
+		const ln = Number(l.layerNumber)
+		if (!Number.isFinite(ln)) return true
+		if (seenExitLayerNums.has(ln)) return false
+		seenExitLayerNums.add(ln)
+		return true
+	})
+
+	// Stop timelines that are exiting (present in current look but not in incoming)
+	if (self.timelineEngine) {
+		const pbNow = self.timelineEngine.getPlayback()
+		if (pbNow?.timelineId) {
+			const exitingTimeline = diff.exit.find((l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId)
+			if (exitingTimeline) {
+				self.timelineEngine.stop(pbNow.timelineId)
+			}
+		}
+	}
+
+	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
+	const fadeTw = globalT.tween
+	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
+	/** When exit opacity fade starts (for teardown timing vs incoming load). */
+	let fadeClockStart = /** @type {number | null} */ (null)
+
+	/** @type {Array<{ layer: object, pLayer: number, clip: string, f: object, mixerLines: string[], loadOpts: object, playOpts: object, pipOverlays: object[] }>} */
+	const takeJobs = []
+
 	for (const layer of incomingSorted) {
 		if (layer.source && layer.source.type === 'timeline') {
-			throw new Error('Mixing timeline and media in one look is not supported — use timeline-only looks or media-only')
+			const tlId = layer.source.value
+			if (tlId && self.timelineEngine) {
+				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
+				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx })
+				self.timelineEngine.setLoop(tlId, !!layer.loop)
+				self.timelineEngine.play(tlId, 0)
+			}
+			continue
 		}
 		const clip = clipPath(layer)
 		if (!clip) continue
@@ -136,7 +203,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		const cur = currentMap.get(layer.layerNumber)
 		if (layerVisuallyEqual(cur, layer)) continue
 
-		const pLayer = phys(Number(layer.layerNumber), activeBank)
+		const pLayer = phys(Number(layer.layerNumber), inactiveBank)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const cl = chLayerAmcp(channel, pLayer)
 		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
@@ -152,22 +219,26 @@ async function runSceneTakeLbg(amcp, opts) {
 			loadOpts.tween = globalT.tween
 		}
 
-		await amcp.loadbg(channel, pLayer, clip, loadOpts)
-
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
 		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
-		// Reset WO-22 mixer transforms that persist on the layer (crop, color, etc.); omitted effects must not linger.
-		const mixerLines = [
-			...mixerEffectNeutralLines(cl),
-			`MIXER ${cl} ANCHOR 0 0`,
-			`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`,
-			`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0`,
-			`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0`,
-			`MIXER ${cl} KEYER ${keyer}`,
-			`MIXER ${cl} VOLUME ${vol}`,
-		]
+		const mixerLines = []
 
-		// Append mixer effect commands from layer.effects[] (WO-22)
+		if (f.x !== 0 || f.y !== 0 || f.scaleX !== 1 || f.scaleY !== 1) {
+			mixerLines.push(`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`)
+		}
+		if (layer.rotation) {
+			mixerLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
+		}
+		if (layer.opacity != null && layer.opacity !== 1) {
+			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity} 0`)
+		}
+		if (keyer === 1) {
+			mixerLines.push(`MIXER ${cl} KEYER 1`)
+		}
+		if (vol !== 1) {
+			mixerLines.push(`MIXER ${cl} VOLUME ${vol}`)
+		}
+
 		if (Array.isArray(layer.effects)) {
 			for (const fx of layer.effects) {
 				const lines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
@@ -175,79 +246,206 @@ async function runSceneTakeLbg(amcp, opts) {
 			}
 		}
 
-		await amcp.batchSend(mixerLines)
+		for (let i = 0; i < mixerLines.length; i++) {
+			mixerLines[i] = deferMixerAmcpLine(mixerLines[i])
+		}
 
 		const playOpts = {}
 		if (af) playOpts.audioFilter = af
 		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
 			playOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
 		}
-		await amcp.play(channel, pLayer, undefined, playOpts)
-		await amcp.mixerCommit(channel)
 
-		// PIP overlay: apply HTML template on overlay layer (WO-25)
-		if (layer.pipOverlay?.type) {
+		takeJobs.push({
+			layer,
+			pLayer,
+			clip,
+			f,
+			mixerLines,
+			loadOpts,
+			playOpts,
+			pipOverlays: pipOverlaysFromLayer(layer),
+		})
+	}
+
+	const currentSceneLayers = opts.currentScene?.layers
+
+	// --- Exit fade first so outgoing layers start dimming while incoming LOADBG/PLAY runs (smooth crossfade). ---
+	if (exitMedia.length > 0 && fadeDur > 0) {
+		const fadeLines = []
+		for (const layer of exitMedia) {
+			const pOut = phys(Number(layer.layerNumber), activeBank)
+			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
+			const cl = `${channel}-${pOut}`
+			let p = `0 ${fadeDur}`
+			if (fadeTw) p += ` ${param(fadeTw)}`
+			fadeLines.push(`MIXER ${cl} OPACITY ${p} DEFER`)
 			try {
-				const overlayLines = buildPipOverlayAmcpLines(layer.pipOverlay, channel, pLayer, f, self)
-				if (overlayLines.length > 0) {
-					await sendPipOverlayLinesSerial(amcp, overlayLines)
-					await amcp.mixerCommit(channel)
+				const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+				const pipN = pipOverlaysFromLayer(layer).length
+				if (pipN > 0) {
+					fadeLines.push(...buildPipOverlayOpacityFadeDeferLines(channel, pOut, p, nextL, pipN))
 				}
-			} catch (e) {
-				self.log?.('warn', `PIP overlay layer ${pLayer}: ${e?.message || e}`)
-			}
-		} else {
-			// No overlay requested — clear any leftover from previous take
+			} catch (_) {}
+		}
+		try {
+			await amcp.batchSendChunked(fadeLines, { skipMixerPreCommit: true })
+			await amcp.mixerCommit(channel)
+		} catch (_) {}
+		fadeClockStart = Date.now()
+	} else if (exitMedia.length > 0) {
+		for (const layer of exitMedia) {
+			const pOut = phys(Number(layer.layerNumber), activeBank)
+			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
+		}
+	}
+
+	// --- Incoming look: LOADBG → mixer → strip old PIP → new PIP (MIXER DEFER) → PLAY → commit (atomic). ---
+	if (takeJobs.length > 0) {
+		for (const job of takeJobs) {
+			await amcp.mixerClear(channel, job.pLayer).catch(() => {})
+			await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
+		}
+
+		const flatMixer = takeJobs.flatMap((j) => j.mixerLines)
+		if (flatMixer.length > 0) {
+			await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
+		}
+
+		let pipRemoveLines = []
+		try {
+			pipRemoveLines = buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentSceneLayers)
+		} catch (_) {}
+		if (pipRemoveLines.length > 0) {
 			try {
-				const removeLines = buildPipOverlayRemoveLines(channel, pLayer)
-				await sendPipOverlayLinesSerial(amcp, removeLines)
+				await sendPipOverlayLinesSerial(amcp, pipRemoveLines)
 			} catch (_) {}
 		}
 
+		const pipAddLines = []
+		for (const job of takeJobs) {
+			if (job.pipOverlays.length > 0) {
+				try {
+					const lines = buildPipOverlayAmcpLinesAll(
+						job.pipOverlays,
+						channel,
+						job.pLayer,
+						job.f,
+						self,
+						nextPipContentLayerInTake(takeJobs, job.pLayer),
+						currentMap.get(job.layer.layerNumber) || null
+					)
+					if (lines.length > 0) pipAddLines.push(...lines)
+				} catch (e) {
+					self.log?.('warn', `PIP overlay layer ${job.pLayer}: ${e?.message || e}`)
+				}
+			}
+		}
+		if (pipAddLines.length > 0) {
+			try {
+				await sendPipOverlayLinesSerial(amcp, pipAddLines)
+			} catch (_) {}
+		}
+
+		// Pre-buffer delay: allow CasparCG's background thread to decode the first frame before PLAY swaps it in
+		await new Promise((r) => setTimeout(r, 80))
+
+		for (const job of takeJobs) {
+			await amcp.play(channel, job.pLayer, undefined, job.playOpts)
+		}
+
+		// One channel commit — deferred video + PIP mixers apply with the PLAY swap (no early PIP geometry pop).
 		try {
-			playbackTracker.recordPlay(self, channel, pLayer, clip, { loop: !!layer.loop })
+			await amcp.mixerCommit(channel)
 		} catch (_) {}
 
-		// WO-25: schedule fade-out before clip end (duration from CLS/CINF/cache, else ffprobe on media disk path)
-		const foe = layer.fadeOnEnd
-		if (fadeWatcher && foe?.enabled && !layer.loop) {
-			let durationMs = playbackTracker.resolveClipDurationMs(self, clip)
-			if (!durationMs || durationMs <= 0) {
-				durationMs = await playbackTracker.resolveClipDurationMsWithDiskProbe(self, clip)
-			}
-			if (durationMs && durationMs > 0) {
-				fadeWatcher.schedule(channel, pLayer, durationMs, foe.frames || 12, framerate)
-			} else if (self.log) {
-				self.log(
-					'warn',
-					`[ClipEndFade] no duration for "${String(clip).slice(0, 80)}" — fade-on-end skipped (CINF + cache + state media + disk probe all missed; check Caspar id vs library)`,
-				)
+		for (const job of takeJobs) {
+			try {
+				playbackTracker.recordPlay(self, channel, job.pLayer, job.clip, { loop: !!job.layer.loop })
+			} catch (_) {}
+
+			const foe = job.layer.fadeOnEnd
+			if (fadeWatcher && foe?.enabled && !job.layer.loop) {
+				const fadeFr = foe.frames || 12
+				let durationMs = playbackTracker.resolveClipDurationMs(self, job.clip)
+				if (!durationMs || durationMs <= 0) {
+					durationMs = await playbackTracker.resolveClipDurationMsWithDiskProbe(self, job.clip)
+				}
+				if (durationMs && durationMs > 0) {
+					fadeWatcher.schedule(channel, job.pLayer, durationMs, fadeFr, framerate)
+				} else {
+					const oscDelay = playbackTracker.getOscClipEndFadeDelayMs(
+						self,
+						channel,
+						job.pLayer,
+						job.clip,
+						fadeFr,
+						framerate,
+					)
+					if (oscDelay != null && Number.isFinite(oscDelay)) {
+						fadeWatcher.scheduleMidPlayback(channel, job.pLayer, oscDelay, fadeFr, framerate)
+					} else {
+						fadeWatcher.scheduleWithOscFallback(
+							self,
+							channel,
+							job.pLayer,
+							job.clip,
+							fadeFr,
+							framerate,
+							() =>
+								playbackTracker.getOscClipEndFadeDelayMs(
+									self,
+									channel,
+									job.pLayer,
+									job.clip,
+									fadeFr,
+									framerate,
+								),
+						)
+					}
+				}
 			}
 		}
 	}
 
-	for (const layer of diff.exit) {
-		if (!layerHasContent(layer)) continue
-		const t = String(layer.source?.type || '')
-		if (t === 'timeline') continue
-		const pOut = phys(Number(layer.layerNumber), activeBank)
-		if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
-		try {
-			await amcp.stop(channel, pOut)
+	// --- Teardown exiting layers after overlap: wait only remaining time from exit-fade start, then STOP/CLEAR/PIP. ---
+	if (exitMedia.length > 0) {
+		let teardownWait = 0
+		if (fadeClockStart != null && fadeDur > 0) {
+			teardownWait = Math.max(0, fadeMs - (Date.now() - fadeClockStart))
+		}
+		if (teardownWait > 0) {
+			await new Promise((r) => setTimeout(r, Math.ceil(teardownWait) + 5))
+		}
+
+		const teardownLines = []
+		for (const layer of exitMedia) {
+			const pOut = phys(Number(layer.layerNumber), activeBank)
+			const cl = `${channel}-${pOut}`
+			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+			try {
+				const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+				const pipN = pipOverlaysFromLayer(layer).length
+				if (pipN > 0) {
+					teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextL, pipN))
+				}
+			} catch (_) {}
 			try {
 				playbackTracker.recordStop(self, channel, pOut)
 			} catch (_) {}
-		} catch (_) {}
+		}
+		if (teardownLines.length > 0) {
+			try {
+				await sendPipOverlayLinesSerial(amcp, teardownLines)
+			} catch (_) {}
+		}
 		try {
-			await amcp.mixerClear(channel, pOut)
-		} catch (_) {}
-		// Clean up PIP overlay layer if it existed (WO-25)
-		try {
-			const removeLines = buildPipOverlayRemoveLines(channel, pOut)
-			await sendPipOverlayLinesSerial(amcp, removeLines)
+			await amcp.mixerCommit(channel)
 		} catch (_) {}
 	}
-	await amcp.mixerCommit(channel)
+
+	self.programLayerBankByChannel[chKey] = inactiveBank
+	persistProgramLayerBanks(self)
 
 	return {
 		ok: true,

@@ -8,10 +8,16 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
-const { runTimelineOnlyTake, isTimelineOnlyScene, layerHasContent } = require('../engine/scene-transition')
+const { layerHasContent, normalizeTransition, resolveChannelFramerateForMixerTween } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
+const { getChannelMap, getRouteString } = require('../config/routing')
 
 const TAKE_TIMEOUT_MS = 120000
+const OUT_PRIMARY_LAYER = 1
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 /** Remove take-only fields from stored live scene JSON. */
 function stripEphemeralTakeFields(scene) {
@@ -24,6 +30,12 @@ function stripEphemeralTakeFields(scene) {
 			})
 		: scene.layers
 	return { ...scene, layers }
+}
+
+function sameSceneId(a, b) {
+	const aid = a && typeof a === 'object' && a.id != null ? String(a.id) : ''
+	const bid = b && typeof b === 'object' && b.id != null ? String(b.id) : ''
+	return !!aid && !!bid && aid === bid
 }
 
 /**
@@ -71,6 +83,7 @@ async function handleSceneTake(body, ctx) {
 	}
 
 	const inc = b.incomingScene
+	const routeMap = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
 	const takeOpts = {
 		channel,
 		currentScene,
@@ -79,11 +92,79 @@ async function handleSceneTake(body, ctx) {
 		forceCut: !!b.forceCut,
 	}
 	const runTake = async () => {
-		if (isTimelineOnlyScene(inc)) {
-			await runTimelineOnlyTake(ctx, takeOpts)
-		} else {
-			await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
+		const mainIdx = Array.isArray(routeMap.programChannels) ? routeMap.programChannels.indexOf(channel) : -1
+		const bus1 = mainIdx >= 0 ? (routeMap.switcherBus1Channels?.[mainIdx] ?? routeMap.previewChannels?.[mainIdx] ?? null) : null
+		const bus2 = null
+		if (typeof ctx.log === 'function') {
+			ctx.log(
+				'info',
+				`[scene-take] scene=${String(inc?.id || 'n/a')} scope=${String(inc?.mainScope || 'n/a')} ch=${channel} main=${mainIdx >= 0 ? mainIdx + 1 : 'n/a'} bus1=${bus1 ?? 'n/a'} bus2=${bus2 ?? 'n/a'} forceCut=${!!b.forceCut}`,
+			)
 		}
+		// PGM-only screens are intentionally single-channel (resource-saving mode): no bus switch path.
+		if (mainIdx < 0) {
+			throw new Error(`scene take requires a valid output channel, got ${channel}`)
+		}
+		// 2-channel PGM/PRV workflow: build incoming on PRV, then transition PGM route to PRV.
+		if (bus1 != null && bus2 == null) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('info', `[scene-take] pgm/prv path ch=${channel} prv=${bus1}`)
+			}
+			// Re-taking the same look should be a no-op to avoid route flicker and extra AMCP churn.
+			if (!b.forceCut && sameSceneId(currentScene, inc)) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('info', `[scene-take] no-op: scene ${String(inc?.id || 'n/a')} already on pgm ch=${channel}`)
+				}
+				liveSceneState.broadcastSceneLive(ctx)
+				return
+			}
+			// Native layer transitions are superior because they don't require detaching a route,
+			// preventing playback time jumps and double-decoding on the PGM channel.
+			const previousPgmScene = currentScene
+			const prvStored = liveSceneState.getChannel(bus1)
+			const prvCurrentScene = prvStored?.scene || null
+
+			await runSceneTakeLbg(ctx.amcp, {
+				...takeOpts,
+				channel,
+				currentScene: previousPgmScene,
+				incomingScene: inc,
+				forceCut: !!b.forceCut,
+				self: ctx,
+			})
+			if (inc && typeof inc === 'object' && inc.id) {
+				liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
+			}
+			
+			// Bus exchange behavior: previous PGM look becomes PRV look after take.
+			if (
+				previousPgmScene &&
+				typeof previousPgmScene === 'object' &&
+				Array.isArray(previousPgmScene.layers) &&
+				previousPgmScene.layers.some(layerHasContent)
+			) {
+				try {
+					await runSceneTakeLbg(ctx.amcp, {
+						...takeOpts,
+						channel: bus1,
+						currentScene: prvCurrentScene,
+						incomingScene: previousPgmScene,
+						forceCut: true,
+						self: ctx,
+					})
+					const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
+					liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
+				} catch (e) {
+					if (typeof ctx.log === 'function') ctx.log('warn', `[scene-take] pgm->prv exchange failed: ${e?.message || e}`)
+				}
+			}
+			liveSceneState.broadcastSceneLive(ctx)
+			return
+		}
+		if (typeof ctx.log === 'function') {
+			ctx.log('info', `[scene-take] direct-program path ch=${channel} (2-channel pgm/prv mode)`)
+		}
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
 		if (inc && typeof inc === 'object' && inc.id) {
 			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 		}

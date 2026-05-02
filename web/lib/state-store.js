@@ -15,6 +15,11 @@ export class StateStore {
 
 	setOffline(offline) {
 		this._isOffline = !!offline
+		this._emit('offline', this._isOffline)
+	}
+
+	isOffline() {
+		return this._isOffline
 	}
 
 	async hydrateFromCache() {

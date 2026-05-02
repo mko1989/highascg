@@ -13,7 +13,7 @@ const http = require('http')
 const WebSocket = require('ws')
 
 const _args = process.argv.slice(2).filter((a) => !a.startsWith('--'))
-const port = parseInt(_args[0] || process.env.HIGHASCG_SMOKE_PORT || '8080', 10)
+const port = parseInt(_args[0] || process.env.HIGHASCG_SMOKE_PORT || '4200', 10)
 const host = process.env.HIGHASCG_SMOKE_HOST || '127.0.0.1'
 const httpOnly = process.argv.includes('--http-only')
 
@@ -103,6 +103,13 @@ async function main() {
 	if (r.status !== 200) fail(`GET ${inst}/app.js expected 200, got ${r.status}`)
 	if (!String(r.body).includes('import ')) fail(`GET ${inst}/app.js expected ES module`)
 
+	// WO-23 T23.5: main CSS bundle under Companion-style prefix (static map)
+	r = await httpGet(`${inst}/styles.css`)
+	if (r.status !== 200) fail(`GET ${inst}/styles.css expected 200, got ${r.status}`)
+	if (!String(r.body).includes('{') && !String(r.body).includes('@')) {
+		fail(`GET ${inst}/styles.css expected CSS content`)
+	}
+
 	r = await httpGet('/api/scene/live')
 	if (r.status !== 200) fail(`GET /api/scene/live expected 200, got ${r.status}`)
 
@@ -110,11 +117,34 @@ async function main() {
 	if (r.status !== 200 && r.status !== 503) {
 		fail(`GET /api/state expected 200 or 503 (no Caspar), got ${r.status}`)
 	}
+	if (r.status === 200) {
+		try {
+			const st = JSON.parse(r.body)
+			const d = st.scene && st.scene.deck
+			if (!d || !Array.isArray(d.layerPresets) || !Array.isArray(d.lookPresets)) {
+				fail('GET /api/state expected scene.deck.layerPresets and .lookPresets (arrays)')
+			}
+		} catch (e) {
+			fail(`GET /api/state JSON: ${e.message}`)
+		}
+	}
 	const casparDisconnected = r.status === 503
 
 	// No-Caspar client surfaces: settings, streams, audio devices (WO-05/06 + router)
 	r = await httpGet('/api/settings')
 	if (r.status !== 200) fail(`GET /api/settings expected 200, got ${r.status}`)
+
+	r = await httpGet('/api/device-view')
+	if (r.status !== 200) fail(`GET /api/device-view expected 200, got ${r.status}`)
+	try {
+		const dv = JSON.parse(r.body)
+		if (!dv.ok || !dv.graph || !dv.live) fail('GET /api/device-view expected ok, graph, live')
+		if (!dv.suggested || !Array.isArray(dv.suggested.devices) || !Array.isArray(dv.suggested.connectors)) {
+			fail('GET /api/device-view expected suggested.devices and suggested.connectors')
+		}
+	} catch (e) {
+		fail(`GET /api/device-view JSON: ${e.message}`)
+	}
 
 	r = await httpGet('/api/system/setup')
 	if (r.status !== 200) fail(`GET /api/system/setup expected 200, got ${r.status}`)

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Color Background</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+	</style>
+</head>
+<body></body>
+<script>
+	window['play'] = function() { /* CasparCG calls play(); no-op */ };
+	window['update'] = function(jsonStr) {
+		try {
+			var data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+			if (data && data.color) {
+				document.body.style.background = data.color;
+			}
+		} catch(e) { /* ignore parse errors */ }
+	};
+</script>
+</html>

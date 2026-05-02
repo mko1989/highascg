@@ -57,6 +57,8 @@ export function appendScenesEditorShell(root) {
 	splitHandle.title = 'Drag to resize compose preview'
 	const previewHost = document.createElement('div')
 	previewHost.className = 'preview-host scenes-preview-host'
+	const tabsHost = document.createElement('div')
+	tabsHost.className = 'scenes-tabs-host'
 	const mainHost = document.createElement('div')
 	mainHost.className = 'scenes-main dashboard-main scenes-split__main'
 
@@ -74,8 +76,9 @@ export function appendScenesEditorShell(root) {
 	scenesSplit.appendChild(previewHost)
 	scenesSplit.appendChild(splitHandle)
 	scenesSplit.appendChild(mainHost)
+	mainHost.appendChild(tabsHost)
 
-	return { rundownPlaybackSlot, scenesSplit, splitHandle, previewHost, mainHost, splitPx }
+	return { rundownPlaybackSlot, scenesSplit, splitHandle, previewHost, mainHost, tabsHost, splitPx }
 }
 
 /**
@@ -138,48 +141,119 @@ export function createTakeSceneToProgram(deps) {
 		}
 		takeBusy = true
 		try {
-			const programCh = deps.getProgramChannel()
-			const fps = deps.getChannelMap().programResolutions?.[sceneState.activeScreenIndex]?.fps ?? 50
+			const cm = deps.getChannelMap() || {}
+			const programChannels = Array.isArray(cm.programChannels) ? cm.programChannels : [deps.getProgramChannel()]
+			const targetMains = (() => {
+				const scope = String(scene.mainScope ?? sceneState.activeScreenIndex)
+				if (scope === 'all') return Array.from({ length: programChannels.length }, (_, i) => i)
+				const n = parseInt(scope, 10)
+				if (Number.isFinite(n) && n >= 0 && n < programChannels.length) return [n]
+				return [sceneState.activeScreenIndex]
+			})()
 			const scenePayloadForState = buildIncomingScenePayload(scene)
-			const incomingJson = buildIncomingScenePayload(scene, {
+			const incomingJsonBase = buildIncomingScenePayload(scene, {
 				timeline: timelineState.getActive(),
 				positionMs: deps.getTimelinePositionMsForTake(),
 			})
-			const body = {
-				channel: programCh,
-				incomingScene: incomingJson,
-				framerate: fps,
-				forceCut,
-				useServerLive: true,
-			}
-			const takeRes = await api.post('/api/scene/take', body)
-			sceneState.setLiveSceneId(sceneId)
 			const prevLive = deps.stateStore.getState()?.scene?.live || {}
-			if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {
-				const merged = { ...prevLive }
-				for (const [k, v] of Object.entries(takeRes.sceneLive)) {
-					if (v && typeof v === 'object' && v.sceneId != null && v.scene) {
-						merged[k] = { sceneId: v.sceneId, scene: v.scene }
-					}
+			const mergedLive = { ...prevLive }
+			const touched = []
+			console.info('[looks][take] start', {
+				sceneId: scene.id,
+				sceneName: scene.name || 'Untitled look',
+				mainScope: String(scene.mainScope ?? sceneState.activeScreenIndex),
+				targetMains,
+				programChannels,
+				forceCut: !!forceCut,
+			})
+			for (const mainIdx of targetMains) {
+				const programCh = programChannels[mainIdx]
+				if (!Number.isFinite(Number(programCh)) || Number(programCh) <= 0) continue
+				touched.push({ mainIdx, channel: Number(programCh) })
+				const fps = cm.programResolutions?.[mainIdx]?.fps ?? 50
+				const body = {
+					channel: Number(programCh),
+					incomingScene: incomingJsonBase,
+					framerate: fps,
+					forceCut,
+					useServerLive: true,
 				}
-				deps.stateStore.applyChange('scene.live', merged)
-			} else {
-				deps.stateStore.applyChange('scene.live', {
-					...prevLive,
-					[String(programCh)]: { sceneId: scene.id, scene: incomingJson },
+				console.info('[looks][take] dispatch', {
+					sceneId: scene.id,
+					mainIdx,
+					channel: Number(programCh),
+					forceCut: !!forceCut,
+					layerCount: Array.isArray(incomingJsonBase?.layers) ? incomingJsonBase.layers.length : 0,
 				})
+				const takeRes = await api.post('/api/scene/take', body)
+				sceneState.setLiveSceneId(sceneId, mainIdx)
+				if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {
+					for (const [k, v] of Object.entries(takeRes.sceneLive)) {
+						if (v && typeof v === 'object' && v.sceneId != null && v.scene) {
+							mergedLive[k] = { sceneId: v.sceneId, scene: v.scene }
+						}
+					}
+				} else {
+					mergedLive[String(programCh)] = { sceneId: scene.id, scene: incomingJsonBase }
+				}
+				const liveSnap = takeRes?.sceneLive?.[String(programCh)]
+				if (liveSnap?.scene && liveSnap.sceneId === scene.id) {
+					sceneState.applySceneFromTakePayload(sceneId, liveSnap.scene)
+				} else {
+					sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState)
+				}
 			}
-			const liveSnap = takeRes?.sceneLive?.[String(programCh)]
-			if (liveSnap?.scene && liveSnap.sceneId === scene.id) {
-				sceneState.applySceneFromTakePayload(sceneId, liveSnap.scene)
-			} else {
-				sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState)
-			}
+			deps.stateStore.applyChange('scene.live', mergedLive)
 			deps.primePreviewSnapshotFromScene(sceneId)
+			if (touched.length > 0) {
+				const mode = forceCut ? 'Cut' : 'Take'
+				const routeText = touched
+					.map((x) => `M${x.mainIdx + 1} ch${x.channel}`)
+					.join(', ')
+				deps.showToast(`${mode}: “${scene.name || 'Look'}” → ${routeText}`, 'info')
+			}
+			console.info('[looks][take] done', {
+				sceneId: scene.id,
+				touched,
+			})
 		} catch (e) {
 			deps.showToast(e?.message || String(e), 'error')
 		} finally {
 			takeBusy = false
 		}
 	}
+}
+
+/**
+ * @param {HTMLElement} container
+ * @param {object} channelMap
+ * @param {number} activeIndex
+ * @param {(idx: number) => void} onSwitch
+ */
+export function renderScreenTabs(container, channelMap, activeIndex, onSwitch) {
+	container.innerHTML = ''
+	const count = Math.max(1, channelMap.screenCount ?? 1)
+	if (count <= 1) return
+
+	const tabs = document.createElement('div')
+	tabs.className = 'scenes-tabs'
+	tabs.style.cssText = 'display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;'
+
+	const virtuals = channelMap.virtualMainChannels || []
+	for (let i = 0; i < count; i++) {
+		const btn = document.createElement('button')
+		btn.type = 'button'
+		btn.className = 'btn ' + (activeIndex === i ? 'btn--primary' : 'btn--secondary')
+		btn.style.padding = '0.35rem 0.75rem'
+		btn.style.fontSize = '12px'
+		btn.style.whiteSpace = 'nowrap'
+		const v = virtuals[i]
+		btn.textContent = v && v.name ? v.name : `Screen ${i + 1}`
+		btn.onclick = (e) => {
+			e.preventDefault()
+			onSwitch(i)
+		}
+		tabs.appendChild(btn)
+	}
+	container.appendChild(tabs)
 }

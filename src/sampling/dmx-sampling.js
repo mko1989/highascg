@@ -256,6 +256,7 @@ class SamplingManager {
 	}
 
 	async stop() {
+		if (this.channels.size === 0 && !this.worker) return
 		this.log('info', '[DMX] Stopping sampling...')
 
 		for (const [ch, data] of this.channels) {

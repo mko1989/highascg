@@ -28,6 +28,25 @@ function findDisplayDetail(displayList, selectedId) {
 }
 
 /**
+ * Matches generated Caspar multiview: show X11 mapping row only when multiview uses a screen window.
+ * @param {Record<string, unknown>} cs
+ */
+function multiviewUiShowsScreenRow(cs) {
+	const mode = String(cs?.multiview_output_mode || '').trim()
+	if (mode === 'stream_only' || mode === 'decklink_only' || mode === 'decklink_stream') return false
+	if (
+		mode === 'screen_only' ||
+		mode === 'screen_decklink' ||
+		mode === 'screen_stream_decklink' ||
+		mode === 'screen_stream'
+	) {
+		return true
+	}
+	if (!mode) return cs.multiview_screen_consumer !== false && cs.multiview_screen_consumer !== 'false'
+	return false
+}
+
+/**
  * @param {string} mode
  * @param {string|number} rate
  */
@@ -154,7 +173,7 @@ export async function mountSystemSettings(container) {
 			: '<span class="hw-pill status-warn">None detected</span>'
 
 		container.innerHTML = `
-			<p class="settings-note">Map physical monitor outputs to your CasparCG screens. "Apply OS Changes" runs xrandr and restarts the display manager (nodm). Optional OS resolution overrides Caspar video mode for the X11 output only.</p>
+			<p class="settings-note">Map each physical output to an on-screen role. <strong>Screen 1…N</strong> follow Caspar&rsquo;s main-screen count. With <strong>one</strong> main screen and a <strong>multiview</strong> window, use <strong>Multiview monitor</strong> for the second head so X11 extends the desktop (not mirror). By default, outputs are placed left-to-right. <strong>Reverse horizontal order</strong> swaps that order.</p>
 			
 			<div class="settings-group">
 				<label>Detected Displays (Hardware)</label>
@@ -184,6 +203,14 @@ export async function mountSystemSettings(container) {
 			</div>
 
 			<div id="sys-mapping-container"></div>
+
+			<div id="sys-x11-swap-wrap" class="settings-group" style="display:none">
+				<label class="checkbox" style="display:inline-flex;align-items:flex-start;gap:0.35rem;cursor:pointer">
+					<input type="checkbox" id="sys-x11-swap">
+					<span>Reverse horizontal order (e.g. Screen 2 on the left, Screen 1 on the right)</span>
+				</label>
+				<p class="settings-note small">Applies only to <code>xrandr --pos</code> placement. Caspar channel → output mapping above is unchanged.</p>
+			</div>
 
 			<div class="settings-actions">
 				<button class="btn btn--danger" id="sys-apply-os">Apply OS / X11 Changes</button>
@@ -235,6 +262,10 @@ export async function mountSystemSettings(container) {
 
 		const renderMapping = () => {
 			const count = parseInt(container.querySelector('#sys-screen-count').value, 10) || 1
+			const cs = cfg.casparServer || {}
+			const mvOn = cs.multiview_enabled !== false && cs.multiview_enabled !== 'false'
+			const mvSc = multiviewUiShowsScreenRow(cs)
+			const showMvRow = count === 1 && mvOn && mvSc
 			let html = ''
 			for (let i = 1; i <= count; i++) {
 				const current = cfg[`screen_${i}_system_id`] || ''
@@ -260,11 +291,47 @@ export async function mountSystemSettings(container) {
 						</select>
 						<label style="margin-top:0.5rem">OS output resolution</label>
 						<select class="sys-os-mode" data-screen="${i}"></select>
-						<p class="settings-note small">Uses xrandr <code>--mode</code> and optional <code>--rate</code> when you Apply OS Changes.</p>
+						<div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+							<div style="flex:1"><label>X Position</label><input type="number" class="sys-os-x" data-screen="${i}" placeholder="Auto"></div>
+							<div style="flex:1"><label>Y Position</label><input type="number" class="sys-os-y" data-screen="${i}" placeholder="Auto"></div>
+						</div>
+						<p class="settings-note small">Uses xrandr <code>--mode</code> and optional <code>--rate</code> when you Apply OS Changes. X/Y overrides allow grid layouts.</p>
 					</div>
 				`
 			}
+			const mvCur = cfg.multiview_system_id || ''
+			const mvOm = cfg.multiview_os_mode || ''
+			const mvOrate = cfg.multiview_os_rate
+			const mvPacked =
+				mvOm && mvOrate != null && String(mvOrate).trim() !== ''
+					? packOsValue(mvOm, mvOrate)
+					: mvOm
+						? packOsValue(mvOm, '')
+						: ''
+			html += `
+				<div id="sys-multiview-os-wrap" class="settings-group" style="display:${showMvRow ? 'block' : 'none'}">
+					<label>Multiview monitor (second display)</label>
+					<p class="settings-note small">Required for <strong>two physical heads</strong> when Caspar has one main screen pair and a multiview channel. Pick the connector for the multiview window; it is placed to the right of Screen 1 (unless you enable <strong>Reverse horizontal order</strong>).</p>
+					<select class="sys-map-select" data-screen="mv">
+						<option value="">— choose output —</option>
+						${displayDetails
+							.map((d) => {
+								const name = typeof d === 'string' ? d : d.name
+								return `<option value="${name}" ${name === mvCur ? 'selected' : ''}>${name}</option>`
+							})
+							.join('')}
+					</select>
+					<label style="margin-top:0.5rem">OS output resolution</label>
+					<select class="sys-os-mode" data-screen="mv"></select>
+					<div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+						<div style="flex:1"><label>X Position</label><input type="number" class="sys-os-x" data-screen="mv" placeholder="Auto"></div>
+						<div style="flex:1"><label>Y Position</label><input type="number" class="sys-os-y" data-screen="mv" placeholder="Auto"></div>
+					</div>
+				</div>
+			`
 			mappingContainer.innerHTML = html
+			const swapWrap = container.querySelector('#sys-x11-swap-wrap')
+			if (swapWrap) swapWrap.style.display = count >= 2 || showMvRow ? 'block' : 'none'
 			for (let i = 1; i <= count; i++) {
 				const mapSel = mappingContainer.querySelector(`.sys-map-select[data-screen="${i}"]`)
 				const current = cfg[`screen_${i}_system_id`] || ''
@@ -281,9 +348,28 @@ export async function mountSystemSettings(container) {
 					fillOsModeSelect(i, mapSel.value, '')
 				})
 			}
+			if (showMvRow) {
+				const mvMap = mappingContainer.querySelector('.sys-map-select[data-screen="mv"]')
+				fillOsModeSelect('mv', mvMap?.value || mvCur, mvPacked)
+				mvMap?.addEventListener('change', () => {
+					fillOsModeSelect('mv', mvMap.value, '')
+				})
+				const mvX = mappingContainer.querySelector('.sys-os-x[data-screen="mv"]')
+				const mvY = mappingContainer.querySelector('.sys-os-y[data-screen="mv"]')
+				if (mvX) mvX.value = cfg.multiview_os_x !== undefined ? cfg.multiview_os_x : ''
+				if (mvY) mvY.value = cfg.multiview_os_y !== undefined ? cfg.multiview_os_y : ''
+			}
+			for (let i = 1; i <= count; i++) {
+				const xIn = mappingContainer.querySelector(`.sys-os-x[data-screen="${i}"]`)
+				const yIn = mappingContainer.querySelector(`.sys-os-y[data-screen="${i}"]`)
+				if (xIn) xIn.value = cfg[`screen_${i}_os_x`] !== undefined ? cfg[`screen_${i}_os_x`] : ''
+				if (yIn) yIn.value = cfg[`screen_${i}_os_y`] !== undefined ? cfg[`screen_${i}_os_y`] : ''
+			}
 		}
 
 		renderMapping()
+		const swapOnce = container.querySelector('#sys-x11-swap')
+		if (swapOnce) swapOnce.checked = !!cfg.x11_horizontal_swap
 		container.querySelector('#sys-screen-count').onchange = renderMapping
 
 		const audioSel = container.querySelector('#sys-audio-device')
@@ -305,27 +391,47 @@ export async function mountSystemSettings(container) {
 		container.getSystemSettings = () => {
 			const data = {
 				screen_count: parseInt(container.querySelector('#sys-screen-count').value, 10),
+				x11_horizontal_swap: !!(container.querySelector('#sys-x11-swap') || {}).checked,
 			}
 			container.querySelectorAll('.sys-map-select').forEach((sel) => {
 				const screenIdx = sel.dataset.screen
-				data[`screen_${screenIdx}_system_id`] = sel.value
+				if (screenIdx === 'mv') {
+					data.multiview_system_id = sel.value
+				} else {
+					data[`screen_${screenIdx}_system_id`] = sel.value
+				}
 			})
 			container.querySelectorAll('.sys-os-mode').forEach((sel) => {
 				const screenIdx = sel.dataset.screen
 				const v = sel.value.trim()
+				const prefix = screenIdx === 'mv' ? 'multiview' : `screen_${screenIdx}`
 				if (!v) {
-					data[`screen_${screenIdx}_os_mode`] = ''
-					data[`screen_${screenIdx}_os_rate`] = ''
+					data[`${prefix}_os_mode`] = ''
+					data[`${prefix}_os_rate`] = ''
 				} else {
 					const at = v.indexOf('@')
 					if (at === -1) {
-						data[`screen_${screenIdx}_os_mode`] = v
-						data[`screen_${screenIdx}_os_rate`] = ''
+						data[`${prefix}_os_mode`] = v
+						data[`${prefix}_os_rate`] = ''
 					} else {
-						data[`screen_${screenIdx}_os_mode`] = v.slice(0, at)
-						data[`screen_${screenIdx}_os_rate`] = v.slice(at + 1)
+						data[`${prefix}_os_mode`] = v.slice(0, at)
+						data[`${prefix}_os_rate`] = v.slice(at + 1)
 					}
 				}
+			})
+			container.querySelectorAll('.sys-os-x').forEach((el) => {
+				const screenIdx = el.dataset.screen
+				const prefix = screenIdx === 'mv' ? 'multiview' : `screen_${screenIdx}`
+				const v = parseInt(el.value, 10)
+				if (!isNaN(v)) data[`${prefix}_os_x`] = v
+				else data[`${prefix}_os_x`] = undefined
+			})
+			container.querySelectorAll('.sys-os-y').forEach((el) => {
+				const screenIdx = el.dataset.screen
+				const prefix = screenIdx === 'mv' ? 'multiview' : `screen_${screenIdx}`
+				const v = parseInt(el.value, 10)
+				if (!isNaN(v)) data[`${prefix}_os_y`] = v
+				else data[`${prefix}_os_y`] = undefined
 			})
 			return data
 		}
@@ -343,7 +449,8 @@ export async function mountSystemSettings(container) {
 			btnApply.disabled = true
 			btnApply.textContent = 'Applying...'
 			try {
-				const res = await api.post('/api/settings/apply-os', {})
+				const payload = container.getSystemSettings ? container.getSystemSettings() : {}
+				const res = await api.post('/api/settings/apply-os', payload)
 				if (res.ok) {
 					alert(
 						'OS changes applied. Display manager restart triggered.\n' +
@@ -382,9 +489,15 @@ export async function mountSystemSettings(container) {
 				memEl.textContent = !isNaN(bytes) ? `${Math.round(bytes / 1024 / 1024)} MB` : 'N/A'
 			}
 			if (casparEl) {
+				const offline = all.offline_mode === 'true'
 				const conn = all.caspar_connected === 'true'
-				casparEl.textContent = conn ? 'Connected' : 'Disconnected'
-				casparEl.style.color = conn ? 'var(--accent-green)' : 'var(--accent-red)'
+				if (offline) {
+					casparEl.textContent = 'Simulation'
+					casparEl.style.color = 'var(--accent-blue)'
+				} else {
+					casparEl.textContent = conn ? 'Connected' : 'Disconnected'
+					casparEl.style.color = conn ? 'var(--accent-green)' : 'var(--accent-red)'
+				}
 				casparEl.style.fontWeight = 'bold'
 			}
 		})

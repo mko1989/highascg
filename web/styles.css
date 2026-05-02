@@ -14,9 +14,15 @@
 @import url('./styles/05b-timeline-editor.css');
 @import url('./styles/05c-multiview-editor.css');
 @import url('./styles/05d-inspector-fields-dashboard.css');
-@import url('./styles/06a-scenes-deck-cards.css');
+@import url('./styles/06a1-scenes-deck-toolbar.css');
+@import url('./styles/06a2-scenes-deck-cards.css');
+@import url('./styles/06a3-scenes-deck-multi.css');
 @import url('./styles/06b-scenes-edit-transitions-layerstrip.css');
 @import url('./styles/06c-inspector-effects-pip.css');
 @import url('./styles/07a-scenes-compose-canvas.css');
 @import url('./styles/07b-audio-mixer-modal-shell.css');
-@import url('./styles/08-modals-settings-logs-misc.css');
+@import url('./styles/08a-modals-logs.css');
+@import url('./styles/08b-modals-settings.css');
+@import url('./styles/08c-modals-misc.css');
+@import url('./styles/09-device-view.css');
+@import url('./styles/03d-mapping-editor.css');

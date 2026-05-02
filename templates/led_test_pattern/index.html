@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>HighAsCG LED Test Pattern</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div id="root">
+		<div id="pattern-container" class="pattern-layer"></div>
+		<div id="grid-container" class="grid-layer"></div>
+		<div id="overlay-container">
+			<div id="circle" class="overlay-circle" style="display:none"></div>
+			<div id="crosshair" class="overlay-cross" style="display:none">
+				<svg width="100%" height="100%" style="position:absolute;inset:0">
+					<line x1="50%" y1="0" x2="50%" y2="100%" stroke="white" stroke-width="1" />
+					<line x1="0" y1="50%" x2="100%" y2="50%" stroke="white" stroke-width="1" />
+				</svg>
+			</div>
+		</div>
+		<div id="brand-stack" class="brand-stack">
+			<h1 id="brand-title" class="brand-title"></h1>
+			<p id="brand-meta" class="brand-meta"></p>
+		</div>
+		<div id="spec-line" style="display:none"></div>
+	</div>
+
+	<script type="module">
+		import { renderPattern } from './patterns.js';
+
+		const state = {
+			pattern: 'grid-white',
+			showLedGrid: false,
+			cols: 10,
+			rows: 10,
+			panelWidth: 192,
+			panelHeight: 108,
+			centerLabel: 'HighAsCG',
+			showCenterCharacter: true,
+			showPanelLabels: true,
+			showSpecLine: true,
+			showCircle: true,
+			showCross: true,
+			resolutionLabel: '',
+			resolutionWidth: 0,
+			resolutionHeight: 0,
+			videoMode: '',
+			connectorLabel: '',
+			ipLines: []
+		};
+
+		window.update = function(json) {
+			let data = {};
+			try {
+				data = typeof json === 'string' ? JSON.parse(json) : json;
+			} catch (e) { console.error('Update parse error', e); return; }
+
+			Object.assign(state, data);
+			refresh();
+		};
+
+		function refresh() {
+			const patternContainer = document.getElementById('pattern-container');
+			const gridContainer = document.getElementById('grid-container');
+			const circle = document.getElementById('circle');
+			const crosshair = document.getElementById('crosshair');
+			const brandTitle = document.getElementById('brand-title');
+			const brandMeta = document.getElementById('brand-meta');
+			const specLine = document.getElementById('spec-line');
+
+			// Pattern
+			renderPattern(state.pattern, patternContainer);
+
+			// Grid
+			gridContainer.innerHTML = '';
+			if (state.showLedGrid) {
+				gridContainer.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+				gridContainer.style.gridTemplateRows = `repeat(${state.rows}, 1fr)`;
+				const total = state.cols * state.rows;
+				for (let i = 0; i < total; i++) {
+					const col = (i % state.cols) + 1;
+					const row = Math.floor(i / state.cols) + 1;
+					const panel = document.createElement('div');
+					panel.className = 'panel';
+					if (state.showPanelLabels) {
+						const lbl = document.createElement('div');
+						lbl.className = 'panel__idx';
+						lbl.textContent = `R${row} C${col}`;
+						panel.appendChild(lbl);
+					}
+					const cross = document.createElement('div');
+					cross.className = 'panel__cross';
+					panel.appendChild(cross);
+					gridContainer.appendChild(panel);
+				}
+			}
+
+			// Overlays
+			circle.style.display = state.showCircle ? 'block' : 'none';
+			crosshair.style.display = state.showCross ? 'block' : 'none';
+
+			// Branding
+			brandTitle.textContent = state.showCenterCharacter ? state.centerLabel : '';
+			brandMeta.textContent = state.connectorLabel || '';
+			brandTitle.style.display = state.showCenterCharacter ? '' : 'none';
+
+			// Spec Line
+			if (state.showSpecLine && state.showLedGrid) {
+				specLine.style.display = 'block';
+				specLine.textContent = `${state.cols}x${state.rows} @ ${state.panelWidth}x${state.panelHeight}px | Total: ${state.cols * state.panelWidth}x${state.rows * state.panelHeight}px`;
+			} else {
+				specLine.style.display = 'none';
+			}
+		}
+
+		// CasparCG CG Play / CG Stop hooks
+		window.play = () => {};
+		window.stop = () => {};
+
+		// Initial render
+		refresh();
+	</script>
+</body>
+</html>

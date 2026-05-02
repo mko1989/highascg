@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "destinations": [
+    {
+      "id": "led1",
+      "label": "LED wall 1",
+      "mainScreenIndex": 0,
+      "mode": "pgm_prv",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "pixelhue": {
+        "layerId": null,
+        "screenGuid": "",
+        "role": "caspar_pgm"
+      },
+      "signalPathId": "caspar_pgm1_in",
+      "edidLabel": "",
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    }
+  ],
+  "signalPaths": [
+    {
+      "id": "caspar_pgm1_in",
+      "label": "Caspar main 1 PGM → switcher input",
+      "kind": "caspar_in",
+      "phInterfaceId": null,
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "edidLabel": "",
+      "notes": "Set phInterfaceId after GET /api/tandem-device populates interfaces from the device."
+    }
+  ],
+  "edidNotes": ""
+}

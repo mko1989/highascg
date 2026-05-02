@@ -474,6 +474,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		syncTimelineToServer,
 		getTimelinePlaybackPos,
 		redrawClipInspector,
+		stateStore,
 	})
 
 	renderEffectsGroup(root, {

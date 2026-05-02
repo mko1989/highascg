@@ -19,4 +19,10 @@ data/waveforms/
 .reference/
 
 # Internal work orders / notes (local only; not published)
-work/
+# Exception: project breakdown and numbered /*_WO_*.md work orders are tracked
+work/**
+!work/
+!work/PROJECT_BREAKDOWN.md
+!work/*_WO_*.md
+!work/WO_*.md
+!work/project_status.md

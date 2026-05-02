@@ -1,15 +1,71 @@
 /**
  * PIP Overlay registry — catalog of HTML-template-based overlay effects for PIP layers.
- * Unlike mixer effects (MIXER AMCP commands), these run as CG HTML templates on a
- * dedicated overlay layer above the PIP content.
+ * CG runs on {@link resolvePipOverlayCasparLayer} (aligned with video or legacy high band).
  *
  * @see 25_WO_PIP_OVERLAY_EFFECTS.md
  */
 
 export const PIP_OVERLAY_LAYER_OFFSET = 100
 
+/** Max stacked HTML overlays above one PIP (border + shadow + …). */
+export const PIP_OVERLAY_MAX_STACK = 8
+
+/** @see src/engine/pip-overlay.js — first PIP/CG layer = content + this (main clip stays on 10, 20, …). */
+export const PIP_OVERLAY_ALIGN_GAP = 1
+
+/** @deprecated legacy high-band slot — use resolvePipOverlayCasparLayer */
+export function overlayLayerSlot(contentLayer, stackIndex = 0) {
+	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
+	const base = Number(contentLayer)
+	const n = Number.isFinite(base) ? base : 0
+	return PIP_OVERLAY_LAYER_OFFSET + n * PIP_OVERLAY_MAX_STACK + i
+}
+
+/**
+ * Must match {@link ../../src/engine/pip-overlay.js resolvePipOverlayCasparLayer}.
+ * @param {number|undefined} nextContentLayer - Min other look layer &gt; this PIP
+ */
+export function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer) {
+	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
+	const p = Number(contentPhysicalLayer)
+	if (!Number.isFinite(p) || p < 0) {
+		return PIP_OVERLAY_LAYER_OFFSET + i
+	}
+	let nx = nextContentLayer
+	if (nx == null) {
+		nx = p >= 10 && p % 10 === 0 ? p + 10 : p + 1
+	} else if (typeof nx === 'string' && nx.trim() === '') {
+		nx = 10000
+	} else {
+		nx = Number(nx)
+	}
+	if (!Number.isFinite(nx) || nx <= p) {
+		nx = 10000
+	}
+	if (p + PIP_OVERLAY_ALIGN_GAP + i < nx) {
+		return p + PIP_OVERLAY_ALIGN_GAP + i
+	}
+	return PIP_OVERLAY_LAYER_OFFSET + p * PIP_OVERLAY_MAX_STACK + i
+}
+
 export function overlayLayer(contentLayer) {
-	return contentLayer + PIP_OVERLAY_LAYER_OFFSET
+	return overlayLayerSlot(contentLayer, 0)
+}
+
+/**
+ * Normalize layer storage: `pipOverlays[]` or legacy single `pipOverlay`.
+ * @param {object | null | undefined} layer
+ * @returns {{ type: string, params: object }[]}
+ */
+export function getPipOverlaysFromLayer(layer) {
+	if (!layer || typeof layer !== 'object') return []
+	if (Array.isArray(layer.pipOverlays) && layer.pipOverlays.length) {
+		return layer.pipOverlays.filter((o) => o && typeof o === 'object' && o.type)
+	}
+	if (layer.pipOverlay && typeof layer.pipOverlay === 'object' && layer.pipOverlay.type) {
+		return [layer.pipOverlay]
+	}
+	return []
 }
 
 /**

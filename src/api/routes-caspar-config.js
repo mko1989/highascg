@@ -6,7 +6,7 @@
 
 const fs = require('fs').promises
 const path = require('path')
-const defaults = require('../../config/default')
+const defaults = require('../config/defaults')
 const { buildConfigXml, normalizeAudioRouting } = require('../config/config-generator')
 const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-generator-config')
 const { getStandardModeChoices } = require('../config/config-modes')
@@ -41,6 +41,42 @@ function normalizeCasparServerConfigPath(cs) {
 	const def = String(defaults.casparServer?.configPath || '').trim() || '/opt/casparcg/config/casparcg.config'
 	const cp = String(cs.configPath || '').trim()
 	cs.configPath = cp || def
+}
+
+/** Max time to wait for AMCP TCP after writing config (Caspar may still be booting). Env: HIGHASCG_CASPAR_CONFIG_RESTART_WAIT_MS */
+function resolveCasparRestartWaitMs() {
+	const raw = process.env.HIGHASCG_CASPAR_CONFIG_RESTART_WAIT_MS
+	if (raw === undefined || raw === '') return 15_000
+	const n = parseInt(String(raw), 10)
+	if (!Number.isFinite(n) || n < 0) return 15_000
+	return Math.min(n, 120_000)
+}
+
+/**
+ * `ctx.amcp` is always set when Caspar is enabled, but TCP may be down (Caspar stopped, restarting, or wrong host/port).
+ * @param {object} ctx
+ * @returns {boolean}
+ */
+function isAmcpTcpConnected(ctx) {
+	return !!(ctx.casparConnection?.tcp?.isConnected)
+}
+
+function sleep(ms) {
+	return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * @param {object} ctx
+ * @param {number} maxMs
+ * @param {number} [pollMs]
+ */
+async function waitForAmcpTcp(ctx, maxMs, pollMs = 400) {
+	const t0 = Date.now()
+	while (Date.now() - t0 < maxMs) {
+		if (isAmcpTcpConnected(ctx)) return true
+		await sleep(pollMs)
+	}
+	return isAmcpTcpConnected(ctx)
 }
 
 /**
@@ -133,7 +169,7 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 	}
 
 	if (!ctx.amcp) {
-		apiLog(ctx, 'warn', '[Caspar config] File written; AMCP RESTART skipped (Caspar not connected)')
+		apiLog(ctx, 'warn', '[Caspar config] File written; AMCP RESTART skipped (no AMCP client — e.g. --no-caspar)')
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
@@ -142,7 +178,40 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 				path: filePath,
 				restartSent: false,
 				message:
-					'Config file written. Caspar is not connected (AMCP), so RESTART was not sent — start Caspar or reconnect, then restart it to load this file.',
+					'Config file written. Caspar AMCP is disabled, so RESTART was not sent — restart Caspar manually so it loads this file.',
+			}),
+		}
+	}
+
+	let tcpUp = isAmcpTcpConnected(ctx)
+	if (!tcpUp) {
+		const waitMs = resolveCasparRestartWaitMs()
+		if (waitMs > 0) {
+			apiLog(
+				ctx,
+				'info',
+				`[Caspar config] AMCP TCP not connected (${ctx._casparStatus?.host ?? '?'}:${ctx._casparStatus?.port ?? '?'}) — waiting up to ${waitMs}ms before RESTART…`,
+			)
+			tcpUp = await waitForAmcpTcp(ctx, waitMs)
+		}
+	}
+	if (!tcpUp) {
+		apiLog(
+			ctx,
+			'warn',
+			'[Caspar config] File written; AMCP TCP still down — RESTART skipped. Fix Settings → Connection (host/port) or start Caspar, then use Write & restart again or restart the Caspar service.',
+		)
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				ok: true,
+				path: filePath,
+				restartSent: false,
+				message:
+					'Config file written. Caspar did not accept AMCP on the configured host/port, so RESTART was not sent. When Caspar is running and reachable, use Write & restart again or restart Caspar so it loads the file below.',
+				hint:
+					'Caspar only reads this XML after AMCP RESTART or a full process restart. Ensure systemd ExecStart (or manual launch) uses the same path as System → Caspar config path.',
 			}),
 		}
 	}
@@ -153,6 +222,21 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 		apiLog(ctx, 'info', '[Caspar config] AMCP RESTART completed')
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e)
+		if (/not connected/i.test(msg)) {
+			apiLog(ctx, 'warn', `[Caspar config] RESTART failed: ${msg} (socket dropped between check and send)`)
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					ok: true,
+					path: filePath,
+					restartSent: false,
+					message:
+						'Config file written. AMCP disconnected before RESTART completed — retry Write & restart when Caspar is stable.',
+					detail: msg,
+				}),
+			}
+		}
 		apiLog(ctx, 'warn', `[Caspar config] AMCP RESTART failed after write: ${msg}`)
 		return {
 			status: 502,

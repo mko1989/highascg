@@ -7,10 +7,12 @@
 const { parseString } = require('xml2js')
 const { getChannelMap } = require('./routing')
 const { getModeDimensions } = require('./config-generator')
+const { pixelSizeForVideoMode } = require('./config-modes')
+const { multiviewGeneratedConfigIncludesScreen } = require('./multiview-helpers')
 
 /**
  * @param {string} xmlStr - INFO CONFIG XML
- * @returns {Promise<Array<{ index: number, videoMode: string, hasScreen: boolean }>>}
+ * @returns {Promise<Array<{ index: number, videoMode: string, hasScreen: boolean, hasDecklinkOutput: boolean, screenWidth: number, screenHeight: number, resolutionLabel: string }>>}
  */
 function parseServerChannels(xmlStr) {
 	return new Promise((resolve) => {
@@ -33,10 +35,34 @@ function parseServerChannels(xmlStr) {
 					const vm = ch['video-mode'] && ch['video-mode'][0] != null ? String(ch['video-mode'][0]) : ''
 					const cons = ch.consumers?.[0]
 					const screens = cons?.screen ? (Array.isArray(cons.screen) ? cons.screen : [cons.screen]) : []
+					const decklinks = cons?.decklink
+						? Array.isArray(cons.decklink)
+							? cons.decklink
+							: [cons.decklink]
+						: []
+					let screenWidth = NaN
+					let screenHeight = NaN
+					if (screens.length > 0) {
+						const s0 = screens[0]
+						const wRaw = s0?.width?.[0]
+						const hRaw = s0?.height?.[0]
+						if (wRaw != null) screenWidth = parseInt(String(wRaw), 10)
+						if (hRaw != null) screenHeight = parseInt(String(hRaw), 10)
+					}
+					if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
+						const px = pixelSizeForVideoMode(vm)
+						screenWidth = px.width
+						screenHeight = px.height
+					}
+					const resolutionLabel = `${screenWidth}×${screenHeight} · ${vm || '—'}`
 					return {
 						index: i + 1,
 						videoMode: vm,
 						hasScreen: screens.length > 0,
+						hasDecklinkOutput: decklinks.length > 0,
+						screenWidth,
+						screenHeight,
+						resolutionLabel,
 					}
 				})
 				resolve(out)
@@ -65,10 +91,14 @@ function buildModuleChannelExpectation(config) {
 	}
 	if (map.multiviewCh != null) {
 		const mvMode = String(cfg.multiview_mode || '1080p5000')
-		const mvHasScreen = cfg.multiview_screen_consumer !== false && cfg.multiview_screen_consumer !== 'false'
+		const mvHasScreen = multiviewGeneratedConfigIncludesScreen({
+			...cfg,
+			...(cfg.casparServer && typeof cfg.casparServer === 'object' ? cfg.casparServer : {}),
+		})
 		list.push({ index: map.multiviewCh, role: 'Multiview', videoMode: mvMode, hasScreen: mvHasScreen })
 	}
-	if (map.inputsCh != null) {
+	// Only list a separate DeckLink inputs channel when NOT hosted on MVR
+	if (map.inputsCh != null && !map.inputsOnMvr) {
 		const inMode = String(cfg.inputs_channel_mode || '1080p5000')
 		list.push({ index: map.inputsCh, role: 'DeckLink inputs', videoMode: inMode, hasScreen: false })
 	}

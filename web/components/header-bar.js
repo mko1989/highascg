@@ -14,7 +14,7 @@ import { showSettingsModal } from './settings-modal.js'
 import { settingsState } from '../lib/settings-state.js'
 import { showSyncModal } from './sync-modal.js'
 import { showPublishModal } from './publish-modal.js'
-import { showLedTestModal, getLedTestSettings } from './led-test-modal.js'
+import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'
 import { createHeaderAudioMonitor } from './header-bar-audio.js'
 import { markLocalProjectSaved } from '../lib/project-remote-sync.js'
 
@@ -46,13 +46,24 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 
 	// Save / Load buttons
 	const saveBtn = document.createElement('button')
-	saveBtn.className = 'header-btn'
-	saveBtn.textContent = 'Save'
-	saveBtn.title = 'Save project'
+	saveBtn.className = 'header-btn header-btn--save'
+	saveBtn.innerHTML = `
+		<div class="header-btn__icons">
+			<img src="assets/arrow-right.svg" class="header-btn__arrow">
+			<img src="assets/save.svg" class="header-btn__disk">
+		</div>
+	`
+	saveBtn.title = 'Save project (click = server, Shift+click = file)'
+
 	const loadBtn = document.createElement('button')
-	loadBtn.className = 'header-btn'
-	loadBtn.textContent = 'Load'
-	loadBtn.title = 'Load project'
+	loadBtn.className = 'header-btn header-btn--load'
+	loadBtn.innerHTML = `
+		<div class="header-btn__icons">
+			<img src="assets/arrow-left.svg" class="header-btn__arrow">
+			<img src="assets/save.svg" class="header-btn__disk">
+		</div>
+	`
+	loadBtn.title = 'Load project (click = server, Shift+click = file)'
 
 	const fileInput = document.createElement('input')
 	fileInput.type = 'file'
@@ -155,6 +166,8 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 			previewSceneId: null,
 			activeScreenIndex: 0,
 			globalDefaultTransition: { ...defaultTransition() },
+			layerPresets: [],
+			lookPresets: [],
 		})
 		sceneState.setEditingScene(null)
 		timelineState.loadFromData({ timelines: [], activeId: null })
@@ -168,26 +181,8 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		startFreshProject()
 	})
 
-	// Sync button (for offline-to-local-caspar push)
-	const syncBtn = document.createElement('button')
-	syncBtn.className = 'header-btn header-btn--sync'
-	syncBtn.textContent = 'Sync to Local'
-	syncBtn.title = 'Sync offline draft to local CasparCG server'
-	syncBtn.style.display = 'none'
-	syncBtn.onclick = () => showSyncModal()
-
-	// Publish button (for offline-to-remote-server push)
-	const publishBtn = document.createElement('button')
-	publishBtn.className = 'header-btn header-btn--publish'
-	publishBtn.textContent = 'Publish to Live' 
-	publishBtn.title = 'Sequential differential sync to production server'
-	publishBtn.style.display = 'none'
-	publishBtn.onclick = () => showPublishModal()
-
 	function updateSyncVisibility(cfg) {
-		const isOffline = !!cfg?.offline_mode
-		syncBtn.style.display = isOffline ? 'inline-block' : 'none'
-		publishBtn.style.display = isOffline ? 'inline-block' : 'none'
+		// Buttons removed as requested (redundant with save/load)
 	}
 	settingsState.subscribe(updateSyncVisibility)
 	updateSyncVisibility(settingsState.getSettings())
@@ -278,11 +273,8 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	const ledTestCb = document.createElement('input')
 	ledTestCb.type = 'checkbox'
 	ledTestCb.id = 'header-led-test-cb'
-	ledTestCb.title = 'Show LED grid test pattern on program output (layer 999)'
-	const ledTestLab = document.createElement('label')
-	ledTestLab.className = 'header-led-test__label'
-	ledTestLab.htmlFor = 'header-led-test-cb'
-	ledTestLab.textContent = 'LED test'
+	ledTestCb.title =
+		'Show LED test card on all program channels (layer 999): screens + resolution + IPs by default; full grid per channel in Test card…'
 	const ledTestBtn = document.createElement('button')
 	ledTestBtn.type = 'button'
 	ledTestBtn.className = 'header-btn header-btn--led-setup'
@@ -295,65 +287,149 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	ftbBtn.textContent = 'FTB'
 	ftbBtn.title = 'Fade to black: fade out all program and preview layers, then clear'
 	ledTestWrap.appendChild(ledTestCb)
-	ledTestWrap.appendChild(ledTestLab)
 	ledTestWrap.appendChild(ledTestBtn)
 	ledTestWrap.appendChild(ftbBtn)
+	const streamStateWrap = document.createElement('div')
+	streamStateWrap.style.display = 'inline-flex'
+	streamStateWrap.style.gap = '4px'
+	streamStateWrap.style.alignItems = 'center'
+	ledTestWrap.appendChild(streamStateWrap)
 
-	const pgmRecBtn = document.createElement('button')
-	pgmRecBtn.type = 'button'
-	pgmRecBtn.className = 'header-btn header-btn--pgm-rec'
-	pgmRecBtn.textContent = 'Rec PGM'
-	const pgmRecTitleIdle =
-		'Record PGM on the Caspar host into the media folder (H.264 + AAC). Path comes from INFO PATHS or Local media path in Settings. Toggle to stop.'
-	pgmRecBtn.title = pgmRecTitleIdle
-	ledTestWrap.appendChild(pgmRecBtn)
+	function focusDeviceConnector(connectorId) {
+		window.dispatchEvent(new CustomEvent('highascg-device-view-focus-connector', { detail: { connectorId } }))
+	}
 
-	let pgmRecBusy = false
-	async function syncPgmRecButton() {
+	async function syncStreamingRecordBadge() {
 		try {
-			const st = await api.get('/api/pgm-record')
-			const on = !!(st && st.recording)
-			pgmRecBtn.textContent = on ? 'Stop rec' : 'Rec PGM'
-			pgmRecBtn.classList.toggle('header-btn--pgm-rec--on', on)
-			pgmRecBtn.title = on
-				? `Recording to ${st.path || '…'} — click to stop (file is on the Caspar machine)`
-				: pgmRecTitleIdle
+			const settings = settingsState.getSettings() || {}
+			const st = await api.get('/api/streaming-channel')
+			const streamOut = Array.isArray(settings?.streamOutputs) ? settings.streamOutputs : []
+			const recordOut = Array.isArray(settings?.recordOutputs) ? settings.recordOutputs : []
+			streamStateWrap.innerHTML = ''
+			for (const s of streamOut) {
+				const id = String(s?.id || '').trim()
+				if (!id) continue
+				const idx = id.match(/(\d+)/)?.[1] || ''
+				const fallback = `Str${idx || ''}`.trim() || 'Str'
+				const name = String(s?.name || s?.label || fallback).trim() || fallback
+				const isOn = !!st?.rtmp?.active && String(st?.rtmp?.outputId || '') === id
+				const b = document.createElement('button')
+				b.type = 'button'
+				b.className = 'header-btn'
+				b.textContent = name
+				b.title = isOn ? `${name} is streaming` : `${name} is not streaming`
+				if (isOn) {
+					b.style.borderColor = 'rgba(220,38,38,0.6)'
+					b.style.background = 'rgba(220,38,38,0.12)'
+				}
+				b.addEventListener('click', () => focusDeviceConnector(id))
+				streamStateWrap.appendChild(b)
+			}
+			for (const r of recordOut) {
+				const id = String(r?.id || '').trim()
+				if (!id) continue
+				const idx = id.match(/(\d+)/)?.[1] || ''
+				const fallback = `Rec${idx || ''}`.trim() || 'Rec'
+				const name = String(r?.name || r?.label || fallback).trim() || fallback
+				const isOn = !!st?.record?.active && String(st?.record?.outputId || '') === id
+				const b = document.createElement('button')
+				b.type = 'button'
+				b.className = 'header-btn'
+				b.textContent = name
+				b.title = isOn
+					? `${name} is recording${st?.record?.path ? ` (${st.record.path})` : ''}`
+					: `${name} is not recording`
+				if (isOn) {
+					b.style.borderColor = 'rgba(220,38,38,0.6)'
+					b.style.background = 'rgba(220,38,38,0.12)'
+				}
+				b.addEventListener('click', () => focusDeviceConnector(id))
+				streamStateWrap.appendChild(b)
+			}
+			if (!streamStateWrap.childElementCount) {
+				const empty = document.createElement('span')
+				empty.className = 'header-btn'
+				empty.style.pointerEvents = 'none'
+				empty.style.opacity = '0.75'
+				empty.textContent = 'No stream/record outputs'
+				streamStateWrap.appendChild(empty)
+			}
 		} catch {
-			/* offline / 503 — leave button idle */
+			streamStateWrap.innerHTML = ''
+			const na = document.createElement('span')
+			na.className = 'header-btn'
+			na.style.pointerEvents = 'none'
+			na.textContent = 'Stream/Rec status n/a'
+			na.title = 'Streaming status unavailable'
+			streamStateWrap.appendChild(na)
 		}
 	}
-	void syncPgmRecButton()
-
-	pgmRecBtn.addEventListener('click', () => {
-		void (async () => {
-			if (pgmRecBusy) return
-			pgmRecBusy = true
-			pgmRecBtn.disabled = true
-			try {
-				const st = await api.get('/api/pgm-record').catch(() => ({ recording: false }))
-				const on = !!(st && st.recording)
-				const res = await api.post('/api/pgm-record', { action: on ? 'stop' : 'start' })
-				if (res?.path) {
-					showHeaderToast(
-						res.recording ? 'Recording → ' + res.path : 'Saved: ' + res.path,
-						'success'
-					)
-				}
-				await syncPgmRecButton()
-			} catch (e) {
-				alert('PGM record: ' + (e?.message || e))
-				await syncPgmRecButton()
-			} finally {
-				pgmRecBusy = false
-				pgmRecBtn.disabled = false
-			}
-		})()
-	})
+	void syncStreamingRecordBadge()
+	setInterval(() => { void syncStreamingRecordBadge() }, 2000)
 
 	async function applyLedTest(enabled) {
 		try {
-			const payload = { enabled, ...getLedTestSettings() }
-			await api.post('/api/led-test-card', payload)
+			const s = getLedTestSettings()
+			const { gridByChannel: _g, ...rest } = s
+			const st = stateStore?.getState?.() || {}
+			const programChannelsRaw = Array.isArray(st?.channelMap?.programChannels) ? st.channelMap.programChannels : [1]
+			const programChannels = [...new Set(programChannelsRaw.map((x) => parseInt(String(x), 10)).filter((n) => Number.isFinite(n) && n > 0))]
+			const mvCh = parseInt(String(st?.channelMap?.multiviewCh ?? ''), 10)
+			const channelsToApply = [...programChannels]
+			if (Number.isFinite(mvCh) && mvCh > 0) channelsToApply.push(mvCh)
+			const uniqueChannels = [...new Set(channelsToApply)]
+			for (const channel of (uniqueChannels.length ? uniqueChannels : [1])) {
+				const row = st?.configComparison?.serverChannels?.find((x) => x.index === channel)
+				const cs = st?.settings?.casparServer && typeof st.settings.casparServer === 'object'
+					? st.settings.casparServer
+					: st?.config?.casparServer && typeof st.config.casparServer === 'object'
+						? st.config.casparServer
+						: {}
+				let connectorLabel = ''
+				const progIdx = programChannels.indexOf(channel)
+				if (progIdx >= 0) {
+					const screenNo = progIdx + 1
+					const screenSystemId = String(cs[`screen_${screenNo}_system_id`] || '').trim()
+					const osMode = String(cs[`screen_${screenNo}_os_mode`] || '').trim()
+					const osRateRaw = parseFloat(String(cs[`screen_${screenNo}_os_rate`] ?? ''))
+					const osRate = Number.isFinite(osRateRaw) && osRateRaw > 0 ? osRateRaw : null
+					const xrandrPart = [osMode, osRate != null ? `${osRate}Hz` : ''].filter(Boolean).join(' @ ')
+					const deck = parseInt(String(cs[`screen_${progIdx + 1}_decklink_device`] ?? 0), 10) || 0
+					connectorLabel = `Output: Screen ${screenNo} (PGM ch ${channel})`
+					if (screenSystemId) connectorLabel += ` · ${screenSystemId}`
+					if (xrandrPart) connectorLabel += ` · ${xrandrPart}`
+					if (deck > 0) connectorLabel += ` · DeckLink ${deck}`
+					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
+				} else if (Number.isFinite(mvCh) && channel === mvCh) {
+					const mvDeck = parseInt(String(cs.multiview_decklink_device ?? 0), 10) || 0
+					const mvSystemId = String(cs.multiview_system_id || '').trim()
+					const mvOsMode = String(cs.multiview_os_mode || '').trim()
+					const mvOsRateRaw = parseFloat(String(cs.multiview_os_rate ?? ''))
+					const mvOsRate = Number.isFinite(mvOsRateRaw) && mvOsRateRaw > 0 ? mvOsRateRaw : null
+					const mvXrandrPart = [mvOsMode, mvOsRate != null ? `${mvOsRate}Hz` : ''].filter(Boolean).join(' @ ')
+					connectorLabel = `Output: Multiview (ch ${channel})`
+					if (mvSystemId) connectorLabel += ` · ${mvSystemId}`
+					if (mvXrandrPart) connectorLabel += ` · ${mvXrandrPart}`
+					if (mvDeck > 0) connectorLabel += ` · DeckLink ${mvDeck}`
+					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
+				}
+				const payload = {
+					enabled,
+					...rest,
+					channel,
+					showLedGrid: getLedTestShowGridForChannel(channel),
+					showCircle: s.showCircle !== false,
+					showCross: s.showCross !== false,
+					connectorLabel,
+				}
+				if (row) {
+					payload.resolutionLabel = row.resolutionLabel
+					payload.resolutionWidth = row.screenWidth
+					payload.resolutionHeight = row.screenHeight
+					payload.videoMode = row.videoMode
+				}
+				await api.post('/api/led-test-card', payload)
+			}
 			localStorage.setItem('highascg_led_test_enabled', enabled ? 'true' : 'false')
 		} catch (e) {
 			ledTestCb.checked = false
@@ -368,7 +444,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	ledTestBtn.addEventListener('click', () => {
 		showLedTestModal(() => {
 			if (ledTestCb.checked) void applyLedTest(true)
-		})
+		}, stateStore)
 	})
 
 	ftbBtn.addEventListener('click', () => {
@@ -408,7 +484,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	// Layout: [title] [project · save · load · new · sync] [server · settings] … [headphones · eyes]
 	const leftWrap = document.createElement('div')
 	leftWrap.className = 'header-left'
-	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn, syncBtn, publishBtn)
+	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn)
 
 	const midWrap = document.createElement('div')
 	midWrap.className = 'header-mid'

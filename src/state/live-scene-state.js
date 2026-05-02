@@ -6,7 +6,8 @@
 'use strict'
 
 const persistence = require('../utils/persistence')
-const { getChannelMap } = require('../config/routing')
+const { getChannelMap } = require('../config/routing-map')
+const { buildChannelMap } = require('../config/channel-map-from-ctx')
 
 const KEY = 'liveScenesByProgramChannel'
 
@@ -89,6 +90,10 @@ function broadcastSceneLive(ctx) {
 	ctx._wsBroadcast('change', {
 		path: 'scene.programLayerBankByChannel',
 		value: ctx.programLayerBankByChannel || {},
+	})
+	ctx._wsBroadcast('change', {
+		path: 'channelMap',
+		value: buildChannelMap(ctx),
 	})
 }
 

@@ -64,6 +64,10 @@ export function initDualComposeLiveView(prvContainer, pgmContainer) {
 	const pgm = initLiveView(pgmContainer, 'pgm_1')
 	return {
 		kind: 'dual',
+		updateStreams(prvName, pgmName) {
+			if (prvName) prv.updateStream(prvName)
+			if (pgmName) pgm.updateStream(pgmName)
+		},
 		destroy() {
 			prv.destroy()
 			pgm.destroy()

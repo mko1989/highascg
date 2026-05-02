@@ -12,7 +12,7 @@ const { buildChannelResolutionMap } = require('./server-info-config')
  */
 function buildChannelMap(ctx) {
 	const cfg = ctx.config || {}
-	const map = getChannelMap(cfg)
+	const map = getChannelMap(cfg, ctx.switcherOutputBusByChannel)
 	const defaultRes = { w: 1920, h: 1080, fps: 50 }
 	const infoXml = (ctx.gatheredInfo && ctx.gatheredInfo.infoConfig) || ''
 	const serverByCh = infoXml.trim() ? buildChannelResolutionMap(infoXml) : {}
@@ -23,12 +23,20 @@ function buildChannelMap(ctx) {
 		return { ...defaultRes }
 	}
 
-	const programResolutions = (map.programChannels || []).map((ch) => pickRes(ch))
-	const previewResolutions = (map.previewChannels || []).map((ch) => pickRes(ch))
+	const programChannels = (map.programChannels || []).map((_, i) => map.programCh(i + 1))
+	const previewChannels = (map.programChannels || []).map((_, i) => map.previewCh(i + 1))
+
+	const programResolutions = programChannels.map((ch) => pickRes(ch))
+	const previewResolutions = previewChannels.map((ch) => pickRes(ch))
 	const dlFromConfig = ctx.gatheredInfo?.decklinkFromConfig || {}
 	const cfgDlExplicitZero = cfg.decklink_input_count != null && String(cfg.decklink_input_count) === '0'
 	const decklinkCount = map.decklinkCount > 0 ? map.decklinkCount : cfgDlExplicitZero ? 0 : (dlFromConfig.decklinkCount ?? 0)
-	const inputsCh = map.decklinkCount > 0 ? map.inputsCh : cfgDlExplicitZero ? null : (dlFromConfig.inputsCh ?? null)
+	const inputsCh =
+		map.decklinkCount > 0 || map.inputsHostChannelEnabled
+			? map.inputsCh
+			: cfgDlExplicitZero
+				? null
+				: (dlFromConfig.inputsCh ?? null)
 	const inputsResolution = dlFromConfig.inputsResolution ?? null
 
 	const channelResolutionsByChannel = {}
@@ -41,10 +49,21 @@ function buildChannelMap(ctx) {
 
 	return {
 		screenCount: map.screenCount,
+		/** Custom PGM/PRV channel rows (Settings → Caspar); used for main tabs labels when non-empty. */
+		virtualMainChannels: map.virtualMainChannels || [],
 		decklinkCount,
-		programChannels: Array.from({ length: map.screenCount }, (_, i) => map.programCh(i + 1)),
-		previewChannels: Array.from({ length: map.screenCount }, (_, i) => map.previewCh(i + 1)),
+		decklinkInputsHost: map.decklinkInputsHost || 'dedicated',
+		inputsOnMvr: !!map.inputsOnMvr,
+		programChannels,
+		previewChannels,
+		switcherBus1Channels: Array.isArray(map.switcherBus1Channels) ? map.switcherBus1Channels.slice(0, map.screenCount) : [],
+		switcherBusChannels: Array.isArray(map.switcherBusChannels) ? map.switcherBusChannels.slice(0, map.screenCount) : [],
+		transitionModel: String(map.transitionModel || 'legacy_layer'),
+		previewEnabledByMain: Array.isArray(map.previewEnabledByMain) ? map.previewEnabledByMain.slice(0, map.screenCount) : [],
 		multiviewCh: map.multiviewCh,
+		multiviewChannels: Array.isArray(map.multiviewChannels) ? map.multiviewChannels : (map.multiviewCh != null ? [map.multiviewCh] : []),
+		streamingCh: map.streamingCh,
+		streamingContentLayer: map.streamingContentLayer,
 		inputsCh,
 		programResolutions,
 		previewResolutions,

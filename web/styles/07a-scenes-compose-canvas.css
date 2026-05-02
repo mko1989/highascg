@@ -158,6 +158,63 @@
 	background: rgba(22, 27, 34, 0.6);
 }
 
+.scenes-layer__placeholder--pattern,
+.source-item__thumbnail--placeholder {
+	background-color: #0d1117;
+	color: #fff;
+	text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.scenes-layer__placeholder--pattern[data-template="color_grid"],
+.source-item__thumbnail--placeholder[data-template="color_grid"] {
+	background-image: 
+		linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+		linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+		linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+		linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+	background-size: 40px 40px;
+	background-position: 0 0, 0 20px, 20px 20px, 20px 0;
+	background-color: #0f172a;
+}
+
+.scenes-layer__placeholder--pattern[data-template="solid"],
+.source-item__thumbnail--placeholder[data-template="solid"] {
+	background-color: var(--placeholder-color, #3b82f6);
+}
+
+.scenes-layer__placeholder--pattern[data-template="smpte_bars"],
+.source-item__thumbnail--placeholder[data-template="smpte_bars"] {
+	background: linear-gradient(to right, 
+		#ffffff 0%, #ffffff 14.2%, 
+		#ffff00 14.2%, #ffff00 28.4%, 
+		#00ffff 28.4%, #00ffff 42.6%, 
+		#00ff00 42.6%, #00ff00 56.8%, 
+		#ff00ff 56.8%, #ff00ff 71%, 
+		#ff0000 71%, #ff0000 85.2%, 
+		#0000ff 85.2%, #0000ff 100%);
+}
+
+.scenes-layer__placeholder--pattern[data-template="aspect_guide"],
+.source-item__thumbnail--placeholder[data-template="aspect_guide"] {
+	border: 2px dashed #58a6ff;
+	background: radial-gradient(circle, #161b22 0%, #0d1117 100%);
+}
+
+.scenes-layer__placeholder--pattern[data-template="countdown"],
+.source-item__thumbnail--placeholder[data-template="countdown"] {
+	background: radial-gradient(circle, #2ecc71 0%, #27ae60 40%, #0d1117 41%);
+}
+
+.scenes-layer__placeholder--pattern[data-template="white_noise"],
+.source-item__thumbnail--placeholder[data-template="white_noise"] {
+	background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADe/F7EAAAACHRSTlMA/////////wB6A99vAAAAUElEQVQ4y2NgQAX8DIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDEwMDIyMTIwMDIDIAADIAt7XvAAAAABJRU5ErkJggg==');
+	background-repeat: repeat;
+	opacity: 0.8;
+}
+
 .scenes-layer__handles {
 	position: absolute;
 	inset: 0;

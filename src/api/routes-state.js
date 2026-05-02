@@ -107,14 +107,14 @@ async function handleGet(path, ctx, query = {}) {
 			// Files on disk under the ingest folder (WeTransfer zip extract, etc.) may lag Caspar CLS — merge them in.
 			try {
 				const ingestBase = getMediaIngestBasePath(ctx.config)
-				const diskIds = scanMediaRecursiveForBrowser(ingestBase)
-				if (diskIds.length > 0) {
+				const diskItems = scanMediaRecursiveForBrowser(ingestBase)
+				if (diskItems.length > 0) {
 					const seen = new Set(media.map((m) => normalizeMediaIdKey(m.id)))
-					for (const id of diskIds) {
-						const key = normalizeMediaIdKey(id)
+					for (const item of diskItems) {
+						const key = normalizeMediaIdKey(item.id)
 						if (!seen.has(key)) {
 							seen.add(key)
-							media.push({ id, label: id })
+							media.push({ id: item.id, label: item.id, isDir: item.isDir })
 						}
 					}
 				}
@@ -125,7 +125,7 @@ async function handleGet(path, ctx, query = {}) {
 			if (basePath) {
 				ctx._mediaProbeCache = ctx._mediaProbeCache || {}
 				const toProbe = media
-					.filter((m) => !m.resolution || (m.fps == null && m.fps !== 0))
+					.filter((m) => !m.isDir && (!m.resolution || (m.fps == null && m.fps !== 0)))
 					.slice(0, 120)
 				await Promise.all(
 					toProbe.map(async (m) => {

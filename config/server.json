@@ -1,0 +1,5 @@
+{
+  "httpPort": 4200,
+  "wsPort": 4200,
+  "bindAddress": "0.0.0.0"
+}

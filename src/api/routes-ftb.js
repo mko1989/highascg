@@ -24,7 +24,8 @@ async function handlePost(path, body, ctx) {
 	const channels = []
 	for (let i = 0; i < map.screenCount; i++) {
 		channels.push(map.programCh(i + 1))
-		channels.push(map.previewCh(i + 1))
+		const prv = map.previewCh(i + 1)
+		if (prv != null) channels.push(prv)
 	}
 
 	try {

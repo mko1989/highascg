@@ -24,32 +24,6 @@
 	border-color: var(--accent);
 }
 
-/* Offline Mode Indicators */
-.offline-watermark {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%) rotate(-15deg);
-	font-size: 5rem;
-	font-weight: 900;
-	color: rgba(255, 193, 7, 0.05); /* Very subtle amber */
-	pointer-events: none;
-	user-select: none;
-	z-index: 100;
-	white-space: nowrap;
-	text-transform: uppercase;
-	letter-spacing: 0.2em;
-	display: none;
-}
-
-.offline-mode .offline-watermark {
-	display: block;
-}
-
-.offline-mode .workspace__content {
-	border: 2px solid rgba(255, 193, 7, 0.2);
-}
-
 /* Sync Modal & Report */
 .sync-modal {
 	max-width: 650px;
@@ -254,6 +228,42 @@
 
 .ingest-menu-item:hover {
 	background: var(--accent);
+}
+
+.ingest-menu-item--placeholder:hover {
+	background: var(--warning);
+	color: #000;
+}
+
+.ingest-menu-item--usb {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.ingest-menu-item--usb:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+/* No drive yet or API issue — still clickable to open the USB modal */
+.ingest-menu-item--usb.ingest-menu-item--usb-pending {
+	opacity: 0.9;
+}
+
+.ingest-usb-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.1rem;
+	padding: 0 5px;
+	height: 1.1rem;
+	font-size: 0.65rem;
+	font-weight: 700;
+	border-radius: 999px;
+	background: var(--accent);
+	color: #fff;
 }
 
 /* ─── Universal Drag Overlay ─── */

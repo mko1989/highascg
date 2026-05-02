@@ -8,29 +8,34 @@
 const fs = require('fs')
 const path = require('path')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { getChannelMap } = require('../config/routing')
+const { getChannelMap } = require('../config/routing-map')
 const persistence = require('../utils/persistence')
+const { infoResponseToXml, listOccupiedStageLayersInRange } = require('../caspar/channel-info-xml')
 
 const MULTIVIEW_APPLY_TIMEOUT_MS = 25_000
 
 async function handleMultiviewApply(body, ctx) {
 	const b = parseBody(body)
+	const n = Math.max(1, parseInt(b.n || 1, 10) || 1)
 	const layout = b.layout
 	const showOverlay = !!b.showOverlay
+	const bgColor = typeof b.bgColor === 'string' && b.bgColor.trim() ? b.bgColor.trim() : '#000000'
 	if (!Array.isArray(layout)) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'layout array required' }) }
 	}
 	const MAX_MV_LAYERS = 48
-	const map = getChannelMap(ctx.config || {})
-	if (!map.multiviewEnabled || map.multiviewCh == null) {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Multiview not enabled' }) }
+	const map = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
+	const mvChs = Array.isArray(map.multiviewChannels) ? map.multiviewChannels : (map.multiviewCh != null ? [map.multiviewCh] : [])
+	if (mvChs.length === 0 || mvChs[n - 1] == null) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Multiviewer ${n} not enabled` }) }
 	}
-	const ch = map.multiviewCh
+	const ch = mvChs[n - 1]
 	const inputsCh = map.inputsCh
 
-	// Pre-check: verify multiview channel exists on CasparCG (avoid confusing 404 later)
+	// Pre-check: verify multiview channel exists; keep INFO XML for surgical CLEAR (only drop stale layers)
+	let infoRes
 	try {
-		await ctx.amcp.info(ch)
+		infoRes = await ctx.amcp.info(ch)
 	} catch (e) {
 		const raw = (e?.message || (e && typeof e.toString === 'function' ? e.toString() : '') || String(e) || '').trim()
 		const isConnection = /not connected|socket|econnrefused|etimedout|econnreset|connection refused|network/i.test(raw) ||
@@ -43,7 +48,11 @@ async function handleMultiviewApply(body, ctx) {
 		return { status: isConnection ? 503 : 400, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 	}
 
-	const previewChannels = map.previewChannels || Array.from({ length: map.screenCount || 4 }, (_, i) => map.previewCh(i + 1))
+	const infoXml = infoResponseToXml(infoRes)
+
+	const previewChannels = Array.isArray(map.previewChannels)
+		? map.previewChannels.filter((ch) => Number.isFinite(Number(ch)))
+		: []
 	/** Legacy multiview/sources used route://N-11 for PRV (old single preview layer). Content now shares PGM layer numbers (10+); use full channel composite. */
 	const normalizePrvRouteSource = (src) => {
 		if (typeof src !== 'string' || !src.startsWith('route://')) return src
@@ -68,7 +77,7 @@ async function handleMultiviewApply(body, ctx) {
 		const prvM = cell.id?.match(/^prv(?:_(\d+))?$/)
 		if (prvM || cell.type === 'prv') {
 			const n = prvM?.[1] != null ? parseInt(prvM[1], 10) + 1 : 1
-			return `route://${map.previewCh(n)}`
+			return `route://${map.previewCh(n) || map.programCh(n)}`
 		}
 		if (cell.type === 'decklink' && inputsCh) {
 			let i = 1
@@ -87,7 +96,10 @@ async function handleMultiviewApply(body, ctx) {
 		return `route://${map.programCh(1)}`
 	}
 
-	const OVERLAY_LAYER = 50
+	/** Layers 1–9: DeckLink inputs (when inputsOnMvr). 10: BG color. 11+: MV cells. 60: overlay CG. */
+	const MV_BG_LAYER = 10
+	const MV_CELL_LAYER_START = 11
+	const OVERLAY_LAYER = 60
 
 	async function loadOverlayTemplate(inst, mvCh, overlayLayer, jsonData) {
 		// Try 1: CG ADD (uses template-path)
@@ -115,37 +127,83 @@ async function handleMultiviewApply(body, ctx) {
 		return false
 	}
 
-	if (showOverlay) {
-		const basePath = (ctx.config?.local_media_path || '').trim()
-		if (basePath) {
+	// Auto-deploy templates to media/template paths
+	const basePath = (ctx.config?.local_media_path || '').trim()
+	if (basePath) {
+		const templatesDir = path.join(__dirname, '..', '..', 'templates')
+		for (const tpl of ['multiview_overlay.html', 'color_bg.html']) {
 			try {
-				const dest = path.join(basePath, 'multiview_overlay.html')
+				const dest = path.join(basePath, tpl)
 				if (!fs.existsSync(dest)) {
-					const src = path.join(__dirname, '..', '..', 'templates', 'multiview_overlay.html')
+					const src = path.join(templatesDir, tpl)
 					if (fs.existsSync(src)) {
 						fs.copyFileSync(src, dest)
-						ctx.log('info', `Deployed multiview_overlay.html to ${dest}`)
+						ctx.log('info', `Deployed ${tpl} to ${dest}`)
 					}
 				}
 			} catch (e) {
-				ctx.log('debug', 'Auto-deploy overlay: ' + (e?.message || e))
+				ctx.log('debug', `Auto-deploy ${tpl}: ` + (e?.message || e))
 			}
 		}
 	}
 
 	const doApply = async () => {
-		const layersToClear =
-			layout.length > 0
-				? [...Array(layout.length).keys()].map((i) => i + 1)
-				: Array.from({ length: MAX_MV_LAYERS }, (_, i) => i + 1)
-		if (showOverlay) layersToClear.push(OVERLAY_LAYER)
+		// Layers we will (re)use: BG, one layer per cell, optional HTML overlay (preserve DeckLink 1–9)
+		const lastCellLayer = MV_CELL_LAYER_START + Math.max(0, layout.length) - 1
+		const needed = new Set([MV_BG_LAYER])
+		for (let L = MV_CELL_LAYER_START; L <= lastCellLayer; L++) needed.add(L)
+		if (showOverlay) needed.add(OVERLAY_LAYER)
+
+		let layersToClear = []
+		const occupiedList = await listOccupiedStageLayersInRange(infoXml, MV_BG_LAYER, OVERLAY_LAYER)
+		if (occupiedList != null) {
+			for (const L of occupiedList) {
+				if (!needed.has(L)) layersToClear.push(L)
+			}
+			if (layersToClear.length > 0) {
+				ctx.log(
+					'debug',
+					`Multiview: surgical CLEAR on ch ${ch} layers ${layersToClear.join(', ')} (INFO had ${occupiedList.length} slot(s) in 10–60, need ${needed.size})`,
+				)
+			}
+		} else {
+			// No usable INFO XML — same behavior as before so stale cells are not left behind
+			const maxCellLayer = MV_CELL_LAYER_START + Math.max(layout.length, MAX_MV_LAYERS)
+			for (let L = MV_BG_LAYER; L <= maxCellLayer; L++) layersToClear.push(L)
+			layersToClear.push(OVERLAY_LAYER)
+			ctx.log('debug', `Multiview: broad CLEAR on ch ${ch} (INFO XML missing or unparseable)`)
+		}
 		for (const L of layersToClear) {
 			try {
 				await ctx.amcp.clear(ch, L)
 			} catch {}
 		}
 
-		let layer = 1
+		// Layer 10: solid background color
+		try {
+			const colorData = JSON.stringify({ color: bgColor })
+			// Try CG ADD first (template-path), then PLAY [html] fallback
+			try {
+				await ctx.amcp.cgAdd(ch, MV_BG_LAYER, 0, 'color_bg', 1, colorData)
+				await ctx.amcp.cgUpdate(ch, MV_BG_LAYER, 0, colorData)
+				ctx.log('debug', `Multiview BG layer ${MV_BG_LAYER}: color ${bgColor} via CG ADD`)
+			} catch {
+				try {
+					await ctx.amcp.raw(`PLAY ${ch}-${MV_BG_LAYER} [html] color_bg`)
+					await new Promise((r) => setTimeout(r, 200))
+					const escaped = colorData.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+					await ctx.amcp.raw(`CALL ${ch}-${MV_BG_LAYER} "update('${escaped}')"`) 
+					ctx.log('debug', `Multiview BG layer ${MV_BG_LAYER}: color ${bgColor} via PLAY [html]`)
+				} catch (e2) {
+					ctx.log('warn', `Multiview BG: could not load color_bg template. Deploy color_bg.html to CasparCG media/template path. (${e2?.message || e2})`)
+				}
+			}
+		} catch (e) {
+			ctx.log('debug', 'Multiview BG setup: ' + (e?.message || e))
+		}
+
+		// Layers 11+: multiview cells
+		let layer = MV_CELL_LAYER_START
 		const failed = []
 		for (const cell of layout) {
 			const route = routeForCell(cell)
@@ -303,8 +361,10 @@ async function handleMultiviewApply(body, ctx) {
 		const result = await Promise.race([doApply(), timeoutPromise])
 		// Persist applied layout so it survives Companion restarts and CasparCG reconnects
 		if (result?.status === 200) {
-			ctx._multiviewLayout = b
-			persistence.set('multiviewLayout', b)
+			const storeKey = n === 1 ? 'multiviewLayout' : `multiviewLayout_${n}`
+			if (!ctx._multiviewLayouts) ctx._multiviewLayouts = {}
+			ctx._multiviewLayouts[n] = b
+			persistence.set(storeKey, b)
 		}
 		return result
 	} catch (e) {

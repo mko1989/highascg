@@ -1,0 +1,135 @@
+/* Per-main output pills + look columns */
+.scenes-toolbar--mains {
+	align-items: flex-start;
+}
+
+.scenes-main-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	flex: 1 1 200px;
+}
+
+.scenes-main-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg-elevated);
+	overflow: hidden;
+}
+
+.scenes-main-pill--active {
+	border-color: var(--accent, #1d4ed8);
+	box-shadow: 0 0 0 1px var(--accent, #1d4ed8);
+}
+
+.scenes-main-pill--active .scenes-main-pill__out {
+	color: #fff;
+	background: var(--accent, #1d4ed8);
+}
+
+.scenes-main-pill--hidden {
+	opacity: 0.6;
+}
+
+.scenes-main-pill__out {
+	margin: 0;
+	padding: 6px 12px;
+	font-size: 0.8rem;
+	background: transparent;
+	border: 0;
+	color: var(--text, #e6edf3);
+	cursor: pointer;
+}
+
+.scenes-main-pill__out:hover {
+	background: var(--bg-3, #30363d);
+}
+
+.scenes-main-pill__eye {
+	margin: 0;
+	padding: 4px 8px;
+	font-size: 0.9rem;
+	background: var(--bg-panel);
+	border: 0;
+	border-left: 1px solid var(--border);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.scenes-main-pill__eye:hover {
+	background: var(--bg-3);
+}
+
+.scenes-next-global {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.scenes-next-global input {
+	vertical-align: middle;
+	margin-right: 4px;
+}
+
+.scenes-toolbar__global-take--right {
+	margin-left: auto;
+}
+
+.scenes-deck-row {
+	display: flex;
+	flex-direction: row;
+	flex: 1;
+	gap: 12px;
+	min-height: 0;
+	align-items: flex-start;
+	padding: 0 8px 12px 8px;
+	overflow-x: auto;
+}
+
+.scenes-deck-col {
+	flex: 1 1 280px;
+	min-width: 220px;
+	max-width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	background: var(--bg-panel, #151b22);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 8px;
+}
+
+.scenes-deck-col__head {
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+	padding: 0 4px 4px 4px;
+}
+
+.scenes-deck__empty--tight {
+	padding: 1rem 0.5rem;
+}
+
+.scenes-card__badge--global {
+	background: rgba(99, 102, 241, 0.25);
+	color: #a5b4fc;
+}
+
+.scenes-card__scope-line {
+	display: block;
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	padding: 0 8px 6px 8px;
+}
+
+.scenes-card__scope {
+	margin-left: 6px;
+	font-size: 0.75rem;
+	max-width: 100%;
+}

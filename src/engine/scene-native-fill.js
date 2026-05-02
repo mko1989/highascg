@@ -116,7 +116,8 @@ function getScreenIndexForChannel(config, channel) {
 	const map = getChannelMap(config || {})
 	const n = parseInt(channel, 10)
 	for (let i = 0; i < map.screenCount; i++) {
-		if (map.programCh(i + 1) === n || map.previewCh(i + 1) === n) return i
+		const prvCh = map.previewCh(i + 1)
+		if (map.programCh(i + 1) === n || (prvCh != null && prvCh === n)) return i
 	}
 	return 0
 }
@@ -231,6 +232,7 @@ function cinfResponseToStr(data) {
  */
 async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	if (!clipValue || !self?.amcp?.query?.cinf) return null
+	if (String(clipValue).trim().toLowerCase().startsWith('route://')) return null
 	try {
 		const res = await self.amcp.query.cinf(clipValue)
 		const str = cinfResponseToStr(res?.data)

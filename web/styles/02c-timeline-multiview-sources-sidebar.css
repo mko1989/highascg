@@ -87,6 +87,8 @@
 	gap: 0;
 	border-bottom: 1px solid var(--border);
 	margin-bottom: 8px;
+	min-width: 0;
+	overflow: hidden;
 }
 
 .sources-tab {
@@ -98,6 +100,10 @@
 	font-size: 0.8rem;
 	cursor: pointer;
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sources-tab:hover {
@@ -187,5 +193,100 @@
 	flex: 1;
 	min-width: 0;
 	width: auto;
+}
+
+.sources-usb-hint {
+	margin: 0;
+	font-size: 0.72rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+/* Streaming workspace tab (WO-27) */
+.streaming-panel {
+	padding: 12px 16px 24px;
+	max-width: 720px;
+}
+.streaming-panel__title {
+	margin: 0 0 8px;
+	font-size: 1.15rem;
+	font-weight: 600;
+}
+.streaming-panel__hint {
+	margin: 0 0 6px;
+	color: var(--muted, #8b949e);
+	font-size: 0.9rem;
+}
+.streaming-panel__status {
+	margin: 0 0 16px;
+	font-size: 0.95rem;
+}
+.streaming-panel__grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+@media (max-width: 900px) {
+	.streaming-panel__grid {
+		grid-template-columns: 1fr;
+	}
+}
+.streaming-panel__card {
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 14px 16px;
+	background: var(--panel-bg, rgba(255, 255, 255, 0.02));
+}
+.streaming-panel__card h3 {
+	margin: 0 0 12px;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.streaming-panel__card label {
+	display: block;
+	margin: 10px 0 4px;
+	font-size: 0.85rem;
+	color: var(--muted, #8b949e);
+}
+.streaming-panel__card input[type='text'],
+.streaming-panel__card input[type='password'],
+.streaming-panel__card input[type='number'],
+.streaming-panel__card select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--border);
+	/* Solid fill so WebKit/password autofill cannot flash white-on-white */
+	background-color: var(--bg-elevated);
+	color: var(--text);
+	caret-color: var(--text);
+	-webkit-text-fill-color: var(--text);
+}
+.streaming-panel__card input::placeholder {
+	color: var(--text-muted);
+	opacity: 1;
+}
+.streaming-panel__card input:-webkit-autofill,
+.streaming-panel__card input:-webkit-autofill:hover,
+.streaming-panel__card input:-webkit-autofill:focus,
+.streaming-panel__card input:-webkit-autofill:active {
+	-webkit-text-fill-color: var(--text) !important;
+	caret-color: var(--text);
+	box-shadow: 0 0 0 1000px var(--bg-elevated) inset !important;
+	transition: background-color 99999s ease-out;
+}
+.streaming-panel__card select option {
+	background-color: var(--bg-elevated);
+	color: var(--text);
+}
+.streaming-panel__btns {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 14px;
+}
+.streaming-panel__foot {
+	margin-top: 20px;
 }
 

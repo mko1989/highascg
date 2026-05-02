@@ -1,0 +1,73 @@
+.mapping-browser {
+	color: #e6edf3;
+	font-family: var(--ui-font-family, sans-serif);
+}
+
+.mapping-browser-item {
+	transition: background 0.2s, border-color 0.2s, transform 0.1s;
+}
+
+.mapping-browser-item:hover {
+	background: rgba(255, 255, 255, 0.1) !important;
+	border-color: rgba(88, 166, 255, 0.5) !important;
+}
+
+.mapping-browser-item:active {
+	cursor: grabbing;
+	transform: scale(0.98);
+}
+
+.mapping-browser-item .header-btn {
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.mapping-browser-item:hover .header-btn {
+	opacity: 1;
+}
+
+.pixel-map-editor .mv-toolbar {
+	background: #161b22;
+	border-bottom: 1px solid #30363d;
+	padding: 8px 12px;
+	height: 40px;
+}
+
+.device-view__mapping-node {
+	background: #1c2128;
+	border: 1px solid #30363d;
+	border-radius: 6px;
+	padding: 12px;
+	margin-bottom: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.device-view__mapping-node-title {
+	font-weight: bold;
+	font-size: 13px;
+	color: #58a6ff;
+}
+
+.device-view__mapping-node-outputs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.device-view__mapping-enter {
+	margin-top: 4px;
+	background: rgba(88, 166, 255, 0.1);
+	border: 1px solid rgba(88, 166, 255, 0.3);
+	color: #58a6ff;
+	font-weight: bold;
+	padding: 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.device-view__mapping-enter:hover {
+	background: rgba(88, 166, 255, 0.2);
+}

@@ -185,50 +185,6 @@ function setDefaultAlsaDevice(card, device, opts = {}) {
 }
 
 /**
- * ALSA PCM names from `aplay -L` — often align with PortAudio’s ALSA backend device strings (fuzzy match in Caspar).
- * @param {string} text
- * @returns {Array<{ id: number, name: string, hostAPIName: string, maxOutputChannels: number, defaultSampleRate: number }>}
- */
-function parseAplayLForPortAudioFallback(text) {
-	const out = []
-	const seen = new Set()
-	for (const line of String(text || '').split('\n')) {
-		if (/^\s/.test(line)) continue
-		const name = line.trim()
-		if (!name || name === 'null') continue
-		if (seen.has(name)) continue
-		seen.add(name)
-		out.push({
-			id: out.length,
-			name,
-			hostAPIName: 'ALSA (aplay -L)',
-			maxOutputChannels: 2,
-			defaultSampleRate: 48000,
-		})
-	}
-	out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-	return out
-}
-
-/**
- * Linux fallback when `naudiodon` is missing or fails to build (GCC/Node ABI issues).
- */
-function listPortAudioDevicesFromAplayL() {
-	if (os.platform() !== 'linux') return []
-	try {
-		const text = execSync('aplay -L', {
-			encoding: 'utf8',
-			timeout: 8000,
-			stdio: ['ignore', 'pipe', 'pipe'],
-			maxBuffer: 512 * 1024,
-		})
-		return parseAplayLForPortAudioFallback(text)
-	} catch {
-		return []
-	}
-}
-
-/**
  * Enumerate PortAudio devices (same names Caspar’s PortAudio consumer fuzzy-matches).
  * 1) Optional `naudiodon` (optionalDependency — build may fail on some toolchains).
  * 2) Linux: `aplay -L` fallback (install `alsa-utils`; names usually match PortAudio/ALSA).
@@ -273,11 +229,18 @@ function listPortAudioDevices(opts = {}) {
 	}
 
 	if (mapped.length === 0) {
-		const fb = listPortAudioDevicesFromAplayL()
-		if (fb.length > 0) {
-			mapped = fb
-			source = 'aplay-l'
+		const alsa = listAudioDevices({ refresh: true }).devices || []
+		for (const d of alsa) {
+			if (d.type !== 'alsa') continue
+			mapped.push({
+				id: d.id, // hw:X,Y
+				name: d.name,
+				hostAPIName: 'ALSA (physical)',
+				maxOutputChannels: 8,
+				defaultSampleRate: 48000,
+			})
 		}
+		source = 'aplay-l'
 	}
 
 	if (mapped.length > 0) {

@@ -1,0 +1,73 @@
+{
+  "amcp_batch": false,
+  "amcp_max_batch_commands": 64,
+  "amcp_mixer_commit_before_amcp_batch": true,
+  "offline_mode": true,
+  "host_stats": {
+    "scan_folder": false
+  },
+  "osc_info_supplement_ms": null,
+  "local_template_path": "",
+  "x11_horizontal_swap": false,
+  "multiview_system_id": "",
+  "multiview_os_mode": "",
+  "multiview_os_rate": "",
+  "gpuPhysicalTopology": [
+    {
+      "physicalPortId": "gpu_p0",
+      "slotOrder": 0,
+      "dpA": "DP-6",
+      "dpB": "DP-7",
+      "connectorNumber": 0,
+      "location": 0
+    },
+    {
+      "physicalPortId": "gpu_p1",
+      "slotOrder": 1,
+      "dpA": "DP-4",
+      "dpB": "DP-5",
+      "connectorNumber": 1,
+      "location": 1
+    },
+    {
+      "physicalPortId": "gpu_p2",
+      "slotOrder": 2,
+      "dpA": "DP-0",
+      "dpB": "DP-1",
+      "connectorNumber": 2,
+      "location": 2
+    },
+    {
+      "physicalPortId": "gpu_p3",
+      "slotOrder": 3,
+      "dpA": "DP-2",
+      "dpB": "DP-3",
+      "connectorNumber": 3,
+      "location": 3
+    }
+  ],
+  "screen_count": 1,
+  "streaming": {
+    "enabled": false,
+    "go2rtcPort": 1984,
+    "webrtcPort": 8555,
+    "protocol": "UDP",
+    "captureMode": "udp",
+    "localCaptureDevice": "auto",
+    "x11Display": ":0",
+    "ndiNamingMode": "auto",
+    "ndiSourcePattern": "CasparCG Channel {ch}",
+    "ndiChannelNames": {},
+    "quality": "medium",
+    "basePort": 40000,
+    "hardwareAccel": true,
+    "maxBitrate": 2000,
+    "resolution": "half",
+    "fps": 25,
+    "drmDevice": "/dev/dri/card0",
+    "autoRelocateBasePort": true,
+    "hardware_accel": false
+  },
+  "periodic_sync_interval_sec": null,
+  "periodic_sync_interval_sec_osc": null
+}

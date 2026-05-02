@@ -7,6 +7,7 @@ const { getChannelMap } = require('../config/routing')
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
 const sceneExitLayers = require('./scene-exit-layers')
 const { runExitLayers } = sceneExitLayers
+const { pipOverlaysFromLayer } = require('./pip-overlay')
 
 /** Second PGM stack for crossfading looks: scene layer N → Caspar N (bank a) or N+100 (bank b), e.g. 10 vs 110. */
 const PGM_BANK_B_OFFSET = 100
@@ -71,6 +72,10 @@ function jsonStable(v) {
 	}
 }
 
+function pipOverlaysStable(layer) {
+	return jsonStable(pipOverlaysFromLayer(layer))
+}
+
 function fadeOnEndEqual(a, b) {
 	const x = a && typeof a === 'object' ? a : { enabled: false, frames: 12 }
 	const y = b && typeof b === 'object' ? b : { enabled: false, frames: 12 }
@@ -95,7 +100,7 @@ function layerVisuallyEqual(cur, incoming) {
 	if (!!cur.muted !== !!incoming.muted) return false
 	if (!fadeOnEndEqual(cur.fadeOnEnd, incoming.fadeOnEnd)) return false
 	if (jsonStable(cur.effects) !== jsonStable(incoming.effects)) return false
-	if (jsonStable(cur.pipOverlay) !== jsonStable(incoming.pipOverlay)) return false
+	if (pipOverlaysStable(cur) !== pipOverlaysStable(incoming)) return false
 	return true
 }
 

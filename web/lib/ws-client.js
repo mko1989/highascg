@@ -57,6 +57,26 @@ export class WsClient {
 		})
 	}
 
+	/**
+	 * Structured AMCP over WS (same fields as REST POST bodies). See WO-07 T5 / `ws-amcp-dispatch.js`.
+	 * @param {Record<string, unknown>} payload — e.g. `{ type: 'play', channel: 1, layer: 10, clip: 'CLIP' }`
+	 * @returns {Promise<unknown>}
+	 */
+	sendAmcpStructured(payload) {
+		return new Promise((resolve) => {
+			const id = Date.now() + '-' + Math.random().toString(36).slice(2)
+			let unsub
+			const handler = (msg) => {
+				if (msg.type === 'amcp_result' && msg.id === id) {
+					if (unsub) unsub()
+					resolve(msg.data)
+				}
+			}
+			unsub = this.on('message', handler)
+			this._send({ ...payload, id })
+		})
+	}
+
 	_connect() {
 		try {
 			this.ws = new WebSocket(this.url)

@@ -1,0 +1,9 @@
+# HighAsCG — paths omitted from the live USB squashfs (penguins-eggs / mksquashfs)
+#
+# mksquashfs is invoked with -wildcards; entries are relative to the image root
+# (no leading slash), anchored at the top of the filesystem.
+# Using "/*" omits *contents*; the parent directory (empty) is still in the image.
+# See: work/docs/LIVE_USB_IMAGE.md §4.2.1
+#
+home/serwer/*
+opt/casparcg/media/*

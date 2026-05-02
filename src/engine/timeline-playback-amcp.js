@@ -172,7 +172,7 @@ module.exports = {
 				}
 			}
 			if (lines.length > 0) {
-				self.amcp.batchSend(lines).catch(() => {})
+				self.amcp.batchSendChunked(lines).catch(() => {})
 				sent = true
 			}
 		}
@@ -192,12 +192,18 @@ module.exports = {
 		const screenIdx = st.screenIdx != null ? st.screenIdx : null
 		const ch = []
 		const addScreen = (i) => {
-			if (previewOn) ch.push(map?.previewCh ? map.previewCh(i + 1) : (i + 1) * 2)
+			if (previewOn) {
+				const prv = map?.previewCh ? map.previewCh(i + 1) : (i + 1) * 2
+				if (prv != null) ch.push(prv)
+			}
 			if (programOn) ch.push(map?.programCh ? map.programCh(i + 1) : (i + 1) * 2 - 1)
 		}
 		if (screenIdx !== null) addScreen(screenIdx)
 		else for (let i = 0; i < screenCount; i++) addScreen(i)
-		if (ch.length === 0) ch.push(programOn ? map?.programCh?.(1) ?? 1 : map?.previewCh?.(1) ?? 2)
+		if (ch.length === 0) {
+			const fallback = programOn ? (map?.programCh?.(1) ?? 1) : (map?.previewCh?.(1) ?? map?.programCh?.(1) ?? 1)
+			ch.push(fallback)
+		}
 		return ch
 	},
 
@@ -205,7 +211,7 @@ module.exports = {
 		return this._channelsFor(this._pb?.sendTo)
 	},
 
-	/** Layer index from Caspar layer number (100+ for timeline stacks). */
+	/** Layer index from Caspar layer number (TIMELINE_LAYER_BASE + stack index). */
 	_timelineLayerIndex(caspLayer) {
 		const li = caspLayer - TIMELINE_LAYER_BASE
 		return li >= 0 ? li : -1

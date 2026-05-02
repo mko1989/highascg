@@ -1,10 +1,12 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
-import { findMediaRow } from '../lib/mixer-fill.js'
+import { findMediaRow, getContentResolution } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { createEffectInstance } from '../lib/effect-registry.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
+import { pixelsToNormalized } from '../lib/fill-math.js'
+import { clipPixelRectAtLocalTime, interpClipProp } from '../lib/timeline-clip-interp.js'
 
 export function showTimelineToast(msg, type = 'info') {
 	let container = document.getElementById('tl-toast-container')
@@ -460,9 +462,25 @@ export function attachTimelineEditorInput(root, bodyEl, deps) {
 			const pb = getPlayback()
 			const localMs = Math.max(0, Math.round(pb.position - clip.startTime))
 			const time = Math.min(localMs, clip.duration)
-			if (e.key === 'p') timelineState.addPositionKeyframe(timelineId, layerIdx, clipId, time, 0, 0)
-			else if (e.key === 's') timelineState.addScaleKeyframe(timelineId, layerIdx, clipId, time, 1)
-			else timelineState.addKeyframe(timelineId, layerIdx, clipId, { time, property: e.key === 'v' ? 'volume' : 'opacity', value: e.key === 'v' ? 1 : 1, easing: 'linear' })
+			
+			const screenIdx = timelineState.getActive()?.screenIdx ?? 0
+			const res = stateStore.getState()?.channelMap?.programResolutions?.[screenIdx] || { w: 1920, h: 1080 }
+			const W = res.w || 1920
+			const H = res.h || 1080
+
+			if (e.key === 'p') {
+				const current = clipPixelRectAtLocalTime(clip, time, W, H, stateStore, screenIdx)
+				timelineState.addPositionKeyframe(timelineId, layerIdx, clipId, time, pixelsToNormalized(current.x, W), pixelsToNormalized(current.y, H))
+			} else if (e.key === 's') {
+				const current = clipPixelRectAtLocalTime(clip, time, W, H, stateStore, screenIdx)
+				timelineState.addScaleKeyframe(timelineId, layerIdx, clipId, time, current.w / W)
+			} else if (e.key === 'v') {
+				const val = interpClipProp(clip, time, 'volume', clip.volume ?? 1)
+				timelineState.addKeyframe(timelineId, layerIdx, clipId, { time, property: 'volume', value: val, easing: 'linear' })
+			} else if (e.key === 't') {
+				const val = interpClipProp(clip, time, 'opacity', 1)
+				timelineState.addKeyframe(timelineId, layerIdx, clipId, { time, property: 'opacity', value: val, easing: 'linear' })
+			}
 			void deps.getSyncToServer()(timelineState.getActive())
 			redrawTimelineView()
 			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: selectedClip }))

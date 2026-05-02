@@ -67,6 +67,7 @@ export class ProjectState {
 		const dashboard = dashboardState?.getExportData?.() ?? null
 		const timelines = timelineState?.getExportData?.() ?? null
 		const multiview = multiviewState?.getExportData?.() ?? null
+		const placeholders = window.placeholderState?.getExportData?.() ?? null
 		return {
 			version: PROJECT_VERSION,
 			name: this.projectName || 'Untitled',
@@ -75,6 +76,7 @@ export class ProjectState {
 			dashboard,
 			timelines,
 			multiview,
+			placeholders,
 		}
 	}
 
@@ -94,6 +96,7 @@ export class ProjectState {
 		if (data.dashboard && dashboardState?.loadFromData) dashboardState.loadFromData(data.dashboard)
 		if (data.timelines && timelineState?.loadFromData) timelineState.loadFromData(data.timelines)
 		if (data.multiview && multiviewState?.loadFromData) multiviewState.loadFromData(data.multiview)
+		if (data.placeholders && window.placeholderState?.loadFromData) window.placeholderState.loadFromData(data.placeholders)
 		this._emit('imported')
 		return true
 	}

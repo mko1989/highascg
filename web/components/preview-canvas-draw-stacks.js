@@ -137,18 +137,23 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		if (isLive && composeDualStreamPreview) {
 			return
 		}
-		ctx.fillStyle = '#6e7681'
-		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
-		ctx.fillText('Add layers and assign sources', 16, Math.round(H / 2))
 		if (!composeDualStreamPreview && !deckThumbnailMode) {
 			drawOutputCanvasBounds(ctx, W, H)
 			drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
 		}
+		ctx.fillStyle = '#6e7681'
+		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
+		ctx.fillText('Add layers and assign sources', 16, Math.round(H / 2))
 		return
 	}
 
 	const sorted = [...scene.layers].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 	const lw = Math.max(2, Math.round(W / 400))
+
+	if (!composeDualStreamPreview && !deckThumbnailMode) {
+		drawOutputCanvasBounds(ctx, W, H)
+		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	}
 
 	for (let i = 0; i < sorted.length; i++) {
 		const layer = sorted[i]
@@ -215,6 +220,8 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 				ctx.fillStyle = 'rgba(48, 54, 61, 0.9)'
 				ctx.fillRect(px, py, pw, ph)
 			}
+		} else if (src?.isPlaceholder || src?.type === 'placeholder' || src?.template || l.template) {
+			drawPlaceholderFill(ctx, px, py, pw, ph, src || { template: l.template })
 		} else if (src?.value) {
 			ctx.fillStyle = 'rgba(48, 54, 61, 0.85)'
 			ctx.fillRect(px, py, pw, ph)
@@ -238,11 +245,6 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		}
 
 		ctx.restore()
-	}
-
-	if (!composeDualStreamPreview && !deckThumbnailMode) {
-		drawOutputCanvasBounds(ctx, W, H)
-		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
 	}
 }
 
@@ -309,6 +311,98 @@ function drawPreviewStatusText(ctx, x, y, w, h, text) {
 	ctx.textBaseline = 'alphabetic'
 }
 
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {object} item
+ */
+function drawPlaceholderFill(ctx, x, y, w, h, item) {
+	const template = String(item.template || 'color_grid').toLowerCase()
+	const label = String(item.label || item.id || '').toUpperCase()
+	
+	ctx.save()
+	ctx.beginPath()
+	ctx.rect(x, y, w, h)
+	ctx.clip()
+
+	if (template === 'color_grid') {
+		const cw = w / 8, ch = h / 4
+		for (let r = 0; r < 4; r++) {
+			for (let c = 0; c < 8; c++) {
+				ctx.fillStyle = (r + c) % 2 === 0 ? '#0f172a' : '#1e293b'
+				ctx.fillRect(x + c * cw, y + r * ch, cw, ch)
+			}
+		}
+	} else if (template === 'solid') {
+		ctx.fillStyle = item.value || '#3b82f6'
+		ctx.fillRect(x, y, w, h)
+	} else if (template === 'smpte_bars') {
+		const colors = ['#ffffff', '#ffff00', '#00ffff', '#00ff00', '#ff00ff', '#ff0000', '#0000ff']
+		const bw = w / colors.length
+		colors.forEach((c, i) => {
+			ctx.fillStyle = c
+			ctx.fillRect(x + i * bw, y, bw, h * 0.7)
+		})
+		const bottomColors = ['#0000ff', '#131313', '#ff00ff', '#131313', '#00ffff', '#131313', '#ffffff']
+		bottomColors.forEach((c, i) => {
+			ctx.fillStyle = c
+			ctx.fillRect(x + i * bw, y + h * 0.7, bw, h * 0.3)
+		})
+	} else if (template === 'aspect_guide') {
+		ctx.fillStyle = '#161b22'
+		ctx.fillRect(x, y, w, h)
+		ctx.strokeStyle = '#58a6ff'
+		ctx.lineWidth = 2
+		ctx.strokeRect(x + 2, y + 2, w - 4, h - 4)
+		// 4:3 guide
+		const targetAR = 4/3, currentAR = w/h
+		let gw = w, gh = h
+		if (currentAR > targetAR) gw = h * targetAR; else gh = w / targetAR
+		ctx.setLineDash([5, 5])
+		ctx.strokeRect(x + (w - gw)/2, y + (h - gh)/2, gw, gh)
+		ctx.setLineDash([])
+	} else if (template === 'countdown') {
+		ctx.fillStyle = '#0d1117'
+		ctx.fillRect(x, y, w, h)
+		ctx.strokeStyle = '#2ecc71'
+		ctx.lineWidth = 4
+		const radius = Math.min(w, h) * 0.3
+		ctx.beginPath()
+		ctx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2)
+		ctx.stroke()
+		ctx.fillStyle = '#fff'
+		ctx.font = `bold ${radius}px ${UI_FONT_FAMILY}`
+		ctx.textAlign = 'center'
+		ctx.textBaseline = 'middle'
+		ctx.fillText('10', x + w / 2, y + h / 2)
+	} else if (template === 'white_noise') {
+		for (let i = 0; i < 1000; i++) {
+			ctx.fillStyle = Math.random() > 0.5 ? '#fff' : '#000'
+			ctx.fillRect(x + Math.random() * w, y + Math.random() * h, 2, 2)
+		}
+	} else {
+		const g = ctx.createLinearGradient(x, y, x + w, y + h)
+		g.addColorStop(0, '#21262d'); g.addColorStop(1, '#0d1117')
+		ctx.fillStyle = g
+		ctx.fillRect(x, y, w, h)
+	}
+
+	// Label overlay
+	ctx.fillStyle = 'rgba(0,0,0,0.5)'
+	const labelH = Math.max(16, h * 0.15)
+	ctx.fillRect(x, y + h - labelH, w, labelH)
+	ctx.fillStyle = '#fff'
+	ctx.font = `${Math.max(10, labelH * 0.6)}px ${UI_FONT_FAMILY}`
+	ctx.textAlign = 'center'
+	ctx.textBaseline = 'middle'
+	ctx.fillText(label, x + w / 2, y + h - labelH / 2)
+
+	ctx.restore()
+}
+
 export function drawTimelineStack(ctx, W, H, opts) {
 	const {
 		timelineState,
@@ -351,6 +445,11 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.fillRect(0, 0, W, H)
 	}
 
+	if (!composeDualStreamPreview) {
+		drawOutputCanvasBounds(ctx, W, H)
+		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
+	}
+
 	const mediaList = stateStore?.getState?.()?.media || []
 
 	const tl = timelineState.getActive()
@@ -361,10 +460,6 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.fillStyle = '#6e7681'
 		ctx.font = `${Math.max(14, Math.round(W / 80))}px ${UI_FONT_FAMILY}`
 		ctx.fillText('No timeline', 16, Math.round(H / 2))
-		if (!composeDualStreamPreview) {
-			drawOutputCanvasBounds(ctx, W, H)
-			drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
-		}
 		return
 	}
 
@@ -435,6 +530,8 @@ export function drawTimelineStack(ctx, W, H, opts) {
 			} else {
 				drawPreviewStatusText(ctx, x, y, w, h, 'Loading…')
 			}
+		} else if (clip.source?.isPlaceholder) {
+			drawPlaceholderFill(ctx, x, y, w, h, clip.source)
 		} else {
 			ctx.fillStyle = 'rgba(48, 54, 61, 0.85)'
 			ctx.fillRect(x, y, w, h)
@@ -453,10 +550,5 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		ctx.fillText(`L${li + 1}`, x + 6, y + Math.max(14, Math.round(H / 70)))
 
 		ctx.restore()
-	}
-
-	if (!composeDualStreamPreview) {
-		drawOutputCanvasBounds(ctx, W, H)
-		drawComposePrvPgmEdgeBars(ctx, W, H, { layout: composePrvPgmLayout })
 	}
 }

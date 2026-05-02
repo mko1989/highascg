@@ -9,7 +9,19 @@
 		"dev": "node --watch index.js",
 		"deploy:dev": "bash scripts/dev-push.sh",
 		"smoke": "node tools/http-smoke.js",
-		"smoke:caspar": "node tools/smoke-caspar.js"
+		"smoke:caspar": "node tools/smoke-caspar.js",
+		"smoke:previs-uv": "node tools/smoke-previs-uv.mjs",
+		"smoke:previs-state": "node tools/smoke-previs-state.mjs",
+		"smoke:previs-stream": "node tools/smoke-previs-stream.mjs",
+		"smoke:previs-texture-crop": "node tools/smoke-previs-texture-crop.mjs",
+		"smoke:usb-lsblk": "node --test tools/smoke-usb-lsblk.js",
+		"test:device-graph": "node --test tools/smoke-device-graph.js tools/smoke-tandem-cable.js",
+		"test:config-generator": "node --test tools/smoke-config-generator-routing.js",
+		"smoke:companion-press": "node tools/smoke-companion-press.mjs",
+		"smoke:streaming-ch": "node tools/verify-streaming-channel.mjs",
+		"smoke:pixelhue-validation": "node tools/smoke-pixelhue-validation.js",
+		"install:base": "npm install --omit=optional",
+		"install:previs": "npm install --include=optional"
 	},
 	"engines": {
 		"node": ">=20"
@@ -17,15 +29,18 @@
 	"dependencies": {
 		"busboy": "^1.6.0",
 		"dmxnet": "^0.9.0",
-		"go2rtc-static": "^1.9.4",
 		"osc": "^2.4.5",
 		"sacn": "^4.6.2",
 		"unzipper": "^0.12.3",
 		"wetransfert": "^2.4.0",
 		"ws": "^8.18.0",
-		"xml2js": "^0.6.2"
+		"xml2js": "^0.6.2",
+		"jsonwebtoken": "^9.0.2"
 	},
 	"optionalDependencies": {
-		"naudiodon": "^2.3.6"
+		"go2rtc-static": "^1.9.4",
+		"naudiodon": "^2.3.6",
+		"onnxruntime-node": "^1.24.3",
+		"three": "^0.184.0"
 	}
 }

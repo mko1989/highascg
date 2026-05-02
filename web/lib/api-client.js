@@ -20,6 +20,21 @@ function getBase() {
 
 /** @param {string} path Absolute path starting with `/api/` */
 export async function apiGet(path) {
+	if (path === '/api/media' && window.stateStore?.isOffline?.()) {
+		const placeholders = window.placeholderState?.getAll() || []
+		try {
+			const res = await fetch(getBase() + path)
+			if (res.ok) {
+				const ct = res.headers.get('content-type') || ''
+				if (ct.includes('application/json')) {
+					const data = await res.json()
+					return [...(Array.isArray(data) ? data : []), ...placeholders]
+				}
+			}
+		} catch {
+			return placeholders
+		}
+	}
 	const url = getBase() + path
 	const res = await fetch(url)
 	if (!res.ok) {

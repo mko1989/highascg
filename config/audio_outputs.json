@@ -1,0 +1,9 @@
+[
+  {
+    "id": "audio_1",
+    "label": "Audio 1",
+    "enabled": true,
+    "deviceName": "hw:CARD=NVidia,DEV=3",
+    "channelLayout": "8ch"
+  }
+]

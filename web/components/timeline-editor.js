@@ -33,9 +33,9 @@ export function initTimelineEditor(root, stateStore) {
 	let _flagBoard = null
 	let previewPanel = null
 	// sendTo.screenIdx: 0-based screen index, null = all screens
-	// Default to both PGM and PRV; timeline uses Caspar layers 100+ (separate from looks / black on 9)
+	// Default PRV only — avoid sending timeline to program until the user enables PGM or uses Take / scene take / dashboard column.
 	const view = {
-		sendTo: { preview: true, program: true, screenIdx: 0 },
+		sendTo: { preview: true, program: false, screenIdx: 0 },
 		follow: true,
 		takeTransition: { type: 'MIX', duration: 12, tween: 'linear' },
 	}
@@ -187,7 +187,7 @@ export function initTimelineEditor(root, stateStore) {
 	const { buildTransport, updateTimecode, syncToServer, togglePlay } = transportApi
 	syncToServerRef.fn = syncToServer
 
-	/** Align Dest PRV/PGM with server playback (fixes missing `program` in sendTo defaulting to no PGM). */
+	/** Align Dest PRV/PGM with server playback state. */
 	async function syncPlaybackFromServer() {
 		const tl = timelineState.getActive()
 		if (!tl?.id) return
@@ -242,7 +242,35 @@ export function initTimelineEditor(root, stateStore) {
 			return { w: 1920, h: 1080 }
 		},
 		stateStore,
-		streamName: 'prv_1',
+		getComposeCellDefs: () => {
+			const s = Math.max(0, view.sendTo.screenIdx ?? 0)
+			const cm = stateStore.getState()?.channelMap || {}
+			const pgmCh = cm.programChannels?.[s] ?? null
+			const prvCh = cm.previewChannels?.[s] ?? null
+			const defs = [{
+				id: `pgm_${s + 1}`,
+				role: 'pgm',
+				mainIndex: s,
+				label: `PGM ${s + 1}${pgmCh != null ? ` (ch ${pgmCh})` : ''}`,
+			}]
+			if (prvCh != null) {
+				defs.push({
+					id: `prv_${s + 1}`,
+					role: 'prv',
+					mainIndex: s,
+					label: `PRV ${s + 1} (ch ${prvCh})`,
+				})
+			}
+			return defs
+		},
+		getDualStreamNames: () => {
+			const s = Math.max(0, view.sendTo.screenIdx ?? 0)
+			const cm = stateStore.getState()?.channelMap || {}
+			const pgmCh = cm.programChannels?.[s] ?? 1
+			const prvCh = cm.previewChannels?.[s] ?? null
+			return { pgm: `pgm_${Math.max(1, pgmCh)}`, prv: `prv_${Math.max(1, prvCh || pgmCh)}` }
+		},
+		showDestinationVisualOverlay: false,
 		composePrvPgmLayoutToggle: true,
 		draw(ctx, W, H, isLive, meta = {}) {
 			drawTimelineStack(ctx, W, H, {
@@ -259,7 +287,7 @@ export function initTimelineEditor(root, stateStore) {
 						: null,
 				onThumbLoaded: () => previewPanel.scheduleDraw(),
 				stateStore,
-				screenIdx: view.sendTo.screenIdx ?? 0,
+				screenIdx: meta.composeScreenIdx ?? (view.sendTo.screenIdx ?? 0),
 			})
 		},
 	})
@@ -342,6 +370,10 @@ export function initTimelineEditor(root, stateStore) {
 
 	stateStore.on('timeline.tick', (data) => onTick(data))
 	stateStore.on('timeline.playback', (pb) => onPlayback(pb))
+	stateStore.on('channelMap', () => {
+		buildTransport()
+		redrawTimelineView()
+	})
 	timelineState.on('change', () => {
 		updateTimecode()
 		redrawTimelineView()

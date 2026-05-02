@@ -1,0 +1,19 @@
+/* Optional headless / service rule: allow user "casparcg" in plugdev to use udisks2
+ * even when polkit's subject.active is false (e.g. no desktop login session).
+ * Use together with 50-highascg-udisks.rules, or on dedicated playout systems only.
+ *
+ * Install: sudo cp scripts/polkit/51-highascg-udisks-casparcg-headless.rules /etc/polkit-1/rules.d/
+ *          sudo systemctl restart polkit
+ *
+ * If your service user is not "casparcg", change install-config.sh USER_CASPAR and adjust subject.user.
+ */
+polkit.addRule(function (action, subject) {
+    if (
+        action.id.indexOf('org.freedesktop.udisks2.') === 0 &&
+        subject.local === true &&
+        subject.user == 'casparcg' &&
+        subject.isInGroup('plugdev')
+    ) {
+        return polkit.Result.YES;
+    }
+});

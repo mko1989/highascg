@@ -5,7 +5,8 @@
 
 'use strict'
 
-const { MAX_BATCH_COMMANDS } = require('../caspar/amcp-batch')
+const { resolveMaxBatchCommands } = require('../caspar/amcp-batch')
+const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
 const liveSceneState = require('../state/live-scene-state')
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
@@ -24,7 +25,7 @@ function layerHasContent(l) {
 	return !!(l && l.source && l.source.value)
 }
 
-/** Caspar layers used by looks: bank A 1–99, bank B 110–199. Timeline uses 100+ (leave 100–109 alone). */
+/** Caspar layers used by looks: bank A 1–99, bank B 110–199. Timeline uses 200+ (TIMELINE_LAYER_BASE). */
 function isLookPhysicalLayer(L) {
 	return (L >= 1 && L <= 99) || (L >= 110 && L <= 199)
 }
@@ -76,7 +77,7 @@ function collectOccupiedLookLayersOnChannel(self, ch) {
 
 /**
  * Physical Caspar layers used by program looks: bank A 1–99, bank B 110–199 (see scene-transition PGM_BANK_B_OFFSET).
- * Timeline output uses 100+ (TIMELINE_LAYER_BASE); clearing occupied look layers removes looks without touching the 100–109 corridor.
+ * Timeline output uses TIMELINE_LAYER_BASE (200+); clearing occupied look layers removes looks without touching timeline slots.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {number|string} channel
  * @param {{ _playbackMatrix?: object, config?: object, programLayerBankByChannel?: object }} [self]
@@ -88,7 +89,7 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 	const layers = collectOccupiedLookLayersOnChannel(self || {}, ch)
 	if (layers.length === 0) return
 
-	const chunkSize = Math.floor(MAX_BATCH_COMMANDS / 2)
+	const chunkSize = Math.floor(resolveMaxBatchCommands(amcp._context) / 2)
 	for (let i = 0; i < layers.length; i += chunkSize) {
 		const chunk = layers.slice(i, i + chunkSize)
 		const lines = []
@@ -125,33 +126,56 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 	}
 }
 
-async function fadeExitLayerOpacities(amcp, channel, exitLayers, globalT, forceCut) {
+/**
+ * Fade all exiting layers together: DEFER opacity tweens, then one channel COMMIT (no per-layer stepping).
+ * Uses physical Caspar layer from scene layer + current program bank.
+ * @param {{ programLayerBankByChannel?: object } | null | undefined} self
+ */
+async function fadeExitLayerOpacities(amcp, channel, exitLayers, globalT, forceCut, self) {
 	if (exitLayers.length === 0) return
 	const dur = forceCut ? 0 : globalT.duration
 	const tw = forceCut ? undefined : globalT.tween
+	if (!dur || dur <= 0) return
+
+	const ch = parseInt(channel, 10)
+	const bank = normalizeProgramLayerBank(self?.programLayerBankByChannel?.[String(ch)])
+	const lines = []
 	for (const layer of exitLayers) {
-		await amcp.mixerOpacity(channel, layer.layerNumber, 0, dur, tw)
+		const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+		const cl = `${ch}-${pL}`
+		let p = '0'
+		p += ` ${dur}`
+		if (tw) p += ` ${param(tw)}`
+		lines.push(`MIXER ${cl} OPACITY ${p} DEFER`)
 	}
+	await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
+	await amcp.mixerCommit(channel)
 }
 
 async function runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, globalT, forceCut, self) {
 	const fadeMs = forceCut || globalT.duration <= 0 ? 0 : (globalT.duration / framerate) * 1000
 	if (exitLayers.length === 0) return
+	const ch = parseInt(channel, 10)
+	const bank = normalizeProgramLayerBank(self?.programLayerBankByChannel?.[String(ch)])
 	await new Promise((resolve) => {
 		setTimeout(async () => {
 			try {
+				const lines = []
 				for (const layer of exitLayers) {
-					try {
-						await amcp.stop(channel, layer.layerNumber)
-						if (self) {
-							try {
-								playbackTracker.recordStop(self, channel, layer.layerNumber)
-							} catch (_) {}
-						}
-					} catch {}
-					try {
-						await amcp.mixerClear(channel, layer.layerNumber)
-					} catch {}
+					const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+					const cl = `${ch}-${pL}`
+					lines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+				}
+				if (lines.length > 0) {
+					await amcp.batchSendChunked(lines)
+				}
+				if (self) {
+					for (const layer of exitLayers) {
+						const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+						try {
+							playbackTracker.recordStop(self, channel, pL)
+						} catch (_) {}
+					}
 				}
 				await amcp.mixerCommit(channel)
 			} catch {}
@@ -161,7 +185,7 @@ async function runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, g
 }
 
 async function runExitLayers(amcp, channel, exitLayers, framerate, globalT, forceCut, self) {
-	await fadeExitLayerOpacities(amcp, channel, exitLayers, globalT, forceCut)
+	await fadeExitLayerOpacities(amcp, channel, exitLayers, globalT, forceCut, self)
 	await runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, globalT, forceCut, self)
 }
 

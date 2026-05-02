@@ -1,14 +1,11 @@
 /**
- * Pixel Map Editor — visual tool for DMX fixture sampling zones.
+ * Unified Mapping Editor — visual tool for Video Slicing and DMX Pixel Mapping.
  */
-
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
-import { dmxState } from '../lib/dmx-state.js'
 import { api } from '../lib/api-client.js'
 import { initLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
-import { settingsState } from '../lib/settings-state.js'
-import { dashboardState } from '../lib/dashboard-state.js'
+import { mappingState } from '../lib/mapping-state.js'
 
 const HANDLE_SIZE = 8
 const ROTATE_HANDLE_DIST = 30
@@ -19,20 +16,8 @@ export function initPixelMapEditor(root, stateStore) {
 	let offsetX = 0
 	let offsetY = 0
 	let dragMode = null // 'move' | 'resize-*' | 'rotate'
-	let dragStart = { x: 0, y: 0, fixture: null, angle: 0 }
-	
-	function getChannelMap() {
-		return stateStore.getState()?.channelMap || {}
-	}
-
-	function syncCanvasAndToolbar() {
-		dmxState.syncCanvasFromProgramResolution(getChannelMap(), dashboardState.activeScreenIndex)
-		const el = root.querySelector('#px-pgm-label')
-		if (el) {
-			el.textContent = `Sampling Program Output (${dmxState.canvasWidth}×${dmxState.canvasHeight})`
-		}
-	}
-
+	let dragStart = { x: 0, y: 0, item: null, angle: 0 }
+	let selectedId = null
 	let wrap = null
 
 	function fitInContainer() {
@@ -44,8 +29,8 @@ export function initPixelMapEditor(root, stateStore) {
 			canvas.width = w
 			canvas.height = h
 		}
-		const cw = dmxState.canvasWidth
-		const ch = dmxState.canvasHeight
+		const cw = mappingState.canvasWidth
+		const ch = mappingState.canvasHeight
 		const sx = w / cw
 		const sy = h / ch
 		scale = Math.min(sx, sy, 0.95)
@@ -60,15 +45,13 @@ export function initPixelMapEditor(root, stateStore) {
 		return { x: (x - offsetX) / scale, y: (y - offsetY) / scale }
 	}
 
-	function getFixtureAt(cx, cy) {
-		const fixtures = dmxState.getFixtures()
-		// Search backwards (top to bottom)
-		for (let i = fixtures.length - 1; i >= 0; i--) {
-			const f = fixtures[i]
-			const { x, y, w, h } = f.sample
-			const angle = (f.rotation || 0) * (Math.PI / 180)
+	function getItemAt(cx, cy) {
+		const items = mappingState.mappings
+		for (let i = items.length - 1; i >= 0; i--) {
+			const m = items[i]
+			const { x, y, w, h } = m.rect
+			const angle = (m.rotation || 0) * (Math.PI / 180)
 			
-			// Transform point to local fixture space
 			const dx = cx - (x + w / 2)
 			const dy = cy - (y + h / 2)
 			const cosA = Math.cos(-angle)
@@ -76,21 +59,23 @@ export function initPixelMapEditor(root, stateStore) {
 			const lx = dx * cosA - dy * sinA
 			const ly = dx * sinA + dy * cosA
 			
-			if (lx >= -w/2 && lx <= w/2 && ly >= -h/2 && ly <= h/2) return f
+			if (lx >= -w/2 && lx <= w/2 && ly >= -h/2 && ly <= h/2) return m
 			
-			// Check rotation handle
-			const hlx = 0
-			const hly = -h/2 - ROTATE_HANDLE_DIST
-			const hdist = Math.sqrt((lx - hlx)**2 + (ly - hly)**2)
-			if (hdist < HANDLE_SIZE / scale * 1.5) return { ...f, _handle: 'rotate' }
+			// Rotation handle
+			if (selectedId === m.id) {
+				const hlx = 0
+				const hly = -h/2 - ROTATE_HANDLE_DIST
+				const hdist = Math.sqrt((lx - hlx)**2 + (ly - hly)**2)
+				if (hdist < (HANDLE_SIZE / scale) * 2) return { ...m, _handle: 'rotate' }
+			}
 		}
 		return null
 	}
 
 	function draw() {
 		if (!ctx || !canvas) return
-		const mw = dmxState.canvasWidth
-		const mh = dmxState.canvasHeight
+		const mw = mappingState.canvasWidth
+		const mh = mappingState.canvasHeight
 		const bx = offsetX, by = offsetY
 		const bw = mw * scale, bh = mh * scale
 
@@ -111,76 +96,51 @@ export function initPixelMapEditor(root, stateStore) {
 		ctx.strokeRect(bx, by, bw, bh)
 		ctx.setLineDash([])
 
-		const fixtures = dmxState.getFixtures()
-		fixtures.forEach(f => {
-			const { x, y, w, h } = f.sample
-			const angle = (f.rotation || 0) * (Math.PI / 180)
-			const isSelected = dmxState.selectedFixtureId === f.id
+		mappingState.mappings.forEach(m => {
+			const { x, y, w, h } = m.rect
+			const angle = (m.rotation || 0) * (Math.PI / 180)
+			const isSelected = selectedId === m.id
 			
 			ctx.save()
 			ctx.translate(bx + (x + w/2) * scale, by + (y + h/2) * scale)
 			ctx.rotate(angle)
 			
-			// Draw sampling grid if enabled or selected
-			const liveColors = dmxState.liveColors.get(f.id)
-			if (liveColors) {
-				const cols = f.grid.cols || 1
-				const rows = f.grid.rows || 1
-				const cw = w / cols
-				const ch = h / rows
-				
-				let colorIdx = 0
-				for (let r = 0; r < rows; r++) {
-					for (let c = 0; c < cols; c++) {
-						const cr = liveColors[colorIdx++] || 0
-						const cg = liveColors[colorIdx++] || 0
-						const cb = liveColors[colorIdx++] || 0
-						// skip w, a etc for visualization if present
-						const format = (f.colorOrder || 'rgb').toLowerCase()
-						if (format.includes('w')) colorIdx++
-						if (format.includes('a')) colorIdx++
-
-						ctx.fillStyle = `rgba(${cr},${cg},${cb}, 0.6)`
-						ctx.fillRect((c * cw - w/2) * scale, (r * ch - h/2) * scale, cw * scale, ch * scale)
-					}
-				}
+			// Fill based on type
+			if (m.type === 'video_slice') {
+				ctx.fillStyle = isSelected ? 'rgba(88,166,255,0.2)' : 'rgba(88,166,255,0.1)'
+				ctx.fillRect(-w/2 * scale, -h/2 * scale, w * scale, h * scale)
+			} else {
+				ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'
+				ctx.fillRect(-w/2 * scale, -h/2 * scale, w * scale, h * scale)
 			}
 
 			// Main box
-			ctx.strokeStyle = isSelected ? '#58a6ff' : '#8b949e'
+			ctx.strokeStyle = isSelected ? '#58a6ff' : (m.type === 'video_slice' ? '#388bfd' : '#8b949e')
 			ctx.lineWidth = isSelected ? 2 : 1
 			ctx.strokeRect(-w/2 * scale, -h/2 * scale, w * scale, h * scale)
 			
 			// Label
 			ctx.fillStyle = '#fff'
-			ctx.font = `10px ${UI_FONT_FAMILY}`
+			ctx.font = `bold 10px ${UI_FONT_FAMILY}`
 			ctx.textAlign = 'center'
-			ctx.fillText(f.id, 0, -h/2 * scale - 5)
+			ctx.fillText(m.label || m.id, 0, -h/2 * scale - 12)
+			
+			ctx.fillStyle = 'rgba(255,255,255,0.5)'
+			ctx.font = `9px ${UI_FONT_FAMILY}`
+			ctx.fillText(m.type === 'video_slice' ? 'Video Slice' : 'DMX Fixture', 0, -h/2 * scale - 2)
 
 			if (isSelected) {
 				// Rotation handle
 				ctx.beginPath()
+				ctx.strokeStyle = '#58a6ff'
 				ctx.moveTo(0, -h/2 * scale)
 				ctx.lineTo(0, -h/2 * scale - ROTATE_HANDLE_DIST * scale)
 				ctx.stroke()
 				
+				ctx.fillStyle = '#58a6ff'
 				ctx.beginPath()
 				ctx.arc(0, -h/2 * scale - ROTATE_HANDLE_DIST * scale, HANDLE_SIZE/2 * scale, 0, Math.PI * 2)
 				ctx.fill()
-				
-				// Grid lines
-				ctx.strokeStyle = 'rgba(255,255,255,0.3)'
-				ctx.lineWidth = 0.5
-				const cols = f.grid.cols || 1
-				const rows = f.grid.rows || 1
-				for (let i = 1; i < cols; i++) {
-					const gx = (i * (w / cols) - w/2) * scale
-					ctx.beginPath(); ctx.moveTo(gx, -h/2 * scale); ctx.lineTo(gx, h/2 * scale); ctx.stroke()
-				}
-				for (let i = 1; i < rows; i++) {
-					const gy = (i * (h / rows) - h/2) * scale
-					ctx.beginPath(); ctx.moveTo(-w/2 * scale, gy); ctx.lineTo(w/2 * scale, gy); ctx.stroke()
-				}
 			}
 
 			ctx.restore()
@@ -191,31 +151,28 @@ export function initPixelMapEditor(root, stateStore) {
 		root.innerHTML = ''
 		const editor = document.createElement('div')
 		editor.className = 'pixel-map-editor'
-		editor.style.display = 'flex'
-		editor.style.height = '100%'
-		editor.style.flexDirection = 'column'
+		editor.style.display = 'flex'; editor.style.height = '100%'; editor.style.flexDirection = 'column'
 
 		const mainArea = document.createElement('div')
-		mainArea.style.flex = '1'
-		mainArea.style.position = 'relative'
-		mainArea.style.display = 'flex'
-		mainArea.style.flexDirection = 'column'
+		mainArea.style.flex = '1'; mainArea.style.position = 'relative'; mainArea.style.display = 'flex'; mainArea.style.flexDirection = 'column'
 
 		const toolbar = document.createElement('div')
 		toolbar.className = 'mv-toolbar'
 		toolbar.innerHTML = `
-			<button type="button" class="mv-btn" id="px-add">Add Fixture</button>
-			<label class="mv-chk"><input type="checkbox" id="px-enabled" ${dmxState.enabled ? 'checked' : ''}> DMX on</label>
-			<label class="mv-chk" title="Log [DMX] lines to HighAsCG server log (header)."><input type="checkbox" id="px-debug-log" ${dmxState.debugLogDmx ? 'checked' : ''}> Log DMX</label>
-			<span id="px-pgm-label" style="margin-left:auto; font-size: 11px; opacity: 0.6;"></span>
+			<div style="display:flex; align-items:center; gap:12px; width:100%">
+				<span id="px-node-label" style="font-weight:bold; font-size:12px">Pixel Mapping</span>
+				<span id="px-pgm-label" style="font-size: 11px; opacity: 0.6;"></span>
+				<div style="margin-left:auto; display:flex; gap:8px">
+					<button type="button" class="mv-btn" id="px-delete" style="display:none; background:rgba(255,68,68,0.2)">Delete</button>
+					<button type="button" class="mv-btn" id="px-close">Close Editor</button>
+				</div>
+			</div>
 		`
 		mainArea.appendChild(toolbar)
 
 		wrap = document.createElement('div')
 		wrap.className = 'mv-canvas-wrap'
-		wrap.style.flex = '1'
-		wrap.style.position = 'relative'
-		wrap.style.backgroundColor = '#000'
+		wrap.style.flex = '1'; wrap.style.position = 'relative'; wrap.style.backgroundColor = '#000'
 		
 		const videoContainer = document.createElement('div')
 		videoContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;'
@@ -226,15 +183,17 @@ export function initPixelMapEditor(root, stateStore) {
 		wrap.appendChild(canvas)
 		mainArea.appendChild(wrap)
 		editor.appendChild(mainArea)
-
 		root.appendChild(editor)
 
-		syncCanvasAndToolbar()
-		stateStore.on('*', (path) => {
-			if (path === null || path === 'channelMap') syncCanvasAndToolbar()
-		})
-		dashboardState.on('change', syncCanvasAndToolbar)
-		dashboardState.on('screenChange', syncCanvasAndToolbar)
+		const updateLabels = () => {
+			const nodeLabel = root.querySelector('#px-node-label')
+			const pgmLabel = root.querySelector('#px-pgm-label')
+			if (nodeLabel) nodeLabel.textContent = mappingState.activeNode?.label || 'Pixel Mapping'
+			if (pgmLabel) pgmLabel.textContent = `${mappingState.canvasWidth}×${mappingState.canvasHeight}`
+		}
+		
+		mappingState.on('change', () => { updateLabels(); fitInContainer(); draw() })
+		updateLabels()
 
 		let liveView = null
 		function updateLiveView() {
@@ -245,47 +204,48 @@ export function initPixelMapEditor(root, stateStore) {
 			}
 			draw()
 		}
-
-		streamState.subscribe(updateLiveView)
-		updateLiveView()
+		streamState.subscribe(updateLiveView); updateLiveView()
 
 		ctx = canvas.getContext('2d')
 		fitInContainer()
-
 		new ResizeObserver(() => { fitInContainer(); draw() }).observe(wrap)
 
-		// Toolbar events
-		root.querySelector('#px-add').addEventListener('click', () => {
-			const f = dmxState.addFixture({ x: 100, y: 100, w: 100, h: 100 })
-			dmxState.setSelectedFixtureId(f.id)
-			draw()
-		})
-		root.querySelector('#px-enabled').addEventListener('change', (e) => {
-			dmxState.setEnabled(e.target.checked)
-		})
-		root.querySelector('#px-debug-log').addEventListener('change', (e) => {
-			dmxState.setDebugLogDmx(e.target.checked)
-		})
+		// Events
+		root.querySelector('#px-close').onclick = () => {
+			window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: false } }))
+			document.querySelector('.tab[data-tab="device-view"]')?.click()
+		}
+		
+		const delBtn = root.querySelector('#px-delete')
+		delBtn.onclick = () => {
+			if (selectedId) {
+				mappingState.removeMapping(selectedId)
+				selectedId = null
+				delBtn.style.display = 'none'
+				draw()
+			}
+		}
 
-		// Canvas interaction
 		canvas.addEventListener('mousedown', (e) => {
 			const rect = canvas.getBoundingClientRect()
 			const { x, y } = toCanvas(e.clientX - rect.left, e.clientY - rect.top)
-			const f = getFixtureAt(x, y)
-			if (f) {
-				dmxState.setSelectedFixtureId(f.id)
-				if (f._handle === 'rotate') {
+			const item = getItemAt(x, y)
+			if (item) {
+				selectedId = item.id
+				delBtn.style.display = ''
+				if (item._handle === 'rotate') {
 					dragMode = 'rotate'
-					const angle = (f.rotation || 0) * (Math.PI / 180)
-					const dx = x - (f.sample.x + f.sample.w/2)
-					const dy = y - (f.sample.y + f.sample.h/2)
+					const angle = (item.rotation || 0) * (Math.PI / 180)
+					const dx = x - (item.rect.x + item.rect.w/2)
+					const dy = y - (item.rect.y + item.rect.h/2)
 					dragStart = { angle: Math.atan2(dy, dx) - angle }
 				} else {
 					dragMode = 'move'
-					dragStart = { x, y, fixture: JSON.parse(JSON.stringify(f)) }
+					dragStart = { x, y, rect: { ...item.rect } }
 				}
 			} else {
-				dmxState.setSelectedFixtureId(null)
+				selectedId = null
+				delBtn.style.display = 'none'
 			}
 			draw()
 		})
@@ -294,46 +254,57 @@ export function initPixelMapEditor(root, stateStore) {
 			if (!dragMode) return
 			const rect = canvas.getBoundingClientRect()
 			const { x, y } = toCanvas(e.clientX - rect.left, e.clientY - rect.top)
-			const f = dmxState.getFixture(dmxState.selectedFixtureId)
-			if (!f) return
-
 			if (dragMode === 'move') {
 				const dx = x - dragStart.x
 				const dy = y - dragStart.y
-				dmxState.updateFixture(f.id, {
-					sample: {
-						x: Math.round(dragStart.fixture.sample.x + dx),
-						y: Math.round(dragStart.fixture.sample.y + dy)
-					}
+				mappingState.updateMapping(selectedId, {
+					rect: { x: Math.round(dragStart.rect.x + dx), y: Math.round(dragStart.rect.y + dy) }
 				})
 			} else if (dragMode === 'rotate') {
-				const dx = x - (f.sample.x + f.sample.w/2)
-				const dy = y - (f.sample.y + f.sample.h/2)
+				const m = mappingState.mappings.find(i => i.id === selectedId)
+				const dx = x - (m.rect.x + m.rect.w/2)
+				const dy = y - (m.rect.y + m.rect.h/2)
 				let angle = Math.atan2(dy, dx) - dragStart.angle
-				let deg = Math.round(angle * (180 / Math.PI))
-				dmxState.updateFixture(f.id, { rotation: deg })
+				mappingState.updateMapping(selectedId, { rotation: Math.round(angle * (180 / Math.PI)) })
 			}
 			draw()
 		})
 
 		canvas.addEventListener('mouseup', () => { dragMode = null; draw() })
 
-		window.addEventListener('dmx-redraw', draw)
-
-		function syncToolbarCheckboxes() {
-			const en = root.querySelector('#px-enabled')
-			const dbg = root.querySelector('#px-debug-log')
-			if (en) en.checked = !!dmxState.enabled
-			if (dbg) dbg.checked = !!dmxState.debugLogDmx
-		}
-
-		dmxState.on('change', () => {
-			syncToolbarCheckboxes()
-			fitInContainer()
-			draw()
+		// Drag & Drop templates
+		canvas.addEventListener('dragover', (e) => {
+			if (e.dataTransfer.types.includes('application/x-highascg-mapping-template')) {
+				e.preventDefault()
+			}
 		})
-		dmxState.on('live-colors', draw)
-		draw()
+
+		canvas.addEventListener('drop', (e) => {
+			e.preventDefault()
+			const raw = e.dataTransfer.getData('application/x-highascg-mapping-template')
+			if (!raw) return
+			try {
+				const template = JSON.parse(raw)
+				const rect = canvas.getBoundingClientRect()
+				const { x, y } = toCanvas(e.clientX - rect.left, e.clientY - rect.top)
+				// Center the dropped template on mouse
+				const mapping = mappingState.addMappingFromTemplate(template, { 
+					x: Math.round(x - (template.width || 200) / 2), 
+					y: Math.round(y - (template.height || 200) / 2) 
+				})
+				selectedId = mapping.id
+				delBtn.style.display = ''
+				draw()
+			} catch (err) { console.error('Mapping drop failed:', err) }
+		})
+
+		window.addEventListener('highascg-mapping-browser-visibility', (ev) => {
+			if (ev.detail?.visible && ev.detail?.nodeId) {
+				api.get('/api/device-view').then(payload => {
+					mappingState.setActiveNode(ev.detail.nodeId, payload)
+				})
+			}
+		})
 	}
 
 	render()

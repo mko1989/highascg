@@ -34,6 +34,13 @@ export function createHeaderAudioMonitor(stateStore) {
 	channelList.className = 'header-audio__channels'
 	dropdown.appendChild(channelList)
 
+	const serverMonitorList = document.createElement('div')
+	serverMonitorList.className = 'header-audio__channels'
+	serverMonitorList.style.borderTop = '1px solid rgba(255,255,255,0.1)'
+	serverMonitorList.style.marginTop = '4px'
+	serverMonitorList.style.paddingTop = '4px'
+	dropdown.appendChild(serverMonitorList)
+
 	const muteRow = document.createElement('label')
 	muteRow.className = 'header-audio__mute'
 	const muteCb = document.createElement('input')
@@ -93,7 +100,42 @@ export function createHeaderAudioMonitor(stateStore) {
 	function setDropdownOpen(open) {
 		dropdown.hidden = !open
 		audioToggle.setAttribute('aria-expanded', open ? 'true' : 'false')
-		if (open) renderChannelMenu()
+		if (open) {
+			renderChannelMenu()
+			renderServerMonitorMenu()
+		}
+	}
+
+	async function renderServerMonitorMenu() {
+		const state = stateStore?.getState?.() || {}
+		const cm = state.channelMap || {}
+		if (!cm.monitorCh) {
+			serverMonitorList.style.display = 'none'
+			return
+		}
+		serverMonitorList.style.display = ''
+		serverMonitorList.innerHTML = '<p class="header-audio__title" style="padding: 4px 8px; font-size: 10px; opacity: 0.5">Server Hardware Monitor</p>'
+		const opts = getMonitorChannelOptions()
+		for (const o of opts) {
+			const b = document.createElement('button')
+			b.type = 'button'
+			b.className = 'header-audio__channel'
+			b.textContent = o.label
+			// Check if this is the active source (requires state tracking or AMCP poll)
+			// For now, we just set it
+			b.addEventListener('click', async (e) => {
+				e.stopPropagation()
+				try {
+					await fetch('/api/audio/monitor-source', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ source: o.id })
+					})
+				} catch (err) { console.error('Monitor source failed', err) }
+				setDropdownOpen(false)
+			})
+			serverMonitorList.appendChild(b)
+		}
 	}
 
 	audioToggle.addEventListener('click', (e) => {

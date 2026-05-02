@@ -2,29 +2,11 @@
 <!--
   HighAsCG — LED wall grid test pattern (CasparCG HTML template)
 
-  Store this file and both_open.svg / left_closed.svg / right_closed.svg in the **same folder** on the
-  server — Caspar’s **template-path** (not media-path), so they are not listed as media (CLS).
-  Typical layout: `/opt/casparcg/template/` or the path in casparcg.config `<paths><template-path>…</template-path>`.
-  In highascg.config.json set **local_template_path** to that absolute folder; HighAsCG copies these on connect.
+  Modes:
+  • **Screens** (default on startup): logo + title, then resolution + LAN IPs (larger type), optional circle + cross.
+  • **Full grid**: columns × rows panels (Web UI “Full LED grid” per channel).
 
-  Center graphic: full HighAsCG **character** (artwork in both_open.svg / left_closed.svg /
-  right_closed.svg next to this file — not the small header status-eye sprites). Blink **timing**
-  matches the connection indicator (left → right → open); the **art** is separate.
-
-  Pass JSON via CG UPDATE (same string rules as multiview_overlay.html):
-
-  {
-    "cols": 20,
-    "rows": 10,
-    "panelWidth": 192,
-    "panelHeight": 108,
-    "centerLabel": "HighAsCG",
-    "showCenterCharacter": true,
-    "showPanelLabels": true,
-    "showSpecLine": true
-  }
-
-  • showCenterCharacter — hide center character + caption when false (default true)
+  Pass JSON via CG UPDATE (same string rules as multiview_overlay.html).
 -->
 <html lang="en">
 <head>
@@ -48,6 +30,118 @@
 			gap: 0;
 			background: #0a0a0f;
 		}
+		#screensMode {
+			display: none;
+			position: absolute;
+			inset: 0;
+			z-index: 4;
+			background: transparent;
+			overflow: hidden;
+		}
+		#patternLayer {
+			position: absolute;
+			inset: 0;
+			z-index: 0;
+			background: #0a0a0f;
+		}
+		@keyframes bounceX { from { left: 0; } to { left: calc(100% - var(--bounce-size, 250px)); } }
+		@keyframes bounceY { from { top: 0; } to { top: calc(100% - var(--bounce-size, 250px)); } }
+		.bouncing-character {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: var(--bounce-size, 250px);
+			height: var(--bounce-size, 250px);
+			animation: bounceX 3.7s infinite alternate linear, bounceY 2.9s infinite alternate linear;
+		}
+		.bouncing-character__img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			filter: drop-shadow(0 0 20px rgba(0,0,0,0.6));
+		}
+		.root--transparent-panels .panel {
+			background: rgba(0,0,0,0.15) !important;
+			border-color: rgba(255,255,255,0.2) !important;
+		}
+		#screensMode.screens-mode--on { display: block; }
+		/* Grid + overlay: panels below; circle/cross + resolution strip stay visible */
+		#screensMode.screens-mode--grid-overlay {
+			background: transparent;
+			pointer-events: none;
+		}
+		#screensMode.screens-mode--grid-overlay .brand-stack { z-index: 20; }
+		.startup-pattern-cross {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			opacity: 0.22;
+			z-index: 8;
+		}
+		.startup-pattern-cross__svg {
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+		/* Corner-to-corner diagonals; stroke stays ~constant px on non-square canvases */
+		.startup-pattern-cross__line {
+			stroke: rgba(180, 200, 255, 0.52);
+			stroke-width: 3px;
+			vector-effect: non-scaling-stroke;
+			fill: none;
+			shape-rendering: geometricPrecision;
+		}
+		/* Perfect circle touching top and bottom of the frame (diameter = viewport height on wide canvases) */
+		.startup-pattern-circle {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			width: auto;
+			height: 100%;
+			max-height: 100%;
+			max-width: 100%;
+			aspect-ratio: 1;
+			border: 3px solid rgba(160, 190, 255, 0.38);
+			border-radius: 50%;
+			pointer-events: none;
+			z-index: 7;
+			box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+			box-sizing: border-box;
+		}
+		.brand-stack {
+			position: absolute;
+			left: 50%;
+			top: 7%;
+			transform: translateX(-50%);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			text-align: center;
+			z-index: 10;
+			max-width: 96vw;
+			pointer-events: none;
+		}
+		.brand-title {
+			margin-top: 0.35rem;
+			font-size: clamp(0.75rem, 1.85vw, 1.05rem);
+			font-weight: 600;
+			letter-spacing: 0.1em;
+			color: rgba(230, 236, 255, 0.92);
+			text-shadow: 0 0 18px rgba(100, 160, 255, 0.2), 0 2px 10px rgba(0,0,0,0.75);
+		}
+		.brand-meta {
+			margin-top: 0.85rem;
+			font-size: clamp(1.05rem, 3.4vw, 2.35rem);
+			font-weight: 700;
+			line-height: 1.28;
+			letter-spacing: 0.02em;
+			color: rgba(248, 250, 255, 0.97);
+			text-shadow: 0 2px 16px rgba(0,0,0,0.85), 0 0 28px rgba(80, 140, 255, 0.25);
+		}
+		.brand-meta__line { display: block; }
+		.brand-meta__line--ips { margin-top: 0.35em; font-weight: 650; opacity: 0.98; }
 		.panel {
 			position: relative;
 			border: 2px solid #2d3140;
@@ -77,7 +171,6 @@
 				linear-gradient(to right, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%),
 				linear-gradient(to bottom, transparent 49.5%, #445 49.5%, #445 50.5%, transparent 50.5%);
 		}
-		/* Character + caption only — no dimmed box over the grid (keeps test pattern clean). */
 		#center {
 			position: absolute;
 			left: 50%;
@@ -134,10 +227,61 @@
 			pointer-events: none;
 			z-index: 5;
 		}
+		
+		@keyframes spinRadar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+		.radar-sweep {
+			position: absolute;
+			top: -50%; left: -50%; width: 200%; height: 200%;
+			background: conic-gradient(from 0deg, transparent 70%, rgba(0, 255, 0, 0.1) 90%, rgba(0, 255, 0, 0.8) 100%);
+			animation: spinRadar 2s linear infinite;
+		}
+		.radar-grid {
+			position: absolute;
+			inset: 0;
+			background: 
+				linear-gradient(rgba(0, 255, 0, 0.2) 1px, transparent 1px) 0 0 / 50px 50px,
+				linear-gradient(90deg, rgba(0, 255, 0, 0.2) 1px, transparent 1px) 0 0 / 50px 50px;
+		}
+		@keyframes scrollStripes { from { background-position: 0 0; } to { background-position: 100px 100px; } }
+		.animated-stripes {
+			position: absolute; inset: 0;
+			background: repeating-linear-gradient(45deg, #000 0, #000 25px, #fff 25px, #fff 50px);
+			animation: scrollStripes 1s linear infinite;
+		}
+		@keyframes pulseCircles { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+		.pulse-circle {
+			position: absolute; top: 50%; left: 50%; width: 100px; height: 100px;
+			margin-top: -50px; margin-left: -50px; border: 5px solid #0ff; border-radius: 50%;
+			animation: pulseCircles 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+		}
+		@keyframes noiseScroll { 0% { background-position: 0 0; } 100% { background-position: 100px 100px; } }
+		.animated-noise {
+			position: absolute; inset: 0;
+			background: url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+			animation: noiseScroll 0.1s steps(2) infinite;
+			opacity: 0.6;
+		}
 	</style>
 </head>
 <body>
+	<div id="patternLayer"></div>
 	<div id="root"></div>
+	<div id="screensMode">
+		<div id="patternCross" class="startup-pattern-cross" style="display:none;" aria-hidden="true">
+			<svg class="startup-pattern-cross__svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+				<line class="startup-pattern-cross__line" x1="0" y1="0" x2="100" y2="100" />
+				<line class="startup-pattern-cross__line" x1="100" y1="0" x2="0" y2="100" />
+			</svg>
+		</div>
+		<div id="patternCircle" class="startup-pattern-circle"></div>
+		<div class="brand-stack">
+			<div id="ledTestEyeScreens" class="led-test-eye" role="img" aria-label="HighAsCG">
+				<img id="ledTestEyeImgScreens" class="led-test-eye__img" alt="" decoding="async" />
+			</div>
+			<p id="brandTitle" class="brand-title"></p>
+			<div id="brandMeta" class="brand-meta"></div>
+		</div>
+	</div>
 	<div id="center">
 		<div id="ledTestEye" class="led-test-eye" role="img" aria-label="HighAsCG">
 			<img id="ledTestEyeImg" class="led-test-eye__img" alt="" decoding="async" />
@@ -149,19 +293,11 @@
 		window.play = function () {}
 		window.stop = function () {}
 
-		/** Blink phase/interval timing matches web/components/connection-eye.js (artwork differs). */
 		var BLINK_PHASE_MS = 250
 		var BLINK_INTERVAL_MS = 30000
-		/** Resolve next to this HTML file — bare filenames often 404 in Caspar CEF */
 		function ledTestAssetUrl(filename) {
-			try {
-				var base = window.location.href || ''
-				var i = base.lastIndexOf('/')
-				var dir = i >= 0 ? base.slice(0, i + 1) : base
-				return new URL(filename, dir).href
-			} catch (e) {
-				return filename
-			}
+			// Keep test assets side-by-side with this template.
+			return './' + String(filename || '').replace(/^\.\//, '')
 		}
 		var blinkInterval = null
 
@@ -188,18 +324,18 @@
 			}
 		}
 
-		function startEyeBlink() {
+		function startEyeBlink(imgId, wrapId) {
 			stopEyeBlink()
-			var eyeWrap = document.getElementById('ledTestEye')
-			var img = document.getElementById('ledTestEyeImg')
+			var eyeWrap = document.getElementById(wrapId || 'ledTestEye')
+			var img = document.getElementById(imgId || 'ledTestEyeImg')
 			if (!eyeWrap || !img) return
 
 			function resolveSrc() {
 				var blinkL = eyeWrap.classList.contains('blink-l')
 				var blinkR = eyeWrap.classList.contains('blink-r')
-				if (blinkL) return ledTestAssetUrl('left_closed.svg')
-				if (blinkR) return ledTestAssetUrl('right_closed.svg')
-				return ledTestAssetUrl('both_open.svg')
+				if (blinkL) return ledTestAssetUrl('ch_left_closed_green.svg')
+				if (blinkR) return ledTestAssetUrl('ch_right_closed_green.svg')
+				return ledTestAssetUrl('ch_both_open_green.svg')
 			}
 
 			function updateImgSrc() {
@@ -244,7 +380,92 @@
 			return true
 		}
 
-		function build(data) {
+		/** mode: 'screens' (solid bg + optional eye) | 'grid-overlay' (transparent; resolution + patterns only) */
+		function fillBrandMetaAndPatterns(data, mode) {
+			var showCross = data.showCross !== false && data.showCross !== 'false'
+			var showCircle = data.showCircle !== false && data.showCircle !== 'false'
+			document.getElementById('patternCross').style.display = showCross ? '' : 'none'
+			document.getElementById('patternCircle').style.display = showCircle ? '' : 'none'
+
+			var title = data.centerLabel != null ? String(data.centerLabel) : 'HighAsCG'
+			document.getElementById('brandTitle').textContent = title
+
+			var meta = document.getElementById('brandMeta')
+			meta.innerHTML = ''
+			var resText = data.resolutionLabel != null && String(data.resolutionLabel).trim()
+				? String(data.resolutionLabel).trim()
+				: ''
+			if (!resText && data.resolutionWidth > 0 && data.resolutionHeight > 0) {
+				resText = data.resolutionWidth + '×' + data.resolutionHeight
+				if (data.videoMode) resText += ' · ' + data.videoMode
+			}
+			if (resText) {
+				var lr = document.createElement('span')
+				lr.className = 'brand-meta__line'
+				lr.textContent = resText
+				meta.appendChild(lr)
+			}
+			var connText = data.connectorLabel != null ? String(data.connectorLabel).trim() : ''
+			if (connText) {
+				var lc = document.createElement('span')
+				lc.className = 'brand-meta__line'
+				lc.textContent = 'Output: ' + connText
+				meta.appendChild(lc)
+			}
+			var lines = data.ipLines
+			if (typeof lines === 'string') {
+				try { lines = JSON.parse(lines) } catch (e) { lines = [lines] }
+			}
+			if (!Array.isArray(lines)) lines = []
+			if (lines.length > 0) {
+				var lip = document.createElement('span')
+				lip.className = 'brand-meta__line brand-meta__line--ips'
+				lip.textContent = lines.join('  ·  ')
+				meta.appendChild(lip)
+			} else if (!resText) {
+				var lip2 = document.createElement('span')
+				lip2.className = 'brand-meta__line brand-meta__line--ips'
+				lip2.textContent = '—'
+				meta.appendChild(lip2)
+			}
+
+			var eyeWrap = document.getElementById('ledTestEyeScreens')
+			if (mode === 'screens' && showCenterWanted(data)) {
+				eyeWrap.style.display = ''
+				var imgScr = document.getElementById('ledTestEyeImgScreens')
+				var fb = document.querySelector('#ledTestEyeScreens .led-test-eye__fallback')
+				if (fb) fb.remove()
+				if (imgScr) {
+					imgScr.style.display = ''
+					imgScr.alt = ''
+				}
+				startEyeBlink('ledTestEyeImgScreens', 'ledTestEyeScreens')
+			} else {
+				eyeWrap.style.display = 'none'
+				stopEyeBlink()
+			}
+		}
+
+		function buildScreensMode(data) {
+			var sm = document.getElementById('screensMode')
+			var root = document.getElementById('root')
+			var center = document.getElementById('center')
+			var spec = document.getElementById('spec')
+			root.style.display = 'none'
+			center.style.display = 'none'
+			spec.style.display = 'none'
+			sm.classList.add('screens-mode--on')
+			sm.classList.remove('screens-mode--grid-overlay')
+			sm.style.background = ''
+			fillBrandMetaAndPatterns(data, 'screens')
+		}
+
+		function buildGridMode(data) {
+			var sm = document.getElementById('screensMode')
+			sm.classList.add('screens-mode--on', 'screens-mode--grid-overlay')
+			fillBrandMetaAndPatterns(data, 'grid-overlay')
+			document.getElementById('root').style.display = ''
+
 			var cols = Math.max(1, parseInt(data.cols, 10) || 4)
 			var rows = Math.max(1, parseInt(data.rows, 10) || 3)
 			var pw = Math.max(0, parseInt(data.panelWidth, 10) || 0)
@@ -291,7 +512,7 @@
 					img.style.display = ''
 					img.alt = ''
 				}
-				startEyeBlink()
+				startEyeBlink('ledTestEyeImg', 'ledTestEye')
 			} else {
 				center.style.display = 'none'
 				stopEyeBlink()
@@ -311,6 +532,115 @@
 			}
 		}
 
+		function resetPatternLayer(layer) {
+			layer.style.background = '#0a0a0f'
+			layer.innerHTML = ''
+		}
+
+		function setPatternBackground(layer, bg) {
+			layer.style.background = bg
+		}
+
+		function renderBouncingCharacter(layer) {
+			setPatternBackground(layer, '#000')
+			var node = document.createElement('div')
+			node.className = 'bouncing-character'
+			node.style.setProperty('--bounce-size', '250px')
+			var img = document.createElement('img')
+			img.className = 'bouncing-character__img'
+			var bounceAssets = [
+				'ch_both_open_green.svg',
+				'ch_left_closed_green.svg',
+				'ch_right_closed_green.svg',
+				'ch_both_open_red.svg',
+				'ch_left_closed_red.svg',
+				'ch_right_closed_red.svg'
+			]
+			var curIdx = 0
+			img.src = ledTestAssetUrl(bounceAssets[curIdx])
+			node.addEventListener('animationiteration', function () {
+				var nextIdx = curIdx
+				while (nextIdx === curIdx) nextIdx = Math.floor(Math.random() * bounceAssets.length)
+				curIdx = nextIdx
+				img.src = ledTestAssetUrl(bounceAssets[curIdx])
+			})
+			node.appendChild(img)
+			layer.appendChild(node)
+		}
+
+		function applyPattern(data) {
+			var pat = data.pattern || 'grid-white'
+			var layer = document.getElementById('patternLayer')
+			resetPatternLayer(layer)
+
+			if (pat === 'smpte-bars') {
+				setPatternBackground(layer, '#000')
+				layer.innerHTML = '<div style="display:flex; flex-direction:column; height:100%; width:100%;">' +
+					'<div style="flex: 0 0 67%; display:flex;">' +
+						'<div style="flex:1; background:#c0c0c0"></div><div style="flex:1; background:#c0c000"></div><div style="flex:1; background:#00c0c0"></div><div style="flex:1; background:#00c000"></div><div style="flex:1; background:#c000c0"></div><div style="flex:1; background:#c00000"></div><div style="flex:1; background:#0000c0"></div>' +
+					'</div>' +
+					'<div style="flex: 0 0 8%; display:flex;">' +
+						'<div style="flex:1; background:#0000c0"></div><div style="flex:1; background:#101010"></div><div style="flex:1; background:#c000c0"></div><div style="flex:1; background:#101010"></div><div style="flex:1; background:#00c0c0"></div><div style="flex:1; background:#101010"></div><div style="flex:1; background:#c0c0c0"></div>' +
+					'</div>' +
+					'<div style="flex: 0 0 25%; display:flex;">' +
+						'<div style="flex:1; background:#00214c"></div><div style="flex:1; background:#ffffff"></div><div style="flex:1; background:#32006a"></div><div style="flex:1; background:#101010"></div><div style="flex:1; background:#101010"></div>' +
+						'<div style="flex:1; display:flex;">' +
+							'<div style="flex:1; background:#101010"></div><div style="flex:1; background:#000000"></div><div style="flex:1; background:#101010"></div><div style="flex:1; background:#202020"></div><div style="flex:1; background:#101010"></div>' +
+						'</div>' +
+						'<div style="flex:1; background:#101010"></div>' +
+					'</div>' +
+				'</div>'
+			} else if (pat === 'gradient-h') {
+				setPatternBackground(layer, 'linear-gradient(to right, #000, #fff)')
+			} else if (pat === 'gradient-v') {
+				setPatternBackground(layer, 'linear-gradient(to bottom, #000, #fff)')
+			} else if (pat === 'checkerboard') {
+				setPatternBackground(layer, 'conic-gradient(#fff 90deg, #000 90deg 180deg, #fff 180deg 270deg, #000 270deg) 0 0 / 100px 100px')
+			} else if (pat === 'solid-red') {
+				setPatternBackground(layer, '#f00')
+			} else if (pat === 'solid-green') {
+				setPatternBackground(layer, '#0f0')
+			} else if (pat === 'solid-blue') {
+				setPatternBackground(layer, '#00f')
+			} else if (pat === 'solid-white') {
+				setPatternBackground(layer, '#fff')
+			} else if (pat === 'solid-black') {
+				setPatternBackground(layer, '#000')
+			} else if (pat === 'animated-radar') {
+				setPatternBackground(layer, '#001a00')
+				layer.innerHTML = '<div class="radar-grid"></div><div class="radar-sweep"></div>'
+			} else if (pat === 'animated-stripes') {
+				setPatternBackground(layer, '#000')
+				layer.innerHTML = '<div class="animated-stripes"></div>'
+			} else if (pat === 'animated-pulse') {
+				setPatternBackground(layer, '#000')
+				layer.innerHTML = '<div class="pulse-circle"></div><div class="pulse-circle" style="animation-delay: -1s"></div>'
+			} else if (pat === 'animated-noise') {
+				setPatternBackground(layer, '#000')
+				layer.innerHTML = '<div class="animated-noise"></div>'
+			} else if (pat === 'bouncing-element') {
+				renderBouncingCharacter(layer)
+			}
+
+			var root = document.getElementById('root')
+			if (pat !== 'grid-white') {
+				root.classList.add('root--transparent-panels')
+			} else {
+				root.classList.remove('root--transparent-panels')
+			}
+		}
+
+		function build(data) {
+			if (!data) data = {}
+			applyPattern(data)
+			var ledGrid = data.showLedGrid === true
+			if (ledGrid) {
+				buildGridMode(data)
+			} else {
+				buildScreensMode(data)
+			}
+		}
+
 		function update(raw) {
 			var data = parsePayload(raw)
 			if (!data) data = {}
@@ -318,7 +648,14 @@
 		}
 
 		window.update = update
-		build({ cols: 4, rows: 3, panelWidth: 192, panelHeight: 108, centerLabel: 'HighAsCG' })
+		build({
+			showLedGrid: false,
+			showCircle: true,
+			showCross: true,
+			resolutionLabel: '—',
+			ipLines: [],
+			centerLabel: 'HighAsCG'
+		})
 	</script>
 </body>
 </html>

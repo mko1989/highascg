@@ -59,7 +59,15 @@ function getLanIPv4Addresses() {
 
 /**
  * @param {string} requestPath
- * @param {{ webDir: string, templatesDir?: string }} dirs
+ * @param {{
+ *   webDir: string,
+ *   templatesDir?: string,
+ *   vendorDirs?: Record<string, string>,
+ * }} dirs
+ *   `vendorDirs` is a map from URL mount prefix (e.g. `/vendor/three/`) to an on-disk
+ *   directory (e.g. `<repo>/node_modules/three`). Used to expose npm-installed ESM
+ *   bundles to the browser without an importmap — see WO-17 previs module for usage.
+ *   Mounts with no underlying install (e.g. `three` not installed) simply 404.
  */
 async function serveWebApp(requestPath, dirs) {
 	let filePath = mapInstanceStaticPath(requestPath || '/')
@@ -76,6 +84,31 @@ async function serveWebApp(requestPath, dirs) {
 			return { status: 200, headers: { 'Content-Type': MIME[ext] || 'text/html' }, body }
 		} catch {
 			return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
+		}
+	}
+	if (dirs.vendorDirs) {
+		for (const prefix of Object.keys(dirs.vendorDirs)) {
+			if (!filePath.startsWith(prefix)) continue
+			const rel = filePath.slice(prefix.length).replace(/^\/+/, '')
+			if (!rel) return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
+			const root = dirs.vendorDirs[prefix]
+			const resolved = path.resolve(root, rel)
+			// Refuse to serve outside the vendor root (defence in depth — `..` is already caught above).
+			if (!resolved.startsWith(path.resolve(root) + path.sep)) {
+				return { status: 403, headers: { 'Content-Type': 'text/plain' }, body: 'Forbidden' }
+			}
+			try {
+				const ext = path.extname(resolved)
+				const contentType = MIME[ext] || 'application/octet-stream'
+				if (BINARY_EXT.has(ext)) {
+					const body = await fs.promises.readFile(resolved)
+					return { status: 200, headers: { 'Content-Type': contentType }, body }
+				}
+				const body = await fs.promises.readFile(resolved, 'utf8')
+				return { status: 200, headers: { 'Content-Type': contentType }, body }
+			} catch {
+				return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
+			}
 		}
 	}
 	const relPath = filePath.replace(/^\/+/, '') || 'index.html'
@@ -128,6 +161,7 @@ async function defaultRouteApi(method, reqPath, body, _req) {
  *   bindAddress?: string,
  *   webDir: string,
  *   templatesDir?: string,
+ *   vendorDirs?: Record<string, string>,
  *   routeApi?: (method: string, path: string, body: string, req: import('http').IncomingMessage) => Promise<{ status?: number, headers?: Record<string, string>, body?: string | Buffer, stream?: import('fs').ReadStream }>,
  *   log?: (msg: string) => void,
  * }} options
@@ -139,6 +173,7 @@ function startHttpServer(options) {
 		bindAddress = '0.0.0.0',
 		webDir,
 		templatesDir,
+		vendorDirs,
 		routeApi = defaultRouteApi,
 		log = (m) => console.log(m),
 	} = options
@@ -153,8 +188,13 @@ function startHttpServer(options) {
 			const rawPath = ((req.url || '').split('#')[0] || '/')
 			const reqPath = rawPath.split('?')[0]
 			const isIngestUpload = reqPath.endsWith('/api/ingest/upload')
+			// Skip body consumption on any multipart request so downstream handlers (busboy)
+			// can own the raw stream. Previously only `/api/ingest/upload` was exempt, which
+			// broke module routes like `/api/previs/models` that also upload binaries.
+			const contentType = String(req.headers['content-type'] || '').toLowerCase()
+			const isMultipart = contentType.startsWith('multipart/')
 			let body = ''
-			if (!isIngestUpload) {
+			if (!isIngestUpload && !isMultipart) {
 				for await (const chunk of req) body += chunk
 			}
 
@@ -168,7 +208,7 @@ function startHttpServer(options) {
 				// Pass path including ?query so router can parse query params (e.g. go2rtc webrtc ?src=)
 				result = await routeApi(req.method || 'GET', rawPath, body, req)
 			} else {
-				result = await serveWebApp(reqPath, { webDir, templatesDir })
+				result = await serveWebApp(reqPath, { webDir, templatesDir, vendorDirs })
 			}
 			const headers = mergeCors(result.headers)
 			res.writeHead(result.status ?? 200, headers)

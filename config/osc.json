@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "listenPort": 6251,
+  "listenAddress": "0.0.0.0",
+  "peakHoldMs": 2000,
+  "emitIntervalMs": 50,
+  "staleTimeoutMs": 5000,
+  "wsDeltaBroadcast": false
+}

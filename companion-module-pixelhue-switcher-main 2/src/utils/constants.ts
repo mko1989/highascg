@@ -1,0 +1,12 @@
+export const PRESET_CATEGORY = {
+	SCREENS: 'Screens',
+	PRESETS: 'Presets',
+	LAYERS: 'Layers',
+	GLOBAL: 'Presets',
+	CONTROL: 'Control',
+	PREVIEW: 'Presets in Preview',
+	PROGRAM: 'Presets in Program',
+	PROGRAM_AUTO: 'Presets in Program (Auto-Take)',
+	DISPLAY: 'Display',
+	BACKUP: 'Input Backups',
+} as const

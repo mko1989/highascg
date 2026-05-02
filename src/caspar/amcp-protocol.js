@@ -1,5 +1,7 @@
 'use strict'
 
+const { amcpVerboseTrace } = require('./amcp-utils')
+
 /** @see companion-module-casparcg-server/src/tcp.js */
 const ACMP_STATE = { NEXT: 0, SINGLE_LINE: 1, MULTI_LINE: 2 }
 
@@ -33,7 +35,7 @@ const RETCODE2TYPE = swapObj(RETCODE)
  * @property {import('./tcp-client').TcpClient} [socket]
  * @property {Record<string, Array<((err: Error|null, line?: string) => void) | ((line: string) => void) | ((lines: string[]) => void)>>} response_callback
  * @property {string|undefined} [_pendingResponseKey]
- * @property {{ onLine: (line: string) => void } | null | undefined} [_amcpBatchDrain]
+ * @property {{ onLine: (line: string) => void, rejectBatch?: (err: Error) => void } | null | undefined} [_amcpBatchDrain]
  * @property {Promise<void>} [_amcpSendQueue]
  * @property {(() => void) | undefined} [_resetAmcpProtocol]
  * @property {(() => void) | undefined} [runCommandQueue]
@@ -71,10 +73,28 @@ class AmcpProtocol {
 	}
 
 	/**
-	 * AMCP response keywords whose status lines are too high-frequency to be useful in the log.
-	 * Must stay in sync with {@link AmcpClient.QUIET_CMDS}.
+	 * AMCP response status tokens (2nd word on `202 …`) suppressed at debug unless {@link amcpVerboseTrace}.
+	 * Align with {@link AmcpClient.QUIET_CMDS} for common hot paths.
 	 */
-	static QUIET_RESP = new Set(['CLS', 'TLS', 'THUMBNAIL', 'VERSION', 'DIAG'])
+	static QUIET_RESP = new Set([
+		'CLS',
+		'TLS',
+		'THUMBNAIL',
+		'VERSION',
+		'DIAG',
+		'MIXER',
+		'CG',
+		'PLAY',
+		'LOADBG',
+		'LOAD',
+		'STOP',
+		'CLEAR',
+		'PAUSE',
+		'RESUME',
+		'SWAP',
+		'ADD',
+		'REMOVE',
+	])
 
 	/**
 	 * @param {string} line - One AMCP line without trailing CRLF
@@ -100,7 +120,10 @@ class AmcpProtocol {
 				const code = parseInt(codeMatch[1], 10)
 
 				// Log successful responses (errors are logged with detail inside the switch).
-				if (code < 400 && !AmcpProtocol.QUIET_RESP.has((status || '').toUpperCase())) {
+				if (
+					code < 400 &&
+					(amcpVerboseTrace() || !AmcpProtocol.QUIET_RESP.has((status || '').toUpperCase()))
+				) {
 					this.log('debug', `AMCP ← ${line}`)
 				}
 
@@ -229,6 +252,14 @@ function rejectAllPendingAmcpCallbacks(ctx) {
 	}
 	ctx.response_callback = {}
 	ctx._pendingResponseKey = undefined
+	const batchDrain = ctx._amcpBatchDrain
+	if (batchDrain && typeof batchDrain.rejectBatch === 'function') {
+		try {
+			batchDrain.rejectBatch(new Error('AMCP connection closed'))
+		} catch (_) {
+			/* non-fatal */
+		}
+	}
 	ctx._amcpBatchDrain = null
 	if (ctx._amcpSendQueue) {
 		ctx._amcpSendQueue = Promise.resolve()

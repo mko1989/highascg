@@ -1,0 +1,54 @@
+{
+  "caspar": {
+    "host": "192.168.0.12",
+    "port": 5250
+  },
+  "offline_mode": false,
+  "server": {
+    "httpPort": 8080,
+    "wsPort": 8080,
+    "bindAddress": "0.0.0.0"
+  },
+  "osc": {
+    "enabled": true,
+    "listenPort": 6251,
+    "listenAddress": "0.0.0.0",
+    "peakHoldMs": 2000,
+    "emitIntervalMs": 50,
+    "staleTimeoutMs": 5000,
+    "wsDeltaBroadcast": false
+  },
+  "ui": {
+    "oscFooterVu": true,
+    "rundownPlaybackTimer": true
+  },
+  "audioRouting": {
+    "programLayout": "stereo",
+    "programOutput": "default",
+    "programAlsaDevice": "",
+    "programFfmpegPath": "",
+    "programFfmpegArgs": "",
+    "extraAudioChannelCount": 0,
+    "extraAudioBus1Layout": "stereo",
+    "extraAudioBus1Output": "default",
+    "extraAudioBus1AlsaDevice": "",
+    "extraAudioBus1FfmpegPath": "",
+    "extraAudioBus1FfmpegArgs": "",
+    "browserMonitor": "pgm"
+  },
+  "streaming": {
+    "enabled": true,
+    "go2rtcPort": 1984,
+    "webrtcPort": 8555,
+    "protocol": "UDP",
+    "quality": "medium",
+    "basePort": 40000,
+    "hardwareAccel": true,
+    "maxBitrate": 2000,
+    "resolution": "540p",
+    "fps": 25,
+    "hardware_accel": true
+  },
+  "periodic_sync_interval_sec": null,
+  "periodic_sync_interval_sec_osc": null
+}

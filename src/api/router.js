@@ -29,14 +29,20 @@ const routesAudio = require('./routes-audio')
 const routesProject = require('./routes-project')
 const routesLedTestCard = require('./routes-led-test-card')
 const routesFtb = require('./routes-ftb')
-const routesPgmRecord = require('./routes-pgm-record')
 const routesSystemStaged = require('./routes-system-staged')
 const routesIngest = require('./routes-ingest')
+const routesUsbIngest = require('./routes-usb-ingest')
+const routesStreamingChannel = require('./routes-streaming-channel')
 const routesSystemSetup = require('./routes-system-setup')
 const routesCasparConfig = require('./routes-caspar-config')
 const routesLogs = require('./routes-logs')
 const routesHostStats = require('./routes-host-stats')
 const routesPipOverlay = require('./routes-pip-overlay')
+const routesModules = require('./routes-modules')
+const routesPixelhue = require('./routes-pixelhue')
+const routesTandemDevice = require('./routes-tandem-device')
+const routesDeviceView = require('./routes-device-view')
+const moduleRegistry = require('../module-registry')
 
 /**
  * @param {string} method
@@ -57,6 +63,11 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	if (method === 'POST' && p === '/api/selection') {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+	}
+
+	{
+		const mr = routesModules.handle(method, p)
+		if (mr) return mr
 	}
 
 	if (method === 'GET' && (p === '/api/caspar-config/generate' || p === '/api/caspar-config/mode-choices')) {
@@ -136,6 +147,34 @@ async function routeRequest(method, path, body, ctx, req) {
 		const r = await routesSystemSetup.handleGet(p, ctx)
 		if (r) return r
 	}
+	if (
+		method === 'POST' &&
+		(p === '/api/system/setup/restart-window-manager' || p === '/api/system/setup/reboot')
+	) {
+		const r = await routesSystemSetup.handlePost(p, body, ctx)
+		if (r) return r
+	}
+
+	{
+		const tr = await routesTandemDevice.handle(method, p, body, ctx)
+		if (tr) return tr
+	}
+	{
+		const dv =
+			(p === '/api/device-view' || p === '/api/device-view/gpu-map-debug')
+				? method === 'GET'
+					? await routesDeviceView.handleGet(p, ctx, query)
+					: method === 'POST'
+						? await routesDeviceView.handlePost(body, ctx)
+						: null
+				: null
+		if (dv) return dv
+	}
+
+	{
+		const pr = await routesPixelhue.handle(method, p, body, query, ctx)
+		if (pr) return pr
+	}
 	if (method === 'GET' && p === '/api/hardware/displays') {
 		const r = await routesSettings.handleHardwareGet(p)
 		if (r) return r
@@ -163,7 +202,7 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 	if (method === 'POST' && p === '/api/settings/apply-os') {
 		try {
-			const r = await routesSettings.handleOsPost(p, ctx)
+			const r = await routesSettings.handleOsPost(p, body, ctx)
 			if (r) return r
 		} catch (e) {
 			const msg = e?.message || String(e)
@@ -180,6 +219,10 @@ async function routeRequest(method, path, body, ctx, req) {
 		}
 	}
 
+	if (method === 'POST' && (p === '/api/config/apply' || p === '/api/config/reset')) {
+		return await routesConfig.handlePost(p, body, ctx)
+	}
+
 	{
 		const sr = routesSystemStaged.handle(method, p)
 		if (sr) return sr
@@ -191,13 +234,19 @@ async function routeRequest(method, path, body, ctx, req) {
 	if (method === 'GET' && p === '/api/ingest/download-status') return routesIngest.handleGetDownloadStatus(ctx)
 	if (method === 'GET' && p === '/api/ingest/preview') return await routesIngest.handleIngestPreview(query, ctx)
 
+	// USB ingest (WO-29) — no Caspar required
+	{
+		const ur = await routesUsbIngest.handle(method, p, pathRaw, body, ctx, req)
+		if (ur) return ur
+	}
+
 	// Media list + local ffprobe — must work when AMCP is down (same folder as ingest / offline)
 	// Project JSON — works without Caspar (disk mirror from web UI Save)
 	if (method === 'POST' && (p === '/api/project/save' || p === '/api/project/load')) {
 		const r = await routesData.handleProject(p, body, ctx)
 		if (r) return r
 	}
-	if (method === 'GET' && p === '/api/project') {
+	if (method === 'GET' && (p === '/api/project' || p === '/api/project/')) {
 		const r = await routesData.handleProjectGet(ctx)
 		if (r) return r
 	}
@@ -228,11 +277,17 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (lr) return lr
 	}
 
-	if (method === 'GET' && p === '/api/pgm-record') {
-		return routesPgmRecord.handleGet(ctx)
+	{
+		const srCh = await routesStreamingChannel.handle(method, p, body, ctx)
+		if (srCh) return srCh
 	}
-	if (method === 'POST' && p === '/api/pgm-record') {
-		return await routesPgmRecord.handlePost(body, ctx)
+
+	// Optional-module routes run **before** the Caspar gate so modules that don't need AMCP
+	// (tracking, auto-follow config, etc.) stay reachable when Caspar is offline. Modules that
+	// do need AMCP can check `ctx.amcp` themselves.
+	{
+		const moduleEarly = await moduleRegistry.handleApi(method, p, body, ctx, req, query)
+		if (moduleEarly) return moduleEarly
 	}
 
 	if (!ctx.amcp) {
@@ -263,8 +318,6 @@ async function routeRequest(method, path, body, ctx, req) {
 			r = await routesCg.handlePost(p, body, ctx)
 			if (r) return r
 			r = await routesData.handlePost(p, body, ctx)
-			if (r) return r
-			r = await routesConfig.handlePost(p, body, ctx)
 			if (r) return r
 			r = await routesMedia.handlePost(p, body, ctx)
 			if (r) return r

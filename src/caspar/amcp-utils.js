@@ -1,5 +1,13 @@
 'use strict'
 
+/**
+ * When true, log every successful AMCP send/recv at debug (default suppresses MIXER/CG/PLAY… noise).
+ * Env: HIGHASCG_AMCP_TRACE=1
+ */
+function amcpVerboseTrace() {
+	return process.env.HIGHASCG_AMCP_TRACE === '1' || String(process.env.HIGHASCG_AMCP_TRACE || '').toLowerCase() === 'true'
+}
+
 function param(str) {
 	if (str == null || str === '') return ''
 	const s = String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -25,4 +33,17 @@ function chLayer(channel, layer) {
 	return `${c}-${parseInt(layer, 10)}`
 }
 
-module.exports = { param, clipParamForPlay, chLayer }
+/**
+ * Append `DEFER` so mixer transforms queue until `MIXER <channel> COMMIT` (atomic multi-layer looks).
+ * Idempotent if the line already ends with DEFER.
+ * @param {string} line
+ * @returns {string}
+ */
+function deferMixerAmcpLine(line) {
+	const s = String(line).trim()
+	if (!/^MIXER\s+\d+-\d+\s+/i.test(s)) return s
+	if (/\bDEFER\b/i.test(s)) return s
+	return `${s} DEFER`
+}
+
+module.exports = { param, clipParamForPlay, chLayer, amcpVerboseTrace, deferMixerAmcpLine }

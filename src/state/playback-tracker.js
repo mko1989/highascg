@@ -270,6 +270,76 @@ function getMatrixSnapshot(ctx) {
 }
 
 /**
+ * Whether OSC-reported clip id matches the clip used on take (path or basename).
+ * @param {string} oscClip
+ * @param {string} clipId
+ */
+function oscClipMatchesTakeClip(oscClip, clipId) {
+	if (!oscClip || !clipId || isRouteClip(clipId)) return false
+	if (mediaIdsMatch(oscClip, clipId)) return true
+	const a = mediaIdKey(oscClip)
+	const b = mediaIdKey(clipId)
+	const ba = a.replace(/^.*[/\\]/, '')
+	const bb = b.replace(/^.*[/\\]/, '')
+	return Boolean(ba && bb && ba.normalize('NFC') === bb.normalize('NFC'))
+}
+
+/**
+ * Milliseconds from **now** until the opacity fade should start (N frames before visible end),
+ * from OSC `file/time`, `remaining`, or frame progress. Returns `null` if OSC inactive or timing unknown.
+ * @param {{ oscState?: { getSnapshot?: () => object } }} ctx
+ * @param {number} channel
+ * @param {number} physLayer
+ * @param {string} clipId
+ * @param {number} fadeFrames
+ * @param {number} framerate
+ * @returns {number | null}
+ */
+function getOscClipEndFadeDelayMs(ctx, channel, physLayer, clipId, fadeFrames, framerate) {
+	if (!isOscPlaybackActive(ctx) || !clipId) return null
+	const snap = ctx.oscState.getSnapshot()
+	const channels = (snap && snap.channels) || {}
+	const chan = channels[channel] ?? channels[String(channel)]
+	if (!chan || !chan.layers) return null
+	const layer = chan.layers[physLayer] ?? chan.layers[String(physLayer)]
+	if (!layer || typeof layer !== 'object') return null
+	if (String(layer.type || '') === 'empty') return null
+	const oscClip = pickClipFromOscLayer(layer)
+	if (!oscClip || !oscClipMatchesTakeClip(oscClip, clipId)) return null
+
+	const f = layer.file || {}
+	if (f.loop === true || f.loop === 1) return null
+
+	const fps = framerate > 0 ? framerate : 50
+	const fadeDurMs = (Math.max(1, Number(fadeFrames)) / fps) * 1000
+
+	let remainingMs = null
+	if (Number.isFinite(f.remaining) && f.remaining >= 0) {
+		remainingMs = f.remaining * 1000
+	} else if (
+		Number.isFinite(f.duration) &&
+		f.duration > 0 &&
+		Number.isFinite(f.elapsed) &&
+		f.elapsed >= 0
+	) {
+		remainingMs = Math.max(0, f.duration - f.elapsed) * 1000
+	} else if (Number.isFinite(f.duration) && f.duration > 0) {
+		remainingMs = f.duration * 1000
+	} else if (Number.isFinite(f.frameElapsed) && Number.isFinite(f.frameTotal) && f.frameTotal > 0) {
+		const prog = f.frameElapsed / f.frameTotal
+		if (Number.isFinite(f.elapsed) && prog > 0.001) {
+			const totalSec = f.elapsed / prog
+			remainingMs = Math.max(0, totalSec - f.elapsed) * 1000
+		}
+	}
+
+	if (remainingMs == null || remainingMs <= 0) return null
+	const delay = remainingMs - fadeDurMs
+	if (remainingMs < fadeDurMs - 1e-6) return null
+	return Math.max(0, delay)
+}
+
+/**
  * Build matrix from `/channel/N/stage/layer/L/...` OSC (authoritative when listener is on).
  * @param {{ oscState: { getSnapshot: () => object }, CHOICES_MEDIAFILES?: unknown, mediaDetails?: unknown, _mediaProbeCache?: unknown }} ctx
  */
@@ -423,5 +493,6 @@ module.exports = {
 	isOscPlaybackActive,
 	resolveClipDurationMs,
 	resolveClipDurationMsWithDiskProbe,
+	getOscClipEndFadeDelayMs,
 	reconcilePlaybackMatrixFromGatheredXml,
 }

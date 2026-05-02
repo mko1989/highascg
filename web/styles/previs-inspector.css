@@ -1,0 +1,255 @@
+/*
+ * Previs module inspector and UV editor.
+ */
+
+.previs-pgm-3d-inspector {
+	position: absolute;
+	top: 40px;
+	right: 6px;
+	bottom: 6px;
+	width: 240px;
+	z-index: 19;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	border-radius: 3px;
+	overflow-y: auto;
+	pointer-events: auto;
+}
+
+.previs-pgm-3d-inspector__section {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.previs-pgm-3d-inspector__section-header {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 9px;
+	opacity: 0.7;
+	margin-top: 4px;
+}
+
+.previs-pgm-3d-inspector__body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.previs-pgm-3d-inspector__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+	padding: 2px 4px;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.previs-pgm-3d-inspector__row--tagged {
+	background: rgba(0, 208, 255, 0.12);
+}
+
+.previs-pgm-3d-inspector__row:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.previs-pgm-3d-inspector__row--tagged:hover {
+	background: rgba(0, 208, 255, 0.2);
+}
+
+.previs-pgm-3d-inspector__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.previs-pgm-3d-inspector__label--active {
+	color: #00d0ff;
+}
+
+.previs-pgm-3d-inspector__empty {
+	opacity: 0.55;
+	margin-top: 2px;
+}
+
+.previs-pgm-3d-inspector__btn {
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+	padding: 1px 6px;
+	font-size: 10px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.previs-pgm-3d-inspector__btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+.previs-pgm-3d-inspector__btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.previs-pgm-3d-inspector__btn--ghost {
+	opacity: 0.7;
+}
+
+.previs-pgm-3d-inspector__select,
+.previs-pgm-3d-inspector__input {
+	padding: 1px 4px;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+}
+
+.previs-pgm-3d-inspector__select {
+	padding: 1px 2px;
+}
+
+.previs-pgm-3d-inspector__input {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.previs-pgm-3d-inspector__preset-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.previs-pgm-3d-inspector__save-row {
+	display: flex;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+.previs-pgm-3d-inspector__row--pipeline {
+	cursor: default;
+}
+
+.previs-pgm-3d-inspector__row--pipeline:hover {
+	background: transparent;
+}
+
+.previs-pgm-3d-inspector__pipeline-badge {
+	font-size: 10px;
+	opacity: 0.85;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+	flex: 0 0 auto;
+}
+
+.previs-pgm-3d-inspector__mapping-line {
+	font-size: 10px;
+	line-height: 1.35;
+	margin-top: 4px;
+	color: rgba(255, 255, 255, 0.92);
+}
+
+.previs-pgm-3d-inspector__mapping-line--muted {
+	opacity: 0.75;
+	font-style: italic;
+}
+
+/* Virtual-canvas region editor (WO-17) */
+.previs-uv-editor {
+	margin-top: 8px;
+	max-width: 220px;
+}
+
+.previs-uv-editor__hint {
+	font-size: 9px;
+	opacity: 0.75;
+	line-height: 1.35;
+	margin-bottom: 4px;
+}
+
+.previs-uv-editor__stage {
+	position: relative;
+	width: 100%;
+	max-height: 140px;
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.35);
+	box-sizing: border-box;
+	touch-action: none;
+}
+
+.previs-uv-editor__rect {
+	position: absolute;
+	box-sizing: border-box;
+	border: 2px solid #00d0ff;
+	background: rgba(0, 208, 255, 0.12);
+	cursor: move;
+	min-width: 8px;
+	min-height: 8px;
+}
+
+.previs-uv-editor__handle {
+	position: absolute;
+	width: 9px;
+	height: 9px;
+	background: #fff;
+	border: 1px solid #00d0ff;
+	box-sizing: border-box;
+}
+
+.previs-uv-editor__handle--nw {
+	top: -4px;
+	left: -4px;
+	cursor: nwse-resize;
+}
+
+.previs-uv-editor__handle--ne {
+	top: -4px;
+	right: -4px;
+	cursor: nesw-resize;
+}
+
+.previs-uv-editor__handle--sw {
+	bottom: -4px;
+	left: -4px;
+	cursor: nesw-resize;
+}
+
+.previs-uv-editor__handle--se {
+	bottom: -4px;
+	right: -4px;
+	cursor: nwse-resize;
+}
+
+.previs-uv-editor__row {
+	margin-top: 6px;
+}
+
+.previs-uv-editor__btn {
+	font-size: 10px;
+	padding: 2px 8px;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.previs-uv-editor__btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.14);
+}
+
+.previs-uv-editor__btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}

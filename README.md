@@ -78,7 +78,7 @@ Open the printed URL (e.g. `http://127.0.0.1:8080/`). WebSocket clients use the 
 - `web/` — static SPA (dashboard, editors)
 - `scripts/` — production installer (`install.sh` + phases), dev deploy, smoke tests, staged Caspar helpers — see **`scripts/README.md`**
 
-See `01_WO_ANALYZE_MODULE.md` and `02_WO_MIGRATE_TO_HIGHASCG.md` in this repo for migration notes and file mapping. Additional work orders: **`docs/WO-07_CasparCG_Server_PRs_1718-1720_Consumers_Audio.md`** (upstream PRs 1718–1720), **`docs/WO-08_Install_CEF_CasparOnly_Pinning_Symlinks.md`** (CEF install policy).
+Migration notes and file mapping: `work/01_WO_ANALYZE_MODULE.md`, `work/02_WO_MIGRATE_TO_HIGHASCG.md` (local `work/` tree). Architecture catalog: **`work/PROJECT_BREAKDOWN.md`**. Work-order status snapshot: **`work/project_status.md`**.
 
 ## Verify
 
@@ -92,6 +92,9 @@ With the server running (`npm start` or `node index.js --port 8080`), in another
 ```bash
 npm run smoke -- 8080
 # or: node tools/http-smoke.js 8080
+# Other checks (no Caspar / optional):
+# npm run smoke:companion-press
+# npm run smoke:streaming-ch 8080
 ```
 
 This checks HTTP (`/`, `/api/scene/live`, `/api/state`, **`/api/settings`**, **`/api/streams`**, **`/api/audio/devices`**, unknown route) and WebSocket initial `state` message.

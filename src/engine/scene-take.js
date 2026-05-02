@@ -5,7 +5,6 @@
 
 'use strict'
 
-const { MAX_BATCH_COMMANDS } = require('../caspar/amcp-batch')
 const playbackTracker = require('../state/playback-tracker')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
@@ -153,10 +152,28 @@ async function runSceneTake(amcp, opts) {
 	const shouldRunBankCrossfade =
 		outNums.length > 0 && (!isFirstTake || playbackOnActive.size > 0)
 
+	// Stop timelines that are exiting (present in current look but not in incoming)
+	if (self.timelineEngine) {
+		const pbNow = self.timelineEngine.getPlayback()
+		if (pbNow?.timelineId) {
+			const exitingTimeline = diff.exit.find((l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId)
+			if (exitingTimeline) {
+				self.timelineEngine.stop(pbNow.timelineId)
+			}
+		}
+	}
+
 	const layerBatches = []
 	for (const layer of incomingSorted) {
 		if (layer.source && layer.source.type === 'timeline') {
-			throw new Error('Mixing timeline and media in one look is not supported — use timeline-only looks or media-only')
+			const tlId = layer.source.value
+			if (tlId && self.timelineEngine) {
+				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
+				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx })
+				self.timelineEngine.setLoop(tlId, !!layer.loop)
+				self.timelineEngine.play(tlId, 0)
+			}
+			continue
 		}
 		const clip = clipPath(layer)
 		if (!clip) continue
@@ -176,25 +193,30 @@ async function runSceneTake(amcp, opts) {
 			`STOP ${cl}`,
 			`MIXER ${cl} CLEAR`,
 			playLine,
-			`MIXER ${cl} ANCHOR 0 0`,
-			`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`,
-			`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0`,
-			`MIXER ${cl} OPACITY ${opStart} 0`,
-			`MIXER ${cl} KEYER ${keyer}`,
-			`MIXER ${cl} VOLUME ${vol}`,
 		]
+
+		if (f.x !== 0 || f.y !== 0 || f.scaleX !== 1 || f.scaleY !== 1) {
+			buildLines.push(`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`)
+		}
+		if (layer.rotation) {
+			buildLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
+		}
+		if (opStart !== 1) {
+			buildLines.push(`MIXER ${cl} OPACITY ${opStart} 0`)
+		}
+		if (keyer === 1) {
+			buildLines.push(`MIXER ${cl} KEYER 1`)
+		}
+		if (vol !== 1) {
+			buildLines.push(`MIXER ${cl} VOLUME ${vol}`)
+		}
 		layerBatches.push({ layer, pLayer, clip, buildLines })
 	}
 
 	const loadLineCount = layerBatches.reduce((n, b) => n + b.buildLines.length, 0)
 	if (loadLineCount > 0) {
-		if (loadLineCount <= MAX_BATCH_COMMANDS) {
-			await amcp.batchSend(layerBatches.flatMap((b) => b.buildLines))
-		} else {
-			for (const b of layerBatches) {
-				await amcp.batchSend(b.buildLines)
-			}
-		}
+		// One flat stream of commands, chunked by resolveMaxBatchCommands — not one BEGIN…COMMIT per layer.
+		await amcp.batchSendChunked(layerBatches.flatMap((b) => b.buildLines))
 		for (const b of layerBatches) {
 			if (self) {
 				try {
@@ -214,7 +236,7 @@ async function runSceneTake(amcp, opts) {
 			fixLines.push(mixerOpacityLine(channel, pIn, b.layer.opacity ?? 1, 0, undefined))
 		}
 		if (fixLines.length > 0) {
-			await amcp.batchSend(fixLines)
+			await amcp.batchSendChunked(fixLines)
 			await amcp.mixerCommit(channel)
 		}
 	}
@@ -233,7 +255,7 @@ async function runSceneTake(amcp, opts) {
 			crossfadeLines.push(mixerOpacityLine(channel, pIn, layer.opacity ?? 1, fadeDur, fadeTw))
 		}
 		if (crossfadeLines.length > 0) {
-			await amcp.batchSend(crossfadeLines)
+			await amcp.batchSendChunked(crossfadeLines)
 		}
 		await amcp.mixerCommit(channel)
 

@@ -1,5 +1,6 @@
 /**
  * Modal: play Decklink or NDI on a Caspar channel/layer (AMCP).
+ * DeckLink: only on the configured inputs host channel (see Settings → Screens); elsewhere use route://.
  * NDI sources come from /api/streaming/ndi-sources (FFmpeg discovery on the server).
  */
 
@@ -27,6 +28,7 @@ export function showLiveInputModal(stateStore) {
 	const channelMap = stateStore.getState()?.channelMap || {}
 	const defaultCh = suggestLiveInputChannel(channelMap)
 	const inputsCh = channelMap.inputsCh
+	const decklinkCount = channelMap.decklinkCount ?? 0
 
 	const modal = document.createElement('div')
 	modal.id = 'live-input-modal'
@@ -38,10 +40,7 @@ export function showLiveInputModal(stateStore) {
 				<button type="button" class="modal-close" id="live-input-close" aria-label="Close">&times;</button>
 			</div>
 			<div class="modal-body">
-				<p class="settings-note live-input-modal__hint">
-					Play a producer on a channel with <strong>PLAY channel-layer …</strong>, then use <code>route://…</code> elsewhere.
-					${inputsCh != null ? ` Your configured <strong>inputs channel</strong> is <strong>${inputsCh}</strong> (Settings → Screens → Decklink input channels &gt; 0).` : ' Enable <strong>Decklink input channels</strong> in Settings → Screens so Caspar gets a dedicated inputs channel (no screen consumer — routing only).'}
-				</p>
+				<p class="settings-note live-input-modal__hint" id="live-input-hint"></p>
 				<div class="settings-group">
 					<label>Type</label>
 					<select id="live-input-kind">
@@ -49,7 +48,7 @@ export function showLiveInputModal(stateStore) {
 						<option value="ndi">NDI</option>
 					</select>
 				</div>
-				<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
+				<div class="settings-group" id="live-input-ch-row" style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
 					<div>
 						<label>Channel</label>
 						<input type="number" id="live-input-ch" min="1" max="999" value="${defaultCh}" style="width:5rem" />
@@ -57,6 +56,13 @@ export function showLiveInputModal(stateStore) {
 					<div>
 						<label>Layer</label>
 						<input type="number" id="live-input-layer" min="0" max="999" value="1" style="width:5rem" />
+					</div>
+				</div>
+				<div class="settings-group" id="live-input-decklink-ch-fixed" style="display:none">
+					<p class="settings-note" style="margin:0">DeckLink channel (locked): <strong id="live-input-ch-fixed-val"></strong> — use <code>route://…</code> on PGM, other previews, and multiview.</p>
+					<div style="margin-top:0.5rem">
+						<label>Layer (input slot)</label>
+						<input type="number" id="live-input-layer-dl" min="1" max="99" value="1" style="width:5rem" />
 					</div>
 				</div>
 				<div class="settings-group" id="live-input-decklink-wrap">
@@ -82,14 +88,43 @@ export function showLiveInputModal(stateStore) {
 	`
 	document.body.appendChild(modal)
 
+	const hintEl = modal.querySelector('#live-input-hint')
 	const kindSel = modal.querySelector('#live-input-kind')
 	const dlWrap = modal.querySelector('#live-input-decklink-wrap')
 	const ndiWrap = modal.querySelector('#live-input-ndi-wrap')
+	const chRow = modal.querySelector('#live-input-ch-row')
+	const dlChFixed = modal.querySelector('#live-input-decklink-ch-fixed')
+	const chFixedVal = modal.querySelector('#live-input-ch-fixed-val')
+
+	function syncHint() {
+		if (!hintEl) return
+		const k = kindSel?.value || 'decklink'
+		if (k === 'decklink') {
+			if (inputsCh != null) {
+				hintEl.innerHTML = `DeckLink is played <strong>only</strong> on the inputs host (channel <strong>${inputsCh}</strong>). On program, other channels, and multiview, drag a <code>route://${inputsCh}-N</code> tile from Sources → Live — do not run a second <code>DECKLINK</code> producer for the same device.`
+			} else {
+				hintEl.innerHTML =
+					'Enable <strong>DeckLink inputs host</strong> in Settings → <strong>Inputs</strong> (and apply Caspar config), then pick the host channel.'
+			}
+		} else {
+			hintEl.innerHTML =
+				'NDI can use any channel/layer. For consistency you can still use the inputs channel if configured.'
+		}
+	}
 
 	function syncKind() {
-		const k = kindSel?.value
+		const k = kindSel?.value || 'decklink'
 		if (dlWrap) dlWrap.style.display = k === 'decklink' ? 'block' : 'none'
 		if (ndiWrap) ndiWrap.style.display = k === 'ndi' ? 'block' : 'none'
+		const useFixed = k === 'decklink' && inputsCh != null
+		if (chRow) chRow.style.display = useFixed ? 'none' : 'flex'
+		if (dlChFixed) dlChFixed.style.display = useFixed ? 'block' : 'none'
+		if (chFixedVal && inputsCh != null) chFixedVal.textContent = String(inputsCh)
+		const layerDl = modal.querySelector('#live-input-layer-dl')
+		if (layerDl && decklinkCount > 0) {
+			layerDl.max = String(Math.min(99, decklinkCount))
+		}
+		syncHint()
 	}
 	kindSel?.addEventListener('change', syncKind)
 	syncKind()
@@ -146,11 +181,30 @@ export function showLiveInputModal(stateStore) {
 		}
 		setStatus('')
 		const k = kindSel?.value || 'decklink'
-		const ch = parseInt(String(modal.querySelector('#live-input-ch')?.value || '1'), 10)
-		const layer = parseInt(String(modal.querySelector('#live-input-layer')?.value || '1'), 10)
-		if (!Number.isFinite(ch) || ch < 1 || !Number.isFinite(layer) || layer < 0) {
-			setStatus('Invalid channel/layer', true)
-			return
+		let ch
+		let layer
+		if (k === 'decklink') {
+			if (inputsCh == null) {
+				setStatus('Configure DeckLink inputs in Settings → Inputs first.', true)
+				return
+			}
+			ch = inputsCh
+			layer = parseInt(String(modal.querySelector('#live-input-layer-dl')?.value || '1'), 10)
+			if (!Number.isFinite(layer) || layer < 1) {
+				setStatus('Invalid layer', true)
+				return
+			}
+			if (decklinkCount > 0 && layer > decklinkCount) {
+				setStatus(`Layer must be 1–${decklinkCount} for configured input slots`, true)
+				return
+			}
+		} else {
+			ch = parseInt(String(modal.querySelector('#live-input-ch')?.value || '1'), 10)
+			layer = parseInt(String(modal.querySelector('#live-input-layer')?.value || '1'), 10)
+			if (!Number.isFinite(ch) || ch < 1 || !Number.isFinite(layer) || layer < 0) {
+				setStatus('Invalid channel/layer', true)
+				return
+			}
 		}
 		let cmd
 		if (k === 'decklink') {

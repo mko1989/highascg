@@ -2,120 +2,108 @@
  * Scene / Look state — named compositions of per-layer content + normalized FILL.
  * @see docs/scene-system-plan.md
  */
-
 import {
 	defaultTransition,
 	defaultLayerConfig,
 	migrateScene,
 	newId,
-	defaultFill,
+	LOOK_LAYER_FIRST,
+	LOOK_LAYER_STEP,
 } from './scene-state-helpers.js'
 
-export { defaultTransition, previewChannelLayerForSceneLayer, defaultLayerConfig } from './scene-state-helpers.js'
+import * as Persistence from './scene-state-persistence-logic.js'
+import * as LayerLogic from './scene-state-layer-logic.js'
+import * as LookLogic from './scene-state-look-logic.js'
 
-const STORAGE_KEY = 'casparcg_scenes_v1'
-const FALLBACK_RESOLUTION = { w: 1920, h: 1080, fps: 50 }
+export {
+	defaultTransition,
+	previewChannelLayerForSceneLayer,
+	defaultLayerConfig,
+	LOOK_LAYER_FIRST,
+	LOOK_LAYER_STEP,
+} from './scene-state-helpers.js'
 
 export class SceneState {
 	constructor() {
-		/** @type {{ w: number, h: number, fps: number }[]} */
 		this._canvasResolutions = []
 		this.activeScreenIndex = 0
-		/** @type {import('./scene-state.js').Scene[]} */
+		this.armedScreenIndices = [0]
 		this.scenes = []
-		/** Scene open in editor, or null on deck */
 		this.editingSceneId = null
-		this.liveSceneId = null
-		/** Last look pushed to preview channel (for global Take / preview panel when not editing). */
-		this.previewSceneId = null
-		/** Default transition for new looks + “Apply to all” (deck). Merged into each scene’s defaultTransition when applied. */
+		this.liveSceneIdByMain = [null, null, null, null]
+		this.previewSceneIdByMain = [null, null, null, null]
 		this.globalDefaultTransition = { ...defaultTransition() }
-		/** Copied layer mixer geometry (fill, opacity, …) — paste onto another layer. */
 		this._layerStyleClipboard = null
+		this.layerPresets = []
+		this.lookPresets = []
+		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
+		this.isInteracting = false
 		this._listeners = new Map()
 		this._load()
 	}
 
+	get liveSceneId() { return this.liveSceneIdByMain[this.activeScreenIndex] ?? null }
+	get previewSceneId() { return this.previewSceneIdByMain[this.activeScreenIndex] ?? null }
+	getLiveSceneIdForMain(mainIdx) { return this.liveSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
+	getPreviewSceneIdForMain(mainIdx) { return this.previewSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
+
 	_getCanvas(screenIdx) {
 		const r = this._canvasResolutions[screenIdx]
 		if (r?.w > 0 && r?.h > 0) return { width: r.w, height: r.h, framerate: r.fps ?? 50 }
-		return { width: FALLBACK_RESOLUTION.w, height: FALLBACK_RESOLUTION.h, framerate: FALLBACK_RESOLUTION.fps }
+		return { width: Persistence.FALLBACK_RESOLUTION.w, height: Persistence.FALLBACK_RESOLUTION.h, framerate: Persistence.FALLBACK_RESOLUTION.fps }
 	}
 
-	/** @param {{ w: number, h: number, fps?: number }[] | undefined} resolutions */
 	setCanvasResolutions(resolutions) {
 		if (!Array.isArray(resolutions)) return
-		const next = resolutions.map((r) =>
-			r?.w > 0 && r?.h > 0 ? { w: r.w, h: r.h, fps: r.fps ?? 50 } : { ...FALLBACK_RESOLUTION }
-		)
-		if (this._canvasResolutionsEqual(this._canvasResolutions, next)) return
+		const next = resolutions.map((r) => r?.w > 0 && r?.h > 0 ? { w: r.w, h: r.h, fps: r.fps ?? 50 } : { ...Persistence.FALLBACK_RESOLUTION })
+		if (Persistence.getCanvasResolutionsEqual(this._canvasResolutions, next)) return
 		this._canvasResolutions = next
 		this._save()
 	}
 
-	_canvasResolutionsEqual(a, b) {
-		const la = a?.length ?? 0
-		const lb = b?.length ?? 0
-		if (la !== lb) return false
-		if (la === 0) return true
-		for (let i = 0; i < la; i++) {
-			if (a[i].w !== b[i].w || a[i].h !== b[i].h || (a[i].fps ?? 50) !== (b[i].fps ?? 50)) return false
-		}
-		return true
-	}
+	getCanvasForScreen(screenIdx = this.activeScreenIndex) { return this._getCanvas(screenIdx) }
 
-	getCanvasForScreen(screenIdx = this.activeScreenIndex) {
-		return this._getCanvas(screenIdx)
-	}
+	_applyPersistedData(data) { return Persistence.applyPersistedData(this, data) }
 
 	_load() {
 		try {
-			const raw = localStorage.getItem(STORAGE_KEY)
+			let raw = localStorage.getItem(Persistence.STORAGE_KEY) || localStorage.getItem(Persistence.STORAGE_KEY_V1)
 			if (raw) {
 				const data = JSON.parse(raw)
-				if (Array.isArray(data.scenes)) {
-					this.scenes = data.scenes.map((s) => migrateScene(s))
-					this.liveSceneId = data.liveSceneId ?? null
-					this.previewSceneId = data.previewSceneId ?? null
-					this.activeScreenIndex = typeof data.activeScreenIndex === 'number' ? data.activeScreenIndex : 0
-					if (data.globalDefaultTransition && typeof data.globalDefaultTransition === 'object') {
-						this.globalDefaultTransition = {
-							...defaultTransition(),
-							...data.globalDefaultTransition,
-						}
-					}
+				if (this._applyPersistedData(data)) {
+					localStorage.removeItem(Persistence.STORAGE_KEY_V1)
+					this._persist()
 					return
 				}
 			}
 		} catch {}
-		this.scenes = []
-		this.liveSceneId = null
-		this.previewSceneId = null
+		this.scenes = []; this.liveSceneIdByMain = [null, null, null, null]; this.previewSceneIdByMain = [null, null, null, null]
+		this.mainEditorVisible = Persistence.defaultMainEditorVisible(); this.layerPresets = []; this.lookPresets = []
+		this.armedScreenIndices = [this.activeScreenIndex]
 	}
 
 	_persist() {
-		try {
-			localStorage.setItem(
-				STORAGE_KEY,
-				JSON.stringify({
-					scenes: this.scenes,
-					liveSceneId: this.liveSceneId,
-					previewSceneId: this.previewSceneId,
-					activeScreenIndex: this.activeScreenIndex,
-					globalDefaultTransition: this.globalDefaultTransition,
-				})
-			)
-		} catch {}
+		if (this._persistTimer) clearTimeout(this._persistTimer)
+		this._persistTimer = setTimeout(() => {
+			this._persistTimer = null
+			try {
+				localStorage.setItem(Persistence.STORAGE_KEY, Persistence.getPersistPayload(this))
+			} catch {}
+		}, 1000)
 	}
 
-	/** Persist + notify — use for structural edits (deck / layer list). */
 	_save() {
-		this._persist()
+		// Save immediately (e.g. on click, delete, scope change)
+		if (this._persistTimer) clearTimeout(this._persistTimer)
+		this._persistTimer = null
+		try {
+			localStorage.setItem(Persistence.STORAGE_KEY, Persistence.getPersistPayload(this))
+		} catch {}
 		this._emit('change')
 	}
 
-	/** Persist + soft notify — layer/defaultTransition tweaks without rebuilding the whole scenes editor DOM. */
 	_softSave() {
+		// Debounce persistence for high-frequency updates (drag/resize)
 		this._persist()
 		this._emit('softChange')
 	}
@@ -125,129 +113,173 @@ export class SceneState {
 		this._listeners.get(key).push(fn)
 		return () => {
 			const fns = this._listeners.get(key)
-			if (fns) {
-				const i = fns.indexOf(fn)
-				if (i >= 0) fns.splice(i, 1)
-			}
+			if (fns) { const i = fns.indexOf(fn); if (i >= 0) fns.splice(i, 1) }
 		}
 	}
 
-	_emit(key, data) {
-		const fns = this._listeners.get(key)
-		if (fns) fns.forEach((fn) => fn(data))
-	}
+	_emit(key, data) { const fns = this._listeners.get(key); if (fns) fns.forEach((fn) => fn(data)) }
 
 	switchScreen(screenIdx) {
-		if (screenIdx === this.activeScreenIndex) return
+		if (screenIdx === this.activeScreenIndex && this.armedScreenIndices.length === 1 && this.armedScreenIndices[0] === screenIdx) return
 		this.activeScreenIndex = screenIdx
+		this.armedScreenIndices = [screenIdx]
 		this._save()
 		this._emit('screenChange', screenIdx)
 	}
 
-	addScene(name) {
-		const scene = {
-			id: newId(),
-			name: name || `Look ${this.scenes.length + 1}`,
-			layers: [],
-			defaultTransition: { ...defaultTransition(), ...this.globalDefaultTransition },
+	toggleArmedScreen(screenIdx) {
+		const s = new Set(this.armedScreenIndices)
+		if (s.has(screenIdx)) {
+			s.delete(screenIdx)
+			if (s.size === 0) s.add(this.activeScreenIndex)
+		} else {
+			s.add(screenIdx)
 		}
-		this.scenes.push(scene)
+		this.armedScreenIndices = Array.from(s).sort()
+		this._emit('screenChange')
+	}
+
+	sceneMatchesMain(scene, mainIdx) {
+		if (!scene) return false
+		const m = scene.mainScope
+		return m === 'all' || String(m) === String(mainIdx)
+	}
+
+	getScenesForMain(mainIdx) { return this.scenes.filter((s) => this.sceneMatchesMain(s, mainIdx)) }
+	isMainEditorVisible(mainIdx) { return mainIdx >= 0 && mainIdx <= 3 ? this.mainEditorVisible[mainIdx] !== false : true }
+	toggleMainEditorVisible(mainIdx) {
+		if (mainIdx < 0 || mainIdx > 3) return
+		const d = [...this.mainEditorVisible]
+		d[mainIdx] = !this.isMainEditorVisible(mainIdx)
+		this.mainEditorVisible = d
 		this._save()
-		return scene.id
 	}
 
-	/**
-	 * Unique name for a duplicated look: "Name (copy)", "Name (copy 2)", …
-	 * @param {string} baseName
-	 * @returns {string}
-	 */
-	_uniqueNameForDuplicate(baseName) {
-		const base = String(baseName || '').trim() || 'Look'
-		const stem = `${base} (copy)`
-		const taken = new Set(this.scenes.map((x) => String(x.name || '').trim().toLowerCase()))
-		if (!taken.has(stem.toLowerCase())) return stem
-		for (let n = 2; n < 1000; n++) {
-			const candidate = `${base} (copy ${n})`
-			if (!taken.has(candidate.toLowerCase())) return candidate
-		}
-		return `${base} (copy ${Date.now()})`
+	setSceneMainScope(id, scope) {
+		const s = this.getScene(id)
+		if (!s) return
+		if (scope === 'all') s.mainScope = 'all'
+		else if (/^[0-3]$/.test(String(scope))) s.mainScope = scope
+		this._save()
 	}
 
-	/**
-	 * Duplicate a look (new id, layers deep-cloned).
-	 * @param {string} id
-	 * @returns {string | null} new scene id
-	 */
+	addScene(name, opts = {}) {
+		const ms = opts.mainScope === 'all' ? 'all' : (/^[0-3]$/.test(String(opts.mainScope)) ? String(opts.mainScope) : String(this.activeScreenIndex))
+		const scene = migrateScene({ id: newId(), name: name || `Look ${this.scenes.length + 1}`, layers: [], mainScope: ms, defaultTransition: { ...defaultTransition(), ...this.globalDefaultTransition } })
+		this.scenes.push(scene); this._save(); return scene.id
+	}
+
 	duplicateScene(id) {
 		const s = this.getScene(id)
 		if (!s) return null
-		const dupe = migrateScene({
-			id: newId(),
-			name: this._uniqueNameForDuplicate(s.name),
-			layers: JSON.parse(JSON.stringify(s.layers || [])),
-			defaultTransition: s.defaultTransition,
-		})
-		this.scenes.push(dupe)
-		this._save()
-		return dupe.id
+		const dupe = migrateScene({ id: newId(), name: LookLogic.uniqueLookNameForDuplicate(this.scenes, s.name), layers: JSON.parse(JSON.stringify(s.layers || [])), mainScope: s.mainScope, defaultTransition: s.defaultTransition })
+		this.scenes.push(dupe); this._save(); return dupe.id
 	}
 
-	setPreviewSceneId(id) {
-		this.previewSceneId = id || null
-		this._persist()
-		// Do not emit softChange — that would re-schedule a redundant PRV push after every successful push.
-		this._emit('previewScene')
+	setPreviewSceneId(id, mainIdx) {
+		const m = mainIdx != null && mainIdx >= 0 && mainIdx < 4 ? Math.floor(mainIdx) : this.activeScreenIndex
+		this.previewSceneIdByMain[m] = id ? String(id) : null
+		this._persist(); this._emit('previewScene')
 	}
 
-	/** Copy layer position/scale/opacity/etc. (not source). */
 	copyLayerStyle(sceneId, layerIndex) {
-		const s = this.getScene(sceneId)
-		const l = s?.layers?.[layerIndex]
+		const l = this.getScene(sceneId)?.layers?.[layerIndex]
 		if (!l) return false
-		this._layerStyleClipboard = {
-			fill: l.fill ? { ...l.fill } : undefined,
-			opacity: l.opacity,
-			rotation: l.rotation,
-			loop: l.loop,
-			audioRoute: l.audioRoute,
-			volume: l.volume,
-			muted: l.muted,
-			straightAlpha: l.straightAlpha,
-			contentFit: l.contentFit,
-			aspectLocked: l.aspectLocked,
-			transition: l.transition ? { ...l.transition } : null,
-			fadeOnEnd: l.fadeOnEnd ? { ...l.fadeOnEnd } : { enabled: false, frames: 12 },
-			pipOverlay: l.pipOverlay ? JSON.parse(JSON.stringify(l.pipOverlay)) : null,
-		}
+		this._layerStyleClipboard = LayerLogic.getLayerStyleDataFromLayer(l)
 		return true
 	}
 
-	hasLayerStyleClipboard() {
-		return this._layerStyleClipboard != null
+	hasLayerStyleClipboard() { return this._layerStyleClipboard != null }
+	getLayerPresets() { return this.layerPresets }
+
+	saveLayerPresetFromLayer(sceneId, layerIndex, name) {
+		const l = this.getScene(sceneId)?.layers?.[layerIndex]
+		if (!l || !String(name || '').trim()) return null
+		const id = newId()
+		this.layerPresets.push({ id, name: LayerLogic.uniqueLayerPresetName(this.layerPresets, name.trim()), data: LayerLogic.getLayerStyleDataFromLayer(l) })
+		this._save(); return id
 	}
 
-	/** Paste copied style onto layer (same scene or another). */
 	pasteLayerStyle(sceneId, layerIndex) {
-		if (!this._layerStyleClipboard) return false
-		const s = this.getScene(sceneId)
-		const L = s?.layers?.[layerIndex]
-		if (!L) return false
-		const c = this._layerStyleClipboard
-		if (c.fill) L.fill = { ...defaultFill(), ...c.fill }
-		if (c.opacity != null) L.opacity = c.opacity
-		if (c.rotation != null) L.rotation = c.rotation
-		if (c.loop != null) L.loop = c.loop
-		if (c.audioRoute != null) L.audioRoute = c.audioRoute
-		if (c.volume != null) L.volume = c.volume
-		if (c.muted != null) L.muted = c.muted
-		if (c.straightAlpha != null) L.straightAlpha = c.straightAlpha
-		if (c.contentFit != null) L.contentFit = c.contentFit
-		if (c.aspectLocked != null) L.aspectLocked = c.aspectLocked
-		L.transition = c.transition
-		if (c.fadeOnEnd) L.fadeOnEnd = { ...c.fadeOnEnd }
-		if (c.pipOverlay !== undefined) L.pipOverlay = c.pipOverlay ? JSON.parse(JSON.stringify(c.pipOverlay)) : null
-		this._softSave()
-		return true
+		const L = this.getScene(sceneId)?.layers?.[layerIndex]
+		if (!L || !this._layerStyleClipboard) return false
+		LayerLogic.applyLayerStyleData(L, this._layerStyleClipboard)
+		this._softSave(); return true
+	}
+
+	applyLayerPresetToLayer(sceneId, layerIndex, presetId) {
+		const p = this.layerPresets.find((x) => x.id === presetId)
+		const L = this.getScene(sceneId)?.layers?.[layerIndex]
+		if (!p?.data || !L) return false
+		LayerLogic.applyLayerStyleData(L, p.data)
+		this._softSave(); return true
+	}
+
+	removeLayerPreset(presetId) {
+		const i = this.layerPresets.findIndex((p) => p.id === presetId)
+		if (i < 0) return false
+		this.layerPresets.splice(i, 1); this._save(); return true
+	}
+
+	getLookPresets() { return this.lookPresets }
+
+	saveLookPreset(name, sourceKind) {
+		const nameTrim = String(name || '').trim()
+		if (!nameTrim) return null
+		
+		const items = []
+		const targets = this.armedScreenIndices?.length ? this.armedScreenIndices : [this.activeScreenIndex]
+		targets.forEach(idx => {
+			const sceneId = sourceKind === 'prv' ? this.previewSceneIdByMain[idx] : (sourceKind === 'pgm' ? this.liveSceneIdByMain[idx] : (sourceKind === 'editing' ? this.editingSceneId : null))
+			if (sceneId && this.getScene(sceneId)) {
+				items.push({ mainIdx: idx, sceneId, sourceKind })
+			}
+		})
+		
+		if (items.length === 0) return null
+		
+		const id = newId()
+		const legacyFallback = items[0]
+		this.lookPresets.push({ 
+			id, 
+			name: LookLogic.uniqueLookPresetName(this.lookPresets, nameTrim), 
+			createdAt: Date.now(), 
+			items,
+			sceneId: legacyFallback.sceneId, 
+			sourceKind: legacyFallback.sourceKind, 
+			targetMain: legacyFallback.mainIdx 
+		})
+		this._save(); return id
+	}
+
+	removeLookPreset(presetId) {
+		const i = this.lookPresets.findIndex((p) => p.id === presetId)
+		if (i < 0) return false
+		this.lookPresets.splice(i, 1); this._save(); return true
+	}
+
+	patchLookPreset(lookPresetId, patch) {
+		const i = this.lookPresets.findIndex((p) => p.id === lookPresetId)
+		if (i < 0) return false
+		if (patch?.tandem === null) {
+			const { tandem: _t, ...rest } = patch
+			this.lookPresets[i] = { ...this.lookPresets[i], ...rest }; delete this.lookPresets[i].tandem
+		} else {
+			this.lookPresets[i] = { ...this.lookPresets[i], ...patch }
+		}
+		this._save(); return true
+	}
+
+	importLayerPresetsFromServer(list) {
+		const next = LayerLogic.importLayerPresetsFromServer(this.layerPresets, list)
+		if (!next) return false
+		this.layerPresets = next; this._save(); return true
+	}
+
+	importLookPresetsFromServer(list) {
+		const next = LookLogic.importLookPresetsFromServer(list)
+		if (!next) return false
+		this.lookPresets = next; this._save(); return true
 	}
 
 	removeScene(id) {
@@ -255,194 +287,114 @@ export class SceneState {
 		if (i < 0) return
 		this.scenes.splice(i, 1)
 		if (this.editingSceneId === id) this.editingSceneId = null
-		if (this.liveSceneId === id) this.liveSceneId = null
-		if (this.previewSceneId === id) this.previewSceneId = null
+		for (let m = 0; m < 4; m++) {
+			if (this.liveSceneIdByMain[m] === id) this.liveSceneIdByMain[m] = null
+			if (this.previewSceneIdByMain[m] === id) this.previewSceneIdByMain[m] = null
+		}
+		this.lookPresets = this.lookPresets.filter((p) => p.sceneId !== id)
 		this._save()
 	}
 
 	setSceneName(id, name) {
-		const s = this.scenes.find((x) => x.id === id)
+		const s = this.getScene(id)
 		if (!s) return
 		s.name = (name || '').trim() || 'Untitled look'
 		this._save()
 	}
 
-	/** Mark which look is live on program (after successful take). */
-	setLiveSceneId(id) {
-		this.liveSceneId = id || null
+	setLiveSceneId(id, mainIdx) {
+		const m = mainIdx != null && mainIdx >= 0 && mainIdx < 4 ? Math.floor(mainIdx) : this.activeScreenIndex
+		this.liveSceneIdByMain[m] = id ? String(id) : null
 		this._softSave()
 	}
 
-	/**
-	 * After a successful take, copy layers (and transition) from the server snapshot so the editor matches
-	 * scene.live.
-	 * @param {string} sceneId
-	 * @param {{ id?: string, layers?: object[], defaultTransition?: object, name?: string }} payload
-	 */
 	applySceneFromTakePayload(sceneId, payload) {
 		const s = this.getScene(sceneId)
-		if (!s || !payload || typeof payload !== 'object') return
-		if (payload.id != null && String(payload.id) !== String(sceneId)) return
-		if (Array.isArray(payload.layers)) {
-			s.layers = JSON.parse(JSON.stringify(payload.layers))
-		}
-		if (payload.defaultTransition != null) {
-			s.defaultTransition = { ...defaultTransition(), ...payload.defaultTransition }
-		}
-		if (typeof payload.name === 'string' && payload.name.trim()) s.name = payload.name.trim()
-		this._softSave()
+		if (s && LookLogic.applySceneFromTakePayload(s, payload)) this._softSave()
 	}
 
-	/**
-	 * Align live highlight with server-persisted program state (GET /api/scene/live or WS scene.live).
-	 * @param {Record<string, { sceneId?: string }>} channels - keyed by program channel number
-	 * @param {{ programChannels?: number[] }} [channelMap]
-	 */
 	applyServerLiveChannels(channels, channelMap) {
-		if (!channels || typeof channels !== 'object' || !channelMap?.programChannels?.length) return
-		const idx = this.activeScreenIndex
-		const ch = channelMap.programChannels[idx]
-		if (ch == null) return
-		const entry = channels[String(ch)]
-		const sid = entry?.sceneId
-		if (!sid) return
-		if (!this.getScene(sid)) return
-		if (this.liveSceneId === sid) return
-		this.liveSceneId = sid
-		this._softSave()
+		if (!channels || !channelMap?.programChannels?.length) return
+		let any = false
+		channelMap.programChannels.forEach((ch, idx) => {
+			const sid = String(channels[String(ch)]?.sceneId || '')
+			if (sid && this.getScene(sid) && this.liveSceneIdByMain[idx] !== sid) {
+				this.liveSceneIdByMain[idx] = sid; any = true
+			}
+		})
+		if (any) this._softSave()
 	}
 
-	getScene(id) {
-		if (id == null) return null
-		const key = String(id)
-		return this.scenes.find((s) => String(s.id) === key) || null
-	}
+	getScene(id) { return id ? this.scenes.find((s) => String(s.id) === String(id)) || null : null }
 
-	setEditingScene(id) {
-		this.editingSceneId = id
-		this._emit('editingChange', id)
-	}
+	setEditingScene(id) { this.editingSceneId = id; this._emit('editingChange', id) }
 
-	/** Next Caspar layer number for a new strip in this scene */
 	nextLayerNumber(scene) {
-		let max = 9
-		for (const l of scene.layers || []) {
-			if (l.layerNumber > max) max = l.layerNumber
-		}
-		return max + 1
+		const used = new Set((scene.layers || []).map(l => Number(l.layerNumber)).filter(n => Number.isFinite(n) && n >= LOOK_LAYER_FIRST && n % LOOK_LAYER_STEP === 0))
+		let c = LOOK_LAYER_FIRST
+		while (used.has(c)) c += LOOK_LAYER_STEP
+		return c
 	}
 
 	addLayer(sceneId) {
 		const s = this.getScene(sceneId)
 		if (!s) return -1
-		const n = this.nextLayerNumber(s)
-		s.layers.push(defaultLayerConfig(n))
-		this._save()
-		return s.layers.length - 1
+		s.layers.push(defaultLayerConfig(this.nextLayerNumber(s))); this._save(); return s.layers.length - 1
 	}
 
 	removeLayer(sceneId, layerIndex) {
 		const s = this.getScene(sceneId)
-		if (!s || layerIndex < 0 || layerIndex >= s.layers.length) return
-		s.layers.splice(layerIndex, 1)
-		this._save()
+		if (s && layerIndex >= 0 && layerIndex < s.layers.length) { s.layers.splice(layerIndex, 1); this._save() }
 	}
 
-	/**
-	 * Reorder layers for Z-order (Caspar layer numbers: bottom = lower, top = higher).
-	 * @param {string} sceneId
-	 * @param {number} fromVisualIndex - index in bottom→top list (0 = bottom)
-	 * @param {number} toVisualIndex - target index in that list (0 = bottom)
-	 */
 	reorderLayers(sceneId, fromVisualIndex, toVisualIndex) {
 		const s = this.getScene(sceneId)
 		if (!s?.layers?.length) return
-		const sorted = [...s.layers].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
-		const n = sorted.length
-		if (fromVisualIndex < 0 || fromVisualIndex >= n) return
-		if (toVisualIndex < 0 || toVisualIndex >= n) return
-		if (fromVisualIndex === toVisualIndex) return
-		const [item] = sorted.splice(fromVisualIndex, 1)
-		sorted.splice(toVisualIndex, 0, item)
-		let ln = 10
-		for (const layer of sorted) layer.layerNumber = ln++
-		s.layers = sorted
-		this._save()
+		const next = LayerLogic.reorderLayers(s.layers, fromVisualIndex, toVisualIndex, LOOK_LAYER_FIRST, LOOK_LAYER_STEP)
+		if (next) { s.layers = next; this._save() }
 	}
 
 	setLayerSource(sceneId, layerIndex, source) {
-		const s = this.getScene(sceneId)
-		if (!s || !s.layers[layerIndex]) return
-		s.layers[layerIndex].source = source
-		const v = source?.value
-		if (v && /\.(jpe?g|png|gif|bmp|webp|tiff?)$/i.test(String(v))) {
-			s.layers[layerIndex].loop = false
-		}
+		const s = this.getScene(sceneId); const L = s?.layers?.[layerIndex]
+		if (!L) return
+		L.source = source
+		if (source?.value && /\.(jpe?g|png|gif|bmp|webp|tiff?)$/i.test(String(source.value))) L.loop = false
 		this._save()
 	}
 
 	patchLayer(sceneId, layerIndex, patch) {
-		const s = this.getScene(sceneId)
-		if (!s || !s.layers[layerIndex]) return
-		const L = s.layers[layerIndex]
-		if (patch.fill) L.fill = { ...L.fill, ...patch.fill }
-		if (patch.fadeOnEnd) L.fadeOnEnd = { ...(L.fadeOnEnd || { enabled: false, frames: 12 }), ...patch.fadeOnEnd }
-		const { fill, fadeOnEnd, startBehaviour, ...rest } = patch
-		Object.assign(L, rest)
-		if ('startBehaviour' in patch) {
-			if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour
-			else L.startBehaviour = startBehaviour
-		}
-		this._softSave()
+		const L = this.getScene(sceneId)?.layers?.[layerIndex]
+		if (L) { LayerLogic.patchLayer(L, patch); this._softSave() }
 	}
 
 	setDefaultTransition(sceneId, t) {
 		const s = this.getScene(sceneId)
-		if (!s) return
-		s.defaultTransition = { ...defaultTransition(), ...s.defaultTransition, ...t }
-		this._softSave()
+		if (s) { s.defaultTransition = { ...defaultTransition(), ...s.defaultTransition, ...t }; this._softSave() }
 	}
 
-	/** Deck: default used for new looks; use {@link applyGlobalDefaultToAllLooks} to update every look. */
 	setGlobalDefaultTransition(t) {
 		this.globalDefaultTransition = { ...defaultTransition(), ...this.globalDefaultTransition, ...t }
 		this._softSave()
 	}
 
-	/** Copy {@link globalDefaultTransition} onto every scene’s defaultTransition (take uses per-look default). */
-	applyGlobalDefaultToAllLooks() {
+	applyGlobalDefaultToAllLooks(screenCount) {
 		const g = { ...defaultTransition(), ...this.globalDefaultTransition }
-		for (const s of this.scenes) {
-			s.defaultTransition = { ...g }
-		}
+		const targets = Number.isFinite(screenCount) && screenCount >= 2 ? this.getScenesForMain(this.activeScreenIndex) : this.scenes
+		const onDeck = new Set(targets.map(s => s.id))
+		this.scenes.forEach(s => { if (onDeck.has(s.id)) s.defaultTransition = { ...g } })
 		this._save()
 	}
 
 	getExportData() {
-		return JSON.parse(
-			JSON.stringify({
-				scenes: this.scenes,
-				liveSceneId: this.liveSceneId,
-				previewSceneId: this.previewSceneId,
-				activeScreenIndex: this.activeScreenIndex,
-				globalDefaultTransition: this.globalDefaultTransition,
-			})
-		)
+		return JSON.parse(JSON.stringify({
+			scenes: this.scenes, liveSceneIdByMain: this.liveSceneIdByMain, previewSceneIdByMain: this.previewSceneIdByMain,
+			liveSceneId: this.liveSceneId, previewSceneId: this.previewSceneId, activeScreenIndex: this.activeScreenIndex,
+			globalDefaultTransition: this.globalDefaultTransition, mainEditorVisible: this.mainEditorVisible,
+			layerPresets: this.layerPresets, lookPresets: this.lookPresets
+		}))
 	}
 
-	loadFromData(data) {
-		if (!data || !Array.isArray(data.scenes)) return
-		this.scenes = data.scenes.map((s) => migrateScene(s))
-		this.liveSceneId = data.liveSceneId ?? null
-		this.previewSceneId = data.previewSceneId ?? null
-		this.activeScreenIndex = typeof data.activeScreenIndex === 'number' ? data.activeScreenIndex : 0
-		this.globalDefaultTransition =
-			data.globalDefaultTransition && typeof data.globalDefaultTransition === 'object'
-				? { ...defaultTransition(), ...data.globalDefaultTransition }
-				: { ...defaultTransition() }
-		this._save()
-		this._emit('imported')
-	}
+	loadFromData(data) { if (this._applyPersistedData(data)) { this._save(); this._emit('imported') } }
 }
 
 export const sceneState = new SceneState()

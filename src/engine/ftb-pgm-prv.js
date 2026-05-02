@@ -5,13 +5,11 @@
 
 'use strict'
 
-const { MAX_BATCH_COMMANDS } = require('../caspar/amcp-batch')
 const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
 const playbackTracker = require('../state/playback-tracker')
 const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
-
-const TIMELINE_LAYER_BASE = 100
+const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
 
 function mapTween(tw) {
 	return String(tw || 'linear')
@@ -103,16 +101,13 @@ async function runFadeToBlackAllLayers(amcp, channels, opts, self) {
 				const cl = `${ch}-${L}`
 				lines.push(`MIXER ${cl} OPACITY 0 ${durationFrames} ${param(tween)}`)
 			}
-			for (let i = 0; i < lines.length; i += MAX_BATCH_COMMANDS) {
-				const chunk = lines.slice(i, i + MAX_BATCH_COMMANDS)
-				try {
-					await amcp.batchSend(chunk)
-				} catch {
-					for (const line of chunk) {
-						try {
-							await amcp.raw(line)
-						} catch (_) {}
-					}
+			try {
+				await amcp.batchSendChunked(lines)
+			} catch {
+				for (const line of lines) {
+					try {
+						await amcp.raw(line)
+					} catch (_) {}
 				}
 			}
 			await amcp.mixerCommit(ch)

@@ -193,23 +193,33 @@ export async function applyMultiviewAudioFocus() {
 	const targetId = multiviewState.audioActiveCellId
 	if (!targetId) return
 
-	// Channel 3 is MV channel as per T1.2
-	const MV_CH = 3 
+	const n = multiviewState.currentIndex || 1
+	const cm = (window.stateStore?.getState()?.channelMap || {})
+	const mvChs = Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : [])
+	const MV_CH = mvChs[n - 1] || 3
 	
+	// Cells start at layer 11 (layers 1–9 = DeckLink inputs, 10 = BG)
+	const MV_CELL_LAYER_START = 11
+
 	const idx = cells.findIndex(c => c.id === targetId)
 	if (idx < 0) return
 
-	const layer = idx + 1
-	
+	const targetLayer = idx + MV_CELL_LAYER_START
+
 	// Ensure browser follows the MV audio
 	streamState.setAudioSource('multiview')
 	streamState.setMuted(false)
-	
+
 	try {
 		const cmds = []
+		// Mute DeckLink input layers 1–9 and BG layer 10
+		for (let L = 1; L <= 10; L++) {
+			cmds.push(`MIXER ${MV_CH} VOLUME ${L} 0`)
+		}
+		// Set volume for cell layers
 		cells.forEach((c, i) => {
-			const L = i + 1
-			cmds.push(`MIXER ${MV_CH} VOLUME ${L} ${L === layer ? 1 : 0}`)
+			const L = i + MV_CELL_LAYER_START
+			cmds.push(`MIXER ${MV_CH} VOLUME ${L} ${L === targetLayer ? 1 : 0}`)
 		})
 		await api.post('/api/amcp/batch', { commands: cmds })
 	} catch (e) {
@@ -224,21 +234,46 @@ export async function applyMultiviewAudioFocus() {
 export async function applyMultiviewLayout(getChannelMap, opts = {}) {
 	const silent = !!opts.silent
 	const cm = getChannelMap()
-	const mvCh = cm.multiviewCh
-	if (mvCh == null) {
-		if (!silent) alert('Multiview is not enabled. Enable it in module settings.')
+	const layout = multiviewState.toApiLayout()
+	const n = multiviewState.currentIndex || 1
+	const mvChs = Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : [])
+	const targetCh = mvChs[n - 1] || cm.multiviewCh
+
+	if (targetCh == null) {
+		if (!silent) alert(`Multiview ${n} channel not found.`)
 		return
 	}
-	const layout = multiviewState.toApiLayout()
+
 	try {
 		await api.post('/api/multiview/apply', {
+			n,
 			layout,
 			showOverlay: multiviewState.showOverlay,
+			bgColor: multiviewState.bgColor,
 		})
 	} catch (e) {
+		const msg = String(e?.message ?? e ?? '')
+		// Backward-compatible fallback for older server builds.
+		if (msg.includes('HTTP 404')) {
+			let fallback404 = false
+			try {
+				await api.post('/api/multiview', {
+					layout,
+					showOverlay: multiviewState.showOverlay,
+					bgColor: multiviewState.bgColor,
+				})
+				return
+			} catch (fallbackErr) {
+				const fbMsg = String(fallbackErr?.message ?? fallbackErr ?? '')
+				fallback404 = fbMsg.includes('HTTP 404')
+				if (!fallback404) console.error('Multiview apply fallback failed:', fallbackErr)
+			}
+			if (silent) return
+			alert('Multiview apply route is missing on this server build. Restart/update the backend so `/api/multiview/apply` is available.')
+			return
+		}
 		console.error('Multiview apply failed:', e)
 		if (silent) return
-		const msg = String(e?.message ?? e ?? '')
 		const hint = (msg.toLowerCase().includes('not connected') || msg.includes('503'))
 			? 'CasparCG is not connected. Check module Settings → Connection and ensure CasparCG server is running.'
 			: msg

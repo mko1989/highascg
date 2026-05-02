@@ -5,7 +5,7 @@
 
 'use strict'
 
-const defaults = require('../../config/default')
+const defaults = require('../config/defaults')
 const { normalizeAudioRouting } = require('../config/config-generator')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
@@ -135,6 +135,43 @@ async function handlePost(path, body, ctx) {
 			status: 200,
 			headers: JSON_HEADERS,
 			body: jsonBody({ ok: true, scope: res.scope || scope, path: res.path }),
+		}
+	}
+	if (path === '/api/audio/monitor-source') {
+		if (!ctx.amcp) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
+		}
+		const b = parseBody(body)
+		if (!b || typeof b !== 'object') {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
+		}
+		const source = String(b.source || 'pgm_1').toLowerCase()
+		const map = (require('../config/routing-map')).getChannelMap(ctx.config)
+		const monitorCh = map.monitorCh
+		if (!monitorCh) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Monitor channel not enabled in config' }) }
+		}
+
+		let src = ''
+		if (source === 'multiview' && map.multiviewCh != null) src = `route://${map.multiviewCh}`
+		else if (source.startsWith('pgm_')) {
+			const n = parseInt(source.split('_')[1], 10) || 1
+			src = `route://${map.programCh(n)}`
+		} else if (source.startsWith('prv_')) {
+			const n = parseInt(source.split('_')[1], 10) || 1
+			const p = map.previewCh(n)
+			if (p != null) src = `route://${p}`
+		}
+
+		if (!src) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Invalid source: ${source}` }) }
+		}
+
+		try {
+			await ctx.amcp.play(monitorCh, 1, src)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, source, monitorCh }) }
+		} catch (e) {
+			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
 		}
 	}
 

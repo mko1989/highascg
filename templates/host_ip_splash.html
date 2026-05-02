@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Host IP</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #000000;
+			color: #ffffff;
+			font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+		}
+		#wrap {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			text-align: center;
+			padding: 4%;
+			background: rgba(0, 0, 0, 0.88);
+			box-sizing: border-box;
+		}
+		#lines {
+			font-size: clamp(18px, 3.2vmin, 42px);
+			font-weight: 600;
+			line-height: 1.45;
+			white-space: pre-line;
+			word-break: break-all;
+			color: #ffffff;
+			text-shadow: 0 0 20px rgba(0, 0, 0, 0.95), 0 2px 4px rgba(0, 0, 0, 0.9);
+		}
+	</style>
+</head>
+<body>
+	<div id="wrap"><div id="lines"></div></div>
+	<script>
+		window['play'] = function (s) {
+			if (s != null && String(s).trim() !== '') update(typeof s === 'string' ? s : JSON.stringify(s))
+		}
+		function update(raw) {
+			var el = document.getElementById('lines')
+			if (!el) return
+			var lines = []
+			try {
+				var s = typeof raw === 'string' ? raw.trim() : ''
+				if (s && s.charAt(0) === '{') {
+					var o = JSON.parse(s)
+					if (o && Array.isArray(o.lines)) lines = o.lines
+					else if (o && typeof o.text === 'string') lines = o.text.split(/\r?\n/)
+				}
+			} catch (e) { return }
+			el.textContent = lines.filter(Boolean).join('\n')
+		}
+		window['update'] = update
+	</script>
+</body>
+</html>

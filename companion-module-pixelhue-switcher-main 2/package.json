@@ -1,0 +1,55 @@
+{
+	"name": "companion-module-pixelhue-switcher",
+	"version": "2.2.55",
+	"main": "dist/main.js",
+	"type": "module",
+	"scripts": {
+		"postinstall": "husky",
+		"format": "prettier -w .",
+		"package": "npm run build && companion-module-build",
+		"build": "rimraf dist && npm run build:main",
+		"build:main": "tsc -p tsconfig.build.json",
+		"dev": "tsc -p tsconfig.build.json --watch",
+		"lint:raw": "eslint",
+		"lint": "npm run lint:raw ."
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bitfocus/companion-module-pixelhue-switcher.git"
+	},
+	"engines": {
+		"node": "^22.14",
+		"yarn": "^4"
+	},
+	"dependencies": {
+		"@companion-module/base": "^1.12.1",
+		"got": "^14.4.7",
+		"jsonwebtoken": "^9.0.2",
+		"ws": "^8.18.3"
+	},
+	"devDependencies": {
+		"@companion-module/tools": "^2.6.1",
+		"@types/jest": "^30.0.0",
+		"@types/jsonwebtoken": "^9",
+		"@types/node": "^22.14.1",
+		"@types/ws": "^8",
+		"eslint": "^9.24.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^15.5.1",
+		"prettier": "^3.5.3",
+		"rimraf": "^6.0.1",
+		"typescript": "~5.8.3",
+		"typescript-eslint": "^8.30.1"
+	},
+	"prettier": "@companion-module/tools/.prettierrc.json",
+	"lint-staged": {
+		"*.{css,json,md,scss}": [
+			"prettier --write"
+		],
+		"*.{ts,tsx,js,jsx}": [
+			"yarn lint:raw --fix"
+		]
+	},
+	"packageManager": "yarn@4.9.2"
+}

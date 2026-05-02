@@ -6,8 +6,8 @@
 
 const os = require('os')
 const fs = require('fs')
-const { execSync } = require('child_process')
-const { JSON_HEADERS, jsonBody } = require('./response')
+const { execSync, execFileSync } = require('child_process')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
  * @returns {Array<{name: string, address: string}>}
@@ -107,4 +107,66 @@ async function handleGet(path, ctx) {
 	}
 }
 
-module.exports = { handleGet, readDisplayMode }
+function checkNuclearPassword(body, ctx) {
+	const cfgUi = ctx?.config?.ui && typeof ctx.config.ui === 'object' ? ctx.config.ui : {}
+	const requirePassword = cfgUi.nuclearRequirePassword === true || cfgUi.nuclearRequirePassword === 'true'
+	if (!requirePassword) return { ok: true }
+	const expected = String(cfgUi.nuclearPassword || '')
+	if (!expected) return { ok: false, status: 403, error: 'Nuclear password required but not configured.' }
+	const b = parseBody(body)
+	const provided = String(b?.password || '')
+	if (provided !== expected) return { ok: false, status: 403, error: 'Invalid password.' }
+	return { ok: true }
+}
+
+function runSudoNoPrompt(candidates) {
+	let lastErr = null
+	for (const c of candidates) {
+		try {
+			const out = execFileSync('sudo', ['-n', c.bin, ...c.args], { encoding: 'utf8', timeout: 15000 })
+			return { ok: true, command: `${c.bin} ${c.args.join(' ')}`.trim(), output: String(out || '').trim() }
+		} catch (e) {
+			lastErr = e
+		}
+	}
+	const msg = lastErr?.stderr ? String(lastErr.stderr).trim() : (lastErr?.message || 'Command failed')
+	return { ok: false, error: msg }
+}
+
+async function handlePost(path, body, ctx) {
+	if (path !== '/api/system/setup/restart-window-manager' && path !== '/api/system/setup/reboot') return null
+	const pw = checkNuclearPassword(body, ctx)
+	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
+
+	if (path === '/api/system/setup/restart-window-manager') {
+		const r = runSudoNoPrompt([
+			{ bin: '/bin/systemctl', args: ['restart', 'nodm'] },
+			{ bin: '/usr/bin/systemctl', args: ['restart', 'nodm'] },
+		])
+		if (!r.ok) {
+			return {
+				status: 502,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: `Restart failed: ${r.error}. Check sudoers for casparcg user.` }),
+			}
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action: 'restart-window-manager' }) }
+	}
+
+	const r = runSudoNoPrompt([
+		{ bin: '/sbin/reboot', args: [] },
+		{ bin: '/usr/sbin/reboot', args: [] },
+		{ bin: '/bin/systemctl', args: ['reboot'] },
+		{ bin: '/usr/bin/systemctl', args: ['reboot'] },
+	])
+	if (!r.ok) {
+		return {
+			status: 502,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: `Reboot failed: ${r.error}. Check sudoers for casparcg user.` }),
+		}
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action: 'reboot' }) }
+}
+
+module.exports = { handleGet, handlePost, readDisplayMode }

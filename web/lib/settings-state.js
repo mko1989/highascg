@@ -20,7 +20,9 @@ export const settingsState = {
 			listenAddress: '0.0.0.0',
 			peakHoldMs: 2000,
 		},
-		ui: { oscFooterVu: true, rundownPlaybackTimer: true },
+		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '' },
+		/** Dedicated Caspar channel for RTMP/record (WO-27); tab visible when enabled */
+		streamingChannel: { enabled: false, videoSource: 'program_1', audioSource: 'follow_video', dedicatedOutputChannel: false },
 		audioRouting: {
 			programLayout: 'stereo',
 			programOutput: 'default',
@@ -36,6 +38,19 @@ export const settingsState = {
 			previewSystemAudioEnabled: [false, false, false, false],
 			previewSystemAudioDevices: ['', '', '', ''],
 		},
+		recordOutputs: [{
+			id: 'rec_1',
+			label: 'Rec1',
+			enabled: true,
+			name: 'Rec1',
+			source: 'program_1',
+			crf: 26,
+			videoCodec: 'h264',
+			videoBitrateKbps: 4500,
+			encoderPreset: 'veryfast',
+			audioCodec: 'aac',
+			audioBitrateKbps: 128,
+		}],
 	},
 	listeners: new Set(),
 

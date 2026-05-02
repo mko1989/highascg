@@ -1,6 +1,8 @@
 import { parseNumberInput } from '../lib/math-input.js'
 import { timelineState } from '../lib/timeline-state.js'
 import { KF_PROPERTIES, KF_PROP_MAP } from './inspector-common.js'
+import { pixelsToNormalized, normalizedToPixels } from '../lib/fill-math.js'
+import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
 
 /**
  * Timeline clip keyframes + add-keyframe UI (after title + basic clip fields).
@@ -13,7 +15,13 @@ export function appendTimelineClipKeyframes(root, opts) {
 		syncTimelineToServer,
 		getTimelinePlaybackPos,
 		redrawClipInspector,
+		stateStore,
 	} = opts
+
+	const screenIdx = timelineState.getActive()?.screenIdx ?? 0
+	const res = stateStore.getState()?.channelMap?.programResolutions?.[screenIdx] || { w: 1920, h: 1080 }
+	const W = res.w || 1920
+	const H = res.h || 1080
 
 	// Keyframes: build grouped position (fill_x+fill_y) and scale (scale_x+scale_y) by time
 	const allKfs = clip.keyframes || []
@@ -50,10 +58,12 @@ export function appendTimelineClipKeyframes(root, opts) {
 		posKfs.forEach((gkf) => {
 			const row = document.createElement('div')
 			row.className = 'inspector-field inspector-keyframe-row'
+			const xPx = Math.round(normalizedToPixels(gkf.x, W))
+			const yPx = Math.round(normalizedToPixels(gkf.y, H))
 			row.innerHTML = `
 				<span class="inspector-field__key">@ ${gkf.time}ms</span>
-				<input type="text" class="inspector-field__input inspector-kf-x" value="${gkf.x}" placeholder="X" style="width:42px" />
-				<input type="text" class="inspector-field__input inspector-kf-y" value="${gkf.y}" placeholder="Y" style="width:42px" />
+				<input type="text" class="inspector-field__input inspector-kf-x" value="${xPx}" placeholder="X" style="width:42px" />
+				<input type="text" class="inspector-field__input inspector-kf-y" value="${yPx}" placeholder="Y" style="width:42px" />
 				<select class="inspector-field__select inspector-keyframe-easing">
 					${['linear', 'ease-in', 'ease-out', 'ease-in-out'].map((e) => `<option value="${e}" ${e === (gkf.easing || 'linear') ? 'selected' : ''}>${e}</option>`).join('')}
 				</select>
@@ -64,10 +74,10 @@ export function appendTimelineClipKeyframes(root, opts) {
 			const easeSel = row.querySelector('.inspector-keyframe-easing')
 			const removeBtn = row.querySelector('.inspector-kf-remove')
 			const applyPos = () => {
-				const x = parseNumberInput(xInp.value, NaN)
-				const y = parseNumberInput(yInp.value, NaN)
-				if (!isNaN(x)) timelineState.addKeyframe(timelineId, layerIdx, clipId, { time: gkf.time, property: 'fill_x', value: x, easing: easeSel.value })
-				if (!isNaN(y)) timelineState.addKeyframe(timelineId, layerIdx, clipId, { time: gkf.time, property: 'fill_y', value: y, easing: easeSel.value })
+				const xPx = parseNumberInput(xInp.value, NaN)
+				const yPx = parseNumberInput(yInp.value, NaN)
+				if (!isNaN(xPx)) timelineState.addKeyframe(timelineId, layerIdx, clipId, { time: gkf.time, property: 'fill_x', value: pixelsToNormalized(xPx, W), easing: easeSel.value })
+				if (!isNaN(yPx)) timelineState.addKeyframe(timelineId, layerIdx, clipId, { time: gkf.time, property: 'fill_y', value: pixelsToNormalized(yPx, H), easing: easeSel.value })
 				syncTimelineToServer()
 			}
 			xInp.addEventListener('change', applyPos)
@@ -197,9 +207,11 @@ export function appendTimelineClipKeyframes(root, opts) {
 		const val = propSel.value
 		valuesWrap.innerHTML = ''
 		if (val === 'position') {
-			valuesWrap.innerHTML = '<input type="text" class="inspector-field__input inspector-kf-val-x" placeholder="X" value="0" style="width:42px" /><input type="text" class="inspector-field__input inspector-kf-val-y" placeholder="Y" value="0" style="width:42px" />'
+			const current = clipPixelRectAtLocalTime(clip, defaultTime, W, H, stateStore, screenIdx)
+			valuesWrap.innerHTML = `<input type="text" class="inspector-field__input inspector-kf-val-x" placeholder="X" value="${Math.round(current.x)}" style="width:42px" /><input type="text" class="inspector-field__input inspector-kf-val-y" placeholder="Y" value="${Math.round(current.y)}" style="width:42px" />`
 		} else if (val === 'scale') {
-			valuesWrap.innerHTML = '<input type="text" class="inspector-field__input inspector-kf-val-single" placeholder="scale" value="1" style="width:50px" />'
+			const current = clipPixelRectAtLocalTime(clip, defaultTime, W, H, stateStore, screenIdx)
+			valuesWrap.innerHTML = `<input type="text" class="inspector-field__input inspector-kf-val-single" placeholder="scale" value="${(current.w / W).toFixed(2)}" style="width:50px" />`
 		} else {
 			valuesWrap.innerHTML = `<input type="text" class="inspector-field__input inspector-kf-val-single" placeholder="value" value="${KF_PROP_MAP[val]?.default ?? 1}" style="width:50px" />`
 		}
@@ -213,11 +225,9 @@ export function appendTimelineClipKeyframes(root, opts) {
 		const time = Math.max(0, Math.round(parseNumberInput(timeInp.value, 0)))
 		const prop = propSel.value
 		if (prop === 'position') {
-			const xInp = addKfRow.querySelector('.inspector-kf-val-x')
-			const yInp = addKfRow.querySelector('.inspector-kf-val-y')
-			const x = parseNumberInput(xInp?.value ?? 0, 0)
-			const y = parseNumberInput(yInp?.value ?? 0, 0)
-			timelineState.addPositionKeyframe(timelineId, layerIdx, clipId, time, x, y)
+			const xPx = parseNumberInput(xInp?.value ?? 0, 0)
+			const yPx = parseNumberInput(yInp?.value ?? 0, 0)
+			timelineState.addPositionKeyframe(timelineId, layerIdx, clipId, time, pixelsToNormalized(xPx, W), pixelsToNormalized(yPx, H))
 		} else if (prop === 'scale') {
 			const valInp = addKfRow.querySelector('.inspector-kf-val-single')
 			const v = parseNumberInput(valInp?.value ?? 1, 1)

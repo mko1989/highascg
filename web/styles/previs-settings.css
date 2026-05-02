@@ -1,0 +1,138 @@
+/*
+ * Previs module scene settings.
+ */
+
+.previs-pgm-3d-settings {
+	position: absolute;
+	left: 6px;
+	bottom: 6px;
+	z-index: 18;
+	max-width: min(260px, calc(100% - 12px));
+	max-height: 45%;
+	overflow: auto;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.55);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 3px;
+	padding: 0px 4px 4px;
+	pointer-events: auto;
+}
+
+.previs-pgm-3d-settings__summary {
+	cursor: pointer;
+	padding: 4px 2px;
+	font-weight: 600;
+	list-style: none;
+}
+
+.previs-pgm-3d-settings__summary::-webkit-details-marker {
+	display: none;
+}
+
+.previs-pgm-3d-settings__body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 2px 4px 4px;
+}
+
+.previs-pgm-3d-settings__row {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.previs-pgm-3d-settings__row--inline {
+	flex-direction: row;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.previs-pgm-3d-settings__label {
+	font-size: 10px;
+	opacity: 0.85;
+}
+
+.previs-pgm-3d-settings__color {
+	width: 100%;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.previs-pgm-3d-settings__slider-line {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+}
+
+.previs-pgm-3d-settings__range {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.previs-pgm-3d-settings__value {
+	min-width: 2.5em;
+	text-align: right;
+	font-size: 10px;
+	opacity: 0.85;
+}
+
+.previs-pgm-3d-settings__select {
+	font-size: 11px;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+}
+
+.previs-pgm-3d-settings__row--inline .previs-pgm-3d-settings__select {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.previs-pgm-3d-settings__num {
+	width: 4.5rem;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+	padding: 2px 4px;
+}
+
+.previs-pgm-3d-settings__vc-sep {
+	font-size: 10px;
+	opacity: 0.75;
+}
+
+.previs-pgm-3d-settings__check {
+	margin: 0;
+}
+
+.previs-pgm-3d-settings__hint {
+	font-size: 9px;
+	opacity: 0.65;
+}
+
+/* Application Settings → 3D Previs tab (WO-30): undo overlay positioning */
+.settings-modal .previs-settings-modal-pane.previs-pgm-3d-settings {
+	position: static;
+	left: auto;
+	bottom: auto;
+	z-index: auto;
+	max-width: none;
+	max-height: none;
+	width: 100%;
+	margin-top: 0.35rem;
+}
+
+/* Skeleton rule kept for back-compat with the stub import; cheap and harmless. */
+.previs-skeleton {
+	display: contents;
+}

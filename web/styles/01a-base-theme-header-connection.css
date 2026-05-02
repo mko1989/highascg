@@ -212,6 +212,40 @@ optgroup {
 	border-color: var(--accent);
 }
 
+.header-btn--save,
+.header-btn--load {
+	display: flex;
+	align-items: center;
+	padding: 4px 8px;
+}
+
+.header-btn__icons {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.header-btn__disk,
+.header-btn__arrow {
+	width: 14px;
+	height: 14px;
+	filter: invert(0.9) brightness(1.2); /* Make black SVG look light */
+	transition: filter 0.15s;
+}
+
+.header-btn:hover .header-btn__disk,
+.header-btn:hover .header-btn__arrow {
+	filter: invert(0.1) brightness(0.8); /* Make them dark when button is light */
+}
+
+.header-btn--save .header-btn__arrow {
+	transform: translateX(-1px);
+}
+
+.header-btn--load .header-btn__arrow {
+	transform: translateX(1px);
+}
+
 .header__status {
 	display: flex;
 	align-items: center;
@@ -231,6 +265,29 @@ optgroup {
 	max-width: min(100%, 18rem);
 	overflow: hidden;
 	text-align: right;
+}
+
+.header-pgm-timer-chips {
+	display: inline-flex;
+	gap: 4px;
+	margin-bottom: 2px;
+}
+
+.header-pgm-timer-chip {
+	border: 1px solid var(--border, #3a3a3a);
+	background: transparent;
+	color: var(--text-muted, #9ca3af);
+	font-size: 10px;
+	line-height: 1;
+	padding: 2px 5px;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+.header-pgm-timer-chip--active {
+	color: var(--text, #fff);
+	border-color: var(--accent, #58a6ff);
+	background: color-mix(in srgb, var(--accent, #58a6ff) 20%, transparent);
 }
 
 /* Beats injected .playback-timer { min-width: 8em } from playback-timer.js */

@@ -483,3 +483,43 @@
 	pointer-events: none;
 }
 
+/* Folder / Tree styles for Sources Panel */
+.source-item--folder {
+	background: rgba(255, 255, 255, 0.03);
+	font-weight: 600;
+	border-left: 3px solid #f59e0b;
+}
+.source-item--folder:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+.source-item--folder .source-item__kind-pill {
+	background: #f59e0b;
+	color: #000;
+}
+.source-item__nest-indent {
+	display: inline-block;
+	width: 14px;
+	height: 10px;
+	border-left: 1px solid rgba(255,255,255,0.15);
+	margin-right: 4px;
+}
+.source-item--folder .source-item__label {
+	color: #f59e0b;
+}
+.source-item--folder .source-item__expand-arrow {
+	display: inline-block;
+	width: 12px;
+	text-align: center;
+	font-size: 8px;
+	opacity: 0.6;
+	margin-right: 4px;
+	transition: transform 0.2s;
+}
+.source-item--folder.collapsed .source-item__expand-arrow {
+	transform: rotate(-90deg);
+}
+.source-item--drop-target {
+	background: rgba(88, 166, 255, 0.2) !important;
+	outline: 1px dashed var(--accent);
+}
+

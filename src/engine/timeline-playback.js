@@ -192,7 +192,11 @@ function applyPlaybackMixin(TimelineEngineClass) {
 						const row = f.companionRow ?? 0
 						const col = f.companionColumn ?? 0
 						const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
-						fetch(url, { method: 'POST' }).catch((err) => {
+						fetch(url, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: '{}',
+						}).catch((err) => {
 							if (typeof this.self?.log === 'function') {
 								this.self.log('warn', `[Timeline] Companion press failed: ${err.message}`)
 							} else {
@@ -224,7 +228,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 				position: pos,
 				playing: true,
 				loop: this._pb?.loop ?? false,
-				sendTo: this._pb?.sendTo || { preview: true, program: true, screenIdx: 0 },
+				sendTo: this._pb?.sendTo || { preview: true, program: false, screenIdx: 0 },
 				_t0: Date.now(),
 				_p0: pos,
 			}
@@ -272,8 +276,8 @@ function applyPlaybackMixin(TimelineEngineClass) {
 					position: pos,
 					playing: false,
 					loop: false,
-					// Keep last sendTo when switching timelines; else match UI (PRV + PGM).
-					sendTo: this._pb?.sendTo || { preview: true, program: true, screenIdx: 0 },
+					// Keep last sendTo when switching timelines; else PRV-only default (same as transport).
+					sendTo: this._pb?.sendTo || { preview: true, program: false, screenIdx: 0 },
 					_t0: Date.now(),
 					_p0: pos,
 				}

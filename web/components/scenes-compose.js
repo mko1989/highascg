@@ -2,6 +2,7 @@
  * Compose frame: layer stack DOM, drag/rotate/scale, media drop.
  */
 
+
 import { fillToPixelRect, pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
@@ -17,6 +18,8 @@ function sourcePayloadForFill(data) {
 		value: data.value,
 		label: data.label,
 		resolution: data.resolution,
+		isPlaceholder: data.isPlaceholder,
+		template: data.template,
 	}
 }
 
@@ -51,62 +54,92 @@ export function createApplyNativeFillForSource(opts) {
  * @param {() => void} schedulePreviewPush
  */
 export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
-	function startDrag(e, layerIndex, scene, aspectEl) {
+	function startDrag(e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
 		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
 		const sx = e.clientX
 		const sy = e.clientY
+		sceneState.isInteracting = true
 
 		function onMove(ev) {
-			const dx = (ev.clientX - sx) / rect.width
-			const dy = (ev.clientY - sy) / rect.height
+			const currentRect = !aspectEl.isConnected ? document.querySelector('.scenes-compose')?.getBoundingClientRect() || rect : aspectEl.getBoundingClientRect()
+			const rw = Math.max(10, currentRect.width)
+			const rh = Math.max(10, currentRect.height)
+			const dx = (ev.clientX - sx) / rw
+			const dy = (ev.clientY - sy) / rh
+			const nx = Math.max(-5, Math.min(5, startFill.x + dx))
+			const ny = Math.max(-5, Math.min(5, startFill.y + dy))
+			
+			// Direct DOM update for instant feedback
+			el.style.left = `${nx * 100}%`
+			el.style.top = `${ny * 100}%`
+			
 			sceneState.patchLayer(scene.id, layerIndex, {
-				fill: { ...startFill, x: startFill.x + dx, y: startFill.y + dy },
+				fill: { ...startFill, x: nx, y: ny },
 			})
 			schedulePreviewPush()
 		}
 		function onUp() {
 			document.removeEventListener('pointermove', onMove)
 			document.removeEventListener('pointerup', onUp)
+			setTimeout(() => {
+				sceneState.isInteracting = false
+				sceneState.emit('change')
+			}, 10)
 		}
 		document.addEventListener('pointermove', onMove)
 		document.addEventListener('pointerup', onUp)
 	}
 
-	function startRotate(e, layerIndex, scene, aspectEl) {
+	function startRotate(e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
 		const fill = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
-		const pr = fillToPixelRect(fill, { width: rect.width, height: rect.height })
+		const rw = Math.max(1, rect.width)
+		const rh = Math.max(1, rect.height)
+		const pr = fillToPixelRect(fill, { width: rw, height: rh })
 		const cx = rect.left + pr.x + pr.w / 2
 		const cy = rect.top + pr.y + pr.h / 2
 		const startAngle = layer.rotation || 0
 		const a0 = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+		sceneState.isInteracting = true
 
 		function onMove(ev) {
 			const a1 = Math.atan2(ev.clientY - cy, ev.clientX - cx) * (180 / Math.PI)
 			let d = a1 - a0
 			while (d > 180) d -= 360
 			while (d < -180) d += 360
-			sceneState.patchLayer(scene.id, layerIndex, { rotation: startAngle + d })
+			const finalAngle = startAngle + d
+			
+			// Direct DOM update
+			el.style.transform = `rotate(${finalAngle}deg)`
+			
+			sceneState.patchLayer(scene.id, layerIndex, { rotation: finalAngle })
 			schedulePreviewPush()
 		}
 		function onUp() {
 			document.removeEventListener('pointermove', onMove)
 			document.removeEventListener('pointerup', onUp)
+			setTimeout(() => {
+				sceneState.isInteracting = false
+				sceneState.emit('change')
+			}, 10)
 		}
 		document.addEventListener('pointermove', onMove)
 		document.addEventListener('pointerup', onUp)
 	}
 
-	function startScale(e, layerIndex, scene, aspectEl) {
+	function startScale(e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
 		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
-		const cx = (startFill.x + startFill.scaleX / 2) * rect.width + rect.left
-		const cy = (startFill.y + startFill.scaleY / 2) * rect.height + rect.top
+		const rw = Math.max(1, rect.width)
+		const rh = Math.max(1, rect.height)
+		const cx = (startFill.x + startFill.scaleX / 2) * rw + rect.left
+		const cy = (startFill.y + startFill.scaleY / 2) * rh + rect.top
 		const r0 = Math.hypot(e.clientX - cx, e.clientY - cy)
+		sceneState.isInteracting = true
 
 		function onMove(ev) {
 			const r1 = Math.hypot(ev.clientX - cx, ev.clientY - cy)
@@ -115,13 +148,22 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 			const nsy = Math.max(0.02, Math.min(4, startFill.scaleY * k))
 			const dx = (startFill.scaleX - nsx) / 2
 			const dy = (startFill.scaleY - nsy) / 2
+			const nx = startFill.x + dx
+			const ny = startFill.y + dy
+
+			// Direct DOM update
+			el.style.left = `${nx * 100}%`
+			el.style.top = `${ny * 100}%`
+			el.style.width = `${nsx * 100}%`
+			el.style.height = `${nsy * 100}%`
+
 			sceneState.patchLayer(scene.id, layerIndex, {
 				fill: {
 					...startFill,
 					scaleX: nsx,
 					scaleY: nsy,
-					x: startFill.x + dx,
-					y: startFill.y + dy,
+					x: nx,
+					y: ny,
 				},
 			})
 			schedulePreviewPush()
@@ -129,6 +171,10 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		function onUp() {
 			document.removeEventListener('pointermove', onMove)
 			document.removeEventListener('pointerup', onUp)
+			setTimeout(() => {
+				sceneState.isInteracting = false
+				sceneState.emit('change')
+			}, 10)
 		}
 		document.addEventListener('pointermove', onMove)
 		document.addEventListener('pointerup', onUp)
@@ -137,17 +183,20 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 	/**
 	 * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
 	 */
-	function startEdgeResize(edge, e, layerIndex, scene, aspectEl) {
+	function startEdgeResize(edge, e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
 		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
 		const sx0 = e.clientX
 		const sy0 = e.clientY
 		const minS = 0.02
+		sceneState.isInteracting = true
 
 		function onMove(ev) {
-			const dx = (ev.clientX - sx0) / rect.width
-			const dy = (ev.clientY - sy0) / rect.height
+			const rw = Math.max(1, rect.width)
+			const rh = Math.max(1, rect.height)
+			const dx = (ev.clientX - sx0) / rw
+			const dy = (ev.clientY - sy0) / rh
 			let x = startFill.x
 			let y = startFill.y
 			let sx = startFill.scaleX
@@ -166,10 +215,12 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 
 			sx = Math.max(minS, sx)
 			sy = Math.max(minS, sy)
-			x = Math.max(0, Math.min(1 - sx, x))
-			y = Math.max(0, Math.min(1 - sy, y))
-			if (x + sx > 1) sx = 1 - x
-			if (y + sy > 1) sy = 1 - y
+
+			// Direct DOM update
+			el.style.left = `${x * 100}%`
+			el.style.top = `${y * 100}%`
+			el.style.width = `${sx * 100}%`
+			el.style.height = `${sy * 100}%`
 
 			sceneState.patchLayer(scene.id, layerIndex, {
 				fill: { ...startFill, x, y, scaleX: sx, scaleY: sy },
@@ -179,6 +230,10 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		function onUp() {
 			document.removeEventListener('pointermove', onMove)
 			document.removeEventListener('pointerup', onUp)
+			setTimeout(() => {
+				sceneState.isInteracting = false
+				sceneState.emit('change')
+			}, 10)
 		}
 		document.addEventListener('pointermove', onMove)
 		document.addEventListener('pointerup', onUp)
@@ -211,7 +266,7 @@ export function renderComposeScene(scene, opts) {
 	const dropHint = document.createElement('p')
 	dropHint.className = 'scenes-compose-hint'
 	dropHint.textContent =
-		'Drop media from the list onto the frame to add a layer, or onto a layer to replace it. Use the shaded margin when layers cover the full frame.'
+		'Drop media or templates from Sources onto the frame to add a layer, or onto a layer to replace it. Use the shaded margin when layers cover the full frame.'
 
 	const pad = document.createElement('div')
 	pad.className = 'scenes-compose-pad'
@@ -228,6 +283,10 @@ export function renderComposeScene(scene, opts) {
 			const val = e.dataTransfer.getData('text/plain')
 			if (val) data = { type: 'media', value: val, label: val }
 		}
+		// Multi-drag reconstruction
+		if (data?.type === 'multi' && Array.isArray(data.items)) {
+			return data.items
+		}
 		return data
 	}
 
@@ -236,6 +295,7 @@ export function renderComposeScene(scene, opts) {
 		const idx = sceneState.addLayer(scene.id)
 		if (idx < 0) return
 		sceneState.setLayerSource(scene.id, idx, {
+			...data,
 			type: data.type || 'media',
 			value: data.value,
 			label: data.label || data.value,
@@ -260,7 +320,15 @@ export function renderComposeScene(scene, opts) {
 		pad.classList.remove('scenes-compose-pad--dropping')
 		if (e.target.closest('.scenes-compose')) return
 		const data = parseDropData(e)
-		if (data?.value) addLayerFromMedia(data)
+		if (Array.isArray(data)) {
+			void (async () => {
+				for (const item of data) {
+					if (item?.value) await addLayerFromMedia(item)
+				}
+			})()
+		} else if (data?.value) {
+			addLayerFromMedia(data)
+		}
 	})
 
 	aspect.addEventListener('dragover', (e) => {
@@ -274,7 +342,15 @@ export function renderComposeScene(scene, opts) {
 		e.preventDefault()
 		e.stopPropagation()
 		const data = parseDropData(e)
-		if (data?.value) addLayerFromMedia(data)
+		if (Array.isArray(data)) {
+			void (async () => {
+				for (const item of data) {
+					if (item?.value) await addLayerFromMedia(item)
+				}
+			})()
+		} else if (data?.value) {
+			addLayerFromMedia(data)
+		}
 	})
 
 	const sorted = [...scene.layers].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
@@ -297,7 +373,17 @@ export function renderComposeScene(scene, opts) {
 		const inner = document.createElement('div')
 		inner.className = 'scenes-layer__inner'
 
-		if (isMediaOrFileSource(layer.source)) {
+		if (layer.source?.isPlaceholder) {
+			const ph = document.createElement('div')
+			ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--pattern'
+			const t = layer.source.template || 'color_grid'
+			ph.dataset.template = t
+			if (t === 'solid' && layer.source.value) {
+				ph.style.backgroundColor = layer.source.value
+			}
+			ph.textContent = layer.source.label || layer.source.value
+			inner.appendChild(ph)
+		} else if (isMediaOrFileSource(layer.source)) {
 			const img = document.createElement('img')
 			img.className = 'scenes-layer__thumb'
 			img.alt = ''
@@ -348,7 +434,7 @@ export function renderComposeScene(scene, opts) {
 				e.stopPropagation()
 				e.preventDefault()
 				dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-				startEdgeResize(ed, e, realIdx, scene, aspect)
+				startEdgeResize(ed, e, realIdx, scene, aspect, el)
 			})
 		})
 
@@ -357,20 +443,20 @@ export function renderComposeScene(scene, opts) {
 			if (e.target.closest('.scenes-layer__edge')) return
 			e.preventDefault()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			startDrag(e, realIdx, scene, aspect)
+			startDrag(e, realIdx, scene, aspect, el)
 		})
 
 		const rotBtn = handles.querySelector('.scenes-layer__handle--rotate')
 		rotBtn.addEventListener('pointerdown', (e) => {
 			e.stopPropagation()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			startRotate(e, realIdx, scene, aspect)
+			startRotate(e, realIdx, scene, aspect, el)
 		})
 		const scaleBtn = handles.querySelector('.scenes-layer__handle--scale')
 		scaleBtn.addEventListener('pointerdown', (e) => {
 			e.stopPropagation()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			startScale(e, realIdx, scene, aspect)
+			startScale(e, realIdx, scene, aspect, el)
 		})
 
 		el.addEventListener('dragover', (e) => {
@@ -384,20 +470,42 @@ export function renderComposeScene(scene, opts) {
 			e.preventDefault()
 			e.stopPropagation()
 			el.classList.remove('scenes-layer--drag-over')
-			let data
-			try {
-				data = JSON.parse(e.dataTransfer.getData('application/json'))
-			} catch {
-				const val = e.dataTransfer.getData('text/plain')
-				if (val) data = { type: 'media', value: val, label: val }
-			}
-			if (data?.value) {
+			const data = parseDropData(e)
+			if (Array.isArray(data)) {
+				void (async () => {
+					// Replace this layer with first item
+					const first = data[0]
+					if (first?.value) {
+						sceneState.setLayerSource(scene.id, realIdx, {
+							...first,
+							type: first.type || 'media',
+							value: first.value,
+							label: first.label || first.value,
+						})
+						await applyNativeFillForSource(realIdx, sourcePayloadForFill(first))
+					}
+					// Add others as new layers
+					for (let i = 1; i < data.length; i++) {
+						if (data[i]?.value) await addLayerFromMedia(data[i])
+					}
+					const updated = sceneState.getScene(scene.id)
+					const layer = updated?.layers?.[realIdx]
+					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+					schedulePreviewPush()
+				})()
+			} else if (data?.value) {
 				sceneState.setLayerSource(scene.id, realIdx, {
+					...data,
 					type: data.type || 'media',
 					value: data.value,
 					label: data.label || data.value,
 				})
-				void applyNativeFillForSource(realIdx, sourcePayloadForFill(data)).then(() => schedulePreviewPush())
+				void applyNativeFillForSource(realIdx, sourcePayloadForFill(data)).then(() => {
+					const updated = sceneState.getScene(scene.id)
+					const layer = updated?.layers?.[realIdx]
+					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+					schedulePreviewPush()
+				})
 			}
 		})
 

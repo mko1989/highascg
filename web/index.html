@@ -6,6 +6,23 @@
 	<title>HighAsCG — Direct Playout</title>
 	<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 	<link rel="stylesheet" href="styles.css">
+
+	<!--
+		Import map for optional modules. The entries below are inert when the underlying
+		npm package isn't installed (`three` is an optionalDependency — only present after
+		`npm run install:previs`). Browsers ignore unused import-map entries, so this is
+		safe to ship unconditionally. Loaded here (before `app.js`) because import maps
+		must exist BEFORE any module script is parsed.
+	-->
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "/vendor/three/build/three.module.js",
+			"three/": "/vendor/three/",
+			"three/addons/": "/vendor/three/examples/jsm/"
+		}
+	}
+	</script>
 </head>
 <body>
 	<div id="app" class="app">
@@ -34,21 +51,28 @@
 					<button class="tab active" data-tab="scenes">Scenes / Looks</button>
 					<button class="tab" data-tab="timeline">Timeline Editor</button>
 					<button class="tab" data-tab="multiview">Multiview Editor</button>
+					<button class="tab" data-tab="device-view">Devices</button>
 					<button class="tab" data-tab="pixelmap">Pixel Map</button>
+					<button class="tab" data-tab="streaming" id="tab-btn-streaming" style="display:none">Streaming</button>
 				</div>
 				<div class="workspace__content">
-					<div class="offline-watermark">Offline Draft</div>
 					<div class="tab-pane active" id="tab-scenes"></div>
 					<div class="tab-pane" id="tab-timeline"></div>
 					<div class="tab-pane" id="tab-multiview"></div>
+					<div class="tab-pane" id="tab-device-view"></div>
 					<div class="tab-pane" id="tab-pixelmap"></div>
+					<div class="tab-pane" id="tab-streaming"></div>
 				</div>
 			</main>
 
 			<div class="resize-handle resize-handle--inspector" id="resize-inspector" title="Drag to resize Inspector" aria-hidden="true"></div>
 			<aside class="panel panel-inspector" id="panel-inspector">
-				<div class="panel__header panel__header--with-actions">
-					<h2>Inspector</h2>
+				<div class="panel__header panel__header--with-actions panel__header--inspector-modes">
+					<div class="panel-inspector-modes" role="tablist" aria-label="Right panel">
+						<button type="button" class="panel-inspector-mode panel-inspector-mode--active" role="tab" data-inspector-mode="inspector" aria-selected="true">Inspector</button>
+						<button type="button" class="panel-inspector-mode" role="tab" data-inspector-mode="layerPresets" aria-selected="false">Layer presets</button>
+						<button type="button" class="panel-inspector-mode" role="tab" data-inspector-mode="lookPresets" aria-selected="false">Look presets</button>
+					</div>
 					<button type="button" class="panel__collapse-btn" id="panel-inspector-collapse" aria-expanded="true" aria-label="Collapse Inspector" title="Collapse Inspector">»</button>
 				</div>
 				<div class="panel__body panel-inspector__body" id="panel-inspector-body">

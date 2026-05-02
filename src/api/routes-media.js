@@ -12,6 +12,8 @@ const {
 	handleLocalMedia: serveLocalMedia,
 	handleDeleteLocalMedia: deleteLocalMediaFile,
 	unlinkMediaById,
+	createMediaFolder,
+	moveMediaFile,
 	resolveMediaFileOnDisk,
 	probeMedia,
 } = require('../media/local-media')
@@ -22,6 +24,8 @@ function cinfResponseToStr(data) {
 	if (Array.isArray(data)) return data.join('\n')
 	return String(data)
 }
+
+const failedThumbs = new Map() // filename -> timestamp
 
 async function handleThumbnail(path, query, ctx) {
 	if (path === '/api/thumbnails') {
@@ -52,6 +56,13 @@ async function handleThumbnail(path, query, ctx) {
 
 	if (filename == null || filename === '') return null
 
+	// Avoid spamming failed thumbnails
+	const now = Date.now()
+	const lastFail = failedThumbs.get(filename)
+	if (lastFail && now - lastFail < 10000) {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Thumbnail retrieval on cooldown' }) }
+	}
+
 	const maxW = Math.min(1920, Math.max(64, parseInt(String(query.w ?? ''), 10) || 960))
 	const seekSec = Math.max(0, parseFloat(String(query.t ?? '')) || 2)
 	const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
@@ -68,11 +79,14 @@ async function handleThumbnail(path, query, ctx) {
 		if (Array.isArray(raw)) base64 = raw.join('').replace(/\s/g, '')
 		else if (typeof raw === 'string' && raw.length > 100) base64 = raw.replace(/\s/g, '')
 		if (base64 && /^[A-Za-z0-9+/=]+$/.test(base64)) {
+			failedThumbs.delete(filename)
 			const buf = Buffer.from(base64, 'base64')
 			return { status: 200, headers: { 'Content-Type': 'image/png' }, body: buf }
 		}
+		if (r?.error) failedThumbs.set(filename, now)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 	} catch (e) {
+		failedThumbs.set(filename, now)
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Thumbnail not found' }) }
 	}
 }
@@ -126,6 +140,22 @@ async function handlePost(path, body, ctx) {
 		const id = (b.id || '').trim()
 		if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
 		const r = await unlinkMediaById(ctx.config || {}, id)
+		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
+		return r
+	}
+	if (path === '/api/media/mkdir') {
+		const b = parseBody(body)
+		const folder = (b.path || '').trim()
+		if (!folder) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'path required' }) }
+		const r = await createMediaFolder(ctx.config || {}, folder)
+		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
+		return r
+	}
+	if (path === '/api/media/move') {
+		const b = parseBody(body)
+		const { sourceId, targetId } = b
+		if (!sourceId || !targetId) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'sourceId and targetId required' }) }
+		const r = await moveMediaFile(ctx.config || {}, sourceId, targetId)
 		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
 		return r
 	}

@@ -40,6 +40,26 @@ function casparUdpStreamUriVariantsForRemove(port) {
 }
 
 /**
+ * Returns a list of active STREAM URIs for a channel by parsing `INFO <channel>`.
+ * @param {import('../caspar/amcp-client').AmcpClient} amcp
+ * @param {number} channel
+ * @returns {Promise<string[]>}
+ */
+async function getActiveStreamUris(amcp, channel) {
+	if (!amcp || !amcp.isConnected) return []
+	try {
+		const info = await amcp.info(channel)
+		const text = amcpInfoText(info)
+		// Extract all udp://... URIs from STREAM consumers
+		// Lines usually look like: #2 STREAM udp://127.0.0.1:10035?localport=20035 ...
+		const matches = text.matchAll(/STREAM\s+(\S+)/gi)
+		return [...matches].map((m) => m[1])
+	} catch {
+		return []
+	}
+}
+
+/**
  * Caspar can stop replying to AMCP while shutting down; unbounded waits block SIGTERM shutdown.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {string} cmd
@@ -194,12 +214,18 @@ async function addStreamingConsumers(amcp, targets, config) {
 	for (const t of targets) {
 		const uri = casparUdpStreamUri(t.port)
 
-		for (const u of casparUdpStreamUriVariantsForRemove(t.port)) {
-			try {
-				await amcp.raw(`REMOVE ${t.channel} STREAM ${u}`)
-				console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} STREAM ${u}`)
-			} catch (e) {
-				console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} (ok if none): ${e?.message || e}`)
+		const active = await getActiveStreamUris(amcp, t.channel)
+		const variants = casparUdpStreamUriVariantsForRemove(t.port)
+		
+		for (const u of active) {
+			// If it's a UDP stream we recognize (matches one of our variants) or any UDP stream on this port
+			if (variants.includes(u) || u.includes(`:${t.port}`)) {
+				try {
+					await amcp.raw(`REMOVE ${t.channel} STREAM ${u}`)
+					console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} STREAM ${u}`)
+				} catch (e) {
+					console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} failed: ${e?.message || e}`)
+				}
 			}
 		}
 		await new Promise((r) => setTimeout(r, 150))
@@ -244,13 +270,17 @@ async function removeStreamingConsumers(amcp, targets, config) {
 				console.warn(`[Streaming] REMOVE NDI ch${t.channel}:`, e?.message || e)
 			}
 		} else if (tier === 'udp') {
-			for (const u of casparUdpStreamUriVariantsForRemove(t.port)) {
-				try {
-					console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
-					await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} STREAM ${u}`)
-					await new Promise((r) => setTimeout(r, 100))
-				} catch (e) {
-					console.warn(`[Streaming] REMOVE STREAM ch${t.channel} ${u}:`, e?.message || e)
+			const active = await getActiveStreamUris(amcp, t.channel)
+			const variants = casparUdpStreamUriVariantsForRemove(t.port)
+			for (const u of active) {
+				if (variants.includes(u) || u.includes(`:${t.port}`)) {
+					try {
+						console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
+						await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} STREAM ${u}`)
+						await new Promise((r) => setTimeout(r, 100))
+					} catch (e) {
+						console.warn(`[Streaming] REMOVE STREAM ch${t.channel} ${u}:`, e?.message || e)
+					}
 				}
 			}
 		}
@@ -263,6 +293,7 @@ module.exports = {
 	buildFfmpegArgs,
 	casparUdpStreamUri,
 	casparUdpStreamUriVariantsForRemove,
+	getActiveStreamUris,
 	amcpInfoText,
 	truncate,
 	addStreamingConsumers,

@@ -4,6 +4,8 @@
  * Preshow/offline mode (`setOffline`) does not force green — use status line / tooltip for that.
  * Not the browser WebSocket to HighAsCG.
  * Blink: left closed → right closed → open (sequential).
+ * For ~5s after AMCP connects, the green character uses random open / left / right frames at random
+ * intervals (separate from the 30s blink), then normal blinking resumes.
  * Hover: panel with CPU load, GPU (nvidia-smi on server), media disk + folder usage.
  */
 import { apiGet } from '../lib/api-client.js'
@@ -114,19 +116,65 @@ export function createConnectionEye(container) {
 	container.appendChild(wrap)
 
 	let isConnected = false
+	let wasConnected = false
 	let isOffline = false
 	let blinkInterval = null
 	let lastFetch = 0
+	/** @type {'open' | 'left' | 'right' | null} */
+	let celebrationEye = null
+	let connectionCelebrationUntil = 0
+	/** @type {ReturnType<typeof setTimeout> | null} */
+	let celebrationTimer = null
 	const BLINK_PHASE_MS = 250
 	const FETCH_MIN_MS = 2500
+	const CONNECTION_CELEBRATION_MS = 5000
+	/** Random interval between random eye frames (moderate pace). */
+	const CELEBRATION_DELAY_MIN_MS = 280
+	const CELEBRATION_DELAY_MAX_MS = 780
 
 	const ASSETS = {
-		greenOpen: 'assets/green_eyes_open.svg',
-		greenLeft: 'assets/green_left_closed.svg',
-		greenRight: 'assets/green_right_closed.svg',
+		greenOpen: 'assets/both_open_green.svg',
+		greenLeft: 'assets/left_closed_green.svg',
+		greenRight: 'assets/right_closed_green.svg',
 		redOpen: 'assets/red_eyes_open.svg',
 		redLeft: 'assets/red_left_closed.svg',
 		redRight: 'assets/red_right_closed.svg',
+	}
+
+	function inConnectionCelebration() {
+		return isConnected && celebrationEye != null && Date.now() < connectionCelebrationUntil
+	}
+
+	function stopConnectionCelebration() {
+		connectionCelebrationUntil = 0
+		celebrationEye = null
+		if (celebrationTimer) {
+			clearTimeout(celebrationTimer)
+			celebrationTimer = null
+		}
+	}
+
+	function scheduleNextCelebrationFrame() {
+		if (!isConnected || Date.now() >= connectionCelebrationUntil) {
+			stopConnectionCelebration()
+			updateImgSrc()
+			return
+		}
+		const choices = /** @type {const} */ (['open', 'left', 'right'])
+		celebrationEye = choices[Math.floor(Math.random() * choices.length)]
+		updateImgSrc()
+		const delay =
+			CELEBRATION_DELAY_MIN_MS +
+			Math.random() * (CELEBRATION_DELAY_MAX_MS - CELEBRATION_DELAY_MIN_MS)
+		celebrationTimer = setTimeout(scheduleNextCelebrationFrame, delay)
+	}
+
+	/** First ~5s after connect: random green frame (open / left / right) at random intervals. */
+	function startConnectionCelebration() {
+		stopConnectionCelebration()
+		connectionCelebrationUntil = Date.now() + CONNECTION_CELEBRATION_MS
+		el.classList.remove('blink-l', 'blink-r')
+		scheduleNextCelebrationFrame()
 	}
 
 	function resolveSrc() {
@@ -134,6 +182,11 @@ export function createConnectionEye(container) {
 		const blinkR = el.classList.contains('blink-r')
 
 		if (isConnected) {
+			if (inConnectionCelebration() && celebrationEye) {
+				if (celebrationEye === 'left') return ASSETS.greenLeft
+				if (celebrationEye === 'right') return ASSETS.greenRight
+				return ASSETS.greenOpen
+			}
 			if (blinkL) return ASSETS.greenLeft
 			if (blinkR) return ASSETS.greenRight
 			return ASSETS.greenOpen
@@ -149,6 +202,7 @@ export function createConnectionEye(container) {
 	}
 
 	function triggerBlink() {
+		if (inConnectionCelebration()) return
 		if (el.classList.contains('blink-l') || el.classList.contains('blink-r')) return
 
 		el.classList.add('blink-l')
@@ -235,7 +289,20 @@ export function createConnectionEye(container) {
 	})
 
 	function setConnected(status) {
-		isConnected = !!status
+		const nowOn = !!status
+		if (!nowOn) {
+			stopConnectionCelebration()
+			wasConnected = false
+			isConnected = false
+			updateClasses()
+			return
+		}
+		const becameConnected = !wasConnected
+		wasConnected = true
+		isConnected = true
+		if (becameConnected) {
+			startConnectionCelebration()
+		}
 		updateClasses()
 	}
 
@@ -261,6 +328,7 @@ export function createConnectionEye(container) {
 		setOffline,
 		triggerBlink,
 		destroy() {
+			stopConnectionCelebration()
 			if (blinkInterval) clearInterval(blinkInterval)
 			window.removeEventListener('resize', onWinResize)
 			wrap.remove()

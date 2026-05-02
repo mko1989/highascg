@@ -6,44 +6,63 @@ import { api } from '../lib/api-client.js'
 import { audioRouteToAudioFilter } from '../lib/audio-routes.js'
 import { resolveLayerFillForAmcp } from '../lib/mixer-fill.js'
 import { shouldApplyStraightAlphaKeyer } from '../lib/media-ext.js'
+import { buildPipOverlayAmcpLinesAll, buildPipOverlayRemoveLines } from '../lib/pip-overlay-amcp.js'
+import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
 import { amcpParam, chLayerAmcp } from './scenes-shared.js'
 
-const PREVIEW_PUSH_DEBOUNCE_MS = 300
+const PREVIEW_PUSH_DEBOUNCE_MS = 30
 
-/** Scene content on PRV uses the same layer numbers as PGM (L9 = black CG; looks use L10+). */
+/** Scene content on PRV uses the same layer numbers as PGM (L9 = black CG; main clips on 10, 20, 30…; PIP/CG in the band above each). */
 const PREVIEW_SCENE_LAYER_MIN = 10
-/** Layers above max(used) to clear so stray frames from nudged geometry don’t linger (was a fixed 10–48 sweep). */
-const PREVIEW_CLEAR_LAYER_BUFFER = 4
-/** Safety cap — very deep stacks only. */
-const PREVIEW_SCENE_LAYER_CLEAR_CAP = 128
-/** Must match server {@link ../../src/caspar/amcp-batch.js MAX_BATCH_COMMANDS} for BEGIN…COMMIT chunks. */
-const AMCP_BATCH_MAX_COMMANDS = 16
+/** Chunk size for `/api/amcp/batch` — should match server default {@link ../../src/caspar/amcp-batch.js resolveMaxBatchCommands}. */
+const AMCP_BATCH_MAX_COMMANDS = 64
 
 /**
- * `MIXER [channel] COMMIT` must not share a BEGIN…COMMIT batch with STOP / per-layer MIXER commands —
- * Caspar can then omit the final `202 COMMIT OK`, so the client waits until batch timeout (~20s).
+ * Preview pipeline: use `/api/amcp/batch` (BEGIN…COMMIT when `amcp_batch` is enabled) for PLAY/MIXER/CG.
+ * `MIXER <channel> COMMIT` is stripped and sent separately after each chunk — Caspar applies deferred
+ * mixer transforms on that commit; **one** commit at the end of the full queue prevents visible layer-by-layer updates.
+ *
+ * @param {string[]} commands
  */
-async function postMixerChannelCommit(previewCh) {
-	try {
-		await api.post('/api/amcp/batch', { commands: [`MIXER ${Number(previewCh)} COMMIT`] })
-	} catch {
-		/* ignore */
+async function postAmcpPreviewPipeline(commands) {
+	const lines = commands.map(String).map((s) => s.trim()).filter(Boolean)
+	if (lines.length === 0) return
+	const commitLines = []
+	const batchable = []
+	for (const line of lines) {
+		if (/^MIXER\s+\d+\s+COMMIT\b/i.test(line)) commitLines.push(line)
+		else batchable.push(line)
 	}
-}
-
-async function postAmcpBatchChunks(commands) {
-	for (let i = 0; i < commands.length; i += AMCP_BATCH_MAX_COMMANDS) {
+	for (let i = 0; i < batchable.length; i += AMCP_BATCH_MAX_COMMANDS) {
+		const chunk = batchable.slice(i, i + AMCP_BATCH_MAX_COMMANDS)
 		try {
-			await api.post('/api/amcp/batch', { commands: commands.slice(i, i + AMCP_BATCH_MAX_COMMANDS) })
+			await api.post('/api/amcp/batch', { commands: chunk })
+		} catch {
+			try {
+				await api.post('/api/amcp/raw-batch', { commands: chunk })
+			} catch {
+				for (const t of chunk) {
+					try {
+						await api.post('/api/raw', { cmd: t })
+					} catch {
+						/* ignore */
+					}
+				}
+			}
+		}
+	}
+	for (const c of commitLines) {
+		try {
+			await api.post('/api/raw', { cmd: c })
 		} catch {
 			/* ignore */
 		}
 	}
 }
 
-/** @param {{ sceneState: object, stateStore: object, getPreviewChannel: () => number, getPreviewOutputResolution: () => { w: number, h: number, fps?: number } }} opts */
+/** @param {{ sceneState: object, stateStore: object, getChannelMap: () => object, getPreviewChannel: () => number|null, getPreviewOutputResolution: () => { w: number, h: number, fps?: number } }} opts */
 export function createScenesPreviewRuntime(opts) {
-	const { sceneState, stateStore, getPreviewChannel, getPreviewOutputResolution } = opts
+	const { sceneState, stateStore, getChannelMap, getPreviewChannel, getPreviewOutputResolution } = opts
 
 	/** @type {Set<number> | null} */
 	let lastPreviewLayers = null
@@ -85,6 +104,17 @@ export function createScenesPreviewRuntime(opts) {
 		}
 	}
 
+	/**
+	 * Wait until the preview AMCP push queue is idle (e.g. after `sendSceneToPreviewCard` for tandem PixelHue).
+	 */
+	async function waitForPreviewPushComplete() {
+		await new Promise((r) => setTimeout(r, 0))
+		for (let i = 0; i < 400; i++) {
+			if (!previewPushBusy && !previewPushPending) return
+			await new Promise((r) => setTimeout(r, 16))
+		}
+	}
+
 	function schedulePreviewPush() {
 		if (previewDebounce != null) clearTimeout(previewDebounce)
 		previewDebounce = setTimeout(() => {
@@ -111,7 +141,7 @@ export function createScenesPreviewRuntime(opts) {
 
 	/** @param {string} sceneId @param {object} scene */
 	function buildPreviewContentSnapshot(sceneId, scene) {
-		/** @type {Map<number, { value: string, loop: boolean, straightAlpha: boolean, contentFit: string, audioRoute: string, volume: number, muted: boolean }>} */
+		/** @type {Map<number, { value: string, loop: boolean, straightAlpha: boolean, contentFit: string, audioRoute: string, volume: number, muted: boolean, pipSig: string }>} */
 		const contentByLayer = new Map()
 		for (const l of scene.layers || []) {
 			if (!l?.source?.value) continue
@@ -123,6 +153,7 @@ export function createScenesPreviewRuntime(opts) {
 				audioRoute: l.audioRoute || '1+2',
 				volume: l.volume != null ? l.volume : 1,
 				muted: !!l.muted,
+				pipSig: JSON.stringify(getPipOverlaysFromLayer(l)),
 			})
 		}
 		return { sceneId, contentByLayer }
@@ -144,7 +175,8 @@ export function createScenesPreviewRuntime(opts) {
 				p.contentFit !== meta.contentFit ||
 				p.audioRoute !== meta.audioRoute ||
 				p.volume !== meta.volume ||
-				p.muted !== meta.muted
+				p.muted !== meta.muted ||
+				(p.pipSig ?? '') !== (meta.pipSig ?? '')
 			) {
 				return false
 			}
@@ -156,76 +188,75 @@ export function createScenesPreviewRuntime(opts) {
 		if (!sceneId) return
 		const scene = sceneState.getScene(sceneId)
 		if (!scene) return
+		const targetMainIdx = sceneState.activeScreenIndex
 
-		const previewCh = getPreviewChannel()
+		const previewCh = Number(getPreviewChannel())
+		const hasPreviewBus = Number.isFinite(previewCh) && previewCh > 0
 		const used = new Set()
-			const prvRes = getPreviewOutputResolution()
+		const prvRes = getPreviewOutputResolution()
 		const previewCanvas = { width: prvRes.w, height: prvRes.h, framerate: prvRes.fps ?? 50 }
 		const authoringCanvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 
+		const cm = getChannelMap()
+		const targetIdxs = (() => {
+			const scope = String(scene.mainScope || 'all')
+			if (scope === 'all') return Array.from({ length: cm.screenCount || 1 }, (_, i) => i)
+			const n = parseInt(scope, 10)
+			if (Number.isFinite(n) && n >= 0 && n < (cm.screenCount || 1)) return [n]
+			return [sceneState.activeScreenIndex]
+		})()
+
 		try {
-			const sortedLayers = [...(scene.layers || [])].sort(
-				(a, b) => (a.layerNumber || 0) - (b.layerNumber || 0)
-			)
-			const geometryOnly = isGeometryOnlyPreview(sceneId, scene)
-
+			const commandsByChannel = new Map()
 			const mediaListPromise = api.get('/api/media').catch(() => [])
-			async function getMediaListOnce() {
-				return mediaListPromise
-			}
+			async function getMediaListOnce() { return mediaListPromise }
 
-			if (!geometryOnly) {
-				const sceneMaxLayer = Math.max(
-					0,
-					...(scene.layers || []).map((l) => Number(l.layerNumber) || 0)
-				)
-				const lastMaxLayer =
-					lastPreviewLayers && lastPreviewLayers.size > 0
-						? Math.max(...lastPreviewLayers)
-						: 0
-				const clearThrough = Math.min(
-					PREVIEW_SCENE_LAYER_CLEAR_CAP,
-					Math.max(
-						PREVIEW_SCENE_LAYER_MIN,
-						sceneMaxLayer + PREVIEW_CLEAR_LAYER_BUFFER,
-						lastMaxLayer + PREVIEW_CLEAR_LAYER_BUFFER
-					)
-				)
-				/** @type {string[]} */
-				const clearCmds = []
-				for (let ln = PREVIEW_SCENE_LAYER_MIN; ln <= clearThrough; ln++) {
-					const dl = chLayerAmcp(previewCh, ln)
-					clearCmds.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`)
+			for (const mIdx of targetIdxs) {
+				const previewCh = cm.previewChannels?.[mIdx] ?? null
+				if (!previewCh || previewCh <= 0) {
+					sceneState.setPreviewSceneId(sceneId, mIdx)
+					continue
 				}
-				await postAmcpBatchChunks(clearCmds)
-				await postMixerChannelCommit(previewCh)
-			}
 
-			async function applyOneLayer(layer, opts) {
-				const mixerOnly = opts?.mixerOnly === true
-				const ln = layer.layerNumber
-				const prvL = ln
-				const cl = chLayerAmcp(previewCh, prvL)
-				if (!layer.source?.value) {
-					if (mixerOnly) return null
-					try {
-						await api.post('/api/amcp/batch', {
-							commands: [`STOP ${cl}`, `MIXER ${cl} CLEAR`],
-						})
-					} catch {
-						/* ignore */
+				const queue = []
+				const geometryOnly = isGeometryOnlyPreview(sceneId, scene) && lastPreviewChannel === previewCh
+				const relevantLayerNumbers = (() => {
+					const s = new Set()
+					for (const l of scene.layers || []) {
+						const n = Number(l?.layerNumber)
+						if (!Number.isFinite(n) || n < PREVIEW_SCENE_LAYER_MIN) continue
+						if (l?.source?.value || getPipOverlaysFromLayer(l).length > 0) s.add(n)
 					}
-					return null
+					return s
+				})()
+
+				const layersToReset = new Set(relevantLayerNumbers)
+				if (lastPreviewLayers && lastPreviewLayers.size > 0) {
+					for (const n of lastPreviewLayers) {
+						if (Number.isFinite(n) && n >= PREVIEW_SCENE_LAYER_MIN) layersToReset.add(n)
+					}
 				}
-				try {
-					const f = await resolveLayerFillForAmcp(
-						layer,
-						stateStore,
-						sceneState.activeScreenIndex,
-						previewCanvas,
-						getMediaListOnce,
-						authoringCanvas
-					)
+
+				if (!geometryOnly) {
+					for (const ln of [...layersToReset].sort((a, b) => a - b)) {
+						const dl = chLayerAmcp(previewCh, ln)
+						queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, ln, 10000))
+					}
+				}
+
+				const sortedLayers = [...(scene.layers || [])].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
+				const layerNumsPip = (scene.layers || []).map((l) => Number(l.layerNumber)).filter((n) => n > 0)
+				const nextPipLayerInPreview = (L) => {
+					const a = layerNumsPip.filter((n) => n > L)
+					return a.length ? Math.min(...a) : 10000
+				}
+
+				for (const layer of sortedLayers) {
+					const ln = layer.layerNumber
+					const cl = chLayerAmcp(previewCh, ln)
+					if (!layer.source?.value) continue
+
+					const f = await resolveLayerFillForAmcp(layer, stateStore, mIdx, previewCanvas, getMediaListOnce, authoringCanvas)
 					const clip = layer.source.value
 					const wantLoop = !!layer.loop
 					let playCmd = `PLAY ${cl}`
@@ -234,35 +265,38 @@ export function createScenesPreviewRuntime(opts) {
 					const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
 					if (af) playCmd += ` AF ${amcpParam(af)}`
 					const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
-					/** @type {string[]} */
 					const mixerPart = [
 						`MIXER ${cl} ANCHOR 0 0`,
 						`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`,
 						`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0`,
 						`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0`,
-						`MIXER ${cl} KEYER ${
-							shouldApplyStraightAlphaKeyer(!!layer.straightAlpha, layer.source?.value) ? 1 : 0
-						}`,
+						`MIXER ${cl} KEYER ${shouldApplyStraightAlphaKeyer(!!layer.straightAlpha, layer.source?.value) ? 1 : 0}`,
 						`MIXER ${cl} VOLUME ${vol}`,
 					]
-					const cmds = mixerOnly ? mixerPart : [playCmd, ...mixerPart]
-					await api.post('/api/amcp/batch', { commands: cmds })
-					await postMixerChannelCommit(previewCh)
-					return prvL
-				} catch (e) {
-					console.warn(`Scene preview layer ${ln} failed:`, e?.message || e)
-					return null
+					if (geometryOnly) queue.push(...mixerPart)
+					else queue.push(playCmd, ...mixerPart)
+
+					const nextP = nextPipLayerInPreview(ln)
+					if (geometryOnly) queue.push(...buildPipOverlayRemoveLines(previewCh, ln, nextP))
+					const pipOverlays = getPipOverlaysFromLayer(layer)
+					if (pipOverlays.length > 0) {
+						queue.push(...buildPipOverlayAmcpLinesAll(pipOverlays, previewCh, ln, f, { w: prvRes.w, h: prvRes.h }, nextP))
+					}
 				}
+
+				queue.push(`MIXER ${previewCh} COMMIT`)
+				commandsByChannel.set(previewCh, queue)
+				sceneState.setPreviewSceneId(sceneId, mIdx)
 			}
 
-			for (const layer of sortedLayers) {
-				const done = await applyOneLayer(layer, { mixerOnly: geometryOnly })
-				if (done != null) used.add(done)
+			const allCommands = [...commandsByChannel.values()].flat()
+			if (allCommands.length > 0) {
+				await postAmcpPreviewPipeline(allCommands)
 			}
 
-			lastPreviewLayers = used
+			lastPreviewLayers = new Set((scene.layers || []).filter(l => l.source?.value).map(l => Number(l.layerNumber)))
 			lastPreviewContentSnapshot = buildPreviewContentSnapshot(sceneId, scene)
-			sceneState.setPreviewSceneId(sceneId)
+			lastPreviewChannel = Number(getPreviewChannel())
 		} catch (e) {
 			console.warn('Scene preview push failed:', e?.message || e)
 		}
@@ -275,9 +309,13 @@ export function createScenesPreviewRuntime(opts) {
 		void drainPreviewPushQueue()
 	}
 
+	/** @type {number | null} */
+	let lastPreviewChannel = null
+
 	function clearLastPreviewLayers() {
 		lastPreviewLayers = null
 		lastPreviewContentSnapshot = null
+		lastPreviewChannel = null
 	}
 
 	/**
@@ -301,7 +339,9 @@ export function createScenesPreviewRuntime(opts) {
 		schedulePreviewPush,
 		flushPreviewPush,
 		scheduleFlushPreviewFromInspector,
+		/** Await the current PRV push queue (e.g. chain PixelHue after Caspar preview). */
 		drainPreviewPushQueue,
+		waitForPreviewPushComplete,
 		sendSceneToPreviewCard,
 		clearLastPreviewLayers,
 		primePreviewSnapshotFromScene,

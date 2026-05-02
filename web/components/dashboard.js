@@ -226,7 +226,7 @@ export function initDashboard(root, stateStore) {
 		storageKeyPrefix: 'casparcg_preview_dashboard',
 		getOutputResolution: getResolution,
 		stateStore,
-		streamName: 'pgm_1',
+		getStreamName: () => `pgm_${Math.max(1, getProgramChannel())}`,
 		draw(ctx, W, H, isLive) {
 			drawDashboardProgramStack(ctx, W, H, {
 				dashboardState,
@@ -414,6 +414,33 @@ export function initDashboard(root, stateStore) {
 	}
 
 	dashboardState.on('change', render)
+
+	/** Main count can change from Settings + WS without any dashboard local state — rebuild screen tabs. */
+	let dashChSig = ''
+	function dashChannelSig(cm) {
+		if (!cm || typeof cm !== 'object') return ''
+		const pc = Array.isArray(cm.programChannels) ? cm.programChannels.join(',') : ''
+		return `${cm.screenCount}|${pc}`
+	}
+	let dashChRaf = null
+	stateStore.on('*', (path) => {
+		if (path !== 'channelMap' && path !== '*') return
+		const sig = dashChannelSig(stateStore.getState()?.channelMap)
+		if (sig && sig === dashChSig) return
+		dashChSig = sig
+		if (dashChRaf != null) cancelAnimationFrame(dashChRaf)
+		dashChRaf = requestAnimationFrame(() => {
+			dashChRaf = null
+			if (!root.isConnected) return
+			const n = getScreenCount()
+			if (dashboardState.activeScreenIndex >= n) {
+				dashboardState.switchScreen(0)
+			} else {
+				render()
+			}
+		})
+	})
+
 	document.addEventListener('dashboard-tab-activated', () => previewPanel.scheduleDraw())
 
 	// T2: Real-time progress and clip name updates

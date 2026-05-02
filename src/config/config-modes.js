@@ -48,6 +48,20 @@ const STANDARD_VIDEO_MODES = {
 }
 
 /**
+ * Pixel size for a Caspar `video-mode` id from INFO CONFIG (standard preset or WxH custom id).
+ * @param {string} vm
+ * @returns {{ width: number, height: number }}
+ */
+function pixelSizeForVideoMode(vm) {
+	const id = String(vm || '').trim()
+	const std = STANDARD_VIDEO_MODES[id]
+	if (std) return { width: std.width, height: std.height }
+	const m = id.match(/^(\d+)x(\d+)$/i)
+	if (m) return { width: parseInt(m[1], 10) || 1920, height: parseInt(m[2], 10) || 1080 }
+	return { width: 1920, height: 1080 }
+}
+
+/**
  * Caspar custom video-mode `cadence` element: **48000 Hz / fps** (48 kHz audio clock per frame).
  * Examples: 50 fps → 960, 60 fps → 800, 25 fps → 1920.
  * @param {number} fps
@@ -145,6 +159,7 @@ module.exports = {
 	STANDARD_VIDEO_MODES,
 	calculateCadence,
 	getModeDimensions,
+	pixelSizeForVideoMode,
 	AUDIO_LAYOUT_CHOICES,
 	layoutChannelCount,
 	getExtraAudioModeDimensions,

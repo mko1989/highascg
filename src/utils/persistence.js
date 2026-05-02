@@ -1,6 +1,5 @@
 /**
- * File-based persistence for HighAsCG runtime state (replaces companion .module-state.json).
- * @see companion-module-casparcg-server/src/persistence.js
+ * Local disk-backed persistence for HighAsCG runtime state.
  */
 
 'use strict'
@@ -10,7 +9,6 @@ const path = require('path')
 
 const STATE_FILE = path.join(__dirname, '..', '..', '.highascg-state.json')
 const STATE_FILE_TMP = STATE_FILE + '.tmp'
-
 let _cache = null
 
 function _load() {
@@ -33,6 +31,9 @@ function _save() {
 		console.warn('[persistence] Failed to save state:', e.message)
 	}
 }
+
+async function hydrateFromAmcp() { return _load() }
+function bindAmcp() {}
 
 function get(key) {
 	const state = _load()
@@ -57,4 +58,11 @@ function getAll() {
 	return { ..._load() }
 }
 
-module.exports = { get, set, remove, getAll }
+module.exports = {
+	get,
+	set,
+	remove,
+	getAll,
+	bindAmcp,
+	hydrateFromAmcp,
+}

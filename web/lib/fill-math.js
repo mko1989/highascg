@@ -117,3 +117,21 @@ export function sceneLayerPixelRectForContentFit(cw, ch, mediaW, mediaH, content
 	const y = Math.round((ch0 - h) / 2)
 	return { x, y, w, h }
 }
+
+/**
+ * @param {number} val - pixel value
+ * @param {number} total - canvas dimension
+ */
+export function pixelsToNormalized(val, total) {
+	const t = total > 0 ? total : 1920
+	return val / t
+}
+
+/**
+ * @param {number} val - 0-1 normalized value
+ * @param {number} total - canvas dimension
+ */
+export function normalizedToPixels(val, total) {
+	const t = total > 0 ? total : 1920
+	return val * t
+}

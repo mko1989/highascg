@@ -84,6 +84,10 @@
 	display: none;
 }
 
+.panel.panel--collapsed .panel__header--inspector-modes .panel-inspector-modes {
+	display: none;
+}
+
 /* Must win over #panel-sources / #panel-inspector more specific flex rules */
 .panel.panel--collapsed .panel__body {
 	display: none !important;
@@ -99,6 +103,41 @@
 .panel__header--with-actions h2 {
 	flex: 1;
 	min-width: 0;
+}
+
+.panel__header--inspector-modes .panel-inspector-modes {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	gap: 0;
+	flex-wrap: nowrap;
+	align-items: center;
+	border-bottom: 1px solid var(--border);
+	overflow: hidden;
+}
+.panel-inspector-mode {
+	border: none;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	font-weight: 500;
+	padding: 8px 10px;
+	cursor: pointer;
+	line-height: 1.2;
+	white-space: nowrap;
+	flex: 1 1 0;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+.panel-inspector-mode:hover {
+	color: var(--text);
+}
+.panel-inspector-mode--active {
+	color: var(--accent);
+	border-bottom-color: var(--accent);
 }
 
 .panel__collapse-btn {

@@ -15,6 +15,9 @@ import {
 import { appendDashboardClipTransitionOverride } from './inspector-transition.js'
 import { renderEffectsGroup } from './inspector-effects.js'
 import { renderPipOverlayGroup } from './inspector-pip-overlay.js'
+import { appendSceneLayerHtmlTemplateGroup } from './inspector-html-template.js'
+import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
+import { showScenesToast } from './scenes-editor-support.js'
 
 /**
  * @param {object} stateStore
@@ -120,6 +123,51 @@ export function renderSceneLayerInspector(deps, sel) {
 	title.textContent = `Layer ${layer.layerNumber} (look)`
 	root.appendChild(title)
 
+	const canPasteInsp = sceneState.hasLayerStyleClipboard()
+	const styleGrp = document.createElement('div')
+	styleGrp.className = 'inspector-group inspector-layer-style'
+	const styleTitle = document.createElement('div')
+	styleTitle.className = 'inspector-group__title'
+	styleTitle.textContent = 'Layer style (clipboard)'
+	styleGrp.appendChild(styleTitle)
+	const clipRow = document.createElement('div')
+	clipRow.className = 'inspector-layer-style__row'
+	clipRow.innerHTML = `
+		<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-insp-ls-copy title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">⎘</button>
+		<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-insp-ls-paste title="Paste copied settings" aria-label="Paste layer settings" ${canPasteInsp ? '' : 'disabled'}>📋</button>
+		<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-insp-ls-save title="Save as layer style preset" aria-label="Save as layer style preset">💾</button>
+	`
+	clipRow.querySelector('[data-insp-ls-copy]')?.addEventListener('click', () => {
+		if (sceneState.copyLayerStyle(sceneId, layerIndex)) {
+			showScenesToast('Layer settings copied (not source).', 'info')
+			const p = clipRow.querySelector('[data-insp-ls-paste]')
+			if (p) p.disabled = false
+		}
+	})
+	clipRow.querySelector('[data-insp-ls-paste]')?.addEventListener('click', () => {
+		if (sceneState.pasteLayerStyle(sceneId, layerIndex)) {
+			showScenesToast('Settings pasted.', 'info')
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+			rerenderSceneLayer(sel)
+		}
+	})
+	clipRow.querySelector('[data-insp-ls-save]')?.addEventListener('click', () => {
+		const name = window.prompt('Layer style preset name?')
+		if (name == null) return
+		if (sceneState.saveLayerPresetFromLayer(sceneId, layerIndex, name)) {
+			showScenesToast('Layer preset saved.', 'info')
+			rerenderSceneLayer(sel)
+		} else {
+			showScenesToast('Could not save preset (empty name).', 'warn')
+		}
+	})
+	styleGrp.appendChild(clipRow)
+	const lpHint = document.createElement('p')
+	lpHint.className = 'inspector-field inspector-field--hint inspector-layer-style__preset-hint'
+	lpHint.textContent = 'Named preset library: use the Layer presets tab (header) or the look editor layer strip.'
+	styleGrp.appendChild(lpHint)
+	root.appendChild(styleGrp)
+
 	function patchFillPx(partial) {
 		const sc = sceneState.getScene(sceneId)
 		const L = sc?.layers?.[layerIndex]
@@ -180,6 +228,8 @@ export function renderSceneLayerInspector(deps, sel) {
 	})
 	appendSceneLayerMixerGroup(root, { sceneId, layerIndex, layer })
 
+	appendSceneLayerHtmlTemplateGroup(root, { sceneState, stateStore, sceneId, layer })
+
 	renderEffectsGroup(root, {
 		effects: layer.effects || [],
 		onUpdate: (newEffects) => {
@@ -190,9 +240,10 @@ export function renderSceneLayerInspector(deps, sel) {
 	})
 
 	renderPipOverlayGroup(root, {
-		pipOverlay: layer.pipOverlay || null,
-		onUpdate: (newOverlay) => {
-			sceneState.patchLayer(sceneId, layerIndex, { pipOverlay: newOverlay })
+		pipOverlays: getPipOverlaysFromLayer(layer),
+		livePushContext: { sceneState, stateStore, sceneId, layerIndex },
+		onUpdate: (next) => {
+			sceneState.patchLayer(sceneId, layerIndex, { pipOverlays: next })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 			// Do not rerenderSceneLayer here: <input type="color"> would unmount on every input and close the native picker.
 		},
