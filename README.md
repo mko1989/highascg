@@ -28,9 +28,9 @@ Defaults live in `config/default.js`. Override with environment variables:
 | `OSC_LISTEN_PORT` | OSC UDP port (default `6251`; Caspar `<default-port>` is typically `6250`) |
 | `OSC_BIND_ADDRESS` | OSC bind address (default `0.0.0.0`) |
 | `HIGHASCG_OSC_WS_DELTA` | `1` / `true` — WebSocket `osc` messages send partial `{ delta: true, channels: { … } }` per throttle (merge client-side); default full snapshot each emit |
-| `CASPAR_ARM_FILE` | Path touched when “arming” staged Caspar startup (default `/opt/casparcg/data/caspar-armed`; same path as `tools/casparcg-staged-start.sh`) |
+| `CASPAR_ARM_FILE` | Path touched when “arming” staged Caspar startup (default `/home/casparcg/highascg/data/caspar-armed`; same path as `tools/casparcg-staged-start.sh`) |
 
-CLI flags (see `node index.js --help`): `--port`, `--caspar-host`, `--caspar-port`, `--bind`, `--no-caspar` (Caspar-dependent AMCP routes return **503**; **settings**, **audio device list**, **go2rtc `/api/streams`**, and **streaming toggle** still work), `--no-osc` (disable OSC UDP), `--ws-broadcast-ms`.
+CLI flags (see `node index.js --help`): `--port`, `--caspar-host`, `--caspar-port`, `--bind`, `--no-caspar` (Caspar-dependent AMCP routes return **503**; **settings**, **audio device list**, `/api/streams`, and **streaming toggle** still work), `--no-osc` (disable OSC UDP), `--ws-broadcast-ms`.
 
 ### APIs without Caspar (`--no-caspar` or Caspar down)
 
@@ -40,8 +40,8 @@ CLI flags (see `node index.js --help`): `--port`, `--caspar-host`, `--caspar-por
 | `GET /api/hardware/displays` | System tab display names |
 | `GET /api/audio/devices` | ALSA / PipeWire list for Audio settings |
 | `POST /api/audio/config` | Persist `audioRouting` |
-| `GET /api/streams` | go2rtc stream list + WebRTC preview (`stream-state.js`) |
-| `POST /api/streaming/toggle` · `…/restart` | Start/stop go2rtc (FFmpeg SRT consumers need Caspar when connected) |
+| `GET /api/streams` | Streaming status and preview pipeline readiness (`stream-state.js`) |
+| `POST /api/streaming/toggle` · `…/restart` | Start/stop streaming consumers (need Caspar when connected) |
 | `GET /api/osc/*` | OSC listener config / snapshot |
 
 Caspar still required for playout, mixer (`/api/mixer/*` except audio volume wrapper), media lists, etc.
@@ -55,7 +55,7 @@ CasparCG should send OSC over UDP (see **`docs/osc-integration.md`**). HighAsCG 
 On a playout machine you can start **media scanner** and **HighAsCG** first, change or upload Caspar config, then **arm** Caspar so the supervisor script starts `casparcg-server`.
 
 - Shell helpers: `tools/casparcg-staged-start.sh`, `tools/start-highascg.sh` — see **`tools/README.md`**.
-- Default ready file: `/opt/casparcg/data/caspar-armed` (override with **`CASPAR_ARM_FILE`** on HighAsCG and the same variable for the bash script if you keep paths in sync).
+- Default ready file: `/home/casparcg/highascg/data/caspar-armed` (override with **`CASPAR_ARM_FILE`** on HighAsCG and the same variable for the bash script if you keep paths in sync).
 - HTTP (no Caspar required): **`GET /api/system/caspar-arm`** (status), **`POST /api/system/caspar-arm`** (create ready file), **`DELETE /api/system/caspar-arm`** (remove it).
 
 ## Usage
@@ -107,7 +107,7 @@ npm run smoke:caspar -- 8080
 
 This asserts unknown routes return **404** (not 503) and **`POST /api/raw`** with `VERSION` succeeds.
 
-The web client **refreshes** cached settings and **go2rtc stream list** on WebSocket reconnect and after **Save** in Application Settings (so WebRTC preview and header monitoring controls update without waiting for the 10s poll).
+The web client **refreshes** cached settings and streaming status on WebSocket reconnect and after **Save** in Application Settings.
 
 **Browser monitoring** (Settings → Audio / OSC → *Browser monitoring preference*) applies to WebRTC preview audio: **PGM** unmutes and listens to the PGM stream; **Off** mutes monitoring. The header shows **Live**/**HTTP** plus **Caspar** / **Caspar offline** / **no AMCP** (`--no-caspar`). **`GET /api/streams`** uses the same **`getApiBase()`** prefix as other API calls when the app is served under **`/instance/…`**.
 

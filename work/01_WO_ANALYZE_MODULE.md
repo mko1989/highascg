@@ -472,7 +472,7 @@ If **`self._amcpBatchDrain`** is set and **`onLine`** is a function, **every** `
 
 - **`http.createServer`**: reads full body via **`for await (const chunk of req)`**; **`OPTIONS`** → **204** + CORS headers.
 - **`/api` or `/api/...`** → **`routeRequest(method, reqPath, body, self)`** (same handler as Companion path).
-- Else → **`serveWebApp(reqPath)`** — static **`src/web/`**, **`/templates/`** from **`src/templates/`**, SPA fallback to **`index.html`**, rejects **`..`**.
+- Else → **`serveWebApp(reqPath)`** — static **`web/`**, **`/template/`** from repo **`template/`**, SPA fallback to **`index.html`**, rejects **`..`**.
 - Response merges **`CORS_HEADERS`** with handler headers; **`res.end(result.body ?? '')`** (string bodies; binary thumbnails go through Companion path in practice, or would need Buffer handling if extended).
 
 ### WebSocket upgrade
@@ -588,7 +588,7 @@ If **`self._amcpBatchDrain`** is set and **`onLine`** is a function, **every** `
 
 ### `setupAllRouting(self)` — connect-time orchestration
 
-1. **Optional file deploy** when **`local_media_path`** set: copy **`multiview_overlay.html`** from **`src/templates/`** if missing; create minimal **`black.html`** if missing.
+1. **Optional file deploy** when **`local_media_path`** set: copy **`multiview_overlay.html`** from repo **`template/`** if missing; create minimal **`black.html`** if missing.
 2. **`setupInputsChannel`** if inputs enabled.
 3. **Loop** **`setupPreviewChannel(self, n)`** for **`n = 1..screenCount`** (errors logged per screen).
 4. **Multiview:** does **not** call **`setupMultiview`** with defaults. Restores layout only if **`self._multiviewLayout`** has a non-empty **`layout`** array → **`handleMultiviewApply(mvPersist, self)`** from **`api-routes.js`** (same code path as HTTP Apply).

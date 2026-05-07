@@ -3,9 +3,8 @@
  */
 'use strict'
 
-const { execSync } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { applyX11Layout, calculateLayoutPositions, restartDisplayManager } = require('../utils/os-config')
+const { applyX11Layout, calculateLayoutPositions } = require('../utils/os-config')
 const { resolveMainScreenCount } = require('../config/routing')
 const { normalizeCasparServerConfigPath } = require('./routes-caspar-config')
 const { normalizeTandemTopology } = require('../config/tandem-topology')
@@ -53,53 +52,6 @@ function mergeSystemDisplaySettings(ctx, s) {
 
 function pickOscForPersistence(o) {
 	return { enabled: o.enabled, listenPort: o.listenPort, listenAddress: o.listenAddress, peakHoldMs: o.peakHoldMs, emitIntervalMs: o.emitIntervalMs, staleTimeoutMs: o.staleTimeoutMs, wsDeltaBroadcast: o.wsDeltaBroadcast }
-}
-
-function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function parseXrandrCurrentPositions(queryOut) {
-	const out = new Map()
-	const lines = String(queryOut || '').split('\n')
-	for (const line of lines) {
-		const m = line.match(/^([A-Za-z0-9._-]+)\s+connected(?:\s+primary)?\s+(\d+)x(\d+)\+(-?\d+)\+(-?\d+)/)
-		if (!m) continue
-		out.set(m[1], {
-			width: parseInt(m[2], 10) || 0,
-			height: parseInt(m[3], 10) || 0,
-			x: parseInt(m[4], 10) || 0,
-			y: parseInt(m[5], 10) || 0,
-		})
-	}
-	return out
-}
-
-function readCurrentXrandrPositions() {
-	try {
-		const out = execSync('xrandr --display :0 --query', {
-			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: process.env.XAUTHORITY || `/home/${process.env.USER || 'casparcg'}/.Xauthority` },
-			encoding: 'utf8',
-		})
-		return parseXrandrCurrentPositions(out)
-	} catch (_) {
-		return new Map()
-	}
-}
-
-function expectedHeadsFromLayout(layout) {
-	return [...Object.values(layout?.screens || {}), ...Object.values(layout?.multiview || {})]
-}
-
-function isLayoutMatchingCurrent(expectedHeads, currentById) {
-	for (const h of expectedHeads) {
-		const id = String(h?.sysId || '').trim()
-		if (!id) continue
-		const cur = currentById.get(id)
-		if (!cur) return false
-		if (Number(cur.x) !== Number(h.x) || Number(cur.y) !== Number(h.y)) return false
-	}
-	return true
 }
 
 async function handleOsPost(path, body, ctx) {
@@ -154,32 +106,9 @@ async function handleOsPost(path, body, ctx) {
 	if (typeof ctx.log === 'function') {
 		ctx.log('info', `[settings-os] layout result applied=${!!layoutRes.applied} persisted=${!!layoutRes.persisted}`)
 	}
-	let dmRestarted = false
-	let reapplyAfterRestart = false
-	try {
-		const expected = expectedHeadsFromLayout(calculateLayoutPositions(ctx.config))
-		dmRestarted = !!restartDisplayManager()
-		if (typeof ctx.log === 'function') ctx.log('info', `[settings-os] nodm restart attempted result=${dmRestarted}`)
-		if (dmRestarted) {
-			await sleep(1200)
-			const current = readCurrentXrandrPositions()
-			const match = isLayoutMatchingCurrent(expected, current)
-			if (typeof ctx.log === 'function') ctx.log('info', `[settings-os] post-restart xrandr verify match=${match}`)
-			if (!match) {
-				reapplyAfterRestart = true
-				const retryRes = applyX11Layout(ctx.config) || { applied: false, persisted: false }
-				if (typeof ctx.log === 'function') {
-					ctx.log(
-						'warn',
-						`[settings-os] post-restart layout mismatch -> reapply applied=${!!retryRes.applied} persisted=${!!retryRes.persisted}`,
-					)
-				}
-			}
-		}
-	} catch (e) {
-		if (typeof ctx.log === 'function') ctx.log('warn', `[settings-os] nodm restart/verify failed: ${e?.message || e}`)
-	}
-	if (typeof ctx.log === 'function') ctx.log('info', `[settings-os] apply-os end dmRestarted=${dmRestarted}`)
+	const dmRestarted = false
+	const reapplyAfterRestart = false
+	if (typeof ctx.log === 'function') ctx.log('info', '[settings-os] apply-os end dmRestarted=false (skipped by design)')
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

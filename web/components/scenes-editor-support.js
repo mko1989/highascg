@@ -130,6 +130,23 @@ export function bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPa
  */
 export function createTakeSceneToProgram(deps) {
 	let takeBusy = false
+
+	async function ensureLiveThumbCached(channel) {
+		const ch = Number(channel)
+		if (!Number.isFinite(ch) || ch <= 0) return
+		try {
+			await api.get(`/api/thumbnail/live/${ch}`)
+			return
+		} catch {
+			// cache miss
+		}
+		try {
+			await api.post('/api/thumbnail/live/capture', { channel: ch })
+		} catch {
+			/* non-fatal */
+		}
+	}
+
 	return async function takeSceneToProgram(sceneId, forceCut) {
 		if (takeBusy) return
 		const scene = sceneState.getScene(sceneId)
@@ -202,6 +219,10 @@ export function createTakeSceneToProgram(deps) {
 				} else {
 					sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState)
 				}
+			}
+			// Capture only when cache is missing to avoid PRINT spam on every take.
+			for (const t of touched) {
+				await ensureLiveThumbCached(t.channel)
 			}
 			deps.stateStore.applyChange('scene.live', mergedLive)
 			deps.primePreviewSnapshotFromScene(sceneId)

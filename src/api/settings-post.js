@@ -27,7 +27,6 @@ async function handlePost(path, body, ctx) {
 		const s = settings.streaming; if (s.enabled !== undefined) cfg.streaming.enabled = !!s.enabled; if (s.quality) cfg.streaming.quality = s.quality; if (s.basePort) cfg.streaming.basePort = parseInt(s.basePort, 10)
 		if (s.hardware_accel !== undefined) cfg.streaming.hardware_accel = s.hardware_accel; if (s.captureMode) cfg.streaming.captureMode = s.captureMode; if (s.ndiNamingMode) cfg.streaming.ndiNamingMode = s.ndiNamingMode; if (s.ndiSourcePattern !== undefined) cfg.streaming.ndiSourcePattern = s.ndiSourcePattern
 		if (s.ndiChannelNames) cfg.streaming.ndiChannelNames = { ...s.ndiChannelNames }; if (s.localCaptureDevice) cfg.streaming.localCaptureDevice = s.localCaptureDevice; if (s.x11Display) cfg.streaming.x11Display = s.x11Display; if (s.drmDevice) cfg.streaming.drmDevice = s.drmDevice
-		if (s.go2rtcLogLevel !== undefined) { const t = String(s.go2rtcLogLevel).trim().toLowerCase(); if (!t) delete cfg.streaming.go2rtcLogLevel; else cfg.streaming.go2rtcLogLevel = t }
 		if (s.autoRelocateBasePort !== undefined) cfg.streaming.autoRelocateBasePort = !!s.autoRelocateBasePort
 	}
 	if (settings.periodic_sync_interval_sec !== undefined) cfg.periodic_sync_interval_sec = parseInt(settings.periodic_sync_interval_sec, 10)
@@ -47,7 +46,24 @@ async function handlePost(path, body, ctx) {
 	if (settings.dmx) cfg.dmx = { ...defaults.dmx, ...settings.dmx }
 	if (settings.rtmp) cfg.rtmp = normalizeRtmpConfig({ ...defaults.rtmp, ...(cfg.rtmp || {}), ...settings.rtmp })
 	if (settings.companion) cfg.companion = { host: String(settings.companion.host || '127.0.0.1').trim(), port: parseInt(settings.companion.port, 10) || 8000 }
-	if (settings.pixelhue) { const x = settings.pixelhue; cfg.pixelhue = { ...defaults.pixelhue, ...(cfg.pixelhue || {}), enabled: x.enabled === true || x.enabled === 'true', host: String(x.host ?? '').trim(), unicoPort: parseInt(x.unicoPort || 19998, 10), apiPort: x.apiPort ? parseInt(x.apiPort, 10) : null, targetSerial: String(x.targetSerial ?? '').trim() }; phClient.clearConnectionCache() }
+	if (settings.pixelhue) {
+		const x = settings.pixelhue
+		const secure =
+			x.secure === undefined
+				? (cfg.pixelhue && cfg.pixelhue.secure !== undefined ? cfg.pixelhue.secure : defaults.pixelhue.secure)
+				: !(x.secure === false || x.secure === 'false' || x.secure === 0 || x.secure === '0')
+		cfg.pixelhue = {
+			...defaults.pixelhue,
+			...(cfg.pixelhue || {}),
+			enabled: x.enabled === true || x.enabled === 'true',
+			host: String(x.host ?? '').trim(),
+			unicoPort: parseInt(x.unicoPort || 19998, 10),
+			secure,
+			apiPort: x.apiPort ? parseInt(x.apiPort, 10) : null,
+			targetSerial: String(x.targetSerial ?? '').trim(),
+		}
+		phClient.clearConnectionCache()
+	}
 	if (settings.tandemTopology) cfg.tandemTopology = normalizeTandemTopology(settings.tandemTopology)
 	if (settings.deviceGraph) cfg.deviceGraph = normalizeDeviceGraph(settings.deviceGraph)
 	if (Array.isArray(settings.gpuPhysicalTopology)) {
@@ -192,7 +208,7 @@ async function handlePost(path, body, ctx) {
 	let oscRestarted = false; if (settings.osc && typeof ctx.restartOscSubsystem === 'function') { ctx.restartOscSubsystem(); oscRestarted = true }
 	let sideEffects = []
 	if (oldC.host !== cfg.caspar.host || oldC.port !== cfg.caspar.port) { if (ctx.casparConnection) { sideEffects.push('Reconnecting to CasparCG…'); ctx.casparConnection.reconnect(cfg.caspar.host, cfg.caspar.port) } }
-	const sChanged = (oldS.enabled !== cfg.streaming.enabled || oldS.quality !== cfg.streaming.quality || oldS.basePort !== cfg.streaming.basePort || oldS.hardware_accel !== cfg.streaming.hardware_accel || oldS.captureMode !== cfg.streaming.captureMode || oldS.ndiNamingMode !== cfg.streaming.ndiNamingMode || oldS.ndiSourcePattern !== cfg.streaming.ndiSourcePattern || JSON.stringify(oldS.ndiChannelNames || {}) !== JSON.stringify(cfg.streaming.ndiChannelNames || {}) || oldS.localCaptureDevice !== cfg.streaming.localCaptureDevice || oldS.x11Display !== cfg.streaming.x11Display || oldS.drmDevice !== cfg.streaming.drmDevice || oldS.go2rtcLogLevel !== cfg.streaming.go2rtcLogLevel || oldS.autoRelocateBasePort !== cfg.streaming.autoRelocateBasePort)
+	const sChanged = (oldS.enabled !== cfg.streaming.enabled || oldS.quality !== cfg.streaming.quality || oldS.basePort !== cfg.streaming.basePort || oldS.hardware_accel !== cfg.streaming.hardware_accel || oldS.captureMode !== cfg.streaming.captureMode || oldS.ndiNamingMode !== cfg.streaming.ndiNamingMode || oldS.ndiSourcePattern !== cfg.streaming.ndiSourcePattern || JSON.stringify(oldS.ndiChannelNames || {}) !== JSON.stringify(cfg.streaming.ndiChannelNames || {}) || oldS.localCaptureDevice !== cfg.streaming.localCaptureDevice || oldS.x11Display !== cfg.streaming.x11Display || oldS.drmDevice !== cfg.streaming.drmDevice || oldS.autoRelocateBasePort !== cfg.streaming.autoRelocateBasePort)
 	if (sChanged) { sideEffects.push('Applying streaming changes…'); if (typeof ctx.toggleStreaming === 'function') await ctx.toggleStreaming(cfg.streaming.enabled); else if (typeof ctx.restartStreaming === 'function') await ctx.restartStreaming() }
 	if (settings.osc_info_supplement_ms !== undefined) startOscPlaybackInfoSupplement(ctx)
 	if (typeof ctx._wsBroadcast === 'function' && typeof ctx.getState === 'function') { const st = ctx.getState(); if (st?.channelMap) ctx._wsBroadcast('change', { path: 'channelMap', value: st.channelMap }) }

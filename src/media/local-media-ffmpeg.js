@@ -255,39 +255,54 @@ function writeThumbnailCacheFile(cacheDir, key, data) {
 function extractThumbnailPng(filePath, maxW = 960, seekSec = 2) {
 	const mw = Math.min(1920, Math.max(64, parseInt(String(maxW), 10) || 960))
 	const ss = Math.max(0, Number.isFinite(Number(seekSec)) ? Number(seekSec) : 2)
-	return new Promise((resolve) => {
-		// Use input-side seek (-ss before -i) for fast seeking — ffmpeg seeks to the nearest
-		// keyframe before the requested time, then decodes forward. For very short files or
-		// still images this is harmless (just grabs the first/only frame).
-		const args = [
-			'-hide_banner',
-			'-loglevel', 'error',
-			...(ss > 0 ? ['-ss', String(ss)] : []),
-			'-i', filePath,
-			'-vf', `scale=${mw}:-2:flags=lanczos`,
-			'-frames:v', '1',
-			'-f', 'image2pipe',
-			'-vcodec', 'png',
-			'pipe:1',
-		]
-		const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
-		const chunks = []
-		ff.stdout.on('data', (c) => chunks.push(c))
-		ff.stderr.on('data', () => {})
-		ff.on('error', () => resolve(null))
-		ff.on('close', (code) => {
-			if (code !== 0 || chunks.length === 0) return resolve(null)
-			resolve(Buffer.concat(chunks))
+
+	const run = (seek) => {
+		return new Promise((resolve) => {
+			const args = [
+				'-hide_banner',
+				'-loglevel', 'error',
+				...(seek > 0 ? ['-ss', String(seek)] : []),
+				'-i', filePath,
+				'-vf', `scale=${mw}:-2:flags=lanczos`,
+				'-frames:v', '1',
+				'-f', 'image2pipe',
+				'-vcodec', 'png',
+				'pipe:1',
+			]
+			const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+			const timeout = setTimeout(() => {
+				try { ff.kill('SIGKILL') } catch { /* ignore */ }
+				resolve(null)
+			}, 10000)
+
+			const chunks = []
+			ff.stdout.on('data', (c) => chunks.push(c))
+			ff.stderr.on('data', () => {})
+			ff.on('error', () => { clearTimeout(timeout); resolve(null) })
+			ff.on('close', (code) => {
+				clearTimeout(timeout)
+				if (code !== 0 || chunks.length === 0) return resolve(null)
+				resolve(Buffer.concat(chunks))
+			})
 		})
-	})
+	}
+
+	return (async () => {
+		let buf = await run(ss)
+		if ((!buf || buf.length === 0) && ss > 0) {
+			// Fallback to start of file if seek failed (common for still images or very short clips)
+			buf = await run(0)
+		}
+		return buf
+	})()
 }
 
 /**
  * PNG thumbnail via ffmpeg from the same tree Caspar uses for media (when paths match this host).
- * Uses `local_media_path` when set; otherwise default ingest path (Linux `/opt/casparcg/media`, etc.)
+ * Uses `local_media_path` when set; otherwise default ingest path (Linux `/home/casparcg/highascg/media`, etc.)
  * — avoids Caspar’s HTTP media-server hop that can throw “Invalid Response” on :8000.
  * PNG thumbnail via ffmpeg from the same tree Caspar uses for media (when paths match this host).
- * Uses `local_media_path` when set; otherwise default ingest path (Linux `/opt/casparcg/media`, etc.)
+ * Uses `local_media_path` when set; otherwise default ingest path (Linux `/home/casparcg/highascg/media`, etc.)
  * — avoids Caspar's HTTP media-server hop that can throw "Invalid Response" on :8000.
  * Results are cached to disk (keyed by file path, mtime, size, maxW, seekSec).
  * @param {object} [config]
@@ -296,12 +311,9 @@ function extractThumbnailPng(filePath, maxW = 960, seekSec = 2) {
  * @param {number} [seekSec=2]
  */
 async function tryLocalThumbnailPng(config, filename, maxW = 960, seekSec = 2) {
-	const { resolveSafe, getMediaIngestBasePath } = require('./local-media')
+	const { resolveMediaFileOnDisk } = require('./local-media')
 	if (!filename) return null
-	const basePathRaw = (config?.local_media_path || '').trim()
-	const basePath = basePathRaw || getMediaIngestBasePath(config)
-	if (!basePath) return null
-	const filePath = resolveSafe(basePath, filename)
+	const filePath = resolveMediaFileOnDisk(config, filename)
 	if (!filePath || !fs.existsSync(filePath)) return null
 	try {
 		const stat = fs.statSync(filePath)
@@ -315,6 +327,55 @@ async function tryLocalThumbnailPng(config, filename, maxW = 960, seekSec = 2) {
 	} catch {
 		return null
 	}
+}
+
+/**
+ * Best-effort thumbnail prewarm from media IDs (typically CLS output).
+ * Generates only missing cache entries and limits work per invocation.
+ * @param {object} [config]
+ * @param {string[]} mediaIds
+ * @param {{ maxItems?: number, maxW?: number, seekSec?: number }} [opts]
+ * @returns {Promise<{ generated: number, cached: number, attempted: number }>}
+ */
+async function ensureLocalThumbnailCacheForMediaIds(config, mediaIds, opts = {}) {
+	const { resolveMediaFileOnDisk } = require('./local-media')
+	const maxItems = Math.max(1, parseInt(String(opts.maxItems ?? 40), 10) || 40)
+	const maxW = Math.min(1920, Math.max(64, parseInt(String(opts.maxW ?? 960), 10) || 960))
+	const seekSec = Math.max(0, Number(opts.seekSec ?? 2) || 2)
+	if (!Array.isArray(mediaIds) || mediaIds.length === 0) return { generated: 0, cached: 0, attempted: 0 }
+	const seen = new Set()
+	let generated = 0
+	let cached = 0
+	let attempted = 0
+	for (const rawId of mediaIds) {
+		if (attempted >= maxItems) break
+		const id = String(rawId || '').trim()
+		if (!id || seen.has(id)) continue
+		seen.add(id)
+		const filePath = resolveMediaFileOnDisk(config, id)
+		if (!filePath || !fs.existsSync(filePath)) continue
+		let stat
+		try {
+			stat = fs.statSync(filePath)
+		} catch {
+			continue
+		}
+		if (!stat.isFile()) continue
+		const cacheDir = getThumbnailCacheDir(config)
+		const key = thumbnailCacheKey(filePath, stat, maxW, seekSec)
+		const hit = readThumbnailCacheFile(cacheDir, key)
+		attempted++
+		if (hit) {
+			cached++
+			continue
+		}
+		const buf = await extractThumbnailPng(filePath, maxW, seekSec)
+		if (buf && buf.length > 0) {
+			writeThumbnailCacheFile(cacheDir, key, buf)
+			generated++
+		}
+	}
+	return { generated, cached, attempted }
 }
 
 module.exports = {
@@ -333,4 +394,5 @@ module.exports = {
 	writeThumbnailCacheFile,
 	extractThumbnailPng,
 	tryLocalThumbnailPng,
+	ensureLocalThumbnailCacheForMediaIds,
 }

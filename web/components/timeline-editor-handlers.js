@@ -2,6 +2,7 @@ import { timelineState } from '../lib/timeline-state.js'
 import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
 import { findMediaRow, getContentResolution } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { createEffectInstance } from '../lib/effect-registry.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
@@ -212,7 +213,7 @@ export function createTimelineCanvasHandlers(deps) {
 			getPreviewPanel()?.scheduleDraw?.()
 		},
 		getThumbnailUrl: (source) => source?.type === 'media' && source?.value
-			? `${getApiBase()}/api/thumbnail/${encodeURIComponent(source.value)}`
+			? getThumbnailUrl(source.value, 320, 2)
 			: null,
 		// Real waveform from same tree as thumbnails (GET /api/local-media/.../waveform); server ffprobe path
 		getWaveformUrl: (source) => {

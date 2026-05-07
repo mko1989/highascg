@@ -8,6 +8,28 @@
 
 const { parseString } = require('xml2js')
 const handlers = require('./handlers')
+const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
+
+function scheduleStartupHqThumbnailPrewarm(self) {
+	if (self?._hqThumbStartupPrewarmDone) return
+	if (self?._hqThumbPrewarmInFlight) return
+	if (self?.config?.hq_thumbnail_prewarm_on_start === false) return
+	const ids = (self?.state?.getState?.()?.media || []).map((m) => String(m?.id || '').trim()).filter(Boolean)
+	if (ids.length === 0) return
+	self._hqThumbPrewarmInFlight = ensureLocalThumbnailCacheForMediaIds(self.config || {}, ids, { maxItems: ids.length, maxW: 960, seekSec: 2 })
+		.then((stats) => {
+			self._hqThumbStartupPrewarmDone = true
+			if (typeof self.log === 'function' && stats?.generated > 0) {
+				self.log('info', `HQ thumbnail startup prewarm: generated ${stats.generated} (cached ${stats.cached}, attempted ${stats.attempted})`)
+			}
+		})
+		.catch((e) => {
+			if (typeof self.log === 'function') self.log('debug', 'HQ thumbnail startup prewarm failed: ' + (e?.message || e))
+		})
+		.finally(() => {
+			self._hqThumbPrewarmInFlight = null
+		})
+}
 
 /**
  * @param {*} data
@@ -84,6 +106,7 @@ function runMediaLibraryQueryCycle(ctx) {
 	self.enqueue('CLS', null, 'CLS', (data) => {
 		handlers.handleCLS(self, data)
 		self.state.updateFromCLS(data)
+		scheduleStartupHqThumbnailPrewarm(self)
 		const queryCinf = self.config && self.config.query_cinf !== false
 		const maxCinf = Math.max(0, parseInt(String(self.config?.max_cinf ?? 100), 10))
 		if (queryCinf && maxCinf > 0) {
@@ -133,6 +156,7 @@ function runConnectionQueryCycle(ctx) {
 	self.enqueue('CLS', null, 'CLS', (data) => {
 		handlers.handleCLS(self, data)
 		self.state.updateFromCLS(data)
+		scheduleStartupHqThumbnailPrewarm(self)
 		const queryCinf = self.config && self.config.query_cinf !== false
 		const maxCinf = Math.max(0, parseInt(String(self.config?.max_cinf ?? 100), 10))
 		if (queryCinf && maxCinf > 0) {

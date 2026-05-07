@@ -114,7 +114,7 @@ function buildScreenFfmpegConsumersXml(config, screenIdx1) {
 
 /**
  * @param {Record<string, unknown>} config - App config
- * @param {number} port - UDP destination port (same URI as AMCP ADD STREAM — MPEG-TS to go2rtc)
+ * @param {number} port - UDP destination port (same URI as AMCP ADD STREAM)
  * @returns {string} XML for an <ffmpeg> consumer
  */
 function buildStreamingFfmpegConsumerXml(config, port) {

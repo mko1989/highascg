@@ -1,0 +1,5 @@
+# Paste AMCP command(s) here.
+# Empty lines and comment lines are ignored.
+# Multiple commands are supported (one command per line).
+
+MIXER 1-10 OPACITY 1 25 linear

@@ -2,7 +2,7 @@
  * Staged Caspar startup: arm file + HTTP control (works without AMCP).
  * GET/POST/DELETE /api/system/caspar-arm
  *
- * Env: CASPAR_ARM_FILE (default /opt/casparcg/data/caspar-armed)
+ * Env: CASPAR_ARM_FILE (default /home/casparcg/highascg/data/caspar-armed)
  */
 
 'use strict'
@@ -12,7 +12,7 @@ const path = require('path')
 const { JSON_HEADERS, jsonBody } = require('./response')
 
 function getArmPath() {
-	return process.env.CASPAR_ARM_FILE || process.env.CASPAR_READY_FILE || '/opt/casparcg/data/caspar-armed'
+	return process.env.CASPAR_ARM_FILE || process.env.CASPAR_READY_FILE || '/home/casparcg/highascg/data/caspar-armed'
 }
 
 /**

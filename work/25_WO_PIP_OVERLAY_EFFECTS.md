@@ -179,10 +179,10 @@ pipOverlay: {
 
 | File | Changes |
 |------|---------|
-| `templates/pip_border.html` | **NEW** — HTML template |
-| `templates/pip_shadow.html` | **NEW** — HTML template |
-| `templates/pip_edge_strip.html` | **NEW** — HTML template |
-| `templates/pip_glow.html` | **NEW** — HTML template |
+| `template/pip_border.html` | **NEW** — HTML template |
+| `template/pip_shadow.html` | **NEW** — HTML template |
+| `template/pip_edge_strip.html` | **NEW** — HTML template |
+| `template/pip_glow.html` | **NEW** — HTML template |
 | `web/lib/pip-overlay-registry.js` | **NEW** — Type definitions, schemas, defaults |
 | `web/components/inspector-pip-overlay.js` | **NEW** — Inspector UI section |
 | `src/engine/pip-overlay.js` | **NEW** — Server-side overlay AMCP builder |

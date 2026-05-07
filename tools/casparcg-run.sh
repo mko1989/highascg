@@ -4,10 +4,10 @@
 # dedicated status; this script starts it again. Stock Linux builds typically use exit code 5.
 #
 # Install (example):
-#   sudo install -m 0755 tools/casparcg-run.sh /opt/casparcg/run.sh
+#   sudo install -m 0755 tools/casparcg-run.sh /home/casparcg/highascg/run.sh
 #
 # Environment (optional):
-#   CASPAR_ROOT           default /opt/casparcg
+#   CASPAR_ROOT           default /home/casparcg/highascg
 #   CASPAR_LIB            default $CASPAR_ROOT/lib  → LD_LIBRARY_PATH
 #   CASPAR_BIN            default $CASPAR_ROOT/bin/casparcg
 #   CASPAR_CONFIG / CASPAR_CONFIG_PATH  config file (default $CASPAR_ROOT/config/casparcg.config)
@@ -22,7 +22,7 @@
 
 set -f
 
-CASPAR_ROOT="${CASPAR_ROOT:-/opt/casparcg}"
+CASPAR_ROOT="${CASPAR_ROOT:-/home/casparcg/highascg}"
 CASPAR_LIB="${CASPAR_LIB:-$CASPAR_ROOT/lib}"
 export LD_LIBRARY_PATH="$CASPAR_LIB"
 unset LD_PRELOAD

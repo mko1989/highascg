@@ -9,6 +9,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { parseCinfMedia } = require('../media/cinf-parse')
 const {
 	tryLocalThumbnailPng,
+	ensureLocalThumbnailCacheForMediaIds,
 	handleLocalMedia: serveLocalMedia,
 	handleDeleteLocalMedia: deleteLocalMediaFile,
 	unlinkMediaById,
@@ -26,8 +27,94 @@ function cinfResponseToStr(data) {
 }
 
 const failedThumbs = new Map() // filename -> timestamp
+const liveThumbByChannel = new Map() // channel -> { png: Buffer, at: number, sourceId?: string }
+const liveCaptureInFlight = new Map() // channel -> Promise<{ ok: boolean, sourceId?: string }>
+
+function parseThumbBase64(raw) {
+	if (Array.isArray(raw)) {
+		const s = raw.join('').replace(/\s/g, '')
+		if (s && /^[A-Za-z0-9+/=]+$/.test(s)) return s
+	}
+	if (typeof raw === 'string' && raw.length > 100) {
+		const s = raw.replace(/\s/g, '')
+		if (s && /^[A-Za-z0-9+/=]+$/.test(s)) return s
+	}
+	return null
+}
+
+async function listClsIds(ctx) {
+	try {
+		if (!ctx?.amcp?.query?.cls) return []
+		const res = await ctx.amcp.query.cls()
+		const arr = Array.isArray(res?.data) ? res.data : []
+		const ids = []
+		for (const line of arr) {
+			const s = String(line || '').trim()
+			if (!s) continue
+			const m = s.match(/^"([^"]+)"/)
+			if (m && m[1]) ids.push(m[1])
+		}
+		return ids
+	} catch {
+		return []
+	}
+}
+
+async function captureLiveThumbnailForChannel(channel, ctx) {
+	const ch = parseInt(channel, 10)
+	if (!Number.isFinite(ch) || ch < 1) return { ok: false }
+	const cached = liveThumbByChannel.get(ch)
+	if (cached?.png?.length) return { ok: true, sourceId: cached.sourceId || null, cached: true }
+	if (liveCaptureInFlight.has(ch)) return liveCaptureInFlight.get(ch)
+	const p = (async () => {
+		if (!ctx?.amcp?.basic?.print || !ctx?.amcp?.thumbnailRetrieve) return { ok: false }
+		const before = new Set(await listClsIds(ctx))
+		const printRes = await ctx.amcp.basic.print(ch)
+		await new Promise((r) => setTimeout(r, 120))
+		const after = await listClsIds(ctx)
+		let sourceId = null
+		for (const id of after) {
+			if (!before.has(id)) {
+				sourceId = id
+				break
+			}
+		}
+		if (!sourceId) {
+			const raw = Array.isArray(printRes?.data) ? printRes.data.join(' ') : String(printRes?.data || '')
+			const m = raw.match(/"([^"]+)"/)
+			if (m?.[1]) sourceId = m[1]
+		}
+		if (!sourceId) return { ok: false }
+		const r = await ctx.amcp.thumbnailRetrieve(sourceId)
+		// Clean up the temporary capture file from media folder so it doesn't accumulate (WO-32)
+		void unlinkMediaById(ctx.config, sourceId).catch(() => {})
+
+		const b64 = parseThumbBase64(r?.data)
+		if (!b64) return { ok: false, sourceId }
+		const png = Buffer.from(b64, 'base64')
+		if (!png || !png.length) return { ok: false, sourceId }
+		liveThumbByChannel.set(ch, { png, at: Date.now(), sourceId })
+		return { ok: true, sourceId }
+	})()
+		.catch(() => ({ ok: false }))
+		.finally(() => liveCaptureInFlight.delete(ch))
+	liveCaptureInFlight.set(ch, p)
+	return p
+}
 
 async function handleThumbnail(path, query, ctx) {
+	const liveM = path.match(/^\/api\/thumbnail\/live\/(\d+)$/)
+	if (liveM) {
+		const ch = parseInt(liveM[1], 10)
+		if (!Number.isFinite(ch) || ch < 1) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'valid channel required' }) }
+		}
+		const row = liveThumbByChannel.get(ch)
+		if (row?.png?.length) {
+			return { status: 200, headers: { 'Content-Type': 'image/png' }, body: row.png }
+		}
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'No live thumbnail cached yet' }) }
+	}
 	if (path === '/api/thumbnails') {
 		if (!ctx.amcp) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
@@ -65,9 +152,16 @@ async function handleThumbnail(path, query, ctx) {
 
 	const maxW = Math.min(1920, Math.max(64, parseInt(String(query.w ?? ''), 10) || 960))
 	const seekSec = Math.max(0, parseFloat(String(query.t ?? '')) || 2)
+	// Default to local ffmpeg thumbnails; Caspar retrieval is explicit fallback only.
+	const hasHqFlag = query.hq != null
+	const preferHqLocal = !hasHqFlag || String(query.hq ?? '').toLowerCase() === '1' || String(query.hq ?? '').toLowerCase() === 'true'
+	const allowHqFallback = String(query.fallback ?? '').toLowerCase() === '1' || String(query.fallback ?? '').toLowerCase() === 'true'
 	const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
 	if (localBuf && localBuf.length) {
 		return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
+	}
+	if (preferHqLocal && !allowHqFallback) {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Local HQ thumbnail not found' }) }
 	}
 	try {
 		if (!ctx.amcp) {
@@ -123,6 +217,8 @@ async function handleMediaRefresh(body, ctx) {
 	if (!ctx.amcp?.query) {
 		return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 	}
+	const parsedBody = parseBody(body)
+	const ensureHqThumbs = parsedBody?.ensureHqThumbs === true || parsedBody?.ensureHqThumbs === 1 || parsedBody?.ensureHqThumbs === '1'
 	const fn = ctx.runMediaLibraryQueryCycle || ctx.runConnectionQueryCycle
 	if (fn && typeof fn === 'function') {
 		fn.call(ctx)
@@ -131,10 +227,45 @@ async function handleMediaRefresh(body, ctx) {
 			if (typeof ctx.log === 'function') ctx.log('warn', 'Media library refresh: ' + (e?.message || e))
 		})
 	}
+	if (ensureHqThumbs && ctx.config?.hq_thumbnail_prewarm_on_media_refresh !== false) {
+		try {
+			await runMediaClsTlsRefresh(ctx)
+			const ids = (ctx.state?.getState?.()?.media || []).map((m) => String(m?.id || '').trim()).filter(Boolean)
+			const stats = await ensureLocalThumbnailCacheForMediaIds(ctx.config || {}, ids, {
+				maxItems: ids.length || 200,
+				maxW: 960,
+				seekSec: 2,
+			})
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, message: 'Media refresh + HQ thumbnail check complete', hqThumbnails: stats }),
+			}
+		} catch (e) {
+			if (typeof ctx.log === 'function') ctx.log('warn', 'Media refresh + HQ prewarm: ' + (e?.message || e))
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, message: 'Media refresh initiated (HQ check failed)', warn: String(e?.message || e) }),
+			}
+		}
+	}
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, message: 'Media refresh initiated' }) }
 }
 
 async function handlePost(path, body, ctx) {
+	if (path === '/api/thumbnail/live/capture') {
+		const b = parseBody(body)
+		const ch = parseInt(String(b.channel || ''), 10)
+		const force = b.force === true || b.force === 1 || b.force === '1'
+		if (!Number.isFinite(ch) || ch < 1) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'valid channel required' }) }
+		}
+		if (force) liveThumbByChannel.delete(ch)
+		const r = await captureLiveThumbnailForChannel(ch, ctx)
+		if (!r.ok) return { status: 502, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'Live thumbnail capture failed' }) }
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel: ch, sourceId: r.sourceId || null, cached: !!r.cached }) }
+	}
 	if (path === '/api/media/delete') {
 		const b = parseBody(body)
 		const id = (b.id || '').trim()

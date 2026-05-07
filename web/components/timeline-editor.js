@@ -9,7 +9,8 @@
 
 import { timelineState } from '../lib/timeline-state.js'
 import { sceneState } from '../lib/scene-state.js'
-import { api, getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initTimelineCanvas } from './timeline-canvas.js'
 import { initPreviewPanel, drawTimelineStack } from './preview-canvas.js'
 import { createTimelineTransport } from './timeline-transport.js'
@@ -283,7 +284,7 @@ export function initTimelineEditor(root, stateStore) {
 				composeCellViewport: meta.composeCellViewport,
 				getThumbUrl: (src) =>
 					src?.type === 'media' && src?.value
-						? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}`
+						? getThumbnailUrl(src.value, 320, 2)
 						: null,
 				onThumbLoaded: () => previewPanel.scheduleDraw(),
 				stateStore,

@@ -31,7 +31,7 @@
 	height: auto !important;
 }
 
-/* When live preview is off or go2rtc isn’t running — JS hides host + split; timeline uses full height */
+/* When live preview is off — JS hides host + split; timeline uses full height */
 .tl-editor-root--no-preview .tl-preview-host,
 .tl-editor-root--no-preview .tl-split-handle {
 	display: none !important;

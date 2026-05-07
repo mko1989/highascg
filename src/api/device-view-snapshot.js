@@ -213,6 +213,23 @@ async function buildLiveSnapshot(ctx, includePh) {
 		}
 	}
 	if (decklinkHw?.warning) warnings.push(`decklink_log: ${decklinkHw.warning}`)
+	if ((!Array.isArray(decklinkHw?.connectors) || decklinkHw.connectors.length === 0) && ctx.gatheredInfo?.decklinkFromConfig) {
+		const fromConfig = ctx.gatheredInfo.decklinkFromConfig
+		const connectors = []
+		Object.keys(fromConfig).forEach((ch) => {
+			const info = fromConfig[ch]
+			if (Array.isArray(info?.consumers)) {
+				info.consumers.forEach((c) => {
+					if (c.device > 0 && !connectors.some((x) => x.index === c.device)) {
+						connectors.push({ index: c.device, label: `DeckLink ${c.device} (from config)` })
+					}
+				})
+			}
+		})
+		if (connectors.length > 0) {
+			decklinkHw = { source: 'caspar_config', connectors: connectors.sort((a, b) => a.index - b.index), detected: true }
+		}
+	}
 	const ph = includePh ? await buildPixelhueLive(ctx) : { available: false, reason: 'skipped' }
 	const caspar = casparSnapshot(ctx); caspar.destinationIntent = buildDestinationCasparIntent(ctx)
 	caspar.generatedChannelOrder = buildGeneratedChannelOrder(ctx); caspar.applyPlan = null // built on demand

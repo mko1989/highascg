@@ -16,11 +16,14 @@ import { setStatus, buildInspectorTable, connectorIdFromEvent } from './device-v
 import { renderCableOverlay } from './device-view-cables.js'
 import { renderDestinations } from './device-view-destinations-ui.js'
 import { renderBands } from './device-view-bands-render.js'
-import { renderEdgeInspector } from './device-view-inspector-render.js'
+import { renderDeviceInspector, renderEdgeInspector } from './device-view-inspector-render.js'
 import * as Actions from './device-view-actions.js'
 import { SWITCHER_INTEGRATION_DISABLED } from './device-view-switcher-integration-disabled.js'
 import { renderConnectorInspector, renderCasparSettingsInspector } from './device-view-inspectors.js'
 import { showLogsModal } from './logs-modal.js'
+import { describeCableRejection, cableReasonFromError } from '../lib/device-view-cable-messages.js'
+import { showCasparConfigModal } from './caspar-config-modal.js'
+import { renderDestinationInspector } from './device-view-destinations-inspector.js'
 
 let mounted = false; export function initDeviceView(root) {
 	if (!root || mounted) return; mounted = true; root.innerHTML = ''
@@ -30,9 +33,10 @@ let mounted = false; export function initDeviceView(root) {
 	const refreshBtn = document.createElement('button'); refreshBtn.className = 'header-btn'; refreshBtn.textContent = 'Refresh'
 	const resetBtn = document.createElement('button'); resetBtn.className = 'header-btn'; resetBtn.textContent = 'Reset all cabling'
 	const applyCasparBtn = document.createElement('button'); applyCasparBtn.className = 'header-btn device-view__apply-btn'; applyCasparBtn.textContent = 'Apply Caspar config (restart)'
+	const editCasparBtn = document.createElement('button'); editCasparBtn.className = 'header-btn device-view__edit-config-btn'; editCasparBtn.innerHTML = '📝 Config'; editCasparBtn.title = 'Edit generated Caspar config'
 	const streamLiveBadge = Object.assign(document.createElement('span'), { className: 'device-view__stream-badge', textContent: 'Str1 ●' })
 	streamLiveBadge.style.display = 'none'
-	actions.append(streamLiveBadge, refreshBtn, resetBtn, applyCasparBtn); header.append(Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }), actions)
+	actions.append(streamLiveBadge, refreshBtn, resetBtn, applyCasparBtn, editCasparBtn); header.append(Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }), actions)
 	const cableRow = document.createElement('div'); cableRow.className = 'device-view__toolbar'
 	const clearCableBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'header-btn', textContent: 'Cancel cable', style: 'display:none' })
 	const skipPh = Object.assign(document.createElement('input'), { type: 'checkbox', id: 'device-view-skip-ph' })
@@ -58,7 +62,7 @@ let mounted = false; export function initDeviceView(root) {
 	const side = document.createElement('aside'); side.className = 'device-view__side'; side.append(inspector)
 	layout.append(main, side); wrap.append(cableOverlay, header, cableRow, Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Cable mode: connect channels to outputs. Apply Caspar config restarts CasparCG.' }), destPanel, layout, statusEl); root.append(wrap)
 
-	let lastPayload = null; let selectedKey = null; let selectedConnectorId = null; let selectedEdgeId = null; let cableSourceId = null; let hoveredEdgeId = null; let casparRestartDirty = false
+	let lastPayload = null; let selectedKey = null; let selectedConnectorId = null; let selectedEdgeId = null; let selectedDestinationId = null; let selectedDeviceId = null; let cableSourceId = null; let hoveredEdgeId = null; let casparRestartDirty = false
 	let cablePointer = null; let suppressDocCableClickUntil = 0; let currentSettings = null; let streamingStatus = null
 	const undoStack = []
 	function pushUndo() {
@@ -89,12 +93,13 @@ let mounted = false; export function initDeviceView(root) {
 	}
 
 	function selectDevice(devId, live) {
-		selectedKey = null; selectedConnectorId = null; selectedEdgeId = null; const dev = (lastPayload?.graph?.devices || []).find(d => d.id === devId)
+		selectedKey = null; selectedConnectorId = null; selectedEdgeId = null; selectedDestinationId = null; selectedDeviceId = devId
+		const dev = (lastPayload?.graph?.devices || []).find(d => d.id === devId)
 		rIntoInsp(h => {
 			if (devId === CASPAR_HOST) {
 				renderCasparSettingsInspector(h, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, showSettingsModal })
 			} else {
-				renderDeviceInspector(h, devId, live, dev)
+				renderDeviceInspector(h, devId, live, dev, { lastPayload, load, setCasparRestartDirty, statusEl })
 			}
 		})
 	}
@@ -111,6 +116,7 @@ let mounted = false; export function initDeviceView(root) {
 			selectedKey = null
 			selectedConnectorId = null
 			selectedEdgeId = null
+			selectedDeviceId = null
 			rIntoInsp((h) =>
 				h.append(
 					Object.assign(document.createElement('p'), {
@@ -122,7 +128,7 @@ let mounted = false; export function initDeviceView(root) {
 			updateUI()
 			return
 		}
-		selectedKey = key; selectedConnectorId = requestedConnectorId; selectedEdgeId = null
+		selectedKey = key; selectedConnectorId = requestedConnectorId; selectedEdgeId = null; selectedDestinationId = null; selectedDeviceId = null
 		const conn = connectorById(lastPayload, selectedConnectorId)
 		if (!conn) {
 			rIntoInsp((h) =>
@@ -160,7 +166,36 @@ let mounted = false; export function initDeviceView(root) {
 	}
 
 	function selectEdgeById(id) {
-		const e = (lastPayload?.graph?.edges || []).find(x => x.id === id); if (!e) return; selectedEdgeId = id; selectedConnectorId = null; selectedKey = null; rIntoInsp(h => renderEdgeInspector(h, e, removeEdge)); updateUI()
+		const e = (lastPayload?.graph?.edges || []).find(x => x.id === id); if (!e) return; selectedEdgeId = id; selectedConnectorId = null; selectedKey = null; selectedDestinationId = null; selectedDeviceId = null; rIntoInsp(h => renderEdgeInspector(h, e, removeEdge)); updateUI()
+	}
+
+	function selectDestinationById(id) {
+		const dests = Array.isArray(lastPayload?.tandemTopology?.destinations) ? lastPayload.tandemTopology.destinations : []
+		const d = dests.find(x => String(x.id) === String(id))
+		if (!d) { selectedDestinationId = null; return }
+		selectedDestinationId = id; selectedEdgeId = null; selectedConnectorId = null; selectedKey = null; selectedDeviceId = null
+		const mode = String(d.mode || 'pgm_prv')
+		const intentItems = Array.isArray(lastPayload?.live?.caspar?.destinationIntent?.items) ? lastPayload.live.caspar.destinationIntent.items : []
+		const intent = intentItems.find(x => String(x.id) === String(d.id)) || null
+		const sinkConnectorId = resolveDestinationSinkConnectorId(lastPayload, d)
+		const graphEdges = Array.isArray(lastPayload?.graph?.edges) ? lastPayload.graph.edges : []
+		const graphConnectors = Array.isArray(lastPayload?.graph?.connectors) ? lastPayload.graph.connectors : []
+		const suggestedConnectors = Array.isArray(lastPayload?.suggested?.connectors) ? lastPayload.suggested.connectors : []
+		const connectorById = new Map([...graphConnectors, ...suggestedConnectors].map(c => [String(c?.id || ''), c]))
+		const mappedOutputEdges = graphEdges.filter(e => String(e?.sourceId || '') === String(sinkConnectorId || ''))
+		
+		rIntoInsp(host => renderDestinationInspector({
+			host,
+			d,
+			mode,
+			intent,
+			mappedOutputEdges,
+			connectorById,
+			patchDestination: (did, patch) => Actions.patchDestination(did, patch).then(() => { setCasparRestartDirty(true); return load() }),
+			removeDestination: (did) => Actions.removeDestination(did).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }),
+			updateDestinationOutputLayer,
+		}))
+		updateUI()
 	}
 
 	async function removeEdge(id) { try { pushUndo(); const res = await Actions.removeEdge(id, tandemSync.checked); if (res?.graph) lastPayload.graph = res.graph; if (selectedEdgeId === id) selectedEdgeId = null; load() } catch (e) { setStatus(statusEl, e.message, false) } }
@@ -190,19 +225,42 @@ let mounted = false; export function initDeviceView(root) {
 		if (!c) return
 		if (cableSourceId && cableSourceId !== c) { tryAddCable(c); return }
 		const conn = connectorById(lastPayload, c); const role = connectorRole(conn)
-		if (role !== 'destination_out' && role !== 'caspar_out') { setStatus(statusEl, 'Cable can start only from destination output or output connector.', false); return }
+		if (role !== 'destination_out' && role !== 'caspar_out' && role !== 'pixel_mapping_out') { setStatus(statusEl, 'Cable can start only from destination output or output connector.', false); return }
 		selectKey(k, { ...d, connectorId: c }); cableSourceId = c; suppressDocCableClickUntil = Date.now() + 100; updateUI(); setStatus(statusEl, 'Cable armed: click another connector dot to connect', true)
 	}
 
 	async function tryAddCable(id) {
 		const o = orderEdgeForDeviceView(cableSourceId, id, (cid) => connectorById(lastPayload, cid))
-		if (!o) { setStatus(statusEl, 'Invalid connection', false); cableSourceId = null; cablePointer = null; updateUI(); return }
+		if (!o) {
+			setStatus(statusEl, 'These connectors cannot be cabled together (wrong roles or direction).', false)
+			cableSourceId = null
+			cablePointer = null
+			updateUI()
+			return
+		}
 		try {
 			pushUndo()
 			const res = await Actions.addCable(o.sourceId, o.sinkId, skipPh.checked, tandemSync.checked)
-			if (res?.error) { setStatus(statusEl, `Cable rejected: ${res.error}`, false); cableSourceId = null; cablePointer = null; updateUI(); return }
-			if (res?.graph) lastPayload.graph = res.graph; cableSourceId = null; cablePointer = null; setCasparRestartDirty(true); load()
-		} catch (e) { setStatus(statusEl, e.message, false) }
+			if (res?.error) {
+				setStatus(statusEl, describeCableRejection(res.error), false)
+				cableSourceId = null
+				cablePointer = null
+				focusConnectorById(id)
+				updateUI()
+				return
+			}
+			if (res?.graph) lastPayload.graph = res.graph
+			cableSourceId = null
+			cablePointer = null
+			setCasparRestartDirty(true)
+			load()
+		} catch (e) {
+			setStatus(statusEl, cableReasonFromError(e), false)
+			cableSourceId = null
+			cablePointer = null
+			focusConnectorById(id)
+			updateUI()
+		}
 	}
 
 	async function updateDestinationOutputLayer(edgeId, outputLayer) {
@@ -289,21 +347,37 @@ let mounted = false; export function initDeviceView(root) {
 		}
 	}
 
+	window.addEventListener('highascg-device-view-update-payload', (ev) => {
+		if (ev.detail?.graph) {
+			lastPayload = { ...lastPayload, graph: ev.detail.graph }
+			render()
+		}
+	})
+
 	async function load() {
 		try {
 			const [payload, settings, stream] = await Promise.all([Actions.loadDeviceView(skipPh.checked), Actions.loadSettings(), Actions.getStreamingChannelStatus().catch(() => null)])
 			lastPayload = payload; currentSettings = settings; streamingStatus = stream; streamLiveBadge.style.display = streamingStatus?.rtmp?.active ? '' : 'none'
-			renderDestinations({ destBody, lastPayload, highlightDestinationIntent: () => {}, clearChipHighlights: () => {}, renderIntoInspector: rIntoInsp, patchDestination: (id, p) => Actions.patchDestination(id, p).then(() => { setCasparRestartDirty(true); return load() }), removeDestination: (id) => Actions.removeDestination(id).then(() => { setCasparRestartDirty(true); return load() }), applyPlan: () => Actions.applyDeviceViewPlan({ applyCaspar: true, applyPixelhue: false }).then(() => { setCasparRestartDirty(false); return load() }), resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(lastPayload, d), cableSourceId, onDestinationPortClick: (connectorId) => beginOrCompleteCable('dest:' + connectorId, connectorId, {}), onDecklinkDropToDestinationOutput: (connectorId, d, intent) => setDecklinkAsDestinationOutput(connectorId, d, intent), updateDestinationOutputLayer, persistDestinationLayout, resetDestinationLayout, requestCableOverlayRender: () => renderCableOverlay(getCOCtx()) })
-			renderBands(bands, { live: lastPayload.live, lastPayload, resolveConnectorId: (t, d) => resolveConnectorId(lastPayload, t, d), isConnectorVisible: (id) => isConnectorVisible(lastPayload, id), selectedKey, cableSourceId, onPortClick: selectKey, onPortStartCable: beginOrCompleteCable, selectDevice, selectedConnectorId }, { currentSettings, statusEl, load })
+			renderDestinations({ destBody, lastPayload, highlightDestinationIntent: () => {}, clearChipHighlights: () => {}, renderIntoInspector: rIntoInsp, selectDestinationById, patchDestination: (id, p) => Actions.patchDestination(id, p).then(() => { setCasparRestartDirty(true); return load() }), removeDestination: (id) => Actions.removeDestination(id).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }), applyPlan: () => Actions.applyDeviceViewPlan({ applyCaspar: true, applyPixelhue: false }).then(() => { setCasparRestartDirty(false); return load() }), resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(lastPayload, d), cableSourceId, onDestinationPortClick: (connectorId) => beginOrCompleteCable('dest:' + connectorId, connectorId, {}), onDecklinkDropToDestinationOutput: (connectorId, d, intent) => setDecklinkAsDestinationOutput(connectorId, d, intent), updateDestinationOutputLayer, persistDestinationLayout, resetDestinationLayout, requestCableOverlayRender: () => renderCableOverlay(getCOCtx()) })
+			renderBands(bands, { live: lastPayload.live, lastPayload, resolveConnectorId: (t, d) => resolveConnectorId(lastPayload, t, d), isConnectorVisible: (id) => isConnectorVisible(lastPayload, id), selectedKey, cableSourceId, onPortClick: selectKey, onPortStartCable: beginOrCompleteCable, selectDevice, selectedConnectorId }, { currentSettings, statusEl, load, setCasparRestartDirty })
 			edgesHost.innerHTML = ''; const edges = lastPayload?.graph?.edges || []; if (edges.length) { const b = Object.assign(document.createElement('div'), { className: 'device-view__band' }); b.append(Object.assign(document.createElement('h3'), { textContent: 'Cables' })); const ul = Object.assign(document.createElement('ul'), { className: 'device-view__edge-list' }); edges.forEach(e => { const li = Object.assign(document.createElement('li'), { className: `device-view__edge-item ${selectedEdgeId === e.id ? 'device-view__edge-item--selected' : ''}` }); li.onmouseenter = () => { hoveredEdgeId = e.id; renderCableOverlay(getCOCtx()) }; li.onmouseleave = () => { hoveredEdgeId = null; renderCableOverlay(getCOCtx()) }; li.onclick = () => selectEdgeById(e.id); li.append(Object.assign(document.createElement('span'), { textContent: `${friendlyConnectorLabel(lastPayload, e.sourceId)} → ${friendlyConnectorLabel(lastPayload, e.sinkId)} ` })); ul.append(li) }); b.append(ul); edgesHost.append(b) }
 			if (selectedEdgeId) { if (edges.some((e) => String(e?.id || '') === String(selectedEdgeId))) selectEdgeById(selectedEdgeId); else selectedEdgeId = null }
 			if (!selectedEdgeId && selectedConnectorId) { const conn = connectorById(lastPayload, selectedConnectorId); if (conn) selectKey(selectedKey || `conn:${selectedConnectorId}`, { connectorId: selectedConnectorId, connector: conn, type: conn.kind || 'connector' }); else { selectedConnectorId = null; selectedKey = null } }
+			if (!selectedEdgeId && !selectedConnectorId && selectedDestinationId) { selectDestinationById(selectedDestinationId) }
+			if (!selectedEdgeId && !selectedConnectorId && !selectedDestinationId && selectedDeviceId) {
+				const dev = (lastPayload?.graph?.devices || []).find((d) => String(d?.id || '') === String(selectedDeviceId))
+				if (dev) selectDevice(selectedDeviceId, lastPayload?.live)
+				else selectedDeviceId = null
+			}
+			const hasOverride = !!settings?.casparServer?.casparConfigOverride
+			editCasparBtn.classList.toggle('device-view__edit-config-btn--active', hasOverride)
+			editCasparBtn.title = hasOverride ? 'Manual XML override active. Click to edit/revert.' : 'Edit generated Caspar config'
 			setStatus(statusEl, `Updated ${lastPayload?.live?.host?.collectedAt || ''}`, true)
 			// Ensure cables and highlights are rendered after the DOM has been populated and laid out
 			requestAnimationFrame(() => updateUI())
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
-	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message, true) }); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
+	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message, true) }); editCasparBtn.onclick = () => showCasparConfigModal().then(() => load()); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
 	destAdd.onclick = () => { const list = Array.isArray(lastPayload?.tandemTopology?.destinations) ? lastPayload.tandemTopology.destinations : []; const highest = Math.max(-1, ...list.map((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0))); Actions.addDestination({ type: destType.value, mainScreenIndex: destType.value === 'multiview' ? 0 : highest + 1 }).then(() => { setCasparRestartDirty(true); load() }) }
 	window.addEventListener('pointermove', (ev) => { if (cableSourceId) { const br = wrap.getBoundingClientRect(); cablePointer = { x: ev.clientX - br.left, y: ev.clientY - br.top }; renderCableOverlay(getCOCtx()) } })
 	document.addEventListener('keydown', (ev) => {
@@ -315,5 +389,8 @@ let mounted = false; export function initDeviceView(root) {
 		}
 	})
 	document.addEventListener('click', (ev) => { if (!cableSourceId || Date.now() < suppressDocCableClickUntil) return; const targetId = connectorIdFromEvent(ev); if (targetId) { if (targetId !== cableSourceId) { ev.preventDefault(); ev.stopPropagation(); void tryAddCable(targetId) }; return }; cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }, true)
-	document.addEventListener('highascg-settings-applied', load); window.addEventListener('highascg-device-view-focus-connector', (ev) => { const cid = String(ev?.detail?.connectorId || '').trim(); if (cid) focusConnectorById(cid) }); void load()
+	document.addEventListener('highascg-settings-applied', load); 
+	window.addEventListener('highascg-device-view-focus-connector', (ev) => { const cid = String(ev?.detail?.connectorId || '').trim(); if (cid) focusConnectorById(cid) }); 
+	window.addEventListener('highascg-device-view-focus-device', (ev) => { if (ev.detail?.deviceId) selectDevice(ev.detail.deviceId, lastPayload?.live) });
+	void load()
 }

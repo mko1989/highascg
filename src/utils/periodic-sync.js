@@ -10,6 +10,7 @@ const { reconcileLiveSceneFromGatheredXml } = require('../state/live-scene-recon
 const playbackTracker = require('../state/playback-tracker')
 const { responseToStr, updateChannelVariablesFromXml } = require('./query-cycle')
 const handlers = require('./handlers')
+const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
 
 /** @type {ReturnType<typeof setInterval> | null} */
 let oscPlaybackInfoTimer = null
@@ -177,6 +178,7 @@ async function runMediaClsTlsRefresh(self) {
 		const clsRes = await self.amcp.query.cls()
 		handlers.handleCLS(self, clsRes?.data)
 		self.state.updateFromCLS(clsRes?.data)
+		scheduleHqThumbnailPrewarmFromCls(self)
 		const n = self.state?.getState?.()?.media?.length ?? self.CHOICES_MEDIAFILES?.length ?? 0
 		if (typeof self.log === 'function') self.log('info', `Media library CLS/TLS: ${n} media item(s) from server`)
 		const tlsRes = await self.amcp.query.tls()
@@ -186,6 +188,27 @@ async function runMediaClsTlsRefresh(self) {
 	} catch (e) {
 		if (typeof self.log === 'function') self.log('warn', 'Media CLS/TLS refresh failed: ' + (e?.message || e))
 	}
+}
+
+function scheduleHqThumbnailPrewarmFromCls(self) {
+	if (self._hqThumbPrewarmInFlight) return
+	const ids = (self.state?.getState?.()?.media || [])
+		.map((m) => String(m?.id || '').trim())
+		.filter(Boolean)
+	if (ids.length === 0) return
+	self._hqThumbPrewarmInFlight = ensureLocalThumbnailCacheForMediaIds(self.config || {}, ids, { maxItems: 80, maxW: 960, seekSec: 2 })
+		.then((stats) => {
+			if (!stats) return
+			if (typeof self.log === 'function' && stats.generated > 0) {
+				self.log('debug', `HQ thumbnail prewarm: generated ${stats.generated} / attempted ${stats.attempted} (cached ${stats.cached})`)
+			}
+		})
+		.catch((e) => {
+			if (typeof self.log === 'function') self.log('debug', 'HQ thumbnail prewarm failed: ' + (e?.message || e))
+		})
+		.finally(() => {
+			self._hqThumbPrewarmInFlight = null
+		})
 }
 
 /**

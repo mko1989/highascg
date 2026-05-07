@@ -87,6 +87,10 @@ optgroup {
 	gap: 8px;
 }
 
+.header__title--pixelweb {
+	color: #c4b5fd;
+}
+
 .header-left {
 	display: flex;
 	align-items: center;
@@ -327,6 +331,70 @@ optgroup {
 .header__status .connection-eye__img {
 	width: 72px;
 	height: 28px;
+}
+
+.pixelweb-shell {
+	position: fixed;
+	left: 0;
+	top: var(--header-h);
+	width: 100vw;
+	height: calc(100vh - var(--header-h));
+	display: none;
+	z-index: 1000;
+	background: #000;
+}
+
+.pixelweb-shell--active {
+	display: block;
+}
+
+.pixelweb-shell__frame {
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: #000;
+}
+
+.pixelweb-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2100;
+}
+
+.pixelweb-modal {
+	width: min(460px, calc(100vw - 24px));
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.pixelweb-modal__label {
+	font-size: 0.85rem;
+	color: var(--text-muted);
+}
+
+.pixelweb-modal__input {
+	width: 100%;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	color: var(--text);
+	border-radius: var(--radius);
+	padding: 8px 10px;
+	font-size: 0.9rem;
+}
+
+.pixelweb-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
 }
 
 /* Server config vs module (FEAT-1) */

@@ -1,11 +1,39 @@
 {
   "version": 1,
+  "edidNotes": "",
   "destinations": [
     {
       "id": "led1",
       "label": "LED wall 1",
       "mainScreenIndex": 0,
       "mode": "pgm_prv",
+      "videoMode": "custom",
+      "width": 5120,
+      "height": 1024,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "pixelhue": {
+        "layerId": null,
+        "screenGuid": "",
+        "role": "caspar_pgm"
+      },
+      "signalPathId": "caspar_pgm1_in",
+      "edidLabel": "",
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    },
+    {
+      "id": "dst_mot0clok_1",
+      "label": "Multiview 1",
+      "mainScreenIndex": 0,
+      "mode": "multiview",
       "videoMode": "1080p5000",
       "width": 1920,
       "height": 1080,
@@ -18,7 +46,7 @@
         "screenGuid": "",
         "role": "caspar_pgm"
       },
-      "signalPathId": "caspar_pgm1_in",
+      "signalPathId": "",
       "edidLabel": "",
       "stream": {
         "type": "rtmp",
@@ -42,6 +70,5 @@
       "edidLabel": "",
       "notes": "Set phInterfaceId after GET /api/tandem-device populates interfaces from the device."
     }
-  ],
-  "edidNotes": ""
+  ]
 }

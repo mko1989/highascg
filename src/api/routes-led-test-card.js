@@ -43,6 +43,7 @@ async function handlePost(path, body, ctx) {
 		}
 
 		const showLedGrid = b.showLedGrid === true
+		const charCount = Math.max(1, Math.min(48, parseInt(b.charCount, 10) || 1))
 		const showCircle = b.showCircle !== false && b.showCircle !== 'false'
 		const showCross = b.showCross !== false && b.showCross !== 'false'
 		let ipLines = b.ipLines
@@ -105,6 +106,7 @@ async function handlePost(path, body, ctx) {
 					connectorLabel,
 					ipLines,
 					pattern: b.pattern || 'grid-white',
+					charCount,
 				}
 			: {
 					showLedGrid: false,
@@ -125,6 +127,7 @@ async function handlePost(path, body, ctx) {
 					showPanelLabels: false,
 					showSpecLine: false,
 					pattern: b.pattern || 'grid-white',
+					charCount,
 				}
 
 		const data = JSON.stringify(payload)

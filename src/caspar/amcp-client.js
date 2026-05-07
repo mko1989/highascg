@@ -1,6 +1,8 @@
 'use strict'
 
 const { EventEmitter } = require('events')
+const fs = require('fs')
+const path = require('path')
 const { AmcpBasic } = require('./amcp-basic')
 const { AmcpMixer } = require('./amcp-mixer')
 const { AmcpCg } = require('./amcp-cg')
@@ -147,6 +149,7 @@ class AmcpClient extends EventEmitter {
 				if (typeof self.log === 'function' && (amcpVerboseTrace() || !AmcpClient.QUIET_CMDS.has(key))) {
 					self.log('debug', `AMCP → ${trimmed}`)
 				}
+				recordAmcpHistory(self, trimmed)
 				self.socket.send(trimmed + '\r\n')
 
 				timeoutHandle = setTimeout(() => {
@@ -362,6 +365,22 @@ class AmcpClient extends EventEmitter {
 	 */
 	batchSendChunked(commandLines, opts) {
 		return this.batch.batchSendChunked(commandLines, opts)
+	}
+}
+
+function recordAmcpHistory(ctx, command) {
+	try {
+		if (!ctx._amcpHistory) ctx._amcpHistory = []
+		const ts = new Date().toISOString()
+		ctx._amcpHistory.push(`${ts} ${command}`)
+		if (ctx._amcpHistory.length > 50) {
+			ctx._amcpHistory = ctx._amcpHistory.slice(ctx._amcpHistory.length - 50)
+		}
+		const fp = path.join(process.cwd(), 'data', 'amcp-last50.txt')
+		fs.mkdirSync(path.dirname(fp), { recursive: true })
+		fs.writeFileSync(fp, ctx._amcpHistory.join('\n') + '\n', 'utf8')
+	} catch {
+		/* non-fatal */
 	}
 }
 

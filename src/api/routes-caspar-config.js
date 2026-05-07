@@ -38,7 +38,7 @@ function toAbsoluteConfigPath(p) {
  */
 function normalizeCasparServerConfigPath(cs) {
 	if (!cs || typeof cs !== 'object') return
-	const def = String(defaults.casparServer?.configPath || '').trim() || '/opt/casparcg/config/casparcg.config'
+	const def = String(defaults.casparServer?.configPath || '').trim() || '/home/casparcg/highascg/config/casparcg.config'
 	const cp = String(cs.configPath || '').trim()
 	cs.configPath = cp || def
 }
@@ -82,13 +82,13 @@ async function waitForAmcpTcp(ctx, maxMs, pollMs = 400) {
 /**
  * Where generated XML is written for Apply / project sync.
  * Order: **saved** `casparServer.configPath` (Settings → System) → `CASPAR_CONFIG_PATH` env → default
- * `/opt/casparcg/config/casparcg.config`. Relative paths resolve from the HighAsCG process cwd.
+ * `/home/casparcg/highascg/config/casparcg.config`. Relative paths resolve from the HighAsCG process cwd.
  *
  * @param {object} ctx
  * @returns {string}
  */
 function resolveCasparConfigWritePath(ctx) {
-	const fallback = String(defaults.casparServer?.configPath || '').trim() || '/opt/casparcg/config/casparcg.config'
+	const fallback = String(defaults.casparServer?.configPath || '').trim() || '/home/casparcg/highascg/config/casparcg.config'
 	const raw = ctx.config?.casparServer && String(ctx.config.casparServer.configPath || '').trim()
 	if (raw) return toAbsoluteConfigPath(raw)
 	const fromEnv = String(process.env.CASPAR_CONFIG_PATH || '').trim()
@@ -124,7 +124,9 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 		}
 	}
 	apiLog(ctx, 'info', `[Caspar config] Writing generated casparcg.config → ${filePath}`)
-	const xml = buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	const override = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
+	const xml = override || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	if (override) apiLog(ctx, 'info', '[Caspar config] Using manual XML override from casparServer.casparConfigOverride')
 	const dir = path.dirname(filePath)
 	try {
 		await fs.mkdir(dir, { recursive: true })
@@ -275,8 +277,9 @@ function handleGet(p, query, ctx) {
 	}
 
 	if (p === '/api/caspar-config/generate') {
-		const xml = buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
 		const q = query || {}
+		const override = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
+		const xml = (q.effective === '1' && override) ? override : buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
 		const download = q.download === '1' || q.download === 'true'
 		const headers = {
 			'Content-Type': 'application/xml; charset=utf-8',
@@ -285,6 +288,14 @@ function handleGet(p, query, ctx) {
 			headers['Content-Disposition'] = 'attachment; filename="casparcg.config"'
 		}
 		return { status: 200, headers, body: xml }
+	}
+
+	if (p === '/api/caspar-config/override') {
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ override: ctx.config?.casparServer?.casparConfigOverride || '' }),
+		}
 	}
 
 	return null
@@ -296,31 +307,45 @@ function handleGet(p, query, ctx) {
  * @param {object} ctx
  */
 async function handlePost(p, body, ctx) {
-	if (p !== '/api/caspar-config/apply') return null
-	apiLog(ctx, 'info', '[Caspar config] POST /api/caspar-config/apply')
-	const b = parseBody(body) || {}
-	if (b.casparServer && typeof b.casparServer === 'object') {
-		ctx.config.casparServer = {
-			...(defaults.casparServer || {}),
-			...(ctx.config.casparServer || {}),
-			...b.casparServer,
+	if (p === '/api/caspar-config/apply') {
+		apiLog(ctx, 'info', '[Caspar config] POST /api/caspar-config/apply')
+		const b = parseBody(body) || {}
+		if (b.casparServer && typeof b.casparServer === 'object') {
+			ctx.config.casparServer = {
+				...(defaults.casparServer || {}),
+				...(ctx.config.casparServer || {}),
+				...b.casparServer,
+			}
+			normalizeCasparServerConfigPath(ctx.config.casparServer)
 		}
-		normalizeCasparServerConfigPath(ctx.config.casparServer)
+		// Audio / OSC tab (ALSA devices, etc.) — must merge before buildConfigXml; apply used to send casparServer only.
+		if (b.audioRouting && typeof b.audioRouting === 'object') {
+			ctx.config.audioRouting = normalizeAudioRouting({
+				...(defaults.audioRouting || {}),
+				...(ctx.config.audioRouting || {}),
+				...b.audioRouting,
+			})
+		}
+		const overridePath = typeof b.path === 'string' ? b.path.trim() : ''
+		if (overridePath) {
+			ctx.config.casparServer = { ...(ctx.config.casparServer || defaults.casparServer || {}), configPath: overridePath }
+			normalizeCasparServerConfigPath(ctx.config.casparServer)
+		}
+		return applyCasparConfigToDiskAndRestart(ctx)
 	}
-	// Audio / OSC tab (ALSA devices, etc.) — must merge before buildConfigXml; apply used to send casparServer only.
-	if (b.audioRouting && typeof b.audioRouting === 'object') {
-		ctx.config.audioRouting = normalizeAudioRouting({
-			...(defaults.audioRouting || {}),
-			...(ctx.config.audioRouting || {}),
-			...b.audioRouting,
-		})
+
+	if (p === '/api/caspar-config/override') {
+		const b = parseBody(body) || {}
+		const override = typeof b.override === 'string' ? b.override : ''
+		if (!ctx.config.casparServer) ctx.config.casparServer = { ...defaults.casparServer }
+		ctx.config.casparServer.casparConfigOverride = override
+		if (ctx.configManager) {
+			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 	}
-	const overridePath = typeof b.path === 'string' ? b.path.trim() : ''
-	if (overridePath) {
-		ctx.config.casparServer = { ...(ctx.config.casparServer || defaults.casparServer || {}), configPath: overridePath }
-		normalizeCasparServerConfigPath(ctx.config.casparServer)
-	}
-	return applyCasparConfigToDiskAndRestart(ctx)
+
+	return null
 }
 
 module.exports = {

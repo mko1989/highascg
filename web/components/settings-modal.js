@@ -31,7 +31,7 @@ export function showSettingsModal(initialTab) {
 
 	function activateSettingsTab(tabName) {
 		const exists = !!modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
-		if (!exists) tabName = 'streaming'
+		if (!exists) tabName = 'simulation'
 		modal.querySelectorAll('.settings-tab, .settings-pane').forEach(x => x.classList.remove('active'))
 		const btn = modal.querySelector(`.settings-tab[data-tab="${tabName}"]`); const pane = modal.querySelector(`#settings-pane-${tabName}`)
 		if (btn) btn.classList.add('active'); if (pane) pane.classList.add('active')

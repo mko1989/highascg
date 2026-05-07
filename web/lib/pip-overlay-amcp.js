@@ -16,6 +16,7 @@ const TEMPLATE_MAP = {
 	shadow: 'pip_shadow',
 	edge_strip: 'pip_edge_strip',
 	glow: 'pip_glow',
+	router: 'pip_router',
 }
 
 function clamp01(v) {
@@ -79,16 +80,6 @@ function expandFillOutward(contentFill, outsetPx, chW, chH) {
 	let y = contentFill.y - oy
 	let sx = contentFill.scaleX + 2 * ox
 	let sy = contentFill.scaleY + 2 * oy
-	if (x < 0) {
-		sx += x
-		x = 0
-	}
-	if (y < 0) {
-		sy += y
-		y = 0
-	}
-	if (x + sx > 1) sx = Math.max(0, 1 - x)
-	if (y + sy > 1) sy = Math.max(0, 1 - y)
 	return { x, y, scaleX: sx, scaleY: sy }
 }
 
@@ -149,15 +140,20 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 	const chH = channelPx?.h > 0 ? channelPx.h : 1080
 
 	const cf = normalizeContentFill(contentFill)
+	const pParams = mergeOverlayParams(overlay)
+	const side = String(pParams.side || 'outside').toLowerCase()
+	const forceExpanded = side === 'outside'
 	const outset = outsetPxForPipOverlay(overlay)
+
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
 	const p = Number(contentPhysicalLayer)
 	const idx = stackIndex | 0
 	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
+
 	let inner
 	let mixFill
-	if (aligned) {
-		inner = innerRectPipLocalFromOutset(cf, outset, chW, chH)
+	if (aligned && !forceExpanded) {
+		inner = { l: 0, t: 0, w: 1, h: 1 }
 		mixFill = cf
 	} else {
 		const overlayFill = expandFillOutward(cf, outset, chW, chH)

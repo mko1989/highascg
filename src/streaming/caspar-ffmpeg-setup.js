@@ -1,6 +1,6 @@
 'use strict'
 
-const { resolveCaptureTier } = require('./go2rtc-manager')
+const { resolveCaptureTier } = require('./stream-capture-tier')
 const { resolveNdiSourceName } = require('./ndi-resolve')
 
 /** AMCP `info()` resolves to `{ ok, data }` — never `body`. */
@@ -18,8 +18,8 @@ function truncate(s, max) {
 }
 
 /**
- * FFmpeg UDP output URL for Caspar → go2rtc. `localport` is the **source** port Caspar binds for sending;
- * without it, some Caspar/ffmpeg builds bind the same port as the destination and collide with go2rtc's
+ * FFmpeg UDP output URL for Caspar streaming consumers. `localport` is the **source** port Caspar binds for sending;
+ * without it, some Caspar/ffmpeg builds bind the same port as the destination and collide with listeners
  * listener on udp://0.0.0.0:destPort (bind failed: Address already in use).
  * @param {number} port - destination UDP port (e.g. basePort+1)
  */
@@ -105,7 +105,7 @@ function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
 }
 
 /**
- * Builds the ffmpeg arguments for the CasparCG ADD STREAM command (MPEG-TS bridge to go2rtc).
+ * Builds the ffmpeg arguments for the CasparCG ADD STREAM command.
  * Caspar expects: ADD n STREAM <output_url> <ffmpeg args…>.
  * **Must use `-format mpegts`**, not `-f mpegts`: Caspar's ffmpeg_consumer maps `-name value` into an options
  * map and only reads `options["format"]` for avformat_alloc_output_context2. The flag `-f` becomes key `f`, so
@@ -113,12 +113,12 @@ function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
  *
  * We use **UDP** to 127.0.0.1:port (not srt://): many Caspar 2.5 builds cannot open srt:// output
  * ("Unable to choose an output format") when libsrt is missing or SRT mux is not wired for STREAM.
- * go2rtc listens on `udp://0.0.0.0:port`; Caspar must send to `127.0.0.1:port` with a **different** local bind
+ * Receiver listens on `udp://0.0.0.0:port`; Caspar must send to `127.0.0.1:port` with a **different** local bind
  * (`?localport=`, see `casparUdpStreamUri`) so the ports do not collide.
  *
  * Caspar’s ffmpeg consumer only forwards **`-name:stream`** style options (`-filter:v`, `-preset:v`, …).
  * **`-vf`**, **`-g`**, **`-r`** are ignored (“Unused option”) — then **yuv420p** / keyframes / headers are wrong
- * and go2rtc hits **H.264 PPS** errors and **AAC channel** errors on multi-channel buses.
+ * and downstream receivers hit **H.264 PPS** errors and **AAC channel** errors on multi-channel buses.
  *
  * **`-filter:v`** chain includes **format=yuv420p**; **`-g:v`** + **`-x264-params:v`** (two tokens) for GOP + **repeat-headers**
  * (Caspar logs showed **`-x264-params`** without **`:v`** and **`-ac`** as unused — they must use **`-name:stream`**).
@@ -175,7 +175,7 @@ async function addStreamingConsumers(amcp, targets, config) {
 	console.log(`[Streaming] addStreamingConsumers: tier=${tier} targets=${targets.map((t) => `ch${t.channel}:${t.port}`).join(', ')}`)
 
 	if (tier === 'local') {
-		// Local capture mode: go2rtc captures directly from X11/DRM.
+		// Local capture mode: capture happens directly from X11/DRM.
 		// No CasparCG consumers needed — the server renders to screen and we grab it.
 		console.log('[Streaming] Local capture mode — skipping CasparCG ADD STREAM (x11grab/kmsgrab handles capture)')
 		return
@@ -183,7 +183,7 @@ async function addStreamingConsumers(amcp, targets, config) {
 
 	if (tier === 'ndi') {
 		// CasparCG outputs NDI natively (AMCP consumer type — sends channel to the network; no ffmpeg on Caspar).
-		// go2rtc separately uses ffmpeg libndi_newtek_input to receive those streams for WebRTC preview.
+		// A preview receiver can separately use ffmpeg libndi_newtek_input to receive those streams.
 		for (const t of targets) {
 			const ndiName = resolveNdiSourceName(config, t.channel)
 			try {
@@ -208,7 +208,7 @@ async function addStreamingConsumers(amcp, targets, config) {
 		return
 	}
 
-	// MPEG-TS over UDP to localhost. go2rtc ingests with `ffmpeg:udp://0.0.0.0:port` (see go2rtc-manager).
+	// MPEG-TS over UDP to localhost.
 	const ffmpegArgs = buildFfmpegArgs(config)
 
 	for (const t of targets) {

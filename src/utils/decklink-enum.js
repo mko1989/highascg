@@ -83,7 +83,7 @@ function parseCasparLogHardware(text) {
 }
 
 function getRecentLogPaths() {
-	const dir = '/opt/casparcg/log'
+	const dir = '/home/casparcg/highascg/log'
 	try {
 		if (!fs.existsSync(dir)) return []
 		return fs
@@ -174,9 +174,50 @@ function probeDecklinkFromCasparLog(opts = {}) {
 	}
 }
 
+/**
+ * @param {string} xmlStr
+ * @param {function} cb
+ */
+function parseInfoConfigForDecklinks(xmlStr, cb) {
+	if (!xmlStr) {
+		if (typeof cb === 'function') cb({})
+		return
+	}
+	const { parseString } = require('xml2js')
+	parseString(xmlStr, (err, result) => {
+		if (err || !result) {
+			if (typeof cb === 'function') cb({})
+			return
+		}
+		const decklink = {}
+		try {
+			let channels = result.configuration?.channels?.[0]?.channel
+			if (channels && !Array.isArray(channels)) channels = [channels]
+			if (Array.isArray(channels)) {
+				channels.forEach((ch, idx) => {
+					let consumers = ch.consumers?.[0]?.decklink
+					if (consumers && !Array.isArray(consumers)) consumers = [consumers]
+					if (Array.isArray(consumers) && consumers.length > 0) {
+						decklink[idx + 1] = {
+							consumers: consumers.map((c) => ({
+								device: parseInt(Array.isArray(c.device) ? c.device[0] : c.device, 10) || 0,
+								embeddedAudio: (Array.isArray(c['embedded-audio']) ? c['embedded-audio'][0] : c['embedded-audio']) === 'true',
+							})),
+						}
+					}
+				})
+			}
+		} catch (e) {
+			// ignore parse errors
+		}
+		if (typeof cb === 'function') cb(decklink)
+	})
+}
+
 module.exports = {
 	probeDecklinkHardware,
 	probeDecklinkFromCasparLog,
 	parseCasparLogHardware,
+	parseInfoConfigForDecklinks,
 }
 

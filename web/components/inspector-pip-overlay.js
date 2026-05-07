@@ -239,7 +239,7 @@ function renderPipOverlayCard(
 
 	const title = document.createElement('span')
 	title.className = 'inspector-effect-card__title'
-	title.textContent = `${def.icon} ${def.label}`
+	title.textContent = def.label
 	header.appendChild(title)
 
 	const reorder = document.createElement('div')
@@ -397,7 +397,7 @@ export function renderPipOverlayGroup(root, { pipOverlays, onUpdate, livePushCon
 	for (const def of PIP_OVERLAYS) {
 		const o = document.createElement('option')
 		o.value = def.type
-		o.textContent = `${def.icon} ${def.label}`
+		o.textContent = def.label
 		addSel.appendChild(o)
 	}
 	addSel.disabled = list.length >= PIP_OVERLAY_MAX_STACK

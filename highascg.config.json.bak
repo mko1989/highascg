@@ -38,7 +38,6 @@
   },
   "streaming": {
     "enabled": true,
-    "go2rtcPort": 1984,
     "webrtcPort": 8555,
     "protocol": "UDP",
     "quality": "medium",

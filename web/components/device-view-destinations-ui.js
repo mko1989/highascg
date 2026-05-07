@@ -12,6 +12,7 @@ export function renderDestinations(ctx) {
 		highlightDestinationIntent,
 		clearChipHighlights,
 		renderIntoInspector,
+		selectDestinationById,
 		patchDestination,
 		removeDestination,
 		applyPlan,
@@ -238,17 +239,9 @@ export function renderDestinations(ctx) {
 		b.addEventListener('mouseleave', () => localClearHighlights())
 		b.addEventListener('click', () => {
 			localHighlightIntent(intent)
-			renderIntoInspector((host) => renderDestinationInspector({
-				host,
-				d,
-				mode,
-				intent,
-				mappedOutputEdges,
-				connectorById,
-				patchDestination,
-				removeDestination,
-				updateDestinationOutputLayer,
-			}))
+			if (typeof selectDestinationById === 'function') {
+				selectDestinationById(d.id)
+			}
 		})
 
 		if (mode === 'multiview' || mode === 'stream') {

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIP Edge Strip Overlay</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	.svg-container {
+		position: absolute;
+		left: calc(var(--il) * 100%);
+		top: calc(var(--it) * 100%);
+		width: calc(var(--iw) * 100%);
+		height: calc(var(--ih) * 100%);
+		overflow: visible;
+	}
+	svg {
+		width: 100%;
+		height: 100%;
+		display: block;
+		overflow: visible;
+	}
+</style>
+<style id="pip-edge-strip-keyframes"></style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+	var root = document.getElementById('root')
+	var kfEl = document.getElementById('pip-edge-strip-keyframes')
+	var state = {
+		direction: 'cw',
+		count: 3,
+		thickness: 3,
+		color: '#e63946',
+		speed: 2,
+		length: 28,
+		glow: true,
+		glowColor: '#ff6b6b',
+		radius: 0,
+		side: 'outside',
+		inner: null,
+	}
+
+	function clamp01(x) {
+		var n = Number(x)
+		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+	}
+
+	function readInner(d) {
+		if (!d || !d.inner || typeof d.inner !== 'object') return null
+		return { l: clamp01(d.inner.l), t: clamp01(d.inner.t), w: clamp01(d.inner.w), h: clamp01(d.inner.h) }
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		return inn.w > 0 && inn.h > 0
+	}
+
+	function render() {
+		root.innerHTML = ''
+		kfEl.textContent = ''
+		var inn = state.inner
+		if (!inn || !hasMargin(inn)) return
+
+		var wrap = document.createElement('div')
+		wrap.className = 'svg-container'
+		wrap.style.setProperty('--il', String(inn.l))
+		wrap.style.setProperty('--it', String(inn.t))
+		wrap.style.setProperty('--iw', String(inn.w))
+		wrap.style.setProperty('--ih', String(inn.h))
+
+		var NS = 'http://www.w3.org/2000/svg'
+		var svg = document.createElementNS(NS, 'svg')
+		svg.setAttribute('viewBox', '0 0 100 100')
+		svg.setAttribute('preserveAspectRatio', 'none')
+
+		var cw = state.direction !== 'ccw'
+		var dur = Math.max(0.1, state.speed)
+		var n = Math.max(1, Math.min(12, Math.round(Number(state.count))))
+		var L = Math.max(2, Math.min(98, state.length))
+		var gap = 100 - L
+		var th = state.thickness || 3
+		var side = state.side || 'outside'
+
+		var animName = 'pes_anim'
+		var offEnd = cw ? '-100' : '100'
+		kfEl.textContent = '@keyframes ' + animName + ' { from { stroke-dashoffset: 0; } to { stroke-dashoffset: ' + offEnd + '; } }\n'
+
+		function createRect(stroke, width, opacity, delay) {
+			var r = document.createElementNS(NS, 'rect')
+			r.setAttribute('x', '0')
+			r.setAttribute('y', '0')
+			r.setAttribute('width', '100')
+			r.setAttribute('height', '100')
+			
+			var rw = Math.max(1, root.clientWidth * inn.w)
+			var rh = Math.max(1, root.clientHeight * inn.h)
+			var rx = (state.radius / rw) * 100
+			var ry = (state.radius / rh) * 100
+			r.setAttribute('rx', rx)
+			r.setAttribute('ry', ry)
+
+			r.setAttribute('fill', 'none')
+			r.setAttribute('stroke', stroke)
+			r.setAttribute('stroke-width', width)
+			r.style.vectorEffect = 'non-scaling-stroke'
+			r.setAttribute('pathLength', '100')
+			r.setAttribute('stroke-dasharray', L + ' ' + gap)
+			r.style.animation = animName + ' ' + dur + 's linear infinite'
+			r.style.animationDelay = delay + 's'
+			if (opacity < 1) r.setAttribute('opacity', String(opacity))
+			return r
+		}
+
+		for (var i = 0; i < n; i++) {
+			var delay = (-(i / n) * dur).toFixed(3)
+			if (state.glow) {
+				var g = createRect(state.glowColor, th * 2.5, 0.3, delay)
+				g.style.filter = 'blur(' + (th * 1.5) + 'px)'
+				svg.appendChild(g)
+			}
+			svg.appendChild(createRect(state.color, th, 1, delay))
+		}
+
+		if (side === 'inside') {
+			wrap.style.overflow = 'hidden'
+		} else {
+			wrap.style.overflow = 'visible'
+			// For 'outside', we could add a mask to hide the inside part, 
+			// but usually edge strips are thin enough that being half-in is fine 
+			// or the user can just use 'inside'.
+		}
+
+		wrap.appendChild(svg)
+		root.appendChild(wrap)
+	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (!d) return
+			if (d.direction != null) state.direction = String(d.direction)
+			if (d.count != null) state.count = parseFloat(d.count)
+			if (d.thickness != null) state.thickness = parseFloat(d.thickness)
+			if (d.color != null) state.color = String(d.color)
+			if (d.speed != null) state.speed = parseFloat(d.speed)
+			if (d.length != null) state.length = parseFloat(d.length)
+			if (d.glow != null) state.glow = !!d.glow
+			if (d.glowColor != null) state.glowColor = String(d.glowColor)
+			if (d.radius != null) state.radius = parseFloat(d.radius)
+			if (d.side != null) state.side = String(d.side)
+			state.inner = readInner(d)
+			render()
+		} catch (e) { console.warn('pip_edge_strip update:', e) }
+	}
+
+	render()
+})()
+</script>
+</body>
+</html>

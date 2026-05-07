@@ -83,6 +83,33 @@ export function createScenesPreviewRuntime(opts) {
 
 	let previewFlushRaf = null
 
+	/**
+	 * Read currently occupied look-stack layers from live state for a given PRV channel.
+	 * This is the source of truth for what is actually on-air in Caspar, so we avoid
+	 * blanket clears and avoid relying only on local "last pushed" cache.
+	 *
+	 * @param {number} previewCh
+	 * @returns {Set<number>}
+	 */
+	function getOccupiedPreviewLookLayersFromState(previewCh) {
+		const out = new Set()
+		const st = stateStore?.getState?.() || {}
+		const matrix = st?.playback?.matrix || st?.playbackMatrix || {}
+		if (!matrix || typeof matrix !== 'object') return out
+		for (const cell of Object.values(matrix)) {
+			if (!cell || typeof cell !== 'object') continue
+			if (cell.playing === false) continue
+			const ch = Number(cell.channel)
+			const ln = Number(cell.layer)
+			if (!Number.isFinite(ch) || !Number.isFinite(ln)) continue
+			if (ch !== Number(previewCh)) continue
+			// Keep preview cleanup scoped to look stack only.
+			if (ln < PREVIEW_SCENE_LAYER_MIN || ln >= 200) continue
+			out.add(ln)
+		}
+		return out
+	}
+
 	async function drainPreviewPushQueue() {
 		if (previewPushBusy) {
 			previewPushPending = true
@@ -141,7 +168,7 @@ export function createScenesPreviewRuntime(opts) {
 
 	/** @param {string} sceneId @param {object} scene */
 	function buildPreviewContentSnapshot(sceneId, scene) {
-		/** @type {Map<number, { value: string, loop: boolean, straightAlpha: boolean, contentFit: string, audioRoute: string, volume: number, muted: boolean, pipSig: string }>} */
+		/** @type {Map<number, { value: string, loop: boolean, straightAlpha: boolean, contentFit: string, audioRoute: string, volume: number, muted: boolean }>} */
 		const contentByLayer = new Map()
 		for (const l of scene.layers || []) {
 			if (!l?.source?.value) continue
@@ -153,7 +180,6 @@ export function createScenesPreviewRuntime(opts) {
 				audioRoute: l.audioRoute || '1+2',
 				volume: l.volume != null ? l.volume : 1,
 				muted: !!l.muted,
-				pipSig: JSON.stringify(getPipOverlaysFromLayer(l)),
 			})
 		}
 		return { sceneId, contentByLayer }
@@ -175,13 +201,25 @@ export function createScenesPreviewRuntime(opts) {
 				p.contentFit !== meta.contentFit ||
 				p.audioRoute !== meta.audioRoute ||
 				p.volume !== meta.volume ||
-				p.muted !== meta.muted ||
-				(p.pipSig ?? '') !== (meta.pipSig ?? '')
+				p.muted !== meta.muted
 			) {
 				return false
 			}
 		}
 		return true
+	}
+
+	function layerContentMetaForSnapshot(layer) {
+		if (!layer?.source?.value) return null
+		return {
+			value: String(layer.source.value),
+			loop: !!layer.loop,
+			straightAlpha: !!layer.straightAlpha,
+			contentFit: layer.contentFit || 'native',
+			audioRoute: layer.audioRoute || '1+2',
+			volume: layer.volume != null ? layer.volume : 1,
+			muted: !!layer.muted,
+		}
 	}
 
 	async function pushSceneToPreview(sceneId) {
@@ -219,7 +257,12 @@ export function createScenesPreviewRuntime(opts) {
 				}
 
 				const queue = []
-				const geometryOnly = isGeometryOnlyPreview(sceneId, scene) && lastPreviewChannel === previewCh
+				const sameSceneOnSamePrv =
+					lastPreviewContentSnapshot &&
+					lastPreviewContentSnapshot.sceneId === sceneId &&
+					Number(lastPreviewChannel) === Number(previewCh)
+				const geometryOnly = isGeometryOnlyPreview(sceneId, scene) && sameSceneOnSamePrv
+				const incrementalPreviewEdit = sameSceneOnSamePrv
 				const relevantLayerNumbers = (() => {
 					const s = new Set()
 					for (const l of scene.layers || []) {
@@ -231,16 +274,31 @@ export function createScenesPreviewRuntime(opts) {
 				})()
 
 				const layersToReset = new Set(relevantLayerNumbers)
-				if (lastPreviewLayers && lastPreviewLayers.size > 0) {
-					for (const n of lastPreviewLayers) {
-						if (Number.isFinite(n) && n >= PREVIEW_SCENE_LAYER_MIN) layersToReset.add(n)
+				if (!incrementalPreviewEdit) {
+					const occupiedNow = getOccupiedPreviewLookLayersFromState(previewCh)
+					if (occupiedNow.size > 0) {
+						for (const n of occupiedNow) layersToReset.add(n)
+					} else if (lastPreviewLayers && lastPreviewLayers.size > 0) {
+						// Fallback for startup races where state matrix has not arrived yet.
+						for (const n of lastPreviewLayers) {
+							if (Number.isFinite(n) && n >= PREVIEW_SCENE_LAYER_MIN) layersToReset.add(n)
+						}
 					}
 				}
 
-				if (!geometryOnly) {
+				if (!geometryOnly && !incrementalPreviewEdit) {
 					for (const ln of [...layersToReset].sort((a, b) => a - b)) {
 						const dl = chLayerAmcp(previewCh, ln)
 						queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, ln, 10000))
+					}
+				}
+
+				if (incrementalPreviewEdit && lastPreviewContentSnapshot?.contentByLayer) {
+					for (const [prevLn] of lastPreviewContentSnapshot.contentByLayer.entries()) {
+						if (!relevantLayerNumbers.has(Number(prevLn))) {
+							const dl = chLayerAmcp(previewCh, prevLn)
+							queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, prevLn, 10000))
+						}
 					}
 				}
 
@@ -273,8 +331,14 @@ export function createScenesPreviewRuntime(opts) {
 						`MIXER ${cl} KEYER ${shouldApplyStraightAlphaKeyer(!!layer.straightAlpha, layer.source?.value) ? 1 : 0}`,
 						`MIXER ${cl} VOLUME ${vol}`,
 					]
+					const prevMeta = incrementalPreviewEdit ? lastPreviewContentSnapshot?.contentByLayer?.get(Number(ln)) : null
+					const curMeta = layerContentMetaForSnapshot(layer)
+					const clipChanged = !prevMeta || !curMeta || JSON.stringify(prevMeta) !== JSON.stringify(curMeta)
 					if (geometryOnly) queue.push(...mixerPart)
-					else queue.push(playCmd, ...mixerPart)
+					else if (incrementalPreviewEdit) {
+						if (clipChanged) queue.push(playCmd)
+						queue.push(...mixerPart)
+					} else queue.push(playCmd, ...mixerPart)
 
 					const nextP = nextPipLayerInPreview(ln)
 					if (geometryOnly) queue.push(...buildPipOverlayRemoveLines(previewCh, ln, nextP))

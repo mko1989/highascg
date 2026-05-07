@@ -20,10 +20,34 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 	const keyVsync = `screen_${screenN}_vsync`
 	const keyBorderless = `screen_${screenN}_borderless`
 	const keyEdid = `screen_${screenN}_edid_override`
+	const keyStretch = `screen_${screenN}_stretch`
+	const keyKeyOnly = `screen_${screenN}_key_only`
+	const keyAlwaysOnTop = `screen_${screenN}_always_on_top`
+	const keyInteractive = `screen_${screenN}_interactive`
+	const keySbsKey = `screen_${screenN}_sbs_key`
+	const keyColourSpace = `screen_${screenN}_colour_space`
+	const keyForceLinear = `screen_${screenN}_force_linear_filter`
+	const keyMipmaps = `screen_${screenN}_enable_mipmaps`
+	const keyName = `screen_${screenN}_name`
+	const keyAspectRatio = `screen_${screenN}_aspect_ratio`
+	const keyPosX = `screen_${screenN}_x`
+	const keyPosY = `screen_${screenN}_y`
 	const windowedOn = cs[keyWindowed] !== false && cs[keyWindowed] !== 'false'
 	const vsyncOn = cs[keyVsync] !== false && cs[keyVsync] !== 'false'
 	const borderlessOn = cs[keyBorderless] === true || cs[keyBorderless] === 'true'
 	const edidOverride = String(cs[keyEdid] || conn?.caspar?.edidOverride || '')
+	const stretchVal = String(cs[keyStretch] || 'none')
+	const keyOnlyOn = cs[keyKeyOnly] === true || cs[keyKeyOnly] === 'true'
+	const alwaysOnTopOn = cs[keyAlwaysOnTop] !== false && cs[keyAlwaysOnTop] !== 'false'
+	const interactiveOn = cs[keyInteractive] === true || cs[keyInteractive] === 'true'
+	const sbsKeyOn = cs[keySbsKey] === true || cs[keySbsKey] === 'true'
+	const colourSpaceVal = String(cs[keyColourSpace] || 'RGB')
+	const forceLinearOn = cs[keyForceLinear] !== false && cs[keyForceLinear] !== 'false'
+	const mipmapsOn = cs[keyMipmaps] === true || cs[keyMipmaps] === 'true'
+	const screenName = String(cs[keyName] || '')
+	const aspectRatio = String(cs[keyAspectRatio] || '')
+	const posXVal = parseInt(String(cs[keyPosX] ?? 0), 10) || 0
+	const posYVal = parseInt(String(cs[keyPosY] ?? 0), 10) || 0
 	const wrapCtl = Object.assign(document.createElement('div'), { className: 'device-view__inspector-links' })
 	const fullscreenCk = Object.assign(document.createElement('label'), { className: 'device-view__cablemode' })
 	const fullscreenIn = Object.assign(document.createElement('input'), { type: 'checkbox' })
@@ -41,6 +65,41 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 	const vsyncIn = Object.assign(document.createElement('input'), { type: 'checkbox' })
 	vsyncIn.checked = !!vsyncOn
 	vsyncCk.append(vsyncIn, document.createTextNode('V-sync'))
+
+	// Advanced screen consumer controls
+	const stretchSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	stretchSel.innerHTML = ['none','fill','uniform','uniform_to_fill'].map(v => `<option value="${v}"${v === stretchVal ? ' selected' : ''}>${v}</option>`).join('')
+	stretchSel.addEventListener('change', saveCasparSettings)
+
+	const mkCk = (label, checked) => {
+		const ck = Object.assign(document.createElement('label'), { className: 'device-view__cablemode' })
+		const inp = Object.assign(document.createElement('input'), { type: 'checkbox' })
+		inp.checked = !!checked
+		inp.addEventListener('change', saveCasparSettings)
+		ck.append(inp, document.createTextNode(label))
+		return { ck, inp }
+	}
+	const { ck: keyOnlyCk, inp: keyOnlyIn } = mkCk('Key only', keyOnlyOn)
+	const { ck: aotCk, inp: aotIn } = mkCk('Always on top', alwaysOnTopOn)
+	const { ck: interactiveCk, inp: interactiveIn } = mkCk('Interactive', interactiveOn)
+	const { ck: sbsKeyCk, inp: sbsKeyIn } = mkCk('SBS Key', sbsKeyOn)
+	const { ck: forceLinearCk, inp: forceLinearIn } = mkCk('Force linear filter', forceLinearOn)
+	const { ck: mipmapsCk, inp: mipmapsIn } = mkCk('Enable mipmaps', mipmapsOn)
+
+	const colourSpaceSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	colourSpaceSel.innerHTML = ['RGB','datavideo-full','datavideo-limited'].map(v => `<option value="${v}"${v === colourSpaceVal ? ' selected' : ''}>${v}</option>`).join('')
+	colourSpaceSel.addEventListener('change', saveCasparSettings)
+
+	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'Screen name (optional)', value: screenName })
+	nameIn.addEventListener('change', saveCasparSettings)
+	const arIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'e.g. 16:9 or 1.7778', value: aspectRatio })
+	arIn.addEventListener('change', saveCasparSettings)
+	const posXIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'X', value: String(posXVal) })
+	posXIn.style.width = '50%'
+	posXIn.addEventListener('change', saveCasparSettings)
+	const posYIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'Y', value: String(posYVal) })
+	posYIn.style.width = '50%'
+	posYIn.addEventListener('change', saveCasparSettings)
 	const keyMode = `screen_${screenN}_mode`
 	const keyCustomWidth = `screen_${screenN}_custom_width`
 	const keyCustomHeight = `screen_${screenN}_custom_height`
@@ -213,7 +272,22 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 		}
 	}
 
-	const saveCasparSettings = async () => {
+	const buildAdvancedPatch = () => ({
+		[keyStretch]: stretchSel.value,
+		[keyKeyOnly]: !!keyOnlyIn.checked,
+		[keyAlwaysOnTop]: !!aotIn.checked,
+		[keyInteractive]: !!interactiveIn.checked,
+		[keySbsKey]: !!sbsKeyIn.checked,
+		[keyColourSpace]: colourSpaceSel.value,
+		[keyForceLinear]: !!forceLinearIn.checked,
+		[keyMipmaps]: !!mipmapsIn.checked,
+		[keyName]: nameIn.value.trim(),
+		[keyAspectRatio]: arIn.value.trim(),
+		[keyPosX]: parseInt(posXIn.value, 10) || 0,
+		[keyPosY]: parseInt(posYIn.value, 10) || 0,
+	})
+
+	async function saveCasparSettings() {
 		const patch = {
 			casparServer: {
 				[keyWindowed]: !!windowedIn.checked,
@@ -223,6 +297,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 				[keyCustomWidth]: inherited ? inherited.width : Math.max(64, parseInt(String(customWidthIn.value || 1920), 10) || 1920),
 				[keyCustomHeight]: inherited ? inherited.height : Math.max(64, parseInt(String(customHeightIn.value || 1080), 10) || 1080),
 				[keyCustomFps]: inherited ? inherited.fps : Math.max(1, parseFloat(String(customFpsIn.value || 50)) || 50),
+				...buildAdvancedPatch(),
 			}
 		}
 		await Actions.saveSettingsPatch(patch)
@@ -291,7 +366,10 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 			casparServer: {
 				[keyMode]: null, [keyWindowed]: null, [keyVsync]: null, [keyBorderless]: null,
 				[keyCustomWidth]: null, [keyCustomHeight]: null, [keyCustomFps]: null, [keyEdid]: null,
-				[keySystemId]: null, [keyOsMode]: null, [keyOsRate]: null, [keyOsBackend]: null
+				[keySystemId]: null, [keyOsMode]: null, [keyOsRate]: null, [keyOsBackend]: null,
+				[keyStretch]: null, [keyKeyOnly]: null, [keyAlwaysOnTop]: null, [keyInteractive]: null,
+				[keySbsKey]: null, [keyColourSpace]: null, [keyForceLinear]: null, [keyMipmaps]: null,
+				[keyName]: null, [keyAspectRatio]: null, [keyPosX]: null, [keyPosY]: null
 			}
 		}
 		await Actions.saveSettingsPatch(patch)
@@ -300,11 +378,22 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, sk
 	}
 
 	const edidLabel = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'EDID Override / Force ID' })
+	const posRow = Object.assign(document.createElement('div'), { style: 'display:flex;gap:6px' })
+	posRow.append(posXIn, posYIn)
+
 	wrapCtl.append(
 		fullscreenCk, windowedCk, borderCk, vsyncCk, 
 		Object.assign(document.createElement('hr'), { className: 'device-view__hr' }),
 		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'CasparCG Video Mode' }),
 		modeSel, customWidthIn, customHeightIn, customFpsIn, 
+		Object.assign(document.createElement('hr'), { className: 'device-view__hr' }),
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Screen Consumer' }),
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Stretch', style: 'font-size:11px;opacity:.7' }), stretchSel,
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Colour Space', style: 'font-size:11px;opacity:.7' }), colourSpaceSel,
+		keyOnlyCk, aotCk, interactiveCk, sbsKeyCk, forceLinearCk, mipmapsCk,
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Name', style: 'font-size:11px;opacity:.7' }), nameIn,
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Aspect Ratio', style: 'font-size:11px;opacity:.7' }), arIn,
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Position (X / Y)', style: 'font-size:11px;opacity:.7' }), posRow,
 		Object.assign(document.createElement('hr'), { className: 'device-view__hr' }),
 		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'OS / X11 Settings' }),
 		osBackendSel, 

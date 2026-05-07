@@ -138,7 +138,7 @@ Full AMCP 2.x protocol implementation with ~79 commands across 7 categories.
 | `src/engine/pip-overlay.js` | 475 | scene-native-fill, amcp-batch | AMCP line builders for HTML PIP templates (server) |
 | `web/lib/pip-overlay-amcp.js` | 243 | pip-overlay-registry.js | Shared AMCP line builders (browser + tooling) |
 | `src/api/routes-pip-overlay.js` | 132 | response, pip-overlay | REST: apply/update/remove PIP overlays |
-| `templates/pip-*.html` | ? | - | HTML/CSS PIP overlay templates (border, shadow, glow, edge strip) |
+| `template/pip-*.html` | ? | - | HTML/CSS PIP overlay templates (border, shadow, glow, edge strip) |
 
 ### 5. Multiview
 
@@ -146,7 +146,7 @@ Full AMCP 2.x protocol implementation with ~79 commands across 7 categories.
 |--------|-------|-------------|-------------|
 | `src/api/routes-multiview.js` | 386 | fs, path, response, routing, persiste... | Multiview grid layout, route sources, HTML overlay, DeckLink cells |
 | `web/components/multiview-editor.js` | **502** ⚠️ | multiview-state.js, live-view.js, str... | Drag-and-drop multiview layout editor |
-| `templates/multiview-overlay.html` | ? | - | Multiview HTML overlay template |
+| `template/multiview-overlay.html` | ? | - | Multiview HTML overlay template |
 
 ### 6. Streaming & Live Preview (WebRTC)
 
@@ -603,7 +603,7 @@ UI copy that says “optional” (e.g. custom Caspar fields, xrandr rate) is pro
 
 ## 📦 Deployment & Imaging
 - [Server Consolidation & USB Image Guide](./SERVER_CONSOLIDATION_AND_USB_IMAGE_GUIDE.md) — Strategy for "Golden Image" portable installs.
-| 18 | Output slicer | Not started |
+| 18 | Output slicer (Pixel Mapping Node) | In progress |
 | 19 | Person tracking (YOLO/ByteTrack; under **WO-30**) | Not started (Phase 1 spec’d) |
 | 20 | Verify Node app | Done |
 | 21–26 | Waveforms, mixer effects, HTML source, Companion press, PIP, fade on clip end | Shipped (some WOs have open QA items) |
@@ -618,6 +618,7 @@ UI copy that says “optional” (e.g. custom Caspar fields, xrandr rate) is pro
 | 35 | **GPU physical connector stability** — mapping and persistence [35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md](./35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md) | In progress |
 | 36 | **PortAudio/DeckLink channel fix** — channel routing stability [36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md](./36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md) | In progress |
 | 37 | **Simulation Mode Placeholders** — Preshow preparation with virtual sources, templates, and resolution generation ([37_WO_SIMULATION_PLACEHOLDERS.md](./37_WO_SIMULATION_PLACEHOLDERS.md)) | Not started |
+| 38 | **Pixel Mapping Calculation Fix** — Correcting MIXER FILL for sliced outputs ([38_WO_PIXEL_MAPPING_CALC_FIX.md](./38_WO_PIXEL_MAPPING_CALC_FIX.md)) | In progress |
 
 ## WO-00 Appendix — Device-view-first setup workflow (new direction)
 

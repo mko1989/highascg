@@ -11,7 +11,7 @@
  * - **audioRouting** — Master program output, optional monitor (second FFmpeg consumer), **browserMonitor** (`pgm` | `off`) for WebRTC preview audio.
  *
  * **streaming** is not stored here by default; at runtime `index.js` merges `resolveStreamingConfig` from
- * `src/streaming/stream-config.js` (go2rtc port, SRT base ports, quality presets).
+ * `src/streaming/stream-config.js` (capture mode, base ports, quality presets).
  * Persisted fields include `enabled`, `quality`, `basePort`, `hardware_accel`, `ffmpeg_path` when saved from Settings.
  *
  * Environment variables (CASPAR_HOST, CASPAR_PORT, HTTP_PORT, etc.) are applied **only** when creating
@@ -56,9 +56,13 @@ module.exports = {
 	 * Env **`HIGHASCG_OSC_INFO_MS`** overrides when this is null.
 	 */
 	osc_info_supplement_ms: null,
+	/** Build/verify local ffmpeg HQ thumbnail cache from CLS media list after first connect/query cycle. */
+	hq_thumbnail_prewarm_on_start: true,
+	/** On media browser refresh, verify/generate missing HQ thumbnails for current CLS media list. */
+	hq_thumbnail_prewarm_on_media_refresh: true,
 	/**
 	 * CasparCG `casparcg.config` generation (Settings → Screens). Merged with Audio / OSC + OSC ports in code.
-	 * `configPath`: main server XML (separate from media-scanner config under `/opt/casparcg`). When set (non-empty), it wins over `CASPAR_CONFIG_PATH`; when empty, env then this default are used (see `resolveCasparConfigWritePath`).
+	 * `configPath`: main server XML (separate from media-scanner config under `/home/casparcg/highascg`). When set (non-empty), it wins over `CASPAR_CONFIG_PATH`; when empty, env then this default are used (see `resolveCasparConfigWritePath`).
 	 */
 	casparServer: {
 		/**
@@ -228,7 +232,9 @@ module.exports = {
 		inputs_channel_mode: '1080p5000',
 		/** CasparCG global `<ndi><auto-load>` in generated casparcg.config (NDI SDK load at startup). */
 		ndi_auto_load: true,
-		configPath: '/opt/casparcg/config/casparcg.config',
+		configPath: '/home/casparcg/highascg/config/casparcg.config',
+		/** Persisted manual XML override. When set, this wins over all generated config. */
+		casparConfigOverride: '',
 		/** Persisted ALSA default (card/device index). Applied to ~/.asoundrc when set from Settings → System (optional scope=system → /etc/asound.conf). */
 		default_alsa_card: '',
 		default_alsa_device: '',
@@ -246,7 +252,7 @@ module.exports = {
 	},
 	/**
 	 * Absolute path matching CasparCG’s template-path directory (same as in casparcg.config XML).
-	 * When set (e.g. `/opt/casparcg/template`), **all** files from HighAsCG’s `templates/` folder are synced here on Caspar connect
+	 * When set (e.g. `/home/casparcg/highascg/template`), **all** files from HighAsCG’s `templates/` folder are synced here on Caspar connect
 	 * (overwrite). Includes `led_grid_test.html` and full-character assets (`ch_both_open_green.svg`, `ch_left_closed_green.svg`, …), not the small web UI status eyes.
 	 * If empty, the same sync uses `local_media_path` when set (legacy; templates may appear in CLS).
 	 */
@@ -434,6 +440,8 @@ module.exports = {
 		host: '',
 		/** ucenter / discovery (HTTPS, self-signed), default 19998. */
 		unicoPort: 19998,
+		/** Discovery and /unico proxy transport: true=https, false=http. */
+		secure: true,
 		/**
 		 * If set to a number, use this HTTP API port and skip taking it from `device-list`.
 		 * If null/empty, the port from discovery (`linkType: http`) is used.

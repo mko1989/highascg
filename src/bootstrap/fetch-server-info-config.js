@@ -11,7 +11,7 @@ const { runStartupLedTestPatternIfNeeded } = require('./startup-led-test-pattern
  *   onAfterInfoConfigReady?: () => void,
  * }} opts
  * `onAfterInfoConfigReady` runs after INFO CONFIG is fetched (or fails), config comparison is updated when XML exists,
- * and startup LED test pattern AMCP is sent. Use for NDI / UDP STREAM / go2rtc so they start only after Caspar vs HighAsCG alignment.
+ * and startup LED test pattern AMCP is sent. Use for NDI / UDP STREAM so they start only after Caspar vs HighAsCG alignment.
  */
 function createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoConfigReady }) {
 	/** Debounce DMX refresh so INFO CONFIG + connect/save do not stop/start sampling twice in one burst. */
@@ -33,6 +33,11 @@ function createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoCo
 				appCtx.log('warn', 'INFO CONFIG: empty response')
 			} else {
 				appCtx.gatheredInfo.infoConfig = xmlStr
+				if (typeof appCtx.parseInfoConfigForDecklinks === 'function') {
+					appCtx.parseInfoConfigForDecklinks(xmlStr, (dl) => {
+						appCtx.gatheredInfo.decklinkFromConfig = dl || {}
+					})
+				}
 				try {
 					refreshConfigComparison(appCtx)
 				} catch (e) {

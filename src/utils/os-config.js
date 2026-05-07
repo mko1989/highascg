@@ -140,7 +140,22 @@ function calculateLayoutPositions(config) {
 	const topology = config?.tandemTopology && typeof config.tandemTopology === 'object' ? config.tandemTopology : {}
 	const dests = Array.isArray(topology.destinations) ? topology.destinations : []
 
-	connectors.forEach(c => {
+	const graphGpuConnectors = connectors.filter(c => c.kind === 'gpu_out' || c.kind === 'gpu_output')
+	const graphHasAnyGpuBinding = graphGpuConnectors.some(c => {
+		const binding = c.caspar?.outputBinding
+		if (binding && binding.type) return true
+		const inEdge = edges.find(e => e.sinkId === c.id)
+		return !!inEdge
+	})
+
+	if (graphHasAnyGpuBinding) {
+		// When the graph has active bindings, treat it as the authoritative source of truth.
+		// Ignore legacy/stale screen_N_system_id or multiview_system_id from the persistent config.
+		allGpuAssignments.clear()
+		mvAssignments.length = 0
+	}
+
+	graphGpuConnectors.forEach(c => {
 		if (c.kind !== 'gpu_out' && c.kind !== 'gpu_output') return
 		const sysId = String(c.externalRef || '').trim()
 		if (!sysId) return
@@ -269,8 +284,7 @@ function calculateLayoutPositions(config) {
 	for (const n of screens) placements.push({ kind: 'screen', n })
 	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
 	
-	// If swap is true, we reverse the WHOLE thing to match user's physical preference
-	if (swap) placements.reverse()
+	// MV always comes after screens in the flow (WO-22/WO-23)
 
 	const results = { screens: {}, multiview: {} }
 	let cumulativeX = 0
@@ -359,10 +373,7 @@ function calculateLayoutPositions(config) {
 function applyX11Layout(config) {
 	logger.info('[OS-Config] applyX11Layout start')
 	const layout = calculateLayoutPositions(config)
-	const metaModeParts = []
 	const xrandrParts = []
-	const configuredSysIds = new Set()
-	let useNvidia = false
 	let xrandrQueryOut = ''
 	/** @type {Map<string, Set<string>>} */
 	const availableModesByOutput = new Map()
@@ -416,7 +427,6 @@ function applyX11Layout(config) {
 		
 		const r = typeof info.rate === 'number' ? info.rate : parseFloat(String(info.rate || ''))
 		const safeRate = Number.isFinite(r) && r > 0 ? r : null
-		if (info.backend === 'nvidia') useNvidia = true
 		const avail = availableModesByOutput.get(safeSysId)
 		const plannedMode = String(info.mode || '').trim()
 		const resolvedMode = pickBestAvailableMode(plannedMode, avail)
@@ -426,13 +436,10 @@ function applyX11Layout(config) {
 			)
 		}
 
-		const rateSuffix = safeRate != null ? `_${Math.round(safeRate * 100) / 100}` : ''
-		metaModeParts.push(`${safeSysId}: ${resolvedMode || info.mode}${rateSuffix} +${info.x}+${info.y}`)
-		// Position-only apply is more robust across mixed EDID/custom-mode environments.
-		// Output modes are managed separately by the OS/display stack.
-		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y}`
-		xrandrParts.push(xPart)
-		configuredSysIds.add(safeSysId)
+		// Include --mode for strict enforcement as requested by user
+		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y} --mode ${resolvedMode || info.mode}`
+		const xPartWithRate = safeRate != null ? `${xPart} --rate ${Math.round(safeRate * 100) / 100}` : xPart
+		xrandrParts.push(xPartWithRate)
 	}
 
 	try {
@@ -444,33 +451,10 @@ function applyX11Layout(config) {
 	Object.values(layout.screens).forEach(processHead)
 	Object.values(layout.multiview).forEach(processHead)
 
-	try {
-		const connectedMatches = String(xrandrQueryOut || '').matchAll(/^([A-Za-z0-9._-]+)\s+connected/gm)
-		for (const m of connectedMatches) {
-			if (!configuredSysIds.has(m[1])) {
-				metaModeParts.push(`${m[1]}: NULL`)
-				xrandrParts.push(`--output ${m[1]} --off`)
-			}
-		}
-	} catch (e) { logger.warn(`[OS-Config] Failed to process connected outputs list: ${e.message}`) }
-
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
 	let applied = false
 	let persisted = false
-	if (useNvidia && metaModeParts.length > 0) {
-		try {
-			const meta = metaModeParts.join(', ')
-			const ncmd = `nvidia-settings --display :0 --assign "CurrentMetaMode=${meta}"`
-			logger.info(`[OS-Config] Applying (nvidia): ${ncmd}`)
-			const out = execSync(ncmd, { env, encoding: 'utf8' })
-			if (out) logger.debug(`[OS-Config] nvidia-settings output: ${out}`)
-			applied = true
-			persisted = persistLayoutScript(ncmd)
-		} catch (e) { 
-			logger.error(`[OS-Config] NVIDIA apply failed: ${e.message}`)
-			if (e.stderr) logger.error(`[OS-Config] stderr: ${e.stderr}`)
-		}
-	} else if (xrandrParts.length > 0) {
+	if (xrandrParts.length > 0) {
 		try {
 			const xcmd = `xrandr --display :0 ${xrandrParts.join(' ')}`
 			logger.info(`[OS-Config] Applying (xrandr): ${xcmd}`)
@@ -483,8 +467,21 @@ function applyX11Layout(config) {
 			if (e.stderr) logger.error(`[OS-Config] stderr: ${e.stderr}`)
 		}
 	} else {
-		logger.warn('[OS-Config] No xrandr/nvidia outputs to apply')
+		logger.warn('[OS-Config] No xrandr outputs to apply')
 	}
+	
+	// Refresh system inventory to capture the new layout state (stores raw xrandr query)
+	try {
+		const { writeSystemInventoryFile } = require('../bootstrap/system-inventory-file')
+		writeSystemInventoryFile((level, msg) => {
+			if (level === 'error') logger.error(msg)
+			else if (level === 'warn') logger.warn(msg)
+			else logger.info(msg)
+		}, config)
+	} catch (e) {
+		logger.warn(`[OS-Config] Failed to refresh system inventory after apply: ${e.message}`)
+	}
+
 	logger.info('[OS-Config] applyX11Layout end')
 	return { applied, persisted }
 }

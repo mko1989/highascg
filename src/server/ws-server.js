@@ -90,7 +90,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				wss.emit('connection', ws, req)
 			})
 		} else {
-			socket.destroy()
+			// Not our WS endpoint; leave the socket for other upgrade handlers.
+			return
 		}
 	}
 	httpServer.on('upgrade', onUpgrade)

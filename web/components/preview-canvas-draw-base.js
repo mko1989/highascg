@@ -8,34 +8,60 @@ import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 export const COMPOSE_DUAL_PREVIEW_BG = '#161b22'
 
 /**
- * Draw a clear outer frame for the program output rectangle (full WxH), on top of layer content.
+ * Draw a clear outer frame for the program output rectangle (full WxH).
+ * Updated to a clean grey boundary per user request.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} W
  * @param {number} H
  */
 export function drawOutputCanvasBounds(ctx, W, H) {
-	const pad = 1.5
 	ctx.save()
-	ctx.strokeStyle = 'rgba(230, 237, 243, 0.92)'
-	ctx.lineWidth = 2
-	ctx.setLineDash([7, 5])
-	ctx.strokeRect(pad, pad, W - pad * 2, H - pad * 2)
-	ctx.setLineDash([])
-	ctx.strokeStyle = 'rgba(88, 166, 255, 0.55)'
-	ctx.lineWidth = 1
-	ctx.strokeRect(pad + 2.5, pad + 2.5, W - pad * 2 - 5, H - pad * 2 - 5)
-	const fs = Math.max(11, Math.round(Math.min(W, H) / 70))
+	ctx.strokeStyle = 'rgba(110, 118, 129, 0.8)' // Clean grey
+	ctx.lineWidth = 1.5
+	ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
+	
+	const fs = Math.max(10, Math.round(Math.min(W, H) / 75))
 	ctx.font = `600 ${fs}px ${UI_FONT_FAMILY}`
 	ctx.textAlign = 'right'
 	ctx.textBaseline = 'bottom'
-	const tag = `Canvas · ${Math.round(W)}×${Math.round(H)}`
-	ctx.fillStyle = 'rgba(13, 17, 23, 0.82)'
+	const tag = `${Math.round(W)}×${Math.round(H)}`
+	ctx.fillStyle = 'rgba(48, 54, 61, 0.6)'
 	const tw = ctx.measureText(tag).width
-	const bx = W - 10
-	const by = H - 8
-	ctx.fillRect(bx - tw - 12, by - fs - 8, tw + 14, fs + 10)
-	ctx.fillStyle = 'rgba(88, 166, 255, 0.95)'
-	ctx.fillText(tag, bx, by)
+	ctx.fillRect(W - tw - 8, H - fs - 6, tw + 8, fs + 6)
+	ctx.fillStyle = 'rgba(230, 237, 243, 0.7)'
+	ctx.fillText(tag, W - 4, H - 3)
+	ctx.restore()
+}
+
+/**
+ * Render content with different opacities for parts inside vs outside the canvas boundaries.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} W - canvas width
+ * @param {number} H - canvas height
+ * @param {number} op - base opacity (0-1)
+ * @param {() => void} drawFn - callback to perform drawing
+ */
+export function drawLayerWithBoundaryTransparency(ctx, W, H, op, drawFn) {
+	const outAlpha = Math.max(0, Math.min(1, op * 0.15))
+	
+	// 1. Draw outside part (faded)
+	ctx.save()
+	ctx.beginPath()
+	// Create a path that covers the "universe" but excludes the canvas
+	ctx.rect(-10000, -10000, 20000, 20000)
+	ctx.rect(0, 0, W, H)
+	ctx.clip('evenodd')
+	ctx.globalAlpha = outAlpha
+	drawFn()
+	ctx.restore()
+
+	// 2. Draw inside part (full)
+	ctx.save()
+	ctx.beginPath()
+	ctx.rect(0, 0, W, H)
+	ctx.clip()
+	ctx.globalAlpha = op
+	drawFn()
 	ctx.restore()
 }
 

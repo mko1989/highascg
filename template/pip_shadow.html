@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIP Shadow Overlay</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
+	#pip-frame {
+		position: absolute;
+		left: calc(var(--il) * 100%);
+		top: calc(var(--it) * 100%);
+		width: calc(var(--iw) * 100%);
+		height: calc(var(--ih) * 100%);
+		border-radius: var(--r, 0);
+		pointer-events: none;
+		box-sizing: border-box;
+		overflow: visible;
+	}
+	#pip-frame.side-outside {
+		box-shadow: var(--ox) var(--oy) var(--b) var(--s) var(--c);
+	}
+	#pip-frame.side-inside {
+		box-shadow: inset var(--ox) var(--oy) var(--b) var(--s) var(--c);
+	}
+</style>
+</head>
+<body>
+<div id="root">
+	<div id="pip-frame"></div>
+</div>
+<script>
+(function () {
+	var frame = document.getElementById('pip-frame')
+	var state = {
+		blur: 20,
+		offsetX: 5,
+		offsetY: 5,
+		color: 'rgba(0,0,0,0.6)',
+		spread: 0,
+		radius: 0,
+		side: 'outside',
+		inner: null,
+	}
+
+	function clamp01(x) {
+		var n = Number(x)
+		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+	}
+
+	function readInner(d) {
+		if (!d || !d.inner || typeof d.inner !== 'object') return null
+		return { l: clamp01(d.inner.l), t: clamp01(d.inner.t), w: clamp01(d.inner.w), h: clamp01(d.inner.h) }
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		return inn.w > 0 && inn.h > 0
+	}
+
+	function apply() {
+		var inn = state.inner
+		if (!inn || !hasMargin(inn)) {
+			frame.style.display = 'none'
+			return
+		}
+		frame.style.display = 'block'
+		frame.style.setProperty('--il', String(inn.l))
+		frame.style.setProperty('--it', String(inn.t))
+		frame.style.setProperty('--iw', String(inn.w))
+		frame.style.setProperty('--ih', String(inn.h))
+		frame.style.setProperty('--b', state.blur + 'px')
+		frame.style.setProperty('--ox', state.offsetX + 'px')
+		frame.style.setProperty('--oy', state.offsetY + 'px')
+		frame.style.setProperty('--s', state.spread + 'px')
+		frame.style.setProperty('--c', state.color)
+		frame.style.setProperty('--r', (state.radius || 0) + 'px')
+
+		frame.className = 'side-' + (state.side || 'outside')
+	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (!d) return
+			if (d.blur != null) state.blur = parseFloat(d.blur) || 0
+			if (d.offsetX != null) state.offsetX = parseFloat(d.offsetX) || 0
+			if (d.offsetY != null) state.offsetY = parseFloat(d.offsetY) || 0
+			if (d.color != null) state.color = String(d.color)
+			if (d.spread != null) state.spread = parseFloat(d.spread) || 0
+			if (d.radius != null) state.radius = parseFloat(d.radius) || 0
+			if (d.side != null) state.side = String(d.side)
+			state.inner = readInner(d)
+			apply()
+		} catch (e) { console.warn('pip_shadow update:', e) }
+	}
+
+	apply()
+})()
+</script>
+</body>
+</html>

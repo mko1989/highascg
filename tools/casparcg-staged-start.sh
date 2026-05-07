@@ -7,14 +7,14 @@
 #   3) this script — blocks until the ready file exists, then starts CasparCG
 #
 # Arm Caspar (allow startup to proceed):
-#   touch /opt/casparcg/data/caspar-armed
+#   touch /home/casparcg/highascg/data/caspar-armed
 #   # or: curl -X POST http://127.0.0.1:8080/api/system/caspar-arm
 #
 # Disarm before reboot if you want to pause Caspar on next boot (optional):
-#   rm /opt/casparcg/data/caspar-armed
+#   rm /home/casparcg/highascg/data/caspar-armed
 #
 # Environment (optional):
-#   CASPAR_BASE          default /opt/casparcg
+#   CASPAR_BASE          default /home/casparcg/highascg
 #   CASPAR_READY_FILE    default $CASPAR_BASE/data/caspar-armed
 #   CASPAR_BIN           default /usr/bin/casparcg-server-2.5
 #   CONFIG_PATH          default $CASPAR_BASE/config/casparcg.config
@@ -23,7 +23,7 @@
 
 set -u
 
-CASPAR_BASE="${CASPAR_BASE:-/opt/casparcg}"
+CASPAR_BASE="${CASPAR_BASE:-/home/casparcg/highascg}"
 READY_FILE="${CASPAR_READY_FILE:-${CASPAR_ARM_FILE:-$CASPAR_BASE/data/caspar-armed}}"
 CASPAR_BIN="${CASPAR_BIN:-/usr/bin/casparcg-server-2.5}"
 CONFIG_PATH="${CONFIG_PATH:-$CASPAR_BASE/config/casparcg.config}"

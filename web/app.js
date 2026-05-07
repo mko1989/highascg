@@ -90,9 +90,16 @@ function initTabs() {
 	
 	window.addEventListener('highascg-open-pixel-mapping', (ev) => {
 		const nodeId = ev.detail?.nodeId
-		activateTab('pixelmap')
-		// The pixelmap editor itself might need the nodeId, handled via dmxState or similar.
+		activateTab('device-view')
 		window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: true, activate: true, nodeId } }))
+		// Also trigger the editor component
+		window.dispatchEvent(new CustomEvent('highascg-pixel-mapping-open', { detail: { nodeId } }))
+	})
+
+	window.addEventListener('highascg-device-view-select-device', (ev) => {
+		const deviceId = ev.detail?.deviceId
+		activateTab('device-view')
+		window.dispatchEvent(new CustomEvent('highascg-device-view-focus-device', { detail: { deviceId } }))
 	})
 
 	let initial = ''

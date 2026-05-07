@@ -161,6 +161,14 @@ async function handlePost(body, ctx) {
 		} else {
 			res = { status: 503, error: 'Failed to save config' }
 		}
+	} else if (Array.isArray(j.mappingTemplates)) {
+		const next = j.mappingTemplates
+		if (persistConfigPatch(ctx, { mappingTemplates: next })) {
+			ctx.config.mappingTemplates = next
+			res = { ok: true, mappingTemplates: next }
+		} else {
+			res = { status: 503, error: 'Failed to save config' }
+		}
 	}
 
 	if (res) {

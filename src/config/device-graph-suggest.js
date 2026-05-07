@@ -265,6 +265,18 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			connectors.push({ id: `dst_in_${did}`, deviceId: DEST_DEVICE_ID, kind: 'destination_in', label: String(item?.label || did).slice(0, 120), externalRef: did })
 		}
 	}
+	// Ensure DeckLink ports from graph are represented even if detection fails
+	const graphConnectors = Array.isArray(appConfig?.deviceGraph?.connectors) ? appConfig.deviceGraph.connectors : []
+	for (const c of graphConnectors) {
+		if (c && c.kind === 'decklink_io' && !connectors.some((x) => x.id === c.id)) {
+			connectors.push({
+				...c,
+				label: c.label || `SDI ${Number(c.index) + 1}`,
+				isVirtual: true,
+			})
+		}
+	}
+
 	return { devices, connectors }
 }
 

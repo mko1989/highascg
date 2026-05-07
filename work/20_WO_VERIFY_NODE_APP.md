@@ -225,7 +225,7 @@ npm run smoke:caspar -- PORT
 ### 2026-04-04 — Agent
 **Work Done:**
 - Read `00_PROJECT_GOAL.md` (standalone HighAsCG app, ≤500-line files, HTTP+WS+Caspar).
-- **Phase 1 (WO-03):** Ran structure audit vs WO-02 target; added [`scripts/verify-w02-structure.js`](scripts/verify-w02-structure.js) (prints missing expected paths). Result: **12/21** present — migration incomplete (no `web/`, `src/server/`, `templates/`, `README.md`, several state/utils files).
+- **Phase 1 (WO-03):** Ran structure audit vs WO-02 target; added [`scripts/verify-w02-structure.js`](scripts/verify-w02-structure.js) (prints missing expected paths). Result: **12/21** present — migration incomplete (no `web/`, `src/server/`, `template/`, `README.md`, several state/utils files).
 - **`npm install`:** succeeds; `package-lock.json` present; 5 packages, 0 vulnerabilities.
 - **`node index.js`:** runs and exits (scaffolding — no HTTP listener yet).
 - **Line counts:** all existing `src/**/*.js` under 500 lines (max `amcp-commands.js` ~438).

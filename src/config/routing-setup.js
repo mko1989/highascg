@@ -129,61 +129,10 @@ async function setupAllRouting(self) {
 	await setupMappingChannels(self)
 }
 
-async function setupMappingChannels(self) {
-	const map = Map.getChannelMap(self.config)
-	if (!map.mappingChannels || !map.mappingChannels.length || !self.amcp) return
-
-	const dg = self.config?.deviceGraph || {}
-	const edges = Array.isArray(dg.edges) ? dg.edges : []
-	const connectors = Array.isArray(dg.connectors) ? dg.connectors : []
-	const devices = Array.isArray(dg.devices) ? dg.devices : []
-
-	for (const mc of map.mappingChannels) {
-		const ch = mc.ch
-		const node = devices.find(d => d.id === mc.nodeId)
-		if (!node) continue
-
-		const inConn = connectors.find(c => c.deviceId === node.id && c.kind === 'pixel_map_in')
-		const inEdge = edges.find(e => e.sinkId === inConn?.id)
-		if (!inEdge) continue
-		const srcId = String(inEdge.sourceId)
-		if (!srcId.startsWith('dst_in_')) continue
-		const dstId = srcId.slice('dst_in_'.length)
-
-		const top = self.config?.tandemTopology || {}
-		const dests = Array.isArray(top.destinations) ? top.destinations : []
-		const dst = dests.find(d => d.id === dstId)
-		if (!dst) continue
-		
-		const mainIdx = parseInt(String(dst.mainScreenIndex ?? 0), 10) || 0
-		const srcCh = map.programChannels[mainIdx]
-		if (!srcCh) continue
-
-		const nodeConn = connectors.find(c => c.id === mc.connectorId)
-		const outputId = String(nodeConn?.id || '').split('_').pop() // e.g. "1" or "out_1"
-		
-		const mappings = Array.isArray(node.settings?.mappings) ? node.settings.mappings : []
-		const slice = mappings.find(m => m.type === 'video_slice' && (String(m.templateId) === outputId || String(m.templateId).endsWith(outputId)))
-		
-		if (!slice) continue
-
-		const cw = Math.max(1, parseInt(dst.width, 10) || 1920)
-		const chH = Math.max(1, parseInt(dst.height, 10) || 1080)
-		
-		const cropX = slice.rect.x / cw
-		const cropY = slice.rect.y / chH
-		const cropW = slice.rect.w / cw
-		const cropH = slice.rect.h / chH
-		
-		try {
-			await self.amcp.play(ch, 1, Map.getRouteString(srcCh))
-			await self.amcp.mixerCrop(ch, 1, cropX, cropY, cropW, cropH)
-			await self.amcp.mixerFill(ch, 1, 0, 0, 1, 1)
-			await self.amcp.mixerCommit(ch)
-		} catch (e) {
-			self.log('error', `Mapping setup failed for channel ${ch}: ${e.message}`)
-		}
-	}
+async function setupMappingChannels(_self) {
+	// Pixel-map → DeckLink is expressed in generated Caspar XML as one program channel (custom width)
+	// plus a single decklink consumer with subregions and synced ports — no extra mapping channels or AMCP mirrors.
+	return
 }
 
 module.exports = { setupInputsChannel, setupPreviewChannel, setupMultiview, setupAllRouting, setupMappingChannels }

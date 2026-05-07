@@ -220,6 +220,15 @@ export function initInspectorPanel(root, stateStore) {
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
+
+		// Allow detachable modules (like cg-studio) to render their own inspectors
+		const evt = new CustomEvent('highascg-inspector-render-external', { detail: { root, selection, handled: false } })
+		window.dispatchEvent(evt)
+		if (evt.detail.handled) {
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+
 		renderEmpty()
 		scheduleSelectionSync(stateStore, selection)
 	}

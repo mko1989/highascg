@@ -456,6 +456,34 @@
 .device-view__status--err {
 	color: #f87171;
 }
+/* WO-42 — cable hook beside connector dots (mapping + rear panel ports) */
+.device-view__cable-affordance {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	margin: 0 2px;
+	border: none;
+	border-radius: 4px;
+	background: rgba(148, 163, 184, 0.12);
+	color: #94a3b8;
+	cursor: pointer;
+	flex-shrink: 0;
+	position: relative;
+	z-index: 5;
+}
+
+.device-view__cable-affordance:hover {
+	background: rgba(88, 166, 255, 0.2);
+	color: #58a6ff;
+}
+
+.device-view__cable-affordance svg {
+	display: block;
+}
+
 .device-view__stream-badge {
 	display: inline-flex;
 	align-items: center;

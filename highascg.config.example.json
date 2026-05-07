@@ -13,7 +13,7 @@
     "decklink_input_count": 0,
     "decklink_input_1_device": 0,
     "decklink_input_2_device": 0,
-    "configPath": "/opt/casparcg/config/casparcg.config",
+    "configPath": "/home/casparcg/highascg/config/casparcg.config",
     "default_alsa_card": "",
     "default_alsa_device": ""
   },
@@ -49,7 +49,6 @@
   },
   "streaming": {
     "enabled": true,
-    "go2rtcPort": 1984,
     "webrtcPort": 8555,
     "protocol": "UDP",
     "captureMode": "udp",

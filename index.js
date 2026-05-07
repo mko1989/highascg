@@ -13,7 +13,7 @@ const persistence = require('./src/utils/persistence'); const { TimelineEngine }
 const { ClipEndFadeWatcher } = require('./src/engine/clip-end-fade'); const { ConnectionManager } = require('./src/caspar/connection-manager')
 const { normalizeOscConfig } = require('./src/osc/osc-config'); const { OscState } = require('./src/osc/osc-state')
 const { OscListener } = require('./src/osc/osc-listener'); const { applyOscSnapshotToVariables, clearOscVariables } = require('./src/osc/osc-variables')
-const { go2rtcManager, resolveCaptureTier } = require('./src/streaming/go2rtc-manager')
+const { resolveCaptureTier } = require('./src/streaming/stream-capture-tier')
 const { addStreamingConsumers, removeStreamingConsumers } = require('./src/streaming/caspar-ffmpeg-setup')
 const { resolveFreeStreamingBasePort } = require('./src/streaming/streaming-udp-ports'); const { prepareNdiStreaming } = require('./src/streaming/ndi-resolve')
 const { startPeriodicSync, startOscPlaybackInfoSupplement } = require('./src/utils/periodic-sync')
@@ -22,6 +22,9 @@ const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-c
 const { getChannelMap } = require('./src/config/routing'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
+const { runConnectionQueryCycle } = require('./src/utils/query-cycle')
+const { proxyUnicoUpgrade } = require('./src/api/routes-pixelweb')
 const moduleRegistry = require('./src/module-registry')
 
 const Args = require('./src/bootstrap/args'); const Config = require('./src/bootstrap/config'); const Modules = require('./src/bootstrap/modules'); const Shutdown = require('./src/bootstrap/shutdown')
@@ -71,6 +74,7 @@ function main() {
 		appCtx.timelineEngine = new TimelineEngine(appCtx); appCtx.clipEndFadeWatcher = new ClipEndFadeWatcher(appCtx)
 		appCtx.getState = () => getState(appCtx); appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 		appCtx.refreshConfigComparison = refreshConfigComparison; appCtx.samplingManager = new SamplingManager(appCtx)
+		appCtx.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
 		Modules.loadOptionalModules(config, appCtx.log)
 
 		const startTime = Date.now(); appCtx._systemVarsInterval = setInterval(() => {
@@ -78,7 +82,7 @@ function main() {
 			appCtx.state.setVariable('app_uptime', `${uptime}s`); appCtx.state.setVariable('app_memory_usage', `${mem}MB`)
 		}, 5000)
 
-		const { stopStreamingSubsystem, toggleStreaming, restartStreaming, enqueueStreaming, handleCasparConnected, handleConfigReload } = createStreamingLifecycle({ appCtx, config, logger, getChannelMap, go2rtcManager, addStreamingConsumers, removeStreamingConsumers, resolveFreeStreamingBasePort, prepareNdiStreaming, resolveCaptureTier })
+		const { stopStreamingSubsystem, toggleStreaming, restartStreaming, enqueueStreaming, handleCasparConnected, handleConfigReload } = createStreamingLifecycle({ appCtx, config, logger, getChannelMap, addStreamingConsumers, removeStreamingConsumers, resolveFreeStreamingBasePort, prepareNdiStreaming, resolveCaptureTier })
 		appCtx.toggleStreaming = toggleStreaming; appCtx.restartStreaming = restartStreaming; appCtx.enqueueStreaming = enqueueStreaming
 		const fetchInfo = createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoConfigReady: () => handleCasparConnected() })
 		if (!config.streaming.enabled) void enqueueStreaming(async () => await stopStreamingSubsystem())
@@ -102,9 +106,27 @@ function main() {
 			const hMs = parseInt(process.env.HIGHASCG_AMCP_HEALTH_MS || '0', 10) || 0; const sMs = parseInt(process.env.HIGHASCG_AMCP_CONNECT_SETTLE_MS || '600', 10) || 600
 			casparConn = new ConnectionManager({ host: config.caspar.host, port: config.caspar.port, config, log: appCtx.log, healthIntervalMs: hMs, healthConnectDelayMs: sMs })
 			appCtx.amcp = casparConn.amcp; appCtx.casparConnection = casparConn
+			casparConn.context.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
+			casparConn.context.gatheredInfo = appCtx.gatheredInfo
 		}
 
-		const httpServer = startHttpServer({ port: config.server.httpPort, bindAddress: config.server.bindAddress, webDir: path.join(__dirname, 'web'), templatesDir: path.join(__dirname, 'templates'), vendorDirs: Modules.buildVendorDirs(logger), routeApi: (m, p, b, r) => routeRequest(m, p, b, appCtx, r), log: m => logger.info(m) })
+		const httpServer = startHttpServer({
+			port: config.server.httpPort,
+			bindAddress: config.server.bindAddress,
+			webDir: path.join(__dirname, 'web'),
+			templatesDir: path.join(__dirname, 'template'),
+			vendorDirs: Modules.buildVendorDirs(logger),
+			routeApi: (m, p, b, r) => routeRequest(m, p, b, appCtx, r),
+			routeUpgrade: (req, socket, head) => {
+				const p = String((req.url || '').split('?')[0] || '')
+				const m = p.match(/^\/instance\/[^/]+\/(.+)$/)
+				const normalized = m ? `/${m[1]}` : p
+				if (!normalized.startsWith('/unico/')) return false
+				proxyUnicoUpgrade({ req: { ...req, url: normalized }, socket, head, ctx: appCtx })
+				return true
+			},
+			log: m => logger.info(m),
+		})
 		const wsBroadcastMs = cli.wsBroadcastMs || parseInt(process.env.HIGHASCG_WS_BROADCAST_MS || '0', 10) || 0
 		appCtx.onFirstWebSocketClient = (ctx) => notifyWebSocketClientConnected(ctx)
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
@@ -123,6 +145,7 @@ function main() {
 				if (payload.connected === true && !wasConnected) {
 					wasConnected = true
 					setTimeout(() => void fetchInfo(), 800)
+					runConnectionQueryCycle(appCtx)
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)
 					startOscPlaybackInfoSupplement(appCtx)
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
@@ -152,7 +175,15 @@ function main() {
 				webDir: path.join(__dirname, 'web'), 
 				templatesDir: path.join(__dirname, 'templates'), 
 				vendorDirs: [], 
-				routeApi: (m, p, b, r) => routeRequest(m, p, b, safeCtx, r), 
+				routeApi: (m, p, b, r) => routeRequest(m, p, b, safeCtx, r),
+				routeUpgrade: (req, socket, head) => {
+					const p = String((req.url || '').split('?')[0] || '')
+					const m = p.match(/^\/instance\/[^/]+\/(.+)$/)
+					const normalized = m ? `/${m[1]}` : p
+					if (!normalized.startsWith('/unico/')) return false
+					proxyUnicoUpgrade({ req: { ...req, url: normalized }, socket, head, ctx: safeCtx })
+					return true
+				},
 				log: m => logger.info(`[SafeMode HTTP] ${m}`) 
 			})
 			logger.info(`[SafeMode] UI active on port ${config.server.httpPort}. Use the web interface to fix configuration.`)

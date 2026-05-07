@@ -1,6 +1,22 @@
 'use strict'
 
-const { param, chLayer } = require('./amcp-utils')
+const { param, chLayer, amcpVerboseTrace } = require('./amcp-utils')
+const { buildClipCommandPlan, serializeClipCommandPlan, describeClipCommandPlan } = require('./amcp-command-plan')
+
+function maybeLogPlannedClipCommand(client, phase, plan) {
+	if (!amcpVerboseTrace()) return
+	const log = client?._context?.log
+	if (typeof log !== 'function') return
+	const d = describeClipCommandPlan(plan)
+	log(
+		'debug',
+		`AMCP plan ${phase} ch=${d.channel} layer=${d.layer} cmd=${d.commandName}` +
+			(d.clip ? ` clip=${d.clip}` : '') +
+			(d.transition ? ` transition=${d.transition} duration=${d.duration || 0} tween=${d.tween || 'linear'}` : '') +
+			(d.seek != null ? ` seek=${d.seek}` : '') +
+			(d.length != null ? ` length=${d.length}` : '')
+	)
+}
 
 class AmcpBasic {
 	/**
@@ -21,19 +37,9 @@ class AmcpBasic {
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
 	loadbg(channel, layer, clip, opts = {}) {
-		let cmd = `LOADBG ${chLayer(channel, layer)}`
-		if (clip) cmd += ' ' + param(clip)
-		if (opts.loop) cmd += ' LOOP'
-		if (opts.transition && opts.transition !== 'CUT') {
-			cmd += ` ${opts.transition} ${opts.duration || 0} ${param(opts.tween || 'linear')}`
-			if (opts.direction) cmd += ` ${opts.direction}`
-		}
-		if (opts.seek != null) cmd += ` SEEK ${opts.seek}`
-		if (opts.length != null) cmd += ` LENGTH ${opts.length}`
-		if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
-		if (opts.audioFilter) cmd += ` AF ${param(opts.audioFilter)}`
-		if (opts.auto) cmd += ' AUTO'
-		if (opts.parameters) cmd += ' ' + opts.parameters
+		const plan = buildClipCommandPlan('LOADBG', channel, layer, clip, opts)
+		maybeLogPlannedClipCommand(this._client, 'basic-loadbg', plan)
+		const cmd = serializeClipCommandPlan(plan)
 		return this._send(cmd, 'LOADBG')
 	}
 
@@ -44,19 +50,9 @@ class AmcpBasic {
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
 	load(channel, layer, clip, opts = {}) {
-		let cmd = `LOAD ${chLayer(channel, layer)}`
-		if (clip) cmd += ' ' + param(clip)
-		if (opts.loop) cmd += ' LOOP'
-		if (opts.transition && opts.transition !== 'CUT') {
-			cmd += ` ${opts.transition} ${opts.duration || 0} ${param(opts.tween || 'linear')}`
-			if (opts.direction) cmd += ` ${opts.direction}`
-		}
-		if (opts.seek != null) cmd += ` SEEK ${opts.seek}`
-		if (opts.length != null) cmd += ` LENGTH ${opts.length}`
-		if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
-		if (opts.audioFilter) cmd += ` AF ${param(opts.audioFilter)}`
-		if (opts.auto) cmd += ' AUTO'
-		if (opts.parameters) cmd += ' ' + opts.parameters
+		const plan = buildClipCommandPlan('LOAD', channel, layer, clip, opts)
+		maybeLogPlannedClipCommand(this._client, 'basic-load', plan)
+		const cmd = serializeClipCommandPlan(plan)
 		return this._send(cmd, 'LOAD')
 	}
 
@@ -67,24 +63,9 @@ class AmcpBasic {
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
 	play(channel, layer, clip, opts = {}) {
-		let cmd = `PLAY ${chLayer(channel, layer)}`
-		if (clip) cmd += ' ' + param(clip)
-		if (opts.loop) cmd += ' LOOP'
-		if (opts.transition && opts.transition !== 'CUT') {
-			if (opts.transition === 'STING') {
-				// Syntax: STING <mask_file> <overlay_file> <duration> [...audio/audio_delay]
-				cmd += ` STING ${param(opts.parameters)}` // simplify STING parameters for now via parameters field
-			} else {
-				cmd += ` ${opts.transition} ${opts.duration || 0} ${param(opts.tween || 'linear')}`
-				if (opts.direction) cmd += ` ${opts.direction}`
-			}
-		}
-		if (opts.seek != null) cmd += ` SEEK ${opts.seek}`
-		if (opts.length != null) cmd += ` LENGTH ${opts.length}`
-		if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
-		if (opts.audioFilter) cmd += ` AF ${param(opts.audioFilter)}`
-		if (opts.auto) cmd += ' AUTO'
-		if (opts.transition !== 'STING' && opts.parameters) cmd += ' ' + opts.parameters
+		const plan = buildClipCommandPlan('PLAY', channel, layer, clip, opts)
+		maybeLogPlannedClipCommand(this._client, 'basic-play', plan)
+		const cmd = serializeClipCommandPlan(plan)
 		return this._send(cmd, 'PLAY')
 	}
 

@@ -31,6 +31,7 @@ export class SceneState {
 		this.scenes = []
 		this.editingSceneId = null
 		this.liveSceneIdByMain = [null, null, null, null]
+		this.liveSceneSnapshotsByMain = [null, null, null, null]
 		this.previewSceneIdByMain = [null, null, null, null]
 		this.globalDefaultTransition = { ...defaultTransition() }
 		this._layerStyleClipboard = null
@@ -45,6 +46,7 @@ export class SceneState {
 	get liveSceneId() { return this.liveSceneIdByMain[this.activeScreenIndex] ?? null }
 	get previewSceneId() { return this.previewSceneIdByMain[this.activeScreenIndex] ?? null }
 	getLiveSceneIdForMain(mainIdx) { return this.liveSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
+	getLiveSceneSnapshot(mainIdx) { return this.liveSceneSnapshotsByMain[Math.max(0, Math.min(3, mainIdx))] || null }
 	getPreviewSceneIdForMain(mainIdx) { return this.previewSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
 
 	_getCanvas(screenIdx) {
@@ -305,12 +307,26 @@ export class SceneState {
 	setLiveSceneId(id, mainIdx) {
 		const m = mainIdx != null && mainIdx >= 0 && mainIdx < 4 ? Math.floor(mainIdx) : this.activeScreenIndex
 		this.liveSceneIdByMain[m] = id ? String(id) : null
+		if (id) {
+			const s = this.getScene(id)
+			if (s) this.liveSceneSnapshotsByMain[m] = JSON.parse(JSON.stringify(s))
+			else this.liveSceneSnapshotsByMain[m] = null
+		} else {
+			this.liveSceneSnapshotsByMain[m] = null
+		}
 		this._softSave()
 	}
 
 	applySceneFromTakePayload(sceneId, payload) {
 		const s = this.getScene(sceneId)
-		if (s && LookLogic.applySceneFromTakePayload(s, payload)) this._softSave()
+		if (s && LookLogic.applySceneFromTakePayload(s, payload)) {
+			for (let m = 0; m < 4; m++) {
+				if (String(this.liveSceneIdByMain[m]) === String(sceneId)) {
+					this.liveSceneSnapshotsByMain[m] = JSON.parse(JSON.stringify(s))
+				}
+			}
+			this._softSave()
+		}
 	}
 
 	applyServerLiveChannels(channels, channelMap) {
@@ -319,7 +335,10 @@ export class SceneState {
 		channelMap.programChannels.forEach((ch, idx) => {
 			const sid = String(channels[String(ch)]?.sceneId || '')
 			if (sid && this.getScene(sid) && this.liveSceneIdByMain[idx] !== sid) {
-				this.liveSceneIdByMain[idx] = sid; any = true
+				this.liveSceneIdByMain[idx] = sid
+				const s = this.getScene(sid)
+				if (s) this.liveSceneSnapshotsByMain[idx] = JSON.parse(JSON.stringify(s))
+				any = true
 			}
 		})
 		if (any) this._softSave()

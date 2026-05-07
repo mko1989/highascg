@@ -35,19 +35,9 @@ function resolveMainScreenCount(config) {
 	if (top != null && Array.isArray(top.destinations) && routableDests.length === 0) {
 		return 1
 	}
-	const dg = config?.deviceGraph || {}
-	const mappingNodes = (Array.isArray(dg.devices) ? dg.devices : []).filter(d => d.role === 'pixel_mapping')
-	const edges = Array.isArray(dg.edges) ? dg.edges : []
-	const connectors = Array.isArray(dg.connectors) ? dg.connectors : []
-	let mappingCount = 0
-	mappingNodes.forEach(node => {
-		const nodeConns = connectors.filter(c => c.deviceId === node.id && c.kind === 'pixel_map_out')
-		nodeConns.forEach(conn => {
-			if (edges.some(e => e.sourceId === conn.id)) mappingCount++
-		})
-	})
-
-	return Math.max(1, Math.max(nA, nB)) + mappingCount
+	// Pixel-mapping outputs attach to an existing program channel (wide canvas + DeckLink subregions/ports).
+	// They must not inflate screen pairs or consume extra Caspar channel slots.
+	return Math.max(1, Math.max(nA, nB))
 }
 
 function resolvePreviewEnabledByMain(config, screenCount) {
@@ -220,22 +210,8 @@ function getChannelMap(config, activeBuses = null) {
 
 	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
 	
+	/** @deprecated Always empty — pixel-map DeckLink routing is merged onto the program channel in generated Caspar XML. */
 	const mappingChannels = []
-	const dg = config?.deviceGraph || {}
-	const mappingNodes = (Array.isArray(dg.devices) ? dg.devices : []).filter(d => d.role === 'pixel_mapping')
-	const edges = Array.isArray(dg.edges) ? dg.edges : []
-	const connectors = Array.isArray(dg.connectors) ? dg.connectors : []
-
-	mappingNodes.forEach(node => {
-		const nodeConns = connectors.filter(c => c.deviceId === node.id && c.kind === 'pixel_map_out')
-		nodeConns.forEach(conn => {
-			// Is this output connected to something physical?
-			const isCabled = edges.some(e => e.sourceId === conn.id)
-			if (isCabled) {
-				mappingChannels.push({ nodeId: node.id, connectorId: conn.id, ch: nextCh++ })
-			}
-		})
-	})
 
 	const monitorChannelEnabled = cs.monitor_channel_enabled === true || cs.monitor_channel_enabled === 'true'
 	const monitorCh = monitorChannelEnabled ? nextCh++ : null

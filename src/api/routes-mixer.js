@@ -78,6 +78,81 @@ function calcStretchFill(mode, lx, ly, lw, lh, resW, resH, cw, ch) {
 }
 
 /**
+ * Build/dispatch one inspector effect by type.
+ * Body:
+ * - channel, layer
+ * - effectType: blend_mode|brightness|contrast|saturation|levels|chroma_key|crop|clip_mask|perspective|grid|keyer|rotation|anchor
+ * - params: effect-specific object
+ * - optional duration/tween/defer for mixer commands that support it
+ */
+async function applyInspectorEffect(amcp, channel, layer, body) {
+	const type = String(body?.effectType || body?.type || '').trim().toLowerCase()
+	const p = body?.params && typeof body.params === 'object' ? body.params : {}
+	const duration = body?.duration
+	const tween = body?.tween
+	const defer = body?.defer
+	switch (type) {
+		case 'blend_mode':
+			return amcp.mixer.mixerBlend(channel, layer, p.mode)
+		case 'brightness':
+			return amcp.mixer.mixerBrightness(channel, layer, p.value, duration, tween, defer)
+		case 'contrast':
+			return amcp.mixer.mixerContrast(channel, layer, p.value, duration, tween, defer)
+		case 'saturation':
+			return amcp.mixer.mixerSaturation(channel, layer, p.value, duration, tween, defer)
+		case 'levels':
+			return amcp.mixer.mixerLevels(channel, layer, {
+				minIn: p.minIn,
+				maxIn: p.maxIn,
+				gamma: p.gamma,
+				minOut: p.minOut,
+				maxOut: p.maxOut,
+				duration,
+				tween,
+				defer,
+			})
+		case 'chroma_key':
+			return amcp.mixer.mixerChroma(channel, layer, {
+				key: p.key,
+				threshold: p.threshold,
+				softness: p.softness,
+				spill: p.spill,
+				blur: p.blur,
+			})
+		case 'crop':
+			return amcp.mixer.mixerCrop(channel, layer, p.left, p.top, p.right, p.bottom, duration, tween, defer)
+		case 'clip_mask':
+			return amcp.mixer.mixerClip(channel, layer, p.left, p.top, p.width, p.height, duration, tween, defer)
+		case 'perspective':
+			return amcp.mixer.mixerPerspective(
+				channel,
+				layer,
+				p.ulX,
+				p.ulY,
+				p.urX,
+				p.urY,
+				p.lrX,
+				p.lrY,
+				p.llX,
+				p.llY,
+				duration,
+				tween,
+				defer,
+			)
+		case 'grid':
+			return amcp.mixer.mixerGrid(channel, p.resolution, duration, tween, defer)
+		case 'keyer':
+			return amcp.mixer.mixerKeyer(channel, layer, p.enabled ? 1 : 0)
+		case 'rotation':
+			return amcp.mixer.mixerRotation(channel, layer, p.degrees, duration, tween, defer)
+		case 'anchor':
+			return amcp.mixer.mixerAnchor(channel, layer, p.x, p.y, duration, tween, defer)
+		default:
+			throw new Error(`Unknown inspector effectType: ${type || '(empty)'}`)
+	}
+}
+
+/**
  * @param {string} path
  * @param {string} body
  * @param {{ amcp: import('../caspar/amcp-client').AmcpClient }} ctx
@@ -186,6 +261,9 @@ async function handleMixer(path, body, ctx) {
 			break
 		case 'clear':
 			r = await amcp.mixer.mixerClear(channel, layer)
+			break
+		case 'effect':
+			r = await applyInspectorEffect(amcp, channel, layer, b)
 			break
 		default:
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown mixer command: ${cmd}` }) }

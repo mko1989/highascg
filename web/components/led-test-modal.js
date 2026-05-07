@@ -15,6 +15,7 @@ const LS = {
 	cross: 'highascg_led_test_show_cross',
 	gridByCh: 'highascg_led_test_grid_by_ch',
 	pattern: 'highascg_led_test_pattern',
+	charCount: 'highascg_led_test_char_count',
 }
 
 function loadGridByChannel() {
@@ -29,7 +30,7 @@ function loadGridByChannel() {
 }
 
 /**
- * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean> }}
+ * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean>, pattern: string, charCount: number }}
  */
 export function getLedTestSettings() {
 	return {
@@ -45,6 +46,7 @@ export function getLedTestSettings() {
 		showCross: localStorage.getItem(LS.cross) !== 'false',
 		gridByChannel: loadGridByChannel(),
 		pattern: localStorage.getItem(LS.pattern) || 'grid-white',
+		charCount: Math.max(1, Math.min(48, parseInt(localStorage.getItem(LS.charCount) || '3', 10) || 3)),
 	}
 }
 
@@ -66,6 +68,7 @@ export function saveLedTestSettings(s) {
 		localStorage.setItem(LS.gridByCh, JSON.stringify(s.gridByChannel))
 	}
 	localStorage.setItem(LS.pattern, s.pattern || 'grid-white')
+	localStorage.setItem(LS.charCount, String(Math.max(1, Math.min(48, s.charCount || 1))))
 }
 
 /**
@@ -87,17 +90,26 @@ export function showLedTestModal(onApplied, stateStore) {
 	const s = getLedTestSettings()
 	const st = typeof stateStore?.getState === 'function' ? stateStore.getState() : {}
 	const serverChannels = st?.configComparison?.serverChannels
-	const screenChannels = Array.isArray(serverChannels) ? serverChannels.filter((c) => c.hasScreen) : []
+	const channelsSorted = Array.isArray(serverChannels)
+		? [...serverChannels].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+		: []
+
+	function consumerHint(c) {
+		const parts = []
+		if (c.hasScreen) parts.push('Screen')
+		if (c.hasDecklinkOutput) parts.push('DeckLink')
+		return parts.length ? parts.join(' · ') : 'no screen / DeckLink'
+	}
 
 	const gridRows =
-		screenChannels.length > 0
-			? screenChannels
+		channelsSorted.length > 0
+			? channelsSorted
 					.map(
 						(c) =>
-							`<label class="led-test-modal__grid-ch"><input type="checkbox" data-led-grid-ch="${c.index}" /> Full LED grid · ch ${c.index} <span class="led-test-modal__muted">${escapeHtml(c.videoMode || '')}</span></label>`
+							`<label class="led-test-modal__grid-ch"><input type="checkbox" data-led-grid-ch="${c.index}" /> Full LED grid · ch ${c.index} <span class="led-test-modal__muted">${escapeHtml(consumerHint(c))}</span> <span class="led-test-modal__muted">${escapeHtml(c.videoMode || '')}</span></label>`
 					)
 					.join('')
-			: '<p class="led-test-modal__muted">Connect to Caspar to list screen channels from INFO CONFIG.</p>'
+			: '<p class="led-test-modal__muted">Connect to Caspar to list channels from INFO CONFIG.</p>'
 
 	const modal = document.createElement('div')
 	modal.id = 'led-test-modal'
@@ -109,7 +121,7 @@ export function showLedTestModal(onApplied, stateStore) {
 				<button type="button" class="modal-close" id="led-test-close" aria-label="Close">&times;</button>
 			</div>
 			<div class="modal-body led-test-modal__body">
-				<p class="led-test-modal__hint">Template <code>led_grid_test</code> on layer <strong>999</strong>. Default view is <strong>screens</strong> (logo, Caspar resolution from INFO CONFIG, LAN IPs, circle + cross). Enable <strong>Full LED grid</strong> per output channel only when aligning a physical LED wall.</p>
+				<p class="led-test-modal__hint">Template <code>led_test_pattern</code> on layer <strong>999</strong>. Default view is <strong>screens</strong> (logo, Caspar resolution from INFO CONFIG, LAN IPs, circle + cross). Enable <strong>Full LED grid</strong> per Caspar channel when aligning a physical LED wall (including DeckLink-only outputs).</p>
 				<div class="led-test-modal__section">
 					<div class="led-test-modal__section-title">Pattern & Overlays</div>
 					<div class="led-test-modal__full">
@@ -135,6 +147,9 @@ export function showLedTestModal(onApplied, stateStore) {
 					<div class="led-test-modal__checks led-test-modal__checks--inline">
 						<label><input type="checkbox" id="led-test-circle" /> Circle</label>
 						<label><input type="checkbox" id="led-test-cross" /> Crosshair</label>
+					</div>
+					<div class="led-test-modal__full" id="led-test-char-wrap" hidden>
+						<label>Bouncing HighAsCG characters <input type="number" id="led-test-char-count" min="1" max="48" step="1" /></label>
 					</div>
 				</div>
 				<div class="led-test-modal__section">
@@ -176,6 +191,8 @@ export function showLedTestModal(onApplied, stateStore) {
 	const circleCb = modal.querySelector('#led-test-circle')
 	const crossCb = modal.querySelector('#led-test-cross')
 	const patternSel = modal.querySelector('#led-test-pattern')
+	const charWrap = modal.querySelector('#led-test-char-wrap')
+	const charCountInp = modal.querySelector('#led-test-char-count')
 
 	cols.value = String(s.cols)
 	rows.value = String(s.rows)
@@ -188,6 +205,15 @@ export function showLedTestModal(onApplied, stateStore) {
 	circleCb.checked = s.showCircle !== false
 	crossCb.checked = s.showCross !== false
 	patternSel.value = s.pattern || 'grid-white'
+	charCountInp.value = String(s.charCount ?? 3)
+
+	function syncBouncingCharUi() {
+		const on = patternSel.value === 'bouncing-element'
+		charWrap.hidden = !on
+	}
+
+	syncBouncingCharUi()
+	patternSel.addEventListener('change', syncBouncingCharUi)
 
 	const gridMap = { ...s.gridByChannel }
 	modal.querySelectorAll('[data-led-grid-ch]').forEach((inp) => {
@@ -221,6 +247,7 @@ export function showLedTestModal(onApplied, stateStore) {
 			showCross: crossCb.checked,
 			gridByChannel: nextGrid,
 			pattern: patternSel.value,
+			charCount: Math.max(1, Math.min(48, parseInt(charCountInp.value, 10) || 1)),
 		}
 		saveLedTestSettings(next)
 		close()

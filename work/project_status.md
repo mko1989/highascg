@@ -63,6 +63,10 @@ Update the table when a WO’s shipping state changes.
 | ID | File | Status | Last touch |
 |----|------|--------|------------|
 | 37 | [37_WO_SIMULATION_PLACEHOLDERS.md](./37_WO_SIMULATION_PLACEHOLDERS.md) | Not started | 2026-04-30 |
+| 38 | [38_WO_PIXEL_MAPPING_CALC_FIX.md](./38_WO_PIXEL_MAPPING_CALC_FIX.md) | Done | 2026-05-03 |
+| 39 | [39_WO_INTERNAL_MIX_TRANSITION.md](./39_WO_INTERNAL_MIX_TRANSITION.md) | Done | 2026-05-03 |
+| 40 | [40_WO_DEVICE_VIEW_UI_FIXES.md](./40_WO_DEVICE_VIEW_UI_FIXES.md) | In progress | 2026-05-03 |
+| 43 | [43_WO_AMCP_COMMAND_PIPELINE_SUPERCONDUCTOR_STYLE.md](./43_WO_AMCP_COMMAND_PIPELINE_SUPERCONDUCTOR_STYLE.md) | Draft | 2026-05-05 |
 
 ### WO-37 initial scope (2026-04-30)
 

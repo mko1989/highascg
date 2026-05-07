@@ -19,6 +19,7 @@ const {
 	writeWaveformCacheFile,
 	extractThumbnailPng,
 	tryLocalThumbnailPng,
+	ensureLocalThumbnailCacheForMediaIds,
 	WAVEFORM_VERSION,
 } = require('./local-media-ffmpeg')
 
@@ -245,14 +246,14 @@ async function handleDeleteLocalMedia(reqPath, config) {
 
 /**
  * Same base directory as ingest (WeTransfer / URL download / upload).
- * When `local_media_path` is unset, matches default ingest: Linux `/opt/casparcg/media`, else `cwd/media`.
+ * When `local_media_path` is unset, matches default ingest: Linux `/home/casparcg/highascg/media`, else `cwd/media`.
  * @param {object} [config]
  * @returns {string}
  */
 function getMediaIngestBasePath(config) {
 	const p = (config?.local_media_path || '').trim()
 	if (p) return path.resolve(p)
-	if (os.platform() === 'linux') return '/opt/casparcg/media'
+	if (os.platform() === 'linux') return '/home/casparcg/highascg/media'
 	return path.join(process.cwd(), 'media')
 }
 
@@ -283,6 +284,7 @@ const _SCAN_EXT = new Set([
 	'.m2ts',
 	'.mts',
 ])
+const _HIDDEN_MEDIA_DIRS = new Set(['tb', '.tb'])
 
 /**
  * Resolve a media id to an absolute file path on disk.
@@ -397,6 +399,7 @@ function findFileByStemUnderDir(dir, stemHint) {
 			const full = path.join(d, ent.name)
 			if (ent.isDirectory()) {
 				if (ent.name.startsWith('.')) continue
+				if (_HIDDEN_MEDIA_DIRS.has(ent.name.toLowerCase())) continue
 				const hit = walk(full, depth + 1)
 				if (hit) return hit
 			} else if (ent.isFile()) {
@@ -437,6 +440,7 @@ function scanMediaRecursiveForBrowser(basePath, maxFiles = 2500) {
 			if (name.startsWith('.')) continue
 			const rel = (relDir ? `${relDir}/${name}` : name).replace(/\\/g, '/')
 			if (ent.isDirectory()) {
+				if (_HIDDEN_MEDIA_DIRS.has(name.toLowerCase())) continue
 				out.push({ id: rel, isDir: true })
 				walk(rel)
 			} else {
@@ -470,6 +474,7 @@ module.exports = {
 	resolveSafe,
 	extractThumbnailPng,
 	tryLocalThumbnailPng,
+	ensureLocalThumbnailCacheForMediaIds,
 	extractWaveform,
 	getMediaIngestBasePath,
 	getWaveformCacheDir,

@@ -54,7 +54,7 @@ export function showLogsModal() {
 				<button type="button" class="modal-close" id="logs-modal-close" aria-label="Close">&times;</button>
 			</div>
 			<div class="modal-body logs-modal__body">
-				<p class="settings-note logs-modal__hint">Enable one or both sources. <strong>HighAsCG</strong> = this Node process (AMCP commands + internal events, streamed live). <strong>CasparCG</strong> = log file on the Caspar host (default <code id="logs-caspar-path-hint">/opt/casparcg/log/caspar_YYYY-MM-DD.log</code>). Override with <code>CASPAR_LOG_PATH</code>.</p>
+				<p class="settings-note logs-modal__hint">Enable one or both sources. <strong>HighAsCG</strong> = this Node process (AMCP commands + internal events, streamed live). <strong>CasparCG</strong> = log file on the Caspar host (default <code id="logs-caspar-path-hint">/home/casparcg/highascg/log/caspar_YYYY-MM-DD.log</code>). Override with <code>CASPAR_LOG_PATH</code>.</p>
 				<div class="logs-modal__toolbar">
 					<button type="button" class="btn btn--secondary logs-modal__toggle logs-modal__toggle--on" id="logs-toggle-highascg" aria-pressed="true">HighAsCG</button>
 					<button type="button" class="btn btn--secondary logs-modal__toggle logs-modal__toggle--on" id="logs-toggle-caspar" aria-pressed="true">CasparCG</button>

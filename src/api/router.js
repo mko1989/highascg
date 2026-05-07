@@ -42,6 +42,7 @@ const routesModules = require('./routes-modules')
 const routesPixelhue = require('./routes-pixelhue')
 const routesTandemDevice = require('./routes-tandem-device')
 const routesDeviceView = require('./routes-device-view')
+const routesPixelweb = require('./routes-pixelweb')
 const moduleRegistry = require('../module-registry')
 
 /**
@@ -57,6 +58,37 @@ async function routeRequest(method, path, body, ctx, req) {
 	let p = qIdx >= 0 ? pathRaw.slice(0, qIdx) : pathRaw
 	const instanceMatch = p.match(/^\/instance\/[^/]+\/(.+)$/)
 	if (instanceMatch) p = '/' + instanceMatch[1]
+	if (p === '/control' || p === '/api/config') {
+		const mappedPath = p === '/control' ? '/pixelweb/control' : '/pixelweb/api/config'
+		const mappedPathWithQuery =
+			qIdx >= 0 ? `${mappedPath}?${pathRaw.slice(qIdx + 1)}` : mappedPath
+		return await routesPixelweb.proxyPixelweb({
+			method,
+			pathWithQuery: mappedPathWithQuery,
+			req,
+			body,
+			ctx,
+		})
+	}
+	if (p.startsWith('/pixelweb')) {
+		return await routesPixelweb.proxyPixelweb({
+			method,
+			pathWithQuery: pathRaw,
+			req,
+			body,
+			ctx,
+		})
+	}
+	if (p.startsWith('/unico/')) {
+		return await routesPixelweb.proxyUnico({
+			method,
+			pathWithQuery: pathRaw,
+			req,
+			body,
+			ctx,
+		})
+	}
+
 	if (!p.startsWith('/api/')) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Not found' }) }
 	}
@@ -70,12 +102,12 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (mr) return mr
 	}
 
-	if (method === 'GET' && (p === '/api/caspar-config/generate' || p === '/api/caspar-config/mode-choices')) {
+	if (method === 'GET' && (p === '/api/caspar-config/generate' || p === '/api/caspar-config/mode-choices' || p === '/api/caspar-config/override')) {
 		const cr = routesCasparConfig.handleGet(p, query, ctx)
 		if (cr) return cr
 	}
 
-	if (method === 'POST' && p === '/api/caspar-config/apply') {
+	if (method === 'POST' && (p === '/api/caspar-config/apply' || p === '/api/caspar-config/override')) {
 		return await routesCasparConfig.handlePost(p, body, ctx)
 	}
 
@@ -138,7 +170,7 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (r) return r
 	}
 
-	// Settings, hardware, go2rtc stream list, and streaming toggle — usable without Caspar (WO-03 / WO-05 / WO-06).
+	// Settings, hardware, stream list, and streaming toggle — usable without Caspar (WO-03 / WO-05 / WO-06).
 	if (method === 'GET' && p === '/api/settings') {
 		const r = await routesSettings.handleGet(p, ctx)
 		if (r) return r
@@ -186,10 +218,6 @@ async function routeRequest(method, path, body, ctx, req) {
 	if (method === 'GET' && p.startsWith('/api/project/')) {
 		const pr = await routesProject.handleGet(p, query, ctx)
 		if (pr) return pr
-	}
-	// Same-origin WebRTC SDP exchange (avoids CORS: browser :8080 → go2rtc :1984)
-	if (method === 'POST' && p === '/api/go2rtc/webrtc') {
-		return await routesStreaming.proxyGo2rtcWebrtc(query, body, ctx)
 	}
 	if (method === 'POST' && p === '/api/settings') {
 		try {

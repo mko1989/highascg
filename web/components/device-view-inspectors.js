@@ -10,6 +10,7 @@ import { renderRecordOutControls } from './device-view-inspector-record.js'
 import { renderAudioOutControls } from './device-view-inspector-audio.js'
 import { renderGpuOutControls } from './device-view-inspector-gpu.js'
 import { renderCasparSettingsInspector } from './device-view-inspector-caspar.js'
+import { renderMappingConnectorControls } from './device-view-inspector-mapping.js'
 
 export { renderCasparSettingsInspector }
 
@@ -41,14 +42,22 @@ export function renderConnectorInspector(h, conn, ctx, {
 	h.append(Object.assign(document.createElement('p'), { textContent: 'Selected connector' }), buildInspectorTable(rows))
 
 	if (conn?.kind === 'decklink_io') {
-		renderDeckLinkIoControls(h, conn, { skipPh, load })
+		renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload, skipPh, statusEl, load, setCasparRestartDirty })
 	} else if (conn?.kind === 'stream_out') {
 		renderStreamOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, setCasparRestartDirty, onRemoveStreamOutput })
 	} else if (conn?.kind === 'record_out') {
 		renderRecordOutControls(h, conn, { currentSettings, statusEl, load, onRemoveRecordOutput })
 	} else if (conn?.kind === 'audio_out') {
 		renderAudioOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, onRemoveAudioOutput })
-	} else if (conn?.kind === 'gpu_out') {
+	} else if (conn?.kind === 'gpu_out' || conn?.kind === 'gpu_output') {
 		renderGpuOutControls(h, conn, { currentSettings, lastPayload, skipPh, statusEl, load, setCasparRestartDirty })
+	} else if (conn?.kind === 'pixel_map_in' || conn?.kind === 'pixel_map_out') {
+		renderMappingConnectorControls(h, conn, {
+			lastPayload,
+			statusEl,
+			load,
+			setCasparRestartDirty,
+			nodeId: String(conn?.deviceId || ''),
+		})
 	}
 }

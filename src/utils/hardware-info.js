@@ -169,7 +169,7 @@ function getDisplaysXrandrDetailed() {
 			}
 		}
 		pushCur()
-		return displays
+		return { displays, raw: stdout }
 	} catch (e) {
 		return null
 	}
@@ -180,7 +180,8 @@ function getDisplaysXrandrDetailed() {
  * @returns {Array<{name: string, connected: boolean, resolution: string, x: number, y: number}>}
  */
 function getDisplaysXrandr() {
-	const d = getDisplaysXrandrDetailed()
+	const res = getDisplaysXrandrDetailed()
+	const d = res?.displays
 	if (!d || !d.length) return null
 	return d.map((x) => ({
 		name: x.name,
@@ -268,10 +269,10 @@ function getGpuConnectorInventory() {
  * Fills `modes` from `/sys/class/drm/.../modes` when xrandr omits them (common when only sysfs names are available).
  */
 function getDisplayDetails() {
-	const xr = getDisplaysXrandrDetailed()
+	const res = getDisplaysXrandrDetailed()
 	let displays
-	if (xr && xr.length) {
-		displays = xr
+	if (res?.displays?.length) {
+		displays = res.displays
 	} else {
 		const sys = getDisplaysSysfs()
 		displays = sys.map((d) => ({

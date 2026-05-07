@@ -440,7 +440,7 @@ export async function mountSystemSettings(container) {
 		btnApply.onclick = async () => {
 			if (
 				!confirm(
-					'Are you sure you want to apply X11 layout changes and restart the display manager? Screens will flicker.',
+					'Apply X11 layout changes now and persist for reboot?',
 				)
 			)
 				return
@@ -452,10 +452,7 @@ export async function mountSystemSettings(container) {
 				const payload = container.getSystemSettings ? container.getSystemSettings() : {}
 				const res = await api.post('/api/settings/apply-os', payload)
 				if (res.ok) {
-					alert(
-						'OS changes applied. Display manager restart triggered.\n' +
-							(res.dmRestarted ? 'Success' : 'Restart failed (check server logs)'),
-					)
+					alert('OS changes applied and persisted for reboot.')
 				} else {
 					alert('Error: ' + (res.error || 'Unknown error'))
 				}

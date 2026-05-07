@@ -25,6 +25,7 @@ const TEMPLATE_MAP = {
 	shadow: 'pip_shadow',
 	edge_strip: 'pip_edge_strip',
 	glow: 'pip_glow',
+	router: 'pip_router',
 }
 
 /** @deprecated use resolvePipOverlayCasparLayer — kept for callers that need legacy slot only */
@@ -205,8 +206,11 @@ function outsetPxForPipOverlay(overlay) {
 			const sp = Math.max(0, Number(p.spread) || 0)
 			return Math.max(12, blur + Math.max(ox, oy) + sp + 2)
 		}
-		case 'glow':
-			return Math.max(6, Number(p.intensity) || 15)
+		case 'glow': {
+			const blur = Number(p.intensity) || 15
+			const spread = Number(p.width) || 0
+			return Math.max(6, blur + spread + 4)
+		}
 		default:
 			return 4
 	}
@@ -229,16 +233,6 @@ function expandFillOutward(contentFill, outsetPx, chW, chH) {
 	let y = contentFill.y - oy
 	let sx = contentFill.scaleX + 2 * ox
 	let sy = contentFill.scaleY + 2 * oy
-	if (x < 0) {
-		sx += x
-		x = 0
-	}
-	if (y < 0) {
-		sy += y
-		y = 0
-	}
-	if (x + sx > 1) sx = Math.max(0, 1 - x)
-	if (y + sy > 1) sy = Math.max(0, 1 - y)
 	return { x, y, scaleX: sx, scaleY: sy }
 }
 
@@ -260,32 +254,6 @@ function innerRectInOverlayNorm(contentFill, overlayFill) {
 		w: clamp01(contentFill.scaleX / sx2),
 		h: clamp01(contentFill.scaleY / sy2),
 	}
-}
-
-/**
- * When CG shares the PIP’s MIXER FILL, template #root = PIP; inner is the “hole” in 0–1 of the PIP
- * (symmetric px border from content edges, same as pip_border’s resolveEffectiveInner fallback).
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill
- * @param {number} bPx
- * @param {number} chW
- * @param {number} chH
- * @returns {{ l: number, t: number, w: number, h: number }}
- */
-function innerRectPipLocalFromOutset(contentFill, bPx, chW, chH) {
-	const w = Math.max(1, chW)
-	const h = Math.max(1, chH)
-	const b = Math.max(0, bPx)
-	const rw = w * contentFill.scaleX
-	const rh = h * contentFill.scaleY
-	if (!(rw > 0) || !(rh > 0)) {
-		return { l: 0, t: 0, w: 1, h: 1 }
-	}
-	const il = b / rw
-	const it = b / rh
-	if (!(il * 2 < 1) || !(it * 2 < 1) || !Number.isFinite(il) || !Number.isFinite(it)) {
-		return { l: 0, t: 0, w: 1, h: 1 }
-	}
-	return { l: il, t: it, w: 1 - 2 * il, h: 1 - 2 * it }
 }
 
 /**
@@ -317,22 +285,22 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 	const chH = res?.h > 0 ? res.h : 1080
 
 	const cf = normalizeContentFill(contentFill)
+	const pParams = mergeOverlayParams(overlay)
+	const side = String(pParams.side || 'outside').toLowerCase()
+	const forceExpanded = side === 'outside'
 	const outset = outsetPxForPipOverlay(overlay)
+
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
 	const p = Number(contentPhysicalLayer)
 	const idx = stackIndex | 0
 	// Must match resolve(): legacy uses 100+8*p+i; aligned uses p+1+idx (no CG on the same layer as the clip).
 	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
-	let inner
-	let mixFill
-	if (aligned) {
-		inner = innerRectPipLocalFromOutset(cf, outset, chW, chH)
-		mixFill = cf
-	} else {
-		const overlayFill = expandFillOutward(cf, outset, chW, chH)
-		inner = innerRectInOverlayNorm(cf, overlayFill)
-		mixFill = overlayFill
-	}
+
+	// To ensure uniform border thickness (preventing non-uniform scaling stretch),
+	// we always render the HTML template at full-screen channel resolution (0 0 1 1)
+	// and let the template position itself using the absolute channel-normalized coordinates.
+	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
+	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const cl = `${channel}-${oLayer}`
 	const data = buildPipOverlayCgPayload(overlay, inner)
 	/** @type {string[]} */
@@ -362,8 +330,19 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
  * @param {{ layerNumber?: number, pipOverlays?: object[] }|null|undefined} [prevSceneLayer] - same screen row on **air**; same template at same index uses CG UPDATE
  */
 function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer, prevSceneLayer) {
+	if (!Array.isArray(overlays) || overlays.length === 0) return []
+
+	// Optimization: Use the "pip_router" template if we have multiple effects.
+	if (overlays.length > 1) {
+		const prevPips = pipOverlaysFromLayer(prevSceneLayer)
+		if (prevPips.length > 1) {
+			return buildPipOverlayRouterUpdateLines(channel, contentPhysicalLayer, overlays, contentFill, appCtx, nextContentLayer)
+		} else {
+			return buildPipOverlayRouterAmcpLines(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer)
+		}
+	}
+
 	const lines = []
-	if (!Array.isArray(overlays)) return lines
 	const prevPips = pipOverlaysFromLayer(prevSceneLayer)
 	for (let i = 0; i < overlays.length && i < PIP_OVERLAY_MAX_STACK; i++) {
 		if (
@@ -408,21 +387,102 @@ function buildPipOverlayUpdateLines(channel, contentPhysicalLayer, overlay, cont
 	const chW = res?.w > 0 ? res.w : 1920
 	const chH = res?.h > 0 ? res.h : 1080
 	const cf = normalizeContentFill(contentFill)
-	const outset = outsetPxForPipOverlay(overlay)
+	const pParamsU = mergeOverlayParams(overlay)
+	const sideU = String(pParamsU.side || 'outside').toLowerCase()
+	const forceExpandedU = sideU === 'outside'
+	const outsetU = outsetPxForPipOverlay(overlay)
+
 	const p = Number(contentPhysicalLayer)
 	const idxU = stackIndex | 0
 	const alignedU = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idxU
-	let inner
-	let mixFill
-	if (alignedU) {
-		inner = innerRectPipLocalFromOutset(cf, outset, chW, chH)
-		mixFill = cf
-	} else {
-		const overlayFill = expandFillOutward(cf, outset, chW, chH)
-		inner = innerRectInOverlayNorm(cf, overlayFill)
-		mixFill = overlayFill
-	}
+
+	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
+	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const data = buildPipOverlayCgPayload(overlay, inner)
+	return [
+		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
+		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
+	]
+}
+
+/**
+ * Collapses all overlays for a layer into a single "router" command.
+ */
+function buildPipOverlayRouterAmcpLines(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer) {
+	if (!Array.isArray(overlays) || overlays.length === 0) return []
+
+	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
+	const chW = res?.w > 0 ? res.w : 1920
+	const chH = res?.h > 0 ? res.h : 1080
+	const cf = normalizeContentFill(contentFill)
+
+	let maxOutset = 0
+	let anyOutside = false
+	for (const o of overlays) {
+		const p = mergeOverlayParams(o)
+		if (p.side === 'outside') {
+			anyOutside = true
+			maxOutset = Math.max(maxOutset, outsetPxForPipOverlay(o))
+		}
+	}
+
+	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
+	const p = Number(contentPhysicalLayer)
+	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP
+
+	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
+	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+
+	const cl = `${channel}-${oLayer}`
+	const data = JSON.stringify({
+		inner,
+		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
+		effects: overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
+	})
+
+	return [
+		`CG ${cl} ADD 0 "pip_router" 1 "${data.replace(/"/g, '\\"')}"`,
+		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
+		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
+		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`),
+	]
+}
+
+/**
+ * Update the router command.
+ */
+function buildPipOverlayRouterUpdateLines(channel, contentPhysicalLayer, overlays, contentFill, appCtx, nextContentLayer) {
+	if (!Array.isArray(overlays) || overlays.length === 0) return []
+
+	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
+	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
+	const chW = res?.w > 0 ? res.w : 1920
+	const chH = res?.h > 0 ? res.h : 1080
+	const cf = normalizeContentFill(contentFill)
+
+	let maxOutset = 0
+	let anyOutside = false
+	for (const o of overlays) {
+		const p = mergeOverlayParams(o)
+		if (p.side === 'outside') {
+			anyOutside = true
+			maxOutset = Math.max(maxOutset, outsetPxForPipOverlay(o))
+		}
+	}
+
+	const p = Number(contentPhysicalLayer)
+	const alignedU = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP
+
+	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
+	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+
+	const cl = `${channel}-${oLayer}`
+	const data = JSON.stringify({
+		inner,
+		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
+		effects: overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
+	})
+
 	return [
 		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
 		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
@@ -563,10 +623,11 @@ module.exports = {
 	outsetPxForPipOverlay,
 	expandFillOutward,
 	innerRectInOverlayNorm,
-	innerRectPipLocalFromOutset,
 	buildPipOverlayAmcpLines,
 	buildPipOverlayAmcpLinesAll,
 	buildPipOverlayUpdateLines,
+	buildPipOverlayRouterAmcpLines,
+	buildPipOverlayRouterUpdateLines,
 	buildPipOverlayRemoveLines,
 	buildPipOverlayRemoveLinesForTakeJobSet,
 	buildPipOverlayOpacityFadeDeferLines,

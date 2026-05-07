@@ -15,6 +15,7 @@ const MIME = {
 	'.html': 'text/html',
 	'.css': 'text/css',
 	'.js': 'application/javascript',
+	'.mjs': 'application/javascript',
 	'.json': 'application/json',
 	'.ico': 'image/x-icon',
 	'.svg': 'image/svg+xml',
@@ -44,6 +45,36 @@ function mapInstanceStaticPath(requestPath) {
 }
 
 /**
+ * When PixelFlow runs under `/pixelweb/*` inside an iframe, it may still navigate using
+ * root-style paths such as `/project` or `/device`. If the request Referer is Pixelweb,
+ * remap those root requests back under `/pixelweb/*` so they do not fall through to
+ * HighAsCG's own root SPA.
+ * @param {string} requestPath
+ * @param {import('http').IncomingMessage} req
+ * @returns {string}
+ */
+function mapPixelwebRefererPath(requestPath, req) {
+	const p = String(requestPath || '/')
+	if (
+		p.startsWith('/pixelweb') ||
+		p.startsWith('/api/') ||
+		p.startsWith('/unico/') ||
+		p.startsWith('/vendor/') ||
+		p.startsWith('/assets/')
+	) return p
+	const ref = String(req?.headers?.referer || '')
+	if (!ref) return p
+	let refPath = ''
+	try {
+		refPath = new URL(ref).pathname || ''
+	} catch {
+		return p
+	}
+	if (!(refPath === '/pixelweb' || refPath.startsWith('/pixelweb/'))) return p
+	return `/pixelweb${p}`
+}
+
+/**
  * @returns {string[]}
  */
 function getLanIPv4Addresses() {
@@ -69,8 +100,9 @@ function getLanIPv4Addresses() {
  *   bundles to the browser without an importmap — see WO-17 previs module for usage.
  *   Mounts with no underlying install (e.g. `three` not installed) simply 404.
  */
-async function serveWebApp(requestPath, dirs) {
+async function serveWebApp(requestPath, dirs, req) {
 	let filePath = mapInstanceStaticPath(requestPath || '/')
+	filePath = mapPixelwebRefererPath(filePath, req)
 	if (filePath === '/') filePath = '/index.html'
 	if (filePath.includes('..')) {
 		return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
@@ -110,6 +142,10 @@ async function serveWebApp(requestPath, dirs) {
 				return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
 			}
 		}
+	}
+	// Avoid serving index.html for missing optional vendor assets (e.g. grapesjs when module is disabled).
+	if (filePath.startsWith('/vendor/')) {
+		return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
 	}
 	const relPath = filePath.replace(/^\/+/, '') || 'index.html'
 	let fullPath = path.join(dirs.webDir, relPath)
@@ -163,6 +199,7 @@ async function defaultRouteApi(method, reqPath, body, _req) {
  *   templatesDir?: string,
  *   vendorDirs?: Record<string, string>,
  *   routeApi?: (method: string, path: string, body: string, req: import('http').IncomingMessage) => Promise<{ status?: number, headers?: Record<string, string>, body?: string | Buffer, stream?: import('fs').ReadStream }>,
+ *   routeUpgrade?: (req: import('http').IncomingMessage, socket: import('net').Socket, head: Buffer) => Promise<boolean> | boolean,
  *   log?: (msg: string) => void,
  * }} options
  * @returns {import('http').Server}
@@ -175,6 +212,7 @@ function startHttpServer(options) {
 		templatesDir,
 		vendorDirs,
 		routeApi = defaultRouteApi,
+		routeUpgrade = null,
 		log = (m) => console.log(m),
 	} = options
 
@@ -199,16 +237,29 @@ function startHttpServer(options) {
 			}
 
 			let result
+			const reqPathForRouting = mapPixelwebRefererPath(reqPath, req)
 			// Same-origin API when UI is served under Companion: /instance/<id>/api/...
 			const isApi =
-				reqPath.startsWith('/api/') ||
-				reqPath === '/api' ||
-				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPath)
+				reqPathForRouting.startsWith('/api/') ||
+				reqPathForRouting === '/api' ||
+				reqPathForRouting === '/control' ||
+				reqPathForRouting === '/api/config' ||
+				reqPathForRouting.startsWith('/pixelweb') ||
+				reqPathForRouting === '/pixelweb' ||
+				reqPathForRouting.startsWith('/unico/') ||
+				/^\/instance\/[^/]+\/control$/.test(reqPathForRouting) ||
+				/^\/instance\/[^/]+\/api\/config$/.test(reqPathForRouting) ||
+				/^\/instance\/[^/]+\/pixelweb(\/.*)?$/.test(reqPathForRouting) ||
+				/^\/instance\/[^/]+\/unico(\/.*)?$/.test(reqPathForRouting) ||
+				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPathForRouting)
 			if (isApi) {
-				// Pass path including ?query so router can parse query params (e.g. go2rtc webrtc ?src=)
-				result = await routeApi(req.method || 'GET', rawPath, body, req)
+				// Pass path including ?query so router can parse query params consistently.
+				const qIdx = rawPath.indexOf('?')
+				const qs = qIdx >= 0 ? rawPath.slice(qIdx) : ''
+				const routedPath = reqPathForRouting + qs
+				result = await routeApi(req.method || 'GET', routedPath, body, req)
 			} else {
-				result = await serveWebApp(reqPath, { webDir, templatesDir, vendorDirs })
+				result = await serveWebApp(reqPath, { webDir, templatesDir, vendorDirs }, req)
 			}
 			const headers = mergeCors(result.headers)
 			res.writeHead(result.status ?? 200, headers)
@@ -243,6 +294,15 @@ function startHttpServer(options) {
 	server.on('connection', (socket) => {
 		trackedSockets.add(socket)
 		socket.on('close', () => trackedSockets.delete(socket))
+	})
+	server.on('upgrade', async (req, socket, head) => {
+		try {
+			if (typeof routeUpgrade !== 'function') return
+			const handled = await routeUpgrade(req, socket, head)
+			if (!handled) return
+		} catch {
+			return
+		}
 	})
 	/** @internal */
 	server._highascgDestroyTrackedSockets = () => {

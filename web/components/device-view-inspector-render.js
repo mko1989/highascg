@@ -4,6 +4,7 @@
 import { CASPAR_HOST } from './device-view-helpers.js'
 import { SWITCHER_INTEGRATION_DISABLED } from './device-view-switcher-integration-disabled.js'
 import { buildInspectorTable } from './device-view-ui-utils.js'
+import { renderMappingNodeInspector } from './device-view-inspector-mapping.js'
 
 /**
  * @param {any} connector
@@ -24,7 +25,7 @@ export function readableConnectorRows(connector, ctx) {
 					: String(connector.deviceId || 'Unknown'),
 		},
 	]
-	if (connector.kind === 'gpu_out') {
+	if (connector.kind === 'gpu_out' || connector.kind === 'gpu_output') {
 		rows.push({ label: 'Type', value: 'GPU output (DisplayPort / HDMI)' })
 	} else if (connector.kind === 'decklink_out') {
 		const mainIdx = connector?.caspar?.mainIndex
@@ -57,13 +58,27 @@ export function readableConnectorRows(connector, ctx) {
 			{ label: 'Source', value: String(connector?.caspar?.source || 'program_1') },
 			{ label: 'CRF', value: String(connector?.caspar?.crf ?? 26) }
 		)
+	} else if (connector.kind === 'pixel_map_in') {
+		rows.push(
+			{ label: 'Type', value: 'Pixel mapping input' },
+			{ label: 'Node', value: String(connector.deviceId || '-') },
+			{ label: 'Connector', value: String(connector.id || '-') }
+		)
+	} else if (connector.kind === 'pixel_map_out') {
+		rows.push(
+			{ label: 'Type', value: 'Pixel mapping output (consumer route)' },
+			{ label: 'Node', value: String(connector.deviceId || '-') },
+			{ label: 'Index', value: String((connector?.index ?? 0) + 1) },
+			{ label: 'Connector', value: String(connector.id || '-') }
+		)
 	} else {
 		rows.push({ label: 'Type', value: String(connector.kind || 'unknown') })
 	}
 	return rows
 }
 
-export function renderDeviceInspector(host, deviceId, live, dev) {
+export function renderDeviceInspector(host, deviceId, live, dev, opts = {}) {
+	const { lastPayload, load, setCasparRestartDirty } = opts
 	const p = document.createElement('p')
 	p.className = 'device-view__status'
 	p.textContent = 'Selected device'
@@ -93,6 +108,11 @@ export function renderDeviceInspector(host, deviceId, live, dev) {
 	}
 	host.append(p, buildInspectorTable(rows))
 	
+	if (dev?.role === 'pixel_mapping') {
+		renderMappingNodeInspector(host, deviceId, live, { lastPayload, load, setCasparRestartDirty })
+		return
+	}
+
 	if (deviceId === CASPAR_HOST) {
 		const intent = Array.isArray(live?.caspar?.destinationIntent?.items) ? live.caspar.destinationIntent.items : []
 		if (intent.length) {

@@ -2,7 +2,8 @@
  * Scenes / Looks editor — deck of looks, drill-in per-scene compose with live PRV preview.
  */
 import { sceneState } from '../lib/scene-state.js'
-import { getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
+import { getLiveThumbnailUrl, getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
 import { drawComposePrvPgmCellEdgeBar, drawDualComposeCellPreview, drawOutputCanvasBounds } from './preview-canvas-draw-base.js'
 import { isMediaOrFileSource } from './scenes-shared.js'
@@ -23,6 +24,11 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	const getProgramChannel = () => getChannelMap().programChannels?.[sceneState.activeScreenIndex] ?? 1
 	const getPlaybackChannel = () => getChannelMap().playbackChannels?.[sceneState.activeScreenIndex] ?? getProgramChannel()
 	const getPreviewChannel = () => getChannelMap().previewChannels?.[sceneState.activeScreenIndex] ?? null
+	const getThumbForSource = (source, channelForLive) => {
+		if (!source || !source.value) return null
+		if (isMediaOrFileSource(source)) return getThumbnailUrl(source.value, SCENE_THUMB_MAX_W, 0)
+		return getLiveThumbnailUrl(channelForLive)
+	}
 	const getComposeStreamNames = () => {
 		const pgmCh = getPlaybackChannel()
 		const prvCh = getPreviewChannel()
@@ -39,6 +45,31 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		sceneState, stateStore, getPreviewOutputResolution, getChannelMap,
 		getPreviewChannel,
 	})
+
+	async function captureOnDemandForDroppedSource(data) {
+		if (!data || !data.type) return
+		const cm = getChannelMap() || {}
+		const mainIdx = sceneState.activeScreenIndex
+		const previewCh = Number(cm.previewChannels?.[mainIdx] ?? getPreviewChannel() ?? 0)
+		const programCh = Number(cm.programChannels?.[mainIdx] ?? getProgramChannel() ?? 0)
+		if (String(data.type) === 'timeline' && data.value) {
+			const timelineId = encodeURIComponent(String(data.value))
+			// One-shot PRV thumb at 5s marker for timeline cards.
+			await api.post(`/api/timelines/${timelineId}/sendto`, { preview: true, program: false, screenIdx: mainIdx }).catch(() => {})
+			await api.post(`/api/timelines/${timelineId}/seek`, { ms: 5000 }).catch(() => {})
+			await api.post(`/api/timelines/${timelineId}/play`, { from: 5000 }).catch(() => {})
+			await new Promise((r) => setTimeout(r, 160))
+			if (previewCh > 0) await api.post('/api/thumbnail/live/capture', { channel: previewCh }).catch(() => {})
+			await api.post(`/api/timelines/${timelineId}/pause`).catch(() => {})
+			previewPanel.scheduleDraw()
+			return
+		}
+		if (String(data.type) === 'route') {
+			const ch = previewCh > 0 ? previewCh : programCh
+			if (ch > 0) await api.post('/api/thumbnail/live/capture', { channel: ch }).catch(() => {})
+			previewPanel.scheduleDraw()
+		}
+	}
 
 	const takeSceneToProgram = createTakeSceneToProgram({
 		stateStore, getChannelMap, getProgramChannel, showToast: showScenesToast,
@@ -81,28 +112,65 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				const id = meta.composeCell === 'prv'
 					? (sceneState.getPreviewSceneIdForMain(mainIdx) || fallbackEditingId)
 					: (sceneState.getLiveSceneIdForMain(mainIdx) || sceneState.getPreviewSceneIdForMain(mainIdx) || fallbackEditingId)
-				const scene = id ? sceneState.getScene(id) : null
+				const scene = meta.composeCell === 'pgm' ? (sceneState.getLiveSceneSnapshot(mainIdx) || (id ? sceneState.getScene(id) : null)) : (id ? sceneState.getScene(id) : null)
 				drawDualComposeCellPreview(ctx, W, H, cellW, cellH, c => {
 					const r = Logic.getResolutionForScreen(mainIdx, sceneState, stateStore)
-					drawOutputCanvasBounds(c, r.w, r.h); drawSceneComposeStack(c, r.w, r.h, { scene: scene || { layers: [] }, selectedLayerIndex: scene?.id === sceneState.editingSceneId ? selectedLayerIndex : null, isLive: false, skipBg: true, composePrvPgmLayout: layout, composeDualStreamPreview: true, getThumbUrl: s => isMediaOrFileSource(s) ? `${getApiBase()}/api/thumbnail/${encodeURIComponent(s.value)}?w=${SCENE_THUMB_MAX_W}` : null, onThumbLoaded: () => previewPanel.scheduleDraw() })
+					drawOutputCanvasBounds(c, r.w, r.h); drawSceneComposeStack(c, r.w, r.h, { scene: scene || { layers: [] }, selectedLayerIndex: scene?.id === sceneState.editingSceneId ? selectedLayerIndex : null, isLive: false, skipBg: true, composePrvPgmLayout: layout, composeDualStreamPreview: true, getThumbUrl: s => getThumbForSource(s, meta.composeCell === 'prv' ? (getPreviewChannel() || getPlaybackChannel()) : getPlaybackChannel()), onThumbLoaded: () => previewPanel.scheduleDraw() })
 				}); drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell }); return
 			}
 			const id = sceneState.editingSceneId || sceneState.previewSceneId; const scene = id ? sceneState.getScene(id) : null
-			drawSceneComposeStack(ctx, W, H, { scene: scene || { layers: [] }, selectedLayerIndex, isLive, composePrvPgmLayout: layout, composeDualStreamPreview: isDual, getThumbUrl: s => isMediaOrFileSource(s) ? `${getApiBase()}/api/thumbnail/${encodeURIComponent(s.value)}?w=${SCENE_THUMB_MAX_W}` : null, onThumbLoaded: () => previewPanel.scheduleDraw() })
+			drawSceneComposeStack(ctx, W, H, { scene: scene || { layers: [] }, selectedLayerIndex, isLive, composePrvPgmLayout: layout, composeDualStreamPreview: isDual, getThumbUrl: s => getThumbForSource(s, getPreviewChannel() || getPlaybackChannel()), onThumbLoaded: () => previewPanel.scheduleDraw() })
 		}
 	})
 	bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPanel, splitPx })
 
 	const render = () => {
+		const preserveDeckScroll = !sceneState.editingSceneId
+		const prevScrollTop = preserveDeckScroll ? mainHost.scrollTop : 0
+		const prevScrollLeft = preserveDeckScroll ? mainHost.scrollLeft : 0
 		tabsHost.innerHTML = ''
-		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, renderCompose: s => renderComposeScene(s, { sceneState, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_CARD_THUMB_W, startDrag, startRotate, startScale, startEdgeResize }), selectedLayerIndexRef, showScenesToast })
+		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, renderCompose: s => renderComposeScene(s, { sceneState, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource }), selectedLayerIndexRef, showScenesToast })
 		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, outputAspect: getResolution().w / getResolution().h, paintDeckThumb: c => {
 			const id = c.dataset.sceneId; const scene = id ? sceneState.getScene(id) : null; if (!scene) return
 			const res = c.dataset.deckMain ? Logic.getResolutionForScreen(parseInt(c.dataset.deckMain, 10), sceneState, stateStore) : getResolution()
 			const cw = SCENE_CARD_THUMB_W; const ch = Math.round((cw * res.h) / res.w)
 			if (c.width !== cw) { c.width = cw; c.height = ch }
-			drawSceneComposeStack(c.getContext('2d'), cw, ch, { scene, selectedLayerIndex: null, getThumbUrl: s => isMediaOrFileSource(s) ? `${getApiBase()}/api/thumbnail/${encodeURIComponent(s.value)}?w=${SCENE_THUMB_MAX_W}` : null, onThumbLoaded: () => { previewPanel.scheduleDraw(); render() }, deckThumbnailMode: true })
+			drawSceneComposeStack(c.getContext('2d'), cw, ch, {
+				scene,
+				selectedLayerIndex: null,
+				getThumbUrl: s => {
+					const main = Number.isFinite(Number(c.dataset.deckMain)) ? parseInt(c.dataset.deckMain, 10) : sceneState.activeScreenIndex
+					const ch = getChannelMap().programChannels?.[main] ?? getProgramChannel()
+					return getThumbForSource(s, ch)
+				},
+				onThumbLoaded: () => {
+					previewPanel.scheduleDraw()
+					if (!c.isConnected) return
+					requestAnimationFrame(() => {
+						if (!c.isConnected) return
+						const sid = c.dataset.sceneId
+						const scn = sid ? sceneState.getScene(sid) : null
+						if (!scn) return
+						drawSceneComposeStack(c.getContext('2d'), cw, ch, {
+							scene: scn,
+							selectedLayerIndex: null,
+							getThumbUrl: s => {
+								const main = Number.isFinite(Number(c.dataset.deckMain)) ? parseInt(c.dataset.deckMain, 10) : sceneState.activeScreenIndex
+								const ch = getChannelMap().programChannels?.[main] ?? getProgramChannel()
+								return getThumbForSource(s, ch)
+							},
+							onThumbLoaded: () => previewPanel.scheduleDraw(),
+							deckThumbnailMode: true,
+						})
+					})
+				},
+				deckThumbnailMode: true,
+			})
 		}, takeSceneToProgram, showToast: showScenesToast, dispatchLayerSelect, previewPanel, sendSceneToPreviewCard: previewRuntime.sendSceneToPreviewCard, selectedLayerIndexRef, globalTakeFromPreview: () => { if (sceneState.previewSceneId) takeSceneToProgram(sceneState.previewSceneId, false) }, globalCutFromPreview: () => { if (sceneState.previewSceneId) takeSceneToProgram(sceneState.previewSceneId, true) } })
+		if (preserveDeckScroll) {
+			mainHost.scrollTop = prevScrollTop
+			mainHost.scrollLeft = prevScrollLeft
+		}
 	}
 
 	let renderRaf = null

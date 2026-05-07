@@ -10,7 +10,6 @@ npm-debug.log*
 .highascg-state.json
 .highascg-state.json.tmp
 highascg.config.json
-go2rtc.yaml
 
 # FFmpeg waveform JSON cache (GET /api/local-media/.../waveform)
 data/waveforms/
@@ -26,3 +25,30 @@ work/**
 !work/*_WO_*.md
 !work/WO_*.md
 !work/project_status.md
+
+# Local/runtime-heavy folders (never commit)
+CasparCG_Enhanced-main/
+cef-cache/
+bin/
+media/
+lib/
+_media/
+data/
+
+# Pixelweb local scratch/extracted artifacts
+pixelweb/.DS_Store
+pixelweb/extracted-source/
+pixelweb/pixelhue-web-server copy/
+pixelweb/pixelhue-web-server copy/.DS_Store
+
+# User/system local artifacts
+core
+health.json
+libndi.so.6
+casparcg.config
+config/casparcg.config
+
+# User-specific runtime configs (keep defaults/examples in source, ignore live overrides)
+config/*.json
+!config/*.example.json
+!config/default*.json

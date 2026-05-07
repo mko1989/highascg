@@ -193,8 +193,8 @@ function handleAddMappingNode(j, ctx) {
 		settings: {
 			numOutputs: 2,
 			outputs: [
-				{ id: 'out_1', mode: '1080p50', label: 'Output 1' },
-				{ id: 'out_2', mode: '1080p50', label: 'Output 2' }
+				{ id: 'out_1', mode: '1080p5000', label: 'Output 1' },
+				{ id: 'out_2', mode: '1080p5000', label: 'Output 2' }
 			],
 			mappings: []
 		}

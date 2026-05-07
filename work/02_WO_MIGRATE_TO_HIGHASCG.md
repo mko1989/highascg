@@ -139,7 +139,7 @@ HighAsCG/
 │       ├── scene-live-match.js
 │       ├── playback-clock.js
 │       └── program-layer-bank.js
-└── templates/                  # CasparCG HTML templates (overlay, black)
+└── template/                   # CasparCG HTML templates (overlay, black)
     ├── multiview_overlay.html
     └── black.html
 ```
@@ -303,8 +303,8 @@ HighAsCG/
   - Copy all remaining lib files
 
 - [x] **T9.5** Migrate template files
-  - `multiview_overlay.html` → `templates/`
-  - `black.html` → `templates/`
+  - `multiview_overlay.html` → `template/`
+  - `black.html` → `template/`
 
 ### Phase 10: Integration & Wiring
 
@@ -455,7 +455,7 @@ const base = '/api'  // Direct to standalone server
 
 ### 2026-04-04 — Agent
 **Work Done:**
-- **Phase 9 (bulk):** Copied companion [`src/web/`](../companion-module-casparcg-server/src/web/) → [`web/`](web/) (30 files: `index.html`, `app.js`, `styles.css`, `components/*`, `lib/*`). **T9.1:** `index.html` title/header **HighAsCG**; `api-client` / `ws-client` already use relative `/api/...` and `getApiBase()` for optional `/instance/ID`. **T9.3–T9.4:** same-origin fetch + WebSocket `…/api/ws` (matches [`ws-server.js`](src/server/ws-server.js)). **T9.5:** [`templates/multiview_overlay.html`](templates/multiview_overlay.html) + [`templates/black.html`](templates/black.html) from companion `src/templates/`. **`styles.css`** ~2452 lines (WO copy as-is).
+- **Phase 9 (bulk):** Copied companion [`src/web/`](../companion-module-casparcg-server/src/web/) → [`web/`](web/) (30 files: `index.html`, `app.js`, `styles.css`, `components/*`, `lib/*`). **T9.1:** `index.html` title/header **HighAsCG**; `api-client` / `ws-client` already use relative `/api/...` and `getApiBase()` for optional `/instance/ID`. **T9.3–T9.4:** same-origin fetch + WebSocket `…/api/ws` (matches [`ws-server.js`](src/server/ws-server.js)). **T9.5:** [`template/multiview_overlay.html`](template/multiview_overlay.html) + [`template/black.html`](template/black.html) from companion `src/templates/`. **`styles.css`** ~2452 lines (WO copy as-is).
 
 **Status:**
 - **T9.1**, **T9.3**, **T9.4**, **T9.5** complete.
@@ -503,7 +503,7 @@ const base = '/api'  // Direct to standalone server
 
 ### 2026-04-04 — Agent
 **Work Done:**
-- **T7.2:** Expanded [`src/config/routing.js`](src/config/routing.js) from `getChannelMap` only to full companion [`routing.js`](../companion-module-casparcg-server/src/routing.js): `getRouteString`, `routeToLayer`, `setupInputsChannel`, `setupPreviewChannel`, `setupMultiview`, `setupAllRouting`. Template deploy uses repo [`templates/`](../templates/) via `path.join(__dirname, '..', '..', 'templates')`. Persisted multiview restore calls [`handleMultiviewApply`](src/api/routes-multiview.js) with **lazy** `require('../api/routes-multiview')` (same pattern as companion `api-routes`). ≤500 lines (`wc -l`).
+- **T7.2:** Expanded [`src/config/routing.js`](src/config/routing.js) from `getChannelMap` only to full companion [`routing.js`](../companion-module-casparcg-server/src/routing.js): `getRouteString`, `routeToLayer`, `setupInputsChannel`, `setupPreviewChannel`, `setupMultiview`, `setupAllRouting`. Template deploy uses repo [`template/`](../template/) via `path.join(__dirname, '..', '..', 'template')`. Persisted multiview restore calls [`handleMultiviewApply`](src/api/routes-multiview.js) with **lazy** `require('../api/routes-multiview')` (same pattern as companion `api-routes`). ≤500 lines (`wc -l`).
 
 **Status:**
 - **T7.2** complete.
@@ -611,7 +611,7 @@ const base = '/api'  // Direct to standalone server
 
 ### 2026-04-04 — Agent
 **Work Done:**
-- **T5.7:** [`src/api/routes-multiview.js`](src/api/routes-multiview.js) — Ported companion `handleMultiviewApply`: `POST /api/multiview/apply` (layout cells, `showOverlay`, INFO pre-check, route cells, PLAY + MIXER FILL, overlay HTML via CG or PLAY+CALL, 25s timeout → **504**, persist `multiviewLayout` + `ctx._multiviewLayout`). Template deploy from [`templates/multiview_overlay.html`](templates/multiview_overlay.html) when present. [`index.js`](index.js) restores `_multiviewLayout` from persistence on startup.
+- **T5.7:** [`src/api/routes-multiview.js`](src/api/routes-multiview.js) — Ported companion `handleMultiviewApply`: `POST /api/multiview/apply` (layout cells, `showOverlay`, INFO pre-check, route cells, PLAY + MIXER FILL, overlay HTML via CG or PLAY+CALL, 25s timeout → **504**, persist `multiviewLayout` + `ctx._multiviewLayout`). Template deploy from [`template/multiview_overlay.html`](template/multiview_overlay.html) when present. [`index.js`](index.js) restores `_multiviewLayout` from persistence on startup.
 
 **Status:**
 - **T5.7** complete.

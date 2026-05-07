@@ -1,6 +1,7 @@
 /**
  * Port Bands Rendering for Device View.
  */
+import { appendCableAffordance } from './device-view-cable-affordance.js'
 import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
 import { setStatus } from './device-view-ui-utils.js'
 import * as Actions from './device-view-actions.js'
@@ -12,6 +13,7 @@ import { renderMappingsBand } from './device-view-mappings-render.js'
  */
 function addPortNodeDot(portEl, connectorId, onPortStartCable, key, data, dotSide = 'right') {
 	if (!portEl || !connectorId) return
+	appendCableAffordance(portEl, { connectorId, portKey: key, data, onPortStartCable })
 	const dot = document.createElement('span')
 	dot.className = 'device-view__connector-dot' + (dotSide === 'left' ? ' device-view__connector-dot--left' : '')
 	dot.title = 'Start or complete cable at this connector'
@@ -318,7 +320,7 @@ export function appendSegment(parent, title) {
 	return body
 }
 
-export function renderBands(bands, ctx, { currentSettings, statusEl, load }) {
+export function renderBands(bands, ctx, { currentSettings, statusEl, load, setCasparRestartDirty }) {
 	bands.innerHTML = ''; const live = ctx.live; if (!live) return
 	const internalCtx = {
 		...ctx,
@@ -383,16 +385,31 @@ export function renderBands(bands, ctx, { currentSettings, statusEl, load }) {
 		onAddMappingNode: async () => {
 			try {
 				await Actions.addMappingNode()
+				setCasparRestartDirty?.(true)
 				setStatus(statusEl, 'Added pixel mapping node', true)
 				await load()
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
+		mappingPersist: async (work) => {
+			try {
+				const r = await work()
+				if (!r?.ok) {
+					setStatus(statusEl, r?.error || 'Mapping save failed', false)
+					return
+				}
+				setCasparRestartDirty?.(true)
+				setStatus(statusEl, 'Mapping updated', true)
+				await load()
+			} catch (e) {
+				setStatus(statusEl, e?.message || String(e), false)
+			}
+		},
 		onApplyGpuSettings: async () => {
 			try {
-				setStatus(statusEl, 'Applying GPU/OS settings...', true)
+				setStatus(statusEl, 'Applying GPU layout...', true)
 				const res = await Actions.applyOsSettings()
 				if (res?.ok) {
-					setStatus(statusEl, res.dmRestarted ? 'Applied settings and restarted display manager' : 'Applied settings (display manager restart skipped)', true)
+					setStatus(statusEl, 'Applied xrandr layout and persisted reboot script', true)
 				} else {
 					throw new Error(res?.error || 'Apply failed')
 				}
@@ -406,4 +423,5 @@ export function renderBands(bands, ctx, { currentSettings, statusEl, load }) {
 	const eq = appendSegment(bands, 'Rear panel connectors')
 	eq.parentElement?.classList.add('device-view__segment--rear-only')
 	eq.append(renderCasparBand(internalCtx))
+	// We only need the graphical rear panel, not the additional list views.
 }

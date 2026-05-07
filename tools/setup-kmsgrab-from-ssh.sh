@@ -112,7 +112,7 @@ else
 	echo "  Recommended for Caspar + HighAsCG live preview:"
 	echo "    In highascg.config.json set:"
 	echo "      \"captureMode\": \"srt\""
-	echo "    and caspar.host to 127.0.0.1 so go2rtc pulls SRT from Caspar (no screen grab)."
+	echo "    and caspar.host to 127.0.0.1 so streaming uses SRT from Caspar (no screen grab)."
 	echo ""
 	echo "  Alternative: \"localCaptureDevice\": \"x11grab\" with DISPLAY=:0 if a local X session draws the desktop"
 	echo "    (systemd may need XAUTHORITY — more fragile than SRT)."
@@ -125,7 +125,7 @@ if [[ "$BEST_RC" -eq 0 ]]; then
 	echo "     \"localCaptureDevice\": \"kmsgrab\","
 	echo "     \"drmDevice\": \"$DRM_DEV\""
 	echo "2) sudo systemctl restart highascg"
-	echo "3) Check /opt/highascg/go2rtc.yaml uses -device $DRM_DEV"
+	echo "3) Check the saved streaming.drmDevice in config matches $DRM_DEV"
 else
 	echo "Skip kmsgrab; switch streaming.captureMode to \"srt\" (or fix GPU/planes), then:"
 	echo "  sudo systemctl restart highascg"

@@ -74,31 +74,32 @@ async function handleSceneTake(body, ctx) {
 		}
 	}
 
-	let currentScene = null
-	if (b.useServerLive === false && Object.prototype.hasOwnProperty.call(b, 'currentScene')) {
-		currentScene = b.currentScene
-	} else {
-		const stored = liveSceneState.getChannel(channel)
-		currentScene = stored?.scene || null
-	}
+	const useClientCurrentScene = b.useServerLive === false && Object.prototype.hasOwnProperty.call(b, 'currentScene')
+	const requestedCurrentScene = useClientCurrentScene ? b.currentScene : null
 
 	const inc = b.incomingScene
 	const routeMap = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
 	const takeOpts = {
 		channel,
-		currentScene,
+		currentScene: null,
 		incomingScene: inc,
 		framerate: b.framerate,
 		forceCut: !!b.forceCut,
 	}
 	const runTake = async () => {
+		// Resolve currentScene at execution time (inside queue) to avoid stale-state races
+		// when multiple rapid take requests are enqueued for the same channel.
+		const currentScene = useClientCurrentScene
+			? requestedCurrentScene
+			: (liveSceneState.getChannel(channel)?.scene || null)
 		const mainIdx = Array.isArray(routeMap.programChannels) ? routeMap.programChannels.indexOf(channel) : -1
 		const bus1 = mainIdx >= 0 ? (routeMap.switcherBus1Channels?.[mainIdx] ?? routeMap.previewChannels?.[mainIdx] ?? null) : null
 		const bus2 = null
 		if (typeof ctx.log === 'function') {
+			const sceneName = String(inc?.name || '').trim()
 			ctx.log(
 				'info',
-				`[scene-take] scene=${String(inc?.id || 'n/a')} scope=${String(inc?.mainScope || 'n/a')} ch=${channel} main=${mainIdx >= 0 ? mainIdx + 1 : 'n/a'} bus1=${bus1 ?? 'n/a'} bus2=${bus2 ?? 'n/a'} forceCut=${!!b.forceCut}`,
+				`[scene-take] scene=${String(inc?.id || 'n/a')}${sceneName ? ` (${sceneName})` : ''} scope=${String(inc?.mainScope || 'n/a')} ch=${channel} main=${mainIdx >= 0 ? mainIdx + 1 : 'n/a'} bus1=${bus1 ?? 'n/a'} bus2=${bus2 ?? 'n/a'} forceCut=${!!b.forceCut}`,
 			)
 		}
 		// PGM-only screens are intentionally single-channel (resource-saving mode): no bus switch path.
@@ -113,7 +114,7 @@ async function handleSceneTake(body, ctx) {
 			// Re-taking the same look should be a no-op to avoid route flicker and extra AMCP churn.
 			if (!b.forceCut && sameSceneId(currentScene, inc)) {
 				if (typeof ctx.log === 'function') {
-					ctx.log('info', `[scene-take] no-op: scene ${String(inc?.id || 'n/a')} already on pgm ch=${channel}`)
+					ctx.log('info', `[scene-take] no-op: scene ${String(inc?.id || 'n/a')}${inc?.name ? ` (${String(inc.name)})` : ''} already on pgm ch=${channel}`)
 				}
 				liveSceneState.broadcastSceneLive(ctx)
 				return

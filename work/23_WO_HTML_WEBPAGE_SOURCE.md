@@ -24,7 +24,7 @@ Document and maintain clarity on **where the HighAsCG browser UI lives**, how it
 | Shared libs | `web/lib/*.js` | API client, WebSocket, state stores |
 | Static assets | `web/assets/*`, `web/fonts/` | SVG, fonts |
 | Alternate entry | `web/setup.html` | If present — same static root |
-| Caspar templates | Repo `templates/` (not under `web/`) | Served as `/templates/...` via `templatesDir` |
+| Caspar templates | Repo `template/` (not under `web/`) | Served as `/template/...` via `templateDir` |
 
 **Server implementation:** `src/server/http-server.js` — `serveWebApp()`, `mapInstanceStaticPath()`, MIME map, binary extensions, SPA fallback to `index.html` on unknown routes under `web/`.
 
@@ -84,7 +84,7 @@ Browser request
 
 **Work Done:**
 
-- Created this work order with inventory of `web/`, explanation of `http-server.js` static resolution and `/instance/<id>/` stripping, SPA fallback behavior, and separation of `templates/` vs `web/`.
+- Created this work order with inventory of `web/`, explanation of `http-server.js` static resolution and `/instance/<id>/` stripping, SPA fallback behavior, and separation of `template/` vs `web/`.
 - Confirmed `package.json` has no frontend build step; UI is edited as plain HTML/CSS/JS modules.
 
 **Status:** Core documentation tasks **T23.1**, **T23.2**, **T23.4** marked done (smoke script exists and covers instance paths per README). **T23.3**, **T23.5**, **T23.F*** remain optional.

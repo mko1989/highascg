@@ -45,6 +45,19 @@ export async function applyCasparConfig() {
 	return await api.post('/api/caspar-config/apply', {})
 }
 
+export async function getCasparConfigOverride() {
+	return await api.get('/api/caspar-config/override')
+}
+
+export async function saveCasparConfigOverride(override) {
+	return await api.post('/api/caspar-config/override', { override })
+}
+
+export async function getGeneratedCasparConfig(effective = false) {
+	const q = effective ? '?effective=1' : ''
+	return await api.get('/api/caspar-config/generate' + q, { type: 'text' })
+}
+
 export async function applyDeviceViewPlan(opts = {}) {
 	return await api.post('/api/device-view', { applyPlan: opts })
 }

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>PIP Router</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%; height: 100%;
+			overflow: visible;
+			background: transparent !important;
+		}
+		#root {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			overflow: visible;
+		}
+		#pip-frame {
+			position: absolute;
+			left: calc(var(--il, 0) * 100%);
+			top: calc(var(--it, 0) * 100%);
+			width: calc(var(--iw, 1) * 100%);
+			height: calc(var(--ih, 1) * 100%);
+			border-radius: var(--r, 0);
+			pointer-events: none;
+			overflow: visible;
+		}
+		.effect-layer {
+			position: absolute;
+			inset: 0;
+			border-radius: inherit;
+			pointer-events: none;
+		}
+		
+		.effect-layer.side-inside {
+			box-sizing: border-box;
+			border: var(--bw) solid var(--bc);
+			margin: 0;
+		}
+		
+		.effect-layer.side-outside {
+			box-sizing: content-box;
+			border: var(--bw) solid var(--bc);
+			margin: calc(var(--bw) * -1);
+		}
+
+		.glow-layer {
+			box-shadow: var(--gside, ) 0 0 var(--gi) var(--gw) var(--gc);
+		}
+		@keyframes glow-pulse {
+			0% { opacity: var(--gmin, 0.4); }
+			100% { opacity: 1; }
+		}
+		.glow-pulse {
+			animation: glow-pulse var(--gps, 2s) ease-in-out infinite alternate;
+		}
+	</style>
+</head>
+<body>
+<div id="root">
+	<div id="pip-frame"></div>
+</div>
+<script>
+(function () {
+	var frame = document.getElementById('pip-frame')
+	var state = { inner: { l: 0, t: 0, w: 1, h: 1 }, radius: 0, effects: [] }
+
+	function apply() {
+		var inn = state.inner || { l: 0, t: 0, w: 1, h: 1 }
+		frame.style.setProperty('--il', String(inn.l))
+		frame.style.setProperty('--it', String(inn.t))
+		frame.style.setProperty('--iw', String(inn.w))
+		frame.style.setProperty('--ih', String(inn.h))
+		frame.style.setProperty('--r', state.radius + 'px')
+
+		frame.innerHTML = ''
+		if (!state.effects || !state.effects.length) return
+
+		state.effects.forEach(function(eff) {
+			var el = document.createElement('div')
+			var p = eff.params || {}
+			el.className = 'effect-layer'
+			
+			if (eff.type === 'border') {
+				el.classList.add('side-' + (p.side || 'outside'))
+				el.style.setProperty('--bw', (p.width || 4) + 'px')
+				el.style.setProperty('--bc', p.color || '#e63946')
+			}
+			
+			if (eff.type === 'glow') {
+				el.classList.add('glow-layer')
+				el.style.setProperty('--gi', (p.intensity || 15) + 'px')
+				el.style.setProperty('--gw', (p.width || 0) + 'px')
+				el.style.setProperty('--gc', p.color || '#e63946')
+				el.style.setProperty('--gside', p.side === 'inside' ? 'inset' : '')
+				if (p.pulse) {
+					el.classList.add('glow-pulse')
+					el.style.setProperty('--gps', (p.pulseSpeed || 2) + 's')
+					el.style.setProperty('--gmin', p.minOpacity || 0.4)
+				}
+			}
+
+			if (eff.type === 'shadow') {
+				var side = p.side === 'inside' ? 'inset ' : ''
+				el.style.boxShadow = side + (p.offsetX || 5) + 'px ' + (p.offsetY || 5) + 'px ' + (p.blur || 20) + 'px ' + (p.spread || 0) + 'px ' + (p.color || 'rgba(0,0,0,0.6)')
+			}
+			
+			frame.appendChild(el)
+		})
+	}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (d) {
+				if (d.inner) state.inner = d.inner
+				if (d.radius != null) state.radius = parseFloat(d.radius)
+				if (d.effects) state.effects = d.effects
+				if (d.type && !d.effects) state.effects = [{ type: d.type, params: d }]
+				apply()
+			}
+		} catch (e) { console.warn('pip_router update:', e) }
+	}
+
+	apply()
+})()
+</script>
+</body>
+</html>

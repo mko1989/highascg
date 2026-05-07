@@ -27,6 +27,128 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	const titleEl = headerEl.querySelector('.header__title')
 	if (!titleEl) return
 
+	const brandLogo = titleEl.querySelector('.header__logo')
+	const highascgLogoSrc = 'assets/logo.svg'
+	const pixelhueLogoSrc = 'assets/pixelhue-logo.svg'
+	let inPixelweb = false
+
+	function setLogoHoverState(hovered) {
+		if (!brandLogo) return
+		if (inPixelweb) brandLogo.src = hovered ? highascgLogoSrc : pixelhueLogoSrc
+		else brandLogo.src = hovered ? pixelhueLogoSrc : highascgLogoSrc
+	}
+
+	function showPixelwebModal(defaultHost = '', defaultUnicoPort = 19998, defaultSecure = true) {
+		return new Promise((resolve) => {
+			const overlay = document.createElement('div')
+			overlay.className = 'pixelweb-modal-backdrop'
+			overlay.innerHTML = `
+				<div class="pixelweb-modal" role="dialog" aria-modal="true" aria-label="Connect PixelHue">
+					<h3>Open PixelFlow</h3>
+					<label class="pixelweb-modal__label" for="pixelweb-host-input">PixelHue IP / Host</label>
+					<input id="pixelweb-host-input" class="pixelweb-modal__input" type="text" placeholder="192.168.1.50" value="${String(defaultHost || '').replace(/"/g, '&quot;')}">
+					<label class="pixelweb-modal__label" for="pixelweb-port-input">Unico Port</label>
+					<input id="pixelweb-port-input" class="pixelweb-modal__input" type="number" min="1" max="65535" value="${Number.isFinite(Number(defaultUnicoPort)) ? Number(defaultUnicoPort) : 19998}">
+					<label class="pixelweb-modal__label"><input id="pixelweb-secure-input" type="checkbox" ${defaultSecure ? 'checked' : ''}> Use TLS (HTTPS/WSS)</label>
+					<div class="pixelweb-modal__actions">
+						<button type="button" class="header-btn" data-role="cancel">Cancel</button>
+						<button type="button" class="header-btn" data-role="open">Open PixelFlow</button>
+					</div>
+				</div>
+			`
+			const cleanup = () => overlay.remove()
+			const input = overlay.querySelector('#pixelweb-host-input')
+			const portInput = overlay.querySelector('#pixelweb-port-input')
+			const secureInput = overlay.querySelector('#pixelweb-secure-input')
+			const submitOpen = () => {
+				const host = String(input?.value || '').trim()
+				const parsedPort = Number.parseInt(String(portInput?.value || ''), 10)
+				const unicoPort = Number.isFinite(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 19998
+				const secure = !!secureInput?.checked
+				if (!host) {
+					input?.focus()
+					return
+				}
+				cleanup()
+				resolve({ host, unicoPort, secure })
+			}
+			overlay.querySelector('[data-role="cancel"]')?.addEventListener('click', () => {
+				cleanup()
+				resolve(null)
+			})
+			overlay.querySelector('[data-role="open"]')?.addEventListener('click', (e) => {
+				e.preventDefault()
+				e.stopPropagation()
+				submitOpen()
+			})
+			input?.addEventListener('keydown', (e) => {
+				if (e.key !== 'Enter') return
+				e.preventDefault()
+				e.stopPropagation()
+				submitOpen()
+			})
+			overlay.addEventListener('click', (e) => {
+				if (e.target === overlay) {
+					cleanup()
+					resolve(null)
+				}
+			})
+			document.body.appendChild(overlay)
+			input?.focus()
+			input?.select()
+		})
+	}
+
+	async function probePixelwebProxy() {
+		try {
+			const res = await fetch('/unico/v1/ucenter/device-list', { credentials: 'same-origin' })
+			return res.ok
+		} catch {
+			return false
+		}
+	}
+
+	async function ensurePixelwebConnected() {
+		let status = null
+		try {
+			status = await api.get('/api/pixelweb/status')
+		} catch {
+			status = null
+		}
+		if (status?.connected) return { connected: true, status }
+
+		const defaults = {
+			host: String(status?.host || '').trim(),
+			unicoPort: Number.isFinite(Number(status?.unicoPort)) ? Number(status.unicoPort) : 19998,
+			secure: status?.secure !== false,
+		}
+		const conf = await showPixelwebModal(defaults.host, defaults.unicoPort, defaults.secure)
+		if (!conf) return { connected: false, cancelled: true, status }
+		await api.post('/api/pixelweb/config', conf)
+		status = await api.get('/api/pixelweb/status')
+		return { connected: !!status?.connected, status }
+	}
+
+	async function openPixelwebFlow() {
+		const conn = await ensurePixelwebConnected()
+		const targetPath = conn.connected ? '/pixelweb/' : '/pixelweb/control'
+		window.open(targetPath, '_blank', 'noopener,noreferrer')
+	}
+
+	titleEl.style.cursor = 'pointer'
+	titleEl.title = 'Open PixelFlow / return to HighAsCG'
+	titleEl.addEventListener('mouseenter', () => setLogoHoverState(true))
+	titleEl.addEventListener('mouseleave', () => setLogoHoverState(false))
+	titleEl.addEventListener('click', () => {
+		void (async () => {
+			try {
+				await openPixelwebFlow()
+			} catch (e) {
+				alert(`Pixel Web: ${e?.message || e}`)
+			}
+		})()
+	})
+
 	// Project name (editable)
 	const nameWrap = document.createElement('div')
 	nameWrap.className = 'header-project'
@@ -375,8 +497,11 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 			const programChannelsRaw = Array.isArray(st?.channelMap?.programChannels) ? st.channelMap.programChannels : [1]
 			const programChannels = [...new Set(programChannelsRaw.map((x) => parseInt(String(x), 10)).filter((n) => Number.isFinite(n) && n > 0))]
 			const mvCh = parseInt(String(st?.channelMap?.multiviewCh ?? ''), 10)
-			const channelsToApply = [...programChannels]
-			if (Number.isFinite(mvCh) && mvCh > 0) channelsToApply.push(mvCh)
+			const gridExtra = Object.entries(s.gridByChannel || {})
+				.filter(([, v]) => v === true)
+				.map(([k]) => parseInt(k, 10))
+				.filter((n) => Number.isFinite(n) && n > 0)
+			const channelsToApply = [...programChannels, ...(Number.isFinite(mvCh) && mvCh > 0 ? [mvCh] : []), ...gridExtra]
 			const uniqueChannels = [...new Set(channelsToApply)]
 			for (const channel of (uniqueChannels.length ? uniqueChannels : [1])) {
 				const row = st?.configComparison?.serverChannels?.find((x) => x.index === channel)

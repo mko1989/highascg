@@ -3,7 +3,7 @@
  */
 
 import { dashboardState } from '../lib/dashboard-state.js'
-import { getApiBase } from '../lib/api-client.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 
 export const CELL_WIDTH = 120
 export const CELL_ASPECT = 16 / 9
@@ -41,8 +41,8 @@ export function createDashboardCell({ colIdx, layerIdx, mainHost, render, cuePre
 
 	if (src?.value) {
 		cell.classList.add('has-source')
-		const thumbUrl = (src.type === 'media' && typeof getApiBase === 'function')
-			? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}`
+		const thumbUrl = src.type === 'media'
+			? getThumbnailUrl(src.value, 320, 2)
 			: ''
 		cell.innerHTML = `
 			<div class="dashboard-cell__preview" style="aspect-ratio: ${CELL_ASPECT};">

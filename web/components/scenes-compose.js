@@ -5,7 +5,8 @@
 
 import { fillToPixelRect, pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
-import { api, getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { isMediaOrFileSource } from './scenes-shared.js'
 
 /**
@@ -85,7 +86,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 			document.removeEventListener('pointerup', onUp)
 			setTimeout(() => {
 				sceneState.isInteracting = false
-				sceneState.emit('change')
+				if (typeof sceneState._emit === 'function') sceneState._emit('change')
 			}, 10)
 		}
 		document.addEventListener('pointermove', onMove)
@@ -256,6 +257,7 @@ export function renderComposeScene(scene, opts) {
 		startRotate,
 		startScale,
 		startEdgeResize,
+		onSourceDropped,
 	} = opts
 
 	const res = getResolution()
@@ -305,6 +307,9 @@ export function renderComposeScene(scene, opts) {
 		const layer = updated?.layers?.[idx]
 		if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: idx, layer })
 		schedulePreviewPush()
+		if (typeof onSourceDropped === 'function') {
+			try { await onSourceDropped(data) } catch {}
+		}
 	}
 
 	pad.addEventListener('dragover', (e) => {
@@ -387,14 +392,9 @@ export function renderComposeScene(scene, opts) {
 			const img = document.createElement('img')
 			img.className = 'scenes-layer__thumb'
 			img.alt = ''
-			img.src = `${getApiBase()}/api/thumbnail/${encodeURIComponent(layer.source.value)}?w=${SCENE_THUMB_MAX_W}`
+			img.src = getThumbnailUrl(layer.source.value, SCENE_THUMB_MAX_W, 0)
 			img.draggable = false
 			inner.appendChild(img)
-		} else if (layer.source?.value) {
-			const ph = document.createElement('div')
-			ph.className = 'scenes-layer__placeholder'
-			ph.textContent = (layer.source.label || layer.source.value || '').slice(0, 20)
-			inner.appendChild(ph)
 		} else {
 			const ph = document.createElement('div')
 			ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--empty'
@@ -492,6 +492,9 @@ export function renderComposeScene(scene, opts) {
 					const layer = updated?.layers?.[realIdx]
 					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
 					schedulePreviewPush()
+					if (first && typeof onSourceDropped === 'function') {
+						try { await onSourceDropped(first) } catch {}
+					}
 				})()
 			} else if (data?.value) {
 				sceneState.setLayerSource(scene.id, realIdx, {
@@ -505,6 +508,9 @@ export function renderComposeScene(scene, opts) {
 					const layer = updated?.layers?.[realIdx]
 					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
 					schedulePreviewPush()
+					if (typeof onSourceDropped === 'function') {
+						void onSourceDropped(data).catch(() => {})
+					}
 				})
 			}
 		})

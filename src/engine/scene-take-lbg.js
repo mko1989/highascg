@@ -15,7 +15,9 @@
 'use strict'
 
 const playbackTracker = require('../state/playback-tracker')
-const { param, deferMixerAmcpLine } = require('../caspar/amcp-utils')
+const { param, deferMixerAmcpLine, amcpVerboseTrace } = require('../caspar/amcp-utils')
+const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
+const { describeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
 const { mixerEffectNeutralLines } = require('./timeline-playback-helpers')
@@ -100,6 +102,19 @@ function shouldApplyStraightAlphaKeyer(clip, straightAlpha) {
 	return STRAIGHT_ALPHA_STILL_EXT.has(ext)
 }
 
+function logPlannedCommand(self, phase, sceneLayer, plan) {
+	if (!amcpVerboseTrace() || typeof self?.log !== 'function' || !plan) return
+	const d = describeClipCommandPlan(plan)
+	self.log(
+		'debug',
+		`AMCP plan ${phase} sceneLayer=${sceneLayer} ch=${d.channel} layer=${d.layer} cmd=${d.commandName}` +
+			(d.clip ? ` clip=${d.clip}` : '') +
+			(d.transition ? ` transition=${d.transition} duration=${d.duration || 0} tween=${d.tween || 'linear'}` : '') +
+			(d.seek != null ? ` seek=${d.seek}` : '') +
+			(d.length != null ? ` length=${d.length}` : '')
+	)
+}
+
 /**
  * @param {object} amcp
  * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean }} opts
@@ -156,15 +171,6 @@ async function runSceneTakeLbg(amcp, opts) {
 		const prev = currentMap.get(updatedIncoming.layerNumber)
 		if (layerHasContent(prev)) exitCandidates.push(prev)
 	}
-	const seenExitLayerNums = new Set()
-	const exitMedia = exitCandidates.filter((l) => {
-		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline') return false
-		const ln = Number(l.layerNumber)
-		if (!Number.isFinite(ln)) return true
-		if (seenExitLayerNums.has(ln)) return false
-		seenExitLayerNums.add(ln)
-		return true
-	})
 
 	// Stop timelines that are exiting (present in current look but not in incoming)
 	if (self.timelineEngine) {
@@ -180,10 +186,13 @@ async function runSceneTakeLbg(amcp, opts) {
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
 	const fadeTw = globalT.tween
 	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
+	// Consistent look-to-look behavior: if there is an existing look on this channel and transition duration > 0,
+	// use bank crossfade path regardless of whether diff classified a source as "update".
+	const shouldRunBankCrossfade = fadeDur > 0 && currentMap.size > 0
 	/** When exit opacity fade starts (for teardown timing vs incoming load). */
 	let fadeClockStart = /** @type {number | null} */ (null)
 
-	/** @type {Array<{ layer: object, pLayer: number, clip: string, f: object, mixerLines: string[], loadOpts: object, playOpts: object, pipOverlays: object[] }>} */
+	/** @type {Array<{ layer: object, pLayer: number, clip: string, f: object, mixerLines: string[], targetOpacity: number, loadOpts: object, loadPlan: object|null, playPlan: object|null, pipOverlays: object[] }>} */
 	const takeJobs = []
 
 	for (const layer of incomingSorted) {
@@ -202,6 +211,9 @@ async function runSceneTakeLbg(amcp, opts) {
 
 		const cur = currentMap.get(layer.layerNumber)
 		if (layerVisuallyEqual(cur, layer)) continue
+		if (layerHasContent(cur) && String(cur?.source?.type || '') !== 'timeline') {
+			exitCandidates.push(cur)
+		}
 
 		const pLayer = phys(Number(layer.layerNumber), inactiveBank)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
@@ -213,7 +225,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
 			loadOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
 		}
-		if (!forceCut && globalT.duration > 0 && globalT.type && String(globalT.type).toUpperCase() !== 'CUT') {
+		if (!shouldRunBankCrossfade && !forceCut && globalT.duration > 0 && globalT.type && String(globalT.type).toUpperCase() !== 'CUT') {
 			loadOpts.transition = globalT.type
 			loadOpts.duration = globalT.duration
 			loadOpts.tween = globalT.tween
@@ -231,6 +243,14 @@ async function runSceneTakeLbg(amcp, opts) {
 		}
 		if (layer.opacity != null && layer.opacity !== 1) {
 			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity} 0`)
+		}
+		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
+		const pOutSame = phys(Number(layer.layerNumber), activeBank)
+		// Caspar layer z-order: higher layer number is on top.
+		// If incoming is below outgoing, incoming opacity tween is invisible; we must tween outgoing instead.
+		const incomingStartsHidden = shouldRunBankCrossfade && !(pOutSame > pLayer)
+		if (incomingStartsHidden) {
+			mixerLines.push(`MIXER ${cl} OPACITY 0 0`)
 		}
 		if (keyer === 1) {
 			mixerLines.push(`MIXER ${cl} KEYER 1`)
@@ -250,11 +270,37 @@ async function runSceneTakeLbg(amcp, opts) {
 			mixerLines[i] = deferMixerAmcpLine(mixerLines[i])
 		}
 
-		const playOpts = {}
-		if (af) playOpts.audioFilter = af
-		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
-			playOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
-		}
+		// Seek belongs on LOADBG only. PLAY without a clip only swaps FG/BG — Caspar 2.6 rejects PLAY … SEEK 0 in that form with “File not found” / 404 PLAY FAILED.
+		const loadPlans = diffCasparLayerPlan(
+			{ channel, layer: pLayer, nextUp: null, playing: false },
+			{
+				channel,
+				layer: pLayer,
+				nextUp: {
+					clip,
+					loop: !!loadOpts.loop,
+					seek: loadOpts.seek,
+					length: loadOpts.length,
+					filter: loadOpts.filter,
+					audioFilter: loadOpts.audioFilter,
+					transition: loadOpts.transition
+						? {
+							type: loadOpts.transition,
+							durationFrames: loadOpts.duration,
+							tween: loadOpts.tween,
+							direction: loadOpts.direction,
+						}
+						: null,
+				},
+				playing: false,
+			},
+			{ fps: framerate }
+		)
+		const playPlans = diffCasparLayerPlan(
+			{ channel, layer: pLayer, nextUp: { clip }, playing: false },
+			{ channel, layer: pLayer, nextUp: { clip }, playing: true },
+			{ fps: framerate }
+		)
 
 		takeJobs.push({
 			layer,
@@ -262,16 +308,29 @@ async function runSceneTakeLbg(amcp, opts) {
 			clip,
 			f,
 			mixerLines,
+			targetOpacity,
+			incomingStartsHidden,
 			loadOpts,
-			playOpts,
+			loadPlan: loadPlans.find((p) => p.commandName === 'LOADBG') || null,
+			playPlan: playPlans.find((p) => p.commandName === 'PLAY') || null,
 			pipOverlays: pipOverlaysFromLayer(layer),
 		})
 	}
 
+	const seenExitLayerNums = new Set()
+	const exitMedia = exitCandidates.filter((l) => {
+		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline') return false
+		const ln = Number(l.layerNumber)
+		if (!Number.isFinite(ln)) return true
+		if (seenExitLayerNums.has(ln)) return false
+		seenExitLayerNums.add(ln)
+		return true
+	})
+
 	const currentSceneLayers = opts.currentScene?.layers
 
 	// --- Exit fade first so outgoing layers start dimming while incoming LOADBG/PLAY runs (smooth crossfade). ---
-	if (exitMedia.length > 0 && fadeDur > 0) {
+	if (exitMedia.length > 0 && fadeDur > 0 && !shouldRunBankCrossfade) {
 		const fadeLines = []
 		for (const layer of exitMedia) {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
@@ -304,7 +363,10 @@ async function runSceneTakeLbg(amcp, opts) {
 	if (takeJobs.length > 0) {
 		for (const job of takeJobs) {
 			await amcp.mixerClear(channel, job.pLayer).catch(() => {})
-			await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
+			if (job.loadPlan) {
+				logPlannedCommand(self, 'load', job.layer.layerNumber, job.loadPlan)
+				await amcp.loadbg(job.loadPlan.channel, job.loadPlan.layer, job.loadPlan.clip, job.loadPlan.opts)
+			}
 		}
 
 		const flatMixer = takeJobs.flatMap((j) => j.mixerLines)
@@ -347,17 +409,61 @@ async function runSceneTakeLbg(amcp, opts) {
 			} catch (_) {}
 		}
 
-		// Pre-buffer delay: allow CasparCG's background thread to decode the first frame before PLAY swaps it in
-		await new Promise((r) => setTimeout(r, 80))
+		// Pre-buffer delay: when crossfade path animates incoming opacity from 0->1,
+		// give decoder a bit more headroom to avoid mid-ramp "pop in" on some stills.
+		const needsIncomingFadePreroll = shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)
+		const prebufferMs = needsIncomingFadePreroll ? 180 : 80
+		await new Promise((r) => setTimeout(r, prebufferMs))
 
 		for (const job of takeJobs) {
-			await amcp.play(channel, job.pLayer, undefined, job.playOpts)
+			if (job.playPlan) {
+				logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
+				await amcp.play(job.playPlan.channel, job.playPlan.layer, job.playPlan.clip, job.playPlan.opts)
+			}
 		}
 
 		// One channel commit — deferred video + PIP mixers apply with the PLAY swap (no early PIP geometry pop).
 		try {
 			await amcp.mixerCommit(channel)
 		} catch (_) {}
+		if (shouldRunBankCrossfade) {
+			const crossfadeLines = []
+			const handledOut = new Set()
+			for (const job of takeJobs) {
+				const pOut = phys(Number(job.layer.layerNumber), activeBank)
+				const pIn = job.pLayer
+				// Paired outgoing layer is handled by the in/out decision for this logical layer.
+				handledOut.add(pOut)
+				if (job.incomingStartsHidden) {
+					// Incoming is on top: tween incoming up.
+					const clIn = `${channel}-${pIn}`
+					let p = `${job.targetOpacity} ${fadeDur}`
+					if (fadeTw) p += ` ${param(fadeTw)}`
+					crossfadeLines.push(`MIXER ${clIn} OPACITY ${p} DEFER`)
+				} else if (pOut > pIn) {
+					// Outgoing is on top: tween outgoing down to reveal incoming below.
+					const clOut = `${channel}-${pOut}`
+					let p = `0 ${fadeDur}`
+					if (fadeTw) p += ` ${param(fadeTw)}`
+					crossfadeLines.push(`MIXER ${clOut} OPACITY ${p} DEFER`)
+				}
+			}
+			for (const layer of exitMedia) {
+				const pOut = phys(Number(layer.layerNumber), activeBank)
+				if (handledOut.has(pOut)) continue
+				const clOut = `${channel}-${pOut}`
+				let p = `0 ${fadeDur}`
+				if (fadeTw) p += ` ${param(fadeTw)}`
+				crossfadeLines.push(`MIXER ${clOut} OPACITY ${p} DEFER`)
+			}
+			if (crossfadeLines.length > 0) {
+				try {
+					await amcp.batchSendChunked(crossfadeLines, { skipMixerPreCommit: true })
+					await amcp.mixerCommit(channel)
+					fadeClockStart = Date.now()
+				} catch (_) {}
+			}
+		}
 
 		for (const job of takeJobs) {
 			try {

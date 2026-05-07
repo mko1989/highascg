@@ -1,6 +1,6 @@
 /**
  * HTTP: tail HighAsCG in-memory log buffer + Caspar log file on disk.
- * Env: `CASPAR_LOG_PATH` overrides default. Otherwise: `/opt/casparcg/log/caspar_YYYY-MM-DD.log` (local date).
+ * Env: `CASPAR_LOG_PATH` overrides default. Otherwise: `/home/casparcg/highascg/log/caspar_YYYY-MM-DD.log` (local date).
  */
 
 'use strict'
@@ -50,7 +50,7 @@ function resolveCasparLogPath() {
 	const y = d.getFullYear()
 	const m = String(d.getMonth() + 1).padStart(2, '0')
 	const day = String(d.getDate()).padStart(2, '0')
-	return `/opt/casparcg/log/caspar_${y}-${m}-${day}.log`
+	return `/home/casparcg/highascg/log/caspar_${y}-${m}-${day}.log`
 }
 
 /**

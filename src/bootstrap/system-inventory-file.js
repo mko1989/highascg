@@ -2,7 +2,7 @@
 
 const fs = require('fs')
 const os = require('os')
-const { getDisplayDetails, getGpuConnectorInventory } = require('../utils/hardware-info')
+const { getDisplayDetails, getGpuConnectorInventory, getDisplaysXrandrDetailed } = require('../utils/hardware-info')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 
@@ -38,7 +38,7 @@ function resolveCasparLogPath() {
 	const y = d.getFullYear()
 	const m = String(d.getMonth() + 1).padStart(2, '0')
 	const day = String(d.getDate()).padStart(2, '0')
-	return `/opt/casparcg/log/caspar_${y}-${m}-${day}.log`
+	return `/home/casparcg/highascg/log/caspar_${y}-${m}-${day}.log`
 }
 
 /**
@@ -115,6 +115,7 @@ function collectDecklinkFromCasparLog() {
 }
 
 function buildPayload(config) {
+	const xrDetailed = getDisplaysXrandrDetailed()
 	const displays = getDisplayDetails() || []
 	const connectors = getGpuConnectorInventory() || []
 	const physicalMap = buildGpuPhysicalMap({ config: config || {}, displays, connectors })
@@ -131,6 +132,7 @@ function buildPayload(config) {
 			displays,
 			connectors,
 			physicalMap,
+			xrandrRawQuery: xrDetailed?.raw || '',
 		},
 		network: {
 			ipv4: collectNetwork(),

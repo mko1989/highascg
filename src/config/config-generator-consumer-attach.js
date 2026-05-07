@@ -19,6 +19,46 @@ const {
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
 
 /**
+ * One DeckLink consumer spanning a wide channel: primary device + optional synced `<ports>` (Caspar reference layout).
+ * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
+ */
+function buildDecklinkTiledConsumersXml(tiles) {
+	if (!Array.isArray(tiles) || tiles.length === 0) return ''
+	const subBlock = (t, indent) =>
+		`${indent}<subregion>\n${indent}    <src-x>${t.srcX}</src-x>\n${indent}    <src-y>${t.srcY}</src-y>\n${indent}    <dest-x>${t.destX}</dest-x>\n${indent}    <dest-y>${t.destY}</dest-y>\n${indent}    <width>${t.width}</width>\n${indent}    <height>${t.height}</height>\n${indent}</subregion>`
+	const primary = tiles[0]
+	const rest = tiles.slice(1)
+	let portsXml = ''
+	if (rest.length) {
+		portsXml =
+			'\n                <ports>' +
+			rest
+				.map(
+					(t) => `
+                    <port>
+                        <device>${t.device}</device>
+                        <key-only>false</key-only>
+                         <buffer-depth>3</buffer-depth>
+                         <video-mode>${escapeXml(t.videoMode)}</video-mode>
+${subBlock(t, '                        ')}
+                     </port>`
+ 				)
+ 				.join('') +
+ 			'\n                </ports>'
+ 	}
+ 	return `\n                <decklink>
+                     <device>${primary.device}</device>
+                     <embedded-audio>true</embedded-audio>
+                     <latency>normal</latency>
+                     <keyer>external</keyer>
+                     <key-only>false</key-only>
+                     <buffer-depth>3</buffer-depth>
+                     <video-mode>${escapeXml(primary.videoMode)}</video-mode>
+${subBlock(primary, '                    ')}${portsXml}
+                 </decklink>`
+ }
+
+/**
  * @param {Record<string, unknown>} config
  * @param {ReturnType<import('./routing').getChannelMap>} routeMap
  * @param {{ n: number, dims: any, cumulativeX: number, nextDevice: number }} ctx
@@ -53,13 +93,18 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const screenSystemAudioXml = buildProgramSystemAudioXml(config, n)
 	const portAudioXml = buildPortAudioConsumerXml(config, n)
 
-	let profConsumersXml = ''
+	const tilesRaw = config[`screen_${n}_decklink_tiles`]
+	const tiles = Array.isArray(tilesRaw) ? tilesRaw : []
 	const decklinkDevice = parseInt(String(config[`screen_${n}_decklink_device`] || '0'), 10)
 	const decklinkReplaceScreen =
 		(config[`screen_${n}_decklink_replace_screen`] === true || config[`screen_${n}_decklink_replace_screen`] === 'true') &&
-		!dims.isCustom &&
-		decklinkDevice > 0
-	if (decklinkDevice > 0) {
+		(decklinkDevice > 0 || tiles.length > 0) &&
+		(!dims.isCustom || tiles.length > 0)
+
+	let profConsumersXml = ''
+	if (tiles.length > 0) {
+		profConsumersXml += buildDecklinkTiledConsumersXml(tiles)
+	} else if (decklinkDevice > 0) {
 		profConsumersXml += `\n                <decklink>
                     <device>${decklinkDevice}</device>
                 </decklink>`
@@ -76,7 +121,8 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const pgmStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 1)
 	const pgmChNum = routeMap.programCh(n)
 	const rtmpPgmXml = buildRtmpFfmpegConsumersForChannel(config, pgmChNum)
-	const screenConsumerXml = decklinkReplaceScreen
+	const screenConsumerEnabled = config[`screen_${n}_screen_consumer`] !== false && config[`screen_${n}_screen_consumer`] !== 'false'
+	const screenConsumerXml = (decklinkReplaceScreen || !screenConsumerEnabled)
 		? ''
 		: `
                 <screen>
@@ -115,7 +161,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		pgmXml,
 		prvXml,
 		bus2Xml,
-		hasScreenConsumer: !decklinkReplaceScreen,
+		hasScreenConsumer: !decklinkReplaceScreen && screenConsumerEnabled,
 	}
 }
 

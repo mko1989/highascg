@@ -3,7 +3,7 @@
 const fs = require('fs')
 const { execSync, spawn } = require('child_process')
 const { param } = require('../caspar/amcp-utils')
-const { resolveCaptureTier } = require('../streaming/go2rtc-manager')
+const { resolveCaptureTier } = require('../streaming/stream-capture-tier')
 const {
 	buildFfmpegArgs,
 	casparUdpStreamUri,
@@ -15,7 +15,7 @@ const {
 
 /** Dedicated Caspar consumer slot — avoids clobbering `ADD 1 STREAM` (preview) on the same channel. */
 const DMX_FILE_CONSUMER_INDEX = 97
-/** Caspar MPEG-TS duplicate stream port offset (per channel: base + 50 + ch). Avoids go2rtc PGM/MV ports. */
+/** Caspar MPEG-TS duplicate stream port offset (per channel: base + 50 + ch). */
 const DMX_UDP_PORT_OFFSET = 50
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))

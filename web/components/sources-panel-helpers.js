@@ -1,4 +1,5 @@
 import { api, getApiBase } from '../lib/api-client.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 
 /** @param {string | null} cd */
 function parseContentDispositionFilename(cd) {
@@ -372,7 +373,7 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 
 			let thumbHtml = ''
 			if (kind === 'video' || kind === 'still') {
-				const thumbUrl = `${getApiBase()}/api/thumbnail/${encodeURIComponent(id)}?w=80&t=2`
+				const thumbUrl = getThumbnailUrl(id, 80, 2)
 				thumbHtml = `<div class="source-item__thumbnail"><img src="${thumbUrl}" loading="lazy" onerror="this.parentElement.innerHTML='<i>${kind === 'video' ? '🎬' : '🖼️'}</i>'"/></div>`
 			} else if (kind === 'audio') {
 				thumbHtml = `<div class="source-item__thumbnail"><i>🎵</i></div>`

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>PIP Border</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%; height: 100%;
+			overflow: visible;
+			background: transparent !important;
+		}
+		#root {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			overflow: visible;
+		}
+		#pip-frame {
+			position: absolute;
+			--il: 0; --it: 0; --iw: 1; --ih: 1;
+			left: calc(var(--il) * 100%);
+			top: calc(var(--it) * 100%);
+			width: calc(var(--iw) * 100%);
+			height: calc(var(--ih) * 100%);
+			border-radius: var(--r, 0);
+			opacity: var(--o, 1);
+			pointer-events: none;
+			border: var(--w) solid var(--c);
+		}
+		
+		#pip-frame.side-inside {
+			box-sizing: border-box;
+			margin: 0;
+		}
+		
+		#pip-frame.side-outside {
+			box-sizing: content-box;
+			margin: calc(var(--w) * -1);
+		}
+	</style>
+</head>
+<body>
+<div id="root">
+	<div id="pip-frame"></div>
+</div>
+<script>
+(function () {
+	var frame = document.getElementById('pip-frame')
+	var state = { inner: { l: 0, t: 0, w: 1, h: 1 }, width: 4, color: '#e63946', radius: 0, opacity: 1, side: 'outside' }
+
+	function apply() {
+		var inn = state.inner || { l: 0, t: 0, w: 1, h: 1 }
+		frame.style.setProperty('--il', String(inn.l))
+		frame.style.setProperty('--it', String(inn.t))
+		frame.style.setProperty('--iw', String(inn.w))
+		frame.style.setProperty('--ih', String(inn.h))
+		frame.style.setProperty('--w', state.width + 'px')
+		frame.style.setProperty('--c', state.color)
+		frame.style.setProperty('--r', state.radius + 'px')
+		frame.style.setProperty('--o', String(state.opacity))
+
+		frame.className = 'side-' + (state.side || 'outside')
+	}
+
+	window['update'] = function (raw) {
+		try {
+			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
+			if (d) {
+				for (var k in d) state[k] = d[k]
+				apply()
+			}
+		} catch (e) { console.warn('pip_border update:', e) }
+	}
+
+	apply()
+})()
+</script>
+</body>
+</html>

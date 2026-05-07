@@ -156,7 +156,7 @@ chmod 644 /etc/profile.d/highascg-console.sh
 SHOULD_DEPLOY_HIGHASCG=false
 if [ "$HIGHASCG_STATUS" = "missing" ]; then
     SHOULD_DEPLOY_HIGHASCG=true
-    echo -e "${CYAN}→ HighAsCG not installed under /opt/highascg — deploying...${NC}"
+    echo -e "${CYAN}→ HighAsCG not installed under /home/casparcg/highascg — deploying...${NC}"
 elif [ -n "$HIGHASCG_RECOMMENDED" ] && [ -n "$HIGHASCG_CURRENT" ] && [ "$HIGHASCG_CURRENT" != "?" ] && ! version_gte "$HIGHASCG_CURRENT" "$HIGHASCG_RECOMMENDED"; then
     SHOULD_DEPLOY_HIGHASCG=true
     echo -e "${RED}→ HighAsCG v$HIGHASCG_CURRENT is below recommended v$HIGHASCG_RECOMMENDED — upgrading...${NC}"
@@ -167,41 +167,41 @@ else
 fi
 
 if [ "$SHOULD_DEPLOY_HIGHASCG" = true ]; then
-    echo -e "${CYAN}→ Deploying HighAsCG to /opt/highascg...${NC}"
-    mkdir -p /opt/highascg
+    echo -e "${CYAN}→ Deploying HighAsCG to /home/casparcg/highascg...${NC}"
+    mkdir -p /home/casparcg/highascg
     if ! command -v rsync >/dev/null 2>&1; then
         apt install -y rsync
     fi
 
     if [ -f "$SCRIPT_DIR/package.json" ]; then
         echo "  Copying from local repo: $SCRIPT_DIR"
-        rsync -a --exclude='node_modules' --exclude='.git' --exclude='work' "$SCRIPT_DIR/" /opt/highascg/
+        rsync -a --exclude='node_modules' --exclude='.git' --exclude='work' "$SCRIPT_DIR/" /home/casparcg/highascg/
     else
         echo "  Cloning from GitHub: $HIGHASCG_GIT_URL"
-        rm -rf /opt/highascg/.git 2>/dev/null || true
-        if [ -d /opt/highascg ] && [ -n "$(ls -A /opt/highascg 2>/dev/null)" ]; then
-            echo "  Replacing existing /opt/highascg contents with fresh clone..."
-            find /opt/highascg -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+        rm -rf /home/casparcg/highascg/.git 2>/dev/null || true
+        if [ -d /home/casparcg/highascg ] && [ -n "$(ls -A /home/casparcg/highascg 2>/dev/null)" ]; then
+            echo "  Replacing existing /home/casparcg/highascg contents with fresh clone..."
+            find /home/casparcg/highascg -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
         fi
-        git clone --depth 1 "$HIGHASCG_GIT_URL" /opt/highascg
+        git clone --depth 1 "$HIGHASCG_GIT_URL" /home/casparcg/highascg
     fi
 
-    chown -R "$USER_CASPAR:$USER_CASPAR" /opt/highascg
-    chmod -R 775 /opt/highascg
+    chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg
+    chmod -R 775 /home/casparcg/highascg
 
-    cd /opt/highascg
+    cd /home/casparcg/highascg
     sudo -u "$USER_CASPAR" npm install --omit=dev
 
-    if [ ! -f /opt/highascg/highascg.config.json ] && [ -f /opt/highascg/highascg.config.example.json ]; then
-        cp /opt/highascg/highascg.config.example.json /opt/highascg/highascg.config.json
-        chown "$USER_CASPAR:$USER_CASPAR" /opt/highascg/highascg.config.json
+    if [ ! -f /home/casparcg/highascg/highascg.config.json ] && [ -f /home/casparcg/highascg/highascg.config.example.json ]; then
+        cp /home/casparcg/highascg/highascg.config.example.json /home/casparcg/highascg/highascg.config.json
+        chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/highascg.config.json
     fi
 else
-    echo -e "  ${YELLOW}○${NC} HighAsCG deploy skipped — leaving /opt/highascg unchanged."
+    echo -e "  ${YELLOW}○${NC} HighAsCG deploy skipped — leaving /home/casparcg/highascg unchanged."
 fi
 
 # systemd service (ensure unit exists whenever the app tree is present)
-if [ -f /opt/highascg/package.json ]; then
+if [ -f /home/casparcg/highascg/package.json ]; then
 # systemd service
 cat <<EOF > /etc/systemd/system/highascg.service
 [Unit]
@@ -213,8 +213,8 @@ Type=simple
 User=$USER_CASPAR
 Group=$USER_CASPAR
 UMask=002
-WorkingDirectory=/opt/highascg
-ExecStart=/usr/bin/node /opt/highascg/index.js
+WorkingDirectory=/home/casparcg/highascg
+ExecStart=/usr/bin/node /home/casparcg/highascg/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

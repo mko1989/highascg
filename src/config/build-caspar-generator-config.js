@@ -3,7 +3,7 @@
 const defaults = require('./defaults')
 const { mergeAudioRoutingIntoConfig } = require('./config-generator')
 const { normalizeRtmpConfig } = require('./rtmp-output')
-const { resolveMainScreenCount, getChannelMap } = require('./routing-map')
+const { resolveMainScreenCount } = require('./routing-map')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeTandemTopology } = require('./tandem-topology')
 
@@ -15,6 +15,19 @@ function getDestinationList(appConfig) {
 	const top = normalizeTandemTopology(appConfig && appConfig.tandemTopology)
 	const list = Array.isArray(top?.destinations) ? top.destinations : []
 	return list.filter((d) => d && typeof d === 'object')
+}
+
+function parseCustomVideoModeString(modeRaw) {
+	const s = String(modeRaw || '').trim().toLowerCase()
+	if (!s) return null
+	// 5120x1024, 5120x1024p50, 5120x1024@50
+	const m = s.match(/^(\d{2,5})x(\d{2,5})(?:p|@)?(\d+(?:\.\d+)?)?$/i)
+	if (!m) return null
+	const w = Math.max(64, parseInt(m[1], 10) || 0)
+	const h = Math.max(64, parseInt(m[2], 10) || 0)
+	const fps = Math.max(1, parseFloat(m[3] || '50') || 50)
+	if (!w || !h) return null
+	return { w, h, fps }
 }
 
 /**
@@ -59,6 +72,14 @@ function applyDestinationOverridesToScreens(merged, appConfig) {
 			merged[`screen_${n}_mode`] = modeRaw
 			continue
 		}
+		const customFromMode = parseCustomVideoModeString(modeRaw)
+		if (customFromMode) {
+			merged[`screen_${n}_mode`] = 'custom'
+			merged[`screen_${n}_custom_width`] = customFromMode.w
+			merged[`screen_${n}_custom_height`] = customFromMode.h
+			merged[`screen_${n}_custom_fps`] = customFromMode.fps
+			continue
+		}
 		if (width > 0 && height > 0) {
 			merged[`screen_${n}_mode`] = 'custom'
 			merged[`screen_${n}_custom_width`] = width
@@ -74,6 +95,40 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 
 	const edges = Array.isArray(g.edges) ? g.edges : []
 	const destinations = Array.isArray(appConfig?.tandemTopology?.destinations) ? appConfig.tandemTopology.destinations : []
+	const byId = new Map(g.connectors.map((c) => [String(c?.id || ''), c]))
+	const outgoing = new Map()
+	for (const e of edges) {
+		const src = String(e?.sourceId || '')
+		if (!src) continue
+		if (!outgoing.has(src)) outgoing.set(src, [])
+		outgoing.get(src).push(String(e?.sinkId || ''))
+	}
+
+	function resolveDestinationSourceForConnector(sourceId) {
+		const seen = new Set()
+		const queue = [String(sourceId || '')]
+		while (queue.length) {
+			const cur = queue.shift()
+			if (!cur || seen.has(cur)) continue
+			seen.add(cur)
+			if (cur.startsWith('dst_in_') || cur.startsWith('dst_ch') || cur.startsWith('dst_mv') || cur.startsWith('caspar_pgm_') || cur === 'caspar_mv_out') return cur
+			const conn = byId.get(cur)
+			if (conn?.kind === 'destination_in') {
+				const did = String(conn.externalRef || '').trim()
+				if (did) return `dst_in_${did}`
+			}
+			// Pixel mapping passthrough: input of same node can feed all node outputs.
+			if (conn?.kind === 'pixel_map_out') {
+				const nodeId = String(conn.deviceId || '')
+				const nodeInputs = g.connectors.filter((c) => String(c?.deviceId || '') === nodeId && c?.kind === 'pixel_map_in')
+				for (const ni of nodeInputs) {
+					const inEdges = edges.filter((e) => String(e?.sinkId || '') === String(ni?.id || ''))
+					for (const ie of inEdges) queue.push(String(ie?.sourceId || ''))
+				}
+			}
+		}
+		return ''
+	}
 
 	g.connectors.forEach((c) => {
 		if (c.kind !== 'decklink_io') return
@@ -95,12 +150,21 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			return
 		}
 
-		const sourceId = String(incomingEdge.sourceId || '')
+		const sourceId = resolveDestinationSourceForConnector(String(incomingEdge.sourceId || ''))
 		
-		if (sourceId.startsWith('dst_in_')) {
+		if (sourceId.startsWith('dst_in_') || sourceId.startsWith('dst_ch')) {
 			// Cabled to a Destination feed
-			const destId = sourceId.slice('dst_in_'.length)
-			const dest = destinations.find((d) => String(d.id) === destId)
+			let dest = null
+			if (sourceId.startsWith('dst_in_')) {
+				const destId = sourceId.slice('dst_in_'.length)
+				dest = destinations.find((d) => String(d.id) === destId)
+			} else {
+				const n = parseInt(sourceId.slice('dst_ch'.length), 10)
+				if (Number.isFinite(n) && n >= 1) {
+					const idx = n - 1
+					dest = destinations.find((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0) === idx)
+				}
+			}
 			if (!dest) return
 			if (String(dest.mode || '') === 'multiview') {
 				merged.multiview_decklink_device = devNum
@@ -122,6 +186,69 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			merged.multiview_decklink_device = devNum
 		}
 	})
+}
+
+function applyScreenConsumerOverridesFromCabling(merged, appConfig) {
+	const g = appConfig?.deviceGraph
+	const destinations = Array.isArray(appConfig?.tandemTopology?.destinations) ? appConfig.tandemTopology.destinations : []
+	if (!g || !Array.isArray(g.connectors) || !Array.isArray(g.edges) || !destinations.length) return
+
+	const byId = new Map(g.connectors.map((c) => [String(c?.id || ''), c]))
+	const edges = g.edges
+	const outgoing = new Map()
+	for (const e of edges) {
+		const src = String(e?.sourceId || '')
+		if (!src) continue
+		if (!outgoing.has(src)) outgoing.set(src, [])
+		outgoing.get(src).push(String(e?.sinkId || ''))
+	}
+
+	function reachesGpuFromSource(sourceId) {
+		const queue = [String(sourceId || '')]
+		const seen = new Set()
+		while (queue.length) {
+			const cur = queue.shift()
+			if (!cur || seen.has(cur)) continue
+			seen.add(cur)
+			const next = outgoing.get(cur) || []
+			for (const sinkId of next) {
+				const sink = byId.get(String(sinkId || ''))
+				if (!sink) continue
+				if (sink.kind === 'gpu_out') return true
+				if (sink.kind === 'pixel_map_in') {
+					const nodeId = String(sink.deviceId || '')
+					const nodeOut = g.connectors.filter((c) => String(c?.deviceId || '') === nodeId && c?.kind === 'pixel_map_out')
+					for (const no of nodeOut) queue.push(String(no?.id || ''))
+				}
+			}
+		}
+		return false
+	}
+
+	function destinationSourceIds(dest, idx) {
+		const out = new Set()
+		const did = String(dest?.id || '').trim()
+		if (did) out.add(`dst_in_${did}`)
+		const n = idx + 1
+		out.add(`dst_ch${n}`)
+		if (String(dest?.mode || '') === 'multiview') out.add(`dst_mv${n}`)
+		for (const c of g.connectors || []) {
+			if (String(c?.kind || '') !== 'destination_in') continue
+			const ref = String(c?.externalRef || '').trim()
+			const cid = String(c?.id || '').trim()
+			if (did && ref === did && cid) out.add(cid)
+		}
+		return [...out].filter(Boolean)
+	}
+
+	for (const dest of destinations) {
+		const mode = String(dest?.mode || 'pgm_prv')
+		if (mode === 'multiview' || mode === 'stream') continue
+		const idx = Math.max(0, parseInt(String(dest?.mainScreenIndex ?? 0), 10) || 0)
+		const n = idx + 1
+		const srcCandidates = destinationSourceIds(dest, idx)
+		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src))
+	}
 }
 
 function applyAudioOutputOverridesToScreens(merged, appConfig) {
@@ -184,44 +311,158 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 	})
 }
 
-function applyMappingOverridesToScreens(merged, appConfig) {
-	const map = getChannelMap(appConfig)
-	if (!map.mappingChannels || !map.mappingChannels.length) return
+/**
+ * Map pixel_mapping outputs onto the **program channel that feeds the node's input** (see `work/caspar_extended.config`):
+ * one wide custom video-mode plus a single `<decklink>` with `<subregion>` and synced `<ports>` for extra SDI devices.
+ */
+function resolvePixelMapFeedToProgramScreen(appConfig, nodeId) {
+	const dg = appConfig?.deviceGraph
+	if (!dg || !Array.isArray(dg.connectors) || !Array.isArray(dg.edges)) return null
+	const connectors = dg.connectors
+	const edges = dg.edges
+	const destinations = Array.isArray(appConfig?.tandemTopology?.destinations) ? appConfig.tandemTopology.destinations : []
+	const inConn = connectors.find((c) => String(c?.deviceId || '') === nodeId && c.kind === 'pixel_map_in')
+	if (!inConn) return null
+	const inEdge = edges.find((e) => String(e?.sinkId || '') === String(inConn.id || ''))
+	if (!inEdge) return null
+	const srcId = String(inEdge.sourceId || '')
+	if (srcId.startsWith('dst_in_')) {
+		const destId = srcId.slice('dst_in_'.length)
+		const dest = destinations.find((d) => String(d?.id || '') === destId)
+		if (!dest) return null
+		if (String(dest.mode || '') === 'multiview') return { kind: 'multiview' }
+		const idx = Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0)
+		return { kind: 'program', screenIndex: idx + 1 }
+	}
+	if (srcId.startsWith('dst_ch')) {
+		const n = parseInt(srcId.slice('dst_ch'.length), 10)
+		if (Number.isFinite(n) && n >= 1) return { kind: 'program', screenIndex: n }
+	}
+	if (srcId.startsWith('dst_mv')) return { kind: 'multiview' }
+	if (srcId.startsWith('caspar_pgm_')) {
+		const n = parseInt(srcId.slice('caspar_pgm_'.length), 10)
+		if (Number.isFinite(n) && n >= 1) return { kind: 'program', screenIndex: n }
+	}
+	return null
+}
 
-	const dg = appConfig?.deviceGraph || {}
-	const edges = Array.isArray(dg.edges) ? dg.edges : []
-	const connectors = Array.isArray(dg.connectors) ? dg.connectors : []
-	const devices = Array.isArray(dg.devices) ? dg.devices : []
+function applyPixelMappingProgramScreens(merged, appConfig) {
+	const dg = appConfig?.deviceGraph
+	if (!dg || !Array.isArray(dg.devices) || !Array.isArray(dg.connectors) || !Array.isArray(dg.edges)) return
+
+	const devices = dg.devices
+	const connectors = dg.connectors
+	const edges = dg.edges
+	const byId = new Map(connectors.map((c) => [String(c?.id || ''), c]))
 	const hardwareDisplays = Array.isArray(appConfig?.hardware?.displays) ? appConfig.hardware.displays : []
+	const mappingNodes = devices.filter((d) => d && d.role === 'pixel_mapping')
 
-	map.mappingChannels.forEach((mc) => {
-		const n = mc.ch
-		const edge = edges.find((e) => String(e.sourceId) === mc.connectorId)
-		if (!edge) return
+	for (const node of mappingNodes) {
+		const nodeId = String(node.id || '')
+		if (!nodeId) continue
 
-		const sinkConn = connectors.find((c) => String(c.id) === edge.sinkId)
-		if (!sinkConn) return
+		const feed = resolvePixelMapFeedToProgramScreen(appConfig, nodeId)
+		const outputs = Array.isArray(node.settings?.outputs) ? node.settings.outputs : []
+		const mappings = Array.isArray(node.settings?.mappings) ? node.settings.mappings : []
+		if (!outputs.length) continue
 
-		// Get mode from node settings
-		const node = devices.find((d) => d.id === mc.nodeId)
-		const nodeConn = connectors.find((c) => c.id === mc.connectorId)
-		const outputSettings = Array.isArray(node?.settings?.outputs)
-			? node.settings.outputs.find((o) => o.id === nodeConn?.id?.split('_').pop() || o.id === nodeConn?.index)
-			: null
-		const mode = String(outputSettings?.mode || '1080p50').trim()
+		const nodeOutConns = connectors.filter((c) => c.deviceId === nodeId && c.kind === 'pixel_map_out')
 
-		if (sinkConn.kind === 'decklink_io') {
-			const devNum = parseInt(String(sinkConn.externalRef || ''), 10)
-			if (Number.isFinite(devNum) && devNum > 0) {
-				merged[`screen_${n}_decklink_device`] = devNum
-				merged[`screen_${n}_decklink_replace_screen`] = true
-				const { STANDARD_VIDEO_MODES } = require('./config-modes')
-				if (STANDARD_VIDEO_MODES[mode]) {
-					merged[`screen_${n}_mode`] = mode
+		let hasNonDeckCable = false
+		for (const c of nodeOutConns) {
+			const e = edges.find((x) => String(x.sourceId) === String(c.id))
+			if (!e) continue
+			const sk = byId.get(String(e.sinkId || ''))
+			if (!sk) continue
+			if (sk.kind === 'decklink_io' || sk.kind === 'decklink_out') continue
+			hasNonDeckCable = true
+			break
+		}
+
+		if (feed?.kind === 'program' && !hasNonDeckCable) {
+			let srcX = 0
+			let maxH = 1080
+			/** @type {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} */
+			const tiles = []
+			let fps = 50
+
+			for (let idx = 0; idx < outputs.length; idx++) {
+				const outDef = outputs[idx]
+				const modeId = String(outDef?.mode || '1080p5000').trim()
+				const spec = STANDARD_VIDEO_MODES[modeId]
+				const w = spec?.width ?? 1920
+				const h = spec?.height ?? 1080
+				const f = spec?.fps ?? 50
+				
+				const slice = mappings.find(m => String(m.outputId) === String(outDef?.id || ''))
+				const tileSrcX = slice?.rect?.x ?? srcX
+				const tileSrcY = slice?.rect?.y ?? 0
+				const tileW = slice?.rect?.w ?? w
+				const tileH = slice?.rect?.h ?? h
+
+				maxH = Math.max(maxH, tileSrcY + tileH)
+
+				const conn =
+					nodeOutConns.find((c) => Number(c?.index) === idx) ||
+					nodeOutConns.find((c) => String(c?.id || '') === `${nodeId}_${String(outDef?.id || '')}`)
+				if (!conn) {
+					srcX += w
+					continue
 				}
+				const edge = edges.find((e) => String(e.sourceId) === String(conn.id))
+				if (!edge) {
+					srcX += w
+					continue
+				}
+				const sink = byId.get(String(edge.sinkId || ''))
+				if (!sink || (sink.kind !== 'decklink_io' && sink.kind !== 'decklink_out')) {
+					srcX += w
+					continue
+				}
+				const devNum = parseInt(String(sink.externalRef || ''), 10)
+				if (!(Number.isFinite(devNum) && devNum > 0)) {
+					srcX += w
+					continue
+				}
+
+				tiles.push({
+					device: devNum,
+					srcX: tileSrcX,
+					srcY: tileSrcY,
+					destX: 0,
+					destY: 0,
+					width: tileW,
+					height: tileH,
+					videoMode: modeId,
+				})
+				fps = f
+				srcX += w
 			}
-		} else if (sinkConn.kind === 'gpu_output') {
-			const displayId = String(sinkConn.externalRef || '')
+
+			if (tiles.length > 0) {
+				const n = feed.screenIndex
+				const totalW = tiles.reduce((acc, t) => acc + t.width, 0)
+				merged[`screen_${n}_mode`] = 'custom'
+				merged[`screen_${n}_custom_width`] = totalW
+				merged[`screen_${n}_custom_height`] = maxH
+				merged[`screen_${n}_custom_fps`] = fps
+				// Keep screen consumer when destination is also cabled to GPU.
+				if (merged[`screen_${n}_screen_consumer`] === true) merged[`screen_${n}_decklink_replace_screen`] = false
+				else merged[`screen_${n}_decklink_replace_screen`] = true
+				merged[`screen_${n}_decklink_tiles`] = tiles
+				delete merged[`screen_${n}_decklink_device`]
+				continue
+			}
+		}
+
+		if (feed?.kind !== 'program') continue
+		const n = feed.screenIndex
+		for (const conn of nodeOutConns) {
+			const edge = edges.find((e) => String(e.sourceId) === String(conn.id))
+			if (!edge) continue
+			const sink = byId.get(String(edge.sinkId || ''))
+			if (!sink || (sink.kind !== 'gpu_out' && sink.kind !== 'gpu_output')) continue
+			const displayId = String(sink.externalRef || '')
 			const disp = hardwareDisplays.find((d) => String(d.id) === displayId)
 			if (disp) {
 				merged[`screen_${n}_mode`] = 'custom'
@@ -230,7 +471,7 @@ function applyMappingOverridesToScreens(merged, appConfig) {
 				merged[`screen_${n}_custom_fps`] = disp.fps || 60
 			}
 		}
-	})
+	}
 }
 
 /**
@@ -254,12 +495,13 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	const host = String(merged.osc_target_host || '127.0.0.1').trim() || '127.0.0.1'
 	merged.osc_target_host = host
 	merged.highascg_host = host
-	/** Same rule as {@link getChannelMap}: max of root `screen_count` and `casparServer.screen_count`. */
+	/** Same rule as routing-map `screen_count`: max of root `screen_count` and `casparServer.screen_count`. */
 	merged.screen_count = resolveMainScreenCount(appConfig || {})
 	applyDestinationOverridesToScreens(merged, appConfig || {})
 	applyDecklinkOverridesToScreens(merged, appConfig || {})
+	applyScreenConsumerOverridesFromCabling(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
-	applyMappingOverridesToScreens(merged, appConfig || {})
+	applyPixelMappingProgramScreens(merged, appConfig || {})
 	merged.rtmp = normalizeRtmpConfig(appConfig && appConfig.rtmp)
 	merged.streamingChannel = {
 		...(defaults.streamingChannel || {}),

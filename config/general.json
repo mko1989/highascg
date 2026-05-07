@@ -2,11 +2,13 @@
   "amcp_batch": false,
   "amcp_max_batch_commands": 64,
   "amcp_mixer_commit_before_amcp_batch": true,
-  "offline_mode": true,
+  "offline_mode": false,
   "host_stats": {
     "scan_folder": false
   },
   "osc_info_supplement_ms": null,
+  "hq_thumbnail_prewarm_on_start": true,
+  "hq_thumbnail_prewarm_on_media_refresh": true,
   "local_template_path": "",
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
@@ -46,6 +48,9 @@
       "location": 3
     }
   ],
+  "features": {
+    "cgStudio": false
+  },
   "screen_count": 1,
   "streaming": {
     "enabled": false,
@@ -65,9 +70,40 @@
     "resolution": "half",
     "fps": 25,
     "drmDevice": "/dev/dri/card0",
+    "go2rtcLogLevel": null,
     "autoRelocateBasePort": true,
     "hardware_accel": false
   },
   "periodic_sync_interval_sec": null,
-  "periodic_sync_interval_sec_osc": null
+  "periodic_sync_interval_sec_osc": null,
+  "mappingTemplates": [
+    {
+      "id": "tmp_mot2u8uy",
+      "type": "video",
+      "label": "New Output",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50
+    },
+    {
+      "id": "tmp_mot2u9eb",
+      "type": "video",
+      "label": "New Output",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50
+    },
+    {
+      "id": "tmp_mot2u9it",
+      "type": "video",
+      "label": "New Output",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50
+    }
+  ],
+  "screen_2_system_id": "DP-4",
+  "screen_2_os_mode": "5120x1024",
+  "screen_2_os_backend": "xrandr",
+  "screen_2_os_rate": 50
 }

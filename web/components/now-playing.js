@@ -3,8 +3,8 @@
  */
 
 import { formatMmSs } from './playback-timer.js'
-import { getApiBase } from '../lib/api-client.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 
 function basename(p) {
 	if (!p) return ''
@@ -77,7 +77,7 @@ export function mountNowPlaying(container, opts) {
 		const id = thumbFileId(f)
 		thumbHost.textContent = ''
 		if (showThumbnail && id) {
-			const url = `${getApiBase()}/api/thumbnail/${encodeURIComponent(id)}`
+			const url = getThumbnailUrl(id, 320, 2)
 			const img = document.createElement('img')
 			img.alt = ''
 			img.style.cssText = 'width:100%;height:100%;object-fit:cover'

@@ -29,6 +29,11 @@ const {
 } = require('../media/local-media')
 const { dedupeMediaList } = require('../utils/media-browser-dedupe')
 
+function isHiddenThumbnailBucket(id) {
+	const norm = String(id || '').replace(/\\/g, '/').toLowerCase()
+	return norm === 'tb' || norm.startsWith('tb/') || norm === '.tb' || norm.startsWith('.tb/')
+}
+
 /**
  * @param {string} path
  * @param {object} ctx
@@ -104,6 +109,7 @@ async function handleGet(path, ctx, query = {}) {
 				stateMedia.length > 0
 					? stateMedia
 					: (ctx.CHOICES_MEDIAFILES || []).map((c) => ({ id: c.id, label: c.label }))
+			media = media.filter((m) => !isHiddenThumbnailBucket(m?.id))
 			// Files on disk under the ingest folder (WeTransfer zip extract, etc.) may lag Caspar CLS — merge them in.
 			try {
 				const ingestBase = getMediaIngestBasePath(ctx.config)
@@ -111,6 +117,7 @@ async function handleGet(path, ctx, query = {}) {
 				if (diskItems.length > 0) {
 					const seen = new Set(media.map((m) => normalizeMediaIdKey(m.id)))
 					for (const item of diskItems) {
+						if (isHiddenThumbnailBucket(item?.id)) continue
 						const key = normalizeMediaIdKey(item.id)
 						if (!seen.has(key)) {
 							seen.add(key)

@@ -11,6 +11,8 @@ function isPhInputConnector(c) { return !!(c && c.deviceId === PH_DEVICE_ID && c
 function isPhOutputConnector(c) { return !!(c && c.deviceId === PH_DEVICE_ID && c.kind === 'ph_out') }
 function isDestinationInputConnector(c) { return !!(c && c.deviceId === DEST_DEVICE_ID && c.kind === 'destination_in') }
 function isDecklinkIoInputConnector(c) { return !!(c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && String(c.caspar?.ioDirection || 'in').toLowerCase() !== 'out') }
+function isPixelMapInputConnector(c) { return !!(c && c.kind === 'pixel_map_in') }
+function isPixelMapOutputConnector(c) { return !!(c && c.kind === 'pixel_map_out') }
 
 function edgeConnectAllowed(graph, sourceId, sinkId) {
 	const g = graph && typeof graph === 'object' ? graph : null
@@ -21,8 +23,16 @@ function edgeConnectAllowed(graph, sourceId, sinkId) {
 	const b = by.get(sinkId)
 	if (!a) return { ok: false, reason: 'unknown_source' }
 	if (!b) return { ok: false, reason: 'unknown_sink' }
+	// Supported cable patterns in Device View:
+	// 1) destination_out <-> caspar_out
+	// 2) destination_out <-> pixel_mapping_in
+	// 3) pixel_mapping_out <-> caspar_out
 	if (isDestinationInputConnector(a) && isCasparOutputConnector(b)) return { ok: true }
 	if (isCasparOutputConnector(a) && isDestinationInputConnector(b)) return { ok: true }
+	if (isDestinationInputConnector(a) && isPixelMapInputConnector(b)) return { ok: true }
+	if (isPixelMapInputConnector(a) && isDestinationInputConnector(b)) return { ok: true }
+	if (isPixelMapOutputConnector(a) && isCasparOutputConnector(b)) return { ok: true }
+	if (isCasparOutputConnector(a) && isPixelMapOutputConnector(b)) return { ok: true }
 	return { ok: false, reason: 'allowed: destination_to_output' }
 }
 

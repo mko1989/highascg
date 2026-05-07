@@ -17,13 +17,11 @@ export function buildSettingsPayload(modal) {
 			host: modal.querySelector('#set-caspar-host')?.value ?? prevAll.caspar?.host ?? '127.0.0.1',
 			port: modal.querySelector('#set-caspar-port')?.value ?? prevAll.caspar?.port ?? 5250,
 		},
+		// Legacy preview settings are removed from UI and kept disabled.
 		streaming: {
 			...prevStream,
-			enabled: modal.querySelector('#set-stream-enabled').checked, captureMode: 'udp',
-			quality: modal.querySelector('#set-stream-quality').value, basePort: modal.querySelector('#set-stream-port').value,
-			hardware_accel: modal.querySelector('#set-stream-hw').checked,
-			go2rtcLogLevel: (modal.querySelector('#set-stream-go2rtc-log') || {}).value ?? '',
-			autoRelocateBasePort: (modal.querySelector('#set-stream-auto-relocate') || {}).checked ?? true,
+			enabled: false,
+			captureMode: 'udp',
 		},
 		periodic_sync_interval_sec: prevAll.periodic_sync_interval_sec ?? '',
 		periodic_sync_interval_sec_osc: prevAll.periodic_sync_interval_sec_osc ?? '',
@@ -97,12 +95,6 @@ export function buildSettingsPayload(modal) {
 export function hydrateSettings(modal, cfg) {
 	const casparHostEl = modal.querySelector('#set-caspar-host'); if (casparHostEl) casparHostEl.value = cfg.caspar.host
 	const casparPortEl = modal.querySelector('#set-caspar-port'); if (casparPortEl) casparPortEl.value = cfg.caspar.port
-	const streamEnabledEl = modal.querySelector('#set-stream-enabled'); if (streamEnabledEl) streamEnabledEl.checked = cfg.streaming.enabled
-	const streamQualityEl = modal.querySelector('#set-stream-quality'); if (streamQualityEl) streamQualityEl.value = cfg.streaming.quality
-	const streamHwEl = modal.querySelector('#set-stream-hw'); if (streamHwEl) streamHwEl.checked = cfg.streaming.hardware_accel
-	const streamPortEl = modal.querySelector('#set-stream-port'); if (streamPortEl) streamPortEl.value = cfg.streaming.basePort
-	const g2l = modal.querySelector('#set-stream-go2rtc-log'); if (g2l) g2l.value = cfg.streaming.go2rtcLogLevel || ''
-	const arEl = modal.querySelector('#set-stream-auto-relocate'); if (arEl) arEl.checked = cfg.streaming.autoRelocateBasePort !== false
 	const offlineModeEl = modal.querySelector('#set-offline-mode'); if (offlineModeEl) offlineModeEl.checked = !!cfg.offline_mode
 	const osc = cfg.osc || {}
 	const oscPortEl = modal.querySelector('#set-osc-port'); if (oscPortEl) oscPortEl.value = osc.listenPort ?? 6251

@@ -10,46 +10,19 @@ export function getMainModalHtml() {
 			</div>
 			<div class="modal-body settings-body">
 				<div class="settings-tabs">
-					<button class="settings-tab active" data-tab="streaming">Preview streaming</button>
+					<button class="settings-tab active" data-tab="simulation">Simulation</button>
 					<button class="settings-tab" data-tab="companion">Companion</button>
 					<button class="settings-tab" data-tab="media-usb">Media (USB)</button>
 					<button class="settings-tab" data-tab="variables">Variables</button>
 					<button class="settings-tab" data-tab="nuclear">Nuclear</button>
 				</div>
 				<div class="settings-panes">
-					<div class="settings-pane active" id="settings-pane-streaming">
-						<h3 class="settings-category">General / Simulation</h3>
+					<div class="settings-pane active" id="settings-pane-simulation">
+						<h3 class="settings-category">Simulation</h3>
 						<div class="settings-group checkbox">
 							<label><input type="checkbox" id="set-offline-mode"> Simulation / Offline Mode (Simulate CasparCG playback)</label>
 						</div>
-						<h3 class="settings-category">In-browser preview (WebRTC / go2rtc)</h3>
-						<div class="settings-group checkbox"><label><input type="checkbox" id="set-stream-enabled"> Enable Live Preview (WebRTC)</label></div>
-						<div class="settings-group">
-							<p class="settings-note">Preview uses <strong>STREAM</strong> into <strong>go2rtc</strong>. Channel numbers follow <strong>Screens</strong> and <strong>Multiview</strong>.</p>
-							<label>Quality Preset</label>
-							<select id="set-stream-quality">
-								<option value="preview">Preview (½ res, 1 fps)</option>
-								<option value="low">Low (½ res, 15 fps)</option>
-								<option value="medium">Medium (½ res — default)</option>
-								<option value="high">High (½ res, higher bitrate)</option>
-								<option value="native">Native (full resolution)</option>
-								<option value="ultrafast">Ultrafast (½ res, minimal bitrate)</option>
-							</select>
-						</div>
-						<div class="settings-group checkbox"><label><input type="checkbox" id="set-stream-hw"> Use Hardware Acceleration (FFmpeg)</label></div>
-						<div class="settings-group">
-							<label>Base Port (go2rtc)</label><input type="number" id="set-stream-port" placeholder="8554">
-							<p class="settings-note">UDP base+1 (PGM), base+2 (PRV), base+5 (MV).</p>
-						</div>
-						<div class="settings-group checkbox">
-							<label><input type="checkbox" id="set-stream-auto-relocate" checked /> Auto-relocate base port if UDP ports are busy</label>
-						</div>
-						<div class="settings-group">
-							<label>go2rtc log level</label>
-							<select id="set-stream-go2rtc-log">
-								<option value="">Default</option><option value="trace">trace</option><option value="debug">debug</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option>
-							</select>
-						</div>
+						<p class="settings-note">Placeholder panel for simulation workflow. More controls will be added here.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>

@@ -13,7 +13,7 @@ import {
 	dashboardCasparLayer,
 } from '../lib/dashboard-state.js'
 import { timelineState } from '../lib/timeline-state.js'
-import { api, getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
 import { calcMixerFill } from '../lib/mixer-fill.js'
 import { initPreviewPanel, drawDashboardProgramStack } from './preview-canvas.js'
 import { createDashboardCell, escapeHtml, truncate } from './dashboard-cell.js'
@@ -21,6 +21,7 @@ import { getVariableStore } from '../lib/variable-state.js'
 import { ws } from '../app.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { parseNumberInput } from '../lib/math-input.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 
 const LAYER_COUNT = 9
 /** Ad-hoc cell preview on PRV — above dashboard rows (10–18) and black (9). */
@@ -234,7 +235,7 @@ export function initDashboard(root, stateStore) {
 				isLive,
 				getThumbUrl: (src) =>
 					src?.type === 'media' && src?.value
-						? `${getApiBase()}/api/thumbnail/${encodeURIComponent(src.value)}`
+						? getThumbnailUrl(src.value, 320, 2)
 						: null,
 				onThumbLoaded: () => previewPanel.scheduleDraw(),
 			})
