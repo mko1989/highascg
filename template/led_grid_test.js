@@ -260,17 +260,25 @@ function renderBouncingCharacter(layer, count) {
 		'ch_left_closed_red.svg',
 		'ch_right_closed_red.svg'
 	]
+	var width = window.innerWidth || 1920
+	var height = window.innerHeight || 1080
+	var bounceSize = 250
+	var travelX = Math.max(100, width - bounceSize)
+	var travelY = Math.max(100, height - bounceSize)
+	var baseSpeed = 250 // Pixels per second constant speed
+
 	for (var i = 0; i < n; i++) {
 		var node = document.createElement('div')
 		node.className = 'bouncing-character'
-		node.style.setProperty('--bounce-size', '250px')
+		node.style.setProperty('--bounce-size', bounceSize + 'px')
 		
-		// Randomize animation to make them unique
-		var durX = (3 + Math.random() * 2.5).toFixed(2) + 's'
-		var durY = (2 + Math.random() * 2.5).toFixed(2) + 's'
+		// Randomize speed slightly per character for visual interest
+		var speedX = baseSpeed * (0.8 + Math.random() * 0.4)
+		var speedY = baseSpeed * (0.8 + Math.random() * 0.4)
+		var durX = (travelX / speedX).toFixed(2) + 's'
+		var durY = (travelY / speedY).toFixed(2) + 's'
 		var delay = (Math.random() * -10).toFixed(2) + 's'
 		node.style.animationDuration = durX + ', ' + durY
-		node.style.animationDelay = delay + ', ' + delay
 		node.style.animationDelay = delay + ', ' + delay
 
 		var img = document.createElement('img')

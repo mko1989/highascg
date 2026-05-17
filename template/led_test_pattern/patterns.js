@@ -58,12 +58,23 @@ export const Patterns = {
 			'../ch_left_closed_red.svg',
 			'../ch_right_closed_red.svg'
 		];
+		const width = window.innerWidth || 1920;
+		const height = window.innerHeight || 1080;
+		const bounceSize = 250;
+		const travelX = Math.max(100, width - bounceSize);
+		const travelY = Math.max(100, height - bounceSize);
+		const baseSpeed = 250; // Pixels per second constant speed
+
 		for (let i = 0; i < n; i++) {
 			const node = document.createElement('div');
 			node.className = 'bouncing-character';
-			node.style.setProperty('--bounce-size', '250px');
-			const durX = (3 + Math.random() * 2.5).toFixed(2) + 's';
-			const durY = (2 + Math.random() * 2.5).toFixed(2) + 's';
+			node.style.setProperty('--bounce-size', `${bounceSize}px`);
+			
+			// Randomize speed slightly per character for visual interest
+			const speedX = baseSpeed * (0.8 + Math.random() * 0.4);
+			const speedY = baseSpeed * (0.8 + Math.random() * 0.4);
+			const durX = (travelX / speedX).toFixed(2) + 's';
+			const durY = (travelY / speedY).toFixed(2) + 's';
 			const delay = (Math.random() * -10).toFixed(2) + 's';
 			node.style.animationDuration = durX + ', ' + durY;
 			node.style.animationDelay = delay + ', ' + delay;
