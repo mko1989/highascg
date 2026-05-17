@@ -52,14 +52,29 @@ function handleUpdateDestination(j, ctx) {
 	const idx = top.destinations.findIndex(d => d.id === id); if (idx < 0) return { error: 'Not found', id }
 	const d0 = top.destinations[idx]; const p = j.updateDestination
 	const nextMode = p.mode === 'pgm_only' || p.mode === 'pgm_prv' || p.mode === 'multiview' || p.mode === 'stream' ? p.mode : d0.mode
+	
+	let nextWidth = p.width || d0.width
+	let nextHeight = p.height || d0.height
+	let nextFps = p.fps || d0.fps
+	
+	if (p.videoMode && p.videoMode !== 'custom') {
+		const { STANDARD_VIDEO_MODES } = require('../config/config-modes')
+		const std = STANDARD_VIDEO_MODES[p.videoMode]
+		if (std) {
+			nextWidth = std.width
+			nextHeight = std.height
+			nextFps = std.fps
+		}
+	}
+
 	top.destinations[idx] = {
 		...d0,
 		label: p.label != null ? String(p.label).trim() || d0.label : d0.label,
 		mainScreenIndex: p.mainScreenIndex != null ? Math.max(0, parseInt(p.mainScreenIndex, 10) || 0) : d0.mainScreenIndex,
 		videoMode: p.videoMode || d0.videoMode,
-		width: p.width || d0.width,
-		height: p.height || d0.height,
-		fps: p.fps || d0.fps,
+		width: nextWidth,
+		height: nextHeight,
+		fps: nextFps,
 		mode: nextMode,
 		stream:
 			p.stream && typeof p.stream === 'object'
@@ -147,13 +162,36 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 						cs[`decklink_input_${slot}_device`] = devNum
 					}
 				}
-				const outBind = patch?.caspar?.outputBinding
+				const outBindPatch = patch?.caspar?.outputBinding
+				const inheritedBind = c0?.caspar?.outputBinding
+				let outBind =
+					outBindPatch && typeof outBindPatch === 'object'
+						? outBindPatch
+						: inheritedBind && typeof inheritedBind === 'object'
+							? inheritedBind
+							: null
+				// PGM SDI needs screen_N_decklink_device; direction=out alone is not enough for Caspar.
+				if (ioDirection === 'out' && (!outBind || typeof outBind !== 'object')) {
+					const bus = String(c1?.caspar?.bus || c0?.caspar?.bus || '').toLowerCase()
+					const mainIdx = Number.isFinite(Number(c1?.caspar?.mainIndex))
+						? Number(c1.caspar.mainIndex)
+						: Number.isFinite(Number(c0?.caspar?.mainIndex))
+							? Number(c0.caspar.mainIndex)
+							: 0
+					if (bus === 'multiview') {
+						outBind = { type: 'multiview' }
+					} else {
+						const screen = Math.min(8, Math.max(1, mainIdx + 1))
+						outBind = { type: 'screen', index: screen }
+					}
+				}
 				if (ioDirection === 'out' && outBind && typeof outBind === 'object') {
+					c1.caspar = { ...(c1.caspar || {}), outputBinding: outBind }
 					const t = String(outBind.type || '').toLowerCase()
 					if (t === 'multiview') {
 						cs.multiview_decklink_device = devNum
 					} else if (t === 'screen') {
-						const screen = Math.min(4, Math.max(1, parseInt(String(outBind.index ?? 1), 10) || 1))
+						const screen = Math.min(8, Math.max(1, parseInt(String(outBind.index ?? 1), 10) || 1))
 						cs[`screen_${screen}_decklink_device`] = devNum
 						cs[`screen_${screen}_decklink_replace_screen`] = true
 					}

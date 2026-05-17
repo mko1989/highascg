@@ -17,6 +17,9 @@ import { showPublishModal } from './publish-modal.js'
 import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'
 import { createHeaderAudioMonitor } from './header-bar-audio.js'
 import { markLocalProjectSaved } from '../lib/project-remote-sync.js'
+import { initConfigStrip } from './header-bar-config-strip.js'
+import { initStreamingBadge } from './header-bar-streaming.js'
+import { initLedTestCard } from './header-bar-led-test.js'
 
 /**
  * @param {HTMLElement} headerEl - Header element (contains title + status)
@@ -200,63 +203,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	serverBtn.textContent = 'Server ▾'
 	serverBtn.title = 'Compare running CasparCG config with module screen settings'
 
-	const strip = document.createElement('div')
-	strip.className = 'server-config-strip'
-	strip.hidden = true
-	strip.innerHTML = `
-		<div class="server-config-strip__summary"></div>
-		<table class="server-config-strip__table"><thead><tr><th>#</th><th>Module expects</th><th>Server</th></tr></thead><tbody></tbody></table>
-		<ul class="server-config-strip__issues"></ul>
-		<p class="server-config-strip__hint"></p>
-	`
-	if (headerEl.parentNode) headerEl.parentNode.insertBefore(strip, headerEl.nextSibling)
-
-	const sumEl = strip.querySelector('.server-config-strip__summary')
-	const tbody = strip.querySelector('.server-config-strip__table tbody')
-	const issuesEl = strip.querySelector('.server-config-strip__issues')
-	const hintEl = strip.querySelector('.server-config-strip__hint')
-
-	function renderConfigComparison(c) {
-		if (!c || !sumEl) return
-		const phys = c.serverPhysicalScreens || []
-		const physIdx = phys.map((s) => s.index).join(', ')
-		const physLine =
-			phys.length > 0
-				? ` Caspar screen outputs: ${phys.length} (ch ${physIdx}). App screens: ${c.moduleScreenCount ?? '—'}.`
-				: ''
-		const screenWarn = c.screensCountMismatch ? ' Screen count differs from app — check multiview or extra screen consumers.' : ''
-		if (c.aligned) {
-			sumEl.textContent = `Server config matches module settings (${c.serverChannelCount} channels).${physLine}`
-			sumEl.className = 'server-config-strip__summary server-config-strip__summary--ok'
-		} else if (!c.serverChannelCount) {
-			sumEl.textContent = 'Connect to CasparCG or wait for INFO CONFIG to compare channel layout.'
-			sumEl.className = 'server-config-strip__summary server-config-strip__summary--warn'
-		} else {
-			sumEl.textContent = `Mismatch: server has ${c.serverChannelCount} channel(s), module expects ${c.moduleChannelCount}.${physLine}${screenWarn}`
-			sumEl.className = 'server-config-strip__summary server-config-strip__summary--warn'
-		}
-		tbody.innerHTML = ''
-		const rows = Math.max(c.serverChannels?.length || 0, c.moduleChannels?.length || 0)
-		for (let i = 0; i < rows; i++) {
-			const s = c.serverChannels?.[i]
-			const m = c.moduleChannels?.[i]
-			const tr = document.createElement('tr')
-			tr.innerHTML = `<td>${s?.index ?? m?.index ?? i + 1}</td><td>${m ? `${m.role}: ${m.videoMode || '—'}` : '—'}</td><td>${s ? `${s.videoMode || '—'}${s.hasScreen ? ' (screen)' : ''}` : '—'}</td>`
-			tbody.appendChild(tr)
-		}
-		issuesEl.innerHTML = ''
-		;(c.issues || []).forEach((msg) => {
-			const li = document.createElement('li')
-			li.textContent = msg
-			issuesEl.appendChild(li)
-		})
-		hintEl.textContent = c.hint || ''
-	}
-
-	serverBtn.addEventListener('click', () => {
-		strip.hidden = !strip.hidden
-		serverBtn.textContent = strip.hidden ? 'Server ▾' : 'Server ▴'
-	})
+	const { renderConfigComparison } = initConfigStrip(headerEl, serverBtn)
 
 	// Settings — directly after Server
 	const settingsBtn = document.createElement('button')
@@ -267,231 +214,12 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	settingsBtn.setAttribute('aria-label', 'Application settings')
 	settingsBtn.addEventListener('click', () => showSettingsModal())
 
-	// LED wall test card (PGM ch · layer 999) — checkbox + setup modal
+
 	const ledTestWrap = document.createElement('div')
 	ledTestWrap.className = 'header-led-test'
-	const ledTestCb = document.createElement('input')
-	ledTestCb.type = 'checkbox'
-	ledTestCb.id = 'header-led-test-cb'
-	ledTestCb.title =
-		'Show LED test card on all program channels (layer 999): screens + resolution + IPs by default; full grid per channel in Test card…'
-	const ledTestBtn = document.createElement('button')
-	ledTestBtn.type = 'button'
-	ledTestBtn.className = 'header-btn header-btn--led-setup'
-	ledTestBtn.textContent = 'Test card…'
-	ledTestBtn.title = 'Grid size and labels'
-	let ftbBusy = false
-	const ftbBtn = document.createElement('button')
-	ftbBtn.type = 'button'
-	ftbBtn.className = 'header-btn header-btn--ftb'
-	ftbBtn.textContent = 'FTB'
-	ftbBtn.title = 'Fade to black: fade out all program and preview layers, then clear'
-	ledTestWrap.appendChild(ledTestCb)
-	ledTestWrap.appendChild(ledTestBtn)
-	ledTestWrap.appendChild(ftbBtn)
-	const streamStateWrap = document.createElement('div')
-	streamStateWrap.style.display = 'inline-flex'
-	streamStateWrap.style.gap = '4px'
-	streamStateWrap.style.alignItems = 'center'
-	ledTestWrap.appendChild(streamStateWrap)
-
-	function focusDeviceConnector(connectorId) {
-		window.dispatchEvent(new CustomEvent('highascg-device-view-focus-connector', { detail: { connectorId } }))
-	}
-
-	async function syncStreamingRecordBadge() {
-		try {
-			const settings = settingsState.getSettings() || {}
-			const st = await api.get('/api/streaming-channel')
-			const streamOut = Array.isArray(settings?.streamOutputs) ? settings.streamOutputs : []
-			const recordOut = Array.isArray(settings?.recordOutputs) ? settings.recordOutputs : []
-			streamStateWrap.innerHTML = ''
-			for (const s of streamOut) {
-				const id = String(s?.id || '').trim()
-				if (!id) continue
-				const idx = id.match(/(\d+)/)?.[1] || ''
-				const fallback = `Str${idx || ''}`.trim() || 'Str'
-				const name = String(s?.name || s?.label || fallback).trim() || fallback
-				const isOn = !!st?.rtmp?.active && String(st?.rtmp?.outputId || '') === id
-				const b = document.createElement('button')
-				b.type = 'button'
-				b.className = 'header-btn'
-				b.textContent = name
-				b.title = isOn ? `${name} is streaming` : `${name} is not streaming`
-				if (isOn) {
-					b.style.borderColor = 'rgba(220,38,38,0.6)'
-					b.style.background = 'rgba(220,38,38,0.12)'
-				}
-				b.addEventListener('click', () => focusDeviceConnector(id))
-				streamStateWrap.appendChild(b)
-			}
-			for (const r of recordOut) {
-				const id = String(r?.id || '').trim()
-				if (!id) continue
-				const idx = id.match(/(\d+)/)?.[1] || ''
-				const fallback = `Rec${idx || ''}`.trim() || 'Rec'
-				const name = String(r?.name || r?.label || fallback).trim() || fallback
-				const isOn = !!st?.record?.active && String(st?.record?.outputId || '') === id
-				const b = document.createElement('button')
-				b.type = 'button'
-				b.className = 'header-btn'
-				b.textContent = name
-				b.title = isOn
-					? `${name} is recording${st?.record?.path ? ` (${st.record.path})` : ''}`
-					: `${name} is not recording`
-				if (isOn) {
-					b.style.borderColor = 'rgba(220,38,38,0.6)'
-					b.style.background = 'rgba(220,38,38,0.12)'
-				}
-				b.addEventListener('click', () => focusDeviceConnector(id))
-				streamStateWrap.appendChild(b)
-			}
-			if (!streamStateWrap.childElementCount) {
-				const empty = document.createElement('span')
-				empty.className = 'header-btn'
-				empty.style.pointerEvents = 'none'
-				empty.style.opacity = '0.75'
-				empty.textContent = 'No stream/record outputs'
-				streamStateWrap.appendChild(empty)
-			}
-		} catch {
-			streamStateWrap.innerHTML = ''
-			const na = document.createElement('span')
-			na.className = 'header-btn'
-			na.style.pointerEvents = 'none'
-			na.textContent = 'Stream/Rec status n/a'
-			na.title = 'Streaming status unavailable'
-			streamStateWrap.appendChild(na)
-		}
-	}
-	void syncStreamingRecordBadge()
-	setInterval(() => { void syncStreamingRecordBadge() }, 2000)
-
-	async function applyLedTest(enabled) {
-		try {
-			const s = getLedTestSettings()
-			const { gridByChannel: _g, ...rest } = s
-			const st = stateStore?.getState?.() || {}
-			const programChannelsRaw = Array.isArray(st?.channelMap?.programChannels) ? st.channelMap.programChannels : [1]
-			const programChannels = [...new Set(programChannelsRaw.map((x) => parseInt(String(x), 10)).filter((n) => Number.isFinite(n) && n > 0))]
-			const mvCh = parseInt(String(st?.channelMap?.multiviewCh ?? ''), 10)
-			const gridExtra = Object.entries(s.gridByChannel || {})
-				.filter(([, v]) => v === true)
-				.map(([k]) => parseInt(k, 10))
-				.filter((n) => Number.isFinite(n) && n > 0)
-			const channelsToApply = [...programChannels, ...(Number.isFinite(mvCh) && mvCh > 0 ? [mvCh] : []), ...gridExtra]
-			const uniqueChannels = [...new Set(channelsToApply)]
-			const targets = uniqueChannels.length ? uniqueChannels : [1]
-			const failures = []
-			for (const channel of targets) {
-				const row = st?.configComparison?.serverChannels?.find((x) => x.index === channel)
-				const cs = st?.settings?.casparServer && typeof st.settings.casparServer === 'object'
-					? st.settings.casparServer
-					: st?.config?.casparServer && typeof st.config.casparServer === 'object'
-						? st.config.casparServer
-						: {}
-				let connectorLabel = ''
-				const progIdx = programChannels.indexOf(channel)
-				if (progIdx >= 0) {
-					const screenNo = progIdx + 1
-					const screenSystemId = String(cs[`screen_${screenNo}_system_id`] || '').trim()
-					const osMode = String(cs[`screen_${screenNo}_os_mode`] || '').trim()
-					const osRateRaw = parseFloat(String(cs[`screen_${screenNo}_os_rate`] ?? ''))
-					const osRate = Number.isFinite(osRateRaw) && osRateRaw > 0 ? osRateRaw : null
-					const xrandrPart = [osMode, osRate != null ? `${osRate}Hz` : ''].filter(Boolean).join(' @ ')
-					const deck = parseInt(String(cs[`screen_${progIdx + 1}_decklink_device`] ?? 0), 10) || 0
-					connectorLabel = `Output: Screen ${screenNo} (PGM ch ${channel})`
-					if (screenSystemId) connectorLabel += ` · ${screenSystemId}`
-					if (xrandrPart) connectorLabel += ` · ${xrandrPart}`
-					if (deck > 0) connectorLabel += ` · DeckLink ${deck}`
-					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
-				} else if (Number.isFinite(mvCh) && channel === mvCh) {
-					const mvDeck = parseInt(String(cs.multiview_decklink_device ?? 0), 10) || 0
-					const mvSystemId = String(cs.multiview_system_id || '').trim()
-					const mvOsMode = String(cs.multiview_os_mode || '').trim()
-					const mvOsRateRaw = parseFloat(String(cs.multiview_os_rate ?? ''))
-					const mvOsRate = Number.isFinite(mvOsRateRaw) && mvOsRateRaw > 0 ? mvOsRateRaw : null
-					const mvXrandrPart = [mvOsMode, mvOsRate != null ? `${mvOsRate}Hz` : ''].filter(Boolean).join(' @ ')
-					connectorLabel = `Output: Multiview (ch ${channel})`
-					if (mvSystemId) connectorLabel += ` · ${mvSystemId}`
-					if (mvXrandrPart) connectorLabel += ` · ${mvXrandrPart}`
-					if (mvDeck > 0) connectorLabel += ` · DeckLink ${mvDeck}`
-					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
-				}
-				const payload = {
-					enabled,
-					...rest,
-					channel,
-					showLedGrid: getLedTestShowGridForChannel(channel),
-					showCircle: s.showCircle !== false,
-					showCross: s.showCross !== false,
-					connectorLabel,
-				}
-				if (row) {
-					payload.resolutionLabel = row.resolutionLabel
-					payload.resolutionWidth = row.screenWidth
-					payload.resolutionHeight = row.screenHeight
-					payload.videoMode = row.videoMode
-				}
-				try {
-					await api.post('/api/led-test-card', payload)
-				} catch (err) {
-					failures.push({ channel, message: err?.message || String(err) })
-				}
-			}
-			if (enabled && failures.length === targets.length) {
-				ledTestCb.checked = false
-				localStorage.setItem('highascg_led_test_enabled', 'false')
-				alert(
-					'LED test card: failed on all outputs.\n' +
-						failures.map((f) => `ch ${f.channel}: ${f.message}`).join('\n')
-				)
-				return
-			}
-			if (enabled && failures.length > 0) {
-				console.warn(
-					'LED test card: partial failure',
-					failures.map((f) => `ch ${f.channel}: ${f.message}`).join('; ')
-				)
-			}
-			localStorage.setItem('highascg_led_test_enabled', enabled ? 'true' : 'false')
-		} catch (e) {
-			ledTestCb.checked = false
-			localStorage.setItem('highascg_led_test_enabled', 'false')
-			alert('LED test card: ' + (e?.message || e))
-		}
-	}
-
-	ledTestCb.addEventListener('change', () => {
-		void applyLedTest(!!ledTestCb.checked)
-	})
-	ledTestBtn.addEventListener('click', () => {
-		showLedTestModal(() => {
-			if (ledTestCb.checked) void applyLedTest(true)
-		}, stateStore)
-	})
-
-	ftbBtn.addEventListener('click', () => {
-		void (async () => {
-			if (ftbBusy) return
-			ftbBusy = true
-			ftbBtn.disabled = true
-			try {
-				await api.post('/api/ftb', {})
-				ledTestCb.checked = false
-				localStorage.setItem('highascg_led_test_enabled', 'false')
-			} catch (e) {
-				alert('FTB: ' + (e?.message || e))
-			} finally {
-				ftbBusy = false
-				ftbBtn.disabled = false
-			}
-		})()
-	})
-	if (localStorage.getItem('highascg_led_test_enabled') === 'true') {
-		ledTestCb.checked = true
-		void applyLedTest(true)
-	}
+	
+	initLedTestCard(ledTestWrap, stateStore)
+	initStreamingBadge(ledTestWrap)
 
 	const audioGroup = createHeaderAudioMonitor(stateStore)
 
@@ -506,9 +234,17 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	}
 
 	// Layout: [title] [project · save · load · new · sync] [server · settings] … [headphones · eyes]
+	const autosaveIndicator = document.createElement('span')
+	autosaveIndicator.className = 'header-autosave-indicator'
+	autosaveIndicator.style.cssText = 'font-size: 11px; opacity: 0; color: #a1a1aa; margin-left: 8px; transition: opacity 0.5s ease; white-space: nowrap; user-select: none;'
+	window.addEventListener('project-autosaved', (ev) => {
+		autosaveIndicator.textContent = 'Autosaved at ' + ev.detail.time
+		autosaveIndicator.style.opacity = '1'
+	})
+
 	const leftWrap = document.createElement('div')
 	leftWrap.className = 'header-left'
-	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn)
+	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn, autosaveIndicator)
 
 	const midWrap = document.createElement('div')
 	midWrap.className = 'header-mid'

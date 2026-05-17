@@ -390,6 +390,13 @@ export function initTimelineEditor(root, stateStore) {
 		canvas.notifyVisible()
 		canvas.zoomFit()
 		previewPanel?.scheduleDraw?.()
+		
+		// Enforce PRV by default when entering the tab
+		view.sendTo.preview = true
+		view.sendTo.program = false
+		transportApi.updateSendTo()
+		transportApi.buildTransport()
+
 		void syncPlaybackFromServer()
 	})
 

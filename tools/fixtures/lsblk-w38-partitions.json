@@ -1,0 +1,88 @@
+{
+   "blockdevices": [
+      {
+         "name": "sda",
+         "path": "/dev/sda",
+         "type": "disk",
+         "size": "500G",
+         "rm": false,
+         "hotplug": false,
+         "children": [
+            {
+               "name": "sda2",
+               "path": "/dev/sda2",
+               "type": "part",
+               "size": "500G",
+               "fstype": "ext4",
+               "label": "INTERNAL_LIB",
+               "uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+               "mountpoint": null,
+               "rm": false,
+               "hotplug": false
+            }
+         ]
+      },
+      {
+         "name": "sdb",
+         "path": "/dev/sdb",
+         "type": "disk",
+         "size": "28.9G",
+         "rm": true,
+         "hotplug": true,
+         "children": [
+            {
+               "name": "sdb1",
+               "path": "/dev/sdb1",
+               "type": "part",
+               "size": "28.9G",
+               "fstype": "vfat",
+               "label": "STICK",
+               "uuid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+               "mountpoint": "/media/live/STICK",
+               "rm": true,
+               "hotplug": true
+            }
+         ]
+      },
+      {
+         "name": "nvme0n1",
+         "path": "/dev/nvme0n1",
+         "type": "disk",
+         "size": "1T",
+         "children": [
+            {
+               "name": "nvme0n1p9",
+               "path": "/dev/nvme0n1p9",
+               "type": "part",
+               "size": "128M",
+               "fstype": null,
+               "uuid": null,
+               "mountpoint": null,
+               "rm": false,
+               "hotplug": false
+            }
+         ]
+      },
+      {
+         "name": "dm-1",
+         "path": "/dev/mapper/data_crypt",
+         "type": "crypt",
+         "size": "200G",
+         "fstype": "ext4",
+         "uuid": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+         "mountpoint": "/mnt/data",
+         "rm": false,
+         "hotplug": false
+      },
+      {
+         "NAME": "LEGACY",
+         "PATH": "/dev/sdz1",
+         "TYPE": "part",
+         "UUID": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+         "SIZE": "10G",
+         "FSTYPE": "xfs",
+         "RM": "0",
+         "HOTPLUG": "0"
+      }
+   ]
+}

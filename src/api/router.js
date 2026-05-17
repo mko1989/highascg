@@ -35,6 +35,7 @@ const routesIngest = require('./routes-ingest')
 const routesUsbIngest = require('./routes-usb-ingest')
 const routesStreamingChannel = require('./routes-streaming-channel')
 const routesSystemSetup = require('./routes-system-setup')
+const routesSystemHardware = require('./routes-system-hardware')
 const routesCasparConfig = require('./routes-caspar-config')
 const routesLogs = require('./routes-logs')
 const routesHostStats = require('./routes-host-stats')
@@ -42,6 +43,7 @@ const routesPipOverlay = require('./routes-pip-overlay')
 const routesModules = require('./routes-modules')
 const routesDeviceView = require('./routes-device-view')
 const routesPlugins = require('./routes-plugins')
+const routesNdi = require('./routes-ndi')
 const moduleRegistry = require('../module-registry')
 
 /**
@@ -102,6 +104,22 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	if (method === 'GET' && p === '/api/host-stats') {
 		return await routesHostStats.handleGet(ctx)
+	}
+
+	if (method === 'GET' && (p === '/api/system/block-devices' || p === '/api/system/media-mount/status')) {
+		const r = await routesSystemStorage.handleGet(p, ctx)
+		if (r) return r
+	}
+	if (method === 'GET' && (p === '/api/system/gpu-nvidia' || p === '/api/system/decklink')) {
+		const r = await routesSystemHardware.hardwareHandleGet(p)
+		if (r) return r
+	}
+	if (
+		method === 'POST' &&
+		(p === '/api/system/gpu-nvidia/apply' || p === '/api/system/gui-launch' || p === '/api/system/gpu-ports-reset')
+	) {
+		const r = await routesSystemHardware.hardwareHandlePost(p, body, ctx)
+		if (r) return r
 	}
 
 	if (method === 'GET' && p === '/api/scene/live') {
@@ -181,8 +199,8 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (dv) return dv
 	}
 
-	if (method === 'GET' && p === '/api/hardware/displays') {
-		const r = await routesSettings.handleHardwareGet(p)
+	if (method === 'GET' && (p === '/api/hardware/displays' || p === '/api/hardware/modeline-preview')) {
+		const r = await routesSettings.handleHardwareGet(p, query)
 		if (r) return r
 	}
 	if (method === 'GET' && (p === '/api/streams' || p === '/api/streaming/ndi-sources')) {
@@ -248,7 +266,7 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	// Media list + local ffprobe — must work when AMCP is down (same folder as ingest / offline)
 	// Project JSON — works without Caspar (disk mirror from web UI Save)
-	if (method === 'POST' && (p === '/api/project/save' || p === '/api/project/load')) {
+	if (method === 'POST' && (p === '/api/project/save' || p === '/api/project/load' || p === '/api/project/autosave')) {
 		const r = await routesData.handleProject(p, body, ctx)
 		if (r) return r
 	}
@@ -272,6 +290,11 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 	// Duration for timeline drop: CINF + ffprobe fallback — must work when AMCP is down if files are on disk
 	if (method === 'POST' && p === '/api/media/cinf') {
+		const r = await routesMedia.handlePost(p, body, ctx)
+		if (r) return r
+	}
+	// Live PRINT still cache — before Caspar gate (returns 502 if AMCP down, not blanket 503)
+	if (method === 'POST' && p === '/api/thumbnail/live/capture') {
 		const r = await routesMedia.handlePost(p, body, ctx)
 		if (r) return r
 	}
@@ -302,7 +325,9 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	try {
 		if (method === 'GET') {
-			let r = await routesPipOverlay.handleGet(p, ctx)
+			let r = await routesNdi.handleGet(p, ctx, query)
+			if (r) return r
+			r = await routesPipOverlay.handleGet(p, ctx)
 			if (r) return r
 			r = await routesState.handleGet(p, ctx, query)
 			if (r) return r

@@ -73,7 +73,7 @@ import { MIXER_EFFECTS, EFFECT_CATEGORIES } from '../lib/effect-registry.js'
  * @param {string} label
  * @param {() => void} [onDeleted] - refresh list / feedback after successful delete
  */
-function attachMediaModifierClick(el, id, label, onDeleted) {
+export function attachMediaModifierClick(el, id, label, onDeleted) {
 	const hintDl = 'Ctrl+click or ⌘+click: download to this computer'
 	const hintRm = 'Ctrl+Alt+click or ⌘+⌥+click: remove from server'
 	el.title = `${label} — ${hintDl} · ${hintRm}`
@@ -188,18 +188,18 @@ export function escapeHtml(s) {
 	return div.innerHTML
 }
 
-function truncate(s, len) {
+export function truncate(s, len) {
 	if (!s || s.length <= len) return s
 	return s.slice(0, len - 1) + '…'
 }
 
-function getExtension(filename) {
+export function getExtension(filename) {
 	if (!filename || typeof filename !== 'string') return ''
 	const m = filename.match(/\.([a-zA-Z0-9]+)$/)
 	return m ? m[1].toLowerCase() : ''
 }
 
-function formatDuration(ms) {
+export function formatDuration(ms) {
 	if (ms == null || ms < 0) return '—'
 	const s = Math.floor(ms / 1000)
 	const m = Math.floor(s / 60)
@@ -208,13 +208,13 @@ function formatDuration(ms) {
 	return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
-function formatFps(fps) {
+export function formatFps(fps) {
 	if (fps == null || fps <= 0 || isNaN(fps)) return ''
 	const n = Math.round(fps * 100) / 100
 	return Number.isInteger(n) ? String(n) : n.toFixed(2)
 }
 
-function formatFileSize(bytes) {
+export function formatFileSize(bytes) {
 	if (bytes == null || bytes < 0 || !Number.isFinite(bytes)) return ''
 	if (bytes < 1024) return bytes + ' B'
 	if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -245,265 +245,7 @@ export function mergeMediaProbeOverlay(stateMedia, probeList) {
 	return [...byKey.values()]
 }
 
-/**
- * Templates tab — Caspar `TLS` list entries, draggable as `template` sources for looks.
- * @param {HTMLElement} container
- * @param {Array<{ id?: string, label?: string }>} templates
- * @param {string} filter
- */
-export function renderTemplatesBrowser(container, templates, filter) {
-	const filtered = filter
-		? (templates || []).filter((i) =>
-				(i.label || i.id || '').toLowerCase().includes(filter.toLowerCase()),
-			)
-		: templates || []
-	
-	const renderKey = JSON.stringify({
-		ids: filtered.map(t => t.id || t.label),
-		filter
-	})
-	if (container._lastRenderKey === renderKey) return
-	container._lastRenderKey = renderKey
-
-	container.innerHTML = ''
-	if (filtered.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No templates (run Refresh — Caspar TLS)</p>'
-		return
-	}
-	for (const item of filtered) {
-		const id = item.id ?? item.label ?? ''
-		if (!id) continue
-		const label = item.label ?? String(id)
-		const el = document.createElement('div')
-		el.className = 'source-item source-item--template'
-		el.dataset.sourceValue = id
-		el.innerHTML = `
-			<span class="source-item__kind-pill" title="HTML / Flash template">FT</span>
-			<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 48))}</span>
-		`
-		makeDraggable(el, 'template', id, label)
-		container.appendChild(el)
-	}
-}
-
-/** Media browser: Detailed compact view with thumbnails and rich metadata. */
-export function renderMediaBrowser(container, media, filter, onMediaDeleted, options = {}) {
-	const collapsed = options.collapsedFolders || new Set()
-	const onToggle = options.onToggleFolder
-	const onMove = options.onMoveItem
-	
-	const filtered = filter
-		? media.filter((i) => (i.label || i.id || i).toLowerCase().includes(filter.toLowerCase()))
-		: media
-
-	const renderKey = JSON.stringify({
-		media: filtered.map(m => ({ id: m.id, res: m.resolution, dur: m.durationMs })),
-		filter,
-		collapsed: Array.from(collapsed),
-		selected: Array.from(options.selected || [])
-	})
-	if (container._lastRenderKey === renderKey) return
-	container._lastRenderKey = renderKey
-
-	container.innerHTML = ''
-	if (filtered.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No media files</p>'
-		return
-	}
-
-	// 1. Group into tree structure
-	const root = { folders: {}, files: [] }
-	filtered.forEach((item) => {
-		const id = item.id ?? item
-		const parts = String(id).split('/')
-		if (item.isDir) {
-			let curr = root
-			for (let i = 0; i < parts.length; i++) {
-				const p = parts[i]
-				if (!curr.folders[p]) curr.folders[p] = { folders: {}, files: [], path: parts.slice(0, i + 1).join('/') }
-				curr = curr.folders[p]
-			}
-		} else {
-			let curr = root
-			for (let i = 0; i < parts.length - 1; i++) {
-				const p = parts[i]
-				if (!curr.folders[p]) curr.folders[p] = { folders: {}, files: [], path: parts.slice(0, i + 1).join('/') }
-				curr = curr.folders[p]
-			}
-			curr.files.push(item)
-		}
-	})
-
-	// 2. Recursive render
-	function walk(node, depth, isVisible) {
-		const folderNames = Object.keys(node.folders).sort()
-		folderNames.forEach((name) => {
-			const folder = node.folders[name]
-			const isCollapsed = collapsed.has(folder.path)
-			const el = document.createElement('div')
-			el.className = `source-item source-item--folder ${isCollapsed ? 'collapsed' : ''}`
-			if (!isVisible) el.style.display = 'none'
-			el.innerHTML = `
-				${'<span class="source-item__nest-indent"></span>'.repeat(depth)}
-				<span class="source-item__expand-arrow">${isCollapsed ? '▶' : '▼'}</span>
-				<span class="source-item__icon">📁</span>
-				<span class="source-item__label">${escapeHtml(name)}</span>
-			`
-			el.onclick = (e) => { e.stopPropagation(); onToggle?.(folder.path) }
-			
-			// Folder drop target for moving files
-			el.addEventListener('dragover', (e) => {
-				const raw = e.dataTransfer.getData('application/json')
-				if (!raw) return
-				try {
-					const data = JSON.parse(raw)
-					if (data.type === 'media' && data.value && !String(data.value).startsWith(folder.path + '/')) {
-						e.preventDefault()
-						el.classList.add('source-item--drop-target')
-					}
-				} catch {}
-			})
-			el.addEventListener('dragleave', () => el.classList.remove('source-item--drop-target'))
-			el.addEventListener('drop', (e) => {
-				el.classList.remove('source-item--drop-target')
-				const raw = e.dataTransfer.getData('application/json')
-				if (!raw) return
-				try {
-					const data = JSON.parse(raw)
-					if (data.type === 'media' && data.value) {
-						e.preventDefault()
-						e.stopPropagation()
-						onMove?.(data.value, folder.path)
-					}
-				} catch {}
-			})
-
-			container.appendChild(el)
-			walk(folder, depth + 1, isVisible && !isCollapsed)
-		})
-
-		const files = node.files.sort((a, b) => (a.label || a.id).localeCompare(b.label || b.id))
-		files.forEach((item) => {
-			const id = item.id ?? item
-			const label = item.label ?? String(id)
-			const shortLabel = label.split('/').pop()
-			const ext = getExtension(shortLabel)
-			const resolution = item.resolution || ''
-			const duration = formatDuration(item.durationMs)
-			const fpsStr = formatFps(item.fps)
-			const kind = classifyMediaItem(item)
-			
-			const el = document.createElement('div')
-			const isSelected = options.selected?.has(id)
-			el.className = `source-item source-item--media source-item--media-detailed source-item--kind-${kind} ${isSelected ? 'source-item--selected' : ''}`
-			if (!isVisible) el.style.display = 'none'
-			el.dataset.sourceValue = id
-
-			let thumbHtml = ''
-			if (kind === 'video' || kind === 'still') {
-				const thumbUrl = getThumbnailUrl(id, 80, 2)
-				thumbHtml = `<div class="source-item__thumbnail"><img src="${thumbUrl}" loading="lazy" onerror="this.parentElement.innerHTML='<i>${kind === 'video' ? '🎬' : '🖼️'}</i>'"/></div>`
-			} else if (kind === 'audio') {
-				thumbHtml = `<div class="source-item__thumbnail"><i>🎵</i></div>`
-			} else {
-				thumbHtml = `<div class="source-item__thumbnail"><i>📄</i></div>`
-			}
-
-			const metaParts = []
-			if (kind === 'video') {
-				if (resolution) metaParts.push(`<span class="source-item__meta-tag">${resolution}</span>`)
-				if (fpsStr) metaParts.push(`<span class="source-item__meta-tag">${fpsStr} fps</span>`)
-				if (item.codec) metaParts.push(`<span class="source-item__meta-tag">${item.codec.toUpperCase()}</span>`)
-				if (ext) metaParts.push(`<span class="source-item__meta-tag">${ext.toUpperCase()}</span>`)
-			} else if (kind === 'still') {
-				if (resolution) metaParts.push(`<span class="source-item__meta-tag">${resolution}</span>`)
-				if (ext) metaParts.push(`<span class="source-item__meta-tag">${ext.toUpperCase()}</span>`)
-			} else if (kind === 'audio') {
-				if (item.codec) metaParts.push(`<span class="source-item__meta-tag">${item.codec.toUpperCase()}</span>`)
-				if (ext) metaParts.push(`<span class="source-item__meta-tag">${ext.toUpperCase()}</span>`)
-			}
-
-			el.innerHTML = `
-				${'<span class="source-item__nest-indent"></span>'.repeat(depth)}
-				${thumbHtml}
-				<div class="source-item__media-col">
-					<div class="source-item__media-line1">
-						<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>
-						${duration !== '—' ? `<span class="source-item__duration">${escapeHtml(duration)}</span>` : ''}
-					</div>
-					<div class="source-item__meta-row">${metaParts.join('')}</div>
-				</div>
-			`
-			
-			// Click on thumbnail to select
-			const thumbEl = el.querySelector('.source-item__thumbnail')
-			if (thumbEl) {
-				thumbEl.onclick = (e) => {
-					e.stopPropagation()
-					options.onToggleSelect?.(id, e.shiftKey)
-				}
-			}
-
-			makeDraggable(el, 'media', id, label, {
-				resolution: item.resolution || '',
-				...(item.durationMs != null && item.durationMs > 0 ? { durationMs: item.durationMs } : {}),
-			})
-			attachMediaModifierClick(el, id, label, onMediaDeleted)
-			container.appendChild(el)
-		})
-	}
-
-	walk(root, 0, true)
-}
-
-/**
- * Render the Effects tab: CasparCG mixer effects grouped by category, each draggable.
- * @param {HTMLElement} container
- * @param {string} filter
- */
-export function renderEffectsTab(container, filter) {
-	const lowerFilter = (filter || '').toLowerCase()
-	const filtered = lowerFilter
-		? MIXER_EFFECTS.filter((e) => e.label.toLowerCase().includes(lowerFilter) || e.category.toLowerCase().includes(lowerFilter))
-		: MIXER_EFFECTS
-
-	const renderKey = JSON.stringify({
-		ids: filtered.map(e => e.type),
-		filter
-	})
-	if (container._lastRenderKey === renderKey) return
-	container._lastRenderKey = renderKey
-
-	container.innerHTML = ''
-	if (filtered.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No matching effects</p>'
-		return
-	}
-
-	// Group by category
-	for (const cat of EFFECT_CATEGORIES) {
-		const inCat = filtered.filter((e) => e.category === cat.id)
-		if (inCat.length === 0) continue
-
-		const heading = document.createElement('div')
-		heading.className = 'sources-effects-category'
-		heading.textContent = cat.label
-		container.appendChild(heading)
-
-		for (const fx of inCat) {
-			const el = document.createElement('div')
-			el.className = 'source-item source-item--effect'
-			el.dataset.sourceValue = fx.type
-			el.innerHTML = `
-				<span class="source-item__label">${escapeHtml(fx.label)}</span>
-			`
-			makeDraggable(el, 'effect', fx.type, fx.label)
-			container.appendChild(el)
-		}
-	}
-}
-
-export function buildLiveSources(channelMap, connectors = []) {
+export function buildLiveSources(channelMap, connectors) {
 	const sources = []
 	if (!channelMap) return sources
 	const {
@@ -588,77 +330,4 @@ export function decklinkSlotStatusMessage(status, slot) {
 	if (sd) return 'Skipped: duplicate device index (see Settings → Screens)'
 	return ''
 }
-/**
- * Placeholders tab — virtual media assets for simulation mode.
- * @param {HTMLElement} container
- * @param {Array<object>} placeholders
- * @param {string} filter
- */
-export function renderPlaceholdersBrowser(container, placeholders, filter) {
-	const filtered = filter
-		? (placeholders || []).filter((i) =>
-				(i.label || i.id || '').toLowerCase().includes(filter.toLowerCase()),
-			)
-		: placeholders || []
-	
-	const renderKey = JSON.stringify({
-		ids: filtered.map(p => p.id),
-		filter
-	})
-	if (container._lastRenderKey === renderKey) return
-	container._lastRenderKey = renderKey
 
-	container.innerHTML = ''
-	if (filtered.length === 0) {
-		container.innerHTML = '<p class="sources-empty">No placeholders. Click + to add one.</p>'
-		return
-	}
-
-	for (const item of filtered) {
-		const id = item.id
-		const label = item.label || id
-		const el = document.createElement('div')
-		el.className = 'source-item source-item--placeholder'
-		el.dataset.sourceValue = id
-		
-		const resolution = item.resolution || ''
-		const duration = formatDuration(item.durationMs)
-		const thumbStyle = item.template === 'solid' && item.value ? `background-color: ${item.value}` : ''
-		
-		el.innerHTML = `
-			<div class="source-item__thumbnail source-item__thumbnail--placeholder" data-template="${item.template}" style="${thumbStyle}"></div>
-			<div class="source-item__media-col">
-				<div class="source-item__media-line1">
-					<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 32))}</span>
-					<span class="source-item__duration">${escapeHtml(duration)}</span>
-				</div>
-				<div class="source-item__meta-row">
-					<span class="source-item__meta-tag">${escapeHtml(item.template.toUpperCase())}</span>
-					<span class="source-item__meta-tag">${escapeHtml(resolution)}</span>
-				</div>
-			</div>
-			<button type="button" class="source-item__remove" title="Remove Placeholder">&times;</button>
-		`
-		
-		makeDraggable(el, 'media', id, label, {
-			isPlaceholder: true,
-			template: item.template,
-			resolution: item.resolution,
-			durationMs: item.durationMs,
-			value: item.value,
-		})
-		
-		const removeBtn = el.querySelector('.source-item__remove')
-		if (removeBtn) {
-			removeBtn.addEventListener('click', (e) => {
-				e.stopPropagation()
-				if (confirm(`Remove placeholder "${label}"?`)) {
-					window.placeholderState.remove(id)
-					renderPlaceholdersBrowser(container, window.placeholderState.getAll(), filter)
-				}
-			})
-		}
-
-		container.appendChild(el)
-	}
-}

@@ -19,8 +19,14 @@ export async function applyOsSettings(patch = {}) {
 	return await api.post('/api/settings/apply-os', patch)
 }
 
-export async function getHardwareDisplays() {
-	return await api.get('/api/hardware/displays')
+export async function getModelinePreview({ w, h, rate, type }) {
+	const q = new URLSearchParams({
+		w: String(Math.round(w)),
+		h: String(Math.round(h)),
+		rate: String(rate),
+		type: String(type || 'cvt'),
+	})
+	return await api.get(`/api/hardware/modeline-preview?${q.toString()}`)
 }
 
 export async function patchDestination(id, patch) {
@@ -141,4 +147,8 @@ export async function stopPgmRecord({ outputId } = {}) {
 
 export async function addMappingNode() {
 	return await api.post('/api/device-view', { addMappingNode: true })
+}
+
+export async function resetGpuLayout() {
+	return await api.post('/api/system/gpu-ports-reset')
 }

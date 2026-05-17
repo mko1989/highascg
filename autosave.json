@@ -1,0 +1,1256 @@
+{
+  "version": 2,
+  "name": "Untitled",
+  "savedAt": "2026-05-17T09:18:33.790Z",
+  "scenes": {
+    "scenes": [
+      {
+        "id": "sc_1778680389775_guz46oj",
+        "name": "Look 1",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "422 TEST 2",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "fill-canvas",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.502853557748848,
+              "y": 0.06690557576339634,
+              "scaleX": 0.4406099966249742,
+              "scaleY": 0.4406099966249742
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778681587275_5q86r8u",
+        "name": "Look 2",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "LED-GRID-3840X1024",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": -0.8377028683190291,
+              "y": 0.4603643140479706,
+              "scaleX": 2.11796875,
+              "scaleY": 1
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778691323035_jifzvxs",
+        "name": "Look 3",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "led-grid-5120x1024.png",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.03855132236799197,
+              "y": 0.06139210015073118,
+              "scaleX": 0.9170134400099101,
+              "scaleY": 0.30933786707713434
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778746721567_x95bmtq",
+        "name": "Look 6",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/BIG_BUCK_BUNNY_1080P24",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "fill-canvas",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0,
+              "y": 0,
+              "scaleX": 1,
+              "scaleY": 1
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          },
+          {
+            "layerNumber": 20,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/FOREST_JESTER-DV",
+              "isPlaceholder": false
+            },
+            "loop": true,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.3233068059867793,
+              "y": 0.16111804707374716,
+              "scaleX": 0.5625,
+              "scaleY": 0.6666666666666666
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto",
+            "effects": [
+              {
+                "type": "crop",
+                "params": {
+                  "left": 0.2,
+                  "top": 0.1,
+                  "right": 0.9,
+                  "bottom": 0.9
+                }
+              }
+            ]
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778746797092_qgqpg5f",
+        "name": "Look 7",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/PIEKLOKOBIET_S01E01_MASTER_178_R709_PL-XX_20DFX_HD_25FPS_HAP_20260210",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "fill-canvas",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0,
+              "y": 0,
+              "scaleX": 1,
+              "scaleY": 1
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778757274665_u68b34b",
+        "name": "Look 9",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "RJD2 - Ghostwriter.mp3",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.25,
+              "y": 0.05555555555555555,
+              "scaleX": 0.5,
+              "scaleY": 0.8888888888888888
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778757531515_ovohzy1",
+        "name": "Look 10",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "Chase & Status - End Credits ft. Plan B_1080p.mp4",
+              "isPlaceholder": false
+            },
+            "loop": true,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": -0.25,
+              "y": -0.25,
+              "scaleX": 1.5,
+              "scaleY": 1.5
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1778852911070_762o0c1",
+        "name": "Look 12",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/FOREST_JESTER-DV",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "vertical",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.078125,
+              "y": 0,
+              "scaleX": 0.84375,
+              "scaleY": 1
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto",
+            "effects": [
+              {
+                "type": "crop",
+                "params": {
+                  "left": 0.3,
+                  "top": 0,
+                  "right": 0.7,
+                  "bottom": 1
+                }
+              }
+            ]
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998,
+          "slices": []
+        }
+      },
+      {
+        "id": "sc_1779006278934_bzc1ntg",
+        "name": "Look 9",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/FOREST_JESTER-DV",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.21875,
+              "y": 0.16666666666666666,
+              "scaleX": 0.5625,
+              "scaleY": 0.6666666666666666
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "audioRoute": "1+2",
+            "muted": false,
+            "volume": 1,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            }
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "slices": [],
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998
+        }
+      },
+      {
+        "id": "sc_1779007293389_kvfxvva",
+        "name": "Look 10",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "timeline",
+              "value": "tmp44b9k8zf5",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "audioRoute": "1+2",
+            "volume": 1,
+            "muted": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0,
+              "y": 0,
+              "scaleX": 1,
+              "scaleY": 1
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 12
+            },
+            "pipOverlays": [],
+            "sourceMode": "single",
+            "playlist": [],
+            "playlistTransition": {
+              "type": "MIX",
+              "duration": 12,
+              "tween": "linear"
+            },
+            "playlistLoop": true,
+            "playlistAdvance": "auto"
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "slices": [],
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 998
+        }
+      },
+      {
+        "id": "sc_1779009156238_sn2l845",
+        "name": "Look 11",
+        "layers": [
+          {
+            "layerNumber": 10,
+            "source": {
+              "type": "media",
+              "value": "TESTOWE/FOREST_JESTER-DV",
+              "isPlaceholder": false
+            },
+            "loop": false,
+            "straightAlpha": false,
+            "contentFit": "native",
+            "aspectLocked": true,
+            "fill": {
+              "x": 0.21875,
+              "y": 0.16666666666666666,
+              "scaleX": 0.5625,
+              "scaleY": 0.6666666666666666
+            },
+            "opacity": 1,
+            "rotation": 0,
+            "transition": null,
+            "audioRoute": "1+2",
+            "muted": false,
+            "volume": 1,
+            "fadeOnEnd": {
+              "enabled": false,
+              "frames": 6
+            }
+          }
+        ],
+        "mainScope": "0",
+        "defaultTransition": {
+          "type": "MIX",
+          "duration": 25,
+          "tween": "linear"
+        },
+        "globalBorder": {
+          "enabled": false,
+          "type": "border",
+          "params": {
+            "side": "inside"
+          },
+          "slices": [],
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          }
+        }
+      }
+    ],
+    "liveSceneIdByMain": [
+      "sc_1779009156238_sn2l845",
+      null,
+      null,
+      null
+    ],
+    "previewSceneIdByMain": [
+      "sc_1779009156238_sn2l845",
+      null,
+      null,
+      null
+    ],
+    "liveSceneId": "sc_1779009156238_sn2l845",
+    "previewSceneId": "sc_1779009156238_sn2l845",
+    "activeScreenIndex": 0,
+    "globalDefaultTransition": {
+      "type": "MIX",
+      "duration": 25,
+      "tween": "linear"
+    },
+    "mainEditorVisible": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "layerPresets": [],
+    "lookPresets": [],
+    "globalBorders": [
+      {
+        "enabled": true,
+        "type": "edge_strip",
+        "fadeDuration": 25,
+        "params": {
+          "width": 50,
+          "color": "#d5ce70",
+          "radius": 0,
+          "opacity": 1,
+          "side": "inside",
+          "intensity": 50,
+          "count": 1,
+          "thickness": 20,
+          "length": 82,
+          "speed": 2,
+          "glowColor": "#00f108",
+          "glow": true,
+          "glowWidth": 12
+        },
+        "artnetPatch": {
+          "startChannel": 1,
+          "universe": 0
+        },
+        "mirrorBorderOnPrv": false,
+        "activePgmLayer": 996,
+        "borderPresets": [
+          {
+            "slot": 1,
+            "name": "Preset 1",
+            "data": {
+              "enabled": true,
+              "type": "glow",
+              "params": {
+                "width": 50,
+                "color": "#e63946",
+                "radius": 0,
+                "opacity": 1,
+                "side": "inside",
+                "intensity": 50
+              },
+              "fadeDuration": 25,
+              "artnetPatch": {
+                "startChannel": 1,
+                "universe": 0
+              }
+            }
+          },
+          {
+            "slot": 2,
+            "name": "Preset 2",
+            "data": {
+              "enabled": true,
+              "type": "edge_strip",
+              "params": {
+                "width": 50,
+                "color": "#d5ce70",
+                "radius": 0,
+                "opacity": 1,
+                "side": "inside",
+                "intensity": 50,
+                "count": 1,
+                "thickness": 20,
+                "length": 82,
+                "speed": 2,
+                "glowColor": "#00f108"
+              },
+              "fadeDuration": 25,
+              "artnetPatch": {
+                "startChannel": 1,
+                "universe": 0
+              }
+            }
+          }
+        ],
+        "pgmAirSnapshot": {
+          "enabled": true,
+          "type": "edge_strip",
+          "params": {
+            "width": 50,
+            "color": "#d5ce70",
+            "radius": 0,
+            "opacity": 1,
+            "side": "inside",
+            "intensity": 50,
+            "count": 1,
+            "thickness": 20,
+            "length": 82,
+            "speed": 2,
+            "glowColor": "#00f108",
+            "glow": true,
+            "glowWidth": 12
+          },
+          "slices": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 0.2,
+              "h": 1
+            },
+            {
+              "x": 0.8,
+              "y": 0,
+              "w": 0.2,
+              "h": 1
+            },
+            {
+              "x": 0.2,
+              "y": 0,
+              "w": 0.6,
+              "h": 1
+            }
+          ],
+          "fadeDuration": 25,
+          "artnetPatch": {
+            "startChannel": 1,
+            "universe": 0
+          },
+          "activePgmLayer": 996
+        },
+        "slices": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0.2,
+            "h": 1
+          },
+          {
+            "x": 0.8,
+            "y": 0,
+            "w": 0.2,
+            "h": 1
+          },
+          {
+            "x": 0.2,
+            "y": 0,
+            "w": 0.6,
+            "h": 1
+          }
+        ]
+      },
+      null,
+      null,
+      null
+    ]
+  },
+  "programOutput": {
+    "layerNames": [
+      "Layer 1",
+      "Layer 2",
+      "Layer 3",
+      "Layer 4",
+      "Layer 5",
+      "Layer 6",
+      "Layer 7",
+      "Layer 8",
+      "Layer 9"
+    ],
+    "layerSettings": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "opacity": 1,
+        "volume": 1,
+        "audioRoute": "1+2",
+        "blend": "normal",
+        "stretch": "none",
+        "aspectLocked": false
+      }
+    ]
+  },
+  "timelines": {
+    "timelines": [
+      {
+        "id": "tmp44b9k8zf5",
+        "name": "Timeline",
+        "duration": 79684.06047516198,
+        "fps": 25,
+        "flags": [],
+        "layers": [
+          {
+            "id": "tmp44b9k82mh",
+            "name": "Layer 1",
+            "clips": [
+              {
+                "id": "tmp9iyzluwa8",
+                "source": {
+                  "type": "media",
+                  "value": "TESTOWE/BREATHEOUT-STEALINGHEATHER-FORRESEARCHONLY",
+                  "label": "testowe/BreatheOut-StealingHeather-ForResearchOnly.mov",
+                  "resolution": "580×326",
+                  "durationMs": 245746
+                },
+                "startTime": 0,
+                "duration": 39388.46652267819,
+                "inPoint": 0,
+                "outPoint": null,
+                "keyframes": [
+                  {
+                    "time": 38888.46652267819,
+                    "property": "opacity",
+                    "value": 1,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 39388.46652267819,
+                    "property": "opacity",
+                    "value": 0,
+                    "easing": "linear"
+                  }
+                ],
+                "audioRoute": "1+2",
+                "muted": false,
+                "volume": 1,
+                "aspectLocked": true,
+                "contentFit": "native",
+                "startBehaviour": "beginning",
+                "fillPx": {
+                  "x": 350,
+                  "y": 197,
+                  "w": 580,
+                  "h": 326
+                }
+              },
+              {
+                "id": "tmp9izr63ooj",
+                "source": {
+                  "type": "media",
+                  "value": "TESTOWE/FOREST_JESTER-DV",
+                  "label": "testowe/forest_jester-dv.mov",
+                  "resolution": "720×480",
+                  "durationMs": 9810
+                },
+                "startTime": 69874.06047516198,
+                "duration": 9810,
+                "inPoint": 0,
+                "outPoint": null,
+                "keyframes": [
+                  {
+                    "time": 0,
+                    "property": "opacity",
+                    "value": 0,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 500,
+                    "property": "opacity",
+                    "value": 1,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 9310,
+                    "property": "opacity",
+                    "value": 1,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 9810,
+                    "property": "opacity",
+                    "value": 0,
+                    "easing": "linear"
+                  }
+                ],
+                "audioRoute": "1+2",
+                "muted": false,
+                "volume": 1,
+                "aspectLocked": true,
+                "contentFit": "native",
+                "startBehaviour": "beginning",
+                "fillPx": {
+                  "x": 280,
+                  "y": 120,
+                  "w": 720,
+                  "h": 480
+                }
+              }
+            ]
+          },
+          {
+            "id": "tmp44b9k8y0p",
+            "name": "Layer 2",
+            "clips": [
+              {
+                "id": "tmp9iziguho9",
+                "source": {
+                  "type": "media",
+                  "value": "TESTOWE/FIREBELLY-TORCHES-DV",
+                  "label": "testowe/firebelly-torches-dv.mov",
+                  "resolution": "720×480",
+                  "durationMs": 33367
+                },
+                "startTime": 38848.89848812094,
+                "duration": 33367,
+                "inPoint": 0,
+                "outPoint": null,
+                "keyframes": [
+                  {
+                    "time": 0,
+                    "property": "opacity",
+                    "value": 0,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 500,
+                    "property": "opacity",
+                    "value": 1,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 32867,
+                    "property": "opacity",
+                    "value": 1,
+                    "easing": "linear"
+                  },
+                  {
+                    "time": 33367,
+                    "property": "opacity",
+                    "value": 0,
+                    "easing": "linear"
+                  }
+                ],
+                "audioRoute": "1+2",
+                "muted": false,
+                "volume": 1,
+                "aspectLocked": true,
+                "contentFit": "native",
+                "startBehaviour": "beginning",
+                "fillPx": {
+                  "x": 280,
+                  "y": 120,
+                  "w": 720,
+                  "h": 480
+                }
+              }
+            ]
+          },
+          {
+            "id": "tmp44b9k80d3",
+            "name": "Layer 3",
+            "clips": []
+          }
+        ],
+        "layerHeights": [
+          54,
+          54,
+          54
+        ]
+      }
+    ],
+    "activeId": "tmp44b9k8zf5"
+  },
+  "multiview": {
+    "cells": [
+      {
+        "id": "cell_mp7h241k",
+        "type": "pgm",
+        "label": "Program 1",
+        "x": 1008.9981096408317,
+        "y": 34.48015122873343,
+        "w": 870.1701323251418,
+        "h": 489,
+        "source": {
+          "value": "route://1",
+          "type": "route",
+          "label": "Program 1"
+        },
+        "aspectLocked": true
+      },
+      {
+        "id": "cell_mp7h29qi",
+        "type": "prv",
+        "label": "Preview 1",
+        "x": 61.446124763705086,
+        "y": 80.61247637051042,
+        "w": 815.7277882797732,
+        "h": 459,
+        "source": {
+          "value": "route://2",
+          "type": "route",
+          "label": "Preview 1"
+        },
+        "aspectLocked": true
+      }
+    ],
+    "canvasWidth": 1920,
+    "canvasHeight": 1080,
+    "showOverlay": true,
+    "bgColor": "#000000"
+  },
+  "placeholders": []
+}

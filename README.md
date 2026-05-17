@@ -1,6 +1,6 @@
 # HighAsCG
 
-Standalone CasparCG control server and web UI, migrated from the `companion-module-casparcg-server` Companion module. It runs its own HTTP + WebSocket server, connects to CasparCG over AMCP, and serves looks / scenes / timeline / multiview tools in a browser.
+HighAsCG is a Node.js control and configuration service built around CasparCG. It runs its own HTTP + WebSocket server, connects to CasparCG over AMCP, and allows to play looks / scenes / timeline / multiview on connected displays from a browser user interface.
 
 ## Requirements
 

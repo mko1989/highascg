@@ -4,12 +4,10 @@
 echo -e "\n${BOLD}─── Phase 5: Security & Hardening ───${NC}\n"
 
 # 5.1 File Permissions — ensure HighAsCG and CasparCG share files seamlessly
-echo -e "${CYAN}→ Verifying /opt/casparcg permissions...${NC}"
-chown -R "$USER_CASPAR:$USER_CASPAR" /opt/casparcg
-chmod -R 775 /opt/casparcg
-chown -R "$USER_CASPAR:$USER_CASPAR" /opt/highascg
-chmod -R 775 /opt/highascg
-echo -e "  ${GREEN}✓${NC} Both /opt/casparcg and /opt/highascg owned by $USER_CASPAR with 775"
+echo -e "${CYAN}→ Verifying /home/casparcg/highascg permissions (Caspar + HighAsCG tree)...${NC}"
+chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg
+chmod -R 775 /home/casparcg/highascg
+echo -e "  ${GREEN}✓${NC} /home/casparcg/highascg owned by $USER_CASPAR with 775"
 
 # 5.2 Firewall — Local & Tailnet only
 echo -e "${CYAN}→ Configuring firewall (Local + Tailnet only)...${NC}"
@@ -35,7 +33,7 @@ echo -e "  ${GREEN}✓${NC} Firewall: Local & Tailnet only. Public internet bloc
 
 # 5.3 Disable Sleep/Blanking
 echo -e "${CYAN}→ Disabling sleep and screen blanking...${NC}"
-sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash consoleblank=0"/' /etc/default/grub
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="consoleblank=0"/' /etc/default/grub
 update-grub 2>/dev/null || true
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 2>/dev/null || true
 

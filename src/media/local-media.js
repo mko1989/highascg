@@ -165,7 +165,14 @@ async function unlinkMediaById(config, rawId) {
 	if (rawId == null || String(rawId).trim() === '' || String(rawId).includes('..')) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid id' }) }
 	}
-	const filePath = resolveMediaFileOnDisk(config, rawId)
+	let filePath = resolveMediaFileOnDisk(config, rawId)
+	if (!filePath) {
+		const base = getMediaIngestBasePath(config)
+		const safe = resolveSafe(base, rawId)
+		if (safe && fs.existsSync(safe) && fs.statSync(safe).isDirectory()) {
+			filePath = safe
+		}
+	}
 	if (!filePath) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'File not found' }) }
 	}

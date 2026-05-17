@@ -30,6 +30,8 @@ function buildChannelsSection(config, routeMap) {
 	const customModeIds = new Set()
 	let cumulativeX = 0
 	let nextDevice = 1
+	/** True if any main-screen PGM pair emits a Caspar screen consumer (not DeckLink-only / disabled). */
+	let anyMainScreenHasScreenConsumer = false
 
 	const { calculateLayoutPositions } = require('../utils/os-config')
 	const layout = calculateLayoutPositions(config)
@@ -54,6 +56,7 @@ function buildChannelsSection(config, routeMap) {
 			setChannelXml(routeMap.switcherBusChannels[s.n - 1], pair.bus2Xml)
 		}
 		if (pair.hasScreenConsumer) {
+			anyMainScreenHasScreenConsumer = true
 			cumulativeX += s.dims.width
 			nextDevice++
 		}
@@ -65,10 +68,14 @@ function buildChannelsSection(config, routeMap) {
 		mvs.forEach((mvPlan, idx) => {
 			const mvIndex = idx + 1
 			const mvInfo = layout.multiview[mvIndex]
+			// OS layout advances X for every GPU-assigned head; Caspar screen consumers should tile only among
+			// real screen consumers. When all mains are DeckLink-only, multiview defaults to 0 unless multiview_x
+			// is set — do not inherit tandem X from mains that emit no screen consumer.
+			const mvDefaultX = anyMainScreenHasScreenConsumer && mvInfo ? mvInfo.x : cumulativeX
 			const mv = buildMultiviewChannel(config, routeMap, { 
 				n: mvIndex,
 				dims: mvPlan.dims,
-				cumulativeX: mvInfo ? mvInfo.x : cumulativeX, 
+				cumulativeX: mvDefaultX, 
 				nextDevice 
 			})
 			const mvCh = Array.isArray(routeMap.multiviewChannels) ? routeMap.multiviewChannels[idx] : routeMap.multiviewCh

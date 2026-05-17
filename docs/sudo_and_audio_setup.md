@@ -1,6 +1,16 @@
 # Sudo Setup for CasparCG / HighAsCG
 
-To allow HighAsCG (running as user `casparcg`) to manage system-level configurations (like `/etc/asound.conf`) and perform restricted tasks without manual password entry, you must configure `sudoers`.
+**Avoid `NOPASSWD: ALL` for `casparcg`.** Use narrow **`/etc/sudoers.d/`** fragments (see **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**): media mount helper, optional nuclear actions, etc.
+
+**ALSA / `/etc/asound.conf`:** HighAsCG **does not install** passwordless `tee` → `/etc/asound.conf` by default. **PortAudio + device names** and per-user **`~/.asoundrc`** cover normal playout without sudo. Enable system-wide ALSA only if you truly need it: **`HIGHASCG_INSTALL_ASOUND_SUDOERS=1`** during **`scripts/install.sh`** (see **`install-phase3.sh`**).
+
+Historical note: older docs sometimes suggested broad `tee` or `ALL` rules; prefer the inventory doc above.
+
+---
+
+## Legacy (overly broad — not recommended)
+
+The following is **not** the reference layout; kept for context only.
 
 ### 1. Open the Sudoers File
 Run the following command as a root-level user:

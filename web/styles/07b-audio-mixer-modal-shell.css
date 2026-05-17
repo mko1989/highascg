@@ -78,7 +78,7 @@
 
 .audio-mixer__bus {
 	display: grid;
-	grid-template-columns: auto 44px;
+	grid-template-columns: minmax(0, 1fr) 44px;
 	gap: 10px;
 	align-items: end;
 	margin-bottom: 10px;
@@ -95,15 +95,65 @@
 	align-items: center;
 	gap: 4px;
 	min-width: 0;
+	position: relative;
 }
 
 .audio-mixer__bus-label {
 	font-size: 0.72rem;
 	color: var(--text-muted);
 	text-align: center;
-	max-width: 72px;
+	max-width: 100%;
+	width: 100%;
 	line-height: 1.2;
-	word-break: break-word;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+	position: relative;
+}
+
+.audio-mixer__bus-label:hover::after {
+	content: attr(title);
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 6px 10px;
+	white-space: normal;
+	z-index: 100;
+	width: max-content;
+	max-width: 200px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+	color: var(--text);
+	font-size: 0.72rem;
+	text-align: center;
+}
+
+.audio-mixer__solo-btn {
+	padding: 2px 6px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-muted);
+	font-size: 0.65rem;
+	font-weight: 700;
+	cursor: pointer;
+	margin-bottom: 2px;
+	transition: all 0.15s ease;
+	min-width: 22px;
+}
+.audio-mixer__solo-btn:hover {
+	border-color: var(--text-muted);
+	color: var(--text);
+}
+.audio-mixer__solo-btn--active {
+	background: #facc15; /* Yellow solo */
+	border-color: #ca8a04;
+	color: #000;
+	box-shadow: 0 0 8px rgba(250, 204, 21, 0.4);
 }
 
 .audio-mixer__meter {
@@ -124,7 +174,7 @@
 	z-index: 1;
 	height: 0%;
 	background: linear-gradient(to top, #166534, #4ade80, #facc15);
-	transition: height 0.05s linear;
+	will-change: height;
 }
 
 .audio-mixer__fader-col {

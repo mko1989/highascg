@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<!--
+  HighAsCG — host layer for “browser as CG” looks.
+  CasparCG loads this via CG ADD; JSON { "url": "https://…" } via CG UPDATE / ADD data.
+-->
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Browser URL (CG)</title>
+	<style>
+		* { margin: 0; box-sizing: border-box; }
+		html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+		iframe { border: 0; display: block; width: 100%; height: 100%; }
+	</style>
+</head>
+<body>
+	<iframe id="hbu" title="content" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation" src="about:blank"></iframe>
+	<script>
+		var current = 'about:blank'
+		function setUrl(u) {
+			var s = typeof u === 'string' && u.length ? u : 'about:blank'
+			if (s === current) return
+			current = s
+			var el = document.getElementById('hbu')
+			if (el) el.src = s
+		}
+		function parsePayload(raw) {
+			if (raw == null || raw === '') return
+			try {
+				var o = typeof raw === 'string' ? JSON.parse(raw) : raw
+				if (o && typeof o.url === 'string') setUrl(o.url)
+			} catch (e) {}
+		}
+		window.play = function () { setUrl(current) }
+		window.stop = function () { setUrl('about:blank') }
+		window.update = function (s) { parsePayload(s) }
+	</script>
+</body>
+</html>

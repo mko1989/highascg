@@ -87,4 +87,38 @@
 	max-height: 100%;
 }
 
+.mv-disabled-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(10, 14, 18, 0.9);
+	z-index: 10;
+	color: #fff;
+}
+
+.mv-disabled-overlay__content {
+	text-align: center;
+	background: #1a222c;
+	padding: 20px 30px;
+	border-radius: 6px;
+	border: 1px solid #30363d;
+	box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+}
+
+.mv-disabled-overlay__content h3 {
+	margin: 0 0 8px 0;
+	color: #f0f6fc;
+}
+
+.mv-disabled-overlay__content p {
+	margin: 0;
+	color: #8b949e;
+	font-size: 0.9rem;
+}
+
 /* ── Inspector panel ─────────────────────────────────────────────────────── */

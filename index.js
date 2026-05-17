@@ -21,7 +21,8 @@ const { ConfigManager } = require('./src/config/config-manager'); const { refres
 const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-config'); const { SamplingManager } = require('./src/sampling/dmx-sampling')
 const { getChannelMap } = require('./src/config/routing'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
-const { notifyWebSocketClientConnected } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+const { ensurePersistedMediaPartitionMounted, mkdirReqDirEarly } = require('./src/system/media-partition-mount')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
 const { runConnectionQueryCycle } = require('./src/utils/query-cycle')
 const moduleRegistry = require('./src/module-registry')
@@ -80,6 +81,26 @@ function main() {
 		}
 		writeSystemInventoryFile(appCtx.log, config); const invSec = Math.max(0, parseInt(process.env.HIGHASCG_SYSTEM_INVENTORY_REFRESH_SEC || '0', 10) || 0)
 		if (invSec > 0) appCtx._startupInventoryInterval = setInterval(() => writeSystemInventoryFile(appCtx.log, config), invSec * 1000)
+
+		/** WO-38: finish before Caspar AMCP connects so scanner/media paths hit the mounted FS (not racing ahead). */
+		const mediaMountStartupPromise = (async () => {
+			try {
+				await mkdirReqDirEarly((lvl, m) => {
+					const fn = lvl === 'error' ? logger.error : lvl === 'warn' ? logger.warn : logger.info
+					fn.call(logger, m)
+				})
+				await ensurePersistedMediaPartitionMounted({
+					configManager,
+					config,
+					log: (lvl, m) => {
+						const fn = lvl === 'error' ? logger.error : lvl === 'warn' ? logger.warn : logger.info
+						fn.call(logger, m)
+					},
+				})
+			} catch (e) {
+				logger.warn(`[media-mount] startup: ${e && e.message ? e.message : e}`)
+			}
+		})()
 
 		appCtx.timelineEngine = new TimelineEngine(appCtx); appCtx.clipEndFadeWatcher = new ClipEndFadeWatcher(appCtx)
 		appCtx.getState = () => getState(appCtx); appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
@@ -152,6 +173,7 @@ function main() {
 				if (payload.connected === true && !wasConnected) {
 					wasConnected = true
 					setTimeout(() => void fetchInfo(), 800)
+					setTimeout(() => void tryClearStartupLedTestForWebUi(appCtx), 1500)
 					runConnectionQueryCycle(appCtx)
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)
 					startOscPlaybackInfoSupplement(appCtx)
@@ -161,7 +183,9 @@ function main() {
 			}); casparConn.on('error', err => appCtx.log('warn', 'Caspar TCP: ' + (err.message || err)))
 			
 			if (!config.offline_mode) {
-				casparConn.start()
+				mediaMountStartupPromise.then(() => {
+					if (casparConn && !config.offline_mode) casparConn.start()
+				})
 			}
 		}
 

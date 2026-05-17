@@ -1,0 +1,23 @@
+# Install as: /etc/systemd/system/home-casparcg-highascg.mount
+# Partition must be formatted:  mkfs.ext4 -L HIGHASCG_PERSIST /dev/sdXN
+#
+# Populate (once): mount partition, rsync -aX /home/casparcg/highascg/ onto it,
+# chown -R casparcg:casparcg.
+
+[Unit]
+Description=HighAsCG tree on USB ext4 (bind path /home/casparcg/highascg)
+DefaultDependencies=no
+Conflicts=umount.target
+Before=highascg.service
+After=blk-availability.target
+# Live session: home may be on overlay — still valid as mount point parent path
+After=systemd-remount-fs.service
+
+[Mount]
+What=/dev/disk/by-label/HIGHASCG_PERSIST
+Where=/home/casparcg/highascg
+Type=ext4
+Options=defaults,noatime,nofail
+
+[Install]
+WantedBy=local-fs.target

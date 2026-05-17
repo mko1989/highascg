@@ -46,6 +46,7 @@ export function showLiveInputModal(stateStore) {
 					<select id="live-input-kind">
 						<option value="decklink">Decklink</option>
 						<option value="ndi">NDI</option>
+						<option value="browser">Web Browser</option>
 					</select>
 				</div>
 				<div class="settings-group" id="live-input-ch-row" style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
@@ -78,6 +79,17 @@ export function showLiveInputModal(stateStore) {
 					<select id="live-input-ndi-select" style="width:100%;max-width:100%;margin-bottom:0.35rem"></select>
 					<label style="font-size:12px">Or type name manually</label>
 					<input type="text" id="live-input-ndi-manual" placeholder="Exact NDI source name" style="width:100%" />
+					<div style="margin-top:0.5rem">
+						<label><input type="checkbox" id="live-input-ndi-direct" checked /> Use Direct Mode (Multiple places, higher traffic)</label>
+					</div>
+				</div>
+				<div class="settings-group" id="live-input-browser-wrap" style="display:none">
+					<label>URL</label>
+					<input type="text" id="live-input-browser-url" placeholder="https://..." style="width:100%" />
+					<label style="margin-top:0.5rem;display:flex;align-items:center;gap:0.35rem;font-weight:normal;cursor:pointer">
+						<input type="checkbox" id="live-input-browser-as-cg" />
+						Add as CG template (plays <code>highascg_browser_url</code> + passes URL via CG UPDATE)
+					</label>
 				</div>
 				<div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
 					<button type="button" class="btn btn--primary" id="live-input-play">Play on channel</button>
@@ -92,6 +104,7 @@ export function showLiveInputModal(stateStore) {
 	const kindSel = modal.querySelector('#live-input-kind')
 	const dlWrap = modal.querySelector('#live-input-decklink-wrap')
 	const ndiWrap = modal.querySelector('#live-input-ndi-wrap')
+	const browserWrap = modal.querySelector('#live-input-browser-wrap')
 	const chRow = modal.querySelector('#live-input-ch-row')
 	const dlChFixed = modal.querySelector('#live-input-decklink-ch-fixed')
 	const chFixedVal = modal.querySelector('#live-input-ch-fixed-val')
@@ -106,9 +119,14 @@ export function showLiveInputModal(stateStore) {
 				hintEl.innerHTML =
 					'Enable <strong>DeckLink inputs host</strong> in Settings → <strong>Inputs</strong> (and apply Caspar config), then pick the host channel.'
 			}
-		} else {
+		} else if (k === 'ndi') {
 			hintEl.innerHTML =
 				'NDI can use any channel/layer. For consistency you can still use the inputs channel if configured.'
+		} else {
+			const cg = modal.querySelector('#live-input-browser-as-cg')?.checked
+			hintEl.innerHTML = cg
+				? 'CG mode: program/preview use a short <strong>highascg_browser_url</strong> template on Caspar (synced from HighAsCG <code>template/</code>) with your URL in CG data — not plain <code>PLAY … https://</code>.'
+				: 'Browser sources play a web page URL directly (<code>PLAY … [HTML] URL</code>).'
 		}
 	}
 
@@ -116,8 +134,9 @@ export function showLiveInputModal(stateStore) {
 		const k = kindSel?.value || 'decklink'
 		if (dlWrap) dlWrap.style.display = k === 'decklink' ? 'block' : 'none'
 		if (ndiWrap) ndiWrap.style.display = k === 'ndi' ? 'block' : 'none'
+		if (browserWrap) browserWrap.style.display = k === 'browser' ? 'block' : 'none'
 		const useFixed = k === 'decklink' && inputsCh != null
-		if (chRow) chRow.style.display = useFixed ? 'none' : 'flex'
+		if (chRow) chRow.style.display = (useFixed || k === 'browser') ? 'none' : 'flex'
 		if (dlChFixed) dlChFixed.style.display = useFixed ? 'block' : 'none'
 		if (chFixedVal && inputsCh != null) chFixedVal.textContent = String(inputsCh)
 		const layerDl = modal.querySelector('#live-input-layer-dl')
@@ -127,6 +146,7 @@ export function showLiveInputModal(stateStore) {
 		syncHint()
 	}
 	kindSel?.addEventListener('change', syncKind)
+	modal.querySelector('#live-input-browser-as-cg')?.addEventListener('change', syncHint)
 	syncKind()
 
 	modal.querySelector('#live-input-ndi-discover')?.addEventListener('click', async () => {
@@ -134,7 +154,7 @@ export function showLiveInputModal(stateStore) {
 		const sel = modal.querySelector('#live-input-ndi-select')
 		if (st) st.textContent = 'Scanning…'
 		try {
-			const r = await api.get('/api/streaming/ndi-sources')
+			const r = await api.get('/api/ndi/list')
 			if (!sel) return
 			sel.innerHTML = ''
 			const sources = Array.isArray(r.sources) ? r.sources : []
@@ -147,7 +167,7 @@ export function showLiveInputModal(stateStore) {
 				sources.forEach((name) => {
 					const o = document.createElement('option')
 					o.value = name
-					o.textContent = name
+					o.textContent = name.startsWith('ndi://') ? name.substring(6).replace(/\/"([^"]+)"/, ' $1') : name
 					sel.appendChild(o)
 				})
 			}
@@ -206,6 +226,68 @@ export function showLiveInputModal(stateStore) {
 				return
 			}
 		}
+		if (k === 'ndi') {
+			const sel = modal.querySelector('#live-input-ndi-select')
+			const manual = (modal.querySelector('#live-input-ndi-manual')?.value || '').trim()
+			let name = manual
+			if (!name && sel && sel.value) name = sel.value.trim()
+			if (!name) {
+				setStatus('Pick a discovered source or enter a name', true)
+				return
+			}
+			const direct = modal.querySelector('#live-input-ndi-direct')?.checked ?? true
+			let thumbCh = parseInt(String(modal.querySelector('#live-input-ch')?.value || ''), 10)
+			if (!Number.isFinite(thumbCh) || thumbCh < 1) thumbCh = suggestLiveInputChannel(channelMap)
+
+			const item = {
+				type: 'ndi',
+				value: name.startsWith('ndi://') ? name : `ndi://${name}`,
+				label: name.startsWith('ndi://') ? name.substring(6).replace(/\/"([^"]+)"/, ' $1') : name,
+				useDirect: direct,
+				// Routed previews use PRINT on this channel; direct NDI is not keyed to a PGM still.
+				...(direct ? {} : { thumbnailChannel: thumbCh }),
+			}
+
+			try {
+				const r = await api.post('/api/device-view', { addExtraLiveSource: item })
+				if (Array.isArray(r?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+					window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+				}
+				setStatus('Added to Live Sources', false)
+				setTimeout(close, 1000)
+			} catch (e) {
+				setStatus(e?.message || String(e), true)
+			}
+			return
+		}
+		
+		if (k === 'browser') {
+			const url = (modal.querySelector('#live-input-browser-url')?.value || '').trim()
+			if (!url) {
+				setStatus('Enter a URL', true)
+				return
+			}
+			const asCg = !!modal.querySelector('#live-input-browser-as-cg')?.checked
+			const item = {
+				type: 'browser',
+				value: url,
+				label: asCg ? `${url} (CG)` : url,
+				thumbnailChannel: suggestLiveInputChannel(channelMap),
+				...(asCg ? { browserAsCg: true } : {}),
+			}
+			try {
+				const r = await api.post('/api/device-view', { addExtraLiveSource: item })
+				if (Array.isArray(r?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+					window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+				}
+				setStatus('Added to Live Sources', false)
+				setTimeout(close, 1000)
+			} catch (e) {
+				setStatus(e?.message || String(e), true)
+			}
+			return
+		}
+
 		let cmd
 		if (k === 'decklink') {
 			const dev = parseInt(String(modal.querySelector('#live-input-decklink-dev')?.value || '0'), 10) || 0

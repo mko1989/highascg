@@ -163,6 +163,14 @@ function listAudioDevices(opts = {}) {
 		alsa = []
 	}
 
+	let alsaL = []
+	try {
+		const text = execAplay('-L')
+		alsaL = parseAplayLongList(text || '')
+	} catch {
+		alsaL = []
+	}
+
 	let pipewire = []
 	try {
 		const text = execPwCliListNodes()
@@ -171,10 +179,19 @@ function listAudioDevices(opts = {}) {
 		pipewire = []
 	}
 
+	// Merge avoiding duplicates by id
+	const seen = new Set()
+	const merged = []
+	for (const d of [...alsa, ...alsaL, ...pipewire]) {
+		if (!d.id || seen.has(d.id)) continue
+		seen.add(d.id)
+		merged.push(d)
+	}
+
 	const payload = {
-		devices: [...alsa, ...pipewire],
+		devices: merged,
 		refreshedAt: new Date().toISOString(),
-		sources: { alsa: alsa.length, pipewire: pipewire.length },
+		sources: { alsa: alsa.length, alsaL: alsaL.length, pipewire: pipewire.length },
 		cached: false,
 	}
 	cache = { at: now, payload }
@@ -247,7 +264,7 @@ function setDefaultAlsaDevice(card, device, opts = {}) {
 		lastErr = (r.stderr || r.stdout || '').trim() || `exit code ${r.status}`
 	}
 	const hint =
-		`sudo needs NOPASSWD for /usr/bin/tee and /bin/tee (see install-phase3.sh). Process runs as ${runAs}; /etc/sudoers.d/highascg-asound must list that user (typically casparcg). Or run manually: sudo tee /etc/asound.conf`
+		`sudo needs NOPASSWD for /usr/bin/tee and /bin/tee only if you enabled HIGHASCG_INSTALL_ASOUND_SUDOERS=1 (install-phase3.sh). Otherwise use scope=user (~/.asoundrc). Current process: ${runAs}. Manual: sudo tee /etc/asound.conf`
 	return { ok: false, error: `${lastErr}. ${hint}` }
 }
 

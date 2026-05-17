@@ -2,8 +2,8 @@
 
 This walkthrough is for a **playout** machine where:
 
-- Linux user **`casparcg`** owns **`/opt/casparcg`** and **`/opt/highascg`**, runs **CasparCG** (and usually X / displays), and runs the **HighAsCG** `systemd` service.
-- You plug in a **USB stick** and want it **mounted without manual `sudo`**, at a path the **HighAsCG** process (running as `casparcg`) can read, so the web UI can **browse** the volume and **import** files into **`/opt/casparcg/media/`**.
+- Linux user **`casparcg`** owns the unified **`/home/casparcg/highascg`** playout tree (Caspar + HighAsCG), runs **CasparCG** (and usually X / displays), and runs the **HighAsCG** `systemd` service.
+- You plug in a **USB stick** and want it **mounted without manual `sudo`**, at a path the **HighAsCG** process (running as `casparcg`) can read, so the web UI can **browse** the volume and **import** files into **`/home/casparcg/highascg/media/`**.
 
 The HighAsCG app does **not** implement its own block-device driver. It lists volumes via **`lsblk`** (and related logic in `src/media/usb-drives.js`) and only sees devices that already have a **`MOUNTPOINT`**. So the OS must **mount** the stick (almost always via **udisks2** on Ubuntu).
 
@@ -47,7 +47,7 @@ The repo ships a rule for **`plugdev`** users who have an **“active”** polki
    Install:
 
    ```bash
-   sudo cp /opt/highascg/scripts/polkit/50-highascg-udisks.rules /etc/polkit-1/rules.d/
+   sudo cp /home/casparcg/highascg/scripts/polkit/50-highascg-udisks.rules /etc/polkit-1/rules.d/
    sudo chmod 644 /etc/polkit-1/rules.d/50-highascg-udisks.rules
    ```
 
@@ -127,15 +127,15 @@ sudo -u casparcg -- udisksctl power-off -b /dev/sdX
 
 ## 7. HighAsCG: import destination
 
-- Default Caspar **media** tree is **`/opt/casparcg/media`**. The installer chowns that tree to **`casparcg`**.
-- In the web app: **Settings → Media (USB)** — enable import if needed; the copy target comes from the configured media path (same as Caspar’s media folder for imports).
-- **Sources → + → Import from USB…** — browse the mounted volume, select files, import. Files land under **`/opt/casparcg/media/`** (or a subfolder per your `usbIngest` settings).
+- Default Caspar **media** tree is **`/home/casparcg/highascg/media`**. The installer chowns that tree to **`casparcg`**.
+- In the web app: **Settings → media/usb** — enable import if needed; the copy target comes from the configured media path (same as Caspar’s media folder for imports).
+- **Sources → + → Import from USB…** — browse the mounted volume, select files, import. Files land under **`/home/casparcg/highascg/media/`** (or a subfolder per your `usbIngest` settings).
 
-If imports fail with permission errors, fix ownership of **`/opt/casparcg/media`**, not the USB (USB is only read for copy):
+If imports fail with permission errors, fix ownership of **`/home/casparcg/highascg/media`**, not the USB (USB is only read for copy):
 
 ```bash
-sudo chown -R casparcg:casparcg /opt/casparcg/media
-sudo chmod -R 775 /opt/casparcg/media
+sudo chown -R casparcg:casparcg /home/casparcg/highascg/media
+sudo chmod -R 775 /home/casparcg/highascg/media
 ```
 
 ---
@@ -153,7 +153,31 @@ sudo chmod -R 775 /opt/casparcg/media
 
 ---
 
-## 9. Related files in this repository
+## 9. Alternative: Lightweight Automount via Udev + Systemd (Ubuntu Server)
+
+If you are running a headless Ubuntu Server and prefer not to use `udisks2` and Polkit, you can use a modern `udev` rule combined with `systemd-mount`. This is lighter and doesn't require an active user session.
+
+1. Create a udev rule file:
+   ```bash
+   sudo nano /etc/udev/rules.d/99-usb-automount.rules
+   ```
+
+2. Add the following line:
+   ```udev
+   ACTION=="add", SUBSYSTEMS=="usb", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", RUN{program}+="/usr/bin/systemd-mount --no-block --automount=yes --collect $devnode"
+   ```
+
+3. Reload rules:
+   ```bash
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+   ```
+
+This will automatically mount USB drives under `/run/media/` (or similar) when plugged in, which HighAsCG will detect.
+
+---
+
+## 10. Related files in this repository
 
 | File | Role |
 |------|------|

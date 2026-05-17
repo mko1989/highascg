@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Populate /opt/nvidia-debs with NVIDIA driver branches that aren't already
+# Populate /opt/nvidia-pool with NVIDIA driver branches that aren't already
 # installed on the build host. The currently-installed branch (typically 535)
 # is *already* baked into the live image via the normal eggs clone, so we
 # only cache the *additional* branches the picker may need to install on
@@ -16,7 +16,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-CACHE_DIR="${CACHE_DIR:-/opt/nvidia-debs}"
+CACHE_DIR="${CACHE_DIR:-/opt/nvidia-pool}"
 NVIDIA_BRANCHES="${NVIDIA_BRANCHES:-470 580}"
 
 mkdir -p "$CACHE_DIR"
@@ -43,13 +43,28 @@ for branch in $NVIDIA_BRANCHES; do
       continue
     fi
     echo ">> Resolving deps for $pkg"
-    deps="$(apt-rdepends "$pkg" 2>/dev/null \
-      | grep -v '^ ' \
-      | grep -vE '^(libc6|libgcc|libstdc|linux-|init|debconf|dpkg|systemd|gcc|g\+\+|glibc|kernel-|coreutils|adduser|dkms-|udev)$' \
-      || true)"
-    echo ">> Downloading $pkg + deps to $CACHE_DIR"
-    # shellcheck disable=SC2086
-    apt-get download $deps 2>/dev/null || true
+    deps="$(
+      {
+        echo "$pkg"
+        apt-rdepends "$pkg" 2>/dev/null \
+          | grep -v '^ ' \
+          | grep -vE '^(libc6|libgcc|libstdc|linux-|init|debconf|dpkg|systemd|gcc|g\+\+|glibc|kernel-|coreutils|adduser|dkms-|udev)$' \
+          || true
+      } | sort -u
+    )"
+    echo ">> Downloading closure for $pkg ($(echo "$deps" | grep -c .) pkgs names) → $CACHE_DIR"
+    dl_ok=0
+    dl_miss=0
+    while IFS= read -r dep || [[ -n ${dep:-} ]]; do
+      [[ -z "${dep// }" ]] && continue
+      if apt-get download "$dep" 2>/dev/null; then
+        ((++dl_ok)) || true
+      else
+        echo "WARN: apt-get download failed: $dep" >&2
+        ((++dl_miss)) || true
+      fi
+    done <<<"$deps"
+    echo ">>   fetched=$dl_ok  skipped/failed=$dl_miss"
   done
 done
 

@@ -4,7 +4,10 @@
 
 export function connectorCenter(surfaceEl, connId) {
 	if (!connId || !surfaceEl) return null
-	const matches = [...surfaceEl.querySelectorAll(`[data-connector-id="${connId}"]`)]
+	const matches = [
+		...surfaceEl.querySelectorAll(`[data-connector-id="${connId}"]`),
+		...surfaceEl.querySelectorAll(`[data-real-ids*="${connId}"]`)
+	]
 	if (!matches.length) return null
 	// Prefer connector dots over container nodes so cable anchors are visually accurate.
 	const dot = matches.find((el) =>

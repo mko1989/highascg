@@ -14,8 +14,45 @@ const DONE_KEY = 'ledTestStartupDoneBootId'
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let retryTimer = null
+/** Web UI connected before startup indices existed or before AMCP was ready — keep trying to clear layer 999. */
+/** @type {ReturnType<typeof setTimeout> | null} */
+let webUiClearRetryTimer = null
 /** CEF “catch-up” replays (must be cancelled if layer 999 is cleared for Web UI) */
 let cefReplayTimeouts = []
+
+const WEB_UI_CLEAR_RETRY_MS = 400
+const WEB_UI_CLEAR_RETRY_MAX_MS = 60000
+
+function clearWebUiClearRetryTimer() {
+	if (webUiClearRetryTimer) {
+		clearTimeout(webUiClearRetryTimer)
+		webUiClearRetryTimer = null
+	}
+}
+
+/**
+ * Until layer 999 is cleared or we time out — covers WS-before-startup-order and WS-before-AMCP.
+ * @param {object} appCtx
+ */
+function scheduleWebUiStartupClearRetries(appCtx) {
+	clearWebUiClearRetryTimer()
+	if (!appCtx || appCtx._ledTestLayer999ClearedAfterWebUi) return
+	const started = Date.now()
+	const tick = () => {
+		if (!appCtx || appCtx._ledTestLayer999ClearedAfterWebUi) {
+			clearWebUiClearRetryTimer()
+			return
+		}
+		if (Date.now() - started > WEB_UI_CLEAR_RETRY_MAX_MS) {
+			clearWebUiClearRetryTimer()
+			return
+		}
+		void tryClearStartupLedTestForWebUi(appCtx)
+		webUiClearRetryTimer = setTimeout(tick, WEB_UI_CLEAR_RETRY_MS)
+		if (webUiClearRetryTimer.unref) webUiClearRetryTimer.unref()
+	}
+	tick()
+}
 
 /**
  * Stable per-boot id so we run once per machine boot, not on every INFO CONFIG refresh.
@@ -161,6 +198,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	clearRetryTimer()
 	persistence.set(DONE_KEY, bootId)
 	appCtx._startupLedTestChannelIndices = withTarget.map((c) => c.index)
+	appCtx._ledTestPatternActive = true
 
 	if (appCtx._webUiClientConnected) {
 		await tryClearStartupLedTestForWebUi(appCtx)
@@ -230,23 +268,9 @@ async function clearLedTestLayerOnChannels(amcp, channelIndices, log) {
  * @returns {Promise<void>}
  */
 async function tryClearStartupLedTestForWebUi(appCtx) {
-	if (!appCtx || appCtx._ledTestLayer999ClearedAfterWebUi) return
-	const amcp = appCtx.amcp
-	if (!amcp?.isConnected) return
-	const indices = appCtx._startupLedTestChannelIndices
-	if (!Array.isArray(indices) || indices.length === 0) return
-	clearCefReplayTimers()
-	try {
-		await clearLedTestLayerOnChannels(amcp, indices, appCtx.log)
-		appCtx._ledTestLayer999ClearedAfterWebUi = true
-		appCtx.log?.(
-			'info',
-			`[Startup LED test] Cleared ${TEMPLATE_NAME} (L${STARTUP_LED_TEST_LAYER}) on ` +
-				`channel(s) ${indices.join(', ')} — Web UI present.`,
-		)
-	} catch (e) {
-		appCtx.log?.('warn', `[Startup LED test] clear: ${e?.message || e}`)
-	}
+	appCtx.log?.('info', `[Startup LED test] Skipping auto-clear on Web UI connection (manual toggle enabled).`)
+	appCtx._ledTestLayer999ClearedAfterWebUi = true
+	return
 }
 
 /**
@@ -258,6 +282,7 @@ function notifyWebSocketClientConnected(appCtx) {
 	if (!appCtx) return
 	appCtx._webUiClientConnected = true
 	void tryClearStartupLedTestForWebUi(appCtx)
+	scheduleWebUiStartupClearRetries(appCtx)
 }
 
 function buildStartupLedTestFlatCommands(withTarget, ipLines) {

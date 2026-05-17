@@ -3,7 +3,7 @@
 **Program goal:** Visual “back of rack” for **Caspar host** + optional **PixelHue**, click-to-inspect ports, cable graph, EDID/timing awareness, and **Caspar config write + restart** via existing APIs.
 
 **Status:** Parent index — child WOs carry task checklists.  
-**Created:** 2026-04-23 · **Updated:** 2026-04-23 (split into sub-WOs)
+**Created:** 2026-04-23 · **Updated:** 2026-05-15 (added WO-40, WO-42 + design doc link)
 
 ---
 
@@ -19,6 +19,9 @@
 | **33f** | [33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md](./33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md) | What moves from Settings; deep links; deprecation | 33c+ (after core UX) |
 | **33g** | [33g_WO_DEVICE_VIEW_QA_DOCS_ACCESSIBILITY.md](./33g_WO_DEVICE_VIEW_QA_DOCS_ACCESSIBILITY.md) | Test matrix, a11y, operator notes | All prior for full pass |
 | **33h** | [18_WO_OUTPUT_SLICER.md](./18_WO_OUTPUT_SLICER.md) | Pixel Mapping Node & Slicer (Video/DMX) | 33a, 33c |
+| **40** | [40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md) | GPU `xrandr` mode/pos from bound **screen destinations**; Override path; multi-head retile | 33a, 33b, 35; design: [docs/GPU_SCREEN_CONSUMER_AND_XRANDR.md](./docs/GPU_SCREEN_CONSUMER_AND_XRANDR.md) |
+| **40a** | [40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md](./40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md) | **`pixel_map_out` → `gpu_out`**: per-head signal, bbox vs destination-only heads, inherited canvas modes, Caspar window alignment | 40, 33h, 33a |
+| **42** | [42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md](./42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md) | Sources **Live** tab list thumbnails (wait-for-play on any ch/layer, one-shot + manual reload); PRINT/HQ clutter → hidden media subfolder | 33a (extra live sources); touches web + `live-thumbnail-cache` |
 
 **Suggested release slices**
 

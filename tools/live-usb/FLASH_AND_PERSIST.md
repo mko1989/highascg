@@ -1,11 +1,26 @@
 # Flash the HighAsCG live ISO to USB with persistence
 
-The first-boot NVIDIA picker only works if changes persist across reboots.
-For a live-USB-only deployment (no install to internal disk) that means
-adding a `persistence` partition to the USB after flashing the ISO.
+**Default goal:** a stick that **remembers the whole live session** — NVIDIA
+drivers, DeckLink-related config, Tailscale, **`/etc`**, **`/var`**, home
+directories, and **`/home/casparcg/highascg`**. That requires Debian Live
+**`persistence`** + **`persistence.conf`** with **`/ union`**, and booting
+**Live with persistence** every time.
 
-This is the standard Debian Live persistence layout, which penguins-eggs
-inherits. The live boot menu has a "with persistence" entry; pick that one.
+**Automation:** from the HighAsCG repo, after `dd` + `sync`:
+
+```bash
+sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
+```
+
+Use `--dry-run` first if you like. If `parted` cannot infer free space, set
+**`START_MIB`** (see script) or follow the manual steps below.
+
+**Narrow alternative:** if you **only** want **`/home/casparcg/highascg`** on a
+separate partition (no full OS persistence), see
+**`HIGHASCG_FOLDER_USB_PARTITION.md`** — **not** suitable when you need
+NVIDIA/Tailscale/DeckLink OS state to survive reboots.
+
+Manual steps below document the **`/ union`** layout if you skip the script.
 
 ## Prerequisites
 
@@ -98,7 +113,7 @@ Expected sequence:
   or the file isn't named exactly `persistence.conf`.
 - **`apt-get install` in the picker fails with "no candidate".** Offline
   cache is missing the dependency tree. Re-run `fetch-debs.sh` with all
-  the branches you need; verify with `ls /opt/nvidia-debs | wc -l`.
+  the branches you need; verify with `ls /opt/nvidia-pool | wc -l`.
 - **Driver installs but `nvidia-smi` errors after reboot.** DKMS hasn't
   finished building against the live kernel. Wait 30s and retry, or
   `sudo dkms autoinstall && sudo modprobe nvidia`.

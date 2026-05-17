@@ -10,6 +10,7 @@ const defaults = require('../config/defaults')
 const { buildConfigXml, normalizeAudioRouting } = require('../config/config-generator')
 const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-generator-config')
 const { getStandardModeChoices } = require('../config/config-modes')
+const { applyX11Layout, restartDisplayManager } = require('../utils/os-config')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -168,6 +169,28 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 				audioRouting: ctx.config.audioRouting || defaults.audioRouting,
 			})
 		} catch (_) {}
+	}
+
+	try {
+		applyX11Layout(ctx.config)
+		const dmRestarted = restartDisplayManager()
+		if (dmRestarted) {
+			apiLog(ctx, 'info', '[Caspar config] Display manager restarted, CasparCG will follow.')
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					ok: true,
+					path: filePath,
+					restartSent: true,
+					message: 'Config written; OS layout applied; display manager restarted.',
+				}),
+			}
+		} else {
+			apiLog(ctx, 'info', '[Caspar config] Display manager restart failed or skipped, falling back to AMCP RESTART.')
+		}
+	} catch (err) {
+		apiLog(ctx, 'warn', `[Caspar config] OS config apply failed: ${err.message}`)
 	}
 
 	if (!ctx.amcp) {

@@ -1,5 +1,9 @@
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
+const { getGpuModel } = require('./hardware-info')
+
 function normalizePortName(v) {
 	const s = String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
 	if (!s) return ''
@@ -19,16 +23,32 @@ function canonicalPairName(a, b) {
 
 function defaultTopology() {
 	return [
-		{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-6', dpB: 'DP-7', connectorNumber: 0, location: 0 },
-		{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 1, location: 1 },
-		{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 2, location: 2 },
-		{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 3, location: 3 },
+		{ physicalPortId: 'gpu_p3', slotOrder: 0, dpA: 'DP-3', dpB: '', connectorNumber: 3, location: 3 },
+		{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-2', dpB: '', connectorNumber: 2, location: 2 },
+		// Single logical HDMI jack often enumerates as HDMI-0 or HDMI-1 — list both so either maps here instead of "unmapped".
+		{ physicalPortId: 'gpu_p1', slotOrder: 2, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
+		{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-1', dpB: '', connectorNumber: 0, location: 0 },
 	]
 }
 
-function readTopologyFromConfig(cfg) {
+function readTopologyFromConfig(cfg, gpuModel) {
 	const arr = Array.isArray(cfg?.gpuPhysicalTopology) ? cfg.gpuPhysicalTopology : null
-	if (!arr || !arr.length) return defaultTopology()
+	if (!arr || !arr.length) {
+		if (gpuModel) {
+			try {
+				const knownPath = path.join(__dirname, '../../data/known-gpus.json')
+				if (fs.existsSync(knownPath)) {
+					const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'))
+					if (known[gpuModel]) {
+						return known[gpuModel]
+					}
+				}
+			} catch (e) {
+				console.error(`[gpu-physical-map] Failed to load known-gpus.json:`, e.message)
+			}
+		}
+		return defaultTopology()
+	}
 	const out = []
 	for (const row of arr) {
 		if (!row || typeof row !== 'object') continue
@@ -47,7 +67,8 @@ function readTopologyFromConfig(cfg) {
 }
 
 function buildGpuPhysicalMap({ config, displays, connectors }) {
-	const topology = readTopologyFromConfig(config)
+	const gpuModel = getGpuModel()
+	const topology = readTopologyFromConfig(config, gpuModel)
 	const displayByName = new Map(
 		(Array.isArray(displays) ? displays : [])
 			.map((d) => d && typeof d === 'object' ? d : null)

@@ -15,7 +15,7 @@ import {
 	renderTimelineFlagInspector,
 	renderTimelineClipInspector,
 } from './inspector-panel-timeline.js'
-import { renderSceneLayerInspector, renderMultiviewInspector, renderSceneInspector } from './inspector-panel-views.js'
+import { renderSceneLayerInspector, renderMultiviewInspector, renderSceneInspector, renderGlobalBorderInspector } from './inspector-panel-views.js'
 import { renderLayerPresetsMode, renderLookPresetsMode } from './inspector-panel-presets-modes.js'
 
 /** @deprecated import from ../lib/mixer-fill.js */
@@ -121,6 +121,11 @@ export function initInspectorPanel(root, stateStore) {
 		}
 		if (data.type === 'multiview' && data.cellId) {
 			renderMultiviewInspector(multiviewDeps, data.cellId)
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+		if (data.type === 'globalBorder' && data.screenIndex != null) {
+			renderGlobalBorderInspector(root, data.screenIndex, stateStore)
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
@@ -250,6 +255,13 @@ export function initInspectorPanel(root, stateStore) {
 		const d = e.detail
 		if (d && d.sceneId) {
 			update({ type: 'scene', sceneId: d.sceneId })
+		}
+	})
+
+	window.addEventListener('global-border-select', (e) => {
+		const d = e.detail
+		if (d && d.screenIndex != null) {
+			update({ type: 'globalBorder', screenIndex: d.screenIndex })
 		}
 	})
 

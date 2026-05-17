@@ -4,11 +4,13 @@
  *
  * Pipeline order (smooth look→look):
  * 1) Build takeJobs + exit list (no AMCP).
- * 2) Exit layers: batched MIXER OPACITY→0 DEFER + channel COMMIT (starts outgoing fade). Chunks use
- *    `skipMixerPreCommit` so pre-batch channel COMMIT cannot flush a subset of DEFER lines.
- * 3) Incoming: LOADBG → batched MIXER … DEFER for all layers (fill/effects) → clear old PIP → new PIP (MIXER … DEFER) →
- *    PLAY → one channel COMMIT (atomic incoming look).
- * 4) Wait only remaining time until exit-fade window completes, then batched STOP/CLEAR/PIP + COMMIT.
+ * 2) Non-merge exit: batched MIXER OPACITY→0 (non-DEFER) when not using bank crossfade.
+ * 3) `{TRANSITION} + Animate` (UI; legacy `+ MERGE`): **no bank B (+100)** — compare PGM vs incoming per logical layer;
+ *    outgoing-only layers get `MIXER … OPACITY 0 <dur> <tween> DEFER`; incoming layers get LOADBG (with
+ *    transition type + duration from default) + mixer prep (DEFER) on the **same** Caspar layer as the look;
+ *    optional border fades ride `mergeMixerExtras`. Preroll, then `MIXER ch COMMIT` + `PLAY` lines in one sequential AMCP chain.
+ * 4) Bank crossfade path (non-merge): paired opacity tweens on active vs inactive bank layers.
+ * 5) Teardown after transition window; merge teardown clears both logical layer N and N+100 to drop legacy bank B.
  * LOADBG/PLAY stay `_send` (not inside BEGIN…COMMIT) so Caspar can resolve each layer reliably.
  */
 
@@ -36,9 +38,46 @@ const {
 	buildGlobalBorderClearLines,
 } = require('./pip-overlay')
 
-const GLOBAL_BORDER_LAYER = 998
+function resolveGlobalBorderPhysicalLayer(gb) {
+	return Number(gb?.activePgmLayer) === 996 ? 996 : 998
+}
 
 const { buildTakeJobs } = require('./scene-take-lbg-jobs')
+const { PGM_BANK_B_OFFSET } = require('./scene-transition')
+const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
+const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
+
+/**
+ * Merge transition: outgoing-only logical layers (still on PGM, not replaced by a takeJob on this beat)
+ * fade to opacity 0 on the **same** Caspar layer index as the look (no bank B / +100).
+ * @param {{ channel: number, exitMedia: object[], takeJobs: object[], fadeDur: number, fadeTw?: string, currentSceneLayers: object, fadeWatcher: object|null }} p
+ * @returns {string[]}
+ */
+function buildMergeOutgoingOpacityDeferLines(p) {
+	const { channel, exitMedia, takeJobs, fadeDur, fadeTw, currentSceneLayers, fadeWatcher } = p
+	const lines = []
+	const takeJobNums = new Set(takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite))
+	for (const layer of exitMedia) {
+		const ln = Number(layer.layerNumber)
+		if (!Number.isFinite(ln) || takeJobNums.has(ln)) continue
+		if (fadeWatcher) {
+			fadeWatcher.cancel(channel, ln)
+			fadeWatcher.cancel(channel, ln + PGM_BANK_B_OFFSET)
+		}
+		const cl = `${channel}-${ln}`
+		let tail = `0 ${fadeDur}`
+		if (fadeTw) tail += ` ${param(fadeTw)}`
+		lines.push(deferMixerAmcpLine(`MIXER ${cl} OPACITY ${tail}`))
+		try {
+			const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+			const pipN = pipOverlaysFromLayer(layer).length
+			if (pipN > 0) {
+				lines.push(...buildPipOverlayOpacityFadeDeferLines(channel, ln, tail, nextL, pipN))
+			}
+		} catch (_) {}
+	}
+	return lines
+}
 
 function logPlannedCommand(self, phase, sceneLayer, plan) {
 	if (!amcpVerboseTrace() || typeof self?.log !== 'function' || !plan) return
@@ -64,9 +103,9 @@ async function runSceneTakeLbg(amcp, opts) {
 		normalizeTransition,
 		physicalProgramLayer,
 		normalizeProgramLayerBank,
-		layerVisuallyEqual,
 		resolveChannelFramerateForMixerTween,
 		persistProgramLayerBanks,
+		isLayerAnimateTakeTransition,
 	} = require('./scene-transition')
 
 	const self = opts.self
@@ -119,7 +158,8 @@ async function runSceneTakeLbg(amcp, opts) {
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
 	const fadeTw = globalT.tween
 	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
-	const shouldRunBankCrossfade = fadeDur > 0 && currentMap.size > 0
+	const isMergeTransition = isLayerAnimateTakeTransition(globalT.type)
+	const shouldRunBankCrossfade = fadeDur > 0 && currentMap.size > 0 && !isMergeTransition
 	let fadeClockStart = null
 	let transitionStartedNotified = false
 	function notifyProgramTransitionStarted() {
@@ -136,7 +176,10 @@ async function runSceneTakeLbg(amcp, opts) {
 		}
 	}
 
-	self.log?.('info', `[scene-take-lbg] shouldRunBankCrossfade=${shouldRunBankCrossfade} fadeDur=${fadeDur} currentMapSize=${currentMap.size}`)
+	self.log?.(
+		'info',
+		`[scene-take-lbg] merge=${isMergeTransition} shouldRunBankCrossfade=${shouldRunBankCrossfade} fadeDur=${fadeDur} currentMapSize=${currentMap.size}`,
+	)
 
 	const { takeJobs, extraExitCandidates } = await buildTakeJobs({
 		incomingSorted,
@@ -168,7 +211,7 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	const currentSceneLayers = opts.currentScene?.layers
 
-	if (exitMedia.length > 0 && fadeDur > 0 && !shouldRunBankCrossfade) {
+	if (exitMedia.length > 0 && fadeDur > 0 && !shouldRunBankCrossfade && !isMergeTransition) {
 		const fadeLines = []
 		for (const layer of exitMedia) {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
@@ -193,8 +236,16 @@ async function runSceneTakeLbg(amcp, opts) {
 		notifyProgramTransitionStarted()
 	} else if (exitMedia.length > 0) {
 		for (const layer of exitMedia) {
-			const pOut = phys(Number(layer.layerNumber), activeBank)
-			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
+			const ln = Number(layer.layerNumber)
+			if (isMergeTransition && Number.isFinite(ln)) {
+				if (fadeWatcher) {
+					fadeWatcher.cancel(channel, ln)
+					fadeWatcher.cancel(channel, ln + PGM_BANK_B_OFFSET)
+				}
+			} else {
+				const pOut = phys(Number(layer.layerNumber), activeBank)
+				if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
+			}
 		}
 	}
 
@@ -209,19 +260,89 @@ async function runSceneTakeLbg(amcp, opts) {
 		incomingGbEnabled &&
 		String(currentGb.type || '').toLowerCase() === String(incomingGb.type || '').toLowerCase()
 	const gbCanFadeWithCrossfade = shouldRunBankCrossfade && fadeDur > 0 && !forceCut
-	const gbWillFadeIn = incomingGbEnabled && !sameGbTemplateType && gbCanFadeWithCrossfade
-	const gbWillFadeOut = currentGbEnabled && !incomingGbEnabled && gbCanFadeWithCrossfade
+	const gbFadeLinked = fadeDur > 0 && !forceCut && (shouldRunBankCrossfade || isMergeTransition)
+	const gbWillFadeIn = incomingGbEnabled && !sameGbTemplateType && gbFadeLinked
+	const gbWillFadeOut = currentGbEnabled && !incomingGbEnabled && gbFadeLinked
 
-	if (takeJobs.length > 0) {
+	const incomingGbLayer = resolveGlobalBorderPhysicalLayer(incomingGb)
+	const currentGbLayer = resolveGlobalBorderPhysicalLayer(currentGb)
+
+	const mergeMixerExtras =
+		isMergeTransition && fadeDur > 0 && !forceCut
+			? [
+					...buildMergeOutgoingOpacityDeferLines({
+						channel,
+						exitMedia,
+						takeJobs,
+						fadeDur,
+						fadeTw,
+						currentSceneLayers,
+						fadeWatcher,
+					}),
+					...(gbWillFadeIn
+						? [
+								deferMixerAmcpLine(
+									buildGlobalBorderOpacityFadeLine(
+										channel,
+										incomingGbLayer,
+										1,
+										fadeDur,
+										fadeTw ? param(fadeTw) : undefined,
+									),
+								),
+						  ]
+						: []),
+					...(gbWillFadeOut
+						? [
+								deferMixerAmcpLine(
+									buildGlobalBorderOpacityFadeLine(
+										channel,
+										currentGbLayer,
+										0,
+										fadeDur,
+										fadeTw ? param(fadeTw) : undefined,
+									),
+								),
+						  ]
+						: []),
+			  ]
+			: []
+
+	// Global border (layer 998) lifecycle — must ride the same channel COMMIT/crossfade
+	// as the bank swap so it doesn't pop on/off when looks transition. See WO-09.
+	if (incomingGbEnabled) {
+		try {
+			let borderLines = []
+			if (sameGbTemplateType) {
+				// Same template → CG UPDATE so params (color/width/etc.) change without re-adding the CG instance.
+				borderLines = buildGlobalBorderUpdateLines(channel, incomingGbLayer, incomingGb)
+			} else {
+				// Fresh add (or template type changed): load hidden when crossfading, full-opacity when cutting.
+				borderLines = buildGlobalBorderAmcpLines(channel, incomingGbLayer, incomingGb, self, {
+					initialOpacity: gbWillFadeIn ? 0 : 1,
+				})
+			}
+			if (borderLines.length > 0) {
+				if (typeof self.log === 'function') self.log('info', `[scene-take-lbg] Sending border lines: ${JSON.stringify(borderLines)}`)
+				await sendPipOverlayLinesSerial(amcp, borderLines)
+			}
+		} catch (e) {
+			self.log?.('warn', `Global border failed: ${e?.message || e}`)
+		}
+	}
+
+	if (takeJobs.length > 0 || mergeMixerExtras.length > 0) {
 		for (const job of takeJobs) {
-			await amcp.mixerClear(channel, job.pLayer).catch(() => {})
+			if (!job.isMerge) {
+				await amcp.mixerClear(channel, job.pLayer).catch(() => {})
+			}
 			if (job.loadPlan) {
 				logPlannedCommand(self, 'load', job.layer.layerNumber, job.loadPlan)
 				await amcp.loadbg(job.loadPlan.channel, job.loadPlan.layer, job.loadPlan.clip, job.loadPlan.opts)
 			}
 		}
 
-		const flatMixer = takeJobs.flatMap((j) => j.mixerLines)
+		const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
 		if (flatMixer.length > 0) {
 			await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
 		}
@@ -265,27 +386,7 @@ async function runSceneTakeLbg(amcp, opts) {
 			} catch (_) {}
 		}
 
-		// Global border (layer 998) lifecycle — must ride the same channel COMMIT/crossfade
-		// as the bank swap so it doesn't pop on/off when looks transition. See WO-09.
-		if (incomingGbEnabled) {
-			try {
-				let borderLines = []
-				if (sameGbTemplateType) {
-					// Same template → CG UPDATE so params (color/width/etc.) change without re-adding the CG instance.
-					borderLines = buildGlobalBorderUpdateLines(channel, GLOBAL_BORDER_LAYER, incomingGb)
-				} else {
-					// Fresh add (or template type changed): load hidden when crossfading, full-opacity when cutting.
-					borderLines = buildGlobalBorderAmcpLines(channel, GLOBAL_BORDER_LAYER, incomingGb, self, {
-						initialOpacity: gbWillFadeIn ? 0 : 1,
-					})
-				}
-				if (borderLines.length > 0) {
-					await sendPipOverlayLinesSerial(amcp, borderLines)
-				}
-			} catch (e) {
-				self.log?.('warn', `Global border failed: ${e?.message || e}`)
-			}
-		}
+
 		let crossfadeLines = []
 		if (shouldRunBankCrossfade) {
 			const handledOut = new Set()
@@ -299,7 +400,7 @@ async function runSceneTakeLbg(amcp, opts) {
 					continue
 				}
 				// Deterministic dissolve: always ramp incoming up and paired outgoing down.
-				if (!job.useLoadAuto) {
+				if (!job.useLoadAuto && !job.hasLoadTransition) {
 					const clIn = `${channel}-${pIn}`
 					let pInTail = `${job.targetOpacity} ${fadeDur}`
 					if (fadeTw) pInTail += ` ${param(fadeTw)}`
@@ -322,23 +423,23 @@ async function runSceneTakeLbg(amcp, opts) {
 			// Tween the global border in sync with the bank crossfade so it never cuts in/out.
 			if (gbWillFadeIn) {
 				crossfadeLines.push(
-					buildGlobalBorderOpacityFadeLine(channel, GLOBAL_BORDER_LAYER, 1, fadeDur, fadeTw ? param(fadeTw) : undefined)
+					buildGlobalBorderOpacityFadeLine(channel, incomingGbLayer, 1, fadeDur, fadeTw ? param(fadeTw) : undefined)
 				)
 			} else if (gbWillFadeOut) {
 				crossfadeLines.push(
-					buildGlobalBorderOpacityFadeLine(channel, GLOBAL_BORDER_LAYER, 0, fadeDur, fadeTw ? param(fadeTw) : undefined)
+					buildGlobalBorderOpacityFadeLine(channel, currentGbLayer, 0, fadeDur, fadeTw ? param(fadeTw) : undefined)
 				)
 			}
 		}
-		try {
-			await amcp.mixerCommit(channel)
-		} catch (_) {}
-
-		const needsIncomingFadePreroll = shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)
+		const needsIncomingFadePreroll =
+			(shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)) ||
+			(isMergeTransition && takeJobs.some((j) => j.hasLoadTransition))
 		const prebufferMs = needsIncomingFadePreroll ? 180 : 80
 		await new Promise((r) => setTimeout(r, prebufferMs))
 
-		const playLinesForCrossfade = []
+		const commitLine = `MIXER ${channel} COMMIT`
+
+		let playLinesForCrossfade = []
 		if (crossfadeLines.length > 0) {
 			for (const job of takeJobs) {
 				if (!job.playPlan) continue
@@ -348,22 +449,69 @@ async function runSceneTakeLbg(amcp, opts) {
 					playLinesForCrossfade.push(`MIXER ${job.playPlan.channel}-${job.playPlan.layer} OPACITY 0 0`)
 				}
 			}
-		} else {
-			for (const job of takeJobs) {
-				if (job.playPlan) {
-					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-					await amcp.play(job.playPlan.channel, job.playPlan.layer, job.playPlan.clip, job.playPlan.opts)
-				}
-			}
 		}
-		if (crossfadeLines.length > 0) {
-			try {
-				await amcp.batchSendChunked([...playLinesForCrossfade, ...crossfadeLines], { skipMixerPreCommit: true })
-				await amcp.mixerCommit(channel)
+
+		try {
+			if (crossfadeLines.length > 0) {
+				await sendAmcpLinesSequential(
+					[commitLine, ...playLinesForCrossfade, ...crossfadeLines, commitLine],
+					amcp,
+				)
 				fadeClockStart = Date.now()
 				notifyProgramTransitionStarted()
-			} catch (_) {}
-		} else if (shouldRunBankCrossfade) {
+			} else if (isMergeTransition && takeJobs.some((j) => j.playPlan)) {
+				const mergePlayLines = []
+				for (const job of takeJobs) {
+					if (!job.playPlan) continue
+					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
+					mergePlayLines.push(`PLAY ${job.playPlan.channel}-${job.playPlan.layer}`)
+				}
+				if (mergePlayLines.length > 0) {
+					await sendAmcpLinesSequential([commitLine, ...mergePlayLines], amcp)
+					fadeClockStart = Date.now()
+					notifyProgramTransitionStarted()
+				} else {
+					await amcp.mixerCommit(channel)
+				}
+			} else {
+				const simplePlays = []
+				for (const job of takeJobs) {
+					if (!job.playPlan) continue
+					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
+					simplePlays.push(serializeClipCommandPlan(job.playPlan))
+				}
+				if (simplePlays.length > 0) {
+					await sendAmcpLinesSequential([commitLine, ...simplePlays], amcp)
+				} else {
+					await amcp.mixerCommit(channel)
+				}
+			}
+		} catch (_) {}
+
+		try {
+			for (const job of takeJobs) {
+				if (!job.browserCgUrl) continue
+				const cl = `${channel}-${job.pLayer}`
+				const json = JSON.stringify({ url: job.browserCgUrl })
+				const lines = [
+					`CG ${cl} CLEAR`,
+					`CG ${cl} ADD 0 highascg_browser_url 1 ${param(json)}`,
+					`CG ${cl} PLAY 0`,
+					`CG ${cl} UPDATE 0 ${param(json)}`,
+				]
+				await sendPipOverlayLinesSerial(amcp, lines)
+			}
+			if (takeJobs.some((j) => j.browserCgUrl)) {
+				await amcp.mixerCommit(channel).catch(() => {})
+			}
+		} catch (e) {
+			self.log?.('warn', `[scene-take-lbg] browser CG: ${e?.message || e}`)
+		}
+
+		if (isMergeTransition && mergeMixerExtras.length > 0 && takeJobs.length === 0) {
+			fadeClockStart = Date.now()
+			notifyProgramTransitionStarted()
+		} else if (shouldRunBankCrossfade && crossfadeLines.length === 0) {
 			fadeClockStart = Date.now()
 			notifyProgramTransitionStarted()
 		}
@@ -429,27 +577,59 @@ async function runSceneTakeLbg(amcp, opts) {
 			await new Promise((r) => setTimeout(r, Math.ceil(teardownWait) + 5))
 		}
 
+		/** Logical layers receiving a take job on this beat still use Caspar layer N for the new clip — do not STOP/CLEAR N after MIX. */
+		const takeJobLogicalNums = new Set(takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite))
+
 		const teardownLines = []
 		for (const layer of exitMedia) {
-			const pOut = phys(Number(layer.layerNumber), activeBank)
-			const cl = `${channel}-${pOut}`
-			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
-			try {
-				const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
-				const pipN = pipOverlaysFromLayer(layer).length
-				if (pipN > 0) {
-					teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextL, pipN))
+			const ln = Number(layer.layerNumber)
+			if (isMergeTransition && Number.isFinite(ln)) {
+				if (takeJobLogicalNums.has(ln)) {
+					// Same-layer swap: old media is gone after PLAY+MIX; clearing N would kill the new foreground.
+					const ghost = ln + PGM_BANK_B_OFFSET
+					const clg = `${channel}-${ghost}`
+					teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
+					try {
+						playbackTracker.recordStop(self, channel, ghost)
+					} catch (_) {}
+					continue
 				}
-			} catch (_) {}
-			try {
-				playbackTracker.recordStop(self, channel, pOut)
-			} catch (_) {}
+				for (const phys of [ln, ln + PGM_BANK_B_OFFSET]) {
+					const cl = `${channel}-${phys}`
+					teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+					try {
+						const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+						const pipN = pipOverlaysFromLayer(layer).length
+						if (pipN > 0 && phys === ln) {
+							teardownLines.push(...buildPipOverlayRemoveLines(channel, phys, nextL, pipN))
+						}
+					} catch (_) {}
+					try {
+						playbackTracker.recordStop(self, channel, phys)
+					} catch (_) {}
+				}
+			} else {
+				const pOut = phys(Number(layer.layerNumber), activeBank)
+				const cl = `${channel}-${pOut}`
+				teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+				try {
+					const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+					const pipN = pipOverlaysFromLayer(layer).length
+					if (pipN > 0) {
+						teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextL, pipN))
+					}
+				} catch (_) {}
+				try {
+					playbackTracker.recordStop(self, channel, pOut)
+				} catch (_) {}
+			}
 		}
 
 		// Border was on the previous look but not the new one — opacity tween (if any) is done,
 		// so the CG and mixer slot are safe to free now.
 		if (currentGbEnabled && !incomingGbEnabled) {
-			teardownLines.push(...buildGlobalBorderClearLines(channel, GLOBAL_BORDER_LAYER))
+			teardownLines.push(...buildGlobalBorderClearLines(channel, 998))
+			teardownLines.push(...buildGlobalBorderClearLines(channel, 996))
 		}
 
 		if (teardownLines.length > 0) {
@@ -462,10 +642,15 @@ async function runSceneTakeLbg(amcp, opts) {
 		} catch (_) {}
 	}
 
-	if (takeJobs.length > 0) {
-		self.programLayerBankByChannel[chKey] = inactiveBank
+	if (takeJobs.length > 0 || mergeMixerExtras.length > 0) {
+		self.programLayerBankByChannel[chKey] = isMergeTransition ? 'a' : inactiveBank
 	}
 	persistProgramLayerBanks(self)
+
+	// Setup playlist automation for list-mode layers in this look
+	if (takeJobs.length > 0) {
+		setupLayerPlaylists(self, channel, incoming, takeJobs)
+	}
 
 	return {
 		ok: true,
@@ -477,6 +662,225 @@ async function runSceneTakeLbg(amcp, opts) {
 			unchanged: diff.unchanged.length,
 		},
 	}
+}
+
+function setupLayerPlaylists(self, channel, incoming, takeJobs) {
+	// Register the global OSC playlist handler on self.oscState exactly once!
+	if (self.oscState && !self._playlistOscBound) {
+		self._playlistOscBound = true
+		self.oscState.on('change', (snapshot) => {
+			handlePlaylistOscUpdate(self, snapshot)
+		})
+	}
+
+	for (const job of takeJobs) {
+		const layer = job.layer
+		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
+			const pKey = `${incoming.id}-${layer.layerNumber}`
+			
+			// Initialize the active index to 0 for auto advance
+			self.playlistActiveIndices = self.playlistActiveIndices || {}
+			
+			if (layer.playlistAdvance === 'auto') {
+				self.playlistActiveIndices[pKey] = 0
+				
+				// Clear any previous image timer for this layer
+				clearPlaylistImageTimer(self, pKey)
+				
+				if (layer.playlist.length > 1) {
+					const firstItem = layer.playlist[0]
+					const isImg = firstItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(firstItem.value)
+					
+					if (isImg) {
+						schedulePlaylistImageTimer(self, channel, job.pLayer, incoming, layer, 0)
+					} else {
+						// Video: preload the second item as LOADBG AUTO
+						queueNextPlaylistItem(self, channel, job.pLayer, layer, 1)
+					}
+				}
+			}
+		}
+	}
+}
+
+function handlePlaylistOscUpdate(self, snapshot) {
+	try {
+		const liveSceneState = require('../state/live-scene-state')
+		const activeScenes = liveSceneState.getAll()
+
+		for (const chKey in activeScenes) {
+			const channel = parseInt(chKey, 10)
+			const liveEntry = activeScenes[chKey]
+			if (!liveEntry || !liveEntry.scene) continue
+			const scene = liveEntry.scene
+			const activeBank = require('./scene-transition').normalizeProgramLayerBank(self.programLayerBankByChannel?.[chKey])
+
+			if (Array.isArray(scene.layers)) {
+				for (const layer of scene.layers) {
+					if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0 && layer.playlistAdvance === 'auto') {
+						// Find physical layer index
+						const pLayer = require('./scene-transition').phys(Number(layer.layerNumber), activeBank)
+
+						// Check current file in OSC snapshot
+						const chOsc = snapshot.channels && snapshot.channels[chKey]
+						const layerOsc = chOsc && chOsc.layers && chOsc.layers[pLayer]
+						const playingFile = layerOsc && layerOsc.file && layerOsc.file.name
+
+						if (playingFile) {
+							const itemIdx = layer.playlist.findIndex(item => sameFileName(item.value, playingFile))
+							if (itemIdx >= 0) {
+								const pKey = `${scene.id}-${layer.layerNumber}`
+								self.playlistActiveIndices = self.playlistActiveIndices || {}
+								const lastIdx = self.playlistActiveIndices[pKey] ?? 0
+
+								if (itemIdx !== lastIdx) {
+									// Advanced to the next item!
+									self.playlistActiveIndices[pKey] = itemIdx
+									if (typeof self.log === 'function') {
+										self.log('info', `[Playlist] Layer ${layer.layerNumber} advanced to item ${itemIdx}: ${playingFile}`)
+									}
+
+									// Clear current image timers
+									clearPlaylistImageTimer(self, pKey)
+
+									const currentItem = layer.playlist[itemIdx]
+									const isImg = currentItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(currentItem.value)
+
+									if (isImg) {
+										schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx)
+									} else {
+										// Video: preload the next item (with loop wrapping)
+										let nextIdx = itemIdx + 1
+										if (layer.playlistLoop !== false) {
+											nextIdx = nextIdx % layer.playlist.length
+										} else if (nextIdx >= layer.playlist.length) {
+											nextIdx = -1
+										}
+
+										if (nextIdx >= 0) {
+											queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	} catch (e) {
+		self.log?.('warn', `[Playlist OSC] Error: ${e?.message || e}`)
+	}
+}
+
+function queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx) {
+	const nextItem = layer.playlist[nextIdx]
+	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
+	const loadOpts = {
+		auto: true,
+		loop: false
+	}
+	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
+		loadOpts.transition = transition.type
+		loadOpts.duration = transition.duration
+	}
+	if (typeof self.log === 'function') {
+		self.log('info', `[Playlist] Preloading next item ${nextIdx} (${nextItem.value}) on ${channel}-${pLayer} with AUTO`)
+	}
+	self.amcp.loadbg(channel, pLayer, nextItem.value, loadOpts).catch((err) => {
+		if (typeof self.log === 'function') {
+			self.log('warn', `[Playlist] Preload failed on ${channel}-${pLayer}: ${err?.message || err}`)
+		}
+	})
+}
+
+function schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx) {
+	const pKey = `${scene.id}-${layer.layerNumber}`
+	clearPlaylistImageTimer(self, pKey)
+
+	const item = layer.playlist[itemIdx]
+	const durationMs = (item.duration ?? 5) * 1000
+
+	if (typeof self.log === 'function') {
+		self.log('info', `[Playlist] Scheduling image timer for item ${itemIdx} (${item.value}) on ${channel}-${pLayer} for ${durationMs}ms`)
+	}
+
+	self.playlistImageTimers = self.playlistImageTimers || {}
+	self.playlistImageTimers[pKey] = setTimeout(() => {
+		delete self.playlistImageTimers[pKey]
+
+		// Advance to next
+		let nextIdx = itemIdx + 1
+		if (layer.playlistLoop !== false) {
+			nextIdx = nextIdx % layer.playlist.length
+		} else if (nextIdx >= layer.playlist.length) {
+			return // Done playing once
+		}
+
+		triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx)
+	}, durationMs)
+}
+
+function clearPlaylistImageTimer(self, pKey) {
+	if (self.playlistImageTimers && self.playlistImageTimers[pKey]) {
+		clearTimeout(self.playlistImageTimers[pKey])
+		delete self.playlistImageTimers[pKey]
+	}
+}
+
+function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
+	const nextItem = layer.playlist[nextIdx]
+	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
+
+	const loadOpts = {
+		loop: false
+	}
+	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
+		loadOpts.transition = transition.type
+		loadOpts.duration = transition.duration
+	}
+
+	if (typeof self.log === 'function') {
+		self.log('info', `[Playlist] Advancing from image to item ${nextIdx} (${nextItem.value}) on ${channel}-${pLayer}`)
+	}
+
+	void (async () => {
+		try {
+			await self.amcp.loadbg(channel, pLayer, nextItem.value, loadOpts)
+			await self.amcp.play(channel, pLayer)
+
+			// Update index state immediately so that it triggers correctly on next update
+			const pKey = `${scene.id}-${layer.layerNumber}`
+			self.playlistActiveIndices = self.playlistActiveIndices || {}
+			self.playlistActiveIndices[pKey] = nextIdx
+
+			// Setup next advancement
+			const isImg = nextItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(nextItem.value)
+			if (isImg) {
+				schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
+			} else {
+				let nextNextIdx = nextIdx + 1
+				if (layer.playlistLoop !== false) {
+					nextNextIdx = nextNextIdx % layer.playlist.length
+				} else if (nextNextIdx >= layer.playlist.length) {
+					nextNextIdx = -1
+				}
+				if (nextNextIdx >= 0) {
+					queueNextPlaylistItem(self, channel, pLayer, layer, nextNextIdx)
+				}
+			}
+		} catch (err) {
+			if (typeof self.log === 'function') {
+				self.log('warn', `[Playlist] Advance trigger failed on ${channel}-${pLayer}: ${err?.message || err}`)
+			}
+		}
+	})()
+}
+
+function sameFileName(a, b) {
+	if (!a || !b) return false
+	const clean = (s) => String(s).toLowerCase().replace(/\\/g, '/').replace(/\.[^/.]+$/, '')
+	return clean(a) === clean(b)
 }
 
 module.exports = { runSceneTakeLbg }

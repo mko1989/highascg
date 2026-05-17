@@ -1,11 +1,7 @@
 /**
- * PIP overlay — Caspar **CG** + MIXER. Two placement modes:
- * - **Aligned** (preferred): HTML on `L+1`, `L+2`, … when `L+1+stackIndex < nextContentLayer` (main **PLAY** stays on `L`;
- *   looks use `L` = 10, 20, 30… so 11–19 are the in-between band above base 10).
- *   MIXER FILL = video FILL when aligned; `inner` is PIP–local 0–1 (chrome inside the PIP box).
- * - **High-band legacy**: `100 + L*8 + i` when there is no room below the next look layer; expanded FILL
- *   and inner in that overlay’s 0–1 (chrome outside the video in channel space).
- * @see 25_WO_PIP_OVERLAY_EFFECTS.md
+ * PIP overlay — Caspar CG + MIXER.
+ * This file contains the command builders for PIP overlays.
+ * Utilities and Global Border logic have been split into separate files.
  */
 
 'use strict'
@@ -14,266 +10,25 @@ const { getChannelResolutionForChannel } = require('./scene-native-fill')
 const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
 const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
 
-const PIP_OVERLAY_LAYER_OFFSET = 100
-/** @see web/lib/pip-overlay-registry.js — keep in sync */
-const PIP_OVERLAY_MAX_STACK = 8
-/** Main clip on decade 10/20/…; first PIP/CG on p+1 so layers 11–19 (above 10) are free for HTML overlays. */
-const PIP_OVERLAY_ALIGN_GAP = 1
+const utils = require('./pip-overlay-utils')
+const globalBorder = require('./global-border')
 
-const TEMPLATE_MAP = {
-	border: 'pip_border',
-	shadow: 'pip_shadow',
-	edge_strip: 'pip_edge_strip',
-	glow: 'pip_glow',
-	router: 'pip_router',
-}
-
-/** @deprecated use resolvePipOverlayCasparLayer — kept for callers that need legacy slot only */
-function overlayLayerSlot(contentLayer, stackIndex = 0) {
-	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const base = Number(contentLayer)
-	const n = Number.isFinite(base) ? base : 0
-	return PIP_OVERLAY_LAYER_OFFSET + n * PIP_OVERLAY_MAX_STACK + i
-}
-
-/**
- * @param {number} contentPhysicalLayer
- * @param {number} stackIndex
- * @param {number|undefined} nextContentLayer - Smallest *other* look layer &gt; this PIP (exclusive end for aligned L+index).
- *   Omit/undefined: treated as `contentPhysicalLayer + 1` (at most one aligned slot without scene context).
- */
-function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer) {
-	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const p = Number(contentPhysicalLayer)
-	if (!Number.isFinite(p) || p < 0) {
-		return PIP_OVERLAY_LAYER_OFFSET + i
-	}
-	// Invalid next (e.g. "" → 0, or ≤ p) was forcing legacy 100+8*p — CG sat above all low-numbered PIPs. Treat as "no bound".
-	let nx = nextContentLayer
-	if (nx == null) {
-		// One main clip per decade (10,20,…); default upper bound = next base layer so 11..19 stay in-band.
-		nx = p >= 10 && p % 10 === 0 ? p + 10 : p + 1
-	} else if (typeof nx === 'string' && nx.trim() === '') {
-		nx = 10000
-	} else {
-		nx = Number(nx)
-	}
-	if (!Number.isFinite(nx) || nx <= p) {
-		nx = 10000
-	}
-	if (p + PIP_OVERLAY_ALIGN_GAP + i < nx) {
-		return p + PIP_OVERLAY_ALIGN_GAP + i
-	}
-	return PIP_OVERLAY_LAYER_OFFSET + p * PIP_OVERLAY_MAX_STACK + i
-}
-
-function overlayLayer(contentLayer) {
-	return overlayLayerSlot(contentLayer, 0)
-}
-
-/**
- * @param {object | null | undefined} layer
- * @returns {{ type: string, params?: object }[]}
- */
-function pipOverlaysFromLayer(layer) {
-	if (!layer || typeof layer !== 'object') return []
-	if (Array.isArray(layer.pipOverlays) && layer.pipOverlays.length) {
-		return layer.pipOverlays.filter((o) => o && typeof o === 'object' && o.type)
-	}
-	if (layer.pipOverlay && typeof layer.pipOverlay === 'object' && layer.pipOverlay.type) {
-		return [layer.pipOverlay]
-	}
-	return []
-}
-
-/**
- * Smallest **scene** layer number in the look above this strip (used for aligned PIP slot bounds).
- * @param {Array<{ layerNumber?: number }> | null | undefined} layers
- * @param {number|string} sceneLayerNum
- */
-function nextPipContentLayerInScene(layers, sceneLayerNum) {
-	const pl = Number(sceneLayerNum)
-	if (!Number.isFinite(pl)) return 10000
-	const m = (layers || [])
-		.map((l) => Number(l.layerNumber))
-		.filter((n) => Number.isFinite(n) && n > pl)
-	if (m.length === 0) return 10000
-	return Math.min(...m)
-}
-
-/**
- * @param {Array<{ pLayer: number }>} takeJobs
- * @param {number} pLayer
- * @returns {number}
- */
-function nextPipContentLayerInTake(takeJobs, pLayer) {
-	const pl = Number(pLayer)
-	if (!Number.isFinite(pl)) return 10000
-	const m = (takeJobs || [])
-		.map((j) => j.pLayer)
-		.filter((n) => Number.isFinite(n) && n > pl)
-	if (m.length === 0) return 10000
-	return Math.min(...m)
-}
-
-/**
- * @param {number} oR
- * @param {Array<{ pLayer: number, layer?: { layerNumber?: number }, pipOverlays?: object[] }>} takeJobs
- * @param {Array<{ layerNumber?: number }> | null | undefined} currentSceneLayers
- */
-function shouldStripPipSlotBeforeAdd(oR, takeJobs, currentSceneLayers) {
-	if (!Array.isArray(takeJobs)) return true
-	for (const job of takeJobs) {
-		const pl = Number(job.pLayer)
-		if (!Number.isFinite(pl)) continue
-		const nxt = nextPipContentLayerInTake(takeJobs, pl)
-		const sceneLn = Number(job.layer?.layerNumber)
-		const cur =
-			Number.isFinite(sceneLn) && Array.isArray(currentSceneLayers)
-				? currentSceneLayers.find((l) => Number(l?.layerNumber) === sceneLn)
-				: null
-		const prevPips = pipOverlaysFromLayer(cur)
-		const newPips = job.pipOverlays || []
-		for (let i = 0; i < newPips.length; i++) {
-			if (String(newPips[i]?.type || '') !== String(prevPips[i]?.type || '')) continue
-			if (newPips[i] == null) continue
-			const slot = resolvePipOverlayCasparLayer(pl, i, nxt)
-			if (slot === oR) {
-				// In-place CG UPDATE in add phase; no immediate strip (avoids flash)
-				return false
-			}
-		}
-	}
-	return true
-}
-
-function clamp01(v) {
-	return Math.max(0, Math.min(1, v))
-}
-
-/**
- * Scene / API may store params under `params` **or** flat next to `type` — merge for AMCP + outset math.
- * @param {{ type?: string, params?: object, inner?: unknown } | null | undefined} overlay
- * @returns {Record<string, unknown>}
- */
-function mergeOverlayParams(overlay) {
-	const out = {}
-	if (!overlay || typeof overlay !== 'object') return out
-	const nested = overlay.params && typeof overlay.params === 'object' ? { ...overlay.params } : {}
-	Object.assign(out, nested)
-	const skip = new Set(['type', 'params', 'inner'])
-	for (const k of Object.keys(overlay)) {
-		if (skip.has(k)) continue
-		const v = overlay[k]
-		if (v !== undefined) out[k] = v
-	}
-	return out
-}
-
-/**
- * @param {{ x?: number, y?: number, scaleX?: number, scaleY?: number } | null | undefined} f
- */
-function normalizeContentFill(f) {
-	const z = { x: 0, y: 0, scaleX: 1, scaleY: 1, ...f }
-	let x = Number(z.x)
-	let y = Number(z.y)
-	let sx = Number(z.scaleX)
-	let sy = Number(z.scaleY)
-	if (!Number.isFinite(x)) x = 0
-	if (!Number.isFinite(y)) y = 0
-	if (!Number.isFinite(sx) || sx <= 0) sx = 1
-	if (!Number.isFinite(sy) || sy <= 0) sy = 1
-	return { x, y, scaleX: sx, scaleY: sy }
-}
-
-/**
- * Pixel outset so overlay MIXER FILL is larger than the content PIP (chrome sits outside the video rect).
- * @param {{ type: string, params?: object }} overlay
- * @returns {number}
- */
-function outsetPxForPipOverlay(overlay) {
-	const p = mergeOverlayParams(overlay)
-	switch (overlay?.type) {
-		case 'border':
-			return Math.max(0, Number(p.width) || 4)
-		case 'edge_strip':
-			/** Mat width in pixels — must match strip thickness (see templates fallback). */
-			return Math.max(1, Number(p.thickness) || 3)
-		case 'shadow': {
-			const blur = Number(p.blur) || 0
-			const ox = Math.abs(Number(p.offsetX) || 0)
-			const oy = Math.abs(Number(p.offsetY) || 0)
-			const sp = Math.max(0, Number(p.spread) || 0)
-			return Math.max(12, blur + Math.max(ox, oy) + sp + 2)
-		}
-		case 'glow': {
-			const blur = Number(p.intensity) || 15
-			const spread = Number(p.width) || 0
-			return Math.max(6, blur + spread + 4)
-		}
-		default:
-			return 4
-	}
-}
-
-/**
- * Expand normalized FILL rect evenly in pixel space (symmetric matting).
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill
- * @param {number} outsetPx
- * @param {number} chW
- * @param {number} chH
- * @returns {{ x: number, y: number, scaleX: number, scaleY: number }}
- */
-function expandFillOutward(contentFill, outsetPx, chW, chH) {
-	const w = Math.max(1, chW)
-	const h = Math.max(1, chH)
-	const ox = outsetPx / w
-	const oy = outsetPx / h
-	let x = contentFill.x - ox
-	let y = contentFill.y - oy
-	let sx = contentFill.scaleX + 2 * ox
-	let sy = contentFill.scaleY + 2 * oy
-	return { x, y, scaleX: sx, scaleY: sy }
-}
-
-/**
- * Content PIP rectangle in **overlay layer** normalized 0–1 coordinates (hole over video).
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} overlayFill
- * @returns {{ l: number, t: number, w: number, h: number }}
- */
-function innerRectInOverlayNorm(contentFill, overlayFill) {
-	const sx2 = overlayFill.scaleX
-	const sy2 = overlayFill.scaleY
-	if (!(sx2 > 0) || !(sy2 > 0)) {
-		return { l: 0, t: 0, w: 1, h: 1 }
-	}
-	return {
-		l: clamp01((contentFill.x - overlayFill.x) / sx2),
-		t: clamp01((contentFill.y - overlayFill.y) / sy2),
-		w: clamp01(contentFill.scaleX / sx2),
-		h: clamp01(contentFill.scaleY / sy2),
-	}
-}
-
-/**
- * CG JSON payload: params + inner (hole) in overlay-local 0–1 space.
- */
-function buildPipOverlayCgPayload(overlay, inner) {
-	return JSON.stringify({ ...mergeOverlayParams(overlay), inner })
-}
+const {
+	PIP_OVERLAY_ALIGN_GAP,
+	PIP_OVERLAY_MAX_STACK,
+	TEMPLATE_MAP,
+	resolvePipOverlayCasparLayer,
+	pipOverlaysFromLayer,
+	mergeOverlayParams,
+	normalizeContentFill,
+	outsetPxForPipOverlay,
+	buildPipOverlayCgPayload,
+	overlayLayerSlot,
+	shouldStripPipSlotBeforeAdd,
+} = utils
 
 /**
  * Build AMCP commands to apply a PIP overlay on a scene layer.
- *
- * @param {object} overlay - { type, params }
- * @param {number} channel
- * @param {number} contentPhysicalLayer - Physical Caspar layer of the PIP content
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill - FILL of the **video** layer
- * @param {object} [appCtx] - module ctx with `config` and optional `state` (for channel resolution)
- * @param {number} [stackIndex] - 0 = first overlay layer above PIP (below higher stack indices)
- * @param {number} [nextContentLayer] - min other look layer &gt; this PIP; see resolvePipOverlayCasparLayer
- * @returns {string[]}
  */
 function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, contentFill, appCtx, stackIndex = 0, nextContentLayer) {
 	if (!overlay?.type) return []
@@ -293,24 +48,18 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
 	const p = Number(contentPhysicalLayer)
 	const idx = stackIndex | 0
-	// Must match resolve(): legacy uses 100+8*p+i; aligned uses p+1+idx (no CG on the same layer as the clip).
 	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
 
-	// To ensure uniform border thickness (preventing non-uniform scaling stretch),
-	// we always render the HTML template at full-screen channel resolution (0 0 1 1)
-	// and let the template position itself using the absolute channel-normalized coordinates.
 	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
 	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const cl = `${channel}-${oLayer}`
 	const data = buildPipOverlayCgPayload(overlay, inner)
-	/** @type {string[]} */
 	const out = []
-	// Aligned: drop old high-band HTML on the legacy slot (2 lines) so CG ADD targets the same layer as video.
+	
 	if (aligned) {
 		const leg = overlayLayerSlot(p, idx)
 		if (Number.isFinite(leg) && leg !== oLayer) {
 			const lcl = `${channel}-${leg}`
-			// Defer to channel COMMIT; avoid instant blank before PLAY + MIXER COMMIT
 			out.push(deferMixerAmcpLine(`MIXER ${lcl} CLEAR`))
 		}
 	}
@@ -325,14 +74,10 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 
 /**
  * AMCP lines for every overlay in order (index 0 = bottom of stack).
- * @param {{ type: string, params?: object }[]} overlays
- * @param {number} [nextContentLayer]
- * @param {{ layerNumber?: number, pipOverlays?: object[] }|null|undefined} [prevSceneLayer] - same screen row on **air**; same template at same index uses CG UPDATE
  */
 function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer, prevSceneLayer) {
 	if (!Array.isArray(overlays) || overlays.length === 0) return []
 
-	// Optimization: Use the "pip_router" template if we have multiple effects.
 	if (overlays.length > 1) {
 		const prevPips = pipOverlaysFromLayer(prevSceneLayer)
 		if (prevPips.length > 1) {
@@ -371,14 +116,6 @@ function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, co
 
 /**
  * CG UPDATE with recomputed inner (call with same contentFill as video layer).
- * @param {number} channel
- * @param {number} contentPhysicalLayer
- * @param {{ type: string, params?: object }} overlay
- * @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill
- * @param {number} [stackIndex]
- * @param {object} [appCtx]
- * @param {number} [nextContentLayer]
- * @returns {string[]}
  */
 function buildPipOverlayUpdateLines(channel, contentPhysicalLayer, overlay, contentFill, appCtx, stackIndex = 0, nextContentLayer) {
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
@@ -499,7 +236,6 @@ function buildPipOverlayRemoveLines(channel, contentPhysicalLayer, nextContentLa
 			? PIP_OVERLAY_MAX_STACK
 			: Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK, Math.floor(Number(maxStack))))
 	if (cap === 0) return []
-	/** @type {Set<number>} */
 	const toClear = new Set()
 	for (let i = 0; i < cap; i++) {
 		const oR = resolvePipOverlayCasparLayer(contentPhysicalLayer, i, nextContentLayer)
@@ -514,16 +250,11 @@ function buildPipOverlayRemoveLines(channel, contentPhysicalLayer, nextContentLa
 }
 
 /**
- * One deduped CG/MIXER clear set for PIP slots that the **previous** look actually used (avoids clearing empty stack slots).
- * @param {number} channel
- * @param {Array<{ pLayer: number, layer?: { layerNumber?: number } }>} takeJobs
- * @param {Array<{ layerNumber?: number }> | null | undefined} currentSceneLayers — previous look
- * @returns {string[]}
+ * One deduped CG/MIXER clear set for PIP slots that the **previous** look actually used.
  */
 function buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentSceneLayers) {
 	const ch = parseInt(channel, 10)
 	if (!Number.isFinite(ch) || !Array.isArray(takeJobs)) return []
-	/** @type {Set<number>} */
 	const toClear = new Set()
 	for (const job of takeJobs) {
 		const pl = Number(job.pLayer)
@@ -535,7 +266,7 @@ function buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentScene
 				: null
 		const prevN = pipOverlaysFromLayer(prevLayer).length
 		if (prevN <= 0) continue
-		const prevNext = nextPipContentLayerInScene(currentSceneLayers, sceneLn)
+		const prevNext = utils.nextPipContentLayerInScene(currentSceneLayers, sceneLn)
 		for (let i = 0; i < prevN; i++) {
 			const oR = resolvePipOverlayCasparLayer(pl, i, prevNext)
 			if (Number.isFinite(oR)) toClear.add(oR)
@@ -544,7 +275,6 @@ function buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentScene
 	const lines = []
 	for (const ol of [...toClear].sort((a, b) => a - b)) {
 		if (!shouldStripPipSlotBeforeAdd(ol, takeJobs, currentSceneLayers)) continue
-		// Defer to one MIXER <ch> COMMIT with LOADBG/PLAY and main layers — no instant CG strip
 		lines.push(deferMixerAmcpLine(`MIXER ${ch}-${ol} CLEAR`))
 	}
 	return lines
@@ -552,8 +282,6 @@ function buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentScene
 
 /**
  * Fade PIP HTML on the same layer slots remove() would clear, in sync with outgoing content.
- * @param {string} opacityFadeParam - Same tail as content `MIXER … OPACITY` (e.g. `0 25` or `0 25 easeboth`)
- * @param {number} [nextContentLayer] - upper bound for aligned PIP band (see resolvePipOverlayCasparLayer)
  */
 function buildPipOverlayOpacityFadeDeferLines(
 	channel,
@@ -571,7 +299,6 @@ function buildPipOverlayOpacityFadeDeferLines(
 			? PIP_OVERLAY_MAX_STACK
 			: Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK, Math.floor(Number(maxStack))))
 	if (cap === 0) return lines
-	/** @type {Set<number>} */
 	const toFade = new Set()
 	for (let i = 0; i < cap; i++) {
 		const oR = resolvePipOverlayCasparLayer(contentPhysicalLayer, i, nextContentLayer)
@@ -583,15 +310,6 @@ function buildPipOverlayOpacityFadeDeferLines(
 	return lines
 }
 
-const PIP_OVERLAY_TEMPLATE_FILES = Object.values(TEMPLATE_MAP).map((t) => t + '.html')
-
-/**
- * PIP overlay AMCP must stay in strict order with no arbitrary chunk boundaries.
- * `batchSendChunked` can split mid–overlay (e.g. CG in one BEGIN…COMMIT chunk, MIXER lines in the next);
- * MIXER-only chunks then get a pre-batch `MIXER <ch> COMMIT`, which commits channel mixer state before
- * overlay MIXER FILL runs — borders attach to the wrong place. Always send one line at a time.
- */
-/** Drop duplicate command lines (common when PIP remove runs 8 stack slots + legacy, then repeated per take job). */
 function dedupeAmcpLineOrderPreserving(lines) {
 	const seen = new Set()
 	const out = []
@@ -611,108 +329,9 @@ async function sendPipOverlayLinesSerial(amcp, lines) {
 	await sendAmcpLinesSequential(clean, amcp)
 }
 
-/**
- * Build AMCP lines for a global border on a high CG layer (default 998).
- * - Escape uses the same `\"` form as pip overlay templates; the previous `\\"` form
- *   was double-escaped and produced "Uncaught SyntaxError" inside the HTML template.
- * - `initialOpacity` lets the caller load the CG hidden so it can fade in during the
- *   scene crossfade (otherwise it pops on at full opacity at the next channel COMMIT).
- *   When the caller asks for `initialOpacity: 0`, an **immediate** opacity-zero is sent
- *   **before** the CG ADD so the slot is already invisible by the time the new template
- *   replaces the previous CG (no one-frame flash of the new border at the old opacity).
- *
- * @param {number} channel
- * @param {number} layer
- * @param {{ type?: string, params?: object } | null | undefined} overlay
- * @param {object} [appCtx]
- * @param {{ initialOpacity?: number }} [opts]
- * @returns {string[]}
- */
-function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
-	if (!overlay?.type) return []
-	const template = TEMPLATE_MAP[overlay.type] || 'pip_border'
-	const cl = `${channel}-${layer}`
-	const inner = { l: 0, t: 0, w: 1, h: 1 }
-	const data = buildPipOverlayCgPayload(overlay, inner)
-	const initialOpacity =
-		opts && Number.isFinite(Number(opts.initialOpacity)) ? Math.max(0, Math.min(1, Number(opts.initialOpacity))) : 1
-
-	const lines = []
-	// Pre-zero the slot so a previous border (if any) doesn't show through at OPACITY 1
-	// in the brief window between CG ADD and the next channel COMMIT.
-	if (initialOpacity === 0) {
-		lines.push(`MIXER ${cl} OPACITY 0 0`)
-	}
-	lines.push(
-		`CG ${cl} ADD 0 "${template}" 1 "${data.replace(/"/g, '\\"')}"`,
-		deferMixerAmcpLine(`MIXER ${cl} FILL 0 0 1 1 0`),
-		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
-		deferMixerAmcpLine(`MIXER ${cl} OPACITY ${initialOpacity} 0`),
-	)
-	return lines
-}
-
-/**
- * CG UPDATE for an existing global border (no flicker — same template type, only params change).
- * Use this when the new look's `globalBorder.type` matches the current look's type.
- *
- * @param {number} channel
- * @param {number} layer
- * @param {{ type?: string, params?: object } | null | undefined} overlay
- * @returns {string[]}
- */
-function buildGlobalBorderUpdateLines(channel, layer, overlay) {
-	if (!overlay?.type) return []
-	const cl = `${channel}-${layer}`
-	const inner = { l: 0, t: 0, w: 1, h: 1 }
-	const data = buildPipOverlayCgPayload(overlay, inner)
-	return [`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`]
-}
-
-/**
- * Opacity tween line for the global border layer.
- *
- * @param {number} channel
- * @param {number} layer
- * @param {number} targetOpacity
- * @param {number} durationFrames
- * @param {string} [tween]
- * @returns {string}
- */
-function buildGlobalBorderOpacityFadeLine(channel, layer, targetOpacity, durationFrames, tween) {
-	const cl = `${channel}-${layer}`
-	const target = Math.max(0, Math.min(1, Number(targetOpacity) || 0))
-	const dur = Math.max(0, Math.floor(Number(durationFrames) || 0))
-	let tail = `${target} ${dur}`
-	if (tween) tail += ` ${tween}`
-	return `MIXER ${cl} OPACITY ${tail}`
-}
-
-/**
- * Teardown lines for a removed global border. Send after the fade completes so the
- * CG CLEAR doesn't appear mid-tween.
- *
- * @param {number} channel
- * @param {number} layer
- * @returns {string[]}
- */
-function buildGlobalBorderClearLines(channel, layer) {
-	const cl = `${channel}-${layer}`
-	return [`CG ${cl} CLEAR`, `MIXER ${cl} CLEAR`]
-}
-
 module.exports = {
-	PIP_OVERLAY_LAYER_OFFSET,
-	PIP_OVERLAY_MAX_STACK,
-	overlayLayer,
-	overlayLayerSlot,
-	resolvePipOverlayCasparLayer,
-	pipOverlaysFromLayer,
-	mergeOverlayParams,
-	normalizeContentFill,
-	outsetPxForPipOverlay,
-	expandFillOutward,
-	innerRectInOverlayNorm,
+	...utils,
+	...globalBorder,
 	buildPipOverlayAmcpLines,
 	buildPipOverlayAmcpLinesAll,
 	buildPipOverlayUpdateLines,
@@ -721,13 +340,5 @@ module.exports = {
 	buildPipOverlayRemoveLines,
 	buildPipOverlayRemoveLinesForTakeJobSet,
 	buildPipOverlayOpacityFadeDeferLines,
-	nextPipContentLayerInScene,
-	nextPipContentLayerInTake,
 	sendPipOverlayLinesSerial,
-	buildGlobalBorderAmcpLines,
-	buildGlobalBorderUpdateLines,
-	buildGlobalBorderOpacityFadeLine,
-	buildGlobalBorderClearLines,
-	PIP_OVERLAY_TEMPLATE_FILES,
-	TEMPLATE_MAP,
 }

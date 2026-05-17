@@ -67,3 +67,8 @@ eggs produce --nointeractive --clone --max --excludes static --basename "${BASEN
 
 echo
 echo "Done. ISO is under /home/eggs/ and should start with ${BASENAME}_"
+echo
+echo "After dd (flash host): DEFAULT — full stick persistence for NVIDIA / DeckLink / Tailscale / etc.:"
+echo "  sudo bash ${HERE}/add-union-persistence-partition.sh /dev/sdX"
+echo "  → then always boot GRUB → Live with persistence (tools/live-usb/FLASH_AND_PERSIST.md)"
+echo "Optional narrow mode (~/highascg only, no full OS persist): tools/live-usb/HIGHASCG_FOLDER_USB_PARTITION.md"

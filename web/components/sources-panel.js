@@ -4,7 +4,11 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { api } from '../lib/api-client.js'
 import { showLiveInputModal } from './live-input-modal.js'
-import { mergeMediaProbeOverlay, renderEffectsTab, renderMediaBrowser, renderTemplatesBrowser, renderSourceList, renderPlaceholdersBrowser } from './sources-panel-helpers.js'
+import { mergeMediaProbeOverlay, renderSourceList } from './sources-panel-helpers.js'
+import { renderMediaBrowser } from './sources-panel-media.js'
+import { renderTemplatesBrowser } from './sources-panel-templates.js'
+import { renderEffectsTab } from './sources-panel-effects.js'
+import { renderPlaceholdersBrowser } from './sources-panel-placeholders.js'
 import { showUsbImportModal } from './usb-import-modal.js'
 import * as Ingest from './sources-panel-ingest-logic.js'
 import { renderLiveTab } from './sources-panel-live-render.js'
@@ -16,8 +20,8 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	const selectedMedia = new Set()
 	const sendToPrv = async (s) => { const ch = (stateStore.getState()?.channelMap?.previewChannels?.[0] ?? 2); try { await api.post('/api/play', { channel: ch, layer: 1, clip: s.value }); const el = root.querySelector(`[data-source-value="${CSS.escape(s.value)}"]`); if (el) { el.classList.add('source-item--previewing'); clearTimeout(previewFeedback); previewFeedback = setTimeout(() => el.classList.remove('source-item--previewing'), 1200) } } catch {} }
 
-	root.innerHTML = `<div class="sources-tabs"><button class="sources-tab active" data-src-tab="media">Media</button><button class="sources-tab" data-src-tab="templates">Templates</button><button class="sources-tab" data-src-tab="placeholders" style="display:none">Placeholders</button><button class="sources-tab" data-src-tab="effects">Effects</button><button class="sources-tab" data-src-tab="live">Live</button><button class="sources-tab" data-src-tab="timelines">Timelines</button></div><div class="sources-search" style="display:none"><input type="text" placeholder="Filter…" id="sources-filter" /></div><div class="sources-list" id="sources-list"></div><div class="sources-live-footer" style="display:none"><button type="button" class="sources-live-add-btn" id="sources-live-add-btn">+</button></div><div class="sources-media-footer" style="display:none"><div class="sources-media-footer__row"><button type="button" class="sources-refresh-btn" id="sources-refresh-media">↻ Refresh</button><div class="ingest-plus-wrap"><button type="button" class="ingest-plus-btn" id="ingest-plus-btn">+</button><div class="ingest-dropup-menu" style="display:none"><button class="ingest-menu-item" id="ingest-menu-file">Select File(s)</button><button class="ingest-menu-item" id="ingest-menu-mkdir">New Folder…</button><button class="ingest-menu-item ingest-menu-item--usb" id="ingest-menu-usb">Import USB…<span class="ingest-usb-badge" style="display:none"></span></button><button class="ingest-menu-item ingest-menu-item--placeholder" id="ingest-menu-placeholder" style="display:none">Add Placeholder…</button><div class="ingest-url-row"><input type="text" id="ingest-url" class="ingest-url-input" placeholder="Paste URL…" /><button type="button" id="ingest-url-btn" class="ingest-url-btn">⬇</button></div></div></div></div><div class="ingest-status-col"><div class="ingest-status" id="ingest-status"></div><div class="ingest-upload-progress" style="display:none"><div class="ingest-upload-progress__track"><div class="ingest-upload-progress__bar" style="width:0%"></div></div><span class="ingest-upload-progress__pct">0%</span></div></div></div><div id="sources-drag-overlay" class="sources-drag-overlay" style="display:none"><div class="sources-drag-overlay__content"><span>Drop to ingest</span></div></div>`
-	const tabs = root.querySelectorAll('.sources-tab'); const filterInput = root.querySelector('#sources-filter'); const listEl = root.querySelector('#sources-list'); const mediaFooter = root.querySelector('.sources-media-footer'); const refreshBtn = root.querySelector('#sources-refresh-media'); const plusBtn = root.querySelector('#ingest-plus-btn'); const dropMenu = root.querySelector('.ingest-dropup-menu'); const fileBtn = root.querySelector('#ingest-menu-file'); const mkdirBtn = root.querySelector('#ingest-menu-mkdir'); const usbBtn = root.querySelector('#ingest-menu-usb'); const placeholderBtn = root.querySelector('#ingest-menu-placeholder'); const usbBadge = root.querySelector('.ingest-usb-badge'); const urlIn = root.querySelector('#ingest-url'); const urlBtn = root.querySelector('#ingest-url-btn'); const iStatus = root.querySelector('#ingest-status'); const iProgWrap = root.querySelector('.ingest-upload-progress'); const iBar = root.querySelector('.ingest-upload-progress__bar'); const iPct = root.querySelector('.ingest-upload-progress__pct'); const liveFooter = root.querySelector('.sources-live-footer'); const dragOverlay = root.querySelector('#sources-drag-overlay')
+	root.innerHTML = `<div class="sources-tabs"><button class="sources-tab active" data-src-tab="media">Media</button><button class="sources-tab" data-src-tab="templates">Templates</button><button class="sources-tab" data-src-tab="placeholders" style="display:none">Placeholders</button><button class="sources-tab" data-src-tab="effects">Effects</button><button class="sources-tab" data-src-tab="live">Live</button><button class="sources-tab" data-src-tab="timelines">Timelines</button></div><div class="sources-search" style="display:none"><input type="text" placeholder="Filter…" id="sources-filter" /></div><div class="sources-list" id="sources-list"></div><div class="sources-live-footer" style="display:none"><button type="button" class="sources-live-add-btn" id="sources-live-add-btn">+</button></div><div class="sources-media-footer" style="display:none"><div class="sources-media-footer__row"><button type="button" class="sources-refresh-btn" id="sources-refresh-media">↻ Refresh</button><button type="button" id="sources-delete-selected" style="display:none; background: #da3637; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-left: 4px;">🗑 Delete (0)</button><div class="ingest-plus-wrap"><button type="button" class="ingest-plus-btn" id="ingest-plus-btn">+</button><div class="ingest-dropup-menu" style="display:none"><button class="ingest-menu-item" id="ingest-menu-file">Select File(s)</button><button class="ingest-menu-item" id="ingest-menu-mkdir">New Folder…</button><button class="ingest-menu-item ingest-menu-item--usb" id="ingest-menu-usb">Import USB…<span class="ingest-usb-badge" style="display:none"></span></button><button class="ingest-menu-item ingest-menu-item--placeholder" id="ingest-menu-placeholder" style="display:none">Add Placeholder…</button><div class="ingest-url-row"><input type="text" id="ingest-url" class="ingest-url-input" placeholder="Paste URL…" /><button type="button" id="ingest-url-btn" class="ingest-url-btn">⬇</button></div></div></div></div><div class="ingest-status-col"><div class="ingest-status" id="ingest-status"></div><div class="ingest-upload-progress" style="display:none"><div class="ingest-upload-progress__track"><div class="ingest-upload-progress__bar" style="width:0%"></div></div><span class="ingest-upload-progress__pct">0%</span></div></div></div><div id="sources-drag-overlay" class="sources-drag-overlay" style="display:none"><div class="sources-drag-overlay__content"><span>Drop to ingest</span></div></div>`
+	const tabs = root.querySelectorAll('.sources-tab'); const filterInput = root.querySelector('#sources-filter'); const listEl = root.querySelector('#sources-list'); const mediaFooter = root.querySelector('.sources-media-footer'); const refreshBtn = root.querySelector('#sources-refresh-media'); const deleteBtn = root.querySelector('#sources-delete-selected'); const plusBtn = root.querySelector('#ingest-plus-btn'); const dropMenu = root.querySelector('.ingest-dropup-menu'); const fileBtn = root.querySelector('#ingest-menu-file'); const mkdirBtn = root.querySelector('#ingest-menu-mkdir'); const usbBtn = root.querySelector('#ingest-menu-usb'); const placeholderBtn = root.querySelector('#ingest-menu-placeholder'); const usbBadge = root.querySelector('.ingest-usb-badge'); const urlIn = root.querySelector('#ingest-url'); const urlBtn = root.querySelector('#ingest-url-btn'); const iStatus = root.querySelector('#ingest-status'); const iProgWrap = root.querySelector('.ingest-upload-progress'); const iBar = root.querySelector('.ingest-upload-progress__bar'); const iPct = root.querySelector('.ingest-upload-progress__pct'); const liveFooter = root.querySelector('.sources-live-footer'); const dragOverlay = root.querySelector('#sources-drag-overlay')
 	root.querySelector('#sources-live-add-btn')?.addEventListener('click', () => showLiveInputModal(stateStore))
 
 	const fetchMedia = async () => { try { const data = await api.get('/api/media'); mediaWithProbe = data.media || data; render() } catch { mediaWithProbe = null } }
@@ -70,7 +74,10 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 				connectorId,
 				decklinkDevice: dev,
 			}
-			await api.post('/api/device-view', { addExtraLiveSource: item })
+			const addRes = await api.post('/api/device-view', { addExtraLiveSource: item })
+			if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+				window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
+			}
 			setStatus(`Live source ready: ${routeVal} (${connectorId})`, 'ok')
 			showDecklinkDropHint(`route://${cl}`, connectorId)
 			activateTab('live')
@@ -84,6 +91,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 
 	function render() {
 		const s = stateStore.getState(); listEl.classList.remove('sources-media-list'); if (liveFooter) liveFooter.style.display = currentTab === 'live' ? 'flex' : 'none'
+		if (deleteBtn) deleteBtn.style.display = 'none'
 		if (currentTab === 'media') {
 			listEl.classList.add('sources-media-list')
 			renderMediaBrowser(listEl, mergeMediaProbeOverlay(s.media || [], mediaWithProbe), filter, refreshMedia, {
@@ -101,6 +109,11 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 				onMoveItem: async (sourceId, targetId) => { try { setStatus(`Moving to ${targetId}…`, 'info'); await api.post('/api/media/move', { sourceId, targetId }); setStatus('Moved successfully', 'ok'); refreshMedia() } catch (e) { setStatus(e.message, 'error') } }
 			})
 			mediaFooter.style.display = 'flex'; startUsb()
+			if (deleteBtn) {
+				const count = selectedMedia.size
+				deleteBtn.textContent = `🗑 Delete (${count})`
+				deleteBtn.style.display = count > 0 ? 'inline-block' : 'none'
+			}
 		}
 		else if (currentTab === 'templates') { renderTemplatesBrowser(listEl, s.templates || [], filter); mediaFooter.style.display = 'flex'; startUsb() }
 		else if (currentTab === 'placeholders') { renderPlaceholdersBrowser(listEl, window.placeholderState?.getAll() || [], filter); mediaFooter.style.display = 'flex'; stopUsb() }
@@ -122,6 +135,26 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	tabs.forEach(t => t.onclick = () => activateTab(t.dataset.srcTab))
 	filterInput?.addEventListener('input', () => { filter = filterInput.value.trim(); render() })
 	if (refreshBtn) refreshBtn.onclick = refreshMedia
+	if (deleteBtn) {
+		deleteBtn.onclick = async () => {
+			const ids = Array.from(selectedMedia)
+			if (ids.length === 0) return
+			if (!confirm(`Delete ${ids.length} selected files?\n\nThis cannot be undone.`)) return
+			setStatus(`Deleting ${ids.length} files…`, 'info')
+			let success = 0
+			for (const id of ids) {
+				try {
+					await api.post('/api/media/delete', { id })
+					success++
+				} catch (e) {
+					console.error(`Failed to delete ${id}:`, e)
+				}
+			}
+			setStatus(`Deleted ${success} of ${ids.length} files`, success === ids.length ? 'ok' : 'error')
+			selectedMedia.clear()
+			refreshMedia()
+		}
+	}
 	const refreshUsb = async () => { try { const r = await api.get('/api/usb/drives'); const n = r.drives?.length || 0; usbBadge.textContent = n || ''; usbBadge.style.display = n ? 'inline-flex' : 'none'; usbBtn.classList.toggle('pending', !n) } catch { usbBadge.style.display = 'none'; usbBtn.classList.add('pending') } }
 	const startUsb = () => { if (!usbBadgeTimer) { refreshUsb(); usbBadgeTimer = setInterval(refreshUsb, 5000) } }; const stopUsb = () => { if (usbBadgeTimer) { clearInterval(usbBadgeTimer); usbBadgeTimer = null } }
 	if (wsClient?.on) { wsClient.on('usb:attached', refreshUsb); wsClient.on('usb:detached', refreshUsb) }

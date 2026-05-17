@@ -413,12 +413,27 @@ export function renderBands(bands, ctx, { currentSettings, statusEl, load, setCa
 				setStatus(statusEl, 'Applying GPU layout...', true)
 				const res = await Actions.applyOsSettings()
 				if (res?.ok) {
-					setStatus(statusEl, 'Applied xrandr layout and persisted reboot script', true)
+					const applied = !!res.layoutApplied
+					const persisted = !!res.layoutPersisted
+					const cmd = typeof res.xrandrCommand === 'string' && res.xrandrCommand.trim() ? res.xrandrCommand.trim() : ''
+					if (applied && persisted) {
+						setStatus(statusEl, cmd ? `Applied xrandr and persisted.\n${cmd}` : 'Applied xrandr layout and persisted reboot script', true)
+					} else if (applied && !persisted) {
+						setStatus(statusEl, cmd ? `xrandr applied; persist failed.\n${cmd}` : 'xrandr layout applied, but persisting the reboot script failed (check server logs / sudo)', false)
+					} else {
+						setStatus(
+							statusEl,
+							cmd
+								? `No xrandr apply reported.\nPlanned: ${cmd}`
+								: 'Apply-os finished but no xrandr change ran (no mapped outputs, xrandr query failed, or apply failed — see server [OS-Config] / [settings-os] logs). Settings were still saved.',
+							false
+						)
+					}
 				} else {
 					throw new Error(res?.error || 'Apply failed')
 				}
 				await load()
-			} catch (e) { setStatus(statusEl, e.message, false) }
+			} catch (e) { setStatus(statusEl, e?.message || String(e), false) }
 		}
 	}
 	const proc = appendSegment(bands, '')

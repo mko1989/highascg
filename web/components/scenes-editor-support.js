@@ -141,11 +141,6 @@ export function createTakeSceneToProgram(deps) {
 		const scene = sceneState.getScene(sceneId)
 		if (!scene) return
 
-		const hasContent = (scene.layers || []).some((l) => l?.source?.value)
-		if (!hasContent) {
-			deps.showToast('Add at least one layer with a source before taking live.', 'error')
-			return
-		}
 		takeBusy = true
 		try {
 			const cm = deps.getChannelMap() || {}
@@ -178,7 +173,7 @@ export function createTakeSceneToProgram(deps) {
 				const fps = cm.programResolutions?.[mainIdx]?.fps ?? 50
 				const body = {
 					channel: Number(programCh),
-					incomingScene: incomingJsonBase,
+					incomingScene: { ...incomingJsonBase, globalBorder: sceneState.getGlobalBorderForScreen(mainIdx) },
 					framerate: fps,
 					forceCut,
 					useServerLive: true,

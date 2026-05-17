@@ -7,14 +7,14 @@
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		html, body {
 			width: 100%; height: 100%;
-			overflow: visible;
+			overflow: hidden;
 			background: transparent !important;
 		}
 		#root {
 			position: absolute;
 			inset: 0;
 			pointer-events: none;
-			overflow: visible;
+			overflow: hidden;
 		}
 		#pip-frame {
 			position: absolute;
@@ -109,6 +109,10 @@
 			frame.appendChild(el)
 		})
 	}
+
+	window['play'] = function () {}
+	window['stop'] = function () {}
+	window['next'] = function () {}
 
 	window['update'] = function (raw) {
 		try {

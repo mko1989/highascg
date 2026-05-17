@@ -122,14 +122,7 @@ async function handleSceneTake(body, ctx) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('info', `[scene-take] pgm/prv path ch=${channel} prv=${bus1}`)
 			}
-			// Re-taking the same look should be a no-op to avoid route flicker and extra AMCP churn.
-			if (!b.forceCut && sameSceneId(currentScene, inc)) {
-				if (typeof ctx.log === 'function') {
-					ctx.log('info', `[scene-take] no-op: scene ${String(inc?.id || 'n/a')}${inc?.name ? ` (${String(inc.name)})` : ''} already on pgm ch=${channel}`)
-				}
-				liveSceneState.broadcastSceneLive(ctx)
-				return
-			}
+			// Removed: We allow re-taking the same look so users can re-trigger animations or videos.
 			// Native layer transitions are superior because they don't require detaching a route,
 			// preventing playback time jumps and double-decoding on the PGM channel.
 			const previousPgmScene = currentScene
@@ -231,10 +224,150 @@ async function handleSceneTake(body, ctx) {
 	}
 }
 
+const GLOBAL_BORDER_LAYER = 998
+
+// Pending fade-out CG CLEAR timers per `${channel}-${layer}`, so a re-enable before the
+// fade finishes cancels the pending clear (otherwise the new CG would be wiped).
+const _pendingBorderClears = new Map()
+
+function _borderKey(channel, layer) {
+	return `${channel}-${layer}`
+}
+
+function _cancelPendingBorderClear(channel, layer) {
+	const key = _borderKey(channel, layer)
+	const t = _pendingBorderClears.get(key)
+	if (t) {
+		clearTimeout(t)
+		_pendingBorderClears.delete(key)
+	}
+}
+
+function _scheduleBorderClearAfterFade(ctx, channel, layer, fadeFrames) {
+	_cancelPendingBorderClear(channel, layer)
+	let framerate = 50
+	try {
+		framerate = resolveChannelFramerateForMixerTween(ctx, channel) || 50
+	} catch (_) {}
+	const fadeMs = Math.ceil((Math.max(1, fadeFrames) / Math.max(1, framerate)) * 1000) + 100
+	const { buildGlobalBorderClearLines } = require('../engine/global-border')
+	const key = _borderKey(channel, layer)
+	const timer = setTimeout(async () => {
+		_pendingBorderClears.delete(key)
+		try {
+			if (!ctx.amcp) return
+			const clearLines = buildGlobalBorderClearLines(channel, layer)
+			for (const line of clearLines) {
+				try { await ctx.amcp.raw(line) } catch (_) {}
+			}
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[global-border] post-fade clear failed: ${e?.message || e}`)
+			}
+		}
+	}, fadeMs)
+	_pendingBorderClears.set(key, timer)
+}
+
+/**
+ * Normalize the global border payload for AMCP template rendering.
+ * - Force `side: 'inside'` — `outside` pushes the frame past the body edge, which
+ *   the HTML consumer renders as scrollbars (and hides the actual border).
+ */
+function _normalizeGlobalBorder(border) {
+	if (!border || typeof border !== 'object') return border
+	return {
+		...border,
+		params: { ...(border.params || {}), side: 'inside' },
+	}
+}
+
+async function handleBorderLines(body, ctx) {
+	const b = parseBody(body)
+	const channel = parseInt(b.channel, 10)
+	const rawBorder = b.border
+	const isUpdate = !!b.isUpdate
+	const rawLayer = parseInt(b.layer, 10)
+	const layer =
+		Number.isFinite(rawLayer) && rawLayer >= 1 && rawLayer <= 9998 ? rawLayer : GLOBAL_BORDER_LAYER
+
+	if (!channel || channel < 1) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
+	}
+
+	const {
+		buildGlobalBorderAmcpLines,
+		buildGlobalBorderUpdateLines,
+		buildGlobalBorderClearLines,
+		buildGlobalBorderOpacityFadeLine,
+	} = require('../engine/global-border')
+
+	const fadeDuration = Math.max(0, parseInt(rawBorder?.fadeDuration ?? 0, 10) || 0)
+	const border = _normalizeGlobalBorder(rawBorder)
+
+	let lines = []
+	if (border && border.enabled) {
+		// A pending fade-out clear would wipe the new CG mid-render.
+		_cancelPendingBorderClear(channel, layer)
+		if (isUpdate) {
+			lines = buildGlobalBorderUpdateLines(channel, layer, border)
+		} else if (fadeDuration > 0) {
+			lines = buildGlobalBorderAmcpLines(channel, layer, border, ctx, { initialOpacity: 0 })
+			lines.push(buildGlobalBorderOpacityFadeLine(channel, layer, 1, fadeDuration))
+		} else {
+			lines = buildGlobalBorderAmcpLines(channel, layer, border, ctx, { initialOpacity: 1 })
+		}
+	} else {
+		if (fadeDuration > 0) {
+			lines = [buildGlobalBorderOpacityFadeLine(channel, layer, 0, fadeDuration)]
+			// MIXER OPACITY 0 leaves the CG resident — schedule a CLEAR after the fade so
+			// a subsequent enable can ADD cleanly and we don't keep a dead template loaded.
+			_scheduleBorderClearAfterFade(ctx, channel, layer, fadeDuration)
+		} else {
+			lines = buildGlobalBorderClearLines(channel, layer)
+		}
+	}
+
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ lines }) }
+}
+
+async function handleBorderPresetCrossfade(body, ctx) {
+	const b = parseBody(body)
+	const channel = parseInt(b.channel, 10)
+	const fromLayer = parseInt(b.fromLayer, 10)
+	const toLayer = parseInt(b.toLayer, 10)
+	const inactiveMode = b.inactiveMode === 'add' ? 'add' : 'update'
+	const fadeDuration = Math.max(0, parseInt(String(b.fadeDuration ?? 25), 10) || 25)
+	if (!channel || channel < 1) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
+	}
+	if (!Number.isFinite(fromLayer) || !Number.isFinite(toLayer)) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'fromLayer and toLayer required' }) }
+	}
+	const rawBorder = b.border
+	if (!rawBorder || typeof rawBorder !== 'object') {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'border object required' }) }
+	}
+	const { buildGlobalBorderPresetCrossfadeLines } = require('../engine/global-border')
+	const border = _normalizeGlobalBorder(rawBorder)
+	_cancelPendingBorderClear(channel, fromLayer)
+	_cancelPendingBorderClear(channel, toLayer)
+	const lines = buildGlobalBorderPresetCrossfadeLines(channel, fromLayer, toLayer, border, ctx, fadeDuration, inactiveMode)
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ lines }) }
+}
+
 async function handlePost(path, body, ctx) {
-	if (path !== '/api/scene/take') return null
-	if (!ctx.amcp) return null
-	return handleSceneTake(body, ctx)
+	if (path === '/api/scene/take') {
+		if (!ctx.amcp) return null
+		return handleSceneTake(body, ctx)
+	}
+	if (path === '/api/scene/border-lines') {
+		return handleBorderLines(body, ctx)
+	}
+	if (path === '/api/scene/border-preset-crossfade') {
+		return handleBorderPresetCrossfade(body, ctx)
+	}
+	return null
 }
 
 module.exports = { handlePost, handleSceneTake }

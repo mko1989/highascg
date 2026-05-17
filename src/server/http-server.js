@@ -256,6 +256,7 @@ function startHttpServer(options) {
 		socket.on('close', () => trackedSockets.delete(socket))
 	})
 	server.on('upgrade', async (req, socket, head) => {
+		log(`[HTTP Server Upgrade] Event fired for path: ${req.url}`)
 		try {
 			if (typeof routeUpgrade !== 'function') return
 			const handled = await routeUpgrade(req, socket, head)

@@ -13,6 +13,7 @@ export function buildSettingsPayload(modal) {
 	const prevAll = settingsState.getSettings() || {}
 	
 	const settings = {
+		local_media_path: modal.querySelector('#set-local-media-path')?.value?.trim() ?? prevAll.local_media_path ?? '',
 		caspar: {
 			host: modal.querySelector('#set-caspar-host')?.value ?? prevAll.caspar?.host ?? '127.0.0.1',
 			port: modal.querySelector('#set-caspar-port')?.value ?? prevAll.caspar?.port ?? 5250,
@@ -86,6 +87,7 @@ export function hydrateSettings(modal, cfg) {
 	const comp = cfg.companion || {}
 	modal.querySelector('#set-companion-host').value = comp.host || '127.0.0.1'
 	modal.querySelector('#set-companion-port').value = comp.port || 8000
+	const lmp = modal.querySelector('#set-local-media-path'); if (lmp) lmp.value = cfg.local_media_path || ''
 	const u = cfg.usbIngest || {}
 	const usbEn = modal.querySelector('#set-usb-enabled'); if (usbEn) usbEn.checked = u.enabled !== false
 	const usbSub = modal.querySelector('#set-usb-subfolder'); if (usbSub) usbSub.value = u.defaultSubfolder || ''

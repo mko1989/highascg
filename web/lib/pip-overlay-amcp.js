@@ -273,6 +273,40 @@ export function buildPipOverlayRemoveLines(channel, contentPhysicalLayer, nextCo
 }
 
 /**
+ * CLEAR only PIP/CG slots that actually change between previous and next overlay stacks.
+ * Avoids blind sweeps of all {@link PIP_OVERLAY_MAX_STACK} slots (e.g. L11–L18 on L10) on every preview push.
+ *
+ * @param {number|undefined} nextContentLayer
+ * @param {{ type: string, params?: object }[]|null|undefined} previousOverlays
+ * @param {{ type: string, params?: object }[]|null|undefined} nextOverlays
+ * @returns {string[]}
+ */
+export function buildPipOverlayRemoveStaleSlots(channel, contentPhysicalLayer, nextContentLayer, previousOverlays, nextOverlays) {
+	const ch = Number(channel)
+	const prev = Array.isArray(previousOverlays) ? previousOverlays : []
+	const next = Array.isArray(nextOverlays) ? nextOverlays : []
+	const maxPrev = Math.min(prev.length, PIP_OVERLAY_MAX_STACK)
+	const maxNext = Math.min(next.length, PIP_OVERLAY_MAX_STACK)
+	/** @type {Set<number>} */
+	const idxToClear = new Set()
+	for (let i = maxNext; i < maxPrev; i++) idxToClear.add(i)
+	for (let i = 0; i < Math.min(maxPrev, maxNext); i++) {
+		if ((prev[i]?.type || '') !== (next[i]?.type || '')) idxToClear.add(i)
+	}
+	if (maxPrev > 0 && maxNext === 0) {
+		for (let i = 0; i < maxPrev; i++) idxToClear.add(i)
+	}
+	const lines = []
+	for (const i of [...idxToClear].sort((a, b) => a - b)) {
+		const oR = resolvePipOverlayCasparLayer(contentPhysicalLayer, i, nextContentLayer)
+		if (!Number.isFinite(oR)) continue
+		const cl = `${ch}-${oR}`
+		lines.push(`CG ${cl} CLEAR`, `MIXER ${cl} CLEAR`)
+	}
+	return lines
+}
+
+/**
  * AMCP lines to clear PIP CG/MIXER for content layers in [minL, maxL].
  * Reuses the same slot resolution as live remove (aligned + legacy); dedupes repeated clears across L.
  * `next=10000` = treat as unbounded so aligned slots p…p+7 and legacy 100+8p… are all cleared.

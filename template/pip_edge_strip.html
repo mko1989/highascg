@@ -7,14 +7,14 @@
 	* { margin: 0; padding: 0; box-sizing: border-box; }
 	html, body {
 		width: 100%; height: 100%;
-		overflow: visible;
+		overflow: hidden;
 		background: transparent !important;
 	}
 	#root {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		overflow: visible;
+		overflow: hidden;
 	}
 	.svg-container {
 		position: absolute;
@@ -41,16 +41,19 @@
 	var kfEl = document.getElementById('pip-edge-strip-keyframes')
 	var state = {
 		direction: 'cw',
-		count: 3,
+		count: 1,
 		thickness: 3,
 		color: '#e63946',
 		speed: 2,
 		length: 28,
 		glow: true,
 		glowColor: '#ff6b6b',
-		radius: 0,
+		glowWidth: 5,
+		roundedTips: false,
 		side: 'outside',
+		opacity: 1,
 		inner: null,
+		slices: [],
 	}
 
 	function clamp01(x) {
@@ -65,27 +68,30 @@
 
 	function hasMargin(inn) {
 		if (!inn) return false
-		return inn.w > 0 && inn.h > 0
+		// Support both {l,t,w,h} and {x,y,w,h}
+		var w = inn.w != null ? inn.w : (inn.width != null ? inn.width : 0)
+		var h = inn.h != null ? inn.h : (inn.height != null ? inn.height : 0)
+		return w > 0 && h > 0
 	}
 
 	function render() {
 		root.innerHTML = ''
 		kfEl.textContent = ''
-		var inn = state.inner
-		if (!inn || !hasMargin(inn)) return
+		
+		var slices = state.slices || []
+		if (slices.length === 0 && state.inner && hasMargin(state.inner)) {
+			// Backward compatibility fallback
+			slices = [{
+				x: state.inner.l,
+				y: state.inner.t,
+				w: state.inner.w,
+				h: state.inner.h
+			}]
+		}
 
-		var wrap = document.createElement('div')
-		wrap.className = 'svg-container'
-		wrap.style.setProperty('--il', String(inn.l))
-		wrap.style.setProperty('--it', String(inn.t))
-		wrap.style.setProperty('--iw', String(inn.w))
-		wrap.style.setProperty('--ih', String(inn.h))
+		if (slices.length === 0) return
 
 		var NS = 'http://www.w3.org/2000/svg'
-		var svg = document.createElementNS(NS, 'svg')
-		svg.setAttribute('viewBox', '0 0 100 100')
-		svg.setAttribute('preserveAspectRatio', 'none')
-
 		var cw = state.direction !== 'ccw'
 		var dur = Math.max(0.1, state.speed)
 		var n = Math.max(1, Math.min(12, Math.round(Number(state.count))))
@@ -98,53 +104,73 @@
 		var offEnd = cw ? '-100' : '100'
 		kfEl.textContent = '@keyframes ' + animName + ' { from { stroke-dashoffset: 0; } to { stroke-dashoffset: ' + offEnd + '; } }\n'
 
-		function createRect(stroke, width, opacity, delay) {
-			var r = document.createElementNS(NS, 'rect')
-			r.setAttribute('x', '0')
-			r.setAttribute('y', '0')
-			r.setAttribute('width', '100')
-			r.setAttribute('height', '100')
-			
-			var rw = Math.max(1, root.clientWidth * inn.w)
-			var rh = Math.max(1, root.clientHeight * inn.h)
-			var rx = (state.radius / rw) * 100
-			var ry = (state.radius / rh) * 100
-			r.setAttribute('rx', rx)
-			r.setAttribute('ry', ry)
+		slices.forEach(function (inn) {
+			if (!hasMargin(inn)) return
 
-			r.setAttribute('fill', 'none')
-			r.setAttribute('stroke', stroke)
-			r.setAttribute('stroke-width', width)
-			r.style.vectorEffect = 'non-scaling-stroke'
-			r.setAttribute('pathLength', '100')
-			r.setAttribute('stroke-dasharray', L + ' ' + gap)
-			r.style.animation = animName + ' ' + dur + 's linear infinite'
-			r.style.animationDelay = delay + 's'
-			if (opacity < 1) r.setAttribute('opacity', String(opacity))
-			return r
-		}
+			var wrap = document.createElement('div')
+			wrap.className = 'svg-container'
+			wrap.style.setProperty('--il', String(inn.x ?? inn.l ?? 0))
+			wrap.style.setProperty('--it', String(inn.y ?? inn.t ?? 0))
+			wrap.style.setProperty('--iw', String(inn.w))
+			wrap.style.setProperty('--ih', String(inn.h))
+			wrap.style.opacity = String(clamp01(state.opacity))
 
-		for (var i = 0; i < n; i++) {
-			var delay = (-(i / n) * dur).toFixed(3)
+			var svg = document.createElementNS(NS, 'svg')
+			svg.setAttribute('viewBox', '0 0 100 100')
+			svg.setAttribute('preserveAspectRatio', 'none')
+			svg.style.position = 'absolute'
+			svg.style.inset = '0'
+
+			var svgGlow = null
 			if (state.glow) {
-				var g = createRect(state.glowColor, th * 2.5, 0.3, delay)
-				g.style.filter = 'blur(' + (th * 1.5) + 'px)'
-				svg.appendChild(g)
+				svgGlow = document.createElementNS(NS, 'svg')
+				svgGlow.setAttribute('viewBox', '0 0 100 100')
+				svgGlow.setAttribute('preserveAspectRatio', 'none')
+				svgGlow.style.position = 'absolute'
+				svgGlow.style.inset = '0'
+				svgGlow.style.filter = 'blur(' + (state.glowWidth || 5) + 'px)'
+				wrap.appendChild(svgGlow)
 			}
-			svg.appendChild(createRect(state.color, th, 1, delay))
-		}
 
-		if (side === 'inside') {
-			wrap.style.overflow = 'hidden'
-		} else {
-			wrap.style.overflow = 'visible'
-			// For 'outside', we could add a mask to hide the inside part, 
-			// but usually edge strips are thin enough that being half-in is fine 
-			// or the user can just use 'inside'.
-		}
+			function createRect(stroke, width, opacity, delay) {
+				var r = document.createElementNS(NS, 'rect')
+				r.setAttribute('x', '0')
+				r.setAttribute('y', '0')
+				r.setAttribute('width', '100')
+				r.setAttribute('height', '100')
+				
+				r.setAttribute('fill', 'none')
+				r.setAttribute('stroke', stroke)
+				r.setAttribute('stroke-width', width)
+				r.setAttribute('stroke-linecap', state.roundedTips ? 'round' : 'butt')
+				r.style.vectorEffect = 'non-scaling-stroke'
+				r.setAttribute('pathLength', '100')
+				r.setAttribute('stroke-dasharray', L + ' ' + gap)
+				r.style.animation = animName + ' ' + dur + 's linear infinite'
+				r.style.animationDelay = delay + 's'
+				if (opacity < 1) r.setAttribute('opacity', String(opacity))
+				return r
+			}
 
-		wrap.appendChild(svg)
-		root.appendChild(wrap)
+			for (var i = 0; i < n; i++) {
+				var delay = (-(i / n) * dur).toFixed(3)
+				if (state.glow && svgGlow) {
+					var gw = state.glowWidth || 5
+					var g = createRect(state.glowColor, th + gw * 1.2, 0.55, delay)
+					svgGlow.appendChild(g)
+				}
+				svg.appendChild(createRect(state.color, th, 1, delay))
+			}
+
+			if (side === 'inside') {
+				wrap.style.overflow = 'hidden'
+			} else {
+				wrap.style.overflow = 'visible'
+			}
+
+			wrap.appendChild(svg)
+			root.appendChild(wrap)
+		})
 	}
 
 	window['play'] = function () {}
@@ -156,16 +182,30 @@
 			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
 			if (!d) return
 			if (d.direction != null) state.direction = String(d.direction)
-			if (d.count != null) state.count = parseFloat(d.count)
+			if (d.count != null) state.count = Math.max(1, Math.min(12, Math.round(parseFloat(d.count))))
 			if (d.thickness != null) state.thickness = parseFloat(d.thickness)
 			if (d.color != null) state.color = String(d.color)
 			if (d.speed != null) state.speed = parseFloat(d.speed)
 			if (d.length != null) state.length = parseFloat(d.length)
 			if (d.glow != null) state.glow = !!d.glow
 			if (d.glowColor != null) state.glowColor = String(d.glowColor)
-			if (d.radius != null) state.radius = parseFloat(d.radius)
+			if (d.glowWidth != null) state.glowWidth = parseFloat(d.glowWidth)
+			if (d.roundedTips != null) state.roundedTips = !!d.roundedTips
 			if (d.side != null) state.side = String(d.side)
+			if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 			state.inner = readInner(d)
+			if (Array.isArray(d.slices)) {
+				state.slices = d.slices.map(function (s) {
+					return {
+						x: clamp01(s.x),
+						y: clamp01(s.y),
+						w: clamp01(s.w),
+						h: clamp01(s.h)
+					}
+				})
+			} else {
+				state.slices = []
+			}
 			render()
 		} catch (e) { console.warn('pip_edge_strip update:', e) }
 	}

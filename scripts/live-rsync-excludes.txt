@@ -1,0 +1,32 @@
+# Rsync excludes for live-sync (deploy Mac→server, pull server→Mac).
+# Paths are relative to repo root.
+
+node_modules/
+CasparCG_Enhanced-main/
+companion-module-pixelhue-switcher-main 2/
+physics_cable_loops_v3.html
+
+.DS_Store
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Local env / secrets (keep separate on each machine; match with .env.example + docs)
+.env
+.env.local
+.env.deploy
+
+# Runtime / generated
+data/waveforms/
+.highascg-state.json
+.highascg-state.json.tmp
+.module-state.json
+.module-state.json.tmp
+go2rtc.yaml
+
+# Optional huge local clone (see root .gitignore)
+.reference/
+
+# Local IDE / previs (not required on server for runtime)
+.cursor/
+.highascg-previs/

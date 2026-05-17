@@ -13,7 +13,7 @@ export function connectorById(payload, id) {
 	const sid = String(id || '').trim()
 	// GPU rear-panel ports can exist as physical runtime ports before graph/suggested mapping.
 	// Provide a synthetic gpu_out connector so GPU inspector settings stay available.
-	if (/^gpu_p\d+$/i.test(sid)) {
+	if (/^gpu_p\d+(_\d+)?$/i.test(sid)) {
 		const ports = Array.isArray(payload?.live?.gpu?.physicalMap?.ports) ? payload.live.gpu.physicalMap.ports : []
 		const p = ports.find((x) => String(x?.physicalPortId || '').trim() === sid) || null
 		const pairName = String(p?.pair?.name || '').trim()
@@ -26,6 +26,15 @@ export function connectorById(payload, id) {
 			label: fallbackLabel,
 			externalRef: active || pairName || sid,
 			gpuPhysical: p?.pair ? { pair: p.pair, slotOrder: p.slotOrder } : undefined,
+			isSynthetic: true,
+		}
+	}
+	if (/^(DP|HDMI)-\d+$/i.test(sid)) {
+		return {
+			id: sid,
+			deviceId: CASPAR_HOST,
+			kind: 'gpu_out',
+			label: sid,
 			isSynthetic: true,
 		}
 	}

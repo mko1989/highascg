@@ -42,6 +42,10 @@ module.exports = {
 	 */
 	amcp_mixer_commit_before_amcp_batch: true,
 	offline_mode: false,
+	screen_1_force_os_resolution: false,
+	screen_2_force_os_resolution: false,
+	screen_3_force_os_resolution: false,
+	screen_4_force_os_resolution: false,
 	/**
 	 * Eyes hover: CPU/RAM (os), free disk (statfs), optional Caspar GL. Keep off in preshow (offline_mode).
 	 * Folder scan uses `du` (walks media tree) — heavy; enable only on production Caspar host via:
@@ -110,6 +114,8 @@ module.exports = {
 		screen_1_sbs_key: false,
 		screen_1_colour_space: 'RGB',
 		screen_1_force_linear_filter: true,
+		/** When true, Video mode + custom W×H×fps drive xrandr --mode/--rate (ignore EDID OS lines & destination topology for mode). */
+		screen_1_force_os_resolution: false,
 		screen_2_mode: '1080p5000',
 		screen_2_stretch: 'none',
 		screen_2_windowed: true,
@@ -134,6 +140,7 @@ module.exports = {
 		screen_2_sbs_key: false,
 		screen_2_colour_space: 'RGB',
 		screen_2_force_linear_filter: true,
+		screen_2_force_os_resolution: false,
 		screen_3_mode: '1080p5000',
 		screen_3_stretch: 'none',
 		screen_3_windowed: true,
@@ -158,6 +165,7 @@ module.exports = {
 		screen_3_sbs_key: false,
 		screen_3_colour_space: 'RGB',
 		screen_3_force_linear_filter: true,
+		screen_3_force_os_resolution: false,
 		screen_4_mode: '1080p5000',
 		screen_4_stretch: 'none',
 		screen_4_windowed: true,
@@ -182,6 +190,7 @@ module.exports = {
 		screen_4_sbs_key: false,
 		screen_4_colour_space: 'RGB',
 		screen_4_force_linear_filter: true,
+		screen_4_force_os_resolution: false,
 		multiview_enabled: true,
 		/**
 		 * When true (default), each preview channel gets a Caspar &lt;screen&gt; consumer (same layout flags as its PGM pair)
@@ -249,6 +258,14 @@ module.exports = {
 		/** `skip` | `overwrite` | `rename` (append _N) */
 		overwritePolicy: 'rename',
 		verifyHash: false,
+	},
+	/**
+	 * Mount a partition onto /home/casparcg/highascg/media (live USB internal library, WO-38).
+	 * Persists `uuid`; applied at HighAsCG startup via sudo NOPASSWD helper.
+	 */
+	mediaMount: {
+		uuid: '',
+		lastKernelName: '',
 	},
 	/**
 	 * Absolute path matching CasparCG’s template-path directory (same as in casparcg.config XML).
@@ -449,10 +466,10 @@ module.exports = {
 	 * expose two runtime DP IDs depending on boot/runtime state.
 	 */
 	gpuPhysicalTopology: [
-		{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-6', dpB: 'DP-7', connectorNumber: 0, location: 0 },
-		{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 1, location: 1 },
-		{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 2, location: 2 },
-		{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 3, location: 3 },
+		{ physicalPortId: 'gpu_p3', slotOrder: 0, dpA: 'DP-3', dpB: '', connectorNumber: 3, location: 3 },
+		{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-2', dpB: '', connectorNumber: 2, location: 2 },
+		{ physicalPortId: 'gpu_p1', slotOrder: 2, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
+		{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-1', dpB: '', connectorNumber: 0, location: 0 },
 	],
 	/**
 	 * Device view (WO-33): logical back-panel graph — ports, cables, layout.

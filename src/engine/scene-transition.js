@@ -86,22 +86,33 @@ function fadeOnEndEqual(a, b) {
  * Same source and same layout — no PLAY / no mixer tweens on take (see runSceneTake unchanged path).
  * Must include every layer field that runSceneTakeLbg turns into AMCP (effects, fade schedule, PIP, etc.).
  */
-function layerVisuallyEqual(cur, incoming) {
-	if (!cur || !incoming) return false
-	if (!sourceEqual(cur.source, incoming.source)) return false
-	if (!fillEqual(cur.fill, incoming.fill)) return false
-	if (!numClose(cur.rotation ?? 0, incoming.rotation ?? 0)) return false
-	if (!numClose(cur.opacity ?? 1, incoming.opacity ?? 1)) return false
-	if (!!cur.straightAlpha !== !!incoming.straightAlpha) return false
-	if ((cur.audioRoute || '1+2') !== (incoming.audioRoute || '1+2')) return false
-	if (!!cur.loop !== !!incoming.loop) return false
-	if ((cur.contentFit || 'native') !== (incoming.contentFit || 'native')) return false
-	if (!numClose(cur.volume ?? 1, incoming.volume ?? 1)) return false
-	if (!!cur.muted !== !!incoming.muted) return false
-	if (!fadeOnEndEqual(cur.fadeOnEnd, incoming.fadeOnEnd)) return false
-	if (jsonStable(cur.effects) !== jsonStable(incoming.effects)) return false
-	if (pipOverlaysStable(cur) !== pipOverlaysStable(incoming)) return false
-	return true
+function layerVisuallyEqual(cur, incoming, returnDiff = false) {
+	if (!cur || !incoming) return returnDiff ? { missing: true } : false
+	const diffs = {}
+	if (!sourceEqual(cur.source, incoming.source)) diffs.source = { cur: cur.source, inc: incoming.source }
+	if (!fillEqual(cur.fill, incoming.fill)) diffs.fill = { cur: cur.fill, inc: incoming.fill }
+	if (!numClose(cur.rotation ?? 0, incoming.rotation ?? 0)) diffs.rotation = { cur: cur.rotation, inc: incoming.rotation }
+	if (!numClose(cur.opacity ?? 1, incoming.opacity ?? 1)) diffs.opacity = { cur: cur.opacity, inc: incoming.opacity }
+	if (!!cur.straightAlpha !== !!incoming.straightAlpha) diffs.straightAlpha = { cur: cur.straightAlpha, inc: incoming.straightAlpha }
+	if ((cur.audioRoute || '1+2') !== (incoming.audioRoute || '1+2')) diffs.audioRoute = { cur: cur.audioRoute, inc: incoming.audioRoute }
+	if (!!cur.loop !== !!incoming.loop) diffs.loop = { cur: cur.loop, inc: incoming.loop }
+	if ((cur.contentFit || 'native') !== (incoming.contentFit || 'native')) diffs.contentFit = { cur: cur.contentFit, inc: incoming.contentFit }
+	if (!numClose(cur.volume ?? 1, incoming.volume ?? 1)) diffs.volume = { cur: cur.volume, inc: incoming.volume }
+	if (!!cur.muted !== !!incoming.muted) diffs.muted = { cur: cur.muted, inc: incoming.muted }
+	if (!fadeOnEndEqual(cur.fadeOnEnd, incoming.fadeOnEnd)) diffs.fadeOnEnd = { cur: cur.fadeOnEnd, inc: incoming.fadeOnEnd }
+	
+	const eff1 = Array.isArray(cur.effects) && cur.effects.length > 0 ? cur.effects : null
+	const eff2 = Array.isArray(incoming.effects) && incoming.effects.length > 0 ? incoming.effects : null
+	if (jsonStable(eff1) !== jsonStable(eff2)) diffs.effects = { cur: eff1, inc: eff2 }
+
+	const pip1 = pipOverlaysFromLayer(cur)
+	const pip2 = pipOverlaysFromLayer(incoming)
+	const pip1_valid = Array.isArray(pip1) && pip1.length > 0 ? pip1 : null
+	const pip2_valid = Array.isArray(pip2) && pip2.length > 0 ? pip2 : null
+	if (jsonStable(pip1_valid) !== jsonStable(pip2_valid)) diffs.pipOverlays = { cur: pip1_valid, inc: pip2_valid }
+
+	if (returnDiff) return diffs
+	return Object.keys(diffs).length === 0
 }
 
 function layerHasContent(l) {
@@ -163,6 +174,20 @@ function normalizeTransition(t, forceCut) {
 	const duration = Math.max(0, t && t.duration != null ? Number(t.duration) : 0)
 	const tween = mapTween((t && t.tween) || 'linear')
 	return { type, duration, tween }
+}
+
+/** Same-layer LOADBG/PLAY path (UI: "+ Animate"; persisted values may still use legacy "+ MERGE"). */
+function isLayerAnimateTakeTransition(typeStr) {
+	const s = String(typeStr || '').toUpperCase().trim()
+	return s.endsWith('+ MERGE') || s.endsWith('+ ANIMATE')
+}
+
+/** Strip "+ ANIMATE" / "+ MERGE" for the Caspar transition token on LOADBG/PLAY. */
+function baseTypeStripAnimateSuffix(typeStr) {
+	return String(typeStr || '')
+		.replace(/\s*\+\s*MERGE\s*$/i, '')
+		.replace(/\s*\+\s*ANIMATE\s*$/i, '')
+		.trim()
 }
 
 /**
@@ -269,6 +294,8 @@ module.exports = {
 	layerVisuallyEqual,
 	layerHasContent,
 	normalizeTransition,
+	isLayerAnimateTakeTransition,
+	baseTypeStripAnimateSuffix,
 	resolveChannelFramerateForMixerTween,
 	physicalProgramLayer,
 	PGM_BANK_B_OFFSET,

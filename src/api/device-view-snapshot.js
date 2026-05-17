@@ -207,12 +207,20 @@ async function buildLiveSnapshot(ctx) {
 		connectors: sanitizedGpuConnectors,
 	})
 	// PortAudio device enumeration for rear panel audio slots and inspector device selectors
+	const { listPortAudioDevices, listAudioDevices } = require('../audio/audio-devices')
 	let portaudioDevices = []
 	try {
 		const paResult = listPortAudioDevices({ outputsOnly: false })
 		portaudioDevices = Array.isArray(paResult?.devices) ? paResult.devices : []
 	} catch (e) {
 		warnings.push(`portaudio_enum: ${e.message}`)
+	}
+	let genericAudioDevices = []
+	try {
+		const genericResult = listAudioDevices()
+		genericAudioDevices = Array.isArray(genericResult?.devices) ? genericResult.devices : []
+	} catch (e) {
+		warnings.push(`audio_enum: ${e.message}`)
 	}
 
 	return {
@@ -226,7 +234,7 @@ async function buildLiveSnapshot(ctx) {
 				name: d.name, 
 				resolution: d.resolution, 
 				refreshHz: d.refreshHz, 
-				modes: (d.modes || []).slice(0, 16),
+			modes: (d.modes || []).slice(0, 64),
 				casparScreenIndex: d.casparScreenIndex,
 				casparMode: d.casparMode,
 				connected: d.connected
@@ -237,6 +245,7 @@ async function buildLiveSnapshot(ctx) {
 		decklink: buildDecklinkSummary(ctx, decklinkHw),
 		audio: {
 			portaudio: portaudioDevices,
+			devices: genericAudioDevices,
 		},
 		caspar,
 		warnings,

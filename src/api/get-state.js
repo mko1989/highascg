@@ -72,6 +72,7 @@ function getState(ctx) {
 		...base,
 		screenDestinations: normalizeScreenDestinations(cfg.screenDestinations),
 		caspar: casparConn,
+		ledTestPatternActive: ctx._ledTestPatternActive ?? false,
 		/** Last DeckLink input PLAY summary after AMCP connect (WO-28); null until first routing setup. */
 		decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
 		channelMap,

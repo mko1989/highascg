@@ -3,10 +3,10 @@
 # Run on the playout host if you see: EACCES: permission denied, open '.../highascg.config.json.tmp'
 #
 # Usage: sudo env HACG_USER=casparcg bash scripts/fix-highascg-config-perms.sh
-#   or:  sudo bash scripts/fix-highascg-config-perms.sh /opt/highascg casparcg
+#   or:  sudo bash scripts/fix-highascg-config-perms.sh /home/casparcg/highascg casparcg
 
 set -euo pipefail
-DIR="${1:-/opt/highascg}"
+DIR="${1:-/home/casparcg/highascg}"
 USER_NAME="${2:-${HACG_USER:-casparcg}}"
 
 if [ ! -d "$DIR" ]; then

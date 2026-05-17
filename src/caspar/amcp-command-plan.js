@@ -24,7 +24,23 @@ function serializeClipCommandPlan(plan) {
 	const withClipFields = shouldAppendClipVerbFields(commandName, clip)
 	let cmd = base
 
-	if (clip) cmd += ' ' + param(clip)
+	if (clip) {
+		if (clip.startsWith('[HTML] ')) {
+			cmd += ' [HTML] ' + param(clip.substring(7))
+		} else if (clip.startsWith('ndi://')) {
+			cmd += ' ' + clip
+		} else if (clip.startsWith('http://') || clip.startsWith('https://')) {
+			const ext = clip.split('?')[0].split('.').pop().toLowerCase()
+			const videoExts = ['mp4', 'm4v', 'mov', 'avi', 'mkv', 'webm', 'm3u8', 'ts']
+			if (!videoExts.includes(ext)) {
+				cmd += ' [HTML] ' + param(clip)
+			} else {
+				cmd += ' ' + param(clip)
+			}
+		} else {
+			cmd += ' ' + param(clip)
+		}
+	}
 	if (opts.loop) cmd += ' LOOP'
 
 	if (withClipFields && opts.transition && opts.transition !== 'CUT') {

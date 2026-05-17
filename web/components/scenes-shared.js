@@ -2,7 +2,7 @@
  * Shared scenes editor helpers — AMCP snippets, transition row UI, take payload.
  */
 
-import { TRANSITION_TYPES, TRANSITION_TWEENS } from '../lib/program-output-state.js'
+import { TRANSITION_TYPES, TRANSITION_TWEENS, TRANSITION_TYPE_LABELS, migrateTransitionTypeToAnimate } from '../lib/program-output-state.js'
 import { parseNumberInput } from '../lib/math-input.js'
 import { sceneState } from '../lib/scene-state.js'
 import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
@@ -21,6 +21,50 @@ export function isMediaOrFileSource(src) {
 	if (src?.isPlaceholder || src?.type === 'placeholder') return false
 	const t = (src?.type || '').toLowerCase()
 	return (t === 'media' || t === 'file') && !!src?.value
+}
+
+/** Layer strip / compose / deck: payloads that can become (or replace) a scene layer source. */
+function isDraggableLayerSourcePayload(data) {
+	if (!data || !data.value) return false
+	const ty = String(data.type || 'media').toLowerCase()
+	if (ty === 'effect') return false
+	return true
+}
+
+/**
+ * Parse Sources-panel style drag data (`application/json`, `text/plain`, or `multi`).
+ * @param {DataTransfer} dt
+ * @returns {object[]}
+ */
+export function parseDraggableSourcesPayload(dt) {
+	if (!dt) return []
+	let data
+	try {
+		data = JSON.parse(dt.getData('application/json') || '')
+	} catch {
+		const val = dt.getData('text/plain')
+		if (val) data = { type: 'media', value: val.trim(), label: val.trim() }
+	}
+	if (!data) return []
+	if (data.type === 'multi' && Array.isArray(data.items)) {
+		return data.items.filter(isDraggableLayerSourcePayload)
+	}
+	return isDraggableLayerSourcePayload(data) ? [data] : []
+}
+
+/**
+ * Whether the deck may show a drop highlight (files from OS, or Sources JSON / plain path).
+ * Excludes internal connector drags that should stay in Sources / Live.
+ * @param {DataTransfer} dt
+ */
+export function dataTransferOffersDeckMedia(dt) {
+	if (!dt?.types) return false
+	const types = [...dt.types]
+	if (types.includes('application/x-highascg-connector')) return false
+	if (types.includes('Files')) return true
+	if (types.includes('application/json')) return true
+	if (types.includes('text/plain')) return true
+	return false
 }
 
 /**
@@ -52,11 +96,12 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 	for (const t of TRANSITION_TYPES) {
 		const o = document.createElement('option')
 		o.value = t
-		o.textContent = t
+		o.textContent = TRANSITION_TYPE_LABELS[t] || t
 		typeSel.appendChild(o)
 	}
 	const d = dt || {}
-	typeSel.value = d.type && TRANSITION_TYPES.includes(d.type) ? d.type : 'CUT'
+	const typeNorm = migrateTransitionTypeToAnimate(d.type)
+	typeSel.value = typeNorm && TRANSITION_TYPES.includes(typeNorm) ? typeNorm : 'CUT'
 	const durIn = transitionRow.querySelector(`#${idPrefix}-dur`)
 	durIn.value = String(Math.max(0, Math.round(Number(d.duration) || 0)))
 	const tweenSel = transitionRow.querySelector(`#${idPrefix}-tween`)
@@ -71,7 +116,7 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 	tweenSel.value = TRANSITION_TWEENS.includes(twNorm) ? twNorm : 'linear'
 
 	function readAndSave() {
-		const type = typeSel.value || 'CUT'
+		const type = migrateTransitionTypeToAnimate(typeSel.value || 'CUT')
 		const duration = Math.max(0, Math.round(parseNumberInput(durIn.value, 0)))
 		const tween = tweenSel.value || 'linear'
 		onChange({ type, duration, tween })
@@ -157,6 +202,11 @@ export function buildIncomingScenePayload(scene, timelineSeekOpts) {
 				l.fadeOnEnd && typeof l.fadeOnEnd === 'object'
 					? { enabled: !!l.fadeOnEnd.enabled, frames: l.fadeOnEnd.frames ?? 12 }
 					: { enabled: false, frames: 12 },
+			sourceMode: l.sourceMode || 'single',
+			playlist: Array.isArray(l.playlist) ? JSON.parse(JSON.stringify(l.playlist)) : [],
+			playlistTransition: l.playlistTransition ? { ...l.playlistTransition } : { type: 'MIX', duration: 12, tween: 'linear' },
+			playlistLoop: l.playlistLoop !== false,
+			playlistAdvance: l.playlistAdvance || 'auto',
 		}
 		if (Array.isArray(l.effects) && l.effects.length > 0) {
 			row.effects = JSON.parse(JSON.stringify(l.effects))

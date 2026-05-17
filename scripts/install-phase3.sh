@@ -22,24 +22,32 @@ for GRP in video audio render plugdev dialout input; do
 done
 echo -e "  ${GREEN}✓${NC} User $USER_CASPAR assigned to hardware groups"
 
-# HighAsCG POST /api/audio/default-device writes /etc/asound.conf via sudo -n tee (non-interactive).
-# List both common tee paths — sudo matches the command path exactly.
+# Optional: NOPASSWD for Web UI → **system-wide** ALSA default (`/etc/asound.conf`).
+# Not installed by default: PortAudio/device-name routing usually needs no ALSA global default,
+# and the API already writes **`~/.asoundrc`** for `scope: user` without sudo (see audio-devices.js).
+HIGHASCG_INSTALL_ASOUND_SUDOERS="${HIGHASCG_INSTALL_ASOUND_SUDOERS:-0}"
+
+# HighAsCG POST /api/audio/default-device with scope=system writes /etc/asound.conf via sudo -n tee when this is enabled.
 SUDO_TEE_RULES=""
-for _t in /usr/bin/tee /bin/tee; do
-	if [ -x "$_t" ]; then
-		SUDO_TEE_RULES="${SUDO_TEE_RULES}${SUDO_TEE_RULES:+, }$_t /etc/asound.conf"
-	fi
-done
-if [ -n "$SUDO_TEE_RULES" ]; then
-	echo -e "${CYAN}→ Sudoers: allow $USER_CASPAR NOPASSWD tee /etc/asound.conf (Web UI default audio)${NC}"
-	echo "$USER_CASPAR ALL=(root) NOPASSWD: $SUDO_TEE_RULES" > /etc/sudoers.d/highascg-asound
-	chmod 440 /etc/sudoers.d/highascg-asound
-	if command -v visudo >/dev/null 2>&1; then visudo -cf /etc/sudoers.d/highascg-asound 2>/dev/null && echo -e "  ${GREEN}✓${NC} /etc/sudoers.d/highascg-asound (visudo OK)" || echo -e "  ${YELLOW}○${NC} visudo check failed — verify /etc/sudoers.d/highascg-asound"
+if [ "$HIGHASCG_INSTALL_ASOUND_SUDOERS" = "1" ]; then
+	for _t in /usr/bin/tee /bin/tee; do
+		if [ -x "$_t" ]; then
+			SUDO_TEE_RULES="${SUDO_TEE_RULES}${SUDO_TEE_RULES:+, }$_t /etc/asound.conf"
+		fi
+	done
+	if [ -n "$SUDO_TEE_RULES" ]; then
+		echo -e "${CYAN}→ Sudoers: allow $USER_CASPAR NOPASSWD tee /etc/asound.conf (Web UI scope=system only)${NC}"
+		echo "$USER_CASPAR ALL=(root) NOPASSWD: $SUDO_TEE_RULES" > /etc/sudoers.d/highascg-asound
+		chmod 440 /etc/sudoers.d/highascg-asound
+		if command -v visudo >/dev/null 2>&1; then visudo -cf /etc/sudoers.d/highascg-asound 2>/dev/null && echo -e "  ${GREEN}✓${NC} /etc/sudoers.d/highascg-asound (visudo OK)" || echo -e "  ${YELLOW}○${NC} visudo check failed — verify /etc/sudoers.d/highascg-asound"
+		else
+			echo -e "  ${GREEN}✓${NC} /etc/sudoers.d/highascg-asound"
+		fi
 	else
-		echo -e "  ${GREEN}✓${NC} /etc/sudoers.d/highascg-asound"
+		echo -e "  ${YELLOW}○${NC} tee not found under /usr/bin or /bin — skip sudoers for /etc/asound.conf (install coreutils)"
 	fi
 else
-	echo -e "  ${YELLOW}○${NC} tee not found under /usr/bin or /bin — skip sudoers for /etc/asound.conf (install coreutils)"
+	echo -e "  ${GREEN}✓${NC} Skipping highascg-asound sudoers (set HIGHASCG_INSTALL_ASOUND_SUDOERS=1 to enable **system** ALSA default via tee)"
 fi
 
 # 3.2 nodm & openbox
@@ -50,6 +58,14 @@ else
     echo -e "  ${GREEN}✓${NC} nodm already installed"
     apt install -y xterm 2>/dev/null || true
 fi
+# Minimal/server images often omit X input drivers — USB kb/mouse work in TTY but not on :0 until these are present (Openbox, DeckLink desktopvideo_setup).
+echo -e "${CYAN}→ X11 input drivers (keyboard / mouse on Openbox session)...${NC}"
+apt install -y xserver-xorg-input-all xserver-xorg-input-libinput
+
+echo -e "${CYAN}→ Avahi (mDNS) for NDI / LAN discovery…${NC}"
+apt install -y avahi-daemon
+systemctl enable avahi-daemon 2>/dev/null || true
+systemctl start avahi-daemon 2>/dev/null || true
 
 cat <<EOF > /etc/default/nodm
 NODM_ENABLED=true
@@ -159,21 +175,21 @@ systemctl disable casparcg-server 2>/dev/null || true
 rm -f /etc/systemd/system/casparcg-server.service
 
 # Setup directory structure with correct permissions
-echo -e "${CYAN}→ Setting up /opt/casparcg directory structure...${NC}"
-mkdir -p /opt/casparcg/{media,log,template,data,cef-cache,config}
-chown -R "$USER_CASPAR:$USER_CASPAR" /opt/casparcg
-chmod -R 775 /opt/casparcg
+echo -e "${CYAN}→ Setting up /home/casparcg/highascg directory structure...${NC}"
+mkdir -p /home/casparcg/highascg/{media,log,template,data,cef-cache,config,lib}
+chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg
+chmod -R 775 /home/casparcg/highascg
 
 # Main CasparCG server config lives under config/ (scanner uses its own config under the casparcg tree).
-if [ -f /opt/casparcg/media/casparcg.config.ftd ] && [ ! -f /opt/casparcg/config/casparcg.config ]; then
-  cp -a /opt/casparcg/media/casparcg.config.ftd /opt/casparcg/config/casparcg.config
-  chown "$USER_CASPAR:$USER_CASPAR" /opt/casparcg/config/casparcg.config
-  echo -e "  ${GREEN}✓${NC} Migrated legacy config to /opt/casparcg/config/casparcg.config"
+if [ -f /home/casparcg/highascg/media/casparcg.config.ftd ] && [ ! -f /home/casparcg/highascg/config/casparcg.config ]; then
+  cp -a /home/casparcg/highascg/media/casparcg.config.ftd /home/casparcg/highascg/config/casparcg.config
+  chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/config/casparcg.config
+  echo -e "  ${GREEN}✓${NC} Migrated legacy config to /home/casparcg/highascg/config/casparcg.config"
 fi
 
-# Copy NDI lib to working dir
-cp /usr/lib/x86_64-linux-gnu/libndi.so.6 /opt/casparcg/ 2>/dev/null || true
-chown "$USER_CASPAR:$USER_CASPAR" /opt/casparcg/libndi.so.6 2>/dev/null || true
+# Copy NDI into playout lib/ (same dir as CEF — run.sh sets LD_LIBRARY_PATH to lib/ only)
+cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
+chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true
 
 # 3.4 Openbox Autostart (normal = CasparCG; x11-only = DeckLink GUI without Caspar)
 # Keep in sync with openbox_autostart.md at repo root ("Recommended autostart" block) + optional NVIDIA line.
@@ -204,14 +220,14 @@ else
       exit 0
     fi
 
-    cd /opt/casparcg || exit 1
+    cd /home/casparcg/highascg || exit 1
     /usr/bin/casparcg-scanner &
 
     while true; do
-      cd /opt/casparcg || exit 1
-      mkdir -p /opt/casparcg/cef-cache
-      find /opt/casparcg/cef-cache -mindepth 1 -delete 2>/dev/null || true
-      /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
+      cd /home/casparcg/highascg || exit 1
+      mkdir -p /home/casparcg/highascg/cef-cache
+      find /home/casparcg/highascg/cef-cache -mindepth 1 -delete 2>/dev/null || true
+      /usr/bin/casparcg-server-2.5 /home/casparcg/highascg/config/casparcg.config >> /tmp/caspar.log 2>&1
       # Wait until nothing listens on AMCP (adjust port if your config differs)
       while ss -tlnp 2>/dev/null | grep -qE ':5250\b'; do sleep 1; done
       sleep 2

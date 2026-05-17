@@ -3,7 +3,7 @@
 # Adds the HighAsCG user to video+render, shows /dev/dri, prints test + restart commands.
 #
 #   curl -fsSL .../setup-kmsgrab-from-ssh.sh | sudo bash
-#   sudo bash /opt/highascg/tools/setup-kmsgrab-from-ssh.sh
+#   sudo bash /home/casparcg/highascg/tools/setup-kmsgrab-from-ssh.sh
 #
 # After this: sudo systemctl restart highascg
 # You do NOT need SSH to have a DISPLAY; kmsgrab uses DRM nodes under /dev/dri, not X11.
@@ -121,7 +121,7 @@ fi
 echo ""
 echo "=== Next steps (only if kmsgrab test succeeded above) ==="
 if [[ "$BEST_RC" -eq 0 ]]; then
-	echo "1) In /opt/highascg/highascg.config.json under \"streaming\":"
+	echo "1) In /home/casparcg/highascg/highascg.config.json under \"streaming\":"
 	echo "     \"localCaptureDevice\": \"kmsgrab\","
 	echo "     \"drmDevice\": \"$DRM_DEV\""
 	echo "2) sudo systemctl restart highascg"

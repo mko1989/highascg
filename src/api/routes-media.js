@@ -18,6 +18,10 @@ const {
 	resolveMediaFileOnDisk,
 	probeMedia,
 } = require('../media/local-media')
+const {
+	handleLiveThumbnailGet,
+	handleLiveThumbnailCapturePost,
+} = require('../media/live-thumbnail-cache')
 const { runMediaClsTlsRefresh } = require('../utils/periodic-sync')
 
 function cinfResponseToStr(data) {
@@ -31,11 +35,8 @@ const failedThumbs = new Map() // filename -> timestamp
 async function handleThumbnail(path, query, ctx) {
 	const liveM = path.match(/^\/api\/thumbnail\/live\/(\d+)$/)
 	if (liveM) {
-		return {
-			status: 410,
-			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'Live thumbnail endpoint is disabled' }),
-		}
+		const ch = parseInt(liveM[1], 10)
+		return handleLiveThumbnailGet(ctx, ch, query || {})
 	}
 	if (path === '/api/thumbnails') {
 		if (!ctx.amcp) {
@@ -177,14 +178,8 @@ async function handleMediaRefresh(body, ctx) {
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/thumbnail/live/capture') {
-		return {
-			status: 410,
-			headers: JSON_HEADERS,
-			body: jsonBody({
-				ok: false,
-				error: 'Live thumbnail capture is disabled',
-			}),
-		}
+		const b = parseBody(body)
+		return handleLiveThumbnailCapturePost(b && typeof b === 'object' ? b : {}, ctx)
 	}
 	if (path === '/api/media/delete') {
 		const b = parseBody(body)

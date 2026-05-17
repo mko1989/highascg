@@ -8,9 +8,11 @@ sudo ./scripts/install.sh
 
 **Entry:** [install.sh](install.sh) — sets `SCRIPT_DIR` to the repo root, then sources (in order) `install-config.sh`, `install-helpers.sh`, and `install-phase1.sh` … `install-phase5.sh`. Copy the **whole** `scripts/` directory when distributing; `install.sh` exits if any of those files are missing.
 
-Openbox autostart reference: [**openbox_autostart.md**](../openbox_autostart.md).
+Openbox autostart reference: [**work/openbox_autostart.md**](../work/openbox_autostart.md).
 
-**USB import on Ubuntu** — udisks2, polkit, and user **`casparcg`** (see `USER_CASPAR` in [install-config.sh](install-config.sh)): [**docs/USB_AUTO_MOUNT_UBUNTU.md**](../docs/USB_AUTO_MOUNT_UBUNTU.md). Phase 4 installs `scripts/polkit/50-*.rules` and **`51-highascg-udisks-casparcg-headless.rules`**; use **`loginctl enable-linger`** on headless playout if needed.
+**X11 input (post-install on minimal Ubuntu):** Phase 3 installs **`xserver-xorg-input-all`** and **`xserver-xorg-input-libinput`** so USB keyboard/mouse work under **nodm/Openbox** (DeckLink **desktopvideo_setup**, etc.). It also installs **`avahi-daemon`** so **mDNS** works for **NDI discovery** (empty **`NDI LIST`** on minimal/server images without Avahi). If you skipped the installer, run: `sudo apt install -y xserver-xorg-input-all xserver-xorg-input-libinput avahi-daemon` then **`systemctl enable --now avahi-daemon`** and **`systemctl restart nodm`** as needed.
+
+**USB import on Ubuntu** — udisks2, polkit, and user **`casparcg`** (see `USER_CASPAR` in [install-config.sh](install-config.sh)): [**docs/USB_AUTO_MOUNT_UBUNTU.md**](../docs/USB_AUTO_MOUNT_UBUNTU.md). Phase 4 installs `scripts/polkit/50-*.rules` and **`51-highascg-udisks-casparcg-headless.rules`**. **Alternative for Ubuntu Server:** See the `systemd-mount` section in that doc for a lighter udev-only approach.
 
 ---
 
@@ -24,14 +26,14 @@ The SSH user must have a **normal login shell** (not `/usr/sbin/nologin`). If yo
 npm run deploy:dev
 ```
 
-Optional: **`DEPLOY_HOST`**, **`DEPLOY_USER`**, **`DEPLOY_PATH`** (default `/opt/highascg`), **`DEPLOY_REMOTE_TMP`**, **`DEPLOY_REMOTE_SUDO`** (set **`1`** if **`DEPLOY_USER`** cannot write **`DEPLOY_PATH`** — extract runs via **`sudo`**), **`DEPLOY_USE_SFTP`**, **`DEPLOY_USE_SCP`**, **`DEPLOY_SSH_CONTROL`**, **`DEPLOY_SSH_PASSWORD`** (uses `sshpass`, if installed), **`DEPLOY_SUDO_PASSWORD`** (used with `sudo -S` when `DEPLOY_REMOTE_SUDO=1`), or a repo-root **`.env.deploy`**.
+Optional: **`DEPLOY_HOST`**, **`DEPLOY_USER`**, **`DEPLOY_PATH`** (default `/home/casparcg/highascg`), **`DEPLOY_REMOTE_TMP`**, **`DEPLOY_REMOTE_SUDO`** (set **`1`** if **`DEPLOY_USER`** cannot write **`DEPLOY_PATH`** — extract runs via **`sudo`**), **`DEPLOY_USE_SFTP`**, **`DEPLOY_USE_SCP`**, **`DEPLOY_SSH_CONTROL`**, **`DEPLOY_SSH_PASSWORD`** (uses `sshpass`, if installed), **`DEPLOY_SUDO_PASSWORD`** (used with `sudo -S` when `DEPLOY_REMOTE_SUDO=1`), or a repo-root **`.env.deploy`**.
 
 Example `.env.deploy`:
 
 ```bash
 DEPLOY_HOST=192.168.0.2
 DEPLOY_USER=casparcg
-DEPLOY_PATH=/opt/highascg
+DEPLOY_PATH=/home/casparcg/highascg
 DEPLOY_SSH_PASSWORD='your-ssh-password'
 # Optional only if DEPLOY_REMOTE_SUDO=1
 # DEPLOY_SUDO_PASSWORD='your-sudo-password'
@@ -43,6 +45,6 @@ The script uses **`BatchMode=no`** and SSH **ControlMaster** so your password is
 
 **`scp` / `sftp` errors (“Received message too long” / noisy shell)** — prefer the default **ssh stream** upload; fix **`~/.bashrc`** so non-interactive sessions print nothing (`case $- in *i*) ;; *) return ;; esac`). **`DEPLOY_USE_SCP=1`** does not help accounts with **`nologin`** shells.
 
-**Paths:** install docs often use **`/opt/highascg`**. If you use a different case (e.g. **`/opt/HighAsCG`**), set **`DEPLOY_PATH`** in **`.env.deploy`** to match **`WorkingDirectory`** / **`ExecStart`** in your systemd unit.
+**Paths:** install docs use **`/home/casparcg/highascg`** as the unified playout root. If you deploy elsewhere, set **`DEPLOY_PATH`** in **`.env.deploy`** to match **`WorkingDirectory`** / **`ExecStart`** in your systemd unit.
 
 **Permissions:** the SSH user must be able to **`rm`** and **`tar -C`** into **`DEPLOY_PATH`**, or set **`DEPLOY_REMOTE_SUDO=1`** so extract uses **`sudo`** (configure **`sudoers`** with **`NOPASSWD`** if you want non-interactive deploy).

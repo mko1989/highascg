@@ -145,7 +145,10 @@ class OscState extends EventEmitter {
 	 * @param {{ address: string, args?: unknown[] }} packet
 	 */
 	handleOscMessage(packet) {
-		const address = packet.address
+		let address = packet.address
+		if (typeof address === 'string' && address.startsWith('/ch/')) {
+			address = '/channel/' + address.slice('/ch/'.length)
+		}
 		const vals = this._argValues(packet.args || [])
 		const m = address.match(/^\/channel\/(\d+)\/(.+)$/)
 		if (!m) return

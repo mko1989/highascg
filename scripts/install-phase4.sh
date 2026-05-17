@@ -76,6 +76,56 @@ if [ -f /etc/polkit-1/rules.d/50-highascg-udisks.rules ] || [ -f /etc/polkit-1/r
 fi
 usermod -aG plugdev "$USER_CASPAR" 2>/dev/null || true
 
+# 4.3c Media partition → fixed media folder (WO-38; live USB + internal library)
+echo -e "${CYAN}→ Media mount helper (sudo wrapper + /run/highascg)…${NC}"
+install -d /usr/local/lib/highascg
+MOUNT_SH_SRC="$SCRIPT_DIR/scripts/highascg-media-mount.sh"
+if [ -f "$MOUNT_SH_SRC" ]; then
+	install -m 0755 -o root -g root "$MOUNT_SH_SRC" /usr/local/lib/highascg/media-mount.sh
+	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/media-mount.sh"
+else
+	echo -e "  ${YELLOW}○${NC} media-mount script missing at $MOUNT_SH_SRC"
+fi
+SUDO_MEDIA="$SCRIPT_DIR/scripts/sudoers.d/highascg-media-mount"
+if [ -f "$SUDO_MEDIA" ]; then
+	sed "s/__HIGHASCG_USER__/${USER_CASPAR}/g" "$SUDO_MEDIA" > /tmp/highascg-media-mount.sudoers
+	install -m 0440 -o root -g root /tmp/highascg-media-mount.sudoers /etc/sudoers.d/highascg-media-mount
+	rm -f /tmp/highascg-media-mount.sudoers
+	if visudo -c -f /etc/sudoers.d/highascg-media-mount 2>/dev/null; then
+		echo -e "  ${GREEN}✓${NC} sudoers.d/highascg-media-mount valid for $USER_CASPAR"
+	else
+		echo -e "  ${RED}✗${NC} sudoers.d/highascg-media-mount syntax error — fix before using Settings → media/usb mount"
+	fi
+else
+	echo -e "  ${YELLOW}○${NC} sudoers fragment missing at $SUDO_MEDIA"
+fi
+GRP_CASPAR=$(id -gn "$USER_CASPAR" 2>/dev/null || echo "$USER_CASPAR")
+echo "d /run/highascg 0770 root $GRP_CASPAR -" > /etc/tmpfiles.d/highascg-media-mount.conf
+systemd-tmpfiles --create --prefix=/run/highascg 2>/dev/null || true
+echo -e "  ${GREEN}✓${NC} tmpfiles.d /run/highascg (0770 root:$GRP_CASPAR)"
+
+# 4.3d NVIDIA driver apply from offline pool (WO-39; Settings → system/hardware)
+NV_SH_SRC="$SCRIPT_DIR/scripts/highascg-nvidia-apply-from-pool.sh"
+if [ -f "$NV_SH_SRC" ]; then
+	install -m 0755 -o root -g root "$NV_SH_SRC" /usr/local/lib/highascg/nvidia-apply-from-pool.sh
+	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/nvidia-apply-from-pool.sh"
+else
+	echo -e "  ${YELLOW}○${NC} nvidia pool apply script missing at $NV_SH_SRC"
+fi
+SUDO_NV="$SCRIPT_DIR/scripts/sudoers.d/highascg-nvidia-apply-from-pool"
+if [ -f "$SUDO_NV" ]; then
+	sed "s/__HIGHASCG_USER__/${USER_CASPAR}/g" "$SUDO_NV" > /tmp/highascg-nvidia-apply.sudoers
+	install -m 0440 -o root -g root /tmp/highascg-nvidia-apply.sudoers /etc/sudoers.d/highascg-nvidia-apply-from-pool
+	rm -f /tmp/highascg-nvidia-apply.sudoers
+	if visudo -c -f /etc/sudoers.d/highascg-nvidia-apply-from-pool 2>/dev/null; then
+		echo -e "  ${GREEN}✓${NC} sudoers.d/highascg-nvidia-apply-from-pool OK for $USER_CASPAR"
+	else
+		echo -e "  ${RED}✗${NC} sudoers fragment syntax error — fix before Settings NVIDIA apply"
+	fi
+else
+	echo -e "  ${YELLOW}○${NC} sudoers fragment missing at $SUDO_NV"
+fi
+
 # Tailscale daemon (login is still: sudo tailscale up — opens auth URL)
 systemctl enable tailscaled 2>/dev/null || true
 systemctl start tailscaled 2>/dev/null || true
@@ -198,6 +248,17 @@ if [ "$SHOULD_DEPLOY_HIGHASCG" = true ]; then
     fi
 else
     echo -e "  ${YELLOW}○${NC} HighAsCG deploy skipped — leaving /home/casparcg/highascg unchanged."
+fi
+
+# Unified playout root: Caspar dirs + NDI copy (Phase 3 may run before deploy; fresh clone clears children)
+if [ -f /home/casparcg/highascg/package.json ]; then
+    echo -e "${CYAN}→ Ensuring Caspar companion directories under playout root...${NC}"
+    mkdir -p /home/casparcg/highascg/{media,log,template,data,cef-cache,lib}
+    cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
+    chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true
+    chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/media /home/casparcg/highascg/log \
+        /home/casparcg/highascg/template /home/casparcg/highascg/data /home/casparcg/highascg/cef-cache \
+        /home/casparcg/highascg/lib 2>/dev/null || true
 fi
 
 # systemd service (ensure unit exists whenever the app tree is present)

@@ -97,6 +97,11 @@ export function applyPersistedData(state, data) {
 	} else {
 		state.lookPresets = []
 	}
+	if (Array.isArray(data.globalBorders)) {
+		state.globalBorders = data.globalBorders
+	} else {
+		state.globalBorders = [null, null, null, null]
+	}
 	return true
 }
 
@@ -112,5 +117,6 @@ export function getPersistPayload(state) {
 		mainEditorVisible: state.mainEditorVisible,
 		layerPresets: state.layerPresets,
 		lookPresets: state.lookPresets,
+		globalBorders: state.globalBorders,
 	})
 }

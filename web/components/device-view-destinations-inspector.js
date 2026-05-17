@@ -7,6 +7,83 @@ export const STANDARD_VIDEO_MODES = [
 	'dci1080p2398', 'dci1080p2400', 'dci1080p2500', 'dci2160p2398', 'dci2160p2400', 'dci2160p2500',
 ]
 
+/** Matches server `src/config/config-modes.js` — used for OS override / xrandr pixel mode from Caspar video mode. */
+export const CASPAR_VIDEO_MODE_SPECS = {
+	PAL: { width: 720, height: 576, fps: 25 },
+	NTSC: { width: 720, height: 486, fps: 29.97 },
+	'576p2500': { width: 720, height: 576, fps: 25 },
+	'720p2398': { width: 1280, height: 720, fps: 23.98 },
+	'720p2400': { width: 1280, height: 720, fps: 24 },
+	'720p2500': { width: 1280, height: 720, fps: 25 },
+	'720p5000': { width: 1280, height: 720, fps: 50 },
+	'720p2997': { width: 1280, height: 720, fps: 29.97 },
+	'720p5994': { width: 1280, height: 720, fps: 59.94 },
+	'720p3000': { width: 1280, height: 720, fps: 30 },
+	'720p6000': { width: 1280, height: 720, fps: 60 },
+	'1080p2398': { width: 1920, height: 1080, fps: 23.98 },
+	'1080p2400': { width: 1920, height: 1080, fps: 24 },
+	'1080p2500': { width: 1920, height: 1080, fps: 25 },
+	'1080p5000': { width: 1920, height: 1080, fps: 50 },
+	'1080p2997': { width: 1920, height: 1080, fps: 29.97 },
+	'1080p5994': { width: 1920, height: 1080, fps: 59.94 },
+	'1080p3000': { width: 1920, height: 1080, fps: 30 },
+	'1080p6000': { width: 1920, height: 1080, fps: 60 },
+	'1080i5000': { width: 1920, height: 1080, fps: 50 },
+	'1080i5994': { width: 1920, height: 1080, fps: 59.94 },
+	'1080i6000': { width: 1920, height: 1080, fps: 60 },
+	'1556p2398': { width: 2048, height: 1556, fps: 23.98 },
+	'1556p2400': { width: 2048, height: 1556, fps: 24 },
+	'1556p2500': { width: 2048, height: 1556, fps: 25 },
+	'2160p2398': { width: 3840, height: 2160, fps: 23.98 },
+	'2160p2400': { width: 3840, height: 2160, fps: 24 },
+	'2160p2500': { width: 3840, height: 2160, fps: 25 },
+	'2160p2997': { width: 3840, height: 2160, fps: 29.97 },
+	'2160p3000': { width: 3840, height: 2160, fps: 30 },
+	'2160p5000': { width: 3840, height: 2160, fps: 50 },
+	'2160p5994': { width: 3840, height: 2160, fps: 59.94 },
+	'2160p6000': { width: 3840, height: 2160, fps: 60 },
+	'dci1080p2398': { width: 2048, height: 1080, fps: 23.98 },
+	'dci1080p2400': { width: 2048, height: 1080, fps: 24 },
+	'dci1080p2500': { width: 2048, height: 1080, fps: 25 },
+	'dci2160p2398': { width: 4096, height: 2160, fps: 23.98 },
+	'dci2160p2400': { width: 4096, height: 2160, fps: 24 },
+	'dci2160p2500': { width: 4096, height: 2160, fps: 25 },
+}
+
+/**
+ * @param {string} modeId
+ * @param {{ customWidth?: number, customHeight?: number, customFps?: number }} [opts]
+ * @returns {{ osMode: string, osRate: number } | null}
+ */
+export function casparVideoModeToOsModeAndRate(modeId, opts) {
+	const raw = String(modeId || '').trim()
+	const aliases = {
+		'1080p50': '1080p5000',
+		'720p50': '720p5000',
+		'1080p60': '1080p6000',
+		'720p60': '720p6000',
+		'1080p59.94': '1080p5994',
+		'720p59.94': '720p5994',
+	}
+	const id = aliases[raw] || raw
+	if (!id || id === 'custom') {
+		const w = Math.max(64, parseInt(String(opts?.customWidth ?? 1920), 10) || 1920)
+		const h = Math.max(64, parseInt(String(opts?.customHeight ?? 1080), 10) || 1080)
+		const fps = Math.max(1, parseFloat(String(opts?.customFps ?? 50)) || 50)
+		return { osMode: `${w}x${h}`, osRate: fps }
+	}
+	const spec = CASPAR_VIDEO_MODE_SPECS[id]
+	if (spec) return { osMode: `${spec.width}x${spec.height}`, osRate: spec.fps }
+	const m = id.match(/^(\d+)\s*x\s*(\d+)$/i)
+	if (m) {
+		const w = parseInt(m[1], 10) || 1920
+		const h = parseInt(m[2], 10) || 1080
+		const fps = Math.max(1, parseFloat(String(opts?.customFps ?? 50)) || 50)
+		return { osMode: `${w}x${h}`, osRate: fps }
+	}
+	return null
+}
+
 export function edgeOutputLayer(edge) {
 	const raw = edge?.note
 	if (raw == null || raw === '') return 1

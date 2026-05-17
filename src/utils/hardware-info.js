@@ -155,21 +155,33 @@ function getDisplaysXrandrDetailed() {
 				continue
 			}
 			if (cur && cur.connected && /^\s/.test(line) && /\d+x\d+/.test(line)) {
-				const m = line.match(/^\s+(\d+)x(\d+)\s+(.+)$/)
-				if (m) {
-					const w = parseInt(m[1], 10)
-					const h = parseInt(m[2], 10)
-					const rest = m[3]
-					const tokens = rest.trim().split(/\s+/)
-					for (const tok of tokens) {
-						const hz = parseFloat(tok.replace(/[^0-9.]/g, ''))
-						if (!Number.isFinite(hz) || hz <= 0) continue
-						const isCurrent = tok.includes('*')
-						const key = `${w}x${h}@${hz}`
-						if (!cur.modes.some((x) => `${x.width}x${x.height}@${x.hz}` === key)) {
-							cur.modes.push({ width: w, height: h, hz, current: isCurrent })
+				const full = line.match(/^\s+(\S+)\s+(.+)$/)
+				if (full) {
+					const modeToken = full[1]
+					if (/^\d+x\d+/i.test(modeToken)) {
+						const dim = modeToken.match(/^(\d+)x(\d+)/i)
+						if (dim) {
+							const w = parseInt(dim[1], 10)
+							const h = parseInt(dim[2], 10)
+							const rest = full[2]
+							const tokens = rest.trim().split(/\s+/)
+							for (const tok of tokens) {
+								const hz = parseFloat(tok.replace(/[^0-9.]/g, ''))
+								if (!Number.isFinite(hz) || hz <= 0) continue
+								const isCurrent = tok.includes('*')
+								const key = `${modeToken}@${hz}`
+								if (!cur.modes.some((x) => `${x.randrMode}@${x.hz}` === key)) {
+									cur.modes.push({
+										width: w,
+										height: h,
+										hz,
+										current: isCurrent,
+										randrMode: modeToken,
+									})
+								}
+								if (isCurrent) cur.refreshHz = hz
+							}
 						}
-						if (isCurrent) cur.refreshHz = hz
 					}
 				}
 			}
@@ -322,11 +334,30 @@ function getConnectedDisplayNames() {
 	return sys.map((d) => d.name)
 }
 
+/**
+ * Detect GPU model using nvidia-smi.
+ * @returns {string|null}
+ */
+function getGpuModel() {
+	try {
+		const { execSync } = require('child_process')
+		const stdout = execSync('nvidia-smi --query-gpu=gpu_name --format=csv,noheader', {
+			stdio: ['ignore', 'pipe', 'ignore'],
+			timeout: 2000,
+		}).toString()
+		return stdout.trim() || null
+	} catch {
+		return null
+	}
+}
+
 module.exports = {
+	getXAuthority,
 	getDisplaysXrandr,
 	getDisplaysXrandrDetailed,
 	getDisplaysSysfs,
 	getGpuConnectorInventory,
 	getConnectedDisplayNames,
 	getDisplayDetails,
+	getGpuModel,
 }

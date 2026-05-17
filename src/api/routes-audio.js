@@ -175,6 +175,50 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 
+	if (path === '/api/audio/solo') {
+		const b = parseBody(body)
+		if (!b || typeof b !== 'object') {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
+		}
+		const solos = Array.isArray(b.solos) ? b.solos : [] // [{ channel, layer }]
+		if (!ctx.amcp) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
+		}
+
+		const map = (require('../config/routing-map')).getChannelMap(ctx.config)
+		const monitorCh = map.monitorCh
+		if (!monitorCh) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Monitor channel not enabled in config' }) }
+		}
+
+		try {
+			if (solos.length === 0) {
+				// Clear solos -> Route PRV (Ch 2) to Monitor
+				const prvCh = map.previewCh(1) || 2
+				await ctx.amcp.play(monitorCh, 1, `route://${prvCh}`)
+				// Clear any extra layers on monitor channel just in case
+				for (let l = 2; l <= 8; l++) {
+					await ctx.amcp.clear(monitorCh, l)
+				}
+				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, mode: 'prv', target: prvCh }) }
+			} else {
+				// Solo layers
+				// We'll use layers 1..N on the monitor channel to host the routes
+				for (let i = 0; i < solos.length; i++) {
+					const s = solos[i]
+					await ctx.amcp.play(monitorCh, i + 1, `route://${s.channel}-${s.layer}`)
+				}
+				// Clear any remaining layers from previous multi-solo
+				for (let i = solos.length; i < 8; i++) {
+					await ctx.amcp.clear(monitorCh, i + 1)
+				}
+				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, mode: 'solo', count: solos.length }) }
+			}
+		} catch (e) {
+			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
+	}
+
 	return null
 }
 

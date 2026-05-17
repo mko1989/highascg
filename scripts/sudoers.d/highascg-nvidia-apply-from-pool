@@ -1,0 +1,2 @@
+# WO-39 — apply NVIDIA packages from offline pool (+ optional apt network fallback inside script).
+__HIGHASCG_USER__ ALL=(root) NOPASSWD: /usr/local/lib/highascg/nvidia-apply-from-pool.sh

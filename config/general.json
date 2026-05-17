@@ -3,6 +3,10 @@
   "amcp_max_batch_commands": 64,
   "amcp_mixer_commit_before_amcp_batch": true,
   "offline_mode": false,
+  "screen_1_force_os_resolution": true,
+  "screen_2_force_os_resolution": false,
+  "screen_3_force_os_resolution": false,
+  "screen_4_force_os_resolution": false,
   "host_stats": {
     "scan_folder": false
   },
@@ -16,39 +20,39 @@
   "multiview_os_rate": "",
   "gpuPhysicalTopology": [
     {
-      "physicalPortId": "gpu_p0",
+      "physicalPortId": "gpu_p3",
       "slotOrder": 0,
-      "dpA": "DP-6",
-      "dpB": "DP-7",
-      "connectorNumber": 0,
-      "location": 0
-    },
-    {
-      "physicalPortId": "gpu_p1",
-      "slotOrder": 1,
-      "dpA": "DP-4",
-      "dpB": "DP-5",
-      "connectorNumber": 1,
-      "location": 1
+      "dpA": "DP-3",
+      "dpB": "",
+      "connectorNumber": 3,
+      "location": 3
     },
     {
       "physicalPortId": "gpu_p2",
-      "slotOrder": 2,
-      "dpA": "DP-0",
-      "dpB": "DP-1",
+      "slotOrder": 1,
+      "dpA": "DP-2",
+      "dpB": "",
       "connectorNumber": 2,
       "location": 2
     },
     {
-      "physicalPortId": "gpu_p3",
+      "physicalPortId": "gpu_p1",
+      "slotOrder": 2,
+      "dpA": "HDMI-1",
+      "dpB": "",
+      "connectorNumber": 1,
+      "location": 1
+    },
+    {
+      "physicalPortId": "gpu_p0",
       "slotOrder": 3,
-      "dpA": "DP-2",
-      "dpB": "DP-3",
-      "connectorNumber": 3,
-      "location": 3
+      "dpA": "DP-1",
+      "dpB": "",
+      "connectorNumber": 0,
+      "location": 0
     }
   ],
-  "screen_count": 2,
+  "screen_count": 1,
   "streaming": {
     "enabled": false,
     "protocol": "UDP",
@@ -67,5 +71,23 @@
     "drmDevice": "/dev/dri/card0",
     "autoRelocateBasePort": true
   },
-  "extraLiveSources": []
+  "extraLiveSources": [
+    {
+      "type": "ndi",
+      "value": "ndi://cccccc/\"vMix - Output 1\"",
+      "label": "cccccc vMix - Output 1",
+      "useDirect": true
+    },
+    {
+      "type": "browser",
+      "value": "https://www.youtube.com/",
+      "label": "https://www.youtube.com/",
+      "thumbnailChannel": 3
+    }
+  ],
+  "screen_1_system_id": "HDMI-0",
+  "screen_1_os_mode": "1920x1080",
+  "screen_1_os_backend": "xrandr",
+  "screen_1_os_rate": 50,
+  "screen_1_os_timing_source": "cvt"
 }

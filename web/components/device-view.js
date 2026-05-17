@@ -125,7 +125,11 @@ let mounted = false; export function initDeviceView(root) {
 			return
 		}
 		selectedKey = key; selectedConnectorId = requestedConnectorId; selectedEdgeId = null; selectedDestinationId = null; selectedDeviceId = null
-		const conn = connectorById(lastPayload, selectedConnectorId)
+		let conn = connectorById(lastPayload, selectedConnectorId)
+		if (!conn && data?.connector?.isVirtual) {
+			conn = data.connector
+		}
+		
 		if (!conn) {
 			rIntoInsp((h) =>
 				h.append(

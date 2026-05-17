@@ -179,13 +179,13 @@ BlackmagicFirmwareUpdater status
 ### 4.3 Download and install CasparCG Server
 
 ```bash
-sudo mkdir -p /opt/casparcg
-cd /opt/casparcg
+sudo mkdir -p /home/casparcg/highascg
+cd /home/casparcg/highascg
 
 # Download latest CasparCG release (check github.com/CasparCG/server for current version)
 wget https://github.com/CasparCG/server/releases/download/v2.3.3/casparcg_server-2.3.3-Linux.tar.gz
 tar -xzf casparcg_server-*.tar.gz --strip-components=1
-sudo chown -R caspar:caspar /opt/casparcg
+sudo chown -R caspar:caspar /home/casparcg/highascg
 ```
 
 ### 4.4 Configure CasparCG to use the media partition
@@ -193,7 +193,7 @@ sudo chown -R caspar:caspar /opt/casparcg
 Edit the CasparCG configuration file:
 
 ```bash
-nano /opt/casparcg/casparcg.config
+nano /home/casparcg/highascg/config/casparcg.config
 ```
 
 Set the media and log paths to point to the data partition mount point (which we will set up in Part 5):
@@ -253,8 +253,8 @@ Requires=caspar-data.mount
 [Service]
 Type=simple
 User=caspar
-WorkingDirectory=/opt/casparcg
-ExecStart=/opt/casparcg/run.sh
+WorkingDirectory=/home/casparcg/highascg
+ExecStart=/home/casparcg/highascg/run.sh
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -385,7 +385,7 @@ sudo systemctl enable caspar-data.mount
 Add a startup check script so CasparCG falls back gracefully if the data partition isn't found:
 
 ```bash
-sudo nano /opt/casparcg/run.sh
+sudo nano /home/casparcg/highascg/run.sh
 ```
 
 ```bash
@@ -406,17 +406,17 @@ done
 # If partition never mounted, use local fallback paths
 if ! mountpoint -q "$MOUNT"; then
   echo "WARNING: Data partition not found. Using local fallback paths."
-  mkdir -p /opt/casparcg/fallback/{media,logs,data,templates}
-  export CASPAR_MEDIA=/opt/casparcg/fallback/media
+  mkdir -p /home/casparcg/highascg/fallback/{media,logs,data,templates}
+  export CASPAR_MEDIA=/home/casparcg/highascg/fallback/media
 else
   export CASPAR_MEDIA=$MOUNT/media
 fi
 
-exec /opt/casparcg/casparcg
+exec /home/casparcg/highascg/casparcg
 ```
 
 ```bash
-chmod +x /opt/casparcg/run.sh
+chmod +x /home/casparcg/highascg/run.sh
 ```
 
 ---
@@ -474,10 +474,10 @@ Add the following — each line is a path that will be **excluded from the ISO**
 
 # CasparCG media, logs, and data (exclude from image)
 # These live on the data partition, not the OS
-/opt/casparcg/media
-/opt/casparcg/logs
-/opt/casparcg/data
-/opt/casparcg/fallback
+/home/casparcg/highascg/media
+/home/casparcg/highascg/logs
+/home/casparcg/highascg/data
+/home/casparcg/highascg/fallback
 
 # Large or machine-specific files
 /var/log
@@ -492,7 +492,7 @@ Add the following — each line is a path that will be **excluded from the ISO**
 /usr/src/nvidia-*/*/dkms.conf.orig
 
 # Any test media you may have had locally during setup
-/opt/casparcg/test-media
+/home/casparcg/highascg/test-media
 ```
 
 > **Important:** The `/mnt/caspar-data` exclusion is critical. Without it, Eggs would try to include whatever is currently mounted there (your internal drive's media partition) into the ISO — potentially gigabytes of media files.
@@ -658,9 +658,9 @@ Remove the USB drive. The machine will boot from the internal drive. CasparCG wi
 
 | Purpose | Path |
 |---|---|
-| CasparCG installation | `/opt/casparcg/` |
-| CasparCG config | `/opt/casparcg/casparcg.config` |
-| CasparCG startup script | `/opt/casparcg/run.sh` |
+| CasparCG installation | `/home/casparcg/highascg/` |
+| CasparCG config | `/home/casparcg/highascg/config/casparcg.config` |
+| CasparCG startup script | `/home/casparcg/highascg/run.sh` |
 | Systemd service | `/etc/systemd/system/casparcg.service` |
 | Data partition mount | `/mnt/caspar-data/` |
 | Media files | `/mnt/caspar-data/media/` |

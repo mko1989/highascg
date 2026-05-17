@@ -96,6 +96,7 @@ class AmcpClient extends EventEmitter {
 			u.startsWith('CLS') ||
 			u.startsWith('TLS') ||
 			u.startsWith('THUMBNAIL') ||
+			u.startsWith('PRINT ') ||
 			u.startsWith('CINF') ||
 			u.startsWith('FLS')
 		) {

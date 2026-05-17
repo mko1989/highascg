@@ -126,17 +126,38 @@ async function init() {
 	_oscClient = new OscClient({ wsClient: ws }); window.highascg_osc_client = _oscClient
 
 	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
-	sceneState.on('change', () => appLogic.scheduleSceneDeckSync())
-	sceneState.on('imported', () => appLogic.scheduleSceneDeckSync())
-	sceneState.on('previewScene', () => appLogic.scheduleSceneDeckSync())
-	sceneState.on('softChange', () => appLogic.scheduleSceneDeckSync())
+	let autosaveTimeout = null
+	async function triggerAutosave() {
+		try {
+			const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+			await api.post('/api/project/autosave', { project })
+			const d = new Date()
+			const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+			document.dispatchEvent(new CustomEvent('project-autosaved', { detail: { time: timeStr } }))
+		} catch (e) {
+			console.warn('[HighAsCG] Auto-save failed:', e.message)
+		}
+	}
+	function scheduleAutosave() {
+		if (autosaveTimeout) clearTimeout(autosaveTimeout)
+		autosaveTimeout = setTimeout(triggerAutosave, 5000)
+	}
+	setInterval(triggerAutosave, 60 * 1000)
+
+	sceneState.on('change', () => { appLogic.scheduleSceneDeckSync(); scheduleAutosave() })
+	sceneState.on('imported', () => { appLogic.scheduleSceneDeckSync(); scheduleAutosave() })
+	sceneState.on('previewScene', () => { appLogic.scheduleSceneDeckSync(); scheduleAutosave() })
+	sceneState.on('softChange', () => { appLogic.scheduleSceneDeckSync(); scheduleAutosave() })
 	sceneState.on('persisted', () => {
 		appLogic.scheduleSceneDeckSync()
 		const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
 		markLocalProjectSaved()
 		api.post('/api/project/save', { project })
-			.catch(e => console.warn('[HighAsCG] Auto-save failed:', e.message))
+			.catch(e => console.warn('[HighAsCG] Main save failed:', e.message))
+		scheduleAutosave()
 	})
+	timelineState.on('change', scheduleAutosave)
+	multiviewState.on('change', scheduleAutosave)
 
 	const header = document.querySelector('.header'); const statusEl = document.querySelector('.header__status')
 	if (header && statusEl) initHeaderBar(header, statusEl, stateStore)
@@ -214,6 +235,10 @@ async function init() {
 	})
 
 	initSourcesPanel(document.querySelector('#panel-sources .panel__body'), stateStore, { wsClient: ws })
+	/** Live tab: POST /api/device-view can return before WS change is applied; bridge for instant list updates. */
+	window.__highascgApplyExtraLiveSources = (list) => {
+		if (Array.isArray(list)) stateStore.applyChange('extraLiveSources', list)
+	}
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, { getOscClient: () => _oscClient })
 	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore); initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
 	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore); initInspectorPanel(document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)

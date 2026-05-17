@@ -46,6 +46,7 @@ async function handlePost(path, body, ctx) {
 				/* ignore if nothing on layer */
 			}
 			await amcp.mixer.mixerCommit(channel)
+			ctx._ledTestPatternActive = false
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, channel, layer: TEST_LAYER }) }
 		}
 
@@ -169,6 +170,8 @@ async function handlePost(path, body, ctx) {
 		await amcp.mixer.mixerFill(channel, TEST_LAYER, 0, 0, 1, 1)
 		await amcp.mixer.mixerOpacity?.(channel, TEST_LAYER, 1).catch(() => {})
 		await amcp.mixer.mixerCommit(channel)
+
+		ctx._ledTestPatternActive = true
 
 		return {
 			status: 200,

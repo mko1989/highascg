@@ -1,370 +1,13 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const { destinationsFromConfig } = require('../config/screen-destinations')
-const { multiviewGeneratedConfigIncludesScreen } = require('../config/multiview-helpers')
-const { getModeDimensions, STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const logger = require('./logger').defaultLogger
+const { getXAuthority } = require('./hardware-info')
+const { calculateLayoutPositions } = require('./os-layout-calculator')
+const { readCreateMissingModes, tryAddXrandrModeFromCvt, pickBestExistingModeForPlan } = require('./xrandr-custom-mode')
+const { readOsTimingSourceForOutput } = require('./modeline-timings')
 
-function readScreenSetting(config, key) {
-	if (!config || typeof config !== 'object') return undefined
-	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
-	if (Object.prototype.hasOwnProperty.call(config, key)) return config[key]
-	if (cs && Object.prototype.hasOwnProperty.call(cs, key)) return cs[key]
-	return undefined
-}
 
-function resolveScreenDimsFromTopology(config, screenIdx1) {
-	const list = destinationsFromConfig(config)
-	if (!list.length) return null
-	const idx0 = Math.max(0, (parseInt(String(screenIdx1), 10) || 1) - 1)
-	const routable = list.filter((d) => {
-		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream'
-	})
-	const perMain = routable.filter((d) => (parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0) === idx0)
-	if (!perMain.length) return null
-	const picked = perMain.find((d) => String(d?.mode || 'pgm_prv') === 'pgm_prv') || perMain[0]
-	const vm = String(picked?.videoMode || '').trim()
-	if (vm && STANDARD_VIDEO_MODES[vm]) return { width: STANDARD_VIDEO_MODES[vm].width, height: STANDARD_VIDEO_MODES[vm].height }
-	const w = parseInt(String(picked?.width ?? 0), 10) || 0
-	const h = parseInt(String(picked?.height ?? 0), 10) || 0
-	if (w > 0 && h > 0) return { width: w, height: h }
-	return null
-}
-
-/**
- * @param {string} mode
- * @returns {string} xrandr mode name e.g. 1920x1080
- */
-function mapCasparModeToXrandrRes(mode) {
-	if (!mode) return '1920x1080'
-	const s = String(mode)
-	if (s === '1080p5000' || s === '1080p50') return '1920x1080'
-	if (s === '720p5000' || s === '720p50') return '1280x720'
-	const m = s.match(/^(\d+)x(\d+)/)
-	return m ? `${m[1]}x${m[2]}` : '1920x1080'
-}
-
-/**
- * Left-to-right order of Caspar screen indices for xrandr --pos (1 = leftmost).
- * @param {number} screenCount
- * @param {boolean} swap - When true, reverse order (e.g. [2,1] or [4,3,2,1]).
- * @returns {number[]}
- */
-function getHorizontalLayoutOrder(screenCount, swap) {
-	const order = []
-	for (let i = 1; i <= screenCount; i++) order.push(i)
-	if (swap) order.reverse()
-	return order
-}
-
-/**
- * One main screen + multiview: second physical head for the multiview window (Caspar screen_count still 1).
- * @param {object} config
- * @param {object} cs - casparServer
- * @param {number} screenCount
- * @returns {boolean}
- */
-function includeMultiviewSecondHead(config, cs, screenCount) {
-	if (screenCount !== 1) return false
-	const mvOn = cs.multiview_enabled !== false && cs.multiview_enabled !== 'false'
-	const mvSc = multiviewGeneratedConfigIncludesScreen(cs)
-	if (!mvOn || !mvSc) return false
-	const mvId =
-		String(config.multiview_system_id || '').trim() || String(config.screen_2_system_id || '').trim()
-	return mvId !== ''
-}
-
-/**
- * Applies X11 screen positioning using xrandr.
- * Maps screen_N_system_id (e.g. HDMI-0) to its target resolution and position.
- * Optional screen_N_os_mode / screen_N_os_rate set OS output mode; otherwise derived from casparServer.screen_N_mode.
- * Optional `x11_horizontal_swap`: when true, reverse horizontal placement order.
- * When **one** main Caspar screen + multiview screen consumer, also places `multiview_system_id` (or `screen_2_system_id`)
- * as the second head so both monitors are not cloned.
- * @param {object} config - Unified app config
- */
-/**
- * Attempts to find the XAUTHORITY file for the session user.
- */
-function getXAuthority() {
-	if (process.env.XAUTHORITY) return process.env.XAUTHORITY
-	const user = process.env.USER || 'casparcg'
-	return `/home/${user}/.Xauthority`
-}
-
-/**
- * Calculates target coordinates and dimensions for each GPU head.
- * @param {object} config
- */
-function calculateLayoutPositions(config) {
-	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : {}
-	const screenCount = Math.min(16, Math.max(1, parseInt(String(config.screen_count ?? cs.screen_count ?? 1), 10) || 1))
-	const swap = !!(config.x11_horizontal_swap === true || config.x11_horizontal_swap === 'true' || config.x11_horizontal_swap === 1 || config.x11_horizontal_swap === '1')
-	
-	const allGpuAssignments = new Map()
-	const mvAssignments = []
-	const explicitScreenAssignments = new Map()
-	
-	// Collect from legacy config
-	for (let n = 1; n <= 8; n++) {
-		const sysId = config[`screen_${n}_system_id`]
-		if (sysId) {
-			allGpuAssignments.set(n, {
-				sysId,
-				osMode: config[`screen_${n}_os_mode`],
-				osBackend: String(config[`screen_${n}_os_backend`] || 'xrandr').trim().toLowerCase(),
-				osRate: config[`screen_${n}_os_rate`],
-				casparMode: readScreenSetting(config, `screen_${n}_mode`),
-				manualX: Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null,
-				manualY: Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null
-			})
-		}
-	}
-	if (config.multiview_system_id) {
-		mvAssignments.push({
-			sysId: config.multiview_system_id,
-			osMode: config.multiview_os_mode,
-			osBackend: String(config.multiview_os_backend || 'xrandr').trim().toLowerCase(),
-			osRate: config.multiview_os_rate,
-			casparMode: cs.multiview_mode,
-			manualX: Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null,
-			manualY: Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null
-		})
-	}
-	
-	// Collect from device graph
-	const connectors = Array.isArray(config?.deviceGraph?.connectors) ? config.deviceGraph.connectors : []
-	const edges = Array.isArray(config?.deviceGraph?.edges) ? config.deviceGraph.edges : []
-	const dests = destinationsFromConfig(config)
-
-	const graphGpuConnectors = connectors.filter(c => c.kind === 'gpu_out' || c.kind === 'gpu_output')
-	const graphHasAnyGpuBinding = graphGpuConnectors.some(c => {
-		const binding = c.caspar?.outputBinding
-		if (binding && binding.type) return true
-		const inEdge = edges.find(e => e.sinkId === c.id)
-		return !!inEdge
-	})
-
-	if (graphHasAnyGpuBinding) {
-		// When the graph has active bindings, treat it as the authoritative source of truth.
-		// Ignore legacy/stale screen_N_system_id or multiview_system_id from the persistent config.
-		allGpuAssignments.clear()
-		mvAssignments.length = 0
-	}
-
-	graphGpuConnectors.forEach(c => {
-		if (c.kind !== 'gpu_out' && c.kind !== 'gpu_output') return
-		const sysId = String(c.externalRef || '').trim()
-		if (!sysId) return
-
-		// 1. Direct binding on connector
-		let binding = c.caspar?.outputBinding
-		let mainIndex = c.caspar?.mainIndex
-		let inferredFromEdge = false
-		let edgeDerivedMode = null
-		let edgeDerivedMainIndex = null
-		const inEdge = edges.find(e => e.sinkId === c.id)
-		if (inEdge) {
-			const srcId = String(inEdge.sourceId || '')
-			if (srcId.startsWith('dst_in_')) {
-				const dstId = srcId.slice('dst_in_'.length)
-				const dest = dests.find(d => d.id === dstId)
-				if (dest) {
-					const dMode = String(dest.mode || 'pgm_prv').toLowerCase()
-					if (dMode === 'multiview') {
-						edgeDerivedMode = 'multiview'
-					} else if (dMode !== 'stream') {
-						edgeDerivedMode = 'screen'
-						edgeDerivedMainIndex = Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0)
-					}
-				}
-			}
-		}
-		
-		// 2. Edges are source-of-truth when present (override stale direct bindings).
-		if (edgeDerivedMode === 'screen') {
-			mainIndex = edgeDerivedMainIndex
-			binding = { type: 'screen', index: edgeDerivedMainIndex + 1 }
-			inferredFromEdge = true
-		} else if (edgeDerivedMode === 'multiview') {
-			binding = { type: 'multiview', index: 1 }
-			mainIndex = null
-			inferredFromEdge = true
-		}
-
-		// 3. Legacy infer from edges only when still unresolved.
-		if (!binding && mainIndex == null) {
-			if (inEdge) {
-				const srcId = String(inEdge.sourceId || '')
-				if (srcId.startsWith('dst_in_')) {
-					const dstId = srcId.slice('dst_in_'.length)
-					const dest = dests.find(d => d.id === dstId)
-					if (dest) {
-						mainIndex = dest.mainScreenIndex
-						binding = { type: 'screen', index: (parseInt(mainIndex, 10) || 0) + 1 }
-						inferredFromEdge = true
-					}
-				}
-			}
-		}
-
-		// Only treat connector as a main screen when explicitly bound to screen,
-		// or when legacy mainIndex exists without an explicit binding.
-		const isScreenBinding = binding?.type === 'screen'
-		const isLegacyMainIndexOnly = !binding && mainIndex != null
-		if (isScreenBinding || isLegacyMainIndexOnly) {
-			const n = Math.min(16, Math.max(1, parseInt(String(binding?.index ?? (Number(mainIndex) + 1) ?? 1), 10) || 1))
-			const assign = {
-				sysId,
-				osMode: config[`screen_${n}_os_mode`] || c.caspar?.mode,
-				osBackend: String(config[`screen_${n}_os_backend`] || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
-				osRate: config[`screen_${n}_os_rate`] || c.caspar?.refreshHz,
-				casparMode: readScreenSetting(config, `screen_${n}_mode`) || c.caspar?.mode,
-				manualX: Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null,
-				manualY: Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null
-			}
-			allGpuAssignments.set(n, assign)
-			if (isScreenBinding || inferredFromEdge) explicitScreenAssignments.set(n, assign)
-		} else {
-			// Explicit non-screen binding (e.g. multiview) must not leak through stale legacy screen_N_system_id.
-			if (binding && binding.type && String(binding.type) !== 'screen') {
-				for (const [k, v] of allGpuAssignments.entries()) {
-					if (String(v?.sysId || '') === sysId) allGpuAssignments.delete(k)
-				}
-			}
-			// Find if this is a multiviewer output
-			let mvIndex = null
-			if (binding?.type === 'multiview') {
-				mvIndex = parseInt(binding.index, 10) || 1
-			} else {
-				const inEdge = edges.find(e => e.sinkId === c.id)
-				if (inEdge) {
-					const srcId = String(inEdge.sourceId || '')
-					if (srcId.startsWith('dst_in_')) {
-						const dstId = srcId.slice('dst_in_'.length)
-						const mvDests = dests.filter(d => String(d.mode || '').toLowerCase() === 'multiview')
-						const mvIdx = mvDests.findIndex(d => d.id === dstId)
-						if (mvIdx >= 0) {
-							mvIndex = mvIdx + 1
-						}
-					} else if (srcId === 'caspar_mv_out' || c.id === 'caspar_mv_out' || c.label?.toLowerCase().includes('multiview')) {
-						mvIndex = 1
-					}
-				}
-			}
-
-			if (mvIndex != null) {
-				const n = mvIndex
-				if (mvAssignments.some(a => a.sysId === sysId)) return
-				mvAssignments.push({ 
-					sysId, 
-					n,
-					osMode: config[`multiview_${n}_os_mode`] || config.multiview_os_mode || c.caspar?.mode, 
-					osBackend: String(config[`multiview_${n}_os_backend`] || config.multiview_os_backend || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(), 
-					osRate: config[`multiview_${n}_os_rate`] || config.multiview_os_rate || c.caspar?.refreshHz, 
-					casparMode: config[`multiview_${n}_mode`] || cs.multiview_mode || c.caspar?.mode, 
-					manualX: Number.isFinite(config[`multiview_${n}_os_x`]) ? config[`multiview_${n}_os_x`] : (Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null), 
-					manualY: Number.isFinite(config[`multiview_${n}_os_y`]) ? config[`multiview_${n}_os_y`] : (Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null) 
-				})
-			}
-		}
-	})
-
-	// If graph has explicit screen bindings, they are source-of-truth for screen lanes.
-	if (explicitScreenAssignments.size > 0) {
-		allGpuAssignments.clear()
-		for (const [n, assign] of explicitScreenAssignments.entries()) allGpuAssignments.set(n, assign)
-	}
-
-	const placements = []
-	const screens = getHorizontalLayoutOrder(screenCount, swap)
-	for (const n of screens) placements.push({ kind: 'screen', n })
-	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
-	
-	// MV always comes after screens in the flow (WO-22/WO-23)
-
-	const results = { screens: {}, multiview: {} }
-	let cumulativeX = 0
-	for (const p of placements) {
-		let data = null
-		if (p.kind === 'screen') {
-			data = allGpuAssignments.get(p.n)
-		} else {
-			data = p.data
-		}
-		if (!data || !data.sysId) continue
-
-		const rawOsMode = data.osMode && String(data.osMode).trim()
-		let modeForXrandr = rawOsMode || mapCasparModeToXrandrRes(data.casparMode)
-		let w = 1920
-		let h = 1080
-		let hasCasparDims = false
-		if (p.kind === 'screen') {
-			// Keep xrandr cumulative positioning in sync with the same destination-driven dimensions as Caspar XML generation.
-			const topoDims = resolveScreenDimsFromTopology(config, p.n)
-			if (topoDims && topoDims.width > 0 && topoDims.height > 0) {
-				w = topoDims.width
-				h = topoDims.height
-				hasCasparDims = true
-				// Topology dimensions are source-of-truth for main screen outputs; avoid stale legacy os_mode here.
-				modeForXrandr = `${w}x${h}`
-			} else {
-				const dims = getModeDimensions(String(data.casparMode || ''), config, p.n)
-				if (Number.isFinite(dims?.width) && dims.width > 0) {
-					w = dims.width
-					hasCasparDims = true
-				}
-				if (Number.isFinite(dims?.height) && dims.height > 0) h = dims.height
-			}
-		}
-		const resMatch = modeForXrandr.match(/^(\d+)x(\d+)/)
-		if (resMatch && !hasCasparDims) {
-			w = parseInt(resMatch[1], 10) || w
-			h = parseInt(resMatch[2], 10) || h
-		}
-		const posX = data.manualX !== null ? data.manualX : cumulativeX
-		const posY = data.manualY !== null ? data.manualY : 0
-
-		const info = {
-			sysId: data.sysId,
-			x: posX,
-			y: posY,
-			width: w,
-			height: h,
-			mode: modeForXrandr,
-			rate: data.osRate,
-			backend: data.osBackend
-		}
-
-		if (p.kind === 'screen') results.screens[p.n] = info
-		else results.multiview[p.n] = info
-
-		if (data.manualX === null) cumulativeX += w
-	}
-
-	try {
-		const screenEntries = Object.entries(results.screens)
-		const mvEntries = Object.entries(results.multiview)
-		if (screenEntries.length === 0 && mvEntries.length === 0) {
-			logger.info('[OS-Config] Layout plan: no assigned outputs')
-		} else {
-			for (const [idx, info] of screenEntries) {
-				logger.info(
-					`[OS-Config] Layout screen_${idx}: id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`
-				)
-			}
-			for (const [idx, info] of mvEntries) {
-				logger.info(
-					`[OS-Config] Layout multiview_${idx}: id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`
-				)
-			}
-		}
-	} catch (_) {}
-
-	return results
-}
 
 /**
  * Applies X11 screen positioning using xrandr or nvidia-settings.
@@ -389,8 +32,14 @@ function applyX11Layout(config) {
 				continue
 			}
 			if (!currentOut) continue
-			const modeMatch = line.match(/^\s+(\d+x\d+)\b/)
-			if (modeMatch) byOut.get(currentOut).add(modeMatch[1])
+			const tokMatch = line.match(/^\s{2,}(\S+)/)
+			if (!tokMatch) continue
+			const token = tokMatch[1]
+			if (!/^\d+x\d+/i.test(token)) continue
+			const set = byOut.get(currentOut)
+			set.add(token)
+			const bare = token.match(/^(\d+x\d+)/i)
+			if (bare && bare[1] !== token) set.add(bare[1])
 		}
 		return byOut
 	}
@@ -406,7 +55,7 @@ function applyX11Layout(config) {
 		let best = ''
 		let bestScore = Number.POSITIVE_INFINITY
 		for (const mode of availableModes) {
-			const mm = String(mode).match(/^(\d+)x(\d+)$/)
+			const mm = String(mode).match(/^(\d+)x(\d+)/i)
 			if (!mm) continue
 			const w = parseInt(mm[1], 10) || 0
 			const h = parseInt(mm[2], 10) || 0
@@ -426,18 +75,73 @@ function applyX11Layout(config) {
 		
 		const r = typeof info.rate === 'number' ? info.rate : parseFloat(String(info.rate || ''))
 		const safeRate = Number.isFinite(r) && r > 0 ? r : null
-		const avail = availableModesByOutput.get(safeSysId)
+		let avail = availableModesByOutput.get(safeSysId)
+		if (!avail) {
+			avail = new Set()
+			availableModesByOutput.set(safeSysId, avail)
+		}
 		const plannedMode = String(info.mode || '').trim()
-		const resolvedMode = pickBestAvailableMode(plannedMode, avail)
+		const allowCreate = readCreateMissingModes(config)
+		let resolvedMode = plannedMode
+		let usedCvtCreate = false
+		let existingToken =
+			plannedMode && /^\d+x\d+$/i.test(plannedMode) ? pickBestExistingModeForPlan(plannedMode, avail, safeRate) : null
+		if (!existingToken && plannedMode && avail.has(plannedMode)) existingToken = plannedMode
+		if (existingToken) {
+			resolvedMode = existingToken
+			if (existingToken !== plannedMode) {
+				logger.info(
+					`[OS-Config] Using existing xrandr mode for ${safeSysId}: planned=${plannedMode} --mode ${existingToken}`
+				)
+			}
+		}
+		if (avail && plannedMode && allowCreate && /^\d+x\d+$/i.test(plannedMode) && !existingToken) {
+			const wm = plannedMode.match(/^(\d+)x(\d+)$/i)
+			if (wm) {
+				const cw = parseInt(wm[1], 10)
+				const ch = parseInt(wm[2], 10)
+		const timingKind = readOsTimingSourceForOutput(config, safeSysId)
+				const created = tryAddXrandrModeFromCvt({
+					output: safeSysId,
+					width: cw,
+					height: ch,
+					refreshHz: safeRate != null ? safeRate : 60,
+					env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+					logger,
+					availableModes: avail,
+					timingKind,
+				})
+				if (created) {
+					avail.add(created)
+					const bare = created.match(/^(\d+x\d+)/i)
+					if (bare) avail.add(bare[1])
+					resolvedMode = created
+					usedCvtCreate = true
+				}
+			}
+		}
+		if (!resolvedMode || !avail.has(resolvedMode)) {
+			resolvedMode = pickBestAvailableMode(plannedMode, avail)
+		}
 		if (resolvedMode && plannedMode && resolvedMode !== plannedMode) {
-			logger.warn(
-				`[OS-Config] Mode fallback for ${safeSysId}: planned=${plannedMode} unavailable, using=${resolvedMode}`
-			)
+			if (usedCvtCreate) {
+				logger.info(
+					`[OS-Config] Custom mode from cvt for ${safeSysId}: planned=${plannedMode} applied as ${resolvedMode}`
+				)
+			} else {
+				logger.warn(
+					`[OS-Config] Mode fallback for ${safeSysId}: planned=${plannedMode} unavailable, using=${resolvedMode}`
+				)
+			}
 		}
 
 		// Include --mode for strict enforcement as requested by user
-		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y} --mode ${resolvedMode || info.mode}`
+		const modeArg = String(resolvedMode || info.mode || '').trim()
+		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y} --mode ${modeArg}`
 		const xPartWithRate = safeRate != null ? `${xPart} --rate ${Math.round(safeRate * 100) / 100}` : xPart
+		logger.info(
+			`[OS-Config] xrandr head: output=${safeSysId} pos=${info.x}x${info.y} mode=${modeArg || '(empty)'} planned=${plannedMode || '(none)'} rate=${safeRate != null ? Math.round(safeRate * 100) / 100 : '(none)'}`
+		)
 		xrandrParts.push(xPartWithRate)
 	}
 
@@ -447,23 +151,44 @@ function applyX11Layout(config) {
 		for (const [out, modes] of parsed.entries()) availableModesByOutput.set(out, modes)
 	} catch (e) { logger.warn(`[OS-Config] Failed to query connected outputs: ${e.message}`) }
 
-	Object.values(layout.screens).forEach(processHead)
-	Object.values(layout.multiview).forEach(processHead)
+	const seenSysIds = new Set()
+	const processHeadDeduped = (info) => {
+		const sid = String(info?.sysId || '').trim()
+		if (!sid || seenSysIds.has(sid)) return
+		seenSysIds.add(sid)
+		processHead(info)
+	}
+	const mapGpu = Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []
+	mapGpu.forEach(processHeadDeduped)
+	Object.values(layout.screens).forEach(processHeadDeduped)
+	Object.values(layout.multiview).forEach(processHeadDeduped)
 
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
 	let applied = false
 	let persisted = false
+	/** @type {string|null} */
+	let xrandrCommand = null
 	if (xrandrParts.length > 0) {
 		try {
 			const xcmd = `xrandr --display :0 ${xrandrParts.join(' ')}`
+			xrandrCommand = `DISPLAY=:0 ${xcmd}`
 			logger.info(`[OS-Config] Applying (xrandr): ${xcmd}`)
-			const out = execSync(xcmd, { env, encoding: 'utf8' })
-			if (out) logger.debug(`[OS-Config] xrandr output: ${out}`)
+			const out = execSync(xcmd, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
+			const trimmed = String(out || '').trim()
+			if (trimmed) {
+				const cap = 8000
+				logger.info(
+					`[OS-Config] xrandr stdout (${trimmed.length} chars): ${trimmed.length > cap ? trimmed.slice(0, cap) + '…' : trimmed}`
+				)
+			} else {
+				logger.info('[OS-Config] xrandr stdout: (empty)')
+			}
 			applied = true
 			persisted = persistLayoutScript(xcmd)
-		} catch (e) { 
+		} catch (e) {
 			logger.error(`[OS-Config] xrandr apply failed: ${e.message}`)
-			if (e.stderr) logger.error(`[OS-Config] stderr: ${e.stderr}`)
+			if (e.stderr) logger.error(`[OS-Config] xrandr stderr: ${String(e.stderr).trim()}`)
+			if (e.stdout) logger.error(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
 		}
 	} else {
 		logger.warn('[OS-Config] No xrandr outputs to apply')
@@ -482,7 +207,7 @@ function applyX11Layout(config) {
 	}
 
 	logger.info('[OS-Config] applyX11Layout end')
-	return { applied, persisted }
+	return { applied, persisted, xrandrCommand }
 }
 
 function persistLayoutScript(cmd) {
@@ -522,6 +247,4 @@ module.exports = {
 	applyX11Layout,
 	calculateLayoutPositions,
 	restartDisplayManager,
-	getHorizontalLayoutOrder,
-	includeMultiviewSecondHead,
 }

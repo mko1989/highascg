@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure /home/serwer and /opt/casparcg/media exist on the *source* machine before
+# Ensure /home/serwer and /home/casparcg/highascg/media exist on the *source* machine before
 # eggs produce, so the squashfs contains empty mount points. Content under them
 # is dropped via penguins-eggs-exclude-highascg-fragment.list (see merge script).
 # Run as root.
@@ -8,7 +8,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo $0" >&2
   exit 1
 fi
-mkdir -p /opt/casparcg/media
+mkdir -p /home/casparcg/highascg/media
 if getent passwd serwer >/dev/null 2>&1; then
   mkdir -p /home/serwer
   u="$(getent passwd serwer | cut -d: -f3)"
@@ -21,6 +21,6 @@ fi
 if getent passwd casparcg >/dev/null 2>&1; then
   u="$(getent passwd casparcg | cut -d: -f3)"
   g="$(getent passwd casparcg | cut -d: -f4)"
-  chown -h "$u":"$g" /opt/casparcg/media
+  chown -h "$u":"$g" /home/casparcg/highascg/media
 fi
-echo "OK: /home/serwer and /opt/casparcg/media exist (tweak ownership if your site uses different UIDs)."
+echo "OK: /home/serwer and /home/casparcg/highascg/media exist (tweak ownership if your site uses different UIDs)."

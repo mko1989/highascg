@@ -7,6 +7,12 @@
 	align-items: stretch;
 }
 
+.scenes-deck--media-drop-target {
+	outline: 2px dashed var(--accent, #58a6ff);
+	outline-offset: 2px;
+	border-radius: var(--radius);
+}
+
 /* Compact “new look” tile after the last card (same action as toolbar ＋). */
 .scenes-deck__add-look {
 	min-height: 120px;
@@ -40,6 +46,17 @@
 .scenes-deck__hint {
 	font-size: 0.85rem;
 	margin-top: 8px;
+}
+
+.scenes-deck__empty--clear-prv {
+	cursor: pointer;
+	border-radius: var(--radius);
+	transition: background 0.12s ease, color 0.12s ease;
+}
+
+.scenes-deck__empty--clear-prv:hover {
+	background: var(--bg-panel);
+	color: var(--text);
 }
 
 .scenes-card {

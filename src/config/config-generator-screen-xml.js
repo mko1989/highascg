@@ -54,6 +54,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 	const keyOnly = config[`screen_${n}_key_only`] === true || config[`screen_${n}_key_only`] === 'true'
 	const interactive = config[`screen_${n}_interactive`] === true || config[`screen_${n}_interactive`] === 'true'
 	const sbsKey = config[`screen_${n}_sbs_key`] === true || config[`screen_${n}_sbs_key`] === 'true'
+	const highBitdepth = config[`screen_${n}_high_bitdepth`] === true || config[`screen_${n}_high_bitdepth`] === 'true'
 	const colourSpace = String(config[`screen_${n}_colour_space`] || '').trim()
 	const forceLinear =
 		config[`screen_${n}_force_linear_filter`] !== false && config[`screen_${n}_force_linear_filter`] !== 'false'
@@ -73,6 +74,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 	)
 	if (colourSpace) lines.push(`<colour-space>${escapeXml(colourSpace)}</colour-space>`)
 	lines.push(`<force-linear-filter>${forceLinear ? 'true' : 'false'}</force-linear-filter>`)
+	lines.push(`<high-bitdepth>${highBitdepth ? 'true' : 'false'}</high-bitdepth>`)
 	return lines.join('\n                    ')
 }
 
@@ -122,6 +124,8 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 	                    (config[`multiview_${idx}_interactive`] ?? config.multiview_interactive) === 'true'
 	const sbsKey = (config[`multiview_${idx}_sbs_key`] ?? config.multiview_sbs_key) === true || 
 	               (config[`multiview_${idx}_sbs_key`] ?? config.multiview_sbs_key) === 'true'
+	const highBitdepth = (config[`multiview_${idx}_high_bitdepth`] ?? config.multiview_high_bitdepth) === true || 
+	                    (config[`multiview_${idx}_high_bitdepth`] ?? config.multiview_high_bitdepth) === 'true'
 	const colourSpace = String(config[`multiview_${idx}_colour_space`] || config.multiview_colour_space || '').trim()
 	const forceLinear =
 		(config[`multiview_${idx}_force_linear_filter`] ?? config.multiview_force_linear_filter) !== false && 
@@ -142,6 +146,7 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 	)
 	if (colourSpace) lines.push(`<colour-space>${escapeXml(colourSpace)}</colour-space>`)
 	lines.push(`<force-linear-filter>${forceLinear ? 'true' : 'false'}</force-linear-filter>`)
+	lines.push(`<high-bitdepth>${highBitdepth ? 'true' : 'false'}</high-bitdepth>`)
 	return lines.join('\n                    ')
 }
 

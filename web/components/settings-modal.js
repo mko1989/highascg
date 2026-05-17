@@ -29,23 +29,245 @@ export function showSettingsModal(initialTab) {
 		if (panesRow && varPane) panesRow.insertBefore(pane, varPane)
 	})
 
+	async function refreshMediaMountPanel() {
+		const sel = modal.querySelector('#media-mount-part-select')
+		const line = modal.querySelector('#media-mount-status-line')
+		const applyBtn = modal.querySelector('#media-mount-apply-btn')
+		if (!sel || !line) return
+		const prev = sel.value
+		line.textContent = 'Loading…'
+		try {
+			const [dRes, mRes] = await Promise.all([
+				api.get('/api/system/block-devices'),
+				api.get('/api/system/media-mount/status'),
+			])
+			const devices = Array.isArray(dRes?.devices) ? dRes.devices : []
+			sel.innerHTML = '<option value="">— select —</option>'
+			for (const d of devices) {
+				const rm = d.removable ? 'removable' : 'internal'
+				const lbl = [d.label, d.mountpoint ? ` @ ${d.mountpoint}` : ''].join('').trim()
+				const txt =
+					`[${rm}] ${d.path} ${d.size} ${d.fstype || ''}${lbl ? ' — ' + lbl : ''}`
+						.replace(/\s+/g, ' ')
+						.trim()
+				const opt = document.createElement('option')
+				opt.value = d.uuid
+				opt.textContent = txt
+				sel.appendChild(opt)
+			}
+			if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev
+			const lines = []
+			if (mRes?.unsupported) lines.push('Drive list unavailable on this platform.')
+			if (mRes?.mounted)
+				lines.push(`Mounted: ${mRes.source || '?'} (${mRes.fstype || '?'})  uuid=${mRes.uuid || '?'}`)
+			else if (mRes?.inheritsFromFilesystem)
+				lines.push(
+					`On host filesystem (${mRes.inheritsFromFilesystem}); no partition mounted solely at /home/casparcg/highascg/media.`,
+				)
+			else lines.push('Folder is not separately mounted.')
+			if (mRes?.savedUuid)
+				lines.push(
+					`Saved at startup: ${mRes.savedUuid}${mRes.savedKernelName ? ` (${mRes.savedKernelName})` : ''}`,
+				)
+			line.textContent = lines.join(' · ')
+			if (applyBtn) applyBtn.disabled = !sel.value
+		} catch (e) {
+			line.textContent = e?.message || String(e)
+		}
+	}
+
+	async function refreshSystemHardwarePanel() {
+		const summary = modal.querySelector('#system-hw-nvidia-summary')
+		const branchSel = modal.querySelector('#system-hw-nvidia-branch')
+		const stat = modal.querySelector('#system-hw-nvidia-status')
+		const applyBtn = modal.querySelector('#system-hw-nvidia-apply')
+		if (!summary || !branchSel) return
+		summary.textContent = 'Loading…'
+		try {
+			const r = await api.get('/api/system/gpu-nvidia')
+			const lines = []
+			if (Array.isArray(r?.nvidiaSmiLines) && r.nvidiaSmiLines.length)
+				r.nvidiaSmiLines.forEach((l) => lines.push(`nvidia-smi: ${l}`))
+			if (r?.loadedModuleVersion) lines.push(`modinfo nvidia version: ${r.loadedModuleVersion}`)
+			if (r?.dpkgDriverLine) lines.push(`dpkg: ${r.dpkgDriverLine}`)
+			if (r?.poolPath != null) lines.push(`pool: ${String(r.poolPath)}`)
+			const hp =
+				r?.helperPresent ?
+					`helper: OK (${String(r.helperScript || '')})`
+				:	`helper missing — run installer phase 4 (${String(r?.helperScript || '')})`
+			lines.push(hp)
+			summary.textContent = lines.length ? lines.join('\n') : '(no NVIDIA probes — GPU driver not loaded?)'
+			const poolBranches = Array.isArray(r?.poolBranches) ? r.poolBranches.slice().sort((a, b) => a - b) : []
+			const prev = branchSel.value
+			branchSel.innerHTML = ''
+			const optEmpty = document.createElement('option')
+			optEmpty.value = ''
+			optEmpty.textContent = poolBranches.length ? '— branch —' : '— populate /opt/nvidia-pool —'
+			branchSel.appendChild(optEmpty)
+			for (const b of poolBranches) {
+				const o = document.createElement('option')
+				o.value = String(b)
+				o.textContent = String(b)
+				branchSel.appendChild(o)
+			}
+			if (prev && [...branchSel.options].some((o) => o.value === prev)) branchSel.value = prev
+			if (applyBtn) applyBtn.disabled = poolBranches.length === 0 || !branchSel.value
+			if (stat) stat.textContent = ''
+		} catch (e) {
+			summary.textContent = e?.message || String(e)
+		}
+	}
+
+	async function refreshDecklinkPanel() {
+		const summary = modal.querySelector('#decklink-summary')
+		const stat = modal.querySelector('#decklink-status-line')
+		if (!summary) return
+		summary.textContent = 'Loading…'
+		try {
+			const r = await api.get('/api/system/decklink')
+			const rows = []
+			const devs = Array.isArray(r?.devices) ? r.devices : []
+			if (!devs.length) rows.push('No DeckLink devices discovered yet (ffmpeg + recent Caspar log).')
+			for (const d of devs) {
+				let line = `#${d.index} ${d.label}`
+				if (d.externalRef != null && String(d.externalRef).length)
+					line += `\tCaspar externalRef=${d.externalRef}`
+				rows.push(line)
+			}
+			if (r?.sourcesTried)
+				rows.push(
+					`sources tried: ffmpeg=${r.sourcesTried.ffmpeg} · casparLog=${r.sourcesTried.casparLog}${r.sourcesTried.casparLogPath ? ` (${r.sourcesTried.casparLogPath})` : ''}`,
+				)
+			if (Array.isArray(r?.warnings) && r.warnings.length)
+				rows.push(...r.warnings.map((w) => `warning: ${w}`))
+			if (r?.updaterPath) rows.push(`Detected updater binary: ${r.updaterPath}`)
+			summary.textContent = rows.join('\n')
+			if (stat) stat.textContent = ''
+		} catch (e) {
+			summary.textContent = e?.message || String(e)
+		}
+	}
+
+	function openMediaMountDestructiveConfirm(onDecision) {
+		const ov = document.createElement('div')
+		ov.className = 'modal-overlay'
+		ov.setAttribute('data-media-mount-confirm', '')
+		ov.innerHTML = `
+			<div class="modal-content settings-modal" style="max-width:28rem">
+				<div class="modal-header"><h2>Mount partition</h2></div>
+				<div class="modal-body settings-body">
+					<p class="settings-note">This will <strong>permanently delete</strong> all files currently under <code>/home/casparcg/highascg/media</code> on this host, then mount the selected partition at that path. Anything that only lived in that folder (not on the disk you select) will be gone.</p>
+					<div class="settings-group checkbox">
+						<label><input type="checkbox" id="media-mount-ack-delete" /> I understand existing files in that folder will be deleted</label>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn--secondary" data-media-mount-cancel>Cancel</button>
+					<button type="button" class="btn btn--primary" data-media-mount-run>Mount and save UUID</button>
+				</div>
+			</div>`
+		document.body.appendChild(ov)
+		const cleanup = () => {
+			try {
+				ov.remove()
+			} catch {}
+		}
+		ov.querySelector('[data-media-mount-cancel]')?.addEventListener('click', () => {
+			cleanup()
+			onDecision(false)
+		})
+		ov.addEventListener('click', ev => {
+			if (ev.target === ov) {
+				cleanup()
+				onDecision(false)
+			}
+		})
+		ov.querySelector('[data-media-mount-run]')?.addEventListener('click', () => {
+			const chk = ov.querySelector('#media-mount-ack-delete')
+			if (!(chk && chk.checked)) {
+				window.alert('Check the acknowledgement box first.')
+				return
+			}
+			cleanup()
+			onDecision(true)
+		})
+	}
+
 	function activateSettingsTab(tabName) {
 		const exists = !!modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
 		if (!exists) tabName = 'simulation'
 		modal.querySelectorAll('.settings-tab, .settings-pane').forEach(x => x.classList.remove('active'))
-		const btn = modal.querySelector(`.settings-tab[data-tab="${tabName}"]`); const pane = modal.querySelector(`#settings-pane-${tabName}`)
-		if (btn) btn.classList.add('active'); if (pane) pane.classList.add('active')
+		const btn = modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
+		const pane = modal.querySelector(`#settings-pane-${tabName}`)
+		if (btn) btn.classList.add('active')
+		if (pane) pane.classList.add('active')
 		const opt = optionalById.get(tabName)
 		if (opt && pane && !optionalMounted.has(tabName)) {
-			try { const ret = opt.mount(pane); optionalMounted.add(tabName); if (typeof ret === 'function') optionalDisposers.push(ret) } catch (e) { console.warn('[settings-modal] optional mount failed:', tabName, e) }
+			try {
+				const ret = opt.mount(pane)
+				optionalMounted.add(tabName)
+				if (typeof ret === 'function') optionalDisposers.push(ret)
+			} catch (e) {
+				console.warn('[settings-modal] optional mount failed:', tabName, e)
+			}
 		}
+		if (tabName === 'media-usb') void refreshMediaMountPanel()
+		if (tabName === 'system-hardware') void refreshSystemHardwarePanel()
+		if (tabName === 'decklink') void refreshDecklinkPanel()
 	}
+
+	modal.querySelector('#media-mount-refresh-btn')?.addEventListener('click', () => void refreshMediaMountPanel())
+	modal.querySelector('#media-mount-part-select')?.addEventListener('change', e => {
+		const applyBtn = modal.querySelector('#media-mount-apply-btn')
+		if (applyBtn) applyBtn.disabled = !(e.target && e.target.value)
+	})
+	modal.querySelector('#media-mount-apply-btn')?.addEventListener('click', () => {
+		const uuid = modal.querySelector('#media-mount-part-select')?.value
+		if (!uuid) return
+		openMediaMountDestructiveConfirm(async ok => {
+			if (!ok) return
+			const st = modal.querySelector('#media-mount-status-line')
+			if (st) st.textContent = 'Mounting…'
+			try {
+				const res = await api.post('/api/system/media-mount', { uuid, confirm: 'DELETE_MEDIA' })
+				if (st)
+					st.textContent =
+						res?.source ?
+							`Mounted ${res.source}. UUID saved (${res.uuid}). Use Refresh in Sources → Media if clips do not appear.`
+						:	'Mounted. UUID saved.'
+				await settingsState.load()
+				await refreshMediaMountPanel()
+			} catch (e) {
+				if (st) st.textContent = e?.message || String(e)
+			}
+		})
+	})
+
+	modal.querySelector('#system-hw-nvidia-branch')?.addEventListener('change', (e) => {
+		const applyBtn = modal.querySelector('#system-hw-nvidia-apply')
+		const sel = e?.target || modal.querySelector('#system-hw-nvidia-branch')
+		if (applyBtn) applyBtn.disabled = !(sel && sel.value)
+	})
+	modal.querySelector('#system-hw-nvidia-refresh')?.addEventListener('click', () => void refreshSystemHardwarePanel())
+	modal.querySelector('#decklink-refresh-btn')?.addEventListener('click', () => void refreshDecklinkPanel())
 
 	modal.querySelector('.settings-tabs')?.addEventListener('click', e => {
 		const btn = e.target.closest('.settings-tab'); if (btn && modal.contains(btn)) activateSettingsTab(btn.dataset.tab)
 	})
 
-	const close = () => { optionalDisposers.forEach(d => { try { d() } catch {} }); modal.remove() }
+	const close = () => {
+		optionalDisposers.forEach(d => {
+			try {
+				d()
+			} catch {}
+		})
+		document.querySelectorAll('[data-media-mount-confirm]').forEach(el => {
+			try {
+				el.remove()
+			} catch {}
+		})
+		modal.remove()
+	}
 	modal.querySelector('#settings-close').onclick = close; modal.querySelector('#settings-cancel').onclick = close
 
 	const nuclearStatus = modal.querySelector('#set-nuclear-status')
@@ -66,6 +288,55 @@ export function showSettingsModal(initialTab) {
 		if (!window.confirm('Reboot host now? This will interrupt all outputs.')) return
 		await postNuclear('/api/system/setup/reboot')
 	})
+
+	const hwNvStatus = modal.querySelector('#system-hw-nvidia-status')
+	const decklinkStatusLine = modal.querySelector('#decklink-status-line')
+	modal.querySelector('#system-hw-nvidia-apply')?.addEventListener('click', async () => {
+		const branch = modal.querySelector('#system-hw-nvidia-branch')?.value
+		if (!branch) return
+		if (
+			!window.confirm(
+				`Apply NVIDIA driver branch ${branch} from the offline pool? This runs apt + DKMS and usually needs a reboot afterward.`,
+			)
+		)
+			return
+		if (hwNvStatus) hwNvStatus.textContent = 'Running apply (can take several minutes)…'
+		try {
+			const res = await api.post('/api/system/gpu-nvidia/apply', {
+				branch,
+				password: getNuclearPassword(),
+			})
+			const parts = []
+			if (res?.output) parts.push(String(res.output).trim())
+			if (res?.error) parts.push(String(res.error))
+			const msg =
+				parts.filter(Boolean).join('\n\n') || (res?.ok ? 'Apply finished.' : 'Apply finished with warnings.')
+			if (hwNvStatus) hwNvStatus.textContent = msg.slice(0, 4000)
+			if (res?.rebootLikely && res?.ok)
+				window.alert('Reboot the host when ready so the new NVIDIA kernel module loads.')
+			await refreshSystemHardwarePanel()
+		} catch (e) {
+			if (hwNvStatus) hwNvStatus.textContent = e?.message || String(e)
+		}
+	})
+	async function guiLaunch(action) {
+		const st =
+			action === 'nvidia-settings' ? hwNvStatus || modal.querySelector('#system-hw-nvidia-status')
+			:	decklinkStatusLine || modal.querySelector('#decklink-status-line')
+		if (st) st.textContent = 'Launching…'
+		try {
+			const res = await api.post('/api/system/gui-launch', {
+				action,
+				password: getNuclearPassword(),
+			})
+			if (st) st.textContent = res?.exe ? `Started: ${res.exe}` : 'Started.'
+		} catch (e) {
+			if (st) st.textContent = e?.message || String(e)
+		}
+	}
+	modal.querySelector('#system-hw-nvidia-settings')?.addEventListener('click', () => void guiLaunch('nvidia-settings'))
+	modal.querySelector('#decklink-dv-setup')?.addEventListener('click', () => void guiLaunch('desktopvideo_setup'))
+	modal.querySelector('#decklink-dv-updater')?.addEventListener('click', () => void guiLaunch('desktop_video_updater'))
 
 	const pluginsListEl = modal.querySelector('#set-plugins-list')
 	const pluginsStatusEl = modal.querySelector('#set-plugin-status')

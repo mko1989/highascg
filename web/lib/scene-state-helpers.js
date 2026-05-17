@@ -52,6 +52,11 @@ export function defaultLayerConfig(layerNumber) {
 		fadeOnEnd: { enabled: false, frames: 12 },
 		/** Stacked PIP overlay effects (border, shadow, …). @see pip-overlay-registry.js */
 		pipOverlays: [],
+		sourceMode: 'single',
+		playlist: [],
+		playlistTransition: { type: 'MIX', duration: 12, tween: 'linear' },
+		playlistLoop: true,
+		playlistAdvance: 'auto',
 	}
 }
 
@@ -119,6 +124,13 @@ export function migrateScene(s) {
 						}
 					}
 					delete base.pipOverlay
+					if (base.sourceMode == null) base.sourceMode = 'single'
+					if (!Array.isArray(base.playlist)) base.playlist = []
+					if (!base.playlistTransition || typeof base.playlistTransition !== 'object') {
+						base.playlistTransition = { type: 'MIX', duration: 12, tween: 'linear' }
+					}
+					if (base.playlistLoop == null) base.playlistLoop = true
+					if (base.playlistAdvance == null) base.playlistAdvance = 'auto'
 					return base
 				})
 			: []
@@ -132,11 +144,14 @@ export function migrateScene(s) {
 		globalBorder: s.globalBorder ? {
 			...s.globalBorder,
 			params: { ...(s.globalBorder.params || {}), side: 'inside' }, // enforce inside
-			artnetPatch: { startChannel: 1, universe: 0, ...(s.globalBorder.artnetPatch || {}) }
+			slices: Array.isArray(s.globalBorder.slices) ? s.globalBorder.slices : [],
+			artnetPatch: { startChannel: 1, universe: 0, ...(s.globalBorder.artnetPatch || {}) },
+			activePgmLayer: Number(s.globalBorder.activePgmLayer) === 996 ? 996 : 998,
 		} : {
 			enabled: false,
 			type: 'border',
 			params: { side: 'inside' },
+			slices: [],
 			artnetPatch: { startChannel: 1, universe: 0 }
 		}
 	}

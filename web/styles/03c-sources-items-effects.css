@@ -152,6 +152,20 @@
 .source-item--folder:hover {
 	background: rgba(255, 255, 255, 0.03);
 }
+.source-item__delete-folder {
+	display: none;
+	cursor: pointer;
+	margin-left: auto;
+	opacity: 0.6;
+	transition: opacity 0.1s, color 0.1s;
+}
+.source-item__delete-folder:hover {
+	opacity: 1;
+	color: #e0786c;
+}
+.source-item--folder:hover .source-item__delete-folder {
+	display: inline;
+}
 .source-item__expand-arrow {
 	font-size: 0.65rem;
 	width: 12px;

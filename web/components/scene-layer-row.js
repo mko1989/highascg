@@ -2,6 +2,8 @@
  * Scenes edit view — layer strip rows (bottom → top list with copy/paste/remove).
  */
 
+import { createEffectInstance } from '../lib/effect-registry.js'
+
 /**
  * @param {object} opts
  * @param {import('../lib/scene-state.js').Scene} opts.scene
@@ -132,11 +134,34 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 				}
 
 				if (data?.value) {
-					sceneState.setLayerSource(scene.id, realIdx, {
+					if (data.type === 'effect') {
+						const type = data.value
+						const instance = createEffectInstance(type)
+						if (!instance) return
+						const layer = scene.layers[realIdx]
+						const existing = layer.effects || []
+						const alreadyHas = existing.some((fx) => fx.type === type)
+						if (alreadyHas) return
+						
+						sceneState.patchLayer(scene.id, realIdx, { effects: [...existing, instance] })
+						
+						const updated = sceneState.getScene(scene.id)
+						const updatedLayer = updated?.layers?.[realIdx]
+						if (updatedLayer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer: updatedLayer })
+						schedulePreviewPush()
+						render()
+						return
+					}
+
+					const src = {
 						type: data.type || 'media',
 						value: data.value,
 						label: data.label || data.value,
-					})
+					}
+					const th = Number(data.thumbnailChannel)
+					if (Number.isFinite(th) && th > 0) src.thumbnailChannel = th
+					if (data.useDirect != null) src.useDirect = data.useDirect === true || data.useDirect === 'true'
+					sceneState.setLayerSource(scene.id, realIdx, src)
 					void applyNativeFillForSource(realIdx, {
 						type: data.type || 'media',
 						value: data.value,

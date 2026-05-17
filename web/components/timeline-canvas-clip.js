@@ -331,15 +331,52 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 
 	const KF_COLORS = { opacity: '#ffd700', volume: '#4ec9b0', fill_x: '#569cd6', fill_y: '#569cd6', scale_x: '#c586c0', scale_y: '#c586c0' }
 	if (clip.keyframes?.length) {
+		const pad = 7
+		const innerH = Math.max(0, h - pad * 2)
+		const byProp = {}
 		for (const kf of clip.keyframes) {
-			const kx = xAt(clip.startTime + kf.time)
-			if (kx < HEADER_W || kx > canvas.width) continue
-			const ky = y + h - 7
-			ctx.fillStyle = KF_COLORS[kf.property] || '#ffd700'
-			ctx.beginPath()
-			ctx.moveTo(kx, ky - 5); ctx.lineTo(kx + 4, ky)
-			ctx.lineTo(kx, ky + 5); ctx.lineTo(kx - 4, ky)
-			ctx.closePath(); ctx.fill()
+			if (!byProp[kf.property]) byProp[kf.property] = []
+			byProp[kf.property].push(kf)
+		}
+
+		for (const [prop, kfs] of Object.entries(byProp)) {
+			kfs.sort((a, b) => a.time - b.time)
+			const isNormalized = prop === 'opacity' || prop === 'volume'
+			
+			if (isNormalized && kfs.length > 1) {
+				ctx.save()
+				ctx.beginPath()
+				ctx.strokeStyle = KF_COLORS[prop] || '#ffd700'
+				ctx.lineWidth = 1.5
+				ctx.setLineDash([2, 2])
+				ctx.globalAlpha = 0.6
+				let first = true
+				for (const kf of kfs) {
+					const kx = xAt(clip.startTime + kf.time)
+					if (kx < HEADER_W || kx > canvas.width) continue
+					const val = Math.max(0, Math.min(1, kf.value || 0))
+					const ky = y + h - pad - val * innerH
+					if (first) { ctx.moveTo(kx, ky); first = false }
+					else { ctx.lineTo(kx, ky) }
+				}
+				ctx.stroke()
+				ctx.restore()
+			}
+
+			for (const kf of kfs) {
+				const kx = xAt(clip.startTime + kf.time)
+				if (kx < HEADER_W || kx > canvas.width) continue
+				let ky = y + h - pad
+				if (isNormalized) {
+					const val = Math.max(0, Math.min(1, kf.value || 0))
+					ky = y + h - pad - val * innerH
+				}
+				ctx.fillStyle = KF_COLORS[prop] || '#ffd700'
+				ctx.beginPath()
+				ctx.moveTo(kx, ky - 5); ctx.lineTo(kx + 4, ky)
+				ctx.lineTo(kx, ky + 5); ctx.lineTo(kx - 4, ky)
+				ctx.closePath(); ctx.fill()
+			}
 		}
 	}
 

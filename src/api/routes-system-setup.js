@@ -137,7 +137,8 @@ async function handlePost(path, body, ctx) {
 	if (
 		path !== '/api/system/setup/restart-window-manager' &&
 		path !== '/api/system/setup/reboot' &&
-		path !== '/api/system/setup/restart-app'
+		path !== '/api/system/setup/restart-app' &&
+		path !== '/api/system/setup/install'
 	)
 		return null
 	const pw = checkNuclearPassword(body, ctx)
@@ -176,6 +177,23 @@ async function handlePost(path, body, ctx) {
 			}),
 		}
 	}
+	if (path === '/api/system/setup/install') {
+		try {
+			const out = execFileSync('sudo', ['-n', '/usr/bin/eggs', 'calamares'], {
+				encoding: 'utf8',
+				timeout: 60000,
+				env: { ...process.env, DISPLAY: ':0' }
+			})
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action: 'install', output: String(out || '').trim() }) }
+		} catch (e) {
+			const msg = e.stderr ? String(e.stderr).trim() : (e.message || 'Command failed')
+			return {
+				status: 502,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: `Launch failed: ${msg}. Check sudoers for casparcg user.` }),
+			}
+		}
+	}
 
 	const r = runSudoNoPrompt([
 		{ bin: '/sbin/reboot', args: [] },
@@ -193,4 +211,4 @@ async function handlePost(path, body, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action: 'reboot' }) }
 }
 
-module.exports = { handleGet, handlePost, readDisplayMode }
+module.exports = { handleGet, handlePost, readDisplayMode, checkNuclearPassword }

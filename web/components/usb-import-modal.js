@@ -180,7 +180,7 @@ export function showUsbImportModal(opts = {}) {
 				if (drives.length === 0 && !r.platformNote) {
 					emptyHint.style.display = 'block'
 					emptyHint.textContent =
-						'No removable disk detected on the server. Plug in a USB stick, ensure it is mounted (Linux: often under /media/…), turn on Settings → Media (USB) → Enable USB import, then press ↻ below.'
+						'No removable disk detected on the server. Plug in a USB stick, ensure it is mounted (Linux: often under /media/…), turn on Settings → media/usb → Enable USB import, then press ↻ below.'
 				} else {
 					emptyHint.style.display = 'none'
 					emptyHint.textContent = ''

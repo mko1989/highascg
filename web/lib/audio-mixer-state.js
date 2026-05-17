@@ -5,19 +5,20 @@
 
 const STORAGE_KEY = 'casparcg_audio_mixer_v1'
 
-/** @typedef {{ master: Record<string, number>, layerRoutes: Record<string, number | null> }} AudioMixerPersisted */
+/** @typedef {{ master: Record<string, number>, layerRoutes: Record<string, number | null>, soloedLayers: string[] }} AudioMixerPersisted */
 
 function load() {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY)
-		if (!raw) return { master: {}, layerRoutes: {} }
+		if (!raw) return { master: {}, layerRoutes: {}, soloedLayers: [] }
 		const j = JSON.parse(raw)
 		return {
 			master: typeof j.master === 'object' && j.master ? j.master : {},
 			layerRoutes: typeof j.layerRoutes === 'object' && j.layerRoutes ? j.layerRoutes : {},
+			soloedLayers: Array.isArray(j.soloedLayers) ? j.soloedLayers : [],
 		}
 	} catch {
-		return { master: {}, layerRoutes: {} }
+		return { master: {}, layerRoutes: {}, soloedLayers: [] }
 	}
 }
 
@@ -62,4 +63,39 @@ export function setLayerRoute(layerNum, destCasparChannel) {
 /** @returns {Record<string, number | null>} */
 export function getAllLayerRoutes() {
 	return { ...load().layerRoutes }
+}
+
+/**
+ * Toggle solo for a layer.
+ * @param {string} layerKey - e.g. "pgm:1:layer:10"
+ * @param {boolean} multi - if true, toggle in list; if false, replace list (or clear if already soloed alone)
+ */
+export function toggleSolo(layerKey, multi) {
+	const d = load()
+	const idx = d.soloedLayers.indexOf(layerKey)
+	if (multi) {
+		if (idx >= 0) d.soloedLayers.splice(idx, 1)
+		else d.soloedLayers.push(layerKey)
+	} else {
+		if (idx >= 0 && d.soloedLayers.length === 1) d.soloedLayers = []
+		else d.soloedLayers = [layerKey]
+	}
+	save(d)
+	return [...d.soloedLayers]
+}
+
+/** @param {string} layerKey @returns {boolean} */
+export function isSoloed(layerKey) {
+	return load().soloedLayers.includes(layerKey)
+}
+
+/** @returns {string[]} */
+export function getSoloedLayers() {
+	return [...load().soloedLayers]
+}
+
+export function clearSolos() {
+	const d = load()
+	d.soloedLayers = []
+	save(d)
 }

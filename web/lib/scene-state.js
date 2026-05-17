@@ -14,6 +14,11 @@ import {
 import * as Persistence from './scene-state-persistence-logic.js'
 import * as LayerLogic from './scene-state-layer-logic.js'
 import * as LookLogic from './scene-state-look-logic.js'
+import { PIP_OVERLAY_MAP } from './pip-overlay-registry.js'
+
+function normActivePgmLayer(v) {
+	return Number(v) === 996 ? 996 : 998
+}
 
 export {
 	defaultTransition,
@@ -37,6 +42,7 @@ export class SceneState {
 		this._layerStyleClipboard = null
 		this.layerPresets = []
 		this.lookPresets = []
+		this.globalBorders = [null, null, null, null]
 		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
 		this.isInteracting = false
 		this.editOnPgm = false
@@ -437,9 +443,166 @@ export class SceneState {
 		if (s) { s.defaultTransition = { ...defaultTransition(), ...s.defaultTransition, ...t }; this._softSave() }
 	}
 
+	getGlobalBorderForScreen(screenIdx) {
+		const m = Math.max(0, Math.min(3, screenIdx))
+		const stored = this.globalBorders[m]
+		if (stored) {
+			// Always force `side: 'inside'` — the global border covers the full screen,
+			// `outside` would push the frame past the viewport (scrollbars on the consumer).
+			const snap =
+				stored.pgmAirSnapshot && typeof stored.pgmAirSnapshot === 'object'
+					? {
+							...stored.pgmAirSnapshot,
+							params: { ...(stored.pgmAirSnapshot.params || {}), side: 'inside' },
+							activePgmLayer: normActivePgmLayer(stored.pgmAirSnapshot.activePgmLayer),
+						}
+					: null
+			return {
+				...stored,
+				fadeDuration: stored.fadeDuration ?? 25,
+				params: { ...(stored.params || {}), side: 'inside' },
+				slices: Array.isArray(stored.slices) ? stored.slices : [],
+				mirrorBorderOnPrv: stored.mirrorBorderOnPrv === true,
+				activePgmLayer: normActivePgmLayer(stored.activePgmLayer),
+				borderPresets: Array.isArray(stored.borderPresets) ? stored.borderPresets : [],
+				pgmAirSnapshot: snap,
+			}
+		}
+		const def = PIP_OVERLAY_MAP.get('border')
+		return {
+			enabled: false,
+			type: 'border',
+			fadeDuration: 25,
+			params: { ...(def?.defaults || {}), side: 'inside' },
+			slices: [],
+			artnetPatch: { startChannel: 1, universe: 0 },
+			/** When true, border control AMCP targets only the PRV Caspar channel (layer 997). */
+			mirrorBorderOnPrv: false,
+			activePgmLayer: 998,
+			borderPresets: [],
+			pgmAirSnapshot: null,
+		}
+	}
+
+	setGlobalBorderForScreen(screenIdx, border) {
+		const m = Math.max(0, Math.min(3, screenIdx))
+		const prev = this.getGlobalBorderForScreen(screenIdx)
+
+		if (!this.borderJustEnabled) this.borderJustEnabled = {}
+		if (border.enabled !== undefined && !prev.enabled && border.enabled) {
+			this.borderJustEnabled[m] = true
+		}
+		if (border.type !== undefined && prev.type !== border.type) {
+			this.borderJustEnabled[m] = true // Use CG ADD for type change
+		}
+
+		let merged = { ...prev, ...border }
+		const turningPrvOff = prev.mirrorBorderOnPrv === true && merged.mirrorBorderOnPrv === false
+		if (turningPrvOff && prev.pgmAirSnapshot && typeof prev.pgmAirSnapshot === 'object') {
+			const snap = prev.pgmAirSnapshot
+			merged = {
+				...merged,
+				enabled: snap.enabled,
+				type: snap.type,
+				params: { ...(snap.params || {}), side: 'inside' },
+				slices: Array.isArray(snap.slices) ? snap.slices : [],
+				fadeDuration: snap.fadeDuration ?? merged.fadeDuration,
+				artnetPatch: { startChannel: 1, universe: 0, ...(snap.artnetPatch || {}) },
+				activePgmLayer: normActivePgmLayer(snap.activePgmLayer ?? merged.activePgmLayer),
+				mirrorBorderOnPrv: false,
+			}
+		}
+
+		if (border.slices != null) {
+			merged.slices = Array.isArray(border.slices) ? border.slices : []
+		}
+
+		const nextParams = turningPrvOff
+			? { ...merged.params, side: 'inside' }
+			: border.params != null
+				? { ...(prev.params || {}), ...border.params, side: 'inside' }
+				: { ...(prev.params || {}), side: 'inside' }
+		merged.params = nextParams
+		merged.activePgmLayer = normActivePgmLayer(merged.activePgmLayer)
+		if (!Array.isArray(merged.borderPresets)) merged.borderPresets = [...(prev.borderPresets || [])]
+
+		this.globalBorders[m] = merged
+		this.borderChanged = true
+		this._softSave()
+	}
+
+	noteGlobalBorderPushedToPgm(screenIdx, slice) {
+		const m = Math.max(0, Math.min(3, screenIdx))
+		const cur = this.getGlobalBorderForScreen(screenIdx)
+		const snap = {
+			enabled: slice.enabled !== undefined ? !!slice.enabled : !!cur.enabled,
+			type: slice.type != null ? String(slice.type) : String(cur.type || 'border'),
+			params: { ...(cur.params || {}), ...(slice.params || {}), side: 'inside' },
+			slices: Array.isArray(slice.slices ?? cur.slices) ? (slice.slices ?? cur.slices) : [],
+			fadeDuration: Math.max(0, parseInt(String(slice.fadeDuration ?? cur.fadeDuration ?? 25), 10) || 25),
+			artnetPatch: { startChannel: 1, universe: 0, ...(slice.artnetPatch || cur.artnetPatch || {}) },
+			activePgmLayer: normActivePgmLayer(slice.activePgmLayer ?? cur.activePgmLayer),
+		}
+		this.globalBorders[m] = { ...cur, pgmAirSnapshot: snap }
+		this._softSave()
+	}
+
+	getGlobalBorderPresetSlotCount(screenIdx) {
+		const cur = this.getGlobalBorderForScreen(screenIdx)
+		const presets = cur.borderPresets || []
+		const maxSlot = presets.reduce(
+			(mx, p) => (p && Number.isFinite(Number(p.slot)) ? Math.max(mx, Number(p.slot)) : mx),
+			0,
+		)
+		return Math.max(2, maxSlot + 2)
+	}
+
+	saveGlobalBorderPresetSlot(screenIdx, slotNum, name) {
+		const m = Math.max(0, Math.min(3, screenIdx))
+		const sn = Math.max(1, Math.floor(Number(slotNum)) || 1)
+		const cur = this.getGlobalBorderForScreen(screenIdx)
+		const source = cur.pgmAirSnapshot && typeof cur.pgmAirSnapshot === 'object' ? cur.pgmAirSnapshot : cur
+		const data = {
+			enabled: !!source.enabled,
+			type: String(source.type || 'border'),
+			params: { ...(source.params || {}), side: 'inside' },
+			slices: Array.isArray(source.slices) ? source.slices : [],
+			fadeDuration: Math.max(0, parseInt(String(source.fadeDuration ?? 25), 10) || 25),
+			artnetPatch: { startChannel: 1, universe: 0, ...(source.artnetPatch || {}) },
+		}
+		const presets = [...(cur.borderPresets || [])]
+		const idx = presets.findIndex((p) => p && Number(p.slot) === sn)
+		const nm = String(name || `Preset ${sn}`).trim() || `Preset ${sn}`
+		const entry = { slot: sn, name: nm, data }
+		if (idx >= 0) presets[idx] = entry
+		else presets.push(entry)
+		presets.sort((a, b) => Number(a.slot) - Number(b.slot))
+		this.globalBorders[m] = { ...cur, borderPresets: presets }
+		this._save()
+	}
+
+	deleteGlobalBorderPresetSlot(screenIdx, slotNum) {
+		const m = Math.max(0, Math.min(3, screenIdx))
+		const sn = Math.floor(Number(slotNum))
+		const cur = this.getGlobalBorderForScreen(screenIdx)
+		const presets = (cur.borderPresets || []).filter((p) => !p || Number(p.slot) !== sn)
+		this.globalBorders[m] = { ...cur, borderPresets: presets }
+		this._save()
+	}
+
+	getGlobalBorderPreset(screenIdx, slotNum) {
+		const cur = this.getGlobalBorderForScreen(screenIdx)
+		const sn = Math.floor(Number(slotNum))
+		return (cur.borderPresets || []).find((p) => p && Number(p.slot) === sn) || null
+	}
+
 	setGlobalBorder(sceneId, border) {
 		const s = this.getScene(sceneId)
-		if (s) { s.globalBorder = { ...s.globalBorder, ...border }; this._softSave() }
+		if (s) {
+			s.globalBorder = { ...s.globalBorder, ...border }
+			this.borderChanged = true
+			this._softSave()
+		}
 	}
 
 	setGlobalDefaultTransition(t) {
@@ -460,7 +623,8 @@ export class SceneState {
 			scenes: this.scenes, liveSceneIdByMain: this.liveSceneIdByMain, previewSceneIdByMain: this.previewSceneIdByMain,
 			liveSceneId: this.liveSceneId, previewSceneId: this.previewSceneId, activeScreenIndex: this.activeScreenIndex,
 			globalDefaultTransition: this.globalDefaultTransition, mainEditorVisible: this.mainEditorVisible,
-			layerPresets: this.layerPresets, lookPresets: this.lookPresets
+			layerPresets: this.layerPresets, lookPresets: this.lookPresets,
+			globalBorders: this.globalBorders,
 		}))
 	}
 

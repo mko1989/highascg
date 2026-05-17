@@ -80,5 +80,5 @@ module.exports = {
 	collectFilesForImport: CopyLogic.collectFilesForImport,
 	copyFromUsb: (ctx, opts) => CopyLogic.copyFromUsb(ctx, opts, getDriveById),
 	ejectUsb, startUsbHotplugWatcher, formatImportSubdirTemplate,
-	parseLsblkJson: Discovery.parseLsblkJson, resolveUnderMount: CopyLogic.resolveUnderMount, MEDIA_EXT
+	parseLsblkJson: jsonText => Discovery.parseLsblkJson(jsonText, encodeDriveId), resolveUnderMount: CopyLogic.resolveUnderMount, MEDIA_EXT
 }

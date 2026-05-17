@@ -12,48 +12,80 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 
 	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'Output label', value: String(existing?.label || conn?.label || '') })
 
-	// Device picker from live PortAudio enumeration
+	const typeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	typeSel.innerHTML = '<option value="portaudio">PortAudio (multi-ch)</option><option value="system-audio">System Audio (stereo monitor)</option>'
+	typeSel.value = String(existing?.type || 'portaudio')
+
+	// Device picker from live enumeration
 	const deviceSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	deviceSel.innerHTML = '<option value="">(select audio device)</option>'
-	const paDevices = Array.isArray(lastPayload?.live?.audio?.portaudio) ? lastPayload.live.audio.portaudio : []
-	const appendPortaudioOptions = (list) => {
-		for (const d of list) {
-			const opt = document.createElement('option')
-			opt.value = String(d?.id ?? d?.name ?? '')
-			const desc = d?.description ? ` — ${d.description}` : ''
-			opt.textContent = `${d?.name || '?'}${desc}`
-			const currentVal = String(existing?.deviceName || '')
-			const idStr = d?.id !== undefined && d?.id !== null ? String(d.id) : ''
-			if (currentVal === idStr || currentVal === String(d?.name || '')) opt.selected = true
-			deviceSel.appendChild(opt)
+
+	const refreshDevices = () => {
+		const type = typeSel.value
+		deviceSel.innerHTML = '<option value="">(select audio device)</option>'
+		if (type === 'system-audio') {
+			const genericDevices = Array.isArray(lastPayload?.live?.audio?.devices) ? lastPayload.live.audio.devices : []
+			for (const d of genericDevices) {
+				const opt = document.createElement('option')
+				opt.value = String(d?.id || d?.name || '')
+				opt.textContent = `${d?.name || '?'}`
+				if (String(existing?.deviceName || '') === opt.value) opt.selected = true
+				deviceSel.appendChild(opt)
+			}
+		} else {
+			const paDevices = Array.isArray(lastPayload?.live?.audio?.portaudio) ? lastPayload.live.audio.portaudio : []
+			for (const d of paDevices) {
+				const opt = document.createElement('option')
+				opt.value = String(d?.id ?? d?.name ?? '')
+				const desc = d?.description ? ` — ${d.description}` : ''
+				opt.textContent = `${d?.name || '?'}${desc}`
+				const currentVal = String(existing?.deviceName || '')
+				const idStr = d?.id !== undefined && d?.id !== null ? String(d.id) : ''
+				if (currentVal === idStr || currentVal === String(d?.name || '')) opt.selected = true
+				deviceSel.appendChild(opt)
+			}
 		}
 	}
-	appendPortaudioOptions(paDevices)
+
+	typeSel.addEventListener('change', () => {
+		refreshDevices()
+		if (typeSel.value === 'system-audio') {
+			layoutSel.value = 'stereo'
+			layoutSel.disabled = true
+		} else {
+			layoutSel.disabled = false
+		}
+	})
+	
+	const layoutSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	layoutSel.innerHTML = '<option value="stereo">stereo</option><option value="mono">mono</option><option value="4ch">4-Channel</option><option value="8ch">8-Channel</option><option value="16ch">16-Channel</option>'
+	layoutSel.value = String(existing?.channelLayout || 'stereo')
+	if (typeSel.value === 'system-audio') layoutSel.disabled = true
+
+	refreshDevices()
 
 	// If the snapshot had no devices, retry enumeration (fresh cache / fixes PATH on server).
-	if (!paDevices.length) {
+	const hasPa = Array.isArray(lastPayload?.live?.audio?.portaudio) && lastPayload.live.audio.portaudio.length > 0
+	const hasGeneric = Array.isArray(lastPayload?.live?.audio?.devices) && lastPayload.live.audio.devices.length > 0
+	if (!hasPa || !hasGeneric) {
 		void (async () => {
 			try {
-				const path = `${api.getApiBase()}/api/audio/portaudio-devices?refresh=1&outputsOnly=false`
-				const res = await api.get(path)
-				const list = Array.isArray(res?.devices) ? res.devices : []
-				if (!list.length) return
-				deviceSel.innerHTML = '<option value="">(select audio device)</option>'
-				appendPortaudioOptions(list)
-				deviceSel.dispatchEvent(new Event('change', { bubbles: true }))
-				setStatus(statusEl, 'Audio device list loaded', true)
+				// Refresh PortAudio
+				await api.get(`${api.getApiBase()}/api/audio/portaudio-devices?refresh=1&outputsOnly=false`)
+				// Refresh ALSA/Generic
+				await api.get(`${api.getApiBase()}/api/audio/devices?refresh=1`)
+				// Reload is usually needed to update lastPayload, but for now we'll just hope the next refresh shows up
+				// or tell the user to refresh.
+				setStatus(statusEl, 'Audio device list refreshed. Re-open inspector to see full list.', true)
 			} catch {
 				/* ignore */
 			}
 		})()
 	}
+
 	// Allow manual entry too
 	const manualDevIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'or type device name manually', value: deviceSel.value ? '' : String(existing?.deviceName || '') })
 	deviceSel.addEventListener('change', () => { manualDevIn.value = '' })
-
-	const layoutSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
-	layoutSel.innerHTML = '<option value="stereo">stereo</option><option value="mono">mono</option><option value="4ch">4-Channel</option><option value="8ch">8-Channel</option><option value="16ch">16-Channel</option>'
-	layoutSel.value = String(existing?.channelLayout || 'stereo')
 
 	// Extended PortAudio settings
 	const hostApiSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
@@ -77,6 +109,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 			...next[idx], 
 			id: String(conn.id), 
 			label, 
+			type: typeSel.value,
 			deviceName, 
 			channelLayout,
 			hostApi: hostApiSel.value,
@@ -114,18 +147,26 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 		wrapCtl.appendChild(warn)
 	}
 
+	const bufferLab = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Buffer frames', style: 'font-size:10px;opacity:.7' })
+	const latencyLab = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Latency ms', style: 'font-size:10px;opacity:.7' })
+	const fifoLab = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'FIFO ms', style: 'font-size:10px;opacity:.7' })
+
 	wrapCtl.append(
 		nameIn,
+		typeSel,
 		deviceSel,
 		manualDevIn,
 		layoutSel,
 		hostApiSel,
+		bufferLab,
 		bufferIn,
+		latencyLab,
 		latencyIn,
+		fifoLab,
 		fifoIn,
 		saveBtn,
 		removeBtn
 	)
 	h.append(wrapCtl)
-	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Select an ALSA/PortAudio device. The device name is used in the CasparCG config to route audio.' }))
+	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Select a consumer type (PortAudio or System Audio) and a corresponding hardware device.' }))
 }

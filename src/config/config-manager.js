@@ -18,6 +18,7 @@ const MODULAR_KEYS = [
 	'dmx',
 	'rtmp',
 	'usbIngest',
+	'mediaMount',
 	'streamingChannel',
 	'recordOutputs',
 	'audioOutputs',

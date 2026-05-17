@@ -1,6 +1,6 @@
-Global Border Effect Fixture (15 Channels)
+Global Border Effect Fixture (18 Channels)
 
-This fixture controls the global border effect on layer 998.
+This fixture controls the global border effect on layer 998 (and related PGM stack layers per project config).
 Parameters are mapped to DMX channels relative to the user-defined Start Channel.
 
 Channel Mapping:
@@ -17,7 +17,11 @@ Ch 10: Glow Color Red (0-255)
 Ch 11: Glow Color Green (0-255)
 Ch 12: Glow Color Blue (0-255)
 Ch 13: Radius (0-255)
-Ch 14: Count (0-255 -> 1 - 12)
-Ch 15: Length (0-255 -> 5% - 100%)
+Ch 14: Count (0-255 -> 1 - 12) — edge strip concurrent strips; other types may ignore
+Ch 15: Length (0-255 -> 5% - 100%) — edge strip strip length %; other types may ignore
+Ch 16: Segments per edge (0-255 -> 1 - 32) — glow/shadow uniform segmentation (WO-44); ignored for border; when Ch 18 is “off”, value is coerced to 1
+Ch 17: Segment ease (0-255 -> 0% - 100%) — taper strength toward cuts (glow/shadow); other types may ignore
+Ch 18: Segmentation mode (0-127 = Full / no cuts, 128-255 = Uniform / use Ch 16-17) — glow/shadow; other types may ignore
 
-Note: Parameters not supported by a specific border type are ignored.
+Note: Parameters not supported by a specific border type are ignored by the HTML template.
+Note: Ch 16-18 match `src/artnet/artnet-receiver.js` global border DMX mapping.

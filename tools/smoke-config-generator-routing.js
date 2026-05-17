@@ -86,6 +86,55 @@ test('multiview auto x counts only real screen consumers', () => {
 	assert.equal(m[2], '0')
 })
 
+test('multiview screen default x is 0 when no main emits a screen consumer (OS tandem may still advance)', () => {
+	const app = clone(defaults)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: 'custom',
+		screen_1_custom_width: 5120,
+		screen_1_custom_height: 768,
+		screen_1_custom_fps: 50,
+		screen_1_decklink_device: 0,
+		screen_1_decklink_replace_screen: false,
+		/** PGM/PRV bus exists but no Caspar screen consumer — only multiview uses a screen consumer. */
+		screen_1_screen_consumer: false,
+		screen_1_system_id: 'GPU-HEAD-A',
+		multiview_enabled: true,
+		multiview_output_mode: 'screen_only',
+		multiview_mode: '720p5000',
+		multiview_system_id: 'GPU-HEAD-B',
+		streamingChannel: { enabled: false },
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	app.deviceGraph = undefined
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{
+				id: 'm1',
+				label: 'M1',
+				mainScreenIndex: 0,
+				mode: 'pgm_prv',
+				videoMode: 'custom',
+				width: 5120,
+				height: 768,
+				fps: 50,
+			},
+			{ id: 'mv', label: 'MV', mainScreenIndex: 0, mode: 'multiview', videoMode: '720p5000', width: 1280, height: 720, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	const flat = buildCasparGeneratorFlatConfig(app)
+	const xml = buildConfigXml(flat)
+	const m = xml.match(/<video-mode>720p5000<\/video-mode>[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x><y>(\d+)<\/y>/)
+	assert.ok(m, 'multiview screen block should be present')
+	assert.equal(m[1], '0', 'multiview must not use OS tandem X when no main screen consumer exists')
+	assert.equal(m[2], '0')
+})
+
 test('decklink inputs use multiview host when mode matches', () => {
 	const cfg = clone(defaults)
 	cfg.screen_count = 2

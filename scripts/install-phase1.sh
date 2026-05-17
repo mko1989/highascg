@@ -179,13 +179,13 @@ if command -v ffmpeg &>/dev/null; then
     echo "$_ffdev" | grep -q x11grab && FFMPEG_HAS_X11GRAB=yes
 fi
 
-# HighAsCG app (deployed to /opt/highascg in Phase 4)
+# HighAsCG app (deployed to /home/casparcg/highascg in Phase 4)
 HIGHASCG_STATUS="missing"
 HIGHASCG_CURRENT=""
 HIGHASCG_RECOMMENDED=$(get_highascg_recommended_version)
-if [ -f /opt/highascg/package.json ]; then
+if [ -f /home/casparcg/highascg/package.json ]; then
     HIGHASCG_STATUS="installed"
-    HIGHASCG_CURRENT=$(read_package_json_version /opt/highascg/package.json)
+    HIGHASCG_CURRENT=$(read_package_json_version /home/casparcg/highascg/package.json)
     [ -z "$HIGHASCG_CURRENT" ] && HIGHASCG_CURRENT="?"
 fi
 

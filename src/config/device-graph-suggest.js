@@ -273,7 +273,24 @@ function mergeHardwareSync(baseGraph, suggested) {
 	}
 	const byId = new Map()
 	for (const c of g.connectors) if (keepConnector(c)) byId.set(c.id, c)
-	for (const c of sug.connectors) if (c && c.id) byId.set(c.id, c)
+	for (const c of sug.connectors) {
+		if (!c || !c.id) continue
+		const prev = byId.get(c.id)
+		// Suggested DeckLink ports come from hardware + Caspar hints; the graph is the operator
+		// source of truth for ioDirection / outputBinding. Blind replace made every port "snap back"
+		// to input after reload even after marking SDI as output.
+		if (prev && prev.kind === 'decklink_io' && c.kind === 'decklink_io') {
+			byId.set(c.id, {
+				...c,
+				label: (prev.label && String(prev.label).trim()) || c.label,
+				externalRef: prev.externalRef != null && String(prev.externalRef).trim() !== '' ? prev.externalRef : c.externalRef,
+				index: Number.isFinite(Number(prev.index)) ? prev.index : c.index,
+				caspar: { ...(c.caspar || {}), ...(prev.caspar || {}) },
+			})
+		} else {
+			byId.set(c.id, c)
+		}
+	}
 	g.connectors = [...byId.values()]
 	// GPU connector migration: remap legacy gpu_DP-* edge endpoints to stable gpu_p* when possible.
 	{

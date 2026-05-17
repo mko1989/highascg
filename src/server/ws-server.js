@@ -83,15 +83,21 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 
 	const onUpgrade = (req, socket, head) => {
 		const p = (req.url || '').split('?')[0]
+		log(`[WS Upgrade] Attempt for path: ${p}`)
 		const isWsPath =
 			p === '/api/ws' ||
 			p === '/ws' ||
 			/^\/instance\/[^/]+\/api\/ws$/.test(p) ||
 			/^\/instance\/[^/]+\/ws$/.test(p)
+		log(`[WS Upgrade] isWsPath: ${isWsPath}`)
 		if (isWsPath) {
-			wss.handleUpgrade(req, socket, head, (ws) => {
-				wss.emit('connection', ws, req)
-			})
+			try {
+				wss.handleUpgrade(req, socket, head, (ws) => {
+					wss.emit('connection', ws, req)
+				})
+			} catch (e) {
+				log(`[WS Upgrade] Error: ${e?.message || e}`)
+			}
 		} else {
 			// Not our WS endpoint; leave the socket for other upgrade handlers.
 			return

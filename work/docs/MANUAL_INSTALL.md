@@ -191,9 +191,9 @@ Alternatively set `LD_LIBRARY_PATH=/opt/casparcg/lib` in the **environment that 
 ## 7. Optional HighAsCG-related bits (from scripts)
 
 - **USB media ingest (WO-29)**: install **`udisks2`** and **`policykit-1`**; copy **`scripts/polkit/50-highascg-udisks.rules`** to **`/etc/polkit-1/rules.d/`** so the `casparcg` user (group **`plugdev`**) can run **`udisksctl unmount` / `power-off`** without a password. The full installer does this in **`install-phase4.sh`** (section 4.3b). If a stick does not auto-mount under **`/media/…`**, check **`udev`/`udisks2`** logs and that the volume is not already mounted elsewhere.
-- **Sudoers for `/etc/asound.conf`**: only if you use HighAsCG’s web UI to set the default ALSA device — see **`install-phase3.sh`** (tee rules).
+- **Sudoers for `/etc/asound.conf`**: **optional** — only for Web UI **system-wide** ALSA default. Default installer skips this; set **`HIGHASCG_INSTALL_ASOUND_SUDOERS=1`** during install (see **`install-phase3.sh`**). Per-user **`~/.asoundrc`** needs no sudo.
 - **NVIDIA X session tweaks**: only for NVIDIA GPUs — see **`install-phase2.sh`**.
-- **`highascg-display-mode`**: optional script in **`install-phase3.sh`** to switch “normal” (Caspar autostart) vs “x11-only” (DeckLink Desktop Video GUI without Caspar).
+- **WO-38 internal media partition → `/home/casparcg/highascg/media`** (often live USB + large clips on SATA/NVMe): **`scripts/install-phase4.sh`** installs **`/usr/local/lib/highascg/media-mount.sh`** and **`/etc/sudoers.d/highascg-media-mount`** so the **`casparcg`** user can run **`sudo -n`** on that script **only**. Details and verification snippets: **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**. Operational notes: **umount fails while Caspar has files open** — stop playback, then retry. **After remounting from Settings while Caspar stays up**, **restart CasparCG** (scanner + media paths refresh). Cold HighAsCG start **waits for this mount step before connecting AMCP** (`index.js`), but **scanner / X11 autostart ordering** remains your responsibility outside Node.
 
 ---
 

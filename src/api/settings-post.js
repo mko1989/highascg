@@ -3,6 +3,7 @@
  */
 'use strict'
 
+const fs = require('fs')
 const defaults = require('../config/defaults')
 const { normalizeAudioRouting } = require('../config/config-generator')
 const { normalizeCasparServerConfigPath } = require('./routes-caspar-config')
@@ -19,7 +20,7 @@ const { mergeSystemDisplaySettings, pickOscForPersistence, SYSTEM_DISPLAY_KEYS }
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
 	const settings = parseBody(body); if (!settings || typeof settings !== 'object') return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid settings' }) }
-	const warnings = []; const oldC = { ...ctx.config.caspar }; const oldS = { ...ctx.config.streaming }
+	const warnings = []; const sideEffects = []; const oldC = { ...ctx.config.caspar }; const oldS = { ...ctx.config.streaming }
 
 	const cfg = ctx.config; if (settings.caspar) { if (settings.caspar.host) cfg.caspar.host = settings.caspar.host; if (settings.caspar.port) cfg.caspar.port = parseInt(settings.caspar.port, 10) }
 	if (settings.streaming) {
@@ -41,6 +42,49 @@ async function handlePost(path, body, ctx) {
 	if (settings.ui) cfg.ui = { ...defaults.ui, ...cfg.ui, ...settings.ui }
 	if (settings.audioRouting) cfg.audioRouting = normalizeAudioRouting({ ...defaults.audioRouting, ...cfg.audioRouting, ...settings.audioRouting })
 	if (settings.offline_mode !== undefined) cfg.offline_mode = !!settings.offline_mode
+	if (settings.local_media_path !== undefined) {
+		const newPath = String(settings.local_media_path).trim()
+		const oldPath = cfg.local_media_path || ''
+		if (newPath !== oldPath) {
+			cfg.local_media_path = newPath
+			try {
+				const mediaLink = '/home/casparcg/highascg/media'
+				if (newPath) {
+					// Verify target exists
+					if (fs.existsSync(newPath)) {
+						// Check if mediaLink exists
+						if (fs.existsSync(mediaLink)) {
+							const st = fs.lstatSync(mediaLink)
+							if (st.isSymbolicLink()) {
+								fs.unlinkSync(mediaLink)
+							} else if (st.isDirectory()) {
+								// Rename existing directory to avoid data loss
+								const bak = mediaLink + '.bak_' + Date.now()
+								fs.renameSync(mediaLink, bak)
+								sideEffects.push(`Moved existing media folder to ${bak}`)
+							}
+						}
+						fs.symlinkSync(newPath, mediaLink)
+						sideEffects.push(`Symlinked media folder to ${newPath}`)
+					} else {
+						warnings.push(`Target media path ${newPath} does not exist. Symlink not created.`)
+					}
+				} else {
+					// If cleared, remove symlink and restore default folder
+					if (fs.existsSync(mediaLink)) {
+						const st = fs.lstatSync(mediaLink)
+						if (st.isSymbolicLink()) {
+							fs.unlinkSync(mediaLink)
+							fs.mkdirSync(mediaLink)
+							sideEffects.push(`Restored default media folder`)
+						}
+					}
+				}
+			} catch (e) {
+				warnings.push(`Failed to update media symlink: ${e.message}`)
+			}
+		}
+	}
 	if (settings.casparServer) { cfg.casparServer = { ...defaults.casparServer, ...cfg.casparServer, ...settings.casparServer }; normalizeCasparServerConfigPath(cfg.casparServer); warnings.push(...validateDecklinkCasparSlice(cfg.casparServer).warnings) }
 	if (settings.dmx) cfg.dmx = { ...defaults.dmx, ...settings.dmx }
 	if (settings.rtmp) cfg.rtmp = normalizeRtmpConfig({ ...defaults.rtmp, ...(cfg.rtmp || {}), ...settings.rtmp })
@@ -187,14 +231,13 @@ async function handlePost(path, body, ctx) {
 	const mainCount = resolveMainScreenCount(cfg); cfg.screen_count = mainCount; if (!cfg.casparServer) cfg.casparServer = { ...defaults.casparServer }; cfg.casparServer.screen_count = mainCount
 
 	if (ctx.configManager) {
-		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []) }
+		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []), local_media_path: cfg.local_media_path, mediaMount: { ...defaults.mediaMount, ...(cfg.mediaMount || {}) } }
 		delete newConfig.streaming._effectiveBasePort; delete newConfig.streaming._casparHost
 		for (const k of SYSTEM_DISPLAY_KEYS) { if (settings[k] !== undefined) { if (cfg[k] !== undefined) newConfig[k] = cfg[k]; else delete newConfig[k] } }
 		ctx.configManager.save(newConfig)
 	}
 
 	let oscRestarted = false; if (settings.osc && typeof ctx.restartOscSubsystem === 'function') { ctx.restartOscSubsystem(); oscRestarted = true }
-	let sideEffects = []
 	if (oldC.host !== cfg.caspar.host || oldC.port !== cfg.caspar.port) { if (ctx.casparConnection) { sideEffects.push('Reconnecting to CasparCG…'); ctx.casparConnection.reconnect(cfg.caspar.host, cfg.caspar.port) } }
 	const sChanged = (oldS.enabled !== cfg.streaming.enabled || oldS.quality !== cfg.streaming.quality || oldS.basePort !== cfg.streaming.basePort || oldS.hardware_accel !== cfg.streaming.hardware_accel || oldS.captureMode !== cfg.streaming.captureMode || oldS.ndiNamingMode !== cfg.streaming.ndiNamingMode || oldS.ndiSourcePattern !== cfg.streaming.ndiSourcePattern || JSON.stringify(oldS.ndiChannelNames || {}) !== JSON.stringify(cfg.streaming.ndiChannelNames || {}) || oldS.localCaptureDevice !== cfg.streaming.localCaptureDevice || oldS.x11Display !== cfg.streaming.x11Display || oldS.drmDevice !== cfg.streaming.drmDevice || oldS.autoRelocateBasePort !== cfg.streaming.autoRelocateBasePort)
 	if (sChanged) { sideEffects.push('Applying streaming changes…'); if (typeof ctx.toggleStreaming === 'function') await ctx.toggleStreaming(cfg.streaming.enabled); else if (typeof ctx.restartStreaming === 'function') await ctx.restartStreaming() }

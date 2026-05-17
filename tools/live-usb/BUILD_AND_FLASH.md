@@ -1,5 +1,15 @@
 # HighAsCG live USB — build and flash
 
+**All-in-one (build + choose USB + `dd` + `/ union` persistence):**
+
+```bash
+cd /path/to/highascg
+sudo bash tools/live-usb/build-flash-and-persist.sh
+# sudo bash tools/live-usb/build-flash-and-persist.sh --help
+```
+
+Use `--flash-only` if the ISO is already built; `--usb /dev/sdX` and `--iso /path` for less interactive use.
+
 ## Build host (Ubuntu Noble recommended)
 
 1. **Install eggs** (if apt repo fails, use the latest `.deb` from  
@@ -60,20 +70,32 @@
 
    sudo dd if=$(ls -t /home/eggs/mnt/highascg_amd64_2026-05-09_1311.iso | head -1) of=$USB bs=4M status=progress oflag=sync conv=fsync
    sudo sync
+   sudo partprobe "$USB"
    ```
 
    Do **not** quote the glob in `dd if=…` — use `ls -t … | head -1` or the full filename.
 
-4. **Optional — long flash in tmux**:
+4. **Persistence (default for production sticks)** — **full live overlay with `/ union`**
+
+   After `dd` + `sync` + `partprobe`, add the **`persistence`** partition and **`persistence.conf`** so the **entire writable root** survives reboot: **NVIDIA drivers / DKMS**, **DeckLink & OS config under `/etc` and `/var`**, **Tailscale state**, **`/home/casparcg/highascg`**, **`apt` installs**, first-boot markers, etc.
+
+   ```bash
+   sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
+   # optional: --dry-run ; or START_MIB=… if parted layout is unusual
+   ```
+
+   Then **always** boot GRUB’s **Live with persistence** entry (or add **`persistence`** to the kernel line per eggs). Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)**.
+
+   **Optional — persist only `~/highascg` (not recommended if you need drivers / Tailscale / system state)**  
+   Second ext4 **`HIGHASCG_PERSIST`** + **`home-casparcg-highascg.mount`** baked in before `eggs produce` — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips **`/var`**, most **`/etc`**, NVIDIA picker markers, etc.
+
+5. **Long flash in tmux** (optional):
 
    ```bash
    tmux new -s flash
    # run dd here; detach: Ctrl+b then d
    tmux attach -t flash
    ```
-
-5. **Persistence** (NVIDIA picker / first-boot changes must persist): see  
-   [FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md).
 
 ---
 
@@ -105,9 +127,13 @@ sudo eggs krill
 
 That installs to disk without Calamares in the ISO.
 
-### Option C — No install, only persistence
+### Option C — No install — **full USB persistence (default / recommended)**
 
-If you never install to internal disk, use a **persistence** partition so changes survive reboots. See [FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md).
+Use **`/ union`** persistence so the stick **remembers** NVIDIA drivers, DeckLink-related OS state, Tailscale, **`/etc`**, **`/var`**, **`/home`**, and HighAsCG. After `dd`, run **`add-union-persistence-partition.sh`** and always boot **Live with persistence**: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)**, [flash step 4](#flash-to-usb).
+
+### Option D — No install — **only `~/highascg` on a data partition (advanced / narrow)**
+
+When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)** and [flash step 4 optional](#flash-to-usb). **Does not** preserve NVIDIA/Tailscale/system-wide changes.
 
 ---
 

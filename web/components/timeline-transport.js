@@ -3,7 +3,7 @@
  */
 
 import { timelineState } from '../lib/timeline-state.js'
-import { TRANSITION_TYPES, TRANSITION_TWEENS } from '../lib/program-output-state.js'
+import { TRANSITION_TYPES, TRANSITION_TWEENS, TRANSITION_TYPE_LABELS, migrateTransitionTypeToAnimate } from '../lib/program-output-state.js'
 import { api } from '../lib/api-client.js'
 import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
 import { parseNumberInput } from '../lib/math-input.js'
@@ -115,6 +115,9 @@ export function createTimelineTransport(deps) {
 	function buildTransport() {
 		const tl = timelineState.getActive()
 		const fps = tl?.fps || 25
+		if (view.takeTransition?.type) {
+			view.takeTransition.type = migrateTransitionTypeToAnimate(view.takeTransition.type)
+		}
 		const tlSelector = timelineState.timelines.map((t) =>
 			`<option value="${t.id}" ${t.id === timelineState.activeId ? 'selected' : ''}>${t.name}</option>`
 		).join('')
@@ -165,7 +168,12 @@ export function createTimelineTransport(deps) {
 				</div>
 				<div class="tl-tb-group tl-tb-take">
 					<select class="tl-select tl-select-sm" id="tl-take-trans" title="Take transition">
-						${TRANSITION_TYPES.map((t) => `<option value="${t}" ${t === view.takeTransition.type ? 'selected' : ''}>${t}</option>`).join('')}
+						${TRANSITION_TYPES.map((t) => {
+							const selType = migrateTransitionTypeToAnimate(view.takeTransition.type)
+							const selected = t === selType ? 'selected' : ''
+							const lab = TRANSITION_TYPE_LABELS[t] || t
+							return `<option value="${t}" ${selected}>${lab}</option>`
+						}).join('')}
 					</select>
 					<input type="text" class="tl-input-sm inspector-math-input" id="tl-take-dur" value="${view.takeTransition.duration}" inputmode="decimal" title="Frames (supports e.g. 24/2)" placeholder="12" />
 					<select class="tl-select tl-select-sm" id="tl-take-tween" title="Tween">${TRANSITION_TWEENS.map((tw) => `<option value="${tw}" ${tw === view.takeTransition.tween ? 'selected' : ''}>${tw}</option>`).join('')}</select>
@@ -242,6 +250,14 @@ export function createTimelineTransport(deps) {
 			const t = timelineState.getActive()
 			if (t) {
 				const trans = view.takeTransition || {}
+				
+				// Force UI to show it's now on PGM (and off PRV)
+				view.sendTo.program = true
+				view.sendTo.preview = false
+				updateSendTo()
+				buildTransport()
+				redrawTimelineView()
+				
 				await api.post(`/api/timelines/${t.id}/take`, {
 					transition: trans.type || 'CUT',
 					duration: trans.duration ?? 12,

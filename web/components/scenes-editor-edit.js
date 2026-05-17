@@ -44,43 +44,7 @@ export function renderEdit(ctx) {
 	mainRow.appendChild(layerStrip); mainRow.appendChild(renderCompose(scene))
 	mountLookTransitionControls(body, scene.defaultTransition || defaultTransitionDef(), t => sceneState.setDefaultTransition(scene.id, t), 'scenes-edit-dt', { label: 'Look transition (this look)', hint: 'Applies when layers enter or change.' })
 	
-	// Global Border Settings (WO-09)
-	const borderSection = document.createElement('div')
-	borderSection.className = 'scenes-look-border-settings'
-	borderSection.style.marginTop = '10px'
-	borderSection.style.padding = '10px'
-	borderSection.style.background = 'rgba(255,255,255,0.05)'
-	borderSection.style.borderRadius = '4px'
-	borderSection.innerHTML = `
-		<div class="scenes-look-transition__label" style="font-weight: bold; margin-bottom: 5px;">Global Border Effect</div>
-		<div style="display: flex; gap: 10px; align-items: center;">
-			<label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-				<input type="checkbox" id="global-border-enable" ${scene.globalBorder?.enabled ? 'checked' : ''} />
-				Enable
-			</label>
-			<select id="global-border-type" class="scenes-look-transition__select" style="width: auto; height: 24px; padding: 0 5px;">
-				<option value="border" ${scene.globalBorder?.type === 'border' ? 'selected' : ''}>Border</option>
-				<option value="glow" ${scene.globalBorder?.type === 'glow' ? 'selected' : ''}>Glow</option>
-				<option value="edge_strip" ${scene.globalBorder?.type === 'edge_strip' ? 'selected' : ''}>Edge Strip</option>
-				<option value="shadow" ${scene.globalBorder?.type === 'shadow' ? 'selected' : ''}>Shadow</option>
-			</select>
-			<button type="button" id="global-border-config" class="scenes-btn scenes-btn--sm" style="height: 24px; padding: 0 10px;">⚙️ Configure</button>
-		</div>
-	`
-	body.appendChild(borderSection)
 
-	borderSection.querySelector('#global-border-enable').addEventListener('change', e => {
-		sceneState.setGlobalBorder(scene.id, { ...scene.globalBorder, enabled: e.target.checked })
-		if (e.target.checked) {
-			window.dispatchEvent(new CustomEvent('scene-select', { detail: { sceneId: scene.id } }))
-		}
-	})
-	borderSection.querySelector('#global-border-type').addEventListener('change', e => {
-		sceneState.setGlobalBorder(scene.id, { ...scene.globalBorder, type: e.target.value })
-	})
-	borderSection.querySelector('#global-border-config').addEventListener('click', () => {
-		window.dispatchEvent(new CustomEvent('scene-select', { detail: { sceneId: scene.id } }))
-	})
 
 	body.appendChild(mainRow); mainHost.appendChild(body)
 }

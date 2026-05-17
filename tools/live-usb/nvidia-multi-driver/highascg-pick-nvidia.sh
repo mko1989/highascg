@@ -3,7 +3,7 @@
 #
 # Strategy:
 #   - The image ships baked with one driver branch (default: 535) for the
-#     common case, plus an offline deb cache at /opt/nvidia-debs containing
+#     common case, plus an offline deb cache at /opt/nvidia-pool containing
 #     additional branches (e.g. 470 legacy, 580 latest).
 #   - On first boot, ubuntu-drivers detects the GPU and recommends a branch.
 #   - If the recommended branch already matches what's loaded -> stamp marker, exit.
@@ -16,7 +16,7 @@ set -euo pipefail
 
 MARKER="/var/lib/highascg/nvidia-installed"
 LOG="/var/log/highascg-pick-nvidia.log"
-CACHE="/opt/nvidia-debs"
+CACHE="${NVIDIA_DEB_POOL:-/opt/nvidia-pool}"
 
 log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG" >&2; }
 

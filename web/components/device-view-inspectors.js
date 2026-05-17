@@ -52,7 +52,7 @@ export function renderConnectorInspector(h, conn, ctx, {
 		h.append(buildInspectorTable(rows))
 	}
 
-	if (conn?.kind === 'decklink_io') {
+	if (conn?.kind === 'decklink_io' || conn?.kind === 'decklink_out') {
 		renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty })
 	} else if (conn?.kind === 'stream_out') {
 		renderStreamOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, setCasparRestartDirty, onRemoveStreamOutput })
@@ -61,7 +61,7 @@ export function renderConnectorInspector(h, conn, ctx, {
 	} else if (conn?.kind === 'audio_out') {
 		renderAudioOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, onRemoveAudioOutput })
 	} else if (conn?.kind === 'gpu_out' || conn?.kind === 'gpu_output') {
-		renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty })
+		renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, connectorCtx: ctx })
 	} else if (conn?.kind === 'pixel_map_in' || conn?.kind === 'pixel_map_out') {
 		renderMappingConnectorControls(h, conn, {
 			lastPayload,

@@ -1,6 +1,9 @@
 'use strict'
 
 const dmxnet = require('dmxnet')
+const { buildPipOverlayCgPayload } = require('../engine/pip-overlay-utils')
+
+const GLOBAL_BORDER_LAYER = 998
 
 class ArtnetReceiver {
 	constructor(appCtx) {
@@ -9,6 +12,21 @@ class ArtnetReceiver {
 		this.artnet = null
 		this.receiver = null
 		this.lastData = null
+		// Per-channel: which border template (type) is currently loaded on the CG slot,
+		// so we know to send CG ADD on first activation / type change vs CG UPDATE otherwise.
+		this._addedTypeByChannel = new Map()
+	}
+
+	_resolveProgramChannel() {
+		// Mirror the routing/config logic that the take pipeline uses, so DMX targets
+		// the same Caspar channel that the global border is actually being rendered on.
+		try {
+			const { getChannelMap } = require('../config/routing')
+			const cm = getChannelMap(this.appCtx.config || {}, this.appCtx.switcherOutputBusByChannel)
+			const ch = cm?.programChannels?.[0]
+			if (Number.isFinite(ch) && ch >= 1) return ch
+		} catch (_) {}
+		return 1
 	}
 
 	init(options = {}) {
@@ -38,141 +56,212 @@ class ArtnetReceiver {
 	handleData(data) {
 		if (!data || data.length === 0) return
 
-		if (this.lastData && this._isEqual(this.lastData, data)) {
+		if (!this.lastData) {
+			this.lastData = [...data]
+			this.log('info', `[ArtNet] Initialized baseline data (first 10 channels: ${data.slice(0, 10).join(',')})`)
 			return
 		}
-		
-		this.log('info', `[ArtNet] Received data change (first 10 channels: ${data.slice(0, 10).join(',')})`)
+
+		// Find changed channels
+		const changedIndices = new Set()
+		for (let i = 0; i < data.length; i++) {
+			if (data[i] !== this.lastData[i]) {
+				changedIndices.add(i)
+			}
+		}
+
+		if (changedIndices.size === 0) return
+
+		this.log('info', `[ArtNet] Received data change. Changed DMX indices: ${[...changedIndices].join(',')}`)
 		this.lastData = [...data]
 
 		const liveSceneState = require('../state/live-scene-state')
-		const channel = 1 // default channel for now
+		const channel = this._resolveProgramChannel()
 		const live = liveSceneState.getChannel(channel)
-		
+
 		if (!live || !live.scene) return
 		const scene = live.scene
 		const gb = scene.globalBorder
-		
+
 		if (!gb || !gb.enabled) return
 		
 		const patch = gb.artnetPatch || { startChannel: 1, universe: 0 }
 		const start = (patch.startChannel || 1) - 1 // DMX is 1-based, array is 0-based
 		
 		const params = { ...gb.params, side: 'inside' } // start with defaults and enforce inside
+		if (params.opacity == null) params.opacity = 1
 		
 		// Helper to get hex color from 3 channels
 		const getHex = (r, g, b) => `#${this._toHex(r)}${this._toHex(g)}${this._toHex(b)}`
 
-		// Fixed 15-channel mapping
-		
+		let updated = false
+
 		// 1. On/Off
-		if (start >= 0 && start < data.length) {
+		if (changedIndices.has(start)) {
+			const wasEnabled = params.enabled
 			params.enabled = data[start] >= 128
+			if (params.enabled && !wasEnabled && params.opacity === 0) {
+				params.opacity = 1 // Auto-correct stuck opacity
+			}
+			updated = true
 		}
 		
 		// 2. Type
-		if (start + 1 >= 0 && start + 1 < data.length) {
+		let typeChanged = false
+		if (changedIndices.has(start + 1)) {
 			const val = data[start + 1]
-			if (val < 64) params.type = 'border'
-			else if (val < 128) params.type = 'glow'
-			else if (val < 192) params.type = 'edge_strip'
-			else params.type = 'shadow'
+			let newType = 'border'
+			if (val < 64) newType = 'border'
+			else if (val < 128) newType = 'glow'
+			else if (val < 192) newType = 'edge_strip'
+			else newType = 'shadow'
+			
+			if (newType !== params.type) {
+				typeChanged = true
+				params.type = newType
+			}
+			updated = true
 		}
 		
 		// 3. Opacity
-		if (start + 2 >= 0 && start + 2 < data.length) {
+		if (changedIndices.has(start + 2)) {
 			params.opacity = data[start + 2] / 255
+			updated = true
 		}
 		
 		// 4-6. Color (RGB)
-		if (start + 5 >= 0 && start + 5 < data.length) {
-			params.color = getHex(data[start + 3], data[start + 4], data[start + 5])
+		if (changedIndices.has(start + 3) || changedIndices.has(start + 4) || changedIndices.has(start + 5)) {
+			const r = (start + 3 < data.length) ? data[start + 3] : (this.lastData[start + 3] || 0)
+			const g = (start + 4 < data.length) ? data[start + 4] : (this.lastData[start + 4] || 0)
+			const b = (start + 5 < data.length) ? data[start + 5] : (this.lastData[start + 5] || 0)
+			params.color = getHex(r, g, b)
+			updated = true
 		}
 		
 		// 7. Width / Thickness / Intensity
-		if (start + 6 >= 0 && start + 6 < data.length) {
+		if (changedIndices.has(start + 6)) {
 			const val = data[start + 6]
 			params.width = (val / 255) * 50
 			params.intensity = (val / 255) * 50 // map to both width and intensity
+			updated = true
 		}
 		
 		// 8. Speed
-		if (start + 7 >= 0 && start + 7 < data.length) {
+		if (changedIndices.has(start + 7)) {
 			params.speed = 0.1 + (data[start + 7] / 255) * 9.9
+			updated = true
 		}
 		
 		// 9. Spread / Blur
-		if (start + 8 >= 0 && start + 8 < data.length) {
+		if (changedIndices.has(start + 8)) {
 			params.spread = (data[start + 8] / 255) * 20
 			params.blur = (data[start + 8] / 255) * 50
+			updated = true
 		}
 		
 		// 10-12. Glow Color (RGB)
-		if (start + 11 >= 0 && start + 11 < data.length) {
-			params.glowColor = getHex(data[start + 9], data[start + 10], data[start + 11])
+		if (changedIndices.has(start + 9) || changedIndices.has(start + 10) || changedIndices.has(start + 11)) {
+			const r = (start + 9 < data.length) ? data[start + 9] : (this.lastData[start + 9] || 0)
+			const g = (start + 10 < data.length) ? data[start + 10] : (this.lastData[start + 10] || 0)
+			const b = (start + 11 < data.length) ? data[start + 11] : (this.lastData[start + 11] || 0)
+			params.glowColor = getHex(r, g, b)
+			updated = true
 		}
 		
 		// 13. Radius
-		if (start + 12 >= 0 && start + 12 < data.length) {
+		if (changedIndices.has(start + 12)) {
 			params.radius = (data[start + 12] / 255) * 50
+			updated = true
 		}
 		
 		// 14. Count
-		if (start + 13 >= 0 && start + 13 < data.length) {
+		if (changedIndices.has(start + 13)) {
 			params.count = Math.floor((data[start + 13] / 255) * 12) + 1
+			updated = true
 		}
 		
 		// 15. Length
-		if (start + 14 >= 0 && start + 14 < data.length) {
+		if (changedIndices.has(start + 14)) {
 			params.length = 5 + (data[start + 14] / 255) * 95
+			updated = true
+		}
+
+		// 16–18: Glow/shadow segmentation (WO-44; templates may ignore until implemented)
+		// Apply mode (Ch 18) before segment count (Ch 16) so one frame can enable uniform + set N.
+		const dmxSegmentsToN = (byte) => Math.max(1, Math.min(32, Math.round((byte / 255) * 31) + 1))
+		if (changedIndices.has(start + 17)) {
+			const v = start + 17 < data.length ? data[start + 17] : 0
+			params.segmentMode = v >= 128 ? 'uniform' : 'full'
+			if (params.segmentMode === 'full') {
+				params.segmentsPerEdge = 1
+			} else if (start + 15 < data.length) {
+				params.segmentsPerEdge = dmxSegmentsToN(data[start + 15])
+			}
+			updated = true
+		}
+		if (changedIndices.has(start + 15)) {
+			if ((params.segmentMode || 'full') === 'uniform') {
+				const v = start + 15 < data.length ? data[start + 15] : 0
+				params.segmentsPerEdge = dmxSegmentsToN(v)
+				updated = true
+			}
+		}
+		if (changedIndices.has(start + 16)) {
+			const v = start + 16 < data.length ? data[start + 16] : 0
+			params.segmentEase = Math.max(0, Math.min(1, v / 255))
+			updated = true
 		}
 
 		// If disabled via DMX, force opacity to 0 to hide it
+		const payloadParams = { ...params }
 		if (params.enabled === false) {
-			params.opacity = 0
+			payloadParams.opacity = 0
 		}
 
-		this.log('debug', `[ArtNet] Dynamic Border update: ${JSON.stringify(params)}`)
+		if (!updated) return
+
+		this.log('debug', `[ArtNet] Dynamic Border update: ${JSON.stringify(payloadParams)}`)
 
 		// Update state so UI reflects changes
 		gb.params = params
 		liveSceneState.setChannel(channel, live)
 		liveSceneState.broadcastSceneLive(this.appCtx)
 
-		// Trigger update to CasparCG
-		this.updateBorder(params)
+		// First DMX activation, or template type changed, requires CG ADD (UPDATE on a
+		// missing CG silently does nothing — that's the "only width works" symptom).
+		const currentType = String(payloadParams.type || 'border')
+		const lastType = this._addedTypeByChannel.get(channel)
+		const needsAdd = typeChanged || lastType !== currentType
+		this.updateBorder(channel, payloadParams, needsAdd, gb.slices || [])
+		this._addedTypeByChannel.set(channel, currentType)
 	}
 
-	updateBorder(params) {
+	updateBorder(channel, params, forceAdd = false, slices = []) {
 		const amcp = this.appCtx.amcp
 		if (!amcp?.isConnected) {
 			this.log('warn', '[ArtNet] Cannot update border, AMCP not connected')
 			return
 		}
 
-		// Target layer 998 on channel 1 (default)
-		// In a full implementation, the channel should be configurable or mapped to screens.
-		const channel = 1 
-		const layer = 998
+		const layer = GLOBAL_BORDER_LAYER
+		const overlay = { type: params.type || 'border', params: params, slices: slices }
 
-		// Build the CG UPDATE command
-		// Reusing the template name 'pip_border' as seen in WO-25
-		const templateName = 'pip_border'
-		
-		// The template expects JSON parameters.
-		// From WO-25: { width, color, radius, opacity, style, gradientEnd }
-		const jsonPayload = JSON.stringify(params)
+		const { buildGlobalBorderAmcpLines, buildGlobalBorderUpdateLines } = require('../engine/global-border')
 
-		// AMCP command: CG channel-layer UPDATE 1 json
-		// Wait, WO-25 says: CG 1-110 ADD 0 "pip_border" 1 <data>
-		// And for update: CG 1-110 UPDATE 1 <data>
-		// Let's assume we need to send the JSON string.
-		
-		const cmd = `CG ${channel}-${layer} UPDATE 1 ${jsonPayload}`
-		
-		amcp.raw(cmd).catch(e => {
-			this.log('error', `[ArtNet] Failed to send CG UPDATE: ${e.message}`)
-		})
+		const lines = forceAdd
+			? buildGlobalBorderAmcpLines(channel, layer, overlay, this.appCtx, { initialOpacity: 1 })
+			: buildGlobalBorderUpdateLines(channel, layer, overlay)
+
+		for (const line of lines) {
+			amcp.raw(line).catch(e => {
+				this.log('error', `[ArtNet] Failed to send AMCP: ${e.message}`)
+			})
+		}
+		if (lines.some((l) => /\bDEFER\b/i.test(String(l)))) {
+			void amcp.mixerCommit(channel).catch((e) => {
+				this.log('error', `[ArtNet] MIXER COMMIT failed: ${e.message}`)
+			})
+		}
 	}
 
 	_toHex(val) {

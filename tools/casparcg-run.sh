@@ -8,7 +8,7 @@
 #
 # Environment (optional):
 #   CASPAR_ROOT           default /home/casparcg/highascg
-#   CASPAR_LIB            default $CASPAR_ROOT/lib  → LD_LIBRARY_PATH
+#   CASPAR_LIB            default $CASPAR_ROOT/lib  → LD_LIBRARY_PATH (CEF + libndi belong here)
 #   CASPAR_BIN            default $CASPAR_ROOT/bin/casparcg
 #   CASPAR_CONFIG / CASPAR_CONFIG_PATH  config file (default $CASPAR_ROOT/config/casparcg.config)
 #   CASPAR_RESTART_EXIT_CODES   space-separated exit codes meaning "relaunch" (default: 5 139)

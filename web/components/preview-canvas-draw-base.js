@@ -338,6 +338,20 @@ export function lerpKeyframeProperty(clip, property, localMs, defaultVal) {
 const _thumbCache = new Map()
 
 /**
+ * Drop cached Image entries so a new URL (e.g. after live PRINT refresh) reloads.
+ * @param {string} [urlSubstring] — if omitted, clears entire thumbnail image cache
+ */
+export function invalidateThumbnailCache(urlSubstring) {
+	if (!urlSubstring) {
+		_thumbCache.clear()
+		return
+	}
+	for (const k of [..._thumbCache.keys()]) {
+		if (k.includes(urlSubstring)) _thumbCache.delete(k)
+	}
+}
+
+/**
  * @param {string} url
  * @param {() => void} onReady
  * @returns {{ img: HTMLImageElement, ready: boolean }}

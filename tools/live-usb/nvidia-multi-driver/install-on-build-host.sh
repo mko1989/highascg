@@ -8,7 +8,7 @@
 #   - Enables the unit so it runs on the live image's first boot
 #   - Adds ConditionPathExists gate to highascg.service so the app waits for
 #     a working GPU stack before starting
-#   - Leaves /opt/nvidia-debs alone (populate it separately via fetch-debs.sh)
+#   - Leaves /opt/nvidia-pool alone (populate it separately via fetch-debs.sh)
 #
 # Idempotent: safe to re-run.
 set -euo pipefail
@@ -63,7 +63,7 @@ cat <<EOF
 OK. Build-host prep complete. Next:
   1. (If not already done) populate the offline driver cache:
        sudo NVIDIA_BRANCHES="470 580" bash $HERE/fetch-debs.sh
-  2. Make sure your eggs exclude fragment does NOT exclude /opt/nvidia-debs.
+  2. Make sure your eggs exclude fragment does NOT exclude /opt/nvidia-pool.
   3. Build the live ISO:
        sudo eggs produce --nointeractive --clone --max --basename highascg-live
 

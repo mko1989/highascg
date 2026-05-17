@@ -20,12 +20,12 @@
 # Config: `.env.deploy` in repo root, or export:
 #   DEPLOY_HOST        (default: 192.168.0.2)
 #   DEPLOY_USER        (default: casparcg)
-#   DEPLOY_PATH        (default: /opt/highascg)
+#   DEPLOY_PATH        (default: /home/casparcg/highascg)
 #   DEPLOY_REMOTE_TMP  (default: /tmp/highascg-deploy-USER.tgz)
 #   DEPLOY_USE_SFTP    (default: 0) set to 1 to upload with interactive sftp (here-doc put)
 #   DEPLOY_USE_SCP     (default: 0) set to 1 to upload with scp instead of ssh stream
 #   DEPLOY_REMOTE_SUDO (default: 0) set to 1 to run mkdir/find/tar/rm under DEPLOY_PATH via sudo
-#                        (needed when DEPLOY_PATH is under /opt and not writable by DEPLOY_USER).
+#                        (needed when DEPLOY_PATH is not writable by DEPLOY_USER).
 #                        Uses ssh -t for extract/verify so an interactive sudo password works; for
 #                        passwordless deploy use sudoers NOPASSWD for the deploy user.
 #   DEPLOY_SSH_PASSWORD optional SSH password used via `sshpass` to avoid repeated SSH prompts
@@ -50,7 +50,7 @@ fi
 
 DEPLOY_HOST="${DEPLOY_HOST:-192.168.0.2}"
 DEPLOY_USER="${DEPLOY_USER:-casparcg}"
-DEPLOY_PATH="${DEPLOY_PATH:-/opt/highascg}"
+DEPLOY_PATH="${DEPLOY_PATH:-/home/casparcg/highascg}"
 DEPLOY_REMOTE_TMP="${DEPLOY_REMOTE_TMP:-/tmp/highascg-deploy-${DEPLOY_USER}.tgz}"
 DEPLOY_USE_SCP="${DEPLOY_USE_SCP:-0}"
 DEPLOY_USE_SFTP="${DEPLOY_USE_SFTP:-0}"

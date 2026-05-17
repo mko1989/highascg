@@ -9,6 +9,7 @@ import { renderPipOverlayGroup, renderParamEditor } from './inspector-pip-overla
 import { appendSceneLayerHtmlTemplateGroup } from './inspector-html-template.js'
 import { getPipOverlaysFromLayer, PIP_OVERLAY_MAP } from '../lib/pip-overlay-registry.js'
 import { showScenesToast } from './scenes-editor-support.js'
+import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 
 let activeInteractionAr = null
 let activeInteractionTimer = null
@@ -95,6 +96,8 @@ export function renderSceneLayerInspector(deps, sel) {
 	lpHint.textContent = 'Named preset library: use the Layer presets tab (header) or the look editor layer strip.'
 	styleGrp.appendChild(lpHint)
 	root.appendChild(styleGrp)
+
+	renderPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore })
 
 	function patchFillPx(partial) {
 		const sc = sceneState.getScene(sceneId)
@@ -233,6 +236,309 @@ export function renderSceneLayerInspector(deps, sel) {
 	root.appendChild(takeGrp)
 }
 
+function renderPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {
+	const grp = document.createElement('div')
+	grp.className = 'inspector-group inspector-layer-playlist'
+	
+	const title = document.createElement('div')
+	title.className = 'inspector-group__title'
+	title.textContent = 'Layer Playback Mode'
+	grp.appendChild(title)
+
+	const row = document.createElement('div')
+	row.className = 'inspector-row'
+	
+	const field = document.createElement('div')
+	field.className = 'inspector-field'
+	
+	const modeSel = document.createElement('select')
+	modeSel.className = 'inspector-field__select'
+	modeSel.id = 'playlist-source-mode'
+	modeSel.innerHTML = `
+		<option value="single" ${layer.sourceMode === 'single' ? 'selected' : ''}>1. Single Media (Default)</option>
+		<option value="list" ${layer.sourceMode === 'list' ? 'selected' : ''}>2. Playlist Workflow</option>
+	`
+	modeSel.addEventListener('change', () => {
+		const nextMode = modeSel.value
+		const patch = { sourceMode: nextMode }
+		if (nextMode === 'list' && (!layer.playlist || layer.playlist.length === 0) && layer.source) {
+			patch.playlist = [{
+				id: `pl_${Date.now()}`,
+				type: layer.source.type || 'media',
+				value: layer.source.value,
+				label: layer.source.label || layer.source.value,
+				duration: 5
+			}]
+		}
+		if (nextMode === 'single' && layer.playlist && layer.playlist.length > 0) {
+			const item = layer.playlist[0]
+			patch.source = { type: item.type, value: item.value, label: item.label }
+		}
+		sceneState.patchLayer(sceneId, layerIndex, patch)
+		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		rerenderSceneLayer(sel)
+	})
+	
+	field.appendChild(modeSel)
+	row.appendChild(field)
+	grp.appendChild(row)
+
+	if (layer.sourceMode === 'list') {
+		const listContainer = document.createElement('div')
+		listContainer.className = 'playlist-editor-container'
+		listContainer.style.marginTop = '10px'
+		listContainer.style.padding = '8px'
+		listContainer.style.background = 'rgba(0,0,0,0.15)'
+		listContainer.style.borderRadius = '6px'
+		listContainer.style.border = '1px solid var(--border)'
+
+		const dropzone = document.createElement('div')
+		dropzone.className = 'playlist-dropzone'
+		dropzone.textContent = 'Drag & Drop Media Here'
+		dropzone.style.border = '2px dashed var(--border, #30363d)'
+		dropzone.style.background = 'rgba(255,255,255,0.02)'
+		dropzone.style.color = 'var(--text-muted)'
+		dropzone.style.fontSize = '0.8rem'
+		dropzone.style.padding = '16px'
+		dropzone.style.textAlign = 'center'
+		dropzone.style.borderRadius = '6px'
+		dropzone.style.marginBottom = '12px'
+		dropzone.style.cursor = 'pointer'
+		dropzone.style.transition = 'border-color 0.2s, background-color 0.2s'
+		
+		dropzone.addEventListener('dragover', (e) => {
+			e.preventDefault()
+			dropzone.style.borderColor = 'var(--accent, #58a6ff)'
+			dropzone.style.backgroundColor = 'rgba(88, 166, 255, 0.05)'
+			dropzone.style.color = 'var(--text)'
+		})
+		dropzone.addEventListener('dragleave', () => {
+			dropzone.style.borderColor = 'var(--border, #30363d)'
+			dropzone.style.backgroundColor = 'rgba(255,255,255,0.02)'
+			dropzone.style.color = 'var(--text-muted)'
+		})
+		dropzone.addEventListener('drop', (e) => {
+			e.preventDefault()
+			dropzone.style.borderColor = 'var(--border, #30363d)'
+			dropzone.style.backgroundColor = 'rgba(255,255,255,0.02)'
+			dropzone.style.color = 'var(--text-muted)'
+			let data
+			try {
+				data = JSON.parse(e.dataTransfer.getData('application/json'))
+			} catch {
+				const val = e.dataTransfer.getData('text/plain')
+				if (val) data = { type: 'media', value: val, label: val }
+			}
+			if (data && data.value) {
+				const isImg = data.kind === 'still' || data.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(data.value)
+				const newItem = {
+					id: `pl_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+					type: isImg ? 'image' : (data.type || 'media'),
+					value: data.value,
+					label: data.label || data.value,
+					duration: 5,
+				}
+				const nextList = [...(layer.playlist || []), newItem]
+				const patch = { playlist: nextList }
+				if (nextList.length === 1) {
+					patch.source = { type: newItem.type, value: newItem.value, label: newItem.label }
+				}
+				sceneState.patchLayer(sceneId, layerIndex, patch)
+				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+				rerenderSceneLayer(sel)
+			}
+		})
+
+
+		// List of items
+		const itemsList = document.createElement('div')
+		itemsList.className = 'playlist-items-list'
+		itemsList.style.display = 'flex'
+		itemsList.style.flexDirection = 'column'
+		itemsList.style.gap = '4px'
+		itemsList.style.marginBottom = '12px'
+
+		let playlistDragFromId = null
+
+		const playlist = layer.playlist || []
+		playlist.forEach((item, idx) => {
+			const itemRow = document.createElement('div')
+			itemRow.className = 'playlist-item-row'
+			itemRow.draggable = true
+			itemRow.style.display = 'flex'
+			itemRow.style.alignItems = 'center'
+			itemRow.style.background = 'var(--bg-elevated, #21262d)'
+			itemRow.style.border = '1px solid var(--border, #30363d)'
+			itemRow.style.borderRadius = '4px'
+			itemRow.style.padding = '4px 8px'
+			itemRow.style.transition = 'all 0.15s ease'
+			
+			const isImg = item.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(item.value)
+			const thumbUrl = getThumbnailUrl(item.value, 80, 2)
+			
+			itemRow.innerHTML = `
+				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 8px; user-select: none;">⋮⋮</span>
+				<img src="${thumbUrl}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2224%22><rect width=%22100%%22 height=%22100%%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2210%22>${isImg?'🖼️':'🎬'}</text></svg>'" style="width: 32px; height: 20px; object-fit: cover; border-radius: 2px; border: 1px solid var(--border); margin-right: 8px;"/>
+				<span class="playlist-item-name" title="${item.label || item.value}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${item.label || item.value}</span>
+				<div style="display: flex; align-items: center; gap: 4px; margin-right: 8px;" title="Duration in seconds (used for static images, or to limit video playback)">
+					<input type="number" class="playlist-item-duration" value="${item.duration ?? 5}" min="1" max="3600" style="width: 42px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.75rem; text-align: center; padding: 1px;"/>
+					<span style="font-size: 0.7rem; color: var(--text-muted);">s</span>
+				</div>
+				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" style="padding: 1px 6px; font-size: 0.75rem; line-height: 1;">🗑</button>
+			`
+
+			// Setup drag & drop reordering
+			itemRow.addEventListener('dragstart', (e) => {
+				playlistDragFromId = item.id
+				e.dataTransfer.effectAllowed = 'move'
+				itemRow.style.opacity = '0.4'
+				itemRow.style.borderStyle = 'dashed'
+			})
+			itemRow.addEventListener('dragend', () => {
+				playlistDragFromId = null
+				itemRow.style.opacity = '1'
+				itemRow.style.borderStyle = 'solid'
+			})
+			itemRow.addEventListener('dragover', (e) => {
+				e.preventDefault()
+				if (playlistDragFromId && playlistDragFromId !== item.id) {
+					itemRow.style.borderColor = 'var(--accent, #58a6ff)'
+					itemRow.style.background = 'rgba(88, 166, 255, 0.05)'
+				}
+			})
+			itemRow.addEventListener('dragleave', () => {
+				itemRow.style.borderColor = 'var(--border, #30363d)'
+				itemRow.style.background = 'var(--bg-elevated, #21262d)'
+			})
+			itemRow.addEventListener('drop', (e) => {
+				e.preventDefault()
+				itemRow.style.borderColor = 'var(--border, #30363d)'
+				itemRow.style.background = 'var(--bg-elevated, #21262d)'
+				if (playlistDragFromId && playlistDragFromId !== item.id) {
+					const list = [...playlist]
+					const fromIdx = list.findIndex(x => x.id === playlistDragFromId)
+					const toIdx = list.findIndex(x => x.id === item.id)
+					if (fromIdx >= 0 && toIdx >= 0) {
+						const [moved] = list.splice(fromIdx, 1)
+						list.splice(toIdx, 0, moved)
+						const patch = { playlist: list }
+						if (toIdx === 0 || fromIdx === 0) {
+							patch.source = { type: list[0].type, value: list[0].value, label: list[0].label }
+						}
+						sceneState.patchLayer(sceneId, layerIndex, patch)
+						document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+						rerenderSceneLayer(sel)
+					}
+				}
+			})
+
+			// Handle image duration change
+			const durInp = itemRow.querySelector('.playlist-item-duration')
+			if (durInp) {
+				durInp.addEventListener('change', () => {
+					const nextDur = Math.max(1, parseInt(durInp.value, 10) || 5)
+					const list = playlist.map(x => x.id === item.id ? { ...x, duration: nextDur } : x)
+					sceneState.patchLayer(sceneId, layerIndex, { playlist: list })
+					document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+				})
+			}
+
+			// Handle delete
+			const delBtn = itemRow.querySelector('.playlist-item-delete')
+			delBtn.addEventListener('click', (e) => {
+				e.stopPropagation()
+				const list = playlist.filter(x => x.id !== item.id)
+				const patch = { playlist: list }
+				if (list.length > 0) {
+					patch.source = { type: list[0].type, value: list[0].value, label: list[0].label }
+				} else {
+					patch.source = null
+				}
+				sceneState.patchLayer(sceneId, layerIndex, patch)
+				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+				rerenderSceneLayer(sel)
+			})
+
+			itemsList.appendChild(itemRow)
+		})
+		listContainer.appendChild(itemsList)
+		listContainer.appendChild(dropzone)
+
+		// Settings group
+		const settingsBlock = document.createElement('div')
+		settingsBlock.className = 'playlist-global-settings'
+		settingsBlock.style.borderTop = '1px solid var(--border)'
+		settingsBlock.style.paddingTop = '8px'
+		settingsBlock.innerHTML = `
+			<div class="inspector-group__title" style="font-size: 0.65rem; margin-bottom: 8px;">Playlist Settings</div>
+			
+			<div class="inspector-row" style="margin-bottom: 8px;">
+				<div class="inspector-field" style="flex: 1;">
+					<label class="inspector-field__label" style="cursor: default;">Advance Mode</label>
+					<select class="inspector-field__select" id="playlist-advance">
+						<option value="auto" ${layer.playlistAdvance === 'auto' ? 'selected' : ''}>Auto Advance</option>
+						<option value="manual" ${layer.playlistAdvance === 'manual' ? 'selected' : ''}>Manual Next</option>
+					</select>
+				</div>
+				<div class="inspector-field" style="display: flex; align-items: center; margin-top: 18px; max-width: 90px;">
+					<label class="inspector-field__label" style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+						<input type="checkbox" id="playlist-loop" ${layer.playlistLoop !== false ? 'checked' : ''} style="margin: 0;"/>
+						Loop List
+					</label>
+				</div>
+			</div>
+
+			<div class="inspector-row">
+				<div class="inspector-field" style="flex: 1;">
+					<label class="inspector-field__label" style="cursor: default;">Transition Type</label>
+					<select class="inspector-field__select" id="playlist-trans-type">
+						<option value="MIX" ${(layer.playlistTransition?.type ?? 'MIX') === 'MIX' ? 'selected' : ''}>MIX (Dissolve)</option>
+						<option value="CUT" ${(layer.playlistTransition?.type ?? 'MIX') === 'CUT' ? 'selected' : ''}>CUT (None)</option>
+						<option value="SLIDE" ${(layer.playlistTransition?.type ?? 'MIX') === 'SLIDE' ? 'selected' : ''}>SLIDE</option>
+						<option value="WIPE" ${(layer.playlistTransition?.type ?? 'MIX') === 'WIPE' ? 'selected' : ''}>WIPE</option>
+					</select>
+				</div>
+				<div class="inspector-field" style="flex: 1;">
+					<label class="inspector-field__label" style="cursor: default;">Transition Frames</label>
+					<input type="number" class="inspector-field__input" id="playlist-trans-frames" value="${layer.playlistTransition?.duration ?? 12}" min="0" max="250" style="max-width: 100%;"/>
+				</div>
+			</div>
+		`
+
+		// Attach settings events
+		const advSel = settingsBlock.querySelector('#playlist-advance')
+		advSel.addEventListener('change', () => {
+			sceneState.patchLayer(sceneId, layerIndex, { playlistAdvance: advSel.value })
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		})
+
+		const loopCb = settingsBlock.querySelector('#playlist-loop')
+		loopCb.addEventListener('change', () => {
+			sceneState.patchLayer(sceneId, layerIndex, { playlistLoop: loopCb.checked })
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		})
+
+		const transSel = settingsBlock.querySelector('#playlist-trans-type')
+		transSel.addEventListener('change', () => {
+			const pt = layer.playlistTransition || { type: 'MIX', duration: 12, tween: 'linear' }
+			sceneState.patchLayer(sceneId, layerIndex, { playlistTransition: { ...pt, type: transSel.value } })
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		})
+
+		const transDur = settingsBlock.querySelector('#playlist-trans-frames')
+		transDur.addEventListener('change', () => {
+			const pt = layer.playlistTransition || { type: 'MIX', duration: 12, tween: 'linear' }
+			sceneState.patchLayer(sceneId, layerIndex, { playlistTransition: { ...pt, duration: Math.max(0, parseInt(transDur.value, 10) || 0) } })
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		})
+
+		listContainer.appendChild(settingsBlock)
+		grp.appendChild(listContainer)
+	}
+
+	root.appendChild(grp)
+}
+
 /**
  * @param {{
  *   root: HTMLElement,
@@ -263,26 +569,101 @@ export function renderSceneInspector(root, sceneId) {
 	title.textContent = `Look: ${scene.name}`
 	root.appendChild(title)
 
-	const gb = scene.globalBorder || { enabled: false, type: 'border', params: {}, artnetPatch: {} }
+}
 
-	// Global Border Settings Group
+export function renderGlobalBorderInspector(root, screenIndex, stateStore) {
+	root.innerHTML = ''
+	const title = document.createElement('div')
+	title.className = 'inspector-title'
+	title.textContent = `Global Border: Screen ${screenIndex + 1}`
+	root.appendChild(title)
+
+	const gbNow = () => sceneState.getGlobalBorderForScreen(screenIndex)
+	const gb = gbNow()
+
 	const borderGrp = document.createElement('div')
 	borderGrp.className = 'inspector-group'
 	borderGrp.innerHTML = '<div class="inspector-group__title">Global Border Effect</div>'
 	
+	const typeWrap = document.createElement('div')
+	typeWrap.className = 'inspector-field'
+	const typeLab = document.createElement('label')
+	typeLab.className = 'inspector-field__label'
+	typeLab.textContent = 'Type'
+	const typeSel = document.createElement('select')
+	typeSel.className = 'inspector-field__select'
+	const types = ['border', 'shadow', 'edge_strip', 'glow']
+	types.forEach(t => {
+		const opt = document.createElement('option')
+		opt.value = t
+		opt.textContent = t
+		if (t === gb.type) opt.selected = true
+		typeSel.appendChild(opt)
+	})
+	typeSel.addEventListener('change', () => {
+		sceneState.setGlobalBorderForScreen(screenIndex, { type: typeSel.value })
+		renderGlobalBorderInspector(root, screenIndex, stateStore)
+	})
+	typeLab.appendChild(typeSel)
+	typeWrap.appendChild(typeLab)
+	borderGrp.appendChild(typeWrap)
+
+	const fadeWrap = document.createElement('div')
+	fadeWrap.className = 'inspector-field'
+	const fadeLab = document.createElement('label')
+	fadeLab.className = 'inspector-field__label'
+	fadeLab.textContent = 'Fade Duration (frames)'
+	const fadeInp = document.createElement('input')
+	fadeInp.type = 'number'
+	fadeInp.className = 'inspector-field__input'
+	fadeInp.style.width = '60px'
+	fadeInp.min = 0
+	fadeInp.max = 250
+	fadeInp.value = gb.fadeDuration ?? 25
+	fadeInp.addEventListener('change', () => {
+		const val = parseInt(fadeInp.value, 10)
+		sceneState.setGlobalBorderForScreen(screenIndex, { fadeDuration: isNaN(val) ? 25 : val })
+	})
+	fadeLab.appendChild(fadeInp)
+	fadeWrap.appendChild(fadeLab)
+	borderGrp.appendChild(fadeWrap)
+
+	const mirrorWrap = document.createElement('div')
+	mirrorWrap.className = 'inspector-field'
+	const mirrorLab = document.createElement('label')
+	mirrorLab.className = 'inspector-field__label'
+	mirrorLab.style.display = 'flex'
+	mirrorLab.style.alignItems = 'center'
+	mirrorLab.style.gap = '8px'
+	const mirrorChk = document.createElement('input')
+	mirrorChk.type = 'checkbox'
+	mirrorChk.checked = gb.mirrorBorderOnPrv === true
+	mirrorChk.addEventListener('change', () => {
+		sceneState.setGlobalBorderForScreen(screenIndex, { mirrorBorderOnPrv: mirrorChk.checked })
+		renderGlobalBorderInspector(root, screenIndex, stateStore)
+	})
+	const prvCh = stateStore?.getState?.()?.channelMap?.previewChannels?.[screenIndex]
+	const mirrorTxt = document.createElement('span')
+	mirrorTxt.textContent = prvCh
+		? `PRV on ch ${prvCh} — border controls update layer 997 only (PGM 998/996 unchanged until this is off)`
+		: 'PRV on preview bus — layer 997 (no PRV channel mapped for this screen)'
+	mirrorLab.appendChild(mirrorChk)
+	mirrorLab.appendChild(mirrorTxt)
+	mirrorWrap.appendChild(mirrorLab)
+	borderGrp.appendChild(mirrorWrap)
+
 	const def = PIP_OVERLAY_MAP.get(gb.type)
 	if (def) {
 		const paramsBlock = document.createElement('div')
 		paramsBlock.className = 'inspector-effect-card__params'
 		for (const schema of def.schema) {
-			// Skip 'side' as it's hardcoded to inside
 			if (schema.key === 'side') continue
 			
 			const curVal = gb.params?.[schema.key] ?? schema.default
 			renderParamEditor(paramsBlock, schema, curVal, (newVal) => {
-				sceneState.setGlobalBorder(sceneId, {
-					...gb,
-					params: { ...gb.params, [schema.key]: newVal, side: 'inside' } // enforce inside
+				const cur = gbNow()
+				sceneState.setGlobalBorderForScreen(screenIndex, {
+					params: { ...cur.params, [schema.key]: newVal, side: 'inside' }
 				})
 			})
 		}
@@ -290,7 +671,187 @@ export function renderSceneInspector(root, sceneId) {
 	}
 	root.appendChild(borderGrp)
 
-	// Art-Net Patch Group
+	const presetGrp = document.createElement('div')
+	presetGrp.className = 'inspector-group'
+	presetGrp.innerHTML = '<div class="inspector-group__title">Border presets (PGM layers 998 ↔ 996)</div>'
+	const slotCount = sceneState.getGlobalBorderPresetSlotCount(screenIndex)
+	const presetRows = document.createElement('div')
+	presetRows.style.display = 'flex'
+	presetRows.style.flexDirection = 'column'
+	presetRows.style.gap = '6px'
+	for (let s = 1; s <= slotCount; s++) {
+		const row = document.createElement('div')
+		row.style.display = 'flex'
+		row.style.flexWrap = 'wrap'
+		row.style.alignItems = 'center'
+		row.style.gap = '8px'
+		const preset = sceneState.getGlobalBorderPreset(screenIndex, s)
+		const lab = document.createElement('span')
+		lab.style.minWidth = '120px'
+		lab.style.fontSize = '0.85rem'
+		lab.textContent = preset ? `${s}. ${preset.name}` : `${s}. —`
+		const recallBtn = Object.assign(document.createElement('button'), {
+			type: 'button',
+			className: 'scenes-btn scenes-btn--sm',
+			textContent: 'Recall',
+			disabled: !preset,
+		})
+		recallBtn.addEventListener('click', () => {
+			if (!preset) return
+			window.dispatchEvent(
+				new CustomEvent('highascg-border-preset-recall', { detail: { screenIndex, slot: s } }),
+			)
+			showScenesToast('Preset recall sent to program border stack.', 'info')
+		})
+		const saveBtn = Object.assign(document.createElement('button'), {
+			type: 'button',
+			className: 'scenes-btn scenes-btn--sm',
+			textContent: 'Save',
+		})
+		saveBtn.addEventListener('click', () => {
+			const nm = window.prompt('Preset name?', preset?.name || `Preset ${s}`)
+			if (nm === null) return
+			sceneState.saveGlobalBorderPresetSlot(screenIndex, s, nm)
+			showScenesToast(`Saved border preset ${s}.`, 'info')
+			renderGlobalBorderInspector(root, screenIndex, stateStore)
+		})
+		row.appendChild(lab)
+		row.appendChild(recallBtn)
+		row.appendChild(saveBtn)
+		if (preset) {
+			const delBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: 'scenes-btn scenes-btn--sm scenes-btn--danger',
+				textContent: 'Delete',
+			})
+			delBtn.addEventListener('click', () => {
+				if (!window.confirm(`Delete preset ${s} (${preset.name})?`)) return
+				sceneState.deleteGlobalBorderPresetSlot(screenIndex, s)
+				showScenesToast('Preset removed.', 'info')
+				renderGlobalBorderInspector(root, screenIndex, stateStore)
+			})
+			row.appendChild(delBtn)
+		}
+		presetRows.appendChild(row)
+	}
+	presetGrp.appendChild(presetRows)
+	root.appendChild(presetGrp)
+
+	const slicesGrp = document.createElement('div')
+	slicesGrp.className = 'inspector-group'
+	slicesGrp.innerHTML = '<div class="inspector-group__title">Slices (Multi-segment physical layout)</div>'
+	const slicesBody = document.createElement('div')
+	slicesBody.className = 'inspector-effect-card__params'
+	slicesBody.style.display = 'flex'
+	slicesBody.style.flexDirection = 'column'
+	slicesBody.style.gap = '10px'
+
+	const slices = gb.slices || []
+	const res = getResolutionForScreen(stateStore)
+
+	if (slices.length === 0) {
+		const empty = document.createElement('div')
+		empty.className = 'inspector-field inspector-field--hint'
+		empty.textContent = 'No slices defined. Defaulting to full canvas (0,0 100×100).'
+		slicesBody.appendChild(empty)
+	}
+
+	slices.forEach((s, idx) => {
+		const row = document.createElement('div')
+		row.className = 'inspector-slice-row'
+		row.style.display = 'flex'
+		row.style.alignItems = 'center'
+		row.style.gap = '6px'
+		row.style.background = 'rgba(255,255,255,0.03)'
+		row.style.padding = '6px'
+		row.style.borderRadius = '4px'
+
+		const createInput = (key, label, val, maxRes) => {
+			const w = document.createElement('div')
+			w.style.display = 'flex'
+			w.style.flexDirection = 'column'
+			w.style.gap = '2px'
+			const l = document.createElement('label')
+			l.style.fontSize = '0.65rem'
+			l.style.color = 'var(--text-muted)'
+			l.textContent = label
+			const i = document.createElement('input')
+			i.type = 'number'
+			i.className = 'inspector-field__input'
+			i.style.width = '52px'
+			i.style.padding = '2px 4px'
+			i.min = 0
+			i.max = maxRes
+			i.value = Math.round(val * maxRes)
+			i.addEventListener('change', () => {
+				const currentSlices = sceneState.getGlobalBorderForScreen(screenIndex).slices || []
+				const next = [...currentSlices]
+				if (next[idx]) {
+					next[idx] = { ...next[idx], [key]: Math.max(0, Math.min(maxRes, parseFloat(i.value) || 0)) / maxRes }
+					sceneState.setGlobalBorderForScreen(screenIndex, { slices: next })
+				}
+			})
+			w.appendChild(l)
+			w.appendChild(i)
+			return w
+		}
+
+		row.appendChild(createInput('x', 'X(px)', s.x ?? 0, res.w))
+		row.appendChild(createInput('y', 'Y(px)', s.y ?? 0, res.h))
+		row.appendChild(createInput('w', 'W(px)', s.w ?? 1, res.w))
+		row.appendChild(createInput('h', 'H(px)', s.h ?? 1, res.h))
+
+		const del = document.createElement('button')
+		del.type = 'button'
+		del.className = 'scenes-btn scenes-btn--sm scenes-btn--danger'
+		del.style.marginLeft = 'auto'
+		del.style.padding = '2px 6px'
+		del.textContent = '×'
+		del.title = 'Remove slice'
+		del.addEventListener('click', () => {
+			const currentSlices = sceneState.getGlobalBorderForScreen(screenIndex).slices || []
+			const next = currentSlices.filter((_, i) => i !== idx)
+			sceneState.setGlobalBorderForScreen(screenIndex, { slices: next })
+			renderGlobalBorderInspector(root, screenIndex, stateStore)
+		})
+		row.appendChild(del)
+		slicesBody.appendChild(row)
+	})
+
+	const sliceBtns = document.createElement('div')
+	sliceBtns.style.display = 'flex'
+	sliceBtns.style.gap = '8px'
+	sliceBtns.style.marginTop = '4px'
+
+	const addBtn = document.createElement('button')
+	addBtn.type = 'button'
+	addBtn.className = 'scenes-btn scenes-btn--sm'
+	addBtn.textContent = '+ Add Slice'
+	addBtn.addEventListener('click', () => {
+		const currentSlices = sceneState.getGlobalBorderForScreen(screenIndex).slices || []
+		// Default to half-width, full-height
+		const next = [...currentSlices, { x: 0, y: 0, w: 0.5, h: 1 }]
+		sceneState.setGlobalBorderForScreen(screenIndex, { slices: next })
+		renderGlobalBorderInspector(root, screenIndex, stateStore)
+	})
+
+	const fullBtn = document.createElement('button')
+	fullBtn.type = 'button'
+	fullBtn.className = 'scenes-btn scenes-btn--sm'
+	fullBtn.textContent = 'Full Canvas'
+	fullBtn.title = 'Reset to full screen border'
+	fullBtn.addEventListener('click', () => {
+		sceneState.setGlobalBorderForScreen(screenIndex, { slices: [] })
+		renderGlobalBorderInspector(root, screenIndex, stateStore)
+	})
+
+	sliceBtns.appendChild(addBtn)
+	sliceBtns.appendChild(fullBtn)
+	slicesBody.appendChild(sliceBtns)
+
+	slicesGrp.appendChild(slicesBody)
+	root.appendChild(slicesGrp)
+
 	const patchGrp = document.createElement('div')
 	patchGrp.className = 'inspector-group'
 	patchGrp.innerHTML = '<div class="inspector-group__title">Art-Net Patch</div>'
@@ -298,7 +859,6 @@ export function renderSceneInspector(root, sceneId) {
 	const patchBlock = document.createElement('div')
 	patchBlock.className = 'inspector-effect-card__params'
 	
-	// Start Channel
 	const scWrap = document.createElement('div')
 	scWrap.className = 'inspector-field'
 	const scLab = document.createElement('label')
@@ -313,17 +873,16 @@ export function renderSceneInspector(root, sceneId) {
 	scInp.value = gb.artnetPatch?.startChannel || 1
 	scInp.addEventListener('change', () => {
 		const val = parseInt(scInp.value, 10)
-		sceneState.setGlobalBorder(sceneId, {
-			...gb,
-			artnetPatch: { ...gb.artnetPatch, startChannel: isNaN(val) ? 1 : val }
+		const cur = gbNow()
+		sceneState.setGlobalBorderForScreen(screenIndex, {
+			artnetPatch: { ...cur.artnetPatch, startChannel: isNaN(val) ? 1 : val }
 		})
-		renderSceneInspector(root, sceneId) // rerender to update table
+		renderGlobalBorderInspector(root, screenIndex, stateStore)
 	})
 	scLab.appendChild(scInp)
 	scWrap.appendChild(scLab)
 	patchBlock.appendChild(scWrap)
 
-	// Universe
 	const uniWrap = document.createElement('div')
 	uniWrap.className = 'inspector-field'
 	const uniLab = document.createElement('label')
@@ -338,16 +897,15 @@ export function renderSceneInspector(root, sceneId) {
 	uniInp.value = gb.artnetPatch?.universe || 0
 	uniInp.addEventListener('change', () => {
 		const val = parseInt(uniInp.value, 10)
-		sceneState.setGlobalBorder(sceneId, {
-			...gb,
-			artnetPatch: { ...gb.artnetPatch, universe: isNaN(val) ? 0 : val }
+		const cur = gbNow()
+		sceneState.setGlobalBorderForScreen(screenIndex, {
+			artnetPatch: { ...cur.artnetPatch, universe: isNaN(val) ? 0 : val }
 		})
 	})
 	uniLab.appendChild(uniInp)
 	uniWrap.appendChild(uniLab)
 	patchBlock.appendChild(uniWrap)
 
-	// Read-only mapping table
 	const start = gb.artnetPatch?.startChannel || 1
 	const mapping = [
 		{ label: 'On/Off', ch: start },
@@ -359,8 +917,11 @@ export function renderSceneInspector(root, sceneId) {
 		{ label: 'Spread / Blur', ch: start + 8 },
 		{ label: 'Glow Color (RGB)', ch: `${start + 9} - ${start + 11}` },
 		{ label: 'Radius', ch: start + 12 },
-		{ label: 'Count', ch: start + 13 },
-		{ label: 'Length', ch: start + 14 }
+		{ label: 'Count (edge strip)', ch: start + 13 },
+		{ label: 'Length (edge strip)', ch: start + 14 },
+		{ label: 'Segments / edge (glow/shadow)', ch: start + 15 },
+		{ label: 'Segment ease (glow/shadow)', ch: start + 16 },
+		{ label: 'Segmentation mode (glow/shadow)', ch: start + 17 },
 	]
 
 	const table = document.createElement('table')

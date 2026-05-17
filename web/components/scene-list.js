@@ -17,7 +17,10 @@ import { escapeHtml } from './scenes-editor-support.js'
  * @param {(msg: string, type?: string) => void} ctx.showToast
  * @param {(detail: object | null) => void} ctx.dispatchLayerSelect
  * @param {{ scheduleDraw: () => void }} ctx.previewPanel
- * @param {(sceneId: string, opts?: { targetMains?: number[] }) => void} ctx.sendSceneToPreviewCard
+ * @param {(sceneId: string, opts?: { targetMains?: number[] }) => void | Promise<void>} ctx.sendSceneToPreviewCard
+ * @param {(mainIdx: number, opts?: { full?: boolean }) => void | Promise<void>} [ctx.clearPreviewBusForMain]
+ * @param {(dt: DataTransfer) => boolean} [ctx.onDeckMediaDropAccept]
+ * @param {(mainCol: number, e: DragEvent) => void | Promise<void>} [ctx.onDeckMediaDrop]
  * @param {{ current: number | null }} ctx.selectedLayerIndexRef
  * @param {() => void} ctx.globalTakeFromPreview
  * @param {() => void} ctx.globalCutFromPreview
@@ -35,6 +38,9 @@ export function renderSceneDeck(ctx) {
 		dispatchLayerSelect,
 		previewPanel,
 		sendSceneToPreviewCard,
+		clearPreviewBusForMain,
+		onDeckMediaDropAccept,
+		onDeckMediaDrop,
 		selectedLayerIndexRef,
 		globalTakeFromPreview,
 		globalCutFromPreview,
@@ -133,6 +139,21 @@ export function renderSceneDeck(ctx) {
 	})
 
 
+	mainHost.addEventListener('click', (e) => {
+		if (e.defaultPrevented) return
+		const t = /** @type {HTMLElement | null} */ (e.target)
+		if (!t?.closest) return
+		if (t.closest('.scenes-card') || t.closest('.scenes-deck__add-look')) return
+		if (t.closest('.scenes-deck-col__head')) return
+		// If clicking in a column, the colEl listener will handle it and prevent default.
+		// If clicking entirely outside any column (e.g. blank padding of mainHost), clear active.
+		if (t.closest('.scenes-deck-col')) return
+		
+		if (typeof clearPreviewBusForMain === 'function') {
+			void clearPreviewBusForMain(sceneState.activeScreenIndex, { full: true })
+		}
+	})
+
 	mainHost.appendChild(deckWrap)
 
 	function applyRowAspect(el) {
@@ -157,15 +178,56 @@ export function renderSceneDeck(ctx) {
 		colEl.dataset.mainCol = String(col)
 		const head = document.createElement('div')
 		head.className = 'scenes-deck-col__head'
-		head.textContent = mainLabel(col)
+		head.style.display = 'flex'
+		head.style.justifyContent = 'space-between'
+		head.style.alignItems = 'center'
+		
+		const title = document.createElement('span')
+		title.textContent = mainLabel(col)
+		head.appendChild(title)
+		
+		const borderBtn = document.createElement('div')
+		borderBtn.className = 'scenes-global-border-item'
+		borderBtn.style.display = 'flex'
+		borderBtn.style.gap = '4px'
+		borderBtn.style.alignItems = 'center'
+		borderBtn.style.cursor = 'pointer'
+		borderBtn.style.background = '#333'
+		borderBtn.style.padding = '2px 6px'
+		borderBtn.style.borderRadius = '4px'
+		borderBtn.style.fontSize = '12px'
+		borderBtn.title =
+			'Global border on PGM (layers 998 / 996 for preset crossfades). Recalling a look to PRV does not change PGM. For PRV-only border tweaks, enable “PRV on ch …” in Global Border inspector (L997).'
+		
+		const gb = sceneState.getGlobalBorderForScreen(col)
+		
+		const chk = document.createElement('input')
+		chk.type = 'checkbox'
+		chk.checked = !!gb.enabled
+		chk.addEventListener('click', (e) => e.stopPropagation())
+		chk.addEventListener('change', () => {
+			sceneState.setGlobalBorderForScreen(col, { enabled: chk.checked })
+		})
+		
+		const lbl = document.createElement('span')
+		lbl.textContent = 'Global Border'
+		
+		borderBtn.appendChild(chk)
+		borderBtn.appendChild(lbl)
+		
+		borderBtn.addEventListener('click', () => {
+			window.dispatchEvent(new CustomEvent('global-border-select', { detail: { screenIndex: col } }))
+		})
+		head.appendChild(borderBtn)
 		colEl.appendChild(head)
 
 		const grid = document.createElement('div')
 		grid.className = 'scenes-deck'
 		if (scenes.length === 0) {
 			const empty = document.createElement('div')
-			empty.className = 'scenes-deck__empty scenes-deck__empty--tight'
-			empty.innerHTML = `<p>No looks for ${escapeHtml(mainLabel(col))}.</p><p class="scenes-deck__hint">Use + to add, or use “all mains” and create a global look.</p>`
+			empty.className = 'scenes-deck__empty scenes-deck__empty--tight scenes-deck__empty--clear-prv'
+			empty.innerHTML = `<p>No looks for ${escapeHtml(mainLabel(col))}.</p><p class="scenes-deck__hint">Use + to add, drop media from Sources or your desktop to start a look, or use “all mains” and create a global look.</p>`
+			empty.title = 'Clear preview for this screen (stops looks on the PRV channel when it is separate from PGM)'
 			grid.appendChild(empty)
 		}
 
@@ -217,11 +279,12 @@ export function renderSceneDeck(ctx) {
 				})
 			}
 
-			const sendPrv = (e) => {
+			const sendPrv = async (e) => {
 				e.stopPropagation()
 				ensureMainForColumn(col)
-				if (sceneState.getPreviewSceneIdForMain(col) === sc.id) return
-				sendSceneToPreviewCard(sc.id, { targetMains: [col] })
+				// Always push AMCP: previewSceneId can match the compose UI while Caspar PRV is stale,
+				// and users expect a re-click to resync the physical preview bus.
+				await sendSceneToPreviewCard(sc.id, { targetMains: [col] })
 			}
 			card.querySelectorAll('[data-action="prv"]').forEach((el) => el.addEventListener('click', sendPrv))
 
@@ -237,10 +300,10 @@ export function renderSceneDeck(ctx) {
 				ensureMainForColumn(col)
 				void takeSceneToProgram(sc.id, true, { targetMains: [col] })
 			})
-			card.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
+			card.querySelector('[data-action="edit"]')?.addEventListener('click', async (e) => {
 				e.stopPropagation()
 				ensureMainForColumn(col)
-				if (sceneState.getPreviewSceneIdForMain(col) !== sc.id) sendSceneToPreviewCard(sc.id, { targetMains: [col] })
+				if (sceneState.getPreviewSceneIdForMain(col) !== sc.id) await sendSceneToPreviewCard(sc.id, { targetMains: [col] })
 				sceneState.setEditingScene(sc.id)
 				selectedLayerIndexRef.current = null
 				dispatchLayerSelect(null)
@@ -293,6 +356,51 @@ export function renderSceneDeck(ctx) {
 			dispatchLayerSelect(null)
 		})
 		grid.appendChild(addTile)
+
+		if (typeof clearPreviewBusForMain === 'function') {
+			colEl.addEventListener('click', (e) => {
+				if (e.defaultPrevented) return
+				const t = /** @type {HTMLElement | null} */ (e.target)
+				if (!t?.closest) return
+				if (t.closest('.scenes-card') || t.closest('.scenes-deck__add-look')) return
+				if (t.closest('.scenes-deck-col__head')) return
+				e.preventDefault() // prevent mainHost fallback
+				ensureMainForColumn(col)
+				void clearPreviewBusForMain(col, { full: true })
+			})
+		}
+
+		if (typeof onDeckMediaDrop === 'function' && typeof onDeckMediaDropAccept === 'function') {
+			grid.addEventListener(
+				'dragover',
+				(e) => {
+					if (!onDeckMediaDropAccept(e.dataTransfer)) return
+					e.preventDefault()
+					e.stopPropagation()
+					const block = e.target.closest('.scenes-card') || e.target.closest('.scenes-deck-col__head')
+					e.dataTransfer.dropEffect = block ? 'none' : 'copy'
+					if (!block) grid.classList.add('scenes-deck--media-drop-target')
+					else grid.classList.remove('scenes-deck--media-drop-target')
+				},
+				true,
+			)
+			grid.addEventListener('dragleave', (e) => {
+				if (!grid.contains(e.relatedTarget)) grid.classList.remove('scenes-deck--media-drop-target')
+			})
+			grid.addEventListener(
+				'drop',
+				async (e) => {
+					if (!onDeckMediaDropAccept(e.dataTransfer)) return
+					e.preventDefault()
+					e.stopPropagation()
+					grid.classList.remove('scenes-deck--media-drop-target')
+					if (e.target.closest('.scenes-card') || e.target.closest('.scenes-deck-col__head')) return
+					await onDeckMediaDrop(col, e)
+				},
+				true,
+			)
+		}
+
 		colEl.appendChild(grid)
 		mount.appendChild(colEl)
 	}
@@ -324,3 +432,4 @@ export function renderSceneDeck(ctx) {
 
 	previewPanel.scheduleDraw()
 }
+

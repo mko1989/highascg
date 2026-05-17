@@ -166,6 +166,41 @@ export function renderEffectsGroup(root, { effects, onUpdate }) {
 	})
 	grp.appendChild(dropZone)
 
+	// Dropdown for adding effects
+	const sel = document.createElement('select')
+	sel.className = 'inspector-field__select'
+	sel.style.marginTop = '8px'
+	sel.style.width = '100%'
+	sel.setAttribute('aria-label', 'Select effect to add')
+	
+	const defOpt = document.createElement('option')
+	defOpt.value = ''
+	defOpt.textContent = '⊕ Choose effect to add...'
+	sel.appendChild(defOpt)
+	
+	for (const fx of MIXER_EFFECTS) {
+		const o = document.createElement('option')
+		o.value = fx.type
+		o.textContent = `${fx.icon} ${fx.label}`
+		sel.appendChild(o)
+	}
+	
+	sel.addEventListener('change', () => {
+		const type = sel.value
+		if (!type) return
+		const existing = effects || []
+		const alreadyHas = existing.some((fx) => fx.type === type)
+		if (alreadyHas) {
+			sel.value = '' // reset
+			return
+		}
+		const instance = createEffectInstance(type)
+		if (!instance) return
+		onUpdate([...existing, instance])
+		sel.value = '' // reset after adding
+	})
+	grp.appendChild(sel)
+
 	// Render existing effects
 	const list = effects || []
 	for (let i = 0; i < list.length; i++) {

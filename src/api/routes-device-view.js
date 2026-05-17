@@ -148,6 +148,9 @@ async function handlePost(body, ctx) {
 			if (persistConfigPatch(ctx, { extraLiveSources: list })) {
 				ctx.config.extraLiveSources = list
 				res = { ok: true, extraLiveSources: list }
+				if (typeof ctx._wsBroadcast === 'function') {
+					ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
+				}
 			} else {
 				res = { status: 503, error: 'Failed to save config' }
 			}
@@ -157,6 +160,9 @@ async function handlePost(body, ctx) {
 		if (persistConfigPatch(ctx, { extraLiveSources: list })) {
 			ctx.config.extraLiveSources = list
 			res = { ok: true, extraLiveSources: list }
+			if (typeof ctx._wsBroadcast === 'function') {
+				ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
+			}
 		} else {
 			res = { status: 503, error: 'Failed to save config' }
 		}
