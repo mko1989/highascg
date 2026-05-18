@@ -14,11 +14,29 @@ import {
 import * as Persistence from './scene-state-persistence-logic.js'
 import * as LayerLogic from './scene-state-layer-logic.js'
 import * as LookLogic from './scene-state-look-logic.js'
-import { PIP_OVERLAY_MAP } from './pip-overlay-registry.js'
-
-function normActivePgmLayer(v) {
-	return Number(v) === 996 ? 996 : 998
-}
+import {
+	sceneStateGetGlobalBorderForScreen,
+	sceneStateSetGlobalBorderForScreen,
+	sceneStateNoteGlobalBorderPushedToPgm,
+	sceneStateGetGlobalBorderPresetSlotCount,
+	sceneStateSaveGlobalBorderPresetSlot,
+	sceneStateDeleteGlobalBorderPresetSlot,
+	sceneStateGetGlobalBorderPreset,
+	sceneStateSetGlobalBorder,
+} from './scene-state-global-border.js'
+import {
+	sceneStateCopyLayerStyle,
+	sceneStateSaveLayerPresetFromLayer,
+	sceneStatePasteLayerStyle,
+	sceneStateApplyLayerPresetToLayer,
+	sceneStateRemoveLayerPreset,
+	sceneStateSaveLookPreset,
+	sceneStateOverwriteLookPreset,
+	sceneStateRemoveLookPreset,
+	sceneStatePatchLookPreset,
+	sceneStateImportLayerPresetsFromServer,
+	sceneStateImportLookPresetsFromServer,
+} from './scene-state-preset-actions.js'
 
 export {
 	defaultTransition,
@@ -201,130 +219,52 @@ export class SceneState {
 	}
 
 	copyLayerStyle(sceneId, layerIndex) {
-		const l = this.getScene(sceneId)?.layers?.[layerIndex]
-		if (!l) return false
-		this._layerStyleClipboard = LayerLogic.getLayerStyleDataFromLayer(l)
-		return true
+		return sceneStateCopyLayerStyle(this, sceneId, layerIndex)
 	}
 
 	hasLayerStyleClipboard() { return this._layerStyleClipboard != null }
 	getLayerPresets() { return this.layerPresets }
 
 	saveLayerPresetFromLayer(sceneId, layerIndex, name) {
-		const l = this.getScene(sceneId)?.layers?.[layerIndex]
-		if (!l || !String(name || '').trim()) return null
-		const id = newId()
-		this.layerPresets.push({ id, name: LayerLogic.uniqueLayerPresetName(this.layerPresets, name.trim()), data: LayerLogic.getLayerStyleDataFromLayer(l) })
-		this._save(); return id
+		return sceneStateSaveLayerPresetFromLayer(this, sceneId, layerIndex, name)
 	}
 
 	pasteLayerStyle(sceneId, layerIndex) {
-		const L = this.getScene(sceneId)?.layers?.[layerIndex]
-		if (!L || !this._layerStyleClipboard) return false
-		LayerLogic.applyLayerStyleData(L, this._layerStyleClipboard)
-		this._softSave(); return true
+		return sceneStatePasteLayerStyle(this, sceneId, layerIndex)
 	}
 
 	applyLayerPresetToLayer(sceneId, layerIndex, presetId) {
-		const p = this.layerPresets.find((x) => x.id === presetId)
-		const L = this.getScene(sceneId)?.layers?.[layerIndex]
-		if (!p?.data || !L) return false
-		LayerLogic.applyLayerStyleData(L, p.data)
-		this._softSave(); return true
+		return sceneStateApplyLayerPresetToLayer(this, sceneId, layerIndex, presetId)
 	}
 
 	removeLayerPreset(presetId) {
-		const i = this.layerPresets.findIndex((p) => p.id === presetId)
-		if (i < 0) return false
-		this.layerPresets.splice(i, 1); this._save(); return true
+		return sceneStateRemoveLayerPreset(this, presetId)
 	}
 
 	getLookPresets() { return this.lookPresets }
 
 	saveLookPreset(name, sourceKind) {
-		const nameTrim = String(name || '').trim()
-		if (!nameTrim) return null
-		
-		const items = []
-		const targets = this.armedScreenIndices?.length ? this.armedScreenIndices : [this.activeScreenIndex]
-		targets.forEach(idx => {
-			const sceneId = sourceKind === 'prv' ? this.previewSceneIdByMain[idx] : (sourceKind === 'pgm' ? this.liveSceneIdByMain[idx] : (sourceKind === 'editing' ? this.editingSceneId : null))
-			if (sceneId && this.getScene(sceneId)) {
-				items.push({ mainIdx: idx, sceneId, sourceKind })
-			}
-		})
-		
-		if (items.length === 0) return null
-		
-		const id = newId()
-		const legacyFallback = items[0]
-		this.lookPresets.push({ 
-			id, 
-			name: LookLogic.uniqueLookPresetName(this.lookPresets, nameTrim), 
-			createdAt: Date.now(), 
-			items,
-			sceneId: legacyFallback.sceneId, 
-			sourceKind: legacyFallback.sourceKind, 
-			targetMain: legacyFallback.mainIdx 
-		})
-		this._save(); return id
+		return sceneStateSaveLookPreset(this, name, sourceKind)
 	}
 
 	overwriteLookPreset(presetId) {
-		const p = this.lookPresets.find((x) => x.id === presetId)
-		if (!p) return false
-		const sourceKind = p.sourceKind || 'prv'
-		
-		const items = []
-		const targets = this.armedScreenIndices?.length ? this.armedScreenIndices : [this.activeScreenIndex]
-		targets.forEach(idx => {
-			const sceneId = sourceKind === 'prv' ? this.previewSceneIdByMain[idx] : (sourceKind === 'pgm' ? this.liveSceneIdByMain[idx] : (sourceKind === 'editing' ? this.editingSceneId : null))
-			if (sceneId && this.getScene(sceneId)) {
-				items.push({ mainIdx: idx, sceneId, sourceKind })
-			}
-		})
-		
-		if (items.length === 0) return false
-		
-		const legacyFallback = items[0]
-		p.items = items
-		p.sceneId = legacyFallback.sceneId
-		p.sourceKind = legacyFallback.sourceKind
-		p.targetMain = legacyFallback.mainIdx
-		p.createdAt = Date.now()
-		
-		this._save()
-		return true
+		return sceneStateOverwriteLookPreset(this, presetId)
 	}
 
 	removeLookPreset(presetId) {
-		const i = this.lookPresets.findIndex((p) => p.id === presetId)
-		if (i < 0) return false
-		this.lookPresets.splice(i, 1); this._save(); return true
+		return sceneStateRemoveLookPreset(this, presetId)
 	}
 
 	patchLookPreset(lookPresetId, patch) {
-		const i = this.lookPresets.findIndex((p) => p.id === lookPresetId)
-		if (i < 0) return false
-		if (patch?.tandem === null) {
-			const { tandem: _t, ...rest } = patch
-			this.lookPresets[i] = { ...this.lookPresets[i], ...rest }; delete this.lookPresets[i].tandem
-		} else {
-			this.lookPresets[i] = { ...this.lookPresets[i], ...patch }
-		}
-		this._save(); return true
+		return sceneStatePatchLookPreset(this, lookPresetId, patch)
 	}
 
 	importLayerPresetsFromServer(list) {
-		const next = LayerLogic.importLayerPresetsFromServer(this.layerPresets, list)
-		if (!next) return false
-		this.layerPresets = next; this._save(); return true
+		return sceneStateImportLayerPresetsFromServer(this, list)
 	}
 
 	importLookPresetsFromServer(list) {
-		const next = LookLogic.importLookPresetsFromServer(list)
-		if (!next) return false
-		this.lookPresets = next; this._save(); return true
+		return sceneStateImportLookPresetsFromServer(this, list)
 	}
 
 	removeScene(id) {
@@ -446,165 +386,35 @@ export class SceneState {
 	}
 
 	getGlobalBorderForScreen(screenIdx) {
-		const m = Math.max(0, Math.min(3, screenIdx))
-		const stored = this.globalBorders[m]
-		if (stored) {
-			// Always force `side: 'inside'` — the global border covers the full screen,
-			// `outside` would push the frame past the viewport (scrollbars on the consumer).
-			const snap =
-				stored.pgmAirSnapshot && typeof stored.pgmAirSnapshot === 'object'
-					? {
-							...stored.pgmAirSnapshot,
-							params: { ...(stored.pgmAirSnapshot.params || {}), side: 'inside' },
-							activePgmLayer: normActivePgmLayer(stored.pgmAirSnapshot.activePgmLayer),
-						}
-					: null
-			return {
-				...stored,
-				fadeDuration: stored.fadeDuration ?? 25,
-				params: { ...(stored.params || {}), side: 'inside' },
-				slices: Array.isArray(stored.slices) ? stored.slices : [],
-				mirrorBorderOnPrv: stored.mirrorBorderOnPrv === true,
-				activePgmLayer: normActivePgmLayer(stored.activePgmLayer),
-				borderPresets: Array.isArray(stored.borderPresets) ? stored.borderPresets : [],
-				pgmAirSnapshot: snap,
-			}
-		}
-		const def = PIP_OVERLAY_MAP.get('border')
-		return {
-			enabled: false,
-			type: 'border',
-			fadeDuration: 25,
-			params: { ...(def?.defaults || {}), side: 'inside' },
-			slices: [],
-			artnetPatch: { startChannel: 1, universe: 0 },
-			/** When true, border control AMCP targets only the PRV Caspar channel (layer 997). */
-			mirrorBorderOnPrv: false,
-			activePgmLayer: 998,
-			borderPresets: [],
-			pgmAirSnapshot: null,
-		}
+		return sceneStateGetGlobalBorderForScreen(this, screenIdx)
 	}
 
 	setGlobalBorderForScreen(screenIdx, border) {
-		const m = Math.max(0, Math.min(3, screenIdx))
-		const prev = this.getGlobalBorderForScreen(screenIdx)
-
-		if (!this.borderJustEnabled) this.borderJustEnabled = {}
-		if (border.enabled !== undefined && !prev.enabled && border.enabled) {
-			this.borderJustEnabled[m] = true
-		}
-		if (border.type !== undefined && prev.type !== border.type) {
-			this.borderJustEnabled[m] = true // Use CG ADD for type change
-		}
-
-		let merged = { ...prev, ...border }
-		const turningPrvOff = prev.mirrorBorderOnPrv === true && merged.mirrorBorderOnPrv === false
-		if (turningPrvOff && prev.pgmAirSnapshot && typeof prev.pgmAirSnapshot === 'object') {
-			const snap = prev.pgmAirSnapshot
-			merged = {
-				...merged,
-				enabled: snap.enabled,
-				type: snap.type,
-				params: { ...(snap.params || {}), side: 'inside' },
-				slices: Array.isArray(snap.slices) ? snap.slices : [],
-				fadeDuration: snap.fadeDuration ?? merged.fadeDuration,
-				artnetPatch: { startChannel: 1, universe: 0, ...(snap.artnetPatch || {}) },
-				activePgmLayer: normActivePgmLayer(snap.activePgmLayer ?? merged.activePgmLayer),
-				mirrorBorderOnPrv: false,
-			}
-		}
-
-		if (border.slices != null) {
-			merged.slices = Array.isArray(border.slices) ? border.slices : []
-		}
-
-		const nextParams = turningPrvOff
-			? { ...merged.params, side: 'inside' }
-			: border.params != null
-				? { ...(prev.params || {}), ...border.params, side: 'inside' }
-				: { ...(prev.params || {}), side: 'inside' }
-		merged.params = nextParams
-		merged.activePgmLayer = normActivePgmLayer(merged.activePgmLayer)
-		if (!Array.isArray(merged.borderPresets)) merged.borderPresets = [...(prev.borderPresets || [])]
-
-		this.globalBorders[m] = merged
-		this.borderChanged = true
-		this._softSave()
+		sceneStateSetGlobalBorderForScreen(this, screenIdx, border)
 	}
 
 	noteGlobalBorderPushedToPgm(screenIdx, slice) {
-		const m = Math.max(0, Math.min(3, screenIdx))
-		const cur = this.getGlobalBorderForScreen(screenIdx)
-		const snap = {
-			enabled: slice.enabled !== undefined ? !!slice.enabled : !!cur.enabled,
-			type: slice.type != null ? String(slice.type) : String(cur.type || 'border'),
-			params: { ...(cur.params || {}), ...(slice.params || {}), side: 'inside' },
-			slices: Array.isArray(slice.slices ?? cur.slices) ? (slice.slices ?? cur.slices) : [],
-			fadeDuration: Math.max(0, parseInt(String(slice.fadeDuration ?? cur.fadeDuration ?? 25), 10) || 25),
-			artnetPatch: { startChannel: 1, universe: 0, ...(slice.artnetPatch || cur.artnetPatch || {}) },
-			activePgmLayer: normActivePgmLayer(slice.activePgmLayer ?? cur.activePgmLayer),
-		}
-		this.globalBorders[m] = { ...cur, pgmAirSnapshot: snap }
-		this._softSave()
+		sceneStateNoteGlobalBorderPushedToPgm(this, screenIdx, slice)
 	}
 
 	getGlobalBorderPresetSlotCount(screenIdx) {
-		const cur = this.getGlobalBorderForScreen(screenIdx)
-		const presets = cur.borderPresets || []
-		const maxSlot = presets.reduce(
-			(mx, p) => (p && Number.isFinite(Number(p.slot)) ? Math.max(mx, Number(p.slot)) : mx),
-			0,
-		)
-		return Math.max(2, maxSlot + 2)
+		return sceneStateGetGlobalBorderPresetSlotCount(this, screenIdx)
 	}
 
 	saveGlobalBorderPresetSlot(screenIdx, slotNum, name) {
-		const m = Math.max(0, Math.min(3, screenIdx))
-		const sn = Math.max(1, Math.floor(Number(slotNum)) || 1)
-		const cur = this.getGlobalBorderForScreen(screenIdx)
-		const source = cur.pgmAirSnapshot && typeof cur.pgmAirSnapshot === 'object' ? cur.pgmAirSnapshot : cur
-		const data = {
-			enabled: !!source.enabled,
-			type: String(source.type || 'border'),
-			params: { ...(source.params || {}), side: 'inside' },
-			slices: Array.isArray(source.slices) ? source.slices : [],
-			fadeDuration: Math.max(0, parseInt(String(source.fadeDuration ?? 25), 10) || 25),
-			artnetPatch: { startChannel: 1, universe: 0, ...(source.artnetPatch || {}) },
-		}
-		const presets = [...(cur.borderPresets || [])]
-		const idx = presets.findIndex((p) => p && Number(p.slot) === sn)
-		const nm = String(name || `Preset ${sn}`).trim() || `Preset ${sn}`
-		const entry = { slot: sn, name: nm, data }
-		if (idx >= 0) presets[idx] = entry
-		else presets.push(entry)
-		presets.sort((a, b) => Number(a.slot) - Number(b.slot))
-		this.globalBorders[m] = { ...cur, borderPresets: presets }
-		this._save()
+		sceneStateSaveGlobalBorderPresetSlot(this, screenIdx, slotNum, name)
 	}
 
 	deleteGlobalBorderPresetSlot(screenIdx, slotNum) {
-		const m = Math.max(0, Math.min(3, screenIdx))
-		const sn = Math.floor(Number(slotNum))
-		const cur = this.getGlobalBorderForScreen(screenIdx)
-		const presets = (cur.borderPresets || []).filter((p) => !p || Number(p.slot) !== sn)
-		this.globalBorders[m] = { ...cur, borderPresets: presets }
-		this._save()
+		sceneStateDeleteGlobalBorderPresetSlot(this, screenIdx, slotNum)
 	}
 
 	getGlobalBorderPreset(screenIdx, slotNum) {
-		const cur = this.getGlobalBorderForScreen(screenIdx)
-		const sn = Math.floor(Number(slotNum))
-		return (cur.borderPresets || []).find((p) => p && Number(p.slot) === sn) || null
+		return sceneStateGetGlobalBorderPreset(this, screenIdx, slotNum)
 	}
 
 	setGlobalBorder(sceneId, border) {
-		const s = this.getScene(sceneId)
-		if (s) {
-			s.globalBorder = { ...s.globalBorder, ...border }
-			this.borderChanged = true
-			this._softSave()
-		}
+		sceneStateSetGlobalBorder(this, sceneId, border)
 	}
 
 	setGlobalDefaultTransition(t) {

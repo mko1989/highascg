@@ -1,0 +1,14 @@
+# Copy to flash-iso.conf (same directory) or pass your file as the only argument:
+#   sudo bash tools/live-usb/flash-iso-from-config.sh /path/to/my-flash.txt
+#
+# Lines are KEY=value. Blank lines and # comments are ignored.
+# Whitespace around = is optional. Values can use "quotes".
+#
+# add-exfat-data-partition.sh and add-union-persistence-partition.sh read DEVICE=
+# from this file when you omit /dev/sdX on the command line (same default path).
+
+ISO=/home/eggs/highascg-live.iso
+DEVICE=/dev/sda
+
+# Optional: dd block size (default 4M)
+# BS=4M

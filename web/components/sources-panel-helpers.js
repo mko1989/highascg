@@ -247,6 +247,19 @@ export function mergeMediaProbeOverlay(stateMedia, probeList) {
 
 export function buildLiveSources(channelMap, connectors) {
 	const sources = []
+	
+	// Built-in System Timers Template source
+	const host = typeof location !== 'undefined' ? location.origin : 'http://localhost:8080'
+	sources.push({
+		type: 'browser',
+		routeType: 'browser',
+		value: `${host}/templates/playback_timers.html`,
+		label: 'System Timers Template',
+		resolution: '1920×1080',
+		fps: '50',
+		browserAsCg: false
+	})
+
 	if (!channelMap) return sources
 	const {
 		programChannels = [],

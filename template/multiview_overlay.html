@@ -4,78 +4,10 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Multiview overlay</title>
-	<style>
-		@font-face { font-family: 'Rewir'; src: url('../web/fonts/Rewir-Light.woff') format('woff'); font-weight: 300; font-style: normal; font-display: swap; }
-		* { margin: 0; padding: 0; box-sizing: border-box; }
-		html, body { width: 100%; height: 100%; overflow: hidden; background: transparent !important; background-color: rgba(0,0,0,0) !important; font-family: 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif; }
-		#container { position: absolute; inset: 0; pointer-events: none; background: transparent !important; overflow: visible; }
-		/* Video tile: border only around the picture — label sits below (no overlay on source). */
-		.cell { position: absolute; border: 3px solid; background: transparent !important; box-sizing: border-box; }
-		.cell .label {
-			position: absolute;
-			top: 100%;
-			left: -3px;
-			width: calc(100% + 6px);
-			box-sizing: border-box;
-			margin: 0;
-			padding: 8px 10px;
-			color: #fff;
-			font: 600 12px/1.35 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif;
-			border-style: solid;
-			border-width: 0 3px 3px 3px;
-			text-align: center;
-			white-space: nowrap;
-			overflow: hidden;
-			text-overflow: ellipsis;
-		}
-		.cell.pgm { border-color: #e63946; }
-		.cell.pgm .label { border-color: #e63946; background: #c92a2a; }
-		.cell.prv { border-color: #2a9d8f; }
-		.cell.prv .label { border-color: #2a9d8f; background: #0d9488; }
-		.cell.decklink { border-color: #457b9d; }
-		.cell.decklink .label { border-color: #457b9d; background: #2563eb; }
-		.cell.ndi { border-color: #457b9d; }
-		.cell.ndi .label { border-color: #457b9d; background: #2563eb; }
-		.cell.route { border-color: #457b9d; }
-		.cell.route .label { border-color: #457b9d; background: #2563eb; }
-	</style>
+	<link rel="stylesheet" href="multiview_overlay.css">
 </head>
 <body>
 	<div id="container"></div>
-	<script>
-		window['play'] = function() { /* CasparCG calls play(); no-op */ }
-		function update(raw) {
-			let data
-			try {
-				if (typeof raw === 'string') {
-					let s = raw.trim()
-					if (!s) return
-					if (s.indexOf('\\"') !== -1) s = s.replace(/\\"/g, '"')
-					if (s.charAt(0) === '"' && s.length > 1 && s.charAt(s.length - 1) === '"') s = s.slice(1, -1)
-					if (s.charAt(0) === '"') { s = s.slice(1).replace(/\\"/g, '"'); s = s.replace(/"\s*$/, '') }
-					data = JSON.parse(s)
-				} else if (raw && typeof raw === 'object') {
-					data = raw
-				} else return
-			} catch (e) { return }
-			const cells = data?.cells || []
-			const c = document.getElementById('container')
-			c.innerHTML = ''
-			cells.forEach(function (cell) {
-				const div = document.createElement('div')
-				div.className = 'cell ' + (cell.type || '')
-				div.style.left = (100 * (cell.x || 0)) + '%'
-				div.style.top = (100 * (cell.y || 0)) + '%'
-				div.style.width = (100 * (cell.w || 0)) + '%'
-				div.style.height = (100 * (cell.h || 0)) + '%'
-				const lbl = document.createElement('div')
-				lbl.className = 'label'
-				lbl.textContent = cell.label || cell.id || ''
-				div.appendChild(lbl)
-				c.appendChild(div)
-			})
-		}
-		window['update'] = update
-	</script>
+	<script src="multiview_overlay.js"></script>
 </body>
 </html>

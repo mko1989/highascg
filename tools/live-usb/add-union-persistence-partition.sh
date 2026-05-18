@@ -3,8 +3,9 @@
 # Default workflow for HighAsCG USB sticks — keeps /home/casparcg/highascg + rest of writable root.
 #
 # Usage:
-#   sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
-#   sudo bash tools/live-usb/add-union-persistence-partition.sh --dry-run /dev/sdX
+#   sudo bash tools/live-usb/add-union-persistence-partition.sh [/dev/sdX]
+#   sudo bash tools/live-usb/add-union-persistence-partition.sh --dry-run [/dev/sdX]
+# Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
 # Requires: parted util-linux blkid mount
 set -euo pipefail
@@ -12,8 +13,11 @@ set -euo pipefail
 DRY=false
 DEV=""
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
-  echo "Usage: sudo $0 [--dry-run] /dev/sdX" >&2
+  echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2
+  echo "If /dev/sdX is omitted, reads DEVICE= from tools/live-usb/flash-iso.conf (or FLASH_ISO_CONF)." >&2
   echo "Adds ext4 labelled 'persistence' + persistence.conf with '/ union'" >&2
   exit 1
 }
@@ -27,6 +31,18 @@ while [[ $# -gt 0 ]]; do
     *) DEV="$1"; shift ;;
   esac
 done
+
+if [[ -z "$DEV" ]]; then
+  CONF_PATH="${FLASH_ISO_CONF:-$HERE/flash-iso.conf}"
+  if [[ ! -f "$CONF_PATH" ]]; then
+    echo "No device argument and no $CONF_PATH — pass /dev/sdX or copy flash-iso.conf.example." >&2
+    usage
+  fi
+  # shellcheck source=flash-iso-conf-lib.sh
+  source "${HERE}/flash-iso-conf-lib.sh"
+  DEV="$(flash_iso_read_device "$CONF_PATH")"
+  echo "Using DEVICE from ${CONF_PATH} → ${DEV}" >&2
+fi
 
 [[ -n "$DEV" ]] || usage
 

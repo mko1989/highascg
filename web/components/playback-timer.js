@@ -284,13 +284,12 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 	const fill = container.querySelector('.playback-timer__fill')
 	const bar = container.querySelector('.playback-timer__bar')
 
-	function paint(layerState, layerNum) {
+	function paint(layerState, layerNum, resolvedChNum) {
 		const rawFile = layerState?.file || {}
 		let infoLayer = null
 		try {
-			const chNum = getChannel()
 			const st = typeof getState === 'function' ? getState() : null
-			const chEntry = Array.isArray(st?.channels) ? st.channels.find((c) => c && c.id === chNum) : null
+			const chEntry = Array.isArray(st?.channels) ? st.channels.find((c) => c && c.id === resolvedChNum) : null
 			infoLayer = getInfoLayerRow(chEntry, layerNum)
 		} catch {
 			infoLayer = null
@@ -337,10 +336,25 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 	}
 
 	function refresh() {
-		const chNum = getChannel()
+		let chNum = getChannel()
+		try {
+			const st = typeof getState === 'function' ? getState() : null
+			const cm = st?.channelMap
+			if (cm && cm.transitionModel === 'switcher_bus') {
+				const screenIdx = cm.playbackChannels ? cm.playbackChannels.indexOf(chNum) : -1
+				if (screenIdx >= 0) {
+					const parentCh = cm.programChannels[screenIdx] || 1
+					const bank = st?.scene?.programLayerBankByChannel?.[String(parentCh)] || 'a'
+					const activeCh = bank === 'b' ? cm.switcherBusChannels?.[screenIdx] : cm.switcherBus1Channels?.[screenIdx]
+					if (activeCh) chNum = activeCh
+				}
+			}
+		} catch (e) {
+			console.warn('[playback-timer] active ch resolution failed:', e)
+		}
 		const ch = oscClient.channels[String(chNum)] || oscClient.channels[chNum]
 		const { layerNum, layerState } = pickTopLayerStateForPlayback(ch)
-		paint(layerState || { file: {} }, layerNum)
+		paint(layerState || { file: {} }, layerNum, chNum)
 	}
 
 	const unsub = oscClient.onAfterIngest(refresh)

@@ -7,7 +7,8 @@ import { pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-m
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl, getLiveThumbnailUrl, getLiveThumbnailChannelForSource } from '../lib/thumbnail-url.js'
-import { isMediaOrFileSource, parseDraggableSourcesPayload } from './scenes-shared.js'
+import { isMediaOrFileSource, parseDraggableSourcesPayload, parseRouteChannelLayer } from './scenes-shared.js'
+import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
 import { showScenesToast } from './scenes-editor-support.js'
 export { createComposeDragHandlers } from './scenes-compose-handlers.js'
@@ -59,6 +60,7 @@ export function createApplyNativeFillForSource(opts) {
 export function renderComposeScene(scene, opts) {
 	const {
 		sceneState,
+		stateStore,
 		getResolution,
 		selectedLayerIndex,
 		dispatchLayerSelect,
@@ -73,6 +75,20 @@ export function renderComposeScene(scene, opts) {
 		getThumbUrlForLayerSource,
 		getPreviewChannelForLiveThumb,
 	} = opts
+
+	/** Block `route://ch-L` on the same channel-layer the look stack uses for that layer (Caspar recursion). */
+	function routeLayerDropAllowed(data, targetLayerNumber) {
+		const parsed = parseRouteChannelLayer(data?.value)
+		if (!parsed) return true
+		const cm = stateStore?.getState?.()?.channelMap || {}
+		const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
+		if (ch == null) return true
+		if (parsed.channel === ch && parsed.layer === Number(targetLayerNumber)) {
+			showScenesToast('A layer cannot play a route to itself (same channel and layer).', 'warn')
+			return false
+		}
+		return true
+	}
 
 	const res = getResolution()
 	const aspectRatio = res.h > 0 ? res.w / res.h : 1
@@ -95,6 +111,12 @@ export function renderComposeScene(scene, opts) {
 		if (!data?.value || !sceneState.editingSceneId) return
 		const idx = sceneState.addLayer(scene.id)
 		if (idx < 0) return
+		const added = sceneState.getScene(scene.id)?.layers?.[idx]
+		const targetLn = added?.layerNumber
+		if (targetLn != null && !routeLayerDropAllowed(data, targetLn)) {
+			sceneState.removeLayer(scene.id, idx)
+			return
+		}
 		sceneState.setLayerSource(scene.id, idx, {
 			...data,
 			type: data.type || 'media',
@@ -327,6 +349,7 @@ export function renderComposeScene(scene, opts) {
 				void (async () => {
 					const first = items[0]
 					if (first?.value) {
+						if (!routeLayerDropAllowed(first, layer.layerNumber)) return
 						sceneState.setLayerSource(scene.id, realIdx, {
 							...first,
 							type: first.type || 'media',
@@ -348,6 +371,7 @@ export function renderComposeScene(scene, opts) {
 				})()
 			} else if (items.length === 1) {
 				const data = items[0]
+				if (!routeLayerDropAllowed(data, layer.layerNumber)) return
 				sceneState.setLayerSource(scene.id, realIdx, {
 					...data,
 					type: data.type || 'media',

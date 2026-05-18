@@ -19,6 +19,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
+
 BUILD_SCRIPT="${HERE}/build-highascg-egg.sh"
 PERSIST_SCRIPT="${HERE}/add-union-persistence-partition.sh"
 
@@ -71,129 +74,6 @@ die() {
 	exit 1
 }
 
-find_latest_iso() {
-	local latest="" t=0 f ts
-	shopt -s nullglob
-	local candidates=(/home/eggs/*.iso /home/eggs/mnt/*.iso)
-	shopt -u nullglob
-	[[ ${#candidates[@]} -gt 0 ]] || {
-		echo "No *.iso found under /home/eggs/ or /home/eggs/mnt/. Build first or pass --iso." >&2
-		return 1
-	}
-	for f in "${candidates[@]}"; do
-		[[ -f "$f" ]] || continue
-		ts=$(stat -c %Y "$f" 2>/dev/null) || continue
-		if (( ts >= t )); then
-			t=$ts
-			latest=$f
-		fi
-	done
-	[[ -n "$latest" ]] || return 1
-	printf '%s' "$latest"
-}
-
-list_flash_candidates() {
-	# Prefer USB-transport or removable whole disks; if none, list all disks with a warning.
-	local -a buf=()
-	local path tran rm typ
-	while read -r path tran rm; do
-		[[ -n "$path" && -b "$path" ]] || continue
-		typ=$(lsblk -ndo TYPE "$path" 2>/dev/null || true)
-		[[ "$typ" == disk ]] || continue
-		if [[ "$tran" == "usb" || "$rm" == "1" ]]; then
-			buf+=("$path")
-		fi
-	done < <(lsblk -dnrpo PATH,TRAN,RM 2>/dev/null || true)
-	if [[ ${#buf[@]} -eq 0 ]]; then
-		echo "No drive with TRAN=usb or RM=1; listing all whole disks (be careful):" >&2
-		while read -r path _; do
-			[[ -n "$path" && -b "$path" ]] || continue
-			typ=$(lsblk -ndo TYPE "$path" 2>/dev/null || true)
-			[[ "$typ" == disk ]] || continue
-			buf+=("$path")
-		done < <(lsblk -dnrpo PATH,TRAN,RM 2>/dev/null || true)
-	fi
-	printf '%s\n' "${buf[@]}" | sort -u
-}
-
-pick_usb_interactive() {
-	local -a opts=()
-	mapfile -t opts < <(list_flash_candidates)
-	if [[ ${#opts[@]} -eq 0 ]]; then
-		echo "No block devices found." >&2
-		return 1
-	fi
-	echo "Removable / USB candidates (whole disks only):"
-	local i=1 p sz model tran
-	for p in "${opts[@]}"; do
-		sz=$(lsblk -dnro SIZE "$p" 2>/dev/null || echo "?")
-		model=$(lsblk -dnro MODEL "$p" 2>/dev/null | head -1 || echo "")
-		tran=$(lsblk -dnro TRAN "$p" 2>/dev/null | head -1 || echo "")
-		printf '  %2d) %-12s %8s  TRAN=%-6s  %s\n' "$i" "$p" "$sz" "$tran" "$model"
-		((i++)) || true
-	done
-	local choice
-	read -r -p "Enter number (1-${#opts[@]}): " choice || true
-	[[ "$choice" =~ ^[0-9]+$ ]] || {
-		echo "Invalid choice." >&2
-		return 1
-	}
-	((choice >= 1 && choice <= ${#opts[@]})) || {
-		echo "Out of range." >&2
-		return 1
-	}
-	USB="${opts[$((choice - 1))]}"
-}
-
-confirm_dd() {
-	local iso="$1" dev="$2"
-	echo
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "About to overwrite **entire disk** $dev"
-	echo "ISO: $iso"
-	echo "This erases all data on that device."
-	if "$DO_PERSIST"; then
-		echo "After dd: add persistence partition (+ persistence.conf with / union)."
-	else
-		echo "After dd: persistence step skipped (--no-persist)."
-	fi
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	if [[ "$ASSUME_YES" != true ]]; then
-		local w
-		read -r -p "Type YES to continue: " w
-		[[ "$w" == "YES" ]] || {
-			echo "Aborted." >&2
-			return 1
-		}
-		local w2
-		read -r -p "Confirm device path (type $dev again): " w2
-		[[ "$w2" == "$dev" ]] || {
-			echo "Confirmation mismatch." >&2
-			return 1
-		}
-	fi
-	return 0
-}
-
-run_dd() {
-	local iso="$1" dev="$2"
-	need_root
-	[[ -f "$iso" ]] || die "ISO not found: $iso"
-	[[ -b "$dev" ]] || die "Not a block device: $dev"
-
-	echo "Unmounting any partitions on $dev …"
-	systemctl daemon-reload 2>/dev/null || true
-	umount "${dev}"* 2>/dev/null || true
-
-	echo "Writing ISO → $dev (bs=4M) …"
-	dd if="$iso" of="$dev" bs=4M status=progress oflag=sync conv=fsync
-	sync
-	partprobe "$dev"
-	sleep 1
-	lsblk "$dev"
-	echo "dd finished."
-}
-
 if "$DO_BUILD"; then
 	need_root
 	echo "==> Build phase: $BUILD_SCRIPT"
@@ -215,8 +95,14 @@ if "$DO_FLASH"; then
 	typ=$(lsblk -ndo TYPE "$USB" 2>/dev/null || true)
 	[[ "$typ" == disk ]] || die "Refusing $USB: expected whole disk (TYPE=disk), got TYPE=$typ"
 
-	confirm_dd "$ISO" "$USB" || exit 1
-	run_dd "$ISO" "$USB"
+	local_dd_note=""
+	if "$DO_PERSIST"; then
+		local_dd_note="After dd: add persistence (+ persistence.conf / union)."
+	else
+		local_dd_note="After dd: persistence step skipped (--no-persist)."
+	fi
+	confirm_dd_flash "$ISO" "$USB" "$ASSUME_YES" "$local_dd_note" || exit 1
+	run_dd_flash "$ISO" "$USB"
 
 	if "$DO_PERSIST"; then
 		echo "==> Persistence: $PERSIST_SCRIPT $USB"

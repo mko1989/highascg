@@ -16,7 +16,8 @@ function scheduleStartupHqThumbnailPrewarm(self) {
 	if (self?.config?.hq_thumbnail_prewarm_on_start === false) return
 	const ids = (self?.state?.getState?.()?.media || []).map((m) => String(m?.id || '').trim()).filter(Boolean)
 	if (ids.length === 0) return
-	self._hqThumbPrewarmInFlight = ensureLocalThumbnailCacheForMediaIds(self.config || {}, ids, { maxItems: ids.length, maxW: 960, seekSec: 2 })
+	const maxStartupThumb = Math.min(ids.length, 80)
+	self._hqThumbPrewarmInFlight = ensureLocalThumbnailCacheForMediaIds(self.config || {}, ids, { maxItems: maxStartupThumb, maxW: 960, seekSec: 2 })
 		.then((stats) => {
 			self._hqThumbStartupPrewarmDone = true
 			if (typeof self.log === 'function' && stats?.generated > 0) {

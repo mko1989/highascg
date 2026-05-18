@@ -38,8 +38,8 @@ export function renderLayerPresetsMode(root, { getSelection, onSceneRefresh }) {
 		const clipRow = document.createElement('div')
 		clipRow.className = 'inspector-layer-style__row'
 		clipRow.innerHTML = `
-			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-lp-tab-copy title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">⎘</button>
-			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-lp-tab-paste title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋</button>
+			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-lp-tab-copy title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">→📋</button>
+			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-lp-tab-paste title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋→</button>
 			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-lp-tab-save title="Save as layer style preset" aria-label="Save as layer style preset">💾</button>
 		`
 		clipRow.querySelector('[data-lp-tab-copy]')?.addEventListener('click', () => {
@@ -117,7 +117,7 @@ export function renderLayerPresetsMode(root, { getSelection, onSceneRefresh }) {
 			onSceneRefresh?.()
 		},
 		title: 'Library',
-		hintText: 'Included in project save. Same fields as the layer list (⎘ / 📋 / 💾).',
+		hintText: 'Included in project save. Same fields as the layer list (→📋 / 📋→ / 💾).',
 	})
 	root.appendChild(box)
 }

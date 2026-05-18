@@ -255,6 +255,11 @@ same style).
 | `tools/live-usb/penguins-eggs-exclude-highascg-fragment.list` | Paths under `home/casparcg/highascg/…` (and caches) to omit from squashfs — merge into eggs |
 | `tools/live-usb/ensure-empty-live-usb-dirs.sh` | `mkdir` + optional `chown` for **`casparcg`** on **`…/media/drive`** and **`/home/casparcg/exfat`** before imaging |
 | `tools/live-usb/merge-penguins-eggs-exclude-highascg.sh` | Appends the fragment to `/etc/penguins-eggs.d/exclude.list` (idempotent) |
+| `tools/live-usb/prepare-eggs-clone-with-exfat.sh` | **Preferred one-shot:** WO-47 systemd units, **`exfat-sync`**, **`highascg.service`** deps, **`exfatprogs`**, empty mount stubs, merge excludes (**[`EXFAT_DATA_ZERO_TOUCH.md`](../tools/live-usb/EXFAT_DATA_ZERO_TOUCH.md)**) |
+
+**Shortcut (recommended):** run **`sudo bash tools/live-usb/prepare-eggs-clone-with-exfat.sh`** once **`/etc/penguins-eggs.d/exclude.list`** exists; it performs steps 1–2 below (`ensure-empty-live-usb-dirs` + merge fragment) and bakes WO-47 into **`/etc`**. **`tools/live-usb/build-highascg-egg.sh`** invokes it automatically.
+
+Alternatively, do the steps manually:
 
 **On the source host (as root), before the final `eggs produce`:**
 

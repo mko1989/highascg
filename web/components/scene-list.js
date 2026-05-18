@@ -46,6 +46,22 @@ export function renderSceneDeck(ctx) {
 		globalCutFromPreview,
 	} = ctx
 
+	// 1. Capture scroll positions before clearing mainHost to prevent scroll jumping
+	const savedScrolls = []
+	try {
+		const scrollables = mainHost.querySelectorAll('.scenes-deck-row, .scenes-deck-col, .scenes-deck')
+		scrollables.forEach((el, index) => {
+			savedScrolls.push({
+				index,
+				scrollLeft: el.scrollLeft,
+				scrollTop: el.scrollTop,
+				className: el.className
+			})
+		})
+	} catch (e) {
+		/* ignore */
+	}
+
 	mainHost.innerHTML = ''
 	const screenCount = Math.max(1, getScreenCount())
 	const cm = getChannelMap()
@@ -428,6 +444,20 @@ export function renderSceneDeck(ctx) {
 			row.appendChild(note)
 		}
 		mainHost.appendChild(row)
+	}
+
+	// 2. Restore scroll positions
+	try {
+		const newScrollables = mainHost.querySelectorAll('.scenes-deck-row, .scenes-deck-col, .scenes-deck')
+		savedScrolls.forEach((saved) => {
+			const el = newScrollables[saved.index]
+			if (el && el.className === saved.className) {
+				el.scrollLeft = saved.scrollLeft
+				el.scrollTop = saved.scrollTop
+			}
+		})
+	} catch (e) {
+		/* ignore */
 	}
 
 	previewPanel.scheduleDraw()

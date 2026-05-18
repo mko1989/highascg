@@ -1,0 +1,208 @@
+/* WO-33 — device view cables, connectors, overlay */
+.device-view__cable-overlay {
+	position: absolute;
+	pointer-events: none;
+	z-index: 3;
+	overflow: visible;
+}
+.device-view__cable-line {
+	fill: none;
+	stroke: var(--cable-color, #3b82f6);
+	stroke-width: 2.2;
+	stroke-linecap: round;
+	stroke-dasharray: 2 0;
+	/* Dual drop-shadow: one for the cable's ambient shadow (depth), one for the glow */
+	filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 1px var(--cable-color));
+	pointer-events: stroke;
+	cursor: pointer;
+	transition: stroke-width 0.2s ease, filter 0.2s ease;
+}
+.device-view__cable-line--active {
+	stroke-width: 3.5;
+	filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 8px var(--cable-color));
+}
+.device-view__backpanel-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	pointer-events: none;
+}
+.device-view__panel-marker {
+	position: relative;
+	width: 44px;
+	height: 44px;
+	border: none;
+	background: transparent;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	z-index: 5;
+	border-radius: 50%;
+	pointer-events: auto;
+}
+.device-view__panel-marker--gpu {
+	background: rgba(37, 99, 235, 0.9);
+}
+.device-view__panel-connector-img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+	transition: filter 0.2s;
+}
+.device-view__panel-marker:hover .device-view__panel-connector-img {
+	filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.8));
+}
+.device-view__panel-marker-label {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 13px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.9);
+	white-space: nowrap;
+	pointer-events: none;
+}
+.device-view__panel-marker-label--left {
+	right: calc(100% + 14px);
+	text-align: right;
+}
+.device-view__panel-marker-label--right {
+	left: calc(100% + 14px);
+	text-align: left;
+}
+.device-view__panel-marker--disabled .device-view__panel-connector-img {
+	opacity: 0.4;
+}
+.device-view__panel-marker--disabled .device-view__panel-status-glow {
+	opacity: 0.2;
+}
+.device-view__panel-marker--decklink-ref {
+	grid-column: 1;
+	grid-row: 5;
+	margin-top: 24px;
+}
+.device-view__panel-status-glow {
+	position: absolute;
+	inset: 2px;
+	border-radius: 50%;
+	opacity: 0.4;
+	mix-blend-mode: screen;
+	pointer-events: none;
+}
+.device-view__panel-marker:hover {
+	filter: brightness(1.12);
+}
+.device-view__panel-marker--dli,
+.device-view__panel-marker--dlo,
+.device-view__panel-marker--decklink-ref {
+	width: 38px;
+	height: 38px;
+	background: rgba(16, 185, 129, 0.8);
+}
+.device-view__panel-marker--dlo {
+	background: rgba(139, 92, 246, 0.8);
+}
+.device-view__panel-marker--stream,
+.device-view__panel-marker--record {
+	width: 40px;
+	height: 40px;
+	background: rgba(245, 158, 11, 0.85);
+}
+.device-view__panel-marker--audio {
+	width: 48px;
+	height: 48px;
+	background: rgba(245, 158, 11, 0.85);
+}
+.device-view__panel-marker--selected {
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+}
+.device-view__panel-marker--armed {
+	box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.85);
+}
+.device-view__panel-marker.device-view__port--ok .device-view__panel-status-glow {
+	background: radial-gradient(circle, rgba(34, 197, 94, 0.8) 0%, transparent 70%);
+	opacity: 0.6;
+}
+.device-view__panel-marker.device-view__port--warn .device-view__panel-status-glow {
+	background: radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, transparent 70%);
+	opacity: 0.6;
+}
+.device-view__panel-marker.device-view__port--err .device-view__panel-status-glow {
+	background: radial-gradient(circle, rgba(239, 68, 68, 0.8) 0%, transparent 70%);
+	opacity: 0.6;
+}
+.device-view__panel-marker.device-view__port--off .device-view__panel-status-glow {
+	background: transparent;
+}
+.device-view__panel-marker--selected .device-view__panel-connector-img {
+	filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9));
+}
+.device-view__panel-marker--armed .device-view__panel-connector-img {
+	filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.9));
+}
+.device-view__connector-dot {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 12px;
+	height: 12px;
+	border-radius: 999px;
+	transform: translate(-50%, -50%);
+	border: 1px solid rgba(148, 163, 184, 0.9);
+	background: #111827;
+	z-index: 10;
+}
+.device-view__connector-dot--left {
+	/* No longer using side-anchored dots for rear panel markers */
+	display: none;
+}
+.device-view__port--connector-dot-left {
+	padding-left: 22px;
+	padding-right: 10px;
+	text-align: right;
+}
+.device-view__connector-dot:hover {
+	border-color: #f59e0b;
+	box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+.device-view__connector-target--valid {
+	border-color: rgba(34, 197, 94, 0.95) !important;
+	box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35);
+}
+.device-view__connector-target--invalid {
+	border-color: rgba(239, 68, 68, 0.95) !important;
+	box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.28);
+}
+.device-view__panel-marker.device-view__connector-target--valid {
+	background: rgba(34, 197, 94, 0.9);
+}
+.device-view__panel-marker.device-view__connector-target--invalid {
+	background: rgba(239, 68, 68, 0.9);
+}
+/* WO-42 — cable hook beside connector dots (mapping + rear panel ports) */
+.device-view__cable-affordance {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	margin: 0 2px;
+	border: none;
+	border-radius: 4px;
+	background: rgba(148, 163, 184, 0.12);
+	color: #94a3b8;
+	cursor: pointer;
+	flex-shrink: 0;
+	position: relative;
+	z-index: 5;
+}
+.device-view__cable-affordance:hover {
+	background: rgba(88, 166, 255, 0.2);
+	color: #58a6ff;
+}
+.device-view__cable-affordance svg {
+	display: block;
+}

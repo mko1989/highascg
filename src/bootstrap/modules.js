@@ -25,6 +25,12 @@ function buildVendorDirs(logger) {
 			}
 		} catch {}
 	}
+	try {
+		const htmlToImageRoot = path.join(__dirname, '..', '..', 'node_modules', 'html-to-image')
+		if (fs.existsSync(path.join(htmlToImageRoot, 'es', 'index.js'))) {
+			out['/vendor/html-to-image/'] = htmlToImageRoot
+		}
+	} catch {}
 	if (moduleRegistry.isLoaded && moduleRegistry.isLoaded('cg-studio')) {
 		const grapesRoot = path.join(__dirname, '..', '..', 'node_modules', 'grapesjs')
 		try {

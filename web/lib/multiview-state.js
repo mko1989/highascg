@@ -91,6 +91,7 @@ export class MultiviewState {
 		this.cells = []
 		this.showOverlay = true
 		this.bgColor = '#000000'
+		this.showTimersUnderLabels = false
 		this.audioActiveCellId = null
 		this._listeners = new Map()
 		this._load()
@@ -117,6 +118,7 @@ export class MultiviewState {
 					this.canvasHeight = data.canvasHeight ?? DEFAULT_HEIGHT
 					this.showOverlay = data.showOverlay !== false
 					this.bgColor = data.bgColor || '#000000'
+					this.showTimersUnderLabels = !!data.showTimersUnderLabels
 					this.audioActiveCellId = data.audioActiveCellId || null
 					if (JSON.stringify(this.cells) !== JSON.stringify(prev)) {
 						// Route migration only — do not re-push the full multiview to Caspar on refresh
@@ -143,6 +145,7 @@ export class MultiviewState {
 					canvasHeight: this.canvasHeight,
 					showOverlay: this.showOverlay,
 					bgColor: this.bgColor,
+					showTimersUnderLabels: this.showTimersUnderLabels,
 					audioActiveCellId: this.audioActiveCellId,
 				})
 			)
@@ -239,6 +242,11 @@ export class MultiviewState {
 		this._save()
 	}
 
+	setShowTimersUnderLabels(v) {
+		this.showTimersUnderLabels = !!v
+		this._save()
+	}
+
 	/** Set multiview background color (layer 10). */
 	setBgColor(color) {
 		this.bgColor = typeof color === 'string' && color.trim() ? color.trim() : '#000000'
@@ -259,6 +267,7 @@ export class MultiviewState {
 			canvasHeight: this.canvasHeight,
 			showOverlay: this.showOverlay,
 			bgColor: this.bgColor,
+			showTimersUnderLabels: this.showTimersUnderLabels,
 		}
 	}
 
@@ -270,6 +279,7 @@ export class MultiviewState {
 		this.canvasHeight = data.canvasHeight ?? DEFAULT_HEIGHT
 		this.showOverlay = data.showOverlay !== false
 		this.bgColor = data.bgColor || '#000000'
+		this.showTimersUnderLabels = !!data.showTimersUnderLabels
 		// Do not re-apply the whole layout to Caspar on every WebUI refresh / project hydrate
 		this._save(false)
 	}
@@ -293,16 +303,17 @@ export class MultiviewState {
 	toApiLayout() {
 		const cw = this.canvasWidth || 1
 		const ch = this.canvasHeight || 1
-		const clamp = (v) => Math.max(0, Math.min(1, v))
+		const fixFloat = (v) => Math.round(v * 1000000) / 1000000
 		return this.cells.map((c) => ({
 			id: c.id,
 			type: c.type,
 			label: c.source ? (c.source.label || c.source.value) : c.label,
-			x: clamp(c.x / cw),
-			y: clamp(c.y / ch),
-			w: clamp(c.w / cw),
-			h: clamp(c.h / ch),
+			x: fixFloat(c.x / cw),
+			y: fixFloat(c.y / ch),
+			w: fixFloat(c.w / cw),
+			h: fixFloat(c.h / ch),
 			source: c.source?.value || null,
+			aspectLocked: c.aspectLocked !== false,
 		}))
 	}
 
@@ -314,6 +325,7 @@ export class MultiviewState {
 			canvasHeight: this.canvasHeight,
 			showOverlay: this.showOverlay,
 			bgColor: this.bgColor,
+			showTimersUnderLabels: this.showTimersUnderLabels,
 			audioActiveCellId: this.audioActiveCellId,
 		}
 	}
@@ -326,6 +338,7 @@ export class MultiviewState {
 		this.canvasHeight = snapshot.canvasHeight ?? this.canvasHeight
 		this.showOverlay = snapshot.showOverlay !== false
 		this.bgColor = snapshot.bgColor || this.bgColor
+		this.showTimersUnderLabels = !!snapshot.showTimersUnderLabels
 		this.audioActiveCellId = snapshot.audioActiveCellId ?? null
 		this._save()
 	}

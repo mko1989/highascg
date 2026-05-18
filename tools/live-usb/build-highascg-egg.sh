@@ -20,6 +20,9 @@ REPO_ROOT="$(cd "${HERE}/../.." && pwd)"
 BASENAME="${BASENAME:-highascg}"
 NVIDIA_BRANCHES="${NVIDIA_BRANCHES:-470 580}"
 
+echo "==> WO-47 exFAT + empty mount stubs + eggs exclude merge (operator-stick truth baked into clone snapshot)"
+SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
+
 echo "==> Install network + firmware essentials for live image"
 apt-get update
 apt-get install -y --no-install-recommends \
@@ -55,9 +58,6 @@ ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || tru
 echo "==> Cache offline NVIDIA branches"
 NVIDIA_BRANCHES="${NVIDIA_BRANCHES}" \
   bash "${HERE}/nvidia-multi-driver/fetch-debs.sh"
-
-echo "==> Merge HighAsCG eggs excludes"
-bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh"
 
 echo "==> Hostname for ISO naming (${BASENAME})"
 hostnamectl set-hostname "${BASENAME}" 2>/dev/null || hostname "${BASENAME}"

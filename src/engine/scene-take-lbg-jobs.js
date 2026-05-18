@@ -13,7 +13,6 @@ const {
 } = require('./scene-take-lbg-helpers')
 
 const {
-	layerVisuallyEqual,
 	layerHasContent,
 	isLayerAnimateTakeTransition,
 	baseTypeStripAnimateSuffix,
@@ -32,6 +31,7 @@ async function buildTakeJobs(opts) {
 		forceCut,
 		globalT,
 		framerate,
+		skipLayerVisualEquality = false,
 	} = opts
 
 	const takeJobs = []
@@ -49,6 +49,8 @@ async function buildTakeJobs(opts) {
 			continue
 		}
 		let clipRaw = clipPath(layer)
+		/** Manual list only: advance index after we know this layer will get a take job (no-op takes must not consume a step). */
+		let pendingManualPlaylistAdvance = null
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			const pKey = `${incoming.id}-${layer.layerNumber}`
@@ -56,17 +58,14 @@ async function buildTakeJobs(opts) {
 				let idx = self.playlistActiveIndices[pKey] || 0
 				if (idx < 0 || idx >= layer.playlist.length) idx = 0
 				clipRaw = layer.playlist[idx].value
-				
-				// Advance the index for the next Take trigger
-				let nextIdx = idx + 1
-				if (layer.playlistLoop !== false) {
-					nextIdx = nextIdx % layer.playlist.length
-				} else {
-					nextIdx = Math.min(nextIdx, layer.playlist.length - 1)
+				pendingManualPlaylistAdvance = {
+					pKey,
+					idx,
+					len: layer.playlist.length,
+					loop: layer.playlistLoop !== false,
 				}
-				self.playlistActiveIndices[pKey] = nextIdx
 			} else {
-				// auto advance starts at index 0 on fresh take
+				// auto advance starts at index 0 on fresh take (unchanged vs old order)
 				self.playlistActiveIndices[pKey] = 0
 				clipRaw = layer.playlist[0].value
 			}
@@ -85,9 +84,21 @@ async function buildTakeJobs(opts) {
 		if (!clip) continue
 
 		const cur = currentMap.get(layer.layerNumber)
-		const diffs = require('./scene-transition').layerVisuallyEqual(cur, layer, true)
+		const diffs = skipLayerVisualEquality
+			? { _: 'skipLayerVisualEquality' }
+			: require('./scene-transition').layerVisuallyEqual(cur, layer, true)
 		if (Object.keys(diffs).length === 0) {
 			continue
+		}
+		if (pendingManualPlaylistAdvance) {
+			const { pKey, idx, len, loop } = pendingManualPlaylistAdvance
+			let nextIdx = idx + 1
+			if (loop) {
+				nextIdx = nextIdx % len
+			} else {
+				nextIdx = Math.min(nextIdx, len - 1)
+			}
+			self.playlistActiveIndices[pKey] = nextIdx
 		}
 		if (cur && typeof self.log === 'function') {
 			self.log('info', `[buildTakeJobs] layer ${layer.layerNumber} changed. Diffs: ${JSON.stringify(Object.keys(diffs))}`)

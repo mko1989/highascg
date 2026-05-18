@@ -44,6 +44,7 @@ const routesHostStats = require('./routes-host-stats')
 const routesPipOverlay = require('./routes-pip-overlay')
 const routesModules = require('./routes-modules')
 const routesDeviceView = require('./routes-device-view')
+const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
 const moduleRegistry = require('../module-registry')
@@ -213,6 +214,14 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (dv) return dv
 	}
 
+	if (method === 'GET' && (p === '/api/device-snapshot/build' || p === '/api/device-snapshot/schema')) {
+		const ds = routesDeviceSnapshot.handleGet(p, ctx)
+		if (ds) return ds
+	}
+	if (method === 'POST' && p === '/api/device-snapshot/apply') {
+		return await routesDeviceSnapshot.handlePost(body, ctx)
+	}
+
 	if (method === 'GET' && (p === '/api/hardware/displays' || p === '/api/hardware/modeline-preview')) {
 		const r = await routesSettings.handleHardwareGet(p, query)
 		if (r) return r
@@ -299,17 +308,21 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 	// Body { id } avoids URL-encoding issues with slashes in paths (some stacks mishandle %2F in DELETE URLs).
 	if (method === 'POST' && p === '/api/media/delete') {
-		const r = await routesMedia.handlePost(p, body, ctx)
+		const r = await routesMedia.handlePost(p, body, ctx, req, query)
 		if (r) return r
 	}
 	// Duration for timeline drop: CINF + ffprobe fallback — must work when AMCP is down if files are on disk
 	if (method === 'POST' && p === '/api/media/cinf') {
-		const r = await routesMedia.handlePost(p, body, ctx)
+		const r = await routesMedia.handlePost(p, body, ctx, req, query)
 		if (r) return r
 	}
 	// Live PRINT still cache — before Caspar gate (returns 502 if AMCP down, not blanket 503)
 	if (method === 'POST' && p === '/api/thumbnail/live/capture') {
-		const r = await routesMedia.handlePost(p, body, ctx)
+		const r = await routesMedia.handlePost(p, body, ctx, req, query)
+		if (r) return r
+	}
+	if (method === 'POST' && p === '/api/thumbnail/live/upload') {
+		const r = await routesMedia.handlePost(p, body, ctx, req, query)
 		if (r) return r
 	}
 
@@ -364,7 +377,7 @@ async function routeRequest(method, path, body, ctx, req) {
 			if (r) return r
 			r = await routesData.handlePost(p, body, ctx)
 			if (r) return r
-			r = await routesMedia.handlePost(p, body, ctx)
+			r = await routesMedia.handlePost(p, body, ctx, req, query)
 			if (r) return r
 			r = await routesMultiview.handlePost(p, body, ctx)
 			if (r) return r

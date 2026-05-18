@@ -76,6 +76,9 @@ async function serveWebApp(requestPath, dirs) {
 	if (filePath.includes('..')) {
 		return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }
 	}
+	if (filePath.startsWith('/template/') && !filePath.startsWith('/templates/')) {
+		filePath = filePath.replace(/^\/template\//, '/templates/')
+	}
 	if (filePath.startsWith('/templates/') && dirs.templatesDir) {
 		const tplName = filePath.replace(/^\/templates\//, '')
 		const tplPath = path.join(dirs.templatesDir, tplName)

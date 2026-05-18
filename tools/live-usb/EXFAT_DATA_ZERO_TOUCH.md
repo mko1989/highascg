@@ -1,12 +1,28 @@
 # exFAT data volume — zero–hand-edit workflow (WO-47)
 
-HighAsCG mounts cross-platform data at **`/home/casparcg/exfat`** by **volume label** `HIGHASCGEXF` (no UUID editing). **`mkfs.exfat`** accepts at most **11** characters for `-L`, so the label is kept short on purpose. **`scripts/install-exfat-systemd-units.sh`** writes **`home-casparcg-exfat.mount`** and **`highascg-exfat-sync.service`** using the **`casparcg`** user’s **uid/gid** at install time. **`scripts/install-phase4.sh`** runs that installer when the app tree is present.
+HighAsCG mounts cross-platform data at **`/home/casparcg/exfat`** by **volume label** `HIGHASCGEXF` (no UUID editing). **`mkfs.exfat`** accepts at most **11** characters for `-L`, so the label is kept short on purpose. **`scripts/install-exfat-systemd-units.sh`** writes **`home-casparcg-exfat.mount`**, **`highascg-exfat-media-prep.service`**, **`home-casparcg-highascg-media-exfat.mount`** (bind **`/home/casparcg/exfat/media` → `/home/casparcg/highascg/media/exfat`** when the data volume is present), and **`highascg-exfat-sync.service`** using the **`casparcg`** user’s **uid/gid** at install time. **`scripts/install-phase4.sh`** runs that installer when the app tree is present.
 
-Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-sync.service`** (oneshot) → **`highascg.service`**.
+**Same label on every operator stick** lets the correct volume attach whether the machine boots from internal disk or from the USB: plug the stick **before** **`local-fs`** if you need it on HDD boots.
+
+Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-media-prep.service`** → **`home-casparcg-highascg-media-exfat.mount`** (bind) → **`highascg-exfat-sync.service`** (oneshot) → **`highascg.service`**.
 
 ---
 
 ## 1. One-time on the **build / dev machine** (becomes the eggs `--clone` source)
+
+Before **`sudo eggs produce --clone`** (or **`build-highascg-egg.sh`**), bake WO-47 into **`/`** so the clone snapshots it:
+
+```bash
+sudo bash tools/live-usb/prepare-eggs-clone-with-exfat.sh
+```
+
+That installs **`exfatprogs`**, **`parted`**, **`python3`**; merges **[`merge-penguins-eggs-exclude-highascg.sh`](merge-penguins-eggs-exclude-highascg.sh)** (once **`/etc/penguins-eggs.d/exclude.list`** exists — see **`docs/LIVE_USB_IMAGE.md`**); creates empty mount stubs; writes **`install-exfat-systemd-units.sh`** outputs + **`/etc/highascg/exfat-sync.json`** when missing; and refreshes **`highascg.service`** ordering (**[`write-highascg-systemd-unit.sh`](../../scripts/write-highascg-systemd-unit.sh)**).
+
+**Eggs excludes:** merging is marker-idempotent.
+
+If **`penguins-eggs-exclude-highascg-fragment.list`** gained new paths (e.g. **`home/casparcg/exfat/*`**), delete the **`# --- HighAsCG tools/live-usb:` …** block from **`exclude.list`** and re-run **`prepare-eggs-clone-with-exfat.sh`** so the ISO drops builder scratch under **`~/exfat`**.
+
+Or run the granular steps manually:
 
 1. **Install OS packages** used on sticks and for formatting:  
    `sudo apt install -y exfatprogs parted python3` (plus your existing eggs / HighAsCG deps).
@@ -15,9 +31,7 @@ Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-sync.service`*
 
 3. **`npm ci`** (or `npm install`) in that directory if you rely on a full `node_modules` tree.
 
-4. **Run the installer** (deploys app dirs, default **`/etc/highascg/exfat-sync.json`**, WO-38 media-mount helper, **exFAT systemd units**, and **`highascg.service`** ordering):  
-   `sudo bash scripts/install-phase4.sh`  
-   Confirm no errors from **`install-exfat-systemd-units.sh`**.
+4. Install everything else (Caspar deps, WO-38, WO-47, **`highascg.service`**) on the imaging host: **`sudo bash scripts/install.sh`** (recommended once). For **WO-47 + service ordering only** (if the rest is already baked): **`sudo bash scripts/install-exfat-systemd-units.sh casparcg`** then **`sudo bash scripts/write-highascg-systemd-unit.sh casparcg`** — or use **`prepare-eggs-clone-with-exfat.sh`** above instead of repeating these fragments.
 
 5. **Squashfs empty mount points** (before `eggs produce`):  
    `sudo bash tools/live-usb/ensure-empty-live-usb-dirs.sh`
@@ -52,7 +66,7 @@ Optional: **`EXFAT_SIZE_MIB=8192`** before **`add-exfat-data-partition.sh`** to 
 
 1. Boot **Live with persistence** when you added the persistence partition (GRUB entry / `persistence` cmdline — see **`tools/live-usb/FLASH_AND_PERSIST.md`**).
 
-2. On first boot with the new exFAT slice, **`home-casparcg-exfat.mount`** attaches **`HIGHASCGEXF`**, **`highascg-exfat-sync.service`** runs **`tools/exfat-sync-cli.js`**, then **HighAsCG** starts.
+2. On first boot with the new exFAT slice, **`home-casparcg-exfat.mount`** attaches **`HIGHASCGEXF`**, the prep/bind units expose **`~/exfat/media`** at **`~/highascg/media/exfat`**, **`highascg-exfat-sync.service`** runs **`tools/exfat-sync-cli.js`**, then **HighAsCG** starts.
 
 3. **Settings → media/usb → exFAT sync** shows the map and pair status; **Dry-run sync** is safe to click anytime.
 
@@ -72,9 +86,15 @@ You **may** edit **`/etc/highascg/exfat-sync.json`** (or **`config/exfat-sync.js
 | Symptom | Check |
 |--------|--------|
 | exFAT not mounted | `lsblk -f`, `blkid` — partition must show **`LABEL="HIGHASCGEXF"`** (or `HIGHASCGEXF` per `blkid`). |
+| Boot from HDD, **`/home/casparcg/exfat`** empty — not a stick mountpoint | **`HIGHASCGEXF`** wasn’t plugged in soon enough **or** no volume with that label exists. Re-plug USB; **`sudo systemctl start home-casparcg-exfat.mount`**. WO-47 does **not** use partition UUID — only that label identifies the operators’ data volume across machines. |
+| **`media/exfat`** not wired | **`journalctl -b -u home-casparcg-highascg-media-exfat.mount`**, **`journalctl -b -u highascg-exfat-media-prep.service`** — **`home-casparcg-exfat.mount`** must be active (`findmnt`). Re-run **`install-exfat-systemd-units.sh`**. |
 | Mount fails at boot | `journalctl -b -u home-casparcg-exfat.mount`; install **`exfatprogs`** / kernel exfat on the image. |
 | Wrong owner on exFAT | Re-run **`sudo bash scripts/install-exfat-systemd-units.sh casparcg`** on the **cloned** system, then `daemon-reload`. |
 | Stick won't boot after **`add-exfat-data-partition.sh`** | Usually exFAT was placed **inside the hybrid ISO** because **`parted`** showed a too-small end for partition 1 (e.g. only the ESP). The script now uses **max(`parted`, `/sys/block/.../start`+`size`)** and re-applies **`boot`/`esp`/`lba`** flags after **`mkpart`**. If the stick was already damaged, **re-`dd` the ISO** and run the updated script. |
+
+### **Portable newer app than the boot partition**
+
+Boot sync (**`highascg-exfat-sync.service`**) copies **`~/exfat/sim/highascg`** ↔ **`~/highascg`** with **mtime-wins** (**`media`**, **`node_modules`**, **`.git`**, etc. are excluded per **`/etc/highascg/exfat-sync.json`**). If you put a **fresher clone on exFAT** under **`sim/highascg`** (e.g. from GitHub), a **reboot** applies it before **`highascg.service`** starts. Without reboot run **`sudo systemctl restart highascg.service`** **after** a manual sync: **`sudo systemctl start highascg-exfat-sync.service`** **or** `node tools/exfat-sync-cli.js` **or** the Settings API **Dry-run / Run**. After pulling new dependencies on exFAT, run **`npm ci`** inside **`~/highascg`** (or wherever won the sync).
 
 ---
 
@@ -82,7 +102,7 @@ You **may** edit **`/etc/highascg/exfat-sync.json`** (or **`config/exfat-sync.js
 
 | Path | Role |
 |------|------|
-| `scripts/install-exfat-systemd-units.sh` | Writes mount + sync units (label + uid/gid). |
+| `scripts/install-exfat-systemd-units.sh` | Writes mount, media bind chain, sync units (label + uid/gid). |
 | `tools/live-usb/add-exfat-data-partition.sh` | Creates exFAT partition (**`mkpart … ntfs`** for MBR type **0x07**) + **`mkfs.exfat -L HIGHASCGEXF`**; placement uses **max(parted, sysfs)** so the slice starts after the real ISO extent. |
 | `tools/live-usb/add-union-persistence-partition.sh` | ext4 persistence to end of disk (after exFAT if you followed §3). |
 | `config/exfat-sync.json` | Default sync map (shipped / copied to **`/etc`** once). |

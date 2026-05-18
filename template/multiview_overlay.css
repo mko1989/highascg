@@ -1,0 +1,238 @@
+		@font-face { 
+			font-family: 'Rewir'; 
+			src: url('../web/fonts/Rewir-Light.woff') format('woff'); 
+			font-weight: 300; 
+			font-style: normal; 
+			font-display: swap; 
+		}
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body { 
+			width: 100%; 
+			height: 100%; 
+			overflow: hidden; 
+			background: transparent !important; 
+			background-color: rgba(0,0,0,0) !important; 
+			font-family: 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif; 
+		}
+		#container { 
+			position: absolute; 
+			inset: 0; 
+			pointer-events: none; 
+			background: transparent !important; 
+			overflow: visible; 
+		}
+		/* Video tile: border only around the picture — label sits at bottom inside the cell bounds. */
+		.cell { 
+			position: absolute; 
+			border: 3px solid; 
+			background: transparent !important; 
+			box-sizing: border-box; 
+		}
+		
+		/* 100% transparent timers template */
+		.cell.timers { 
+			border: none !important; 
+			background: transparent !important; 
+		}
+		.cell.timers .label { 
+			display: none !important; 
+		}
+
+		.cell .label {
+			position: absolute;
+			top: calc(100% + 3px);
+			left: -3px;
+			width: calc(100% + 6px);
+			min-height: 24px;
+			height: auto;
+			box-sizing: border-box;
+			margin: 0;
+			padding: 3px 8px 4px;
+			color: #fff;
+			font: 500 11px/1.25 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif;
+			text-align: center;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			z-index: 10;
+		}
+
+		.cell .label.mv-chrome-sized {
+			min-height: 0;
+		}
+
+		/* Opt-in PGM/PRV: full-width title bar + timer dock below (narrow: max(200px, 50% cell width), centered) */
+		.cell .label.has-timers {
+			padding: 0;
+			white-space: normal;
+			overflow: hidden;
+			background: transparent !important;
+			flex-direction: column;
+			justify-content: flex-end;
+			align-items: stretch;
+		}
+
+		.label-chrome-column {
+			display: flex;
+			flex-direction: column;
+			width: 100%;
+			height: 100%;
+			min-height: 0;
+			justify-content: flex-end;
+			align-items: stretch;
+		}
+
+		.label-timer-dock {
+			width: max(200px, 50%);
+			max-width: 100%;
+			align-self: center;
+			flex: 1 1 auto;
+			min-height: 0;
+			display: flex;
+			flex-direction: column;
+			background: transparent !important;
+			border-radius: 0 0 6px 6px;
+			box-sizing: border-box;
+			overflow: hidden;
+		}
+
+		.label-solid-bar {
+			flex-shrink: 0;
+			width: 100%;
+			padding: 5px 8px 6px;
+			text-align: center;
+			box-sizing: border-box;
+		}
+		.label-solid-bar .label-title {
+			margin: 0;
+			text-shadow: none;
+		}
+
+		.label-timers-stack {
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			width: 100%;
+			background: transparent !important;
+		}
+		.label-timers-inner {
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow-x: hidden;
+			overflow-y: auto;
+			display: flex;
+			flex-direction: column;
+			justify-content: flex-start;
+			padding: 6px 8px 8px;
+			color: #fff;
+			text-shadow:
+				0 0 1px rgba(0,0,0,1),
+				0 1px 3px rgba(0,0,0,1),
+				0 0 14px rgba(0,0,0,0.95);
+			background: transparent !important;
+		}
+
+		.cell.pgm { border-color: #e63946; }
+		.cell.pgm .label:not(.has-timers) { background: #c92a2a; }
+		.cell.prv { border-color: #2a9d8f; }
+		.cell.prv .label:not(.has-timers) { background: #0d9488; }
+		.cell.decklink { border-color: #457b9d; }
+		.cell.decklink .label:not(.has-timers) { background: #2563eb; }
+		.cell.ndi { border-color: #457b9d; }
+		.cell.ndi .label:not(.has-timers) { background: #2563eb; }
+		.cell.route { border-color: #457b9d; }
+		.cell.route .label:not(.has-timers) { background: #2563eb; }
+
+		.cell.pgm .label-solid-bar { background: #c92a2a; }
+		.cell.prv .label-solid-bar { background: #0d9488; }
+		.cell.decklink .label-solid-bar { background: #2563eb; }
+		.cell.ndi .label-solid-bar { background: #2563eb; }
+		.cell.route .label-solid-bar { background: #2563eb; }
+
+		/* Title row (plain strip, or inside solid bar when timers on) */
+		.label-title {
+			font-size: 11px;
+			font-weight: 600;
+			letter-spacing: 0.35px;
+			text-transform: uppercase;
+			flex-shrink: 0;
+			width: 100%;
+			text-align: center;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.cell .label:not(.has-timers) .label-title {
+			margin-bottom: 0;
+		}
+		.label-timer-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			width: 100%;
+			font-size: 10px;
+			margin-bottom: 4px;
+			flex-shrink: 0;
+		}
+		.label-clip-name {
+			flex: 1;
+			text-align: left;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			margin-right: 8px;
+			font-weight: 500;
+		}
+		.label-time-elapsed {
+			font-weight: 600;
+			margin-right: 6px;
+			white-space: nowrap;
+		}
+		.label-time-remaining {
+			font-weight: 700;
+			color: #ffc078;
+			white-space: nowrap;
+		}
+		.label-progress-bar-bg {
+			width: 100%;
+			height: 4px;
+			background: rgba(255,255,255,0.25);
+			border-radius: 2px;
+			overflow: hidden;
+			margin-bottom: 3px;
+			flex-shrink: 0;
+		}
+		.label-progress-bar-fill {
+			height: 100%;
+			background: #fff;
+			width: 0%;
+			border-radius: 3px;
+			transition: width 0.1s linear;
+		}
+		.cell.prv .label-progress-bar-fill {
+			background: #a7f3d0;
+		}
+		.label-layers-list {
+			width: 100%;
+			display: flex;
+			flex-direction: column;
+			font-size: 9px;
+			flex-shrink: 0;
+			text-align: left;
+			margin-top: 4px;
+			gap: 2px;
+		}
+		.label-layer-item {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			line-height: 1.35;
+			font-weight: 500;
+			color: #fff;
+		}

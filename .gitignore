@@ -35,6 +35,9 @@ libndi.so.6
 casparcg.config
 config/casparcg.config
 
+# Local live-USB flash settings (copy from tools/live-usb/flash-iso.conf.example)
+tools/live-usb/flash-iso.conf
+
 # User-specific runtime configs (keep defaults/examples in source, ignore live overrides)
 config/*.json
 !config/*.example.json

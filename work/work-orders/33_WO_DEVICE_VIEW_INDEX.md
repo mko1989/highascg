@@ -3,7 +3,7 @@
 **Program goal:** Visual “back of rack” for **Caspar host** + optional **PixelHue**, click-to-inspect ports, cable graph, EDID/timing awareness, and **Caspar config write + restart** via existing APIs.
 
 **Status:** Parent index — child WOs carry task checklists.  
-**Created:** 2026-04-23 · **Updated:** 2026-05-15 (added WO-40, WO-42 + design doc link)
+**Created:** 2026-04-23 · **Updated:** 2026-05-18 (added WO-48, WO-49)
 
 ---
 
@@ -22,6 +22,8 @@
 | **40** | [40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md) | GPU `xrandr` mode/pos from bound **screen destinations**; Override path; multi-head retile | 33a, 33b, 35; design: [docs/GPU_SCREEN_CONSUMER_AND_XRANDR.md](./docs/GPU_SCREEN_CONSUMER_AND_XRANDR.md) |
 | **40a** | [40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md](./40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md) | **`pixel_map_out` → `gpu_out`**: per-head signal, bbox vs destination-only heads, inherited canvas modes, Caspar window alignment | 40, 33h, 33a |
 | **42** | [42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md](./42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md) | Sources **Live** tab list thumbnails (wait-for-play on any ch/layer, one-shot + manual reload); PRINT/HQ clutter → hidden media subfolder | 33a (extra live sources); touches web + `live-thumbnail-cache` |
+| **48** | [48_WO_LAYER_ROUTE_LIVE_SOURCE_REUSE.md](./48_WO_LAYER_ROUTE_LIVE_SOURCE_REUSE.md) | Scene layer row → **`addExtraLiveSource`** with `route://ch-layer` so Sources **Live** can reuse one playing layer (PIPs / second screen) without duplicating media | 33a (`POST /api/device-view`); relates to [WO-46](./46_WO_LAYER_PLAYLISTS.md) |
+| **49** | [49_WO_DEVICE_WIDE_SNAPSHOT_AND_MACHINE_PROFILE.md](./49_WO_DEVICE_WIDE_SNAPSHOT_AND_MACHINE_PROFILE.md) | **Device-wide snapshot:** one JSON **machine profile** (device graph + GPU / DeckLink–relevant settings), **save prompts for device name**, embed **rear-panel visual**; bundled generics + manual JSON drops (no submit UI) | 33a, 33c; aligns with [WO-39](./39_WO_SETTINGS_SYSTEM_HARDWARE.md), [WO-40](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md) |
 
 **Suggested release slices**
 

@@ -5,7 +5,7 @@ import { multiviewState } from '../lib/multiview-state.js'
 import { initLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
-import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus } from './multiview-editor-canvas.js'
+import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
 
 export function initMultiviewEditor(root, stateStore) {
 	let canvas, ctx, scale = 1, offsetX = 0, offsetY = 0, selectedId = null, dragMode = null, dragStart = { x: 0, y: 0, cell: null }, dropHoverId = null, wrap = null, disabledOverlay = null, applyTimer = null
@@ -14,7 +14,7 @@ export function initMultiviewEditor(root, stateStore) {
 	const scheduleApply = () => { if (!isEnabled()) return; if (applyTimer) clearTimeout(applyTimer); applyTimer = setTimeout(() => { applyTimer = null; applyMultiviewLayout(getCM, { silent: true }) }, 400) }
 	const flushApply = () => { if (!isEnabled()) return; if (applyTimer) clearTimeout(applyTimer); applyTimer = null; applyMultiviewLayout(getCM, { silent: true }) }
 	const syncOverlay = () => { if (!isEnabled()) { if (!disabledOverlay && wrap) { disabledOverlay = Object.assign(document.createElement('div'), { className: 'mv-disabled-overlay', innerHTML: '<div class="mv-disabled-overlay__content"><h3>No Multiview Channel</h3><p>Add a Multiview destination in Device View to enable.</p></div>' }); wrap.appendChild(disabledOverlay) } if (disabledOverlay) disabledOverlay.style.display = 'flex' } else if (disabledOverlay) disabledOverlay.style.display = 'none' }
-	const draw = () => drawMultiviewEditor(ctx, canvas, { offsetX, offsetY, scale, selectedId, dropHoverId })
+	const draw = () => drawMultiviewEditor(ctx, canvas, { offsetX, offsetY, scale, selectedId, dropHoverId, channelMap: getCM() })
 
 	const updateToolbar = () => {
 		const cm = getCM()
@@ -31,6 +31,7 @@ export function initMultiviewEditor(root, stateStore) {
 		<select id="mv-index-select" class="mv-select" style="margin-right:8px"></select>
 		<button id="mv-reset" class="mv-btn">Reset</button>
 		<label class="mv-chk"><input type="checkbox" id="mv-overlay" ${multiviewState.showOverlay ? 'checked' : ''}> Borders</label>
+		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-timers-under-labels" ${multiviewState.showTimersUnderLabels ? 'checked' : ''}> Timers under labels</label>
 		<span class="mv-toolbar__sep"></span>
 		<label class="mv-chk">BG <input type="color" id="mv-bg-color" value="${multiviewState.bgColor || '#000000'}"></label>
 		<span class="mv-toolbar__sep"></span>
@@ -54,6 +55,7 @@ export function initMultiviewEditor(root, stateStore) {
 	idxSel.onchange = (e) => {
 		multiviewState.switchTo(e.target.value)
 		root.querySelector('#mv-overlay').checked = multiviewState.showOverlay
+		root.querySelector('#mv-timers-under-labels').checked = multiviewState.showTimersUnderLabels
 		root.querySelector('#mv-bg-color').value = multiviewState.bgColor
 		upPres()
 		updateLive()
@@ -62,27 +64,47 @@ export function initMultiviewEditor(root, stateStore) {
 	updateToolbar()
 
 	root.querySelector('#mv-overlay').onchange = e => multiviewState.setShowOverlay(e.target.checked)
+	root.querySelector('#mv-timers-under-labels').onchange = e => { multiviewState.setShowTimersUnderLabels(e.target.checked); flushApply() }
 	root.querySelector('#mv-bg-color').oninput = e => multiviewState.setBgColor(e.target.value)
 	root.querySelector('#mv-bg-color').onchange = e => { multiviewState.setBgColor(e.target.value); flushApply() }
-	canvas.onmousedown = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y)
-		if (c) { selectedId = c.id; const h = getResizeHandle(c, x, y, scale); if (h) { dragMode = 'resize-' + h; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = cursorForResizeHandle(h) } else { dragMode = 'move'; dragStart = { x, y, cell: { ...c } }; canvas.style.cursor = 'grabbing' } window.dispatchEvent(new CustomEvent('multiview-select', { detail: { cellId: selectedId } })) }
+	canvas.onmousedown = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM())
+		if (c) { selectedId = c.id; const h = getResizeHandle(c, x, y, scale, getCM()); if (h) { dragMode = 'resize-' + h; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = cursorForResizeHandle(h) } else { dragMode = 'move'; dragStart = { x, y, cell: { ...c } }; canvas.style.cursor = 'grabbing' } window.dispatchEvent(new CustomEvent('multiview-select', { detail: { cellId: selectedId } })) }
 		else { selectedId = null; canvas.style.cursor = ''; window.dispatchEvent(new CustomEvent('multiview-select', { detail: {} })) }
 	}
 	canvas.onmousemove = e => { const r = canvas.getBoundingClientRect(); const { x: cx, y: cy } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale)
 		if (dragMode && dragStart.cell) { const c = multiviewState.getCell(dragStart.cell.id); if (!c) return; if (dragMode === 'move') { const dx = cx - dragStart.x, dy = cy - dragStart.y; multiviewState.setCell(c.id, { x: dragStart.cell.x + dx, y: dragStart.cell.y + dy }); dragStart.x = cx; dragStart.y = cy; dragStart.cell = { ...c } }
-		else { const h = dragMode.replace('resize-', ''); let { x, y, w, h: ch } = { ...dragStart.cell }; const dx = cx - dragStart.mouseX, dy = cy - dragStart.mouseY, ratio = dragStart.cell.w / dragStart.cell.h
-			if (h.includes('e')) w = Math.max(60, dragStart.cell.w + dx); if (h.includes('w')) { const nw = Math.max(60, dragStart.cell.w - dx); x = dragStart.cell.x + dragStart.cell.w - nw; w = nw }
-			if (h.includes('s')) ch = Math.max(40, dragStart.cell.h + dy); if (h.includes('n')) { const nh = Math.max(40, dragStart.cell.h - dy); y = dragStart.cell.y + dragStart.cell.h - nh; ch = nh }
-			if (c.aspectLocked) { if (h.includes('e') || h.includes('w')) ch = Math.max(40, Math.round(w / ratio)); else if (h.includes('s') || h.includes('n')) w = Math.max(60, Math.round(ch * ratio)) } multiviewState.setCell(c.id, { x, y, w, h: ch }) } return }
-		const c = getCellAt(cx, cy); if (!c) { canvas.style.cursor = ''; return }; const h = getResizeHandle(c, cx, cy, scale); canvas.style.cursor = h ? cursorForResizeHandle(h) : 'move'
+		else { const handleStr = dragMode.replace('resize-', ''); let { x, y, w, h: ch } = { ...dragStart.cell }; const dx = cx - dragStart.mouseX, dy = cy - dragStart.mouseY
+			if (handleStr.includes('e')) w = Math.max(60, dragStart.cell.w + dx); if (handleStr.includes('w')) { const nw = Math.max(60, dragStart.cell.w - dx); x = dragStart.cell.x + dragStart.cell.w - nw; w = nw }
+			if (handleStr.includes('s')) ch = Math.max(40, dragStart.cell.h + dy); if (handleStr.includes('n')) { const nh = Math.max(40, dragStart.cell.h - dy); y = dragStart.cell.y + dragStart.cell.h - nh; ch = nh }
+			if (c.aspectLocked) {
+				const ratio = resolveSourceAspectRatio(c, getCM())
+				const programChannels = getCM().programChannels || []
+				const previewChannels = getCM().previewChannels || []
+				const ovType = getCellOverlayType(c, programChannels, previewChannels)
+				const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
+				if (handleStr.includes('e') || handleStr.includes('w')) {
+					const solved = solveCellDimensions(w, ch, ratio, 'width', ovType, showTimersUnderLabels)
+					ch = solved.h
+					if (handleStr.includes('w')) x = dragStart.cell.x + dragStart.cell.w - w
+					if (handleStr.includes('n')) y = dragStart.cell.y + dragStart.cell.h - ch
+				} else if (handleStr.includes('s') || handleStr.includes('n')) {
+					const solved = solveCellDimensions(w, ch, ratio, 'height', ovType, showTimersUnderLabels)
+					w = solved.w
+					if (handleStr.includes('w')) x = dragStart.cell.x + dragStart.cell.w - w
+					if (handleStr.includes('n')) y = dragStart.cell.y + dragStart.cell.h - ch
+				}
+			}
+			multiviewState.setCell(c.id, { x, y, w, h: ch })
+		} return }
+		const c = getCellAt(cx, cy, getCM()); if (!c) { canvas.style.cursor = ''; return }; const h = getResizeHandle(c, cx, cy, scale, getCM()); canvas.style.cursor = h ? cursorForResizeHandle(h) : 'move'
 	}
 	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; flushApply() }
 	canvas.onmouseleave = () => { dragMode = null; canvas.style.cursor = '' }
-	canvas.oncontextmenu = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y); if (!c) return; if (c.source) multiviewState.setCellSource(c.id, null); else multiviewState.removeCell(c.id) }
-	canvas.onclick = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y); if (c) multiviewState.setAudioActiveCell(c.id) }
-	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
+	canvas.oncontextmenu = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (!c) return; if (c.source) multiviewState.setCellSource(c.id, null); else multiviewState.removeCell(c.id) }
+	canvas.onclick = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (c) multiviewState.setAudioActiveCell(c.id) }
+	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
 	canvas.ondragleave = () => { dropHoverId = null; draw() }
-	canvas.ondrop = e => { e.preventDefault(); dropHoverId = null; const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); let c = getCellAt(x, y), data; try { data = JSON.parse(e.dataTransfer.getData('application/json')) } catch { const v = e.dataTransfer.getData('text/plain'); if (v) data = { type: 'media', value: v, label: v } }; if (!data?.value) { draw(); return }
+	canvas.ondrop = e => { e.preventDefault(); dropHoverId = null; const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); let c = getCellAt(x, y, getCM()), data; try { data = JSON.parse(e.dataTransfer.getData('application/json')) } catch { const v = e.dataTransfer.getData('text/plain'); if (v) data = { type: 'media', value: v, label: v } }; if (!data?.value) { draw(); return }
 		if (!c) { const mw = multiviewState.canvasWidth, mh = multiviewState.canvasHeight; if (x < 0 || x > mw || y < 0 || y > mh) { draw(); return }; let cw = Math.round(mw / 4), ch = Math.round(mh / 4); if (data.resolution) { const m = String(data.resolution).match(/(\d+)[×x](\d+)/i); if (m) { const sw = parseInt(m[1]), sh = parseInt(m[2]), rat = sw / sh; cw = Math.min(mw / 4, mw); ch = Math.round(cw / rat); if (ch > mh) { ch = mh; cw = Math.round(ch * rat) } } }
 		c = multiviewState.addCell({ type: data.routeType || data.type, label: data.label || data.value, x: Math.max(0, Math.min(mw - cw, x - cw / 2)), y: Math.max(0, Math.min(mh - ch, y - ch / 2)), w: cw, h: ch, source: { value: data.value, type: data.type || 'media', label: data.label || data.value }, aspectLocked: true }); selectedId = c.id }
 		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); flushApply()
@@ -90,5 +112,23 @@ export function initMultiviewEditor(root, stateStore) {
 	multiviewState.on('change', () => { draw() })
 	multiviewState.on('apply-request', () => { if (!isEnabled()) return; scheduleApply() })
 	multiviewState.on('audio-change', () => { draw(); applyMultiviewAudioFocus() })
+
+	const onKeyDown = (e) => {
+		const tab = document.querySelector('#tab-multiview')
+		const isActive = tab && tab.classList.contains('active')
+		if (isActive && selectedId && (e.key === 'Backspace' || e.key === 'Delete')) {
+			const activeEl = document.activeElement
+			if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+				return
+			}
+			e.preventDefault()
+			multiviewState.removeCell(selectedId)
+			selectedId = null
+			draw()
+			flushApply()
+		}
+	}
+	document.addEventListener('keydown', onKeyDown)
+
 	stateStore.on('*', () => { syncOverlay(); updateToolbar(); refit(); draw() }); draw()
 }

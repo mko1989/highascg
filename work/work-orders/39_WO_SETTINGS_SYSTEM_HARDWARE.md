@@ -75,6 +75,7 @@ DeckLink GUI launches: **prefer no root**; if BMD tools require root in some ins
 
 - `web/components/settings-modal-templates.js` — tab buttons + panes  
 - `web/components/settings-modal.js` — tab activation, API calls  
+- `src/api/routes-system-hardware.js` — thin router; implementations: `system-hardware-nvidia.js`, `system-hardware-decklink.js`, `system-hardware-gui.js`, `system-hardware-gpu-ports.js`  
 - `src/api/routes-system-setup.js` — pattern for `sudo -n` + nuclear password  
 - `src/utils/os-config.js`, `src/utils/hardware-info.js` — DISPLAY / XAUTHORITY  
 - `scripts/sudoers.d/highascg-media-mount` — sudoers template pattern  
@@ -105,3 +106,9 @@ DeckLink GUI launches: **prefer no root**; if BMD tools require root in some ins
 - **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**: documents NVIDIA apply NOPASSWD + GUI launch (no sudo).
 
 **Instructions for next agent:** complete **T9** on real hardware; tighten BMD updater path heuristics per installed `desktopvideo-gui` layout if needed.
+
+### 2026-05-18 — Sweep: split `routes-system-hardware.js`
+
+- Factored WO-39 handlers into **`src/api/system-hardware-nvidia.js`**, **`system-hardware-decklink.js`**, **`system-hardware-gui.js`**, **`system-hardware-gpu-ports.js`**; **`routes-system-hardware.js`** is a small delegate (**`router.js`** import path unchanged).
+
+**Instructions for next agent:** No functional change intended — smoke **Settings → System / Decklink** and GPU port reset from Device View if you touch this stack; complete **T9** on hardware when possible; continue **Sweep 1** on **`multiview-editor-canvas.js`** if trimming large web modules.

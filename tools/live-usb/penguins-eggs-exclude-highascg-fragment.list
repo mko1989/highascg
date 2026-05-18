@@ -12,6 +12,10 @@ home/casparcg/highascg/data/
 home/casparcg/highascg/refs/
 home/casparcg/highascg/work/
 
+# --- WO-47 exFAT mount stub (empty mountpoint in ISO — no builder scratch on media) ---
+# Runtime: systemd mounts LABEL=HIGHASCGEXF at `/home/casparcg/exfat`. Exclude any stray files created on the dev host.
+home/casparcg/exfat/*
+
 # --- IDE / dev-tool caches ---
 home/casparcg/.cache
 home/casparcg/.cursor-server

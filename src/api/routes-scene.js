@@ -10,6 +10,7 @@ const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
 const { layerHasContent, normalizeTransition, resolveChannelFramerateForMixerTween } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
+const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { getChannelMap, getRouteString } = require('../config/routing')
 
 const TAKE_TIMEOUT_MS = 120000
@@ -126,8 +127,6 @@ async function handleSceneTake(body, ctx) {
 			// Native layer transitions are superior because they don't require detaching a route,
 			// preventing playback time jumps and double-decoding on the PGM channel.
 			const previousPgmScene = currentScene
-			const prvStored = liveSceneState.getChannel(bus1)
-			const prvCurrentScene = prvStored?.scene || null
 			let previewExchangePromise = null
 			let previewExchangeStarted = false
 			const startPreviewExchange = () => {
@@ -143,13 +142,16 @@ async function handleSceneTake(body, ctx) {
 				previewExchangeStarted = true
 				previewExchangePromise = (async () => {
 					try {
+						// After PGM take completes: wipe PRV occupied look-stack layers, then hard-cut the *pre-take* PGM look onto PRV (no transition, no fade).
+						await clearSceneProgramLookStackLayers(ctx.amcp, bus1, ctx)
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,
-							currentScene: prvCurrentScene,
+							currentScene: null,
 							incomingScene: previousPgmScene,
 							forceCut: true,
 							self: ctx,
+							skipLayerVisualEquality: true,
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
@@ -167,14 +169,13 @@ async function handleSceneTake(body, ctx) {
 				incomingScene: inc,
 				forceCut: !!b.forceCut,
 				self: ctx,
-				onProgramTransitionStarted: startPreviewExchange,
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
 				liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 			}
-			
-			// Bus exchange behavior: previous PGM look becomes PRV look after take.
-			if (!previewExchangeStarted) startPreviewExchange()
+
+			// Bus exchange: previous PGM look on PRV — runs only after PGM take finishes (no AMCP race with the PGM mix).
+			startPreviewExchange()
 			if (previewExchangePromise) await previewExchangePromise
 			liveSceneState.broadcastSceneLive(ctx)
 			return
@@ -182,7 +183,10 @@ async function handleSceneTake(body, ctx) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('info', `[scene-take] direct-program path ch=${channel} (no pgm/prv bus exchange)`)
 		}
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx })
+		// PGM-only (and any layout without a real preview bus): there is no separate PRV stack to
+		// pre-build looks on, so live JSON often matches the incoming look while Caspar still needs
+		// a fresh PLAY (re-take, recovery, or first air). Skip the layerVisuallyEqual no-op shortcut.
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true })
 		if (inc && typeof inc === 'object' && inc.id) {
 			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 		}

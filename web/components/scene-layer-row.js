@@ -3,6 +3,9 @@
  */
 
 import { createEffectInstance } from '../lib/effect-registry.js'
+import { api } from '../lib/api-client.js'
+import { parseRouteChannelLayer } from './scenes-shared.js'
+import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 
 /**
  * @param {object} opts
@@ -12,8 +15,10 @@ import { createEffectInstance } from '../lib/effect-registry.js'
  * @param {(msg: string, type?: string) => void} opts.showToast
  * @param {() => void} opts.schedulePreviewPush
  * @param {import('../lib/scene-state.js').SceneState} opts.sceneState
+ * @param {{ getState?: () => { channelMap?: object } }} [opts.stateStore]
  * @param {(s: string) => string} opts.escapeHtml
  * @param {(layerIndex: number, data: object) => Promise<void>} opts.applyNativeFillForSource
+ * @param {(scene: import('../lib/scene-state.js').Scene, layerNumber: number, opts?: { forceBus?: 'edit' | 'pgm' | 'prv' }) => { item: object } | { error: string }} [opts.buildLayerRouteLiveSourceItem]
  */
 export function appendSceneLayerStripRows(layerStrip, opts) {
 	const {
@@ -24,8 +29,10 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 		schedulePreviewPush,
 		selectedLayerIndexRef,
 		sceneState,
+		stateStore,
 		escapeHtml,
 		applyNativeFillForSource,
+		buildLayerRouteLiveSourceItem,
 	} = opts
 
 	/** HTML5 DnD: visual index being dragged (bottom→top); avoids MIME type quirks in dragover. */
@@ -41,6 +48,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 			const src = l.source
 			const label = src ? (src.label || src.value || '').slice(0, 28) : 'Empty'
 			const canPaste = sceneState.hasLayerStyleClipboard()
+			const canAddLayerRoute = typeof buildLayerRouteLiveSourceItem === 'function'
 			row.innerHTML = `
 				<span class="scenes-layer-row__drag" draggable="true" title="Drag to change stack order (Z)" aria-grabbed="false" aria-label="Drag to reorder layer">⋮⋮</span>
 				<div class="scenes-layer-row__col">
@@ -49,9 +57,10 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 						<span class="scenes-layer-row__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
 					</div>
 					<div class="scenes-layer-row__line2">
-						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-copy-style="${realIdx}" title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">⎘</button>
-						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-copy-style="${realIdx}" title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">→📋</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋→</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-save-preset="${realIdx}" title="Save as layer style preset" aria-label="Save as layer style preset">💾</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-add-layer-route="${realIdx}" title="Add this layer as a Live route (↗ default = edit bus; Shift+↗ = PGM; Ctrl+↗ = PRV)" aria-label="Add layer route to Live sources" ${canAddLayerRoute ? '' : 'disabled'}>↗</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">🗑</button>
 					</div>
 				</div>
@@ -158,6 +167,16 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 						value: data.value,
 						label: data.label || data.value,
 					}
+					const parsed = parseRouteChannelLayer(src.value)
+					if (parsed) {
+						const cm = stateStore?.getState?.()?.channelMap || {}
+						const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
+						const targetLn = scene.layers[realIdx]?.layerNumber
+						if (ch != null && parsed.channel === ch && parsed.layer === Number(targetLn)) {
+							showToast('A layer cannot play a route to itself (same channel and layer).', 'warn')
+							return
+						}
+					}
 					const th = Number(data.thumbnailChannel)
 					if (Number.isFinite(th) && th > 0) src.thumbnailChannel = th
 					if (data.useDirect != null) src.useDirect = data.useDirect === true || data.useDirect === 'true'
@@ -179,7 +198,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 			row.addEventListener('click', (e) => {
 				if (
 					e.target.closest(
-						'[data-remove], [data-copy-style], [data-paste-style], [data-save-preset], .scenes-layer-row__drag',
+						'[data-remove], [data-copy-style], [data-paste-style], [data-save-preset], [data-add-layer-route], .scenes-layer-row__drag',
 					)
 				)
 					return
@@ -213,6 +232,27 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 					render()
 				} else {
 					showToast('Could not save preset (empty name).', 'warn')
+				}
+			})
+			row.querySelector('[data-add-layer-route]')?.addEventListener('click', async (e) => {
+				e.stopPropagation()
+				if (typeof buildLayerRouteLiveSourceItem !== 'function') return
+				let forceBus = 'edit'
+				if (e.shiftKey) forceBus = 'pgm'
+				else if (e.ctrlKey || e.metaKey) forceBus = 'prv'
+				const built = buildLayerRouteLiveSourceItem(scene, l.layerNumber, { forceBus })
+				if ('error' in built && built.error) {
+					showToast(built.error, 'warn')
+					return
+				}
+				try {
+					const addRes = await api.post('/api/device-view', { addExtraLiveSource: built.item })
+					if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+						window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
+					}
+					showToast('Added to Live sources.', 'info')
+				} catch (err) {
+					showToast(err?.message || String(err), 'error')
 				}
 			})
 			row.querySelector('[data-remove]').addEventListener('click', (e) => {
@@ -353,7 +393,7 @@ export function appendLayerPresetBar(parent, opts) {
 			render()
 		},
 		title: 'Layer style presets',
-		hintText: '💾 on a row saves the same data as ⎘ / 📋, by name.',
+		hintText: '💾 on a row saves the same data as →📋 / 📋→, by name.',
 	})
 	parent.appendChild(wrap)
 }

@@ -10,17 +10,28 @@ sudo bash tools/live-usb/build-flash-and-persist.sh
 
 Use `--flash-only` if the ISO is already built; `--usb /dev/sdX` and `--iso /path` for less interactive use.
 
+### Operator stick — one command (`build-operator-stick`)
+
+```bash
+cd /path/to/highascg
+sudo bash tools/live-usb/build-operator-stick.sh
+```
+
+Runs **`build-highascg-egg.sh`** (WO‑47 **`/etc`** prep, Eggs **`--clone --max --excludes static`**, NVIDIA offline cache), confirms the **USB whole-disk** interactively (`dd`), adds **exFAT `HIGHASCGEXF`** with start **≥ hybrid ISO tail** and **≥ ceil(ISO MiB)+`EXFAT_AFTER_ISO_MARGIN_MIB`** (**1152** MiB default — adjust if your ISO grows), then **union persistence**. Warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
+
 ## Build host (Ubuntu Noble recommended)
 
 1. **Install eggs** (if apt repo fails, use the latest `.deb` from  
    https://github.com/pieroproietti/penguins-eggs/releases )
 
-2. **One-shot build** (network stack + NVIDIA offline cache + excludes + ISO):
+2. **One-shot build** (WO-47 / operator exFAT baked into **`/etc`**, network stack, NVIDIA offline cache, eggs excludes + ISO):
 
    ```bash
    cd /path/to/highascg
    sudo bash tools/live-usb/build-highascg-egg.sh
    ```
+
+   The build script runs **`prepare-eggs-clone-with-exfat.sh`** first (mount + bind + boot sync units, **`highascg.service`** ordering, empty **`~/exfat`** / **`~/highascg/media/*`** stubs, merge of **`penguins-eggs-exclude-highascg-fragment.list`**). If **`/etc/penguins-eggs.d/exclude.list`** does not exist yet, run Eggs config or a preliminary **`eggs produce`** once; then rerun the build script or **`sudo bash tools/live-usb/prepare-eggs-clone-with-exfat.sh`**. Stick + exFAT workflow: [**`EXFAT_DATA_ZERO_TOUCH.md`**](EXFAT_DATA_ZERO_TOUCH.md).
 
    Optional:
 
@@ -37,8 +48,7 @@ Use `--flash-only` if the ISO is already built; `--usb /dev/sdX` and `--iso /pat
    sudo chmod 600 /etc/netplan/01-live-networkd.yaml
    ```
 
-5. **Excludes** (large dirs omitted from squashfs): fragment merged by  
-   `merge-penguins-eggs-exclude-highascg.sh` — includes `home/casparcg/highascg/media`.
+5. **Excludes** (large dirs omitted from squashfs): fragment merged via **`prepare-eggs-clone-with-exfat.sh`** (or **`merge-penguins-eggs-exclude-highascg.sh`**) — includes **`home/casparcg/highascg/media`** and **`home/casparcg/exfat/*`** so the ISO carries an empty WO-47 stub, not developer scratch files.
 
 6. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs produce` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
    - `.deb` installs often use **`/var/lib/tailscale/`**, but **snap** layouts use **`/var/snap/tailscale/…`** — so “no `/var/lib/tailscale`” does **not** prove there is no shipped identity.  

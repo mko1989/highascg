@@ -62,7 +62,9 @@ function collectOccupiedLookLayersOnChannel(self, ch) {
 	}
 	const map = getChannelMap(self?.config || {})
 	const programs = map.programChannels || []
-	if (programs.includes(ch)) {
+	const previews = (map.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
+	const useLiveSceneLayers = programs.includes(ch) || previews.includes(ch)
+	if (useLiveSceneLayers) {
 		const entry = liveSceneState.getChannel(ch)
 		const scene = entry?.scene
 		const bank = normalizeProgramLayerBank(self?.programLayerBankByChannel?.[String(ch)])

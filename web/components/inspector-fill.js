@@ -8,6 +8,7 @@ import { api } from '../lib/api-client.js'
 import { multiviewState } from '../lib/multiview-state.js'
 import { createMathInput } from '../lib/math-input.js'
 import { createDragInput } from './inspector-common.js'
+import { getCellOverlayType, resolveSourceAspectRatio, solveCellDimensions } from './multiview-editor-canvas.js'
 
 /** @typedef {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} SceneContentFit */
 
@@ -182,25 +183,22 @@ export function appendSceneLayerFillGroup(root, opts) {
  * @param {HTMLElement} root
  * @param {object} opts
  */
-export function appendMultiviewPositionSize(root, { cellId, cell }) {
-	const cw = multiviewState.canvasWidth || 1920
-	const ch = multiviewState.canvasHeight || 1080
-
+export function appendMultiviewPositionSize(root, { cellId, cell, stateStore }) {
 	const posGrp = document.createElement('div')
 	posGrp.className = 'inspector-group'
 	posGrp.innerHTML = '<div class="inspector-group__title">Position (px)</div>'
 	const xInp = createMathInput({
-		label: 'X', value: Math.round(cell.x ?? 0), min: 0, max: cw - 1, step: 1, decimals: 0,
-		placeholder: 'e.g. 1920/2',
+		label: 'X', value: Math.round(cell.x ?? 0), min: -999999, max: 999999, step: 1, decimals: 0,
+		placeholder: 'e.g. -1920',
 		onChange: (v) => {
-			multiviewState.setCell(cellId, { x: Math.round(Math.max(0, Math.min(cw - (cell.w ?? 1), v))) })
+			multiviewState.setCell(cellId, { x: Math.round(v) })
 		},
 	})
 	const yInp = createMathInput({
-		label: 'Y', value: Math.round(cell.y ?? 0), min: 0, max: ch - 1, step: 1, decimals: 0,
-		placeholder: 'e.g. 1080-540',
+		label: 'Y', value: Math.round(cell.y ?? 0), min: -999999, max: 999999, step: 1, decimals: 0,
+		placeholder: 'e.g. -100',
 		onChange: (v) => {
-			multiviewState.setCell(cellId, { y: Math.round(Math.max(0, Math.min(ch - (cell.h ?? 1), v))) })
+			multiviewState.setCell(cellId, { y: Math.round(v) })
 		},
 	})
 	posGrp.appendChild(xInp.wrap)
@@ -210,7 +208,11 @@ export function appendMultiviewPositionSize(root, { cellId, cell }) {
 	const sizeGrp = document.createElement('div')
 	sizeGrp.className = 'inspector-group'
 	sizeGrp.innerHTML = '<div class="inspector-group__title">Size (px)</div>'
-	const aspectRatio = (cell.w && cell.h) ? cell.w / cell.h : 16 / 9
+
+	const cm = stateStore?.getState()?.channelMap || {}
+	const programChannels = cm.programChannels || []
+	const previewChannels = cm.previewChannels || []
+	const ovType = getCellOverlayType(cell, programChannels, previewChannels)
 
 	const lockWrap = document.createElement('div')
 	lockWrap.className = 'inspector-field inspector-row'
@@ -226,22 +228,32 @@ export function appendMultiviewPositionSize(root, { cellId, cell }) {
 	sizeGrp.appendChild(lockWrap)
 
 	const wInp = createMathInput({
-		label: 'W', value: Math.round(cell.w ?? 0), min: 1, max: cw, step: 1, decimals: 0,
-		placeholder: 'e.g. 960',
+		label: 'W', value: Math.round(cell.w ?? 0), min: 1, max: 999999, step: 1, decimals: 0,
+		placeholder: 'e.g. 3300',
 		onChange: (v) => {
-			let nw = Math.round(Math.max(1, Math.min(cw - (cell.x ?? 0), v)))
+			let nw = Math.round(Math.max(1, v))
 			let nh = cell.h ?? 100
-			if (lockCheck.checked && cell.h) nh = Math.max(1, Math.min(ch - (cell.y ?? 0), Math.round(nw / aspectRatio)))
+			if (lockCheck.checked) {
+				const ratio = resolveSourceAspectRatio(cell, cm)
+				const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
+				const solved = solveCellDimensions(nw, nh, ratio, 'width', ovType, showTimersUnderLabels)
+				nh = solved.h
+			}
 			multiviewState.setCell(cellId, { w: nw, h: nh })
 		},
 	})
 	const hInp = createMathInput({
-		label: 'H', value: Math.round(cell.h ?? 0), min: 1, max: ch, step: 1, decimals: 0,
+		label: 'H', value: Math.round(cell.h ?? 0), min: 1, max: 999999, step: 1, decimals: 0,
 		placeholder: 'e.g. 540',
 		onChange: (v) => {
-			let nh = Math.round(Math.max(1, Math.min(ch - (cell.y ?? 0), v)))
+			let nh = Math.round(Math.max(1, v))
 			let nw = cell.w ?? 100
-			if (lockCheck.checked && cell.w) nw = Math.max(1, Math.min(cw - (cell.x ?? 0), Math.round(nh * aspectRatio)))
+			if (lockCheck.checked) {
+				const ratio = resolveSourceAspectRatio(cell, cm)
+				const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
+				const solved = solveCellDimensions(nw, nh, ratio, 'height', ovType, showTimersUnderLabels)
+				nw = solved.w
+			}
 			multiviewState.setCell(cellId, { w: nw, h: nh })
 		},
 	})
@@ -249,7 +261,17 @@ export function appendMultiviewPositionSize(root, { cellId, cell }) {
 	sizeGrp.appendChild(hInp.wrap)
 	root.appendChild(sizeGrp)
 
-	lockCheck.addEventListener('change', () => multiviewState.setCell(cellId, { aspectLocked: lockCheck.checked }))
+	lockCheck.addEventListener('change', () => {
+		const locked = lockCheck.checked
+		const update = { aspectLocked: locked }
+		if (locked) {
+			const ratio = resolveSourceAspectRatio(cell, cm)
+			const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
+			const solved = solveCellDimensions(cell.w ?? 100, cell.h ?? 100, ratio, 'width', ovType, showTimersUnderLabels)
+			update.h = solved.h
+		}
+		multiviewState.setCell(cellId, update)
+	})
 }
 
 export { appendTimelineClipKeyframes } from './inspector-fill-timeline.js'

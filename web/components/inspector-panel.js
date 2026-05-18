@@ -85,7 +85,7 @@ export function initInspectorPanel(root, stateStore) {
 		},
 	}
 
-	const multiviewDeps = { root, renderEmpty }
+	const multiviewDeps = { root, renderEmpty, stateStore }
 
 	function syncInspectorModeTabs() {
 		document.querySelectorAll('#panel-inspector [data-inspector-mode]').forEach((btn) => {

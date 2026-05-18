@@ -1,4 +1,6 @@
 /* WO-33 — device view style entrypoint (split for maintainability) */
 @import url('./09a-device-view-layout-destinations.css');
-@import url('./09b-device-view-connectors-inspector.css');
+@import url('./09b1-device-view-connectors-overlay.css');
+@import url('./09b2-device-view-backpanel-hardware.css');
+@import url('./09b3-device-view-inspector-sidebar.css');
 @import url('./09c-device-view-config-modal.css');

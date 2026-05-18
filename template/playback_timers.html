@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>System Playback Timers</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="playback_timers.css">
+</head>
+<body>
+	<div id="app">
+		<header>
+			<div class="title-area">
+				<h1>SYSTEM PLAYBACK TIMERS</h1>
+			</div>
+			<div class="status-indicator">
+				<div class="status-dot" id="status-dot"></div>
+				<span id="status-text">OFFLINE</span>
+			</div>
+		</header>
+
+		<main>
+			<!-- Screens Section -->
+			<div class="screens-section" id="screens-sec">
+				<div class="section-title">Program Outputs</div>
+				<div class="screens-grid" id="screens-grid"></div>
+			</div>
+
+			<!-- Layers Section -->
+			<div class="layers-section" id="layers-sec">
+				<div class="section-title">Active Look Layers</div>
+				<div class="layers-grid-container">
+					<div class="layers-grid" id="layers-grid"></div>
+				</div>
+			</div>
+		</main>
+	</div>
+
+	<script src="playback_timers_helpers.js"></script>
+	<script src="playback_timers.js"></script>
+</body>
+</html>

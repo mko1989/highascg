@@ -1,5 +1,5 @@
 /**
- * POST /api/multiview/apply — layout cells + optional HTML overlay.
+ * POST /api/multiview/apply — layout cells + route layers; single full-screen CG chrome template (multiview_master) draws all borders/labels/timers.
  * @see companion-module-casparcg-server/src/api-routes.js handleMultiviewApply
  */
 
@@ -11,6 +11,17 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getChannelMap } = require('../config/routing-map')
 const persistence = require('../utils/persistence')
 const { infoResponseToXml, listOccupiedStageLayersInRange } = require('../caspar/channel-info-xml')
+const {
+	MV_STAGE_W,
+	MV_STAGE_H,
+	routeForCell,
+	overlayType,
+	inferPgmScreen,
+	inferPrvScreen,
+	containFillInPictureRect,
+	chromeReserveForCellLayout,
+	loadOverlayTemplate,
+} = require('./multiview-layout-helper')
 
 const MULTIVIEW_APPLY_TIMEOUT_MS = 25_000
 
@@ -53,93 +64,31 @@ async function handleMultiviewApply(body, ctx) {
 	const previewChannels = Array.isArray(map.previewChannels)
 		? map.previewChannels.filter((ch) => Number.isFinite(Number(ch)))
 		: []
-	/** Legacy multiview/sources used route://N-11 for PRV (old single preview layer). Content now shares PGM layer numbers (10+); use full channel composite. */
-	const normalizePrvRouteSource = (src) => {
-		if (typeof src !== 'string' || !src.startsWith('route://')) return src
-		const rest = src.replace(/^route:\/\//, '')
-		const m = rest.match(/^(\d+)-(\d+)$/)
-		if (!m) return src
-		const routeCh = parseInt(m[1], 10)
-		const layerNum = parseInt(m[2], 10)
-		if (previewChannels.includes(routeCh) && layerNum === 11) return `route://${routeCh}`
-		return src
-	}
 
-	const routeForCell = (cell) => {
-		if (cell.source) return normalizePrvRouteSource(cell.source)
-		// Support pgm / pgm_0 (screen 1) ... pgm_N (screen N+1)
-		const pgmM = cell.id?.match(/^pgm(?:_(\d+))?$/)
-		if (pgmM || cell.type === 'pgm') {
-			const n = pgmM?.[1] != null ? parseInt(pgmM[1], 10) + 1 : 1
-			return `route://${map.programCh(n)}`
-		}
-		// Support prv / prv_0 (screen 1) ... prv_N (screen N+1)
-		const prvM = cell.id?.match(/^prv(?:_(\d+))?$/)
-		if (prvM || cell.type === 'prv') {
-			const n = prvM?.[1] != null ? parseInt(prvM[1], 10) + 1 : 1
-			return `route://${map.previewCh(n) || map.programCh(n)}`
-		}
-		if (cell.type === 'decklink' && inputsCh) {
-			let i = 1
-			const idM = cell.id?.match(/decklink_(\d+)/)
-			if (idM) {
-				i = parseInt(idM[1], 10) + 1
-			} else if (cell.source && String(cell.source).startsWith('route://')) {
-				const parts = String(cell.source).replace(/^route:\/\//, '').split('-')
-				if (parseInt(parts[0], 10) === inputsCh && parts[1]) i = parseInt(parts[1], 10) || 1
-			} else {
-				const lblM = (cell.label || '').match(/decklink\s*(\d+)/i)
-				if (lblM) i = parseInt(lblM[1], 10) || 1
-			}
-			return `route://${inputsCh}-${i}`
-		}
-		return `route://${map.programCh(1)}`
-	}
+	const programChannels = map.programChannels || Array.from({ length: map.screenCount || 4 }, (_, i) => map.programCh(i + 1))
 
 	/** Layers 1–9: DeckLink inputs (when inputsOnMvr). 10: BG color. 11+: MV cells. 60: overlay CG. */
 	const MV_BG_LAYER = 10
 	const MV_CELL_LAYER_START = 11
 	const OVERLAY_LAYER = 60
 
-	async function loadOverlayTemplate(inst, mvCh, overlayLayer, jsonData) {
-		// Try 1: CG ADD (uses template-path)
-		try {
-			await inst.amcp.cgAdd(mvCh, overlayLayer, 0, 'multiview_overlay', 0, jsonData)
-			await inst.amcp.cgUpdate(mvCh, overlayLayer, 0, jsonData)
-			await inst.amcp.cgPlay(mvCh, overlayLayer, 0)
-			inst.log('debug', 'Multiview overlay loaded via CG ADD')
-			return true
-		} catch (e1) {
-			inst.log('debug', 'CG ADD overlay failed: ' + (e1?.message || e1))
-		}
-		// Try 2: PLAY [html] with media-path relative name (media-path usually = media/)
-		try {
-			await inst.amcp.raw(`PLAY ${mvCh}-${overlayLayer} [html] multiview_overlay`)
-			await new Promise((r) => setTimeout(r, 300))
-			const escaped = jsonData.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-			await inst.amcp.raw(`CALL ${mvCh}-${overlayLayer} "update('${escaped}')"`)
-			inst.log('debug', 'Multiview overlay loaded via PLAY [html] + CALL')
-			return true
-		} catch (e2) {
-			inst.log('debug', 'PLAY [html] overlay failed: ' + (e2?.message || e2))
-		}
-		inst.log('warn', 'Multiview overlay could not be loaded. Place multiview_overlay.html in CasparCG template-path AND media-path folders.')
-		return false
-	}
-
 	// Auto-deploy templates to media/template paths
 	const basePath = (ctx.config?.local_media_path || '').trim()
 	if (basePath) {
-		const templatesDir = path.join(__dirname, '..', '..', 'templates')
-		for (const tpl of ['multiview_overlay.html', 'color_bg.html']) {
+		const templatesDir = path.join(__dirname, '..', '..', 'template')
+		for (const tpl of [
+			'multiview_master.html',
+			'multiview_overlay.html',
+			'multiview_overlay.css',
+			'multiview_overlay.js',
+			'color_bg.html',
+		]) {
 			try {
 				const dest = path.join(basePath, tpl)
-				if (!fs.existsSync(dest)) {
-					const src = path.join(templatesDir, tpl)
-					if (fs.existsSync(src)) {
-						fs.copyFileSync(src, dest)
-						ctx.log('info', `Deployed ${tpl} to ${dest}`)
-					}
+				const src = path.join(templatesDir, tpl)
+				if (fs.existsSync(src)) {
+					fs.copyFileSync(src, dest)
+					ctx.log('info', `Deployed ${tpl} to ${dest}`)
 				}
 			} catch (e) {
 				ctx.log('debug', `Auto-deploy ${tpl}: ` + (e?.message || e))
@@ -148,6 +97,14 @@ async function handleMultiviewApply(body, ctx) {
 	}
 
 	const doApply = async () => {
+		/** Live resolutions for PGM/PRV contain-fill (ultrawide / custom canvas, e.g. 15360×1728). */
+		let cmForMv = null
+		try {
+			cmForMv = require('../config/channel-map-from-ctx').buildChannelMap(ctx)
+		} catch (_) {
+			cmForMv = null
+		}
+
 		// Layers we will (re)use: BG, one layer per cell, optional HTML overlay (preserve DeckLink 1–9)
 		const lastCellLayer = MV_CELL_LAYER_START + Math.max(0, layout.length) - 1
 		const needed = new Set([MV_BG_LAYER])
@@ -205,8 +162,77 @@ async function handleMultiviewApply(body, ctx) {
 		// Layers 11+: multiview cells
 		let layer = MV_CELL_LAYER_START
 		const failed = []
+		const showTimersUnderLabels = !!b.showTimersUnderLabels
+		
 		for (const cell of layout) {
-			const route = routeForCell(cell)
+			const route = routeForCell(cell, map, inputsCh, previewChannels)
+			const ovType = overlayType(cell, programChannels, previewChannels, inputsCh)
+			
+			// Adjust coordinates if it has a border and label so the source is NOT covered
+			let vx = cell.x
+			let vy = cell.y
+			let vw = cell.w
+			let vh = cell.h
+			
+			if (ovType !== 'timers') {
+				// Picture rect = inner tile minus bottom chrome (labels/timers). Video is letterboxed inside that rect only.
+				const px = cell.x * MV_STAGE_W
+				const py = cell.y * MV_STAGE_H
+				const pw = cell.w * MV_STAGE_W
+				const ph = cell.h * MV_STAGE_H
+				
+				const borderSize = 3
+				const { labelSize } = chromeReserveForCellLayout(cell, ovType, showTimersUnderLabels)
+				
+				const adjustedX = px + borderSize
+				const adjustedY = py + borderSize
+				const adjustedW = pw - (borderSize * 2)
+				const adjustedH = ph - (borderSize * 2) - labelSize
+				
+				let fill = {
+					vx: adjustedX / MV_STAGE_W,
+					vy: adjustedY / MV_STAGE_H,
+					vw: adjustedW / MV_STAGE_W,
+					vh: adjustedH / MV_STAGE_H,
+				}
+				if (cell.aspectLocked !== false && cmForMv && (ovType === 'pgm' || ovType === 'prv')) {
+					const si = ovType === 'pgm' ? inferPgmScreen(cell, programChannels) - 1 : inferPrvScreen(cell, previewChannels) - 1
+					const res =
+						ovType === 'pgm'
+							? cmForMv.programResolutions?.[si]
+							: cmForMv.previewResolutions?.[si] || cmForMv.programResolutions?.[si]
+					if (res && res.w > 0 && res.h > 0) {
+						fill = containFillInPictureRect(res.w, res.h, adjustedX, adjustedY, adjustedW, adjustedH)
+					}
+				}
+				vx = Math.round(fill.vx * 1000000) / 1000000
+				vy = Math.round(fill.vy * 1000000) / 1000000
+				vw = Math.round(Math.max(0.01, fill.vw) * 1000000) / 1000000
+				vh = Math.round(Math.max(0.01, fill.vh) * 1000000) / 1000000
+				
+				cell._calc = {
+					vx,
+					vy,
+					vw,
+					vh,
+					lx: vx,
+					ly: vy + vh + (borderSize / MV_STAGE_H),
+					lw: vw,
+					lh: labelSize / MV_STAGE_H,
+				}
+			} else {
+				cell._calc = {
+					vx: cell.x,
+					vy: cell.y,
+					vw: cell.w,
+					vh: cell.h,
+					lx: cell.x,
+					ly: cell.y + cell.h,
+					lw: cell.w,
+					lh: 0,
+				}
+			}
+			
 			try {
 				await ctx.amcp.play(ch, layer, route)
 			} catch (e) {
@@ -215,7 +241,7 @@ async function handleMultiviewApply(body, ctx) {
 				continue
 			}
 			try {
-				await ctx.amcp.mixerFill(ch, layer, cell.x, cell.y, cell.w, cell.h)
+				await ctx.amcp.mixerFill(ch, layer, vx, vy, vw, vh)
 			} catch (e) {
 				failed.push({ layer, route: 'MIXER', err: e?.message || e })
 			}
@@ -235,66 +261,67 @@ async function handleMultiviewApply(body, ctx) {
 		}
 
 		if (showOverlay) {
-			// Derive overlay type from source so Program 2 / Preview 2 (type: route) get pgm/prv borders
-			const programChannels = map.programChannels || Array.from({ length: map.screenCount || 4 }, (_, i) => map.programCh(i + 1))
-			const overlayType = (c) => {
-				const src = c.source || ''
-				if (typeof src === 'string' && src.startsWith('route://')) {
-					const routeCh = String(src).replace(/^route:\/\//, '').split('-')[0]
-					const ch = parseInt(routeCh, 10)
-					if (!isNaN(ch)) {
-						if (programChannels.includes(ch)) return 'pgm'
-						if (previewChannels.includes(ch)) return 'prv'
-						if (inputsCh != null && ch === inputsCh) return 'decklink'
+			const { buildChannelMap } = require('../config/channel-map-from-ctx')
+			const cm = buildChannelMap(ctx)
+
+			const cells = layout.map((c) => {
+				const ovType = overlayType(c, programChannels, previewChannels, inputsCh)
+				let suffix = ''
+				let channelNum = null
+				let screenIdx = -1
+				
+				if (ovType === 'pgm') {
+					screenIdx = inferPgmScreen(c, programChannels) - 1
+					channelNum = programChannels[screenIdx] || null
+					const res = cm.programResolutions?.[screenIdx]
+					if (res && res.w > 0 && res.h > 0) {
+						suffix = ` (${res.w}x${res.h} ${res.fps}p)`
+					}
+				} else if (ovType === 'prv') {
+					screenIdx = inferPrvScreen(c, previewChannels) - 1
+					channelNum = previewChannels[screenIdx] || null
+					const res = cm.previewResolutions?.[screenIdx] || cm.programResolutions?.[screenIdx]
+					if (res && res.w > 0 && res.h > 0) {
+						suffix = ` (${res.w}x${res.h} ${res.fps}p)`
 					}
 				}
-				// Fallback: infer from label when source missing (e.g. manually created cells)
-				const lbl = (c.label || '').toLowerCase()
-				if (/\b(?:program|pgm)\s*\d+\b|\bpgm\d+\b|pgm\s*s\s*\d+/.test(lbl)) return 'pgm'
-				if (/\b(?:preview|prv)\s*\d+\b|\bprv\d+\b|prv\s*s\s*\d+/.test(lbl)) return 'prv'
-				return c.type
-			}
-			function inferPgmScreen(cell) {
-				const src = cell?.source
-				if (src && typeof src === 'string') {
-					const ch = parseInt(String(src).replace(/^route:\/\//, '').split('-')[0], 10)
-					if (!isNaN(ch) && programChannels.includes(ch)) {
-						const idx = programChannels.indexOf(ch)
-						return idx >= 0 ? idx + 1 : 1
-					}
+				
+				const displayLabel = c.label || c.id || ''
+				const { chromeBottomFrac } = chromeReserveForCellLayout(c, ovType, !!b.showTimersUnderLabels)
+				return {
+					id: c.id,
+					label: displayLabel + suffix,
+					x: c._calc ? c._calc.vx : c.x,
+					y: c._calc ? c._calc.vy : c.y,
+					w: c._calc ? c._calc.vw : c.w,
+					h: c._calc ? c._calc.vh : c.h,
+					labelX: c._calc ? c._calc.lx : c.x,
+					labelY: c._calc ? c._calc.ly : (c.y + c.h),
+					labelW: c._calc ? c._calc.lw : c.w,
+					labelH: c._calc ? c._calc.lh : 0,
+					type: ovType,
+					screenIdx,
+					channelNum,
+					chromeBottomFrac: c._calc ? (c._calc.lh / c._calc.vh) : chromeBottomFrac,
 				}
-				const lbl = (cell?.label || '').toLowerCase()
-				const m = lbl.match(/program\s*(\d+)|pgm\s*(\d+)|pgm(\d+)|pgm\s*s\s*(\d+)/)
-				return m ? parseInt(m[1] || m[2] || m[3] || m[4], 10) || 1 : 1
-			}
-			function inferPrvScreen(cell) {
-				const src = cell?.source
-				if (src && typeof src === 'string') {
-					const ch = parseInt(String(src).replace(/^route:\/\//, '').split('-')[0], 10)
-					if (!isNaN(ch) && previewChannels.includes(ch)) {
-						const idx = previewChannels.indexOf(ch)
-						return idx >= 0 ? idx + 1 : 1
-					}
-				}
-				const lbl = (cell?.label || '').toLowerCase()
-				const m = lbl.match(/preview\s*(\d+)|prv\s*(\d+)|prv(\d+)|prv\s*s\s*(\d+)/)
-				return m ? parseInt(m[1] || m[2] || m[3] || m[4], 10) || 1 : 1
-			}
-			const cells = layout.map((c) => ({
-				id: c.id,
-				label: c.label,
-				x: c.x,
-				y: c.y,
-				w: c.w,
-				h: c.h,
-				type: overlayType(c),
-			}))
+			})
+			
 			// Build keyed overlay slots (pgm, prev, pgm2, prev2, ...) — use route channel as primary source.
 			// Each pgm/prv cell must map to a unique slot; route://N determines screen index when available.
 			const keyed = {}
 			for (const c of layout) {
-				const r = { x: c.x, y: c.y, w: c.w, h: c.h, label: c.label || c.id || '' }
-				const ovType = overlayType(c)
+				const r = {
+					x: c._calc ? c._calc.vx : c.x,
+					y: c._calc ? c._calc.vy : c.y,
+					w: c._calc ? c._calc.vw : c.w,
+					h: c._calc ? c._calc.vh : c.h,
+					labelX: c._calc ? c._calc.lx : c.x,
+					labelY: c._calc ? c._calc.ly : (c.y + c.h),
+					labelW: c._calc ? c._calc.lw : c.w,
+					labelH: c._calc ? c._calc.lh : 0,
+					label: c.label || c.id || '',
+				}
+				const ovType = overlayType(c, programChannels, previewChannels, inputsCh)
 				// Id-based: pgm → pgm, pgm_1 → pgm2, prv_1 → prev2
 				const pgmM = c.id?.match(/^pgm(?:_(\d+))?$/)
 				const prvM = c.id?.match(/^prv(?:_(\d+))?$/)
@@ -305,8 +332,8 @@ async function handleMultiviewApply(body, ctx) {
 						const ch = parseInt(String(c.source).replace(/^route:\/\//, '').split('-')[0], 10)
 						if (!isNaN(ch) && programChannels.includes(ch))
 							n = programChannels.indexOf(ch) + 1
-						else n = inferPgmScreen(c)
-					} else n = inferPgmScreen(c)
+						else n = inferPgmScreen(c, programChannels)
+					} else n = inferPgmScreen(c, programChannels)
 					keyed[n === 1 ? 'pgm' : `pgm${n}`] = r
 				} else if (prvM || ovType === 'prv') {
 					if (prvM?.[1] != null) n = parseInt(prvM[1], 10) + 1
@@ -314,8 +341,8 @@ async function handleMultiviewApply(body, ctx) {
 						const ch = parseInt(String(c.source).replace(/^route:\/\//, '').split('-')[0], 10)
 						if (!isNaN(ch) && previewChannels.includes(ch))
 							n = previewChannels.indexOf(ch) + 1
-						else n = inferPrvScreen(c)
-					} else n = inferPrvScreen(c)
+						else n = inferPrvScreen(c, previewChannels)
+					} else n = inferPrvScreen(c, previewChannels)
 					keyed[n === 1 ? 'prev' : `prev${n}`] = r
 				} else {
 					let m = c.id?.match(/^(decklink|ndi)_(\d+)$/)
@@ -339,7 +366,7 @@ async function handleMultiviewApply(body, ctx) {
 					}
 				}
 			}
-			const overlayData = JSON.stringify({ cells, ...keyed })
+			const overlayData = JSON.stringify({ cells, showTimersUnderLabels, ...keyed })
 			await loadOverlayTemplate(ctx, ch, OVERLAY_LAYER, overlayData)
 		} else {
 			try {

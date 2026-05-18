@@ -7,6 +7,18 @@ export async function loadDeviceView() {
 	return await api.get('/api/device-view')
 }
 
+export async function applyDeviceSnapshot(snapshot, opts = {}) {
+	return await api.post('/api/device-snapshot/apply', {
+		snapshot,
+		mode: opts.mode === 'graphOnly' ? 'graphOnly' : 'full',
+		dryRun: !!opts.dryRun,
+	})
+}
+
+export async function buildDeviceSnapshotEnvelope() {
+	return await api.get('/api/device-snapshot/build')
+}
+
 export async function loadSettings() {
 	return await api.get('/api/settings')
 }

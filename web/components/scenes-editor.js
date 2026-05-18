@@ -18,6 +18,8 @@ import { LOOK_PRESET_RECALL_PGM, LOOK_PRESET_RECALL_PRV } from '../lib/look-pres
 
 import * as Logic from './scenes-editor-logic.js'
 import { renderEdit } from './scenes-editor-edit.js'
+import { formatFps } from './sources-panel-helpers.js'
+import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 
 export function initScenesEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -26,6 +28,46 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	const getProgramChannel = () => getChannelMap().programChannels?.[sceneState.activeScreenIndex] ?? 1
 	const getPlaybackChannel = () => getChannelMap().playbackChannels?.[sceneState.activeScreenIndex] ?? getProgramChannel()
 	const getPreviewChannel = () => getChannelMap().previewChannels?.[sceneState.activeScreenIndex] ?? null
+
+	/**
+	 * Caspar channel where look-stack layers are played for {@link scene} (matches preview AMCP target).
+	 * @param {import('../lib/scene-state.js').Scene} scene
+	 * @param {number} layerNumber
+	 * @param {{ forceBus?: 'edit' | 'pgm' | 'prv' }} [opts]
+	 * @returns {{ item: object } | { error: string }}
+	 */
+	function buildLayerRouteLiveSourceItem(scene, layerNumber, opts = {}) {
+		const cm = getChannelMap()
+		const forceBus = opts.forceBus || 'edit'
+		const ch = resolveLookStackChannelForBus(cm, sceneState, scene, forceBus)
+		if (!Number.isFinite(ch) || ch <= 0) {
+			return { error: 'No Caspar preview/program channel for this screen. Check routing in Settings.' }
+		}
+		const ln = Number(layerNumber)
+		if (!Number.isFinite(ln) || ln < 1) return { error: 'Invalid layer number.' }
+		const screenCount = Math.max(1, cm.screenCount ?? 1)
+		const scope = String(scene?.mainScope || 'all')
+		const mIdx =
+			scope === 'all'
+				? (sceneState.activeScreenIndex ?? 0)
+				: Math.min(Math.max(parseInt(scope, 10) || 0, 0), screenCount - 1)
+		const res = cm.previewResolutions?.[mIdx] || cm.programResolutions?.[mIdx]
+		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
+		const fps = res?.fps != null ? formatFps(res.fps) : ''
+		const value = `route://${ch}-${ln}`
+		const busTag = forceBus === 'pgm' ? ' PGM' : forceBus === 'prv' ? ' PRV' : ''
+		return {
+			item: {
+				type: 'route',
+				routeType: 'layer',
+				value,
+				label: `Route: Ch${ch} L${ln}${busTag}`,
+				resolution,
+				fps,
+				thumbnailChannel: ch,
+			},
+		}
+	}
 	const getThumbForSource = (source, channelForLive) => {
 		if (!source || !source.value) return null
 		if (isMediaOrFileSource(source)) return getThumbnailUrl(source.value, SCENE_THUMB_MAX_W, 0)
@@ -221,7 +263,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		const prevScrollTop = preserveDeckScroll ? mainHost.scrollTop : 0
 		const prevScrollLeft = preserveDeckScroll ? mainHost.scrollLeft : 0
 		tabsHost.innerHTML = ''
-		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, renderCompose: s => renderComposeScene(s, { sceneState, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getPreviewChannel()), getPreviewChannelForLiveThumb: getPreviewChannel }), selectedLayerIndexRef, showScenesToast })
+		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getPreviewChannel()), getPreviewChannelForLiveThumb: getPreviewChannel }), selectedLayerIndexRef, showScenesToast })
 		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, outputAspect: getResolution().w / getResolution().h, paintDeckThumb: c => {
 			const id = c.dataset.sceneId; const scene = id ? sceneState.getScene(id) : null; if (!scene) return
 			const res = c.dataset.deckMain ? Logic.getResolutionForScreen(parseInt(c.dataset.deckMain, 10), sceneState, stateStore) : getResolution()

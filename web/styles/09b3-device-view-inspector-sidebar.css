@@ -1,0 +1,205 @@
+/* WO-33 — device view inspector & port sidebar */
+.device-view__port {
+	min-width: 88px;
+	min-height: 40px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--color-border, #3f3f48);
+	background: #222228;
+	color: inherit;
+	font-size: 12px;
+	text-align: left;
+	cursor: pointer;
+	position: relative;
+	padding-right: 24px;
+}
+.device-view__port:hover {
+	border-color: #5a8fd8;
+}
+.device-view__port--selected {
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 1px #3b82f6;
+}
+.device-view__port--ok {
+	border-color: rgba(34, 197, 94, 0.65);
+	background: rgba(21, 92, 44, 0.35);
+}
+.device-view__port--warn {
+	border-color: rgba(245, 158, 11, 0.75);
+	background: rgba(124, 79, 17, 0.32);
+}
+.device-view__port--err {
+	border-color: rgba(239, 68, 68, 0.8);
+	background: rgba(116, 31, 31, 0.38);
+}
+.device-view__port--off {
+	border-color: rgba(107, 114, 128, 0.55);
+	background: rgba(55, 65, 81, 0.28);
+}
+.device-view__port--cable-armed {
+	border-color: #f59e0b;
+	box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
+}
+.device-view__edges-host {
+	margin-bottom: 8px;
+}
+.device-view__edge-list {
+	margin: 8px 0 0;
+	padding-left: 1.2rem;
+	font-size: 12px;
+	line-height: 1.6;
+}
+.device-view__edge-rm {
+	margin-left: 10px;
+	font-size: 11px;
+	padding: 2px 8px;
+	cursor: pointer;
+}
+.device-view__edge-item {
+	cursor: pointer;
+}
+.device-view__edge-item--selected {
+	color: #f59e0b;
+}
+.device-view__port small {
+	display: block;
+	opacity: 0.75;
+	font-size: 10px;
+	margin-top: 2px;
+}
+.device-view__inspector {
+	margin-top: 0;
+	padding: 4px 12px 10px;
+	border-radius: 8px;
+	border: 1px dashed var(--color-border, #2a2a32);
+	font-size: 12px;
+	background: rgba(0, 0, 0, 0.18);
+}
+.device-view__inspector-title {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--accent);
+	margin: 4px 0 8px;
+	opacity: 0.9;
+}
+.device-view__inherited-box {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	background: rgba(88, 166, 255, 0.12);
+	border: 1px solid rgba(88, 166, 255, 0.35);
+	border-radius: 4px;
+	color: #8bbfff;
+	font-size: 10px;
+	font-weight: 600;
+	margin-bottom: 8px;
+}
+.device-view__kv {
+	display: grid;
+	gap: 6px;
+	margin: 8px 0 10px;
+}
+.device-view__kv-row {
+	display: grid;
+	grid-template-columns: 150px 1fr;
+	gap: 10px;
+	align-items: start;
+}
+.device-view__kv-key {
+	opacity: 0.75;
+	font-size: 11px;
+	padding-right: 12px;
+	word-break: break-all;
+}
+.device-view__kv-val {
+	font-size: 12px;
+	color: #fff;
+	word-break: break-all;
+	min-width: 0;
+}
+.device-view__links {
+	display: inline-flex;
+}
+.device-view__status {
+	font-size: 12px;
+	margin-top: 8px;
+}
+.device-view__status--ok {
+	color: #22c55e;
+}
+.device-view__status--err {
+	color: #f87171;
+}
+.device-view__stream-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	line-height: 1.4;
+	background: rgba(34, 197, 94, 0.18);
+	border: 1px solid rgba(34, 197, 94, 0.75);
+	color: #86efac;
+}
+.device-view__inspector-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 8px 0;
+}
+.device-view__inspector-links .header-btn {
+	font-size: 11px;
+	padding: 4px 8px;
+}
+.device-view__section-divider {
+	border: none;
+	border-top: 1px dashed rgba(148, 163, 184, 0.25);
+	margin: 8px 0;
+}
+.device-view__cable-btn {
+	font-size: 12px !important;
+}
+.device-view--external-inspector .device-view__layout {
+	grid-template-columns: 1fr;
+}
+.device-view--external-inspector .device-view__side {
+	display: none;
+}
+@media (max-width: 1160px) {
+	.device-view__layout {
+		grid-template-columns: 1fr;
+	}
+	.device-view__panel-row {
+		grid-template-columns: 1fr;
+	}
+	.device-view__side {
+		position: static;
+	}
+	.device-view__inspector {
+		margin-top: 6px;
+	}
+}
+.device-view__input--inherited {
+	background: rgba(88, 166, 255, 0.08) !important;
+	border: 1px solid rgba(88, 166, 255, 0.35) !important;
+	color: #8bbfff !important;
+	font-weight: 600;
+	cursor: default;
+}
+.device-view__inspector-link-btn {
+	background: none;
+	border: none;
+	color: #3b82f6;
+	text-decoration: underline;
+	cursor: pointer;
+	padding: 0;
+	font-size: 12px;
+	text-align: left;
+	display: inline-block;
+}
+.device-view__inspector-link-btn:hover {
+	color: #60a5fa;
+}

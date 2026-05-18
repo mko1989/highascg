@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Multiview master</title>
+	<style>
+		@font-face {
+			font-family: 'Rewir';
+			src: url('../web/fonts/Rewir-Light.woff') format('woff');
+			font-weight: 300;
+			font-style: normal;
+			font-display: swap;
+		}
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: transparent !important;
+			font-family: 'Rewir', system-ui, sans-serif;
+		}
+		#cv {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+			display: block;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="cv" width="1920" height="1080"></canvas>
+	<script>
+		const W = 1920;
+		const H = 1080;
+		const canvas = document.getElementById('cv');
+		const ctx = canvas.getContext('2d', { alpha: true });
+
+		let ws = null;
+		let oscState = { channels: {} };
+		let channelMap = { programChannels: [], programResolutions: [] };
+		let sceneLive = {};
+		let programLayerBankByChannel = {};
+		let cellsConfig = [];
+		let showTimersUnderLabels = false;
+
+		function mergeChannel(a, b) {
+			if (!b) return a;
+			if (!a) return b;
+			const o = { ...a, ...b };
+			if (b.layers || a.layers) {
+				o.layers = { ...(a.layers || {}) };
+				for (const k of Object.keys(b.layers || {})) {
+					const aL = a.layers && a.layers[k] ? a.layers[k] : {};
+					const bL = b.layers[k];
+					const merged = { ...aL, ...bL };
+					if (aL.file && bL.file && typeof aL.file === 'object' && typeof bL.file === 'object') {
+						merged.file = { ...aL.file, ...bL.file };
+					}
+					o.layers[k] = merged;
+				}
+			}
+			return o;
+		}
+
+		function connect() {
+			const host = window.location.hostname || '127.0.0.1';
+			const port = window.location.port || '4200';
+			const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			ws = new WebSocket(proto + '//' + host + ':' + port + '/api/ws');
+			ws.onclose = () => setTimeout(connect, 2000);
+			ws.onmessage = (ev) => {
+				try {
+					const msg = JSON.parse(ev.data);
+					if (msg.type === 'state') {
+						if (msg.data?.osc?.channels) oscState.channels = msg.data.osc.channels;
+						if (msg.data?.channelMap) channelMap = msg.data.channelMap;
+						if (msg.data?.scene) {
+							sceneLive = msg.data.scene.live || {};
+							programLayerBankByChannel = msg.data.scene.programLayerBankByChannel || {};
+						}
+					} else if (msg.type === 'osc') {
+						if (msg.data?.channels) {
+							if (msg.data.delta) {
+								for (const k of Object.keys(msg.data.channels)) {
+									oscState.channels[k] = mergeChannel(oscState.channels[k], msg.data.channels[k]);
+								}
+							} else {
+								oscState.channels = msg.data.channels;
+							}
+						}
+					} else if (msg.type === 'change') {
+						if (msg.data?.path === 'scene.live') sceneLive = msg.data.value || {};
+						else if (msg.data?.path === 'scene.programLayerBankByChannel') {
+							programLayerBankByChannel = msg.data.value || {};
+						}
+					}
+				} catch (e) {
+					console.error('Multiview master WS:', e);
+				}
+			};
+		}
+		connect();
+
+		function formatMmSs(sec) {
+			if (!Number.isFinite(sec) || sec < 0) return '0:00';
+			const m = Math.floor(sec / 60);
+			const s = Math.floor(sec % 60);
+			return `${m}:${String(s).padStart(2, '0')}`;
+		}
+
+		function getScreenLabelForChannel(chNum) {
+			if (channelMap && Array.isArray(channelMap.programChannels)) {
+				const idx = channelMap.programChannels.indexOf(chNum);
+				if (idx !== -1) return `Screen ${idx + 1}`;
+			}
+			return `Ch ${chNum}`;
+		}
+
+		function getTopLayerForPlayback(chNum, seen = new Set()) {
+			if (seen.has(chNum)) return null;
+			seen.add(chNum);
+			const ch = oscState.channels[String(chNum)] || oscState.channels[chNum];
+			const layers = ch?.layers;
+			if (!layers) return null;
+			let bestN = -1;
+			let bestState = null;
+			for (const key of Object.keys(layers)) {
+				const n = parseInt(key, 10);
+				if (!Number.isFinite(n)) continue;
+				const ly = layers[key];
+				const f = ly?.file;
+				if (f && (f.name || f.path)) {
+					if (n > bestN) {
+						bestN = n;
+						bestState = ly;
+					}
+				}
+			}
+			if (bestState) {
+				const f = bestState.file || {};
+				const name = String(f.name || f.path || '');
+				if (name.toLowerCase().startsWith('route://')) {
+					const match = name.match(/route:\/\/(\d+)/i);
+					if (match) {
+						const targetCh = parseInt(match[1], 10);
+						if (targetCh !== chNum) {
+							const targetState = getTopLayerForPlayback(targetCh, seen);
+							if (targetState) {
+								return {
+									...targetState,
+									file: { ...targetState.file, name: targetState.file?.name || '', path: targetState.file?.path || '' },
+									isRoute: true,
+									routeTarget: targetCh,
+									routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`,
+								};
+							}
+							return {
+								file: { name: `Route (${getScreenLabelForChannel(targetCh)})` },
+								isRoute: true,
+								routeTarget: targetCh,
+								routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`,
+							};
+						}
+					}
+				}
+			}
+			return bestState;
+		}
+
+		function getActiveScenes() {
+			const list = [];
+			if (channelMap && Array.isArray(channelMap.programChannels)) {
+				channelMap.programChannels.forEach((chNum) => {
+					const entry = sceneLive[String(chNum)] || sceneLive[chNum];
+					if (entry?.scene) list.push(entry.scene);
+				});
+			}
+			return list;
+		}
+
+		function colorsForType(t) {
+			if (t === 'pgm') return { border: '#e63946', solid: '#c92a2a', prog: '#ffffff' };
+			if (t === 'prv') return { border: '#2a9d8f', solid: '#0d9488', prog: '#a7f3d0' };
+			return { border: '#457b9d', solid: '#2563eb', prog: '#ffffff' };
+		}
+
+		function cellRectPx(cell) {
+			return {
+				x: (cell.x || 0) * W,
+				y: (cell.y || 0) * H,
+				w: Math.max(1, (cell.w || 0) * W),
+				h: Math.max(1, (cell.h || 0) * H),
+			};
+		}
+
+		function resolvePlaybackCh(cell) {
+			const chNum = cell.channelNum;
+			const screenIdx = cell.screenIdx;
+			let resolvedChNum = chNum;
+			if (cell.type === 'pgm') {
+				const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
+				const activeCh =
+					channelMap.transitionModel === 'switcher_bus'
+						? bank === 'b'
+							? channelMap.switcherBusChannels?.[screenIdx]
+							: channelMap.switcherBus1Channels?.[screenIdx]
+						: chNum;
+				resolvedChNum = activeCh || chNum;
+			}
+			return resolvedChNum;
+		}
+
+		function fillTruncatedLine(text, x, y, maxW, padL, padR, font) {
+			const max = maxW - padL - padR;
+			let t = String(text);
+			ctx.font = font || '500 10px Rewir, system-ui, sans-serif';
+			ctx.textBaseline = 'middle';
+			while (t.length > 3 && ctx.measureText(t).width > max) t = t.slice(0, -2) + '…';
+			ctx.fillText(t, x + padL, y);
+		}
+
+		function drawCenteredTitle(text, x, y, w, h) {
+			ctx.font = '600 11px Rewir, system-ui, sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			let t = String(text || '');
+			while (t.length > 3 && ctx.measureText(t).width > w - 12) t = t.slice(0, -2) + '…';
+			ctx.fillStyle = '#fff';
+			ctx.fillText(t, x + w / 2, y + h / 2);
+			ctx.textAlign = 'left';
+			ctx.textBaseline = 'alphabetic';
+		}
+
+		function roundRectPath(x, y, rw, rh, r) {
+			const rr = Math.min(r, rw / 2, rh / 2);
+			ctx.beginPath();
+			ctx.moveTo(x + rr, y);
+			ctx.arcTo(x + rw, y, x + rw, y + rh, rr);
+			ctx.arcTo(x + rw, y + rh, x, y + rh, rr);
+			ctx.arcTo(x, y + rh, x, y, rr);
+			ctx.arcTo(x, y, x + rw, y, rr);
+			ctx.closePath();
+		}
+
+		function collectLayerLines(cell, resolvedChNum, screenIdx, chNum) {
+			const lines = [];
+			if (cell.type !== 'pgm') return lines;
+			const activeScenes = getActiveScenes();
+			for (const scene of activeScenes) {
+				if (!Array.isArray(scene.layers)) continue;
+				for (const layer of scene.layers) {
+					const num = Number(layer.layerNumber);
+					if (layer.source?.value && layer.source.value.includes('playback_timers.html')) continue;
+					let lookScreenIdx = 0;
+					if (/^[0-3]$/.test(String(scene.mainScope))) lookScreenIdx = parseInt(scene.mainScope, 10);
+					else if (channelMap.programChannels) {
+						for (let i = 0; i < channelMap.programChannels.length; i++) {
+							const entry = sceneLive[String(channelMap.programChannels[i])] || sceneLive[channelMap.programChannels[i]];
+							if (entry?.sceneId === scene.id) {
+								lookScreenIdx = i;
+								break;
+							}
+						}
+					}
+					if (lookScreenIdx !== screenIdx) continue;
+					const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
+					const pLayer = bank === 'b' ? num + 100 : num;
+					const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
+					const layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
+					let lFile = layerOsc?.file || {};
+					let isLayerRoute = false;
+					let layerRouteLabel = '';
+					const lName = String(lFile.name || lFile.path || '');
+					if (lName.toLowerCase().startsWith('route://')) {
+						const match = lName.match(/route:\/\/(\d+)/i);
+						if (match) {
+							const targetCh = parseInt(match[1], 10);
+							isLayerRoute = true;
+							layerRouteLabel = `Route (${getScreenLabelForChannel(targetCh)})`;
+							const targetOsc =
+								oscState.channels[String(targetCh)]?.layers?.[num] ||
+								oscState.channels[String(targetCh)]?.layers?.[String(num)];
+							if (targetOsc?.file) lFile = targetOsc.file;
+						}
+					}
+					let lFileName = lFile.name || (lFile.path ? lFile.path.split(/[/\\]/).pop() : '');
+					if (isLayerRoute) {
+						const subName = lFile.name && !lFile.name.toLowerCase().startsWith('route://') ? lFile.name : '';
+						lFileName = layerRouteLabel + (subName ? ` - ${subName}` : '');
+					}
+					if (!lFileName) continue;
+					const lElapsed = lFile.elapsed ?? 0;
+					const lDur = lFile.duration ?? 0;
+					const lRem = Number.isFinite(lDur) && lDur > 0 ? Math.max(0, lDur - lElapsed) : null;
+					lines.push(
+						`L${num} [${layer.label || `Layer ${num}`}]: ${lFileName}  ${formatMmSs(lElapsed)}/${formatMmSs(lDur)}` +
+							(Number.isFinite(lRem) ? ` (-${formatMmSs(lRem)})` : ''),
+					);
+				}
+			}
+			return lines;
+		}
+
+		function redraw() {
+			ctx.clearRect(0, 0, W, H);
+			ctx.save();
+			for (const cell of cellsConfig) {
+				if (cell.type === 'timers') continue;
+				const r = cellRectPx(cell);
+				const c = colorsForType(cell.type);
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = c.border;
+				ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+
+				const lx = (cell.labelX ?? cell.x) * W;
+				const ly = (cell.labelY ?? (cell.y + cell.h)) * H;
+				const lw = (cell.labelW ?? cell.w) * W;
+				const lh = (cell.labelH ?? 0) * H;
+
+				const frac = typeof cell.chromeBottomFrac === 'number' && cell.chromeBottomFrac > 0 ? cell.chromeBottomFrac : 0.035;
+				const chromeH = lh > 0 ? lh : r.h * frac;
+				const titleBarH = Math.min(34, Math.max(22, Math.floor(chromeH * 0.36)));
+
+				const isScreen = cell.type === 'pgm' || cell.type === 'prv';
+				const useTimers = isScreen && showTimersUnderLabels && cell.channelNum != null;
+
+				if (!useTimers) {
+					const solidH = lh > 0 ? lh : titleBarH;
+					ctx.fillStyle = c.solid;
+					ctx.fillRect(lx, ly, lw, solidH);
+					drawCenteredTitle(cell.label || '', lx, ly, lw, solidH);
+					continue;
+				}
+
+				const resolvedChNum = resolvePlaybackCh(cell);
+				const lyState = getTopLayerForPlayback(resolvedChNum);
+				const file = lyState?.file || {};
+				const elapsed = file.elapsed ?? 0;
+				const dur = file.duration ?? 0;
+				const rem = Number.isFinite(dur) && dur > 0 ? Math.max(0, dur - elapsed) : null;
+				const pct = dur > 0 ? Math.min(100, Math.max(0, (elapsed / dur) * 100)) : 0;
+				let fileName = file.name || (file.path ? file.path.split(/[/\\]/).pop() : '');
+				if (lyState?.isRoute) {
+					const subName = file.name && !file.name.toLowerCase().startsWith('route://') ? file.name : '';
+					fileName = lyState.routeLabel + (subName ? ` - ${subName}` : '');
+				}
+				const clip = fileName || 'No active clip';
+
+				ctx.fillStyle = c.solid;
+				ctx.fillRect(lx, ly, lw, titleBarH);
+				drawCenteredTitle(cell.label || '', lx, ly, lw, titleBarH);
+
+				const dockW = Math.min(lw - 8, Math.max(200, lw * 0.5));
+				const dockX = lx + (lw - dockW) / 2;
+				const dockY = ly + titleBarH;
+				const dockH = chromeH - titleBarH;
+				if (dockH > 12) {
+					const pad = 8;
+					let ty = dockY + 14;
+					ctx.textBaseline = 'middle';
+					ctx.fillStyle = '#fff';
+					ctx.font = '600 10px Rewir, system-ui, sans-serif';
+					ctx.shadowColor = 'rgba(0,0,0,0.9)';
+					ctx.shadowBlur = 4;
+					const timeStr = `${formatMmSs(elapsed)} / ${formatMmSs(dur)}${Number.isFinite(rem) ? `  -${formatMmSs(rem)}` : ''}`;
+					const rowY = ty;
+					let clipDraw = String(clip);
+					const maxClip = dockW - pad * 2 - ctx.measureText(timeStr).width - 10;
+					while (clipDraw.length > 3 && ctx.measureText(clipDraw).width > maxClip) clipDraw = clipDraw.slice(0, -2) + '…';
+					ctx.textAlign = 'left';
+					ctx.fillText(clipDraw, dockX + pad, rowY);
+					ctx.textAlign = 'right';
+					ctx.fillText(timeStr, dockX + dockW - pad, rowY);
+					ctx.textAlign = 'left';
+					ctx.shadowBlur = 0;
+					ty += 18;
+					ctx.fillStyle = 'rgba(255,255,255,0.25)';
+					ctx.fillRect(dockX + pad, ty, dockW - pad * 2, 4);
+					ctx.fillStyle = c.prog;
+					ctx.fillRect(dockX + pad, ty, ((dockW - pad * 2) * pct) / 100, 4);
+					ty += 12;
+					ctx.fillStyle = '#f1f5f9';
+					ctx.font = '500 9px Rewir, system-ui, sans-serif';
+					const layerLines = collectLayerLines(cell, resolvedChNum, cell.screenIdx, cell.channelNum);
+					const lineH = 11;
+					const maxY = ly + chromeH - 4;
+					for (const ln of layerLines) {
+						if (ty + lineH > maxY) break;
+						fillTruncatedLine(ln, dockX, ty + lineH * 0.5, dockW, pad, pad, '500 9px Rewir, system-ui, sans-serif');
+						ty += lineH;
+					}
+					ctx.textBaseline = 'alphabetic';
+				}
+			}
+			ctx.restore();
+		}
+
+		setInterval(redraw, 150);
+
+		window['play'] = function () {};
+
+		function update(raw) {
+			let data;
+			try {
+				if (typeof raw === 'string') {
+					let s = raw.trim();
+					if (!s) return;
+					if (s.indexOf('\\"') !== -1) s = s.replace(/\\"/g, '"');
+					if (s.charAt(0) === '"' && s.length > 1 && s.charAt(s.length - 1) === '"') s = s.slice(1, -1);
+					if (s.charAt(0) === '"') {
+						s = s.slice(1).replace(/\\"/g, '"');
+						s = s.replace(/"\s*$/, '');
+					}
+					data = JSON.parse(s);
+				} else if (raw && typeof raw === 'object') {
+					data = raw;
+				} else return;
+			} catch (e) {
+				console.error('Multiview master update:', e);
+				return;
+			}
+			cellsConfig = data?.cells || [];
+			showTimersUnderLabels = !!data?.showTimersUnderLabels;
+			redraw();
+		}
+		window['update'] = update;
+
+		if (document.fonts && document.fonts.ready) {
+			document.fonts.ready.then(redraw).catch(() => redraw());
+		}
+	</script>
+</body>
+</html>

@@ -2,21 +2,25 @@
 
 **Default goal:** a stick that **remembers the whole live session** — NVIDIA
 drivers, DeckLink-related config, Tailscale, **`/etc`**, **`/var`**, home
-directories, and **`/home/casparcg/highascg`**. That requires Debian Live
+directories, and **`/home/casparcg/highascg`**. That requires Ubuntu Live
 **`persistence`** + **`persistence.conf`** with **`/ union`**, and booting
 **Live with persistence** every time.
 
-**WO-47 exFAT data (optional, no UUID edits):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`** (installed by **`scripts/install-phase4.sh`**). After `dd`, if you want **both** exFAT and **`/ union`** persistence, run **exFAT first**, then persistence — see **`EXFAT_DATA_ZERO_TOUCH.md`**.
+**WO-47 exFAT data (optional, no UUID edits):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`**, binds **`~/exfat/media` → `~/highascg/media/exfat`**, and runs boot-time sync (**`highascg-exfat-sync.service`**) — installed from **`scripts/install-exfat-systemd-units.sh`**, **`scripts/write-highascg-systemd-unit.sh`**, and **`scripts/install-phase4.sh`**; **Eggs `--clone`** images bake the same logic if you ran **`tools/live-usb/prepare-eggs-clone-with-exfat.sh`** (or **`build-highascg-egg.sh`**) on the build host. After `dd`, if you want **both** exFAT and **`/ union`** persistence, run **exFAT first**, then persistence — see **`EXFAT_DATA_ZERO_TOUCH.md`**.
 
-**Automation:** from the HighAsCG repo, after `dd` + `sync`:
+**Automation:** from the HighAsCG repo, after `dd` + `sync` (or **`flash-iso-from-config.sh`**). If **`tools/live-usb/flash-iso.conf`** exists with **`DEVICE=/dev/sdX`**, you can omit the device on the **`add-*`** lines; otherwise pass **`/dev/sdX`** explicitly.
 
 ```bash
 # exFAT + persistence: exFAT first (default 4 GiB), then persistence uses the tail.
-sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
-sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
+sudo bash tools/live-usb/add-exfat-data-partition.sh
+sudo bash tools/live-usb/add-union-persistence-partition.sh
+
+# Or with explicit device:
+# sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
+# sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
 
 # Persistence only (no exFAT slice):
-# sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
+# sudo bash tools/live-usb/add-union-persistence-partition.sh
 ```
 
 Use `--dry-run` first if you like. If `parted` cannot infer free space, set

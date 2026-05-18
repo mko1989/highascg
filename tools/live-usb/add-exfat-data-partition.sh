@@ -3,17 +3,24 @@
 # used by add-union-persistence-partition.sh (never start from bogus "free space" after ESP only).
 #
 # Usage:
-#   sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
-#   sudo bash tools/live-usb/add-exfat-data-partition.sh --dry-run /dev/sdX
+#   sudo bash tools/live-usb/add-exfat-data-partition.sh [/dev/sdX]
+#   sudo bash tools/live-usb/add-exfat-data-partition.sh --dry-run [/dev/sdX]
+# Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
-# Requires: parted util-linux blkid mkfs.exfat (exfatprogs) python3
+# Optional: EXFAT_ISO_PATH + EXFAT_AFTER_ISO_MARGIN_MIB — never place exFAT before ceil(ISO MiB)+margin (safe gap after dd).
+# Optional: EXFAT_LABEL (≤11 chars; default HIGHASCGEXF matches systemd WO-47).
+#
+# Requires: parted util-linux blkid mkfs.exfat (exfatprogs) python3 wipefs
 set -euo pipefail
 
 DRY=false
 DEV=""
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
-	echo "Usage: sudo $0 [--dry-run] /dev/sdX" >&2
+	echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2
+	echo "If /dev/sdX is omitted, reads DEVICE= from tools/live-usb/flash-iso.conf (or FLASH_ISO_CONF)." >&2
 	echo "Creates a primary exFAT partition after the last MBR partition (LABEL=HIGHASCGEXF)." >&2
 	echo "Default size EXFAT_SIZE_MIB=4096 so add-union-persistence-partition.sh can use the tail." >&2
 	echo "ExFAT-only stick: EXFAT_FILL_DISK=1 sudo $0 /dev/sdX" >&2
@@ -32,6 +39,18 @@ while [[ $# -gt 0 ]]; do
 		*) DEV="$1"; shift ;;
 	esac
 done
+
+if [[ -z "$DEV" ]]; then
+	CONF_PATH="${FLASH_ISO_CONF:-$HERE/flash-iso.conf}"
+	if [[ ! -f "$CONF_PATH" ]]; then
+		echo "No device argument and no $CONF_PATH — pass /dev/sdX or copy flash-iso.conf.example." >&2
+		usage
+	fi
+	# shellcheck source=flash-iso-conf-lib.sh
+	source "${HERE}/flash-iso-conf-lib.sh"
+	DEV="$(flash_iso_read_device "$CONF_PATH")"
+	echo "Using DEVICE from ${CONF_PATH} → ${DEV}" >&2
+fi
 
 [[ -n "$DEV" ]] || usage
 
@@ -52,6 +71,13 @@ command -v mkfs.exfat >/dev/null 2>&1 || {
 	echo "Missing mkfs.exfat (install package exfatprogs on Debian/Ubuntu)." >&2
 	exit 1
 }
+
+EXFAT_LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
+if [[ "${#EXFAT_LABEL}" -gt 11 ]]; then
+	echo "exFAT volume labels are at most 11 characters (got ${#EXFAT_LABEL}: \"$EXFAT_LABEL\")." >&2
+	echo "WO-47 expects HIGHASCGEXF (a longer human name like \"highascg-data\" does not fit on exFAT)." >&2
+	exit 1
+fi
 
 calc_exfat_layout() {
 	python3 - "$DEV" <<'PY'
@@ -239,6 +265,25 @@ if gap < min_exfat_mib:
 	sys.exit(3)
 
 start_mib = math.ceil(max_end + 1)
+
+iso_path = os.environ.get("EXFAT_ISO_PATH", "").strip()
+if iso_path:
+	try:
+		iso_sz = os.path.getsize(iso_path)
+	except OSError as e:
+		print(f"EXFAT_ISO_PATH unreadable ({iso_path}): {e}", file=sys.stderr)
+		sys.exit(8)
+	margin_mib = float(os.environ.get("EXFAT_AFTER_ISO_MARGIN_MIB", "1536"))
+	iso_floor = math.ceil(iso_sz / float(1024 * 1024)) + margin_mib
+	if iso_floor > start_mib:
+		print(
+			f"Note: exFAT slice starts at {iso_floor:.0f} MiB (ISO ceil + {margin_mib:.0f} MiB margin) "
+			f"instead of hybridextent {math.ceil(max_end + 1):.0f} MiB.",
+			file=sys.stderr,
+		)
+		start_mib = iso_floor
+
+start_mib = int(math.ceil(start_mib))
 if fill_disk:
 	end_mib = disk_mib - 2
 else:
@@ -265,10 +310,10 @@ trap 'rm -f "$META"' EXIT
 calc_exfat_layout >"$META" || exit $?
 read -r STARTMIB ENDMIB < <(head -n1 "$META")
 
-echo "Disk $DEV → exFAT partition ${STARTMIB}–${ENDMIB} MiB (LABEL=HIGHASCGEXF; leave room for persistence unless EXFAT_FILL_DISK=1)"
+echo "Disk $DEV → exFAT partition ${STARTMIB}–${ENDMIB} MiB (LABEL=$EXFAT_LABEL; leave room for persistence unless EXFAT_FILL_DISK=1)"
 
 if [[ "$DRY" == true ]]; then
-	echo "[dry-run] would run: parted mkpart primary ntfs ${STARTMIB}MiB ${ENDMIB}MiB ; mkfs.exfat -L HIGHASCGEXF …"
+	echo "[dry-run] would run: parted mkpart primary ntfs ${STARTMIB}MiB ${ENDMIB}MiB ; mkfs.exfat -L $EXFAT_LABEL …"
 	exit 0
 fi
 
@@ -300,12 +345,16 @@ if [[ -z "$LASTPART" || "$LASTPART" == "$DEV" ]]; then
 	exit 6
 fi
 
-echo "Formatting $LASTPART → exFAT LABEL=HIGHASCGEXF"
+echo "Formatting $LASTPART → exFAT LABEL=$EXFAT_LABEL"
 wipefs -a "$LASTPART" 2>/dev/null || true
-mkfs.exfat -L HIGHASCGEXF "$LASTPART"
+mkfs.exfat -L "$EXFAT_LABEL" "$LASTPART"
 partprobe "$DEV"
 sleep 1
 blkid "$LASTPART" || true
 
-echo "Done. Systemd unit home-casparcg-exfat.mount mounts by-label/HIGHASCGEXF (install via install-phase4 / install-exfat-systemd-units.sh)."
+echo "Done. WO-47 expects LABEL=HIGHASCGEXF in home-casparcg-exfat.mount (install via install-phase4 / install-exfat-systemd-units.sh)."
+if [[ "$EXFAT_LABEL" != "HIGHASCGEXF" ]]; then
+	echo "Warning: WO-47 default is LABEL=HIGHASCGEXF; home-casparcg-exfat.mount will not attach this volume until you regenerate units or edit What=." >&2
+fi
+
 echo "Reboot or: sudo systemctl start home-casparcg-exfat.mount && sudo systemctl start highascg-exfat-sync.service"

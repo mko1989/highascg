@@ -176,10 +176,14 @@ async function handleMediaRefresh(body, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, message: 'Media refresh initiated' }) }
 }
 
-async function handlePost(path, body, ctx) {
+async function handlePost(path, body, ctx, req, query) {
 	if (path === '/api/thumbnail/live/capture') {
 		const b = parseBody(body)
 		return handleLiveThumbnailCapturePost(b && typeof b === 'object' ? b : {}, ctx)
+	}
+	if (path === '/api/thumbnail/live/upload') {
+		const { handleLiveThumbnailUploadPost } = require('../media/live-thumbnail-cache')
+		return handleLiveThumbnailUploadPost(req, query, ctx)
 	}
 	if (path === '/api/media/delete') {
 		const b = parseBody(body)

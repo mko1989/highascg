@@ -253,7 +253,7 @@ fi
 # Unified playout root: Caspar dirs + NDI copy (Phase 3 may run before deploy; fresh clone clears children)
 if [ -f /home/casparcg/highascg/package.json ]; then
     echo -e "${CYAN}→ Ensuring Caspar companion directories under playout root...${NC}"
-    mkdir -p /home/casparcg/highascg/{media,media/drive,log,template,data,cef-cache,lib}
+    mkdir -p /home/casparcg/highascg/{media,media/drive,media/exfat,log,template,data,cef-cache,lib}
     mkdir -p /home/casparcg/exfat
     cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
     chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true
@@ -282,42 +282,17 @@ fi
 
 # systemd service (ensure unit exists whenever the app tree is present)
 if [ -f /home/casparcg/highascg/package.json ]; then
-if [ -f /etc/systemd/system/home-casparcg-exfat.mount ] && [ -f /etc/systemd/system/highascg-exfat-sync.service ]; then
-	read -r -d '' HIGHASCG_UNIT_DEPS <<'EUD' || true
-After=network.target home-casparcg-exfat.mount highascg-exfat-sync.service
-Wants=home-casparcg-exfat.mount highascg-exfat-sync.service
-EUD
-else
-	HIGHASCG_UNIT_DEPS="After=network.target"
-fi
-# systemd service
-cat <<EOF > /etc/systemd/system/highascg.service
-[Unit]
-Description=HighAsCG Playout Control Server
-${HIGHASCG_UNIT_DEPS}
-
-[Service]
-Type=simple
-User=$USER_CASPAR
-Group=$USER_CASPAR
-UMask=002
-WorkingDirectory=/home/casparcg/highascg
-ExecStart=/usr/bin/node /home/casparcg/highascg/index.js
-Restart=always
-RestartSec=5
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable highascg.service
-if [ "$SHOULD_DEPLOY_HIGHASCG" = true ]; then
-    systemctl restart highascg.service
-else
-    systemctl start highascg.service 2>/dev/null || true
-fi
+ HG_UNIT_SH="$SCRIPT_DIR/scripts/write-highascg-systemd-unit.sh"
+ if [ -f "$HG_UNIT_SH" ]; then
+  bash "$HG_UNIT_SH" "$USER_CASPAR"
+ else
+  echo -e "  ${YELLOW}○${NC} write-highascg-systemd-unit.sh missing at $HG_UNIT_SH"
+ fi
+ if [ "$SHOULD_DEPLOY_HIGHASCG" = true ]; then
+  systemctl restart highascg.service
+ else
+  systemctl start highascg.service 2>/dev/null || true
+ fi
 fi
 
 # 4.5 Boot Orchestrator — add to MOTD (visible to any SSH login)

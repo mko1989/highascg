@@ -23,6 +23,7 @@ import { showLogsModal } from './logs-modal.js'
 import { describeCableRejection, cableReasonFromError } from '../lib/device-view-cable-messages.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
 import { renderDestinationInspector } from './device-view-destinations-inspector.js'
+import { openSaveDeviceSnapshotModal, openLoadDeviceSnapshotModal } from './device-view-snapshot-modals.js'
 
 let mounted = false; export function initDeviceView(root) {
 	if (!root || mounted) return; mounted = true; root.innerHTML = ''
@@ -35,7 +36,9 @@ let mounted = false; export function initDeviceView(root) {
 	const editCasparBtn = document.createElement('button'); editCasparBtn.className = 'header-btn device-view__edit-config-btn'; editCasparBtn.innerHTML = '📝 Config'; editCasparBtn.title = 'Edit generated Caspar config'
 	const streamLiveBadge = Object.assign(document.createElement('span'), { className: 'device-view__stream-badge', textContent: 'Str1 ●' })
 	streamLiveBadge.style.display = 'none'
-	actions.append(streamLiveBadge, refreshBtn, resetBtn, applyCasparBtn, editCasparBtn); header.append(Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }), actions)
+	const saveSnapBtn = document.createElement('button'); saveSnapBtn.className = 'header-btn'; saveSnapBtn.textContent = 'Save snapshot'
+	const loadSnapBtn = document.createElement('button'); loadSnapBtn.className = 'header-btn'; loadSnapBtn.textContent = 'Load snapshot'
+	actions.append(streamLiveBadge, refreshBtn, saveSnapBtn, loadSnapBtn, resetBtn, applyCasparBtn, editCasparBtn); header.append(Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }), actions)
 	const cableRow = document.createElement('div'); cableRow.className = 'device-view__toolbar'
 	const clearCableBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'header-btn', textContent: 'Cancel cable', style: 'display:none' })
 	const messinessLabel = Object.assign(document.createElement('label'), { textContent: 'Cable loops: ', style: 'margin-left: 14px; font-size: 11px; opacity: 0.8' })
@@ -376,6 +379,18 @@ let mounted = false; export function initDeviceView(root) {
 			requestAnimationFrame(() => updateUI())
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
+	saveSnapBtn.onclick = () =>
+		openSaveDeviceSnapshotModal({
+			getRearPanelEl: () => wrap.querySelector('.device-view__backpanel--caspar'),
+			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
+		})
+	loadSnapBtn.onclick = () =>
+		openLoadDeviceSnapshotModal({
+			onApplied: () => {
+				void load()
+			},
+			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
+		})
 	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message, true) }); editCasparBtn.onclick = () => showCasparConfigModal().then(() => load()); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
 	destAdd.onclick = () => { const list = Array.isArray(lastPayload?.screenDestinations?.destinations) ? lastPayload.screenDestinations.destinations : []; const highest = Math.max(-1, ...list.map((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0))); Actions.addDestination({ type: destType.value, mainScreenIndex: destType.value === 'multiview' ? 0 : highest + 1 }).then(() => { setCasparRestartDirty(true); load() }) }
 	window.addEventListener('pointermove', (ev) => { if (cableSourceId) { const br = wrap.getBoundingClientRect(); cablePointer = { x: ev.clientX - br.left, y: ev.clientY - br.top }; renderCableOverlay(getCOCtx()) } })

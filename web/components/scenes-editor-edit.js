@@ -7,7 +7,7 @@ import { appendLayerPresetBar, appendSceneLayerStripRows } from './scene-layer-r
 import { escapeHtml } from './scenes-editor-support.js'
 
 export function renderEdit(ctx) {
-	const { mainHost, sceneState, takeSceneToProgram, clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush, applyNativeFillForSource, renderCompose, selectedLayerIndexRef, showScenesToast } = ctx
+	const { mainHost, sceneState, stateStore, takeSceneToProgram, clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose, selectedLayerIndexRef, showScenesToast } = ctx
 	const id = sceneState.editingSceneId; const scene = id ? sceneState.getScene(id) : null
 	if (!scene) { sceneState.setEditingScene(null); return }
 
@@ -38,7 +38,7 @@ export function renderEdit(ctx) {
 	layerStrip.innerHTML = '<div class="scenes-layer-strip__title">Layers (bottom → top)</div>'
 
 	const renderFn = () => renderEdit(ctx)
-	appendSceneLayerStripRows(layerStrip, { scene, dispatchLayerSelect, render: renderFn, showToast: showScenesToast, schedulePreviewPush, selectedLayerIndexRef, sceneState, escapeHtml, applyNativeFillForSource })
+	appendSceneLayerStripRows(layerStrip, { scene, dispatchLayerSelect, render: renderFn, showToast: showScenesToast, schedulePreviewPush, selectedLayerIndexRef, sceneState, stateStore, escapeHtml, applyNativeFillForSource, buildLayerRouteLiveSourceItem })
 	appendLayerPresetBar(layerStrip, { scene, render: renderFn, showToast: showScenesToast, schedulePreviewPush, selectedLayerIndexRef, sceneState })
 
 	mainRow.appendChild(layerStrip); mainRow.appendChild(renderCompose(scene))

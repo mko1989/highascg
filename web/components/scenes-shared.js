@@ -245,3 +245,17 @@ export function buildIncomingScenePayload(scene, timelineSeekOpts) {
 		layers,
 	}
 }
+
+/**
+ * Parse `route://channel-layer` (layer-specific route consumer).
+ * @param {unknown} value
+ * @returns {{ channel: number, layer: number } | null}
+ */
+export function parseRouteChannelLayer(value) {
+	const m = String(value || '').match(/^route:\/\/(\d+)-(\d+)/i)
+	if (!m) return null
+	const channel = parseInt(m[1], 10)
+	const layer = parseInt(m[2], 10)
+	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layer) || layer < 1) return null
+	return { channel, layer }
+}
