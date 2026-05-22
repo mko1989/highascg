@@ -6,14 +6,18 @@ directories, and **`/home/casparcg/highascg`**. That requires Ubuntu Live
 **`persistence`** + **`persistence.conf`** with **`/ union`**, and booting
 **Live with persistence** every time.
 
-**WO-47 exFAT data (optional, no UUID edits):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`**, binds **`~/exfat/media` → `~/highascg/media/exfat`**, and runs boot-time sync (**`highascg-exfat-sync.service`**) — installed from **`scripts/install-exfat-systemd-units.sh`**, **`scripts/write-highascg-systemd-unit.sh`**, and **`scripts/install-phase4.sh`**; **Eggs `--clone`** images bake the same logic if you ran **`tools/live-usb/prepare-eggs-clone-with-exfat.sh`** (or **`build-highascg-egg.sh`**) on the build host. After `dd`, if you want **both** exFAT and **`/ union`** persistence, run **exFAT first**, then persistence — see **`EXFAT_DATA_ZERO_TOUCH.md`**.
+**WO-47 exFAT data (required on production sticks):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`**, binds **`~/exfat/media` → `~/highascg/media/exfat`**, and runs boot-time sync (**`highascg-exfat-sync.service`**) — installed from **`scripts/install-exfat-systemd-units.sh`**, **`scripts/write-highascg-systemd-unit.sh`**, and **`scripts/install-phase4.sh`**; **Eggs `--clone`** images bake the same logic if you ran **`tools/live-usb/prepare-eggs-clone-with-exfat.sh`** (or **`build-highascg-egg.sh`**) on the build host. After `dd`, run **persistence first** (**2 GiB**), then **exFAT fills the rest** — **`finish-operator-stick.sh`** or **`EXFAT_DATA_ZERO_TOUCH.md`**. Client steps: **`for_client/USB_STICK_AFTER_FLASH.md`**.
 
 **Automation:** from the HighAsCG repo, after `dd` + `sync` (or **`flash-iso-from-config.sh`**). If **`tools/live-usb/flash-iso.conf`** exists with **`DEVICE=/dev/sdX`**, you can omit the device on the **`add-*`** lines; otherwise pass **`/dev/sdX`** explicitly.
 
 ```bash
-# exFAT + persistence: exFAT first (default 4 GiB), then persistence uses the tail.
-sudo bash tools/live-usb/add-exfat-data-partition.sh
-sudo bash tools/live-usb/add-union-persistence-partition.sh
+# Production: persistence first (2 GiB default), then exFAT uses the rest of the disk.
+sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso
+# Or:
+# PERSIST_SIZE_MIB=2048 EXFAT_FILL_DISK=1 EXFAT_ISO_PATH=/path/to.iso \
+#   sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
+# EXFAT_ISO_PATH=/path/to.iso EXFAT_FILL_DISK=1 \
+#   sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
 
 # Or with explicit device:
 # sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
@@ -66,9 +70,9 @@ persistence partition.
 # Find the end of the last existing partition
 sudo parted /dev/sdX unit MiB print free
 
-# Create a new partition spanning the remaining free space.
-# Replace START_MIB with the start offset shown in the "Free Space" row.
-sudo parted -s /dev/sdX -- mkpart primary ext4 START_MIB 100%
+# Create a fixed-size persistence slice (example: 2 GiB after START_MIB), not the whole tail.
+# Replace START_MIB and END_MIB from parted print free / finish-operator-stick dry-run.
+sudo parted -s /dev/sdX -- mkpart primary ext4 START_MIB END_MIB
 
 # Format and label it. The label MUST be exactly `persistence`.
 sudo mkfs.ext4 -L persistence /dev/sdX3   # or sdX4 if there are 3 existing partitions

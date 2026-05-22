@@ -7,6 +7,13 @@
 #   sudo bash tools/live-usb/add-union-persistence-partition.sh --dry-run [/dev/sdX]
 # Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
+# Optional env:
+#   PERSIST_SIZE_MIB=2048     — fixed overlay size (default 2 GiB; not the whole tail)
+#   PERSIST_ISO_PATH / EXFAT_ISO_PATH — ISO file for safe start after hybrid image
+#   PERSIST_AFTER_ISO_MARGIN_MIB / EXFAT_AFTER_ISO_MARGIN_MIB — default 1536
+#
+# Run **before** add-exfat-data-partition.sh on production sticks (exFAT then fills the rest).
+#
 # Requires: parted util-linux blkid mount
 set -euo pipefail
 
@@ -14,6 +21,11 @@ DRY=false
 DEV=""
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=usb-env.sh
+source "${HERE}/usb-env.sh"
+MKPART_SH="${HERE}/usb-mkpart-numbered.sh"
+RESTORE_ESP_SH="${HERE}/usb-restore-esp-flags.sh"
+SLOTS_PY="${HERE}/usb-partition-slots.py"
 
 usage() {
   echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2
@@ -61,6 +73,9 @@ calc_start_python() {
 import os
 import subprocess, sys, math, re
 
+import shutil
+
+parted = os.environ.get("PARTED") or shutil.which("parted") or "/usr/sbin/parted"
 PARTED_ENV = {**os.environ, "LC_ALL": "C"}
 
 
@@ -84,7 +99,7 @@ def split_fields(line):
 
 def disk_mib_from_print(dev):
     out = subprocess.check_output(
-        ["parted", "-sm", dev, "unit", "MiB", "print"],
+        [parted, "-sm", dev, "unit", "MiB", "print"],
         text=True,
         env=PARTED_ENV,
     ).strip().splitlines()
@@ -103,7 +118,7 @@ def disk_mib_from_print(dev):
 def max_partition_end_mib(dev):
     """Largest end coordinate of any numbered partition row (strip fields — leading spaces break isdigit())."""
     out = subprocess.check_output(
-        ["parted", "-sm", dev, "unit", "MiB", "print"],
+        [parted, "-sm", dev, "unit", "MiB", "print"],
         text=True,
         env=PARTED_ENV,
     ).strip().splitlines()
@@ -161,7 +176,7 @@ def max_partition_end_mib_sysfs(dev):
 
 def snapshot_partition_flags(dev):
     out = subprocess.check_output(
-        ["parted", "-sm", dev, "unit", "MiB", "print"],
+        [parted, "-sm", dev, "unit", "MiB", "print"],
         text=True,
         env=PARTED_ENV,
     ).strip().splitlines()
@@ -181,7 +196,8 @@ def snapshot_partition_flags(dev):
 
 
 dev = sys.argv[1]
-min_persist_mib = 512
+min_persist_mib = float(os.environ.get("MIN_PERSIST_MIB", "512"))
+persist_size_mib = float(os.environ.get("PERSIST_SIZE_MIB", "2048"))
 
 disk_mib = disk_mib_from_print(dev)
 if disk_mib is None:
@@ -217,11 +233,68 @@ if gap < min_persist_mib:
 
 start_mib = math.ceil(max_end + 1)
 
-if start_mib + min_persist_mib > disk_mib - 2:
-    print("Cannot fit persistence safely; check parted layout.", file=sys.stderr)
+iso_path = (
+    os.environ.get("PERSIST_ISO_PATH", "").strip()
+    or os.environ.get("EXFAT_ISO_PATH", "").strip()
+)
+if iso_path:
+    try:
+        iso_sz = os.path.getsize(iso_path)
+    except OSError as e:
+        print(f"PERSIST_ISO_PATH/EXFAT_ISO_PATH unreadable ({iso_path}): {e}", file=sys.stderr)
+        sys.exit(8)
+    margin_mib = float(
+        os.environ.get(
+            "PERSIST_AFTER_ISO_MARGIN_MIB",
+            os.environ.get("EXFAT_AFTER_ISO_MARGIN_MIB", "1536"),
+        )
+    )
+    iso_mib_ceil = math.ceil(iso_sz / float(1024 * 1024))
+    # sysfs already reflects the hybrid ISO extent → small tail only (large margin is for
+    # broken parted layouts that stop at the ESP).
+    if sys_max >= iso_mib_ceil - 64:
+        tail_mib = float(
+            os.environ.get(
+                "PERSIST_AFTER_ISO_TAIL_MIB",
+                os.environ.get("EXFAT_AFTER_ISO_TAIL_MIB", "64"),
+            )
+        )
+        iso_floor = iso_mib_ceil + tail_mib
+        margin_note = f"{tail_mib:.0f} MiB tail"
+    else:
+        iso_floor = iso_mib_ceil + margin_mib
+        margin_note = f"{margin_mib:.0f} MiB margin"
+    if iso_floor > start_mib:
+        print(
+            f"Note: persistence starts at {iso_floor:.0f} MiB (ISO ceil + {margin_note}) "
+            f"instead of hybridextent {math.ceil(max_end + 1):.0f} MiB.",
+            file=sys.stderr,
+        )
+        start_mib = iso_floor
+
+start_mib = int(math.ceil(start_mib))
+end_mib = start_mib + persist_size_mib
+if end_mib > disk_mib - 2:
+    end_mib = disk_mib - 2
+
+if end_mib - start_mib < min_persist_mib:
+    print(
+        f"Persistence slice too small ({end_mib - start_mib:.1f} MiB). "
+        f"Lower PERSIST_SIZE_MIB or use a larger USB.",
+        file=sys.stderr,
+    )
     sys.exit(4)
 
-print(f"{start_mib}")
+min_exfat_tail = float(os.environ.get("MIN_EXFAT_TAIL_MIB", "256"))
+if disk_mib - end_mib - 2 < min_exfat_tail:
+    print(
+        f"Not enough space after {persist_size_mib:.0f} MiB persistence for exFAT "
+        f"(need >= {min_exfat_tail:.0f} MiB tail on {disk_mib:.1f} MiB disk).",
+        file=sys.stderr,
+    )
+    sys.exit(5)
+
+print(f"{start_mib} {end_mib}")
 for num, fl in snapshot_partition_flags(dev):
     print(f"F\t{num}\t{fl}")
 PY
@@ -242,46 +315,42 @@ if command -v python3 >/dev/null 2>&1; then
   META=$(mktemp)
   trap 'rm -f "$META"' EXIT
   calc_start_python >"$META" || exit $?
-  read -r STARTMIB < <(head -n1 "$META")
+  read -r STARTMIB ENDMIB < <(head -n1 "$META")
 else
   META=""
   STARTMIB="$(calc_start_legacy)" || exit $?
+  ENDMIB=$((STARTMIB + ${PERSIST_SIZE_MIB:-2048}))
 fi
 
-echo "Disk $DEV → persistence partition starts at ${STARTMIB} MiB (/ union)"
+PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-2048}"
+read -r PERSIST_NUM _EXFAT_NUM < <(python3 "$SLOTS_PY" "$DEV")
+echo "Disk $DEV → MBR slot ${PERSIST_NUM} persistence ${STARTMIB}–${ENDMIB} MiB (/ union; slot 1=ISO slot 2=ESP)"
 
 if [[ "$DRY" == true ]]; then
-  echo "[dry-run] would run: parted mkpart … ; mkfs.ext4 -L persistence … ; persistence.conf"
+  echo "[dry-run] would run: usb-mkpart-numbered.sh slot ${PERSIST_NUM} ; mkfs.ext4 -L persistence"
   exit 0
 fi
 
-echo "Creating partition (${STARTMIB}MiB … 100%)"
-LC_ALL=C parted -s "$DEV" unit MiB mkpart primary ext4 "${STARTMIB}MiB" 100%
-partprobe "$DEV"
-sleep 1
+LASTPART="$(bash "$MKPART_SH" "$DEV" "$PERSIST_NUM" ext4 "$STARTMIB" "$ENDMIB" | tail -n1)"
+FALLBACK_PART="${DEV}${PERSIST_NUM}"
+if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
+  if [[ -b "$FALLBACK_PART" ]]; then
+    echo "Note: using ${FALLBACK_PART} (mkpart output was not a single device path)." >&2
+    LASTPART="$FALLBACK_PART"
+  fi
+fi
+bash "$RESTORE_ESP_SH" "$DEV"
 
 if [[ -n "${META:-}" ]] && [[ "$(wc -l <"$META")" -gt 1 ]]; then
   while IFS=$'\t' read -r tag partnum flg; do
     [[ "$tag" == "F" ]] || continue
-    LC_ALL=C parted -s "$DEV" set "$partnum" "$flg" on 2>/dev/null || true
+    "$PARTED" -s "$DEV" set "$partnum" "$flg" on 2>/dev/null || true
   done < <(tail -n +2 "$META")
-  partprobe "$DEV"
-  sleep 1
+  bash "$RESTORE_ESP_SH" "$DEV"
 fi
 
-# lsblk NAME is usually a full path (/dev/sda2); only prepend /dev/ when it is a bare "sdXn".
-PN=$(lsblk -nrpo NAME "$DEV" | grep -v "^${DEV}$" | sort -V | tail -1)
-LASTPART=""
-if [[ -n "$PN" ]]; then
-	if [[ "$PN" == /* ]]; then
-		LASTPART="$PN"
-	else
-		LASTPART="/dev/$PN"
-	fi
-fi
-
-if [[ -z "$LASTPART" || "$LASTPART" == "$DEV" ]]; then
-  echo "Could not resolve new partition under $DEV; check parted manually." >&2
+if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
+  echo "Could not resolve persistence partition (slot ${PERSIST_NUM}) under $DEV." >&2
   lsblk "$DEV"
   exit 6
 fi

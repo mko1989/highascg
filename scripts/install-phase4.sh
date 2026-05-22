@@ -276,11 +276,9 @@ if [ -f /home/casparcg/highascg/package.json ]; then
     cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
     chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true
     chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat 2>/dev/null || true
-    EXFAT_MAP_SRC="$SCRIPT_DIR/config/exfat-sync.json"
-    if [ -f "$EXFAT_MAP_SRC" ] && [ ! -f /etc/highascg/exfat-sync.json ]; then
-        install -d /etc/highascg
-        install -m 0644 -o root -g root "$EXFAT_MAP_SRC" /etc/highascg/exfat-sync.json
-        echo -e "  ${GREEN}✓${NC} installed /etc/highascg/exfat-sync.json (WO-47; systemd mounts LABEL=HIGHASCGEXF — see tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md)"
+    EXFAT_MAP_INSTALL="$SCRIPT_DIR/tools/eggs/live-usb/install-exfat-sync-map.sh"
+    if [ -f "$EXFAT_MAP_INSTALL" ]; then
+        bash "$EXFAT_MAP_INSTALL" && echo -e "  ${GREEN}✓${NC} /etc/highascg/exfat-sync.json (drop-config only; no sim/)"
     fi
     chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/media /home/casparcg/highascg/log \
         /home/casparcg/highascg/template /home/casparcg/highascg/data /home/casparcg/highascg/cef-cache \

@@ -35,6 +35,13 @@ if ! mountpoint -q "$EXFAT_MP"; then
 	exit 0
 fi
 
+# Legacy sticks: sim/highascg/ is not used on Linux playout (drop-update/ only).
+if [[ -d "${EXFAT_MP}/sim" ]]; then
+	log "removing deprecated ${EXFAT_MP}/sim (not synced on current images)"
+	rm -rf "${EXFAT_MP}/sim"
+	sync 2>/dev/null || true
+fi
+
 start_unit highascg-exfat-media-prep.service
 start_unit home-casparcg-highascg-media-exfat.mount
 start_unit highascg-exfat-server-update.service

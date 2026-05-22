@@ -52,9 +52,9 @@ Use `dd`, Balena Etcher, or **`tools/live-usb/build-flash-and-persist.sh`** — 
 
 | Goal | Commands |
 |------|-----------|
-| **exFAT + persistence** (recommended) | ① `sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX` (default **4 GiB** exFAT, leaves the tail free) ② `sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX` |
-| **exFAT only** (whole free space) | `EXFAT_FILL_DISK=1 sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX` — **do not** run persistence afterward unless you shrink/repartition manually. |
-| **Persistence only** (no exFAT) | Only **`add-union-persistence-partition.sh`**. Mount unit stays enabled; until a volume labelled **`HIGHASCGEXF`** appears, the mount is skipped (`nofail` + device timeout). |
+| **Production stick (required)** | `sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso` — **persistence first** (**`PERSIST_SIZE_MIB=2048`** default), then **exFAT fills the rest**. On re-flashed sticks with leftover slices, add **`--prune-stale`**. |
+| **exFAT only** (dev / not playout) | `EXFAT_FILL_DISK=1 sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX` — **do not** run persistence afterward unless you shrink/repartition manually. |
+| **Persistence only** (broken playout layout) | Not for production — exFAT operator volume is still required for **`drop-update/`** and **`HIGHASCGEXF`**. |
 
 Optional: **`EXFAT_SIZE_MIB=8192`** before **`add-exfat-data-partition.sh`** to change the reserved exFAT size.
 

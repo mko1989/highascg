@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Add exFAT data partition (LABEL=HIGHASCGEXF) after the last existing partition — hybrid ISO safe
-# used by add-union-persistence-partition.sh (never start from bogus "free space" after ESP only).
+# Run after add-union-persistence-partition.sh on production sticks (exFAT fills the tail).
 #
 # Usage:
 #   sudo bash tools/live-usb/add-exfat-data-partition.sh [/dev/sdX]
@@ -17,13 +17,18 @@ DRY=false
 DEV=""
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=usb-env.sh
+source "${HERE}/usb-env.sh"
+MKPART_SH="${HERE}/usb-mkpart-numbered.sh"
+RESTORE_ESP_SH="${HERE}/usb-restore-esp-flags.sh"
+SLOTS_PY="${HERE}/usb-partition-slots.py"
 
 usage() {
 	echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2
 	echo "If /dev/sdX is omitted, reads DEVICE= from tools/live-usb/flash-iso.conf (or FLASH_ISO_CONF)." >&2
 	echo "Creates a primary exFAT partition after the last MBR partition (LABEL=HIGHASCGEXF)." >&2
-	echo "Default size EXFAT_SIZE_MIB=4096 so add-union-persistence-partition.sh can use the tail." >&2
-	echo "ExFAT-only stick: EXFAT_FILL_DISK=1 sudo $0 /dev/sdX" >&2
+	echo "Production: persistence first, then EXFAT_FILL_DISK=1 (see finish-operator-stick.sh)." >&2
+	echo "Legacy fixed slice: EXFAT_SIZE_MIB=4096 without EXFAT_FILL_DISK." >&2
 	exit 1
 }
 
@@ -80,10 +85,13 @@ if [[ "${#EXFAT_LABEL}" -gt 11 ]]; then
 fi
 
 calc_exfat_layout() {
+	export PARTED
 	python3 - "$DEV" <<'PY'
 import os
+import shutil
 import subprocess, sys, math, re
 
+parted = os.environ.get("PARTED") or shutil.which("parted") or "/usr/sbin/parted"
 PARTED_ENV = {**os.environ, "LC_ALL": "C"}
 
 
@@ -107,7 +115,7 @@ def split_fields(line):
 
 def disk_mib_from_print(dev):
 	out = subprocess.check_output(
-		["parted", "-sm", dev, "unit", "MiB", "print"],
+		[parted, "-sm", dev, "unit", "MiB", "print"],
 		text=True,
 		env=PARTED_ENV,
 	).strip().splitlines()
@@ -124,7 +132,7 @@ def disk_mib_from_print(dev):
 
 
 def partition_table_type(dev):
-	out = subprocess.check_output(["parted", "-sm", dev, "print"], text=True, env=PARTED_ENV).strip().splitlines()
+	out = subprocess.check_output([parted, "-sm", dev, "print"], text=True, env=PARTED_ENV).strip().splitlines()
 	for line in out:
 		parts = split_fields(line)
 		if parts and parts[0].startswith("/") and len(parts) >= 6:
@@ -134,7 +142,7 @@ def partition_table_type(dev):
 
 def max_partition_end_mib(dev):
 	out = subprocess.check_output(
-		["parted", "-sm", dev, "unit", "MiB", "print"],
+		[parted, "-sm", dev, "unit", "MiB", "print"],
 		text=True,
 		env=PARTED_ENV,
 	).strip().splitlines()
@@ -197,7 +205,7 @@ def max_partition_end_mib_sysfs(dev):
 
 
 def count_primary_partitions(dev):
-	out = subprocess.check_output(["parted", "-sm", dev, "print"], text=True, env=PARTED_ENV).strip().splitlines()
+	out = subprocess.check_output([parted, "-sm", dev, "print"], text=True, env=PARTED_ENV).strip().splitlines()
 	n = 0
 	for line in out:
 		if not line or line.strip() == "BYT":
@@ -210,7 +218,7 @@ def count_primary_partitions(dev):
 
 def snapshot_partition_flags(dev):
 	out = subprocess.check_output(
-		["parted", "-sm", dev, "unit", "MiB", "print"],
+		[parted, "-sm", dev, "unit", "MiB", "print"],
 		text=True,
 		env=PARTED_ENV,
 	).strip().splitlines()
@@ -233,6 +241,21 @@ dev = sys.argv[1]
 min_exfat_mib = float(os.environ.get("MIN_EXFAT_MIB", "256"))
 exfat_size_mib = float(os.environ.get("EXFAT_SIZE_MIB", "4096"))
 fill_disk = os.environ.get("EXFAT_FILL_DISK", "").strip().lower() in ("1", "true", "yes")
+# After a labelled persistence partition exists, always consume the tail for operator data.
+if not fill_disk:
+    try:
+        out = subprocess.check_output(["lsblk", "-nrpo", "LABEL,NAME", dev], text=True)
+        for line in out.strip().splitlines():
+            parts = line.split(None, 1)
+            if len(parts) >= 1 and parts[0] == "persistence":
+                fill_disk = True
+                print(
+                    "Note: persistence partition present — exFAT will use remaining disk (EXFAT_FILL_DISK).",
+                    file=sys.stderr,
+                )
+                break
+    except (subprocess.CalledProcessError, OSError):
+        pass
 
 pttype = partition_table_type(dev)
 if pttype == "msdos" and count_primary_partitions(dev) >= 4:
@@ -274,10 +297,17 @@ if iso_path:
 		print(f"EXFAT_ISO_PATH unreadable ({iso_path}): {e}", file=sys.stderr)
 		sys.exit(8)
 	margin_mib = float(os.environ.get("EXFAT_AFTER_ISO_MARGIN_MIB", "1536"))
-	iso_floor = math.ceil(iso_sz / float(1024 * 1024)) + margin_mib
+	iso_mib_ceil = math.ceil(iso_sz / float(1024 * 1024))
+	if sys_max >= iso_mib_ceil - 64:
+		tail_mib = float(os.environ.get("EXFAT_AFTER_ISO_TAIL_MIB", "64"))
+		iso_floor = iso_mib_ceil + tail_mib
+		margin_note = f"{tail_mib:.0f} MiB tail"
+	else:
+		iso_floor = iso_mib_ceil + margin_mib
+		margin_note = f"{margin_mib:.0f} MiB margin"
 	if iso_floor > start_mib:
 		print(
-			f"Note: exFAT slice starts at {iso_floor:.0f} MiB (ISO ceil + {margin_mib:.0f} MiB margin) "
+			f"Note: exFAT slice starts at {iso_floor:.0f} MiB (ISO ceil + {margin_note}) "
 			f"instead of hybridextent {math.ceil(max_end + 1):.0f} MiB.",
 			file=sys.stderr,
 		)
@@ -310,37 +340,36 @@ trap 'rm -f "$META"' EXIT
 calc_exfat_layout >"$META" || exit $?
 read -r STARTMIB ENDMIB < <(head -n1 "$META")
 
-echo "Disk $DEV → exFAT partition ${STARTMIB}–${ENDMIB} MiB (LABEL=$EXFAT_LABEL; leave room for persistence unless EXFAT_FILL_DISK=1)"
+FILL_NOTE=""
+if [[ "${EXFAT_FILL_DISK:-}" == 1 ]] || [[ "${EXFAT_FILL_DISK:-}" == true ]] || [[ "${EXFAT_FILL_DISK:-}" == yes ]]; then
+	FILL_NOTE="; fills remaining disk"
+fi
+read -r _PERSIST_NUM EXFAT_NUM < <(python3 "$SLOTS_PY" "$DEV")
+echo "Disk $DEV → MBR slot ${EXFAT_NUM} exFAT ${STARTMIB}–${ENDMIB} MiB (LABEL=$EXFAT_LABEL${FILL_NOTE})"
 
 if [[ "$DRY" == true ]]; then
-	echo "[dry-run] would run: parted mkpart primary ntfs ${STARTMIB}MiB ${ENDMIB}MiB ; mkfs.exfat -L $EXFAT_LABEL …"
+	echo "[dry-run] would run: usb-mkpart-numbered.sh slot ${EXFAT_NUM} ; mkfs.exfat -L $EXFAT_LABEL"
 	exit 0
 fi
 
-echo "Creating partition (${STARTMIB}MiB … ${ENDMIB}MiB; parted type ntfs → 0x07 for exFAT)"
-LC_ALL=C parted -s "$DEV" unit MiB mkpart primary ntfs "${STARTMIB}MiB" "${ENDMIB}MiB"
-partprobe "$DEV"
-sleep 1
+LASTPART="$(bash "$MKPART_SH" "$DEV" "$EXFAT_NUM" exfat "$STARTMIB" "$ENDMIB" | tail -n1)"
+FALLBACK_PART="${DEV}${EXFAT_NUM}"
+if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
+	if [[ -b "$FALLBACK_PART" ]]; then
+		echo "Note: using ${FALLBACK_PART} (mkpart output was not a single device path)." >&2
+		LASTPART="$FALLBACK_PART"
+	fi
+fi
+bash "$RESTORE_ESP_SH" "$DEV"
 
 while IFS=$'\t' read -r tag partnum flg; do
 	[[ "$tag" == "F" ]] || continue
-	LC_ALL=C parted -s "$DEV" set "$partnum" "$flg" on 2>/dev/null || true
+	"$PARTED" -s "$DEV" set "$partnum" "$flg" on 2>/dev/null || true
 done < <(tail -n +2 "$META")
-partprobe "$DEV"
-sleep 1
+bash "$RESTORE_ESP_SH" "$DEV"
 
-PN=$(lsblk -nrpo NAME "$DEV" | grep -v "^${DEV}$" | sort -V | tail -1)
-LASTPART=""
-if [[ -n "$PN" ]]; then
-	if [[ "$PN" == /* ]]; then
-		LASTPART="$PN"
-	else
-		LASTPART="/dev/$PN"
-	fi
-fi
-
-if [[ -z "$LASTPART" || "$LASTPART" == "$DEV" ]]; then
-	echo "Could not resolve new partition under $DEV; check parted manually." >&2
+if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
+	echo "Could not resolve exFAT partition (slot ${EXFAT_NUM}) under $DEV." >&2
 	lsblk "$DEV"
 	exit 6
 fi

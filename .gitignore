@@ -44,7 +44,8 @@ template/global-border-live-*.json
 template/global-border-live-*.json.tmp
 
 # Client integration notes (generated locally for UI work)
-for_client/
+for_client/*
+!for_client/USB_STICK_AFTER_FLASH.md
 
 refs/
 # User/system local artifacts

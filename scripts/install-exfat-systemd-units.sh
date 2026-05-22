@@ -75,8 +75,12 @@ DOC_URI="file:${DOC_PKG}/EXFAT_DATA_ZERO_TOUCH.md"
 install -d /home/casparcg/exfat /etc/systemd/system
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media/exfat 2>/dev/null || install -d /home/casparcg/highascg/media/exfat
 chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/highascg/media/exfat
+STRIP_SIM_SH="${REPO_ROOT}/tools/eggs/live-usb/strip-legacy-exfat-sim.sh"
 if [[ -f "$SEED_LAYOUT_SH" ]]; then
 	HIGHASCG_SERVICE_USER="$USER_CASPAR" bash "$SEED_LAYOUT_SH" /home/casparcg/exfat
+fi
+if [[ -f "$STRIP_SIM_SH" ]]; then
+	bash "$STRIP_SIM_SH" /home/casparcg/exfat
 fi
 touch /etc/highascg/disable-exfat-bootstrap 2>/dev/null || true
 

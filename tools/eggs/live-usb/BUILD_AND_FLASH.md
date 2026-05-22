@@ -97,19 +97,22 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
    Do **not** quote the glob in `dd if=…` — use `ls -t … | head -1` or the full filename.
 
-4. **Persistence (default for production sticks)** — **full live overlay with `/ union`**
+4. **Required for production sticks — exFAT + persistence** (not optional)
 
-   After `dd` + `sync` + `partprobe`, add the **`persistence`** partition and **`persistence.conf`** so the **entire writable root** survives reboot: **NVIDIA drivers / DKMS**, **DeckLink & OS config under `/etc` and `/var`**, **Tailscale state**, **`/home/casparcg/highascg`**, **`apt` installs**, first-boot markers, etc.
+   After `dd` + `sync` + `partprobe`, add **both** partitions (exFAT **first**, persistence **second**). Do **not** use partition **2** for operator data if it is a tiny leftover slice — remove stale partitions 2+ from a previous attempt, then run the finish script.
 
    ```bash
-   sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
-   # optional: --dry-run ; or START_MIB=… if parted layout is unusual
+   USB=/dev/sdX
+   ISO=/home/eggs/mnt/highascg_amd64_YYYY-MM-DD_HHMM.iso
+
+   sudo bash tools/eggs/live-usb/finish-operator-stick.sh "$USB" --iso "$ISO" --prune-stale
    ```
 
-   Then **always** boot GRUB’s **Live with persistence** entry (or add **`persistence`** to the kernel line per eggs). Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)**.
+   Or manually: **`add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=2048`** ) → **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. On a **32 GiB** stick: ~5 GiB ISO · ~2 GiB persistence · ~24 GiB exFAT.
 
-   **Optional — persist only `~/highascg` (not recommended if you need drivers / Tailscale / system state)**  
-   Second ext4 **`HIGHASCG_PERSIST`** + **`home-casparcg-highascg.mount`** baked in before `eggs produce` — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips **`/var`**, most **`/etc`**, NVIDIA picker markers, etc.
+   **Always** boot GRUB’s **Live with persistence** entry. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · client handout: **[`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md)** (macOS / Windows / Linux).
+
+   **Narrow alternative (not production playout):** persist only **`~/highascg`** on a separate ext4 — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips NVIDIA/Tailscale/system-wide persistence.
 
 5. **Long flash in tmux** (optional):
 
@@ -159,9 +162,11 @@ When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOL
 
 ---
 
-## Windows / macOS — write ISO + HIGHASCGEXF layout (no Linux)
+## Windows / macOS — write ISO + exFAT + persistence
 
-**Manual Etcher + system partitioning:** [`MANUAL_STICK_WINDOWS_MACOS.md`](MANUAL_STICK_WINDOWS_MACOS.md).
+**Operator handout (Etcher + both extra partitions):** [`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md).
+
+**Manual Etcher + system partitioning (legacy detail):** [`MANUAL_STICK_WINDOWS_MACOS.md`](MANUAL_STICK_WINDOWS_MACOS.md).
 
 If you already have a **`*.iso`** built elsewhere:
 

@@ -15,8 +15,9 @@
 #   -y, --yes   Skip interactive confirmation (dangerous)
 #   -h, --help  Show this help
 #
-# After dd: run add-exfat-data-partition.sh then add-union-persistence-partition.sh
-# if needed — see tools/live-usb/FLASH_AND_PERSIST.md
+# After dd (required for production sticks):
+#   sudo bash tools/eggs/live-usb/finish-operator-stick.sh DEVICE --iso PATH [--prune-stale]
+# See for_client/USB_STICK_AFTER_FLASH.md and tools/eggs/live-usb/FLASH_AND_PERSIST.md
 #
 set -euo pipefail
 

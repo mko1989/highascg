@@ -1,6 +1,8 @@
 # Manual USB stick — Windows & macOS (Etcher + system partitioning)
 
-Use this guide when you **prefer GUI tools** instead of **`make-highascg-stick`** scripts. Goal: bootable HighAsCG live ISO, plus an **exFAT** volume labelled **`HIGHASCGEXF`** (WO‑47) where you drop an **extracted GitHub release** (`.tar.gz` or unzip a `.zip` if you ship one) and carry media/templates/config/snapshots.
+**Primary handout:** [`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md) — ISO flash, **exFAT**, and **persistence** (required for production sticks).
+
+Use this guide when you **prefer GUI tools** instead of automation scripts. Goal: bootable HighAsCG live ISO, plus **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) with **`drop-update/`** server drops and operator folders, plus **ext4 persistence** (usually finished on Linux).
 
 ---
 

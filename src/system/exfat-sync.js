@@ -36,8 +36,17 @@ function isExcluded(rel, excludes) {
  */
 function validateMap(m) {
 	if (!m || typeof m !== 'object') throw new Error('exfat-sync map: not an object')
-	const pairs = /** @type {unknown} */ (m).pairs
+	let pairs = /** @type {unknown} */ (m).pairs
 	if (!Array.isArray(pairs)) throw new Error('exfat-sync map: pairs must be an array')
+	pairs = pairs.filter((p) => {
+		if (!p || typeof p !== 'object') return true
+		const id = String(p.id || '').trim()
+		const exfat = String(p.exfat || '').trim().replace(/\\/g, '/').replace(/^\/+/, '')
+		if (id === 'sim-highascg' || exfat === 'sim/highascg' || exfat.startsWith('sim/highascg/')) {
+			return false
+		}
+		return true
+	})
 	for (const p of pairs) {
 		if (!p || typeof p !== 'object') throw new Error('exfat-sync map: invalid pair entry')
 		const id = String(p.id || '').trim()
@@ -120,6 +129,10 @@ function assertUnderExfat(exfatRoot, abs) {
 	const a = path.resolve(abs)
 	if (a !== root && !a.startsWith(root + path.sep)) {
 		throw new Error(`Refusing sync: path escapes exfat root: ${a}`)
+	}
+	const rel = a === root ? '' : a.slice(root.length + 1).replace(/\\/g, '/')
+	if (rel === 'sim' || rel.startsWith('sim/')) {
+		throw new Error(`Refusing sync: deprecated exFAT path sim/ (use drop-update/ on playout sticks)`)
 	}
 }
 
