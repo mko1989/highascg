@@ -32,6 +32,12 @@ home/casparcg/highascg/samples
 home/casparcg/highascg/samples/*
 home/casparcg/highascg/scratch
 home/casparcg/highascg/scratch/*
+home/casparcg/highascg/audio_testing
+home/casparcg/highascg/audio_testing/*
+home/casparcg/highascg/for_client
+home/casparcg/highascg/for_client/*
+home/casparcg/highascg/From_client
+home/casparcg/highascg/From_client/*
 
 # Runtime under ~/highascg (stubs stay on ISO)
 home/casparcg/highascg/media/*

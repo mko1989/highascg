@@ -20,6 +20,12 @@ home/casparcg/highascg/samples
 home/casparcg/highascg/samples/*
 home/casparcg/highascg/scratch
 home/casparcg/highascg/scratch/*
+home/casparcg/highascg/audio_testing
+home/casparcg/highascg/audio_testing/*
+home/casparcg/highascg/for_client
+home/casparcg/highascg/for_client/*
+home/casparcg/highascg/From_client
+home/casparcg/highascg/From_client/*
 
 # tools/ except runtime/ (exfat-sync, Caspar helpers)
 home/casparcg/highascg/tools/eggs

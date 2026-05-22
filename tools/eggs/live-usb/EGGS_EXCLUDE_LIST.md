@@ -36,7 +36,7 @@ sudo npm run eggs:build
 |-------------------------|----------------|
 | `src/`, `scripts/`, `index.js`, `package.json`, `tools/`, … | exFAT **`drop-update/`** (`highascg-server_*.tar.gz`) |
 | `client/`, `dist-web/` | Remote UI (not on playout stick) |
-| `node_modules/`, `work/`, `deprecated/` | Build / dev only |
+| `node_modules/`, `work/`, `deprecated/`, `audio_testing/`, `for_client/`, `From_client/` | Build / dev only |
 | `media/*`, `log/`, `cef-cache/`, `data/` | Runtime on machine |
 | `home/casparcg/exfat/*` | Mounted at boot (WO-47) |
 | Tailscale state (`var/snap`, `snap/`, `root/snap/`, `var/lib`) | Not cloned (avoid stealing builder node) |

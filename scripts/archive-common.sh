@@ -90,6 +90,9 @@ archive_common_server_tar_excludes() {
 		--exclude=./client
 		--exclude=./dist-web
 		--exclude=./dist/launcher
+		--exclude=./audio_testing
+		--exclude=./for_client
+		--exclude=./From_client
 	)
 }
 
