@@ -1,6 +1,6 @@
 # Manual USB stick — Windows & macOS (Etcher + system partitioning)
 
-**Primary handout:** [`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md) — ISO flash, **exFAT**, and **persistence** (required for production sticks).
+ISO flash, **exFAT**, and **persistence** (required for production sticks). Linux build host: **`finish-operator-stick.sh`** — see [FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md).
 
 Use this guide when you **prefer GUI tools** instead of automation scripts. Goal: bootable HighAsCG live ISO, plus **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) with **`drop-update/`** server drops and operator folders, plus **ext4 persistence** (usually finished on Linux).
 

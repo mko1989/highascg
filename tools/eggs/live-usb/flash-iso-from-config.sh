@@ -17,7 +17,7 @@
 #
 # After dd (required for production sticks):
 #   sudo bash tools/eggs/live-usb/finish-operator-stick.sh DEVICE --iso PATH [--prune-stale]
-# See for_client/USB_STICK_AFTER_FLASH.md and tools/eggs/live-usb/FLASH_AND_PERSIST.md
+# See tools/eggs/live-usb/FLASH_AND_PERSIST.md and MANUAL_STICK_WINDOWS_MACOS.md
 #
 set -euo pipefail
 

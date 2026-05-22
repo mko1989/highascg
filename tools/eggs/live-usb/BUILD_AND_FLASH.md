@@ -110,7 +110,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
    Or manually: **`add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=2048`** ) → **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. On a **32 GiB** stick: ~5 GiB ISO · ~2 GiB persistence · ~24 GiB exFAT.
 
-   **Always** boot GRUB’s **Live with persistence** entry. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · client handout: **[`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md)** (macOS / Windows / Linux).
+   **Always** boot GRUB’s **Live with persistence** entry. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
 
    **Narrow alternative (not production playout):** persist only **`~/highascg`** on a separate ext4 — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips NVIDIA/Tailscale/system-wide persistence.
 
@@ -164,7 +164,7 @@ When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOL
 
 ## Windows / macOS — write ISO + exFAT + persistence
 
-**Operator handout (Etcher + both extra partitions):** [`for_client/USB_STICK_AFTER_FLASH.md`](../../for_client/USB_STICK_AFTER_FLASH.md).
+**Etcher + extra partitions (macOS / Windows):** [MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md).
 
 **Manual Etcher + system partitioning (legacy detail):** [`MANUAL_STICK_WINDOWS_MACOS.md`](MANUAL_STICK_WINDOWS_MACOS.md).
 

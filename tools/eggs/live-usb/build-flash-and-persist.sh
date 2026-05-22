@@ -168,7 +168,7 @@ if "$DO_FLASH"; then
 	echo "Done."
 	echo "- Boot GRUB → **Live with persistence** (not plain Live)."
 	echo "- Doc: tools/eggs/live-usb/FLASH_AND_PERSIST.md"
-	echo "- Client handout: for_client/USB_STICK_AFTER_FLASH.md"
+	echo "- macOS / Windows: tools/eggs/live-usb/MANUAL_STICK_WINDOWS_MACOS.md"
 fi
 
 if ! "$DO_BUILD" && ! "$DO_FLASH"; then
