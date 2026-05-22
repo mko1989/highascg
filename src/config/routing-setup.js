@@ -7,15 +7,41 @@ const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 const Map = require('./routing-map')
+const {
+	resolveLiveAudioPlayClip,
+	resolveLiveAudioHostLayer,
+	resolveLiveAudioRouteString,
+	listConfiguredLiveAudioSlots,
+} = require('./live-audio-input')
+const {
+	normalizeAudioPreview,
+	resolveAudioPreviewChannel,
+	resolveAudioPreviewDefaultRoute,
+} = require('./audio-preview')
 
 async function setupInputsChannel(self) {
 	const map = Map.getChannelMap(self.config)
-	if (!map.inputsEnabled || !map.inputsCh || !self.amcp) {
-		self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: false, reason: !self.amcp ? 'amcp_disconnected' : (!map.inputsCh ? 'no_inputs_channel' : 'inputs_disabled') }
+	if (!map.decklinkCount || !map.inputsEnabled || !map.inputsCh || !self.amcp) {
+		self._decklinkInputsStatus = {
+			updatedAt: Date.now(),
+			enabled: false,
+			reason: !self.amcp
+				? 'amcp_disconnected'
+				: !map.decklinkCount
+					? 'decklink_inputs_disabled'
+					: !map.inputsCh
+						? 'no_inputs_channel'
+						: 'inputs_disabled',
+		}
 		return
 	}
-	const targetCh = map.inputsCh; let hostLabel = map.inputsOnMvr ? `MVR channel ${targetCh}` : (map.decklinkInputsHost === 'preview_1' ? `Preview 1 channel ${targetCh}` : `dedicated inputs channel ${targetCh}`)
-	self.log('info', `DeckLink inputs: hosting on ${hostLabel}`)
+	const targetCh = map.inputsCh
+	let hostLabel = map.inputsOnMvr
+		? `MVR channel ${targetCh}`
+		: map.decklinkInputsHost === 'preview_1'
+			? `Preview 1 channel ${targetCh}`
+			: `dedicated inputs channel ${targetCh}`
+	if (map.decklinkCount > 0) self.log('info', `DeckLink inputs: hosting on ${hostLabel}`)
 
 	const outputDevices = new Set(); for (let n = 1; n <= map.screenCount; n++) {
 		const dlOut = parseInt(String(Map.readCasparSetting(self.config, `screen_${n}_decklink_device`) ?? '0'), 10)
@@ -40,6 +66,113 @@ async function setupInputsChannel(self) {
 		}
 	}
 	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, hostingChannel: targetCh, hostLabel, inputsOnMvr: map.inputsOnMvr, requestedSlots: map.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
+}
+
+async function setupLiveAudioInputs(self) {
+	const map = Map.getChannelMap(self.config)
+	const { count, slots } = listConfiguredLiveAudioSlots(self.config)
+	if (!map.inputsEnabled || !map.inputsCh || !self.amcp || count <= 0) {
+		self._liveAudioInputsStatus = {
+			updatedAt: Date.now(),
+			enabled: false,
+			reason: !self.amcp ? 'amcp_disconnected' : !map.inputsCh ? 'no_inputs_channel' : count <= 0 ? 'live_audio_disabled' : 'inputs_disabled',
+		}
+		return
+	}
+	const targetCh = map.inputsCh
+	const failed = []
+	let playOk = 0
+	for (const slot of slots) {
+		const layer = resolveLiveAudioHostLayer(slot.slot)
+		const clip = slot.clip
+		try {
+			await self.amcp.raw(`PLAY ${targetCh}-${layer} ${clip} LOOP`)
+			playOk++
+		} catch (e) {
+			const msg = e?.message || String(e)
+			if (/already playing|404|PLAY FAILED/i.test(msg)) playOk++
+			else failed.push({ slot: slot.slot, layer, clip, message: msg })
+		}
+	}
+	self._liveAudioInputsStatus = {
+		updatedAt: Date.now(),
+		enabled: true,
+		hostingChannel: targetCh,
+		requestedSlots: count,
+		scheduledPlays: slots.length,
+		playSucceeded: playOk,
+		slots: slots.map((s) => ({ slot: s.slot, layer: s.layer, clip: s.clip, route: s.route })),
+		failed,
+	}
+	const { LIVE_AUDIO_LAYER_BASE } = require('./live-audio-input')
+	self.log('info', `Live ALSA inputs: ${playOk}/${slots.length} PLAY on channel ${targetCh} (layers ${LIVE_AUDIO_LAYER_BASE}+)`)
+}
+
+async function setupLiveAudioPgmRoutes(self) {
+	const map = Map.getChannelMap(self.config)
+	if (!self.amcp) return
+	const alwaysOn =
+		Map.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== false &&
+		Map.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== 'false'
+	if (!alwaysOn) return
+	const { slots } = listConfiguredLiveAudioSlots(self.config)
+	if (!slots.length) return
+
+	const screen = Math.max(1, parseInt(String(Map.readCasparSetting(self.config, 'live_audio_pgm_screen') ?? 1), 10) || 1)
+	const baseLayer = Math.max(1, parseInt(String(Map.readCasparSetting(self.config, 'live_audio_pgm_layer') ?? 2), 10) || 2)
+	const audioOnly =
+		Map.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === true ||
+		Map.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === 'true'
+	const pgmCh = map.programCh(screen)
+	const routes = []
+
+	for (let i = 0; i < slots.length; i++) {
+		const slot = slots[i]
+		const route =
+			slot.route || resolveLiveAudioRouteString(self.config, slot.slot)
+		if (!route) continue
+		const layer = baseLayer + i
+		const cl = `${pgmCh}-${layer}`
+		try {
+			await self.amcp.raw(`PLAY ${cl} ${route}`)
+			if (audioOnly) {
+				try {
+					await self.amcp.raw(`MIXER ${cl} OPACITY 0`)
+					await self.amcp.raw(`MIXER ${cl} VOLUME 1`)
+				} catch (_) {}
+			}
+			routes.push({ screen, layer, route, audioOnly })
+		} catch (e) {
+			self.log('warn', `Live audio PGM route ${cl} ${route}: ${e?.message || e}`)
+		}
+	}
+	if (routes.length) {
+		self.log('info', `Live ALSA: routed ${routes.length} input(s) to PGM ch ${pgmCh}`)
+	}
+	if (self._liveAudioInputsStatus) {
+		self._liveAudioInputsStatus.pgmRoutes = routes
+	}
+}
+
+async function setupAudioPreviewBus(self) {
+	const map = Map.getChannelMap(self.config)
+	const ap = normalizeAudioPreview(self.config)
+	if (!ap.enabled || !self.amcp) return
+	const ch = resolveAudioPreviewChannel(self.config, map)
+	if (ch == null) return
+	const defaultRoute = resolveAudioPreviewDefaultRoute(self.config, map)
+	if (!defaultRoute) return
+	try {
+		await self.amcp.play(ch, ap.soloLayerStart, defaultRoute)
+		for (let L = ap.soloLayerStart + 1; L < ap.soloLayerStart + ap.soloLayerCount; L++) {
+			try {
+				await self.amcp.clear(ch, L)
+			} catch (_) {}
+		}
+		self.log('info', `Audio preview: ch ${ch} (${ap.bus}) default ${defaultRoute} on layer ${ap.soloLayerStart}`)
+	} catch (e) {
+		self.log('warn', `Audio preview bus setup: ${e?.message || e}`)
+	}
 }
 
 async function setupPreviewChannel(self, screenIdx) {
@@ -97,7 +230,12 @@ async function setupAllRouting(self) {
 			}
 		} catch {}
 	}
-	if (map.inputsEnabled) await setupInputsChannel(self)
+	if (map.inputsEnabled) {
+		if (map.decklinkCount > 0) await setupInputsChannel(self)
+		await setupLiveAudioInputs(self)
+		await setupLiveAudioPgmRoutes(self)
+	}
+	await setupAudioPreviewBus(self)
 	for (let n = 1; n <= map.screenCount; n++) await setupPreviewChannel(self, n)
 	if (map.switcherBusMode && self.amcp) {
 		if (!self.switcherOutputBusByChannel) self.switcherOutputBusByChannel = {}
@@ -136,4 +274,13 @@ async function setupMappingChannels(_self) {
 	return
 }
 
-module.exports = { setupInputsChannel, setupPreviewChannel, setupMultiview, setupAllRouting, setupMappingChannels }
+module.exports = {
+	setupInputsChannel,
+	setupLiveAudioInputs,
+	setupLiveAudioPgmRoutes,
+	setupAudioPreviewBus,
+	setupPreviewChannel,
+	setupMultiview,
+	setupAllRouting,
+	setupMappingChannels,
+}

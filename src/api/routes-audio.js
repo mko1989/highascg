@@ -8,6 +8,12 @@
 const defaults = require('../config/defaults')
 const { normalizeAudioRouting } = require('../config/config-generator')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
+const {
+	normalizeAudioPreview,
+	resolveAudioPreviewChannel,
+	resolveAudioPreviewDefaultRoute,
+} = require('../config/audio-preview')
+const { listConfiguredLiveAudioSlots, normalizeAlsaCaptureUri } = require('../config/live-audio-input')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -22,12 +28,28 @@ function apiLog(ctx, level, msg) {
 /**
  * @param {string} path
  * @param {string} query
+ * @param {object} [ctx]
  */
-function handleGet(path, query) {
+function handleGet(path, query, ctx) {
 	if (path === '/api/audio/devices') {
 		const refresh = query.refresh === '1' || query.refresh === 'true'
 		const data = listAudioDevices({ refresh })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	}
+	if (path === '/api/audio/live-inputs') {
+		const cfg = ctx?.config || {}
+		const map = require('../config/routing-map').getChannelMap(cfg)
+		const configured = listConfiguredLiveAudioSlots(cfg)
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				inputsCh: map.inputsCh,
+				liveAudioCount: map.liveAudioCount,
+				configured,
+				status: ctx?._liveAudioInputsStatus ?? null,
+			}),
+		}
 	}
 	if (path === '/api/audio/portaudio-devices') {
 		const refresh = query.refresh === '1' || query.refresh === 'true'
@@ -146,18 +168,24 @@ async function handlePost(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
 		const source = String(b.source || 'pgm_1').toLowerCase()
-		const map = (require('../config/routing-map')).getChannelMap(ctx.config)
-		const monitorCh = map.monitorCh
+		const map = require('../config/routing-map').getChannelMap(ctx.config)
+		const previewCh = resolveAudioPreviewChannel(ctx.config, map)
+		const monitorCh = previewCh ?? map.monitorCh
 		if (!monitorCh) {
-			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Monitor channel not enabled in config' }) }
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'Audio preview not enabled (set audioPreview or monitor channel)' }),
+			}
 		}
+		const ap = normalizeAudioPreview(ctx.config)
 
 		let src = ''
 		if (source === 'multiview' && map.multiviewCh != null) src = `route://${map.multiviewCh}`
 		else if (source.startsWith('pgm_')) {
 			const n = parseInt(source.split('_')[1], 10) || 1
 			src = `route://${map.programCh(n)}`
-		} else if (source.startsWith('prv_')) {
+		} else if (source.startsWith('prv_') || source.startsWith('preview_')) {
 			const n = parseInt(source.split('_')[1], 10) || 1
 			const p = map.previewCh(n)
 			if (p != null) src = `route://${p}`
@@ -168,8 +196,12 @@ async function handlePost(path, body, ctx) {
 		}
 
 		try {
-			await ctx.amcp.play(monitorCh, 1, src)
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, source, monitorCh }) }
+			await ctx.amcp.play(monitorCh, ap.soloLayerStart, src)
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, source, previewCh: monitorCh, bus: ap.bus }),
+			}
 		} catch (e) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
 		}
@@ -185,38 +217,89 @@ async function handlePost(path, body, ctx) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}
 
-		const map = (require('../config/routing-map')).getChannelMap(ctx.config)
-		const monitorCh = map.monitorCh
+		const map = require('../config/routing-map').getChannelMap(ctx.config)
+		const previewCh = resolveAudioPreviewChannel(ctx.config, map)
+		const monitorCh = previewCh ?? map.monitorCh
 		if (!monitorCh) {
-			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Monitor channel not enabled in config' }) }
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'Audio preview not enabled (set audioPreview or monitor channel)' }),
+			}
 		}
+		const ap = normalizeAudioPreview(ctx.config)
+		const layer0 = ap.soloLayerStart
+		const maxLayers = ap.soloLayerStart + ap.soloLayerCount - 1
 
 		try {
 			if (solos.length === 0) {
-				// Clear solos -> Route PRV (Ch 2) to Monitor
-				const prvCh = map.previewCh(1) || 2
-				await ctx.amcp.play(monitorCh, 1, `route://${prvCh}`)
-				// Clear any extra layers on monitor channel just in case
-				for (let l = 2; l <= 8; l++) {
+				const defaultRoute = resolveAudioPreviewDefaultRoute(ctx.config, map)
+				if (defaultRoute) await ctx.amcp.play(monitorCh, layer0, defaultRoute)
+				for (let l = layer0 + 1; l <= maxLayers; l++) {
+					try {
+						await ctx.amcp.clear(monitorCh, l)
+					} catch (_) {}
+				}
+				return {
+					status: 200,
+					headers: JSON_HEADERS,
+					body: jsonBody({ ok: true, mode: 'default', previewCh: monitorCh, route: defaultRoute }),
+				}
+			}
+			for (let i = 0; i < solos.length; i++) {
+				const s = solos[i]
+				await ctx.amcp.play(monitorCh, layer0 + i, `route://${s.channel}-${s.layer}`)
+			}
+			for (let l = layer0 + solos.length; l <= maxLayers; l++) {
+				try {
 					await ctx.amcp.clear(monitorCh, l)
-				}
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, mode: 'prv', target: prvCh }) }
-			} else {
-				// Solo layers
-				// We'll use layers 1..N on the monitor channel to host the routes
-				for (let i = 0; i < solos.length; i++) {
-					const s = solos[i]
-					await ctx.amcp.play(monitorCh, i + 1, `route://${s.channel}-${s.layer}`)
-				}
-				// Clear any remaining layers from previous multi-solo
-				for (let i = solos.length; i < 8; i++) {
-					await ctx.amcp.clear(monitorCh, i + 1)
-				}
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, mode: 'solo', count: solos.length }) }
+				} catch (_) {}
+			}
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, mode: 'solo', count: solos.length, previewCh: monitorCh, bus: ap.bus }),
 			}
 		} catch (e) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
 		}
+	}
+
+	if (path === '/api/audio/live-inputs/apply') {
+		if (!ctx.amcp) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
+		}
+		const { setupLiveAudioInputs, setupLiveAudioPgmRoutes } = require('../config/routing-setup')
+		try {
+			await setupLiveAudioInputs(ctx)
+			await setupLiveAudioPgmRoutes(ctx)
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, status: ctx._liveAudioInputsStatus ?? null }),
+			}
+		} catch (e) {
+			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
+	}
+
+	if (path === '/api/audio/live-inputs/config') {
+		const b = parseBody(body)
+		if (!b || typeof b !== 'object') {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
+		}
+		const cs = { ...(ctx.config.casparServer || {}), ...(b.casparServer || {}) }
+		if (b.live_audio_input_count != null) cs.live_audio_input_count = b.live_audio_input_count
+		for (let i = 1; i <= 8; i++) {
+			const key = `live_audio_input_${i}_device`
+			if (b[key] != null) cs[key] = normalizeAlsaCaptureUri(String(b[key]))
+		}
+		if (b.live_audio_pgm_always_on != null) cs.live_audio_pgm_always_on = b.live_audio_pgm_always_on
+		ctx.config.casparServer = { ...defaults.casparServer, ...cs }
+		if (ctx.configManager) {
+			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, casparServer: ctx.config.casparServer }) }
 	}
 
 	return null

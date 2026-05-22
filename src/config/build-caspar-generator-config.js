@@ -7,6 +7,11 @@ const { resolveMainScreenCount } = require('./routing-map')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')
+const {
+	parseDecklinkDeviceIndex,
+	readDecklinkKeyFillFromConnectorCaspar,
+	writeDecklinkKeyFillToCasparServer,
+} = require('./decklink-key-fill')
 
 /**
  * @param {Record<string, unknown>} appConfig
@@ -98,6 +103,16 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		outgoing.get(src).push(String(e?.sinkId || ''))
 	}
 
+	function applyDecklinkKeyFillFromConnector(merged, prefix, connector) {
+		const keyFill = readDecklinkKeyFillFromConnectorCaspar(connector?.caspar)
+		if (!keyFill.enabled) return
+		writeDecklinkKeyFillToCasparServer(merged, prefix, {
+			fillDevice: parseDecklinkDeviceIndex(connector?.externalRef),
+			keyDevice: keyFill.keyDevice,
+			keyer: keyFill.keyer,
+		})
+	}
+
 	function resolveDestinationSourceForConnector(sourceId) {
 		const seen = new Set()
 		const queue = [String(sourceId || '')]
@@ -138,8 +153,10 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
 				merged[`screen_${n}_decklink_device`] = devNum
 				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
+				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
 			} else if (binding?.type === 'multiview') {
 				merged.multiview_decklink_device = devNum
+				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 			}
 			return
 		}
@@ -162,11 +179,13 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			if (!dest) return
 			if (String(dest.mode || '') === 'multiview') {
 				merged.multiview_decklink_device = devNum
+				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 			} else {
 				const idx = Number.isFinite(Number(dest.mainScreenIndex)) ? Number(dest.mainScreenIndex) : 0
 				const n = idx + 1
 				merged[`screen_${n}_decklink_device`] = devNum
 				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
+				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
 			}
 		} else if (sourceId.startsWith('caspar_pgm_')) {
 			// Cabled directly to a raw Caspar Program output
@@ -175,9 +194,11 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			if (n > 0) {
 				merged[`screen_${n}_decklink_device`] = devNum
 				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
+				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
 			}
 		} else if (sourceId === 'caspar_mv_out') {
 			merged.multiview_decklink_device = devNum
+			applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 		}
 	})
 }

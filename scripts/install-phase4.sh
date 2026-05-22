@@ -105,7 +105,18 @@ systemd-tmpfiles --create --prefix=/run/highascg 2>/dev/null || true
 echo -e "  ${GREEN}✓${NC} tmpfiles.d /run/highascg (0770 root:$GRP_CASPAR)"
 
 # 4.3d NVIDIA driver apply from offline pool (WO-39; Settings → system/hardware)
+NV_LIB_SRC="$SCRIPT_DIR/tools/eggs/live-usb/nvidia-multi-driver/nvidia-pool-lib.sh"
 NV_SH_SRC="$SCRIPT_DIR/scripts/highascg-nvidia-apply-from-pool.sh"
+mkdir -p /usr/local/lib/highascg /etc/highascg
+if [ -f "$NV_LIB_SRC" ]; then
+	install -m 0644 -o root -g root "$NV_LIB_SRC" /usr/local/lib/highascg/nvidia-pool-lib.sh
+	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/nvidia-pool-lib.sh"
+fi
+if [ ! -f /etc/highascg/nvidia-driver-flavor ]; then
+	echo "open" > /etc/highascg/nvidia-driver-flavor
+	chmod 0644 /etc/highascg/nvidia-driver-flavor
+	echo -e "  ${GREEN}✓${NC} /etc/highascg/nvidia-driver-flavor → open"
+fi
 if [ -f "$NV_SH_SRC" ]; then
 	install -m 0755 -o root -g root "$NV_SH_SRC" /usr/local/lib/highascg/nvidia-apply-from-pool.sh
 	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/nvidia-apply-from-pool.sh"

@@ -12,6 +12,7 @@ const {
 	nextPipContentLayerInScene,
 	pipOverlaysFromLayer,
 } = require('./pip-overlay')
+const { PGM_BANK_B_OFFSET } = require('./scene-transition')
 
 /**
  * @param {object} ctx

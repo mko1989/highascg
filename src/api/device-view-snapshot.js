@@ -10,6 +10,7 @@ const { casparSnapshot } = require('./device-view-caspar-snapshot')
 const { resolveMainScreenCount, getChannelMap } = require('../config/routing')
 const { destinationsFromConfig } = require('../config/screen-destinations')
 const { probeDecklinkHardware, probeDecklinkFromCasparLog } = require('../utils/decklink-enum')
+const { readDecklinkKeyFillSettings } = require('../config/decklink-key-fill')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { listPortAudioDevices } = require('../audio/audio-devices')
 
@@ -77,12 +78,26 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 	for (let s = 1; s <= screenCount; s++) {
 		const device = parseInt(String(cs[`screen_${s}_decklink_device`] ?? 0), 10) || 0
 		const replaceScreen = !!cs[`screen_${s}_decklink_replace_screen`]
-		if (device > 0 || replaceScreen) screenOutputs.push({ screen: s, device, replaceScreen })
+		const keyFill = readDecklinkKeyFillSettings(cs, `screen_${s}_`)
+		if (device > 0 || replaceScreen) {
+			screenOutputs.push({
+				screen: s,
+				device,
+				replaceScreen,
+				keyFill: keyFill.keyFillEnabled
+					? { enabled: true, keyDevice: keyFill.keyDevice, keyer: keyFill.keyer }
+					: { enabled: false, keyDevice: 0, keyer: keyFill.keyer },
+			})
+		}
 	}
+	const mvKeyFill = readDecklinkKeyFillSettings(cs, 'multiview_')
 	return {
 		inputs,
 		screenOutputs,
 		multiviewDevice: parseInt(String(cs.multiview_decklink_device ?? 0), 10) || 0,
+		multiviewKeyFill: mvKeyFill.keyFillEnabled
+			? { enabled: true, keyDevice: mvKeyFill.keyDevice, keyer: mvKeyFill.keyer }
+			: { enabled: false, keyDevice: 0, keyer: mvKeyFill.keyer },
 		runtime: rt || null,
 		hardware: decklinkHardware || { source: 'none', connectors: [] },
 		detected: hardwareCount > 0,

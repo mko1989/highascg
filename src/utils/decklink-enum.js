@@ -201,6 +201,15 @@ function parseInfoConfigForDecklinks(xmlStr, cb) {
 						decklink[idx + 1] = {
 							consumers: consumers.map((c) => ({
 								device: parseInt(Array.isArray(c.device) ? c.device[0] : c.device, 10) || 0,
+								keyDevice:
+									parseInt(
+										Array.isArray(c['key-device']) ? c['key-device'][0] : c['key-device'],
+										10
+									) || 0,
+								keyOnly:
+									(Array.isArray(c['key-only']) ? c['key-only'][0] : c['key-only']) === 'true' ||
+									(Array.isArray(c['key-only']) ? c['key-only'][0] : c['key-only']) === true,
+								keyer: String(Array.isArray(c.keyer) ? c.keyer[0] : c.keyer || '').trim(),
 								embeddedAudio: (Array.isArray(c['embedded-audio']) ? c['embedded-audio'][0] : c['embedded-audio']) === 'true',
 							})),
 						}

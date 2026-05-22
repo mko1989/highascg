@@ -31,12 +31,16 @@ function buildChannelMap(ctx) {
 	const dlFromConfig = ctx.gatheredInfo?.decklinkFromConfig || {}
 	const cfgDlExplicitZero = cfg.decklink_input_count != null && String(cfg.decklink_input_count) === '0'
 	const decklinkCount = map.decklinkCount > 0 ? map.decklinkCount : cfgDlExplicitZero ? 0 : (dlFromConfig.decklinkCount ?? 0)
+	const liveAudioCount = map.liveAudioCount > 0 ? map.liveAudioCount : 0
 	const inputsCh =
-		map.decklinkCount > 0 || map.inputsHostChannelEnabled
+		map.decklinkCount > 0 || liveAudioCount > 0 || map.inputsHostChannelEnabled
 			? map.inputsCh
 			: cfgDlExplicitZero
 				? null
 				: (dlFromConfig.inputsCh ?? null)
+	const { normalizeAudioPreview, resolveAudioPreviewChannel } = require('./audio-preview')
+	const audioPreview = normalizeAudioPreview(cfg)
+	const audioPreviewCh = resolveAudioPreviewChannel(cfg, map)
 	const inputsResolution = dlFromConfig.inputsResolution ?? null
 
 	const channelResolutionsByChannel = {}
@@ -52,8 +56,11 @@ function buildChannelMap(ctx) {
 		/** Custom PGM/PRV channel rows (Settings → Caspar); used for main tabs labels when non-empty. */
 		virtualMainChannels: map.virtualMainChannels || [],
 		decklinkCount,
+		liveAudioCount,
 		decklinkInputsHost: map.decklinkInputsHost || 'dedicated',
 		inputsOnMvr: !!map.inputsOnMvr,
+		audioPreview,
+		audioPreviewCh,
 		programChannels,
 		previewChannels,
 		switcherBus1Channels: Array.isArray(map.switcherBus1Channels) ? map.switcherBus1Channels.slice(0, map.screenCount) : [],

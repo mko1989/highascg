@@ -4,8 +4,38 @@
 
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
+
 const { TEMPLATE_MAP, mergePipOverlayParamsWithDefaults } = require('./pip-overlay-utils')
 const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..')
+
+/** Per-screen border from project (`scenes.globalBorders[screenIndex]`). */
+function readGlobalBorderSlot(screenIdx) {
+	if (!Number.isFinite(screenIdx) || screenIdx < 0) return null
+	try {
+		const { loadProjectScenes } = require('./project-scenes')
+		const scenes = loadProjectScenes()
+		const arr = scenes?.globalBorders
+		if (!Array.isArray(arr) || screenIdx >= arr.length) return null
+		return arr[screenIdx]
+	} catch {
+		return null
+	}
+}
+
+/**
+ * Look `globalBorder` does not store layout slices; the inspector saves them on
+ * `globalBorders[screenIndex]`. Merge those rects into the border used for PGM output.
+ */
+function mergeScreenSlicesIntoBorder(lookBorder, screenIdx) {
+	if (!lookBorder || typeof lookBorder !== 'object') return lookBorder
+	const slot = readGlobalBorderSlot(screenIdx)
+	if (!slot || !Array.isArray(slot.slices) || slot.slices.length === 0) return lookBorder
+	return { ...lookBorder, slices: slot.slices }
+}
 
 /**
  * Normalize the overlay payload for the global border template. The global border
@@ -21,11 +51,12 @@ function _forceInside(overlay) {
 }
 
 /** JSON for global-border templates: visual params + inner only (no Art-Net / fade / mirror metadata). */
-function buildGlobalBorderCgJson(overlay) {
+function buildGlobalBorderCgJson(overlay, opts = {}) {
 	const ov = _forceInside(overlay)
 	const p = mergePipOverlayParamsWithDefaults(ov)
 	p.side = 'inside'
 	const out = { ...p }
+	if (opts.liveFile) out.liveFile = String(opts.liveFile)
 	
 	if (Array.isArray(ov.slices) && ov.slices.length > 0) {
 		out.slices = ov.slices
@@ -38,7 +69,21 @@ function buildGlobalBorderCgJson(overlay) {
 		out.slices = []
 	}
 
-	if (ov.enabled !== undefined) out.enabled = !!ov.enabled
+	// Non-visual keys must not reach Caspar CG (templates only read style params).
+	for (const k of [
+		'enabled',
+		'type',
+		'artnetListenEnabled',
+		'artnetChannelMap',
+		'artnetPatch',
+		'fadeDuration',
+		'mirrorBorderOnPrv',
+		'borderPresets',
+		'pgmAirSnapshot',
+		'activePgmLayer',
+	]) {
+		delete out[k]
+	}
 	return JSON.stringify(out)
 }
 
@@ -47,7 +92,11 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	const ov = _forceInside(overlay)
 	const template = TEMPLATE_MAP[ov.type] || 'pip_border'
 	const cl = `${channel}-${layer}`
-	const data = buildGlobalBorderCgJson(ov)
+	const { liveFileName } = require('./global-border-live')
+	const ch = parseInt(channel, 10)
+	const data = buildGlobalBorderCgJson(ov, {
+		liveFile: Number.isFinite(ch) && ch >= 1 ? liveFileName(ch) : undefined,
+	})
 	const escaped = data.replace(/"/g, '\\"')
 	const initialOpacity =
 		opts && Number.isFinite(Number(opts.initialOpacity)) ? Math.max(0, Math.min(1, Number(opts.initialOpacity))) : 1
@@ -59,10 +108,11 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	}
 	// Many Caspar/CEF builds reject CG UPDATE until after PLAY; some also need an initial UPDATE after PLAY
 	// (same sequence as startup-led-test-pattern and led test card routes).
+	const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))
 	lines.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${escaped}"`,
 		`CG ${cl} PLAY 0`,
-		`CG ${cl} UPDATE 0 "${escaped}"`,
+		`CG ${cl} UPDATE ${updateDur} "${escaped}"`,
 		deferMixerAmcpLine(`MIXER ${cl} FILL 0 0 1 1 0`),
 		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
 	)
@@ -73,15 +123,16 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	return lines
 }
 
-function buildGlobalBorderUpdateLines(channel, layer, overlay) {
+function buildGlobalBorderUpdateLines(channel, layer, overlay, opts) {
 	if (!overlay?.type) return []
 	const ov = _forceInside(overlay)
 	const cl = `${channel}-${layer}`
 	const data = buildGlobalBorderCgJson(ov)
 	const escaped = data.replace(/"/g, '\\"')
+	const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))
 	// After ADD+PLAY warmed the Flash layer (`buildGlobalBorderAmcpLines`), params should move via UPDATE only —
 	// repeating PLAY each drag step spams Caspar logs and stalls CEF.
-	return [`CG ${cl} UPDATE 0 "${escaped}"`]
+	return [`CG ${cl} UPDATE ${updateDur} "${escaped}"`]
 }
 
 function buildGlobalBorderOpacityFadeLine(channel, layer, targetOpacity, durationFrames, tween) {
@@ -148,12 +199,15 @@ function buildGlobalBorderPresetCrossfadeLines(channel, fromLayer, toLayer, bord
 }
 
 module.exports = {
+	buildGlobalBorderCgJson,
 	buildGlobalBorderAmcpLines,
 	buildGlobalBorderUpdateLines,
 	buildGlobalBorderOpacityFadeLine,
 	buildGlobalBorderClearLines,
 	buildGlobalBorderPresetCrossfadeLines,
 	borderPayloadToOverlay,
+	mergeScreenSlicesIntoBorder,
+	readGlobalBorderSlot,
 	GLOBAL_BORDER_LAYER_PGM_A,
 	GLOBAL_BORDER_LAYER_PGM_B,
 }

@@ -16,7 +16,7 @@
 		pointer-events: none;
 		overflow: hidden;
 	}
-	#pip-frame {
+	.pip-frame {
 		position: absolute;
 		left: calc(var(--il) * 100%);
 		top: calc(var(--it) * 100%);
@@ -28,21 +28,19 @@
 		overflow: visible;
 		opacity: var(--o, 1);
 	}
-	#pip-frame.side-outside {
+	.pip-frame.side-outside {
 		box-shadow: var(--ox) var(--oy) var(--b) var(--s) var(--c);
 	}
-	#pip-frame.side-inside {
+	.pip-frame.side-inside {
 		box-shadow: inset var(--ox) var(--oy) var(--b) var(--s) var(--c);
 	}
 </style>
 </head>
 <body>
-<div id="root">
-	<div id="pip-frame"></div>
-</div>
+<div id="root"></div>
 <script>
 (function () {
-	var frame = document.getElementById('pip-frame')
+	var root = document.getElementById('root')
 	var state = {
 		blur: 20,
 		offsetX: 5,
@@ -53,7 +51,12 @@
 		side: 'outside',
 		opacity: 1,
 		inner: null,
+		slices: [],
+		liveFile: null,
 	}
+
+	var livePollId = null
+	var lastLiveRaw = ''
 
 	function clamp01(x) {
 		var n = Number(x)
@@ -67,16 +70,30 @@
 
 	function hasMargin(inn) {
 		if (!inn) return false
-		return inn.w > 0 && inn.h > 0
+		var w = inn.w != null ? inn.w : 0
+		var h = inn.h != null ? inn.h : 0
+		return w > 0 && h > 0
 	}
 
-	function apply() {
-		var inn = state.inner
-		if (!inn || !hasMargin(inn)) {
-			frame.style.display = 'none'
-			return
+	function normalizeSlice(s) {
+		return {
+			l: clamp01(s.x != null ? s.x : s.l),
+			t: clamp01(s.y != null ? s.y : s.t),
+			w: clamp01(s.w),
+			h: clamp01(s.h),
 		}
-		frame.style.display = 'block'
+	}
+
+	function activeSlices() {
+		var slices = state.slices || []
+		if (slices.length === 0 && state.inner && hasMargin(state.inner)) {
+			return [state.inner]
+		}
+		return slices.map(normalizeSlice).filter(hasMargin)
+	}
+
+	function styleFrame(frame, inn) {
+		if (!frame || !inn) return
 		frame.style.setProperty('--il', String(inn.l))
 		frame.style.setProperty('--it', String(inn.t))
 		frame.style.setProperty('--iw', String(inn.w))
@@ -88,32 +105,96 @@
 		frame.style.setProperty('--c', state.color)
 		frame.style.setProperty('--r', (state.radius || 0) + 'px')
 		frame.style.setProperty('--o', String(clamp01(state.opacity)))
+		frame.className = 'pip-frame side-' + (state.side || 'outside')
+	}
 
-		frame.className = 'side-' + (state.side || 'outside')
+	var layoutKey = ''
+
+	function sliceLayoutKey(slices) {
+		var out = []
+		for (var i = 0; i < slices.length; i++) {
+			var s = slices[i]
+			out.push([s.l, s.t, s.w, s.h].join(','))
+		}
+		return out.join('|')
+	}
+
+	function render() {
+		var slices = activeSlices()
+		var key = sliceLayoutKey(slices)
+		var frames = root.querySelectorAll('.pip-frame')
+		if (key !== layoutKey || frames.length !== slices.length) {
+			root.innerHTML = ''
+			slices.forEach(function () {
+				var frame = document.createElement('div')
+				frame.className = 'pip-frame'
+				root.appendChild(frame)
+			})
+			layoutKey = key
+			frames = root.querySelectorAll('.pip-frame')
+		}
+		for (var i = 0; i < slices.length; i++) {
+			if (frames[i]) styleFrame(frames[i], slices[i])
+		}
 	}
 
 	window['play'] = function () {}
 	window['stop'] = function () {}
 	window['next'] = function () {}
 
+	function applyFromData(d) {
+		if (!d) return
+		if (d.blur != null) state.blur = parseFloat(d.blur) || 0
+		if (d.offsetX != null) state.offsetX = parseFloat(d.offsetX) || 0
+		if (d.offsetY != null) state.offsetY = parseFloat(d.offsetY) || 0
+		if (d.color != null) state.color = String(d.color)
+		if (d.spread != null) state.spread = parseFloat(d.spread) || 0
+		if (d.radius != null) state.radius = parseFloat(d.radius) || 0
+		if (d.side != null) state.side = String(d.side)
+		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
+		state.inner = readInner(d)
+		if (Array.isArray(d.slices)) {
+			state.slices = d.slices.map(function (s) {
+				return {
+					x: clamp01(s.x),
+					y: clamp01(s.y),
+					w: clamp01(s.w),
+					h: clamp01(s.h),
+				}
+			})
+		}
+		render()
+	}
+
+	function pollLiveFile() {
+		if (!state.liveFile) return
+		var xhr = new XMLHttpRequest()
+		xhr.open('GET', state.liveFile + '?_=' + Date.now(), true)
+		xhr.onload = function () {
+			if (xhr.status !== 200 && xhr.status !== 0) return
+			if (xhr.responseText === lastLiveRaw) return
+			lastLiveRaw = xhr.responseText
+			try { applyFromData(JSON.parse(xhr.responseText)) } catch (e) { console.warn('pip_shadow live:', e) }
+		}
+		xhr.send(null)
+	}
+
+	function ensureLivePoll(file) {
+		if (file) state.liveFile = String(file)
+		if (!state.liveFile || livePollId) return
+		livePollId = setInterval(pollLiveFile, 33)
+		pollLiveFile()
+	}
+
 	window['update'] = function (raw) {
 		try {
 			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
-			if (!d) return
-			if (d.blur != null) state.blur = parseFloat(d.blur) || 0
-			if (d.offsetX != null) state.offsetX = parseFloat(d.offsetX) || 0
-			if (d.offsetY != null) state.offsetY = parseFloat(d.offsetY) || 0
-			if (d.color != null) state.color = String(d.color)
-			if (d.spread != null) state.spread = parseFloat(d.spread) || 0
-			if (d.radius != null) state.radius = parseFloat(d.radius) || 0
-			if (d.side != null) state.side = String(d.side)
-			if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
-			state.inner = readInner(d)
-			apply()
+			if (d.liveFile) ensureLivePoll(d.liveFile)
+			applyFromData(d)
 		} catch (e) { console.warn('pip_shadow update:', e) }
 	}
 
-	apply()
+	render()
 })()
 </script>
 </body>

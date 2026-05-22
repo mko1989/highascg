@@ -93,6 +93,10 @@ module.exports = {
 		screen_1_borderless: false,
 		screen_1_always_on_top: true,
 		screen_1_decklink_device: 0,
+		/** Separate DeckLink SDI for alpha key when fill uses `screen_N_decklink_device`; 0 = fill-only. */
+		screen_1_decklink_key_device: 0,
+		/** Caspar `<keyer>` on fill consumer when key/fill pair is active (`internal` | `external` | `external_separate_device`). */
+		screen_1_decklink_keyer: 'internal',
 		/** When true and video mode is a standard preset (not custom) and decklink device > 0: omit Caspar screen consumer, output PGM to DeckLink only. */
 		screen_1_decklink_replace_screen: false,
 		screen_1_ndi_enabled: false,
@@ -123,6 +127,8 @@ module.exports = {
 		screen_2_borderless: false,
 		screen_2_always_on_top: true,
 		screen_2_decklink_device: 0,
+		screen_2_decklink_key_device: 0,
+		screen_2_decklink_keyer: 'internal',
 		screen_2_decklink_replace_screen: false,
 		screen_2_ndi_enabled: false,
 		screen_2_ndi_name: 'HighAsCG-CH2',
@@ -148,6 +154,8 @@ module.exports = {
 		screen_3_borderless: false,
 		screen_3_always_on_top: true,
 		screen_3_decklink_device: 0,
+		screen_3_decklink_key_device: 0,
+		screen_3_decklink_keyer: 'internal',
 		screen_3_decklink_replace_screen: false,
 		screen_3_ndi_enabled: false,
 		screen_3_ndi_name: 'HighAsCG-CH3',
@@ -173,6 +181,8 @@ module.exports = {
 		screen_4_borderless: false,
 		screen_4_always_on_top: true,
 		screen_4_decklink_device: 0,
+		screen_4_decklink_key_device: 0,
+		screen_4_decklink_keyer: 'internal',
 		screen_4_decklink_replace_screen: false,
 		screen_4_ndi_enabled: false,
 		screen_4_ndi_name: 'HighAsCG-CH4',
@@ -204,6 +214,8 @@ module.exports = {
 		multiview_output_mode: '',
 		/** DeckLink device index for multiview channel when output mode includes decklink (standard video modes only for decklink-only). */
 		multiview_decklink_device: 0,
+		multiview_decklink_key_device: 0,
+		multiview_decklink_keyer: 'internal',
 		multiview_mode: '1080p5000',
 		multiview_windowed: true,
 		multiview_vsync: true,
@@ -239,6 +251,35 @@ module.exports = {
 		decklink_input_7_device: 0,
 		decklink_input_8_device: 0,
 		inputs_channel_mode: '1080p5000',
+		/**
+		 * Live ALSA/USB capture via FFmpeg producer (`PLAY … alsa://…` on inputs host layers 10+).
+		 * @see src/config/live-audio-input.js, for_client/ALSA_LIVE_AUDIO_CLIENT.md
+		 */
+		live_audio_input_count: 0,
+		live_audio_input_1_device: '',
+		live_audio_input_2_device: '',
+		live_audio_input_3_device: '',
+		live_audio_input_4_device: '',
+		live_audio_input_5_device: '',
+		live_audio_input_6_device: '',
+		live_audio_input_7_device: '',
+		live_audio_input_8_device: '',
+		live_audio_inputs_host_channel_enabled: false,
+		live_audio_inputs_channel_mode: '1080p5000',
+		/** After connect: route each live input to PGM (route:// from inputs host). */
+		live_audio_pgm_always_on: true,
+		live_audio_pgm_screen: 1,
+		live_audio_pgm_layer: 2,
+		/** MIXER OPACITY 0 on PGM route layers (audio without visible capture). */
+		live_audio_pgm_audio_only: true,
+		/** Headphone preview: system-audio on PRV or MVR (not a separate PortAudio monitor channel). */
+		audio_preview_enabled: false,
+		audio_preview_bus: 'preview_1',
+		audio_preview_screen: 1,
+		audio_preview_device_name: '',
+		audio_preview_solo_layer_start: 1,
+		audio_preview_solo_layer_count: 8,
+		audio_preview_default_source: 'preview_1',
 		/** CasparCG global `<ndi><auto-load>` in generated casparcg.config (NDI SDK load at startup). */
 		ndi_auto_load: true,
 		configPath: '/home/casparcg/highascg/config/casparcg.config',
@@ -319,6 +360,19 @@ module.exports = {
 		previewSystemAudioEnabled: [false, false, false, false],
 		/** Per screen: OpenAL device for PRV when previewSystemAudioEnabled; empty = default. */
 		previewSystemAudioDevices: ['', '', '', ''],
+		/**
+		 * Operator headphone bus: OpenAL `<system-audio>` on preview or multiview channel.
+		 * Solo API (`POST /api/audio/solo`) routes layers on that channel.
+		 */
+		audioPreview: {
+			enabled: false,
+			bus: 'preview_1',
+			screenIndex: 1,
+			deviceName: '',
+			soloLayerStart: 1,
+			soloLayerCount: 8,
+			defaultSource: 'preview_1',
+		},
 	},
 	/**
 	 * X11 layout from System → Apply OS: when true, `xrandr --pos` order is reversed (e.g. two heads: Screen 2 left, Screen 1 right).
@@ -335,6 +389,18 @@ module.exports = {
 		debugLogDmx: false,
 		fps: 25,
 		fixtures: [],
+		/** Art-Net input for global border (UDP 6454). Universe is 0–15 within subnet; many desks label universe 1 as 0 here. */
+		artnetInputEnabled: true,
+		artnetInputPort: 6454,
+		/** 0-based main screen: globalBorders[screenIndex] supplies universe/startChannel (not activeScreenIndex). */
+		artnetInputScreenIndex: 0,
+		/** Optional overrides in highascg.config.json only — omit so UI artnetPatch wins. */
+		/** Patch DMX snapshot log interval ms (0 = off). Default once per minute. */
+		artnetInputLogIntervalMs: 60_000,
+		/** Min ms between WS globalBorders sync during DMX (Caspar still updates faster). */
+		artnetInputWsIntervalMs: 500,
+		/** Periodic Art-Net receive stats log (0 = off). Shows UDP vs handled vs dropped. */
+		artnetInputStatsIntervalMs: 10_000,
 	},
 	/**
 	 * RTMP (FFmpeg) outputs — merged into flat Caspar generator config; each destination targets one channel (PGM/PRV/multiview).

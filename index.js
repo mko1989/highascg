@@ -104,8 +104,13 @@ function main() {
 				}
 			},
 		}
-		writeSystemInventoryFile(appCtx.log, config); const invSec = Math.max(0, parseInt(process.env.HIGHASCG_SYSTEM_INVENTORY_REFRESH_SEC || '0', 10) || 0)
-		if (invSec > 0) appCtx._startupInventoryInterval = setInterval(() => writeSystemInventoryFile(appCtx.log, config), invSec * 1000)
+		writeSystemInventoryFile(appCtx.log, config, { configManager }); const invSec = Math.max(0, parseInt(process.env.HIGHASCG_SYSTEM_INVENTORY_REFRESH_SEC || '0', 10) || 0)
+		if (invSec > 0) {
+			appCtx._startupInventoryInterval = setInterval(
+				() => writeSystemInventoryFile(appCtx.log, config, { configManager }),
+				invSec * 1000,
+			)
+		}
 
 		/** WO-38: finish before Caspar AMCP connects so scanner/media paths hit the mounted FS (not racing ahead). */
 		const mediaMountStartupPromise = (async () => {
@@ -136,7 +141,7 @@ function main() {
 		
 		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
-			appCtx.artnetReceiver.init({ universe: config.dmx?.artnetInputUniverse || 0 })
+			appCtx.artnetReceiver.init()
 		}
 		Modules.loadOptionalModules(config, appCtx.log)
 
@@ -167,6 +172,7 @@ function main() {
 			logger.info('[Config] Reloading subsystems...')
 			if (appCtx.restartOscSubsystem) appCtx.restartOscSubsystem(); handleConfigReload()
 			if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] update failed: ' + (e.message || e)))
+			if (appCtx.artnetReceiver) appCtx.artnetReceiver.reconfigure()
 			if (casparConn) {
 				if (config.offline_mode) {
 					casparConn.stop()

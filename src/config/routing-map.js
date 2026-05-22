@@ -160,8 +160,13 @@ function getChannelMap(config, activeBuses = null) {
 		: resolvePreviewEnabledByMain(config, screenCount) || Array.from({ length: screenCount }, () => true)
 
 	const decklinkCount = Math.min(8, Math.max(0, parseInt(String(config?.decklink_input_count ?? cs.decklink_input_count ?? 0), 10) || 0))
-	const inputsHostChannelEnabled = readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === true || readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === 'true'
-	const inputsEnabled = decklinkCount > 0 || inputsHostChannelEnabled
+	const liveAudioCount = Math.min(8, Math.max(0, parseInt(String(config?.live_audio_input_count ?? cs.live_audio_input_count ?? 0), 10) || 0))
+	const inputsHostChannelEnabled =
+		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === true ||
+		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === 'true' ||
+		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === true ||
+		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === 'true'
+	const inputsEnabled = decklinkCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled
 	const extraAudioCount = Math.min(4, Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0))
 
 	const programChannels = []; const previewChannels = []
@@ -320,8 +325,11 @@ function getChannelMap(config, activeBuses = null) {
 		streamingDedicatedChannelSlot: streamingCh != null && streamingDedicatedChannelSlot,
 		streamingAttachToChannel,
 		streamingContentLayer: Math.max(1, parseInt(String(sc.contentLayer ?? 10), 10) || 10),
-		inputsHostChannelEnabled, useVirtual, virtualMainChannels,
-		multiviewChannels
+		inputsHostChannelEnabled,
+		liveAudioCount,
+		useVirtual,
+		virtualMainChannels,
+		multiviewChannels,
 	}
 
 	return result

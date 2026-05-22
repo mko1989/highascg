@@ -29,6 +29,7 @@ const { resolveGlobalBorderPhysicalLayer, buildMergeMixerExtrasForTake } = requi
 const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
+const { collectOrphanLookLogicalLayers } = require('./scene-exit-layers')
 
 /**
  * @param {object} amcp
@@ -138,6 +139,15 @@ async function runSceneTakeLbg(amcp, opts) {
 		exitCandidates.push(...extraExitCandidates)
 	}
 
+	// Caspar may still have look layers when live JSON already matches incoming (diff.exit empty).
+	for (const ln of collectOrphanLookLogicalLayers(self, channel, incoming)) {
+		const row =
+			currentMap.get(ln) ||
+			(opts.currentScene?.layers || []).find((l) => Number(l.layerNumber) === ln) ||
+			{ layerNumber: ln }
+		exitCandidates.push(row)
+	}
+
 	const seenExitLayerNums = new Set()
 	const exitMedia = exitCandidates.filter((l) => {
 		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline') return false
@@ -190,8 +200,12 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	// Global border (layer 998) lifecycle is computed before takeJobs so the teardown
 	// block can also act when only the border changes (no media swap). See WO-09.
+	const { mergeScreenSlicesIntoBorder } = require('./global-border')
 	const currentGb = opts.currentScene?.globalBorder
-	const incomingGb = incoming.globalBorder
+	const incomingGb = mergeScreenSlicesIntoBorder(
+		incoming.globalBorder,
+		Number.isFinite(opts.mainScreenIndex) ? opts.mainScreenIndex : -1,
+	)
 	const currentGbEnabled = !!(currentGb && currentGb.enabled)
 	const incomingGbEnabled = !!(incomingGb && incomingGb.enabled)
 	const sameGbTemplateType =
@@ -225,6 +239,7 @@ async function runSceneTakeLbg(amcp, opts) {
 	await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
 		self,
 		channel,
+		incoming,
 		incomingGb,
 		incomingGbEnabled,
 		sameGbTemplateType,
@@ -240,6 +255,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		fadeTw,
 		phys,
 		activeBank,
+		inactiveBank,
 		exitMedia,
 		gbWillFadeOut,
 		currentGbLayer,

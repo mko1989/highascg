@@ -13,6 +13,7 @@ function buildChannelPlan(config, routeMap) {
 	// Must match {@link ../routing-map#getChannelMap}: nested casparServer.decklink_input_count counts too,
 	// or routing burns inputsCh/nextCh while this plan assumed 0 → rogue empty `<channel>` placeholders.
 	const decklinkCount = typeof routeMap.decklinkCount === 'number' ? routeMap.decklinkCount : 0
+	const liveAudioCount = typeof routeMap.liveAudioCount === 'number' ? routeMap.liveAudioCount : 0
 	const extraAudioCount = Array.isArray(routeMap.audioOnlyChannels) ? routeMap.audioOnlyChannels.length : 0
 
 	const screens = []
@@ -43,6 +44,7 @@ function buildChannelPlan(config, routeMap) {
 		multiviewEnabled,
 		multiviews,
 		decklinkCount,
+		liveAudioCount,
 		inputsHostChannelEnabled: routeMap.inputsHostChannelEnabled === true,
 		streamingChannelEnabled: routeMap.streamingCh != null,
 		/** Extra `<channel>` in caspar config only when not attaching RTMP/record to an existing channel */

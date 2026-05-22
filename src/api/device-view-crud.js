@@ -5,6 +5,12 @@
 
 const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
+const {
+	parseDecklinkDeviceIndex,
+	normalizeDecklinkKeyer,
+	readDecklinkKeyFillFromConnectorCaspar,
+	writeDecklinkKeyFillToCasparServer,
+} = require('../config/decklink-key-fill')
 
 function saveConfig(ctx, patch) {
 	if (!ctx.configManager) {
@@ -187,13 +193,39 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 				}
 				if (ioDirection === 'out' && outBind && typeof outBind === 'object') {
 					c1.caspar = { ...(c1.caspar || {}), outputBinding: outBind }
+					const keyFill = readDecklinkKeyFillFromConnectorCaspar({ ...(c1.caspar || {}), ...(patch.caspar || {}) })
+					if (patch?.caspar?.decklinkKeyFill === false || patch?.caspar?.decklinkKeyFill === 'false') {
+						c1.caspar.decklinkKeyFill = false
+						c1.caspar.decklinkKeyDevice = 0
+					} else if (patch?.caspar?.decklinkKeyDevice != null) {
+						const keyDev = parseDecklinkDeviceIndex(patch.caspar.decklinkKeyDevice)
+						c1.caspar.decklinkKeyDevice = keyDev
+						c1.caspar.decklinkKeyFill = keyDev > 0
+						if (patch?.caspar?.decklinkKeyer != null) {
+							c1.caspar.decklinkKeyer = normalizeDecklinkKeyer(patch.caspar.decklinkKeyer)
+						}
+					} else if (keyFill.enabled) {
+						c1.caspar.decklinkKeyDevice = keyFill.keyDevice
+						c1.caspar.decklinkKeyFill = true
+						c1.caspar.decklinkKeyer = keyFill.keyer
+					}
 					const t = String(outBind.type || '').toLowerCase()
 					if (t === 'multiview') {
 						cs.multiview_decklink_device = devNum
+						writeDecklinkKeyFillToCasparServer(cs, 'multiview_', {
+							fillDevice: devNum,
+							keyDevice: parseDecklinkDeviceIndex(c1.caspar.decklinkKeyDevice),
+							keyer: c1.caspar.decklinkKeyer,
+						})
 					} else if (t === 'screen') {
 						const screen = Math.min(8, Math.max(1, parseInt(String(outBind.index ?? 1), 10) || 1))
 						cs[`screen_${screen}_decklink_device`] = devNum
 						cs[`screen_${screen}_decklink_replace_screen`] = true
+						writeDecklinkKeyFillToCasparServer(cs, `screen_${screen}_`, {
+							fillDevice: devNum,
+							keyDevice: parseDecklinkDeviceIndex(c1.caspar.decklinkKeyDevice),
+							keyer: c1.caspar.decklinkKeyer,
+						})
 					}
 				}
 				ctx.config.casparServer = cs

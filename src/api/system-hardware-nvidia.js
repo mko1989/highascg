@@ -37,7 +37,7 @@ function scanPoolBranches(poolPath) {
 	try {
 		if (!fs.existsSync(poolPath)) return out
 		const files = fs.readdirSync(poolPath)
-		const re = /^nvidia-driver-(\d+)_.+\.deb$/i
+		const re = /^nvidia-driver-(\d+)(?:-open)?_.+\.deb$/i
 		for (const f of files) {
 			const m = f.match(re)
 			if (!m) continue

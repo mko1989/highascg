@@ -38,6 +38,7 @@
 		"smoke:wo47-manifest": "node tools/smoke/smoke-wo47-manifest.mjs",
 		"smoke:api-origin": "node tools/smoke/smoke-api-origin.mjs",
 		"test:highascg": "node --test tools/smoke/highascg-health-api-amcp.test.js",
+		"test:audio-live": "node audio_testing/run.js",
 		"test:highascg:live": "node --test tools/smoke/highascg-live-amcp.test.js",
 		"test:highascg:live:http": "node --test tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:live:all": "node --test tools/smoke/highascg-live-amcp.test.js tools/smoke/highascg-live-highascg-http.test.js",

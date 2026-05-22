@@ -39,6 +39,21 @@ function sameSceneId(a, b) {
 	return !!aid && !!bid && aid === bid
 }
 
+/** Resolve Caspar preview (PRV) channel for a program take request. */
+function resolvePreviewChannel(routeMap, mainIdx, requestChannel) {
+	if (mainIdx >= 0) {
+		return routeMap.switcherBus1Channels?.[mainIdx] ?? routeMap.previewChannels?.[mainIdx] ?? null
+	}
+	const ch = parseInt(requestChannel, 10)
+	const previews = (routeMap.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
+	return previews.includes(ch) ? ch : null
+}
+
+function isPreviewTakeTarget(body) {
+	const t = String(body?.target || body?.bus || '').toLowerCase()
+	return t === 'preview' || t === 'prv' || t === 'bus1'
+}
+
 /**
  * @param {string} body
  * @param {object} ctx — app context (`self` in companion)
@@ -86,6 +101,7 @@ async function handleSceneTake(body, ctx) {
 		incomingScene: inc,
 		framerate: b.framerate,
 		forceCut: !!b.forceCut,
+		mainScreenIndex: -1,
 	}
 	const runTake = async () => {
 		// Resolve currentScene at execution time (inside queue) to avoid stale-state races
@@ -102,8 +118,32 @@ async function handleSceneTake(body, ctx) {
 				}
 			}
 		}
-		const bus1 = mainIdx >= 0 ? (routeMap.switcherBus1Channels?.[mainIdx] ?? routeMap.previewChannels?.[mainIdx] ?? null) : null
+		const bus1 = resolvePreviewChannel(routeMap, mainIdx, channel)
 		const bus2 = null
+		const previewOnly = isPreviewTakeTarget(b)
+
+		if (previewOnly && bus1 != null) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('info', `[scene-take] preview-only path prv=${bus1}`)
+			}
+			const prvCurrent = liveSceneState.getChannel(bus1)?.scene || null
+			await runSceneTakeLbg(ctx.amcp, {
+				...takeOpts,
+				channel: bus1,
+				currentScene: prvCurrent,
+				incomingScene: inc,
+				forceCut: !!b.forceCut,
+				self: ctx,
+				skipLayerVisualEquality: true,
+			})
+			if (inc && typeof inc === 'object' && inc.id) {
+				liveSceneState.setChannel(bus1, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
+			}
+			liveSceneState.broadcastSceneLive(ctx)
+			return
+		}
+
+		takeOpts.mainScreenIndex = mainIdx
 		if (typeof ctx.log === 'function') {
 			const sceneName = String(inc?.name || '').trim()
 			ctx.log(
@@ -118,15 +158,32 @@ async function handleSceneTake(body, ctx) {
 				`[scene-take] channel ${channel} not in routing programChannels — using direct-program path (no pgm/prv exchange)`,
 			)
 		}
-		// 2-channel PGM/PRV workflow: build incoming on PRV, then transition PGM route to PRV.
+		// 2-channel PGM/PRV: stage incoming on PRV (bus1), then take the same look on PGM; swap previous PGM onto PRV.
 		if (bus1 != null && bus2 == null) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('info', `[scene-take] pgm/prv path ch=${channel} prv=${bus1}`)
 			}
-			// Removed: We allow re-taking the same look so users can re-trigger animations or videos.
-			// Native layer transitions are superior because they don't require detaching a route,
-			// preventing playback time jumps and double-decoding on the PGM channel.
 			const previousPgmScene = currentScene
+			const stageOnPreview = b.stageOnPreview !== false
+			if (stageOnPreview) {
+				const prvCurrent = liveSceneState.getChannel(bus1)?.scene || null
+				// PRV is a staging bus only: hard-cut so PGM can run the real transition without waiting twice.
+				await runSceneTakeLbg(ctx.amcp, {
+					...takeOpts,
+					channel: bus1,
+					currentScene: prvCurrent,
+					incomingScene: inc,
+					forceCut: true,
+					self: ctx,
+					skipLayerVisualEquality: true,
+				})
+				if (inc && typeof inc === 'object' && inc.id) {
+					liveSceneState.setChannel(bus1, {
+						sceneId: String(inc.id),
+						scene: stripEphemeralTakeFields(inc),
+					})
+				}
+			}
 			let previewExchangePromise = null
 			let previewExchangeStarted = false
 			const startPreviewExchange = () => {
@@ -169,6 +226,7 @@ async function handleSceneTake(body, ctx) {
 				incomingScene: inc,
 				forceCut: !!b.forceCut,
 				self: ctx,
+				skipLayerVisualEquality: true,
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
 				liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
@@ -301,31 +359,43 @@ async function handleBorderLines(body, ctx) {
 
 	const {
 		buildGlobalBorderAmcpLines,
-		buildGlobalBorderUpdateLines,
 		buildGlobalBorderClearLines,
 		buildGlobalBorderOpacityFadeLine,
+		borderPayloadToOverlay,
 	} = require('../engine/global-border')
+	const {
+		writeGlobalBorderLiveFile,
+		markCasparBorderType,
+		casparBorderTypeChanged,
+		clearCasparBorderType,
+	} = require('../engine/global-border-live')
 
 	const fadeDuration = Math.max(0, parseInt(rawBorder?.fadeDuration ?? 0, 10) || 0)
 	const border = _normalizeGlobalBorder(rawBorder)
 
+	const overlay = border ? borderPayloadToOverlay(border) : null
 	let lines = []
-	if (border && border.enabled) {
-		// A pending fade-out clear would wipe the new CG mid-render.
+	if (overlay && border.enabled) {
+		writeGlobalBorderLiveFile(channel, overlay)
 		_cancelPendingBorderClear(channel, layer)
-		if (isUpdate) {
-			lines = buildGlobalBorderUpdateLines(channel, layer, border)
-		} else if (fadeDuration > 0) {
-			lines = buildGlobalBorderAmcpLines(channel, layer, border, ctx, { initialOpacity: 0 })
+		const typeChanged = casparBorderTypeChanged(channel, overlay.type)
+		// Param/slice changes: live JSON only (template polls). CG ADD only when type changes.
+		if (isUpdate && !typeChanged) {
+			lines = []
+		} else if (fadeDuration > 0 && !isUpdate) {
+			lines = buildGlobalBorderAmcpLines(channel, layer, overlay, ctx, { initialOpacity: 0 })
 			lines.push(buildGlobalBorderOpacityFadeLine(channel, layer, 1, fadeDuration))
+			markCasparBorderType(channel, overlay.type)
 		} else {
-			lines = buildGlobalBorderAmcpLines(channel, layer, border, ctx, { initialOpacity: 1 })
+			lines = buildGlobalBorderAmcpLines(channel, layer, overlay, ctx, {
+				initialOpacity: isUpdate && typeChanged ? 1 : 1,
+			})
+			markCasparBorderType(channel, overlay.type)
 		}
 	} else {
+		clearCasparBorderType(channel)
 		if (fadeDuration > 0) {
 			lines = [buildGlobalBorderOpacityFadeLine(channel, layer, 0, fadeDuration)]
-			// MIXER OPACITY 0 leaves the CG resident — schedule a CLEAR after the fade so
-			// a subsequent enable can ADD cleanly and we don't keep a dead template loaded.
 			_scheduleBorderClearAfterFade(ctx, channel, layer, fadeDuration)
 		} else {
 			lines = buildGlobalBorderClearLines(channel, layer)

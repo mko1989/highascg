@@ -36,6 +36,13 @@ media/
 _media/
 data/
 
+# Live border state polled by pip_* templates (written by Art-Net / inspector)
+template/global-border-live-*.json
+template/global-border-live-*.json.tmp
+
+# Client integration notes (generated locally for UI work)
+for_client/
+
 refs/
 # User/system local artifacts
 core
@@ -52,3 +59,6 @@ tools/eggs/live-usb/flash-iso.conf
 config/*.json
 !config/*.example.json
 !config/default*.json
+
+audio_testing/
+From_client/

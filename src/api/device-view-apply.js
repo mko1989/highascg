@@ -7,6 +7,7 @@ const { applyCasparConfigToDiskAndRestart } = require('./routes-caspar-config')
 const { normalizeDeviceGraph } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { getChannelMap } = require('../config/routing')
+const { readDecklinkKeyFillFromConnectorCaspar, writeDecklinkKeyFillToCasparServer } = require('../config/decklink-key-fill')
 
 function readEdgeOutputLayer(edge) {
 	const raw = edge?.note
@@ -107,18 +108,32 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 				target: targetKey,
 			})
 		}
+		const keyFill = readDecklinkKeyFillFromConnectorCaspar(winner.sink?.caspar)
 		if (targetKey === 'multiview') {
 			nextCaspar.multiview_decklink_device = winner.deviceNum
+			writeDecklinkKeyFillToCasparServer(nextCaspar, 'multiview_', {
+				fillDevice: winner.deviceNum,
+				keyDevice: keyFill.enabled ? keyFill.keyDevice : 0,
+				keyer: keyFill.keyer,
+			})
 		} else {
 			const n = parseInt(String(targetKey.replace(/^screen_/, '')), 10) || 1
-			nextCaspar[`screen_${n}_decklink_device`] = winner.deviceNum
-			nextCaspar[`screen_${n}_decklink_replace_screen`] = true
+			const prefix = `screen_${n}_`
+			nextCaspar[`${prefix}decklink_device`] = winner.deviceNum
+			nextCaspar[`${prefix}decklink_replace_screen`] = true
+			writeDecklinkKeyFillToCasparServer(nextCaspar, prefix, {
+				fillDevice: winner.deviceNum,
+				keyDevice: keyFill.enabled ? keyFill.keyDevice : 0,
+				keyer: keyFill.keyer,
+			})
 		}
 		plan.actions.push({
 			kind: 'caspar_output_mapping',
 			destinationId: winner.destinationId,
 			target: targetKey,
 			decklinkDevice: winner.deviceNum,
+			decklinkKeyDevice: keyFill.enabled ? keyFill.keyDevice : 0,
+			decklinkKeyer: keyFill.enabled ? keyFill.keyer : null,
 			layer: winner.layer,
 			edgeId: String(winner.edge?.id || ''),
 		})

@@ -122,7 +122,13 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		const s = parseInt(o.screen, 10)
 		const d = parseInt(o.device, 10)
 		if (isNaN(s) || isNaN(d)) continue
-		addDecklinkPort(s, d, 'decklink_io', `SDI ${s}`, { caspar: { ioDirection: 'out', bus: 'pgm', mainIndex: s - 1 } })
+		const caspar = { ioDirection: 'out', bus: 'pgm', mainIndex: s - 1 }
+		if (o?.keyFill?.enabled && parseInt(String(o.keyFill.keyDevice), 10) > 0) {
+			caspar.decklinkKeyFill = true
+			caspar.decklinkKeyDevice = parseInt(String(o.keyFill.keyDevice), 10)
+			caspar.decklinkKeyer = String(o.keyFill.keyer || 'internal')
+		}
+		addDecklinkPort(s, d, 'decklink_io', `SDI ${s}`, { caspar })
 	}
 
 	const mvd = parseInt(live?.decklink?.multiviewDevice, 10)

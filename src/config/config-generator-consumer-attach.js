@@ -18,6 +18,12 @@ const {
 	buildMonitorChannelXml,
 } = require('./config-generator-builders')
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
+const {
+	buildDecklinkKeyFillConsumersXml,
+	readDecklinkKeyFillSettings,
+	parseDecklinkDeviceIndex,
+	normalizeDecklinkKeyer,
+} = require('./decklink-key-fill')
 
 /**
  * One DeckLink consumer spanning a wide channel: primary device + optional synced `<ports>` (Caspar reference layout).
@@ -106,9 +112,12 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	if (tiles.length > 0) {
 		profConsumersXml += buildDecklinkTiledConsumersXml(tiles)
 	} else if (decklinkDevice > 0) {
-		profConsumersXml += `\n                <decklink>
-                    <device>${decklinkDevice}</device>
-                </decklink>`
+		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
+		profConsumersXml += buildDecklinkKeyFillConsumersXml({
+			fillDevice: decklinkDevice,
+			keyDevice: keyFill.keyDevice,
+			keyer: keyFill.keyer,
+		})
 	}
 	const ndiEnabled = config[`screen_${n}_ndi_enabled`] === true || config[`screen_${n}_ndi_enabled`] === 'true'
 	if (ndiEnabled) {
@@ -246,7 +255,15 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	if (!includeScreen && !includeStream && !includeDeck) includeScreen = true
 
 	const screenBlock = includeScreen ? `\n                <screen>\n                    ${screenXml}\n                </screen>` : ''
-	const deckBlock = includeDeck && mvDlDev > 0 ? `\n                <decklink>\n                    <device>${mvDlDev}</device>\n                </decklink>` : ''
+	const mvKeyFill = readDecklinkKeyFillSettings(config, 'multiview_')
+	const deckBlock =
+		includeDeck && mvDlDev > 0
+			? buildDecklinkKeyFillConsumersXml({
+					fillDevice: mvDlDev,
+					keyDevice: mvKeyFill.keyDevice,
+					keyer: mvKeyFill.keyer,
+				})
+			: ''
 	const streamBlock = includeStream ? mvStreamingXml : ''
 	
 	const mvChs = Array.isArray(routeMap.multiviewChannels) ? routeMap.multiviewChannels : [routeMap.multiviewCh]
@@ -272,17 +289,20 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 /**
  * @param {Record<string, unknown>} config
  * @param {number} decklinkCount
+ * @param {number} liveAudioCount
  * @param {boolean} inputsHostChannelEnabled
  * @param {boolean} inputsOnMvr
  * @param {number|null|undefined} casparChannelNum - channel index for comment
  */
-function buildInputsHostChannel(config, decklinkCount, inputsHostChannelEnabled, inputsOnMvr, casparChannelNum) {
+function buildInputsHostChannel(config, decklinkCount, liveAudioCount, inputsHostChannelEnabled, inputsOnMvr, casparChannelNum) {
 	if (inputsOnMvr) return ''
-	const hostCh = decklinkCount > 0 || inputsHostChannelEnabled === true
+	const hostCh = decklinkCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled === true
 	if (!hostCh) return ''
-	const modeId = effectiveStandardVideoModeId(config.inputs_channel_mode)
+	const modeId = effectiveStandardVideoModeId(
+		config.live_audio_inputs_channel_mode || config.inputs_channel_mode
+	)
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
-	return `${channelXmlComment(`Caspar channel ${ch}: DeckLink INPUT host (PLAY … DECKLINK capture). Empty consumers is normal; not a PGM DeckLink output.`)}        <channel>
+	return `${channelXmlComment(`Caspar channel ${ch}: Live INPUT host (DeckLink PLAY … DECKLINK; ALSA PLAY … alsa:// on layers 10+). Empty consumers is normal.`)}        <channel>
             <video-mode>${modeId}</video-mode>
             <consumers/>
             <mixer>
@@ -326,10 +346,11 @@ function buildStreamingChannel(config, casparChannelNum) {
 	const mvStd = !!STANDARD_VIDEO_MODES[rawMode]
 	let profXml = ''
 	if (deckN > 0 && mvStd) {
-		profXml = `
-                <decklink>
-                    <device>${deckN}</device>
-                </decklink>`
+		profXml = buildDecklinkKeyFillConsumersXml({
+			fillDevice: deckN,
+			keyDevice: parseDecklinkDeviceIndex(sc.decklinkKeyDevice),
+			keyer: normalizeDecklinkKeyer(sc.decklinkKeyer),
+		})
 	}
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	return `${channelXmlComment(`Caspar channel ${ch}: Dedicated streaming / encode bus (HighAsCG attaches FFmpeg/SRT here)`)}        <channel>

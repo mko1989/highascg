@@ -18,6 +18,7 @@ const {
 const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
+const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
 
 /**
  * @param {object} amcp
@@ -43,13 +44,22 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		fadeTw,
 		phys,
 		activeBank,
+		inactiveBank,
 		exitMedia,
 		gbWillFadeOut,
 		currentGbLayer,
 		framerate,
 		fadeWatcher,
 		notifyProgramTransitionStarted,
+		incoming,
 	} = ctx
+
+	// Stale layers on the off-air bank are cleared immediately so they cannot resurface on the next swap.
+	if (!isMergeTransition && incoming) {
+		try {
+			await clearStaleInactiveBankLookLayers(amcp, channel, inactiveBank, incoming, self)
+		} catch (_) {}
+	}
 
 	// Global border (layer 998) lifecycle — must ride the same channel COMMIT/crossfade
 	// as the bank swap so it doesn't pop on/off when looks transition. See WO-09.
@@ -85,13 +95,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			}
 		}
 
-		const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
-		if (flatMixer.length > 0) {
-			await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
-		}
 		const prePlayOpacityLines = takeJobs.map((j) => j.prePlayOpacityZeroLine).filter(Boolean)
 		if (prePlayOpacityLines.length > 0) {
 			await amcp.batchSendChunked(prePlayOpacityLines, { skipMixerPreCommit: true })
+		}
+		const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
+		if (flatMixer.length > 0) {
+			await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
 		}
 
 		let pipRemoveLines = []

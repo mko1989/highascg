@@ -5,6 +5,7 @@ const os = require('os')
 const { getDisplayDetails, getGpuConnectorInventory, getDisplaysXrandrDetailed } = require('../utils/hardware-info')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
+const { ensureGpuPhysicalTopologyFromXrandr } = require('../utils/gpu-topology-xrandr')
 
 const DEFAULT_PATH = '/tmp/highascg-system-inventory.json'
 
@@ -163,11 +164,19 @@ function summarizeGpuPhysicalMap(payload) {
  * Write startup hardware inventory snapshot for device-view.
  * @param {(level:'info'|'warn'|'error'|'debug', msg: string) => void} [log]
  * @param {object} [config]
+ * @param {{ configManager?: { get: () => object, save: (c: object) => boolean } }} [opts]
  * @returns {{ path: string, payload: object } | null}
  */
-function writeSystemInventoryFile(log, config) {
+function writeSystemInventoryFile(log, config, opts) {
 	const p = resolveOutputPath()
 	try {
+		if (config && typeof config === 'object') {
+			ensureGpuPhysicalTopologyFromXrandr({
+				config,
+				configManager: opts?.configManager || null,
+				log,
+			})
+		}
 		const payload = buildPayload(config)
 		const body = JSON.stringify(payload, null, 2) + '\n'
 		fs.writeFileSync(p, body, 'utf8')

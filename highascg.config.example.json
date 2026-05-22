@@ -13,6 +13,14 @@
     "decklink_input_count": 0,
     "decklink_input_1_device": 0,
     "decklink_input_2_device": 0,
+    "live_audio_input_count": 0,
+    "live_audio_input_1_device": "",
+    "live_audio_pgm_always_on": true,
+    "live_audio_pgm_screen": 1,
+    "live_audio_pgm_layer": 2,
+    "live_audio_pgm_audio_only": true,
+    "audio_preview_enabled": false,
+    "audio_preview_bus": "preview_1",
     "configPath": "/home/casparcg/highascg/config/casparcg.config",
     "default_alsa_card": "",
     "default_alsa_device": ""
@@ -45,7 +53,16 @@
     "monitorAlsaDevice": "",
     "monitorFfmpegPath": "",
     "monitorFfmpegArgs": "",
-    "browserMonitor": "pgm"
+    "browserMonitor": "pgm",
+    "audioPreview": {
+      "enabled": false,
+      "bus": "preview_1",
+      "screenIndex": 1,
+      "deviceName": "",
+      "soloLayerStart": 1,
+      "soloLayerCount": 8,
+      "defaultSource": "preview_1"
+    }
   },
   "streaming": {
     "enabled": true,
@@ -67,6 +84,10 @@
     "enabled": false,
     "debugLogDmx": false,
     "fps": 25,
+    "artnetInputEnabled": true,
+    "artnetInputPort": 6454,
+    "artnetInputScreenIndex": 0,
+    "artnetInputLogIntervalMs": 60000,
     "fixtures": [
       {
         "id": "bar1",

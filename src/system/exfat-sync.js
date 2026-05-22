@@ -354,12 +354,10 @@ async function runExfatSync(opts) {
 			prSt = null
 		}
 
-		/** Single-file pair (both paths are files) */
+		/** Single-file pair (one or both sides may be missing on disk) */
 		if (exSt?.isFile() || prSt?.isFile()) {
 			const rel = path.basename(exfatRel) || id
-			const a = exSt?.isFile() ? exfatAbs : null
-			const b = prSt?.isFile() ? projectAbs : null
-			const r = syncOneFilePair(a, b, direction, dryRun, id, rel)
+			const r = syncOneFilePair(exfatAbs, projectAbs, direction, dryRun, id, rel)
 			copied += r.copied
 			skipped += r.skipped
 			if (r.error) errors.push(r.error)
@@ -392,14 +390,7 @@ async function runExfatSync(opts) {
 				stB = fs.statSync(b)
 			} catch {}
 			if (stA?.isDirectory() || stB?.isDirectory()) continue
-			const r = syncOneFilePair(
-				stA?.isFile() ? a : null,
-				stB?.isFile() ? b : null,
-				direction,
-				dryRun,
-				id,
-				rel,
-			)
+			const r = syncOneFilePair(a, b, direction, dryRun, id, rel)
 			copied += r.copied
 			skipped += r.skipped
 			if (r.error) errors.push(r.error)
@@ -411,53 +402,64 @@ async function runExfatSync(opts) {
 }
 
 /**
- * @param {string | null} pathA - exfat side file
- * @param {string | null} pathB - project side file
+ * @param {string} pathExfat - exfat side path (file may not exist yet)
+ * @param {string} pathProject - project side path (file may not exist yet)
  */
-function syncOneFilePair(pathA, pathB, direction, dryRun, pairId, rel) {
+function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel) {
 	let copied = 0
 	let skipped = 0
+	/** @type {fs.Stats | null} */
+	let stA = null
+	/** @type {fs.Stats | null} */
+	let stB = null
 	try {
-		if (pathA && !pathB) {
+		stA = fs.statSync(pathExfat)
+	} catch {}
+	try {
+		stB = fs.statSync(pathProject)
+	} catch {}
+	const hasA = stA?.isFile() === true
+	const hasB = stB?.isFile() === true
+	if (!hasA && !hasB) return { copied: 0, skipped: 1 }
+	try {
+		if (hasA && !hasB) {
 			if (direction === 'to_exfat') return { copied: 0, skipped: 1 }
 			if (dryRun) return { copied: 1, skipped: 0 }
-			copyFilePreserveTimes(pathA, pathB)
+			copyFilePreserveTimes(pathExfat, pathProject)
 			return { copied: 1, skipped: 0 }
 		}
-		if (!pathA && pathB) {
+		if (!hasA && hasB) {
 			if (direction === 'to_project') return { copied: 0, skipped: 1 }
 			if (dryRun) return { copied: 1, skipped: 0 }
-			copyFilePreserveTimes(pathB, pathA)
+			copyFilePreserveTimes(pathProject, pathExfat)
 			return { copied: 1, skipped: 0 }
 		}
-		if (pathA && pathB) {
-			const stA = fs.statSync(pathA)
-			const stB = fs.statSync(pathB)
-			const mtA = stA.mtimeMs
-			const mtB = stB.mtimeMs
+		if (hasA && hasB) {
+			const mtA = /** @type {fs.Stats} */ (stA).mtimeMs
+			const mtB = /** @type {fs.Stats} */ (stB).mtimeMs
 			if (mtA > mtB) {
 				if (direction === 'to_project') return { copied: 0, skipped: 1 }
 				if (dryRun) return { copied: 1, skipped: 0 }
-				copyFilePreserveTimes(pathA, pathB)
+				copyFilePreserveTimes(pathExfat, pathProject)
 				return { copied: 1, skipped: 0 }
 			}
 			if (mtB > mtA) {
 				if (direction === 'to_exfat') return { copied: 0, skipped: 1 }
 				if (dryRun) return { copied: 1, skipped: 0 }
-				copyFilePreserveTimes(pathB, pathA)
+				copyFilePreserveTimes(pathProject, pathExfat)
 				return { copied: 1, skipped: 0 }
 			}
-			if (stA.size !== stB.size) {
-				if (stA.size > stB.size) {
+			if (/** @type {fs.Stats} */ (stA).size !== /** @type {fs.Stats} */ (stB).size) {
+				if (/** @type {fs.Stats} */ (stA).size > /** @type {fs.Stats} */ (stB).size) {
 					if (direction === 'to_project') return { copied: 0, skipped: 1 }
 					if (dryRun) return { copied: 1, skipped: 0 }
-					copyFilePreserveTimes(pathA, pathB)
+					copyFilePreserveTimes(pathExfat, pathProject)
 					return { copied: 1, skipped: 0 }
 				}
-				if (stB.size > stA.size) {
+				if (/** @type {fs.Stats} */ (stB).size > /** @type {fs.Stats} */ (stA).size) {
 					if (direction === 'to_exfat') return { copied: 0, skipped: 1 }
 					if (dryRun) return { copied: 1, skipped: 0 }
-					copyFilePreserveTimes(pathB, pathA)
+					copyFilePreserveTimes(pathProject, pathExfat)
 					return { copied: 1, skipped: 0 }
 				}
 			}

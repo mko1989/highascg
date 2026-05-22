@@ -77,6 +77,109 @@ function collectOccupiedLookLayersOnChannel(self, ch) {
 	return [...set].sort((a, b) => a - b)
 }
 
+function logicalLayerFromPhysicalLookLayer(phys) {
+	const n = parseInt(phys, 10)
+	if (!Number.isFinite(n) || !isLookPhysicalLayer(n)) return null
+	return n >= 110 ? n - PGM_BANK_B_OFFSET : n
+}
+
+function physicalLookLayerBank(phys) {
+	const n = parseInt(phys, 10)
+	if (!Number.isFinite(n)) return null
+	if (n >= 1 && n <= 99) return 'a'
+	if (n >= 110 && n <= 199) return 'b'
+	return null
+}
+
+/**
+ * Logical look layers still on Caspar (matrix/OSC/live) but absent from the incoming look.
+ * Covers stale PGM when live JSON already matches the new look before take runs.
+ * @param {{ _playbackMatrix?: object, config?: object, programLayerBankByChannel?: object }} self
+ * @param {number} ch
+ * @param {object} incomingScene
+ * @returns {number[]}
+ */
+function collectOrphanLookLogicalLayers(self, ch, incomingScene) {
+	const incomingNums = new Set(
+		(incomingScene?.layers || [])
+			.filter(layerHasContent)
+			.map((l) => Number(l.layerNumber))
+			.filter(Number.isFinite),
+	)
+	const orphans = new Set()
+	for (const phys of collectOccupiedLookLayersOnChannel(self, ch)) {
+		const logical = logicalLayerFromPhysicalLookLayer(phys)
+		if (logical != null && !incomingNums.has(logical)) orphans.add(logical)
+	}
+	return [...orphans].sort((a, b) => a - b)
+}
+
+/**
+ * STOP/CLEAR specific look-stack physical layers (both banks).
+ * @param {import('../caspar/amcp-client').AmcpClient} amcp
+ * @param {number} ch
+ * @param {number[]} physicalLayers
+ * @param {object} [self]
+ */
+async function clearPhysicalLookLayers(amcp, ch, physicalLayers, self) {
+	const layers = (physicalLayers || []).filter((L) => isLookPhysicalLayer(L))
+	if (layers.length === 0) return
+	const lines = []
+	for (const L of layers) {
+		const cl = `${ch}-${L}`
+		lines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+	}
+	try {
+		await amcp.batchSend(lines)
+		if (self) {
+			for (const L of layers) {
+				try {
+					playbackTracker.recordStop(self, ch, L)
+				} catch (_) {}
+			}
+		}
+	} catch {
+		for (const L of layers) {
+			try {
+				await amcp.stop(ch, L)
+			} catch (_) {}
+			try {
+				await amcp.mixerClear(ch, L)
+			} catch (_) {}
+			if (self) {
+				try {
+					playbackTracker.recordStop(self, ch, L)
+				} catch (_) {}
+			}
+		}
+	}
+	await amcp.mixerCommit(ch)
+}
+
+/**
+ * Remove look-stack layers on the inactive bank that are not in the incoming look (not on air).
+ * @param {import('../caspar/amcp-client').AmcpClient} amcp
+ * @param {number} ch
+ * @param {'a'|'b'} inactiveBank
+ * @param {object} incomingScene
+ * @param {object} [self]
+ */
+async function clearStaleInactiveBankLookLayers(amcp, ch, inactiveBank, incomingScene, self) {
+	const incomingNums = new Set(
+		(incomingScene?.layers || [])
+			.filter(layerHasContent)
+			.map((l) => Number(l.layerNumber))
+			.filter(Number.isFinite),
+	)
+	const stale = []
+	for (const phys of collectOccupiedLookLayersOnChannel(self || {}, ch)) {
+		if (physicalLookLayerBank(phys) !== inactiveBank) continue
+		const logical = logicalLayerFromPhysicalLookLayer(phys)
+		if (logical != null && !incomingNums.has(logical)) stale.push(phys)
+	}
+	await clearPhysicalLookLayers(amcp, ch, stale, self)
+}
+
 /**
  * Physical Caspar layers used by program looks: bank A 1–99, bank B 110–199 (see scene-transition PGM_BANK_B_OFFSET).
  * Timeline output uses TIMELINE_LAYER_BASE (200+); clearing occupied look layers removes looks without touching timeline slots.
@@ -197,4 +300,9 @@ module.exports = {
 	runExitLayers,
 	clearSceneProgramLookStackLayers,
 	collectOccupiedLookLayersOnChannel,
+	collectOrphanLookLogicalLayers,
+	clearPhysicalLookLayers,
+	clearStaleInactiveBankLookLayers,
+	logicalLayerFromPhysicalLookLayer,
+	physicalLookLayerBank,
 }

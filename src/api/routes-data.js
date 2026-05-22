@@ -70,6 +70,11 @@ async function handleProject(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
 		persistence.set(PROJECT_DISK_KEY, project)
+		if (ctx.artnetReceiver?.reconfigureFromProject) {
+			ctx.artnetReceiver.reconfigureFromProject(project)
+		} else if (ctx.artnetReceiver) {
+			ctx.artnetReceiver.reconfigure()
+		}
 		if (typeof ctx._wsBroadcast === 'function') {
 			scheduleProjectSyncBroadcast(ctx, project)
 		}
@@ -93,6 +98,12 @@ async function handleProject(path, body, ctx) {
 			const { REPO_ROOT } = require('../repo-paths')
 			const autosavePath = pathObj.join(REPO_ROOT, 'autosave.json')
 			fs.writeFileSync(autosavePath, JSON.stringify(project, null, 2), 'utf8')
+			persistence.set(PROJECT_DISK_KEY, project)
+			if (ctx.artnetReceiver?.reconfigureFromProject) {
+				ctx.artnetReceiver.reconfigureFromProject(project)
+			} else if (ctx.artnetReceiver) {
+				ctx.artnetReceiver.reconfigure()
+			}
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 		} catch (e) {
 			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e.message }) }

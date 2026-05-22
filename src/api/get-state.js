@@ -4,6 +4,8 @@
 
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
 const liveSceneState = require('../state/live-scene-state')
 const playbackTracker = require('../state/playback-tracker')
 const { parseCinfMedia } = require('../media/cinf-parse')
@@ -93,6 +95,18 @@ function getState(ctx, opts = {}) {
 		lookPresets: Array.isArray(rawDeck.lookPresets) ? rawDeck.lookPresets : [],
 	}
 
+	let globalBorders = null
+	try {
+		const { REPO_ROOT } = require('../repo-paths')
+		const autosavePath = path.join(REPO_ROOT, 'autosave.json')
+		if (fs.existsSync(autosavePath)) {
+			const project = JSON.parse(fs.readFileSync(autosavePath, 'utf8'))
+			if (Array.isArray(project?.scenes?.globalBorders)) {
+				globalBorders = project.scenes.globalBorders
+			}
+		}
+	} catch (_) {}
+
 	return {
 		...base,
 		screenDestinations: normalizeScreenDestinations(cfg.screenDestinations),
@@ -100,11 +114,13 @@ function getState(ctx, opts = {}) {
 		ledTestPatternActive: ctx._ledTestPatternActive ?? false,
 		/** Last DeckLink input PLAY summary after AMCP connect (WO-28); null until first routing setup. */
 		decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
+		liveAudioInputsStatus: ctx._liveAudioInputsStatus ?? null,
 		channelMap,
 		scene: {
 			live: liveSceneState.getAll(),
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
 			deck: sceneDeck,
+			...(globalBorders ? { globalBorders } : {}),
 		},
 		timeline: {
 			list: timelines,

@@ -16,9 +16,8 @@
 			pointer-events: none;
 			overflow: hidden;
 		}
-		#pip-frame {
+		.pip-frame {
 			position: absolute;
-			--il: 0; --it: 0; --iw: 1; --ih: 1;
 			left: calc(var(--il) * 100%);
 			top: calc(var(--it) * 100%);
 			width: calc(var(--iw) * 100%);
@@ -28,29 +27,67 @@
 			pointer-events: none;
 			border: var(--w) solid var(--c);
 		}
-		
-		#pip-frame.side-inside {
+		.pip-frame.side-inside {
 			box-sizing: border-box;
 			margin: 0;
 		}
-		
-		#pip-frame.side-outside {
+		.pip-frame.side-outside {
 			box-sizing: content-box;
 			margin: calc(var(--w) * -1);
 		}
 	</style>
 </head>
 <body>
-<div id="root">
-	<div id="pip-frame"></div>
-</div>
+<div id="root"></div>
 <script>
 (function () {
-	var frame = document.getElementById('pip-frame')
-	var state = { inner: { l: 0, t: 0, w: 1, h: 1 }, width: 4, color: '#e63946', radius: 0, opacity: 1, side: 'inside' }
+	var root = document.getElementById('root')
+	var state = {
+		inner: { l: 0, t: 0, w: 1, h: 1 },
+		slices: [],
+		width: 4,
+		color: '#e63946',
+		radius: 0,
+		opacity: 1,
+		side: 'inside',
+		liveFile: null,
+	}
 
-	function apply() {
-		var inn = state.inner || { l: 0, t: 0, w: 1, h: 1 }
+	var livePollId = null
+	var lastLiveRaw = ''
+
+	function clamp01(x) {
+		var n = Number(x)
+		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+	}
+
+	function hasMargin(inn) {
+		if (!inn) return false
+		var w = inn.w != null ? inn.w : 0
+		var h = inn.h != null ? inn.h : 0
+		return w > 0 && h > 0
+	}
+
+	function normalizeSlice(s) {
+		return {
+			l: clamp01(s.x != null ? s.x : s.l),
+			t: clamp01(s.y != null ? s.y : s.t),
+			w: clamp01(s.w),
+			h: clamp01(s.h),
+		}
+	}
+
+	function activeSlices() {
+		var slices = state.slices || []
+		if (slices.length === 0) {
+			var inn = state.inner || { l: 0, t: 0, w: 1, h: 1 }
+			return hasMargin(inn) ? [inn] : []
+		}
+		return slices.map(normalizeSlice).filter(hasMargin)
+	}
+
+	function styleFrame(frame, inn) {
+		if (!frame || !inn) return
 		frame.style.setProperty('--il', String(inn.l))
 		frame.style.setProperty('--it', String(inn.t))
 		frame.style.setProperty('--iw', String(inn.w))
@@ -59,25 +96,100 @@
 		frame.style.setProperty('--c', state.color)
 		frame.style.setProperty('--r', state.radius + 'px')
 		frame.style.setProperty('--o', String(state.opacity))
+		frame.className = 'pip-frame side-' + (state.side || 'inside')
+	}
 
-		frame.className = 'side-' + (state.side || 'inside')
+	var layoutKey = ''
+
+	function sliceLayoutKey(slices) {
+		var out = []
+		for (var i = 0; i < slices.length; i++) {
+			var s = slices[i]
+			out.push([s.l, s.t, s.w, s.h].join(','))
+		}
+		return out.join('|')
+	}
+
+	function render() {
+		var slices = activeSlices()
+		var key = sliceLayoutKey(slices)
+		var frames = root.querySelectorAll('.pip-frame')
+		if (key !== layoutKey || frames.length !== slices.length) {
+			root.innerHTML = ''
+			slices.forEach(function () {
+				var frame = document.createElement('div')
+				frame.className = 'pip-frame'
+				root.appendChild(frame)
+			})
+			layoutKey = key
+			frames = root.querySelectorAll('.pip-frame')
+		}
+		for (var i = 0; i < slices.length; i++) {
+			if (frames[i]) styleFrame(frames[i], slices[i])
+		}
 	}
 
 	window['play'] = function () {}
 	window['stop'] = function () {}
 	window['next'] = function () {}
 
+	function applyFromData(d) {
+		if (!d) return
+		if (d.width != null) state.width = parseFloat(d.width) || 4
+		if (d.color != null) state.color = String(d.color)
+		if (d.radius != null) state.radius = parseFloat(d.radius) || 0
+		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
+		if (d.side != null) state.side = String(d.side)
+		if (d.inner && typeof d.inner === 'object') {
+			state.inner = {
+				l: clamp01(d.inner.l),
+				t: clamp01(d.inner.t),
+				w: clamp01(d.inner.w),
+				h: clamp01(d.inner.h),
+			}
+		}
+		if (Array.isArray(d.slices)) {
+			state.slices = d.slices.map(function (s) {
+				return {
+					x: clamp01(s.x),
+					y: clamp01(s.y),
+					w: clamp01(s.w),
+					h: clamp01(s.h),
+				}
+			})
+		}
+		render()
+	}
+
+	function pollLiveFile() {
+		if (!state.liveFile) return
+		var xhr = new XMLHttpRequest()
+		xhr.open('GET', state.liveFile + '?_=' + Date.now(), true)
+		xhr.onload = function () {
+			if (xhr.status !== 200 && xhr.status !== 0) return
+			if (xhr.responseText === lastLiveRaw) return
+			lastLiveRaw = xhr.responseText
+			try { applyFromData(JSON.parse(xhr.responseText)) } catch (e) { console.warn('pip_border live:', e) }
+		}
+		xhr.send(null)
+	}
+
+	function ensureLivePoll(file) {
+		if (file) state.liveFile = String(file)
+		if (!state.liveFile || livePollId) return
+		livePollId = setInterval(pollLiveFile, 33)
+		pollLiveFile()
+	}
+
 	window['update'] = function (raw) {
 		try {
 			var d = typeof raw === 'string' ? JSON.parse(raw.replace(/\\"/g, '"').replace(/^"|"$/g, '')) : raw
-			if (d) {
-				for (var k in d) state[k] = d[k]
-				apply()
-			}
+			if (d.liveFile) ensureLivePoll(d.liveFile)
+			applyFromData(d)
 		} catch (e) { console.warn('pip_border update:', e) }
 	}
 
-	apply()
+	render()
 })()
 </script>
 </body>

@@ -34,6 +34,11 @@ prep_svc="highascg-exfat-media-prep.service"
 bind_mount_esc="home-casparcg-highascg-media-exfat.mount"
 bootstrap_svc="highascg-exfat-bootstrap.service"
 update_svc="highascg-exfat-server-update.service"
+arrive_svc="highascg-exfat-arrive.service"
+ARRIVE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-arrive.sh"
+ARRIVE_SH_DST=/usr/local/lib/highascg/highascg-exfat-arrive.sh
+UDEV_RULE_SRC="${REPO_ROOT}/config/udev/99-highascg-exfat-arrive.rules"
+UDEV_RULE_DST=/etc/udev/rules.d/99-highascg-exfat-arrive.rules
 BOOT_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-bootstrap.sh"
 BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-bootstrap.sh
 UPDATE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-server-update.sh"
@@ -52,7 +57,12 @@ mkdir -p /usr/local/lib/highascg /etc/highascg "$DOC_PKG"
 	exit 1
 }
 install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
+[[ -f "$ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$ARRIVE_SH_SRC" "$ARRIVE_SH_DST"
 [[ -f "$UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$UPDATE_SH_SRC" "$UPDATE_SH_DST"
+if [[ -f "$UDEV_RULE_SRC" ]]; then
+	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
+	echo "installed ${UDEV_RULE_DST}"
+fi
 if [[ -f "$BOOT_EXCLUDE_SRC" ]]; then
 	install -m 0644 -o root -g root "$BOOT_EXCLUDE_SRC" "$BOOT_EXCLUDE_DST"
 	echo "installed ${BOOT_EXCLUDE_DST}"
@@ -87,7 +97,7 @@ After=blk-availability.target systemd-remount-fs.service
 What=/dev/disk/by-label/HIGHASCGEXF
 Where=/home/casparcg/exfat
 Type=exfat
-Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=20
+Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=90
 
 [Install]
 WantedBy=local-fs.target
@@ -198,6 +208,23 @@ ExecStart=/usr/bin/node /home/casparcg/highascg/tools/runtime/exfat-sync-cli.js
 WantedBy=multi-user.target
 SVCEOF
 
+cat > "/etc/systemd/system/${arrive_svc}" <<ARRIVEEOF
+[Unit]
+Description=Mount HIGHASCGEXF and run WO-47 pipeline (late USB / hotplug)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+ConditionPathExists=/dev/disk/by-label/HIGHASCGEXF
+ConditionPathExists=!/etc/highascg/disable-exfat-arrive
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=${ARRIVE_SH_DST}
+
+[Install]
+WantedBy=multi-user.target
+ARRIVEEOF
+
 chmod 0644 "/etc/systemd/system/home-casparcg-exfat.mount" \
 	"/etc/systemd/system/highascg-exfat-sync.service" \
 	"/etc/systemd/system/highascg-exfat-bootstrap.service" \
@@ -207,9 +234,13 @@ chmod 0644 "/etc/systemd/system/home-casparcg-exfat.mount" \
 
 systemctl daemon-reload
 systemctl enable home-casparcg-exfat.mount "${bootstrap_svc}" "${update_svc}" highascg-exfat-sync.service \
-	"${bind_mount_esc}" "${prep_svc}" 2>/dev/null || true
+	"${bind_mount_esc}" "${prep_svc}" "${arrive_svc}" 2>/dev/null || true
+udevadm control --reload-rules 2>/dev/null || true
+udevadm trigger --subsystem-match=block --action=add 2>/dev/null || true
 
 echo "Installed:"
+echo "  ${ARRIVE_SH_DST}"
+echo "  ${UDEV_RULE_DST} (hotplug + late USB → ${arrive_svc})"
 echo "  ${BOOT_SH_DST}"
 echo "  ${UPDATE_SH_DST}"
 echo "  ${BOOT_EXCLUDE_DST} (rsync excludes — protects caspar lib/config on seed)"
@@ -221,4 +252,5 @@ echo "  /etc/systemd/system/${bind_mount_esc}"
 echo "  /etc/systemd/system/${bootstrap_svc}"
 echo "  /etc/systemd/system/${update_svc}"
 echo "  /etc/systemd/system/highascg-exfat-sync.service"
+echo "  /etc/systemd/system/${arrive_svc}"
 echo "Re-run: sudo bash ${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh ${USER_CASPAR}"

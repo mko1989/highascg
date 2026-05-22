@@ -42,6 +42,7 @@ const routesCasparConfig = require('./routes-caspar-config')
 const routesLogs = require('./routes-logs')
 const routesHostStats = require('./routes-host-stats')
 const routesPipOverlay = require('./routes-pip-overlay')
+const routesArtnet = require('./routes-artnet')
 const routesModules = require('./routes-modules')
 const routesDeviceView = require('./routes-device-view')
 const routesDeviceSnapshot = require('./routes-device-snapshot')
@@ -148,13 +149,20 @@ async function routeRequest(method, path, body, ctx, req) {
 		}
 	}
 
+	if (method === 'GET' && p === '/api/artnet/input') {
+		return routesArtnet.handleGetArtnetInput(ctx)
+	}
+
 	if (method === 'GET' && p.startsWith('/api/osc')) {
 		const or = routesOsc.handleGet(p, ctx)
 		if (or) return or
 	}
 
-	if (method === 'GET' && (p === '/api/audio/devices' || p === '/api/audio/portaudio-devices')) {
-		const ar = routesAudio.handleGet(p, query)
+	if (
+		method === 'GET' &&
+		(p === '/api/audio/devices' || p === '/api/audio/portaudio-devices' || p === '/api/audio/live-inputs')
+	) {
+		const ar = routesAudio.handleGet(p, query, ctx)
 		if (ar) return ar
 	}
 
@@ -168,7 +176,15 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (ar) return ar
 	}
 
-	if (method === 'POST' && (p === '/api/audio/config' || p === '/api/audio/route')) {
+	if (
+		method === 'POST' &&
+		(p === '/api/audio/config' ||
+			p === '/api/audio/route' ||
+			p === '/api/audio/monitor-source' ||
+			p === '/api/audio/solo' ||
+			p === '/api/audio/live-inputs/apply' ||
+			p === '/api/audio/live-inputs/config')
+	) {
 		const ar = await routesAudio.handlePost(p, body, ctx)
 		if (ar) return ar
 	}

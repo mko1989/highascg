@@ -1,0 +1,4 @@
+# When the operator data partition (exFAT label HIGHASCGEXF) appears — including slow USB
+# enumeration after boot — start the WO-47 mount + sync pipeline.
+ACTION=="add|change", KERNEL=="sd*[0-9]", ENV{ID_FS_LABEL}=="HIGHASCGEXF", ENV{ID_FS_TYPE}=="exfat", \
+  TAG+="systemd", ENV{SYSTEMD_WANTS}+="highascg-exfat-arrive.service"

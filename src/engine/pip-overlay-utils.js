@@ -181,6 +181,9 @@ const PIP_OVERLAY_JSON_SKIP = new Set([
 	'pgmAirSnapshot',
 	'activePgmLayer',
 	'artnetPatch',
+	'artnetListenEnabled',
+	'artnetChannelMap',
+	'slices',
 ])
 
 /**

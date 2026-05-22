@@ -51,4 +51,6 @@ Manual run (root): `/usr/local/lib/highascg/highascg-exfat-server-update.sh`
 exfat mount → server-update → exfat-sync → highascg.service
 ```
 
+If the USB stick enumerates **after** `local-fs.target` (slow hub/port), **`highascg-exfat-arrive.service`** runs when udev sees `LABEL=HIGHASCGEXF` (and again at `multi-user` if the label node exists but the mount is still down). Disable with `/etc/highascg/disable-exfat-arrive`.
+
 See also: [`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md).

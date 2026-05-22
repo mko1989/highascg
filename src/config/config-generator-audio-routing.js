@@ -3,6 +3,7 @@
 const defaults = require('./defaults')
 const { getChannelMap } = require('./routing')
 const { padStringArray, padBoolArray, ffmpegPathFromAlsaId } = require('./config-generator-utils')
+const { applyAudioPreviewToGeneratorConfig } = require('./audio-preview')
 
 /**
  * Merge defaults, coerce stale `alsa`/`custom` without a sink to `default` (avoids ghost FFmpeg consumers).
@@ -52,6 +53,7 @@ function mergeAudioRoutingIntoConfig(config) {
 	const progDev = ar.programSystemAudioDevices
 	const prevEn = ar.previewSystemAudioEnabled
 	const prevDev = ar.previewSystemAudioDevices
+	const ap = ar.audioPreview && typeof ar.audioPreview === 'object' ? ar.audioPreview : {}
 
 	/**
 	 * PGM audio: **only** `<system-audio>` (OpenAL). Empty device name → `<system-audio />` (default);
@@ -70,8 +72,19 @@ function mergeAudioRoutingIntoConfig(config) {
 		out[`screen_${n}_ffmpeg_audio_args_2`] = ''
 		out[`screen_${n}_system_audio_enabled`] = true
 		out[`screen_${n}_system_audio_device_name`] = progDev[n - 1] || ''
-		out[`screen_${n}_preview_system_audio_enabled`] = prevEn[n - 1] === true
-		out[`screen_${n}_preview_system_audio_device_name`] = prevDev[n - 1] || ''
+		const apEn =
+			ap.enabled === true ||
+			ap.enabled === 'true' ||
+			out.audio_preview_enabled === true ||
+			out.audio_preview_enabled === 'true'
+		const apBus = String(ap.bus ?? out.audio_preview_bus ?? 'preview_1').toLowerCase()
+		const apScreen = Math.max(1, parseInt(String(ap.screenIndex ?? out.audio_preview_screen ?? n), 10) || n)
+		const apDev = String(ap.deviceName ?? out.audio_preview_device_name ?? '').trim()
+		const previewBusOn =
+			prevEn[n - 1] === true || (apEn && apBus !== 'multiview' && apScreen === n)
+		out[`screen_${n}_preview_system_audio_enabled`] = previewBusOn
+		out[`screen_${n}_preview_system_audio_device_name`] =
+			previewBusOn && apDev ? apDev : prevDev[n - 1] || ''
 		/** PortAudio (PR #1720) replaces OpenAL program output for this screen — avoid duplicate consumers */
 		if (
 			profile === 'custom_live' &&
@@ -91,6 +104,8 @@ function mergeAudioRoutingIntoConfig(config) {
 
 	// Extra Caspar audio-only channels removed from Settings UI — always zero for generated config.
 	out.extra_audio_channel_count = 0
+
+	applyAudioPreviewToGeneratorConfig(out)
 
 	return out
 }

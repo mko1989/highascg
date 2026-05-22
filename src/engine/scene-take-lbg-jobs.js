@@ -49,6 +49,14 @@ async function buildTakeJobs(opts) {
 			continue
 		}
 		let clipRaw = clipPath(layer)
+		if (layer.source && String(layer.source.type || '') === 'live_audio') {
+			const slot = parseInt(String(layer.source.value || '1'), 10) || 1
+			const { resolveLiveAudioRouteString, resolveLiveAudioPlayClip } = require('../config/live-audio-input')
+			clipRaw =
+				resolveLiveAudioRouteString(self.config, slot) ||
+				resolveLiveAudioPlayClip(self.config, slot) ||
+				clipRaw
+		}
 		/** Manual list only: advance index after we know this layer will get a take job (no-op takes must not consume a step). */
 		let pendingManualPlaylistAdvance = null
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
@@ -146,7 +154,14 @@ async function buildTakeJobs(opts) {
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
 		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
 		const mixerLines = []
-		const fillTail = isMerge ? `${globalT.duration}` : '0'
+		// FILL is always immediate (tail 0). Animated FILL during MERGE/+Animate was visible on the on-air layer.
+		const fillTail = '0'
+
+		const incomingStartsHidden = shouldRunBankCrossfade && !hasLoadTransition
+		// Hide off-air bank before FILL/PLAY so geometry changes are not visible on program.
+		if (incomingStartsHidden) {
+			mixerLines.push(`MIXER ${cl} OPACITY 0 0`)
+		}
 
 		// Always emit FILL: fill-canvas (and similar) often resolves to 0,0,1,1 — skipping looks like an
 		// "identity" no-op but leaves the previous clip's MIXER FILL on the layer until something else overwrites it.
@@ -155,9 +170,6 @@ async function buildTakeJobs(opts) {
 			mixerLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
 		}
 		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
-		// For bank crossfades the incoming side must be controlled by mixer
-		// opacity too; LOADBG AUTO can finish before the layer is visible.
-		const incomingStartsHidden = shouldRunBankCrossfade && !hasLoadTransition
 		if (isMerge) {
 			mixerLines.push(`MIXER ${cl} OPACITY ${targetOpacity} ${globalT.duration}`)
 		} else if (!incomingStartsHidden && layer.opacity != null && layer.opacity !== 1) {

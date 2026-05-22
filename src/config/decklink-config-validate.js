@@ -17,9 +17,19 @@ function validateDecklinkCasparSlice(casparServerSlice) {
 	for (let n = 1; n <= map.screenCount; n++) {
 		const dlOut = parseInt(String(readCasparSetting({ casparServer: cs }, `screen_${n}_decklink_device`) ?? '0'), 10)
 		if (dlOut > 0) outputDevices.add(dlOut)
+		const dlKey = parseInt(String(readCasparSetting({ casparServer: cs }, `screen_${n}_decklink_key_device`) ?? '0'), 10)
+		if (dlKey > 0) outputDevices.add(dlKey)
+		if (dlOut > 0 && dlKey > 0 && dlOut === dlKey) {
+			warnings.push(`Screen ${n}: DeckLink fill device and key device are both ${dlOut}; key device must differ from fill device.`)
+		}
 	}
 	const mvDl = parseInt(String(readCasparSetting({ casparServer: cs }, 'multiview_decklink_device') ?? '0'), 10)
 	if (mvDl > 0) outputDevices.add(mvDl)
+	const mvKey = parseInt(String(readCasparSetting({ casparServer: cs }, 'multiview_decklink_key_device') ?? '0'), 10)
+	if (mvKey > 0) outputDevices.add(mvKey)
+	if (mvDl > 0 && mvKey > 0 && mvDl === mvKey) {
+		warnings.push(`Multiview: DeckLink fill device and key device are both ${mvDl}; key device must differ from fill device.`)
+	}
 
 	const used = new Map()
 	for (let i = 1; i <= map.decklinkCount; i++) {

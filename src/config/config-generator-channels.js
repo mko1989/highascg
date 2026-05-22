@@ -91,6 +91,7 @@ function buildChannelsSection(config, routeMap) {
 	const hostXml = buildInputsHostChannel(
 		config,
 		plan.decklinkCount,
+		plan.liveAudioCount,
 		plan.inputsHostChannelEnabled,
 		routeMap.inputsOnMvr,
 		routeMap.inputsCh,

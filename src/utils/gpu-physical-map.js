@@ -3,14 +3,10 @@
 const fs = require('fs')
 const path = require('path')
 const { getGpuModel } = require('./hardware-info')
-
-function normalizePortName(v) {
-	const s = String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
-	if (!s) return ''
-	const m = s.match(/^(DP|HDMI|DVI|VGA|E-?DP)-?(\d+)$/)
-	if (m) return `${m[1].replace('E-DP', 'EDP')}-${parseInt(m[2], 10)}`
-	return s
-}
+const {
+	normalizePortName,
+	discoverGpuPhysicalTopologyFromXrandr,
+} = require('./gpu-topology-xrandr')
 
 function canonicalPairName(a, b) {
 	const aa = normalizePortName(a)
@@ -25,51 +21,64 @@ function defaultTopology() {
 	return [
 		{ physicalPortId: 'gpu_p3', slotOrder: 0, dpA: 'DP-3', dpB: '', connectorNumber: 3, location: 3 },
 		{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-2', dpB: '', connectorNumber: 2, location: 2 },
-		// Single logical HDMI jack often enumerates as HDMI-0 or HDMI-1 — list both so either maps here instead of "unmapped".
 		{ physicalPortId: 'gpu_p1', slotOrder: 2, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
 		{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-1', dpB: '', connectorNumber: 0, location: 0 },
 	]
 }
 
-function readTopologyFromConfig(cfg, gpuModel) {
+/**
+ * @param {object} cfg
+ * @param {string|null} gpuModel
+ * @returns {{ rows: object[], source: string }}
+ */
+function resolvePhysicalTopology(cfg, gpuModel) {
+	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr()
+	if (fromXrandr?.length) {
+		return { rows: fromXrandr, source: 'xrandr' }
+	}
+
 	const arr = Array.isArray(cfg?.gpuPhysicalTopology) ? cfg.gpuPhysicalTopology : null
-	if (!arr || !arr.length) {
-		if (gpuModel) {
-			try {
-				const { REPO_ROOT } = require('../repo-paths')
-				const knownPath = path.join(REPO_ROOT, 'data/known-gpus.json')
-				if (fs.existsSync(knownPath)) {
-					const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'))
-					if (known[gpuModel]) {
-						return known[gpuModel]
-					}
-				}
-			} catch (e) {
-				console.error(`[gpu-physical-map] Failed to load known-gpus.json:`, e.message)
-			}
+	if (arr?.length) {
+		const out = []
+		for (const row of arr) {
+			if (!row || typeof row !== 'object') continue
+			const id = String(row.physicalPortId || '').trim()
+			if (!id) continue
+			out.push({
+				physicalPortId: id,
+				slotOrder: Number.isFinite(Number(row.slotOrder)) ? Number(row.slotOrder) : out.length,
+				dpA: normalizePortName(row.dpA),
+				dpB: normalizePortName(row.dpB),
+				connectorNumber: Number.isFinite(Number(row.connectorNumber)) ? Number(row.connectorNumber) : null,
+				location: Number.isFinite(Number(row.location)) ? Number(row.location) : null,
+			})
 		}
-		return defaultTopology()
+		if (out.length) {
+			return { rows: out.sort((a, b) => a.slotOrder - b.slotOrder), source: 'config' }
+		}
 	}
-	const out = []
-	for (const row of arr) {
-		if (!row || typeof row !== 'object') continue
-		const id = String(row.physicalPortId || '').trim()
-		if (!id) continue
-		out.push({
-			physicalPortId: id,
-			slotOrder: Number.isFinite(Number(row.slotOrder)) ? Number(row.slotOrder) : out.length,
-			dpA: normalizePortName(row.dpA),
-			dpB: normalizePortName(row.dpB),
-			connectorNumber: Number.isFinite(Number(row.connectorNumber)) ? Number(row.connectorNumber) : null,
-			location: Number.isFinite(Number(row.location)) ? Number(row.location) : null,
-		})
+
+	if (gpuModel) {
+		try {
+			const { REPO_ROOT } = require('../repo-paths')
+			const knownPath = path.join(REPO_ROOT, 'data/known-gpus.json')
+			if (fs.existsSync(knownPath)) {
+				const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'))
+				if (known[gpuModel]) {
+					return { rows: known[gpuModel], source: 'known-gpu' }
+				}
+			}
+		} catch (e) {
+			console.error(`[gpu-physical-map] Failed to load known-gpus.json:`, e.message)
+		}
 	}
-	return out.length ? out.sort((a, b) => a.slotOrder - b.slotOrder) : defaultTopology()
+
+	return { rows: defaultTopology(), source: 'default' }
 }
 
 function buildGpuPhysicalMap({ config, displays, connectors }) {
 	const gpuModel = getGpuModel()
-	const topology = readTopologyFromConfig(config, gpuModel)
+	const { rows: topology, source: topologySource } = resolvePhysicalTopology(config, gpuModel)
 	const displayByName = new Map(
 		(Array.isArray(displays) ? displays : [])
 			.map((d) => d && typeof d === 'object' ? d : null)
@@ -122,7 +131,7 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		}
 	})
 
-	// Append connected displays not in topology
+	// Connected outputs that still do not match any A/B pair (non DP/HDMI or odd enumeration).
 	let nextUnmappedIdx = 0
 	for (const [name, display] of displayByName) {
 		if (usedDisplays.has(name)) continue
@@ -153,7 +162,7 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 	}
 
 	return {
-		topologySource: Array.isArray(config?.gpuPhysicalTopology) && config.gpuPhysicalTopology.length ? 'config' : 'default',
+		topologySource,
 		ports,
 	}
 }
@@ -161,5 +170,5 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 module.exports = {
 	normalizePortName,
 	buildGpuPhysicalMap,
+	resolvePhysicalTopology,
 }
-
