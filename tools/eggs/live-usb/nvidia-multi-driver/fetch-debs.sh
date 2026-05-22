@@ -26,22 +26,30 @@ CACHE_DIR="${CACHE_DIR:-/opt/nvidia-pool}"
 NVIDIA_BRANCHES="${NVIDIA_BRANCHES:-535 580 595}"
 NVIDIA_POOL_FORCE_REFRESH="${NVIDIA_POOL_FORCE_REFRESH:-0}"
 NVIDIA_POOL_SKIP_EXISTING="${NVIDIA_POOL_SKIP_EXISTING:-1}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=nvidia-pool-lib.sh
+source "${HERE}/nvidia-pool-lib.sh"
 
 mkdir -p "$CACHE_DIR"
 cd "$CACHE_DIR"
 
+FLAVOR="$(nvidia_pool_read_flavor)"
+echo ">> NVIDIA pool flavor: ${FLAVOR} (set /etc/highascg/nvidia-driver-flavor or NVIDIA_DRIVER_FLAVOR)"
+
 pool_has_driver_dkms_debs() {
 	local b="$1"
-	local g1 g2
-	g1="$(compgen -G "./nvidia-driver-${b}_*.deb" || true)"
-	g2="$(compgen -G "./nvidia-dkms-${b}_*.deb" || true)"
+	local driver_pkg dkms_pkg g1 g2
+	driver_pkg="$(nvidia_pool_driver_pkg "$b")"
+	dkms_pkg="$(nvidia_pool_dkms_pkg "$b")"
+	g1="$(compgen -G "./${driver_pkg}_*.deb" || true)"
+	g2="$(compgen -G "./${dkms_pkg}_*.deb" || true)"
 	[[ -n "$g1" && -n "$g2" ]]
 }
 
 branches_to_fetch=()
 for branch in $NVIDIA_BRANCHES; do
 	if [[ "$NVIDIA_POOL_SKIP_EXISTING" -eq 1 && "$NVIDIA_POOL_FORCE_REFRESH" -eq 0 ]] && pool_has_driver_dkms_debs "$branch"; then
-		echo ">> Branch ${branch}: nvidia-driver-${branch} + nvidia-dkms-${branch} already in ${CACHE_DIR} — skip download (NVIDIA_POOL_FORCE_REFRESH=1 to refill)"
+		echo ">> Branch ${branch}: $(nvidia_pool_driver_pkg "$branch") + $(nvidia_pool_dkms_pkg "$branch") already in ${CACHE_DIR} — skip download (NVIDIA_POOL_FORCE_REFRESH=1 to refill)"
 		continue
 	fi
 	branches_to_fetch+=("$branch")
@@ -72,7 +80,7 @@ if ! grep -qiR 'graphics-drivers' /etc/apt/sources.list /etc/apt/sources.list.d 
 fi
 
 for branch in "${branches_to_fetch[@]}"; do
-  for pkg in "nvidia-driver-${branch}" "nvidia-dkms-${branch}"; do
+  for pkg in "$(nvidia_pool_driver_pkg "$branch")" "$(nvidia_pool_dkms_pkg "$branch")"; do
     if ! apt-cache show "$pkg" >/dev/null 2>&1; then
       echo "WARN: $pkg not found in apt; skipping" >&2
       continue

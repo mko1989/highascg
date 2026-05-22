@@ -17,6 +17,9 @@ set -euo pipefail
 MARKER="/var/lib/highascg/nvidia-installed"
 LOG="/var/log/highascg-pick-nvidia.log"
 CACHE="${NVIDIA_DEB_POOL:-/opt/nvidia-pool}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=nvidia-pool-lib.sh
+source "${HERE}/nvidia-pool-lib.sh"
 
 log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG" >&2; }
 
@@ -65,9 +68,9 @@ if [[ -n "$loaded_branch" && "$loaded_branch" == "$recommended_branch" ]]; then
   exit 0
 fi
 
-dkms_pkg="${recommended_pkg/-driver-/-dkms-}"
-dkms_pkg="${dkms_pkg%-server}"
-log "Plan: install $recommended_pkg + $dkms_pkg"
+recommended_pkg="$(nvidia_pool_map_recommended_pkg "$recommended_pkg")"
+dkms_pkg="$(nvidia_pool_map_recommended_dkms "$recommended_pkg")"
+log "Plan: install $recommended_pkg + $dkms_pkg (flavor=$(nvidia_pool_read_flavor))"
 
 declare -a APT_OPTS=(-y --no-install-recommends)
 if [[ -d "$CACHE" ]] && compgen -G "$CACHE/*.deb" >/dev/null; then
@@ -78,8 +81,10 @@ else
 fi
 
 if [[ -n "$loaded_branch" && "$loaded_branch" != "$recommended_branch" ]]; then
-  log "Purging stale nvidia-driver-$loaded_branch and nvidia-dkms-$loaded_branch"
-  apt-get purge -y "nvidia-driver-$loaded_branch" "nvidia-dkms-$loaded_branch" || true
+  log "Purging stale NVIDIA packages for branch $loaded_branch"
+  apt-get purge -y \
+    "nvidia-driver-$loaded_branch" "nvidia-dkms-$loaded_branch" \
+    "nvidia-driver-${loaded_branch}-open" "nvidia-dkms-${loaded_branch}-open" 2>/dev/null || true
   apt-get autoremove -y --purge || true
 fi
 

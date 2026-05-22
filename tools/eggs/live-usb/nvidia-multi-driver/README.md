@@ -11,7 +11,7 @@ strategy is:
    doing any work — boot is instant.
 
 2. **Ship the alternate branches as offline `.deb`s** at **`/opt/nvidia-pool/`**.
-   `fetch-debs.sh` populates the cache (default branches **535 580 595**; override `NVIDIA_BRANCHES`). Existing `nvidia-driver-*` + `nvidia-dkms-*` metapackage `.deb`s for a branch **skip re-download** unless `NVIDIA_POOL_FORCE_REFRESH=1`.
+   `fetch-debs.sh` populates the cache (default branches **535 580 595**; override `NVIDIA_BRANCHES`). Package names follow **`/etc/highascg/nvidia-driver-flavor`** (default **`open`** → `nvidia-driver-535-open`, `nvidia-dkms-535-open`, …). Existing metapackage `.deb`s for a branch **skip re-download** unless `NVIDIA_POOL_FORCE_REFRESH=1`. After switching flavor, refresh the pool or remove stale closed `nvidia-driver-*_*.deb` files.
 
    If you already populated **`/opt/nvidia-debs`**, rename or merge before building:  
    **`sudo mkdir -p /opt/nvidia-pool && sudo rsync -a /opt/nvidia-debs/ /opt/nvidia-pool/`** (then drop the old path when satisfied).
