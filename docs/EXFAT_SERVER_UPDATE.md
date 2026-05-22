@@ -35,7 +35,7 @@ For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node serve
 
 ## Client / UI
 
-Install the client on **Mac/Windows** (`npm run release:github-client` → `dist-web/`). Point it at the playout host IP — no UI files on the stick.
+Install the client on **Mac/Windows** from [**highascg-client**](https://github.com/mko1989/highascg-client) (`npm run release:github-client` or launcher). Point it at the playout host IP — no UI files on the stick.
 
 ## Disable / test
 

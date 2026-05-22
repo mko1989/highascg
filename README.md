@@ -4,9 +4,9 @@ HighAsCG is a Node.js control and configuration service built around CasparCG. I
 
 **This repository is the source tree for everything that goes into the [live ISO](docs/ISO_CONTENTS.md)** (Ubuntu, NVIDIA/DeckLink stack, CasparCG, installer, systemd units, and the Node server under `src/`). The hybrid image is built from this checkout on the eggs host; WO‑47 then loads the server from exFAT (`drop-update/`) using release tarballs produced from the same repo.
 
-**Browser UI (client):** operator-facing HTML/CSS/JS lives in [`client/`](client/) ([`client/README.md`](client/README.md)). Built with `npm run build:client` → `dist-web/`, hosted by the [**Electron launcher**](client/tools/electron-launcher/) on the operator machine — **not** served from the playout server (see [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md)).
+**Browser UI (client):** separate repository [**highascg-client**](https://github.com/mko1989/highascg-client) — Vite UI, Electron launcher, stick prep, simulation. **Not** in this repo.
 
-**Playout server:** API + WebSocket only (`HIGHASCG_HEADLESS=true` via systemd). **Operator UI:** `npm run launcher:prepare` then `npm run launcher` ([`client/tools/electron-launcher/README.md`](client/tools/electron-launcher/README.md)).
+**Playout server (this repo):** API + WebSocket only (`HIGHASCG_HEADLESS=true` via systemd). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md).
 
 ## Requirements
 
@@ -67,35 +67,32 @@ On a playout machine you can start **media scanner** and **HighAsCG** first, cha
 
 ## Usage
 
-**Production (playout + operator laptop):** API on the playout host (`highascg.service`, port **4200**); UI in **`npm run launcher`** (Electron). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md).
+**Production (playout + operator laptop):** API on the playout host (`highascg.service`, port **4200**); UI from [**highascg-client**](https://github.com/mko1989/highascg-client) (`npm run launcher`). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md).
 
-**Dev — split (same as ISO / production):**
+**Dev — split (canonical):**
 
-| Machine | Command |
-|---------|---------|
-| Playout / API host | `npm start` — API only **:4200** (`HIGHASCG_HEADLESS` set in script + `.env`) |
-| Operator laptop | `npm run dev:client` — UI **:3000** (set `VITE_HIGHASCG_API_ORIGIN` in `.env.development` to playout IP) |
-| Operator laptop | `npm run launcher` — Electron UI (set playout host in launcher) |
+| Machine | Repo | Command |
+|---------|------|---------|
+| Playout / API host | **this repo** | `npm start` — API **:4200** |
+| Operator laptop | **highascg-client** | `npm run dev` — UI **:3000** (`VITE_HIGHASCG_API_ORIGIN=http://<playout-ip>:4200`) |
+| Operator laptop | **highascg-client** | `npm run launcher` — Electron |
 
-Remote UI: copy `.env.development.example` → `.env.development` with `VITE_HIGHASCG_API_ORIGIN=http://<playout-ip>:4200`.
+**Deploy server to playout host:** `npm run deploy:dev` (server-only tarball; see `scripts/dev-push.sh`).
 
-**Dev — legacy monolith (deprecated):** `npm run start:monolith` serves `client/` or `dist-web/` on the API port.
-
-**Deploy API to dev playout host:** `npm run deploy:dev` (server-only; writes `HIGHASCG_HEADLESS=true` in remote `.env`).
+**Legacy monolith (deprecated):** `npm run start:monolith` only if you still serve built `dist-web/` from the API host.
 
 ## Project layout
 
 | Path | Role |
 |------|------|
 | `index.js`, [`src/`](src/) | Node server — Caspar AMCP, REST `/api/*`, WebSocket |
-| [`client/`](client/) | Browser UI — static ES modules ([`client/README.md`](client/README.md)) |
-| `dist-web/` | Vite build output — packaged in Electron / `release:github-client`, not on playout ISO |
+| — | UI: [**highascg-client**](https://github.com/mko1989/highascg-client) (not tracked here) |
 | `config/` | Modular settings (runtime JSON; see `.gitignore`) |
 | `template/` | Caspar HTML templates |
 | `scripts/` | Production installer, systemd — [`scripts/README.md`](scripts/README.md) |
-| `tools/` | Live USB, smoke tests, operator launcher |
+| `tools/` | Live USB, smoke tests, server release |
 
-**Dev:** `npm start` (API **:4200**) · `npm run dev:client` (UI **:3000**) · `npm run launcher` (Electron).
+**Dev:** `npm start` (API **:4200**) · UI in [**highascg-client**](https://github.com/mko1989/highascg-client).
 
 **Eggs build host:** use only `~/highascg`. Remove stale `~/highascg-server` / `~/highascg-frontend` if present (`npm run clean:eggs-host`).
 

@@ -18,7 +18,7 @@ Openbox autostart reference: [**work/openbox_autostart.md**](../work/openbox_aut
 
 ## Dev deploy (optional)
 
-[dev-push.sh](../client/scripts/dev-push.sh) — **`tar`** (excludes `node_modules`, `.git`, `work`, env files, `highascg.config.json`) → **`ssh`** stream upload (`cat >` tarball on the server) → **`ssh`** to wipe everything under **`DEPLOY_PATH`** except existing **`highascg.config.json`** and **`node_modules`** (so deps are not deleted every time), then **`tar -xzf`**. Does **not** run `npm` on the server. Optional **`DEPLOY_USE_SFTP=1`** or **`DEPLOY_USE_SCP=1`** for other upload modes.
+[dev-push.sh](dev-push.sh) — server-only **`tar`** → **`ssh`** upload → extract into **`DEPLOY_PATH`** (keeps remote `highascg.config.json`, `node_modules`, `config/`). Operator UI: [**highascg-client**](https://github.com/mko1989/highascg-client).
 
 The SSH user must have a **normal login shell** (not `/usr/sbin/nologin`). If you see *This account is currently not available*, run on the server: **`sudo chsh -s /bin/bash`** for **`DEPLOY_USER`**.
 

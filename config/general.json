@@ -3,7 +3,7 @@
   "amcp_max_batch_commands": 64,
   "amcp_mixer_commit_before_amcp_batch": true,
   "offline_mode": false,
-  "screen_1_force_os_resolution": true,
+  "screen_1_force_os_resolution": false,
   "screen_2_force_os_resolution": false,
   "screen_3_force_os_resolution": false,
   "screen_4_force_os_resolution": false,
@@ -38,8 +38,8 @@
     {
       "physicalPortId": "gpu_p1",
       "slotOrder": 2,
-      "dpA": "HDMI-1",
-      "dpB": "",
+      "dpA": "HDMI-0",
+      "dpB": "HDMI-1",
       "connectorNumber": 1,
       "location": 1
     },
@@ -51,37 +51,5 @@
       "connectorNumber": 0,
       "location": 0
     }
-  ],
-  "screen_count": 2,
-  "streaming": {
-    "enabled": false,
-    "protocol": "UDP",
-    "captureMode": "udp",
-    "localCaptureDevice": "auto",
-    "x11Display": ":0",
-    "ndiNamingMode": "auto",
-    "ndiSourcePattern": "CasparCG Channel {ch}",
-    "ndiChannelNames": {},
-    "quality": "medium",
-    "basePort": 40000,
-    "hardwareAccel": true,
-    "maxBitrate": 2000,
-    "resolution": "half",
-    "fps": 25,
-    "drmDevice": "/dev/dri/card0",
-    "autoRelocateBasePort": true
-  },
-  "extraLiveSources": [
-    {
-      "type": "ndi",
-      "value": "ndi://cccccc/\"vMix - Output 1\"",
-      "label": "cccccc vMix - Output 1",
-      "useDirect": true
-    }
-  ],
-  "screen_1_system_id": "HDMI-0",
-  "screen_1_os_mode": "1920x1080",
-  "screen_1_os_backend": "xrandr",
-  "screen_1_os_rate": 50,
-  "screen_1_os_timing_source": "cvt"
+  ]
 }

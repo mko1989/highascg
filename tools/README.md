@@ -1,15 +1,14 @@
 # Backend tools (minimal)
 
-Production playout host and **eggs ISO build** only. Development smoke tests, client launchers, and legacy helpers live elsewhere.
+Production playout host and **eggs ISO build** only. Operator UI and launchers live in [**highascg-client**](https://github.com/mko1989/highascg-client).
 
 | Path | Purpose |
 |------|---------|
 | [`runtime/`](runtime/) | Playout helpers shipped in server releases (`exfat-sync-cli`, Caspar staged start) |
 | [`eggs/`](eggs/) | penguins-eggs / live USB image prep (`live-usb/`, `verify-w02-structure.js`) |
 | [`release/`](release/) | `release:github-server` — backend tarball |
-| [`smoke/`](smoke/) | All HTTP/AMCP/unit smoke tests (`npm run smoke`, `npm run test:*`) |
+| [`smoke/`](smoke/) | HTTP/AMCP/unit smoke tests (`npm run smoke`, `npm run test:*`) |
 
-**Client / operator:** [`../client/tools/`](../client/tools/)  
 **Deprecated:** [`../deprecated/`](../deprecated/)
 
 ```bash

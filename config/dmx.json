@@ -2,5 +2,11 @@
   "enabled": false,
   "debugLogDmx": false,
   "fps": 25,
-  "fixtures": []
+  "fixtures": [],
+  "artnetInputEnabled": true,
+  "artnetInputPort": 6454,
+  "artnetInputScreenIndex": 0,
+  "artnetInputLogIntervalMs": 60000,
+  "artnetInputWsIntervalMs": 500,
+  "artnetInputStatsIntervalMs": 10000
 }

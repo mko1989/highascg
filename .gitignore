@@ -20,10 +20,13 @@ data/waveforms/
 .reference/
 
 
-# Electron launcher copy of Vite output (npm run launcher:prepare)
-client/tools/electron-launcher/dist-web/
+# Operator UI — separate repo: https://github.com/mko1989/highascg-client
+client/
+vite.config.js
+.env.development
+.env.development.example
 
-# Vite / packager outputs (UI ships via launcher or release:github-client)
+# Vite / packager outputs (built in highascg-client; not on playout server)
 dist-web/
 dist/
 

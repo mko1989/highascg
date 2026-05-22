@@ -114,7 +114,7 @@ Backend + runtime tree for playout sticks (**\`drop-update/\`** on \`HIGHASCGEXF
 
 ${NM_NOTE}
 
-Pair with **Electron launcher** (\`npm run launcher\` + \`highascg-client_*.tar.gz\`) or \`HIGHASCG_HEADLESS=true\` on playout.
+Pair with [**highascg-client**](https://github.com/mko1989/highascg-client) (Electron launcher + optional \`highascg-client_*.tar.gz\`). Playout runs \`HIGHASCG_HEADLESS=true\`.
 
 **Start:** \`node index.js\` — API only on production hosts (no \`dist-web/\` in this tarball).
 
