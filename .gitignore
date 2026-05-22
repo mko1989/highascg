@@ -43,11 +43,12 @@ data/
 template/global-border-live-*.json
 template/global-border-live-*.json.tmp
 
-# Client integration notes (generated locally for UI work)
-for_client/*
+# Client integration notes — only the USB handout is published
+for_client/
 !for_client/USB_STICK_AFTER_FLASH.md
 
 refs/
+
 # User/system local artifacts
 core
 health.json
@@ -65,5 +66,7 @@ config/*.json
 !config/default*.json
 !config/exfat-sync.json
 
+# Local-only trees (never on GitHub)
 audio_testing/
 From_client/
+deprecated/
