@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Apply a server-only drop from exFAT: /home/casparcg/exfat/update/server/
+# Apply a server-only drop from exFAT: /home/casparcg/exfat/drop-update/
 #
 # Operators unpack highascg-server_*.tar.gz (or copy src/, index.js, tools/, …) into
-# update/server/ on the stick. On boot (before highascg.service):
+# drop-update/ on the stick. On boot (before highascg.service):
 #   1. stop highascg.service
 #   2. rsync update/server/ → ~/highascg/
 #   3. optional npm ci when package-lock.json was in the drop
@@ -18,7 +18,8 @@ set -euo pipefail
 USER_NAME="${HIGHASCG_SERVICE_USER:-casparcg}"
 DISABLE="/etc/highascg/disable-exfat-server-update"
 EXFAT_ROOT="/home/casparcg/exfat"
-SRC="${EXFAT_ROOT}/update/server"
+DROP_UPDATE="${EXFAT_ROOT}/drop-update"
+LEGACY_UPDATE="${EXFAT_ROOT}/update/server"
 DST="/home/casparcg/highascg"
 EXCLUDES="/etc/highascg/server-update-rsync-excludes.txt"
 LOCK=/run/highascg/server-update.lock
@@ -26,6 +27,20 @@ SERVICE=highascg.service
 
 log() {
 	echo "[highascg-exfat-server-update] $*" >&2
+}
+
+# Prefer drop-update/; accept legacy update/server/ on old sticks.
+resolve_drop_src() {
+	if [[ -f "${DROP_UPDATE}/package.json" ]]; then
+		echo "$DROP_UPDATE"
+		return 0
+	fi
+	if [[ -f "${LEGACY_UPDATE}/package.json" ]]; then
+		log "using legacy ${LEGACY_UPDATE}/ — move future drops to ${DROP_UPDATE}/"
+		echo "$LEGACY_UPDATE"
+		return 0
+	fi
+	return 1
 }
 
 stop_service() {
@@ -62,8 +77,8 @@ main() {
 		exit 0
 	fi
 
-	if [[ ! -f "${SRC}/package.json" ]]; then
-		log "no pending update (${SRC}/package.json missing)."
+	if ! SRC="$(resolve_drop_src)"; then
+		log "no pending update (${DROP_UPDATE}/package.json missing)."
 		exit 0
 	fi
 
@@ -113,26 +128,26 @@ main() {
 
 		local stamp applied
 		stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-		applied="${EXFAT_ROOT}/update/applied/${stamp}"
-		mkdir -p "${EXFAT_ROOT}/update/applied"
+		applied="${DROP_UPDATE}/applied/${stamp}"
+		mkdir -p "${DROP_UPDATE}/applied"
 		log "archiving drop → ${applied}"
 		mv "$SRC" "$applied"
-		mkdir -p "$SRC"
-		cat >"${SRC}/README.txt" <<'EOF'
+		mkdir -p "$DROP_UPDATE"
+		cat >"${DROP_UPDATE}/README.txt" <<'EOF'
 Drop server updates here (contents of highascg-server_*.tar.gz from GitHub releases).
 
-Required: package.json at the top of this folder (along with index.js, src/, tools/, …).
+Required: package.json at the top of this folder (along with index.js, src/, tools/runtime/, …).
 
 On next boot the live system will:
   - stop highascg.service
   - copy files into /home/casparcg/highascg (client/ and dist-web/ are not touched)
   - run npm ci when package-lock.json is included
-  - move this folder to update/applied/<timestamp>/
+  - move this folder to drop-update/applied/<timestamp>/
   - start highascg.service
 
-Client/UI updates: use sim/highascg/ (full tree) or replace client/ / dist-web/ there.
+UI/simulation runs from the Electron launcher on Mac/Windows — not from this stick.
 EOF
-		chown "${USER_NAME}:${grp}" "${SRC}/README.txt" 2>/dev/null || true
+		chown "${USER_NAME}:${grp}" "${DROP_UPDATE}/README.txt" 2>/dev/null || true
 
 		start_service
 		log "server update applied."

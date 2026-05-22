@@ -13,7 +13,7 @@ set -euo pipefail
 #   HIGHASCG_ISO_EMBED_SERVER=1             bake server+node_modules into squashfs (default 1)
 #   HIGHASCG_ISO_BUILD_WEB=0                skip dist-web on ISO (default 0; UI via Electron)
 #   HIGHASCG_ISO_BUILD_WEB=1                legacy: build dist-web on imaging host before clone
-#   HIGHASCG_ISO_EMBED_SERVER=0             WO-47 only: omit Node tree; use exFAT update/server/
+#   HIGHASCG_ISO_EMBED_SERVER=0             WO-47 only: omit Node tree; use exFAT drop-update/
 #   SKIP_APT=1                               skip apt install (you already installed packages)
 #   SKIP_MERGE_EGGS_EXCLUDES=1              do not merge penguins-eggs exclude fragment
 #   SKIP_HIGHASCG_SYSTEMD_RESTART=1         skip systemctl restart highascg.service at end
@@ -73,6 +73,7 @@ GRP=$(id -gn "$USER_CASPAR")
 mkdir -p "${HIGHASCG_ROOT}/"{bin,media,media/drive,media/exfat,log,template,data,cef-cache,lib}
 
 mkdir -p /home/casparcg/exfat
+bash "${HERE}/seed-exfat-operator-layout.sh" /home/casparcg/exfat
 mkdir -p /etc/highascg
 install -m 0755 -o "$USER_CASPAR" -g "$GRP" -d "${HIGHASCG_ROOT}/media" "${HIGHASCG_ROOT}/media/drive" \
 	"${HIGHASCG_ROOT}/media/exfat" /home/casparcg/exfat 2>/dev/null || true
@@ -97,7 +98,7 @@ if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 		echo "==> merge HighAsCG eggs excludes (embed server on ISO — standalone boot)"
 	else
 		export HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${HERE}/penguins-eggs-exclude-highascg-fragment.list"
-		echo "==> merge HighAsCG eggs excludes (WO-47 — server from exFAT update/server/)"
+		echo "==> merge HighAsCG eggs excludes (WO-47 — server from exFAT drop-update/)"
 	fi
 	bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh" --replace || {
 		echo >&2 ""

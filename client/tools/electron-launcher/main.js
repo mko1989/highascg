@@ -369,13 +369,17 @@ ipcMain.handle('check-usb-status', async () => {
   }
 
   if (mountedPath) {
-    const simDir = path.join(mountedPath, 'sim/highascg')
-    const hasSim = fs.existsSync(simDir) && fs.existsSync(path.join(simDir, 'package.json'))
+    const dropDir = path.join(mountedPath, 'drop-update')
+    const legacyDir = path.join(mountedPath, 'update/server')
+    const hasDrop =
+      (fs.existsSync(dropDir) && fs.existsSync(path.join(dropDir, 'package.json'))) ||
+      (fs.existsSync(legacyDir) && fs.existsSync(path.join(legacyDir, 'package.json')))
+    const payloadPath = fs.existsSync(path.join(dropDir, 'package.json')) ? dropDir : legacyDir
     return {
       mounted: true,
       path: mountedPath,
-      hasPayload: hasSim,
-      payloadPath: simDir
+      hasPayload: hasDrop,
+      payloadPath: hasDrop ? payloadPath : dropDir
     }
   }
 

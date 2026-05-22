@@ -1,6 +1,6 @@
 # HighAsCG — omit dev trees from squashfs; keep server runtime on ISO (standalone boot).
 # Use with HIGHASCG_ISO_EMBED_SERVER=1 in prepare-eggs-clone-with-exfat.sh
-# See docs/WO47_ISO_VS_EXFAT.md (exFAT update/server/ still applies when stick present)
+# See docs/WO47_ISO_VS_EXFAT.md (exFAT drop-update/ still applies when stick present)
 
 swap.img
 swapfile

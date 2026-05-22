@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"exfatRoot": "/home/casparcg/exfat",
+	"pairs": [
+		{
+			"id": "drop-config",
+			"label": "Monolithic config overlay",
+			"exfat": "drop-config/highascg.config.json",
+			"project": "/home/casparcg/highascg/highascg.config.json",
+			"direction": "both"
+		}
+	]
+}

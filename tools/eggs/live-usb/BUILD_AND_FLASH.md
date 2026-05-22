@@ -170,7 +170,7 @@ If you already have a **`*.iso`** built elsewhere:
 | **Windows** (Admin PowerShell) | [`windows/make-highascg-stick.ps1`](windows/make-highascg-stick.ps1) |
 | **macOS** (sudo in Terminal) | [`macos/make-highascg-stick.sh`](macos/make-highascg-stick.sh) |
 
-Both: **visible menu** of removable targets, **explicit confirmations**, raw **ISO** write, then **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) and seeded folders: **`sim/highascg`**, **`drop-config`**, **`media`**, **`templates`**, **`configs`**, **`snapshots/rear-panels`**. Hybrid ISO + free-space detection varies by OS; macOS may require **Disk Utility** or **Linux `add-exfat-data-partition.sh`** fallback if `diskutil addPartition` fails.
+Both: **visible menu** of removable targets, **explicit confirmations**, raw **ISO** write, then **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) and seeded folders: **`drop-update`**, **`drop-config`**, **`media`**, **`templates`**, **`configs`**, **`snapshots/rear-panels`**. Hybrid ISO + free-space detection varies by OS; macOS may require **Disk Utility** or **Linux `add-exfat-data-partition.sh`** fallback if `diskutil addPartition` fails.
 
 ---
 

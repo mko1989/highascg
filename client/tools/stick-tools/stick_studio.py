@@ -71,7 +71,7 @@ def disk_desc(path: Path) -> str:
 	return f"{path} — {sz} — {mod}"
 
 
-DEFAULT_EXFAT_DIRS = ("sim/highascg", "drop-config", "media", "templates", "configs", "snapshots/rear-panels")
+DEFAULT_EXFAT_DIRS = ("drop-update", "drop-config", "media", "templates", "configs", "snapshots/rear-panels")
 
 
 def ensure_operator_tree(vol: Path) -> None:
@@ -153,7 +153,7 @@ class StickStudioUi:
 		self.var_do_mkdirs = tk.BooleanVar(value=True)
 		tk.Checkbutton(
 			root,
-			text="Ensure sim/highascg (+ operator dirs) at mount path below",
+			text="Ensure drop-update (+ operator dirs) at mount path below",
 			variable=self.var_do_mkdirs,
 		).pack(anchor="w", padx=16)
 
@@ -196,7 +196,7 @@ class StickStudioUi:
 			self.var_mount.set(p)
 
 	def _pick_copy_src(self) -> None:
-		p = self.filedialog.askdirectory(title="Sources → …/sim/highascg/")
+		p = self.filedialog.askdirectory(title="Server tarball extract → …/drop-update/")
 		if p:
 			self.var_copy_src.set(p)
 
@@ -282,7 +282,7 @@ class StickStudioUi:
 					readme = mount_pt / "README-HIGHASCG-EXFAT.txt"
 					if not readme.is_file():
 						readme.write_text(
-							"sim/highascg — HighAsCG payload (ZIP or git sync).\n"
+							"drop-update — server tarball for playout (highascg-server_*.tar.gz).\n"
 							"See tools/live-usb/MANUAL_STICK_WINDOWS_MACOS.md · WO‑47.\n",
 							encoding="utf-8",
 						)
@@ -296,7 +296,7 @@ class StickStudioUi:
 			if not mount_pt.is_dir():
 				m.showerror("Stick Studio", f"Bad mount:\n{mount_pt}")
 				return
-			dest = mount_pt / "sim/highascg"
+			dest = mount_pt / "drop-update"
 			try:
 				sync_tree(src_p, dest)
 			except OSError as e:

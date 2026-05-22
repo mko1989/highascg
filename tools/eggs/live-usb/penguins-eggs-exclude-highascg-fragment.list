@@ -1,11 +1,11 @@
 # HighAsCG — omit from squashfs (liveroot-relative paths, no leading /)
-# ISO = Caspar shell; Node server from exFAT update/server/ (tools/runtime/ in tarball)
+# ISO = Caspar shell; Node server from exFAT drop-update/ (tools/runtime/ in tarball)
 # See docs/WO47_ISO_VS_EXFAT.md
 
 swap.img
 swapfile
 
-# Node app tree (exFAT update/server/)
+# Node app tree (exFAT drop-update/)
 home/casparcg/highascg/index.js
 home/casparcg/highascg/package.json
 home/casparcg/highascg/package-lock.json

@@ -59,6 +59,7 @@ tools/eggs/live-usb/flash-iso.conf
 config/*.json
 !config/*.example.json
 !config/default*.json
+!config/exfat-sync.json
 
 audio_testing/
 From_client/

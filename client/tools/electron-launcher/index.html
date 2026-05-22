@@ -128,7 +128,7 @@
                 <span class="check-box">!</span>
                 <div class="check-details">
                   <h3>Application Payload</h3>
-                  <p id="check-payload-details">Release folder sim/highascg/package.json not yet detected on the USB stick.</p>
+                  <p id="check-payload-details">Server drop folder drop-update/package.json not yet detected on the USB stick.</p>
                 </div>
               </div>
             </div>
@@ -317,7 +317,7 @@
               <div class="step-num">04</div>
               <div class="step-content">
                 <h3>Seed Folders & App Payload</h3>
-                <p>Open the new drive in File Explorer. Create folders inside: <code>sim/highascg</code>, <code>drop-config</code>, <code>media</code>, <code>templates</code>, and <code>configs</code>. Unzip the HighAsCG release zip directly inside <code>sim/highascg/</code>, so that <code>package.json</code> sits directly under that path.</p>
+                <p>Open the new drive in File Explorer. Create folders inside: <code>drop-update</code>, <code>drop-config</code>, <code>media</code>, <code>templates</code>, and <code>configs</code>. Extract <code>highascg-server_*.tar.gz</code> into <code>drop-update/</code> so that <code>package.json</code> sits directly under that path (playout applies on boot).</p>
                 
                 <div class="screenshot-placeholder" style="position: relative; overflow: hidden;">
                 <img src="images/win_partition_step4_folder_layout.png" alt="Root exFAT File Layout" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2;" onerror="this.style.display='none'">
@@ -488,7 +488,7 @@
                 <h3>Create operator folders</h3>
                 <p class="step-note">Writes only on the exFAT volume.</p>
                 <div class="cmd-copy">
-                  <pre class="cmd-copy-pre">mkdir -p "/Volumes/HIGHASCGEXF/sim/highascg" "/Volumes/HIGHASCGEXF/drop-config" "/Volumes/HIGHASCGEXF/media" "/Volumes/HIGHASCGEXF/templates" "/Volumes/HIGHASCGEXF/configs" "/Volumes/HIGHASCGEXF/snapshots/rear-panels"</pre>
+                  <pre class="cmd-copy-pre">mkdir -p "/Volumes/HIGHASCGEXF/drop-update" "/Volumes/HIGHASCGEXF/drop-config" "/Volumes/HIGHASCGEXF/media" "/Volumes/HIGHASCGEXF/templates" "/Volumes/HIGHASCGEXF/configs" "/Volumes/HIGHASCGEXF/snapshots/rear-panels"</pre>
                   <button type="button" class="cmd-copy-btn">Copy</button>
                 </div>
               </div>
@@ -501,17 +501,17 @@
                 <p class="step-note">Choose one method. Edit the source path before running.</p>
                 <p class="step-note"><strong>From unpacked folder:</strong></p>
                 <div class="cmd-copy">
-                  <pre class="cmd-copy-pre">ditto "/path/to/highascg-main/." "/Volumes/HIGHASCGEXF/sim/highascg"</pre>
+                  <pre class="cmd-copy-pre">ditto "/path/to/highascg-server-tree/." "/Volumes/HIGHASCGEXF/drop-update"</pre>
                   <button type="button" class="cmd-copy-btn">Copy</button>
                 </div>
                 <p class="step-note"><strong>From tarball:</strong></p>
                 <div class="cmd-copy">
-                  <pre class="cmd-copy-pre">tar -xzf ~/Downloads/highascg_*.tar.gz -C "/Volumes/HIGHASCGEXF/sim/highascg"</pre>
+                  <pre class="cmd-copy-pre">tar -xzf ~/Downloads/highascg-server_*.tar.gz -C "/Volumes/HIGHASCGEXF/drop-update"</pre>
                   <button type="button" class="cmd-copy-btn">Copy</button>
                 </div>
                 <p class="step-note"><strong>Verify package.json exists:</strong></p>
                 <div class="cmd-copy">
-                  <pre class="cmd-copy-pre">test -f "/Volumes/HIGHASCGEXF/sim/highascg/package.json" &amp;&amp; echo OK</pre>
+                  <pre class="cmd-copy-pre">test -f "/Volumes/HIGHASCGEXF/drop-update/package.json" &amp;&amp; echo OK</pre>
                   <button type="button" class="cmd-copy-btn">Copy</button>
                 </div>
               </div>

@@ -152,5 +152,5 @@ done
 	echo "Volume not mounted at ${VOL} — open Disk Utility or re-plug the stick." >&2
 	exit 0
 }
-mkdir -p "$VOL/sim/highascg" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
-echo "Done. Copy release to ${VOL}/sim/highascg (package.json at root of that folder)."
+mkdir -p "$VOL/drop-update" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
+echo "Done. Extract highascg-server release to ${VOL}/drop-update (package.json at root of that folder)."

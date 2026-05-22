@@ -108,7 +108,7 @@ Vite production bundle (\`dist-web/\`) for the **Electron launcher** or legacy e
 
 Production playout runs **API only** (\`HIGHASCG_HEADLESS=true\`). Open UI with \`npm run launcher\` and set playout API host/port.
 
-Requires matching **server** tarball on \`update/server/\` or embedded on ISO.
+Requires matching **server** tarball on \`drop-update/\` or embedded on ISO.
 
 [\`docs/PLAN_SERVER_CLIENT_SPLIT.md\`](docs/PLAN_SERVER_CLIENT_SPLIT.md) · [\`client/tools/electron-launcher/README.md\`](client/tools/electron-launcher/README.md)
 EOF

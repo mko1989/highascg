@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# DEPRECATED: sim/highascg seed — disabled by default (/etc/highascg/disable-exfat-bootstrap).
+# Use drop-update/ via highascg-exfat-server-update.sh instead.
+#
 # Seed /home/casparcg/highascg from exFAT sim/highascg when the squashfs omitted the Node tree.
 # Runs before highascg-exfat-sync (node). Idempotent: skips if ~/highascg/package.json exists.
 #

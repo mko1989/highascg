@@ -19,8 +19,8 @@ EXFAT_LABEL="HIGHASCGEXF"
 
 usage() {
 	echo "Usage: sudo $0 [--skip-exfat] [--dry-run] [--tar-gz PATH] [--app-dir PATH] /path/to/image.iso" >&2
-	echo "  --tar-gz   extract release .tar.gz into sim/highascg after exFAT is ready" >&2
-	echo "  --app-dir  copy an unpacked HighAsCG tree (must contain package.json) into sim/highascg" >&2
+	echo "  --tar-gz   extract highascg-server_*.tar.gz into drop-update after exFAT is ready" >&2
+	echo "  --app-dir  copy an unpacked server tree (must contain package.json) into drop-update" >&2
 	exit 1
 }
 
@@ -179,16 +179,16 @@ fi
 
 if [[ -z "${VOL:-}" || ! -d "$VOL" ]]; then
 	echo "exFAT created but not mounted under /Volumes — open Disk Utility to mount, then create folders manually:" >&2
-	echo "  sim/highascg  drop-config  media  templates  configs  snapshots/rear-panels" >&2
+	echo "  drop-update  drop-config  media  templates  configs  snapshots/rear-panels" >&2
 	exit 0
 fi
 
 echo "==> Seeding operator layout under $VOL"
-mkdir -p "$VOL/sim/highascg" "$VOL/update/server" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
+mkdir -p "$VOL/drop-update" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
 cat >"$VOL/README-HIGHASCG-EXFAT.txt" <<EOF
 HighAsCG operator data (exFAT volume label: $EXFAT_LABEL)
 
-sim/highascg — Extract release tarball or sync sources here (Linux WO-47 mtime sync → ~/highascg).
+drop-update — Extract highascg-server_*.tar.gz here (Linux boot applies → ~/highascg).
 drop-config — Optional monolithic highascg.config.json.
 media — Carry media; binds to ~/highascg/media/exfat on tuned Linux images.
 templates — Extra templates.
@@ -199,14 +199,14 @@ Linux: mounts at /home/casparcg/exfat (LABEL=$EXFAT_LABEL).
 EOF
 
 if [[ -n "${TAR_GZ}" ]]; then
-	echo "==> Extracting HighAsCG tarball into $VOL/sim/highascg …"
-	find "$VOL/sim/highascg" -mindepth 1 -delete 2>/dev/null || true
-	tar -xzf "$TAR_GZ" -C "$VOL/sim/highascg"
+	echo "==> Extracting server tarball into $VOL/drop-update …"
+	find "$VOL/drop-update" -mindepth 1 -delete 2>/dev/null || true
+	tar -xzf "$TAR_GZ" -C "$VOL/drop-update"
 fi
 if [[ -n "${APP_DIR}" ]]; then
-	echo "==> Copying app tree into $VOL/sim/highascg …"
-	find "$VOL/sim/highascg" -mindepth 1 -delete 2>/dev/null || true
-	ditto "${APP_DIR}/." "$VOL/sim/highascg"
+	echo "==> Copying server tree into $VOL/drop-update …"
+	find "$VOL/drop-update" -mindepth 1 -delete 2>/dev/null || true
+	ditto "${APP_DIR}/." "$VOL/drop-update"
 fi
 
 echo ""

@@ -34,7 +34,7 @@ sudo npm run eggs:build
 
 | Omitted from ISO squashfs | Provided via |
 |-------------------------|----------------|
-| `src/`, `scripts/`, `index.js`, `package.json`, `tools/`, … | exFAT **`update/server/`** (`highascg-server_*.tar.gz`) |
+| `src/`, `scripts/`, `index.js`, `package.json`, `tools/`, … | exFAT **`drop-update/`** (`highascg-server_*.tar.gz`) |
 | `client/`, `dist-web/` | Remote UI (not on playout stick) |
 | `node_modules/`, `work/`, `deprecated/` | Build / dev only |
 | `media/*`, `log/`, `cef-cache/`, `data/` | Runtime on machine |

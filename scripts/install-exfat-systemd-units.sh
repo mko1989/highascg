@@ -32,16 +32,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DOC_PKG=/usr/share/doc/highascg-wo47
 prep_svc="highascg-exfat-media-prep.service"
 bind_mount_esc="home-casparcg-highascg-media-exfat.mount"
-bootstrap_svc="highascg-exfat-bootstrap.service"
 update_svc="highascg-exfat-server-update.service"
 arrive_svc="highascg-exfat-arrive.service"
 ARRIVE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-arrive.sh"
 ARRIVE_SH_DST=/usr/local/lib/highascg/highascg-exfat-arrive.sh
 UDEV_RULE_SRC="${REPO_ROOT}/config/udev/99-highascg-exfat-arrive.rules"
 UDEV_RULE_DST=/etc/udev/rules.d/99-highascg-exfat-arrive.rules
-BOOT_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-bootstrap.sh"
-BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-bootstrap.sh
 UPDATE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-server-update.sh"
+SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
 UPDATE_SH_DST=/usr/local/lib/highascg/highascg-exfat-server-update.sh
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
 BOOT_EXCLUDE_DST=/etc/highascg/bootstrap-rsync-excludes.txt
@@ -52,11 +50,6 @@ DOC_EXFAT="${REPO_ROOT}/tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md"
 DOC_MATRIX="${REPO_ROOT}/docs/WO47_ISO_VS_EXFAT.md"
 
 mkdir -p /usr/local/lib/highascg /etc/highascg "$DOC_PKG"
-[[ -f "$BOOT_SH_SRC" ]] || {
-	echo "Missing ${BOOT_SH_SRC}" >&2
-	exit 1
-}
-install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
 [[ -f "$ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$ARRIVE_SH_SRC" "$ARRIVE_SH_DST"
 [[ -f "$UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$UPDATE_SH_SRC" "$UPDATE_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
@@ -82,6 +75,10 @@ DOC_URI="file:${DOC_PKG}/EXFAT_DATA_ZERO_TOUCH.md"
 install -d /home/casparcg/exfat /etc/systemd/system
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media/exfat 2>/dev/null || install -d /home/casparcg/highascg/media/exfat
 chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/highascg/media/exfat
+if [[ -f "$SEED_LAYOUT_SH" ]]; then
+	HIGHASCG_SERVICE_USER="$USER_CASPAR" bash "$SEED_LAYOUT_SH" /home/casparcg/exfat
+fi
+touch /etc/highascg/disable-exfat-bootstrap 2>/dev/null || true
 
 # shellcheck disable=SC2094
 cat > /etc/systemd/system/home-casparcg-exfat.mount <<EOF
@@ -90,7 +87,7 @@ Description=HighAsCG exFAT data (LABEL=HIGHASCGEXF)
 Documentation=${DOC_URI}
 DefaultDependencies=no
 Conflicts=umount.target
-Before=${prep_svc} ${bind_mount_esc} ${bootstrap_svc} ${update_svc} highascg-exfat-sync.service highascg.service
+Before=${prep_svc} ${bind_mount_esc} ${update_svc} highascg-exfat-sync.service highascg.service
 After=blk-availability.target systemd-remount-fs.service
 
 [Mount]
@@ -110,7 +107,7 @@ Documentation=${DOC_URI}
 DefaultDependencies=no
 BindsTo=home-casparcg-exfat.mount
 After=home-casparcg-exfat.mount
-Before=${bind_mount_esc} ${bootstrap_svc} ${update_svc} highascg-exfat-sync.service highascg.service
+Before=${bind_mount_esc} ${update_svc} highascg-exfat-sync.service highascg.service
 
 [Service]
 Type=oneshot
@@ -130,7 +127,7 @@ Requires=${prep_svc} home-casparcg-exfat.mount
 After=${prep_svc} home-casparcg-exfat.mount
 BindsTo=home-casparcg-exfat.mount
 RequiresMountsFor=/home/casparcg/exfat
-Before=${bootstrap_svc} ${update_svc} highascg-exfat-sync.service highascg.service
+Before=${update_svc} highascg-exfat-sync.service highascg.service
 
 [Mount]
 What=/home/casparcg/exfat/media
@@ -142,37 +139,14 @@ Options=bind
 WantedBy=multi-user.target
 EOF
 
-cat > "/etc/systemd/system/${bootstrap_svc}" <<BVCEOF
-[Unit]
-Description=Seed HighAsCG tree from exFAT sim/highascg if ISO omitted Node sources (WO-47)
-Documentation=${DOC_URI}
-DefaultDependencies=no
-After=network-pre.target home-casparcg-exfat.mount ${bind_mount_esc}
-Before=${update_svc} highascg-exfat-sync.service highascg.service
-ConditionPathIsMountPoint=/home/casparcg/exfat
-ConditionPathExists=/home/casparcg/exfat/sim/highascg/package.json
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-User=root
-Group=root
-Environment=HIGHASCG_SERVICE_USER=${USER_CASPAR}
-ExecStart=${BOOT_SH_DST}
-
-[Install]
-WantedBy=multi-user.target
-BVCEOF
-
 cat > "/etc/systemd/system/${update_svc}" <<UPDEOF
 [Unit]
-Description=Apply server drop from exFAT update/server/ (WO-47)
+Description=Apply server drop from exFAT drop-update/ (WO-47)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=home-casparcg-exfat.mount ${bind_mount_esc} ${bootstrap_svc}
+After=home-casparcg-exfat.mount ${bind_mount_esc}
 Before=highascg-exfat-sync.service highascg.service
 ConditionPathIsMountPoint=/home/casparcg/exfat
-ConditionPathExists=/home/casparcg/exfat/update/server/package.json
 
 [Service]
 Type=oneshot
@@ -191,7 +165,7 @@ cat > /etc/systemd/system/highascg-exfat-sync.service <<SVCEOF
 Description=HighAsCG exFAT to project mtime sync (WO-47)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=network-pre.target home-casparcg-exfat.mount ${bind_mount_esc} ${bootstrap_svc} ${update_svc}
+After=network-pre.target home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc}
 Before=highascg.service
 ConditionPathIsMountPoint=/home/casparcg/exfat
 ConditionPathExists=/home/casparcg/highascg/tools/runtime/exfat-sync-cli.js
@@ -227,13 +201,13 @@ ARRIVEEOF
 
 chmod 0644 "/etc/systemd/system/home-casparcg-exfat.mount" \
 	"/etc/systemd/system/highascg-exfat-sync.service" \
-	"/etc/systemd/system/highascg-exfat-bootstrap.service" \
 	"/etc/systemd/system/${update_svc}" \
 	"/etc/systemd/system/${prep_svc}" \
 	"/etc/systemd/system/${bind_mount_esc}"
 
 systemctl daemon-reload
-systemctl enable home-casparcg-exfat.mount "${bootstrap_svc}" "${update_svc}" highascg-exfat-sync.service \
+systemctl disable highascg-exfat-bootstrap.service 2>/dev/null || true
+systemctl enable home-casparcg-exfat.mount "${update_svc}" highascg-exfat-sync.service \
 	"${bind_mount_esc}" "${prep_svc}" "${arrive_svc}" 2>/dev/null || true
 udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=block --action=add 2>/dev/null || true
@@ -241,16 +215,15 @@ udevadm trigger --subsystem-match=block --action=add 2>/dev/null || true
 echo "Installed:"
 echo "  ${ARRIVE_SH_DST}"
 echo "  ${UDEV_RULE_DST} (hotplug + late USB → ${arrive_svc})"
-echo "  ${BOOT_SH_DST}"
 echo "  ${UPDATE_SH_DST}"
-echo "  ${BOOT_EXCLUDE_DST} (rsync excludes — protects caspar lib/config on seed)"
+echo "  /etc/highascg/disable-exfat-bootstrap (legacy sim/highascg seed off)"
+echo "  ${BOOT_EXCLUDE_DST} (legacy bootstrap excludes — unused when disabled)"
 echo "  ${UPDATE_EXCLUDE_DST} (server drop — skips client/, dist-web/, runtime)"
 echo "  ${DOC_PKG}/ (offline Documentation= targets)"
 echo "  /etc/systemd/system/home-casparcg-exfat.mount"
 echo "  /etc/systemd/system/${prep_svc}"
 echo "  /etc/systemd/system/${bind_mount_esc}"
-echo "  /etc/systemd/system/${bootstrap_svc}"
-echo "  /etc/systemd/system/${update_svc}"
+echo "  /etc/systemd/system/${update_svc} (drop-update/ or legacy update/server/)"
 echo "  /etc/systemd/system/highascg-exfat-sync.service"
 echo "  /etc/systemd/system/${arrive_svc}"
 echo "Re-run: sudo bash ${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh ${USER_CASPAR}"

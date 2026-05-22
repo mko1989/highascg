@@ -1,4 +1,4 @@
-# exFAT server updates (`update/server/`)
+# exFAT server updates (`drop-update/`)
 
 For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server** by dropping files on the stick — without reflashing the image.
 
@@ -6,22 +6,24 @@ For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node serve
 
 | Path on `HIGHASCGEXF` | Purpose |
 |------------------------|---------|
-| **`update/server/`** | **Server-only** drop — extract **`highascg-server_*.tar.gz`** here |
-| `update/applied/<UTC>/` | Archived drops after successful apply |
+| **`drop-update/`** | **Server-only** drop — extract **`highascg-server_*.tar.gz`** here |
+| `drop-update/applied/<UTC>/` | Archived drops after successful apply |
 | `drop-config/` | Optional `highascg.config.json` (mtime sync) |
 | `media/`, `templates/`, `configs/`, … | Operator data |
 
-**Not on playout stick:** `sim/highascg/` (legacy), `client/`, `dist-web/` — UI runs on Mac/Windows and connects via HTTP/WebSocket.
+**Not on playout stick:** `sim/highascg/` (removed — simulation runs from the **Electron launcher** on Mac/Windows), `client/`, `dist-web/`.
+
+**Legacy:** `update/server/` is still applied once if present (log asks you to use `drop-update/`).
 
 ## Drop workflow
 
-1. On a workstation, extract **`highascg-server_*.tar.gz`** from [`release:github-server`](DEV_RELEASE_GITHUB.md) into `update/server/` on the exFAT volume (must include `package.json` at the top of that folder).
+1. On a workstation, extract **`highascg-server_*.tar.gz`** from [`release:github-server`](DEV_RELEASE_GITHUB.md) into `drop-update/` on the exFAT volume (must include `package.json` at the top of that folder).
 2. Boot the live system (or reboot).
 3. **`highascg-exfat-server-update.service`** runs **before** `highascg.service`:
    - Stops `highascg.service`
-   - `rsync` from `exfat/update/server/` → `/home/casparcg/highascg/` (does **not** touch `client/` or `dist-web/`)
+   - `rsync` from `exfat/drop-update/` → `/home/casparcg/highascg/` (does **not** touch `client/` or `dist-web/`)
    - Runs `npm ci --omit=dev` when `package-lock.json` is in the drop
-   - Moves the drop to `update/applied/<UTC>/`
+   - Moves the drop to `drop-update/applied/<UTC>/`
    - Starts `highascg.service`
 
 ## What the server tarball contains
@@ -48,9 +50,9 @@ Manual run (root): `/usr/local/lib/highascg/highascg-exfat-server-update.sh`
 ## Boot order
 
 ```
-exfat mount → server-update → exfat-sync → highascg.service
+exfat mount → server-update (drop-update/) → exfat-sync (drop-config/) → highascg.service
 ```
 
-If the USB stick enumerates **after** `local-fs.target` (slow hub/port), **`highascg-exfat-arrive.service`** runs when udev sees `LABEL=HIGHASCGEXF` (and again at `multi-user` if the label node exists but the mount is still down). Disable with `/etc/highascg/disable-exfat-arrive`.
+If the USB stick enumerates **after** `local-fs.target` (slow hub/port), **`highascg-exfat-arrive.service`** runs when udev sees `LABEL=HIGHASCGEXF`. Disable with `/etc/highascg/disable-exfat-arrive`.
 
 See also: [`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md).

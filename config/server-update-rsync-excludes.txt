@@ -1,5 +1,5 @@
-# rsync excludes: exfat/update/server/ → ~/highascg (server-only drop)
-# UI stays on stick under sim/highascg (client/) or dist-web/ — never overwritten from update/server/
+# rsync excludes: exfat/drop-update/ → ~/highascg (server-only drop)
+# UI runs on operator workstations (Electron) — never overwritten from drop-update/
 client/
 dist-web/
 node_modules/

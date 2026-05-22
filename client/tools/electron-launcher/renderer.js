@@ -100,7 +100,7 @@ async function pollUsbStatus() {
       } else {
         checkPayload.classList.remove('checked')
         checkPayload.querySelector('.check-box').textContent = '!'
-        checkPayloadDetails.textContent = `Payload folder 'sim/highascg/' not found. Place the extracted release files on the stick.`
+        checkPayloadDetails.textContent = `Server drop folder 'drop-update/' not found. Extract highascg-server_*.tar.gz there for playout updates.`
       }
     } else {
       usbIndicator.className = 'indicator-dot status-warning'

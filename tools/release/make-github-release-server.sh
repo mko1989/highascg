@@ -106,11 +106,11 @@ trap 'rm -f "$NOTES"' EXIT
 cat >"$NOTES" <<EOF
 ## HighAsCG server (${STAMP})
 
-Backend + runtime tree for **\`sim/highascg\`** (no browser UI in this asset).
+Backend + runtime tree for playout sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`; no browser UI in this asset).
 
 | Asset | Extract |
 |-------|---------|
-| \`${ARCHIVE_BASENAME}.tar.gz\` | \`mkdir -p <mount>/sim/highascg && tar -xzf … -C <mount>/sim/highascg\` |
+| \`${ARCHIVE_BASENAME}.tar.gz\` | \`mkdir -p <mount>/drop-update && tar -xzf … -C <mount>/drop-update\` |
 
 ${NM_NOTE}
 

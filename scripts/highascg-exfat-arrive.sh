@@ -37,7 +37,6 @@ fi
 
 start_unit highascg-exfat-media-prep.service
 start_unit home-casparcg-highascg-media-exfat.mount
-start_unit highascg-exfat-bootstrap.service
 start_unit highascg-exfat-server-update.service
 start_unit highascg-exfat-sync.service
 
