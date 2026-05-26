@@ -20,7 +20,9 @@ strategy is:
    unit (`highascg-pick-nvidia.service`) runs `ubuntu-drivers devices`,
    compares against the loaded branch, and if a swap is needed: purges the
    stale branch, installs the recommended one from the offline cache,
-   stamps `/var/lib/highascg/nvidia-installed`, reboots.
+   writes `/var/lib/highascg/nvidia-installed` (`gpu_pci=` + `branch=`),
+   reboots. Moving the stick to **another machine** with a different GPU
+   invalidates the marker and triggers a new pick (see **Persistence** below).
 
 4. **`highascg.service` waits for the marker** via a drop-in
    (`ConditionPathExists=/var/lib/highascg/nvidia-installed`) so the app
@@ -55,6 +57,19 @@ sudo PURGE_DEV=1 PURGE_SNAPS=1 BUILD_EGGS=0 bash tools/prepare-eggs-minimal.sh
 sudo eggs produce --nointeractive --clone --max --basename highascg-live
 ```
 
+## `fetch-debs.sh` WARN lines (usually harmless)
+
+`apt-rdepends` lists names that are **not** downloadable `.deb` files:
+
+| Failed name | Why |
+|-------------|-----|
+| `debconf-2.0`, `systemd-sysusers`, `xorg-video-abi-*` | **Virtual** packages (satisfied on the live system at install time). |
+| `libc-dev`, `kldutils` | Virtual; real payload is e.g. **`libc6-dev`** (already in the pool). |
+| `perlapi-5.38.2` | Versioned virtual from Perl. |
+| `nvidia-kernel-common-580-580.159.03` | **Not** a package name — apt-rdepends version pin; the real archive is **`nvidia-kernel-common-580_….deb`** (check `ls /opt/nvidia-pool/nvidia-kernel-common-*`). |
+
+A **~1.2 GiB** pool with **fetched≈190** per driver metapackage and **`nvidia-kernel-common-{535,580,595}_*.deb`** present is normal. Re-run is only needed if **`apt-get download failed: nvidia-driver-…`** appears for a real metapackage, or `du -sh /opt/nvidia-pool` is far below ~1 GiB.
+
 ## Persistence
 
 `--clone` produces a live ISO whose default boot mode does **not** persist
@@ -67,7 +82,18 @@ You must either:
   (changes persist on the installed disk), or
 - **Flash with a persistence partition** (changes persist on the USB itself).
 
-See `../FLASH_AND_PERSIST.md` for the flash procedure.
+See `../FLASH_AND_PERSIST.md` for the flash procedure. **Default overlay size is 4 GiB** (`PERSIST_SIZE_MIB=4096`); it holds OS deltas (drivers, DKMS, `/var`), not operator JSON — use exFAT **`configs/`** for show config.
+
+### Same stick, different machines
+
+With **`/ union`** persistence, the NVIDIA marker and installed driver packages live on the **ext4 `persistence`** slice. On each boot the picker:
+
+1. Reads **`ubuntu-drivers`** recommendation for the **current** GPU.
+2. Compares **`gpu_pci`** / **`branch`** in the marker.
+3. If the GPU or recommended branch changed → purge stale branch, install from **`/opt/nvidia-pool`**, update marker, reboot if needed.
+4. If already loaded and marker matches → no work.
+
+Operator settings are **not** tied to that overlay: they sync via **`HIGHASCGEXF`** (`configs/` ↔ `~/highascg/config/`).
 
 ### Cache the **full** `595` stack (not just two metapackage `.deb` files)
 

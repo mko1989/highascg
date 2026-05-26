@@ -47,7 +47,8 @@
 		"release:github-app": "bash deprecated/tools/release/make-dev-github-release.sh --app-only",
 		"release:github-app:dry": "bash deprecated/tools/release/make-dev-github-release.sh --app-only --dry-run",
 		"eggs:prepare": "sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh",
-		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh"
+		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
+		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh"
 	},
 	"engines": {
 		"node": ">=20"

@@ -3,18 +3,29 @@
 **Default goal:** a stick that **remembers the whole live session** — NVIDIA
 drivers, DeckLink-related config, Tailscale, **`/etc`**, **`/var`**, home
 directories, and **`/home/casparcg/highascg`**. That requires Ubuntu Live
-**`persistence`** + **`persistence.conf`** with **`/ union`**, and booting
-**Live with persistence** every time.
+**`persistence`** + **`persistence.conf`** with **`/ union`**. The ISO must
+pass **`persistence`** on the **default** GRUB kernel line (10 s countdown);
+there is no separate “persistence” menu item to choose after flash.
 
-**WO-47 exFAT data (required on production sticks):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`**, binds **`~/exfat/media` → `~/highascg/media/exfat`**, and runs boot-time sync (**`highascg-exfat-sync.service`**) — installed from **`scripts/install-exfat-systemd-units.sh`**, **`scripts/write-highascg-systemd-unit.sh`**, and **`scripts/install-phase4.sh`**; **Eggs `--clone`** images bake the same logic if you ran **`tools/live-usb/prepare-eggs-clone-with-exfat.sh`** (or **`build-highascg-egg.sh`**) on the build host. After `dd`, run **persistence first** (**2 GiB**), then **exFAT fills the rest** — **`finish-operator-stick.sh`** or **`EXFAT_DATA_ZERO_TOUCH.md`**. Etcher / macOS / Windows steps: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)** (optional local copy: `for_client/USB_STICK_AFTER_FLASH.md`, not in git).
+**Boot branding:** optional **`tools/eggs/live-usb/branding/splash.png`** (GRUB wallpaper) and Plymouth **`highascg`** theme (dark splash instead of purple Ubuntu). See **`tools/eggs/live-usb/branding/README.md`**.
+
+**ISO GRUB (build host):** `build-highascg-egg.sh` runs **`install-eggs-live-grub-theme.sh`**, then **`eggs produce … --theme …/highascg-eggs-theme`**. Eggs **does not** read `theme:` from `eggs.yaml` unless **`--theme`** is passed — without it you get stock **“Live/Installation”** with **no** `persistence`. The default entry is **“Live”** and its `linux` line includes **`persistence`** (`timeout=10`, `default=0`). Verify before `dd`:
+
+```bash
+sudo bash tools/eggs/live-usb/verify-iso-boot-branding.sh /home/eggs/highascg_*.iso
+```
+
+You still need the **`persistence`** ext4 slice on the USB (`finish-operator-stick.sh`); without that partition, the kernel param has no effect. Operator JSON on exFAT syncs whenever **`HIGHASCGEXF`** is mounted, independent of union boot.
+
+**WO-47 exFAT data (required on production sticks):** systemd mounts **`LABEL=HIGHASCGEXF`** at **`/home/casparcg/exfat`**, binds **`~/exfat/media` → `~/highascg/media/exfat`**, and runs boot-time sync (**`highascg-exfat-sync.service --boot`**) — on every boot, **`configs/` on the stick overwrites `~/highascg/config/`** (`bootPrefer: exfat` in **`exfat-sync.json`**), then **`highascg.service`** starts. UI saves **push to exFAT immediately** (then a debounced full sync). Installed from **`scripts/install-exfat-systemd-units.sh`**, **`tools/eggs/live-usb/install-exfat-sync-map.sh`**, **`scripts/write-highascg-systemd-unit.sh`**. After `dd`, run **persistence first** (**4 GiB** default), then **exFAT fills the rest** — **`finish-operator-stick.sh`**. Verify: **`bash tools/eggs/live-usb/verify-config-persistence.sh`**. Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)** (optional local copy: `for_client/USB_STICK_AFTER_FLASH.md`, not in git).
 
 **Automation:** from the HighAsCG repo, after `dd` + `sync` (or **`flash-iso-from-config.sh`**). If **`tools/live-usb/flash-iso.conf`** exists with **`DEVICE=/dev/sdX`**, you can omit the device on the **`add-*`** lines; otherwise pass **`/dev/sdX`** explicitly.
 
 ```bash
-# Production: persistence first (2 GiB default), then exFAT uses the rest of the disk.
+# Production: persistence first (4 GiB default), then exFAT uses the rest of the disk.
 sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso
 # Or:
-# PERSIST_SIZE_MIB=2048 EXFAT_FILL_DISK=1 EXFAT_ISO_PATH=/path/to.iso \
+# PERSIST_SIZE_MIB=4096 EXFAT_FILL_DISK=1 EXFAT_ISO_PATH=/path/to.iso \
 #   sudo bash tools/live-usb/add-union-persistence-partition.sh /dev/sdX
 # EXFAT_ISO_PATH=/path/to.iso EXFAT_FILL_DISK=1 \
 #   sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX
@@ -70,7 +81,7 @@ persistence partition.
 # Find the end of the last existing partition
 sudo parted /dev/sdX unit MiB print free
 
-# Create a fixed-size persistence slice (example: 2 GiB after START_MIB), not the whole tail.
+# Create a fixed-size persistence slice (default 4 GiB after START_MIB), not the whole tail.
 # Replace START_MIB and END_MIB from parted print free / finish-operator-stick dry-run.
 sudo parted -s /dev/sdX -- mkpart primary ext4 START_MIB END_MIB
 
@@ -91,12 +102,12 @@ echo '/ union' | sudo tee /mnt/persist/persistence.conf
 sudo umount /mnt/persist
 ```
 
-## Step 4 — Boot and pick the persistence entry
+## Step 4 — Boot (persistence is the default menu entry)
 
-Insert the USB into a target machine, boot from it, and at the GRUB menu
-choose **"Live with persistence"** (or the equivalent entry; eggs labels it
-explicitly). Subsequent boots remember everything — including the NVIDIA
-driver installed by the first-boot picker.
+Insert the USB into a target machine and boot from it. With the HighAsCG
+eggs theme installed, the **first GRUB entry** already includes **`persistence`**.
+Use **“Live (no persistence)”** only for debugging. Subsequent persistence boots
+remember NVIDIA drivers, `/etc`, and overlay state from the picker.
 
 ## Verifying the picker on a target machine
 
@@ -115,17 +126,38 @@ Expected sequence:
 2. `highascg-pick-nvidia.service` runs:
    - If the recommended branch already matches the loaded one → marker stamped, no reboot, `highascg.service` starts immediately.
    - Otherwise → swap drivers, reboot.
-3. (If a reboot happened) Second boot: marker exists, picker is a no-op, `highascg.service` starts.
+3. (If a reboot happened) Second boot: marker exists for **this GPU + branch**, picker is a no-op, `highascg.service` starts.
+
+## Union persistence size (`/ union`)
+
+The overlay stores **every change under `/`** (apt/NVIDIA, `/var`, `/etc`, not just HighAsCG config). **Default stick scripts use `PERSIST_SIZE_MIB=4096` (4 GiB).** Smaller slices fill quickly; operator **show config** should live on **exFAT `configs/`**, not in the 4 GiB slice alone.
+
+## Moving the same USB between machines (NVIDIA)
+
+With **`persistence`** active, **`/var/lib/highascg/nvidia-installed`** lives on the **persistence overlay** (not exFAT). The picker records **`gpu_pci=`** and **`branch=`** in that file.
+
+| Situation | Behaviour |
+|-----------|-----------|
+| Same machine, same GPU, driver already correct | Marker matches → picker exits; no reinstall. |
+| **Different machine** (different PCI id) | Marker is **stale** → removed → `ubuntu-drivers` picks the **recommended** branch for the new GPU → purge/install from **`/opt/nvidia-pool`** if needed → new marker → reboot if swapped. |
+| Same GPU, recommendation changed | Marker branch mismatch → re-pick. |
+
+**What accumulates on the persistence partition:** installed `.deb` payloads, DKMS build trees under **`/var/lib/dkms`**, apt cache, logs — **not** a full ISO copy, but it can exceed 4 GiB on heavy setups. **Show settings** sync to **`HIGHASCGEXF`** via **`configs/`** (survives machine changes without relying on the overlay).
+
+To force a re-pick on one machine: `sudo rm /var/lib/highascg/nvidia-installed` and reboot (with persistence boot).
 
 ## Common gotchas
 
-- **No "with persistence" entry in the boot menu.** Some eggs builds hide
-  it; press `e` at the default entry and append `persistence` to the
-  kernel cmdline, then `Ctrl-X` to boot. To make it permanent, edit the
-  ISO's grub config before flashing or pass it via the eggs theme.
+- **No persistence after reboot.** Confirm you booted the default entry (or
+  re-ran **`install-eggs-live-grub-theme.sh`** before **`eggs produce`**). Check
+  **`cat /proc/cmdline`** contains **`persistence`**. Without the labelled
+  **`persistence`** partition, the param does nothing.
 - **Picker loops forever.** Marker isn't persisting — you booted without
   `persistence`, or the partition isn't labelled exactly `persistence`,
   or the file isn't named exactly `persistence.conf`.
+- **Wrong NVIDIA driver after moving stick to another PC.** Delete
+  **`/var/lib/highascg/nvidia-installed`** on the stick session (or boot once
+  with persistence so the picker sees a new **`gpu_pci`** and re-runs).
 - **`apt-get install` in the picker fails with "no candidate".** Offline
   cache is missing the dependency tree. Re-run `fetch-debs.sh` with all
   the branches you need; verify with `ls /opt/nvidia-pool | wc -l`.

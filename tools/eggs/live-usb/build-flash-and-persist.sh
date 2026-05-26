@@ -129,8 +129,8 @@ if "$DO_FLASH"; then
 	typ=$(lsblk -ndo TYPE "$USB" 2>/dev/null || true)
 	[[ "$typ" == disk ]] || die "Refusing $USB: expected whole disk (TYPE=disk), got TYPE=$typ"
 
-	local_dd_note="After dd: ${PERSIST_SIZE_MIB:-2048} MiB persistence, then exFAT (rest of disk), seed folders."
-	export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-2048}"
+	local_dd_note="After dd: ${PERSIST_SIZE_MIB:-4096} MiB persistence, then exFAT (rest of disk), seed folders."
+	export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-4096}"
 	export EXFAT_FILL_DISK="${EXFAT_FILL_DISK:-1}"
 	if ! "$DO_EXFAT" && ! "$DO_PERSIST"; then
 		local_dd_note="After dd: exFAT and persistence skipped (not for production sticks)."

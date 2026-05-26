@@ -46,6 +46,7 @@ home/casparcg/highascg/log
 home/casparcg/highascg/log/*
 home/casparcg/highascg/cef-cache
 home/casparcg/highascg/cef-cache/*
+home/casparcg/highascg/.env
 home/casparcg/highascg/data
 home/casparcg/highascg/data/*
 home/casparcg/highascg/refs
@@ -64,6 +65,10 @@ home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor
 home/casparcg/.cursor/*
+home/casparcg/.antigravity-ide-server
+home/casparcg/.antigravity-ide-server/*
+home/casparcg/.vscode-server
+home/casparcg/.vscode-server/*
 home/casparcg/.local
 home/casparcg/.local/*
 home/casparcg/.ssh

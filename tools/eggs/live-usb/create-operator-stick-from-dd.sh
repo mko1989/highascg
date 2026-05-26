@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full production USB stick: dd ISO → 2 GiB persistence → exFAT (rest) → seed layout.
+# Full production USB stick: dd ISO → 4 GiB persistence → exFAT (rest) → seed layout.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sdX
@@ -13,10 +13,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${HERE}/usb-env.sh"
 DEV=""
 ISO=""
+ASSUME_YES=false
 
 usage() {
-	echo "Usage: sudo $0 /dev/sdX [--iso /path/to.iso]" >&2
-	echo "  Layout (32 GiB typical): hybrid ISO ~5 GiB · persistence 2 GiB · exFAT remainder." >&2
+	echo "Usage: sudo $0 /dev/sdX [--iso /path/to.iso] [-y]" >&2
+	echo "  Layout (32 GiB typical): hybrid ISO ~5 GiB · persistence 4 GiB · exFAT remainder." >&2
 	exit 1
 }
 
@@ -28,6 +29,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		-h | --help) usage ;;
+		-y | --yes) ASSUME_YES=true ;;
 		--iso)
 			ISO="${2:?}"
 			shift
@@ -74,11 +76,15 @@ echo "DEVICE: $DEV  ($(lsblk -dno SIZE,MODEL "$DEV" 2>/dev/null || true))"
 echo "ISO:    $ISO  ($(numfmt --to=iec-i --suffix=B "$(stat -c%s "$ISO")" 2>/dev/null || stat -c%s "$ISO") bytes)"
 echo "This ERASES all data on $DEV."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-read -r -p "Type YES to continue: " ok
-[[ "$ok" == "YES" ]] || {
-	echo "Aborted."
-	exit 1
-}
+if [[ "$ASSUME_YES" != true ]]; then
+	read -r -p "Type YES to continue: " ok
+	[[ "$ok" == "YES" ]] || {
+		echo "Aborted."
+		exit 1
+	}
+else
+	echo "(-y) Skipping interactive confirmation."
+fi
 
 echo "==> 1/3 Unmount and flash ISO (dd)"
 bash "${HERE}/unmount-usb-for-partitioning.sh" "$DEV" 2>/dev/null || true
@@ -91,7 +97,7 @@ sleep 2
 lsblk -f "$DEV"
 
 echo "==> 2/3 Persistence + exFAT + seed (finish-operator-stick)"
-export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-2048}"
+export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-4096}"
 export EXFAT_FILL_DISK=1
 bash "${HERE}/install-exfat-sync-map.sh"
 bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale

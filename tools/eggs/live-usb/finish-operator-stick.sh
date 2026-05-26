@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Finish a HighAsCG USB after dd: persistence (fixed 2 GiB) then exFAT (rest of disk), seed layout.
+# Finish a HighAsCG USB after dd: persistence (fixed 4 GiB) then exFAT (rest of disk), seed layout.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/finish-operator-stick.sh [/dev/sdX] [--iso /path/to.iso]
 #   sudo bash tools/eggs/live-usb/finish-operator-stick.sh --prune-stale [/dev/sdX] [--iso …]
 #
-# Layout on a 32 GiB stick (typical): ~5 GiB hybrid ISO · 2 GiB persistence · ~24 GiB exFAT.
+# Layout on a 32 GiB stick (typical): ~5 GiB hybrid ISO · 4 GiB persistence · ~22 GiB exFAT.
 # Order: persistence first (no HIGHASCGEXF automount), then exFAT fills the tail.
 #
-# Env (optional): PERSIST_SIZE_MIB (default 2048), EXFAT_AFTER_ISO_MARGIN_MIB (default 1536)
+# Env (optional): PERSIST_SIZE_MIB (default 4096), EXFAT_AFTER_ISO_MARGIN_MIB (default 1536)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ PRUNE=false
 DEV=""
 ISO=""
 
-export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-2048}"
+export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-4096}"
 export EXFAT_FILL_DISK="${EXFAT_FILL_DISK:-1}"
 
 usage() {
@@ -130,4 +130,4 @@ echo "  lsblk -f $DEV"
 echo "  persistence ~${PERSIST_SIZE_MIB} MiB; exFAT should be most of the stick (e.g. ~20+ GiB on 32 GiB)"
 echo "Boot GRUB → Live with persistence"
 bash "$UNMASK_SH"
-echo "Removed legacy sim/ sync: /etc/highascg/exfat-sync.json matches repo (drop-config only)."
+echo "Installed exfat-sync map (configs/, drop-config, state files)."

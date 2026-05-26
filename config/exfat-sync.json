@@ -3,11 +3,40 @@
 	"exfatRoot": "/home/casparcg/exfat",
 	"pairs": [
 		{
+			"id": "modular-config",
+			"label": "Modular settings + Caspar XML (configs/ ↔ config/)",
+			"exfat": "configs",
+			"project": "/home/casparcg/highascg/config",
+			"direction": "both",
+			"bootPrefer": "exfat",
+			"exclude": []
+		},
+		{
 			"id": "drop-config",
-			"label": "Monolithic config overlay",
+			"label": "Optional monolithic highascg.config.json",
 			"exfat": "drop-config/highascg.config.json",
 			"project": "/home/casparcg/highascg/highascg.config.json",
-			"direction": "both"
+			"direction": "both",
+			"bootPrefer": "exfat",
+			"exclude": []
+		},
+		{
+			"id": "state-highascg",
+			"label": "UI/state JSON at repo root",
+			"exfat": "configs/.highascg-state.json",
+			"project": "/home/casparcg/highascg/.highascg-state.json",
+			"direction": "both",
+			"bootPrefer": "exfat",
+			"exclude": []
+		},
+		{
+			"id": "state-module",
+			"label": "Module runtime state",
+			"exfat": "configs/.module-state.json",
+			"project": "/home/casparcg/highascg/.module-state.json",
+			"direction": "both",
+			"bootPrefer": "exfat",
+			"exclude": []
 		}
 	]
 }

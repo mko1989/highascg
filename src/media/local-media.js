@@ -206,6 +206,43 @@ async function createMediaFolder(config, rawPath) {
 }
 
 /**
+ * Move/rename on one volume, or copy+unlink when src/dest are on different mounts (e.g. media/ → media/exfat bind).
+ * @param {string} src
+ * @param {string} dest
+ * @returns {Promise<{ removedSource: boolean, crossDevice?: boolean, warning?: string }>}
+ */
+async function moveFileAcrossDevices(src, dest) {
+	try {
+		await fs.promises.rename(src, dest)
+		return { removedSource: true }
+	} catch (e) {
+		if (e?.code !== 'EXDEV') throw e
+	}
+	const st = await fs.promises.stat(src)
+	if (st.isDirectory()) {
+		throw new Error(
+			'Cannot move a folder across volumes (squashfs/overlay ↔ exFAT). Move files individually or copy the folder on the stick.',
+		)
+	}
+	await fs.promises.mkdir(path.dirname(dest), { recursive: true })
+	await fs.promises.copyFile(src, dest)
+	try {
+		await fs.promises.unlink(src)
+		return { removedSource: true, crossDevice: true }
+	} catch (unlinkErr) {
+		if (unlinkErr?.code === 'EROFS' || unlinkErr?.code === 'EPERM') {
+			return {
+				removedSource: false,
+				crossDevice: true,
+				warning:
+					'File copied to exFAT but the original could not be removed (read-only main media). Delete it manually or boot Live with persistence.',
+			}
+		}
+		throw unlinkErr
+	}
+}
+
+/**
  * @param {object} config
  * @param {string} sourceId
  * @param {string} targetId - can be a new filename or a folder (if folder, file is moved into it)
@@ -214,8 +251,12 @@ async function moveMediaFile(config, sourceId, targetId) {
 	const base = getMediaIngestBasePath(config)
 	const src = resolveMediaFileOnDisk(config, sourceId)
 	if (!src) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Source not found' }) }
-	
-	let dest = resolveSafe(base, targetId)
+
+	const targetNorm = String(targetId || '')
+		.replace(/\\/g, '/')
+		.trim()
+		.replace(/^MEDIA\//i, '')
+	let dest = resolveSafe(base, targetNorm)
 	if (!dest) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid target path' }) }
 
 	try {
@@ -223,12 +264,26 @@ async function moveMediaFile(config, sourceId, targetId) {
 		if (fs.existsSync(dest) && fs.statSync(dest).isDirectory()) {
 			dest = path.join(dest, path.basename(src))
 		}
-		// Ensure parent dir exists
 		await fs.promises.mkdir(path.dirname(dest), { recursive: true })
-		await fs.promises.rename(src, dest)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, source: sourceId, target: targetId }) }
+		const moveResult = await moveFileAcrossDevices(src, dest)
+		const relUnderBase = path.relative(path.resolve(base), dest).split(path.sep).join('/')
+		const body = {
+			ok: true,
+			source: sourceId,
+			target: targetId,
+			id: relUnderBase,
+			...(moveResult.crossDevice ? { crossDevice: true } : {}),
+			...(moveResult.warning ? { warning: moveResult.warning } : {}),
+			...(moveResult.removedSource === false ? { copiedOnly: true } : {}),
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(body) }
 	} catch (e) {
-		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Move failed' }) }
+		const msg = e?.message || 'Move failed'
+		const hint =
+			msg.includes('EXDEV') || msg.includes('cross')
+				? ' Move between main media and exFAT uses copy; ensure HIGHASCGEXF is mounted (Settings → media).'
+				: ''
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: msg + hint }) }
 	}
 }
 

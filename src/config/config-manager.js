@@ -130,6 +130,12 @@ class ConfigManager extends EventEmitter {
 			this._lastConfigChangeJson = payloadJson
 			this._lastConfigChangeAt = now
 			this.emit('change', this.config)
+			try {
+				const { scheduleExfatSyncAfterConfigSave } = require('../system/exfat-sync-on-save')
+				scheduleExfatSyncAfterConfigSave(this.logger)
+			} catch {
+				/* optional on non-Linux / minimal trees */
+			}
 			return true
 		} catch (e) {
 			const code = e && e.code

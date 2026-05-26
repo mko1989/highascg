@@ -8,7 +8,7 @@
 # Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
 # Optional env:
-#   PERSIST_SIZE_MIB=2048     — fixed overlay size (default 2 GiB; not the whole tail)
+#   PERSIST_SIZE_MIB=4096     — fixed overlay size (default 4 GiB; not the whole tail)
 #   PERSIST_ISO_PATH / EXFAT_ISO_PATH — ISO file for safe start after hybrid image
 #   PERSIST_AFTER_ISO_MARGIN_MIB / EXFAT_AFTER_ISO_MARGIN_MIB — default 1536
 #
@@ -197,7 +197,7 @@ def snapshot_partition_flags(dev):
 
 dev = sys.argv[1]
 min_persist_mib = float(os.environ.get("MIN_PERSIST_MIB", "512"))
-persist_size_mib = float(os.environ.get("PERSIST_SIZE_MIB", "2048"))
+persist_size_mib = float(os.environ.get("PERSIST_SIZE_MIB", "4096"))
 
 disk_mib = disk_mib_from_print(dev)
 if disk_mib is None:
@@ -319,10 +319,10 @@ if command -v python3 >/dev/null 2>&1; then
 else
   META=""
   STARTMIB="$(calc_start_legacy)" || exit $?
-  ENDMIB=$((STARTMIB + ${PERSIST_SIZE_MIB:-2048}))
+  ENDMIB=$((STARTMIB + ${PERSIST_SIZE_MIB:-4096}))
 fi
 
-PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-2048}"
+PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-4096}"
 read -r PERSIST_NUM _EXFAT_NUM < <(python3 "$SLOTS_PY" "$DEV")
 echo "Disk $DEV → MBR slot ${PERSIST_NUM} persistence ${STARTMIB}–${ENDMIB} MiB (/ union; slot 1=ISO slot 2=ESP)"
 

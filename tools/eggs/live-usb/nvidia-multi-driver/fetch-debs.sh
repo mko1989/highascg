@@ -71,6 +71,24 @@ if ! command -v apt-rdepends >/dev/null 2>&1; then
   apt-get install -y --no-install-recommends apt-rdepends
 fi
 
+# apt-rdepends lists virtual provides (xorg-video-abi-*, libc-dev) and version-pinned
+# names (nvidia-kernel-common-580-580.159.03) that are not valid apt-get download targets.
+dep_has_pool_archive() {
+  local dep="$1"
+  [[ -n "$dep" ]] || return 1
+  apt-cache show "$dep" 2>/dev/null | grep -q '^Filename:'
+}
+
+dep_skip_quietly() {
+  local dep="$1"
+  case "$dep" in
+    debconf-2.0|kldutils|libc-dev|libxt6|systemd-sysusers) return 0 ;;
+    perlapi-*|xorg-video-abi-*) return 0 ;;
+    nvidia-kernel-common-[0-9]*-[0-9]*) return 0 ;;
+  esac
+  return 1
+}
+
 # Ensure the graphics-drivers PPA is present so ubuntu-drivers / apt see
 # the same branches that ubuntu-drivers will recommend on target machines.
 if ! grep -qiR 'graphics-drivers' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
@@ -91,7 +109,7 @@ for branch in "${branches_to_fetch[@]}"; do
         echo "$pkg"
         apt-rdepends "$pkg" 2>/dev/null \
           | grep -v '^ ' \
-          | grep -vE '^(libc6|libgcc|libstdc|linux-|init|debconf|dpkg|systemd|gcc|g\+\+|glibc|kernel-|coreutils|adduser|dkms-|udev)$' \
+          | grep -vE '^(libc6|libgcc|libstdc|linux-|init|debconf|dpkg|systemd|gcc|g\+\+|glibc|kernel-|coreutils|adduser|dkms-|udev|kldutils|libc-dev|libxt6|perlapi-|xorg-video-abi-|nvidia-kernel-common-[0-9]+-[0-9])' \
           || true
       } | sort -u
     )"
@@ -100,6 +118,19 @@ for branch in "${branches_to_fetch[@]}"; do
     dl_miss=0
     while IFS= read -r dep || [[ -n ${dep:-} ]]; do
       [[ -z "${dep// }" ]] && continue
+      if compgen -G "./${dep}_*.deb" >/dev/null 2>&1; then
+        ((++dl_ok)) || true
+        continue
+      fi
+      if ! dep_has_pool_archive "$dep"; then
+        if dep_skip_quietly "$dep"; then
+          ((++dl_miss)) || true
+        else
+          echo "WARN: no .deb in apt archives (virtual/skip): $dep" >&2
+          ((++dl_miss)) || true
+        fi
+        continue
+      fi
       if apt-get download "$dep" 2>/dev/null; then
         ((++dl_ok)) || true
       else
@@ -107,7 +138,7 @@ for branch in "${branches_to_fetch[@]}"; do
         ((++dl_miss)) || true
       fi
     done <<<"$deps"
-    echo ">>   fetched=$dl_ok  skipped/failed=$dl_miss"
+    echo ">>   fetched=$dl_ok  skipped=$dl_miss (virtual/already-cached — expected)"
   done
 done
 

@@ -26,6 +26,15 @@ Then:
 sudo npm run eggs:build
 ```
 
+## Volatile IDE paths (eggs produce)
+
+Exclude **`home/casparcg/.antigravity-ide-server/*`** (and `.cursor*`, `.vscode-server`) so mksquashfs does not scan live log files that change during the snapshot (“changed size while reading”). After adding lines to the fragment, re-merge:
+
+```bash
+sudo bash tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh --replace
+grep antigravity /etc/penguins-eggs.d/exclude.list
+```
+
 ## What HighAsCG excludes (summary)
 
 **Default (`HIGHASCG_ISO_EMBED_SERVER=1` on prepare):** use **`penguins-eggs-exclude-highascg-embed-server.list`** — server runtime stays on ISO; **`client/`**, **`dist-web/`**, dev trees omitted (UI via Electron launcher).
@@ -41,7 +50,7 @@ sudo npm run eggs:build
 | `home/casparcg/exfat/*` | Mounted at boot (WO-47) |
 | Tailscale state (`var/snap`, `snap/`, `root/snap/`, `var/lib`) | Not cloned (avoid stealing builder node) |
 
-**Stays on ISO:** Caspar `config/casparcg.config`, `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc.
+**Stays on ISO:** Factory **`config/*.json`** (from `defaults.js` at build time), **`config/casparcg.config`** (from `casparcg.config.iso`), `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc. **Not** the build host’s operator JSON or **`.env`**.
 
 See [`docs/WO47_ISO_VS_EXFAT.md`](../../../docs/WO47_ISO_VS_EXFAT.md).
 

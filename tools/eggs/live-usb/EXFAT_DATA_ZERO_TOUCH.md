@@ -52,7 +52,7 @@ Use `dd`, Balena Etcher, or **`tools/live-usb/build-flash-and-persist.sh`** — 
 
 | Goal | Commands |
 |------|-----------|
-| **Production stick (required)** | `sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso` — **persistence first** (**`PERSIST_SIZE_MIB=2048`** default), then **exFAT fills the rest**. On re-flashed sticks with leftover slices, add **`--prune-stale`**. |
+| **Production stick (required)** | `sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso` — **persistence first** (**`PERSIST_SIZE_MIB=4096`** default, 4 GiB), then **exFAT fills the rest**. On re-flashed sticks with leftover slices, add **`--prune-stale`**. |
 | **exFAT only** (dev / not playout) | `EXFAT_FILL_DISK=1 sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX` — **do not** run persistence afterward unless you shrink/repartition manually. |
 | **Persistence only** (broken playout layout) | Not for production — exFAT operator volume is still required for **`drop-update/`** and **`HIGHASCGEXF`**. |
 
@@ -64,7 +64,7 @@ Optional: **`EXFAT_SIZE_MIB=8192`** before **`add-exfat-data-partition.sh`** to 
 
 ## 4. **Boot**
 
-1. Boot **Live with persistence** when you added the persistence partition (GRUB entry / `persistence` cmdline — see **`tools/live-usb/FLASH_AND_PERSIST.md`**).
+1. Boot from the stick (default GRUB entry = **Live with persistence** if the ISO was built with **`install-eggs-live-grub-theme.sh`**). See **`tools/live-usb/FLASH_AND_PERSIST.md`**. exFAT mount/sync runs whenever **`HIGHASCGEXF`** is present, even on the no-persistence menu entry.
 
 2. On boot with **`HIGHASCGEXF`** present: **mount → bind → server-update (`drop-update/`) → mtime sync (node)** — see **[`docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md)** — then **`highascg.service`** if **`package.json`** exists.
 
@@ -94,7 +94,7 @@ You **may** edit **`/etc/highascg/exfat-sync.json`** (or **`config/exfat-sync.js
 
 ### **Portable newer app than the boot partition**
 
-Boot sync (**`highascg-exfat-sync.service`**) applies **`drop-config/highascg.config.json`** ↔ **`~/highascg/highascg.config.json`** (mtime-wins). **Server tree updates** use **`drop-update/`** ( **`highascg-exfat-server-update`** ), not whole-tree mtime sync. Manual sync: **`sudo systemctl start highascg-exfat-sync.service`** or `node tools/runtime/exfat-sync-cli.js`. After a server drop with new lockfile, **`npm ci`** runs automatically when enabled.
+Boot sync (**`highascg-exfat-sync.service`**) applies **`configs/` ↔ `~/highascg/config/`** (modular JSON + `casparcg.config`), **`drop-config/highascg.config.json`**, and state JSON under **`configs/`** (mtime-wins). **After UI saves**, debounced sync pushes to exFAT when mounted (**`HIGHASCG_EXFAT_SYNC_ON_SAVE=1`**). **Server tree updates** use **`drop-update/`** ( **`highascg-exfat-server-update`** ), not whole-tree mtime sync. Manual sync: **`sudo systemctl start highascg-exfat-sync.service`** or `node tools/runtime/exfat-sync-cli.js`. After a server drop with new lockfile, **`npm ci`** runs automatically when enabled.
 
 ---
 

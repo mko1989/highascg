@@ -2,15 +2,18 @@
 
 **What is inside the ISO?** Stack from Ubuntu → nodm/Openbox → NVIDIA → DeckLink → CasparCG → HighAsCG (and WO‑47 exFAT split): **[`docs/ISO_CONTENTS.md`](../../docs/ISO_CONTENTS.md)**.
 
-**All-in-one (build + choose USB + `dd` + `/ union` persistence):**
+**All-in-one (eggs produce → `dd` → persistence + exFAT on `/dev/sda`):**
 
 ```bash
-cd /path/to/highascg
-sudo bash tools/live-usb/build-flash-and-persist.sh
-# sudo bash tools/live-usb/build-flash-and-persist.sh --help
+cd ~/highascg
+sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
+# non-interactive dd confirm: add -y
+# npm run eggs:build-flash
 ```
 
-Use `--flash-only` if the ISO is already built; `--usb /dev/sdX` and `--iso /path` for less interactive use.
+Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt/` (e.g. `highascg_amd64_2026-05-25_2108.iso`), then runs **`create-operator-stick-from-dd.sh`** (4 GiB persistence, exFAT remainder, seed layout).
+
+**Alternate** (pick USB interactively): `sudo bash tools/eggs/live-usb/build-flash-and-persist.sh --help`
 
 ### Operator stick — one command (`build-operator-stick`)
 
@@ -108,9 +111,9 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    sudo bash tools/eggs/live-usb/finish-operator-stick.sh "$USB" --iso "$ISO" --prune-stale
    ```
 
-   Or manually: **`add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=2048`** ) → **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. On a **32 GiB** stick: ~5 GiB ISO · ~2 GiB persistence · ~24 GiB exFAT.
+   Or manually: **`add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=4096`** ) → **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. On a **32 GiB** stick: ~5 GiB ISO · ~4 GiB persistence · ~22 GiB exFAT.
 
-   **Always** boot GRUB’s **Live with persistence** entry. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
+   GRUB default entry includes **`persistence`** when the ISO was built after **`install-eggs-live-grub-theme.sh`**. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
 
    **Narrow alternative (not production playout):** persist only **`~/highascg`** on a separate ext4 — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips NVIDIA/Tailscale/system-wide persistence.
 

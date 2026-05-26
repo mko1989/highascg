@@ -12,8 +12,8 @@ log() {
 
 start_unit() {
 	local u="$1"
-	if ! systemctl start "$u"; then
-		log "warning: systemctl start ${u} failed (continuing)"
+	if ! systemctl start --no-block "$u"; then
+		log "warning: systemctl start --no-block ${u} failed (continuing)"
 	fi
 }
 

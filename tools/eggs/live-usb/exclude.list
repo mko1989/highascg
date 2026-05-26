@@ -156,6 +156,10 @@ home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor
 home/casparcg/.cursor/*
+home/casparcg/.antigravity-ide-server
+home/casparcg/.antigravity-ide-server/*
+home/casparcg/.vscode-server
+home/casparcg/.vscode-server/*
 home/casparcg/.local
 home/casparcg/.local/*
 home/casparcg/.ssh

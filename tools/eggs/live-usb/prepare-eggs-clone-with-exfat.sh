@@ -65,6 +65,9 @@ fi
 echo "==> ISO defaults (Caspar config + optional embedded server)"
 bash "${HERE}/install-iso-defaults.sh"
 
+echo "==> eggs GRUB/isolinux theme (persistence on default boot entry)"
+bash "${HERE}/install-eggs-live-grub-theme.sh"
+
 echo "==> empty mount stubs for squashfs (${HIGHASCG_ROOT}/media *, ~/exfat)"
 bash "${HERE}/ensure-empty-live-usb-dirs.sh"
 

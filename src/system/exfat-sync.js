@@ -62,6 +62,12 @@ function validateMap(m) {
 		if (p.exclude !== undefined && !Array.isArray(p.exclude)) {
 			throw new Error(`exfat-sync map: pair ${id} exclude must be an array of strings`)
 		}
+		if (p.bootPrefer !== undefined && p.bootPrefer !== null && String(p.bootPrefer).trim() !== '') {
+			const bp = String(p.bootPrefer).toLowerCase()
+			if (bp !== 'exfat' && bp !== 'project') {
+				throw new Error(`exfat-sync map: pair ${id} bootPrefer must be exfat or project`)
+			}
+		}
 	}
 	const root = String(m.exfatRoot || '/home/casparcg/exfat').trim() || '/home/casparcg/exfat'
 	const version = Number(m.version) || 1
@@ -309,12 +315,136 @@ function copyFilePreserveTimes(src, dst) {
 }
 
 /**
- * @param {{ dryRun?: boolean, log?: (lvl: string, m: string) => void }} opts
+ * Boot: apply exFAT operator config over ISO/overlay defaults (ignores mtime).
+ * @param {string} exfatAbs
+ * @param {string} projectAbs
+ * @param {boolean} dryRun
+ * @param {string} pairId
+ * @param {(rel: string) => boolean} exPred
+ */
+function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred) {
+	let copied = 0
+	let skipped = 0
+	/** @type {string[]} */
+	const errors = []
+	let exSt = null
+	try {
+		exSt = fs.statSync(exfatAbs)
+	} catch {
+		return { copied: 0, skipped: 1, errors }
+	}
+	if (exSt.isFile()) {
+		const r = syncOneFilePair(exfatAbs, projectAbs, 'both', dryRun, pairId, path.basename(exfatAbs), {
+			bootPreferExfat: true,
+		})
+		return { copied: r.copied, skipped: r.skipped, errors: r.error ? [r.error] : [] }
+	}
+	if (!exSt.isDirectory()) return { copied: 0, skipped: 1, errors }
+	for (const rel of walkRelativeFiles(exfatAbs, exPred)) {
+		const a = path.join(exfatAbs, rel)
+		const b = path.join(projectAbs, rel)
+		let stA = null
+		try {
+			stA = fs.statSync(a)
+		} catch {
+			continue
+		}
+		if (stA.isDirectory()) continue
+		const r = syncOneFilePair(a, b, 'both', dryRun, pairId, rel, { bootPreferExfat: true })
+		copied += r.copied
+		skipped += r.skipped
+		if (r.error) errors.push(r.error)
+	}
+	return { copied, skipped, errors }
+}
+
+/**
+ * Push project config files to exFAT immediately after UI save (no mtime compare).
+ * @param {{ dryRun?: boolean, log?: (lvl: string, m: string) => void, pairIds?: string[] }} opts
+ */
+async function pushProjectConfigToExfat(opts) {
+	const log = opts?.log || (() => {})
+	const dryRun = !!opts?.dryRun
+	const loaded = loadExfatSyncMapFromDisk()
+	if (!loaded.mapPath) return { copied: 0, skipped: 0, errors: [loaded.loadError || 'no map'] }
+	const exfatRoot = path.resolve(loaded.map.exfatRoot || '/home/casparcg/exfat')
+	const mount = await getExfatMountStatus(exfatRoot)
+	if (!mount.mounted) {
+		const msg = `[exfat-sync] push skipped — ${exfatRoot} not mounted`
+		log('warn', msg)
+		return { copied: 0, skipped: 0, errors: [msg] }
+	}
+	const want = new Set(
+		(opts?.pairIds && opts.pairIds.length
+			? opts.pairIds
+			: ['modular-config', 'drop-config', 'state-highascg', 'state-module']
+		).map((x) => String(x)),
+	)
+	let copied = 0
+	let skipped = 0
+	/** @type {string[]} */
+	const errors = []
+	for (const p of loaded.map.pairs) {
+		const id = String(p.id || '').trim()
+		if (!want.has(id)) continue
+		const exfatRel = String(p.exfat || '').trim().replace(/\\/g, '/').replace(/^\/+/, '')
+		const projectPath = String(p.project || '').trim()
+		const exfatAbs = path.join(exfatRoot, exfatRel)
+		const projectAbs = path.resolve(projectPath)
+		let prSt = null
+		try {
+			prSt = fs.statSync(projectAbs)
+		} catch {
+			skipped += 1
+			continue
+		}
+		const exPred = (rel) => isExcluded(rel, Array.isArray(p.exclude) ? p.exclude : [])
+		if (prSt.isFile()) {
+			if (dryRun) {
+				copied += 1
+				continue
+			}
+			try {
+				copyFilePreserveTimes(projectAbs, exfatAbs)
+				copied += 1
+			} catch (e) {
+				errors.push(`${id}: ${e instanceof Error ? e.message : e}`)
+			}
+			continue
+		}
+		if (!prSt.isDirectory()) continue
+		for (const rel of walkRelativeFiles(projectAbs, exPred)) {
+			const b = path.join(projectAbs, rel)
+			const a = path.join(exfatAbs, rel)
+			try {
+				if (!fs.statSync(b).isFile()) continue
+			} catch {
+				continue
+			}
+			if (dryRun) {
+				copied += 1
+				continue
+			}
+			try {
+				copyFilePreserveTimes(b, a)
+				copied += 1
+			} catch (e) {
+				errors.push(`${id} ${rel}: ${e instanceof Error ? e.message : e}`)
+			}
+		}
+	}
+	log('info', `[exfat-sync] push to exFAT copied=${copied} skipped=${skipped}`)
+	return { copied, skipped, errors }
+}
+
+/**
+ * @param {{ dryRun?: boolean, boot?: boolean, log?: (lvl: string, m: string) => void }} opts
  * @returns {Promise<{ copied: number, skipped: number, errors: string[] }>}
  */
 async function runExfatSync(opts) {
 	const log = opts?.log || (() => {})
 	const dryRun = !!opts?.dryRun
+	const boot = !!opts?.boot
 	const loaded = loadExfatSyncMapFromDisk()
 	if (!loaded.mapPath) {
 		const msg = loaded.loadError || 'no exfat sync map'
@@ -339,6 +469,7 @@ async function runExfatSync(opts) {
 		const exfatRel = String(p.exfat || '').trim().replace(/\\/g, '/').replace(/^\/+/, '')
 		const projectPath = String(p.project || '').trim()
 		const direction = String(p.direction || 'both').toLowerCase()
+		const bootPrefer = String(p.bootPrefer || '').toLowerCase()
 		const excludes = Array.isArray(p.exclude) ? p.exclude.map((x) => String(x)) : []
 		const exPred = (rel) => isExcluded(rel, excludes)
 
@@ -351,6 +482,15 @@ async function runExfatSync(opts) {
 			assertSafeProjectPath(projectAbs)
 		} catch (e) {
 			errors.push(`${id}: ${e instanceof Error ? e.message : e}`)
+			continue
+		}
+
+		if (boot && bootPrefer === 'exfat') {
+			const br = syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, id, exPred)
+			copied += br.copied
+			skipped += br.skipped
+			errors.push(...br.errors)
+			log('info', `[exfat-sync] boot ${id}: prefer exFAT → project (copied=${br.copied})`)
 			continue
 		}
 
@@ -370,7 +510,7 @@ async function runExfatSync(opts) {
 		/** Single-file pair (one or both sides may be missing on disk) */
 		if (exSt?.isFile() || prSt?.isFile()) {
 			const rel = path.basename(exfatRel) || id
-			const r = syncOneFilePair(exfatAbs, projectAbs, direction, dryRun, id, rel)
+			const r = syncOneFilePair(exfatAbs, projectAbs, direction, dryRun, id, rel, boot ? { bootPreferExfat: bootPrefer === 'exfat' } : undefined)
 			copied += r.copied
 			skipped += r.skipped
 			if (r.error) errors.push(r.error)
@@ -403,14 +543,14 @@ async function runExfatSync(opts) {
 				stB = fs.statSync(b)
 			} catch {}
 			if (stA?.isDirectory() || stB?.isDirectory()) continue
-			const r = syncOneFilePair(a, b, direction, dryRun, id, rel)
+			const r = syncOneFilePair(a, b, direction, dryRun, id, rel, boot ? { bootPreferExfat: bootPrefer === 'exfat' } : undefined)
 			copied += r.copied
 			skipped += r.skipped
 			if (r.error) errors.push(r.error)
 		}
 	}
 
-	log('info', `[exfat-sync] done dryRun=${dryRun} copied=${copied} skipped=${skipped} errors=${errors.length}`)
+	log('info', `[exfat-sync] done boot=${boot} dryRun=${dryRun} copied=${copied} skipped=${skipped} errors=${errors.length}`)
 	return { copied, skipped, errors }
 }
 
@@ -418,9 +558,10 @@ async function runExfatSync(opts) {
  * @param {string} pathExfat - exfat side path (file may not exist yet)
  * @param {string} pathProject - project side path (file may not exist yet)
  */
-function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel) {
+function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel, syncOpts) {
 	let copied = 0
 	let skipped = 0
+	const bootPreferExfat = !!(syncOpts && syncOpts.bootPreferExfat)
 	/** @type {fs.Stats | null} */
 	let stA = null
 	/** @type {fs.Stats | null} */
@@ -435,6 +576,11 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel)
 	const hasB = stB?.isFile() === true
 	if (!hasA && !hasB) return { copied: 0, skipped: 1 }
 	try {
+		if (bootPreferExfat && hasA) {
+			if (dryRun) return { copied: 1, skipped: 0 }
+			copyFilePreserveTimes(pathExfat, pathProject)
+			return { copied: 1, skipped: 0 }
+		}
 		if (hasA && !hasB) {
 			if (direction === 'to_exfat') return { copied: 0, skipped: 1 }
 			if (dryRun) return { copied: 1, skipped: 0 }
@@ -492,6 +638,7 @@ module.exports = {
 	getExfatSyncDashboard,
 	getExfatMountStatus,
 	runExfatSync,
+	pushProjectConfigToExfat,
 	isExcluded,
 	validateMap,
 }

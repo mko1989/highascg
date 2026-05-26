@@ -3,23 +3,37 @@
 # shellcheck shell=bash
 
 find_latest_iso() {
-	local latest="" t=0 f ts
+	find_newest_iso_since 0 "${BASENAME:-}"
+}
+
+# Newest *.iso under /home/eggs/ (+ mnt/) written at or after EPOCH (0 = any).
+# Optional BASENAME prefix filter (e.g. highascg → highascg_*.iso).
+find_newest_iso_since() {
+	local since="${1:-0}"
+	local prefix="${2:-}"
+	local latest="" t=0 f ts dir base
 	shopt -s nullglob
-	local candidates=(/home/eggs/*.iso /home/eggs/mnt/*.iso)
+	for dir in /home/eggs /home/eggs/mnt; do
+		[[ -d "$dir" ]] || continue
+		for f in "${dir}"/*.iso; do
+			[[ -f "$f" ]] || continue
+			if [[ -n "$prefix" ]]; then
+				base="${f##*/}"
+				[[ "$base" == "${prefix}"* ]] || [[ "$base" == "${prefix}_"* ]] || continue
+			fi
+			ts=$(stat -c %Y "$f" 2>/dev/null) || continue
+			((ts >= since)) || continue
+			if ((ts >= t)); then
+				t=$ts
+				latest=$f
+			fi
+		done
+	done
 	shopt -u nullglob
-	[[ ${#candidates[@]} -gt 0 ]] || {
-		echo "No *.iso found under /home/eggs/ or /home/eggs/mnt/. Build first or pass --iso." >&2
+	[[ -n "$latest" ]] || {
+		echo "No *.iso under /home/eggs/ (since epoch ${since}${prefix:+, prefix ${prefix}})." >&2
 		return 1
 	}
-	for f in "${candidates[@]}"; do
-		[[ -f "$f" ]] || continue
-		ts=$(stat -c %Y "$f" 2>/dev/null) || continue
-		if ((ts >= t)); then
-			t=$ts
-			latest=$f
-		fi
-	done
-	[[ -n "$latest" ]] || return 1
 	printf '%s' "$latest"
 }
 

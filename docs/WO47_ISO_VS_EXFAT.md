@@ -31,7 +31,7 @@ Excluded from the snapshot; applied from **`exfat/drop-update/`** when the stick
 
 **First boot / hotfix:** **`highascg-exfat-server-update.service`** rsyncs **`drop-update/`** → **`~/highascg/`** when **`drop-update/package.json`** exists (stops **`highascg.service`**, optional **`npm ci`**, archives drop to **`drop-update/applied/<UTC>/`**). Legacy **`update/server/`** is still accepted once.
 
-Then **`highascg-exfat-sync.service`** runs **`node tools/runtime/exfat-sync-cli.js`** ( **`drop-config/`** mtime sync per **`/etc/highascg/exfat-sync.json`**).
+Then **`highascg-exfat-sync.service`** runs **`node tools/runtime/exfat-sync-cli.js`** (**`configs/` ↔ `config/`**, **`drop-config/`**, state JSON per **`/etc/highascg/exfat-sync.json`**; post-save debounced sync from the Node app).
 
 **`sim/highascg/`** is not used on playout sticks (simulation runs from the **Electron launcher**). Legacy **`highascg-exfat-bootstrap`** is disabled by default.
 
@@ -48,7 +48,7 @@ Then **`highascg-exfat-sync.service`** runs **`node tools/runtime/exfat-sync-cli
 
 By default **`prepare-eggs-clone-with-exfat.sh`** sets **`HIGHASCG_ISO_EMBED_SERVER=1`** and **`HIGHASCG_ISO_BUILD_WEB=0`**:
 
-- Installs **`config/casparcg.config`** from **`config/casparcg.config.iso`** (single **720p50** windowed borderless screen consumer).
+- Resets **`config/*.json`** from **`src/config/defaults.js`** (not the eggs build host’s saved settings) via **`reset-iso-operator-config.sh`**; installs **`config/casparcg.config`** from **`config/casparcg.config.iso`** (single **720p50** windowed borderless screen consumer); copies **`.env.example` → `.env`** (headless stub; build-host **`.env`** is excluded from squashfs).
 - Runs **`npm ci --omit=dev`** so **`package.json`**, **`src/`**, **`node_modules/`** are in the squashfs — **not** **`dist-web/`** (operator UI via Electron; see [`PLAN_SERVER_CLIENT_SPLIT.md`](PLAN_SERVER_CLIENT_SPLIT.md)).
 - **`highascg.service.d/10-headless.conf`** sets **`HIGHASCG_HEADLESS=true`** (API-only on playout).
 - Merges **`penguins-eggs-exclude-highascg-embed-server.list`** (excludes **`client/`**, **`dist-web/`**, dev trees).

@@ -21,17 +21,7 @@ if [[ ! -f "${REPO_ROOT}/package.json" ]]; then
 	exit 1
 fi
 
-ISO_CASPAR="${REPO_ROOT}/config/casparcg.config.iso"
-LIVE_CASPAR="${HIGHASCG_ROOT}/config/casparcg.config"
-
-if [[ ! -f "$ISO_CASPAR" ]]; then
-	echo "Missing ${ISO_CASPAR}" >&2
-	exit 1
-fi
-
-mkdir -p "$(dirname "$LIVE_CASPAR")"
-cp -a "$ISO_CASPAR" "$LIVE_CASPAR"
-echo "==> Caspar config: ${LIVE_CASPAR} (from casparcg.config.iso)"
+bash "${HERE}/reset-iso-operator-config.sh"
 
 if [[ "$EMBED" != "1" ]]; then
 	echo "==> HIGHASCG_ISO_EMBED_SERVER=0 — skipping npm ci / dist-web (WO-47 exFAT-only server)"
