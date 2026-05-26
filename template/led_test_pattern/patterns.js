@@ -171,7 +171,17 @@ export const Patterns = {
 
 					const imgEl = images[ch.imgIndex];
 					if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
-						ctx.drawImage(imgEl, ch.x, ch.y, bounceSize, bounceSize);
+						let drawW = bounceSize;
+						let drawH = bounceSize;
+						const ratio = imgEl.naturalWidth / imgEl.naturalHeight;
+						if (ratio > 1) {
+							drawH = bounceSize / ratio;
+						} else {
+							drawW = bounceSize * ratio;
+						}
+						const offsetX = (bounceSize - drawW) / 2;
+						const offsetY = (bounceSize - drawH) / 2;
+						ctx.drawImage(imgEl, ch.x + offsetX, ch.y + offsetY, drawW, drawH);
 					} else {
 						ctx.fillStyle = '#00ff00';
 						ctx.fillRect(ch.x, ch.y, bounceSize, bounceSize);
