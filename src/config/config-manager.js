@@ -18,7 +18,6 @@ const MODULAR_KEYS = [
 	'dmx',
 	'rtmp',
 	'usbIngest',
-	'mediaMount',
 	'streamingChannel',
 	'recordOutputs',
 	'audioOutputs',
@@ -59,12 +58,16 @@ class ConfigManager extends EventEmitter {
 			if (fs.existsSync(this.configPath)) {
 				const stats = fs.statSync(this.configPath)
 				if (stats.isDirectory()) {
-					this.config = finalizeScreenDestinationsConfig(this._loadModular(this.configPath))
+					this.config = finalizeScreenDestinationsConfig(
+						this._stripLegacyMediaMount(this._loadModular(this.configPath)),
+					)
 					this.logger.info(`[Config] Loaded modular config from directory: ${this.configPath}`)
 				} else {
 					const raw = fs.readFileSync(this.configPath, 'utf8')
 					const parsed = JSON.parse(raw)
-					this.config = finalizeScreenDestinationsConfig(this._merge(defaults, parsed))
+					this.config = finalizeScreenDestinationsConfig(
+						this._stripLegacyMediaMount(this._merge(defaults, parsed)),
+					)
 					this.logger.info(`[Config] Loaded monolithic config from ${this.configPath}`)
 				}
 			} else {
@@ -234,6 +237,30 @@ class ConfigManager extends EventEmitter {
 
 	_camelToSnake(str) {
 		return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+	}
+
+	/** WO-38 mediaMount removed — warn once and drop legacy keys from effective config. */
+	_stripLegacyMediaMount(cfg) {
+		const legacy = cfg && cfg.mediaMount
+		const uuid = String(legacy?.uuid || '').trim()
+		if (uuid) {
+			this.logger.warn(
+				`[Config] Ignoring deprecated mediaMount.uuid (${uuid}). Use exFAT (HIGHASCGEXF) for durable config/state/media.`,
+			)
+		}
+		if (legacy) delete cfg.mediaMount
+		if (this.configPath && fs.existsSync(this.configPath)) {
+			try {
+				const stats = fs.statSync(this.configPath)
+				if (stats.isDirectory()) {
+					const legacyFile = path.join(this.configPath, 'media_mount.json')
+					if (fs.existsSync(legacyFile)) fs.unlinkSync(legacyFile)
+				}
+			} catch (e) {
+				this.logger.warn(`[Config] Could not remove legacy media_mount.json: ${e.message}`)
+			}
+		}
+		return cfg
 	}
 
 	/**

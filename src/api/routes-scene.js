@@ -212,6 +212,9 @@ async function handleSceneTake(body, ctx) {
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
+						if (typeof ctx.log === 'function') {
+							ctx.log('info', `[scene-take] pgm->prv exchange done prvCh=${bus1}`)
+						}
 					} catch (e) {
 						if (typeof ctx.log === 'function') ctx.log('warn', `[scene-take] pgm->prv exchange failed: ${e?.message || e}`)
 					}

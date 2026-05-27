@@ -32,7 +32,6 @@ async function handleGet(path, ctx) {
 			screen_1_force_os_resolution: !!(cfg.screen_1_force_os_resolution ?? cs.screen_1_force_os_resolution), screen_2_force_os_resolution: !!(cfg.screen_2_force_os_resolution ?? cs.screen_2_force_os_resolution), screen_3_force_os_resolution: !!(cfg.screen_3_force_os_resolution ?? cs.screen_3_force_os_resolution), screen_4_force_os_resolution: !!(cfg.screen_4_force_os_resolution ?? cs.screen_4_force_os_resolution),
 			x11_horizontal_swap: !!cfg.x11_horizontal_swap, multiview_system_id: cfg.multiview_system_id ?? '', multiview_os_mode: cfg.multiview_os_mode ?? '', multiview_os_backend: cfg.multiview_os_backend ?? 'xrandr', multiview_os_rate: cfg.multiview_os_rate ?? '',
 			usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) },
-			mediaMount: { ...defaults.mediaMount, ...(cfg.mediaMount || {}) },
 			local_media_path: cfg.local_media_path ?? '',
 			streamOutputs: Array.isArray(cfg.streamOutputs) && cfg.streamOutputs.length ? cfg.streamOutputs : [{
 				id: 'str_1',

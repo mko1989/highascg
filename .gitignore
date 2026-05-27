@@ -38,6 +38,7 @@ media/
 /lib/
 _media/
 data/
+!data/nvidia-driver-guide.json
 
 # Live border state polled by pip_* templates (written by Art-Net / inspector)
 template/global-border-live-*.json
@@ -70,3 +71,4 @@ config/*.json
 audio_testing/
 From_client/
 deprecated/
+logs_lap/

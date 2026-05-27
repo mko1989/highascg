@@ -1,24 +1,39 @@
 #!/usr/bin/env bash
+# Build a HighAsCG live ISO with ONE baked NVIDIA driver (535, 580, or 595).
+#
+#   sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh
+#
+# Does NOT download multi-branch /opt/nvidia-pool debs.
 set -euo pipefail
 
-# Build a HighAsCG live ISO with robust network tooling included.
-#
-# Usage:
-#   sudo bash tools/eggs/live-usb/build-highascg-egg.sh
-#
-# Optional env:
-#   NVIDIA_BRANCHES="535 580 595"   (default; align with Settings allow-list / WO-39)
-#   BASENAME="highascg"
+[[ "$(id -u)" -eq 0 ]] || {
+	echo "Run as root: sudo HIGHASCG_NVIDIA_DRIVER=595 $0" >&2
+	exit 1
+}
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Run as root: sudo bash $0" >&2
-  exit 1
-fi
+BR="${HIGHASCG_NVIDIA_DRIVER:-}"
+case "$BR" in
+535 | 580 | 595) ;;
+*)
+	echo "Set HIGHASCG_NVIDIA_DRIVER to 535, 580, or 595 (one driver per ISO)." >&2
+	exit 1
+	;;
+esac
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
-BASENAME="${BASENAME:-highascg}"
-NVIDIA_BRANCHES="${NVIDIA_BRANCHES:-535 580 595}"
+export HIGHASCG_NVIDIA_DRIVER="$BR"
+BASENAME="${BASENAME:-highascg-nvidia-${BR}}"
+
+mkdir -p /etc/highascg
+echo "$BR" > /etc/highascg/nvidia-iso-driver
+chmod 0644 /etc/highascg/nvidia-iso-driver
+echo "[build-highascg-egg] stamped /etc/highascg/nvidia-iso-driver = $BR"
+
+DISABLE="$REPO_ROOT/scripts/disable-nvidia-multi-driver-boot.sh"
+if [[ -f "$DISABLE" ]]; then
+	bash "$DISABLE"
+fi
 
 echo "==> WO-47 exFAT + empty mount stubs + eggs exclude merge (operator-stick truth baked into clone snapshot)"
 SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
@@ -32,9 +47,9 @@ bash "${HERE}/install-eggs-live-grub-theme.sh"
 echo "==> Install network + firmware essentials for live image"
 apt-get update
 apt-get install -y --no-install-recommends \
-  network-manager wpasupplicant isc-dhcp-client \
-  iproute2 ethtool pciutils usbutils rfkill wireless-regdb \
-  linux-firmware netplan.io
+	network-manager wpasupplicant isc-dhcp-client \
+	iproute2 ethtool pciutils usbutils rfkill wireless-regdb \
+	linux-firmware netplan.io
 
 echo "==> Live auto-network without NM (systemd-networkd + netplan)"
 mkdir -p /etc/systemd/network /etc/netplan
@@ -61,10 +76,6 @@ chown root:root /etc/netplan/01-live-networkd.yaml
 systemctl enable systemd-networkd systemd-resolved || true
 ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || true
 
-echo "==> Cache offline NVIDIA branches"
-NVIDIA_BRANCHES="${NVIDIA_BRANCHES}" \
-  bash "${HERE}/nvidia-multi-driver/fetch-debs.sh"
-
 echo "==> Hostname for ISO naming (${BASENAME})"
 hostnamectl set-hostname "${BASENAME}" 2>/dev/null || hostname "${BASENAME}"
 
@@ -80,8 +91,7 @@ THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 	exit 1
 }
 
-echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS}"
-# eggs produce ignores eggs.yaml theme: unless --theme is passed (defaults to stock eggs GRUB).
+echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
 
 echo "==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)"
@@ -106,13 +116,13 @@ fi
 
 echo
 if [[ -n "$BUILT_ISO" ]]; then
-	echo "Done. ISO: ${BUILT_ISO}"
+	echo "Done. ISO: ${BUILT_ISO} (nvidia-${BR}, no nvidia-pool)"
 else
-	echo "Done. ISO is under /home/eggs/ (name starts with ${BASENAME}_)"
+	echo "Done. ISO is under /home/eggs/ (name starts with ${BASENAME}_, nvidia-${BR})"
 fi
 echo
 echo "Full build + flash /dev/sda:"
-echo "  sudo bash ${HERE}/build-produce-flash-stick.sh -y"
+echo "  sudo HIGHASCG_NVIDIA_DRIVER=${BR} bash ${HERE}/build-produce-flash-stick.sh -y"
 echo
 echo "Flash only (this ISO):"
 echo "  sudo bash ${HERE}/create-operator-stick-from-dd.sh /dev/sda --iso ${BUILT_ISO:-/home/eggs/${BASENAME}_*.iso}"

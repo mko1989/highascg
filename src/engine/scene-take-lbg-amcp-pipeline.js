@@ -95,7 +95,9 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			}
 		}
 
-		const prePlayOpacityLines = takeJobs.map((j) => j.prePlayOpacityZeroLine).filter(Boolean)
+		const prePlayOpacityLines = takeJobs
+			.flatMap((j) => [j.prePlayOpacityZeroLine, j.prePlayOpacityFullLine])
+			.filter(Boolean)
 		if (prePlayOpacityLines.length > 0) {
 			await amcp.batchSendChunked(prePlayOpacityLines, { skipMixerPreCommit: true })
 		}
@@ -152,27 +154,22 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					// never fade a layer against itself if state is corrupt.
 					continue
 				}
-				// Deterministic dissolve: always ramp incoming up and paired outgoing down.
-				if (!job.useLoadAuto && !job.hasLoadTransition) {
-					const clIn = `${channel}-${pIn}`
-					let pInTail = `${job.targetOpacity} ${fadeDur}`
-					if (fadeTw) pInTail += ` ${param(fadeTw)}`
-					crossfadeLines.push(`MIXER ${clIn} OPACITY ${pInTail}`)
+				// Only the top layer tweens during crossfade — bottom stays at full opacity (no 50% dip).
+				if (!job.useLoadAuto && (shouldRunBankCrossfade || !job.hasLoadTransition)) {
+					if (job.incomingIsAboveOutgoing) {
+						const clIn = `${channel}-${pIn}`
+						let pInTail = `${job.targetOpacity} ${fadeDur}`
+						if (fadeTw) pInTail += ` ${param(fadeTw)}`
+						crossfadeLines.push(`MIXER ${clIn} OPACITY ${pInTail}`)
+					} else {
+						const clOut = `${channel}-${pOut}`
+						let pOutTail = `0 ${fadeDur}`
+						if (fadeTw) pOutTail += ` ${param(fadeTw)}`
+						crossfadeLines.push(`MIXER ${clOut} OPACITY ${pOutTail}`)
+					}
 				}
-
-				const clOut = `${channel}-${pOut}`
-				let pOutTail = `0 ${fadeDur}`
-				if (fadeTw) pOutTail += ` ${param(fadeTw)}`
-				crossfadeLines.push(`MIXER ${clOut} OPACITY ${pOutTail}`)
 			}
-			for (const layer of exitMedia) {
-				const pOut = phys(Number(layer.layerNumber), activeBank)
-				if (handledOut.has(pOut)) continue
-				const clOut = `${channel}-${pOut}`
-				let p = `0 ${fadeDur}`
-				if (fadeTw) p += ` ${param(fadeTw)}`
-				crossfadeLines.push(`MIXER ${clOut} OPACITY ${p}`)
-			}
+			// Orphan exit layers on the active bank: cleared in teardown after fadeMs, not faded here.
 			// Tween the global border in sync with the bank crossfade so it never cuts in/out.
 			if (gbWillFadeIn) {
 				crossfadeLines.push(
@@ -186,7 +183,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		}
 		const needsIncomingFadePreroll =
 			(shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)) ||
-			(isMergeTransition && takeJobs.some((j) => j.hasLoadTransition))
+			(isMergeTransition && fadeDur > 0 && takeJobs.some((j) => j.isMerge && j.loadPlan))
 		const prebufferMs = needsIncomingFadePreroll ? 180 : 80
 		await new Promise((r) => setTimeout(r, prebufferMs))
 
@@ -213,14 +210,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				fadeClockRef.start = Date.now()
 				notifyProgramTransitionStarted()
 			} else if (isMergeTransition && takeJobs.some((j) => j.playPlan)) {
-				const mergePlayLines = []
+				const animatePlayLines = []
 				for (const job of takeJobs) {
 					if (!job.playPlan) continue
 					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-					mergePlayLines.push(`PLAY ${job.playPlan.channel}-${job.playPlan.layer}`)
+					animatePlayLines.push(serializeClipCommandPlan(job.playPlan))
 				}
-				if (mergePlayLines.length > 0) {
-					await sendAmcpLinesSequential([commitLine, ...mergePlayLines], amcp)
+				if (animatePlayLines.length > 0) {
+					await sendAmcpLinesSequential([commitLine, ...animatePlayLines, commitLine], amcp)
 					fadeClockRef.start = Date.now()
 					notifyProgramTransitionStarted()
 				} else {

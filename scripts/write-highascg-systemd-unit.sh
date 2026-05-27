@@ -28,21 +28,21 @@ if [[ ! -f "${HIGHASCG_HOME}/package.json" ]]; then
 	echo "Note: ${HIGHASCG_HOME}/package.json not present yet — enabling highascg.service anyway (skipped at boot until synced)." >&2
 fi
 
-if [[ -f /etc/systemd/system/home-casparcg-exfat.mount ]] &&
-	[[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
-	# Apply exFAT configs/ → ~/highascg/config before Node loads settings (exfat-boot uses --no-block; no deadlock).
-	AF_LIST="network.target home-casparcg-exfat.mount"
-	WA_LIST="home-casparcg-exfat.mount"
-	if [[ -f /etc/systemd/system/highascg-exfat-server-update.service ]]; then
-		AF_LIST="$AF_LIST highascg-exfat-server-update.service"
-		WA_LIST="${WA_LIST:+$WA_LIST }highascg-exfat-server-update.service"
+if [[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
+	# Do NOT Wants/After home-casparcg-exfat.mount — missing HIGHASCGEXF used to block
+	# highascg for ~90s (device-timeout). Mount is started by exfat-boot / udev arrive only.
+	# Sync is ConditionPathIsMountPoint-gated and skips instantly when exFAT is absent.
+	AF_LIST="network.target"
+	WA_LIST=""
+	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
+		AF_LIST="$AF_LIST highascg-exfat-boot.service"
 	fi
 	AF_LIST="$AF_LIST highascg-exfat-sync.service"
-	WA_LIST="${WA_LIST:+$WA_LIST }highascg-exfat-sync.service"
+	WA_LIST="highascg-exfat-sync.service"
 	if [[ -f /etc/systemd/system/highascg-exfat-bootstrap.service ]] &&
 		[[ ! -f /etc/highascg/disable-exfat-bootstrap ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-bootstrap.service"
-		WA_LIST="${WA_LIST:+$WA_LIST }highascg-exfat-bootstrap.service"
+		WA_LIST="${WA_LIST} highascg-exfat-bootstrap.service"
 	fi
 	read -r -d '' HIGHASCG_UNIT_DEPS <<EUD || true
 After=${AF_LIST}
@@ -85,6 +85,9 @@ cat <<'EOF' >"$HEADLESS_DROPIN"
 Environment=HIGHASCG_HEADLESS=true
 EOF
 chmod 0644 "$HEADLESS_DROPIN"
+
+# Single-driver ISO: no first-boot NVIDIA picker gate
+rm -f /etc/systemd/system/highascg.service.d/10-wait-for-nvidia.conf 2>/dev/null || true
 
 systemctl daemon-reload
 systemctl enable highascg.service 2>/dev/null || true

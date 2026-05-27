@@ -40,13 +40,29 @@ if [ "$HAS_NVIDIA_GPU" = true ]; then
     
     if [ "$SHOULD_INSTALL_NVIDIA" = true ]; then
         apt install -y ubuntu-drivers-common
-        DRIVER_NAME=$(ubuntu-drivers devices 2>/dev/null | grep recommended | awk '{print $3}')
-        if [ -n "$DRIVER_NAME" ]; then
-            echo "  Installing recommended: $DRIVER_NAME"
-            apt install -y "$DRIVER_NAME"
+        if [ -n "${HIGHASCG_NVIDIA_DRIVER:-}" ]; then
+            case "${HIGHASCG_NVIDIA_DRIVER}" in
+            535|580|595)
+                echo "  Installing pinned ISO driver: nvidia-driver-${HIGHASCG_NVIDIA_DRIVER}"
+                apt install -y "nvidia-driver-${HIGHASCG_NVIDIA_DRIVER}" "nvidia-dkms-${HIGHASCG_NVIDIA_DRIVER}"
+                mkdir -p /etc/highascg
+                echo "${HIGHASCG_NVIDIA_DRIVER}" > /etc/highascg/nvidia-iso-driver
+                ;;
+            *)
+                echo -e "  ${YELLOW}HIGHASCG_NVIDIA_DRIVER invalid — use 535, 580, or 595${NC}"
+                DRIVER_NAME=$(ubuntu-drivers devices 2>/dev/null | grep recommended | awk '{print $3}')
+                [ -n "$DRIVER_NAME" ] && apt install -y "$DRIVER_NAME" || apt install -y nvidia-driver-550
+                ;;
+            esac
         else
-            echo "  Fallback: nvidia-driver-550"
-            apt install -y nvidia-driver-550
+            DRIVER_NAME=$(ubuntu-drivers devices 2>/dev/null | grep recommended | awk '{print $3}')
+            if [ -n "$DRIVER_NAME" ]; then
+                echo "  Installing recommended: $DRIVER_NAME"
+                apt install -y "$DRIVER_NAME"
+            else
+                echo "  Fallback: nvidia-driver-550"
+                apt install -y nvidia-driver-550
+            fi
         fi
         apt install -y nvidia-persistenced
         systemctl unmask nvidia-persistenced

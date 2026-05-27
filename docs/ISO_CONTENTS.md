@@ -13,7 +13,7 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 | Region | What it is |
 |--------|------------|
 | **Hybrid ISO partition(s)** | Bootable live system (this document). |
-| **Optional persistence** | ext4 **`persistence`** + **`/ union`** — survives reboots (drivers, `/etc`, `/var`, home). See [`FLASH_AND_PERSIST.md`](../tools/eggs/live-usb/FLASH_AND_PERSIST.md). |
+| **Operator data (exFAT)** | Label **`HIGHASCGEXF`** — configs, media, server drops; survives reboot when the stick is prepared with WO-47. No union **`/ union`** persistence partition. See [`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md). |
 | **exFAT `HIGHASCGEXF`** | Operator data: **`update/server/`**, media, templates, configs — **not** inside the squashfs. See [§ WO‑47 split](#wo-47-what-is-on-the-iso-vs-on-exfat). |
 
 ---
@@ -30,7 +30,7 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 ├─────────────────────────────────────────────────────────────┤
 │  X11 :0 — nodm → openbox-session (user casparcg)            │
 ├─────────────────────────────────────────────────────────────┤
-│  Drivers: NVIDIA (baked branch + /opt/nvidia-pool picker)   │
+│  Drivers: NVIDIA (one branch per ISO — 535 / 580 / 595)     │
 │           DeckLink desktopvideo (DKMS blackmagic_io)        │
 │           NDI (libndi in tree + ~/highascg/lib copies)     │
 ├─────────────────────────────────────────────────────────────┤
@@ -96,10 +96,10 @@ Stock **`casparcg-server.service`** is **disabled** — Caspar is started from O
 
 | Item | Notes |
 |------|------|
-| **Driver on build host** | Whatever was installed when the image was cloned (often **535** series via `ubuntu-drivers` / `install-phase2.sh`) |
-| **`/opt/nvidia-pool/`** | Offline **`.deb`** cache for branches **535 / 580 / 595** (`fetch-debs.sh` during full egg build) |
-| **`highascg-pick-nvidia.service`** | First-boot oneshot: `ubuntu-drivers` recommendation vs loaded branch; swap from pool; reboot if needed |
-| **`highascg.service` drop-in** | Waits for **`/var/lib/highascg/nvidia-installed`** marker before starting HighAsCG |
+| **Driver on build host** | Set **`HIGHASCG_NVIDIA_DRIVER=535\|580\|595`** before install + `eggs produce` (one branch per ISO) |
+| **`/etc/highascg/nvidia-iso-driver`** | Stamp file baked into the image (e.g. `595`) |
+| **`GET /api/system/gpu-nvidia`** | Read-only status + GPU → branch recommendation (`data/nvidia-driver-guide.json`) |
+| **No** `/opt/nvidia-pool` | Multi-driver pool removed — see **`work/work-orders/WO_single-nvidia-driver-per-iso.md`** |
 | **X session** | `__GL_SYNC_TO_VBLANK=0`, `highascg-nvidia-x-apply.sh`, **`nvidia-settings`** |
 
 Settings UI: **Application Settings → system** can apply another branch from the pool (WO‑39) when HighAsCG is deployed.
@@ -194,7 +194,7 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 2. **`highascg-exfat-media-prep`** + bind **`exfat/media`** → **`~/highascg/media/exfat`**  
 3. **`highascg-exfat-server-update`** — apply **`update/server/`** → **`~/highascg`** when pending  
 4. **`highascg-exfat-sync`** — mtime sync **`drop-config/`** (and configured pairs)    
-5. **`highascg-pick-nvidia`** (first boot)  
+5. **`highascg.service`** (no NVIDIA first-boot picker)  
 6. **`nodm`** → Openbox → Caspar  
 7. **`highascg.service`** — Node app when **`package.json`** exists  
 
@@ -209,7 +209,6 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 | `home-casparcg-highascg-media-exfat.mount` | Bind exFAT media into tree |
 | `highascg-exfat-server-update.service` | Apply **`update/server/`** server drop |
 | `highascg-exfat-sync.service` | Boot sync via **`exfat-sync-cli.js`** |
-| `highascg-pick-nvidia.service` | First-boot NVIDIA branch selection |
 | `highascg.service` | HighAsCG Node server |
 | `nodm.service` | X11 for **casparcg** |
 
@@ -260,7 +259,7 @@ sudo bash deprecated/tools/release/make-dev-github-release-iso-quick.sh
 |----------|--------|
 | Ubuntu + kernel + systemd? | **Yes** (clone of build host) |
 | nodm + Openbox + X? | **Yes**, if install.sh ran |
-| NVIDIA driver + `/opt/nvidia-pool`? | **Yes** on full **`build-highascg-egg.sh`** build |
+| NVIDIA driver per ISO? | Set **`HIGHASCG_NVIDIA_DRIVER`** on build host; **`npm run eggs:build`** |
 | DeckLink **desktopvideo**? | **Yes**, if installed on build host before produce |
 | Caspar + scanner binaries? | **Yes**, if install.sh ran |
 | **`~/highascg/config/casparcg.config`** stub? | **Yes** (minimal shell) |

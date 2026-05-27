@@ -81,20 +81,31 @@ MIXER {ch}-{pOut} OPACITY 0 {fadeDur} [{tween}]
 → MIXER {ch} COMMIT
 ```
 
-### Phase B — Merge-only outgoing opacity (optional)
+### Phase B — +Animate outgoing-only opacity (optional)
 
-**When:** transition type is **MERGE / Animate** (`isMergeTransition`), `fadeDur > 0`.
+**When:** `+ Animate` / `+ MERGE` (`isMergeTransition`), `fadeDur > 0`.
 
-Appended to `mergeMixerExtras` (batched in phase D):
+Appended to `mergeMixerExtras` for layers **leaving** the look (not replaced by a takeJob):
 
 ```
-# Per exit layer NOT replaced by a takeJob this beat (logical layer ln):
 MIXER {ch}-{ln} OPACITY 0 {fadeDur} [{tween}] DEFER
-# + PIP overlay opacity DEFER lines
-
-# If global border fading in/out on merge:
-MIXER {ch}-{gbLayer} OPACITY 1|0 {fadeDur} [{tween}] DEFER
 ```
+
+Replaced layers use **PLAY MIX** on the on-air physical layer — no `MIXER OPACITY <dur>` on that slot.
+
+### Phase B2 — +Animate take sandwich
+
+**When:** `isMergeTransition`, `takeJobs` with `playPlan`.
+
+Prep: `LOADBG` (no MIX) + immediate `MIXER FILL … {fadeDur} {tween}` + DEFER mixer extras.
+
+```
+MIXER {ch} COMMIT
+PLAY {ch}-{pOnAir} "{clip}" MIX {fadeDur} [{tween}]
+MIXER {ch} COMMIT
+```
+
+`pOnAir = phys(logicalN, activeBank)`. Bank pointer **not** flipped after animate.
 
 ### Phase C — Main AMCP pipeline (`runSceneTakeLbgAmcpPipeline`)
 
@@ -148,10 +159,11 @@ MIXER {ch}-{pLayer} VOLUME {vol} [DEFER]
 # + effect lines (BLEND, BRIGHTNESS, …) [DEFER]
 ```
 
-**Pre-play hide** (bank crossfade, separate batch):
+**Pre-play opacity** (bank crossfade, separate batch):
 
 ```
-MIXER {ch}-{pLayer} OPACITY 0 0              # per job with incomingStartsHidden
+MIXER {ch}-{pLayer} OPACITY 0 0              # incoming on bank B (top) — incomingStartsHidden
+MIXER {ch}-{pLayer} OPACITY {target} 0       # incoming on bank A (under) — prePlayOpacityFullLine
 ```
 
 #### C.3 PIP remove / add
@@ -181,12 +193,14 @@ MIXER {ch}-{oLayer} OPACITY 1 DEFER
 
 **Preroll:** 80 ms (180 ms if incoming hidden or merge+load transition).
 
-**Bank crossfade** builds `crossfadeLines`:
+**Bank crossfade** builds `crossfadeLines` (only **one** layer tweens — avoids ~50% composite dip):
 
 ```
-MIXER {ch}-{pIn} OPACITY {targetOpacity} {fadeDur} [{tween}]   # if not LOAD auto
-MIXER {ch}-{pOut} OPACITY 0 {fadeDur} [{tween}]                 # paired outgoing
-# + exitMedia not in takeJobs
+# incoming on bank B (above outgoing):
+MIXER {ch}-{pIn} OPACITY {targetOpacity} {fadeDur} [{tween}]
+# incoming on bank A (below outgoing):
+MIXER {ch}-{pOut} OPACITY 0 {fadeDur} [{tween}]
+# + exitMedia not in takeJobs → teardown only, not faded here
 # + global border opacity fade lines on 998/996 if gbWillFadeIn/Out
 ```
 

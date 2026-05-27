@@ -2,7 +2,9 @@
 
 **Context:** Issues seen on a live ISO test machine (RTX 3060, analog minijack, operator USB). Use this as a **pre-flight checklist** before the next stick build and as **on-site recovery** steps on a booted system.
 
-**Related:** [`tools/eggs/live-usb/FLASH_AND_PERSIST.md`](../tools/eggs/live-usb/FLASH_AND_PERSIST.md), [`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md), WO‑47 [`docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), WO‑35 [`work/work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md`](work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md), audio [`docs/guides/audio/audio-setup-guide.md`](../docs/guides/audio/audio-setup-guide.md).
+**Related:** [`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md), WO‑47 [`docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), WO‑35 [`work/work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md`](work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md), audio [`docs/guides/audio/audio-setup-guide.md`](../docs/guides/audio/audio-setup-guide.md).
+
+> **2026-05 update:** Union **`/ union`** persistence and WO‑38 **`media/drive`** mount were removed — operator sticks use **plain Live + exFAT (`HIGHASCGEXF`) only**. See [`work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md`](work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md).
 
 ---
 
@@ -10,57 +12,47 @@
 
 | # | Symptom | Likely root cause | Fix priority |
 |---|---------|-------------------|--------------|
-| 1 | Everything gone after reboot | Booted **plain Live** (RAM overlay) and/or stick never got **union persistence** + **exFAT** partitions; data written under squashfs/overlay paths | **Blocker** for next stick |
+| 1 | Everything gone after reboot | Stick missing **exFAT (`HIGHASCGEXF`)** or data written only under RAM overlay paths (`~/highascg` before exFAT mount) | **Blocker** for next stick |
 | 2 | No sound on rear 3.5 mm | Wrong ALSA **card/profile** (GPU HDMI vs onboard HDA); ISO **minimal Caspar config** (no audio consumer); PipeWire default sink not analog | High |
 | 3 | Broken GPU connector IDs (`None 0/1`, one screen) | **xrandr** only lists connected heads; NVIDIA **DP pair drift**; default topology ≠ RTX 3060 layout | High (Device View + OS layout) |
 
 ---
 
-## 1. exFAT / persistence — “completely fresh” after reboot
+## 1. exFAT — “completely fresh” after reboot
 
 ### How it is supposed to work
 
-The operator stick has **two different** persistence mechanisms:
-
 | Layer | Partition | Label | What survives reboot |
 |-------|-----------|-------|----------------------|
-| **A. Union overlay** | ext4 tail slice | `persistence` | Changes under **`/`** when booting **Live with persistence**: `/etc`, `/var`, apt/NVIDIA, most of `~/highascg` **on the overlay** |
-| **B. WO‑47 exFAT** | exFAT tail (largest slice) | `HIGHASCGEXF` | Files on **`/home/casparcg/exfat/`** (`drop-update/`, `drop-config/`, `media/`, etc.) |
+| **WO‑47 exFAT** | exFAT tail (largest slice) | `HIGHASCGEXF` | Files on **`/home/casparcg/exfat/`** (`drop-update/`, `drop-config/`, `configs/`, `media/`, etc.) |
 
-exFAT files live on a **real partition** on the USB stick. They do **not** require the union overlay — but only if you actually **wrote to the mounted exFAT tree**, not to an empty squashfs stub.
+The live OS root stays on a **RAM overlay** (plain **Live** boot). Only data under the mounted exFAT tree survives reboot.
 
 ### Most common failure modes (field)
 
-1. **ISO flashed with `dd` only** — no `finish-operator-stick.sh` → no `persistence` partition, no `HIGHASCGEXF` partition.
-2. **GRUB: “Try Ubuntu” / plain Live** instead of **“Live with persistence”** → all overlay writes lost on reboot.
-3. **`HIGHASCGEXF` missing or wrong label** → `home-casparcg-exfat.mount` never mounts; `~/exfat` stays an empty directory inside the ISO.
-4. **Setup saved only in RAM paths** — e.g. edited `~/highascg/config/*.json` before exFAT mounted, or used paths that never sync to exFAT (`drop-config/` / exfat-sync map).
-5. **Persistence partition exists but label ≠ `persistence`** or missing `persistence.conf` containing exactly `/ union`.
-6. **Re-partition order wrong** — exFAT added first, then persistence, overlapping layout (see EXFAT doc §3).
+1. **ISO flashed with `dd` only** — no operator exFAT partition prep → no `HIGHASCGEXF` partition.
+2. **`HIGHASCGEXF` missing or wrong label** → `home-casparcg-exfat.mount` never mounts; `~/exfat` stays an empty directory inside the ISO.
+3. **Setup saved only in RAM paths** — e.g. edited `~/highascg/config/*.json` before exFAT mounted, or used paths that never sync to exFAT (`drop-config/` / exfat-sync map).
+4. **Re-partition geometry wrong** — overlapping tail slice (see EXFAT doc §3).
 
 ### Verify on a running system
 
 ```bash
 # Partition table + labels
 lsblk -f /dev/sdX
-blkid | grep -E 'HIGHASCGEXF|persistence'
+blkid | grep HIGHASCGEXF
 
 # exFAT actually mounted (must not be "none" / empty stub)
 findmnt /home/casparcg/exfat
 systemctl status home-casparcg-exfat.mount \
   highascg-exfat-media-prep.service \
   highascg-exfat-sync.service
-
-# Union persistence active (cmdline + mount)
-cat /proc/cmdline | tr ' ' '\n' | grep -i persist
-findmnt /cow /overlay 2>/dev/null || findmnt | grep -E 'overlay|persistence'
 ```
 
 **Pass criteria:**
 
 - `HIGHASCGEXF` mounted at `/home/casparcg/exfat`
-- Boot entry includes **`persistence`** (or overlay backed by labeled `persistence` partition)
-- Operator data visible under `~/exfat/` (e.g. `drop-update/`, `media/`)
+- Operator data visible under `~/exfat/` (e.g. `drop-update/`, `media/`, `configs/`)
 
 ### Fix before next eggs / stick build
 
@@ -70,7 +62,7 @@ findmnt /cow /overlay 2>/dev/null || findmnt | grep -E 'overlay|persistence'
 cd ~/highascg
 ISO=/home/eggs/highascg_*.iso   # your built image
 
-# Production layout: persistence (2 GiB) THEN exFAT fills disk tail
+# Production layout: exFAT tail partition (HIGHASCGEXF)
 sudo bash tools/eggs/live-usb/finish-operator-stick.sh /dev/sdX --iso "$ISO"
 
 # Re-flash leftover partitions from an old stick:
@@ -85,13 +77,13 @@ sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh
 sudo bash tools/eggs/live-usb/build-highascg-egg.sh
 ```
 
-**Operator habit:** Always boot **Live with persistence**. Treat `~/exfat/` as the durable store for configs/media you must keep across machines.
+**Operator habit:** Boot plain **Live**; treat **`~/exfat/`** as the only durable store for configs/media that must survive reboot.
 
 ### Eggs / repo improvements (backlog)
 
-- [ ] Post-flash **smoke script** on stick: assert `blkid` shows both labels, mount units enabled.
+- [ ] Post-flash **smoke script** on stick: assert `blkid` shows `HIGHASCGEXF`, mount units enabled.
 - [ ] First-boot **one-line banner** if `/home/casparcg/exfat` is not a mountpoint (“WO‑47 volume missing — stick not finished”).
-- [ ] Document in ISO installer UI which paths are **exFAT-durable** vs **overlay-only**.
+- [ ] Document in ISO installer UI which paths are **exFAT-durable** vs **RAM overlay-only**.
 
 ---
 
@@ -248,15 +240,14 @@ Run on the **imaging host** before `eggs produce`, and on the **flash host** aft
 ### USB stick (after ISO written)
 
 - [ ] `sudo bash tools/eggs/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso`
-- [ ] `lsblk -f` → `persistence` + `HIGHASCGEXF`
-- [ ] Boot once → verify `findmnt /home/casparcg/exfat` and **Live with persistence** in GRUB
+- [ ] `lsblk -f` → `HIGHASCGEXF`
+- [ ] Boot once → verify `findmnt /home/casparcg/exfat` (plain **Live** GRUB entry)
 - [ ] Audio: `aplay -l` + analog `speaker-test` on PCH card
 - [ ] GPU: `curl …/api/device-view/gpu-map-debug` with expected `gpu_p*` map
 
 ### Operator documentation (one-pager for testers)
 
-1. Boot **Live with persistence** every time.
-2. Durable files → **`/home/casparcg/exfat/`** (or synced paths in exfat-sync map).
+1. Boot plain **Live**; durable files → **`/home/casparcg/exfat/`** (or synced paths in exfat-sync map).
 3. Analog audio → PCH ALSA device, then HighAsCG audio settings / PortAudio.
 4. GPU cabling → **`gpu_p*`** ports; run **GPU ports reset** after hardware changes.
 
@@ -270,20 +261,18 @@ Run on the **imaging host** before `eggs produce`, and on the **flash host** aft
 |------|------|-------|-------|
 | `sda1` | ~5 GiB | `highascg` | Hybrid ISO (iso9660) |
 | `sda2` | 16 MiB | — | ESP |
-| `sda3` | 2 GiB | **`persistence`** | ext4 — union overlay slice **present** |
-| `sda4` | ~20 GiB | **`HIGHASCGEXF`** | exFAT — operator data slice **present** |
+| `sda3` | ~20 GiB | **`HIGHASCGEXF`** | exFAT — operator data slice **present** |
 
-**Labels are correct.** This session did not mount `sda4` at `/home/casparcg/exfat` because the host booted from `nvme1n1p2`, not the stick — only an automount hint at `/run/media/.../persistence`.
+**Label is correct.** This session did not mount `sda3` at `/home/casparcg/exfat` because the host booted from `nvme1n1p2`, not the stick.
 
-**Why setup “vanished” on the playout test:** if the tester booted **plain Live** (no persistence cmdline) or saved under `~/highascg` on the **RAM overlay** before exFAT mounted, reboot wipes that regardless of stick labels. Confirm on the **playout boot**:
+**Why setup “vanished” on the playout test:** data saved under `~/highascg` on the **RAM overlay** before exFAT mounted, or never written under **`/home/casparcg/exfat/`**. Confirm on the **playout boot**:
 
 ```bash
-cat /proc/cmdline | tr ' ' '\n' | grep -i persist
 findmnt /home/casparcg/exfat
-lsblk -f | grep -E 'HIGHASCGEXF|persistence'
+lsblk -f | grep HIGHASCGEXF
 ```
 
-Data that must survive → paths under **`/home/casparcg/exfat/`** (when mounted) or boot **Live with persistence**.
+Data that must survive → paths under **`/home/casparcg/exfat/`** when mounted (and exfat-sync mapped configs).
 
 ---
 

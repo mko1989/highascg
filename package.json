@@ -20,7 +20,6 @@
 		"smoke:previs-stream": "node tools/smoke/smoke-previs-stream.mjs",
 		"smoke:previs-texture-crop": "node tools/smoke/smoke-previs-texture-crop.mjs",
 		"smoke:usb-lsblk": "node --test tools/smoke/smoke-usb-lsblk.js",
-		"smoke:media-mount": "node --test tools/smoke/smoke-media-mount-lsblk.js",
 		"smoke:exfat-sync": "node --test tools/smoke/smoke-exfat-sync.js",
 		"test:device-graph": "node --test tools/smoke/smoke-device-graph.js",
 		"test:device-snapshot": "node --test tools/smoke/smoke-device-snapshot.js",

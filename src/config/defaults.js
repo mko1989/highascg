@@ -301,14 +301,6 @@ module.exports = {
 		verifyHash: false,
 	},
 	/**
-	 * Mount a partition onto /home/casparcg/highascg/media/drive (live USB internal library, WO-38).
-	 * Persists `uuid`; applied at HighAsCG startup via sudo NOPASSWD helper.
-	 */
-	mediaMount: {
-		uuid: '',
-		lastKernelName: '',
-	},
-	/**
 	 * Absolute path matching CasparCG’s template-path directory (same as in casparcg.config XML).
 	 * When set (e.g. `/home/casparcg/highascg/template`), **all** files from HighAsCG’s `templates/` folder are synced here on Caspar connect
 	 * (overwrite). Includes `led_grid_test.html` and full-character assets (`ch_both_open_green.svg`, `ch_left_closed_green.svg`, …), not the small web UI status eyes.

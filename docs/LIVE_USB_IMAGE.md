@@ -4,7 +4,7 @@
 > drivers, DeckLink, NDI, CasparCG (custom CEF build), HighAsCG, autostart
 > configuration — into a bootable ISO that can:
 >
-> 1. **Boot live from USB** (test / emergency playout — see **§7.1 persistence** below)
+> 1. **Boot live from USB** (test / emergency playout — durable data on **exFAT** `HIGHASCGEXF`, see **§7**)
 > 2. **Install to an internal drive** (permanent deployment on new hardware)
 
 ---
@@ -17,7 +17,7 @@
 4. [Method A — penguins-eggs (Recommended)](#4-method-a--penguins-eggs-recommended)
 5. [Method B — Manual SquashFS + GRUB ISO](#5-method-b--manual-squashfs--grub-iso)
 6. [Writing the ISO to USB](#6-writing-the-iso-to-usb)
-7. [Booting the Live USB](#7-booting-the-live-usb) — **§7.1–§7.2 persistence** (why data vanishes / how to fix)
+7. [Booting the Live USB](#7-booting-the-live-usb) — **§7 durable data on exFAT** (not union persistence)
 8. [Installing to a Drive from Live USB](#8-installing-to-a-drive-from-live-usb)
 9. [Post-Install Steps on New Hardware](#9-post-install-steps-on-new-hardware)
 10. [Troubleshooting](#10-troubleshooting)
@@ -237,9 +237,9 @@ compression: zstd           # fast compression, good ratio
 
 This repository ships a **mksquashfs exclude fragment** and helper scripts in
 `tools/eggs/live-usb/`. The goal: **runtime trees under `/home/casparcg/highascg` are
-empty in the live image** (media, logs, cache, etc.), while **WO‑38 / WO‑47
-mount points** such as **`media/drive`** and **`/home/casparcg/exfat`** still
-exist as **empty directories** so systemd can mount onto them after boot.
+empty in the live image** (media, logs, cache, etc.), while **WO‑47**
+mount point **`/home/casparcg/exfat`** still exists as an **empty directory** so
+systemd can mount the operator exFAT volume after boot.
 
 penguins-eggs calls `mksquashfs` with **`-wildcards`**. The patterns use
 **`/*`** where needed so **only the contents** of each directory are excluded;
@@ -253,7 +253,7 @@ same style).
 | File | Role |
 |------|------|
 | `tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list` | Paths under `home/casparcg/highascg/…` (and caches) to omit from squashfs — merge into eggs |
-| `tools/eggs/live-usb/ensure-empty-live-usb-dirs.sh` | `mkdir` + optional `chown` for **`casparcg`** on **`…/media/drive`** and **`/home/casparcg/exfat`** before imaging |
+| `tools/eggs/live-usb/ensure-empty-live-usb-dirs.sh` | `mkdir` + optional `chown` for **`casparcg`** on **`/home/casparcg/exfat`** before imaging |
 | `tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh` | Appends the fragment to `/etc/penguins-eggs.d/exclude.list` (idempotent) |
 | `tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh` | **Preferred one-shot:** WO-47 systemd units, **`exfat-sync`**, **`highascg.service`** deps, **`exfatprogs`**, empty mount stubs, merge excludes (**[`EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md)**) |
 
@@ -538,8 +538,7 @@ sync
 sudo partprobe /dev/sdX
 ```
 
-**HighAsCG — default: full live persistence (`/ union`)** so the stick remembers **NVIDIA, DeckLink-related OS state, Tailscale, `/etc`, `/var`, home, and `~/highascg`**. After imaging the stick: **`sudo bash tools/eggs/live-usb/add-union-persistence-partition.sh /dev/sdX`**, then always boot **Live with persistence** — **`tools/eggs/live-usb/FLASH_AND_PERSIST.md`**, **`tools/eggs/live-usb/BUILD_AND_FLASH.md`**.  
-*(Optional narrow mode: only `~/highascg` on **`HIGHASCG_PERSIST`** — **`tools/eggs/live-usb/HIGHASCG_FOLDER_USB_PARTITION.md`**.)*
+**HighAsCG — after `dd`, add the exFAT data partition** (label **`HIGHASCGEXF`**) for configs, media, and server drops — see **`docs/WO47_ISO_VS_EXFAT.md`**, **`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`**. Boot plain **Live** (no union **`/ union`** persistence partition).
 
 ### From macOS
 
@@ -570,7 +569,7 @@ mode" in Rufus).
 2. Enter BIOS/UEFI (usually `F2`, `F12`, `Del`, or `Esc` at POST).
 3. **Disable Secure Boot** (NVIDIA and DeckLink DKMS modules are unsigned).
 4. Set USB as first boot device, or use the boot menu (`F12` on most boards).
-5. In GRUB, pick the HighAsCG **Live with persistence** entry when you configured **`/ union`** persistence (recommended for NVIDIA, Tailscale, DeckLink OS state); use plain **Live** only for a disposable session. If **Live with persistence** is missing, append **`persistence`** to the kernel cmdline (see **`tools/eggs/live-usb/FLASH_AND_PERSIST.md`**).
+5. In GRUB, pick the default **Live** entry (disposable RAM overlay is fine for the OS root; operator data lives on exFAT).
 
 ### What Happens on Boot
 
@@ -589,38 +588,34 @@ The live system will:
 > If you used `--clone`, your original `casparcg` user and SSH keys are also
 > present.
 
-### 7.1 Live overlay and persistence (why media / settings vanish)
+### 7.1 Why data vanishes on a plain Live session
 
-A normal **live session** stacks a **writable layer** on top of the read-only **`filesystem.squashfs`**.
+A normal **live session** stacks a **writable layer** on top of the read-only **`filesystem.squashfs`**. That layer is usually **RAM** (`tmpfs`), so **reboot clears** anything written only under **`/home`**, **`/etc`**, or **`~/highascg`** during the session.
 
-- On many setups that writable layer lives in **`tmpfs` (RAM)**, not on the bulk storage of the USB stick.
-- The **`toram`** boot flavour is even clearer: copies end up RAM-backed; power-off wipes them.
-- **Reboot clears RAM**, so uploads under **`/home/casparcg/highascg/media`**, Settings changes flushed only to **`/home`** or **`/etc`**, and **`highascg.config`/modular JSON** disappear unless something below is **actually on persistent disks**.
+**Operator rule:** keep anything that must survive on the **exFAT volume** (`HIGHASCGEXF` → **`/home/casparcg/exfat`**), not on the live overlay.
 
-That stick is delivering a mostly **immutable image** unless you enable **explicit persistence** (below) **or** you store libraries somewhere else (**internal SATA/NVMe**, second USB partition, NFS, Syncthing, …).
+### 7.2 Durable storage (exFAT only — current product)
 
-### 7.2 Keeping data across reboots (operators)
+| What | Where |
+|------|--------|
+| Modular config + Caspar XML | exFAT **`configs/`** ↔ **`~/highascg/config/`** (boot sync) |
+| Optional monolithic config | **`drop-config/highascg.config.json`** |
+| UI/state JSON | **`configs/.highascg-state.json`**, **`.module-state.json`** |
+| Media / templates | exFAT **`media/`**, **`templates/`** (bind under playout tree when prepared) |
+| Server code drops | **`drop-update/`** → applied by **`highascg-exfat-server-update.service`** |
 
-Pick one strategy and bake it into the image or systemd layout:
+See **`docs/WO47_ISO_VS_EXFAT.md`**, **`docs/EXFAT_SERVER_UPDATE.md`**, **`config/exfat-sync.json`**.
 
-| Approach | What survives |
-|---------|----------------|
-| **A. Full live persistence — default (`/ union` on eggs/Debian Live)** | After `dd`, **`add-union-persistence-partition.sh`** + GRUB **Live with persistence** — **[`BUILD_AND_FLASH.md`](../../tools/eggs/live-usb/BUILD_AND_FLASH.md)**, **[`FLASH_AND_PERSIST.md`](../../tools/eggs/live-usb/FLASH_AND_PERSIST.md)**. Survives: **NVIDIA/DKMS**, **DeckLink-related `/etc`**, **Tailscale**, **`/var`**, **home**, **`~/highascg`**. |
-| **B. Install to internal disk** (§8) | Normal install persistence. |
-| **C. Stable data mount + `HIGHASCG_CONFIG_PATH`** | HighAsCG reads config from env first (**`index.js`**). Point it at **`/mnt/your-disk/config`** (and optionally put **`media`** next to it) so USB live RAM resets do not wipe operator state. Requires the mount on boot (fstab/unit) **or** repetition each session. |
-| **D. WO‑38 partition on internal disk → `/home/casparcg/highascg/media/drive`** | Large clips on NVMe/SATA survive reboot once mount runs; **`mediaMount` UUID still needs persisted config**, so combine with **C** or **A**/**B**. |
+**Removed (do not use on new sticks):**
 
-**CasparCG note (WO‑38):** If you remount that folder **while CasparCG is already running**, **restart CasparCG** afterward so scanners and loaders see the new filesystem. **`umount` fails when files are busy** (`device busy`) — stop playback first. Narrow **`sudo`** for the mount helper: **`scripts/install-phase4.sh`**, **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**, **`docs/MANUAL_INSTALL.md`** §7. Cold **HighAsCG** start attempts the saved mount before connecting AMCP; **Caspar Scanner** (often started from Openbox) may still need a scanner restart after you change mounts outside a full reboot — treat **reboot / restart scanner** as the blunt fix.
+- Union **`/ union`** ext4 **`persistence`** partition + GRUB **Live with persistence**
+- WO-38 **`media/drive`** internal partition mount + Settings **Mount** UI
 
-Sudo/helpers (WO‑38) only **elevate mounts** — they never turn a RAM overlay into a writable USB filesystem.
+HighAsCG **no longer waits** on partition mount at startup — **`systemctl restart highascg`** should complete in seconds.
 
-### 7.3 Pick a persistence backend
+### 7.3 Install to internal disk (optional)
 
-**Option A — Full live USB persistence (`/ union`) — default**  
-The stick retains **NVIDIA/DKMS**, **DeckLink-related `/etc`** and **`/var`**, **Tailscale**, **`apt`** installs, **home directories**, and **`/home/casparcg/highascg`**. After **`dd`**, run [`add-union-persistence-partition.sh`](../../tools/eggs/live-usb/add-union-persistence-partition.sh); always boot **Live with persistence** — **[`BUILD_AND_FLASH.md`](../../tools/eggs/live-usb/BUILD_AND_FLASH.md)**, **[`FLASH_AND_PERSIST.md`](../../tools/eggs/live-usb/FLASH_AND_PERSIST.md)**.
-
-**Option B — Only mount `/home/casparcg/highascg` from a second partition (advanced)**  
-Use when you **intentionally** skip full-root persistence. Stores configs, Caspar XML HighAsCG writes, media, templates, projects, and the Node checkout under that tree only. Follow **[`HIGHASCG_FOLDER_USB_PARTITION.md`](../../tools/eggs/live-usb/HIGHASCG_FOLDER_USB_PARTITION.md)** and install **`home-casparcg-highascg.mount`** (from **[`home-casparcg-highascg.mount.example`](../../tools/eggs/live-usb/systemd/home-casparcg-highascg.mount.example)**) as **`/etc/systemd/system/home-casparcg-highascg.mount`** **before** `eggs produce`. You do **not** need GRUB **Live with persistence** for this narrow layout. **Does not** remember NVIDIA picker state under **`/var`**, **`apt`** changes, Tailscale/OS-wide **`/etc`** drift — use **Option A** when the whole stick must “remember.”
+For a permanent machine, use §8 (Calamares / `eggs calamares`) instead of relying on live overlay or exFAT.
 
 ---
 
@@ -717,7 +712,7 @@ After installing on a new machine, run these checks:
 
 ### 9.1 GPU Drivers
 
-Offline multi-branch rigs carry **`/opt/nvidia-pool`** (see **`tools/eggs/live-usb/nvidia-multi-driver/`**). With HighAsCG **`install-phase4`** deployed (**`nvidia-apply-from-pool.sh`** + sudoers — **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**), operators can switch from **Application Settings → system**. Otherwise rely on **`apt`** as below.
+Each live ISO is built with **one** NVIDIA branch (**535**, **580**, or **595**). Set **`HIGHASCG_NVIDIA_DRIVER`** on the build host before **`install.sh`** and **`eggs produce`** — see **`work/work-orders/WO_single-nvidia-driver-per-iso.md`**. **`GET /api/system/gpu-nvidia`** shows the baked branch and a GPU recommendation guide; driver switching in Settings was removed.
 
 ```bash
 # Check NVIDIA
@@ -956,7 +951,7 @@ systemd → highascg.service
 /home/casparcg/.config/openbox/autostart  # CasparCG launch script
 /home/casparcg/.xsession     # exec openbox-session
 /etc/ld.so.conf.d/casparcg.conf  # CEF library path
-/opt/nvidia-pool/            # Offline NVIDIA .deb cache (first-boot picker / multi-branch)
+/etc/highascg/nvidia-iso-driver  # Baked driver branch (535|580|595) for this ISO
 /etc/sudoers.d/highascg-asound   # optional: system ALSA via tee (install with HIGHASCG_INSTALL_ASOUND_SUDOERS=1)
 /usr/local/bin/highascg-display-mode      # normal/x11-only switcher
 /usr/local/bin/highascg-nvidia-x-apply.sh # GPU perf on X start

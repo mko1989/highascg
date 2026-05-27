@@ -50,35 +50,50 @@ CG `ADD` / `UPDATE` on layer `998` (or `996`), sometimes at opacity `0` before a
 
 ## Phase 4 — Per incoming layer (inactive bank)
 
-For each layer in the incoming look (example: logical `10` → physical `110` when bank B is on air):
+For each layer in the incoming look (example: logical `10` → physical `110` when bank B is inactive):
 
 ```text
 MIXER 1-110 CLEAR
-LOADBG 1-110 "clip.mov" MIX 75 linear
-MIXER 1-110 OPACITY 0 0
+LOADBG 1-110 "clip.mov"
+MIXER 1-110 OPACITY 0 0          # only when incoming is the top layer (bank B)
 MIXER 1-110 FILL <x> <y> <scaleX> <scaleY> 0
 MIXER 1-110 ROTATION <deg> 0
 … other DEFER mixer lines (volume, keyer, effects) …
 ```
 
+When incoming is on **bank A** (under outgoing bank B), prep uses `MIXER 1-10 OPACITY 1 0` instead of hiding — incoming must be full opacity under the top layer.
+
 Then PIP overlay CG lines if configured.
 
-**Important:** `OPACITY 0 0` is sent **before** `FILL` so geometry changes are not visible on program during prep.
+**Important:** When incoming is on top, `OPACITY 0 0` is sent **before** `FILL` so geometry changes are not visible on program during prep.
 
 ## Phase 5 — Bank crossfade + PLAY (when `shouldRunBankCrossfade`)
 
-After a short preroll (~80–180 ms):
+After a short preroll (~80–180 ms when incoming is pre-hidden; ~80 ms when incoming is underneath).
+
+**Case A — incoming above outgoing** (on-air `1-10`, incoming `1-110`):
 
 ```text
 MIXER 1 COMMIT
 PLAY 1-110
 MIXER 1-110 OPACITY 0 0
 MIXER 1-110 OPACITY 1 <frames> <tween>
-MIXER 1-10 OPACITY 0 <frames> <tween>
 MIXER 1 COMMIT
 ```
 
-Outgoing physical layer `10` is the **active** bank; incoming `110` is the **inactive** bank prepared above.
+Outgoing `1-10` stays at full opacity; teardown clears it after the fade window.
+
+**Case B — outgoing above incoming** (on-air `1-110`, incoming `1-10`):
+
+```text
+MIXER 1 COMMIT
+PLAY 1-10
+MIXER 1-10 OPACITY 1 0
+MIXER 1-110 OPACITY 0 <frames> <tween>
+MIXER 1 COMMIT
+```
+
+Incoming `1-10` is already at full opacity under `1-110`; only the top layer tweens.
 
 ## Phase 5b — Cut / no crossfade
 
@@ -98,9 +113,34 @@ MIXER 1 COMMIT
 
 Bank pointer flips: inactive becomes active for the next take.
 
-## MERGE / +Animate path (same physical layer)
+## `+ Animate` path (same on-air physical layer)
 
-No bank swap: incoming uses logical layer `N` on the **same** slot as the outgoing clip, `LOADBG` with transition, `MIXER OPACITY` with `DEFER`, then `MIXER COMMIT` + `PLAY`. Outgoing-only layers fade on `N` (and ghost `N+100` cleared in teardown).
+No bank swap. Incoming uses **`phys(N, activeBank)`** — the layer currently on program (e.g. `1-110` when bank B is on air).
+
+**Phase A — Prepare**
+
+```text
+LOADBG 1-110 "example2.mov" LOOP …
+MIXER 1-110 FILL <x> <y> <sx> <sy> 75 linear
+MIXER 1-110 ROTATION … 0
+… KEYER / VOLUME / effects (DEFER) …
+```
+
+No `LOADBG MIX`. No `MIXER OPACITY <dur>` on the on-air layer (Caspar `PLAY … MIX` owns the dissolve).
+
+**Phase B — COMMIT sandwich**
+
+```text
+MIXER 1 COMMIT
+PLAY 1-110 "example2.mov" MIX 75 linear
+MIXER 1 COMMIT
+```
+
+`FILL` duration/tween matches `PLAY` transition frames/tween.
+
+**Phase C — Teardown**
+
+After `fadeMs`: clear **inactive** bank ghost for updated layers; `STOP/CLEAR` true exits on both banks. `programLayerBank` unchanged. Then PGM→PRV exchange (`routes-scene.js`).
 
 ## PGM + PRV dual-channel summary
 
@@ -113,4 +153,4 @@ No bank swap: incoming uses logical layer `N` on the **same** slot as the outgoi
 - Animated `MIXER FILL` with a non-zero duration on an on-air layer (`MERGE` path).
 - `FILL` before `OPACITY 0` on the incoming (off-air) layer.
 
-Current code applies immediate `FILL` (tail `0`) and hides the inactive bank with `OPACITY 0 0` before `FILL`.
+Current code applies immediate `FILL` (tail `0`). The inactive bank is hidden with `OPACITY 0 0` only when it is the **top** layer (bank B); when incoming is bank A, it is set to full opacity before `PLAY`.

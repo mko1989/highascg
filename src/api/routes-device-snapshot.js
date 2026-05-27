@@ -53,7 +53,6 @@ function saveFullConfigLikeSettings(cm, next) {
 		recordOutputs: Array.isArray(next.recordOutputs) ? next.recordOutputs : cur.recordOutputs || [],
 		audioOutputs: Array.isArray(next.audioOutputs) ? next.audioOutputs : cur.audioOutputs || [],
 		local_media_path: next.local_media_path,
-		mediaMount: { ...defaults.mediaMount, ...(next.mediaMount || {}) },
 	}
 	delete newConfig.streaming._effectiveBasePort
 	delete newConfig.streaming._casparHost

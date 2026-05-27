@@ -1,0 +1,56 @@
+{
+	"version": 1,
+	"branches": {
+		"535": {
+			"label": "535 series",
+			"isoHint": "Flash the HighAsCG live ISO built with HIGHASCG_NVIDIA_DRIVER=535"
+		},
+		"580": {
+			"label": "580 series",
+			"isoHint": "Flash the HighAsCG live ISO built with HIGHASCG_NVIDIA_DRIVER=580"
+		},
+		"595": {
+			"label": "595 series",
+			"isoHint": "Flash the HighAsCG live ISO built with HIGHASCG_NVIDIA_DRIVER=595"
+		}
+	},
+	"gpuRules": [
+		{
+			"match": "RTX 50",
+			"recommendedBranch": 595,
+			"note": "Blackwell / RTX 50xx — use 595 ISO unless Ubuntu docs say otherwise"
+		},
+		{
+			"match": "RTX 40",
+			"recommendedBranch": 535,
+			"note": "Ada / RTX 40xx — 535 or 580 ISO common; verify with ubuntu-drivers on a test install"
+		},
+		{
+			"match": "RTX 30",
+			"recommendedBranch": 535,
+			"note": "Ampere / RTX 30xx — 535 ISO is typical"
+		},
+		{
+			"match": "RTX 20",
+			"recommendedBranch": 535,
+			"note": "Turing — 535 ISO"
+		},
+		{
+			"match": "GTX 16",
+			"recommendedBranch": 535,
+			"note": "Turing GTX — 535 ISO"
+		},
+		{
+			"match": "Quadro RTX",
+			"recommendedBranch": 535,
+			"note": "Professional Turing/Ampere — match RTX generation"
+		},
+		{
+			"match": "Tesla",
+			"recommendedBranch": 535,
+			"note": "Datacenter — confirm with vendor matrix"
+		}
+	],
+	"defaultBranch": 535,
+	"defaultNote": "No rule matched — check ubuntu-drivers on Ubuntu 24.04 install media or HighAsCG release notes"
+}

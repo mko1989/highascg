@@ -1,2 +1,0 @@
-# WO-38: HighAsCG — mount partition on /home/casparcg/highascg/media/drive (script reads /run/highascg/media-mount.req).
-__HIGHASCG_USER__ ALL=(root) NOPASSWD: /usr/local/lib/highascg/media-mount.sh

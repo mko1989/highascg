@@ -9,7 +9,7 @@ LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
 MP="${HIGHASCG_EXFAT_ROOT:-/home/casparcg/exfat}"
 DEV="/dev/disk/by-label/${LABEL}"
 # Short wait when no operator stick (imaging host / internal disk only).
-WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-30}"
+WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-5}"
 LOG=/var/log/highascg-exfat-boot.log
 
 log() {
@@ -58,7 +58,6 @@ else
 		fi
 	fi
 
-	# Let systemd finish the mount job (non-blocking start above).
 	for ((i = 0; i < 30; i++)); do
 		if findmnt -n "$MP" &>/dev/null; then
 			break
@@ -76,8 +75,7 @@ fi
 for unit in \
 	highascg-exfat-media-prep.service \
 	home-casparcg-highascg-media-exfat.mount \
-	highascg-exfat-server-update.service \
-	highascg-exfat-sync.service; do
+	highascg-exfat-server-update.service; do
 	if systemctl cat "$unit" &>/dev/null; then
 		log "Queueing $unit (--no-block)"
 		systemctl start --no-block "$unit" 2>>"$LOG" || log "WARN: queue ${unit} failed"
@@ -86,5 +84,12 @@ for unit in \
 	fi
 done
 
-log "WO-47 boot chain queued (sync may still be running)"
+if systemctl cat highascg-exfat-sync.service &>/dev/null; then
+	log "Starting highascg-exfat-sync.service (blocking)"
+	systemctl start highascg-exfat-sync.service 2>>"$LOG" || log "WARN: exfat-sync failed or skipped"
+else
+	log "Skip missing unit highascg-exfat-sync.service"
+fi
+
+log "WO-47 boot chain finished"
 exit 0

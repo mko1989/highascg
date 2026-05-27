@@ -1,5 +1,7 @@
 # Work Order 39: Settings — “system” (NVIDIA) and “decklink” tabs
 
+> **SUPERSEDED (2026-05) for NVIDIA branch switching:** one driver per ISO — **`WO_single-nvidia-driver-per-iso.md`**. `GET /api/system/gpu-nvidia` is read-only; **`POST …/apply`** returns 410. DeckLink + GUI launch below remain valid.
+
 > **AGENT COLLABORATION PROTOCOL**  
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the **Work Log** section at the bottom documenting what was done  

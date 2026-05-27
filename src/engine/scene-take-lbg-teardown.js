@@ -12,8 +12,6 @@ const {
 	nextPipContentLayerInScene,
 	pipOverlaysFromLayer,
 } = require('./pip-overlay')
-const { PGM_BANK_B_OFFSET } = require('./scene-transition')
-
 /**
  * @param {object} ctx
  * @param {object} ctx.amcp
@@ -30,6 +28,7 @@ const { PGM_BANK_B_OFFSET } = require('./scene-transition')
  * @param {boolean} ctx.currentGbEnabled
  * @param {boolean} ctx.incomingGbEnabled
  * @param {'a'|'b'} ctx.activeBank
+ * @param {'a'|'b'} ctx.inactiveBank
  * @param {(sceneLn: number, bank: 'a'|'b') => number} ctx.phys
  */
 async function runSceneTakeLbgTeardown(ctx) {
@@ -48,6 +47,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 		currentGbEnabled,
 		incomingGbEnabled,
 		activeBank,
+		inactiveBank,
 		phys,
 	} = ctx
 
@@ -68,21 +68,25 @@ async function runSceneTakeLbgTeardown(ctx) {
 		const ln = Number(layer.layerNumber)
 		if (isMergeTransition && Number.isFinite(ln)) {
 			if (takeJobLogicalNums.has(ln)) {
-				const ghost = ln + PGM_BANK_B_OFFSET
-				const clg = `${channel}-${ghost}`
-				teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
-				try {
-					playbackTracker.recordStop(self, channel, ghost)
-				} catch (_) {}
+				const stale = phys(ln, inactiveBank)
+				const onAir = phys(ln, activeBank)
+				if (stale !== onAir) {
+					const clg = `${channel}-${stale}`
+					teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
+					try {
+						playbackTracker.recordStop(self, channel, stale)
+					} catch (_) {}
+				}
 				continue
 			}
-			for (const physLn of [ln, ln + PGM_BANK_B_OFFSET]) {
+			for (const bank of ['a', 'b']) {
+				const physLn = phys(ln, bank)
 				const cl = `${channel}-${physLn}`
 				teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
 				try {
 					const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
 					const pipN = pipOverlaysFromLayer(layer).length
-					if (pipN > 0 && physLn === ln) {
+					if (pipN > 0 && physLn === phys(ln, activeBank)) {
 						teardownLines.push(...buildPipOverlayRemoveLines(channel, physLn, nextL, pipN))
 					}
 				} catch (_) {}

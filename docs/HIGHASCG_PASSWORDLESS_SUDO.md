@@ -12,16 +12,13 @@ Always prefer **one fixed path per action** (wrapper script with **no user-contr
 
 | Fragment / rule | User | Command | Feature |
 |-----------------|------|---------|---------|
-| **`/etc/sudoers.d/highascg-media-mount`** | `casparcg` | `/usr/local/lib/highascg/media-mount.sh` | WO-38: mount internal/partition → `/home/casparcg/highascg/media/drive` (`src/system/media-partition-mount.js`) |
-| **`/etc/sudoers.d/highascg-nvidia-apply-from-pool`** | `casparcg` | `/usr/local/lib/highascg/nvidia-apply-from-pool.sh` | WO-39: NVIDIA driver apply from offline pool (**reads** `/run/highascg/nvidia-apply.req` then deletes it — no argv) |
-
 Source templates in the repo:
 
-- `scripts/sudoers.d/highascg-media-mount`
-- `scripts/sudoers.d/highascg-nvidia-apply-from-pool`
 - `scripts/install-phase4.sh` (installs helpers + sudoers fragments)
 
-**WO-38 operations:** If you remount **`/home/casparcg/highascg/media/drive`** while CasparCG is up, **restart Caspar** afterward; **umount** needs open files closed (see **`docs/MANUAL_INSTALL.md`** §7, **`docs/LIVE_USB_IMAGE.md`** §7.2).
+**Removed (2026-05):** WO-38 **`highascg-media-mount`** / **`media/drive`** partition mount — durable config/state/media use **exFAT only** (`HIGHASCGEXF`, WO-47). See **`work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md`**.
+
+**Removed (2026-05):** Multi-branch **`/opt/nvidia-pool`** and **`nvidia-apply-from-pool`** — one NVIDIA driver per live ISO (`HIGHASCG_NVIDIA_DRIVER=535|580|595`). See **`work/work-orders/WO_single-nvidia-driver-per-iso.md`**.
 
 
 ### Optional ALSA — **`highascg-asound`** (off by default)
@@ -60,7 +57,7 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 
 ## Settings → **system** / **decklink** (WO-39)
 
-- **NVIDIA pool apply:** **`POST /api/system/gpu-nvidia/apply`** writes **`/run/highascg/nvidia-apply.req`** then runs **`sudo -n /usr/local/lib/highascg/nvidia-apply-from-pool.sh`**. The script allow-lists branches **535**, **580**, **595** and uses **`/opt/nvidia-pool`** (or **`NVIDIA_DEB_POOL`**) as **`Dir::Cache::Archives`** for apt. Optional **nuclear password** is enforced in-process (same as reboot) — not via sudoers.
+- **NVIDIA:** read-only **`GET /api/system/gpu-nvidia`** (ISO branch stamp + GPU guide). Driver switching via Settings was removed — use the correct single-driver ISO.
 - **GUI launch:** **`POST /api/system/gui-launch`** spawns allow-listed apps on **`:0`** with **`XAUTHORITY`** from **`getXAuthority()`** — **no sudo** when binaries are executable for the service user.
 
 ---
@@ -83,12 +80,6 @@ id casparcg
 
 # Non-interactive check (should succeed when rules exist)
 sudo -n -u casparcg /usr/bin/true
-
-# Media helper (will fail with “Missing request file” if no request — that still proves sudo is allowed)
-sudo -n -u casparcg /usr/local/lib/highascg/media-mount.sh
-
-# Nvidia apply helper (expects missing req file unless you staged one — proves NOPASSWD)
-sudo -n -u casparcg /usr/local/lib/highascg/nvidia-apply-from-pool.sh || true
 ```
 
 ---

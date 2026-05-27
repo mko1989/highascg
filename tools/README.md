@@ -5,7 +5,7 @@ Production playout host and **eggs ISO build** only. Operator UI and launchers l
 | Path | Purpose |
 |------|---------|
 | [`runtime/`](runtime/) | Playout helpers shipped in server releases (`exfat-sync-cli`, Caspar staged start) |
-| [`eggs/`](eggs/) | penguins-eggs / live USB image prep (`live-usb/`, `verify-w02-structure.js`) |
+| [`eggs/`](eggs/) | penguins-eggs / live USB (`live-usb/build-highascg-egg.sh` — **one** `HIGHASCG_NVIDIA_DRIVER` per ISO) |
 | [`release/`](release/) | `release:github-server` — backend tarball |
 | [`smoke/`](smoke/) | HTTP/AMCP/unit smoke tests (`npm run smoke`, `npm run test:*`) |
 
@@ -14,6 +14,6 @@ Production playout host and **eggs ISO build** only. Operator UI and launchers l
 ```bash
 npm run verify:structure
 npm run eggs:prepare    # sudo — WO-47 clone prep on build host
-npm run eggs:build      # sudo — eggs produce
+npm run eggs:build      # sudo HIGHASCG_NVIDIA_DRIVER=595 — single-driver ISO
 npm run release:github-server
 ```

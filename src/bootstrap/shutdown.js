@@ -15,9 +15,9 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 		shutdownStarted = true
 
 		const failsafe = setTimeout(() => {
-			logger.warn('[Shutdown] Failsafe exit after 25s')
+			logger.warn('[Shutdown] Failsafe exit after 12s')
 			process.exit(0)
-		}, 25000)
+		}, 12000)
 
 		try {
 			clearPeriodicSyncTimer(appCtx)
@@ -29,7 +29,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			try {
 				await Promise.race([
 					stopStreamingSubsystem(),
-					new Promise((_, reject) => setTimeout(() => reject(new Error('Streaming stop timeout')), 12000))
+					new Promise((_, reject) => setTimeout(() => reject(new Error('Streaming stop timeout')), 5000))
 				])
 			} catch (e) { appCtx.log('warn', `[Shutdown] streaming: ${e.message}`) }
 

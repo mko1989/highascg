@@ -1,5 +1,7 @@
 # Work Order 38: Mount internal disk partition to media folder (live USB)
 
+> **SUPERSEDED / REMOVED (2026-05):** WO-38 code, sudoers, and Settings mount UI were removed. Durable config/state/media use **exFAT only** (WO-47). See **`WO_remove-persistence-partition-workflow_exfat-only.md`**. This file is kept for history.
+
 > **AGENT COLLABORATION PROTOCOL**  
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done  

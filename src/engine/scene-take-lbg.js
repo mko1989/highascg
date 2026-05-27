@@ -5,11 +5,11 @@
  * Pipeline order (smooth look→look):
  * 1) Build takeJobs + exit list (no AMCP).
  * 2) Non-merge exit: batched MIXER OPACITY→0 (non-DEFER) when not using bank crossfade.
- * 3) `{TRANSITION} + Animate` (UI; legacy `+ MERGE`): **no bank B (+100)** — compare PGM vs incoming per logical layer;
- *    outgoing-only layers get `MIXER … OPACITY 0 <dur> <tween> DEFER`; incoming layers get LOADBG (with
- *    transition type + duration from default) + mixer prep (DEFER) on the **same** Caspar layer as the look;
- *    optional border fades ride `mergeMixerExtras`. Preroll, then `MIXER ch COMMIT` + `PLAY` lines in one sequential AMCP chain.
- * 4) Bank crossfade path (non-merge): paired opacity tweens on active vs inactive bank layers.
+ * 3) `{TRANSITION} + Animate` (UI; legacy `+ MERGE`): same **on-air** physical layer (`phys(N, activeBank)`);
+ *    LOADBG (no MIX) + animated `MIXER FILL <dur> <tween>` + `MIXER ch COMMIT` + `PLAY … MIX <dur> <tween>` + COMMIT;
+ *    outgoing-only layers still get DEFER opacity fade via `mergeMixerExtras`. Bank pointer unchanged.
+ * 4) Bank crossfade path (non-merge): direction-aware opacity — fade incoming in when it is on top (bank B),
+ *    or fade outgoing out when incoming is underneath (bank A); only one side tweens (no 50% dip).
  * 5) Teardown after transition window; merge teardown clears both logical layer N and N+100 to drop legacy bank B.
  * LOADBG/PLAY stay `_send` (not inside BEGIN…COMMIT) so Caspar can resolve each layer reliably.
  */
@@ -128,6 +128,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		self,
 		phys,
 		inactiveBank,
+		activeBank,
 		shouldRunBankCrossfade,
 		forceCut,
 		globalT,
@@ -188,8 +189,8 @@ async function runSceneTakeLbg(amcp, opts) {
 			const ln = Number(layer.layerNumber)
 			if (isMergeTransition && Number.isFinite(ln)) {
 				if (fadeWatcher) {
-					fadeWatcher.cancel(channel, ln)
-					fadeWatcher.cancel(channel, ln + PGM_BANK_B_OFFSET)
+					fadeWatcher.cancel(channel, phys(ln, activeBank))
+					fadeWatcher.cancel(channel, phys(ln, inactiveBank))
 				}
 			} else {
 				const pOut = phys(Number(layer.layerNumber), activeBank)
@@ -283,13 +284,21 @@ async function runSceneTakeLbg(amcp, opts) {
 		currentGbEnabled,
 		incomingGbEnabled,
 		activeBank,
+		inactiveBank,
 		phys,
 	})
 
-	if (takeJobs.length > 0 || mergeMixerExtras.length > 0) {
-		self.programLayerBankByChannel[chKey] = isMergeTransition ? 'a' : inactiveBank
+	if (!isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0)) {
+		self.programLayerBankByChannel[chKey] = inactiveBank
 	}
 	persistProgramLayerBanks(self)
+
+	if (isMergeTransition && incoming) {
+		try {
+			const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
+			await clearStaleInactiveBankLookLayers(amcp, channel, inactiveBank, incoming, self)
+		} catch (_) {}
+	}
 
 	// Setup playlist automation for list-mode layers in this look
 	if (takeJobs.length > 0) {

@@ -76,65 +76,30 @@ if [ -f /etc/polkit-1/rules.d/50-highascg-udisks.rules ] || [ -f /etc/polkit-1/r
 fi
 usermod -aG plugdev "$USER_CASPAR" 2>/dev/null || true
 
-# 4.3c Media partition → fixed media folder (WO-38; live USB + internal library)
-echo -e "${CYAN}→ Media mount helper (sudo wrapper + /run/highascg)…${NC}"
-install -d /usr/local/lib/highascg
-MOUNT_SH_SRC="$SCRIPT_DIR/scripts/highascg-media-mount.sh"
-if [ -f "$MOUNT_SH_SRC" ]; then
-	install -m 0755 -o root -g root "$MOUNT_SH_SRC" /usr/local/lib/highascg/media-mount.sh
-	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/media-mount.sh"
-else
-	echo -e "  ${YELLOW}○${NC} media-mount script missing at $MOUNT_SH_SRC"
-fi
-SUDO_MEDIA="$SCRIPT_DIR/scripts/sudoers.d/highascg-media-mount"
-if [ -f "$SUDO_MEDIA" ]; then
-	sed "s/__HIGHASCG_USER__/${USER_CASPAR}/g" "$SUDO_MEDIA" > /tmp/highascg-media-mount.sudoers
-	install -m 0440 -o root -g root /tmp/highascg-media-mount.sudoers /etc/sudoers.d/highascg-media-mount
-	rm -f /tmp/highascg-media-mount.sudoers
-	if visudo -c -f /etc/sudoers.d/highascg-media-mount 2>/dev/null; then
-		echo -e "  ${GREEN}✓${NC} sudoers.d/highascg-media-mount valid for $USER_CASPAR"
-	else
-		echo -e "  ${RED}✗${NC} sudoers.d/highascg-media-mount syntax error — fix before using Settings → media/usb mount"
-	fi
-else
-	echo -e "  ${YELLOW}○${NC} sudoers fragment missing at $SUDO_MEDIA"
-fi
+# 4.3c Runtime state dir for privileged helpers (NVIDIA apply, etc.)
 GRP_CASPAR=$(id -gn "$USER_CASPAR" 2>/dev/null || echo "$USER_CASPAR")
-echo "d /run/highascg 0770 root $GRP_CASPAR -" > /etc/tmpfiles.d/highascg-media-mount.conf
+echo -e "${CYAN}→ tmpfiles.d /run/highascg (privileged helper requests)…${NC}"
+echo "d /run/highascg 0770 root $GRP_CASPAR -" > /etc/tmpfiles.d/highascg-run.conf
 systemd-tmpfiles --create --prefix=/run/highascg 2>/dev/null || true
 echo -e "  ${GREEN}✓${NC} tmpfiles.d /run/highascg (0770 root:$GRP_CASPAR)"
 
-# 4.3d NVIDIA driver apply from offline pool (WO-39; Settings → system/hardware)
-NV_LIB_SRC="$SCRIPT_DIR/tools/eggs/live-usb/nvidia-multi-driver/nvidia-pool-lib.sh"
-NV_SH_SRC="$SCRIPT_DIR/scripts/highascg-nvidia-apply-from-pool.sh"
-mkdir -p /usr/local/lib/highascg /etc/highascg
-if [ -f "$NV_LIB_SRC" ]; then
-	install -m 0644 -o root -g root "$NV_LIB_SRC" /usr/local/lib/highascg/nvidia-pool-lib.sh
-	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/nvidia-pool-lib.sh"
+# 4.3d NVIDIA: single-driver ISO stamp (no multi-branch pool / pick-nvidia)
+mkdir -p /etc/highascg
+if [ -n "${HIGHASCG_NVIDIA_DRIVER:-}" ]; then
+	case "${HIGHASCG_NVIDIA_DRIVER}" in
+	535 | 580 | 595)
+		echo "${HIGHASCG_NVIDIA_DRIVER}" > /etc/highascg/nvidia-iso-driver
+		chmod 0644 /etc/highascg/nvidia-iso-driver
+		echo -e "  ${GREEN}✓${NC} /etc/highascg/nvidia-iso-driver → ${HIGHASCG_NVIDIA_DRIVER}"
+		;;
+	*)
+		echo -e "  ${YELLOW}○${NC} HIGHASCG_NVIDIA_DRIVER ignored (use 535, 580, or 595)"
+		;;
+	esac
 fi
-if [ ! -f /etc/highascg/nvidia-driver-flavor ]; then
-	echo "open" > /etc/highascg/nvidia-driver-flavor
-	chmod 0644 /etc/highascg/nvidia-driver-flavor
-	echo -e "  ${GREEN}✓${NC} /etc/highascg/nvidia-driver-flavor → open"
-fi
-if [ -f "$NV_SH_SRC" ]; then
-	install -m 0755 -o root -g root "$NV_SH_SRC" /usr/local/lib/highascg/nvidia-apply-from-pool.sh
-	echo -e "  ${GREEN}✓${NC} installed /usr/local/lib/highascg/nvidia-apply-from-pool.sh"
-else
-	echo -e "  ${YELLOW}○${NC} nvidia pool apply script missing at $NV_SH_SRC"
-fi
-SUDO_NV="$SCRIPT_DIR/scripts/sudoers.d/highascg-nvidia-apply-from-pool"
-if [ -f "$SUDO_NV" ]; then
-	sed "s/__HIGHASCG_USER__/${USER_CASPAR}/g" "$SUDO_NV" > /tmp/highascg-nvidia-apply.sudoers
-	install -m 0440 -o root -g root /tmp/highascg-nvidia-apply.sudoers /etc/sudoers.d/highascg-nvidia-apply-from-pool
-	rm -f /tmp/highascg-nvidia-apply.sudoers
-	if visudo -c -f /etc/sudoers.d/highascg-nvidia-apply-from-pool 2>/dev/null; then
-		echo -e "  ${GREEN}✓${NC} sudoers.d/highascg-nvidia-apply-from-pool OK for $USER_CASPAR"
-	else
-		echo -e "  ${RED}✗${NC} sudoers fragment syntax error — fix before Settings NVIDIA apply"
-	fi
-else
-	echo -e "  ${YELLOW}○${NC} sudoers fragment missing at $SUDO_NV"
+DISABLE_NV="$SCRIPT_DIR/scripts/disable-nvidia-multi-driver-boot.sh"
+if [ -f "$DISABLE_NV" ]; then
+	bash "$DISABLE_NV" && echo -e "  ${GREEN}✓${NC} disabled nvidia pick-nvidia / pool boot hooks"
 fi
 
 # Tailscale daemon (login is still: sudo tailscale up — opens auth URL)
@@ -271,7 +236,7 @@ fi
 # Unified playout root: Caspar dirs + NDI copy (Phase 3 may run before deploy; fresh clone clears children)
 if [ -f /home/casparcg/highascg/package.json ]; then
     echo -e "${CYAN}→ Ensuring Caspar companion directories under playout root...${NC}"
-    mkdir -p /home/casparcg/highascg/{media,media/drive,media/exfat,log,template,data,cef-cache,lib}
+    mkdir -p /home/casparcg/highascg/{media,media/exfat,log,template,data,cef-cache,lib}
     mkdir -p /home/casparcg/exfat
     cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
     chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true

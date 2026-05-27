@@ -2,8 +2,9 @@
 
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
-const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
+const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
+const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 const {
 	clipPath,
@@ -27,6 +28,7 @@ async function buildTakeJobs(opts) {
 		self,
 		phys,
 		inactiveBank,
+		activeBank,
 		shouldRunBankCrossfade,
 		forceCut,
 		globalT,
@@ -122,9 +124,10 @@ async function buildTakeJobs(opts) {
 		}
 
 		const isMerge = isLayerAnimateTakeTransition(globalT.type)
-		// Prepare incoming content on the inactive bank. Mixer state is layer-wide in
-		// CasparCG, so preparing on the active PGM layer would move the foreground.
-		const pLayer = isMerge ? Number(layer.layerNumber) : phys(Number(layer.layerNumber), inactiveBank)
+		// Bank crossfade: inactive bank. +Animate: same physical layer as on-air (no A/B swap).
+		const pLayer = isMerge
+			? phys(Number(layer.layerNumber), activeBank)
+			: phys(Number(layer.layerNumber), inactiveBank)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const cl = chLayerAmcp(channel, pLayer)
 		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
@@ -144,7 +147,15 @@ async function buildTakeJobs(opts) {
 		}
 		const baseType = isMerge ? baseTypeStripAnimateSuffix(globalT.type) : globalT.type
 
-		if (!forceCut && globalT.duration > 0 && globalT.type && String(globalT.type).toUpperCase() !== 'CUT') {
+		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. +Animate: transition on PLAY only.
+		if (
+			!shouldRunBankCrossfade &&
+			!isMerge &&
+			!forceCut &&
+			globalT.duration > 0 &&
+			globalT.type &&
+			String(globalT.type).toUpperCase() !== 'CUT'
+		) {
 			loadOpts.transition = baseType
 			loadOpts.duration = globalT.duration
 			loadOpts.tween = globalT.tween
@@ -154,11 +165,17 @@ async function buildTakeJobs(opts) {
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
 		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
 		const mixerLines = []
-		// FILL is always immediate (tail 0). Animated FILL during MERGE/+Animate was visible on the on-air layer.
-		const fillTail = '0'
+		let fillTail = '0'
+		if (isMerge && globalT.duration > 0) {
+			fillTail = String(globalT.duration)
+			if (globalT.tween) fillTail += ` ${param(globalT.tween)}`
+		}
 
-		const incomingStartsHidden = shouldRunBankCrossfade && !hasLoadTransition
-		// Hide off-air bank before FILL/PLAY so geometry changes are not visible on program.
+		// Bank B (+100) stacks above bank A — only pre-hide when incoming is the top layer.
+		const incomingIsAboveOutgoing =
+			shouldRunBankCrossfade && inactiveBank === 'b' && activeBank === 'a'
+		const incomingStartsHidden = incomingIsAboveOutgoing
+		// Hide off-air top bank before FILL/PLAY so geometry changes are not visible on program.
 		if (incomingStartsHidden) {
 			mixerLines.push(`MIXER ${cl} OPACITY 0 0`)
 		}
@@ -170,15 +187,18 @@ async function buildTakeJobs(opts) {
 			mixerLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
 		}
 		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
-		if (isMerge) {
-			mixerLines.push(`MIXER ${cl} OPACITY ${targetOpacity} ${globalT.duration}`)
-		} else if (!incomingStartsHidden && layer.opacity != null && layer.opacity !== 1) {
+		if (!incomingStartsHidden && layer.opacity != null && layer.opacity !== 1) {
 			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity} 0`)
 		}
 		// Important: pre-hide for crossfade must be immediate (non-DEFER) before PLAY.
 		// If we DEFER this together with "OPACITY 1 <dur>", Caspar may only honor the
 		// final state at COMMIT and the fade appears as a hard cut.
 		const prePlayOpacityZeroLine = incomingStartsHidden ? `MIXER ${cl} OPACITY 0 0` : null
+		// Incoming below outgoing: full opacity on inactive bank before PLAY (revealed when top fades out).
+		const prePlayOpacityFullLine =
+			shouldRunBankCrossfade && !incomingIsAboveOutgoing
+				? `MIXER ${cl} OPACITY ${targetOpacity} 0`
+				: null
 		if (keyer === 1) {
 			mixerLines.push(`MIXER ${cl} KEYER 1`)
 		}
@@ -196,8 +216,7 @@ async function buildTakeJobs(opts) {
 		for (let i = 0; i < mixerLines.length; i++) {
 			const line = String(mixerLines[i] || '')
 			// Keep FILL immediate so geometry is applied before PLAY and not gated by COMMIT.
-			// This removes "... FILL ... DEFER" from take logs as requested.
-			if (!isMerge && /^\s*MIXER\s+\d+-\d+\s+FILL\b/i.test(line)) continue
+			if (/^\s*MIXER\s+\d+-\d+\s+FILL\b/i.test(line)) continue
 			mixerLines[i] = deferMixerAmcpLine(line)
 		}
 
@@ -233,6 +252,15 @@ async function buildTakeJobs(opts) {
 			{ fps: framerate }
 		)
 		const useLoadAuto = false
+		let playPlan = useLoadAuto ? null : playPlans.find((p) => p.commandName === 'PLAY') || null
+		if (isMerge && globalT.duration > 0 && baseType && String(baseType).toUpperCase() !== 'CUT') {
+			playPlan = buildClipCommandPlan('PLAY', channel, pLayer, clip, {
+				loop: !!loadOpts.loop,
+				transition: baseType,
+				duration: globalT.duration,
+				tween: globalT.tween,
+			})
+		}
 
 		takeJobs.push({
 			layer,
@@ -242,14 +270,16 @@ async function buildTakeJobs(opts) {
 			f,
 			mixerLines,
 			targetOpacity,
+			incomingIsAboveOutgoing,
 			incomingStartsHidden,
 			prePlayOpacityZeroLine,
+			prePlayOpacityFullLine,
 			useLoadAuto,
 			loadOpts,
 			isMerge,
 			hasLoadTransition,
 			loadPlan: (layer.source && layer.source.type === 'template') ? null : (loadPlans.find((p) => p.commandName === 'LOADBG') || null),
-			playPlan: useLoadAuto ? null : (playPlans.find((p) => p.commandName === 'PLAY') || null),
+			playPlan,
 			pipOverlays: pipOverlaysFromLayer(layer),
 		})
 	}

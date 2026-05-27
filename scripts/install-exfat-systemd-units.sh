@@ -97,17 +97,18 @@ Description=HighAsCG exFAT data (LABEL=HIGHASCGEXF)
 Documentation=${DOC_URI}
 DefaultDependencies=no
 Conflicts=umount.target
-Before=${prep_svc} ${bind_mount_esc} ${update_svc} highascg-exfat-sync.service highascg.service
+ConditionPathExists=/dev/disk/by-label/HIGHASCGEXF
+Before=${prep_svc} ${bind_mount_esc} ${update_svc} highascg-exfat-sync.service
 After=blk-availability.target systemd-remount-fs.service
 
 [Mount]
 What=/dev/disk/by-label/HIGHASCGEXF
 Where=/home/casparcg/exfat
 Type=exfat
-Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=90
+Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=5
 
 [Install]
-WantedBy=local-fs.target
+WantedBy=multi-user.target
 EOF
 
 cat > "/etc/systemd/system/${prep_svc}" <<EOF
@@ -217,6 +218,7 @@ Description=HighAsCG WO-47 — wait for HIGHASCGEXF, mount ~/exfat, queue sync (
 Documentation=${DOC_URI}
 DefaultDependencies=no
 After=local-fs-pre.target highascg-live-stick-init.service
+Before=highascg.service highascg-exfat-sync.service
 Conflicts=shutdown.target
 
 [Service]

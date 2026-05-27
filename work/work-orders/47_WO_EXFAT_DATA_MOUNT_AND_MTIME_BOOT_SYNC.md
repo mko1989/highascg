@@ -24,9 +24,9 @@ Improve the **live-USB + cross-platform data** story beyond **WO-38** (partition
 
 | Work | Relationship |
 |------|----------------|
-| **WO-38** (`mediaMount`, `highascg-media-mount.sh`) | Mounts one UUID at **`/home/casparcg/highascg/media/drive`** after clearing that subfolder. This WO **does not remove WO-38**; it adds **exFAT at `/home/casparcg/exfat`**, **optional bind**, and **boot sync**. |
-| **`tools/eggs/live-usb/add-union-persistence-partition.sh`** | Already avoids carving persistence into the ISO region; **same discipline** applies to any **new primary** for exFAT: start **after the last hybrid MBR partition end**, never trust **`parted … print free`** alone for start sector. |
-| **`docs/LIVE_USB_IMAGE.md`**, **`tools/eggs/live-usb/FLASH_AND_PERSIST.md`** | After implementation, add a short **operator subsection** linking here (one paragraph + link). |
+| **WO-38** (`mediaMount`, `highascg-media-mount.sh`) | **Removed (2026-05).** Use exFAT only — see **`WO_remove-persistence-partition-workflow_exfat-only.md`**. |
+| **Tail partition geometry** | Any **new primary** for exFAT must start **after the last hybrid MBR partition end**; never trust **`parted … print free`** alone for start sector. |
+| **`docs/LIVE_USB_IMAGE.md`** | Operator §7 documents exFAT-only durable storage (no union **`/ union`**). |
 
 ---
 
