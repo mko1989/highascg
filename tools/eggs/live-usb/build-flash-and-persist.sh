@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build HighAsCG eggs ISO, flash to USB, add exFAT (HIGHASCGEXF) + union persistence + seed layout.
+# Build HighAsCG eggs ISO, flash to USB, add exFAT (HIGHASCGEXF) + seed layout (exFAT-only; no union persistence).
 #
 # Usage (all heavy steps require root — run the whole script with sudo):
 #   sudo bash tools/live-usb/build-flash-and-persist.sh
@@ -33,7 +33,7 @@ SEED_SCRIPT="${HERE}/seed-exfat-operator-layout.sh"
 DO_BUILD=true
 DO_FLASH=true
 DO_EXFAT=true
-DO_PERSIST=true
+DO_PERSIST=false
 PRUNE_STALE=false
 DRY_PERSIST=false
 DRY_EXFAT=false

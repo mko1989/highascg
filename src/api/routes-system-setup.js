@@ -43,7 +43,7 @@ function readDisplayMode() {
 async function handleGet(path, ctx) {
 	if (path !== '/api/system/setup') return null
 
-	const httpPort = ctx.config?.server?.httpPort ?? 8080
+	const httpPort = ctx.config?.server?.httpPort ?? 4200
 	const interfaces = listIPv4Interfaces()
 	const primary = interfaces[0]?.address || '127.0.0.1'
 

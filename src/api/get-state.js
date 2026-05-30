@@ -12,6 +12,7 @@ const { parseCinfMedia } = require('../media/cinf-parse')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { enrichMediaListWithCinfAndProbe } = require('../utils/media-snapshot-cinf')
+const { buildSceneDeckForApi } = require('../engine/project-scenes')
 
 /**
  * @param {object} ctx — app context (state, config, gatheredInfo, …)
@@ -76,24 +77,8 @@ function getState(ctx, opts = {}) {
 	const timelinePlayback =
 		timelineEngine && typeof timelineEngine.getPlayback === 'function' ? timelineEngine.getPlayback() : null
 
-	/**
-	 * Live deck mirror (WS `scene_deck_sync` from web UI) + same preset arrays as the browser’s `sceneState`
-	 * (`layerPresets` / `lookPresets` — named mix shortcuts and look bookmarks). Always includes arrays
-	 * so Companion can rely on the shape. Optional: `sceneSnapshots` (full look JSON) when the browser
-	 * is connected, `previewSceneId`, `looks` (id + name + mainScope).
-	 */
-	const rawDeck =
-		ctx.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks) ? ctx.sceneDeck : { looks: [] }
-	const sceneDeck = {
-		...rawDeck,
-		looks: Array.isArray(rawDeck.looks) ? rawDeck.looks : [],
-		previewSceneId:
-			rawDeck.previewSceneId != null && String(rawDeck.previewSceneId).trim()
-				? String(rawDeck.previewSceneId).trim()
-				: null,
-		layerPresets: Array.isArray(rawDeck.layerPresets) ? rawDeck.layerPresets : [],
-		lookPresets: Array.isArray(rawDeck.lookPresets) ? rawDeck.lookPresets : [],
-	}
+	/** Looks + snapshots from saved project; live `previewSceneId` from WS when UI is connected. */
+	const sceneDeck = buildSceneDeckForApi(ctx)
 
 	let globalBorders = null
 	try {

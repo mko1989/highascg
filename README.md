@@ -105,14 +105,14 @@ npm run verify:structure
 find src client -name "*.js" | xargs wc -l | sort -n
 ```
 
-With the server running (`npm start` or `node index.js --port 8080`), in another terminal:
+With the server running (`npm start` or `node index.js --port 4200`), in another terminal:
 
 ```bash
-npm run smoke -- 8080
-# or: node tools/smoke/http-smoke.js 8080
+npm run smoke -- 4200
+# or: node tools/smoke/http-smoke.js 4200
 # Other checks (no Caspar / optional):
 # npm run smoke:companion-press
-# npm run smoke:streaming-ch 8080
+# npm run smoke:streaming-ch 4200
 ```
 
 This checks HTTP (`/`, `/api/scene/live`, `/api/state`, **`/api/settings`**, **`/api/streams`**, **`/api/audio/devices`**, unknown route) and WebSocket initial `state` message.
@@ -120,7 +120,7 @@ This checks HTTP (`/`, `/api/scene/live`, `/api/state`, **`/api/settings`**, **`
 **With CasparCG connected** (GET `/api/state` → 200), also run:
 
 ```bash
-npm run smoke:caspar -- 8080
+npm run smoke:caspar -- 4200
 ```
 
 This asserts unknown routes return **404** (not 503) and **`POST /api/raw`** with `VERSION` succeeds.

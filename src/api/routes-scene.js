@@ -12,6 +12,7 @@ const { layerHasContent, normalizeTransition, resolveChannelFramerateForMixerTwe
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { getChannelMap, getRouteString } = require('../config/routing')
+const { resolveSceneById } = require('../engine/project-scenes')
 
 const TAKE_TIMEOUT_MS = 120000
 const OUT_PRIMARY_LAYER = 1
@@ -63,6 +64,14 @@ async function handleSceneTake(body, ctx) {
 	const channel = parseInt(b.channel, 10)
 	if (!channel || channel < 1) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
+	}
+
+	const sceneIdRaw = b.sceneId ?? b.lookId ?? b.incomingSceneId
+	if ((!b.incomingScene || typeof b.incomingScene !== 'object') && sceneIdRaw != null && String(sceneIdRaw).trim()) {
+		const fromProject = resolveSceneById(sceneIdRaw)
+		if (fromProject) {
+			b.incomingScene = fromProject
+		}
 	}
 
 	if (!b.incomingScene || typeof b.incomingScene !== 'object') {

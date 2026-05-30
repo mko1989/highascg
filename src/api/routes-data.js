@@ -7,6 +7,11 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const persistence = require('../utils/persistence')
+const {
+	loadFullProject,
+	validateIncomingProject,
+	persistProject,
+} = require('../engine/project-scenes')
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null
@@ -57,9 +62,8 @@ function scheduleProjectSyncBroadcast(ctx, project) {
 /** Full project object — same shape as POST /api/project/save body `project`. */
 const PROJECT_DISK_KEY = 'web_project'
 
-async function loadProjectMerged(ctx) {
-	const project = persistence.get(PROJECT_DISK_KEY)
-	return project && typeof project === 'object' ? project : null
+async function loadProjectMerged(_ctx) {
+	return loadFullProject()
 }
 
 async function handleProject(path, body, ctx) {
@@ -69,13 +73,36 @@ async function handleProject(path, body, ctx) {
 		if (!project || typeof project !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
-		persistence.set(PROJECT_DISK_KEY, project)
+		const existing = loadFullProject()
+		const allowReplace = b.force === true || b.allowReplace === true
+		const check = validateIncomingProject(project, existing, { allowReplace })
+		if (!check.ok) {
+			if (typeof ctx.log === 'function') {
+				ctx.log(
+					'warn',
+					`[project] save rejected (${check.reason}) incoming=${check.details?.incomingSavedAt || project.savedAt || '?'} stored=${check.details?.storedSavedAt || existing?.savedAt || '?'}`,
+				)
+			}
+			return {
+				status: 409,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error:
+						check.reason === 'unrelated_scene_set'
+							? 'Project save rejected: looks do not match the stored project (stale client tab?)'
+							: 'Project save rejected: payload is older than the stored project',
+					reason: check.reason,
+					...(check.details || {}),
+				}),
+			}
+		}
+		persistProject(ctx, project, { writeAutosave: true })
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)
 		} else if (ctx.artnetReceiver) {
 			ctx.artnetReceiver.reconfigure()
 		}
-		if (typeof ctx._wsBroadcast === 'function') {
+		if (b.broadcastProject !== false && typeof ctx._wsBroadcast === 'function') {
 			scheduleProjectSyncBroadcast(ctx, project)
 		}
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
@@ -92,13 +119,30 @@ async function handleProject(path, body, ctx) {
 		if (!project || typeof project !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
-		const fs = require('fs')
-		const pathObj = require('path')
+		const existing = loadFullProject()
+		const check = validateIncomingProject(project, existing)
+		if (!check.ok) {
+			if (typeof ctx.log === 'function') {
+				ctx.log(
+					'warn',
+					`[project] autosave rejected (${check.reason}) looks ${check.details?.incomingLookCount ?? '?'} vs stored ${check.details?.storedLookCount ?? '?'}`,
+				)
+			}
+			return {
+				status: 409,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error:
+						check.reason === 'unrelated_scene_set'
+							? 'Autosave rejected: browser project does not match stored looks (close stale tabs or reload)'
+							: 'Autosave rejected: payload is older than the stored project',
+					reason: check.reason,
+					...(check.details || {}),
+				}),
+			}
+		}
 		try {
-			const { REPO_ROOT } = require('../repo-paths')
-			const autosavePath = pathObj.join(REPO_ROOT, 'autosave.json')
-			fs.writeFileSync(autosavePath, JSON.stringify(project, null, 2), 'utf8')
-			persistence.set(PROJECT_DISK_KEY, project)
+			persistProject(ctx, project, { writeAutosave: true })
 			if (ctx.artnetReceiver?.reconfigureFromProject) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {

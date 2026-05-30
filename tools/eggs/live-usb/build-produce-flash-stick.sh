@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full pipeline: eggs produce → dd ISO → persistence (4 GiB) → exFAT (rest) → seed layout.
+# Full pipeline: eggs produce → dd ISO → exFAT (slot 3, rest of disk) → seed layout.
 #
 # Default target disk: /dev/sda (override with --usb or USB_DEVICE=).
 # ISO path: newest file under /home/eggs/ (+ mnt/) from this build (BASENAME prefix).

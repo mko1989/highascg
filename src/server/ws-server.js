@@ -247,39 +247,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				} else if (msg.type === 'selection_sync' && msg.data) {
 					if (typeof ctx.setUiSelection === 'function') ctx.setUiSelection(ctx, msg.data)
 				} else if (msg.type === 'scene_deck_sync' && msg.data) {
-					const raw = msg.data.looks
-					const looks = Array.isArray(raw)
-						? raw
-								.map((x) => ({
-									id: String(x?.id != null ? x.id : ''),
-									name: String(x?.name != null ? x.name : ''),
-								}))
-								.filter((x) => x.id)
-						: []
-					const prvRaw = msg.data.previewSceneId
-					const previewSceneId =
-						prvRaw != null && String(prvRaw).trim() ? String(prvRaw).trim() : null
-					/** Full scene JSON per look (browser-only until project Save) — for Companion take without disk project. */
-					const snapRaw = msg.data.sceneSnapshots
-					const sceneSnapshots = Array.isArray(snapRaw)
-						? snapRaw.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
-						: null
-					const layerPresets = Array.isArray(msg.data.layerPresets) ? msg.data.layerPresets : []
-					const lookPresets = Array.isArray(msg.data.lookPresets) ? msg.data.lookPresets : []
-					ctx.sceneDeck = {
-						looks,
-						previewSceneId,
-						...(sceneSnapshots && sceneSnapshots.length ? { sceneSnapshots } : {}),
-						layerPresets,
-						lookPresets,
-					}
-					const persistence = ctx.persistence || require('../utils/persistence')
-					try {
-						persistence.set('scene_deck', { looks, previewSceneId, layerPresets, lookPresets })
-					} catch (e) {
-						if (typeof ctx.log === 'function') ctx.log('warn', 'scene_deck persist: ' + (e?.message || e))
-					}
-					broadcast('change', { path: 'scene.deck', value: ctx.sceneDeck })
+					const { mergeDeckSyncIntoProject } = require('../engine/project-scenes')
+					mergeDeckSyncIntoProject(ctx, msg.data)
 				}
 			} catch (e) {
 				const m = e instanceof Error ? e.message : String(e)

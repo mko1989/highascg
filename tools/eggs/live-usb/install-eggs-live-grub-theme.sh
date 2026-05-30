@@ -75,7 +75,7 @@ echo "==> Plymouth boot splash (replaces Ubuntu purple screen)"
 bash "${HERE}/install-highascg-plymouth-theme.sh"
 
 echo "OK: eggs theme → ${THEME_ABS}"
-echo "     GRUB: default Live entry includes persistence on the kernel line"
+echo "     GRUB: default Live entry (exFAT-only; no union persistence on kernel line)"
 echo "     Plymouth: highascg (see branding/README.md)"
 grep '^theme:' "$EGGS_YAML"
 echo

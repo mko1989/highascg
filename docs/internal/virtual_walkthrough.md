@@ -9,7 +9,7 @@ Welcome to the **HighAsCG** project virtual walkthrough! This document serves as
 Live broadcast and show-control servers must be extremely stable. HighAsCG is built around a "fail-safe" and "sandboxed" architecture to guarantee that manual operations, crashes, or double-clicks do not lock up high-end hardware, display ports, or standard system services.
 
 ### 1. Single-Instance Safety (Process Locking)
-To prevent multiple instances from running at the same time and causing port conflicts (e.g., AMCP port `5250` or HTTP port `8080`) or locking expensive PCI video cards (like Blackmagic Decklink), the Openbox autostart script employs a strict single-instance file lock:
+To prevent multiple instances from running at the same time and causing port conflicts (e.g., AMCP port `5250` or HTTP port `4200`) or locking expensive PCI video cards (like Blackmagic Decklink), the Openbox autostart script employs a strict single-instance file lock:
 ```bash
 exec 9>/tmp/caspar-openbox-autostart.lock
 if ! flock -n 9; then
@@ -195,15 +195,15 @@ npm start
 npm run dev
 
 # To check if all APIs and systems are healthy (smoke tests):
-npm run smoke -- 8080
+npm run smoke -- 4200
 ```
 
 ### Checking Active Outputs
 You can inspect which ports are actively bound and running using common command line tools:
 
 ```bash
-# Check if HighAsCG is listening on port 8080
-ss -tlnp | grep 8080
+# Check if HighAsCG is listening on port 4200
+ss -tlnp | grep 4200
 
 # Check if CasparCG is listening on AMCP port 5250
 ss -tlnp | grep 5250

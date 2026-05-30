@@ -24,6 +24,10 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	const displays = live && live.gpu && Array.isArray(live.gpu.displays) ? live.gpu.displays : []
 	const gpuInventory = live && live.gpu && Array.isArray(live.gpu.connectors) ? live.gpu.connectors : []
 	const gpuPhysicalPorts = Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : []
+	const gpuCards = Array.isArray(live?.gpu?.physicalMap?.cards)
+		? live.gpu.physicalMap.cards
+		: [...new Set(gpuPhysicalPorts.map((p) => String(p?.drmCard || '').trim()).filter(Boolean))]
+	const multiGpu = gpuCards.length > 1
 	const connectedDisplayByName = new Map(
 		displays
 			.map((d) => String(d?.name || '').trim())
@@ -39,14 +43,17 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			seenGpuIds.add(pid)
 			const activePort = String(p?.runtime?.activePort || '').trim()
 			const pairName = String(p?.pair?.name || '').trim()
-			const label = pid.replace(/^gpu_p/i, 'P')
+			const drmCard = String(p?.drmCard || '').trim()
+			const drmName = String(p?.drmName || '').trim()
+			const cardPrefix = multiGpu && drmCard ? `${drmCard.replace(/^card/i, 'C')}.` : ''
+			const label = `${cardPrefix}${pid.replace(/^gpu_p/i, 'P')}`
 			const displayIdx = activePort ? connectedDisplayByName.get(activePort.toUpperCase()) : undefined
 			connectors.push({
 				id: pid,
 				deviceId: DEFAULT_DEVICE_ID,
 				kind: 'gpu_out',
 				label,
-				externalRef: activePort || pairName || pid,
+				externalRef: drmName || activePort || pairName || pid,
 				caspar: { bus: 'pgm', mainIndex: Number.isFinite(displayIdx) ? displayIdx : 0 },
 				gpuPhysical: {
 					pair: {
@@ -55,6 +62,8 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 						name: pairName,
 					},
 					slotOrder: Number.isFinite(Number(p.slotOrder)) ? Number(p.slotOrder) : 0,
+					...(drmCard ? { drmCard } : {}),
+					...(drmName ? { drmName } : {}),
 				},
 			})
 		}

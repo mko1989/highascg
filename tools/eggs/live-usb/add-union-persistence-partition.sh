@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# LEGACY: Add Debian Live union persistence (/ union) after flashing an ISO with dd.
+# Removed from default operator workflow — use finish-operator-stick.sh (exFAT-only).
+# Set HIGHASCG_LEGACY_UNION_PERSIST=1 to run this script intentionally.
+#
 # Add Debian Live union persistence (/ union) after flashing an ISO with dd/gnome-disks.
 # Default workflow for HighAsCG USB sticks — keeps /home/casparcg/highascg + rest of writable root.
 #
@@ -35,6 +39,14 @@ usage() {
 }
 
 [[ "$(id -u)" -eq 0 ]] || { echo "Must run as root (sudo)." >&2; exit 1; }
+
+if [[ "${HIGHASCG_LEGACY_UNION_PERSIST:-0}" != "1" ]]; then
+	echo "Union persistence partitions were removed from HighAsCG (exFAT-only operator sticks)." >&2
+	echo "Use: sudo bash tools/eggs/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso" >&2
+	echo "To force this legacy script: HIGHASCG_LEGACY_UNION_PERSIST=1 sudo $0 …" >&2
+	exit 2
+fi
+export HIGHASCG_EXFAT_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

@@ -10,8 +10,16 @@ const { getDisplaysXrandrDetailed } = require('./hardware-info')
 function normalizePortName(v) {
 	const s = String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
 	if (!s) return ''
-	const m = s.match(/^(DP|HDMI|DVI|VGA|E-?DP)-?(\d+)$/)
-	if (m) return `${m[1].replace('E-DP', 'EDP')}-${parseInt(m[2], 10)}`
+	let m = s.match(/^(DP)-(\d+(?:-\d+)*)$/)
+	if (m) return `DP-${m[2]}`
+	m = s.match(/^(HDMI-A)-(\d+)$/)
+	if (m) return `${m[1]}-${parseInt(m[2], 10)}`
+	m = s.match(/^(HDMI|DVI|VGA)-(\d+)$/)
+	if (m) return `${m[1]}-${parseInt(m[2], 10)}`
+	m = s.match(/^(E-?DP)-(\d+)-(\d+)$/)
+	if (m) return `EDP-${parseInt(m[2], 10)}-${parseInt(m[3], 10)}`
+	m = s.match(/^(E-?DP)-(\d+)$/)
+	if (m) return `EDP-${parseInt(m[2], 10)}`
 	return s
 }
 
@@ -22,8 +30,18 @@ function normalizePortName(v) {
  */
 function canonicalAbPair(port) {
 	const norm = normalizePortName(port)
-	const m = norm.match(/^(DP|HDMI)-(\d+)$/)
-	if (!m) return norm ? [norm] : []
+	let m = norm.match(/^(DP|HDMI|EDP)-(\d+)$/)
+	if (!m) {
+		// xrandr internal panel lanes: eDP-1-0 / eDP-1-1
+		const lane = norm.match(/^(EDP)-(\d+)-(\d+)$/)
+		if (lane) {
+			const n = parseInt(lane[2], 10)
+			const sub = parseInt(lane[3], 10)
+			const first = sub % 2 === 0 ? sub : sub - 1
+			return [`EDP-${n}-${first}`, `EDP-${n}-${first + 1}`]
+		}
+		return norm ? [norm] : []
+	}
 	const prefix = m[1]
 	const num = parseInt(m[2], 10)
 	const first = num % 2 === 0 ? num : num - 1
@@ -34,15 +52,20 @@ function canonicalAbPair(port) {
  * @param {string} raw xrandr --query text
  * @returns {string[]}
  */
-function parseXrandrDpHdmiOutputNames(raw) {
+function parseXrandrVideoOutputNames(raw) {
 	const outputs = []
 	for (const line of String(raw || '').split('\n')) {
 		const m = line.match(/^(\S+)\s+(connected|disconnected)\b/)
 		if (!m) continue
 		const name = m[1].replace(/^card\d+-/i, '')
-		if (/^(DP|HDMI)/i.test(name)) outputs.push(name)
+		if (/^(DP|HDMI|E-?DP)/i.test(name)) outputs.push(name)
 	}
 	return outputs
+}
+
+/** @deprecated use parseXrandrVideoOutputNames */
+function parseXrandrDpHdmiOutputNames(raw) {
+	return parseXrandrVideoOutputNames(raw)
 }
 
 /**
@@ -61,7 +84,7 @@ function discoverGpuPhysicalTopologyFromXrandr(raw) {
 	}
 	if (!query) return null
 
-	const outputs = parseXrandrDpHdmiOutputNames(query)
+	const outputs = parseXrandrVideoOutputNames(query)
 	if (!outputs.length) return null
 
 	const seenPairs = new Set()
@@ -121,14 +144,17 @@ function topologyRowsEqual(a, b) {
 function ensureGpuPhysicalTopologyFromXrandr(opts) {
 	const config = opts?.config
 	const log = opts?.log
-	const discovered = discoverGpuPhysicalTopologyFromXrandr()
+	const { discoverGpuPhysicalTopology } = require('./gpu-topology-drm')
+	const probe = discoverGpuPhysicalTopology({ config })
+	const discovered = probe?.rows || null
+	const source = probe?.source || 'unknown'
 	if (!discovered?.length) {
-		return { topology: null, updated: false }
+		return { topology: null, updated: false, source: null }
 	}
 
 	const cur = Array.isArray(config?.gpuPhysicalTopology) ? config.gpuPhysicalTopology : []
 	if (topologyRowsEqual(cur, discovered)) {
-		return { topology: discovered, updated: false }
+		return { topology: discovered, updated: false, source }
 	}
 
 	config.gpuPhysicalTopology = discovered
@@ -136,20 +162,24 @@ function ensureGpuPhysicalTopologyFromXrandr(opts) {
 	if (cm && typeof cm.get === 'function' && typeof cm.save === 'function') {
 		const saved = cm.save({ ...cm.get(), gpuPhysicalTopology: discovered })
 		if (saved && typeof log === 'function') {
-			log('info', `[gpu-topology] saved xrandr physical map (${discovered.length} ports): ${discovered.map((r) => `${r.physicalPortId}=${r.dpA}/${r.dpB || '-'}`).join(', ')}`)
+			log(
+				'info',
+				`[gpu-topology] saved ${source} physical map (${discovered.length} ports): ${discovered.map((r) => `${r.physicalPortId}=${r.dpA}/${r.dpB || '-'}`).join(', ')}`,
+			)
 		} else if (!saved && typeof log === 'function') {
-			log('warn', '[gpu-topology] discovered xrandr map but failed to persist config')
+			log('warn', `[gpu-topology] discovered ${source} map but failed to persist config`)
 		}
 	} else if (typeof log === 'function') {
-		log('info', `[gpu-topology] applied xrandr physical map in memory (${discovered.length} ports)`)
+		log('info', `[gpu-topology] applied ${source} physical map in memory (${discovered.length} ports)`)
 	}
 
-	return { topology: discovered, updated: true }
+	return { topology: discovered, updated: true, source }
 }
 
 module.exports = {
 	normalizePortName,
 	canonicalAbPair,
+	parseXrandrVideoOutputNames,
 	parseXrandrDpHdmiOutputNames,
 	discoverGpuPhysicalTopologyFromXrandr,
 	topologyRowsEqual,

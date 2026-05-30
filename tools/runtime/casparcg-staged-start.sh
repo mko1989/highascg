@@ -8,7 +8,7 @@
 #
 # Arm Caspar (allow startup to proceed):
 #   touch /home/casparcg/highascg/data/caspar-armed
-#   # or: curl -X POST http://127.0.0.1:8080/api/system/caspar-arm
+#   # or: curl -X POST http://127.0.0.1:4200/api/system/caspar-arm
 #
 # Disarm before reboot if you want to pause Caspar on next boot (optional):
 #   rm /home/casparcg/highascg/data/caspar-armed

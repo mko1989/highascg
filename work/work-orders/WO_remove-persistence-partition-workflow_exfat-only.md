@@ -91,6 +91,10 @@ Update/remove references in:
 
 ## Work log
 
+### 2026-05-28 — Agent (USB tooling)
+
+**`finish-operator-stick.sh` / `create-operator-stick-from-dd.sh`:** exFAT-only by default (`HIGHASCG_EXFAT_ONLY=1`); always prune `persistence` + exFAT before recreating HIGHASCGEXF on MBR slot 3. **`add-union-persistence-partition.sh`** requires `HIGHASCG_LEGACY_UNION_PERSIST=1`. GRUB/isolinux themes: removed `persistence` kernel param. **`repair-stick-exfat-only.sh`** for sticks already flashed with persistence.
+
 ### 2026-05-27 — Agent (implementation)
 
 **Code removed:** `src/system/media-partition-mount.js`, `src/system/block-devices.js`, `src/api/routes-system-storage.js`, `scripts/highascg-media-mount.sh`, `scripts/sudoers.d/highascg-media-mount`, `config/media_mount.json`. Startup no longer waits on partition mount (`index.js`). API/settings no longer expose `mediaMount`. `install-phase4.sh` no longer installs WO-38 helpers or creates `media/drive`. Legacy `mediaMount.uuid` in config logs a one-time warning and is stripped (`config-manager.js`).

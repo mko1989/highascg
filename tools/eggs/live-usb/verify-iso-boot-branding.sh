@@ -77,12 +77,11 @@ if [[ -n "$GRUB_CFG" ]]; then
 	if [[ -z "$first_linux" ]]; then
 		bad "grub.cfg has no linux line ($(basename "$GRUB_CFG"))"
 	elif grep -qE '(^|[[:space:]])persistence([[:space:]]|$)' <<<"$first_linux"; then
-		ok "default grub linux line includes persistence ($(basename "$GRUB_CFG"))"
+		warn "default grub line still has persistence (exFAT-only sticks — rebuild ISO after grub.main.cfg update)"
 	else
-		bad "default grub linux line missing persistence (stock eggs theme? use eggs produce --theme)"
-		echo "       line: ${first_linux}" >&2
+		ok "default grub linux line is plain Live (no union persistence) ($(basename "$GRUB_CFG"))"
 	fi
-	if grep -q 'Live/Installation' "$GRUB_CFG" && ! grep -qE '(^|[[:space:]])persistence([[:space:]]|$)' <<<"${first_linux:-}"; then
+	if grep -q 'Live/Installation' "$GRUB_CFG"; then
 		bad "grub.cfg is stock eggs Live/Installation (rebuild with --theme highascg-eggs-theme)"
 	fi
 	if grep -q 'quiet splash' "$GRUB_CFG"; then

@@ -137,7 +137,7 @@ TS=$(/usr/local/bin/highascg-tailscale-ip.sh)
   echo "┌─ HighAsCG ─────────────────────────────────────────────────"
   echo "│  Primary IP: ${IP:-unknown}"
   echo "│  Tailscale:  ${TS}"
-  echo "│  Setup page: http://${IP:-127.0.0.1}:8080/setup.html"
+  echo "│  Setup page: http://${IP:-127.0.0.1}:4200/setup.html"
   echo "│  Syncthing:  http://${IP:-127.0.0.1}:8384/"
   echo "└──────────────────────────────────────────────────────────"
   echo ""
@@ -171,7 +171,7 @@ if [ -z "${HIGHASCG_CONSOLE_HINT:-}" ] && [ -n "${PS1:-}" ]; then
     /dev/tty[0-9]|/dev/tty[0-9][0-9])
       export HIGHASCG_CONSOLE_HINT=1
       echo ""
-      echo "━━ HighAsCG ━━  http://$(hostname -I 2>/dev/null | awk '{print $1}'):8080/setup.html  ━━"
+      echo "━━ HighAsCG ━━  http://$(hostname -I 2>/dev/null | awk '{print $1}'):4200/setup.html  ━━"
       ;;
   esac
 fi
@@ -294,8 +294,8 @@ TS=$(/usr/local/bin/highascg-tailscale-ip.sh)
 HG=$(systemctl show -p ActiveState --value -- highascg 2>/dev/null | head -n1)
 [ -z "$HG" ] && HG="unknown"
 echo ""
-echo "  Web UI:    http://${PI}:8080/"
-echo "  Setup:     http://${PI}:8080/setup.html  (IPs, Tailscale, Syncthing)"
+echo "  Web UI:    http://${PI}:4200/"
+echo "  Setup:     http://${PI}:4200/setup.html  (IPs, Tailscale, Syncthing)"
 echo "  Syncthing: http://${PI}:8384/"
 echo "  Tailscale: ${TS}"
 echo "  HighAsCG:  ${HG}"

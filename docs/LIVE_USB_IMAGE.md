@@ -578,7 +578,7 @@ The live system will:
 1. Load the kernel and initramfs from the USB.
 2. Mount `filesystem.squashfs` as a read-only root via overlayfs.
 3. Start `nodm` → Openbox → CasparCG autostart (if display-mode is `normal`).
-4. Start the `highascg.service` (HighAsCG web GUI on port 8080).
+4. Start the `highascg.service` (HighAsCG web GUI on port 4200).
 
 > [!TIP]
 > If using **penguins-eggs**, the default live credentials are:
@@ -771,7 +771,7 @@ ufw status
 # Re-apply if needed
 ufw allow 5250/tcp comment "CasparCG AMCP"
 ufw allow 8000/tcp comment "CasparCG Scanner"
-ufw allow 8080/tcp comment "HighAsCG Web GUI"
+ufw allow 4200/tcp comment "HighAsCG Web GUI"
 ufw allow 6250/udp comment "CasparCG OSC"
 ```
 
@@ -895,7 +895,7 @@ This section documents the full software stack that the image captures.
 | Application | `/opt/highascg/` | Node.js playout control |
 | Config | `/opt/highascg/highascg.config.json` | Application config |
 | Service | `highascg.service` | systemd unit |
-| Web GUI | `http://<IP>:8080` | Browser-based control |
+| Web GUI | `http://<IP>:4200` | Browser-based control |
 
 ### Drivers & Libraries
 
@@ -922,7 +922,7 @@ systemd → nodm → X11 (:0) → Openbox
           done &
 
 systemd → highascg.service
-  └─ node /opt/highascg/index.js (port 8080)
+  └─ node /opt/highascg/index.js (port 4200)
 ```
 
 ### System Hardening
@@ -932,7 +932,7 @@ systemd → highascg.service
 | No screen blanking | `xset s off; xset -dpms` in autostart |
 | No sleep/suspend | `systemctl mask sleep.target suspend.target hibernate.target` |
 | GRUB quiet | `GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"` |
-| UFW firewall | Ports 5250, 6250, 8000, 8080 open |
+| UFW firewall | Ports 5250, 6250, 8000, 4200 open |
 | Single CasparCG instance | `flock` in autostart (prevents duplicate starts) |
 
 ### Key User

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Full production USB stick: dd ISO → 4 GiB persistence → exFAT (rest) → seed layout.
+# Full production USB stick: dd ISO → exFAT (HIGHASCGEXF, slot 3) → seed layout.
+# No union persistence partition (exFAT-only).
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sdX
@@ -17,7 +18,7 @@ ASSUME_YES=false
 
 usage() {
 	echo "Usage: sudo $0 /dev/sdX [--iso /path/to.iso] [-y]" >&2
-	echo "  Layout (32 GiB typical): hybrid ISO ~5 GiB · persistence 4 GiB · exFAT remainder." >&2
+	echo "  Layout (32 GiB typical): hybrid ISO ~5 GiB · exFAT remainder on MBR slot 3." >&2
 	exit 1
 }
 
@@ -71,9 +72,12 @@ if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
 	chown "${USER_CASPAR}:${grp}" /home/casparcg/exfat /home/casparcg/highascg/media/exfat
 fi
 
+ISO_BYTES="$(stat -c%s "$ISO")"
+ISO_HUMAN="$(numfmt --to=iec-i --suffix=B "$ISO_BYTES" 2>/dev/null || echo "${ISO_BYTES} bytes")"
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "DEVICE: $DEV  ($(lsblk -dno SIZE,MODEL "$DEV" 2>/dev/null || true))"
-echo "ISO:    $ISO  ($(numfmt --to=iec-i --suffix=B "$(stat -c%s "$ISO")" 2>/dev/null || stat -c%s "$ISO") bytes)"
+echo "ISO:    $ISO  ($ISO_HUMAN)"
 echo "This ERASES all data on $DEV."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [[ "$ASSUME_YES" != true ]]; then
@@ -96,8 +100,8 @@ partprobe "$DEV"
 sleep 2
 lsblk -f "$DEV"
 
-echo "==> 2/3 Persistence + exFAT + seed (finish-operator-stick)"
-export PERSIST_SIZE_MIB="${PERSIST_SIZE_MIB:-4096}"
+echo "==> 2/3 exFAT + seed (finish-operator-stick, no persistence)"
+export HIGHASCG_EXFAT_ONLY=1
 export EXFAT_FILL_DISK=1
 bash "${HERE}/install-exfat-sync-map.sh"
 bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale
@@ -108,6 +112,6 @@ if ! "$PARTED" -s "$DEV" unit MiB print 2>/dev/null | grep -qi esp; then
 	echo "WARNING: no ESP flag in partition table — stick may not boot. Re-dd and rerun." >&2
 fi
 lsblk -f "$DEV"
-echo "Expected: persistence on MBR slot 3 (sda3), exFAT on slot 4 (sda4), ESP on slot 2."
-echo "Boot GRUB → Live with persistence"
-echo "Operator data on LABEL=HIGHASCGEXF (drop-update/, drop-config/, media/, …)"
+echo "Expected: ESP on slot 2, exFAT HIGHASCGEXF on slot 3 (sda3) — no persistence partition."
+echo "Boot GRUB → Live (config/state on exFAT only)"
+echo "Operator data on LABEL=HIGHASCGEXF (drop-update/, configs/, media/, …)"

@@ -118,7 +118,7 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 | Path | Purpose |
 |------|---------|
 | **`dist-web/`** | Vite output (`npm run build:client`) — minified HTML/JS/CSS the server prefers to serve when present |
-| **`vite.config.js`** | Build config: `root: 'client'`, `outDir: '../dist-web'`, dev proxy to `:8080` |
+| **`vite.config.js`** | Build config: `root: 'client'`, `outDir: '../dist-web'`, dev proxy to `:4200` |
 
 ### What the client does **not** do
 
@@ -148,7 +148,7 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 │  Browser: client/ or dist-web/                              │
 │  fetch('/api/...')  WebSocket('/api/ws')                    │
 └───────────────────────────┬─────────────────────────────┘
-                            │ same host :8080 (or /instance/id/)
+                            │ same host :4200 (or /instance/id/)
 ┌───────────────────────────▼─────────────────────────────┐
 │  Node: index.js + src/                                     │
 │  HTTP router → src/api/*                                   │
@@ -157,7 +157,7 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Dev:** `npm run dev:client` (Vite :3000) proxies `/api` to `npm start` (:8080).
+- **Dev:** `npm run dev:client` (Vite :3000) proxies `/api` to `npm start` (:4200).
 - **Production playout:** headless server; client app on operator Mac/Windows points at server IP.
 
 ---

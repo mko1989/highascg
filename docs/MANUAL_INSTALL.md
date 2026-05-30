@@ -308,7 +308,7 @@ sudo systemctl enable highascg.service
 sudo systemctl start highascg.service
 ```
 
-Check: `systemctl status highascg`, then open **`http://SERVER_IP:8080/`** (or the port in your config).
+Check: `systemctl status highascg`, then open **`http://SERVER_IP:4200/`** (or the port in your config).
 
 ### 9.3.1 npm: `go2rtc-static` download timeout
 

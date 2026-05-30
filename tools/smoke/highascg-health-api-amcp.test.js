@@ -4,7 +4,7 @@
  * HighAsCG tests: offline router + AMCP dispatch (no TCP to Caspar).
  *
  * For **live** Caspar AMCP on localhost, run `npm run test:highascg:live`.
- * For **live** HighAsCG HTTP → Caspar, run `HIGHASCG_HTTP_PORT=8080 npm run test:highascg:live:http`.
+ * For **live** HighAsCG HTTP → Caspar, run `HIGHASCG_HTTP_PORT=4200 npm run test:highascg:live:http`.
  *
  * Optional: probe a running server from this file only:
  *   HIGHASCG_INTEGRATION_PORT=8099 node --test tools/highascg-health-api-amcp.test.js

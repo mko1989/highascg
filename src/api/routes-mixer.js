@@ -8,6 +8,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const persistence = require('../utils/persistence')
 const { scheduleProjectSyncBroadcast } = require('./routes-data')
+const { resolveSceneById } = require('../engine/project-scenes')
 const PROJECT_DISK_KEY = 'web_project'
 
 /**
@@ -200,7 +201,7 @@ function updateProjectStateFromSelection(ctx, property, value) {
 	if (!layer) return null
 
 	// Find fresh state from UI if available to prevent jumps
-	const freshScene = ctx.sceneDeck?.sceneSnapshots?.find(s => s.id === lookId)
+	const freshScene = resolveSceneById(lookId) || ctx.sceneDeck?.sceneSnapshots?.find((s) => s.id === lookId)
 	const freshLayer = freshScene?.layers?.[layerIdx]
 	const baseLayer = freshLayer || layer
 

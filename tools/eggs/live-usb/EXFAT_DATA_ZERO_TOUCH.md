@@ -52,9 +52,9 @@ Use `dd`, Balena Etcher, or **`tools/live-usb/build-flash-and-persist.sh`** — 
 
 | Goal | Commands |
 |------|-----------|
-| **Production stick (required)** | `sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso` — **persistence first** (**`PERSIST_SIZE_MIB=4096`** default, 4 GiB), then **exFAT fills the rest**. On re-flashed sticks with leftover slices, add **`--prune-stale`**. |
-| **exFAT only** (dev / not playout) | `EXFAT_FILL_DISK=1 sudo bash tools/live-usb/add-exfat-data-partition.sh /dev/sdX` — **do not** run persistence afterward unless you shrink/repartition manually. |
-| **Persistence only** (broken playout layout) | Not for production — exFAT operator volume is still required for **`drop-update/`** and **`HIGHASCGEXF`**. |
+| **Production stick (required)** | `sudo bash tools/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso` — **exFAT only** on MBR slot 3 (**`HIGHASCGEXF`**, fills disk after ISO). No union **`persistence`** partition. Re-flash: add **`--prune-stale`**. Fix an old persist stick: **`repair-stick-exfat-only.sh`**. |
+| **Full dd + exFAT** | `sudo bash tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sdX --iso /path/to.iso` |
+| **Legacy union persistence** | `HIGHASCG_LEGACY_UNION_PERSIST=1` + **`add-union-persistence-partition.sh`** — not for production. |
 
 Optional: **`EXFAT_SIZE_MIB=8192`** before **`add-exfat-data-partition.sh`** to change the reserved exFAT size.
 

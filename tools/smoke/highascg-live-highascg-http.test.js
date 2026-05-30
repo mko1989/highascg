@@ -3,7 +3,7 @@
 /**
  * Live HighAsCG HTTP → real AMCP on Caspar (server must be running with Caspar connected).
  *
- *   HIGHASCG_HTTP_PORT=8080 npm run test:highascg:live:http
+ *   HIGHASCG_HTTP_PORT=4200 npm run test:highascg:live:http
  *
  * Avoid sending `DIAG` via tests: CasparCG shows diagnostics on the program output.
  */
@@ -20,7 +20,7 @@ const runHttp = Number.isFinite(HTTP_PORT) && HTTP_PORT > 0
 test('requires HIGHASCG_HTTP_PORT (or HIGHASCG_INTEGRATION_PORT)', () => {
 	assert.ok(
 		runHttp,
-		`Set HIGHASCG_HTTP_PORT to your running HighAsCG HTTP port (e.g. 8080). Got: "${HTTP_PORT_RAW}"`,
+		`Set HIGHASCG_HTTP_PORT to your running HighAsCG HTTP port (e.g. 4200). Got: "${HTTP_PORT_RAW}"`,
 	)
 })
 

@@ -5,8 +5,9 @@ const path = require('path')
 const { getGpuModel } = require('./hardware-info')
 const {
 	normalizePortName,
-	discoverGpuPhysicalTopologyFromXrandr,
 } = require('./gpu-topology-xrandr')
+const { discoverGpuPhysicalTopology, cardFromDrmName } = require('./gpu-topology-drm')
+const { resolveDisplayByDrmHeuristic } = require('./gpu-display-alias')
 
 function canonicalPairName(a, b) {
 	const aa = normalizePortName(a)
@@ -32,9 +33,9 @@ function defaultTopology() {
  * @returns {{ rows: object[], source: string }}
  */
 function resolvePhysicalTopology(cfg, gpuModel) {
-	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr()
-	if (fromXrandr?.length) {
-		return { rows: fromXrandr, source: 'xrandr' }
+	const probed = discoverGpuPhysicalTopology({ config: cfg })
+	if (probed?.rows?.length) {
+		return { rows: probed.rows, source: probed.source }
 	}
 
 	const arr = Array.isArray(cfg?.gpuPhysicalTopology) ? cfg.gpuPhysicalTopology : null
@@ -76,84 +77,143 @@ function resolvePhysicalTopology(cfg, gpuModel) {
 	return { rows: defaultTopology(), source: 'default' }
 }
 
+function drmLookupKey(name) {
+	return String(name || '').trim().toLowerCase()
+}
+
 function buildGpuPhysicalMap({ config, displays, connectors }) {
 	const gpuModel = getGpuModel()
 	const { rows: topology, source: topologySource } = resolvePhysicalTopology(config, gpuModel)
-	const displayByName = new Map(
-		(Array.isArray(displays) ? displays : [])
-			.map((d) => d && typeof d === 'object' ? d : null)
-			.filter(Boolean)
-			.map((d) => [normalizePortName(d.name), d])
-	)
+	const displayList = (Array.isArray(displays) ? displays : [])
+		.map((d) => (d && typeof d === 'object' ? d : null))
+		.filter(Boolean)
+	const connectorList = (Array.isArray(connectors) ? connectors : [])
+		.map((c) => (c && typeof c === 'object' ? c : null))
+		.filter(Boolean)
+
+	const displayByName = new Map(displayList.map((d) => [normalizePortName(d.name), d]))
+	const displayByDrm = new Map(displayList.map((d) => [drmLookupKey(d.name), d]))
 	const connectorByName = new Map(
-		(Array.isArray(connectors) ? connectors : [])
-			.map((c) => c && typeof c === 'object' ? c : null)
-			.filter(Boolean)
-			.map((c) => [normalizePortName(c.shortName || c.name), c])
+		connectorList.map((c) => [normalizePortName(c.shortName || c.name), c]),
 	)
+	const connectorByDrm = new Map(connectorList.map((c) => [drmLookupKey(c.name), c]))
+
+	const lookupDisplay = (topologyRow, normName, usedDisplayKeys) => {
+		const drm = drmLookupKey(topologyRow?.drmName)
+		if (drm && displayByDrm.has(drm)) {
+			const d = displayByDrm.get(drm)
+			return { display: d, key: normalizePortName(d.name) }
+		}
+		if (normName && displayByName.has(normName)) {
+			const d = displayByName.get(normName)
+			return { display: d, key: normName }
+		}
+		return resolveDisplayByDrmHeuristic(topologyRow, displayList, connectorByDrm, usedDisplayKeys)
+	}
+
+	const lookupConnector = (topologyRow, normName) => {
+		const drm = drmLookupKey(topologyRow?.drmName)
+		if (drm && connectorByDrm.has(drm)) return connectorByDrm.get(drm)
+		const card = String(topologyRow?.drmCard || '').trim().toLowerCase()
+		if (card && normName) {
+			for (const c of connectorList) {
+				if (cardFromDrmName(c.name) !== card) continue
+				if (normalizePortName(c.shortName || c.name) === normName) return c
+			}
+		}
+		if (normName && connectorByName.has(normName)) return connectorByName.get(normName)
+		return null
+	}
 
 	const usedDisplays = new Set()
 	const ports = topology.map((t) => {
 		const a = normalizePortName(t.dpA)
 		const b = normalizePortName(t.dpB)
-		const aDisplay = a ? displayByName.get(a) || null : null
-		const bDisplay = b ? displayByName.get(b) || null : null
-		const aConn = a ? connectorByName.get(a) || null : null
-		const bConn = b ? connectorByName.get(b) || null : null
-		const activeRuntimePort = aDisplay ? a : (bDisplay ? b : null)
-		const connected = !!(aDisplay || bDisplay)
+		const aHit = a ? lookupDisplay(t, a, usedDisplays) : null
+		const bHit = b
+			? lookupDisplay({ ...t, drmName: t.drmNameB || t.drmName }, b, usedDisplays)
+			: null
+		const aDisplay = aHit?.display || null
+		const bDisplay = bHit?.display || null
+		const aConn = lookupConnector(t, a)
+		const bConn = b
+			? lookupConnector({ ...t, drmName: t.drmNameB || '' }, b)
+			: null
+		const xrandrName = aDisplay?.name || bDisplay?.name || ''
+		const activeRuntimePort = xrandrName
+			? normalizePortName(xrandrName)
+			: aDisplay
+				? a
+				: bDisplay
+					? b
+					: null
+		const connected = !!(aDisplay || bDisplay || aConn?.connected || bConn?.connected)
 		const activeDisplay = aDisplay || bDisplay || null
 
-		if (aDisplay) usedDisplays.add(a)
-		if (bDisplay) usedDisplays.add(b)
+		if (aHit?.key) usedDisplays.add(aHit.key)
+		if (bHit?.key) usedDisplays.add(bHit.key)
 
 		return {
 			physicalPortId: t.physicalPortId,
 			slotOrder: t.slotOrder,
 			connectorNumber: t.connectorNumber,
 			location: t.location,
+			drmCard: t.drmCard || '',
+			drmName: t.drmName || '',
+			...(t.drmNameB ? { drmNameB: t.drmNameB } : {}),
 			pair: { dpA: a, dpB: b, name: canonicalPairName(a, b) },
 			runtime: {
 				activePort: activeRuntimePort,
+				xrandrName: xrandrName || null,
 				candidatePorts: [a, b].filter(Boolean),
 				connected,
-				displayName: activeDisplay?.name || '',
+				displayName: activeDisplay?.name || t.drmName || '',
 				resolution: activeDisplay?.resolution || '',
 				refreshHz: Number.isFinite(activeDisplay?.refreshHz) ? activeDisplay.refreshHz : null,
 				casparScreenIndex: activeDisplay?.casparScreenIndex || null,
-				casparMode: activeDisplay?.casparMode || null
+				casparMode: activeDisplay?.casparMode || null,
 			},
 			probe: {
-				connectorA: aConn ? { name: aConn.name || '', shortName: aConn.shortName || '', connected: !!aConn.connected } : null,
-				connectorB: bConn ? { name: bConn.name || '', shortName: bConn.shortName || '', connected: !!bConn.connected } : null,
+				connectorA: aConn
+					? { name: aConn.name || '', shortName: aConn.shortName || '', connected: !!aConn.connected }
+					: null,
+				connectorB: bConn
+					? { name: bConn.name || '', shortName: bConn.shortName || '', connected: !!bConn.connected }
+					: null,
 			},
 			confidence: connected ? 'high' : 'medium',
 		}
 	})
 
-	// Connected outputs that still do not match any A/B pair (non DP/HDMI or odd enumeration).
+	// Connected outputs that still do not match any topology row.
 	let nextUnmappedIdx = 0
-	for (const [name, display] of displayByName) {
-		if (usedDisplays.has(name)) continue
-		const conn = connectorByName.get(name) || null
+	for (const display of displayList) {
+		const key = normalizePortName(display.name)
+		if (!key || usedDisplays.has(key)) continue
+		const conn = connectorByDrm.get(drmLookupKey(display.name)) || connectorByName.get(key) || null
+		usedDisplays.add(key)
 		ports.push({
 			physicalPortId: `gpu_unmapped_${nextUnmappedIdx++}`,
 			slotOrder: 100 + nextUnmappedIdx,
 			connectorNumber: null,
 			location: null,
-			pair: { dpA: name, dpB: '', name },
+			drmCard: cardFromDrmName(display.name),
+			drmName: display.name || '',
+			pair: { dpA: key, dpB: '', name: key },
 			runtime: {
-				activePort: name,
-				candidatePorts: [name],
+				activePort: key,
+				candidatePorts: [key],
 				connected: true,
 				displayName: display.name || '',
 				resolution: display.resolution || '',
 				refreshHz: Number.isFinite(display.refreshHz) ? display.refreshHz : null,
 				casparScreenIndex: display.casparScreenIndex || null,
-				casparMode: display.casparMode || null
+				casparMode: display.casparMode || null,
 			},
 			probe: {
-				connectorA: conn ? { name: conn.name || '', shortName: conn.shortName || '', connected: !!conn.connected } : null,
+				connectorA: conn
+					? { name: conn.name || '', shortName: conn.shortName || '', connected: !!conn.connected }
+					: null,
 				connectorB: null,
 			},
 			confidence: 'high',
@@ -161,8 +221,11 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		})
 	}
 
+	const cards = [...new Set(ports.map((p) => p.drmCard).filter(Boolean))]
+
 	return {
 		topologySource,
+		cards,
 		ports,
 	}
 }

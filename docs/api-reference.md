@@ -35,7 +35,7 @@ Play a clip on a channel and layer.
   ```
 - **Example:**
   ```bash
-  curl -X POST -H "Content-Type: application/json" -d '{"clip":"AMB","loop":true,"channel":1,"layer":10}' http://localhost:8080/api/play
+  curl -X POST -H "Content-Type: application/json" -d '{"clip":"AMB","loop":true,"channel":1,"layer":10}' http://localhost:4200/api/play
   ```
   ```javascript
   fetch('/api/play', { method: 'POST', body: JSON.stringify({ clip: 'AMB', channel: 1, layer: 10, loop: true }) })

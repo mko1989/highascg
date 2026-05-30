@@ -360,4 +360,6 @@ module.exports = {
 	getConnectedDisplayNames,
 	getDisplayDetails,
 	getGpuModel,
+	compareConnectorNames,
+	drmShort,
 }

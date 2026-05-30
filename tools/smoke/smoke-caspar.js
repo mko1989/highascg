@@ -4,7 +4,7 @@
  * Verifies unknown route → 404 and AMCP passthrough via POST /api/raw.
  *
  * Usage: start HighAsCG with Caspar reachable, then:
- *   node tools/smoke-caspar.js 8080
+ *   node tools/smoke-caspar.js 4200
  *
  * Exits 0 on success, 1 on failure or if Caspar is not connected (503 on /api/state).
  */
@@ -12,7 +12,7 @@
 
 const http = require('http')
 
-const port = parseInt(process.argv[2] || process.env.HIGHASCG_SMOKE_PORT || '8080', 10)
+const port = parseInt(process.argv[2] || process.env.HIGHASCG_SMOKE_PORT || '4200', 10)
 const host = process.env.HIGHASCG_SMOKE_HOST || '127.0.0.1'
 
 function req(method, path, body = null) {

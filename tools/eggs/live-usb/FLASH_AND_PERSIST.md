@@ -1,11 +1,6 @@
-# Flash the HighAsCG live ISO to USB with persistence
+# Flash the HighAsCG live ISO to USB (exFAT-only operator data)
 
-**Default goal:** a stick that **remembers the whole live session** — NVIDIA
-drivers, DeckLink-related config, Tailscale, **`/etc`**, **`/var`**, home
-directories, and **`/home/casparcg/highascg`**. That requires Ubuntu Live
-**`persistence`** + **`persistence.conf`** with **`/ union`**. The ISO must
-pass **`persistence`** on the **default** GRUB kernel line (10 s countdown);
-there is no separate “persistence” menu item to choose after flash.
+**Default goal:** plain **Live** boot (RAM overlay) with durable config/state/media on **`LABEL=HIGHASCGEXF`** (exFAT, MBR slot 3 after ISO+ESP). **No** union **`persistence`** ext4 partition — removed for faster boot (see **`WO_remove-persistence-partition-workflow_exfat-only.md`**).
 
 **Boot branding:** optional **`tools/eggs/live-usb/branding/splash.png`** (GRUB wallpaper) and Plymouth **`highascg`** theme (dark splash instead of purple Ubuntu). See **`tools/eggs/live-usb/branding/README.md`**.
 

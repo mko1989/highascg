@@ -49,7 +49,7 @@ flowchart TB
 | Operator workflow | Keyboard/mouse on playout head | Control from laptop (Electron) |
 | Security | Wide HTTP static surface on playout | API surface only (`HIGHASCG_HEADLESS`) |
 
-WO‑47 **exFAT `update/server/`** already assumes server-only drops; this plan makes **headless the default on ISO** and moves UI hosting into **Electron** instead of “open browser to playout :8080”.
+WO‑47 **exFAT `update/server/`** already assumes server-only drops; this plan makes **headless the default on ISO** and moves UI hosting into **Electron** instead of “open browser to playout :4200”.
 
 ---
 
@@ -233,7 +233,7 @@ HighAsCG-Launcher.app/
 
 ### 5.3 UI ↔ API wiring
 
-1. Operator enters **Server IP** + **port** (default **4200**, not 8080 — align docs).
+1. Operator enters **Server IP** + **port** (default **4200**).
 2. On **Connect**, main process stores `HIGHASCG_API_ORIGIN`, opens app window, preload injects origin.
 3. Renderer `fetch(getApiOrigin() + '/api/state')`, `new WebSocket(getWsUrl())`.
 4. **Import map** in `client/index.html` must use **runtime-generated** vendor URLs:
@@ -395,7 +395,7 @@ Caspar HTML templates and previs/CG-studio depend on server-mounted paths:
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| 1 | Default API port in operator docs: **4200** vs **8080**? | **4200** (matches `defaults.js` and sim launcher today) |
+| 1 | Default API port in operator docs | **4200** (matches `defaults.js`, `config/server.json`, and sim launcher) |
 | 2 | Bundle server in Electron for offline sim? | **No** — spawn from stick `sim/highascg` or repo |
 | 3 | `file://` vs `app://` protocol for UI? | **`app://` custom protocol** (avoids `file://` CORS/storage limits) |
 | 4 | Keep `npm start` serving UI for dev? | **Yes**, only when `HIGHASCG_HEADLESS` unset — print deprecation warning |

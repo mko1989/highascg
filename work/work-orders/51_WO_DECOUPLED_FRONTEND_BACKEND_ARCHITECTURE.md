@@ -78,7 +78,7 @@ server {
   - Install the standard Node `cors` package: `npm install cors`.
   - Wire it inside `src/server/http-server.js` to allow specific dev server origins (e.g., `http://localhost:5173`).
 - [x] **T2: Backend - Configurable API Ports**
-  - Add `HIGHASCG_API_PORT` (default `8080`) in `highascg.config.json` or `.env` to support independent backend execution.
+  - Add `HIGHASCG_API_PORT` (default `4200`) in `highascg.config.json` or `.env` to support independent backend execution.
 - [x] **T3: Backend - Conditionally Disable Static Assets**
   - Add a flag (e.g. `HIGHASCG_HEADLESS=true`) to bypass serving `./web` via `express.static` in `src/server/http-server.js` or `index.js`.
 - [x] **T4: Frontend - Initialize Vite Configuration**
@@ -93,9 +93,9 @@ server {
 
 ## 5. Success Criteria
 
-1. **Headless Mode Runs**: Node.js backend starts up on port `8080` without serving frontend folders and successfully accepts incoming REST API calls under `/api`.
+1. **Headless Mode Runs**: Node.js backend starts up on port `4200` without serving frontend folders and successfully accepts incoming REST API calls under `/api`.
 2. **Frontend Compiles**: Running `npm run build` inside the frontend directory compiles optimized, minified HTML/CSS/JS bundles inside `dist/`.
-3. **Pristine Connection**: The compiled frontend SPA connects successfully to the backend in both local dev mode (`localhost:5173` connecting to `localhost:8080`) and under production Nginx reverse proxy configurations.
+3. **Pristine Connection**: The compiled frontend SPA connects successfully to the backend in both local dev mode (`localhost:5173` connecting to `localhost:4200`) and under production Nginx reverse proxy configurations.
 
 ---
 

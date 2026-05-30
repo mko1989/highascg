@@ -219,7 +219,7 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 | Item | Notes |
 |------|------|
 | **Live networking** | **systemd-networkd** + DHCP on `en*` / `eth*` (egg build) |
-| **UFW** (if configured on build host) | Often **5250** AMCP, **6250**, **8000** scanner, **8080** HighAsCG |
+| **UFW** (if configured on build host) | Often **5250** AMCP, **6250**, **8000** scanner, **4200** HighAsCG |
 
 ---
 
