@@ -13,61 +13,10 @@ const {
 	persistProject,
 } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
-
-function injectHardwareConfigToProject(ctx, project) {
-	if (!ctx?.configManager) return
-	try {
-		const persistence = ctx.persistence || require('../utils/persistence')
-		const cfg = ctx.configManager.get()
-		project.hardwareConfig = {
-			deviceGraph: cfg.deviceGraph,
-			screenDestinations: cfg.screenDestinations,
-			casparServer: cfg.casparServer,
-			audioRouting: cfg.audioRouting,
-			streamingChannel: cfg.streamingChannel,
-			dmx: cfg.dmx,
-			recordOutputs: cfg.recordOutputs,
-			streamOutputs: cfg.streamOutputs,
-			audioOutputs: cfg.audioOutputs,
-			multiviewLayout: persistence.get('multiviewLayout')
-		}
-	} catch (e) {
-		if (typeof ctx.log === 'function') ctx.log('warn', '[project] failed to inject hardwareConfig: ' + e.message)
-	}
-}
-
-function applyHardwareConfigFromProject(ctx, project) {
-	if (!ctx?.configManager || !project?.hardwareConfig || typeof project.hardwareConfig !== 'object') return
-	try {
-		const hc = project.hardwareConfig
-		const persistence = ctx.persistence || require('../utils/persistence')
-		
-		const cfgPatch = {}
-		const keys = ['deviceGraph', 'screenDestinations', 'casparServer', 'audioRouting', 'streamingChannel', 'dmx', 'recordOutputs', 'streamOutputs', 'audioOutputs']
-		for (const k of keys) {
-			if (hc[k] !== undefined) cfgPatch[k] = hc[k]
-		}
-		
-		if (Object.keys(cfgPatch).length > 0) {
-			const cur = ctx.configManager.get()
-			const next = { ...cur, ...cfgPatch }
-			ctx.configManager.save(next)
-			if (ctx.config) Object.assign(ctx.config, cfgPatch)
-			if (typeof ctx.log === 'function') ctx.log('info', '[project] Loaded hardware configuration from project. Note: changes to device topology or channel counts may require a server restart to fully apply.')
-		}
-		
-		if (hc.multiviewLayout !== undefined) {
-			persistence.set('multiviewLayout', hc.multiviewLayout)
-			ctx._multiviewLayout = hc.multiviewLayout
-			try {
-				const { handleMultiviewApply } = require('./routes-multiview')
-				handleMultiviewApply(hc.multiviewLayout, ctx)
-			} catch (err) {}
-		}
-	} catch (e) {
-		if (typeof ctx.log === 'function') ctx.log('warn', '[project] failed to apply hardwareConfig: ' + e.message)
-	}
-}
+const {
+	injectHardwareConfigToProject,
+	applyHardwareConfigFromProject,
+} = require('../engine/project-hardware-config')
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null

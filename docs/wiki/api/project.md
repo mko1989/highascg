@@ -45,10 +45,28 @@ The `project` object is the same envelope the operator UI saves:
 |------|----------------|
 | Metadata | `name`, `slug`, `savedAt`, `version` |
 | Scenes | `scenes.scenes[]` — looks with `layers`, transitions |
-| Routing | channel map, multiview, audio (merged into server config on save) |
+| **`hardwareConfig`** | Injected on **save/autosave** from live server config (v2) |
 | Timelines | May be client-localStorage; sync via [`/api/timelines`](timelines.md) separately |
 
-Exact schema evolves with the client; treat as opaque JSON except fields you set.
+### `hardwareConfig` (server-injected, v2)
+
+Written by the server on `POST /api/project/save` and `POST /api/project/autosave`; restored on `POST /api/project/load` into `highascg.config.json`.
+
+| Key | Contents |
+|-----|----------|
+| `version` | `2` |
+| `deviceGraph` | Device View graph |
+| `screenDestinations` | PGM/PRV/multiview bindings |
+| `osDisplay` | GPU xrandr layout (`screen_N_os_*`, `multiview_os_*`, `screen_count`, …) |
+| `gpuPhysicalTopology` | Physical GPU port map (when present) |
+| `casparServer` | Caspar generator settings dict |
+| `audioRouting`, `streamingChannel`, `dmx`, `*Outputs` | Routing extras |
+| `multiviewLayout` | Multiview editor layout |
+| `fingerprint` | `{ hostname }` — informational for client mismatch UI |
+
+**Load does not** run `apply-os`, regenerate `casparcg.config`, or restart Caspar — client should call those after applying hardware when heads changed.
+
+Implementation: [`src/engine/project-hardware-config.js`](../../../src/engine/project-hardware-config.js)
 
 ---
 

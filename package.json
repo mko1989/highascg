@@ -26,6 +26,7 @@
 		"smoke:exfat-sync": "node --test tools/smoke/smoke-exfat-sync.js",
 		"test:device-graph": "node --test tools/smoke/smoke-device-graph.js",
 		"test:device-snapshot": "node --test tools/smoke/smoke-device-snapshot.js",
+		"test:project-hardware-config": "node --test tools/smoke/smoke-project-hardware-config.test.js",
 		"test:os-layout-w40": "node --test tools/smoke/smoke-os-layout-w40.js",
 		"test:mapping-gpu-os-layout": "node --test tools/smoke/smoke-mapping-gpu-os-layout.js",
 		"test:xrandr-custom-mode": "node --test tools/smoke/smoke-xrandr-custom-mode.js",
