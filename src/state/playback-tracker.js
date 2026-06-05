@@ -33,6 +33,13 @@ function recordPlay(ctx, channel, layer, clip, opts = {}) {
 		loop: !!opts.loop,
 		isRoute: media.isRouteClip(clip),
 	}
+	try {
+		const { logicalLayerFromPhysical, rememberLastPlayFrame } = require('../engine/scene-play-seek')
+		const logical = logicalLayerFromPhysical(ln)
+		if (logical != null) rememberLastPlayFrame(ctx, ch, logical, 0)
+	} catch {
+		/* optional WO-33 memory */
+	}
 	emitMatrix(ctx)
 }
 

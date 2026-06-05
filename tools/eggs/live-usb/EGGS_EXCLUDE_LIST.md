@@ -84,25 +84,35 @@ unsquashfs -ll /home/eggs/mnt/iso/live/filesystem.squashfs | grep -E 'swap\.img|
 
 ## Why is the ISO still ~5 GiB?
 
-A **~5 GiB** `filesystem.squashfs` / hybrid ISO is normal for **`eggs produce --clone --max`** on a full HighAsCG imaging host. Excludes remove **HighAsCG dev trees** and **caches**; they do **not** strip the underlying Ubuntu + broadcast stack.
+A **~4–5 GiB** `filesystem.squashfs` is normal for **`eggs produce --clone --max`** on a full HighAsCG imaging host **after** excludes. If you still see **~5 GiB** after removing **`/opt/nvidia-pool`**, the last ISO was probably built **before** the pool was deleted or **without** merged excludes — the May 2026 stick still had **`opt/nvidia-pool`** inside squashfs (~1.5 GiB of `.deb` files).
 
-Typical squashfs contents (your build host pattern):
+Typical squashfs contents:
 
-| Component | Rough size | Excluded? |
-|-----------|------------|-----------|
-| Ubuntu userland + `linux-modules` + `linux-firmware` | ~2–3 GiB compressed | No (the OS) |
-| **`/opt/nvidia-pool`** (offline `.deb` cache for WO‑39) | ~1.5 GiB | **No** — needed on ISO for first-boot driver pick |
-| Caspar + **`~/highascg/lib`** (NDI, etc.) | ~0.7 GiB+ | No (playout) |
-| Installed NVIDIA / DeckLink / build deps | varies | No |
-| `src/`, `node_modules`, `.cache`, swap | large on disk | **Yes** — not in squashfs |
+| Component | Rough size | In squashfs? |
+|-----------|------------|--------------|
+| Ubuntu userland + `linux-modules` + `linux-firmware` | ~2–3 GiB compressed | Yes (the OS) |
+| **`/opt/nvidia-pool`** | ~1.5 GiB if present on host | **No** — excluded + purged before build (`HIGHASCG_PURGE_NVIDIA_POOL=1`) |
+| Caspar + **`~/highascg/lib`** (NDI, etc.) | ~0.7 GiB+ | Yes (playout) |
+| One baked NVIDIA branch (535/580/595) | varies | Yes |
+| `src/`, `node_modules`, `.cache`, `/swapfile` | large on disk | **No** — exclude.list + `strip-host-swap` |
+| **`/run`**, **`/tmp`**, **`/proc`**, **`/dev`** | tmpfs at runtime | **No** — eggs master `run/*`, `tmp/*`, … |
 
-So shrinking below ~4 GiB means **smaller base OS** (fewer packages, one NVIDIA branch only, drop locales/docs) or **moving `nvidia-pool` off-ISO** (network required on first boot). That is a separate tradeoff from the HighAsCG exclude list.
+**tmpfs / swap:** Clone snapshots the root filesystem tree, not live tmpfs mounts. Eggs already omits `proc/*`, `dev/*`, `sys/*`, `tmp/*`; HighAsCG adds **`run/*`** and **`swapfile`**. `/swapfile` on the build disk is fine if listed in excludes — `strip-host-swap-for-live-iso.sh prepare` only **swapoff** + drops fstab lines.
+
+Pre/post checks:
+
+```bash
+sudo bash tools/eggs/live-usb/audit-eggs-clone-host.sh
+sudo eggs produce …   # use build-highascg-egg.sh (not bare eggs produce)
+bash tools/eggs/live-usb/verify-iso-squashfs-excludes.sh
+```
 
 Quick size check:
 
 ```bash
 du -h /home/eggs/mnt/iso/live/filesystem.squashfs
-du -sh /swap.img /var/cache /home/casparcg/.cache ~/highascg/node_modules /opt/nvidia-pool
+du -sh /swapfile /var/cache /home/casparcg/.cache ~/highascg/node_modules /opt/nvidia-pool
+unsquashfs -ll /home/eggs/mnt/iso/live/filesystem.squashfs | grep -c nvidia-pool || echo "OK: no pool"
 ```
 
 ## Maintenance

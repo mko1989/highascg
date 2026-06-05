@@ -2,7 +2,7 @@
 
 How the repository is split after the **server-at-root + `client/`** layout (May 2026). Use this when deciding what ships on a **closed ISO**, what goes in **`highascg-server_*.tar.gz`** on **`exfat/update/server/`**, and what runs on **Mac/Windows** as the remote client.
 
-**Related:** [`52_FILE_SEPARATION_INVENTORY.md`](52_FILE_SEPARATION_INVENTORY.md) (older `client/` naming), [`../docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), [`../docs/EXFAT_SERVER_UPDATE.md`](../docs/EXFAT_SERVER_UPDATE.md), WO‑51 decoupled architecture.
+**Related:** [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md), [`52_FILE_SEPARATION_INVENTORY.md`](52_FILE_SEPARATION_INVENTORY.md) (older `client/` naming), [`../docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), [`../docs/EXFAT_SERVER_UPDATE.md`](../docs/EXFAT_SERVER_UPDATE.md), WO‑51 decoupled architecture.
 
 ---
 
@@ -10,10 +10,12 @@ How the repository is split after the **server-at-root + `client/`** layout (May
 
 | Side | Role | Runs where |
 |------|------|------------|
-| **Backend (bundled server)** | Node process: Caspar AMCP, config generation, REST `/api/*`, WebSocket, OSC, streaming, OS/GPU hooks | `node index.js` on the playout machine |
-| **Client** | Browser UI: dashboards, scenes, device view, settings — talks to the server over HTTP/WS only | Static files in `client/` or built `dist-web/` |
+| **Backend (bundled server)** | Node **bridge**: client↔Caspar (AMCP) + client↔Ubuntu (GPU, exFAT, USB, systemd) via REST/WS | `node index.js` on the playout machine |
+| **Client** | Operator UI in **Electron launcher** — HTTP/WS to server only | Operator laptop (`highascg-client` repo); **not** on playout |
 
-The backend **may serve** `dist-web/` or `client/` for local debugging; **production playout** uses **`HIGHASCG_HEADLESS=true`** and a **remote client** over HTTP/WebSocket. There is no shared runtime except the **API contract**.
+The backend **does not** serve operator UI in production (`HIGHASCG_HEADLESS=true`). The in-tree **`client/`** folder is legacy/dev-only and is excluded from server tarballs and playout ISOs (including **`client/tools/electron-launcher/`**).
+
+**`work/`** and **`work/references/`** are engineering notes and design prototypes — **not part of the shipped program**.
 
 ---
 
@@ -145,20 +147,21 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Browser: client/ or dist-web/                              │
-│  fetch('/api/...')  WebSocket('/api/ws')                    │
+│  Operator machine: Electron launcher + dist-web/            │
+│  fetch('http://playout:4200/api/...')  WebSocket /api/ws  │
 └───────────────────────────┬─────────────────────────────┘
-                            │ same host :4200 (or /instance/id/)
+                            │
 ┌───────────────────────────▼─────────────────────────────┐
-│  Node: index.js + src/                                     │
+│  Playout: index.js + src/  (bridge, headless :4200)       │
 │  HTTP router → src/api/*                                   │
 │  WS → state + AMCP dispatch                                │
 │  Caspar ← AMCP TCP :5250                                   │
+│  Ubuntu ← GPU / exFAT / USB / systemd hooks                │
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Dev:** `npm run dev:client` (Vite :3000) proxies `/api` to `npm start` (:4200).
-- **Production playout:** headless server; client app on operator Mac/Windows points at server IP.
+- **Dev:** UI from **highascg-client** (`npm run dev` :3000) or legacy in-tree `client/` — both proxy `/api` to `npm start` (:4200).
+- **Production playout:** headless server only; **Electron client** on operator laptop points at server IP.
 
 ---
 
@@ -189,7 +192,8 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 
 ## Summary
 
-- **Bundled backend** = `index.js` + **`src/`** + **`scripts/`** + **`tools/runtime/`** + **`config/`**, **`template/`** + root **`package.json`** — one headless Node service owning Caspar, config, and APIs.
-- **Client** = **`client/`** (and **`dist-web/`** when built) — everything the **operator sees in the browser**, which only **calls the backend** over HTTP and WebSocket.
+- **Bundled backend (bridge)** = `index.js` + **`src/`** + **`scripts/`** + **`tools/runtime/`** + **`config/`**, **`template/`** + root **`package.json`** — headless Node service between client, Caspar, and Ubuntu.
+- **Client** = **highascg-client** Electron launcher + **`dist-web/`** — operator UI; **never** on playout ISO/server tarball.
+- **Not shipped:** **`client/`** (legacy in-repo), **`work/`**, **`work/references/`**, **`tools/eggs/`**, **`tools/smoke/`**.
 
 Keeping that boundary strict is what allows a **closed ISO**, **server-only exFAT updates**, and **client-first** iteration without reflashing the image.

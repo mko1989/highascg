@@ -17,16 +17,23 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 BRANDING="${HERE}/branding"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
-KVER="$(uname -r)"
+# shellcheck source=eggs-kernel-lib.sh
+source "${HERE}/eggs-kernel-lib.sh"
+highascg_resolve_eggs_kernel
 
-echo "==> GRUB theme + Plymouth (eggs.yaml, splash.png, initramfs)"
-bash "${HERE}/install-eggs-live-grub-theme.sh"
+echo "==> GRUB theme + Plymouth files (single host initramfs rebuild after this)"
+HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/install-eggs-live-grub-theme.sh"
 
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 LIVE_SPLASH="${THEME_ABS}/theme/livecd/splash.png"
 EGGS_PENGUINS="/usr/lib/penguins-eggs/addons/eggs/theme/livecd/splash.png"
 
-if [[ -f "${BRANDING}/splash.png" ]]; then
+bash "${HERE}/prepare-branding-assets.sh"
+if [[ -f "${BRANDING}/splash.boot.png" ]]; then
+	install -m 0644 -o root -g root "${BRANDING}/splash.boot.png" "${LIVE_SPLASH}"
+	[[ -f "${BRANDING}/splash.boot.jpg" ]] && \
+		install -m 0644 -o root -g root "${BRANDING}/splash.boot.jpg" "${THEME_ABS}/theme/livecd/splash.jpg"
+elif [[ -f "${BRANDING}/splash.png" ]]; then
 	install -m 0644 -o root -g root "${BRANDING}/splash.png" "${LIVE_SPLASH}"
 fi
 
@@ -60,8 +67,7 @@ if [[ ! -f "/boot/initrd.img-${KVER}" || ! -f "/boot/vmlinuz-${KVER}" ]]; then
 	exit 1
 fi
 
-echo "==> initramfs for ${KVER} (eggs produce runs mkinitramfs again into ISO /live/)"
-update-initramfs -u -k "$KVER"
+highascg_rebuild_host_initramfs "$KVER" "finalize before eggs produce"
 
 echo "OK: boot branding ready for eggs produce"
 echo "     theme: $(grep '^theme:' "$EGGS_YAML")"

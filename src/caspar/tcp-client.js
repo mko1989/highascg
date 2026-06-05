@@ -1,3 +1,4 @@
+/** @deprecated Replaced by casparcg-connection. Use ConnectionManager with HIGHASCG_AMCP_LEGACY_TRANSPORT=1 if absolutely needed. */
 'use strict'
 
 const net = require('net')

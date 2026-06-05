@@ -64,11 +64,15 @@ if [ "$HAS_NVIDIA_GPU" = true ]; then
                 apt install -y nvidia-driver-550
             fi
         fi
-        apt install -y nvidia-persistenced
-        systemctl unmask nvidia-persistenced
-        systemctl enable nvidia-persistenced
-        systemctl start nvidia-persistenced
-        nvidia-smi -pm 1 || true
+        install_nvidia_persistenced_packages
+        if systemctl list-unit-files nvidia-persistenced.service &>/dev/null || \
+           [ -f /usr/lib/systemd/system/nvidia-persistenced.service ]; then
+            systemctl unmask nvidia-persistenced 2>/dev/null || true
+            systemctl enable nvidia-persistenced 2>/dev/null || true
+            bash "${SCRIPT_DIR}/scripts/install-nvidia-persistenced-boot-order.sh"
+            systemctl start nvidia-persistenced 2>/dev/null || true
+        fi
+        nvidia-smi -pm 1 2>/dev/null || true
     fi
 
     # Persistent: OpenGL max performance + sync-to-vblank off + PowerMizer “Prefer Consistent Performance” (fallback: Prefer Maximum Performance).
@@ -103,7 +107,7 @@ for _g in 0 1 2 3; do
 	fi
 done
 nvidia-settings -a "GPUPowerMizerMode=2" 2>/dev/null || nvidia-settings -a "GPUPowerMizerMode=1" 2>/dev/null || true
-# Sync to VBlank off (GPU / screen when exposed by driver)
+# Sync to VBlank off — pair with Caspar screen consumer vsync ON; see docs/reference/screen-consumer-vsync-nvidia.md
 for _g in 0 1 2 3; do
 	nvidia-settings -q "[gpu:${_g}]/SyncToVBlank" &>/dev/null || continue
 	nvidia-settings -a "[gpu:${_g}]/SyncToVBlank=0" 2>/dev/null || true

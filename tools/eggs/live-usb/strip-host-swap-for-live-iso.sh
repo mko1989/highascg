@@ -26,9 +26,9 @@ remove_swap_fstab_lines() {
 		/etc/fstab
 }
 
-cmd_prepare() {
+	cmd_prepare() {
 	mkdir -p "$STATE_DIR"
-	echo "==> Prepare host for live ISO (swap file stays on disk; omitted via exclude.list)"
+	echo "==> Prepare host for live ISO (swap file stays on disk; omitted via exclude.list; tmpfs mounts are never cloned)"
 	if [[ -f /swap.img ]]; then
 		swapoff /swap.img 2>/dev/null || true
 	fi

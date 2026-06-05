@@ -221,6 +221,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			} else {
 				this._prevKey = new Map()
 				this._lastKfValues.clear()
+				this._lastKfSegment.clear()
 			}
 			this._lastTickPositionMs = undefined
 			this._pb = {
@@ -263,6 +264,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			if (tl && !opts?.skipAmcp) this._stopAll(tl)
 			this._prevKey = new Map()
 			this._lastKfValues.clear()
+			this._lastKfSegment.clear()
 			this._emitPb()
 		},
 
@@ -306,6 +308,9 @@ function applyPlaybackMixin(TimelineEngineClass) {
 							this._prevKey.delete(`${ch}-${caspLayer}`)
 							for (const pk of this._lastKfValues.keys()) {
 								if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
+							}
+							for (const pk of this._lastKfSegment.keys()) {
+								if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfSegment.delete(pk)
 							}
 						}
 					}

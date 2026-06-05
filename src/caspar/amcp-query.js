@@ -19,20 +19,22 @@ class AmcpQuery {
 	}
 
 	cls(subDir) {
-		return this._send(subDir ? `CLS ${param(subDir)}` : 'CLS', 'CLS')
+		if (subDir) return this._send(`CLS ${param(subDir)}`, 'CLS')
+		return this._client._invokeTyped('cls', {}, 'CLS', 'CLS')
 	}
 
 	fls() {
-		return this._send('FLS', 'FLS')
+		return this._client._invokeTyped('fls', {}, 'FLS', 'FLS')
 	}
 
 	tls(subDir) {
-		return this._send(subDir ? `TLS ${param(subDir)}` : 'TLS', 'TLS')
+		if (subDir) return this._send(subDir ? `TLS ${param(subDir)}` : 'TLS', 'TLS')
+		return this._client._invokeTyped('tls', {}, 'TLS', 'TLS')
 	}
 
 	version(component) {
-		const cmd = component ? `VERSION ${param(component)}` : 'VERSION'
-		return this._send(cmd, 'VERSION')
+		if (component) return this._send(`VERSION ${param(component)}`, 'VERSION')
+		return this._client._invokeTyped('version', {}, 'VERSION', 'VERSION')
 	}
 
 	/**
@@ -41,13 +43,18 @@ class AmcpQuery {
 	 */
 	info(channel, layer) {
 		if (channel != null && channel !== '') return this.infoChannel(channel, layer)
-		return this._send('INFO', 'INFO')
+		return this._client._invokeTyped('info', {}, 'INFO', 'INFO')
 	}
 
 	infoChannel(channel, layer) {
 		let cmd = 'INFO'
+		const typed = { channel: Number(channel) }
 		if (channel != null && channel !== '') cmd += ' ' + chLayer(channel, layer)
-		return this._send(cmd, 'INFO')
+		if (layer != null && layer !== '') {
+			typed.layer = Number(layer)
+			return this._client._invokeTyped('infoLayer', typed, cmd, 'INFO')
+		}
+		return this._client._invokeTyped('infoChannel', typed, cmd, 'INFO')
 	}
 
 	infoTemplate(filename) {
@@ -55,27 +62,27 @@ class AmcpQuery {
 	}
 
 	infoConfig() {
-		return this._send('INFO CONFIG', 'INFO')
+		return this._client._invokeTyped('infoConfig', {}, 'INFO CONFIG', 'INFO')
 	}
 
 	infoPaths() {
-		return this._send('INFO PATHS', 'INFO')
+		return this._client._invokeTyped('infoPaths', {}, 'INFO PATHS', 'INFO')
 	}
 
 	infoSystem() {
-		return this._send('INFO SYSTEM', 'INFO')
+		return this._client._invokeTyped('infoSystem', {}, 'INFO SYSTEM', 'INFO')
 	}
 
 	infoServer() {
-		return this._send('INFO SERVER', 'INFO')
+		return this._client._invokeTyped('infoServer', {}, 'INFO SERVER', 'INFO')
 	}
 
 	infoQueues() {
-		return this._send('INFO QUEUES', 'INFO')
+		return this._client._invokeTyped('infoQueues', {}, 'INFO QUEUES', 'INFO')
 	}
 
 	infoThreads() {
-		return this._send('INFO THREADS', 'INFO')
+		return this._client._invokeTyped('infoThreads', {}, 'INFO THREADS', 'INFO')
 	}
 
 	infoDelay(channel, layer) {
@@ -86,15 +93,15 @@ class AmcpQuery {
 	}
 
 	diag() {
-		return this._send('DIAG', 'DIAG')
+		return this._client._invokeTyped('diag', {}, 'DIAG', 'DIAG')
 	}
 
 	glInfo() {
-		return this._send('GL INFO', 'GL')
+		return this._client._invokeTyped('glInfo', {}, 'GL INFO', 'GL')
 	}
 
 	glGc() {
-		return this._send('GL GC', 'GL')
+		return this._client._invokeTyped('glGc', {}, 'GL GC', 'GL')
 	}
 
 	bye() {

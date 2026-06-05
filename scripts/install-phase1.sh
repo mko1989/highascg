@@ -93,27 +93,26 @@ fi
 # CasparCG Server (semver from binary --version; dpkg can embed CEF/build noise)
 CASPAR_STATUS="missing"
 CASPAR_CURRENT=""
-CASPAR_RECOMMENDED=$(normalize_github_release_tag "$(get_latest_github_tag "CasparCG/server")")
-[ -z "$CASPAR_RECOMMENDED" ] && CASPAR_RECOMMENDED="2.5.0"
-if command -v casparcg-server-2.5 &>/dev/null || dpkg-query -W casparcg-server &>/dev/null; then
+CASPAR_RECOMMENDED="${CASPAR_ENHANCED_VERSION:-2.6.0}"
+if [ -x "${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}/bin/casparcg" ] || command -v casparcg-server-2.5 &>/dev/null || dpkg-query -W casparcg-server &>/dev/null; then
     CASPAR_CURRENT=$(detect_caspar_server_version)
-    [ -z "$CASPAR_CURRENT" ] && CASPAR_CURRENT="2.5.0"
+    [ -z "$CASPAR_CURRENT" ] && CASPAR_CURRENT="${CASPAR_ENHANCED_VERSION:-2.6.0}"
     CASPAR_STATUS="installed"
 fi
 
-# CEF (dependency for CasparCG Server)
+# CEF (pinned binary overlaid into Caspar enhanced lib/)
 CEF_STATUS="missing"
 CEF_CURRENT=""
-if dpkg-query -W 'casparcg-cef-*' &>/dev/null; then
-    CEF_CURRENT=$(dpkg-query -W -f='${Version}' 'casparcg-cef-*' 2>/dev/null | head -1 | cut -d'~' -f1)
+if [ -f "${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}/lib/libcef.so" ] || dpkg-query -W 'casparcg-cef-*' &>/dev/null; then
+    CEF_CURRENT="${CASPAR_CEF_VERSION:-142.0.17}"
+    [ -f /etc/highascg/cef-version ] && CEF_CURRENT=$(cat /etc/highascg/cef-version)
     CEF_STATUS="installed"
 fi
 
 # Media Scanner
 SCANNER_STATUS="missing"
 SCANNER_CURRENT=""
-SCANNER_RECOMMENDED=$(normalize_github_release_tag "$(get_latest_github_tag "CasparCG/media-scanner")")
-[ -z "$SCANNER_RECOMMENDED" ] && SCANNER_RECOMMENDED="1.3.4"
+SCANNER_RECOMMENDED="${SCANNER_PIN_VERSION:-1.4.0}"
 if command -v casparcg-scanner &>/dev/null || dpkg-query -W casparcg-scanner &>/dev/null; then
     SCANNER_CURRENT=$(detect_caspar_scanner_version)
     [ -z "$SCANNER_CURRENT" ] && SCANNER_CURRENT="1.3.4"
@@ -233,4 +232,4 @@ dep_status "HighAsCG"            "$HIGHASCG_STATUS"  "$HIGHASCG_CURRENT"  "$HIGH
 echo ""
 echo -e "${BOLD}─── Phase 1 Complete ───${NC}"
 echo ""
-read -r -p "  Review the audit above. Press ENTER to continue installation, or Ctrl+C to abort. "
+if [ "${HIGHASCG_INSTALL_YES:-0}" != "1" ]; then read -r -p "  Review the audit above. Press ENTER to continue installation, or Ctrl+C to abort. " _; fi

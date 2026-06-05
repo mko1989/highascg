@@ -97,3 +97,47 @@ test('live Caspar: CLS returns media list payload', async () => {
 		cm.stop()
 	}
 })
+
+test('live Caspar: Batching works', async () => {
+	const cm = await connectCaspar(12_000)
+	cm._context.config.amcp_batch = true
+	try {
+		const result = await cm.amcp.batchSend(['PLAY 1-10 AMB', 'PLAY 1-11 AMB'], { skipMixerPreCommit: true })
+		assert.equal(result.ok, true)
+		assert.equal(result.batched, true)
+	} catch (e) {
+		assert.fail(e)
+	} finally {
+		cm.stop()
+	}
+})
+
+test('live Caspar: mixerCommit via library typed path', async () => {
+	const cm = await connectCaspar(12_000)
+	try {
+		const r = await cm.amcp.mixer.mixerCommit(1)
+		assert.equal(r.ok, true)
+	} finally {
+		cm.stop()
+	}
+})
+
+test('live Caspar: cgClear via library typed path', async () => {
+	const cm = await connectCaspar(12_000)
+	try {
+		const r = await cm.amcp.cg.cgClear(1, 10)
+		assert.equal(r.ok, true)
+	} finally {
+		cm.stop()
+	}
+})
+
+test('live Caspar: INFO CONFIG via library typed path', async () => {
+	const cm = await connectCaspar(12_000)
+	try {
+		const r = await cm.amcp.query.infoConfig()
+		assert.equal(r.ok, true)
+	} finally {
+		cm.stop()
+	}
+})

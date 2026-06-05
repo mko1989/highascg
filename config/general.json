@@ -20,36 +20,45 @@
   "multiview_os_rate": "",
   "gpuPhysicalTopology": [
     {
-      "physicalPortId": "gpu_p3",
+      "physicalPortId": "gpu_p0",
       "slotOrder": 0,
-      "dpA": "DP-3",
-      "dpB": "",
-      "connectorNumber": 3,
-      "location": 3
-    },
-    {
-      "physicalPortId": "gpu_p2",
-      "slotOrder": 1,
-      "dpA": "DP-2",
-      "dpB": "",
-      "connectorNumber": 2,
-      "location": 2
+      "dpA": "DP-1",
+      "dpB": "DP-2",
+      "connectorNumber": 0,
+      "location": 0,
+      "drmName": "card1-DP-1",
+      "drmNameB": "card1-DP-2",
+      "drmCard": "card1"
     },
     {
       "physicalPortId": "gpu_p1",
-      "slotOrder": 2,
-      "dpA": "HDMI-0",
-      "dpB": "HDMI-1",
+      "slotOrder": 1,
+      "dpA": "DP-3",
+      "dpB": "DP-4",
       "connectorNumber": 1,
-      "location": 1
-    },
-    {
-      "physicalPortId": "gpu_p0",
-      "slotOrder": 3,
-      "dpA": "DP-1",
-      "dpB": "",
-      "connectorNumber": 0,
-      "location": 0
+      "location": 1,
+      "drmName": "card1-DP-3",
+      "drmNameB": "card1-DP-4",
+      "drmCard": "card1"
     }
-  ]
+  ],
+  "screen_count": 1,
+  "streaming": {
+    "enabled": false,
+    "protocol": "UDP",
+    "captureMode": "udp",
+    "localCaptureDevice": "auto",
+    "x11Display": ":0",
+    "ndiNamingMode": "auto",
+    "ndiSourcePattern": "CasparCG Channel {ch}",
+    "ndiChannelNames": {},
+    "quality": "medium",
+    "basePort": 40000,
+    "hardwareAccel": true,
+    "maxBitrate": 2000,
+    "resolution": "half",
+    "fps": 25,
+    "drmDevice": "/dev/dri/card0",
+    "autoRelocateBasePort": true
+  }
 }

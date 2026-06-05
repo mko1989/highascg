@@ -30,6 +30,29 @@ class AmcpBasic {
 		return this._client._send(cmd, responseKey)
 	}
 
+	_isComplexClip(clip, plan) {
+		if (!clip) return false
+		if (clip.startsWith('[HTML]') || clip.startsWith('ndi://') || clip.startsWith('route://')) return true
+		if (plan && plan.transition === 'STING') return true
+		return false
+	}
+
+	_buildTypedClipParams(channel, layer, clip, plan, opts) {
+		return {
+			channel,
+			layer,
+			clip,
+			loop: !!opts.loop,
+			transition: plan.transition,
+			transitionDuration: plan.duration,
+			transitionTween: plan.tween,
+			auto: !!opts.auto,
+			seek: plan.seek,
+			length: plan.length,
+			clearOn404: !!opts.clearOn404,
+		}
+	}
+
 	/**
 	 * @param {number} channel
 	 * @param {number} [layer]
@@ -40,7 +63,8 @@ class AmcpBasic {
 		const plan = buildClipCommandPlan('LOADBG', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-loadbg', plan)
 		const cmd = serializeClipCommandPlan(plan)
-		return this._send(cmd, 'LOADBG')
+		if (this._isComplexClip(clip, plan)) return this._send(cmd, 'LOADBG')
+		return this._client._invokeTyped('loadbg', this._buildTypedClipParams(channel, layer, clip, plan, opts), cmd, 'LOADBG')
 	}
 
 	/**
@@ -53,7 +77,8 @@ class AmcpBasic {
 		const plan = buildClipCommandPlan('LOAD', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-load', plan)
 		const cmd = serializeClipCommandPlan(plan)
-		return this._send(cmd, 'LOAD')
+		if (this._isComplexClip(clip, plan)) return this._send(cmd, 'LOAD')
+		return this._client._invokeTyped('load', this._buildTypedClipParams(channel, layer, clip, plan, opts), cmd, 'LOAD')
 	}
 
 	/**
@@ -66,23 +91,24 @@ class AmcpBasic {
 		const plan = buildClipCommandPlan('PLAY', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-play', plan)
 		const cmd = serializeClipCommandPlan(plan)
-		return this._send(cmd, 'PLAY')
+		if (this._isComplexClip(clip, plan)) return this._send(cmd, 'PLAY')
+		return this._client._invokeTyped('play', this._buildTypedClipParams(channel, layer, clip, plan, opts), cmd, 'PLAY')
 	}
 
 	pause(channel, layer) {
-		return this._send(`PAUSE ${chLayer(channel, layer)}`, 'PAUSE')
+		return this._client._invokeTyped('pause', { channel, layer }, `PAUSE ${chLayer(channel, layer)}`, 'PAUSE')
 	}
 
 	resume(channel, layer) {
-		return this._send(`RESUME ${chLayer(channel, layer)}`, 'RESUME')
+		return this._client._invokeTyped('resume', { channel, layer }, `RESUME ${chLayer(channel, layer)}`, 'RESUME')
 	}
 
 	stop(channel, layer) {
-		return this._send(`STOP ${chLayer(channel, layer)}`, 'STOP')
+		return this._client._invokeTyped('stop', { channel, layer }, `STOP ${chLayer(channel, layer)}`, 'STOP')
 	}
 
 	clear(channel, layer) {
-		return this._send(`CLEAR ${chLayer(channel, layer)}`, 'CLEAR')
+		return this._client._invokeTyped('clear', { channel, layer }, `CLEAR ${chLayer(channel, layer)}`, 'CLEAR')
 	}
 
 	call(channel, layer, fn, paramsStr) {
@@ -114,31 +140,35 @@ class AmcpBasic {
 	}
 
 	print(channel) {
-		return this._send(`PRINT ${parseInt(channel, 10)}`, 'PRINT')
+		return this._client._invokeTyped('print', { channel: parseInt(channel, 10) }, `PRINT ${parseInt(channel, 10)}`, 'PRINT')
 	}
 
 	logLevel(level) {
-		return this._send(`LOG LEVEL ${level}`, 'LOG')
+		return this._client._invokeTyped('logLevel', { level }, `LOG LEVEL ${level}`, 'LOG')
 	}
 
 	logCategory(category, enable) {
-		return this._send(`LOG CATEGORY ${category} ${enable ? '1' : '0'}`, 'LOG')
+		return this._client._invokeTyped('logCategory', { category, enable }, `LOG CATEGORY ${category} ${enable ? '1' : '0'}`, 'LOG')
 	}
 
 	set(channel, variable, value) {
-		return this._send(`SET ${parseInt(channel, 10)} ${variable} ${value}`, 'SET')
+		return this._client._invokeTyped('set', { channel: parseInt(channel, 10), variable, value }, `SET ${parseInt(channel, 10)} ${variable} ${value}`, 'SET')
 	}
 
 	lock(channel, action, phrase) {
 		let cmd = `LOCK ${parseInt(channel, 10)} ${action}`
 		if (phrase) cmd += ` ${param(phrase)}`
-		return this._send(cmd, 'LOCK')
+		return this._client._invokeTyped('lock', { channel: parseInt(channel, 10), action, lockPhrase: phrase }, cmd, 'LOCK')
 	}
 
 	ping(token) {
 		// Ensure token syntax if present; it responds with token if provided.
 		const cmd = token != null ? `PING ${param(token)}` : 'PING'
-		return this._send(cmd, 'PING')
+		// Note: casparcg-connection library's ping doesn't take parameters, so we fall back to raw if token is given
+		if (token != null) {
+			return this._send(cmd, 'PING')
+		}
+		return this._client._invokeTyped('ping', {}, cmd, 'PING')
 	}
 }
 

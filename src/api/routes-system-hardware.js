@@ -6,6 +6,7 @@
 'use strict'
 
 const { gpuNvidiaGet, handleGpuNvidiaApply } = require('./system-hardware-nvidia')
+const { handleGpuLayoutGet } = require('./system-hardware-gpu-layout')
 const { decklinkGet } = require('./system-hardware-decklink')
 const { handleGuiLaunchPost } = require('./system-hardware-gui')
 const { handleGpuPortsReset } = require('./system-hardware-gpu-ports')
@@ -15,6 +16,7 @@ const { handleGpuPortsReset } = require('./system-hardware-gpu-ports')
  */
 async function hardwareHandleGet(p) {
 	if (p === '/api/system/gpu-nvidia') return gpuNvidiaGet()
+	if (p === '/api/system/gpu-layout') return handleGpuLayoutGet()
 	if (p === '/api/system/decklink') return decklinkGet()
 	return null
 }

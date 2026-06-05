@@ -6,11 +6,15 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 
 | Document | Topic |
 |----------|--------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | **Server bridge** (client↔Caspar↔Ubuntu), what ships on playout vs operator laptop |
+| [PLAN_SERVER_CLIENT_SPLIT.md](PLAN_SERVER_CLIENT_SPLIT.md) | Headless server + Electron client model |
 | [MANUAL_INSTALL.md](MANUAL_INSTALL.md) | Production install on Ubuntu (`scripts/install.sh`) |
 | [LIVE_USB_IMAGE.md](LIVE_USB_IMAGE.md) | Build / flash / boot a live USB from a running host |
 | [ISO_CONTENTS.md](ISO_CONTENTS.md) | What is inside the Eggs live ISO (OS → Caspar → HighAsCG) |
 | [DEV_RELEASE_GITHUB.md](DEV_RELEASE_GITHUB.md) | GitHub prereleases (alpha tarball, full ISO+tarball) |
 | [WO47_ISO_VS_EXFAT.md](WO47_ISO_VS_EXFAT.md) | ISO squashfs vs exFAT stick payload (modular updates) |
+| [BRIDGE_DISK_AND_USB_EXFAT.md](BRIDGE_DISK_AND_USB_EXFAT.md) | Internal bridge disk (HIGHASCGDAT) vs USB stick (HIGHASCGEXF) |
+| [BOOT_EMERGENCY_RECOVERY.md](BOOT_EMERGENCY_RECOVERY.md) | Emergency boot (Ctrl+D): stale EFI fstab + optional USB mount blocking local-fs |
 | [CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md](CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md) | Caspar-only ISO shell + HighAsCG from exFAT |
 | [HIGHASCG_PASSWORDLESS_SUDO.md](HIGHASCG_PASSWORDLESS_SUDO.md) | Narrow `sudo` rules for media mount, NVIDIA, etc. |
 | [openbox_autostart.md](openbox_autostart.md) | nodm + Openbox + Caspar autostart chain |
@@ -21,7 +25,15 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 
 | Document | Topic |
 |----------|--------|
-| [api-reference.md](api-reference.md) | HTTP / WebSocket API overview |
+| [wiki/api/README.md](wiki/api/README.md) | **HTTP API wiki** (all endpoints, examples, OpenAPI YAML) |
+| [wiki/api/scene-take.md](wiki/api/scene-take.md) | **`POST /api/scene/take`** (detailed) |
+| [wiki/api/playback.md](wiki/api/playback.md) | **Playback** — play/load/stop/clear, etc. |
+| [wiki/api/timelines.md](wiki/api/timelines.md) | **Timelines** — CRUD, transport, take |
+| [wiki/api/mixer.md](wiki/api/mixer.md) | **Mixer** — `/api/mixer/{command}` |
+| [wiki/api/cg.md](wiki/api/cg.md) | **CG** templates |
+| [wiki/api/project.md](wiki/api/project.md) | **Project** save/load |
+| [wiki/api/state-and-media.md](wiki/api/state-and-media.md) | **State**, media, variables |
+| [api-reference.md](api-reference.md) | Legacy AMCP REST overview (partial — see wiki) |
 | [MODULES.md](MODULES.md) | Feature flags and optional modules |
 | [osc-integration.md](osc-integration.md) | OSC from CasparCG into HighAsCG |
 | [caspar_config_explained.md](caspar_config_explained.md) | Caspar XML / config concepts |
@@ -39,8 +51,9 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 
 | Folder | Audience |
 |--------|----------|
-| [reference/](reference/) | AMCP mapping, GPU/xrandr design, PixelHue API, deep audio routing |
+| [reference/](reference/) | AMCP mapping, GPU/xrandr design, [screen consumer vsync (NVIDIA)](reference/screen-consumer-vsync-nvidia.md), PixelHue API, deep audio routing |
 | [internal/](internal/) | Custom Caspar builds, image consolidation, architecture notes |
-| [../work/work-orders/](../work/work-orders/) | Engineering work orders (WO-*) |
+| [../work/work-orders/](../work/work-orders/) | Engineering work orders (WO-*) — **not shipped runtime** |
+| [../work/references/](../work/references/) | Design prototypes — **not part of the program** |
 
-Stick / release tooling: [`client/tools/stick-tools/README.md`](../client/tools/stick-tools/README.md), [`client/tools/operator-desktop/README.md`](../client/tools/operator-desktop/README.md), [`tools/eggs/live-usb/BUILD_AND_FLASH.md`](../tools/eggs/live-usb/BUILD_AND_FLASH.md).
+**Not on playout server:** in-repo **`client/`** (legacy UI + electron launcher), **`work/`**, **`dist-web/`**. Production UI: [**highascg-client**](https://github.com/mko1989/highascg-client).

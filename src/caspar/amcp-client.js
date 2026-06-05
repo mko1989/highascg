@@ -151,7 +151,27 @@ class AmcpClient extends EventEmitter {
 					self.log('debug', `AMCP → ${trimmed}`)
 				}
 				recordAmcpHistory(self, trimmed)
-				self.socket.send(trimmed + '\r\n')
+				
+				if (typeof self.socket.send === 'function') {
+					// AmcpConnectionAdapter or legacy TcpClient — responses via AmcpProtocol callbacks
+					self.socket.send(trimmed)
+				} else if (typeof self.socket.sendRaw === 'function') {
+					// Legacy adapter path (should not run after plain-AMCP migration)
+					self.socket.sendRaw(trimmed).then(res => {
+						if (settled) return
+						settled = true
+						if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+						if (!res.ok) rejectP(new Error(res.data || 'AMCP error'))
+						else resolveP(res)
+					}).catch(err => {
+						if (settled) return
+						settled = true
+						if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+						rejectP(err)
+					})
+				} else {
+					throw new Error('AMCP socket has no send method')
+				}
 
 				timeoutHandle = setTimeout(() => {
 					if (settled) return
@@ -168,6 +188,8 @@ class AmcpClient extends EventEmitter {
 					} catch (_) {
 						/* non-fatal */
 					}
+					// Unblock _amcpSendQueue so later UI commands are not stuck behind a dead request.
+					self._amcpSendQueue = Promise.resolve()
 					if (typeof self.log === 'function') {
 						const isVersion = key === 'VERSION' || trimmed.toUpperCase().startsWith('VERSION')
 						const hint = isVersion
@@ -241,6 +263,66 @@ class AmcpClient extends EventEmitter {
 
 		self._amcpSendQueue = (self._amcpSendQueue || Promise.resolve()).then(execute).catch(() => {})
 		return p
+	}
+
+	/**
+	 * Invoke a typed command on the new casparcg-connection library if available,
+	 * while preserving HighAsCG's history, timeout, offline simulation, and logging.
+	 * Falls back to sending raw string if the library is not used (legacy mode).
+	 */
+	_invokeTyped(methodName, params, originalCmdString, responseKey) {
+		const self = this._context
+		const trimmed = originalCmdString.trim()
+		const key = (responseKey || trimmed.split(/\s+/)[0]).toUpperCase()
+		const timeoutMs = AmcpClient.resolveSendTimeoutMs(trimmed)
+
+		if (this.isOffline) {
+			return this._simulated.send(originalCmdString)
+		}
+
+		if (!self.socket || !self.socket.isConnected) {
+			return Promise.reject(new Error('Not connected'))
+		}
+
+		if (
+			self.socket.useLibraryTyped === true &&
+			typeof self.socket.ccg !== 'undefined' &&
+			typeof self.socket.ccg[methodName] === 'function'
+		) {
+			if (typeof self.log === 'function' && (amcpVerboseTrace() || !AmcpClient.QUIET_CMDS.has(key))) {
+				self.log('debug', `AMCP → ${trimmed}`)
+			}
+			recordAmcpHistory(self, trimmed)
+
+			return new Promise((resolve, reject) => {
+				let settled = false
+				let timeoutHandle = setTimeout(() => {
+					if (settled) return
+					settled = true
+					timeoutHandle = null
+					const hint = key === 'VERSION' ? ' — Caspar did not reply in time...' : ''
+					if (typeof self.log === 'function') self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${trimmed}${hint}`)
+					reject(new Error(`AMCP response timeout: ${trimmed}`))
+				}, timeoutMs)
+
+				self.socket.ccg[methodName](params).then(res => {
+					return self.socket.normalizeResponse(res)
+				}).then(norm => {
+					if (settled) return
+					settled = true
+					if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+					if (!norm.ok) reject(new Error(norm.data || 'AMCP error'))
+					else resolve(norm)
+				}).catch(err => {
+					if (settled) return
+					settled = true
+					if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+					reject(err)
+				})
+			})
+		} else {
+			return this._send(originalCmdString, responseKey)
+		}
 	}
 
 	// === Flat Convenience Aliases === //

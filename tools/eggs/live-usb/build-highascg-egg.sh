@@ -30,19 +30,17 @@ echo "$BR" > /etc/highascg/nvidia-iso-driver
 chmod 0644 /etc/highascg/nvidia-iso-driver
 echo "[build-highascg-egg] stamped /etc/highascg/nvidia-iso-driver = $BR"
 
+export HIGHASCG_PURGE_NVIDIA_POOL=1
 DISABLE="$REPO_ROOT/scripts/disable-nvidia-multi-driver-boot.sh"
 if [[ -f "$DISABLE" ]]; then
 	bash "$DISABLE"
 fi
 
 echo "==> WO-47 exFAT + empty mount stubs + eggs exclude merge (operator-stick truth baked into clone snapshot)"
-SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
+HIGHASCG_SKIP_BOOT_BRANDING_IN_PREPARE=1 SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
 
-echo "==> One build kernel (eggs.yaml + purge stale linux-image)"
-bash "${HERE}/sync-eggs-kernel-and-purge-stale.sh"
-
-echo "==> eggs livecd theme (persistence default — install-eggs-live-grub-theme.sh)"
-bash "${HERE}/install-eggs-live-grub-theme.sh"
+echo "==> Latest single kernel (apt generic + eggs.yaml + purge older images)"
+HIGHASCG_ENSURE_LATEST_KERNEL=1 HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/sync-eggs-kernel-and-purge-stale.sh"
 
 echo "==> Install network + firmware essentials for live image"
 apt-get update
@@ -82,8 +80,24 @@ hostnamectl set-hostname "${BASENAME}" 2>/dev/null || hostname "${BASENAME}"
 echo "==> Factory operator config (not eggs build-host JSON / .env)"
 bash "${HERE}/reset-iso-operator-config.sh"
 
+echo "==> Clone host audit (swap, nvidia-pool, excludes, branding)"
+bash "${HERE}/audit-eggs-clone-host.sh"
+
+echo "==> Umount WO-47 paths (empty stubs only in squashfs)"
+umount /home/casparcg/bridge /home/casparcg/exfat /home/casparcg/highascg/media 2>/dev/null || true
+
+echo "==> Clean eggs liveroot / stale squashfs (avoid usr_1 duplicate bloat)"
+bash "${HERE}/clean-eggs-workspace-before-produce.sh"
+
 echo "==> Finalize GRUB splash + Plymouth initramfs (must run immediately before eggs produce)"
 bash "${HERE}/finalize-boot-branding-for-eggs-produce.sh"
+
+sample="$(file -b /usr/share/plymouth/themes/highascg/throbber-0001.png 2>/dev/null || true)"
+echo "==> Host Plymouth throbber sample before produce: ${sample:-missing}"
+if echo "$sample" | grep -q RGBA; then
+	echo "ERROR: host Plymouth frames still RGBA — prepare-branding-assets.sh did not run" >&2
+	exit 1
+fi
 
 THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 [[ -f "${THEME_ABS}/theme/livecd/grub.main.cfg" ]] || {
@@ -91,11 +105,18 @@ THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 	exit 1
 }
 
+echo "==> Stop highascg during squashfs (avoid .highascg-state.json changing mid-pack)"
+systemctl stop highascg.service 2>/dev/null || true
+
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
 
 echo "==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)"
-bash "${HERE}/inject-iso-boot-branding.sh"
+# Fresh produce already cloned host /usr into squashfs — skip 25 min squashfs rebuild.
+HIGHASCG_SKIP_SQUASHFS_REFRESH=1 bash "${HERE}/inject-iso-boot-branding.sh"
+
+echo "==> Verify squashfs excludes (no swap file, nvidia-pool, dev trees)"
+bash "${HERE}/verify-iso-squashfs-excludes.sh"
 
 echo "==> Verify ISO boot branding (persistence on default linux line, splash, plymouth)"
 bash "${HERE}/verify-iso-boot-branding.sh" || {

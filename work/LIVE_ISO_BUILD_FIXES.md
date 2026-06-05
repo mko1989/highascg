@@ -222,6 +222,7 @@ So xrandr pairing found **fewer than four** DP/HDMI pairs (often only one connec
 - [ ] Default **`known-gpus.json`** entry for **RTX 3060** back-panel order.
 - [ ] Device View: show **DRM disconnected** connectors alongside xrandr connected set.
 - [ ] Optional boot hook: **`highascg-apply-os-layout.service`** after `graphical.target` (WO‑40).
+- [x] **Screen consumer vsync (NVIDIA):** documented — [screen-consumer-vsync-nvidia.md](../docs/reference/screen-consumer-vsync-nvidia.md) (**Sync to VBlank off**, Caspar **vsync on**).
 - [ ] Document **`nvidia-settings` vs xrandr**: layout apply is **xrandr-only** in code today.
 
 ---

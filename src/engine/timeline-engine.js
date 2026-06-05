@@ -22,6 +22,8 @@ class TimelineEngine extends EventEmitter {
 		this._ticker = null
 		this._prevKey = new Map()
 		this._lastKfValues = new Map()
+		/** @type {Map<string, number>} Active keyframe segment index per ch-layer-prop (playback tween scheduling). */
+		this._lastKfSegment = new Map()
 	}
 
 	create(opts) {

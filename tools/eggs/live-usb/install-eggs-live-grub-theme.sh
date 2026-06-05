@@ -45,20 +45,26 @@ echo "==> GRUB theme.cfg (HighAsCG colours)"
 }
 chmod 0644 "${LIVE}/grub.theme.cfg"
 
-if [[ -f "${BRANDING}/splash.png" ]]; then
-	echo "==> GRUB/isolinux splash from branding/splash.png"
-	install -m 0644 -o root -g root "${BRANDING}/splash.png" "${LIVE}/splash.png"
-else
+if [[ ! -f "${BRANDING}/splash.png" ]]; then
 	echo "ERROR: Missing ${BRANDING}/splash.png — GRUB will show eggs penguins on the ISO." >&2
 	echo "       Copy your wallpaper to branding/splash.png (see branding/README.md)." >&2
 	exit 1
 fi
 
-for f in isolinux.theme.cfg; do
-	src="${EGGS_LIVECD}/${f}"
-	[[ -e "$src" ]] || continue
-	ln -sfn "$src" "${LIVE}/${f}"
-done
+echo "==> Prepare boot-ready splash + Plymouth frames (RGB PNG for GRUB)"
+bash "${HERE}/prepare-branding-assets.sh"
+
+if [[ -f "${BRANDING}/splash.boot.png" ]]; then
+	echo "==> GRUB/isolinux splash from branding/splash.boot.png"
+	install -m 0644 -o root -g root "${BRANDING}/splash.boot.png" "${LIVE}/splash.png"
+	[[ -f "${BRANDING}/splash.boot.jpg" ]] && \
+		install -m 0644 -o root -g root "${BRANDING}/splash.boot.jpg" "${LIVE}/splash.jpg"
+else
+	echo "==> GRUB/isolinux splash from branding/splash.png (prepare step skipped)"
+	install -m 0644 -o root -g root "${BRANDING}/splash.png" "${LIVE}/splash.png"
+fi
+
+install -m 0644 -o root -g root "${HERE}/isolinux.theme.cfg" "${LIVE}/isolinux.theme.cfg"
 
 for d in calamares applications artwork; do
 	[[ -d "${EGGS_THEME}/${d}" ]] || continue
@@ -74,9 +80,12 @@ fi
 echo "==> Plymouth boot splash (replaces Ubuntu purple screen)"
 bash "${HERE}/install-highascg-plymouth-theme.sh"
 
+nthrob="$(find /usr/share/plymouth/themes/highascg -maxdepth 1 -name 'throbber-*.png' 2>/dev/null | wc -l)"
+nthrob="${nthrob//[[:space:]]/}"
+PLYMOUTH_NOTE="highascg two-step throbber (${nthrob} frames: animation 1,2,29,30)"
 echo "OK: eggs theme → ${THEME_ABS}"
 echo "     GRUB: default Live entry (exFAT-only; no union persistence on kernel line)"
-echo "     Plymouth: highascg (see branding/README.md)"
+echo "     Plymouth: ${PLYMOUTH_NOTE} (see branding/README.md)"
 grep '^theme:' "$EGGS_YAML"
 echo
 echo "IMPORTANT: eggs produce ignores eggs.yaml theme: unless you pass --theme."

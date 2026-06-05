@@ -1,0 +1,1534 @@
+openapi: 3.1.0
+info:
+  title: HighAsCG REST API
+  version: 1.0.0
+  description: |
+    HTTP API for the HighAsCG playout bridge (CasparCG AMCP + Ubuntu system).
+    Narrative docs and examples: docs/wiki/api/
+  contact:
+    name: HighAsCG
+servers:
+  - url: http://{host}:4200
+    description: Default playout server
+    variables:
+      host:
+        default: 127.0.0.1
+tags:
+  - name: Playback
+  - name: AMCP
+  - name: Mixer
+  - name: CG
+  - name: Scene
+  - name: Project
+  - name: State
+  - name: Media
+  - name: Timelines
+  - name: Streaming
+  - name: Audio
+  - name: OSC
+  - name: Settings
+  - name: System
+  - name: Hardware
+  - name: Ingest
+  - name: USB
+  - name: Modules
+paths:
+  /api/play:
+    post:
+      tags: [Playback]
+      summary: PLAY clip on channel/layer
+      description: 'Narrative docs: docs/wiki/api/playback.md'
+      operationId: play
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayRequest'
+            examples:
+              simple:
+                value: { channel: 1, layer: 10, clip: AMB, loop: true }
+              mix:
+                value:
+                  channel: 1
+                  layer: 10
+                  clip: clip.mov
+                  transition: MIX
+                  duration: 25
+                  tween: linear
+      responses:
+        '200':
+          description: AMCP result plus playbackMatrix
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackResponse'
+        '503':
+          description: Caspar not connected
+  /api/load:
+    post:
+      tags: [Playback]
+      summary: LOAD clip to foreground
+      description: 'See docs/wiki/api/playback.md'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClipLoadRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/loadbg:
+    post:
+      tags: [Playback]
+      summary: LOADBG clip to background
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ClipLoadRequest'
+                - type: object
+                  properties:
+                    auto:
+                      type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/pause:
+    post:
+      tags: [Playback]
+      summary: PAUSE layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LayerTransportRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/resume:
+    post:
+      tags: [Playback]
+      summary: RESUME layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LayerTransportRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/stop:
+    post:
+      tags: [Playback]
+      summary: STOP layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LayerTransportRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackResponse'
+  /api/clear:
+    post:
+      tags: [Playback]
+      summary: CLEAR layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LayerTransportRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackResponse'
+  /api/call:
+    post:
+      tags: [Playback]
+      summary: CALL background to foreground
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LayerTransportRequest'
+                - type: object
+                  properties:
+                    fn:
+                      type: string
+                    params:
+                      type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/swap:
+    post:
+      tags: [Playback]
+      summary: SWAP two layers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: integer
+                  default: 1
+                layer:
+                  type: integer
+                channel2:
+                  type: integer
+                layer2:
+                  type: integer
+                transforms:
+                  type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/add:
+    post:
+      tags: [Playback]
+      summary: ADD channel consumer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: integer
+                  default: 1
+                consumer:
+                  type: string
+                params:
+                  type: string
+                index:
+                  type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/remove:
+    post:
+      tags: [Playback]
+      summary: REMOVE channel consumer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: integer
+                  default: 1
+                consumer:
+                  type: string
+                index:
+                  type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+  /api/amcp/batch:
+    post:
+      tags: [AMCP]
+      summary: Send AMCP command batch (chunked, optional BEGIN/COMMIT)
+      description: |
+        Do not include BEGIN/COMMIT in the commands array — the server batches.
+        MIXER {ch} COMMIT must be outside BEGIN/COMMIT batches.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmcpBatchRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+  /api/amcp/raw-batch:
+    post:
+      tags: [AMCP]
+      summary: Send raw AMCP lines sequentially
+  /api/amcp/raw:
+    post:
+      tags: [AMCP]
+      summary: Single raw AMCP line
+  /api/raw:
+    post:
+      tags: [AMCP]
+      summary: Alias for amcp/raw
+  /api/print:
+    post:
+      tags: [AMCP]
+      summary: PRINT diagnostics
+  /api/ping:
+    post:
+      tags: [AMCP]
+      summary: PING
+  /api/restart:
+    post:
+      tags: [AMCP]
+      summary: Restart CasparCG
+  /api/kill:
+    post:
+      tags: [AMCP]
+      summary: Kill CasparCG
+  /api/mixer/{command}:
+    parameters:
+      - $ref: '#/components/parameters/MixerCommandParam'
+    get:
+      tags: [Mixer]
+      summary: Query current mixer property (AMCP read)
+      description: 'Narrative docs: docs/wiki/api/mixer.md'
+      parameters:
+        - $ref: '#/components/parameters/MixerCommandParam'
+        - name: channel
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: layer
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+        '503':
+          description: Caspar not connected
+    post:
+      tags: [Mixer]
+      summary: Set mixer property on channel/layer
+      description: |
+        Command-specific fields — see docs/wiki/api/mixer.md.
+        Use defer=true on multiple POSTs then POST /api/mixer/commit.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MixerPostRequest'
+            examples:
+              opacity:
+                summary: Opacity tween
+                value:
+                  channel: 1
+                  layer: 10
+                  opacity: 0.5
+                  duration: 25
+                  tween: linear
+              fillDefer:
+                summary: Fill with defer
+                value:
+                  channel: 1
+                  layer: 10
+                  x: 0
+                  y: 0
+                  xScale: 0.8
+                  yScale: 0.8
+                  defer: true
+              commit:
+                summary: Commit deferred mixer
+                value:
+                  channel: 1
+              effect:
+                summary: Inspector effect
+                value:
+                  channel: 1
+                  layer: 10
+                  effectType: brightness
+                  params:
+                    value: 1.1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '502':
+          description: AMCP failure
+        '503':
+          description: Caspar not connected
+  /api/cg/{command}:
+    parameters:
+      - $ref: '#/components/parameters/CgCommandParam'
+    post:
+      tags: [CG]
+      summary: CG template command (add, remove, play, update, …)
+      description: 'Narrative docs: docs/wiki/api/cg.md'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CgRequest'
+            examples:
+              add:
+                summary: CG ADD with data
+                value:
+                  channel: 1
+                  layer: 10
+                  templateHostLayer: 1
+                  template: lower_third
+                  playOnLoad: true
+                  data: '<template><text>Hello</text></template>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmcpResult'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Caspar not connected
+  /api/scene/take:
+    post:
+      tags: [Scene]
+      summary: Scene / look take to program or preview (LBG AMCP pipeline)
+      description: |
+        Full narrative docs: docs/wiki/api/scene-take.md
+        Requires Caspar AMCP. Serializes per channel. 120s timeout.
+      operationId: sceneTake
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SceneTakeRequest'
+            examples:
+              programCut:
+                summary: Program take (hard cut)
+                value:
+                  channel: 1
+                  forceCut: true
+                  incomingScene:
+                    id: sc_example
+                    name: Look 1
+                    layers:
+                      - layerNumber: 10
+                        source:
+                          type: media
+                          value: led-grid-3840x1024.png
+              previewOnly:
+                summary: Preview bus only
+                value:
+                  channel: 1
+                  target: preview
+                  incomingScene:
+                    id: look_prv
+                    layers:
+                      - layerNumber: 10
+                        source:
+                          type: media
+                          value: still.png
+              bySceneId:
+                summary: Resolve scene from loaded project
+                value:
+                  channel: 1
+                  sceneId: sc_1778329614472_gbdse4w
+      responses:
+        '200':
+          description: Take completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SceneTakeResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Caspar not connected
+        '504':
+          description: Take timed out (120s)
+  /api/scene/live:
+    get:
+      tags: [Scene]
+      summary: Live scene state per channel
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: object
+                  programLayerBankByChannel:
+                    type: object
+  /api/scene/border-lines:
+    post:
+      tags: [Scene]
+      summary: AMCP lines for global border overlay
+  /api/scene/border-preset-crossfade:
+    post:
+      tags: [Scene]
+      summary: Border preset crossfade AMCP lines
+  /api/ftb:
+    post:
+      tags: [Scene]
+      summary: Fade to black
+  /api/led-test-card:
+    post:
+      tags: [Scene]
+      summary: LED test pattern on outputs
+  /api/project:
+    get:
+      tags: [Project]
+      summary: Get current project JSON (or empty object)
+      description: 'docs/wiki/api/project.md — no Caspar required'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/project/save:
+    post:
+      tags: [Project]
+      summary: Save project to disk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSaveRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSaveResponse'
+        '409':
+          description: Stale or conflicting save
+  /api/project/load:
+    post:
+      tags: [Project]
+      summary: Load project by slug
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectLoadRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+  /api/project/list:
+    get:
+      tags: [Project]
+      summary: List saved projects
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+  /api/state:
+    get:
+      tags: [State]
+      summary: Aggregated server state (UI bootstrap)
+      description: 'docs/wiki/api/state-and-media.md — requires Caspar'
+      parameters:
+        - name: full_cinf
+          in: query
+          schema:
+            type: string
+            enum: ['1']
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StateSnapshot'
+        '503':
+          description: Caspar not connected
+  /api/selection:
+    post:
+      tags: [State]
+      summary: UI selection to variables (no Caspar)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectionPayload'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/media/cinf:
+    post:
+      tags: [Media]
+      summary: Media duration/metadata (CINF or ffprobe)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaCinfRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  id:
+                    type: string
+                  durationMs:
+                    type: number
+  /api/channels:
+    get:
+      tags: [State]
+      summary: Channel info from Caspar
+  /api/variables:
+    get:
+      tags: [State]
+      summary: UI/companion variables
+  /api/variables/batch:
+    get:
+      tags: [State]
+      summary: Variable batch read
+    post:
+      tags: [State]
+      summary: Variable batch write
+  /api/media:
+    get:
+      tags: [Media]
+      summary: Media file list
+  /api/thumbnail:
+    get:
+      tags: [Media]
+      summary: Single thumbnail image
+  /api/timelines:
+    get:
+      tags: [Timelines]
+      summary: List all timelines
+      description: 'Narrative docs: docs/wiki/api/timelines.md'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Timeline'
+        '503':
+          description: Caspar not connected or timeline engine not ready
+    post:
+      tags: [Timelines]
+      summary: Create timeline or update when id exists
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Timeline'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+  /api/timelines/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Timelines]
+      summary: Get one timeline
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+    put:
+      tags: [Timelines]
+      summary: Replace or upsert timeline by id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Timeline'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+    delete:
+      tags: [Timelines]
+      summary: Delete timeline
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+  /api/timelines/{id}/state:
+    get:
+      tags: [Timelines]
+      summary: Current timeline playback state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelinePlayback'
+  /api/timelines/{id}/play:
+    post:
+      tags: [Timelines]
+      summary: Start or resume timeline playback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimelinePlayRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/timelines/{id}/pause:
+    post:
+      tags: [Timelines]
+      summary: Pause timeline
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/timelines/{id}/stop:
+    post:
+      tags: [Timelines]
+      summary: Stop timeline and reset position
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/timelines/{id}/seek:
+    post:
+      tags: [Timelines]
+      summary: Seek playhead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimelineSeekRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+  /api/timelines/{id}/loop:
+    post:
+      tags: [Timelines]
+      summary: Set loop flag for active playback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                loop:
+                  type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/timelines/{id}/sendto:
+    post:
+      tags: [Timelines]
+      summary: Set preview/program routing targets
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimelineSendTo'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+  /api/timelines/{id}/take:
+    post:
+      tags: [Timelines]
+      summary: Take timeline to program (clears look stacks, plays)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimelineTakeRequest'
+            examples:
+              singleScreen:
+                value: { screenIdx: 0 }
+              allScreens:
+                value: { screenIdx: all }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Caspar not connected
+  /api/settings:
+    get:
+      tags: [Settings]
+      summary: Full settings object
+    post:
+      tags: [Settings]
+      summary: Persist settings
+  /api/streams:
+    get:
+      tags: [Streaming]
+      summary: WebRTC / preview pipeline status
+  /api/streaming/toggle:
+    post:
+      tags: [Streaming]
+      summary: Enable/disable streaming
+  /api/audio/devices:
+    get:
+      tags: [Audio]
+      summary: ALSA/PipeWire devices
+  /api/osc/state:
+    get:
+      tags: [OSC]
+      summary: OSC aggregated state
+  /api/modules:
+    get:
+      tags: [Modules]
+      summary: Enabled optional modules
+  /api/system/gpu-nvidia:
+    get:
+      tags: [System]
+      summary: NVIDIA GPU layout probe
+  /api/system/exfat-sync:
+    get:
+      tags: [System]
+      summary: exFAT sync status
+  /api/host-stats:
+    get:
+      tags: [System]
+      summary: CPU/memory/disk stats
+  /api/logs:
+    get:
+      tags: [System]
+      summary: Tail server/Caspar logs
+
+components:
+  parameters:
+    MixerCommandParam:
+      name: command
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+          - keyer
+          - chroma
+          - blend
+          - invert
+          - straight_alpha
+          - opacity
+          - brightness
+          - saturation
+          - contrast
+          - levels
+          - fill
+          - clip
+          - anchor
+          - crop
+          - rotation
+          - volume
+          - mastervolume
+          - grid
+          - commit
+          - clear
+          - effect
+    CgCommandParam:
+      name: command
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [add, remove, clear, play, stop, next, goto, update, invoke, info]
+  schemas:
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: string
+    OkBody:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+    MixerCommonFields:
+      type: object
+      properties:
+        channel:
+          type: integer
+          default: 1
+          minimum: 1
+        layer:
+          type: integer
+        duration:
+          type: integer
+          description: Tween duration in frames
+        tween:
+          type: string
+        defer:
+          type: boolean
+          description: Queue change until MIXER COMMIT
+    CgRequest:
+      type: object
+      properties:
+        channel:
+          type: integer
+          default: 1
+        layer:
+          type: integer
+        templateHostLayer:
+          type: integer
+          default: 1
+        template:
+          type: string
+        playOnLoad:
+          type: boolean
+        data:
+          type: string
+        label:
+          type: string
+        method:
+          type: string
+    ProjectSaveRequest:
+      type: object
+      required: [project]
+      properties:
+        project:
+          type: object
+          additionalProperties: true
+        force:
+          type: boolean
+        allowReplace:
+          type: boolean
+        broadcastProject:
+          type: boolean
+          default: true
+    ProjectSaveResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        slug:
+          type: string
+        activeSlug:
+          type: string
+        created:
+          type: boolean
+    ProjectLoadRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+    ProjectListResponse:
+      type: object
+      properties:
+        activeSlug:
+          type: string
+          nullable: true
+        projects:
+          type: array
+          items:
+            type: object
+    SelectionPayload:
+      type: object
+      additionalProperties: true
+      description: UI inspector selection fields (context, lookId, layerIndex, …)
+    MediaCinfRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+    StateSnapshot:
+      type: object
+      additionalProperties: true
+      description: Full getState() payload
+    MixerPostRequest:
+      allOf:
+        - $ref: '#/components/schemas/MixerCommonFields'
+        - type: object
+          properties:
+            opacity:
+              type: number
+            x:
+              type: number
+            y:
+              type: number
+            xScale:
+              type: number
+            yScale:
+              type: number
+            stretch:
+              type: string
+              enum: [none, fit, fill-h, fill-v, stretch]
+            channelW:
+              type: integer
+            channelH:
+              type: integer
+            layerW:
+              type: number
+            layerH:
+              type: number
+            layerX:
+              type: number
+            layerY:
+              type: number
+            left:
+              type: number
+            top:
+              type: number
+            right:
+              type: number
+            bottom:
+              type: number
+            degrees:
+              type: number
+            mode:
+              type: string
+            keyer:
+              type: integer
+              enum: [0, 1]
+            invert:
+              type: boolean
+            enable:
+              type: boolean
+            value:
+              type: number
+            volume:
+              type: number
+            minInput:
+              type: number
+            maxInput:
+              type: number
+            gamma:
+              type: number
+            minOutput:
+              type: number
+            maxOutput:
+              type: number
+            resolution:
+              type: integer
+            effectType:
+              type: string
+              description: Inspector effect (use with command=effect)
+            type:
+              type: string
+              description: Alias for effectType
+            params:
+              type: object
+              additionalProperties: true
+    TimelineClipSource:
+      type: object
+      properties:
+        type:
+          type: string
+          example: media
+        value:
+          type: string
+        resolution:
+          type: string
+          description: e.g. 1920x1080 for aspect
+    TimelineKeyframe:
+      type: object
+      properties:
+        time:
+          type: number
+          description: Ms inside clip
+        property:
+          type: string
+          example: opacity
+        value:
+          type: number
+        easing:
+          type: string
+          example: linear
+    TimelineClip:
+      type: object
+      required: [id, startTime, duration]
+      properties:
+        id:
+          type: string
+        source:
+          $ref: '#/components/schemas/TimelineClipSource'
+        startTime:
+          type: number
+        duration:
+          type: number
+        inPoint:
+          type: number
+        outPoint:
+          type: number
+          nullable: true
+        keyframes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineKeyframe'
+        audioRoute:
+          type: string
+        volume:
+          type: number
+        muted:
+          type: boolean
+        startBehaviour:
+          type: string
+          enum: [beginning, relativeToPrevious]
+    TimelineLayer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        clips:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineClip'
+    TimelineFlag:
+      type: object
+      properties:
+        id:
+          type: string
+        timeMs:
+          type: number
+        type:
+          type: string
+          enum: [pause, play, jump, companion_press]
+        jumpTimeMs:
+          type: number
+        jumpFlagId:
+          type: string
+        label:
+          type: string
+    Timeline:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        duration:
+          type: number
+          description: Timeline length in ms
+        fps:
+          type: number
+        flags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineFlag'
+        layers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineLayer'
+    TimelineSendTo:
+      type: object
+      properties:
+        preview:
+          type: boolean
+          default: true
+        program:
+          type: boolean
+          default: false
+        screenIdx:
+          type: integer
+          nullable: true
+          description: 0-based screen; null = all screens
+    TimelinePlayback:
+      type: object
+      properties:
+        timelineId:
+          type: string
+        position:
+          type: number
+          description: Playhead ms
+        playing:
+          type: boolean
+        loop:
+          type: boolean
+        sendTo:
+          $ref: '#/components/schemas/TimelineSendTo'
+    TimelinePlayRequest:
+      type: object
+      properties:
+        from:
+          type: number
+          description: Start position ms
+        sendTo:
+          $ref: '#/components/schemas/TimelineSendTo'
+    TimelineSeekRequest:
+      type: object
+      required: [ms]
+      properties:
+        ms:
+          type: number
+          minimum: 0
+    TimelineTakeRequest:
+      type: object
+      properties:
+        screenIdx:
+          oneOf:
+            - type: integer
+            - type: string
+              enum: [all]
+          description: 0-based screen index, or all for every main screen
+    LayerTransportRequest:
+      type: object
+      properties:
+        channel:
+          type: integer
+          default: 1
+          minimum: 1
+        layer:
+          type: integer
+          minimum: 0
+    ClipTransitionFields:
+      type: object
+      properties:
+        transition:
+          type: string
+          enum: [CUT, MIX, PUSH, WIPE, SLIDE, STING]
+        duration:
+          type: integer
+          description: Frames at channel framerate
+        tween:
+          type: string
+          example: linear
+        parameters:
+          type: string
+          description: Extra AMCP tokens (required for STING)
+        audioFilter:
+          type: string
+        audioRoute:
+          type: string
+          description: Shorthand 1+2, 3+4, … mapped to AF filter
+    ClipLoadRequest:
+      allOf:
+        - $ref: '#/components/schemas/LayerTransportRequest'
+        - $ref: '#/components/schemas/ClipTransitionFields'
+        - type: object
+          required: [layer]
+          properties:
+            clip:
+              type: string
+            loop:
+              type: boolean
+    PlayRequest:
+      allOf:
+        - $ref: '#/components/schemas/ClipLoadRequest'
+        - type: object
+          properties:
+            auto:
+              type: boolean
+              description: AUTO on PLAY/LOADBG
+    PlaybackMatrixEntry:
+      type: object
+      properties:
+        channel:
+          type: integer
+        layer:
+          type: integer
+        clip:
+          type: string
+        startedAt:
+          type: integer
+          format: int64
+        durationMs:
+          type: number
+        playing:
+          type: boolean
+        loop:
+          type: boolean
+        isRoute:
+          type: boolean
+    PlaybackMatrix:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/PlaybackMatrixEntry'
+    AmcpResult:
+      type: object
+      description: Passthrough Caspar AMCP response fields (varies by command)
+      additionalProperties: true
+    PlaybackResponse:
+      allOf:
+        - $ref: '#/components/schemas/AmcpResult'
+        - type: object
+          properties:
+            playbackMatrix:
+              $ref: '#/components/schemas/PlaybackMatrix'
+    AmcpBatchRequest:
+      type: object
+      required: [commands]
+      properties:
+        commands:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: AMCP lines (no BEGIN/COMMIT wrapper)
+    SceneSource:
+      type: object
+      required: [type, value]
+      properties:
+        type:
+          type: string
+          enum: [media, route, timeline, empty, cg]
+        value:
+          type: string
+    SceneLayer:
+      type: object
+      required: [layerNumber, source]
+      properties:
+        layerNumber:
+          type: integer
+          minimum: 1
+        source:
+          $ref: '#/components/schemas/SceneSource'
+        transition:
+          $ref: '#/components/schemas/SceneTransition'
+        loop:
+          type: boolean
+        playSeekFrames:
+          type: integer
+          description: Ephemeral; stripped from persisted live state
+    SceneTransition:
+      type: object
+      properties:
+        type:
+          type: string
+          example: MIX
+        duration:
+          type: integer
+          description: Frames at channel framerate
+        tween:
+          type: string
+          example: linear
+    IncomingScene:
+      type: object
+      required: [layers]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mainScope:
+          type: string
+        defaultTransition:
+          $ref: '#/components/schemas/SceneTransition'
+        layers:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SceneLayer'
+    SceneTakeRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          type: integer
+          minimum: 1
+          description: Caspar program channel (e.g. 1)
+        incomingScene:
+          $ref: '#/components/schemas/IncomingScene'
+        sceneId:
+          type: string
+          description: Alternative to incomingScene — resolve from project
+        lookId:
+          type: string
+          description: Alias for sceneId
+        incomingSceneId:
+          type: string
+          description: Alias for sceneId
+        target:
+          type: string
+          enum: [preview, prv, bus1]
+          description: Preview-only take
+        bus:
+          type: string
+          description: Alias for target
+        forceCut:
+          type: boolean
+          default: false
+        framerate:
+          type: number
+          description: Override channel fps for mixer tweens
+        useServerLive:
+          type: boolean
+          default: true
+        currentScene:
+          $ref: '#/components/schemas/IncomingScene'
+        stageOnPreview:
+          type: boolean
+          default: true
+          description: Stage on PRV before PGM mix (PGM/PRV routing)
+    SceneTakeResponse:
+      type: object
+      required: [ok, sceneLive, playbackMatrix]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        sceneLive:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              sceneId:
+                type: string
+              scene:
+                $ref: '#/components/schemas/IncomingScene'
+        playbackMatrix:
+          type: object
+          description: Playback tracker snapshot

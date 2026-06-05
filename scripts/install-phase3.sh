@@ -104,38 +104,19 @@ echo "Display mode set to: $MODE (nodm restarted)."
 DMODE
 chmod 755 /usr/local/bin/highascg-display-mode
 
-# 3.3 CasparCG Server & Scanner
-SHOULD_INSTALL_CASPAR=false
-if [ "$CASPAR_STATUS" = "missing" ] || [ "$CEF_STATUS" = "missing" ]; then
-    SHOULD_INSTALL_CASPAR=true
-    echo -e "${CYAN}→ CasparCG Server or CEF dependency not found. Installing...${NC}"
-elif [ -n "$MIN_CASPARCG" ] && ! version_gte "$CASPAR_CURRENT" "$MIN_CASPARCG"; then
-    SHOULD_INSTALL_CASPAR=true
-    echo -e "${RED}→ CasparCG v$CASPAR_CURRENT below minimum v$MIN_CASPARCG. Upgrading...${NC}"
-elif [ -n "$CASPAR_RECOMMENDED" ] && version_gte "$CASPAR_CURRENT" "$CASPAR_RECOMMENDED"; then
-    echo -e "  ${GREEN}✓${NC} CasparCG Server matches latest GitHub release (v$CASPAR_CURRENT ≥ v$CASPAR_RECOMMENDED)"
-else
-    if ask_action "CasparCG Server" "installed" "$CASPAR_CURRENT" "" "Upgrade to v${CASPAR_RECOMMENDED:-latest} (includes CEF update)?"; then
-        SHOULD_INSTALL_CASPAR=true
-    fi
+# 3.3 CasparCG (~/highascg/bin/casparcg + run.sh) & pinned CEF
+ensure_highascg_caspar_launcher
+
+SHOULD_INSTALL_CEF=false
+if [ "$CEF_STATUS" = "missing" ]; then
+    SHOULD_INSTALL_CEF=true
+    echo -e "${CYAN}→ CEF not found in playout lib — installing pinned binary…${NC}"
+elif ask_action "CEF (Caspar HTML)" "$CEF_STATUS" "$CEF_CURRENT" "" "Reinstall pinned CEF ${CASPAR_CEF_VERSION:-142}?"; then
+    SHOULD_INSTALL_CEF=true
 fi
 
-if [ "$SHOULD_INSTALL_CASPAR" = true ]; then
-    URL_CEF=$(get_latest_github_deb "CasparCG/server" "casparcg-cef-")
-    URL_SERVER=$(get_latest_github_deb "CasparCG/server" "casparcg-server-2.5")
-    
-    if [ -n "$URL_CEF" ] && [ -n "$URL_SERVER" ]; then
-        cd /tmp
-        echo -e "${CYAN}→ Downloading CEF dependency…${NC}"
-        wget -q -O caspar-cef.deb "$URL_CEF"
-        echo -e "${CYAN}→ Downloading CasparCG Server…${NC}"
-        wget -q -O caspar-server.deb "$URL_SERVER"
-        
-        echo -e "${CYAN}→ Installing CEF and Server…${NC}"
-        dpkg -i caspar-cef.deb caspar-server.deb || apt install -f -y
-    else
-        echo -e "  ${YELLOW}Warning: Could not resolve latest CasparCG .deb packages (server or CEF).${NC}"
-    fi
+if [ "$SHOULD_INSTALL_CEF" = true ]; then
+    install_highascg_cef_binary
 fi
 
 # Scanner
@@ -150,26 +131,14 @@ elif ask_action "Media Scanner" "$SCANNER_STATUS" "$SCANNER_CURRENT" "" "Upgrade
 fi
 
 if [ "$SHOULD_INSTALL_SCANNER" = true ]; then
-    URL_SCANNER=$(get_latest_github_deb "CasparCG/media-scanner" "casparcg-scanner_")
-    if [ -n "$URL_SCANNER" ]; then
-        cd /tmp
-        wget -q -O scanner.deb "$URL_SCANNER"
-        dpkg -i scanner.deb || apt install -f -y
-        if command -v casparcg-scanner &>/dev/null; then
-            echo -e "  ${GREEN}✓${NC} Media Scanner installed: $(command -v casparcg-scanner)"
-        else
-            echo -e "  ${RED}✗${NC} Media Scanner binary missing after .deb install (dpkg may have removed a broken package)."
-            echo "    • Install manually: $URL_SCANNER"
-        fi
+    if install_highascg_scanner_deb; then
+        :
     else
-        echo -e "  ${YELLOW}Warning: Could not resolve Scanner .deb for this arch (see CasparCG/media-scanner releases).${NC}"
+        echo -e "  ${YELLOW}Warning: Scanner install failed — see URL_SCANNER_DEB in install-config.sh${NC}"
     fi
 fi
 
-# Replace generic system CEF libs with the CasparCG .deb build (same paths Caspar loads at runtime).
-sync_caspar_cef_into_system
-
-# Disable stock CasparCG service (we use Openbox autostart)
+# Disable stock CasparCG service (we use Openbox autostart + run.sh)
 systemctl stop casparcg-server 2>/dev/null || true
 systemctl disable casparcg-server 2>/dev/null || true
 rm -f /etc/systemd/system/casparcg-server.service
@@ -222,16 +191,10 @@ else
 
     cd /home/casparcg/highascg || exit 1
     /usr/bin/casparcg-scanner &
-
-    while true; do
-      cd /home/casparcg/highascg || exit 1
-      mkdir -p /home/casparcg/highascg/cef-cache
-      find /home/casparcg/highascg/cef-cache -mindepth 1 -delete 2>/dev/null || true
-      /usr/bin/casparcg-server-2.5 /home/casparcg/highascg/config/casparcg.config >> /tmp/caspar.log 2>&1
-      # Wait until nothing listens on AMCP (adjust port if your config differs)
-      while ss -tlnp 2>/dev/null | grep -qE ':5250\b'; do sleep 1; done
-      sleep 2
-    done
+    mkdir -p /home/casparcg/highascg/cef-cache
+    find /home/casparcg/highascg/cef-cache -mindepth 1 -delete 2>/dev/null || true
+    export CASPAR_RESPAWN=1
+    ./run.sh >> /tmp/caspar.log 2>&1
   ) &
 fi
 AST

@@ -1,6 +1,20 @@
 # AMCP Architecture Mapping
 
 This document maps out the CasparCG TCP AMCP commands, their respective HighAsCG REST endpoints, and the underlying modular JS methods.
+*(Note: As of the `casparcg-connection` migration, these commands are dispatched either via native typed objects for basic commands, or parsed as custom commands through the adapter, but the surface API remains identical.)*
+
+See [amcp-migration.md](amcp-migration.md) for env flags and rollback.
+
+### Transport (default: library, not legacy TCP)
+
+| Transport | When used |
+|-----------|-----------|
+| **typed** | `casparcg-connection` method via `AmcpClient._invokeTyped()` |
+| **raw** | `sendCustom()` — complex clips, batch lines, CG ADD with data, DATA STORE escaping, parameterized HELP/INFO/CINF, `cgGoto`, mixer FILL/LEVELS/CHROMA, engine `raw()` |
+
+**Mostly typed today:** basic play/load (simple clips), pause/resume/stop/clear, mixer opacity/brightness/saturation/contrast/keyer/blend/invert/commit/clear, CG play/stop/next/remove/clear/update/invoke, query version/cls/tls/fls/diag/info\*, data retrieve/list/remove, thumbnails.
+
+**Always raw:** `[HTML]`/`ndi://`/STING clips, `batchSendChunked`, scene-take pipelines, `call`/`swap`/`add`/`remove`, `dataStore`, `cgGoto`, `cgAdd` with template data payload.
 
 ## Basic Layout
 

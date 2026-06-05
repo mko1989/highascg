@@ -12,8 +12,8 @@ function exfatSyncOnSaveEnabled() {
 }
 
 /**
- * Debounced push of config map pairs to exFAT after ConfigManager.save (WO-47).
- * No-op when exFAT is not mounted or sync map is missing.
+ * Debounced push after ConfigManager.save: bridge (HIGHASCGDAT) + USB (HIGHASCGEXF) only when
+ * that volume is mounted (pushOnSave). USB is not overwritten from server at boot.
  */
 function scheduleExfatSyncAfterConfigSave(logger) {
 	if (!exfatSyncOnSaveEnabled()) return

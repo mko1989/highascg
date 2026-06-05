@@ -4,39 +4,57 @@ const fs = require('fs')
 const path = require('path')
 
 const { REPO_ROOT } = require('../repo-paths')
+const projectStore = require('./project-store')
 
 /**
- * Newest full project from `web_project` persistence vs `autosave.json` (by `savedAt`).
+ * Active project: `projects/<activeSlug>.json`, merged only with autosave for the **same** slug.
+ * Other slugs on disk are left untouched when the name changes.
  * @returns {object | null}
  */
 function loadFullProject() {
-	let fromAutosave = null
-	let fromPersist = null
-
-	try {
-		const autosavePath = path.join(REPO_ROOT, 'autosave.json')
-		if (fs.existsSync(autosavePath)) {
-			const project = JSON.parse(fs.readFileSync(autosavePath, 'utf8'))
-			if (project && typeof project === 'object') {
-				fromAutosave = project
-			}
-		}
-	} catch (_) {}
-
 	try {
 		const persistence = require('../utils/persistence')
-		const project = persistence.get('web_project')
-		if (project && typeof project === 'object') {
-			fromPersist = project
+		projectStore.migrateLegacySingleProject(persistence)
+		const slug = projectStore.getActiveSlug(persistence)
+		let fromFile = slug ? projectStore.readProjectFile(slug) : null
+		if (!fromFile) {
+			const project = persistence.get('web_project')
+			if (project && typeof project === 'object') {
+				fromFile = project
+				const inferred = projectStore.projectSlugFromName(project.name)
+				if (inferred && !slug) projectStore.setActiveSlug(persistence, inferred)
+			}
 		}
-	} catch (_) {}
-
-	if (fromPersist && fromAutosave) {
-		const tP = Date.parse(fromPersist.savedAt || '') || 0
-		const tA = Date.parse(fromAutosave.savedAt || '') || 0
-		return tP >= tA ? fromPersist : fromAutosave
+		if (!fromFile) return null
+		const activeSlug =
+			slug || projectStore.projectSlugFromName(fromFile.name) || String(fromFile.slug || '')
+		const fromAutosave =
+			projectStore.readAutosaveFile(activeSlug) ||
+			projectStore.readLegacyAutosaveIfMatches(activeSlug)
+		if (fromAutosave) return pickNewerFullProject(fromFile, fromAutosave)
+		return fromFile
+	} catch (_) {
+		return null
 	}
-	return fromPersist || fromAutosave || null
+}
+
+/** @param {object | null} fromPersist @param {object | null} fromAutosave */
+function projectSceneCount(project) {
+	const scenes = project?.scenes?.scenes
+	return Array.isArray(scenes) ? scenes.length : 0
+}
+
+/** Prefer non-empty looks; then newer `savedAt`. */
+function pickNewerFullProject(fromPersist, fromAutosave) {
+	if (!fromPersist) return fromAutosave || null
+	if (!fromAutosave) return fromPersist
+	const cP = projectSceneCount(fromPersist)
+	const cA = projectSceneCount(fromAutosave)
+	if (cP > 0 && cA === 0) return fromPersist
+	if (cA > 0 && cP === 0) return fromAutosave
+	const tP = Date.parse(fromPersist.savedAt || '') || 0
+	const tA = Date.parse(fromAutosave.savedAt || '') || 0
+	return tP >= tA ? fromPersist : fromAutosave
 }
 
 /**
@@ -170,6 +188,15 @@ function isProjectSaveNewerOrEqual(incoming, existing) {
  * @returns {{ ok: true } | { ok: false, reason: string, details?: object }}
  */
 function validateIncomingProject(incoming, existing, opts = {}) {
+	const storedLooks = sceneIdSet(existing).size
+	const incomingLooks = sceneIdSet(incoming).size
+	if (!opts.allowReplace && storedLooks > 0 && incomingLooks === 0) {
+		return {
+			ok: false,
+			reason: 'empty_over_nonempty',
+			details: { storedLookCount: storedLooks, incomingLookCount: 0 },
+		}
+	}
 	if (!isProjectSaveNewerOrEqual(incoming, existing)) {
 		return {
 			ok: false,
@@ -204,11 +231,21 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 function persistProject(ctx, project, opts = {}) {
 	if (!ctx || !project || typeof project !== 'object') return false
 	const persistence = ctx.persistence || require('../utils/persistence')
-	persistence.set('web_project', project)
+	const slug = projectStore.projectSlugFromName(project.name)
+	projectStore.migrateLegacySingleProject(persistence)
+	const stamped = projectStore.withProjectSlug(project, slug)
+	try {
+		projectStore.writeProjectFile(slug, stamped)
+		projectStore.setActiveSlug(persistence, slug)
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', '[project] projects/ write: ' + (e?.message || e))
+		}
+	}
+	persistence.set('web_project', stamped)
 	if (opts.writeAutosave !== false) {
 		try {
-			const autosavePath = path.join(REPO_ROOT, 'autosave.json')
-			fs.writeFileSync(autosavePath, JSON.stringify(project, null, 2), 'utf8')
+			projectStore.writeAutosaveFile(slug, stamped)
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('warn', '[project] autosave write: ' + (e?.message || e))
@@ -285,6 +322,8 @@ function mergeDeckSyncIntoProject(ctx, data) {
 
 module.exports = {
 	loadFullProject,
+	pickNewerFullProject,
+	projectSceneCount,
 	loadProjectScenes,
 	extractSceneDeckFromProjectScenes,
 	buildSceneDeckForApi,

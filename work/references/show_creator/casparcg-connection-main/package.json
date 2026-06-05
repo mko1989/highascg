@@ -1,0 +1,131 @@
+{
+	"name": "casparcg-connection",
+	"version": "7.0.0-0",
+	"description": "Node.js Javascript/Typescript library for CasparCG connection and commands.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/SuperFlyTV/casparcg-connection.git"
+	},
+	"bugs": {
+		"url": "https://github.com/SuperFlyTV/casparcg-connection/issues"
+	},
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./package.json": "./package.json"
+	},
+	"homepage": "http://superfly.tv",
+	"author": {
+		"name": "Jesper Stærkær",
+		"email": "jesper@superfly.tv",
+		"url": "http://superfly.tv"
+	},
+	"contributors": [
+		{
+			"name": "Johan Nyman",
+			"email": "johan@superfly.tv",
+			"url": "http://superfly.tv"
+		},
+		{
+			"name": "Balte de Wit",
+			"email": "balte.dewit@gmail.com",
+			"url": "http://balte.nl"
+		},
+		{
+			"name": "Andreas Jeansson",
+			"email": "andreas.jeansson@svt.se",
+			"url": "http://svt.se"
+		},
+		{
+			"name": "Aleksandr Besedin",
+			"email": "sasha.besedin@gmail.com",
+			"url": "http://cosmonova.net"
+		},
+		{
+			"name": "Craig Sweaton",
+			"email": "craig@csweaton.com",
+			"url": "https://csweaton.com"
+		},
+		{
+			"name": "Stephan Nordnes Eriksen",
+			"email": "Stephanruler@gmail.com"
+		}
+	],
+	"scripts": {
+		"build": "rimraf dist && run build:main",
+		"build:main": "tsc -p tsconfig.build.json",
+		"unit": "vitest --run",
+		"test": "run lint && run unit",
+		"watch": "vitest --watch",
+		"cov": "vitest --run --coverage; open-cli coverage/lcov-report/index.html",
+		"cov-open": "open-cli coverage/lcov-report/index.html",
+		"docs": "typedoc ./src/index.ts",
+		"changelog": "sofie-version",
+		"release": "run reset && run test && run changelog",
+		"release:skiptest": "run reset && run changelog",
+		"reset": "git clean -dfx && git reset --hard && yarn",
+		"validate:dependencies": "yarn npm audit --environment production && run license-validate",
+		"validate:dev-dependencies": "yarn npm audit --environment development",
+		"prepare": "husky",
+		"lint:raw": "eslint",
+		"lint": "run lint:raw .",
+		"lint-fix": "run lint --fix",
+		"license-validate": "sofie-licensecheck"
+	},
+	"engines": {
+		"node": ">= 22.18"
+	},
+	"files": [
+		"/dist",
+		"/CHANGELOG.md",
+		"/README.md",
+		"/LICENSE"
+	],
+	"devDependencies": {
+		"@sofie-automation/code-standard-preset": "~3.2.2",
+		"@types/node": "^22.19.15",
+		"@types/xml2js": "^0.4.14",
+		"@vitest/coverage-v8": "^4.1.0",
+		"eslint": "^9.39.4",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.4.0",
+		"open-cli": "^8.0.0",
+		"prettier": "^3.8.1",
+		"rimraf": "^6.1.3",
+		"typedoc": "^0.28.17",
+		"typescript": "~5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"keywords": [
+		"casparcg",
+		"caspar",
+		"amcp",
+		"socket",
+		"tcp",
+		"broadcast",
+		"graphics",
+		"superfly",
+		"connection",
+		"middleware",
+		"remote"
+	],
+	"dependencies": {
+		"tslib": "^2.8.1",
+		"xml2js": "^0.6.2"
+	},
+	"prettier": "@sofie-automation/code-standard-preset/.prettierrc.json",
+	"lint-staged": {
+		"*.{css,json,md,scss}": [
+			"prettier --write"
+		],
+		"*.{ts,tsx,js,jsx}": [
+			"yarn lint:raw --fix"
+		]
+	},
+	"packageManager": "yarn@4.13.0"
+}

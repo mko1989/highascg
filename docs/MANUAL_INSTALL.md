@@ -192,7 +192,7 @@ Alternatively set `LD_LIBRARY_PATH=/opt/casparcg/lib` in the **environment that 
 
 - **USB media ingest (WO-29)**: install **`udisks2`** and **`policykit-1`**; copy **`scripts/polkit/50-highascg-udisks.rules`** to **`/etc/polkit-1/rules.d/`** so the `casparcg` user (group **`plugdev`**) can run **`udisksctl unmount` / `power-off`** without a password. The full installer does this in **`install-phase4.sh`** (section 4.3b). If a stick does not auto-mount under **`/media/…`**, check **`udev`/`udisks2`** logs and that the volume is not already mounted elsewhere.
 - **Sudoers for `/etc/asound.conf`**: **optional** — only for Web UI **system-wide** ALSA default. Default installer skips this; set **`HIGHASCG_INSTALL_ASOUND_SUDOERS=1`** during install (see **`install-phase3.sh`**). Per-user **`~/.asoundrc`** needs no sudo.
-- **NVIDIA X session tweaks**: only for NVIDIA GPUs — see **`install-phase2.sh`**.
+- **NVIDIA X session tweaks**: only for NVIDIA GPUs — see **`install-phase2.sh`** (**Sync to VBlank off**). Pair with Caspar screen consumer **vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md).
 - **Durable config/state/media (exFAT only):** use WO-47 — mount **`HIGHASCGEXF`** at **`/home/casparcg/exfat`**, sync via **`highascg-exfat-sync.service`** and **`config/exfat-sync.json`** (see **`docs/WO47_ISO_VS_EXFAT.md`**, **`docs/EXFAT_SERVER_UPDATE.md`**). WO-38 **`media/drive`** partition mount was removed (no startup wait, no Settings mount UI).
 
 ---

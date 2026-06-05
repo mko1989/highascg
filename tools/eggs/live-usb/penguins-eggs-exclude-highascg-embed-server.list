@@ -5,6 +5,9 @@
 swap.img
 swapfile
 
+opt/nvidia-pool
+opt/nvidia-pool/*
+
 # Browser UI (operator workstation / Electron — not on playout ISO)
 home/casparcg/highascg/client
 home/casparcg/highascg/client/*
@@ -65,6 +68,8 @@ home/casparcg/.cursor
 home/casparcg/.cursor/*
 home/casparcg/.antigravity-ide-server
 home/casparcg/.antigravity-ide-server/*
+home/casparcg/.gemini
+home/casparcg/.gemini/*
 home/casparcg/.vscode-server
 home/casparcg/.vscode-server/*
 home/casparcg/.local

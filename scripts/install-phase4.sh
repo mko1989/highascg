@@ -149,8 +149,8 @@ chmod 755 /usr/local/bin/highascg-refresh-console-issue.sh
 cat <<'UNITSVC' > /etc/systemd/system/highascg-console-issue.service
 [Unit]
 Description=Refresh HighAsCG /etc/issue.d banner after network
-After=network-online.target
-Wants=network-online.target
+After=network.target NetworkManager.service
+Wants=network.target
 
 [Service]
 Type=oneshot

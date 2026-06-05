@@ -23,7 +23,9 @@ runExfatSync({
 		const benign =
 			!r.errors?.length ||
 			(r.errors.length === 1 &&
-				/not a mount point|no valid exfat-sync map|no exfat sync map\b/i.test(String(r.errors[0])))
+				/not a mount point|no valid exfat-sync map|no exfat sync map|no bridge or USB data volume mounted/i.test(
+					String(r.errors[0]),
+				))
 		process.exit(benign ? 0 : 1)
 	})
 	.catch((e) => {

@@ -27,21 +27,21 @@ class AmcpData {
 				: /\s/.test(String(name))
 					? `"${String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 					: String(name)
+		// HighAsCG escaping differs from library DATA STORE serializer — keep raw.
 		return this._send(`DATA STORE ${nameQ} "${escaped}"`, 'DATA')
 	}
 
 	dataRetrieve(name) {
-		return this._send(`DATA RETRIEVE ${param(name)}`, 'DATA')
+		return this._client._invokeTyped('dataRetrieve', { name: String(name) }, `DATA RETRIEVE ${param(name)}`, 'DATA')
 	}
 
 	dataList(subDir) {
-		let cmd = 'DATA LIST'
-		if (subDir) cmd += ` ${param(subDir)}`
-		return this._send(cmd, 'DATA')
+		if (subDir) return this._send(`DATA LIST ${param(subDir)}`, 'DATA')
+		return this._client._invokeTyped('dataList', {}, 'DATA LIST', 'DATA')
 	}
 
 	dataRemove(name) {
-		return this._send(`DATA REMOVE ${param(name)}`, 'DATA')
+		return this._client._invokeTyped('dataRemove', { name: String(name) }, `DATA REMOVE ${param(name)}`, 'DATA')
 	}
 }
 

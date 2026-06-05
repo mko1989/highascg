@@ -34,7 +34,7 @@ xset s off
 xset s noblank
 xset -dpms
 unclutter -idle 1 -root &
-# Optional (production installer): see install-phase3.sh
+# Optional (production installer): NVIDIA Sync to VBlank off — see install-phase2.sh / docs/reference/screen-consumer-vsync-nvidia.md
 # [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
 
 if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only$' /etc/highascg/display-mode; then

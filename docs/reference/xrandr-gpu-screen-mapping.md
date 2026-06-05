@@ -77,7 +77,8 @@ Device View **Apply resolution** sends **`apply-os`** a body that includes both 
 2. **Override off** — xrandr follows **destination video mode**; EDID row is a hint / alternate OS apply path (“Use detected display mode”).  
 3. **Override on** — set **Video mode** (and optional custom timing); **Apply resolution**; confirm logs show **`plan id=<connector> mode=<WxH>`** matching **1080p** (or your choice), not the old link resolution.  
 4. If the monitor has no matching mode line, enable **`os_xrandr_create_missing_modes`** and appropriate **timing source** (CVT/GTF) so the server can create a line before applying.
+5. **NVIDIA + screen consumer:** **Sync to VBlank off** in `nvidia-settings`, **vsync on** on the Caspar screen consumer — see **[screen-consumer-vsync-nvidia.md](screen-consumer-vsync-nvidia.md)**.
 
 ---
 
-*Last updated: 2026-05-15 — documents behaviour verified after Device View + `apply-os` persistence and layout calculator fixes.*
+*Last updated: 2026-06-03 — vsync checklist added; layout behaviour as of 2026-05-15.*

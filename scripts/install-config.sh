@@ -24,6 +24,16 @@ URL_DECKLINK_TAR="https://swr.cloud.blackmagicdesign.com/DesktopVideo/v15.3.1/Bl
 URL_NDI_SDK_TAR="https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz"
 HIGHASCG_GIT_URL="https://github.com/mko1989/highascg.git"
 
+# Pinned Caspar stack (mko1989/highascg releases)
+# Binary: ~/highascg/bin/casparcg (restored/baked — not installed from tarball)
+# Launcher: ~/highascg/run.sh → LD_LIBRARY_PATH=~/highascg/lib
+URL_CEF_BINARY_TAR="https://github.com/mko1989/highascg/releases/download/v.142/cef_binary_142.0.17+g60aac24+chromium-142.0.7444.176_linux64_minimal.tar.bz2"
+URL_SCANNER_DEB="https://github.com/mko1989/highascg/releases/download/v1.4.0/casparcg-scanner_1.4.0-ubuntu1_amd64.deb"
+CASPAR_PLAYOUT_ROOT="/home/casparcg/highascg"
+CASPAR_ENHANCED_VERSION="2.6.0"
+CASPAR_CEF_VERSION="142.0.17"
+SCANNER_PIN_VERSION="1.4.0"
+
 # Colors for terminal output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

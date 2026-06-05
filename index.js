@@ -209,7 +209,11 @@ function main() {
 				if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('change', { path: 'caspar.connection', value: appCtx._casparStatus })
 				if (payload.connected === true && !wasConnected) {
 					wasConnected = true
-					setTimeout(() => void fetchInfo(), 800)
+					const infoDelayMs = Math.max(
+						0,
+						parseInt(process.env.HIGHASCG_INFO_CONFIG_DELAY_MS || '800', 10) || 800,
+					)
+					setTimeout(() => void fetchInfo(), infoDelayMs)
 					setTimeout(() => void tryClearStartupLedTestForWebUi(appCtx), 1500)
 					runConnectionQueryCycle(appCtx)
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)

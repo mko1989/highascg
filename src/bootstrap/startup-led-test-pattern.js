@@ -23,6 +23,11 @@ let cefReplayTimeouts = []
 const WEB_UI_CLEAR_RETRY_MS = 400
 const WEB_UI_CLEAR_RETRY_MAX_MS = 60000
 
+function startupLedTestFastMode() {
+	const v = process.env.HIGHASCG_STARTUP_LED_TEST_FAST
+	return v === '1' || String(v).toLowerCase() === 'true'
+}
+
 function clearWebUiClearRetryTimer() {
 	if (webUiClearRetryTimer) {
 		clearTimeout(webUiClearRetryTimer)
@@ -160,7 +165,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 			if (xml) appCtx.gatheredInfo = { ...appCtx.gatheredInfo, infoConfig: xml }
 		} catch (e) {
 			appCtx.log('warn', '[Startup LED test] INFO CONFIG: ' + (e?.message || e))
-			scheduleRetry(appCtx, 4000)
+			scheduleRetry(appCtx, startupLedTestFastMode() ? 1500 : 4000)
 			return
 		}
 	}
@@ -185,7 +190,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 			'warn',
 			`[Startup LED test] AMCP: ${e?.message || e} (deploy templates/${TEMPLATE_NAME}.html to Caspar template-path)`,
 		)
-		scheduleRetry(appCtx, 5000)
+		scheduleRetry(appCtx, startupLedTestFastMode() ? 2500 : 5000)
 		return
 	}
 
@@ -221,7 +226,8 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 		 */
 		clearCefReplayTimers()
 		const bootSnap = bootId
-		for (const ms of [4000, 10000]) {
+		const replayDelays = startupLedTestFastMode() ? [1500, 4000] : [4000, 10000]
+		for (const ms of replayDelays) {
 			const t = setTimeout(() => {
 				if (persistence.get(DONE_KEY) !== bootSnap) return
 				if (appCtx._ledTestLayer999ClearedAfterWebUi) return

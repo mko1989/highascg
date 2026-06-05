@@ -65,8 +65,12 @@ fi
 echo "==> ISO defaults (Caspar config + optional embedded server)"
 bash "${HERE}/install-iso-defaults.sh"
 
-echo "==> eggs GRUB/isolinux theme (persistence on default boot entry)"
-bash "${HERE}/install-eggs-live-grub-theme.sh"
+if [[ "${HIGHASCG_SKIP_BOOT_BRANDING_IN_PREPARE:-0}" != "1" ]]; then
+	echo "==> eggs GRUB/isolinux theme (persistence on default boot entry)"
+	bash "${HERE}/install-eggs-live-grub-theme.sh"
+else
+	echo "==> Skip GRUB/Plymouth in prepare (build-highascg-egg.sh runs finalize once)"
+fi
 
 echo "==> empty mount stubs for squashfs (${HIGHASCG_ROOT}/media *, ~/exfat)"
 bash "${HERE}/ensure-empty-live-usb-dirs.sh"
@@ -94,6 +98,15 @@ bash "${REPO_ROOT}/scripts/install-exfat-systemd-units.sh" "$USER_CASPAR"
 
 echo "==> HighAsCG service unit ordering (depends on WO-47 when present)"
 bash "${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh" "$USER_CASPAR"
+LIVE_BOOT_DROPIN="${HERE}/systemd/highascg.service.d-20-live-boot.conf.example"
+if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
+	install -d /etc/systemd/system/highascg.service.d
+	install -m 0644 "$LIVE_BOOT_DROPIN" /etc/systemd/system/highascg.service.d/20-live-boot.conf
+	echo "  installed 20-live-boot.conf (faster AMCP settle + startup testcard)"
+fi
+
+echo "==> clone host audit (swap inactive, no nvidia-pool, exclude.list)"
+bash "${HERE}/audit-eggs-clone-host.sh"
 
 if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 	if [[ "$HIGHASCG_ISO_EMBED_SERVER" == "1" ]]; then

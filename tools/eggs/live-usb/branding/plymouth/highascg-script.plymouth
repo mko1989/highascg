@@ -1,0 +1,10 @@
+[Plymouth Theme]
+Name=HighAsCG
+Description=HighAsCG split boot (logs left 2/3, logo right 1/3, opaque RGB)
+ModuleName=script
+ImageDir=/usr/share/plymouth/themes/highascg
+ScriptFile=/usr/share/plymouth/themes/highascg/highascg.script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/highascg
+ScriptFile=/usr/share/plymouth/themes/highascg/highascg.script

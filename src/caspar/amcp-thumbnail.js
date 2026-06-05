@@ -15,21 +15,30 @@ class AmcpThumbnail {
 	}
 
 	thumbnailList(subDir) {
-		let cmd = 'THUMBNAIL LIST'
-		if (subDir) cmd += ` ${param(subDir)}`
-		return this._send(cmd, 'THUMBNAIL')
+		if (subDir) return this._send(`THUMBNAIL LIST ${param(subDir)}`, 'THUMBNAIL')
+		return this._client._invokeTyped('thumbnailList', {}, 'THUMBNAIL LIST', 'THUMBNAIL')
 	}
 
 	thumbnailRetrieve(filename) {
-		return this._send(`THUMBNAIL RETRIEVE ${param(filename)}`, 'THUMBNAIL')
+		return this._client._invokeTyped(
+			'thumbnailRetrieve',
+			{ filename: String(filename) },
+			`THUMBNAIL RETRIEVE ${param(filename)}`,
+			'THUMBNAIL',
+		)
 	}
 
 	thumbnailGenerate(filename) {
-		return this._send(`THUMBNAIL GENERATE ${param(filename)}`, 'THUMBNAIL')
+		return this._client._invokeTyped(
+			'thumbnailGenerate',
+			{ filename: String(filename) },
+			`THUMBNAIL GENERATE ${param(filename)}`,
+			'THUMBNAIL',
+		)
 	}
 
 	thumbnailGenerateAll() {
-		return this._send('THUMBNAIL GENERATE_ALL', 'THUMBNAIL')
+		return this._client._invokeTyped('thumbnailGenerateAll', {}, 'THUMBNAIL GENERATE_ALL', 'THUMBNAIL')
 	}
 }
 

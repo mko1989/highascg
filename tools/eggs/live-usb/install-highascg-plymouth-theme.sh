@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install HighAsCG Plymouth theme on the eggs build host (before eggs produce --clone).
 #
-# Replaces ubuntu-text (purple + Ubuntu wordmark) with dark HighAsCG spinner theme.
+# Uses two-step spinner: your branding frames as small throbber dots only (no large logo).
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/install-highascg-plymouth-theme.sh
@@ -27,28 +27,35 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get install -y --no-install-recommends \
 	plymouth plymouth-theme-spinner plymouth-label
 
+bash "${HERE}/install-initramfs-eggs-build-conf.sh"
+
+if modinfo nvidia_drm &>/dev/null; then
+	bash "${HERE}/install-plymouth-nvidia-initramfs.sh"
+else
+	echo "WARN: nvidia_drm not on build host — Plymouth animation may be black on NVIDIA ISO" >&2
+fi
+
 [[ -d "$SPINNER_DIR" ]] || {
 	echo "Missing $SPINNER_DIR after apt install" >&2
 	exit 1
 }
 
-echo "==> Plymouth theme: copy spinner assets → ${THEME_DIR}"
+echo "==> Plymouth theme: copy spinner base → ${THEME_DIR}"
 rm -rf "$THEME_DIR"
 mkdir -p "$THEME_DIR"
 rsync -a --delete "${SPINNER_DIR}/" "${THEME_DIR}/"
-install -m 0644 -o root -g root "$PLYMOUTH_SRC" "${THEME_DIR}/highascg.plymouth"
+rm -f "${THEME_DIR}"/animation-*.png "${THEME_DIR}"/throbber-*.png "${THEME_DIR}"/highascg.script 2>/dev/null || true
 
 LOGO="${HERE}/branding/logo.png"
 if [[ -f "$LOGO" ]]; then
 	install -m 0644 -o root -g root "$LOGO" "${THEME_DIR}/watermark.png" 2>/dev/null || \
 		cp -f "$LOGO" "${THEME_DIR}/watermark.png" 2>/dev/null || true
-	echo "  installed optional watermark.png"
+	echo "  optional watermark.png"
 fi
 
-# Custom PNG sequences (two-step module): animation-0001.png …, throbber-0001.png …
 install_png_sequence() {
 	local src_dir="$1" prefix="$2" label="$3"
-	[[ -d "$src_dir" ]] || return 0
+	[[ -d "$src_dir" ]] || return 1
 	local frames=()
 	local f
 	shopt -s nullglob
@@ -56,8 +63,8 @@ install_png_sequence() {
 		frames+=("$f")
 	done
 	shopt -u nullglob
-	[[ ${#frames[@]} -gt 0 ]] || return 0
-	mapfile -t frames < <(printf '%s\n' "${frames[@]}" | sort)
+	[[ ${#frames[@]} -gt 0 ]] || return 1
+	mapfile -t frames < <(printf '%s\n' "${frames[@]}" | sort -V)
 	local i=1 idx
 	for f in "${frames[@]}"; do
 		printf -v idx '%04d' "$i"
@@ -65,10 +72,32 @@ install_png_sequence() {
 		i=$((i + 1))
 	done
 	echo "  ${label}: ${#frames[@]} frames → ${prefix}-0001 … ${prefix}-$(printf '%04d' ${#frames[@]})"
+	return 0
 }
 
-install_png_sequence "${HERE}/branding/plymouth/animation" "animation" "custom animation"
-install_png_sequence "${HERE}/branding/plymouth/throbber" "throbber" "custom throbber (spinner dots)"
+bash "${HERE}/prepare-branding-assets.sh"
+
+THROBBER_SRC="${HERE}/branding/plymouth/throbber-boot"
+if [[ -d "$THROBBER_SRC" ]] && [[ -n "$(find "$THROBBER_SRC" -maxdepth 1 -name '*.png' -print -quit 2>/dev/null)" ]]; then
+	sample="$(find "$THROBBER_SRC" -maxdepth 1 -name '*.png' | sort -V | head -1)"
+	if file -b "$sample" | grep -q RGBA; then
+		echo "ERROR: ${sample} still has alpha — run prepare-branding-assets.sh" >&2
+		exit 1
+	fi
+	if ! install_png_sequence "$THROBBER_SRC" "throbber" "branding throbber (small spinner)"; then
+		echo "ERROR: failed to install throbber frames from ${THROBBER_SRC}" >&2
+		exit 1
+	fi
+else
+	echo "WARN: no throbber-boot frames — restoring stock spinner throbber dots" >&2
+	cp -a "${SPINNER_DIR}"/throbber-*.png "${THEME_DIR}/" 2>/dev/null || true
+fi
+
+# two-step: no large animation-*.png (throbber only)
+rm -f "${THEME_DIR}"/animation-*.png 2>/dev/null || true
+
+install -m 0644 -o root -g root "$PLYMOUTH_SRC" "${THEME_DIR}/highascg.plymouth"
+echo "  Plymouth module: two-step (throbber spinner + boot messages below)"
 
 HOOK_SRC="${HERE}/etc-initramfs-tools-hooks-highascg.sh"
 HOOK_DEST=/etc/initramfs-tools/hooks/highascg
@@ -91,8 +120,11 @@ else
 	echo -e '[Daemon]\nTheme=highascg' >/etc/plymouth/plymouthd.conf
 fi
 
-KVER="$(uname -r)"
-echo "==> Rebuild initramfs for ${KVER} (eggs produce also runs mkinitramfs into ISO /live/)"
-update-initramfs -u -k "$KVER"
+# shellcheck source=eggs-kernel-lib.sh
+source "${HERE}/eggs-kernel-lib.sh"
+highascg_resolve_eggs_kernel
+highascg_rebuild_host_initramfs "$KVER" "install-highascg-plymouth-theme.sh"
 
-echo "OK: Plymouth default theme = highascg (dark background, spinner dots, no Ubuntu text)"
+nthrob="$(find "$THEME_DIR" -maxdepth 1 -name 'throbber-*.png' 2>/dev/null | wc -l)"
+nthrob="${nthrob//[[:space:]]/}"
+echo "OK: Plymouth default = highascg (two-step throbber, ${nthrob} frames, initrd ${KVER})"

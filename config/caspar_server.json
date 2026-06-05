@@ -10,7 +10,7 @@
   "screen_1_stretch": "none",
   "screen_1_windowed": true,
   "screen_1_vsync": true,
-  "screen_1_borderless": false,
+  "screen_1_borderless": true,
   "screen_1_always_on_top": true,
   "screen_1_decklink_device": 0,
   "screen_1_decklink_key_device": 0,

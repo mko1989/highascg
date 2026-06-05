@@ -15,6 +15,9 @@
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
 		"smoke": "node tools/smoke/http-smoke.js",
 		"smoke:caspar": "node tools/smoke/smoke-caspar.js",
+		"smoke:amcp-batch": "node --test tools/smoke/smoke-amcp-batch-library.test.js",
+		"test:highascg:parity": "node --test tools/smoke/smoke-amcp-migration-parity.test.js",
+		"test:highascg:send-after": "node --test tools/smoke/smoke-amcp-send-after.test.js",
 		"smoke:previs-uv": "node tools/smoke/smoke-previs-uv.mjs",
 		"smoke:previs-state": "node tools/smoke/smoke-previs-state.mjs",
 		"smoke:previs-stream": "node tools/smoke/smoke-previs-stream.mjs",
@@ -38,6 +41,10 @@
 		"test:highascg:live": "node --test tools/smoke/highascg-live-amcp.test.js",
 		"test:highascg:live:http": "node --test tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:live:all": "node --test tools/smoke/highascg-live-amcp.test.js tools/smoke/highascg-live-highascg-http.test.js",
+		"test:highascg:migration": "node --test --test-force-exit tools/smoke/smoke-amcp-migration-parity.test.js tools/smoke/smoke-amcp-batch-library.test.js tools/smoke/smoke-amcp-send-after.test.js tools/smoke/smoke-amcp-offline-migration.test.js tools/smoke/highascg-health-api-amcp.test.js",
+		"test:highascg:legacy": "node --test tools/smoke/smoke-amcp-legacy-transport.test.js",
+		"test:highascg:air-paths": "node --test tools/smoke/smoke-amcp-migration-air-paths.test.js",
+		"test:highascg:migration:all": "node --test --test-force-exit tools/smoke/smoke-amcp-migration-parity.test.js tools/smoke/smoke-amcp-batch-library.test.js tools/smoke/smoke-amcp-send-after.test.js tools/smoke/smoke-amcp-offline-migration.test.js tools/smoke/smoke-amcp-migration-air-paths.test.js tools/smoke/highascg-health-api-amcp.test.js tools/smoke/highascg-live-amcp.test.js tools/smoke/smoke-amcp-legacy-transport.test.js",
 		"install:base": "npm install --omit=optional",
 		"install:previs": "npm install --include=optional",
 		"install:cg-studio": "npm install --no-save grapesjs",
@@ -46,14 +53,17 @@
 		"release:github-app": "bash deprecated/tools/release/make-dev-github-release.sh --app-only",
 		"release:github-app:dry": "bash deprecated/tools/release/make-dev-github-release.sh --app-only --dry-run",
 		"eggs:prepare": "sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh",
+		"exfat:starter-zip": "bash tools/eggs/live-usb/pack-exfat-starter-zip.sh",
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
 		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh"
 	},
 	"engines": {
 		"node": ">=20"
 	},
-	"dependencies": {
+	"notes": "highascg uses casparcg-connection@6 for AMCP transport. Legacy raw TCP transport is available via HIGHASCG_AMCP_LEGACY_TRANSPORT=1.",
+  "dependencies": {
 		"busboy": "^1.6.0",
+		"casparcg-connection": "^6.3.3",
 		"dmxnet": "^0.9.0",
 		"html-to-image": "^1.11.13",
 		"osc": "^2.4.5",

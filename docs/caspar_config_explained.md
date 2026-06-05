@@ -113,7 +113,7 @@
                 <stretch>fill [none|fill|uniform|uniform_to_fill]</stretch> <-- How to fill the window -->
                 <windowed>true [true|false]</windowed> <-- If true the output will be in a controllable window, otherwise fullscreen -->
                 <key-only>false [true|false]</key-only> <-- Output only the key -->
-                <vsync>false [true|false]</vsync> <-- V-sync -->
+                <vsync>false [true|false]</vsync> <-- V-sync on the screen consumer. On NVIDIA playout hosts use true here AND Sync to VBlank off in nvidia-settings; see docs/reference/screen-consumer-vsync-nvidia.md -->
                 <borderless>false [true|false]</borderless> <-- Disable border/window-chrome -->
                 <interactive>true [true|false]</interactive>  <-- If the screen consumer should send mouse interaction to CEF.  You could open up a website and interact withit like it would be running in your browser -->
                 <always-on-top>false [true|false]<</always-on-top> <-- Fix window so it's always on top of other windows -->

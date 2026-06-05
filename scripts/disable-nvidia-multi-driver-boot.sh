@@ -26,9 +26,13 @@ for f in \
 	fi
 done
 
-if [[ -d /opt/nvidia-pool ]] && [[ "${HIGHASCG_PURGE_NVIDIA_POOL:-0}" == "1" ]]; then
-	rm -rf /opt/nvidia-pool
-	log "removed /opt/nvidia-pool"
+if [[ -d /opt/nvidia-pool ]]; then
+	if [[ "${HIGHASCG_PURGE_NVIDIA_POOL:-1}" == "1" ]]; then
+		rm -rf /opt/nvidia-pool
+		log "removed /opt/nvidia-pool"
+	else
+		log "keeping /opt/nvidia-pool (set HIGHASCG_PURGE_NVIDIA_POOL=1 to remove before eggs produce)"
+	fi
 fi
 
 systemctl daemon-reload

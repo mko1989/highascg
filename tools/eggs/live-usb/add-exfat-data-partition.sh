@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Add exFAT data partition (LABEL=HIGHASCGEXF) after the last existing partition — hybrid ISO safe
+# Add exFAT data partition (LABEL=HIGHASCGEXF, USB operator tail) after the last existing partition — hybrid ISO safe
 # Run after add-union-persistence-partition.sh on production sticks (exFAT fills the tail).
 #
 # Usage:
@@ -8,7 +8,7 @@
 # Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
 # Optional: EXFAT_ISO_PATH + EXFAT_AFTER_ISO_MARGIN_MIB — never place exFAT before ceil(ISO MiB)+margin (safe gap after dd).
-# Optional: EXFAT_LABEL (≤11 chars; default HIGHASCGEXF matches systemd WO-47).
+# Optional: EXFAT_LABEL (≤11 chars; default HIGHASCGEXF matches systemd WO-47 USB mount).
 #
 # Requires: parted util-linux blkid mkfs.exfat (exfatprogs) python3 wipefs
 set -euo pipefail
@@ -80,7 +80,7 @@ command -v mkfs.exfat >/dev/null 2>&1 || {
 EXFAT_LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
 if [[ "${#EXFAT_LABEL}" -gt 11 ]]; then
 	echo "exFAT volume labels are at most 11 characters (got ${#EXFAT_LABEL}: \"$EXFAT_LABEL\")." >&2
-	echo "WO-47 expects HIGHASCGEXF (a longer human name like \"highascg-data\" does not fit on exFAT)." >&2
+	echo "WO-47 USB stick expects HIGHASCGEXF (internal bridge disk uses HIGHASCGDAT separately)." >&2
 	exit 1
 fi
 
@@ -381,9 +381,9 @@ partprobe "$DEV"
 sleep 1
 blkid "$LASTPART" || true
 
-echo "Done. WO-47 expects LABEL=HIGHASCGEXF in home-casparcg-exfat.mount (install via install-phase4 / install-exfat-systemd-units.sh)."
+echo "Done. WO-47 USB expects LABEL=HIGHASCGEXF in home-casparcg-exfat.mount (install via install-phase4 / install-exfat-systemd-units.sh)."
 if [[ "$EXFAT_LABEL" != "HIGHASCGEXF" ]]; then
-	echo "Warning: WO-47 default is LABEL=HIGHASCGEXF; home-casparcg-exfat.mount will not attach this volume until you regenerate units or edit What=." >&2
+	echo "Warning: WO-47 USB default is LABEL=HIGHASCGEXF; home-casparcg-exfat.mount will not attach this volume until you regenerate units or edit What=." >&2
 fi
 
 echo "Reboot or: sudo systemctl start home-casparcg-exfat.mount && sudo systemctl start highascg-exfat-sync.service"

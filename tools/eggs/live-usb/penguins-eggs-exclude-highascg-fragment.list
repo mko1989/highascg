@@ -5,6 +5,10 @@
 swap.img
 swapfile
 
+# Multi-branch NVIDIA deb cache (removed — one driver baked per ISO)
+opt/nvidia-pool
+opt/nvidia-pool/*
+
 # Node app tree (exFAT drop-update/)
 home/casparcg/highascg/index.js
 home/casparcg/highascg/package.json
@@ -67,6 +71,8 @@ home/casparcg/.cursor
 home/casparcg/.cursor/*
 home/casparcg/.antigravity-ide-server
 home/casparcg/.antigravity-ide-server/*
+home/casparcg/.gemini
+home/casparcg/.gemini/*
 home/casparcg/.vscode-server
 home/casparcg/.vscode-server/*
 home/casparcg/.local

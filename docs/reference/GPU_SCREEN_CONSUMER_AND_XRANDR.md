@@ -39,6 +39,15 @@ When the physical monitor **cannot** or **should not** match the channel’s nat
 - **Caspar** continues to render the **screen consumer** at the **destination’s** mode (unless the operator separately changes Caspar screen settings). Override affects **OS framebuffer layout** seen by the window manager and the monitor — it does not by itself rescale Caspar’s internal buffer unless separate consumer/stretch settings are used.
 - Document this distinction in UI copy where confusion is likely.
 
+### 1.6 V-sync (NVIDIA screen consumers)
+
+For **good vsync** on program **screen** outputs with an **NVIDIA** GPU:
+
+1. **NVIDIA Settings:** **Sync to VBlank** → **Off** (driver-level; HighAsCG sets `__GL_SYNC_TO_VBLANK=0` and `highascg-nvidia-x-apply.sh` on install/ISO).
+2. **Caspar screen consumer:** **V-sync** → **On** (`screen_N_vsync: true` / `<vsync>true</vsync>` in generated config).
+
+See **[screen-consumer-vsync-nvidia.md](screen-consumer-vsync-nvidia.md)** for rationale, verification, and operator steps.
+
 ---
 
 ## 2. Data flow summary

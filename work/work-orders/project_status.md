@@ -2,6 +2,10 @@
 
 **Note:** Per-WO checklists and specs live in `work/*_WO_*.md`.
 
+| ID | File | Status | Summary |
+|----|------|--------|---------|
+| 52 | [52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md](./52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md) | Draft | Split internal **bridge** exFAT (sole media + config sync) vs **USB** (one-way media ingest + config sync) |
+
 ## WO-33 — Device view (split)
 
 | ID | File | Status | Last touch |

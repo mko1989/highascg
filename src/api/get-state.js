@@ -12,7 +12,7 @@ const { parseCinfMedia } = require('../media/cinf-parse')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { enrichMediaListWithCinfAndProbe } = require('../utils/media-snapshot-cinf')
-const { buildSceneDeckForApi } = require('../engine/project-scenes')
+const { buildSceneDeckForApi, loadProjectScenes } = require('../engine/project-scenes')
 
 /**
  * @param {object} ctx — app context (state, config, gatheredInfo, …)
@@ -82,14 +82,8 @@ function getState(ctx, opts = {}) {
 
 	let globalBorders = null
 	try {
-		const { REPO_ROOT } = require('../repo-paths')
-		const autosavePath = path.join(REPO_ROOT, 'autosave.json')
-		if (fs.existsSync(autosavePath)) {
-			const project = JSON.parse(fs.readFileSync(autosavePath, 'utf8'))
-			if (Array.isArray(project?.scenes?.globalBorders)) {
-				globalBorders = project.scenes.globalBorders
-			}
-		}
+		const scenes = loadProjectScenes()
+		if (Array.isArray(scenes?.globalBorders)) globalBorders = scenes.globalBorders
 	} catch (_) {}
 
 	return {

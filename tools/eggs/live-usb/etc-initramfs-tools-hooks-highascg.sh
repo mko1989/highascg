@@ -22,3 +22,7 @@ mkdir -p "${DESTDIR}/usr/share/plymouth/themes"
 cp -a "$THEME_DIR" "${DESTDIR}/usr/share/plymouth/themes/"
 ln -sf /usr/share/plymouth/themes/highascg/highascg.plymouth \
 	"${DESTDIR}/usr/share/plymouth/themes/default.plymouth"
+if [ -f /etc/plymouth/plymouthd.conf ]; then
+	mkdir -p "${DESTDIR}/etc/plymouth"
+	cp -a /etc/plymouth/plymouthd.conf "${DESTDIR}/etc/plymouth/"
+fi

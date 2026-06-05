@@ -57,16 +57,18 @@ async function main() {
 	r = await req('GET', '/api/__smoke_not_a_route__')
 	if (r.status !== 404) fail(`GET unknown /api/* expected 404 when Caspar on, got ${r.status}`)
 
-	r = await req('POST', '/api/raw', { cmd: 'VERSION' })
-	if (r.status !== 200) fail(`POST /api/raw VERSION expected 200, got ${r.status}`)
-	let parsed
-	try {
-		parsed = JSON.parse(r.body)
-	} catch {
-		fail('POST /api/raw body not JSON')
-	}
-	if (!parsed || (parsed.data === undefined && parsed.ok === undefined)) {
-		fail('POST /api/raw unexpected response shape')
+	for (const rawPath of ['/api/raw', '/api/amcp/raw']) {
+		r = await req('POST', rawPath, { cmd: 'VERSION' })
+		if (r.status !== 200) fail(`POST ${rawPath} VERSION expected 200, got ${r.status}`)
+		let parsed
+		try {
+			parsed = JSON.parse(r.body)
+		} catch {
+			fail(`POST ${rawPath} body not JSON`)
+		}
+		if (!parsed || (parsed.data === undefined && parsed.ok === undefined)) {
+			fail(`POST ${rawPath} unexpected response shape`)
+		}
 	}
 
 	console.log('[smoke-caspar] OK')

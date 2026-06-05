@@ -224,9 +224,17 @@ async function handlePost(path, body, ctx) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(await amcp.query.glGc()) }
 		case '/api/channel-grid':
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(await amcp.mixer.channelGrid()) }
-		case '/api/raw': {
-			if (!b.cmd) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'cmd required' }) }
-			const r = await amcp.raw(b.cmd)
+		case '/api/raw':
+		case '/api/amcp/raw': {
+			const line = String(b.cmd ?? b.command ?? '').trim()
+			if (!line) {
+				return {
+					status: 400,
+					headers: JSON_HEADERS,
+					body: jsonBody({ error: 'cmd (or command): single AMCP line required' }),
+				}
+			}
+			const r = await amcp.raw(line)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		default:

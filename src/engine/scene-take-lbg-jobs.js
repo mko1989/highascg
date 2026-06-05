@@ -18,6 +18,7 @@ const {
 	isLayerAnimateTakeTransition,
 	baseTypeStripAnimateSuffix,
 } = require('./scene-transition')
+const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
 
 async function buildTakeJobs(opts) {
 	const {
@@ -142,9 +143,17 @@ async function buildTakeJobs(opts) {
 		}
 		const loadOpts = { loop: isLoop }
 		if (af) loadOpts.audioFilter = af
-		if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
-			loadOpts.seek = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
-		}
+		const seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {
+			channel,
+			layerNumber: layer.layerNumber,
+			physicalLayer: pLayer,
+			fps: framerate,
+			forceCut,
+			phys,
+			activeBank,
+			incoming,
+		})
+		if (seekFrames != null) loadOpts.seek = seekFrames
 		const baseType = isMerge ? baseTypeStripAnimateSuffix(globalT.type) : globalT.type
 
 		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. +Animate: transition on PLAY only.

@@ -54,18 +54,20 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    sudo NVIDIA_BRANCHES="535 580 595" BASENAME=highascg bash tools/live-usb/build-highascg-egg.sh
    ```
 
-3. **Output**: ISO under `/home/eggs/` — name starts with `BASENAME` (default `highascg`), e.g.  
+3. **Kernel (one version)** — `build-highascg-egg.sh` runs `sync-eggs-kernel-and-purge-stale.sh` with **`HIGHASCG_ENSURE_LATEST_KERNEL=1`**: installs **`linux-image-generic`**, points **`eggs.yaml`** at the **newest** `linux-image-*-generic`, purges older images. The ISO matches that kernel, not necessarily the kernel you booted before the build. If the script warns that running ≠ latest, **reboot** after the build (or before a long `eggs produce`) so DKMS (NVIDIA, DeckLink) matches.
+
+4. **Output**: ISO under `/home/eggs/` — name starts with `BASENAME` (default `highascg`), e.g.  
    `highascg_amd64_YYYY-MM-DD_HHMM.iso`
 
-4. **Netplan**: If `netplan` warns about permissions, fix once:
+5. **Netplan**: If `netplan` warns about permissions, fix once:
 
    ```bash
    sudo chmod 600 /etc/netplan/01-live-networkd.yaml
    ```
 
-5. **Excludes** (large dirs omitted from squashfs): fragment merged via **`prepare-eggs-clone-with-exfat.sh`** (or **`merge-penguins-eggs-exclude-highascg.sh`**) — includes **`home/casparcg/highascg/media`** and **`home/casparcg/exfat/*`** so the ISO carries an empty WO-47 stub, not developer scratch files. **`swap.img`** is excluded and **`strip-host-swap-for-live-iso.sh`** drops file-swap from **`/etc/fstab`** during produce (restored on the build host after **`build-highascg-egg.sh`**).
+6. **Excludes** (large dirs omitted from squashfs): fragment merged via **`prepare-eggs-clone-with-exfat.sh`** (or **`merge-penguins-eggs-exclude-highascg.sh`**) — includes **`home/casparcg/highascg/media`** and **`home/casparcg/exfat/*`** so the ISO carries an empty WO-47 stub, not developer scratch files. **`swap.img`** is excluded and **`strip-host-swap-for-live-iso.sh`** drops file-swap from **`/etc/fstab`** during produce (restored on the build host after **`build-highascg-egg.sh`**).
 
-6. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs produce` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
+7. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs produce` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
    - `.deb` installs often use **`/var/lib/tailscale/`**, but **snap** layouts use **`/var/snap/tailscale/…`** — so “no `/var/lib/tailscale`” does **not** prove there is no shipped identity.  
    - Custom locations: check **`systemctl cat tailscaled`** and **`/etc/default/tailscaled`** for `--statedir=` / `--state=`. Add matching paths to **`tools/live-usb/penguins-eggs-exclude-highascg-fragment.list`**, run **`merge-penguins-eggs-exclude-highascg.sh`**, rebuild.  
    - **Persistence** (`FLASH_AND_PERSIST.md`, `/ union`) saves overlays too — once state exists on the stick, it keeps coming back until you delete or reflash.  

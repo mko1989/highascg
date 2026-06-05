@@ -117,7 +117,7 @@ async function routeRequest(method, path, body, ctx, req) {
 		const r = await routesExfatSync.handlePost(p, body, ctx)
 		if (r) return r
 	}
-	if (method === 'GET' && (p === '/api/system/gpu-nvidia' || p === '/api/system/decklink')) {
+	if (method === 'GET' && (p === '/api/system/gpu-nvidia' || p === '/api/system/decklink' || p === '/api/system/gpu-layout')) {
 		const r = await routesSystemHardware.hardwareHandleGet(p)
 		if (r) return r
 	}
@@ -298,6 +298,10 @@ async function routeRequest(method, path, body, ctx, req) {
 	// Project JSON — works without Caspar (disk mirror from web UI Save)
 	if (method === 'POST' && (p === '/api/project/save' || p === '/api/project/load' || p === '/api/project/autosave')) {
 		const r = await routesData.handleProject(p, body, ctx)
+		if (r) return r
+	}
+	if (method === 'GET' && p === '/api/project/list') {
+		const r = await routesData.handleProjectList(ctx)
 		if (r) return r
 	}
 	if (method === 'GET' && (p === '/api/project' || p === '/api/project/')) {

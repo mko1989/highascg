@@ -4,6 +4,8 @@ const { EventEmitter } = require('events')
 const { TcpClient } = require('./tcp-client')
 const { AmcpProtocol, rejectAllPendingAmcpCallbacks } = require('./amcp-protocol')
 const { AmcpClient } = require('./amcp-client')
+const { CasparCG } = require('casparcg-connection')
+const { AmcpConnectionAdapter } = require('./amcp-connection-adapter')
 
 /**
  * @typedef {object} ConnectionStatusPayload
@@ -58,8 +60,21 @@ class ConnectionManager extends EventEmitter {
 			maxBackoffMs: options.maxBackoffMs,
 		})
 
+		const useLegacy = process.env.HIGHASCG_AMCP_LEGACY_TRANSPORT === '1'
+		this._useLegacy = useLegacy
+
+		if (!useLegacy) {
+			this._ccg = new CasparCG({
+				host: this._host,
+				port: this._port,
+				autoConnect: false,
+			})
+			this._adapter = new AmcpConnectionAdapter(this._ccg, { log: this._log })
+			this._instrumentLibraryPlainAmcpSocket()
+		}
+
 		this._context = {
-			socket: this._tcp,
+			socket: useLegacy ? this._tcp : this._adapter,
 			response_callback: {},
 			_pendingResponseKey: undefined,
 			_amcpBatchDrain: null,
@@ -75,14 +90,25 @@ class ConnectionManager extends EventEmitter {
 		this._amcp = new AmcpClient(this._context)
 
 		/** After a send timeout, reset parser so late/partial multiline data cannot desync the next command. */
-		this._context._resetAmcpProtocol = () => this._protocol.reset()
+		this._context._resetAmcpProtocol = () => {
+			if (this._protocol) this._protocol.reset()
+		}
 
 		/** @type {ReturnType<typeof setInterval> | null} */
 		this._healthTimer = null
 		this._destroyed = false
 		this._started = false
 
-		this._onData = (line) => this._protocol.handleLine(line)
+		this._onData = (line) => {
+			if (this._context._amcpBatchDrain) {
+				this._context._amcpBatchDrain.onLine(line)
+				return // intercepted
+			}
+			if (this._protocol) this._protocol.handleLine(line)
+		}
+
+		this._rawCcgBuffer = ''
+
 		this._onConnected = () => this._handleConnected()
 		this._onDisconnected = () => this._handleDisconnected()
 		this._onTcpError = (err) => this._handleTcpError(err)
@@ -90,6 +116,13 @@ class ConnectionManager extends EventEmitter {
 
 	get tcp() {
 		return this._tcp
+	}
+
+	/** True when AMCP transport can send (library `CasparCG.connected` or legacy {@link TcpClient}). */
+	get isConnected() {
+		if (this._destroyed || !this._started) return false
+		if (this._useLegacy) return !!(this._tcp && this._tcp.isConnected)
+		return !!(this._ccg && this._ccg.connected)
 	}
 
 	get amcp() {
@@ -113,38 +146,125 @@ class ConnectionManager extends EventEmitter {
 		return this._port
 	}
 
+	/**
+	 * Feed CRLF-delimited AMCP lines into {@link AmcpProtocol} or an active batch drain.
+	 * @param {string | Buffer} chunk
+	 */
+	_feedPlainAmcpSocketData(chunk) {
+		this._rawCcgBuffer += chunk.toString('utf-8')
+		const newLines = this._rawCcgBuffer.split('\r\n')
+		this._rawCcgBuffer = newLines.pop() || ''
+		for (const line of newLines) {
+			// Empty line terminates OKMULTIDATA (e.g. CLS); must not skip (legacy TcpClient emits it).
+			if (this._context._amcpBatchDrain) {
+				this._context._amcpBatchDrain.onLine(line)
+			} else if (this._protocol) {
+				this._protocol.handleLine(line)
+			}
+		}
+	}
+
+	/**
+	 * Replace the library's REQ/RES parser so every TCP `data` chunk is handled by
+	 * {@link AmcpProtocol}. Re-applied after each library `_setupSocket()` (reconnect).
+	 */
+	_instrumentLibraryPlainAmcpSocket() {
+		if (this._useLegacy || !this._ccg?._connection) return
+		const conn = this._ccg._connection
+		if (conn._highascgPlainAmcpPatched) return
+		conn._highascgPlainAmcpPatched = true
+		const self = this
+		const origSetup = conn._setupSocket.bind(conn)
+		conn._setupSocket = function patchedSetupSocket() {
+			origSetup()
+			self._patchLibraryProcessIncomingData()
+		}
+		this._patchLibraryProcessIncomingData()
+	}
+
+	_patchLibraryProcessIncomingData() {
+		if (this._useLegacy || !this._ccg?._connection) return
+		const conn = this._ccg._connection
+		if (!conn._highascgOrigProcessIncomingData) {
+			conn._highascgOrigProcessIncomingData = conn._processIncomingData.bind(conn)
+		}
+		const orig = conn._highascgOrigProcessIncomingData
+		const self = this
+		conn._processIncomingData = function patchedProcessIncomingData(data) {
+			try {
+				orig(data)
+			} catch (e) {
+				self._log('error', 'Library AMCP parse: ' + (e?.message || e))
+			}
+			self._feedPlainAmcpSocketData(data)
+		}
+	}
+
 	_bindSocket() {
-		this._tcp.on('data', this._onData)
-		this._tcp.on('connected', this._onConnected)
-		this._tcp.on('disconnected', this._onDisconnected)
-		this._tcp.on('error', this._onTcpError)
+		if (this._useLegacy) {
+			this._tcp.on('data', this._onData)
+			this._tcp.on('connected', this._onConnected)
+			this._tcp.on('disconnected', this._onDisconnected)
+			this._tcp.on('error', this._onTcpError)
+		} else {
+			this._ccg.on('connect', this._onConnected)
+			this._ccg.on('disconnect', this._onDisconnected)
+			this._ccg.on('error', this._onTcpError)
+		}
 	}
 
 	_unbindSocket() {
-		this._tcp.removeListener('data', this._onData)
-		this._tcp.removeListener('connected', this._onConnected)
-		this._tcp.removeListener('disconnected', this._onDisconnected)
-		this._tcp.removeListener('error', this._onTcpError)
+		if (this._useLegacy) {
+			this._tcp.removeListener('data', this._onData)
+			this._tcp.removeListener('connected', this._onConnected)
+			this._tcp.removeListener('disconnected', this._onDisconnected)
+			this._tcp.removeListener('error', this._onTcpError)
+		} else {
+			this._ccg.removeListener('connect', this._onConnected)
+			this._ccg.removeListener('disconnect', this._onDisconnected)
+			this._ccg.removeListener('error', this._onTcpError)
+		}
 	}
 
-	_handleConnected() {
-		this._protocol.reset()
-		/** @type {ConnectionStatusPayload} */
-		const payload = { connected: true, host: this._host, port: this._port, at: Date.now() }
-		this.emit('status', payload)
+	async _handleConnected() {
+		if (this._protocol) this._protocol.reset()
+		if (!this._useLegacy) this._patchLibraryProcessIncomingData()
 		this._startHealthTimer()
 		const d = this._healthConnectDelayMs
-		if (d > 0) {
-			setTimeout(() => this._runHealthCheck().catch(() => {}), d)
-		} else {
+		if (d > 0) await new Promise((r) => setTimeout(r, d))
+		let connected = true
+		let versionLine
+		let healthError
+		if (this._useLegacy) {
+			connected = !!(this._tcp && this._tcp.isConnected)
+		} else if (this._amcp) {
+			try {
+				const r = await this._amcp.version()
+				versionLine =
+					typeof r.data === 'string'
+						? r.data
+						: Array.isArray(r.data)
+							? r.data.join('\n')
+							: undefined
+			} catch (e) {
+				connected = false
+				healthError = e instanceof Error ? e.message : String(e)
+				this._log('warn', `AMCP connect probe failed: ${healthError}`)
+			}
+		}
+		/** @type {ConnectionStatusPayload} */
+		const payload = { connected, host: this._host, port: this._port, at: Date.now(), versionLine, healthError }
+		this.emit('status', payload)
+		if (connected && !this._healthIntervalMs) {
 			this._runHealthCheck().catch(() => {})
 		}
 	}
 
 	_handleDisconnected() {
 		this._clearHealthTimer()
+		this._rawCcgBuffer = ''
 		rejectAllPendingAmcpCallbacks(this._context)
-		this._protocol.reset()
+		if (this._protocol) this._protocol.reset()
 		this.emit('status', { connected: false, host: this._host, port: this._port, at: Date.now() })
 	}
 
@@ -176,10 +296,16 @@ class ConnectionManager extends EventEmitter {
 	}
 
 	async _runHealthCheck() {
-		if (!this._tcp.isConnected) return
+		const isConn = this._useLegacy ? this._tcp.isConnected : this._ccg.connected
+		if (!isConn) return
 		try {
 			const r = await this._amcp.version()
-			const versionLine = typeof r.data === 'string' ? r.data : undefined
+			const versionLine =
+				typeof r.data === 'string'
+					? r.data
+					: Array.isArray(r.data)
+						? r.data.join('\n')
+						: undefined
 			this.emit('status', {
 				connected: true,
 				host: this._host,
@@ -204,7 +330,8 @@ class ConnectionManager extends EventEmitter {
 		if (this._destroyed || this._started) return
 		this._started = true
 		this._bindSocket()
-		this._tcp.connect(this._host, this._port)
+		if (this._useLegacy) this._tcp.connect(this._host, this._port)
+		else this._ccg.connect(this._host, this._port)
 	}
 
 	/** Stop health timer, disconnect TCP, remove listeners */
@@ -212,7 +339,8 @@ class ConnectionManager extends EventEmitter {
 		if (!this._started) return
 		this._started = false
 		this._clearHealthTimer()
-		this._tcp.disconnect()
+		if (this._useLegacy) this._tcp.disconnect()
+		else this._ccg.disconnect()
 		this._unbindSocket()
 	}
 
@@ -223,7 +351,8 @@ class ConnectionManager extends EventEmitter {
 		this._clearHealthTimer()
 		rejectAllPendingAmcpCallbacks(this._context)
 		this._unbindSocket()
-		this._tcp.destroy()
+		if (this._useLegacy) this._tcp.destroy()
+		else this._ccg.discard()
 		this.removeAllListeners()
 	}
 
@@ -236,11 +365,20 @@ class ConnectionManager extends EventEmitter {
 		this._host = host || this._host
 		this._port = port || this._port
 		if (this._started) {
-			this._tcp.disconnect()
-			this._tcp.connect(this._host, this._port)
+			if (this._useLegacy) {
+				this._tcp.disconnect()
+				this._tcp.connect(this._host, this._port)
+			} else {
+				this._ccg.connect(this._host, this._port)
+			}
 		} else {
-			this._tcp.host = this._host
-			this._tcp.port = this._port
+			if (this._useLegacy) {
+				this._tcp.host = this._host
+				this._tcp.port = this._port
+			} else {
+				this._ccg.host = this._host
+				this._ccg.port = this._port
+			}
 		}
 	}
 }

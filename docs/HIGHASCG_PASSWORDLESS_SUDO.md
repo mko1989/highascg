@@ -57,7 +57,7 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 
 ## Settings → **system** / **decklink** (WO-39)
 
-- **NVIDIA:** read-only **`GET /api/system/gpu-nvidia`** (ISO branch stamp + GPU guide). Driver switching via Settings was removed — use the correct single-driver ISO.
+- **NVIDIA:** read-only **`GET /api/system/gpu-nvidia`** (ISO branch stamp + GPU guide). Driver switching via Settings was removed — use the correct single-driver ISO. **Screen consumer vsync:** NVIDIA **Sync to VBlank off** + Caspar **vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md).
 - **GUI launch:** **`POST /api/system/gui-launch`** spawns allow-listed apps on **`:0`** with **`XAUTHORITY`** from **`getXAuthority()`** — **no sudo** when binaries are executable for the service user.
 
 ---

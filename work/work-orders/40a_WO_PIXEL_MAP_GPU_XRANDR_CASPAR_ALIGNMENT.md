@@ -4,7 +4,7 @@
 > Same rules as [WO-40](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md): dated work log at bottom, update checkboxes, instructions for next agent, do not delete prior log rows.
 
 **Parent:** [WO-40](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md) (GPU / xrandr / destinations / Override)  
-**Related:** [WO-33h](./33_WO_DEVICE_VIEW_INDEX.md) (pixel mapping node), [GPU_SCREEN_CONSUMER_AND_XRANDR.md](../../docs/reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md)  
+**Related:** [WO-33h](./33_WO_DEVICE_VIEW_INDEX.md) (pixel mapping node), [GPU_SCREEN_CONSUMER_AND_XRANDR.md](../../docs/reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md), [screen-consumer-vsync-nvidia.md](../../docs/reference/screen-consumer-vsync-nvidia.md)  
 **Status:** Draft  
 
 **Hard boundary:** Do **not** implement anything listed under WO-40 **§4** (explicit rejections), especially implicit xrandr on every edit and Caspar **FILL** hacks to hide OS mismatch.

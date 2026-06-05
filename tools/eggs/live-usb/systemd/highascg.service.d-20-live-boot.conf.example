@@ -1,0 +1,10 @@
+# Installed on eggs clone hosts by prepare-eggs-clone-with-exfat.sh as:
+#   /etc/systemd/system/highascg.service.d/20-live-boot.conf
+#
+# Faster welcome testcard after Caspar AMCP is up (live laptop / stick).
+[Service]
+Environment=HIGHASCG_AMCP_CONNECT_SETTLE_MS=200
+Environment=HIGHASCG_INFO_CONFIG_DELAY_MS=250
+Environment=HIGHASCG_STARTUP_LED_TEST_FAST=1
+# WO-52: internal HIGHASCGDAT (NVMe) often appears after USB exFAT at boot.
+Environment=HIGHASCG_BRIDGE_BOOT_WAIT_SEC=45

@@ -6,6 +6,7 @@ const {
 	isLikelyStaleProjectReplace,
 	validateIncomingProject,
 	sceneIdSet,
+	pickNewerFullProject,
 } = require('../../src/engine/project-scenes')
 
 function projectWithIds(ids, savedAt = '2026-05-30T10:00:00.000Z') {
@@ -36,6 +37,14 @@ describe('project-scenes stale replace detection', () => {
 		assert.equal(check.ok, true)
 	})
 
+	it('rejects autosave that would wipe all looks', () => {
+		const existing = projectWithIds(['0', '1', '2'], '2026-05-30T10:00:00.000Z')
+		const incoming = projectWithIds([], '2026-05-30T10:01:00.000Z')
+		const check = validateIncomingProject(incoming, existing)
+		assert.equal(check.ok, false)
+		assert.equal(check.reason, 'empty_over_nonempty')
+	})
+
 	it('rejects autosave with unrelated looks even when savedAt is newer', () => {
 		const existing = projectWithIds(['0', '1', '2', '3'], '2026-05-30T10:00:00.000Z')
 		const incoming = projectWithIds(['Loop', 'GLOWNA'], '2026-05-30T10:01:00.000Z')
@@ -49,5 +58,13 @@ describe('project-scenes stale replace detection', () => {
 		const incoming = projectWithIds(['Loop', 'GLOWNA'], '2026-05-30T10:01:00.000Z')
 		const check = validateIncomingProject(incoming, existing, { allowReplace: true })
 		assert.equal(check.ok, true)
+	})
+})
+
+describe('pickNewerFullProject', () => {
+	it('prefers persisted project when autosave is newer but empty', () => {
+		const persist = projectWithIds(['a', 'b'], '2026-05-30T09:00:00.000Z')
+		const emptyAutosave = projectWithIds([], '2026-05-30T12:00:00.000Z')
+		assert.equal(pickNewerFullProject(persist, emptyAutosave), persist)
 	})
 })

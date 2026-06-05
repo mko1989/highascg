@@ -1,0 +1,4 @@
+# When the internal bridge partition (exFAT label HIGHASCGDAT) appears — including slow
+# NVMe enumeration after USB live boot — mount bridge + bind media library.
+ACTION=="add|change", ENV{ID_FS_LABEL}=="HIGHASCGDAT", ENV{ID_FS_TYPE}=="exfat", \
+  TAG+="systemd", ENV{SYSTEMD_WANTS}+="highascg-bridge-arrive.service"

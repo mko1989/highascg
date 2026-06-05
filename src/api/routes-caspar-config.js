@@ -55,11 +55,16 @@ function resolveCasparRestartWaitMs() {
 
 /**
  * `ctx.amcp` is always set when Caspar is enabled, but TCP may be down (Caspar stopped, restarting, or wrong host/port).
+ * Uses {@link ConnectionManager#isConnected} (library transport does not set legacy `tcp.isConnected`).
  * @param {object} ctx
  * @returns {boolean}
  */
 function isAmcpTcpConnected(ctx) {
-	return !!(ctx.casparConnection?.tcp?.isConnected)
+	const conn = ctx.casparConnection
+	if (conn && typeof conn.isConnected === 'boolean') return conn.isConnected
+	const sock = ctx.amcp?._context?.socket
+	if (sock && typeof sock.isConnected === 'boolean') return sock.isConnected
+	return !!(conn?.tcp?.isConnected)
 }
 
 function sleep(ms) {

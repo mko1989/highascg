@@ -94,7 +94,7 @@ function attachEnqueueQueue(ctx) {
 			if (ctx.response_callback[key] === undefined) ctx.response_callback[key] = []
 			ctx.response_callback[key].push(callback)
 			ctx._pendingResponseKey = key
-			ctx.socket.send(fullCommand + '\r\n')
+			ctx.socket.send(fullCommand)
 		}
 	}
 }

@@ -19,9 +19,43 @@ class AmcpMixer {
 		return this._send(`MIXER ${cl} ${subcmd}`, key)
 	}
 
+	/**
+	 * @param {string} method - casparcg-connection method (e.g. mixerOpacity)
+	 * @param {string} keyword - AMCP subcommand (e.g. OPACITY)
+	 * @param {number} channel
+	 * @param {number} [layer]
+	 * @param {number} val
+	 * @param {number} [duration]
+	 * @param {string} [tween]
+	 * @param {boolean} [defer]
+	 */
+	_mixerDeferNumber(method, keyword, channel, layer, val, duration, tween, defer) {
+		if (val === undefined) return this._mixer(channel, layer, keyword)
+		const cl = chLayer(channel, layer)
+		let cmd = `MIXER ${cl} ${keyword} ${val}`
+		if (duration != null) cmd += ` ${duration}`
+		if (tween) cmd += ` ${param(tween)}`
+		if (defer) cmd += ' DEFER'
+		const typed = {
+			channel: Number(channel),
+			layer: Number(layer),
+			value: Number(val),
+			...(duration != null ? { duration: Number(duration) } : {}),
+			...(tween ? { tween } : {}),
+			...(defer ? { defer: true } : {}),
+		}
+		return this._client._invokeTyped(method, typed, cmd, 'MIXER')
+	}
+
 	mixerKeyer(channel, layer, keyer) {
 		if (keyer === undefined) return this._mixer(channel, layer, 'KEYER')
-		return this._mixer(channel, layer, `KEYER ${keyer ? 1 : 0}`)
+		const cl = chLayer(channel, layer)
+		return this._client._invokeTyped(
+			'mixerKeyer',
+			{ channel: Number(channel), layer: Number(layer), keyer: !!keyer },
+			`MIXER ${cl} KEYER ${keyer ? 1 : 0}`,
+			'MIXER',
+		)
 	}
 
 	/**
@@ -50,48 +84,40 @@ class AmcpMixer {
 
 	mixerBlend(channel, layer, mode) {
 		if (mode === undefined) return this._mixer(channel, layer, 'BLEND')
-		return this._mixer(channel, layer, `BLEND ${param(mode)}`)
+		const cl = chLayer(channel, layer)
+		return this._client._invokeTyped(
+			'mixerBlend',
+			{ channel: Number(channel), layer: Number(layer), value: mode },
+			`MIXER ${cl} BLEND ${param(mode)}`,
+			'MIXER',
+		)
 	}
 
 	mixerInvert(channel, layer, invert) {
 		if (invert === undefined) return this._mixer(channel, layer, 'INVERT')
-		return this._mixer(channel, layer, `INVERT ${invert ? 1 : 0}`)
+		const cl = chLayer(channel, layer)
+		return this._client._invokeTyped(
+			'mixerInvert',
+			{ channel: Number(channel), layer: Number(layer), value: !!invert },
+			`MIXER ${cl} INVERT ${invert ? 1 : 0}`,
+			'MIXER',
+		)
 	}
 
 	mixerOpacity(channel, layer, opacity, duration, tween, defer) {
-		if (opacity === undefined) return this._mixer(channel, layer, 'OPACITY')
-		let p = String(opacity)
-		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
-		if (defer) p += ' DEFER'
-		return this._mixer(channel, layer, `OPACITY ${p}`)
+		return this._mixerDeferNumber('mixerOpacity', 'OPACITY', channel, layer, opacity, duration, tween, defer)
 	}
 
 	mixerBrightness(channel, layer, val, duration, tween, defer) {
-		if (val === undefined) return this._mixer(channel, layer, 'BRIGHTNESS')
-		let p = String(val)
-		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
-		if (defer) p += ' DEFER'
-		return this._mixer(channel, layer, `BRIGHTNESS ${p}`)
+		return this._mixerDeferNumber('mixerBrightness', 'BRIGHTNESS', channel, layer, val, duration, tween, defer)
 	}
 
 	mixerSaturation(channel, layer, val, duration, tween, defer) {
-		if (val === undefined) return this._mixer(channel, layer, 'SATURATION')
-		let p = String(val)
-		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
-		if (defer) p += ' DEFER'
-		return this._mixer(channel, layer, `SATURATION ${p}`)
+		return this._mixerDeferNumber('mixerSaturation', 'SATURATION', channel, layer, val, duration, tween, defer)
 	}
 
 	mixerContrast(channel, layer, val, duration, tween, defer) {
-		if (val === undefined) return this._mixer(channel, layer, 'CONTRAST')
-		let p = String(val)
-		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
-		if (defer) p += ' DEFER'
-		return this._mixer(channel, layer, `CONTRAST ${p}`)
+		return this._mixerDeferNumber('mixerContrast', 'CONTRAST', channel, layer, val, duration, tween, defer)
 	}
 
 	/**
@@ -199,15 +225,25 @@ class AmcpMixer {
 	}
 
 	mixerCommit(channel) {
-		return this._send(`MIXER ${parseInt(channel, 10)} COMMIT`, 'MIXER')
+		const ch = parseInt(channel, 10)
+		return this._client._invokeTyped('mixerCommit', { channel: ch }, `MIXER ${ch} COMMIT`, 'MIXER')
 	}
 
 	mixerClear(channel, layer) {
-		return this._mixer(channel, layer, 'CLEAR')
+		if (layer === undefined || layer === null || layer === '') {
+			return this._mixer(channel, layer, 'CLEAR')
+		}
+		const cl = chLayer(channel, layer)
+		return this._client._invokeTyped(
+			'mixerClear',
+			{ channel: Number(channel), layer: Number(layer) },
+			`MIXER ${cl} CLEAR`,
+			'MIXER',
+		)
 	}
 
 	channelGrid() {
-		return this._send('CHANNEL_GRID', 'CHANNEL_GRID')
+		return this._client._invokeTyped('channelGrid', {}, 'CHANNEL_GRID', 'CHANNEL_GRID')
 	}
 }
 

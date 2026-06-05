@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.  
 > 4. Do **not** delete previous agents’ log entries.
 
-**Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md); design reference [GPU / screen consumer interaction](../../docs/reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md)  
+**Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md); design reference [GPU / screen consumer interaction](../../docs/reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md); NVIDIA vsync [screen-consumer-vsync-nvidia.md](../../docs/reference/screen-consumer-vsync-nvidia.md)  
 **Sub work orders:** [WO-40a — Pixel map → GPU, xrandr, Caspar alignment](./40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md) (mapping-fed `gpu_out`, mixed heads, inherited canvas modes)  
 **Status:** Draft  
 **Prerequisites:** [33a](./33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md) (graph + settings); [35](./35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md) (stable `gpu_out` IDs)

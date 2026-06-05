@@ -4,8 +4,8 @@ Two separate layers on the live ISO:
 
 | Layer | When | What you see today | Customize |
 |-------|------|-------------------|-----------|
-| **GRUB / isolinux** | Boot menu (10 s countdown) | Background image + menu | `splash.png` + `grub.theme.cfg` |
-| **Plymouth** | Kernel loading until desktop | Purple Ubuntu + dots | Plymouth theme `highascg` (dark blue + spinner dots) |
+| **GRUB / isolinux** | Boot menu (**3 s** timeout) | Background image + menu (eggs penguins model) | `splash.boot.jpg` + `grub.theme.cfg` + `font.pf2` (GNU Unifont) |
+| **Plymouth** | Kernel loading until desktop | **Split screen**: logs left **2/3**, logo right **1/3** (opaque RGB) | `highascg.script` + `splash systemd.show_status=true` |
 
 ## Eggs / Wardrobe (official model)
 
@@ -48,7 +48,11 @@ sudo bash tools/eggs/live-usb/build-highascg-egg.sh
 
 Re-flash the USB after a new ISO is produced.
 
-**Important:** `eggs produce` runs **`mkinitramfs`** and writes a **new** `live/initrd*.img` on the ISO (it does not copy `/boot/initrd.img` verbatim). Plymouth must be configured on the build host **immediately before** `eggs produce` — `build-highascg-egg.sh` runs `finalize-boot-branding-for-eggs-produce.sh` for that. After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highascg`.
+**Important:** `eggs produce` runs **`mkinitramfs`** and writes a **new** `live/initrd*.img` on the ISO (it does not copy `/boot/initrd.img` verbatim). Plymouth must be configured on the build host **immediately before** `eggs produce` — `build-highascg-egg.sh` runs `finalize-boot-branding-for-eggs-produce.sh` for that.
+
+**GRUB wallpaper:** Eggs copies stock **`splash.png` after** the ISO tree is built, so a plain `eggs produce` **drops** your custom GRUB image. **`build-highascg-egg.sh`** always runs **`inject-iso-boot-branding.sh`** after produce (re-copies `splash.png`, rebuilds initrd, re-packs ISO). If you run `eggs produce` manually you **must** pass **`--theme …/highascg-eggs-theme`** and then run **`inject-iso-boot-branding.sh`** + **`verify-iso-boot-branding.sh`**.
+
+After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highascg` and that `boot/grub/splash.png` is not stock penguins.
 
 If you still see **penguins** at the GRUB menu or **terminal text** during boot, the ISO was built without that step (or without `branding/splash.png`). Rebuild with `sudo npm run eggs:build` and re-flash.
 
@@ -71,8 +75,7 @@ You can use a mostly dark **`splash.png`** and rely on **`highascg-eggs-theme/th
 
 | Sequence | Files on disk | Typical role |
 |----------|---------------|--------------|
-| **Main animation** | `animation-0001.png` … `animation-0036.png` | Logo / motion above the spinner (36 frames in the default pack) |
-| **Throbber** | `throbber-0001.png` … `throbber-0030.png` | Small loading dots (30 frames) |
+| **Throbber (only)** | `throbber-0001.png` … `throbber-0004.png` | Small spinner — from `animation/1.png`, `2.png`, `29.png`, `30.png` |
 
 ### Drop-in replacement (easiest)
 
@@ -98,7 +101,36 @@ then rename or let the install script sort them.
 
 ### Full-screen / arbitrary frame counts
 
-For a large logo or a different number of frames, you need a **`script`** Plymouth theme (`.plymouth` + `.script` that loads `Image("frame-001.png")` in a loop). That is not bundled yet; the spinner/`two-step` path above is the supported operator workflow.
+If **`branding/plymouth/animation/*.png`** exists (your **134×178 RGBA** frames are fine), **`install-highascg-plymouth-theme.sh`** switches to the **`script`** module: animation in the **right third** of the screen (vertically centred), no Ubuntu wordmark. Frames are installed in **natural sort order** (`1.png` … `30.png`, not `1, 10, 11, 2`).
+
+## Boot console + right-third animation
+
+Default GRUB/isolinux line (see `grub.main.cfg`):
+
+`console=tty1 fbcon=nodefer splash loglevel=4 …` — **no `quiet`**, so kernel/systemd text stays on the **left ~2/3** while Plymouth draws only the RGBA loop in the **right third** (no full-screen background in the script theme).
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Black screen after GRUB, then TTY flash | **NVIDIA:** initrd missing `nvidia_drm` + `nvidia-drm.fbdev=1` (theme files alone are not enough) |
+| No animation, only scrolling text | ISO still has `quiet splash` (inject did not patch grub) or Plymouth DRM never opened |
+| Purple Ubuntu dots | Old initrd (`ubuntu-text`) — reinstall Plymouth + rebuild ISO |
+| verify passes theme but stick still blank | Stick not re-flashed after inject, or testing old ISO from before inject |
+
+## Preview before eggs produce / USB flash
+
+**Do not run `plymouthd` / `plymouth --show-splash` on the eggs build host** while Xorg, nodm, or CasparCG outputs are up — it takes over DRM and can blank monitors until reboot or `recover-display-after-plymouth.sh`.
+
+| Step | Command |
+|------|---------|
+| Frame list + safe MP4 mockup (no root) | `bash tools/eggs/live-usb/preview-plymouth-boot-branding.sh` |
+| Play mockup | `bash …/preview-plymouth-boot-branding.sh --open` → `work/plymouth-corner-preview.mp4` |
+| Install theme for ISO only | `sudo bash …/preview-plymouth-boot-branding.sh --install` |
+| Full boot path (GRUB → console → Plymouth) | `sudo bash tools/eggs/live-usb/preview-live-iso-qemu.sh [/path/to.iso]` |
+| Video lost after old preview | `sudo bash tools/eggs/live-usb/recover-display-after-plymouth.sh` |
+
+Use **QEMU** for real Plymouth + kernel console together. After preview looks right, rebuild and flash as usual.
+
+After changing Plymouth or frames: **`sudo bash tools/eggs/live-usb/install-highascg-plymouth-theme.sh`**, then **rebuild the ISO** (`inject-iso-boot-branding.sh` runs this automatically). Re-flash the stick. Old May ISO still has **ubuntu-text** in initrd.
 
 ## Plymouth (purple Ubuntu → HighAsCG)
 
@@ -106,13 +138,11 @@ Default Ubuntu live uses **`plymouth-theme-ubuntu-text`** (purple + “Ubuntu”
 
 **`install-eggs-live-grub-theme.sh`** installs **`plymouth-theme-spinner`**, copies it to **`/usr/share/plymouth/themes/highascg`**, applies **`branding/plymouth/highascg.plymouth`** (dark background, blue progress, **no Ubuntu wordmark**), sets the default theme, and runs **`update-initramfs -u`**.
 
-To preview on the build host (reboot to see fully):
+Quick preview (see table above):
 
 ```bash
-sudo plymouthd
-sudo plymouth --show-splash
-sleep 3
-sudo plymouth quit
+bash tools/eggs/live-usb/preview-plymouth-boot-branding.sh --open
+sudo bash tools/eggs/live-usb/preview-plymouth-boot-branding.sh --install   # ISO theme only
 ```
 
 ## Changing colours without new images

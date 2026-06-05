@@ -1,5 +1,7 @@
 # Sample `casparcg.config` from production (custom resolution)
 
+**NVIDIA screen consumer vsync:** use **Sync to VBlank off** in NVIDIA Settings and **`<vsync>true</vsync>`** on the Caspar screen consumer. See [screen-consumer-vsync-nvidia.md](screen-consumer-vsync-nvidia.md).
+
 **Custom mode `3072x1728` @ 60 fps:** `<time-scale>60000</time-scale>` = `fps × 1000`; `<duration>1000</duration>` is always 1000; `<cadence>800</cadence>` = `48000 / fps`. At 50 fps: `time-scale` 50000, `cadence` 960, `duration` still 1000.
 
 ## Decklink inputs: one virtual screen, many layers

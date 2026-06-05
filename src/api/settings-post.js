@@ -16,6 +16,7 @@ const { resolveMainScreenCount } = require('../config/routing')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { normalizeDeviceGraph } = require('../config/device-graph')
 const { mergeSystemDisplaySettings, pickOscForPersistence, SYSTEM_DISPLAY_KEYS } = require('./settings-os')
+const { normalizeEditorDefaults } = require('../config/editor-defaults')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -40,6 +41,9 @@ async function handlePost(path, body, ctx) {
 		ctx.config.osc = normalizeOscConfig(cfg)
 	}
 	if (settings.ui) cfg.ui = { ...defaults.ui, ...cfg.ui, ...settings.ui }
+	if (settings.editorDefaults) {
+		cfg.editorDefaults = normalizeEditorDefaults(settings.editorDefaults, cfg.editorDefaults)
+	}
 	if (settings.audioRouting) cfg.audioRouting = normalizeAudioRouting({ ...defaults.audioRouting, ...cfg.audioRouting, ...settings.audioRouting })
 	if (settings.offline_mode !== undefined) cfg.offline_mode = !!settings.offline_mode
 	if (settings.local_media_path !== undefined) {

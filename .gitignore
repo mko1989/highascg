@@ -11,6 +11,8 @@ npm-debug.log*
 .module-state.json.tmp
 .highascg-state.json
 .highascg-state.json.tmp
+autosave.json
+projects/
 highascg.config.json
 
 # FFmpeg waveform JSON cache (GET /api/local-media/.../waveform)

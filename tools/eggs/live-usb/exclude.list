@@ -14,9 +14,11 @@ dev/*
 media/*
 mnt/*
 proc/*
+run/*
 swapfile
 sys/*
 tmp/*
+dev/shm/*
 
 # fedora/el9/etc
 boot/*rescue*
@@ -104,6 +106,10 @@ var/tmp/*
 # --- HighAsCG tools/eggs/live-usb: see EGGS_EXCLUDE_LIST.md ---
 swap.img
 swapfile
+
+# Single-driver ISO — no multi-branch deb pool (WO single-nvidia-driver-per-iso)
+opt/nvidia-pool
+opt/nvidia-pool/*
 home/casparcg/highascg/index.js
 home/casparcg/highascg/package.json
 home/casparcg/highascg/package-lock.json
@@ -158,6 +164,8 @@ home/casparcg/.cursor
 home/casparcg/.cursor/*
 home/casparcg/.antigravity-ide-server
 home/casparcg/.antigravity-ide-server/*
+home/casparcg/.gemini
+home/casparcg/.gemini/*
 home/casparcg/.vscode-server
 home/casparcg/.vscode-server/*
 home/casparcg/.local

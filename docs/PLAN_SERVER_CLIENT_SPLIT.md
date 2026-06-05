@@ -1,7 +1,9 @@
 # Plan: Permanent server / client split
 
 **Status:** Phase 3–4 complete (server/client split shipped)  
-**Goal:** One canonical model everywhere: **Node server = API + Caspar orchestration only**; **client = static Web UI hosted by the Electron launcher** (operator workstation). Playout ISO and exFAT drops carry **server only**.
+**Goal:** One canonical model everywhere: **Node server = bridge** (client↔Caspar + client↔Ubuntu) via API/WS only; **client = Electron launcher + static Web UI** on the operator workstation. Playout ISO and exFAT drops carry **server only** — no `client/`, no `work/`, no electron launcher on playout.
+
+**Canonical reference:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 **Related:** [`work/BACKEND_AND_CLIENT_SPLIT.md`](../work/BACKEND_AND_CLIENT_SPLIT.md), WO‑51 [`work/work-orders/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md`](../work/work-orders/51_WO_DECOUPLED_FRONTEND_ARCHITECTURE.md), [`docs/WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`client/tools/electron-launcher/`](../../client/tools/electron-launcher/).
 
@@ -31,9 +33,9 @@ flowchart TB
 
 | Role | Process | Hosts | Does **not** do |
 |------|---------|-------|------------------|
-| **Server** | `node index.js` (`highascg.service` on playout) | REST `/api/*`, WS `/api/ws`, `/templates/*`, `/vendor/*` (npm ESM for previs/CG studio) | Serve `dist-web/`, `client/`, or operator HTML |
-| **Client** | Static SPA inside **Electron** (or Vite dev server) | Operator UI, scene editor, settings forms | AMCP, Caspar XML generation, OSC UDP, systemd, GPU layout |
-| **Launcher** | Electron `main.js` | Stick prep UI, sim controls, **embedded `dist-web/`**, API base configuration | Playout (except optional local sim child) |
+| **Server (bridge)** | `node index.js` (`highascg.service` on playout) | REST `/api/*`, WS `/api/ws`, `/templates/*`, OS/GPU hooks | Serve operator UI (`client/`, `dist-web/`, Electron) |
+| **Client** | Static SPA inside **Electron** on operator laptop | Scene editor, settings forms, device view | AMCP, Caspar XML, OSC UDP, systemd, GPU drivers |
+| **Launcher** | Electron `main.js` (highascg-client) | Stick prep, sim, embedded `dist-web/`, API base URL | Playout (except optional local sim child) |
 
 **Connection rule:** The browser/Electron renderer always knows **`HIGHASCG_API_ORIGIN`** (e.g. `http://192.168.0.42:4200`). All API, WS, `/templates/`, and `/vendor/` URLs are resolved against that origin—not `location.origin` of the UI page.
 

@@ -33,6 +33,7 @@ Config generation and marking GPU outputs as **online / connected** in device vi
 
 - Many NVIDIA `DP-*` outputs **disconnected**; one output (e.g. `DP-7`) **connected** at **1920×1080**.
 - UI may still label multiview / screen consumer as **1280×720 · 720p5000** — metadata can drift from **actual framebuffer / connector** state.
+- **NVIDIA vsync:** program screen consumers need **Sync to VBlank off** (NVIDIA) + **vsync on** (Caspar) — [screen-consumer-vsync-nvidia.md](../../docs/reference/screen-consumer-vsync-nvidia.md).
 
 ### Work direction
 

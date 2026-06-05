@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Install WO-47 systemd units: mount exFAT by LABEL=HIGHASCGEXF at /home/casparcg/exfat,
-# bind ~/exfat/media → ~/highascg/media/exfat when present, optional rsync bootstrap (ISO→stick),
-# then boot mtime sync (node).
-# Uses casparcg's uid/gid in mount options (no manual UUID — partition must be labelled HIGHASCGEXF).
+# WO-52: LABEL=HIGHASCGDAT → /home/casparcg/bridge (internal playout disk, media library).
+# WO-47: LABEL=HIGHASCGEXF → /home/casparcg/exfat (USB stick — field configs/media ingest).
+# Neither volume is required for boot (nofail / boot scripts exit 0 when absent).
 #
 # Documentation= points at /usr/share/doc/highascg-wo47/ so units stay valid after eggs excludes
 # drop ~/highascg/tools from the squashfs.
@@ -34,17 +33,28 @@ prep_svc="highascg-exfat-media-prep.service"
 bind_mount_esc="home-casparcg-highascg-media-exfat.mount"
 update_svc="highascg-exfat-server-update.service"
 arrive_svc="highascg-exfat-arrive.service"
+bridge_arrive_svc="highascg-bridge-arrive.service"
 ARRIVE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-arrive.sh"
+BRIDGE_ARRIVE_SH_SRC="${REPO_ROOT}/scripts/highascg-bridge-arrive.sh"
 FIX_CFG_SRC="${REPO_ROOT}/scripts/highascg-fix-config-permissions.sh"
 FIX_CFG_DST=/usr/local/lib/highascg/highascg-fix-config-permissions.sh
 ARRIVE_SH_DST=/usr/local/lib/highascg/highascg-exfat-arrive.sh
+BRIDGE_ARRIVE_SH_DST=/usr/local/lib/highascg/highascg-bridge-arrive.sh
 UDEV_RULE_SRC="${REPO_ROOT}/config/udev/99-highascg-exfat-arrive.rules"
 UDEV_RULE_DST=/etc/udev/rules.d/99-highascg-exfat-arrive.rules
+UDEV_BRIDGE_RULE_SRC="${REPO_ROOT}/config/udev/99-highascg-bridge-arrive.rules"
+UDEV_BRIDGE_RULE_DST=/etc/udev/rules.d/99-highascg-bridge-arrive.rules
 UPDATE_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-server-update.sh"
 BOOT_SH_SRC="${REPO_ROOT}/scripts/highascg-exfat-boot.sh"
+BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/highascg-bridge-boot.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
+SEED_BRIDGE_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-bridge-operator-layout.sh"
+LEGACY_USB_MEDIA_BIND="${HIGHASCG_LEGACY_USB_MEDIA_BIND:-0}"
+bridge_prep_svc="highascg-bridge-media-prep.service"
+bridge_media_mount="home-casparcg-highascg-media.mount"
 UPDATE_SH_DST=/usr/local/lib/highascg/highascg-exfat-server-update.sh
 BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
+BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
 BOOT_EXCLUDE_DST=/etc/highascg/bootstrap-rsync-excludes.txt
 UPDATE_EXCLUDE_SRC="${REPO_ROOT}/config/server-update-rsync-excludes.txt"
@@ -55,12 +65,18 @@ DOC_MATRIX="${REPO_ROOT}/docs/WO47_ISO_VS_EXFAT.md"
 
 mkdir -p /usr/local/lib/highascg /etc/highascg "$DOC_PKG"
 [[ -f "$ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$ARRIVE_SH_SRC" "$ARRIVE_SH_DST"
+[[ -f "$BRIDGE_ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_ARRIVE_SH_SRC" "$BRIDGE_ARRIVE_SH_DST"
 [[ -f "$FIX_CFG_SRC" ]] && install -m 0755 -o root -g root "$FIX_CFG_SRC" "$FIX_CFG_DST"
 [[ -f "$UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$UPDATE_SH_SRC" "$UPDATE_SH_DST"
 [[ -f "$BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
+[[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
 	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
 	echo "installed ${UDEV_RULE_DST}"
+fi
+if [[ -f "$UDEV_BRIDGE_RULE_SRC" ]]; then
+	install -m 0644 -o root -g root "$UDEV_BRIDGE_RULE_SRC" "$UDEV_BRIDGE_RULE_DST"
+	echo "installed ${UDEV_BRIDGE_RULE_DST}"
 fi
 if [[ -f "$BOOT_EXCLUDE_SRC" ]]; then
 	install -m 0644 -o root -g root "$BOOT_EXCLUDE_SRC" "$BOOT_EXCLUDE_DST"
@@ -78,9 +94,13 @@ done
 
 DOC_URI="file:${DOC_PKG}/EXFAT_DATA_ZERO_TOUCH.md"
 
-install -d /home/casparcg/exfat /etc/systemd/system
+install -d /home/casparcg/exfat /home/casparcg/bridge /etc/systemd/system
+install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media 2>/dev/null || install -d /home/casparcg/highascg/media
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media/exfat 2>/dev/null || install -d /home/casparcg/highascg/media/exfat
-chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/highascg/media/exfat
+chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/bridge /home/casparcg/highascg/media /home/casparcg/highascg/media/exfat
+if [[ -f "$SEED_BRIDGE_SH" ]]; then
+	HIGHASCG_SERVICE_USER="$USER_CASPAR" bash "$SEED_BRIDGE_SH" /home/casparcg/bridge
+fi
 STRIP_SIM_SH="${REPO_ROOT}/tools/eggs/live-usb/strip-legacy-exfat-sim.sh"
 if [[ -f "$SEED_LAYOUT_SH" ]]; then
 	HIGHASCG_SERVICE_USER="$USER_CASPAR" bash "$SEED_LAYOUT_SH" /home/casparcg/exfat
@@ -89,11 +109,95 @@ if [[ -f "$STRIP_SIM_SH" ]]; then
 	bash "$STRIP_SIM_SH" /home/casparcg/exfat
 fi
 touch /etc/highascg/disable-exfat-bootstrap 2>/dev/null || true
+rm -f /etc/highascg/legacy-usb-media-bind 2>/dev/null || true
+if [[ "$LEGACY_USB_MEDIA_BIND" == "1" ]]; then
+	touch /etc/highascg/legacy-usb-media-bind
+fi
+
+# WO-52: bridge disk (HIGHASCGDAT) → sole media library
+cat > /etc/systemd/system/home-casparcg-bridge.mount <<BRIDGEEOF
+[Unit]
+Description=HighAsCG bridge data (LABEL=HIGHASCGDAT)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+Conflicts=umount.target
+ConditionPathExists=/dev/disk/by-label/HIGHASCGDAT
+Before=${bridge_prep_svc} ${bridge_media_mount} highascg-exfat-sync.service
+After=blk-availability.target systemd-remount-fs.service
+
+[Mount]
+What=/dev/disk/by-label/HIGHASCGDAT
+Where=/home/casparcg/bridge
+Type=exfat
+Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=5,x-systemd.mount-timeout=5
+
+[Install]
+# Do not WantedBy=local-fs — highascg-bridge-boot.service starts this when LABEL exists.
+WantedBy=multi-user.target
+BRIDGEEOF
+
+cat > "/etc/systemd/system/${bridge_prep_svc}" <<BRIDGEPREPEOF
+[Unit]
+Description=Ensure bridge volume exposes media/ (WO-52)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+BindsTo=home-casparcg-bridge.mount
+After=home-casparcg-bridge.mount
+Before=${bridge_media_mount} highascg-exfat-sync.service highascg.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/install -d -m 0755 -o ${UIDN} -g ${GIDN} /home/casparcg/bridge/media /home/casparcg/bridge/configs /home/casparcg/bridge/drop-config
+
+[Install]
+RequiredBy=${bridge_media_mount}
+BRIDGEPREPEOF
+
+cat > "/etc/systemd/system/${bridge_media_mount}" <<BRIDGEMEDIAEOF
+[Unit]
+Description=Bind bridge media/ → ~/highascg/media (WO-52 sole library)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+Requires=${bridge_prep_svc} home-casparcg-bridge.mount
+After=${bridge_prep_svc} home-casparcg-bridge.mount
+BindsTo=home-casparcg-bridge.mount
+RequiresMountsFor=/home/casparcg/bridge
+Before=highascg-exfat-sync.service highascg.service
+
+[Mount]
+What=/home/casparcg/bridge/media
+Where=/home/casparcg/highascg/media
+Type=none
+Options=bind
+
+[Install]
+WantedBy=multi-user.target
+BRIDGEMEDIAEOF
+
+cat > /etc/systemd/system/highascg-bridge-boot.service <<BRIDGEBOOTEOF
+[Unit]
+Description=HighAsCG WO-52 — mount HIGHASCGDAT bridge + bind media library
+Documentation=${DOC_URI}
+DefaultDependencies=no
+After=local-fs-pre.target blk-availability.target
+Before=highascg-exfat-boot.service highascg.service highascg-exfat-sync.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=120
+ExecStart=${BRIDGE_BOOT_SH_DST}
+
+[Install]
+WantedBy=multi-user.target
+BRIDGEBOOTEOF
 
 # shellcheck disable=SC2094
 cat > /etc/systemd/system/home-casparcg-exfat.mount <<EOF
 [Unit]
-Description=HighAsCG exFAT data (LABEL=HIGHASCGEXF)
+Description=HighAsCG USB operator data (LABEL=HIGHASCGEXF)
 Documentation=${DOC_URI}
 DefaultDependencies=no
 Conflicts=umount.target
@@ -105,9 +209,10 @@ After=blk-availability.target systemd-remount-fs.service
 What=/dev/disk/by-label/HIGHASCGEXF
 Where=/home/casparcg/exfat
 Type=exfat
-Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=5
+Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeout=5,x-systemd.mount-timeout=5
 
 [Install]
+# Not enabled at install — highascg-exfat-boot.service mounts USB when present (avoids local-fs emergency).
 WantedBy=multi-user.target
 EOF
 
@@ -176,9 +281,8 @@ cat > /etc/systemd/system/highascg-fix-config-permissions.service <<FIXEOF
 Description=Fix ownership of ~/highascg/config for exfat-sync (WO-47)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc}
+After=home-casparcg-bridge.mount home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc}
 Before=highascg-exfat-sync.service
-ConditionPathIsMountPoint=/home/casparcg/exfat
 
 [Service]
 Type=oneshot
@@ -191,12 +295,11 @@ FIXEOF
 
 cat > /etc/systemd/system/highascg-exfat-sync.service <<SVCEOF
 [Unit]
-Description=HighAsCG exFAT to project mtime sync (WO-47)
+Description=HighAsCG bridge/USB mtime sync (WO-47 + WO-52)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=network-pre.target home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} highascg-fix-config-permissions.service
+After=network-pre.target home-casparcg-bridge.mount ${bridge_media_mount} home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} highascg-fix-config-permissions.service highascg-bridge-boot.service highascg-exfat-boot.service
 Before=highascg.service
-ConditionPathIsMountPoint=/home/casparcg/exfat
 ConditionPathExists=/home/casparcg/highascg/tools/runtime/exfat-sync-cli.js
 
 [Service]
@@ -214,10 +317,10 @@ SVCEOF
 
 cat > /etc/systemd/system/highascg-exfat-boot.service <<BOOTEOF
 [Unit]
-Description=HighAsCG WO-47 — wait for HIGHASCGEXF, mount ~/exfat, queue sync (automatic at boot)
+Description=HighAsCG WO-47 — wait for HIGHASCGEXF USB, mount ~/exfat, queue sync (optional at boot)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=local-fs-pre.target highascg-live-stick-init.service
+After=local-fs-pre.target highascg-live-stick-init.service highascg-bridge-boot.service
 Before=highascg.service highascg-exfat-sync.service
 Conflicts=shutdown.target
 
@@ -230,6 +333,24 @@ ExecStart=${BOOT_SH_DST}
 [Install]
 WantedBy=multi-user.target
 BOOTEOF
+
+cat > "/etc/systemd/system/${bridge_arrive_svc}" <<BRIDGEARRIVEEOF
+[Unit]
+Description=Mount HIGHASCGDAT bridge + bind media (late NVMe / hotplug)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+ConditionPathExists=/dev/disk/by-label/HIGHASCGDAT
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=${BRIDGE_ARRIVE_SH_DST}
+
+[Install]
+WantedBy=multi-user.target
+BRIDGEARRIVEEOF
 
 cat > "/etc/systemd/system/${arrive_svc}" <<ARRIVEEOF
 [Unit]
@@ -261,20 +382,53 @@ chmod 0644 "/etc/systemd/system/home-casparcg-exfat.mount" \
 systemctl daemon-reload
 systemctl disable highascg-exfat-bootstrap.service 2>/dev/null || true
 systemctl reset-failed highascg-exfat-arrive.service 2>/dev/null || true
-systemctl enable home-casparcg-exfat.mount highascg-exfat-boot.service "${update_svc}" \
-	highascg-fix-config-permissions.service highascg-exfat-sync.service "${bind_mount_esc}" \
-	"${prep_svc}" "${arrive_svc}" 2>/dev/null || true
+systemctl reset-failed highascg-bridge-arrive.service 2>/dev/null || true
+ENABLE_UNITS=(
+	highascg-bridge-boot.service
+	highascg-exfat-boot.service
+	"${update_svc}"
+	highascg-fix-config-permissions.service
+	highascg-exfat-sync.service
+	"${prep_svc}"
+	"${arrive_svc}"
+	"${bridge_arrive_svc}"
+)
+# Mount/bind units are started on demand (bridge-boot / exfat-boot / udev). Enabling them
+# pulls dev-disk-by-label.* into local-fs.target and can block boot ~90s when absent.
+DISABLE_AT_BOOT=(
+	home-casparcg-exfat.mount
+	home-casparcg-bridge.mount
+	"${bridge_media_mount}"
+)
+if [[ "$LEGACY_USB_MEDIA_BIND" == "1" ]]; then
+	ENABLE_UNITS+=("${bind_mount_esc}")
+else
+	DISABLE_AT_BOOT+=("${bind_mount_esc}")
+fi
+systemctl enable "${ENABLE_UNITS[@]}" 2>/dev/null || true
+for u in "${DISABLE_AT_BOOT[@]}"; do
+	[[ -n "$u" ]] || continue
+	systemctl disable "$u" 2>/dev/null || true
+done
 udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=block --action=add 2>/dev/null || true
 
 echo "Installed:"
 echo "  ${ARRIVE_SH_DST}"
 echo "  ${UDEV_RULE_DST} (hotplug + late USB → ${arrive_svc})"
+echo "  ${UDEV_BRIDGE_RULE_DST} (late NVMe → ${bridge_arrive_svc})"
+echo "  ${BRIDGE_ARRIVE_SH_DST}"
 echo "  ${UPDATE_SH_DST}"
 echo "  /etc/highascg/disable-exfat-bootstrap (legacy sim/highascg seed off)"
 echo "  ${BOOT_EXCLUDE_DST} (legacy bootstrap excludes — unused when disabled)"
 echo "  ${UPDATE_EXCLUDE_DST} (server drop — skips client/, dist-web/, runtime)"
 echo "  ${DOC_PKG}/ (offline Documentation= targets)"
+echo "  /etc/systemd/system/home-casparcg-bridge.mount (LABEL=HIGHASCGDAT)"
+echo "  /etc/systemd/system/${bridge_prep_svc}"
+echo "  /etc/systemd/system/${bridge_media_mount} (sole media library)"
+echo "  /etc/systemd/system/highascg-bridge-boot.service"
+echo "  ${BRIDGE_BOOT_SH_DST}"
+echo "  legacy USB media bind: $([[ "$LEGACY_USB_MEDIA_BIND" == "1" ]] && echo enabled || echo disabled — WO-52)"
 echo "  /etc/systemd/system/home-casparcg-exfat.mount"
 echo "  /etc/systemd/system/${prep_svc}"
 echo "  /etc/systemd/system/${bind_mount_esc}"

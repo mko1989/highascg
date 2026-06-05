@@ -2,7 +2,7 @@
 
 HighAsCG can generate `casparcg.config` XML for a **custom** `casparcg-server` binary that includes:
 
-- **PR #1718** — Screen consumer: flexible `aspect-ratio`, `enable-mipmaps`, multi-display spanning (see upstream PR for full behavior).
+- **PR #1718** — Screen consumer: flexible `aspect-ratio`, `enable-mipmaps`, multi-display spanning (see upstream PR for full behavior). On NVIDIA hosts keep **`<vsync>true</vsync>`** and **Sync to VBlank off** in NVIDIA Settings — [screen-consumer-vsync-nvidia.md](../reference/screen-consumer-vsync-nvidia.md).
 - **PR #1719** — OAL consumer: video-scheduled audio (no extra HighAsCG XML; use stock OpenAL / system-audio paths).
 - **PR #1720** — **PortAudio** consumer: ASIO multi-channel output with configurable `device-name`, `output-channels`, buffer/latency/FIFO, `auto-tune-latency`.
 

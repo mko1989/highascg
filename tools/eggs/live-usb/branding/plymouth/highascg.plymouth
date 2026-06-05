@@ -1,6 +1,6 @@
 [Plymouth Theme]
 Name=HighAsCG
-Description=HighAsCG boot splash (spinner dots, no Ubuntu wordmark)
+Description=HighAsCG boot splash (small throbber only, boot messages below)
 ModuleName=two-step
 
 [two-step]
@@ -12,9 +12,9 @@ DialogVerticalAlignment=.382
 TitleHorizontalAlignment=.5
 TitleVerticalAlignment=.36
 HorizontalAlignment=.5
-VerticalAlignment=.7
+VerticalAlignment=.55
 WatermarkHorizontalAlignment=.5
-WatermarkVerticalAlignment=.12
+WatermarkVerticalAlignment=.08
 Transition=none
 TransitionDuration=0.0
 BackgroundStartColor=0x0c1220

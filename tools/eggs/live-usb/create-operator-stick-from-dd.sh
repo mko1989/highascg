@@ -64,6 +64,13 @@ fi
 	echo "ISO not found: $ISO" >&2
 	exit 1
 }
+iso_mib="$(du -m "$ISO" | awk '{print $1}')"
+if [[ "$iso_mib" -lt 1500 ]]; then
+	echo "ERROR: ISO is only ${iso_mib} MiB — expected ~3200–4000 MiB for a full live image." >&2
+	echo "       A truncated squashfs cannot boot. Run full build:" >&2
+	echo "       sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
+	exit 1
+fi
 
 USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"
 if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
@@ -93,6 +100,13 @@ fi
 echo "==> 1/3 Unmount and flash ISO (dd)"
 bash "${HERE}/unmount-usb-for-partitioning.sh" "$DEV" 2>/dev/null || true
 umount "${DEV}"?* 2>/dev/null || true
+# Build host often mounts stick exFAT at ~/exfat — blocks partition/format.
+for mp in /home/casparcg/exfat /home/casparcg/highascg/media/exfat; do
+	if findmnt -n -o SOURCE "$mp" 2>/dev/null | grep -q "^${DEV}"; then
+		echo "Unmounting ${mp} (was on ${DEV})"
+		umount "$mp" 2>/dev/null || true
+	fi
+done
 sync
 dd if="$ISO" of="$DEV" bs=4M status=progress oflag=sync conv=fsync
 sync
@@ -108,6 +122,7 @@ bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale
 
 echo "==> 3/3 Verify boot layout"
 bash "${HERE}/usb-restore-esp-flags.sh" "$DEV"
+bash "${HERE}/verify-operator-stick-branding.sh" "$DEV" "$ISO"
 if ! "$PARTED" -s "$DEV" unit MiB print 2>/dev/null | grep -qi esp; then
 	echo "WARNING: no ESP flag in partition table — stick may not boot. Re-dd and rerun." >&2
 fi

@@ -14,6 +14,7 @@ const MODULAR_KEYS = [
 	'server',
 	'osc',
 	'ui',
+	'editorDefaults',
 	'audioRouting',
 	'dmx',
 	'rtmp',

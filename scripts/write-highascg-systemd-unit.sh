@@ -34,6 +34,9 @@ if [[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
 	# Sync is ConditionPathIsMountPoint-gated and skips instantly when exFAT is absent.
 	AF_LIST="network.target"
 	WA_LIST=""
+	if [[ -f /etc/systemd/system/highascg-bridge-boot.service ]]; then
+		AF_LIST="$AF_LIST highascg-bridge-boot.service"
+	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-boot.service"
 	fi

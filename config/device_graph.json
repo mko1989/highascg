@@ -5,9 +5,48 @@
       "id": "caspar_host",
       "role": "caspar_host",
       "label": "Caspar / HighAsCG host"
+    },
+    {
+      "id": "destinations",
+      "role": "destinations",
+      "label": "Screen destinations"
     }
   ],
-  "connectors": [],
-  "edges": [],
-  "layout": {}
+  "connectors": [
+    {
+      "id": "dst_in_dst_mq125bhh_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM/PRV 1",
+      "externalRef": "dst_mq125bhh_1"
+    },
+    {
+      "id": "gpu_p0",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P0",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "card1-DP-1"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_dst_in_dst_mq125bhh_1_gpu_p0",
+      "sourceId": "dst_in_dst_mq125bhh_1",
+      "sinkId": "gpu_p0"
+    }
+  ],
+  "sources": [
+    {
+      "id": "dst_in_dst_mq125bhh_1",
+      "label": "PGM/PRV 1",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50
+    }
+  ]
 }

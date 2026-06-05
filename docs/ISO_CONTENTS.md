@@ -22,8 +22,9 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  HighAsCG (Node.js API) — highascg.service → :4200 (headless) │
-│  (full app tree often from exFAT after WO‑47 bootstrap)     │
+│  HighAsCG (Node.js bridge) — highascg.service → :4200 (headless) │
+│  Client↔Caspar AMCP + Client↔Ubuntu OS via REST/WS               │
+│  (full app tree often from exFAT after WO‑47 bootstrap)         │
 ├─────────────────────────────────────────────────────────────┤
 │  CasparCG Server 2.5 + CEF + casparcg-scanner               │
 │  Openbox autostart (respawn) — config under ~/highascg/    │
@@ -84,7 +85,7 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 **Autostart chain (`display-mode=normal`)**
 
 1. `xset` — disable screensaver / DPMS  
-2. `highascg-nvidia-x-apply.sh` — PowerMizer / sync-to-vblank (if NVIDIA)  
+2. `highascg-nvidia-x-apply.sh` — PowerMizer / **Sync to VBlank off** (if NVIDIA); Caspar screen consumer **vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md)  
 3. `casparcg-scanner` (background)  
 4. Loop: clear **`cef-cache`**, run **`casparcg-server-2.5`** with **`~/highascg/config/casparcg.config`** (respawn on crash)
 
@@ -101,6 +102,7 @@ Stock **`casparcg-server.service`** is **disabled** — Caspar is started from O
 | **`GET /api/system/gpu-nvidia`** | Read-only status + GPU → branch recommendation (`data/nvidia-driver-guide.json`) |
 | **No** `/opt/nvidia-pool` | Multi-driver pool removed — see **`work/work-orders/WO_single-nvidia-driver-per-iso.md`** |
 | **X session** | `__GL_SYNC_TO_VBLANK=0`, `highascg-nvidia-x-apply.sh`, **`nvidia-settings`** |
+| **Screen consumer vsync** | NVIDIA **Sync to VBlank off** + Caspar **screen consumer vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md) |
 
 Settings UI: **Application Settings → system** can apply another branch from the pool (WO‑39) when HighAsCG is deployed.
 
@@ -176,7 +178,7 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 
 **Not in squashfs** (excluded — see fragment list):
 
-- **`src/`**, **`client/`**, **`tools/`**, **`scripts/`**, **`work/`**, **`examples/`**, …  
+- **`client/`**, **`work/`**, **`work/references/`**, **`tools/`**, **`scripts/`**, **`examples/`**, …  
 - **`package.json`**, **`index.js`**, **`node_modules/`**  
 - Builder **`media/`** scratch, **`.git`**, IDE caches  
 
@@ -263,7 +265,7 @@ sudo bash deprecated/tools/release/make-dev-github-release-iso-quick.sh
 | DeckLink **desktopvideo**? | **Yes**, if installed on build host before produce |
 | Caspar + scanner binaries? | **Yes**, if install.sh ran |
 | **`~/highascg/config/casparcg.config`** stub? | **Yes** (minimal shell) |
-| Full HighAsCG **`src/` / `node_modules`?** | **Yes** when **`HIGHASCG_ISO_EMBED_SERVER=1`** (default); **`dist-web/`** excluded — use Electron launcher |
+| Full HighAsCG **`src/` / `node_modules`?** | **Yes** when **`HIGHASCG_ISO_EMBED_SERVER=1`** (default); **`client/`**, **`dist-web/`**, **`work/`** excluded — operator UI via **Electron launcher** (highascg-client) |
 | Operator media / templates? | **No** in squashfs — **exFAT** |
 | GitHub alpha tarball contents? | Same as **exFAT app tree**, not the minimal ISO shell |
 

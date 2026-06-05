@@ -114,6 +114,8 @@ But the code at [config-generator-channels.js:84-93](file:///opt/highascg/src/co
 
 **The fundamental design issue**: When a mapping node splits a destination to GPU outputs, those GPU channels should NOT create screen consumers. The main PGM channel's single screen consumer (spanning across physical GPU heads via OS layout) is the correct approach. The mapping channels should be screen-less route-only channels.
 
+**NVIDIA vsync (when using screen consumers):** **Sync to VBlank off** in `nvidia-settings`, **vsync on** on the Caspar `<screen>` consumer — [screen-consumer-vsync-nvidia.md](../../docs/reference/screen-consumer-vsync-nvidia.md).
+
 ---
 
 ### Bug 4: No Single Spanning Screen Window

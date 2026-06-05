@@ -1,4 +1,6 @@
-# AMCP REST API Reference
+# AMCP REST API Reference (legacy)
+
+> **Canonical docs:** [wiki/api/README.md](wiki/api/README.md) — full endpoint list, Caspar gate, OpenAPI [`openapi.yaml`](wiki/api/openapi.yaml), and per-topic examples.
 
 HighAsCG maps subset functionality of the underlying CasparCG AMCP protocol into an easy-to-use HTTP REST JSON API. All endpoints are accessible via `http://localhost:<PORT>/api`.
 

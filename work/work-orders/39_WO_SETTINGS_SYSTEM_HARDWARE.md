@@ -21,7 +21,7 @@ Add two panes under **Application Settings** for headless broadcast rigs:
      - *Canonical pool path:* **`/opt/nvidia-pool`** (default for `fetch-debs.sh` and first-boot picker; override with **`NVIDIA_DEB_POOL`** only if needed).  
      - **595**: builder must download debs even when that branch is already installed on the build host (e.g. `apt-get download nvidia-driver-595 nvidia-dkms-595` into the pool, or a dedicated script flag) — see **Tasks**.  
    - **Button: “Apply driver set”** — runs an **audited root helper** (no arbitrary shell from the UI) that `dpkg -i` / `apt install` from the pool for the selected branch, triggers **`dkms`** rebuild if needed, and returns log output to the UI. **Requires new `NOPASSWD`** or polkit; see `docs/HIGHASCG_PASSWORDLESS_SUDO.md`.  
-   - **Button: “Open NVIDIA Settings”** — launch **`nvidia-settings`** on **`DISPLAY=:0`** with correct **`XAUTHORITY`** (reuse pattern from `src/utils/os-config.js` / `getXAuthority()`). Usually **no sudo**.
+   - **Button: “Open NVIDIA Settings”** — launch **`nvidia-settings`** on **`DISPLAY=:0`** with correct **`XAUTHORITY`** (reuse pattern from `src/utils/os-config.js` / `getXAuthority()`). Usually **no sudo**. Operators should confirm **Sync to VBlank** is **off** while Caspar screen consumers use **vsync on** — [screen-consumer-vsync-nvidia.md](../../docs/reference/screen-consumer-vsync-nvidia.md).
 
 2. **Decklink** (`data-tab="decklink"` or `decklink-hardware"`)  
    - Read-only card summary: enumerate DeckLink devices and **logical ports** (reuse or extend existing host inventory if present under `src/` / device-view; otherwise call **`DesktopVideoHelper`** / **`mctl`** / sysfs — **pick one supported path** and degrade gracefully if BMD tools are missing).  

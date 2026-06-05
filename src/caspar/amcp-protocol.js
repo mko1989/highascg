@@ -1,3 +1,4 @@
+/** @deprecated Replaced by casparcg-connection. Use ConnectionManager with HIGHASCG_AMCP_LEGACY_TRANSPORT=1 if absolutely needed. */
 'use strict'
 
 const { amcpVerboseTrace } = require('./amcp-utils')
@@ -97,9 +98,20 @@ class AmcpProtocol {
 	])
 
 	/**
+	 * Strip optional `RES <reqId> ` prefix (library auto `REQ VERSION` on connect).
+	 * @param {string} line
+	 * @returns {string}
+	 */
+	_normalizeLine(line) {
+		const m = line.match(/^RES\s+\S+\s+(.+)$/)
+		return m ? m[1] : line
+	}
+
+	/**
 	 * @param {string} line - One AMCP line without trailing CRLF
 	 */
 	handleLine(line) {
+		line = this._normalizeLine(line)
 		const self = this._ctx
 		if (self._amcpBatchDrain && typeof self._amcpBatchDrain.onLine === 'function') {
 			try {

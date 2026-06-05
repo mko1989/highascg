@@ -1,12 +1,14 @@
 # HighAsCG
 
-HighAsCG is a Node.js control and configuration service built around CasparCG. It runs its own HTTP + WebSocket server, connects to CasparCG over AMCP, and allows to play looks / scenes / timeline / multiview on connected displays from a browser user interface.
+HighAsCG is a Node.js **bridge service** on the playout machine. It connects the **operator client** (Electron + web UI on a laptop) to **CasparCG** (AMCP playout) and to **Ubuntu OS** APIs (GPU layout, exFAT, USB ingest, hardware settings). It runs HTTP + WebSocket on port **4200**; it does **not** host the operator UI in production.
 
-**This repository is the source tree for everything that goes into the [live ISO](docs/ISO_CONTENTS.md)** (Ubuntu, NVIDIA/DeckLink stack, CasparCG, installer, systemd units, and the Node server under `src/`). The hybrid image is built from this checkout on the eggs host; WO‑47 then loads the server from exFAT (`drop-update/`) using release tarballs produced from the same repo.
+**Architecture (canonical):** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
-**Browser UI (client):** separate repository [**highascg-client**](https://github.com/mko1989/highascg-client) — Vite UI, Electron launcher, stick prep, simulation. **Not** in this repo.
+**This repository is the source tree for the server** that goes into the [live ISO](docs/ISO_CONTENTS.md) and exFAT server drops (Ubuntu stack, CasparCG, installer, systemd, Node under `src/`). WO‑47 loads the server from exFAT (`drop-update/`) using release tarballs from this repo.
 
-**Playout server (this repo):** API + WebSocket only (`HIGHASCG_HEADLESS=true` via systemd). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md).
+**Browser UI (client):** separate repository [**highascg-client**](https://github.com/mko1989/highascg-client) — Vite UI + **Electron launcher** on the **operator machine**. The in-tree **`client/`** folder here is legacy/dev-only and is **not** deployed to the playout server (especially not `client/tools/electron-launcher/`).
+
+**Playout server (this repo):** API + WebSocket bridge only (`HIGHASCG_HEADLESS=true` via systemd). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](docs/PLAN_SERVER_CLIENT_SPLIT.md).
 
 ## Requirements
 
@@ -83,14 +85,17 @@ On a playout machine you can start **media scanner** and **HighAsCG** first, cha
 
 ## Project layout
 
-| Path | Role |
-|------|------|
-| `index.js`, [`src/`](src/) | Node server — Caspar AMCP, REST `/api/*`, WebSocket |
-| — | UI: [**highascg-client**](https://github.com/mko1989/highascg-client) (not tracked here) |
-| `config/` | Modular settings (runtime JSON; see `.gitignore`) |
-| `template/` | Caspar HTML templates |
-| `scripts/` | Production installer, systemd — [`scripts/README.md`](scripts/README.md) |
-| `tools/` | Live USB, smoke tests, server release |
+| Path | Role | On playout server? |
+|------|------|--------------------|
+| `index.js`, [`src/`](src/) | Node **bridge** — Caspar AMCP, REST `/api/*`, WebSocket, OS hooks | **Yes** |
+| — | UI: [**highascg-client**](https://github.com/mko1989/highascg-client) + Electron launcher (operator laptop) | **No** |
+| `client/` | Legacy in-tree browser UI (dev); **not** in server tarball or ISO | **No** |
+| `work/` | Work orders, references, planning — **not part of the program** | **No** |
+| `config/` | Modular settings (runtime JSON; see `.gitignore`) | **Yes** |
+| `template/` | Caspar HTML templates | **Yes** |
+| `scripts/` | Production installer, systemd — [`scripts/README.md`](scripts/README.md) | **Yes** |
+| `tools/runtime/` | exFAT sync CLI, staged Caspar start | **Yes** |
+| `tools/eggs/`, `tools/smoke/` | ISO build host, dev tests | **No** |
 
 **Dev:** `npm start` (API **:4200**) · UI in [**highascg-client**](https://github.com/mko1989/highascg-client).
 
