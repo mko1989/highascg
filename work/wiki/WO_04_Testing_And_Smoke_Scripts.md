@@ -1,0 +1,37 @@
+# Chapter 4: Testing & Smoke Scripts
+
+HighAsCG maintains extensive offline and integration test suites in `tools/smoke/`.
+
+## 1. AMCP API Offline Parity Tests
+File: `tools/smoke/highascg-health-api-amcp.test.js`
+
+This test suite uses the Node.js native `--test` runner to simulate CasparCG AMCP packet dispatch entirely offline, proving that the HTTP/WebSocket routers construct exact AMCP commands.
+
+**Mechanics:**
+* The router uses `makeAppCtx(amcp)` injected with a simulated AMCP Client (`makeOfflineAmcp`).
+* The `captureAmcp` helper wraps `sim.send` to capture all AMCP protocol strings pushed into the socket buffer.
+* Examples tested:
+  * `POST /api/ping` verifies generation of `PING highascg-health\r\n`.
+  * `POST /api/amcp/batch` with `{ amcp_batch: false }` verifies that sequential mode correctly breaks apart chunks.
+  * Structured WebSockets (e.g., `{ type: "mixer", command: "opacity", channel: 1, opacity: 0.42 }`) are verified to emit `MIXER 1-10 OPACITY 0.42`.
+
+**Integration Mode**:
+This file can also ping a real running HTTP server:
+```bash
+HIGHASCG_INTEGRATION_PORT=8099 HIGHASCG_EXPECT_CASPAR=1 node --test tools/smoke/highascg-health-api-amcp.test.js
+```
+If `HIGHASCG_EXPECT_CASPAR=1` is passed, it strictly asserts that `GET /api/state` returns HTTP `200` and `scene.deck` shapes exist. Otherwise, it tolerates `503` (offline).
+
+## 2. CasparCG Live Smoke Script
+File: `tools/smoke/smoke-caspar.js`
+
+A fast bash/Node script to quickly verify HTTP routing when a real CasparCG instance is attached. 
+
+**Execution:**
+```bash
+node tools/smoke/smoke-caspar.js 4200
+```
+**Assertions:**
+1. `GET /api/state` strictly returns `200` (exits code `1` if `503` is encountered, meaning Caspar is down).
+2. `GET /api/__smoke_not_a_route__` must return `404` (proving unknown routes aren't swallowed by 503 error handlers).
+3. `POST /api/raw` with `{ "cmd": "VERSION" }` succeeds and returns a JSON wrapper containing AMCP data.

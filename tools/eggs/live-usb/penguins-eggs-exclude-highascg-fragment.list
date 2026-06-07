@@ -5,6 +5,14 @@
 swap.img
 swapfile
 
+# ISO build tooling — not needed on playout live system
+usr/lib/penguins-eggs
+usr/lib/penguins-eggs/*
+
+# Kernel/NVIDIA headers — build host only
+usr/src
+usr/src/*
+
 # Multi-branch NVIDIA deb cache (removed — one driver baked per ISO)
 opt/nvidia-pool
 opt/nvidia-pool/*
@@ -42,6 +50,14 @@ home/casparcg/highascg/for_client
 home/casparcg/highascg/for_client/*
 home/casparcg/highascg/From_client
 home/casparcg/highascg/From_client/*
+home/casparcg/highascg/.git
+home/casparcg/highascg/.git/*
+home/casparcg/highascg/.reference
+home/casparcg/highascg/.reference/*
+home/casparcg/highascg/docs
+home/casparcg/highascg/docs/*
+home/casparcg/highascg/lib/libcef_dll
+home/casparcg/highascg/lib/libcef_dll/*
 
 # Runtime under ~/highascg (stubs stay on ISO)
 home/casparcg/highascg/media/*

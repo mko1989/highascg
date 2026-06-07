@@ -5,7 +5,7 @@ Two separate layers on the live ISO:
 | Layer | When | What you see today | Customize |
 |-------|------|-------------------|-----------|
 | **GRUB / isolinux** | Boot menu (**3 s** timeout) | Background image + menu (eggs penguins model) | `splash.boot.jpg` + `grub.theme.cfg` + `font.pf2` (GNU Unifont) |
-| **Plymouth** | Kernel loading until desktop | **Split screen**: logs left **2/3**, logo right **1/3** (opaque RGB) | `highascg.script` + `splash systemd.show_status=true` |
+| **Plymouth** | Kernel loading until desktop (optional) | **Alternate** ISO menu: splash + corner throbber. **Default Live** = full dmesg (`nosplash`) | `throbber-boot/` + `install-highascg-plymouth-theme.sh` |
 
 ## Eggs / Wardrobe (official model)
 
@@ -71,22 +71,21 @@ You can use a mostly dark **`splash.png`** and rely on **`highascg-eggs-theme/th
 
 ## Custom Plymouth animation (multiple PNGs)
 
-**Yes.** The installed **`highascg`** theme uses Ubuntu’s **`two-step`** module (same as the **spinner** theme). It plays two frame sequences:
+**Default:** Plymouth **`script`** module — **systemd status lines scroll on the left**, **4 throbber frames** animate in the **top-right corner** (`throbber-boot/`). Requires kernel `splash systemd.show_status=true` (no `quiet`).
 
-| Sequence | Files on disk | Typical role |
-|----------|---------------|--------------|
-| **Throbber (only)** | `throbber-0001.png` … `throbber-0004.png` | Small spinner — from `animation/1.png`, `2.png`, `29.png`, `30.png` |
+| Source | Installed as | Role |
+|--------|--------------|------|
+| `throbber-boot/1–4.png` | `throbber-0001.png` … `throbber-0004.png` | Small corner spinner (from `animation/1.png`, `2.png`, `29.png`, `30.png`) |
 
-### Drop-in replacement (easiest)
+`prepare-branding-assets.sh` builds `throbber-boot/` automatically. Replace those 4 PNGs (or change `PLYMOUTH_THROBBER_FRAMES`) before install.
 
-Put your frames in the repo **before** running the install script:
+### Optional modes
 
-```text
-tools/eggs/live-usb/branding/plymouth/animation/   → 0001.png, 0002.png, … (any count; renamed on install)
-tools/eggs/live-usb/branding/plymouth/throbber/    → optional; replaces the dots only
-```
-
-Files are sorted by name, then installed as `animation-0001.png`, `animation-0002.png`, …
+| Env var | Result |
+|---------|--------|
+| *(default)* | Throbber top-right + status log left |
+| `HIGHASCG_PLYMOUTH_FULL_ANIM=1` | Large 30-frame mascot right 1/3 + log left |
+| `HIGHASCG_PLYMOUTH_TWO_STEP=1` | Legacy Ubuntu two-step (may hide framebuffer logs behind full-screen bg) |
 
 **Tips:**
 
@@ -99,15 +98,13 @@ Files are sorted by name, then installed as `animation-0001.png`, `animation-000
 `ffmpeg -i clip.mp4 -vf fps=12,scale=32:32 branding/plymouth/animation/frame-%04d.png`  
 then rename or let the install script sort them.
 
-### Full-screen / arbitrary frame counts
+## Boot console (default) vs Plymouth splash (alternate)
 
-If **`branding/plymouth/animation/*.png`** exists (your **134×178 RGBA** frames are fine), **`install-highascg-plymouth-theme.sh`** switches to the **`script`** module: animation in the **right third** of the screen (vertically centred), no Ubuntu wordmark. Frames are installed in **natural sort order** (`1.png` … `30.png`, not `1, 10, 11, 2`).
+**Default Live** (`grub.main.cfg`): `nosplash loglevel=7 ignore_loglevel console=tty0` — **full early kernel dmesg** on screen. Plymouth cannot run at the same time (it replaces the text console). The playout host and ISO rootfs can still show the **small corner throbber** via `highascg-fb-corner-throbber.service` (framebuffer overlay, no Plymouth).
 
-## Boot console + right-third animation
+**Alternate menu** “Live (Plymouth splash)”: `splash` + corner throbber — use when you want branding instead of dmesg.
 
-Default GRUB/isolinux line (see `grub.main.cfg`):
-
-`console=tty1 fbcon=nodefer splash loglevel=4 …` — **no `quiet`**, so kernel/systemd text stays on the **left ~2/3** while Plymouth draws only the RGBA loop in the **right third** (no full-screen background in the script theme).
+**Playout host** (`install-host-boot-branding.sh`): same as default Live — GRUB wallpaper + full dmesg + **framebuffer corner throbber** (`install-fb-corner-throbber.sh`); Plymouth masked on the host.
 
 | Symptom | Likely cause |
 |---------|----------------|

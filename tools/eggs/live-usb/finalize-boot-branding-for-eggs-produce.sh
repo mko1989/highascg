@@ -24,6 +24,9 @@ highascg_resolve_eggs_kernel
 echo "==> GRUB theme + Plymouth files (single host initramfs rebuild after this)"
 HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/install-eggs-live-grub-theme.sh"
 
+echo "==> Framebuffer corner throbber (default Live nosplash + corner animation)"
+bash "${HERE}/install-fb-corner-throbber.sh"
+
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 LIVE_SPLASH="${THEME_ABS}/theme/livecd/splash.png"
 EGGS_PENGUINS="/usr/lib/penguins-eggs/addons/eggs/theme/livecd/splash.png"

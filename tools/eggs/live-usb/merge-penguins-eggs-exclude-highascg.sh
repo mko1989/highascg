@@ -25,11 +25,15 @@ if [[ ! -f "$FRAG" ]]; then
   echo "Fragment not found: $FRAG" >&2
   exit 1
 fi
+TEMPLATE="${HERE}/exclude.list"
 if [[ ! -f "$TARGET" ]]; then
-  echo "Not found: $TARGET" >&2
-  echo "Create it first (e.g. run penguins-eggs configuration or one" >&2
-  echo "  eggs produce without --excludes static so the template is built)." >&2
-  exit 1
+  if [[ ! -f "$TEMPLATE" ]]; then
+    echo "Not found: $TARGET (and no template at $TEMPLATE)" >&2
+    exit 1
+  fi
+  install -d "$(dirname "$TARGET")"
+  install -m 0644 "$TEMPLATE" "$TARGET"
+  echo "Installed eggs exclude template → $TARGET (from $TEMPLATE)" >&2
 fi
 if [[ "$REPLACE" -eq 1 ]]; then
   tmp="$(mktemp)"

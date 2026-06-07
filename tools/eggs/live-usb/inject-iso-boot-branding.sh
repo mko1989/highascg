@@ -80,7 +80,9 @@ if [[ -f "$SQ_CHECK" ]]; then
 fi
 # Default: skip squashfs rebuild (inject only patches GRUB + initrd). Full OS root comes from eggs produce.
 if [[ "${HIGHASCG_FORCE_SQUASHFS_REFRESH:-0}" == "1" || "${HIGHASCG_SKIP_SQUASHFS_REFRESH:-1}" == "0" ]]; then
-	bash "${HERE}/refresh-squashfs-plymouth-branding.sh"
+	echo "ERROR: squashfs refresh removed (was unsafe under /home/eggs/liveroot)." >&2
+	echo "       Run full eggs produce instead: sudo bash work/run-eggs-produce-from-host.sh" >&2
+	exit 1
 else
 	echo "==> Skip squashfs refresh (default — Plymouth in initrd; OS root unchanged)"
 fi

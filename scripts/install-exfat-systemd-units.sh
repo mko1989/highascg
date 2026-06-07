@@ -97,7 +97,9 @@ DOC_URI="file:${DOC_PKG}/EXFAT_DATA_ZERO_TOUCH.md"
 install -d /home/casparcg/exfat /home/casparcg/bridge /etc/systemd/system
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media 2>/dev/null || install -d /home/casparcg/highascg/media
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media/exfat 2>/dev/null || install -d /home/casparcg/highascg/media/exfat
-chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/bridge /home/casparcg/highascg/media /home/casparcg/highascg/media/exfat
+install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /home/casparcg/highascg/media/bridge 2>/dev/null || install -d /home/casparcg/highascg/media/bridge
+chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/exfat /home/casparcg/bridge \
+	/home/casparcg/highascg/media /home/casparcg/highascg/media/exfat /home/casparcg/highascg/media/bridge
 if [[ -f "$SEED_BRIDGE_SH" ]]; then
 	HIGHASCG_SERVICE_USER="$USER_CASPAR" bash "$SEED_BRIDGE_SH" /home/casparcg/bridge
 fi
@@ -156,7 +158,7 @@ BRIDGEPREPEOF
 
 cat > "/etc/systemd/system/${bridge_media_mount}" <<BRIDGEMEDIAEOF
 [Unit]
-Description=Bind bridge media/ → ~/highascg/media (WO-52 sole library)
+Description=Bind bridge media/ → ~/highascg/media/bridge (WO-52 — does not hide local media/)
 Documentation=${DOC_URI}
 DefaultDependencies=no
 Requires=${bridge_prep_svc} home-casparcg-bridge.mount
@@ -167,7 +169,7 @@ Before=highascg-exfat-sync.service highascg.service
 
 [Mount]
 What=/home/casparcg/bridge/media
-Where=/home/casparcg/highascg/media
+Where=/home/casparcg/highascg/media/bridge
 Type=none
 Options=bind
 
@@ -425,7 +427,7 @@ echo "  ${UPDATE_EXCLUDE_DST} (server drop — skips client/, dist-web/, runtime
 echo "  ${DOC_PKG}/ (offline Documentation= targets)"
 echo "  /etc/systemd/system/home-casparcg-bridge.mount (LABEL=HIGHASCGDAT)"
 echo "  /etc/systemd/system/${bridge_prep_svc}"
-echo "  /etc/systemd/system/${bridge_media_mount} (sole media library)"
+	echo "  /etc/systemd/system/${bridge_media_mount} (bridge library → ~/highascg/media/bridge)"
 echo "  /etc/systemd/system/highascg-bridge-boot.service"
 echo "  ${BRIDGE_BOOT_SH_DST}"
 echo "  legacy USB media bind: $([[ "$LEGACY_USB_MEDIA_BIND" == "1" ]] && echo enabled || echo disabled — WO-52)"

@@ -11,9 +11,10 @@ ISO_WORK="${1:-${EGGS_ISO_WORK:-/home/eggs/mnt/iso}}"
 	exit 1
 }
 
-# Default Live: Plymouth split screen + systemd [ OK ] lines (RPi-style; no quiet).
-LIVE_EXTRA='splash systemd.show_status=true loglevel=3 nvidia-drm.modeset=1 nvidia-drm.fbdev=1'
-VERBOSE_EXTRA='console=tty1 nosplash systemd.show_status=true loglevel=4 nvidia-drm.modeset=1 nvidia-drm.fbdev=1'
+# Default Live: full early kernel dmesg (nosplash). Optional Plymouth entry patched separately.
+LIVE_EXTRA='console=tty0 fbcon=nodefer nosplash loglevel=7 ignore_loglevel systemd.show_status=true nvidia-drm.modeset=1 nvidia-drm.fbdev=1'
+PLYMOUTH_EXTRA='splash systemd.show_status=true loglevel=4 nvidia-drm.modeset=1 nvidia-drm.fbdev=1'
+VERBOSE_EXTRA='console=tty1 nosplash systemd.show_status=true loglevel=7 ignore_loglevel nvidia-drm.modeset=1 nvidia-drm.fbdev=1'
 SAFE_EXTRA='nomodeset quiet splash'
 TEXT_EXTRA='console=tty1 systemd.show_status=true systemd.unit=multi-user.target'
 
@@ -45,4 +46,4 @@ for f in \
 	patch_one "$f"
 done
 
-echo "OK: ISO kernel cmdline (console + splash + nvidia-drm.fbdev=1)"
+echo "OK: ISO kernel cmdline (default Live = full dmesg nosplash; Plymouth splash is alternate menuentry)"

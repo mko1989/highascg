@@ -9,18 +9,26 @@ highascg_latest_installed_kernel() {
 		tail -1
 }
 
-# Sets KVER, VM, IR. Optional: HIGHASCG_ENSURE_LATEST_KERNEL=1 runs apt install first.
+# Sets KVER, VM, IR.
+# /etc/highascg/pinned-kernel wins (playout host must stay on 6.8.0-117).
+# HIGHASCG_ENSURE_LATEST_KERNEL=1 installs linux-image-generic only when NOT pinned.
 highascg_resolve_eggs_kernel() {
-	local running
+	local running pin_file=/etc/highascg/pinned-kernel
 	running="$(uname -r)"
 
-	if [[ "${HIGHASCG_ENSURE_LATEST_KERNEL:-0}" == "1" ]]; then
+	if [[ -f "$pin_file" ]]; then
+		KVER="$(tr -d '[:space:]' <"$pin_file")"
+		echo "==> Using pinned kernel from ${pin_file}: ${KVER}" >&2
+	elif [[ "${HIGHASCG_ENSURE_LATEST_KERNEL:-0}" == "1" ]]; then
+		echo "WARN: HIGHASCG_ENSURE_LATEST_KERNEL=1 without ${pin_file} — may pull newest HWE kernel" >&2
 		export DEBIAN_FRONTEND=noninteractive
 		apt-get update
 		apt-get install -y --no-install-recommends linux-image-generic linux-headers-generic
+		KVER="$(highascg_latest_installed_kernel)"
+	else
+		KVER="$(highascg_latest_installed_kernel)"
 	fi
 
-	KVER="$(highascg_latest_installed_kernel)"
 	[[ -n "$KVER" ]] || KVER="$running"
 
 	VM="/boot/vmlinuz-${KVER}"

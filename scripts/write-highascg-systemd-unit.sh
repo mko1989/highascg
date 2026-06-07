@@ -86,6 +86,8 @@ install -d "$HEADLESS_DROPIN_DIR"
 cat <<'EOF' >"$HEADLESS_DROPIN"
 [Service]
 Environment=HIGHASCG_HEADLESS=true
+# No startup HTML/CEF template on playout (avoids visible Chromium window on :0).
+Environment=HIGHASCG_NO_STARTUP_LED_TEST=1
 EOF
 chmod 0644 "$HEADLESS_DROPIN"
 

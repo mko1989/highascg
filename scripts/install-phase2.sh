@@ -6,7 +6,7 @@ echo -e "\n${BOLD}─── Phase 2: Hardware & Drivers ───${NC}\n"
 
 # apt base deps (always needed)
 apt update -y
-apt install -y curl wget git jq unzip rsync software-properties-common
+apt install -y curl wget git jq unzip rsync software-properties-common alsa-utils
 
 # FFmpeg + DRM — kmsgrab needs KMS/DRM; casparcg user is in video/render for /dev/dri access
 if [ "$FFMPEG_STATUS" = "missing" ]; then
@@ -39,30 +39,25 @@ if [ "$HAS_NVIDIA_GPU" = true ]; then
     fi
     
     if [ "$SHOULD_INSTALL_NVIDIA" = true ]; then
-        apt install -y ubuntu-drivers-common
         if [ -n "${HIGHASCG_NVIDIA_DRIVER:-}" ]; then
             case "${HIGHASCG_NVIDIA_DRIVER}" in
             535|580|595)
-                echo "  Installing pinned ISO driver: nvidia-driver-${HIGHASCG_NVIDIA_DRIVER}"
-                apt install -y "nvidia-driver-${HIGHASCG_NVIDIA_DRIVER}" "nvidia-dkms-${HIGHASCG_NVIDIA_DRIVER}"
-                mkdir -p /etc/highascg
-                echo "${HIGHASCG_NVIDIA_DRIVER}" > /etc/highascg/nvidia-iso-driver
+                if [[ "${HIGHASCG_NVIDIA_DRIVER}" == "595" ]]; then
+                    echo "  Installing proprietary NVIDIA ${HIGHASCG_NVIDIA_DRIVER} (CUDA repo: cuda-keyring + cuda-drivers)"
+                    bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+                else
+                    echo -e "  ${YELLOW}CUDA repo installer only wired for 595 — use install-nvidia-cuda-repo-595.sh${NC}"
+                    HIGHASCG_NVIDIA_DRIVER=595 bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+                fi
                 ;;
             *)
-                echo -e "  ${YELLOW}HIGHASCG_NVIDIA_DRIVER invalid — use 535, 580, or 595${NC}"
-                DRIVER_NAME=$(ubuntu-drivers devices 2>/dev/null | grep recommended | awk '{print $3}')
-                [ -n "$DRIVER_NAME" ] && apt install -y "$DRIVER_NAME" || apt install -y nvidia-driver-550
+                echo -e "  ${YELLOW}HIGHASCG_NVIDIA_DRIVER invalid — use 535, 580, or 595; defaulting to 595${NC}"
+                bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
                 ;;
             esac
         else
-            DRIVER_NAME=$(ubuntu-drivers devices 2>/dev/null | grep recommended | awk '{print $3}')
-            if [ -n "$DRIVER_NAME" ]; then
-                echo "  Installing recommended: $DRIVER_NAME"
-                apt install -y "$DRIVER_NAME"
-            else
-                echo "  Fallback: nvidia-driver-550"
-                apt install -y nvidia-driver-550
-            fi
+            echo "  Installing proprietary NVIDIA 595 (CUDA repo: cuda-keyring + cuda-drivers)"
+            bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
         fi
         install_nvidia_persistenced_packages
         if systemctl list-unit-files nvidia-persistenced.service &>/dev/null || \

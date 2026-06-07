@@ -11,7 +11,7 @@ lsblk -f -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS 2>/dev/null || lsblk -f
 
 echo ""
 echo "=== Expected mount points ==="
-for mp in /home/casparcg/bridge /home/casparcg/exfat /home/casparcg/highascg/media; do
+for mp in /home/casparcg/bridge /home/casparcg/exfat /home/casparcg/highascg/media/bridge /home/casparcg/highascg/media/exfat; do
 	if findmnt -n "$mp" &>/dev/null; then
 		echo "OK  $mp ← $(findmnt -n -o SOURCE,FSTYPE "$mp")"
 	else

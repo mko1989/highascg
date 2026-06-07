@@ -1,5 +1,7 @@
 # Manual install: `casparcg` user, `/opt/casparcg`, X11, DeckLink, NDI
 
+> **Playout host (recommended):** use the ordered setup scripts and **[`scripts/setup/MANUAL_INSTALL.md`](../scripts/setup/MANUAL_INSTALL.md)** — kernel 117, NVIDIA open 595, `~/highascg`, nodm/Openbox.
+
 This guide mirrors the intent of **`scripts/install-phase2.sh`**, **`install-phase3.sh`**, and **`install-helpers.sh`**, but every step is **manual** (no `install.sh`). Adjust paths and versions to your machine.
 
 **Privileges:** Steps below assume a normal user with **`sudo`**. Commands that need root are prefixed with `sudo`. Alternatively, open a root shell once: `sudo -i`, then run the same commands **without** the `sudo` prefix.

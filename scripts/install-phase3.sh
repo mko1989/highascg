@@ -191,8 +191,6 @@ else
 
     cd /home/casparcg/highascg || exit 1
     /usr/bin/casparcg-scanner &
-    mkdir -p /home/casparcg/highascg/cef-cache
-    find /home/casparcg/highascg/cef-cache -mindepth 1 -delete 2>/dev/null || true
     export CASPAR_RESPAWN=1
     ./run.sh >> /tmp/caspar.log 2>&1
   ) &

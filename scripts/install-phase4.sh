@@ -236,7 +236,7 @@ fi
 # Unified playout root: Caspar dirs + NDI copy (Phase 3 may run before deploy; fresh clone clears children)
 if [ -f /home/casparcg/highascg/package.json ]; then
     echo -e "${CYAN}→ Ensuring Caspar companion directories under playout root...${NC}"
-    mkdir -p /home/casparcg/highascg/{media,media/exfat,log,template,data,cef-cache,lib}
+    mkdir -p /home/casparcg/highascg/{media,media/exfat,media/bridge,log,template,data,cef-cache,lib}
     mkdir -p /home/casparcg/exfat
     cp /usr/lib/x86_64-linux-gnu/libndi.so.6* /home/casparcg/highascg/lib/ 2>/dev/null || true
     chown "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/lib/libndi.so.6* 2>/dev/null || true

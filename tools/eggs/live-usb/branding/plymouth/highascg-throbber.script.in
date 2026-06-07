@@ -1,0 +1,129 @@
+// HighAsCG Plymouth — boot status lines left, small throbber top-right (throbber-boot/).
+throbber_frames = @@FRAME_COUNT@@;
+throbber_index = 0;
+throbber_image = [];
+throbber_sprite;
+
+NUM_SCROLL_LINES = 24;
+LINE_HEIGHT = 16;
+LINE_WIDTH = 80;
+scroll_line_text = [];
+scroll_sprites = [];
+THROBBER_MARGIN = 20;
+
+for (i = 0; i < throbber_frames; i++) {
+	throbber_image[i] = Image(sprintf("throbber-%04d.png", i + 1));
+}
+
+for (i = 0; i < NUM_SCROLL_LINES; i++) {
+	scroll_line_text[i] = "";
+	scroll_sprites[i] = Sprite();
+	scroll_sprites[i].SetOpacity(0);
+}
+
+fun place_throbber () {
+	global throbber_sprite;
+	global THROBBER_MARGIN;
+	sw = throbber_sprite.GetWidth();
+	throbber_sprite.SetX(Window.GetWidth() - sw - THROBBER_MARGIN);
+	throbber_sprite.SetY(THROBBER_MARGIN);
+}
+
+fun place_scroll_lines () {
+	global scroll_sprites;
+	global NUM_SCROLL_LINES;
+	global LINE_HEIGHT;
+	start_x = 12;
+	start_y = 12;
+	for (i = 0; i < NUM_SCROLL_LINES; i++) {
+		scroll_sprites[i].SetX(start_x);
+		scroll_sprites[i].SetY(start_y + (i * LINE_HEIGHT));
+	}
+}
+
+fun refresh_scroll_display () {
+	global scroll_line_text;
+	global scroll_sprites;
+	global NUM_SCROLL_LINES;
+
+	for (i = 0; i < NUM_SCROLL_LINES; i++) {
+		if (string_length(scroll_line_text[i]) > 0) {
+			scroll_sprites[i].SetImage(Image.Text(scroll_line_text[i], 0.82, 0.88, 0.95));
+			scroll_sprites[i].SetOpacity(1);
+		} else {
+			scroll_sprites[i].SetOpacity(0);
+		}
+	}
+}
+
+fun refresh_callback () {
+	global throbber_index;
+	global throbber_sprite;
+	global throbber_image;
+	global throbber_frames;
+
+	throbber_sprite.SetImage(throbber_image[throbber_index]);
+	throbber_index = (throbber_index + 1) % throbber_frames;
+	place_throbber();
+}
+
+fun string_length (s) {
+	idx = 0;
+	while (s.CharAt(idx)) {
+		idx++;
+	}
+	return idx;
+}
+
+fun append_status_line (text) {
+	global scroll_line_text;
+	global NUM_SCROLL_LINES;
+	global LINE_WIDTH;
+
+	if (string_length(text) == 0) {
+		return;
+	}
+
+	if (string_length(text) > LINE_WIDTH) {
+		text = text.SubString(0, LINE_WIDTH - 3);
+		text = text + "...";
+	}
+
+	for (i = 0; i < NUM_SCROLL_LINES - 1; i++) {
+		scroll_line_text[i] = scroll_line_text[i + 1];
+	}
+	scroll_line_text[NUM_SCROLL_LINES - 1] = text;
+	refresh_scroll_display();
+}
+
+fun display_message_callback (text) {
+	append_status_line(text);
+}
+
+fun update_status_callback (text) {
+	append_status_line(text);
+}
+
+fun resize_callback () {
+	place_throbber();
+	place_scroll_lines();
+}
+
+fun boot_up () {
+	global throbber_sprite;
+
+	Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+	Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+	throbber_sprite = Sprite(throbber_image[0]);
+	throbber_sprite.SetOpacity(1);
+	place_throbber();
+	place_scroll_lines();
+
+	Plymouth.SetRefreshFunction(refresh_callback);
+	Plymouth.SetResizeFunction(resize_callback);
+	Plymouth.SetDisplayMessageFunction(display_message_callback);
+	Plymouth.SetUpdateStatusFunction(update_status_callback);
+}
+
+Plymouth.SetBootUpFunction(boot_up);

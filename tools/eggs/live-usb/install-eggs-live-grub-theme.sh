@@ -82,7 +82,7 @@ bash "${HERE}/install-highascg-plymouth-theme.sh"
 
 nthrob="$(find /usr/share/plymouth/themes/highascg -maxdepth 1 -name 'throbber-*.png' 2>/dev/null | wc -l)"
 nthrob="${nthrob//[[:space:]]/}"
-PLYMOUTH_NOTE="highascg two-step throbber (${nthrob} frames: animation 1,2,29,30)"
+PLYMOUTH_NOTE="highascg throbber-script (${nthrob} frames top-right + status log left)"
 echo "OK: eggs theme → ${THEME_ABS}"
 echo "     GRUB: default Live entry (exFAT-only; no union persistence on kernel line)"
 echo "     Plymouth: ${PLYMOUTH_NOTE} (see branding/README.md)"

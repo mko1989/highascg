@@ -1,23 +1,30 @@
 #!/usr/bin/env node
 /**
  * WO-47: run exFAT ↔ project mtime sync from the shell (boot hook / manual).
- * Usage: node tools/runtime/exfat-sync-cli.js [--boot] [--dry-run]
+ * Usage: node tools/runtime/exfat-sync-cli.js [--boot] [--push] [--dry-run]
  */
 'use strict'
 
-const { runExfatSync } = require('../../src/system/exfat-sync')
+const { runExfatSync, pushProjectConfigToExfat } = require('../../src/system/exfat-sync')
 
 const dryRun = process.argv.includes('--dry-run')
 const boot = process.argv.includes('--boot')
+const pushOnly = process.argv.includes('--push')
 
-runExfatSync({
-	dryRun,
-	boot,
-	log: (lvl, m) => {
-		if (lvl === 'warn' || lvl === 'error') console.error(m)
-		else console.log(m)
-	},
-})
+const logFn = (lvl, m) => {
+	if (lvl === 'warn' || lvl === 'error') console.error(m)
+	else console.log(m)
+}
+
+const run = pushOnly
+	? pushProjectConfigToExfat({ dryRun, log: logFn })
+	: runExfatSync({
+			dryRun,
+			boot,
+			log: logFn,
+		})
+
+run
 	.then((r) => {
 		console.log(JSON.stringify(r, null, 2))
 		const benign =

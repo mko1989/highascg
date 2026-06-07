@@ -25,10 +25,11 @@ warn() {
 
 echo "==> verify squashfs excludes: $SQ"
 
-# unsquashfs -l <prefix> — fast; ignore header-only "squashfs-root" line.
+# Full listing — unsquashfs -l "$SQ" <subdir> does not filter reliably.
 squash_has_tree() {
 	local prefix="${1%/}"
-	unsquashfs -l "$SQ" "$prefix" 2>/dev/null | grep -q "^squashfs-root/${prefix}/"
+	# Match directory itself or any path beneath it (unsquashfs -l may list the dir without a trailing child).
+	unsquashfs -l "$SQ" 2>/dev/null | grep -qE "^squashfs-root/${prefix}(/|$)"
 }
 
 # Root-level swap file (not usr/bin/live-swapfile or kernel headers)
@@ -44,7 +45,11 @@ else
 	ok "no /opt/nvidia-pool in squashfs"
 fi
 
-for needle in 'home/casparcg/highascg/node_modules' 'home/casparcg/.antigravity-ide-server'; do
+for needle in \
+	'home/casparcg/highascg/.git' \
+	'usr/lib/penguins-eggs' \
+	'usr/src/linux-headers-6.8.0-117' \
+	'home/casparcg/.antigravity-ide-server'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"
 	else
@@ -52,8 +57,23 @@ for needle in 'home/casparcg/highascg/node_modules' 'home/casparcg/.antigravity-
 	fi
 done
 
+# WO-47 exFAT-only server omits node_modules; embed-server ISO keeps production deps.
+if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "0" ]]; then
+	if squash_has_tree 'home/casparcg/highascg/node_modules'; then
+		bad "unexpected path in squashfs: home/casparcg/highascg/node_modules"
+	else
+		ok "absent: home/casparcg/highascg/node_modules"
+	fi
+else
+	if squash_has_tree 'home/casparcg/highascg/node_modules'; then
+		ok "present: home/casparcg/highascg/node_modules (embed-server ISO)"
+	else
+		warn "missing node_modules — embed-server ISO may not boot standalone"
+	fi
+fi
+
 if unsquashfs -l "$SQ" 2>/dev/null | grep -qE '^squashfs-root/usr_[0-9]/'; then
-	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — run clean-eggs-workspace-before-produce.sh and rebuild"
+	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — reboot and rerun full eggs produce (never rm /home/eggs)"
 fi
 
 tmp="$(mktemp -d)"

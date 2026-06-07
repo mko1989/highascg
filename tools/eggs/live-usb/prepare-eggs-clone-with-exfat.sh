@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bake WO-47 (exFAT + boot sync + media bind + highascg.service ordering) into the host
-# that will become the penguins-eggs --clone squashfs snapshot. Operators then use USB
-# data partition LABEL=HIGHASCGEXF as the sticky “source of truth” (see EXFAT_DATA_ZERO_TOUCH.md).
+# INSTALL/configure WO-47 (exFAT + boot sync + media bind + highascg.service ordering) on the host.
+# Not the check-only prepare step — use work/run-eggs-prepare-safe.sh to verify readiness.
 #
 # Usage (on dev / imaging host):
 #   sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh [casparcg]
@@ -105,9 +104,6 @@ if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 	echo "  installed 20-live-boot.conf (faster AMCP settle + startup testcard)"
 fi
 
-echo "==> clone host audit (swap inactive, no nvidia-pool, exclude.list)"
-bash "${HERE}/audit-eggs-clone-host.sh"
-
 if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 	if [[ "$HIGHASCG_ISO_EMBED_SERVER" == "1" ]]; then
 		export HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${HERE}/penguins-eggs-exclude-highascg-embed-server.list"
@@ -116,14 +112,11 @@ if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 		export HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${HERE}/penguins-eggs-exclude-highascg-fragment.list"
 		echo "==> merge HighAsCG eggs excludes (WO-47 — server from exFAT drop-update/)"
 	fi
-	bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh" --replace || {
-		echo >&2 ""
-		echo >&2 "If merge failed because ${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list} does not exist yet,"
-		echo >&2 "run eggs configuration once, then re-run this script with SKIP_MERGE_EGGS_EXCLUDES=1 for the WO-47 part only,"
-		echo >&2 "or manually create the exclude file and merge again."
-		exit 1
-	}
+	bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh" --replace
 fi
+
+echo "==> clone host audit (swap inactive, no nvidia-pool, exclude.list)"
+bash "${HERE}/audit-eggs-clone-host.sh"
 
 echo ""
 echo "==> Ready for clone snapshot:"

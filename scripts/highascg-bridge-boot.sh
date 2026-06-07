@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WO-52: wait for LABEL=HIGHASCGDAT, mount bridge volume, bind media → ~/highascg/media.
+# WO-52: wait for LABEL=HIGHASCGDAT, mount bridge volume, bind media → ~/highascg/media/bridge.
 set -euo pipefail
 
 LABEL="${BRIDGE_LABEL:-HIGHASCGDAT}"

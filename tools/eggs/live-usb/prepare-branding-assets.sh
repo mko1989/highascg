@@ -9,6 +9,7 @@
 #   branding/splash.boot.png  (1920×1080 RGB — GRUB + isolinux)
 #   branding/splash.boot.jpg  (optional 4:4:4 JPEG for size; not used by GRUB theme)
 #   branding/plymouth/throbber-boot/*.png  (small spinner — two-step throbber only)
+#   branding/plymouth/animation-boot/*.png (RGB full frames — Plymouth script theme)
 #
 # Usage: bash tools/eggs/live-usb/prepare-branding-assets.sh
 set -euo pipefail
@@ -18,6 +19,7 @@ BRANDING="${HERE}/branding"
 SRC_SPLASH="${BRANDING}/splash.png"
 ANIM_SRC="${BRANDING}/plymouth/animation"
 THROBBER_OUT="${BRANDING}/plymouth/throbber-boot"
+ANIM_BOOT="${BRANDING}/plymouth/animation-boot"
 GRUB_BG='#0c1220'
 PLYMOUTH_BG='black'
 GRUB_W=1920
@@ -90,9 +92,43 @@ prepare_throbber_frame_ffmpeg() {
 		" -frames:v 1 -update 1 "$dest"
 }
 
+png_format_desc() {
+	local f="$1"
+	if command -v file >/dev/null 2>&1; then
+		file -b "$f"
+		return 0
+	fi
+	if command -v ffprobe >/dev/null 2>&1; then
+		local fmt
+		fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of csv=p=0 "$f" 2>/dev/null || true)"
+		printf 'PNG %s (%s)\n' "$(basename "$f")" "${fmt:-unknown}"
+		return 0
+	fi
+	printf 'PNG %s\n' "$(basename "$f")"
+}
+
 verify_rgb_png() {
 	local f="$1"
-	file "$f" | grep -q 'RGB' && ! file "$f" | grep -q 'RGBA'
+	if command -v file >/dev/null 2>&1; then
+		file "$f" | grep -q 'RGB' && ! file "$f" | grep -q 'RGBA'
+		return $?
+	fi
+	if command -v ffprobe >/dev/null 2>&1; then
+		local fmt
+		fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of csv=p=0 "$f" 2>/dev/null || true)"
+		case "$fmt" in
+		rgb24 | gray | pal8 | yuvj444p) return 0 ;;
+		*) return 1 ;;
+		esac
+	fi
+	if command -v identify >/dev/null 2>&1; then
+		local ch
+		ch="$(identify -format '%[channels]' "$f" 2>/dev/null || true)"
+		[[ "$ch" == *r* && "$ch" != *a* ]]
+		return $?
+	fi
+	echo "ERROR: need file, ffprobe, or identify to verify RGB PNG (apt install file ffmpeg)" >&2
+	return 1
 }
 
 [[ -f "$SRC_SPLASH" ]] || {
@@ -118,10 +154,10 @@ else
 fi
 if ! verify_rgb_png "${BRANDING}/splash.boot.png"; then
 	echo "ERROR: splash.boot.png must be RGB (no alpha) for GRUB" >&2
-	file "${BRANDING}/splash.boot.png" >&2
+	png_format_desc "${BRANDING}/splash.boot.png" >&2
 	exit 1
 fi
-echo "     ${BRANDING}/splash.boot.png ($(file -b "${BRANDING}/splash.boot.png"))"
+echo "     ${BRANDING}/splash.boot.png ($(png_format_desc "${BRANDING}/splash.boot.png"))"
 echo "     ${BRANDING}/splash.boot.jpg (optional 4:4:4 JPEG)"
 
 mkdir -p "$THROBBER_OUT"
@@ -142,12 +178,44 @@ for src_num in $PLYMOUTH_THROBBER_FRAMES; do
 	fi
 	if ! verify_rgb_png "$dest"; then
 		echo "ERROR: ${dest} is not RGB after flatten — install imagemagick" >&2
-		file "$dest" >&2
+		png_format_desc "$dest" >&2
 		exit 1
 	fi
 	seq_i=$((seq_i + 1))
 done
 throbber_count=$((seq_i - 1))
 sample="$(find "$THROBBER_OUT" -maxdepth 1 -name '*.png' | sort -V | head -1)"
-echo "     ${throbber_count} throbber frame(s) from animation/{${PLYMOUTH_THROBBER_FRAMES}}; sample: $(file -b "$sample")"
+echo "     ${throbber_count} throbber frame(s) from animation/{${PLYMOUTH_THROBBER_FRAMES}}; sample: $(png_format_desc "$sample")"
+
+mkdir -p "$ANIM_BOOT"
+rm -f "${ANIM_BOOT}"/*.png
+if [[ -d "$ANIM_SRC" ]]; then
+	anim_frames=()
+	shopt -s nullglob
+	for f in "${ANIM_SRC}"/*.png; do
+		anim_frames+=("$f")
+	done
+	shopt -u nullglob
+	if [[ ${#anim_frames[@]} -gt 0 ]]; then
+		echo "==> Plymouth animation-boot → ${ANIM_BOOT} (${#anim_frames[@]} frames, RGB for script theme)"
+		mapfile -t anim_sorted < <(printf '%s\n' "${anim_frames[@]}" | sort -V)
+		for f in "${anim_sorted[@]}"; do
+			dest="${ANIM_BOOT}/$(basename "$f")"
+			if [[ "$USE_FFMPEG" -eq 1 ]]; then
+				ffmpeg -y -hide_banner -loglevel error -i "$f" \
+					-filter_complex "[0:v]format=rgba,scale=iw:ih[fg];color=c=black:s=2x2[bg];[bg][fg]scale2ref[background][foreground];[background][foreground]overlay=format=auto,format=rgb24" \
+					-frames:v 1 -update 1 "$dest"
+			else
+				flatten_rgba_imagemagick "$f" "$dest" "$PLYMOUTH_BG"
+			fi
+			verify_rgb_png "$dest" || {
+				echo "ERROR: ${dest} is not RGB" >&2
+				exit 1
+			}
+		done
+		anim_sample="$(find "$ANIM_BOOT" -maxdepth 1 -name '*.png' | sort -V | head -1)"
+		echo "     ${#anim_sorted[@]} animation frame(s); sample: $(png_format_desc "$anim_sample")"
+	fi
+fi
+
 echo "OK: boot-ready branding assets prepared"

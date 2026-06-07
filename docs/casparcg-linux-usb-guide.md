@@ -426,14 +426,14 @@ chmod +x /home/casparcg/highascg/run.sh
 ### 6.1 Install Penguins' Eggs
 
 ```bash
-# Add the Penguins' Eggs repository
-curl -fsSL https://pieroproietti.github.io/penguins-eggs-ppa/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/penguins-eggs.gpg
+# Official apt repo (PPA KEY.gpg is empty — use penguins-eggs.net instead)
+curl -fsSL https://penguins-eggs.net/repos/KEY.asc | sudo gpg --dearmor -o /usr/share/keyrings/penguins-eggs-repos.gpg
 
-echo "deb [signed-by=/usr/share/keyrings/penguins-eggs.gpg] https://pieroproietti.github.io/penguins-eggs-ppa ./" | \
-  sudo tee /etc/apt/sources.list.d/penguins-eggs.list
+echo "deb [signed-by=/usr/share/keyrings/penguins-eggs-repos.gpg] https://penguins-eggs.net/repos/deb stable main" | \
+  sudo tee /etc/apt/sources.list.d/penguins-eggs-repos.list
 
 sudo apt update
-sudo apt install -y eggs
+sudo apt install -y penguins-eggs
 ```
 
 ### 6.2 Initialise Eggs

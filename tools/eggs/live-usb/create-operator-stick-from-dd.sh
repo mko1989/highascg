@@ -66,7 +66,7 @@ fi
 }
 iso_mib="$(du -m "$ISO" | awk '{print $1}')"
 if [[ "$iso_mib" -lt 1500 ]]; then
-	echo "ERROR: ISO is only ${iso_mib} MiB — expected ~3200–4000 MiB for a full live image." >&2
+	echo "ERROR: ISO is only ${iso_mib} MiB — expected ~2400–3500 MiB (lean excludes, no nvidia-pool)." >&2
 	echo "       A truncated squashfs cannot boot. Run full build:" >&2
 	echo "       sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
 	exit 1
@@ -107,20 +107,40 @@ for mp in /home/casparcg/exfat /home/casparcg/highascg/media/exfat; do
 		umount "$mp" 2>/dev/null || true
 	fi
 done
+
+if command -v fuser >/dev/null 2>&1 && fuser -s "$DEV" 2>/dev/null; then
+	echo "ERROR: ${DEV} is already in use (another dd or mount?):" >&2
+	fuser -v "$DEV" >&2 || true
+	echo "Wait for the other write to finish, or reboot if a prior dd is stuck." >&2
+	exit 1
+fi
+
+echo "Syncing filesystem buffers before write (can take a minute)…" >&2
 sync
-dd if="$ISO" of="$DEV" bs=4M status=progress oflag=sync conv=fsync
+echo "Writing ISO to ${DEV} (~5–15 min)…" >&2
+# conv=fsync syncs every 4M block — often hangs for minutes on USB; one sync after dd is enough.
+if command -v pv >/dev/null 2>&1; then
+	pv -ptebar -s "$ISO_BYTES" "$ISO" | dd of="$DEV" bs=4M status=progress
+else
+	dd if="$ISO" of="$DEV" bs=4M iflag=fullblock status=progress
+fi
+echo "Flushing to stick…" >&2
 sync
+echo "ISO write complete."
 partprobe "$DEV"
 sleep 2
 lsblk -f "$DEV"
 
-echo "==> 2/3 exFAT + seed (finish-operator-stick, no persistence)"
+echo "==> 2/4 exFAT + operator layout (finish-operator-stick, no persistence)"
 export HIGHASCG_EXFAT_ONLY=1
 export EXFAT_FILL_DISK=1
 bash "${HERE}/install-exfat-sync-map.sh"
 bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale
 
-echo "==> 3/3 Verify boot layout"
+echo "==> 3/4 Push running config → fresh HIGHASCGEXF (configs/, state JSON)"
+bash "${HERE}/seed-stick-config-from-host.sh" "$DEV"
+
+echo "==> 4/4 Verify boot layout"
 bash "${HERE}/usb-restore-esp-flags.sh" "$DEV"
 bash "${HERE}/verify-operator-stick-branding.sh" "$DEV" "$ISO"
 if ! "$PARTED" -s "$DEV" unit MiB print 2>/dev/null | grep -qi esp; then

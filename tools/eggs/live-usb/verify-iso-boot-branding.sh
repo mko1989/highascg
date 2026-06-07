@@ -3,6 +3,9 @@
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/verify-iso-boot-branding.sh [/path/to/highascg*.iso]
+#
+# Env:
+#   HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST=1  — grub.cfg + splash only (skip slow initrd lsinitramfs)
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -99,10 +102,12 @@ if [[ -n "$GRUB_CFG" ]]; then
 	if grep -q 'Live/Installation' "$GRUB_CFG"; then
 		bad "grub.cfg is stock eggs Live/Installation (rebuild with --theme highascg-eggs-theme)"
 	fi
-	if grep -qE '(^|[[:space:]])splash([[:space:]]|$)' <<<"$first_linux"; then
-		ok "grub.cfg default linux line has splash (Plymouth)"
+	if grep -qE '(^|[[:space:]])nosplash([[:space:]]|$)' <<<"$first_linux"; then
+		ok "grub.cfg default linux line has nosplash (full early dmesg)"
+	elif grep -qE '(^|[[:space:]])splash([[:space:]]|$)' <<<"$first_linux"; then
+		warn "default grub line uses splash (Plymouth) — expected nosplash for default Live"
 	else
-		bad "grub.cfg default linux line missing splash"
+		bad "grub.cfg default linux line missing nosplash (or splash alternate)"
 	fi
 	if grep -qE '(^|[[:space:]])systemd\.show_status=true([[:space:]]|$)' <<<"$first_linux"; then
 		ok "grub.cfg default linux line has systemd.show_status=true (RPi-style status log)"
@@ -114,10 +119,16 @@ if [[ -n "$GRUB_CFG" ]]; then
 	else
 		bad "grub.cfg missing nvidia-drm.fbdev=1 — Plymouth animation will not show on NVIDIA GPU"
 	fi
-	if grep -q 'HIGHASCG Live' "$GRUB_CFG"; then
-		ok "grub.cfg has HIGHASCG Live menuentry"
+	if grep -q 'Live (Plymouth splash)' "$GRUB_CFG" && \
+		grep -qE '(^|[[:space:]])splash([[:space:]]|$)' "$GRUB_CFG"; then
+		ok "grub.cfg has alternate Live (Plymouth splash) menuentry"
 	else
-		bad "grub.cfg missing HIGHASCG Live — stock eggs menu or wrong theme"
+		warn "grub.cfg missing alternate Plymouth splash menuentry"
+	fi
+	if grep -qE 'menuentry "[^"]+ Live"' "$GRUB_CFG"; then
+		ok "grub.cfg has custom Live menuentry (highascg-eggs-theme)"
+	else
+		bad "grub.cfg missing custom Live menuentry — stock eggs menu or wrong theme"
 	fi
 	GRUB_MAIN="$MNT/boot/grub/grub.cfg"
 	if grep -q 'insmod gfxterm' "$GRUB_MAIN" 2>/dev/null; then
@@ -175,7 +186,9 @@ done
 [[ -z "$INITRD" && -f "$MNT/live/initrd.img" ]] && INITRD="$MNT/live/initrd.img"
 shopt -u nullglob
 [[ -n "$INITRD" && -f "$INITRD" ]] || bad "no live/initrd*.img on ISO"
-if [[ -n "$INITRD" ]]; then
+if [[ "${HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST:-0}" == "1" ]]; then
+	ok "fast verify — skipped initrd lsinitramfs (Plymouth/NVIDIA initrd checks)"
+elif [[ -n "$INITRD" ]]; then
 	# ISO9660 loop mounts often break lsinitramfs on large initrds; use a normal file path.
 	INITRD_BASENAME="$(basename "$INITRD")"
 	EGGS_STAGING="${EGGS_ISO_WORK:-/home/eggs/mnt/iso}/live/${INITRD_BASENAME}"
@@ -206,7 +219,9 @@ if [[ -n "$INITRD" ]]; then
 	else
 		bad "live initrd missing plymouth — kernel will show console text"
 	fi
-	if initrd_contains "$INITRD_LOCAL" 'usr/share/plymouth/themes/highascg/throbber-0001.png'; then
+	if initrd_contains "$INITRD_LOCAL" 'usr/share/plymouth/themes/highascg/highascg.script'; then
+		ok "live initrd contains highascg.script (status log + corner throbber)"
+	elif initrd_contains "$INITRD_LOCAL" 'usr/share/plymouth/themes/highascg/throbber-0001.png'; then
 		ok "live initrd contains throbber-0001.png (small spinner)"
 	else
 		bad "live initrd missing throbber-0001.png — run install-highascg-plymouth-theme.sh + inject"

@@ -86,8 +86,10 @@ else
 fi
 
 if systemctl cat highascg-exfat-sync.service &>/dev/null; then
-	log "Starting highascg-exfat-sync.service (blocking)"
-	systemctl start highascg-exfat-sync.service 2>>"$LOG" || log "WARN: exfat-sync failed or skipped"
+	# Must be --no-block: exfat-sync.service After=highascg-exfat-boot.service.
+	# A blocking start here deadlocks until TimeoutStartSec (90s) then highascg starts late.
+	log "Queueing highascg-exfat-sync.service (--no-block; highascg.service waits on it)"
+	systemctl start --no-block highascg-exfat-sync.service 2>>"$LOG" || log "WARN: queue exfat-sync failed"
 else
 	log "Skip missing unit highascg-exfat-sync.service"
 fi

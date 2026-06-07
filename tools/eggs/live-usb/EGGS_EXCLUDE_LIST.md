@@ -7,6 +7,27 @@ Single file to replace **`/etc/penguins-eggs.d/exclude.list`** on the eggs build
 | **[`exclude.list`](exclude.list)** | Ready to install (eggs master + one HighAsCG block) |
 | [`penguins-eggs-exclude-highascg-fragment.list`](penguins-eggs-exclude-highascg-fragment.list) | HighAsCG-only lines (for merge script) |
 
+## Safety: will prepare / produce erase `/usr`, `/bin`, …?
+
+**`prepare-eggs-clone-with-exfat.sh` is safe** — it only installs systemd units, merges `exclude.list`, creates empty mount stubs under `~/highascg/media` and `~/exfat`, tweaks swap **fstab** (restored after produce), and runs `apt install` for stick tooling. It does **not** delete or replace `/usr`, `/bin`, `/lib`, etc.
+
+**The danger is `eggs produce --clone` staging (`/home/eggs/liveroot`):** while produce runs (or after a **crashed/interrupted** produce), eggs **bind-mounts your live** `/usr`, `/opt`, `/home`, … **into** `/home/eggs/liveroot/`. If you then run `rm -rf /home/eggs/liveroot` or `umount -R /home/eggs/liveroot`, you destroy the **real** system tree.
+
+| Action | Safe on running host? |
+|--------|------------------------|
+| `prepare-eggs-clone-with-exfat.sh` | Yes |
+| `build-highascg-egg.sh` (normal completion) | Yes |
+| `stop-and-unmount-wo47-for-eggs-produce.sh` **before** produce | Yes (guarded — refuses if bind mounts exist) |
+| `rm -rf /home/eggs/liveroot` during/after interrupted produce | **NO — can wipe `/usr`** |
+| `HIGHASCG_FORCE_SQUASHFS_REFRESH=1` while bind mounts active | **NO** |
+| `inject-iso-boot-branding.sh` (default: skip squashfs refresh) | Yes |
+
+**If a build was interrupted:** **reboot** (clears liveroot bind mounts), then rerun the build script. Do **not** delete anything under `/home/eggs`. Audit before produce:
+
+```bash
+sudo bash tools/eggs/live-usb/audit-eggs-clone-host.sh
+```
+
 ## Install (overwrite `/etc`)
 
 ```bash

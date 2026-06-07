@@ -334,20 +334,32 @@ fetch_ndi_sdk_tarball() {
 ensure_highascg_caspar_launcher() {
     local root="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"
     local bin="${root}/bin/casparcg"
-    local run_src="${SCRIPT_DIR}/run.sh"
-    local user="${USER_CASPAR:-casparcg}"
+    local run_src user="${USER_CASPAR:-casparcg}"
 
     [ -x "$bin" ] || {
         echo -e "  ${RED}Missing ${bin} — restore your custom Caspar build into ${root}/bin/${NC}" >&2
         return 1
     }
 
-    if [ -f "$run_src" ]; then
-        install -m 0755 -o "$user" -g "$user" "$run_src" "${root}/run.sh"
-    elif [ -f "${SCRIPT_DIR}/tools/runtime/casparcg-run.sh" ]; then
-        install -m 0755 -o "$user" -g "$user" "${SCRIPT_DIR}/tools/runtime/casparcg-run.sh" "${root}/run.sh"
+    local run_dest="${root}/run.sh"
+    local run_canonical="${SCRIPT_DIR}/tools/runtime/casparcg-run.sh"
+    if [ -f "$run_canonical" ]; then
+        run_src="$run_canonical"
+    elif [ -f "${SCRIPT_DIR}/run.sh" ]; then
+        run_src="${SCRIPT_DIR}/run.sh"
+    else
+        run_src=""
     fi
-    chmod +x "${root}/run.sh" 2>/dev/null || true
+
+    if [ -n "$run_src" ] && [ -f "$run_src" ]; then
+        if [ "$run_src" -ef "$run_dest" ]; then
+            chmod 0755 "$run_dest" 2>/dev/null || true
+            chown "$user:$user" "$run_dest" 2>/dev/null || true
+        else
+            install -m 0755 -o "$user" -g "$user" "$run_src" "$run_dest"
+        fi
+    fi
+    chmod +x "$run_dest" 2>/dev/null || true
     echo -e "  ${GREEN}✓${NC} Caspar binary ${bin} (launcher ${root}/run.sh)"
 
     # Remove mistaken /opt installer from earlier runs (does not affect restored bin/).
@@ -355,6 +367,7 @@ ensure_highascg_caspar_launcher() {
 }
 
 # Pinned CEF: system layout /usr/lib/cef/<ver>/<triplet>/ + playout ~/highascg/lib for run.sh.
+# Overlays Release/* and Resources into lib/ via cp -a — does not wipe libndi.so etc.
 install_highascg_cef_binary() {
     local url="${HIGHASCG_CEF_TAR_URL:-${URL_CEF_BINARY_TAR:-}}"
     local root="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"

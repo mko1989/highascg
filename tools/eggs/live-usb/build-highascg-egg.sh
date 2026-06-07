@@ -39,8 +39,14 @@ fi
 echo "==> WO-47 exFAT + empty mount stubs + eggs exclude merge (operator-stick truth baked into clone snapshot)"
 HIGHASCG_SKIP_BOOT_BRANDING_IN_PREPARE=1 SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
 
-echo "==> Latest single kernel (apt generic + eggs.yaml + purge older images)"
-HIGHASCG_ENSURE_LATEST_KERNEL=1 HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/sync-eggs-kernel-and-purge-stale.sh"
+if [[ -f /etc/highascg/pinned-kernel ]]; then
+	echo "==> Pinned kernel $(cat /etc/highascg/pinned-kernel) — eggs.yaml + purge non-pinned images (no linux-image-generic)"
+	HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/sync-eggs-kernel-and-purge-stale.sh"
+else
+	echo "==> Latest single kernel (apt generic + eggs.yaml + purge older images)"
+	echo "WARN: no /etc/highascg/pinned-kernel — this may install a newer HWE kernel" >&2
+	HIGHASCG_ENSURE_LATEST_KERNEL=1 HIGHASCG_SKIP_HOST_INITRAMFS=1 bash "${HERE}/sync-eggs-kernel-and-purge-stale.sh"
+fi
 
 echo "==> Install network + firmware essentials for live image"
 apt-get update
@@ -83,11 +89,7 @@ bash "${HERE}/reset-iso-operator-config.sh"
 echo "==> Clone host audit (swap, nvidia-pool, excludes, branding)"
 bash "${HERE}/audit-eggs-clone-host.sh"
 
-echo "==> Umount WO-47 paths (empty stubs only in squashfs)"
-umount /home/casparcg/bridge /home/casparcg/exfat /home/casparcg/highascg/media 2>/dev/null || true
-
-echo "==> Clean eggs liveroot / stale squashfs (avoid usr_1 duplicate bloat)"
-bash "${HERE}/clean-eggs-workspace-before-produce.sh"
+bash "${HERE}/pre-produce-preflight.sh"
 
 echo "==> Finalize GRUB splash + Plymouth initramfs (must run immediately before eggs produce)"
 bash "${HERE}/finalize-boot-branding-for-eggs-produce.sh"
@@ -118,15 +120,27 @@ HIGHASCG_SKIP_SQUASHFS_REFRESH=1 bash "${HERE}/inject-iso-boot-branding.sh"
 echo "==> Verify squashfs excludes (no swap file, nvidia-pool, dev trees)"
 bash "${HERE}/verify-iso-squashfs-excludes.sh"
 
-echo "==> Verify ISO boot branding (persistence on default linux line, splash, plymouth)"
-bash "${HERE}/verify-iso-boot-branding.sh" || {
-	echo "ERROR: ISO boot branding check failed — do not flash this ISO." >&2
-	exit 1
-}
+if [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY:-0}" == "1" ]]; then
+	echo "==> Skip ISO boot branding verify (HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1)"
+else
+	echo "==> Verify ISO boot branding (set HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1 or FAST=1 to shorten)"
+	HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST="${HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST:-0}" \
+		bash "${HERE}/verify-iso-boot-branding.sh" || {
+		echo "ERROR: ISO boot branding check failed — do not flash this ISO." >&2
+		exit 1
+	}
+fi
 
 if [[ "${SKIP_STRIP_HOST_SWAP:-0}" != "1" ]]; then
 	bash "${HERE}/strip-host-swap-for-live-iso.sh" restore
 fi
+
+echo "==> Remount bridge/USB + config sync (eggs produce umounts volumes for squashfs)"
+bash "${HERE}/unmask-exfat-systemd.sh"
+systemctl reset-failed highascg-exfat-boot.service 2>/dev/null || true
+bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null || {
+	echo "WARN: remount/sync skipped — run: sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" >&2
+}
 
 # shellcheck source=flash-stick-common.sh
 source "${HERE}/flash-stick-common.sh" 2>/dev/null || true

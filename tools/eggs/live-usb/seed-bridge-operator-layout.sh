@@ -17,7 +17,7 @@ if [[ ! -f "$README" ]]; then
 	cat >"$README" <<'EOF'
 HighAsCG bridge partition (LABEL=HIGHASCGDAT)
 
-  media/     Sole Caspar/HighAsCG media library (bind-mounted to ~/highascg/media on Linux)
+  media/     Bridge media library (bind-mounted to ~/highascg/media/bridge on Linux)
   configs/   Modular settings + .highascg-state.json (synced with ~/highascg/config)
   drop-config/  Optional monolithic highascg.config.json overlay
 

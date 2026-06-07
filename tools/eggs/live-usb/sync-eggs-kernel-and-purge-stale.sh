@@ -52,6 +52,9 @@ purge_kernel_pkg() {
 
 mapfile -t installed < <(dpkg -l 'linux-image-[0-9]*-generic' 2>/dev/null | awk '/^ii/{print $2}' | sort -V)
 keep="linux-image-${KVER}"
+if [[ -f /etc/highascg/pinned-kernel ]]; then
+	echo "==> Pinned kernel — keep ${keep} only"
+fi
 for kpkg in "${installed[@]}"; do
 	[[ "$kpkg" == "$keep" ]] && continue
 	purge_kernel_pkg "$kpkg"

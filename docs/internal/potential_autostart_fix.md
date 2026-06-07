@@ -12,7 +12,7 @@ Install on the playout host:
 sudo install -m 0755 tools/casparcg-run.sh /opt/casparcg/run.sh
 ```
 
-**If AMCP `RESTART` still “hangs”** (no second process, log stops): the Caspar process is stuck *inside* teardown — the shell is still waiting on the first `casparcg`. The wrapper cannot fix that. Try: close HTML producers before restart, wipe **`cef-cache`**, shorten **`command-line-args`** / disable GPU in config, or use **`KILL`** and rely on **`CASPAR_RESPAWN=1`** or systemd **`Restart=`** instead of `RESTART`.
+**If AMCP `RESTART` still “hangs”** (no second process, log stops): the Caspar process is stuck *inside* teardown — `run.sh` blocks on the first `casparcg`. **`pkill -f 'bin/casparcg.*config/casparcg.config'`** (main process only) so **`CASPAR_RESPAWN=1`** can start again. Also try: close HTML producers before restart, wipe **`cef-cache`**, shorten **`command-line-args`** / disable GPU in config, or use **`KILL`** instead of `RESTART`.
 
 **If RESTART exits with a code other than 5** (wrapper exits and does not relaunch): run once, send `RESTART`, then `echo $?` in a wrapper, or check logs — set e.g. `export CASPAR_RESTART_EXIT_CODES="5 42"` before `run.sh`.
 

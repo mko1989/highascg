@@ -54,16 +54,8 @@ else
 
     cd /opt/casparcg || exit 1
     /usr/bin/casparcg-scanner &
-
-    while true; do
-      cd /opt/casparcg || exit 1
-      mkdir -p /opt/casparcg/cef-cache
-      find /opt/casparcg/cef-cache -mindepth 1 -delete 2>/dev/null || true
-      /usr/bin/casparcg-server-2.5 /opt/casparcg/config/casparcg.config >> /tmp/caspar.log 2>&1
-      # Wait until nothing listens on AMCP (adjust port if your config differs)
-      while ss -tlnp 2>/dev/null | grep -qE ':5250\b'; do sleep 1; done
-      sleep 2
-    done
+    export CASPAR_RESPAWN=1
+    ./run.sh >> /tmp/caspar.log 2>&1
   ) &
 fi
 ```

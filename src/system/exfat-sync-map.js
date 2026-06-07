@@ -17,7 +17,7 @@ const DEFAULT_VOLUMES = {
 		id: 'bridge',
 		label: 'Bridge disk (HIGHASCGDAT)',
 		mount: '/home/casparcg/bridge',
-		mediaMount: '/home/casparcg/highascg/media',
+		mediaMount: '/home/casparcg/highascg/media/bridge',
 	},
 	usb: {
 		id: 'usb',

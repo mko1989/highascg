@@ -43,7 +43,7 @@ test('validateMap accepts WO-52 multi-volume shape', () => {
 				id: 'usb-media-ingest',
 				volume: 'usb',
 				exfat: 'media',
-				project: '/home/casparcg/highascg/media',
+				project: '/home/casparcg/highascg/media/bridge',
 				direction: 'to_project',
 				bootPrefer: 'exfat',
 			},

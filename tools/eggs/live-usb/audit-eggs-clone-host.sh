@@ -12,8 +12,11 @@ set -euo pipefail
 }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=eggs-liveroot-safety.sh
+source "${HERE}/eggs-liveroot-safety.sh"
 STRICT="${HIGHASCG_AUDIT_STRICT:-1}"
 EXCLUDE="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
+LIVEROOT="$(eggs_liveroot_default)"
 FAIL=0
 WARN=0
 
@@ -32,6 +35,14 @@ ok() {
 
 echo "==> HighAsCG eggs clone host audit (strict=${STRICT})"
 
+# --- liveroot: never produce/clean while eggs bind-mounts live /usr, /opt, … ---
+if eggs_liveroot_has_host_bind_mounts "$LIVEROOT"; then
+	fail "eggs liveroot has LIVE system bind mounts under ${LIVEROOT} — reboot before produce (rm/umount there can erase /usr, /bin, …)"
+	eggs_liveroot_print_host_bind_mounts "$LIVEROOT"
+else
+	ok "no eggs liveroot bind mounts (safe to run eggs produce — never rm ${LIVEROOT})"
+fi
+
 # --- swap: must not be active; file may stay on disk if excluded ---
 for sw in /swap.img /swapfile; do
 	if swapon --show 2>/dev/null | grep -qF "$sw"; then
@@ -49,15 +60,15 @@ if [[ -f /swapfile ]]; then
 	fi
 fi
 
-# --- tmpfs / runtime mounts: must not be bind-mounted into clone paths ---
-for mp in /home/casparcg/highascg/media /home/casparcg/exfat /home/casparcg/bridge; do
-	if findmnt -T "$mp" >/dev/null 2>&1; then
-		SRC="$(findmnt -T "$mp" -no SOURCE 2>/dev/null || true)"
-		FST="$(findmnt -T "$mp" -no FSTYPE 2>/dev/null || true)"
+# --- WO-47 volumes: warn only when path is an actual mount point (not merely on /) ---
+for mp in /home/casparcg/highascg/media/bridge /home/casparcg/highascg/media/exfat /home/casparcg/exfat /home/casparcg/bridge; do
+	if findmnt -n "$mp" >/dev/null 2>&1; then
+		SRC="$(findmnt -n "$mp" -no SOURCE 2>/dev/null || true)"
+		FST="$(findmnt -n "$mp" -no FSTYPE 2>/dev/null || true)"
 		case "$FST" in
 		tmpfs | autofs) fail "$mp is on $FST ($SRC) — umount before clone" ;;
 		exfat | ext4 | btrfs | xfs | vfat)
-			warn "$mp is mounted ($FST $SRC) — ensure content is empty/stubs only (see ensure-empty-live-usb-dirs.sh)"
+			warn "$mp is mounted ($FST $SRC) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)"
 			;;
 		*) warn "$mp is mounted ($FST $SRC)" ;;
 		esac
@@ -76,9 +87,35 @@ else
 	ok "no /opt/nvidia-pool on host"
 fi
 
+# --- NVIDIA 595 for ISO clone (Blackwell needs open kernel modules) ---
+if dpkg-query -W cuda-drivers &>/dev/null && journalctl -k -b --no-pager 2>/dev/null | grep -q 'requires use of the NVIDIA open kernel modules'; then
+	fail "closed cuda-drivers cannot init Blackwell — run: sudo bash scripts/install-nvidia-cuda-repo-open-595.sh"
+elif dpkg-query -W nvidia-open &>/dev/null || dpkg-query -W nvidia-driver-open &>/dev/null; then
+	if [[ -r /proc/driver/nvidia/version ]] && grep -q 'Open Kernel Module' /proc/driver/nvidia/version 2>/dev/null; then
+		ok "nvidia-open + Open Kernel Module loaded (required for Blackwell)"
+	else
+		warn "nvidia-open installed but kernel still closed — reboot"
+	fi
+elif dpkg-query -W cuda-drivers &>/dev/null && dpkg-query -W cuda-keyring &>/dev/null; then
+	ok "cuda-drivers + cuda-keyring (closed — OK only on pre-Blackwell GPUs)"
+elif dpkg-query -W nvidia-driver-595 &>/dev/null && dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null; then
+	warn "Ubuntu nvidia-driver-595 stack — migrate to CUDA repo: sudo bash scripts/install-nvidia-cuda-repo-595.sh"
+elif dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null && ! dpkg-query -W nvidia-driver-595 &>/dev/null; then
+	fail "linux-modules without userspace — run: sudo bash scripts/restore-nvidia-595-closed-userspace.sh or install-nvidia-cuda-repo-595.sh"
+elif command -v nvidia-smi &>/dev/null; then
+	warn "nvidia-smi present but cuda-drivers not installed — run install-nvidia-cuda-repo-595.sh before eggs produce"
+else
+	warn "no NVIDIA driver — run: sudo bash scripts/install-nvidia-cuda-repo-595.sh"
+fi
+if ! command -v aplay &>/dev/null; then
+	warn "alsa-utils missing (aplay) — sudo apt install alsa-utils"
+else
+	ok "alsa-utils present"
+fi
+
 # --- exclude.list installed and merged ---
 if [[ ! -f "$EXCLUDE" ]]; then
-	fail "missing ${EXCLUDE} — run: sudo cp tools/eggs/live-usb/exclude.list ${EXCLUDE} && sudo bash tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh --replace"
+	fail "missing ${EXCLUDE} — run: sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT=${HERE}/penguins-eggs-exclude-highascg-embed-server.list bash ${HERE}/merge-penguins-eggs-exclude-highascg.sh --replace"
 else
 	ok "exclude.list present ($(wc -l <"$EXCLUDE") lines)"
 	for needle in 'home/casparcg/.antigravity-ide-server' 'opt/nvidia-pool' 'swapfile' 'tmp/\*'; do
@@ -90,19 +127,41 @@ else
 	done
 fi
 
-# --- IDE bloat on build host (excluded, but warn if huge) ---
-for dir in /home/casparcg/.antigravity-ide-server /home/casparcg/.cursor-server /home/casparcg/highascg/node_modules; do
+# --- IDE bloat on build host (always excluded from squashfs) ---
+for dir in /home/casparcg/.antigravity-ide-server /home/casparcg/.cursor-server; do
 	if [[ -d "$dir" ]]; then
 		warn "$(du -sh "$dir" 2>/dev/null | awk -v d="$dir" '{print $1 " " d}') on host — must stay out of squashfs via exclude.list"
 	fi
 done
+
+# --- node_modules: embed-server ISO needs it; WO-47 shell omits it (exFAT drop-update/) ---
+EMBED_SERVER="${HIGHASCG_ISO_EMBED_SERVER:-1}"
+NM="/home/casparcg/highascg/node_modules"
+if [[ "$EMBED_SERVER" == "1" ]]; then
+	if [[ -d "$NM" ]] && [[ -f /home/casparcg/highascg/package.json ]]; then
+		ok "node_modules present ($(du -sh "$NM" 2>/dev/null | awk '{print $1}')) — embed-server ISO will include production deps"
+	else
+		warn "node_modules missing — run prepare / install-iso-defaults (npm ci) before produce for standalone boot"
+	fi
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/highascg/node_modules' "$EXCLUDE"; then
+		fail "exclude.list omits node_modules but HIGHASCG_ISO_EMBED_SERVER=1 — re-merge embed-server fragment (node_modules must be IN squashfs)"
+	fi
+else
+	if [[ -d "$NM" ]]; then
+		warn "$(du -sh "$NM" 2>/dev/null | awk '{print $1}') $NM on host — WO-47 shell: must stay out of squashfs (server from exFAT drop-update/)"
+	fi
+	if [[ -f "$EXCLUDE" ]] && ! grep -qE '^home/casparcg/highascg/node_modules' "$EXCLUDE"; then
+		warn "exclude.list missing node_modules lines (WO-47 shell should omit them from squashfs)"
+	fi
+fi
 
 # --- boot branding ready ---
 BRANDING="${HERE}/branding/splash.png"
 THEME_SPLASH="${HERE}/highascg-eggs-theme/theme/livecd/splash.png"
 if [[ ! -f "$BRANDING" ]]; then
 	fail "missing ${BRANDING} — GRUB will show stock eggs penguins"
-elif [[ -f "$THEME_SPLASH" ]] && cmp -s "$BRANDING" "$THEME_SPLASH"; then
+elif [[ -f "$THEME_SPLASH" ]] && { cmp -s "${HERE}/branding/splash.boot.png" "$THEME_SPLASH" 2>/dev/null \
+	|| cmp -s "$BRANDING" "$THEME_SPLASH" 2>/dev/null; }; then
 	ok "GRUB splash.png ready in highascg-eggs-theme"
 else
 	warn "run install-eggs-live-grub-theme.sh / finalize-boot-branding before produce"

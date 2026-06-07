@@ -39,7 +39,7 @@ systemctl start highascg-bridge-boot.service
 echo ""
 echo "Bridge mount:"
 findmnt "$MP" || true
-findmnt /home/casparcg/highascg/media || true
+findmnt /home/casparcg/highascg/media/bridge || true
 echo ""
 echo "Sync map:"
 grep -E '"version"|HIGHASCG' /etc/highascg/exfat-sync.json | head -5

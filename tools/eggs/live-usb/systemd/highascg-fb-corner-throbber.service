@@ -1,0 +1,21 @@
+[Unit]
+Description=HighAsCG corner throbber on framebuffer (nosplash dmesg overlay)
+Documentation=file:/usr/share/doc/highascg/fb-corner-throbber.txt
+DefaultDependencies=no
+After=dev-fb0.device systemd-udev-settle.service
+Before=nodm.service display-manager.service
+ConditionPathExists=/dev/fb0
+ConditionPathExists=/usr/local/bin/highascg-fb-corner-throbber
+
+[Service]
+Type=simple
+# Geometry is written at install time by install-fb-corner-throbber.sh (do not hand-edit 60x80).
+ExecStart=/usr/local/bin/highascg-fb-corner-throbber \
+	-d /usr/share/highascg/boot-throbber \
+	-w 60 -h 80 -c 4 -m 20 -i 200
+Restart=no
+KillMode=mixed
+TimeoutStopSec=2
+
+[Install]
+WantedBy=sysinit.target

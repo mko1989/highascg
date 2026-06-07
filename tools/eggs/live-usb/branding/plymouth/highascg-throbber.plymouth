@@ -1,0 +1,10 @@
+[Plymouth Theme]
+Name=HighAsCG
+Description=HighAsCG boot splash (status log left, throbber-boot top-right)
+ModuleName=script
+ImageDir=/usr/share/plymouth/themes/highascg
+ScriptFile=/usr/share/plymouth/themes/highascg/highascg.script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/highascg
+ScriptFile=/usr/share/plymouth/themes/highascg/highascg.script

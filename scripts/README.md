@@ -1,5 +1,20 @@
 # Production install
 
+## Recommended: step-by-step setup
+
+For clean host rebuilds (kernel → verify → NVIDIA → NDI → Caspar deps → DeckLink manual → Node):
+
+```bash
+cd ~/highascg
+sudo bash scripts/setup/01-kernel-117.sh   # see scripts/setup/README.md
+```
+
+Full order: **[setup/README.md](setup/README.md)**. **Manual install guide:** **[setup/MANUAL_INSTALL.md](setup/MANUAL_INSTALL.md)**. Legacy one-off scripts are listed in **[deprecated/README.md](deprecated/README.md)**.
+
+---
+
+## Legacy monolith (still works)
+
 From a cloned repo (see main [README.md](../README.md) for Node app setup):
 
 ```bash

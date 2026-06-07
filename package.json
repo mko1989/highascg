@@ -56,7 +56,8 @@
 		"eggs:prepare": "sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh",
 		"exfat:starter-zip": "bash tools/eggs/live-usb/pack-exfat-starter-zip.sh",
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
-		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh"
+		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh",
+		"eggs:clone-flash-tmux": "bash work/run-eggs-clone-flash-tmux.sh --attach"
 	},
 	"engines": {
 		"node": ">=20"

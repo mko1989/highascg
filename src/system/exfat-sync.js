@@ -91,7 +91,13 @@ async function pushProjectConfigToExfat(opts) {
 			assertSafeProjectPath(projectAbs)
 			prSt = fs.statSync(projectAbs)
 		} catch (e) {
-			errors.push(`${p.id}: ${e instanceof Error ? e.message : e}`)
+			const msg = e instanceof Error ? e.message : String(e)
+			// Optional state / drop-config files may not exist until the app has run once.
+			if (/ENOENT|no such file or directory/i.test(msg)) {
+				skipped += 1
+				continue
+			}
+			errors.push(`${p.id}: ${msg}`)
 			continue
 		}
 		const exPred = (rel) => isExcluded(rel, p.exclude || [])
@@ -271,6 +277,15 @@ async function runExfatSync(opts) {
 		copied += r.copied
 		skipped += r.skipped
 		errors.push(...r.errors)
+	}
+
+	// Boot pulls volume → project first (bootPrefer exfat). Empty configs/ on bridge/USB
+	// never get seeded without this push (eggs build clears stick; playout host edits RAM only).
+	if (boot && anyVolumeMounted) {
+		const push = await pushProjectConfigToExfat({ log, dryRun })
+		copied += push.copied
+		skipped += push.skipped
+		errors.push(...(push.errors || []))
 	}
 
 	log('info', `[exfat-sync] done boot=${boot} dryRun=${dryRun} copied=${copied} skipped=${skipped} errors=${errors.length}`)

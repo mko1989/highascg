@@ -6,7 +6,7 @@
 			"id": "bridge",
 			"label": "Bridge disk (HIGHASCGDAT)",
 			"mount": "/home/casparcg/bridge",
-			"mediaMount": "/home/casparcg/highascg/media"
+			"mediaMount": "/home/casparcg/highascg/media/bridge"
 		},
 		"usb": {
 			"id": "usb",
@@ -108,7 +108,7 @@
 			"volume": "usb",
 			"label": "USB: media field kit → playout library (one-way)",
 			"exfat": "media",
-			"project": "/home/casparcg/highascg/media",
+			"project": "/home/casparcg/highascg/media/bridge",
 			"direction": "to_project",
 			"bootPrefer": "exfat",
 			"exclude": []
