@@ -2,7 +2,10 @@
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
-const { mergeProjectCatalogs } = require('../../src/engine/project-volume-sync')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { mergeProjectCatalogs, copyIfSrcNewer } = require('../../src/engine/project-volume-sync')
 
 describe('project-volume-sync catalog merge', () => {
 	it('prefers USB catalog when mounted and timestamps tie', () => {
@@ -16,6 +19,19 @@ describe('project-volume-sync catalog merge', () => {
 		assert.equal(merged.length, 1)
 		assert.equal(merged[0].source, 'usb')
 		assert.equal(merged[0].name, 'Stick Show')
+	})
+
+	it('copyIfSrcNewer updates when source is newer', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-vol-'))
+		const src = path.join(dir, 'src.json')
+		const dst = path.join(dir, 'dst.json')
+		fs.writeFileSync(dst, '{"v":1}', 'utf8')
+		const old = Date.now() - 60_000
+		fs.utimesSync(dst, old / 1000, old / 1000)
+		fs.writeFileSync(src, '{"v":2}', 'utf8')
+		assert.equal(copyIfSrcNewer(src, dst), true)
+		assert.equal(fs.readFileSync(dst, 'utf8'), '{"v":2}')
+		fs.rmSync(dir, { recursive: true, force: true })
 	})
 
 	it('keeps newest savedAt across sources', () => {

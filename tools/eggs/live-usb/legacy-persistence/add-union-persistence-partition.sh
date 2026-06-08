@@ -25,11 +25,12 @@ DRY=false
 DEV=""
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=usb-env.sh
-source "${HERE}/usb-env.sh"
-MKPART_SH="${HERE}/usb-mkpart-numbered.sh"
-RESTORE_ESP_SH="${HERE}/usb-restore-esp-flags.sh"
-SLOTS_PY="${HERE}/usb-partition-slots.py"
+LIVE_USB="$(cd "${HERE}/.." && pwd)"
+# shellcheck source=../usb-env.sh
+source "${LIVE_USB}/usb-env.sh"
+MKPART_SH="${LIVE_USB}/usb-mkpart-numbered.sh"
+RESTORE_ESP_SH="${LIVE_USB}/usb-restore-esp-flags.sh"
+SLOTS_PY="${LIVE_USB}/usb-partition-slots.py"
 
 usage() {
   echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2

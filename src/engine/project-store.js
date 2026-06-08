@@ -3,7 +3,11 @@
 const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
-const { listProjectsFromVolumes, pullProjectSlugFromUsbIfNewer } = require('./project-volume-sync')
+const {
+	listProjectsFromVolumes,
+	pullProjectSlugFromUsbIfNewer,
+	pullAutosaveSlugFromVolumesIfNewer,
+} = require('./project-volume-sync')
 
 const PROJECTS_DIR = path.join(REPO_ROOT, 'projects')
 const AUTOSAVE_SUBDIR = '_autosave'
@@ -143,6 +147,9 @@ function writeAutosaveFile(slug, project) {
  */
 function readAutosaveFile(slug) {
 	if (!slug) return null
+	try {
+		pullAutosaveSlugFromVolumesIfNewer(slug)
+	} catch (_) {}
 	const p = autosaveFilePath(slug)
 	if (!fs.existsSync(p)) return null
 	try {

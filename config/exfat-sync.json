@@ -66,8 +66,7 @@
 			"exfat": "projects",
 			"project": "/home/casparcg/highascg/projects",
 			"direction": "both",
-			"bootPrefer": "exfat",
-			"exclude": ["_autosave"]
+			"bootPrefer": "exfat"
 		},
 		{
 			"id": "usb-modular-config",
@@ -120,8 +119,7 @@
 			"exfat": "projects",
 			"project": "/home/casparcg/highascg/projects",
 			"direction": "to_project",
-			"bootPrefer": "exfat",
-			"exclude": ["_autosave"]
+			"bootPrefer": "exfat"
 		},
 		{
 			"id": "usb-media-ingest",

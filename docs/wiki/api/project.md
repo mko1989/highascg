@@ -43,10 +43,12 @@ Legacy **`/api/data/*`** → **410 Gone** — use project routes instead.
 |----------|------|
 | `~/highascg/projects/<slug>.json` | Working copy on the playout host |
 | `~/highascg/projects/_autosave/<slug>.json` | Autosave for active slug |
-| **USB stick** `HIGHASCGEXF` → `projects/*.json` | **Field catalog** — listed when stick is mounted; boot pulls stick → working dir |
-| **Bridge disk** `HIGHASCGDAT` → `projects/*.json` | Production sync — bidirectional mtime sync with working dir |
+| **USB stick** `HIGHASCGEXF` → `projects/*.json` + `projects/_autosave/*.json` | **Field catalog** — listed when stick is mounted; boot pulls stick → working dir |
+| **Bridge disk** `HIGHASCGDAT` → `projects/*.json` + `_autosave/` | Production sync — bidirectional mtime sync with working dir |
 
-**Save behaviour:** each save writes the working copy, then pushes **only that slug** to USB and/or bridge when those volumes are mounted. The server never bulk-copies the whole local `projects/` tree onto the stick.
+**Save behaviour:** each save/autosave writes the working copy and `_autosave/`, then pushes **only that slug** (main + autosave files) to USB and/or bridge when those volumes are mounted.
+
+**Boot behaviour:** `exfat-sync --boot` pulls `projects/` **including `_autosave/`** from the stick (and bridge when mounted). On load, `readAutosaveFile` refreshes from the newest volume copy so reboot restores where the operator left off.
 
 **List behaviour:** when USB is mounted, `GET /api/project/list` reads the catalog from the stick (`source: "usb"`). Without USB, local + bridge entries are merged (newest `savedAt` wins).
 

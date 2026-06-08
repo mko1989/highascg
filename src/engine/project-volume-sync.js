@@ -157,6 +157,30 @@ function copyIfExists(src, dst) {
 }
 
 /**
+ * Copy `src` → `dst` when source is newer than destination (or dest missing).
+ * @returns {boolean}
+ */
+function copyIfSrcNewer(src, dst) {
+	if (!fs.existsSync(src)) return false
+	let stSrc
+	try {
+		stSrc = fs.statSync(src)
+	} catch {
+		return false
+	}
+	let stDst = null
+	try {
+		stDst = fs.statSync(dst)
+	} catch {
+		stDst = null
+	}
+	if (stDst && stDst.mtimeMs >= stSrc.mtimeMs && stDst.size >= stSrc.size) return false
+	fs.mkdirSync(path.dirname(dst), { recursive: true })
+	copyFilePreserveTimes(src, dst)
+	return true
+}
+
+/**
  * Push one saved project (and its autosave) to mounted USB and/or bridge.
  * Never bulk-copies the whole projects/ tree — only the slug being saved.
  * @param {string} slug
@@ -203,23 +227,42 @@ function pullProjectSlugFromUsbIfNewer(slug) {
 	if (!s) return false
 	const usbFile = path.join(volumeProjectsDir(roots.usb), `${s}.json`)
 	const localFile = path.join(roots.local, `${s}.json`)
-	if (!fs.existsSync(usbFile)) return false
-	let stUsb
-	let stLocal
-	try {
-		stUsb = fs.statSync(usbFile)
-	} catch {
-		return false
+	return copyIfSrcNewer(usbFile, localFile)
+}
+
+/**
+ * After boot / before load: refresh working autosave from USB or bridge (newest wins).
+ * @param {string} slug
+ */
+function pullAutosaveSlugFromVolumesIfNewer(slug) {
+	const roots = getProjectRoots()
+	const s = String(slug || '').trim()
+	if (!s) return false
+	const localFile = path.join(roots.local, AUTOSAVE_SUBDIR, `${s}.json`)
+	/** @type {string[]} */
+	const sources = []
+	if (roots.usb && isVolumeMountedSync(roots.usb)) {
+		sources.push(path.join(volumeProjectsDir(roots.usb), AUTOSAVE_SUBDIR, `${s}.json`))
 	}
-	try {
-		stLocal = fs.statSync(localFile)
-	} catch {
-		stLocal = null
+	if (roots.bridge && isVolumeMountedSync(roots.bridge)) {
+		sources.push(path.join(volumeProjectsDir(roots.bridge), AUTOSAVE_SUBDIR, `${s}.json`))
 	}
-	if (stLocal && stLocal.mtimeMs >= stUsb.mtimeMs && stLocal.size >= stUsb.size) return false
-	fs.mkdirSync(path.dirname(localFile), { recursive: true })
-	copyFilePreserveTimes(usbFile, localFile)
-	return true
+	let best = ''
+	let bestMtime = -1
+	for (const src of sources) {
+		if (!fs.existsSync(src)) continue
+		try {
+			const st = fs.statSync(src)
+			if (st.mtimeMs > bestMtime) {
+				bestMtime = st.mtimeMs
+				best = src
+			}
+		} catch {
+			/* skip */
+		}
+	}
+	if (!best) return false
+	return copyIfSrcNewer(best, localFile)
 }
 
 module.exports = {
@@ -233,4 +276,6 @@ module.exports = {
 	listProjectsFromVolumes,
 	pushProjectSlugToVolumes,
 	pullProjectSlugFromUsbIfNewer,
+	pullAutosaveSlugFromVolumesIfNewer,
+	copyIfSrcNewer,
 }

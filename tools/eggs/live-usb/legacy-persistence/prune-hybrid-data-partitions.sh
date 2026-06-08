@@ -6,8 +6,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=usb-env.sh
-source "${HERE}/usb-env.sh"
+LIVE_USB="$(cd "${HERE}/.." && pwd)"
+# shellcheck source=../usb-env.sh
+source "${LIVE_USB}/usb-env.sh"
 
 DEV="${1:?}"
 ISO_ARG=""

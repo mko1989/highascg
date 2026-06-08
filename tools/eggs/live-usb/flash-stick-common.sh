@@ -129,12 +129,13 @@ confirm_dd_flash() {
 }
 
 # Write ISO → whole disk with periodic progress on stderr.
-# Plain status=progress is often silent under "sudo bash script.sh" (no controlling TTY).
-# SIGUSR1 makes GNU dd print copied bytes/speed — same as interactive dd.
+# status=progress is often silent under "sudo bash script.sh"; SIGUSR1 + wait can abort the script.
+# Poll /sys/block/.../stat instead (no signals sent to dd).
 dd_iso_with_progress() {
 	local iso="$1" dev="$2"
 	local bs="${3:-4M}"
 	local dd_pid progress_pid dd_rc=0
+	local dev_base iso_bytes sectors bytes
 
 	[[ -f "$iso" ]] || {
 		echo "ISO not found: $iso" >&2
@@ -145,11 +146,23 @@ dd_iso_with_progress() {
 		return 1
 	}
 
+	dev_base="$(basename "$dev")"
+	iso_bytes="$(stat -c%s "$iso")"
+
 	echo "Writing ${iso} → ${dev} (bs=${bs}) …" >&2
-	dd if="$iso" of="$dev" bs="$bs" iflag=fullblock status=progress &
+	dd if="$iso" of="$dev" bs="$bs" iflag=fullblock status=none &
 	dd_pid=$!
 	(
-		while kill -USR1 "$dd_pid" 2>/dev/null; do
+		while kill -0 "$dd_pid" 2>/dev/null; do
+			if [[ -r "/sys/block/${dev_base}/stat" ]]; then
+				sectors="$(awk '{print $7}' "/sys/block/${dev_base}/stat")"
+				bytes=$((sectors * 512))
+				printf '%s  written: ' "$(date +%H:%M:%S)" >&2
+				numfmt --to=iec-i --suffix=B "$bytes" 2>/dev/null || printf '%s B' "$bytes" >&2
+				printf ' / ' >&2
+				numfmt --to=iec-i --suffix=B "$iso_bytes" 2>/dev/null || printf '%s B' "$iso_bytes" >&2
+				echo >&2
+			fi
 			sleep 2
 		done
 	) &
