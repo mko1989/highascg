@@ -446,7 +446,7 @@ decklink_report_status() {
         echo "  desktopvideo: NOT installed"
         echo "    Download Desktop Video for Linux from Blackmagic, then:"
         echo "      export HIGHASCG_DECKLINK_TAR=/path/to/Blackmagic_Desktop_Video_Linux_*.tar.gz"
-        echo "      sudo -E bash scripts/install.sh"
+        echo "      sudo -E bash scripts/setup/01-kernel-117.sh  # or legacy scripts/install.sh"
         echo "    Or: cp tarball /tmp/decklink.tar.gz and re-run install"
     fi
     command -v desktopvideo_setup >/dev/null && echo "  desktopvideo_setup: $(command -v desktopvideo_setup)" || echo "  desktopvideo_setup: not found (optional GUI)"

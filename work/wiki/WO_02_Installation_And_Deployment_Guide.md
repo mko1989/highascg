@@ -20,12 +20,21 @@ Running `sudo ./scripts/install.sh` sequentially sources five phases. It assumes
 2. **Networking**: Installs Tailscale for secure LAN/WAN access and Syncthing (exposing its GUI on `0.0.0.0:8384` for the operator).
 3. **USB Ingest Prep**: Installs `udisks2` and `policykit-1` to allow the unprivileged `casparcg` user to auto-mount drives (via `/etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules`).
 4. **NVIDIA Pinning**: Reads `HIGHASCG_NVIDIA_DRIVER` (e.g., `595`) and stamps it to `/etc/highascg/nvidia-iso-driver`, disabling multi-branch boot hooks.
-5. **Systemd Unit Setup**: Calls `scripts/write-highascg-systemd-unit.sh`. If running headless, it drops a configuration at `/etc/systemd/system/highascg.service.d/10-headless.conf`:
+5. **Systemd Unit Setup**: Calls `scripts/write-highascg-systemd-unit.sh` and `scripts/install-exfat-systemd-units.sh` (bridge + USB mounts, exFAT sync map from `config/exfat-sync.json`). If running headless, it drops a configuration at `/etc/systemd/system/highascg.service.d/10-headless.conf`:
    ```ini
    [Service]
    Environment=HIGHASCG_HEADLESS=true
    ```
 6. **MOTD Injection**: Rewrites `/etc/update-motd.d/99-highascg` to print the Tailscale IP and Web UI link when an operator SSHes into the box.
+
+**Operator stick seeding** (after `finish-operator-stick.sh`):
+
+```bash
+sudo bash tools/eggs/live-usb/seed-exfat-operator-layout.sh /home/casparcg/exfat
+sudo bash tools/eggs/live-usb/seed-stick-config-from-host.sh /dev/sda   # optional: push configs/
+```
+
+Creates `projects/`, `configs/`, `drop-update/`, etc. on `HIGHASCGEXF`. See [`docs/BRIDGE_DISK_AND_USB_EXFAT.md`](../../docs/BRIDGE_DISK_AND_USB_EXFAT.md).
 
 ### Dev Deployment (`scripts/dev-push.sh`)
 For rapid iteration without rebuilding the ISO, the `npm run deploy:dev` command executes `dev-push.sh`.

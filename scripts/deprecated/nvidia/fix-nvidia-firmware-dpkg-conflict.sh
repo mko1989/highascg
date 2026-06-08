@@ -19,8 +19,9 @@ set -euo pipefail
 }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=apt-block-service-starts.sh
-source "${HERE}/apt-block-service-starts.sh"
+REPO_ROOT="$(cd "${HERE}/../.." && pwd)"
+# shellcheck source=../../lib/apt-block-service-starts.sh
+source "${REPO_ROOT}/scripts/lib/apt-block-service-starts.sh"
 
 log() { echo "==> $*"; }
 

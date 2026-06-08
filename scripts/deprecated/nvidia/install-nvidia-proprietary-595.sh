@@ -11,5 +11,5 @@
 #   sudo bash scripts/restore-nvidia-595-closed-userspace.sh
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec bash "${REPO_ROOT}/scripts/install-nvidia-cuda-repo-595.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+exec bash "${REPO_ROOT}/scripts/deprecated/nvidia/install-nvidia-cuda-repo-595.sh"

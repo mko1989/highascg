@@ -10,6 +10,8 @@ USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"
 mkdir -p \
 	"${ROOT}/media" \
 	"${ROOT}/configs" \
+	"${ROOT}/projects" \
+	"${ROOT}/projects/_autosave" \
 	"${ROOT}/drop-config"
 
 README="${ROOT}/README.txt"
@@ -19,6 +21,7 @@ HighAsCG bridge partition (LABEL=HIGHASCGDAT)
 
   media/     Bridge media library (bind-mounted to ~/highascg/media/bridge on Linux)
   configs/   Modular settings + .highascg-state.json (synced with ~/highascg/config)
+  projects/  Show files (*.json) synced with ~/highascg/projects (bidirectional)
   drop-config/  Optional monolithic highascg.config.json overlay
 
 Format: mkfs.exfat -L HIGHASCGDAT /dev/sdXN

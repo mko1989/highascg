@@ -97,7 +97,7 @@ if [ -n "${HIGHASCG_NVIDIA_DRIVER:-}" ]; then
 		;;
 	esac
 fi
-DISABLE_NV="$SCRIPT_DIR/scripts/disable-nvidia-multi-driver-boot.sh"
+DISABLE_NV="$SCRIPT_DIR/scripts/nvidia/disable-nvidia-multi-driver-boot.sh"
 if [ -f "$DISABLE_NV" ]; then
 	bash "$DISABLE_NV" && echo -e "  ${GREEN}✓${NC} disabled nvidia pick-nvidia / pool boot hooks"
 fi
@@ -248,7 +248,7 @@ if [ -f /home/casparcg/highascg/package.json ]; then
     chown -R "$USER_CASPAR:$USER_CASPAR" /home/casparcg/highascg/media /home/casparcg/highascg/log \
         /home/casparcg/highascg/template /home/casparcg/highascg/data /home/casparcg/highascg/cef-cache \
         /home/casparcg/highascg/lib 2>/dev/null || true
-    EXFAT_UNIT_SH="$SCRIPT_DIR/scripts/install-exfat-systemd-units.sh"
+    EXFAT_UNIT_SH="$SCRIPT_DIR/scripts/exfat/install-exfat-systemd-units.sh"
     if [ -f "$EXFAT_UNIT_SH" ]; then
         echo -e "${CYAN}→ WO-47 exFAT systemd units (by-label mount + boot sync)…${NC}"
         if bash "$EXFAT_UNIT_SH" "$USER_CASPAR"; then
@@ -263,7 +263,7 @@ fi
 
 # systemd service (ensure unit exists whenever the app tree is present)
 if [ -f /home/casparcg/highascg/package.json ]; then
- HG_UNIT_SH="$SCRIPT_DIR/scripts/write-highascg-systemd-unit.sh"
+ HG_UNIT_SH="$SCRIPT_DIR/scripts/exfat/write-highascg-systemd-unit.sh"
  if [ -f "$HG_UNIT_SH" ]; then
   bash "$HG_UNIT_SH" "$USER_CASPAR"
  else

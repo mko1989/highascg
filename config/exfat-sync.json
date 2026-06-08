@@ -60,6 +60,16 @@
 			"exclude": []
 		},
 		{
+			"id": "bridge-projects",
+			"volume": "bridge",
+			"label": "Bridge: show projects (projects/ ↔ working dir, mtime sync)",
+			"exfat": "projects",
+			"project": "/home/casparcg/highascg/projects",
+			"direction": "both",
+			"bootPrefer": "exfat",
+			"exclude": ["_autosave"]
+		},
+		{
 			"id": "usb-modular-config",
 			"volume": "usb",
 			"label": "USB: modular settings (field prep)",
@@ -102,6 +112,16 @@
 			"bootPrefer": "exfat",
 			"pushOnSave": true,
 			"exclude": []
+		},
+		{
+			"id": "usb-projects",
+			"volume": "usb",
+			"label": "USB: show projects (stick → working dir at boot; per-save push only)",
+			"exfat": "projects",
+			"project": "/home/casparcg/highascg/projects",
+			"direction": "to_project",
+			"bootPrefer": "exfat",
+			"exclude": ["_autosave"]
 		},
 		{
 			"id": "usb-media-ingest",

@@ -89,7 +89,7 @@ fi
 
 # --- NVIDIA 595 for ISO clone (Blackwell needs open kernel modules) ---
 if dpkg-query -W cuda-drivers &>/dev/null && journalctl -k -b --no-pager 2>/dev/null | grep -q 'requires use of the NVIDIA open kernel modules'; then
-	fail "closed cuda-drivers cannot init Blackwell — run: sudo bash scripts/install-nvidia-cuda-repo-open-595.sh"
+	fail "closed cuda-drivers cannot init Blackwell — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
 elif dpkg-query -W nvidia-open &>/dev/null || dpkg-query -W nvidia-driver-open &>/dev/null; then
 	if [[ -r /proc/driver/nvidia/version ]] && grep -q 'Open Kernel Module' /proc/driver/nvidia/version 2>/dev/null; then
 		ok "nvidia-open + Open Kernel Module loaded (required for Blackwell)"
@@ -99,13 +99,13 @@ elif dpkg-query -W nvidia-open &>/dev/null || dpkg-query -W nvidia-driver-open &
 elif dpkg-query -W cuda-drivers &>/dev/null && dpkg-query -W cuda-keyring &>/dev/null; then
 	ok "cuda-drivers + cuda-keyring (closed — OK only on pre-Blackwell GPUs)"
 elif dpkg-query -W nvidia-driver-595 &>/dev/null && dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null; then
-	warn "Ubuntu nvidia-driver-595 stack — migrate to CUDA repo: sudo bash scripts/install-nvidia-cuda-repo-595.sh"
+	warn "Ubuntu nvidia-driver-595 stack — migrate: sudo bash scripts/setup/03-nvidia-open-595.sh"
 elif dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null && ! dpkg-query -W nvidia-driver-595 &>/dev/null; then
-	fail "linux-modules without userspace — run: sudo bash scripts/restore-nvidia-595-closed-userspace.sh or install-nvidia-cuda-repo-595.sh"
+	fail "linux-modules without userspace — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
 elif command -v nvidia-smi &>/dev/null; then
-	warn "nvidia-smi present but cuda-drivers not installed — run install-nvidia-cuda-repo-595.sh before eggs produce"
+	warn "nvidia-smi present but cuda-drivers not installed — run scripts/setup/03-nvidia-open-595.sh before eggs produce"
 else
-	warn "no NVIDIA driver — run: sudo bash scripts/install-nvidia-cuda-repo-595.sh"
+	warn "no NVIDIA driver — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
 fi
 if ! command -v aplay &>/dev/null; then
 	warn "alsa-utils missing (aplay) — sudo apt install alsa-utils"

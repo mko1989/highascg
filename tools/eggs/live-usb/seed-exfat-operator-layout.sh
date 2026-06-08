@@ -14,6 +14,8 @@ mkdir -p \
 	"${ROOT}/media" \
 	"${ROOT}/templates" \
 	"${ROOT}/configs" \
+	"${ROOT}/projects" \
+	"${ROOT}/projects/_autosave" \
 	"${ROOT}/snapshots/rear-panels"
 
 README="${ROOT}/drop-update/README.txt"

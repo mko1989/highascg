@@ -76,13 +76,9 @@ for unit in highascg-exfat-media-prep.service highascg-exfat-server-update.servi
 	fi
 done
 
-if [[ -f /etc/highascg/legacy-usb-media-bind ]]; then
-	if systemctl cat home-casparcg-highascg-media-exfat.mount &>/dev/null; then
-		log "Legacy: queue home-casparcg-highascg-media-exfat.mount"
-		systemctl start --no-block home-casparcg-highascg-media-exfat.mount 2>>"$LOG" || true
-	fi
-else
-	log "WO-52: USB media/exfat bind disabled (bridge owns ~/highascg/media)"
+if systemctl cat home-casparcg-highascg-media-exfat.mount &>/dev/null; then
+	log "Queueing home-casparcg-highascg-media-exfat.mount (~/exfat/media → ~/highascg/media/exfat)"
+	systemctl start --no-block home-casparcg-highascg-media-exfat.mount 2>>"$LOG" || log "WARN: queue exfat media bind failed"
 fi
 
 if systemctl cat highascg-exfat-sync.service &>/dev/null; then

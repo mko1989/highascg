@@ -78,7 +78,51 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 | POST | `/api/logs/clear` |
 | GET | `/api/host-stats` |
 
-### Logs query
+**Caspar:** not required.
+
+### exFAT sync dashboard (`GET /api/system/exfat-sync`)
+
+Returns the installed sync map (`/etc/highascg/exfat-sync.json` or repo `config/exfat-sync.json`) with per-pair mount status, paths, and existence flags. Useful before/after inserting the operator USB stick or bridge disk.
+
+```bash
+curl -s http://127.0.0.1:4200/api/system/exfat-sync | jq '.volumes, .pairs[] | select(.id | test("project"))'
+```
+
+Key pairs (see [BRIDGE_DISK_AND_USB_EXFAT.md](../../BRIDGE_DISK_AND_USB_EXFAT.md)):
+
+| Pair id | Volume | Direction | Role |
+|---------|--------|-----------|------|
+| `bridge-modular-config` | bridge | both | `configs/` ↔ `~/highascg/config/` |
+| `usb-modular-config` | usb | to_project | Stick configs → host at boot |
+| `usb-media-ingest` | usb | to_project | `media/` → `~/highascg/media/bridge` (one-way) |
+| `bridge-projects` | bridge | both | `projects/` ↔ `~/highascg/projects/` (mtime sync) |
+| `usb-projects` | usb | to_project | Stick `projects/` → working dir at boot only |
+
+**Project saves** use a separate code path (`project-volume-sync.js`): each `POST /api/project/save` pushes **only the saved slug** to mounted USB/bridge volumes. The `usb-projects` pair does **not** use `pushOnSave` — stick catalog updates happen on explicit project save, not on Settings save.
+
+### Run sync (`POST /api/system/exfat-sync/run`)
+
+Preview (no writes):
+
+```bash
+curl -s -X POST http://127.0.0.1:4200/api/system/exfat-sync/run \
+  -H 'Content-Type: application/json' \
+  -d '{"dryRun": true}' | jq .
+```
+
+Commit mtime sync (overwrites older side per pair direction):
+
+```bash
+curl -s -X POST http://127.0.0.1:4200/api/system/exfat-sync/run \
+  -H 'Content-Type: application/json' \
+  -d '{"dryRun": false, "confirm": "EXFAT_SYNC"}' | jq .
+```
+
+**400** without `dryRun: true` or `confirm: "EXFAT_SYNC"`.
+
+Implementation: [`src/api/routes-exfat-sync.js`](../../../src/api/routes-exfat-sync.js) · [`src/system/exfat-sync.js`](../../../src/system/exfat-sync.js)
+
+---
 
 ```bash
 curl -s 'http://127.0.0.1:4200/api/logs?lines=100&source=highascg' | jq .

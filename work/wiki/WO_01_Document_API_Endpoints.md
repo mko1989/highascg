@@ -62,6 +62,14 @@ The server listens to OSC state packets (typically on UDP port `6251`) sent by C
 
 Project configurations (looks, templates, sequences) are saved locally on the playout machine disk.
 
+### `GET /api/project/list`
+
+When the operator USB stick (`HIGHASCGEXF`) is mounted, the catalog is read from **`/home/casparcg/exfat/projects/`**. Each row includes `source` (`usb`, `bridge`, or `local`) and the response adds `volumes.usb` / `volumes.bridge` mount status.
+
+Merge rule: newest `savedAt` wins; on ties with USB mounted, stick entries win.
+
+See full schema: [`docs/wiki/api/project.md`](../../docs/wiki/api/project.md).
+
 ### `POST /api/project/save`
 **Payload Schema:**
 ```json

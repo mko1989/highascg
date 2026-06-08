@@ -25,6 +25,7 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 
 | Document | Topic |
 |----------|--------|
+| [**HTML wiki**](wiki-site/index.html) | **Standalone browser UI** — open `docs/wiki-site/index.html` (`npm run wiki:build` after doc edits) |
 | [wiki/api/README.md](wiki/api/README.md) | **HTTP API wiki** (all endpoints, examples, OpenAPI YAML) |
 | [wiki/api/scene-take.md](wiki/api/scene-take.md) | **`POST /api/scene/take`** (detailed) |
 | [wiki/api/playback.md](wiki/api/playback.md) | **Playback** — play/load/stop/clear, etc. |

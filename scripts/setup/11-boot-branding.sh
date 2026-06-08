@@ -16,4 +16,4 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
 
-exec bash "${SCRIPTS_DIR}/install-host-boot-branding.sh"
+exec bash "${SCRIPTS_BOOT}/install-host-boot-branding.sh"

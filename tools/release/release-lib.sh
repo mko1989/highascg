@@ -4,7 +4,7 @@ set -euo pipefail
 
 RELEASE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../scripts/archive-common.sh
-source "${RELEASE_LIB_DIR}/../../scripts/archive-common.sh"
+source "${RELEASE_LIB_DIR}/../../scripts/lib/archive-common.sh"
 
 release_lib_repo_root() {
 	(cd "${RELEASE_LIB_DIR}/../.." && pwd)

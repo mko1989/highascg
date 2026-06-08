@@ -10,6 +10,7 @@ WO-52 splits operator storage into two volumes.
 | **Linux mount** | `/home/casparcg/bridge` |
 | **Media library** | `bridge/media/` bind-mounted to **`/home/casparcg/highascg/media/bridge`** (local files under `media/` stay visible) |
 | **Configs** | `bridge/configs/` ↔ `~/highascg/config/` + state JSON (bidirectional, boot prefers bridge) |
+| **Projects** | `bridge/projects/*.json` ↔ `~/highascg/projects/` (bidirectional mtime sync) |
 
 Create on Windows (Disk Management) or Linux:
 
@@ -38,6 +39,7 @@ sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /home/casparcg/brid
 | **Linux mount** | `/home/casparcg/exfat` |
 | **Media** | `exfat/media/` → **one-way ingest** into `~/highascg/media/bridge` (USB → bridge library only) |
 | **Configs** | `exfat/configs/` ↔ project (bidirectional; boot prefers USB when stick present) |
+| **Projects** | `exfat/projects/*.json` — stick catalog; boot pulls to `~/highascg/projects/`; saves push **only the active slug** while stick mounted |
 | **Server drops** | `drop-update/` (unchanged) |
 
 Use [`HIGHASCGEXF-starter-layout.zip`](../dist/HIGHASCGEXF-starter-layout.zip) for USB folder stubs.

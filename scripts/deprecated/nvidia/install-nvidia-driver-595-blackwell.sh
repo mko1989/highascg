@@ -15,9 +15,9 @@ set -euo pipefail
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=apt-block-service-starts.sh
-source "${SCRIPT_DIR}/apt-block-service-starts.sh"
+source "${REPO_ROOT}/scripts/lib/apt-block-service-starts.sh"
 
 KREL="$(uname -r)"
 STAMP=/etc/highascg/nvidia-kernel-module-type
@@ -60,7 +60,7 @@ log "Block service starts during package configure"
 highascg_apt_block_service_starts
 
 log "Install closed prebuilt modules + userspace (no nvidia-dkms-595)"
-bash "${REPO_ROOT}/scripts/fix-nvidia-dkms-prebuilt-conflict.sh" "${KREL}"
+bash "${REPO_ROOT}/scripts/deprecated/nvidia/fix-nvidia-dkms-prebuilt-conflict.sh" "${KREL}"
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 	"linux-modules-nvidia-595-${KREL}" \
 	nvidia-kernel-common-595 \
@@ -76,12 +76,12 @@ for pkg in "linux-modules-nvidia-595-${KREL}" nvidia-utils-595 \
 done
 apt-mark hold nvidia-dkms-595 nvidia-kernel-source-595 nvidia-driver-595 2>/dev/null || true
 
-if [[ -f "${REPO_ROOT}/scripts/install-nvidia-gsp-rpc-workaround.sh" ]]; then
+if [[ -f "${REPO_ROOT}/scripts/deprecated/nvidia/install-nvidia-gsp-rpc-workaround.sh" ]]; then
 	log "GSP RPC / blank-screen workaround (playout host)"
-	HIGHASCG_SKIP_INITRAMFS=1 bash "${REPO_ROOT}/scripts/install-nvidia-gsp-rpc-workaround.sh" || true
+	HIGHASCG_SKIP_INITRAMFS=1 bash "${REPO_ROOT}/scripts/deprecated/nvidia/install-nvidia-gsp-rpc-workaround.sh" || true
 fi
-if [[ -f "${REPO_ROOT}/scripts/install-nvidia-persistenced-boot-order.sh" ]]; then
-	bash "${REPO_ROOT}/scripts/install-nvidia-persistenced-boot-order.sh"
+if [[ -f "${REPO_ROOT}/scripts/boot/install-nvidia-persistenced-boot-order.sh" ]]; then
+	bash "${REPO_ROOT}/scripts/boot/install-nvidia-persistenced-boot-order.sh"
 fi
 
 log "Update initramfs"

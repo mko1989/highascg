@@ -12,4 +12,4 @@
 
 **NPM (this repo):** `release:github-server` · `eggs:build` · `deploy:dev`
 
-**Shared layout:** [`scripts/archive-common.sh`](../../scripts/archive-common.sh) — server at repo root only; no `client/` in this repository.
+**Shared layout:** [`scripts/lib/archive-common.sh`](../../scripts/lib/archive-common.sh) — server at repo root only; no `client/` in this repository.

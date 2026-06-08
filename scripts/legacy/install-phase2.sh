@@ -43,28 +43,28 @@ if [ "$HAS_NVIDIA_GPU" = true ]; then
             case "${HIGHASCG_NVIDIA_DRIVER}" in
             535|580|595)
                 if [[ "${HIGHASCG_NVIDIA_DRIVER}" == "595" ]]; then
-                    echo "  Installing proprietary NVIDIA ${HIGHASCG_NVIDIA_DRIVER} (CUDA repo: cuda-keyring + cuda-drivers)"
-                    bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+                    echo "  Installing NVIDIA open 595 (scripts/setup/03-nvidia-open-595.sh)"
+                    bash "${SCRIPT_DIR}/scripts/setup/03-nvidia-open-595.sh"
                 else
-                    echo -e "  ${YELLOW}CUDA repo installer only wired for 595 — use install-nvidia-cuda-repo-595.sh${NC}"
-                    HIGHASCG_NVIDIA_DRIVER=595 bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+                    echo -e "  ${YELLOW}Only 595 is supported — use setup/03-nvidia-open-595.sh${NC}"
+                    bash "${SCRIPT_DIR}/scripts/setup/03-nvidia-open-595.sh"
                 fi
                 ;;
             *)
-                echo -e "  ${YELLOW}HIGHASCG_NVIDIA_DRIVER invalid — use 535, 580, or 595; defaulting to 595${NC}"
-                bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+                echo -e "  ${YELLOW}HIGHASCG_NVIDIA_DRIVER invalid — use 595; defaulting to open 595${NC}"
+                bash "${SCRIPT_DIR}/scripts/setup/03-nvidia-open-595.sh"
                 ;;
             esac
         else
-            echo "  Installing proprietary NVIDIA 595 (CUDA repo: cuda-keyring + cuda-drivers)"
-            bash "${SCRIPT_DIR}/scripts/install-nvidia-cuda-repo-595.sh"
+            echo "  Installing NVIDIA open 595 (scripts/setup/03-nvidia-open-595.sh)"
+            bash "${SCRIPT_DIR}/scripts/setup/03-nvidia-open-595.sh"
         fi
         install_nvidia_persistenced_packages
         if systemctl list-unit-files nvidia-persistenced.service &>/dev/null || \
            [ -f /usr/lib/systemd/system/nvidia-persistenced.service ]; then
             systemctl unmask nvidia-persistenced 2>/dev/null || true
             systemctl enable nvidia-persistenced 2>/dev/null || true
-            bash "${SCRIPT_DIR}/scripts/install-nvidia-persistenced-boot-order.sh"
+            bash "${SCRIPT_DIR}/scripts/boot/install-nvidia-persistenced-boot-order.sh"
             systemctl start nvidia-persistenced 2>/dev/null || true
         fi
         nvidia-smi -pm 1 2>/dev/null || true

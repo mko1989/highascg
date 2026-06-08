@@ -65,7 +65,7 @@ else
 	log "Mounted $MP ← $(findmnt -n -o SOURCE,FSTYPE "$MP")"
 fi
 
-for unit in highascg-bridge-media-prep.service home-casparcg-highascg-media.mount; do
+for unit in highascg-bridge-media-prep.service home-casparcg-highascg-media-bridge.mount; do
 	if systemctl cat "$unit" &>/dev/null; then
 		log "Queueing $unit (--no-block)"
 		systemctl start --no-block "$unit" 2>>"$LOG" || log "WARN: queue ${unit} failed"

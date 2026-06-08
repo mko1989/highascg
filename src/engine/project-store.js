@@ -3,6 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
+const { listProjectsFromVolumes, pullProjectSlugFromUsbIfNewer } = require('./project-volume-sync')
 
 const PROJECTS_DIR = path.join(REPO_ROOT, 'projects')
 const AUTOSAVE_SUBDIR = '_autosave'
@@ -79,6 +80,9 @@ function migrateLegacySingleProject(persistence) {
  */
 function readProjectFile(slug) {
 	if (!slug) return null
+	try {
+		pullProjectSlugFromUsbIfNewer(slug)
+	} catch (_) {}
 	const p = projectFilePath(slug)
 	if (!fs.existsSync(p)) return null
 	try {
@@ -165,35 +169,15 @@ function readLegacyAutosaveIfMatches(slug) {
 }
 
 /**
- * @returns {Array<{ slug: string, name: string, savedAt: string | null, path: string }>}
+ * @returns {Array<{ slug: string, name: string, savedAt: string | null, path: string, source?: string }>}
  */
 function listProjectFiles() {
 	ensureProjectsDir()
-	const out = []
-	let names
 	try {
-		names = fs.readdirSync(PROJECTS_DIR)
-	} catch {
-		return out
+		return listProjectsFromVolumes()
+	} catch (_) {
+		return []
 	}
-	for (const ent of names) {
-		if (!ent.endsWith('.json')) continue
-		const slug = ent.slice(0, -5)
-		const project = readProjectFile(slug)
-		if (!project) continue
-		out.push({
-			slug,
-			name: String(project.name || slug),
-			savedAt: project.savedAt || null,
-			path: projectFilePath(slug),
-		})
-	}
-	out.sort((a, b) => {
-		const ta = Date.parse(a.savedAt || '') || 0
-		const tb = Date.parse(b.savedAt || '') || 0
-		return tb - ta
-	})
-	return out
 }
 
 /**

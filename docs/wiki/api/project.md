@@ -37,7 +37,22 @@ Legacy **`/api/data/*`** → **410 Gone** — use project routes instead.
 
 ---
 
-## Project JSON shape
+## On-disk layout
+
+| Location | Role |
+|----------|------|
+| `~/highascg/projects/<slug>.json` | Working copy on the playout host |
+| `~/highascg/projects/_autosave/<slug>.json` | Autosave for active slug |
+| **USB stick** `HIGHASCGEXF` → `projects/*.json` | **Field catalog** — listed when stick is mounted; boot pulls stick → working dir |
+| **Bridge disk** `HIGHASCGDAT` → `projects/*.json` | Production sync — bidirectional mtime sync with working dir |
+
+**Save behaviour:** each save writes the working copy, then pushes **only that slug** to USB and/or bridge when those volumes are mounted. The server never bulk-copies the whole local `projects/` tree onto the stick.
+
+**List behaviour:** when USB is mounted, `GET /api/project/list` reads the catalog from the stick (`source: "usb"`). Without USB, local + bridge entries are merged (newest `savedAt` wins).
+
+Sync map pairs: `usb-projects` (`direction: to_project`, boot pull only) and `bridge-projects` (`direction: both`).
+
+---
 
 The `project` object is the same envelope the operator UI saves:
 
@@ -85,14 +100,46 @@ curl -s http://127.0.0.1:4200/api/project | jq '.name, .scenes'
 
 ## `GET /api/project/list`
 
+Returns the project catalog merged from mounted volumes. Each entry includes a `source` field indicating which volume supplied the winning copy.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `activeSlug` | string \| null | Last loaded slug (persistence) |
+| `projects[]` | array | Catalog entries (newest `savedAt` per slug) |
+| `projects[].source` | `"usb"` \| `"bridge"` \| `"local"` | Origin of the listed entry |
+| `volumes.usb` | object | `{ mount, mounted }` for `HIGHASCGEXF` |
+| `volumes.bridge` | object | `{ mount, mounted }` for `HIGHASCGDAT` |
+
+**Catalog rules:**
+
+- USB mounted → scan stick `projects/` as the primary catalog; merge bridge entries when bridge is also mounted.
+- USB absent → scan local `~/highascg/projects/` and merge bridge when mounted.
+- Tie on `savedAt` → USB wins when the stick is mounted (field catalog).
+
+```bash
+curl -s http://127.0.0.1:4200/api/project/list | jq .
+```
+
 ```json
 {
   "activeSlug": "show-a",
+  "volumes": {
+    "usb": { "mount": "/home/casparcg/exfat", "mounted": true },
+    "bridge": { "mount": "/home/casparcg/bridge", "mounted": false }
+  },
   "projects": [
-    { "slug": "show-a", "name": "Show A", "savedAt": "…" }
+    {
+      "slug": "show-a",
+      "name": "Show A",
+      "savedAt": "2026-06-07T12:00:00.000Z",
+      "path": "/home/casparcg/exfat/projects/show-a.json",
+      "source": "usb"
+    }
   ]
 }
 ```
+
+**Load side effect:** `POST /api/project/load` (and any read by slug) calls `pullProjectSlugFromUsbIfNewer` — if the stick copy has a newer mtime, it refreshes the working file under `~/highascg/projects/` before returning JSON.
 
 ---
 
@@ -232,6 +279,8 @@ Applies bundle from pre-show tooling; may rewrite config, exit process, restart 
 | [state-and-media.md](state-and-media.md) | `/api/state` snapshot includes `scene.deck` |
 | [scene-take.md](scene-take.md) | Resolve `sceneId` from loaded project |
 | [timelines.md](timelines.md) | Timeline CRUD separate from project file |
+| [system-settings-hardware.md](system-settings-hardware.md) | exFAT sync pairs (`usb-projects`, `bridge-projects`) |
+| [BRIDGE_DISK_AND_USB_EXFAT.md](../../BRIDGE_DISK_AND_USB_EXFAT.md) | Volume layout, boot order, seed scripts |
 
 ---
 

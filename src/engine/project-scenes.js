@@ -5,6 +5,7 @@ const path = require('path')
 
 const { REPO_ROOT } = require('../repo-paths')
 const projectStore = require('./project-store')
+const { pushProjectSlugToVolumes } = require('./project-volume-sync')
 
 /**
  * Active project: `projects/<activeSlug>.json`, merged only with autosave for the **same** slug.
@@ -250,6 +251,15 @@ function persistProject(ctx, project, opts = {}) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('warn', '[project] autosave write: ' + (e?.message || e))
 			}
+		}
+	}
+	try {
+		pushProjectSlugToVolumes(slug, {
+			log: typeof ctx.log === 'function' ? ctx.log.bind(ctx) : undefined,
+		})
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', '[project] volume push: ' + (e?.message || e))
 		}
 	}
 	const deck = extractSceneDeckFromProjectScenes(project.scenes)

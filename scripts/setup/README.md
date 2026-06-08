@@ -68,9 +68,10 @@ sudo bash scripts/setup/09-openbox-autostart.sh
 | Path | Purpose |
 |------|---------|
 | `scripts/apt-block-service-starts.sh` | apt policy-rc.d during driver install |
-| `scripts/write-highascg-systemd-unit.sh` | highascg.service |
-| `scripts/install-helpers.sh` | CEF, scanner, version helpers |
-| `scripts/install-config.sh` | URLs and pins |
+| `scripts/exfat/write-highascg-systemd-unit.sh` | highascg.service |
+| `scripts/lib/install-helpers.sh` | CEF, scanner, version helpers |
+| `scripts/lib/install-config.sh` | URLs and pins |
+| `scripts/exfat/install-exfat-systemd-units.sh` | WO-47/WO-52 mounts |
 | `tools/eggs/` | USB clone pipeline (after host is stable) |
 
 ## Legacy monolith

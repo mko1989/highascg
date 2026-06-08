@@ -13,8 +13,9 @@ set -euo pipefail
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=apt-block-service-starts.sh
-source "${SCRIPT_DIR}/apt-block-service-starts.sh"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# shellcheck source=../../lib/apt-block-service-starts.sh
+source "${REPO_ROOT}/scripts/lib/apt-block-service-starts.sh"
 
 TARGET_KREL="${1:-6.8.0-117-generic}"
 DKMS_PIN=/etc/apt/preferences.d/highascg-nvidia-no-dkms.pref

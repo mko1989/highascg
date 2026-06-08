@@ -196,10 +196,25 @@ async function handleProjectList(ctx) {
 	projectStore.migrateLegacySingleProject(persistence)
 	const projects = projectStore.listProjectFiles()
 	const activeSlug = projectStore.getActiveSlug(persistence)
+	const { getProjectRoots, isVolumeMountedSync } = require('../engine/project-volume-sync')
+	const roots = getProjectRoots()
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ activeSlug: activeSlug || null, projects }),
+		body: jsonBody({
+			activeSlug: activeSlug || null,
+			projects,
+			volumes: {
+				usb: {
+					mount: roots.usb,
+					mounted: !!(roots.usb && isVolumeMountedSync(roots.usb)),
+				},
+				bridge: {
+					mount: roots.bridge,
+					mounted: !!(roots.bridge && isVolumeMountedSync(roots.bridge)),
+				},
+			},
+		}),
 	}
 }
 

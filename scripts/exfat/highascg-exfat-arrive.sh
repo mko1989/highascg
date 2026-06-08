@@ -43,9 +43,7 @@ if [[ -d "${EXFAT_MP}/sim" ]]; then
 fi
 
 start_unit highascg-exfat-media-prep.service
-if [[ -f /etc/highascg/legacy-usb-media-bind ]]; then
-	start_unit home-casparcg-highascg-media-exfat.mount
-fi
+start_unit home-casparcg-highascg-media-exfat.mount
 start_unit highascg-exfat-server-update.service
 start_unit highascg-exfat-sync.service
 

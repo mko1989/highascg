@@ -58,9 +58,9 @@ log "npm install (production)"
 cd "${PLAYOUT}"
 sudo -u "${USER_CASPAR}" npm install --omit=dev
 
-if [[ -f "${SCRIPTS_DIR}/write-highascg-systemd-unit.sh" ]]; then
+if [[ -f "${SCRIPTS_EXFAT}/write-highascg-systemd-unit.sh" ]]; then
 	log "systemd unit highascg.service"
-	bash "${SCRIPTS_DIR}/write-highascg-systemd-unit.sh" "${USER_CASPAR}"
+	bash "${SCRIPTS_EXFAT}/write-highascg-systemd-unit.sh" "${USER_CASPAR}"
 	systemctl daemon-reload
 	systemctl enable highascg.service 2>/dev/null || true
 	systemctl restart highascg.service 2>/dev/null || systemctl start highascg.service 2>/dev/null || true

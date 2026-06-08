@@ -13,9 +13,9 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 
 # shellcheck source=../install-config.sh
-source "${SCRIPTS_DIR}/install-config.sh"
-# shellcheck source=../install-helpers.sh
-source "${SCRIPTS_DIR}/install-helpers.sh"
+source "${SCRIPTS_LIB}/install-config.sh"
+# shellcheck source=../lib/install-helpers.sh
+source "${SCRIPTS_LIB}/install-helpers.sh"
 
 MIN_NDI="${MIN_NDI:-6.1}"
 PLAYOUT="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"

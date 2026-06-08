@@ -8,9 +8,12 @@ SETUP_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_DIR="$(cd "${SETUP_LIB}/.." && pwd)"
 REPO_ROOT="$(cd "${SETUP_DIR}/../.." && pwd)"
 SCRIPTS_DIR="${REPO_ROOT}/scripts"
+SCRIPTS_LIB="${SCRIPTS_DIR}/lib"
+SCRIPTS_EXFAT="${SCRIPTS_DIR}/exfat"
+SCRIPTS_BOOT="${SCRIPTS_DIR}/boot"
 
-# shellcheck source=../../apt-block-service-starts.sh
-source "${SCRIPTS_DIR}/apt-block-service-starts.sh"
+# shellcheck source=../../lib/apt-block-service-starts.sh
+source "${SCRIPTS_LIB}/apt-block-service-starts.sh"
 
 TARGET_KVER="6.8.0-117"
 TARGET_KREL="${TARGET_KVER}-generic"

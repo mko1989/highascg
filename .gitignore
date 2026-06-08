@@ -72,5 +72,6 @@ config/*.json
 # Local-only trees (never on GitHub)
 audio_testing/
 From_client/
-deprecated/
+/deprecated/
+!scripts/deprecated/
 logs_lap/

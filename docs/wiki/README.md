@@ -2,6 +2,23 @@
 
 Operator and integrator documentation beyond the top-level [docs/](../README.md) guides.
 
+## HTML wiki (browser UI)
+
+Standalone static site — **not served by the playout server**. Open in any browser:
+
+```text
+docs/wiki-site/index.html
+```
+
+From the repo root:
+
+```bash
+npm run wiki:build    # after editing markdown under docs/
+npm run wiki:open     # Linux/macOS shortcut
+```
+
+Or double-click `docs/wiki-site/index.html`. All page content is embedded in `assets/wiki-bundle.js` at build time (works with `file://` — no server required).
+
 ## API reference (OpenAPI-style)
 
 | Page | Contents |
@@ -14,7 +31,7 @@ Operator and integrator documentation beyond the top-level [docs/](../README.md)
 | [**api/mixer.md**](api/mixer.md) | **Mixer** — opacity/fill/crop, defer/commit, effects |
 | [api/mixer-cg-scene.md](api/mixer-cg-scene.md) | FTB, LED test card, PiP |
 | [**api/cg.md**](api/cg.md) | **CG** — `/api/cg/{command}` |
-| [**api/project.md**](api/project.md) | **Project** — save/load/bundle/sync |
+| [**api/project.md**](api/project.md) | **Project** — save/load/bundle/sync, **USB/bridge volume catalog** |
 | [**api/state-and-media.md**](api/state-and-media.md) | **State**, variables, media, thumbnails |
 | [api/project-state-media.md](api/project-state-media.md) | Index → project + state pages |
 | [**api/timelines.md**](api/timelines.md) | **Timelines** — CRUD, play/seek/take, sendTo |

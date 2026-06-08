@@ -13,7 +13,7 @@ sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
 
 Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt/` (e.g. `highascg_amd64_2026-05-25_2108.iso`), then runs **`create-operator-stick-from-dd.sh`** (4 GiB persistence, exFAT remainder, seed layout).
 
-**Alternate** (pick USB interactively): `sudo bash tools/eggs/live-usb/build-flash-and-persist.sh --help`
+**Alternate** (legacy interactive flash): `sudo bash tools/eggs/live-usb/legacy-persistence/build-flash-and-persist.sh --help`
 
 ### Operator stick — one command (`build-operator-stick`)
 

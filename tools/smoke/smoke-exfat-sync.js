@@ -59,6 +59,8 @@ test('repo config/exfat-sync.json has bridge + usb pairs and no sim-highascg', (
 	const ids = m.pairs.map((p) => p.id)
 	assert.ok(ids.includes('bridge-modular-config'), `expected bridge-modular-config, got ${ids.join(',')}`)
 	assert.ok(ids.includes('usb-media-ingest'), `expected usb-media-ingest, got ${ids.join(',')}`)
+	assert.ok(ids.includes('usb-projects'), `expected usb-projects, got ${ids.join(',')}`)
+	assert.ok(ids.includes('bridge-projects'), `expected bridge-projects, got ${ids.join(',')}`)
 	assert.ok(!ids.includes('sim-highascg'), 'sim-highascg must not be in production map')
 	assert.ok(m.volumes.bridge && m.volumes.usb)
 	const usbCfg = m.pairs.find((p) => p.id === 'usb-modular-config')
@@ -68,6 +70,13 @@ test('repo config/exfat-sync.json has bridge + usb pairs and no sim-highascg', (
 	assert.strictEqual(usbCfg.pushOnSave, true)
 	const bridgeCfg = m.pairs.find((p) => p.id === 'bridge-modular-config')
 	assert.strictEqual(bridgeCfg.direction, 'both')
+	const usbProjects = m.pairs.find((p) => p.id === 'usb-projects')
+	assert.ok(usbProjects)
+	assert.strictEqual(usbProjects.direction, 'to_project')
+	assert.strictEqual(usbProjects.pushOnSave, undefined)
+	const bridgeProjects = m.pairs.find((p) => p.id === 'bridge-projects')
+	assert.ok(bridgeProjects)
+	assert.strictEqual(bridgeProjects.direction, 'both')
 })
 
 test('loadExfatSyncMapFromDisk finds a map file', () => {

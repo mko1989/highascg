@@ -25,9 +25,9 @@ set -euo pipefail
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=apt-block-service-starts.sh
-source "${SCRIPT_DIR}/apt-block-service-starts.sh"
+source "${REPO_ROOT}/scripts/lib/apt-block-service-starts.sh"
 
 BR="${HIGHASCG_NVIDIA_DRIVER:-595}"
 KREL="$(uname -r)"
@@ -83,11 +83,11 @@ for pkg in nvidia-open nvidia-driver-open nvidia-dkms-open nvidia-kernel-source-
 	apt-mark manual "$pkg" 2>/dev/null || true
 done
 
-if [[ -f "${REPO_ROOT}/scripts/install-nvidia-gsp-rpc-workaround.sh" ]]; then
-	HIGHASCG_SKIP_INITRAMFS=1 bash "${REPO_ROOT}/scripts/install-nvidia-gsp-rpc-workaround.sh" || true
+if [[ -f "${REPO_ROOT}/scripts/deprecated/nvidia/install-nvidia-gsp-rpc-workaround.sh" ]]; then
+	HIGHASCG_SKIP_INITRAMFS=1 bash "${REPO_ROOT}/scripts/deprecated/nvidia/install-nvidia-gsp-rpc-workaround.sh" || true
 fi
-if [[ -f "${REPO_ROOT}/scripts/install-nvidia-persistenced-boot-order.sh" ]]; then
-	bash "${REPO_ROOT}/scripts/install-nvidia-persistenced-boot-order.sh"
+if [[ -f "${REPO_ROOT}/scripts/boot/install-nvidia-persistenced-boot-order.sh" ]]; then
+	bash "${REPO_ROOT}/scripts/boot/install-nvidia-persistenced-boot-order.sh"
 fi
 
 log "Update initramfs for ${KREL}"

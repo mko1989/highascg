@@ -136,6 +136,19 @@ if [[ -n "$GRUB_CFG" ]]; then
 	else
 		bad "grub.cfg missing gfxterm — GRUB falls back to generic text menu"
 	fi
+	if grep -q 'gfxmode=1920x1080' "$GRUB_MAIN" 2>/dev/null; then
+		ok "grub.cfg sets gfxmode=1920x1080 (matches splash.boot.png)"
+	elif grep -q 'gfxmode=auto' "$GRUB_MAIN" 2>/dev/null; then
+		warn "grub.cfg uses gfxmode=auto — may show centred black letterbox after menu select"
+	else
+		warn "grub.cfg missing gfxmode=1920x1080"
+	fi
+	_live_gfx="$(awk '/menuentry ".* Live"/ && !/Plymouth/ {p=1} p{print} p && /^}/ {exit}' "$GRUB_MAIN" 2>/dev/null || true)"
+	if grep -q 'gfxpayload=text' <<<"$_live_gfx"; then
+		ok "default Live menuentry uses gfxpayload=text (clean kernel handoff)"
+	elif grep -q 'gfxpayload=auto' <<<"$_live_gfx"; then
+		warn "default Live uses gfxpayload=auto — expect ~2s frozen splash before dmesg"
+	fi
 	THEME_CFG="$MNT/boot/grub/theme.cfg"
 	if [[ -f "$THEME_CFG" ]]; then
 		if grep -q 'Sans Regular' "$THEME_CFG"; then

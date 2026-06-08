@@ -267,7 +267,7 @@ sudo bash scripts/setup/08-caspar-cef-scanner.sh
 
 Skip CEF download: `HIGHASCG_SKIP_CEF=1 sudo bash scripts/setup/08-caspar-cef-scanner.sh`
 
-Pins/URLs: `scripts/install-config.sh` (`URL_CEF_BINARY_TAR`, `URL_SCANNER_DEB`).
+Pins/URLs: `scripts/lib/install-config.sh` (`URL_CEF_BINARY_TAR`, `URL_SCANNER_DEB`).
 
 ---
 

@@ -1072,6 +1072,33 @@ components:
       properties:
         slug:
           type: string
+    ProjectVolumeStatus:
+      type: object
+      properties:
+        mount:
+          type: string
+          nullable: true
+          description: Linux mount path (null when volume not configured)
+        mounted:
+          type: boolean
+          description: findmnt reports the mount path is active
+    ProjectCatalogEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        savedAt:
+          type: string
+          nullable: true
+        path:
+          type: string
+          description: Absolute path to the JSON file that supplied this catalog row
+        source:
+          type: string
+          enum: [usb, bridge, local]
+          description: Volume that won the merge for this slug
     ProjectListResponse:
       type: object
       properties:
@@ -1081,7 +1108,14 @@ components:
         projects:
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/ProjectCatalogEntry'
+        volumes:
+          type: object
+          properties:
+            usb:
+              $ref: '#/components/schemas/ProjectVolumeStatus'
+            bridge:
+              $ref: '#/components/schemas/ProjectVolumeStatus'
     SelectionPayload:
       type: object
       additionalProperties: true

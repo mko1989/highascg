@@ -56,6 +56,19 @@ After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highas
 
 If you still see **penguins** at the GRUB menu or **terminal text** during boot, the ISO was built without that step (or without `branding/splash.png`). Rebuild with `sudo npm run eggs:build` and re-flash.
 
+### Post-GRUB black box (~50% screen, ~2 seconds)
+
+**Symptom:** After choosing **Live** in GRUB, a dark centred rectangle (letterbox) for ~2 s, then kernel dmesg scrolls.
+
+**Cause:**
+
+1. **`gfxmode=auto`** with a **1920×1080** `splash.png` — GRUB centres the wallpaper on `desktop-color` `#0c1220` (near-black) → looks like a half-size black panel.
+2. **`gfxpayload=auto`** on the default menu entry — kernel inherits a frozen graphics framebuffer briefly before text console.
+
+**Fix (in repo):** `grub.main.cfg` uses **`gfxmode=1920x1080`** and default Live uses **`set gfxpayload=text`** before `linux` (clean handoff to `nosplash` dmesg). Rebuild ISO after pulling.
+
+**On laptop now (no rebuild):** pick **Text Mode** once to confirm, or edit ISO `boot/grub/grub.cfg` default entry: `set gfxpayload=text`, `gfxmode=1920x1080`.
+
 ## Artwork files
 
 | File | Used for | Recommended |

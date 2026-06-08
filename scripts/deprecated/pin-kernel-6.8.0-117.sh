@@ -15,9 +15,9 @@ set -euo pipefail
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-# shellcheck source=apt-block-service-starts.sh
-source "${SCRIPT_DIR}/apt-block-service-starts.sh"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# shellcheck source=../lib/apt-block-service-starts.sh
+source "${REPO_ROOT}/scripts/lib/apt-block-service-starts.sh"
 
 TARGET_KVER="6.8.0-117"
 TARGET_KREL="${TARGET_KVER}-generic"
@@ -62,7 +62,7 @@ cleanup() {
 trap cleanup EXIT
 
 log "Block DKMS NVIDIA (prebuilt modules only)"
-bash "${REPO_ROOT}/scripts/fix-nvidia-dkms-prebuilt-conflict.sh" "${TARGET_KREL}" || true
+bash "${REPO_ROOT}/scripts/deprecated/nvidia/fix-nvidia-dkms-prebuilt-conflict.sh" "${TARGET_KREL}" || true
 
 log "Ensure kernel ${TARGET_KREL} (headers + modules before image triggers dkms)"
 DEBIAN_FRONTEND=noninteractive apt-get update -y

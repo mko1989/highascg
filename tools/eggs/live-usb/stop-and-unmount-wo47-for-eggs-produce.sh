@@ -24,7 +24,6 @@ STRICT="${STRICT:-1}"
 WO47_UMOUNT_PATHS=(
 	/home/casparcg/highascg/media/exfat
 	/home/casparcg/highascg/media/bridge
-	/home/casparcg/highascg/media
 	/home/casparcg/exfat
 	/home/casparcg/bridge
 )
@@ -56,7 +55,7 @@ for unit in \
 	highascg-exfat-media-prep.service \
 	highascg-bridge-media-prep.service \
 	home-casparcg-highascg-media-exfat.mount \
-	home-casparcg-highascg-media.mount \
+	home-casparcg-highascg-media-bridge.mount \
 	highascg-exfat-boot.service \
 	highascg-bridge-boot.service \
 	highascg-exfat-arrive.service \
@@ -73,7 +72,7 @@ for unit in \
 	home-casparcg-exfat.mount \
 	home-casparcg-bridge.mount \
 	home-casparcg-highascg-media-exfat.mount \
-	home-casparcg-highascg-media.mount; do
+	home-casparcg-highascg-media-bridge.mount; do
 	mask_unit "$unit"
 done
 

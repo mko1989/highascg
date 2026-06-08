@@ -49,10 +49,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$DEV" ]]; then
-	CONF_PATH="${FLASH_ISO_CONF:-$HERE/flash-iso.conf}"
+	CONF_PATH="${FLASH_ISO_CONF:-$HERE/legacy-persistence/flash-iso.conf}"
 	if [[ -f "$CONF_PATH" ]]; then
-		# shellcheck source=flash-iso-conf-lib.sh
-		source "${HERE}/flash-iso-conf-lib.sh"
+		# shellcheck source=legacy-persistence/flash-iso-conf-lib.sh
+		source "${HERE}/legacy-persistence/flash-iso-conf-lib.sh"
 		DEV="$(flash_iso_read_device "$CONF_PATH")"
 		echo "Using DEVICE from ${CONF_PATH} → ${DEV}" >&2
 	fi
@@ -66,10 +66,10 @@ fi
 
 UNMOUNT_SH="${HERE}/unmount-usb-for-partitioning.sh"
 PRUNE_SH="${HERE}/prune-operator-data-partitions.sh"
-PRUNE_HYBRID_SH="${HERE}/prune-hybrid-data-partitions.sh"
+PRUNE_HYBRID_SH="${HERE}/legacy-persistence/prune-hybrid-data-partitions.sh"
 INSTALL_MAP="${HERE}/install-exfat-sync-map.sh"
 UNMASK_SH="${HERE}/unmask-exfat-systemd.sh"
-PERSIST_SH="${HERE}/add-union-persistence-partition.sh"
+PERSIST_SH="${HERE}/legacy-persistence/add-union-persistence-partition.sh"
 PRUNE_EXFAT_SH="${HERE}/prune-exfat-partition-only.sh"
 
 trap 'bash "$UNMASK_SH" 2>/dev/null || true' EXIT

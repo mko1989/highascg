@@ -42,7 +42,7 @@ if ! mountpoint -q "$BRIDGE_MP"; then
 fi
 
 start_unit highascg-bridge-media-prep.service
-start_unit home-casparcg-highascg-media.mount
+start_unit home-casparcg-highascg-media-bridge.mount
 
 # Config sync may have run before bridge was up — safe to run again.
 if systemctl is-active highascg.service &>/dev/null; then

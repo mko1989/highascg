@@ -79,8 +79,8 @@ for pkg in nvidia-open nvidia-driver-open nvidia-dkms-open nvidia-kernel-source-
 	apt-mark manual "$pkg" 2>/dev/null || true
 done
 
-if [[ -f "${SCRIPTS_DIR}/install-nvidia-persistenced-boot-order.sh" ]]; then
-	bash "${SCRIPTS_DIR}/install-nvidia-persistenced-boot-order.sh" || true
+if [[ -f "${SCRIPTS_BOOT}/install-nvidia-persistenced-boot-order.sh" ]]; then
+	bash "${SCRIPTS_BOOT}/install-nvidia-persistenced-boot-order.sh" || true
 fi
 
 update-initramfs -u -k "${KREL}" 2>/dev/null || true

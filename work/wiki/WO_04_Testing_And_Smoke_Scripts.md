@@ -35,3 +35,18 @@ node tools/smoke/smoke-caspar.js 4200
 1. `GET /api/state` strictly returns `200` (exits code `1` if `503` is encountered, meaning Caspar is down).
 2. `GET /api/__smoke_not_a_route__` must return `404` (proving unknown routes aren't swallowed by 503 error handlers).
 3. `POST /api/raw` with `{ "cmd": "VERSION" }` succeeds and returns a JSON wrapper containing AMCP data.
+
+## 3. Project volume sync tests
+File: `tools/smoke/smoke-project-volume-sync.test.js`
+
+Offline unit tests for catalog merge logic in `src/engine/project-volume-sync.js`:
+
+```bash
+node --test tools/smoke/smoke-project-volume-sync.test.js
+```
+
+Cases covered:
+- USB catalog wins on equal `savedAt` when stick is mounted
+- Newest `savedAt` wins across bridge/local sources
+
+Related: `tools/smoke/smoke-exfat-sync.js` asserts repo `config/exfat-sync.json` includes `usb-projects` and `bridge-projects` pair ids.

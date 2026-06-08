@@ -1,4 +1,4 @@
-# Production install
+# Production scripts
 
 ## Recommended: step-by-step setup
 
@@ -9,57 +9,69 @@ cd ~/highascg
 sudo bash scripts/setup/01-kernel-117.sh   # see scripts/setup/README.md
 ```
 
-Full order: **[setup/README.md](setup/README.md)**. **Manual install guide:** **[setup/MANUAL_INSTALL.md](setup/MANUAL_INSTALL.md)**. Legacy one-off scripts are listed in **[deprecated/README.md](deprecated/README.md)**.
+Full order: **[setup/README.md](setup/README.md)**. **Manual install guide:** **[setup/MANUAL_INSTALL.md](setup/MANUAL_INSTALL.md)**.
+
+---
+
+## Layout
+
+| Folder | Purpose |
+|--------|---------|
+| **[setup/](setup/)** | Canonical numbered host install (`01`–`11`) |
+| **[lib/](lib/)** | Shared `install-config.sh`, `install-helpers.sh`, `apt-block-service-starts.sh`, `archive-common.sh` |
+| **[exfat/](exfat/)** | WO-47/WO-52 mounts, bridge/USB boot scripts, `write-highascg-systemd-unit.sh` |
+| **[boot/](boot/)** | Host GRUB branding, `nvidia-persistenced` boot order |
+| **[nvidia/](nvidia/)** | Active eggs helper: `disable-nvidia-multi-driver-boot.sh` |
+| **[deploy/](deploy/)** | `dev-push.sh` (`npm run deploy:dev`) |
+| **[eggs/](eggs/)** | Build-host cleanup (`clean-eggs-dev-host.sh`) |
+| **[fix/](fix/)** | Emergency boot / exfat ordering recovery |
+| **[legacy/](legacy/)** | Old monolith `install.sh` + `install-phase1`–`5` (still works via root stub) |
+| **[deprecated/](deprecated/)** | Superseded NVIDIA/kernel scripts — see [deprecated/README.md](deprecated/README.md) |
+| **[unused/](unused/)** | Orphans kept for reference (not called by current flows) |
+| **[polkit/](polkit/)** | udisks rules installed by legacy phase 4 |
+
+**Root stubs:** `scripts/install-exfat-systemd-units.sh`, `dev-push.sh`, `apply-bridge-label-highascgdat.sh`, etc. forward to the folders above so older docs and muscle memory still work.
+
+---
+
+## Common entry points
+
+| Goal | Command |
+|------|---------|
+| Host setup | `scripts/setup/01-kernel-117.sh` … `11-boot-branding.sh` |
+| NVIDIA Blackwell | `scripts/setup/03-nvidia-open-595.sh` |
+| WO-47/52 systemd | `sudo bash scripts/install-exfat-systemd-units.sh casparcg` |
+| Bridge disk label | `sudo bash scripts/apply-bridge-label-highascgdat.sh casparcg` |
+| Host boot branding | `sudo bash scripts/setup/11-boot-branding.sh` |
+| Dev deploy | `npm run deploy:dev` → `scripts/deploy/dev-push.sh` |
+| Boot emergency | `sudo bash scripts/fix/fix-boot-emergency-recovery.sh` |
+
+Eggs produce, stick flash, and ISO tooling: **[tools/eggs/](tools/eggs/)** and **[tools/README.md](../tools/README.md)**.
 
 ---
 
 ## Legacy monolith (still works)
 
-From a cloned repo (see main [README.md](../README.md) for Node app setup):
-
 ```bash
 sudo ./scripts/install.sh
 ```
 
-**Entry:** [install.sh](install.sh) — sets `SCRIPT_DIR` to the repo root, then sources (in order) `install-config.sh`, `install-helpers.sh`, and `install-phase1.sh` … `install-phase5.sh`. Copy the **whole** `scripts/` directory when distributing; `install.sh` exits if any of those files are missing.
+Forwards to **[legacy/install.sh](legacy/install.sh)** with a note to prefer `setup/`. Phase 2 now calls **`setup/03-nvidia-open-595.sh`** for NVIDIA.
 
 Openbox autostart reference: [**work/openbox_autostart.md**](../work/openbox_autostart.md).
 
-**X11 input (post-install on minimal Ubuntu):** Phase 3 installs **`xserver-xorg-input-all`** and **`xserver-xorg-input-libinput`** so USB keyboard/mouse work under **nodm/Openbox** (DeckLink **desktopvideo_setup**, etc.). It also installs **`avahi-daemon`** so **mDNS** works for **NDI discovery** (empty **`NDI LIST`** on minimal/server images without Avahi). If you skipped the installer, run: `sudo apt install -y xserver-xorg-input-all xserver-xorg-input-libinput avahi-daemon` then **`systemctl enable --now avahi-daemon`** and **`systemctl restart nodm`** as needed.
+**X11 input (post-install on minimal Ubuntu):** Phase 3 / setup installs **`xserver-xorg-input-all`**, **`xserver-xorg-input-libinput`**, and **`avahi-daemon`**. See main [README.md](../README.md).
 
-**USB import on Ubuntu** — udisks2, polkit, and user **`casparcg`** (see `USER_CASPAR` in [install-config.sh](install-config.sh)): [**docs/USB_AUTO_MOUNT_UBUNTU.md**](../docs/USB_AUTO_MOUNT_UBUNTU.md). Phase 4 installs `scripts/polkit/50-*.rules` and **`51-highascg-udisks-casparcg-headless.rules`**. **Alternative for Ubuntu Server:** See the `systemd-mount` section in that doc for a lighter udev-only approach.
+**USB import on Ubuntu** — [**docs/USB_AUTO_MOUNT_UBUNTU.md**](../docs/USB_AUTO_MOUNT_UBUNTU.md). Polkit rules: `scripts/polkit/`.
 
 ---
 
-## Dev deploy (optional)
+## Dev deploy
 
-[dev-push.sh](dev-push.sh) — server-only **`tar`** → **`ssh`** upload → extract into **`DEPLOY_PATH`** (keeps remote `highascg.config.json`, `node_modules`, `config/`). Operator UI: [**highascg-client**](https://github.com/mko1989/highascg-client).
-
-The SSH user must have a **normal login shell** (not `/usr/sbin/nologin`). If you see *This account is currently not available*, run on the server: **`sudo chsh -s /bin/bash`** for **`DEPLOY_USER`**.
+[deploy/dev-push.sh](deploy/dev-push.sh) — server-only **`tar`** → **`ssh`** upload → extract into **`DEPLOY_PATH`**. Operator UI: [**highascg-client**](https://github.com/mko1989/highascg-client).
 
 ```bash
 npm run deploy:dev
 ```
 
-Optional: **`DEPLOY_HOST`**, **`DEPLOY_USER`**, **`DEPLOY_PATH`** (default `/home/casparcg/highascg`), **`DEPLOY_REMOTE_TMP`**, **`DEPLOY_REMOTE_SUDO`** (set **`1`** if **`DEPLOY_USER`** cannot write **`DEPLOY_PATH`** — extract runs via **`sudo`**), **`DEPLOY_USE_SFTP`**, **`DEPLOY_USE_SCP`**, **`DEPLOY_SSH_CONTROL`**, **`DEPLOY_SSH_PASSWORD`** (uses `sshpass`, if installed), **`DEPLOY_SUDO_PASSWORD`** (used with `sudo -S` when `DEPLOY_REMOTE_SUDO=1`), or a repo-root **`.env.deploy`**.
-
-Example `.env.deploy`:
-
-```bash
-DEPLOY_HOST=192.168.0.2
-DEPLOY_USER=casparcg
-DEPLOY_PATH=/home/casparcg/highascg
-DEPLOY_SSH_PASSWORD='your-ssh-password'
-# Optional only if DEPLOY_REMOTE_SUDO=1
-# DEPLOY_SUDO_PASSWORD='your-sudo-password'
-```
-
-The script uses **`BatchMode=no`** and SSH **ControlMaster** so your password is normally prompted in the terminal. If you set password vars, deploy can run non-interactively. Keep `.env.deploy` local/private (do not commit secrets).
-
-**After deploy:** restart the service if needed. Run `cd "$DEPLOY_PATH" && npm ci` (or `npm install`) **only when `package.json` / `package-lock.json` changed** — the deploy no longer removes the server’s `node_modules` each time.
-
-**`scp` / `sftp` errors (“Received message too long” / noisy shell)** — prefer the default **ssh stream** upload; fix **`~/.bashrc`** so non-interactive sessions print nothing (`case $- in *i*) ;; *) return ;; esac`). **`DEPLOY_USE_SCP=1`** does not help accounts with **`nologin`** shells.
-
-**Paths:** install docs use **`/home/casparcg/highascg`** as the unified playout root. If you deploy elsewhere, set **`DEPLOY_PATH`** in **`.env.deploy`** to match **`WorkingDirectory`** / **`ExecStart`** in your systemd unit.
-
-**Permissions:** the SSH user must be able to **`rm`** and **`tar -C`** into **`DEPLOY_PATH`**, or set **`DEPLOY_REMOTE_SUDO=1`** so extract uses **`sudo`** (configure **`sudoers`** with **`NOPASSWD`** if you want non-interactive deploy).
+See comments in `dev-push.sh` for `.env.deploy`, `DEPLOY_REMOTE_SUDO`, etc.

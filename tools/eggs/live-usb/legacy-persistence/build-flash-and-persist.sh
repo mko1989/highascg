@@ -22,13 +22,14 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=flash-stick-common.sh
-source "${HERE}/flash-stick-common.sh"
+LIVE_USB="$(cd "${HERE}/.." && pwd)"
+# shellcheck source=../flash-stick-common.sh
+source "${LIVE_USB}/flash-stick-common.sh"
 
-BUILD_SCRIPT="${HERE}/build-highascg-egg.sh"
-EXFAT_SCRIPT="${HERE}/add-exfat-data-partition.sh"
+BUILD_SCRIPT="${LIVE_USB}/build-highascg-egg.sh"
+EXFAT_SCRIPT="${LIVE_USB}/add-exfat-data-partition.sh"
 PERSIST_SCRIPT="${HERE}/add-union-persistence-partition.sh"
-SEED_SCRIPT="${HERE}/seed-exfat-operator-layout.sh"
+SEED_SCRIPT="${LIVE_USB}/seed-exfat-operator-layout.sh"
 
 DO_BUILD=true
 DO_FLASH=true

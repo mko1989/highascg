@@ -13,9 +13,9 @@ require_root
 
 export SCRIPT_DIR="${REPO_ROOT}"
 # shellcheck source=../install-config.sh
-source "${SCRIPTS_DIR}/install-config.sh"
-# shellcheck source=../install-helpers.sh
-source "${SCRIPTS_DIR}/install-helpers.sh"
+source "${SCRIPTS_LIB}/install-config.sh"
+# shellcheck source=../lib/install-helpers.sh
+source "${SCRIPTS_LIB}/install-helpers.sh"
 
 PLAYOUT="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"
 

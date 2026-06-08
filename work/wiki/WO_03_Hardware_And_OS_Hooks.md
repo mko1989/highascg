@@ -3,7 +3,7 @@
 HighAsCG controls Ubuntu OS internals via shell APIs (`sudo`).
 
 ## 1. exFAT USB Media Ingest (`routes-exfat-sync.js`)
-The `GET /api/system/exfat-sync` and `POST /api/system/exfat-sync/run` endpoints manage transferring files from USB drives directly to CasparCG's `/media` directory.
+The `GET /api/system/exfat-sync` and `POST /api/system/exfat-sync/run` endpoints manage cross-volume mtime sync between the bridge disk, USB stick, and the playout host working tree.
 
 **Ingestion Workflow:**
 1. Polkit rule `51-highascg-udisks-casparcg-headless.rules` allows `udisks2` to mount inserted USBs automatically.
@@ -14,6 +14,30 @@ The `GET /api/system/exfat-sync` and `POST /api/system/exfat-sync/run` endpoints
      ```json
      { "dryRun": false, "confirm": "EXFAT_SYNC" }
      ```
+
+**Sync map pairs (v2):** configs, state JSON, media ingest, and **`projects/`** directories. Pair ids: `bridge-projects` (bidirectional mtime) and `usb-projects` (boot pull stick → `~/highascg/projects/` only).
+
+## 1b. Project volume sync (`project-volume-sync.js`)
+
+Show files live in `~/highascg/projects/` at runtime. USB and bridge volumes mirror them with different rules:
+
+| Volume | Label | List catalog | Boot | On save |
+|--------|-------|--------------|------|---------|
+| USB stick | `HIGHASCGEXF` | Primary when mounted | Pull stick → working dir | Push **only saved slug** |
+| Bridge disk | `HIGHASCGDAT` | Merged when mounted | Mtime sync via exFAT pair | Push **only saved slug** |
+| Local | — | Fallback when no stick | — | Always written first |
+
+Implementation hooks:
+- `listProjectsFromVolumes()` — used by `GET /api/project/list`
+- `pushProjectSlugToVolumes(slug)` — called after every save/autosave in `project-scenes.js`
+- `pullProjectSlugFromUsbIfNewer(slug)` — called before read in `project-store.js`
+
+Seed `projects/` on new volumes:
+
+```bash
+sudo bash tools/eggs/live-usb/seed-exfat-operator-layout.sh /home/casparcg/exfat
+sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /home/casparcg/bridge
+```
 
 ## 2. GPU & Topologies (`system-hardware-*`)
 HighAsCG dynamically rewrites OS display layouts based on Operator UI configurations.
