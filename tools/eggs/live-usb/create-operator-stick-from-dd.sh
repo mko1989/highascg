@@ -12,6 +12,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=usb-env.sh
 source "${HERE}/usb-env.sh"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
 DEV=""
 ISO=""
 ASSUME_YES=false
@@ -53,8 +55,6 @@ typ=$(lsblk -ndo TYPE "$DEV" 2>/dev/null || true)
 }
 
 if [[ -z "$ISO" ]]; then
-	# shellcheck source=flash-stick-common.sh
-	source "${HERE}/flash-stick-common.sh"
 	ISO="$(find_latest_iso)" || {
 		echo "No ISO under /home/eggs/ — pass --iso" >&2
 		exit 1
@@ -117,13 +117,9 @@ fi
 
 echo "Syncing filesystem buffers before write (can take a minute)…" >&2
 sync
-echo "Writing ISO to ${DEV} (~5–15 min)…" >&2
-# conv=fsync syncs every 4M block — often hangs for minutes on USB; one sync after dd is enough.
-if command -v pv >/dev/null 2>&1; then
-	pv -ptebar -s "$ISO_BYTES" "$ISO" | dd of="$DEV" bs=4M status=progress
-else
-	dd if="$ISO" of="$DEV" bs=4M iflag=fullblock status=progress
-fi
+echo "Writing ISO to ${DEV} (~5–15 min, progress every 2s)…" >&2
+# No pv|dd pipe (hides progress); no conv=fsync (hangs on USB). One sync after dd is enough.
+dd_iso_with_progress "$ISO" "$DEV" 4M
 echo "Flushing to stick…" >&2
 sync
 echo "ISO write complete."

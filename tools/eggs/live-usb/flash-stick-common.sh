@@ -128,6 +128,41 @@ confirm_dd_flash() {
 	return 0
 }
 
+# Write ISO → whole disk with periodic progress on stderr.
+# Plain status=progress is often silent under "sudo bash script.sh" (no controlling TTY).
+# SIGUSR1 makes GNU dd print copied bytes/speed — same as interactive dd.
+dd_iso_with_progress() {
+	local iso="$1" dev="$2"
+	local bs="${3:-4M}"
+	local dd_pid progress_pid dd_rc=0
+
+	[[ -f "$iso" ]] || {
+		echo "ISO not found: $iso" >&2
+		return 1
+	}
+	[[ -b "$dev" ]] || {
+		echo "Not a block device: $dev" >&2
+		return 1
+	}
+
+	echo "Writing ${iso} → ${dev} (bs=${bs}) …" >&2
+	dd if="$iso" of="$dev" bs="$bs" iflag=fullblock status=progress &
+	dd_pid=$!
+	(
+		while kill -USR1 "$dd_pid" 2>/dev/null; do
+			sleep 2
+		done
+	) &
+	progress_pid=$!
+	set +e
+	wait "$dd_pid"
+	dd_rc=$?
+	set -e
+	kill "$progress_pid" 2>/dev/null || true
+	wait "$progress_pid" 2>/dev/null || true
+	return "$dd_rc"
+}
+
 run_dd_flash() {
 	local iso="$1" dev="$2"
 	[[ "$(id -u)" -eq 0 ]] || {
@@ -148,7 +183,7 @@ run_dd_flash() {
 	umount "${dev}"* 2>/dev/null || true
 
 	echo "Writing ISO → $dev (bs=4M) …"
-	dd if="$iso" of="$dev" bs=4M status=progress oflag=sync conv=fsync
+	dd_iso_with_progress "$iso" "$dev" 4M || return 1
 	sync
 	partprobe "$dev"
 	sleep 1
