@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>HighAsCG Wiki</title>
+	<link rel="stylesheet" href="assets/wiki.css">
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+</head>
+<body>
+	<div class="wiki-app" id="wiki-app">
+		<header class="wiki-header">
+			<button type="button" class="wiki-menu-btn" id="menu-toggle" aria-label="Toggle navigation">☰</button>
+			<div class="wiki-brand">
+				<a href="#/" class="wiki-brand-link">HighAsCG Wiki</a>
+				<span class="wiki-brand-sub">Operator &amp; integrator docs</span>
+			</div>
+			<div class="wiki-search-wrap">
+				<input type="search" id="wiki-search" class="wiki-search" placeholder="Search pages…" autocomplete="off" aria-label="Search wiki">
+			</div>
+		</header>
+		<div class="wiki-body">
+			<aside class="wiki-sidebar" id="wiki-sidebar">
+				<nav id="wiki-nav" class="wiki-nav" aria-label="Wiki sections"></nav>
+			</aside>
+			<main class="wiki-main" id="wiki-main">
+				<div class="wiki-loading" id="wiki-loading">Loading…</div>
+				<article class="wiki-article" id="wiki-article" hidden></article>
+				<div class="wiki-error" id="wiki-error" hidden></div>
+			</main>
+		</div>
+		<footer class="wiki-footer">
+			<span>Standalone HTML wiki — open <code>docs/wiki-site/index.html</code> in your browser</span>
+			<span id="wiki-generated"></span>
+		</footer>
+	</div>
+	<script src="assets/wiki-bundle.js"></script>
+	<script src="assets/wiki.js"></script>
+</body>
+</html>

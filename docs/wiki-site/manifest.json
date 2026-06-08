@@ -1,0 +1,546 @@
+{
+  "version": 2,
+  "standalone": true,
+  "generatedAt": "2026-06-08T14:27:27.749Z",
+  "defaultPage": "wiki--README",
+  "categories": [
+    "Home",
+    "Getting started",
+    "Installation",
+    "Storage & USB",
+    "API reference",
+    "Integration",
+    "Audio",
+    "Reference"
+  ],
+  "pages": [
+    {
+      "id": "README",
+      "title": "HighAsCG documentation",
+      "file": "README.md",
+      "category": "Home",
+      "description": "Operator and integrator docs live at the **top level** of this folder. Deeper material is grouped by audience.",
+      "order": 0
+    },
+    {
+      "id": "wiki--README",
+      "title": "HighAsCG wiki",
+      "file": "wiki/README.md",
+      "category": "Home",
+      "description": "Operator and integrator documentation beyond the top-level [docs/](../README.md) guides.",
+      "order": 1
+    },
+    {
+      "id": "ARCHITECTURE",
+      "title": "HighAsCG architecture — server bridge and client",
+      "file": "ARCHITECTURE.md",
+      "category": "Getting started",
+      "description": "**Status:** Canonical reference (2026-06-03)",
+      "order": 10
+    },
+    {
+      "id": "PLAN_SERVER_CLIENT_SPLIT",
+      "title": "Plan: Permanent server / client split",
+      "file": "PLAN_SERVER_CLIENT_SPLIT.md",
+      "category": "Getting started",
+      "description": "**Status:** Phase 3–4 complete (server/client split shipped)",
+      "order": 11
+    },
+    {
+      "id": "MODULES",
+      "title": "Optional modules (Previs / Tracking / Auto-follow)",
+      "file": "MODULES.md",
+      "category": "Getting started",
+      "description": "HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the o",
+      "order": 12
+    },
+    {
+      "id": "MANUAL_INSTALL",
+      "title": "Manual install: `casparcg` user, `/opt/casparcg`, X11, DeckLink, NDI",
+      "file": "MANUAL_INSTALL.md",
+      "category": "Installation",
+      "description": "> **Playout host (recommended):** use the ordered setup scripts and **[`scripts/setup/MANUAL_INSTALL.md`](../scripts/setup/MANUAL_INSTALL.md)** — kernel 117, NV",
+      "order": 20
+    },
+    {
+      "id": "LIVE_USB_IMAGE",
+      "title": "Creating a Live USB Image from a Running HighAsCG / CasparCG Server",
+      "file": "LIVE_USB_IMAGE.md",
+      "category": "Installation",
+      "description": "> **Goal:** Capture the entire running production server — Ubuntu 24.04 LTS, NVIDIA",
+      "order": 21
+    },
+    {
+      "id": "ISO_CONTENTS",
+      "title": "HighAsCG live ISO — contents reference",
+      "file": "ISO_CONTENTS.md",
+      "category": "Installation",
+      "description": "What is inside the **penguins-eggs** hybrid ISO produced by **`tools/eggs/live-usb/build-highascg-egg.sh`** (or **`make-dev-github-release-iso-quick.sh`**).",
+      "order": 22
+    },
+    {
+      "id": "DEV_RELEASE_GITHUB",
+      "title": "Dev GitHub releases (ISO + portable tarball)",
+      "file": "DEV_RELEASE_GITHUB.md",
+      "category": "Installation",
+      "description": "Use this flow when you have a **build host or workstation** running the repo (typically with `node_modules` already installed). Two modes:",
+      "order": 23
+    },
+    {
+      "id": "BOOT_EMERGENCY_RECOVERY",
+      "title": "Boot emergency mode (Ctrl+D to continue)",
+      "file": "BOOT_EMERGENCY_RECOVERY.md",
+      "category": "Installation",
+      "description": "If the machine drops into **emergency mode** during boot and you must press **Ctrl+D** to continue, check the journal on the playout PC:",
+      "order": 24
+    },
+    {
+      "id": "openbox_autostart",
+      "title": "Openbox autostart — CasparCG + HighAsCG (reference)",
+      "file": "openbox_autostart.md",
+      "category": "Installation",
+      "description": "1. **Background `&`** — The `while true; do … done &` block detaches from Openbox. After a nodm/X restart, those processes are **not always** in the same proces",
+      "order": 25
+    },
+    {
+      "id": "HIGHASCG_PASSWORDLESS_SUDO",
+      "title": "HighAsCG passwordless sudo (`NOPASSWD`)",
+      "file": "HIGHASCG_PASSWORDLESS_SUDO.md",
+      "category": "Installation",
+      "description": "HighAsCG’s Node service often runs as **`casparcg`** (see installer). Several features call **`sudo -n`** so the Web UI works **without an interactive TTY passw",
+      "order": 26
+    },
+    {
+      "id": "BRIDGE_DISK_AND_USB_EXFAT",
+      "title": "Bridge disk (HIGHASCGDAT) and USB stick (HIGHASCGEXF)",
+      "file": "BRIDGE_DISK_AND_USB_EXFAT.md",
+      "category": "Storage & USB",
+      "description": "WO-52 splits operator storage into two volumes.",
+      "order": 30
+    },
+    {
+      "id": "WO47_ISO_VS_EXFAT",
+      "title": "WO‑47: What stays in the Eggs squashfs vs what rides on exFAT",
+      "file": "WO47_ISO_VS_EXFAT.md",
+      "category": "Storage & USB",
+      "description": "This matches **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`** and the boot chain **`highascg-exfat-server-update`** → **`highascg-exfat-sy",
+      "order": 31
+    },
+    {
+      "id": "EXFAT_SERVER_UPDATE",
+      "title": "exFAT server updates (`drop-update/`)",
+      "file": "EXFAT_SERVER_UPDATE.md",
+      "category": "Storage & USB",
+      "description": "For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server** by dropping files on the stick — without reflashing the image.",
+      "order": 32
+    },
+    {
+      "id": "USB_AUTO_MOUNT_UBUNTU",
+      "title": "Ubuntu: auto-mount USB drives for the `casparcg` user (HighAsCG import)",
+      "file": "USB_AUTO_MOUNT_UBUNTU.md",
+      "category": "Storage & USB",
+      "description": "This walkthrough is for a **playout** machine where:",
+      "order": 33
+    },
+    {
+      "id": "casparcg-linux-usb-guide",
+      "title": "CasparCG Linux Bootable USB — Comprehensive Build Guide",
+      "file": "casparcg-linux-usb-guide.md",
+      "category": "Storage & USB",
+      "description": "A complete guide to building a bootable Ubuntu Server USB drive running CasparCG, with live boot capability, optional local installation via Calamares, and a de",
+      "order": 34
+    },
+    {
+      "id": "CASPAR_IMAGE_VS_HIGHASCG_OVERLAY",
+      "title": "CasparCG-only image vs HighAsCG on exFAT (overlay mental model)",
+      "file": "CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md",
+      "category": "Storage & USB",
+      "description": "**Authoritative matrix** (what the ISO keeps vs what lives on **`HIGHASCGEXF`**, boot order, knobs): **[`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md)**.",
+      "order": 35
+    },
+    {
+      "id": "wiki--api--README",
+      "title": "HighAsCG HTTP API",
+      "file": "wiki/api/README.md",
+      "category": "API reference",
+      "group": "Overview",
+      "description": "HighAsCG exposes a **JSON REST API** on the playout server. The operator UI ([highascg-client](https://github.com/mko1989/highascg-client)) and Companion module",
+      "order": 40
+    },
+    {
+      "id": "wiki--api--scene-take",
+      "title": "`POST /api/scene/take` — scene / look take",
+      "file": "wiki/api/scene-take.md",
+      "category": "API reference",
+      "group": "Scene & playback",
+      "description": "Takes a **look** (scene JSON with layers) to **program** or **preview** on Caspar, using the LBG pipeline (`runSceneTakeLbg`). This is the main air chain used b",
+      "order": 41
+    },
+    {
+      "id": "wiki--api--playback",
+      "title": "Playback API — PLAY, LOAD, LOADBG, transport",
+      "file": "wiki/api/playback.md",
+      "category": "API reference",
+      "group": "Scene & playback",
+      "description": "Layer-level CasparCG AMCP commands exposed as JSON POST routes. These are the **direct** playout controls (single channel/layer). Full **look takes** use [`POST",
+      "order": 42
+    },
+    {
+      "id": "wiki--api--playback-and-amcp",
+      "title": "AMCP bridge & server control",
+      "file": "wiki/api/playback-and-amcp.md",
+      "category": "API reference",
+      "group": "Scene & playback",
+      "description": "**Caspar:** required for all routes on this page.",
+      "order": 43
+    },
+    {
+      "id": "wiki--api--mixer",
+      "title": "Mixer API — `MIXER` AMCP over HTTP",
+      "file": "wiki/api/mixer.md",
+      "category": "API reference",
+      "group": "Mixer & CG",
+      "description": "CasparCG layer and channel mixer commands: opacity, fill, crop, color, audio volume, deferred tweens, and inspector effects.",
+      "order": 44
+    },
+    {
+      "id": "wiki--api--mixer-cg-scene",
+      "title": "CG, scene & overlays",
+      "file": "wiki/api/mixer-cg-scene.md",
+      "category": "API reference",
+      "group": "Mixer & CG",
+      "description": "**Caspar:** required unless noted.",
+      "order": 45
+    },
+    {
+      "id": "wiki--api--cg",
+      "title": "CG API — HTML templates (`CG` AMCP)",
+      "file": "wiki/api/cg.md",
+      "category": "API reference",
+      "group": "Mixer & CG",
+      "description": "CasparCG **HTML/template CG** commands on a channel layer. Templates live under the Caspar template path; data payloads are XML/JSON strings passed on add/updat",
+      "order": 46
+    },
+    {
+      "id": "wiki--api--project",
+      "title": "Project API — save, load, sync",
+      "file": "wiki/api/project.md",
+      "category": "API reference",
+      "group": "Project & state",
+      "description": "Persist show data (looks/scenes, routing, timelines in project JSON, settings mirrors) on the playout host disk. **Does not require Caspar** for core save/load/",
+      "order": 47
+    },
+    {
+      "id": "wiki--api--project-state-media",
+      "title": "Project, state & media (index)",
+      "file": "wiki/api/project-state-media.md",
+      "category": "API reference",
+      "group": "Project & state",
+      "description": "Split into detailed pages:",
+      "order": 48
+    },
+    {
+      "id": "wiki--api--state-and-media",
+      "title": "State, variables, selection & media",
+      "file": "wiki/api/state-and-media.md",
+      "category": "API reference",
+      "group": "Project & state",
+      "description": "Query and update server snapshots for the operator UI, Companion variables, and the media library.",
+      "order": 49
+    },
+    {
+      "id": "wiki--api--timelines",
+      "title": "Timelines API",
+      "file": "wiki/api/timelines.md",
+      "category": "API reference",
+      "group": "Timelines & streaming",
+      "description": "Multi-track timelines with clip keyframes, playhead transport, and Caspar output on **layers 200+** (above look stacks 1–199). The server holds timelines in the",
+      "order": 50
+    },
+    {
+      "id": "wiki--api--timelines-multiview",
+      "title": "Multiview & NDI",
+      "file": "wiki/api/timelines-multiview.md",
+      "category": "API reference",
+      "group": "Timelines & streaming",
+      "description": "**Full reference:** [timelines.md](timelines.md) — CRUD, transport (`play`/`pause`/`stop`/`seek`), `sendTo`, `take`, data model, WebSocket.",
+      "order": 51
+    },
+    {
+      "id": "wiki--api--streaming-audio-osc",
+      "title": "Streaming, audio & OSC",
+      "file": "wiki/api/streaming-audio-osc.md",
+      "category": "API reference",
+      "group": "Timelines & streaming",
+      "description": "| Method | Path | Caspar | Description |",
+      "order": 52
+    },
+    {
+      "id": "wiki--api--system-settings-hardware",
+      "title": "System, settings & hardware",
+      "file": "wiki/api/system-settings-hardware.md",
+      "category": "API reference",
+      "group": "System & hardware",
+      "description": "**Caspar:** not required.",
+      "order": 53
+    },
+    {
+      "id": "wiki--api--ingest-usb-plugins",
+      "title": "Ingest, USB, plugins & modules",
+      "file": "wiki/api/ingest-usb-plugins.md",
+      "category": "API reference",
+      "group": "System & hardware",
+      "description": "**Caspar:** not required for upload/download.",
+      "order": 54
+    },
+    {
+      "id": "api-reference",
+      "title": "AMCP REST API Reference (legacy)",
+      "file": "api-reference.md",
+      "category": "API reference",
+      "group": "Overview",
+      "description": "> **Canonical docs:** [wiki/api/README.md](wiki/api/README.md) — full endpoint list, Caspar gate, OpenAPI [`openapi.yaml`](wiki/api/openapi.yaml), and per-topic",
+      "order": 55
+    },
+    {
+      "id": "osc-integration",
+      "title": "OSC integration (CasparCG → HighAsCG)",
+      "file": "osc-integration.md",
+      "category": "Integration",
+      "description": "HighAsCG listens for **Open Sound Control (OSC)** over **UDP** from CasparCG Server. **Production setups assume Caspar sends OSC to HighAsCG**; the UDP listener",
+      "order": 60
+    },
+    {
+      "id": "companion-websocket-catalog-bootstrap",
+      "title": "Companion module: WebSocket slim bootstrap & catalog loading",
+      "file": "companion-websocket-catalog-bootstrap.md",
+      "category": "Integration",
+      "description": "HighAsCG can send a **small first `state` frame** on WebSocket connect when the operator enables slim bootstrap on the server. Companion modules that assumed **",
+      "order": 61
+    },
+    {
+      "id": "companion-module-ui-selection",
+      "title": "Companion module: UI selection variables (`ui_selection_*`)",
+      "file": "companion-module-ui-selection.md",
+      "category": "Integration",
+      "description": "HighAsCG pushes **inspector selection** from the web UI into the same **Companion-style variable map** used for OSC, channel INFO, and app stats. A Bitfocus **C",
+      "order": 62
+    },
+    {
+      "id": "caspar_config_explained",
+      "title": "Caspar Config Explained",
+      "file": "caspar_config_explained.md",
+      "category": "Integration",
+      "description": "<?xml version=\"1.0\" encoding=\"utf-8\"?> <-- The opening XML declaration -->",
+      "order": 63
+    },
+    {
+      "id": "guides--audio--audio_features_walkthrough",
+      "title": "Audio Playout & Monitoring Walkthrough",
+      "file": "guides/audio/audio_features_walkthrough.md",
+      "category": "Audio",
+      "description": "This update enhances HighAsCG with \"CasparCG Enhanced\" features, specifically focusing on PortAudio support, multi-channel layouts (8ch/16ch), and hardware-leve",
+      "order": 70
+    },
+    {
+      "id": "guides--audio--audio-setup-guide",
+      "title": "Audio setup guide (CasparCG on Ubuntu)",
+      "file": "guides/audio/audio-setup-guide.md",
+      "category": "Audio",
+      "description": "Single entry point for **multi-channel playout**: follow one path below, then use [Audio routing reference](../../reference/audio/audio-routing-reference.md) fo",
+      "order": 70
+    },
+    {
+      "id": "reference--audio--alsa-device-enumeration",
+      "title": "ALSA device enumeration (Linux)",
+      "file": "reference/audio/alsa-device-enumeration.md",
+      "category": "Audio",
+      "description": "This guide explains how to **list and interpret** ALSA playback devices on Ubuntu (and similar distributions). Use it when wiring CasparCG **FFmpeg** or **syste",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--audio-routing-reference",
+      "title": "Audio routing reference (CasparCG + HighAsCG)",
+      "file": "reference/audio/audio-routing-reference.md",
+      "category": "Audio",
+      "description": "Quick reference for **layer/channel audio levels**, **layouts**, **routing between channels**, and **FFmpeg audio filters**. For Linux device setup, see [Audio ",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--caspar-audio-consumers",
+      "title": "CasparCG audio consumers (config reference)",
+      "file": "reference/audio/caspar-audio-consumers.md",
+      "category": "Audio",
+      "description": "How to declare **audio outputs** in `casparcg.config`: system default sink, FFmpeg to ALSA/Pulse, NDI, audio-only channels, and **channel layouts**. Complements",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--caspar-outputs-nvidia-stereo-usb",
+      "title": "CasparCG audio outputs on Linux: NVIDIA, 3.5 mm stereo, USB",
+      "file": "reference/audio/caspar-outputs-nvidia-stereo-usb.md",
+      "category": "Audio",
+      "description": "Practical guide for the three most common **local** playout paths on Ubuntu:",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--jack-audio-routing",
+      "title": "JACK audio routing (Linux alternative to PipeWire graph)",
+      "file": "reference/audio/jack-audio-routing.md",
+      "category": "Audio",
+      "description": "**JACK** (JACK Audio Connection Kit) is a low-latency audio server with a patchable **client graph**. It fits when you want **deterministic** routing between ap",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--network-audio-protocols",
+      "title": "Network audio protocols (Linux + CasparCG context)",
+      "file": "reference/audio/network-audio-protocols.md",
+      "category": "Audio",
+      "description": "Options for moving **audio over the network** or bridging **Dante / AES67** to Linux. Use with local I/O guides: [ALSA](./alsa-device-enumeration.md), [Caspar a",
+      "order": 71
+    },
+    {
+      "id": "reference--audio--pipewire-multichannel-routing",
+      "title": "PipeWire multi-channel routing (Linux)",
+      "file": "reference/audio/pipewire-multichannel-routing.md",
+      "category": "Audio",
+      "description": "[PipeWire](https://pipewire.org/) is the default audio server on **Ubuntu 24.04+** (with **WirePlumber** as the session/policy manager). Use it to route **multi",
+      "order": 71
+    },
+    {
+      "id": "reference--amcp-mapping",
+      "title": "AMCP Architecture Mapping",
+      "file": "reference/amcp-mapping.md",
+      "category": "Reference",
+      "description": "This document maps out the CasparCG TCP AMCP commands, their respective HighAsCG REST endpoints, and the underlying modular JS methods.",
+      "order": 80
+    },
+    {
+      "id": "reference--amcp-clean-look-fade",
+      "title": "AMCP Clean Look Fade",
+      "file": "reference/amcp-clean-look-fade.md",
+      "category": "Reference",
+      "description": "This is the working banked look-to-look fade pattern used by HighAsCG for clean program transitions.",
+      "order": 80
+    },
+    {
+      "id": "reference--amcp-migration-qa-checklist",
+      "title": "AMCP migration — manual QA checklist (T7.4)",
+      "file": "reference/amcp-migration-qa-checklist.md",
+      "category": "Reference",
+      "description": "Run on **each playout PC** with CasparCG and HighAsCG on the build that includes `casparcg-connection` (default transport). Record date, machine, and pass/fail.",
+      "order": 80
+    },
+    {
+      "id": "reference--amcp-migration",
+      "title": "AMCP transport: `casparcg-connection` migration",
+      "file": "reference/amcp-migration.md",
+      "category": "Reference",
+      "description": "HighAsCG uses the [casparcg-connection](https://www.npmjs.com/package/casparcg-connection) npm package (v6.x, CommonJS) as the default AMCP transport. The publi",
+      "order": 80
+    },
+    {
+      "id": "reference--audio_output_architecture",
+      "title": "Audio Output Architecture Redesign & Remaining Issues",
+      "file": "reference/audio_output_architecture.md",
+      "category": "Reference",
+      "description": "**Before:** Every PortAudio / ALSA device was auto-generated as a rear panel connector, flooding the panel with ~40 entries for 3 physical cards.",
+      "order": 80
+    },
+    {
+      "id": "reference--GPU_SCREEN_CONSUMER_AND_XRANDR",
+      "title": "GPU output, screen consumers, and X11 (xrandr) — intended interaction",
+      "file": "reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md",
+      "category": "Reference",
+      "description": "This document describes how **screen destinations**, **CasparCG channel / screen consumers**, **Device View cabling**, and **OS-level display layout (xrandr)** ",
+      "order": 80
+    },
+    {
+      "id": "reference--SUDO_UBUNTU_SETUP",
+      "title": "HighAsCG sudo (no-password) setup on Ubuntu",
+      "file": "reference/SUDO_UBUNTU_SETUP.md",
+      "category": "Reference",
+      "description": "This guide configures **only the minimum commands** that HighAsCG may run as root without a password when the app runs as `casparcg:casparcg`.",
+      "order": 80
+    },
+    {
+      "id": "reference--amcp-pgm-look-take-pipeline",
+      "title": "PGM look take — AMCP pipeline",
+      "file": "reference/amcp-pgm-look-take-pipeline.md",
+      "category": "Reference",
+      "description": "`POST /api/scene/take` runs `runSceneTakeLbg` on the Caspar program channel (and optionally the paired preview channel). This document is the **command order** ",
+      "order": 80
+    },
+    {
+      "id": "reference--PIXELHUE_API",
+      "title": "PixelHue / Unico HTTP / WebSocket API (Companion + PixelFlow OpenAPI V2.0.1)",
+      "file": "reference/PIXELHUE_API.md",
+      "category": "Reference",
+      "description": "This document combines:",
+      "order": 80
+    },
+    {
+      "id": "reference--polling-vs-osc",
+      "title": "Polling vs OSC in HighAsCG",
+      "file": "reference/polling-vs-osc.md",
+      "category": "Reference",
+      "description": "CasparCG exposes rich state in two ways: **AMCP** (TCP, request/response) and **OSC** (UDP, push). HighAsCG uses OSC for real-time mixer, layer, playback, profi",
+      "order": 80
+    },
+    {
+      "id": "reference--README",
+      "title": "Reference documentation",
+      "file": "reference/README.md",
+      "category": "Reference",
+      "description": "Technical deep dives for integrators and developers. Operators should start at [../README.md](../README.md).",
+      "order": 80
+    },
+    {
+      "id": "reference--config_from_server",
+      "title": "Sample `casparcg.config` from production (custom resolution)",
+      "file": "reference/config_from_server.md",
+      "category": "Reference",
+      "description": "**NVIDIA screen consumer vsync:** use **Sync to VBlank off** in NVIDIA Settings and **`<vsync>true</vsync>`** on the Caspar screen consumer. See [screen-consume",
+      "order": 80
+    },
+    {
+      "id": "reference--screen-consumer-vsync-nvidia",
+      "title": "Screen consumer vsync (NVIDIA)",
+      "file": "reference/screen-consumer-vsync-nvidia.md",
+      "category": "Reference",
+      "description": "Normative setup for **smooth, tear-free** output on CasparCG **screen** consumers when the playout GPU is **NVIDIA**.",
+      "order": 80
+    },
+    {
+      "id": "reference--sudo_and_audio_setup",
+      "title": "Sudo Setup for CasparCG / HighAsCG",
+      "file": "reference/sudo_and_audio_setup.md",
+      "category": "Reference",
+      "description": "**Avoid `NOPASSWD: ALL` for `casparcg`.** Use narrow **`/etc/sudoers.d/`** fragments (see **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**): media mount helper, optiona",
+      "order": 80
+    },
+    {
+      "id": "reference--web-browser-and-server-logs",
+      "title": "Web Browser And Server Logs",
+      "file": "reference/web-browser-and-server-logs.md",
+      "category": "Reference",
+      "description": "[2026-04-05 09:07:18.294] [info]    async_event_server[:5250] Client 127.0.0.1 disconnected (0 connections).",
+      "order": 80
+    },
+    {
+      "id": "reference--xrandr-gpu-screen-mapping",
+      "title": "xrandr GPU ↔ screen mapping (Device View)",
+      "file": "reference/xrandr-gpu-screen-mapping.md",
+      "category": "Reference",
+      "description": "This document is the **implementation-facing** companion to the product narrative in [GPU_SCREEN_CONSUMER_AND_XRANDR.md](GPU_SCREEN_CONSUMER_AND_XRANDR.md). It ",
+      "order": 80
+    },
+    {
+      "id": "decoupled_architecture_list",
+      "title": "HighAsCG Decoupled Service Architecture",
+      "file": "decoupled_architecture_list.md",
+      "category": "Reference",
+      "description": "This document defines the strict boundary of responsibilities between the **Headless Backend (Service Engine)** and the **Decoupled Frontend (Single-Page Applic",
+      "order": 81
+    }
+  ]
+}
