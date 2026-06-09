@@ -92,7 +92,13 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		.filter(Boolean)
 
 	const displayByName = new Map(displayList.map((d) => [normalizePortName(d.name), d]))
-	const displayByDrm = new Map(displayList.map((d) => [drmLookupKey(d.name), d]))
+	const displayByDrm = new Map()
+	const displayByDrmShort = new Map()
+	for (const d of displayList) {
+		if (d?.drmName) displayByDrm.set(drmLookupKey(d.drmName), d)
+		if (d?.drmConnector) displayByDrmShort.set(normalizePortName(d.drmConnector), d)
+		if (d?.xrandrName) displayByName.set(normalizePortName(d.xrandrName), d)
+	}
 	const connectorByName = new Map(
 		connectorList.map((c) => [normalizePortName(c.shortName || c.name), c]),
 	)
@@ -102,11 +108,20 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		const drm = drmLookupKey(topologyRow?.drmName)
 		if (drm && displayByDrm.has(drm)) {
 			const d = displayByDrm.get(drm)
-			return { display: d, key: normalizePortName(d.name) }
+			return { display: d, key: normalizePortName(d.xrandrName || d.name) }
+		}
+		const drmShort = normalizePortName(
+			String(topologyRow?.drmName || '')
+				.replace(/^card\d+-/i, '')
+				.trim(),
+		)
+		if (drmShort && displayByDrmShort.has(drmShort)) {
+			const d = displayByDrmShort.get(drmShort)
+			return { display: d, key: normalizePortName(d.xrandrName || d.name) }
 		}
 		if (normName && displayByName.has(normName)) {
 			const d = displayByName.get(normName)
-			return { display: d, key: normName }
+			return { display: d, key: normalizePortName(d.xrandrName || d.name) }
 		}
 		return resolveDisplayByDrmHeuristic(topologyRow, displayList, connectorByDrm, usedDisplayKeys)
 	}

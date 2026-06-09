@@ -66,6 +66,11 @@ if [[ -f "${SCRIPTS_EXFAT}/write-highascg-systemd-unit.sh" ]]; then
 	systemctl restart highascg.service 2>/dev/null || systemctl start highascg.service 2>/dev/null || true
 fi
 
+if [[ -f "${SCRIPT_DIR}/12-passwordless-sudo.sh" ]]; then
+	log "passwordless sudo for Web UI (nodm restart, reboot)"
+	bash "${SCRIPT_DIR}/12-passwordless-sudo.sh" "${USER_CASPAR}"
+fi
+
 echo
 systemctl is-active highascg.service 2>/dev/null && ok "highascg.service active" || echo "  note: start highascg after config/Caspar are ready"
 echo

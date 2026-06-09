@@ -5,6 +5,7 @@ const { multiviewGeneratedConfigIncludesScreen } = require('../config/multiview-
 const { getModeDimensions, STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const { buildMappingGpuLayoutArtifacts } = require('./mapping-gpu-os-layout')
 const { resolvePixelMapFeedToProgramScreen } = require('../config/pixel-mapping-config')
+const { resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
 const logger = require('./logger').defaultLogger
 
 function readScreenSetting(config, key) {
@@ -335,7 +336,8 @@ function calculateLayoutPositions(config) {
 				const allowTopoReplaceMode = !explicitPixelOsMode && !forceOsRes
 				if (allowTopoReplaceMode) {
 					const mappedOk = /^\d+x\d+$/i.test(modeForXrandr)
-					if (!mappedOk) modeForXrandr = `${w}x${h}`
+					const cmLower = String(cm || '').toLowerCase()
+					if (!mappedOk || cmLower === 'custom') modeForXrandr = `${w}x${h}`
 				}
 			} else {
 				const dims = getModeDimensions(String(data.casparMode || ''), config, p.n)
@@ -378,8 +380,10 @@ function calculateLayoutPositions(config) {
 			}
 		}
 
+		const resolvedSysId = resolveSysIdToXrandrOutput(data.sysId)
 		const info = {
-			sysId: data.sysId,
+			sysId: resolvedSysId,
+			drmSysId: resolvedSysId !== data.sysId ? data.sysId : undefined,
 			x: posX,
 			y: posY,
 			width: w,

@@ -81,3 +81,49 @@ test('legacy v1 hardwareConfig without osDisplay still applies graph', () => {
 	assert.equal(phc.applyHardwareConfigToCtx(ctx, legacy), true)
 	assert.equal(cfg.deviceGraph.version, 1)
 })
+
+test('applyHardwareConfigFromProject skips empty hardwareConfig', () => {
+	const cfg = cloneCfg()
+	cfg.screenDestinations = {
+		version: 1,
+		destinations: [
+			{
+				id: 'dst_keep',
+				label: 'PGM 1',
+				mainScreenIndex: 0,
+				mode: 'pgm_only',
+				videoMode: '1080p5000',
+				width: 1920,
+				height: 1080,
+				fps: 50,
+				caspar: { bus: 'pgm' },
+			},
+		],
+		edidNotes: '',
+	}
+	const ctx = {
+		config: cfg,
+		configManager: {
+			get: () => cfg,
+			save: (next) => {
+				Object.assign(cfg, next)
+				return true
+			},
+		},
+		logs: [],
+		log(level, msg) {
+			this.logs.push(`${level}:${msg}`)
+		},
+	}
+	phc.applyHardwareConfigFromProject(ctx, {
+		version: 2,
+		name: 'tacja2',
+		hardwareConfig: {
+			version: 2,
+			deviceGraph: { version: 1, devices: [], connectors: [], edges: [] },
+			screenDestinations: { version: 1, destinations: [], edidNotes: '' },
+		},
+	})
+	assert.equal(cfg.screenDestinations.destinations.length, 1)
+	assert.ok(ctx.logs.some((l) => l.includes('Skipped empty hardwareConfig')))
+})

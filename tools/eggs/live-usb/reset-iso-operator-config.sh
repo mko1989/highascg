@@ -55,4 +55,5 @@ if [[ -d "${EXFAT_ROOT}/configs" ]]; then
 fi
 rm -f "${EXFAT_ROOT}/drop-config/highascg.config.json" 2>/dev/null || true
 
-echo "OK: ISO will ship factory defaults, not eggs build-host operator config"
+echo "==> Reset projects/ to starter show (New project 1 + PGM-only destination)"
+echo "OK: ISO will ship factory defaults + clean starter project, not eggs build-host operator data"

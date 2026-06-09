@@ -89,8 +89,38 @@ function showCenterWanted(data) {
 	return true
 }
 
+function fillGpuPortBadge(data) {
+	var badge = document.getElementById('gpuPortBadge')
+	if (!badge) return
+	var gpuId = data.gpuConnectorId != null ? String(data.gpuConnectorId).trim() : ''
+	if (!gpuId && data.connectorLabel != null) {
+		var conn = String(data.connectorLabel).trim()
+		var m = conn.match(/^(DP-\d+|HDMI-A?-\d+|eDP-\d+)/i)
+		if (m) gpuId = m[1]
+	}
+	if (!gpuId) {
+		badge.style.display = 'none'
+		badge.textContent = ''
+		badge.setAttribute('aria-hidden', 'true')
+		return
+	}
+	badge.style.display = ''
+	badge.setAttribute('aria-hidden', 'false')
+	var sub = ''
+	var xr = ''
+	if (data.connectorLabel != null) {
+		var parts = String(data.connectorLabel).split('·')
+		if (parts.length > 1) xr = parts[parts.length - 1].trim()
+	}
+	if (xr && xr.toUpperCase() !== gpuId.toUpperCase()) {
+		sub = xr
+	}
+	badge.innerHTML = gpuId + (sub ? '<span class="gpu-port-badge__sub">' + sub + '</span>' : '')
+}
+
 /** mode: 'screens' (solid bg + optional eye) | 'grid-overlay' (transparent; resolution + patterns only) */
 function fillBrandMetaAndPatterns(data, mode) {
+	fillGpuPortBadge(data)
 	var showCross = data.showCross !== false && data.showCross !== 'false'
 	var showCircle = data.showCircle !== false && data.showCircle !== 'false'
 	document.getElementById('patternCross').style.display = showCross ? '' : 'none'
@@ -115,6 +145,7 @@ function fillBrandMetaAndPatterns(data, mode) {
 		meta.appendChild(lr)
 	}
 	var connText = data.connectorLabel != null ? String(data.connectorLabel).trim() : ''
+	if (/^Output:\s*/i.test(connText)) connText = connText.replace(/^Output:\s*/i, '')
 	if (connText) {
 		var lc = document.createElement('span')
 		lc.className = 'brand-meta__line'

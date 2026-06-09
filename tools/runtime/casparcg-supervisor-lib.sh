@@ -55,11 +55,60 @@ caspar_kill_main_processes() {
 	return "$([ "$_killed" -eq 1 ] && echo 0 || echo 1)"
 }
 
+# All casparcg PIDs for this install (main + CEF children).
+caspar_list_all_pids() {
+	for _pid in $(pgrep -f "${CASPAR_BIN}" 2>/dev/null) $(pgrep -f "casparcg-server" 2>/dev/null); do
+		_cmd="$(caspar_cmdline "$_pid")"
+		case "$_cmd" in
+		*"${CASPAR_ROOT}"* | *"${CONFIG_PATH}"*) printf '%s\n' "$_pid" ;;
+		esac
+	done | sort -u
+}
+
+caspar_any_process_running() {
+	caspar_list_all_pids | grep -q .
+}
+
+# Kill main process and CEF children (user-data-dir under this CASPAR_ROOT).
+caspar_kill_all_processes() {
+	_sig="${1:-TERM}"
+	_killed=0
+	for _pid in $(caspar_list_main_pids); do
+		for _child in $(pgrep -P "$_pid" 2>/dev/null); do
+			kill -"$_sig" "$_child" 2>/dev/null && _killed=1
+		done
+		kill -"$_sig" "$_pid" 2>/dev/null && _killed=1
+	done
+	_cache="${CASPAR_CEF_CACHE:-$CASPAR_ROOT/cef-cache}"
+	for _pid in $(pgrep -f "user-data-dir=${_cache}" 2>/dev/null); do
+		kill -"$_sig" "$_pid" 2>/dev/null && _killed=1
+	done
+	return "$([ "$_killed" -eq 1 ] && echo 0 || echo 1)"
+}
+
 caspar_clear_cef_cache() {
+	if caspar_any_process_running; then
+		caspar_supervisor_log "[supervisor] skip cef-cache clear — casparcg still running"
+		return 1
+	fi
 	_cache="${CASPAR_CEF_CACHE:-$CASPAR_ROOT/cef-cache}"
 	mkdir -p "$_cache"
 	find "$_cache" -mindepth 1 -delete 2>/dev/null || true
 	rm -rf /tmp/.org.chromium.Chromium.* /tmp/.com.google.* 2>/dev/null || true
+	return 0
+}
+
+# Port may be free while the main process is hung mid-RESTART teardown.
+caspar_ensure_fully_stopped() {
+	caspar_wait_amcp_port_free
+	if ! caspar_any_process_running; then
+		return 0
+	fi
+	caspar_supervisor_log "[supervisor] casparcg still running without AMCP — killing process tree"
+	caspar_kill_all_processes TERM
+	sleep 2
+	caspar_kill_all_processes KILL
+	sleep 1
 }
 
 # Wait until AMCP port is free before the next casparcg start.
@@ -70,10 +119,10 @@ caspar_wait_amcp_port_free() {
 	while caspar_amcp_listening; do
 		_n=$((_n + 1))
 		if [ "$_n" -ge "$_max" ]; then
-			caspar_supervisor_log "[supervisor] AMCP :${CASPAR_AMCP_PORT} still busy after ${_max}s — killing main casparcg"
-			caspar_kill_main_processes TERM
+			caspar_supervisor_log "[supervisor] AMCP :${CASPAR_AMCP_PORT} still busy after ${_max}s — killing casparcg tree"
+			caspar_kill_all_processes TERM
 			sleep 3
-			caspar_kill_main_processes KILL
+			caspar_kill_all_processes KILL
 			sleep 2
 			break
 		fi

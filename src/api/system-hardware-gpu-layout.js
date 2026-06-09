@@ -4,6 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const { promisify } = require('util')
 const execFileAsync = promisify(require('child_process').execFile)
+const { getGpuConnectorInventory } = require('../utils/hardware-info')
 const { JSON_HEADERS, jsonBody } = require('./response')
 
 const DB_PATH = path.join(__dirname, '../../data/gpu_database.json')
@@ -28,56 +29,40 @@ async function getInstalledGpuName() {
 }
 
 /**
- * Helper to get the physical ports from DRM subsystem.
+ * Physical GPU ports from modetest connector inventory.
  */
-function getPhysicalPortsFromDrm() {
-	try {
-		const drmPath = '/sys/class/drm'
-		if (!fs.existsSync(drmPath)) return []
+function getPhysicalPortsFromModetest() {
+	const connectors = getGpuConnectorInventory() || []
+	const ports = connectors.map((c, i) => {
+		const connectorName = String(c.shortName || c.name || '').replace(/^card\d+-/i, '')
+		let type = connectorName
+		if (type.startsWith('DP-')) type = 'DisplayPort'
+		else if (type.startsWith('eDP-')) type = 'eDP'
+		else if (type.startsWith('HDMI-')) type = 'HDMI'
+		else if (type.startsWith('DVI-')) type = 'DVI'
+		else if (type.startsWith('VGA-')) type = 'VGA'
 
-		const dirs = fs.readdirSync(drmPath)
-		const ports = []
-		let portIndex = 0
-
-		for (const dir of dirs) {
-			const match = dir.match(/^card\d+-(.+)$/)
-			if (match) {
-				const connectorName = match[1]
-				let type = connectorName
-				if (type.startsWith('DP-')) type = 'DisplayPort'
-				else if (type.startsWith('eDP-')) type = 'eDP'
-				else if (type.startsWith('HDMI-')) type = 'HDMI'
-				else if (type.startsWith('DVI-')) type = 'DVI'
-				else if (type.startsWith('VGA-')) type = 'VGA'
-
-				ports.push({
-					id: `port-${portIndex}`,
-					type: type,
-					sys_name: connectorName,
-					version: 'unknown',
-					position: portIndex + 1
-				})
-				portIndex++
-			}
+		return {
+			id: `port-${i}`,
+			type,
+			sys_name: connectorName,
+			xrandr_name: c.xrandrName || null,
+			connected: !!c.connected,
+			version: 'unknown',
+			position: i + 1,
 		}
+	})
 
-		// Sort ports: eDP first, then DisplayPort, then HDMI
-		ports.sort((a, b) => {
-			if (a.type === 'eDP' && b.type !== 'eDP') return -1
-			if (b.type === 'eDP' && a.type !== 'eDP') return 1
-			return a.sys_name.localeCompare(b.sys_name)
-		})
-
-		// Reassign positions after sort
-		ports.forEach((p, i) => {
-			p.id = `port-${i}`
-			p.position = i + 1
-		})
-
-		return ports
-	} catch (err) {
-		return []
-	}
+	ports.sort((a, b) => {
+		if (a.type === 'eDP' && b.type !== 'eDP') return -1
+		if (b.type === 'eDP' && a.type !== 'eDP') return 1
+		return a.sys_name.localeCompare(b.sys_name)
+	})
+	ports.forEach((p, i) => {
+		p.id = `port-${i}`
+		p.position = i + 1
+	})
+	return ports
 }
 
 /**
@@ -95,7 +80,7 @@ async function handleGpuLayoutGet() {
 
 	const gpuName = await getInstalledGpuName()
 
-	const drmPorts = getPhysicalPortsFromDrm()
+	const drmPorts = getPhysicalPortsFromModetest()
 
 	// Try finding an exact or fuzzy match in the database.
 	let match = null

@@ -22,27 +22,37 @@
     {
       "physicalPortId": "gpu_p0",
       "slotOrder": 0,
-      "dpA": "DP-1",
-      "dpB": "DP-2",
+      "dpA": "DP-0",
+      "dpB": "DP-1",
       "connectorNumber": 0,
-      "location": 0,
-      "drmName": "card1-DP-1",
-      "drmNameB": "card1-DP-2",
-      "drmCard": "card1"
+      "location": 0
     },
     {
       "physicalPortId": "gpu_p1",
       "slotOrder": 1,
-      "dpA": "DP-3",
-      "dpB": "DP-4",
+      "dpA": "DP-4",
+      "dpB": "DP-5",
       "connectorNumber": 1,
-      "location": 1,
-      "drmName": "card1-DP-3",
-      "drmNameB": "card1-DP-4",
-      "drmCard": "card1"
+      "location": 1
+    },
+    {
+      "physicalPortId": "gpu_p2",
+      "slotOrder": 2,
+      "dpA": "DP-2",
+      "dpB": "",
+      "connectorNumber": 2,
+      "location": 2
+    },
+    {
+      "physicalPortId": "gpu_p3",
+      "slotOrder": 3,
+      "dpA": "HDMI-A-1",
+      "dpB": "",
+      "connectorNumber": 3,
+      "location": 3
     }
   ],
-  "screen_count": 1,
+  "screen_count": 2,
   "streaming": {
     "enabled": false,
     "protocol": "UDP",

@@ -24,6 +24,7 @@
 | **Hostname** → `highascg-nvidia-595` | `hostnamectl set-hostname casparcg` |
 | **Network** netplan + systemd-networkd files | Keep or restore from backup |
 | **`config/casparcg.config`** | Overwritten with ISO factory default (`reset-iso-operator-config.sh`) — **back up first** |
+| **`config/*` + `projects/*` + `.highascg-state.json`** | Factory reset to **New project 1** (empty looks/timelines, one PGM-only screen) — **back up operator projects first** |
 | **`~/exfat/configs/*`** | Cleared for ISO snapshot |
 | **`/etc/fstab` swap lines** | Stripped during build, **restored** at end (`strip-host-swap restore`) |
 | **Initramfs** for pinned kernel | Rebuilt for Plymouth branding |

@@ -117,13 +117,22 @@ async function routeRequest(method, path, body, ctx, req) {
 		const r = await routesExfatSync.handlePost(p, body, ctx)
 		if (r) return r
 	}
-	if (method === 'GET' && (p === '/api/system/gpu-nvidia' || p === '/api/system/decklink' || p === '/api/system/gpu-layout')) {
-		const r = await routesSystemHardware.hardwareHandleGet(p)
+	if (
+		method === 'GET' &&
+		(p === '/api/system/gpu-nvidia' ||
+			p === '/api/system/decklink' ||
+			p === '/api/system/gpu-layout' ||
+			p === '/api/system/xrandr-layout')
+	) {
+		const r = await routesSystemHardware.hardwareHandleGet(p, ctx)
 		if (r) return r
 	}
 	if (
 		method === 'POST' &&
-		(p === '/api/system/gpu-nvidia/apply' || p === '/api/system/gui-launch' || p === '/api/system/gpu-ports-reset')
+		(p === '/api/system/gpu-nvidia/apply' ||
+			p === '/api/system/gui-launch' ||
+			p === '/api/system/gpu-ports-reset' ||
+			p === '/api/system/xrandr-layout/apply')
 	) {
 		const r = await routesSystemHardware.hardwareHandlePost(p, body, ctx)
 		if (r) return r

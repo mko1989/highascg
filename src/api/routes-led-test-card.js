@@ -8,6 +8,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
+const { resolveGpuConnectorLabelForChannel } = require('../utils/gpu-connector-label')
 
 const TEST_LAYER = 999
 const TEMPLATE = 'led_grid_test'
@@ -72,9 +73,14 @@ async function handlePost(path, body, ctx) {
 		const mainIdx = Array.isArray(programChannels) ? programChannels.indexOf(channel) : -1
 		let outputRole = ''
 		let connectorLabel = mainIdx >= 0 ? `Screen ${mainIdx + 1} (PGM ch ${channel})` : `PGM ch ${channel}`
-		const screenSystemId =
-			mainIdx >= 0 ? String(ctx?.config?.casparServer?.[`screen_${mainIdx + 1}_system_id`] || '').trim() : ''
-		if (screenSystemId) connectorLabel += ` · ${screenSystemId}`
+		const gpu = resolveGpuConnectorLabelForChannel(ctx?.config || {}, channel)
+		let gpuConnectorId = gpu.gpuConnectorId || ''
+		if (gpu.connectorLabel) connectorLabel = gpu.connectorLabel
+		else {
+			const screenSystemId =
+				mainIdx >= 0 ? String(ctx?.config?.casparServer?.[`screen_${mainIdx + 1}_system_id`] || '').trim() : ''
+			if (screenSystemId) connectorLabel += ` · ${screenSystemId}`
+		}
 		const cc = st.configComparison?.serverChannels
 		if ((!resolutionLabel || !Number.isFinite(resolutionWidth)) && Array.isArray(cc)) {
 			const row = cc.find((s) => s.index === channel)
@@ -97,6 +103,7 @@ async function handlePost(path, body, ctx) {
 		const payload = showLedGrid
 			? {
 					showLedGrid: true,
+					gpuConnectorId,
 					showCircle,
 					showCross,
 					cols: Math.max(1, parseInt(b.cols, 10) || 4),
@@ -118,6 +125,7 @@ async function handlePost(path, body, ctx) {
 				}
 			: {
 					showLedGrid: false,
+					gpuConnectorId,
 					showCircle,
 					showCross,
 					resolutionLabel: resolutionLabel || '',

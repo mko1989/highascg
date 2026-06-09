@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Step 3: NVIDIA open kernel modules 595 for Blackwell (RTX PRO 4000).
+# Step 3: NVIDIA open kernel modules 595.
 # Requires 6.8.0-117-generic (run 01 + 02 first).
 #
-# Closed cuda-drivers / Ubuntu nvidia-driver-595 break Blackwell:
+# Blackwell (RTX PRO 4000): closed cuda-drivers / Ubuntu nvidia-driver-595 fail with
 #   NVRM: requires use of the NVIDIA open kernel modules.
+# Turing+ (e.g. RTX 2080 SUPER): open modules work fine; closed also works, but we
+# standardize on open from the CUDA repo for one ISO/stack across GPU generations.
 #
 #   sudo bash scripts/setup/03-nvidia-open-595.sh
 #   sudo reboot
@@ -32,6 +34,54 @@ KEYRING_URL="https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/
 WORKDIR="${TMPDIR:-/tmp}/highascg-nvidia-cuda-repo"
 STAMP=/etc/highascg/nvidia-kernel-module-type
 HIGHASCG_PIN=/etc/apt/preferences.d/highascg-nvidia-proprietary.pref
+
+# Ubuntu nvidia-firmware-595-* blocks CUDA-repo nvidia-firmware (gsp_ga10x.bin overlap).
+# Must run before any apt install — broken iU packages block apt entirely.
+force_drop_pkg() {
+	local pkg=$1
+	if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install'; then
+		log "Force-drop ${pkg}"
+		dpkg --remove --force-depends "$pkg" 2>/dev/null || true
+		dpkg --purge --force-depends "$pkg" 2>/dev/null || true
+	fi
+}
+
+recover_nvidia_firmware_conflict() {
+	log "Drop Ubuntu firmware/modules that block CUDA-repo nvidia-firmware"
+	while IFS= read -r p; do
+		force_drop_pkg "$p"
+	done < <(dpkg-query -W -f='${Package}\n' 2>/dev/null | grep -E \
+		'^nvidia-firmware-595-|^linux-modules-nvidia-|^linux-objects-nvidia-|^linux-signatures-nvidia-' \
+		|| true)
+
+	if dpkg-query -W -f='${Status}' nvidia-kernel-common 2>/dev/null | grep -q 'unpacked'; then
+		log "Install CUDA-repo nvidia-firmware (--force-overwrite)"
+		local fw_deb=""
+		for candidate in \
+			/var/cache/apt/archives/nvidia-firmware_*_amd64.deb \
+			/tmp/apt-dpkg-install-*/nvidia-firmware_*_amd64.deb; do
+			[[ -f $candidate ]] && fw_deb=$candidate && break
+		done
+		if [[ -z "$fw_deb" ]]; then
+			apt-get download nvidia-firmware 2>/dev/null || true
+			fw_deb=$(ls -t nvidia-firmware_*_amd64.deb 2>/dev/null | head -1 || true)
+		fi
+		if [[ -n "$fw_deb" && -f "$fw_deb" ]]; then
+			dpkg -i --force-overwrite "$fw_deb"
+		else
+			log "WARN: nvidia-firmware .deb not cached — apt will fetch during configure"
+		fi
+	fi
+
+	if dpkg-query -W -f='${Status}' nvidia-dkms-open 2>/dev/null | grep -qE 'unpacked|half-configured'; then
+		log "Finish interrupted open-driver install (DKMS build may take several minutes)"
+		DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+		DEBIAN_FRONTEND=noninteractive apt-get install -y -f
+	fi
+}
+
+highascg_apt_block_service_starts
+recover_nvidia_firmware_conflict
 
 log "Kernel headers for ${KREL}"
 DEBIAN_FRONTEND=noninteractive apt-get update -y
@@ -63,8 +113,6 @@ done
 if ((${#CLOSED_PKGS[@]} > 0)); then
 	DEBIAN_FRONTEND=noninteractive apt-get remove -y "${CLOSED_PKGS[@]}"
 fi
-
-highascg_apt_block_service_starts
 
 log "Install open kernel modules: nvidia-open"
 DEBIAN_FRONTEND=noninteractive apt-get install -y nvidia-open nvidia-settings

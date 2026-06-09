@@ -10,8 +10,16 @@ const defaults = require('../config/defaults')
 const { buildConfigXml, normalizeAudioRouting } = require('../config/config-generator')
 const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-generator-config')
 const { getStandardModeChoices } = require('../config/config-modes')
-const { applyX11Layout, restartDisplayManager } = require('../utils/os-config')
+const { applyX11Layout } = require('../utils/os-config')
+const {
+	isAmcpTcpConnected,
+	waitForAmcpTcp,
+	sendRestartAndWaitForCaspar,
+	resolveReconnectWaitMs,
+} = require('../utils/caspar-restart')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
  * @param {object} ctx
@@ -51,38 +59,6 @@ function resolveCasparRestartWaitMs() {
 	const n = parseInt(String(raw), 10)
 	if (!Number.isFinite(n) || n < 0) return 15_000
 	return Math.min(n, 120_000)
-}
-
-/**
- * `ctx.amcp` is always set when Caspar is enabled, but TCP may be down (Caspar stopped, restarting, or wrong host/port).
- * Uses {@link ConnectionManager#isConnected} (library transport does not set legacy `tcp.isConnected`).
- * @param {object} ctx
- * @returns {boolean}
- */
-function isAmcpTcpConnected(ctx) {
-	const conn = ctx.casparConnection
-	if (conn && typeof conn.isConnected === 'boolean') return conn.isConnected
-	const sock = ctx.amcp?._context?.socket
-	if (sock && typeof sock.isConnected === 'boolean') return sock.isConnected
-	return !!(conn?.tcp?.isConnected)
-}
-
-function sleep(ms) {
-	return new Promise((r) => setTimeout(r, ms))
-}
-
-/**
- * @param {object} ctx
- * @param {number} maxMs
- * @param {number} [pollMs]
- */
-async function waitForAmcpTcp(ctx, maxMs, pollMs = 400) {
-	const t0 = Date.now()
-	while (Date.now() - t0 < maxMs) {
-		if (isAmcpTcpConnected(ctx)) return true
-		await sleep(pollMs)
-	}
-	return isAmcpTcpConnected(ctx)
 }
 
 /**
@@ -176,28 +152,6 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 		} catch (_) {}
 	}
 
-	try {
-		applyX11Layout(ctx.config)
-		const dmRestarted = restartDisplayManager()
-		if (dmRestarted) {
-			apiLog(ctx, 'info', '[Caspar config] Display manager restarted, CasparCG will follow.')
-			return {
-				status: 200,
-				headers: JSON_HEADERS,
-				body: jsonBody({
-					ok: true,
-					path: filePath,
-					restartSent: true,
-					message: 'Config written; OS layout applied; display manager restarted.',
-				}),
-			}
-		} else {
-			apiLog(ctx, 'info', '[Caspar config] Display manager restart failed or skipped, falling back to AMCP RESTART.')
-		}
-	} catch (err) {
-		apiLog(ctx, 'warn', `[Caspar config] OS config apply failed: ${err.message}`)
-	}
-
 	if (!ctx.amcp) {
 		apiLog(ctx, 'warn', '[Caspar config] File written; AMCP RESTART skipped (no AMCP client — e.g. --no-caspar)')
 		return {
@@ -246,10 +200,21 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 		}
 	}
 
+	let restartResult = { restartSent: false, disconnected: false, reconnected: false }
 	try {
-		apiLog(ctx, 'info', '[Caspar config] Sending AMCP RESTART…')
-		await ctx.amcp.query.restart()
-		apiLog(ctx, 'info', '[Caspar config] AMCP RESTART completed')
+		restartResult = await sendRestartAndWaitForCaspar(ctx, {
+			log: (level, msg) => apiLog(ctx, level, msg),
+			onDisconnected: async () => {
+				apiLog(ctx, 'info', '[Caspar config] AMCP disconnected. Waiting for Caspar to uninitialize (2s)...')
+				await sleep(2000)
+				apiLog(ctx, 'info', '[Caspar config] Applying OS layout...')
+				try {
+					applyX11Layout(ctx.config)
+				} catch (err) {
+					apiLog(ctx, 'warn', `[Caspar config] OS config apply failed: ${err.message}`)
+				}
+			}
+		})
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e)
 		if (/not connected/i.test(msg)) {
@@ -284,8 +249,14 @@ async function applyCasparConfigToDiskAndRestart(ctx) {
 		body: jsonBody({
 			ok: true,
 			path: filePath,
-			restartSent: true,
-			message: 'Config written; Caspar RESTART sent.',
+			restartSent: restartResult.restartSent,
+			disconnected: restartResult.disconnected,
+			reconnected: restartResult.reconnected,
+			message: restartResult.reconnected
+				? 'Config written; Caspar restarted and AMCP reconnected.'
+				: restartResult.disconnected
+					? 'Config written; Caspar exited but AMCP has not reconnected yet — check run.sh / /tmp/caspar.log.'
+					: 'Config written; Caspar RESTART sent but process did not exit — forced kill may have been attempted.',
 		}),
 	}
 }

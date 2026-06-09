@@ -98,9 +98,9 @@ describe('gpu topology from DRM sysfs', () => {
 			'HDMI-1 disconnected',
 		].join('\n')
 		const rows = buildTopologyRowsFromDrmConnectors(connectors, { xrandrRaw })
-		assert.equal(rows.length, 2)
-		assert.equal(rows[0].dpA, 'DP-0')
-		assert.equal(rows[0].dpB, 'DP-1')
+		const dpRow = rows.find((r) => r.dpA === 'DP-0' && r.dpB === 'DP-1')
+		assert.ok(dpRow, 'expected DP-0/DP-1 pair when both halves exist in DRM and xrandr')
+		assert.equal(dpRow.drmName, 'card1-DP-0')
 	})
 
 	it('lists two server GPUs without merging across cards', () => {
@@ -115,6 +115,31 @@ describe('gpu topology from DRM sysfs', () => {
 		assert.equal(rows.filter((r) => r.drmCard === 'card0').length, 2)
 		assert.equal(rows.filter((r) => r.drmCard === 'card1').length, 2)
 		assert.notEqual(rows[0].physicalPortId, rows[2].physicalPortId)
+	})
+
+	it('maps NVIDIA DRM DP-3 to xrandr DP-4/DP-5 when DP-2/DP-3 lanes are idle (RTX 2080 SUPER)', () => {
+		const connectors = [
+			{ name: 'card1-DP-1', shortName: 'DP-1', connected: true, type: 'displayport' },
+			{ name: 'card1-DP-2', shortName: 'DP-2', connected: false, type: 'displayport' },
+			{ name: 'card1-DP-3', shortName: 'DP-3', connected: true, type: 'displayport' },
+			{ name: 'card1-HDMI-A-1', shortName: 'HDMI-A-1', connected: true, type: 'hdmi' },
+		]
+		const xrandrRaw = [
+			'DP-0 connected primary 1920x1080+2560+0',
+			'DP-1 disconnected',
+			'HDMI-0 connected 1920x1080+0+0',
+			'DP-2 disconnected',
+			'DP-3 disconnected',
+			'DP-4 connected 2560x1280+0+0',
+			'DP-5 disconnected',
+		].join('\n')
+		const rows = buildTopologyRowsFromDrmConnectors(connectors, { xrandrRaw })
+		const dp01 = rows.find((r) => r.dpA === 'DP-0' && r.dpB === 'DP-1')
+		const dp45 = rows.find((r) => r.dpA === 'DP-4' && r.dpB === 'DP-5')
+		assert.ok(dp01, 'expected DP-0/DP-1 row')
+		assert.equal(dp01.drmName, 'card1-DP-1')
+		assert.ok(dp45, 'expected DP-4/DP-5 row for DRM DP-3')
+		assert.equal(dp45.drmName, 'card1-DP-3')
 	})
 
 	it('aliases xrandr HDMI-0 to DRM card0-HDMI-A-1', () => {

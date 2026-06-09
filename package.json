@@ -33,6 +33,8 @@
 		"test:os-layout-w40": "node --test tools/smoke/smoke-os-layout-w40.js",
 		"test:mapping-gpu-os-layout": "node --test tools/smoke/smoke-mapping-gpu-os-layout.js",
 		"test:xrandr-custom-mode": "node --test tools/smoke/smoke-xrandr-custom-mode.js",
+		"test:gpu-modetest": "node --test tools/smoke/smoke-gpu-modetest.test.js",
+		"test:gpu-topology": "node --test tools/smoke/smoke-gpu-topology.test.js",
 		"test:modeline-timings": "node --test tools/smoke/smoke-modeline-timings.js",
 		"test:config-generator": "node --test tools/smoke/smoke-config-generator-routing.js",
 		"test:playlist": "node --test tools/smoke/smoke-playlist.js",

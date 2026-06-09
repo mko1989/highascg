@@ -63,6 +63,22 @@ function parseXrandrVideoOutputNames(raw) {
 	return outputs
 }
 
+/**
+ * Connected xrandr output names (normalized), e.g. DP-0, HDMI-0.
+ * @param {string} raw
+ * @returns {Set<string>}
+ */
+function parseXrandrConnectedNames(raw) {
+	const connected = new Set()
+	for (const line of String(raw || '').split('\n')) {
+		const m = line.match(/^(\S+)\s+connected\b/)
+		if (!m) continue
+		const norm = normalizePortName(m[1].replace(/^card\d+-/i, ''))
+		if (norm) connected.add(norm)
+	}
+	return connected
+}
+
 /** @deprecated use parseXrandrVideoOutputNames */
 function parseXrandrDpHdmiOutputNames(raw) {
 	return parseXrandrVideoOutputNames(raw)
@@ -180,6 +196,7 @@ module.exports = {
 	normalizePortName,
 	canonicalAbPair,
 	parseXrandrVideoOutputNames,
+	parseXrandrConnectedNames,
 	parseXrandrDpHdmiOutputNames,
 	discoverGpuPhysicalTopologyFromXrandr,
 	topologyRowsEqual,

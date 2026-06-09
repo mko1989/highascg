@@ -6,6 +6,7 @@ const {
 	canonicalAbPair,
 	discoverGpuPhysicalTopologyFromXrandr,
 	parseXrandrVideoOutputNames,
+	parseXrandrConnectedNames,
 } = require('./gpu-topology-xrandr')
 
 function cardFromDrmName(name) {
@@ -129,6 +130,33 @@ function isNonPairingPort(short) {
 }
 
 /**
+ * Unique NVIDIA-style xrandr A/B pairs (DP-0/1, DP-2/3, …) from output names.
+ * @param {string[]} xrandrOutputs
+ */
+function collectXrandrAbPairs(xrandrOutputs) {
+	const seen = new Set()
+	/** @type {Array<{ dpA: string, dpB: string, key: string }>} */
+	const pairs = []
+	for (const out of xrandrOutputs) {
+		const p = canonicalAbPair(out)
+		if (p.length !== 2) continue
+		const dpA = normalizePortName(p[0])
+		const dpB = normalizePortName(p[1])
+		if (!dpA || !dpB || dpA === dpB) continue
+		const key = `${dpA}|${dpB}`
+		if (seen.has(key)) continue
+		seen.add(key)
+		pairs.push({ dpA, dpB, key })
+	}
+	pairs.sort((a, b) => {
+		const na = parseInt(a.dpA.split('-')[1], 10)
+		const nb = parseInt(b.dpA.split('-')[1], 10)
+		return (Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)
+	})
+	return pairs
+}
+
+/**
  * Build topology rows for one DRM card (pairing scoped to this card only).
  * @param {string} drmCard
  * @param {Array<{ drmName: string, short: string, norm: string, connected: boolean, type: string }>} onCard
@@ -138,6 +166,7 @@ function isNonPairingPort(short) {
  */
 function buildRowsForDrmCard(drmCard, onCard, xrandrNames, xrandrOutputs, opts = {}) {
 	const pairAdjacentDp = opts.pairAdjacentDp !== false
+	const xrandrConnected = opts.xrandrConnected || new Set()
 	const byNorm = new Map(onCard.map((c) => [c.norm, c]))
 	const used = new Set()
 	/** @type {Array<{ dpA: string, dpB: string, drmName?: string, drmNameB?: string, drmCard: string }>} */
@@ -166,9 +195,15 @@ function buildRowsForDrmCard(drmCard, onCard, xrandrNames, xrandrOutputs, opts =
 		const ca = byNorm.get(a) || (isSimpleEdpName(c.short) && normalizePortName(c.short) === a ? c : null)
 		const cb = byNorm.get(b)
 		if (!ca && !cb) continue
+		// Adjacent DRM DP-N + DP-N+1 are separate jacks on NVIDIA; do not claim an
+		// xrandr A/B pair unless a lane in that pair is actually connected.
+		if (ca && cb && ca !== cb && !xrandrConnected.has(a) && !xrandrConnected.has(b)) {
+			continue
+		}
+		const anchor = ca || cb || c
 		used.add(a)
 		used.add(b)
-		pushRow(a, b, ca || c, cb)
+		pushRow(a, b, anchor, cb && cb !== anchor ? cb : null)
 	}
 
 	// 1b) xrandr eDP panel lanes (eDP-N-0 / eDP-N-1) anchored to DRM eDP-N when lanes only in xrandr.
@@ -187,6 +222,50 @@ function buildRowsForDrmCard(drmCard, onCard, xrandrNames, xrandrOutputs, opts =
 		used.add(laneA)
 		used.add(laneB)
 		pushRow(laneA, laneB, c, null)
+	}
+
+	// 1c) NVIDIA: lone DRM DP jack -> unused xrandr A/B pair when lanes are connected
+	// (e.g. DRM card1-DP-3 -> xrandr DP-4/DP-5, not DRM DP-2+DP-3).
+	{
+		const assignedDrm = new Set()
+		for (const row of rows) {
+			if (row.drmName) assignedDrm.add(row.drmName)
+			if (row.drmNameB) assignedDrm.add(row.drmNameB)
+		}
+		const usedPairKeys = new Set(rows.map((r) => `${r.dpA}|${r.dpB}`))
+		const availPairs = collectXrandrAbPairs(xrandrOutputs).filter(
+			(p) => !usedPairKeys.has(p.key) && /^DP-/i.test(p.dpA),
+		)
+		const connectedPairs = availPairs.filter(
+			(p) => xrandrConnected.has(p.dpA) || xrandrConnected.has(p.dpB),
+		)
+		const connectedDrmDp = onCard
+			.filter(
+				(c) =>
+					isSimpleDpName(c.short) &&
+					!assignedDrm.has(c.drmName) &&
+					!used.has(c.norm) &&
+					c.connected,
+			)
+			.sort((a, b) => {
+				const na = parseInt(a.short.match(/^DP-(\d+)$/i)?.[1] || '0', 10)
+				const nb = parseInt(b.short.match(/^DP-(\d+)$/i)?.[1] || '0', 10)
+				return na - nb
+			})
+
+		let pairIdx = 0
+		for (const c of connectedDrmDp) {
+			while (pairIdx < connectedPairs.length) {
+				const pair = connectedPairs[pairIdx++]
+				if (used.has(pair.dpA) || used.has(pair.dpB)) continue
+				used.add(pair.dpA)
+				used.add(pair.dpB)
+				used.add(c.norm)
+				assignedDrm.add(c.drmName)
+				pushRow(pair.dpA, pair.dpB, c, null)
+				break
+			}
+		}
 	}
 
 	// 2) Adjacent DP-N / DP-N+1 on same card (physical dual-mode jack), e.g. DRM DP-1+DP-2.
@@ -286,7 +365,9 @@ function buildTopologyRowsFromDrmConnectors(connectors, opts = {}) {
 	)
 	if (!list.length) return null
 
-	const xrandrOutputs = parseXrandrVideoOutputNames(opts.xrandrRaw || '')
+	const xrandrRaw = opts.xrandrRaw || ''
+	const xrandrOutputs = parseXrandrVideoOutputNames(xrandrRaw)
+	const xrandrConnected = parseXrandrConnectedNames(xrandrRaw)
 	const xrandrNames = new Set(
 		xrandrOutputs.map((n) => normalizePortName(n)).filter(Boolean),
 	)
@@ -322,6 +403,7 @@ function buildTopologyRowsFromDrmConnectors(connectors, opts = {}) {
 			.filter((c) => c.norm)
 		merged.push(...buildRowsForDrmCard(drmCard, onCard, xrandrNames, xrandrOutputs, {
 			pairAdjacentDp: opts.pairAdjacentDp,
+			xrandrConnected,
 		}))
 	}
 
@@ -341,7 +423,7 @@ function buildTopologyRowsFromDrmConnectors(connectors, opts = {}) {
 }
 
 /**
- * Enumerate topology from `/sys/class/drm` (all connectors on all GPU cards).
+ * Enumerate topology from modetest connectors (all connectors on all GPU cards).
  * @param {{ config?: object, xrandrRaw?: string }} [opts]
  */
 function discoverGpuPhysicalTopologyFromDrm(opts = {}) {
@@ -381,7 +463,7 @@ function discoverGpuPhysicalTopology(opts = {}) {
 	const fromDrm = discoverGpuPhysicalTopologyFromDrm({ config: cfg, xrandrRaw })
 	if (fromDrm?.length) {
 		const cards = [...new Set(fromDrm.map((r) => r.drmCard).filter(Boolean))]
-		return { rows: fromDrm, source: 'drm', cards }
+		return { rows: fromDrm, source: 'modetest', cards }
 	}
 
 	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr(xrandrRaw)
@@ -399,6 +481,7 @@ module.exports = {
 	buildRowsForDrmCard,
 	adjacentDrmDpPair,
 	adjacentEdpPair,
+	collectXrandrAbPairs,
 	edpPanelPairFromXrandr,
 	groupConnectorsByDrmCard,
 	buildTopologyRowsFromDrmConnectors,

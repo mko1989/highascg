@@ -23,6 +23,7 @@ const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-c
 const { getChannelMap } = require('./src/config/routing'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
 const { runConnectionQueryCycle } = require('./src/utils/query-cycle')
 const moduleRegistry = require('./src/module-registry')
@@ -200,6 +201,7 @@ function main() {
 		logBuffer.setOnNewLine(line => { try { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('log_line', line) } catch (_) {} })
 		appCtx.timelineEngine.on('playback', pb => { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('timeline.playback', pb) })
 		moduleRegistry.bootAll(appCtx)
+		appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
 
 		if (casparConn) {
 			let wasConnected = false; casparConn.on('status', payload => {

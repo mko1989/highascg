@@ -1,0 +1,283 @@
+trying to open device '/dev/dri/card1'... done
+opened device `NVIDIA DRM driver` on driver `nvidia-drm` (version 0.0.0 at 20160202)
+Connectors:
+id	encoder	status		name		size (mm)	modes	encoders
+126	0	connected	DP-1           	0x0		28	125, 128
+  modes:
+	index name refresh (Hz) hdisp hss hse htot vdisp vss vse vtot
+  #0 1920x1080 50.00 1920 1968 2000 2080 1080 1083 1088 1106 115020 flags: phsync, nvsync; type: preferred
+  #1 4096x2160 59.94 4096 4184 4272 4400 2160 2168 2178 2250 593410 flags: phsync, pvsync; type: 
+  #2 4096x2160 50.00 4096 5064 5152 5280 2160 2168 2178 2250 594000 flags: phsync, pvsync; type: 
+  #3 4096x2160 29.97 4096 4184 4272 4400 2160 2168 2178 2250 296700 flags: phsync, pvsync; type: 
+  #4 4096x2160 25.00 4096 5064 5152 5280 2160 2168 2178 2250 297000 flags: phsync, pvsync; type: 
+  #5 3840x2160 59.94 3840 4016 4104 4400 2160 2168 2178 2250 593410 flags: phsync, pvsync; type: 
+  #6 3840x2160 30.00 3840 3888 3920 4000 2160 2163 2168 2222 266640 flags: nhsync, nvsync; type: 
+  #7 2560x1600 60.00 2560 2608 2640 2720 1600 1603 1609 1646 268630 flags: nhsync, nvsync; type: 
+  #8 2560x1080 59.94 2560 2808 2852 3000 1080 1084 1089 1100 197800 flags: phsync, pvsync; type: 
+  #9 1920x1200 60.00 1920 1968 2000 2080 1200 1203 1209 1235 154130 flags: nhsync, nvsync; type: 
+  #10 1920x1080 60.00 1920 2008 2052 2200 1080 1084 1089 1125 148500 flags: nhsync, nvsync; type: 
+  #11 1920x1080 60.00 1920 2008 2052 2200 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: 
+  #12 1920x1080 59.94 1920 2008 2052 2200 1080 1084 1089 1125 148350 flags: phsync, pvsync; type: 
+  #13 1920x1080 50.00 1920 2448 2492 2640 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: 
+  #14 1920x1080 29.97 1920 2008 2052 2200 1080 1084 1089 1125 74180 flags: phsync, pvsync; type: 
+  #15 1680x1050 59.95 1680 1784 1960 2240 1050 1053 1059 1089 146250 flags: nhsync, pvsync; type: 
+  #16 1280x1024 75.02 1280 1296 1440 1688 1024 1025 1028 1066 135000 flags: phsync, pvsync; type: 
+  #17 1280x1024 60.02 1280 1328 1440 1688 1024 1025 1028 1066 108000 flags: phsync, pvsync; type: 
+  #18 1440x900 59.89 1440 1520 1672 1904 900 903 909 934 106500 flags: nhsync, pvsync; type: 
+  #19 1280x960 60.00 1280 1376 1488 1800 960 961 964 1000 108000 flags: phsync, pvsync; type: 
+  #20 1280x720 60.00 1280 1390 1430 1650 720 725 730 750 74250 flags: phsync, pvsync; type: 
+  #21 1024x768 75.03 1024 1040 1136 1312 768 769 772 800 78750 flags: phsync, pvsync; type: 
+  #22 1024x768 70.07 1024 1048 1184 1328 768 771 777 806 75000 flags: nhsync, nvsync; type: 
+  #23 1024x768 60.00 1024 1048 1184 1344 768 771 777 806 65000 flags: nhsync, nvsync; type: 
+  #24 800x600 75.00 800 816 896 1056 600 601 604 625 49500 flags: phsync, pvsync; type: 
+  #25 800x600 60.32 800 840 968 1056 600 601 605 628 40000 flags: phsync, pvsync; type: 
+  #26 640x480 75.00 640 656 720 840 480 481 484 500 31500 flags: nhsync, nvsync; type: 
+  #27 640x480 59.94 640 656 752 800 480 490 492 525 25175 flags: nhsync, nvsync; type: 
+  props:
+	1 EDID:
+		flags: immutable blob
+		blobs:
+
+		value:
+			00ffffffffffff0039f65ee401010101
+			021f0104c50000781a3131a5554ea126
+			0c5054254f00d1c0b300950081808140
+			81c001010101ee2c80a070381a403020
+			35005f592100001a000000fd0017f00f
+			ff3c000a202020202020000000fc0050
+			38300a20202020202020202000000011
+			000000000000000000000000000001e3
+			02031731496b5a901f22666564636503
+			0c000000e2004f286800a0f0703e8030
+			2035005f5921000018ef6800a0a0402e
+			6030203600e00e11000018353c80a070
+			b0234030203600e00e11000018023a80
+			1871382d40582c4500e00e1100001800
+			00000000000000000000000000000000
+			0000000000000000000000000000005c
+	2 DPMS:
+		flags: enum
+		enums: On=0 Standby=1 Suspend=2 Off=3
+		value: 3
+	5 link-status:
+		flags: enum
+		enums: Good=0 Bad=1
+		value: 0
+	6 non-desktop:
+		flags: immutable range
+		values: 0 1
+		value: 0
+	4 TILE:
+		flags: immutable blob
+		blobs:
+
+		value:
+	127 Colorspace:
+		flags: enum
+		enums: Default=0 BT2020_RGB=9 BT2020_YCC=10
+		value: 0
+	7 HDR_OUTPUT_METADATA:
+		flags: blob
+		blobs:
+
+		value:
+	140 vrr_capable:
+		flags: immutable range
+		values: 0 1
+		value: 0
+130	0	connected	HDMI-A-1       	480x270		20	129
+  modes:
+	index name refresh (Hz) hdisp hss hse htot vdisp vss vse vtot
+  #0 1920x1080 60.00 1920 2008 2052 2200 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: preferred
+  #1 1920x1080 59.94 1920 2008 2052 2200 1080 1084 1089 1125 148350 flags: phsync, pvsync; type: 
+  #2 1920x1080 50.00 1920 2448 2492 2640 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: 
+  #3 1680x1050 59.95 1680 1784 1960 2240 1050 1053 1059 1089 146250 flags: nhsync, pvsync; type: 
+  #4 1280x1024 60.02 1280 1328 1440 1688 1024 1025 1028 1066 108000 flags: phsync, pvsync; type: 
+  #5 1440x900 59.89 1440 1520 1672 1904 900 903 909 934 106500 flags: nhsync, pvsync; type: 
+  #6 1280x800 59.81 1280 1352 1480 1680 800 803 809 831 83500 flags: nhsync, pvsync; type: 
+  #7 1152x864 75.00 1152 1216 1344 1600 864 865 868 900 108000 flags: phsync, pvsync; type: 
+  #8 1280x720 60.00 1280 1390 1430 1650 720 725 730 750 74250 flags: phsync, pvsync; type: 
+  #9 1280x720 59.94 1280 1390 1430 1650 720 725 730 750 74180 flags: phsync, pvsync; type: 
+  #10 1280x720 50.00 1280 1720 1760 1980 720 725 730 750 74250 flags: phsync, pvsync; type: 
+  #11 1024x768 70.07 1024 1048 1184 1328 768 771 777 806 75000 flags: nhsync, nvsync; type: 
+  #12 1024x768 60.00 1024 1048 1184 1344 768 771 777 806 65000 flags: nhsync, nvsync; type: 
+  #13 800x600 60.32 800 840 968 1056 600 601 605 628 40000 flags: phsync, pvsync; type: 
+  #14 800x600 56.25 800 824 896 1024 600 601 603 625 36000 flags: phsync, pvsync; type: 
+  #15 720x576 50.00 720 732 796 864 576 581 586 625 27000 flags: nhsync, nvsync; type: 
+  #16 720x480 59.94 720 736 798 858 480 489 495 525 27000 flags: nhsync, nvsync; type: 
+  #17 640x480 59.94 640 656 752 800 480 490 492 525 25175 flags: nhsync, nvsync; type: 
+  #18 640x480 59.93 640 656 752 800 480 490 492 525 25170 flags: nhsync, nvsync; type: 
+  #19 624x464 59.95 624 632 728 800 464 466 468 525 25180 flags: nhsync, nvsync; type: 
+  props:
+	1 EDID:
+		flags: immutable blob
+		blobs:
+
+		value:
+			00ffffffffffff000472120595088080
+			081c010380301b78eeebf5a656519c26
+			105054b30c00714f818081c081009500
+			b300d1c00101023a801871382d40582c
+			4500dc0c1100001e000000fd00384c1f
+			4b12000a202020202020000000fc006b
+			32323248514c0a2020202020000000ff
+			005435584545303133323435350a01cd
+			02031cf1499001030412131f05140309
+			07070301000065030c001000023a8018
+			71382d40582c4500dd0c1100001e011d
+			007251d01e206e285500dd0c1100001e
+			8c0ad08a20e02d10103e9600dd0c1100
+			0018d60980a020e02d1008602200dd0c
+			11080818000000000000000000000000
+			00000000000000000000000000000046
+	2 DPMS:
+		flags: enum
+		enums: On=0 Standby=1 Suspend=2 Off=3
+		value: 3
+	5 link-status:
+		flags: enum
+		enums: Good=0 Bad=1
+		value: 0
+	6 non-desktop:
+		flags: immutable range
+		values: 0 1
+		value: 0
+	4 TILE:
+		flags: immutable blob
+		blobs:
+
+		value:
+	131 Colorspace:
+		flags: enum
+		enums: Default=0 BT2020_RGB=9 BT2020_YCC=10
+		value: 0
+	7 HDR_OUTPUT_METADATA:
+		flags: blob
+		blobs:
+
+		value:
+	141 vrr_capable:
+		flags: immutable range
+		values: 0 1
+		value: 0
+133	0	disconnected	DP-2           	0x0		0	132, 135
+  props:
+	1 EDID:
+		flags: immutable blob
+		blobs:
+
+		value:
+	2 DPMS:
+		flags: enum
+		enums: On=0 Standby=1 Suspend=2 Off=3
+		value: 0
+	5 link-status:
+		flags: enum
+		enums: Good=0 Bad=1
+		value: 0
+	6 non-desktop:
+		flags: immutable range
+		values: 0 1
+		value: 0
+	4 TILE:
+		flags: immutable blob
+		blobs:
+
+		value:
+	134 Colorspace:
+		flags: enum
+		enums: Default=0 BT2020_RGB=9 BT2020_YCC=10
+		value: 0
+	7 HDR_OUTPUT_METADATA:
+		flags: blob
+		blobs:
+
+		value:
+	142 vrr_capable:
+		flags: immutable range
+		values: 0 1
+		value: 0
+137	0	connected	DP-3           	0x0		28	136, 139
+  modes:
+	index name refresh (Hz) hdisp hss hse htot vdisp vss vse vtot
+  #0 2560x1280 50.00 2560 2608 2640 2720 1280 1283 1293 1311 178290 flags: phsync, nvsync; type: preferred
+  #1 4096x2160 59.94 4096 4184 4272 4400 2160 2168 2178 2250 593410 flags: phsync, pvsync; type: 
+  #2 4096x2160 50.00 4096 5064 5152 5280 2160 2168 2178 2250 594000 flags: phsync, pvsync; type: 
+  #3 4096x2160 29.97 4096 4184 4272 4400 2160 2168 2178 2250 296700 flags: phsync, pvsync; type: 
+  #4 4096x2160 25.00 4096 5064 5152 5280 2160 2168 2178 2250 297000 flags: phsync, pvsync; type: 
+  #5 3840x2160 59.94 3840 4016 4104 4400 2160 2168 2178 2250 593410 flags: phsync, pvsync; type: 
+  #6 3840x2160 30.00 3840 3888 3920 4000 2160 2163 2168 2222 266640 flags: nhsync, nvsync; type: 
+  #7 2560x1600 60.00 2560 2608 2640 2720 1600 1603 1609 1646 268630 flags: nhsync, nvsync; type: 
+  #8 2560x1080 59.94 2560 2808 2852 3000 1080 1084 1089 1100 197800 flags: phsync, pvsync; type: 
+  #9 1920x1200 60.00 1920 1968 2000 2080 1200 1203 1209 1235 154130 flags: nhsync, nvsync; type: 
+  #10 1920x1080 60.00 1920 2008 2052 2200 1080 1084 1089 1125 148500 flags: nhsync, nvsync; type: 
+  #11 1920x1080 60.00 1920 2008 2052 2200 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: 
+  #12 1920x1080 59.94 1920 2008 2052 2200 1080 1084 1089 1125 148350 flags: phsync, pvsync; type: 
+  #13 1920x1080 50.00 1920 2448 2492 2640 1080 1084 1089 1125 148500 flags: phsync, pvsync; type: 
+  #14 1920x1080 29.97 1920 2008 2052 2200 1080 1084 1089 1125 74180 flags: phsync, pvsync; type: 
+  #15 1680x1050 59.95 1680 1784 1960 2240 1050 1053 1059 1089 146250 flags: nhsync, pvsync; type: 
+  #16 1280x1024 75.02 1280 1296 1440 1688 1024 1025 1028 1066 135000 flags: phsync, pvsync; type: 
+  #17 1280x1024 60.02 1280 1328 1440 1688 1024 1025 1028 1066 108000 flags: phsync, pvsync; type: 
+  #18 1440x900 59.89 1440 1520 1672 1904 900 903 909 934 106500 flags: nhsync, pvsync; type: 
+  #19 1280x960 60.00 1280 1376 1488 1800 960 961 964 1000 108000 flags: phsync, pvsync; type: 
+  #20 1280x720 60.00 1280 1390 1430 1650 720 725 730 750 74250 flags: phsync, pvsync; type: 
+  #21 1024x768 75.03 1024 1040 1136 1312 768 769 772 800 78750 flags: phsync, pvsync; type: 
+  #22 1024x768 70.07 1024 1048 1184 1328 768 771 777 806 75000 flags: nhsync, nvsync; type: 
+  #23 1024x768 60.00 1024 1048 1184 1344 768 771 777 806 65000 flags: nhsync, nvsync; type: 
+  #24 800x600 75.00 800 816 896 1056 600 601 604 625 49500 flags: phsync, pvsync; type: 
+  #25 800x600 60.32 800 840 968 1056 600 601 605 628 40000 flags: phsync, pvsync; type: 
+  #26 640x480 75.00 640 656 720 840 480 481 484 500 31500 flags: nhsync, nvsync; type: 
+  #27 640x480 59.94 640 656 752 800 480 490 492 525 25175 flags: nhsync, nvsync; type: 
+  props:
+	1 EDID:
+		flags: immutable blob
+		blobs:
+
+		value:
+			00ffffffffffff0039f65ee401010101
+			021f0104c50000781a3131a5554ea126
+			0c5054254f00d1c0b300950081808140
+			81c001010101a54500a0a0001f503020
+			3a005f592100001a000000fd0017f00f
+			ff3c000a202020202020000000fc0050
+			38300a20202020202020202000000011
+			00000000000000000000000000000181
+			02031e71496b5a901f2266656463260f
+			07074d070065030c000000e2004f2868
+			00a0f0703e80302035005f5921000018
+			ef6800a0a0402e6030203600e00e1100
+			0018353c80a070b0234030203600e00e
+			11000018023a801871382d40582c4500
+			e00e1100001800000000000000000000
+			0000000000000000000000000000007e
+	2 DPMS:
+		flags: enum
+		enums: On=0 Standby=1 Suspend=2 Off=3
+		value: 3
+	5 link-status:
+		flags: enum
+		enums: Good=0 Bad=1
+		value: 0
+	6 non-desktop:
+		flags: immutable range
+		values: 0 1
+		value: 0
+	4 TILE:
+		flags: immutable blob
+		blobs:
+
+		value:
+	138 Colorspace:
+		flags: enum
+		enums: Default=0 BT2020_RGB=9 BT2020_YCC=10
+		value: 0
+	7 HDR_OUTPUT_METADATA:
+		flags: blob
+		blobs:
+
+		value:
+	143 vrr_capable:
+		flags: immutable range
+		values: 0 1
+		value: 0
+

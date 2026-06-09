@@ -2,6 +2,7 @@
 
 const fs = require('fs')
 const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
+const { resolveGpuConnectorLabelForChannel } = require('../utils/gpu-connector-label')
 const { parseServerChannels } = require('../config/config-compare')
 const { responseToStr } = require('../utils/query-cycle')
 const persistence = require('../utils/persistence')
@@ -118,6 +119,7 @@ function buildStartupPayload(opts) {
 		showCircle: true,
 		showCross: true,
 		videoMode: opts.videoMode || '',
+		gpuConnectorId: opts.gpuConnectorId || '',
 		connectorLabel: opts.connectorLabel || '',
 		resolutionWidth: opts.screenWidth,
 		resolutionHeight: opts.screenHeight,
@@ -182,7 +184,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	const ipLines = getLanIPv4Addresses()
 
 	/** Same order as `routes-led-test-card.js` (PLAY before UPDATE) — some Caspar HTML builds reject UPDATE until after PLAY. */
-	const flat = buildStartupLedTestFlatCommands(withTarget, ipLines)
+	const flat = buildStartupLedTestFlatCommands(withTarget, ipLines, appCtx.config)
 	try {
 		await amcp.batchSendChunked(flat, { skipMixerPreCommit: true })
 	} catch (e) {
@@ -231,7 +233,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 			const t = setTimeout(() => {
 				if (persistence.get(DONE_KEY) !== bootSnap) return
 				if (appCtx._ledTestLayer999ClearedAfterWebUi) return
-				void replayStartupLedTestFullBatch(appCtx, withTarget, ipLines)
+				void replayStartupLedTestFullBatch(appCtx, withTarget, ipLines, appCtx.config)
 			}, ms)
 			if (t.unref) t.unref()
 			cefReplayTimeouts.push(t)
@@ -291,15 +293,19 @@ function notifyWebSocketClientConnected(appCtx) {
 	scheduleWebUiStartupClearRetries(appCtx)
 }
 
-function buildStartupLedTestFlatCommands(withTarget, ipLines) {
+function buildStartupLedTestFlatCommands(withTarget, ipLines, config) {
 	const flat = []
 	for (const ch of withTarget) {
+		const gpu = resolveGpuConnectorLabelForChannel(config || {}, ch.index)
 		const payload = buildStartupPayload({
 			resolutionLabel: ch.resolutionLabel,
 			screenWidth: ch.screenWidth,
 			screenHeight: ch.screenHeight,
 			videoMode: ch.videoMode,
-			connectorLabel: `PGM ch ${ch.index}${ch.videoMode ? ` · ${ch.videoMode}` : ''}`,
+			gpuConnectorId: gpu.gpuConnectorId,
+			connectorLabel:
+				gpu.connectorLabel ||
+				`PGM ch ${ch.index}${ch.videoMode ? ` · ${ch.videoMode}` : ''}`,
 			ipLines,
 		})
 		const json = JSON.stringify(payload)
@@ -319,11 +325,11 @@ function buildStartupLedTestFlatCommands(withTarget, ipLines) {
 	return flat
 }
 
-async function replayStartupLedTestFullBatch(appCtx, withTarget, ipLines) {
+async function replayStartupLedTestFullBatch(appCtx, withTarget, ipLines, config) {
 	if (appCtx._ledTestLayer999ClearedAfterWebUi) return
 	const amcp = appCtx.amcp
 	if (!amcp?.batchSendChunked || !withTarget?.length) return
-	const flat = buildStartupLedTestFlatCommands(withTarget, ipLines)
+	const flat = buildStartupLedTestFlatCommands(withTarget, ipLines, config || appCtx.config)
 	try {
 		await amcp.batchSendChunked(flat, { skipMixerPreCommit: true })
 		for (const ch of withTarget) {
@@ -337,8 +343,15 @@ async function replayStartupLedTestFullBatch(appCtx, withTarget, ipLines) {
 	}
 }
 
+function clearStartupLedTestTimers() {
+	clearRetryTimer()
+	clearWebUiClearRetryTimer()
+	clearCefReplayTimers()
+}
+
 module.exports = {
 	runStartupLedTestPatternIfNeeded,
+	clearStartupLedTestTimers,
 	getMachineBootIdentity,
 	STARTUP_LED_TEST_LAYER,
 	TEMPLATE_NAME,

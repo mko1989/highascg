@@ -91,13 +91,15 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/disp
     (xterm -e 'bash -c "echo X11-only: CasparCG not started.; echo Resume: sudo highascg-display-mode normal; read"') &
   fi
 else
+  _runpid=/tmp/caspar-runsh.pid
+  if [ -f "\$_runpid" ] && kill -0 "\$(cat "\$_runpid")" 2>/dev/null; then
+    exit 0
+  fi
   (
-    exec 9>/tmp/caspar-openbox-autostart.lock
-    flock -n 9 || exit 0
-
-    cd ${PLAYOUT} || exit 1
+    cd ${PLAYOUT} || exit 0
     command -v casparcg-scanner >/dev/null && casparcg-scanner &
-    export CASPAR_RESPAWN=1
+    # run.sh relaunches on AMCP RESTART and kills hung teardown (CASPAR_RESTART_HANG_SEC).
+    # Use CASPAR_RESPAWN=1 only while debugging CEF crashes.
     [ -x ./run.sh ] && exec ./run.sh >> /tmp/caspar.log 2>&1
   ) &
 fi

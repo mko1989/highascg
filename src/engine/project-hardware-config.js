@@ -146,11 +146,36 @@ function injectHardwareConfigToProject(ctx, project) {
 }
 
 /**
+ * True when hardwareConfig carries operator Device View / routing data worth applying.
+ * Empty snapshots (saved after eggs factory reset) must not wipe live server config.
+ * @param {object} hc
+ */
+function hardwareConfigHasOperatorData(hc) {
+	if (!hc || typeof hc !== 'object') return false
+	const dg = hc.deviceGraph && typeof hc.deviceGraph === 'object' ? hc.deviceGraph : null
+	const connectors = Array.isArray(dg?.connectors) ? dg.connectors.length : 0
+	const edges = Array.isArray(dg?.edges) ? dg.edges.length : 0
+	const dests = Array.isArray(hc.screenDestinations?.destinations)
+		? hc.screenDestinations.destinations.length
+		: 0
+	return connectors > 0 || edges > 0 || dests > 0
+}
+
+/**
  * @param {object} ctx
  * @param {object} project
  */
 function applyHardwareConfigFromProject(ctx, project) {
 	if (!project?.hardwareConfig) return
+	if (!hardwareConfigHasOperatorData(project.hardwareConfig)) {
+		if (typeof ctx.log === 'function') {
+			ctx.log(
+				'info',
+				'[project] Skipped empty hardwareConfig — scenes/timelines loaded; server Device View unchanged (save project after cabling to embed hardware).',
+			)
+		}
+		return
+	}
 	const ok = applyHardwareConfigToCtx(ctx, project.hardwareConfig)
 	if (ok && typeof ctx.log === 'function') {
 		const ver = project.hardwareConfig.version || 1
@@ -170,4 +195,5 @@ module.exports = {
 	applyHardwareConfigToCtx,
 	injectHardwareConfigToProject,
 	applyHardwareConfigFromProject,
+	hardwareConfigHasOperatorData,
 }

@@ -29,28 +29,10 @@ if [[ ! -f "${HIGHASCG_HOME}/package.json" ]]; then
 fi
 
 if [[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
-	# Do NOT Wants/After home-casparcg-exfat.mount — missing HIGHASCGEXF used to block
-	# highascg for ~90s (device-timeout). Mount is started by exfat-boot / udev arrive only.
-	# Sync is ConditionPathIsMountPoint-gated and skips instantly when exFAT is absent.
-	AF_LIST="network.target"
-	WA_LIST=""
-	if [[ -f /etc/systemd/system/highascg-bridge-boot.service ]]; then
-		AF_LIST="$AF_LIST highascg-bridge-boot.service"
-	fi
-	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
-		AF_LIST="$AF_LIST highascg-exfat-boot.service"
-	fi
-	AF_LIST="$AF_LIST highascg-exfat-sync.service"
-	WA_LIST="highascg-exfat-sync.service"
-	if [[ -f /etc/systemd/system/highascg-exfat-bootstrap.service ]] &&
-		[[ ! -f /etc/highascg/disable-exfat-bootstrap ]]; then
-		AF_LIST="$AF_LIST highascg-exfat-bootstrap.service"
-		WA_LIST="${WA_LIST} highascg-exfat-bootstrap.service"
-	fi
-	read -r -d '' HIGHASCG_UNIT_DEPS <<EUD || true
-After=${AF_LIST}
-Wants=${WA_LIST}
-EUD
+	# Boot order: exfat-sync has Before=highascg.service and is WantedBy=multi-user.target.
+	# Do NOT Wants/After mount or server-update units here — on `systemctl restart highascg`
+	# that pulled HIGHASCGEXF device wait (~90s) when the USB stick is absent.
+	HIGHASCG_UNIT_DEPS="After=network.target"
 else
 	HIGHASCG_UNIT_DEPS="After=network.target"
 fi
@@ -71,6 +53,9 @@ WorkingDirectory=${HIGHASCG_HOME}
 ExecStart=/usr/bin/node ${HIGHASCG_HOME}/index.js
 Restart=always
 RestartSec=5
+TimeoutStopSec=15
+KillMode=mixed
+KillSignal=SIGTERM
 Environment=NODE_ENV=production
 
 [Install]

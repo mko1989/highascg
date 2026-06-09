@@ -154,6 +154,31 @@
 		}
 		.brand-meta__line { display: block; }
 		.brand-meta__line--ips { margin-top: 0.35em; font-weight: 650; opacity: 0.98; }
+		.gpu-port-badge {
+			position: absolute;
+			top: 2.5%;
+			left: 2.5%;
+			z-index: 30;
+			padding: 0.15em 0.35em;
+			font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, monospace;
+			font-size: clamp(1.75rem, 7.5vw, 5.5rem);
+			font-weight: 800;
+			line-height: 1;
+			letter-spacing: 0.04em;
+			color: #b8ff9a;
+			text-shadow:
+				0 0 24px rgba(80, 255, 120, 0.45),
+				0 2px 12px rgba(0, 0, 0, 0.9);
+			pointer-events: none;
+		}
+		.gpu-port-badge__sub {
+			display: block;
+			margin-top: 0.2em;
+			font-size: 0.28em;
+			font-weight: 650;
+			letter-spacing: 0.08em;
+			color: rgba(220, 240, 255, 0.82);
+		}
 		.panel {
 			position: relative;
 			border: 2px solid #2d3140;
@@ -279,6 +304,7 @@
 	<div id="patternLayer"></div>
 	<div id="root"></div>
 	<div id="screensMode">
+		<div id="gpuPortBadge" class="gpu-port-badge" style="display:none;" aria-hidden="true"></div>
 		<div id="patternCross" class="startup-pattern-cross" style="display:none;" aria-hidden="true">
 			<svg class="startup-pattern-cross__svg" viewBox="0 0 100 100" preserveAspectRatio="none">
 				<line class="startup-pattern-cross__line" x1="0" y1="0" x2="100" y2="100" />

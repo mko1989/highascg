@@ -1,8 +1,11 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const fs = require('fs')
-const path = require('path')
+const {
+	probeModetestConnectors,
+	parseXrandrVerboseOutputs,
+	modetestModesToDisplayModes,
+} = require('./gpu-modetest')
 
 function drmShort(name) {
 	return String(name || '').replace(/^card\d+-/i, '')
@@ -47,56 +50,6 @@ function compareConnectorNames(a, b) {
 }
 
 /**
- * xrandr often reports `DP-1` while sysfs uses `card0-DP-1` — resolve the directory that has `modes`.
- * @param {string} name
- * @returns {string}
- */
-function resolveDrmConnectorDir(name) {
-	const base = '/sys/class/drm'
-	try {
-		if (fs.existsSync(path.join(base, name, 'modes'))) return name
-		const short = drmShort(name)
-		const files = fs.readdirSync(base)
-		for (const f of files) {
-			if (!f.includes('-')) continue
-			if (drmShort(f) === short && fs.existsSync(path.join(base, f, 'modes'))) return f
-		}
-	} catch {
-		// ignore
-	}
-	return name
-}
-
-/**
- * Read `/sys/class/drm/.../modes` (one `WxH` per line) when xrandr is unavailable or lists no modes.
- * @param {string} drmName — e.g. DP-1 or card0-DP-1
- * @returns {Array<{ width: number, height: number, hz: null, current: boolean }>}
- */
-function readDrmModesFromSysfs(drmName) {
-	const dir = resolveDrmConnectorDir(drmName)
-	try {
-		const p = path.join('/sys/class/drm', dir, 'modes')
-		if (!fs.existsSync(p)) return []
-		const lines = fs.readFileSync(p, 'utf8').split('\n').filter(Boolean)
-		const out = []
-		const seen = new Set()
-		for (const line of lines) {
-			const m = line.match(/^(\d+)x(\d+)/)
-			if (!m) continue
-			const w = parseInt(m[1], 10)
-			const h = parseInt(m[2], 10)
-			const key = `${w}x${h}`
-			if (seen.has(key)) continue
-			seen.add(key)
-			out.push({ width: w, height: h, hz: null, current: false })
-		}
-		return out
-	} catch {
-		return []
-	}
-}
-
-/**
  * Parse `xrandr --query` into connected outputs with geometry, current refresh, and listed modes.
  * @returns {Array<{
  *   name: string,
@@ -112,6 +65,18 @@ function getXAuthority() {
 	if (process.env.XAUTHORITY) return process.env.XAUTHORITY
 	const user = process.env.USER || 'casparcg'
 	return `/home/${user}/.Xauthority`
+}
+
+function getDisplaysXrandrVerboseRaw() {
+	try {
+		return execSync('xrandr --verbose', {
+			stdio: ['ignore', 'pipe', 'ignore'],
+			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+		}).toString()
+	} catch (e) {
+		console.error(`[Hardware-Info] getDisplaysXrandrVerboseRaw failed:`, e.message)
+		return ''
+	}
 }
 
 function getDisplaysXrandrDetailed() {
@@ -211,105 +176,118 @@ function getDisplaysXrandr() {
 	}))
 }
 
+let _modetestProbeCache = null
+let _modetestProbeAt = 0
+const MODETEST_PROBE_TTL_MS = 2000
+
 /**
- * Get connected displays using sysfs /sys/class/drm (Linux).
- * Works without X being started.
- * @returns {Array<{name: string, connected: boolean}>}
+ * Probe GPU connectors via `modetest -c` and correlate to xrandr by EDID.
+ * @param {{ refresh?: boolean, xrandrVerboseRaw?: string }} [opts]
  */
-function getDisplaysSysfs() {
-	const drmPath = '/sys/class/drm'
-	if (!fs.existsSync(drmPath)) return []
-
-	const displays = []
-	try {
-		const files = fs.readdirSync(drmPath)
-		for (const file of files) {
-			if (file.includes('-')) {
-				const statusPath = path.join(drmPath, file, 'status')
-				if (fs.existsSync(statusPath)) {
-					const status = fs.readFileSync(statusPath, 'utf8').trim()
-					if (status === 'connected') {
-						displays.push({
-							name: file,
-							connected: true,
-						})
-					}
-				}
-			}
-		}
-	} catch (e) {
-		// ignore
+function getModetestProbe(opts = {}) {
+	const now = Date.now()
+	if (!opts.refresh && _modetestProbeCache && now - _modetestProbeAt < MODETEST_PROBE_TTL_MS) {
+		return _modetestProbeCache
 	}
-	return displays.sort((a, b) => compareConnectorNames(a?.name, b?.name))
-}
-
-function inferConnectorType(name) {
-	const s = String(name || '').toUpperCase()
-	if (s.includes('HDMI')) return 'hdmi'
-	if (s.includes('DISPLAYPORT') || s.includes('DP-') || s.includes('-DP') || s.includes('E-DP') || s.includes('EDP')) return 'displayport'
-	if (s.includes('DVI')) return 'dvi'
-	if (s.includes('VGA')) return 'vga'
-	if (s.includes('USB-C') || s.includes('USBC') || s.includes('TYPEC')) return 'usb-c'
-	return 'unknown'
+	const xrandrVerboseRaw = opts.xrandrVerboseRaw ?? getDisplaysXrandrVerboseRaw()
+	const probe = probeModetestConnectors({ xrandrVerboseRaw })
+	_modetestProbeCache = probe
+	_modetestProbeAt = now
+	return probe
 }
 
 /**
- * Enumerate DRM connectors (connected and disconnected) with inferred type.
- * @returns {Array<{name: string, shortName: string, connected: boolean, type: string}>}
+ * Enumerate DRM connectors (connected and disconnected) from modetest with inferred type.
+ * @returns {Array<{
+ *   name: string,
+ *   shortName: string,
+ *   connected: boolean,
+ *   type: string,
+ *   modetestId: number,
+ *   drmCard: string,
+ *   modes: object[],
+ *   edid: string,
+ *   xrandrName: string | null,
+ *   matchMethod: string | null,
+ *   sizeMm: object | null
+ * }>}
  */
 function getGpuConnectorInventory() {
-	const drmPath = '/sys/class/drm'
-	if (!fs.existsSync(drmPath)) return []
-	const out = []
-	try {
-		const files = fs.readdirSync(drmPath)
-		for (const file of files) {
-			if (!file.includes('-')) continue
-			const statusPath = path.join(drmPath, file, 'status')
-			if (!fs.existsSync(statusPath)) continue
-			const status = String(fs.readFileSync(statusPath, 'utf8') || '').trim().toLowerCase()
-			const short = drmShort(file)
-			if (isGpuConnectorPseudoName(short) || isGpuConnectorPseudoName(file)) continue
-			out.push({
-				name: file,
-				shortName: short,
-				connected: status === 'connected',
-				type: inferConnectorType(short),
-			})
-		}
-	} catch {
-		return []
-	}
-	return out.sort((a, b) => compareConnectorNames(a?.shortName || a?.name, b?.shortName || b?.name))
+	const probe = getModetestProbe()
+	const connectors = probe?.connectors || []
+	return connectors
+		.map((c) => ({
+			name: c.name,
+			shortName: c.shortName,
+			connected: !!c.connected,
+			type: c.type,
+			modetestId: c.id,
+			drmCard: c.drmCard,
+			modes: c.modes || [],
+			edid: c.edid || '',
+			xrandrName: c.xrandrName || null,
+			matchMethod: c.matchMethod || null,
+			sizeMm: c.sizeMm || null,
+		}))
+		.sort((a, b) => compareConnectorNames(a?.shortName || a?.name, b?.shortName || b?.name))
 }
 
 /**
- * Connected displays with resolution, position, refresh rate, and available modes (from xrandr when possible).
- * Fills `modes` from `/sys/class/drm/.../modes` when xrandr omits them (common when only sysfs names are available).
+ * Connected displays with resolution, position, refresh rate, and available modes.
+ * Modes and EDID come from modetest; geometry and xrandr output names from xrandr.
  */
 function getDisplayDetails() {
-	const res = getDisplaysXrandrDetailed()
-	let displays
-	if (res?.displays?.length) {
-		displays = res.displays
-	} else {
-		const sys = getDisplaysSysfs()
-		displays = sys.map((d) => ({
-			name: d.name,
-			connected: true,
-			resolution: 'unknown',
-			x: 0,
-			y: 0,
-			refreshHz: null,
-			modes: [],
-		}))
+	const xr = getDisplaysXrandrDetailed()
+	const xrandrVerboseRaw = getDisplaysXrandrVerboseRaw()
+	const probe = getModetestProbe({ refresh: true, xrandrVerboseRaw })
+	const modetestByXrandr = new Map()
+	const modetestByShort = new Map()
+	for (const c of probe.connectors || []) {
+		modetestByShort.set(drmShort(c.shortName).toLowerCase(), c)
+		if (c.xrandrName) modetestByXrandr.set(c.xrandrName, c)
 	}
-	for (const d of displays) {
-		if (!d.modes || d.modes.length === 0) {
-			const drm = readDrmModesFromSysfs(d.name)
-			if (drm.length) d.modes = drm
+
+	const displays = []
+	if (xr?.displays?.length) {
+		for (const d of xr.displays) {
+			const modetest = modetestByXrandr.get(d.name) || null
+			const modes = modetest?.modes?.length
+				? modetestModesToDisplayModes(modetest.modes, d.resolution, d.refreshHz)
+				: d.modes
+			displays.push({
+				...d,
+				drmName: modetest?.name || '',
+				drmConnector: modetest?.shortName || '',
+				drmCard: modetest?.drmCard || '',
+				modetestId: modetest?.id ?? null,
+				xrandrName: d.name,
+				matchMethod: modetest?.matchMethod || null,
+				edid: modetest?.edid || '',
+				modes,
+			})
+		}
+	} else {
+		for (const c of probe.connectors || []) {
+			if (!c.connected) continue
+			displays.push({
+				name: c.xrandrName || c.shortName,
+				xrandrName: c.xrandrName || null,
+				drmName: c.name,
+				drmConnector: c.shortName,
+				drmCard: c.drmCard,
+				modetestId: c.id,
+				matchMethod: c.matchMethod || null,
+				edid: c.edid || '',
+				connected: true,
+				resolution: 'unknown',
+				x: 0,
+				y: 0,
+				refreshHz: null,
+				modes: modetestModesToDisplayModes(c.modes),
+			})
 		}
 	}
+
 	return displays
 		.filter((d) => !isGpuConnectorPseudoName(d?.name))
 		.sort((a, b) => {
@@ -319,19 +297,20 @@ function getDisplayDetails() {
 			const by = Number(b?.y)
 			const posKnown = Number.isFinite(ax) && Number.isFinite(bx) && Number.isFinite(ay) && Number.isFinite(by)
 			if (posKnown && (ax !== bx || ay !== by)) return ax !== bx ? ax - bx : ay - by
-			return compareConnectorNames(a?.name, b?.name)
+			return compareConnectorNames(a?.drmConnector || a?.name, b?.drmConnector || b?.name)
 		})
 }
 
 /**
- * Returns names of all connected displays.
+ * Returns names of all connected displays (xrandr output names when X is up).
  */
 function getConnectedDisplayNames() {
 	const xr = getDisplaysXrandr()
 	if (xr && xr.length > 0) return xr.map((d) => d.name)
 
-	const sys = getDisplaysSysfs()
-	return sys.map((d) => d.name)
+	return (getGpuConnectorInventory() || [])
+		.filter((c) => c.connected)
+		.map((c) => c.xrandrName || c.shortName)
 }
 
 /**
@@ -340,7 +319,6 @@ function getConnectedDisplayNames() {
  */
 function getGpuModel() {
 	try {
-		const { execSync } = require('child_process')
 		const stdout = execSync('nvidia-smi --query-gpu=gpu_name --format=csv,noheader', {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			timeout: 2000,
@@ -355,11 +333,13 @@ module.exports = {
 	getXAuthority,
 	getDisplaysXrandr,
 	getDisplaysXrandrDetailed,
-	getDisplaysSysfs,
+	getDisplaysXrandrVerboseRaw,
 	getGpuConnectorInventory,
+	getModetestProbe,
 	getConnectedDisplayNames,
 	getDisplayDetails,
 	getGpuModel,
 	compareConnectorNames,
 	drmShort,
+	parseXrandrVerboseOutputs,
 }

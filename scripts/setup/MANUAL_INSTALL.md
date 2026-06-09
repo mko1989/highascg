@@ -400,6 +400,8 @@ ss -ltn | grep 5250
 |---------|--------|
 | Wrong kernel after reboot | Re-run `01-kernel-117.sh`, check GRUB default, boot top-level Ubuntu entry |
 | `nvidia-smi` fails / NVRM open modules | Re-run `03-nvidia-open-595.sh`; remove `cuda-drivers` |
+| `dpkg -l` shows `iU nvidia-*` / firmware conflict on `gsp_ga10x.bin` | Re-run `03-nvidia-open-595.sh` (drops Ubuntu `nvidia-firmware-595-*`, finishes DKMS); then reboot |
+| `xrandr` shows `None-1`, DRM only `Unknown-1` | NVIDIA module not loaded — fix driver install first; RTX 2080 SUPER works with **open** |
 | `ldd casparcg` missing libs | Re-run `05-caspar-deps.sh` or `fix-caspar-and-grub.sh` |
 | No keyboard/mouse on :0 | `apt install xserver-xorg-input-all xserver-xorg-input-libinput`; restart nodm |
 | NDI LIST empty | `systemctl status avahi-daemon`; firewall mDNS |
