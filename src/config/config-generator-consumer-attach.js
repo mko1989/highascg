@@ -335,6 +335,30 @@ function buildExtraAudioChannel(config, i, dims, casparChannelNum) {
 }
 
 /**
+ * WO-53: one dedicated channel per live input. The producer (DeckLink/ALSA) is PLAYed here over AMCP,
+ * so the channel-level OSC meter is isolated to that single input. DeckLink uses a full-quality mode
+ * (`inputs_channel_mode`); audio-only ALSA uses the cheap lowest standard mode. No config consumers.
+ * @param {Record<string, unknown>} config
+ * @param {{ kind: string, slot: number, channel: number, layer: number, mode: string, label: string }} entry
+ */
+function buildInputChannel(config, entry) {
+	void config
+	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
+	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
+	const role =
+		entry?.kind === 'live_audio'
+			? `Live audio input ${entry?.slot} (ALSA PLAY … alsa:// on layer ${entry?.layer}; cheap channel, isolated VU)`
+			: `DeckLink input ${entry?.slot} (PLAY ${ch}-${entry?.layer} DECKLINK <device>; dedicated channel, isolated VU)`
+	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
+            <video-mode>${escapeXml(modeId)}</video-mode>
+            <consumers/>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
+        </channel>`
+}
+
+/**
  * @param {Record<string, unknown>} config
  * @param {number|null|undefined} casparChannelNum
  */
@@ -368,6 +392,7 @@ module.exports = {
 	buildMultiviewChannel,
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
+	buildInputChannel,
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 }

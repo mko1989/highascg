@@ -55,7 +55,7 @@ install -m 0644 "${LIVE_USB}/highascg-eggs-theme/theme/livecd/grub.theme.cfg" /b
 # theme.cfg ships with ISO Unifont names; host uses Rewir (same as client UI).
 sed -i 's/GNU Unifont Regular 16/Rewir Regular 16/g' /boot/grub/theme.cfg
 
-REWIR_TTF="${REPO_ROOT}/client/fonts/Rewir-Light.ttf"
+REWIR_TTF="${REPO_ROOT}/template/fonts/Rewir-Light.ttf"
 if command -v grub-mkfont >/dev/null 2>&1; then
 	if [[ -f "$REWIR_TTF" ]]; then
 		grub-mkfont -o /boot/grub/font.pf2 "$REWIR_TTF"

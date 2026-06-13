@@ -316,7 +316,7 @@ sudo reboot
 sudo bash scripts/setup/verify-boot-branding.sh
 ```
 
-GRUB font uses **Rewir** from `client/fonts/Rewir-Light.ttf` (via `grub-mkfont`).
+GRUB font uses **Rewir** from `template/fonts/Rewir-Light.ttf` (via `grub-mkfont`).
 
 ISO/USB branding is separate: `tools/eggs/live-usb/branding/README.md`
 

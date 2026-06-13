@@ -14,6 +14,7 @@ const {
 	resolveAudioPreviewDefaultRoute,
 } = require('../config/audio-preview')
 const { listConfiguredLiveAudioSlots, normalizeAlsaCaptureUri } = require('../config/live-audio-input')
+const { getChannelMap } = require('../config/routing')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -38,13 +39,14 @@ function handleGet(path, query, ctx) {
 	}
 	if (path === '/api/audio/live-inputs') {
 		const cfg = ctx?.config || {}
-		const map = require('../config/routing-map').getChannelMap(cfg)
+		const map = getChannelMap(cfg)
 		const configured = listConfiguredLiveAudioSlots(cfg)
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				inputsCh: map.inputsCh,
+				liveAudioInputChannels: map.liveAudioInputChannels,
 				liveAudioCount: map.liveAudioCount,
 				configured,
 				status: ctx?._liveAudioInputsStatus ?? null,
@@ -168,7 +170,7 @@ async function handlePost(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
 		const source = String(b.source || 'pgm_1').toLowerCase()
-		const map = require('../config/routing-map').getChannelMap(ctx.config)
+		const map = getChannelMap(ctx.config)
 		const previewCh = resolveAudioPreviewChannel(ctx.config, map)
 		const monitorCh = previewCh ?? map.monitorCh
 		if (!monitorCh) {
@@ -217,7 +219,7 @@ async function handlePost(path, body, ctx) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}
 
-		const map = require('../config/routing-map').getChannelMap(ctx.config)
+		const map = getChannelMap(ctx.config)
 		const previewCh = resolveAudioPreviewChannel(ctx.config, map)
 		const monitorCh = previewCh ?? map.monitorCh
 		if (!monitorCh) {

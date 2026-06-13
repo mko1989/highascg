@@ -51,6 +51,20 @@ function buildChannelMap(ctx) {
 
 	const audioOnlyResolutions = (map.audioOnlyChannels || []).map((ch) => pickRes(ch))
 
+	// WO-53: one dedicated channel per live input (isolated VU). DeckLink = full mode, ALSA = cheap mode.
+	const inputChannels = (Array.isArray(map.inputChannels) ? map.inputChannels : []).map((m) => ({
+		kind: m.kind,
+		slot: m.slot,
+		channel: m.channel,
+		layer: m.layer,
+		mode: m.mode,
+		route: m.route,
+		label: m.label,
+		resolution: pickRes(m.channel),
+	}))
+	const decklinkInputChannels = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
+	const liveAudioInputChannels = Array.isArray(map.liveAudioInputChannels) ? map.liveAudioInputChannels : []
+
 	return {
 		screenCount: map.screenCount,
 		/** Custom PGM/PRV channel rows (Settings → Caspar); used for main tabs labels when non-empty. */
@@ -80,6 +94,9 @@ function buildChannelMap(ctx) {
 		audioOnlyChannels: map.audioOnlyChannels,
 		audioOnlyLayouts: [],
 		audioOnlyResolutions: audioOnlyResolutions,
+		inputChannels,
+		decklinkInputChannels,
+		liveAudioInputChannels,
 	}
 }
 

@@ -54,18 +54,20 @@ When the flag is on, `index.js` calls `moduleRegistry.tryLoad('previs' | 'tracki
 
 The heavy native/runtime deps are marked `optionalDependencies` so a base install never pays for them:
 
-| Package           | Purpose                          | Size on disk |
-|-------------------|----------------------------------|--------------|
-| `three`           | WebGL2 scene for 3D previs       | ~2 MB JS     |
-| `onnxruntime-node`| Server-side YOLOv8-Pose inference| ~40–400 MB (CPU/GPU EPs) |
+| Package     | Purpose                    | Size on disk |
+|-------------|----------------------------|--------------|
+| `three`     | WebGL2 scene for 3D previs | ~2 MB JS     |
+| `naudiodon` | PortAudio device capture   | native addon |
+
+Browser-only deps (`grapesjs` for CG Studio) live in **highascg-client**. `onnxruntime-node` (WO-19 person tracking) will be added when that module ships — not in the base server install.
 
 Two install scripts:
 
 ```bash
-# Lean: skip three + onnxruntime-node (and any other optional dep that fails)
+# Lean: skip optional deps (recommended for playout servers)
 npm run install:base
 
-# Full: include optional deps
+# Full: include optional deps (three, naudiodon)
 npm run install:previs
 ```
 

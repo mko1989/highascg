@@ -48,13 +48,12 @@ if [[ "$BUILD_WEB" == "1" ]]; then
 	else
 		run_as_caspar 'npm install'
 	fi
-	echo "==> Vite client build → dist-web/ (dev/Electron only — not baked into ISO by default)"
-	run_as_caspar 'npm run build:client'
+	echo "==> build:client skipped (client is a separate repo)"
 	echo "==> npm prune --omit=dev --omit=optional (production node_modules for squashfs)"
 	run_as_caspar 'export NPM_CONFIG_LOGLEVEL=error; npm prune --omit=dev --omit=optional'
 else
 	echo "==> Production npm install (omit=dev + optional) for ISO embed"
-	# Skip optionalDeps (grapesjs → backbone-undo, onnxruntime-node → boolean) — not needed on playout ISO.
+	# Skip optionalDeps (three for legacy monolith previs vendor) — not needed on playout ISO.
 	if [[ -f "${HIGHASCG_ROOT}/package-lock.json" ]]; then
 		run_as_caspar 'export NODE_ENV=production NPM_CONFIG_LOGLEVEL=error; npm ci --omit=dev --omit=optional'
 	else

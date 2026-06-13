@@ -21,7 +21,8 @@ const {
 
 async function setupInputsChannel(self) {
 	const map = Map.getChannelMap(self.config)
-	if (!map.decklinkCount || !map.inputsEnabled || !map.inputsCh || !self.amcp) {
+	const decklinkEntries = (Array.isArray(map.inputChannels) ? map.inputChannels : []).filter((e) => e.kind === 'decklink')
+	if (!map.decklinkCount || !map.inputsEnabled || decklinkEntries.length === 0 || !self.amcp) {
 		self._decklinkInputsStatus = {
 			updatedAt: Date.now(),
 			enabled: false,
@@ -29,19 +30,14 @@ async function setupInputsChannel(self) {
 				? 'amcp_disconnected'
 				: !map.decklinkCount
 					? 'decklink_inputs_disabled'
-					: !map.inputsCh
+					: decklinkEntries.length === 0
 						? 'no_inputs_channel'
 						: 'inputs_disabled',
 		}
 		return
 	}
-	const targetCh = map.inputsCh
-	let hostLabel = map.inputsOnMvr
-		? `MVR channel ${targetCh}`
-		: map.decklinkInputsHost === 'preview_1'
-			? `Preview 1 channel ${targetCh}`
-			: `dedicated inputs channel ${targetCh}`
-	if (map.decklinkCount > 0) self.log('info', `DeckLink inputs: hosting on ${hostLabel}`)
+	// WO-53: each DeckLink input has its own dedicated full-quality channel (isolated audio meter).
+	self.log('info', `DeckLink inputs: ${decklinkEntries.length} dedicated channel(s) (${decklinkEntries.map((e) => e.channel).join(', ')})`)
 
 	const outputDevices = new Set(); for (let n = 1; n <= map.screenCount; n++) {
 		const dlOut = parseInt(String(Map.readCasparSetting(self.config, `screen_${n}_decklink_device`) ?? '0'), 10)
@@ -50,62 +46,60 @@ async function setupInputsChannel(self) {
 	const mvDlOut = parseInt(String(Map.readCasparSetting(self.config, 'multiview_decklink_device') ?? '0'), 10); if (mvDlOut > 0) outputDevices.add(mvDlOut)
 
 	const usedDevices = new Map(); const inputDevice = []; const skippedConflicts = []; const skippedDuplicates = []
-	for (let i = 1; i <= map.decklinkCount; i++) {
+	for (const entry of decklinkEntries) {
+		const i = entry.slot
 		const device = Map.resolveDecklinkInputDeviceIndex(self.config, i)
 		if (outputDevices.has(device)) { skippedConflicts.push({ input: i, device }); continue }
 		if (usedDevices.has(device)) { skippedDuplicates.push({ input: i, device, firstUser: usedDevices.get(device) }); continue }
-		usedDevices.set(device, i); inputDevice.push({ layer: i, device })
+		usedDevices.set(device, i); inputDevice.push({ channel: entry.channel, layer: entry.layer, slot: i, device })
 	}
 
 	const failed = []; let playOk = 0
-	for (const { layer, device } of inputDevice) {
-		try { await self.amcp.raw(`PLAY ${targetCh}-${layer} DECKLINK ${device}`); playOk++ }
+	for (const { channel, layer, device } of inputDevice) {
+		try { await self.amcp.raw(`PLAY ${channel}-${layer} DECKLINK ${device}`); playOk++ }
 		catch (e) {
 			const msg = e?.message || String(e); if (/already playing|404|PLAY FAILED/i.test(msg)) playOk++
-			else failed.push({ layer, device, message: msg })
+			else failed.push({ channel, layer, device, message: msg })
 		}
 	}
-	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, hostingChannel: targetCh, hostLabel, inputsOnMvr: map.inputsOnMvr, requestedSlots: map.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
+	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: map.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
 }
 
 async function setupLiveAudioInputs(self) {
-	const map = Map.getChannelMap(self.config)
 	const { count, slots } = listConfiguredLiveAudioSlots(self.config)
-	if (!map.inputsEnabled || !map.inputsCh || !self.amcp || count <= 0) {
+	const playable = slots.filter((s) => Number.isFinite(Number(s.channel)))
+	if (!self.amcp || count <= 0 || playable.length === 0) {
 		self._liveAudioInputsStatus = {
 			updatedAt: Date.now(),
 			enabled: false,
-			reason: !self.amcp ? 'amcp_disconnected' : !map.inputsCh ? 'no_inputs_channel' : count <= 0 ? 'live_audio_disabled' : 'inputs_disabled',
+			reason: !self.amcp ? 'amcp_disconnected' : count <= 0 ? 'live_audio_disabled' : 'no_inputs_channel',
 		}
 		return
 	}
-	const targetCh = map.inputsCh
+	// WO-53: each ALSA input plays on its own cheap channel so its audio meter is isolated.
 	const failed = []
 	let playOk = 0
-	for (const slot of slots) {
-		const layer = resolveLiveAudioHostLayer(slot.slot)
-		const clip = slot.clip
+	for (const slot of playable) {
+		const cl = `${slot.channel}-${slot.layer}`
 		try {
-			await self.amcp.raw(`PLAY ${targetCh}-${layer} ${clip} LOOP`)
+			await self.amcp.raw(`PLAY ${cl} ${slot.clip} LOOP`)
 			playOk++
 		} catch (e) {
 			const msg = e?.message || String(e)
 			if (/already playing|404|PLAY FAILED/i.test(msg)) playOk++
-			else failed.push({ slot: slot.slot, layer, clip, message: msg })
+			else failed.push({ slot: slot.slot, channel: slot.channel, layer: slot.layer, clip: slot.clip, message: msg })
 		}
 	}
 	self._liveAudioInputsStatus = {
 		updatedAt: Date.now(),
 		enabled: true,
-		hostingChannel: targetCh,
 		requestedSlots: count,
-		scheduledPlays: slots.length,
+		scheduledPlays: playable.length,
 		playSucceeded: playOk,
-		slots: slots.map((s) => ({ slot: s.slot, layer: s.layer, clip: s.clip, route: s.route })),
+		slots: playable.map((s) => ({ slot: s.slot, channel: s.channel, layer: s.layer, clip: s.clip, route: s.route })),
 		failed,
 	}
-	const { LIVE_AUDIO_LAYER_BASE } = require('./live-audio-input')
-	self.log('info', `Live ALSA inputs: ${playOk}/${slots.length} PLAY on channel ${targetCh} (layers ${LIVE_AUDIO_LAYER_BASE}+)`)
+	self.log('info', `Live ALSA inputs: ${playOk}/${playable.length} PLAY on dedicated channel(s) ${playable.map((s) => s.channel).join(', ')}`)
 }
 
 async function setupLiveAudioPgmRoutes(self) {
@@ -250,7 +244,10 @@ async function setupAllRouting(self) {
 		}
 	}
 	if (map.multiviewEnabled && self._multiviewLayout?.layout?.length > 0) {
-		try { const { handleMultiviewApply } = require('../api/routes-multiview'); await handleMultiviewApply(self._multiviewLayout, self) } catch {}
+		try {
+			const { applyMultiviewLayout } = require('../engine/multiview-apply')
+			await applyMultiviewLayout(self._multiviewLayout, self)
+		} catch {}
 	}
 	if (map.streamingCh != null && self.amcp) {
 		// Attach mode: `streamingCh` is an existing program/preview bus — it already has output; do not layer route:// on it.

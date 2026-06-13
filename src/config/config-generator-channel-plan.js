@@ -38,11 +38,15 @@ function buildChannelPlan(config, routeMap) {
 	/** Emit multiview `<channel>` blocks only when routing allocated multiview slot(s). */
 	const multiviewEnabled = multiviewChannels.length > 0
 
+	// WO-53: one Caspar channel per live input (DeckLink = full mode, ALSA = cheap mode).
+	const inputChannels = Array.isArray(routeMap.inputChannels) ? routeMap.inputChannels : []
+
 	return {
 		screens,
 		extraAudio,
 		multiviewEnabled,
 		multiviews,
+		inputChannels,
 		decklinkCount,
 		liveAudioCount,
 		inputsHostChannelEnabled: routeMap.inputsHostChannelEnabled === true,

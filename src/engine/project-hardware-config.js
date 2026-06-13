@@ -123,8 +123,8 @@ function applyHardwareConfigToCtx(ctx, hc) {
 			persistence.set('multiviewLayout', hc.multiviewLayout)
 			ctx._multiviewLayout = hc.multiviewLayout
 			try {
-				const { handleMultiviewApply } = require('../api/routes-multiview')
-				handleMultiviewApply(hc.multiviewLayout, ctx)
+				const { applyMultiviewLayout } = require('./multiview-apply')
+				void applyMultiviewLayout(hc.multiviewLayout, ctx).catch(() => {})
 			} catch {
 				/* optional */
 			}

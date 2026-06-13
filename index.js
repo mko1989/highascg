@@ -19,7 +19,7 @@ const { resolveFreeStreamingBasePort } = require('./src/streaming/streaming-udp-
 const { startPeriodicSync, startOscPlaybackInfoSupplement } = require('./src/utils/periodic-sync')
 const { ConfigManager } = require('./src/config/config-manager'); const { refreshConfigComparison } = require('./src/config/config-compare')
 const { hashSubsystemReload } = require('./src/config/config-reload-signature')
-const { applyCasparConfigToDiskAndRestart } = require('./src/api/routes-caspar-config'); const { SamplingManager } = require('./src/sampling/dmx-sampling')
+const { SamplingManager } = require('./src/sampling/dmx-sampling')
 const { getChannelMap } = require('./src/config/routing'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')

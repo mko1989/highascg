@@ -6,7 +6,7 @@
 'use strict'
 
 const persistence = require('../utils/persistence')
-const { getChannelMap } = require('../config/routing-map')
+const { getChannelMap } = require('../config/routing')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 
 const KEY = 'liveScenesByProgramChannel'

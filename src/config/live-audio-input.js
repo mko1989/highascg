@@ -2,7 +2,10 @@
 
 const { getRouteString, readCasparSetting } = require('./routing-map')
 
-/** First layer index on the shared inputs host for ALSA slots (DeckLink uses 1–8). */
+/**
+ * WO-53: each ALSA input has its own (cheap) channel; ALSA plays at this layer on that channel.
+ * (Historically this was the base layer on a shared inputs host; kept as 10 for continuity.)
+ */
 const LIVE_AUDIO_LAYER_BASE = 10
 
 /**
@@ -28,25 +31,38 @@ function resolveLiveAudioInputDevice(cfg, slot) {
 }
 
 /**
- * @param {number} slot 1–8
+ * Layer the ALSA producer plays on (its own dedicated channel — WO-53).
+ * @param {number} _slot 1–8
  * @returns {number}
  */
-function resolveLiveAudioHostLayer(slot) {
+function resolveLiveAudioHostLayer(_slot) {
+	return LIVE_AUDIO_LAYER_BASE
+}
+
+/**
+ * Dedicated Caspar channel for an ALSA input slot (WO-53).
+ * @param {object} cfg
+ * @param {number} slot 1–8
+ * @returns {number|null}
+ */
+function resolveLiveAudioChannel(cfg, slot) {
+	const { getChannelMap } = require('./routing-map')
+	const map = getChannelMap(cfg)
+	const chans = Array.isArray(map.liveAudioInputChannels) ? map.liveAudioInputChannels : []
 	const n = parseInt(String(slot), 10)
-	if (!Number.isFinite(n) || n < 1) return LIVE_AUDIO_LAYER_BASE
-	return LIVE_AUDIO_LAYER_BASE + n - 1
+	if (!Number.isFinite(n) || n < 1 || n > chans.length) return null
+	return chans[n - 1]
 }
 
 /**
  * @param {object} cfg
  * @param {number} slot
- * @returns {string|null} route://… for use in looks
+ * @returns {string|null} route://… (full channel — its own channel hosts only this input) for looks/PGM
  */
 function resolveLiveAudioRouteString(cfg, slot) {
-	const { getChannelMap } = require('./routing-map')
-	const map = getChannelMap(cfg)
-	if (!map.inputsEnabled || map.inputsCh == null) return null
-	return getRouteString(map.inputsCh, resolveLiveAudioHostLayer(slot))
+	const ch = resolveLiveAudioChannel(cfg, slot)
+	if (ch == null) return null
+	return getRouteString(ch)
 }
 
 /**
@@ -70,6 +86,7 @@ function listConfiguredLiveAudioSlots(cfg) {
 		if (!clip) continue
 		slots.push({
 			slot: i,
+			channel: resolveLiveAudioChannel(cfg, i),
 			layer: resolveLiveAudioHostLayer(i),
 			device: readCasparSetting(cfg, `live_audio_input_${i}_device`),
 			clip,
@@ -84,6 +101,7 @@ module.exports = {
 	normalizeAlsaCaptureUri,
 	resolveLiveAudioInputDevice,
 	resolveLiveAudioHostLayer,
+	resolveLiveAudioChannel,
 	resolveLiveAudioRouteString,
 	resolveLiveAudioPlayClip,
 	listConfiguredLiveAudioSlots,

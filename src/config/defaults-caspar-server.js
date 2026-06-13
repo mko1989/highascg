@@ -90,6 +90,8 @@ function casparServerDefaults() {
 		live_audio_input_8_device: '',
 		live_audio_inputs_host_channel_enabled: false,
 		live_audio_inputs_channel_mode: '1080p5000',
+		// WO-53: each audio-only (ALSA) input gets its own cheap channel. Empty → lowest standard mode.
+		live_audio_input_channel_mode: '',
 		live_audio_pgm_always_on: true,
 		live_audio_pgm_screen: 1,
 		live_audio_pgm_layer: 2,

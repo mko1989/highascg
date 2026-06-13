@@ -112,8 +112,7 @@ archive_common_build_client_if_requested() {
 		echo "archive-common: no package.json under $root" >&2
 		return 1
 	fi
-	echo "==> Vite production build (dist-web/)"
-	(cd "$root" && npm run build:client)
+	echo "==> build:client skipped (client is a separate repo)"
 }
 
 # Deploy default: API-only tree (matches playout ISO / headless service).

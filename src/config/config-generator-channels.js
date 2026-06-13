@@ -9,6 +9,7 @@ const {
 	buildMultiviewChannel,
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
+	buildInputChannel,
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 } = require('./config-generator-consumer-attach')
@@ -88,15 +89,22 @@ function buildChannelsSection(config, routeMap) {
 		})
 	}
 
-	const hostXml = buildInputsHostChannel(
-		config,
-		plan.decklinkCount,
-		plan.liveAudioCount,
-		plan.inputsHostChannelEnabled,
-		routeMap.inputsOnMvr,
-		routeMap.inputsCh,
-	)
-	if (hostXml) setChannelXml(routeMap.inputsCh, hostXml)
+	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).
+	for (const entry of plan.inputChannels) {
+		setChannelXml(entry.channel, buildInputChannel(config, entry))
+	}
+	// Legacy: empty inputs-host channel only when the host toggle is on with no real inputs.
+	if (plan.inputChannels.length === 0) {
+		const hostXml = buildInputsHostChannel(
+			config,
+			plan.decklinkCount,
+			plan.liveAudioCount,
+			plan.inputsHostChannelEnabled,
+			routeMap.inputsOnMvr,
+			routeMap.inputsCh,
+		)
+		if (hostXml) setChannelXml(routeMap.inputsCh, hostXml)
+	}
 
 	for (const a of plan.extraAudio) {
 		if (a.dims.isCustom) pushCustomMode(customVideoModes, customModeIds, a.dims)

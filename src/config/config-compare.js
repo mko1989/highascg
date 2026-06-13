@@ -97,10 +97,10 @@ function buildModuleChannelExpectation(config) {
 		})
 		list.push({ index: map.multiviewCh, role: 'Multiview', videoMode: mvMode, hasScreen: mvHasScreen })
 	}
-	// Only list a separate DeckLink inputs channel when NOT hosted on MVR
-	if (map.inputsCh != null && !map.inputsOnMvr) {
-		const inMode = String(cfg.inputs_channel_mode || '1080p5000')
-		list.push({ index: map.inputsCh, role: 'DeckLink inputs', videoMode: inMode, hasScreen: false })
+	// WO-53: one dedicated channel per live input (DeckLink = full mode, ALSA = cheap mode).
+	for (const entry of Array.isArray(map.inputChannels) ? map.inputChannels : []) {
+		const role = entry.kind === 'live_audio' ? `Live audio input ${entry.slot}` : `DeckLink input ${entry.slot}`
+		list.push({ index: entry.channel, role, videoMode: String(entry.mode || '1080p5000'), hasScreen: false })
 	}
 	const extraN = map.audioOnlyChannels?.length ?? 0
 	for (let i = 0; i < extraN; i++) {

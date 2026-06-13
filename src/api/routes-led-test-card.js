@@ -17,7 +17,7 @@ const HOST_LAYER = 0
 /**
  * Multiview output builds real pixels from layer 10 (`color_bg`) upward; layer 0 is often empty,
  * so CG ADD … 0 fails with COMMAND_UNKNOWN_DATA while PGM channels still work.
- * @see routes-multiview.js MV_BG_LAYER
+ * @see multiview-apply.js MV_BG_LAYER
  */
 const MULTIVIEW_TEMPLATE_HOST_FALLBACK = 10
 

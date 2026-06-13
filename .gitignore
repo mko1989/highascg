@@ -42,6 +42,9 @@ _media/
 data/
 !data/nvidia-driver-guide.json
 
+# CasparCG daily logs (runtime; can grow to hundreds of MB)
+log/
+
 # Live border state polled by pip_* templates (written by Art-Net / inspector)
 template/global-border-live-*.json
 template/global-border-live-*.json.tmp

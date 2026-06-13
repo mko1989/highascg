@@ -3,7 +3,7 @@
 const defaults = require('./defaults')
 const { mergeAudioRoutingIntoConfig } = require('./config-generator')
 const { normalizeRtmpConfig } = require('./rtmp-output')
-const { resolveMainScreenCount } = require('./routing-map')
+const { resolveMainScreenCount } = require('./routing')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')

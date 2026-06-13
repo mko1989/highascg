@@ -144,6 +144,28 @@ function getExtraAudioModeDimensions(config, idx1) {
 }
 
 /**
+ * Smallest-area standard `video-mode` id, restricted to integer frame rates so the 48 kHz audio
+ * cadence stays clean (stable meters). NTSC (720×486) is technically smaller but uses fractional
+ * 29.97 fps, so it is skipped in favor of PAL (720×576 @ 25). Used for cheap audio-meter channels.
+ * @returns {string}
+ */
+function getLowestStandardVideoModeId() {
+	let bestId = 'PAL'
+	let bestArea = Infinity
+	let bestFps = Infinity
+	for (const [id, m] of Object.entries(STANDARD_VIDEO_MODES)) {
+		if (!m || !Number.isInteger(m.fps)) continue
+		const area = m.width * m.height
+		if (area < bestArea || (area === bestArea && m.fps < bestFps)) {
+			bestArea = area
+			bestFps = m.fps
+			bestId = id
+		}
+	}
+	return bestId
+}
+
+/**
  * @returns {Array<{ id: string, label: string }>}
  */
 function getStandardModeChoices() {
@@ -164,4 +186,5 @@ module.exports = {
 	layoutChannelCount,
 	getExtraAudioModeDimensions,
 	getStandardModeChoices,
+	getLowestStandardVideoModeId,
 }

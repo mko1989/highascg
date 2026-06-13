@@ -234,17 +234,55 @@ function getChannelMap(config, activeBuses = null) {
 		mvDests.forEach(() => multiviewChannels.push(nextCh++))
 	}
 	const multiviewCh = multiviewChannels[0] || null
-	const mvMode = String(readCasparSetting(config, 'multiview_mode') ?? '1080p5000')
-	const inMode = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000')
 	const decklinkInputsHost = String(readCasparSetting(config, 'decklink_inputs_host') ?? 'multiview_if_match').toLowerCase()
 
-	const inputsOnMvr =
-		inputsEnabled && multiviewCh != null && mvMode === inMode && decklinkInputsHost !== 'preview_1'
-	let inputsCh = null; if (inputsEnabled) {
-		if (decklinkInputsHost === 'preview_1') inputsCh = previewChannels[0] || 1
-		else if (inputsOnMvr) inputsCh = multiviewCh
-		else inputsCh = nextCh++
+	// WO-53: each live input gets its own Caspar channel so its audio meter is isolated (channel-level
+	// OSC meter == one input). DeckLink inputs get a full-quality channel (inputs_channel_mode); the
+	// DeckLink plays at layer = slot. Audio-only (ALSA) inputs get a cheap channel (lowest standard
+	// mode); ALSA plays at LIVE_AUDIO_INPUT_LAYER. Inputs are no longer bundled onto a shared host.
+	const _modes = require('./config-modes')
+	const decklinkInputModeRaw = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000').trim()
+	const decklinkInputMode = _modes.STANDARD_VIDEO_MODES[decklinkInputModeRaw] ? decklinkInputModeRaw : '1080p5000'
+	const liveAudioModeRaw = String(readCasparSetting(config, 'live_audio_input_channel_mode') ?? '').trim()
+	const liveAudioInputMode = _modes.STANDARD_VIDEO_MODES[liveAudioModeRaw]
+		? liveAudioModeRaw
+		: _modes.getLowestStandardVideoModeId()
+	const LIVE_AUDIO_INPUT_LAYER = 10
+
+	const inputsOnMvr = false // WO-53: inputs are never bundled onto the MVR/preview host channel.
+	const inputChannels = []
+	const decklinkInputChannels = []
+	for (let i = 1; i <= decklinkCount; i++) {
+		const channel = nextCh++
+		decklinkInputChannels.push(channel)
+		inputChannels.push({
+			kind: 'decklink',
+			slot: i,
+			channel,
+			layer: i,
+			mode: decklinkInputMode,
+			route: getRouteString(channel, i),
+			label: `DeckLink ${i}`,
+		})
 	}
+	const liveAudioInputChannels = []
+	for (let i = 1; i <= liveAudioCount; i++) {
+		const channel = nextCh++
+		liveAudioInputChannels.push(channel)
+		inputChannels.push({
+			kind: 'live_audio',
+			slot: i,
+			channel,
+			layer: LIVE_AUDIO_INPUT_LAYER,
+			mode: liveAudioInputMode,
+			route: getRouteString(channel),
+			label: `Live audio ${i}`,
+		})
+	}
+	// Legacy: explicit empty inputs-host toggle with no real inputs configured.
+	let legacyHostCh = null
+	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0) legacyHostCh = nextCh++
+	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? legacyHostCh ?? null
 
 	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
 	
@@ -330,6 +368,11 @@ function getChannelMap(config, activeBuses = null) {
 		useVirtual,
 		virtualMainChannels,
 		multiviewChannels,
+		inputChannels,
+		decklinkInputChannels,
+		liveAudioInputChannels,
+		decklinkInputMode,
+		liveAudioInputMode,
 	}
 
 	return result

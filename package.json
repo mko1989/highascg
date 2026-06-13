@@ -21,10 +21,6 @@
 		"smoke:amcp-batch": "node --test tools/smoke/smoke-amcp-batch-library.test.js",
 		"test:highascg:parity": "node --test tools/smoke/smoke-amcp-migration-parity.test.js",
 		"test:highascg:send-after": "node --test tools/smoke/smoke-amcp-send-after.test.js",
-		"smoke:previs-uv": "node tools/smoke/smoke-previs-uv.mjs",
-		"smoke:previs-state": "node tools/smoke/smoke-previs-state.mjs",
-		"smoke:previs-stream": "node tools/smoke/smoke-previs-stream.mjs",
-		"smoke:previs-texture-crop": "node tools/smoke/smoke-previs-texture-crop.mjs",
 		"smoke:usb-lsblk": "node --test tools/smoke/smoke-usb-lsblk.js",
 		"smoke:exfat-sync": "node --test tools/smoke/smoke-exfat-sync.js",
 		"test:device-graph": "node --test tools/smoke/smoke-device-graph.js",
@@ -37,13 +33,11 @@
 		"test:gpu-topology": "node --test tools/smoke/smoke-gpu-topology.test.js",
 		"test:modeline-timings": "node --test tools/smoke/smoke-modeline-timings.js",
 		"test:config-generator": "node --test tools/smoke/smoke-config-generator-routing.js",
-		"test:playlist": "node --test tools/smoke/smoke-playlist.js",
 		"smoke:companion-press": "node tools/smoke/smoke-companion-press.mjs",
 		"smoke:streaming-ch": "node tools/smoke/verify-streaming-channel.mjs",
 		"smoke:wo47-manifest": "node tools/smoke/smoke-wo47-manifest.mjs",
 		"smoke:api-origin": "node tools/smoke/smoke-api-origin.mjs",
 		"test:highascg": "node --test tools/smoke/highascg-health-api-amcp.test.js",
-		"test:audio-live": "node audio_testing/run.js",
 		"test:highascg:live": "node --test tools/smoke/highascg-live-amcp.test.js",
 		"test:highascg:live:http": "node --test tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:live:all": "node --test tools/smoke/highascg-live-amcp.test.js tools/smoke/highascg-live-highascg-http.test.js",
@@ -53,11 +47,8 @@
 		"test:highascg:migration:all": "node --test --test-force-exit tools/smoke/smoke-amcp-migration-parity.test.js tools/smoke/smoke-amcp-batch-library.test.js tools/smoke/smoke-amcp-send-after.test.js tools/smoke/smoke-amcp-offline-migration.test.js tools/smoke/smoke-amcp-migration-air-paths.test.js tools/smoke/highascg-health-api-amcp.test.js tools/smoke/highascg-live-amcp.test.js tools/smoke/smoke-amcp-legacy-transport.test.js",
 		"install:base": "npm install --omit=optional",
 		"install:previs": "npm install --include=optional",
-		"install:cg-studio": "npm install --no-save grapesjs",
 		"release:github-server": "bash tools/release/make-github-release-server.sh",
 		"release:github-server:dry": "bash tools/release/make-github-release-server.sh --dry-run",
-		"release:github-app": "bash deprecated/tools/release/make-dev-github-release.sh --app-only",
-		"release:github-app:dry": "bash deprecated/tools/release/make-dev-github-release.sh --app-only --dry-run",
 		"eggs:prepare": "sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh",
 		"exfat:starter-zip": "bash tools/eggs/live-usb/pack-exfat-starter-zip.sh",
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
@@ -67,7 +58,7 @@
 	"engines": {
 		"node": ">=20"
 	},
-	"notes": "highascg uses casparcg-connection@6 for AMCP transport. Legacy raw TCP transport is available via HIGHASCG_AMCP_LEGACY_TRANSPORT=1.",
+	"notes": "highascg uses casparcg-connection@6 for AMCP transport. Legacy raw TCP transport is available via HIGHASCG_AMCP_LEGACY_TRANSPORT=1. Browser UI deps (grapesjs, three) belong in highascg-client; onnxruntime-node is added when WO-19 tracking ships.",
   "dependencies": {
 		"busboy": "^1.6.0",
 		"casparcg-connection": "^6.3.3",
@@ -81,9 +72,7 @@
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
-		"grapesjs": "^0.21.2",
 		"naudiodon": "^2.3.6",
-		"onnxruntime-node": "^1.24.3",
 		"three": "^0.184.0"
 	}
 }

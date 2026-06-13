@@ -32,17 +32,7 @@ function buildVendorDirs(logger) {
 			out['/vendor/html-to-image/'] = htmlToImageRoot
 		}
 	} catch {}
-	if (moduleRegistry.isLoaded && moduleRegistry.isLoaded('cg-studio')) {
-		const grapesRoot = path.join(REPO_ROOT, 'node_modules', 'grapesjs')
-		try {
-			if (fs.existsSync(path.join(grapesRoot, 'dist', 'grapes.mjs'))) {
-				out['/vendor/grapesjs/'] = grapesRoot
-			} else {
-				logger.warn('[modules] cg-studio enabled but `grapesjs` is not installed — run `npm run install:cg-studio`.')
-				out['/vendor/grapesjs/'] = grapesRoot
-			}
-		} catch {}
-	}
+	// cg-studio editor (grapesjs) runs in highascg-client — server only exposes /api/cg-studio/*.
 	return out
 }
 

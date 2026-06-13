@@ -135,7 +135,7 @@ test('multiview screen default x is 0 when no main emits a screen consumer (OS t
 	assert.equal(m[2], '0')
 })
 
-test('decklink inputs use multiview host when mode matches', () => {
+test('WO-53: each DeckLink input gets its own dedicated channel (never bundled onto MVR)', () => {
 	const cfg = clone(defaults)
 	cfg.screen_count = 2
 	cfg.casparServer = {
@@ -158,11 +158,18 @@ test('decklink inputs use multiview host when mode matches', () => {
 	}
 	const map = getChannelMap(cfg)
 	assert.ok(map.multiviewCh != null, 'multiview channel should exist')
-	assert.equal(map.inputsCh, map.multiviewCh, 'inputs should host on multiview when modes match')
-	assert.equal(map.inputsOnMvr, true)
+	assert.equal(map.inputsOnMvr, false, 'WO-53: inputs are never bundled onto the multiview channel')
+	assert.equal(map.decklinkInputChannels.length, 3, 'one dedicated channel per DeckLink input')
+	assert.equal(map.inputsCh, map.decklinkInputChannels[0], 'inputsCh aliases the first DeckLink channel')
+	for (const ch of map.decklinkInputChannels) {
+		assert.notEqual(ch, map.multiviewCh, 'DeckLink channels are separate from the multiview channel')
+	}
+	for (const entry of map.inputChannels) {
+		assert.equal(entry.mode, '1080p5000', 'DeckLink channels use full inputs_channel_mode')
+	}
 })
 
-test('only one dedicated inputs channel when multiview host is not used', () => {
+test('WO-53: one dedicated channel per DeckLink input', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
 	app.screen_count = 1
@@ -178,14 +185,14 @@ test('only one dedicated inputs channel when multiview host is not used', () => 
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const xml = buildConfigXml(flat)
 	const channels = (xml.match(/<channel>/g) || []).length
-	assert.equal(channels, 3, 'expected OUTPUT/PGM + PRV + one dedicated inputs channel')
+	assert.equal(channels, 5, 'expected OUTPUT/PGM + PRV + 3 dedicated DeckLink channels')
 })
 
 /**
  * Multiview off, DeckLink inputs on, dedicated inputs host, streaming channel on.
  * Expected `<channel>` order: PGM → PRV → empty inputs host → streaming channel (no multiview slot).
  */
-test('multiview off: inputs host then streaming channel after screen pairs', () => {
+test('multiview off: per-DeckLink channels then streaming channel after screen pairs', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
 	app.screen_count = 1
@@ -202,9 +209,54 @@ test('multiview off: inputs host then streaming channel after screen pairs', () 
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const xml = buildConfigXml(flat)
 	const channelBlocks = [...xml.matchAll(/<channel>[\s\S]*?<\/channel>/g)].map((m) => m[0])
-	assert.equal(channelBlocks.length, 4, 'OUTPUT/PGM + PRV + inputs host + streaming (legacy dedicated slot)')
-	assert.match(channelBlocks[2], /<consumers\s*\/>/, 'inputs host channel has no consumers')
-	assert.match(channelBlocks[3], /<video-mode>720p5000<\/video-mode>/, 'streaming channel is last with its mode')
+	assert.equal(channelBlocks.length, 5, 'OUTPUT/PGM + PRV + 2 DeckLink channels + streaming')
+	assert.match(channelBlocks[2], /<consumers\s*\/>/, 'DeckLink channel has no consumers')
+	assert.match(channelBlocks[2], /<audio-osc>true<\/audio-osc>/, 'DeckLink channel exposes audio OSC')
+	assert.match(channelBlocks[4], /<video-mode>720p5000<\/video-mode>/, 'streaming channel is last with its mode')
+})
+
+test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest standard mode', () => {
+	const { getLowestStandardVideoModeId } = require('../../src/config/config-modes')
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: '1080p5000',
+		multiview_enabled: false,
+		decklink_input_count: 2,
+		live_audio_input_count: 1,
+		live_audio_input_1_device: 'hw:1,0',
+		inputs_channel_mode: '1080p5000',
+		decklink_inputs_host: 'dedicated',
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	const map = getChannelMap(flat)
+	const lowest = getLowestStandardVideoModeId()
+	// One dedicated channel per input (2 decklink + 1 live audio).
+	assert.equal(map.inputChannels.length, 3, 'one dedicated channel per input slot')
+	assert.deepEqual(
+		map.inputChannels.map((m) => m.kind),
+		['decklink', 'decklink', 'live_audio'],
+	)
+	assert.equal(map.inputChannels[0].mode, '1080p5000', 'DeckLink uses full inputs_channel_mode')
+	assert.equal(map.inputChannels[2].mode, lowest, 'ALSA uses the cheap lowest standard mode')
+	assert.equal(map.inputChannels[0].route, `route://${map.decklinkInputChannels[0]}-1`)
+	assert.equal(map.inputChannels[2].route, `route://${map.liveAudioInputChannels[0]}`)
+	const xml = buildConfigXml(flat)
+	assert.match(xml, /DeckLink input 1/, 'DeckLink input channel comment present')
+	assert.match(xml, /Live audio input 1/, 'live audio input channel comment present')
+	assert.match(xml, new RegExp(`<video-mode>${lowest}</video-mode>`), 'cheap ALSA channel uses lowest standard mode')
+	// No inputs configured → no input channels.
+	const off = clone(flat)
+	off.decklink_input_count = 0
+	off.live_audio_input_count = 0
+	off.casparServer = { ...off.casparServer, decklink_input_count: 0, live_audio_input_count: 0 }
+	const mapOff = getChannelMap(off)
+	assert.equal(mapOff.inputChannels.length, 0, 'no inputs → no dedicated input channels')
 })
 
 test('streaming without dedicatedOutputChannel encodes the videoSource bus — no extra <channel>', () => {

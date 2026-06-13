@@ -8,7 +8,7 @@
 const http = require('http')
 const fs = require('fs')
 const path = require('path')
-const os = require('os')
+const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
 const { mergeCors } = require('./cors')
 const { isHeadlessMode } = require('./headless-mode')
 
@@ -43,20 +43,6 @@ function mapInstanceStaticPath(requestPath) {
 	const rest = m[1]
 	if (!rest || rest === '/') return '/'
 	return rest
-}
-
-/**
- * @returns {string[]}
- */
-function getLanIPv4Addresses() {
-	const out = []
-	const nets = os.networkInterfaces()
-	for (const k of Object.keys(nets)) {
-		for (const n of nets[k] || []) {
-			if (n.family === 'IPv4' && !n.internal) out.push(n.address)
-		}
-	}
-	return out
 }
 
 /**

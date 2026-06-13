@@ -17,8 +17,8 @@ const PLUGIN_CATALOG = [
 		name: 'Tracking',
 		moduleName: 'tracking',
 		legacyEnabled: (config) => {
-			const envFlag = process.env.HIGHASCG_PREVIS
-			return isTruthy(envFlag) || config?.features?.previs3d === true
+			const envFlag = process.env.HIGHASCG_TRACKING
+			return isTruthy(envFlag) || config?.features?.tracking === true
 		},
 	},
 	{
@@ -26,8 +26,8 @@ const PLUGIN_CATALOG = [
 		name: 'Auto Follow',
 		moduleName: 'autofollow',
 		legacyEnabled: (config) => {
-			const envFlag = process.env.HIGHASCG_PREVIS
-			return isTruthy(envFlag) || config?.features?.previs3d === true
+			const envFlag = process.env.HIGHASCG_AUTOFOLLOW
+			return isTruthy(envFlag) || config?.features?.autofollow === true
 		},
 	},
 	{

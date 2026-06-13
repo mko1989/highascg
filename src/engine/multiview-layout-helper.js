@@ -40,19 +40,26 @@ function routeForCell(cell, map, inputsCh, previewChannels) {
 		const n = prvM?.[1] != null ? parseInt(prvM[1], 10) + 1 : 1
 		return `route://${map.previewCh(n) || map.programCh(n)}`
 	}
-	if (cell.type === 'decklink' && inputsCh) {
+	if (cell.type === 'decklink') {
+		// WO-53: each DeckLink input has its own dedicated channel; route the channel layer = slot.
+		const dlChans = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
 		let i = 1
 		const idM = cell.id?.match(/decklink_(\d+)/)
 		if (idM) {
 			i = parseInt(idM[1], 10) + 1
 		} else if (cell.source && String(cell.source).startsWith('route://')) {
 			const parts = String(cell.source).replace(/^route:\/\//, '').split('-')
-			if (parseInt(parts[0], 10) === inputsCh && parts[1]) i = parseInt(parts[1], 10) || 1
+			const ch0 = parseInt(parts[0], 10)
+			const slotIdx = dlChans.indexOf(ch0)
+			if (slotIdx >= 0) i = slotIdx + 1
+			else if (ch0 === inputsCh && parts[1]) i = parseInt(parts[1], 10) || 1
 		} else {
 			const lblM = (cell.label || '').match(/decklink\s*(\d+)/i)
 			if (lblM) i = parseInt(lblM[1], 10) || 1
 		}
-		return `route://${inputsCh}-${i}`
+		const ch = dlChans[i - 1]
+		if (ch != null) return `route://${ch}-${i}`
+		if (inputsCh) return `route://${inputsCh}-${i}`
 	}
 	return `route://${map.programCh(1)}`
 }
@@ -60,7 +67,7 @@ function routeForCell(cell, map, inputsCh, previewChannels) {
 /**
  * Infer the overlay type of a cell.
  */
-function overlayType(c, programChannels, previewChannels, inputsCh) {
+function overlayType(c, programChannels, previewChannels, inputsCh, decklinkInputChannels = []) {
 	const src = c.source || ''
 	if (typeof src === 'string' && src.includes('playback_timers.html')) return 'timers'
 	if (typeof src === 'string' && src.startsWith('route://')) {
@@ -69,7 +76,8 @@ function overlayType(c, programChannels, previewChannels, inputsCh) {
 		if (!isNaN(ch)) {
 			if (programChannels.includes(ch)) return 'pgm'
 			if (previewChannels.includes(ch)) return 'prv'
-			if (inputsCh != null && ch === inputsCh) return 'decklink'
+			if ((Array.isArray(decklinkInputChannels) && decklinkInputChannels.includes(ch)) || (inputsCh != null && ch === inputsCh))
+				return 'decklink'
 		}
 	}
 	// Fallback: infer from label when source missing (e.g. manually created cells)
