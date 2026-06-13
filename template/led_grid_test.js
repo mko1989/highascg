@@ -306,12 +306,12 @@ function renderBouncingCharacter(layer, count) {
 	var ctx = canvas.getContext('2d', { alpha: false })
 	
 	var bounceAssets = [
-		'ch_both_open_green.png',
-		'ch_left_closed_green.png',
-		'ch_right_closed_green.png',
-		'both_open.png',
-		'left_closed.png',
-		'right_closed.png'
+		'ch_both_open_green.svg',
+		'ch_left_closed_green.svg',
+		'ch_right_closed_green.svg',
+		'both_open.svg',
+		'left_closed.svg',
+		'right_closed.svg'
 	]
 	
 	var images = []
