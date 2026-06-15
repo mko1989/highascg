@@ -50,15 +50,14 @@ function mergeAudioRoutingIntoConfig(config) {
 	const pl = String(ar.programLayout || 'stereo').toLowerCase()
 	const layoutId = layoutMap[pl] || 'stereo'
 	const screenCount = getChannelMap(out).screenCount
-	const progDev = ar.programSystemAudioDevices
 	const prevEn = ar.previewSystemAudioEnabled
 	const prevDev = ar.previewSystemAudioDevices
 	const ap = ar.audioPreview && typeof ar.audioPreview === 'object' ? ar.audioPreview : {}
 
 	/**
-	 * PGM audio: **only** `<system-audio>` (OpenAL). Empty device name → `<system-audio />` (default);
-	 * non-empty → `<device-name>…</device-name>`. We never emit `<ffmpeg-consumer>` for program/monitor
-	 * on these channels when routing is default — it duplicated ALSA routing.
+	 * PGM `<system-audio>` is opt-in only (Device View audio output cabling →
+	 * `applyAudioOutputOverridesToScreens`). Root OpenAL may still be declared in `<configuration>`;
+	 * do not attach a channel consumer unless the operator wires one in the web client.
 	 */
 	const profile = String(out.caspar_build_profile || 'stock')
 	for (let n = 1; n <= screenCount; n++) {
@@ -70,8 +69,12 @@ function mergeAudioRoutingIntoConfig(config) {
 		out[`screen_${n}_ffmpeg_audio_args`] = ''
 		out[`screen_${n}_ffmpeg_audio_path_2`] = ''
 		out[`screen_${n}_ffmpeg_audio_args_2`] = ''
-		out[`screen_${n}_system_audio_enabled`] = true
-		out[`screen_${n}_system_audio_device_name`] = progDev[n - 1] || ''
+		const systemAudioAlreadyOn =
+			out[`screen_${n}_system_audio_enabled`] === true || out[`screen_${n}_system_audio_enabled`] === 'true'
+		if (!systemAudioAlreadyOn) {
+			out[`screen_${n}_system_audio_enabled`] = false
+			out[`screen_${n}_system_audio_device_name`] = ''
+		}
 		const apEn =
 			ap.enabled === true ||
 			ap.enabled === 'true' ||

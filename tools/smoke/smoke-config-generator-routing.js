@@ -410,3 +410,49 @@ test('empty screen destinations ignore stale screen_count (one main bus)', () =>
 	const xml = buildConfigXml(flat)
 	assert.equal((xml.match(/<channel>/g) || []).length, 2, 'one main: OUTPUT/PGM + PRV')
 })
+
+test('default audio routing does not attach channel system-audio consumers', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 2
+	app.casparServer = { ...app.casparServer, screen_count: 2, multiview_enabled: false }
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	const xml = buildConfigXml(flat)
+	const channelBlocks = [...xml.matchAll(/<channel>[\s\S]*?<\/channel>/g)].map((m) => m[0])
+	assert.ok(channelBlocks.length >= 2)
+	for (const block of channelBlocks) {
+		const consumers = block.match(/<consumers>([\s\S]*?)<\/consumers>/)?.[1] || block
+		assert.doesNotMatch(consumers, /<system-audio/, 'channel consumers must not get system-audio unless cabled in Device View')
+	}
+})
+
+test('Device View system-audio cabling enables channel consumer (empty device = default sink)', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = { ...app.casparServer, screen_count: 1, multiview_enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.audioOutputs = [{ id: 'audio_1', label: 'PGM out', enabled: true, type: 'system-audio', deviceName: '' }]
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_d1', kind: 'destination_in', externalRef: 'd1' },
+			{ id: 'audio_1', kind: 'audio_out' },
+		],
+		edges: [{ sourceId: 'dst_in_d1', sinkId: 'audio_1' }],
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_system_audio_enabled, true)
+	const xml = buildConfigXml(flat)
+	const pgmBlock = xml.match(/Caspar channel 1:[\s\S]*?<channel>([\s\S]*?)<\/channel>/)?.[1] || ''
+	assert.match(pgmBlock, /<system-audio\s*\/>/, 'cabled system-audio should appear on program channel')
+})

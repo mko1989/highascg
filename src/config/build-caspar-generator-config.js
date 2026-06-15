@@ -271,11 +271,16 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 	const destinations = destinationsFromConfig(appConfig || {})
 	const edges = Array.isArray(appConfig?.deviceGraph?.edges) ? appConfig.deviceGraph.edges : []
 
-	// Map each audio output to the corresponding screen in Caspar via cabling.
+	// Map each cabled audio output to the corresponding screen in Caspar (Device View).
 	audioOutputs.forEach((out) => {
-		if (!out || !out.deviceName) return
-		const id = String(out.id).trim()
+		if (!out || typeof out !== 'object') return
+		if (out.enabled === false || out.enabled === 'false') return
+		const id = String(out.id || '').trim()
+		if (!id) return
 		const consumerType = String(out.type || 'portaudio').toLowerCase()
+		const deviceName = String(out.deviceName || '').trim()
+		// OpenAL default sink uses empty device name → bare `<system-audio />`; PortAudio needs a device.
+		if (consumerType !== 'system-audio' && !deviceName) return
 
 		// Find edge pointing to this audio output
 		const edge = edges.find((e) => String(e.sinkId) === id)
@@ -297,7 +302,7 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 
 		if (consumerType === 'system-audio') {
 			merged[`${prefix}system_audio_enabled`] = true
-			merged[`${prefix}system_audio_device_name`] = out.deviceName
+			merged[`${prefix}system_audio_device_name`] = deviceName
 			// If this is a main screen and we enabled system audio via cabling,
 			// make sure we don't accidentally enable PortAudio fallback if not cabled.
 			if (!merged[`${prefix}portaudio_consumers`]) {
