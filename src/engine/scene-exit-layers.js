@@ -77,10 +77,16 @@ function collectOccupiedLookLayersOnChannel(self, ch) {
 	return [...set].sort((a, b) => a - b)
 }
 
-function logicalLayerFromPhysicalLookLayer(phys) {
+/**
+ * @param {number} phys
+ * @param {'a'|'b'|unknown} [bank] — when set, bank B maps 110→logical 10; bank A treats 110 as logical 110
+ */
+function logicalLayerFromPhysicalLookLayer(phys, bank) {
 	const n = parseInt(phys, 10)
 	if (!Number.isFinite(n) || !isLookPhysicalLayer(n)) return null
-	return n >= 110 ? n - PGM_BANK_B_OFFSET : n
+	const b = normalizeProgramLayerBank(bank ?? physicalLookLayerBank(n))
+	if (b === 'b' && n >= PGM_BANK_B_OFFSET && n <= 199) return n - PGM_BANK_B_OFFSET
+	return n
 }
 
 function physicalLookLayerBank(phys) {
@@ -99,19 +105,36 @@ function physicalLookLayerBank(phys) {
  * @param {object} incomingScene
  * @returns {number[]}
  */
-function collectOrphanLookLogicalLayers(self, ch, incomingScene) {
-	const incomingNums = new Set(
+function collectOrphanLookLogicalLayers(self, ch, incomingScene, incomingBank = 'a') {
+	const bank = normalizeProgramLayerBank(incomingBank)
+	const incomingPhysical = new Set(
 		(incomingScene?.layers || [])
 			.filter(layerHasContent)
-			.map((l) => Number(l.layerNumber))
+			.map((l) => physicalProgramLayer(l.layerNumber, bank))
 			.filter(Number.isFinite),
 	)
 	const orphans = new Set()
 	for (const phys of collectOccupiedLookLayersOnChannel(self, ch)) {
-		const logical = logicalLayerFromPhysicalLookLayer(phys)
-		if (logical != null && !incomingNums.has(logical)) orphans.add(logical)
+		if (incomingPhysical.has(phys)) continue
+		const physBank = physicalLookLayerBank(phys)
+		// Other bank slot (e.g. stale L110 when incoming uses L10) — clearPhysicalLookLayers handles it.
+		if (physBank !== bank) continue
+		const logical = logicalLayerFromPhysicalLookLayer(phys, physBank)
+		if (logical != null) orphans.add(logical)
 	}
 	return [...orphans].sort((a, b) => a - b)
+}
+
+/**
+ * Physical look-stack layers on Caspar not targeted by this take's LOADBG/PLAY jobs.
+ * @param {{ _playbackMatrix?: object, config?: object, programLayerBankByChannel?: object }} self
+ * @param {number} ch
+ * @param {number[]} incomingPhysicalLayers
+ * @returns {number[]}
+ */
+function collectOrphanLookPhysicalLayers(self, ch, incomingPhysicalLayers) {
+	const incoming = new Set((incomingPhysicalLayers || []).filter((n) => Number.isFinite(n)))
+	return collectOccupiedLookLayersOnChannel(self, ch).filter((phys) => !incoming.has(phys))
 }
 
 /**
@@ -174,7 +197,7 @@ async function clearStaleInactiveBankLookLayers(amcp, ch, inactiveBank, incoming
 	const stale = []
 	for (const phys of collectOccupiedLookLayersOnChannel(self || {}, ch)) {
 		if (physicalLookLayerBank(phys) !== inactiveBank) continue
-		const logical = logicalLayerFromPhysicalLookLayer(phys)
+		const logical = logicalLayerFromPhysicalLookLayer(phys, inactiveBank)
 		if (logical != null && !incomingNums.has(logical)) stale.push(phys)
 	}
 	await clearPhysicalLookLayers(amcp, ch, stale, self)
@@ -301,6 +324,7 @@ module.exports = {
 	clearSceneProgramLookStackLayers,
 	collectOccupiedLookLayersOnChannel,
 	collectOrphanLookLogicalLayers,
+	collectOrphanLookPhysicalLayers,
 	clearPhysicalLookLayers,
 	clearStaleInactiveBankLookLayers,
 	logicalLayerFromPhysicalLookLayer,

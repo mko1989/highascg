@@ -1,0 +1,315 @@
+/**
+ * PGM-only program take — single stack (no A/B banks), CUT or +Animate only.
+ * Outgoing layers are cleared in teardown after the transition window, not before LOADBG.
+ */
+
+'use strict'
+
+const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
+const playbackTracker = require('../state/playback-tracker')
+const { param } = require('../caspar/amcp-utils')
+const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
+const { audioRouteToAudioFilter } = require('./audio-route')
+const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const {
+	buildPipOverlayAmcpLinesAll,
+	buildPipOverlayRemoveLines,
+	nextPipContentLayerInScene,
+	pipOverlaysFromLayer,
+	sendPipOverlayLinesSerial,
+} = require('./pip-overlay')
+const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
+const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
+const {
+	diffScenes,
+	layerHasContent,
+	normalizeTransition,
+	isLayerAnimateTakeTransition,
+	baseTypeStripAnimateSuffix,
+	resolveChannelFramerateForMixerTween,
+} = require('./scene-transition')
+
+function normalizeTransitionForPgmOnly(t, forceCut) {
+	const n = normalizeTransition(t, forceCut)
+	if (forceCut || n.duration <= 0 || String(n.type || '').toUpperCase() === 'CUT') {
+		return { type: 'CUT', duration: 0, tween: 'linear' }
+	}
+	if (isLayerAnimateTakeTransition(n.type)) return n
+	// Legacy plain MIX/WIPE/… (still on many looks) → same-layer + Animate on PGM-only.
+	const base = (baseTypeStripAnimateSuffix(n.type) || String(n.type || 'MIX').trim()).split(/\s+/)[0] || 'MIX'
+	const baseUpper = base.toUpperCase()
+	const animateBase = ['MIX', 'WIPE', 'SLIDE', 'PUSH'].includes(baseUpper) ? baseUpper : 'MIX'
+	return { type: `${animateBase} + ANIMATE`, duration: n.duration, tween: n.tween }
+}
+
+function physicalLayer(sceneLayerNum) {
+	const n = parseInt(sceneLayerNum, 10)
+	return Number.isFinite(n) && n >= 1 ? n : 10
+}
+
+/** Caspar reference gap between MIXER COMMIT and PLAY on same-layer LOADBG MIX takes. */
+const PGM_ONLY_PLAY_PREROLL_MS = 80
+
+/** +Animate: duration (+ tween) + DEFER on tweenable mixer props; CUT: immediate tail `0`. */
+function pgmOnlyMixerAnimTail(isAnimate, fadeDur, fadeTw) {
+	if (isAnimate && fadeDur > 0) {
+		return `${fadeDur}${fadeTw ? ` ${param(fadeTw)}` : ''} DEFER`
+	}
+	return '0'
+}
+
+function buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw) {
+	const cl = chLayerAmcp(channel, job.pLayer)
+	const vol = job.layer.muted ? 0 : job.layer.volume != null ? job.layer.volume : 1
+	const targetOpacity = job.layer.muted ? 0 : job.layer.opacity != null ? job.layer.opacity : 1
+	const keyer = shouldApplyStraightAlphaKeyer(job.clip, !!job.layer.straightAlpha) ? 1 : 0
+	const animTail = pgmOnlyMixerAnimTail(isAnimate, fadeDur, fadeTw)
+	const lines = [`MIXER ${cl} FILL ${job.f.x} ${job.f.y} ${job.f.scaleX} ${job.f.scaleY} ${animTail}`]
+	if (job.layer.rotation) {
+		lines.push(`MIXER ${cl} ROTATION ${job.layer.rotation} ${animTail}`)
+	}
+	if (isAnimate && fadeDur > 0) {
+		lines.push(`MIXER ${cl} OPACITY ${targetOpacity} ${animTail}`)
+	} else if (targetOpacity !== 1) {
+		lines.push(`MIXER ${cl} OPACITY ${targetOpacity} 0`)
+	}
+	lines.push(`MIXER ${cl} KEYER ${keyer}`)
+	if (vol !== 1) {
+		const volTail = isAnimate && fadeDur > 0 ? animTail : ''
+		lines.push(`MIXER ${cl} VOLUME ${vol}${volTail ? ` ${volTail}` : ''}`)
+	}
+	for (const fx of job.layer.effects || []) {
+		const fxLines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
+		if (fxLines) lines.push(...fxLines)
+	}
+	return lines
+}
+
+/**
+ * @param {object} amcp
+ * @param {object} opts — same surface as runSceneTakeLbg (+ pgmOnly implied by caller)
+ */
+async function runSceneTakePgmOnly(amcp, opts) {
+	const self = opts.self
+	const channel = parseInt(opts.channel, 10)
+	if (!channel || channel < 1) throw new Error('channel required')
+	const incoming = opts.incomingScene
+	if (!incoming?.layers?.length) throw new Error('incomingScene.layers required')
+
+	const forceCut = !!opts.forceCut
+	const globalT = normalizeTransitionForPgmOnly(incoming.defaultTransition, forceCut)
+	const isAnimate = isLayerAnimateTakeTransition(globalT.type) && globalT.duration > 0
+	const fadeDur = isAnimate ? globalT.duration : 0
+	const fadeTw = globalT.tween
+	const animateBase = isAnimate ? baseTypeStripAnimateSuffix(globalT.type) || 'MIX' : null
+	const framerate = resolveChannelFramerateForMixerTween(self, channel, opts.framerate)
+	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
+
+	const chKey = String(channel)
+	if (!self.programLayerBankByChannel) self.programLayerBankByChannel = {}
+	self.programLayerBankByChannel[chKey] = 'a'
+
+	const fadeWatcher = self.clipEndFadeWatcher || null
+	if (fadeWatcher) fadeWatcher.cancelChannel(channel)
+
+	const currentMap = new Map()
+	for (const l of opts.currentScene?.layers || []) {
+		if (layerHasContent(l)) currentMap.set(l.layerNumber, l)
+	}
+	const diff = diffScenes(opts.currentScene || null, incoming)
+	const incomingSorted = incoming.layers.filter(layerHasContent).sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
+	const incomingLayerNums = new Set(incomingSorted.map((l) => Number(l.layerNumber)))
+
+	const exitLayers = []
+	const seenExit = new Set()
+	for (const l of diff.exit || []) {
+		const ln = Number(l.layerNumber)
+		if (!Number.isFinite(ln) || seenExit.has(ln)) continue
+		seenExit.add(ln)
+		exitLayers.push(l)
+	}
+	for (const l of opts.currentScene?.layers || []) {
+		if (!layerHasContent(l)) continue
+		const ln = Number(l.layerNumber)
+		if (!Number.isFinite(ln) || incomingLayerNums.has(ln) || seenExit.has(ln)) continue
+		seenExit.add(ln)
+		exitLayers.push(l)
+	}
+
+	self.log?.(
+		'info',
+		`[scene-take-pgm-only] ch=${channel} animate=${isAnimate} fadeDur=${fadeDur} exitLayers=${exitLayers.length} incomingLayers=${incomingSorted.length}`,
+	)
+
+	const takeJobs = []
+	for (const layer of incomingSorted) {
+		if (layer.source?.type === 'timeline') {
+			const tlId = layer.source.value
+			if (tlId && self.timelineEngine) {
+				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
+				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx })
+				self.timelineEngine.setLoop(tlId, !!layer.loop)
+				self.timelineEngine.play(tlId, 0)
+			}
+			continue
+		}
+
+		let clip = clipPath(layer)
+		if (layer.source?.type === 'live_audio') {
+			const slot = parseInt(String(layer.source.value || '1'), 10) || 1
+			const { resolveLiveAudioRouteString, resolveLiveAudioPlayClip } = require('../config/live-audio-input')
+			clip =
+				resolveLiveAudioRouteString(self.config, slot) ||
+				resolveLiveAudioPlayClip(self.config, slot) ||
+				clip
+		}
+		if (!clip) continue
+
+		const pLayer = physicalLayer(layer.layerNumber)
+		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
+		const loadOpts = { loop: !!layer.loop }
+		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
+		if (af) loadOpts.audioFilter = af
+
+		if (isAnimate && fadeDur > 0) {
+			loadOpts.transition = animateBase
+			loadOpts.duration = fadeDur
+			loadOpts.tween = fadeTw
+		}
+
+		const seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {
+			channel,
+			layerNumber: layer.layerNumber,
+			physicalLayer: pLayer,
+			fps: framerate,
+			forceCut,
+			phys: physicalLayer,
+			activeBank: 'a',
+			incoming,
+		})
+		if (seekFrames != null && seekFrames > 0) loadOpts.seek = seekFrames
+
+		takeJobs.push({
+			layer,
+			pLayer,
+			clip,
+			f,
+			loadOpts,
+			pipOverlays: pipOverlaysFromLayer(layer),
+		})
+	}
+
+	if (takeJobs.length === 0 && exitLayers.length === 0) {
+		return { ok: true, takeMode: 'pgm-only', diff: diff }
+	}
+
+	const flatMixer = []
+	for (const job of takeJobs) {
+		await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
+		flatMixer.push(...buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw))
+	}
+
+	if (flatMixer.length > 0) {
+		await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
+	}
+
+	if (isAnimate && fadeDur > 0 && takeJobs.length > 0) {
+		await new Promise((r) => setTimeout(r, PGM_ONLY_PLAY_PREROLL_MS))
+	}
+
+	if (takeJobs.length > 0) {
+		const commitLine = `MIXER ${channel} COMMIT`
+		const playLines = takeJobs.map((job) => `PLAY ${channel}-${job.pLayer}`)
+		const sandwich =
+			isAnimate && fadeDur > 0 ? [commitLine, ...playLines, commitLine] : [commitLine, ...playLines]
+		await sendAmcpLinesSequential(sandwich, amcp)
+		if (typeof opts.onProgramTransitionStarted === 'function' && isAnimate && fadeDur > 0) {
+			try {
+				opts.onProgramTransitionStarted()
+			} catch (_) {}
+		}
+	}
+
+	for (const job of takeJobs) {
+		try {
+			playbackTracker.recordPlay(self, channel, job.pLayer, job.clip, { loop: !!job.layer.loop })
+		} catch (_) {}
+	}
+
+	for (const job of takeJobs) {
+		if (!job.pipOverlays?.length) continue
+		try {
+			const prev = currentMap.get(job.layer.layerNumber)
+			const nextP = nextPipContentLayerInScene(incomingSorted, job.layer.layerNumber)
+			const lines = buildPipOverlayAmcpLinesAll(
+				job.pipOverlays,
+				channel,
+				job.pLayer,
+				job.f,
+				self,
+				nextP,
+				prev || null,
+			)
+			if (lines.length) await sendPipOverlayLinesSerial(amcp, lines)
+		} catch (e) {
+			self.log?.('warn', `[scene-take-pgm-only] PIP add failed: ${e?.message || e}`)
+		}
+	}
+	if (takeJobs.some((j) => j.pipOverlays?.length)) {
+		await amcp.mixerCommit(channel).catch(() => {})
+	}
+
+	if (typeof opts.onProgramTransitionStarted === 'function' && !(isAnimate && fadeDur > 0)) {
+		try {
+			opts.onProgramTransitionStarted()
+		} catch (_) {}
+	}
+
+	if (exitLayers.length > 0) {
+		if (fadeMs > 0) {
+			await new Promise((r) => setTimeout(r, Math.ceil(fadeMs) + 5))
+		}
+		const teardownLines = []
+		for (const layer of exitLayers) {
+			const ln = Number(layer.layerNumber)
+			// Same physical slot is being re-taken — Caspar already swapped on PLAY; do not clear it.
+			if (Number.isFinite(ln) && incomingLayerNums.has(ln)) continue
+			const pOut = physicalLayer(layer.layerNumber)
+			const cl = chLayerAmcp(channel, pOut)
+			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+			try {
+				const nextP = nextPipContentLayerInScene(opts.currentScene?.layers, layer.layerNumber)
+				const pipN = pipOverlaysFromLayer(layer).length
+				if (pipN > 0) {
+					teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextP, pipN))
+				}
+			} catch (_) {}
+			try {
+				playbackTracker.recordStop(self, channel, pOut)
+			} catch (_) {}
+		}
+		if (teardownLines.length > 0) {
+			try {
+				await sendPipOverlayLinesSerial(amcp, teardownLines)
+			} catch (_) {}
+			await amcp.mixerCommit(channel).catch(() => {})
+		}
+	}
+
+	if (takeJobs.length > 0) {
+		setupLayerPlaylists(self, channel, incoming, takeJobs.map((j) => ({ layer: j.layer, pLayer: j.pLayer, clip: j.clip })))
+	}
+
+	return {
+		ok: true,
+		takeMode: 'pgm-only',
+		diff: {
+			update: diff.update.length,
+			enter: diff.enter.length,
+			exit: diff.exit.length,
+			unchanged: diff.unchanged.length,
+		},
+	}
+}
+
+module.exports = { runSceneTakePgmOnly, normalizeTransitionForPgmOnly, physicalLayer, pgmOnlyMixerAnimTail }

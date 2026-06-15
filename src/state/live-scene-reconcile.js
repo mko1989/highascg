@@ -153,12 +153,9 @@ async function reconcileLiveSceneFromGatheredXml(self) {
 				if (!clip) continue
 				if (!expectedPhysical.has(k)) {
 					self.log(
-						'info',
-						`Live scene reconcile: channel ${ch} layer ${k} has output in Caspar but not in persisted look; clearing.`
+						'debug',
+						`Live scene reconcile: channel ${ch} layer ${k} on Caspar but not in persisted look (likely stale bank slot); keeping persisted live JSON.`,
 					)
-					liveSceneState.clearChannel(ch)
-					cleared = true
-					break
 				}
 			}
 		}

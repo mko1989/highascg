@@ -130,6 +130,19 @@ async function handleSceneTake(body, ctx) {
 		const bus1 = resolvePreviewChannel(routeMap, mainIdx, channel)
 		const bus2 = null
 		const previewOnly = isPreviewTakeTarget(b)
+		// Preview bus mapped to the same physical channel as PGM — treat as PGM-only (no staging/exchange on shared air).
+		const sharedPreviewBus = bus1 != null && Number(bus1) === Number(channel)
+
+		if (previewOnly && bus1 == null) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error:
+						'Preview take requested but this main has no preview bus (PGM-only destination). Use a normal program take or add a PGM/PRV screen destination.',
+				}),
+			}
+		}
 
 		if (previewOnly && bus1 != null) {
 			if (typeof ctx.log === 'function') {
@@ -168,7 +181,7 @@ async function handleSceneTake(body, ctx) {
 			)
 		}
 		// 2-channel PGM/PRV: stage incoming on PRV (bus1), then take the same look on PGM; swap previous PGM onto PRV.
-		if (bus1 != null && bus2 == null) {
+		if (bus1 != null && bus2 == null && !sharedPreviewBus) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('info', `[scene-take] pgm/prv path ch=${channel} prv=${bus1}`)
 			}
@@ -253,10 +266,17 @@ async function handleSceneTake(body, ctx) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('info', `[scene-take] direct-program path ch=${channel} (no pgm/prv bus exchange)`)
 		}
+		const pgmOnly = bus1 == null || sharedPreviewBus
+		if (pgmOnly && typeof ctx.log === 'function') {
+			ctx.log(
+				'info',
+				`[scene-take] pgm-only stack ch=${channel} (no A/B banks; CUT / +Animate only)${sharedPreviewBus ? ' shared-preview-bus' : ''}`,
+			)
+		}
 		// PGM-only (and any layout without a real preview bus): there is no separate PRV stack to
 		// pre-build looks on, so live JSON often matches the incoming look while Caspar still needs
 		// a fresh PLAY (re-take, recovery, or first air). Skip the layerVisuallyEqual no-op shortcut.
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true })
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly })
 		if (inc && typeof inc === 'object' && inc.id) {
 			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 		}

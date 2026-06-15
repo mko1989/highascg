@@ -29,13 +29,16 @@ const { resolveGlobalBorderPhysicalLayer, buildMergeMixerExtrasForTake } = requi
 const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
-const { collectOrphanLookLogicalLayers } = require('./scene-exit-layers')
+const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
 
 /**
  * @param {object} amcp
  * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, skipLayerVisualEquality?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
+	if (opts.pgmOnly) {
+		return require('./scene-take-pgm-only').runSceneTakePgmOnly(amcp, opts)
+	}
 	const {
 		diffScenes,
 		layerHasContent,
@@ -78,11 +81,8 @@ async function runSceneTakeLbg(amcp, opts) {
 	const framerate = resolveChannelFramerateForMixerTween(self, channel, opts.framerate)
 	const incomingSorted = [...layersWithContent].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 
+	// diff.update = same layer slot, new content — handled by LOADBG/PLAY; never STOP/CLEAR that slot in teardown.
 	const exitCandidates = [...(diff.exit || [])]
-	for (const updatedIncoming of diff.update || []) {
-		const prev = currentMap.get(updatedIncoming.layerNumber)
-		if (layerHasContent(prev)) exitCandidates.push(prev)
-	}
 
 	if (self.timelineEngine) {
 		const pbNow = self.timelineEngine.getPlayback()
@@ -140,8 +140,22 @@ async function runSceneTakeLbg(amcp, opts) {
 		exitCandidates.push(...extraExitCandidates)
 	}
 
+	// PGM-only / empty live JSON: bank A/B may leave the other slot on-air (e.g. L110 then L10).
+	// Clear stale physical layers before LOADBG when we are not doing a bank opacity crossfade.
+	if (!shouldRunBankCrossfade && takeJobs.length > 0) {
+		const incomingPhys = takeJobs.map((j) => j.pLayer)
+		const stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
+		if (stalePhys.length > 0) {
+			try {
+				await clearPhysicalLookLayers(amcp, channel, stalePhys, self)
+			} catch (e) {
+				self.log?.('warn', `[scene-take-lbg] stale look-layer clear failed: ${e?.message || e}`)
+			}
+		}
+	}
+
 	// Caspar may still have look layers when live JSON already matches incoming (diff.exit empty).
-	for (const ln of collectOrphanLookLogicalLayers(self, channel, incoming)) {
+	for (const ln of collectOrphanLookLogicalLayers(self, channel, incoming, inactiveBank)) {
 		const row =
 			currentMap.get(ln) ||
 			(opts.currentScene?.layers || []).find((l) => Number(l.layerNumber) === ln) ||
