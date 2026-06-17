@@ -350,7 +350,7 @@ function buildInputChannel(config, entry) {
 			? `Live audio input ${entry?.slot} (ALSA PLAY … alsa:// on layer ${entry?.layer}; cheap channel, isolated VU)`
 			: `DeckLink input ${entry?.slot} (PLAY ${ch}-${entry?.layer} DECKLINK <device>; dedicated channel, isolated VU)`
 	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
-            <video-mode>${escapeXml(modeId)}</video-mode>
+            <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
             <consumers/>
             <mixer>
                 <audio-osc>true</audio-osc>

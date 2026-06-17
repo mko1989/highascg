@@ -20,7 +20,8 @@ const { startPeriodicSync, startOscPlaybackInfoSupplement } = require('./src/uti
 const { ConfigManager } = require('./src/config/config-manager'); const { refreshConfigComparison } = require('./src/config/config-compare')
 const { hashSubsystemReload } = require('./src/config/config-reload-signature')
 const { SamplingManager } = require('./src/sampling/dmx-sampling')
-const { getChannelMap } = require('./src/config/routing'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
+const { getChannelMap, setupAllRouting } = require('./src/config/routing')
+const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
@@ -118,6 +119,8 @@ function main() {
 		appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 		appCtx.refreshConfigComparison = refreshConfigComparison; appCtx.samplingManager = new SamplingManager(appCtx)
 		appCtx.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
+		appCtx.setupAllRouting = setupAllRouting
+		appCtx.reconcileAfterInfoGather = reconcileAfterInfoGather
 		
 		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
@@ -132,7 +135,19 @@ function main() {
 
 		const { stopStreamingSubsystem, toggleStreaming, restartStreaming, enqueueStreaming, handleCasparConnected, handleConfigReload } = createStreamingLifecycle({ appCtx, config, logger, getChannelMap, addStreamingConsumers, removeStreamingConsumers, resolveFreeStreamingBasePort, prepareNdiStreaming, resolveCaptureTier })
 		appCtx.toggleStreaming = toggleStreaming; appCtx.restartStreaming = restartStreaming; appCtx.enqueueStreaming = enqueueStreaming
-		const fetchInfo = createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoConfigReady: () => handleCasparConnected() })
+		const fetchInfo = createFetchServerInfoConfigAndBroadcast({
+			appCtx,
+			config,
+			onAfterInfoConfigReady: () => {
+				handleCasparConnected()
+				void setupAllRouting(appCtx).catch((e) => {
+					appCtx.log('warn', 'Routing setup: ' + (e?.message || e))
+				})
+				void reconcileAfterInfoGather(appCtx).catch((e) => {
+					appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
+				})
+			},
+		})
 		if (!config.streaming.enabled) void enqueueStreaming(async () => await stopStreamingSubsystem())
 
 		/** Subsystem recycle hash — null until first config change after boot. */

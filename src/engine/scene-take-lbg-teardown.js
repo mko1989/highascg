@@ -5,6 +5,7 @@
 'use strict'
 
 const playbackTracker = require('../state/playback-tracker')
+const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
 const {
 	buildPipOverlayRemoveLines,
 	buildGlobalBorderClearLines,
@@ -72,15 +73,18 @@ async function runSceneTakeLbgTeardown(ctx) {
 				const onAir = phys(ln, activeBank)
 				if (stale !== onAir) {
 					const clg = `${channel}-${stale}`
-					teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
-					try {
-						playbackTracker.recordStop(self, channel, stale)
-					} catch (_) {}
+					if (!isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, stale)) {
+						teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
+						try {
+							playbackTracker.recordStop(self, channel, stale)
+						} catch (_) {}
+					}
 				}
 				continue
 			}
 			for (const bank of ['a', 'b']) {
 				const physLn = phys(ln, bank)
+				if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, physLn)) continue
 				const cl = `${channel}-${physLn}`
 				teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
 				try {
@@ -96,6 +100,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 			}
 		} else {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
+			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
 			const cl = `${channel}-${pOut}`
 			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
 			try {

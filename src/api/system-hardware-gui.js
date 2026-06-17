@@ -11,6 +11,7 @@ const { execFileSync, spawn } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { checkNuclearPassword } = require('./routes-system-setup')
 const { getXAuthority } = require('../utils/hardware-info')
+const { resolveAlsamixer } = require('../audio/alsa-mixer')
 
 /** @readonly */
 const NVIDIA_SETTINGS_BINARIES = ['/usr/bin/nvidia-settings', '/usr/local/bin/nvidia-settings']
@@ -91,23 +92,27 @@ function resolveBmdUpdater() {
 
 /**
  * @param {string} action
+ * @param {{ card?: number }} [opts]
  */
-function spawnGuiDetached(action) {
-	const bin =
-		action === 'nvidia-settings' ?
-			resolveNvidiaSettings()
-		: action === 'desktopvideo_setup' ?
-			resolveDesktopvideoSetup()
-		: action === 'desktop_video_updater' ?
-			resolveBmdUpdater()
-		:	null
+function spawnGuiDetached(action, opts = {}) {
+	let bin = null
+	/** @type {string[]} */
+	let args = []
+	if (action === 'nvidia-settings') bin = resolveNvidiaSettings()
+	else if (action === 'desktopvideo_setup') bin = resolveDesktopvideoSetup()
+	else if (action === 'desktop_video_updater') bin = resolveBmdUpdater()
+	else if (action === 'alsamixer') {
+		bin = resolveAlsamixer()
+		const card = parseInt(String(opts.card ?? 0), 10)
+		if (Number.isFinite(card) && card >= 0) args = ['-c', String(card)]
+	}
 
 	if (!bin || !fs.existsSync(bin))
 		throw new Error(`Launcher not installed or not on PATH (${action}).`)
 
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
 
-	const proc = spawn(bin, [], {
+	const proc = spawn(bin, args, {
 		env,
 		detached: true,
 		stdio: 'ignore',
@@ -126,7 +131,7 @@ async function handleGuiLaunchPost(body, ctx) {
 
 	const b = parseBody(body)
 	const action = String(b?.action ?? '').trim()
-	const okActions = /** @type {const} */ (['nvidia-settings', 'desktopvideo_setup', 'desktop_video_updater'])
+	const okActions = /** @type {const} */ (['nvidia-settings', 'desktopvideo_setup', 'desktop_video_updater', 'alsamixer'])
 	if (!okActions.includes(/** @type {any} */ (action))) {
 		return {
 			status: 400,
@@ -135,8 +140,9 @@ async function handleGuiLaunchPost(body, ctx) {
 		}
 	}
 	try {
-		const exe = spawnGuiDetached(action)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe }) }
+		const card = b?.card != null ? parseInt(String(b.card), 10) : 0
+		const exe = spawnGuiDetached(action, { card: Number.isFinite(card) ? card : 0 })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe, card: Number.isFinite(card) ? card : 0 }) }
 	} catch (e) {
 		const m = e instanceof Error ? e.message : String(e)
 		return {

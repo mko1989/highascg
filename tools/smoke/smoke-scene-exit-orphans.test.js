@@ -49,3 +49,20 @@ test('same logical layer on bank B does not orphan when incoming also targets ba
 	const physical = collectOrphanLookPhysicalLayers(self, ch, [110])
 	assert.deepEqual(physical, [])
 })
+
+test('PGM audio track layers 1–9 are never cleared as look orphans; video from layer 10+ is', () => {
+	const ch = 1
+	const self = {
+		_playbackMatrix: {
+			[`${ch}-2`]: { channel: ch, layer: 2, playing: true, clip: 'route://5' },
+			[`${ch}-10`]: { channel: ch, layer: 10, playing: true, clip: 'media/x.mov' },
+		},
+		config: { screen_count: 1 },
+	}
+	const incoming = {
+		layers: [{ layerNumber: 11, source: { type: 'media', value: 'clip.mov' } }],
+	}
+	const physical = collectOrphanLookPhysicalLayers(self, ch, [11])
+	assert.equal(physical.includes(2), false, 'layer 2 is audio track slot — never orphan-clear')
+	assert.deepEqual(physical, [10], 'layer 10 video look is cleared when not in incoming take')
+})

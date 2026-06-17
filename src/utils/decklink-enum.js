@@ -1,12 +1,14 @@
 'use strict'
 
-const { execFile } = require('child_process')
+const { execFile, execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
 const CACHE_TTL_MS = 5000
 let lastProbeAt = 0
 let lastProbe = null
+
+const DEFAULT_LOG_DIR = '/home/casparcg/highascg/log'
 
 /**
  * @param {string} text
@@ -31,31 +33,16 @@ function parseDecklinkDevicesFromFfmpegText(text) {
 
 /**
  * Parse CasparCG startup log lines with DeckLink devices and Screen consumers.
- * Searches for the last initialization block.
  *
  * @param {string} text
  * @returns {{ decklinks: Array<{ index: number, label: string, externalRef?: string }>, screens: Array<{ index: number, mode: string }> }}
  */
 function parseCasparLogHardware(text) {
 	const lines = String(text || '').split(/\r?\n/)
-	let startupIdx = -1
-	for (let i = lines.length - 1; i >= 0; i--) {
-		// Match any DeckLink model (8K Pro, Duo 2, Mini, Quad, etc.) or generic startup markers
-		if (lines[i].includes('CasparCG Server is starting') || lines[i].includes('Initializing DeckLink') || /DeckLink\s+\S+/i.test(lines[i])) {
-			startupIdx = i
-			// Keep going back to find the very start of the list
-			while (startupIdx > 0 && (/DeckLink/i.test(lines[startupIdx - 1]) || lines[startupIdx - 1].includes('Screen consumer'))) {
-				startupIdx--
-			}
-			break
-		}
-	}
-
 	const decklinks = new Map()
 	const screens = new Map()
-	const searchLines = startupIdx >= 0 ? lines.slice(startupIdx) : lines
 
-	for (const line of searchLines) {
+	for (const line of lines) {
 		const dm = line.match(/-\s*(DeckLink[^[]*?)\s*\[(\d+)\]\s*\((\d+)\)/i)
 		if (dm) {
 			const labelBase = String(dm[1] || '').trim() || 'DeckLink'
@@ -82,8 +69,14 @@ function parseCasparLogHardware(text) {
 	}
 }
 
+function resolveLogDir() {
+	const env = String(process.env.CASPAR_LOG_DIR || process.env.HIGHASCG_CASPAR_LOG_DIR || '').trim()
+	if (env) return env
+	return DEFAULT_LOG_DIR
+}
+
 function getRecentLogPaths() {
-	const dir = '/home/casparcg/highascg/log'
+	const dir = resolveLogDir()
 	try {
 		if (!fs.existsSync(dir)) return []
 		return fs
@@ -118,18 +111,128 @@ function tailFileUtf8(filePath, maxBytes) {
 	}
 }
 
-async function probeDecklinkHardware(opts = {}) {
-	const now = Date.now()
-	if (lastProbe && now - lastProbeAt < CACHE_TTL_MS) return lastProbe
+/**
+ * Read kernel log tail for Blackmagic firmware/driver warnings.
+ * @returns {{ firmwareMismatch?: boolean, driverVersion?: string, detail?: string, warning?: string }}
+ */
+function probeDecklinkDriverHealth() {
+	const sources = [
+		() => execFileSync('journalctl', ['-k', '--no-pager', '-n', '400'], { encoding: 'utf8', timeout: 2000 }),
+		() => fs.readFileSync('/var/log/kern.log', 'utf8').slice(-256 * 1024),
+		() => fs.readFileSync('/var/log/syslog', 'utf8').slice(-256 * 1024),
+	]
+	let text = ''
+	for (const read of sources) {
+		try {
+			text = String(read() || '')
+			if (text.includes('BlackmagicIO') || text.includes('blackmagic')) break
+		} catch {
+			// try next source
+		}
+	}
+	if (!text) return { warning: 'Could not read kernel log for DeckLink health' }
+
+	const mismatch = /firmware version mismatch/i.test(text)
+	const driverVer = text.match(/BlackmagicIO: Driver version ([^\n]+)/i)
+	const mismatchLine = text.match(/BlackmagicIO: WARNING:[^\n]*firmware version mismatch[^\n]*/i)
+
+	const out = {}
+	if (driverVer?.[1]) out.driverVersion = String(driverVer[1]).trim()
+	if (mismatch) {
+		out.firmwareMismatch = true
+		out.detail = mismatchLine?.[0]?.replace(/^[^\]]+\]\s*/, '').trim() || 'DeckLink firmware version mismatch (card older than Desktop Video driver)'
+		out.warning =
+			'DeckLink firmware mismatch: Caspar may enumerate zero devices until firmware is updated with Desktop Video Updater (run on local display :0).'
+	}
+	return out
+}
+
+/**
+ * Enumerate DeckLink subdevices from PCI + /dev/blackmagic (no ffmpeg/API required).
+ * @returns {{ source: string, connectors: Array<{ index: number, label: string, externalRef?: string }>, pciModel?: string, ioNodes?: string[], warning?: string, driverHealth?: object }}
+ */
+function probeDecklinkFromOs() {
+	const health = probeDecklinkDriverHealth()
+	let pciModel = ''
+	try {
+		const lspci = execFileSync('lspci', ['-nn'], { encoding: 'utf8', timeout: 1500 })
+		const line = String(lspci || '')
+			.split(/\r?\n/)
+			.find((l) => /blackmagic|decklink/i.test(l))
+		if (line) {
+			const bm = line.match(/Blackmagic Design DeckLink[^\[]*|DeckLink [^\[]+/i)
+			pciModel = bm?.[0]?.trim() || ''
+			if (!pciModel) {
+				const afterColon = line.split(':').slice(2).join(':').trim()
+				const m = afterColon.match(/^(.+?)\s*\[[0-9a-f]{4}:[0-9a-f]{4}\]/i)
+				pciModel = m?.[1]?.trim() || afterColon.replace(/\s*\[[^\]]+\]\s*$/, '').trim()
+			}
+		}
+	} catch {
+		// lspci optional
+	}
+
+	const ioDir = '/dev/blackmagic'
+	/** @type {string[]} */
+	let ioNodes = []
+	try {
+		if (fs.existsSync(ioDir)) {
+			ioNodes = fs
+				.readdirSync(ioDir)
+				.filter((n) => /^io\d+$/.test(n))
+				.sort((a, b) => parseInt(a.slice(2), 10) - parseInt(b.slice(2), 10))
+		}
+	} catch {
+		ioNodes = []
+	}
+
+	if (!pciModel && ioNodes.length === 0) {
+		return {
+			source: 'os_probe',
+			connectors: [],
+			driverHealth: health,
+			warning: health.warning || 'No DeckLink PCI device or /dev/blackmagic nodes found',
+		}
+	}
+
+	const modelBase = pciModel || 'DeckLink'
+	const connectors = ioNodes.map((node, i) => ({
+		index: i + 1,
+		label: `${modelBase} [${i + 1}]`,
+		externalRef: node,
+	}))
+
+	// PCI present but no io nodes — still report card so UI is not blank.
+	if (connectors.length === 0 && pciModel) {
+		connectors.push({ index: 1, label: `${pciModel} [1]` })
+	}
+
+	const warnings = []
+	if (health.warning) warnings.push(health.warning)
+	if (health.firmwareMismatch) {
+		warnings.push('Caspar "Decklink devices found" block may be empty until firmware matches Desktop Video driver.')
+	}
+
+	return {
+		source: 'os_probe',
+		connectors,
+		pciModel: pciModel || undefined,
+		ioNodes,
+		driverHealth: health,
+		warning: warnings.length ? warnings.join(' ') : undefined,
+	}
+}
+
+async function probeDecklinkFromFfmpeg(opts = {}) {
 	const timeoutMs = Math.max(250, parseInt(String(opts.timeoutMs ?? 1200), 10) || 1200)
+	const ffmpegBin = String(opts.ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg').trim() || 'ffmpeg'
 	const args = ['-hide_banner', '-f', 'decklink', '-list_devices', '1', '-i', 'dummy']
-	const res = await new Promise((resolve) => {
-		execFile('ffmpeg', args, { timeout: timeoutMs, windowsHide: true }, (err, stdout, stderr) => {
+	return new Promise((resolve) => {
+		execFile(ffmpegBin, args, { timeout: timeoutMs, windowsHide: true }, (err, stdout, stderr) => {
 			const body = `${stdout || ''}\n${stderr || ''}`
 			const connectors = []
 			const seen = new Set()
-			const lines = body.split(/\r?\n/)
-			for (const line of lines) {
+			for (const line of body.split(/\r?\n/)) {
 				const m = line.match(/"([^"]*decklink[^"]*)"/i)
 				if (m && m[1]) {
 					const label = m[1].trim()
@@ -150,6 +253,38 @@ async function probeDecklinkHardware(opts = {}) {
 			resolve({ source: 'ffmpeg_decklink', connectors: [] })
 		})
 	})
+}
+
+async function probeDecklinkHardware(opts = {}) {
+	const now = Date.now()
+	if (lastProbe && now - lastProbeAt < CACHE_TTL_MS) return lastProbe
+
+	const ffmpeg = await probeDecklinkFromFfmpeg(opts)
+	if (ffmpeg.connectors.length > 0) {
+		lastProbeAt = now
+		lastProbe = ffmpeg
+		return ffmpeg
+	}
+
+	const os = probeDecklinkFromOs()
+	if (os.connectors.length > 0) {
+		const merged = {
+			...os,
+			sources: { ffmpeg: ffmpeg.source, os: os.source },
+			warning: [ffmpeg.warning, os.warning].filter(Boolean).join(' ') || undefined,
+		}
+		lastProbeAt = now
+		lastProbe = merged
+		return merged
+	}
+
+	const res = {
+		source: ffmpeg.source,
+		connectors: [],
+		sources: { ffmpeg: ffmpeg.source, os: os.source },
+		driverHealth: os.driverHealth,
+		warning: [ffmpeg.warning, os.warning].filter(Boolean).join(' ') || undefined,
+	}
 	lastProbeAt = now
 	lastProbe = res
 	return res
@@ -159,15 +294,48 @@ function probeDecklinkFromCasparLog(opts = {}) {
 	try {
 		const logPaths = getRecentLogPaths()
 		if (!logPaths.length) return { source: 'caspar_log', connectors: [], screens: [], warning: 'No Caspar log files found' }
-		
+
+		/** @type {Array<{ index: number, label: string, externalRef?: string }>} */
+		let bestDecklinks = []
+		let decklinkLogPath = null
+		/** @type {Array<{ index: number, mode: string }>} */
+		let latestScreens = []
+		let screensLogPath = null
+
 		for (const logPath of logPaths) {
 			const text = tailFileUtf8(logPath, opts.maxBytes ?? 4 * 1024 * 1024)
 			if (!text) continue
 			const { decklinks, screens } = parseCasparLogHardware(text)
-			if (decklinks.length > 0 || screens.length > 0) {
-				return { source: 'caspar_log', connectors: decklinks, screens, logPath }
+			if (decklinks.length > bestDecklinks.length) {
+				bestDecklinks = decklinks
+				decklinkLogPath = logPath
+			}
+			if (screens.length > 0 && !screensLogPath) {
+				latestScreens = screens
+				screensLogPath = logPath
 			}
 		}
+
+		if (bestDecklinks.length > 0) {
+			return {
+				source: 'caspar_log',
+				connectors: bestDecklinks,
+				screens: latestScreens,
+				logPath: decklinkLogPath,
+				screensLogPath,
+			}
+		}
+
+		if (latestScreens.length > 0) {
+			return {
+				source: 'caspar_log',
+				connectors: [],
+				screens: latestScreens,
+				logPath: screensLogPath,
+				warning: 'No DeckLink enumeration in recent Caspar logs (screens only)',
+			}
+		}
+
 		return { source: 'caspar_log', connectors: [], screens: [], warning: 'No hardware initialization found in recent logs' }
 	} catch (e) {
 		return { source: 'caspar_log', connectors: [], screens: [], warning: e?.message || String(e) }
@@ -226,7 +394,9 @@ function parseInfoConfigForDecklinks(xmlStr, cb) {
 module.exports = {
 	probeDecklinkHardware,
 	probeDecklinkFromCasparLog,
+	probeDecklinkFromOs,
+	probeDecklinkDriverHealth,
 	parseCasparLogHardware,
 	parseInfoConfigForDecklinks,
+	parseDecklinkDevicesFromFfmpegText,
 }
-

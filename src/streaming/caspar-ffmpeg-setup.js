@@ -166,83 +166,11 @@ function buildFfmpegArgs(config) {
  * @param {Object} config (from stream-config)
  */
 async function addStreamingConsumers(amcp, targets, config) {
-	if (!amcp || !amcp.isConnected) {
-		console.warn('[Streaming] addStreamingConsumers: AMCP not connected — skip')
-		return
-	}
-
-	const tier = resolveCaptureTier(config.captureMode || 'udp', config._casparHost || '127.0.0.1')
-	console.log(`[Streaming] addStreamingConsumers: tier=${tier} targets=${targets.map((t) => `ch${t.channel}:${t.port}`).join(', ')}`)
-
-	if (tier === 'local') {
-		// Local capture mode: capture happens directly from X11/DRM.
-		// No CasparCG consumers needed — the server renders to screen and we grab it.
-		console.log('[Streaming] Local capture mode — skipping CasparCG ADD STREAM (x11grab/kmsgrab handles capture)')
-		return
-	}
-
-	if (tier === 'ndi') {
-		// CasparCG outputs NDI natively (AMCP consumer type — sends channel to the network; no ffmpeg on Caspar).
-		// A preview receiver can separately use ffmpeg libndi_newtek_input to receive those streams.
-		for (const t of targets) {
-			const ndiName = resolveNdiSourceName(config, t.channel)
-			try {
-				const info = await amcp.info(t.channel)
-				if (amcpInfoText(info).includes('NDI')) {
-					console.log(`[Streaming] NDI output already registered on channel ${t.channel}`)
-					continue
-				}
-			} catch { /* proceed */ }
-
-			const cmd = `ADD ${t.channel} NDI "${ndiName}"`
-			try {
-				const res = await amcp.raw(cmd)
-				console.log(
-					`[Streaming] Registered Caspar NDI: ch${t.channel} → "${ndiName}" (${truncate(amcpInfoText(res), 80)})`
-				)
-				await new Promise((r) => setTimeout(r, 100))
-			} catch (e) {
-				console.error(`[Streaming] Failed to register NDI output on channel ${t.channel}:`, e.message)
-			}
-		}
-		return
-	}
-
-	// MPEG-TS over UDP to localhost.
-	const ffmpegArgs = buildFfmpegArgs(config)
-
-	for (const t of targets) {
-		const uri = casparUdpStreamUri(t.port)
-
-		const active = await getActiveStreamUris(amcp, t.channel)
-		const variants = casparUdpStreamUriVariantsForRemove(t.port)
-		
-		for (const u of active) {
-			// If it's a UDP stream we recognize (matches one of our variants) or any UDP stream on this port
-			if (variants.includes(u) || u.includes(`:${t.port}`)) {
-				try {
-					await amcp.raw(`REMOVE ${t.channel} STREAM ${u}`)
-					console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} STREAM ${u}`)
-				} catch (e) {
-					console.log(`[Streaming] pre-ADD REMOVE ch${t.channel} failed: ${e?.message || e}`)
-				}
-			}
-		}
-		await new Promise((r) => setTimeout(r, 150))
-
-		const cmd = `ADD ${t.channel} STREAM ${uri} ${ffmpegArgs}`
-		try {
-			const res = await amcp.raw(cmd)
-			console.log(
-				`[Streaming] ADD STREAM ch${t.channel} ${uri} → AMCP ${truncate(amcpInfoText(res), 100)}`
-			)
-			await new Promise((r) => setTimeout(r, 100))
-		} catch (e) {
-			console.error(`[Streaming] Failed ADD STREAM ch${t.channel}:`, e.message)
-		}
-	}
-
-	scheduleVerifyUdpStreams(amcp, targets)
+	void amcp
+	void targets
+	void config
+	// Preview UDP / go2rtc WebRTC pipeline removed — do not add MPEG-TS STREAM consumers.
+	console.log('[Streaming] addStreamingConsumers: preview UDP/WebRTC removed (no STREAM consumers added)')
 }
 
 /**

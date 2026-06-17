@@ -9,6 +9,12 @@ const defaults = require('../config/defaults')
 const { normalizeAudioRouting } = require('../config/config-generator')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const {
+	getAlsaMixerState,
+	setAlsaMixerControl,
+	resolveSuggestedAlsaMixerCard,
+	alsaMixerErrorResponse,
+} = require('../audio/alsa-mixer')
+const {
 	normalizeAudioPreview,
 	resolveAudioPreviewChannel,
 	resolveAudioPreviewDefaultRoute,
@@ -58,6 +64,21 @@ function handleGet(path, query, ctx) {
 		const outputsOnly = query.outputsOnly !== '0' && query.outputsOnly !== 'false'
 		const data = listPortAudioDevices({ refresh, outputsOnly })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	}
+	if (path === '/api/audio/alsa-mixer') {
+		const cardRaw = query.card != null ? parseInt(String(query.card), 10) : 0
+		if (!Number.isFinite(cardRaw) || cardRaw < 0) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid card' }) }
+		}
+		const refresh = query.refresh === '1' || query.refresh === 'true'
+		try {
+			const suggestedCard = resolveSuggestedAlsaMixerCard(ctx.config)
+			const data = getAlsaMixerState(cardRaw, { refresh, suggestedCard })
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+		} catch (e) {
+			const { status, error } = alsaMixerErrorResponse(e)
+			return { status, headers: JSON_HEADERS, body: jsonBody({ error }) }
+		}
 	}
 	return null
 }
@@ -282,6 +303,20 @@ async function handlePost(path, body, ctx) {
 			}
 		} catch (e) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
+	}
+
+	if (path === '/api/audio/alsa-mixer') {
+		const b = parseBody(body)
+		if (!b || typeof b !== 'object') {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
+		}
+		try {
+			const result = setAlsaMixerControl(b, (level, msg) => apiLog(ctx, level, msg))
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(result) }
+		} catch (e) {
+			const { status, error } = alsaMixerErrorResponse(e)
+			return { status, headers: JSON_HEADERS, body: jsonBody({ error }) }
 		}
 	}
 

@@ -119,16 +119,10 @@ function buildScreenFfmpegConsumersXml(config, screenIdx1) {
  * @returns {string} XML for an <ffmpeg> consumer
  */
 function buildStreamingFfmpegConsumerXml(config, port) {
-	if (!config.streaming || (config.streaming.enabled === false || config.streaming.enabled === 'false')) return ''
-	
-	const args = buildFfmpegArgs(config.streaming)
-	const path = casparUdpStreamUri(port)
-
-	return `
-                <ffmpeg>
-                    <path>${escapeXml(path)}</path>
-                    <args>${escapeXml(args)}</args>
-                </ffmpeg>`
+	void config
+	void port
+	// Preview UDP/WebRTC STREAM consumers removed — do not embed in generated casparcg.config.
+	return ''
 }
 
 /**

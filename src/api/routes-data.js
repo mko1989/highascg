@@ -141,7 +141,17 @@ async function handleProject(path, body, ctx) {
 		projectStore.setActiveSlug(persistence, activeSlug)
 		
 		applyHardwareConfigFromProject(ctx, project)
-		
+		try {
+			const { ensureLiveAudioRouting } = require('../config/routing-setup')
+			void ensureLiveAudioRouting(ctx).catch((e) => {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', `[project] Live audio routing: ${e?.message || e}`)
+				}
+			})
+		} catch {
+			/* optional */
+		}
+
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(project) }
 	}
 	if (path === '/api/project/autosave') {

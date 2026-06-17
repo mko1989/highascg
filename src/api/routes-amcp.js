@@ -8,10 +8,31 @@
 /** Prefer chunked `/api/amcp/batch` over sequential `raw` lines when this is exceeded. */
 const RAW_BATCH_WARN_MIN_LINES = 50
 
+function normalizeAmcpCommandLines(cmds) {
+	return cmds.map(String).map((s) => s.trim()).filter(Boolean)
+}
+
+/**
+ * Replace preview/client per-layer CLEAR storms with `CLEAR <channel>` before send.
+ * @param {string[]} lines
+ * @param {object} [ctx]
+ */
+function applyClearCoalescing(lines, ctx) {
+	const { lines: coalesced, coalesced: did, channels } = coalescePerLayerClearStorm(lines)
+	if (did && typeof ctx?.log === 'function') {
+		ctx.log(
+			'warn',
+			`[AMCP] coalesced ${lines.length} per-layer CLEAR/STOP lines → CLEAR ${channels.join(', ')} (use CLEAR <channel> instead of layer sweeps)`,
+		)
+	}
+	return coalesced
+}
+
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter } = require('../engine/audio-route')
+const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
 	const matrix = playbackTracker.getMatrixForState(ctx)
@@ -56,7 +77,7 @@ async function handlePost(path, body, ctx) {
 					amcp._context.config.amcp_mixer_commit_before_amcp_batch = ctx.config.amcp_mixer_commit_before_amcp_batch
 				}
 			}
-			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
+			const lines = applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx)
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
@@ -70,7 +91,7 @@ async function handlePost(path, body, ctx) {
 					body: jsonBody({ error: 'commands: non-empty array of AMCP lines required' }),
 				}
 			}
-			const lines = cmds.map(String).map((s) => s.trim()).filter(Boolean)
+			const lines = applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx)
 			const MAX = 4000
 			if (lines.length > MAX) {
 				return {
@@ -158,6 +179,13 @@ async function handlePost(path, body, ctx) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
 		}
 		case '/api/clear': {
+			const ch = parseInt(channel, 10)
+			if (layer === undefined || layer === null || layer === '') {
+				const { clearCasparChannel } = require('../engine/caspar-channel-clear')
+				await clearCasparChannel(amcp, ch, ctx)
+				notifyProgramMutationMayInvalidateLive(ctx, ch)
+				return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, { ok: true, cleared: 'channel', channel: ch }) }
+			}
 			const r = await amcp.clear(channel, layer)
 			playbackTracker.recordStop(ctx, channel, layer)
 			notifyProgramMutationMayInvalidateLive(ctx, channel)

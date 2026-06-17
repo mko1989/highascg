@@ -450,7 +450,17 @@ decklink_report_status() {
         echo "    Or: cp tarball /tmp/decklink.tar.gz and re-run install"
     fi
     command -v desktopvideo_setup >/dev/null && echo "  desktopvideo_setup: $(command -v desktopvideo_setup)" || echo "  desktopvideo_setup: not found (optional GUI)"
-    lsmod 2>/dev/null | grep -q blackmagic && lsmod | grep blackmagic | sed 's/^/  module: /' || echo "  module: blackmagic_io not loaded (reboot after install)"
+    if lsmod 2>/dev/null | grep -q blackmagic; then
+        lsmod | grep blackmagic | sed 's/^/  module: /'
+    else
+        echo "  module: blackmagic_io not loaded (reboot after install)"
+    fi
+    if command -v journalctl >/dev/null 2>&1; then
+        if journalctl -k --no-pager -n 400 2>/dev/null | grep -qi 'firmware version mismatch'; then
+            echo "  FIRMWARE: mismatch detected — update with Desktop Video Updater on :0"
+            journalctl -k --no-pager -n 400 2>/dev/null | grep -i 'firmware version mismatch' | tail -1 | sed 's/^/    /'
+        fi
+    fi
 }
 
 # Copy CasparCG .deb CEF build into the system Chromium CEF layout (/usr/lib/cef/<ver>/…).

@@ -3,35 +3,8 @@
 const defaults = require('./defaults')
 const { getChannelMap } = require('./routing')
 const { escapeXml } = require('./config-generator-builders')
-
-/**
- * Combine RTMP ingest base URL and stream key for FFmpeg (e.g. YouTube: `rtmp://…/live2` + key).
- * @param {string} serverUrl
- * @param {string} streamKey
- * @returns {string}
- */
-function joinRtmpServerUrlAndStreamKey(serverUrl, streamKey) {
-	const s = String(serverUrl || '').trim().replace(/\/+$/, '')
-	const k = String(streamKey || '').trim().replace(/^\/+/, '')
-	if (!s && !k) return ''
-	if (!k) return s
-	if (!s) return k
-	return `${s}/${k}`
-}
-
-/**
- * Effective FLV URL for FFmpeg: prefers server URL + stream key; falls back to legacy single `rtmpUrl`.
- * @param {Record<string, unknown>} raw - one destination object
- * @returns {string}
- */
-function getEffectiveRtmpDestinationUrl(raw) {
-	if (!raw || typeof raw !== 'object') return ''
-	const server = String(raw.rtmpServerUrl ?? '').trim()
-	const key = String(raw.streamKey ?? '').trim()
-	const legacy = String(raw.rtmpUrl || raw.url || '').trim()
-	if (server || key) return joinRtmpServerUrlAndStreamKey(server, key)
-	return legacy
-}
+const { joinRtmpServerUrlAndStreamKey, getEffectiveRtmpDestinationUrl } = require('./rtmp-url')
+const { buildStreamingRtmpFfmpegArgs } = require('../streaming/streaming-channel-ffmpeg')
 
 /**
  * @param {Record<string, unknown>} config - flat generator config
@@ -77,15 +50,17 @@ function buildRtmpFfmpegConsumersForChannel(config, casparChannel) {
 		if (target === 'multiview' && rtmp.multiviewOutputEnabled === false) continue
 		if (target.startsWith('preview') && rtmp.previewOutputsEnabled === false) continue
 
-		const vcodec = String(raw.videoCodec || 'h264').toLowerCase() === 'hevc' ? 'libx265' : 'libx264'
 		const vbr = Math.max(200, parseInt(String(raw.videoBitrateKbps || 2500), 10) || 2500)
 		const preset = String(raw.encoderPreset || 'veryfast').trim() || 'veryfast'
 		const audioMode = String(raw.audioSource || 'muxed').toLowerCase()
 		const abr = Math.max(32, parseInt(String(raw.audioBitrateKbps || 128), 10) || 128)
-		const audioPart =
-			audioMode === 'none' || audioMode === 'off' ? '-an' : `-c:a aac -b:a ${abr}k`
-		/** Caspar STREAM consumer uses `-format mpegts` (see caspar-ffmpeg-setup). */
-		const args = `-format mpegts -i - -c:v ${vcodec} -preset ${preset} -b:v ${vbr}k ${audioPart} -f flv ${url}`
+		const ffmpegTail = buildStreamingRtmpFfmpegArgs('medium', {
+			videoBitrateKbps: vbr,
+			encoderPreset: preset,
+			audioCodec: audioMode === 'none' || audioMode === 'off' ? 'none' : 'aac',
+			audioBitrateKbps: abr,
+		})
+		const args = `${ffmpegTail} ${url}`
 		xml += `
                 <ffmpeg>
                     <path>-</path>

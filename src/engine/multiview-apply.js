@@ -10,6 +10,7 @@ const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 const { getChannelMap } = require('../config/routing')
 const { infoResponseToXml, listOccupiedStageLayersInRange } = require('../caspar/channel-info-xml')
+const { clearCasparChannel } = require('./caspar-channel-clear')
 const {
 	MV_STAGE_W,
 	MV_STAGE_H,
@@ -149,10 +150,9 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		layersToClear.push(OVERLAY_LAYER)
 		ctx.log('debug', `Multiview: broad CLEAR on ch ${ch} (INFO XML missing or unparseable)`)
 	}
-	for (const L of layersToClear) {
-		try {
-			await ctx.amcp.clear(ch, L)
-		} catch {}
+	if (layersToClear.length > 0) {
+		ctx.log('debug', `Multiview: CLEAR ${ch} (was ${layersToClear.length} per-layer slot(s) in 10–60)`)
+		await clearCasparChannel(ctx.amcp, ch, ctx)
 	}
 
 	try {

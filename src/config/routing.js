@@ -39,4 +39,5 @@ module.exports = {
 	listConfiguredLiveAudioSlots: require('./live-audio-input').listConfiguredLiveAudioSlots,
 	resolveLiveAudioRouteString: require('./live-audio-input').resolveLiveAudioRouteString,
 	normalizeAlsaCaptureUri: require('./live-audio-input').normalizeAlsaCaptureUri,
+	ensureLiveAudioRouting: Setup.ensureLiveAudioRouting,
 }

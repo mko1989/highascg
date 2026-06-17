@@ -158,7 +158,16 @@ function hardwareConfigHasOperatorData(hc) {
 	const dests = Array.isArray(hc.screenDestinations?.destinations)
 		? hc.screenDestinations.destinations.length
 		: 0
-	return connectors > 0 || edges > 0 || dests > 0
+	if (connectors > 0 || edges > 0 || dests > 0) return true
+	const cs = hc.casparServer && typeof hc.casparServer === 'object' ? hc.casparServer : null
+	if (!cs) return false
+	const liveCount = Math.min(8, Math.max(0, parseInt(String(cs.live_audio_input_count ?? 0), 10) || 0))
+	const deckCount = Math.min(8, Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0))
+	if (liveCount > 0 || deckCount > 0) return true
+	for (let i = 1; i <= 8; i++) {
+		if (String(cs[`live_audio_input_${i}_device`] || '').trim()) return true
+	}
+	return false
 }
 
 /**

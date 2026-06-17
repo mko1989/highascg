@@ -1,6 +1,11 @@
 'use strict'
 
 const { getRouteString, readCasparSetting } = require('./routing-map')
+const {
+	LOOK_LAYER_MIN,
+	PGM_AUDIO_TRACK_LAYER_MAX,
+	isPgmAudioTrackPhysicalLayerOnChannel,
+} = require('../engine/look-layer-ranges')
 
 /**
  * WO-53: each ALSA input has its own (cheap) channel; ALSA plays at this layer on that channel.
@@ -18,6 +23,31 @@ function normalizeAlsaCaptureUri(raw) {
 	if (/^alsa:\/\//i.test(s)) return s
 	if (/^hw:/i.test(s) || /^plughw:/i.test(s) || /^default/i.test(s)) return `alsa://${s}`
 	return `alsa://${s}`
+}
+
+/**
+ * Extract hw card,device from alsa:// or hw: style URIs for conflict checks.
+ * @param {string} raw
+ * @returns {string|null} e.g. "0,0"
+ */
+function parseAlsaHwIdentity(raw) {
+	const s = String(raw || '').trim().split(/\s+/)[0]
+	if (!s) return null
+	const uri = normalizeAlsaCaptureUri(s).replace(/^alsa:\/\//i, '')
+	const m = uri.match(/^(?:plug)?hw:(\d+),(\d+)/i)
+	return m ? `${m[1]},${m[2]}` : null
+}
+
+/**
+ * Caspar ffmpeg producer accepts `-buffer_size N` after the clip on PLAY (reduces ALSA xruns).
+ * @param {object} cfg
+ * @returns {number|null}
+ */
+function resolveLiveAudioAlsaBufferSize(cfg) {
+	const raw = readCasparSetting(cfg, 'live_audio_alsa_buffer_size')
+	if (raw === false || raw === 'false' || raw === 0 || raw === '0') return null
+	const n = parseInt(String(raw ?? 131072), 10)
+	return Number.isFinite(n) && n > 0 ? n : null
 }
 
 /**
@@ -71,7 +101,11 @@ function resolveLiveAudioRouteString(cfg, slot) {
  * @returns {string|null} AMCP PLAY clip (alsa://…)
  */
 function resolveLiveAudioPlayClip(cfg, slot) {
-	return resolveLiveAudioInputDevice(cfg, slot) || null
+	const uri = resolveLiveAudioInputDevice(cfg, slot)
+	if (!uri) return null
+	const buf = resolveLiveAudioAlsaBufferSize(cfg)
+	if (buf == null) return uri
+	return `${uri} -buffer_size ${buf}`
 }
 
 /**
@@ -96,13 +130,53 @@ function listConfiguredLiveAudioSlots(cfg) {
 	return { count, slots }
 }
 
+/**
+ * PGM layers used by live_audio_pgm_always_on routes (must stay within audio track slots 1–9).
+ * @param {object} cfg
+ * @returns {Array<{ channel: number, layer: number, slot: number }>}
+ */
+function listLiveAudioPgmProtectedLayers(cfg) {
+	const alwaysOn =
+		readCasparSetting(cfg, 'live_audio_pgm_always_on') !== false &&
+		readCasparSetting(cfg, 'live_audio_pgm_always_on') !== 'false'
+	if (!alwaysOn) return []
+	const { slots } = listConfiguredLiveAudioSlots(cfg)
+	if (!slots.length) return []
+	const screen = Math.max(1, parseInt(String(readCasparSetting(cfg, 'live_audio_pgm_screen') ?? 1), 10) || 1)
+	const baseLayer = Math.min(
+		PGM_AUDIO_TRACK_LAYER_MAX,
+		Math.max(1, parseInt(String(readCasparSetting(cfg, 'live_audio_pgm_layer') ?? 2), 10) || 2),
+	)
+	const { getChannelMap } = require('./routing-map')
+	const pgmCh = getChannelMap(cfg).programCh(screen)
+	if (!Number.isFinite(pgmCh) || pgmCh < 1) return []
+	return slots
+		.map((slot, i) => ({
+			channel: pgmCh,
+			layer: baseLayer + i,
+			slot: slot.slot,
+		}))
+		.filter((p) => p.layer >= 1 && p.layer <= PGM_AUDIO_TRACK_LAYER_MAX)
+}
+
+/** @deprecated use isPgmAudioTrackPhysicalLayerOnChannel from look-layer-ranges */
+function isLiveAudioPgmInfrastructureLayer(cfg, channel, physicalLayer) {
+	return isPgmAudioTrackPhysicalLayerOnChannel(cfg, channel, physicalLayer)
+}
+
 module.exports = {
 	LIVE_AUDIO_LAYER_BASE,
+	LOOK_LAYER_MIN,
+	PGM_AUDIO_TRACK_LAYER_MAX,
 	normalizeAlsaCaptureUri,
+	parseAlsaHwIdentity,
+	resolveLiveAudioAlsaBufferSize,
 	resolveLiveAudioInputDevice,
 	resolveLiveAudioHostLayer,
 	resolveLiveAudioChannel,
 	resolveLiveAudioRouteString,
 	resolveLiveAudioPlayClip,
 	listConfiguredLiveAudioSlots,
+	listLiveAudioPgmProtectedLayers,
+	isLiveAudioPgmInfrastructureLayer,
 }

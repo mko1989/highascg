@@ -96,6 +96,10 @@ function casparServerDefaults() {
 		live_audio_pgm_screen: 1,
 		live_audio_pgm_layer: 2,
 		live_audio_pgm_audio_only: true,
+		/** Fly-add `ADD ch-96 STREAM … -format null` so consumer-less input channels publish OSC meters. */
+		live_audio_meter_null_consumer: true,
+		/** FFmpeg `-buffer_size` on PLAY alsa://… (bytes). Set 0 to disable. */
+		live_audio_alsa_buffer_size: 131072,
 		audio_preview_enabled: false,
 		audio_preview_bus: 'preview_1',
 		audio_preview_screen: 1,

@@ -10,6 +10,7 @@ const { getChannelMap } = require('../config/routing')
 const playbackTracker = require('../state/playback-tracker')
 const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
 const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+const { clearCasparChannel } = require('./caspar-channel-clear')
 
 function mapTween(tw) {
 	return String(tw || 'linear')
@@ -120,21 +121,7 @@ async function runFadeToBlackAllLayers(amcp, channels, opts, self) {
 	}
 
 	for (const ch of uniq) {
-		try {
-			await amcp.clear(ch)
-		} catch {
-			try {
-				await amcp.raw(`CLEAR ${ch}`)
-			} catch (_) {}
-		}
-		try {
-			await amcp.mixerCommit(ch)
-		} catch (_) {}
-		if (self) {
-			try {
-				playbackTracker.clearChannelFromMatrix(self, ch)
-			} catch (_) {}
-		}
+		await clearCasparChannel(amcp, ch, self)
 	}
 
 	return { channels: uniq, durationFrames }

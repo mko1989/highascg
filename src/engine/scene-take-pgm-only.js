@@ -20,6 +20,7 @@ const {
 } = require('./pip-overlay')
 const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
+const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
 const {
 	diffScenes,
 	layerHasContent,
@@ -275,6 +276,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			// Same physical slot is being re-taken — Caspar already swapped on PLAY; do not clear it.
 			if (Number.isFinite(ln) && incomingLayerNums.has(ln)) continue
 			const pOut = physicalLayer(layer.layerNumber)
+			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
 			const cl = chLayerAmcp(channel, pOut)
 			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
 			try {

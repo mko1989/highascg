@@ -160,13 +160,16 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	if (
 		method === 'GET' &&
-		(p === '/api/audio/devices' || p === '/api/audio/portaudio-devices' || p === '/api/audio/live-inputs')
+		(p === '/api/audio/devices' ||
+			p === '/api/audio/portaudio-devices' ||
+			p === '/api/audio/live-inputs' ||
+			p === '/api/audio/alsa-mixer')
 	) {
 		const ar = routesAudio.handleGet(p, query, ctx)
 		if (ar) return ar
 	}
 
-	if (method === 'POST' && p === '/api/audio/default-device') {
+	if (method === 'POST' && (p === '/api/audio/default-device' || p === '/api/audio/alsa-mixer')) {
 		const ar = await routesAudio.handlePost(p, body, ctx)
 		if (ar) return ar
 	}

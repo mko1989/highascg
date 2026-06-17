@@ -8,13 +8,17 @@
 const { resolveMaxBatchCommands } = require('../caspar/amcp-batch')
 const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
+const {
+	PGM_BANK_B_OFFSET,
+	isLookPhysicalLayer,
+	isPgmAudioTrackPhysicalLayerOnChannel,
+} = require('./look-layer-ranges')
 const liveSceneState = require('../state/live-scene-state')
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
 const playbackTracker = require('../state/playback-tracker')
+const { clearCasparChannel, isPreviewCasparChannel } = require('./caspar-channel-clear')
 
 /** Same as scene-transition physicalProgramLayer (avoid require cycle with scene-transition). */
-const PGM_BANK_B_OFFSET = 100
-
 function physicalProgramLayer(sceneLayerNum, bank) {
 	const n = parseInt(sceneLayerNum, 10)
 	if (!Number.isFinite(n)) return 10
@@ -25,9 +29,8 @@ function layerHasContent(l) {
 	return !!(l && l.source && l.source.value)
 }
 
-/** Caspar layers used by looks: bank A 1–99, bank B 110–199. Timeline uses 200+ (TIMELINE_LAYER_BASE). */
-function isLookPhysicalLayer(L) {
-	return (L >= 1 && L <= 99) || (L >= 110 && L <= 199)
+function shouldSkipLookTeardownOnPhysicalLayer(self, ch, physicalLayer) {
+	return isPgmAudioTrackPhysicalLayerOnChannel(self?.config, ch, physicalLayer)
 }
 
 /**
@@ -134,7 +137,11 @@ function collectOrphanLookLogicalLayers(self, ch, incomingScene, incomingBank = 
  */
 function collectOrphanLookPhysicalLayers(self, ch, incomingPhysicalLayers) {
 	const incoming = new Set((incomingPhysicalLayers || []).filter((n) => Number.isFinite(n)))
-	return collectOccupiedLookLayersOnChannel(self, ch).filter((phys) => !incoming.has(phys))
+	return collectOccupiedLookLayersOnChannel(self, ch).filter((phys) => {
+		if (incoming.has(phys)) return false
+		if (shouldSkipLookTeardownOnPhysicalLayer(self, ch, phys)) return false
+		return true
+	})
 }
 
 /**
@@ -145,7 +152,11 @@ function collectOrphanLookPhysicalLayers(self, ch, incomingPhysicalLayers) {
  * @param {object} [self]
  */
 async function clearPhysicalLookLayers(amcp, ch, physicalLayers, self) {
-	const layers = (physicalLayers || []).filter((L) => isLookPhysicalLayer(L))
+	const layers = (physicalLayers || []).filter((L) => {
+		if (!isLookPhysicalLayer(L)) return false
+		if (shouldSkipLookTeardownOnPhysicalLayer(self, ch, L)) return false
+		return true
+	})
 	if (layers.length === 0) return
 	const lines = []
 	for (const L of layers) {
@@ -204,8 +215,8 @@ async function clearStaleInactiveBankLookLayers(amcp, ch, inactiveBank, incoming
 }
 
 /**
- * Physical Caspar layers used by program looks: bank A 1–99, bank B 110–199 (see scene-transition PGM_BANK_B_OFFSET).
- * Timeline output uses TIMELINE_LAYER_BASE (200+); clearing occupied look layers removes looks without touching timeline slots.
+ * Physical Caspar layers used by program looks: bank A 10–99, bank B 110–199.
+ * Layers 1–9 / 101–109 are always-on audio tracks — never cleared here.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {number|string} channel
  * @param {{ _playbackMatrix?: object, config?: object, programLayerBankByChannel?: object }} [self]
@@ -214,7 +225,15 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 	const ch = parseInt(channel, 10)
 	if (!Number.isFinite(ch) || ch < 1) return
 
-	const layers = collectOccupiedLookLayersOnChannel(self || {}, ch)
+	// Preview bus: one `CLEAR <channel>` wipes looks, timeline (200+), and CG — not layer-by-layer.
+	if (isPreviewCasparChannel(self?.config, ch)) {
+		await clearCasparChannel(amcp, ch, self)
+		return
+	}
+
+	const layers = collectOccupiedLookLayersOnChannel(self || {}, ch).filter(
+		(L) => !shouldSkipLookTeardownOnPhysicalLayer(self, ch, L),
+	)
 	if (layers.length === 0) return
 
 	const chunkSize = Math.floor(resolveMaxBatchCommands(amcp._context) / 2)
@@ -270,12 +289,14 @@ async function fadeExitLayerOpacities(amcp, channel, exitLayers, globalT, forceC
 	const lines = []
 	for (const layer of exitLayers) {
 		const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+		if (shouldSkipLookTeardownOnPhysicalLayer(self, ch, pL)) continue
 		const cl = `${ch}-${pL}`
 		let p = '0'
 		p += ` ${dur}`
 		if (tw) p += ` ${param(tw)}`
 		lines.push(`MIXER ${cl} OPACITY ${p} DEFER`)
 	}
+	if (lines.length === 0) return
 	await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
 	await amcp.mixerCommit(channel)
 }
@@ -291,6 +312,7 @@ async function runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, g
 				const lines = []
 				for (const layer of exitLayers) {
 					const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+					if (shouldSkipLookTeardownOnPhysicalLayer(self, ch, pL)) continue
 					const cl = `${ch}-${pL}`
 					lines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
 				}
@@ -300,6 +322,7 @@ async function runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, g
 				if (self) {
 					for (const layer of exitLayers) {
 						const pL = physicalProgramLayer(Number(layer.layerNumber), bank)
+						if (shouldSkipLookTeardownOnPhysicalLayer(self, ch, pL)) continue
 						try {
 							playbackTracker.recordStop(self, channel, pL)
 						} catch (_) {}
@@ -329,4 +352,5 @@ module.exports = {
 	clearStaleInactiveBankLookLayers,
 	logicalLayerFromPhysicalLookLayer,
 	physicalLookLayerBank,
+	isLookPhysicalLayer,
 }
