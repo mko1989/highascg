@@ -331,7 +331,23 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 	// Body { id } avoids URL-encoding issues with slashes in paths (some stacks mishandle %2F in DELETE URLs).
 	if (method === 'POST' && p === '/api/media/delete') {
-		const r = await routesMedia.handlePost(p, body, ctx, req, query)
+		const r = await routesMedia.handleMediaDelete(body, ctx)
+		if (r) return r
+	}
+	if (method === 'POST' && p === '/api/media/mkdir') {
+		const r = await routesMedia.handleMediaMkdir(body, ctx)
+		if (r) return r
+	}
+	if (method === 'POST' && p === '/api/media/move') {
+		const r = await routesMedia.handleMediaMove(body, ctx)
+		if (r) return r
+	}
+	if (method === 'POST' && p === '/api/media/copy') {
+		const r = await routesMedia.handleMediaCopy(body, ctx)
+		if (r) return r
+	}
+	if (method === 'POST' && p === '/api/media/refresh') {
+		const r = await routesMedia.handleMediaRefresh(body, ctx)
 		if (r) return r
 	}
 	// Duration for timeline drop: CINF + ffprobe fallback — must work when AMCP is down if files are on disk

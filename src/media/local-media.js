@@ -27,6 +27,7 @@ const {
 	unlinkMediaById,
 	createMediaFolder,
 	moveMediaFile,
+	copyMediaFile,
 } = require('./local-media-api')
 
 module.exports = {
@@ -35,6 +36,7 @@ module.exports = {
 	unlinkMediaById,
 	createMediaFolder,
 	moveMediaFile,
+	copyMediaFile,
 	resolveMediaFileOnDisk,
 	probeMedia,
 	resolveSafe,

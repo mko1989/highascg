@@ -15,6 +15,7 @@ const {
 	unlinkMediaById,
 	createMediaFolder,
 	moveMediaFile,
+	copyMediaFile,
 	resolveMediaFileOnDisk,
 	probeMedia,
 } = require('../media/local-media')
@@ -137,15 +138,12 @@ async function probeDurationMsFromLocalFiles(ctx, id) {
 }
 
 async function handleMediaRefresh(body, ctx) {
-	if (!ctx.amcp?.query) {
-		return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
-	}
 	const parsedBody = parseBody(body)
 	const ensureHqThumbs = parsedBody?.ensureHqThumbs === true || parsedBody?.ensureHqThumbs === 1 || parsedBody?.ensureHqThumbs === '1'
 	const fn = ctx.runMediaLibraryQueryCycle || ctx.runConnectionQueryCycle
 	if (fn && typeof fn === 'function') {
 		fn.call(ctx)
-	} else {
+	} else if (ctx.amcp?.query) {
 		runMediaClsTlsRefresh(ctx).catch((e) => {
 			if (typeof ctx.log === 'function') ctx.log('warn', 'Media library refresh: ' + (e?.message || e))
 		})
@@ -176,6 +174,135 @@ async function handleMediaRefresh(body, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, message: 'Media refresh initiated' }) }
 }
 
+function parseJsonErrorBody(r) {
+	try {
+		const o = JSON.parse(String(r?.body || '{}'))
+		return o?.error || o?.message || `HTTP ${r?.status || 500}`
+	} catch {
+		return `HTTP ${r?.status || 500}`
+	}
+}
+
+function collectTransferIds(b, singleKey, batchKey) {
+	if (Array.isArray(b[batchKey]) && b[batchKey].length) {
+		return b[batchKey].map((id) => String(id || '').trim()).filter(Boolean)
+	}
+	const one = String(b[singleKey] || '').trim()
+	return one ? [one] : []
+}
+
+async function runBatchMediaOp(ctx, ids, opName, opFn) {
+	let count = 0
+	/** @type {Array<{ id: string, error: string }>} */
+	const errors = []
+	/** @type {number|null} */
+	let firstFailStatus = null
+	for (const id of ids) {
+		const r = await opFn(id)
+		if (r.status >= 200 && r.status < 300) count++
+		else {
+			if (firstFailStatus == null) firstFailStatus = r.status
+			errors.push({ id, error: parseJsonErrorBody(r) })
+		}
+	}
+	const ok = errors.length === 0
+	const body = { ok, [opName]: count, count }
+	if (errors.length) body.errors = errors
+	const status = ok ? 200 : count > 0 ? 200 : firstFailStatus || 500
+	return { status, headers: JSON_HEADERS, body: jsonBody(body) }
+}
+
+function triggerMediaRescan(ctx) {
+	if (typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
+}
+
+async function handleMediaDelete(body, ctx) {
+	const b = parseBody(body)
+	const ids = collectTransferIds(b, 'id', 'ids')
+	if (!ids.length) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id or ids required' }) }
+	if (typeof ctx.log === 'function') ctx.log('info', `[media] delete ids=${JSON.stringify(ids)}`)
+	if (ids.length === 1) {
+		const r = await unlinkMediaById(ctx.config || {}, ids[0])
+		if (r.status === 200) triggerMediaRescan(ctx)
+		return r
+	}
+	const r = await runBatchMediaOp(ctx, ids, 'deleted', (id) => unlinkMediaById(ctx.config || {}, id))
+	if (r.status === 200) triggerMediaRescan(ctx)
+	return r
+}
+
+async function handleMediaMkdir(body, ctx) {
+	const b = parseBody(body)
+	const folder = String(b.path || '').trim()
+	if (!folder) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'path required' }) }
+	if (typeof ctx.log === 'function') ctx.log('info', `[media] mkdir path=${folder}`)
+	const r = await createMediaFolder(ctx.config || {}, folder)
+	if (r.status === 200) triggerMediaRescan(ctx)
+	return r
+}
+
+async function handleMediaMove(body, ctx) {
+	const b = parseBody(body)
+	if (b.targetId === undefined || b.targetId === null) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'targetId required' }) }
+	}
+	const sourceIds = collectTransferIds(b, 'sourceId', 'sourceIds')
+	if (!sourceIds.length) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'sourceId or sourceIds required' }) }
+	}
+	if (typeof ctx.log === 'function') {
+		ctx.log('info', `[media] move sourceIds=${JSON.stringify(sourceIds)} targetId=${String(b.targetId)}`)
+	}
+	const cfg = ctx.config || {}
+	const targetId = b.targetId
+	if (sourceIds.length === 1) {
+		const r = await moveMediaFile(cfg, sourceIds[0], targetId)
+		if (r.status === 200) triggerMediaRescan(ctx)
+		if (r.status === 200) {
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, moved: 1, count: 1 }),
+			}
+		}
+		return r
+	}
+	const r = await runBatchMediaOp(ctx, sourceIds, 'moved', (sourceId) => moveMediaFile(cfg, sourceId, targetId))
+	if (r.status === 200) triggerMediaRescan(ctx)
+	return r
+}
+
+async function handleMediaCopy(body, ctx) {
+	const b = parseBody(body)
+	if (b.targetId === undefined || b.targetId === null) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'targetId required' }) }
+	}
+	const sourceIds = collectTransferIds(b, 'sourceId', 'sourceIds')
+	if (!sourceIds.length) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'sourceId or sourceIds required' }) }
+	}
+	if (typeof ctx.log === 'function') {
+		ctx.log('info', `[media] copy sourceIds=${JSON.stringify(sourceIds)} targetId=${String(b.targetId)}`)
+	}
+	const cfg = ctx.config || {}
+	const targetId = b.targetId
+	if (sourceIds.length === 1) {
+		const r = await copyMediaFile(cfg, sourceIds[0], targetId)
+		if (r.status === 200) triggerMediaRescan(ctx)
+		if (r.status === 200) {
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, copied: 1, count: 1 }),
+			}
+		}
+		return r
+	}
+	const r = await runBatchMediaOp(ctx, sourceIds, 'copied', (sourceId) => copyMediaFile(cfg, sourceId, targetId))
+	if (r.status === 200) triggerMediaRescan(ctx)
+	return r
+}
+
 async function handlePost(path, body, ctx, req, query) {
 	if (path === '/api/thumbnail/live/capture') {
 		const b = parseBody(body)
@@ -185,30 +312,10 @@ async function handlePost(path, body, ctx, req, query) {
 		const { handleLiveThumbnailUploadPost } = require('../media/live-thumbnail-cache')
 		return handleLiveThumbnailUploadPost(req, query, ctx)
 	}
-	if (path === '/api/media/delete') {
-		const b = parseBody(body)
-		const id = (b.id || '').trim()
-		if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
-		const r = await unlinkMediaById(ctx.config || {}, id)
-		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
-		return r
-	}
-	if (path === '/api/media/mkdir') {
-		const b = parseBody(body)
-		const folder = (b.path || '').trim()
-		if (!folder) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'path required' }) }
-		const r = await createMediaFolder(ctx.config || {}, folder)
-		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
-		return r
-	}
-	if (path === '/api/media/move') {
-		const b = parseBody(body)
-		const { sourceId, targetId } = b
-		if (!sourceId || !targetId) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'sourceId and targetId required' }) }
-		const r = await moveMediaFile(ctx.config || {}, sourceId, targetId)
-		if (r.status === 200 && typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
-		return r
-	}
+	if (path === '/api/media/delete') return handleMediaDelete(body, ctx)
+	if (path === '/api/media/mkdir') return handleMediaMkdir(body, ctx)
+	if (path === '/api/media/move') return handleMediaMove(body, ctx)
+	if (path === '/api/media/copy') return handleMediaCopy(body, ctx)
 	if (path === '/api/media/refresh') return handleMediaRefresh(body, ctx)
 	if (path === '/api/media/cinf') {
 		const b = parseBody(body)
@@ -283,4 +390,14 @@ async function handlePost(path, body, ctx, req, query) {
 	return null
 }
 
-module.exports = { handleThumbnail, handleLocalMedia, handleDeleteLocalMedia, handlePost, handleMediaRefresh }
+module.exports = {
+	handleThumbnail,
+	handleLocalMedia,
+	handleDeleteLocalMedia,
+	handlePost,
+	handleMediaRefresh,
+	handleMediaDelete,
+	handleMediaMkdir,
+	handleMediaMove,
+	handleMediaCopy,
+}
