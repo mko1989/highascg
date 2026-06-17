@@ -94,10 +94,14 @@ function casparServerDefaults() {
 		live_audio_input_channel_mode: '',
 		live_audio_pgm_always_on: true,
 		live_audio_pgm_screen: 1,
+		/** When true (default) and screen_count > 1, always-on live routes hit every PGM bus on startup. */
+		live_audio_pgm_all_screens: true,
 		live_audio_pgm_layer: 2,
 		live_audio_pgm_audio_only: true,
-		/** Fly-add `ADD ch-96 STREAM … -format null` so consumer-less input channels publish OSC meters. */
+		/** Fly-add `ADD ch-96 STREAM … -format null` on every channel so OSC audio meters tick. */
 		live_audio_meter_null_consumer: true,
+		/** When capture hw matches PortAudio output hw, use dsnoop (non-exclusive capture). */
+		live_audio_capture_dsnoop: true,
 		/** FFmpeg `-buffer_size` on PLAY alsa://… (bytes). Set 0 to disable. */
 		live_audio_alsa_buffer_size: 131072,
 		audio_preview_enabled: false,

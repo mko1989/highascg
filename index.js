@@ -236,7 +236,12 @@ function main() {
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)
 					startOscPlaybackInfoSupplement(appCtx)
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
-				} else if (payload.connected === false) { wasConnected = false; (require('./src/utils/periodic-sync')).clearPeriodicSyncTimer(appCtx); if (appCtx.clipEndFadeWatcher) appCtx.clipEndFadeWatcher.cancelAll() }
+				} else if (payload.connected === false) {
+					wasConnected = false
+					;(require('./src/utils/periodic-sync')).clearPeriodicSyncTimer(appCtx)
+					;(require('./src/audio/meter-health')).stopLiveInputMeterHealthWatch(appCtx)
+					if (appCtx.clipEndFadeWatcher) appCtx.clipEndFadeWatcher.cancelAll()
+				}
 				if (config.offline_mode) appCtx.state.setVariable('caspar_connected', 'true')
 			}); casparConn.on('error', err => appCtx.log('warn', 'Caspar TCP: ' + (err.message || err)))
 			

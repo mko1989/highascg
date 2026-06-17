@@ -335,6 +335,31 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 				break
 			}
 		}
+
+		if (conn.xrandrName) continue
+
+		const { aliasNameScore, connectorMediaKind } = require('./gpu-display-alias')
+		const kind = connectorMediaKind(conn.shortName)
+		if (kind === 'other') continue
+		const candidates = (xrandrOutputs || []).filter(
+			(x) => x.connected && !usedXrandr.has(x.name) && connectorMediaKind(x.name) === kind,
+		)
+		if (!candidates.length) continue
+		let best = candidates[0]
+		let bestScore = -1
+		for (const x of candidates) {
+			const score = aliasNameScore(x.name, conn.shortName)
+			if (score > bestScore) {
+				bestScore = score
+				best = x
+			}
+		}
+		if (bestScore > 0) {
+			matches.set(conn.shortName, best.name)
+			usedXrandr.add(best.name)
+			conn.xrandrName = best.name
+			conn.matchMethod = 'heuristic'
+		}
 	}
 
 	return matches

@@ -7,7 +7,9 @@ const {
 	METER_NULL_CONSUMER_INDEX,
 	METER_UDP_PORT_BASE,
 	isMeterNullConsumerEnabled,
+	listMeterNullTargetChannels,
 } = require('../../src/audio/meter-null-consumer')
+const { getChannelMap } = require('../../src/config/routing-map')
 
 describe('meter-null-consumer', () => {
 	it('builds unique discard UDP URI per channel', () => {
@@ -25,5 +27,29 @@ describe('meter-null-consumer', () => {
 		assert.equal(isMeterNullConsumerEnabled({}), true)
 		assert.equal(isMeterNullConsumerEnabled({ casparServer: {} }), true)
 		assert.equal(isMeterNullConsumerEnabled({ casparServer: { live_audio_meter_null_consumer: false } }), false)
+	})
+
+	it('lists all channels from INFO CONFIG when present', () => {
+		const xml = `<configuration><channels>
+			<channel><video-mode>1080p5000</video-mode></channel>
+			<channel><video-mode>1080p5000</video-mode></channel>
+			<channel><video-mode>PAL</video-mode></channel>
+		</channels></configuration>`
+		assert.deepEqual(listMeterNullTargetChannels({}, xml), [1, 2, 3])
+	})
+
+	it('falls back to routing map channel indices', () => {
+		const cfg = {
+			screen_count: 2,
+			multiview_enabled: true,
+			live_audio_input_count: 1,
+			live_audio_input_1_device: 'hw:0,0',
+			casparServer: { screen_count: 2, multiview_enabled: true, live_audio_input_count: 1, live_audio_input_1_device: 'hw:0,0' },
+		}
+		const map = getChannelMap(cfg)
+		const channels = listMeterNullTargetChannels(cfg, '')
+		assert.ok(channels.includes(map.programCh(1)))
+		assert.ok(channels.includes(map.programCh(2)))
+		assert.ok(channels.includes(map.liveAudioInputChannels[0]))
 	})
 })

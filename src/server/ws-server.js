@@ -161,6 +161,29 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		})
 	}
 
+	function sendOscBootstrap(ws) {
+		if (!ctx.oscState || typeof ctx.oscState.getSnapshot !== 'function') return
+		try {
+			const oscSnap = ctx.oscState.getSnapshot()
+			ws.send(safeStringify({ type: 'osc', data: oscSnap }))
+		} catch (e) {
+			log('ws initial osc: ' + (e?.message || e))
+		}
+	}
+
+	function refreshLiveInputMetersOnConnect() {
+		try {
+			const { repairLiveInputMetersIfStale, broadcastOscSnapshot } = require('../audio/meter-health')
+			void repairLiveInputMetersIfStale(ctx, { broadcastOsc: true, staleMs: 3000 }).catch((e) => {
+				if (typeof ctx.log === 'function') ctx.log('debug', '[meter] ws connect repair: ' + (e?.message || e))
+			})
+			// Push current OSC even when repair is a no-op (UI reload / navigation).
+			setTimeout(() => broadcastOscSnapshot(ctx), 250)
+		} catch (e) {
+			log('[meter] ws connect refresh: ' + (e?.message || e))
+		}
+	}
+
 	const onUpgrade = (req, socket, head) => {
 		const p = (req.url || '').split('?')[0]
 		log(`[WS Upgrade] Attempt for path: ${p}`)
@@ -199,6 +222,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		try {
 			const snap = getSnapshot()
 			ws.send(safeStringify({ type: 'state', data: snap }))
+			sendOscBootstrap(ws)
+			refreshLiveInputMetersOnConnect()
 		} catch (e) {
 			log('ws initial state: ' + (e?.message || e))
 			try {
@@ -239,6 +264,10 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					ws.send(safeStringify({ type: 'amcp_result', data, id: msg.id }))
 				} else if (await dispatchCatalogWsMessage(ws, ctx, msg, safeStringify)) {
 					return
+				} else if (msg.type === 'osc_resync') {
+					sendOscBootstrap(ws)
+					refreshLiveInputMetersOnConnect()
+					ws.send(safeStringify({ type: 'osc_resync_ok', id: msg.id }))
 				} else if (msg.type === 'multiview_sync' && msg.data) {
 					ctx._multiviewLayout = msg.data
 					const persistence = ctx.persistence || require('../utils/persistence')

@@ -1,9 +1,10 @@
 /**
- * Fly-added Caspar consumer so consumer-less input channels tick the mixer and publish OSC meters.
+ * Fly-added Caspar consumer so channels tick the mixer and publish OSC audio meters.
  *
  * CasparCG only runs the channel compositor / audio mixer when at least one consumer is attached.
- * Screen, PortAudio, and streaming STREAM consumers all satisfy this; dedicated live-input channels
- * intentionally ship with `<consumers/>` in casparcg.config (WO-53).
+ * Many HighAsCG channels ship with `<consumers/>` in casparcg.config (PGM/PRV without screen,
+ * dedicated live-input channels — WO-53). On this build, `<audio-osc>true</audio-osc>` alone is
+ * not enough; a lightweight consumer must be present for `/channel/N/mixer/audio/…` OSC to flow.
  *
  * Cheapest runtime fix (verified on Caspar 2.6): AMCP ffmpeg STREAM with `-format null` to a
  * discard UDP port — no video encode, no audio output device, same pattern as streaming ADD STREAM.
@@ -14,6 +15,7 @@
 'use strict'
 
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
+const { parseChannelVideoModesFromInfoConfigXml } = require('../config/server-info-config')
 
 /** Dedicated slot — below DMX (97), above typical route layers. */
 const METER_NULL_CONSUMER_INDEX = 96
@@ -87,6 +89,52 @@ async function removeMeterNullConsumer(amcp, channel) {
 }
 
 /**
+ * All Caspar channel indices that should receive a meter-null consumer on startup.
+ * Prefer live INFO CONFIG (authoritative channel list); fall back to routing map.
+ * @param {object} [config]
+ * @param {string} [infoConfigXml]
+ * @returns {number[]}
+ */
+function listMeterNullTargetChannels(config, infoConfigXml) {
+	const channels = new Set()
+	const add = (ch) => {
+		const n = parseInt(String(ch), 10)
+		if (Number.isFinite(n) && n >= 1) channels.add(n)
+	}
+	const xml = String(infoConfigXml || '').trim()
+	if (xml) {
+		for (const row of parseChannelVideoModesFromInfoConfigXml(xml)) add(row.index)
+	}
+	if (channels.size === 0 && config) {
+		const { getChannelMap } = require('../config/routing-map')
+		const map = getChannelMap(config)
+		for (const ch of map.programChannels || []) add(ch)
+		for (const ch of map.previewChannels || []) add(ch)
+		for (const ch of map.multiviewChannels || []) add(ch)
+		add(map.multiviewCh)
+		add(map.streamingCh)
+		add(map.monitorCh)
+		add(map.inputsCh)
+		for (const ch of map.liveAudioInputChannels || []) add(ch)
+		for (const ch of map.decklinkInputChannels || []) add(ch)
+		for (const ch of map.audioOnlyChannels || []) add(ch)
+		for (const ch of map.mappingChannels || []) add(ch)
+		for (const ch of map.switcherBusChannels || []) add(ch)
+		for (const ch of map.switcherBus1Channels || []) add(ch)
+	}
+	return [...channels].sort((a, b) => a - b)
+}
+
+/**
+ * Ensure meter-null STREAM consumers on every configured Caspar channel (connect / routing setup).
+ * @param {object} ctx app context (amcp, config, gatheredInfo, log)
+ */
+async function ensureAllMeterNullConsumers(ctx) {
+	const channels = listMeterNullTargetChannels(ctx?.config, ctx?.gatheredInfo?.infoConfig)
+	return ensureMeterNullConsumersForChannels(ctx, channels)
+}
+
+/**
  * @param {object} ctx app context (amcp, config, log)
  * @param {number[]} channels
  */
@@ -103,7 +151,8 @@ async function ensureMeterNullConsumersForChannels(ctx, channels) {
 		}
 	}
 	if (ok.length && typeof ctx.log === 'function') {
-		ctx.log('info', `[meter] null STREAM consumer on channel(s) ${ok.join(', ')} (OSC tick)`)
+		const label = ok.length > 6 ? `${ok.length} channels (${ok.slice(0, 5).join(', ')}…)` : ok.join(', ')
+		ctx.log('info', `[meter] null STREAM consumer on ${label} (OSC tick)`)
 	}
 	if (failed.length && typeof ctx.log === 'function') {
 		ctx.log('warn', `[meter] null consumer failed: ${JSON.stringify(failed)}`)
@@ -116,6 +165,8 @@ module.exports = {
 	METER_UDP_PORT_BASE,
 	meterNullStreamUri,
 	isMeterNullConsumerEnabled,
+	listMeterNullTargetChannels,
+	ensureAllMeterNullConsumers,
 	ensureMeterNullConsumer,
 	removeMeterNullConsumer,
 	ensureMeterNullConsumersForChannels,

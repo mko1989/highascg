@@ -219,6 +219,7 @@ class OscState extends EventEmitter {
 			const n = vals.length
 			if (!a.nbChannels || a.nbChannels < n) a.nbChannels = n
 			const now = Date.now()
+			a._lastUpdateAt = now
 			for (let i = 0; i < n; i++) {
 				const db = intMeterSampleToDbfs(vals[i])
 				while (a.levels.length <= i) {
@@ -251,11 +252,42 @@ class OscState extends EventEmitter {
 			const now = Date.now()
 			const db = Number.isFinite(rawDb) ? rawDb : slot.dBFS
 			slot.dBFS = db
+			a._lastUpdateAt = now
 			if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
 				slot.peak = db
 				slot.peakAge = now
 			}
 		}
+	}
+
+	/** Reset mixer levels when Caspar stops sending fresh OSC (avoids frozen VU after CLEAR / lost consumer). */
+	_decayStaleAudio(now = Date.now()) {
+		const staleMs = this._config.staleTimeoutMs
+		if (!Number.isFinite(staleMs) || staleMs <= 0) return false
+		let any = false
+		for (const chKey of Object.keys(this._channels)) {
+			const ch = parseInt(chKey, 10)
+			const a = this._channels[chKey]?.audio
+			if (!a?.levels?.length) continue
+			const lastAt = a._lastUpdateAt || 0
+			if (lastAt && now - lastAt <= staleMs) continue
+			let chStale = false
+			for (const slot of a.levels) {
+				if (slot.dBFS !== -120) {
+					slot.dBFS = -120
+					chStale = true
+				}
+				if (now - (slot.peakAge || 0) > this._config.peakHoldMs && slot.peak !== -120) {
+					slot.peak = -120
+					chStale = true
+				}
+			}
+			if (chStale && Number.isFinite(ch)) {
+				this._dirtyChannels.add(ch)
+				any = true
+			}
+		}
+		return any
 	}
 
 	/**
@@ -374,6 +406,7 @@ class OscState extends EventEmitter {
 
 	_flushEmit() {
 		this._lastEmit = Date.now()
+		this._decayStaleAudio(this._lastEmit)
 		if (!this._config.wsDeltaBroadcast) {
 			this._dirtyChannels.clear()
 		}
@@ -404,9 +437,11 @@ class OscState extends EventEmitter {
 
 	/** Full serializable snapshot for API / WebSocket (Phase 2). */
 	getSnapshot() {
+		const now = Date.now()
+		this._decayStaleAudio(now)
 		return {
 			channels: JSON.parse(JSON.stringify(this._channels)),
-			updatedAt: Date.now(),
+			updatedAt: now,
 		}
 	}
 

@@ -299,7 +299,7 @@ function persistLayoutScript(cmd) {
 function checkXrandrLayout(config) {
 	const layout = calculateLayoutPositions(config)
 	const inventory = getGpuConnectorInventory()
-	return verifyXrandrMatchesLayout(layout, { inventory })
+	return verifyXrandrMatchesLayout(layout, { inventory, config })
 }
 
 /**
