@@ -7,6 +7,7 @@ const { resolveMainScreenCount } = require('./routing')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')
+const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-mapping')
 const {
 	parseDecklinkDeviceIndex,
 	readDecklinkKeyFillFromConnectorCaspar,
@@ -423,7 +424,31 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 		if (appConfig.multiview_os_x !== undefined) merged.multiview_os_x = appConfig.multiview_os_x
 		if (appConfig.multiview_os_y !== undefined) merged.multiview_os_y = appConfig.multiview_os_y
 	}
-	
+
+	// Keep Caspar screen consumer window coords aligned with the xrandr planner.
+	try {
+		const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+		const layout = calculateLayoutPositions(merged)
+		const mv1 = layout?.multiview?.[1]
+		if (mv1 && Number.isFinite(mv1.x)) merged.multiview_x = mv1.x
+		if (mv1 && Number.isFinite(mv1.y)) merged.multiview_y = mv1.y
+		for (let n = 1; n <= 16; n++) {
+			const head = layout?.screens?.[n]
+			if (!head || !Number.isFinite(head.x)) continue
+			merged[`screen_${n}_x`] = head.x
+			if (Number.isFinite(head.y)) merged[`screen_${n}_y`] = head.y
+		}
+	} catch (_) {}
+
+	try {
+		applyStreamRecordMappingsFromGraph({
+			deviceGraph: appConfig?.deviceGraph,
+			screenDestinations: appConfig?.screenDestinations,
+			streamingChannel: merged.streamingChannel,
+			recordOutputs: Array.isArray(appConfig?.recordOutputs) ? appConfig.recordOutputs : [],
+		})
+	} catch (_) {}
+
 	return merged
 }
 

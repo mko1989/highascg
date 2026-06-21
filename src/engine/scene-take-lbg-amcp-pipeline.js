@@ -19,8 +19,57 @@ const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
 const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
+const { partitionTakeJobsPlayOrder } = require('./scene-route-deps')
+
+const ROUTE_SOURCE_PLAY_DELAY_MS = 80
 
 /**
+ * @param {object[]} jobs
+ * @param {*} self
+ * @param {'load'|'play'} kind
+ */
+function serializeTakeJobPlans(jobs, self, kind) {
+	const lines = []
+	for (const job of jobs) {
+		const plan = kind === 'load' ? job.loadPlan : job.playPlan
+		if (!plan) continue
+		logPlannedCommand(self, kind, job.layer.layerNumber, plan)
+		if (kind === 'play') {
+			lines.push(serializeClipCommandPlan(plan))
+		}
+	}
+	return lines
+}
+
+/**
+ * PLAY source layers before same-channel intra-look routes so route:// targets are on-air.
+ * @param {object} amcp
+ * @param {number} channel
+ * @param {object[]} takeJobs
+ * @param {*} self
+ * @param {{ trailingCommit?: boolean }} [opts]
+ */
+async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
+	const commitLine = `MIXER ${channel} COMMIT`
+	const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
+	const sourceLines = serializeTakeJobPlans(sources, self, 'play')
+	const routeLines = serializeTakeJobPlans(routes, self, 'play')
+	const tail = opts.trailingCommit !== false ? [commitLine] : []
+
+	if (sourceLines.length && routeLines.length) {
+		await sendAmcpLinesSequential([commitLine, ...sourceLines, commitLine], amcp)
+		await new Promise((r) => setTimeout(r, ROUTE_SOURCE_PLAY_DELAY_MS))
+		await sendAmcpLinesSequential([...routeLines, ...tail], amcp)
+		return
+	}
+	const all = [...sourceLines, ...routeLines]
+	if (all.length > 0) {
+		await sendAmcpLinesSequential([commitLine, ...all, ...tail], amcp)
+	} else {
+		await amcp.mixerCommit(channel)
+	}
+}
+
  * @param {object} amcp
  * @param {{ start: number|null }} fadeClockRef — mutated when a timed crossfade / merge play starts
  * @param {object} ctx
@@ -189,52 +238,58 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 
 		const commitLine = `MIXER ${channel} COMMIT`
 
-		let playLinesForCrossfade = []
-		if (crossfadeLines.length > 0) {
-			for (const job of takeJobs) {
+		const buildCrossfadePlayLines = (jobs) => {
+			const lines = []
+			for (const job of jobs) {
 				if (!job.playPlan) continue
 				logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-				playLinesForCrossfade.push(`PLAY ${job.playPlan.channel}-${job.playPlan.layer}`)
+				lines.push(`PLAY ${job.playPlan.channel}-${job.playPlan.layer}`)
 				if (job.incomingStartsHidden) {
-					playLinesForCrossfade.push(`MIXER ${job.playPlan.channel}-${job.playPlan.layer} OPACITY 0 0`)
+					lines.push(`MIXER ${job.playPlan.channel}-${job.playPlan.layer} OPACITY 0 0`)
 				}
 			}
+			return lines
 		}
 
 		try {
 			if (crossfadeLines.length > 0) {
-				await sendAmcpLinesSequential(
-					[commitLine, ...playLinesForCrossfade, ...crossfadeLines, commitLine],
-					amcp,
-				)
+				const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
+				const srcPlays = buildCrossfadePlayLines(sources)
+				const routePlays = buildCrossfadePlayLines(routes)
+				if (srcPlays.length && routePlays.length) {
+					await sendAmcpLinesSequential(
+						[commitLine, ...srcPlays, ...crossfadeLines, commitLine],
+						amcp,
+					)
+					await new Promise((r) => setTimeout(r, ROUTE_SOURCE_PLAY_DELAY_MS))
+					await sendAmcpLinesSequential([...routePlays, commitLine], amcp)
+				} else {
+					await sendAmcpLinesSequential(
+						[commitLine, ...srcPlays, ...routePlays, ...crossfadeLines, commitLine],
+						amcp,
+					)
+				}
 				fadeClockRef.start = Date.now()
 				notifyProgramTransitionStarted()
 			} else if (isMergeTransition && takeJobs.some((j) => j.playPlan)) {
-				const animatePlayLines = []
-				for (const job of takeJobs) {
-					if (!job.playPlan) continue
-					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-					animatePlayLines.push(serializeClipCommandPlan(job.playPlan))
-				}
-				if (animatePlayLines.length > 0) {
-					await sendAmcpLinesSequential([commitLine, ...animatePlayLines, commitLine], amcp)
+				const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
+				const animateSources = serializeTakeJobPlans(sources, self, 'play')
+				const animateRoutes = serializeTakeJobPlans(routes, self, 'play')
+				if (animateSources.length > 0 || animateRoutes.length > 0) {
+					if (animateSources.length && animateRoutes.length) {
+						await sendAmcpLinesSequential([commitLine, ...animateSources, commitLine], amcp)
+						await new Promise((r) => setTimeout(r, ROUTE_SOURCE_PLAY_DELAY_MS))
+						await sendAmcpLinesSequential([...animateRoutes, commitLine], amcp)
+					} else {
+						await sendAmcpLinesSequential([commitLine, ...animateSources, ...animateRoutes, commitLine], amcp)
+					}
 					fadeClockRef.start = Date.now()
 					notifyProgramTransitionStarted()
 				} else {
 					await amcp.mixerCommit(channel)
 				}
 			} else {
-				const simplePlays = []
-				for (const job of takeJobs) {
-					if (!job.playPlan) continue
-					logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-					simplePlays.push(serializeClipCommandPlan(job.playPlan))
-				}
-				if (simplePlays.length > 0) {
-					await sendAmcpLinesSequential([commitLine, ...simplePlays], amcp)
-				} else {
-					await amcp.mixerCommit(channel)
-				}
+				await sendPhasedTakePlays(amcp, channel, takeJobs, self)
 			}
 		} catch (_) {}
 

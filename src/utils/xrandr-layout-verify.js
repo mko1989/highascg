@@ -16,9 +16,9 @@ const { resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
  */
 function plannedHeadsFromLayout(layout, opts = {}) {
 	const list = [
-		...(Array.isArray(layout?.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 		...Object.values(layout?.screens || {}),
 		...Object.values(layout?.multiview || {}),
+		...(Array.isArray(layout?.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 	]
 	const seen = new Set()
 	/** @type {PlannedHead[]} */
@@ -99,6 +99,88 @@ function compareXrandrLayout(planned, actual, opts = {}) {
 }
 
 /**
+ * @param {Array<{ x?: number, y?: number, width?: number, height?: number }>} heads
+ */
+function boundingBoxFromHeads(heads) {
+	let maxX = 0
+	let maxY = 0
+	for (const h of heads || []) {
+		const x = Number(h?.x) || 0
+		const y = Number(h?.y) || 0
+		const w = Number(h?.width) || 0
+		const hgt = Number(h?.height) || 0
+		maxX = Math.max(maxX, x + w)
+		maxY = Math.max(maxY, y + hgt)
+	}
+	return { width: maxX, height: maxY }
+}
+
+/**
+ * Parse `Screen 0: minimum …, current WxH, maximum …` from xrandr --query.
+ * @param {string} raw
+ */
+function parseXrandrScreenCurrentCanvas(raw) {
+	const m = String(raw || '').match(/^Screen \d+:\s+minimum\s+\d+\s+x\s+\d+,\s+current\s+(\d+)\s+x\s+(\d+)/m)
+	if (!m) return null
+	const width = parseInt(m[1], 10)
+	const height = parseInt(m[2], 10)
+	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
+	return { width, height }
+}
+
+/**
+ * Current RandR desktop canvas size (Screen line, else union of connected heads).
+ * @param {{ raw?: string, displays?: object[] }} [xrDetailed]
+ */
+function currentXrandrCanvasSize(xrDetailed) {
+	const fromScreen = parseXrandrScreenCurrentCanvas(xrDetailed?.raw || '')
+	if (fromScreen) return { ...fromScreen, source: 'screen' }
+	const displays = Array.isArray(xrDetailed?.displays) ? xrDetailed.displays : []
+	if (!displays.length) return null
+	let maxX = 0
+	let maxY = 0
+	for (const d of displays) {
+		const res = String(d?.resolution || '').match(/^(\d+)x(\d+)$/i)
+		const w = res ? parseInt(res[1], 10) : 0
+		const h = res ? parseInt(res[2], 10) : 0
+		maxX = Math.max(maxX, (Number(d?.x) || 0) + w)
+		maxY = Math.max(maxY, (Number(d?.y) || 0) + h)
+	}
+	if (maxX <= 0 || maxY <= 0) return null
+	return { width: maxX, height: maxY, source: 'heads' }
+}
+
+/**
+ * True when the planned layout extends past the live X desktop canvas — live xrandr
+ * cannot grow the framebuffer; nodm restart is required.
+ * @param {object} config
+ */
+function needsNodmRestartForLayout(config) {
+	const { calculateLayoutPositions } = require('./os-layout-calculator')
+	const { getGpuConnectorInventory } = require('./hardware-info')
+	const layout = calculateLayoutPositions(config)
+	const inventory = getGpuConnectorInventory()
+	const planned = plannedHeadsFromLayout(layout, { inventory, config })
+	const plannedCanvas = boundingBoxFromHeads(planned)
+	if (plannedCanvas.width <= 0 || plannedCanvas.height <= 0) {
+		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_planned_heads' }
+	}
+	const xr = getDisplaysXrandrDetailed()
+	const currentCanvas = currentXrandrCanvasSize(xr)
+	if (!currentCanvas) {
+		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_live_canvas' }
+	}
+	const needed =
+		plannedCanvas.width > currentCanvas.width || plannedCanvas.height > currentCanvas.height
+	return {
+		needed,
+		plannedCanvas,
+		currentCanvas,
+		reason: needed ? 'canvas_expansion' : 'canvas_fits',
+	}
+}
+
+/**
  * Read live xrandr state and compare to a layout plan.
  * @param {ReturnType<import('./os-layout-calculator').calculateLayoutPositions>} layout
  * @param {{ inventory?: object[] }} [opts]
@@ -120,4 +202,8 @@ module.exports = {
 	plannedHeadsFromLayout,
 	compareXrandrLayout,
 	verifyXrandrMatchesLayout,
+	boundingBoxFromHeads,
+	parseXrandrScreenCurrentCanvas,
+	currentXrandrCanvasSize,
+	needsNodmRestartForLayout,
 }

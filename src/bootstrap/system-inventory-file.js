@@ -6,7 +6,6 @@ const {
 	getDisplayDetails,
 	getGpuConnectorInventory,
 	getDisplaysXrandrDetailed,
-	getModetestProbe,
 } = require('../utils/hardware-info')
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
@@ -122,7 +121,6 @@ function collectDecklinkFromCasparLog() {
 
 function buildPayload(config) {
 	const xrDetailed = getDisplaysXrandrDetailed()
-	const modetestProbe = getModetestProbe()
 	const displays = getDisplayDetails() || []
 	const connectors = getGpuConnectorInventory() || []
 	const physicalMap = buildGpuPhysicalMap({ config: config || {}, displays, connectors })
@@ -140,8 +138,7 @@ function buildPayload(config) {
 			connectors,
 			physicalMap,
 			xrandrRawQuery: xrDetailed?.raw || '',
-			modetestSource: modetestProbe?.source || 'modetest',
-			modetestDrmCard: modetestProbe?.drmCard || '',
+			topologySource: physicalMap?.topologySource || 'xrandr',
 		},
 		network: {
 			ipv4: collectNetwork(),

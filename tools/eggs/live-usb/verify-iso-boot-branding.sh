@@ -156,6 +156,19 @@ if [[ -n "$GRUB_CFG" ]]; then
 		elif grep -q 'GNU Unifont' "$THEME_CFG"; then
 			ok "theme.cfg fonts match GNU Unifont (font.pf2)"
 		fi
+		if grep -q 'menu_bg_color' "$THEME_CFG"; then
+			ok "theme.cfg sets boot_menu menu_bg_color (visible labels on dark splash)"
+		fi
+	fi
+	if [[ -f "${MNT}/boot/grub/font.pf2" ]]; then
+		ok "boot/grub/font.pf2 present on ISO"
+	else
+		bad "missing boot/grub/font.pf2 — GRUB gfx menu labels will not render"
+	fi
+	if grep -qE '^set timeout=5' "$GRUB_MAIN" 2>/dev/null; then
+		ok "grub.cfg timeout=5"
+	elif grep -qE '^set timeout=' "$GRUB_MAIN" 2>/dev/null; then
+		warn "grub.cfg timeout is not 5 — rebuild with updated grub.main.cfg / inject"
 	fi
 fi
 

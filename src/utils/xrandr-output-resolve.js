@@ -130,6 +130,25 @@ function inventoryXrandrNameFor(raw, rawKey, inventory) {
 }
 
 /**
+ * Pick the layout sysId for a gpu_out connector: operator screen binding wins over DRM externalRef.
+ * @param {object} [config]
+ * @param {object} [connector]
+ * @param {number|null|undefined} screenIndex1 1-based screen index when bound to a program screen
+ * @returns {string}
+ */
+function pickGpuOutLayoutSysId(config, connector, screenIndex1) {
+	if (!connector) return ''
+	const n = screenIndex1 != null ? parseInt(String(screenIndex1), 10) : NaN
+	if (Number.isFinite(n) && n >= 1 && n <= 16) {
+		const fromScreen = String(config?.[`screen_${n}_system_id`] || '').trim()
+		if (fromScreen) return fromScreen
+	}
+	const alias = String(connector.alias || connector.caspar?.xrandrName || connector.caspar?.runtimePort || '').trim()
+	if (alias && looksLikeXrandrOutputName(alias)) return alias
+	return String(connector.externalRef || '').trim()
+}
+
+/**
  * Resolve a Device View / config sysId (DRM or xrandr) to a live xrandr output name.
  * @param {string} sysId
  * @param {{ inventory?: ReturnType<typeof getGpuConnectorInventory>, config?: object, displays?: object[] }} [opts]
@@ -143,17 +162,17 @@ function resolveSysIdToXrandrOutput(sysId, opts = {}) {
 	const fromAlias = resolveFromDeviceGraphAlias(raw, aliasMap)
 	if (fromAlias) return fromAlias
 
-	const inventory = Array.isArray(opts.inventory) ? opts.inventory : getGpuConnectorInventory()
 	const rawKey = raw.toLowerCase()
-	const fromInventory = inventoryXrandrNameFor(raw, rawKey, inventory)
-	if (fromInventory) return fromInventory
-
 	if (looksLikeXrandrOutputName(raw)) {
 		const live = (opts.displays || getDisplaysXrandrDetailed()?.displays || []).some(
 			(d) => String(d?.name || '').toLowerCase() === rawKey,
 		)
 		if (live) return raw
 	}
+
+	const inventory = Array.isArray(opts.inventory) ? opts.inventory : getGpuConnectorInventory()
+	const fromInventory = inventoryXrandrNameFor(raw, rawKey, inventory)
+	if (fromInventory) return fromInventory
 
 	const heuristic = resolveViaLiveXrandrHeuristic(raw, opts.displays)
 	if (heuristic) return heuristic
@@ -180,6 +199,7 @@ module.exports = {
 	looksLikeDrmStylePortName,
 	looksLikeXrandrOutputName,
 	deviceGraphXrandrAliasMap,
+	pickGpuOutLayoutSysId,
 	resolveSysIdToXrandrOutput,
 	resolveLayoutHeadSysId,
 	normalizePortName,

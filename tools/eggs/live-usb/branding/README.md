@@ -4,7 +4,7 @@ Two separate layers on the live ISO:
 
 | Layer | When | What you see today | Customize |
 |-------|------|-------------------|-----------|
-| **GRUB / isolinux** | Boot menu (**3 s** timeout) | Background image + menu (eggs penguins model) | `splash.boot.jpg` + `grub.theme.cfg` + `font.pf2` (GNU Unifont) |
+| **GRUB / isolinux** | Boot menu (**5 s** timeout) | Background image + menu (eggs penguins model) | `splash.boot.jpg` + `grub.theme.cfg` + `font.pf2` (GNU Unifont) |
 | **Plymouth** | Kernel loading until desktop (optional) | **Alternate** ISO menu: splash + corner throbber. **Default Live** = full dmesg (`nosplash`) | `throbber-boot/` + `install-highascg-plymouth-theme.sh` |
 
 ## Eggs / Wardrobe (official model)
@@ -55,6 +55,20 @@ Re-flash the USB after a new ISO is produced.
 After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highascg` and that `boot/grub/splash.png` is not stock penguins.
 
 If you still see **penguins** at the GRUB menu or **terminal text** during boot, the ISO was built without that step (or without `branding/splash.png`). Rebuild with `sudo npm run eggs:build` and re-flash.
+
+### GRUB menu: blank black panel (no entry labels)
+
+**Symptom:** Wallpaper visible but a dark rectangle covers the menu; no white text / no selectable lines.
+
+**Cause:**
+
+1. **`font.pf2` missing or wrong** — `grub.theme.cfg` uses `GNU Unifont Regular 16`; if `loadfont` fails, gfxmenu draws the menu box with no glyphs.
+2. **`gfxmode=1920x1080` only** on a laptop panel — theme layout can clip or letterbox the menu region.
+3. **Opaque `boot_menu` background** without `menu_bg_color` / font — looks like a solid black bar.
+
+**Fix (in repo):** `grub.theme.cfg` sets `menu_bg_color` + `selected_item_bg_color`; `grub.main.cfg` / inject use a **gfxmode fallback chain**; `inject-iso-boot-branding.sh` copies `/boot/grub/font.pf2` onto the ISO. Rebuild and re-flash.
+
+**On stick now (no rebuild):** mount the EFI/ISO partition, edit `boot/grub/grub.cfg`: `set timeout=5`; confirm `boot/grub/font.pf2` exists; replace `boot/grub/theme.cfg` from the repo.
 
 ### Post-GRUB black box (~50% screen, ~2 seconds)
 

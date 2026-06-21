@@ -5,6 +5,7 @@ const path = require('path')
 const EventEmitter = require('events')
 const defaults = require('./defaults')
 const { finalizeScreenDestinationsConfig } = require('./screen-destinations')
+const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-mapping')
 
 /**
  * Top-level keys that should be saved to separate files when in modular mode.
@@ -62,6 +63,7 @@ class ConfigManager extends EventEmitter {
 					this.config = finalizeScreenDestinationsConfig(
 						this._stripLegacyMediaMount(this._loadModular(this.configPath)),
 					)
+					applyStreamRecordMappingsFromGraph(this.config)
 					this.logger.info(`[Config] Loaded modular config from directory: ${this.configPath}`)
 				} else {
 					const raw = fs.readFileSync(this.configPath, 'utf8')
@@ -69,6 +71,7 @@ class ConfigManager extends EventEmitter {
 					this.config = finalizeScreenDestinationsConfig(
 						this._stripLegacyMediaMount(this._merge(defaults, parsed)),
 					)
+					applyStreamRecordMappingsFromGraph(this.config)
 					this.logger.info(`[Config] Loaded monolithic config from ${this.configPath}`)
 				}
 			} else {

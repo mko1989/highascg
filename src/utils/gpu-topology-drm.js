@@ -449,7 +449,6 @@ function discoverGpuPhysicalTopologyFromDrm(opts = {}) {
  * @returns {{ rows: object[], source: string, cards?: string[] } | null}
  */
 function discoverGpuPhysicalTopology(opts = {}) {
-	const cfg = opts?.config && typeof opts.config === 'object' ? opts.config : {}
 	let xrandrRaw = opts.xrandrRaw
 	if (xrandrRaw == null) {
 		try {
@@ -460,15 +459,9 @@ function discoverGpuPhysicalTopology(opts = {}) {
 		}
 	}
 
-	const fromDrm = discoverGpuPhysicalTopologyFromDrm({ config: cfg, xrandrRaw })
-	if (fromDrm?.length) {
-		const cards = [...new Set(fromDrm.map((r) => r.drmCard).filter(Boolean))]
-		return { rows: fromDrm, source: 'modetest', cards }
-	}
-
 	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr(xrandrRaw)
 	if (fromXrandr?.length) {
-		return { rows: fromXrandr, source: 'xrandr', cards: [] }
+		return { rows: fromXrandr, source: 'xrandr', cards: ['card0'] }
 	}
 
 	return null

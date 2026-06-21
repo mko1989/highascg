@@ -310,8 +310,28 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 
 	const matches = new Map()
 	const usedXrandr = new Set()
+	const usedConn = new Set()
+
+	// Pass 1: live xrandr name match (authoritative when an output is connected).
+	for (const x of xrandrOutputs || []) {
+		if (!x.connected || usedXrandr.has(x.name)) continue
+		const xNorm = normalizePortName(x.name)
+		if (!xNorm) continue
+		for (const conn of modetestConnectors || []) {
+			if (usedConn.has(conn.shortName)) continue
+			if (normalizePortName(conn.shortName) !== xNorm) continue
+			matches.set(conn.shortName, x.name)
+			usedXrandr.add(x.name)
+			usedConn.add(conn.shortName)
+			conn.xrandrName = x.name
+			conn.matchMethod = 'name'
+			break
+		}
+	}
 
 	for (const conn of modetestConnectors || []) {
+		if (conn.xrandrName) continue
+
 		const edidKey = edidMatchKey(conn.edid)
 		if (edidKey && byEdid.has(edidKey)) {
 			const candidates = byEdid.get(edidKey).filter((x) => !usedXrandr.has(x.name))
@@ -319,20 +339,10 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 			if (hit) {
 				matches.set(conn.shortName, hit.name)
 				usedXrandr.add(hit.name)
+				usedConn.add(conn.shortName)
 				conn.xrandrName = hit.name
 				conn.matchMethod = 'edid'
 				continue
-			}
-		}
-
-		for (const x of xrandrOutputs || []) {
-			if (usedXrandr.has(x.name) || !x.connected) continue
-			if (normalizePortName(conn.shortName) === normalizePortName(x.name)) {
-				matches.set(conn.shortName, x.name)
-				usedXrandr.add(x.name)
-				conn.xrandrName = x.name
-				conn.matchMethod = 'name'
-				break
 			}
 		}
 
@@ -340,7 +350,7 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 
 		const { aliasNameScore, connectorMediaKind } = require('./gpu-display-alias')
 		const kind = connectorMediaKind(conn.shortName)
-		if (kind === 'other') continue
+		if (kind === 'other' || !conn.connected) continue
 		const candidates = (xrandrOutputs || []).filter(
 			(x) => x.connected && !usedXrandr.has(x.name) && connectorMediaKind(x.name) === kind,
 		)
@@ -357,6 +367,7 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 		if (bestScore > 0) {
 			matches.set(conn.shortName, best.name)
 			usedXrandr.add(best.name)
+			usedConn.add(conn.shortName)
 			conn.xrandrName = best.name
 			conn.matchMethod = 'heuristic'
 		}

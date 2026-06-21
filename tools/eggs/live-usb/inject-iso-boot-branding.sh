@@ -109,8 +109,28 @@ elif [[ -f "$SPLASH" ]]; then
 fi
 install -m 0644 -o root -g root "${HERE}/isolinux.theme.cfg" "${ISO_WORK}/isolinux/isolinux.theme.cfg" 2>/dev/null || true
 
+echo "==> GRUB font.pf2 (theme text invisible without matching Unifont on ISO)"
+FONT_SRC="${HIGHASCG_GRUB_FONT:-/boot/grub/font.pf2}"
+if [[ -f "$FONT_SRC" ]]; then
+	install -m 0644 -o root -g root "$FONT_SRC" "${ISO_WORK}/boot/grub/font.pf2"
+	echo "OK: copied ${FONT_SRC} → boot/grub/font.pf2"
+else
+	echo "WARN: missing ${FONT_SRC} — GRUB menu may show a blank black panel (install grub-common on build host)" >&2
+fi
+
 echo "==> GRUB gfx preamble + theme fonts (Unifont — avoids generic text menu)"
 bash "${HERE}/ensure-iso-grub-gfx-theme.sh" "$ISO_WORK"
+
+echo "==> GRUB menu timeout + gfx fallbacks on ISO grub.cfg"
+for f in "${ISO_WORK}/boot/grub/grub.cfg" "${ISO_WORK}/EFI/ubuntu/grub.cfg"; do
+	[[ -f "$f" ]] || continue
+	sed -i \
+		-e 's/^set timeout=3/set timeout=5/' \
+		-e 's/^set timeout=10/set timeout=5/' \
+		-e 's/set gfxmode=1920x1080$/set gfxmode=1920x1080,1680x1050,1600x900,1366x768,1280x1024,1024x768,800x600,auto/' \
+		-e 's/set gfxmode=auto/set gfxmode=1920x1080,1680x1050,1600x900,1366x768,1280x1024,1024x768,800x600,auto/' \
+		"$f"
+done
 
 echo "==> GRUB kernel cmdline (console + splash + nvidia-drm.fbdev=1)"
 bash "${HERE}/patch-iso-grub-kernel-cmdline.sh" "$ISO_WORK"

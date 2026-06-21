@@ -85,6 +85,24 @@ function parseXrandrDpHdmiOutputNames(raw) {
 }
 
 /**
+ * All DP/HDMI xrandr outputs in --query order (connected and disconnected).
+ * @param {string} raw
+ * @returns {Array<{ name: string, connected: boolean }>}
+ */
+function parseXrandrAllOutputs(raw) {
+	/** @type {Array<{ name: string, connected: boolean }>} */
+	const out = []
+	for (const line of String(raw || '').split('\n')) {
+		const m = line.match(/^(\S+)\s+(connected|disconnected)\b/)
+		if (!m) continue
+		const name = m[1].replace(/^card\d+-/i, '')
+		if (!/^(DP|HDMI|E-?DP)/i.test(name)) continue
+		out.push({ name, connected: m[2] === 'connected' })
+	}
+	return out
+}
+
+/**
  * Build stable gpu_p* rows from xrandr (all DP/HDMI outputs, connected or not).
  * @param {string} [raw] optional xrandr --query; fetched when omitted
  * @returns {Array<{ physicalPortId: string, slotOrder: number, dpA: string, dpB: string, connectorNumber: number, location: number }> | null}
@@ -114,12 +132,6 @@ function discoverGpuPhysicalTopologyFromXrandr(raw) {
 		seenPairs.add(key)
 		pairs.push(pArr)
 	}
-
-	pairs.sort((a, b) => {
-		const na = parseInt(String(a[0] || '').split('-')[1], 10)
-		const nb = parseInt(String(b[0] || '').split('-')[1], 10)
-		return (Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)
-	})
 
 	return pairs.map((pArr, i) => ({
 		physicalPortId: `gpu_p${i}`,
@@ -198,6 +210,7 @@ module.exports = {
 	parseXrandrVideoOutputNames,
 	parseXrandrConnectedNames,
 	parseXrandrDpHdmiOutputNames,
+	parseXrandrAllOutputs,
 	discoverGpuPhysicalTopologyFromXrandr,
 	topologyRowsEqual,
 	ensureGpuPhysicalTopologyFromXrandr,

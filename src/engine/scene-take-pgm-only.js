@@ -21,6 +21,7 @@ const {
 const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
+const { remapIntraLookRoutesForTakeChannel, partitionTakeJobsPlayOrder } = require('./scene-route-deps')
 const {
 	diffScenes,
 	layerHasContent,
@@ -94,7 +95,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	const self = opts.self
 	const channel = parseInt(opts.channel, 10)
 	if (!channel || channel < 1) throw new Error('channel required')
-	const incoming = opts.incomingScene
+	const incoming = remapIntraLookRoutesForTakeChannel(opts.incomingScene, channel)
 	if (!incoming?.layers?.length) throw new Error('incomingScene.layers required')
 
 	const forceCut = !!opts.forceCut
@@ -220,10 +221,26 @@ async function runSceneTakePgmOnly(amcp, opts) {
 
 	if (takeJobs.length > 0) {
 		const commitLine = `MIXER ${channel} COMMIT`
-		const playLines = takeJobs.map((job) => `PLAY ${channel}-${job.pLayer}`)
-		const sandwich =
-			isAnimate && fadeDur > 0 ? [commitLine, ...playLines, commitLine] : [commitLine, ...playLines]
-		await sendAmcpLinesSequential(sandwich, amcp)
+		const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
+		const playLine = (job) => `PLAY ${channel}-${job.pLayer}`
+		const srcPlays = sources.map(playLine)
+		const routePlays = routes.map(playLine)
+		if (srcPlays.length && routePlays.length) {
+			await sendAmcpLinesSequential(
+				isAnimate && fadeDur > 0 ? [commitLine, ...srcPlays, commitLine] : [commitLine, ...srcPlays],
+				amcp,
+			)
+			await new Promise((r) => setTimeout(r, 80))
+			await sendAmcpLinesSequential(
+				isAnimate && fadeDur > 0 ? [...routePlays, commitLine] : [...routePlays],
+				amcp,
+			)
+		} else {
+			const playLines = [...srcPlays, ...routePlays]
+			const sandwich =
+				isAnimate && fadeDur > 0 ? [commitLine, ...playLines, commitLine] : [commitLine, ...playLines]
+			await sendAmcpLinesSequential(sandwich, amcp)
+		}
 		if (typeof opts.onProgramTransitionStarted === 'function' && isAnimate && fadeDur > 0) {
 			try {
 				opts.onProgramTransitionStarted()

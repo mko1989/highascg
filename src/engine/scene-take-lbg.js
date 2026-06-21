@@ -30,6 +30,7 @@ const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
+const { remapIntraLookRoutesForTakeChannel } = require('./scene-route-deps')
 
 /**
  * @param {object} amcp
@@ -53,8 +54,9 @@ async function runSceneTakeLbg(amcp, opts) {
 	const self = opts.self
 	const channel = parseInt(opts.channel, 10)
 	if (!channel || channel < 1) throw new Error('channel required')
-	const incoming = opts.incomingScene
-	if (!incoming || !Array.isArray(incoming.layers)) throw new Error('incomingScene.layers required')
+	const incomingRaw = opts.incomingScene
+	if (!incomingRaw || !Array.isArray(incomingRaw.layers)) throw new Error('incomingScene.layers required')
+	const incoming = remapIntraLookRoutesForTakeChannel(incomingRaw, channel)
 	const layersWithContent = incoming.layers.filter(layerHasContent)
 	if (layersWithContent.length === 0) {
 		throw new Error('incomingScene has no layers with sources — cannot take an empty look')

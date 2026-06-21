@@ -60,4 +60,23 @@ describe('gpu modetest parser', () => {
 		assert.equal(a.length, 256)
 		assert.equal(a, b)
 	})
+
+	it('prefers live xrandr name match before heuristic reassignment', () => {
+		const connectors = [
+			{ shortName: 'DP-1', name: 'card0-DP-1', connected: false, edid: '' },
+			{ shortName: 'DP-2', name: 'card0-DP-2', connected: false, edid: '' },
+			{ shortName: 'DP-3', name: 'card0-DP-3', connected: false, edid: '' },
+		]
+		const xrandrOutputs = [
+			{ name: 'HDMI-0', connected: true, edid: '' },
+			{ name: 'DP-2', connected: true, edid: '' },
+			{ name: 'DP-4', connected: true, edid: '' },
+		]
+		matchModetestToXrandr(connectors, xrandrOutputs)
+		const dp2 = connectors.find((c) => c.shortName === 'DP-2')
+		const dp1 = connectors.find((c) => c.shortName === 'DP-1')
+		assert.equal(dp2.xrandrName, 'DP-2')
+		assert.equal(dp2.matchMethod, 'name')
+		assert.notEqual(dp1.xrandrName, 'DP-2')
+	})
 })

@@ -5,6 +5,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { applyX11Layout, calculateLayoutPositions } = require('../utils/os-config')
+const { resolveSysIdToXrandrOutput } = require('../utils/xrandr-output-resolve')
 const { resolveMainScreenCount } = require('../config/routing')
 const { normalizeCasparServerConfigPath } = require('./routes-caspar-config')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
@@ -122,17 +123,19 @@ async function handleOsPost(path, body, ctx) {
 		try {
 			const layout = calculateLayoutPositions(ctx.config)
 			const headList = [
-				...(Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 				...Object.values(layout.screens || {}),
 				...Object.values(layout.multiview || {}),
+				...(Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 			]
 			const seenHead = new Set()
 			const heads = []
 			for (const h of headList) {
-				const sid = String(h?.sysId || '').trim()
+				const rawId = String(h?.sysId || '').trim()
+				if (!rawId) continue
+				const sid = resolveSysIdToXrandrOutput(rawId, { config: ctx.config })
 				if (!sid || seenHead.has(sid)) continue
 				seenHead.add(sid)
-				heads.push(h)
+				heads.push({ ...h, sysId: sid })
 			}
 			if (!heads.length) {
 				ctx.log('warn', '[settings-os] xrandr plan has no mapped outputs')

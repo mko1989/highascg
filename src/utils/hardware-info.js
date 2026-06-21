@@ -1,11 +1,6 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const {
-	probeModetestConnectors,
-	parseXrandrVerboseOutputs,
-	modetestModesToDisplayModes,
-} = require('./gpu-modetest')
 
 function drmShort(name) {
 	return String(name || '').replace(/^card\d+-/i, '')
@@ -176,117 +171,81 @@ function getDisplaysXrandr() {
 	}))
 }
 
+/** @param {string} raw */
+function parseXrandrAllOutputs(raw) {
+	/** @type {Array<{ name: string, connected: boolean }>} */
+	const out = []
+	for (const line of String(raw || '').split('\n')) {
+		const m = line.match(/^(\S+)\s+(connected|disconnected)\b/)
+		if (!m) continue
+		const name = m[1].replace(/^card\d+-/i, '')
+		if (!/^(DP|HDMI|E-?DP)/i.test(name)) continue
+		out.push({ name, connected: m[2] === 'connected' })
+	}
+	return out
+}
+
 let _modetestProbeCache = null
 let _modetestProbeAt = 0
 const MODETEST_PROBE_TTL_MS = 2000
 
 /**
- * Probe GPU connectors via `modetest -c` and correlate to xrandr by EDID.
- * @param {{ refresh?: boolean, xrandrVerboseRaw?: string }} [opts]
+ * @deprecated Modetest is not used for live GPU mapping; retained for optional debug only.
  */
 function getModetestProbe(opts = {}) {
 	const now = Date.now()
 	if (!opts.refresh && _modetestProbeCache && now - _modetestProbeAt < MODETEST_PROBE_TTL_MS) {
 		return _modetestProbeCache
 	}
-	const xrandrVerboseRaw = opts.xrandrVerboseRaw ?? getDisplaysXrandrVerboseRaw()
-	const probe = probeModetestConnectors({ xrandrVerboseRaw })
-	_modetestProbeCache = probe
+	_modetestProbeCache = { connectors: [], matches: new Map(), raw: '', source: 'disabled', drmCard: '' }
 	_modetestProbeAt = now
-	return probe
+	return _modetestProbeCache
 }
 
 /**
- * Enumerate DRM connectors (connected and disconnected) from modetest with inferred type.
- * @returns {Array<{
- *   name: string,
- *   shortName: string,
- *   connected: boolean,
- *   type: string,
- *   modetestId: number,
- *   drmCard: string,
- *   modes: object[],
- *   edid: string,
- *   xrandrName: string | null,
- *   matchMethod: string | null,
- *   sizeMm: object | null
- * }>}
+ * GPU connector list from live xrandr --query (connected and disconnected DP/HDMI outputs).
  */
 function getGpuConnectorInventory() {
-	const probe = getModetestProbe()
-	const connectors = probe?.connectors || []
-	return connectors
-		.map((c) => ({
-			name: c.name,
-			shortName: c.shortName,
-			connected: !!c.connected,
-			type: c.type,
-			modetestId: c.id,
-			drmCard: c.drmCard,
-			modes: c.modes || [],
-			edid: c.edid || '',
-			xrandrName: c.xrandrName || null,
-			matchMethod: c.matchMethod || null,
-			sizeMm: c.sizeMm || null,
-		}))
-		.sort((a, b) => compareConnectorNames(a?.shortName || a?.name, b?.shortName || b?.name))
+	const xr = getDisplaysXrandrDetailed()
+	const outputs = parseXrandrAllOutputs(xr?.raw || '')
+	return outputs.map((o) => ({
+		name: o.name,
+		shortName: o.name,
+		connected: !!o.connected,
+		type: /^HDMI/i.test(o.name) ? 'hdmi' : 'displayport',
+		modetestId: null,
+		drmCard: 'card0',
+		modes: [],
+		edid: '',
+		xrandrName: o.name,
+		matchMethod: 'xrandr',
+		sizeMm: null,
+	}))
 }
 
 /**
- * Connected displays with resolution, position, refresh rate, and available modes.
- * Modes and EDID come from modetest; geometry and xrandr output names from xrandr.
+ * Connected displays with resolution, position, refresh rate, and modes from xrandr.
  */
 function getDisplayDetails() {
 	const xr = getDisplaysXrandrDetailed()
-	const xrandrVerboseRaw = getDisplaysXrandrVerboseRaw()
-	const probe = getModetestProbe({ refresh: true, xrandrVerboseRaw })
-	const modetestByXrandr = new Map()
-	const modetestByShort = new Map()
-	for (const c of probe.connectors || []) {
-		modetestByShort.set(drmShort(c.shortName).toLowerCase(), c)
-		if (c.xrandrName) modetestByXrandr.set(c.xrandrName, c)
-	}
-
-	const displays = []
-	if (xr?.displays?.length) {
-		for (const d of xr.displays) {
-			const modetest = modetestByXrandr.get(d.name) || null
-			const modes = modetest?.modes?.length
-				? modetestModesToDisplayModes(modetest.modes, d.resolution, d.refreshHz)
-				: d.modes
-			displays.push({
-				...d,
-				drmName: modetest?.name || '',
-				drmConnector: modetest?.shortName || '',
-				drmCard: modetest?.drmCard || '',
-				modetestId: modetest?.id ?? null,
-				xrandrName: d.name,
-				matchMethod: modetest?.matchMethod || null,
-				edid: modetest?.edid || '',
-				modes,
-			})
-		}
-	} else {
-		for (const c of probe.connectors || []) {
-			if (!c.connected) continue
-			displays.push({
-				name: c.xrandrName || c.shortName,
-				xrandrName: c.xrandrName || null,
-				drmName: c.name,
-				drmConnector: c.shortName,
-				drmCard: c.drmCard,
-				modetestId: c.id,
-				matchMethod: c.matchMethod || null,
-				edid: c.edid || '',
-				connected: true,
-				resolution: 'unknown',
-				x: 0,
-				y: 0,
-				refreshHz: null,
-				modes: modetestModesToDisplayModes(c.modes),
-			})
-		}
-	}
+	const displays = (xr?.displays || []).map((d) => ({
+		...d,
+		drmName: '',
+		drmConnector: '',
+		drmCard: 'card0',
+		modetestId: null,
+		xrandrName: d.name,
+		matchMethod: 'xrandr',
+		edid: '',
+		modes: (d.modes || []).map((m) => ({
+			width: m.width,
+			height: m.height,
+			hz: m.hz,
+			current: !!m.current,
+			preferred: false,
+			modetestIndex: null,
+		})),
+	}))
 
 	return displays
 		.filter((d) => !isGpuConnectorPseudoName(d?.name))
@@ -297,7 +256,7 @@ function getDisplayDetails() {
 			const by = Number(b?.y)
 			const posKnown = Number.isFinite(ax) && Number.isFinite(bx) && Number.isFinite(ay) && Number.isFinite(by)
 			if (posKnown && (ax !== bx || ay !== by)) return ax !== bx ? ax - bx : ay - by
-			return compareConnectorNames(a?.drmConnector || a?.name, b?.drmConnector || b?.name)
+			return compareConnectorNames(a?.name, b?.name)
 		})
 }
 
@@ -341,5 +300,4 @@ module.exports = {
 	getGpuModel,
 	compareConnectorNames,
 	drmShort,
-	parseXrandrVerboseOutputs,
 }

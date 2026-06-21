@@ -456,3 +456,32 @@ test('Device View system-audio cabling enables channel consumer (empty device = 
 	const pgmBlock = xml.match(/Caspar channel 1:[\s\S]*?<channel>([\s\S]*?)<\/channel>/)?.[1] || ''
 	assert.match(pgmBlock, /<system-audio\s*\/>/, 'cabled system-audio should appear on program channel')
 })
+
+test('screen consumer x/y sync from graph layout without screen_N_system_id', () => {
+	const app = {
+		screen_count: 2,
+		screen_2_x: 0,
+		screen_2_y: 0,
+		casparServer: {
+			screen_count: 2,
+			screen_1_mode: 'custom',
+			screen_1_custom_width: 5120,
+			screen_1_custom_height: 1024,
+			screen_1_custom_fps: 50,
+			screen_2_mode: '1080p5000',
+			multiview_enabled: true,
+			multiview_mode: '1080p5000',
+			multiview_screen_consumer: true,
+			preview_screen_consumer: false,
+			streamingChannel: { enabled: false },
+		},
+		screenDestinations: require('../../config/screen_destinations.json'),
+		deviceGraph: require('../../config/device_graph.json'),
+	}
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_2_x, 5120)
+	const xml = buildConfigXml(flat)
+	const ch3 = xml.match(/Caspar channel 3:[\s\S]*?<x>(\d+)<\/x>/)
+	assert.ok(ch3, 'channel 3 screen consumer')
+	assert.equal(ch3[1], '5120')
+})

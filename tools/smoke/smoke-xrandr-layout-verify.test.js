@@ -2,8 +2,15 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { resolveSysIdToXrandrOutput, looksLikeDrmConnectorName, looksLikeXrandrOutputName } = require('../../src/utils/xrandr-output-resolve')
+const { resolveSysIdToXrandrOutput, looksLikeDrmConnectorName, looksLikeXrandrOutputName, pickGpuOutLayoutSysId } = require('../../src/utils/xrandr-output-resolve')
 const { compareXrandrLayout, plannedHeadsFromLayout } = require('../../src/utils/xrandr-layout-verify')
+
+test('pickGpuOutLayoutSysId prefers screen_N_system_id over externalRef', () => {
+	const config = { screen_1_system_id: 'DP-0' }
+	const connector = { externalRef: 'card1-DP-1', alias: 'DP-2' }
+	assert.equal(pickGpuOutLayoutSysId(config, connector, 1), 'DP-0')
+	assert.equal(pickGpuOutLayoutSysId(config, connector, null), 'DP-2')
+})
 
 test('resolveSysIdToXrandrOutput maps DRM inventory to xrandr names', () => {
 	const inventory = [
@@ -11,10 +18,15 @@ test('resolveSysIdToXrandrOutput maps DRM inventory to xrandr names', () => {
 		{ name: 'card1-DP-1', shortName: 'DP-1', drmCard: 'card1', xrandrName: 'DP-0', connected: true },
 		{ name: 'card1-HDMI-A-1', shortName: 'HDMI-A-1', drmCard: 'card1', xrandrName: 'HDMI-0', connected: true },
 	]
-	assert.equal(resolveSysIdToXrandrOutput('card1-DP-3', { inventory }), 'DP-4')
-	assert.equal(resolveSysIdToXrandrOutput('DP-0', { inventory }), 'DP-0')
-	assert.equal(resolveSysIdToXrandrOutput('HDMI-A-1', { inventory }), 'HDMI-0')
-	assert.equal(resolveSysIdToXrandrOutput('card1-HDMI-A-1', { inventory }), 'HDMI-0')
+	const displays = [
+		{ name: 'DP-0', connected: true },
+		{ name: 'DP-4', connected: true },
+		{ name: 'HDMI-0', connected: true },
+	]
+	assert.equal(resolveSysIdToXrandrOutput('card1-DP-3', { inventory, displays }), 'DP-4')
+	assert.equal(resolveSysIdToXrandrOutput('DP-0', { inventory, displays }), 'DP-0')
+	assert.equal(resolveSysIdToXrandrOutput('HDMI-A-1', { inventory, displays }), 'HDMI-0')
+	assert.equal(resolveSysIdToXrandrOutput('card1-HDMI-A-1', { inventory, displays }), 'HDMI-0')
 	assert.equal(looksLikeDrmConnectorName('card1-DP-3'), true)
 	assert.equal(looksLikeXrandrOutputName('HDMI-A-1'), false)
 	assert.equal(looksLikeXrandrOutputName('HDMI-0'), true)
@@ -28,6 +40,18 @@ test('resolveSysIdToXrandrOutput uses device graph alias', () => {
 	}
 	assert.equal(resolveSysIdToXrandrOutput('card1-HDMI-A-1', { config, inventory: [] }), 'HDMI-0')
 	assert.equal(resolveSysIdToXrandrOutput('HDMI-A-1', { config, inventory: [] }), 'HDMI-0')
+})
+
+test('resolveSysIdToXrandrOutput prefers live xrandr name over wrong inventory', () => {
+	const inventory = [
+		{ name: 'card0-DP-2', shortName: 'DP-2', xrandrName: 'DP-4', connected: true },
+	]
+	const displays = [
+		{ name: 'DP-2', connected: true },
+		{ name: 'DP-4', connected: true },
+	]
+	assert.equal(resolveSysIdToXrandrOutput('DP-2', { inventory, displays }), 'DP-2')
+	assert.equal(resolveSysIdToXrandrOutput('card0-DP-2', { inventory, displays }), 'DP-4')
 })
 
 test('resolveSysIdToXrandrOutput heuristic when inventory lacks xrandrName', () => {

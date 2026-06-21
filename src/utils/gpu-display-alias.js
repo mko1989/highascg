@@ -48,7 +48,7 @@ function resolveDisplayByDrmHeuristic(topologyRow, displayList, connectorByDrm, 
 	if (!drmKey) return null
 
 	const conn = connectorByDrm.get(drmKey)
-	if (!conn?.connected) return null
+	if (!conn) return null
 
 	if (conn.xrandrName) {
 		const xrKey = normalizePortName(conn.xrandrName)
@@ -57,6 +57,8 @@ function resolveDisplayByDrmHeuristic(topologyRow, displayList, connectorByDrm, 
 			if (hit) return { display: hit, key: xrKey }
 		}
 	}
+
+	if (!conn.connected) return null
 
 	const kind = connectorMediaKind(drmName || topologyRow?.dpA)
 	if (kind === 'other') return null

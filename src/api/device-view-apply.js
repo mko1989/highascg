@@ -4,71 +4,53 @@
 'use strict'
 
 const { applyCasparConfigToDiskAndRestart } = require('./routes-caspar-config')
-const { normalizeDeviceGraph } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { getChannelMap } = require('../config/routing')
 const { readDecklinkKeyFillFromConnectorCaspar, writeDecklinkKeyFillToCasparServer } = require('../config/decklink-key-fill')
-
-function readEdgeOutputLayer(edge) {
-	const raw = edge?.note
-	if (raw == null || raw === '') return 1
-	if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(1, Math.round(raw))
-	const s = String(raw || '').trim()
-	if (!s) return 1
-	try {
-		const parsed = JSON.parse(s)
-		const n = Number(parsed?.outputLayer)
-		return Number.isFinite(n) ? Math.max(1, Math.round(n)) : 1
-	} catch {
-		const m = s.match(/outputLayer\s*[:=]\s*(\d+)/i)
-		return m ? Math.max(1, parseInt(m[1], 10) || 1) : 1
-	}
-}
+const {
+	collectDestinationOutputEdges,
+	applyStreamRecordMappingsFromGraph,
+} = require('../config/device-graph-output-mapping')
 
 function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
-	const graph = normalizeDeviceGraph(ctx.config?.deviceGraph)
-	const map = getChannelMap(ctx.config || {})
-	const byConn = new Map((graph.connectors || []).map((c) => [String(c.id), c]))
-	const byDestId = new Map((normalizeScreenDestinations(ctx.config?.screenDestinations).destinations || []).map((d) => [String(d?.id || ''), d]))
-	const edges = Array.isArray(graph.edges) ? graph.edges : []
-	const destinationEdges = edges
-		.map((e) => {
-			const source = byConn.get(String(e?.sourceId || ''))
-			const sink = byConn.get(String(e?.sinkId || ''))
-			if (!source || !sink) return null
-			if (source.kind !== 'destination_in') return null
-			if (!isCasparOutputConnector(sink)) return null
-			const destinationId = String(source.externalRef || '').trim()
-			if (!destinationId) return null
-			const destination = byDestId.get(destinationId)
-			if (!destination) return null
-			const mode = String(destination.mode || 'pgm_prv')
-			const mainIndex = Math.max(0, parseInt(String(destination.mainScreenIndex ?? 0), 10) || 0)
-			const layer = readEdgeOutputLayer(e)
-			return { edge: e, sink, destinationId, destination, mode, mainIndex, layer }
-		})
-		.filter(Boolean)
+	const destinationEdges = collectDestinationOutputEdges(ctx.config || {})
 	if (!destinationEdges.length) return { changed: false, warnings: [] }
 
 	const nextCaspar = { ...((ctx.config && ctx.config.casparServer) || {}) }
-	const nextStreaming = { ...((ctx.config && typeof ctx.config.streamingChannel === 'object') ? ctx.config.streamingChannel : {}) }
-	const nextRecordOutputs = Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs.map((x) => ({ ...x })) : []
+	const streamSync = {
+		deviceGraph: ctx.config?.deviceGraph,
+		screenDestinations: ctx.config?.screenDestinations,
+		streamingChannel: { ...((ctx.config && ctx.config.streamingChannel) || {}) },
+		recordOutputs: Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs.map((x) => ({ ...x })) : [],
+	}
+	const streamRecordRes = applyStreamRecordMappingsFromGraph(streamSync)
+	const nextStreaming = streamSync.streamingChannel
+	const nextRecordOutputs = streamSync.recordOutputs
 	const warnings = []
 	const groupedByTarget = new Map()
-	const groupedStreams = new Map()
-	const groupedRecords = new Map()
+
 	for (const item of destinationEdges) {
 		const sink = item.sink
-		if (sink.kind === 'stream_out') {
-			const k = String(sink.id || '')
-			if (!groupedStreams.has(k)) groupedStreams.set(k, [])
-			groupedStreams.get(k).push(item)
-			continue
-		}
-		if (sink.kind === 'record_out') {
-			const k = String(sink.id || '')
-			if (!groupedRecords.has(k)) groupedRecords.set(k, [])
-			groupedRecords.get(k).push(item)
+		if (sink.kind === 'stream_out' || sink.kind === 'record_out') {
+			if (sink.kind === 'stream_out') {
+				plan.actions.push({
+					kind: 'stream_output_mapping',
+					destinationId: item.destinationId,
+					target: String(sink.id || ''),
+					videoSource: item.videoSource,
+					layer: item.layer,
+					edgeId: String(item.edge?.id || ''),
+				})
+			} else {
+				plan.actions.push({
+					kind: 'record_output_mapping',
+					destinationId: item.destinationId,
+					target: String(sink.id || ''),
+					source: item.videoSource,
+					layer: item.layer,
+					edgeId: String(item.edge?.id || ''),
+				})
+			}
 			continue
 		}
 		if (sink.kind === 'audio_out') {
@@ -138,87 +120,15 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 			edgeId: String(winner.edge?.id || ''),
 		})
 	}
-	for (const [streamId, list] of groupedStreams.entries()) {
-		const ordered = list.slice().sort((a, b) => a.layer - b.layer)
-		const winner = ordered[0]
-		if (ordered.length > 1) {
-			warnings.push({
-				code: 'multiple_stream_sources',
-				message: `Multiple mapped sources for ${streamId}; using layer ${winner.layer}.`,
-				destinationId: winner.destinationId,
-				target: streamId,
-			})
-		}
-		let source = 'program_1'
-		if (winner.mode === 'multiview') source = 'multiview'
-		else if (winner.mode === 'pgm_only' || winner.mode === 'pgm_prv') source = `program_${Math.max(1, winner.mainIndex + 1)}`
-		nextStreaming.enabled = true
-		nextStreaming.videoSource = source
-		const sink = winner.sink || {}
-		const q = String(sink?.caspar?.quality || '').trim()
-		const url = String(sink?.caspar?.rtmpServerUrl || '').trim()
-		const key = String(sink?.caspar?.streamKey || '').trim()
-		if (q) nextStreaming.quality = q
-		if (url) nextStreaming.rtmpServerUrl = url
-		if (key) nextStreaming.streamKey = key
-		plan.actions.push({
-			kind: 'stream_output_mapping',
-			destinationId: winner.destinationId,
-			target: streamId,
-			videoSource: source,
-			layer: winner.layer,
-			edgeId: String(winner.edge?.id || ''),
-		})
-	}
-	for (const [recordId, list] of groupedRecords.entries()) {
-		const ordered = list.slice().sort((a, b) => a.layer - b.layer)
-		const winner = ordered[0]
-		if (ordered.length > 1) {
-			warnings.push({
-				code: 'multiple_record_sources',
-				message: `Multiple mapped sources for ${recordId}; using layer ${winner.layer}.`,
-				destinationId: winner.destinationId,
-				target: recordId,
-			})
-		}
-		let source = 'program_1'
-		if (winner.mode === 'multiview') source = 'multiview'
-		else if (winner.mode === 'pgm_only' || winner.mode === 'pgm_prv') source = `program_${Math.max(1, winner.mainIndex + 1)}`
-		const idx = nextRecordOutputs.findIndex((x) => String(x?.id || '') === recordId)
-		if (idx >= 0) nextRecordOutputs[idx] = { ...nextRecordOutputs[idx], source }
-		else {
-			nextRecordOutputs.push({
-				id: recordId,
-				label: recordId,
-				enabled: true,
-				name: recordId,
-				source,
-				crf: 26,
-				videoCodec: 'h264',
-				videoBitrateKbps: 4500,
-				encoderPreset: 'veryfast',
-				audioCodec: 'aac',
-				audioBitrateKbps: 128,
-			})
-		}
-		plan.actions.push({
-			kind: 'record_output_mapping',
-			destinationId: winner.destinationId,
-			target: recordId,
-			source,
-			layer: winner.layer,
-			edgeId: String(winner.edge?.id || ''),
-		})
-	}
-
 	const changed = JSON.stringify(nextCaspar) !== JSON.stringify(ctx.config?.casparServer || {})
-	const streamChanged = JSON.stringify(nextStreaming) !== JSON.stringify((ctx.config && ctx.config.streamingChannel) || {})
-	const recordChanged = JSON.stringify(nextRecordOutputs) !== JSON.stringify(Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs : [])
+	const streamChanged = streamRecordRes.changed || JSON.stringify(nextStreaming) !== JSON.stringify((ctx.config && ctx.config.streamingChannel) || {})
+	const recordChanged = streamRecordRes.changed || JSON.stringify(nextRecordOutputs) !== JSON.stringify(Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs : [])
 	if (changed) {
 		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), casparServer: nextCaspar })
 		ctx.config.casparServer = nextCaspar
 	}
 	if (streamChanged) {
+		nextStreaming.enabled = true
 		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), streamingChannel: nextStreaming })
 		ctx.config.streamingChannel = nextStreaming
 	}

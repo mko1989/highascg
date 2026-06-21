@@ -14,11 +14,39 @@ const { verifyXrandrMatchesLayout } = require('./xrandr-layout-verify')
 
 
 
+/** Synchronous sleep between xrandr retries (this function runs in a sync execSync context). */
+function sleepSyncMs(ms) {
+	if (!(ms > 0)) return
+	try {
+		execSync(`sleep ${Math.max(0.05, ms / 1000)}`, { stdio: 'ignore' })
+	} catch (_) {
+		/* best effort */
+	}
+}
+
+/** Number of xrandr apply attempts (NVIDIA BadMatch often clears on identical retry). Env: HIGHASCG_XRANDR_APPLY_ATTEMPTS */
+function readXrandrApplyAttempts(config) {
+	const raw = process.env.HIGHASCG_XRANDR_APPLY_ATTEMPTS ?? config?.xrandr_apply_attempts
+	const n = parseInt(String(raw ?? ''), 10)
+	if (Number.isFinite(n) && n >= 1) return Math.min(n, 5)
+	return 3
+}
+
+/** Delay between xrandr apply attempts in ms. Env: HIGHASCG_XRANDR_APPLY_RETRY_DELAY_MS */
+function readXrandrApplyRetryDelayMs(config) {
+	const raw = process.env.HIGHASCG_XRANDR_APPLY_RETRY_DELAY_MS ?? config?.xrandr_apply_retry_delay_ms
+	const n = parseInt(String(raw ?? ''), 10)
+	if (Number.isFinite(n) && n >= 0) return Math.min(n, 5000)
+	return 600
+}
+
 /**
  * Applies X11 screen positioning using xrandr or nvidia-settings.
  */
-function applyX11Layout(config) {
-	logger.info('[OS-Config] applyX11Layout start')
+function applyX11Layout(config, opts = {}) {
+	const live = opts.live !== false
+	const persist = opts.persist !== false
+	logger.info(`[OS-Config] applyX11Layout start live=${live} persist=${persist}`)
 	const layout = calculateLayoutPositions(config)
 	const xrandrParts = []
 	let xrandrQueryOut = ''
@@ -78,7 +106,7 @@ function applyX11Layout(config) {
 
 	const processHead = (info) => {
 		const rawSysId = String(info.sysId).trim()
-		const safeSysId = resolveSysIdToXrandrOutput(rawSysId, { inventory: connectorInventory })
+		const safeSysId = resolveSysIdToXrandrOutput(rawSysId, { inventory: connectorInventory, config })
 		if (!safeSysId || !/^[A-Za-z0-9._-]+$/.test(safeSysId)) return
 		if (rawSysId !== safeSysId) {
 			logger.info(`[OS-Config] Resolved output ${rawSysId} → ${safeSysId} for xrandr`)
@@ -170,33 +198,56 @@ function applyX11Layout(config) {
 		processHead(info)
 	}
 	const mapGpu = Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []
-	mapGpu.forEach(processHeadDeduped)
 	Object.values(layout.screens).forEach(processHeadDeduped)
 	Object.values(layout.multiview).forEach(processHeadDeduped)
+	mapGpu.forEach(processHeadDeduped)
 
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
 	let applied = false
 	let persisted = false
 	/** @type {string|null} */
 	let xrandrCommand = null
-	if (xrandrParts.length > 0) {
-		try {
-			const xcmd = `xrandr --display :0 ${xrandrParts.join(' ')}`
-			xrandrCommand = `DISPLAY=:0 ${xcmd}`
-			logger.info(`[OS-Config] Applying (xrandr): ${xcmd}`)
-			const out = execSync(xcmd, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
-			const trimmed = String(out || '').trim()
-			if (trimmed) {
-				const cap = 8000
-				logger.info(
-					`[OS-Config] xrandr stdout (${trimmed.length} chars): ${trimmed.length > cap ? trimmed.slice(0, cap) + '…' : trimmed}`
-				)
-			} else {
-				logger.info('[OS-Config] xrandr stdout: (empty)')
+	const xcmd = xrandrParts.length > 0 ? `xrandr --display :0 ${xrandrParts.join(' ')}` : null
+	if (xcmd) xrandrCommand = `DISPLAY=:0 ${xcmd}`
+
+	if (persist && xcmd) {
+		persisted = persistLayoutScript(xcmd)
+	}
+
+	if (live && xcmd) {
+		// NVIDIA RandR often rejects the first combined CRTC reconfig with BadMatch when
+		// transitioning from a wedged/narrower canvas, then accepts the *identical* command on
+		// retry (observed on highascg-nvidia-595). Retry on failure before giving up.
+		const maxAttempts = readXrandrApplyAttempts(config)
+		const retryDelayMs = readXrandrApplyRetryDelayMs(config)
+		let lastErr = null
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			try {
+				logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xcmd}`)
+				const out = execSync(xcmd, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
+				const trimmed = String(out || '').trim()
+				if (trimmed) {
+					const cap = 8000
+					logger.info(
+						`[OS-Config] xrandr stdout (${trimmed.length} chars): ${trimmed.length > cap ? trimmed.slice(0, cap) + '…' : trimmed}`
+					)
+				} else {
+					logger.info('[OS-Config] xrandr stdout: (empty)')
+				}
+				applied = true
+				lastErr = null
+				break
+			} catch (e) {
+				lastErr = e
+				const stderr = e.stderr ? String(e.stderr).trim() : ''
+				logger.warn(`[OS-Config] xrandr apply attempt ${attempt}/${maxAttempts} failed: ${e.message}`)
+				if (stderr) logger.warn(`[OS-Config] xrandr stderr: ${stderr}`)
+				if (e.stdout) logger.warn(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
+				if (attempt < maxAttempts && retryDelayMs > 0) sleepSyncMs(retryDelayMs)
 			}
-			applied = true
-			persisted = persistLayoutScript(xcmd)
-			const verify = verifyXrandrMatchesLayout(layout, { inventory: connectorInventory })
+		}
+		if (applied) {
+			const verify = verifyXrandrMatchesLayout(layout, { inventory: connectorInventory, config })
 			if (!verify.ok) {
 				for (const m of verify.mismatches) {
 					logger.warn(
@@ -206,12 +257,12 @@ function applyX11Layout(config) {
 			} else {
 				logger.info('[OS-Config] xrandr verify OK — live layout matches plan')
 			}
-		} catch (e) {
-			logger.error(`[OS-Config] xrandr apply failed: ${e.message}`)
-			if (e.stderr) logger.error(`[OS-Config] xrandr stderr: ${String(e.stderr).trim()}`)
-			if (e.stdout) logger.error(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
+		} else if (lastErr) {
+			logger.error(`[OS-Config] xrandr apply failed after ${maxAttempts} attempts: ${lastErr.message}`)
 		}
-	} else {
+	} else if (!live && xcmd) {
+		logger.info('[OS-Config] Skipping live xrandr push (persist-only)')
+	} else if (xrandrParts.length === 0) {
 		logger.warn('[OS-Config] No xrandr outputs to apply')
 	}
 	
@@ -228,7 +279,7 @@ function applyX11Layout(config) {
 	}
 
 	logger.info('[OS-Config] applyX11Layout end')
-	const verify = applied ? verifyXrandrMatchesLayout(layout, { inventory: connectorInventory }) : null
+	const verify = applied ? verifyXrandrMatchesLayout(layout, { inventory: connectorInventory, config }) : null
 	return { applied, persisted, xrandrCommand, verify }
 }
 

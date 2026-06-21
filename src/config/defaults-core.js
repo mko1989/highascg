@@ -188,10 +188,10 @@ function coreDefaults() {
 			edidNotes: '',
 		},
 		gpuPhysicalTopology: [
-			{ physicalPortId: 'gpu_p3', slotOrder: 0, dpA: 'DP-3', dpB: '', connectorNumber: 3, location: 3 },
-			{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-2', dpB: '', connectorNumber: 2, location: 2 },
-			{ physicalPortId: 'gpu_p1', slotOrder: 2, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
-			{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-1', dpB: '', connectorNumber: 0, location: 0 },
+			{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 0, location: 0 },
+			{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
+			{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 2, location: 2 },
+			{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 3, location: 3 },
 		],
 		deviceGraph: {
 			version: 1,

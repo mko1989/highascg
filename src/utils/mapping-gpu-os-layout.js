@@ -1,6 +1,7 @@
 'use strict'
 
 const { STANDARD_VIDEO_MODES } = require('../config/config-modes')
+const { pickGpuOutLayoutSysId, resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
 
 /** @typedef {{ sysId: string, x: number, y: number, width: number, height: number, mode: string, rate?: number|null, backend: string, nodeId: string, mapOutId: string, outputId?: string }} MappingGpuLayoutEntry */
 
@@ -124,6 +125,12 @@ function buildMappingGpuLayoutArtifacts(config) {
 	for (const e of edges) {
 		const sink = byId.get(String(e?.sinkId || ''))
 		if (!sink || (sink.kind !== 'gpu_out' && sink.kind !== 'gpu_output')) continue
+		const hasDestEdge = edges.some((edge) => {
+			if (String(edge?.sinkId || '') !== String(sink.id || '')) return false
+			const src = byId.get(String(edge?.sourceId || ''))
+			return src && src.kind === 'destination_in'
+		})
+		if (hasDestEdge) continue
 		const src = byId.get(String(e?.sourceId || ''))
 		if (!src || src.kind !== 'pixel_map_out') continue
 
@@ -131,7 +138,9 @@ function buildMappingGpuLayoutArtifacts(config) {
 		const node = devices.find((d) => d && d.id === nodeId && d.role === 'pixel_mapping')
 		if (!node) continue
 
-		const sysId = String(sink.externalRef || '').trim()
+		const rawSysId = pickGpuOutLayoutSysId(config, sink, null)
+		if (!rawSysId) continue
+		const sysId = resolveSysIdToXrandrOutput(rawSysId, { config })
 		if (!sysId) continue
 
 		const outputs = Array.isArray(node.settings?.outputs) ? node.settings.outputs : []

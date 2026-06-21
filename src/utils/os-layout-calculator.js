@@ -5,7 +5,7 @@ const { multiviewGeneratedConfigIncludesScreen } = require('../config/multiview-
 const { getModeDimensions, STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const { buildMappingGpuLayoutArtifacts } = require('./mapping-gpu-os-layout')
 const { resolvePixelMapFeedToProgramScreen } = require('../config/pixel-mapping-config')
-const { resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
+const { pickGpuOutLayoutSysId, resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
 const logger = require('./logger').defaultLogger
 
 function readScreenSetting(config, key) {
@@ -64,6 +64,18 @@ function getHorizontalLayoutOrder(screenCount, swap) {
 	return order
 }
 
+/** True when operator explicitly set OS layout fields (Apply OS), not bare system_id alone. */
+function hasOperatorOsLayoutOverride(config, n) {
+	if (!String(config?.[`screen_${n}_system_id`] || '').trim()) return false
+	if (Number.isFinite(config[`screen_${n}_os_x`])) return true
+	if (Number.isFinite(config[`screen_${n}_os_y`])) return true
+	if (String(config[`screen_${n}_os_mode`] || '').trim()) return true
+	const fk = config[`screen_${n}_force_os_resolution`]
+	if (fk === true || fk === 'true' || fk === 1 || fk === '1') return true
+	const rate = parseFloat(String(config[`screen_${n}_os_rate`] ?? ''))
+	return Number.isFinite(rate) && rate > 0
+}
+
 function includeMultiviewSecondHead(config, cs, screenCount) {
 	if (screenCount !== 1) return false
 	const mvOn = cs.multiview_enabled !== false && cs.multiview_enabled !== 'false'
@@ -82,11 +94,13 @@ function calculateLayoutPositions(config) {
 	const allGpuAssignments = new Map()
 	const mvAssignments = []
 	const explicitScreenAssignments = new Map()
+	/** Operator Apply OS / Device View screen_N_* — must survive graph rebuild. */
+	const operatorScreenAssignments = new Map()
 	
 	for (let n = 1; n <= 8; n++) {
 		const sysId = config[`screen_${n}_system_id`]
 		if (sysId) {
-			allGpuAssignments.set(n, {
+			const assign = {
 				sysId,
 				osMode: config[`screen_${n}_os_mode`],
 				osBackend: String(config[`screen_${n}_os_backend`] || 'xrandr').trim().toLowerCase(),
@@ -94,7 +108,9 @@ function calculateLayoutPositions(config) {
 				casparMode: readScreenSetting(config, `screen_${n}_mode`),
 				manualX: Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null,
 				manualY: Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null
-			})
+			}
+			allGpuAssignments.set(n, assign)
+			if (hasOperatorOsLayoutOverride(config, n)) operatorScreenAssignments.set(n, assign)
 		}
 	}
 	if (config.multiview_system_id) {
@@ -114,22 +130,19 @@ function calculateLayoutPositions(config) {
 	const dests = destinationsFromConfig(config)
 
 	const graphGpuConnectors = connectors.filter(c => c.kind === 'gpu_out' || c.kind === 'gpu_output')
-	const graphHasAnyGpuBinding = graphGpuConnectors.some(c => {
-		const binding = c.caspar?.outputBinding
-		if (binding && binding.type) return true
-		const inEdge = edges.find(e => e.sinkId === c.id)
-		return !!inEdge
+	const graphHasDestinationGpuBinding = graphGpuConnectors.some((c) => {
+		const inEdge = edges.find((e) => e.sinkId === c.id)
+		if (!inEdge) return false
+		return String(inEdge.sourceId || '').startsWith('dst_in_')
 	})
 
-	if (graphHasAnyGpuBinding) {
+	if (graphHasDestinationGpuBinding) {
 		allGpuAssignments.clear()
 		mvAssignments.length = 0
 	}
 
 	graphGpuConnectors.forEach(c => {
 		if (c.kind !== 'gpu_out' && c.kind !== 'gpu_output') return
-		const sysId = String(c.externalRef || '').trim()
-		if (!sysId) return
 
 		let binding = c.caspar?.outputBinding
 		let mainIndex = c.caspar?.mainIndex
@@ -179,6 +192,10 @@ function calculateLayoutPositions(config) {
 		const isLegacyMainIndexOnly = !binding && mainIndex != null
 		if (isScreenBinding || isLegacyMainIndexOnly) {
 			const n = Math.min(16, Math.max(1, parseInt(String(binding?.index ?? (Number(mainIndex) + 1) ?? 1), 10) || 1))
+			const sysId = inferredFromEdge
+				? pickGpuOutLayoutSysId(config, c, null)
+				: pickGpuOutLayoutSysId(config, c, n)
+			if (!sysId) return
 			const destMode = boundDest ? String(boundDest.mode || 'pgm_prv').toLowerCase() : ''
 			const routableBound =
 				boundDest && destMode !== 'multiview' && destMode !== 'stream'
@@ -196,9 +213,14 @@ function calculateLayoutPositions(config) {
 					: ''
 			const assign = {
 				sysId,
-				osMode: config[`screen_${n}_os_mode`] || c.caspar?.mode,
+				osMode: inferredFromEdge ? '' : config[`screen_${n}_os_mode`] || c.caspar?.mode,
 				osBackend: String(config[`screen_${n}_os_backend`] || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
-				osRate: config[`screen_${n}_os_rate`] || c.caspar?.refreshHz,
+				osRate:
+					(boundDest && Number.isFinite(Number(boundDest.fps)) && Number(boundDest.fps) > 0
+						? Number(boundDest.fps)
+						: null) ??
+					config[`screen_${n}_os_rate`] ??
+					c.caspar?.refreshHz,
 				casparMode:
 					casparModeFromBoundDest ||
 					readScreenSetting(config, `screen_${n}_mode`) ||
@@ -209,6 +231,8 @@ function calculateLayoutPositions(config) {
 			allGpuAssignments.set(n, assign)
 			if (isScreenBinding || inferredFromEdge) explicitScreenAssignments.set(n, assign)
 		} else {
+			const sysId = pickGpuOutLayoutSysId(config, c, null)
+			if (!sysId) return
 			if (binding && binding.type && String(binding.type) !== 'screen') {
 				for (const [k, v] of allGpuAssignments.entries()) {
 					if (String(v?.sysId || '') === sysId) allGpuAssignments.delete(k)
@@ -234,13 +258,18 @@ function calculateLayoutPositions(config) {
 			if (mvIndex != null) {
 				const n = mvIndex
 				if (mvAssignments.some(a => a.sysId === sysId)) return
+				const mvVideoMode = boundDest ? String(boundDest.videoMode || '').trim() : ''
+				const mvFps =
+					boundDest && Number.isFinite(Number(boundDest.fps)) && Number(boundDest.fps) > 0
+						? Number(boundDest.fps)
+						: null
 				mvAssignments.push({ 
 					sysId, 
 					n,
-					osMode: config[`multiview_${n}_os_mode`] || config.multiview_os_mode || c.caspar?.mode, 
+					osMode: config[`multiview_${n}_os_mode`] || config.multiview_os_mode || mvVideoMode || c.caspar?.mode, 
 					osBackend: String(config[`multiview_${n}_os_backend`] || config.multiview_os_backend || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(), 
-					osRate: config[`multiview_${n}_os_rate`] || config.multiview_os_rate || c.caspar?.refreshHz, 
-					casparMode: config[`multiview_${n}_mode`] || cs.multiview_mode || c.caspar?.mode, 
+					osRate: mvFps ?? config[`multiview_${n}_os_rate`] ?? config.multiview_os_rate ?? c.caspar?.refreshHz, 
+					casparMode: mvVideoMode || config[`multiview_${n}_mode`] || cs.multiview_mode || c.caspar?.mode, 
 					manualX: Number.isFinite(config[`multiview_${n}_os_x`]) ? config[`multiview_${n}_os_x`] : (Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null), 
 					manualY: Number.isFinite(config[`multiview_${n}_os_y`]) ? config[`multiview_${n}_os_y`] : (Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null) 
 				})
@@ -249,12 +278,51 @@ function calculateLayoutPositions(config) {
 	})
 
 	if (explicitScreenAssignments.size > 0) {
-		allGpuAssignments.clear()
-		for (const [n, assign] of explicitScreenAssignments.entries()) allGpuAssignments.set(n, assign)
+		if (operatorScreenAssignments.size === 0 || graphHasDestinationGpuBinding) {
+			allGpuAssignments.clear()
+			for (const [n, assign] of explicitScreenAssignments.entries()) allGpuAssignments.set(n, assign)
+		} else {
+			for (const [n, assign] of explicitScreenAssignments.entries()) {
+				if (!operatorScreenAssignments.has(n)) allGpuAssignments.set(n, assign)
+			}
+		}
+	}
+	if (!graphHasDestinationGpuBinding) {
+		for (const [n, assign] of operatorScreenAssignments.entries()) allGpuAssignments.set(n, assign)
+	} else {
+		for (const [n, assign] of operatorScreenAssignments.entries()) {
+			const manualX = Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null
+			const manualY = Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null
+			const forceOs =
+				readScreenSetting(config, `screen_${n}_force_os_resolution`) === true ||
+				readScreenSetting(config, `screen_${n}_force_os_resolution`) === 'true' ||
+				readScreenSetting(config, `screen_${n}_force_os_resolution`) === 1 ||
+				readScreenSetting(config, `screen_${n}_force_os_resolution`) === '1'
+			if (forceOs) {
+				allGpuAssignments.set(n, {
+					...assign,
+					manualX: manualX != null ? manualX : assign.manualX,
+					manualY: manualY != null ? manualY : assign.manualY,
+				})
+				continue
+			}
+			if (manualX == null && manualY == null) continue
+			const base = allGpuAssignments.get(n) || assign
+			allGpuAssignments.set(n, {
+				...base,
+				...(manualX != null ? { manualX } : {}),
+				...(manualY != null ? { manualY } : {}),
+			})
+		}
+	}
+
+	let effectiveScreenCount = screenCount
+	if (graphHasDestinationGpuBinding && allGpuAssignments.size > 0) {
+		effectiveScreenCount = Math.max(screenCount, ...allGpuAssignments.keys())
 	}
 
 	const placements = []
-	const screens = getHorizontalLayoutOrder(screenCount, swap)
+	const screens = getHorizontalLayoutOrder(effectiveScreenCount, swap)
 	for (const n of screens) placements.push({ kind: 'screen', n })
 	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
 	
@@ -380,7 +448,7 @@ function calculateLayoutPositions(config) {
 			}
 		}
 
-		const resolvedSysId = resolveSysIdToXrandrOutput(data.sysId)
+		const resolvedSysId = resolveSysIdToXrandrOutput(data.sysId, { config })
 		const info = {
 			sysId: resolvedSysId,
 			drmSysId: resolvedSysId !== data.sysId ? data.sysId : undefined,
@@ -399,10 +467,30 @@ function calculateLayoutPositions(config) {
 		if (data.manualX === null) cumulativeX += w
 	}
 
-	const { mappingGpuOutputs, mappingGpuBBox } = buildMappingGpuLayoutArtifacts(config)
+	let { mappingGpuOutputs, mappingGpuBBox } = buildMappingGpuLayoutArtifacts(config)
+
+	const occupiedForMapping = new Set()
+	for (const info of Object.values(results.screens)) {
+		const id = resolveSysIdToXrandrOutput(String(info?.sysId || ''), { config })
+		if (id) occupiedForMapping.add(id)
+	}
+	for (const info of Object.values(results.multiview)) {
+		const id = resolveSysIdToXrandrOutput(String(info?.sysId || ''), { config })
+		if (id) occupiedForMapping.add(id)
+	}
+	if (occupiedForMapping.size > 0 && mappingGpuOutputs.length > 0) {
+		mappingGpuOutputs = mappingGpuOutputs.filter((row) => {
+			const id = resolveSysIdToXrandrOutput(String(row?.sysId || ''), { config })
+			return id && !occupiedForMapping.has(id)
+		})
+		if (mappingGpuOutputs.length === 0) mappingGpuBBox = null
+	}
+
+	const skipWo40aAutoOffset = !graphHasDestinationGpuBinding && operatorScreenAssignments.size > 0
 
 	// WO-40a: place destination-driven heads to the right of mapping-fed bbox (e.g. 4th monitor at x=maxX).
 	if (
+		!skipWo40aAutoOffset &&
 		mappingGpuBBox &&
 		mappingGpuOutputs.length > 0 &&
 		Object.keys(results.screens).length > 0

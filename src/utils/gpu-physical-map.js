@@ -20,10 +20,10 @@ function canonicalPairName(a, b) {
 
 function defaultTopology() {
 	return [
-		{ physicalPortId: 'gpu_p3', slotOrder: 0, dpA: 'DP-3', dpB: '', connectorNumber: 3, location: 3 },
-		{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-2', dpB: '', connectorNumber: 2, location: 2 },
-		{ physicalPortId: 'gpu_p1', slotOrder: 2, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
-		{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-1', dpB: '', connectorNumber: 0, location: 0 },
+		{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 0, location: 0 },
+		{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
+		{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 2, location: 2 },
+		{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 3, location: 3 },
 	]
 }
 
@@ -105,6 +105,14 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 	const connectorByDrm = new Map(connectorList.map((c) => [drmLookupKey(c.name), c]))
 
 	const lookupDisplay = (topologyRow, normName, usedDisplayKeys) => {
+		const normKey = normalizePortName(normName)
+		if (normKey && !usedDisplayKeys.has(normKey)) {
+			const direct = displayList.find(
+				(d) => d?.connected !== false && normalizePortName(d.name) === normKey,
+			)
+			if (direct) return { display: direct, key: normKey }
+		}
+
 		const drm = drmLookupKey(topologyRow?.drmName)
 		if (drm && displayByDrm.has(drm)) {
 			const d = displayByDrm.get(drm)
@@ -141,6 +149,15 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 	}
 
 	const usedDisplays = new Set()
+	const displayForConnectorXrandr = (conn) => {
+		if (!conn?.xrandrName) return null
+		const key = normalizePortName(conn.xrandrName)
+		if (!key) return null
+		return (
+			displayList.find((d) => d?.connected !== false && normalizePortName(d.name) === key) || null
+		)
+	}
+
 	const ports = topology.map((t) => {
 		const a = normalizePortName(t.dpA)
 		const b = normalizePortName(t.dpB)
@@ -148,12 +165,12 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		const bHit = b
 			? lookupDisplay({ ...t, drmName: t.drmNameB || t.drmName }, b, usedDisplays)
 			: null
-		const aDisplay = aHit?.display || null
-		const bDisplay = bHit?.display || null
 		const aConn = lookupConnector(t, a)
 		const bConn = b
 			? lookupConnector({ ...t, drmName: t.drmNameB || '' }, b)
 			: null
+		let aDisplay = aHit?.display || displayForConnectorXrandr(aConn) || null
+		let bDisplay = bHit?.display || displayForConnectorXrandr(bConn) || null
 		const xrandrName = aDisplay?.name || bDisplay?.name || ''
 		const activeRuntimePort = xrandrName
 			? normalizePortName(xrandrName)
@@ -165,8 +182,8 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		const connected = !!(aDisplay || bDisplay || aConn?.connected || bConn?.connected)
 		const activeDisplay = aDisplay || bDisplay || null
 
-		if (aHit?.key) usedDisplays.add(aHit.key)
-		if (bHit?.key) usedDisplays.add(bHit.key)
+		if (aDisplay) usedDisplays.add(normalizePortName(aDisplay.name))
+		if (bDisplay && bDisplay !== aDisplay) usedDisplays.add(normalizePortName(bDisplay.name))
 
 		return {
 			physicalPortId: t.physicalPortId,
@@ -217,6 +234,7 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 			pair: { dpA: key, dpB: '', name: key },
 			runtime: {
 				activePort: key,
+				xrandrName: display.name || null,
 				candidatePorts: [key],
 				connected: true,
 				displayName: display.name || '',
