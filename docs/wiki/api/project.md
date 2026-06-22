@@ -210,7 +210,9 @@ Sets active slug in persistence.
 
 Same body as save (`project` required). Stricter validation — rejects empty projects that would wipe stored looks.
 
-**409** messages tuned for stale browser tabs.
+**409** messages tuned for stale browser tabs. Expected **`stale_saved_at`** when `scene_deck_sync` already wrote a newer copy — client should refresh from `GET /api/project` or `project_sync` WS (see `from_client/project-persistence-client-agent.md`).
+
+Triggers USB/bridge push on success. **`scene_deck_sync`** (WebSocket) debounces local disk writes (default 750ms, `HIGHASCG_SCENE_DECK_SYNC_DEBOUNCE_MS`) and does **not** push to USB.
 
 ---
 

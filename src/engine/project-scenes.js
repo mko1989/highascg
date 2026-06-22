@@ -7,6 +7,39 @@ const { REPO_ROOT } = require('../repo-paths')
 const projectStore = require('./project-store')
 const { pushProjectSlugToVolumes } = require('./project-volume-sync')
 
+/** Debounce disk writes from WebSocket `scene_deck_sync` (default 750ms). */
+const SCENE_DECK_SYNC_DEBOUNCE_MS = Math.max(
+	0,
+	Math.min(10_000, parseInt(process.env.HIGHASCG_SCENE_DECK_SYNC_DEBOUNCE_MS || '750', 10) || 750),
+)
+
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _deckSyncPersistTimer = null
+/** @type {{ ctx: object, project: object } | null} */
+let _deckSyncPersistPending = null
+
+function flushDeckSyncPersist() {
+	if (_deckSyncPersistTimer) {
+		clearTimeout(_deckSyncPersistTimer)
+		_deckSyncPersistTimer = null
+	}
+	const pending = _deckSyncPersistPending
+	_deckSyncPersistPending = null
+	if (!pending?.ctx || !pending?.project) return
+	persistProject(pending.ctx, pending.project, { writeAutosave: true, pushVolumes: false })
+}
+
+function scheduleDeckSyncPersist(ctx, project) {
+	_deckSyncPersistPending = { ctx, project }
+	if (SCENE_DECK_SYNC_DEBOUNCE_MS <= 0) {
+		flushDeckSyncPersist()
+		return
+	}
+	if (_deckSyncPersistTimer) clearTimeout(_deckSyncPersistTimer)
+	_deckSyncPersistTimer = setTimeout(flushDeckSyncPersist, SCENE_DECK_SYNC_DEBOUNCE_MS)
+	if (_deckSyncPersistTimer.unref) _deckSyncPersistTimer.unref()
+}
+
 /**
  * Active project: `projects/<activeSlug>.json`, merged only with autosave for the **same** slug.
  * Other slugs on disk are left untouched when the name changes.
@@ -226,7 +259,7 @@ function validateIncomingProject(incoming, existing, opts = {}) {
  * Persist project + optional autosave file; update in-memory deck mirror (no WS broadcast).
  * @param {object} ctx
  * @param {object} project
- * @param {{ writeAutosave?: boolean }} [opts]
+ * @param {{ writeAutosave?: boolean, pushVolumes?: boolean }} [opts]
  * @returns {boolean}
  */
 function persistProject(ctx, project, opts = {}) {
@@ -253,13 +286,15 @@ function persistProject(ctx, project, opts = {}) {
 			}
 		}
 	}
-	try {
-		pushProjectSlugToVolumes(slug, {
-			log: typeof ctx.log === 'function' ? ctx.log.bind(ctx) : undefined,
-		})
-	} catch (e) {
-		if (typeof ctx.log === 'function') {
-			ctx.log('warn', '[project] volume push: ' + (e?.message || e))
+	if (opts.pushVolumes !== false) {
+		try {
+			pushProjectSlugToVolumes(slug, {
+				log: typeof ctx.log === 'function' ? ctx.log.bind(ctx) : undefined,
+			})
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', '[project] volume push: ' + (e?.message || e))
+			}
 		}
 	}
 	const deck = extractSceneDeckFromProjectScenes(project.scenes)
@@ -326,7 +361,7 @@ function mergeDeckSyncIntoProject(ctx, data) {
 		}
 		return null
 	}
-	persistProject(ctx, project, { writeAutosave: true })
+	scheduleDeckSyncPersist(ctx, project)
 	return project
 }
 
@@ -344,4 +379,6 @@ module.exports = {
 	sceneIdSet,
 	persistProject,
 	mergeDeckSyncIntoProject,
+	flushDeckSyncPersist,
+	SCENE_DECK_SYNC_DEBOUNCE_MS,
 }

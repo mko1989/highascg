@@ -45,4 +45,13 @@ describe('scene-template-cg', () => {
 		assert.equal(lines.some((l) => l.startsWith('LOADBG')), false)
 		assert.equal(lines.some((l) => l.startsWith('PLAY 3-20')), false)
 	})
+
+	it('buildSceneTemplateCgSpec supplies default data for lower-thirds templates', () => {
+		const layer = { source: { type: 'template', value: 'LOWER-THIRDS/LT-CLASSIC-BOX' } }
+		const spec = buildSceneTemplateCgSpec(layer, layer.source.value, {})
+		assert.ok(spec)
+		assert.equal(spec.cgName, 'lower-thirds/lt-classic-box')
+		assert.match(spec.data, /"title":"Name"/)
+		assert.match(spec.data, /"subtitle":"Title"/)
+	})
 })

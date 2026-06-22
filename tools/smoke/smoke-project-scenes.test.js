@@ -68,3 +68,11 @@ describe('pickNewerFullProject', () => {
 		assert.equal(pickNewerFullProject(persist, emptyAutosave), persist)
 	})
 })
+
+describe('scene_deck_sync debounce exports', () => {
+	it('exports debounce flush hook and positive default interval', () => {
+		const { flushDeckSyncPersist, SCENE_DECK_SYNC_DEBOUNCE_MS } = require('../../src/engine/project-scenes')
+		assert.equal(typeof flushDeckSyncPersist, 'function')
+		assert.ok(SCENE_DECK_SYNC_DEBOUNCE_MS >= 0)
+	})
+})

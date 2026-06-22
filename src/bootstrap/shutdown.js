@@ -6,6 +6,7 @@
 const { clearPeriodicSyncTimer } = require('../utils/periodic-sync')
 const { stopHttpServer } = require('../server/http-server')
 const { flushProjectSyncBroadcast } = require('../api/routes-data')
+const { flushDeckSyncPersist } = require('../engine/project-scenes')
 const { clearStartupLedTestTimers } = require('./startup-led-test-pattern')
 
 function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSubsystem, stopOscSubsystem, wsHandle, httpServer, persistence }) {
@@ -61,6 +62,11 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (typeof appCtx._stopOsLayoutWatchdog === 'function') appCtx._stopOsLayoutWatchdog()
 			if (typeof appCtx._stopCasparAmcpWatchdog === 'function') appCtx._stopCasparAmcpWatchdog()
 
+			try {
+				flushDeckSyncPersist()
+			} catch (e) {
+				logger.warn(`[Shutdown] deck sync flush: ${e.message}`)
+			}
 			try {
 				flushProjectSyncBroadcast()
 			} catch (e) {

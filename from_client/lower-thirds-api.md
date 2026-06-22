@@ -196,6 +196,7 @@ To ensure compatibility with custom templates, standard CasparCG controllers, an
 * **`textColor`** *(string)*: Color applied to primary text.
 * **`position`** *(string)*: Vertical/horizontal alignment. Supported values: `left` (default), `center`, `right`.
 * **`speed`** *(number)*: Animation speed multiplier. E.g., `1.5` speeds up GSAP timelines by 50%.
+* **`displayDurationSec`** *(number)*: Seconds on air after animate-in before auto animate-out. Default **`10`**. Set **`0`** to hold until `POST /api/lower-thirds/stop` or CG STOP.
 * **`customFont`** *(string)*: The filename of an uploaded font (e.g. `Montserrat-Regular.ttf`).
 
 ---

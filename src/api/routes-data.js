@@ -167,10 +167,12 @@ async function handleProject(path, body, ctx) {
 		const check = validateIncomingProject(project, existing)
 		if (!check.ok) {
 			if (typeof ctx.log === 'function') {
-				ctx.log(
-					'warn',
-					`[project] autosave rejected (${check.reason}) looks ${check.details?.incomingLookCount ?? '?'} vs stored ${check.details?.storedLookCount ?? '?'}`,
-				)
+				const lvl = check.reason === 'stale_saved_at' ? 'debug' : 'warn'
+				const detail =
+					check.reason === 'stale_saved_at'
+						? `incoming=${check.details?.incomingSavedAt || project.savedAt || '?'} stored=${check.details?.storedSavedAt || existing?.savedAt || '?'}`
+						: `looks ${check.details?.incomingLookCount ?? '?'} vs stored ${check.details?.storedLookCount ?? '?'}`
+				ctx.log(lvl, `[project] autosave skipped (${check.reason}) ${detail}`)
 			}
 			return {
 				status: 409,

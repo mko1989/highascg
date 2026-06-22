@@ -9,7 +9,6 @@
  *   - CasparCG window.update / play / stop / next / previous / reset / remove
  *   - Animation queue with threshold
  *   - Dynamic data + style application
- *   - Auto animate-out after `style.displayDurationSec` (default 10s; 0 = hold until stop)
  *   - Optional HTTP polling for API-driven content updates
  */
 
@@ -26,16 +25,16 @@ const LTEngine = (function () {
     /** Variant-supplied config — selectors + animate callbacks */
     let cfg = {};
 
-    const STYLE_KEYS = new Set([
-        'primaryColor', 'textColor', 'position', 'displayDurationSec', 'speed', 'customFont',
-    ]);
-
     function clearDisplayTimer() {
         if (displayTimer) {
             clearTimeout(displayTimer);
             displayTimer = null;
         }
     }
+
+    const STYLE_KEYS = new Set([
+        'primaryColor', 'textColor', 'position', 'displayDurationSec', 'speed', 'customFont',
+    ]);
 
     function syncStyleFromActiveData() {
         const step = data[activeStep];
@@ -277,41 +276,16 @@ const LTEngine = (function () {
 
     /* ── CasparCG interface ──────────────────────────────────── */
 
-    const DEFAULT_DATA = { title: 'Name', subtitle: 'Title' };
-
-    function ensurePlayableDefaults() {
-        if (!data.length) {
-            data = [{ ...DEFAULT_DATA }];
-            activeStep = 0;
-            currentStep = 0;
-        }
-        applyData();
-        applyStyles();
-        if (state === 0) state = 1;
-    }
-
     function update(raw) {
         const parsed = normalizeUpdatePayload(raw);
         if (!parsed) return;
 
-        const hasStyle = parsed.style && Object.keys(parsed.style).length > 0;
-        if (!parsed.data && !hasStyle) {
-            if (state === 0) {
-                try {
-                    ensurePlayableDefaults();
-                } catch (error) {
-                    handleError(error);
-                }
-            }
-            return;
-        }
-
         if (parsed.data) {
-            data = parsed.data;
+            data = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
             activeStep = Math.min(activeStep, data.length - 1);
             currentStep = activeStep;
         }
-        if (hasStyle) {
+        if (parsed.style) {
             style = { ...style, ...parsed.style };
         }
         syncStyleFromActiveData();
@@ -331,14 +305,6 @@ const LTEngine = (function () {
     }
 
     function play() {
-        if (state === 0) {
-            try {
-                ensurePlayableDefaults();
-            } catch (error) {
-                handleError(error);
-                return;
-            }
-        }
         if (state === 1) {
             syncStyleFromActiveData();
             addPlayOutCommand(() =>
@@ -355,17 +321,12 @@ const LTEngine = (function () {
             play();
         } else if (state === 2) {
             if (data.length > currentStep + 1) {
-                clearDisplayTimer();
                 currentStep++;
                 const animation = () =>
                     cfg.animateOut(data[activeStep], style).then(() => {
                         activeStep++;
-                        syncStyleFromActiveData();
                         applyData();
-                        applyStyles();
-                    }).then(() => cfg.animateIn(data[activeStep], style)).then(() => {
-                        scheduleDisplayStop();
-                    });
+                    }).then(() => cfg.animateIn(data[activeStep], style));
                 addPlayOutCommand(animation);
             } else {
                 handleError('Graphic is out of titles to display');

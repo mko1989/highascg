@@ -41,11 +41,25 @@ function resolveCgTemplateName(tlsId) {
  * Minimal CG JSON when a look layer has no `cgData` / `templateData` (template-specific).
  * @type {Record<string, string>}
  */
+const DEFAULT_LT_CG_DATA = JSON.stringify({
+	data: { title: 'Name', subtitle: 'Title' },
+	style: { textColor: '#ffffff', primaryColor: 'lightblue', position: 'left' },
+})
+
 const DEFAULT_CG_DATA_BY_TEMPLATE = {
 	'casparcg-guide-html-template-master/html/lower-third.1': JSON.stringify({
 		data: { title: 'Title', subtitle: 'Subtitle' },
 		style: { textColor: '#ffffff', primaryColor: '#e30613' },
 	}),
+	'lower-thirds/lt-classic-box': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-slide-bar': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-minimal-fade': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-split-color': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-frosted-glass': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-underline-reveal': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-tag-badge': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-gradient-wave': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-corner-bracket': DEFAULT_LT_CG_DATA,
 }
 
 /**
