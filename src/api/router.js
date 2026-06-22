@@ -47,6 +47,7 @@ const routesDeviceView = require('./routes-device-view')
 const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
+const routesLowerThirds = require('./routes-lower-thirds')
 const moduleRegistry = require('../module-registry')
 
 /**
@@ -375,6 +376,16 @@ async function routeRequest(method, path, body, ctx, req) {
 	{
 		const srCh = await routesStreamingChannel.handle(method, p, body, ctx)
 		if (srCh) return srCh
+	}
+
+	// Lower-thirds API — works before Caspar gate (listing templates is offline-safe)
+	if (method === 'GET' && p.startsWith('/api/lower-thirds/')) {
+		const lr = routesLowerThirds.handleGet(p, ctx)
+		if (lr) return lr
+	}
+	if (method === 'POST' && p.startsWith('/api/lower-thirds/')) {
+		const lr = await routesLowerThirds.handlePost(p, body, ctx, req)
+		if (lr) return lr
 	}
 
 	// Optional-module routes run **before** the Caspar gate so modules that don't need AMCP

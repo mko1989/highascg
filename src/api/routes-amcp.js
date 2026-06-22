@@ -33,6 +33,12 @@ const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter } = require('../engine/audio-route')
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
+const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
+
+function applyAmcpLineNormalizations(lines, ctx) {
+	const cfg = ctx?.config || {}
+	return normalizeDecklinkPlayAmcpLines(lines, cfg)
+}
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
 	const matrix = playbackTracker.getMatrixForState(ctx)
@@ -77,7 +83,7 @@ async function handlePost(path, body, ctx) {
 					amcp._context.config.amcp_mixer_commit_before_amcp_batch = ctx.config.amcp_mixer_commit_before_amcp_batch
 				}
 			}
-			const lines = applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx)
+			const lines = applyAmcpLineNormalizations(applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx), ctx)
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
@@ -91,7 +97,7 @@ async function handlePost(path, body, ctx) {
 					body: jsonBody({ error: 'commands: non-empty array of AMCP lines required' }),
 				}
 			}
-			const lines = applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx)
+			const lines = applyAmcpLineNormalizations(applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx), ctx)
 			const MAX = 4000
 			if (lines.length > MAX) {
 				return {
@@ -213,7 +219,11 @@ async function handlePost(path, body, ctx) {
 		}
 		case '/api/print':
 		case '/api/amcp/print': {
-			const r = await amcp.basic.print(channel)
+			const ly = b.layer != null ? parseInt(String(b.layer), 10) : NaN
+			const r =
+				Number.isFinite(ly) && ly >= 1
+					? await amcp.basic.print(channel, ly)
+					: await amcp.basic.print(channel)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/log/level': {
@@ -254,7 +264,7 @@ async function handlePost(path, body, ctx) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(await amcp.mixer.channelGrid()) }
 		case '/api/raw':
 		case '/api/amcp/raw': {
-			const line = String(b.cmd ?? b.command ?? '').trim()
+			const line = applyAmcpLineNormalizations([String(b.cmd ?? b.command ?? '').trim()], ctx)[0]
 			if (!line) {
 				return {
 					status: 400,

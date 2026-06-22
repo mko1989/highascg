@@ -251,6 +251,26 @@ test('WO-40: override width on screen 1 shifts following head X', () => {
 	assert.equal(layout.screens[2].width, 1280)
 })
 
+test('WO-40a: multiview head shifts right of mapping GPU bbox (pixel-map screen 1 + screen 2 + MV)', () => {
+	const cfg = {
+		screen_count: 2,
+		casparServer: {
+			screen_count: 2,
+			screen_1_mode: 'custom',
+			screen_1_custom_width: 5120,
+			screen_1_custom_height: 1024,
+			multiview_enabled: true,
+			multiview_mode: '1080p5000',
+		},
+		screenDestinations: require('../../config/screen_destinations.json'),
+		deviceGraph: require('../../config/device_graph.json'),
+	}
+	const layout = calculateLayoutPositions(cfg)
+	assert.equal(layout.screens[2]?.x, 5120, 'screen 2 after mapping bbox')
+	assert.equal(layout.multiview[1]?.x, 7040, 'multiview after screen 2 (5120 + 1920)')
+	assert.equal(layout.multiview[1]?.sysId, 'HDMI-0')
+})
+
 test('graph-bound 3-head layout ignores stale screen_N overrides (multiview + PGM/PRV + PGM2)', () => {
 	const cfg = {
 		screen_count: 2,

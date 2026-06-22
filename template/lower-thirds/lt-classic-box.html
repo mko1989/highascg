@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<!-- lt-classic-box.html — Classic Box Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Classic Box</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-classic-box {
+            align-self: flex-end;
+            display: flex;
+            margin: 43px 77px;
+            position: relative;
+        }
+        .graphic {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr min-content;
+            max-width: 634px;
+            min-width: 346px;
+            text-align: center;
+            overflow: hidden;
+            position: relative;
+            opacity: 0;
+        }
+        svg {
+            position: absolute;
+            height: 100%; width: 100%;
+            z-index: 5;
+        }
+        svg path {
+            fill: none;
+            stroke: var(--primary, lightblue);
+            stroke-linecap: round;
+            stroke-width: 8px;
+        }
+        h1 {
+            font-size: 46px;
+            font-weight: 700;
+            padding: 11px 58px;
+            color: var(--text, #fff);
+        }
+        .subtitle {
+            background-color: var(--primary, lightblue);
+            padding: 6px 0;
+        }
+        .subtitle p {
+            font-size: 27px;
+            color: var(--text, #222);
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-classic-box">
+        <div class="graphic">
+            <svg viewbox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path vector-effect="non-scaling-stroke" d="M50 100 H0 V0 H50" />
+                <path vector-effect="non-scaling-stroke" d="M50 100 H100 V0 H50" />
+            </svg>
+            <h1>Name</h1>
+            <div class="subtitle"><p>Title</p></div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-classic-box',
+            titleSel: 'h1',
+            subtitleSel: '.subtitle p',
+            applyStyles: function(style) {
+                const root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
+                if (style.textColor) root.style.setProperty('--text', style.textColor);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    const graphic = document.querySelector('.lt-classic-box .graphic');
+                    const paths = graphic.querySelectorAll('svg path');
+                    const title = graphic.querySelector('h1');
+                    const subtitleCon = graphic.querySelector('.subtitle');
+                    const subtitle = subtitleCon.querySelector('p');
+                    const w = LTEngine.getComputedStyle(graphic, 'width')[0];
+                    const pathLen = w * 2;
+                    var tl = new gsap.timeline({ duration: 1, ease: 'power1.out', onComplete: resolve });
+                    tl.set(paths, { strokeDashoffset: pathLen, strokeDasharray: pathLen })
+                      .set(title, { y: '162px' })
+                      .set(subtitleCon, { y: '108px' })
+                      .set(subtitle, { y: '216px' })
+                      .set(graphic, { opacity: 1 })
+                      .to(paths, { strokeDashoffset: 0, duration: 1.5 })
+                      .to(title, { y: 0 }, '-=1')
+                      .to(subtitleCon, { y: 0 }, '-=.9')
+                      .to(subtitle, { y: 0 }, '-=1');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var graphic = document.querySelector('.lt-classic-box .graphic');
+                    var paths = graphic.querySelectorAll('svg path');
+                    var title = graphic.querySelector('h1');
+                    var subtitleCon = graphic.querySelector('.subtitle');
+                    var subtitle = subtitleCon.querySelector('p');
+                    var w = LTEngine.getComputedStyle(graphic, 'width')[0];
+                    var pathLen = w * 2;
+                    var tl = new gsap.timeline({ duration: 1, ease: 'power1.in', onComplete: resolve });
+                    tl.to(title, { y: '162px' })
+                      .to(subtitleCon, { y: '108px' }, '-=.75')
+                      .to(subtitle, { y: '216px' }, '-=.55')
+                      .to(paths, { strokeDashoffset: pathLen, ease: 'power1.inOut', duration: 2 }, '-=1')
+                      .to(graphic, { opacity: 0 }, '-=.25');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

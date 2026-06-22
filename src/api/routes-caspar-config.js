@@ -107,11 +107,14 @@ async function writeCasparConfigToDisk(ctx) {
 	}
 	if (ctx.configManager && ctx.config.casparServer) {
 		try {
-			ctx.configManager.save({
-				...ctx.configManager.get(),
-				casparServer: ctx.config.casparServer,
-				audioRouting: ctx.config.audioRouting || defaults.audioRouting,
-			})
+			ctx.configManager.save(
+				{
+					...ctx.configManager.get(),
+					casparServer: ctx.config.casparServer,
+					audioRouting: ctx.config.audioRouting || defaults.audioRouting,
+				},
+				{ emitChange: !ctx._fullApplyInProgress },
+			)
 		} catch (_) {}
 	}
 	return { ok: true, path: filePath }
@@ -123,7 +126,9 @@ async function writeCasparConfigToDisk(ctx) {
  * @returns {Promise<{ status: number, headers: Record<string, string>, body: string }>}
  */
 async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
+	apiLog(ctx, 'info', '[Caspar config] Full apply starting')
 	let fullApply
+	ctx._fullApplyInProgress = true
 	try {
 		fullApply = await applyFullServerConfig(ctx, {
 			log: (level, msg) => apiLog(ctx, level, msg),
@@ -141,6 +146,8 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 				detail: msg,
 			}),
 		}
+	} finally {
+		delete ctx._fullApplyInProgress
 	}
 
 	if (fullApply.step === 'caspar_write' && fullApply.caspar) {

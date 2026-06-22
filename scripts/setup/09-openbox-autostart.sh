@@ -29,21 +29,7 @@ export __GL_ALLOW_MAXIMUM_PERFORMANCE=1
 EOF
 	chmod 644 /etc/profile.d/99-highascg-nvidia-gl.sh
 
-	cat >/usr/local/bin/highascg-nvidia-x-apply.sh <<'EOF'
-#!/bin/bash
-command -v nvidia-settings &>/dev/null || exit 0
-for _g in 0 1 2 3; do
-	nvidia-settings -q "[gpu:${_g}]/GPUPowerMizerMode" &>/dev/null || continue
-	nvidia-settings -a "[gpu:${_g}]/GPUPowerMizerMode=2" 2>/dev/null ||
-		nvidia-settings -a "[gpu:${_g}]/GPUPowerMizerMode=1" 2>/dev/null || true
-done
-for _g in 0 1 2 3; do
-	nvidia-settings -q "[gpu:${_g}]/SyncToVBlank" &>/dev/null || continue
-	nvidia-settings -a "[gpu:${_g}]/SyncToVBlank=0" 2>/dev/null || true
-done
-nvidia-settings -a "[gpu:0]/SyncToVBlank=0" 2>/dev/null || true
-nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true
-EOF
+	install -m 755 "${PLAYOUT}/tools/runtime/highascg-nvidia-x-apply.sh" /usr/local/bin/highascg-nvidia-x-apply.sh
 	chmod 755 /usr/local/bin/highascg-nvidia-x-apply.sh
 	ok "nvidia-x-apply installed"
 fi
@@ -79,7 +65,16 @@ xset s off
 xset s noblank
 xset -dpms
 unclutter -idle 1 -root &
-[ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
+
+# xrandr (apply-layout) resets MetaMode — run layout first, then NVIDIA policy (with retries).
+_layout="\${HOME}/.config/highascg/apply-layout.sh"
+if [ -x "\$_layout" ]; then
+  "\$_layout"
+elif [ -x /etc/highascg/apply-layout.sh ]; then
+  /etc/highascg/apply-layout.sh
+fi
+( sleep 6; [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh ) &
+( sleep 18; [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh ) &
 
 if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/display-mode; then
   if command -v BlackmagicDesktopVideoSetup >/dev/null 2>&1; then

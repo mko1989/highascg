@@ -13,6 +13,7 @@ const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { enrichMediaListWithCinfAndProbe } = require('../utils/media-snapshot-cinf')
 const { buildSceneDeckForApi, loadProjectScenes } = require('../engine/project-scenes')
+const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 
 /**
  * @param {object} ctx — app context (state, config, gatheredInfo, …)
@@ -111,7 +112,7 @@ function getState(ctx, opts = {}) {
 		localMediaEnabled: !!(cfg.local_media_path || '').trim(),
 		configComparison: ctx._configComparison || null,
 		ui: cfg.ui || {},
-		extraLiveSources: Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [],
+		extraLiveSources: enrichExtraLiveSources(Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [], ctx),
 		osc:
 			base.osc !== undefined
 				? base.osc

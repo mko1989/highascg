@@ -29,22 +29,38 @@ function handleCLS(ctx, data) {
  * @param {{ CHOICES_TEMPLATES?: Array<{ id: string, label: string }>, variables?: object, setVariableValues?: (o: object) => void, init_actions?: () => void }} ctx
  * @param {string[]} data
  */
-function handleTLS(ctx, data) {
-	if (!ctx.CHOICES_TEMPLATES) ctx.CHOICES_TEMPLATES = []
-	ctx.CHOICES_TEMPLATES.length = 0
+/**
+ * @param {Array<string>} data - TLS response lines
+ * @returns {Array<{ id: string, label: string }>}
+ */
+function parseTlsLines(data) {
+	const templates = []
 	for (let i = 0; i < (data || []).length; ++i) {
-		const match = data[i].match(/\"(.*?)\" +(.*)/)
+		const line = String(data[i] || '')
+			.replace(/\r/g, '')
+			.trim()
+		if (!line || /^TLS\b/i.test(line) || /^\d{3}\s/.test(line)) continue
+		const match = line.match(/\"(.*?)\" +(.*)/)
 		let file = null
-		if (match === null) file = data[i]
+		if (match === null) file = line
 		else file = match[1]
 		if (file !== null) {
 			file = file.replace(/\\/g, '\\\\')
-			ctx.CHOICES_TEMPLATES.push({ label: file, id: file })
+			templates.push({ label: file, id: file })
 		}
+	}
+	return templates
+}
+
+function handleTLS(ctx, data) {
+	if (!ctx.CHOICES_TEMPLATES) ctx.CHOICES_TEMPLATES = []
+	ctx.CHOICES_TEMPLATES.length = 0
+	for (const row of parseTlsLines(data)) {
+		ctx.CHOICES_TEMPLATES.push(row)
 	}
 	if (ctx.variables) ctx.variables.template_count = String(ctx.CHOICES_TEMPLATES.length)
 	if (typeof ctx.setVariableValues === 'function') ctx.setVariableValues({ template_count: ctx.variables.template_count })
 	if (typeof ctx.init_actions === 'function') ctx.init_actions()
 }
 
-module.exports = { handleCLS, handleTLS }
+module.exports = { handleCLS, handleTLS, parseTlsLines }

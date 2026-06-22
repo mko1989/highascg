@@ -519,6 +519,15 @@ function calculateLayoutPositions(config) {
 					if (manualOsY != null) continue
 					info.y += offY
 				}
+				for (const [key, info] of Object.entries(results.multiview)) {
+					const n = parseInt(key, 10)
+					if (!Number.isFinite(n) || n < 1 || !info) continue
+					const manualOsY =
+						Number.isFinite(config[`multiview_${n}_os_y`]) ? config[`multiview_${n}_os_y`] :
+						Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null
+					if (manualOsY != null) continue
+					info.y += offY
+				}
 			}
 		} else if (offX > 0) {
 			for (const [key, info] of Object.entries(results.screens)) {
@@ -526,6 +535,15 @@ function calculateLayoutPositions(config) {
 				if (!Number.isFinite(n) || n < 1 || !info) continue
 				if (mappingFeedScreens.size > 0 && mappingFeedScreens.has(n)) continue
 				const manualOsX = Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null
+				if (manualOsX != null) continue
+				info.x += offX
+			}
+			for (const [key, info] of Object.entries(results.multiview)) {
+				const n = parseInt(key, 10)
+				if (!Number.isFinite(n) || n < 1 || !info) continue
+				const manualOsX =
+					Number.isFinite(config[`multiview_${n}_os_x`]) ? config[`multiview_${n}_os_x`] :
+					Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null
 				if (manualOsX != null) continue
 				info.x += offX
 			}

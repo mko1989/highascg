@@ -29,7 +29,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	libx11-6 libxrandr2 libxinerama1 libxi6 libxcursor1 \
 	avahi-daemon \
 	xserver-xorg-input-all xserver-xorg-input-libinput \
-	nodm openbox unclutter xterm
+	nodm openbox unclutter xterm xdotool
+
+if command -v nvidia-smi >/dev/null 2>&1 || dpkg-query -W -f='${Status}' nvidia-settings 2>/dev/null | grep -q 'install ok installed'; then
+	log "NVIDIA tools (nvidia-settings + python3 for composition-pipeline MetaMode patch)"
+	DEBIAN_FRONTEND=noninteractive apt-get install -y nvidia-settings python3
+fi
 
 systemctl enable avahi-daemon 2>/dev/null || true
 systemctl start avahi-daemon 2>/dev/null || true

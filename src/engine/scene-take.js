@@ -8,6 +8,7 @@
 const playbackTracker = require('../state/playback-tracker')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter } = require('./audio-route')
+const { shouldApplyStraightAlphaKeyer } = require('./scene-take-lbg-helpers')
 
 function clipPath(layer) {
 	const v = layer.source && layer.source.value
@@ -38,14 +39,6 @@ function extFromPath(filename) {
 	const base = filename.split(/[/\\]/).pop() || ''
 	const i = base.lastIndexOf('.')
 	return i < 0 ? '' : base.slice(i + 1).toLowerCase()
-}
-
-const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga'])
-
-function shouldApplyStraightAlphaKeyer(clip, straightAlpha) {
-	if (!straightAlpha) return false
-	const ext = extFromPath(clip)
-	return STRAIGHT_ALPHA_STILL_EXT.has(ext)
 }
 
 /**

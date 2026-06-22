@@ -11,6 +11,7 @@ const playbackTracker = require('../state/playback-tracker')
 const { responseToStr, updateChannelVariablesFromXml } = require('./query-cycle')
 const handlers = require('./handlers')
 const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
+const { broadcastTemplateCatalog, broadcastMediaCatalogCounts } = require('./media-catalog-broadcast')
 
 const CHANNELS_BLOB_DEBOUNCE_MS = Math.max(
 	0,
@@ -241,20 +242,37 @@ function resolveIntervalSec(self) {
  */
 async function runMediaClsTlsRefresh(self) {
 	if (!self.amcp?.query) return
-	try {
-		const clsRes = await self.amcp.query.cls()
-		handlers.handleCLS(self, clsRes?.data)
-		self.state.updateFromCLS(clsRes?.data)
-		scheduleHqThumbnailPrewarmFromCls(self)
-		const n = self.state?.getState?.()?.media?.length ?? self.CHOICES_MEDIAFILES?.length ?? 0
-		if (typeof self.log === 'function') self.log('info', `Media library CLS/TLS: ${n} media item(s) from server`)
-		const tlsRes = await self.amcp.query.tls()
-		if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails || {})
-		handlers.handleTLS(self, tlsRes?.data)
-		self.state.updateFromTLS(tlsRes?.data)
-	} catch (e) {
-		if (typeof self.log === 'function') self.log('warn', 'Media CLS/TLS refresh failed: ' + (e?.message || e))
+	if (self._mediaClsTlsInFlight) {
+		self._mediaClsTlsQueued = true
+		return self._mediaClsTlsInFlight
 	}
+	self._mediaClsTlsInFlight = (async () => {
+		try {
+			const clsRes = await self.amcp.query.cls()
+			handlers.handleCLS(self, clsRes?.data)
+			self.state.updateFromCLS(clsRes?.data)
+			scheduleHqThumbnailPrewarmFromCls(self)
+			const n = self.state?.getState?.()?.media?.length ?? self.CHOICES_MEDIAFILES?.length ?? 0
+			if (typeof self.log === 'function') self.log('info', `Media library CLS/TLS: ${n} media item(s) from server`)
+			const tlsRes = await self.amcp.query.tls()
+			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails || {})
+			handlers.handleTLS(self, tlsRes?.data)
+			self.state.updateFromTLS(tlsRes?.data)
+			const tCount = self.CHOICES_TEMPLATES?.length ?? 0
+			if (typeof self.log === 'function') self.log('info', `Template library TLS: ${tCount} template(s) from server`)
+			broadcastTemplateCatalog(self)
+			broadcastMediaCatalogCounts(self)
+		} catch (e) {
+			if (typeof self.log === 'function') self.log('warn', 'Media CLS/TLS refresh failed: ' + (e?.message || e))
+		} finally {
+			self._mediaClsTlsInFlight = null
+			if (self._mediaClsTlsQueued) {
+				self._mediaClsTlsQueued = false
+				await runMediaClsTlsRefresh(self)
+			}
+		}
+	})()
+	return self._mediaClsTlsInFlight
 }
 
 function scheduleHqThumbnailPrewarmFromCls(self) {

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!-- lt-minimal-fade.html — Minimal Fade Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Minimal Fade</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-minimal-fade {
+            align-self: flex-end;
+            margin: 54px 96px;
+        }
+        .graphic {
+            display: flex;
+            align-items: stretch;
+            gap: 23px;
+            opacity: 0;
+        }
+        .accent-bar {
+            width: 6px;
+            background: var(--primary, #e91e63);
+            border-radius: 2px;
+        }
+        .text-block {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 3px;
+        }
+        h1 {
+            font-size: 50px;
+            font-weight: 300;
+            color: var(--text, #fff);
+            text-shadow: 0 3px 12px rgba(0,0,0,0.7);
+            letter-spacing: 0.02em;
+        }
+        p {
+            font-size: 25px;
+            font-weight: 400;
+            color: var(--primary, #e91e63);
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-minimal-fade">
+        <div class="graphic">
+            <div class="accent-bar"></div>
+            <div class="text-block">
+                <h1>Name</h1>
+                <p>Title</p>
+            </div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-minimal-fade',
+            titleSel: '.text-block h1',
+            subtitleSel: '.text-block p',
+            applyStyles: function(style) {
+                var root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
+                if (style.textColor) root.style.setProperty('--text', style.textColor);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-minimal-fade .graphic');
+                    var bar = g.querySelector('.accent-bar');
+                    var h1 = g.querySelector('h1');
+                    var p = g.querySelector('p');
+                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    tl.set(g, { opacity: 1 })
+                      .fromTo(bar, { scaleY: 0, transformOrigin: 'bottom' }, { scaleY: 1, duration: 0.5 })
+                      .fromTo(h1, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6 }, '-=0.2')
+                      .fromTo(p, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5 }, '-=0.3');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-minimal-fade .graphic');
+                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    tl.to(g, { opacity: 0, y: 10, duration: 0.6 })
+                      .set(g, { y: 0 });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

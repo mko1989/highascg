@@ -13,6 +13,7 @@ const { probeDecklinkHardware, probeDecklinkFromCasparLog } = require('../utils/
 const { readDecklinkKeyFillSettings } = require('../config/decklink-key-fill')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { listPortAudioDevices } = require('../audio/audio-devices')
+const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
 
 function isPseudoGpuConnectorName(name) {
 	const s = String(name || '').trim().toLowerCase()
@@ -61,8 +62,11 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 	else n = 0
 	n = Math.min(8, Math.max(0, n))
 	const rt = ctx._decklinkInputsStatus; const inputs = []
+	const routeMap = getChannelMap(ctx.config || {})
 	for (let i = 1; i <= n; i++) {
 		const device = parseInt(String(cs[`decklink_input_${i}_device`] ?? 0), 10) || 0
+		const resolvedDevice = resolveDecklinkInputDeviceIndex(ctx.config || {}, i)
+		const inputEntry = (routeMap.inputChannels || []).find((e) => e.kind === 'decklink' && Number(e.slot) === i)
 		const ioRaw = String(cs[`decklink_input_${i}_direction`] || 'in').toLowerCase()
 		const ioDirection = ioRaw === 'out' ? 'out' : 'in'
 		const fail = (rt?.failed || []).find(x => Number(x?.layer) === i); let state = 'ready', message = ''
@@ -70,8 +74,20 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		else if ((rt.skippedConflicts || []).find(x => Number(x?.input) === i)) { state = 'conflict_output_device'; message = 'conflict' }
 		else if ((rt.skippedDuplicates || []).find(x => Number(x?.input) === i)) { state = 'duplicate_device'; message = 'duplicate' }
 		else if (fail) { state = 'failed'; message = fail.message }
-		else if (device <= 0) { state = 'unassigned'; message = '0' }
-		inputs.push({ slot: i, device, ioDirection, state, message, hostingChannel: rt?.hostingChannel ?? null, hostLabel: rt?.hostLabel || '', updatedAt: rt?.updatedAt || null })
+		else if (device <= 0 && resolvedDevice <= 0) { state = 'unassigned'; message = '0' }
+		inputs.push({
+			slot: i,
+			device,
+			resolvedDevice,
+			hostChannel: inputEntry?.channel ?? null,
+			hostLayer: inputEntry?.layer ?? i,
+			ioDirection,
+			state,
+			message,
+			hostingChannel: rt?.hostingChannel ?? null,
+			hostLabel: rt?.hostLabel || '',
+			updatedAt: rt?.updatedAt || null,
+		})
 	}
 	const screenCount = Math.max(1, resolveMainScreenCount(ctx.config))
 	const screenOutputs = []

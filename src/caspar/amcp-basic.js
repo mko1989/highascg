@@ -139,8 +139,17 @@ class AmcpBasic {
 		return this._send(cmd, 'REMOVE')
 	}
 
-	print(channel) {
-		return this._client._invokeTyped('print', { channel: parseInt(channel, 10) }, `PRINT ${parseInt(channel, 10)}`, 'PRINT')
+	print(channel, layer) {
+		const ch = parseInt(channel, 10)
+		const ly = layer != null && layer !== '' ? parseInt(layer, 10) : NaN
+		const hasLayer = Number.isFinite(ly) && ly >= 1
+		const cmd = hasLayer ? `PRINT ${ch}-${ly}` : `PRINT ${ch}`
+		return this._client._invokeTyped(
+			'print',
+			hasLayer ? { channel: ch, layer: ly } : { channel: ch },
+			cmd,
+			'PRINT',
+		)
 	}
 
 	logLevel(level) {

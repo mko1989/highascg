@@ -3,7 +3,7 @@
  */
 'use strict'
 
-const Map = require('./routing-map')
+const routingMapLib = require('./routing-map')
 const Setup = require('./routing-setup')
 
 /**
@@ -14,19 +14,19 @@ const Setup = require('./routing-setup')
  * @param {number} dstLayer
  */
 async function routeToLayer(self, srcChannel, srcLayer, dstChannel, dstLayer) {
-	const route = Map.getRouteString(srcChannel, srcLayer)
+	const route = routingMapLib.getRouteString(srcChannel, srcLayer)
 	return self.amcp.play(dstChannel, dstLayer, route)
 }
 
 module.exports = {
-	getChannelMap: Map.getChannelMap,
-	getRouteString: Map.getRouteString,
-	resolveMainScreenCount: Map.resolveMainScreenCount,
-	resolveStreamingChannelRoute: Map.resolveStreamingChannelRoute,
-	resolveStreamingChannelRouteForRole: Map.resolveStreamingChannelRouteForRole,
+	getChannelMap: routingMapLib.getChannelMap,
+	getRouteString: routingMapLib.getRouteString,
+	resolveMainScreenCount: routingMapLib.resolveMainScreenCount,
+	resolveStreamingChannelRoute: routingMapLib.resolveStreamingChannelRoute,
+	resolveStreamingChannelRouteForRole: routingMapLib.resolveStreamingChannelRouteForRole,
 	routeToLayer,
-	readCasparSetting: Map.readCasparSetting,
-	resolveDecklinkInputDeviceIndex: Map.resolveDecklinkInputDeviceIndex,
+	readCasparSetting: routingMapLib.readCasparSetting,
+	resolveDecklinkInputDeviceIndex: routingMapLib.resolveDecklinkInputDeviceIndex,
 	setupInputsChannel: Setup.setupInputsChannel,
 	setupLiveAudioInputs: Setup.setupLiveAudioInputs,
 	setupLiveAudioPgmRoutes: Setup.setupLiveAudioPgmRoutes,

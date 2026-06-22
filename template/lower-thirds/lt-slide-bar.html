@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!-- lt-slide-bar.html — Slide Bar Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Slide Bar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-slide-bar {
+            align-self: flex-end;
+            margin: 54px 0;
+            width: 1920px;
+        }
+        .graphic {
+            display: flex;
+            flex-direction: column;
+            max-width: 806px;
+            opacity: 0;
+        }
+        .accent-line {
+            height: 7px;
+            background: var(--primary, #00bcd4);
+            transform-origin: left;
+        }
+        .name-row {
+            background: rgba(20, 20, 30, 0.88);
+            padding: 9px 48px;
+        }
+        .name-row h1 {
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--text, #fff);
+            letter-spacing: 0.05em;
+        }
+        .title-row {
+            background: var(--primary, #00bcd4);
+            padding: 4px 48px;
+        }
+        .title-row p {
+            font-size: 23px;
+            font-weight: 500;
+            color: var(--text-alt, #111);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-slide-bar">
+        <div class="graphic">
+            <div class="accent-line"></div>
+            <div class="name-row"><h1>Name</h1></div>
+            <div class="title-row"><p>Title</p></div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-slide-bar',
+            titleSel: '.name-row h1',
+            subtitleSel: '.title-row p',
+            applyStyles: function(style) {
+                var root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
+                if (style.textColor) root.style.setProperty('--text', style.textColor);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-slide-bar .graphic');
+                    var accent = g.querySelector('.accent-line');
+                    var nameRow = g.querySelector('.name-row');
+                    var titleRow = g.querySelector('.title-row');
+                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    tl.set(g, { opacity: 1 })
+                      .fromTo(accent, { scaleX: 0 }, { scaleX: 1, duration: 0.6 })
+                      .fromTo(nameRow, { x: '-110%', opacity: 0 }, { x: '0%', opacity: 1, duration: 0.7 }, '-=0.3')
+                      .fromTo(titleRow, { x: '-110%', opacity: 0 }, { x: '0%', opacity: 1, duration: 0.5 }, '-=0.35');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-slide-bar .graphic');
+                    var accent = g.querySelector('.accent-line');
+                    var nameRow = g.querySelector('.name-row');
+                    var titleRow = g.querySelector('.title-row');
+                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    tl.to(titleRow, { x: '-110%', opacity: 0, duration: 0.4 })
+                      .to(nameRow, { x: '-110%', opacity: 0, duration: 0.5 }, '-=0.2')
+                      .to(accent, { scaleX: 0, duration: 0.4 }, '-=0.2')
+                      .set(g, { opacity: 0 });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

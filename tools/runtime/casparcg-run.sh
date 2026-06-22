@@ -37,7 +37,7 @@ CASPAR_BIN="${CASPAR_BIN:-$CASPAR_ROOT/bin/casparcg}"
 . "${CASPAR_ROOT}/tools/runtime/casparcg-supervisor-lib.sh"
 
 # Some builds exit 1 (not 5) after AMCP RESTART when boost logs local_endpoint during teardown.
-RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134}"
+RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134 137 143 130}"
 RESPAWN_SLEEP="${CASPAR_RESTART_SLEEP:-5}"
 
 is_restart_code() {
@@ -57,18 +57,31 @@ prepare_restart() {
 
 run_one() {
 	_hang_sec="${CASPAR_RESTART_HANG_SEC:-45}"
+	_boot_hang_sec="${CASPAR_BOOT_HANG_SEC:-180}"
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
 	_saw_amcp=0
 	_down_n=0
+	_boot_n=0
 	while kill -0 "$_child" 2>/dev/null; do
 		if caspar_amcp_listening; then
 			_saw_amcp=1
 			_down_n=0
+			_boot_n=0
 		elif [ "$_saw_amcp" -eq 1 ]; then
 			_down_n=$((_down_n + 1))
 			if [ "$_down_n" -ge "$_hang_sec" ]; then
 				caspar_supervisor_log "[run.sh] hung teardown (${_hang_sec}s without AMCP) — killing pid ${_child}"
+				caspar_kill_all_processes TERM
+				sleep 2
+				caspar_kill_all_processes KILL
+				wait "$_child" 2>/dev/null
+				return 5
+			fi
+		else
+			_boot_n=$((_boot_n + 1))
+			if [ "$_boot_n" -ge "$_boot_hang_sec" ]; then
+				caspar_supervisor_log "[run.sh] boot hang (${_boot_hang_sec}s without AMCP) — killing pid ${_child}"
 				caspar_kill_all_processes TERM
 				sleep 2
 				caspar_kill_all_processes KILL

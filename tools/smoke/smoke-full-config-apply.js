@@ -34,9 +34,26 @@ function mockDisplayWait() {
 
 function mockCasparRestart() {
 	return {
+		killStuckCasparMainProcess() {
+			steps.push('kill caspar')
+			return true
+		},
+		isAmcpTcpConnected() {
+			return false
+		},
+		async waitForAmcpDisconnect() {
+			return true
+		},
+		async finishCasparAfterApply() {
+			steps.push('caspar restart')
+			return { attempted: true, restartSent: true, disconnected: true, reconnected: true }
+		},
 		async sendRestartAndWaitForCaspar() {
 			steps.push('caspar restart')
 			return { restartSent: true, disconnected: true, reconnected: true }
+		},
+		resolveReconnectWaitMs() {
+			return 1000
 		},
 	}
 }
@@ -81,17 +98,18 @@ async function runApply(canvasNeeded) {
 	}
 }
 
-test('full apply: canvas fits — persist layout + AMCP restart only', async () => {
+test('full apply: canvas fits — write, persist layout, live xrandr, AMCP restart', async () => {
 	const res = await runApply(false)
 	assert.equal(res.ok, true)
 	assert.deepEqual(steps, [
 		'write caspar',
 		'xrandr live=false persist=true',
+		'xrandr live=true persist=false',
 		'caspar restart',
 	])
 })
 
-test('full apply: canvas expansion — nodm, live xrandr, then AMCP restart', async () => {
+test('full apply: canvas expansion — nodm, live xrandr, kill autostart, AMCP restart', async () => {
 	const res = await runApply(true)
 	assert.equal(res.ok, true)
 	assert.deepEqual(steps, [
@@ -100,6 +118,7 @@ test('full apply: canvas expansion — nodm, live xrandr, then AMCP restart', as
 		'nodm restart',
 		'wait display stable',
 		'xrandr live=true persist=false',
+		'kill caspar',
 		'caspar restart',
 	])
 })

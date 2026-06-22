@@ -86,7 +86,7 @@ test('multiview auto x counts only real screen consumers', () => {
 	assert.equal(m[2], '0')
 })
 
-test('multiview screen default x is 0 when no main emits a screen consumer (OS tandem may still advance)', () => {
+test('multiview caspar x follows OS layout when no main emits a screen consumer', () => {
 	const app = clone(defaults)
 	app.screen_count = 1
 	app.casparServer = {
@@ -131,7 +131,7 @@ test('multiview screen default x is 0 when no main emits a screen consumer (OS t
 	const xml = buildConfigXml(flat)
 	const m = xml.match(/<video-mode>720p5000<\/video-mode>[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x><y>(\d+)<\/y>/)
 	assert.ok(m, 'multiview screen block should be present')
-	assert.equal(m[1], '0', 'multiview must not use OS tandem X when no main screen consumer exists')
+	assert.equal(m[1], '5120', 'multiview window x must match OS head position (5120 after 5120-wide screen_1 head)')
 	assert.equal(m[2], '0')
 })
 
@@ -484,4 +484,47 @@ test('screen consumer x/y sync from graph layout without screen_N_system_id', ()
 	const ch3 = xml.match(/Caspar channel 3:[\s\S]*?<x>(\d+)<\/x>/)
 	assert.ok(ch3, 'channel 3 screen consumer')
 	assert.equal(ch3[1], '5120')
+})
+
+test('multiview window chrome inherits PGM screen_1; other flags stay multiview-only', () => {
+	const app = clone(defaults)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: '1080p5000',
+		screen_1_windowed: true,
+		screen_1_vsync: false,
+		screen_1_borderless: true,
+		screen_1_always_on_top: true,
+		screen_1_force_linear_filter: true,
+		multiview_enabled: true,
+		multiview_output_mode: 'screen_only',
+		multiview_mode: '1080p5000',
+		multiview_windowed: true,
+		multiview_vsync: false,
+		multiview_borderless: false,
+		multiview_always_on_top: false,
+		multiview_force_linear_filter: false,
+		streamingChannel: { enabled: false },
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'mv', label: 'MV', mainScreenIndex: 0, mode: 'multiview', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	addMockGraph(app)
+	const xml = buildConfigXml(buildCasparGeneratorFlatConfig(app))
+	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>([\s\S]*?)<\/screen>/)
+	assert.ok(mv, 'multiview screen consumer block')
+	const block = mv[1]
+	assert.match(block, /<windowed>true<\/windowed>/)
+	assert.match(block, /<vsync>false<\/vsync>/)
+	assert.match(block, /<borderless>true<\/borderless>/)
+	assert.match(block, /<always-on-top>false<\/always-on-top>/)
+	assert.match(block, /<force-linear-filter>false<\/force-linear-filter>/)
 })

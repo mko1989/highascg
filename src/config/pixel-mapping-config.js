@@ -2,11 +2,11 @@
 
 const { destinationsFromConfig } = require('./screen-destinations')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
-const { computePixelMappingCanvasUnion } = require('../utils/mapping-gpu-os-layout')
 
 /**
  * Map pixel_mapping outputs onto the **program channel that feeds the node's input** (see `work/caspar_extended.config`):
- * one wide custom video-mode plus a single `<decklink>` with `<subregion>` and synced `<ports>` for extra SDI devices.
+ * destination panel resolution defines the Caspar channel video-mode; mapping only adds DeckLink `<subregion>` /
+ * synced `<ports>` (or GPU head layout via xrandr) — it must not resize the channel.
  */
 function resolvePixelMapFeedToProgramScreen(appConfig, nodeId) {
 	const dg = appConfig?.deviceGraph
@@ -60,23 +60,10 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 
 		const nodeOutConns = connectors.filter((c) => c.deviceId === nodeId && c.kind === 'pixel_map_out')
 
-		let hasNonDeckCable = false
-		for (const c of nodeOutConns) {
-			const e = edges.find((x) => String(x.sourceId) === String(c.id))
-			if (!e) continue
-			const sk = byId.get(String(e.sinkId || ''))
-			if (!sk) continue
-			if (sk.kind === 'decklink_io' || sk.kind === 'decklink_out') continue
-			hasNonDeckCable = true
-			break
-		}
-
-		if (feed?.kind === 'program' && !hasNonDeckCable) {
+		if (feed?.kind === 'program') {
 			let srcX = 0
-			let maxH = 1080
 			/** @type {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} */
 			const tiles = []
-			let fps = 50
 
 			for (let idx = 0; idx < outputs.length; idx++) {
 				const outDef = outputs[idx]
@@ -84,19 +71,17 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 				const spec = STANDARD_VIDEO_MODES[modeId]
 				const w = spec?.width ?? 1920
 				const h = spec?.height ?? 1080
-				const f = spec?.fps ?? 50
-				
-				const slice = mappings.find(m => String(m.outputId) === String(outDef?.id || ''))
+
+				const slice = mappings.find((m) => String(m.outputId) === String(outDef?.id || ''))
 				const tileSrcX = slice?.rect?.x ?? srcX
 				const tileSrcY = slice?.rect?.y ?? 0
 				const tileW = slice?.rect?.w ?? w
 				const tileH = slice?.rect?.h ?? h
 
-				maxH = Math.max(maxH, tileSrcY + tileH)
-
 				const conn =
 					nodeOutConns.find((c) => Number(c?.index) === idx) ||
-					nodeOutConns.find((c) => String(c?.id || '') === `${nodeId}_${String(outDef?.id || '')}`)
+					nodeOutConns.find((c) => String(c?.id || '') === `${nodeId}_${String(outDef?.id || '')}`) ||
+					nodeOutConns.find((c) => String(c?.id || '').endsWith(`_${String(outDef?.id || '')}`))
 				if (!conn) {
 					srcX += w
 					continue
@@ -127,18 +112,20 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 					height: tileH,
 					videoMode: modeId,
 				})
-				fps = f
 				srcX += w
 			}
 
 			if (tiles.length > 0) {
 				const n = feed.screenIndex
-				const totalW = tiles.reduce((acc, t) => acc + t.width, 0)
-				merged[`screen_${n}_mode`] = 'custom'
-				merged[`screen_${n}_custom_width`] = totalW
-				merged[`screen_${n}_custom_height`] = maxH
-				merged[`screen_${n}_custom_fps`] = fps
-				// Keep screen consumer when destination is also cabled to GPU.
+				const hasGpuOut = nodeOutConns.some((conn) => {
+					const edge = edges.find((e) => String(e.sourceId) === String(conn.id))
+					if (!edge) return false
+					const sink = byId.get(String(edge.sinkId || ''))
+					return sink?.kind === 'gpu_out'
+				})
+				// Destination / applyDestinationOverridesToScreens already set channel video-mode.
+				// Mapping defines DeckLink subregions on that canvas; GPU heads use mappingGpuOutputs separately.
+				if (hasGpuOut) merged[`screen_${n}_screen_consumer`] = true
 				if (merged[`screen_${n}_screen_consumer`] === true) merged[`screen_${n}_decklink_replace_screen`] = false
 				else merged[`screen_${n}_decklink_replace_screen`] = true
 				merged[`screen_${n}_decklink_tiles`] = tiles
@@ -147,23 +134,8 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 			}
 		}
 
+		// GPU mapping head layout is applied via xrandr (mappingGpuOutputs) — do not override channel resolution.
 		if (feed?.kind !== 'program') continue
-		const n = feed.screenIndex
-		const hasGpuOut = nodeOutConns.some((conn) => {
-			const edge = edges.find((e) => String(e.sourceId) === String(conn.id))
-			if (!edge) return false
-			const sink = byId.get(String(edge.sinkId || ''))
-			return !!(sink && (sink.kind === 'gpu_out' || sink.kind === 'gpu_output'))
-		})
-		if (!hasGpuOut) continue
-
-		const union = computePixelMappingCanvasUnion(node)
-		if (union && union.width > 0 && union.height > 0) {
-			merged[`screen_${n}_mode`] = 'custom'
-			merged[`screen_${n}_custom_width`] = union.width
-			merged[`screen_${n}_custom_height`] = union.height
-			merged[`screen_${n}_custom_fps`] = union.fps
-		}
 	}
 }
 

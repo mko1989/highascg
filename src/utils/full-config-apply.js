@@ -1,17 +1,25 @@
 'use strict'
 
 const { applyX11Layout, restartDisplayManager } = require('./os-config')
+const { calculateLayoutPositions } = require('./os-layout-calculator')
 const { waitForDisplayStable } = require('./display-stable-wait')
-const { sendRestartAndWaitForCaspar } = require('./caspar-restart')
+const { applyOperatorDisplaySession } = require('./x-display-session')
+const {
+	finishCasparAfterApply,
+	killStuckCasparMainProcess,
+	waitForAmcpDisconnect,
+} = require('./caspar-restart')
 const { needsNodmRestartForLayout } = require('./xrandr-layout-verify')
 
 /**
- * Full server apply:
+ * Full server apply (normal path — no Caspar kill):
  *   1. Write casparcg.config
- *   2. Persist ~/.config/highascg/apply-layout.sh
- *   3a. When planned canvas fits the live desktop: AMCP RESTART CasparCG (no nodm)
- *   3b. When planned canvas is larger than the live desktop: restart nodm, wait for X,
- *       apply live xrandr, then AMCP RESTART CasparCG
+ *   2. Persist apply-layout.sh
+ *   3. Apply live xrandr when canvas fits (no nodm)
+ *   4. AMCP RESTART — run.sh relaunches Caspar with the new config
+ *
+ * Canvas expansion path adds nodm restart, live xrandr after X settles,
+ * then stop autostart Caspar (wrong layout window) before relaunch.
  *
  * @param {object} ctx
  * @param {{
@@ -28,45 +36,20 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		throw new Error('writeCasparConfig hook required')
 	}
 
-	log('info', '[Full apply] Step 1 — writing casparcg.config')
-	const writeResult = await writeCasparConfig(ctx)
-	if (!writeResult.ok) {
-		return {
-			ok: false,
-			step: 'caspar_write',
-			caspar: writeResult,
-			message: writeResult.error || 'Failed to write Caspar config',
-		}
-	}
-
-	const canvasCheck = needsNodmRestartForLayout(ctx.config)
-	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed
-	if (needsNodm) {
-		log(
-			'info',
-			`[Full apply] Desktop canvas expansion required (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} > current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — nodm restart will run`,
-		)
-	} else {
-		log('info', '[Full apply] Planned layout fits current desktop canvas — skipping nodm restart')
-	}
-
-	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
-	const layoutRes = applyX11Layout(ctx.config, { live: false, persist: true })
-
 	const out = {
 		ok: true,
 		step: 'done',
-		caspar: { ok: true, path: writeResult.path },
+		caspar: null,
 		layout: {
-			persisted: !!layoutRes.persisted,
+			persisted: false,
 			preApplied: false,
-			preXrandrCommand: layoutRes.xrandrCommand || null,
+			preXrandrCommand: null,
 			postApplied: false,
 			postXrandrCommand: null,
-			needsNodmRestart: needsNodm,
-			plannedCanvas: canvasCheck.plannedCanvas || null,
-			currentCanvas: canvasCheck.currentCanvas || null,
-			canvasReason: canvasCheck.reason || null,
+			needsNodmRestart: false,
+			plannedCanvas: null,
+			currentCanvas: null,
+			canvasReason: null,
 		},
 		displayRestart: {
 			nodmRestarted: false,
@@ -82,11 +65,47 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		message: '',
 	}
 
+	log('info', '[Full apply] Step 1 — writing casparcg.config')
+	const writeResult = await writeCasparConfig(ctx)
+	out.caspar = writeResult.ok ? { ok: true, path: writeResult.path } : writeResult
+	if (!writeResult.ok) {
+		return {
+			...out,
+			ok: false,
+			step: 'caspar_write',
+			caspar: writeResult,
+			message: writeResult.error || 'Failed to write Caspar config',
+		}
+	}
+
+	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
+	const canvasCheck = needsNodmRestartForLayout(ctx.config)
+	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed
+	out.layout.needsNodmRestart = needsNodm
+	out.layout.plannedCanvas = canvasCheck.plannedCanvas || null
+	out.layout.currentCanvas = canvasCheck.currentCanvas || null
+	out.layout.canvasReason = canvasCheck.reason || null
+
+	if (needsNodm) {
+		log(
+			'info',
+			`[Full apply] Desktop canvas expansion required (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} > current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — nodm restart will run`,
+		)
+	} else {
+		log('info', '[Full apply] Planned layout fits current desktop canvas — skipping nodm restart')
+	}
+
+	const layoutRes = applyX11Layout(ctx.config, { live: false, persist: true })
+	out.layout.persisted = !!layoutRes.persisted
+	out.layout.preXrandrCommand = layoutRes.xrandrCommand || null
+
 	if (!layoutRes.persisted && !layoutRes.xrandrCommand) {
-		out.ok = false
-		out.step = 'layout_persist'
-		out.message = 'Config written but apply-layout.sh was not persisted.'
-		return out
+		return {
+			...out,
+			ok: false,
+			step: 'layout_persist',
+			message: 'Config written but apply-layout.sh was not persisted.',
+		}
 	}
 
 	if (needsNodm) {
@@ -107,6 +126,25 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		out.layout.postApplied = !!postLayout.applied
 		out.layout.postXrandrCommand = postLayout.xrandrCommand || null
 		out.displayRestart.postLayoutApplied = !!postLayout.applied
+
+		await applyOperatorDisplaySession(ctx.config, {
+			layout: calculateLayoutPositions(ctx.config),
+			log,
+		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
+
+		log('info', '[Full apply] Step 5 — stopping autostart Caspar (wrong layout window)')
+		await killStuckCasparMainProcess(ctx)
+		await waitForAmcpDisconnect(ctx, 5_000)
+	} else {
+		log('info', '[Full apply] Step 3 — applying live xrandr layout')
+		const liveLayout = applyX11Layout(ctx.config, { live: true, persist: false })
+		out.layout.preApplied = !!liveLayout.applied
+		out.layout.postApplied = !!liveLayout.applied
+		out.layout.postXrandrCommand = liveLayout.xrandrCommand || null
+		await applyOperatorDisplaySession(ctx.config, {
+			layout: calculateLayoutPositions(ctx.config),
+			log,
+		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
 	}
 
 	if (opts.skipCasparRestart) {
@@ -115,27 +153,35 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			? out.layout.postApplied
 				? 'Config written; nodm restarted; layout applied; Caspar restart skipped.'
 				: 'Config written; nodm restarted; Caspar restart skipped.'
-			: layoutRes.persisted
-				? 'Config written; apply-layout.sh saved; Caspar restart skipped.'
-				: 'Config written; Caspar restart skipped.'
+			: out.layout.postApplied
+				? 'Config written; layout applied; Caspar restart skipped.'
+				: layoutRes.persisted
+					? 'Config written; apply-layout.sh saved; Caspar restart skipped.'
+					: 'Config written; Caspar restart skipped.'
 		return out
 	}
 
-	const casparStep = needsNodm ? 5 : 3
-	log('info', `[Full apply] Step ${casparStep} — AMCP RESTART CasparCG`)
+	const casparStep = needsNodm ? 6 : 4
+	log('info', `[Full apply] Step ${casparStep} — AMCP RESTART (reload Caspar config)`)
 	if (ctx.amcp) {
 		out.casparRestart.attempted = true
 		try {
-			const restartResult = await sendRestartAndWaitForCaspar(ctx, { log })
+			const restartResult = await finishCasparAfterApply(ctx, {
+				log,
+				disconnectMs: 10_000,
+				reconnectMs: 45_000,
+			})
 			Object.assign(out.casparRestart, restartResult)
 		} catch (e) {
-			out.ok = false
-			out.step = 'caspar_restart'
-			out.message = e instanceof Error ? e.message : String(e)
-			return out
+			return {
+				...out,
+				ok: false,
+				step: 'caspar_restart',
+				message: e instanceof Error ? e.message : String(e),
+			}
 		}
 	} else {
-		log('warn', '[Full apply] Caspar not connected — config and layout script saved; restart Caspar manually')
+		log('warn', '[Full apply] Caspar not connected — config and layout saved; restart Caspar manually')
 	}
 
 	if (needsNodm) {
@@ -146,10 +192,12 @@ async function applyFullServerConfig(ctx, opts = {}) {
 				: 'Config written; nodm restarted; post-layout xrandr failed — check apply-layout.sh.'
 	} else {
 		out.message = out.casparRestart.reconnected
-			? 'Config written; apply-layout.sh saved; Caspar restarted.'
-			: layoutRes.persisted
-				? 'Config written; apply-layout.sh saved.'
-				: 'Config written.'
+			? 'Config written; layout applied; Caspar restarted.'
+			: out.layout.postApplied
+				? 'Config written; layout applied; Caspar restart pending.'
+				: layoutRes.persisted
+					? 'Config written; apply-layout.sh saved.'
+					: 'Config written.'
 	}
 	return out
 }

@@ -107,8 +107,9 @@ class ConfigManager extends EventEmitter {
 	/**
 	 * Atomic save to disk. Supports both monolithic file and modular directory.
 	 * @param {object} newConfig
+	 * @param {{ emitChange?: boolean }} [opts] — `emitChange: false` skips subsystem recycle (e.g. during full apply).
 	 */
-	save(newConfig) {
+	save(newConfig, opts = {}) {
 		try {
 			const isDir = fs.existsSync(this.configPath) && fs.statSync(this.configPath).isDirectory()
 
@@ -136,12 +137,14 @@ class ConfigManager extends EventEmitter {
 			}
 			this._lastConfigChangeJson = payloadJson
 			this._lastConfigChangeAt = now
-			this.emit('change', this.config)
-			try {
-				const { scheduleExfatSyncAfterConfigSave } = require('../system/exfat-sync-on-save')
-				scheduleExfatSyncAfterConfigSave(this.logger)
-			} catch {
-				/* optional on non-Linux / minimal trees */
+			if (opts.emitChange !== false) {
+				this.emit('change', this.config)
+				try {
+					const { scheduleExfatSyncAfterConfigSave } = require('../system/exfat-sync-on-save')
+					scheduleExfatSyncAfterConfigSave(this.logger)
+				} catch {
+					/* optional on non-Linux / minimal trees */
+				}
 			}
 			return true
 		} catch (e) {

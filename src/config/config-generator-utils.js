@@ -50,6 +50,48 @@ function ffmpegPathFromAlsaId(id) {
 }
 
 /**
+ * Parse Caspar screen/multiview boolean from config JSON.
+ * @param {unknown} raw
+ * @param {boolean} [defaultWhenUnset=false]
+ * @returns {boolean}
+ */
+function casparBoolEnabled(raw, defaultWhenUnset = false) {
+	if (raw === undefined || raw === null) return defaultWhenUnset
+	if (raw === false || raw === 'false' || raw === 0 || raw === '0') return false
+	return raw === true || raw === 'true' || raw === 1 || raw === '1'
+}
+
+/**
+ * Multiview per-index setting with global `multiview_*` fallback (never PGM screen_1).
+ * @param {Record<string, unknown>} config
+ * @param {number} n - 1-based multiview index
+ * @param {string} field - suffix after multiview_N_ / multiview_
+ * @returns {unknown}
+ */
+function readMultiviewSetting(config, n, field) {
+	return config[`multiview_${n}_${field}`] ?? config[`multiview_${field}`]
+}
+
+/**
+ * Window chrome for multiview: per-index override, then PGM screen 1, then global multiview_*.
+ * Matches operator expectation when UI sets borderless/windowed on program screens only.
+ * @param {Record<string, unknown>} config
+ * @param {number} n
+ * @param {'windowed'|'borderless'} field
+ * @param {boolean} [defaultWhenUnset=true]
+ * @returns {boolean}
+ */
+function readMultiviewWindowChromeFlag(config, n, field, defaultWhenUnset = true) {
+	const perIdx = config[`multiview_${n}_${field}`]
+	if (perIdx !== undefined && perIdx !== null) return casparBoolEnabled(perIdx, defaultWhenUnset)
+	const fromScreen = config[`screen_1_${field}`]
+	if (fromScreen !== undefined && fromScreen !== null) return casparBoolEnabled(fromScreen, defaultWhenUnset)
+	const global = config[`multiview_${field}`]
+	if (global !== undefined && global !== null) return casparBoolEnabled(global, defaultWhenUnset)
+	return defaultWhenUnset
+}
+
+/**
  * @param {Record<string, unknown>} config
  * @returns {boolean}
  */
@@ -63,5 +105,8 @@ module.exports = {
 	padStringArray,
 	padBoolArray,
 	ffmpegPathFromAlsaId,
+	casparBoolEnabled,
+	readMultiviewSetting,
+	readMultiviewWindowChromeFlag,
 	isCustomLiveProfile,
 }

@@ -18,6 +18,7 @@
 		"smoke:wiki": "node --test tools/smoke/smoke-wiki.test.js",
 		"smoke": "node tools/smoke/http-smoke.js",
 		"smoke:caspar": "node tools/smoke/smoke-caspar.js",
+		"thumbnails:lt": "node tools/runtime/generate-lt-thumbnails.js",
 		"smoke:amcp-batch": "node --test tools/smoke/smoke-amcp-batch-library.test.js",
 		"test:highascg:parity": "node --test tools/smoke/smoke-amcp-migration-parity.test.js",
 		"test:highascg:send-after": "node --test tools/smoke/smoke-amcp-send-after.test.js",
@@ -59,7 +60,7 @@
 		"node": ">=20"
 	},
 	"notes": "highascg uses casparcg-connection@6 for AMCP transport. Legacy raw TCP transport is available via HIGHASCG_AMCP_LEGACY_TRANSPORT=1. Browser UI deps (grapesjs, three) belong in highascg-client; onnxruntime-node is added when WO-19 tracking ships.",
-  "dependencies": {
+	"dependencies": {
 		"busboy": "^1.6.0",
 		"casparcg-connection": "^6.3.3",
 		"dmxnet": "^0.9.0",
@@ -74,5 +75,8 @@
 	"optionalDependencies": {
 		"naudiodon": "^2.3.6",
 		"three": "^0.184.0"
+	},
+	"devDependencies": {
+		"puppeteer": "^25.1.0"
 	}
 }

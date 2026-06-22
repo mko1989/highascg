@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- lt-frosted-glass.html — Frosted Glass Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Frosted Glass</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-frosted-glass {
+            align-self: flex-end;
+            margin: 54px 77px;
+        }
+        .graphic {
+            display: flex;
+            flex-direction: column;
+            max-width: 691px;
+            min-width: 384px;
+            opacity: 0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 13px 48px;
+        }
+        h1 {
+            font-size: 42px;
+            font-weight: 600;
+            color: var(--text, #fff);
+            text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .subtitle-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 4px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary, #4fc3f7);
+            flex-shrink: 0;
+        }
+        p {
+            font-size: 23px;
+            font-weight: 400;
+            color: var(--primary, #4fc3f7);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-frosted-glass">
+        <div class="graphic">
+            <div class="glass-panel">
+                <h1>Name</h1>
+                <div class="subtitle-row">
+                    <div class="dot"></div>
+                    <p>Title</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-frosted-glass',
+            titleSel: '.glass-panel h1',
+            subtitleSel: '.subtitle-row p',
+            applyStyles: function(style) {
+                var root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
+                if (style.textColor) root.style.setProperty('--text', style.textColor);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-frosted-glass .graphic');
+                    var h1 = g.querySelector('h1');
+                    var sub = g.querySelector('.subtitle-row');
+                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    tl.set(g, { opacity: 0, scale: 0.92 })
+                      .to(g, { opacity: 1, scale: 1, duration: 0.5 })
+                      .fromTo(h1, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5 }, '-=0.25')
+                      .fromTo(sub, { opacity: 0, x: -15 }, { opacity: 1, x: 0, duration: 0.4 }, '-=0.2');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-frosted-glass .graphic');
+                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    tl.to(g, { opacity: 0, scale: 0.92, duration: 0.45 });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

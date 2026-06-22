@@ -19,6 +19,7 @@ const {
 	sendPipOverlayLinesSerial,
 } = require('./pip-overlay')
 const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
+const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
 const { remapIntraLookRoutesForTakeChannel, partitionTakeJobsPlayOrder } = require('./scene-route-deps')
@@ -167,6 +168,8 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		}
 		if (!clip) continue
 
+		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
+
 		const pLayer = physicalLayer(layer.layerNumber)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const loadOpts = { loop: !!layer.loop }
@@ -197,6 +200,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			clip,
 			f,
 			loadOpts,
+			templateCg,
 			pipOverlays: pipOverlaysFromLayer(layer),
 		})
 	}
@@ -207,7 +211,9 @@ async function runSceneTakePgmOnly(amcp, opts) {
 
 	const flatMixer = []
 	for (const job of takeJobs) {
-		await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
+		if (!job.templateCg) {
+			await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
+		}
 		flatMixer.push(...buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw))
 	}
 
@@ -222,9 +228,9 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	if (takeJobs.length > 0) {
 		const commitLine = `MIXER ${channel} COMMIT`
 		const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
-		const playLine = (job) => `PLAY ${channel}-${job.pLayer}`
-		const srcPlays = sources.map(playLine)
-		const routePlays = routes.map(playLine)
+		const playLine = (job) => (job.templateCg ? null : `PLAY ${channel}-${job.pLayer}`)
+		const srcPlays = sources.map(playLine).filter(Boolean)
+		const routePlays = routes.map(playLine).filter(Boolean)
 		if (srcPlays.length && routePlays.length) {
 			await sendAmcpLinesSequential(
 				isAnimate && fadeDur > 0 ? [commitLine, ...srcPlays, commitLine] : [commitLine, ...srcPlays],
@@ -249,9 +255,29 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	}
 
 	for (const job of takeJobs) {
+		if (job.templateCg) continue
 		try {
 			playbackTracker.recordPlay(self, channel, job.pLayer, job.clip, { loop: !!job.layer.loop })
 		} catch (_) {}
+	}
+
+	for (const job of takeJobs) {
+		if (!job.templateCg) continue
+		try {
+			const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg)
+			if (lines.length > 0) {
+				self.log?.(
+					'info',
+					`[scene-take-pgm-only] template CG layer ${job.layer.layerNumber} → ${job.templateCg.cgName}`,
+				)
+				await sendPipOverlayLinesSerial(amcp, lines)
+			}
+		} catch (e) {
+			self.log?.('warn', `[scene-take-pgm-only] template CG failed: ${e?.message || e}`)
+		}
+	}
+	if (takeJobs.some((j) => j.templateCg)) {
+		await amcp.mixerCommit(channel).catch(() => {})
 	}
 
 	for (const job of takeJobs) {
@@ -295,7 +321,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			const pOut = physicalLayer(layer.layerNumber)
 			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
 			const cl = chLayerAmcp(channel, pOut)
-			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+			teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 			try {
 				const nextP = nextPipContentLayerInScene(opts.currentScene?.layers, layer.layerNumber)
 				const pipN = pipOverlaysFromLayer(layer).length

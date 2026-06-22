@@ -58,6 +58,8 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			}
 			stopOscSubsystem()
 			if (typeof appCtx._stopUsbHotplugWatcher === 'function') appCtx._stopUsbHotplugWatcher()
+			if (typeof appCtx._stopOsLayoutWatchdog === 'function') appCtx._stopOsLayoutWatchdog()
+			if (typeof appCtx._stopCasparAmcpWatchdog === 'function') appCtx._stopCasparAmcpWatchdog()
 
 			try {
 				flushProjectSyncBroadcast()

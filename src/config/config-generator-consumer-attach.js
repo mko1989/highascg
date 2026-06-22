@@ -17,6 +17,7 @@ const {
 	buildPortAudioConsumerXml,
 	buildMonitorChannelXml,
 } = require('./config-generator-builders')
+const { casparBoolEnabled, readMultiviewSetting, readMultiviewWindowChromeFlag } = require('./config-generator-utils')
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
 const {
 	buildDecklinkKeyFillConsumersXml,
@@ -26,22 +27,23 @@ const {
 } = require('./decklink-key-fill')
 
 /**
- * One DeckLink consumer spanning a wide channel: primary device + optional synced `<ports>` (Caspar reference layout).
+ * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + synced `<ports>`.
+ * Caspar cannot use the channel custom mode (e.g. 5120×1024) for DeckLink format — parent video-mode is required.
  * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
+ * @param {{ videoMode?: string, keyer?: string }} [opts]
  */
-function buildDecklinkTiledConsumersXml(tiles) {
+function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 	if (!Array.isArray(tiles) || tiles.length === 0) return ''
+	const globalVideoMode = escapeXml(String(opts.videoMode || tiles[0]?.videoMode || '1080p5000'))
+	const keyFillEnabled = opts.keyFillEnabled === true
+	const keyer = escapeXml(normalizeDecklinkKeyer(keyFillEnabled ? opts.keyer : 'internal'))
 	const subBlock = (t, indent) =>
 		`${indent}<subregion>\n${indent}    <src-x>${t.srcX}</src-x>\n${indent}    <src-y>${t.srcY}</src-y>\n${indent}    <dest-x>${t.destX}</dest-x>\n${indent}    <dest-y>${t.destY}</dest-y>\n${indent}    <width>${t.width}</width>\n${indent}    <height>${t.height}</height>\n${indent}</subregion>`
-	const primary = tiles[0]
-	const rest = tiles.slice(1)
-	let portsXml = ''
-	if (rest.length) {
-		portsXml =
-			'\n                <ports>' +
-			rest
-				.map(
-					(t) => `
+	const portsXml =
+		'\n                <ports>' +
+		tiles
+			.map(
+				(t) => `
                     <port>
                         <device>${t.device}</device>
                         <key-only>false</key-only>
@@ -49,21 +51,14 @@ function buildDecklinkTiledConsumersXml(tiles) {
                          <video-mode>${escapeXml(t.videoMode)}</video-mode>
 ${subBlock(t, '                        ')}
                      </port>`
- 				)
- 				.join('') +
- 			'\n                </ports>'
- 	}
- 	return `\n                <decklink>
-                     <device>${primary.device}</device>
-                     <embedded-audio>true</embedded-audio>
-                     <latency>normal</latency>
-                     <keyer>external</keyer>
-                     <key-only>false</key-only>
-                     <buffer-depth>3</buffer-depth>
-                     <video-mode>${escapeXml(primary.videoMode)}</video-mode>
-${subBlock(primary, '                    ')}${portsXml}
+			)
+			.join('') +
+		'\n                </ports>'
+	return `\n                <decklink>
+                     <video-mode>${globalVideoMode}</video-mode>
+                     <keyer>${keyer}</keyer>${portsXml}
                  </decklink>`
- }
+}
 
 /**
  * @param {Record<string, unknown>} config
@@ -76,10 +71,10 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const stretch = ['none', 'fill', 'uniform', 'uniform_to_fill'].includes(String(config[`screen_${n}_stretch`] || 'none'))
 		? String(config[`screen_${n}_stretch`])
 		: 'none'
-	const windowed = config[`screen_${n}_windowed`] !== false && config[`screen_${n}_windowed`] !== 'false'
-	const vsync = config[`screen_${n}_vsync`] !== false && config[`screen_${n}_vsync`] !== 'false'
-	const alwaysOnTop = config[`screen_${n}_always_on_top`] !== false && config[`screen_${n}_always_on_top`] !== 'false'
-	const borderless = config[`screen_${n}_borderless`] === true || config[`screen_${n}_borderless`] === 'true'
+	const windowed = casparBoolEnabled(config[`screen_${n}_windowed`], true)
+	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], true)
+	const alwaysOnTop = casparBoolEnabled(config[`screen_${n}_always_on_top`], false)
+	const borderless = casparBoolEnabled(config[`screen_${n}_borderless`], false)
 
 	const posX = parseOptionalPixel(config[`screen_${n}_x`], ctx.cumulativeX)
 	const posY = parseOptionalPixel(config[`screen_${n}_y`], 0)
@@ -110,7 +105,12 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 
 	let profConsumersXml = ''
 	if (tiles.length > 0) {
-		profConsumersXml += buildDecklinkTiledConsumersXml(tiles)
+		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
+		profConsumersXml += buildDecklinkTiledConsumersXml(tiles, {
+			videoMode: String(tiles[0]?.videoMode || '1080p5000'),
+			keyer: keyFill.keyer,
+			keyFillEnabled: keyFill.keyFillEnabled,
+		})
 	} else if (decklinkDevice > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
 		profConsumersXml += buildDecklinkKeyFillConsumersXml({
@@ -192,16 +192,11 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	const mvStd = !!STANDARD_VIDEO_MODES[mode]
 	const stretch = 'none'
 	
-	// Multiview channels should follow main screen window flags unless explicitly overridden per multiview index.
-	const windowedRaw = config[`multiview_${n}_windowed`] ?? config.screen_1_windowed ?? config.multiview_windowed
-	const vsyncRaw = config[`multiview_${n}_vsync`] ?? config.screen_1_vsync ?? config.multiview_vsync
-	const alwaysOnTopRaw =
-		config[`multiview_${n}_always_on_top`] ?? config.screen_1_always_on_top ?? config.multiview_always_on_top
-	const borderlessRaw = config[`multiview_${n}_borderless`] ?? config.screen_1_borderless ?? config.multiview_borderless
-	const windowed = windowedRaw !== false && windowedRaw !== 'false'
-	const vsync = vsyncRaw !== false && vsyncRaw !== 'false'
-	const alwaysOnTop = alwaysOnTopRaw !== false && alwaysOnTopRaw !== 'false'
-	const borderless = borderlessRaw === true || borderlessRaw === 'true'
+	// Multiview screen flags: per-index, then PGM screen 1 for window chrome, then global multiview_*.
+	const windowed = readMultiviewWindowChromeFlag(config, n, 'windowed', true)
+	const vsync = casparBoolEnabled(readMultiviewSetting(config, n, 'vsync'), true)
+	const alwaysOnTop = casparBoolEnabled(readMultiviewSetting(config, n, 'always_on_top'), false)
+	const borderless = readMultiviewWindowChromeFlag(config, n, 'borderless', true)
 	
 	const mvX = parseOptionalPixel(config[`multiview_${n}_x`] ?? config.multiview_x, ctx.cumulativeX)
 	const mvY = parseOptionalPixel(config[`multiview_${n}_y`] ?? config.multiview_y, 0)
@@ -388,6 +383,7 @@ function buildStreamingChannel(config, casparChannelNum) {
 }
 
 module.exports = {
+	buildDecklinkTiledConsumersXml,
 	buildScreenPairChannels,
 	buildMultiviewChannel,
 	buildInputsHostChannel,

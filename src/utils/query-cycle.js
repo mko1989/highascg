@@ -9,6 +9,7 @@
 const { parseString } = require('xml2js')
 const { getInfoXml2jsOptions, extractChannelInfoFromParsed } = require('../state/info-channel-parse')
 const handlers = require('./handlers')
+const { broadcastTemplateCatalog } = require('./media-catalog-broadcast')
 const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
 const { broadcastWsStateSnapshot } = require('../api/get-state')
 
@@ -120,6 +121,7 @@ function runMediaLibraryQueryCycle(ctx) {
 			files.forEach((choice) => {
 				const filename = choice.id || choice.label
 				if (!filename || String(filename).match(/^\d+-/)) return
+				if (/^CASPARCG-/i.test(String(filename))) return
 				const cinfParam = filename.indexOf(' ') >= 0 ? '"' + String(filename).replace(/"/g, '\\"') + '"' : filename
 				self.enqueue('CINF', cinfParam, 'CINF', (cinfData) => {
 					self.mediaDetails[filename] = responseToStr(cinfData)
@@ -130,6 +132,7 @@ function runMediaLibraryQueryCycle(ctx) {
 			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails)
 			handlers.handleTLS(self, data)
 			self.state.updateFromTLS(data)
+			broadcastTemplateCatalog(self)
 		})
 		self.runCommandQueue()
 	})
@@ -170,6 +173,7 @@ function runConnectionQueryCycle(ctx) {
 			files.forEach((choice) => {
 				const filename = choice.id || choice.label
 				if (!filename || String(filename).match(/^\d+-/)) return
+				if (/^CASPARCG-/i.test(String(filename))) return
 				const cinfParam = filename.indexOf(' ') >= 0 ? '"' + String(filename).replace(/"/g, '\\"') + '"' : filename
 				self.enqueue('CINF', cinfParam, 'CINF', (cinfData) => {
 					self.mediaDetails[filename] = responseToStr(cinfData)
@@ -180,6 +184,7 @@ function runConnectionQueryCycle(ctx) {
 			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails)
 			handlers.handleTLS(self, data)
 			self.state.updateFromTLS(data)
+			broadcastTemplateCatalog(self)
 			self.enqueue('VERSION', null, 'VERSION', (line) => {
 				const v = responseToStr(line)
 				if (self.variables) self.variables.server_version = v

@@ -140,6 +140,16 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		return ''
 	}
 
+	function assignDecklinkToScreen(n, devNum, connector) {
+		const existingTiles = merged[`screen_${n}_decklink_tiles`]
+		if (Array.isArray(existingTiles) && existingTiles.length > 0) return
+		merged[`screen_${n}_decklink_device`] = devNum
+		if (merged[`screen_${n}_decklink_replace_screen`] === undefined) {
+			merged[`screen_${n}_decklink_replace_screen`] = true
+		}
+		applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, connector)
+	}
+
 	g.connectors.forEach((c) => {
 		if (c.kind !== 'decklink_io') return
 		const devNum = parseInt(String(c.externalRef || ''), 10)
@@ -152,9 +162,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			const binding = c.caspar?.outputBinding
 			if (binding?.type === 'screen') {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
-				merged[`screen_${n}_decklink_device`] = devNum
-				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
-				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
+				assignDecklinkToScreen(n, devNum, c)
 			} else if (binding?.type === 'multiview') {
 				merged.multiview_decklink_device = devNum
 				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
@@ -184,19 +192,13 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			} else {
 				const idx = Number.isFinite(Number(dest.mainScreenIndex)) ? Number(dest.mainScreenIndex) : 0
 				const n = idx + 1
-				merged[`screen_${n}_decklink_device`] = devNum
-				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
-				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
+				assignDecklinkToScreen(n, devNum, c)
 			}
 		} else if (sourceId.startsWith('caspar_pgm_')) {
 			// Cabled directly to a raw Caspar Program output
 			const idx = parseInt(sourceId.slice('caspar_pgm_'.length), 10) - 1
 			const n = idx + 1
-			if (n > 0) {
-				merged[`screen_${n}_decklink_device`] = devNum
-				if (merged[`screen_${n}_decklink_replace_screen`] === undefined) merged[`screen_${n}_decklink_replace_screen`] = true
-				applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, c)
-			}
+			if (n > 0) assignDecklinkToScreen(n, devNum, c)
 		} else if (sourceId === 'caspar_mv_out') {
 			merged.multiview_decklink_device = devNum
 			applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
@@ -264,6 +266,21 @@ function applyScreenConsumerOverridesFromCabling(merged, appConfig) {
 		const n = idx + 1
 		const srcCandidates = destinationSourceIds(dest, idx)
 		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src))
+	}
+}
+
+/**
+ * DeckLink tiles + GPU screen consumer can coexist; stale saved `decklink_replace_screen` must not suppress `<screen>`.
+ * @param {Record<string, unknown>} merged
+ */
+function reconcileDecklinkScreenConsumerFlags(merged) {
+	const sc = Math.min(16, Math.max(1, parseInt(String(merged.screen_count || 4), 10) || 4))
+	for (let n = 1; n <= sc; n++) {
+		const tiles = merged[`screen_${n}_decklink_tiles`]
+		if (!Array.isArray(tiles) || tiles.length === 0) continue
+		const wantsScreen =
+			merged[`screen_${n}_screen_consumer`] === true || merged[`screen_${n}_screen_consumer`] === 'true'
+		merged[`screen_${n}_decklink_replace_screen`] = !wantsScreen
 	}
 }
 
@@ -391,10 +408,11 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	/** Same rule as routing-map `screen_count`: max of root `screen_count` and `casparServer.screen_count`. */
 	merged.screen_count = resolveMainScreenCount(appConfig || {})
 	applyDestinationOverridesToScreens(merged, appConfig || {})
+	applyPixelMappingProgramScreens(merged, appConfig || {})
 	applyDecklinkOverridesToScreens(merged, appConfig || {})
 	applyScreenConsumerOverridesFromCabling(merged, appConfig || {})
+	reconcileDecklinkScreenConsumerFlags(merged)
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
-	applyPixelMappingProgramScreens(merged, appConfig || {})
 	merged.rtmp = normalizeRtmpConfig(appConfig && appConfig.rtmp)
 	merged.streamingChannel = {
 		...(defaults.streamingChannel || {}),
@@ -428,15 +446,43 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	// Keep Caspar screen consumer window coords aligned with the xrandr planner.
 	try {
 		const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+		const { resolvePixelMapFeedToProgramScreen } = require('./pixel-mapping-config')
 		const layout = calculateLayoutPositions(merged)
 		const mv1 = layout?.multiview?.[1]
 		if (mv1 && Number.isFinite(mv1.x)) merged.multiview_x = mv1.x
 		if (mv1 && Number.isFinite(mv1.y)) merged.multiview_y = mv1.y
+		const mappingFeedScreens = new Set()
+		const devices = Array.isArray(merged.deviceGraph?.devices) ? merged.deviceGraph.devices : []
+		for (const d of devices) {
+			if (!d || d.role !== 'pixel_mapping') continue
+			const feed = resolvePixelMapFeedToProgramScreen(merged, String(d.id))
+			if (feed?.kind === 'program' && Number.isFinite(feed.screenIndex) && feed.screenIndex >= 1) {
+				mappingFeedScreens.add(feed.screenIndex)
+			}
+		}
+		const bbox = layout?.mappingGpuBBox
+		const hasMappingGpu = Array.isArray(layout?.mappingGpuOutputs) && layout.mappingGpuOutputs.length > 0
 		for (let n = 1; n <= 16; n++) {
 			const head = layout?.screens?.[n]
-			if (!head || !Number.isFinite(head.x)) continue
-			merged[`screen_${n}_x`] = head.x
-			if (Number.isFinite(head.y)) merged[`screen_${n}_y`] = head.y
+			if (head && Number.isFinite(head.x)) merged[`screen_${n}_x`] = head.x
+			if (head && Number.isFinite(head.y)) merged[`screen_${n}_y`] = head.y
+			const tiles = merged[`screen_${n}_decklink_tiles`]
+			const wantsScreen =
+				merged[`screen_${n}_screen_consumer`] !== false && merged[`screen_${n}_screen_consumer`] !== 'false'
+			if (
+				wantsScreen &&
+				Array.isArray(tiles) &&
+				tiles.length > 0 &&
+				hasMappingGpu &&
+				bbox &&
+				mappingFeedScreens.has(n) &&
+				!Number.isFinite(merged[`screen_${n}_os_x`])
+			) {
+				const spanX = bbox.maxX - bbox.minX
+				const spanY = bbox.maxY - bbox.minY
+				if (spanY > spanX) merged[`screen_${n}_y`] = Math.max(0, bbox.maxY)
+				else merged[`screen_${n}_x`] = Math.max(0, bbox.maxX)
+			}
 		}
 	} catch (_) {}
 

@@ -8,6 +8,7 @@
 'use strict'
 
 const { parseCinfMedia } = require('../media/cinf-parse')
+const { isTemplateClip } = require('../state/playback-tracker-media')
 const { getChannelMap } = require('../config/routing')
 const { getModeDimensions } = require('../config/config-modes')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
@@ -233,6 +234,7 @@ function cinfResponseToStr(data) {
 async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	if (!clipValue || !self?.amcp?.query?.cinf) return null
 	if (String(clipValue).trim().toLowerCase().startsWith('route://')) return null
+	if (isTemplateClip(clipValue, self)) return null
 	try {
 		const res = await self.amcp.query.cinf(clipValue)
 		const str = cinfResponseToStr(res?.data)
@@ -321,7 +323,9 @@ function resolveSceneLayerFill(layer, authoringW, authoringH, targetW, targetH, 
 	const raw = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 	const srcType = layer.source && layer.source.type
 	if (srcType === 'timeline') return raw
+	if (srcType === 'template') return raw
 	if (layer.source && String(layer.source.value || '').startsWith('route://')) return raw
+	if (isTemplateClip(clipPath(layer), null)) return raw
 
 	const canProbe = !srcType || srcType === 'media' || srcType === 'file'
 	if (!canProbe) return raw
@@ -351,7 +355,12 @@ async function getResolvedFillForSceneLayer(self, layer, channel, incomingScene)
 	const { w: targetW, h: targetH } = getChannelResolutionForChannel(self?.config, channel, self)
 	const clip = clipPath(layer)
 	let mediaRes = getMediaResolutionFromSelf(self, clip)
-	if ((!mediaRes || !(mediaRes.w > 0 && mediaRes.h > 0)) && clip) {
+	if (
+		(!mediaRes || !(mediaRes.w > 0 && mediaRes.h > 0)) &&
+		clip &&
+		layer.source?.type !== 'template' &&
+		!isTemplateClip(clip, self)
+	) {
 		const fromAmcp = await fetchCinfResolutionFromAmcp(self, clip)
 		if (fromAmcp) mediaRes = fromAmcp
 	}
@@ -362,6 +371,7 @@ module.exports = {
 	nativeFillNorm,
 	getChannelResolutionForChannel,
 	getMediaResolutionFromSelf,
+	fetchCinfResolutionFromAmcp,
 	resolveSceneLayerFill,
 	getResolvedFillForSceneLayer,
 	parseResolutionString,

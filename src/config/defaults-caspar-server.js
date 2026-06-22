@@ -10,7 +10,7 @@ function casparScreenDefaults(n, ndiName) {
 		/** NVIDIA: keep true; driver Sync to VBlank must be off — docs/reference/screen-consumer-vsync-nvidia.md */
 		[`${p}vsync`]: true,
 		[`${p}borderless`]: false,
-		[`${p}always_on_top`]: true,
+		[`${p}always_on_top`]: false,
 		[`${p}decklink_device`]: 0,
 		[`${p}decklink_key_device`]: 0,
 		[`${p}decklink_keyer`]: 'internal',
@@ -30,7 +30,7 @@ function casparScreenDefaults(n, ndiName) {
 		[`${p}interactive`]: false,
 		[`${p}sbs_key`]: false,
 		[`${p}colour_space`]: 'RGB',
-		[`${p}force_linear_filter`]: true,
+		[`${p}force_linear_filter`]: false,
 		[`${p}force_os_resolution`]: false,
 	}
 }
@@ -58,7 +58,7 @@ function casparServerDefaults() {
 		multiview_mode: '1080p5000',
 		multiview_windowed: true,
 		multiview_vsync: true,
-		multiview_borderless: false,
+		multiview_borderless: true,
 		multiview_always_on_top: true,
 		multiview_aspect_ratio: '',
 		multiview_enable_mipmaps: false,
@@ -66,7 +66,7 @@ function casparServerDefaults() {
 		multiview_interactive: false,
 		multiview_sbs_key: false,
 		multiview_colour_space: 'RGB',
-		multiview_force_linear_filter: true,
+		multiview_force_linear_filter: false,
 		decklink_inputs_host_channel_enabled: false,
 		decklink_input_count: 0,
 		decklink_inputs_host: 'multiview_if_match',

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- lt-gradient-wave.html — Gradient Wave Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Gradient Wave</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-gradient-wave {
+            align-self: flex-end;
+            margin: 54px 0;
+            width: 1920px;
+        }
+        .graphic {
+            display: flex;
+            flex-direction: column;
+            max-width: 960px;
+            opacity: 0;
+            position: relative;
+        }
+        .wave-bg {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg,
+                var(--grad-start, #1a237e) 0%,
+                var(--grad-mid, #4a148c) 50%,
+                var(--grad-end, #880e4f) 100%);
+            clip-path: polygon(0 15%, 5% 0, 100% 0, 100% 100%, 0 100%);
+            z-index: 0;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            padding: 13px 77px 13px 96px;
+        }
+        h1 {
+            font-size: 46px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+        p {
+            font-size: 23px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.8);
+            letter-spacing: 0.06em;
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-gradient-wave">
+        <div class="graphic">
+            <div class="wave-bg"></div>
+            <div class="content">
+                <h1>Name</h1>
+                <p>Title</p>
+            </div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-gradient-wave',
+            titleSel: '.content h1',
+            subtitleSel: '.content p',
+            applyStyles: function(style) {
+                var root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--grad-start', style.primaryColor);
+                if (style.gradientMid) root.style.setProperty('--grad-mid', style.gradientMid);
+                if (style.gradientEnd) root.style.setProperty('--grad-end', style.gradientEnd);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-gradient-wave .graphic');
+                    var bg = g.querySelector('.wave-bg');
+                    var h1 = g.querySelector('h1');
+                    var p = g.querySelector('p');
+                    var tl = new gsap.timeline({ ease: 'power3.out', onComplete: resolve });
+                    tl.set(g, { opacity: 1 })
+                      .fromTo(bg, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.7 })
+                      .fromTo(h1, { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.5 }, '-=0.3')
+                      .fromTo(p, { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.4 }, '-=0.2');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-gradient-wave .graphic');
+                    var bg = g.querySelector('.wave-bg');
+                    var h1 = g.querySelector('h1');
+                    var p = g.querySelector('p');
+                    var tl = new gsap.timeline({ ease: 'power3.in', onComplete: resolve });
+                    tl.to(p, { opacity: 0, x: 20, duration: 0.3 })
+                      .to(h1, { opacity: 0, x: 30, duration: 0.35 }, '-=0.15')
+                      .to(bg, { scaleX: 0, transformOrigin: 'right', duration: 0.5 }, '-=0.15')
+                      .set(g, { opacity: 0 });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

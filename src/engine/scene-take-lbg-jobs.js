@@ -6,6 +6,7 @@ const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
+const { buildSceneTemplateCgSpec } = require('./scene-template-cg')
 const {
 	clipPath,
 	chLayerAmcp,
@@ -93,6 +94,8 @@ async function buildTakeJobs(opts) {
 			clip = '[HTML] black'
 		}
 		if (!clip) continue
+
+		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
 
 		const cur = currentMap.get(layer.layerNumber)
 		const diffs = skipLayerVisualEquality
@@ -261,8 +264,14 @@ async function buildTakeJobs(opts) {
 			{ fps: framerate }
 		)
 		const useLoadAuto = false
-		let playPlan = useLoadAuto ? null : playPlans.find((p) => p.commandName === 'PLAY') || null
-		if (isMerge && globalT.duration > 0 && baseType && String(baseType).toUpperCase() !== 'CUT') {
+		let playPlan = templateCg ? null : useLoadAuto ? null : playPlans.find((p) => p.commandName === 'PLAY') || null
+		if (
+			!templateCg &&
+			isMerge &&
+			globalT.duration > 0 &&
+			baseType &&
+			String(baseType).toUpperCase() !== 'CUT'
+		) {
 			playPlan = buildClipCommandPlan('PLAY', channel, pLayer, clip, {
 				loop: !!loadOpts.loop,
 				transition: baseType,
@@ -287,8 +296,9 @@ async function buildTakeJobs(opts) {
 			loadOpts,
 			isMerge,
 			hasLoadTransition,
-			loadPlan: (layer.source && layer.source.type === 'template') ? null : (loadPlans.find((p) => p.commandName === 'LOADBG') || null),
+			loadPlan: templateCg ? null : loadPlans.find((p) => p.commandName === 'LOADBG') || null,
 			playPlan,
+			templateCg,
 			pipOverlays: pipOverlaysFromLayer(layer),
 		})
 	}

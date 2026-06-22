@@ -1,6 +1,9 @@
 'use strict'
 
-const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga'])
+const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga', 'dpx'])
+
+/** Containers/codecs Caspar ffmpeg often plays with an alpha channel (QT Animation, ProRes 4444, VP9, …). */
+const STRAIGHT_ALPHA_VIDEO_EXT = new Set(['mov', 'webm', 'mkv', 'mxf'])
 
 const STILL_IMAGE_LOADBG_NO_TRANSITION_EXT = new Set([
 	'png',
@@ -68,8 +71,10 @@ function extFromPath(filename) {
 
 function shouldApplyStraightAlphaKeyer(clip, straightAlpha) {
 	if (!straightAlpha) return false
-	const ext = extFromPath(clip)
-	return STRAIGHT_ALPHA_STILL_EXT.has(ext)
+	const id = String(clip || '').trim().replace(/^"(.*)"$/, '$1')
+	if (!id || id.startsWith('route://') || /^\[HTML\]/i.test(id)) return false
+	const ext = extFromPath(id)
+	return STRAIGHT_ALPHA_STILL_EXT.has(ext) || STRAIGHT_ALPHA_VIDEO_EXT.has(ext)
 }
 
 module.exports = {
@@ -79,4 +84,6 @@ module.exports = {
 	extFromPath,
 	shouldApplyStraightAlphaKeyer,
 	STILL_IMAGE_LOADBG_NO_TRANSITION_EXT,
+	STRAIGHT_ALPHA_STILL_EXT,
+	STRAIGHT_ALPHA_VIDEO_EXT,
 }

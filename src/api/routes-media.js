@@ -19,6 +19,7 @@ const {
 	resolveMediaFileOnDisk,
 	probeMedia,
 } = require('../media/local-media')
+const { isTemplateClip } = require('../state/playback-tracker-media')
 const {
 	handleLiveThumbnailGet,
 	handleLiveThumbnailCapturePost,
@@ -322,6 +323,13 @@ async function handlePost(path, body, ctx, req, query) {
 		const id = (b.id || b.filename || '').trim()
 		if (!id) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id or filename required' }) }
+		}
+		if (isTemplateClip(id, ctx)) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'CINF is not supported for HTML/CG templates' }),
+			}
 		}
 		if (!ctx.amcp?.query?.cinf) {
 			const durationMs = await probeDurationMsFromLocalFiles(ctx, id)

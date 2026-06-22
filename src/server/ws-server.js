@@ -253,7 +253,9 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 						ws.send(safeStringify({ type: 'error', data: 'AMCP not connected', id: msg.id }))
 						return
 					}
-					const r = await ctx.amcp.raw(msg.cmd)
+					const { normalizeDecklinkPlayAmcpLine } = require('../config/decklink-amcp')
+					const cmd = normalizeDecklinkPlayAmcpLine(msg.cmd, ctx.config)
+					const r = await ctx.amcp.raw(cmd)
 					ws.send(safeStringify({ type: 'amcp_result', data: r, id: msg.id }))
 				} else if (isStructuredAmcpMessage(msg)) {
 					if (!ctx.amcp) {

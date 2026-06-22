@@ -7,6 +7,7 @@ const EventEmitter = require('events')
 const { parseString } = require('xml2js')
 const { parseCinfMedia } = require('../media/cinf-parse')
 const { dedupeMediaList } = require('../utils/media-browser-dedupe')
+const { parseTlsLines } = require('../utils/handlers')
 const { getInfoXml2jsOptions, extractChannelInfoFromParsed } = require('./info-channel-parse')
 
 const MAX_CHANGES = 500
@@ -225,17 +226,7 @@ class StateManager extends EventEmitter {
 	 * @param {Array<string>} data - TLS response lines
 	 */
 	updateFromTLS(data) {
-		const templates = []
-		for (let i = 0; i < (data || []).length; ++i) {
-			const match = data[i].match(/\"(.*?)\" +(.*)/)
-			let file = null
-			if (match === null) file = data[i]
-			else file = match[1]
-			if (file !== null) {
-				file = file.replace(/\\/g, '\\\\')
-				templates.push({ id: file, label: file })
-			}
-		}
+		const templates = parseTlsLines(data)
 		this._state.templates = templates
 		this._emit('templates', templates)
 	}

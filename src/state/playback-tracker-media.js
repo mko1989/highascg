@@ -15,6 +15,26 @@ function isRouteClip(clip) {
 	return String(clip || '').trim().startsWith('route://')
 }
 
+/**
+ * HTML/CG templates are not media files — Caspar CINF on them can HTTP-fetch the template host and fail (501).
+ * @param {string} clipId
+ * @param {{ CHOICES_TEMPLATES?: Array<{ id: string }> } | null | undefined} [ctx]
+ * @returns {boolean}
+ */
+function isTemplateClip(clipId, ctx) {
+	const id = mediaIdKey(clipId)
+	if (!id) return false
+	// Built-in Caspar template packs (CASPARCG-TEMPLATES-*, CASPARCG-GUIDE-HTML-TEMPLATE-*, …)
+	if (/^CASPARCG-/i.test(id)) return true
+	const templates = ctx?.CHOICES_TEMPLATES
+	if (Array.isArray(templates) && templates.some((t) => mediaIdsMatch(t.id, id))) return true
+	// TLS shorthand ids (no slash) when clip is a single segment
+	if (!id.includes('/') && Array.isArray(templates) && templates.some((t) => mediaIdsMatch(t.id, id))) {
+		return true
+	}
+	return false
+}
+
 /** First path token of a Caspar clip id, NFC-normalized for comparison with CLS / disk. */
 function mediaIdKey(clipId) {
 	const raw = String(clipId || '').replace(/^"(.*)"$/, '$1').trim()
@@ -68,7 +88,7 @@ function tryDurationFromStateMedia(ctx, clipId) {
  * @returns {Promise<number | null>}
  */
 async function resolveClipDurationMsWithAmcpCinf(ctx, clipId) {
-	if (!clipId || isRouteClip(clipId)) return null
+	if (!clipId || isRouteClip(clipId) || isTemplateClip(clipId, ctx)) return null
 	if (!ctx.amcp?.query?.cinf || ctx.amcp.isOffline) return null
 	const rawToken = String(clipId).replace(/^"(.*)"$/, '$1').trim().split(/\s+/)[0].replace(/^"|"$/g, '')
 	if (!rawToken) return null
@@ -153,7 +173,7 @@ function resolveClipDurationMs(ctx, clipId) {
 async function resolveClipDurationMsWithDiskProbe(ctx, clipId) {
 	const quick = resolveClipDurationMs(ctx, clipId)
 	if (Number.isFinite(quick) && quick > 0) return quick
-	if (!clipId || isRouteClip(clipId)) return null
+	if (!clipId || isRouteClip(clipId) || isTemplateClip(clipId, ctx)) return null
 	const fromAmcp = await resolveClipDurationMsWithAmcpCinf(ctx, clipId)
 	if (Number.isFinite(fromAmcp) && fromAmcp > 0) return fromAmcp
 	try {
@@ -181,6 +201,7 @@ async function resolveClipDurationMsWithDiskProbe(ctx, clipId) {
 
 module.exports = {
 	isRouteClip,
+	isTemplateClip,
 	mediaIdKey,
 	mediaIdsMatch,
 	resolveClipDurationMs,

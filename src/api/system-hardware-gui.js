@@ -92,7 +92,7 @@ function resolveBmdUpdater() {
 
 /**
  * @param {string} action
- * @param {{ card?: number }} [opts]
+ * @param {{ card?: number, config?: object, log?: Function }} [opts]
  */
 function spawnGuiDetached(action, opts = {}) {
 	let bin = null
@@ -118,6 +118,10 @@ function spawnGuiDetached(action, opts = {}) {
 		stdio: 'ignore',
 	})
 	proc.unref()
+	if (opts.config) {
+		const { scheduleGuiWindowPosition } = require('../utils/x-display-session')
+		scheduleGuiWindowPosition(action, opts.config, { log: opts.log })
+	}
 	return bin
 }
 
@@ -141,7 +145,13 @@ async function handleGuiLaunchPost(body, ctx) {
 	}
 	try {
 		const card = b?.card != null ? parseInt(String(b.card), 10) : 0
-		const exe = spawnGuiDetached(action, { card: Number.isFinite(card) ? card : 0 })
+		const exe = spawnGuiDetached(action, {
+			card: Number.isFinite(card) ? card : 0,
+			config: ctx.config,
+			log: (level, msg) => {
+				if (typeof ctx.log === 'function') ctx.log(level, msg)
+			},
+		})
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe, card: Number.isFinite(card) ? card : 0 }) }
 	} catch (e) {
 		const m = e instanceof Error ? e.message : String(e)

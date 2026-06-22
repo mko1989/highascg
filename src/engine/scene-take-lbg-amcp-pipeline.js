@@ -5,6 +5,7 @@
 'use strict'
 
 const playbackTracker = require('../state/playback-tracker')
+const { isSceneTemplateLayer } = require('./scene-template-cg')
 const { param } = require('../caspar/amcp-utils')
 const {
 	buildPipOverlayAmcpLinesAll,
@@ -17,6 +18,7 @@ const {
 } = require('./pip-overlay')
 const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
+const { buildSceneTemplateCgAmcpLines } = require('./scene-template-cg')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
 const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
 const { partitionTakeJobsPlayOrder } = require('./scene-route-deps')
@@ -70,6 +72,7 @@ async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 	}
 }
 
+/**
  * @param {object} amcp
  * @param {{ start: number|null }} fadeClockRef — mutated when a timed crossfade / merge play starts
  * @param {object} ctx
@@ -306,11 +309,24 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				]
 				await sendPipOverlayLinesSerial(amcp, lines)
 			}
-			if (takeJobs.some((j) => j.browserCgUrl)) {
+			for (const job of takeJobs) {
+				if (!job.templateCg) continue
+				const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg)
+				if (lines.length > 0) {
+					if (typeof self.log === 'function') {
+						self.log(
+							'info',
+							`[scene-take-lbg] template CG layer ${job.layer.layerNumber} → ${job.templateCg.cgName}`,
+						)
+					}
+					await sendPipOverlayLinesSerial(amcp, lines)
+				}
+			}
+			if (takeJobs.some((j) => j.browserCgUrl || j.templateCg)) {
 				await amcp.mixerCommit(channel).catch(() => {})
 			}
 		} catch (e) {
-			self.log?.('warn', `[scene-take-lbg] browser CG: ${e?.message || e}`)
+			self.log?.('warn', `[scene-take-lbg] browser/template CG: ${e?.message || e}`)
 		}
 
 		if (isMergeTransition && mergeMixerExtras.length > 0 && takeJobs.length === 0) {
@@ -322,12 +338,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		}
 
 		for (const job of takeJobs) {
+			if (job.templateCg) continue
 			try {
 				playbackTracker.recordPlay(self, channel, job.pLayer, job.clip, { loop: !!job.layer.loop })
 			} catch (_) {}
 
 			const foe = job.layer.fadeOnEnd
-			if (fadeWatcher && foe?.enabled && !job.layer.loop) {
+			const clipIsTemplate = isSceneTemplateLayer(job.layer, job.clip, self)
+			if (fadeWatcher && foe?.enabled && !job.layer.loop && !clipIsTemplate) {
 				const fadeFr = foe.frames || 12
 				let durationMs = playbackTracker.resolveClipDurationMs(self, job.clip)
 				if (!durationMs || durationMs <= 0) {

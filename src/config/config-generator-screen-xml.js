@@ -1,6 +1,6 @@
 'use strict'
 
-const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
+const { escapeXml, isCustomLiveProfile, casparBoolEnabled, readMultiviewSetting } = require('./config-generator-utils')
 
 /**
  * PR #1718: optional `<aspect-ratio>`, `<enable-mipmaps>` inside `<screen>` (custom build only).
@@ -56,8 +56,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 	const sbsKey = config[`screen_${n}_sbs_key`] === true || config[`screen_${n}_sbs_key`] === 'true'
 	const highBitdepth = config[`screen_${n}_high_bitdepth`] === true || config[`screen_${n}_high_bitdepth`] === 'true'
 	const colourSpace = String(config[`screen_${n}_colour_space`] || '').trim()
-	const forceLinear =
-		config[`screen_${n}_force_linear_filter`] !== false && config[`screen_${n}_force_linear_filter`] !== 'false'
+	const forceLinear = casparBoolEnabled(config[`screen_${n}_force_linear_filter`], false)
 	const lines = [`<device>${nextDevice}</device>`]
 	if (extras) lines.push(extras)
 	lines.push(
@@ -127,9 +126,7 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 	const highBitdepth = (config[`multiview_${idx}_high_bitdepth`] ?? config.multiview_high_bitdepth) === true || 
 	                    (config[`multiview_${idx}_high_bitdepth`] ?? config.multiview_high_bitdepth) === 'true'
 	const colourSpace = String(config[`multiview_${idx}_colour_space`] || config.multiview_colour_space || '').trim()
-	const forceLinear =
-		(config[`multiview_${idx}_force_linear_filter`] ?? config.multiview_force_linear_filter) !== false && 
-		(config[`multiview_${idx}_force_linear_filter`] ?? config.multiview_force_linear_filter) !== 'false'
+	const forceLinear = casparBoolEnabled(readMultiviewSetting(config, idx, 'force_linear_filter'), false)
 	const lines = [`<device>${nextDevice}</device>`]
 	if (extrasStr) lines.push(extrasStr)
 	lines.push(

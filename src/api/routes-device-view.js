@@ -10,6 +10,7 @@ const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const Snapshot = require('./device-view-snapshot')
 const Apply = require('./device-view-apply')
 const CRUD = require('./device-view-crud')
+const { enrichExtraLiveSource } = require('../config/extra-live-source-enrich')
 
 /**
  * Merge patch into on-disk config and refresh `ctx.config` from ConfigManager (same as `change` listener).
@@ -142,12 +143,13 @@ async function handlePost(body, ctx) {
 		const list = Array.isArray(ctx.config.extraLiveSources) ? [...ctx.config.extraLiveSources] : []
 		const item = j.addExtraLiveSource
 		if (item && item.value) {
-			const existing = list.findIndex(x => x.value === item.value)
-			if (existing >= 0) list[existing] = item
-			else list.push(item)
+			const enriched = enrichExtraLiveSource(item, ctx)
+			const existing = list.findIndex(x => x.value === enriched.value)
+			if (existing >= 0) list[existing] = enriched
+			else list.push(enriched)
 			if (persistConfigPatch(ctx, { extraLiveSources: list })) {
 				ctx.config.extraLiveSources = list
-				res = { ok: true, extraLiveSources: list }
+				res = { ok: true, extraLiveSources: list.map((x) => enrichExtraLiveSource(x, ctx)) }
 				if (typeof ctx._wsBroadcast === 'function') {
 					ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
 				}

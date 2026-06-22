@@ -6,7 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
-const Map = require('./routing-map')
+const routingMap = require('./routing-map')
 const {
 	listConfiguredLiveAudioSlots,
 	resolveLiveAudioRouteString,
@@ -22,9 +22,9 @@ const { startLiveInputMeterHealthWatch, repairLiveInputMetersIfStale } = require
 const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
 
 async function setupInputsChannel(self) {
-	const map = Map.getChannelMap(self.config)
-	const decklinkEntries = (Array.isArray(map.inputChannels) ? map.inputChannels : []).filter((e) => e.kind === 'decklink')
-	if (!map.decklinkCount || !map.inputsEnabled || decklinkEntries.length === 0 || !self.amcp) {
+	const channelMap = routingMap.getChannelMap(self.config)
+	const decklinkEntries = (Array.isArray(channelMap.inputChannels) ? channelMap.inputChannels : []).filter((e) => e.kind === 'decklink')
+	if (!channelMap.decklinkCount || !channelMap.inputsEnabled || decklinkEntries.length === 0 || !self.amcp) {
 		self._decklinkInputsStatus = {
 			updatedAt: Date.now(),
 			enabled: false,
@@ -41,16 +41,16 @@ async function setupInputsChannel(self) {
 	// WO-53: each DeckLink input has its own dedicated full-quality channel (isolated audio meter).
 	self.log('info', `DeckLink inputs: ${decklinkEntries.length} dedicated channel(s) (${decklinkEntries.map((e) => e.channel).join(', ')})`)
 
-	const outputDevices = new Set(); for (let n = 1; n <= map.screenCount; n++) {
-		const dlOut = parseInt(String(Map.readCasparSetting(self.config, `screen_${n}_decklink_device`) ?? '0'), 10)
+	const outputDevices = new Set(); for (let n = 1; n <= channelMap.screenCount; n++) {
+		const dlOut = parseInt(String(routingMap.readCasparSetting(self.config, `screen_${n}_decklink_device`) ?? '0'), 10)
 		if (dlOut > 0) outputDevices.add(dlOut)
 	}
-	const mvDlOut = parseInt(String(Map.readCasparSetting(self.config, 'multiview_decklink_device') ?? '0'), 10); if (mvDlOut > 0) outputDevices.add(mvDlOut)
+	const mvDlOut = parseInt(String(routingMap.readCasparSetting(self.config, 'multiview_decklink_device') ?? '0'), 10); if (mvDlOut > 0) outputDevices.add(mvDlOut)
 
-	const usedDevices = new Map(); const inputDevice = []; const skippedConflicts = []; const skippedDuplicates = []
+	const usedDevices = new globalThis.Map(); const inputDevice = []; const skippedConflicts = []; const skippedDuplicates = []
 	for (const entry of decklinkEntries) {
 		const i = entry.slot
-		const device = Map.resolveDecklinkInputDeviceIndex(self.config, i)
+		const device = routingMap.resolveDecklinkInputDeviceIndex(self.config, i)
 		if (outputDevices.has(device)) { skippedConflicts.push({ input: i, device }); continue }
 		if (usedDevices.has(device)) { skippedDuplicates.push({ input: i, device, firstUser: usedDevices.get(device) }); continue }
 		usedDevices.set(device, i); inputDevice.push({ channel: entry.channel, layer: entry.layer, slot: i, device })
@@ -64,7 +64,7 @@ async function setupInputsChannel(self) {
 			else failed.push({ channel, layer, device, message: msg })
 		}
 	}
-	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: map.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
+	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: channelMap.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
 }
 
 async function setupLiveAudioInputs(self) {
@@ -107,11 +107,11 @@ async function setupLiveAudioInputs(self) {
 }
 
 async function setupLiveAudioPgmRoutes(self) {
-	const map = Map.getChannelMap(self.config)
+	const map = routingMap.getChannelMap(self.config)
 	if (!self.amcp) return
 	const alwaysOn =
-		Map.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== false &&
-		Map.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== 'false'
+		routingMap.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== false &&
+		routingMap.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== 'false'
 	if (!alwaysOn) return
 	const { slots } = listConfiguredLiveAudioSlots(self.config)
 	if (!slots.length) return
@@ -119,11 +119,11 @@ async function setupLiveAudioPgmRoutes(self) {
 	const screens = resolveLiveAudioPgmTargetScreens(self.config)
 	const baseLayer = Math.min(
 		9,
-		Math.max(1, parseInt(String(Map.readCasparSetting(self.config, 'live_audio_pgm_layer') ?? 2), 10) || 2),
+		Math.max(1, parseInt(String(routingMap.readCasparSetting(self.config, 'live_audio_pgm_layer') ?? 2), 10) || 2),
 	)
 	const audioOnly =
-		Map.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === true ||
-		Map.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === 'true'
+		routingMap.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === true ||
+		routingMap.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === 'true'
 	const routes = []
 
 	for (const screen of screens) {
@@ -164,7 +164,7 @@ async function setupLiveAudioPgmRoutes(self) {
 }
 
 async function setupAudioPreviewBus(self) {
-	const map = Map.getChannelMap(self.config)
+	const map = routingMap.getChannelMap(self.config)
 	const ap = normalizeAudioPreview(self.config)
 	if (!ap.enabled || !self.amcp) return
 	const ch = resolveAudioPreviewChannel(self.config, map)
@@ -185,21 +185,21 @@ async function setupAudioPreviewBus(self) {
 }
 
 async function setupPreviewChannel(self, screenIdx) {
-	const map = Map.getChannelMap(self.config); if (!self.amcp) return
+	const map = routingMap.getChannelMap(self.config); if (!self.amcp) return
 	const pgmCh = map.programCh(screenIdx); const prvCh = map.previewCh(screenIdx)
 	if (prvCh == null || prvCh === pgmCh) return
-	if (Map.readCasparSetting(self.config, 'preview_black_cg') === true || String(Map.readCasparSetting(self.config, 'preview_black_cg') ?? '').toLowerCase() === 'true') {
+	if (routingMap.readCasparSetting(self.config, 'preview_black_cg') === true || String(routingMap.readCasparSetting(self.config, 'preview_black_cg') ?? '').toLowerCase() === 'true') {
 		try { await self.amcp.cgAdd(pgmCh, 9, 0, 'black', 1, '') } catch {}
 		try { await self.amcp.cgAdd(prvCh, 9, 0, 'black', 1, '') } catch {}
 	}
 }
 
 async function setupMultiview(self, layout) {
-	const map = Map.getChannelMap(self.config); if (!map.multiviewEnabled || map.multiviewCh == null || !self.amcp) return
+	const map = routingMap.getChannelMap(self.config); if (!map.multiviewEnabled || map.multiviewCh == null || !self.amcp) return
 	const ch = map.multiviewCh
 	const finalLayout = (layout && layout.length > 0) ? layout : [
-		{ layer: 11, x: 0, y: 0, w: 0.5, h: 0.5, route: Map.getRouteString(map.programCh(1)) },
-		{ layer: 12, x: 0.5, y: 0, w: 0.5, h: 0.5, route: Map.getRouteString(map.previewCh(1) || map.programCh(1)) }
+		{ layer: 11, x: 0, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(map.programCh(1)) },
+		{ layer: 12, x: 0.5, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(map.previewCh(1) || map.programCh(1)) }
 	]
 	for (const cell of finalLayout) {
 		await self.amcp.play(ch, cell.layer, cell.route || cell.source)
@@ -220,7 +220,7 @@ function syncAllTemplatesToDestination(self, destDir, label) {
 }
 
 async function setupAllRouting(self) {
-	const { PIP_OVERLAY_TEMPLATE_FILES } = require('../engine/pip-overlay'); const map = Map.getChannelMap(self.config)
+	const { PIP_OVERLAY_TEMPLATE_FILES } = require('../engine/pip-overlay'); const map = routingMap.getChannelMap(self.config)
 	const tBase = (self.config?.local_template_path || '').trim(); const mBase = (self.config?.local_media_path || '').trim()
 	if (tBase) syncAllTemplatesToDestination(self, tBase, 'local_template_path')
 	else if (mBase) { syncAllTemplatesToDestination(self, mBase, 'local_media_path'); self.log('info', 'Templates synced to local_media_path') }
@@ -253,7 +253,7 @@ async function setupAllRouting(self) {
 			const bus1 = map.switcherBus1Channels?.[i] ?? map.previewChannels?.[i]
 			if (outCh == null || bus1 == null) continue
 			try {
-				await self.amcp.play(outCh, 1, Map.getRouteString(bus1))
+				await self.amcp.play(outCh, 1, routingMap.getRouteString(bus1))
 				self.switcherOutputBusByChannel[String(outCh)] = bus1
 			} catch (_) {}
 		}
@@ -267,7 +267,7 @@ async function setupAllRouting(self) {
 	if (map.streamingCh != null && self.amcp) {
 		// Attach mode: `streamingCh` is an existing program/preview bus — it already has output; do not layer route:// on it.
 		if (map.streamingAttachToChannel == null) {
-			const cLayer = map.streamingContentLayer; const vRoute = Map.resolveStreamingChannelRouteForRole(self.config, 'video'); const aRoute = Map.resolveStreamingChannelRouteForRole(self.config, 'audio')
+			const cLayer = map.streamingContentLayer; const vRoute = routingMap.resolveStreamingChannelRouteForRole(self.config, 'video'); const aRoute = routingMap.resolveStreamingChannelRouteForRole(self.config, 'audio')
 			if (vRoute && aRoute && vRoute !== aRoute && cLayer >= 2) {
 				const aLayer = cLayer - 1; try {
 					await self.amcp.play(map.streamingCh, aLayer, aRoute); await self.amcp.play(map.streamingCh, cLayer, vRoute)

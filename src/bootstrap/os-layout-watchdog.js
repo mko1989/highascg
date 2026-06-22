@@ -2,6 +2,7 @@
 
 const { applyX11Layout, checkXrandrLayout } = require('../utils/os-config')
 const { getDisplaysXrandrDetailed } = require('../utils/hardware-info')
+const { applyOperatorDisplaySession } = require('../utils/x-display-session')
 
 function envTruthy(name, defaultVal) {
 	const raw = process.env[name]
@@ -59,6 +60,7 @@ function startOsLayoutWatchdog(ctx) {
 			done = true
 			if (timer) clearInterval(timer)
 			log('info', '[OS-Watchdog] xrandr layout matches config')
+			applyOperatorDisplaySession(ctx.config, { log }).catch(() => {})
 			return
 		}
 
@@ -75,6 +77,9 @@ function startOsLayoutWatchdog(ctx) {
 			done = true
 			if (timer) clearInterval(timer)
 			log('info', '[OS-Watchdog] xrandr layout corrected')
+			applyOperatorDisplaySession(ctx.config, { log }).catch((e) => {
+				log('warn', `[OS-Watchdog] NVIDIA display policy after layout: ${e?.message || e}`)
+			})
 			return
 		}
 

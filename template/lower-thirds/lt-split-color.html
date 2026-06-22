@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- lt-split-color.html — Split Color Lower Third -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lower Third — Split Color</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            display: flex;
+            font-family: 'Arial', 'Helvetica Neue', sans-serif;
+            height: 1080px; width: 1920px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lt-split-color {
+            align-self: flex-end;
+            margin: 54px 77px;
+        }
+        .graphic {
+            display: flex;
+            align-items: stretch;
+            overflow: hidden;
+            opacity: 0;
+        }
+        .left-panel {
+            background: var(--primary, #ff6f00);
+            padding: 9px 38px;
+            display: flex;
+            align-items: center;
+        }
+        .left-panel h1 {
+            font-size: 46px;
+            font-weight: 800;
+            color: #fff;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .right-panel {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 9px 48px;
+            display: flex;
+            align-items: center;
+        }
+        .right-panel p {
+            font-size: 27px;
+            font-weight: 400;
+            color: var(--text, #ccc);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <main class="lt-split-color">
+        <div class="graphic">
+            <div class="left-panel"><h1>Name</h1></div>
+            <div class="right-panel"><p>Title</p></div>
+        </div>
+    </main>
+    <script src="../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js"></script>
+    <script src="lt-engine.js"></script>
+    <script>
+        LTEngine.init({
+            containerSel: '.lt-split-color',
+            titleSel: '.left-panel h1',
+            subtitleSel: '.right-panel p',
+            applyStyles: function(style) {
+                var root = document.documentElement;
+                if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
+                if (style.textColor) root.style.setProperty('--text', style.textColor);
+            },
+            animateIn: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-split-color .graphic');
+                    var left = g.querySelector('.left-panel');
+                    var right = g.querySelector('.right-panel');
+                    var tl = new gsap.timeline({ ease: 'power3.out', onComplete: resolve });
+                    tl.set(g, { opacity: 1 })
+                      .fromTo(left, { x: '-110%' }, { x: '0%', duration: 0.6 })
+                      .fromTo(right, { x: '110%' }, { x: '0%', duration: 0.6 }, '-=0.4');
+                });
+            },
+            animateOut: function() {
+                return new Promise(function(resolve) {
+                    var g = document.querySelector('.lt-split-color .graphic');
+                    var left = g.querySelector('.left-panel');
+                    var right = g.querySelector('.right-panel');
+                    var tl = new gsap.timeline({ ease: 'power3.in', onComplete: resolve });
+                    tl.to(right, { x: '110%', duration: 0.5 })
+                      .to(left, { x: '-110%', duration: 0.5 }, '-=0.3')
+                      .set(g, { opacity: 0 });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

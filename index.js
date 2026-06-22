@@ -25,8 +25,9 @@ const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
+const { startCasparAmcpWatchdog } = require('./src/bootstrap/caspar-amcp-watchdog')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
-const { runConnectionQueryCycle } = require('./src/utils/query-cycle')
+const { runConnectionQueryCycle, runMediaLibraryQueryCycle } = require('./src/utils/query-cycle')
 const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
 const { ArtnetReceiver } = require('./src/artnet/artnet-receiver')
@@ -116,6 +117,7 @@ function main() {
 		appCtx.timelineEngine = new TimelineEngine(appCtx); appCtx.clipEndFadeWatcher = new ClipEndFadeWatcher(appCtx)
 		appCtx.getState = () => getState(appCtx)
 		appCtx.getStateWsBootstrap = () => getState(appCtx, { slimCatalog: true })
+		appCtx.runMediaLibraryQueryCycle = () => runMediaLibraryQueryCycle(appCtx)
 		appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 		appCtx.refreshConfigComparison = refreshConfigComparison; appCtx.samplingManager = new SamplingManager(appCtx)
 		appCtx.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
@@ -217,6 +219,10 @@ function main() {
 		appCtx.timelineEngine.on('playback', pb => { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('timeline.playback', pb) })
 		moduleRegistry.bootAll(appCtx)
 		appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
+
+		if (casparConn && !config.offline_mode) {
+			appCtx._stopCasparAmcpWatchdog = startCasparAmcpWatchdog(appCtx)
+		}
 
 		if (casparConn) {
 			let wasConnected = false; casparConn.on('status', payload => {

@@ -42,7 +42,7 @@ function sceneLayerOccupiesLookSlot(layer) {
 	if (!layerHasContent(layer)) return false
 	const t = String(layer.source?.type || '')
 	if (t === 'timeline') return false
-	return t === 'file' || t === 'template' || t === 'media'
+	return t === 'file' || t === 'template' || t === 'media' || t === 'cg'
 }
 
 /**
@@ -161,7 +161,7 @@ async function clearPhysicalLookLayers(amcp, ch, physicalLayers, self) {
 	const lines = []
 	for (const L of layers) {
 		const cl = `${ch}-${L}`
-		lines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+		lines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 	}
 	try {
 		await amcp.batchSend(lines)
