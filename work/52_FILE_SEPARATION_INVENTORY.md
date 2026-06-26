@@ -1,8 +1,8 @@
 # HighAsCG file separation and distribution inventory
 
-Concrete list of what belongs to the **server (bundled backend)** vs the **client (browser UI)**. Use for penguins-eggs excludes, `release:github-server` / `release:github-client` tarballs, and exFAT layout.
+Concrete list of what belongs to the **server (Node bridge)** vs the **browser UI** for packaging. **Unified repo:** `client/` + `src/` in one tree; **`dist-web/`** served on `:4200` on the playout machine. Optional Electron launcher = sim / multiserver / modules packaging only.
 
-**Narrative overview:** [`BACKEND_AND_CLIENT_SPLIT.md`](BACKEND_AND_CLIENT_SPLIT.md)  
+**Narrative overview:** [`BACKEND_AND_CLIENT_SPLIT.md`](BACKEND_AND_CLIENT_SPLIT.md) · [`../from_client/AGENT_SERVER_CLIENT_MERGE.md`](../from_client/AGENT_SERVER_CLIENT_MERGE.md)  
 **WO‑47 ISO vs stick:** [`../docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md)  
 **Eggs exclude fragment:** [`../tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`](../tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list)
 
@@ -13,8 +13,8 @@ Concrete list of what belongs to the **server (bundled backend)** vs the **clien
 | Location | Role |
 |----------|------|
 | **`index.js`**, **`src/`** | Server at **repo root** — Node orchestrator |
-| **`client/`** | UI sources (ES modules) — **not** on playout stick |
-| **`dist-web/`** | Vite production build (`npm run build:client`) — Mac/Windows client |
+| **`client/`** | UI **sources** (ES modules) — build only; **not** deployed as sources on playout |
+| **`dist-web/`** | Vite production build — **required on playout**; served on `:4200` |
 | **`config/`**, **`template/`**, **`scripts/`** | Shipped with server |
 | **`tools/runtime/`** | Playout helpers only (`exfat-sync-cli`, Caspar staged start) |
 | **`tools/eggs/`**, **`tools/smoke/`**, **`tools/release/`** | Build host / dev — **not** on playout stick |
@@ -22,22 +22,22 @@ Concrete list of what belongs to the **server (bundled backend)** vs the **clien
 
 ---
 
-## 1. Client only (SPA / static UI)
+## 1. UI sources only (not deployed to playout as-is)
 
-Remove from **headless server** tarballs, **closed ISO** squashfs, and **exFAT `update/server/`**.
+Exclude **`client/`** from playout rsync; **include** built **`dist-web/`**.
 
 | Path | Notes |
 |------|--------|
-| **`client/`**, **`dist-web/`** | Remote UI; connects to server via HTTP/WS |
-| **`client/tools/`** | Launchers, stick studio, client GitHub release |
+| **`client/`** | **Canonical UI sources** — `npm run build:client` → `dist-web/` |
+| **`client/tools/`** | Electron launcher sources → optional [highascg-client](https://github.com/mko1989/highascg-client) packaging (sim, multiserver, modules) |
 
 ---
 
-## 2. Server only (bundled backend)
+## 2. Server + UI on playout
 
 | Path | Notes |
 |------|--------|
-| **`index.js`**, **`src/`**, **`config/`**, **`template/`**, **`scripts/`** | Core server |
+| **`index.js`**, **`src/`**, **`config/`**, **`template/`**, **`scripts/`**, **`dist-web/`** | Core server + operator UI |
 | **`tools/runtime/`** | Only tools subtree on playout (`exfat-sync-cli.js`, …) |
 | **`package.json`**, **`package-lock.json`** | Node deps |
 
@@ -79,8 +79,8 @@ ISO keeps: Caspar **`config/casparcg.config`**, **`lib/`**, empty **`media/`** /
 
 | Script | Includes | Excludes |
 |--------|----------|----------|
-| **`release:github-server`** | `index.js`, `src/`, `scripts/`, `config/`, `template/`, **`tools/runtime/`** | `client/`, `dist-web/`, `tools/smoke/`, `tools/eggs/` |
-| **`release:github-client`** | `dist-web/` only | All server paths |
+| **`release:github-server`** | `index.js`, `src/`, `scripts/`, `config/`, `template/`, **`tools/runtime/`**, **`dist-web/`** | `client/` (sources), `tools/smoke/`, `tools/eggs/` |
+| **`release:github-client`** | `dist-web/` only (optional UI-only hotfix) | All server paths |
 | **Monolith** (deprecated) | See `deprecated/tools/release/make-dev-github-release.sh` | — |
 
 ---

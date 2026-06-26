@@ -114,6 +114,13 @@ async function handleProject(path, body, ctx) {
 		if (b.broadcastProject !== false && typeof ctx._wsBroadcast === 'function') {
 			scheduleProjectSyncBroadcast(ctx, project)
 		}
+		if (typeof ctx.onProjectSavedForReplication === 'function') {
+			try {
+				ctx.onProjectSavedForReplication(project)
+			} catch (e) {
+				if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project push: ' + (e?.message || e))
+			}
+		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,

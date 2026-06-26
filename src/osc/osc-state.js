@@ -207,6 +207,7 @@ class OscState extends EventEmitter {
 		if (sub === 'nb_channels') {
 			const n = Math.max(0, parseInt(String(vals[0]), 10) || 0)
 			c.audio.nbChannels = n
+			c.audio._nbChannelsFromOsc = true
 			while (c.audio.levels.length < n) {
 				c.audio.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
 			}
@@ -216,8 +217,10 @@ class OscState extends EventEmitter {
 		// Forks may emit bundled int meters (e.g. 16× int32) instead of per-index …/M/dBFS messages.
 		if (sub === 'volume' && vals.length > 0) {
 			const a = c.audio
-			const n = vals.length
-			if (!a.nbChannels || a.nbChannels < n) a.nbChannels = n
+			// Do not inflate channel count from padded volume bundles — trust nb_channels when set.
+			const cap = a._nbChannelsFromOsc && a.nbChannels > 0 ? a.nbChannels : vals.length
+			const n = Math.min(vals.length, cap)
+			if (!a._nbChannelsFromOsc) a.nbChannels = n
 			const now = Date.now()
 			a._lastUpdateAt = now
 			for (let i = 0; i < n; i++) {

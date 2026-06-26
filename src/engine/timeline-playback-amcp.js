@@ -6,7 +6,9 @@ const { resolveTimelineClipFrame } = require('./scene-play-seek')
 const {
 	buildEffectAmcpLinesPlayback,
 	mixerEffectNeutralLines,
+	clipAudioRoute,
 	playAfSuffix,
+	timelineClipTransportStale,
 	TIMELINE_LAYER_BASE,
 	TIMELINE_AMCP_DRIFT_MS,
 } = require('./timeline-playback-helpers')
@@ -87,20 +89,36 @@ module.exports = {
 				const prev = this._prevKey.get(key)
 
 				if (clip) {
-					const newClip = !prev || prev.clipId !== clip.id
-					const atEntry = newClip || force
+					const transportStale = timelineClipTransportStale(prev, clip)
+					// Clip-entry behaviour (startBehaviour → inPoint) only when playback tick enters a clip.
+					// Forced seek/scrub/play-from-position always resolve frame from timeline ms.
+					const atEntry = transportStale && !force
 					const transportOpts = { atEntry, channel: ch, physicalLayer: caspLayer }
 					const meta = clipTransportMeta(clip, ms, tl, self, transportOpts)
 					const driftMeta = atEntry ? meta : clipTransportMeta(clip, ms, tl, self, { atEntry: false, channel: ch, physicalLayer: caspLayer })
+					// Full STOP+PLAY only when clip/route changes, first load, or seek while playing.
+					// Paused scrub on an already-loaded clip uses CALL SEEK to avoid a black flash.
+					const needsFullTransport = transportStale || (force && playing)
+					const needsPausedSeek =
+						force &&
+						!playing &&
+						prev?.clipId === clip.id &&
+						!transportStale &&
+						prev.frame !== meta.frame &&
+						!meta.isRoute &&
+						!meta.loopAlways
 					let transportSent = false
 
 					if (meta.loopAlways) {
-						if (newClip || force) {
+						if (needsFullTransport || (force && !playing && !prev)) {
 							this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
 							transportSent = true
 						}
-					} else if (newClip || force) {
+					} else if (needsFullTransport) {
 						this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
+						transportSent = true
+					} else if (needsPausedSeek) {
+						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(() => {})
 						transportSent = true
 					} else if (
 						allowDriftSeek &&
@@ -116,13 +134,14 @@ module.exports = {
 							transportSent = true
 							this._prevKey.set(key, {
 								clipId: clip.id,
+								audioRoute: clipAudioRoute(clip),
 								frame: driftMeta.frame,
 								lastDriftAt: now,
 							})
 						}
 					}
 
-					if (transportSent && (force || newClip)) {
+					if (transportSent && (force || transportStale)) {
 						for (const pk of this._lastKfValues.keys()) {
 							if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
 						}
@@ -131,10 +150,11 @@ module.exports = {
 						}
 					}
 
-					if (transportSent || newClip || !prev) {
+					if (transportSent || transportStale || !prev) {
 						this._prevKey.set(key, {
 							clipId: clip.id,
-							frame: transportSent && !atEntry ? driftMeta.frame : meta.frame,
+							audioRoute: clipAudioRoute(clip),
+							frame: transportSent ? meta.frame : (prev?.frame ?? meta.frame),
 							lastDriftAt:
 								transportSent && driftMeta.implicitLoop
 									? Date.now()
@@ -170,7 +190,21 @@ module.exports = {
 	},
 
 	/**
-	 * PLAY / LOAD for one layer — only when clip starts or user scrubs (startTransport).
+	 * Program master layout from server config (matches Device View → Audio).
+	 */
+	_programLayoutForPlayback() {
+		const { resolveConfigProgramLayout } = require('./audio-route')
+		const screenIdx = this._pb?.sendTo?.screenIdx
+		const mainIndex =
+			screenIdx === null || screenIdx === 'all' || screenIdx === undefined
+				? 0
+				: Math.max(0, parseInt(String(screenIdx), 10) || 0)
+		return resolveConfigProgramLayout(this.self?.config, mainIndex)
+	},
+
+	/**
+	 * PLAY / LOADBG for one layer — only when clip starts or user scrubs (startTransport).
+	 * STOP first so Caspar reapplies AF when route/clip changes. LOAD ignores AF on some builds — use LOADBG.
 	 * @param {boolean} opts.playing timeline transport playing
 	 * @param {boolean} opts.startTransport new clip, play(), or seek/scrub
 	 */
@@ -181,23 +215,47 @@ module.exports = {
 
 		if (meta.loopAlways) {
 			if (!startTransport) return
-			self.amcp.raw(`PLAY ${ch}-${caspLayer} ${meta.srcQ} LOOP${playAfSuffix(clip)}`).catch(() => {})
+			const layout = this._programLayoutForPlayback()
+			const afSuffix = playAfSuffix(clip, layout)
+			const cl = `${ch}-${caspLayer}`
+			const cmd = `PLAY ${cl} ${meta.srcQ} LOOP${afSuffix}`
+			self.amcp
+				.stop(ch, caspLayer)
+				.catch(() => {})
+				.then(() => self.amcp.raw(cmd).catch(() => {}))
 			return
 		}
 		if (!startTransport) return
 
-		if (meta.isRoute) {
-			self.amcp.raw(`PLAY ${ch}-${caspLayer} ${meta.srcQ}${playAfSuffix(clip)}`).catch(() => {})
-		} else if (playing || meta.loopClip) {
-			const loopStr = meta.loopClip ? ' LOOP' : ''
-			self.amcp
-				.raw(`PLAY ${ch}-${caspLayer} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${playAfSuffix(clip)}`)
-				.catch(() => {})
-		} else {
-			self.amcp
-				.raw(`LOAD ${ch}-${caspLayer} ${meta.srcQ} SEEK ${meta.frame}${playAfSuffix(clip)}`)
-				.catch(() => {})
+		const layout = this._programLayoutForPlayback()
+		const afSuffix = playAfSuffix(clip, layout)
+		const cl = `${ch}-${caspLayer}`
+
+		const runTransport = () => {
+			if (meta.isRoute) {
+				self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${afSuffix}`).catch(() => {})
+			} else if (playing || meta.loopClip) {
+				const loopStr = meta.loopClip ? ' LOOP' : ''
+				self.amcp
+					.raw(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`)
+					.catch(() => {})
+			} else if (afSuffix) {
+				// LOAD ignores AF on many Caspar builds; PLAY applies pan then pause for scrub still.
+				self.amcp
+					.raw(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`)
+					.catch(() => {})
+					.then(() => {
+						if (!playing) self.amcp.pause(ch, caspLayer).catch(() => {})
+					})
+			} else {
+				self.amcp.raw(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`).catch(() => {})
+			}
 		}
+
+		self.amcp
+			.stop(ch, caspLayer)
+			.catch(() => {})
+			.then(() => runTransport())
 	},
 
 	_clearLayerMixerSchedule(ch, layer) {

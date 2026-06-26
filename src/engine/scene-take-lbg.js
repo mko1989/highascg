@@ -56,14 +56,22 @@ async function runSceneTakeLbg(amcp, opts) {
 	if (!channel || channel < 1) throw new Error('channel required')
 	const incomingRaw = opts.incomingScene
 	if (!incomingRaw || !Array.isArray(incomingRaw.layers)) throw new Error('incomingScene.layers required')
-	const incoming = remapIntraLookRoutesForTakeChannel(incomingRaw, channel)
+
+	const forceCut = !!opts.forceCut
+	const globalT = normalizeTransition(incomingRaw.defaultTransition, forceCut)
+	const isMergeTransitionEarly = isLayerAnimateTakeTransition(globalT.type)
+
+	const chKey = String(channel)
+	if (!self.programLayerBankByChannel) self.programLayerBankByChannel = {}
+	const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
+	const inactiveBank = activeBank === 'a' ? 'b' : 'a'
+	const routeRemapBank = isMergeTransitionEarly ? activeBank : inactiveBank
+	const incoming = remapIntraLookRoutesForTakeChannel(incomingRaw, channel, routeRemapBank)
 	const layersWithContent = incoming.layers.filter(layerHasContent)
 	if (layersWithContent.length === 0) {
 		throw new Error('incomingScene has no layers with sources — cannot take an empty look')
 	}
 
-	const forceCut = !!opts.forceCut
-	const globalT = normalizeTransition(incoming.defaultTransition, forceCut)
 	const diff = diffScenes(opts.currentScene || null, incoming)
 
 	const currentMap = new Map()
@@ -71,10 +79,6 @@ async function runSceneTakeLbg(amcp, opts) {
 		if (layerHasContent(l)) currentMap.set(l.layerNumber, l)
 	}
 
-	const chKey = String(channel)
-	if (!self.programLayerBankByChannel) self.programLayerBankByChannel = {}
-	const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
-	const inactiveBank = activeBank === 'a' ? 'b' : 'a'
 	const phys = (sceneLn, bank) => physicalProgramLayer(sceneLn, bank)
 
 	const fadeWatcher = self.clipEndFadeWatcher || null

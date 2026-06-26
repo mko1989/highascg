@@ -1,0 +1,12 @@
+# Optional systemd drop-in — API-only mode (CI / debugging).
+# WO-52: NOT installed by default. Production playout serves dist-web/ on :4200.
+#
+# To enable manually:
+#   sudo install -d /etc/systemd/system/highascg.service.d
+#   sudo cp this file /etc/systemd/system/highascg.service.d/10-headless.conf
+#   sudo systemctl daemon-reload && sudo systemctl restart highascg
+#
+# Or: HIGHASCG_INSTALL_HEADLESS=1 sudo bash scripts/write-highascg-systemd-unit.sh
+
+[Service]
+Environment=HIGHASCG_HEADLESS=true

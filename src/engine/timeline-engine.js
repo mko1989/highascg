@@ -34,6 +34,7 @@ class TimelineEngine extends EventEmitter {
 			duration: opts?.duration || 30000,
 			fps: opts?.fps || 25,
 			flags: Array.isArray(opts?.flags) ? opts.flags : [],
+			...(opts?.sendTo && typeof opts.sendTo === 'object' ? { sendTo: opts.sendTo } : {}),
 			layers: opts?.layers || [
 				{ id: uid(), name: 'Layer 1', clips: [] },
 				{ id: uid(), name: 'Layer 2', clips: [] },
@@ -55,8 +56,19 @@ class TimelineEngine extends EventEmitter {
 
 	update(id, tl) {
 		if (!this.timelines.has(id)) return null
-		this.timelines.set(id, { ...tl, id })
+		const updated = { ...tl, id }
+		this.timelines.set(id, updated)
+		if (updated.sendTo && typeof updated.sendTo === 'object' && this._pb?.timelineId === id) {
+			this.setSendTo(updated.sendTo)
+		}
 		this._emitChange()
+		// Clip edits (e.g. audioRoute) must refresh PLAY/LOAD+AF while this timeline is on air.
+		// While playing, avoid force=true — redundant PUTs (e.g. mouseup sync) must not STOP+PLAY all layers.
+		if (this._pb?.timelineId === id && this.self?.amcp) {
+			const ms = this._nowMs()
+			const playing = !!this._pb.playing
+			this._syncAmcpLayers(id, ms, { force: !playing, allowDriftSeek: false })
+		}
 		return this.timelines.get(id)
 	}
 

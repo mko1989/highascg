@@ -1,0 +1,258 @@
+:root {
+	--bg: #1a1d23;
+	--panel: #242830;
+	--border: #3a404c;
+	--text: #e8eaed;
+	--muted: #9aa0a8;
+	--accent: #4fc3f7;
+	--accent-dim: #2a7a99;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+	font-family: system-ui, -apple-system, sans-serif;
+	background: var(--bg);
+	color: var(--text);
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--panel);
+}
+
+.topbar h1 { font-size: 1.1rem; font-weight: 600; }
+
+.toolbar { display: flex; gap: 0.5rem; }
+
+button {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	color: var(--text);
+	padding: 0.4rem 0.75rem;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.875rem;
+}
+
+button:hover { border-color: var(--accent); }
+
+button.primary {
+	background: var(--accent-dim);
+	border-color: var(--accent);
+}
+
+.layout {
+	flex: 1;
+	display: grid;
+	grid-template-columns: 220px 1fr 340px;
+	min-height: 0;
+}
+
+.gallery, .inspector {
+	padding: 0.75rem;
+	border-right: 1px solid var(--border);
+	overflow-y: auto;
+}
+
+.inspector { border-right: none; border-left: 1px solid var(--border); }
+
+.gallery h2, .inspector h2 {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+	margin-bottom: 0.75rem;
+}
+
+#template-list { list-style: none; }
+
+#template-list li {
+	margin-bottom: 0.35rem;
+}
+
+#template-list button {
+	width: 100%;
+	text-align: left;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.45rem;
+}
+
+#template-list button.active {
+	border-color: var(--accent);
+	background: #2a3440;
+}
+
+#template-list img {
+	width: 48px;
+	height: 27px;
+	object-fit: cover;
+	border-radius: 2px;
+	background: #111;
+}
+
+#template-list .meta {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+#template-list .meta .name {
+	font-size: 0.8rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+#template-list .meta .cat {
+	font-size: 0.65rem;
+	color: var(--muted);
+}
+
+.preview-pane {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+	background: #111418;
+	overflow: hidden;
+}
+
+.preview-frame-wrap {
+	width: 100%;
+	max-width: 960px;
+	aspect-ratio: 16 / 9;
+	border: 1px solid var(--border);
+	background: #000;
+	position: relative;
+}
+
+#preview {
+	width: 1920px;
+	height: 1080px;
+	border: none;
+	transform-origin: top left;
+	position: absolute;
+	top: 0;
+	left: 0;
+	background: transparent;
+}
+
+.hint { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+#inspector-form label {
+	display: block;
+	margin-bottom: 0.65rem;
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.inspector-field {
+	margin-bottom: 0.5rem;
+}
+
+.field-hint {
+	display: block;
+	font-size: 0.65rem;
+	color: var(--muted);
+	margin-top: 0.15rem;
+	line-height: 1.3;
+}
+
+.range-value {
+	display: inline-block;
+	min-width: 2.5rem;
+	margin-left: 0.35rem;
+	font-size: 0.75rem;
+	color: var(--text);
+}
+
+#inspector-form input[type="color"] {
+	padding: 0.15rem;
+	height: 2rem;
+	cursor: pointer;
+}
+
+#inspector-form input,
+#inspector-form select {
+	display: block;
+	width: 100%;
+	margin-top: 0.2rem;
+	padding: 0.35rem 0.5rem;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	color: var(--text);
+	border-radius: 3px;
+	font-size: 0.875rem;
+}
+
+#inspector-form fieldset {
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 0.5rem 0.65rem 0.65rem;
+	margin-bottom: 0.75rem;
+}
+
+#inspector-form legend {
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	color: var(--muted);
+	padding: 0 0.25rem;
+}
+
+dialog {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--panel);
+	color: var(--text);
+	padding: 1.25rem;
+	max-width: 400px;
+}
+
+dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+
+dialog h3 { margin-bottom: 0.5rem; }
+
+dialog label {
+	display: block;
+	margin: 0.75rem 0;
+	font-size: 0.8rem;
+}
+
+dialog input {
+	display: block;
+	width: 100%;
+	margin-top: 0.25rem;
+	padding: 0.4rem;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	color: var(--text);
+	border-radius: 3px;
+}
+
+.dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
+.status { margin-top: 0.75rem; font-size: 0.8rem; }
+.status.ok { color: #81c784; }
+.status.err { color: #e57373; }
+
+code {
+	font-size: 0.75rem;
+	background: var(--bg);
+	padding: 0.1rem 0.3rem;
+	border-radius: 2px;
+}

@@ -35,13 +35,13 @@ describe('scene-template-cg', () => {
 		assert.equal(isSceneTemplateLayer(layer, layer.source.value, {}), true)
 	})
 
-	it('buildSceneTemplateCgAmcpLines emits CG not LOADBG', () => {
+	it('buildSceneTemplateCgAmcpLines emits CG on overlay host layer 700+', () => {
 		const lines = buildSceneTemplateCgAmcpLines(3, 20, {
 			cgName: 'casparcg-guide-html-template-master/html/lower-third.1',
 			data: '{}',
 		})
-		assert.ok(lines.some((l) => l.startsWith('CG 3-20 ADD')))
-		assert.ok(lines.some((l) => l.startsWith('CG 3-20 PLAY')))
+		assert.ok(lines.some((l) => l.startsWith('CG 3-710 ADD')))
+		assert.ok(lines.some((l) => l.startsWith('CG 3-710 PLAY')))
 		assert.equal(lines.some((l) => l.startsWith('LOADBG')), false)
 		assert.equal(lines.some((l) => l.startsWith('PLAY 3-20')), false)
 	})

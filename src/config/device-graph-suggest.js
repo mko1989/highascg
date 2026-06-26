@@ -135,7 +135,7 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		if (o?.keyFill?.enabled && parseInt(String(o.keyFill.keyDevice), 10) > 0) {
 			caspar.decklinkKeyFill = true
 			caspar.decklinkKeyDevice = parseInt(String(o.keyFill.keyDevice), 10)
-			caspar.decklinkKeyer = String(o.keyFill.keyer || 'internal')
+			caspar.decklinkKeyer = String(o.keyFill.keyer || 'default')
 		}
 		addDecklinkPort(s, d, 'decklink_io', `SDI ${s}`, { caspar })
 	}

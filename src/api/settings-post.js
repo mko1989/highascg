@@ -11,12 +11,13 @@ const { normalizeOscConfig } = require('../osc/osc-config')
 const { startOscPlaybackInfoSupplement } = require('../utils/periodic-sync')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { normalizeRtmpConfig } = require('../config/rtmp-output')
-const { validateDecklinkCasparSlice } = require('../config/decklink-config-validate')
+const { validateDecklinkCasparSlice, validateDecklinkOutputResolution } = require('../config/decklink-config-validate')
 const { resolveMainScreenCount } = require('../config/routing')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { normalizeDeviceGraph } = require('../config/device-graph')
 const { mergeSystemDisplaySettings, pickOscForPersistence, SYSTEM_DISPLAY_KEYS } = require('./settings-os')
 const { normalizeEditorDefaults } = require('../config/editor-defaults')
+const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -220,15 +221,37 @@ async function handlePost(path, body, ctx) {
 				const idx = i + 1
 				const id = String(x.id || `audio_${idx}`).trim() || `audio_${idx}`
 				const label = String(x.label || x.name || `Audio ${idx}`).trim() || `Audio ${idx}`
-				return {
+				const type = String(x.type || 'portaudio').toLowerCase() === 'system-audio' ? 'system-audio' : 'portaudio'
+				const channelLayout = String(x.channelLayout || 'stereo').trim() || 'stereo'
+				const out = {
 					id,
 					label,
 					enabled: x.enabled !== false,
+					type,
 					deviceName: String(x.deviceName || '').trim(),
-					channelLayout: String(x.channelLayout || 'stereo').trim(),
+					channelLayout: type === 'system-audio' ? 'stereo' : channelLayout,
 				}
+				if (type === 'portaudio') {
+					out.hostApi = String(x.hostApi || 'auto').trim() || 'auto'
+					const buf = parseInt(String(x.bufferFrames ?? 128), 10)
+					const lat = parseInt(String(x.latencyMs ?? 40), 10)
+					const fifo = parseInt(String(x.fifoMs ?? 50), 10)
+					if (Number.isFinite(buf) && buf > 0) out.bufferFrames = buf
+					if (Number.isFinite(lat) && lat >= 0) out.latencyMs = lat
+					if (Number.isFinite(fifo) && fifo > 0) out.fifoMs = fifo
+					if (x.autoTuneLatency === false || x.autoTuneLatency === 'false') out.autoTuneLatency = false
+				}
+				return out
 			})
 			.filter(Boolean)
+	}
+
+	if (Array.isArray(cfg.audioOutputs)) {
+		const ar = normalizeAudioRouting({ ...defaults.audioRouting, ...(cfg.audioRouting || {}) })
+		cfg.audioRouting = {
+			...ar,
+			programLayout: resolveEffectiveProgramLayout(ar, cfg.audioOutputs, cfg),
+		}
 	}
 
 	mergeSystemDisplaySettings(ctx, settings)
@@ -248,6 +271,8 @@ async function handlePost(path, body, ctx) {
 	if (sChanged) { sideEffects.push('Applying streaming changes…'); if (typeof ctx.toggleStreaming === 'function') await ctx.toggleStreaming(cfg.streaming.enabled); else if (typeof ctx.restartStreaming === 'function') await ctx.restartStreaming() }
 	if (settings.osc_info_supplement_ms !== undefined) startOscPlaybackInfoSupplement(ctx)
 	if (typeof ctx._wsBroadcast === 'function' && typeof ctx.getState === 'function') { const st = ctx.getState(); if (st?.channelMap) ctx._wsBroadcast('change', { path: 'channelMap', value: st.channelMap }) }
+
+	warnings.push(...validateDecklinkOutputResolution(cfg).warnings)
 
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sideEffects, oscRestarted, ...(warnings.length ? { warnings } : {}) }) }
 }

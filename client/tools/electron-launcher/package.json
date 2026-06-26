@@ -1,0 +1,7 @@
+{
+  "name": "highascg-launcher",
+  "version": "2026.05.20",
+  "main": "main.js",
+  "description": "Premium Electron Launcher & Simulation Center for HighAsCG",
+  "private": true
+}

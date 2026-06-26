@@ -347,6 +347,10 @@ class AmcpClient extends EventEmitter {
 		return this.basic.stop(channel, layer)
 	}
 
+	call(channel, layer, fn, paramsStr) {
+		return this.basic.call(channel, layer, fn, paramsStr)
+	}
+
 	clear(channel, layer) {
 		return this.basic.clear(channel, layer)
 	}

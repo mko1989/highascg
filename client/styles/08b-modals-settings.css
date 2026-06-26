@@ -1,0 +1,252 @@
+.modal-footer {
+	padding: 16px 20px;
+	border-top: 1px solid var(--border);
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 12px;
+}
+
+.settings-modal .modal-footer {
+	justify-content: flex-start;
+}
+
+/* Settings — viewport-sized shell; inner pane scrolls so tab switches don’t resize the modal */
+.modal-content.settings-modal {
+	width: min(94vw, 52rem) !important;
+	max-width: min(94vw, 52rem) !important;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.settings-body {
+	display: flex;
+	gap: 20px;
+	padding: 0;
+	min-height: min(70vh, 52rem);
+	height: min(70vh, 52rem);
+	max-height: min(76vh, 56rem);
+	overflow: hidden;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.settings-tabs {
+	width: 160px;
+	background: var(--bg-dark);
+	border-right: 1px solid var(--border);
+	padding: 12px 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.settings-tab {
+	padding: 10px 16px;
+	background: none;
+	border: none;
+	border-left: 3px solid transparent;
+	color: var(--text-muted);
+	text-align: left;
+	font-size: 0.9rem;
+	cursor: pointer;
+	transition: background 0.1s, color 0.1s;
+}
+
+.settings-tab:hover {
+	background: var(--bg-elevated);
+	color: var(--text);
+}
+
+.settings-tab.active {
+	color: var(--accent);
+	background: rgba(88, 166, 255, 0.1);
+	border-left-color: var(--accent);
+}
+
+.settings-panes {
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 20px;
+	-webkit-overflow-scrolling: touch;
+}
+
+.settings-pane {
+	display: none;
+}
+
+.settings-pane.active {
+	display: block;
+}
+
+.settings-category {
+	font-size: 0.72rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+	margin: 1.35rem 0 0.65rem;
+	padding-top: 1.1rem;
+	border-top: 1px solid var(--border);
+	line-height: 1.3;
+}
+
+.settings-pane > .settings-category:first-of-type {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+
+.settings-group {
+	margin-bottom: 20px;
+}
+
+.settings-group label {
+	display: block;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}
+
+.settings-group input[type="text"],
+.settings-group input[type="number"],
+.settings-group select {
+	width: 100%;
+	padding: 8px 12px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.9rem;
+}
+
+.settings-group.checkbox label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	color: var(--text);
+}
+
+.settings-group.checkbox input {
+	margin: 0;
+}
+
+.settings-note {
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	font-style: italic;
+	margin-bottom: 16px;
+}
+
+/* ALSA hardware mixer (alsamixer-style) in Live audio settings */
+.alsa-mixer-panel__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 0.75rem;
+	align-items: flex-end;
+	margin-bottom: 0.5rem;
+}
+
+.alsa-mixer-panel__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.alsa-mixer-panel__select {
+	min-width: 8rem;
+	padding: 6px 10px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.85rem;
+}
+
+.alsa-mixer-panel__controls {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	max-height: 22rem;
+	overflow-y: auto;
+	padding: 0.35rem 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.alsa-mixer-panel__row {
+	display: grid;
+	grid-template-columns: minmax(6rem, 1.2fr) auto 1fr auto;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0.35rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alsa-mixer-panel__row--volume {
+	grid-template-columns: minmax(6rem, 1.2fr) 2rem 1fr 4.5rem;
+}
+
+.alsa-mixer-panel__label {
+	font-size: 0.8rem;
+	color: var(--text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.alsa-mixer-panel__slider {
+	width: 100%;
+	accent-color: var(--accent, #58a6ff);
+}
+
+.alsa-mixer-panel__val {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+.alsa-mixer-panel__mute {
+	width: 2rem;
+	height: 1.6rem;
+	padding: 0;
+	font-size: 0.7rem;
+	font-weight: 600;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg-dark);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.alsa-mixer-panel__mute--active {
+	background: rgba(248, 113, 113, 0.2);
+	border-color: #f87171;
+	color: #fca5a5;
+}
+
+.alsa-mixer-panel__enum {
+	width: 100%;
+	padding: 6px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.85rem;
+}
+
+.alsa-mixer-panel__bool {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	cursor: pointer;
+}

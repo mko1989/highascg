@@ -1,0 +1,7 @@
+/**
+ * Audio Mixer Console view — style entrypoint (split for maintainability).
+ */
+@import url('./07c1-audio-mixer-view-shell-header.css');
+@import url('./07c2-audio-mixer-view-console-layout.css');
+@import url('./07c3-audio-mixer-view-channel-strip.css');
+@import url('./07c4-audio-mixer-view-matrix-empty-modal.css');

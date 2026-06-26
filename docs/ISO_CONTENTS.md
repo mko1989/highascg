@@ -22,8 +22,8 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  HighAsCG (Node.js bridge) — highascg.service → :4200 (headless) │
-│  Client↔Caspar AMCP + Client↔Ubuntu OS via REST/WS               │
+│  HighAsCG — highascg.service → :4200 (API + dist-web/ UI, WO-52) │
+│  Browser UI ↔ Caspar AMCP + UI ↔ Ubuntu OS via REST/WS (same host) │
 │  (full app tree often from exFAT after WO‑47 bootstrap)         │
 ├─────────────────────────────────────────────────────────────┤
 │  CasparCG Server 2.5 + CEF + casparcg-scanner               │
@@ -149,7 +149,7 @@ Caspar is launched with config under **`~/highascg`**, matching HighAsCG’s gen
 | Item | Notes |
 |------|------|
 | **Service** | **`highascg.service`** — `node index.js` (see **`scripts/write-highascg-systemd-unit.sh`**) |
-| **HTTP API** | Default **:4200**; **`HIGHASCG_HEADLESS=true`** — no Web UI on playout (Electron on operator PC) |
+| **HTTP** | Default **:4200** — REST **`/api/*`**, WS **`/api/ws`**, operator UI **`dist-web/`** at **`/`** (WO-52). **`HIGHASCG_HEADLESS=true`** = API-only debug (optional) |
 | **Deploy path on playout host** | **`/home/casparcg/highascg`** |
 | **Depends on** | **`package.json`** present (WO‑47: from exFAT **`update/server/`** apply) |
 
@@ -265,7 +265,7 @@ sudo bash deprecated/tools/release/make-dev-github-release-iso-quick.sh
 | DeckLink **desktopvideo**? | **Yes**, if installed on build host before produce |
 | Caspar + scanner binaries? | **Yes**, if install.sh ran |
 | **`~/highascg/config/casparcg.config`** stub? | **Yes** (minimal shell) |
-| Full HighAsCG **`src/` / `node_modules`?** | **Yes** when **`HIGHASCG_ISO_EMBED_SERVER=1`** (default); **`client/`**, **`dist-web/`**, **`work/`** excluded — operator UI via **Electron launcher** (highascg-client) |
+| Full HighAsCG **`src/` / `node_modules`?** | **Yes** when **`HIGHASCG_ISO_EMBED_SERVER=1`** (default). **`client/`** sources excluded from ISO; **`dist-web/`** via **`drop-update/`** (WO-52) |
 | Operator media / templates? | **No** in squashfs — **exFAT** |
 | GitHub alpha tarball contents? | Same as **exFAT app tree**, not the minimal ISO shell |
 

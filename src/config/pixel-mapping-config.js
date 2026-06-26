@@ -1,7 +1,8 @@
 'use strict'
 
 const { destinationsFromConfig } = require('./screen-destinations')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
+const { resolveOutputPixelSize } = require('../utils/mapping-gpu-os-layout')
+const { resolveDecklinkTileVideoMode } = require('./decklink-output-resolve')
 
 /**
  * Map pixel_mapping outputs onto the **program channel that feeds the node's input** (see `work/caspar_extended.config`):
@@ -61,46 +62,46 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 		const nodeOutConns = connectors.filter((c) => c.deviceId === nodeId && c.kind === 'pixel_map_out')
 
 		if (feed?.kind === 'program') {
-			let srcX = 0
+			/** Horizontal pack position for DeckLink outputs that have no mapping rect yet. */
+			let decklinkPackX = 0
 			/** @type {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} */
 			const tiles = []
 
 			for (let idx = 0; idx < outputs.length; idx++) {
 				const outDef = outputs[idx]
 				const modeId = String(outDef?.mode || '1080p5000').trim()
-				const spec = STANDARD_VIDEO_MODES[modeId]
-				const w = spec?.width ?? 1920
-				const h = spec?.height ?? 1080
+				const { width: specW, height: specH } = resolveOutputPixelSize(outDef)
 
 				const slice = mappings.find((m) => String(m.outputId) === String(outDef?.id || ''))
-				const tileSrcX = slice?.rect?.x ?? srcX
-				const tileSrcY = slice?.rect?.y ?? 0
-				const tileW = slice?.rect?.w ?? w
-				const tileH = slice?.rect?.h ?? h
+				const hasRect =
+					slice?.rect &&
+					Number.isFinite(Number(slice.rect.x)) &&
+					Number.isFinite(Number(slice.rect.y))
+				const tileW = slice?.rect?.w ?? specW
+				const tileH = slice?.rect?.h ?? specH
 
 				const conn =
 					nodeOutConns.find((c) => Number(c?.index) === idx) ||
 					nodeOutConns.find((c) => String(c?.id || '') === `${nodeId}_${String(outDef?.id || '')}`) ||
 					nodeOutConns.find((c) => String(c?.id || '').endsWith(`_${String(outDef?.id || '')}`))
-				if (!conn) {
-					srcX += w
-					continue
-				}
+				if (!conn) continue
 				const edge = edges.find((e) => String(e.sourceId) === String(conn.id))
-				if (!edge) {
-					srcX += w
-					continue
-				}
+				if (!edge) continue
 				const sink = byId.get(String(edge.sinkId || ''))
-				if (!sink || (sink.kind !== 'decklink_io' && sink.kind !== 'decklink_out')) {
-					srcX += w
-					continue
-				}
+				if (!sink || (sink.kind !== 'decklink_io' && sink.kind !== 'decklink_out')) continue
 				const devNum = parseInt(String(sink.externalRef || ''), 10)
-				if (!(Number.isFinite(devNum) && devNum > 0)) {
-					srcX += w
-					continue
-				}
+				if (!(Number.isFinite(devNum) && devNum > 0)) continue
+
+				const tileSrcX = hasRect ? Number(slice.rect.x) : decklinkPackX
+				const tileSrcY = hasRect ? Number(slice.rect.y) : 0
+				if (!hasRect) decklinkPackX += tileW
+				const tileFps = Math.max(1, parseFloat(String(outDef?.fps ?? 50)) || 50)
+				const tileVideoMode = resolveDecklinkTileVideoMode({
+					width: tileW,
+					height: tileH,
+					fps: tileFps,
+					modeHint: modeId,
+				})
 
 				tiles.push({
 					device: devNum,
@@ -110,9 +111,8 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 					destY: 0,
 					width: tileW,
 					height: tileH,
-					videoMode: modeId,
+					videoMode: tileVideoMode,
 				})
-				srcX += w
 			}
 
 			if (tiles.length > 0) {

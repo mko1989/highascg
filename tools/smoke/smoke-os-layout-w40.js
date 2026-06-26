@@ -252,6 +252,7 @@ test('WO-40: override width on screen 1 shifts following head X', () => {
 })
 
 test('WO-40a: multiview head shifts right of mapping GPU bbox (pixel-map screen 1 + screen 2 + MV)', () => {
+	const nodeId = 'pm1'
 	const cfg = {
 		screen_count: 2,
 		casparServer: {
@@ -262,16 +263,62 @@ test('WO-40a: multiview head shifts right of mapping GPU bbox (pixel-map screen 
 			multiview_enabled: true,
 			multiview_mode: '1080p5000',
 		},
-		screenDestinations: require('../../config/screen_destinations.json'),
-		deviceGraph: require('../../config/device_graph.json'),
+		screenDestinations: {
+			version: 1,
+			destinations: [
+				{ id: 'd1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: 'custom', width: 5120, height: 1024 },
+				{ id: 'mv1', mode: 'multiview', videoMode: '1080p5000' },
+			],
+		},
+		deviceGraph: {
+			devices: [
+				{ id: HOST, role: 'caspar_host', label: 'H' },
+				{ id: DEST_DEV, role: 'destinations', label: 'D' },
+				{
+					id: nodeId,
+					role: 'pixel_mapping',
+					label: 'M',
+					settings: {
+						outputs: [
+							{ id: 'o1', mode: '1080p5000' },
+							{ id: 'o2', mode: '1080p5000' },
+						],
+						mappings: [
+							{ outputId: 'o1', rect: { x: 0, y: 0, w: 2560, h: 1024 } },
+							{ outputId: 'o2', rect: { x: 2560, y: 0, w: 2560, h: 1024 } },
+						],
+					},
+				},
+			],
+			connectors: [
+				{ id: 'gpu_a', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-0' },
+				{ id: 'gpu_b', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-6' },
+				{ id: 'gpu_mv', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-4' },
+				{ id: `${nodeId}_o1`, deviceId: nodeId, kind: 'pixel_map_out', index: 0 },
+				{ id: `${nodeId}_o2`, deviceId: nodeId, kind: 'pixel_map_out', index: 1 },
+				{ id: 'dst_in_d1', deviceId: DEST_DEV, kind: 'destination_in', externalRef: 'd1' },
+				{ id: 'dst_in_mv1', deviceId: DEST_DEV, kind: 'destination_in', externalRef: 'mv1' },
+				{ id: 'pm_in', deviceId: nodeId, kind: 'pixel_map_in' },
+			],
+			edges: [
+				{ id: 'e0', sourceId: 'dst_in_d1', sinkId: 'pm_in' },
+				{ id: 'e1', sourceId: `${nodeId}_o1`, sinkId: 'gpu_a' },
+				{ id: 'e2', sourceId: `${nodeId}_o2`, sinkId: 'gpu_b' },
+				{ id: 'e3', sourceId: 'dst_in_mv1', sinkId: 'gpu_mv' },
+			],
+		},
 	}
 	const layout = calculateLayoutPositions(cfg)
-	assert.equal(layout.screens[2]?.x, 5120, 'screen 2 after mapping bbox')
-	assert.equal(layout.multiview[1]?.x, 7040, 'multiview after screen 2 (5120 + 1920)')
-	assert.equal(layout.multiview[1]?.sysId, 'HDMI-0')
+	assert.equal(layout.mappingGpuOutputs.length, 2)
+	assert.equal(layout.mappingGpuOutputs[0].sysId, 'DP-0')
+	assert.equal(layout.mappingGpuOutputs[1].sysId, 'DP-6')
+	assert.equal(layout.multiview[1]?.x, 5120, 'multiview after mapping bbox')
+	assert.equal(layout.multiview[1]?.sysId, 'DP-4')
+	assert.equal(layout.screens[2], undefined, 'no separate screen 2 when mapping owns DP-6')
 })
 
 test('graph-bound 3-head layout ignores stale screen_N overrides (multiview + PGM/PRV + PGM2)', () => {
+	const nodeId = 'pm1'
 	const cfg = {
 		screen_count: 2,
 		screen_1_system_id: 'HDMI-0',
@@ -280,19 +327,99 @@ test('graph-bound 3-head layout ignores stale screen_N overrides (multiview + PG
 		screen_2_system_id: 'DP-2',
 		screen_2_os_mode: '1920x1080',
 		screen_2_os_rate: 50,
-		screenDestinations: require('../../config/screen_destinations.json'),
-		deviceGraph: require('../../config/device_graph.json'),
+		screenDestinations: {
+			version: 1,
+			destinations: [
+				{ id: 'd1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: 'custom', width: 5120, height: 1024 },
+				{ id: 'mv1', mode: 'multiview', videoMode: '1080p5000' },
+			],
+		},
+		deviceGraph: {
+			devices: [
+				{ id: HOST, role: 'caspar_host', label: 'H' },
+				{ id: DEST_DEV, role: 'destinations', label: 'D' },
+				{
+					id: nodeId,
+					role: 'pixel_mapping',
+					label: 'M',
+					settings: {
+						outputs: [
+							{ id: 'o1', mode: '1080p5000' },
+							{ id: 'o2', mode: '1080p5000' },
+						],
+						mappings: [
+							{ outputId: 'o1', rect: { x: 0, y: 0, w: 2560, h: 1024 } },
+							{ outputId: 'o2', rect: { x: 2560, y: 0, w: 2560, h: 1024 } },
+						],
+					},
+				},
+			],
+			connectors: [
+				{ id: 'gpu_a', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-0' },
+				{ id: 'gpu_b', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-6' },
+				{ id: 'gpu_mv', deviceId: HOST, kind: 'gpu_out', externalRef: 'DP-4' },
+				{ id: `${nodeId}_o1`, deviceId: nodeId, kind: 'pixel_map_out', index: 0 },
+				{ id: `${nodeId}_o2`, deviceId: nodeId, kind: 'pixel_map_out', index: 1 },
+				{ id: 'dst_in_d1', deviceId: DEST_DEV, kind: 'destination_in', externalRef: 'd1' },
+				{ id: 'dst_in_mv1', deviceId: DEST_DEV, kind: 'destination_in', externalRef: 'mv1' },
+				{ id: 'pm_in', deviceId: nodeId, kind: 'pixel_map_in' },
+			],
+			edges: [
+				{ id: 'e0', sourceId: 'dst_in_d1', sinkId: 'pm_in' },
+				{ id: 'e1', sourceId: `${nodeId}_o1`, sinkId: 'gpu_a' },
+				{ id: 'e2', sourceId: `${nodeId}_o2`, sinkId: 'gpu_b' },
+				{ id: 'e3', sourceId: 'dst_in_mv1', sinkId: 'gpu_mv' },
+			],
+		},
 	}
 	const { plannedHeadsFromLayout } = require('../../src/utils/xrandr-layout-verify')
 	const layout = calculateLayoutPositions(cfg)
 	const planned = plannedHeadsFromLayout(layout, { config: cfg })
 	assert.equal(planned.length, 3)
+	const byX = (a, b) => a.x - b.x
 	assert.deepEqual(
-		planned.map((h) => ({ sysId: h.sysId, mode: h.mode, x: h.x, rate: h.rate })),
+		planned.map((h) => ({ sysId: h.sysId, mode: h.mode, x: h.x, rate: h.rate })).sort(byX),
 		[
-			{ sysId: 'DP-2', mode: '5120x1024', x: 0, rate: 50 },
+			{ sysId: 'DP-0', mode: '2560x1024', x: 0, rate: 50 },
+			{ sysId: 'DP-6', mode: '2560x1024', x: 2560, rate: 50 },
 			{ sysId: 'DP-4', mode: '1920x1080', x: 5120, rate: 50 },
-			{ sysId: 'HDMI-0', mode: '1920x1080', x: 7040, rate: 50 },
 		],
 	)
+})
+
+test('multiview 2160p5000 maps to 3840x2160 for xrandr layout', () => {
+	const { mapCasparModeToXrandrRes } = require('../../src/utils/os-layout-calculator-helpers')
+	assert.equal(mapCasparModeToXrandrRes('2160p5000'), '3840x2160')
+	assert.equal(mapCasparModeToXrandrRes('1080p5000'), '1920x1080')
+	assert.equal(mapCasparModeToXrandrRes('720p5000'), '1280x720')
+
+	const cfg = {
+		screen_count: 2,
+		casparServer: { screen_count: 2, multiview_enabled: true, multiview_mode: '1080p5000' },
+		screenDestinations: {
+			version: 1,
+			destinations: [
+				{ id: 'd1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000' },
+				{ id: 'd2', mainScreenIndex: 1, mode: 'pgm_prv', videoMode: '1080p5000' },
+				{ id: 'mv1', mode: 'multiview', videoMode: '2160p5000', width: 3840, height: 2160 },
+			],
+		},
+		deviceGraph: {
+			devices: [
+				{ id: 'caspar_host', role: 'caspar_host', label: 'H' },
+				{ id: 'dest_dev', role: 'destinations', label: 'D' },
+			],
+			connectors: [
+				{ id: 'gpu_a', deviceId: 'caspar_host', kind: 'gpu_out', externalRef: 'DP-0' },
+				{ id: 'gpu_b', deviceId: 'caspar_host', kind: 'gpu_out', externalRef: 'DP-1' },
+				{ id: 'gpu_mv', deviceId: 'caspar_host', kind: 'gpu_out', externalRef: 'DP-2' },
+				{ id: 'dst_in_mv1', deviceId: 'dest_dev', kind: 'destination_in', externalRef: 'mv1' },
+			],
+			edges: [{ id: 'e1', sourceId: 'dst_in_mv1', sinkId: 'gpu_mv' }],
+		},
+	}
+	const layout = calculateLayoutPositions(cfg)
+	assert.equal(layout.multiview[1]?.mode, '3840x2160')
+	assert.equal(layout.multiview[1]?.width, 3840)
+	assert.equal(layout.multiview[1]?.height, 2160)
 })

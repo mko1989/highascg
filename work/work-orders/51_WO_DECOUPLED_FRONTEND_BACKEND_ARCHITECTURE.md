@@ -8,7 +8,7 @@
 > 4. Do **not** delete previous agents’ log entries.
 
 **Parent / context:** [Architecture Analysis](../../docs/architecture_analysis.md) or `/home/casparcg/.gemini/antigravity/brain/0ec5855d-b84e-4947-b307-3f07952c0eca/architecture_analysis.md`  
-**Status:** Implemented (see [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](../../docs/PLAN_SERVER_CLIENT_SPLIT.md))  
+**Status:** Historical — WO-51 headless model superseded by **WO-52** (API + `dist-web/` on playout `:4200`). See [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](../../docs/PLAN_SERVER_CLIENT_SPLIT.md), [`from_client/AGENT_SERVER_CLIENT_MERGE.md`](../../from_client/AGENT_SERVER_CLIENT_MERGE.md).  
 **Prerequisites:** HighAsCG modular layout rendering, functioning settings and device-graph APIs.
 
 ---
@@ -120,7 +120,10 @@ server {
 - **Verified Operations**: Confirmed dynamic CORS integration, compiled file pathways, and seamless reverse proxy routing. Headless execution verified on port 8888 under local CLI options.
 - **Instructions for Next Agent:** Continue monitoring production Nginx bindings; optionally optimize production bundles further once deployed on local site servers.
 
+### 2026-06 — WO-52 supersession note
+- **Production:** API + **`dist-web/`** on playout **`:4200`** (same machine). See [`from_client/AGENT_SERVER_CLIENT_MERGE.md`](../../from_client/AGENT_SERVER_CLIENT_MERGE.md).
+- **WO-51 headless + remote Electron** remains documented in [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](../../docs/PLAN_SERVER_CLIENT_SPLIT.md) as historical.
+
 ### 2026-05-20 — Server/client split closed (PLAN phases 3–4)
-- **Canonical operator UI:** Electron launcher (`npm run launcher`) with `HIGHASCG_HEADLESS=true` on playout; server GitHub tarball excludes `client/` and `dist-web/`.
-- **Releases:** `npm run release:github-server`, `release:github-launcher`, optional `release:github-client`; `release:github-app` documented as legacy monolith.
-- **Instructions for next agent:** None — WO‑51 checklist complete; follow [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](../../docs/PLAN_SERVER_CLIENT_SPLIT.md) for future hardening only.
+- **At the time:** Electron launcher with `HIGHASCG_HEADLESS=true` on playout; server tarball excluded `client/` and `dist-web/`.
+- **Superseded by WO-52** — see entry above.

@@ -1,0 +1,139 @@
+/**
+ * Drag overlay, ingest URL/upload progress, publish modal progress.
+ */
+
+.sources-drag-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(99, 102, 241, 0.15);
+	backdrop-filter: blur(2px);
+	z-index: 999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 2px dashed var(--accent);
+	border-radius: 4px;
+	pointer-events: none;
+}
+
+.sources-drag-overlay__content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	background: var(--bg-elevated);
+	padding: 24px 48px;
+	border-radius: 8px;
+	border: 1px solid var(--accent);
+	box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+	color: var(--text);
+	font-size: 1.1rem;
+	font-weight: 500;
+}
+
+.sources-drag-overlay__icon {
+	font-size: 2.5rem;
+	color: var(--accent);
+}
+
+.ingest-url-row {
+	display: flex;
+	gap: 4px;
+}
+
+.ingest-url-input {
+	flex: 1;
+	min-width: 0;
+	padding: 5px 8px;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+	background: var(--bg-elevated);
+	color: var(--text);
+	font-size: 0.75rem;
+}
+.ingest-url-input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+.ingest-url-btn {
+	padding: 5px 10px;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+	background: var(--accent);
+	color: #fff;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+.ingest-url-btn:hover {
+	filter: brightness(1.15);
+}
+
+.ingest-status-col {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: 100%;
+	min-width: 0;
+}
+
+.ingest-status {
+	font-size: 0.72rem;
+	min-height: 1em;
+	padding: 0 2px;
+}
+.ingest-status--info { color: var(--text-muted); }
+.ingest-status--ok { color: #34d399; }
+.ingest-status--error { color: #f87171; }
+
+.ingest-upload-progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+}
+.ingest-upload-progress__track {
+	flex: 1;
+	min-width: 0;
+	height: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 3px;
+	overflow: hidden;
+}
+.ingest-upload-progress__bar {
+	height: 100%;
+	background: var(--accent);
+	border-radius: 3px;
+	transition: width 0.08s ease-out;
+}
+.ingest-upload-progress__pct {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	min-width: 2.5rem;
+	text-align: right;
+}
+
+.publish-modal .progress-bar-wrap {
+	height: 8px;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 4px;
+	overflow: hidden;
+}
+.publish-modal .progress-bar {
+	height: 100%;
+	background: var(--accent);
+	border-radius: 4px;
+	transition: width 0.12s ease-out;
+}
+.publish-upload-percent {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	margin-top: 2px;
+}
+

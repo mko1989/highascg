@@ -96,3 +96,27 @@ test('addEdge: caspar output → caspar output rejected', () => {
 	assert.equal(addEdgeToGraph(g, 'gpu_a', 'gpu_b').ok, false)
 	assert.equal(edgeConnectAllowed(g, 'gpu_a', 'gpu_b').ok, false)
 })
+
+test('pruneDestinationFromGraph removes cables and destination_in connector', () => {
+	const { pruneDestinationFromGraph } = require('../../src/config/device-graph-edges')
+	const g = normalizeDeviceGraph({
+		devices: [
+			{ id: DEFAULT_DEVICE_ID, role: 'caspar_host', label: 'C' },
+			{ id: DEST_DEVICE_ID, role: 'destinations', label: 'Dst' },
+		],
+		connectors: [
+			{ id: 'gpu_p0', deviceId: DEFAULT_DEVICE_ID, kind: 'gpu_out', label: 'GPU 0' },
+			{ id: 'dst_in_led1', deviceId: DEST_DEVICE_ID, kind: 'destination_in', label: 'LED', externalRef: 'led1' },
+			{ id: 'dst_in_led2', deviceId: DEST_DEVICE_ID, kind: 'destination_in', label: 'LED 2', externalRef: 'led2' },
+		],
+		edges: [
+			{ id: 'e1', sourceId: 'dst_in_led1', sinkId: 'gpu_p0' },
+			{ id: 'e2', sourceId: 'dst_in_led2', sinkId: 'gpu_p0' },
+		],
+	})
+	const pruned = pruneDestinationFromGraph(g, 'led1')
+	assert.equal(pruned.connectors.some((c) => c.id === 'dst_in_led1'), false)
+	assert.equal(pruned.connectors.some((c) => c.id === 'dst_in_led2'), true)
+	assert.equal((pruned.edges || []).length, 1)
+	assert.equal(pruned.edges[0].sourceId, 'dst_in_led2')
+})

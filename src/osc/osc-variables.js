@@ -1,6 +1,6 @@
 /**
  * Companion-style `variables` keys from Caspar OSC aggregate (bridge / GET /api/variables).
- * Naming: `playback_ch{N}_lay{L}_*`, `audio_ch{N}_L_dBFS` / `_R_dBFS`, `profiler_ch{N}_healthy`.
+ * Naming: `playback_ch{N}_lay{L}_*`, `osc_ch{N}_audio_c{M}_dBFS` (1-based), legacy `_L` / `_R`, `profiler_ch{N}_healthy`.
  */
 
 'use strict'
@@ -57,6 +57,15 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 
 		const audio = ch.audio
 		if (audio && Array.isArray(audio.levels) && audio.levels.length > 0) {
+			const nb = Math.max(0, audio.nbChannels || audio.levels.length)
+			for (let i = 0; i < nb; i++) {
+				const slot = audio.levels[i]
+				const db = slot && Number.isFinite(slot.dBFS) ? _fmt(slot.dBFS, 1) : ''
+				state.setVariable(`${prefix}_audio_c${i + 1}_dBFS`, db)
+			}
+			for (let i = nb + 1; i <= 16; i++) {
+				state.setVariable(`${prefix}_audio_c${i}_dBFS`, '')
+			}
 			const L = audio.levels[0]
 			const R = audio.levels[1]
 			state.setVariable(`${prefix}_audio_L`, L && Number.isFinite(L.dBFS) ? _fmt(L.dBFS, 1) : '')
@@ -65,7 +74,9 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 				R && Number.isFinite(R.dBFS) ? _fmt(R.dBFS, 1) : L && Number.isFinite(L.dBFS) ? _fmt(L.dBFS, 1) : ''
 			)
 		} else {
-			// Clear stale L/R when snapshot has no meter data (otherwise Companion + UI keep last loud value)
+			for (let i = 1; i <= 16; i++) {
+				state.setVariable(`${prefix}_audio_c${i}_dBFS`, '')
+			}
 			state.setVariable(`${prefix}_audio_L`, '')
 			state.setVariable(`${prefix}_audio_R`, '')
 		}

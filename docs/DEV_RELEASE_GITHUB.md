@@ -3,13 +3,12 @@
 Use this flow when you have a **build host or workstation** running the repo (typically with `node_modules` already installed). Two modes:
 
 - **Full image (rare)** — Eggs ISO + tarball: **`npm run release:dev-github`** (needs **`sudo`** / eggs).
-- **Split server + client (canonical)** — playout API tarball + operator UI:
-  - **`npm run release:github-server`** → `highascg-server_<UTC>.tar.gz` (no `client/`, `dist-web/`)
-  - **`npm run release:github-launcher`** → `highascg-launcher_<UTC>.tar.gz` (Electron prep kit + embedded `dist-web/`)
-  - **`npm run release:github-client`** → `highascg-client_<UTC>.tar.gz` (`dist-web/` only — optional if you use launcher tarball)
-- **Alpha / app-only (legacy monolith)** — **`npm run release:github-app`** — full repo tarball with `dist-web/`; prefer split releases for new sticks.
+- **Server drop (canonical)** — playout tarball includes API + **`dist-web/`** (built from in-repo **`client/`**):
+  - **`npm run release:github-server`** → `highascg-server_<UTC>.tar.gz` (`src/` + **`dist-web/`**; no raw `client/` sources)
+  - **`npm run release:github-launcher`** → Electron hub (sim, multiserver, modules — packaged from `client/tools/electron-launcher/`)
+- **Alpha / app-only (legacy monolith)** — **`npm run release:github-app`** — full repo tarball; prefer **`release:github-server`** for playout.
 
-**Playout stick:** extract **`highascg-server_*.tar.gz`** into **`update/server/`** only (API + Caspar; no UI). **Operator laptop:** **`highascg-launcher_*.tar.gz`** or clone + **`npm run launcher`**. Do not put `dist-web/` on the playout stick.
+**Playout stick:** extract **`highascg-server_*.tar.gz`** into **`drop-update/`** (API + UI on **`http://<playout-ip>:4200/`**). Optional Electron hub ([highascg-client](https://github.com/mko1989/highascg-client)) for simulator / multiserver / stick prep — opens browser to playout.
 
 ## What gets published
 
@@ -23,7 +22,7 @@ Use this flow when you have a **build host or workstation** running the repo (ty
 
 | Asset | Produced by |
 |-------|----------------|
-| `dist/highascg_<UTC>.tar.gz` | **Legacy** monolith (`release:github-app`): `src/` + built **`dist-web/`**. Split server tarball has **no** `dist-web/`. |
+| `dist/highascg_<UTC>.tar.gz` | **Legacy** monolith (`release:github-app`). **WO-52 server** tarball includes **`dist-web/`**. |
 
 **Legacy alpha** (`npm run release:github-app`): monolith tarball only — prefer **`release:github-server`** + **`release:github-launcher`** for new deployments.
 
@@ -31,16 +30,16 @@ GitHub Releases have a soft **per-asset ~2 GiB** limit. If the server tarball 
 
 ### Why is the **server** tarball so big?
 
-The **server** asset (`release:github-server`) is backend-only — it does **not** include `client/` or `dist-web/`. Size still adds up because:
+The **server** asset (`release:github-server`) includes **`dist-web/`** (WO-52) but not in-tree **`client/`** sources. Size still adds up because:
 
 | Component | Typical share |
 |-----------|----------------|
 | **`node_modules/`** | Largest — all runtime deps (optional packages too if installed). Use `--zip-exclude-node-modules` + `npm ci` on the stick. |
 | **`tools/runtime/`** | Only tools subtree in server tarball (`exfat-sync-cli`, staged Caspar). |
-| **`src/`** | Node orchestrator, APIs, Caspar client (repo root). |
+| **`src/`**, **`dist-web/`** | Node bridge + operator UI bundle |
 | **`scripts/`**, **`config/`**, **`template/`** | Install helpers and Caspar templates. |
 
-The **client** tarball is small (`dist-web/` only). The **launcher** tarball ships `client/tools/electron-launcher/` including synced `dist-web/`. **`release:github-app`** remains a legacy monolith with both server and UI.
+The **client** tarball (if published separately) is `dist-web/` only. The **launcher** tarball ships `client/tools/electron-launcher/` (optional Electron packaging — not the canonical UI tree). **`release:github-app`** remains a legacy monolith.
 
 Shared rules: [`scripts/archive-common.sh`](../scripts/archive-common.sh) (used by deploy + release scripts).
 
@@ -62,16 +61,14 @@ npm run release:github-server
 npm run release:github-launcher
 ```
 
-On the playout stick:
+On the playout stick (WO-52):
 
 ```bash
-mkdir -p <mount>/update/server
-tar -xzf highascg-server_<stamp>.tar.gz -C <mount>/update/server
+mkdir -p <mount>/drop-update
+tar -xzf highascg-server_<stamp>.tar.gz -C <mount>/drop-update
 ```
 
-Operator laptop: extract **`highascg-launcher_*.tar.gz`**, `npm install electron` in `electron-launcher/`, run Electron, set playout API host/port. Production playout: **`HIGHASCG_HEADLESS=true`**.
-
-Optional UI-only drop: **`npm run release:github-client`** (same `dist-web/` as launcher sync).
+After boot: open **`http://<playout-ip>:4200/`**. Optional Electron hub ([highascg-client](https://github.com/mko1989/highascg-client)) opens the same URL for simulator / multiserver / modules. **`HIGHASCG_HEADLESS=true`** is API-only debug, not production default.
 
 ### Legacy — monolith tarball
 

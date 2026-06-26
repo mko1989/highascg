@@ -48,6 +48,8 @@ const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
+const routesReplication = require('./routes-replication')
+const routesPrivateSync = require('./routes-private-sync')
 const moduleRegistry = require('../module-registry')
 
 /**
@@ -110,6 +112,15 @@ async function routeRequest(method, path, body, ctx, req) {
 		return await routesHostStats.handleGet(ctx)
 	}
 
+	if (method === 'GET') {
+		const replGet = await routesReplication.handleGet(p, ctx, req)
+		if (replGet) return replGet
+	}
+	if (method === 'POST') {
+		const replPost = await routesReplication.handlePost(p, body, ctx, req)
+		if (replPost) return replPost
+	}
+
 	if (method === 'GET' && p === '/api/system/exfat-sync') {
 		const r = await routesExfatSync.handleGet(p, ctx)
 		if (r) return r
@@ -117,6 +128,14 @@ async function routeRequest(method, path, body, ctx, req) {
 	if (method === 'POST' && p === '/api/system/exfat-sync/run') {
 		const r = await routesExfatSync.handlePost(p, body, ctx)
 		if (r) return r
+	}
+	if (method === 'GET') {
+		const pr = await routesPrivateSync.handleGet(p, ctx)
+		if (pr) return pr
+	}
+	if (method === 'POST') {
+		const pr = await routesPrivateSync.handlePost(p, body, ctx)
+		if (pr) return pr
 	}
 	if (
 		method === 'GET' &&
@@ -224,7 +243,7 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	{
 		const dv =
-			(p === '/api/device-view' || p === '/api/device-view/gpu-map-debug')
+			(p === '/api/device-view' || p === '/api/device-view/gpu-map-debug' || p === '/api/device-view/snapshot')
 				? method === 'GET'
 					? await routesDeviceView.handleGet(p, ctx, query)
 					: method === 'POST'
@@ -380,7 +399,7 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	// Lower-thirds API — works before Caspar gate (listing templates is offline-safe)
 	if (method === 'GET' && p.startsWith('/api/lower-thirds/')) {
-		const lr = routesLowerThirds.handleGet(p, ctx)
+		const lr = routesLowerThirds.handleGet(p, ctx, query)
 		if (lr) return lr
 	}
 	if (method === 'POST' && p.startsWith('/api/lower-thirds/')) {

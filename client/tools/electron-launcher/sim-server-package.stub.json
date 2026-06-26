@@ -1,0 +1,29 @@
+{
+	"name": "highascg-sim",
+	"version": "2026.05.20",
+	"description": "HighAsCG playout API (local simulation bundle for Electron launcher)",
+	"type": "commonjs",
+	"main": "index.js",
+	"private": true,
+	"scripts": {
+		"start": "node index.js --no-caspar"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"dependencies": {
+		"busboy": "^1.6.0",
+		"dmxnet": "^0.9.0",
+		"html-to-image": "^1.11.13",
+		"osc": "^2.4.5",
+		"sacn": "^4.6.2",
+		"unzipper": "^0.12.3",
+		"wetransfert": "^2.4.0",
+		"ws": "^8.18.0",
+		"xml2js": "^0.6.2"
+	},
+	"optionalDependencies": {
+		"grapesjs": "^0.21.2",
+		"three": "^0.184.0"
+	}
+}

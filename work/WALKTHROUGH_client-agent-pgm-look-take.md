@@ -1,10 +1,8 @@
 # Walkthrough: client agent — PGM look take (no client AMCP)
 
-**Audience:** Agent working in **`highascg-client`** (Electron + `dist-web`), **not** the legacy `client/` tree in **`highascg`** (server repo).
+**Audience:** Agent working on the **operator UI** — canonical sources in **`client/`** in this repo; production bundle **`dist-web/`**.
 
-**Problem we hit:** Fade-to-black between looks on PGM-only routing. Caspar logs showed `STOP 1-10` + `CG 1-11..18 CLEAR` **before** each server take. HACG server logs showed `exitLayers=0` — the server take path was correct; **client-side preview AMCP** was clearing PGM layer 10 first.
-
-**Root cause:** The client still builds and sends look-stack AMCP (`STOP`/`CLEAR`/`PLAY`/`LOADBG`) via `POST /api/amcp/batch`. That violates the server/client split documented in [`BACKEND_AND_CLIENT_SPLIT.md`](./BACKEND_AND_CLIENT_SPLIT.md).
+**Deploy model (WO-52):** UI and API run on the **same playout machine** at **`http://<host>:4200/`**. The UI still must not send look-stack AMCP to PGM — use server take APIs only.
 
 ---
 
@@ -105,9 +103,9 @@ If you still see `STOP 1-10` + `CG 1-11..18` before `LOADBG`, something on the *
 
 ---
 
-## Client changes required (`highascg-client`)
+## UI changes required (`dist-web/` — sources in highascg-client or in-tree `client/`)
 
-> **Note:** Any edits under `highascg/client/` in the server repo are **legacy/dev-only** and are **not shipped** on the playout stick. Port the behaviour below into **`highascg-client`**, then stop maintaining look AMCP in the server tree.
+> **Note:** In-tree **`highascg/client/`** is dev/build sources only. Production ships **`dist-web/`** on playout. Apply UI fixes in the UI source tree, rebuild, and deploy **`dist-web/`**.
 
 ### 1. Deck take — one API call only
 
@@ -206,6 +204,6 @@ These are **not** blockers for the client walkthrough but align with "client sen
 1. **Stop** sending look-stack AMCP from the client — that caused fade-to-black (`STOP` before `LOADBG`).
 2. **Deck take =** `POST /api/scene/take` with `{ channel, sceneId, forceCut?, framerate?, useServerLive: true }`.
 3. **PGM-only =** program take only; no preview push, no `/api/amcp/batch` for looks on PGM.
-4. Work in **`highascg-client`**; treat `highascg/client/` as legacy reference only, not the shipping UI.
+4. Work in in-repo **`client/`**; run `npm run build:client` before deploy. highascg-client is Electron packaging only.
 
 **Reference logs:** [`work/logs`](./logs) (2026-06-15) — STOP block at 20:07:39.449, server take at 20:07:39.472, `exitLayers=0`.

@@ -52,8 +52,15 @@ function augmentGraphWithSources(graph, live) {
  */
 async function handleGet(path, ctx, query) {
 	ctx.augmentGraphWithSources = augmentGraphWithSources
-	if (path !== '/api/device-view' && path !== '/api/device-view/gpu-map-debug') return null
+	if (path !== '/api/device-view' && path !== '/api/device-view/gpu-map-debug' && path !== '/api/device-view/snapshot') return null
 	const live = await Snapshot.buildLiveSnapshot(ctx)
+	if (path === '/api/device-view/snapshot') {
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody(live),
+		}
+	}
 	if (path === '/api/device-view/gpu-map-debug') {
 		return {
 			status: 200, headers: JSON_HEADERS,

@@ -100,6 +100,38 @@ function removeEdgeById(baseGraph, edgeId) {
 	return normalizeDeviceGraph(g)
 }
 
+/** Connector ids for a screen destination feed (`dst_in_<id>` and matching externalRef). */
+function destinationInputConnectorIds(graph, destinationId) {
+	const did = String(destinationId || '').trim()
+	const ids = new Set()
+	if (!did) return ids
+	ids.add(`dst_in_${did}`)
+	for (const c of graph?.connectors || []) {
+		if (c?.kind === 'destination_in' && String(c?.externalRef || '').trim() === did) {
+			ids.add(String(c.id))
+		}
+	}
+	return ids
+}
+
+/**
+ * Drop cables and destination_in connectors when a screen destination is removed.
+ * @param {object} baseGraph
+ * @param {string} destinationId
+ */
+function pruneDestinationFromGraph(baseGraph, destinationId) {
+	const g = normalizeDeviceGraph(baseGraph)
+	const dropIds = destinationInputConnectorIds(g, destinationId)
+	if (!dropIds.size) return g
+	g.edges = (g.edges || []).filter((e) => {
+		const s = String(e?.sourceId || '')
+		const t = String(e?.sinkId || '')
+		return !dropIds.has(s) && !dropIds.has(t)
+	})
+	g.connectors = (g.connectors || []).filter((c) => !dropIds.has(String(c?.id || '')))
+	return normalizeDeviceGraph(g)
+}
+
 module.exports = {
 	isCasparOutputConnector,
 	isDestinationInputConnector,
@@ -108,4 +140,6 @@ module.exports = {
 	ensureConnectorsFromSuggested,
 	addEdgeToGraph,
 	removeEdgeById,
+	pruneDestinationFromGraph,
+	destinationInputConnectorIds,
 }

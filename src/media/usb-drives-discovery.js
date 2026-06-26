@@ -23,6 +23,64 @@ function flattenLsblk(nodes, acc = []) {
 	return acc
 }
 
+function isRemovableBlockNode(n) {
+	const name = String(n?.name || '')
+	if (name.startsWith('loop')) return false
+	const tran = String(n.tran || '').toLowerCase()
+	return (
+		n.rm === true ||
+		n.rm === 1 ||
+		n.rm === 'true' ||
+		n.hotplug === true ||
+		n.hotplug === 1 ||
+		tran === 'usb'
+	)
+}
+
+/**
+ * Removable partitions/disks seen by lsblk but not mounted under an allowed ingest path.
+ * @param {string} jsonText
+ */
+function parseRemovableCandidates(jsonText) {
+	let root
+	try {
+		root = JSON.parse(jsonText)
+	} catch {
+		return []
+	}
+	/** @type {Array<{ blockDevice: string, label: string, size: string, fsType: string, readOnly: boolean }>} */
+	const out = []
+	const walk = (nodes, parentRemovable) => {
+		if (!Array.isArray(nodes)) return
+		for (const n of nodes) {
+			if (!n || typeof n !== 'object') continue
+			const name = String(n.name || '')
+			if (name.startsWith('loop')) continue
+			const removable = isRemovableBlockNode(n) || parentRemovable
+			const children = Array.isArray(n.children) ? n.children : []
+			const hasChildren = children.length > 0
+			const mp = n.mountpoint || null
+			const type = String(n.type || '')
+			const fsType = String(n.fstype || n.fsType || '')
+			const isMountCandidate =
+				type === 'part' || (type === 'disk' && !hasChildren && !!fsType)
+			if (isMountCandidate && !mp && removable) {
+				const blockDevice = name.startsWith('/') ? name : `/dev/${name}`
+				out.push({
+					blockDevice,
+					label: String(n.label || name),
+					size: String(n.size || ''),
+					fsType,
+					readOnly: n.ro === true || n.ro === 1 || String(n.mode || '').includes('ro'),
+				})
+			}
+			if (hasChildren) walk(children, removable)
+		}
+	}
+	walk(root.blockdevices || [], false)
+	return out
+}
+
 function parseLsblkJson(jsonText, encodeDriveId) {
 	let root; try { root = JSON.parse(jsonText) } catch { return [] }
 	const flat = flattenLsblk(root.blockdevices || [])
@@ -92,4 +150,16 @@ async function listUsbDrives(encodeDriveId) {
 	return drives.length ? drives : listLinuxFallbackMounts(encodeDriveId)
 }
 
-module.exports = { listUsbDrives, parseLsblkJson }
+async function listRemovableBlockDevices() {
+	if (process.platform !== 'linux') return []
+	const json = await runLsblkJson()
+	return parseRemovableCandidates(json)
+}
+
+module.exports = {
+	listUsbDrives,
+	listRemovableBlockDevices,
+	parseLsblkJson,
+	parseRemovableCandidates,
+	isRemovableBlockNode,
+}

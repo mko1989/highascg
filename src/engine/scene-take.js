@@ -7,7 +7,8 @@
 
 const playbackTracker = require('../state/playback-tracker')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
-const { audioRouteToAudioFilter } = require('./audio-route')
+const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
+const { audioFilterParam } = require('../caspar/amcp-utils')
 const { shouldApplyStraightAlphaKeyer } = require('./scene-take-lbg-helpers')
 
 function clipPath(layer) {
@@ -177,8 +178,8 @@ async function runSceneTake(amcp, opts) {
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
 		const cl = chLayerAmcp(channel, pLayer)
 		
-		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
-		const afConfig = af ? ` AF ${amcpParam(af)}` : ''
+		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2', resolveConfigProgramLayoutForChannel(self.config, channel))
+		const afConfig = af ? ` AF ${audioFilterParam(af)}` : ''
 
 		const playLine = `PLAY ${cl} ${amcpParam(clip)}${layer.loop ? ' LOOP' : ''}${afConfig}`
 		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1

@@ -22,12 +22,21 @@ const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
 const {
 	buildDecklinkKeyFillConsumersXml,
 	readDecklinkKeyFillSettings,
+	readDecklinkConsumerSettings,
 	parseDecklinkDeviceIndex,
-	normalizeDecklinkKeyer,
+	resolveDecklinkConsumerKeyer,
+	decklinkPixelFormatXml,
 } = require('./decklink-key-fill')
+const {
+	resolveDecklinkVideoModeForTarget,
+	channelVideoModeForDecklinkConsumer,
+	pickDecklinkParentVideoMode,
+	buildDecklinkPassthroughSubregion,
+} = require('./decklink-output-resolve')
 
 /**
- * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + synced `<ports>`.
+ * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + primary SDI
+ * (first tile on `<decklink>`) + synced `<ports>` for additional tiles.
  * Caspar cannot use the channel custom mode (e.g. 5120×1024) for DeckLink format — parent video-mode is required.
  * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
  * @param {{ videoMode?: string, keyer?: string }} [opts]
@@ -35,28 +44,29 @@ const {
 function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 	if (!Array.isArray(tiles) || tiles.length === 0) return ''
 	const globalVideoMode = escapeXml(String(opts.videoMode || tiles[0]?.videoMode || '1080p5000'))
-	const keyFillEnabled = opts.keyFillEnabled === true
-	const keyer = escapeXml(normalizeDecklinkKeyer(keyFillEnabled ? opts.keyer : 'internal'))
+	const pixelFormatXml = decklinkPixelFormatXml(String(opts.videoMode || tiles[0]?.videoMode || ''))
+	const keyerXml = `\n                     <keyer>${escapeXml(
+		resolveDecklinkConsumerKeyer({
+			fillDevice: tiles[0]?.device,
+			keyDevice: opts.keyDevice,
+			keyer: opts.keyer,
+		}),
+	)}</keyer>`
 	const subBlock = (t, indent) =>
 		`${indent}<subregion>\n${indent}    <src-x>${t.srcX}</src-x>\n${indent}    <src-y>${t.srcY}</src-y>\n${indent}    <dest-x>${t.destX}</dest-x>\n${indent}    <dest-y>${t.destY}</dest-y>\n${indent}    <width>${t.width}</width>\n${indent}    <height>${t.height}</height>\n${indent}</subregion>`
+	const portBody = (t, indent) =>
+		`\n${indent}<device>${t.device}</device>\n${indent}    <key-only>false</key-only>\n${indent}     <buffer-depth>3</buffer-depth>\n${indent}     <video-mode>${escapeXml(t.videoMode)}</video-mode>\n${subBlock(t, indent)}`
+	const primary = tiles[0]
+	const secondaries = tiles.slice(1)
+	const primaryXml = portBody(primary, '                    ')
 	const portsXml =
-		'\n                <ports>' +
-		tiles
-			.map(
-				(t) => `
-                    <port>
-                        <device>${t.device}</device>
-                        <key-only>false</key-only>
-                         <buffer-depth>3</buffer-depth>
-                         <video-mode>${escapeXml(t.videoMode)}</video-mode>
-${subBlock(t, '                        ')}
-                     </port>`
-			)
-			.join('') +
-		'\n                </ports>'
+		secondaries.length > 0
+			? `\n                <ports>${secondaries
+					.map((t) => `\n                   <port>${portBody(t, '                        ')}\n                     </port>`)
+					.join('')}\n                </ports>`
+			: ''
 	return `\n                <decklink>
-                     <video-mode>${globalVideoMode}</video-mode>
-                     <keyer>${keyer}</keyer>${portsXml}
+                     <video-mode>${globalVideoMode}</video-mode>${pixelFormatXml}${keyerXml}${primaryXml}${portsXml}
                  </decklink>`
 }
 
@@ -107,17 +117,26 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	if (tiles.length > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
 		profConsumersXml += buildDecklinkTiledConsumersXml(tiles, {
-			videoMode: String(tiles[0]?.videoMode || '1080p5000'),
+			videoMode: pickDecklinkParentVideoMode(tiles),
 			keyer: keyFill.keyer,
+			keyDevice: keyFill.keyDevice,
 			keyFillEnabled: keyFill.keyFillEnabled,
 		})
 	} else if (decklinkDevice > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
-		profConsumersXml += buildDecklinkKeyFillConsumersXml({
-			fillDevice: decklinkDevice,
-			keyDevice: keyFill.keyDevice,
-			keyer: keyFill.keyer,
-		})
+		const decklinkVideoMode = resolveDecklinkVideoModeForTarget(config, 'screen', n)
+		const consumerSettings = readDecklinkConsumerSettings(config, `screen_${n}_`)
+		if (decklinkVideoMode) {
+			const passthroughSubregion = buildDecklinkPassthroughSubregion({ width: dims.width, height: dims.height })
+			profConsumersXml += buildDecklinkKeyFillConsumersXml({
+				fillDevice: decklinkDevice,
+				keyDevice: keyFill.keyDevice,
+				keyer: keyFill.keyer,
+				videoMode: decklinkVideoMode,
+				consumerSettings,
+				passthroughSubregion,
+			})
+		}
 	}
 	const ndiEnabled = config[`screen_${n}_ndi_enabled`] === true || config[`screen_${n}_ndi_enabled`] === 'true'
 	if (ndiEnabled) {
@@ -132,6 +151,15 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const pgmChNum = routeMap.programCh(n)
 	const rtmpPgmXml = buildRtmpFfmpegConsumersForChannel(config, pgmChNum)
 	const screenConsumerEnabled = config[`screen_${n}_screen_consumer`] !== false && config[`screen_${n}_screen_consumer`] !== 'false'
+	const decklinkVideoModeForScreen =
+		decklinkDevice > 0 ? resolveDecklinkVideoModeForTarget(config, 'screen', n) : null
+	const pgmChannelModeId = channelVideoModeForDecklinkConsumer({
+		channelModeId: dims.modeId,
+		isChannelCustom: dims.isCustom,
+		decklinkVideoMode: decklinkVideoModeForScreen,
+		hasScreenConsumer: screenConsumerEnabled && !decklinkReplaceScreen,
+		decklinkReplaceScreen,
+	})
 	const screenConsumerXml = (decklinkReplaceScreen || !screenConsumerEnabled)
 		? ''
 		: `
@@ -140,7 +168,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
                 </screen>`
 
 	const pgmXml = `${channelXmlComment(`Caspar channel ${pgmChNum}: Screen ${n} program output (PGM)`)}        <channel>
-            <video-mode>${dims.modeId}</video-mode>${layoutXml}
+            <video-mode>${pgmChannelModeId}</video-mode>${layoutXml}
             <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${pgmStreamingXml}${profConsumersXml}${rtmpPgmXml}
             </consumers>
             <mixer>
@@ -239,7 +267,7 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	switch (mvProfile) {
 		case 'stream_only': includeStream = streamingOn; break
 		case 'screen_only': includeScreen = true; break
-		case 'decklink_only': includeDeck = mvDlDev > 0 && mvStd; break
+		case 'decklink_only': includeDeck = mvDlDev > 0; break
 		case 'screen_decklink': includeScreen = true; includeDeck = mvDlDev > 0; break
 		case 'decklink_stream': includeStream = streamingOn; includeDeck = mvDlDev > 0; break
 		case 'screen_stream_decklink': includeScreen = true; includeStream = streamingOn; includeDeck = mvDlDev > 0; break
@@ -253,11 +281,20 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	const mvKeyFill = readDecklinkKeyFillSettings(config, 'multiview_')
 	const deckBlock =
 		includeDeck && mvDlDev > 0
-			? buildDecklinkKeyFillConsumersXml({
-					fillDevice: mvDlDev,
-					keyDevice: mvKeyFill.keyDevice,
-					keyer: mvKeyFill.keyer,
-				})
+			? (() => {
+					const inheritedMode = resolveDecklinkVideoModeForTarget(config, 'multiview', n)
+					if (!inheritedMode) return ''
+					const consumerSettings = readDecklinkConsumerSettings(config, 'multiview_')
+					const passthroughSubregion = buildDecklinkPassthroughSubregion({ width: dims.width, height: dims.height })
+					return buildDecklinkKeyFillConsumersXml({
+						fillDevice: mvDlDev,
+						keyDevice: mvKeyFill.keyDevice,
+						keyer: mvKeyFill.keyer,
+						videoMode: inheritedMode,
+						consumerSettings,
+						passthroughSubregion,
+					})
+				})()
 			: ''
 	const streamBlock = includeStream ? mvStreamingXml : ''
 	
@@ -265,9 +302,18 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	const mvChNum = mvChs[n - 1] || null
 	const rtmpMvXml = mvChNum != null ? buildRtmpFfmpegConsumersForChannel(config, mvChNum) : ''
 
+	const decklinkVideoMode =
+		includeDeck && mvDlDev > 0 ? resolveDecklinkVideoModeForTarget(config, 'multiview', n) : null
+	const channelModeId = channelVideoModeForDecklinkConsumer({
+		channelModeId: modeId,
+		isChannelCustom: !mvStd,
+		decklinkVideoMode,
+		hasScreenConsumer: includeScreen,
+	})
+
 	const mvChLabel = mvChNum != null && Number.isFinite(Number(mvChNum)) ? mvChNum : '?'
 	const xml = `${channelXmlComment(`Caspar channel ${mvChLabel}: Multiview output #${n}`)}        <channel>
-            <video-mode>${modeId}</video-mode>
+            <video-mode>${channelModeId}</video-mode>
             <consumers>${screenBlock}${systemAudioXml}${portAudioXml}${streamBlock}${deckBlock}${rtmpMvXml}
             </consumers>
             <mixer>
@@ -368,7 +414,6 @@ function buildStreamingChannel(config, casparChannelNum) {
 		profXml = buildDecklinkKeyFillConsumersXml({
 			fillDevice: deckN,
 			keyDevice: parseDecklinkDeviceIndex(sc.decklinkKeyDevice),
-			keyer: normalizeDecklinkKeyer(sc.decklinkKeyer),
 		})
 	}
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'

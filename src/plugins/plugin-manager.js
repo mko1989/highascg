@@ -30,15 +30,6 @@ const PLUGIN_CATALOG = [
 			return isTruthy(envFlag) || config?.features?.autofollow === true
 		},
 	},
-	{
-		id: 'cg-studio',
-		name: 'Template Editor',
-		moduleName: 'cg-studio',
-		legacyEnabled: (config) => {
-			const envFlag = process.env.HIGHASCG_CG_STUDIO
-			return isTruthy(envFlag) || config?.features?.cgStudio === true
-		},
-	},
 ]
 
 function isTruthy(v) {

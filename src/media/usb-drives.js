@@ -39,6 +39,47 @@ async function listDirectory(driveId, relPath) {
 	} catch (e) { return { error: e.message } }
 }
 
+async function listRemovableBlockDevices() {
+	return Discovery.listRemovableBlockDevices()
+}
+
+async function mountUsbBlockDevice(blockDevice) {
+	if (process.platform === 'darwin') {
+		return { ok: false, message: 'Mount from UI is not supported on macOS' }
+	}
+	if (process.platform !== 'linux') return { ok: false, message: 'OS not supported' }
+	const dev = String(blockDevice || '').trim()
+	if (!/^\/dev\/[a-z0-9]+$/i.test(dev)) return { ok: false, message: 'Invalid device path' }
+	const candidates = await listRemovableBlockDevices()
+	if (!candidates.some((c) => c.blockDevice === dev)) {
+		return { ok: false, message: 'Device is not a removable volume eligible for mount' }
+	}
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			'udisksctl',
+			['mount', '-b', dev, '--no-user-interaction'],
+			{ timeout: 120000 },
+		)
+		const text = `${stdout || ''}${stderr || ''}`.trim()
+		const m = text.match(/\bat\s+(\S+)\s*\.?\s*$/m)
+		let mountpoint = m ? m[1].trim() : null
+		if (!mountpoint) {
+			const drives = await listUsbDrives()
+			const hit = drives.find((d) => d.device === dev)
+			mountpoint = hit?.mountpoint || null
+		}
+		return { ok: true, mountpoint, message: text || 'Mounted' }
+	} catch (e) {
+		const raw = [e.stderr, e.stdout, e.message].filter(Boolean).join(' ').trim() || 'Mount failed'
+		const needsPolkit =
+			/NotAuthorized|polkit-error|authentication agent|no user interaction/i.test(raw)
+		const message = needsPolkit
+			? 'USB mount not authorized by polkit. Re-apply USB ingest setup, then restart polkit and HighAsCG: sudo bash scripts/setup/13-usb-ingest.sh casparcg && sudo systemctl restart polkit highascg'
+			: raw
+		return { ok: false, message, needsPolkit: !!needsPolkit }
+	}
+}
+
 async function ejectUsb(drive) {
 	if (process.platform === 'darwin') {
 		try { await execFileAsync('diskutil', ['eject', drive.mountpoint], { timeout: 60000 }); return { ok: true } }
@@ -76,9 +117,20 @@ function formatImportSubdirTemplate(template, drive) {
 }
 
 module.exports = {
-	encodeDriveId, decodeDriveId, listUsbDrives, getDriveById, listDirectory,
+	encodeDriveId,
+	decodeDriveId,
+	listUsbDrives,
+	listRemovableBlockDevices,
+	mountUsbBlockDevice,
+	getDriveById,
+	listDirectory,
 	collectFilesForImport: CopyLogic.collectFilesForImport,
 	copyFromUsb: (ctx, opts) => CopyLogic.copyFromUsb(ctx, opts, getDriveById),
-	ejectUsb, startUsbHotplugWatcher, formatImportSubdirTemplate,
-	parseLsblkJson: jsonText => Discovery.parseLsblkJson(jsonText, encodeDriveId), resolveUnderMount: CopyLogic.resolveUnderMount, MEDIA_EXT
+	ejectUsb,
+	startUsbHotplugWatcher,
+	formatImportSubdirTemplate,
+	parseLsblkJson: (jsonText) => Discovery.parseLsblkJson(jsonText, encodeDriveId),
+	parseRemovableCandidates: (jsonText) => Discovery.parseRemovableCandidates(jsonText),
+	resolveUnderMount: CopyLogic.resolveUnderMount,
+	MEDIA_EXT,
 }

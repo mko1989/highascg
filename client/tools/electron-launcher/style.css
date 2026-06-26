@@ -1,0 +1,12 @@
+/**
+ * Electron launcher styles — composed from ./styles/*.css (≤500 lines per file).
+ */
+@import url('./styles/launcher-00-base.css');
+@import url('./styles/launcher-01-header.css');
+@import url('./styles/launcher-02-layout-sidebar.css');
+@import url('./styles/launcher-03-main-cards-buttons.css');
+@import url('./styles/launcher-04-tabs-dashboard.css');
+@import url('./styles/launcher-05-flash-partition-guides.css');
+@import url('./styles/launcher-06-simulation.css');
+@import url('./styles/launcher-08-modules.css');
+@import url('./styles/launcher-07-scrollbars.css');

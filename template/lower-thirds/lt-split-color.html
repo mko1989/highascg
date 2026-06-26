@@ -70,6 +70,7 @@
                 var root = document.documentElement;
                 if (style.primaryColor) root.style.setProperty('--primary', style.primaryColor);
                 if (style.textColor) root.style.setProperty('--text', style.textColor);
+                if (style.panelColor) root.style.setProperty('--panel', style.panelColor);
             },
             animateIn: function() {
                 return new Promise(function(resolve) {

@@ -24,6 +24,7 @@ const { getChannelMap, setupAllRouting } = require('./src/config/routing')
 const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+const { startReplicationService, stopReplicationService } = require('./src/replication/replication-service')
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
 const { startCasparAmcpWatchdog } = require('./src/bootstrap/caspar-amcp-watchdog')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
@@ -94,7 +95,19 @@ function main() {
 			_multiviewLayout: persistence.get('multiviewLayout') || null,
 			sceneDeck: (pSceneDeck && typeof pSceneDeck === 'object' && Array.isArray(pSceneDeck.looks)) ? { looks: pSceneDeck.looks, previewSceneId: String(pSceneDeck.previewSceneId || '').trim() || null, layerPresets: pSceneDeck.layerPresets || [], lookPresets: pSceneDeck.lookPresets || [] } : { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] },
 			persistence, amcp: null, timelineEngine: null, oscState: null, _casparStatus: { connected: false, host: config.caspar.host, port: config.caspar.port }, configManager, samplingManager: null,
-			resetConfigToDefaults: () => configManager.factoryReset(),
+			resetConfigToDefaults: () => {
+				const ok = configManager.factoryReset()
+				if (ok) {
+					syncRuntimeConfigFromManager()
+					try {
+						const { clearPersistedOsLayout } = require('./src/utils/os-config')
+						clearPersistedOsLayout({ reason: 'factory reset' })
+					} catch (e) {
+						debugLog.warn(`[Config] Factory reset: could not clear OS layout script: ${e?.message || e}`)
+					}
+				}
+				return ok
+			},
 			log: (level, msg) => { const l = level === 'error' ? logger.error : (level === 'warn' ? logger.warn : (level === 'info' ? logger.info : debugLog.debug)); l(msg) },
 			setUiSelection: (ctx, data) => {
 				try {
@@ -190,13 +203,16 @@ function main() {
 		}
 
 		if (!isHeadlessMode()) {
-			logger.warn(
-				'[HTTP] Serving Web UI from Node is deprecated for production playout. ' +
-					'Set HIGHASCG_HEADLESS=true on the server and use the Electron launcher (npm run launcher). ' +
-					'See docs/PLAN_SERVER_CLIENT_SPLIT.md'
+			logger.info(
+				'[HTTP] Serving operator UI from dist-web/ on :' +
+					config.server.httpPort +
+					' (unified repo: client/ → dist-web/ on :' +
+					config.server.httpPort +
+					'). ' +
+					'Optional Electron launcher (highascg-client) = sim/multiserver/modules — see docs/ARCHITECTURE.md'
 			)
 			if (process.env.HIGHASCG_WEB_DIR) {
-				logger.warn('[HTTP] HIGHASCG_WEB_DIR is deprecated; prefer headless server + launcher or Vite dev.')
+				logger.info(`[HTTP] UI directory override: HIGHASCG_WEB_DIR=${process.env.HIGHASCG_WEB_DIR}`)
 			}
 		}
 
@@ -213,10 +229,18 @@ function main() {
 		const wsBroadcastMs = cli.wsBroadcastMs || parseInt(process.env.HIGHASCG_WS_BROADCAST_MS || '0', 10) || 0
 		appCtx.onFirstWebSocketClient = (ctx) => notifyWebSocketClientConnected(ctx)
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
+		startReplicationService(appCtx, {
+			clients: wsHandle.clients,
+			getOperatorWsCount: () => wsHandle.clients.size,
+		})
+		appCtx._stopReplicationService = () => stopReplicationService(appCtx)
 		appCtx._stopUsbHotplugWatcher = startUsbHotplugWatcher(appCtx)
 
 		logBuffer.setOnNewLine(line => { try { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('log_line', line) } catch (_) {} })
-		appCtx.timelineEngine.on('playback', pb => { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('timeline.playback', pb) })
+		appCtx.timelineEngine.on('playback', pb => {
+			if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('timeline.playback', pb)
+			if (typeof appCtx.markReplicationLiveStateDirty === 'function') appCtx.markReplicationLiveStateDirty()
+		})
 		moduleRegistry.bootAll(appCtx)
 		appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
 

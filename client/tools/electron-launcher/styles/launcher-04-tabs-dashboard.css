@@ -1,0 +1,158 @@
+/* Tabs Panel Panes */
+.tab-pane {
+  display: none;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+#tab-simulation.tab-pane.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Dashboard Tab Specifics */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.check-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background-color: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.check-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background-color: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.2);
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.check-item.checked {
+  border-color: rgba(63, 185, 80, 0.2);
+}
+
+.check-item.checked .check-box {
+  background-color: rgba(63, 185, 80, 0.08);
+  border-color: rgba(63, 185, 80, 0.2);
+  color: var(--success);
+}
+
+.check-details h3 {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.check-details p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.shortcut-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shortcut-btn {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition);
+  width: 100%;
+  text-align: left;
+}
+
+.shortcut-btn:hover {
+  border-color: var(--accent);
+  background-color: var(--bg-elevated);
+}
+
+.shortcut-number {
+  font-size: 0.85rem;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: rgba(88, 166, 255, 0.1);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.shortcut-text h3 {
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.shortcut-text p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.splash-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+}
+
+.splash-content h2 {
+  font-size: 1.15rem;
+  color: var(--text);
+  margin-bottom: 6px;
+  text-transform: none;
+}
+
+.splash-content p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+}

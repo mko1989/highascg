@@ -31,7 +31,7 @@ function applyClearCoalescing(lines, ctx) {
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
-const { audioRouteToAudioFilter } = require('../engine/audio-route')
+const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('../engine/audio-route')
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
 const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
 
@@ -130,7 +130,7 @@ async function handlePost(path, body, ctx) {
 			if (parameters) opts.parameters = parameters
 			if (audioFilter) opts.audioFilter = String(audioFilter)
 			else if (audioRoute) {
-				const af = audioRouteToAudioFilter(String(audioRoute))
+				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
 			const r = await amcp.play(channel, layer, clip, opts)
@@ -147,7 +147,7 @@ async function handlePost(path, body, ctx) {
 			if (parameters) opts.parameters = parameters
 			if (audioFilter) opts.audioFilter = String(audioFilter)
 			else if (audioRoute) {
-				const af = audioRouteToAudioFilter(String(audioRoute))
+				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
 			const r = await amcp.loadbg(channel, layer, clip, opts)
@@ -163,7 +163,7 @@ async function handlePost(path, body, ctx) {
 			if (parameters) opts.parameters = parameters
 			if (audioFilter) opts.audioFilter = String(audioFilter)
 			else if (audioRoute) {
-				const af = audioRouteToAudioFilter(String(audioRoute))
+				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
 			const r = await amcp.load(channel, layer, clip, opts)

@@ -185,23 +185,6 @@ function parseXrandrAllOutputs(raw) {
 	return out
 }
 
-let _modetestProbeCache = null
-let _modetestProbeAt = 0
-const MODETEST_PROBE_TTL_MS = 2000
-
-/**
- * @deprecated Modetest is not used for live GPU mapping; retained for optional debug only.
- */
-function getModetestProbe(opts = {}) {
-	const now = Date.now()
-	if (!opts.refresh && _modetestProbeCache && now - _modetestProbeAt < MODETEST_PROBE_TTL_MS) {
-		return _modetestProbeCache
-	}
-	_modetestProbeCache = { connectors: [], matches: new Map(), raw: '', source: 'disabled', drmCard: '' }
-	_modetestProbeAt = now
-	return _modetestProbeCache
-}
-
 /**
  * GPU connector list from live xrandr --query (connected and disconnected DP/HDMI outputs).
  */
@@ -294,7 +277,6 @@ module.exports = {
 	getDisplaysXrandrDetailed,
 	getDisplaysXrandrVerboseRaw,
 	getGpuConnectorInventory,
-	getModetestProbe,
 	getConnectedDisplayNames,
 	getDisplayDetails,
 	getGpuModel,

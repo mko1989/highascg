@@ -307,6 +307,13 @@ async function handleSceneTake(body, ctx) {
 	}
 
 	const matrix = playbackTracker.getMatrixForState(ctx)
+	if (typeof ctx.markReplicationLiveStateDirty === 'function') {
+		try {
+			ctx.markReplicationLiveStateDirty()
+		} catch {
+			/* ignore */
+		}
+	}
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

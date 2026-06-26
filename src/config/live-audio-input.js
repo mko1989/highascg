@@ -5,7 +5,6 @@ const { getRouteString, readCasparSetting } = require('./routing-map')
 const {
 	LOOK_LAYER_MIN,
 	PGM_AUDIO_TRACK_LAYER_MAX,
-	isPgmAudioTrackPhysicalLayerOnChannel,
 } = require('../engine/look-layer-ranges')
 
 /**
@@ -326,11 +325,6 @@ function listLiveAudioPgmProtectedLayers(cfg) {
 	return out
 }
 
-/** @deprecated use isPgmAudioTrackPhysicalLayerOnChannel from look-layer-ranges */
-function isLiveAudioPgmInfrastructureLayer(cfg, channel, physicalLayer) {
-	return isPgmAudioTrackPhysicalLayerOnChannel(cfg, channel, physicalLayer)
-}
-
 module.exports = {
 	LIVE_AUDIO_LAYER_BASE,
 	LOOK_LAYER_MIN,
@@ -350,5 +344,4 @@ module.exports = {
 	listConfiguredLiveAudioSlots,
 	resolveLiveAudioPgmTargetScreens,
 	listLiveAudioPgmProtectedLayers,
-	isLiveAudioPgmInfrastructureLayer,
 }

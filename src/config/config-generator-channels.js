@@ -13,6 +13,32 @@ const {
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 } = require('./config-generator-consumer-attach')
+const { parseOptionalPixel } = require('./config-generator-utils')
+
+/**
+ * Caspar multiview `<screen>` x — OS layout planner first, then mapping GPU bbox (WO-40a), not PGM channel width strip.
+ * @param {Record<string, unknown>} config
+ * @param {ReturnType<import('../utils/os-layout-calculator').calculateLayoutPositions>} layout
+ * @param {number} mvIndex 1-based
+ * @param {number} cumulativeX fallback when no planner / mapping hint
+ */
+function resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX) {
+	const n = mvIndex
+	const keyed = config[`multiview_${n}_x`] ?? config.multiview_x
+	if (keyed !== undefined && keyed !== null && String(keyed).trim() !== '') {
+		return parseOptionalPixel(keyed, cumulativeX)
+	}
+	const mvInfo = layout?.multiview?.[n]
+	if (mvInfo && Number.isFinite(mvInfo.x)) return mvInfo.x
+	const bbox = layout?.mappingGpuBBox
+	const hasMapGpu = Array.isArray(layout?.mappingGpuOutputs) && layout.mappingGpuOutputs.length > 0
+	if (hasMapGpu && bbox && Number.isFinite(bbox.maxX)) {
+		const spanX = bbox.maxX - bbox.minX
+		const spanY = bbox.maxY - bbox.minY
+		if (spanX >= spanY) return Math.max(0, bbox.maxX)
+	}
+	return cumulativeX
+}
 
 /**
  * Build full `<channels>` XML entries and collect custom video modes.
@@ -68,11 +94,7 @@ function buildChannelsSection(config, routeMap) {
 		const mvs = Array.isArray(plan.multiviews) ? plan.multiviews : []
 		mvs.forEach((mvPlan, idx) => {
 			const mvIndex = idx + 1
-			const mvInfo = layout.multiview[mvIndex]
-			// OS layout advances X for every GPU-assigned head; Caspar screen consumers should tile only among
-			// real screen consumers. When all mains are DeckLink-only, multiview defaults to 0 unless multiview_x
-			// is set — do not inherit tandem X from mains that emit no screen consumer.
-			const mvDefaultX = anyMainScreenHasScreenConsumer && mvInfo ? mvInfo.x : cumulativeX
+			const mvDefaultX = resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX)
 			const mv = buildMultiviewChannel(config, routeMap, { 
 				n: mvIndex,
 				dims: mvPlan.dims,

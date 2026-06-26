@@ -6,23 +6,33 @@
 'use strict'
 
 const { runExfatSync, pushProjectConfigToExfat } = require('../../src/system/exfat-sync')
+const { runPrivateVolumeSync } = require('../../src/system/private-volume-sync')
 
 const dryRun = process.argv.includes('--dry-run')
 const boot = process.argv.includes('--boot')
 const pushOnly = process.argv.includes('--push')
+const privateOnly = process.argv.includes('--private')
 
 const logFn = (lvl, m) => {
 	if (lvl === 'warn' || lvl === 'error') console.error(m)
 	else console.log(m)
 }
 
-const run = pushOnly
-	? pushProjectConfigToExfat({ dryRun, log: logFn })
-	: runExfatSync({
-			dryRun,
-			boot,
-			log: logFn,
-		})
+const run = privateOnly
+	? runPrivateVolumeSync({ dryRun, boot, pushOnly, log: logFn })
+	: pushOnly
+		? pushProjectConfigToExfat({ dryRun, log: logFn })
+		: runExfatSync({
+				dryRun,
+				boot,
+				log: logFn,
+			}).then(async (r) => {
+				if (boot && !dryRun) {
+					const pr = await runPrivateVolumeSync({ dryRun: false, boot: true, log: logFn })
+					r.privateSync = pr
+				}
+				return r
+			})
 
 run
 	.then((r) => {

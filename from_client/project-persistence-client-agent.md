@@ -1,8 +1,8 @@
 # Client agent — project persistence & autosave
 
-**Audience:** Agent working in **`highascg-client`** (Electron + `dist-web`).
+**Audience:** Agent working on the **operator UI** (`dist-web/` on playout, or UI sources in highascg-client).
 
-**Server repo:** `highascg` — this document describes what the server expects from the client for project save, autosave, and live deck sync.
+**Server repo:** `highascg` — this document describes what the server expects from the browser UI for project save, autosave, and live deck sync.
 
 ---
 

@@ -10,7 +10,7 @@ set -euo pipefail
 # Optional env:
 #   HIGHASCG_ROOT=/home/casparcg/highascg   deployed tree path (must contain package.json)
 #   HIGHASCG_ISO_EMBED_SERVER=1             bake server+node_modules into squashfs (default 1)
-#   HIGHASCG_ISO_BUILD_WEB=0                skip dist-web on ISO (default 0; UI via Electron)
+#   HIGHASCG_ISO_BUILD_WEB=0                skip dist-web on squashfs (default; deploy via drop-update)
 #   HIGHASCG_ISO_BUILD_WEB=1                legacy: build dist-web on imaging host before clone
 #   HIGHASCG_ISO_EMBED_SERVER=0             WO-47 only: omit Node tree; use exFAT drop-update/
 #   SKIP_APT=1                               skip apt install (you already installed packages)

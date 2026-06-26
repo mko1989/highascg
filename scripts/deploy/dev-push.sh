@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Dev deploy: tar the server repo → upload to /tmp on the playout host → ssh and extract.
-# Operator UI lives in https://github.com/mko1989/highascg-client (not deployed with this script).
+# Dev deploy: tar the unified repo → upload to /tmp on the playout host → ssh and extract.
+# Includes dist-web/ (built operator UI) by default. UI sources: client/ in this repo.
 #
 # Config: `.env.deploy` in repo root, or export DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, …
 # See comments in this file for DEPLOY_USE_SFTP, DEPLOY_REMOTE_SUDO, passwords, etc.
 #
-# Default: server-only (DEPLOY_SERVER_ONLY=1). Matches playout ISO headless layout.
+# Default: full stack (DEPLOY_SERVER_ONLY=0). Set DEPLOY_SERVER_ONLY=1 for API-only emergency.
 
 set -euo pipefail
 
@@ -77,22 +77,24 @@ fi
 
 export COPYFILE_DISABLE=1
 
-if [[ "${DEPLOY_SERVER_ONLY:-1}" != "1" ]]; then
-	echo "WARN: DEPLOY_SERVER_ONLY=0 includes UI paths — use highascg-client repo for operator UI." >&2
+if [[ "${DEPLOY_SERVER_ONLY:-0}" != "1" ]]; then
 	archive_common_build_client_if_requested "$ROOT"
+	if [[ ! -f "${ROOT}/dist-web/index.html" ]]; then
+		echo "WARN: dist-web/index.html missing — run npm run build:client before deploy." >&2
+	fi
 fi
 local_excludes=()
 archive_common_deploy_tar_excludes local_excludes
 archive_common_apply_deploy_packaging_rules "$ROOT" local_excludes
 
-echo "→ tar → $TMP (server-only=${DEPLOY_SERVER_ONLY:-1})"
+echo "→ tar → $TMP (server-only=${DEPLOY_SERVER_ONLY:-0})"
 tar czf "$TMP" "${local_excludes[@]}" .
 
 PATH_Q=$(printf '%q' "$DEPLOY_PATH")
 TGZ_Q=$(printf '%q' "$DEPLOY_REMOTE_TMP")
 INDEX_Q=$(printf '%q' "${DEPLOY_PATH}/index.js")
 
-REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=' \"\$ENV_F\" 2>/dev/null; then sed -i 's/^HIGHASCG_HEADLESS=.*/HIGHASCG_HEADLESS=true/' \"\$ENV_F\"; else echo 'HIGHASCG_HEADLESS=true' >> \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
+REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
 if [[ "$DEPLOY_REMOTE_SUDO" == "1" ]]; then
 	if [[ -n "$DEPLOY_SUDO_PASSWORD" ]]; then
 		SUDO_PW_SQ=${DEPLOY_SUDO_PASSWORD//\'/\'\"\'\"\'}
@@ -125,5 +127,9 @@ if ! "${SSH_BASE[@]}" "${SSH_TTY[@]}" "${SSH_OPTS[@]}" "$REMOTE" "$REMOTE_VERIFY
 	exit 1
 fi
 
-echo "→ done: ${REMOTE}:${DEPLOY_PATH} (HIGHASCG_HEADLESS=true). Restart highascg.service if used."
-echo "   Operator UI: clone https://github.com/mko1989/highascg-client — npm run launcher / dev:client"
+echo "→ done: ${REMOTE}:${DEPLOY_PATH}. Restart highascg.service if used."
+if [[ "${DEPLOY_SERVER_ONLY:-0}" == "1" ]]; then
+	echo "   Deployed API-only (DEPLOY_SERVER_ONLY=1). Run npm run build:client on playout for UI."
+else
+	echo "   Operator UI: http://${DEPLOY_HOST}:4200/ (dist-web/ from in-repo client/)"
+fi

@@ -3,10 +3,10 @@
 #
 # Verified vsync stack for Caspar screen consumers on NVIDIA:
 #   - Sync to VBlank OFF (driver must not double-sync with Caspar consumer vsync)
-#   - Force Full Composition Pipeline ON for every connected output (MetaMode)
+#   - Force Composition Pipeline ON for every connected output (MetaMode)
 #   - Caspar <vsync>true</vsync> on screen consumers
 #
-# xrandr resets CurrentMetaMode and clears ForceFullCompositionPipeline; this script
+# xrandr resets CurrentMetaMode and clears ForceCompositionPipeline; this script
 # must run after apply-layout.sh (and retries until MetaMode is populated).
 #
 # Install: scripts/setup/09-openbox-autostart.sh → /usr/local/bin/highascg-nvidia-x-apply.sh
@@ -53,10 +53,12 @@ if " :: " in raw:
 
 def patch_block(m):
     body = m.group(1)
-    if "ForceFullCompositionPipeline=On" in body:
+    body = re.sub(r',?\s*ForceFullCompositionPipeline=On', '', body)
+    body = re.sub(r'ForceFullCompositionPipeline=On,?\s*', '', body)
+    body = body.strip().rstrip(',')
+    if "ForceCompositionPipeline=On" in body:
         return "{" + body + "}"
-    body = body.strip().rstrip(",")
-    add = "ForceFullCompositionPipeline=On"
+    add = "ForceCompositionPipeline=On"
     if body:
         body = body + ", " + add
     else:
@@ -68,7 +70,7 @@ print(prefix + patched)
 PY
 ) || return 1
 	if [ -z "$_new_meta" ] || [ "$_new_meta" = "$_raw_meta" ]; then
-		echo "$_raw_meta" | grep -q 'ForceFullCompositionPipeline=On'
+		echo "$_raw_meta" | grep -q 'ForceCompositionPipeline=On'
 		return $?
 	fi
 	nvidia-settings --assign "CurrentMetaMode=${_new_meta}" 2>/dev/null || return 1

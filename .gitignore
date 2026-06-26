@@ -11,6 +11,7 @@ npm-debug.log*
 .module-state.json.tmp
 .highascg-state.json
 .highascg-state.json.tmp
+.private/
 autosave.json
 projects/
 highascg.config.json
@@ -22,13 +23,10 @@ data/waveforms/
 .reference/
 
 
-# Operator UI — separate repo: https://github.com/mko1989/highascg-client
-client/
-vite.config.js
+# Operator UI dev env (local only)
 .env.development
-.env.development.example
 
-# Vite / packager outputs (built in highascg-client; not on playout server)
+# Vite production bundle (built from client/ via npm run build:client)
 dist-web/
 dist/
 
@@ -78,3 +76,4 @@ From_client/
 /deprecated/
 !scripts/deprecated/
 logs_lap/
+CT-SS-master/

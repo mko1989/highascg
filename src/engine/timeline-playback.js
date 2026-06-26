@@ -284,8 +284,14 @@ function applyPlaybackMixin(TimelineEngineClass) {
 					_p0: pos,
 				}
 			} else {
+				const samePausedPos =
+					!this._pb.playing && Math.abs((this._pb.position ?? 0) - pos) < 1
 				this._pb = { ...this._pb, position: pos, _p0: pos, _t0: Date.now() }
 				if (this._pb.playing) this._lastTickPositionMs = pos
+				if (samePausedPos) {
+					this._emitPb()
+					return
+				}
 			}
 			this._applyAt(id, pos, true)
 			this._emitPb()

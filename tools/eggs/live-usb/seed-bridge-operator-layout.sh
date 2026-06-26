@@ -12,7 +12,8 @@ mkdir -p \
 	"${ROOT}/configs" \
 	"${ROOT}/projects" \
 	"${ROOT}/projects/_autosave" \
-	"${ROOT}/drop-config"
+	"${ROOT}/drop-config" \
+	"${ROOT}/.private"
 
 README="${ROOT}/README.txt"
 if [[ ! -f "$README" ]]; then
@@ -23,6 +24,7 @@ HighAsCG bridge partition (LABEL=HIGHASCGDAT)
   configs/   Modular settings + .highascg-state.json (synced with ~/highascg/config)
   projects/  Show files (*.json) synced with ~/highascg/projects (bidirectional)
   drop-config/  Optional monolithic highascg.config.json overlay
+  .private/     Per-machine Tailscale/Syncthing/replication secrets (not in configs/)
 
 Format: mkfs.exfat -L HIGHASCGDAT /dev/sdXN
 EOF

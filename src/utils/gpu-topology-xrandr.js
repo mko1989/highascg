@@ -79,11 +79,6 @@ function parseXrandrConnectedNames(raw) {
 	return connected
 }
 
-/** @deprecated use parseXrandrVideoOutputNames */
-function parseXrandrDpHdmiOutputNames(raw) {
-	return parseXrandrVideoOutputNames(raw)
-}
-
 /**
  * All DP/HDMI xrandr outputs in --query order (connected and disconnected).
  * @param {string} raw
@@ -209,7 +204,6 @@ module.exports = {
 	canonicalAbPair,
 	parseXrandrVideoOutputNames,
 	parseXrandrConnectedNames,
-	parseXrandrDpHdmiOutputNames,
 	parseXrandrAllOutputs,
 	discoverGpuPhysicalTopologyFromXrandr,
 	topologyRowsEqual,

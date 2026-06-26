@@ -8,6 +8,7 @@
 
 const { param } = require('../caspar/amcp-utils')
 const { isTemplateClip } = require('../state/playback-tracker-media')
+const { resolveTemplateCgHostLayer } = require('./cg-routing')
 
 /**
  * @param {object} layer
@@ -77,6 +78,7 @@ function extractTemplateCgData(layer, cgName) {
 	if (raw == null || raw === '') {
 		const key = String(cgName || '').toLowerCase()
 		if (DEFAULT_CG_DATA_BY_TEMPLATE[key]) return DEFAULT_CG_DATA_BY_TEMPLATE[key]
+		if (key.startsWith('studio/lt-')) return DEFAULT_LT_CG_DATA
 		return '{}'
 	}
 	if (typeof raw === 'string') return raw
@@ -89,14 +91,15 @@ function extractTemplateCgData(layer, cgName) {
 
 /**
  * @param {number} channel
- * @param {number} pLayer
+ * @param {number} logicalOrHostLayer — scene layerNumber; mapped to 700+ overlay host
  * @param {{ cgName: string, data?: string, playOnLoad?: boolean }} spec
  * @returns {string[]}
  */
-function buildSceneTemplateCgAmcpLines(channel, pLayer, spec) {
+function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec) {
 	const cgName = String(spec?.cgName || '').trim()
 	if (!cgName) return []
-	const cl = `${channel}-${pLayer}`
+	const hostLayer = resolveTemplateCgHostLayer(logicalOrHostLayer, cgName)
+	const cl = `${channel}-${hostLayer}`
 	const dataStr =
 		typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
 	const playOnLoad = spec?.playOnLoad !== false ? 1 : 0
@@ -133,4 +136,5 @@ module.exports = {
 	extractTemplateCgData,
 	buildSceneTemplateCgAmcpLines,
 	buildSceneTemplateCgSpec,
+	resolveTemplateCgHostLayer,
 }

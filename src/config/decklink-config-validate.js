@@ -1,6 +1,7 @@
 'use strict'
 
 const { getChannelMap, readCasparSetting, resolveDecklinkInputDeviceIndex } = require('./routing')
+const { validateDecklinkOutputResolutions } = require('./decklink-output-resolve')
 
 /**
  * Client-side validation for DeckLink input vs output indices (before Caspar startup).
@@ -50,4 +51,13 @@ function validateDecklinkCasparSlice(casparServerSlice) {
 	return { warnings }
 }
 
-module.exports = { validateDecklinkCasparSlice }
+/**
+ * DeckLink output resolution validation (graph + settings shape).
+ * @param {Record<string, unknown>} config - full app config or flat generator config with deviceGraph
+ * @returns {{ warnings: string[] }}
+ */
+function validateDecklinkOutputResolution(config) {
+	return { warnings: validateDecklinkOutputResolutions(config || {}) }
+}
+
+module.exports = { validateDecklinkCasparSlice, validateDecklinkOutputResolution }

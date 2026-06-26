@@ -1,0 +1,113 @@
+import { decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
+
+/** RandR names may be DP-0 or card0-DP-0 depending on source. */
+export function normRandrCaspar(v) {
+	return String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
+}
+
+function layoutSlotIdForPairs(pairs) {
+	const want = new Set((pairs || []).map((p) => normRandrCaspar(p)).filter(Boolean))
+	if (!want.size) return ''
+	try {
+		const raw = localStorage.getItem('gpu_custom_layout')
+		const arr = raw ? JSON.parse(raw) : null
+		if (!Array.isArray(arr)) return ''
+		for (const item of arr) {
+			const slotId = String(item?.id || '').replace(/__.*$/i, '')
+			if (!/^gpu_p\d+$/i.test(slotId)) continue
+			const itemPairs = Array.isArray(item?.pairs) ? item.pairs : []
+			for (const p of itemPairs) {
+				if (want.has(normRandrCaspar(p))) return slotId
+			}
+		}
+	} catch {
+		/* ignore */
+	}
+	return ''
+}
+
+/**
+ * Map a UI slot's RandR pair to the canonical graph connector id (e.g. gpu_p0).
+ * Saved rear-panel layout wins over server physicalMap when pairs were reassigned.
+ */
+export function resolveCanonicalGpuConnectorId(pairs, physicalPorts, suggestedGpuOuts) {
+	if (!Array.isArray(pairs) || !pairs.length) return ''
+	const fromLayout = layoutSlotIdForPairs(pairs)
+	if (fromLayout) return fromLayout
+	const set = new Set(pairs.map((p) => normRandrCaspar(p)).filter(Boolean))
+	if (set.size === 0) return ''
+	for (const p of physicalPorts || []) {
+		const act = normRandrCaspar(p?.runtime?.activePort)
+		if (act && set.has(act)) return String(p.physicalPortId || '').trim()
+	}
+	for (const p of physicalPorts || []) {
+		const a = normRandrCaspar(p?.pair?.dpA)
+		const b = normRandrCaspar(p?.pair?.dpB)
+		if ((a && set.has(a)) || (b && set.has(b))) return String(p.physicalPortId || '').trim()
+	}
+	for (const c of suggestedGpuOuts || []) {
+		const ref = normRandrCaspar(c?.externalRef)
+		if (ref && set.has(ref)) return String(c.id || '').trim()
+		const a = normRandrCaspar(c?.gpuPhysical?.pair?.dpA)
+		const b = normRandrCaspar(c?.gpuPhysical?.pair?.dpB)
+		if ((a && set.has(a)) || (b && set.has(b))) return String(c.id || '').trim()
+	}
+	return ''
+}
+
+export function casparRearKindTitle(kind) {
+	if (kind === 'gpu_out') return 'GPU / program bus output'
+	if (kind === 'decklink_in') return 'DeckLink input (capture)'
+	if (kind === 'decklink_out') return 'DeckLink program output'
+	if (kind === 'caspar_mv_out') return 'Multiview channel output'
+	if (kind === 'audio_out') return 'Audio output'
+	if (kind === 'audio_in') return 'Audio input'
+	return kind || 'connector'
+}
+
+export function casparRearKindToIcon(kind) {
+	if (kind === 'gpu_out') return '/assets/hdmi-port-icon.svg'
+	if (kind?.startsWith('decklink') || kind === 'caspar_mv_out') return '/assets/bnc_female_axis.svg'
+	if (kind === 'audio_out') return '/assets/jack-svg.svg'
+	if (kind === 'stream_out') return '/assets/ethernet-port-icon.svg'
+	if (kind === 'record_out') return '/assets/record-port-icon.svg'
+	return '/assets/bnc_female_axis.svg'
+}
+
+export function createCasparRearMarkerStatusResolver({ live, lastPayload }) {
+	return (it) => {
+		if (!it.connectorId) return stateClass('off')
+		if (it.kind === 'gpu_out') {
+			if (it.connected) return stateClass('ok')
+			if (it.livePresent) return stateClass('warn')
+			return stateClass('off')
+		}
+		const conn = connectorById(lastPayload, it.connectorId)
+		if (!conn) return ''
+		const isDecklinkOutput =
+			it.kind === 'decklink_out' ||
+			(it.kind === 'decklink_io' && String(conn?.caspar?.ioDirection || 'in').toLowerCase() === 'out')
+		if (isDecklinkOutput) {
+			const outputs = Array.isArray(live?.decklink?.outputs) ? live.decklink.outputs : []
+			const st = outputs.find((o) => String(o?.connectorId || '') === String(it.connectorId || ''))
+			if (st && !st.ok) return stateClass('err')
+			if (st?.ok) return stateClass('ok')
+		}
+		if (it.kind === 'decklink_in' || it.kind === 'decklink_io') {
+			const st = live.decklink?.inputs?.find((x) => String(x.device) === String(conn.externalRef))
+			if (st) return stateClass(decklinkInputState(st).level)
+		}
+		if (it.kind === 'stream_out') {
+			const active = !!(live.streaming?.activeOutputs?.some((id) => String(id) === String(it.connectorId)))
+			return stateClass(active ? 'ok' : 'off')
+		}
+		if (it.kind === 'record_out') {
+			const active = !!(live.recording?.activeOutputs?.some((id) => String(id) === String(it.connectorId)))
+			return stateClass(active ? 'ok' : 'off')
+		}
+		if (it.kind === 'audio_out') {
+			return stateClass('ok')
+		}
+		return stateClass('ok')
+	}
+}

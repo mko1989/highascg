@@ -457,6 +457,90 @@ test('Device View system-audio cabling enables channel consumer (empty device = 
 	assert.match(pgmBlock, /<system-audio\s*\/>/, 'cabled system-audio should appear on program channel')
 })
 
+test('Device View PortAudio 8ch cabling sets channel-layout and output channels', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = { ...app.casparServer, screen_count: 1, caspar_build_profile: 'custom_live', multiview_enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50, audioLayout: '8ch' },
+		],
+		edidNotes: '',
+	}
+	app.audioOutputs = [{
+		id: 'audio_1',
+		label: 'PGM out',
+		enabled: true,
+		type: 'portaudio',
+		deviceName: 'hw:1,3',
+		channelLayout: '8ch',
+		hostApi: 'ALSA',
+		bufferFrames: 128,
+		latencyMs: 40,
+		fifoMs: 50,
+	}]
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_d1', kind: 'destination_in', externalRef: 'd1' },
+			{ id: 'audio_1', kind: 'audio_out' },
+		],
+		edges: [{ sourceId: 'dst_in_d1', sinkId: 'audio_1' }],
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_audio_layout, '8ch')
+	assert.equal(flat.screen_1_portaudio_enabled, true)
+	const consumers = flat.screen_1_portaudio_consumers
+	assert.ok(Array.isArray(consumers) && consumers.length === 1)
+	assert.equal(consumers[0].outputChannels, 8)
+	const xml = buildConfigXml(flat)
+	assert.match(xml, /<output-channels>8<\/output-channels>/)
+	const pgmBlock = xml.match(/Caspar channel 1:[\s\S]*?<channel>([\s\S]*?)<\/channel>/)?.[1] || ''
+	assert.match(pgmBlock, /<channel-layout>discrete-8ch<\/channel-layout>/)
+	assert.match(xml, /<channel-order>c0 c1 c2 c3 c4 c5 c6 c7<\/channel-order>/)
+})
+
+test('uncabled second main stays stereo when first main has 8ch PortAudio', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 2
+	app.casparServer = { ...app.casparServer, screen_count: 2, caspar_build_profile: 'custom_live', multiview_enabled: false }
+	app.audioRouting = { ...(app.audioRouting || {}), programLayout: '8ch' }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50, audioLayout: '8ch' },
+			{ id: 'd2', label: 'Main2', mainScreenIndex: 1, mode: 'pgm_only', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50, audioLayout: 'stereo' },
+		],
+		edidNotes: '',
+	}
+	app.audioOutputs = [{
+		id: 'audio_1',
+		label: 'PGM out',
+		enabled: true,
+		type: 'portaudio',
+		deviceName: 'hw:1,3',
+		channelLayout: '8ch',
+	}]
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_d1', kind: 'destination_in', externalRef: 'd1' },
+			{ id: 'audio_1', kind: 'audio_out' },
+		],
+		edges: [{ sourceId: 'dst_in_d1', sinkId: 'audio_1' }],
+	}
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_audio_layout, '8ch')
+	assert.equal(flat.screen_2_audio_layout, 'stereo')
+	const xml = buildConfigXml(flat)
+	const ch2Block = xml.match(/Caspar channel 2:[\s\S]*?<channel>([\s\S]*?)<\/channel>/)?.[1] || ''
+	assert.doesNotMatch(ch2Block, /<channel-layout>discrete-8ch<\/channel-layout>/)
+	assert.doesNotMatch(ch2Block, /<output-channels>8<\/output-channels>/)
+})
+
 test('screen consumer x/y sync from graph layout without screen_N_system_id', () => {
 	const app = {
 		screen_count: 2,
@@ -479,11 +563,15 @@ test('screen consumer x/y sync from graph layout without screen_N_system_id', ()
 		deviceGraph: require('../../config/device_graph.json'),
 	}
 	const flat = buildCasparGeneratorFlatConfig(app)
-	assert.equal(flat.screen_2_x, 5120)
+	assert.equal(flat.screen_1_x, 0, 'mapping-fed PGM screen consumer aligns to mapping bbox origin')
+	assert.equal(flat.multiview_x, 5120)
 	const xml = buildConfigXml(flat)
-	const ch3 = xml.match(/Caspar channel 3:[\s\S]*?<x>(\d+)<\/x>/)
-	assert.ok(ch3, 'channel 3 screen consumer')
-	assert.equal(ch3[1], '5120')
+	const pgm = xml.match(/Screen 1 program output \(PGM\)[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x>/)
+	assert.ok(pgm, 'PGM screen consumer')
+	assert.equal(pgm[1], '0')
+	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x>/)
+	assert.ok(mv, 'multiview screen consumer')
+	assert.equal(mv[1], '5120')
 })
 
 test('multiview window chrome inherits PGM screen_1; other flags stay multiview-only', () => {

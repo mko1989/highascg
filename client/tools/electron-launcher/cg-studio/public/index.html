@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>CG Studio</title>
+	<link rel="stylesheet" href="/studio.css">
+</head>
+<body>
+	<header class="topbar">
+		<h1>CG Studio</h1>
+		<div class="toolbar">
+			<button type="button" id="btn-play" title="Animate in">Play</button>
+			<button type="button" id="btn-stop" title="Animate out">Stop</button>
+			<button type="button" id="btn-reset" title="Show transitioned-in preview state">Preview hold</button>
+			<button type="button" id="btn-export" class="primary">Export template…</button>
+		</div>
+	</header>
+
+	<main class="layout">
+		<aside class="gallery" id="gallery">
+			<h2>Templates</h2>
+			<ul id="template-list"></ul>
+		</aside>
+
+		<section class="preview-pane">
+			<div class="preview-frame-wrap">
+				<iframe id="preview" title="Template preview" sandbox="allow-scripts allow-same-origin"></iframe>
+			</div>
+		</section>
+
+		<aside class="inspector" id="inspector">
+			<h2>Inspector</h2>
+			<p class="hint" id="template-label">Select a template</p>
+			<form id="inspector-form"></form>
+		</aside>
+	</main>
+
+	<dialog id="export-dialog">
+		<form method="dialog" id="export-form">
+			<h3>Export Caspar HTML template</h3>
+			<p class="hint">Saves to <code>template/studio/</code> for CasparCG / HighAsCG playout.</p>
+			<label>
+				Template ID
+				<input type="text" id="export-id" pattern="lt-[a-z0-9-]+" placeholder="lt-my-show" required>
+			</label>
+			<label>
+				Display name
+				<input type="text" id="export-name" placeholder="My Show Lower Third">
+			</label>
+			<div class="dialog-actions">
+				<button type="button" id="export-cancel">Cancel</button>
+				<button type="submit" class="primary">Export</button>
+			</div>
+			<p class="status" id="export-status"></p>
+		</form>
+	</dialog>
+
+	<script src="/app.js"></script>
+</body>
+</html>

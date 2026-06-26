@@ -6,6 +6,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { normalizeCgRequest } = require('../engine/cg-routing')
 
 /**
  * @param {string} path
@@ -15,8 +16,8 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 async function handleCg(path, body, ctx) {
 	const m = path.match(/^\/api\/cg\/([^/]+)$/)
 	if (!m) return null
-	const b = parseBody(body)
-	const { channel = 1, layer, templateHostLayer = 1 } = b
+	const b = normalizeCgRequest(parseBody(body), ctx)
+	const { channel, layer, templateHostLayer = 1 } = b
 	const cmd = m[1].toLowerCase()
 	const amcp = ctx.amcp
 	let r

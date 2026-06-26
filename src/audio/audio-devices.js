@@ -320,7 +320,7 @@ function listPortAudioDevices(opts = {}) {
 					id: d.id,
 					name: d.name,
 					hostAPIName: 'ALSA (physical)',
-					maxOutputChannels: 8,
+					maxOutputChannels: 16,
 					defaultSampleRate: 48000,
 				})
 			} else if (d.type === 'pipewire') {
@@ -328,7 +328,7 @@ function listPortAudioDevices(opts = {}) {
 					id: d.id,
 					name: d.name,
 					hostAPIName: 'PipeWire',
-					maxOutputChannels: 8,
+					maxOutputChannels: 16,
 					defaultSampleRate: 48000,
 				})
 			}
@@ -344,7 +344,7 @@ function listPortAudioDevices(opts = {}) {
 				id: d.id,
 				name: d.name,
 				hostAPIName: 'ALSA (PCM list)',
-				maxOutputChannels: 8,
+				maxOutputChannels: 16,
 				defaultSampleRate: 48000,
 			})
 		}

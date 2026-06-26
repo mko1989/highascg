@@ -1,0 +1,120 @@
+/**
+ * Dedicated full-screen Audio Mixer Console view stylesheet.
+ * Professional DAW-inspired dark aesthetics.
+ */
+
+#tab-audio-mixer-view.active {
+	display: flex;
+	flex-direction: column;
+	margin: -24px;
+	overflow: hidden;
+	flex: 1;
+	min-height: 0;
+}
+
+.audio-mixer-view {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	background: var(--bg-dark, #0d1117);
+	color: var(--text, #e6edf3);
+	padding: 24px;
+	box-sizing: border-box;
+	min-height: 0;
+}
+
+/* Header strip */
+.audio-mixer-view__header {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 20px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+.audio-mixer-view__header-left {
+	display: flex;
+	flex-direction: column;
+}
+
+.audio-mixer-view__title-wrap {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 4px;
+}
+
+.audio-mixer-view__title {
+	margin: 0;
+	font-size: 1.35rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+
+.audio-mixer-view__add-input-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: rgba(88, 166, 255, 0.08);
+	border: 1px solid rgba(88, 166, 255, 0.25);
+	color: var(--accent, #58a6ff);
+	font-size: 1.15rem;
+	font-weight: 700;
+	cursor: pointer;
+	line-height: 1;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 0 8px rgba(88, 166, 255, 0.05);
+	outline: none;
+	padding: 0;
+}
+
+.audio-mixer-view__add-input-btn:hover {
+	background: rgba(88, 166, 255, 0.2);
+	border-color: var(--accent, #58a6ff);
+	color: #ffffff;
+	box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
+	transform: scale(1.08);
+}
+
+.audio-mixer-view__add-input-btn:active {
+	transform: scale(0.95);
+}
+
+.audio-mixer-view__subtitle {
+	margin: 0;
+	font-size: 0.82rem;
+	color: var(--text-muted);
+}
+
+.audio-mixer-view__status-badge {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: rgba(46, 204, 113, 0.08);
+	border: 1px solid rgba(46, 204, 113, 0.2);
+	border-radius: 99px;
+	padding: 6px 14px;
+	color: var(--accent-green, #2ecc71);
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.audio-mixer-view__status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--accent-green, #2ecc71);
+	box-shadow: 0 0 8px var(--accent-green, #2ecc71);
+	display: inline-block;
+}
+

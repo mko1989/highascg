@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill-rule="evenodd">
+	<!-- Drive housing — edge-to-edge like other rear-panel port icons -->
+	<path fill="#1f2937" d="M16 24h480c13.3 0 24 10.7 24 24v416c0 13.3-10.7 24-24 24H16c-13.3 0-24-10.7-24-24V48c0-13.3 10.7-24 24-24z"/>
+	<path fill="#374151" d="M40 48h432c8.8 0 16 7.2 16 16v368c0 8.8-7.2 16-16 16H40c-8.8 0-16-7.2-16-16V64c0-8.8 7.2-16 16-16z"/>
+	<!-- Platter -->
+	<circle cx="256" cy="252" r="168" fill="#9ca3af"/>
+	<circle cx="256" cy="252" r="142" fill="#e5e7eb"/>
+	<circle cx="256" cy="252" r="44" fill="#6b7280"/>
+	<circle cx="256" cy="252" r="62" fill="none" stroke="#9ca3af" stroke-width="14"/>
+	<!-- Activity LED -->
+	<rect x="56" y="432" width="64" height="24" rx="5" fill="#22c55e"/>
+	<rect x="136" y="432" width="112" height="24" rx="5" fill="#4b5563"/>
+</svg>

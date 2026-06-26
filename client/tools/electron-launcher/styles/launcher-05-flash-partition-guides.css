@@ -1,0 +1,277 @@
+/* Flashing / Partitioning Step Guides */
+.guide-intro h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.guide-intro p {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-top: 4px;
+}
+
+.steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-step-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+}
+
+.guide-step-card--info {
+  border-color: #2a4a3a;
+  background: rgba(42, 74, 58, 0.2);
+}
+
+.guide-step-card--warning {
+  border-color: #4a3a2a;
+  background: rgba(74, 58, 42, 0.2);
+}
+
+.guide-step-card--secondary {
+  border-color: #3a3a4a;
+  background: rgba(40, 40, 50, 0.35);
+}
+
+.step-num {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.08);
+  line-height: 1.1;
+  font-family: var(--font-mono);
+}
+
+.step-content {
+  flex-grow: 1;
+}
+
+.step-content h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.step-content p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.step-content .inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--accent);
+  background: #000;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.cmd-copy {
+  display: flex;
+  align-items: stretch;
+  margin: 8px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #000;
+  overflow: hidden;
+}
+
+.cmd-copy-pre {
+  flex: 1;
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+  user-select: text;
+}
+
+.cmd-copy-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  min-width: 60px;
+  padding: 0 12px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: rgba(88, 166, 255, 0.08);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cmd-copy-btn:hover {
+  background: rgba(88, 166, 255, 0.16);
+}
+
+.cmd-copy-btn.copied {
+  background: rgba(63, 185, 80, 0.12);
+  color: var(--success);
+}
+
+.sample-output {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: #000;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin: 8px 0;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.start-mib-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin: 8px 0 12px;
+}
+
+.start-mib-table th,
+.start-mib-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.start-mib-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.fdisk-type-list {
+  margin: 8px 0 12px 16px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.step-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+.step-note.safe { color: var(--success); }
+.step-note.warn { color: var(--warn); }
+
+/* Screenshots Sleek Flat Schematics Layout */
+.screenshot-placeholder {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 240px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.screenshot-placeholder img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 2;
+}
+
+.placeholder-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.placeholder-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  opacity: 0.8;
+}
+
+.placeholder-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.placeholder-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Inner Partition Subtabs */
+.inner-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1px;
+}
+
+.inner-tab {
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.inner-tab:hover {
+  color: var(--text);
+}
+
+.inner-tab.active {
+  color: var(--accent);
+}
+
+.inner-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--accent);
+}
+
+.os-guide {
+  display: none;
+  animation: fadeIn 0.2s ease-out;
+  margin-top: 16px;
+}
+
+.os-guide.active {
+  display: block;
+}

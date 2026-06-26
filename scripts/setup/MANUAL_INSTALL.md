@@ -237,13 +237,18 @@ sudo systemctl restart nodm
 sudo bash scripts/setup/07-node-highascg.sh
 ```
 
-**Headless API** (no CEF test pattern on boot): ensure drop-in matches `highascg-headless.env.conf`:
+**API-only mode** (optional — **not** production default):
+
+> **Production (WO-52):** client and server on the **same playout machine**; Node serves API + web GUI (`dist-web/`) on **`:4200`**. Electron launcher = multiplatform **hub** (setup, links, sim) — not the UI host.
 
 ```ini
 # /etc/systemd/system/highascg.service.d/10-headless.conf
+# Only when HIGHASCG_INSTALL_HEADLESS=1 or explicit API-only debug:
 Environment=HIGHASCG_HEADLESS=true
 Environment=HIGHASCG_NO_STARTUP_LED_TEST=1
 ```
+
+Production: **do not** install `10-headless.conf` unless you explicitly want API-only (no operator UI).
 
 ---
 
@@ -279,7 +284,7 @@ Pins/URLs: `scripts/lib/install-config.sh` (`URL_CEF_BINARY_TAR`, `URL_SCANNER_D
 **What it does:**
 
 - NVIDIA GL env (`__GL_SYNC_TO_VBLANK=0`, PowerMizer max)
-- `highascg-nvidia-x-apply.sh` — SyncToVBlank off + **Force Full Composition Pipeline on all outputs**
+- `highascg-nvidia-x-apply.sh` — SyncToVBlank off + **Force Composition Pipeline on all outputs**
 - `highascg-display-mode` helper (`normal` | `x11-only`)
 - Openbox autostart: **casparcg-scanner** + **`run.sh`** with `CASPAR_RESPAWN=1`
 - flock guard (single Caspar instance)

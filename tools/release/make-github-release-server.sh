@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Server (backend) GitHub prerelease — no frontend sources, no ISO.
+# Server (backend + dist-web UI) GitHub prerelease — no ISO.
 #
 # Usage (repo root):
 #   npm run release:github-server
@@ -106,7 +106,7 @@ trap 'rm -f "$NOTES"' EXIT
 cat >"$NOTES" <<EOF
 ## HighAsCG server (${STAMP})
 
-Backend + runtime tree for playout sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`; no browser UI in this asset).
+Unified playout stack for sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`): API + operator UI (\`dist-web/\` built from in-repo \`client/\`).
 
 | Asset | Extract |
 |-------|---------|
@@ -114,11 +114,11 @@ Backend + runtime tree for playout sticks (**\`drop-update/\`** on \`HIGHASCGEXF
 
 ${NM_NOTE}
 
-Pair with [**highascg-client**](https://github.com/mko1989/highascg-client) (Electron launcher + optional \`highascg-client_*.tar.gz\`). Playout runs \`HIGHASCG_HEADLESS=true\`.
+**Start:** \`node index.js\` — **\`http://<playout-ip>:4200/\`** (API + UI). \`HIGHASCG_HEADLESS=true\` is API-only debug.
 
-**Start:** \`node index.js\` — API only on production hosts (no \`dist-web/\` in this tarball).
+Optional [**highascg-client**](https://github.com/mko1989/highascg-client) Electron app: simulator, multiserver, modules — opens browser to playout; **not** the UI source tree.
 
-See [\`docs/PLAN_SERVER_CLIENT_SPLIT.md\`](docs/PLAN_SERVER_CLIENT_SPLIT.md) · [\`docs/DEV_RELEASE_GITHUB.md\`](docs/DEV_RELEASE_GITHUB.md)
+See [\`docs/ARCHITECTURE.md\`](docs/ARCHITECTURE.md) · [\`docs/DEV_RELEASE_GITHUB.md\`](docs/DEV_RELEASE_GITHUB.md)
 EOF
 
 if [[ "$DRY_RUN" -eq 1 ]]; then

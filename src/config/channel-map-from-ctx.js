@@ -6,6 +6,7 @@
 
 const { getChannelMap } = require('./routing')
 const { buildChannelResolutionMap } = require('./server-info-config')
+const { resolveProgramAudioLayoutsForConfig } = require('./program-audio-layouts')
 
 /**
  * @param {object} ctx — app context (`config`, `gatheredInfo`, …)
@@ -90,7 +91,7 @@ function buildChannelMap(ctx) {
 		previewResolutions,
 		inputsResolution,
 		channelResolutionsByChannel,
-		programAudioLayouts: [],
+		programAudioLayouts: resolveProgramAudioLayoutsForConfig(cfg, map.screenCount),
 		audioOnlyChannels: map.audioOnlyChannels,
 		audioOnlyLayouts: [],
 		audioOnlyResolutions: audioOnlyResolutions,

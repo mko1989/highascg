@@ -88,7 +88,13 @@ async function writeCasparConfigToDisk(ctx) {
 	apiLog(ctx, 'info', `[Caspar config] Writing generated casparcg.config → ${filePath}`)
 	const override = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
 	const xml = override || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
-	if (override) apiLog(ctx, 'info', '[Caspar config] Using manual XML override from casparServer.casparConfigOverride')
+	if (override) {
+		apiLog(
+			ctx,
+			'warn',
+			'[Caspar config] Using manual XML override (casparServer.casparConfigOverride) — generator DeckLink/keyer fixes are bypassed; clear override in Settings to use generated XML',
+		)
+	}
 	const dir = path.dirname(filePath)
 	try {
 		await fs.mkdir(dir, { recursive: true })

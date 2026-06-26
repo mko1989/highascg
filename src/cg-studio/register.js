@@ -1,32 +1,22 @@
 /**
- * Template Editor (CG Studio) module registration.
- * Loaded by `src/module-registry.tryLoad('cg-studio')` when the module is enabled.
+ * CG Studio — launcher-hosted module (no playout server process).
+ *
+ * CG Studio — optional Electron launcher module (highascg-client packaging).
+ * Operator UI: client/ → dist-web/ on playout :4200 in this unified repo.
+ * Template files are read/written under the linked HighAsCG server checkout `template/`.
  */
 
 'use strict'
-
-const { handleHealth, handleSave } = require('./routes')
 
 module.exports = {
 	name: 'cg-studio',
 
 	onBoot(ctx) {
 		if (ctx && typeof ctx.log === 'function') {
-			ctx.log('info', '[cg-studio] Template Editor module initialized')
+			ctx.log(
+				'info',
+				'[cg-studio] launcher-hosted — enable in Electron launcher Modules tab; not started on playout server',
+			)
 		}
 	},
-
-	apiPathPrefixes: ['/api/cg-studio'],
-
-	async handleApi({ method, path, body, ctx, req, query }) {
-		if (method === 'GET' && path === '/api/cg-studio/health') {
-			return handleHealth(ctx)
-		}
-		if (method === 'POST' && path === '/api/cg-studio/save') {
-			return handleSave(ctx, body)
-		}
-		return null
-	},
-
-	webBundles: ['/assets/modules/cg-studio/entry.js'],
 }

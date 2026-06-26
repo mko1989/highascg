@@ -1,19 +1,24 @@
-# HighAsCG: bundled backend vs client
+# HighAsCG: server bridge vs browser UI (logical split)
 
-How the repository is split after the **server-at-root + `client/`** layout (May 2026). Use this when deciding what ships on a **closed ISO**, what goes in **`highascg-server_*.tar.gz`** on **`exfat/update/server/`**, and what runs on **Mac/Windows** as the remote client.
+How the repository is organized after WO-52 (**unified playout**: API + **`dist-web/`** on **`:4200`** on the same machine). Use this when deciding what ships on a **closed ISO**, what goes in **`highascg-server_*.tar.gz`** on **`exfat/drop-update/`**, and what stays dev-only.
 
-**Related:** [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md), [`52_FILE_SEPARATION_INVENTORY.md`](52_FILE_SEPARATION_INVENTORY.md) (older `client/` naming), [`../docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), [`../docs/EXFAT_SERVER_UPDATE.md`](../docs/EXFAT_SERVER_UPDATE.md), WO‑51 decoupled architecture.
+**Canonical (WO-52):** [`../from_client/AGENT_SERVER_CLIENT_MERGE.md`](../from_client/AGENT_SERVER_CLIENT_MERGE.md), [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)  
+**Related:** [`52_FILE_SEPARATION_INVENTORY.md`](52_FILE_SEPARATION_INVENTORY.md), [`../docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), [`../docs/EXFAT_SERVER_UPDATE.md`](../docs/EXFAT_SERVER_UPDATE.md)
 
 ---
 
 ## One-line model
 
-| Side | Role | Runs where |
-|------|------|------------|
-| **Backend (bundled server)** | Node **bridge**: client↔Caspar (AMCP) + client↔Ubuntu (GPU, exFAT, USB, systemd) via REST/WS | `node index.js` on the playout machine |
-| **Client** | Operator UI in **Electron launcher** — HTTP/WS to server only | Operator laptop (`highascg-client` repo); **not** on playout |
+> **Client + server in one repo, one playout machine.** Node serves API and web GUI from `dist-web/` (built from **`client/`**). Optional Electron launcher ([highascg-client](https://github.com/mko1989/highascg-client)) = sim, multiserver, modules — **not** the operator UI source tree.
 
-The backend **does not** serve operator UI in production (`HIGHASCG_HEADLESS=true`). The in-tree **`client/`** folder is legacy/dev-only and is excluded from server tarballs and playout ISOs (including **`client/tools/electron-launcher/`**).
+| Layer | Role | Runs where (production) |
+|------|------|-------------------------|
+| **Server (`index.js` + `src/`)** | Node **bridge**: UI↔Caspar (AMCP) + UI↔Ubuntu (GPU, exFAT, USB, systemd) via REST/WS | Playout machine |
+| **UI (`dist-web/`)** | Operator SPA — HTTP/WS to server only (same origin) | **Same playout machine**, served by Node on `:4200` |
+
+**Physical:** one host, one port. **Logical:** the browser still does not speak AMCP or run OS hooks; the server owns playout and hardware.
+
+The in-tree **`client/`** folder is the **canonical operator UI source** — build with `npm run build:client` → **`dist-web/`**; do not deploy raw `client/` to playout. **`HIGHASCG_HEADLESS=true`** is opt-in API-only debug, not the production default.
 
 **`work/`** and **`work/references/`** are engineering notes and design prototypes — **not part of the shipped program**.
 
@@ -85,8 +90,8 @@ These modules may register **`webBundles`** URLs under `client/assets/modules/�
 
 | Path | Why |
 |------|-----|
-| **`client/`**, **`client/tools/`** | UI + operator launchers — **not** on playout stick |
-| **`dist-web/`** | Built UI — `release:github-client` on Mac/Windows |
+| **`client/`**, **`client/tools/`** | UI **sources** + operator kit — not rsync'd as sources to playout |
+| **`dist-web/`** | **Required on playout** — built UI served on `:4200` |
 | **`tools/smoke/`**, **`tools/eggs/`**, **`tools/release/`** | Dev / build host only |
 | **`node_modules/`** | Often omitted from tarball; `npm ci` on target |
 | **`media/`**, **`log/`**, **`data/`** (runtime) | Machine-local |
@@ -143,25 +148,23 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 
 ---
 
-## How they connect
+## How they connect (production)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Operator machine: Electron launcher + dist-web/            │
-│  fetch('http://playout:4200/api/...')  WebSocket /api/ws  │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│  Playout: index.js + src/  (bridge, headless :4200)       │
-│  HTTP router → src/api/*                                   │
-│  WS → state + AMCP dispatch                                │
-│  Caspar ← AMCP TCP :5250                                   │
-│  Ubuntu ← GPU / exFAT / USB / systemd hooks                │
-└───────────────────────────────────────────────────────────┘
+│  Playout machine: highascg.service :4200                    │
+│    ├── /api/*  /api/ws  (bridge)                            │
+│    └── /*      dist-web/  (operator UI, same origin)        │
+│         AMCP → Caspar :5250  ·  shell → Ubuntu OS           │
+└─────────────────────────────────────────────────────────────┘
+         ▲
+         │  http://<playout-ip>:4200/
+   Browser on playout or LAN · optional Electron hub opens this URL
 ```
 
-- **Dev:** UI from **highascg-client** (`npm run dev` :3000) or legacy in-tree `client/` — both proxy `/api` to `npm start` (:4200).
-- **Production playout:** headless server only; **Electron client** on operator laptop points at server IP.
+- **Production playout:** browser (or LAN) → **`http://<playout-ip>:4200/`** — no separate UI port.
+- **Dev:** `npm run dev:client` (Vite `:4350`) proxies `/api` to `npm start` (`:4200`). UI sources: in-repo **`client/`**.
+- **Optional Electron hub** (Mac/Windows): stick prep / sim — opens **system browser** to playout `:4200`; does **not** embed the control UI.
 
 ---
 
@@ -170,30 +173,20 @@ Formerly under **`client/`** (Companion module layout). Renamed to **`client/`**
 | Artifact | Backend contents | Client contents |
 |----------|------------------|-----------------|
 | **Eggs squashfs (WO‑47)** | Caspar shell: `config/casparcg.config`, `lib/`, stubs — **no `src/`**, **no `tools/`** | **Excluded** |
-| **exFAT `update/server/`** | `highascg-server_*.tar.gz` → `index.js`, `src/`, `scripts/`, **`tools/runtime/`** | **Not touched** |
-| **`release:github-server`** | Same as server drop (includes **`tools/runtime/`** only) | No |
-| **`release:github-client`** | No | `dist-web/` — install on Mac/Windows |
+| **exFAT `drop-update/`** | `highascg-server_*.tar.gz` → `index.js`, `src/`, `scripts/`, **`tools/runtime/`**, **`dist-web/`** | UI updated with server drop |
+| **`release:github-server`** | Same as server drop (includes **`dist-web/`** unless `RELEASE_SERVER_ONLY=1`) | — |
+| **`release:github-client`** | Optional UI-only hotfix tarball | `dist-web/` only |
 | **Legacy `sim/highascg/`** | Deprecated for Linux playout | Win/Mac sim only (WO‑50) |
 
-**ISO rebuilds** are rare; **server updates** use **`update/server/`**. **UI work** is **`client/`** + remote deploy, not the playout stick.
-
----
-
-## Quick file-count sanity check (repo)
-
-| Tree | Approx. scale |
-|------|----------------|
-| `src/` | ~22 top-level packages, 50+ API route files — all backend |
-| `client/components/` | ~126 UI modules |
-| `client/lib/` | ~40 browser helper modules |
-| `index.js` | Single orchestrator — backend |
+**ISO rebuilds** are rare; **server + UI updates** use **`drop-update/`** (includes **`dist-web/`**).
 
 ---
 
 ## Summary
 
-- **Bundled backend (bridge)** = `index.js` + **`src/`** + **`scripts/`** + **`tools/runtime/`** + **`config/`**, **`template/`** + root **`package.json`** — headless Node service between client, Caspar, and Ubuntu.
-- **Client** = **highascg-client** Electron launcher + **`dist-web/`** — operator UI; **never** on playout ISO/server tarball.
-- **Not shipped:** **`client/`** (legacy in-repo), **`work/`**, **`work/references/`**, **`tools/eggs/`**, **`tools/smoke/`**.
+- **Server bridge** = `index.js` + **`src/`** + **`scripts/`** + **`tools/runtime/`** + **`config/`**, **`template/`** — Node service between UI, Caspar, and Ubuntu.
+- **Operator UI** = **`dist-web/`** on playout — same machine, same port **`:4200`**.
+- **Not deployed as sources:** **`client/`** (build into `dist-web/` only), **`work/`**, **`tools/eggs/`**, **`tools/smoke/`**.
+- **Electron packaging** ([highascg-client](https://github.com/mko1989/highascg-client)) = optional extract from `client/tools/electron-launcher/` — simulator, multiserver, modules; opens browser to playout `:4200`. **Not** the operator UI source tree.
 
-Keeping that boundary strict is what allows a **closed ISO**, **server-only exFAT updates**, and **client-first** iteration without reflashing the image.
+Keeping **`client/` sources** out of playout drops while shipping **`dist-web/`** allows closed ISOs, stick updates, and UI iteration without separate UI hosting on a laptop.

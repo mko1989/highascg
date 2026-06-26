@@ -20,7 +20,7 @@
 
 | File | Change |
 |------|--------|
-| [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) | **New** — bridge model, what is not on playout |
+| [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) | **Updated** — unified playout: API + `dist-web/` on `:4200` |
 | [`README.md`](../README.md) | Bridge role; `client/`/`work/` not on server |
 | [`docs/README.md`](../docs/README.md) | Links ARCHITECTURE; not-shipped paths |
 | [`docs/PLAN_SERVER_CLIENT_SPLIT.md`](../docs/PLAN_SERVER_CLIENT_SPLIT.md) | Bridge wording |

@@ -1,0 +1,76 @@
+/* WO-33 — device view layout + destination visuals */
+.device-view {
+	padding: 12px 16px;
+	max-width: 1800px;
+	position: relative;
+}
+.device-view__layout {
+	display: grid;
+	grid-template-columns: 240px 180px 1fr 340px;
+	gap: 20px;
+	align-items: start;
+}
+.device-view__mappings-column {
+	width: 100%;
+	box-sizing: border-box;
+}
+.device-view__mappings-column .device-view__ports {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: stretch;
+}
+.device-view__rear-column {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+}
+.device-view__side {
+	position: sticky;
+	top: 12px;
+}
+.device-view__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px 20px;
+	margin-bottom: 10px;
+	font-size: 12px;
+}
+.device-view__cablemode {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+.device-view__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+	flex-wrap: wrap;
+}
+.device-view__title {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0;
+}
+.device-view__actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.device-view__apply-btn {
+	background: #7f1d1d;
+	border-color: #b91c1c;
+}
+.device-view__apply-btn--dirty {
+	background: #9a3412;
+	border-color: #f59e0b;
+}
+.device-view__note {
+	font-size: 12px;
+	opacity: 0.8;
+	margin: 0 0 12px;
+}

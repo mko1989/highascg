@@ -84,4 +84,10 @@ const relEntry = resolveTimelineClipFrame(
 )
 assert.strictEqual(relEntry.frame, 77)
 
+// Scrub/seek must not use clip-entry frame (atEntry=true would restart at inPoint).
+const scrubMid = resolveTimelineClipFrame(clip, 4000, tl, {}, { atEntry: false, channel: 1, physicalLayer: 5 })
+assert.strictEqual(scrubMid.frame, 112, 'seek at 4s → inPoint 12 + 100 frames')
+const scrubEntryWrong = resolveTimelineClipFrame(clip, 4000, tl, {}, { atEntry: true, channel: 1, physicalLayer: 5 })
+assert.strictEqual(scrubEntryWrong.frame, 12, 'atEntry would wrongly SEEK inPoint only')
+
 console.log('smoke-editor-defaults: OK')

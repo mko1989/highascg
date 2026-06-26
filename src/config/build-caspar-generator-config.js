@@ -12,7 +12,10 @@ const {
 	parseDecklinkDeviceIndex,
 	readDecklinkKeyFillFromConnectorCaspar,
 	writeDecklinkKeyFillToCasparServer,
+	applyDecklinkConsumerSettingsFromConnector,
 } = require('./decklink-key-fill')
+const { channelCountFromLayout, normalizeProgramLayout } = require('./audio-channel-layouts')
+const { destinationAudioLayoutsByMain } = require('./screen-destinations')
 
 /**
  * @param {Record<string, unknown>} appConfig
@@ -148,17 +151,18 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			merged[`screen_${n}_decklink_replace_screen`] = true
 		}
 		applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, connector)
+		applyDecklinkConsumerSettingsFromConnector(merged, `screen_${n}_`, connector)
 	}
 
 	g.connectors.forEach((c) => {
-		if (c.kind !== 'decklink_io') return
+		if (c.kind !== 'decklink_io' && c.kind !== 'decklink_out') return
 		const devNum = parseInt(String(c.externalRef || ''), 10)
 		if (!Number.isFinite(devNum) || devNum <= 0) return
 
 		const incomingEdge = edges.find((e) => e.sinkId === c.id)
 		if (!incomingEdge) {
 			// Fallback to legacy binding if no cable exists
-			if (c.caspar?.ioDirection !== 'out') return
+			if (c.kind === 'decklink_io' && String(c.caspar?.ioDirection || 'in').toLowerCase() !== 'out') return
 			const binding = c.caspar?.outputBinding
 			if (binding?.type === 'screen') {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
@@ -166,6 +170,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			} else if (binding?.type === 'multiview') {
 				merged.multiview_decklink_device = devNum
 				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
+				applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)
 			}
 			return
 		}
@@ -189,6 +194,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			if (String(dest.mode || '') === 'multiview') {
 				merged.multiview_decklink_device = devNum
 				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
+				applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)
 			} else {
 				const idx = Number.isFinite(Number(dest.mainScreenIndex)) ? Number(dest.mainScreenIndex) : 0
 				const n = idx + 1
@@ -202,8 +208,44 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		} else if (sourceId === 'caspar_mv_out') {
 			merged.multiview_decklink_device = devNum
 			applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
+			applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)
 		}
 	})
+}
+
+/**
+ * Project multiview destination panel videoMode into `multiview_mode` for generator + channel plan.
+ * @param {Record<string, unknown>} merged
+ * @param {Record<string, unknown>} appConfig
+ */
+function applyMultiviewDestinationOverrides(merged, appConfig) {
+	const list = destinationsFromConfig(appConfig || {})
+	const mvDest = list.find((d) => d && String(d.mode || '') === 'multiview')
+	if (!mvDest) return
+
+	const modeRaw = String(mvDest.videoMode || '').trim()
+	const width = Math.max(64, parseInt(String(mvDest.width ?? 0), 10) || 0)
+	const height = Math.max(64, parseInt(String(mvDest.height ?? 0), 10) || 0)
+	const fps = Math.max(1, parseFloat(String(mvDest.fps ?? 50)) || 50)
+
+	if (modeRaw && STANDARD_VIDEO_MODES[modeRaw]) {
+		merged.multiview_mode = modeRaw
+		return
+	}
+	const customFromMode = parseCustomVideoModeString(modeRaw)
+	if (customFromMode) {
+		merged.multiview_mode = 'custom'
+		merged.multiview_custom_width = customFromMode.w
+		merged.multiview_custom_height = customFromMode.h
+		merged.multiview_custom_fps = customFromMode.fps
+		return
+	}
+	if (width > 0 && height > 0) {
+		merged.multiview_mode = 'custom'
+		merged.multiview_custom_width = width
+		merged.multiview_custom_height = height
+		merged.multiview_custom_fps = fps
+	}
 }
 
 function applyScreenConsumerOverridesFromCabling(merged, appConfig) {
@@ -277,10 +319,26 @@ function reconcileDecklinkScreenConsumerFlags(merged) {
 	const sc = Math.min(16, Math.max(1, parseInt(String(merged.screen_count || 4), 10) || 4))
 	for (let n = 1; n <= sc; n++) {
 		const tiles = merged[`screen_${n}_decklink_tiles`]
-		if (!Array.isArray(tiles) || tiles.length === 0) continue
+		const decklinkDevice = parseInt(String(merged[`screen_${n}_decklink_device`] || '0'), 10) || 0
+		const hasDecklink = decklinkDevice > 0 || (Array.isArray(tiles) && tiles.length > 0)
+		if (!hasDecklink) continue
 		const wantsScreen =
 			merged[`screen_${n}_screen_consumer`] === true || merged[`screen_${n}_screen_consumer`] === 'true'
 		merged[`screen_${n}_decklink_replace_screen`] = !wantsScreen
+	}
+}
+
+/**
+ * Device View destination `audioLayout` → `screen_N_audio_layout` for Caspar PGM bus width.
+ * @param {Record<string, unknown>} merged
+ * @param {Record<string, unknown>} appConfig
+ */
+function applyDestinationAudioLayoutsToScreens(merged, appConfig) {
+	const sc = Math.min(16, Math.max(1, parseInt(String(merged.screen_count || 4), 10) || 4))
+	const byMain = destinationAudioLayoutsByMain(appConfig || {})
+	for (let n = 1; n <= sc; n++) {
+		const layout = byMain[n - 1] != null ? normalizeProgramLayout(String(byMain[n - 1])) : 'stereo'
+		merged[`screen_${n}_audio_layout`] = layout
 	}
 }
 
@@ -334,7 +392,7 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 			merged.caspar_global_portaudio = true
 
 			const layout = String(out.channelLayout || 'stereo')
-			const chCount = layout === '16ch' ? 16 : layout === '8ch' ? 8 : layout === '4ch' ? 4 : 2
+			const chCount = channelCountFromLayout(layout)
 
 			const consumer = {
 				deviceName: out.deviceName,
@@ -358,6 +416,34 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 	})
 
 	reconcileCustomLivePortAudioVsOpenAl(merged)
+	assignStereoBusPatchesOnScreens(merged)
+}
+
+/**
+ * When several stereo PortAudio outputs share one PGM channel, map each device to the next bus pair (1+2, 3+4, …).
+ * @param {Record<string, unknown>} merged
+ */
+function assignStereoBusPatchesOnScreens(merged) {
+	const sc = Math.min(16, Math.max(1, parseInt(String(merged.screen_count || 4), 10) || 4))
+	for (let n = 1; n <= sc; n++) {
+		const list = merged[`screen_${n}_portaudio_consumers`]
+		if (!Array.isArray(list) || list.length <= 1) continue
+		let nextMixCh = 1
+		for (const c of list) {
+			if (!c || typeof c !== 'object') continue
+			const outCh = parseInt(String(c.outputChannels || 2), 10) || 2
+			if (outCh !== 2) {
+				nextMixCh += outCh
+				continue
+			}
+			if (nextMixCh > 15) break
+			const patch = c.audioPatch && typeof c.audioPatch === 'object' ? c.audioPatch : {}
+			if (Object.keys(patch).length === 0) {
+				c.audioPatch = { '1-2': `${nextMixCh}-${nextMixCh + 1}` }
+			}
+			nextMixCh += 2
+		}
+	}
 }
 
 /**
@@ -408,10 +494,12 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	/** Same rule as routing-map `screen_count`: max of root `screen_count` and `casparServer.screen_count`. */
 	merged.screen_count = resolveMainScreenCount(appConfig || {})
 	applyDestinationOverridesToScreens(merged, appConfig || {})
+	applyMultiviewDestinationOverrides(merged, appConfig || {})
 	applyPixelMappingProgramScreens(merged, appConfig || {})
 	applyDecklinkOverridesToScreens(merged, appConfig || {})
 	applyScreenConsumerOverridesFromCabling(merged, appConfig || {})
 	reconcileDecklinkScreenConsumerFlags(merged)
+	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
 	merged.rtmp = normalizeRtmpConfig(appConfig && appConfig.rtmp)
 	merged.streamingChannel = {
@@ -469,19 +557,26 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 			const tiles = merged[`screen_${n}_decklink_tiles`]
 			const wantsScreen =
 				merged[`screen_${n}_screen_consumer`] !== false && merged[`screen_${n}_screen_consumer`] !== 'false'
+			const manualOsX = Number.isFinite(merged[`screen_${n}_os_x`]) ? merged[`screen_${n}_os_x`] : null
 			if (
 				wantsScreen &&
 				Array.isArray(tiles) &&
 				tiles.length > 0 &&
 				hasMappingGpu &&
 				bbox &&
-				mappingFeedScreens.has(n) &&
-				!Number.isFinite(merged[`screen_${n}_os_x`])
+				manualOsX == null &&
+				!head
 			) {
 				const spanX = bbox.maxX - bbox.minX
 				const spanY = bbox.maxY - bbox.minY
-				if (spanY > spanX) merged[`screen_${n}_y`] = Math.max(0, bbox.maxY)
-				else merged[`screen_${n}_x`] = Math.max(0, bbox.maxX)
+				if (mappingFeedScreens.has(n)) {
+					merged[`screen_${n}_x`] = Math.max(0, bbox.minX)
+					merged[`screen_${n}_y`] = Math.max(0, bbox.minY)
+				} else if (spanY > spanX) {
+					merged[`screen_${n}_y`] = Math.max(0, bbox.maxY)
+				} else {
+					merged[`screen_${n}_x`] = Math.max(0, bbox.maxX)
+				}
 			}
 		}
 	} catch (_) {}

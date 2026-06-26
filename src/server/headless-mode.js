@@ -1,6 +1,9 @@
 'use strict'
 
-/** @returns {boolean} */
+/**
+ * API-only mode — opt-in debug/CI. Production serves dist-web/ on :4200 (same machine as API).
+ * @returns {boolean}
+ */
 function isHeadlessMode() {
 	const v = process.env.HIGHASCG_HEADLESS
 	if (v == null || v === '') return false

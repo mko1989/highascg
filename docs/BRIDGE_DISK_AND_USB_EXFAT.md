@@ -41,6 +41,7 @@ sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /home/casparcg/brid
 | **Configs** | `exfat/configs/` ↔ project (bidirectional; boot prefers USB when stick present) |
 | **Projects** | `exfat/projects/*.json` — stick catalog; boot pulls to `~/highascg/projects/`; saves push **only the active slug** while stick mounted |
 | **Server drops** | `drop-update/` (unchanged) |
+| **Private (per machine)** | `.private/<machine-id>/` on USB and bridge — Tailscale/Syncthing/replication pairing; **not** in `configs/` sync |
 
 Use [`HIGHASCGEXF-starter-layout.zip`](../dist/HIGHASCGEXF-starter-layout.zip) for USB folder stubs.
 

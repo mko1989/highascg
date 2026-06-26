@@ -1,0 +1,162 @@
+/* Global Setup-style Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: 0 16px;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 1000;
+}
+
+.header__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header__logo {
+  height: 20px;
+  width: auto;
+}
+
+.header__badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.header__status {
+  display: flex;
+  align-items: center;
+}
+
+.header-connection-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+}
+
+.header-input-group .input-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.header-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  outline: none;
+  padding: 2px 0;
+}
+
+#header-server-ip {
+  width: 140px;
+}
+
+#header-server-port {
+  width: 60px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.input-separator {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.header-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.header-status-pill .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.header-status-pill .status-dot.connected {
+  background-color: var(--success);
+}
+
+.header-status-pill .status-dot.disconnected {
+  background-color: var(--error);
+}
+
+.header-btn {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: var(--transition);
+}
+
+.header-btn:hover {
+  background: var(--accent);
+  color: var(--bg-dark);
+  border-color: var(--accent);
+}
+
+.header-btn--open-webui {
+  background-color: var(--accent);
+  color: var(--bg-dark);
+  border-color: var(--accent);
+}
+
+.header-btn--open-webui:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.header-btn--open-cg-studio {
+  background-color: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.header-btn--open-cg-studio:hover {
+  background-color: rgba(79, 195, 247, 0.15);
+  color: var(--accent);
+}
+
+.hidden {
+  display: none !important;
+}

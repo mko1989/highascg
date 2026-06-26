@@ -4,6 +4,11 @@ const { execFile, spawn } = require('child_process')
 const { promisify } = require('util')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
 const { getXAuthority } = require('./hardware-info')
+const {
+	resolveNvidiaXApplyScript,
+	buildNvidiaDisplayPolicyShellLines,
+	applyNvidiaDisplayPolicy,
+} = require('./nvidia-display-policy')
 
 const execFileAsync = promisify(execFile)
 
@@ -105,19 +110,7 @@ function buildOperatorDisplaySessionShellLines(config, layout) {
 		`  xdotool mousemove --sync ${cx} ${cy} 2>/dev/null || true`,
 		'fi',
 	)
-	lines.push(
-		'if [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ]; then',
-		'  /usr/local/bin/highascg-nvidia-x-apply.sh',
-		'  ( sleep 6; /usr/local/bin/highascg-nvidia-x-apply.sh ) &',
-		'elif command -v nvidia-settings >/dev/null 2>&1; then',
-		'  for _g in 0 1 2 3; do',
-		'    nvidia-settings -q "[gpu:${_g}]/SyncToVBlank" &>/dev/null || continue',
-		'    nvidia-settings -a "[gpu:${_g}]/SyncToVBlank=0" 2>/dev/null || true',
-		'  done',
-		'  nvidia-settings -a "[gpu:0]/SyncToVBlank=0" 2>/dev/null || true',
-		'  nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true',
-		'fi',
-	)
+	lines.push(...buildNvidiaDisplayPolicyShellLines())
 	return lines
 }
 
@@ -157,27 +150,12 @@ async function applyOperatorDisplaySession(config, opts = {}) {
 		}
 	}
 	if (await commandExists('nvidia-settings')) {
-		const applyBin = '/usr/local/bin/highascg-nvidia-x-apply.sh'
-		try {
-			if (await commandExists(applyBin)) {
-				await execFileAsync(applyBin, [], { env, timeout: 15_000 })
-			} else {
-				for (const g of [0, 1, 2, 3]) {
-					try {
-						await execFileAsync('nvidia-settings', ['-a', `[gpu:${g}]/SyncToVBlank=0`], { env, timeout: 4000 })
-					} catch {
-						/* gpu index may not exist */
-					}
-				}
-				try {
-					await execFileAsync('nvidia-settings', ['-a', '[screen:0]/SyncToVBlank=0'], { env, timeout: 4000 })
-				} catch {
-					/* ignore */
-				}
-			}
-			log('info', '[X-Display] NVIDIA SyncToVBlank off + Force Full Composition Pipeline (Caspar consumer vsync on)')
-		} catch (e) {
-			log('warn', `[X-Display] NVIDIA display policy failed: ${e?.message || e}`)
+		const result = await applyNvidiaDisplayPolicy(env, { log })
+		if (!result.ok && resolveNvidiaXApplyScript()) {
+			// Script exists but first pass can race empty MetaMode after xrandr — one delayed retry.
+			setTimeout(() => {
+				applyNvidiaDisplayPolicy(env, { log, timeoutMs: 20_000 }).catch(() => {})
+			}, 6000)
 		}
 	}
 	return { ok: true, rect }

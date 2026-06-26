@@ -1,7 +1,9 @@
 # Plan: Permanent server / client split
 
-**Status:** Phase 3–4 complete (server/client split shipped)  
-**Goal:** One canonical model everywhere: **Node server = bridge** (client↔Caspar + client↔Ubuntu) via API/WS only; **client = Electron launcher + static Web UI** on the operator workstation. Playout ISO and exFAT drops carry **server only** — no `client/`, no `work/`, no electron launcher on playout.
+> **Superseded for production (2026):** **One unified repo** — **`client/`** (canonical UI) + **`src/`** (API) on the **same playout machine**. Node serves **API + web GUI** (`dist-web/`) on **`:4200`**. [**highascg-client**](https://github.com/mko1989/highascg-client) is **optional Electron packaging only** (simulator, multiserver, modules) — not the UI source tree. This document records the **WO-51 headless + remote Electron** plan only. **Current model:** [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`../client/README.md`](../client/README.md).
+
+**Status:** Historical (WO-51 shipped; WO-52 merged UI onto playout)  
+**Goal (original):** Node server = bridge via API/WS; UI on operator workstation. **WO-52 update:** UI is **`dist-web/`** on playout `:4200`; Electron is hub-only.
 
 **Canonical reference:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 

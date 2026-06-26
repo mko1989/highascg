@@ -1,7 +1,7 @@
 'use strict'
 
 const { audioRouteToAudioFilter } = require('./audio-route')
-const { param } = require('../caspar/amcp-utils')
+const { audioFilterParam } = require('../caspar/amcp-utils')
 
 /**
  * Reset Caspar mixer transforms that persist on a layer (crop, color, key, etc.).
@@ -64,9 +64,26 @@ function buildEffectAmcpLinesPlayback(type, params, cl) {
 }
 
 /** @param {object} clip */
-function playAfSuffix(clip) {
-	const af = audioRouteToAudioFilter(clip.audioRoute || '1+2')
-	return af ? ` AF ${param(af)}` : ''
+function clipAudioRoute(clip) {
+	return clip?.audioRoute || '1+2'
+}
+
+/** @param {object} clip */
+function playAfSuffix(clip, programLayout) {
+	const af = audioRouteToAudioFilter(clipAudioRoute(clip), programLayout)
+	return af ? ` AF ${audioFilterParam(af)}` : ''
+}
+
+/**
+ * True when Caspar transport (PLAY/LOAD + AF) must be re-sent for this layer.
+ * @param {{ clipId?: string, audioRoute?: string } | null | undefined} prev
+ * @param {object} clip
+ */
+function timelineClipTransportStale(prev, clip) {
+	if (!prev || !clip) return true
+	if (prev.clipId !== clip.id) return true
+	if ((prev.audioRoute || '1+2') !== clipAudioRoute(clip)) return true
+	return false
 }
 
 /** @param {string|undefined} s */
@@ -98,7 +115,9 @@ const TIMELINE_AMCP_DRIFT_MS = 500
 module.exports = {
 	buildEffectAmcpLinesPlayback,
 	mixerEffectNeutralLines,
+	clipAudioRoute,
 	playAfSuffix,
+	timelineClipTransportStale,
 	parseResolutionAspect,
 	TIMELINE_LAYER_BASE,
 	TICK_MS,

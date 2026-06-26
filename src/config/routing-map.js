@@ -253,6 +253,8 @@ function getChannelMap(config, activeBuses = null) {
 	const inputChannels = []
 	const decklinkInputChannels = []
 	for (let i = 1; i <= decklinkCount; i++) {
+		const dir = String(readCasparSetting(config, `decklink_input_${i}_direction`) ?? 'in').toLowerCase()
+		if (dir === 'out') continue
 		const channel = nextCh++
 		decklinkInputChannels.push(channel)
 		inputChannels.push({
@@ -265,6 +267,7 @@ function getChannelMap(config, activeBuses = null) {
 			label: `DeckLink ${i}`,
 		})
 	}
+	const effectiveDecklinkInputCount = decklinkInputChannels.length
 	const liveAudioInputChannels = []
 	for (let i = 1; i <= liveAudioCount; i++) {
 		const channel = nextCh++
@@ -331,10 +334,10 @@ function getChannelMap(config, activeBuses = null) {
 		screenCount,
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
 		multiviewEnabled: multiviewChannels.length > 0,
-		inputsEnabled,
+		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled,
 		inputsOnMvr,
 		decklinkInputsHost,
-		decklinkCount,
+		decklinkCount: effectiveDecklinkInputCount,
 		programCh: (n) => programChannels[n - 1] || programChannels[0],
 		previewCh: (n) => {
 			const idx = n - 1

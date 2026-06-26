@@ -7,7 +7,7 @@ Normative setup for **smooth, tear-free** output on CasparCG **screen** consumer
 | Layer | Setting | Value |
 |-------|---------|--------|
 | **NVIDIA** (`nvidia-settings`) | **Sync to VBlank** (`SyncToVBlank` on GPU/screen) | **Off** |
-| **NVIDIA** (`nvidia-settings` → X Server Display Configuration → Advanced, per output) | **Force full composition pipeline** | **On** (all connected screens) |
+| **NVIDIA** (`nvidia-settings` → X Server Display Configuration → Advanced, per output) | **Force composition pipeline** | **On** (all connected screens) |
 | **Caspar screen consumer** (`<screen>` / HighAsCG `screen_N_vsync`) | **V-sync** | **On** (`true`) |
 
 Do **all three**. Using only one side often causes tearing, stutter, or frame pacing that looks like “bad vsync.”
@@ -17,30 +17,30 @@ Do **all three**. Using only one side often causes tearing, stutter, or frame pa
 - **Driver sync-to-vblank** forces OpenGL swaps to the display refresh at the **driver** level for all GL clients on that GPU.
 - Caspar’s **screen consumer** has its own **vsync** when presenting the playout window.
 - With NVIDIA **Sync to VBlank on**, the driver and the consumer can **double-sync** or fight each other → uneven frame times.
-- With NVIDIA **Sync to VBlank off**, **Force Full Composition Pipeline on** (all outputs), and Caspar **vsync on**, presentation is gated correctly for playout — verified on multi-head DP/HDMI + DeckLink setups.
+- With NVIDIA **Sync to VBlank off**, **Force Composition Pipeline on** (all outputs), and Caspar **vsync on**, presentation is gated correctly for playout — verified on multi-head DP/HDMI + DeckLink setups.
 
 ## How to apply
 
 ### NVIDIA (OS / X session)
 
 1. Open **`nvidia-settings`** (HighAsCG: **Settings → System → Open NVIDIA Settings**, or `DISPLAY=:0 nvidia-settings`).
-2. **X Server Display Configuration** → **Advanced** (per output): enable **Force full composition pipeline** on **every** connected screen.
+2. **X Server Display Configuration** → **Advanced** (per output): enable **Force composition pipeline** on **every** connected screen (not “Force full composition pipeline”).
 3. Under the GPU (and screen section if shown), set **Sync to VBlank** to **disabled / off**.
 4. Confirm with:
    ```bash
    nvidia-settings -q "[gpu:0]/SyncToVBlank"
-   nvidia-settings -q CurrentMetaMode -t | grep ForceFullCompositionPipeline
+   nvidia-settings -q CurrentMetaMode -t | grep ForceCompositionPipeline
    ```
-   (`SyncToVBlank` **0** = off; each MetaMode block should include `ForceFullCompositionPipeline=On`)
+   (`SyncToVBlank` **0** = off; each MetaMode block should include `ForceCompositionPipeline=On`)
 
 HighAsCG production install also sets:
 
 - Environment: **`__GL_SYNC_TO_VBLANK=0`** in the X session / autostart chain.
-- Script: **`highascg-nvidia-x-apply.sh`** (PowerMizer max, `SyncToVBlank=0`, **Force Full Composition Pipeline on all outputs**), installed by `scripts/setup/09-openbox-autostart.sh` from `tools/runtime/highascg-nvidia-x-apply.sh`.
+- Script: **`highascg-nvidia-x-apply.sh`** (PowerMizer max, `SyncToVBlank=0`, **Force Composition Pipeline on all outputs**), installed by `scripts/setup/09-openbox-autostart.sh` from `tools/runtime/highascg-nvidia-x-apply.sh`. Node bridge resolves the same script via `src/utils/nvidia-display-policy.js` after every layout apply and before opening **nvidia-settings** from Settings.
 
 Re-run after layout apply, **nodm restart**, driver upgrades, or if tearing returns:
 
-**Important:** `xrandr` / layout apply resets NVIDIA **CurrentMetaMode** and clears **Force Full Composition Pipeline**. HighAsCG runs `highascg-nvidia-x-apply.sh` **after** `apply-layout.sh` (openbox autostart + apply-layout tail + layout watchdog), with retries until MetaMode is populated.
+**Important:** `xrandr` / layout apply resets NVIDIA **CurrentMetaMode** and clears **Force Composition Pipeline**. HighAsCG runs `highascg-nvidia-x-apply.sh` **after** `apply-layout.sh` (openbox autostart + apply-layout tail + layout watchdog), with retries until MetaMode is populated.
 
 Permanent on a production box:
 
@@ -71,7 +71,7 @@ In HighAsCG settings (`casparServer` / Device View), keep **`screen_N_vsync`: tr
 
 ## Verification
 
-1. NVIDIA: Sync to VBlank **off**; CurrentMetaMode shows **ForceFullCompositionPipeline=On** on each output.
+1. NVIDIA: Sync to VBlank **off**; CurrentMetaMode shows **ForceCompositionPipeline=On** on each output.
 2. Caspar config: `<vsync>true</vsync>` on the program screen consumer(s).
 3. Observe output: no torn frames at stable refresh; frame drops show in Caspar log rather than horizontal tears.
 
@@ -82,4 +82,4 @@ In HighAsCG settings (`casparServer` / Device View), keep **`screen_N_vsync`: tr
 - [caspar_config_explained.md](../caspar_config_explained.md) — `<screen>` consumer XML
 - [ISO_CONTENTS.md](../ISO_CONTENTS.md) — baked NVIDIA X session defaults on live ISO
 
-*Last updated: 2026-06-21*
+*Last updated: 2026-06-24*

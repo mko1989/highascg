@@ -48,6 +48,10 @@ function mockCasparRestart() {
 			steps.push('caspar restart')
 			return { attempted: true, restartSent: true, disconnected: true, reconnected: true }
 		},
+		async reloadCasparAfterConfigWrite() {
+			steps.push('caspar restart')
+			return { attempted: true, restartSent: true, disconnected: true, reconnected: true }
+		},
 		async sendRestartAndWaitForCaspar() {
 			steps.push('caspar restart')
 			return { restartSent: true, disconnected: true, reconnected: true }
@@ -79,6 +83,24 @@ async function runApply(canvasNeeded) {
 		if (request.endsWith('/display-stable-wait')) return mockDisplayWait()
 		if (request.endsWith('/caspar-restart')) return mockCasparRestart()
 		if (request.endsWith('/xrandr-layout-verify')) return mockCanvasCheck(canvasNeeded)
+		if (request.endsWith('/x-display-session')) {
+			return {
+				async applyOperatorDisplaySession() {
+					steps.push('operator display session')
+				},
+				displaySessionEnv() {
+					return {}
+				},
+			}
+		}
+		if (request.endsWith('/nvidia-display-policy')) {
+			return {
+				async applyNvidiaDisplayPolicy() {
+					steps.push('nvidia display policy')
+					return { ok: true }
+				},
+			}
+		}
 		return origLoad.apply(this, arguments)
 	}
 	try {
@@ -105,7 +127,9 @@ test('full apply: canvas fits — write, persist layout, live xrandr, AMCP resta
 		'write caspar',
 		'xrandr live=false persist=true',
 		'xrandr live=true persist=false',
+		'operator display session',
 		'caspar restart',
+		'nvidia display policy',
 	])
 })
 
@@ -118,7 +142,9 @@ test('full apply: canvas expansion — nodm, live xrandr, kill autostart, AMCP r
 		'nodm restart',
 		'wait display stable',
 		'xrandr live=true persist=false',
+		'operator display session',
 		'kill caspar',
 		'caspar restart',
+		'nvidia display policy',
 	])
 })

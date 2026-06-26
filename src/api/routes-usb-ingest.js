@@ -4,6 +4,7 @@
 
 'use strict'
 
+const path = require('path')
 const defaults = require('../config/defaults')
 const { JSON_HEADERS, jsonBody, parseBody, parseQueryString } = require('./response')
 const usbDrives = require('../media/usb-drives')
@@ -85,6 +86,8 @@ async function handleGetDrives(ctx) {
 	if (denied) return denied
 	try {
 		const drives = await usbDrives.listUsbDrives()
+		const unmounted =
+			process.platform === 'linux' ? await usbDrives.listRemovableBlockDevices() : []
 		const platformNote =
 			process.platform === 'win32'
 				? 'USB import from the server is not supported on Windows in this version.'
@@ -92,7 +95,7 @@ async function handleGetDrives(ctx) {
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, drives, platform: process.platform, platformNote }),
+			body: jsonBody({ ok: true, drives, unmounted, platform: process.platform, platformNote }),
 		}
 	} catch (e) {
 		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
@@ -265,6 +268,50 @@ function handleImportCancel(ctx) {
 }
 
 /**
+ * POST /api/usb/mount
+ * @param {object} ctx
+ * @param {string} body
+ */
+async function handleMount(ctx, body) {
+	const denied = ensureUsbEnabled(ctx)
+	if (denied) return denied
+	const parsed = parseBody(body)
+	const blockDevice = String(parsed?.blockDevice || '').trim()
+	if (!blockDevice) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'blockDevice required' }) }
+	}
+	const r = await usbDrives.mountUsbBlockDevice(blockDevice)
+	if (!r.ok) {
+		return {
+			status: r.needsPolkit ? 503 : 500,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				error: r.message || 'Mount failed',
+				needsPolkitSetup: !!r.needsPolkit,
+			}),
+		}
+	}
+	const drives = await usbDrives.listUsbDrives()
+	const drive =
+		drives.find((d) => (r.mountpoint && d.mountpoint === path.resolve(r.mountpoint))) ||
+		drives.find((d) => d.device === blockDevice) ||
+		null
+	if (drive && typeof ctx._wsBroadcast === 'function') {
+		ctx._wsBroadcast('usb:attached', { drive })
+	}
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({
+			ok: true,
+			mountpoint: r.mountpoint || drive?.mountpoint || null,
+			drive,
+			message: r.message || 'Mounted',
+		}),
+	}
+}
+
+/**
  * POST /api/usb/eject
  * @param {object} ctx
  * @param {string} body
@@ -298,6 +345,7 @@ async function handle(method, p, pathWithQuery, body, ctx, req) {
 	if (method === 'GET' && p === '/api/usb/browse') return handleBrowse(ctx, query, req)
 	if (method === 'GET' && p === '/api/usb/import-status') return handleImportStatus(ctx)
 	if (method === 'POST' && p === '/api/usb/import') return handleImport(ctx, body)
+	if (method === 'POST' && p === '/api/usb/mount') return handleMount(ctx, body)
 	if (method === 'POST' && p === '/api/usb/import-cancel') return handleImportCancel(ctx)
 	if (method === 'POST' && p === '/api/usb/eject') return handleEject(ctx, body)
 	return null

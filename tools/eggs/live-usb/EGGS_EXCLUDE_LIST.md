@@ -58,14 +58,14 @@ grep antigravity /etc/penguins-eggs.d/exclude.list
 
 ## What HighAsCG excludes (summary)
 
-**Default (`HIGHASCG_ISO_EMBED_SERVER=1` on prepare):** use **`penguins-eggs-exclude-highascg-embed-server.list`** — server runtime stays on ISO; **`client/`**, **`dist-web/`**, dev trees omitted (UI via Electron launcher).
+**Default (`HIGHASCG_ISO_EMBED_SERVER=1` on prepare):** use **`penguins-eggs-exclude-highascg-embed-server.list`** — server runtime stays on ISO; **`client/`** sources and dev trees omitted. **WO-52:** operator UI is **`dist-web/`** on playout via **`drop-update/`**, not a remote laptop.
 
 **WO‑47 only (`HIGHASCG_ISO_EMBED_SERVER=0`):**
 
 | Omitted from ISO squashfs | Provided via |
 |-------------------------|----------------|
-| `src/`, `scripts/`, `index.js`, `package.json`, `tools/`, … | exFAT **`drop-update/`** (`highascg-server_*.tar.gz`) |
-| `client/`, `dist-web/` | Remote UI (not on playout stick) |
+| `src/`, `scripts/`, `index.js`, `package.json`, `tools/`, … | exFAT **`drop-update/`** (`highascg-server_*.tar.gz` incl. **`dist-web/`**) |
+| `client/` (sources) | Build host only — deploy **`dist-web/`** via drop |
 | `node_modules/`, `work/`, `deprecated/`, `audio_testing/`, `for_client/`, `From_client/` | Build / dev only |
 | `media/*`, `log/`, `cef-cache/`, `data/` | Runtime on machine |
 | `home/casparcg/exfat/*` | Mounted at boot (WO-47) |

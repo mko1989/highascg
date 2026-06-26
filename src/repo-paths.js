@@ -7,8 +7,9 @@ const path = require('path')
 const REPO_ROOT = path.join(__dirname, '..')
 
 /**
- * Directory served as static UI when not headless (local dev / legacy monolith only).
- * Production playout: HIGHASCG_HEADLESS=true — UI via Electron launcher, not Node static files.
+ * Directory served as static operator UI when not headless.
+ * Production (unified repo): dist-web/ on the same playout machine as the API (:4200).
+ * HIGHASCG_HEADLESS=true skips static UI (API-only debug). Electron launcher is hub-only.
  * @param {string} [repoRoot]
  * @returns {string}
  */

@@ -20,12 +20,13 @@ Running `sudo ./scripts/install.sh` sequentially sources five phases. It assumes
 2. **Networking**: Installs Tailscale for secure LAN/WAN access and Syncthing (exposing its GUI on `0.0.0.0:8384` for the operator).
 3. **USB Ingest Prep**: Installs `udisks2` and `policykit-1` to allow the unprivileged `casparcg` user to auto-mount drives (via `/etc/polkit-1/rules.d/51-highascg-udisks-casparcg-headless.rules`).
 4. **NVIDIA Pinning**: Reads `HIGHASCG_NVIDIA_DRIVER` (e.g., `595`) and stamps it to `/etc/highascg/nvidia-iso-driver`, disabling multi-branch boot hooks.
-5. **Systemd Unit Setup**: Calls `scripts/write-highascg-systemd-unit.sh` and `scripts/install-exfat-systemd-units.sh` (bridge + USB mounts, exFAT sync map from `config/exfat-sync.json`). If running headless, it drops a configuration at `/etc/systemd/system/highascg.service.d/10-headless.conf`:
+5. **Systemd Unit Setup**: Calls `scripts/write-highascg-systemd-unit.sh` and `scripts/install-exfat-systemd-units.sh`. **WO-52 default:** do **not** install `highascg.service.d/10-headless.conf` unless `HIGHASCG_INSTALL_HEADLESS=1` — production serves **`dist-web/`** on `:4200`.
    ```ini
-   [Service]
-   Environment=HIGHASCG_HEADLESS=true
+   # Optional API-only debug only — NOT production default:
+   # /etc/systemd/system/highascg.service.d/10-headless.conf
+   # Environment=HIGHASCG_HEADLESS=true
    ```
-6. **MOTD Injection**: Rewrites `/etc/update-motd.d/99-highascg` to print the Tailscale IP and Web UI link when an operator SSHes into the box.
+6. **MOTD Injection**: Rewrites `/etc/update-motd.d/99-highascg` to print the Tailscale IP and Web UI link (`http://<host>:4200/`) when an operator SSHes into the box.
 
 **Operator stick seeding** (after `finish-operator-stick.sh`):
 
@@ -38,6 +39,6 @@ Creates `projects/`, `configs/`, `drop-update/`, etc. on `HIGHASCGEXF`. See [`do
 
 ### Dev Deployment (`scripts/dev-push.sh`)
 For rapid iteration without rebuilding the ISO, the `npm run deploy:dev` command executes `dev-push.sh`.
-* It bundles `src/`, `config/`, and `tools/` into a tarball (excluding `node_modules` and the Web UI `dist-web`).
+* It bundles `src/`, `config/`, `tools/`, and **`dist-web/`** (when present) into a tarball (excluding `node_modules`).
 * Pushes over SSH to `DEPLOY_HOST`.
 * `DEPLOY_REMOTE_SUDO=1` can be passed to use `sudo tar` for extraction on hosts where permissions are restricted.

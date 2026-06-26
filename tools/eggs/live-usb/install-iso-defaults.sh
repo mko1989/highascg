@@ -2,7 +2,7 @@
 # Bake ISO-first defaults on the eggs build host before `eggs produce --clone`.
 #
 # - Caspar: config/casparcg.config from config/casparcg.config.iso
-# - HighAsCG: production node_modules for server embed (no dist-web on ISO; UI via Electron)
+# - HighAsCG: production node_modules for server embed (dist-web/ via exFAT drop-update; WO-52 serves UI on :4200)
 #
 # Usage (repo root):
 #   bash tools/eggs/live-usb/install-iso-defaults.sh
@@ -48,7 +48,7 @@ if [[ "$BUILD_WEB" == "1" ]]; then
 	else
 		run_as_caspar 'npm install'
 	fi
-	echo "==> build:client skipped (client is a separate repo)"
+	echo "==> build:client: run npm run build:client in repo root (client/ → dist-web/)"
 	echo "==> npm prune --omit=dev --omit=optional (production node_modules for squashfs)"
 	run_as_caspar 'export NPM_CONFIG_LOGLEVEL=error; npm prune --omit=dev --omit=optional'
 else
@@ -59,7 +59,7 @@ else
 	else
 		run_as_caspar 'export NODE_ENV=production NPM_CONFIG_LOGLEVEL=error; npm install --omit=dev --omit=optional'
 	fi
-	echo "==> HIGHASCG_ISO_BUILD_WEB=0 — no dist-web on imaging host (operator UI via Electron launcher)"
+	echo "==> HIGHASCG_ISO_BUILD_WEB=0 — no dist-web on squashfs (deploy dist-web/ via exFAT drop-update; server serves UI on :4200)"
 fi
 
 echo "==> ISO embed server ready under ${HIGHASCG_ROOT} (package.json + node_modules present)"

@@ -6,8 +6,9 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 
 | Document | Topic |
 |----------|--------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | **Server bridge** (client↔Caspar↔Ubuntu), what ships on playout vs operator laptop |
-| [PLAN_SERVER_CLIENT_SPLIT.md](PLAN_SERVER_CLIENT_SPLIT.md) | Headless server + Electron client model |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | **Unified playout stack** — API + `dist-web/` on `:4200`, same machine |
+| [PLAN_SERVER_CLIENT_SPLIT.md](PLAN_SERVER_CLIENT_SPLIT.md) | Historical WO-51 headless plan (superseded by WO-52) |
+| [../from_client/AGENT_SERVER_CLIENT_MERGE.md](../from_client/AGENT_SERVER_CLIENT_MERGE.md) | **WO-52** deploy checklist — API + UI on playout |
 | [MANUAL_INSTALL.md](MANUAL_INSTALL.md) | Production install on Ubuntu (`scripts/install.sh`) |
 | [LIVE_USB_IMAGE.md](LIVE_USB_IMAGE.md) | Build / flash / boot a live USB from a running host |
 | [ISO_CONTENTS.md](ISO_CONTENTS.md) | What is inside the Eggs live ISO (OS → Caspar → HighAsCG) |
@@ -57,4 +58,7 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 | [../work/work-orders/](../work/work-orders/) | Engineering work orders (WO-*) — **not shipped runtime** |
 | [../work/references/](../work/references/) | Design prototypes — **not part of the program** |
 
-**Not on playout server:** in-repo **`client/`** (legacy UI + electron launcher), **`work/`**, **`dist-web/`**. Production UI: [**highascg-client**](https://github.com/mko1989/highascg-client).
+**On playout server:** **`dist-web/`** (built from in-repo **`client/`**, served on `:4200` on the **same machine** as the API), **`index.js`**, **`src/`**, **`config/`**, **`template/`**.  
+**Not on playout as sources:** raw **`client/`** tree (ship **`dist-web/`** only), **`work/`**.  
+**Canonical UI development:** edit **`client/`** in this repo → `npm run build:client`.  
+**highascg-client** (optional): Electron packaging extract (`client/tools/electron-launcher/`) — simulator, multiserver, modules; opens browser to playout `:4200`; **not** the operator UI source tree.

@@ -115,9 +115,9 @@ flowchart LR
 - [ ] **T4.4** Demotion: old leader rejoining as follower performs full reconcile **from new leader** before any mirror; never pushes its stale state up.
 - [ ] **T4.5** Smoke test `tools/smoke/smoke-replication-failover.js` — kill leader link; promote follower; rejoin old leader → it demotes and reconciles, no split-brain.
 
-### Phase 5 — Client / Companion UX (client repo: highascg-client)
+### Phase 5 — Operator UI / Companion UX (`dist-web/` on playout)
 
-> Server exposes the API; UI lives in **highascg-client**. This phase is the **client-side** chunk.
+> UI is served from **`dist-web/`** on the playout host (`:4200`). Build from in-repo **`client/`** (`npm run build:client`); deploy **`dist-web/`**, not a separate remote UI process.
 
 - [ ] **T5.1** Connection profiles: launcher stores **A/B host** for the pair; one-click "Connect to other node".
 - [ ] **T5.2** Replication status banner: leader/follower badge, peer reachable, media sync %, live-state lag, "initial sync" progress. Polls `/api/replication/status`.

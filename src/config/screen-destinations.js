@@ -1,6 +1,8 @@
 'use strict'
 
 const defaults = require('./defaults')
+const { STANDARD_VIDEO_MODES } = require('./config-modes')
+const { normalizeProgramLayout } = require('./audio-channel-layouts')
 
 function normalizeDestination(d) {
 	if (!d || typeof d !== 'object') return null
@@ -23,15 +25,18 @@ function normalizeDestination(d) {
 	const height = Math.max(64, parseInt(String(d.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(d.fps ?? 50)) || 50)
 	const videoMode = String(d.videoMode || '1080p5000').trim() || '1080p5000'
+	const std = videoMode !== 'custom' ? STANDARD_VIDEO_MODES[videoMode] : null
 	return {
 		id,
 		label,
 		mainScreenIndex,
 		mode,
+		/** Caspar program bus width for this destination's PGM output (`stereo` | `4ch` | `8ch` | `16ch`). */
+		audioLayout: normalizeProgramLayout(d.audioLayout || 'stereo'),
 		videoMode,
-		width,
-		height,
-		fps,
+		width: std ? std.width : width,
+		height: std ? std.height : height,
+		fps: std ? std.fps : fps,
 		caspar: { bus },
 		edidLabel: d.edidLabel != null ? String(d.edidLabel) : '',
 		stream:
@@ -101,10 +106,27 @@ function routingDestinationsFromConfig(cfg) {
 	return raw.map(normalizeDestination).filter(Boolean)
 }
 
+/**
+ * Program bus layout per main screen index from Device View destinations.
+ * @param {object} [cfg]
+ * @returns {Record<number, string>}
+ */
+function destinationAudioLayoutsByMain(cfg) {
+	const byMain = /** @type {Record<number, string>} */ ({})
+	for (const dest of destinationsFromConfig(cfg)) {
+		const mode = String(dest.mode || '')
+		if (mode === 'multiview' || mode === 'stream') continue
+		const idx = Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0)
+		byMain[idx] = normalizeProgramLayout(dest.audioLayout || 'stereo')
+	}
+	return byMain
+}
+
 module.exports = {
 	normalizeDestination,
 	normalizeScreenDestinations,
 	finalizeScreenDestinationsConfig,
 	destinationsFromConfig,
 	routingDestinationsFromConfig,
+	destinationAudioLayoutsByMain,
 }

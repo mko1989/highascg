@@ -2,6 +2,7 @@
 
 const { casparServerDefaults } = require('./defaults-caspar-server')
 const { editorDefaultsDefaults } = require('./editor-defaults')
+const { replicationDefaults } = require('./defaults-replication')
 
 /** Top-level defaults excluding casparServer (merged in defaults.js). */
 function coreDefaults() {
@@ -168,6 +169,10 @@ function coreDefaults() {
 		plugins: {
 			entries: {},
 		},
+		cgStudio: {
+			httpPort: 4300,
+			bindAddress: '127.0.0.1',
+		},
 		recordOutputs: [
 			{
 				id: 'rec_1',
@@ -200,6 +205,7 @@ function coreDefaults() {
 			edges: [],
 			layout: {},
 		},
+		replication: replicationDefaults(),
 	}
 }
 

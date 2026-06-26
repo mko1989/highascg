@@ -9,7 +9,7 @@ const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
 const playbackTracker = require('../state/playback-tracker')
 const { param } = require('../caspar/amcp-utils')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
-const { audioRouteToAudioFilter } = require('./audio-route')
+const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
 const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
 const {
 	buildPipOverlayAmcpLinesAll,
@@ -22,7 +22,7 @@ const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAm
 const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
-const { remapIntraLookRoutesForTakeChannel, partitionTakeJobsPlayOrder } = require('./scene-route-deps')
+const { remapIntraLookRoutesForTakeChannel, sendStaggeredTakePlays } = require('./scene-route-deps')
 const {
 	diffScenes,
 	layerHasContent,
@@ -173,7 +173,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		const pLayer = physicalLayer(layer.layerNumber)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const loadOpts = { loop: !!layer.loop }
-		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
+		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2', resolveConfigProgramLayoutForChannel(self.config, channel))
 		if (af) loadOpts.audioFilter = af
 
 		if (isAnimate && fadeDur > 0) {
@@ -226,27 +226,17 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	}
 
 	if (takeJobs.length > 0) {
-		const commitLine = `MIXER ${channel} COMMIT`
-		const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, channel)
-		const playLine = (job) => (job.templateCg ? null : `PLAY ${channel}-${job.pLayer}`)
-		const srcPlays = sources.map(playLine).filter(Boolean)
-		const routePlays = routes.map(playLine).filter(Boolean)
-		if (srcPlays.length && routePlays.length) {
-			await sendAmcpLinesSequential(
-				isAnimate && fadeDur > 0 ? [commitLine, ...srcPlays, commitLine] : [commitLine, ...srcPlays],
-				amcp,
-			)
-			await new Promise((r) => setTimeout(r, 80))
-			await sendAmcpLinesSequential(
-				isAnimate && fadeDur > 0 ? [...routePlays, commitLine] : [...routePlays],
-				amcp,
-			)
-		} else {
-			const playLines = [...srcPlays, ...routePlays]
-			const sandwich =
-				isAnimate && fadeDur > 0 ? [commitLine, ...playLines, commitLine] : [commitLine, ...playLines]
-			await sendAmcpLinesSequential(sandwich, amcp)
-		}
+		await sendStaggeredTakePlays(
+			amcp,
+			channel,
+			takeJobs,
+			(job) => (job.templateCg ? [] : [`PLAY ${channel}-${job.pLayer}`]),
+			{
+				leadingCommit: true,
+				commitAfterSources: isAnimate && fadeDur > 0,
+				commitAfterRoutes: isAnimate && fadeDur > 0,
+			},
+		)
 		if (typeof opts.onProgramTransitionStarted === 'function' && isAnimate && fadeDur > 0) {
 			try {
 				opts.onProgramTransitionStarted()
@@ -264,7 +254,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	for (const job of takeJobs) {
 		if (!job.templateCg) continue
 		try {
-			const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg)
+			const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
 			if (lines.length > 0) {
 				self.log?.(
 					'info',

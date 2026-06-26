@@ -2,6 +2,7 @@
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
 const { layoutChannelCount } = require('./config-modes')
+const { casparChannelLayoutId, DISCRETE_8CH_LAYOUT_ID } = require('./audio-channel-layouts')
 const { buildFfmpegArgs, casparUdpStreamUri } = require('../streaming/caspar-ffmpeg-setup')
 const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
 
@@ -35,15 +36,25 @@ function buildAudioLayoutsXml(config, screenCount) {
 	const ids = new Set()
 	for (let n = 1; n <= screenCount; n++) {
 		const id = String(config[`screen_${n}_audio_layout`] || 'default').toLowerCase()
+		if (id === '8ch' || id === DISCRETE_8CH_LAYOUT_ID) ids.add(DISCRETE_8CH_LAYOUT_ID)
 		if (id === 'live-8ch' || id === '4ch' || id === '16ch') ids.add(id)
 	}
 	const extraN = Math.min(4, Math.max(0, parseInt(String(config.extra_audio_channel_count || 0), 10) || 0))
 	for (let i = 1; i <= extraN; i++) {
 		const id = String(config[`extra_audio_${i}_audio_layout`] || 'default').toLowerCase()
+		if (id === '8ch' || id === DISCRETE_8CH_LAYOUT_ID) ids.add(DISCRETE_8CH_LAYOUT_ID)
 		if (id === 'live-8ch' || id === '4ch' || id === '16ch') ids.add(id)
 	}
 	if (ids.size === 0) return ''
 	const fragments = []
+	if (ids.has(DISCRETE_8CH_LAYOUT_ID)) {
+		fragments.push(`            <channel-layout>
+                <name>${DISCRETE_8CH_LAYOUT_ID}</name>
+                <type>8ch</type>
+                <num-channels>8</num-channels>
+                <channel-order>c0 c1 c2 c3 c4 c5 c6 c7</channel-order>
+            </channel-layout>`)
+	}
 	if (ids.has('live-8ch')) {
 		fragments.push(`            <channel-layout>
                 <name>live-8ch</name>
@@ -168,7 +179,8 @@ function buildExtraAudioFfmpegConsumersXml(config, idx1) {
 function channelLayoutElementXml(layoutId) {
 	const id = String(layoutId || 'default').toLowerCase()
 	if (!id || id === 'default') return ''
-	return `\n            <channel-layout>${escapeXml(id)}</channel-layout>`
+	const casparId = casparChannelLayoutId(id)
+	return `\n            <channel-layout>${escapeXml(casparId)}</channel-layout>`
 }
 
 /**
@@ -223,6 +235,60 @@ function buildGlobalPortAudioInnerXml(config) {
 }
 
 /**
+ * @param {Record<string, unknown>} config
+ * @returns {number}
+ */
+function countPortAudioConsumers(config) {
+	let n = 0
+	for (let i = 1; i <= 16; i++) {
+		const list = config[`screen_${i}_portaudio_consumers`]
+		if (Array.isArray(list)) n += list.length
+	}
+	const mv = config.multiview_portaudio_consumers
+	if (Array.isArray(mv)) n += mv.length
+	return n
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} consumers
+ * @returns {string}
+ */
+function renderPortAudioConsumerBlocks(consumers) {
+	return consumers
+		.map((c) => {
+			let inner = ''
+			if (c.deviceName) {
+				inner += `\n                    <device-name>${escapeXml(c.deviceName)}</device-name>`
+				inner += `\n                    <device>${escapeXml(c.deviceName)}</device>`
+			}
+			inner += `\n                    <output-channels>${c.outputChannels || 2}</output-channels>`
+			inner += `\n                    <channels>${c.outputChannels || 2}</channels>`
+
+			const patch = c.audioPatch || {}
+			if (Object.keys(patch).length > 0) {
+				const ch = c.outputChannels || 2
+				const layoutArr = Array.from({ length: ch }, (_, i) => i + 1)
+				Object.entries(patch).forEach(([outPair, mixPair]) => {
+					const outIdx = parseInt(outPair.split('-')[0], 10) - 1
+					const mixIdx = parseInt(mixPair.split('-')[0], 10)
+					if (outIdx >= 0 && outIdx < ch) {
+						layoutArr[outIdx] = mixIdx
+						if (outIdx + 1 < ch) layoutArr[outIdx + 1] = mixIdx + 1
+					}
+				})
+				inner += `\n                    <channel-layout>${layoutArr.join(',')}</channel-layout>`
+			}
+
+			inner += `\n                    <buffer-size-frames>${c.bufferFrames || 128}</buffer-size-frames>`
+			inner += `\n                    <latency-compensation-ms>${c.latencyMs || 40}</latency-compensation-ms>`
+			inner += `\n                    <fifo-ms>${c.fifoMs || 50}</fifo-ms>`
+			inner += `\n                    <auto-tune-latency>${c.autoTune !== false ? 'true' : 'false'}</auto-tune-latency>`
+			return `\n                <portaudio>${inner}\n                </portaudio>`
+		})
+		.join('')
+}
+
+/**
  * After `<lock-clear-phrase>`: log-level, root system-audio, global PortAudio (extended Caspar only).
  * @param {Record<string, unknown>} config
  * @returns {string}
@@ -240,7 +306,7 @@ function buildCustomLiveRootXml(config) {
     </system-audio>`)
 	}
 	const globalPa = config.caspar_global_portaudio === true || config.caspar_global_portaudio === 'true'
-	if (globalPa) {
+	if (globalPa && countPortAudioConsumers(config) <= 1) {
 		const inner = buildGlobalPortAudioInnerXml(config)
 		parts.push(`    <portaudio>${inner}\n    </portaudio>`)
 	}
@@ -258,42 +324,16 @@ function buildPortAudioConsumerXml(config, screenIdx1) {
 	const prefix = screenIdx1 === 'multiview' ? 'multiview_' : `screen_${screenIdx1}_`
 	const globalPa = config.caspar_global_portaudio === true || config.caspar_global_portaudio === 'true'
 	const en = config[`${prefix}portaudio_enabled`] === true || config[`${prefix}portaudio_enabled`] === 'true'
-	if (globalPa && en) return `\n                <portaudio/>`
+	const consumers = Array.isArray(config[`${prefix}portaudio_consumers`]) ? config[`${prefix}portaudio_consumers`] : []
+
+	if (globalPa && en) {
+		if (consumers.length > 1) return renderPortAudioConsumerBlocks(consumers)
+		return `\n                <portaudio/>`
+	}
 	if (globalPa && !en) return ''
 
-	const consumers = Array.isArray(config[`${prefix}portaudio_consumers`]) ? config[`${prefix}portaudio_consumers`] : []
-	
 	if (consumers.length > 0) {
-		return consumers.map(c => {
-			let inner = ''
-			if (c.deviceName) {
-				inner += `\n                    <device-name>${escapeXml(c.deviceName)}</device-name>`
-				inner += `\n                    <device>${escapeXml(c.deviceName)}</device>`
-			}
-			inner += `\n                    <output-channels>${c.outputChannels || 2}</output-channels>`
-			inner += `\n                    <channels>${c.outputChannels || 2}</channels>`
-			
-			const patch = c.audioPatch || {}
-			if (Object.keys(patch).length > 0) {
-				const ch = c.outputChannels || 2
-				const layoutArr = Array.from({ length: ch }, (_, i) => i + 1)
-				Object.entries(patch).forEach(([outPair, mixPair]) => {
-					const outIdx = parseInt(outPair.split('-')[0]) - 1
-					const mixIdx = parseInt(mixPair.split('-')[0])
-					if (outIdx >= 0 && outIdx < ch) {
-						layoutArr[outIdx] = mixIdx
-						if (outIdx + 1 < ch) layoutArr[outIdx + 1] = mixIdx + 1
-					}
-				})
-				inner += `\n                    <channel-layout>${layoutArr.join(',')}</channel-layout>`
-			}
-
-			inner += `\n                    <buffer-size-frames>${c.bufferFrames || 128}</buffer-size-frames>`
-			inner += `\n                    <latency-compensation-ms>${c.latencyMs || 40}</latency-compensation-ms>`
-			inner += `\n                    <fifo-ms>${c.fifoMs || 50}</fifo-ms>`
-			inner += `\n                    <auto-tune-latency>${c.autoTune !== false ? 'true' : 'false'}</auto-tune-latency>`
-			return `\n                <portaudio>${inner}\n                </portaudio>`
-		}).join('')
+		return renderPortAudioConsumerBlocks(consumers)
 	}
 
 	// Legacy single-consumer fallback

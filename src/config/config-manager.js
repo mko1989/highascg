@@ -29,6 +29,7 @@ const MODULAR_KEYS = [
 	'deviceGraph',
 	'companion',
 	'plugins',
+	'replication',
 ]
 
 class ConfigManager extends EventEmitter {

@@ -68,7 +68,7 @@ Openbox autostart reference: [**work/openbox_autostart.md**](../work/openbox_aut
 
 ## Dev deploy
 
-[deploy/dev-push.sh](deploy/dev-push.sh) — server-only **`tar`** → **`ssh`** upload → extract into **`DEPLOY_PATH`**. Operator UI: [**highascg-client**](https://github.com/mko1989/highascg-client).
+[deploy/dev-push.sh](deploy/dev-push.sh) — **`tar`** → **`ssh`** → extract into **`DEPLOY_PATH`** (includes **`dist-web/`** when present). See [`from_client/AGENT_SERVER_CLIENT_MERGE.md`](../from_client/AGENT_SERVER_CLIENT_MERGE.md).
 
 ```bash
 npm run deploy:dev

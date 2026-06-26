@@ -1,11 +1,11 @@
 <div align="center">
   <h1>HighAsCG</h1>
-  <p><strong>A Node.js bridge service for CasparCG playout machines.</strong></p>
+  <p><strong>CasparCG playout control — unified client + server on one Ubuntu host.</strong></p>
   
   <p>
     <a href="https://mko1989.github.io/highascg/"><strong>📚 Read the Wiki</strong></a> ·
     <a href="https://highascg.dpdns.org/"><strong>💿 Download the ISO</strong></a> ·
-    <a href="https://github.com/mko1989/highascg-client"><strong>🖥️ Client UI Repository</strong></a>
+    <a href="https://github.com/mko1989/highascg-client"><strong>🖥️ Electron launcher</strong></a> (optional)
   </p>
 </div>
 
@@ -13,16 +13,24 @@
 
 ## 📌 Overview
 
-**HighAsCG** is a backend bridge service designed to run on a playout machine. It acts as the critical connection layer between the **operator client** (an Electron/web UI on a laptop) and **CasparCG** (AMCP playout). Additionally, it interfaces with Ubuntu OS APIs to manage GPU layout, exFAT/USB ingest, and hardware settings.
+**HighAsCG** is a **single repository** for modular, unified development: the **operator UI** (`client/`), the **Node API bridge** (`src/`), and playout tooling all live here and run together on the **Ubuntu playout machine**.
 
-HighAsCG runs an HTTP and WebSocket server on port **4200**. 
-*(Note: HighAsCG does **not** host the operator UI in production.)*
+The Node service on port **4200** serves **both** the REST/WebSocket API and the built operator web GUI (`dist-web/`). Operators open **`http://<playout-ip>:4200/`** in any browser on the playout host or LAN.
 
-### 🧱 Architecture Overview
+| Piece | Where it lives | Role |
+|-------|----------------|------|
+| **Operator UI sources** | **`client/`** in this repo | Canonical UI — dashboard, scenes, device view, timeline, settings |
+| **Production UI bundle** | **`dist-web/`** | Vite build output — what `:4200` serves |
+| **API / Caspar / OS bridge** | **`src/`**, `index.js` | AMCP, GPU, exFAT, WebSocket, config |
+| **Electron launcher** | [**highascg-client**](https://github.com/mko1989/highascg-client) (optional, separate packaging) | Stick prep, **simulator**, **multiserver** workflow, optional modules (CG Studio, …) — extracted from `client/tools/electron-launcher/` here. Opens the **system browser** to playout `:4200`; does **not** host the control UI |
 
-- **This Repository (Server)**: The Node.js API and WebSocket bridge (`src/`), systemd services, installer, and Ubuntu stack utilities. These go into the [live ISO](https://highascg.dpdns.org/) and exFAT server drops.
-- **Client Repository**: [**highascg-client**](https://github.com/mko1989/highascg-client) — A separate Vite UI and Electron launcher that runs on the **operator machine**. 
-- **Documentation**: Check out the [Wiki](https://mko1989.github.io/highascg/) for in-depth technical documentation. Local architectural documents can also be found in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> **Do not develop the operator UI in highascg-client.** That repo is an Electron packaging extract only. Edit **`client/`** in this repo, then `npm run build:client`.
+
+### 🧱 Architecture
+
+- **This repository** — unified client + server; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+- **highascg-client** — optional Mac/Windows/Linux Electron hub (simulator, multiserver, modules); not the UI source tree.
+- **Documentation** — [Wiki](https://mko1989.github.io/highascg/) · local [`docs/`](docs/).
 
 ---
 
@@ -31,82 +39,101 @@ HighAsCG runs an HTTP and WebSocket server on port **4200**.
 ### Requirements
 
 - **Node.js** ≥ 20 (LTS 20 or 22 recommended)
-- **CasparCG** (Reachable on the configured AMCP port, default `5250`)
+- **CasparCG** (reachable on AMCP port, default `5250`)
+- **`dist-web/index.html`** — run `npm run build:client` after cloning (or ship a prebuilt `dist-web/`)
 
 ### Installation
 
 ```bash
-cd HighAsCG
+cd highascg
 npm install
+npm run build:client   # client/ → dist-web/
 ```
 
-### Starting the Server
+### Starting the server
 
 ```bash
 npm start
 ```
-By default, the API will be available at `http://127.0.0.1:4200`.
+
+By default: **`http://127.0.0.1:4200/`** (UI + API) and **`http://127.0.0.1:4200/api/...`**.
 
 ---
 
 ## ⚙️ Configuration
 
-Defaults live in `config/default.js`. You can override them via environment variables:
+Defaults live in `config/`. Override via environment variables:
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
+| Variable | Purpose | Default (production) |
+|----------|---------|----------------------|
 | `CASPAR_HOST` | CasparCG host IP | `127.0.0.1` |
 | `CASPAR_PORT` | AMCP port | `5250` |
-| `HTTP_PORT` | API server port | `4200` |
-| `HIGHASCG_HEADLESS` | Run API only (no static UI) | `true` (on playout) |
+| `HTTP_PORT` | HTTP server port | `4200` |
+| `HIGHASCG_HEADLESS` | API only (no `dist-web/`) | **unset** (serve UI) |
 | `BIND_ADDRESS` | Listen address | `0.0.0.0` |
 | `OSC_LISTEN_PORT` | OSC UDP port | `6251` |
-| `CASPAR_ARM_FILE` | Path touched when "arming" staged Caspar startup | `/home/casparcg/highascg/data/caspar-armed` |
+| `CASPAR_ARM_FILE` | Staged Caspar startup arm file | `/home/casparcg/highascg/data/caspar-armed` |
 
-Alternatively, use CLI flags (e.g., `node index.js --port 4200 --no-caspar`). See `node index.js --help` for all options.
+CLI flags: `node index.js --help`.
 
 ---
 
 ## 🔌 API & Integration
 
 ### OSC (CasparCG → HighAsCG)
-CasparCG sends OSC over UDP. HighAsCG listens on `OSC_LISTEN_PORT` (default `6251`) and aggregates messages into its internal state. 
+CasparCG sends OSC over UDP. HighAsCG listens on `OSC_LISTEN_PORT` (default `6251`).
 
-### Staged Caspar Startup (Production)
-On a playout machine, HighAsCG can start first, allow for Caspar config updates, and then **arm** Caspar so the supervisor script starts `casparcg-server`.
-- Manage via HTTP: `GET /api/system/caspar-arm`, `POST`, `DELETE`
+### Staged Caspar startup
+HighAsCG can start first, apply config, then arm Caspar: `GET/POST/DELETE /api/system/caspar-arm`.
 
 ---
 
-## 💻 Development & Deployment
+## 💻 Development & deployment
 
-**Split Development (Recommended)**:
-1. **Playout API Host (This Repo)**: Run `npm start` (API on `:4200`)
-2. **Operator Laptop (Client Repo)**: Run `npm run dev` in [highascg-client](https://github.com/mko1989/highascg-client) (UI on `:3000` connected to `VITE_HIGHASCG_API_ORIGIN=http://<playout-ip>:4200`)
+**On playout (production):** `highascg.service` serves API + `dist-web/` on `:4200`. Do **not** install `10-headless.conf` unless you explicitly want API-only debug.
 
-**Deploy Server to Playout Host**:
+**UI iteration (same machine or dev laptop):**
+
 ```bash
-npm run deploy:dev
+npm start              # API on :4200
+npm run dev:client     # Vite on :4350 → proxies /api to :4200
 ```
 
-### Project Layout
+Copy `.env.development.example` → `.env.development`; set `VITE_HIGHASCG_API_ORIGIN` to the API host.
+
+**Rebuild what the server serves after UI edits:**
+
+```bash
+npm run build:client   # refreshes dist-web/ — normal browser refresh is enough (no server restart)
+```
+
+Use `npm run start:headless` only for API-only debug.
+
+**Deploy to playout host:**
+
+```bash
+npm run build:client   # ensure dist-web/ is current
+npm run deploy:dev     # includes dist-web/ by default
+```
+
+See [`from_client/AGENT_SERVER_CLIENT_MERGE.md`](from_client/AGENT_SERVER_CLIENT_MERGE.md).
+
+### Project layout
 
 | Path | Role | On playout server? |
 |------|------|--------------------|
-| `index.js`, `src/` | Node bridge — Caspar AMCP, REST `/api/*`, WebSocket, OS hooks | **Yes** |
-| `config/` | Modular settings (runtime JSON) | **Yes** |
-| `template/` | Caspar HTML templates | **Yes** |
-| `scripts/` | Production installer, systemd | **Yes** |
+| `index.js`, `src/` | Node bridge — REST, WS, Caspar, OS hooks | **Yes** |
+| `client/` | **Canonical operator UI sources** | Sources only — ship **`dist-web/`** |
+| `dist-web/` | Built operator UI (served on `:4200`) | **Yes** |
+| `config/`, `template/`, `scripts/` | Settings, Caspar templates, systemd | **Yes** |
 | `tools/runtime/` | exFAT sync CLI, staged Caspar start | **Yes** |
-| `client/` | Legacy in-tree browser UI (dev); not in server tarball | **No** |
-| `work/` | Work orders, references, planning | **No** |
+| `client/tools/electron-launcher/` | Electron hub sources (packaged in highascg-client) | **No** on playout |
+| `work/` | Work orders, planning | **No** |
 
-### Verification & Testing
-Run smoke tests against the running server:
+### Verification
+
 ```bash
 npm run smoke -- 4200
-```
-With CasparCG connected:
-```bash
 npm run smoke:caspar -- 4200
+curl -sf http://127.0.0.1:4200/ | head -5   # expect HTML when dist-web present
 ```

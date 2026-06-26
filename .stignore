@@ -1,0 +1,63 @@
+// Syncthing ignore — highascg playout ↔ dev Mac
+// Edit on both sides (same file should exist in the shared folder root).
+
+// Large / machine-local runtime (never sync)
+media
+bin
+cef-cache
+node_modules
+log
+data
+lib
+_media
+dist
+
+// Git metadata (optional — remove this block if you want .git synced)
+.git
+
+// Env + live runtime state
+.env
+.env.*
+.highascg-state.json
+.highascg-state.json.tmp
+.module-state.json
+.module-state.json.tmp
+autosave.json
+health.json
+core
+libndi.so.6
+casparcg.config
+highascg.config.json
+server.log
+*.log
+
+// Live Caspar / modular config on playout (machine-specific)
+config/casparcg.config
+config/*.json
+!config/*.example.json
+!config/default*.json
+
+// Waveform / still caches
+data/waveforms
+data/live-thumbnails
+
+// Live template poll files
+template/global-border-live-*.json
+
+// Local-only trees
+.reference
+audio_testing
+From_client
+from_client
+deprecated
+for_client
+for-client
+logs_lap
+refs
+
+// OS / editor junk
+.DS_Store
+Thumbs.db
+
+// Optional: UI build output (Mac rebuilds from highascg-client; playout ships dist-web/)
+// dist-web

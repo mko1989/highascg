@@ -5,6 +5,29 @@ const { pickGpuOutLayoutSysId, resolveSysIdToXrandrOutput } = require('./xrandr-
 
 /** @typedef {{ sysId: string, x: number, y: number, width: number, height: number, mode: string, rate?: number|null, backend: string, nodeId: string, mapOutId: string, outputId?: string }} MappingGpuLayoutEntry */
 
+function resolveOutputPixelSize(outDef) {
+	const modeId = String(outDef?.mode || '1080p5000').trim()
+	const wNum = parseInt(String(outDef?.width ?? ''), 10)
+	const hNum = parseInt(String(outDef?.height ?? ''), 10)
+	if (wNum > 0 && hNum > 0) {
+		const fpsRaw = parseFloat(String(outDef?.fps ?? ''))
+		const fps = Number.isFinite(fpsRaw) && fpsRaw > 0 ? fpsRaw : inferRefreshHzFromCasparMode(modeId)
+		return { width: wNum, height: hNum, fps: fps ?? 50 }
+	}
+	const spec = STANDARD_VIDEO_MODES[modeId]
+	if (spec) return { width: spec.width, height: spec.height, fps: spec.fps }
+	const px = modeId.match(/^(\d+)x(\d+)p?([\d.]+)?$/i)
+	if (px) {
+		const fps = px[3] ? parseFloat(px[3]) : inferRefreshHzFromCasparMode(modeId)
+		return {
+			width: parseInt(px[1], 10) || 1920,
+			height: parseInt(px[2], 10) || 1080,
+			fps: Number.isFinite(fps) && fps > 0 ? fps : 50,
+		}
+	}
+	return { width: 1920, height: 1080, fps: inferRefreshHzFromCasparMode(modeId) ?? 50 }
+}
+
 function inferRefreshHzFromCasparMode(modeId) {
 	const s = String(modeId || '').toLowerCase()
 	if (!s) return null
@@ -149,10 +172,7 @@ function buildMappingGpuLayoutArtifacts(config) {
 		if (!outDef) continue
 
 		const modeId = String(outDef.mode || '1080p5000').trim()
-		const spec = STANDARD_VIDEO_MODES[modeId]
-		const baseW = spec?.width ?? 1920
-		const baseH = spec?.height ?? 1080
-		const baseFps = spec?.fps ?? inferRefreshHzFromCasparMode(modeId) ?? 50
+		const { width: baseW, height: baseH, fps: baseFps } = resolveOutputPixelSize(outDef)
 
 		const oid = String(outDef.id || '').trim()
 		const slice = mappings.find((m) => String(m?.outputId || '') === oid)
@@ -220,4 +240,5 @@ module.exports = {
 	buildMappingGpuLayoutArtifacts,
 	resolveOutputDefForMapOutConnector,
 	computePixelMappingCanvasUnion,
+	resolveOutputPixelSize,
 }

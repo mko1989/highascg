@@ -72,6 +72,21 @@ function calculateCadence(fps) {
 }
 
 /**
+ * Read a per-screen Caspar field from root config or nested `casparServer`.
+ * @param {Record<string, unknown>} config
+ * @param {number} screenIdx - 1-based
+ * @param {string} suffix - e.g. `custom_width`
+ */
+function readScreenConfigValue(config, screenIdx, suffix) {
+	if (!config || typeof config !== 'object') return undefined
+	const key = `screen_${screenIdx}_${suffix}`
+	if (Object.prototype.hasOwnProperty.call(config, key)) return config[key]
+	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
+	if (cs && Object.prototype.hasOwnProperty.call(cs, key)) return cs[key]
+	return undefined
+}
+
+/**
  * @param {string} modeId
  * @param {Record<string, unknown>} config
  * @param {number} screenIdx - 1-based screen index
@@ -79,13 +94,20 @@ function calculateCadence(fps) {
  */
 function getModeDimensions(modeId, config, screenIdx) {
 	if (modeId === 'custom') {
-		const w = parseInt(String(config[`screen_${screenIdx}_custom_width`] || '1920'), 10) || 1920
-		const h = parseInt(String(config[`screen_${screenIdx}_custom_height`] || '1080'), 10) || 1080
-		const fps = parseFloat(String(config[`screen_${screenIdx}_custom_fps`] || '50')) || 50
+		const w = parseInt(String(readScreenConfigValue(config, screenIdx, 'custom_width') || '1920'), 10) || 1920
+		const h = parseInt(String(readScreenConfigValue(config, screenIdx, 'custom_height') || '1080'), 10) || 1080
+		const fps = parseFloat(String(readScreenConfigValue(config, screenIdx, 'custom_fps') || '50')) || 50
 		return { width: w, height: h, fps, modeId: `${w}x${h}`, isCustom: true }
 	}
 	const std = STANDARD_VIDEO_MODES[modeId]
 	if (std) return { ...std, modeId, isCustom: false }
+	const px = String(modeId || '').match(/^(\d+)x(\d+)p?([\d.]+)?$/i)
+	if (px) {
+		const w = parseInt(px[1], 10) || 1920
+		const h = parseInt(px[2], 10) || 1080
+		const fps = px[3] ? parseFloat(px[3]) : 50
+		return { width: w, height: h, fps: Number.isFinite(fps) && fps > 0 ? fps : 50, modeId: `${w}x${h}`, isCustom: true }
+	}
 	return { width: 1920, height: 1080, fps: 50, modeId: modeId || '1080p5000', isCustom: false }
 }
 
@@ -123,6 +145,7 @@ function layoutChannelCount(layout) {
 		case 'dolby-e':
 		case 'matrix':
 		case 'live-8ch':
+		case 'discrete-8ch':
 			return 8
 		default:
 			return 2

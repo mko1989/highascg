@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-06-08T14:27:27.749Z",
+  "generatedAt": "2026-06-24T11:40:01.057Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -32,10 +32,10 @@
     },
     {
       "id": "ARCHITECTURE",
-      "title": "HighAsCG architecture — server bridge and client",
+      "title": "HighAsCG architecture — unified playout stack",
       "file": "ARCHITECTURE.md",
       "category": "Getting started",
-      "description": "**Status:** Canonical reference (2026-06-03)",
+      "description": "**Status:** Canonical reference (2026)",
       "order": 10
     },
     {
@@ -43,12 +43,12 @@
       "title": "Plan: Permanent server / client split",
       "file": "PLAN_SERVER_CLIENT_SPLIT.md",
       "category": "Getting started",
-      "description": "**Status:** Phase 3–4 complete (server/client split shipped)",
+      "description": "> **Superseded for production (2026):** **One unified repo** — **`client/`** (canonical UI) + **`src/`** (API) on the **same playout machine**. Node serves **AP",
       "order": 11
     },
     {
       "id": "MODULES",
-      "title": "Optional modules (Previs / Tracking / Auto-follow)",
+      "title": "Optional modules (Previs / Tracking / Auto-follow / CG Studio)",
       "file": "MODULES.md",
       "category": "Getting started",
       "description": "HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the o",
@@ -131,7 +131,7 @@
       "title": "exFAT server updates (`drop-update/`)",
       "file": "EXFAT_SERVER_UPDATE.md",
       "category": "Storage & USB",
-      "description": "For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server** by dropping files on the stick — without reflashing the image.",
+      "description": "For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server + operator UI** by dropping files on the stick — without reflashing the image.",
       "order": 32
     },
     {
@@ -164,7 +164,7 @@
       "file": "wiki/api/README.md",
       "category": "API reference",
       "group": "Overview",
-      "description": "HighAsCG exposes a **JSON REST API** on the playout server. The operator UI ([highascg-client](https://github.com/mko1989/highascg-client)) and Companion module",
+      "description": "HighAsCG exposes a **JSON REST API** on the playout server. The operator UI (served from **`dist-web/`** on the same host at `:4200`) and Companion modules call",
       "order": 40
     },
     {
@@ -359,6 +359,14 @@
       "order": 71
     },
     {
+      "id": "reference--audio--alsa-mixer-api",
+      "title": "ALSA mixer API (server handoff)",
+      "file": "reference/audio/alsa-mixer-api.md",
+      "category": "Audio",
+      "description": "**Server:** `src/audio/alsa-mixer.js` · **Routes:** `src/api/routes-audio.js`",
+      "order": 71
+    },
+    {
       "id": "reference--audio--audio-routing-reference",
       "title": "Audio routing reference (CasparCG + HighAsCG)",
       "file": "reference/audio/audio-routing-reference.md",
@@ -463,6 +471,14 @@
       "order": 80
     },
     {
+      "id": "reference--hot-backup-replication",
+      "title": "Hot backup replication (WO-54)",
+      "file": "reference/hot-backup-replication.md",
+      "category": "Reference",
+      "description": "Two playout machines run as a **leader/follower** pair.",
+      "order": 80
+    },
+    {
       "id": "reference--amcp-pgm-look-take-pipeline",
       "title": "PGM look take — AMCP pipeline",
       "file": "reference/amcp-pgm-look-take-pipeline.md",
@@ -484,6 +500,14 @@
       "file": "reference/polling-vs-osc.md",
       "category": "Reference",
       "description": "CasparCG exposes rich state in two ways: **AMCP** (TCP, request/response) and **OSC** (UDP, push). HighAsCG uses OSC for real-time mixer, layer, playback, profi",
+      "order": 80
+    },
+    {
+      "id": "reference--private-volume-sync",
+      "title": "Private volume sync (machine secrets on USB / bridge)",
+      "file": "reference/private-volume-sync.md",
+      "category": "Reference",
+      "description": "Per-machine folder for **Tailscale**, **Syncthing**, and **replication pairing** — kept off the public `configs/` and `projects/` sync paths.",
       "order": 80
     },
     {
@@ -539,8 +563,80 @@
       "title": "HighAsCG Decoupled Service Architecture",
       "file": "decoupled_architecture_list.md",
       "category": "Reference",
-      "description": "This document defines the strict boundary of responsibilities between the **Headless Backend (Service Engine)** and the **Decoupled Frontend (Single-Page Applic",
+      "description": "> **Production (WO-52):** API and UI both run on the **playout machine** at **`http://<host>:4200/`** (`dist-web/` + `/api/*`). The diagram below is the **logic",
       "order": 81
+    },
+    {
+      "id": "DEV_RELEASE_GITHUB.sync-conflict-20260624-110533-S5R6E5O",
+      "title": "Dev GitHub releases (ISO + portable tarball)",
+      "file": "DEV_RELEASE_GITHUB.sync-conflict-20260624-110533-S5R6E5O.md",
+      "category": "Reference",
+      "description": "Use this flow when you have a **build host or workstation** running the repo (typically with `node_modules` already installed). Two modes:",
+      "order": 900
+    },
+    {
+      "id": "EXFAT_SERVER_UPDATE.sync-conflict-20260624-110447-S5R6E5O",
+      "title": "exFAT server updates (`drop-update/`)",
+      "file": "EXFAT_SERVER_UPDATE.sync-conflict-20260624-110447-S5R6E5O.md",
+      "category": "Reference",
+      "description": "For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server** by dropping files on the stick — without reflashing the image.",
+      "order": 900
+    },
+    {
+      "id": "ARCHITECTURE.sync-conflict-20260624-110518-S5R6E5O",
+      "title": "HighAsCG architecture — server bridge and client",
+      "file": "ARCHITECTURE.sync-conflict-20260624-110518-S5R6E5O.md",
+      "category": "Reference",
+      "description": "**Status:** Canonical reference (2026-06-03)",
+      "order": 900
+    },
+    {
+      "id": "decoupled_architecture_list.sync-conflict-20260624-110546-S5R6E5O",
+      "title": "HighAsCG Decoupled Service Architecture",
+      "file": "decoupled_architecture_list.sync-conflict-20260624-110546-S5R6E5O.md",
+      "category": "Reference",
+      "description": "This document defines the strict boundary of responsibilities between the **Headless Backend (Service Engine)** and the **Decoupled Frontend (Single-Page Applic",
+      "order": 900
+    },
+    {
+      "id": "README.sync-conflict-20260624-110503-S5R6E5O",
+      "title": "HighAsCG documentation",
+      "file": "README.sync-conflict-20260624-110503-S5R6E5O.md",
+      "category": "Reference",
+      "description": "Operator and integrator docs live at the **top level** of this folder. Deeper material is grouped by audience.",
+      "order": 900
+    },
+    {
+      "id": "wiki--api--README.sync-conflict-20260624-110541-S5R6E5O",
+      "title": "HighAsCG HTTP API",
+      "file": "wiki/api/README.sync-conflict-20260624-110541-S5R6E5O.md",
+      "category": "Reference",
+      "description": "HighAsCG exposes a **JSON REST API** on the playout server. The operator UI ([highascg-client](https://github.com/mko1989/highascg-client)) and Companion module",
+      "order": 900
+    },
+    {
+      "id": "ISO_CONTENTS.sync-conflict-20260624-110508-S5R6E5O",
+      "title": "HighAsCG live ISO — contents reference",
+      "file": "ISO_CONTENTS.sync-conflict-20260624-110508-S5R6E5O.md",
+      "category": "Reference",
+      "description": "What is inside the **penguins-eggs** hybrid ISO produced by **`tools/eggs/live-usb/build-highascg-egg.sh`** (or **`make-dev-github-release-iso-quick.sh`**).",
+      "order": 900
+    },
+    {
+      "id": "MODULES.sync-conflict-20260624-110458-S5R6E5O",
+      "title": "Optional modules (Previs / Tracking / Auto-follow)",
+      "file": "MODULES.sync-conflict-20260624-110458-S5R6E5O.md",
+      "category": "Reference",
+      "description": "HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the o",
+      "order": 900
+    },
+    {
+      "id": "PLAN_SERVER_CLIENT_SPLIT.sync-conflict-20260624-110453-S5R6E5O",
+      "title": "Plan: Permanent server / client split",
+      "file": "PLAN_SERVER_CLIENT_SPLIT.sync-conflict-20260624-110453-S5R6E5O.md",
+      "category": "Reference",
+      "description": "**Status:** Phase 3–4 complete (server/client split shipped)",
+      "order": 900
     }
   ]
 }

@@ -22,9 +22,15 @@
 const fs = require('fs')
 const path = require('path')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const {
+	resolveCgRequestChannel,
+	resolveTemplateCgHostLayer,
+} = require('../engine/cg-routing')
 
 /** Directory holding the lower-thirds HTML files. */
 const LT_DIR = path.join(__dirname, '..', '..', 'template', 'lower-thirds')
+/** User exports from CG Studio. */
+const STUDIO_LT_DIR = path.join(__dirname, '..', '..', 'template', 'studio')
 /** Directory holding custom font files for templates. */
 const FONTS_DIR = path.join(__dirname, '..', '..', 'template', 'fonts')
 const busboy = require('busboy')
@@ -49,37 +55,104 @@ const DEFAULT_STYLE = {
 	position: 'left',
 }
 
-/** Ensure appCtx.lowerThird state bag exists. */
-function ensureState(ctx) {
-	if (!ctx._lowerThird) {
-		ctx._lowerThird = {
+/** Default logical look layer for standalone LT API (maps to Caspar host 710). */
+const DEFAULT_LT_LOGICAL_LAYER = 20
+
+function humanizeLtId(id) {
+	return id
+		.replace(/^lt-/, '')
+		.split('-')
+		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+		.join(' ')
+}
+
+/** Scan template/studio/ for CG Studio exports. */
+function listStudioTemplates() {
+	if (!fs.existsSync(STUDIO_LT_DIR)) return []
+	return fs
+		.readdirSync(STUDIO_LT_DIR, { withFileTypes: true })
+		.filter((ent) => ent.isFile() && ent.name.endsWith('.html') && ent.name.startsWith('lt-'))
+		.map((ent) => {
+			const id = ent.name.replace(/\.html$/, '')
+			return {
+				id,
+				name: humanizeLtId(id),
+				htmlPath: 'studio/' + ent.name,
+				casparPath: 'studio/' + id,
+				category: 'studio',
+				available: true,
+			}
+		})
+		.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Caspar CG template path for a lower-third id (built-in or studio export). */
+function resolveLtCasparPath(templateId) {
+	const id = String(templateId || '').trim()
+	if (!id) return 'lower-thirds/lt-classic-box'
+	if (TEMPLATE_CATALOG[id]) return 'lower-thirds/' + id
+	const studioFile = path.join(STUDIO_LT_DIR, id + '.html')
+	if (fs.existsSync(studioFile)) return 'studio/' + id
+	return 'lower-thirds/' + id
+}
+
+/** Ensure per-channel lower-third state (channel 3 LT does not affect channel 1). */
+function ensureState(ctx, body) {
+	if (!ctx._lowerThirdByChannel) ctx._lowerThirdByChannel = {}
+	const ch = resolveCgRequestChannel(body || {}, ctx)
+	const key = String(ch)
+	if (!ctx._lowerThirdByChannel[key]) {
+		ctx._lowerThirdByChannel[key] = {
 			templateId: null,
 			data: [],
 			style: { ...DEFAULT_STYLE },
 			playing: false,
 			activeStep: 0,
-			channel: 1,
-			layer: 20,
+			channel: ch,
+			logicalLayer: DEFAULT_LT_LOGICAL_LAYER,
+			layer: resolveTemplateCgHostLayer(DEFAULT_LT_LOGICAL_LAYER, 'lower-thirds/lt-classic-box'),
 			templateHostLayer: 1,
 		}
 	}
-	return ctx._lowerThird
+	return ctx._lowerThirdByChannel[key]
+}
+
+function ltHostLayer(st) {
+	const logical = st.logicalLayer != null ? st.logicalLayer : st.layer
+	const cgName = st.templateId ? resolveLtCasparPath(st.templateId) : 'lower-thirds/lt-classic-box'
+	return resolveTemplateCgHostLayer(logical, cgName)
+}
+
+function applyLtRoutingFields(st, b, ctx) {
+	if (b.channel !== undefined) st.channel = resolveCgRequestChannel(b, ctx, st.channel)
+	else st.channel = resolveCgRequestChannel({ channel: st.channel }, ctx)
+	if (b.logicalLayer !== undefined) st.logicalLayer = parseInt(b.logicalLayer, 10)
+	if (b.layer !== undefined) {
+		const raw = parseInt(b.layer, 10)
+		if (raw >= 700) st.layer = raw
+		else st.logicalLayer = raw
+	}
+	st.layer = ltHostLayer(st)
+	if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
 }
 
 /* ── GET handlers ──────────────────────────────────────────── */
 
-function handleGet(p, ctx) {
+function handleGet(p, ctx, query = {}) {
 	if (p === '/api/lower-thirds/templates') {
-		const templates = Object.entries(TEMPLATE_CATALOG).map(([id, name]) => {
+		const builtins = Object.entries(TEMPLATE_CATALOG).map(([id, name]) => {
 			const htmlFile = path.join(LT_DIR, id + '.html')
 			const exists = fs.existsSync(htmlFile)
 			return {
 				id,
 				name,
 				htmlPath: 'lower-thirds/' + id + '.html',
+				casparPath: 'lower-thirds/' + id,
+				category: 'lower-thirds',
 				available: exists,
 			}
 		})
+		const templates = builtins.concat(listStudioTemplates())
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
@@ -88,7 +161,8 @@ function handleGet(p, ctx) {
 	}
 
 	if (p === '/api/lower-thirds/active') {
-		const st = ensureState(ctx)
+		const ch = resolveCgRequestChannel(query, ctx)
+		const st = ensureState(ctx, { channel: ch })
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
@@ -98,6 +172,10 @@ function handleGet(p, ctx) {
 				style: st.style,
 				playing: st.playing,
 				activeStep: st.activeStep,
+				channel: st.channel,
+				logicalLayer: st.logicalLayer,
+				layer: st.layer,
+				templateHostLayer: st.templateHostLayer,
 			}),
 		}
 	}
@@ -159,9 +237,12 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── load ──
 	if (p === '/api/lower-thirds/load') {
-		const st = ensureState(ctx)
-		if (b.templateId && TEMPLATE_CATALOG[b.templateId]) {
-			st.templateId = b.templateId
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
+		if (b.templateId) {
+			if (TEMPLATE_CATALOG[b.templateId] || fs.existsSync(path.join(STUDIO_LT_DIR, b.templateId + '.html'))) {
+				st.templateId = b.templateId
+			}
 		}
 		if (b.data) {
 			st.data = Array.isArray(b.data) ? b.data : [b.data]
@@ -169,9 +250,7 @@ async function handlePost(p, body, ctx, req) {
 		if (b.style) {
 			st.style = { ...DEFAULT_STYLE, ...b.style }
 		}
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
+		applyLtRoutingFields(st, b, ctx)
 		st.activeStep = 0
 		st.playing = false
 
@@ -180,7 +259,7 @@ async function handlePost(p, body, ctx, req) {
 			const ch = st.channel
 			const layer = st.layer
 			const thl = st.templateHostLayer
-			const templatePath = 'lower-thirds/' + st.templateId
+			const templatePath = resolveLtCasparPath(st.templateId)
 			try {
 				await ctx.amcp.cg.cgAdd(ch, layer, thl, templatePath, false, JSON.stringify({
 					data: st.data.length ? st.data : [{ title: '', subtitle: '' }],
@@ -210,7 +289,8 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── update text / style ──
 	if (p === '/api/lower-thirds/update') {
-		const st = ensureState(ctx)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		if (b.data) {
 			st.data = Array.isArray(b.data) ? b.data : [b.data]
 		}
@@ -220,9 +300,6 @@ async function handlePost(p, body, ctx, req) {
 		if (b.activeStep !== undefined) {
 			st.activeStep = Math.max(0, Math.min(b.activeStep, st.data.length - 1))
 		}
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
 
 		// CG UPDATE on CasparCG
 		if (ctx.amcp && st.templateId) {
@@ -257,11 +334,9 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── play ──
 	if (p === '/api/lower-thirds/play') {
-		const st = ensureState(ctx)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		st.playing = true
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
 		if (ctx.amcp) {
 			const ch = st.channel
 			const layer = st.layer
@@ -276,11 +351,9 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── stop ──
 	if (p === '/api/lower-thirds/stop') {
-		const st = ensureState(ctx)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		st.playing = false
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
 		if (ctx.amcp) {
 			const ch = st.channel
 			const layer = st.layer
@@ -295,10 +368,8 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── next ──
 	if (p === '/api/lower-thirds/next') {
-		const st = ensureState(ctx)
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		if (ctx.amcp) {
 			const ch = st.channel
 			const layer = st.layer
@@ -313,10 +384,8 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── previous ──
 	if (p === '/api/lower-thirds/previous') {
-		const st = ensureState(ctx)
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		if (ctx.amcp) {
 			const ch = st.channel
 			const layer = st.layer
@@ -333,10 +402,8 @@ async function handlePost(p, body, ctx, req) {
 
 	// ── clear ──
 	if (p === '/api/lower-thirds/clear') {
-		const st = ensureState(ctx)
-		if (b.channel !== undefined) st.channel = parseInt(b.channel, 10)
-		if (b.layer !== undefined) st.layer = parseInt(b.layer, 10)
-		if (b.templateHostLayer !== undefined) st.templateHostLayer = parseInt(b.templateHostLayer, 10)
+		const st = ensureState(ctx, b)
+		applyLtRoutingFields(st, b, ctx)
 		if (ctx.amcp) {
 			const ch = st.channel
 			const layer = st.layer

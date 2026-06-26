@@ -14,6 +14,13 @@ function param(str) {
 	return /\s/.test(s) ? `"${s}"` : s
 }
 
+/** FFmpeg audio filter for PLAY/LOAD AF — always quoted (pan=… contains `=` / `|`). */
+function audioFilterParam(str) {
+	if (str == null || str === '') return ''
+	const s = String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+	return `"${s}"`
+}
+
 /**
  * Clip name for raw PLAY/LOAD lines. Always double-quote non-route media so Caspar never
  * tokenizes on spaces/odd characters (Caspar logs may still show dequoted text).
@@ -46,4 +53,11 @@ function deferMixerAmcpLine(line) {
 	return `${s} DEFER`
 }
 
-module.exports = { param, clipParamForPlay, chLayer, amcpVerboseTrace, deferMixerAmcpLine }
+module.exports = {
+	param,
+	audioFilterParam,
+	clipParamForPlay,
+	chLayer,
+	amcpVerboseTrace,
+	deferMixerAmcpLine,
+}

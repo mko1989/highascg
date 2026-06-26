@@ -61,6 +61,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (typeof appCtx._stopUsbHotplugWatcher === 'function') appCtx._stopUsbHotplugWatcher()
 			if (typeof appCtx._stopOsLayoutWatchdog === 'function') appCtx._stopOsLayoutWatchdog()
 			if (typeof appCtx._stopCasparAmcpWatchdog === 'function') appCtx._stopCasparAmcpWatchdog()
+			if (typeof appCtx._stopReplicationService === 'function') appCtx._stopReplicationService()
 
 			try {
 				flushDeckSyncPersist()

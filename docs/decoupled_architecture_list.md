@@ -1,6 +1,10 @@
 # HighAsCG Decoupled Service Architecture
 
-This document defines the strict boundary of responsibilities between the **Headless Backend (Service Engine)** and the **Decoupled Frontend (Single-Page Application)**.
+> **Production (WO-52):** API and UI both run on the **playout machine** at **`http://<host>:4200/`** (`dist-web/` + `/api/*`). The diagram below is the **logical** split (browser vs Node bridge), not separate physical hosts.
+>
+> **Electron launcher** ([highascg-client](https://github.com/mko1989/highascg-client)): optional packaging extract from `client/tools/electron-launcher/` — **simulator**, **multiserver**, **modules**; opens the system browser to `:4200`. **Canonical UI:** in-repo **`client/`** → `npm run build:client` → `dist-web/`.
+
+This document defines the strict boundary of responsibilities between the **Node bridge (server)** and the **browser SPA (UI)**.
 
 ```mermaid
 graph TD
@@ -31,7 +35,7 @@ graph TD
 ---
 
 ## 1. Headless Backend Server (Service Engine)
-The backend is a pure, headless Node.js program running as a system service. It owns all state persistence, hardware interfaces, and playout scheduling.
+The Node bridge runs as a system service on playout. It owns state persistence, hardware interfaces, and playout scheduling. The browser UI (`dist-web/`) is served from the same process on production hosts.
 
 ### Responsibilities
 - **HTTP / REST API Engine**: Handles saving configurations, uploading previs GLTF models, backing up snapshot states, and processing operational logs.
@@ -44,7 +48,7 @@ The backend is a pure, headless Node.js program running as a system service. It 
 ---
 
 ## 2. Decoupled Frontend Client (SPA)
-The frontend is a lightweight, pure static bundle (HTML, CSS, JS, SVG logos) compiled via Vite. It can be hosted on any CDNs, static file servers, or local Nginx instances.
+The frontend is a lightweight static bundle (HTML, CSS, JS) built with Vite. **On production playout** it is served by the same Node process as the API (`dist-web/` on `:4200`). Dev builds may use a separate Vite dev server that proxies to the API.
 
 ### Responsibilities
 - **Interactive UI (Vanilla JS Components)**: Renders the Devices panel, Sources inspector, Audio Mixer, and Timeline grid.

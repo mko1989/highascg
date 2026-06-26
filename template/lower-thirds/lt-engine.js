@@ -27,8 +27,19 @@ const LTEngine = (function () {
     let cfg = {};
 
     const STYLE_KEYS = new Set([
-        'primaryColor', 'textColor', 'position', 'displayDurationSec', 'speed', 'customFont',
+        'primaryColor', 'textColor', 'panelColor', 'gradientMid', 'gradientEnd',
+        'position', 'marginX', 'marginY', 'opacity',
+        'titleFontSize', 'subtitleFontSize', 'titleFontWeight', 'letterSpacing', 'textTransform',
+        'blurAmount', 'displayDurationSec', 'speed', 'customFont',
     ]);
+
+    function isStudioMode() {
+        try {
+            return new URLSearchParams(window.location.search).get('studio') === '1';
+        } catch (_) {
+            return false;
+        }
+    }
 
     function clearDisplayTimer() {
         if (displayTimer) {
@@ -92,6 +103,7 @@ const LTEngine = (function () {
     }
 
     function scheduleDisplayStop() {
+        if (isStudioMode()) return;
         clearDisplayTimer();
         const durationSec = readDisplayDurationSec();
         if (durationSec <= 0) return;
@@ -219,13 +231,67 @@ const LTEngine = (function () {
                     // Default to left
                     container.style.marginRight = 'auto';
                 }
+                if (style.marginX != null || style.marginY != null) {
+                    const mx = style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77;
+                    const my = style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43;
+                    if (Number.isFinite(mx) && Number.isFinite(my)) {
+                        container.style.margin = my + 'px ' + mx + 'px';
+                    }
+                }
+                if (style.opacity != null && style.opacity !== '') {
+                    const op = Number(style.opacity);
+                    if (Number.isFinite(op)) container.style.opacity = String(Math.max(0, Math.min(1, op)));
+                }
             }
         }
+
+        applyTypographyOverrides();
+        applyBlurOverride();
 
         if (typeof cfg.applyStyles === 'function') {
             cfg.applyStyles(style);
             return;
         }
+    }
+
+    function applyTypographyOverrides() {
+        const titleSel = cfg.titleSel || 'h1';
+        const subtitleSel = cfg.subtitleSel || 'p';
+        const rules = [];
+        if (style.titleFontSize != null && style.titleFontSize !== '') {
+            rules.push(titleSel + ' { font-size: ' + Number(style.titleFontSize) + 'px !important; }');
+        }
+        if (style.subtitleFontSize != null && style.subtitleFontSize !== '') {
+            rules.push(subtitleSel + ' { font-size: ' + Number(style.subtitleFontSize) + 'px !important; }');
+        }
+        if (style.titleFontWeight != null && style.titleFontWeight !== '') {
+            rules.push(titleSel + ' { font-weight: ' + style.titleFontWeight + ' !important; }');
+        }
+        if (style.letterSpacing != null && style.letterSpacing !== '') {
+            rules.push(titleSel + ' { letter-spacing: ' + style.letterSpacing + ' !important; }');
+            rules.push(subtitleSel + ' { letter-spacing: ' + style.letterSpacing + ' !important; }');
+        }
+        if (style.textTransform) {
+            rules.push(titleSel + ' { text-transform: ' + style.textTransform + ' !important; }');
+            rules.push(subtitleSel + ' { text-transform: ' + style.textTransform + ' !important; }');
+        }
+        let el = document.getElementById('lt-studio-typography');
+        if (!rules.length) {
+            if (el) el.textContent = '';
+            return;
+        }
+        if (!el) {
+            el = document.createElement('style');
+            el.id = 'lt-studio-typography';
+            document.head.appendChild(el);
+        }
+        el.textContent = rules.join('\n');
+    }
+
+    function applyBlurOverride() {
+        if (style.blurAmount == null || style.blurAmount === '' || !cfg.containerSel) return;
+        const panel = document.querySelector(cfg.containerSel + ' .glass-panel');
+        if (panel) panel.style.backdropFilter = 'blur(' + Number(style.blurAmount) + 'px)';
     }
 
     function parseCasparXML(xml) {
@@ -273,6 +339,21 @@ const LTEngine = (function () {
             data: { ...dataObj, title, subtitle },
             style: styleObj
         };
+    }
+
+
+    function studioHoldIn() {
+        ensurePlayableDefaults();
+        syncStyleFromActiveData();
+        applyData();
+        applyStyles();
+        const prevScale = window.gsap && gsap.globalTimeline ? gsap.globalTimeline.timeScale() : 1;
+        if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(1000);
+        return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
+            if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(prevScale);
+            state = 2;
+            clearDisplayTimer();
+        }).catch(handleError);
     }
 
     /* ── CasparCG interface ──────────────────────────────────── */
@@ -480,6 +561,9 @@ const LTEngine = (function () {
         const params = new URLSearchParams(window.location.search);
         if (params.get('poll')) {
             startPolling(params.get('poll'), parseInt(params.get('interval') || '1000', 10));
+        }
+        if (isStudioMode()) {
+            window['studioHoldIn'] = studioHoldIn;
         }
     }
 

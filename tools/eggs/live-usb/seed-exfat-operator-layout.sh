@@ -16,7 +16,23 @@ mkdir -p \
 	"${ROOT}/configs" \
 	"${ROOT}/projects" \
 	"${ROOT}/projects/_autosave" \
-	"${ROOT}/snapshots/rear-panels"
+	"${ROOT}/projects/_autosave" \
+	"${ROOT}/snapshots/rear-panels" \
+	"${ROOT}/.private"
+
+README_PRIVATE="${ROOT}/.private/README.txt"
+if [[ ! -f "$README_PRIVATE" ]]; then
+	mkdir -p "${ROOT}/.private"
+	cat >"$README_PRIVATE" <<'EOF'
+HighAsCG private volume root — per-machine subfolders are created at sync time.
+
+  .private/<machine-id>/syncthing/   device ID, media folder manifest
+  .private/<machine-id>/tailscale/   status snapshot (not tailscaled.state)
+  .private/<machine-id>/replication/ pairing manifest (no peer token)
+
+Not synced via configs/ or projects/. exFAT is not encrypted.
+EOF
+fi
 
 README="${ROOT}/drop-update/README.txt"
 if [[ ! -f "$README" ]]; then

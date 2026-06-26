@@ -11,6 +11,7 @@ const { resolveMainScreenCount, getChannelMap } = require('../config/routing')
 const { destinationsFromConfig } = require('../config/screen-destinations')
 const { probeDecklinkHardware, probeDecklinkFromCasparLog } = require('../utils/decklink-enum')
 const { readDecklinkKeyFillSettings } = require('../config/decklink-key-fill')
+const { listDecklinkOutputStatuses } = require('../config/decklink-output-resolve')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { listPortAudioDevices } = require('../audio/audio-devices')
 const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
@@ -107,6 +108,7 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		}
 	}
 	const mvKeyFill = readDecklinkKeyFillSettings(cs, 'multiview_')
+	const outputStatuses = listDecklinkOutputStatuses(ctx.config || {})
 	return {
 		inputs,
 		screenOutputs,
@@ -114,6 +116,7 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		multiviewKeyFill: mvKeyFill.keyFillEnabled
 			? { enabled: true, keyDevice: mvKeyFill.keyDevice, keyer: mvKeyFill.keyer }
 			: { enabled: false, keyDevice: 0, keyer: mvKeyFill.keyer },
+		outputs: outputStatuses,
 		runtime: rt || null,
 		hardware: decklinkHardware || { source: 'none', connectors: [] },
 		detected: hardwareCount > 0,

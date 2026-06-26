@@ -1,6 +1,8 @@
-# Optional modules (Previs / Tracking / Auto-follow)
+# Optional modules (Previs / Tracking / Auto-follow / CG Studio)
 
 HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the ones enforced by [WO-30](../work/30_WO_PREVIS_TRACKING_MODULE.md); everything in the Previs / Tracking / Stage Auto-follow WOs (17 / 19 / 31) is built on top of them.
+
+**CG Studio** (WO-32) is also an optional module but runs a **separate HTTP server** on port 4300 — see [src/cg-studio/README.md](../src/cg-studio/README.md).
 
 Acceptance test for the "lean build": delete the module directories listed below and the base server must still boot normally.
 
@@ -16,6 +18,8 @@ src/
 ├── tracking/                   ← optional module (delete to remove)
 │   └── register.js
 └── autofollow/                 ← optional module (delete to remove)
+    └── register.js
+└── cg-studio/                  ← optional module (delete to remove)
     └── register.js
 
 web/
@@ -59,7 +63,7 @@ The heavy native/runtime deps are marked `optionalDependencies` so a base instal
 | `three`     | WebGL2 scene for 3D previs | ~2 MB JS     |
 | `naudiodon` | PortAudio device capture   | native addon |
 
-Browser-only deps (`grapesjs` for CG Studio) live in **highascg-client**. `onnxruntime-node` (WO-19 person tracking) will be added when that module ships — not in the base server install.
+Browser-only deps for Previs (`three`) live in optionalDependencies. CG Studio ships as vanilla static files under `src/cg-studio/public/` (no GrapesJS, no client build). `onnxruntime-node` (WO-19 person tracking) will be added when that module ships — not in the base server install.
 
 Two install scripts:
 
@@ -160,3 +164,13 @@ npm uninstall three onnxruntime-node
 ```
 
 Then boot. `GET /api/modules` returns `{ enabled: [] }`, the web client logs `loaded: [—]`, and the base app runs untouched.
+
+## CG Studio (launcher-hosted module)
+
+CG Studio does **not** run on the playout server in normal production. Source is `src/cg-studio/` in **this repo**. The optional Electron launcher ([highascg-client](https://github.com/mko1989/highascg-client)) — packaged from `client/tools/electron-launcher/` — starts it locally on port **4300** when enabled in the Modules tab.
+
+**Local dev:** `npm run cg-studio` from this repo checkout.
+
+The **operator UI** (dashboard, scenes, device view) is always **`client/`** in this repo → `dist-web/` on playout `:4200`. Do not develop that UI in highascg-client.
+
+Exported templates land in `template/studio/` on the linked HighAsCG checkout and appear in `GET /api/lower-thirds/templates` after playout picks up the files.

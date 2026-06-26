@@ -12,6 +12,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { checkNuclearPassword } = require('./routes-system-setup')
 const { getXAuthority } = require('../utils/hardware-info')
 const { resolveAlsamixer } = require('../audio/alsa-mixer')
+const { applyNvidiaDisplayPolicy } = require('../utils/nvidia-display-policy')
 
 /** @readonly */
 const NVIDIA_SETTINGS_BINARIES = ['/usr/bin/nvidia-settings', '/usr/local/bin/nvidia-settings']
@@ -111,6 +112,10 @@ function spawnGuiDetached(action, opts = {}) {
 		throw new Error(`Launcher not installed or not on PATH (${action}).`)
 
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
+
+	if (action === 'nvidia-settings') {
+		void applyNvidiaDisplayPolicy(env, { log: opts.log })
+	}
 
 	const proc = spawn(bin, args, {
 		env,

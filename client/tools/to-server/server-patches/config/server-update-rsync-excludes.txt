@@ -1,0 +1,13 @@
+# rsync excludes: exfat drop-update/ → ~/highascg (server drop, WO-52)
+# client/ sources are never in the drop; dist-web/ IS updated from the drop.
+client/
+node_modules/
+.git/
+media/
+cef-cache/
+log/
+data/
+lib/
+config/casparcg.config
+.highascg-state.json
+.module-state.json

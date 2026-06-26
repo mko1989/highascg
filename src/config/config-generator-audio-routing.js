@@ -46,9 +46,6 @@ function mergeAudioRoutingIntoConfig(config) {
 	const mergedAr = normalizeAudioRouting(base.audioRouting)
 	const out = { ...base, audioRouting: mergedAr }
 	const ar = mergedAr
-	const layoutMap = { stereo: 'stereo', '4ch': '4ch', '8ch': '8ch', '16ch': '16ch' }
-	const pl = String(ar.programLayout || 'stereo').toLowerCase()
-	const layoutId = layoutMap[pl] || 'stereo'
 	const screenCount = getChannelMap(out).screenCount
 	const prevEn = ar.previewSystemAudioEnabled
 	const prevDev = ar.previewSystemAudioDevices
@@ -61,8 +58,8 @@ function mergeAudioRoutingIntoConfig(config) {
 	 */
 	const profile = String(out.caspar_build_profile || 'stock')
 	for (let n = 1; n <= screenCount; n++) {
-		if (!out[`screen_${n}_audio_layout`] || out[`screen_${n}_audio_layout`] === 'stereo' || out[`screen_${n}_audio_layout`] === 'default') {
-			out[`screen_${n}_audio_layout`] = layoutId
+		if (!out[`screen_${n}_audio_layout`] || out[`screen_${n}_audio_layout`] === 'default') {
+			out[`screen_${n}_audio_layout`] = 'stereo'
 		}
 		out[`screen_${n}_ffmpeg_audio_enabled`] = false
 		out[`screen_${n}_ffmpeg_audio_path`] = ''

@@ -1,0 +1,124 @@
+/*
+ * Previs module HUD styles.
+ */
+
+.previs-pgm-toggle {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 20;
+	padding: 3px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.55);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 3px;
+	cursor: pointer;
+	pointer-events: auto;
+}
+
+.previs-pgm-toggle:hover {
+	background: rgba(0, 0, 0, 0.7);
+	border-color: rgba(255, 255, 255, 0.4);
+}
+
+.previs-pgm-3d-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	background: #111;
+	pointer-events: auto;
+	outline: none;
+}
+
+.previs-pgm-3d-overlay:focus-visible {
+	outline: 1px solid rgba(0, 208, 255, 0.5);
+	outline-offset: -1px;
+}
+
+.previs-pgm-3d-toolbar {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	z-index: 20;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+	padding: 4px 8px;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.55);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 3px;
+	pointer-events: auto;
+	max-width: calc(100% - 12px);
+}
+
+.previs-pgm-3d-toolbar__model-row {
+	flex: 0 1 auto;
+}
+
+.previs-pgm-3d-toolbar__model-select {
+	max-width: 140px;
+	padding: 0 1px;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 2px;
+}
+
+.previs-pgm-3d-toolbar__button {
+	background: rgba(255, 255, 255, 0.1);
+	color: #fff;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 2px;
+	padding: 2px 6px;
+	cursor: pointer;
+	font-size: 11px;
+}
+
+.previs-pgm-3d-toolbar__button:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.18);
+}
+
+.previs-pgm-3d-toolbar__button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.previs-pgm-3d-toolbar__button--ghost {
+	opacity: 0.6;
+}
+
+.previs-pgm-3d-toolbar__status {
+	opacity: 0.85;
+}
+
+.previs-pgm-3d-toolbar__file-input {
+	display: none;
+}
+
+.previs-pgm-3d-dropzone {
+	position: absolute;
+	inset: 0;
+	z-index: 15;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	background: rgba(0, 140, 220, 0.25);
+	border: 2px dashed rgba(255, 255, 255, 0.7);
+	border-radius: 4px;
+	pointer-events: none;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.previs-pgm-3d-dropzone.is-visible {
+	display: flex;
+}

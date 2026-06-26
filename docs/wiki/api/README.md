@@ -1,6 +1,6 @@
 # HighAsCG HTTP API
 
-HighAsCG exposes a **JSON REST API** on the playout server. The operator UI ([highascg-client](https://github.com/mko1989/highascg-client)) and Companion modules call these endpoints over HTTP; live state also flows over **WebSocket** on the same port.
+HighAsCG exposes a **JSON REST API** on the playout server. The operator UI (served from **`dist-web/`** on the same host at `:4200`) and Companion modules call these endpoints over HTTP; live state also flows over **WebSocket** on the same port.
 
 ## Base URL
 
@@ -84,7 +84,7 @@ Same host/port as HTTP (default **4200**). Clients subscribe for:
 - **Scene live** updates
 - Optional periodic broadcast (`HIGHASCG_WS_BROADCAST_MS`)
 
-WebSocket message shapes are not duplicated here; see [osc-integration.md](../../osc-integration.md) and client `ws-client` in highascg-client.
+WebSocket message shapes are not duplicated here; see [osc-integration.md](../../osc-integration.md) and client `lib/ws-client.js` in this repo.
 
 ## OpenAPI file
 

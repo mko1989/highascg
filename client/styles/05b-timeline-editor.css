@@ -1,0 +1,187 @@
+/**
+ * Timeline editor transport, tracks, timecode, canvas.
+ */
+
+/* ── Timeline editor ─────────────────────────────────────────────────────── */
+
+.tl-editor {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	background: #0d1117;
+	overflow: hidden;
+}
+
+.tl-transport {
+	flex-shrink: 0;
+	border-bottom: 1px solid #30363d;
+	background: #161b22;
+}
+
+.tl-tb {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	flex-wrap: wrap;
+}
+
+.tl-tb-group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0 6px;
+	border-right: 1px solid #30363d;
+}
+
+.tl-tb-group:last-child {
+	border-right: none;
+}
+
+.tl-tb-transport {
+	gap: 2px;
+}
+
+.tl-btn {
+	padding: 3px 8px;
+	background: #21262d;
+	border: 1px solid #30363d;
+	border-radius: 4px;
+	color: #c9d1d9;
+	font-size: 13px;
+	cursor: pointer;
+	line-height: 1.4;
+	transition: background 0.15s;
+	white-space: nowrap;
+}
+
+.tl-btn:hover { background: #30363d; }
+.tl-btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
+.tl-btn-play { font-size: 15px; min-width: 28px; }
+
+.tl-timecode {
+	font-family: var(--font-ui);
+	font-size: 14px;
+	font-weight: bold;
+	color: #58a6ff;
+	letter-spacing: 1px;
+	min-width: 96px;
+	padding: 2px 6px;
+	background: #0d1117;
+	border-radius: 4px;
+	border: 1px solid #21262d;
+	text-align: center;
+}
+
+.tl-select {
+	background: #21262d;
+	border: 1px solid #30363d;
+	border-radius: 4px;
+	color: #c9d1d9;
+	font-size: 12px;
+	padding: 3px 6px;
+	max-width: 130px;
+}
+
+.tl-select-sm {
+	max-width: 90px;
+}
+
+.tl-input-sm {
+	width: 3.5em;
+	min-width: 2.5em;
+}
+
+.tl-tb-dest {
+	gap: 6px;
+}
+
+.tl-tb-label {
+	font-size: 11px;
+	color: #8b949e;
+}
+
+.tl-chk {
+	font-size: 11px;
+	color: #8b949e;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.tl-layer-menu {
+	display: flex;
+	flex-direction: column;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+	padding: 4px 0;
+	min-width: 140px;
+}
+.tl-layer-menu button {
+	background: none;
+	border: none;
+	color: var(--text);
+	text-align: left;
+	padding: 6px 12px;
+	font-size: 12px;
+	cursor: pointer;
+}
+.tl-layer-menu button:hover {
+	background: var(--bg-hover);
+}
+
+.tl-timecode-group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.tl-timecode-input {
+	width: 80px;
+	font-family: var(--font-ui);
+	font-size: 13px;
+}
+.tl-timecode-sep {
+	color: #8b949e;
+	font-size: 12px;
+}
+
+.tl-body {
+	flex: 1;
+	overflow: hidden;
+	position: relative;
+}
+
+.tl-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Prompt 25: Layer context menu */
+.tl-layer-menu {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px;
+	background: var(--bg-elevated, #21262d);
+	border: 1px solid var(--border, #30363d);
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.tl-layer-menu button {
+	padding: 6px 12px;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text, #c9d1d9);
+	font-size: 12px;
+	cursor: pointer;
+}
+.tl-layer-menu button:hover {
+	background: var(--bg-dark, #30363d);
+}
+

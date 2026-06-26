@@ -34,6 +34,16 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const intervalMs = options.stateBroadcastIntervalMs ?? 0
 	const clients = new Set()
 	const wss = new WebSocket.Server({ noServer: true })
+	const replWss = new WebSocket.Server({ noServer: true })
+
+	function notifyOperatorClientCount() {
+		try {
+			const { notifyOperatorWsCount } = require('../replication/replication-service')
+			notifyOperatorWsCount(ctx, clients.size)
+		} catch {
+			/* replication optional */
+		}
+	}
 
 	const logLineMaxHzRaw = parseInt(process.env.HIGHASCG_WS_LOG_LINE_MAX_HZ || '50', 10)
 	const logLineMaxHz = Number.isFinite(logLineMaxHzRaw) ? logLineMaxHzRaw : 50
@@ -185,14 +195,34 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	}
 
 	const onUpgrade = (req, socket, head) => {
-		const p = (req.url || '').split('?')[0]
+		const urlRaw = req.url || ''
+		const p = urlRaw.split('?')[0]
 		log(`[WS Upgrade] Attempt for path: ${p}`)
+		const isReplPath = p === '/api/replication/ws'
 		const isWsPath =
 			p === '/api/ws' ||
 			p === '/ws' ||
 			/^\/instance\/[^/]+\/api\/ws$/.test(p) ||
 			/^\/instance\/[^/]+\/ws$/.test(p)
-		log(`[WS Upgrade] isWsPath: ${isWsPath}`)
+		log(`[WS Upgrade] isWsPath: ${isWsPath} isReplPath: ${isReplPath}`)
+		if (isReplPath) {
+			try {
+				const qs = new URL(urlRaw, 'http://127.0.0.1')
+				const token = qs.searchParams.get('token') || ''
+				const replToken = ctx.config?.replication?.peer?.token || ''
+				if (!replToken || token !== replToken) {
+					socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+					socket.destroy()
+					return
+				}
+				replWss.handleUpgrade(req, socket, head, (ws) => {
+					replWss.emit('connection', ws, req)
+				})
+			} catch (e) {
+				log(`[WS Upgrade] replication error: ${e?.message || e}`)
+			}
+			return
+		}
 		if (isWsPath) {
 			try {
 				wss.handleUpgrade(req, socket, head, (ws) => {
@@ -211,6 +241,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	wss.on('connection', (ws) => {
 		const firstClient = clients.size === 0
 		clients.add(ws)
+		notifyOperatorClientCount()
 		log('[WS] client connected')
 		if (firstClient && typeof ctx.onFirstWebSocketClient === 'function') {
 			try {
@@ -287,7 +318,36 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 			}
 		})
 
-		ws.on('close', () => clients.delete(ws))
+		ws.on('close', () => {
+			clients.delete(ws)
+			notifyOperatorClientCount()
+		})
+	})
+
+	replWss.on('connection', (ws) => {
+		log('[WS] replication peer connected')
+		try {
+			const { registerPeerWsClient, getReplicationRuntime } = require('../replication/replication-service')
+			const { snapshotLiveState, broadcastLiveState } = require('../replication/live-state-feed')
+			registerPeerWsClient(ws)
+			const rt = getReplicationRuntime(ctx)
+			if (rt) {
+				const snap = snapshotLiveState(rt, ctx)
+				ws.send(safeStringify({ type: 'live_state', data: snap }))
+			}
+		} catch (e) {
+			log('ws replication connect: ' + (e?.message || e))
+		}
+		ws.on('message', async (raw) => {
+			try {
+				const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw)
+				const msg = JSON.parse(text.trim())
+				const { handlePeerWsMessage } = require('../replication/replication-service')
+				await handlePeerWsMessage(ctx, msg)
+			} catch {
+				/* ignore malformed peer frames */
+			}
+		})
 	})
 
 	/** @type {ReturnType<typeof setInterval> | null} */
@@ -303,7 +363,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		if (timer.unref) timer.unref()
 	}
 
-	log('[HighAsCG] WebSocket: /api/ws, /ws, and /instance/<id>/api/ws (same port as HTTP)')
+	log('[HighAsCG] WebSocket: /api/ws, /ws, /api/replication/ws, and /instance/<id>/api/ws (same port as HTTP)')
 
 	return {
 		wss,
@@ -322,7 +382,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 			}
 			clients.clear()
 			try {
-				wss.close()
+				replWss.close()
 			} catch (_) {}
 			if (ctx._wsBroadcast === broadcast) delete ctx._wsBroadcast
 		},

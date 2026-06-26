@@ -1,0 +1,162 @@
+/* CG Overlay Studio — workspace tab (WO-32) */
+
+#tab-cg-studio.active {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	margin: -24px;
+	padding: 0;
+}
+
+#tab-cg-studio .cg-studio-toolbar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 8px 16px;
+	background: var(--bg-panel);
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+#tab-cg-studio .cg-studio-toolbar select.cg-studio-anim-preset,
+#tab-cg-studio .cg-studio-toolbar select.cg-studio-load-select {
+	min-width: 7rem;
+	max-width: 10rem;
+	padding: 4px 8px;
+	font-size: 12px;
+	background: var(--bg-elevated);
+	color: var(--text);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+#tab-cg-studio .cg-studio-toolbar input.header-project__name {
+	min-width: 10rem;
+	flex: 1;
+	max-width: 20rem;
+}
+
+#tab-cg-studio .cg-studio-toolbar .header-btn--secondary {
+	opacity: 0.92;
+}
+
+#tab-cg-studio .cg-studio-toolbar .header-btn--icon {
+	min-width: 2rem;
+	padding-left: 0.5rem;
+	padding-right: 0.5rem;
+}
+
+#tab-cg-studio .cg-studio-zoom-label {
+	font-size: 11px;
+	opacity: 0.75;
+	min-width: 2.5rem;
+	text-align: center;
+}
+
+#tab-cg-studio .cg-studio-status {
+	font-size: 11px;
+	opacity: 0.7;
+	margin-left: auto;
+}
+
+#tab-cg-studio .cg-studio-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+#tab-cg-studio .cg-studio-canvas-wrap {
+	flex: 1;
+	min-height: 0;
+	position: relative;
+	overflow: hidden;
+}
+
+/* Off-screen parking for GrapesJS managers when inspector is unavailable */
+#tab-cg-studio .cg-studio-panels-park {
+	position: absolute;
+	left: -10000px;
+	top: 0;
+	width: 280px;
+	height: 1px;
+	overflow: hidden;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+#tab-cg-studio .cg-studio-error {
+	padding: 1rem;
+	color: var(--danger, #e55);
+}
+
+/* —— Inspector mount (right panel) —— */
+
+#panel-inspector .cg-studio-inspector-shell {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+#panel-inspector .cg-studio-inspector-title {
+	flex-shrink: 0;
+}
+
+#panel-inspector .cg-studio-inspector-panels-mount {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+#panel-inspector .cg-studio-panels-host {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+#panel-inspector .cg-studio-panels-host--parked {
+	visibility: hidden;
+	pointer-events: none;
+}
+
+#panel-inspector .cg-studio-inspector-section {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+#panel-inspector .cg-studio-inspector-section--grow {
+	flex: 1;
+	border-bottom: none;
+	min-height: 120px;
+}
+
+#panel-inspector .cg-studio-inspector-section__title {
+	margin: 0;
+	padding: 8px 0 4px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.65;
+}
+
+#panel-inspector .cg-studio-inspector-blocks,
+#panel-inspector .cg-studio-inspector-layers {
+	max-height: 160px;
+	overflow: auto;
+}
+
+#panel-inspector .cg-studio-inspector-styles {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}

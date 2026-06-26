@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Shared paths and tar/rsync excludes for src/ (root) + client/ + dist-web/ layout.
+# Shared paths and tar/rsync excludes for unified repo layout.
 # Source from deploy and release scripts (do not execute directly).
 #
 # Layout:
 #   src/         — Node server (repo root)
-#   client/      — Browser UI sources (ES modules)
-#   dist-web/    — Vite bundle (Electron launcher / release:github-client — not on playout server)
+#   client/      — Canonical browser UI sources (ES modules) — not shipped on playout when dist-web/ exists
+#   dist-web/    — Vite bundle from client/ — served on playout :4200
 #   index.js     — Server entry
 #
 set -euo pipefail
@@ -15,7 +15,7 @@ archive_common_repo_root() {
 	(cd "$(dirname "$script")/.." && pwd)
 }
 
-# Explicit members for server-only GitHub tarball (no client/ sources).
+# Explicit members for server GitHub tarball (built UI, no client/ sources).
 archive_common_server_tar_members() {
 	local -n _out=$1
 	_out=(
@@ -28,6 +28,9 @@ archive_common_server_tar_members() {
 		scripts
 		tools/runtime
 	)
+	if [[ "${RELEASE_SERVER_ONLY:-0}" != "1" ]]; then
+		_out+=(dist-web)
+	fi
 }
 
 # Runtime / workstation bulk excluded from release and deploy archives.
@@ -83,20 +86,22 @@ archive_common_deploy_tar_excludes() {
 	archive_common_bulk_tar_excludes _ex
 }
 
-# Server-only tarball: never ship browser UI (WO-47 / PLAN_SERVER_CLIENT_SPLIT).
+# Server tarball: never ship client/ sources; dist-web/ included unless RELEASE_SERVER_ONLY=1.
 archive_common_server_tar_excludes() {
 	local -n _ex=$1
 	_ex+=(
 		--exclude=./client
-		--exclude=./dist-web
 		--exclude=./dist/launcher
 		--exclude=./audio_testing
 		--exclude=./for_client
 		--exclude=./From_client
 	)
+	if [[ "${RELEASE_SERVER_ONLY:-0}" == "1" ]]; then
+		_ex+=(--exclude=./dist-web)
+	fi
 }
 
-# Omit client/ dev tree when shipping a built dist-web/ (monolith / legacy).
+# Omit client/ dev tree when shipping a built dist-web/.
 archive_common_exclude_client_sources() {
 	local -n _ex=$1
 	_ex+=(--exclude=./client)
@@ -112,15 +117,16 @@ archive_common_build_client_if_requested() {
 		echo "archive-common: no package.json under $root" >&2
 		return 1
 	fi
-	echo "==> build:client skipped (client is a separate repo)"
+	echo "==> Vite production build (client/ → dist-web/)"
+	(cd "$root" && npm run build:client)
 }
 
-# Deploy default: API-only tree (matches playout ISO / headless service).
+# Deploy default: server + dist-web/. Set DEPLOY_SERVER_ONLY=1 for API-only emergency deploy.
 archive_common_apply_deploy_packaging_rules() {
 	local root="$1"
 	local -n _ex=$2
-	if [[ "${DEPLOY_SERVER_ONLY:-1}" == "1" ]]; then
-		archive_common_server_tar_excludes _ex
+	if [[ "${DEPLOY_SERVER_ONLY:-0}" == "1" ]]; then
+		RELEASE_SERVER_ONLY=1 archive_common_server_tar_excludes _ex
 		return 0
 	fi
 	archive_common_apply_client_packaging_rules "$root" _ex
@@ -145,7 +151,11 @@ archive_common_print_size_hints() {
 	echo "      • node_modules/ (runtime deps; use --zip-exclude-node-modules + npm ci on target)"
 	echo "      • tools/runtime/ (exfat-sync-cli, staged Caspar helpers)"
 	echo "      • src/ (orchestrator + APIs at repo root)"
-	echo "    UI is a separate asset: npm run release:github-client → dist-web/"
+	if [[ "${RELEASE_SERVER_ONLY:-0}" == "1" ]]; then
+		echo "    UI omitted (RELEASE_SERVER_ONLY=1) — run npm run build:client on playout or redeploy with dist-web/."
+	else
+		echo "      • dist-web/ (operator UI built from in-repo client/)"
+	fi
 	if [[ -n "$archive_path" && -f "$archive_path" ]]; then
 		echo "    This archive: $(du -h "$archive_path" | cut -f1)  $archive_path"
 	fi

@@ -3,20 +3,22 @@
 const { applyX11Layout, restartDisplayManager } = require('./os-config')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
 const { waitForDisplayStable } = require('./display-stable-wait')
-const { applyOperatorDisplaySession } = require('./x-display-session')
+const { applyOperatorDisplaySession, displaySessionEnv } = require('./x-display-session')
+const { applyNvidiaDisplayPolicy } = require('./nvidia-display-policy')
 const {
-	finishCasparAfterApply,
+	reloadCasparAfterConfigWrite,
 	killStuckCasparMainProcess,
 	waitForAmcpDisconnect,
 } = require('./caspar-restart')
 const { needsNodmRestartForLayout } = require('./xrandr-layout-verify')
 
 /**
- * Full server apply (normal path — no Caspar kill):
+ * Full server apply:
  *   1. Write casparcg.config
  *   2. Persist apply-layout.sh
  *   3. Apply live xrandr when canvas fits (no nodm)
- *   4. AMCP RESTART — run.sh relaunches Caspar with the new config
+ *   4. Brief AMCP RESTART, then fast-kill if still up — run.sh relaunches with new config
+ *   5. NVIDIA Force Composition Pipeline on all outputs (after restart — xrandr/Caspar clear MetaMode)
  *
  * Canvas expansion path adds nodm restart, live xrandr after X settles,
  * then stop autostart Caspar (wrong layout window) before relaunch.
@@ -61,6 +63,10 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			restartSent: false,
 			disconnected: false,
 			reconnected: false,
+		},
+		nvidiaDisplay: {
+			applied: false,
+			ok: false,
 		},
 		message: '',
 	}
@@ -162,14 +168,14 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	}
 
 	const casparStep = needsNodm ? 6 : 4
-	log('info', `[Full apply] Step ${casparStep} — AMCP RESTART (reload Caspar config)`)
+	log('info', `[Full apply] Step ${casparStep} — reload Caspar (RESTART + fast kill if hung)`)
 	if (ctx.amcp) {
 		out.casparRestart.attempted = true
 		try {
-			const restartResult = await finishCasparAfterApply(ctx, {
+			const restartResult = await reloadCasparAfterConfigWrite(ctx, {
 				log,
-				disconnectMs: 10_000,
-				reconnectMs: 45_000,
+				skipRestartCommand: needsNodm,
+				acceptPortListening: true,
 			})
 			Object.assign(out.casparRestart, restartResult)
 		} catch (e) {
@@ -182,6 +188,27 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		}
 	} else {
 		log('warn', '[Full apply] Caspar not connected — config and layout saved; restart Caspar manually')
+	}
+
+	if (out.layout.preApplied || out.layout.postApplied) {
+		const nvidiaStep = needsNodm ? 7 : 5
+		log('info', `[Full apply] Step ${nvidiaStep} — NVIDIA Force Composition Pipeline (all outputs)`)
+		out.nvidiaDisplay.applied = true
+		try {
+			const env = displaySessionEnv()
+			let nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
+			if (!nvidiaRes.ok) {
+				log('info', '[Full apply] NVIDIA display policy retry in 6s (MetaMode may lag Caspar restart)')
+				await new Promise((r) => setTimeout(r, 6000))
+				nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
+			}
+			out.nvidiaDisplay.ok = !!nvidiaRes.ok
+			if (nvidiaRes.reason) out.nvidiaDisplay.reason = nvidiaRes.reason
+		} catch (e) {
+			log('warn', `[Full apply] NVIDIA display policy: ${e?.message || e}`)
+			out.nvidiaDisplay.ok = false
+			out.nvidiaDisplay.error = e instanceof Error ? e.message : String(e)
+		}
 	}
 
 	if (needsNodm) {

@@ -3,7 +3,7 @@
  */
 'use strict'
 
-const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync } = require('../config/device-graph')
+const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDestinationFromGraph } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const {
 	parseDecklinkDeviceIndex,
@@ -77,6 +77,7 @@ function handleUpdateDestination(j, ctx) {
 		...d0,
 		label: p.label != null ? String(p.label).trim() || d0.label : d0.label,
 		mainScreenIndex: p.mainScreenIndex != null ? Math.max(0, parseInt(p.mainScreenIndex, 10) || 0) : d0.mainScreenIndex,
+		audioLayout: p.audioLayout != null ? String(p.audioLayout).trim() || d0.audioLayout : d0.audioLayout,
 		videoMode: p.videoMode || d0.videoMode,
 		width: nextWidth,
 		height: nextHeight,
@@ -108,8 +109,11 @@ function handleRemoveDestination(j, ctx) {
 	if (top.destinations.length === before) return { error: 'Not found', id }
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
-	saveConfig(ctx, { screenDestinations: next })
-	return { ok: true, screenDestinations: next, removedId: id }
+	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
+	const graph = pruneDestinationFromGraph(g0, id)
+	ctx.config.deviceGraph = graph
+	saveConfig(ctx, { screenDestinations: next, deviceGraph: graph })
+	return { ok: true, screenDestinations: next, removedId: id, graph }
 }
 
 function handleAddEdge(j, ctx, liveSnapshot) {

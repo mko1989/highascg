@@ -1,19 +1,26 @@
-/* Optional headless / service rule: allow user "casparcg" in plugdev to use udisks2
- * even when polkit's subject.active is false (e.g. no desktop login session).
- * Use together with 50-highascg-udisks.rules, or on dedicated playout systems only.
+/* Headless HighAsCG: udisks2 mount/eject for casparcg (systemd service / no TTY).
+ * Includes *-other-seat actions required when not on an active logind seat.
  *
- * Install: sudo cp scripts/polkit/51-highascg-udisks-casparcg-headless.rules /etc/polkit-1/rules.d/
- *          sudo systemctl restart polkit
- *
- * If your service user is not "casparcg", change install-config.sh USER_CASPAR and adjust subject.user.
+ * Install: sudo bash scripts/setup/13-usb-ingest.sh [casparcg]
  */
 polkit.addRule(function (action, subject) {
-    if (
-        action.id.indexOf('org.freedesktop.udisks2.') === 0 &&
-        subject.local === true &&
-        subject.user == 'casparcg' &&
-        subject.isInGroup('plugdev')
-    ) {
-        return polkit.Result.YES;
-    }
-});
+	var YES = polkit.Result.YES
+	var permission = {
+		'org.freedesktop.udisks2.filesystem-mount': YES,
+		'org.freedesktop.udisks2.filesystem-mount-system': YES,
+		'org.freedesktop.udisks2.filesystem-mount-other-seat': YES,
+		'org.freedesktop.udisks2.filesystem-mount-other-user': YES,
+		'org.freedesktop.udisks2.filesystem-unmount': YES,
+		'org.freedesktop.udisks2.filesystem-unmount-others': YES,
+		'org.freedesktop.udisks2.eject-media': YES,
+		'org.freedesktop.udisks2.eject-media-other-seat': YES,
+		'org.freedesktop.udisks2.power-off-drive': YES,
+		'org.freedesktop.udisks2.power-off-drive-other-seat': YES,
+	}
+	var allowed =
+		subject.user == 'casparcg' ||
+		(typeof subject.isInGroup === 'function' && subject.isInGroup('plugdev'))
+	if (allowed) {
+		return permission[action.id]
+	}
+})

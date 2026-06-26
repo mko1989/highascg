@@ -1,6 +1,6 @@
 'use strict'
 
-const { chLayer, param } = require('./amcp-utils')
+const { chLayer, param, audioFilterParam } = require('./amcp-utils')
 
 function shouldAppendClipVerbFields(commandName, clip) {
 	return commandName !== 'PLAY' || (clip != null && String(clip).trim() !== '')
@@ -54,7 +54,7 @@ function serializeClipCommandPlan(plan) {
 	if (withClipFields && opts.seek != null) cmd += ` SEEK ${opts.seek}`
 	if (withClipFields && opts.length != null) cmd += ` LENGTH ${opts.length}`
 	if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
-	if (opts.audioFilter) cmd += ` AF ${param(opts.audioFilter)}`
+	if (opts.audioFilter) cmd += ` AF ${audioFilterParam(opts.audioFilter)}`
 	if (opts.auto) cmd += ' AUTO'
 	if ((opts.transition !== 'STING' || !withClipFields) && opts.parameters) cmd += ' ' + opts.parameters
 

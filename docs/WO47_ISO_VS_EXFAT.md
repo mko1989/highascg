@@ -49,8 +49,8 @@ Then **`highascg-exfat-sync.service`** runs **`node tools/runtime/exfat-sync-cli
 By default **`prepare-eggs-clone-with-exfat.sh`** sets **`HIGHASCG_ISO_EMBED_SERVER=1`** and **`HIGHASCG_ISO_BUILD_WEB=0`**:
 
 - Resets **`config/*.json`** from **`src/config/defaults.js`** (not the eggs build host’s saved settings) via **`reset-iso-operator-config.sh`**; installs **`config/casparcg.config`** from **`config/casparcg.config.iso`** (single **720p50** windowed borderless screen consumer); copies **`.env.example` → `.env`** (headless stub; build-host **`.env`** is excluded from squashfs).
-- Runs **`npm ci --omit=dev`** so **`package.json`**, **`src/`**, **`node_modules/`** are in the squashfs — **not** **`dist-web/`** (operator UI via Electron; see [`PLAN_SERVER_CLIENT_SPLIT.md`](PLAN_SERVER_CLIENT_SPLIT.md)).
-- **`highascg.service.d/10-headless.conf`** sets **`HIGHASCG_HEADLESS=true`** (API-only on playout).
+- Runs **`npm ci --omit=dev`** so **`package.json`**, **`src/`**, **`node_modules/`** are in the squashfs — **`dist-web/`** is **not** baked into squashfs; it arrives via **`exfat/drop-update/`** (WO-52: server serves web GUI on `:4200` on the same machine).
+- **`highascg.service.d/10-headless.conf`** is **not** installed by default (WO-52). Use **`HIGHASCG_INSTALL_HEADLESS=1`** only for API-only debug.
 - Merges **`penguins-eggs-exclude-highascg-embed-server.list`** (excludes **`client/`**, **`dist-web/`**, dev trees).
 
 Set **`HIGHASCG_ISO_EMBED_SERVER=0`** for Caspar shell only (Node app from **`exfat/drop-update/`**). Set **`HIGHASCG_ISO_BUILD_WEB=1`** only for legacy monolith ISO experiments.
@@ -59,9 +59,9 @@ Set **`HIGHASCG_ISO_EMBED_SERVER=0`** for Caspar shell only (Node app from **`ex
 
 1. Build host: **`sudo npm run eggs:prepare`** (or **`sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh`**) — WO‑47 units + exclude merge (+ ISO defaults when embed is on)  
 2. Eggs **`--clone`**: squashfs honors **`exclude.list`** fragment (re-merge after edits: **`sudo bash tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh`**)  
-3. Stick: extract **`highascg-server_*.tar.gz`** into **`drop-update/`** (must include top-level **`package.json`**, **`src/`**, **`tools/runtime/`**, …)  
-4. Client UI: separate Mac/Windows install or **`release:github-client`** — **not** on the playout stick  
-5. Boot with **`HIGHASCGEXF`**: server-update applies when pending; sync runs when **`tools/runtime/exfat-sync-cli.js`** exists; **`highascg.service`** starts when **`package.json`** is present  
+3. Stick: extract **`highascg-server_*.tar.gz`** into **`drop-update/`** (must include **`dist-web/`**, **`package.json`**, **`src/`**, **`tools/runtime/`**, …)  
+4. Boot with **`HIGHASCGEXF`**: server-update applies when pending; sync runs when **`tools/runtime/exfat-sync-cli.js`** exists; **`highascg.service`** starts when **`package.json`** is present; open **`http://<playout-ip>:4200/`** for operator UI (same machine as API)  
+5. **Electron launcher** (optional, Mac/Windows/Linux): multiplatform hub for stick setup, links, sim — opens browser to `:4200`; not required on playout
 
 ## Prerequisites on image
 

@@ -5,10 +5,12 @@
 	"type": "commonjs",
 	"main": "index.js",
 	"scripts": {
-		"start": "HIGHASCG_HEADLESS=true node index.js",
-		"dev": "HIGHASCG_HEADLESS=true node --watch index.js",
-		"start:monolith": "node index.js",
-		"dev:monolith": "node --watch index.js",
+		"start": "node index.js",
+		"dev": "node --watch index.js",
+		"build:client": "vite build",
+		"dev:client": "vite",
+		"start:headless": "HIGHASCG_HEADLESS=true node index.js",
+		"dev:headless": "HIGHASCG_HEADLESS=true node --watch index.js",
 		"deploy:dev": "bash scripts/dev-push.sh",
 		"clean:eggs-host": "bash scripts/clean-eggs-dev-host.sh",
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
@@ -16,6 +18,9 @@
 		"wiki:build": "node tools/wiki/build-wiki.js",
 		"wiki:open": "xdg-open docs/wiki-site/index.html 2>/dev/null || open docs/wiki-site/index.html 2>/dev/null || echo 'Open docs/wiki-site/index.html in your browser'",
 		"smoke:wiki": "node --test tools/smoke/smoke-wiki.test.js",
+		"cg-studio": "node scripts/cg-studio-run.js",
+		"launcher:prepare": "bash client/tools/electron-launcher/sync-cg-studio.sh",
+		"launcher": "npm run launcher:prepare && npx electron --no-sandbox client/tools/electron-launcher",
 		"smoke": "node tools/smoke/http-smoke.js",
 		"smoke:caspar": "node tools/smoke/smoke-caspar.js",
 		"thumbnails:lt": "node tools/runtime/generate-lt-thumbnails.js",
@@ -26,6 +31,8 @@
 		"smoke:exfat-sync": "node --test tools/smoke/smoke-exfat-sync.js",
 		"test:device-graph": "node --test tools/smoke/smoke-device-graph.js",
 		"test:device-snapshot": "node --test tools/smoke/smoke-device-snapshot.js",
+		"test:replication": "node --test tools/smoke/smoke-config-classify.js tools/smoke/smoke-replication-role.js",
+		"test:private-volume": "node --test tools/smoke/smoke-private-volume-sync.js",
 		"test:project-hardware-config": "node --test tools/smoke/smoke-project-hardware-config.test.js",
 		"test:os-layout-w40": "node --test tools/smoke/smoke-os-layout-w40.js",
 		"test:mapping-gpu-os-layout": "node --test tools/smoke/smoke-mapping-gpu-os-layout.js",
@@ -59,7 +66,7 @@
 	"engines": {
 		"node": ">=20"
 	},
-	"notes": "highascg uses casparcg-connection@6 for AMCP transport. Legacy raw TCP transport is available via HIGHASCG_AMCP_LEGACY_TRANSPORT=1. Browser UI deps (grapesjs, three) belong in highascg-client; onnxruntime-node is added when WO-19 tracking ships.",
+	"notes": "Unified repo: client/ (canonical UI) + src/ (API) on one Ubuntu playout host. Node serves dist-web/ + API on :4200. Build UI: npm run build:client. highascg-client is optional Electron packaging (sim, multiserver, modules) — not the UI source tree. HIGHASCG_HEADLESS=true is API-only debug.",
 	"dependencies": {
 		"busboy": "^1.6.0",
 		"casparcg-connection": "^6.3.3",
@@ -73,10 +80,14 @@
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
+		"grapesjs": "^0.22.5",
 		"naudiodon": "^2.3.6",
-		"three": "^0.184.0"
+		"three": "^0.184.0",
+		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {
-		"puppeteer": "^25.1.0"
+		"electron": "^30.5.1",
+		"puppeteer": "^25.1.0",
+		"vite": "^6.4.3"
 	}
 }

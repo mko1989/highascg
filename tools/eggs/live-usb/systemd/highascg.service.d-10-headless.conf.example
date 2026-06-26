@@ -1,8 +1,13 @@
-# Installed automatically by scripts/write-highascg-systemd-unit.sh as:
-#   /etc/systemd/system/highascg.service.d/10-headless.conf
+# Opt-in API-only mode (debug / CI). Do NOT install on production playout by default.
 #
-# Playout machine: API + WebSocket only. Operator UI runs in Electron launcher.
-# See docs/PLAN_SERVER_CLIENT_SPLIT.md
+# WO-52 production: highascg.service serves API + dist-web/ operator UI on :4200
+# (client and server on the same machine). Electron launcher is hub-only (setup, links).
+#
+# Install only when you explicitly want API-only (no web GUI):
+#   sudo cp this file /etc/systemd/system/highascg.service.d/10-headless.conf
+#   sudo systemctl daemon-reload && sudo systemctl restart highascg
+#
+# Or: HIGHASCG_INSTALL_HEADLESS=1 sudo bash scripts/write-highascg-systemd-unit.sh
 
 [Service]
 Environment=HIGHASCG_HEADLESS=true

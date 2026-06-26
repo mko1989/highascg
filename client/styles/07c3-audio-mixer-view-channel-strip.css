@@ -1,0 +1,265 @@
+/* Hardware Audio Channel Strip */
+.audio-mixer-view__strip {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 12px 10px;
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	width: 98px;
+	height: 260px;
+	flex-shrink: 0;
+	position: relative;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+	box-sizing: border-box;
+}
+
+.audio-mixer-view__strip:hover {
+	border-color: rgba(88, 166, 255, 0.35);
+}
+
+.audio-mixer-view__strip--master {
+	height: 532px; /* double height to match 2-row layout */
+	width: auto;
+	min-width: 128px;
+	max-width: 200px;
+	background: linear-gradient(180deg, var(--bg-panel) 0%, rgba(255, 255, 255, 0.005) 100%);
+	border-color: rgba(212, 163, 89, 0.15);
+	box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.audio-mixer-view__strip--master:hover {
+	border-color: rgba(212, 163, 89, 0.4);
+	box-shadow: 0 0 8px rgba(212, 163, 89, 0.1), inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Channel Header Label */
+.audio-mixer-view__strip-label {
+	font-size: 0.68rem;
+	font-weight: 700;
+	color: var(--text);
+	text-align: center;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	width: 100%;
+	flex-shrink: 0;
+	letter-spacing: 0.01em;
+	padding: 2px 4px;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 3px;
+	border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.audio-mixer-view__strip-label--master {
+	color: #d4a359;
+	background: rgba(212, 163, 89, 0.05);
+	border-color: rgba(212, 163, 89, 0.1);
+}
+
+/* Fader Block (VU Meter + scale ticks + hardware vertical range) */
+.audio-mixer-view__fader-container {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	justify-content: space-between;
+	height: 100%;
+	flex: 1;
+	width: 100%;
+	position: relative;
+	gap: 6px;
+	margin: 6px 0;
+	min-height: 90px;
+}
+
+.audio-mixer-view__fader-container--master {
+	align-items: flex-end;
+}
+
+.audio-mixer-view__bus-meter-bank {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-end;
+	gap: 4px;
+	height: 100%;
+	flex: 1;
+	min-width: 0;
+}
+
+.audio-mixer-view__bus-meter-cell {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	height: 100%;
+	flex: 1;
+	min-width: 0;
+	max-width: 18px;
+}
+
+.audio-mixer-view__bus-meter-label {
+	font-size: 0.52rem;
+	line-height: 1;
+	color: var(--text-muted);
+}
+
+.audio-mixer-view__meter-vertical--bus {
+	width: 100%;
+	flex: 1;
+	min-height: 0;
+}
+
+/* Meter Vertical Bar */
+.audio-mixer-view__meter-vertical {
+	width: 7px;
+	height: 100%;
+	background: #090c10;
+	border-radius: 3px;
+	position: relative;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.04);
+	flex-shrink: 0;
+}
+
+.audio-mixer-view__meter-vertical .audio-mixer-view__meter-fill {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 0%;
+	background: linear-gradient(to top, 
+		#166534 0%, 
+		#22c55e 65%, 
+		#ca8a04 82%, 
+		#eab308 90%, 
+		#ef4444 100%
+	);
+	will-change: height;
+}
+
+/* Decibel Scale Numbers */
+.audio-mixer-view__scale {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	font-size: 0.52rem;
+	color: var(--text-muted);
+	text-align: right;
+	width: 22px;
+	user-select: none;
+	font-family: 'Courier New', Courier, monospace;
+	line-height: 1;
+	flex-shrink: 0;
+	padding: 2px 0;
+	opacity: 0.8;
+}
+
+/* Professional Fader - Native vertical styled nicely */
+input[type="range"].audio-mixer-view__fader {
+	writing-mode: vertical-lr;
+	direction: rtl;
+	width: 18px;
+	height: 100%;
+	padding: 0;
+	margin: 0;
+	cursor: ns-resize;
+	accent-color: var(--accent);
+	background: rgba(255, 255, 255, 0.02);
+	appearance: slider-vertical;
+	-webkit-appearance: slider-vertical;
+	outline: none;
+	flex-shrink: 0;
+}
+
+.audio-mixer-view__strip--master input[type="range"].audio-mixer-view__fader {
+	accent-color: #d4a359;
+}
+
+/* Fader % value readout */
+.audio-mixer-view__fader-val {
+	font-size: 0.65rem;
+	color: var(--text-muted);
+	font-family: monospace;
+	font-weight: 600;
+	text-align: center;
+	width: 100%;
+	flex-shrink: 0;
+}
+
+/* Solo / Mute Actions block */
+.audio-mixer-view__strip-actions {
+	display: flex;
+	flex-direction: row;
+	gap: 4px;
+	width: 100%;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.audio-mixer-view__solo-btn,
+.audio-mixer-view__mute-btn {
+	flex: 1;
+	height: 20px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-muted);
+	font-size: 0.58rem;
+	font-weight: 800;
+	cursor: pointer;
+	transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+	text-transform: uppercase;
+}
+
+.audio-mixer-view__solo-btn:hover {
+	border-color: var(--warn);
+	color: var(--text);
+}
+
+.audio-mixer-view__mute-btn:hover {
+	border-color: var(--error);
+	color: var(--text);
+}
+
+/* SOLO Backlit State (DAW-style Yellow) */
+.audio-mixer-view__solo-btn--active {
+	background: #ca8a04 !important;
+	border-color: #facc15 !important;
+	color: #000000 !important;
+	font-weight: 900;
+	box-shadow: 0 0 8px rgba(250, 204, 21, 0.4);
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* MUTE Backlit State (DAW-style Red) */
+.audio-mixer-view__mute-btn--active {
+	background: #991b1b !important;
+	border-color: #f87171 !important;
+	color: #ffffff !important;
+	font-weight: 900;
+	box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+
+/* Master Strip custom badge instead of buttons */
+.audio-mixer-view__master-badge {
+	flex: 1;
+	height: 20px;
+	border-radius: 4px;
+	background: rgba(212, 163, 89, 0.08);
+	border: 1px solid rgba(212, 163, 89, 0.2);
+	color: #d4a359;
+	font-size: 0.6rem;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}

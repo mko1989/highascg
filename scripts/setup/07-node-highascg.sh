@@ -71,6 +71,11 @@ if [[ -f "${SCRIPT_DIR}/12-passwordless-sudo.sh" ]]; then
 	bash "${SCRIPT_DIR}/12-passwordless-sudo.sh" "${USER_CASPAR}"
 fi
 
+if [[ -f "${SCRIPT_DIR}/13-usb-ingest.sh" ]]; then
+	log "USB ingest (udisks2 + polkit for Import from USB mount)"
+	bash "${SCRIPT_DIR}/13-usb-ingest.sh" "${USER_CASPAR}"
+fi
+
 echo
 systemctl is-active highascg.service 2>/dev/null && ok "highascg.service active" || echo "  note: start highascg after config/Caspar are ready"
 echo

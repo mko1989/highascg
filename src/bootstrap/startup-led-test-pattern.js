@@ -358,6 +358,4 @@ module.exports = {
 	channelsForLedTestOutput,
 	notifyWebSocketClientConnected,
 	tryClearStartupLedTestForWebUi,
-	/** @deprecated use runStartupLedTestPatternIfNeeded */
-	runStartupHostIpSplashIfNeeded: runStartupLedTestPatternIfNeeded,
 }

@@ -1,7 +1,7 @@
 'use strict'
 
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
-const { audioRouteToAudioFilter } = require('./audio-route')
+const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
 const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
@@ -98,6 +98,7 @@ async function buildTakeJobs(opts) {
 		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
 
 		const cur = currentMap.get(layer.layerNumber)
+		const hasOutgoingOnAir = layerHasContent(cur)
 		const diffs = skipLayerVisualEquality
 			? { _: 'skipLayerVisualEquality' }
 			: require('./scene-transition').layerVisuallyEqual(cur, layer, true)
@@ -134,7 +135,7 @@ async function buildTakeJobs(opts) {
 			: phys(Number(layer.layerNumber), inactiveBank)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const cl = chLayerAmcp(channel, pLayer)
-		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2')
+		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2', resolveConfigProgramLayoutForChannel(self.config, channel))
 
 		let isLoop = !!layer.loop
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length === 1) {
@@ -186,7 +187,10 @@ async function buildTakeJobs(opts) {
 		// Bank B (+100) stacks above bank A — only pre-hide when incoming is the top layer.
 		const incomingIsAboveOutgoing =
 			shouldRunBankCrossfade && inactiveBank === 'b' && activeBank === 'a'
-		const incomingStartsHidden = incomingIsAboveOutgoing
+		const isEnterOnly = !hasOutgoingOnAir
+		// New layers (not in leaving look) always fade in; replace-below reveals through outgoing fade.
+		const incomingStartsHidden =
+			shouldRunBankCrossfade && (incomingIsAboveOutgoing || isEnterOnly)
 		// Hide off-air top bank before FILL/PLAY so geometry changes are not visible on program.
 		if (incomingStartsHidden) {
 			mixerLines.push(`MIXER ${cl} OPACITY 0 0`)
@@ -206,9 +210,9 @@ async function buildTakeJobs(opts) {
 		// If we DEFER this together with "OPACITY 1 <dur>", Caspar may only honor the
 		// final state at COMMIT and the fade appears as a hard cut.
 		const prePlayOpacityZeroLine = incomingStartsHidden ? `MIXER ${cl} OPACITY 0 0` : null
-		// Incoming below outgoing: full opacity on inactive bank before PLAY (revealed when top fades out).
+		// Incoming below outgoing on a replaced slot: full opacity before PLAY (revealed when top fades out).
 		const prePlayOpacityFullLine =
-			shouldRunBankCrossfade && !incomingIsAboveOutgoing
+			shouldRunBankCrossfade && !incomingIsAboveOutgoing && hasOutgoingOnAir
 				? `MIXER ${cl} OPACITY ${targetOpacity} 0`
 				: null
 		if (keyer === 1) {
@@ -289,6 +293,8 @@ async function buildTakeJobs(opts) {
 			mixerLines,
 			targetOpacity,
 			incomingIsAboveOutgoing,
+			isEnterOnly,
+			hasOutgoingOnAir,
 			incomingStartsHidden,
 			prePlayOpacityZeroLine,
 			prePlayOpacityFullLine,
