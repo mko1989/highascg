@@ -26,10 +26,11 @@ describe('compose-preview-ffmpeg-args', () => {
 		assert.equal(buildScaleFilter('full'), null)
 	})
 
-	it('buildComposeFfmpegFilterChain includes fps', () => {
+	it('buildComposeFfmpegFilterChain includes fps and yuvj420p', () => {
 		const chain = buildComposeFfmpegFilterChain({ fps: 5, resolutionScale: 'half' })
 		assert.match(chain, /scale=iw\/2:ih\/2/)
 		assert.match(chain, /fps=5/)
+		assert.match(chain, /format=yuvj420p/)
 	})
 
 	it('buildComposeStreamConsumerArgs uses mpegts with stereo downmix (no -an)', () => {
@@ -44,6 +45,9 @@ describe('compose-preview-ffmpeg-args', () => {
 		const args = buildComposeFfmpegConsumerArgs({ fps: 2, resolutionScale: 'half', jpegQuality: 10 })
 		assert.match(args, /-format image2 -update 1/)
 		assert.match(args, /-codec:v mjpeg/)
+		assert.match(args, /format=yuvj420p/)
+		assert.match(args, /-q:v 10/)
+		assert.doesNotMatch(args, /-q:v:v/)
 	})
 
 	it('buildComposePreviewFfmpegConsumerXml embeds path when static config enabled', () => {

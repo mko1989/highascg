@@ -5,16 +5,18 @@ import {
 	CASPAR_VIDEO_MODE_SPECS,
 } from '../components/device-view-destinations-inspector.js'
 import { videoModeToResolution } from './mapping-node-service.js'
+import { resolveDefaultVideoMode } from './project-fps.js'
 
 /**
  * @param {object | null | undefined} raw
  * @returns {{ id: string, label?: string, videoMode: string, width: number, height: number, fps: number } | null}
  */
-function normalizeFeedSource(raw) {
+function normalizeFeedSource(raw, settings) {
 	if (!raw || typeof raw !== 'object') return null
 	const id = String(raw.id || '').trim()
 	if (!id) return null
-	const videoMode = String(raw.videoMode || '1080p5000').trim() || '1080p5000'
+	const fallbackMode = resolveDefaultVideoMode(settings)
+	const videoMode = String(raw.videoMode || fallbackMode).trim() || fallbackMode
 	const spec = CASPAR_VIDEO_MODE_SPECS[videoMode]
 	const fallback = videoModeToResolution(videoMode)
 	return {
@@ -36,7 +38,7 @@ function resolveDestinationFeedSource(lastPayload, sourceId) {
 	if (!sid.startsWith('dst_in_')) return null
 
 	const fromGraph = (lastPayload?.graph?.sources || []).find((s) => String(s?.id || '') === sid)
-	if (fromGraph) return normalizeFeedSource(fromGraph)
+	if (fromGraph) return normalizeFeedSource(fromGraph, lastPayload?._settings)
 
 	const dstId = sid.slice('dst_in_'.length).trim()
 	if (!dstId) return null
@@ -53,7 +55,7 @@ function resolveDestinationFeedSource(lastPayload, sourceId) {
 			width: intent.width,
 			height: intent.height,
 			fps: intent.fps,
-		})
+		}, lastPayload?._settings)
 	}
 
 	const dests = Array.isArray(lastPayload?.screenDestinations?.destinations)
@@ -68,7 +70,7 @@ function resolveDestinationFeedSource(lastPayload, sourceId) {
 			width: d.width,
 			height: d.height,
 			fps: d.fps,
-		})
+		}, lastPayload?._settings)
 	}
 
 	return null
@@ -106,7 +108,7 @@ function resolveMappingOutputFeedSource(lastPayload, sourceId) {
 		width: output?.width ?? resolved?.w,
 		height: output?.height ?? resolved?.h,
 		fps: output?.fps ?? resolved?.fps,
-	})
+	}, lastPayload?._settings)
 }
 
 /**

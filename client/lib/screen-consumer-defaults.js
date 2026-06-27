@@ -2,6 +2,7 @@
  * Default CasparCG screen-consumer flags when settings keys are unset.
  * Windowed + borderless, V-sync on when keys are unset.
  */
+import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from './project-fps.js'
 export const SCREEN_CONSUMER_DEFAULTS = {
 	windowed: true,
 	borderless: true,
@@ -95,8 +96,14 @@ export function screenConsumerSeedCasparPatch(cs, screenN) {
 }
 
 /** POST /api/settings body fragment — seeds only missing consumer keys. */
-export function screenConsumerSeedSettingsPatch(cs, screenN) {
-	return { casparServer: screenConsumerSeedCasparPatch(cs, screenN) }
+export function screenConsumerSeedSettingsPatch(cs, screenN, settings) {
+	const n = Math.max(1, Number(screenN) || 1)
+	const modeKey = `screen_${n}_mode`
+	const patch = screenConsumerSeedCasparPatch(cs, n)
+	if (settings && (!cs[modeKey] || !String(cs[modeKey]).trim())) {
+		patch[modeKey] = defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(settings))
+	}
+	return { casparServer: patch }
 }
 
 /** @returns {boolean} true when a settings write is needed */

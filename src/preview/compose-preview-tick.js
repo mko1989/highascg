@@ -108,6 +108,10 @@ async function captureChannelOnce(ctx, channel) {
 					url: `/api/compose-preview/${ch}.png`,
 				})
 			}
+			const companionThumb = require('./compose-preview-companion-thumb')
+			if (companionThumb.isCompanionThumbEnabled(ctx.config)) {
+				void companionThumb.onComposePreviewUpdated(ctx, ch, stable.stat.mtimeMs)
+			}
 		} catch (e) {
 			_stats.errors += 1
 			dirty.markCaptureFailed(ch, e?.message || String(e))

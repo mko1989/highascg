@@ -18,14 +18,25 @@ function getBasename(config, channel) {
 }
 
 /**
+ * Target JPG path for ffmpeg receiver (file may not exist yet).
+ * @param {object} config
+ * @param {number} channel
+ * @returns {string | null}
+ */
+function resolvePreviewJpgOutputPath(config, channel) {
+	const { getComposePreviewJpgBasename } = require('./compose-preview-ffmpeg-args')
+	const { getMediaIngestBasePath, resolveSafe } = require('../media/local-media-paths')
+	const base = getComposePreviewJpgBasename(config, channel)
+	return resolveSafe(getMediaIngestBasePath(config), base)
+}
+
+/**
  * @param {object} config
  * @param {number} channel
  * @returns {string | null}
  */
 function resolvePreviewJpgPath(config, channel) {
-	const { getComposePreviewJpgBasename } = require('./compose-preview-ffmpeg-args')
-	const base = getComposePreviewJpgBasename(config, channel)
-	return resolveMediaFileOnDisk(config, base)
+	return resolveMediaFileOnDisk(config, require('./compose-preview-ffmpeg-args').getComposePreviewJpgBasename(config, channel))
 }
 
 /**
@@ -224,10 +235,70 @@ async function handleComposePreviewPngGet(ctx, channel, query = {}) {
 	return handleComposePreviewImageGet(ctx, channel, query)
 }
 
+/**
+ * @param {object} ctx
+ * @param {number} channel
+ * @param {Record<string, string>} [query]
+ */
+async function handleComposePreviewCompanionGet(ctx, channel, query = {}) {
+	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	const cfg = ctx.config || {}
+	const {
+		isCompanionThumbEnabled,
+		getCompanionPreviewJpegBuffer,
+		onComposePreviewUpdated,
+	} = require('./compose-preview-companion-thumb')
+	if (!isCompanionThumbEnabled(cfg)) {
+		return {
+			status: 404,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Companion preview disabled', channel: ch }),
+		}
+	}
+	let buf = getCompanionPreviewJpegBuffer(ch)
+	if (!buf) {
+		await onComposePreviewUpdated(ctx, ch)
+		buf = getCompanionPreviewJpegBuffer(ch)
+	}
+	if (!buf || buf.length <= 32) {
+		const { resolveCompanionThumbOutputPath } = require('./compose-preview-companion-thumb')
+		const fp = resolveCompanionThumbOutputPath(cfg, ch)
+		if (fp) {
+			try {
+				buf = await fs.promises.readFile(fp)
+			} catch {
+				buf = null
+			}
+		}
+	}
+	if (!buf || buf.length <= 32) {
+		return {
+			status: 404,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Companion preview not ready', channel: ch }),
+		}
+	}
+	const etag = `"${crypto.createHash('md5').update(buf).digest('hex')}"`
+	const inm = query['if-none-match'] || query.ifNoneMatch
+	if (inm && String(inm).trim() === etag) {
+		return { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache' } }
+	}
+	return {
+		status: 200,
+		headers: {
+			'Content-Type': 'image/png',
+			'Cache-Control': 'no-cache',
+			ETag: etag,
+		},
+		body: buf,
+	}
+}
+
 module.exports = {
 	getBasename,
 	resolvePreviewPngPath,
 	resolvePreviewJpgPath,
+	resolvePreviewJpgOutputPath,
 	resolvePreviewImagePath,
 	waitForPngStable,
 	ensurePreviewDir,
@@ -236,4 +307,5 @@ module.exports = {
 	handleComposePreviewMetaGet,
 	handleComposePreviewImageGet,
 	handleComposePreviewPngGet,
+	handleComposePreviewCompanionGet,
 }

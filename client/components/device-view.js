@@ -36,6 +36,7 @@ import {
 	multiviewConsumerDefaultsSettingsPatch,
 	shouldSeedMultiviewAlwaysOnTopDefault,
 } from '../lib/screen-consumer-defaults.js'
+import { resolveProjectFpsFromSettings, defaultVideoModeForProjectFps } from '../lib/project-fps.js'
 import {
 	gpuOutputBindingFromCableSource,
 	gpuScreenInheritedSettingsPatch,
@@ -480,7 +481,7 @@ let mounted = false; export function initDeviceView(root) {
 					? Promise.resolve(cachedStream)
 					: Actions.getStreamingChannelStatus().catch(() => null),
 			])
-			lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null }; currentSettings = settings; streamingStatus = stream
+			lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null, _settings: settings }; currentSettings = settings; streamingStatus = stream
 			renderDestinations({ destBody, lastPayload, highlightDestinationIntent: () => {}, clearChipHighlights: () => {}, renderIntoInspector: rIntoInsp, selectDestinationById, patchDestination: (id, p) => Actions.patchDestination(id, p).then(() => { setCasparRestartDirty(true); return load() }), removeDestination: (id) => Actions.removeDestination(id).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }), applyPlan: () => Actions.applyDeviceViewPlan({ applyCaspar: true }).then(() => { setCasparRestartDirty(false); return load() }), resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(lastPayload, d), cableSourceId, onDestinationPortClick: (connectorId) => beginOrCompleteCable('dest:' + connectorId, connectorId, {}), onDecklinkDropToDestinationOutput: (connectorId, d, intent) => setDecklinkAsDestinationOutput(connectorId, d, intent), updateDestinationOutputLayer, requestCableOverlayRender: () => renderCableOverlay(getCOCtx()) })
 			renderBands(mappingPanel, rearPanel, { live: lastPayload.live, lastPayload, resolveConnectorId: (t, d) => resolveConnectorId(lastPayload, t, d), isConnectorVisible: (id) => isConnectorVisible(lastPayload, id), selectedKey, cableSourceId, onPortClick: selectKey, onPortStartCable: beginOrCompleteCable, selectDevice, selectedConnectorId }, { currentSettings, statusEl, load, setCasparRestartDirty }); rearPanel.append(edgesHost)
 			edgesHost.innerHTML = ''; const edges = lastPayload?.graph?.edges || []; if (edges.length) { const b = Object.assign(document.createElement('div'), { className: 'device-view__band' }); b.append(Object.assign(document.createElement('h3'), { textContent: 'Cables' })); const ul = Object.assign(document.createElement('ul'), { className: 'device-view__edge-list' }); edges.forEach(e => { const li = Object.assign(document.createElement('li'), { className: `device-view__edge-item ${selectedEdgeId === e.id ? 'device-view__edge-item--selected' : ''}` }); li.onmouseenter = () => { hoveredEdgeId = e.id; renderCableOverlay(getCOCtx()) }; li.onmouseleave = () => { hoveredEdgeId = null; renderCableOverlay(getCOCtx()) }; li.onclick = () => selectEdgeById(e.id); li.append(Object.assign(document.createElement('span'), { textContent: `${friendlyConnectorLabel(lastPayload, e.sourceId)} → ${friendlyConnectorLabel(lastPayload, e.sinkId)} ` })); ul.append(li) }); b.append(ul); edgesHost.append(b) }
@@ -525,14 +526,18 @@ let mounted = false; export function initDeviceView(root) {
 		const type = destType.value
 		const newMainIdx = type === 'multiview' ? 0 : highest + 1
 		const newScreenN = type === 'multiview' ? 0 : newMainIdx + 1
-		void Actions.addDestination({ type, mainScreenIndex: newMainIdx }).then(async () => {
+		void Actions.addDestination({
+			type,
+			mainScreenIndex: newMainIdx,
+			videoMode: defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(currentSettings)),
+		}).then(async () => {
 			if (newScreenN >= 1 && currentSettings) {
 				const cs =
 					currentSettings.casparServer && typeof currentSettings.casparServer === 'object'
 						? currentSettings.casparServer
 						: {}
 				if (shouldSeedScreenConsumerDefaults(cs, newScreenN)) {
-					await Actions.saveSettingsPatch(screenConsumerSeedSettingsPatch(cs, newScreenN))
+					await Actions.saveSettingsPatch(screenConsumerSeedSettingsPatch(cs, newScreenN, currentSettings))
 				}
 			}
 			setCasparRestartDirty(true)

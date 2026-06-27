@@ -49,14 +49,43 @@ export function initTimelineEditor(root, stateStore) {
 		takeTransition: { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) },
 	}
 
-	// Smooth playhead: track server tick reference point for local interpolation (same clock as RAF)
+	// Playhead clock — uses Date.now() to match server timeline-playback (_p0 + Date.now() - _t0).
+	// Extrapolate between WS ticks (~165 ms); never pull the UI playhead backward during play.
 	let serverTickPos = 0
 	let serverTickAt = 0
 	let playLoopRaf = null
-	/** Above this, snap playhead to server time. Between soft and hard, blend (reduces stepping over Tailscale). */
-	const TICK_DRIFT_HARD_MS = 120
-	const TICK_DRIFT_SOFT_MIN_MS = 10
-	const TICK_DRIFT_BLEND = 0.25
+	/** Server more than this ahead of client → snap (seek / tab resume). */
+	const TICK_AHEAD_SNAP_MS = 80
+	/** Ignore server reports this far behind extrapolated time (network latency). */
+	const TICK_LATENCY_MS = 35
+
+	function clientPlayheadMs() {
+		return serverTickPos + (Date.now() - serverTickAt)
+	}
+
+	function anchorPlayhead(ms) {
+		serverTickPos = ms
+		serverTickAt = Date.now()
+	}
+
+	/** Re-anchor from a server tick without backward jumps during playback. */
+	function applyServerTick(serverMs) {
+		const now = Date.now()
+		const extrapolated = serverTickPos + (now - serverTickAt)
+		if (serverMs - extrapolated > TICK_AHEAD_SNAP_MS) {
+			serverTickPos = serverMs
+		} else if (serverMs >= extrapolated - TICK_LATENCY_MS) {
+			serverTickPos = serverMs
+		} else {
+			serverTickPos = extrapolated
+		}
+		serverTickAt = now
+	}
+
+	function maybeFollowPlayhead() {
+		if (!view.follow) return
+		canvas.followPlayhead(playback.position, { playing: playback.playing })
+	}
 
 	function startPlaybackLoop() {
 		if (playLoopRaf) return
@@ -65,10 +94,10 @@ export function initTimelineEditor(root, stateStore) {
 				playLoopRaf = null
 				return
 			}
-			const elapsed = performance.now() - serverTickAt
 			const tl = timelineState.getActive()
-			const extrapolated = serverTickPos + elapsed
-			playback.position = tl ? Math.min(extrapolated, tl.duration) : extrapolated
+			const pos = clientPlayheadMs()
+			playback.position = tl ? Math.min(pos, tl.duration) : pos
+			maybeFollowPlayhead()
 			updateTimecode()
 			redrawTimelineView()
 			playLoopRaf = requestAnimationFrame(loop)
@@ -81,6 +110,7 @@ export function initTimelineEditor(root, stateStore) {
 			cancelAnimationFrame(playLoopRaf)
 			playLoopRaf = null
 		}
+		canvas.resetFollowScroll?.()
 	}
 
 	root.innerHTML = `
@@ -162,6 +192,7 @@ export function initTimelineEditor(root, stateStore) {
 		sceneState,
 		getPlayback: () => playback,
 		getView: () => view,
+		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		getSelectedClip: () => selectedClip,
 		setSelectedClip: (v) => { selectedClip = v },
 		getSelectedFlagDetail: () => selectedFlagDetail,
@@ -169,10 +200,7 @@ export function initTimelineEditor(root, stateStore) {
 		redrawTimelineView: () => redrawTimelineView(),
 		updateTimecode: () => updateTimecode(),
 		getSyncToServer: () => syncToServerRef.fn,
-		syncPlayheadClock: (ms) => {
-			serverTickPos = ms
-			serverTickAt = performance.now()
-		},
+		syncPlayheadClock: (ms) => anchorPlayhead(ms),
 		notifyTimelineSeekFailed,
 		getPreviewPanel: () => previewPanel,
 		showLayerContextMenu,
@@ -192,10 +220,8 @@ export function initTimelineEditor(root, stateStore) {
 		redrawTimelineView,
 		stopPlaybackLoop,
 		startPlaybackLoop,
-		setServerTick: (pos) => {
-			serverTickPos = pos
-			serverTickAt = performance.now()
-		},
+		setServerTick: (pos) => anchorPlayhead(pos),
+		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 	})
 	const { buildTransport, updateTimecode, syncToServer, updateSendTo, togglePlay } = transportApi
 	syncToServerRef.fn = syncToServer
@@ -229,13 +255,12 @@ export function initTimelineEditor(root, stateStore) {
 			if (pb.timelineId != null) playback.timelineId = pb.timelineId
 			if (typeof pb.position === 'number') {
 				playback.position = pb.position
+				anchorPlayhead(pb.position)
 				canvas.setPlayheadPosition(pb.position)
 			}
 			if (typeof pb.playing === 'boolean') {
 				playback.playing = pb.playing
 				if (pb.playing) {
-					serverTickPos = pb.position ?? 0
-					serverTickAt = performance.now()
 					startPlaybackLoop()
 				} else {
 					stopPlaybackLoop()
@@ -379,25 +404,14 @@ export function initTimelineEditor(root, stateStore) {
 		if (!data?.timelineId) return
 		const tl = timelineState.getActive()
 		if (tl?.id !== data.timelineId) return
-		const now = performance.now()
-		const predicted = serverTickPos + (now - serverTickAt)
-		const drift = data.position - predicted
-		const abs = Math.abs(drift)
-		if (abs > TICK_DRIFT_HARD_MS) {
-			serverTickPos = data.position
-			serverTickAt = now
-		} else if (drift < 0) {
-			// Don't pull the playhead backwards for minor network latency / websocket jitter.
-			// Just update serverTickAt to now, but keep serverTickPos at the predicted time
-			// so the playhead continues smoothly from where it is.
-			serverTickPos = predicted
-			serverTickAt = now
-		} else if (drift > TICK_DRIFT_SOFT_MIN_MS) {
-			serverTickPos += drift * TICK_DRIFT_BLEND
-			serverTickAt = now
+		if (typeof data.position === 'number') applyServerTick(data.position)
+		if (playback.playing) {
+			const pos = clientPlayheadMs()
+			playback.position = tl ? Math.min(pos, tl.duration) : pos
 		}
 		if (!playback.playing) {
 			playback.playing = true
+			canvas.resetFollowScroll?.()
 			buildTransport()
 			startPlaybackLoop()
 		}
@@ -416,13 +430,15 @@ export function initTimelineEditor(root, stateStore) {
 		playback.loop = !!pb.loop
 		if (pb.timelineId != null) playback.timelineId = pb.timelineId
 		if (pb.playing) {
-			serverTickPos = pb.position ?? 0
-			serverTickAt = performance.now()
+			anchorPlayhead(pb.position ?? 0)
 			playback.position = serverTickPos
+			maybeFollowPlayhead()
 			if (!wasPlaying) startPlaybackLoop()
 		} else {
-			playback.position = pb.position ?? 0
+			anchorPlayhead(pb.position ?? 0)
+			playback.position = serverTickPos
 			stopPlaybackLoop()
+			maybeFollowPlayhead()
 			canvas.setPlayheadPosition(playback.position)
 		}
 		buildTransport()

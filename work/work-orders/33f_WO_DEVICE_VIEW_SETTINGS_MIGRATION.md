@@ -25,7 +25,8 @@ Reduce **duplication and confusion** between the **old** settings panels and the
 | Settings → **Screens** / Caspar | Screen count, resolution, consumer | Inspector + backplane | **Duplicate** for one release, then “Open in device view” primary | — |
 | Settings → **Tandem** / Caspar+PH | `tandemTopology` | Same graph; **old panel** links to new | **Redirect banner** on old panel | Keep `tandem-device-panel` until graph parity |
 | Settings → **PixelHue** | Host, port, test | Unchanged; optional link “Cabling in device view” | **Remain** in Settings | Server credentials stay here |
-| Settings → **Connection** (Caspar host/port) | — | **Remain**; device view may show **read-only** + link | | |
+| Settings → **Connection** (Caspar host/port) | AMCP host/port | **Remain** in Settings; Device View server inspector shows **read-only** AMCP status | **Moved (WO-59)** | No duplicate editors in Device View |
+| Device View → **Server** (click host band) | Project frame rate, Ethernet IP, factory reset | **Primary** for machine profile + network | **New (WO-59)** | Replaces stale Caspar host setup block |
 | **Multiview** / audio | — | **Out of device view** v1 | **Remain** | |
 
 *Update the table in the PR that closes 33f; link PR from this WO.*

@@ -79,6 +79,7 @@ export function createTimelineCanvasHandlers(deps) {
 		showLayerContextMenu,
 		/** Reset RAF playhead clock after user seek while transport is playing. */
 		syncPlayheadClock,
+		maybeFollowPlayhead,
 	} = deps
 
 	let _seekThrottleLast = 0
@@ -100,6 +101,7 @@ export function createTimelineCanvasHandlers(deps) {
 			if (!tl) return
 			const clamped = Math.max(0, Math.min(ms, tl.duration))
 			applySeekPosition(clamped)
+			maybeFollowPlayhead?.()
 			// Throttle SEEK API during drag (~100ms) to avoid flooding CasparCG
 			const now = Date.now()
 			if (!_seekThrottleLast || now - _seekThrottleLast >= 100) {
@@ -124,6 +126,7 @@ export function createTimelineCanvasHandlers(deps) {
 			const pb = getPlayback()
 			const clamped = Math.max(0, Math.min(ms ?? pb.position, tl.duration))
 			applySeekPosition(clamped)
+			maybeFollowPlayhead?.()
 			api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
 			redrawTimelineView()
 		},
@@ -255,9 +258,10 @@ export function createTimelineCanvasHandlers(deps) {
 					if (match?.durationMs > 0) durationMs = match.durationMs
 				}
 				const durationSec = durationMs > 0 ? durationMs / 1000 : 30
-				// Use a higher density of bars for longer clips to maintain high resolution when zooming in.
-				// 200 bars per second of audio, minimum 512, maximum 8192.
-				bars = Math.min(8192, Math.max(512, Math.ceil(durationSec * 200)))
+				const need = Math.ceil(durationSec * 40)
+				if (need <= 512) bars = 512
+				else if (need <= 2048) bars = 2048
+				else bars = 8192
 			}
 			return `${getApiBase()}/api/local-media/${encodeURIComponent(source.value)}/waveform?bars=${bars}`
 		},

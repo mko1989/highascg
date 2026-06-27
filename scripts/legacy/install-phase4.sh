@@ -261,6 +261,17 @@ if [ -f /home/casparcg/highascg/package.json ]; then
     fi
 fi
 
+# WO-59: network apply helper (Device View server inspector)
+NET_APPLY_SH="$SCRIPT_DIR/tools/runtime/highascg-network-apply.sh"
+if [ -f "$NET_APPLY_SH" ]; then
+	echo -e "${CYAN}→ WO-59 network apply helper (nmcli + sudoers)…${NC}"
+	if bash "$SCRIPT_DIR/scripts/runtime/install-network-apply.sh" "$USER_CASPAR"; then
+		echo -e "  ${GREEN}✓${NC} highascg-network-apply.sh"
+	else
+		echo -e "  ${YELLOW}○${NC} install-network-apply.sh failed (non-fatal)"
+	fi
+fi
+
 # systemd service (ensure unit exists whenever the app tree is present)
 if [ -f /home/casparcg/highascg/package.json ]; then
  HG_UNIT_SH="$SCRIPT_DIR/scripts/exfat/write-highascg-systemd-unit.sh"

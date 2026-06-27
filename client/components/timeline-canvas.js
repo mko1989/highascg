@@ -105,6 +105,18 @@ export function initTimelineCanvas(container, opts) {
 	let raf = null
 	let wheelZoomAccum = 0
 	let wheelZoomLastSign = 0
+	/** True while playback follow is incrementally scrolling (playhead pinned near right edge). */
+	let followAutoScroll = false
+	let followLastMs = 0
+
+	function clampScrollX(ms) {
+		const tl = getTimeline()
+		const trackW = canvas.width - HEADER_W
+		const maxScroll = tl && trackW > 0 && pxPerMs > 0
+			? Math.max(0, tl.duration - trackW / pxPerMs)
+			: 0
+		scrollX = Math.max(0, Math.min(maxScroll, ms))
+	}
 
 	// ── Coordinate helpers ────────────────────────────────────────────────────
 
@@ -624,15 +636,52 @@ export function initTimelineCanvas(container, opts) {
 			scrollX = 0; scrollY = 0
 			schedDraw()
 		},
-		followPlayhead(ms) {
-			const x = xAt(ms)
+		/**
+		 * Keep the playhead visible. During playback, only scroll once the playhead nears
+		 * the viewport edge — then advance scroll by delta time so the playhead stays pinned
+		 * without re-scrolling the entire canvas every frame.
+		 * @param {number} ms
+		 * @param {{ playing?: boolean }} [opts]
+		 */
+		followPlayhead(ms, opts = {}) {
+			const trackW = canvas.width - HEADER_W
+			if (trackW <= 0 || pxPerMs <= 0) return
+
 			const margin = 80
-			if (x > canvas.width - margin) {
-				scrollX = Math.max(0, ms - (canvas.width - HEADER_W - margin) / pxPerMs)
-			} else if (x < HEADER_W + margin) {
-				scrollX = Math.max(0, ms - margin / pxPerMs)
+			const rightEdge = canvas.width - margin
+			const leftEdge = HEADER_W + margin
+
+			if (opts.playing && followAutoScroll) {
+				scrollX += ms - followLastMs
+				followLastMs = ms
+				clampScrollX(scrollX)
+				// Stop auto-scroll if the playhead is no longer near the right edge (seek/zoom).
+				if (xAt(ms) < rightEdge - 24) followAutoScroll = false
+				return
 			}
-			schedDraw()
+
+			followLastMs = ms
+			const x = xAt(ms)
+
+			if (x > rightEdge) {
+				if (opts.playing) {
+					followAutoScroll = true
+					scrollX = ms - (rightEdge - HEADER_W) / pxPerMs
+					clampScrollX(scrollX)
+				} else {
+					followAutoScroll = false
+					clampScrollX(ms - (trackW - margin) / pxPerMs)
+				}
+			} else if (x < leftEdge) {
+				followAutoScroll = false
+				clampScrollX(ms - margin / pxPerMs)
+			} else {
+				followAutoScroll = false
+			}
+		},
+		resetFollowScroll() {
+			followAutoScroll = false
+			followLastMs = 0
 		},
 	}
 }

@@ -9,6 +9,7 @@ import {
 	contentFitOptionsHtml,
 } from './editor-defaults-constants.js'
 import { resolveTransitionDuration } from './transition-duration.js'
+import { resolveProjectFpsFromSettings } from './project-fps.js'
 
 export { DEFAULT_EDITOR_DEFAULTS, mergeEditorDefaults } from './editor-defaults-constants.js'
 
@@ -24,11 +25,12 @@ export function getCoordinateOrigin() {
 }
 
 /**
- * @param {number} [fps] — project frame rate; defaults to 50 when unknown
+ * @param {number} [fps] — project frame rate; defaults to settings / 50 when unknown
  */
 export function getDefaultTransitionFromEditor(fps) {
 	const t = getEditorDefaults().transition
-	const rate = Number(fps) > 0 ? Number(fps) : 50
+	const fromSettings = resolveProjectFpsFromSettings(settingsState.getSettings())
+	const rate = Number(fps) > 0 ? Number(fps) : fromSettings > 0 ? fromSettings : 50
 	return {
 		...defaultTransition(),
 		...t,
@@ -70,7 +72,9 @@ export function applyTimelineClipDefaults(clip) {
  */
 export function applyEditorDefaultsToRuntime(sceneState, opts = {}) {
 	if (opts.syncSceneGlobalTransition && sceneState?.setGlobalDefaultTransition) {
-		const fps = sceneState.getCanvasForScreen?.(0)?.framerate ?? 50
+		const fps =
+			sceneState.getCanvasForScreen?.(0)?.framerate ??
+			resolveProjectFpsFromSettings(settingsState.getSettings())
 		sceneState.setGlobalDefaultTransition(getDefaultTransitionFromEditor(fps))
 	}
 	document.dispatchEvent(

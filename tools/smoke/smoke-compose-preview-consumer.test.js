@@ -14,7 +14,26 @@ const {
 } = require('../../src/preview/compose-preview-ffmpeg-args')
 
 describe('compose-preview-consumer', () => {
-	it('buildComposeStreamAddParams uses UDP STREAM and mpegts', () => {
+	it('buildComposeFileAddParams uses media/ path and image2 mjpeg', () => {
+		const params = buildComposeFileAddParams(
+			{
+				composePreview: {
+					fps: 5,
+					resolutionScale: 'half',
+					jpegQuality: 8,
+					basenamePrefix: 'highascg_preview',
+				},
+			},
+			2,
+		)
+		assert.match(params, /^media\/highascg_preview\/ch2\.jpg /)
+		assert.match(params, /-format image2 -update 1/)
+		assert.match(params, /format=yuvj420p/)
+		assert.match(params, /fps=5/)
+		assert.match(params, /-codec:v mjpeg/)
+	})
+
+	it('buildComposeStreamAddParams uses UDP STREAM and mpegts (fallback)', () => {
 		const params = buildComposeStreamAddParams(
 			{
 				composePreview: {
@@ -43,12 +62,7 @@ describe('compose-preview-consumer', () => {
 		assert.match(args, /-codec:a aac/)
 	})
 
-	it('buildComposeFileAddParams alias matches stream params', () => {
-		const cfg = { composePreview: { fps: 2, resolutionScale: 'half' } }
-		assert.equal(buildComposeFileAddParams(cfg, 1), buildComposeStreamAddParams(cfg, 1))
-	})
-
-	it('uses fixed consumer index 98 (701 ignored by Caspar)', () => {
-		assert.equal(COMPOSE_FILE_CONSUMER_INDEX, 98)
+	it('uses fixed consumer index 701 for direct FILE', () => {
+		assert.equal(COMPOSE_FILE_CONSUMER_INDEX, 701)
 	})
 })

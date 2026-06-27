@@ -5,6 +5,8 @@
 
 const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDestinationFromGraph } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
+const { resolveProjectFps, defaultVideoModeForProjectFps } = require('../config/project-fps')
+const { STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const {
 	parseDecklinkDeviceIndex,
 	normalizeDecklinkKeyer,
@@ -45,7 +47,25 @@ function handleAddDestination(j, ctx) {
 				: mode === 'pgm_only'
 					? `PGM ${nextMain + 1}`
 					: `PGM/PRV ${nextMain + 1}`
-	top.destinations.push({ id, label: String(j.addDestination.label || '').trim() || defaultLabel, mainScreenIndex: nextMain, caspar: { bus: 'pgm' }, edidLabel: '', mode, videoMode: String(j.addDestination.videoMode || '1080p5000'), width: Math.max(64, j.addDestination.width || 1920), height: Math.max(64, j.addDestination.height || 1080), fps: Math.max(1, j.addDestination.fps || 50), stream: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' } })
+	const projectFps = resolveProjectFps(ctx.config)
+	const defaultMode = defaultVideoModeForProjectFps(projectFps)
+	const std = STANDARD_VIDEO_MODES[defaultMode] || STANDARD_VIDEO_MODES['1080p5000']
+	const reqVideoMode = String(j.addDestination.videoMode || defaultMode).trim() || defaultMode
+	const reqStd = STANDARD_VIDEO_MODES[reqVideoMode] || std
+	top.destinations.push({
+		id,
+		label: String(j.addDestination.label || '').trim() || defaultLabel,
+		mainScreenIndex: nextMain,
+		caspar: { bus: 'pgm' },
+		edidLabel: '',
+		mode,
+		videoMode: reqVideoMode,
+		width: Math.max(64, j.addDestination.width || reqStd.width),
+		height: Math.max(64, j.addDestination.height || reqStd.height),
+		fps: Math.max(1, j.addDestination.fps || reqStd.fps),
+		inheritsProjectFps: j.addDestination.inheritsProjectFps !== false,
+		stream: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' },
+	})
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
 	saveConfig(ctx, { screenDestinations: next })
@@ -83,6 +103,8 @@ function handleUpdateDestination(j, ctx) {
 		height: nextHeight,
 		fps: nextFps,
 		mode: nextMode,
+		inheritsProjectFps:
+			p.inheritsProjectFps != null ? p.inheritsProjectFps !== false : d0.inheritsProjectFps !== false,
 		stream:
 			p.stream && typeof p.stream === 'object'
 				? {

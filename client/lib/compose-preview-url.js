@@ -47,6 +47,20 @@ export function getComposePreviewUrl(channel, etag) {
 }
 
 /**
+ * Companion / Stream Deck square thumb (144×144 by default).
+ * @param {number} channel
+ * @param {string} [etag]
+ */
+export function getComposePreviewCompanionUrl(channel, etag) {
+	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	const base = `${getApiBase()}/api/compose-preview/${ch}/companion.jpg`
+	if (etag != null && String(etag).trim() !== '') {
+		return `${base}?v=${encodeURIComponent(String(etag))}`
+	}
+	return base
+}
+
+/**
  * @param {number} channel
  */
 export function getComposePreviewMetaUrl(channel) {

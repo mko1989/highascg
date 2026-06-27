@@ -8,16 +8,40 @@ import { roundRect } from './timeline-canvas-utils.js'
 
 const CLIP_PALETTE = ['#1f6b36', '#0c5d8c', '#5a1e87', '#8c1a44', '#7a3100', '#005c54']
 
-/** Find a cached waveform of different resolution for the same source to avoid flicker when loading. */
+/** Screen pixels per drawn waveform column — kept ≥2 to limit canvas work. */
+const WAVEFORM_PX_PER_BAR = 2
+
+/** Server fetch tiers — fixed per source duration, never tied to timeline zoom. */
+const WAVEFORM_FETCH_TIERS = [512, 2048, 8192]
+
+/**
+ * Peak count to request from the server for a media file (stable across zoom).
+ * ~40 peaks/sec of source audio, capped at 8192 — one fetch per tier per file.
+ */
+function waveformFetchBars(sourceDurationMs, clipDurationMs) {
+	const ms = sourceDurationMs > 0 ? sourceDurationMs : clipDurationMs
+	const sec = ms > 0 ? ms / 1000 : 30
+	const need = Math.ceil(sec * 40)
+	for (const tier of WAVEFORM_FETCH_TIERS) {
+		if (need <= tier) return tier
+	}
+	return WAVEFORM_FETCH_TIERS[WAVEFORM_FETCH_TIERS.length - 1]
+}
+
+/** Best cached waveform for a source (any resolution) — keeps the strip visible while upgrading. */
 function getCachedWaveformFallback(waveformCache, sourceValue) {
 	if (!sourceValue) return undefined
 	const searchStr = `/api/local-media/${encodeURIComponent(sourceValue)}/waveform`
+	let best = undefined
+	let bestLen = 0
 	for (const [url, data] of waveformCache.entries()) {
-		if (url.includes(searchStr) && data && typeof data === 'object' && Array.isArray(data.peaks)) {
-			return data
+		if (!url.includes(searchStr) || !data || typeof data !== 'object' || !Array.isArray(data.peaks)) continue
+		if (data.peaks.length > bestLen) {
+			best = data
+			bestLen = data.peaks.length
 		}
 	}
-	return undefined
+	return best
 }
 
 /**
@@ -195,16 +219,13 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 	const waveH = Math.max(8, h - wavePad * 2)
 	const waveY = y + wavePad
 
-	// Snap target bars based on whole clip width (w) to one of the discrete levels: 512, 2048, 8192, 32768
-	const targetBars = Math.floor(w / 3)
-	let reqBars = 512
-	if (targetBars > 8192) reqBars = 32768
-	else if (targetBars > 2048) reqBars = 8192
-	else if (targetBars > 512) reqBars = 2048
-
+	const sourceDur = getSourceDurationMs?.(clip.source)
+	const reqBars = waveformFetchBars(sourceDur, clip.duration)
 	const waveformUrl = getWaveformUrl?.(clip.source, reqBars)
 	let wf = waveformUrl ? waveformCache.get(waveformUrl) : undefined
-	const fallbackWf = (wf === undefined || wf === 'loading') ? getCachedWaveformFallback(waveformCache, clip.source?.value) : undefined
+	const fallbackWf = (wf === undefined || wf === 'loading' || wf === 'error')
+		? getCachedWaveformFallback(waveformCache, clip.source?.value)
+		: undefined
 	const serverNoAudio = wf === 'no-audio'
 	const showWaveStrip =
 		hasAudio &&
@@ -241,7 +262,6 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 			})
 		}
 
-		// Use the target resolution if available, otherwise fallback to any cached resolution for this source.
 		const activeWf = (wf && wf !== 'loading' && wf !== 'error' && wf !== 'no-audio') ? wf : fallbackWf
 
 		if (activeWf && activeWf !== 'error') {
@@ -250,25 +270,21 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 				activeWf && typeof activeWf === 'object' && !Array.isArray(activeWf) && typeof activeWf.durationMs === 'number' && activeWf.durationMs > 0
 					? activeWf.durationMs
 					: null
-			const useSynthetic = wf === 'error' || (Array.isArray(peaks) && peaks.length === 0)
-			
-			// We can support up to 32768 bars. The bars are drawn every 3px on screen.
-			const barCount = Math.min(32768, Math.max(16, Math.floor(w / 3)))
-			const sourceDur = getSourceDurationMs?.(clip.source) ?? wfDurationMs
-			const nBars = barCount
+			const useSynthetic = (Array.isArray(peaks) && peaks.length === 0)
+			const peakSourceDur = sourceDur ?? wfDurationMs
+
+			// Map peak samples across full clip width; only draw columns in the visible viewport.
 			const padX = 3
-			const innerW = Math.max(1, w - padX * 2)
-			const barW = Math.max(1, (innerW - (nBars - 1) * 1) / nBars)
-			const gap = 1
+			const step = WAVEFORM_PX_PER_BAR
+			const totalCols = Math.max(16, Math.floor(w / step))
+			const barW = Math.max(1, step - (step >= 2 ? 1 : 0))
+			const firstCol = Math.max(0, Math.floor((visX - x - padX) / step))
+			const lastCol = Math.min(totalCols - 1, Math.ceil((visX + visW - x - padX) / step))
 			const cy = waveY + waveH / 2
 			const maxHalf = waveH / 2 - 2
 			const seed = String(clip.id || clip.source?.value || '')
 				.split('')
 				.reduce((a, c) => a + c.charCodeAt(0), 0)
-
-			// Calculate range of visible indices to keep the drawing loop extremely fast
-			const startIndex = Math.max(0, Math.floor((visX - x - padX - barW) / (barW + gap)))
-			const endIndex = Math.min(nBars - 1, Math.ceil((visX + visW - x - padX) / (barW + gap)))
 
 			ctx.save()
 			ctx.beginPath()
@@ -277,10 +293,10 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 			ctx.fillStyle = 'rgba(0,0,0,0.2)'
 			ctx.fillRect(x, waveY, w, waveH)
 			ctx.fillStyle = 'rgba(255,255,255,0.75)'
-			for (let i = startIndex; i <= endIndex; i++) {
-				const v = getPeakForIndex(peaks, clip, _fps, sourceDur, nBars, i, useSynthetic, seed)
+			for (let col = firstCol; col <= lastCol; col++) {
+				const v = getPeakForIndex(peaks, clip, _fps, peakSourceDur, totalCols, col, useSynthetic, seed)
 				const barH = (0.15 + 0.85 * v) * maxHalf
-				const bx = x + padX + i * (barW + gap)
+				const bx = x + padX + col * step
 				ctx.fillRect(bx, cy - barH, barW, barH * 2)
 			}
 			ctx.restore()

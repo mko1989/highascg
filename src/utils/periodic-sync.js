@@ -1,5 +1,7 @@
 /**
- * Periodic AMCP refresh: INFO on program/preview channels, or light CLS/TLS + INFO CONFIG when OSC drives layers.
+ * Periodic AMCP refresh: INFO on program/preview channels when OSC is **off** (AMCP-only fallback).
+ * When OSC listener is active, layer/playback state is push UDP — no periodic AMCP poll loop.
+ * Media CLS/TLS runs on connect (`runConnectionQueryCycle`) and manual refresh only.
  * Interval off by default — set `periodic_sync_interval_sec` or `HIGHASCG_PERIODIC_SYNC_SEC`.
  * @see companion-module-casparcg-server/src/periodic-sync.js
  */
@@ -211,11 +213,12 @@ function canRunPeriodicSync(self) {
 
 /**
  * Effective interval (seconds). `null` = periodic sync disabled.
- * When OSC is active, floor at 45s unless `periodic_sync_interval_sec_osc` / `HIGHASCG_PERIODIC_SYNC_OSC_SEC` overrides.
+ * When OSC listener is active, returns `null` — no AMCP poll loop (UDP push is authoritative).
  * @param {object} self
  * @returns {number | null}
  */
 function resolveIntervalSec(self) {
+	if (playbackTracker.isOscPlaybackActive(self)) return null
 	const env = process.env
 	const raw =
 		self.config?.periodic_sync_interval_sec != null && self.config?.periodic_sync_interval_sec !== ''
@@ -224,16 +227,7 @@ function resolveIntervalSec(self) {
 	if (raw === '' || raw == null || raw === undefined) return null
 	const sec = parseInt(String(raw), 10)
 	if (!Number.isFinite(sec) || sec <= 0) return null
-	if (!playbackTracker.isOscPlaybackActive(self)) return sec
-	const oscRaw =
-		self.config?.periodic_sync_interval_sec_osc != null && self.config?.periodic_sync_interval_sec_osc !== ''
-			? self.config.periodic_sync_interval_sec_osc
-			: env.HIGHASCG_PERIODIC_SYNC_OSC_SEC
-	if (oscRaw !== '' && oscRaw != null && oscRaw !== undefined) {
-		const o = parseInt(String(oscRaw), 10)
-		if (Number.isFinite(o) && o > 0) return o
-	}
-	return Math.max(sec, 45)
+	return sec
 }
 
 /**
@@ -379,31 +373,19 @@ async function runPeriodicChannelInfoSync(self) {
 }
 
 /**
- * OSC path: no per-channel INFO (layers from UDP); refresh media lists + server config.
- * @param {object} self
- */
-async function runPeriodicOscLightSync(self) {
-	await runMediaClsTlsRefresh(self)
-	await runPeriodicInfoConfigRefresh(self)
-}
-
-/**
- * Refresh INFO XML, variables, optional live-scene reconcile, playback matrix — or light sync when OSC is on.
+ * AMCP INFO poll loop — only when OSC is off (no UDP layer push).
  * @param {object} self - app context
  */
 async function runPeriodicSync(self) {
 	if (!canRunPeriodicSync(self)) return
+	if (playbackTracker.isOscPlaybackActive(self)) return
 	if (self._periodicSyncInFlight) {
 		if (typeof self.log === 'function') self.log('debug', 'Periodic sync: skipped (previous tick still in flight)')
 		return
 	}
 	self._periodicSyncInFlight = true
 	try {
-		if (playbackTracker.isOscPlaybackActive(self)) {
-			await runPeriodicOscLightSync(self)
-		} else {
-			await runPeriodicChannelInfoSync(self)
-		}
+		await runPeriodicChannelInfoSync(self)
 
 		try {
 			if (typeof self.updateDynamicVariables === 'function') self.updateDynamicVariables(self)
@@ -416,14 +398,20 @@ async function runPeriodicSync(self) {
 
 /**
  * Start or restart the interval after connection / channel list is known.
- * Disabled when `periodic_sync_interval_sec` and `HIGHASCG_PERIODIC_SYNC_SEC` are unset or ≤0.
+ * No-op when OSC listener is active. Disabled when `periodic_sync_interval_sec` unset or ≤0.
  * @param {object} self
  */
 function startPeriodicSync(self) {
 	clearPeriodicSyncTimer(self)
+	if (playbackTracker.isOscPlaybackActive(self)) {
+		if (typeof self.log === 'function') {
+			self.log('debug', '[sync] periodic AMCP poll off (OSC listener active)')
+		}
+		return
+	}
 	const intervalSec = resolveIntervalSec(self)
 	if (intervalSec == null || intervalSec <= 0) return
-	if (!playbackTracker.isOscPlaybackActive(self) && getSyncChannelIds(self).length === 0) return
+	if (getSyncChannelIds(self).length === 0) return
 
 	const intervalMs = intervalSec * 1000
 	self.periodicSyncTimer = setInterval(() => {

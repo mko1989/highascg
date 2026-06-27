@@ -121,6 +121,21 @@ class StateManager extends EventEmitter {
 	}
 
 	/**
+	 * Push a variable update immediately (no 10 Hz batching). Used for high-rate
+	 * compose preview images consumed by Companion button styling.
+	 * @param {string} key
+	 * @param {any} value
+	 */
+	setVariableImmediate(key, value) {
+		const strVal = value == null ? '' : String(value)
+		if (this.variables[key] === strVal) return
+		this.variables[key] = strVal
+		this._pendingVarChanges.delete(key)
+		this._emit(`variables.${key}`, strVal)
+		this.emit('variables', { [key]: strVal })
+	}
+
+	/**
 	 * Parse INFO channel XML and update channels state.
 	 * @param {number} channel - Channel number
 	 * @param {string} xml - Raw INFO response XML

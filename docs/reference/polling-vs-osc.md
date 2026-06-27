@@ -37,12 +37,17 @@ Exact behavior depends on build and config: some AMCP paths remain for **reconci
 
 ## Periodic sync and OSC
 
-`src/utils/periodic-sync.js` uses **config** (`periodic_sync_interval_sec`, `periodic_sync_interval_sec_osc`) and whether OSC is active:
+When the **OSC UDP listener is running** (normal production setup), HighAsCG does **not** run a periodic AMCP poll loop. Caspar pushes layer/mixer/playback state; HighAsCG listens — there is nothing to “sync” on a timer.
 
-- When **OSC is driving** state, expensive per-channel `INFO` loops can be **reduced or skipped** in favor of lighter CLS/TLS and **INFO CONFIG** style refresh on a longer cadence.
-- When **OSC is off**, the app relies more on **AMCP** `INFO` and related polling to keep layer/channel state fresh.
+| Data | How it updates |
+|------|----------------|
+| Layers, playback, meters | OSC push from Caspar |
+| Media/template catalog (CLS/TLS) | Once on Caspar connect + manual refresh / upload / ingest |
+| Channel INFO (AMCP fallback) | **`periodic_sync_interval_sec`** interval only when OSC is **off** (`--no-osc` or `osc.enabled: false`) |
 
-Tune intervals via environment (see `index.js` / `HIGHASCG_PERIODIC_SYNC_*`) and persisted settings.
+`periodic_sync_interval_sec_osc` is **ignored** when OSC is on (legacy setting; do not use for CLS).
+
+Tune AMCP-only polling via `periodic_sync_interval_sec` / `HIGHASCG_PERIODIC_SYNC_SEC` (only applies without OSC).
 
 ### `INFO 1` (or `INFO` on your program channel) every ~2 seconds
 

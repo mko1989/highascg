@@ -254,16 +254,17 @@ function drawPlayhead(ctx, canvas, pb, xAt, rulerH) {
 	const x = xAt(pos)
 	if (x < HEADER_W || x > canvas.width) return
 
+	const sx = Math.round(x) + 0.5
 	ctx.strokeStyle = '#f85149'
-	ctx.lineWidth = 1.5
+	ctx.lineWidth = 1
 	ctx.beginPath()
-	ctx.moveTo(x, rulerH)
-	ctx.lineTo(x, canvas.height)
+	ctx.moveTo(sx, rulerH)
+	ctx.lineTo(sx, canvas.height)
 	ctx.stroke()
 
 	ctx.fillStyle = '#f85149'
 	ctx.beginPath()
-	ctx.moveTo(x - 6, 0); ctx.lineTo(x + 6, 0); ctx.lineTo(x, 12)
+	ctx.moveTo(sx - 6, 0); ctx.lineTo(sx + 6, 0); ctx.lineTo(sx, 12)
 	ctx.closePath(); ctx.fill()
 }
 

@@ -65,6 +65,9 @@ function coreDefaults() {
 			embedConsumersInCasparConfig: true,
 			attachViaAmcp: true,
 			pauseConsumerWhenIdle: false,
+			companionThumbEnabled: false,
+			companionThumbSize: 144,
+			companionThumbIntervalMs: 1000,
 		},
 		editorDefaults: editorDefaultsDefaults(),
 		audioRouting: {

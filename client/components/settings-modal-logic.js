@@ -114,6 +114,7 @@ export function buildSettingsPayload(modal) {
 			resolutionScale: modal.querySelector('#set-compose-preview-scale')?.value ?? prevAll.composePreview?.resolutionScale ?? 'half',
 			jpegQuality: clampComposePreviewJpegQuality(modal.querySelector('#set-compose-preview-jpeg-q')?.value ?? prevAll.composePreview?.jpegQuality ?? 10),
 			tickIntervalMs: clampComposePreviewTickMs(modal.querySelector('#set-compose-preview-tick-ms')?.value ?? prevAll.composePreview?.tickIntervalMs ?? 125),
+			companionThumbEnabled: !!(modal.querySelector('#set-compose-preview-companion-thumb') || {}).checked,
 		},
 		dmx: JSON.parse(JSON.stringify(settingsState.getSettings()?.dmx || { enabled: false, debugLogDmx: false, fps: 25, fixtures: [] })),
 		casparServer: JSON.parse(JSON.stringify(prevAll.casparServer || {})),
@@ -211,4 +212,6 @@ export function hydrateSettings(modal, cfg) {
 		cpTick.value = String(ms)
 		syncComposePreviewTickLabel(modal)
 	}
+	const cpCompanion = modal.querySelector('#set-compose-preview-companion-thumb')
+	if (cpCompanion) cpCompanion.checked = cp.companionThumbEnabled === true
 }

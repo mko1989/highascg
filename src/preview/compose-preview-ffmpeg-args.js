@@ -67,12 +67,12 @@ function buildComposeFfmpegFilterChain(opts = {}) {
 	const parts = []
 	const scale = buildScaleFilter(opts.resolutionScale ?? 'half')
 	if (scale) parts.push(scale)
-	parts.push('format=yuv420p', `fps=${clampComposePreviewFps(opts.fps, 2)}`)
+	parts.push('format=yuvj420p', `fps=${clampComposePreviewFps(opts.fps, 2)}`)
 	return parts.join(',')
 }
 
 /**
- * Caspar FILE→image2 is unreliable on many builds; kept for optional static casparcg.config embed.
+ * Caspar ADD FILE → image2 (direct JPG on disk). Use yuvj420p for MJPEG on this FFmpeg build.
  * @param {object} [composePreview]
  * @returns {string}
  */
@@ -82,7 +82,7 @@ function buildComposeFfmpegConsumerArgs(composePreview = {}) {
 		resolutionScale: composePreview.resolutionScale,
 	})
 	const q = clampJpegQuality(composePreview.jpegQuality, 10)
-	return `-filter:v ${filter} -codec:v mjpeg -q:v:v ${q} -format image2 -update 1`
+	return `-filter:v ${filter} -codec:v mjpeg -q:v ${q} -format image2 -update 1`
 }
 
 /**
@@ -111,9 +111,9 @@ function buildComposeStreamConsumerArgs(composePreview = {}) {
 	} else if (scale) {
 		filterV = `${scale},format=yuv420p,fps=${fps}`
 	}
-	const keyint = fps <= 5 ? 1 : Math.max(2 * fps, 8)
-	const minKeyint = fps <= 5 ? 1 : fps
-	const x264opts = `min-keyint=${minKeyint}:scenecut=0:repeat-headers=1`
+	const keyint = 1
+	const minKeyint = 1
+	const x264opts = `min-keyint=${minKeyint}:scenecut=0:repeat-headers=1:keyint=${keyint}`
 	return `-filter:v ${filterV} -codec:v libx264 -preset:v ultrafast -tune:v zerolatency -g:v ${keyint} -x264-params:v ${x264opts} -filter:a aformat=channel_layouts=stereo,aresample=48000 -codec:a aac -b:a 64k -format mpegts`
 }
 
@@ -126,6 +126,16 @@ function getComposePreviewJpgBasename(config, channel) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
 	const prefix = String(config?.composePreview?.basenamePrefix || 'highascg_preview').trim() || 'highascg_preview'
 	return `${prefix}/ch${ch}.jpg`
+}
+
+/**
+ * Path for AMCP ADD FILE — Caspar passes this verbatim to ffmpeg (must include media/ prefix).
+ * @param {object} config
+ * @param {number} channel
+ * @returns {string}
+ */
+function getComposePreviewJpgAmcpPath(config, channel) {
+	return `media/${getComposePreviewJpgBasename(config, channel)}`
 }
 
 module.exports = {
@@ -142,4 +152,5 @@ module.exports = {
 	composePreviewStreamUri,
 	composePreviewUdpPort,
 	getComposePreviewJpgBasename,
+	getComposePreviewJpgAmcpPath,
 }

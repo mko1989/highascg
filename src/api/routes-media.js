@@ -146,13 +146,12 @@ async function handleMediaRefresh(body, ctx) {
 	if (fn && typeof fn === 'function') {
 		fn.call(ctx)
 	} else if (ctx.amcp?.query) {
-		runMediaClsTlsRefresh(ctx).catch((e) => {
+		await runMediaClsTlsRefresh(ctx).catch((e) => {
 			if (typeof ctx.log === 'function') ctx.log('warn', 'Media library refresh: ' + (e?.message || e))
 		})
 	}
 	if (ensureHqThumbs && ctx.config?.hq_thumbnail_prewarm_on_media_refresh !== false) {
 		try {
-			await runMediaClsTlsRefresh(ctx)
 			const ids = (ctx.state?.getState?.()?.media || []).map((m) => String(m?.id || '').trim()).filter(Boolean)
 			const stats = await ensureLocalThumbnailCacheForMediaIds(ctx.config || {}, ids, {
 				maxItems: ids.length || 200,

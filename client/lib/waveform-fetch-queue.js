@@ -2,7 +2,7 @@
  * Stagger waveform GET starts so many clips do not hammer the server at once (WO T5.4).
  */
 
-const MIN_GAP_MS = 55
+const MIN_GAP_MS = 120
 let _lastStart = 0
 const _pending = []
 

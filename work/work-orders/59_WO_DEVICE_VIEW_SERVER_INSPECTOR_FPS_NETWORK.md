@@ -154,7 +154,7 @@ Reuse **`src/config/config-modes.js`** and client **`CASPAR_VIDEO_MODE_SPECS`** 
 - [x] **T59.1.1** Replace `renderCasparSettingsInspector` with new layout (§2.3); **keep factory reset** only from legacy actions.
 - [x] **T59.1.2** Merge read-only host summary into server inspector (hostname, platform, AMCP connected) — avoid duplicate empty `renderDeviceInspector` path for `CASPAR_HOST`.
 - [x] **T59.1.3** Remove stale controls: AMCP/OSC/screen mode text/build profile/browser monitor/Companion link/generic save.
-- [ ] **T59.1.4** CSS pass: `device-view__server-inspector` section spacing consistent with other inspectors (WO-41 polish patterns).
+- [x] **T59.1.4** CSS pass: `device-view__server-inspector` section spacing consistent with other inspectors (WO-41 polish patterns).
 
 ### Phase 2 — Default project frame rate
 
@@ -174,7 +174,7 @@ Reuse **`src/config/config-modes.js`** and client **`CASPAR_VIDEO_MODE_SPECS`** 
 
 ### Phase 4 — Docs & migration notes
 
-- [ ] **T59.4.1** Update WO-33f settings migration matrix: “Caspar host setup” fields **removed** from Device View server inspector; deep-link to Settings only where still needed (AMCP connection if retained there).
+- [x] **T59.4.1** Update WO-33f settings migration matrix: “Caspar host setup” fields **removed** from Device View server inspector; deep-link to Settings only where still needed (AMCP connection if retained there).
 - [ ] **T59.4.2** Operator doc snippet: “Set project frame rate and network on Device View → click server.”
 
 ---
@@ -251,6 +251,18 @@ Reuse **`src/config/config-modes.js`** and client **`CASPAR_VIDEO_MODE_SPECS`** 
 - **Remaining:** T59.1.4 CSS polish; T59.2.3 per-output inspector default mode on *new* destinations; T59.3.5 install-hook in `install-phase4.sh`; T59.4 docs/migration matrix.
 
 **Instructions for Next Agent:** Install network sudoers on rig and QA DHCP/static. Wire `defaultVideoModeForProjectFps` into destination creation paths in GPU/DeckLink inspectors (T59.2.3). Add installer copy of `highascg-network-apply.sh`.
+
+---
+
+### 2026-06-27 — Agent (WO-59 implementation pass 2)
+
+**Work done:**
+- **CSS:** `device-view__server-inspector` sections, fields, danger zone in `09b3-device-view-inspector-sidebar.css`.
+- **Installer:** `scripts/runtime/install-network-apply.sh` + hook in `install-phase4.sh`.
+- **Project fps propagation:** new destinations use project default mode (server + client); screen consumer seed includes `screen_N_mode`; GPU video modeline / cable inherit use `resolveDefaultVideoMode`; settings-state defaults for `machineProfile` + `network`.
+- **Docs:** WO-33f migration matrix row for WO-59 server inspector; npm script `smoke:project-fps-network`.
+
+**Instructions for Next Agent:** Run `sudo bash scripts/runtime/install-network-apply.sh casparcg` on rig; manual QA network apply. Optional: T59.4.2 operator doc snippet.
 
 ---
 

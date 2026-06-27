@@ -53,12 +53,13 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 			mediaWithProbe = null
 		}
 	}
-	const refreshMedia = async () => {
+	const loadMedia = () => void fetchMedia()
+	/** Full Caspar CLS/TLS rescan — use only after mutations or explicit Refresh. */
+	const rescanMediaFromCaspar = async () => {
 		await api.post('/api/media/refresh', { ensureHqThumbs: true }).catch(() => {})
 		await fetchMedia()
-		setTimeout(fetchMedia, 400)
-		setTimeout(fetchMedia, 1100)
 	}
+	const refreshMedia = rescanMediaFromCaspar
 	const setStatus = (m, t) => { iStatus.textContent = m; iStatus.className = `ingest-status ingest-status--${t}`; if (t === 'ok') setTimeout(() => { iStatus.textContent = ''; iStatus.className = 'ingest-status' }, 4000) }
 	const poller = Ingest.createDownloadPoller({ setStatus, refreshCallback: refreshMedia })
 	const parseDecklinkDrop = (ev) => { const raw = ev?.dataTransfer?.getData('application/x-highascg-connector') || ''; if (!raw) return null; try { const payload = JSON.parse(raw); if (String(payload?.kind || '') !== 'decklink_io') return null; const connectorId = String(payload?.connectorId || '').trim(); return connectorId ? { connectorId } : null } catch { return null } }
@@ -262,12 +263,12 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		tabs.forEach(x => x.classList.toggle('active', x.dataset.srcTab === tabName))
 		filterInput.value = ''
 		filter = ''
-		if (['media', 'templates'].includes(currentTab)) refreshMedia()
+		if (['media', 'templates'].includes(currentTab)) loadMedia()
 		render()
 	}
 	tabs.forEach(t => t.onclick = () => activateTab(t.dataset.srcTab))
 	filterInput?.addEventListener('input', () => { filter = filterInput.value.trim(); render() })
-	if (refreshBtn) refreshBtn.onclick = refreshMedia
+	if (refreshBtn) refreshBtn.onclick = rescanMediaFromCaspar
 	if (copyBtn) copyBtn.onclick = () => void runMediaTransfer('copy')
 	if (moveBtn) moveBtn.onclick = () => void runMediaTransfer('move')
 	if (deleteBtn) deleteBtn.onclick = () => void runMediaDelete()
@@ -348,5 +349,5 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 			debouncedRender()
 		}
 	})
-	timelineState.on('change', debouncedRender); render(); if (['media', 'templates'].includes(currentTab)) refreshMedia()
+	timelineState.on('change', debouncedRender); render(); if (['media', 'templates'].includes(currentTab)) loadMedia()
 }

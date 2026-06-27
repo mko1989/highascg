@@ -12,6 +12,7 @@ import {
 import { resolveGpuScreenNumber } from './device-view-inspector-gpu-resolve.js'
 import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
 import { STANDARD_VIDEO_MODES, casparVideoModeToOsModeAndRate, CASPAR_VIDEO_MODE_SPECS } from './device-view-destinations-inspector.js'
+import { resolveDefaultVideoMode } from '../lib/project-fps.js'
 
 function resolveMainScreenCount(cs, currentSettings) {
 	return Math.max(1, Math.min(4, parseInt(String(currentSettings?.screen_count ?? cs?.screen_count ?? 1), 10) || 1))
@@ -85,7 +86,8 @@ function readScreenCasparOsDims(cs, currentSettings, screenN) {
 	const wKey = `screen_${n}_custom_width`
 	const hKey = `screen_${n}_custom_height`
 	const fpsKey = `screen_${n}_custom_fps`
-	const modeId = String(cs[modeKey] ?? currentSettings?.casparServer?.[modeKey] ?? currentSettings?.[modeKey] ?? '1080p5000').trim() || '1080p5000'
+	const projectMode = resolveDefaultVideoMode(currentSettings)
+	const modeId = String(cs[modeKey] ?? currentSettings?.casparServer?.[modeKey] ?? currentSettings?.[modeKey] ?? projectMode).trim() || projectMode
 	return casparVideoModeToOsModeAndRate(modeId, {
 		customWidth: Math.max(64, parseInt(String(cs[wKey] ?? currentSettings?.casparServer?.[wKey] ?? 1920), 10) || 1920),
 		customHeight: Math.max(64, parseInt(String(cs[hKey] ?? currentSettings?.casparServer?.[hKey] ?? 1080), 10) || 1080),
@@ -103,6 +105,7 @@ function listSiblingGpuPortsOnCasparScreen(conn, lastPayload, casparScreenN) {
 
 export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN, statusEl, load } = ctx
+	const projectMode = resolveDefaultVideoMode(currentSettings)
 	const runSave = () => void saveRef.invoke?.()
 	const runOsSave = () => void osSaveRef?.invoke?.()
 
@@ -126,13 +129,13 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const inEdge = edges.find((e) => e.sinkId === conn.id)
 	const source = inEdge ? resolveCableSourceResolution(lastPayload, inEdge.sourceId) : null
 	const inherited = source ? {
-		mode: source.videoMode || '1080p5000',
+		mode: source.videoMode || projectMode,
 		width: Math.max(64, parseInt(String(source.width ?? 1920), 10) || 1920),
 		height: Math.max(64, parseInt(String(source.height ?? 1080), 10) || 1080),
 		fps: Math.max(1, parseFloat(String(source.fps ?? 50)) || 50)
 	} : null
 
-	const currentMode = String(cs[keyMode] || currentSettings?.casparServer?.[keyMode] || conn?.caspar?.mode || '1080p5000')
+	const currentMode = String(cs[keyMode] || currentSettings?.casparServer?.[keyMode] || conn?.caspar?.mode || projectMode)
 	const isStandardMode = STANDARD_VIDEO_MODES.includes(currentMode)
 	const modeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	modeSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`

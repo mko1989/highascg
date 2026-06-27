@@ -33,12 +33,18 @@ export function applySettingsFromServer(cfg) {
 export const settingsState = {
 	settings: {
 		editorDefaults: { ...DEFAULT_EDITOR_DEFAULTS },
+		machineProfile: { defaultProjectFps: 50 },
+		network: {
+			primaryInterface: '',
+			mode: 'dhcp',
+			static: { address: '', prefixLength: 24, gateway: '', dns: [] },
+		},
 		caspar: { host: '127.0.0.1', port: 5250 },
 		streaming: { enabled: true, quality: 'medium', basePort: 10000, hardware_accel: true },
 		/** Mirrors server defaults so subscribers (e.g. DMX) see shape before GET /api/settings completes. */
 		dmx: { enabled: false, debugLogDmx: false, fps: 25, fixtures: [] },
-		periodic_sync_interval_sec: 10,
-		periodic_sync_interval_sec_osc: 1,
+		periodic_sync_interval_sec: null,
+		periodic_sync_interval_sec_osc: null,
 		osc: {
 			enabled: true,
 			listenPort: 6251,
@@ -54,6 +60,9 @@ export const settingsState = {
 			tickIntervalMs: 125,
 			basenamePrefix: 'highascg_preview',
 			channels: 'compose_visible',
+			companionThumbEnabled: false,
+			companionThumbSize: 144,
+			companionThumbIntervalMs: 1000,
 		},
 		/** Dedicated Caspar channel for RTMP/record (WO-27); tab visible when enabled */
 		streamingChannel: { enabled: false, videoSource: 'program_1', audioSource: 'follow_video', dedicatedOutputChannel: false },

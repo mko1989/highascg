@@ -253,3 +253,56 @@
 .device-view__inspector-link-btn:hover {
 	color: #60a5fa;
 }
+
+/* WO-59 — server inspector (click Caspar host band) */
+.device-view__server-inspector {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.device-view__inspector-section {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+.device-view__inspector-section .device-view__note {
+	margin: 0 0 8px;
+}
+.device-view__inspector-section .header-btn {
+	margin-top: 6px;
+}
+.device-view__inspector-section--danger {
+	border-top-color: rgba(239, 68, 68, 0.35);
+}
+.device-view__inspector-section--danger .device-view__note {
+	color: rgba(252, 165, 165, 0.95);
+}
+.device-view__inspector-grid {
+	display: grid;
+	gap: 8px;
+	margin: 8px 0;
+}
+.device-view__field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 6px 0;
+}
+.device-view__field-label {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.72;
+}
+.device-view__server-inspector .device-view__destinations-type,
+.device-view__server-inspector .device-view__cablemode {
+	width: 100%;
+	max-width: 100%;
+}
+.device-view__server-inspector .device-view__cablemode {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+}

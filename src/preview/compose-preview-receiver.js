@@ -4,7 +4,6 @@ const { spawn } = require('child_process')
 const cache = require('./compose-preview-cache')
 const {
 	COMPOSE_PREVIEW_UDP_PORT_BASE,
-	clampComposePreviewFps,
 	clampJpegQuality,
 	composePreviewUdpPort,
 } = require('./compose-preview-ffmpeg-args')
@@ -30,7 +29,7 @@ function startComposePreviewReceiver(ctx, channel) {
 	if (!Number.isFinite(ch) || ch < 1) return
 	stopComposePreviewReceiver(ch)
 	const cfg = ctx?.config || {}
-	const outPath = cache.resolvePreviewJpgPath(cfg, ch)
+	const outPath = cache.resolvePreviewJpgOutputPath(cfg, ch)
 	if (!outPath) {
 		_receivers.set(ch, {
 			proc: null,
@@ -44,22 +43,27 @@ function startComposePreviewReceiver(ctx, channel) {
 	const port = composePreviewUdpPort(ch)
 	const cp = cfg.composePreview || {}
 	const q = clampJpegQuality(cp.jpegQuality, 10)
-	const fps = clampComposePreviewFps(cp.fps, 2)
-	const input = `udp://0.0.0.0:${port}?overrun_nonfatal=1&fifo_size=5000000`
+	// Small UDP fifo + fast demux — Caspar already rate-limits via fps filter on the encoder.
+	const input = `udp://0.0.0.0:${port}?overrun_nonfatal=1&fifo_size=65536`
 	const args = [
 		'-hide_banner',
 		'-loglevel',
 		'warning',
 		'-nostdin',
+		'-y',
 		'-fflags',
-		'nobuffer',
+		'nobuffer+discardcorrupt',
 		'-flags',
 		'low_delay',
+		'-probesize',
+		'32',
+		'-analyzeduration',
+		'0',
 		'-i',
 		input,
 		'-an',
-		'-vf',
-		`fps=${fps}`,
+		'-vsync',
+		'0',
 		'-q:v',
 		String(q),
 		'-update',
@@ -135,7 +139,7 @@ function getComposeReceiverStats(config) {
 		const st = _receivers.get(ch)
 		byChannel[ch] = st
 			? {
-					running: !!(st.proc && !st.proc.killed),
+					running: !!(st.proc && st.proc.exitCode == null && !st.proc.killed),
 					port: st.port,
 					outPath: st.outPath || null,
 					lastError: st.lastError || null,

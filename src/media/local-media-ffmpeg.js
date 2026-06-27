@@ -6,7 +6,7 @@ const crypto = require('crypto')
 const { spawn } = require('child_process')
 
 /** Bump when peak algorithm / bar semantics change (invalidates on-disk cache). */
-const WAVEFORM_VERSION = 3
+const WAVEFORM_VERSION = 4
 
 /** Bump when thumbnail ffmpeg args or quality change (invalidates on-disk thumbnail cache). */
 const THUMBNAIL_VERSION = 1

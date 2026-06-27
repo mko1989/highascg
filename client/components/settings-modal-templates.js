@@ -115,6 +115,10 @@ export function getMainModalHtml() {
 								<input type="range" id="set-compose-preview-jpeg-q" min="2" max="20" step="1" value="10" style="width:100%;max-width:24rem" />
 								<p class="settings-note">Lower number = higher quality, larger files.</p>
 							</div>
+							<div class="settings-group checkbox">
+								<label><input type="checkbox" id="set-compose-preview-companion-thumb" /> Companion preview variables (Stream Deck button images)</label>
+								<p class="settings-note">Pushes <code>compose_preview_ch{N}_image</code> data-URI variables at compose preview rate (same fps). In Companion, set a button image to <code>$(highascg_compose_preview_ch1_image)</code>.</p>
+							</div>
 						</div>
 						<div id="set-compose-preview-tick-fields">
 							<div class="settings-group">

@@ -12,11 +12,58 @@ let _pollTimer = null
 /** @type {Set<(channel: number) => void>} */
 const _listeners = new Set()
 
+function notifyComposePreviewListeners(channel) {
+	for (const fn of _listeners) {
+		try {
+			fn(channel)
+		} catch {
+			/* ignore */
+		}
+	}
+}
+
+/**
+ * @param {number} channel
+ * @param {string} etag
+ */
+async function loadComposePreviewImage(channel, etag) {
+	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	let entry = _cache.get(ch)
+	if (!entry) {
+		entry = { img: new Image(), etag: null, loading: false }
+		_cache.set(ch, entry)
+	}
+	if (entry.loading) return
+	if (etag && etag === entry.etag) return
+	entry.loading = true
+	try {
+		const url = getComposePreviewUrl(ch, etag)
+		await new Promise((resolve, reject) => {
+			const img = new Image()
+			img.onload = () => {
+				entry.img = img
+				entry.etag = etag
+				entry.loading = false
+				notifyComposePreviewListeners(ch)
+				resolve()
+			}
+			img.onerror = () => {
+				entry.loading = false
+				reject(new Error('compose preview load failed'))
+			}
+			img.src = url
+		})
+	} catch {
+		entry.loading = false
+	}
+}
+
 function ensurePoll() {
 	if (_pollTimer) return
+	// Fallback when WS is quiet; primary path is `compose.preview` push from server.
 	_pollTimer = setInterval(() => {
 		void pollAllTracked()
-	}, 150)
+	}, 1000)
 }
 
 function stopPollIfIdle() {
@@ -25,6 +72,19 @@ function stopPollIfIdle() {
 		clearInterval(_pollTimer)
 		_pollTimer = null
 	}
+}
+
+/**
+ * Push path — server broadcasts on JPG mtime change (much lower latency than meta polling).
+ * @param {{ channel?: number, etag?: string }} data
+ */
+export function ingestComposePreviewWs(data) {
+	if (!isSnapshotComposePreview()) return
+	const ch = parseInt(String(data?.channel ?? ''), 10)
+	const etag = data?.etag != null ? String(data.etag) : null
+	if (!Number.isFinite(ch) || ch < 1 || !etag) return
+	trackComposePreviewChannel(ch)
+	void loadComposePreviewImage(ch, etag)
 }
 
 /**
@@ -44,31 +104,9 @@ async function pollChannelMeta(channel) {
 		const meta = await res.json()
 		const etag = meta?.etag ? String(meta.etag) : null
 		if (!etag || etag === entry.etag) return
-		entry.loading = true
-		const url = getComposePreviewUrl(ch, etag)
-		await new Promise((resolve, reject) => {
-			const img = new Image()
-			img.onload = () => {
-				entry.img = img
-				entry.etag = etag
-				entry.loading = false
-				for (const fn of _listeners) {
-					try {
-						fn(ch)
-					} catch {
-						/* ignore */
-					}
-				}
-				resolve()
-			}
-			img.onerror = () => {
-				entry.loading = false
-				reject(new Error('compose preview load failed'))
-			}
-			img.src = url
-		})
+		await loadComposePreviewImage(ch, etag)
 	} catch {
-		entry.loading = false
+		/* ignore */
 	}
 }
 

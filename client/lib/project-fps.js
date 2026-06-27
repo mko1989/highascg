@@ -53,3 +53,8 @@ export function resolveProjectFpsFromSettings(settings) {
 	if (pr?.fps > 0) return normalizeProjectFps(pr.fps)
 	return 50
 }
+
+/** Default Caspar video mode id for current project frame rate. */
+export function resolveDefaultVideoMode(settings) {
+	return defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(settings))
+}

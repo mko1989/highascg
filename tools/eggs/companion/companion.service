@@ -1,0 +1,24 @@
+[Unit]
+Description=Bitfocus Companion (headless)
+ConditionPathExists=/home/casparcg/companion/companion_headless.sh
+After=network.target
+
+[Service]
+Type=simple
+User=casparcg
+Group=casparcg
+SupplementaryGroups=companion input plugdev
+UMask=002
+WorkingDirectory=/home/casparcg/companion
+ExecStart=/home/casparcg/companion/companion_headless.sh \
+  --config-dir /home/casparcg/.config/companion \
+  --admin-port 8001 \
+  --admin-address 0.0.0.0 \
+  --extra-module-path /home/casparcg/companion-module-dev \
+  --log-level info
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -46,9 +46,10 @@ function createComposePreviewLifecycle({ appCtx }) {
 
 	function onConfigChange() {
 		composeTick.restartComposePreviewTick(appCtx)
-		void ffmpegJpeg.stopFfmpegJpegComposePreview(appCtx)
 		if (isFfmpegJpegComposePreview(appCtx.config)) {
 			ffmpegJpeg.startFfmpegJpegComposePreview(appCtx)
+		} else {
+			void ffmpegJpeg.stopFfmpegJpegComposePreview(appCtx)
 		}
 	}
 

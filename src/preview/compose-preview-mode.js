@@ -65,6 +65,15 @@ function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 				: prev.tickIntervalMs ?? defaults.tickIntervalMs ?? 125,
 		embedConsumersInCasparConfig: prev.embedConsumersInCasparConfig !== false,
 		pauseConsumerWhenIdle: prev.pauseConsumerWhenIdle === true,
+		companionThumbEnabled: prev.companionThumbEnabled === true,
+		companionThumbSize: (() => {
+			const n = parseInt(String(prev.companionThumbSize ?? 144), 10)
+			return Number.isFinite(n) ? Math.max(32, Math.min(512, n)) : 144
+		})(),
+		companionThumbIntervalMs: (() => {
+			const n = parseInt(String(prev.companionThumbIntervalMs ?? 1000), 10)
+			return Number.isFinite(n) ? Math.max(250, Math.min(10000, n)) : 1000
+		})(),
 	}
 }
 

@@ -20,6 +20,7 @@ import { resolveTransitionDuration, transitionDurationForFps } from '../lib/tran
  * @param {() => void} deps.stopPlaybackLoop
  * @param {() => void} deps.startPlaybackLoop
  * @param {(n: number) => void} deps.setServerTick
+ * @param {() => void} [deps.maybeFollowPlayhead]
  */
 export function createTimelineTransport(deps) {
 	const {
@@ -32,6 +33,7 @@ export function createTimelineTransport(deps) {
 		stopPlaybackLoop,
 		startPlaybackLoop,
 		setServerTick,
+		maybeFollowPlayhead,
 	} = deps
 
 	async function syncToServer(tl) {
@@ -66,6 +68,7 @@ export function createTimelineTransport(deps) {
 		if (!tl) return
 		playback.position = ms
 		canvas.setPlayheadPosition(ms)
+		maybeFollowPlayhead?.()
 		updateTimecode()
 		redrawTimelineView()
 		await api.post(`/api/timelines/${tl.id}/seek`, { ms }).catch(() => {})
@@ -262,7 +265,12 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-zm')?.addEventListener('click', () => canvas.zoom(-1))
 		transportEl.querySelector('#tl-zp')?.addEventListener('click', () => canvas.zoom(1))
 		transportEl.querySelector('#tl-zf')?.addEventListener('click', () => canvas.zoomFit())
-		transportEl.querySelector('#tl-follow')?.addEventListener('click', () => { view.follow = !view.follow; buildTransport() })
+		transportEl.querySelector('#tl-follow')?.addEventListener('click', () => {
+			view.follow = !view.follow
+			buildTransport()
+			if (view.follow) maybeFollowPlayhead?.()
+			redrawTimelineView()
+		})
 		transportEl.querySelector('#tl-screen')?.addEventListener('change', (e) => {
 			const v = e.target.value
 			view.sendTo.screenIdx = v === 'all' ? null : parseInt(v, 10)

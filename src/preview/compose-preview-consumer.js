@@ -1,14 +1,17 @@
 'use strict'
 
+const fs = require('fs')
 const cache = require('./compose-preview-cache')
 const {
 	casparUdpStreamUriVariantsForRemove,
 	getActiveStreamUris,
 } = require('../streaming/caspar-ffmpeg-setup')
 const {
+	buildComposeFfmpegConsumerArgs,
 	buildComposeStreamConsumerArgs,
 	composePreviewStreamUri,
 	composePreviewUdpPort,
+	getComposePreviewJpgAmcpPath,
 	getComposePreviewJpgBasename,
 } = require('./compose-preview-ffmpeg-args')
 const {
@@ -16,8 +19,10 @@ const {
 	resolveMonitoredChannels,
 } = require('./compose-preview-mode')
 
-/** Dedicated AMCP slot for compose preview STREAM (below DMX 97; 701 is ignored by this Caspar build). */
-const COMPOSE_FILE_CONSUMER_INDEX = 98
+/** Dedicated AMCP slot for compose preview FILE (jpeg) consumer. */
+const COMPOSE_FILE_CONSUMER_INDEX = 701
+/** Legacy UDP relay slot — remove when migrating from STREAM fallback. */
+const COMPOSE_STREAM_CONSUMER_INDEX = 98
 /** Legacy ADD IMAGE slot — remove when switching to ffmpeg_jpeg. */
 const COMPOSE_IMAGE_CONSUMER_INDEX = 700
 
@@ -30,6 +35,17 @@ const _channels = new Map()
  * @param {object} config
  * @param {number} channel
  */
+function buildComposeFileAddParams(config, channel) {
+	const cp = config?.composePreview || {}
+	const path = getComposePreviewJpgAmcpPath(config, channel)
+	const args = buildComposeFfmpegConsumerArgs(cp)
+	return `${path} ${args}`
+}
+
+/**
+ * @param {object} config
+ * @param {number} channel
+ */
 function buildComposeStreamAddParams(config, channel) {
 	const cp = config?.composePreview || {}
 	const uri = composePreviewStreamUri(channel)
@@ -37,9 +53,19 @@ function buildComposeStreamAddParams(config, channel) {
 	return `${uri} ${args}`
 }
 
-/** @deprecated use buildComposeStreamAddParams */
-function buildComposeFileAddParams(config, channel) {
-	return buildComposeStreamAddParams(config, channel)
+/**
+ * @param {object} config
+ * @param {number} channel
+ */
+async function ensureComposePreviewJpgStub(config, channel) {
+	const outPath = cache.resolvePreviewJpgOutputPath(config, channel)
+	if (!outPath) return
+	await cache.ensurePreviewDir(config).catch(() => {})
+	try {
+		if (!fs.existsSync(outPath)) fs.writeFileSync(outPath, Buffer.alloc(0))
+	} catch {
+		/* ok */
+	}
 }
 
 /**
@@ -52,7 +78,11 @@ async function removeComposeConsumers(ctx, channel) {
 	const port = composePreviewUdpPort(ch)
 	const variants = casparUdpStreamUriVariantsForRemove(port)
 	if (ctx.amcp.basic?.remove) {
-		for (const idx of [COMPOSE_FILE_CONSUMER_INDEX, COMPOSE_IMAGE_CONSUMER_INDEX]) {
+		for (const idx of [
+			COMPOSE_FILE_CONSUMER_INDEX,
+			COMPOSE_STREAM_CONSUMER_INDEX,
+			COMPOSE_IMAGE_CONSUMER_INDEX,
+		]) {
 			try {
 				await ctx.amcp.basic.remove(ch, null, idx)
 			} catch {
@@ -65,7 +95,7 @@ async function removeComposeConsumers(ctx, channel) {
 		for (const u of active) {
 			if (variants.includes(u) || u.includes(`:${port}`)) {
 				try {
-					await ctx.amcp.raw(`REMOVE ${ch}-${COMPOSE_FILE_CONSUMER_INDEX} STREAM ${u}`)
+					await ctx.amcp.raw(`REMOVE ${ch}-${COMPOSE_STREAM_CONSUMER_INDEX} STREAM ${u}`)
 				} catch {
 					try {
 						await ctx.amcp.raw(`REMOVE ${ch} STREAM ${u}`)
@@ -92,24 +122,24 @@ async function attachComposeFileConsumer(ctx, channel) {
 		return
 	}
 	const cfg = ctx.config || {}
-	await cache.ensurePreviewDir(cfg).catch(() => {})
+	await ensureComposePreviewJpgStub(cfg, ch)
 	await removeComposeConsumers(ctx, ch)
 	await delay(150)
-	const params = buildComposeStreamAddParams(cfg, ch)
+	const params = buildComposeFileAddParams(cfg, ch)
 	try {
-		const res = await ctx.amcp.basic.add(ch, 'STREAM', params, COMPOSE_FILE_CONSUMER_INDEX)
+		const res = await ctx.amcp.basic.add(ch, 'FILE', params, COMPOSE_FILE_CONSUMER_INDEX)
 		if (res && res.ok === false) {
-			throw new Error(res.error || 'ADD STREAM failed')
+			throw new Error(res.error || 'ADD FILE failed')
 		}
 		_channels.set(ch, { attached: true, attachedAt: Date.now(), lastError: undefined })
 		ctx.log?.(
 			'info',
-			`[compose-preview] ch${ch} STREAM consumer → ${getComposePreviewJpgBasename(cfg, ch)} (udp ${composePreviewUdpPort(ch)})`,
+			`[compose-preview] ch${ch} FILE consumer → ${getComposePreviewJpgBasename(cfg, ch)} (direct image2)`,
 		)
 	} catch (e) {
 		const msg = e?.message || String(e)
 		_channels.set(ch, { attached: false, lastError: msg })
-		ctx.log?.('warn', `[compose-preview] ch${ch} ADD STREAM failed: ${msg}`)
+		ctx.log?.('warn', `[compose-preview] ch${ch} ADD FILE failed: ${msg}`)
 	}
 }
 
@@ -144,7 +174,7 @@ async function detachAllComposeFileConsumers(ctx) {
 		}
 	}
 	_channels.clear()
-	if (ctx) ctx.log?.('debug', '[compose-preview] STREAM consumers removed')
+	if (ctx) ctx.log?.('debug', '[compose-preview] FILE consumers removed')
 }
 
 function getComposeConsumerStats(config) {
@@ -157,11 +187,11 @@ function getComposeConsumerStats(config) {
 			attached: !!st.attached,
 			lastError: st.lastError || null,
 			attachedAt: st.attachedAt || null,
-			udpPort: composePreviewUdpPort(ch),
+			amcpPath: getComposePreviewJpgAmcpPath(config, ch),
 			file: resolved ? { format: resolved.format, path: resolved.path } : null,
 		}
 	}
-	return { consumerIndex: COMPOSE_FILE_CONSUMER_INDEX, transport: 'udp_stream', byChannel }
+	return { consumerIndex: COMPOSE_FILE_CONSUMER_INDEX, transport: 'file_image2', byChannel }
 }
 
 function resetComposeConsumerState() {
@@ -170,9 +200,10 @@ function resetComposeConsumerState() {
 
 module.exports = {
 	COMPOSE_FILE_CONSUMER_INDEX,
+	COMPOSE_STREAM_CONSUMER_INDEX,
 	COMPOSE_IMAGE_CONSUMER_INDEX,
-	buildComposeStreamAddParams,
 	buildComposeFileAddParams,
+	buildComposeStreamAddParams,
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
 	detachAllComposeFileConsumers,
