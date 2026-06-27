@@ -1,5 +1,6 @@
 import { buildInspectorTable, roleLabel } from './device-view-ui-utils.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
+import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 
 export const STANDARD_VIDEO_MODES = [
 	'PAL', 'NTSC', '576p2500', '720p2398', '720p2400', '720p2500', '720p2997', '720p3000', '720p5000', '720p5994', '720p6000',
@@ -112,7 +113,9 @@ export function renderDestinationInspector(args) {
 		patchDestination,
 		removeDestination,
 		updateDestinationOutputLayer,
+		currentSettings,
 	} = args
+	const projectDefaultMode = defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(currentSettings))
 
 	if (mode === 'host_channel' || d?.virtual === true) {
 		const role = d?.hostRole || intent?.hostRole
@@ -276,7 +279,9 @@ export function renderDestinationInspector(args) {
 	const vmSel = document.createElement('select')
 	vmSel.className = 'device-view__destinations-type'
 	vmSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`
-	const currentMode = String(d?.videoMode || '1080p5000')
+	const currentMode = String(
+		d?.videoMode || (d?.inheritsProjectFps !== false ? projectDefaultMode : '1080p5000'),
+	)
 	vmSel.value = STANDARD_VIDEO_MODES.includes(currentMode) ? currentMode : 'custom'
 
 	const widthIn = document.createElement('input')
@@ -316,7 +321,7 @@ export function renderDestinationInspector(args) {
 		heightIn.disabled = true
 		fpsIn.disabled = true
 		syncVideoModeSummary(modeId, spec.width, spec.height, spec.fps)
-		patchDestination(d.id, { videoMode: modeId, width: spec.width, height: spec.height, fps: spec.fps })
+		patchDestination(d.id, { videoMode: modeId, width: spec.width, height: spec.height, fps: spec.fps, inheritsProjectFps: false })
 	}
 	vmSel.addEventListener('change', () => {
 		if (vmSel.value === 'custom') {
@@ -330,7 +335,7 @@ export function renderDestinationInspector(args) {
 			heightIn.disabled = false
 			fpsIn.disabled = false
 			syncVideoModeSummary('custom', width, height, fps)
-			patchDestination(d.id, { videoMode: 'custom', width, height, fps })
+			patchDestination(d.id, { videoMode: 'custom', width, height, fps, inheritsProjectFps: false })
 			return
 		}
 		applyStandardVideoMode(vmSel.value)

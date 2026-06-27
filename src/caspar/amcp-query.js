@@ -1,6 +1,7 @@
 'use strict'
 
 const { param, chLayer } = require('./amcp-utils')
+const { resolveCasparCinfMediaId, toCasparClsMediaId } = require('../media/caspar-cls-id')
 
 class AmcpQuery {
 	/**
@@ -14,8 +15,13 @@ class AmcpQuery {
 		return this._client._send(cmd, responseKey)
 	}
 
-	cinf(filename) {
-		return this._send(`CINF ${param(filename)}`, 'CINF')
+	/**
+	 * @param {string} filename
+	 * @param {{ ctx?: object }} [opts]
+	 */
+	cinf(filename, opts = {}) {
+		const id = opts?.ctx ? resolveCasparCinfMediaId(filename, opts.ctx) : toCasparClsMediaId(filename)
+		return this._send(`CINF ${param(id)}`, 'CINF')
 	}
 
 	cls(subDir) {

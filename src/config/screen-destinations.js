@@ -39,6 +39,8 @@ function normalizeDestination(d) {
 		fps: std ? std.fps : fps,
 		caspar: { bus },
 		edidLabel: d.edidLabel != null ? String(d.edidLabel) : '',
+		/** When true (default), video mode tracks machineProfile.defaultProjectFps until customized. */
+		inheritsProjectFps: d.inheritsProjectFps !== false,
 		stream:
 			d.stream && typeof d.stream === 'object'
 				? {

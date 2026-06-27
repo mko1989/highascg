@@ -107,7 +107,7 @@ function readDecklinkConsumerCaspar(conn) {
 		embeddedAudio: c.decklinkEmbeddedAudio !== false && c.decklinkEmbeddedAudio !== 'false',
 		channelLayout: String(c.decklinkChannelLayout || 'stereo').toLowerCase(),
 		latency: String(c.decklinkLatency || 'normal').toLowerCase(),
-		bufferDepth: Math.min(16, Math.max(1, parseInt(String(c.decklinkBufferDepth ?? 5), 10) || 5)),
+		bufferDepth: Math.min(3, Math.max(1, parseInt(String(c.decklinkBufferDepth ?? 3), 10) || 3)),
 		colorSpace: String(c.decklinkColorSpace || 'bt709').toLowerCase(),
 	}
 }
@@ -170,7 +170,7 @@ function renderDecklinkConsumerSettingsControls(h, conn, { statusEl, load, setCa
 	const depthIn = Object.assign(document.createElement('input'), {
 		type: 'number',
 		min: '1',
-		max: '16',
+		max: '3',
 		className: 'device-view__destinations-type',
 		value: String(cur.bufferDepth),
 	})
@@ -216,7 +216,7 @@ function renderDecklinkConsumerSettingsControls(h, conn, { statusEl, load, setCa
 			decklinkEmbeddedAudio: audioCheck.checked,
 			decklinkChannelLayout: String(layoutSel.value || 'stereo'),
 			decklinkLatency: String(latencySel.value || 'normal'),
-			decklinkBufferDepth: Math.min(16, Math.max(1, parseInt(String(depthIn.value || '5'), 10) || 5)),
+			decklinkBufferDepth: Math.min(3, Math.max(1, parseInt(String(depthIn.value || '3'), 10) || 3)),
 			decklinkColorSpace: String(colorSel.value || 'bt709'),
 		}
 		if (conn?.caspar?.outputBinding) casparPatch.outputBinding = conn.caspar.outputBinding

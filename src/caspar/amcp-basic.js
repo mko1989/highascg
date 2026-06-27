@@ -152,6 +152,24 @@ class AmcpBasic {
 		)
 	}
 
+	/**
+	 * ADD channel IMAGE basename — fixed PNG path under media (compose preview tick).
+	 * @param {number|string} channel
+	 * @param {string} basename — no extension, e.g. highascg_preview/ch1
+	 * @param {number|null} [consumerIndex] — fixed slot to avoid consumer pile-up (default 700)
+	 */
+	addImage(channel, basename, consumerIndex = 700) {
+		const ch = parseInt(channel, 10)
+		const base = String(basename || '').trim()
+		if (!base) return Promise.resolve({ ok: false, error: 'basename required' })
+		const idx =
+			consumerIndex != null && consumerIndex !== '' && Number.isFinite(Number(consumerIndex))
+				? `-${parseInt(String(consumerIndex), 10)}`
+				: ''
+		const cmd = `ADD ${ch}${idx} IMAGE ${base}`
+		return this._client._invokeTyped('addImage', { channel: ch, basename: base, consumerIndex }, cmd, 'ADD')
+	}
+
 	logLevel(level) {
 		return this._client._invokeTyped('logLevel', { level }, `LOG LEVEL ${level}`, 'LOG')
 	}

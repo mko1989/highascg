@@ -503,6 +503,43 @@ test('Device View PortAudio 8ch cabling sets channel-layout and output channels'
 	assert.match(xml, /<channel-order>c0 c1 c2 c3 c4 c5 c6 c7<\/channel-order>/)
 })
 
+test('PortAudio 8ch widens PGM channel-layout when destination is still stereo', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = { ...app.casparServer, screen_count: 1, caspar_build_profile: 'custom_live', multiview_enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50, audioLayout: 'stereo' },
+		],
+		edidNotes: '',
+	}
+	app.audioOutputs = [{
+		id: 'audio_1',
+		label: 'PGM out',
+		enabled: true,
+		type: 'portaudio',
+		deviceName: 'hw:1,3',
+		channelLayout: '8ch',
+	}]
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_d1', kind: 'destination_in', externalRef: 'd1' },
+			{ id: 'audio_1', kind: 'audio_out' },
+		],
+		edges: [{ sourceId: 'dst_in_d1', sinkId: 'audio_1' }],
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_audio_layout, '8ch')
+	const xml = buildConfigXml(flat)
+	const pgmBlock = xml.match(/Caspar channel 1:[\s\S]*?<channel>([\s\S]*?)<\/channel>/)?.[1] || ''
+	assert.match(pgmBlock, /<channel-layout>discrete-8ch<\/channel-layout>/)
+	assert.match(xml, /<channel-order>c0 c1 c2 c3 c4 c5 c6 c7<\/channel-order>/)
+})
+
 test('uncabled second main stays stereo when first main has 8ch PortAudio', () => {
 	const app = clone(defaults)
 	addMockGraph(app)

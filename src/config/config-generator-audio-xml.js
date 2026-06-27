@@ -5,6 +5,14 @@ const { layoutChannelCount } = require('./config-modes')
 const { casparChannelLayoutId, DISCRETE_8CH_LAYOUT_ID } = require('./audio-channel-layouts')
 const { buildFfmpegArgs, casparUdpStreamUri } = require('../streaming/caspar-ffmpeg-setup')
 const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
+const {
+	buildComposeFfmpegConsumerArgs,
+	getComposePreviewJpgBasename,
+} = require('../preview/compose-preview-ffmpeg-args')
+const {
+	isFfmpegJpegComposePreview,
+	isMonitoredComposeChannel,
+} = require('../preview/compose-preview-mode')
 
 /**
  * @param {string} path - e.g. alsa://hw:NVidia,3 or pulse://caspar_monitor
@@ -134,6 +142,29 @@ function buildStreamingFfmpegConsumerXml(config, port) {
 	void port
 	// Preview UDP/WebRTC STREAM consumers removed — do not embed in generated casparcg.config.
 	return ''
+}
+
+/**
+ * WO-58: Caspar ffmpeg consumer writes compose preview JPEG directly under media-path.
+ * @param {Record<string, unknown>} config
+ * @param {number} channel — Caspar channel (1-based)
+ * @returns {string}
+ */
+/** WO-58: dynamic AMCP attach is primary; static config embed is optional fallback. */
+function buildComposePreviewFfmpegConsumerXml(config, channel) {
+	if (!isFfmpegJpegComposePreview(config)) return ''
+	const cp = config?.composePreview || {}
+	if (cp.embedConsumersInCasparConfig === false || cp.attachViaAmcp !== false) return ''
+	const ch = parseInt(String(channel), 10)
+	if (!Number.isFinite(ch) || ch < 1) return ''
+	if (!isMonitoredComposeChannel(config, ch)) return ''
+	const outPath = getComposePreviewJpgBasename(config, ch)
+	const args = buildComposeFfmpegConsumerArgs(cp)
+	return `
+                <ffmpeg>
+                    <path>${escapeXml(outPath)}</path>
+                    <args>${escapeXml(args)}</args>
+                </ffmpeg>`
 }
 
 /**
@@ -457,6 +488,7 @@ module.exports = {
 	buildAudioLayoutsXml,
 	buildScreenFfmpegConsumersXml,
 	buildStreamingFfmpegConsumerXml,
+	buildComposePreviewFfmpegConsumerXml,
 	buildExtraAudioFfmpegConsumersXml,
 	channelLayoutElementXml,
 	buildCustomLiveRootXml,

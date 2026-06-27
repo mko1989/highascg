@@ -31,6 +31,7 @@ module.exports = {
 	buildAudioLayoutsXml: audioXml.buildAudioLayoutsXml,
 	buildScreenFfmpegConsumersXml: audioXml.buildScreenFfmpegConsumersXml,
 	buildStreamingFfmpegConsumerXml: audioXml.buildStreamingFfmpegConsumerXml,
+	buildComposePreviewFfmpegConsumerXml: audioXml.buildComposePreviewFfmpegConsumerXml,
 	buildExtraAudioFfmpegConsumersXml: audioXml.buildExtraAudioFfmpegConsumersXml,
 	channelLayoutElementXml: audioXml.channelLayoutElementXml,
 	buildCustomLiveRootXml: audioXml.buildCustomLiveRootXml,

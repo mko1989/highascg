@@ -6,7 +6,7 @@ const crypto = require('crypto')
 const { spawn } = require('child_process')
 
 /** Bump when peak algorithm / bar semantics change (invalidates on-disk cache). */
-const WAVEFORM_VERSION = 2
+const WAVEFORM_VERSION = 3
 
 /** Bump when thumbnail ffmpeg args or quality change (invalidates on-disk thumbnail cache). */
 const THUMBNAIL_VERSION = 1
@@ -106,7 +106,7 @@ function parseWaveformBars(query) {
 	const raw = query && typeof query === 'object' ? query.bars : undefined
 	const n = parseInt(String(raw ?? ''), 10)
 	if (!Number.isFinite(n) || n < 1) return 128
-	return Math.min(512, Math.max(8, Math.floor(n)))
+	return Math.min(32768, Math.max(8, Math.floor(n)))
 }
 
 /**

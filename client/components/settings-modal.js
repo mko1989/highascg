@@ -36,6 +36,11 @@ export function showSettingsModal(initialTab) {
 
 	MountHw.wireMediaUsbMountListeners(modal)
 
+	modal.querySelector('#set-compose-preview-mode')?.addEventListener('change', () => Logic.syncComposePreviewModeVisibility(modal))
+	modal.querySelector('#set-compose-preview-tick-ms')?.addEventListener('input', () => Logic.syncComposePreviewTickLabel(modal))
+	modal.querySelector('#set-compose-preview-fps')?.addEventListener('input', () => Logic.syncComposePreviewFpsLabel(modal))
+	modal.querySelector('#set-compose-preview-jpeg-q')?.addEventListener('input', () => Logic.syncComposePreviewJpegQualityLabel(modal))
+
 	function activateSettingsTab(tabName) {
 		const exists = !!modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
 		if (!exists) tabName = 'defaults'
@@ -139,6 +144,7 @@ export function showSettingsModal(initialTab) {
 
 	async function persistSettings() {
 		const settings = Logic.buildSettingsPayload(modal)
+		if (settings.composePreview) settingsState.settings.composePreview = { ...settings.composePreview }
 		settingsState.notify()
 		try {
 			const res = await api.post('/api/settings', settings)

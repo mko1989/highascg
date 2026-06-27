@@ -78,8 +78,9 @@ PY
 }
 
 _try=1
-while [ "$_try" -le "$_retries" ]; do
+	while [ "$_try" -le "$_retries" ]; do
 	if _patch_metamode; then
+		nvidia-settings --save 2>/dev/null || true
 		exit 0
 	fi
 	if [ "$_try" -ge "$_retries" ]; then

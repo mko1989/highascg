@@ -5,7 +5,7 @@
 import { sceneState } from '../lib/scene-state.js'
 import { sourceSupportsLoopPlayback } from '../lib/media-ext.js'
 import { audioOutputRoutesForLayout, normalizeAudioRouteForLayout } from '../lib/audio-routes.js'
-import { resolveProgramLayoutForMain } from '../lib/program-audio-layouts.js'
+import { resolveProgramLayoutForMain, resolveEffectiveProgramLayout } from '../lib/program-audio-layouts.js'
 import { faderPercentToLinearGain, formatVolumeDb, linearGainToFaderPercent } from '../lib/audio-volume-scale.js'
 import { settingsState } from '../lib/settings-state.js'
 import { timelineState } from '../lib/timeline-state.js'
@@ -17,23 +17,31 @@ import { createDragInput } from './inspector-common.js'
  * @param {object} opts
  * @param {() => { audioRoute?: string, muted?: boolean, volume?: number }} opts.getAudio
  * @param {(patch: { audioRoute?: string, muted?: boolean, volume?: number }) => void} opts.onPatch
+ * @param {boolean} [opts.showStoredRoute]
+ * @param {number|null|undefined} [opts.mainIndex] 0-based main; null = all screens (widest bus)
+ * @param {object|null|undefined} [opts.channelMap] defaults to settings.channelMap
  */
-export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredRoute = false }) {
+export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredRoute = false, mainIndex, channelMap }) {
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group'
 	grp.innerHTML = '<div class="inspector-group__title">Audio</div>'
-	const masterLayout = resolveProgramLayoutForMain(
-		settingsState.getSettings(),
-		null,
-		sceneState.activeScreenIndex ?? 0,
-	)
+	const settings = settingsState.getSettings()
+	const cm = channelMap ?? settings?.channelMap ?? null
+	const masterLayout =
+		mainIndex === null
+			? resolveEffectiveProgramLayout(settings, cm)
+			: resolveProgramLayoutForMain(
+					settings,
+					cm,
+					mainIndex != null && Number.isFinite(Number(mainIndex))
+						? Number(mainIndex)
+						: sceneState.activeScreenIndex ?? 0,
+				)
 	const routes = audioOutputRoutesForLayout(masterLayout)
 	let a = getAudio()
 	let canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
 	if (canonical !== (a.audioRoute || '1+2')) {
-		onPatch({ audioRoute: canonical })
-		a = getAudio()
-		canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
+		queueMicrotask(() => onPatch({ audioRoute: canonical }))
 	}
 
 	const routeWrap = document.createElement('div')
@@ -71,7 +79,7 @@ export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredR
 		layoutHint.className = 'inspector-field inspector-field--hint'
 		layoutHint.style.fontSize = '0.78rem'
 		layoutHint.textContent =
-			'Program master is stereo — only ch1+2 is available. Widen master layout in Device View → Audio to use more pairs.'
+			'Program master is stereo — only ch1+2 is available. Widen program audio layout on the screen destination (Device View).'
 		grp.appendChild(layoutHint)
 	}
 
@@ -230,6 +238,8 @@ export function appendSceneLayerMixerGroup(root, { sceneId, layerIndex, layer })
 			sceneState.patchLayer(sceneId, layerIndex, p)
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 		},
+		mainIndex: sceneState.activeScreenIndex ?? 0,
+		channelMap: settingsState.getSettings()?.channelMap ?? null,
 	})
 }
 

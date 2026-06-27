@@ -87,6 +87,42 @@ export function getMainModalHtml() {
 							</select>
 						</div>
 						<p class="settings-note">Also used for the timeline Take bar default. Existing looks and clips are not changed.</p>
+						<h3 class="settings-category">Compose preview</h3>
+						<div class="settings-group">
+							<label for="set-compose-preview-mode">Preview source</label>
+							<select id="set-compose-preview-mode">
+								<option value="canvas">Canvas thumbnails (legacy)</option>
+								<option value="ffmpeg_jpeg">Caspar JPEG — ffmpeg writes file (recommended)</option>
+								<option value="caspar_image">Caspar ADD IMAGE tick (legacy)</option>
+							</select>
+							<p class="settings-note">JPEG mode embeds a low-cost ffmpeg consumer in Caspar config — no AMCP spam. Apply Caspar config after changing FPS or resolution.</p>
+						</div>
+						<div id="set-compose-preview-ffmpeg-fields">
+							<div class="settings-group">
+								<label for="set-compose-preview-fps">Update rate: <strong id="set-compose-preview-fps-val">2</strong> fps</label>
+								<input type="range" id="set-compose-preview-fps" min="1" max="30" step="1" value="2" style="width:100%;max-width:24rem" />
+							</div>
+							<div class="settings-group">
+								<label for="set-compose-preview-scale">Resolution (relative to channel)</label>
+								<select id="set-compose-preview-scale">
+									<option value="half">Half width × height (default)</option>
+									<option value="75">75%</option>
+									<option value="full">Full channel size</option>
+								</select>
+							</div>
+							<div class="settings-group">
+								<label for="set-compose-preview-jpeg-q">JPEG quality: <strong id="set-compose-preview-jpeg-q-val">10</strong></label>
+								<input type="range" id="set-compose-preview-jpeg-q" min="2" max="20" step="1" value="10" style="width:100%;max-width:24rem" />
+								<p class="settings-note">Lower number = higher quality, larger files.</p>
+							</div>
+						</div>
+						<div id="set-compose-preview-tick-fields">
+							<div class="settings-group">
+								<label for="set-compose-preview-tick-ms">Capture interval: <strong id="set-compose-preview-tick-ms-val">125</strong> ms</label>
+								<input type="range" id="set-compose-preview-tick-ms" min="100" max="1000" step="25" value="125" style="width:100%;max-width:24rem" />
+								<p class="settings-note">ADD IMAGE mode only. Unchanged channels are never captured.</p>
+							</div>
+						</div>
 					</div>
 					<div class="settings-pane" id="settings-pane-simulation">
 						<h3 class="settings-category">Simulation</h3>

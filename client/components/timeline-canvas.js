@@ -170,6 +170,7 @@ export function initTimelineCanvas(container, opts) {
 
 		// Ruler → flag drag or seek
 		if (cy < RULER_H) {
+			canvas.dataset.lastClicked = 'ruler'
 			const hf = tl ? hitFlag(tl, cx, cy, xAt) : null
 			if (hf && tl) {
 				onSelectFlag?.({ timelineId: tl.id, flagId: hf.flag.id, flag: hf.flag })
@@ -190,6 +191,7 @@ export function initTimelineCanvas(container, opts) {
 
 		const divIdx = hitLayerDivider(cy, tl, scrollY, RULER_H)
 		if (divIdx != null && e.button === 0 && onLayerHeightsChange) {
+			canvas.dataset.lastClicked = 'divider'
 			drag = {
 				type: 'layer-divider',
 				dividerIdx: divIdx,
@@ -205,12 +207,14 @@ export function initTimelineCanvas(container, opts) {
 
 		// Left-click on layer header → open layer inspector
 		if (cx < HEADER_W && li >= 0 && li < tl.layers.length && e.button === 0) {
+			canvas.dataset.lastClicked = 'header'
 			onLayerClick?.(tl.id, li, tl.layers[li])
 			return
 		}
 		const clip = li < tl.layers.length ? hitClip(tl, li, ms) : null
 
 		if (clip) {
+			canvas.dataset.lastClicked = 'clip'
 			const trackY = trackTopForLayer(tl, li, scrollY, RULER_H)
 			const kfIdx = hitKeyframe(clip, trackY, layerHeightAt(tl, li), cx, cy, canvas, xAt, pxPerMs)
 			if (kfIdx != null && onSelectKeyframe) {
@@ -237,6 +241,7 @@ export function initTimelineCanvas(container, opts) {
 				}
 			}
 		} else {
+			canvas.dataset.lastClicked = 'track'
 			onSelectClip(null)
 			// Click empty track = move playhead (same as ruler seek)
 			drag = { type: 'seek' }

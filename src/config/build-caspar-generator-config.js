@@ -14,7 +14,7 @@ const {
 	writeDecklinkKeyFillToCasparServer,
 	applyDecklinkConsumerSettingsFromConnector,
 } = require('./decklink-key-fill')
-const { channelCountFromLayout, normalizeProgramLayout } = require('./audio-channel-layouts')
+const { channelCountFromLayout, normalizeProgramLayout, maxProgramLayout } = require('./audio-channel-layouts')
 const { destinationAudioLayoutsByMain } = require('./screen-destinations')
 
 /**
@@ -391,7 +391,7 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 			}
 			merged.caspar_global_portaudio = true
 
-			const layout = String(out.channelLayout || 'stereo')
+			const layout = normalizeProgramLayout(String(out.channelLayout || 'stereo'))
 			const chCount = channelCountFromLayout(layout)
 
 			const consumer = {
@@ -407,6 +407,13 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 
 			merged[`${prefix}portaudio_consumers`].push(consumer)
 			merged[`${prefix}portaudio_enabled`] = true
+
+			// PortAudio consumer width must match PGM `<channel-layout>` on the cabled program channel.
+			if (!isMv) {
+				const layoutKey = `screen_${idx + 1}_audio_layout`
+				const current = normalizeProgramLayout(String(merged[layoutKey] || 'stereo'))
+				merged[layoutKey] = maxProgramLayout(current, layout)
+			}
 		}
 
 		// Ensure we are in custom_live profile if we are using either PortAudio or System Audio device names
@@ -502,6 +509,12 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
 	merged.rtmp = normalizeRtmpConfig(appConfig && appConfig.rtmp)
+	merged.composePreview = {
+		...(defaults.composePreview || {}),
+		...(appConfig && appConfig.composePreview && typeof appConfig.composePreview === 'object'
+			? appConfig.composePreview
+			: {}),
+	}
 	merged.streamingChannel = {
 		...(defaults.streamingChannel || {}),
 		...(appConfig && appConfig.streamingChannel && typeof appConfig.streamingChannel === 'object'

@@ -20,6 +20,7 @@ const {
 	probeMedia,
 } = require('../media/local-media')
 const { isTemplateClip } = require('../state/playback-tracker-media')
+const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
 const {
 	handleLiveThumbnailGet,
 	handleLiveThumbnailCapturePost,
@@ -343,7 +344,8 @@ async function handlePost(path, body, ctx, req, query) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}
 		try {
-			const res = await ctx.amcp.query.cinf(id)
+			const cinfId = resolveCasparCinfMediaId(id, ctx)
+			const res = await ctx.amcp.query.cinf(cinfId, { ctx })
 			const cinf = cinfResponseToStr(res?.data)
 			const parsed = parseCinfMedia(cinf)
 			let durationMs = parsed.durationMs
@@ -352,11 +354,12 @@ async function handlePost(path, body, ctx, req, query) {
 			}
 			if (ctx.mediaDetails && typeof ctx.mediaDetails === 'object') {
 				ctx.mediaDetails[id] = cinf
+				if (cinfId !== id) ctx.mediaDetails[cinfId] = cinf
 			}
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, id, cinf, ...parsed, ...(durationMs > 0 ? { durationMs } : {}) }),
+				body: jsonBody({ ok: true, id, cinfId, cinf, ...parsed, ...(durationMs > 0 ? { durationMs } : {}) }),
 			}
 		} catch (e) {
 			const durationMs = await probeDurationMsFromLocalFiles(ctx, id)

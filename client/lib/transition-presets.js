@@ -2,6 +2,8 @@
  * Transition type constants + pure helpers (no scene-state dependency — safe to import anywhere).
  */
 
+import { transitionDurationForFps } from './transition-duration.js'
+
 export const DEFAULT_TRANSITION = { type: 'CUT', duration: 0, tween: 'linear' }
 /** Values persisted on scenes / timeline. Labels for the UI are in {@link TRANSITION_TYPE_LABELS}. */
 export const TRANSITION_TYPES = ['CUT', 'MIX', 'PUSH', 'WIPE', 'SLIDE', 'MIX + ANIMATE', 'WIPE + ANIMATE', 'SLIDE + ANIMATE', 'PUSH + ANIMATE']
@@ -66,7 +68,7 @@ export function normalizeTransitionForPgmOnly(t) {
 		const dur = Math.max(0, Math.round(Number(base.duration) || 0))
 		return {
 			type: mapped,
-			duration: dur > 0 ? dur : 12,
+			duration: dur > 0 ? dur : transitionDurationForFps(50),
 			tween: base.tween || 'linear',
 		}
 	}

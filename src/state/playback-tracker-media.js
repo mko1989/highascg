@@ -5,6 +5,7 @@
 'use strict'
 
 const { parseCinfMedia } = require('../media/cinf-parse')
+const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
 const { canonicalMediaBasenameKey } = require('../utils/media-browser-dedupe')
 
 /**
@@ -94,7 +95,8 @@ async function resolveClipDurationMsWithAmcpCinf(ctx, clipId) {
 	if (!rawToken) return null
 	const id = mediaIdKey(clipId)
 	try {
-		const res = await ctx.amcp.query.cinf(rawToken)
+		const cinfId = resolveCasparCinfMediaId(rawToken, ctx)
+		const res = await ctx.amcp.query.cinf(cinfId, { ctx })
 		const str = cinfResponseToStr(res?.data)
 		if (!str.trim()) return null
 		const parsed = parseCinfMedia(str)

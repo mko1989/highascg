@@ -1,4 +1,8 @@
 import { fullFill } from './fill-math.js'
+import {
+	AUTO_TRANSITION_DURATION_SENTINEL,
+	transitionDurationForFps,
+} from './transition-duration.js'
 
 /** Main look clips on PGM/PRV use 10, 20, 30…; layers 1–9 are reserved (e.g. black CG, channel chrome); 11–19 sit above layer 10 for PIP/CG, 21–29 above 20, etc. */
 export const LOOK_LAYER_FIRST = 10
@@ -9,10 +13,12 @@ function defaultFill() {
 	return { ...fullFill() }
 }
 
-/** @returns {object} */
-export function defaultTransition() {
+/** @param {number} [fps] — when set, duration is half fps; otherwise auto sentinel until fps is known */
+export function defaultTransition(fps) {
 	// MIX + frames ≈ fade to program when taking a look (Caspar load transition).
-	return { type: 'MIX', duration: 12, tween: 'linear' }
+	const duration =
+		fps != null ? transitionDurationForFps(fps) : AUTO_TRANSITION_DURATION_SENTINEL
+	return { type: 'MIX', duration, tween: 'linear' }
 }
 
 /**
@@ -54,7 +60,7 @@ export function defaultLayerConfig(layerNumber) {
 		pipOverlays: [],
 		sourceMode: 'single',
 		playlist: [],
-		playlistTransition: { type: 'MIX', duration: 12, tween: 'linear' },
+		playlistTransition: { type: 'MIX', duration: AUTO_TRANSITION_DURATION_SENTINEL, tween: 'linear' },
 		playlistLoop: true,
 		playlistAdvance: 'auto',
 	}
@@ -127,7 +133,7 @@ export function migrateScene(s) {
 					if (base.sourceMode == null) base.sourceMode = 'single'
 					if (!Array.isArray(base.playlist)) base.playlist = []
 					if (!base.playlistTransition || typeof base.playlistTransition !== 'object') {
-						base.playlistTransition = { type: 'MIX', duration: 12, tween: 'linear' }
+						base.playlistTransition = { type: 'MIX', duration: AUTO_TRANSITION_DURATION_SENTINEL, tween: 'linear' }
 					}
 					if (base.playlistLoop == null) base.playlistLoop = true
 					if (base.playlistAdvance == null) base.playlistAdvance = 'auto'

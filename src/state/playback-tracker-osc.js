@@ -193,6 +193,7 @@ function getOccupiedLayerNumbersFromOsc(ctx, ch) {
 
 module.exports = {
 	isOscPlaybackActive,
+	pickClipFromOscLayer,
 	buildMatrixFromOsc,
 	getOccupiedLayerNumbersFromOsc,
 	getOscClipEndFadeDelayMs,

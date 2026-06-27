@@ -5,6 +5,7 @@
 import { mountLookTransitionControls } from './scenes-shared.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
+import { api } from '../lib/api-client.js'
 
 /**
  * Click on unused deck column area (gaps, empty placeholder, padding below cards).
@@ -133,7 +134,7 @@ export function renderSceneDeck(ctx) {
 	})()
 	mountLookTransitionControls(
 		transMount,
-		sceneState.globalDefaultTransition,
+		sceneState.getResolvedGlobalDefaultTransition(),
 		(t) => sceneState.setGlobalDefaultTransition(t),
 		'scenes-deck-dt',
 		{
@@ -209,11 +210,41 @@ export function renderSceneDeck(ctx) {
 		head.style.display = 'flex'
 		head.style.justifyContent = 'space-between'
 		head.style.alignItems = 'center'
-		
+
+		const headLeft = document.createElement('div')
+		headLeft.className = 'scenes-deck-col__head-left'
+
 		const title = document.createElement('span')
+		title.className = 'scenes-deck-col__title'
 		title.textContent = mainLabel(col)
-		head.appendChild(title)
-		
+		headLeft.appendChild(title)
+
+		const ftbBtn = document.createElement('button')
+		ftbBtn.type = 'button'
+		ftbBtn.className = 'scenes-btn scenes-btn--ftb'
+		ftbBtn.textContent = 'FTB'
+		ftbBtn.title = `Fade to black on ${mainLabel(col)} (PGM + PRV), then clear`
+		ftbBtn.setAttribute('aria-label', `Fade to black ${mainLabel(col)}`)
+		ftbBtn.addEventListener('click', (e) => {
+			e.stopPropagation()
+			if (ftbBtn.disabled) return
+			ftbBtn.disabled = true
+			void (async () => {
+				try {
+					await api.post('/api/ftb', { screenIdx: col })
+					sceneState.setLiveSceneId(null, col)
+					sceneState.setPreviewSceneId(null, col)
+					showToast(`FTB: ${mainLabel(col)}`, 'info')
+				} catch (err) {
+					showToast(`FTB: ${err?.message || err}`, 'error')
+				} finally {
+					ftbBtn.disabled = false
+				}
+			})()
+		})
+		headLeft.appendChild(ftbBtn)
+		head.appendChild(headLeft)
+
 		const borderBtn = document.createElement('div')
 		borderBtn.className = 'scenes-global-border-item'
 		borderBtn.style.display = 'flex'

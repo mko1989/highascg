@@ -52,6 +52,20 @@ function coreDefaults() {
 			nuclearRequirePassword: false,
 			nuclearPassword: '',
 		},
+		composePreview: {
+			mode: 'canvas',
+			tickHz: 8,
+			tickIntervalMs: 125,
+			fps: 2,
+			resolutionScale: 'half',
+			jpegQuality: 10,
+			basenamePrefix: 'highascg_preview',
+			maxWidth: 480,
+			channels: 'compose_visible',
+			embedConsumersInCasparConfig: true,
+			attachViaAmcp: true,
+			pauseConsumerWhenIdle: false,
+		},
 		editorDefaults: editorDefaultsDefaults(),
 		audioRouting: {
 			programLayout: 'stereo',
@@ -206,6 +220,19 @@ function coreDefaults() {
 			layout: {},
 		},
 		replication: replicationDefaults(),
+		machineProfile: {
+			defaultProjectFps: 50,
+		},
+		network: {
+			primaryInterface: '',
+			mode: 'dhcp',
+			static: {
+				address: '',
+				prefixLength: 24,
+				gateway: '',
+				dns: [],
+			},
+		},
 	}
 }
 

@@ -181,13 +181,12 @@ test('generator XML: multiview decklink consumer includes inherited 2160p5000 vi
 	}
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const xml = buildConfigXml(flat)
-	assert.match(xml, /<video-mode>2160p5000<\/video-mode>[\s\S]*<decklink>[\s\S]*<video-mode>2160p5000<\/video-mode>[\s\S]*<buffer-depth>5<\/buffer-depth>/)
-	assert.doesNotMatch(xml, /<decklink>[\s\S]*<pixel-format>yuv<\/pixel-format>/)
+	assert.match(xml, /<video-mode>2160p5000<\/video-mode>[\s\S]*<decklink>[\s\S]*<video-mode>2160p5000<\/video-mode>[\s\S]*<pixel-format>yuv<\/pixel-format>[\s\S]*<buffer-depth>3<\/buffer-depth>/)
 	assert.match(xml, /Multiview output #1[\s\S]*<decklink>[\s\S]*<keyer>default<\/keyer>/)
 	assert.doesNotMatch(xml, /Multiview output #1[\s\S]*<video-mode>1080p5000<\/video-mode>[\s\S]*<decklink>/)
 })
 
-test('generator XML: custom PGM screen emits decklink with 1:1 subregion when SDI format set', () => {
+test('generator XML: custom PGM screen emits decklink without subregion when SDI format set', () => {
 	const app = clone(defaults)
 	app.screenDestinations = {
 		version: 1,
@@ -233,8 +232,8 @@ test('generator XML: custom PGM screen emits decklink with 1:1 subregion when SD
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const xml = buildConfigXml(flat)
 	assert.match(xml, /Screen 1 program[\s\S]*<video-mode>3072x1728<\/video-mode>/)
-	assert.match(xml, /Screen 1 program[\s\S]*<decklink>[\s\S]*<video-mode>2160p5000<\/video-mode>/)
-	assert.match(xml, /Screen 1 program[\s\S]*<subregion>[\s\S]*<width>3072<\/width>[\s\S]*<height>1728<\/height>/)
+	assert.match(xml, /Screen 1 program[\s\S]*<decklink>[\s\S]*<video-mode>2160p5000<\/video-mode>[\s\S]*<pixel-format>yuv<\/pixel-format>/)
+	assert.doesNotMatch(xml, /Screen 1 program[\s\S]*<decklink>[\s\S]*<subregion>/)
 	assert.match(xml, /Screen 1 program[\s\S]*<embedded-audio>true<\/embedded-audio>/)
 })
 
@@ -285,9 +284,21 @@ test('buildDecklinkKeyFillConsumersXml: fill-only includes consumer defaults', (
 	const xml = buildDecklinkKeyFillConsumersXml({ fillDevice: 4, videoMode: '1080p5000' })
 	assert.match(xml, /<keyer>default<\/keyer>/)
 	assert.match(xml, /<embedded-audio>true<\/embedded-audio>/)
-	assert.match(xml, /<buffer-depth>5<\/buffer-depth>/)
+	assert.match(xml, /<buffer-depth>3<\/buffer-depth>/)
 	assert.match(xml, /<color-space>bt709<\/color-space>/)
 	assert.doesNotMatch(xml, /<key-device>/)
+})
+
+test('buildDecklinkKeyFillConsumersXml: 2160p includes yuv pixel-format', () => {
+	const { buildDecklinkKeyFillConsumersXml } = require('../../src/config/decklink-key-fill')
+	const xml = buildDecklinkKeyFillConsumersXml({ fillDevice: 4, videoMode: '2160p5000' })
+	assert.match(xml, /<pixel-format>yuv<\/pixel-format>/)
+})
+
+test('buildDecklinkKeyFillConsumersXml: 1080p omits pixel-format', () => {
+	const { buildDecklinkKeyFillConsumersXml } = require('../../src/config/decklink-key-fill')
+	const xml = buildDecklinkKeyFillConsumersXml({ fillDevice: 4, videoMode: '1080p5000' })
+	assert.doesNotMatch(xml, /<pixel-format>/)
 })
 
 test('buildDecklinkKeyFillConsumersXml: key/fill pair uses configured keyer', () => {
@@ -300,6 +311,20 @@ test('buildDecklinkKeyFillConsumersXml: key/fill pair uses configured keyer', ()
 	})
 	assert.match(xml, /<keyer>internal<\/keyer>/)
 	assert.match(xml, /<key-device>2<\/key-device>/)
+})
+
+test('buildDecklinkKeyFillConsumersXml: 2160p key/fill includes yuv on fill and key-only', () => {
+	const { buildDecklinkKeyFillConsumersXml } = require('../../src/config/decklink-key-fill')
+	const xml = buildDecklinkKeyFillConsumersXml({
+		fillDevice: 1,
+		keyDevice: 2,
+		keyer: 'external',
+		videoMode: '2160p5000',
+	})
+	const blocks = xml.split('<decklink>').slice(1)
+	assert.equal(blocks.length, 2)
+	assert.match(blocks[0], /<pixel-format>yuv<\/pixel-format>/)
+	assert.match(blocks[1], /<key-only>true<\/key-only>[\s\S]*<pixel-format>yuv<\/pixel-format>/)
 })
 
 test('validateDecklinkOutputResolutions: warns on UHD decklink output', () => {

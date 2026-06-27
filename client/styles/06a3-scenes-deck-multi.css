@@ -127,6 +127,43 @@
 	padding: 0 4px 4px 4px;
 }
 
+.scenes-deck-col__head-left {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.scenes-deck-col__title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.scenes-btn--ftb {
+	padding: 1px 6px;
+	font-size: 0.62rem;
+	font-weight: 700;
+	line-height: 1.35;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	background: #7f1d1d;
+	border-color: #b91c1c;
+	color: #fecaca;
+	flex-shrink: 0;
+}
+
+.scenes-btn--ftb:hover:not(:disabled) {
+	background: #991b1b;
+	border-color: #dc2626;
+	color: #fff;
+}
+
+.scenes-btn--ftb:disabled {
+	opacity: 0.55;
+	cursor: wait;
+}
+
 .scenes-deck__empty--tight {
 	padding: 1rem 0.5rem;
 }

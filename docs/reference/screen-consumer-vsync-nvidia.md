@@ -40,7 +40,13 @@ HighAsCG production install also sets:
 
 Re-run after layout apply, **nodm restart**, driver upgrades, or if tearing returns:
 
-**Important:** `xrandr` / layout apply resets NVIDIA **CurrentMetaMode** and clears **Force Composition Pipeline**. HighAsCG runs `highascg-nvidia-x-apply.sh` **after** `apply-layout.sh` (openbox autostart + apply-layout tail + layout watchdog), with retries until MetaMode is populated.
+**Important:** `xrandr` / layout apply resets NVIDIA **CurrentMetaMode** and clears per-output **Force Composition Pipeline** in MetaMode. HighAsCG runs `highascg-nvidia-x-apply.sh` **after** every `apply-layout.sh` (openbox autostart + apply-layout tail), with retries at 6s and 18s.
+
+**Persistent defaults (no polling watchdog):**
+
+1. **Xorg** — `scripts/setup/09-openbox-autostart.sh` installs `/etc/X11/xorg.conf.d/99-highascg-force-composition.conf` with `Option "ForceCompositionPipeline" "On"` on the NVIDIA device (driver default at session start).
+2. **nvidia-settings rc** — after each apply, `highascg-nvidia-x-apply.sh` runs `nvidia-settings --save` so `~/.nvidia-settings-rc` includes the patched `CurrentMetaMode`.
+3. **Runtime** — any `xrandr` layout change must still be followed by `highascg-nvidia-x-apply.sh` (wired into `apply-layout.sh` and full config apply).
 
 Permanent on a production box:
 

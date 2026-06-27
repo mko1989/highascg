@@ -390,6 +390,9 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		const clip = findClipAtTime(tl.layers[li], pos)
 		if (!clip?.source?.value) continue
 
+		// Upper tracks are often audio beds — audible on output, not shown on video compose preview.
+		if (isLikelyAudioOnlySource(clip.source, mediaList) && li > 0) continue
+
 		const localMs = Math.max(0, pos - clip.startTime)
 		const op = lerpKeyframeProperty(clip, 'opacity', localMs, 1)
 		const r = clipPixelRectAtLocalTime(clip, localMs, W, H, stateStore, screenIdx)

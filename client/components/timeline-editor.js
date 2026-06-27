@@ -13,6 +13,13 @@ import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initTimelineCanvas } from './timeline-canvas.js'
 import { initPreviewPanel, drawTimelineStack } from './preview-canvas.js'
+import {
+	drawComposeSnapshotCell,
+	isSnapshotComposePreview,
+	resolveComposeChannelForCell,
+	subscribeComposePreviewRefresh,
+} from './preview-canvas-compose-snapshot.js'
+import { drawComposePrvPgmCellEdgeBar } from './preview-canvas-draw-base.js'
 import { createTimelineTransport } from './timeline-transport.js'
 import { streamState } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
@@ -39,7 +46,7 @@ export function initTimelineEditor(root, stateStore) {
 	const view = {
 		sendTo: { preview: true, program: false, screenIdx: 0 },
 		follow: true,
-		takeTransition: { ...getDefaultTransitionFromEditor() },
+		takeTransition: { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) },
 	}
 
 	// Smooth playhead: track server tick reference point for local interpolation (same clock as RAF)
@@ -298,6 +305,25 @@ export function initTimelineEditor(root, stateStore) {
 		showDestinationVisualOverlay: false,
 		composePrvPgmLayoutToggle: true,
 		draw(ctx, W, H, isLive, meta = {}) {
+			if (isSnapshotComposePreview() && meta.composeCell) {
+				const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'
+				const v = meta.composeCellViewport
+				const cellW = v?.w || W
+				const cellH = v?.h || H
+				if (isLive) {
+					ctx.clearRect(0, 0, cellW, cellH)
+					drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
+					return
+				}
+				const cm = stateStore.getState()?.channelMap || {}
+				const ch = resolveComposeChannelForCell(meta, cm, view.sendTo.screenIdx ?? 0)
+				if (ch) {
+					drawComposeSnapshotCell(ctx, cellW, cellH, ch, { onLoaded: () => previewPanel.scheduleDraw() })
+					drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
+					return
+				}
+			}
+			// --- legacy canvas compose (WO-57: keep until caspar_image sign-off) ---
 			drawTimelineStack(ctx, W, H, {
 				timelineState,
 				getPlayback: () => playback,
@@ -325,6 +351,7 @@ export function initTimelineEditor(root, stateStore) {
 	}
 	streamState.subscribe(syncTimelinePreviewVisibility)
 	settingsState.subscribe(syncTimelinePreviewVisibility)
+	subscribeComposePreviewRefresh(() => previewPanel?.scheduleDraw?.())
 	syncTimelinePreviewVisibility()
 
 	// ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -420,7 +447,11 @@ export function initTimelineEditor(root, stateStore) {
 	})
 	window.addEventListener('timeline-redraw-request', () => redrawTimelineView())
 	document.addEventListener('highascg-editor-defaults-changed', () => {
-		view.takeTransition = { ...getDefaultTransitionFromEditor() }
+		view.takeTransition = { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) }
+		buildTransport()
+	})
+	sceneState.on('screenChange', () => {
+		view.takeTransition = { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) }
 		buildTransport()
 	})
 

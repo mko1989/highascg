@@ -16,6 +16,56 @@ export function syncEditorDefaultsFromModal(modal) {
 	return editorDefaults
 }
 
+/** @param {number} ms */
+function clampComposePreviewTickMs(ms) {
+	const n = parseInt(String(ms), 10)
+	if (!Number.isFinite(n)) return 125
+	return Math.max(100, Math.min(1000, Math.round(n / 25) * 25))
+}
+
+/** @param {number} fps */
+function clampComposePreviewFps(fps) {
+	const n = parseInt(String(fps), 10)
+	if (!Number.isFinite(n)) return 2
+	return Math.max(1, Math.min(30, n))
+}
+
+export function syncComposePreviewTickLabel(modal) {
+	const range = modal.querySelector('#set-compose-preview-tick-ms')
+	const label = modal.querySelector('#set-compose-preview-tick-ms-val')
+	if (!range || !label) return
+	label.textContent = String(clampComposePreviewTickMs(range.value))
+}
+
+export function syncComposePreviewFpsLabel(modal) {
+	const range = modal.querySelector('#set-compose-preview-fps')
+	const label = modal.querySelector('#set-compose-preview-fps-val')
+	if (!range || !label) return
+	label.textContent = String(clampComposePreviewFps(range.value))
+}
+
+/** @param {number} q */
+function clampComposePreviewJpegQuality(q) {
+	const n = parseInt(String(q), 10)
+	if (!Number.isFinite(n)) return 10
+	return Math.max(2, Math.min(31, n))
+}
+
+export function syncComposePreviewJpegQualityLabel(modal) {
+	const range = modal.querySelector('#set-compose-preview-jpeg-q')
+	const label = modal.querySelector('#set-compose-preview-jpeg-q-val')
+	if (!range || !label) return
+	label.textContent = String(clampComposePreviewJpegQuality(range.value))
+}
+
+export function syncComposePreviewModeVisibility(modal) {
+	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'canvas'
+	const ffmpegFields = modal.querySelector('#set-compose-preview-ffmpeg-fields')
+	const tickFields = modal.querySelector('#set-compose-preview-tick-fields')
+	if (ffmpegFields) ffmpegFields.style.display = mode === 'ffmpeg_jpeg' ? '' : 'none'
+	if (tickFields) tickFields.style.display = mode === 'caspar_image' ? '' : 'none'
+}
+
 export function buildSettingsPayload(modal) {
 	const prevAr = settingsState.getSettings()?.audioRouting || {}
 	const openalAr = collectOpenalAudioRoutingFromModal(modal)
@@ -57,6 +107,14 @@ export function buildSettingsPayload(modal) {
 			port: parseInt(modal.querySelector('#set-companion-port').value, 10) || 8000,
 		},
 		audioRouting: { ...prevAr, ...openalAr },
+		composePreview: {
+			...(prevAll.composePreview || {}),
+			mode: modal.querySelector('#set-compose-preview-mode')?.value ?? prevAll.composePreview?.mode ?? 'canvas',
+			fps: clampComposePreviewFps(modal.querySelector('#set-compose-preview-fps')?.value ?? prevAll.composePreview?.fps ?? 2),
+			resolutionScale: modal.querySelector('#set-compose-preview-scale')?.value ?? prevAll.composePreview?.resolutionScale ?? 'half',
+			jpegQuality: clampComposePreviewJpegQuality(modal.querySelector('#set-compose-preview-jpeg-q')?.value ?? prevAll.composePreview?.jpegQuality ?? 10),
+			tickIntervalMs: clampComposePreviewTickMs(modal.querySelector('#set-compose-preview-tick-ms')?.value ?? prevAll.composePreview?.tickIntervalMs ?? 125),
+		},
 		dmx: JSON.parse(JSON.stringify(settingsState.getSettings()?.dmx || { enabled: false, debugLogDmx: false, fps: 25, fixtures: [] })),
 		casparServer: JSON.parse(JSON.stringify(prevAll.casparServer || {})),
 		rtmp: JSON.parse(JSON.stringify(prevAll.rtmp || {})),
@@ -90,7 +148,8 @@ export function buildSettingsPayload(modal) {
 }
 
 export function hydrateSettings(modal, cfg) {
-	hydrateEditorDefaultsModal(modal, cfg.editorDefaults)
+	const fps = sceneState.getCanvasForScreen(0).framerate
+	hydrateEditorDefaultsModal(modal, cfg.editorDefaults, fps)
 	const casparHostEl = modal.querySelector('#set-caspar-host'); if (casparHostEl) casparHostEl.value = cfg.caspar.host
 	const casparPortEl = modal.querySelector('#set-caspar-port'); if (casparPortEl) casparPortEl.value = cfg.caspar.port
 	const offlineModeEl = modal.querySelector('#set-offline-mode'); if (offlineModeEl) offlineModeEl.checked = !!cfg.offline_mode
@@ -124,4 +183,32 @@ export function hydrateSettings(modal, cfg) {
 	const ui = cfg.ui || {}
 	const nr = modal.querySelector('#set-nuclear-require-pass'); if (nr) nr.checked = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
 	const np = modal.querySelector('#set-nuclear-password'); if (np) np.value = String(ui.nuclearPassword || '')
+	const cp = cfg.composePreview || {}
+	const cpMode = modal.querySelector('#set-compose-preview-mode')
+	if (cpMode) {
+		const m = cp.mode === 'ffmpeg_jpeg' || cp.mode === 'caspar_image' ? cp.mode : 'canvas'
+		cpMode.value = m
+	}
+	syncComposePreviewModeVisibility(modal)
+	const cpFps = modal.querySelector('#set-compose-preview-fps')
+	if (cpFps) {
+		cpFps.value = String(clampComposePreviewFps(cp.fps ?? 2))
+		syncComposePreviewFpsLabel(modal)
+	}
+	const cpScale = modal.querySelector('#set-compose-preview-scale')
+	if (cpScale) {
+		const s = String(cp.resolutionScale || 'half')
+		cpScale.value = s === '75' || s === 'full' ? s : 'half'
+	}
+	const cpJq = modal.querySelector('#set-compose-preview-jpeg-q')
+	if (cpJq) {
+		cpJq.value = String(clampComposePreviewJpegQuality(cp.jpegQuality ?? 10))
+		syncComposePreviewJpegQualityLabel(modal)
+	}
+	const cpTick = modal.querySelector('#set-compose-preview-tick-ms')
+	if (cpTick) {
+		const ms = clampComposePreviewTickMs(cp.tickIntervalMs ?? (cp.tickHz ? Math.floor(1000 / cp.tickHz) : 125))
+		cpTick.value = String(ms)
+		syncComposePreviewTickLabel(modal)
+	}
 }

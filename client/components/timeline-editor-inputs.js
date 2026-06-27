@@ -163,6 +163,58 @@ function handleTimelineEditorKeydown(e, deps) {
 		return
 	}
 
+	if (!inField && !e.shiftKey && !mod && !e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+		const canvas = document.querySelector('.tl-canvas')
+		const lastClicked = canvas?.dataset?.lastClicked
+		const selected = freshClipSelection(getSelectedClip)
+
+		if (selected && lastClicked !== 'ruler') {
+			e.preventDefault()
+			const { timelineId, layerIdx, clipId, clip } = selected
+			const tl = timelineState.getTimeline(timelineId)
+			if (tl) {
+				const fps = tl.fps || 25
+				const frameMs = 1000 / fps
+				let newStartTime = clip.startTime
+				if (e.key === 'ArrowRight') {
+					newStartTime = Math.min(tl.duration - clip.duration, newStartTime + frameMs)
+				} else {
+					newStartTime = Math.max(0, newStartTime - frameMs)
+				}
+				timelineState.updateClip(timelineId, layerIdx, clipId, { startTime: newStartTime })
+				void getSyncToServer()(timelineState.getActive())
+				redrawTimelineView()
+
+				const refreshed = freshClipSelection(getSelectedClip)
+				if (refreshed) {
+					setSelectedClip(refreshed)
+					window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: refreshed }))
+				}
+			}
+			return
+		}
+
+		if (lastClicked === 'ruler') {
+			const tl = timelineState.getActive()
+			if (tl) {
+				e.preventDefault()
+				const fps = tl.fps || 25
+				const frameMs = 1000 / fps
+				const pb = getPlayback()
+				let targetMs = pb.position
+				if (e.key === 'ArrowRight') {
+					targetMs = Math.min(tl.duration || 0, targetMs + frameMs)
+				} else {
+					targetMs = Math.max(0, targetMs - frameMs)
+				}
+				pb.position = targetMs
+				api.post(`/api/timelines/${encodeURIComponent(tl.id)}/seek`, { ms: targetMs }).catch(() => {})
+				redrawTimelineView()
+			}
+			return
+		}
+	}
+
 	const selected = freshClipSelection(getSelectedClip)
 	if (!selected) return
 	const { timelineId, layerIdx, clipId, clip } = selected

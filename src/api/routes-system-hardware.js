@@ -12,6 +12,7 @@ const { handleGuiLaunchPost } = require('./system-hardware-gui')
 const { handleGpuPortsReset } = require('./system-hardware-gpu-ports')
 const { handleXrandrLayoutGet, handleXrandrLayoutApplyPost } = require('./system-hardware-xrandr-layout')
 const { handleIdentifyDisplaysPost } = require('./system-hardware-identify-displays')
+const { handleNetworkGet, handleNetworkApplyPost } = require('./system-hardware-network')
 
 /**
  * @param {string} p
@@ -21,6 +22,7 @@ async function hardwareHandleGet(p, ctx) {
 	if (p === '/api/system/gpu-layout') return handleGpuLayoutGet()
 	if (p === '/api/system/decklink') return decklinkGet()
 	if (p === '/api/system/xrandr-layout') return handleXrandrLayoutGet(ctx)
+	if (p === '/api/system/network') return handleNetworkGet(ctx)
 	return null
 }
 
@@ -35,6 +37,7 @@ async function hardwareHandlePost(p, body, ctx) {
 	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset()
 	if (p === '/api/system/xrandr-layout/apply') return handleXrandrLayoutApplyPost(ctx)
 	if (p === '/api/system/identify-displays') return handleIdentifyDisplaysPost(body, ctx)
+	if (p === '/api/system/network/apply') return handleNetworkApplyPost(body, ctx)
 
 	return null
 }

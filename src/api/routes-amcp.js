@@ -135,7 +135,11 @@ async function handlePost(path, body, ctx) {
 			}
 			const r = await amcp.play(channel, layer, clip, opts)
 			playbackTracker.recordPlay(ctx, channel, layer, clip, { loop: !!loop })
-			notifyProgramMutationMayInvalidateLive(ctx, channel)
+			notifyProgramMutationMayInvalidateLive(ctx, channel, {
+				transition: transition || 'CUT',
+				durationFrames: duration,
+				clip,
+			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
 		}
 		case '/api/loadbg': {
@@ -151,7 +155,11 @@ async function handlePost(path, body, ctx) {
 				if (af) opts.audioFilter = af
 			}
 			const r = await amcp.loadbg(channel, layer, clip, opts)
-			notifyProgramMutationMayInvalidateLive(ctx, channel)
+			notifyProgramMutationMayInvalidateLive(ctx, channel, {
+				transition: transition || 'CUT',
+				durationFrames: duration,
+				clip,
+			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/load': {
@@ -167,11 +175,20 @@ async function handlePost(path, body, ctx) {
 				if (af) opts.audioFilter = af
 			}
 			const r = await amcp.load(channel, layer, clip, opts)
-			notifyProgramMutationMayInvalidateLive(ctx, channel)
+			notifyProgramMutationMayInvalidateLive(ctx, channel, {
+				transition: transition || 'CUT',
+				durationFrames: duration,
+				clip,
+			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/pause': {
 			const r = await amcp.pause(channel, layer)
+			try {
+				require('../preview/compose-preview-activity').onPlaybackPaused(ctx, channel)
+			} catch {
+				/* WO-57 optional */
+			}
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/resume': {

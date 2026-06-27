@@ -8,6 +8,7 @@ import {
 	mergeEditorDefaults,
 	contentFitOptionsHtml,
 } from './editor-defaults-constants.js'
+import { resolveTransitionDuration } from './transition-duration.js'
 
 export { DEFAULT_EDITOR_DEFAULTS, mergeEditorDefaults } from './editor-defaults-constants.js'
 
@@ -22,9 +23,17 @@ export function getCoordinateOrigin() {
 	return getEditorDefaults().coordinateOrigin
 }
 
-export function getDefaultTransitionFromEditor() {
+/**
+ * @param {number} [fps] — project frame rate; defaults to 50 when unknown
+ */
+export function getDefaultTransitionFromEditor(fps) {
 	const t = getEditorDefaults().transition
-	return { ...defaultTransition(), ...t }
+	const rate = Number(fps) > 0 ? Number(fps) : 50
+	return {
+		...defaultTransition(),
+		...t,
+		duration: resolveTransitionDuration(t.duration, rate),
+	}
 }
 
 /**
@@ -61,7 +70,8 @@ export function applyTimelineClipDefaults(clip) {
  */
 export function applyEditorDefaultsToRuntime(sceneState, opts = {}) {
 	if (opts.syncSceneGlobalTransition && sceneState?.setGlobalDefaultTransition) {
-		sceneState.setGlobalDefaultTransition(getDefaultTransitionFromEditor())
+		const fps = sceneState.getCanvasForScreen?.(0)?.framerate ?? 50
+		sceneState.setGlobalDefaultTransition(getDefaultTransitionFromEditor(fps))
 	}
 	document.dispatchEvent(
 		new CustomEvent('highascg-editor-defaults-changed', { detail: getEditorDefaults() }),
@@ -106,9 +116,11 @@ export function collectEditorDefaultsFromModal(modal) {
 /**
  * @param {HTMLElement} modal
  * @param {typeof DEFAULT_EDITOR_DEFAULTS} ed
+ * @param {number} [fps]
  */
-export function hydrateEditorDefaultsModal(modal, ed) {
+export function hydrateEditorDefaultsModal(modal, ed, fps) {
 	const d = mergeEditorDefaults(ed)
+	const rate = Number(fps) > 0 ? Number(fps) : 50
 	const coordEl = modal.querySelector('#ed-coordinate-origin')
 	if (coordEl) coordEl.value = d.coordinateOrigin
 	const sceneLoopEl = modal.querySelector('#ed-scene-loop')
@@ -126,7 +138,7 @@ export function hydrateEditorDefaultsModal(modal, ed) {
 	const trTypeEl = modal.querySelector('#ed-transition-type')
 	if (trTypeEl) trTypeEl.value = d.transition.type
 	const trDurEl = modal.querySelector('#ed-transition-duration')
-	if (trDurEl) trDurEl.value = String(d.transition.duration)
+	if (trDurEl) trDurEl.value = String(resolveTransitionDuration(d.transition.duration, rate))
 	const trTweenEl = modal.querySelector('#ed-transition-tween')
 	if (trTweenEl) trTweenEl.value = d.transition.tween
 }

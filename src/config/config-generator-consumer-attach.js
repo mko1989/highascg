@@ -6,6 +6,7 @@ const { effectiveStandardVideoModeId } = require('./config-generator-mode-helper
 const {
 	parseOptionalPixel,
 	buildStreamingFfmpegConsumerXml,
+	buildComposePreviewFfmpegConsumerXml,
 	buildScreenFfmpegConsumersXml,
 	buildExtraAudioFfmpegConsumersXml,
 	channelLayoutElementXml,
@@ -31,7 +32,6 @@ const {
 	resolveDecklinkVideoModeForTarget,
 	channelVideoModeForDecklinkConsumer,
 	pickDecklinkParentVideoMode,
-	buildDecklinkPassthroughSubregion,
 } = require('./decklink-output-resolve')
 
 /**
@@ -127,14 +127,12 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		const decklinkVideoMode = resolveDecklinkVideoModeForTarget(config, 'screen', n)
 		const consumerSettings = readDecklinkConsumerSettings(config, `screen_${n}_`)
 		if (decklinkVideoMode) {
-			const passthroughSubregion = buildDecklinkPassthroughSubregion({ width: dims.width, height: dims.height })
 			profConsumersXml += buildDecklinkKeyFillConsumersXml({
 				fillDevice: decklinkDevice,
 				keyDevice: keyFill.keyDevice,
 				keyer: keyFill.keyer,
 				videoMode: decklinkVideoMode,
 				consumerSettings,
-				passthroughSubregion,
 			})
 		}
 	}
@@ -149,6 +147,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const streamingBasePort = parseInt(String(config.streaming?.basePort || '10000'), 10) || 10000
 	const pgmStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 1)
 	const pgmChNum = routeMap.programCh(n)
+	const composePgmXml = buildComposePreviewFfmpegConsumerXml(config, pgmChNum)
 	const rtmpPgmXml = buildRtmpFfmpegConsumersForChannel(config, pgmChNum)
 	const screenConsumerEnabled = config[`screen_${n}_screen_consumer`] !== false && config[`screen_${n}_screen_consumer`] !== 'false'
 	const decklinkVideoModeForScreen =
@@ -169,7 +168,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 
 	const pgmXml = `${channelXmlComment(`Caspar channel ${pgmChNum}: Screen ${n} program output (PGM)`)}        <channel>
             <video-mode>${pgmChannelModeId}</video-mode>${layoutXml}
-            <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${pgmStreamingXml}${profConsumersXml}${rtmpPgmXml}
+            <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${pgmStreamingXml}${profConsumersXml}${rtmpPgmXml}
             </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
@@ -179,10 +178,11 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const prvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 2)
 	const prvSystemAudioXml = buildPreviewSystemAudioXml(config, n)
 	const prvChNum = routeMap.previewCh(n)
+	const composePrvXml = buildComposePreviewFfmpegConsumerXml(config, prvChNum)
 	const rtmpPrvXml = buildRtmpFfmpegConsumersForChannel(config, prvChNum)
 	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)`)}        <channel>
             <video-mode>${dims.modeId}</video-mode>
-            <consumers>${prvStreamingXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
+            <consumers>${composePrvXml}${prvStreamingXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>
@@ -285,14 +285,12 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 					const inheritedMode = resolveDecklinkVideoModeForTarget(config, 'multiview', n)
 					if (!inheritedMode) return ''
 					const consumerSettings = readDecklinkConsumerSettings(config, 'multiview_')
-					const passthroughSubregion = buildDecklinkPassthroughSubregion({ width: dims.width, height: dims.height })
 					return buildDecklinkKeyFillConsumersXml({
 						fillDevice: mvDlDev,
 						keyDevice: mvKeyFill.keyDevice,
 						keyer: mvKeyFill.keyer,
 						videoMode: inheritedMode,
 						consumerSettings,
-						passthroughSubregion,
 					})
 				})()
 			: ''

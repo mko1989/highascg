@@ -102,7 +102,12 @@ function broadcastSceneLive(ctx) {
  * @param {number|string} channel
  * @returns {boolean}
  */
-function notifyProgramMutationMayInvalidateLive(ctx, channel) {
+function notifyProgramMutationMayInvalidateLive(ctx, channel, opts = {}) {
+	try {
+		require('../preview/compose-preview-activity').onProgramMutation(ctx, channel, opts)
+	} catch {
+		/* WO-57 optional */
+	}
 	if (!invalidateIfProgramChannel(ctx?.config, channel)) return false
 	broadcastSceneLive(ctx)
 	return true

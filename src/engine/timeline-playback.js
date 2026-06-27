@@ -213,9 +213,16 @@ function applyPlaybackMixin(TimelineEngineClass) {
 		play(id, fromMs) {
 			const tl = this.timelines.get(id)
 			if (!tl) return
-			const pos = fromMs != null ? fromMs : this._pb?.timelineId === id ? this._pb.position : 0
-			if (this._ticker) clearInterval(this._ticker)
 			const wasPaused = this._pb?.timelineId === id && !this._pb?.playing && this._prevKey.size > 0
+			// Resume from server pause position — client `from` can lag WS ticks and would rewind a few frames.
+			const pos = wasPaused
+				? (this._pb.position ?? 0)
+				: fromMs != null
+					? fromMs
+					: this._pb?.timelineId === id
+						? this._pb.position
+						: 0
+			if (this._ticker) clearInterval(this._ticker)
 			if (wasPaused) {
 				this._resumeAll()
 			} else {

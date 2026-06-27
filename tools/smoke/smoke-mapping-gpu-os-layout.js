@@ -667,7 +667,7 @@ test('buildDecklinkTiledConsumersXml: primary tile outside ports, secondaries in
 		{ device: 1, srcX: 11520, srcY: 0, destX: 0, destY: 0, width: 3840, height: 2160, videoMode: '2160p5000' },
 	])
 	assert.match(xml, /<video-mode>2160p5000<\/video-mode>/)
-	assert.doesNotMatch(xml, /<pixel-format>yuv<\/pixel-format>/)
+	assert.match(xml, /<pixel-format>yuv<\/pixel-format>/)
 	assert.match(xml, /<device>4<\/device>[\s\S]*<src-x>0<\/src-x>[\s\S]*<ports>/)
 	assert.doesNotMatch(xml, /<ports>[\s\S]*<device>4<\/device>/)
 	assert.match(xml, /<ports>[\s\S]*<device>2<\/device>[\s\S]*<device>3<\/device>[\s\S]*<device>1<\/device>/)

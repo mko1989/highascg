@@ -30,25 +30,68 @@ export function destinationAudioLayoutsByMain(settings) {
 }
 
 /**
+ * Widest PortAudio consumer layout cabled to each main destination's PGM feed.
+ * @param {object} [settings]
+ * @returns {Record<number, string>}
+ */
+export function cabledPortAudioLayoutsByMain(settings) {
+	const byMain = /** @type {Record<number, string>} */ ({})
+	const audioOutputs = Array.isArray(settings?.audioOutputs) ? settings.audioOutputs : []
+	const destinations = destinationsFromSettings(settings)
+	const edges = Array.isArray(settings?.deviceGraph?.edges) ? settings.deviceGraph.edges : []
+
+	for (const out of audioOutputs) {
+		if (!out || typeof out !== 'object') continue
+		if (out.enabled === false || out.enabled === 'false') continue
+		const consumerType = String(out.type || 'portaudio').toLowerCase()
+		if (consumerType === 'system-audio') continue
+		const id = String(out.id || '').trim()
+		if (!id) continue
+
+		const edge = edges.find((e) => String(e.sinkId) === id)
+		if (!edge) continue
+
+		const srcId = String(edge.sourceId || '')
+		let destId = ''
+		if (srcId.startsWith('dst_in_')) destId = srcId.slice('dst_in_'.length)
+		const dest = destinations.find((d) => String(d.id) === destId)
+		if (!dest || String(dest.mode || '') === 'multiview') continue
+
+		const idx = Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0)
+		const layout = normalizeProgramLayout(String(out.channelLayout || 'stereo'))
+		byMain[idx] = byMain[idx] != null ? maxProgramLayout(byMain[idx], layout) : layout
+	}
+	return byMain
+}
+
+/**
  * @param {object} [settings]
  * @param {object} [channelMap]
  * @param {number} [screenCount]
  * @returns {string[]}
  */
 export function resolveProgramAudioLayouts(settings, channelMap, screenCount) {
-	const fromMap = channelMap?.programAudioLayouts
 	const sc =
 		screenCount != null && Number.isFinite(Number(screenCount))
 			? Math.max(1, Number(screenCount))
 			: channelMap?.screenCount || settings?.casparServer?.screen_count || 1
-	if (Array.isArray(fromMap) && fromMap.length >= sc) {
-		return fromMap.slice(0, sc).map((l) => normalizeProgramLayout(l))
+	const destByMain = destinationAudioLayoutsByMain(settings)
+	const cabledByMain = cabledPortAudioLayoutsByMain(settings)
+
+	const widen = (layout, i) => {
+		const dest = layout || destByMain[i] || 'stereo'
+		const cabled = cabledByMain[i]
+		return cabled != null ? maxProgramLayout(dest, cabled) : dest
 	}
 
-	const byMain = destinationAudioLayoutsByMain(settings)
+	const fromMap = channelMap?.programAudioLayouts
+	if (Array.isArray(fromMap) && fromMap.length >= sc) {
+		return fromMap.slice(0, sc).map((l, i) => widen(normalizeProgramLayout(l), i))
+	}
+
 	const layouts = []
 	for (let i = 0; i < sc; i++) {
-		layouts.push(byMain[i] || 'stereo')
+		layouts.push(widen(destByMain[i] || 'stereo', i))
 	}
 	return layouts
 }

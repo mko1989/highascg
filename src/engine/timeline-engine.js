@@ -63,11 +63,11 @@ class TimelineEngine extends EventEmitter {
 		}
 		this._emitChange()
 		// Clip edits (e.g. audioRoute) must refresh PLAY/LOAD+AF while this timeline is on air.
-		// While playing, avoid force=true — redundant PUTs (e.g. mouseup sync) must not STOP+PLAY all layers.
+		// Never force=true here — redundant PUTs (sync before resume, mouseup) must not CALL SEEK or STOP+PLAY.
+		// Stale transport / changed mixer values are picked up via timelineClipTransportStale and value diffs.
 		if (this._pb?.timelineId === id && this.self?.amcp) {
 			const ms = this._nowMs()
-			const playing = !!this._pb.playing
-			this._syncAmcpLayers(id, ms, { force: !playing, allowDriftSeek: false })
+			this._syncAmcpLayers(id, ms, { force: false, allowDriftSeek: false })
 		}
 		return this.timelines.get(id)
 	}

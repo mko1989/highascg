@@ -244,9 +244,22 @@ export function createTimelineCanvasHandlers(deps) {
 			? getThumbnailUrl(source.value, 320, 2)
 			: null,
 		// Real waveform from same tree as thumbnails (GET /api/local-media/.../waveform); server ffprobe path
-		getWaveformUrl: (source) => {
+		getWaveformUrl: (source, reqBars) => {
 			if (source?.type !== 'media' || !source?.value) return null
-			return `${getApiBase()}/api/local-media/${encodeURIComponent(source.value)}/waveform?bars=128`
+			let bars = Number(reqBars)
+			if (!(bars > 0)) {
+				let durationMs = Number(source.durationMs)
+				if (!(durationMs > 0)) {
+					const mediaList = stateStore.getState()?.media || []
+					const match = findMediaRow(mediaList, source.value)
+					if (match?.durationMs > 0) durationMs = match.durationMs
+				}
+				const durationSec = durationMs > 0 ? durationMs / 1000 : 30
+				// Use a higher density of bars for longer clips to maintain high resolution when zooming in.
+				// 200 bars per second of audio, minimum 512, maximum 8192.
+				bars = Math.min(8192, Math.max(512, Math.ceil(durationSec * 200)))
+			}
+			return `${getApiBase()}/api/local-media/${encodeURIComponent(source.value)}/waveform?bars=${bars}`
 		},
 		getSourceDurationMs: (source) => {
 			if (source?.type !== 'media' || !source?.value) return null

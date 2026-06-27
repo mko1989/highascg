@@ -7,6 +7,7 @@ import { TRANSITION_TYPES, TRANSITION_TWEENS, TRANSITION_TYPE_LABELS, migrateTra
 import { api } from '../lib/api-client.js'
 import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
 import { parseNumberInput } from '../lib/math-input.js'
+import { resolveTransitionDuration, transitionDurationForFps } from '../lib/transition-duration.js'
 
 /**
  * @param {object} deps
@@ -90,7 +91,10 @@ export function createTimelineTransport(deps) {
 			await api.post(`/api/timelines/${tl.id}/pause`).catch(() => {})
 		} else {
 			const resumingFromPause = playback.timelineId === tl.id && !playback.playing
-			await syncToServer(tl)
+			// Skip redundant PUT on resume — it used to force CALL SEEK + full mixer reset while paused.
+			if (!resumingFromPause) {
+				await syncToServer(tl)
+			}
 			await api.post(`/api/timelines/${tl.id}/sendto`, view.sendTo).catch(() => {})
 			const fromMs = Math.max(0, Math.round(playback.position))
 			playback.position = fromMs
@@ -104,9 +108,8 @@ export function createTimelineTransport(deps) {
 			buildTransport()
 			startPlaybackLoop()
 			redrawTimelineView()
-			await api
-				.post(`/api/timelines/${tl.id}/play`, { from: fromMs, sendTo: view.sendTo })
-				.catch(() => {})
+			const playBody = resumingFromPause ? { sendTo: view.sendTo } : { from: fromMs, sendTo: view.sendTo }
+			await api.post(`/api/timelines/${tl.id}/play`, playBody).catch(() => {})
 		}
 	}
 
@@ -122,9 +125,18 @@ export function createTimelineTransport(deps) {
 		await api.post(`/api/timelines/${tl.id}/stop`).catch(() => {})
 	}
 
-	function buildTransport() {
+	function projectFps() {
 		const tl = timelineState.getActive()
-		const fps = tl?.fps || 25
+		if (tl?.fps > 0) return tl.fps
+		const pr = stateStore.getState()?.channelMap?.programResolutions?.[0]
+		if (pr?.fps > 0) return pr.fps
+		return 50
+	}
+
+	function buildTransport() {
+		const fps = projectFps()
+		const defaultDur = transitionDurationForFps(fps)
+		const tl = timelineState.getActive()
 		if (view.takeTransition?.type) {
 			view.takeTransition.type = migrateTransitionTypeToAnimate(view.takeTransition.type)
 		}
@@ -185,7 +197,7 @@ export function createTimelineTransport(deps) {
 							return `<option value="${t}" ${selected}>${lab}</option>`
 						}).join('')}
 					</select>
-					<input type="text" class="tl-input-sm inspector-math-input" id="tl-take-dur" value="${view.takeTransition.duration}" inputmode="decimal" title="Frames (supports e.g. 24/2)" placeholder="12" />
+					<input type="text" class="tl-input-sm inspector-math-input" id="tl-take-dur" value="${view.takeTransition.duration}" inputmode="decimal" title="Frames (supports e.g. 24/2)" placeholder="${defaultDur}" />
 					<select class="tl-select tl-select-sm" id="tl-take-tween" title="Tween">${TRANSITION_TWEENS.map((tw) => `<option value="${tw}" ${tw === view.takeTransition.tween ? 'selected' : ''}>${tw}</option>`).join('')}</select>
 					<button class="tl-btn tl-btn-take" id="tl-take" title="Take to program">Take</button>
 				</div>
@@ -268,6 +280,7 @@ export function createTimelineTransport(deps) {
 			const t = timelineState.getActive()
 			if (t) {
 				const trans = view.takeTransition || {}
+				const fps = projectFps()
 
 				// Force playout to use latest clip fields (audioRoute, volume, etc.) before take.
 				await syncToServer(t)
@@ -281,7 +294,7 @@ export function createTimelineTransport(deps) {
 				
 				await api.post(`/api/timelines/${t.id}/take`, {
 					transition: trans.type || 'CUT',
-					duration: trans.duration ?? 12,
+					duration: resolveTransitionDuration(trans.duration, fps),
 					tween: trans.tween || 'linear',
 					screenIdx: view.sendTo.screenIdx,
 				}).catch(() => {})

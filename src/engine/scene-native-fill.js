@@ -8,6 +8,7 @@
 'use strict'
 
 const { parseCinfMedia } = require('../media/cinf-parse')
+const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
 const { isTemplateClip } = require('../state/playback-tracker-media')
 const { getChannelMap } = require('../config/routing')
 const { getModeDimensions } = require('../config/config-modes')
@@ -236,7 +237,8 @@ async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	if (String(clipValue).trim().toLowerCase().startsWith('route://')) return null
 	if (isTemplateClip(clipValue, self)) return null
 	try {
-		const res = await self.amcp.query.cinf(clipValue)
+		const cinfId = resolveCasparCinfMediaId(clipValue, self)
+		const res = await self.amcp.query.cinf(cinfId, { ctx: self })
 		const str = cinfResponseToStr(res?.data)
 		if (!str.trim()) return null
 		const parsed = parseCinfMedia(str)

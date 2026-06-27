@@ -24,6 +24,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 
 		try {
 			clearStartupLedTestTimers()
+			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onShutdown()
 			clearPeriodicSyncTimer(appCtx)
 			if (appCtx._systemVarsInterval) clearInterval(appCtx._systemVarsInterval)
 			if (appCtx._startupInventoryInterval) clearInterval(appCtx._startupInventoryInterval)

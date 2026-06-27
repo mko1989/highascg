@@ -37,7 +37,13 @@ function buildNvidiaDisplayPolicyShellLines() {
 	const script = resolveNvidiaXApplyScript()
 	if (!script) return []
 	const q = script.replace(/'/g, `'\\''`)
-	return [`if [ -x '${q}' ]; then`, `  '${q}'`, `  ( sleep 6; '${q}' ) &`, `fi`]
+	return [
+		`if [ -x '${q}' ]; then`,
+		`  '${q}'`,
+		`  ( sleep 6; '${q}' ) &`,
+		`  ( sleep 18; '${q}' ) &`,
+		`fi`,
+	]
 }
 
 /**

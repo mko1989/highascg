@@ -7,6 +7,7 @@
 const { getChannelMap } = require('./routing')
 const { buildChannelResolutionMap } = require('./server-info-config')
 const { resolveProgramAudioLayoutsForConfig } = require('./program-audio-layouts')
+const { resolveProjectFps } = require('./project-fps')
 
 /**
  * @param {object} ctx — app context (`config`, `gatheredInfo`, …)
@@ -14,13 +15,16 @@ const { resolveProgramAudioLayoutsForConfig } = require('./program-audio-layouts
 function buildChannelMap(ctx) {
 	const cfg = ctx.config || {}
 	const map = getChannelMap(cfg, ctx.switcherOutputBusByChannel)
-	const defaultRes = { w: 1920, h: 1080, fps: 50 }
+	const projectFps = resolveProjectFps(cfg)
+	const defaultRes = { w: 1920, h: 1080, fps: projectFps }
 	const infoXml = (ctx.gatheredInfo && ctx.gatheredInfo.infoConfig) || ''
 	const serverByCh = infoXml.trim() ? buildChannelResolutionMap(infoXml) : {}
 
 	function pickRes(channelNum) {
 		const r = serverByCh[channelNum]
-		if (r && r.w > 0 && r.h > 0) return { w: r.w, h: r.h, fps: r.fps }
+		if (r && r.w > 0 && r.h > 0) {
+			return { w: r.w, h: r.h, fps: r.fps > 0 ? r.fps : projectFps }
+		}
 		return { ...defaultRes }
 	}
 

@@ -22,7 +22,10 @@ export function applySettingsFromServer(cfg) {
 	if (settingsState.settings.audioRouting && typeof settingsState.settings.audioRouting === 'object') {
 		settingsState.settings.audioRouting = {
 			...settingsState.settings.audioRouting,
-			programLayout: resolveEffectiveProgramLayout(settingsState.settings, null),
+			programLayout: resolveEffectiveProgramLayout(
+				settingsState.settings,
+				settingsState.settings.channelMap,
+			),
 		}
 	}
 }
@@ -43,6 +46,15 @@ export const settingsState = {
 			peakHoldMs: 2000,
 		},
 		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '' },
+		composePreview: {
+			mode: 'canvas',
+			fps: 2,
+			resolutionScale: 'half',
+			jpegQuality: 10,
+			tickIntervalMs: 125,
+			basenamePrefix: 'highascg_preview',
+			channels: 'compose_visible',
+		},
 		/** Dedicated Caspar channel for RTMP/record (WO-27); tab visible when enabled */
 		streamingChannel: { enabled: false, videoSource: 'program_1', audioSource: 'follow_video', dedicatedOutputChannel: false },
 		audioRouting: {

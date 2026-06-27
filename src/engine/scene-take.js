@@ -238,6 +238,10 @@ async function runSceneTake(amcp, opts) {
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
 	const fadeTw = fadeDur > 0 ? globalT.tween : undefined
 
+	try {
+		require('../preview/compose-preview-activity').onSceneTake(channel, fadeDur, framerate)
+	} catch (_) {}
+
 	if (shouldRunBankCrossfade) {
 		const crossfadeLines = []
 		for (const ln of outNums) {

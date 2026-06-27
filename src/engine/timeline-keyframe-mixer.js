@@ -76,6 +76,18 @@ function mapKeyframeTween(tw) {
 	return map[t] || 'linear'
 }
 
+/**
+ * Instant MIXER (duration 0) is for scrub/pause and static holds — not while Caspar tweens a segment.
+ * @param {{ playing?: boolean, force?: boolean, inTweenSpan?: boolean, valueChanged?: boolean }} opts
+ * @returns {boolean}
+ */
+function shouldSendInstantKeyframeMixer(opts) {
+	if (!opts?.valueChanged) return false
+	if (opts.force) return true
+	if (!opts.playing) return true
+	return !opts.inTweenSpan
+}
+
 module.exports = {
 	FILL_KF_PROPS,
 	mergedFillKeyframeTimes,
@@ -84,4 +96,5 @@ module.exports = {
 	easingAtTime,
 	fillTweenForSegmentEnd,
 	mapKeyframeTween,
+	shouldSendInstantKeyframeMixer,
 }

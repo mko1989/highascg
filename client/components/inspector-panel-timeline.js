@@ -9,6 +9,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { getClipBasePixelRect } from '../lib/timeline-clip-interp.js'
 import { fillToPixelRect, pixelRectToFill, fullFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { getContentResolution, fetchMediaContentResolution } from '../lib/mixer-fill.js'
+import { settingsState } from '../lib/settings-state.js'
 import { appendAudioInspectorGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
 
@@ -260,6 +261,8 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 
 	appendAudioInspectorGroup(root, {
 		showStoredRoute: true,
+		mainIndex: timelineState.getSendTo(timelineId).screenIdx,
+		channelMap: stateStore.getState()?.channelMap ?? settingsState.getSettings()?.channelMap ?? null,
 		getAudio: () => {
 			const c = freshClip()
 			return {

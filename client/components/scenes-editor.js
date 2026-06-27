@@ -7,6 +7,12 @@ import { api, getApiBase } from '../lib/api-client.js'
 import { getLiveThumbnailUrl, getThumbnailUrl, getLiveThumbnailChannelForSource } from '../lib/thumbnail-url.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
 import { drawComposePrvPgmCellEdgeBar, drawDualComposeCellPreview, drawOutputCanvasBounds } from './preview-canvas-draw-base.js'
+import {
+	drawComposeSnapshotCell,
+	isSnapshotComposePreview,
+	resolveComposeChannelForCell,
+	subscribeComposePreviewRefresh,
+} from './preview-canvas-compose-snapshot.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
 import { isMediaOrFileSource, dataTransferOffersDeckMedia, parseDraggableSourcesPayload } from './scenes-shared.js'
 import { renderSceneDeck } from './scene-list.js'
@@ -279,6 +285,16 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				}
 				const r = Logic.getResolutionForScreen(mainIdx, sceneState, stateStore)
 				const cellZoom = meta.composeCellZoom || 1.0
+				if (isSnapshotComposePreview()) {
+					const cm = getChannelMap()
+					const ch = resolveComposeChannelForCell(meta, cm, mainIdx)
+					if (ch) {
+						drawComposeSnapshotCell(ctx, cellW, cellH, ch, { onLoaded: () => previewPanel.scheduleDraw() })
+						drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
+						return
+					}
+				}
+				// --- legacy canvas compose (WO-57) ---
 				drawDualComposeCellPreview(ctx, r.w, r.h, cellW, cellH, cellZoom, c => {
 					const cm = getChannelMap()
 					const prvForMain = cm.previewChannels?.[mainIdx]
@@ -293,10 +309,20 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				}); drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell }); return
 			}
 			const id = sceneState.editingSceneId || sceneState.previewSceneId; const scene = id ? sceneState.getScene(id) : null
+			if (isSnapshotComposePreview()) {
+				const cm = getChannelMap()
+				const mainIdx = sceneState.activeScreenIndex
+				const ch = resolveComposeChannelForCell({ composeCell: 'pgm', composeScreenIdx: mainIdx }, cm, mainIdx)
+				if (ch) {
+					drawComposeSnapshotCell(ctx, W, H, ch, { onLoaded: () => previewPanel.scheduleDraw() })
+					return
+				}
+			}
 			drawSceneComposeStack(ctx, W, H, { scene: scene || { layers: [] }, selectedLayerIndex, isLive, composePrvPgmLayout: layout, composeDualStreamPreview: isDual, getThumbUrl: s => getThumbForSource(s, getPreviewChannel() || getPlaybackChannel()), onThumbLoaded: () => previewPanel.scheduleDraw() })
 		}
 	})
 	bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPanel, splitPx })
+	subscribeComposePreviewRefresh(() => previewPanel?.scheduleDraw?.())
 
 	const render = () => {
 		const preserveDeckScroll = !sceneState.editingSceneId

@@ -26,6 +26,35 @@ test('resolveProgramAudioLayoutsForConfig uses destination audioLayout per main'
 	assert.equal(resolveEffectiveProgramLayout(config.audioRouting, config.audioOutputs, config), '8ch')
 })
 
+test('resolveProgramAudioLayoutsForConfig widens stereo destination with cabled PortAudio 8ch', () => {
+	const config = {
+		screen_count: 1,
+		screenDestinations: {
+			version: 1,
+			destinations: [
+				{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', audioLayout: 'stereo' },
+			],
+		},
+		audioOutputs: [
+			{
+				id: 'audio_1',
+				enabled: true,
+				type: 'portaudio',
+				channelLayout: '8ch',
+			},
+		],
+		deviceGraph: {
+			connectors: [
+				{ id: 'dst_in_d1', kind: 'destination_in', externalRef: 'd1' },
+				{ id: 'audio_1', kind: 'audio_out' },
+			],
+			edges: [{ sourceId: 'dst_in_d1', sinkId: 'audio_1' }],
+		},
+	}
+	assert.deepEqual(resolveProgramAudioLayoutsForConfig(config, 1), ['8ch'])
+	assert.equal(resolveEffectiveProgramLayout(config.audioRouting, config.audioOutputs, config), '8ch')
+})
+
 test('resolveEffectiveProgramLayout ignores uncabled outputs without config', () => {
 	const layout = resolveEffectiveProgramLayout(
 		{ programLayout: '8ch' },

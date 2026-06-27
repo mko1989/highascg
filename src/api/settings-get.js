@@ -14,6 +14,8 @@ const { normalizeDeviceGraph } = require('../config/device-graph')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
+const { normalizeNetworkSettings } = require('../config/network-settings')
+const { resolveProjectFps } = require('../config/project-fps')
 
 async function handleGet(path, ctx) {
 	if (path !== '/api/settings') return null
@@ -28,6 +30,7 @@ async function handleGet(path, ctx) {
 			server: { httpPort: cfg.server.httpPort, bindAddress: cfg.server.bindAddress },
 			osc: { enabled: cfg.osc.enabled, listenPort: cfg.osc.listenPort, listenAddress: cfg.osc.listenAddress, peakHoldMs: cfg.osc.peakHoldMs, emitIntervalMs: cfg.osc.emitIntervalMs, staleTimeoutMs: cfg.osc.staleTimeoutMs, wsDeltaBroadcast: cfg.osc.wsDeltaBroadcast },
 			ui: cfg.ui || defaults.ui,
+			composePreview: { ...defaults.composePreview, ...(cfg.composePreview || {}) },
 			editorDefaults: normalizeEditorDefaults(cfg.editorDefaults),
 			audioRouting: (() => {
 				const ar = normalizeAudioRouting({ ...defaults.audioRouting, ...(cfg.audioRouting || {}) })
@@ -82,7 +85,11 @@ async function handleGet(path, ctx) {
 				audioCodec: 'aac',
 				audioBitrateKbps: 128,
 			}],
-			audioOutputs: Array.isArray(cfg.audioOutputs) && cfg.audioOutputs.length ? cfg.audioOutputs : []
+			audioOutputs: Array.isArray(cfg.audioOutputs) && cfg.audioOutputs.length ? cfg.audioOutputs : [],
+			machineProfile: {
+				defaultProjectFps: resolveProjectFps(cfg),
+			},
+			network: normalizeNetworkSettings(cfg.network, defaults.network),
 		})
 	}
 }

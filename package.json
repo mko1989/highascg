@@ -41,6 +41,7 @@
 		"test:gpu-topology": "node --test tools/smoke/smoke-gpu-topology.test.js",
 		"test:modeline-timings": "node --test tools/smoke/smoke-modeline-timings.js",
 		"test:config-generator": "node --test tools/smoke/smoke-config-generator-routing.js",
+		"test:compose-preview": "node --test tools/smoke/smoke-compose-preview-dirty.test.js tools/smoke/smoke-compose-preview-activity.test.js tools/smoke/smoke-compose-preview-ffmpeg-args.test.js tools/smoke/smoke-compose-preview-consumer.test.js",
 		"smoke:companion-press": "node tools/smoke/smoke-companion-press.mjs",
 		"smoke:streaming-ch": "node tools/smoke/verify-streaming-channel.mjs",
 		"smoke:wo47-manifest": "node tools/smoke/smoke-wo47-manifest.mjs",

@@ -28,6 +28,7 @@ const routesSettings = require('./routes-settings')
 const routesAudio = require('./routes-audio')
 const routesProject = require('./routes-project')
 const routesLedTestCard = require('./routes-led-test-card')
+const routesComposePreview = require('./routes-compose-preview')
 const { applyUiSelectionPayloadToVariables } = require('./apply-ui-selection-variables')
 const routesFtb = require('./routes-ftb')
 const routesSystemStaged = require('./routes-system-staged')
@@ -142,7 +143,8 @@ async function routeRequest(method, path, body, ctx, req) {
 		(p === '/api/system/gpu-nvidia' ||
 			p === '/api/system/decklink' ||
 			p === '/api/system/gpu-layout' ||
-			p === '/api/system/xrandr-layout')
+			p === '/api/system/xrandr-layout' ||
+			p === '/api/system/network')
 	) {
 		const r = await routesSystemHardware.hardwareHandleGet(p, ctx)
 		if (r) return r
@@ -152,7 +154,8 @@ async function routeRequest(method, path, body, ctx, req) {
 		(p === '/api/system/gpu-nvidia/apply' ||
 			p === '/api/system/gui-launch' ||
 			p === '/api/system/gpu-ports-reset' ||
-			p === '/api/system/xrandr-layout/apply')
+			p === '/api/system/xrandr-layout/apply' ||
+			p === '/api/system/network/apply')
 	) {
 		const r = await routesSystemHardware.hardwareHandlePost(p, body, ctx)
 		if (r) return r
@@ -384,8 +387,14 @@ async function routeRequest(method, path, body, ctx, req) {
 		const r = await routesMedia.handlePost(p, body, ctx, req, query)
 		if (r) return r
 	}
+	if (method === 'POST' && p === '/api/compose-preview/refresh') {
+		const r = await routesComposePreview.handlePost(p, body, ctx)
+		if (r) return r
+	}
 
 	if (method === 'GET') {
+		const cpr = await routesComposePreview.handleGet(p, query, ctx)
+		if (cpr) return cpr
 		const tr = await routesMedia.handleThumbnail(p, query, ctx)
 		if (tr) return tr
 		const lr = await routesMedia.handleLocalMedia(p, query, ctx)

@@ -23,6 +23,7 @@ const { SamplingManager } = require('./src/sampling/dmx-sampling')
 const { getChannelMap, setupAllRouting } = require('./src/config/routing')
 const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
+const { createComposePreviewLifecycle } = require('./src/bootstrap/compose-preview-lifecycle')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
 const { startReplicationService, stopReplicationService } = require('./src/replication/replication-service')
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
@@ -137,6 +138,7 @@ function main() {
 		appCtx.setupAllRouting = setupAllRouting
 		appCtx.reconcileAfterInfoGather = reconcileAfterInfoGather
 		
+		appCtx._composePreviewLifecycle = createComposePreviewLifecycle({ appCtx })
 		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
 			appCtx.artnetReceiver.init()
@@ -192,6 +194,7 @@ function main() {
 				}
 			}
 			appCtx.state.setVariable('offline_mode', config.offline_mode ? 'true' : 'false')
+			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onConfigChange()
 		})
 
 		let casparConn = null; if (!cli.noCaspar) {
@@ -266,8 +269,10 @@ function main() {
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)
 					startOscPlaybackInfoSupplement(appCtx)
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
+					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
 				} else if (payload.connected === false) {
 					wasConnected = false
+					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparDisconnected()
 					;(require('./src/utils/periodic-sync')).clearPeriodicSyncTimer(appCtx)
 					;(require('./src/audio/meter-health')).stopLiveInputMeterHealthWatch(appCtx)
 					if (appCtx.clipEndFadeWatcher) appCtx.clipEndFadeWatcher.cancelAll()

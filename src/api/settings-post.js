@@ -18,6 +18,8 @@ const { normalizeDeviceGraph } = require('../config/device-graph')
 const { mergeSystemDisplaySettings, pickOscForPersistence, SYSTEM_DISPLAY_KEYS } = require('./settings-os')
 const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
+const { normalizeNetworkSettings } = require('../config/network-settings')
+const { normalizeProjectFps, applyProjectFpsToInheritedOutputs, resolveProjectFps } = require('../config/project-fps')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -42,8 +44,39 @@ async function handlePost(path, body, ctx) {
 		ctx.config.osc = normalizeOscConfig(cfg)
 	}
 	if (settings.ui) cfg.ui = { ...defaults.ui, ...cfg.ui, ...settings.ui }
+	if (settings.composePreview && typeof settings.composePreview === 'object') {
+		const prev = cfg.composePreview || {}
+		const { normalizeComposePreviewSettings } = require('../preview/compose-preview-mode')
+		const next = normalizeComposePreviewSettings(
+			{ ...prev, ...settings.composePreview },
+			defaults.composePreview,
+		)
+		const modeChanged = prev.mode !== next.mode
+		const ffmpegParamsChanged =
+			prev.fps !== next.fps ||
+			prev.resolutionScale !== next.resolutionScale ||
+			prev.jpegQuality !== next.jpegQuality
+		cfg.composePreview = next
+		if (next.mode === 'ffmpeg_jpeg' && (modeChanged || ffmpegParamsChanged)) {
+			sideEffects.push(
+				'Compose preview uses Caspar ffmpeg consumers — apply/regenerate Caspar config and restart Caspar for FPS/scale changes.',
+			)
+		}
+	}
 	if (settings.editorDefaults) {
 		cfg.editorDefaults = normalizeEditorDefaults(settings.editorDefaults, cfg.editorDefaults)
+	}
+	if (settings.machineProfile && typeof settings.machineProfile === 'object') {
+		const prevFps = resolveProjectFps(cfg)
+		const nextFps = normalizeProjectFps(settings.machineProfile.defaultProjectFps ?? prevFps)
+		cfg.machineProfile = { ...(cfg.machineProfile || {}), defaultProjectFps: nextFps }
+		if (nextFps !== prevFps) {
+			applyProjectFpsToInheritedOutputs(cfg, nextFps, prevFps)
+			sideEffects.push(`Project frame rate set to ${nextFps} fps`)
+		}
+	}
+	if (settings.network) {
+		cfg.network = normalizeNetworkSettings(settings.network, cfg.network)
 	}
 	if (settings.audioRouting) cfg.audioRouting = normalizeAudioRouting({ ...defaults.audioRouting, ...cfg.audioRouting, ...settings.audioRouting })
 	if (settings.offline_mode !== undefined) cfg.offline_mode = !!settings.offline_mode
@@ -258,7 +291,7 @@ async function handlePost(path, body, ctx) {
 	const mainCount = resolveMainScreenCount(cfg); cfg.screen_count = mainCount; if (!cfg.casparServer) cfg.casparServer = { ...defaults.casparServer }; cfg.casparServer.screen_count = mainCount
 
 	if (ctx.configManager) {
-		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []), local_media_path: cfg.local_media_path }
+		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, composePreview: { ...defaults.composePreview, ...(cfg.composePreview || {}) }, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []), local_media_path: cfg.local_media_path, machineProfile: cfg.machineProfile || { ...defaults.machineProfile }, network: normalizeNetworkSettings(cfg.network, defaults.network) }
 		delete newConfig.mediaMount
 		delete newConfig.streaming._effectiveBasePort; delete newConfig.streaming._casparHost
 		for (const k of SYSTEM_DISPLAY_KEYS) { if (settings[k] !== undefined) { if (cfg[k] !== undefined) newConfig[k] = cfg[k]; else delete newConfig[k] } }

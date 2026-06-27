@@ -454,6 +454,18 @@ async function handleMixer(path, body, ctx) {
 		default:
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown mixer command: ${cmd}` }) }
 	}
+	try {
+		const dur = parseInt(String(b?.duration ?? ''), 10)
+		if (Number.isFinite(dur) && dur > 0) {
+			const fps = 50
+			require('../preview/compose-preview-activity').scheduleSettle(
+				channel,
+				Math.ceil((dur / fps) * 1000) + 100,
+			)
+		}
+	} catch {
+		/* WO-57 optional */
+	}
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 }
 

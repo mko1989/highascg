@@ -19,6 +19,7 @@ const {
 	fillTweenForSegmentEnd,
 	mapKeyframeTween,
 	easingAtTime,
+	shouldSendInstantKeyframeMixer,
 } = require('./timeline-keyframe-mixer')
 
 /**
@@ -328,7 +329,15 @@ module.exports = {
 
 		const cur = fillAt(localMs)
 		const curStr = fillKey(cur)
-		if (!segChanged && (force || this._lastKfValues.get(kFill) !== curStr)) {
+		if (
+			!segChanged &&
+			shouldSendInstantKeyframeMixer({
+				playing,
+				force,
+				inTweenSpan: inAnimatedSpan,
+				valueChanged: this._lastKfValues.get(kFill) !== curStr,
+			})
+		) {
 			this._lastKfValues.set(kFill, curStr)
 			if (playing && inAnimatedSpan) this._lastKfSegment.set(kFillSeg, fillSegIdx)
 			else if (!playing) this._lastKfSegment.delete(kFillSeg)
@@ -410,7 +419,16 @@ module.exports = {
 		const val = kfs.length ? this._interpProp(clip, prop, localMs, holdValue) : holdValue
 		const kVal = `${ch}-${layer}-${prop}`
 		const last = this._lastKfValues.get(kVal)
-		if (!segChanged && (force || last === undefined || Math.abs(val - last) >= 1e-5)) {
+		const valueChanged = last === undefined || Math.abs(val - last) >= 1e-5
+		if (
+			!segChanged &&
+			shouldSendInstantKeyframeMixer({
+				playing,
+				force,
+				inTweenSpan: inSpan,
+				valueChanged,
+			})
+		) {
 			this._lastKfValues.set(kVal, val)
 			if (playing && inSpan) this._lastKfSegment.set(kSeg, segIdx)
 			else if (!playing) this._lastKfSegment.delete(kSeg)

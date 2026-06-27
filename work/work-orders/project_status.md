@@ -5,6 +5,9 @@
 | ID | File | Status | Summary |
 |----|------|--------|---------|
 | 52 | [52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md](./52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md) | Draft | Split internal **bridge** exFAT (sole media + config sync) vs **USB** (one-way media ingest + config sync) |
+| 57 | [57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md](./57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md) | Draft | Caspar ADD IMAGE tick compose preview — fixed basename, dirty-channel gate (not PRINT/WebRTC) |
+| 58 | [58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md](./58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md) | Draft | Caspar ffmpeg consumer → JPG file (direct write, channel-relative scale) — no ADD IMAGE tick, no UDP relay |
+| 59 | [59_WO_DEVICE_VIEW_SERVER_INSPECTOR_FPS_NETWORK.md](./59_WO_DEVICE_VIEW_SERVER_INSPECTOR_FPS_NETWORK.md) | In progress | Device View server inspector — project default fps, Ethernet IP auto/manual, factory reset only |
 
 ## WO-33 — Device view (split)
 

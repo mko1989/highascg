@@ -2,6 +2,7 @@
 
 const { escapeXml } = require('./config-generator-builders')
 const { casparChannelLayoutId } = require('./audio-channel-layouts')
+const { STANDARD_VIDEO_MODES } = require('./config-modes')
 
 const DECKLINK_LATENCY_VALUES = new Set(['normal', 'low', 'default'])
 const DECKLINK_COLOR_SPACE_VALUES = new Set(['bt709', 'bt601', 'bt2020'])
@@ -10,21 +11,39 @@ const DEFAULT_DECKLINK_CONSUMER_SETTINGS = {
 	embeddedAudio: true,
 	channelLayout: 'stereo',
 	latency: 'normal',
-	bufferDepth: 5,
+	bufferDepth: 3,
 	colorSpace: 'bt709',
 }
+
+/** Caspar DeckLink consumer buffer-depth valid range on this stack. */
+const DECKLINK_BUFFER_DEPTH_MIN = 1
+const DECKLINK_BUFFER_DEPTH_MAX = 3
 
 const KEYER_VALUES = new Set(['internal', 'external', 'external_separate_device', 'default'])
 /** Caspar fill-only SDI: no hardware keyer (not internal/external). */
 const FILL_ONLY_KEYER = 'default'
 
 /**
- * DeckLink pixel-format is not emitted — Caspar defaults (RGBA) are preferred for fill output.
- * @param {string} [_videoMode]
+ * Caspar DeckLink UHD outputs require explicit YUV pixel format on many builds.
+ * @param {string} videoMode
+ * @returns {boolean}
+ */
+function decklinkRequiresYuvPixelFormat(videoMode) {
+	const mode = String(videoMode || '').trim().toLowerCase()
+	if (!mode) return false
+	if (/^2160p/.test(mode) || /^dci2160p/.test(mode)) return true
+	const spec = STANDARD_VIDEO_MODES[mode]
+	return !!(spec && spec.height >= 2160 && spec.width >= 3840)
+}
+
+/**
+ * 1080p and below: Caspar default (RGBA). 2160p/UHD: required YUV on many DeckLink devices.
+ * @param {string} [videoMode]
  * @returns {string}
  */
-function decklinkPixelFormatXml(_videoMode) {
-	return ''
+function decklinkPixelFormatXml(videoMode) {
+	if (!decklinkRequiresYuvPixelFormat(videoMode)) return ''
+	return `\n                    <pixel-format>yuv</pixel-format>`
 }
 
 /**
@@ -137,7 +156,8 @@ function normalizeDecklinkColorSpace(raw) {
  */
 function normalizeDecklinkBufferDepth(raw) {
 	const n = parseInt(String(raw ?? DEFAULT_DECKLINK_CONSUMER_SETTINGS.bufferDepth), 10)
-	return Number.isFinite(n) && n >= 1 && n <= 16 ? n : DEFAULT_DECKLINK_CONSUMER_SETTINGS.bufferDepth
+	if (!Number.isFinite(n)) return DEFAULT_DECKLINK_CONSUMER_SETTINGS.bufferDepth
+	return Math.min(DECKLINK_BUFFER_DEPTH_MAX, Math.max(DECKLINK_BUFFER_DEPTH_MIN, n))
 }
 
 /**
@@ -264,7 +284,7 @@ function buildDecklinkKeyFillConsumersXml(opts) {
 	     </decklink>
 		<decklink>
                <device>${keyDevice}</device>
-             <key-only>true</key-only>
+             <key-only>true</key-only>${pixelFormatXml}
              </decklink>`
 	}
 	// Fill-only: explicit default — omitting <keyer> makes Caspar use external and fail init on many devices.
@@ -279,8 +299,11 @@ module.exports = {
 	normalizeDecklinkKeyer,
 	resolveDecklinkConsumerKeyer,
 	decklinkPixelFormatXml,
+	decklinkRequiresYuvPixelFormat,
 	FILL_ONLY_KEYER,
 	DEFAULT_DECKLINK_CONSUMER_SETTINGS,
+	DECKLINK_BUFFER_DEPTH_MIN,
+	DECKLINK_BUFFER_DEPTH_MAX,
 	DECKLINK_LATENCY_VALUES,
 	DECKLINK_COLOR_SPACE_VALUES,
 	parseDecklinkEmbeddedAudio,

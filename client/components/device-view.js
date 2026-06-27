@@ -120,7 +120,7 @@ let mounted = false; export function initDeviceView(root) {
 		const dev = (lastPayload?.graph?.devices || []).find(d => d.id === devId)
 		rIntoInsp(h => {
 			if (devId === CASPAR_HOST) {
-				renderCasparSettingsInspector(h, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, showSettingsModal })
+				renderCasparSettingsInspector(h, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty })
 			} else {
 				renderDeviceInspector(h, devId, live, dev, { lastPayload, load, setCasparRestartDirty, statusEl })
 			}
@@ -218,6 +218,7 @@ let mounted = false; export function initDeviceView(root) {
 			connectorById,
 			patchDestination: (did, patch) => Actions.patchDestination(did, patch).then(() => { setCasparRestartDirty(true); return load() }),
 			removeDestination: (did) => Actions.removeDestination(did).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }),
+			currentSettings,
 			updateDestinationOutputLayer,
 		}))
 		updateUI()

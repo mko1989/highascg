@@ -13,9 +13,9 @@ require_root
 
 PLAYOUT="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"
 
-if command -v nvidia-settings &>/dev/null; then
+	if command -v nvidia-settings &>/dev/null; then
 	log "NVIDIA GL env + per-session nvidia-settings"
-	mkdir -p /etc/X11/Xsession.d
+	mkdir -p /etc/X11/Xsession.d /etc/X11/xorg.conf.d
 	cat >/etc/X11/Xsession.d/99-highascg-nvidia-gl <<'EOF'
 #!/bin/sh
 export __GL_SYNC_TO_VBLANK=0
@@ -28,6 +28,20 @@ export __GL_SYNC_TO_VBLANK=0
 export __GL_ALLOW_MAXIMUM_PERFORMANCE=1
 EOF
 	chmod 644 /etc/profile.d/99-highascg-nvidia-gl.sh
+
+	# Driver-level default: Force Composition Pipeline on (not "full" — see docs).
+	# xrandr still resets CurrentMetaMode at runtime; highascg-nvidia-x-apply.sh re-patches after layout.
+	cat >/etc/X11/xorg.conf.d/99-highascg-force-composition.conf <<'EOF'
+# HighAsCG playout: default Force Composition Pipeline on all NVIDIA outputs.
+# See docs/reference/screen-consumer-vsync-nvidia.md
+Section "Device"
+    Identifier "NVIDIA Default Device"
+    Driver "nvidia"
+    Option "ForceCompositionPipeline" "On"
+EndSection
+EOF
+	chmod 644 /etc/X11/xorg.conf.d/99-highascg-force-composition.conf
+	ok "xorg ForceCompositionPipeline default installed"
 
 	install -m 755 "${PLAYOUT}/tools/runtime/highascg-nvidia-x-apply.sh" /usr/local/bin/highascg-nvidia-x-apply.sh
 	chmod 755 /usr/local/bin/highascg-nvidia-x-apply.sh

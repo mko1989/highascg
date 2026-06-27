@@ -40,6 +40,12 @@ function recordPlay(ctx, channel, layer, clip, opts = {}) {
 	} catch {
 		/* optional WO-33 memory */
 	}
+	try {
+		const activity = require('../preview/compose-preview-activity')
+		activity.onPlaybackPlay(ctx, ch, clip)
+	} catch {
+		/* WO-57 optional */
+	}
 	emitMatrix(ctx)
 }
 
@@ -53,6 +59,11 @@ function recordStop(ctx, channel, layer) {
 	if (!ctx._playbackMatrix) return
 	const key = `${ch}-${ln}`
 	delete ctx._playbackMatrix[key]
+	try {
+		require('../preview/compose-preview-activity').onPlaybackStop(ctx, ch)
+	} catch {
+		/* WO-57 optional */
+	}
 	emitMatrix(ctx)
 }
 
@@ -74,6 +85,11 @@ function clearChannelFromMatrix(ctx, channel) {
 	const prefix = `${ch}-`
 	for (const key of Object.keys(ctx._playbackMatrix)) {
 		if (key.startsWith(prefix)) delete ctx._playbackMatrix[key]
+	}
+	try {
+		require('../preview/compose-preview-activity').onChannelClear(ch)
+	} catch {
+		/* WO-57 optional */
 	}
 	emitMatrix(ctx)
 }

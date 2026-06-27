@@ -1,8 +1,43 @@
 'use strict'
 
 const { getChannelMap } = require('./routing')
-const { destinationAudioLayoutsByMain } = require('./screen-destinations')
+const { destinationAudioLayoutsByMain, destinationsFromConfig } = require('./screen-destinations')
 const { normalizeProgramLayout, maxProgramLayout } = require('./audio-channel-layouts')
+
+/**
+ * Widest PortAudio consumer layout cabled to each main destination's PGM feed.
+ * @param {Record<string, unknown>} [config]
+ * @returns {Record<number, string>}
+ */
+function cabledPortAudioLayoutsByMain(config) {
+	const byMain = /** @type {Record<number, string>} */ ({})
+	const audioOutputs = Array.isArray(config?.audioOutputs) ? config.audioOutputs : []
+	const destinations = destinationsFromConfig(config || {})
+	const edges = Array.isArray(config?.deviceGraph?.edges) ? config.deviceGraph.edges : []
+
+	for (const out of audioOutputs) {
+		if (!out || typeof out !== 'object') continue
+		if (out.enabled === false || out.enabled === 'false') continue
+		const consumerType = String(out.type || 'portaudio').toLowerCase()
+		if (consumerType === 'system-audio') continue
+		const id = String(out.id || '').trim()
+		if (!id) continue
+
+		const edge = edges.find((e) => String(e.sinkId) === id)
+		if (!edge) continue
+
+		const srcId = String(edge.sourceId || '')
+		let destId = ''
+		if (srcId.startsWith('dst_in_')) destId = srcId.slice('dst_in_'.length)
+		const dest = destinations.find((d) => String(d.id) === destId)
+		if (!dest || String(dest.mode || '') === 'multiview') continue
+
+		const idx = Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0)
+		const layout = normalizeProgramLayout(String(out.channelLayout || 'stereo'))
+		byMain[idx] = byMain[idx] != null ? maxProgramLayout(byMain[idx], layout) : layout
+	}
+	return byMain
+}
 
 /**
  * Per-main program bus layout from Device View destination settings.
@@ -15,10 +50,13 @@ function resolveProgramAudioLayoutsForConfig(config, screenCount) {
 		screenCount != null && Number.isFinite(Number(screenCount))
 			? Math.max(1, Number(screenCount))
 			: getChannelMap(config || {}).screenCount || 1
-	const byMain = destinationAudioLayoutsByMain(config)
+	const destByMain = destinationAudioLayoutsByMain(config)
+	const cabledByMain = cabledPortAudioLayoutsByMain(config)
 	const layouts = []
 	for (let i = 0; i < sc; i++) {
-		layouts.push(byMain[i] || 'stereo')
+		const dest = destByMain[i] || 'stereo'
+		const cabled = cabledByMain[i]
+		layouts.push(cabled != null ? maxProgramLayout(dest, cabled) : dest)
 	}
 	return layouts
 }
@@ -64,12 +102,13 @@ function resolveEffectiveProgramLayout(audioRouting, _audioOutputs, config, scre
 	return normalizeProgramLayout(String(audioRouting?.programLayout || 'stereo'))
 }
 
-/** @deprecated Use destination `audioLayout` instead of cabled PortAudio width. */
-function resolveCabledLayoutsByMain(_config) {
-	return {}
+/** @deprecated Use {@link cabledPortAudioLayoutsByMain} */
+function resolveCabledLayoutsByMain(config) {
+	return cabledPortAudioLayoutsByMain(config)
 }
 
 module.exports = {
+	cabledPortAudioLayoutsByMain,
 	resolveCabledLayoutsByMain,
 	resolveProgramAudioLayoutsForConfig,
 	resolveProgramLayoutForMain,

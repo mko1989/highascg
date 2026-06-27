@@ -26,6 +26,11 @@ import {
 } from './scene-state-global-border.js'
 import { applySceneLayerDefaults } from './editor-defaults.js'
 import {
+	isAutoTransitionDuration,
+	resolveTransitionDuration,
+	transitionDurationForFps,
+} from './transition-duration.js'
+import {
 	sceneStateCopyLayerStyle,
 	sceneStateSaveLayerPresetFromLayer,
 	sceneStatePasteLayerStyle,
@@ -66,6 +71,7 @@ export class SceneState {
 		this.editOnPgm = false
 		this._listeners = new Map()
 		this._load()
+		this._applyFpsAwareGlobalDefaultTransition(false)
 	}
 
 	get liveSceneId() { return this.liveSceneIdByMain[this.activeScreenIndex] ?? null }
@@ -85,19 +91,33 @@ export class SceneState {
 		const next = resolutions.map((r) => r?.w > 0 && r?.h > 0 ? { w: r.w, h: r.h, fps: r.fps ?? 50 } : { ...Persistence.FALLBACK_RESOLUTION })
 		if (Persistence.getCanvasResolutionsEqual(this._canvasResolutions, next)) return
 		this._canvasResolutions = next
-		
-		// Make the default transition half the fps of the first main screen
-		if (this.globalDefaultTransition && this.globalDefaultTransition.duration === 12) {
-			const fps = next[0]?.fps ?? 50
-			this.globalDefaultTransition.duration = Math.round(fps / 2)
-		}
-		
+		this._applyFpsAwareGlobalDefaultTransition()
 		this._save()
 		this._emit('screenChange')
 		this._emit('change')
 	}
 
 	getCanvasForScreen(screenIdx = this.activeScreenIndex) { return this._getCanvas(screenIdx) }
+
+	/** @param {boolean} [persist] */
+	_applyFpsAwareGlobalDefaultTransition(persist = true) {
+		const g = this.globalDefaultTransition
+		if (!g || !isAutoTransitionDuration(g.duration)) return false
+		const fps = this.getCanvasForScreen(0).framerate
+		const next = transitionDurationForFps(fps)
+		if (Math.round(Number(g.duration)) === next) return false
+		g.duration = next
+		if (persist) this._save()
+		return true
+	}
+
+	getResolvedGlobalDefaultTransition() {
+		const fps = this.getCanvasForScreen(0).framerate
+		return {
+			...this.globalDefaultTransition,
+			duration: resolveTransitionDuration(this.globalDefaultTransition?.duration, fps),
+		}
+	}
 
 	_applyPersistedData(data) { return Persistence.applyPersistedData(this, data) }
 
