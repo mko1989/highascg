@@ -29,7 +29,7 @@ Excluded from the snapshot; applied from **`exfat/drop-update/`** when the stick
 - **`tools/`** (entire tree) — playout receives **`tools/runtime/`** only inside the server tarball (`exfat-sync-cli.js`, staged Caspar helpers)
 - **`client/`**, **`dist-web/`**, **`work/`**, **`deprecated/`**, **`node_modules/`**, dev trees
 
-**First boot / hotfix:** **`highascg-exfat-server-update.service`** rsyncs **`drop-update/`** → **`~/highascg/`** when **`drop-update/package.json`** exists (stops **`highascg.service`**, optional **`npm ci`**, archives drop to **`drop-update/applied/<UTC>/`**). Legacy **`update/server/`** is still accepted once.
+**First boot / hotfix:** **`highascg-exfat-server-update.service`** rsyncs **`drop-update/`** → **`~/highascg/`** when **`drop-update/package.json`** exists (stops **`highascg.service`**, optional **`npm ci`**). **Live USB:** drop **stays** in **`drop-update/`** (retain — `~/highascg/` is reset each boot). **Persistent install:** drop may move to **`drop-update/applied/<UTC>/`**. Legacy **`update/server/`** is still accepted once.
 
 Then **`highascg-exfat-sync.service`** runs **`node tools/runtime/exfat-sync-cli.js`** (**`configs/` ↔ `config/`**, **`drop-config/`**, state JSON per **`/etc/highascg/exfat-sync.json`**; post-save debounced sync from the Node app).
 

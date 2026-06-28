@@ -13,6 +13,8 @@
 | 64 | [64_WO_HOT_BACKUP_AMCP_FANOUT.md](./64_WO_HOT_BACKUP_AMCP_FANOUT.md) | Phase A–C shipped | Leader AMCP fan-out to follower Caspar (2026-06-27) |
 | 65 | [65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md](./65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md) | Draft | Playhead sync, fan-out robustness, failover v2 (WO-64 follow-on) |
 | 63 | [63_WO_LOOKS_DECK_LIVE_COMPOSE_PREVIEW_THUMBS.md](./63_WO_LOOKS_DECK_LIVE_COMPOSE_PREVIEW_THUMBS.md) | In progress | Looks deck cards show live compose preview when on PGM/PRV (Companion parity); edit mode keeps legacy thumbs |
+| 67 | [67_WO_LOGS_MODAL_CATEGORIES_AND_SUPPORT_BUNDLE.md](./67_WO_LOGS_MODAL_CATEGORIES_AND_SUPPORT_BUNDLE.md) | Shipped (v1) | Logs modal toggles, categorized logging + filters, support bundle ZIP — live QA optional |
+| 69 | [69_WO_CLEAN_SLATE_FULL_RESET.md](./69_WO_CLEAN_SLATE_FULL_RESET.md) | Draft | Clean-slate reset — wipe internal projects/config; fail-safe skip for all mount-linked media (bridge/USB/drive) |
 
 ## WO-33 — Device view (split)
 

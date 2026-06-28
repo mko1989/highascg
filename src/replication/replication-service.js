@@ -1,12 +1,12 @@
 'use strict'
 
 const crypto = require('crypto')
+const os = require('os')
 const { RoleState } = require('./role-state')
 const { startPeerClient } = require('./peer-client')
 const { startPeerWsClient } = require('./peer-ws-client')
 const { getReplicationConfig, replicationPairConfigured, normalizeReplicationConfig } = require('../config/replication-config')
 const { markLiveStateDirty, broadcastLiveState } = require('./live-state-feed')
-const { getMediaSyncStatus } = require('./syncthing-media-status')
 const { pushProjectToPeer, reconcileProjectsToPeer } = require('./replicate-projects')
 const { reconcileAllToPeer } = require('./replication-reconcile')
 const { scheduleLiveIntentApply } = require('./mirror-apply')
@@ -33,6 +33,8 @@ const { scheduleLiveIntentApply } = require('./mirror-apply')
 
 /** @type {ReplicationRuntime|null} */
 let _runtime = null
+/** @type {object|null} */
+let _ctx = null
 
 function hashConfig(cfg) {
 	try {
@@ -47,6 +49,7 @@ function hashConfig(cfg) {
  * @param {{ clients?: Set, getOperatorWsCount?: () => number }} [wsInfo]
  */
 function startReplicationService(ctx, wsInfo = {}) {
+	_ctx = ctx
 	const repl = getReplicationConfig(ctx.config)
 	const roleState = new RoleState()
 	roleState.configure({ enabled: repl.enabled, role: repl.role })
@@ -61,6 +64,8 @@ function startReplicationService(ctx, wsInfo = {}) {
 		peerReachable: false,
 		lastPeerPingAt: 0,
 		lastPeerPing: null,
+		peerInstanceId: null,
+		instanceId: crypto.randomBytes(8).toString('hex'),
 		peerLeaderEpoch: 0,
 		projectsPushed: 0,
 		timelinesPushed: 0,
@@ -73,6 +78,8 @@ function startReplicationService(ctx, wsInfo = {}) {
 		lastClockSyncAt: 0,
 		getOperatorWsCount: wsInfo.getOperatorWsCount || (() => (wsInfo.clients ? wsInfo.clients.size : 0)),
 		peerClient: null,
+		peerWsConnected: false,
+		lastMediaSync: null,
 		configHash: hashConfig(ctx.config),
 	}
 
@@ -113,7 +120,22 @@ function startReplicationService(ctx, wsInfo = {}) {
 	})
 
 	if (repl.enabled && repl.peer.host) {
-		peerClient.start()
+		const { reloadReplicationFromConfig } = require('./replication-reload')
+		reloadReplicationFromConfig(ctx)
+		void (async () => {
+			try {
+				const { forcePeerPing } = require('./replication-refresh')
+				const ping = await forcePeerPing(ctx, runtime)
+				if (ping.ok && runtime.roleState.getRole() === 'follower') {
+					const { reconcileFromLeader } = require('./replication-reconcile')
+					await reconcileFromLeader(ctx, runtime)
+				}
+			} catch (e) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', '[replication] boot connection refresh: ' + (e?.message || e))
+				}
+			}
+		})()
 	}
 
 	ctx._replication = runtime
@@ -170,8 +192,8 @@ async function handlePeerWsMessage(ctx, msg) {
 	runtime.lastLiveIntent = msg.data
 	if (msg.data.seq) runtime.lastPeerLiveSeq = msg.data.seq
 
-	const { isAmcpFanoutMirrorActive } = require('./amcp-fanout')
-	if (isAmcpFanoutMirrorActive(ctx.config)) return
+	const { shouldSkipSemanticLiveMirror } = require('./amcp-fanout')
+	if (shouldSkipSemanticLiveMirror(ctx.config)) return
 
 	if (repl.followerMode === 'mirror') {
 		const result = await scheduleLiveIntentApply(ctx, msg.data, repl, runtime)
@@ -183,11 +205,65 @@ async function handlePeerWsMessage(ctx, msg) {
 
 /**
  * @param {object} ctx
+ * @param {import('./replication-service').ReplicationRuntime} runtime
+ * @param {object|null} peerPing
+ * @param {ReturnType<import('../config/replication-config').getReplicationConfig>} repl
+ */
+function buildPeerBox(runtime, peerPing, repl) {
+	if (!repl.enabled || !repl.peer?.host) return null
+	const ping = peerPing || {}
+	return {
+		host: repl.peer.host,
+		port: repl.peer.port || 4200,
+		selfId: ping.selfId || null,
+		hostname: ping.hostname || null,
+		reachable: !!runtime?.peerReachable,
+		pingAgeMs: runtime?.lastPeerPingAt ? Date.now() - runtime.lastPeerPingAt : null,
+		role: ping.role || null,
+		appVersion: ping.appVersion || null,
+		configHash: ping.configHash || null,
+		lastAppliedSeq: runtime?.peerLastAppliedSeq ?? ping.lastAppliedSeq ?? null,
+		liveStateSeq: ping.liveStateSeq ?? null,
+		casparHost: ping.casparHost || null,
+		casparPort: ping.casparPort ?? null,
+		mirrorTransport: ping.mirrorTransport || null,
+		programFramerates: ping.programFramerates || {},
+		channelMap: ping.channelMap || null,
+	}
+}
+
+/**
+ * @param {object} ctx
+ * @param {import('./replication-service').ReplicationRuntime} runtime
+ * @param {ReturnType<import('../config/replication-config').getReplicationConfig>} repl
+ */
+function buildLocalBox(ctx, runtime, repl) {
+	const { buildChannelMapSummary } = require('./channel-parity')
+	let channelMap = null
+	try {
+		channelMap = buildChannelMapSummary(ctx.config)
+	} catch {
+		channelMap = null
+	}
+	return {
+		selfId: repl.selfId,
+		hostname: os.hostname(),
+		role: runtime?.roleState?.getRole() || 'standalone',
+		configHash: hashConfig(ctx.config),
+		channelMap,
+		liveStateSeq: runtime?.liveStateSeq ?? 0,
+		lastAppliedSeq: runtime?.lastAppliedSeq ?? 0,
+	}
+}
+
+/**
+ * @param {object} ctx
  */
 async function buildReplicationStatus(ctx) {
 	const runtime = getReplicationRuntime(ctx)
 	const repl = getReplicationConfig(ctx.config)
-	const media = await getMediaSyncStatus(repl.syncthingMediaFolderId)
+	const { getReplicationMediaSyncStatus } = require('./media-sync-status')
+	const media = await getReplicationMediaSyncStatus(ctx)
 
 	const role = runtime?.roleState?.getRole() || 'standalone'
 	const leaderLag =
@@ -211,6 +287,108 @@ async function buildReplicationStatus(ctx) {
 			casparOutput = { ok: true, warnings: [] }
 		}
 	}
+
+	const amcpFanout = (() => {
+		try {
+			const fan = require('./amcp-fanout')
+			return {
+				active: fan.isAmcpFanoutMirrorActive(ctx.config),
+				receiveBox: fan.isAmcpFanoutReceiveBox(ctx),
+			}
+		} catch {
+			return { active: false, receiveBox: false }
+		}
+	})()
+
+	const playheadSync = (() => {
+		try {
+			const { getPlayheadSyncStatus } = require('./playhead-sync')
+			return {
+				enabled: amcpFanout.active,
+				measureOnly: true,
+				...getPlayheadSyncStatus(runtime),
+			}
+		} catch {
+			return { enabled: false, driftMs: 0, measureOnly: true }
+		}
+	})()
+
+	const follower =
+		role === 'leader' && repl.enabled && repl.peer?.host
+			? {
+					...buildPeerBox(runtime, peerPing, repl),
+					mirrorLag: leaderLag,
+				}
+			: null
+
+	const local = buildLocalBox(ctx, runtime, repl)
+	const peerBox = repl.enabled && repl.peer?.host ? buildPeerBox(runtime, peerPing, repl) : null
+
+	let channelParity = { ok: true, mismatches: [], peerAvailable: false, configHashMatch: null }
+	try {
+		const { compareChannelParity } = require('./channel-parity')
+		channelParity = {
+			...compareChannelParity(local.channelMap, peerBox?.channelMap || null),
+			configHashMatch:
+				peerBox?.configHash && local.configHash
+					? peerBox.configHash === local.configHash
+					: null,
+		}
+	} catch {
+		/* ignore */
+	}
+
+	const { PING_MS } = require('./peer-client')
+	const pingAgeMs = runtime?.lastPeerPingAt ? Date.now() - runtime.lastPeerPingAt : null
+	const pingFresh = pingAgeMs != null && pingAgeMs <= Math.ceil(PING_MS * 2.5)
+	const pairIdOk = !peerPing?.pairId || !repl.pairId || peerPing.pairId === repl.pairId
+	const peerRoleOk =
+		!peerPing?.role ||
+		(role === 'leader' && peerPing.role === 'follower') ||
+		(role === 'follower' && peerPing.role === 'leader')
+	const wsConnected =
+		role === 'follower'
+			? !!runtime?.peerWsConnected
+			: role === 'leader'
+				? (runtime?.peerWsClients?.size ?? 0) > 0
+				: true
+	const peerHttpReachable = !!runtime?.peerReachable && pingFresh && pairIdOk && peerRoleOk
+	const peerLinkReady = peerHttpReachable && wsConnected
+
+	const connection = repl.enabled && repl.peer?.host
+		? {
+				peerHttp: {
+					reachable: peerHttpReachable,
+					rawReachable: !!runtime?.peerReachable,
+					pingAgeMs,
+					pingFresh,
+					pairIdOk,
+					peerRoleOk,
+				},
+				peerLiveWs:
+					role === 'follower'
+						? { connected: !!runtime?.peerWsConnected, direction: 'outbound' }
+						: {
+								connected: (runtime?.peerWsClients?.size ?? 0) > 0,
+								clientCount: runtime?.peerWsClients?.size ?? 0,
+								direction: 'inbound',
+							},
+				peerCaspar: {
+					active: amcpFanout.active && role === 'leader',
+					connected: !!runtime?.peerCasparConnection?.isConnected,
+					endpoint: runtime?.peerCasparConnection?.endpoint || repl.peerCaspar || null,
+				},
+			}
+		: null
+
+	let companion = null
+	try {
+		const { buildCompanionControlStatus } = require('../api/companion-control-status')
+		companion = buildCompanionControlStatus(ctx)
+	} catch {
+		companion = null
+	}
+
 	return {
 		enabled: repl.enabled,
 		configured: replicationPairConfigured(repl),
@@ -226,8 +404,12 @@ async function buildReplicationStatus(ctx) {
 		peer: { host: repl.peer.host, port: repl.peer.port },
 		peerSelfId: peerPing?.selfId || peerPing?.hostname || null,
 		peerHostname: peerPing?.hostname || null,
-		peerReachable: !!runtime?.peerReachable,
-		lastPeerPingAgeMs: runtime?.lastPeerPingAt ? Date.now() - runtime.lastPeerPingAt : null,
+		peerReachable: peerHttpReachable,
+		peerLinkReady,
+		peerHttpReachable,
+		lastPeerPingAgeMs: pingAgeMs,
+		peerInstanceId: runtime?.peerInstanceId ?? null,
+		peerPingError: peerHttpReachable ? null : runtime?.lastPeerPingError || null,
 		peerLeaderEpoch: runtime?.peerLeaderEpoch ?? null,
 		followerMode: repl.followerMode,
 		autoPromote: repl.autoPromote,
@@ -246,15 +428,17 @@ async function buildReplicationStatus(ctx) {
 		scheduledApplyLeadMs: repl.scheduledApplyLeadMs,
 		mirrorTransport: repl.mirrorTransport,
 		peerCaspar: repl.peerCaspar,
+		local,
+		peerBox,
+		channelParity,
+		connection,
+		casparParity: runtime?.lastCasparParity || null,
+		follower,
 		amcpFanout: {
-			active: (() => {
-				try {
-					return require('./amcp-fanout').isAmcpFanoutMirrorActive(ctx.config)
-				} catch {
-					return false
-				}
-			})(),
+			active: amcpFanout.active,
+			receiveBox: amcpFanout.receiveBox,
 			connected: !!runtime?.peerCasparConnection?.isConnected,
+			endpoint: runtime?.peerCasparConnection?.endpoint || repl.peerCaspar || null,
 			commandsSent: runtime?.peerCasparConnection?.commandsSent ?? 0,
 			correctionsSent: runtime?.peerCasparConnection?.correctionsSent ?? 0,
 			queueDepth: runtime?.peerCasparConnection?.queueDepth ?? 0,
@@ -263,19 +447,10 @@ async function buildReplicationStatus(ctx) {
 			lastError: runtime?.peerCasparConnection?.lastError || '',
 			skippedNotConnected: runtime?.amcpFanoutSkippedNotConnected ?? 0,
 		},
-		playheadSync: (() => {
-			try {
-				const { getPlayheadSyncStatus } = require('./playhead-sync')
-				return {
-					enabled: !!repl.playheadSync?.enabled,
-					...getPlayheadSyncStatus(runtime),
-				}
-			} catch {
-				return { enabled: false, driftMs: 0 }
-			}
-		})(),
+		playheadSync,
 		promotedAt: runtime?.promotedAt || null,
 		promoteReason: runtime?.promoteReason || null,
+		companion,
 	}
 }
 
@@ -295,8 +470,18 @@ function notifyOperatorWsCount(ctx, operatorCount) {
 function registerPeerWsClient(ws) {
 	if (!_runtime) return
 	_runtime.peerWsClients.add(ws)
-	ws.on('close', () => _runtime?.peerWsClients.delete(ws))
+	ws.on('close', () => {
+		_runtime?.peerWsClients.delete(ws)
+		if (_ctx) {
+			const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+			notifyReplicationStatusChanged(_ctx, 'peer-ws-inbound-closed')
+		}
+	})
 	if (_runtime.lastLiveIntent) broadcastLiveState(_runtime, _runtime.peerWsClients)
+	if (_ctx) {
+		const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+		notifyReplicationStatusChanged(_ctx, 'peer-ws-inbound')
+	}
 }
 
 module.exports = {

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMPANION_HOME="/home/casparcg/companion"
-CONFIG_DIR="/home/casparcg/.config/companion"
-SERVICE_SRC="/home/casparcg/highascg/tools/eggs/companion/companion.service"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
+COMPANION_HOME="${COMPANION_HOME:-/home/casparcg/companion}"
+CONFIG_DIR="${CONFIG_DIR:-/home/casparcg/.config/companion}"
+SERVICE_SRC="${SERVICE_SRC:-${REPO_ROOT}/tools/eggs/companion/companion.service}"
 SERVICE_DST="/etc/systemd/system/companion.service"
 UDEV_SRC="${CONFIG_DIR}/udev-rules/50-companion-headless.rules"
 UDEV_DST="/etc/udev/rules.d/50-companion-headless.rules"
@@ -45,7 +47,11 @@ fi
 
 systemctl daemon-reload
 systemctl enable companion.service
-systemctl restart companion.service
+if [[ "${HIGHASCG_SKIP_COMPANION_RESTART:-0}" != "1" ]]; then
+	systemctl restart companion.service
+else
+	echo "Skipped companion restart (HIGHASCG_SKIP_COMPANION_RESTART=1)"
+fi
 
 echo ""
 echo "Companion service installed."

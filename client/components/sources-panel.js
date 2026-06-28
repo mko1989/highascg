@@ -24,6 +24,14 @@ import {
 	getDefaultUploadSubdir,
 	filterMediaForActiveProject,
 } from '../lib/project-media-context.js'
+import {
+	initReplicationMediaSpread,
+	onReplicationMediaSyncUiChange,
+	getReplicationMediaSyncUiState,
+	runReplicationMediaPush,
+	runReplicationMediaPull,
+	refreshProjectMediaParity,
+} from '../lib/replication-media-spread.js'
 
 export function initSourcesPanel(root, stateStore, opts = {}) {
 	const wsClient = opts.wsClient; let previewFeedback = null; let currentTab = 'media'; let filter = ''; let mediaWithProbe = null; let extraLiveSources = []
@@ -43,8 +51,8 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	let visibleMediaOrder = []
 	const sendToPrv = async (s) => { const ch = (stateStore.getState()?.channelMap?.previewChannels?.[0] ?? 2); try { await api.post('/api/play', { channel: ch, layer: 1, clip: s.value }); const el = root.querySelector(`[data-source-value="${CSS.escape(s.value)}"]`); if (el) { el.classList.add('source-item--previewing'); clearTimeout(previewFeedback); previewFeedback = setTimeout(() => el.classList.remove('source-item--previewing'), 1200) } } catch {} }
 
-	root.innerHTML = `<div class="sources-tabs"><button class="sources-tab active" data-src-tab="media">Media</button><button class="sources-tab" data-src-tab="templates">Templates</button><button class="sources-tab" data-src-tab="placeholders" style="display:none">Placeholders</button><button class="sources-tab" data-src-tab="effects">Effects</button><button class="sources-tab" data-src-tab="live">Live</button><button class="sources-tab" data-src-tab="timelines">Timelines</button></div><div class="sources-project-media-bar" id="sources-project-media-bar" style="display:none"><div class="sources-project-media-bar__info"><span class="sources-project-media-bar__label" id="sources-project-media-label"></span><span class="sources-project-media-bar__path" id="sources-project-media-path"></span></div><label class="sources-project-media-bar__filter"><input type="checkbox" id="sources-project-media-filter" /> This project only</label></div><div class="sources-search" style="display:none"><input type="text" placeholder="Filter…" id="sources-filter" /></div><div class="sources-list" id="sources-list"></div><div class="sources-live-footer" style="display:none"><button type="button" class="sources-live-add-btn" id="sources-live-add-btn">+</button></div><div class="sources-media-footer" style="display:none"><div class="sources-media-selection-bar" id="sources-media-selection-bar" style="display:none"><span class="sources-media-selection-bar__count" id="sources-selection-count">0 selected</span><button type="button" class="sources-media-action-btn" id="sources-copy-selected">Copy to…</button><button type="button" class="sources-media-action-btn" id="sources-move-selected">Move to…</button><button type="button" class="sources-media-action-btn sources-media-action-btn--danger" id="sources-delete-selected">Delete</button><button type="button" class="sources-media-action-btn sources-media-action-btn--ghost" id="sources-clear-selected">Clear</button></div><div class="sources-media-footer__row"><button type="button" class="sources-refresh-btn" id="sources-refresh-media">↻ Refresh</button><div class="ingest-plus-wrap"><button type="button" class="ingest-plus-btn" id="ingest-plus-btn">+</button><div class="ingest-dropup-menu" style="display:none"><button class="ingest-menu-item" id="ingest-menu-file">Select File(s)</button><button class="ingest-menu-item" id="ingest-menu-mkdir">New Folder…</button><button class="ingest-menu-item ingest-menu-item--usb" id="ingest-menu-usb">Import USB…<span class="ingest-usb-badge" style="display:none"></span></button><button class="ingest-menu-item ingest-menu-item--placeholder" id="ingest-menu-placeholder" style="display:none">Add Placeholder…</button><div class="ingest-url-row"><input type="text" id="ingest-url" class="ingest-url-input" placeholder="Paste URL…" /><button type="button" id="ingest-url-btn" class="ingest-url-btn">⬇</button></div></div></div></div><div class="ingest-status-col"><div class="ingest-status" id="ingest-status"></div><div class="ingest-upload-progress" style="display:none"><div class="ingest-upload-progress__track"><div class="ingest-upload-progress__bar" style="width:0%"></div></div><span class="ingest-upload-progress__pct">0%</span></div></div></div><div id="sources-drag-overlay" class="sources-drag-overlay" style="display:none"><div class="sources-drag-overlay__content"><span>Drop to ingest</span></div></div>`
-	const tabs = root.querySelectorAll('.sources-tab'); const filterInput = root.querySelector('#sources-filter'); const listEl = root.querySelector('#sources-list'); const projectMediaBar = root.querySelector('#sources-project-media-bar'); const projectMediaLabel = root.querySelector('#sources-project-media-label'); const projectMediaPath = root.querySelector('#sources-project-media-path'); const projectMediaFilter = root.querySelector('#sources-project-media-filter'); const mediaFooter = root.querySelector('.sources-media-footer'); const selectionBar = root.querySelector('#sources-media-selection-bar'); const selectionCountEl = root.querySelector('#sources-selection-count'); const refreshBtn = root.querySelector('#sources-refresh-media'); const copyBtn = root.querySelector('#sources-copy-selected'); const moveBtn = root.querySelector('#sources-move-selected'); const deleteBtn = root.querySelector('#sources-delete-selected'); const clearSelBtn = root.querySelector('#sources-clear-selected'); const plusBtn = root.querySelector('#ingest-plus-btn'); const dropMenu = root.querySelector('.ingest-dropup-menu'); const fileBtn = root.querySelector('#ingest-menu-file'); const mkdirBtn = root.querySelector('#ingest-menu-mkdir'); const usbBtn = root.querySelector('#ingest-menu-usb'); const placeholderBtn = root.querySelector('#ingest-menu-placeholder'); const usbBadge = root.querySelector('.ingest-usb-badge'); const urlIn = root.querySelector('#ingest-url'); const urlBtn = root.querySelector('#ingest-url-btn'); const iStatus = root.querySelector('#ingest-status'); const iProgWrap = root.querySelector('.ingest-upload-progress'); const iBar = root.querySelector('.ingest-upload-progress__bar'); const iPct = root.querySelector('.ingest-upload-progress__pct'); const liveFooter = root.querySelector('.sources-live-footer'); const dragOverlay = root.querySelector('#sources-drag-overlay')
+	root.innerHTML = `<div class="sources-tabs"><button class="sources-tab active" data-src-tab="media">Media</button><button class="sources-tab" data-src-tab="templates">Templates</button><button class="sources-tab" data-src-tab="placeholders" style="display:none">Placeholders</button><button class="sources-tab" data-src-tab="effects">Effects</button><button class="sources-tab" data-src-tab="live">Live</button><button class="sources-tab" data-src-tab="timelines">Timelines</button></div><div class="sources-project-media-bar" id="sources-project-media-bar" style="display:none"><div class="sources-project-media-bar__info"><span class="sources-project-media-bar__label" id="sources-project-media-label"></span><span class="sources-project-media-bar__path" id="sources-project-media-path"></span></div><label class="sources-project-media-bar__filter"><input type="checkbox" id="sources-project-media-filter" /> This project only</label></div><div class="sources-search" style="display:none"><input type="text" placeholder="Filter…" id="sources-filter" /></div><div class="sources-list" id="sources-list"></div><div class="sources-live-footer" style="display:none"><button type="button" class="sources-live-add-btn" id="sources-live-add-btn">+</button></div><div class="sources-media-footer" style="display:none"><div class="sources-media-selection-bar" id="sources-media-selection-bar" style="display:none"><span class="sources-media-selection-bar__count" id="sources-selection-count">0 selected</span><button type="button" class="sources-media-action-btn" id="sources-copy-selected">Copy to…</button><button type="button" class="sources-media-action-btn" id="sources-move-selected">Move to…</button><button type="button" class="sources-media-action-btn sources-media-action-btn--danger" id="sources-delete-selected">Delete</button><button type="button" class="sources-media-action-btn sources-media-action-btn--ghost" id="sources-clear-selected">Clear</button></div><div class="sources-media-footer__row"><button type="button" class="sources-refresh-btn" id="sources-refresh-media">↻ Refresh</button><button type="button" class="sources-repl-media-btn" id="sources-repl-media-sync" style="display:none" title="" aria-label="Replication media sync"></button><div class="ingest-plus-wrap"><button type="button" class="ingest-plus-btn" id="ingest-plus-btn">+</button><div class="ingest-dropup-menu" style="display:none"><button class="ingest-menu-item" id="ingest-menu-file">Select File(s)</button><button class="ingest-menu-item" id="ingest-menu-mkdir">New Folder…</button><button class="ingest-menu-item ingest-menu-item--usb" id="ingest-menu-usb">Import USB…<span class="ingest-usb-badge" style="display:none"></span></button><button class="ingest-menu-item ingest-menu-item--placeholder" id="ingest-menu-placeholder" style="display:none">Add Placeholder…</button><div class="ingest-url-row"><input type="text" id="ingest-url" class="ingest-url-input" placeholder="Paste URL…" /><button type="button" id="ingest-url-btn" class="ingest-url-btn">⬇</button></div></div></div></div><div class="ingest-status-col"><div class="ingest-status" id="ingest-status"></div><div class="ingest-upload-progress" style="display:none"><div class="ingest-upload-progress__track"><div class="ingest-upload-progress__bar" style="width:0%"></div></div><span class="ingest-upload-progress__pct">0%</span></div><div class="repl-spread-progress" id="repl-spread-progress" style="display:none"><div class="repl-spread-progress__track"><div class="repl-spread-progress__bar" style="width:0%"></div></div><span class="repl-spread-progress__pct">0%</span></div></div></div><div id="sources-drag-overlay" class="sources-drag-overlay" style="display:none"><div class="sources-drag-overlay__content"><span>Drop to ingest</span></div></div>`
+	const tabs = root.querySelectorAll('.sources-tab'); const filterInput = root.querySelector('#sources-filter'); const listEl = root.querySelector('#sources-list'); const projectMediaBar = root.querySelector('#sources-project-media-bar'); const projectMediaLabel = root.querySelector('#sources-project-media-label'); const projectMediaPath = root.querySelector('#sources-project-media-path'); const projectMediaFilter = root.querySelector('#sources-project-media-filter'); const mediaFooter = root.querySelector('.sources-media-footer'); const selectionBar = root.querySelector('#sources-media-selection-bar'); const selectionCountEl = root.querySelector('#sources-selection-count'); const refreshBtn = root.querySelector('#sources-refresh-media'); const replMediaBtn = root.querySelector('#sources-repl-media-sync'); const copyBtn = root.querySelector('#sources-copy-selected'); const moveBtn = root.querySelector('#sources-move-selected'); const deleteBtn = root.querySelector('#sources-delete-selected'); const clearSelBtn = root.querySelector('#sources-clear-selected'); const plusBtn = root.querySelector('#ingest-plus-btn'); const dropMenu = root.querySelector('.ingest-dropup-menu'); const fileBtn = root.querySelector('#ingest-menu-file'); const mkdirBtn = root.querySelector('#ingest-menu-mkdir'); const usbBtn = root.querySelector('#ingest-menu-usb'); const placeholderBtn = root.querySelector('#ingest-menu-placeholder'); const usbBadge = root.querySelector('.ingest-usb-badge'); const urlIn = root.querySelector('#ingest-url'); const urlBtn = root.querySelector('#ingest-url-btn'); const iStatus = root.querySelector('#ingest-status'); const iProgWrap = root.querySelector('.ingest-upload-progress'); const iBar = root.querySelector('.ingest-upload-progress__bar'); const iPct = root.querySelector('.ingest-upload-progress__pct'); const spreadProgWrap = root.querySelector('#repl-spread-progress'); const spreadBar = root.querySelector('.repl-spread-progress__bar'); const spreadPct = root.querySelector('.repl-spread-progress__pct'); const liveFooter = root.querySelector('.sources-live-footer'); const dragOverlay = root.querySelector('#sources-drag-overlay')
 	root.querySelector('#sources-live-add-btn')?.addEventListener('click', () => showLiveInputModal(stateStore))
 
 	const refreshProjectMediaBar = async () => {
@@ -68,12 +76,78 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	window.addEventListener('project-loaded', () => {
 		void refreshProjectMediaBar().then(() => render())
 	})
+	document.addEventListener('highascg-settings-applied', () => {
+		void refreshProjectMediaBar().then(() => render())
+	})
 
 	const applyMediaList = (list) => {
 		if (!Array.isArray(list)) return
 		mediaWithProbe = list
 		stateStore?.applyChange?.('media', list)
 		render()
+	}
+	const updateReplMediaSyncUi = () => {
+		if (!replMediaBtn) return
+		const ui = getReplicationMediaSyncUiState()
+		if (ui.showSpread) {
+			replMediaBtn.style.display = ''
+			replMediaBtn.textContent = ui.syncing ? '…' : '⤴'
+			replMediaBtn.title = 'Spread new project media to backup'
+			replMediaBtn.setAttribute('aria-label', 'Spread project media to backup')
+			replMediaBtn.classList.toggle('sources-repl-media-btn--highlight', !ui.syncing)
+		} else if (ui.showPull) {
+			replMediaBtn.style.display = ''
+			replMediaBtn.textContent = ui.syncing ? '…' : '⬇'
+			replMediaBtn.title = 'Download project media from leader'
+			replMediaBtn.setAttribute('aria-label', 'Download project media from leader')
+			replMediaBtn.classList.remove('sources-repl-media-btn--highlight')
+		} else {
+			replMediaBtn.style.display = 'none'
+			replMediaBtn.title = ''
+		}
+		replMediaBtn.disabled = ui.syncing
+		replMediaBtn.classList.toggle('sources-repl-media-btn--syncing', ui.syncing)
+
+		if (spreadProgWrap && spreadBar && spreadPct) {
+			if (ui.syncing && ui.syncProgress) {
+				spreadProgWrap.style.display = 'flex'
+				spreadBar.style.width = `${ui.syncProgress.percent}%`
+				spreadPct.textContent = `${ui.syncProgress.percent}%`
+				if (iProgWrap) iProgWrap.style.display = 'none'
+				if (iStatus) {
+					iStatus.textContent = ui.syncProgress.label
+					iStatus.className = 'ingest-status ingest-status--spread'
+				}
+			} else {
+				spreadProgWrap.style.display = 'none'
+				spreadBar.style.width = '0%'
+				spreadPct.textContent = '0%'
+				if (iStatus?.classList.contains('ingest-status--spread')) {
+					iStatus.textContent = ''
+					iStatus.className = 'ingest-status'
+				}
+			}
+		}
+	}
+	initReplicationMediaSpread()
+	onReplicationMediaSyncUiChange(updateReplMediaSyncUi)
+	updateReplMediaSyncUi()
+	if (replMediaBtn) {
+		replMediaBtn.onclick = async () => {
+			const ui = getReplicationMediaSyncUiState()
+			if (ui.syncing) return
+			try {
+				if (ui.showSpread) {
+					await runReplicationMediaPush()
+					await refreshMedia()
+				} else if (ui.showPull) {
+					await runReplicationMediaPull()
+					await refreshMedia()
+				}
+			} catch {
+				/* toast shown in helper */
+			}
+		}
 	}
 	const fetchMedia = async () => {
 		try {
@@ -88,6 +162,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	const rescanMediaFromCaspar = async () => {
 		await api.post('/api/media/refresh', { ensureHqThumbs: true }).catch(() => {})
 		await fetchMedia()
+		await refreshProjectMediaParity()
 	}
 	const refreshMedia = rescanMediaFromCaspar
 	const setStatus = (m, t) => { iStatus.textContent = m; iStatus.className = `ingest-status ingest-status--${t}`; if (t === 'ok') setTimeout(() => { iStatus.textContent = ''; iStatus.className = 'ingest-status' }, 4000) }

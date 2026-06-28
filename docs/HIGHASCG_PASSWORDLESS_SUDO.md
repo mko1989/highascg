@@ -47,8 +47,16 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 | **`/usr/sbin/reboot`** | *(none)* | Same |
 | **`/bin/systemctl`** | `reboot` | Same |
 | **`/usr/bin/systemctl`** | `reboot` | Same |
+| **`/usr/local/lib/highascg/highascg-webui-server-update.sh`** | `--source <extract-dir>` | Web UI server update (WO-66) |
 | **`/usr/bin/eggs`** | `calamares` | `src/api/routes-system-setup.js` (DISPLAY often `:0`) |
 | **`/usr/local/lib/highascg/highascg-network-apply.sh`** | fixed `dhcp` / `static` + allow-listed iface args | WO-59 **Apply network** (`POST /api/system/network/apply`) |
+
+**WO-66 Web UI server update** (install helper via `install-exfat-systemd-units.sh`, then sudoers):
+
+```bash
+echo 'casparcg ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-webui-server-update.sh' | sudo tee /etc/sudoers.d/highascg-webui-server-update
+sudo visudo -cf /etc/sudoers.d/highascg-webui-server-update
+```
 
 **WO-59 network helper** (install manually until wired in `install-phase4.sh`):
 

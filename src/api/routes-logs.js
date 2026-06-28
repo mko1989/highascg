@@ -8,6 +8,7 @@
 const fs = require('fs')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const logBuffer = require('../utils/log-buffer')
+const { parseFilterList } = require('../utils/log-record')
 
 /**
  * @param {string} filePath
@@ -63,9 +64,17 @@ function handleGet(p, query = {}) {
 	const maxBytes = Math.min(4 * 1024 * 1024, Math.max(65536, parseInt(String(query.maxBytes || '393216'), 10) || 393216))
 	const wantHigh = query.highascg !== '0' && query.highascg !== 'false'
 	const wantCaspar = query.caspar !== '0' && query.caspar !== 'false'
+	const wantRecords = query.records === '1' || query.records === 'true'
 	const casparPath = resolveCasparLogPath()
+	const highascgOpts = {
+		lines,
+		categories: parseFilterList(query.categories),
+		levels: parseFilterList(query.levels),
+		format: wantRecords ? 'records' : 'text',
+	}
 	const out = {
-		highascg: wantHigh ? logBuffer.getHighasLines(lines) : [],
+		schemaVersion: 1,
+		highascg: wantHigh ? logBuffer.getHighasLines(highascgOpts) : [],
 		caspar: wantCaspar ? tailFileLines(casparPath, lines, maxBytes) : [],
 		casparPath: wantCaspar ? casparPath : null,
 	}

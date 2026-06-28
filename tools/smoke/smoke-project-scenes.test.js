@@ -76,3 +76,37 @@ describe('scene_deck_sync debounce exports', () => {
 		assert.ok(SCENE_DECK_SYNC_DEBOUNCE_MS >= 0)
 	})
 })
+
+describe('buildSceneDeckForApi live deck', () => {
+	it('prefers live ctx.sceneDeck snapshot names', () => {
+		const { buildSceneDeckForApi, applyLiveSceneDeckToCtx } = require('../../src/engine/project-scenes')
+		const ctx = { sceneDeck: { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] } }
+		applyLiveSceneDeckToCtx(ctx, {
+			looks: [{ id: 'a', name: 'Stale meta' }],
+			sceneSnapshots: [{ id: 'a', name: 'Renamed live', layers: [] }],
+			previewSceneId: null,
+			layerPresets: [],
+			lookPresets: [],
+		})
+		const deck = buildSceneDeckForApi(ctx)
+		assert.equal(deck.looks[0].name, 'Renamed live')
+		assert.equal(deck.sceneSnapshots[0].name, 'Renamed live')
+	})
+
+	it('fills layer payloads from saved project when snapshots are metadata-only', () => {
+		const { buildSceneDeckForApi, applyLiveSceneDeckToCtx } = require('../../src/engine/project-scenes')
+		const ctx = { sceneDeck: { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] } }
+		applyLiveSceneDeckToCtx(ctx, {
+			looks: [{ id: 'sc_1782382061255_cgvbqwy', name: 'pipy' }],
+			sceneSnapshots: [{ id: 'sc_1782382061255_cgvbqwy', name: 'pipy', layers: [] }],
+			previewSceneId: null,
+			layerPresets: [],
+			lookPresets: [],
+		})
+		const deck = buildSceneDeckForApi(ctx)
+		const snap = deck.sceneSnapshots.find((s) => s.id === 'sc_1782382061255_cgvbqwy')
+		assert.ok(snap)
+		assert.ok(Array.isArray(snap.layers))
+		assert.ok(snap.layers.some((l) => l?.source?.value))
+	})
+})

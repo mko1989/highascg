@@ -74,8 +74,8 @@ async function applyLiveIntentOnFollower(ctx, livePacket, repl) {
 		if (repl.followerMode === 'armed') return { applied: false, reason: 'armed_store_only' }
 		return { applied: false, reason: 'no_intent' }
 	}
-	const { isAmcpFanoutMirrorActive } = require('./amcp-fanout')
-	if (isAmcpFanoutMirrorActive(ctx.config)) {
+	const { shouldSkipSemanticLiveMirror } = require('./amcp-fanout')
+	if (shouldSkipSemanticLiveMirror(ctx.config)) {
 		return { applied: false, reason: 'amcp-fanout', alreadyMirrored: true }
 	}
 	if (repl.followerMode !== 'mirror' && repl.followerMode !== 'armed') {

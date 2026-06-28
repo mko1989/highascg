@@ -66,7 +66,11 @@ function resolveCasparConfigWritePath(ctx) {
  * @param {object} ctx
  * @returns {Promise<{ ok: boolean, status?: number, path?: string, error?: string, detail?: string, hint?: string }>}
  */
-async function writeCasparConfigToDisk(ctx) {
+/**
+ * @param {object} ctx
+ * @param {{ xml?: string }} [opts] - one-shot XML from editor Apply (not persisted in settings)
+ */
+async function writeCasparConfigToDisk(ctx, opts = {}) {
 	if (ctx.config?.offline_mode) {
 		apiLog(ctx, 'warn', '[Caspar config] Write rejected: offline_mode is enabled')
 		return {
@@ -85,10 +89,13 @@ async function writeCasparConfigToDisk(ctx) {
 				'Set System → Caspar config path in Settings (saved in highascg.config.json), or CASPAR_CONFIG_PATH on the HighAsCG process when no path is saved.',
 		}
 	}
-	apiLog(ctx, 'info', `[Caspar config] Writing generated casparcg.config → ${filePath}`)
-	const override = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
-	const xml = override || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
-	if (override) {
+	apiLog(ctx, 'info', `[Caspar config] Writing casparcg.config → ${filePath}`)
+	const oneShot = typeof opts.xml === 'string' ? opts.xml.trim() : ''
+	const persistedOverride = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
+	const xml = oneShot || persistedOverride || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	if (oneShot) {
+		apiLog(ctx, 'info', '[Caspar config] Using one-shot XML from config editor (not saved in settings)')
+	} else if (persistedOverride) {
 		apiLog(
 			ctx,
 			'warn',
@@ -133,12 +140,16 @@ async function writeCasparConfigToDisk(ctx) {
  */
 async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 	apiLog(ctx, 'info', '[Caspar config] Full apply starting')
+	const oneShotXml = typeof opts.xml === 'string' ? opts.xml.trim() : ''
+	const writeHook = oneShotXml
+		? (applyCtx) => writeCasparConfigToDisk(applyCtx, { xml: oneShotXml })
+		: writeCasparConfigToDisk
 	let fullApply
 	ctx._fullApplyInProgress = true
 	try {
 		fullApply = await applyFullServerConfig(ctx, {
 			log: (level, msg) => apiLog(ctx, level, msg),
-			writeCasparConfig: writeCasparConfigToDisk,
+			writeCasparConfig: writeHook,
 			skipCasparRestart: opts.skipCasparRestart,
 		})
 	} catch (e) {
@@ -266,7 +277,8 @@ async function handlePost(p, body, ctx) {
 			b.skipCasparRestart === 'true' ||
 			b.skipDisplayRestart === true ||
 			b.skipDisplayRestart === 'true'
-		return applyCasparConfigToDiskAndRestart(ctx, { skipCasparRestart })
+		const xml = typeof b.xml === 'string' ? b.xml : ''
+		return applyCasparConfigToDiskAndRestart(ctx, { skipCasparRestart, xml })
 	}
 
 	if (p === '/api/caspar-config/override') {

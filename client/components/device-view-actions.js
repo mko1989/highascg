@@ -74,8 +74,10 @@ export async function addDestination(typeOrOptions) {
 	return await api.post('/api/device-view', { addDestination })
 }
 
-export async function applyCasparConfig() {
-	return await api.post('/api/caspar-config/apply', {})
+export async function applyCasparConfig(opts = {}) {
+	const body = {}
+	if (typeof opts.xml === 'string' && opts.xml.trim()) body.xml = opts.xml.trim()
+	return await api.post('/api/caspar-config/apply', body)
 }
 
 export async function getCasparConfigOverride() {

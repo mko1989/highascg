@@ -100,4 +100,18 @@ describe('resolveBusLookIdsForMain', () => {
 			prvLookId: null,
 		})
 	})
+
+	it('falls back to client preview when server PRV channel is empty', () => {
+		const sceneLive = {
+			'1': { sceneId: 'look-b' },
+		}
+		const fallback = {
+			getLiveSceneIdForMain: () => null,
+			getPreviewSceneIdForMain: () => 'look-a',
+		}
+		assert.deepEqual(resolveBusLookIdsForMain(0, sceneLive, multiMap, exists, fallback), {
+			pgmLookId: 'look-b',
+			prvLookId: 'look-a',
+		})
+	})
 })

@@ -48,12 +48,19 @@ class PeerCasparConnection {
 		this.stop()
 		this._host = String(host || '').trim()
 		this._port = Math.max(1, parseInt(String(port ?? 5250), 10) || 5250)
+		this._refusedLogged = false
 		if (!this._host) return
 
-		this._tcp = new TcpClient({ host: this._host, port: this._port })
+		this._tcp = new TcpClient({
+			host: this._host,
+			port: this._port,
+			initialBackoffMs: 2000,
+			maxBackoffMs: 30000,
+		})
 		this._tcp.on('connected', () => {
 			this.connected = true
 			this.lastError = ''
+			this._refusedLogged = false
 			this._log('info', `[replication] peer Caspar AMCP connected ${this._host}:${this._port}`)
 		})
 		this._tcp.on('disconnected', () => {
@@ -61,6 +68,17 @@ class PeerCasparConnection {
 		})
 		this._tcp.on('error', (err) => {
 			this.lastError = err?.message || String(err)
+			const refused = /ECONNREFUSED/i.test(this.lastError)
+			if (refused) {
+				if (!this._refusedLogged) {
+					this._refusedLogged = true
+					this._log(
+						'warn',
+						`[replication] peer Caspar AMCP: ${this.lastError} (retrying until peer Caspar is up)`,
+					)
+				}
+				return
+			}
 			this._log('warn', `[replication] peer Caspar AMCP: ${this.lastError}`)
 		})
 		this._tcp.on('data', () => {

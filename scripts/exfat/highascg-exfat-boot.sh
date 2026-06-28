@@ -69,12 +69,17 @@ else
 	log "Already mounted: $MP ($(findmnt -n -o SOURCE "$MP"))"
 fi
 
-for unit in highascg-exfat-media-prep.service highascg-exfat-server-update.service; do
+for unit in highascg-exfat-media-prep.service; do
 	if systemctl cat "$unit" &>/dev/null; then
 		log "Queueing $unit (--no-block)"
 		systemctl start --no-block "$unit" 2>>"$LOG" || log "WARN: queue ${unit} failed"
 	fi
 done
+
+if systemctl cat highascg-exfat-server-update.service &>/dev/null; then
+	log "Starting highascg-exfat-server-update.service (blocking — apply drop-update/ before highascg)"
+	systemctl start highascg-exfat-server-update.service 2>>"$LOG" || log "WARN: server-update failed or skipped"
+fi
 
 if systemctl cat home-casparcg-highascg-media-exfat.mount &>/dev/null; then
 	log "Queueing home-casparcg-highascg-media-exfat.mount (~/exfat/media → ~/highascg/media/exfat)"

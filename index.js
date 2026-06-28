@@ -6,6 +6,7 @@
 
 const path = require('path'); const os = require('os'); const fs = require('fs')
 const { createLogger } = require('./src/utils/logger'); const logBuffer = require('./src/utils/log-buffer')
+const { config: configLogger } = require('./src/utils/buffered-logger')
 const { StateManager } = require('./src/state/state-manager')
 const { startHttpServer } = require('./src/server/http-server'); const { attachWebSocketServer } = require('./src/server/ws-server')
 const { startUsbHotplugWatcher } = require('./src/media/usb-drives'); const { routeRequest, getState } = require('./src/api/router')
@@ -70,7 +71,7 @@ function main() {
 		configPath = modularDir
 	}
 
-	const configManager = new ConfigManager(configPath, logger)
+	const configManager = new ConfigManager(configPath, configLogger)
 	let config
 	try {
 		configManager.load()
@@ -232,6 +233,7 @@ function main() {
 		const wsBroadcastMs = cli.wsBroadcastMs || parseInt(process.env.HIGHASCG_WS_BROADCAST_MS || '0', 10) || 0
 		appCtx.onFirstWebSocketClient = (ctx) => notifyWebSocketClientConnected(ctx)
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
+		appCtx._getWsLogLineStats = typeof wsHandle.getLogLineStats === 'function' ? () => wsHandle.getLogLineStats() : null
 		startReplicationService(appCtx, {
 			clients: wsHandle.clients,
 			getOperatorWsCount: () => wsHandle.clients.size,
@@ -239,7 +241,17 @@ function main() {
 		appCtx._stopReplicationService = () => stopReplicationService(appCtx)
 		appCtx._stopUsbHotplugWatcher = startUsbHotplugWatcher(appCtx)
 
-		logBuffer.setOnNewLine(line => { try { if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('log_line', line) } catch (_) {} })
+		logBuffer.setOnNewLine((record) => {
+			try {
+				if (typeof appCtx._wsBroadcast === 'function') {
+					const payload =
+						typeof record === 'string'
+							? record
+							: { ...record, line: record.line || String(record.message || '') }
+					appCtx._wsBroadcast('log_line', payload)
+				}
+			} catch (_) {}
+		})
 		appCtx.timelineEngine.on('playback', pb => {
 			if (typeof appCtx._wsBroadcast === 'function') appCtx._wsBroadcast('timeline.playback', pb)
 			if (typeof appCtx.markReplicationLiveStateDirty === 'function') appCtx.markReplicationLiveStateDirty()

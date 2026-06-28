@@ -13,6 +13,7 @@ const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { getChannelMap, getRouteString } = require('../config/routing')
 const { resolveSceneById } = require('../engine/project-scenes')
+const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
 
 const TAKE_TIMEOUT_MS = 120000
 const OUT_PRIMARY_LAYER = 1
@@ -186,6 +187,16 @@ async function handleSceneTake(body, ctx) {
 				liveSceneState.setChannel(bus1, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 			}
 			liveSceneState.broadcastSceneLive(ctx)
+			return
+		}
+
+		if (shouldFollowerSkipLocalPgmAmcp(ctx, channel, { previewOnly: false })) {
+			if (typeof ctx.log === 'function') {
+				ctx.log(
+					'info',
+					`[scene-take] follower amcp-fanout: skip local PGM AMCP ch=${channel} (leader fan-out drives air)`,
+				)
+			}
 			return
 		}
 
@@ -488,10 +499,68 @@ async function handleBorderPresetCrossfade(body, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ lines }) }
 }
 
+/**
+ * POST /api/scene/live/preview — register PRV look on server live map (no AMCP).
+ * Keeps deck PGM/PRV rings in sync when the editor composes via client look-stack AMCP.
+ */
+function handlePreviewLiveRegister(body, ctx) {
+	const b = parseBody(body)
+	const sceneIdRaw = b.sceneId ?? b.lookId ?? b.incomingSceneId
+	if (sceneIdRaw == null || !String(sceneIdRaw).trim()) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'sceneId required' }) }
+	}
+
+	const routeMap = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
+	let mainIdx = b.mainIndex != null ? parseInt(b.mainIndex, 10) : -1
+	if (mainIdx < 0 && b.mainScreenIndex != null) {
+		mainIdx = parseInt(b.mainScreenIndex, 10) - 1
+	}
+
+	let previewCh = null
+	if (mainIdx >= 0) {
+		previewCh = resolvePreviewChannel(routeMap, mainIdx, null)
+	}
+	if (!previewCh && b.channel != null) {
+		const ch = parseInt(b.channel, 10)
+		const previews = (routeMap.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
+		if (previews.includes(ch)) previewCh = ch
+	}
+	if (!previewCh) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				error:
+					'Preview channel not found for mainIndex (PGM-only destination or invalid mainIndex). Pass mainIndex or preview channel.',
+			}),
+		}
+	}
+
+	let scene = b.incomingScene || b.scene
+	if (!scene || typeof scene !== 'object') {
+		scene = resolveSceneById(sceneIdRaw)
+	}
+	if (!scene || typeof scene !== 'object') {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'scene not found' }) }
+	}
+
+	const sceneId = String(scene.id || sceneIdRaw)
+	liveSceneState.setChannel(previewCh, { sceneId, scene: stripEphemeralTakeFields(scene) })
+	liveSceneState.broadcastSceneLive(ctx)
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ok: true, previewChannel: previewCh, mainIndex: mainIdx, sceneLive: liveSceneState.getAll() }),
+	}
+}
+
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
 		if (!ctx.amcp) return null
 		return handleSceneTake(body, ctx)
+	}
+	if (path === '/api/scene/live/preview') {
+		return handlePreviewLiveRegister(body, ctx)
 	}
 	if (path === '/api/scene/border-lines') {
 		return handleBorderLines(body, ctx)
@@ -502,4 +571,4 @@ async function handlePost(path, body, ctx) {
 	return null
 }
 
-module.exports = { handlePost, handleSceneTake }
+module.exports = { handlePost, handleSceneTake, handlePreviewLiveRegister }

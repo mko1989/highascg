@@ -31,6 +31,8 @@ import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { formatFps } from './sources-panel-helpers.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
+import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
+import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 
 export function initScenesEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -127,6 +129,32 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		getPreviewChannel,
 		flushSceneDeckSync: opts.flushSceneDeckSync,
 	})
+
+	async function exitLookEditor() {
+		commitPendingLookNameEdits(mainHost, sceneState)
+		const id = sceneState.editingSceneId
+		await previewRuntime.waitForPreviewPushComplete()
+		if (id) {
+			const scene = sceneState.getScene(id)
+			if (scene) {
+				const mainIdx = resolveMainIndexForScene(scene, sceneState)
+				try {
+					await syncPreviewLiveToServer(id, mainIdx, { sceneState, stateStore })
+				} catch (e) {
+					console.warn('Exit edit: preview live sync failed:', e?.message || e)
+				}
+			}
+			try {
+				await refreshSceneLiveFromServer(sceneState, stateStore)
+			} catch (e) {
+				console.warn('Exit edit: scene.live refresh failed:', e?.message || e)
+			}
+		}
+		sceneState.setEditingScene(null)
+		selectedLayerIndexRef.current = null
+		dispatchLayerSelect(null)
+		previewRuntime.clearLastPreviewLayers()
+	}
 
 	window.addEventListener('highascg-border-preset-recall', (ev) => {
 		const d = ev?.detail
@@ -413,11 +441,12 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 
 	const render = () => {
+		commitPendingLookNameEdits(mainHost, sceneState)
 		const preserveDeckScroll = !sceneState.editingSceneId
 		const prevScrollTop = preserveDeckScroll ? mainHost.scrollTop : 0
 		const prevScrollLeft = preserveDeckScroll ? mainHost.scrollLeft : 0
 		tabsHost.innerHTML = ''
-		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getEditBusChannelForComposeScene()), getPreviewChannelForLiveThumb: getEditBusChannelForComposeScene }), selectedLayerIndexRef, showScenesToast })
+		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, onExitEdit: exitLookEditor, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getEditBusChannelForComposeScene()), getPreviewChannelForLiveThumb: getEditBusChannelForComposeScene }), selectedLayerIndexRef, showScenesToast })
 		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, getSceneLive: () => stateStore.getState()?.scene?.live || {}, outputAspect: getResolution().w / getResolution().h, paintDeckThumb, takeSceneToProgram, showToast: showScenesToast, dispatchLayerSelect, previewPanel, sendSceneToPreviewCard: sendSceneToPreviewWithTimelineClear, clearPreviewBusForMain: previewRuntime.clearPreviewBusForMain, selectedLayerIndexRef,
 		onDeckMediaDropAccept: dataTransferOffersDeckMedia,
 		onDeckMediaDrop,

@@ -12,6 +12,7 @@ import {
 } from '../lib/device-view-decklink-keyfill.js'
 import { decklinkInputForSlot, decklinkSlotFromConnector, routeForDecklinkSlot } from '../lib/input-channels.js'
 import { STANDARD_VIDEO_MODES } from './device-view-destinations-inspector.js'
+import { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } from '../lib/decklink-io-direction.js'
 
 const DECKLINK_LATENCY_OPTIONS = ['normal', 'low', 'default']
 const DECKLINK_COLOR_SPACE_OPTIONS = ['bt709', 'bt601', 'bt2020']
@@ -84,7 +85,15 @@ function renderDecklinkOutputInheritControls(h, conn, { lastPayload }) {
 		box.append(
 			Object.assign(document.createElement('p'), {
 				className: 'device-view__decklink-io-note device-view__decklink-io-note--warn',
-				textContent: status.reason || 'Set SDI output format below.',
+				textContent: status.reason || 'Wire a destination feed to this SDI port.',
+			})
+		)
+	} else if (status?.reason) {
+		box.append(
+			Object.assign(document.createElement('p'), {
+				className: 'device-view__note',
+				style: 'font-size:11px',
+				textContent: status.reason,
 			})
 		)
 	} else if (inherited?.outputModeSource === 'override') {
@@ -112,7 +121,7 @@ function readDecklinkConsumerCaspar(conn) {
 	}
 }
 
-function renderDecklinkConsumerSettingsControls(h, conn, { statusEl, load, setCasparRestartDirty }) {
+function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, statusEl, load, setCasparRestartDirty }) {
 	const cur = readDecklinkConsumerCaspar(conn)
 	const box = Object.assign(document.createElement('div'), { className: 'device-view__decklink-consumer-settings' })
 	appendDecklinkSectionHeading(box, 'SDI consumer')
@@ -133,12 +142,17 @@ function renderDecklinkConsumerSettingsControls(h, conn, { statusEl, load, setCa
 		return { wrap, cap }
 	}
 
-	const modeField = mkField('SDI format (required)')
+	const modeField = mkField('SDI format')
 	const modeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	const status = decklinkOutputStatusForConnector(lastPayload, conn?.id)
+	const inheritedMode = String(status?.decklinkVideoMode || '').trim()
 	modeSel.innerHTML =
 		'<option value="" disabled>Select SDI format…</option>' +
 		STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')
-	modeSel.value = cur.outputVideoMode && STANDARD_VIDEO_MODES.includes(cur.outputVideoMode) ? cur.outputVideoMode : ''
+	const savedMode = cur.outputVideoMode && STANDARD_VIDEO_MODES.includes(cur.outputVideoMode) ? cur.outputVideoMode : ''
+	modeSel.value =
+		savedMode ||
+		(inheritedMode && STANDARD_VIDEO_MODES.includes(inheritedMode) ? inheritedMode : '')
 	modeField.wrap.append(modeSel)
 	grid.append(modeField.wrap)
 
@@ -256,9 +270,10 @@ function renderDecklinkKeyFillControls(h, conn, { lastPayload, statusEl, load, s
 	})
 	const row = Object.assign(document.createElement('div'), { className: 'device-view__decklink-kf-row' })
 
-	const kfCheck = Object.assign(document.createElement('input'), { type: 'checkbox', id: 'decklink_kf_on' })
+	const kfFieldId = `decklink_kf_on_${String(conn?.id || fillDevice).replace(/[^a-zA-Z0-9_-]/g, '_')}`
+	const kfCheck = Object.assign(document.createElement('input'), { type: 'checkbox', id: kfFieldId })
 	kfCheck.checked = keyFillEnabled
-	const kfLbl = Object.assign(document.createElement('label'), { htmlFor: 'decklink_kf_on', textContent: 'Fill + key' })
+	const kfLbl = Object.assign(document.createElement('label'), { htmlFor: kfFieldId, textContent: 'Fill + key' })
 
 	const keySel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	keySel.innerHTML = '<option value="0">Key port…</option>'
@@ -507,12 +522,12 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 
 	if (conn?.kind === 'decklink_out') {
 		renderDecklinkOutputInheritControls(h, conn, { lastPayload })
-		renderDecklinkConsumerSettingsControls(h, conn, { statusEl, load, setCasparRestartDirty })
+		renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, statusEl, load, setCasparRestartDirty })
 		renderDecklinkKeyFillControls(h, conn, { lastPayload, statusEl, load, setCasparRestartDirty })
 		return
 	}
 
-	const ioDir = String(conn?.caspar?.ioDirection || 'in').toLowerCase() === 'out' ? 'out' : 'in'
+	const ioDir = normalizeDecklinkIoDirection(conn?.caspar)
 	const devNum = parseInt(String(conn?.externalRef || '0'), 10) || 0
 	const slot = decklinkSlotFromConnector(conn)
 	const channelMap = lastPayload?.live?.caspar?.channelMap || currentSettings?.channelMap || {}
@@ -556,9 +571,9 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 				} catch (e) {
 					/* best effort */
 				}
-				await Actions.updateConnector(conn.id, { caspar: { ioDirection: 'out' } })
+				await Actions.updateConnector(conn.id, { caspar: { ioDirection: DECKLINK_IO_UNASSIGNED } })
 				setCasparRestartDirty(true)
-				setStatus(statusEl, `Port ${devNum}: output mode.`, true)
+				setStatus(statusEl, `Port ${devNum}: unassigned.`, true)
 				await load()
 			} catch (e) {
 				setStatus(statusEl, `Failed: ${e?.message || e}`, false)
@@ -579,16 +594,21 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 	} else {
 		const formBox = Object.assign(document.createElement('div'), { className: 'device-view__decklink-input-setup' })
 
-		if (inputEntry == null) {
+		if (inputEntry == null && ioDir !== DECKLINK_IO_UNASSIGNED) {
 			appendDecklinkSectionNote(
 				formBox,
 				`Configure DeckLink input count in Settings (slot ${slot} needs a dedicated channel). Apply Caspar config and restart before using this port as input.`
+			)
+		} else if (ioDir === DECKLINK_IO_UNASSIGNED) {
+			appendDecklinkSectionNote(
+				formBox,
+				'Starts a dedicated Caspar host channel for this SDI port. After restart, the input loops on that channel.'
 			)
 		}
 
 		const activateBtn = Object.assign(document.createElement('button'), {
 			className: 'header-btn',
-			textContent: 'Use as input',
+			textContent: 'Start an input',
 			style: 'width:100%;margin-top:8px',
 		})
 
@@ -663,9 +683,16 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 			'This port is in input mode. Stop input above to use it as a program / fill+key output.'
 		)
 	} else {
-		appendDecklinkSectionNote(outputSection, 'Program output, fill+key pairs, and destination mapping.')
+		if (ioDir === DECKLINK_IO_UNASSIGNED) {
+			appendDecklinkSectionNote(
+				outputSection,
+				'Unassigned SDI port. Cable a screen destination here to use as program output, or configure fill+key below.'
+			)
+		} else {
+			appendDecklinkSectionNote(outputSection, 'Program output, fill+key pairs, and destination mapping.')
+		}
 		renderDecklinkOutputInheritControls(outputSection, conn, { lastPayload })
-		renderDecklinkConsumerSettingsControls(outputSection, conn, { statusEl, load, setCasparRestartDirty })
+		renderDecklinkConsumerSettingsControls(outputSection, conn, { lastPayload, statusEl, load, setCasparRestartDirty })
 		renderDecklinkKeyFillControls(outputSection, conn, { lastPayload, statusEl, load, setCasparRestartDirty })
 	}
 

@@ -11,7 +11,7 @@ const {
 const { receiveProjectFromPeer } = require('../replication/replicate-projects')
 const { receiveTimelineFromPeer } = require('../replication/replicate-timelines')
 const { promoteToLeader, generatePairingCredentials, leaderYield } = require('../replication/promote')
-const { getMediaSyncStatus } = require('../replication/syncthing-media-status')
+const { getReplicationMediaSyncStatus } = require('../replication/media-sync-status')
 const { discoverAvailableLeaders } = require('../replication/discover-leaders')
 const {
 	becomeLeaderAvailable,
@@ -31,6 +31,12 @@ function replicationTokenOk(ctx, req, body) {
 	const fromHdr = Array.isArray(hdr) ? hdr[0] : hdr
 	const token = String(fromHdr || body?.token || '').trim()
 	return !!(repl.peer.token && token === repl.peer.token)
+}
+
+function replicationPeerRequest(req) {
+	const hdr = req?.headers?.['x-highascg-replication-token']
+	const token = String(Array.isArray(hdr) ? hdr[0] : hdr || '').trim()
+	return !!token
 }
 
 function rejectIfLeader(ctx) {
@@ -70,6 +76,31 @@ async function handleGet(path, ctx, req) {
 		} catch {
 			syncthingDeviceId = ''
 		}
+		/** @type {Record<string, string>} */
+		let programFramerates = {}
+		try {
+			const { exportProgramPlayheads } = require('../replication/playhead-export')
+			const playheads = await exportProgramPlayheads(ctx)
+			for (const [chKey, ch] of Object.entries(playheads.channels || {})) {
+				if (ch?.framerate) programFramerates[chKey] = String(ch.framerate)
+			}
+		} catch {
+			programFramerates = {}
+		}
+		let channelMap = null
+		try {
+			const { buildChannelMapSummary } = require('../replication/channel-parity')
+			channelMap = buildChannelMapSummary(ctx.config)
+		} catch {
+			channelMap = null
+		}
+		let projectMedia = null
+		try {
+			const { getProjectMediaPingSummary } = require('../replication/project-media-parity')
+			projectMedia = await getProjectMediaPingSummary(ctx)
+		} catch {
+			projectMedia = null
+		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
@@ -89,6 +120,10 @@ async function handleGet(path, ctx, req) {
 				casparHost: casparEp.host,
 				casparPort: casparEp.port,
 				mirrorTransport: repl.mirrorTransport,
+				programFramerates,
+				channelMap,
+				instanceId: rt?.instanceId || null,
+				projectMedia,
 			}),
 		}
 	}
@@ -104,9 +139,57 @@ async function handleGet(path, ctx, req) {
 	}
 
 	if (path === '/api/replication/media-status') {
-		const repl = getReplicationConfig(ctx.config)
-		const media = await getMediaSyncStatus(repl.syncthingMediaFolderId)
+		const media = await getReplicationMediaSyncStatus(ctx)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(media) }
+	}
+
+	if (path === '/api/replication/project-media-manifest') {
+		if (replicationPeerRequest(req) && !replicationTokenOk(ctx, req, {})) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
+		}
+		try {
+			const { getLocalProjectMediaManifest } = require('../replication/project-media-parity')
+			const manifest = await getLocalProjectMediaManifest(ctx)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(manifest) }
+		} catch (e) {
+			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
+	}
+
+	if (path === '/api/replication/compare-project-media') {
+		try {
+			const { compareProjectMediaWithPeer } = require('../replication/project-media-parity')
+			const out = await compareProjectMediaWithPeer(ctx, { forcePing: true })
+			return {
+				status: out.ok ? 200 : 503,
+				headers: JSON_HEADERS,
+				body: jsonBody(out),
+			}
+		} catch (e) {
+			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: e?.message || String(e) }) }
+		}
+	}
+
+	if (path === '/api/replication/export/caspar-channels') {
+		if (!replicationTokenOk(ctx, req, {})) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
+		}
+		try {
+			const { fetchLocalCasparChannels } = require('../replication/caspar-parity')
+			const out = await fetchLocalCasparChannels(ctx)
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					ok: out.ok,
+					channelCount: out.channelCount,
+					channels: out.channels,
+					error: out.error || null,
+				}),
+			}
+		} catch (e) {
+			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
 	}
 
 	if (path === '/api/replication/export/project') {
@@ -225,6 +308,71 @@ async function handlePost(path, body, ctx, req) {
 		if (!rt) return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'replication service not started' }) }
 		const out = await disconnectToStandalone(ctx, rt, { reason: 'manual' })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(out) }
+	}
+
+	if (path === '/api/replication/refresh-connection') {
+		const { refreshReplicationConnection } = require('../replication/replication-refresh')
+		const out = await refreshReplicationConnection(ctx)
+		return {
+			status: out.ok ? 200 : 400,
+			headers: JSON_HEADERS,
+			body: jsonBody(out),
+		}
+	}
+
+	if (path === '/api/replication/sync-project-media') {
+		const rt = getReplicationRuntime(ctx)
+		if (!rt) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'replication service not started' }) }
+		}
+		const { loadFullProject } = require('../engine/project-scenes')
+		const { syncProjectMediaToPeer } = require('../replication/sync-project-media')
+		const direction =
+			payload.direction === 'pull' || payload.direction === 'push' ? payload.direction : 'auto'
+		try {
+			const project = await loadFullProject()
+			const out = await syncProjectMediaToPeer(ctx, project, { direction })
+			return {
+				status: out.ok || out.skipped ? 200 : 500,
+				headers: JSON_HEADERS,
+				body: jsonBody(out),
+			}
+		} catch (e) {
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: false, error: e?.message || String(e) }),
+			}
+		}
+	}
+
+	if (path === '/api/replication/validate-caspar-parity') {
+		const rt = getReplicationRuntime(ctx)
+		if (!rt) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'replication service not started' }) }
+		}
+		const { validateCasparParityForPair } = require('../replication/caspar-parity')
+		const parity = await validateCasparParityForPair(ctx)
+		rt.lastCasparParity = parity
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(parity) }
+	}
+
+	if (path === '/api/replication/apply-device-view-caspar') {
+		const rt = getReplicationRuntime(ctx)
+		if (!rt) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'replication service not started' }) }
+		}
+		const { isFollowerRole } = require('../replication/follower-machine-profile')
+		if (!isFollowerRole(ctx)) {
+			return { status: 409, headers: JSON_HEADERS, body: jsonBody({ error: 'follower only' }) }
+		}
+		const { ensureFollowerCasparParity } = require('../replication/caspar-parity')
+		const parity = await ensureFollowerCasparParity(ctx, rt, { forceRegenerate: true })
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: parity.ok, parity }),
+		}
 	}
 
 	if (path === '/api/replication/reload-local-machine') {

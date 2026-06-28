@@ -2,6 +2,7 @@
 
 const { resolveCaptureTier } = require('./stream-capture-tier')
 const { resolveNdiSourceName } = require('./ndi-resolve')
+const streamLog = require('../utils/buffered-logger').streaming
 
 /** AMCP `info()` resolves to `{ ok, data }` — never `body`. */
 function amcpInfoText(info) {
@@ -90,14 +91,14 @@ function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
 					const info = await amcp.info(t.channel)
 					const text = amcpInfoText(info)
 					const hasUdp = text.includes(uri)
-					console.log(
+					streamLog.info(
 						`[Streaming] VERIFY ch${t.channel} port ${t.port}: INFO contains ${uri} → ${hasUdp} (INFO length ${text.length})`
 					)
 					if (!hasUdp) {
-						console.warn(`[Streaming] VERIFY ch${t.channel} INFO excerpt:\n${truncate(text, 900)}`)
+						streamLog.warn(`[Streaming] VERIFY ch${t.channel} INFO excerpt:\n${truncate(text, 900)}`)
 					}
 				} catch (e) {
-					console.warn(`[Streaming] VERIFY ch${t.channel} failed:`, e?.message || e)
+					streamLog.warn(`[Streaming] VERIFY ch${t.channel} failed: ${e?.message || e}`)
 				}
 			}
 		})()
@@ -170,7 +171,7 @@ async function addStreamingConsumers(amcp, targets, config) {
 	void targets
 	void config
 	// Preview UDP / go2rtc WebRTC pipeline removed — do not add MPEG-TS STREAM consumers.
-	console.log('[Streaming] addStreamingConsumers: preview UDP/WebRTC removed (no STREAM consumers added)')
+	streamLog.info('[Streaming] addStreamingConsumers: preview UDP/WebRTC removed (no STREAM consumers added)')
 }
 
 /**
@@ -180,22 +181,22 @@ async function addStreamingConsumers(amcp, targets, config) {
  */
 async function removeStreamingConsumers(amcp, targets, config) {
 	if (!amcp || !amcp.isConnected) {
-		console.warn('[Streaming] removeStreamingConsumers: AMCP not connected — skip')
+		streamLog.warn('[Streaming] removeStreamingConsumers: AMCP not connected — skip')
 		return
 	}
 
 	const tier = config ? resolveCaptureTier(config.captureMode || 'udp', config._casparHost || '127.0.0.1') : 'udp'
-	console.log(`[Streaming] removeStreamingConsumers: tier=${tier}`)
+	streamLog.info(`[Streaming] removeStreamingConsumers: tier=${tier}`)
 
 	for (const t of targets) {
 		if (tier === 'ndi') {
 			const ndiName = resolveNdiSourceName(config || {}, t.channel)
 			try {
-				console.log(`[Streaming] REMOVE ch${t.channel} NDI "${ndiName}"`)
+				streamLog.info(`[Streaming] REMOVE ch${t.channel} NDI "${ndiName}"`)
 				await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} NDI "${ndiName}"`)
 				await new Promise((r) => setTimeout(r, 100))
 			} catch (e) {
-				console.warn(`[Streaming] REMOVE NDI ch${t.channel}:`, e?.message || e)
+				streamLog.warn(`[Streaming] REMOVE NDI ch${t.channel}: ${e?.message || e}`)
 			}
 		} else if (tier === 'udp') {
 			const active = await getActiveStreamUris(amcp, t.channel)
@@ -203,11 +204,11 @@ async function removeStreamingConsumers(amcp, targets, config) {
 			for (const u of active) {
 				if (variants.includes(u) || u.includes(`:${t.port}`)) {
 					try {
-						console.log(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
+						streamLog.info(`[Streaming] REMOVE ch${t.channel} STREAM ${u}`)
 						await amcpRawWithTimeout(amcp, `REMOVE ${t.channel} STREAM ${u}`)
 						await new Promise((r) => setTimeout(r, 100))
 					} catch (e) {
-						console.warn(`[Streaming] REMOVE STREAM ch${t.channel} ${u}:`, e?.message || e)
+						streamLog.warn(`[Streaming] REMOVE STREAM ch${t.channel} ${u}: ${e?.message || e}`)
 					}
 				}
 			}

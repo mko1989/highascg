@@ -158,6 +158,21 @@ function isBatchCommitAckLine(line) {
 function runBeginCommitBatch(client, lines, options) {
 	const skipMixerPreCommit = options?.skipMixerPreCommit === true
 	const connection = client._context
+	const ch = inferProgramChannelFromAmcpLines(lines)
+	try {
+		const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+		if (ch != null && shouldFollowerSkipLocalPgmAmcp(connection, ch, { previewOnly: false })) {
+			if (typeof connection.log === 'function') {
+				connection.log(
+					'debug',
+					`[replication] skip local PGM AMCP batch ch=${ch} (${lines.length} cmds, leader fan-out drives air)`,
+				)
+			}
+			return Promise.resolve({ ok: true, batched: true, skipped: true, responses: [] })
+		}
+	} catch {
+		/* replication optional */
+	}
 	const payload = ['BEGIN', ...lines, 'COMMIT'].join('\r\n') + '\r\n'
 	/** @type {{ lines: string[], onLine: (line: string) => void, rejectBatch: (err: Error) => void } | null} */
 	let drainRef = null
@@ -196,7 +211,6 @@ function runBeginCommitBatch(client, lines, options) {
 	})
 	// Mixer COMMIT must not use client.mixerCommit() here: that calls _send, which appends to
 	// _amcpSendQueue behind the pending batch job — deadlock (mixer never sends, batch never completes).
-	const ch = inferProgramChannelFromAmcpLines(lines)
 	const tail = connection._amcpSendQueue || Promise.resolve()
 	let chain = tail
 	if (

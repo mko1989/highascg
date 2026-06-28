@@ -6,11 +6,35 @@
 const fs = require('fs')
 const path = require('path')
 const { getMediaIngestBasePath, normalizeMediaIdKey, resolveSafe } = require('./local-media-paths')
+const {
+	getProjectMediaRelId: relIdForSlug,
+	getProjectMediaRelPrefix,
+} = require('./project-media-location')
 const projectStore = require('../engine/project-store')
 const persistence = require('../utils/persistence')
 const { collectProjectAssetRefs } = require('../replication/project-media-refs')
 
 const PROJECTS_NAMESPACE = 'projects'
+
+/** @param {string} slug @returns {string[]} */
+function projectMediaIdPrefixesForSlug(slug, config) {
+	const s = String(slug || '').trim()
+	if (!s) return []
+	const seen = new Set()
+	const out = []
+	for (const prefix of [
+		`${relIdForSlug(s, config)}/`,
+		`projects/${s}/`,
+		`exfat/projects/${s}/`,
+		`bridge/projects/${s}/`,
+	]) {
+		if (!seen.has(prefix)) {
+			seen.add(prefix)
+			out.push(prefix)
+		}
+	}
+	return out
+}
 
 /**
  * @param {object} [config]
@@ -41,12 +65,11 @@ function getActiveProjectSlug(store, project) {
 
 /**
  * @param {string} slug
+ * @param {object} [config]
  * @returns {string}
  */
-function getProjectMediaRelId(slug) {
-	const s = String(slug || '').trim()
-	if (!s) return ''
-	return `${PROJECTS_NAMESPACE}/${s}`
+function getProjectMediaRelId(slug, config) {
+	return relIdForSlug(slug, config)
 }
 
 /**
@@ -59,7 +82,8 @@ function getProjectMediaRoot(config, store, slug) {
 	const mediaRoot = getMediaIngestBasePath(config)
 	const s = String(slug || getActiveProjectSlug(store) || '').trim()
 	if (!s) return mediaRoot
-	return path.join(mediaRoot, PROJECTS_NAMESPACE, s)
+	const relPrefix = getProjectMediaRelPrefix(config)
+	return path.join(mediaRoot, ...relPrefix.split('/'), s)
 }
 
 /**
@@ -70,7 +94,7 @@ function getProjectMediaRoot(config, store, slug) {
 function getDefaultIngestSubdir(config, store) {
 	if (!isProjectScopedMediaEnabled(config)) return ''
 	const slug = getActiveProjectSlug(store)
-	return slug ? getProjectMediaRelId(slug) : ''
+	return slug ? getProjectMediaRelId(slug, config) : ''
 }
 
 /**
@@ -105,28 +129,37 @@ function ensureProjectMediaDir(config, slug, store) {
 /**
  * @param {string} storedId
  * @param {string} slug
+ * @param {object} [config]
  * @returns {string}
  */
-function normalizeMediaIdForProject(storedId, slug) {
+function normalizeMediaIdForProject(storedId, slug, config) {
 	const id = normalizeMediaIdKey(storedId).trim()
 	if (!id || !slug) return id
-	const prefix = `${PROJECTS_NAMESPACE}/${slug}/`
-	if (id.startsWith(prefix)) return id.slice(prefix.length)
+	for (const prefix of projectMediaIdPrefixesForSlug(slug, config)) {
+		if (id.startsWith(prefix)) return id.slice(prefix.length)
+	}
 	return id
 }
 
 /**
  * @param {string} storedId
  * @param {string} slug
+ * @param {object} [config]
  * @returns {string}
  */
-function expandMediaIdToMediaRoot(storedId, slug) {
+function expandMediaIdToMediaRoot(storedId, slug, config) {
 	const id = normalizeMediaIdKey(storedId).trim()
 	if (!id || !slug) return id
 	if (/^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i.test(id)) return id
-	if (id.startsWith(`${PROJECTS_NAMESPACE}/`)) return id
+	if (
+		id.startsWith(`${PROJECTS_NAMESPACE}/`) ||
+		id.startsWith('exfat/projects/') ||
+		id.startsWith('bridge/projects/')
+	) {
+		return id
+	}
 	if (id.includes('/') && !id.startsWith('../')) return id
-	return `${PROJECTS_NAMESPACE}/${slug}/${id}`
+	return `${getProjectMediaRelId(slug, config)}/${id}`
 }
 
 /**
@@ -142,14 +175,19 @@ function getProjectMediaResolveCandidates(config, filename, store) {
 	const id = normalizeMediaIdKey(filename).trim()
 	if (!id || id.includes('..')) return []
 	const mediaRoot = getMediaIngestBasePath(config)
-	const prefix = `${PROJECTS_NAMESPACE}/${slug}/`
+	const prefix = `${getProjectMediaRelId(slug, config)}/`
 	const out = []
 	if (id.startsWith(prefix)) {
 		out.push(id)
-	} else if (!id.startsWith(`${PROJECTS_NAMESPACE}/`) && !/^[a-z]+:\/\//i.test(id)) {
+	} else if (
+		!id.startsWith(`${PROJECTS_NAMESPACE}/`) &&
+		!id.startsWith('exfat/projects/') &&
+		!id.startsWith('bridge/projects/') &&
+		!/^[a-z]+:\/\//i.test(id)
+	) {
 		out.push(`${prefix}${id}`)
 	}
-	const projectRoot = path.join(mediaRoot, PROJECTS_NAMESPACE, slug)
+	const projectRoot = getProjectMediaRoot(config, store, slug)
 	const relUnderProject = id.startsWith(prefix) ? id.slice(prefix.length) : id
 	const abs = resolveSafe(projectRoot, relUnderProject)
 	if (abs) out.push(path.relative(mediaRoot, abs).replace(/\\/g, '/'))
@@ -159,14 +197,15 @@ function getProjectMediaResolveCandidates(config, filename, store) {
 /**
  * @param {object} source
  * @param {string} slug
+ * @param {object} [config]
  */
-function normalizeSourceRef(source, slug) {
+function normalizeSourceRef(source, slug, config) {
 	if (!source || typeof source !== 'object' || !slug) return
 	const t = String(source.type || 'media').toLowerCase()
 	if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live') return
 	const value = String(source.value || '').trim()
 	if (!value || /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i.test(value)) return
-	source.value = normalizeMediaIdForProject(value, slug)
+	source.value = normalizeMediaIdForProject(value, slug, config)
 }
 
 /**
@@ -193,8 +232,8 @@ function normalizeProjectMediaRefs(project, config, store) {
 
 	for (const scene of sceneList) {
 		for (const layer of scene?.layers || []) {
-			normalizeSourceRef(layer.source, slug)
-			for (const item of layer.playlist || []) normalizeSourceRef(item, slug)
+			normalizeSourceRef(layer.source, slug, config)
+			for (const item of layer.playlist || []) normalizeSourceRef(item, slug, config)
 		}
 	}
 
@@ -207,7 +246,7 @@ function normalizeProjectMediaRefs(project, config, store) {
 
 	for (const tl of timelineList) {
 		for (const layer of tl?.layers || []) {
-			for (const clip of layer?.clips || []) normalizeSourceRef(clip?.source, slug)
+			for (const clip of layer?.clips || []) normalizeSourceRef(clip?.source, slug, config)
 		}
 	}
 
@@ -245,6 +284,7 @@ function buildProjectMediaManifest(config, store, project) {
 	}
 
 	if (isProjectScopedMediaEnabled(config) && slug) {
+		const relPrefix = getProjectMediaRelId(slug, config)
 		const proj = project && typeof project === 'object' ? project : null
 		if (proj) {
 			const refs = collectProjectAssetRefs(proj)
@@ -262,12 +302,12 @@ function buildProjectMediaManifest(config, store, project) {
 						continue
 					}
 				}
-				addRel(expandMediaIdToMediaRoot(ref, slug))
+				addRel(expandMediaIdToMediaRoot(ref, slug, config))
 				addRel(ref)
 			}
 		}
 
-		const projectDir = path.join(mediaBase, PROJECTS_NAMESPACE, slug)
+		const projectDir = getProjectMediaRoot(config, store, slug)
 		if (fs.existsSync(projectDir)) {
 			/** @param {string} relDir */
 			function walk(relDir) {
@@ -282,7 +322,7 @@ function buildProjectMediaManifest(config, store, project) {
 					if (ent.name.startsWith('.')) continue
 					const rel = relDir ? `${relDir}/${ent.name}` : ent.name
 					if (ent.isDirectory()) walk(rel)
-					else addRel(`${PROJECTS_NAMESPACE}/${slug}/${rel}`)
+					else addRel(`${relPrefix}/${rel}`)
 				}
 			}
 			walk('')

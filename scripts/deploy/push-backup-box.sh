@@ -66,7 +66,11 @@ DROPIN_DIR_Q=$(printf '%q' "/etc/systemd/system/highascg.service.d")
 DROPIN_Q=$(printf '%q' "/etc/systemd/system/highascg.service.d/30-replication.conf")
 
 push_replication_json() {
-	echo "→ scp replication.json (hot-backup defaults)"
+	if [[ "${DEPLOY_FORCE_REPLICATION_JSON:-0}" != "1" ]]; then
+		echo "→ skip replication.json (backup keeps local pairing; DEPLOY_FORCE_REPLICATION_JSON=1 to overwrite)"
+		return
+	fi
+	echo "→ scp replication.json (forced)"
 	"${SCP_BASE[@]}" "${SSH_OPTS[@]}" "${ROOT}/config/replication.json" "${REMOTE}:${DEPLOY_PATH}/config/replication.json"
 }
 
@@ -84,12 +88,47 @@ try_systemd_dropin() {
 	fi
 }
 
+restart_remote_highascg() {
+	if [[ "${DEPLOY_SKIP_RESTART:-0}" == "1" ]]; then
+		echo "→ skip remote highascg restart (DEPLOY_SKIP_RESTART=1)"
+		return
+	fi
+	echo "→ restart highascg on ${REMOTE} (required — Node keeps old code until restart)"
+	local restarted=0
+	if "${SSH_BASE[@]}" "${SSH_OPTS[@]}" "$REMOTE" "sudo -n systemctl restart highascg" 2>/dev/null; then
+		restarted=1
+	elif "${SSH_BASE[@]}" "${SSH_OPTS[@]}" "$REMOTE" "systemctl --user restart highascg" 2>/dev/null; then
+		restarted=1
+	fi
+	if [[ "$restarted" == "1" ]]; then
+		sleep 2
+		local code manifest_code
+		code=$("${SSH_BASE[@]}" "${SSH_OPTS[@]}" "$REMOTE" \
+			"curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:4200/api/replication/ping" 2>/dev/null || echo "000")
+		manifest_code=$("${SSH_BASE[@]}" "${SSH_OPTS[@]}" "$REMOTE" \
+			"curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:4200/api/replication/project-media-manifest" 2>/dev/null || echo "000")
+		if [[ "$code" == "200" && "$manifest_code" == "200" ]]; then
+			echo "   highascg up — ping and project-media-manifest OK"
+		elif [[ "$code" == "200" ]]; then
+			echo "   WARN: highascg running but project-media-manifest HTTP ${manifest_code}"
+			echo "   → on ${REMOTE}: sudo systemctl restart highascg"
+		else
+			echo "   WARN: ping returned HTTP ${code} — check: ssh ${REMOTE} sudo systemctl status highascg"
+		fi
+	else
+		echo "   *** RESTART REQUIRED ON TARGET (deploy updated files but process is still old) ***"
+		echo "   ssh ${REMOTE} 'sudo systemctl restart highascg'"
+	fi
+}
+
 finish_message() {
 	echo ""
 	echo "Done (${DEPLOY_MODE}). Backup box: ${REMOTE}:${DEPLOY_PATH}"
 	echo "Verify: curl -s http://${DEPLOY_HOST}:4200/api/replication/ping | python3 -m json.tool"
+	echo "Manifest: curl -s http://${DEPLOY_HOST}:4200/api/replication/project-media-manifest | head -c 120"
 	echo "Leader: Become leader · Backup: Follower → Scan → Connect"
 	echo "Note: code push never removes bin/, lib/, or media/ on the target."
+	echo "Note: restart highascg on THIS machine too if you edited code locally (sudo systemctl restart highascg)."
 }
 
 mirror_push() {
@@ -149,6 +188,7 @@ mirror_push() {
 	"${SSH_BASE[@]}" "${SSH_OPTS[@]}" "$REMOTE" "test -f ${PATH_Q}/index.js && test -d ${PATH_Q}/bin"
 	push_replication_json
 	try_systemd_dropin
+	restart_remote_highascg
 	finish_message
 }
 
@@ -206,6 +246,7 @@ EOF
 
 	push_replication_json
 	try_systemd_dropin
+	restart_remote_highascg
 	finish_message
 
 	trap - EXIT

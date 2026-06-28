@@ -4,7 +4,8 @@
 'use strict'
 
 const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDestinationFromGraph } = require('../config/device-graph')
-const { normalizeScreenDestinations } = require('../config/screen-destinations')
+const { normalizeScreenDestinations, destinationsFromConfig } = require('../config/screen-destinations')
+const { getDestinationOutputWiring } = require('../config/device-graph-destination-wiring')
 const { resolveProjectFps, defaultVideoModeForProjectFps } = require('../config/project-fps')
 const { STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const {
@@ -13,6 +14,8 @@ const {
 	readDecklinkKeyFillFromConnectorCaspar,
 	writeDecklinkKeyFillToCasparServer,
 } = require('../config/decklink-key-fill')
+const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
+const { clearDecklinkInputSlot } = require('./device-view-decklink-wiring')
 
 function saveConfig(ctx, patch) {
 	if (!ctx.configManager) {
@@ -29,6 +32,15 @@ function saveConfig(ctx, patch) {
 		/* optional */
 	}
 	return true
+}
+
+function scheduleDeviceViewCasparSyncIfNeeded(ctx) {
+	try {
+		const { scheduleDeviceViewCasparSync } = require('./device-view-decklink-wiring')
+		scheduleDeviceViewCasparSync(ctx)
+	} catch {
+		/* optional */
+	}
 }
 
 function handleAddDestination(j, ctx) {
@@ -151,8 +163,12 @@ function handleAddEdge(j, ctx, liveSnapshot) {
 	const sid = String(j.addEdge.sourceId), tid = String(j.addEdge.sinkId)
 	const merged = ensureConnectorsFromSuggested(ctx.config?.deviceGraph, [sid, tid], suggested)
 	const res = addEdgeToGraph(merged, sid, tid); if (!res.ok) return { error: res.reason }
-	ctx.config.deviceGraph = res.graph
-	saveConfig(ctx, { deviceGraph: res.graph })
+	let nextGraph = res.graph
+	const wired = require('./device-view-decklink-wiring').applyDecklinkOutputOnDestinationEdge(ctx, nextGraph, sid, tid)
+	if (wired.changed) nextGraph = wired.graph
+	ctx.config.deviceGraph = nextGraph
+	saveConfig(ctx, { deviceGraph: nextGraph, ...(ctx.config.casparServer ? { casparServer: ctx.config.casparServer } : {}) })
+	scheduleDeviceViewCasparSyncIfNeeded(ctx)
 	if (typeof ctx.augmentGraphWithSources === 'function') ctx.augmentGraphWithSources(res.graph, liveSnapshot)
 	return { ok: true, graph: res.graph }
 }
@@ -162,6 +178,7 @@ function handleRemoveEdge(j, ctx) {
 	const next = removeEdgeById(g0, eid)
 	ctx.config.deviceGraph = next
 	saveConfig(ctx, { deviceGraph: next })
+	scheduleDeviceViewCasparSyncIfNeeded(ctx)
 	if (typeof ctx.augmentGraphWithSources === 'function') {
 		const Snapshot = require('./device-view-snapshot')
 		Snapshot.buildLiveSnapshot(ctx).then(live => ctx.augmentGraphWithSources(next, live)).catch(() => {})
@@ -184,23 +201,27 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 	if (patch.label != null) c1.label = String(patch.label).trim() || c0.label
 	if (patch.caspar && typeof patch.caspar === 'object') c1.caspar = { ...(c0.caspar || {}), ...patch.caspar }
 	if (c0.kind === 'decklink_io') {
-		const dirRaw = String(c1?.caspar?.ioDirection || 'in').toLowerCase()
-		const ioDirection = dirRaw === 'out' ? 'out' : 'in'
+		const dirRaw = String(c1?.caspar?.ioDirection || DECKLINK_IO_UNASSIGNED).toLowerCase()
+		const ioDirection =
+			dirRaw === 'out' ? 'out' : dirRaw === 'in' ? 'in' : DECKLINK_IO_UNASSIGNED
 		c1.caspar = { ...(c1.caspar || {}), ioDirection }
 		const m = id.match(/^dlsdi_(\d+)$/)
 		if (m) {
 			const slot = parseInt(m[1], 10)
 			if (Number.isFinite(slot) && slot > 0) {
 				const cs = { ...(ctx.config.casparServer || {}) }
-				const currentCount = Math.min(8, Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0))
 				const devNumRaw = parseInt(String(c1?.externalRef ?? c0?.externalRef ?? 0), 10)
 				const devNum = Number.isFinite(devNumRaw) && devNumRaw > 0 ? devNumRaw : slot
-				cs[`decklink_input_${slot}_direction`] = ioDirection
 				if (ioDirection === 'in') {
+					const currentCount = Math.min(8, Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0))
+					cs[`decklink_input_${slot}_direction`] = 'in'
 					cs.decklink_input_count = Math.max(currentCount, slot)
 					if ((parseInt(String(cs[`decklink_input_${slot}_device`] ?? 0), 10) || 0) <= 0) {
 						cs[`decklink_input_${slot}_device`] = devNum
 					}
+				} else {
+					clearDecklinkInputSlot(cs, slot, devNum)
+					cs[`decklink_input_${slot}_direction`] = ioDirection
 				}
 				const outBindPatch = patch?.caspar?.outputBinding
 				const inheritedBind = c0?.caspar?.outputBinding
@@ -253,8 +274,14 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 						})
 					} else if (t === 'screen') {
 						const screen = Math.min(8, Math.max(1, parseInt(String(outBind.index ?? 1), 10) || 1))
+						const destList = destinationsFromConfig(ctx.config || {})
+						const destIdx = destList.findIndex(
+							(d) => (Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0) || 0) === screen - 1,
+						)
+						const dest = destIdx >= 0 ? destList[destIdx] : null
+						const wiring = dest ? getDestinationOutputWiring(ctx.config || {}, dest, destIdx) : { gpu: false }
 						cs[`screen_${screen}_decklink_device`] = devNum
-						cs[`screen_${screen}_decklink_replace_screen`] = true
+						cs[`screen_${screen}_decklink_replace_screen`] = !wiring.gpu
 						writeDecklinkKeyFillToCasparServer(cs, `screen_${screen}_`, {
 							fillDevice: devNum,
 							keyDevice: parseDecklinkDeviceIndex(c1.caspar.decklinkKeyDevice),
@@ -270,6 +297,7 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 	next.connectors[idx] = c1
 	ctx.config.deviceGraph = normalizeDeviceGraph(next)
 	saveConfig(ctx, { deviceGraph: ctx.config.deviceGraph, ...(ctx.config.casparServer ? { casparServer: ctx.config.casparServer } : {}) })
+	scheduleDeviceViewCasparSyncIfNeeded(ctx)
 	if (typeof ctx.augmentGraphWithSources === 'function') ctx.augmentGraphWithSources(ctx.config.deviceGraph, liveSnapshot)
 	return { ok: true, graph: ctx.config.deviceGraph, updatedConnectorId: id }
 }

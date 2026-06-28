@@ -75,3 +75,41 @@ release_lib_create_prerelease() {
 	echo ""
 	echo "Release: ${base_url}/releases/tag/${tag}  (${owner_repo})"
 }
+
+# Temporary package.json version bump for server tarballs (WO-66 T2.2).
+_RELEASE_LIB_PKG_BACKUP=""
+
+release_lib_bump_package_json() {
+	local repo_root="$1" stamp="$2"
+	local pkg="${repo_root}/package.json"
+	[[ -f "$pkg" ]] || {
+		echo "release_lib_bump_package_json: missing ${pkg}" >&2
+		return 1
+	}
+	release_lib_need_cmd node
+	_RELEASE_LIB_PKG_BACKUP="$(mktemp)"
+	cp "$pkg" "$_RELEASE_LIB_PKG_BACKUP"
+	STAMP="$stamp" PKG="$pkg" node <<'NODE'
+const fs = require('fs')
+const pkg = process.env.PKG
+const stamp = process.env.STAMP
+const j = JSON.parse(fs.readFileSync(pkg, 'utf8'))
+j.version = stamp
+fs.writeFileSync(pkg, `${JSON.stringify(j, null, '\t')}\n`)
+NODE
+}
+
+release_lib_restore_package_json() {
+	local repo_root="${1:-}"
+	if [[ -z "$_RELEASE_LIB_PKG_BACKUP" || ! -f "$_RELEASE_LIB_PKG_BACKUP" ]]; then
+		return 0
+	fi
+	local pkg
+	if [[ -n "$repo_root" ]]; then
+		pkg="${repo_root}/package.json"
+	else
+		pkg="$(dirname "$_RELEASE_LIB_PKG_BACKUP")/package.json"
+	fi
+	mv -f "$_RELEASE_LIB_PKG_BACKUP" "$pkg"
+	_RELEASE_LIB_PKG_BACKUP=""
+}

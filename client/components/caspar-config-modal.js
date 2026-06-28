@@ -1,98 +1,149 @@
 /**
- * CasparCG Config Edit Modal.
+ * CasparCG config editor — preview generated XML; one-shot Apply & restart (no saved override).
  */
-import { getGeneratedCasparConfig, saveCasparConfigOverride, getCasparConfigOverride } from './device-view-actions.js'
+import { getGeneratedCasparConfig, applyCasparConfig } from './device-view-actions.js'
 
-export async function showCasparConfigModal() {
+/**
+ * @param {{ onApplied?: () => void|Promise<void> }} [opts]
+ */
+export async function showCasparConfigModal(opts = {}) {
 	if (document.getElementById('caspar-config-modal')) return
-	
+
 	const modal = document.createElement('div')
 	modal.id = 'caspar-config-modal'
 	modal.className = 'modal-overlay'
-	
+
 	modal.innerHTML = `
 		<div class="modal-shell caspar-config-modal">
 			<div class="modal-header">
 				<div class="modal-header__title">
-					<h2>CasparCG Config</h2>
+					<h2>Caspar config</h2>
+					<p class="caspar-config-modal__subtitle">Generated proposal from Device View — advanced / dev only</p>
 				</div>
-				<div style="display:flex;gap:6px;align-items:center">
-					<button type="button" class="btn btn--secondary" id="caspar-config-revert" title="Revert to generated config">↻ Revert</button>
-					<button type="button" class="btn btn--primary" id="caspar-config-save" title="Save override">💾 Save</button>
-					<button type="button" class="modal-close" id="caspar-config-close" aria-label="Close">×</button>
-				</div>
+				<button type="button" class="modal-close" id="caspar-config-close" aria-label="Close">×</button>
 			</div>
 			<div class="modal-body caspar-config-modal__body">
+				<p class="caspar-config-modal__hint">Preview matches what <strong>Apply Caspar config</strong> would write. Close without applying leaves the server unchanged.</p>
+				<div class="caspar-config-modal__toolbar">
+					<button type="button" class="btn btn--secondary" id="caspar-config-edit" title="Enable editing">✏️ Edit</button>
+					<button type="button" class="btn btn--secondary" id="caspar-config-reset" title="Reload generated proposal" hidden>↻ Reset to proposal</button>
+				</div>
 				<div class="caspar-config-modal__editor-wrap">
-					<textarea id="caspar-config-textarea" class="caspar-config-modal__textarea" spellcheck="false"></textarea>
+					<textarea id="caspar-config-textarea" class="caspar-config-modal__textarea" spellcheck="false" readonly></textarea>
 				</div>
 				<div id="caspar-config-status" class="caspar-config-modal__status"></div>
+			</div>
+			<div class="caspar-config-modal__footer">
+				<span id="caspar-config-mode-label" class="caspar-config-modal__mode-label">View only</span>
+				<div class="caspar-config-modal__footer-right">
+					<button type="button" class="btn btn--secondary" id="caspar-config-cancel">Close</button>
+					<button type="button" class="btn btn--primary" id="caspar-config-apply" disabled title="Apply edited XML and restart Caspar">Apply &amp; restart</button>
+				</div>
 			</div>
 		</div>
 	`
 	document.body.appendChild(modal)
-	
+
 	const textarea = modal.querySelector('#caspar-config-textarea')
 	const statusEl = modal.querySelector('#caspar-config-status')
-	const saveBtn = modal.querySelector('#caspar-config-save')
-	const revertBtn = modal.querySelector('#caspar-config-revert')
+	const editBtn = modal.querySelector('#caspar-config-edit')
+	const resetBtn = modal.querySelector('#caspar-config-reset')
+	const applyBtn = modal.querySelector('#caspar-config-apply')
+	const cancelBtn = modal.querySelector('#caspar-config-cancel')
 	const closeBtn = modal.querySelector('#caspar-config-close')
-	
-	let originalGenerated = ''
-	
-	async function load() {
-		statusEl.textContent = 'Loading...'
+	const modeLabel = modal.querySelector('#caspar-config-mode-label')
+
+	let proposalXml = ''
+	let editing = false
+
+	function isDirty() {
+		return editing && textarea.value !== proposalXml
+	}
+
+	function syncEditUi() {
+		textarea.readOnly = !editing
+		textarea.classList.toggle('caspar-config-modal__textarea--readonly', !editing)
+		editBtn.hidden = editing
+		resetBtn.hidden = !editing
+		applyBtn.disabled = !editing
+		modeLabel.textContent = editing ? (isDirty() ? 'Editing (unsaved)' : 'Editing') : 'View only'
+	}
+
+	async function loadProposal() {
+		statusEl.textContent = 'Loading generated proposal…'
+		statusEl.classList.remove('caspar-config-modal__status--error')
 		try {
-			const [resOverride, resGenerated] = await Promise.all([
-				getCasparConfigOverride(),
-				getGeneratedCasparConfig(false)
-			])
-			originalGenerated = resGenerated
-			textarea.value = resOverride.override || resGenerated
-			statusEl.textContent = resOverride.override ? 'Manual override active' : ''
-			statusEl.classList.toggle('caspar-config-modal__status--override', !!resOverride.override)
+			proposalXml = await getGeneratedCasparConfig(false)
+			textarea.value = proposalXml
+			statusEl.textContent = ''
+			syncEditUi()
 		} catch (e) {
-			statusEl.textContent = 'Error: ' + e.message
+			statusEl.textContent = `Error: ${e?.message || e}`
+			statusEl.classList.add('caspar-config-modal__status--error')
 		}
 	}
-	
-	const close = () => modal.remove()
-	
-	closeBtn.onclick = close
-	modal.addEventListener('click', (e) => { if (e.target === modal) close() })
-	document.addEventListener('keydown', function onKey(e) {
-		if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey) }
+
+	function tryClose() {
+		if (isDirty()) {
+			if (!confirm('Discard your edits? Nothing will be applied to Caspar.')) return
+		}
+		modal.remove()
+	}
+
+	editBtn.onclick = () => {
+		editing = true
+		syncEditUi()
+		textarea.focus()
+	}
+
+	resetBtn.onclick = () => {
+		if (isDirty() && !confirm('Reset to the latest generated proposal? Your edits will be lost.')) return
+		textarea.value = proposalXml
+		statusEl.textContent = ''
+		syncEditUi()
+	}
+
+	textarea.addEventListener('input', () => syncEditUi())
+
+	cancelBtn.onclick = tryClose
+	closeBtn.onclick = tryClose
+	modal.addEventListener('click', (e) => {
+		if (e.target === modal) tryClose()
 	})
-	
-	saveBtn.onclick = async () => {
+	document.addEventListener('keydown', function onKey(e) {
+		if (e.key === 'Escape') {
+			tryClose()
+			document.removeEventListener('keydown', onKey)
+		}
+	})
+
+	applyBtn.onclick = async () => {
 		const val = textarea.value.trim()
-		if (!val) { statusEl.textContent = 'Config cannot be empty.'; return }
-		saveBtn.disabled = true
-		statusEl.textContent = 'Saving...'
+		if (!val) {
+			statusEl.textContent = 'Config cannot be empty.'
+			statusEl.classList.add('caspar-config-modal__status--error')
+			return
+		}
+		if (
+			val !== proposalXml &&
+			!confirm('Apply this XML to casparcg.config and restart Caspar? This does not change Device View wiring.')
+		) {
+			return
+		}
+		applyBtn.disabled = true
+		statusEl.textContent = 'Applying and restarting Caspar…'
+		statusEl.classList.remove('caspar-config-modal__status--error')
 		try {
-			await saveCasparConfigOverride(val)
-			statusEl.textContent = 'Override saved.'
-			statusEl.classList.add('caspar-config-modal__status--override')
-			setTimeout(close, 800)
+			const r = await applyCasparConfig({ xml: val })
+			statusEl.textContent = r?.message || 'Applied.'
+			if (typeof opts.onApplied === 'function') await opts.onApplied()
+			setTimeout(() => modal.remove(), 600)
 		} catch (e) {
-			statusEl.textContent = 'Save failed: ' + e.message
-			saveBtn.disabled = false
+			statusEl.textContent = `Apply failed: ${e?.message || e}`
+			statusEl.classList.add('caspar-config-modal__status--error')
+			applyBtn.disabled = false
 		}
 	}
-	
-	revertBtn.onclick = async () => {
-		if (!confirm('Revert to generated config? This will delete your manual edits.')) return
-		textarea.value = originalGenerated
-		statusEl.textContent = 'Reverting...'
-		try {
-			await saveCasparConfigOverride('')
-			statusEl.textContent = 'Using generated config.'
-			statusEl.classList.remove('caspar-config-modal__status--override')
-			setTimeout(close, 800)
-		} catch (e) {
-			statusEl.textContent = 'Revert failed: ' + e.message
-		}
-	}
-	
-	void load()
+
+	await loadProposal()
 }

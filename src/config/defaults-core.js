@@ -34,6 +34,7 @@ function coreDefaults() {
 		},
 		projectScopedMedia: {
 			enabled: true,
+			location: 'internal',
 		},
 		local_template_path: '',
 		server: {

@@ -1,11 +1,17 @@
 'use strict'
 
-/** @type {string[]} */
+const {
+	normalizeLogRecord,
+	parseFilterList,
+	recordMatchesFilters,
+} = require('./log-record')
+
+/** @type {Array<{ ts: string, level: string, category: string, message: string, line: string }>} */
 const _lines = []
 const DEFAULT_MAX = 4000
 
 let _maxLines = DEFAULT_MAX
-/** @type {((line: string) => void) | null} */
+/** @type {((record: { ts: string, level: string, category: string, message: string, line: string }) => void) | null} */
 let _onNewLine = null
 
 /**
@@ -17,24 +23,23 @@ function setMaxLines(n) {
 }
 
 /**
- * Register a callback invoked synchronously for every new line appended.
- * Used to push log lines to WebSocket clients in real time.
- * @param {((line: string) => void) | null} fn
+ * @param {((record: object) => void) | null} fn
  */
 function setOnNewLine(fn) {
 	_onNewLine = typeof fn === 'function' ? fn : null
 }
 
 /**
- * @param {string} line
+ * @param {string | object} lineOrRecord
  */
-function appendHighasLine(line) {
-	if (typeof line !== 'string' || !line) return
-	_lines.push(line)
+function appendHighasLine(lineOrRecord) {
+	const record = normalizeLogRecord(lineOrRecord)
+	if (!record.message && !record.line) return
+	_lines.push(record)
 	while (_lines.length > _maxLines) _lines.shift()
 	if (_onNewLine) {
 		try {
-			_onNewLine(line)
+			_onNewLine(record)
 		} catch (_) {
 			/* non-fatal */
 		}
@@ -46,18 +51,43 @@ function clearHighasLines() {
 }
 
 /**
- * @param {number} [n]
- * @returns {string[]}
+ * @param {number | { lines?: number, categories?: string | Set<string> | null, levels?: string | Set<string> | null, format?: 'text' | 'records' }} [opts]
+ * @returns {string[] | object[]}
  */
-function getHighasLines(n = 500) {
-	const cap = Math.min(_lines.length, Math.max(1, parseInt(String(n), 10) || 500))
-	return _lines.slice(-cap)
+function getHighasLines(opts = 500) {
+	const options = typeof opts === 'number' ? { lines: opts } : opts || {}
+	const cap = Math.min(
+		_lines.length,
+		Math.max(1, parseInt(String(options.lines ?? 500), 10) || 500),
+	)
+	const categories =
+		options.categories instanceof Set
+			? options.categories
+			: parseFilterList(typeof options.categories === 'string' ? options.categories : null)
+	const levels =
+		options.levels instanceof Set
+			? options.levels
+			: parseFilterList(typeof options.levels === 'string' ? options.levels : null)
+	const filters = { categories, levels }
+	const filtered = _lines.filter((r) => recordMatchesFilters(r, filters))
+	const slice = filtered.slice(-cap)
+	if (options.format === 'records') return slice.map((r) => ({ ...r }))
+	return slice.map((r) => r.line)
+}
+
+/**
+ * @param {number} [n]
+ * @returns {object[]}
+ */
+function getHighasRecords(n = 5000) {
+	return /** @type {object[]} */ (getHighasLines({ lines: n, format: 'records' }))
 }
 
 module.exports = {
 	appendHighasLine,
 	clearHighasLines,
 	getHighasLines,
+	getHighasRecords,
 	setMaxLines,
 	setOnNewLine,
 }

@@ -36,10 +36,12 @@ const routesIngest = require('./routes-ingest')
 const routesUsbIngest = require('./routes-usb-ingest')
 const routesStreamingChannel = require('./routes-streaming-channel')
 const routesSystemSetup = require('./routes-system-setup')
+const routesSystemUpdate = require('./routes-system-update')
 const routesSystemHardware = require('./routes-system-hardware')
 const routesExfatSync = require('./routes-exfat-sync')
 const routesCasparConfig = require('./routes-caspar-config')
 const routesLogs = require('./routes-logs')
+const routesSupportBundle = require('./routes-support-bundle')
 const routesHostStats = require('./routes-host-stats')
 const routesPipOverlay = require('./routes-pip-overlay')
 const routesArtnet = require('./routes-artnet')
@@ -51,6 +53,7 @@ const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
 const routesCgThumb = require('./routes-cg-thumb')
 const routesReplication = require('./routes-replication')
+const routesCompanion = require('./routes-companion')
 const routesPrivateSync = require('./routes-private-sync')
 const moduleRegistry = require('../module-registry')
 
@@ -110,10 +113,23 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (lr) return lr
 	}
 
+	if (method === 'GET' && p === '/api/support/bundle') {
+		const sr = await routesSupportBundle.handleGet(p, query, ctx)
+		if (sr) return sr
+	}
+	if (method === 'POST' && p === '/api/support/bundle') {
+		const sr = await routesSupportBundle.handlePost(p, body, ctx)
+		if (sr) return sr
+	}
+
 	if (method === 'GET' && p === '/api/host-stats') {
 		return await routesHostStats.handleGet(ctx)
 	}
 
+	if (method === 'GET') {
+		const companionGet = routesCompanion.handleGet(p, ctx)
+		if (companionGet) return companionGet
+	}
 	if (method === 'GET') {
 		const replGet = await routesReplication.handleGet(p, ctx, req)
 		if (replGet) return replGet
@@ -234,6 +250,17 @@ async function routeRequest(method, path, body, ctx, req) {
 	if (method === 'GET' && p === '/api/system/setup') {
 		const r = await routesSystemSetup.handleGet(p, ctx)
 		if (r) return r
+	}
+	{
+		const ur = await routesSystemUpdate.handleGet(p, ctx, query)
+		if (ur) return ur
+	}
+	if (
+		method === 'POST' &&
+		p === '/api/system/update/apply'
+	) {
+		const ur = await routesSystemUpdate.handlePost(p, body, ctx)
+		if (ur) return ur
 	}
 	if (
 		method === 'POST' &&

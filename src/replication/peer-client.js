@@ -109,10 +109,51 @@ function startPeerClient(ctx, runtime) {
 		const res = await peerPing(repl.peer)
 		const now = Date.now()
 		if (res.ok && res.json) {
+			if (repl.pairId && res.json.pairId && res.json.pairId !== repl.pairId) {
+				peerFailStreak += 1
+				runtime.peerReachable = false
+				runtime.lastPeerPingError = 'pair id mismatch'
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', '[replication] peer ping rejected — pair id mismatch')
+				}
+				return
+			}
+
+			const localRole = runtime.roleState.getRole()
+			const peerRole = String(res.json.role || '')
+			if (
+				(localRole === 'leader' && peerRole && peerRole !== 'follower') ||
+				(localRole === 'follower' && peerRole && peerRole !== 'leader')
+			) {
+				peerFailStreak += 1
+				runtime.peerReachable = false
+				runtime.lastPeerPingError = `unexpected peer role: ${peerRole || '?'}`
+				return
+			}
+
+			const prevInstance = runtime.peerInstanceId
+			if (res.json.instanceId) {
+				if (prevInstance && prevInstance !== res.json.instanceId) {
+					if (typeof ctx.log === 'function') {
+						ctx.log('info', '[replication] peer restarted — refreshing replication state')
+					}
+					if (localRole === 'follower') {
+						const { reconcileFromLeader } = require('./replication-reconcile')
+						void reconcileFromLeader(ctx, runtime).catch((e) => {
+							if (typeof ctx.log === 'function') {
+								ctx.log('warn', '[replication] peer restart reconcile: ' + (e?.message || e))
+							}
+						})
+					}
+				}
+				runtime.peerInstanceId = res.json.instanceId
+			}
+
 			peerFailStreak = 0
 			runtime.lastPeerPingAt = now
 			runtime.lastPeerPing = res.json
 			runtime.peerReachable = true
+			runtime.lastPeerPingError = null
 			updateClockOffsetFromPing(runtime, now, res.json)
 			runtime.peerLeaderEpoch = res.json.leaderEpoch ?? runtime.peerLeaderEpoch
 			if (typeof res.json.lastAppliedSeq === 'number') {
@@ -121,7 +162,6 @@ function startPeerClient(ctx, runtime) {
 			const peerLiveSeq = res.json.liveStateSeq ?? 0
 			runtime.peerLiveStateSeq = peerLiveSeq
 
-			const localRole = runtime.roleState.getRole()
 			const peerEpoch = res.json.leaderEpoch || 0
 
 			if (
@@ -129,8 +169,8 @@ function startPeerClient(ctx, runtime) {
 				peerLiveSeq > (runtime.lastAppliedSeq || 0) &&
 				!runtime._liveStateCatchUpInFlight
 			) {
-				const { isAmcpFanoutMirrorActive } = require('./amcp-fanout')
-				if (!isAmcpFanoutMirrorActive(ctx.config)) {
+				const { shouldSkipSemanticLiveMirror } = require('./amcp-fanout')
+				if (!shouldSkipSemanticLiveMirror(ctx.config)) {
 					runtime._liveStateCatchUpInFlight = true
 					const { catchUpLiveStateFromLeader } = require('./replication-reconcile')
 					void catchUpLiveStateFromLeader(ctx, runtime)
@@ -152,9 +192,30 @@ function startPeerClient(ctx, runtime) {
 				const { reconcileFromLeader } = require('./replication-reconcile')
 				await reconcileFromLeader(ctx, runtime)
 			}
+
+			if (!wasReachable) {
+				const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+				notifyReplicationStatusChanged(ctx, 'peer-http-online')
+			}
+
+			if (localRole === 'leader') {
+				const { isAmcpFanoutMirrorActive, syncPeerCasparConnection } = require('./replication-reload')
+				const peerCaspar = runtime.peerCasparConnection
+				const needsPeerCaspar =
+					isAmcpFanoutMirrorActive(ctx.config) && (!peerCaspar || !peerCaspar.isConnected)
+				if (needsPeerCaspar && (!wasReachable || (prevInstance && prevInstance !== res.json.instanceId))) {
+					syncPeerCasparConnection(ctx, runtime)
+				}
+			}
 		} else {
 			peerFailStreak += 1
+			const wasUp = runtime.peerReachable
 			runtime.peerReachable = false
+			runtime.lastPeerPingError = res.error || (res.status ? `HTTP ${res.status}` : 'peer ping failed')
+			if (wasUp) {
+				const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+				notifyReplicationStatusChanged(ctx, 'peer-http-offline')
+			}
 			const age = runtime.lastPeerPingAt ? now - runtime.lastPeerPingAt : Infinity
 			const failTicksNeeded = Math.max(2, Math.ceil(FAILOVER_MS / PING_MS))
 			if (

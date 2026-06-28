@@ -158,7 +158,11 @@ async function handlePost(path, body, ctx) {
 	}
 	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
 	if (settings.projectScopedMedia) {
-		cfg.projectScopedMedia = { enabled: settings.projectScopedMedia.enabled !== false }
+		const { normalizeProjectMediaLocation } = require('../media/project-media-location')
+		cfg.projectScopedMedia = {
+			enabled: settings.projectScopedMedia.enabled !== false,
+			location: normalizeProjectMediaLocation(settings.projectScopedMedia.location),
+		}
 	}
 	if (settings.streamingChannel) {
 		const s = settings.streamingChannel

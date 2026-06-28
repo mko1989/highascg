@@ -9,6 +9,8 @@ import { getOptionalSettingsTabs } from '../lib/optional-modules.js'
 import * as Templates from './settings-modal-templates.js'
 import * as Logic from './settings-modal-logic.js'
 import * as MountHw from './settings-modal-mount-hardware.js'
+import * as SystemUpdates from './settings-modal-system-updates.js'
+import { wireDiagnosticsPanel } from './settings-modal-diagnostics.js'
 import { mountLiveAudioSettingsPanel } from './settings-live-audio-panel.js'
 export function showSettingsModal(initialTab) {
 	if (document.getElementById('settings-modal')) return
@@ -35,6 +37,8 @@ export function showSettingsModal(initialTab) {
 	})
 
 	MountHw.wireMediaUsbMountListeners(modal)
+	SystemUpdates.wireSystemUpdatesPanel(modal, { getNuclearPassword: () => (modal.querySelector('#set-nuclear-action-password') || {}).value || '' })
+	wireDiagnosticsPanel(modal)
 
 	modal.querySelector('#set-compose-preview-mode')?.addEventListener('change', () => Logic.syncComposePreviewModeVisibility(modal))
 	modal.querySelector('#set-compose-preview-tick-ms')?.addEventListener('input', () => Logic.syncComposePreviewTickLabel(modal))
@@ -63,6 +67,7 @@ export function showSettingsModal(initialTab) {
 			void MountHw.refreshMediaMountPanel(modal)
 			void MountHw.refreshExfatSyncPanel(modal)
 		}
+		if (tabName === 'system-updates') void SystemUpdates.refreshSystemUpdatesPanel(modal)
 		if (tabName === 'system-hardware') void MountHw.refreshSystemHardwarePanel(modal)
 		if (tabName === 'decklink') void MountHw.refreshDecklinkPanel(modal)
 		if (tabName === 'live-audio' && pane && !liveAudioMounted) {

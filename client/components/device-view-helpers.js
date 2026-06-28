@@ -1,6 +1,7 @@
 import { hasDrmGpuPhysicalMap, readGpuLayoutPrefs, resolveEffectiveGpuTopology } from '../lib/device-view-gpu-port-list.js'
 import { findScreenDestinationById } from '../lib/device-view-host-channels.js'
 import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
+import { isDecklinkIoIn, isDecklinkIoOut, isDecklinkIoOutputSink } from '../lib/decklink-io-direction.js'
 
 export const CASPAR_HOST = 'caspar_host'
 
@@ -100,7 +101,9 @@ export function connectorRole(c) {
 	if (!c) return 'other'
 	if (c.deviceId === CASPAR_HOST && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out')) return 'caspar_out'
 	if (c.deviceId === CASPAR_HOST && c.kind === 'decklink_io') {
-		return String(c.caspar?.ioDirection || 'in').toLowerCase() === 'out' ? 'caspar_out' : 'caspar_in'
+		if (isDecklinkIoOut(c) || isDecklinkIoOutputSink(c)) return 'caspar_out'
+		if (isDecklinkIoIn(c)) return 'caspar_in'
+		return 'other'
 	}
 	if (c.deviceId === 'destinations' && c.kind === 'destination_in') return 'destination_out'
 	if (c.kind === 'pixel_map_in') return 'pixel_mapping_in'

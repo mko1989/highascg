@@ -57,17 +57,37 @@ Implementation: `src/config/config-classify.js` — `stripDeviceLocalFromProject
 
 Peer rsync of `config/device_graph.json` must **not** be used on a paired follower without explicit operator opt-in. `screen_destinations.json` is replicated via project sync when paired.
 
-## Syncthing (optional, automated)
+## Project media sync (rsync, default)
 
-No manual Syncthing GUI steps when enabled. On connect:
+On connect and when the leader pushes project updates, HighAsCG syncs **project-referenced media** over **rsync/SSH** — not the whole `media/` tree:
 
-1. Leader builds `media/.replication-active/` with hardlinks to clips referenced by the active project.
-2. REST API adds remote device + sendonly/receiveonly folder on both sides.
-3. Requires Syncthing installed and running (`scripts/setup/12-syncthing-highascg.sh`).
+1. **`media/projects/<active-slug>/`** — project-scoped folder (WO-62)
+2. Any **referenced clips** still in flat `media/` (legacy paths)
+3. Referenced **`template/`** HTML files
+
+| Role | Direction | When |
+|------|-----------|------|
+| Leader | push → backup | After follower registers; after each project push |
+| Follower | pull ← leader | After reconcile on connect |
+
+Config: `replication.mediaTransport` — **`rsync`** (default) or `syncthing` (legacy).
+
+Env (optional): `HIGHASCG_REPL_RSYNC_USER` (default `casparcg`), `HIGHASCG_REPL_RSYNC_REMOTE_ROOT` (default repo root), `HIGHASCG_REPL_RSYNC_SSH_OPTS`, `HIGHASCG_REPL_RSYNC_TIMEOUT_MS`.
+
+Manual: `POST /api/replication/sync-project-media` with optional `{ "direction": "push"|"pull"|"auto" }`.
+
+**Requires** passwordless SSH between boxes (same as `scripts/deploy/push-backup-box.sh`).
+
+### Legacy: Syncthing staging (optional)
+
+Set `replication.mediaTransport` to `syncthing` to use the old path:
+
+1. Leader builds `media/.replication-active/` with hardlinks to referenced clips.
+2. Syncthing REST API shares staging as `highascg-project-media`.
 
 **Exclude** `media/.replication-active/` from manual Syncthing shares of `media/`.
 
-Bulk file sync between boxes can also use **rsync** (WO-61) — often simpler for one-off clones; Syncthing remains useful for ongoing media sync with a GUI.
+Bulk file sync between boxes can also use **full rsync mirror** (WO-61 / `push-backup-box.sh DEPLOY_MODE=mirror`).
 
 ## CT-SS / time-aligned mirror
 
@@ -86,7 +106,25 @@ Config: `scheduledApply: true`, `syncClock: ct-ss`, `scheduledApplyLeadMs: 1500`
 | `GET /api/replication/leaders` | LAN scan for available leaders |
 | `POST /api/replication/connect` | Follower joins a leader |
 | `POST /api/replication/disconnect` | Return to standalone |
-| `GET /api/replication/status` | Role, peer, media %, lag, clock offset |
+| `GET /api/replication/status` | Role, peer, media %, lag, clock offset, `companion` control-plane |
+| `GET /api/companion/control-status` | Lightweight Companion routing hint (`acceptsCompanionControl`, `suggestedCompanionTarget`) |
+
+### Companion hot backup (WO-70)
+
+When Companion is configured with **main** and **backup** box hosts, poll:
+
+```http
+GET /api/companion/control-status
+```
+
+| Field | Use |
+|-------|-----|
+| `acceptsCompanionControl` | Send button actions to this box when `true` |
+| `suggestedCompanionTarget` | `self` — keep this connection; `peer` — prefer the paired leader IP; `none` — degraded |
+| `controlPlaneReason` | `standalone`, `leader_air`, `follower_standby`, `follower_promoted_backup`, `degraded_no_caspar`, `not_paired` |
+| `warnings` | e.g. `channel_parity_mismatch` — does not block control |
+
+Same payload is nested under `companion` on `GET /api/replication/status`.
 
 ## Tests
 

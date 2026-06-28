@@ -17,6 +17,7 @@ function replicationDefaults() {
 		scheduledApplyLeadMs: 250,
 		syncClock: 'ct-ss',
 		syncthingMediaFolderId: 'highascg-project-media',
+		mediaTransport: 'rsync',
 		mirrorTransport: 'live-state',
 		peerCaspar: { host: '', port: 5250, connectTimeoutMs: 5000 },
 		amcpFanout: {
@@ -25,11 +26,11 @@ function replicationDefaults() {
 			maxUnconfirmed: 3,
 		},
 		playheadSync: {
-			enabled: true,
+			enabled: false,
 			softThresholdMs: 150,
 			hardThresholdMs: 2000,
-			sampleIntervalMs: 500,
-			minCorrectionIntervalMs: 5000,
+			sampleIntervalMs: 5000,
+			minCorrectionIntervalMs: 2000,
 			maxCorrectionsPerMinute: 6,
 		},
 	}

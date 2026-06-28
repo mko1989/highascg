@@ -222,7 +222,7 @@ async function handleProjectList(ctx) {
 	const activeProjectMedia =
 		activeSlug && ctx.config
 			? {
-					relId: getProjectMediaRelId(activeSlug),
+					relId: getProjectMediaRelId(activeSlug, ctx.config),
 					absPath: getProjectMediaRoot(ctx.config, persistence, activeSlug),
 				}
 			: null
@@ -234,7 +234,7 @@ async function handleProjectList(ctx) {
 			activeProjectMedia,
 			projects: projects.map((p) => ({
 				...p,
-				mediaFolder: p.slug ? getProjectMediaRelId(p.slug) : null,
+				mediaFolder: p.slug ? getProjectMediaRelId(p.slug, ctx.config) : null,
 			})),
 			volumes: {
 				usb: {

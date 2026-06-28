@@ -63,7 +63,7 @@ function renderBanner(status, settings) {
 	const role = String(status.role || 'standalone')
 	const roleClass =
 		role === 'leader' ? 'replication-status-banner--leader' : role === 'follower' ? 'replication-status-banner--follower' : ''
-	const peerOk = !!status.peerReachable
+	const peerOk = !!(status.peerLinkReady ?? status.peerReachable)
 	const mediaPct = status.mediaSync?.percent ?? (status.mediaSync?.caughtUp ? 100 : 0)
 	const lag = status.liveStateLag ?? 0
 	const syncPct = status.initialSync?.inProgress ? status.initialSync.percent : null

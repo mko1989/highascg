@@ -54,6 +54,7 @@ function extractChannelInfoFromParsed(result) {
 					let bgClip = ''
 					let nbFrames = 0
 					let currentFrame = 0
+					let fileElapsedSec = NaN
 					if (fg) {
 						const p = _first(fg.producer)
 						if (p) {
@@ -71,12 +72,48 @@ function extractChannelInfoFromParsed(result) {
 						const file = _first(fg.file)
 						if (file) {
 							const fAttrs = file.$ || {}
-							const clipRaw = file.clip
-							const clipSecond = Array.isArray(clipRaw) ? clipRaw[1] : clipRaw && typeof clipRaw === 'object' ? clipRaw._ : undefined
-							fgClip = fAttrs.name || (clipSecond != null ? String(clipSecond) : '') || fgClip
-							if (clipSecond != null && String(clipSecond).length) {
-								const fpsNum = parseInt(framerate, 10) || 1
-								nbFrames = Math.floor(parseFloat(String(clipSecond)) * fpsNum)
+							const fileName = _str(file.name) || fAttrs.name
+							if (fileName) fgClip = fileName
+							const filePath = _str(file.path)
+							if (!fgClip && filePath) {
+								const parts = filePath.split(/[/\\]/)
+								fgClip = parts[parts.length - 1] || fgClip
+							}
+
+							const timeRaw = file.time
+							/** @type {number[]} */
+							const timeVals = []
+							if (Array.isArray(timeRaw)) {
+								for (const t of timeRaw) {
+									const n = parseFloat(_str(t))
+									if (Number.isFinite(n)) timeVals.push(n)
+								}
+							} else if (timeRaw != null) {
+								const n = parseFloat(_str(timeRaw))
+								if (Number.isFinite(n)) timeVals.push(n)
+							}
+							if (timeVals.length > 0) fileElapsedSec = timeVals[0]
+							const durSec =
+								timeVals.length >= 2 && Number.isFinite(timeVals[1]) && timeVals[1] > 0
+									? timeVals[1]
+									: NaN
+
+							const fpsNum = parseInt(framerate, 10) || 1
+							if (Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0) {
+								currentFrame = Math.round(fileElapsedSec * fpsNum)
+							}
+							if (Number.isFinite(durSec) && durSec > 0) {
+								nbFrames = Math.round(durSec * fpsNum)
+							} else {
+								const clipRaw = file.clip
+								const clipSecond = Array.isArray(clipRaw)
+									? clipRaw[1]
+									: clipRaw && typeof clipRaw === 'object'
+										? clipRaw._
+										: undefined
+								if (clipSecond != null && String(clipSecond).length && nbFrames <= 0) {
+									nbFrames = Math.floor(parseFloat(String(clipSecond)) * fpsNum)
+								}
 							}
 						}
 					}
@@ -88,8 +125,14 @@ function extractChannelInfoFromParsed(result) {
 						}
 					}
 					const fpsNum = parseInt(framerate, 10) || 1
-					const durationSec = nbFrames > 0 ? (nbFrames / fpsNum).toFixed(2) : ''
-					const timeSec = nbFrames > 0 && currentFrame >= 0 ? (currentFrame / fpsNum).toFixed(2) : ''
+					const durationSec =
+						nbFrames > 0 ? (nbFrames / fpsNum).toFixed(2) : Number.isFinite(fileElapsedSec) ? String(fileElapsedSec) : ''
+					const timeSec =
+						Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0
+							? fileElapsedSec.toFixed(2)
+							: nbFrames > 0 && currentFrame >= 0
+								? (currentFrame / fpsNum).toFixed(2)
+								: ''
 					const remainingSec = nbFrames > 0 && currentFrame >= 0 ? ((nbFrames - currentFrame) / fpsNum).toFixed(2) : ''
 					layers[layerIdx] = { fgClip, fgState, bgClip, durationSec, timeSec, remainingSec }
 				})

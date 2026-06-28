@@ -52,7 +52,12 @@ let mounted = false; export function initDeviceView(root) {
 	const refreshBtn = document.createElement('button'); refreshBtn.className = 'header-btn'; refreshBtn.textContent = 'Refresh'
 	const resetBtn = document.createElement('button'); resetBtn.className = 'header-btn'; resetBtn.textContent = 'Reset all cabling'
 	const applyCasparBtn = document.createElement('button'); applyCasparBtn.className = 'header-btn device-view__apply-btn'; applyCasparBtn.textContent = 'Apply Caspar config (restart)'
-	const editCasparBtn = document.createElement('button'); editCasparBtn.className = 'header-btn device-view__edit-config-btn'; editCasparBtn.innerHTML = '📝 Config'; editCasparBtn.title = 'Edit generated Caspar config'
+	const editCasparBtn = document.createElement('button')
+	editCasparBtn.type = 'button'
+	editCasparBtn.className = 'header-btn device-view__edit-config-btn'
+	editCasparBtn.innerHTML = `<svg class="device-view__edit-config-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="12" height="13" rx="1.5"/><line x1="7" y1="12" x2="13" y2="12"/><line x1="7" y1="15" x2="13" y2="15"/><line x1="7" y1="18" x2="10" y2="18"/><line x1="12" y1="3" x2="20" y2="11"/><line x1="19" y1="10" x2="21" y2="12"/><line x1="10" y1="5" x2="12" y2="3"/></svg>`
+	editCasparBtn.title = 'View or edit generated Caspar config (advanced)'
+	editCasparBtn.setAttribute('aria-label', 'Caspar config editor')
 	const saveSnapBtn = document.createElement('button'); saveSnapBtn.className = 'header-btn'; saveSnapBtn.textContent = 'Save snapshot'
 	const loadSnapBtn = document.createElement('button'); loadSnapBtn.className = 'header-btn'; loadSnapBtn.textContent = 'Load snapshot'
 	actions.append(refreshBtn, saveSnapBtn, loadSnapBtn, resetBtn, applyCasparBtn, editCasparBtn); header.append(Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }), actions)
@@ -501,9 +506,6 @@ let mounted = false; export function initDeviceView(root) {
 					else selectedDeviceId = null
 				}
 			}
-			const hasOverride = !!settings?.casparServer?.casparConfigOverride
-			editCasparBtn.classList.toggle('device-view__edit-config-btn--active', hasOverride)
-			editCasparBtn.title = hasOverride ? 'Manual XML override active. Click to edit/revert.' : 'Edit generated Caspar config'
 			setStatus(statusEl, `Updated ${lastPayload?.live?.host?.collectedAt || ''}`, true)
 			// Ensure cables and highlights are rendered after the DOM has been populated and laid out
 			requestAnimationFrame(() => updateUI())
@@ -521,7 +523,29 @@ let mounted = false; export function initDeviceView(root) {
 			},
 			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
 		})
-	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message || 'Caspar config applied', true) }).catch(e => setStatus(statusEl, e?.message || String(e), false)); editCasparBtn.onclick = () => showCasparConfigModal().then(() => load()); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
+	refreshBtn.onclick = load
+	resetBtn.onclick = resetCabling
+	applyCasparBtn.onclick = () =>
+		Actions.applyCasparConfig()
+			.then((r) => {
+				setCasparRestartDirty(false)
+				setStatus(statusEl, r.message || 'Caspar config applied', true)
+			})
+			.catch((e) => setStatus(statusEl, e?.message || String(e), false))
+	editCasparBtn.onclick = () =>
+		showCasparConfigModal({
+			onApplied: () => {
+				setCasparRestartDirty(false)
+				return load()
+			},
+		})
+	window.onresize = () => renderCableOverlay(getCOCtx())
+	clearCableBtn.onclick = () => {
+		cableSourceId = null
+		cablePointer = null
+		updateUI()
+		setStatus(statusEl, 'Cable mode cancelled', true)
+	}
 	destAdd.onclick = () => {
 		const list = Array.isArray(lastPayload?.screenDestinations?.destinations)
 			? lastPayload.screenDestinations.destinations

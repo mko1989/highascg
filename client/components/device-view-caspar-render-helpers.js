@@ -1,4 +1,5 @@
 import { decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
+import { isDecklinkIoIn, isDecklinkIoOut } from '../lib/decklink-io-direction.js'
 
 /** RandR names may be DP-0 or card0-DP-0 depending on source. */
 export function normRandrCaspar(v) {
@@ -86,14 +87,17 @@ export function createCasparRearMarkerStatusResolver({ live, lastPayload }) {
 		if (!conn) return ''
 		const isDecklinkOutput =
 			it.kind === 'decklink_out' ||
-			(it.kind === 'decklink_io' && String(conn?.caspar?.ioDirection || 'in').toLowerCase() === 'out')
+			(it.kind === 'decklink_io' && isDecklinkIoOut(conn))
 		if (isDecklinkOutput) {
 			const outputs = Array.isArray(live?.decklink?.outputs) ? live.decklink.outputs : []
 			const st = outputs.find((o) => String(o?.connectorId || '') === String(it.connectorId || ''))
-			if (st && !st.ok) return stateClass('err')
+			if (st && !st.ok) return stateClass('warn')
 			if (st?.ok) return stateClass('ok')
+			if (isDecklinkIoOut(conn)) {
+				return stateClass('warn')
+			}
 		}
-		if (it.kind === 'decklink_in' || it.kind === 'decklink_io') {
+		if (it.kind === 'decklink_in' || (it.kind === 'decklink_io' && isDecklinkIoIn(conn))) {
 			const st = live.decklink?.inputs?.find((x) => String(x.device) === String(conn.externalRef))
 			if (st) return stateClass(decklinkInputState(st).level)
 		}

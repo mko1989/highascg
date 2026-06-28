@@ -12,11 +12,11 @@ const { REPO_ROOT } = require('../repo-paths')
 
 const ACTIVE_MEDIA_FOLDER_ID = 'highascg-project-media'
 
-function resolveMediaFile(ref, mediaBase, slug) {
+function resolveMediaFile(ref, mediaBase, slug, config) {
 	const raw = String(ref || '').trim()
 	if (!raw) return null
 	const candidates = []
-	if (slug) candidates.push(expandMediaIdToMediaRoot(raw, slug))
+	if (slug) candidates.push(expandMediaIdToMediaRoot(raw, slug, config))
 	candidates.push(raw, path.basename(raw))
 	const seen = new Set()
 	for (const cand of candidates) {
@@ -67,9 +67,10 @@ function linkOrCopyFile(src, dest) {
 /**
  * @param {object} project
  * @param {string} [mediaBase]
+ * @param {object} [config]
  */
-function rebuildProjectMediaStaging(project, mediaBase) {
-	const base = mediaBase || getMediaIngestBasePath()
+function rebuildProjectMediaStaging(project, mediaBase, config) {
+	const base = mediaBase || getMediaIngestBasePath(config)
 	const staging = path.join(base, '.replication-active')
 	const mediaDir = path.join(staging, 'media')
 	const templatesDir = path.join(staging, 'templates')
@@ -82,7 +83,7 @@ function rebuildProjectMediaStaging(project, mediaBase) {
 	let linkedTemplates = 0
 
 	for (const ref of refs.media) {
-		const src = resolveMediaFile(ref, base, slug)
+		const src = resolveMediaFile(ref, base, slug, config)
 		if (!src) continue
 		const dest = path.join(mediaDir, path.basename(src))
 		if (linkOrCopyFile(src, dest)) linkedMedia += 1
@@ -153,6 +154,7 @@ async function syncProjectMediaViaSyncthing(project, remoteDeviceId, opts = {}) 
 
 	return {
 		ok: out.ok,
+		transport: 'syncthing',
 		folderId: ACTIVE_MEDIA_FOLDER_ID,
 		staging,
 		linkedMedia,
@@ -163,10 +165,38 @@ async function syncProjectMediaViaSyncthing(project, remoteDeviceId, opts = {}) 
 	}
 }
 
+/**
+ * Sync active project media + templates to/from peer (default: rsync over SSH).
+ * @param {object} ctx
+ * @param {object} project
+ * @param {{ direction?: 'push'|'pull'|'auto', asLeader?: boolean }} [opts]
+ */
+async function syncProjectMediaToPeer(ctx, project, opts = {}) {
+	const repl = require('../config/replication-config').getReplicationConfig(ctx.config)
+	const transport = repl.mediaTransport || 'rsync'
+
+	if (transport === 'syncthing') {
+		const { getLocalSyncthingDeviceId } = require('./syncthing-client')
+		const { peerPing } = require('./peer-client')
+		let remoteDeviceId = ''
+		if (opts.asLeader || repl.role === 'leader') {
+			const ping = await peerPing(repl.peer)
+			remoteDeviceId = ping.json?.syncthingDeviceId || ''
+		} else {
+			remoteDeviceId = (await getLocalSyncthingDeviceId()) || ''
+		}
+		return syncProjectMediaViaSyncthing(project, remoteDeviceId, opts)
+	}
+
+	const { rsyncProjectMediaToPeer } = require('./sync-project-media-rsync')
+	return rsyncProjectMediaToPeer(ctx, project, opts)
+}
+
 module.exports = {
 	ACTIVE_MEDIA_FOLDER_ID,
 	rebuildProjectMediaStaging,
 	installTemplatesFromStaging,
 	syncProjectMediaViaSyncthing,
+	syncProjectMediaToPeer,
 	resolveMediaFile,
 }

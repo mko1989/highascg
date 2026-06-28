@@ -143,6 +143,24 @@ class AmcpClient extends EventEmitter {
 		const execute = () => {
 			try {
 				if (settled) return p
+				try {
+					const { shouldBlockLocalPgmAmcpCommand } = require('../replication/amcp-fanout')
+					if (shouldBlockLocalPgmAmcpCommand(self, trimmed)) {
+						if (typeof self.log === 'function') {
+							self.log(
+								'debug',
+								`[replication] skip local PGM AMCP (leader fan-out drives air): ${trimmed}`,
+							)
+						}
+						if (!settled) {
+							settled = true
+							resolveP({ ok: true, skipped: true, data: '202 OK' })
+						}
+						return p
+					}
+				} catch {
+					/* replication optional */
+				}
 				if (!self.socket || !self.socket.isConnected) {
 					throw new Error('Not connected')
 				}

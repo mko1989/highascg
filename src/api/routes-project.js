@@ -8,6 +8,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { layerHasContent } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
+const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
 const fs = require('fs')
 const path = require('path')
 const { getMediaIngestBasePath } = require('../media/local-media')
@@ -104,6 +105,10 @@ async function handleSyncPush(ctx) {
 		const channel = parseInt(chKey, 10)
 		const entry = live[chKey]
 		if (!channel || !entry?.scene) continue
+		if (shouldFollowerSkipLocalPgmAmcp(ctx, channel, { previewOnly: false })) {
+			results.push({ channel, ok: true, skipped: true, reason: 'follower-fanout-pgm' })
+			continue
+		}
 
 		try {
 			await runSceneTakeLbg(ctx.amcp, {

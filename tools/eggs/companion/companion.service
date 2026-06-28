@@ -14,7 +14,6 @@ ExecStart=/home/casparcg/companion/companion_headless.sh \
   --config-dir /home/casparcg/.config/companion \
   --admin-port 8001 \
   --admin-address 0.0.0.0 \
-  --extra-module-path /home/casparcg/companion-module-dev \
   --log-level info
 Restart=always
 RestartSec=5

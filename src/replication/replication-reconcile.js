@@ -110,7 +110,18 @@ async function reconcileFromLeader(ctx, runtime) {
 	patchInitialSync(runtime, { inProgress: false, phase: 'caught_up', percent: 100 })
 	if (typeof ctx.log === 'function') ctx.log('info', '[replication] reconciled from leader')
 
+	try {
+		const { ensureFollowerCasparParity } = require('./caspar-parity')
+		await ensureFollowerCasparParity(ctx, runtime)
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', '[replication] caspar parity after reconcile: ' + (e?.message || e))
+		}
+	}
+
 	await applyLiveStateFromLeader(ctx, runtime)
+	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+	notifyReplicationStatusChanged(ctx, 'reconcile-from-leader')
 	return { ok: true }
 }
 
@@ -133,8 +144,8 @@ async function applyLiveStateFromLeader(ctx, runtime, opts = {}) {
 	if (runtime.roleState.getRole() !== 'follower') return { ok: false, skipped: true }
 	const repl = getReplicationConfig(ctx.config)
 	if (!repl.enabled || !repl.peer.host || repl.followerMode !== 'mirror') return { ok: false, skipped: true }
-	const { isAmcpFanoutMirrorActive } = require('./amcp-fanout')
-	if (isAmcpFanoutMirrorActive(ctx.config)) return { ok: true, skipped: true, reason: 'amcp-fanout' }
+	const { shouldSkipSemanticLiveMirror } = require('./amcp-fanout')
+	if (shouldSkipSemanticLiveMirror(ctx.config)) return { ok: true, skipped: true, reason: 'amcp-fanout' }
 
 	const res = await peerHttpRequest(repl.peer, '/api/replication/export/live-state', {
 		timeoutMs: SYNC_REQUEST_TIMEOUT_MS,

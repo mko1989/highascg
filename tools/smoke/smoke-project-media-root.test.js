@@ -43,6 +43,20 @@ describe('project-scoped media root', () => {
 		assert.equal(getProjectMediaRoot(cfg, persistence, slug), path.join(tmp, 'projects', slug))
 	})
 
+	it('maps slug to exfat/projects/<slug> when location is exfat', () => {
+		const exfatCfg = { ...cfg, projectScopedMedia: { enabled: true, location: 'exfat' } }
+		assert.equal(getProjectMediaRelId(slug, exfatCfg), 'exfat/projects/evening_news')
+		assert.equal(getDefaultIngestSubdir(exfatCfg), 'exfat/projects/evening_news')
+		assert.equal(getProjectMediaRoot(exfatCfg, persistence, slug), path.join(tmp, 'exfat', 'projects', slug))
+	})
+
+	it('maps slug to bridge/projects/<slug> when location is bridge', () => {
+		const bridgeCfg = { ...cfg, projectScopedMedia: { enabled: true, location: 'bridge' } }
+		assert.equal(getProjectMediaRelId(slug, bridgeCfg), 'bridge/projects/evening_news')
+		assert.equal(getDefaultIngestSubdir(bridgeCfg), 'bridge/projects/evening_news')
+		assert.equal(getProjectMediaRoot(bridgeCfg, persistence, slug), path.join(tmp, 'bridge', 'projects', slug))
+	})
+
 	it('ensureProjectMediaDir creates folder', () => {
 		const dir = ensureProjectMediaDir(cfg, slug)
 		assert.ok(dir)
@@ -51,7 +65,12 @@ describe('project-scoped media root', () => {
 
 	it('normalize and expand media ids', () => {
 		assert.equal(normalizeMediaIdForProject('projects/evening_news/open.mxf', slug), 'open.mxf')
+		assert.equal(normalizeMediaIdForProject('exfat/projects/evening_news/open.mxf', slug, { projectScopedMedia: { location: 'exfat' } }), 'open.mxf')
 		assert.equal(expandMediaIdToMediaRoot('open.mxf', slug), 'projects/evening_news/open.mxf')
+		assert.equal(
+			expandMediaIdToMediaRoot('open.mxf', slug, { projectScopedMedia: { location: 'bridge' } }),
+			'bridge/projects/evening_news/open.mxf',
+		)
 	})
 
 	it('resolveMediaFileOnDisk finds project-relative clip', () => {

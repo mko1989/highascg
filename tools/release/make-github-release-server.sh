@@ -4,7 +4,7 @@
 # Usage (repo root):
 #   npm run release:github-server
 #   npm run release:github-server:dry
-#   ./tools/release/make-github-release-server.sh [--dry-run] [--replace] [--tag NAME]
+#   ./tools/release/make-github-release-server.sh [--dry-run] [--replace] [--tag NAME] [--no-bump-package]
 #
 set -euo pipefail
 
@@ -18,10 +18,19 @@ TAG=""
 REPLACE_RELEASE=0
 OUT_DIR=""
 ZIP_EXCLUDE_NODE_MODULES=0
+BUMP_PACKAGE=1
+BUILD_STAMP_FILE=""
+NOTES=""
 
 usage() {
 	sed -n '2,/^set -euo/p' "$0" | head -n -1 | sed 's/^# \{0,1\}//'
 	exit "${1:-0}"
+}
+
+cleanup_release() {
+	rm -f "${BUILD_STAMP_FILE:-}"
+	release_lib_restore_package_json "$REPO_ROOT"
+	[[ -n "${NOTES:-}" ]] && rm -f "$NOTES"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -38,6 +47,7 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--zip-exclude-node-modules) ZIP_EXCLUDE_NODE_MODULES=1 ;;
+	--no-bump-package) BUMP_PACKAGE=0 ;;
 	*)
 		echo "Unknown option: $1" >&2
 		usage 1
@@ -47,6 +57,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 STAMP="$(release_lib_stamp)"
+BUILD_STAMP_FILE="${REPO_ROOT}/BUILD_STAMP"
+trap cleanup_release EXIT
 if [[ -z "${TAG}" ]]; then
 	TAG="$(release_lib_stamp_tag "$STAMP")"
 	TAG="${TAG%Z}"
@@ -65,6 +77,18 @@ fi
 build_server_archive() {
 	local -a paths=()
 	archive_common_server_tar_members paths
+
+	if [[ "$BUMP_PACKAGE" -eq 1 ]]; then
+		if [[ "$DRY_RUN" -eq 1 ]]; then
+			echo "[dry-run] would set package.json version → ${STAMP}"
+		else
+			release_lib_bump_package_json "$REPO_ROOT" "$STAMP"
+			echo "==> package.json version → ${STAMP} (restored after tarball)"
+		fi
+	fi
+
+	echo "$STAMP" >"${REPO_ROOT}/BUILD_STAMP"
+	paths+=(BUILD_STAMP)
 	if [[ "$ZIP_EXCLUDE_NODE_MODULES" -eq 0 ]] && [[ -d "${REPO_ROOT}/node_modules" ]]; then
 		paths+=(node_modules)
 	fi
@@ -86,10 +110,12 @@ build_server_archive() {
 
 	if [[ "$DRY_RUN" -eq 1 ]]; then
 		echo "[dry-run] would create $ARCHIVE_PATH"
-		echo "[dry-run] paths: ${paths[*]} nm_excl=$ZIP_EXCLUDE_NODE_MODULES"
+		echo "[dry-run] would write BUILD_STAMP=$STAMP"
+		echo "[dry-run] paths: ${paths[*]} nm_excl=$ZIP_EXCLUDE_NODE_MODULES bump_pkg=$BUMP_PACKAGE"
 		return 0
 	fi
 	rm -f "$ARCHIVE_PATH"
+	echo "==> BUILD_STAMP ${STAMP}"
 	echo "==> Server tarball → $ARCHIVE_PATH"
 	tar "${tar_args[@]}"
 	archive_common_print_size_hints "$ARCHIVE_PATH"
@@ -101,7 +127,6 @@ NM_NOTE="Includes **node_modules**."
 [[ "$ZIP_EXCLUDE_NODE_MODULES" -eq 1 ]] && NM_NOTE="**node_modules** omitted — run \`npm ci\` after extract."
 
 NOTES="$(mktemp)"
-trap 'rm -f "$NOTES"' EXIT
 
 cat >"$NOTES" <<EOF
 ## HighAsCG server (${STAMP})
@@ -113,6 +138,8 @@ Unified playout stack for sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`): API 
 | \`${ARCHIVE_BASENAME}.tar.gz\` | \`mkdir -p <mount>/drop-update && tar -xzf … -C <mount>/drop-update\` |
 
 ${NM_NOTE}
+
+**Version:** \`BUILD_STAMP\` and \`package.json\` \`version\` = \`${STAMP}\`.
 
 **Start:** \`node index.js\` — **\`http://<playout-ip>:4200/\`** (API + UI). \`HIGHASCG_HEADLESS=true\` is API-only debug.
 

@@ -22,6 +22,7 @@ import {
 } from './scenes-preview-look-stack.js'
 import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot } from './scenes-preview-snapshot.js'
+import { syncPreviewLiveToServer } from './scene-live-sync.js'
 
 /**
  * @param {object} opts
@@ -350,6 +351,13 @@ export async function pushSceneToPreviewImpl(opts) {
 
 		for (const mIdx of pendingPreviewMainIds) {
 			sceneState.setPreviewSceneId(sceneId, mIdx)
+		}
+		for (const mIdx of pendingPreviewMainIds) {
+			try {
+				await syncPreviewLiveToServer(sceneId, mIdx, { sceneState, stateStore })
+			} catch (e) {
+				console.warn('Preview live sync failed:', e?.message || e)
+			}
 		}
 
 		const nextLastPreviewLayers = new Set(

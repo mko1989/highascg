@@ -123,11 +123,21 @@ function seedProjectHardwareFromLocalProfile(ctx, existing) {
  * @returns {boolean}
  */
 function applyLocalMachineProfileToConfig(ctx, hardwareConfig) {
-	const local =
-		(hardwareConfig && typeof hardwareConfig === 'object' ? pickLocalSlices(hardwareConfig) : null) ||
-		loadLocalMachineProfile() ||
-		buildMachineProfileFromCtx(ctx)
-	if (!local) return false
+	const fromArg =
+		hardwareConfig && typeof hardwareConfig === 'object' ? pickLocalSlices(hardwareConfig) : null
+	const fromDisk = loadLocalMachineProfile()
+	const fromCtx = buildMachineProfileFromCtx(ctx)
+
+	// Baseline from project/disk; live ctx wins for device-hardware slices (cables, Caspar server, GPU).
+	const local = { version: 2, ...(fromArg || {}), ...(fromDisk || {}) }
+	for (const slice of DEVICE_HARDWARE_SLICES) {
+		if (fromCtx?.[slice] !== undefined) local[slice] = fromCtx[slice]
+	}
+	for (const slice of SHOW_ROUTING_HARDWARE_SLICES) {
+		const v = fromDisk?.[slice] ?? fromArg?.[slice] ?? fromCtx?.[slice]
+		if (v !== undefined) local[slice] = v
+	}
+	if (!fromArg && !fromDisk && !fromCtx) return false
 
 	const deviceOnly = { version: local.version || 2 }
 	for (const slice of DEVICE_HARDWARE_SLICES) {
@@ -174,6 +184,53 @@ async function regenerateFollowerCasparFromDeviceView(ctx) {
 	return { ok: res.status < 300 && body.ok !== false, body }
 }
 
+/** @type {NodeJS.Timeout | null} */
+let followerCasparSyncTimer = null
+
+/**
+ * Follower: materialize Device View output wiring into casparServer + regenerate casparcg.config.
+ * @param {object} ctx
+ */
+async function syncFollowerDeviceViewToCaspar(ctx) {
+	if (!isFollowerRole(ctx)) return { ok: true, skipped: true }
+
+	const { applyDestinationOutputEdgesToCasparConfig } = require('../api/device-view-apply')
+	const { repairFollowerDecklinkGraph } = require('./follower-caspar-output')
+	const plan = { actions: [], warnings: [] }
+	applyDestinationOutputEdgesToCasparConfig(ctx, plan)
+	repairFollowerDecklinkGraph(ctx)
+
+	if (typeof ctx.log === 'function') {
+		ctx.log('info', '[replication] Follower Device View output wiring — regenerating casparcg.config')
+	}
+	const regen = await regenerateFollowerCasparFromDeviceView(ctx)
+	try {
+		const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+		notifyReplicationStatusChanged(ctx, 'follower-caspar-regen')
+	} catch {
+		/* optional */
+	}
+	return regen
+}
+
+/**
+ * Debounced follower Caspar regen after Device View cable / connector edits.
+ * @param {object} ctx
+ * @param {number} [delayMs]
+ */
+function scheduleFollowerDeviceViewCasparSync(ctx, delayMs = 1500) {
+	if (!isFollowerRole(ctx)) return
+	if (followerCasparSyncTimer) clearTimeout(followerCasparSyncTimer)
+	followerCasparSyncTimer = setTimeout(() => {
+		followerCasparSyncTimer = null
+		syncFollowerDeviceViewToCaspar(ctx).catch((e) => {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', '[replication] follower device-view caspar sync: ' + (e?.message || e))
+			}
+		})
+	}, delayMs)
+}
+
 module.exports = {
 	LOCAL_PROFILE_PATH,
 	isFollowerRole,
@@ -186,4 +243,6 @@ module.exports = {
 	mergeLocalHardwareIntoProject,
 	applyLocalMachineProfileToConfig,
 	regenerateFollowerCasparFromDeviceView,
+	syncFollowerDeviceViewToCaspar,
+	scheduleFollowerDeviceViewCasparSync,
 }

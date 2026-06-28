@@ -2,6 +2,7 @@
  * DeckLink fill + key helpers (inspector + cable overlay).
  */
 import { CASPAR_HOST } from '../components/device-view-helpers.js'
+import { isDecklinkIoOut } from './decklink-io-direction.js'
 
 const DECKLINK_KINDS = new Set(['decklink_io', 'decklink_out', 'decklink_in'])
 
@@ -42,6 +43,17 @@ function liveKeyFillForBinding(lastPayload, binding) {
 	return row?.keyFill ?? null
 }
 
+/** Physical fill device index for a program/multiview output binding (from live Caspar config). */
+function liveFillDeviceForBinding(lastPayload, binding) {
+	if (!binding || !lastPayload) return 0
+	if (binding.type === 'multiview') {
+		return parseInt(String(lastPayload?.live?.decklink?.multiviewDevice ?? '0'), 10) || 0
+	}
+	const outs = Array.isArray(lastPayload?.live?.decklink?.screenOutputs) ? lastPayload.live.decklink.screenOutputs : []
+	const row = outs.find((o) => Number(o?.screen) === binding.screen)
+	return parseInt(String(row?.device ?? '0'), 10) || 0
+}
+
 export function collectDecklinkDeviceIndices(lastPayload, { exclude = 0 } = {}) {
 	const seen = new Set()
 	const add = (n) => {
@@ -69,18 +81,33 @@ export function resolveDecklinkKeyFillState(conn, lastPayload) {
 	const caspar = conn?.caspar && typeof conn.caspar === 'object' ? conn.caspar : {}
 	const fillDevice = parseInt(String(conn?.externalRef ?? '0'), 10) || 0
 	const graphKeyDev = parseInt(String(caspar.decklinkKeyDevice ?? '0'), 10) || 0
-	const graphKeyFill = caspar.decklinkKeyFill === true || caspar.decklinkKeyFill === 'true'
+	const graphKeyFillOff = caspar.decklinkKeyFill === false || caspar.decklinkKeyFill === 'false'
+	const graphKeyFillOn =
+		caspar.decklinkKeyFill === true ||
+		caspar.decklinkKeyFill === 'true' ||
+		(!graphKeyFillOff && graphKeyDev > 0)
 	const graphKeyer = String(caspar.decklinkKeyer || '').trim()
 
 	const binding = resolveDecklinkOutputBinding(conn)
 	const liveKf = liveKeyFillForBinding(lastPayload, binding)
-	const liveEnabled = liveKf?.enabled === true
 	const liveKeyDev = parseInt(String(liveKf?.keyDevice ?? '0'), 10) || 0
 	const liveKeyer = String(liveKf?.keyer || '').trim()
+	const liveFillDevice = liveFillDeviceForBinding(lastPayload, binding)
+	const isThisFillPort = fillDevice > 0 && liveFillDevice > 0 && fillDevice === liveFillDevice
+	// Key-only SDI port for another fill — never show Fill+key as enabled here.
+	const isThisKeyPort = fillDevice > 0 && liveKf?.enabled === true && liveKeyDev === fillDevice && !isThisFillPort
 
-	const keyFillEnabled = graphKeyFill || graphKeyDev > 0 || liveEnabled || liveKeyDev > 0
-	let keyDevice = graphKeyDev > 0 ? graphKeyDev : liveKeyDev
-	if (!keyFillEnabled) keyDevice = 0
+	if (graphKeyFillOff) {
+		return { fillDevice, keyFillEnabled: false, keyDevice: 0, keyer: graphKeyer || 'internal', binding }
+	}
+
+	// Per-connector graph state, or live config only when this port is the bound fill device.
+	const keyFillEnabled =
+		!isThisKeyPort && (graphKeyFillOn || (liveKf?.enabled === true && isThisFillPort))
+	let keyDevice = 0
+	if (keyFillEnabled) {
+		keyDevice = graphKeyDev > 0 ? graphKeyDev : liveKeyDev
+	}
 	const keyer = graphKeyer || liveKeyer || 'internal'
 
 	return { fillDevice, keyFillEnabled, keyDevice, keyer, binding }
@@ -93,7 +120,7 @@ export function collectDecklinkKeyFillVirtualEdges(payload) {
 	const all = [...(payload?.graph?.connectors || []), ...(payload?.suggested?.connectors || [])]
 	for (const conn of all) {
 		if (conn?.deviceId !== CASPAR_HOST) continue
-		if (conn.kind === 'decklink_io' && String(conn?.caspar?.ioDirection || 'in').toLowerCase() !== 'out') continue
+		if (conn.kind === 'decklink_io' && !isDecklinkIoOut(conn)) continue
 		if (conn.kind !== 'decklink_io' && conn.kind !== 'decklink_out') continue
 
 		const { keyFillEnabled, keyDevice, fillDevice } = resolveDecklinkKeyFillState(conn, payload)

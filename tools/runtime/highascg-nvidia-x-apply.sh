@@ -39,17 +39,17 @@ nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true
 _patch_metamode() {
 	_raw_meta=$(nvidia-settings -q CurrentMetaMode -t 2>/dev/null) || _raw_meta=""
 	[ -n "$_raw_meta" ] || return 1
+	_meta_body="$_raw_meta"
+	if [[ "$_raw_meta" == *" :: "* ]]; then
+		_meta_body="${_raw_meta#* :: }"
+	fi
 	command -v python3 >/dev/null 2>&1 || return 1
-	_new_meta=$(printf '%s' "$_raw_meta" | python3 <<'PY'
+	# Assign only the DPY section — including id=/source= prefix drops outputs (NVIDIA forum).
+	_new_meta=$(python3 - "$_meta_body" <<'PY'
 import re, sys
-raw = sys.stdin.read().strip()
-if not raw:
+meta = sys.argv[1].strip()
+if not meta:
     sys.exit(1)
-prefix = ""
-meta = raw
-if " :: " in raw:
-    prefix, meta = raw.split(" :: ", 1)
-    prefix += " :: "
 
 def patch_block(m):
     body = m.group(1)
@@ -66,15 +66,36 @@ def patch_block(m):
     return "{" + body + "}"
 
 patched = re.sub(r"\{([^}]*)\}", patch_block, meta)
-print(prefix + patched)
+print(patched)
 PY
 ) || return 1
-	if [ -z "$_new_meta" ] || [ "$_new_meta" = "$_raw_meta" ]; then
-		echo "$_raw_meta" | grep -q 'ForceCompositionPipeline=On'
+	if [ -z "$_new_meta" ]; then
+		return 1
+	fi
+	if [ "$_new_meta" = "$_meta_body" ]; then
+		python3 - "$_meta_body" <<'PY'
+import re, sys
+blocks = re.findall(r"\{([^}]*)\}", sys.argv[1])
+if not blocks:
+    sys.exit(1)
+sys.exit(0 if all("ForceCompositionPipeline=On" in b for b in blocks) else 1)
+PY
 		return $?
 	fi
 	nvidia-settings --assign "CurrentMetaMode=${_new_meta}" 2>/dev/null || return 1
-	return 0
+	_verify=$(nvidia-settings -q CurrentMetaMode -t 2>/dev/null) || return 1
+	_verify_body="$_verify"
+	if [[ "$_verify" == *" :: "* ]]; then
+		_verify_body="${_verify#* :: }"
+	fi
+	python3 - "$_verify_body" <<'PY'
+import re, sys
+blocks = re.findall(r"\{([^}]*)\}", sys.argv[1])
+if not blocks:
+    sys.exit(1)
+sys.exit(0 if all("ForceCompositionPipeline=On" in b for b in blocks) else 1)
+PY
+	return $?
 }
 
 _try=1
@@ -90,4 +111,5 @@ _try=1
 	_try=$((_try + 1))
 done
 
-exit 0
+echo "highascg-nvidia-x-apply: ForceCompositionPipeline not applied after ${_retries} tries" >&2
+exit 1

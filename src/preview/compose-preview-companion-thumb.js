@@ -83,6 +83,44 @@ function ffmpegBinary(config) {
 	return config?.streaming?.ffmpeg_path || process.env.FFMPEG_PATH || 'ffmpeg'
 }
 
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Wait until Caspar/ffmpeg has finished writing the preview JPEG (image2 -update 1).
+ * @param {string} filePath
+ * @param {number} [minSize]
+ * @returns {Promise<import('fs').Stats | null>}
+ */
+async function waitForStablePreviewFile(filePath, minSize = 256) {
+	let prev = null
+	for (let i = 0; i < 8; i++) {
+		let st
+		try {
+			st = await fs.promises.stat(filePath)
+		} catch {
+			return null
+		}
+		if (st.size < minSize) {
+			await sleep(30)
+			continue
+		}
+		if (prev && prev.size === st.size && prev.mtimeMs === st.mtimeMs) {
+			await sleep(40)
+			try {
+				const again = await fs.promises.stat(filePath)
+				if (again.size === st.size && again.mtimeMs === st.mtimeMs) return again
+			} catch {
+				return null
+			}
+		}
+		prev = { size: st.size, mtimeMs: st.mtimeMs }
+		await sleep(30)
+	}
+	return prev ? fs.promises.stat(filePath).catch(() => null) : null
+}
+
 /**
  * @param {object} config
  * @param {string} sourcePath
@@ -93,6 +131,7 @@ function resizePreviewToPngBuffer(config, sourcePath, size) {
 	const vf = `scale=${size}:${size}:force_original_aspect_ratio=decrease,pad=${size}:${size}:(ow-iw)/2:(oh-ih)/2`
 	return new Promise((resolve) => {
 		const chunks = []
+		const errChunks = []
 		const proc = spawn(
 			ffmpegBinary(config),
 			[
@@ -115,9 +154,13 @@ function resizePreviewToPngBuffer(config, sourcePath, size) {
 			{ stdio: ['ignore', 'pipe', 'pipe'] },
 		)
 		proc.stdout.on('data', (chunk) => chunks.push(chunk))
+		proc.stderr.on('data', (chunk) => errChunks.push(chunk))
 		proc.on('close', (code) => {
 			if (code === 0 && chunks.length) resolve(Buffer.concat(chunks))
-			else resolve(null)
+			else {
+				if (errChunks.length) proc._stderr = Buffer.concat(errChunks).toString('utf8').trim()
+				resolve(null)
+			}
 		})
 		proc.on('error', () => resolve(null))
 	})
@@ -152,19 +195,26 @@ function onComposePreviewUpdated(ctx, channel, sourceMtimeMs) {
 		if (!source?.path) return
 		let st
 		try {
-			st = await fs.promises.stat(source.path)
+			st = await waitForStablePreviewFile(source.path)
 		} catch {
 			return
 		}
-		if (st.size < 256) return
+		if (!st || st.size < 256) return
 		const mtimeMs = sourceMtimeMs ?? st.mtimeMs
 		const prevMtime = _lastSourceMtime.get(ch) || 0
 		if (mtimeMs <= prevMtime) return
 
-		const png = await resizePreviewToPngBuffer(cfg, source.path, companionThumbSize(cfg))
+		let png = await resizePreviewToPngBuffer(cfg, source.path, companionThumbSize(cfg))
+		if (!png || png.length < 64) {
+			await sleep(60)
+			png = await resizePreviewToPngBuffer(cfg, source.path, companionThumbSize(cfg))
+		}
 		if (!png || png.length < 64) {
 			if (typeof ctx.log === 'function') {
-				ctx.log('warn', `[companion-preview] ch${ch}: ffmpeg resize failed (${source.path})`)
+				ctx.log(
+					'warn',
+					`[companion-preview] ch${ch}: ffmpeg resize failed (${source.path}, format=${source.format || 'unknown'})`,
+				)
 			}
 			return
 		}

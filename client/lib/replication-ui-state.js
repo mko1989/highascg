@@ -48,10 +48,10 @@ function emit(status) {
 function phaseFromStatus(status) {
 	if (!status) return 'standalone'
 	if (status.enabled && status.role === 'follower') {
-		return status.peerReachable ? 'paired-follower' : 'connecting'
+		return status.peerLinkReady ?? status.peerReachable ? 'paired-follower' : 'connecting'
 	}
 	if (status.enabled && status.role === 'leader') {
-		return status.peerReachable ? 'paired-leader' : 'connecting'
+		return status.peerLinkReady ?? status.peerReachable ? 'paired-leader' : 'connecting'
 	}
 	if (status.leaderAvailable) return 'leader-available'
 	return 'standalone'
@@ -108,9 +108,19 @@ export function refreshReplicationStatusSoon() {
 	void pollOnce()
 }
 
-export function initReplicationUiState() {
+/**
+ * Subscribe to server replication events over the operator WebSocket.
+ * @param {import('./ws-client.js').WsClient | null | undefined} ws
+ */
+export function bindReplicationWsPush(ws) {
+	if (!ws?.on) return
+	ws.on('replication_status', () => refreshReplicationStatusSoon())
+}
+
+export function initReplicationUiState(ws) {
 	if (_pollTimer) clearInterval(_pollTimer)
 	_skipTransitionToast = true
+	bindReplicationWsPush(ws)
 	void pollOnce()
 	_pollTimer = setInterval(() => void pollOnce(), POLL_MS)
 }
@@ -119,5 +129,35 @@ export function stopReplicationUiState() {
 	if (_pollTimer) {
 		clearInterval(_pollTimer)
 		_pollTimer = null
+	}
+}
+
+const INSPECTOR_MODE_KEY = 'highascg.replication.inspectorMode'
+
+/**
+ * Operator intent in Device View hot backup mode dropdown (survives inspector re-render on Apply/load).
+ * @returns {'standalone'|'leader'|'follower'|null}
+ */
+export function getReplicationInspectorMode() {
+	try {
+		const v = sessionStorage.getItem(INSPECTOR_MODE_KEY)
+		return v === 'follower' || v === 'leader' || v === 'standalone' ? v : null
+	} catch {
+		return null
+	}
+}
+
+/**
+ * @param {'standalone'|'leader'|'follower'|null|undefined} mode
+ */
+export function setReplicationInspectorMode(mode) {
+	try {
+		if (mode === 'follower' || mode === 'leader' || mode === 'standalone') {
+			sessionStorage.setItem(INSPECTOR_MODE_KEY, mode)
+		} else {
+			sessionStorage.removeItem(INSPECTOR_MODE_KEY)
+		}
+	} catch {
+		/* ignore */
 	}
 }

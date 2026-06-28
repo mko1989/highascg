@@ -12,6 +12,7 @@ const { destinationsFromConfig } = require('../config/screen-destinations')
 const { probeDecklinkHardware, probeDecklinkFromCasparLog } = require('../utils/decklink-enum')
 const { readDecklinkKeyFillSettings } = require('../config/decklink-key-fill')
 const { listDecklinkOutputStatuses } = require('../config/decklink-output-resolve')
+const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { listPortAudioDevices } = require('../audio/audio-devices')
 const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
@@ -68,8 +69,18 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		const device = parseInt(String(cs[`decklink_input_${i}_device`] ?? 0), 10) || 0
 		const resolvedDevice = resolveDecklinkInputDeviceIndex(ctx.config || {}, i)
 		const inputEntry = (routeMap.inputChannels || []).find((e) => e.kind === 'decklink' && Number(e.slot) === i)
-		const ioRaw = String(cs[`decklink_input_${i}_direction`] || 'in').toLowerCase()
-		const ioDirection = ioRaw === 'out' ? 'out' : 'in'
+		const graphConn = graphConnectors.find((c) => {
+			if (c?.kind !== 'decklink_io') return false
+			const slotFromIndex = (parseInt(String(c.index ?? -1), 10) || 0) + 1
+			const dev = parseInt(String(c.externalRef ?? 0), 10) || 0
+			return slotFromIndex === i || dev === resolvedDevice || dev === device
+		})
+		let ioDirection = DECKLINK_IO_UNASSIGNED
+		if (graphConn?.caspar) {
+			ioDirection = normalizeDecklinkIoDirection(graphConn.caspar)
+		} else if (device > 0 || resolvedDevice > 0) {
+			ioDirection = normalizeDecklinkIoDirection({ ioDirection: cs[`decklink_input_${i}_direction`] })
+		}
 		const fail = (rt?.failed || []).find(x => Number(x?.layer) === i); let state = 'ready', message = ''
 		if (!rt || rt.enabled === false) { state = 'disabled'; message = rt?.reason || 'disabled' }
 		else if ((rt.skippedConflicts || []).find(x => Number(x?.input) === i)) { state = 'conflict_output_device'; message = 'conflict' }

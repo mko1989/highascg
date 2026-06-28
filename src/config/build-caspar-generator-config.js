@@ -8,6 +8,13 @@ const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')
 const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-mapping')
+const { isDecklinkIoOut } = require('./decklink-io-direction')
+const {
+	reachesGpuFromSource,
+	createDestinationWiringContext,
+	destinationSourceIds,
+	applyMultiviewOutputOverridesFromCabling,
+} = require('./device-graph-destination-wiring')
 const {
 	parseDecklinkDeviceIndex,
 	readDecklinkKeyFillFromConnectorCaspar,
@@ -162,7 +169,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		const incomingEdge = edges.find((e) => e.sinkId === c.id)
 		if (!incomingEdge) {
 			// Fallback to legacy binding if no cable exists
-			if (c.kind === 'decklink_io' && String(c.caspar?.ioDirection || 'in').toLowerCase() !== 'out') return
+			if (c.kind === 'decklink_io' && !isDecklinkIoOut(c)) return
 			const binding = c.caspar?.outputBinding
 			if (binding?.type === 'screen') {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
@@ -249,65 +256,17 @@ function applyMultiviewDestinationOverrides(merged, appConfig) {
 }
 
 function applyScreenConsumerOverridesFromCabling(merged, appConfig) {
-	const g = appConfig?.deviceGraph
 	const destinations = destinationsFromConfig(appConfig || {})
-	if (!g || !Array.isArray(g.connectors) || !destinations.length) return
-
-	const byId = new Map(g.connectors.map((c) => [String(c?.id || ''), c]))
-	const edges = Array.isArray(g.edges) ? g.edges : []
-	const outgoing = new Map()
-	for (const e of edges) {
-		const src = String(e?.sourceId || '')
-		if (!src) continue
-		if (!outgoing.has(src)) outgoing.set(src, [])
-		outgoing.get(src).push(String(e?.sinkId || ''))
-	}
-
-	function reachesGpuFromSource(sourceId) {
-		const queue = [String(sourceId || '')]
-		const seen = new Set()
-		while (queue.length) {
-			const cur = queue.shift()
-			if (!cur || seen.has(cur)) continue
-			seen.add(cur)
-			const next = outgoing.get(cur) || []
-			for (const sinkId of next) {
-				const sink = byId.get(String(sinkId || ''))
-				if (!sink) continue
-				if (sink.kind === 'gpu_out') return true
-				if (sink.kind === 'pixel_map_in') {
-					const nodeId = String(sink.deviceId || '')
-					const nodeOut = g.connectors.filter((c) => String(c?.deviceId || '') === nodeId && c?.kind === 'pixel_map_out')
-					for (const no of nodeOut) queue.push(String(no?.id || ''))
-				}
-			}
-		}
-		return false
-	}
-
-	function destinationSourceIds(dest, idx) {
-		const out = new Set()
-		const did = String(dest?.id || '').trim()
-		if (did) out.add(`dst_in_${did}`)
-		const n = idx + 1
-		out.add(`dst_ch${n}`)
-		if (String(dest?.mode || '') === 'multiview') out.add(`dst_mv${n}`)
-		for (const c of g.connectors || []) {
-			if (String(c?.kind || '') !== 'destination_in') continue
-			const ref = String(c?.externalRef || '').trim()
-			const cid = String(c?.id || '').trim()
-			if (did && ref === did && cid) out.add(cid)
-		}
-		return [...out].filter(Boolean)
-	}
+	const ctx = createDestinationWiringContext(appConfig)
+	if (!ctx.g.connectors?.length || !destinations.length) return
 
 	for (const dest of destinations) {
 		const mode = String(dest?.mode || 'pgm_prv')
 		if (mode === 'multiview' || mode === 'stream') continue
 		const idx = Math.max(0, parseInt(String(dest?.mainScreenIndex ?? 0), 10) || 0)
 		const n = idx + 1
-		const srcCandidates = destinationSourceIds(dest, idx)
-		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src))
+		const srcCandidates = destinationSourceIds(dest, idx, ctx)
+		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src, ctx))
 	}
 }
 
@@ -505,6 +464,7 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	applyPixelMappingProgramScreens(merged, appConfig || {})
 	applyDecklinkOverridesToScreens(merged, appConfig || {})
 	applyScreenConsumerOverridesFromCabling(merged, appConfig || {})
+	applyMultiviewOutputOverridesFromCabling(merged, appConfig || {})
 	reconcileDecklinkScreenConsumerFlags(merged)
 	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})

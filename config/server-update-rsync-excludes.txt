@@ -1,10 +1,6 @@
-# rsync excludes: exfat/drop-update/ → ~/highascg (server-only drop)
-# UI runs on operator workstations (Electron) — never overwritten from drop-update/
+# rsync excludes: exfat drop-update/ → ~/highascg (server drop, WO-52)
+# dist-web/ IS deployed from the drop (unified playout UI on :4200)
 client/
-dist-web/
-audio_testing/
-for_client/
-From_client/
 node_modules/
 .git/
 media/

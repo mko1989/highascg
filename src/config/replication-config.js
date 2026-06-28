@@ -25,6 +25,7 @@ const { replicationDefaults } = require('./defaults-replication')
  * @property {number} scheduledApplyLeadMs
  * @property {'ct-ss'|'immediate'} syncClock
  * @property {string} syncthingMediaFolderId
+ * @property {'rsync'|'syncthing'} mediaTransport
  * @property {'live-state'|'amcp-fanout'} mirrorTransport
  * @property {{ host: string, port: number, connectTimeoutMs?: number }} peerCaspar
  * @property {{ enabled?: boolean, confirmLooks?: boolean, maxUnconfirmed?: number }} amcpFanout
@@ -65,6 +66,7 @@ function normalizeReplicationConfig(raw) {
 		),
 		syncClock: String(o.syncClock || d.syncClock) === 'immediate' ? 'immediate' : 'ct-ss',
 		syncthingMediaFolderId: String(o.syncthingMediaFolderId || d.syncthingMediaFolderId).trim() || d.syncthingMediaFolderId,
+		mediaTransport: String(o.mediaTransport || d.mediaTransport) === 'syncthing' ? 'syncthing' : 'rsync',
 		mirrorTransport: String(o.mirrorTransport || d.mirrorTransport) === 'amcp-fanout' ? 'amcp-fanout' : 'live-state',
 		peerCaspar: (() => {
 			const pc = o.peerCaspar && typeof o.peerCaspar === 'object' ? /** @type {Record<string, unknown>} */ (o.peerCaspar) : {}
@@ -91,13 +93,13 @@ function normalizeReplicationConfig(raw) {
 			const ps = o.playheadSync && typeof o.playheadSync === 'object' ? /** @type {Record<string, unknown>} */ (o.playheadSync) : {}
 			const dps = d.playheadSync || {}
 			return {
-				enabled: ps.enabled !== false,
+				enabled: ps.enabled === true,
 				softThresholdMs: Math.max(20, parseInt(String(ps.softThresholdMs ?? dps.softThresholdMs ?? 150), 10) || 150),
 				hardThresholdMs: Math.max(500, parseInt(String(ps.hardThresholdMs ?? dps.hardThresholdMs ?? 2000), 10) || 2000),
-				sampleIntervalMs: Math.max(250, parseInt(String(ps.sampleIntervalMs ?? dps.sampleIntervalMs ?? 500), 10) || 500),
+				sampleIntervalMs: Math.max(1000, parseInt(String(ps.sampleIntervalMs ?? dps.sampleIntervalMs ?? 2000), 10) || 2000),
 				minCorrectionIntervalMs: Math.max(
 					1000,
-					parseInt(String(ps.minCorrectionIntervalMs ?? dps.minCorrectionIntervalMs ?? 5000), 10) || 5000,
+					parseInt(String(ps.minCorrectionIntervalMs ?? dps.minCorrectionIntervalMs ?? 2000), 10) || 2000,
 				),
 				maxCorrectionsPerMinute: Math.max(
 					1,

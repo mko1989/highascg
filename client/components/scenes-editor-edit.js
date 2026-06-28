@@ -7,6 +7,13 @@ import { appendLayerPresetBar, appendSceneLayerStripRows } from './scene-layer-r
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 
+function commitEditLookName(input, sceneId, sceneState) {
+	if (!(input instanceof HTMLInputElement) || !sceneId) return
+	sceneState.setSceneName(sceneId, input.value)
+	const u = sceneState.getScene(sceneId)
+	if (u && input.value !== u.name) input.value = u.name
+}
+
 function mainIdxForScene(scene, sceneState) {
 	const scope = String(scene?.mainScope || 'all')
 	if (scope !== 'all') {
@@ -17,7 +24,7 @@ function mainIdxForScene(scene, sceneState) {
 }
 
 export function renderEdit(ctx) {
-	const { mainHost, sceneState, stateStore, getChannelMap = () => ({}), takeSceneToProgram, clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose, selectedLayerIndexRef, showScenesToast } = ctx
+	const { mainHost, sceneState, stateStore, getChannelMap = () => ({}), takeSceneToProgram, clearLastPreviewLayers, onExitEdit, dispatchLayerSelect, schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose, selectedLayerIndexRef, showScenesToast } = ctx
 	const id = sceneState.editingSceneId; const scene = id ? sceneState.getScene(id) : null
 	if (!scene) { sceneState.setEditingScene(null); return }
 
@@ -38,8 +45,30 @@ export function renderEdit(ctx) {
 	bar.querySelector('#scenes-take-cut').addEventListener('click', () => {
 		void takeSceneToProgram(scene.id, true)
 	})
-	bar.querySelector('#scenes-back').addEventListener('click', () => { sceneState.setEditingScene(null); selectedLayerIndexRef.current = null; dispatchLayerSelect(null); clearLastPreviewLayers() })
-	bar.querySelector('#scenes-name').addEventListener('change', e => sceneState.setSceneName(scene.id, e.target.value))
+	bar.querySelector('#scenes-back').addEventListener('click', () => {
+		void (async () => {
+			if (typeof onExitEdit === 'function') {
+				await onExitEdit()
+			} else {
+				sceneState.setEditingScene(null)
+				selectedLayerIndexRef.current = null
+				dispatchLayerSelect(null)
+				clearLastPreviewLayers()
+			}
+		})()
+	})
+	bar.querySelector('#scenes-name').addEventListener('blur', (e) =>
+		commitEditLookName(e.target, scene.id, sceneState),
+	)
+	bar.querySelector('#scenes-name').addEventListener('change', (e) =>
+		commitEditLookName(e.target, scene.id, sceneState),
+	)
+	bar.querySelector('#scenes-name').addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			e.target.blur()
+		}
+	})
 	bar.querySelector('#scenes-add-layer').addEventListener('click', () => sceneState.addLayer(scene.id))
 
 	const body = document.createElement('div'); body.className = 'scenes-edit-body scenes-edit-body--stacked'

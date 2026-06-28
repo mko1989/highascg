@@ -186,6 +186,12 @@ async function runOscPlaybackInfoSupplementOnce(self) {
 function startOscPlaybackInfoSupplement(self) {
 	clearOscPlaybackInfoSupplement()
 	if (!playbackTracker.isOscPlaybackActive(self)) return
+	try {
+		const { isAmcpFanoutReceiveBox } = require('../replication/amcp-fanout')
+		if (isAmcpFanoutReceiveBox(self)) return
+	} catch {
+		/* ignore */
+	}
 	const ms = resolveOscInfoSupplementMs(self)
 	if (ms === 0) return
 	if (!Number.isFinite(ms) || ms < 500) return

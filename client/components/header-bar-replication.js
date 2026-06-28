@@ -31,7 +31,7 @@ export function initReplicationBadge(container) {
 		const role = String(status.role || 'standalone')
 		const enabled = !!status.enabled
 		const leaderAvail = !!status.leaderAvailable
-		const peerOk = !!status.peerReachable
+		const peerOk = !!(status.peerLinkReady ?? status.peerReachable)
 
 		let letter = ''
 		let mode = 'hidden'

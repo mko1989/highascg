@@ -127,6 +127,7 @@ export function buildSettingsPayload(modal) {
 		},
 		projectScopedMedia: {
 			enabled: !!(modal.querySelector('#set-project-scoped-media') || {}).checked,
+			location: modal.querySelector('#set-project-media-location')?.value ?? prevAll.projectScopedMedia?.location ?? 'internal',
 		},
 		streamingChannel: (() => {
 			const prevSch = prevAll.streamingChannel || {}
@@ -169,6 +170,11 @@ export function hydrateSettings(modal, cfg) {
 	const usbEn = modal.querySelector('#set-usb-enabled'); if (usbEn) usbEn.checked = u.enabled !== false
 	const psm = cfg.projectScopedMedia || {}
 	const psmEl = modal.querySelector('#set-project-scoped-media'); if (psmEl) psmEl.checked = psm.enabled !== false
+	const psmLoc = modal.querySelector('#set-project-media-location')
+	if (psmLoc) {
+		const loc = String(psm.location || 'internal').toLowerCase()
+		psmLoc.value = loc === 'exfat' || loc === 'bridge' ? loc : 'internal'
+	}
 	const usbSub = modal.querySelector('#set-usb-subfolder'); if (usbSub) usbSub.value = u.defaultSubfolder || ''
 	const usbPol = modal.querySelector('#set-usb-policy'); if (usbPol) usbPol.value = ['skip', 'overwrite', 'rename'].includes(u.overwritePolicy) ? u.overwritePolicy : 'rename'
 	const usbVer = modal.querySelector('#set-usb-verify'); if (usbVer) usbVer.checked = !!u.verifyHash

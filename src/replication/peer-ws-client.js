@@ -2,7 +2,6 @@
 
 const WebSocket = require('ws')
 const { getReplicationConfig } = require('../config/replication-config')
-const { handlePeerWsMessage } = require('./replication-service')
 
 /**
  * Follower maintains outbound WS to leader for live-state stream.
@@ -16,6 +15,7 @@ function startPeerWsClient(ctx, runtime) {
 	let reconnectTimer = null
 
 	function stop() {
+		runtime.peerWsConnected = false
 		if (reconnectTimer) {
 			clearTimeout(reconnectTimer)
 			reconnectTimer = null
@@ -54,6 +54,7 @@ function startPeerWsClient(ctx, runtime) {
 		}
 
 		ws.on('open', () => {
+			runtime.peerWsConnected = true
 			try {
 				const { resetMirrorApplyDedup } = require('./mirror-apply')
 				resetMirrorApplyDedup()
@@ -61,18 +62,24 @@ function startPeerWsClient(ctx, runtime) {
 				/* ignore */
 			}
 			if (typeof ctx.log === 'function') ctx.log('info', '[replication] peer live-state ws connected')
+			const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+			notifyReplicationStatusChanged(ctx, 'peer-ws-connected')
 		})
 		ws.on('message', (raw) => {
 			try {
 				const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw)
 				const msg = JSON.parse(text)
+				const { handlePeerWsMessage } = require('./replication-service')
 				void handlePeerWsMessage(ctx, msg)
 			} catch {
 				/* ignore */
 			}
 		})
 		ws.on('close', () => {
+			runtime.peerWsConnected = false
 			ws = null
+			const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+			notifyReplicationStatusChanged(ctx, 'peer-ws-disconnected')
 			scheduleReconnect()
 		})
 		ws.on('error', () => {

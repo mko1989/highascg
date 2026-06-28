@@ -11,7 +11,12 @@ import {
 } from '../lib/device-view-gpu-port-list.js'
 import { resolveGpuScreenNumber } from './device-view-inspector-gpu-resolve.js'
 import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
-import { STANDARD_VIDEO_MODES, casparVideoModeToOsModeAndRate, CASPAR_VIDEO_MODE_SPECS } from './device-view-destinations-inspector.js'
+import {
+	STANDARD_VIDEO_MODES,
+	casparVideoModeToOsModeAndRate,
+	CASPAR_VIDEO_MODE_SPECS,
+	resolveGpuInspectorVideoMode,
+} from './device-view-destinations-inspector.js'
 import { resolveDefaultVideoMode } from '../lib/project-fps.js'
 
 function resolveMainScreenCount(cs, currentSettings) {
@@ -135,68 +140,16 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		fps: Math.max(1, parseFloat(String(source.fps ?? 50)) || 50)
 	} : null
 
-	const currentMode = String(cs[keyMode] || currentSettings?.casparServer?.[keyMode] || conn?.caspar?.mode || projectMode)
-	const isStandardMode = STANDARD_VIDEO_MODES.includes(currentMode)
-	const modeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
-	modeSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`
-	modeSel.value = isStandardMode ? currentMode : 'custom'
+	const physicalPortRow = (() => {
+		const canonicalId = gpuPhysicalPortCableId(conn?.id || '')
+		const ports = Array.isArray(lastPayload?.live?.gpu?.physicalMap?.ports) ? lastPayload.live.gpu.physicalMap.ports : []
+		return ports.find((p) => String(p?.physicalPortId || '').trim() === canonicalId) || null
+	})()
 
-	const parsedCurrentCustom = currentMode.match(/^(\d+)\s*x\s*(\d+)$/i)
 	const readDim = (suffix, fallback) => {
 		const k = `screen_${screenN}_${suffix}`
 		return cs[k] ?? currentSettings?.casparServer?.[k] ?? fallback
 	}
-	const customWidthIn = Object.assign(document.createElement('input'), {
-		className: 'device-view__destinations-type',
-		type: 'number',
-		min: '64',
-		step: '1',
-		placeholder: 'Width',
-		value: String(
-			Math.max(
-				64,
-				parseInt(
-					String(
-						readDim('custom_width', parsedCurrentCustom ? parseInt(parsedCurrentCustom[1], 10) : 1920) ?? 1920,
-					),
-					10,
-				) || 1920,
-			),
-		),
-	})
-	const customHeightIn = Object.assign(document.createElement('input'), {
-		className: 'device-view__destinations-type',
-		type: 'number',
-		min: '64',
-		step: '1',
-		placeholder: 'Height',
-		value: String(
-			Math.max(
-				64,
-				parseInt(
-					String(
-						readDim('custom_height', parsedCurrentCustom ? parseInt(parsedCurrentCustom[2], 10) : 1080) ?? 1080,
-					),
-					10,
-				) || 1080,
-			),
-		),
-	})
-	const customFpsIn = Object.assign(document.createElement('input'), {
-		className: 'device-view__destinations-type',
-		type: 'number',
-		min: '1',
-		step: '0.01',
-		placeholder: 'Frame rate',
-		value: String(Math.max(1, parseFloat(String(readDim('custom_fps', 50) ?? 50)) || 50)),
-	})
-	const syncCustomInputsState = () => {
-		const isCustom = modeSel.value === 'custom'
-		customWidthIn.disabled = !isCustom
-		customHeightIn.disabled = !isCustom
-		customFpsIn.disabled = !isCustom
-	}
-	syncCustomInputsState()
 
 	let cableFeedNote = null
 	if (inherited) {
@@ -290,6 +243,87 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		: currentModeIdx >= 0
 			? currentModeIdx
 			: 0
+
+	const resolvedVideoMode = resolveGpuInspectorVideoMode({
+		cs,
+		currentSettings,
+		screenN,
+		conn,
+		inherited,
+		detectedDisplay,
+		uniqueDetectedModes,
+		defaultModeIdx,
+		physicalCasparMode: physicalPortRow?.runtime?.casparMode || detectedDisplay?.casparMode || null,
+	})
+	const displayModeId = String(resolvedVideoMode?.modeId || projectMode)
+	const isStandardMode = displayModeId !== 'custom' && STANDARD_VIDEO_MODES.includes(displayModeId)
+	const modeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	modeSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`
+	modeSel.value = isStandardMode ? displayModeId : 'custom'
+
+	const customWidthIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'number',
+		min: '64',
+		step: '1',
+		placeholder: 'Width',
+		value: String(
+			Math.max(
+				64,
+				parseInt(
+					String(
+						resolvedVideoMode?.width ??
+							readDim('custom_width', inherited?.width ?? 1920) ??
+							1920,
+					),
+					10,
+				) || 1920,
+			),
+		),
+	})
+	const customHeightIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'number',
+		min: '64',
+		step: '1',
+		placeholder: 'Height',
+		value: String(
+			Math.max(
+				64,
+				parseInt(
+					String(
+						resolvedVideoMode?.height ??
+							readDim('custom_height', inherited?.height ?? 1080) ??
+							1080,
+					),
+					10,
+				) || 1080,
+			),
+		),
+	})
+	const customFpsIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'number',
+		min: '1',
+		step: '0.01',
+		placeholder: 'Frame rate',
+		value: String(
+			Math.max(
+				1,
+				parseFloat(
+					String(resolvedVideoMode?.fps ?? readDim('custom_fps', inherited?.fps ?? 50) ?? 50),
+				) || 50,
+			),
+		),
+	})
+	const syncCustomInputsState = () => {
+		const isCustom = modeSel.value === 'custom'
+		customWidthIn.disabled = !isCustom
+		customHeightIn.disabled = !isCustom
+		customFpsIn.disabled = !isCustom
+	}
+	syncCustomInputsState()
+
 	const modeFromRes = String(detectedDisplay?.resolution || '').match(/^(\d+)x(\d+)$/)
 	const displayModeSelect = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	const displayLabel = detectedDisplay?.name ? String(detectedDisplay.name) : ''

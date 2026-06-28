@@ -3,11 +3,29 @@
 	width: 95vw;
 }
 
+.caspar-config-modal__subtitle {
+	margin: 0.15rem 0 0;
+	font-size: 0.8rem;
+	font-weight: normal;
+	color: var(--text-muted);
+}
+
 .caspar-config-modal__body {
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
 	height: 70vh;
+}
+
+.caspar-config-modal__toolbar {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.caspar-config-modal__mode-label {
+	font-size: 0.8rem;
+	color: var(--text-muted);
 }
 
 .caspar-config-modal__hint {
@@ -45,14 +63,19 @@
 	border-color: var(--accent);
 }
 
+.caspar-config-modal__textarea--readonly {
+	opacity: 0.92;
+	cursor: default;
+}
+
 .caspar-config-modal__status {
 	font-size: 0.8rem;
 	color: var(--text-muted);
 	min-height: 1.2rem;
 }
 
-.caspar-config-modal__status--override {
-	color: var(--warning, #e3b341);
+.caspar-config-modal__status--error {
+	color: var(--danger, #f85149);
 	font-weight: 600;
 }
 
@@ -67,26 +90,31 @@
 	gap: 0.5rem;
 }
 
-/* Edit icon button next to Apply Caspar config */
+/* Icon-only Caspar config editor (advanced) */
 .device-view__edit-config-btn {
-	padding: 4px 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 6px;
 	margin-left: 4px;
-	font-size: 1.1rem;
+	min-width: 2rem;
+	min-height: 2rem;
 	opacity: 0.8;
+	color: var(--text, #e6edf3);
 	background: transparent;
 	border: 1px solid transparent;
 	cursor: pointer;
 	border-radius: var(--radius);
-	transition: opacity 0.15s, border-color 0.15s;
+	transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.device-view__edit-config-icon {
+	display: block;
 }
 
 .device-view__edit-config-btn:hover {
 	opacity: 1;
 	border-color: var(--border);
 	background: var(--bg-elevated);
-}
-
-.device-view__edit-config-btn--active {
-	color: var(--warning, #e3b341);
-	opacity: 1;
+	color: #fff;
 }

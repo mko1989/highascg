@@ -2,6 +2,7 @@
 
 const { normalizeDeviceGraph } = require('./device-graph-core')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS, slug } = require('./device-graph-constants')
+const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('./decklink-io-direction')
 
 function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	const devices = [{ id: DEFAULT_DEVICE_ID, role: 'caspar_host', label: 'Caspar / HighAsCG host' }]
@@ -121,10 +122,11 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	for (const i of live?.decklink?.inputs || []) {
 		const slot = parseInt(i.slot, 10)
 		if (isNaN(slot)) continue
-		const ioDirection = String(i?.ioDirection || 'in').toLowerCase() === 'out' ? 'out' : 'in'
+		const ioDirection = normalizeDecklinkIoDirection({ ioDirection: i?.ioDirection })
 		addDecklinkPort(slot, i.device, 'decklink_io', `SDI ${slot}`, { caspar: { ioDirection } })
-		// Also keep the virtual mixer input bus separate if needed, but usually we just want the SDI
-		connectors.push({ id: `dli_${slot}`, deviceId: DEFAULT_DEVICE_ID, kind: 'decklink_in', index: slot - 1, label: `Mixer In ${slot}`, externalRef: String(i.device) })
+		if (ioDirection === 'in') {
+			connectors.push({ id: `dli_${slot}`, deviceId: DEFAULT_DEVICE_ID, kind: 'decklink_in', index: slot - 1, label: `Mixer In ${slot}`, externalRef: String(i.device) })
+		}
 	}
 	
 	for (const o of live?.decklink?.screenOutputs || []) {
@@ -150,10 +152,10 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	const inputCount = Math.max(0, parseInt(String(cs.decklink_input_count || 0), 10))
 	for (let i = 1; i <= inputCount; i++) {
 		const dev = parseInt(String(cs[`decklink_input_${i}_device`] || i), 10)
-		const dir = String(cs[`decklink_input_${i}_direction`] || 'in').toLowerCase() === 'out' ? 'out' : 'in'
+		const dir = normalizeDecklinkIoDirection({ ioDirection: cs[`decklink_input_${i}_direction`] })
+		if (dir === DECKLINK_IO_UNASSIGNED) continue
 		addDecklinkPort(i, dev, 'decklink_io', `SDI ${i}`, { caspar: { ioDirection: dir } })
-		// Only push dli_ if not already pushed (by id check)
-		if (!connectors.some(c => c.id === `dli_${i}`)) {
+		if (dir === 'in' && !connectors.some(c => c.id === `dli_${i}`)) {
 			connectors.push({ id: `dli_${i}`, deviceId: DEFAULT_DEVICE_ID, kind: 'decklink_in', index: i - 1, label: `Mixer In ${i}`, externalRef: String(dev) })
 		}
 	}
@@ -174,8 +176,9 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	for (const hw of hwConnectors) {
 		const devIdx = parseInt(String(hw.index), 10)
 		if (Number.isFinite(devIdx) && devIdx > 0 && !seenDecklinkIndices.has(devIdx)) {
-			// Add it as an unassigned input by default so it appears on the rear panel
-			addDecklinkPort(devIdx, devIdx, 'decklink_io', hw.name || `DeckLink ${devIdx}`, { caspar: { ioDirection: 'in' } })
+			addDecklinkPort(devIdx, devIdx, 'decklink_io', hw.name || `DeckLink ${devIdx}`, {
+				caspar: { ioDirection: DECKLINK_IO_UNASSIGNED },
+			})
 		}
 	}
 

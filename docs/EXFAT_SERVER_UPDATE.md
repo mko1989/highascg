@@ -9,7 +9,8 @@ For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node serve
 | Path on `HIGHASCGEXF` | Purpose |
 |------------------------|---------|
 | **`drop-update/`** | Server drop — extract **`highascg-server_*.tar.gz`** here (must include **`dist-web/`** for UI) |
-| `drop-update/applied/<UTC>/` | Archived drops after successful apply |
+| `drop-update/applied/<UTC>/` | Optional audit copies (live USB **retain** mode); **consumed** drops on persistent installs |
+| `drop-update/.applied-stamp` | Last successfully applied build stamp (retain mode) |
 | `drop-config/` | Optional `highascg.config.json` (mtime sync) |
 | `media/`, `templates/`, `configs/`, … | Operator data |
 
@@ -23,9 +24,11 @@ For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node serve
 2. Boot the live system (or reboot).
 3. **`highascg-exfat-server-update.service`** runs **before** `highascg.service`:
    - Stops `highascg.service`
+   - Validates drop (`package.json`, `src/`, **`dist-web/index.html`**, `tools/runtime/`)
    - `rsync` from `exfat/drop-update/` → `/home/casparcg/highascg/` (includes **`dist-web/`**; does not deploy **`client/`** sources)
    - Runs `npm ci --omit=dev` when `package-lock.json` is in the drop
-   - Moves the drop to `drop-update/applied/<UTC>/`
+   - **Live USB (retain):** leaves the drop in **`drop-update/`** — required on every cold boot because `~/highascg/` is not durable on the stick image
+   - **Persistent install (consume):** moves the drop to `drop-update/applied/<UTC>/` after success
    - Starts `highascg.service`
 
 ## What the server tarball contains
@@ -46,10 +49,16 @@ Optional **Electron launcher** on Mac/Windows ([**highascg-client**](https://git
 | Knob | Effect |
 |------|--------|
 | `/etc/highascg/disable-exfat-server-update` | Skip apply |
+| `/etc/highascg/server-update-retain-drop` | Force **retain** (installed on live-USB images) |
+| `/etc/highascg/server-update-consume-drop` | Force **consume** (move to `applied/`) |
+| `HIGHASCG_SERVER_UPDATE_RETAIN_DROP=1` | Force retain |
+| `HIGHASCG_SERVER_UPDATE_RETAIN_DROP=0` | Force consume |
 | `HIGHASCG_SERVER_UPDATE_DRY_RUN=1` | Log only |
 | `HIGHASCG_SERVER_UPDATE_NPM_CI=0` | Skip `npm ci` after rsync |
+| `HIGHASCG_SERVER_UPDATE_ARCHIVE_COPY=1` | Retain mode: optional `cp -a` audit under `applied/` |
 
-Manual run (root): `/usr/local/lib/highascg/highascg-exfat-server-update.sh`
+Manual run (root): `/usr/local/lib/highascg/highascg-exfat-server-update.sh`  
+Apply helper: `/usr/local/lib/highascg/highascg-apply-server-drop.sh`
 
 ## Boot order
 

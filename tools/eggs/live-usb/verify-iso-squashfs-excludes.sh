@@ -72,6 +72,22 @@ else
 	fi
 fi
 
+# Companion + highpass-highascg module (when embed is on — default).
+if [[ "${HIGHASCG_ISO_EMBED_COMPANION:-1}" == "1" ]]; then
+	for needle in \
+		'home/casparcg/companion/companion_headless.sh' \
+		'home/casparcg/.config/companion/modules/highpass-highascg/main.js' \
+		'etc/systemd/system/companion.service'; do
+		if unsquashfs -l "$SQ" 2>/dev/null | grep -qF "squashfs-root/${needle}"; then
+			ok "present: ${needle}"
+		else
+			bad "missing from squashfs: ${needle} — run prepare-companion-for-eggs-clone.sh before produce"
+		fi
+	done
+else
+	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skip Companion squashfs checks"
+fi
+
 if unsquashfs -l "$SQ" 2>/dev/null | grep -qE '^squashfs-root/usr_[0-9]/'; then
 	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — reboot and rerun full eggs produce (never rm /home/eggs)"
 fi

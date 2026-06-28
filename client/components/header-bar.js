@@ -108,7 +108,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 
 	async function saveToServer() {
 		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
-		project = normalizeProjectMediaRefs(project)
+		project = normalizeProjectMediaRefs(project, settingsState.getSettings())
 		const id = projectFileIdFromName(project.name || projectState.getProjectName())
 		try {
 			await api.post('/api/project/save', { project, id })

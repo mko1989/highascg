@@ -3,6 +3,7 @@
  */
 import { appendCableAffordance } from './device-view-cable-affordance.js'
 import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
+import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { setStatus } from './device-view-ui-utils.js'
 import * as Actions from './device-view-actions.js'
 import { renderCasparBand } from './device-view-caspar-render.js'
@@ -57,12 +58,9 @@ export function renderDeckLinkBand(ctx) {
 
 	const inPorts = appendSubtitle('Inputs & capture')
 	const outPorts = appendSubtitle('Program & multiview outputs')
-	const normalizeIoDirection = (value) => {
-		const v = String(value || '').trim().toLowerCase()
-		if (v === 'in' || v === 'input') return 'in'
-		if (v === 'out' || v === 'output') return 'out'
-		return 'io'
-	}
+	const normalizeIoDirection = (value) => normalizeDecklinkIoDirection(
+		typeof value === 'string' ? value : { ioDirection: value }
+	)
 
 	const ins = live.decklink?.inputs || []
 	const outs = live.decklink?.screenOutputs || []
@@ -88,7 +86,11 @@ export function renderDeckLinkBand(ctx) {
 		if (cid) b.setAttribute('data-connector-id', cid)
 		if (io?.id) renderedIoIds.add(io.id)
 		const ioDir = normalizeIoDirection(io?.caspar?.ioDirection ?? i?.ioDirection)
-		b.appendChild(Object.assign(document.createElement('span'), { textContent: io ? `SDI ${i.slot} (${ioDir.toUpperCase()})` : `In ${i.slot}` }))
+		b.appendChild(Object.assign(document.createElement('span'), {
+			textContent: io
+				? `${io.label || io.id} (${ioDir === 'unassigned' ? 'UNASSIGNED' : ioDir.toUpperCase()})`
+				: `In ${i.slot}`,
+		}))
 		b.appendChild(Object.assign(document.createElement('small'), { textContent: `device ${i.device} · ${st.text}` }))
 		if (io?.id) {
 			b.draggable = true
@@ -108,7 +110,8 @@ export function renderDeckLinkBand(ctx) {
 		if (ioDir !== 'in') addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_in', input: i }, 'left')
 		if (selectedKey === k) b.classList.add('device-view__port--selected')
 		if (cableSourceId && cid === cableSourceId) b.classList.add('device-view__port--cable-armed')
-		;(ioDir === 'out' ? outPorts : inPorts).append(b)
+		if (ioDir === 'in') inPorts.append(b)
+		else outPorts.append(b)
 	}
 
 	for (const o of outs) {
@@ -153,14 +156,16 @@ export function renderDeckLinkBand(ctx) {
 		const b = document.createElement('button')
 		b.type = 'button'
 		const dir = normalizeIoDirection(io?.caspar?.ioDirection)
-		b.className = 'device-view__port' + stateClass(dir === 'out' ? 'ok' : (dir === 'in' ? 'warn' : 'off'))
+		b.className = 'device-view__port' + stateClass(dir === 'out' ? 'ok' : dir === 'in' ? 'warn' : 'off')
 		const k = `decklink_io:${io.id}`
 		b.dataset.portKey = k
 		const ioId = String(io.id || '').trim()
 		if (!ioId || !isConnectorVisible(ioId)) continue
 		b.setAttribute('data-connector-id', ioId)
-		b.title = `${io.label || io.id} — SDI I/O slot, direction ${dir.toUpperCase()} (device ${io.externalRef || 0})`
-		b.appendChild(Object.assign(document.createElement('span'), { textContent: `${io.label || io.id} (${dir.toUpperCase()})` }))
+		b.title = `${io.label || io.id} — SDI I/O slot, direction ${dir === 'unassigned' ? 'unassigned' : dir} (device ${io.externalRef || 0})`
+		b.appendChild(Object.assign(document.createElement('span'), {
+			textContent: `${io.label || io.id} (${dir === 'unassigned' ? 'UNASSIGNED' : dir.toUpperCase()})`,
+		}))
 		b.appendChild(Object.assign(document.createElement('small'), { textContent: `device ${io.externalRef || 0}` }))
 		b.draggable = true
 		b.addEventListener('dragstart', (ev) => {
@@ -172,10 +177,11 @@ export function renderDeckLinkBand(ctx) {
 			)
 		})
 		b.addEventListener('click', () => onPortClick(k, ioId, { type: 'decklink_io', connector: io }))
-		addPortNodeDot(b, ioId, onPortStartCable, k, { type: 'decklink_io', connector: io }, dir === 'out' ? 'left' : 'right')
+		addPortNodeDot(b, ioId, onPortStartCable, k, { type: 'decklink_io', connector: io }, dir === 'in' ? 'right' : 'left')
 		if (selectedKey === k) b.classList.add('device-view__port--selected')
 		if (cableSourceId && ioId === cableSourceId) b.classList.add('device-view__port--cable-armed')
-		;(dir === 'out' ? outPorts : inPorts).append(b)
+		if (dir === 'in') inPorts.append(b)
+		else outPorts.append(b)
 	}
 
 	if (!ins.length && !outs.length && !(mvd > 0) && !ioPorts.length) {

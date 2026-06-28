@@ -2,6 +2,8 @@
 
 const { STANDARD_VIDEO_MODES, getModeDimensions } = require('./config-modes')
 const { destinationsFromConfig } = require('./screen-destinations')
+const { defaultVideoModeForProjectFps, default2160VideoModeForProjectFps, normalizeProjectFps } = require('./project-fps')
+const { isDecklinkIoOut } = require('./decklink-io-direction')
 
 const FPS_TOLERANCE = 0.02
 
@@ -38,6 +40,43 @@ function matchStandardDecklinkVideoMode(feed) {
 	return { decklinkVideoMode: null, isCustom: true, mappedFromCustom: false }
 }
 
+/** Custom canvas height at or below 1080 lines → 1080p SDI; above → 2160p (project frame rate). */
+const DECKLINK_AUTO_SDI_HEIGHT_1080 = 1080
+
+/**
+ * Pick a standard DeckLink SDI format for a wired feed.
+ * Exact WxH@fps match wins; custom canvases bucket to 1080p or 2160p at project fps.
+ * @param {{ videoMode?: string, width?: number, height?: number, fps?: number }} feed
+ * @returns {{ decklinkVideoMode: string|null, source: 'exact'|'auto'|'none', mappedFromCustom: boolean, autoTier: '1080p'|'2160p'|null }}
+ */
+function pickAutoDecklinkSdiFormatForFeed(feed) {
+	const match = matchStandardDecklinkVideoMode(feed)
+	if (match.decklinkVideoMode) {
+		return {
+			decklinkVideoMode: match.decklinkVideoMode,
+			source: 'exact',
+			mappedFromCustom: match.mappedFromCustom,
+			autoTier: null,
+		}
+	}
+
+	const width = Math.max(0, parseInt(String(feed?.width ?? 0), 10) || 0)
+	const height = Math.max(0, parseInt(String(feed?.height ?? 0), 10) || 0)
+	if (width <= 0 && height <= 0) {
+		return { decklinkVideoMode: null, source: 'none', mappedFromCustom: false, autoTier: null }
+	}
+
+	const fps = normalizeProjectFps(feed?.fps ?? 50)
+	const use2160 = height > DECKLINK_AUTO_SDI_HEIGHT_1080
+	const decklinkVideoMode = use2160 ? default2160VideoModeForProjectFps(fps) : defaultVideoModeForProjectFps(fps)
+	return {
+		decklinkVideoMode,
+		source: 'auto',
+		mappedFromCustom: true,
+		autoTier: use2160 ? '2160p' : '1080p',
+	}
+}
+
 /**
  * @param {object} connector
  * @returns {string}
@@ -47,26 +86,26 @@ function readConnectorDecklinkOutputVideoMode(connector) {
 }
 
 /**
- * SDI `<video-mode>`: operator-selected format, or exact standard match from upstream.
- * Custom upstream requires an explicit SDI format — no auto / nearest mapping.
+ * SDI `<video-mode>`: operator override, exact standard match, or auto 1080p/2160p bucket for custom canvases.
  * @param {{ videoMode?: string, width?: number, height?: number, fps?: number }} feed
  * @param {string} [connectorOverride]
- * @returns {{ decklinkVideoMode: string|null, source: 'override'|'exact'|'none', mappedFromCustom: boolean }}
+ * @returns {{ decklinkVideoMode: string|null, source: 'override'|'exact'|'auto'|'none', mappedFromCustom: boolean, autoTier: '1080p'|'2160p'|null }}
  */
 function resolveEffectiveDecklinkVideoMode(feed, connectorOverride = '') {
 	const override = String(connectorOverride || '').trim()
 	if (override && STANDARD_VIDEO_MODES[override]) {
-		return { decklinkVideoMode: override, source: 'override', mappedFromCustom: false }
+		return { decklinkVideoMode: override, source: 'override', mappedFromCustom: false, autoTier: null }
 	}
-	const match = matchStandardDecklinkVideoMode(feed)
-	if (match.decklinkVideoMode && !match.isCustom) {
+	const picked = pickAutoDecklinkSdiFormatForFeed(feed)
+	if (picked.decklinkVideoMode) {
 		return {
-			decklinkVideoMode: match.decklinkVideoMode,
-			source: 'exact',
-			mappedFromCustom: match.mappedFromCustom,
+			decklinkVideoMode: picked.decklinkVideoMode,
+			source: picked.source === 'exact' ? 'exact' : 'auto',
+			mappedFromCustom: picked.mappedFromCustom,
+			autoTier: picked.autoTier,
 		}
 	}
-	return { decklinkVideoMode: null, source: 'none', mappedFromCustom: match.isCustom }
+	return { decklinkVideoMode: null, source: 'none', mappedFromCustom: false, autoTier: null }
 }
 
 /**
@@ -343,9 +382,16 @@ function resolveDecklinkOutputStatus(config, connector) {
 	}
 
 	if (!effective.decklinkVideoMode) {
-		let reason = 'Set SDI output format below (1:1 passthrough, no scaling)'
-		if (!feed.cableResolved && !feed.sourceLabel) reason = 'No upstream cable'
-		else if (match.isCustom) reason = 'Set SDI output format below (1:1 passthrough, no scaling)'
+		let reason = 'Cable a destination to this SDI port, then pick SDI format below if needed'
+		if (!feed.cableResolved && !feed.sourceLabel) reason = 'No upstream cable — wire a destination feed to this SDI port'
+		else if (match.isCustom) {
+			const w = feed.width || 0
+			const h = feed.height || 0
+			reason =
+				w > 0 && h > 0
+					? `Custom ${w}×${h} needs SDI format — auto mapping failed (missing canvas size?)`
+					: 'Set SDI output format below (upstream canvas size unknown)'
+		}
 		return {
 			ok: false,
 			reason,
@@ -356,7 +402,12 @@ function resolveDecklinkOutputStatus(config, connector) {
 
 	let reason = ''
 	if (effective.source === 'override') reason = 'SDI format set on this port (1:1 passthrough)'
-	else if (effective.mappedFromCustom) reason = 'Upstream WxH matches standard mode'
+	else if (effective.source === 'auto') {
+		const wh =
+			inherited.width && inherited.height ? `${inherited.width}×${inherited.height}` : 'custom canvas'
+		const tier = effective.autoTier === '2160p' ? '2160p' : '1080p'
+		reason = `Auto ${effective.decklinkVideoMode}: ${wh} → ${tier} SDI at project frame rate (1:1 passthrough)`
+	} else if (effective.mappedFromCustom) reason = 'Upstream WxH matches standard mode'
 
 	return {
 		ok: true,
@@ -372,8 +423,7 @@ function resolveDecklinkOutputStatus(config, connector) {
 function isDecklinkOutputConnector(c) {
 	if (!c || typeof c !== 'object') return false
 	if (c.kind === 'decklink_out') return true
-	if (c.kind === 'decklink_io' && String(c.caspar?.ioDirection || 'in').toLowerCase() === 'out') return true
-	return false
+	return c.kind === 'decklink_io' && isDecklinkIoOut(c)
 }
 
 /**
@@ -485,6 +535,7 @@ function channelVideoModeForDecklinkConsumer(opts) {
 
 module.exports = {
 	matchStandardDecklinkVideoMode,
+	pickAutoDecklinkSdiFormatForFeed,
 	readConnectorDecklinkOutputVideoMode,
 	resolveEffectiveDecklinkVideoMode,
 	buildDecklinkPassthroughSubregion,

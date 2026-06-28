@@ -4,7 +4,7 @@ const crypto = require('crypto')
 const os = require('os')
 const { getReplicationConfig, normalizeReplicationConfig } = require('../config/replication-config')
 const { getLocalSyncthingDeviceId } = require('./syncthing-client')
-const { syncProjectMediaViaSyncthing } = require('./sync-project-media')
+const { syncProjectMediaToPeer } = require('./sync-project-media')
 const { reconcileFromLeader } = require('./replication-reconcile')
 const { peerHttpRequest, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
 const { loadFullProject } = require('../engine/project-scenes')
@@ -30,6 +30,8 @@ async function disconnectToStandalone(ctx, runtime, opts = {}) {
 	const { reloadReplicationFromConfig } = require('./replication-reload')
 	reloadReplicationFromConfig(ctx)
 	if (typeof ctx.log === 'function') ctx.log('info', `[replication] standalone (${opts.reason || 'disconnect'})`)
+	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+	notifyReplicationStatusChanged(ctx, 'disconnect')
 	return { ok: true, reason: opts.reason || 'disconnect' }
 }
 
@@ -157,24 +159,26 @@ async function connectToLeader(ctx, runtime, opts) {
 	const { reloadReplicationFromConfig } = require('./replication-reload')
 	reloadReplicationFromConfig(ctx)
 
+	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+	notifyReplicationStatusChanged(ctx, 'connect')
+
 	return { ok: true, syncing: true, replication: nextRepl, leader: { host: leaderHost, port: leaderPort } }
 }
 
-async function runFollowerPostConnectSync(ctx, runtime, leaderSyncthingId) {
-	if (leaderSyncthingId) {
-		try {
-			const project = await loadFullProject()
-			await syncProjectMediaViaSyncthing(project, leaderSyncthingId, { asLeader: false })
-		} catch (e) {
-			if (typeof ctx.log === 'function') ctx.log('warn', '[replication] media syncthing: ' + (e?.message || e))
-		}
-	}
+async function runFollowerPostConnectSync(ctx, runtime, _leaderSyncthingId) {
 	try {
 		await reconcileFromLeader(ctx, runtime)
 	} catch (e) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('warn', '[replication] post-connect reconcile: ' + (e?.message || e))
 		}
+	}
+	try {
+		const { loadFullProject } = require('../engine/project-scenes')
+		const project = await loadFullProject()
+		await syncProjectMediaToPeer(ctx, project, { direction: 'pull' })
+	} catch (e) {
+		if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project media rsync pull: ' + (e?.message || e))
 	}
 }
 
@@ -240,18 +244,13 @@ async function registerFollowerOnLeader(ctx, body) {
 
 	void runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId)
 
+	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+	notifyReplicationStatusChanged(ctx, 'follower-registered')
+
 	return response
 }
 
-async function runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId) {
-	if (followerSyncthingId) {
-		try {
-			const project = await loadFullProject()
-			await syncProjectMediaViaSyncthing(project, followerSyncthingId, { asLeader: true })
-		} catch (e) {
-			if (typeof ctx.log === 'function') ctx.log('warn', '[replication] leader media staging: ' + (e?.message || e))
-		}
-	}
+async function runLeaderPostRegisterSync(ctx, runtime, _followerSyncthingId) {
 	if (!runtime) return
 	try {
 		const { reconcileAllToPeer } = require('./replication-reconcile')
@@ -259,6 +258,30 @@ async function runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId) {
 	} catch (e) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('warn', '[replication] leader post-register reconcile: ' + (e?.message || e))
+		}
+	}
+	try {
+		const { loadFullProject } = require('../engine/project-scenes')
+		const project = await loadFullProject()
+		await syncProjectMediaToPeer(ctx, project, { direction: 'push' })
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', '[replication] leader project media rsync push: ' + (e?.message || e))
+		}
+	}
+	try {
+		const { validateCasparParityForPair } = require('./caspar-parity')
+		const parity = await validateCasparParityForPair(ctx)
+		runtime.lastCasparParity = parity
+		if (!parity.ok && typeof ctx.log === 'function') {
+			const note = parity.followerNeedsMoreChannels
+				? `backup needs ${parity.missingCount} more Caspar channel(s)`
+				: parity.mismatches?.[0]?.message || 'Caspar config mismatch'
+			ctx.log('warn', `[replication] Caspar parity on pair: ${note}`)
+		}
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', '[replication] leader caspar parity: ' + (e?.message || e))
 		}
 	}
 }

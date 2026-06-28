@@ -14,8 +14,10 @@ export function getMainModalHtml() {
 					<button class="settings-tab" data-tab="simulation">Simulation</button>
 					<button class="settings-tab" data-tab="companion">Companion</button>
 					<button class="settings-tab" data-tab="media-usb">media/usb</button>
+					<button class="settings-tab" data-tab="system-updates">updates</button>
 					<button class="settings-tab" data-tab="system-hardware">system</button>
 					<button class="settings-tab" data-tab="decklink">decklink</button>
+					<button class="settings-tab" data-tab="diagnostics">Diagnostics</button>
 					<button class="settings-tab" data-tab="live-audio">Live audio</button>
 					<button class="settings-tab" data-tab="variables">Variables</button>
 					<button class="settings-tab" data-tab="nuclear">Nuclear</button>
@@ -173,6 +175,16 @@ export function getMainModalHtml() {
 							</table>
 						</div>
 						<hr style="border:none;border-top:1px solid rgba(255,255,255,0.12);margin:1rem 0" />
+						<h3 class="settings-category">Project media folder</h3>
+						<div class="settings-group">
+							<label for="set-project-media-location">Store <code>media/projects/&lt;slug&gt;/</code> on</label>
+							<select id="set-project-media-location">
+								<option value="internal">System media root (<code>~/highascg/media/projects/</code>)</option>
+								<option value="exfat">exFAT stick (<code>~/highascg/media/exfat/projects/</code>)</option>
+								<option value="bridge">Bridge partition (<code>~/highascg/media/bridge/projects/</code>)</option>
+							</select>
+						</div>
+						<p class="settings-note" id="set-project-media-location-hint">Default upload and ingest target for the active project. The full media library remains browsable.</p>
 						<h3 class="settings-category">USB media import</h3>
 						<div class="settings-group"><label>CasparCG Media Path</label><input type="text" id="set-local-media-path" placeholder="/home/casparcg/highascg/media"></div>
 						<div class="settings-group checkbox"><label><input type="checkbox" id="set-project-scoped-media" checked /> Default uploads to active project folder (<code>media/projects/&lt;slug&gt;/</code>)</label></div>
@@ -180,6 +192,20 @@ export function getMainModalHtml() {
 						<div class="settings-group"><label>Default subfolder template</label><input type="text" id="set-usb-subfolder" placeholder="usb/{label}/{date}"></div>
 						<div class="settings-group"><label>When file already exists</label><select id="set-usb-policy"><option value="rename">Rename</option><option value="skip">Skip</option><option value="overwrite">Overwrite</option></select></div>
 						<div class="settings-group checkbox"><label><input type="checkbox" id="set-usb-verify" /> Verify SHA1 after copy</label></div>
+					</div>
+					<div class="settings-pane" id="settings-pane-system-updates">
+						<h3 class="settings-category">Server version</h3>
+						<p class="settings-note">Build stamp (UTC). On live USB sticks the canonical copy lives in <code>drop-update/</code> on exFAT — it is re-applied every boot.</p>
+						<pre class="settings-note" id="system-updates-stamp" style="white-space:pre-wrap;font-size:1rem;line-height:1.4;background:rgba(0,0,0,0.25);padding:0.6rem;border-radius:0.35rem;margin:0.35rem 0">Loading…</pre>
+						<p class="settings-note" id="system-updates-volumes" style="margin-top:0.25rem"></p>
+						<h3 class="settings-category">GitHub releases</h3>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+							<button type="button" class="btn btn--secondary" id="system-updates-refresh">Refresh</button>
+							<button type="button" class="btn btn--secondary" id="system-updates-check">Check now</button>
+							<button type="button" class="btn btn--primary" id="system-updates-apply" disabled>Install latest release</button>
+						</div>
+						<p class="settings-note" id="system-updates-check-line" style="margin-top:0.35rem">Loading…</p>
+						<pre class="settings-note" id="system-updates-log" style="white-space:pre-wrap;max-height:12rem;overflow:auto;font-size:0.78rem;line-height:1.35;background:rgba(0,0,0,0.2);padding:0.5rem;border-radius:0.35rem;margin:0.5rem 0 0"></pre>
 					</div>
 					<div class="settings-pane" id="settings-pane-system-hardware">
 						<h3 class="settings-category">NVIDIA GPU</h3>
@@ -200,6 +226,16 @@ export function getMainModalHtml() {
 							<button type="button" class="btn btn--secondary" id="decklink-dv-updater">Desktop Video Updater</button>
 						</div>
 						<p class="settings-note" id="decklink-status-line" style="margin-top:0.35rem"></p>
+					</div>
+					<div class="settings-pane" id="settings-pane-diagnostics">
+						<h3 class="settings-category">Diagnostics &amp; support</h3>
+						<p class="settings-note">Download a ZIP with redacted config, Caspar XML, project summary, system inventory, GPU/xrandr layout, and recent HighAsCG + Caspar log tails. Filename: <code>highascg-support_&lt;hostname&gt;_&lt;timestamp&gt;.zip</code>.</p>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+							<button type="button" class="btn btn--primary" id="settings-diagnostics-bundle">Download support bundle</button>
+							<button type="button" class="btn btn--secondary" id="settings-diagnostics-logs">Open server logs</button>
+						</div>
+						<p class="settings-note" id="settings-diagnostics-status" style="margin-top:0.35rem"></p>
+						<p class="settings-note">Same bundle as the <strong>Support bundle</strong> button in the connection-eye logs modal. Use after a failure or before contacting support.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-live-audio"></div>
 					<div class="settings-pane" id="settings-pane-variables"></div>

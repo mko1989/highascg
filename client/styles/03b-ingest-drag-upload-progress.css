@@ -118,6 +118,43 @@
 	text-align: right;
 }
 
+.ingest-status--spread {
+	color: #6ee7b7;
+}
+
+.repl-spread-progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+}
+
+.repl-spread-progress__track {
+	flex: 1;
+	min-width: 0;
+	height: 6px;
+	background: rgba(52, 211, 153, 0.12);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.repl-spread-progress__bar {
+	height: 100%;
+	background: linear-gradient(90deg, #34d399, #6ee7b7);
+	border-radius: 3px;
+	transition: width 0.12s ease-out;
+	box-shadow: 0 0 8px rgba(52, 211, 153, 0.35);
+}
+
+.repl-spread-progress__pct {
+	font-size: 0.68rem;
+	color: #6ee7b7;
+	font-variant-numeric: tabular-nums;
+	min-width: 2.5rem;
+	text-align: right;
+}
+
 .publish-modal .progress-bar-wrap {
 	height: 8px;
 	background: rgba(255, 255, 255, 0.08);

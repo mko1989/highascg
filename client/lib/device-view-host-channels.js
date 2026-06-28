@@ -110,7 +110,7 @@ function activeDecklinkInputSlots(payload) {
 /** @param {object | null | undefined} row — live.decklink.inputs[] entry */
 function isDecklinkInputSlotLive(row) {
 	if (!row || typeof row !== 'object') return false
-	if (String(row.ioDirection || 'in').toLowerCase() === 'out') return false
+	if (String(row.ioDirection || '').toLowerCase() !== 'in') return false
 	// Only slots explicitly assigned in settings count — not hardware placeholders (device 0).
 	const device = parseInt(String(row.device ?? 0), 10) || 0
 	return device > 0

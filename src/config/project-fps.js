@@ -17,6 +17,17 @@ const DEFAULT_VIDEO_MODE_BY_FPS = {
 	60: '1080p6000',
 }
 
+const DEFAULT_2160_VIDEO_MODE_BY_FPS = {
+	23.98: '2160p2398',
+	24: '2160p2400',
+	25: '2160p2500',
+	29.97: '2160p2997',
+	30: '2160p3000',
+	50: '2160p5000',
+	59.94: '2160p5994',
+	60: '2160p6000',
+}
+
 /**
  * @param {unknown} fps
  * @returns {number}
@@ -43,6 +54,16 @@ function normalizeProjectFps(fps) {
 function defaultVideoModeForProjectFps(fps) {
 	const n = normalizeProjectFps(fps)
 	return DEFAULT_VIDEO_MODE_BY_FPS[n] || '1080p5000'
+}
+
+/**
+ * UHD SDI format id for a project frame rate (DeckLink output bucketing).
+ * @param {number} fps
+ * @returns {string}
+ */
+function default2160VideoModeForProjectFps(fps) {
+	const n = normalizeProjectFps(fps)
+	return DEFAULT_2160_VIDEO_MODE_BY_FPS[n] || '2160p5000'
 }
 
 /**
@@ -136,6 +157,7 @@ module.exports = {
 	STANDARD_PROJECT_FPS,
 	normalizeProjectFps,
 	defaultVideoModeForProjectFps,
+	default2160VideoModeForProjectFps,
 	videoModeMatchesProjectFps,
 	inferProjectFpsFromConfig,
 	resolveProjectFps,

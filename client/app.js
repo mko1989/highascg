@@ -174,7 +174,7 @@ async function init() {
 		e.preventDefault(); showSettingsModal()
 	})
 	initTabs(); initWorkspaceLayout()
-	initReplicationUiState()
+	initReplicationUiState(ws)
 	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState })
 	_oscClient = new OscClient({ wsClient: ws })
 	window.highascg_osc_client = _oscClient
@@ -195,7 +195,7 @@ async function init() {
 		autosaveInFlight = (async () => {
 			try {
 				let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
-				project = normalizeProjectMediaRefs(project)
+				project = normalizeProjectMediaRefs(project, settingsState.getSettings())
 				await api.post('/api/project/autosave', { project })
 				const d = new Date()
 				const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -238,11 +238,14 @@ async function init() {
 
 	sceneState.on('change', () => {
 		appLogic.scheduleSceneDeckSync()
-		if (document.querySelector('input:focus, select:focus, textarea:focus')) {
-			scheduleAutosave(3000)
-		} else {
-			void flushAutosave()
-		}
+		// Defer focus check so blur handlers (e.g. look rename) finish before autosave scheduling.
+		queueMicrotask(() => {
+			if (document.querySelector('input:focus, select:focus, textarea:focus')) {
+				scheduleAutosave(3000)
+			} else {
+				void flushAutosave()
+			}
+		})
 	})
 	sceneState.on('imported', () => {
 		appLogic.scheduleSceneDeckSync()
@@ -262,7 +265,7 @@ async function init() {
 		if (!canPushProjectToServer()) return
 		appLogic.scheduleSceneDeckSync()
 		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
-		project = normalizeProjectMediaRefs(project)
+		project = normalizeProjectMediaRefs(project, settingsState.getSettings())
 		const id = projectFileIdFromName(project.name || projectState.getProjectName())
 		markLocalProjectSaved()
 		api.post('/api/project/save', { project, id })

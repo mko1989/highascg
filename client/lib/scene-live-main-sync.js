@@ -78,13 +78,15 @@ export function resolveBusLookIdsForMain(mainIdx, sceneLive, channelMap, sceneEx
 		prvLookId = prvSidRaw && sceneExists(prvSidRaw) ? prvSidRaw : null
 	}
 
-	if (!pgmLookId && !prvLookId && sceneStateFallback) {
+	if (!pgmLookId && sceneStateFallback) {
 		const liveFn = sceneStateFallback.getLiveSceneIdForMain
-		const previewFn = sceneStateFallback.getPreviewSceneIdForMain
 		if (typeof liveFn === 'function') {
 			const sid = liveFn.call(sceneStateFallback, idx)
 			pgmLookId = sid != null && sceneExists(String(sid)) ? String(sid) : null
 		}
+	}
+	if (hasSeparatePrv && !prvLookId && sceneStateFallback) {
+		const previewFn = sceneStateFallback.getPreviewSceneIdForMain
 		if (typeof previewFn === 'function') {
 			const sid = previewFn.call(sceneStateFallback, idx)
 			prvLookId = sid != null && sceneExists(String(sid)) ? String(sid) : null

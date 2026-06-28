@@ -2,13 +2,14 @@
 
 const { normalizeDeviceGraph, validateDeviceGraph } = require('./device-graph-core')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, slug } = require('./device-graph-constants')
+const { isDecklinkIoOutputSink, isDecklinkIoIn } = require('./decklink-io-direction')
 
 function isCasparOutputConnector(c) {
-	const ioOut = c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && String(c.caspar?.ioDirection || '').toLowerCase() === 'out'
+	const ioOut = c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && isDecklinkIoOutputSink(c)
 	return !!(c && c.deviceId === DEFAULT_DEVICE_ID && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out' || ioOut))
 }
 function isDestinationInputConnector(c) { return !!(c && c.deviceId === DEST_DEVICE_ID && c.kind === 'destination_in') }
-function isDecklinkIoInputConnector(c) { return !!(c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && String(c.caspar?.ioDirection || 'in').toLowerCase() !== 'out') }
+function isDecklinkIoInputConnector(c) { return !!(c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && isDecklinkIoIn(c)) }
 function isPixelMapInputConnector(c) { return !!(c && c.kind === 'pixel_map_in') }
 function isPixelMapOutputConnector(c) { return !!(c && c.kind === 'pixel_map_out') }
 

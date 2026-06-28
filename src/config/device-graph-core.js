@@ -80,14 +80,14 @@ function normalizeDeviceGraph(raw) {
 	const eds = edges
 		.map((e) => {
 			if (!e || typeof e !== 'object') return null
-			const id = String(e.id || '').trim()
-			if (!id) return null
 			let sourceId = String(e.sourceId || '').trim()
 			let sinkId = String(e.sinkId || '').trim()
+			if (!sourceId || !sinkId) return null
 			const srcGpuMapped = gpuLegacyMap.get(sourceId.toUpperCase())
 			const sinkGpuMapped = gpuLegacyMap.get(sinkId.toUpperCase())
 			if (srcGpuMapped) sourceId = srcGpuMapped
 			if (sinkGpuMapped) sinkId = sinkGpuMapped
+			const id = String(e.id || '').trim() || `edge_${sourceId}_${sinkId}`
 			return {
 				id,
 				sourceId,
@@ -96,7 +96,7 @@ function normalizeDeviceGraph(raw) {
 				...(e.edid && typeof e.edid === 'object' ? { edid: e.edid } : {}),
 			}
 		})
-		.filter((e) => e && e.sourceId && e.sinkId)
+		.filter(Boolean)
 	const legacyMixerGraphDeviceId = Buffer.from('cGl4ZWxodWVfbWFpbg==', 'base64').toString()
 	const devicesNorm = outDev.filter((d) => d && String(d.id || '') !== legacyMixerGraphDeviceId)
 	const devFinal =

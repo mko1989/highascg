@@ -69,3 +69,9 @@
 ## Regression risks
 
 - Clients relying on **every** intermediate **`change`** for animations — verify timeline/multiview UIs still converge within one frame tick.
+
+---
+
+## 2026-06-28 — `log_line` structured payload (WO-67)
+
+WebSocket **`log_line`** events may send an object `{ ts, level, category, message, line }` instead of a plain string. Payloads are slightly larger per message; **Phase A** rate cap (`HIGHASCG_WS_LOG_LINE_MAX_HZ`, default 50/s) is unchanged. Dropped lines since process start are exposed in support bundle `manifest.json` → `wsLogLineDropped` when available.

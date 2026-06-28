@@ -295,6 +295,30 @@
 .device-view__replication-local-note {
 	margin-bottom: 4px;
 }
+.device-view__replication-connection summary {
+	cursor: pointer;
+	list-style: none;
+}
+.device-view__replication-connection summary::-webkit-details-marker {
+	display: none;
+}
+.device-view__replication-channel-parity--ok {
+	color: var(--ok-fg, #6bcf7f);
+}
+.device-view__replication-channel-parity--warn {
+	color: var(--warn-fg, #e8b84a);
+}
+.device-view__replication-caspar-parity--ok {
+	color: var(--ok-fg, #6bcf7f);
+}
+.device-view__replication-caspar-parity--warn {
+	color: var(--warn-fg, #e8b84a);
+}
+.device-view__replication-local-table,
+.device-view__replication-peer-table,
+.device-view__replication-transport-table {
+	margin-top: 6px;
+}
 .device-view__replication-leader-pick .device-view__destinations-type {
 	width: 100%;
 	max-width: 100%;

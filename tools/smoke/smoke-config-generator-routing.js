@@ -52,12 +52,14 @@ test('multiview auto x counts only real screen consumers', () => {
 	app.rtmp = { ...app.rtmp, enabled: false }
 	app.deviceGraph = {
 		connectors: [
-			{ id: 'dst_in_led1', kind: 'destination_in', externalRef: 'led1' },
-			{ id: 'gpu_p0', kind: 'gpu_out' }
+			{ id: 'dst_in_m1', kind: 'destination_in', externalRef: 'm1' },
+			{ id: 'dst_in_mv', kind: 'destination_in', externalRef: 'mv' },
+			{ id: 'gpu_p0', kind: 'gpu_out' },
 		],
 		edges: [
-			{ sourceId: 'dst_in_led1', sinkId: 'gpu_p0' }
-		]
+			{ sourceId: 'dst_in_m1', sinkId: 'gpu_p0' },
+			{ sourceId: 'dst_in_mv', sinkId: 'gpu_p0' },
+		],
 	}
 	// Multiview Caspar channel is allocated only when a multiview destination exists (not from multiview_enabled alone).
 	app.screenDestinations = {
@@ -579,6 +581,11 @@ test('uncabled second main stays stereo when first main has 8ch PortAudio', () =
 })
 
 test('screen consumer x/y sync from graph layout without screen_N_system_id', () => {
+	const graph = clone(require('../../config/device_graph.json'))
+	graph.edges = [
+		...(Array.isArray(graph.edges) ? graph.edges : []),
+		{ id: 'e_mv_gpu', sourceId: 'dst_in_dst_mqtchens_1', sinkId: 'gpu_p2' },
+	]
 	const app = {
 		screen_count: 2,
 		screen_2_x: 0,
@@ -597,18 +604,18 @@ test('screen consumer x/y sync from graph layout without screen_N_system_id', ()
 			streamingChannel: { enabled: false },
 		},
 		screenDestinations: require('../../config/screen_destinations.json'),
-		deviceGraph: require('../../config/device_graph.json'),
+		deviceGraph: graph,
 	}
 	const flat = buildCasparGeneratorFlatConfig(app)
 	assert.equal(flat.screen_1_x, 0, 'mapping-fed PGM screen consumer aligns to mapping bbox origin')
-	assert.equal(flat.multiview_x, 5120)
+	assert.ok(Number.isFinite(flat.multiview_x), 'multiview x from layout when GPU cabled')
 	const xml = buildConfigXml(flat)
 	const pgm = xml.match(/Screen 1 program output \(PGM\)[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x>/)
 	assert.ok(pgm, 'PGM screen consumer')
 	assert.equal(pgm[1], '0')
 	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x>/)
-	assert.ok(mv, 'multiview screen consumer')
-	assert.equal(mv[1], '5120')
+	assert.ok(mv, 'multiview screen consumer when GPU cabled in Device View')
+	assert.equal(mv[1], String(flat.multiview_x))
 })
 
 test('multiview window chrome inherits PGM screen_1; other flags stay multiview-only', () => {
@@ -642,7 +649,13 @@ test('multiview window chrome inherits PGM screen_1; other flags stay multiview-
 		],
 		edidNotes: '',
 	}
-	addMockGraph(app)
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_mv', kind: 'destination_in', externalRef: 'mv' },
+			{ id: 'gpu_p0', kind: 'gpu_out' },
+		],
+		edges: [{ sourceId: 'dst_in_mv', sinkId: 'gpu_p0' }],
+	}
 	const xml = buildConfigXml(buildCasparGeneratorFlatConfig(app))
 	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>([\s\S]*?)<\/screen>/)
 	assert.ok(mv, 'multiview screen consumer block')
@@ -652,4 +665,43 @@ test('multiview window chrome inherits PGM screen_1; other flags stay multiview-
 	assert.match(block, /<borderless>true<\/borderless>/)
 	assert.match(block, /<always-on-top>false<\/always-on-top>/)
 	assert.match(block, /<force-linear-filter>false<\/force-linear-filter>/)
+})
+
+test('multiview screen consumer omitted when Device View has no GPU cable to multiview destination', () => {
+	const app = clone(defaults)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: '1080p5000',
+		multiview_enabled: true,
+		multiview_mode: '1080p5000',
+		multiview_screen_consumer: true,
+		streamingChannel: { enabled: false },
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'pgm1', label: 'PGM', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+			{ id: 'mv1', label: 'MV', mainScreenIndex: 0, mode: 'multiview', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_pgm1', kind: 'destination_in', externalRef: 'pgm1' },
+			{ id: 'dst_in_mv1', kind: 'destination_in', externalRef: 'mv1' },
+			{ id: 'gpu_p0', kind: 'gpu_out' },
+		],
+		edges: [{ sourceId: 'dst_in_pgm1', sinkId: 'gpu_p0' }],
+	}
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.multiview_screen_consumer, false)
+	assert.equal(flat.multiview_output_mode, 'disabled')
+	const xml = buildConfigXml(flat)
+	const mvBlock = xml.match(/Multiview output #1[\s\S]*?<channel>([\s\S]*?)<\/channel>/)
+	assert.ok(mvBlock, 'multiview channel block')
+	assert.doesNotMatch(mvBlock[1], /<screen>/)
 })

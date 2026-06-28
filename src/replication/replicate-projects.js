@@ -39,8 +39,12 @@ async function commitReplicatedProject(ctx, merged, slug) {
 	let caspar = null
 	// Only regenerate/restart Caspar when the active show slug changes — not on every leader save.
 	if (slugChanged) {
-		try {
-			caspar = await regenerateFollowerCasparFromDeviceView(ctx)
+	try {
+		const { repairFollowerDecklinkGraph } = require('./follower-caspar-output')
+		const { applyDestinationOutputEdgesToCasparConfig } = require('../api/device-view-apply')
+		applyDestinationOutputEdgesToCasparConfig(ctx, { actions: [], warnings: [] })
+		repairFollowerDecklinkGraph(ctx)
+		caspar = await regenerateFollowerCasparFromDeviceView(ctx)
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('warn', '[replication] follower caspar regenerate: ' + (e?.message || e))
@@ -58,6 +62,8 @@ async function commitReplicatedProject(ctx, merged, slug) {
 		ctx.log('info', `[replication] Show synced (active slug=${activeSlug}). ${casparNote}.`)
 	}
 	scheduleProjectSyncBroadcast(ctx, merged)
+	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
+	notifyReplicationStatusChanged(ctx, 'project-sync')
 	return merged
 }
 
@@ -84,15 +90,11 @@ async function pushProjectToPeer(ctx, runtime, project) {
 	if (res.ok) {
 		runtime.projectsPushed += 1
 		try {
-			const { syncProjectMediaViaSyncthing } = require('./sync-project-media')
-			const { getLocalSyncthingDeviceId } = require('./syncthing-client')
-			const peerPing = await require('./peer-client').peerPing(repl.peer)
-			const followerSyncthingId = peerPing.json?.syncthingDeviceId
-			if (followerSyncthingId) {
-				await syncProjectMediaViaSyncthing(project, followerSyncthingId, { asLeader: true })
+			await require('./sync-project-media').syncProjectMediaToPeer(ctx, project, { direction: 'push' })
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', '[replication] project media sync: ' + (e?.message || e))
 			}
-		} catch {
-			/* optional syncthing refresh */
 		}
 	}
 	return { ok: res.ok, status: res.status, error: res.error }

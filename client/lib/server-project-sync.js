@@ -105,11 +105,13 @@ export async function bootstrapFromServer(deps) {
 				stateStore,
 				source: deps.source || 'server-bootstrap',
 			})
-			markServerProjectSynced()
-			appLogic.scheduleSceneDeckSync?.()
 		}
 	} catch (e) {
 		console.warn('[HighAsCG] Server project load failed:', e?.message || e)
+	} finally {
+		// Allow scene_deck_sync / autosave even when project fetch or import fails.
+		markServerProjectSynced()
+		appLogic.scheduleSceneDeckSync?.()
 	}
 
 	return state

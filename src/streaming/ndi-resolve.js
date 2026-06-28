@@ -1,6 +1,7 @@
 'use strict'
 
 const { spawnSync } = require('child_process')
+const streamLog = require('../utils/buffered-logger').streaming
 
 /**
  * Ensure system `ffmpeg` can use the NDI demuxer (libndi_newtek_input).
@@ -201,12 +202,12 @@ function prepareNdiStreaming(config, targets) {
 			if (m) config._ndiResolvedNames[String(t.channel)] = m
 		}
 		if (Object.keys(config._ndiResolvedNames).length) {
-			console.log('[NDI] Auto-matched sources:', JSON.stringify(config._ndiResolvedNames))
+			streamLog.info('[NDI] Auto-matched sources: ' + JSON.stringify(config._ndiResolvedNames))
 		} else {
-			console.log('[NDI] No CasparCG Channel N in discovered list; using default name pattern.')
+			streamLog.info('[NDI] No CasparCG Channel N in discovered list; using default name pattern.')
 		}
 	} else {
-		console.log('[NDI] Source listing unavailable or empty; using default name pattern.')
+		streamLog.info('[NDI] Source listing unavailable or empty; using default name pattern.')
 	}
 }
 

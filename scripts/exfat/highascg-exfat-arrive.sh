@@ -12,8 +12,15 @@ log() {
 
 start_unit() {
 	local u="$1"
-	if ! systemctl start --no-block "$u"; then
-		log "warning: systemctl start --no-block ${u} failed (continuing)"
+	local block="${2:-0}"
+	if [[ "$block" == "1" ]]; then
+		if ! systemctl start "$u"; then
+			log "warning: systemctl start ${u} failed (continuing)"
+		fi
+	else
+		if ! systemctl start --no-block "$u"; then
+			log "warning: systemctl start --no-block ${u} failed (continuing)"
+		fi
 	fi
 }
 
@@ -44,7 +51,8 @@ fi
 
 start_unit highascg-exfat-media-prep.service
 start_unit home-casparcg-highascg-media-exfat.mount
-start_unit highascg-exfat-server-update.service
+# Block until drop-update apply finishes — late USB must not start highascg on stale squashfs.
+start_unit highascg-exfat-server-update.service 1
 start_unit highascg-exfat-sync.service
 
 log "pipeline finished for ${EXFAT_MP}"

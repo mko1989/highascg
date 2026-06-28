@@ -2,9 +2,9 @@
  * Device View — server inspector hot backup section (WO-54 operator UX).
  */
 import { api } from '../lib/api-client.js'
-import { setStatus } from './device-view-ui-utils.js'
+import { setStatus, buildInspectorTable } from './device-view-ui-utils.js'
 import { showAppToast } from '../lib/app-toast.js'
-import { refreshReplicationStatusSoon } from '../lib/replication-ui-state.js'
+import { refreshReplicationStatusSoon, getReplicationInspectorMode, setReplicationInspectorMode } from '../lib/replication-ui-state.js'
 
 /**
  * @param {HTMLElement} host
@@ -19,6 +19,59 @@ export function renderReplicationInspector(host, ctx) {
 	statusLine.className = 'device-view__note small device-view__replication-status'
 	statusLine.textContent = 'Loading replication status…'
 
+	const connectionDetails = document.createElement('details')
+	connectionDetails.className = 'device-view__inspector-section device-view__replication-connection'
+	connectionDetails.open = true
+	connectionDetails.hidden = true
+	const connectionSummary = document.createElement('summary')
+	connectionSummary.className = 'device-view__note'
+	connectionSummary.innerHTML = '<strong>Connection</strong>'
+	connectionDetails.append(connectionSummary)
+
+	const channelParityLine = document.createElement('p')
+	channelParityLine.className = 'device-view__note small device-view__replication-channel-parity'
+	channelParityLine.hidden = true
+
+	const casparParityLine = document.createElement('p')
+	casparParityLine.className = 'device-view__note small device-view__replication-caspar-parity'
+	casparParityLine.hidden = true
+
+	const connectionActions = document.createElement('div')
+	connectionActions.className = 'device-view__replication-actions'
+	const refreshConnBtn = Object.assign(document.createElement('button'), {
+		type: 'button',
+		className: 'header-btn',
+		textContent: 'Refresh connection',
+		title: 'Reconnect peer HTTP, live-state WebSocket, and AMCP fan-out; force ping and reconcile',
+	})
+	connectionActions.append(refreshConnBtn)
+
+	const localTableHost = document.createElement('div')
+	localTableHost.className = 'device-view__replication-local-table'
+	const peerTableHost = document.createElement('div')
+	peerTableHost.className = 'device-view__replication-peer-table'
+	const transportTableHost = document.createElement('div')
+	transportTableHost.className = 'device-view__replication-transport-table'
+
+	const connectionWarnLine = document.createElement('p')
+	connectionWarnLine.className = 'device-view__note small device-view__replication-connection-warn'
+	connectionWarnLine.hidden = true
+
+	connectionDetails.append(
+		channelParityLine,
+		casparParityLine,
+		connectionActions,
+		localTableHost,
+		peerTableHost,
+		transportTableHost,
+		connectionWarnLine,
+	)
+
+	/** @deprecated alias — leader follower panel merged into connectionDetails */
+	const followerSec = connectionDetails
+	const followerTableHost = peerTableHost
+	const followerWarnLine = connectionWarnLine
+
 	const outputWarnLine = document.createElement('p')
 	outputWarnLine.className = 'device-view__note small device-view__replication-output-warn'
 	outputWarnLine.hidden = true
@@ -32,7 +85,8 @@ export function renderReplicationInspector(host, ctx) {
 	const reloadLocalBtn = Object.assign(document.createElement('button'), {
 		type: 'button',
 		className: 'header-btn',
-		textContent: 'Regenerate Caspar from Device View',
+		textContent: 'Apply Device View → Caspar',
+		title: 'Load leader screen destinations into config and regenerate casparcg.config on this backup box',
 	})
 
 	const modeLab = document.createElement('label')
@@ -89,19 +143,39 @@ export function renderReplicationInspector(host, ctx) {
 		textContent: 'Disconnect (standalone)',
 	})
 	btnRow.append(scanBtn, becomeBtn, stopLeaderBtn, connectBtn, disconnectBtn, reloadLocalBtn)
-	sec.append(statusLine, outputWarnLine, localWiringNote, modeLab, leaderPick, btnRow)
+	sec.append(statusLine, connectionDetails, outputWarnLine, localWiringNote, modeLab, leaderPick, btnRow)
 	host.append(sec)
 
 	let lastStatus = null
-	let modeUserSet = false
 	/** @type {ReturnType<typeof setInterval>|null} */
 	let pollTimer = null
 
+	const savedMode = getReplicationInspectorMode()
+	if (savedMode) modeSel.value = savedMode
+
 	function applyServerMode(st) {
 		if (!st?.enabled) return
-		if (st.configuredRole === 'follower' || st.role === 'follower') modeSel.value = 'follower'
-		else modeSel.value = 'leader'
-		modeUserSet = false
+		if (st.configuredRole === 'follower' || st.role === 'follower') {
+			modeSel.value = 'follower'
+			setReplicationInspectorMode('follower')
+		} else {
+			modeSel.value = 'leader'
+			setReplicationInspectorMode('leader')
+		}
+	}
+
+	function syncModeFromStatus(st) {
+		if (st?.enabled) {
+			applyServerMode(st)
+			return
+		}
+		const intent = getReplicationInspectorMode()
+		if (intent === 'follower' || intent === 'leader') {
+			modeSel.value = intent
+			return
+		}
+		modeSel.value = st?.leaderAvailable ? 'leader' : 'standalone'
+		if (modeSel.value === 'standalone') setReplicationInspectorMode('standalone')
 	}
 
 	function syncLeaderSelect(st) {
@@ -137,6 +211,288 @@ export function renderReplicationInspector(host, ctx) {
 		reloadLocalBtn.style.display = isFollower ? '' : 'none'
 	}
 
+	function formatCasparFps(fr) {
+		if (!fr) return '—'
+		const s = String(fr).trim()
+		const slash = s.indexOf('/')
+		if (slash > 0) {
+			const num = parseInt(s.slice(0, slash), 10)
+			const den = parseInt(s.slice(slash + 1), 10)
+			if (Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+				const fps = num / den
+				return `${Number.isInteger(fps) ? fps : fps.toFixed(3)} fps`
+			}
+		}
+		const n = parseFloat(s)
+		return Number.isFinite(n) ? `${n} fps` : s
+	}
+
+	function formatAgeMs(ms) {
+		if (ms == null || !Number.isFinite(ms)) return '—'
+		if (ms < 2000) return 'just now'
+		if (ms < 60_000) return `${Math.round(ms / 1000)}s ago`
+		return `${Math.round(ms / 60_000)}m ago`
+	}
+
+	function formatDriftMs(ms) {
+		if (!Number.isFinite(ms)) return '—'
+		const sign = ms > 0 ? '+' : ''
+		return `${sign}${ms} ms`
+	}
+
+	function formatChannelParity(cp) {
+		if (!cp?.peerAvailable) return 'Channel plan: peer not reached yet'
+		if (cp.ok) return 'Channel plan matches'
+		const parts = (cp.mismatches || []).map((m) => `${m.label}: ${m.local} ≠ ${m.peer}`)
+		return `Channel plan mismatch — ${parts.join('; ')}`
+	}
+
+	function formatCasparParity(cp, role) {
+		if (!cp || cp.skipped) return ''
+		if (cp.ok) {
+			return `Running Caspar: ${cp.leaderChannelCount} channels match (leader ↔ ${role === 'leader' ? 'backup' : 'this box'})`
+		}
+		if (cp.followerNeedsMoreChannels) {
+			return `Running Caspar: backup needs ${cp.missingCount} more channel(s) (${cp.followerChannelCount} on backup vs ${cp.leaderChannelCount} on leader) — load Device View setup and regenerate`
+		}
+		const msgs = (cp.mismatches || []).map((m) => m.message).filter(Boolean)
+		return msgs.length ? `Running Caspar: ${msgs.join('; ')}` : 'Running Caspar: mismatch vs leader'
+	}
+
+	function buildPeerRows(peer, st, roleLabel) {
+		if (!peer) return []
+		const fan = st.amcpFanout || {}
+		const ph = st.playheadSync || {}
+		const endpoint = fan.endpoint?.host
+			? `${fan.endpoint.host}:${fan.endpoint.port || 5250}`
+			: peer.casparHost
+				? `${peer.casparHost}:${peer.casparPort || 5250}`
+				: '—'
+
+		const rows = [
+			{ label: roleLabel, value: peer.hostname || peer.selfId || peer.host || '—' },
+			{ label: 'Address', value: `${peer.host}:${peer.port || 4200}` },
+			{
+				label: 'Peer status',
+				value: peer.reachable ? `online · ping ${formatAgeMs(peer.pingAgeMs)}` : 'offline',
+			},
+			{ label: 'Role', value: peer.role || '—' },
+			{ label: 'App version', value: peer.appVersion || '—' },
+		]
+		if (st.role === 'leader') {
+			rows.push({
+				label: 'AMCP fan-out',
+				value: fan.active
+					? fan.connected
+						? `connected → ${endpoint}`
+						: `disconnected${fan.lastError ? ` (${fan.lastError})` : ''}`
+					: 'inactive',
+			})
+			if (fan.active) {
+				rows.push(
+					{ label: 'Commands sent', value: String(fan.commandsSent ?? 0) },
+					{ label: 'Queue depth', value: String(fan.queueDepth ?? 0) },
+				)
+				if ((fan.skippedNotConnected ?? 0) > 0) {
+					rows.push({ label: 'Skipped (offline)', value: String(fan.skippedNotConnected) })
+				}
+			}
+		}
+		if (peer.lastAppliedSeq != null || peer.liveStateSeq != null) {
+			rows.push({
+				label: 'Mirror seq',
+				value:
+					st.role === 'leader'
+						? `follower ${peer.lastAppliedSeq ?? '—'} · leader ${peer.liveStateSeq ?? st.liveStateSeq ?? '—'}`
+						: `local ${st.lastAppliedSeq ?? '—'} · leader ${peer.liveStateSeq ?? '—'}`,
+			})
+		}
+		if (peer.mirrorLag > 0) {
+			rows.push({ label: 'Mirror lag', value: `${peer.mirrorLag} events` })
+		}
+		if (ph.lastSampleAt && st.role === 'leader') {
+			rows.push(
+				{ label: 'Playhead drift', value: formatDriftMs(ph.driftMs) },
+				{ label: 'Drift sampled', value: formatAgeMs(Date.now() - ph.lastSampleAt) },
+			)
+		}
+		const frKeys = new Set([
+			...Object.keys(ph.followerFramerates || {}),
+			...Object.keys(ph.leaderFramerates || {}),
+			...Object.keys(peer.programFramerates || {}),
+		])
+		for (const ch of [...frKeys].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))) {
+			const leaderFr = ph.leaderFramerates?.[ch]
+			const followerFr = ph.followerFramerates?.[ch] || peer.programFramerates?.[ch]
+			if (!leaderFr && !followerFr) continue
+			rows.push({
+				label: `PGM ch ${ch} fps`,
+				value: `${formatCasparFps(leaderFr)} / ${formatCasparFps(followerFr)}`,
+			})
+		}
+		return rows
+	}
+
+	function buildLocalRows(local, st) {
+		if (!local) return []
+		const map = local.channelMap || {}
+		const pgm = (map.programChannels || []).map((ch) => `ch${ch}`).join(', ') || '—'
+		const prv = (map.previewChannels || [])
+			.map((ch, i) => (ch == null ? `screen${i + 1}:off` : `screen${i + 1}:ch${ch}`))
+			.join(', ')
+		return [
+			{ label: 'This server', value: local.hostname || local.selfId || '—' },
+			{ label: 'Role', value: local.role || st.role || '—' },
+			{ label: 'PGM channels', value: pgm },
+			{ label: 'PRV channels', value: prv || '—' },
+			{
+				label: 'Multiview',
+				value: map.multiviewCh == null ? 'off' : `ch ${map.multiviewCh}`,
+			},
+		]
+	}
+
+	function buildTransportRows(st) {
+		const conn = st.connection
+		if (!conn) return []
+		const cp = st.casparParity
+		const rows = [
+			{
+				label: 'Peer HTTP',
+				value: conn.peerHttp?.reachable
+					? `online · ${formatAgeMs(conn.peerHttp.pingAgeMs)}`
+					: conn.peerHttp?.rawReachable
+						? `stale · ${formatAgeMs(conn.peerHttp.pingAgeMs)}`
+						: 'offline',
+			},
+			{
+				label: 'Peer link',
+				value: st.peerLinkReady
+					? 'ready'
+					: st.peerHttpReachable
+						? 'HTTP only (WS pending)'
+						: st.peerPingError || 'offline',
+			},
+		]
+		if (cp && !cp.skipped) {
+			rows.push({
+				label: 'Caspar channels',
+				value: cp.ok
+					? `${cp.leaderChannelCount} match`
+					: `${cp.followerChannelCount ?? '?'}/${cp.leaderChannelCount ?? '?'} (backup/leader)`,
+			})
+		}
+		if (conn.peerLiveWs) {
+			const ws = conn.peerLiveWs
+			if (ws.direction === 'outbound') {
+				rows.push({
+					label: 'Live-state WS',
+					value: ws.connected ? 'connected (outbound)' : 'disconnected',
+				})
+			} else {
+				rows.push({
+					label: 'Live-state WS',
+					value:
+						ws.clientCount > 0
+							? `${ws.clientCount} follower client(s)`
+							: 'no follower WS clients',
+				})
+			}
+		}
+		if (conn.peerCaspar?.active) {
+			const ep = conn.peerCaspar.endpoint
+			const epStr = ep?.host ? `${ep.host}:${ep.port || 5250}` : '—'
+			rows.push({
+				label: 'Peer Caspar AMCP',
+				value: conn.peerCaspar.connected ? `connected → ${epStr}` : 'disconnected',
+			})
+		}
+		return rows
+	}
+
+	function syncConnectionPanel(st) {
+		const show = st?.enabled && st.peer?.host
+		connectionDetails.hidden = !show
+		if (!show) {
+			channelParityLine.hidden = true
+			connectionWarnLine.hidden = true
+			localTableHost.replaceChildren()
+			peerTableHost.replaceChildren()
+			transportTableHost.replaceChildren()
+			return
+		}
+
+		const localRole = st.role || 'standalone'
+		const peerRole = st.peerBox?.role || (localRole === 'leader' ? 'follower' : 'leader')
+		const peerLabel = peerRole === 'leader' ? 'Leader' : peerRole === 'follower' ? 'Follower' : 'Peer'
+		connectionSummary.innerHTML = `<strong>Connection</strong> — ${localRole} ↔ ${peerLabel}`
+
+		const cp = st.channelParity || {}
+		channelParityLine.hidden = false
+		const parityOk = cp.ok && cp.configHashMatch !== false
+		channelParityLine.textContent = formatChannelParity(cp)
+		channelParityLine.classList.toggle('device-view__replication-channel-parity--ok', parityOk)
+		channelParityLine.classList.toggle('device-view__replication-channel-parity--warn', !parityOk)
+
+		const caspar = st.casparParity
+		const casparText = formatCasparParity(caspar, localRole)
+		casparParityLine.hidden = !casparText
+		if (casparText) {
+			casparParityLine.textContent = casparText
+			const casparOk = !!caspar?.ok
+			casparParityLine.classList.toggle('device-view__replication-caspar-parity--ok', casparOk)
+			casparParityLine.classList.toggle('device-view__replication-caspar-parity--warn', !casparOk)
+		}
+
+		const peer = st.peerBox || st.follower
+		localTableHost.replaceChildren(buildInspectorTable(buildLocalRows(st.local, st)))
+		peerTableHost.replaceChildren(buildInspectorTable(buildPeerRows(peer, st, peerLabel)))
+		transportTableHost.replaceChildren(buildInspectorTable(buildTransportRows(st)))
+
+		const warnings = []
+		if (cp.peerAvailable && !cp.ok) {
+			warnings.push(formatChannelParity(cp))
+		}
+		if (caspar && !caspar.skipped && !caspar.ok) {
+			warnings.push(formatCasparParity(caspar, localRole))
+			if (caspar.fixHint && localRole === 'follower') {
+				warnings.push(caspar.fixHint)
+			}
+		}
+		if (caspar?.regenerateAttempted && !caspar?.regenerateOk) {
+			warnings.push(`Caspar regenerate failed: ${caspar.regenerateError || 'unknown error'}`)
+		}
+		if (cp.configHashMatch === false) {
+			warnings.push('Replication config hash differs from peer — review pairing and saved settings.')
+		}
+		if (Array.isArray(st.playheadSync?.fpsMismatch) && st.playheadSync.fpsMismatch.length) {
+			warnings.push(
+				`Channel fps mismatch: ${st.playheadSync.fpsMismatch.map((m) => `ch${m.channel}`).join(', ')}`,
+			)
+		}
+		if (Math.abs(st.playheadSync?.driftMs ?? 0) >= 500) {
+			warnings.push(`Playhead drift ${formatDriftMs(st.playheadSync.driftMs)} — check Caspar load and video modes.`)
+		}
+		if (st.amcpFanout?.active && !st.amcpFanout.connected) {
+			warnings.push('AMCP fan-out disconnected — backup may not receive live takes.')
+		}
+		if (st.connection?.peerLiveWs?.direction === 'outbound' && !st.connection.peerLiveWs.connected) {
+			warnings.push('Live-state WebSocket disconnected — mirror may be stale after restart.')
+		}
+		if (st.peerHttpReachable && !st.peerLinkReady) {
+			warnings.push('Peer HTTP ok but live-state WebSocket not connected — mirror may be stale.')
+		} else if (!(st.peerLinkReady ?? st.peerReachable)) {
+			const err = st.peerPingError ? ` (${st.peerPingError})` : ''
+			warnings.push(`Peer link not ready${err} — use Refresh connection after restarts.`)
+		}
+		connectionWarnLine.hidden = !warnings.length
+		connectionWarnLine.textContent = warnings.join(' ')
+	}
+
+	function syncFollowerPanel(st) {
+		syncConnectionPanel(st)
+	}
+
 	function formatStatus(st) {
 		if (!st) return 'Replication unavailable'
 		const parts = [`Role: ${st.role || 'standalone'}`]
@@ -144,16 +500,34 @@ export function renderReplicationInspector(host, ctx) {
 		if (st.enabled) {
 			const peerLabel = st.peerSelfId || st.peerHostname || st.peer?.host || '?'
 			parts.push(`paired → ${peerLabel}`)
-			parts.push(st.peerReachable ? 'peer online' : 'peer offline')
+			const linkOk = st.peerLinkReady ?? st.peerReachable
+			parts.push(linkOk ? 'peer linked' : st.peerHttpReachable === false ? 'peer offline' : 'peer connecting…')
+			if (!linkOk && st.peerPingError) parts.push(st.peerPingError)
 		} else if (!st.leaderAvailable) {
 			parts.push('not paired')
 		}
-		if (st.mediaSync?.percent != null) parts.push(`media ${st.mediaSync.percent}%`)
+		if (st.mediaSync?.percent != null) {
+			const transport = st.mediaSync.transport === 'syncthing' ? 'syncthing' : 'rsync'
+			parts.push(`media ${st.mediaSync.percent}% (${transport})`)
+		}
 		if (st.casparOutput?.ok === false && st.casparOutput.warnings?.length) parts.push('Caspar output needs wiring')
 		if (st.scheduledApply === false) parts.push('mirror immediate')
 		else if (st.scheduledApplyLeadMs != null) parts.push(`mirror lead ${st.scheduledApplyLeadMs}ms`)
 		if (st.peerLiveStateSeq > 0 && st.lastAppliedSeq < st.peerLiveStateSeq) {
 			parts.push(`behind seq ${st.peerLiveStateSeq - st.lastAppliedSeq}`)
+		}
+		if (st.role === 'leader' && st.amcpFanout?.active) {
+			parts.push(st.amcpFanout.connected ? 'fan-out connected' : 'fan-out disconnected')
+			if (st.playheadSync?.lastSampleAt && Number.isFinite(st.playheadSync.driftMs)) {
+				parts.push(`drift ${formatDriftMs(st.playheadSync.driftMs)}`)
+			}
+		}
+		if (st.casparParity && !st.casparParity.skipped && !st.casparParity.ok) {
+			if (st.casparParity.followerNeedsMoreChannels) {
+				parts.push(`backup +${st.casparParity.missingCount} ch needed`)
+			} else {
+				parts.push('Caspar mismatch')
+			}
 		}
 		return parts.join(' · ')
 	}
@@ -169,28 +543,8 @@ export function renderReplicationInspector(host, ctx) {
 		outputWarnLine.textContent = warnings.map((w) => w.message).join(' ')
 	}
 
-	async function refreshStatus() {
-		try {
-			lastStatus = await api.get('/api/replication/status')
-			statusLine.textContent = formatStatus(lastStatus)
-			if (lastStatus.enabled) {
-				applyServerMode(lastStatus)
-				localWiringNote.hidden = false
-			} else {
-				localWiringNote.hidden = true
-				if (!modeUserSet) {
-					modeSel.value = lastStatus.leaderAvailable ? 'leader' : 'standalone'
-				}
-			}
-			syncLeaderSelect(lastStatus)
-			syncOutputWarnings(lastStatus)
-			syncModeUi()
-		} catch (e) {
-			statusLine.textContent = `Replication unavailable: ${e?.message || e}`
-		}
-	}
-
-	scanBtn.onclick = async () => {
+	async function scanForLeaders(opts = {}) {
+		const { quiet = false } = opts
 		scanBtn.disabled = true
 		try {
 			const res = await api.get('/api/replication/leaders')
@@ -208,13 +562,49 @@ export function renderReplicationInspector(host, ctx) {
 				opt.textContent = `${l.hostname || l.host} (${l.selfId || l.host})`
 				leaderSel.append(opt)
 			}
-			setStatus(ctx.statusEl, `Found ${leaders.length} leader(s)`, true)
-			showAppToast(leaders.length ? `Found ${leaders.length} leader(s)` : 'No leaders on subnet', leaders.length ? 'success' : 'warn')
+			if (!quiet) {
+				setStatus(ctx.statusEl, `Found ${leaders.length} leader(s)`, true)
+				showAppToast(
+					leaders.length ? `Found ${leaders.length} leader(s)` : 'No leaders on subnet',
+					leaders.length ? 'success' : 'warn',
+				)
+			}
+			return leaders
 		} catch (e) {
-			setStatus(ctx.statusEl, e?.message || String(e), false)
-			showAppToast(e?.message || String(e), 'error')
+			if (!quiet) {
+				setStatus(ctx.statusEl, e?.message || String(e), false)
+				showAppToast(e?.message || String(e), 'error')
+			}
+			throw e
 		} finally {
 			scanBtn.disabled = false
+		}
+	}
+
+	async function refreshStatus() {
+		try {
+			lastStatus = await api.get('/api/replication/status')
+			statusLine.textContent = formatStatus(lastStatus)
+			syncFollowerPanel(lastStatus)
+			if (lastStatus.enabled) {
+				localWiringNote.hidden = false
+			} else {
+				localWiringNote.hidden = true
+			}
+			syncModeFromStatus(lastStatus)
+			syncLeaderSelect(lastStatus)
+			syncOutputWarnings(lastStatus)
+			syncModeUi()
+		} catch (e) {
+			statusLine.textContent = `Replication unavailable: ${e?.message || e}`
+		}
+	}
+
+	scanBtn.onclick = async () => {
+		try {
+			await scanForLeaders()
+		} catch {
+			/* toast/status in scanForLeaders */
 		}
 	}
 
@@ -290,6 +680,7 @@ export function renderReplicationInspector(host, ctx) {
 		disconnectBtn.disabled = true
 		try {
 			await api.post('/api/replication/disconnect', {})
+			setReplicationInspectorMode('standalone')
 			setStatus(ctx.statusEl, 'Standalone — local playout continues', true)
 			showAppToast('Disconnected — standalone playout', 'warn')
 			refreshReplicationStatusSoon()
@@ -302,19 +693,60 @@ export function renderReplicationInspector(host, ctx) {
 		}
 	}
 
+	refreshConnBtn.onclick = async () => {
+		if (!lastStatus?.enabled) {
+			showAppToast('Not paired — connect to a leader first', 'warn')
+			return
+		}
+		refreshConnBtn.disabled = true
+		showAppToast('Refreshing replication connection…', 'info')
+		try {
+			const out = await api.post('/api/replication/refresh-connection', {})
+			const ok = !!out?.ok
+			if (out?.status) {
+				lastStatus = out.status
+				statusLine.textContent = formatStatus(lastStatus)
+				syncConnectionPanel(lastStatus)
+				syncLeaderSelect(lastStatus)
+				syncOutputWarnings(lastStatus)
+				syncModeUi()
+			} else {
+				await refreshStatus()
+			}
+			const msg = ok
+				? out.pingOk
+					? 'Connection refreshed'
+					: `Reloaded transports; peer ping failed: ${out.pingError || 'unknown'}`
+				: out?.error || 'Refresh failed'
+			setStatus(ctx.statusEl, msg, ok && out.pingOk !== false)
+			showAppToast(msg, ok ? (out.pingOk ? 'success' : 'warn') : 'error')
+			refreshReplicationStatusSoon()
+			if (ok && typeof ctx.load === 'function') await ctx.load()
+		} catch (e) {
+			setStatus(ctx.statusEl, e?.message || String(e), false)
+			showAppToast(e?.message || String(e), 'error')
+		} finally {
+			refreshConnBtn.disabled = false
+		}
+	}
+
 	reloadLocalBtn.onclick = async () => {
 		reloadLocalBtn.disabled = true
-		showAppToast('Regenerating Caspar config from local Device View…', 'info')
+		showAppToast('Applying Device View setup and regenerating Caspar…', 'info')
 		try {
-			const out = await api.post('/api/replication/reload-local-machine', {})
-			const ok = !!out?.ok && out?.caspar?.ok !== false
-			setStatus(
-				ctx.statusEl,
-				ok ? 'Caspar config regenerated from this server’s Device View' : out?.caspar?.body?.error || 'Regenerate failed',
-				ok,
-			)
-			showAppToast(ok ? 'Caspar config regenerated' : out?.caspar?.body?.error || 'Regenerate failed', ok ? 'success' : 'error')
-			if (ok && typeof ctx.load === 'function') await ctx.load()
+			const out = await api.post('/api/replication/apply-device-view-caspar', {})
+			const parity = out?.parity
+			const ok = !!out?.ok && parity?.ok !== false && parity?.regenerateOk !== false
+			const msg = parity?.ok
+				? 'Caspar channels now match leader'
+				: parity?.followerNeedsMoreChannels
+					? `Still short ${parity.missingCount} channel(s) — check Device View destinations`
+					: parity?.regenerateError || out?.parity?.mismatches?.[0]?.message || 'Regenerate finished — review parity'
+			setStatus(ctx.statusEl, msg, ok)
+			showAppToast(msg, ok ? 'success' : 'warn')
+			refreshReplicationStatusSoon()
+			await refreshStatus()
+			if (typeof ctx.load === 'function') await ctx.load()
 		} catch (e) {
 			setStatus(ctx.statusEl, e?.message || String(e), false)
 			showAppToast(e?.message || String(e), 'error')
@@ -324,20 +756,39 @@ export function renderReplicationInspector(host, ctx) {
 	}
 
 	modeSel.onchange = async () => {
-		modeUserSet = true
+		const mode = modeSel.value
+		setReplicationInspectorMode(mode)
 		syncModeUi()
-		if (modeSel.value === 'follower' && lastStatus?.leaderAvailable && !lastStatus?.enabled) {
+
+		if (mode === 'follower') {
 			try {
-				await api.post('/api/replication/stop-leader', {})
-				showAppToast('Leader availability stopped — scan and connect', 'info')
-				refreshReplicationStatusSoon()
-				await refreshStatus()
-			} catch (e) {
-				showAppToast(e?.message || String(e), 'error')
+				await scanForLeaders({ quiet: false })
+			} catch {
+				/* scanForLeaders reports errors */
 			}
+			if (lastStatus?.leaderAvailable && !lastStatus?.enabled) {
+				try {
+					await api.post('/api/replication/stop-leader', {})
+					showAppToast('Leader availability stopped — pick a leader and connect', 'info')
+					refreshReplicationStatusSoon()
+					await refreshStatus()
+				} catch (e) {
+					showAppToast(e?.message || String(e), 'error')
+				}
+			}
+			return
+		}
+
+		if (mode === 'standalone') {
+			/* keep intent only — no scan */
 		}
 	}
-	void refreshStatus()
+
+	void refreshStatus().then(() => {
+		if (getReplicationInspectorMode() === 'follower' && !lastStatus?.enabled) {
+			void scanForLeaders({ quiet: true }).catch(() => {})
+		}
+	})
 	pollTimer = setInterval(() => void refreshStatus(), 3000)
 
 	const onFocus = () => void refreshStatus()

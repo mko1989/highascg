@@ -155,6 +155,36 @@ else
 	fi
 fi
 
+# --- Companion + highpass-highascg module (clone snapshot) ---
+EMBED_COMPANION="${HIGHASCG_ISO_EMBED_COMPANION:-1}"
+if [[ "$EMBED_COMPANION" == "1" ]]; then
+	COMPANION_BIN="/home/casparcg/companion/companion_headless.sh"
+	COMPANION_MOD="/home/casparcg/.config/companion/modules/highpass-highascg/main.js"
+	if [[ -x "$COMPANION_BIN" ]]; then
+		ok "Companion headless present ($(du -sh /home/casparcg/companion 2>/dev/null | awk '{print $1}'))"
+	else
+		fail "Companion missing at ${COMPANION_BIN} — extract tarball to /home/casparcg/companion before produce"
+	fi
+	if [[ -f "$COMPANION_MOD" ]]; then
+		ok "highpass-highascg module packaged under .config/companion/modules"
+	else
+		fail "highpass-highascg module missing — run tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
+	fi
+	if [[ -f /etc/systemd/system/companion.service ]]; then
+		ok "companion.service unit installed"
+	else
+		fail "missing /etc/systemd/system/companion.service — run prepare-companion-for-eggs-clone.sh"
+	fi
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/companion' "$EXCLUDE"; then
+		fail "exclude.list omits /home/casparcg/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
+	fi
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion' "$EXCLUDE"; then
+		fail "exclude.list omits .config/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
+	fi
+else
+	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skipping Companion clone checks"
+fi
+
 # --- boot branding ready ---
 BRANDING="${HERE}/branding/splash.png"
 THEME_SPLASH="${HERE}/highascg-eggs-theme/theme/livecd/splash.png"

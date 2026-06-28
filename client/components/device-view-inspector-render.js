@@ -4,6 +4,7 @@
 import { CASPAR_HOST } from './device-view-helpers.js'
 import { buildInspectorTable } from './device-view-ui-utils.js'
 import { renderMappingNodeInspector } from './device-view-inspector-mapping.js'
+import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 
 /**
  * @param {any} connector
@@ -35,10 +36,11 @@ export function readableConnectorRows(connector, ctx) {
 			{ label: 'Caspar main', value: main != null ? `Main ${main}` : 'Not mapped' }
 		)
 	} else if (connector.kind === 'decklink_io') {
-		const dir = String(connector?.caspar?.ioDirection || 'in').toLowerCase() === 'out' ? 'out' : 'in'
+		const dir = normalizeDecklinkIoDirection(connector?.caspar)
+		const dirLabel = dir === 'out' ? 'Output' : dir === 'in' ? 'Input' : 'Unassigned'
 		rows.push(
 			{ label: 'Port', value: String(connector.externalRef ?? '?') },
-			{ label: 'Direction', value: dir === 'out' ? 'Output' : 'Input' }
+			{ label: 'Direction', value: dirLabel }
 		)
 	} else if (connector.kind === 'decklink_in') {
 		rows.push(

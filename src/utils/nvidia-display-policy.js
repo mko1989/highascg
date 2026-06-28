@@ -11,8 +11,8 @@ const { REPO_ROOT } = require('../repo-paths')
 
 /** @readonly */
 const APPLY_SCRIPT_CANDIDATES = [
-	'/usr/local/bin/highascg-nvidia-x-apply.sh',
 	path.join(REPO_ROOT, 'tools/runtime/highascg-nvidia-x-apply.sh'),
+	'/usr/local/bin/highascg-nvidia-x-apply.sh',
 ]
 
 /**

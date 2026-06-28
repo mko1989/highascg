@@ -8,6 +8,7 @@ import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { resolveBusLookIdsForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
+import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 
 /**
  * Click on unused deck column area (gaps, empty placeholder, padding below cards).
@@ -82,6 +83,8 @@ export function renderSceneDeck(ctx) {
 	} catch (e) {
 		/* ignore */
 	}
+
+	commitPendingLookNameEdits(mainHost, sceneState)
 
 	mainHost.innerHTML = ''
 	const screenCount = Math.max(1, getScreenCount())
@@ -321,6 +324,7 @@ export function renderSceneDeck(ctx) {
 				(onPreview ? ' scenes-card--preview' : '') +
 				(isGlobal ? ' scenes-card--global' : '') +
 				(cgOnly ? ' scenes-card--cg-only' : '')
+			card.dataset.sceneId = String(sc.id)
 			card.innerHTML = `
 			<div class="scenes-card__header">
 				<input type="text" class="scenes-card__name-input" maxlength="120" spellcheck="false" aria-label="Look name" />

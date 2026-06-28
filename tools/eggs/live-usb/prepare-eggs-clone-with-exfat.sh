@@ -10,6 +10,7 @@ set -euo pipefail
 # Optional env:
 #   HIGHASCG_ROOT=/home/casparcg/highascg   deployed tree path (must contain package.json)
 #   HIGHASCG_ISO_EMBED_SERVER=1             bake server+node_modules into squashfs (default 1)
+#   HIGHASCG_ISO_EMBED_COMPANION=1          bake Companion + highpass-highascg module (default 1)
 #   HIGHASCG_ISO_BUILD_WEB=0                skip dist-web on squashfs (default; deploy via drop-update)
 #   HIGHASCG_ISO_BUILD_WEB=1                legacy: build dist-web on imaging host before clone
 #   HIGHASCG_ISO_EMBED_SERVER=0             WO-47 only: omit Node tree; use exFAT drop-update/
@@ -74,7 +75,10 @@ fi
 echo "==> empty mount stubs for squashfs (${HIGHASCG_ROOT}/media *, ~/exfat)"
 bash "${HERE}/ensure-empty-live-usb-dirs.sh"
 
-echo "==> companion dirs under ${HIGHASCG_ROOT}"
+echo "==> Companion + highpass-highascg module (clone into squashfs)"
+bash "${REPO_ROOT}/tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
+
+echo "==> playout mount stubs under ${HIGHASCG_ROOT}"
 GRP=$(id -gn "$USER_CASPAR")
 mkdir -p "${HIGHASCG_ROOT}/"{bin,media,media/drive,media/exfat,log,template,data,cef-cache,lib}
 
@@ -94,6 +98,8 @@ fi
 
 echo "==> WO-47 systemd units (mount + bind + boot sync)"
 bash "${REPO_ROOT}/scripts/install-exfat-systemd-units.sh" "$USER_CASPAR"
+touch /etc/highascg/server-update-retain-drop
+echo "  installed /etc/highascg/server-update-retain-drop (live USB — keep drop-update/ across boots)"
 
 echo "==> HighAsCG service unit ordering (depends on WO-47 when present)"
 bash "${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh" "$USER_CASPAR"

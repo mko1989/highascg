@@ -52,11 +52,14 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const logLineTimestamps = []
 	let logLineThrottleWarnAt = 0
 
+	let logLineDropped = 0
+
 	function logLineSendAllowed() {
 		if (!Number.isFinite(logLineMaxHz) || logLineMaxHz <= 0) return true
 		const now = Date.now()
 		while (logLineTimestamps.length && now - logLineTimestamps[0] > LOG_LINE_WINDOW_MS) logLineTimestamps.shift()
 		if (logLineTimestamps.length >= logLineMaxHz) {
+			logLineDropped++
 			if (now - logLineThrottleWarnAt >= 10_000) {
 				logLineThrottleWarnAt = now
 				log(`[WS] log_line traffic exceeded ${logLineMaxHz}/s (rolling ${LOG_LINE_WINDOW_MS}ms); dropping excess. Set HIGHASCG_WS_LOG_LINE_MAX_HZ=0 to disable.`)
@@ -309,8 +312,18 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				} else if (msg.type === 'selection_sync' && msg.data) {
 					if (typeof ctx.setUiSelection === 'function') ctx.setUiSelection(ctx, msg.data)
 				} else if (msg.type === 'scene_deck_sync' && msg.data) {
-					const { mergeDeckSyncIntoProject } = require('../engine/project-scenes')
-					mergeDeckSyncIntoProject(ctx, msg.data)
+					const { mergeDeckSyncIntoProject, buildSceneDeckForApi } = require('../engine/project-scenes')
+					const merged = mergeDeckSyncIntoProject(ctx, msg.data)
+					if (merged) {
+						try {
+							const deck = buildSceneDeckForApi(ctx)
+							broadcast('change', { path: 'scene.deck', value: deck })
+						} catch (e) {
+							if (typeof ctx.log === 'function') {
+								ctx.log('warn', '[WS] scene.deck broadcast: ' + (e?.message || e))
+							}
+						}
+					}
 				}
 			} catch (e) {
 				const m = e instanceof Error ? e.message : String(e)
@@ -368,6 +381,10 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	return {
 		wss,
 		clients,
+		getLogLineStats: () => ({
+			dropped: logLineDropped,
+			maxHz: logLineMaxHz,
+		}),
 		stop() {
 			flushPendingStateChanges()
 			if (timer) {

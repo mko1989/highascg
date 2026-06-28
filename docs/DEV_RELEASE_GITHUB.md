@@ -4,7 +4,7 @@ Use this flow when you have a **build host or workstation** running the repo (ty
 
 - **Full image (rare)** — Eggs ISO + tarball: **`npm run release:dev-github`** (needs **`sudo`** / eggs).
 - **Server drop (canonical)** — playout tarball includes API + **`dist-web/`** (built from in-repo **`client/`**):
-  - **`npm run release:github-server`** → `highascg-server_<UTC>.tar.gz` (`src/` + **`dist-web/`**; no raw `client/` sources)
+  - **`npm run release:github-server`** → `highascg-server_<UTC>.tar.gz` (`src/` + **`dist-web/`**; `BUILD_STAMP` + `package.json` `version` = UTC stamp in tarball; working tree restored after pack)
   - **`npm run release:github-launcher`** → Electron hub (sim, multiserver, modules — packaged from `client/tools/electron-launcher/`)
 - **Alpha / app-only (legacy monolith)** — **`npm run release:github-app`** — full repo tarball; prefer **`release:github-server`** for playout.
 

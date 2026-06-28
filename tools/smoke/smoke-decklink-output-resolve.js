@@ -20,10 +20,26 @@ test('matchStandardDecklinkVideoMode: standard id passes through', () => {
 	assert.equal(m.isCustom, false)
 })
 
-test('matchStandardDecklinkVideoMode: custom 8192x1080 is invalid', () => {
+test('matchStandardDecklinkVideoMode: custom 8192x1080 is invalid for exact match', () => {
 	const m = matchStandardDecklinkVideoMode({ videoMode: 'custom', width: 8192, height: 1080, fps: 50 })
 	assert.equal(m.decklinkVideoMode, null)
 	assert.equal(m.isCustom, true)
+})
+
+test('pickAutoDecklinkSdiFormatForFeed: custom 8192x1080 buckets to 1080p at project fps', () => {
+	const { pickAutoDecklinkSdiFormatForFeed } = require('../../src/config/decklink-output-resolve')
+	const p = pickAutoDecklinkSdiFormatForFeed({ videoMode: 'custom', width: 8192, height: 1080, fps: 50 })
+	assert.equal(p.decklinkVideoMode, '1080p5000')
+	assert.equal(p.source, 'auto')
+	assert.equal(p.autoTier, '1080p')
+})
+
+test('pickAutoDecklinkSdiFormatForFeed: custom 3072x1728 buckets to 2160p at project fps', () => {
+	const { pickAutoDecklinkSdiFormatForFeed } = require('../../src/config/decklink-output-resolve')
+	const p = pickAutoDecklinkSdiFormatForFeed({ videoMode: 'custom', width: 3072, height: 1728, fps: 50 })
+	assert.equal(p.decklinkVideoMode, '2160p5000')
+	assert.equal(p.source, 'auto')
+	assert.equal(p.autoTier, '2160p')
 })
 
 test('matchStandardDecklinkVideoMode: exact WxH maps to standard', () => {
@@ -70,7 +86,7 @@ test('resolver: MVR destination 2160p5000 cabled to decklink_out is ok', () => {
 	assert.equal(st.decklinkVideoMode, '2160p5000')
 })
 
-test('resolver: custom destination cabled to decklink is invalid without SDI format', () => {
+test('resolver: custom destination cabled to decklink auto-picks 1080p SDI format', () => {
 	const app = clone(defaults)
 	app.screenDestinations = {
 		version: 1,
@@ -100,8 +116,9 @@ test('resolver: custom destination cabled to decklink is invalid without SDI for
 	}
 	const statuses = listDecklinkOutputStatuses(app)
 	assert.equal(statuses.length, 1)
-	assert.equal(statuses[0].ok, false)
-	assert.match(String(statuses[0].reason || ''), /SDI output format/i)
+	assert.equal(statuses[0].ok, true)
+	assert.equal(statuses[0].decklinkVideoMode, '1080p5000')
+	assert.match(String(statuses[0].reason || ''), /Auto 1080p5000/i)
 })
 
 test('resolver: custom destination with explicit SDI format is ok', () => {
@@ -237,7 +254,7 @@ test('generator XML: custom PGM screen emits decklink without subregion when SDI
 	assert.match(xml, /Screen 1 program[\s\S]*<embedded-audio>true<\/embedded-audio>/)
 })
 
-test('generator XML: custom PGM omits decklink without explicit SDI format', () => {
+test('generator XML: custom PGM auto-picks 2160p decklink when SDI format unset', () => {
 	const app = clone(defaults)
 	app.screenDestinations = {
 		version: 1,
@@ -276,7 +293,7 @@ test('generator XML: custom PGM omits decklink without explicit SDI format', () 
 	}
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const xml = buildConfigXml(flat)
-	assert.doesNotMatch(xml, /Screen 1 program[\s\S]*<decklink>/)
+	assert.match(xml, /Screen 1 program[\s\S]*<decklink>[\s\S]*<video-mode>2160p5000<\/video-mode>/)
 })
 
 test('buildDecklinkKeyFillConsumersXml: fill-only includes consumer defaults', () => {

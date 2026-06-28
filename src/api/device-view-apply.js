@@ -11,6 +11,8 @@ const {
 	collectDestinationOutputEdges,
 	applyStreamRecordMappingsFromGraph,
 } = require('../config/device-graph-output-mapping')
+const { getDestinationOutputWiring } = require('../config/device-graph-destination-wiring')
+const { destinationsFromConfig } = require('../config/screen-destinations')
 
 function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 	const destinationEdges = collectDestinationOutputEdges(ctx.config || {})
@@ -101,8 +103,12 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 		} else {
 			const n = parseInt(String(targetKey.replace(/^screen_/, '')), 10) || 1
 			const prefix = `screen_${n}_`
+			const destList = destinationsFromConfig(ctx.config || {})
+			const destIdx = destList.findIndex((d) => String(d?.id || '') === String(winner.destinationId || ''))
+			const dest = destIdx >= 0 ? destList[destIdx] : null
+			const wiring = dest ? getDestinationOutputWiring(ctx.config || {}, dest, destIdx) : { gpu: false }
 			nextCaspar[`${prefix}decklink_device`] = winner.deviceNum
-			nextCaspar[`${prefix}decklink_replace_screen`] = true
+			nextCaspar[`${prefix}decklink_replace_screen`] = !wiring.gpu
 			writeDecklinkKeyFillToCasparServer(nextCaspar, prefix, {
 				fillDevice: winner.deviceNum,
 				keyDevice: keyFill.enabled ? keyFill.keyDevice : 0,

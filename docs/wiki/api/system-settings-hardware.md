@@ -76,6 +76,8 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 | POST | `/api/system/exfat-sync/run` |
 | GET | `/api/logs` |
 | POST | `/api/logs/clear` |
+| GET | `/api/support/bundle` | Download diagnostics ZIP (configs, logs, GPU/xrandr, network) |
+| POST | `/api/support/bundle` | Same; optional JSON `{ "operatorNote": "…" }` |
 | GET | `/api/host-stats` |
 
 **Caspar:** not required.
@@ -121,6 +123,27 @@ curl -s -X POST http://127.0.0.1:4200/api/system/exfat-sync/run \
 **400** without `dryRun: true` or `confirm: "EXFAT_SYNC"`.
 
 Implementation: [`src/api/routes-exfat-sync.js`](../../../src/api/routes-exfat-sync.js) · [`src/system/exfat-sync.js`](../../../src/system/exfat-sync.js)
+
+### Server logs (`GET /api/logs`)
+
+HighAsCG in-memory log buffer (also streamed live on WebSocket `log_line`). Filter by category and level:
+
+```bash
+curl -s 'http://127.0.0.1:4200/api/logs?lines=200&categories=artnet,os-display&levels=warn,error&caspar=0'
+```
+
+Categories include `system`, `config`, `os-display`, `amcp`, `playback`, `streaming`, `audio`, `network`, `artnet`, `replication`, `websocket`, `device`, `sync`, `debug`. Open the **connection eye** in the Web UI for a live view with category dropdown and level checkboxes.
+
+### Support bundle (`GET /api/support/bundle`)
+
+One ZIP for post-mortems and bug reports — redacted settings, Caspar XML, project summary, system inventory, network, GPU/xrandr layout, log tails, host stats. Filename pattern: `highascg-support_<hostname>_<ISO-timestamp>.zip`. Max size defaults to 25 MB (`HIGHASCG_SUPPORT_BUNDLE_MAX_BYTES`). Sensitive config keys (token, password, secret, …) are replaced with `[REDACTED]`; see `manifest.json` → `redactedKeyPatterns`.
+
+```bash
+curl -s -o support.zip 'http://127.0.0.1:4200/api/support/bundle?logLines=2000&casparLines=500'
+unzip -l support.zip
+```
+
+Same bundle as the **Support bundle** button in the connection-eye logs modal, or **Settings → Diagnostics**. Use after a failure or before contacting support.
 
 ---
 

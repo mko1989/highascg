@@ -45,6 +45,8 @@ UDEV_RULE_DST=/etc/udev/rules.d/99-highascg-exfat-arrive.rules
 UDEV_BRIDGE_RULE_SRC="${REPO_ROOT}/config/udev/99-highascg-bridge-arrive.rules"
 UDEV_BRIDGE_RULE_DST=/etc/udev/rules.d/99-highascg-bridge-arrive.rules
 UPDATE_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-server-update.sh"
+APPLY_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-apply-server-drop.sh"
+WEBUI_UPDATE_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-webui-server-update.sh"
 BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-boot.sh"
 BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-bridge-boot.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
@@ -54,6 +56,8 @@ bridge_prep_svc="highascg-bridge-media-prep.service"
 # systemd: unit name must match Where= path (/home/.../media/bridge → …-media-bridge.mount)
 bridge_media_mount="home-casparcg-highascg-media-bridge.mount"
 UPDATE_SH_DST=/usr/local/lib/highascg/highascg-exfat-server-update.sh
+APPLY_SH_DST=/usr/local/lib/highascg/highascg-apply-server-drop.sh
+WEBUI_UPDATE_SH_DST=/usr/local/lib/highascg/highascg-webui-server-update.sh
 BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
 BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
@@ -64,11 +68,14 @@ UPDATE_EXCLUDE_DST=/etc/highascg/server-update-rsync-excludes.txt
 DOC_EXFAT="${REPO_ROOT}/tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md"
 DOC_MATRIX="${REPO_ROOT}/docs/WO47_ISO_VS_EXFAT.md"
 
-mkdir -p /usr/local/lib/highascg /etc/highascg "$DOC_PKG"
+mkdir -p /usr/local/lib/highascg /etc/highascg /var/cache/highascg/update-staging /var/cache/highascg/updates "$DOC_PKG"
+install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/dev/null || install -d -m 0755 /var/cache/highascg/updates
 [[ -f "$ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$ARRIVE_SH_SRC" "$ARRIVE_SH_DST"
 [[ -f "$BRIDGE_ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_ARRIVE_SH_SRC" "$BRIDGE_ARRIVE_SH_DST"
 [[ -f "$FIX_CFG_SRC" ]] && install -m 0755 -o root -g root "$FIX_CFG_SRC" "$FIX_CFG_DST"
 [[ -f "$UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$UPDATE_SH_SRC" "$UPDATE_SH_DST"
+[[ -f "$APPLY_SH_SRC" ]] && install -m 0755 -o root -g root "$APPLY_SH_SRC" "$APPLY_SH_DST"
+[[ -f "$WEBUI_UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$WEBUI_UPDATE_SH_SRC" "$WEBUI_UPDATE_SH_DST"
 [[ -f "$BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
 [[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
@@ -425,6 +432,8 @@ echo "  ${UDEV_RULE_DST} (hotplug + late USB → ${arrive_svc})"
 echo "  ${UDEV_BRIDGE_RULE_DST} (late NVMe → ${bridge_arrive_svc})"
 echo "  ${BRIDGE_ARRIVE_SH_DST}"
 echo "  ${UPDATE_SH_DST}"
+echo "  ${APPLY_SH_DST}"
+echo "  ${WEBUI_UPDATE_SH_DST}"
 echo "  /etc/highascg/disable-exfat-bootstrap (legacy sim/highascg seed off)"
 echo "  ${BOOT_EXCLUDE_DST} (legacy bootstrap excludes — unused when disabled)"
 echo "  ${UPDATE_EXCLUDE_DST} (server drop — skips client/, dist-web/, runtime)"

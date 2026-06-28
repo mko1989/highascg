@@ -307,7 +307,9 @@ export class SceneState {
 	setSceneName(id, name) {
 		const s = this.getScene(id)
 		if (!s) return
-		s.name = (name || '').trim() || 'Untitled look'
+		const next = (name || '').trim() || 'Untitled look'
+		if (s.name === next) return
+		s.name = next
 		this._save()
 	}
 

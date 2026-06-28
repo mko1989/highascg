@@ -35,22 +35,23 @@ EOF
 fi
 
 README="${ROOT}/drop-update/README.txt"
-if [[ ! -f "$README" ]]; then
-	cat >"$README" <<'EOF'
+cat >"$README" <<'EOF'
 Drop server updates here (contents of highascg-server_*.tar.gz from GitHub releases).
 
-Required: package.json at the top of this folder (along with index.js, src/, tools/runtime/, …).
+Required: package.json, index.js, src/, dist-web/, tools/runtime/ at the top of this folder.
 
-On boot the live system will:
-  - stop highascg.service
-  - rsync this folder → /home/casparcg/highascg (client/ and dist-web/ are not touched)
-  - run npm ci when package-lock.json is included
-  - move this folder to drop-update/applied/<timestamp>/
-  - start highascg.service
+Live USB stick (retain mode):
+  - On every boot, files are rsync'd into /home/casparcg/highascg/
+  - LEAVE the drop here — do not move to applied/ manually
+  - The stick is the durable copy; RAM/overlay does not keep ~/highascg across reboots
+  - Optional history copies may appear under drop-update/applied/ (audit only)
 
-UI/simulation runs from the Electron launcher on Mac/Windows — not from this stick path.
+Persistent install (consume mode):
+  - After a successful apply the drop may move to drop-update/applied/<UTC>/
+  - ~/highascg/ survives reboot on internal disk
+
+Operator UI: http://<playout-ip>:4200/
 EOF
-fi
 
 if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
 	grp="$(id -gn "$USER_CASPAR")"

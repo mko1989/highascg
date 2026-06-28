@@ -265,17 +265,36 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	let includeStream = false
 	let includeDeck = false
 	switch (mvProfile) {
-		case 'stream_only': includeStream = streamingOn; break
-		case 'screen_only': includeScreen = true; break
-		case 'decklink_only': includeDeck = mvDlDev > 0; break
-		case 'screen_decklink': includeScreen = true; includeDeck = mvDlDev > 0; break
-		case 'decklink_stream': includeStream = streamingOn; includeDeck = mvDlDev > 0; break
-		case 'screen_stream_decklink': includeScreen = true; includeStream = streamingOn; includeDeck = mvDlDev > 0; break
+		case 'disabled':
+			break
+		case 'stream_only':
+			includeStream = streamingOn
+			break
+		case 'screen_only':
+			includeScreen = true
+			break
+		case 'decklink_only':
+			includeDeck = mvDlDev > 0
+			break
+		case 'screen_decklink':
+			includeScreen = true
+			includeDeck = mvDlDev > 0
+			break
+		case 'decklink_stream':
+			includeStream = streamingOn
+			includeDeck = mvDlDev > 0
+			break
+		case 'screen_stream_decklink':
+			includeScreen = true
+			includeStream = streamingOn
+			includeDeck = mvDlDev > 0
+			break
 		case 'screen_stream':
-		default: includeScreen = true; includeStream = streamingOn; break
+		default:
+			includeScreen = true
+			includeStream = streamingOn
+			break
 	}
-	if (mvProfile === 'decklink_only' && !includeDeck) includeScreen = true
-	if (!includeScreen && !includeStream && !includeDeck) includeScreen = true
 
 	const screenBlock = includeScreen ? `\n                <screen>\n                    ${screenXml}\n                </screen>` : ''
 	const mvKeyFill = readDecklinkKeyFillSettings(config, 'multiview_')
