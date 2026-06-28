@@ -59,7 +59,7 @@ export function syncComposePreviewJpegQualityLabel(modal) {
 }
 
 export function syncComposePreviewModeVisibility(modal) {
-	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'canvas'
+	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'ffmpeg_jpeg'
 	const ffmpegFields = modal.querySelector('#set-compose-preview-ffmpeg-fields')
 	const tickFields = modal.querySelector('#set-compose-preview-tick-fields')
 	if (ffmpegFields) ffmpegFields.style.display = mode === 'ffmpeg_jpeg' ? '' : 'none'
@@ -105,12 +105,17 @@ export function buildSettingsPayload(modal) {
 		companion: {
 			host: modal.querySelector('#set-companion-host').value || '127.0.0.1',
 			port: parseInt(modal.querySelector('#set-companion-port').value, 10) || 8000,
+			satelliteEnabled: !!(modal.querySelector('#set-companion-satellite-enabled') || {}).checked,
+			satelliteHost: (modal.querySelector('#set-companion-satellite-host') || {}).value?.trim?.() ?? '',
+			satellitePort: parseInt((modal.querySelector('#set-companion-satellite-port') || {}).value, 10) || 16622,
+			previewBitmapSize: parseInt((modal.querySelector('#set-companion-preview-size') || {}).value, 10) || 72,
+			pickerGridSize: parseInt((modal.querySelector('#set-companion-picker-grid') || {}).value, 10) || 8,
 		},
 		audioRouting: { ...prevAr, ...openalAr },
 		composePreview: {
 			...(prevAll.composePreview || {}),
-			mode: modal.querySelector('#set-compose-preview-mode')?.value ?? prevAll.composePreview?.mode ?? 'canvas',
-			fps: clampComposePreviewFps(modal.querySelector('#set-compose-preview-fps')?.value ?? prevAll.composePreview?.fps ?? 2),
+			mode: modal.querySelector('#set-compose-preview-mode')?.value ?? prevAll.composePreview?.mode ?? 'ffmpeg_jpeg',
+			fps: clampComposePreviewFps(modal.querySelector('#set-compose-preview-fps')?.value ?? prevAll.composePreview?.fps ?? 25),
 			resolutionScale: modal.querySelector('#set-compose-preview-scale')?.value ?? prevAll.composePreview?.resolutionScale ?? 'half',
 			jpegQuality: clampComposePreviewJpegQuality(modal.querySelector('#set-compose-preview-jpeg-q')?.value ?? prevAll.composePreview?.jpegQuality ?? 10),
 			tickIntervalMs: clampComposePreviewTickMs(modal.querySelector('#set-compose-preview-tick-ms')?.value ?? prevAll.composePreview?.tickIntervalMs ?? 125),
@@ -165,6 +170,16 @@ export function hydrateSettings(modal, cfg) {
 	const comp = cfg.companion || {}
 	modal.querySelector('#set-companion-host').value = comp.host || '127.0.0.1'
 	modal.querySelector('#set-companion-port').value = comp.port || 8000
+	const satEn = modal.querySelector('#set-companion-satellite-enabled')
+	if (satEn) satEn.checked = comp.satelliteEnabled !== false
+	const satHost = modal.querySelector('#set-companion-satellite-host')
+	if (satHost) satHost.value = comp.satelliteHost || ''
+	const satPort = modal.querySelector('#set-companion-satellite-port')
+	if (satPort) satPort.value = comp.satellitePort ?? 16622
+	const prevSize = modal.querySelector('#set-companion-preview-size')
+	if (prevSize) prevSize.value = comp.previewBitmapSize ?? 72
+	const pickerGrid = modal.querySelector('#set-companion-picker-grid')
+	if (pickerGrid) pickerGrid.value = comp.pickerGridSize ?? 8
 	const lmp = modal.querySelector('#set-local-media-path'); if (lmp) lmp.value = cfg.local_media_path || ''
 	const u = cfg.usbIngest || {}
 	const usbEn = modal.querySelector('#set-usb-enabled'); if (usbEn) usbEn.checked = u.enabled !== false
@@ -198,13 +213,16 @@ export function hydrateSettings(modal, cfg) {
 	const cp = cfg.composePreview || {}
 	const cpMode = modal.querySelector('#set-compose-preview-mode')
 	if (cpMode) {
-		const m = cp.mode === 'ffmpeg_jpeg' || cp.mode === 'caspar_image' ? cp.mode : 'canvas'
+		const m =
+			cp.mode === 'ffmpeg_jpeg' || cp.mode === 'caspar_image' || cp.mode === 'canvas'
+				? cp.mode
+				: 'ffmpeg_jpeg'
 		cpMode.value = m
 	}
 	syncComposePreviewModeVisibility(modal)
 	const cpFps = modal.querySelector('#set-compose-preview-fps')
 	if (cpFps) {
-		cpFps.value = String(clampComposePreviewFps(cp.fps ?? 2))
+		cpFps.value = String(clampComposePreviewFps(cp.fps ?? 25))
 		syncComposePreviewFpsLabel(modal)
 	}
 	const cpScale = modal.querySelector('#set-compose-preview-scale')

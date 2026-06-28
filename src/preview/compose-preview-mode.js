@@ -15,8 +15,8 @@ function resolveComposePreviewMode(config) {
 	const env = process.env.HIGHASCG_COMPOSE_PREVIEW_MODE
 	if (env === 'ffmpeg_jpeg' || env === 'caspar_image' || env === 'canvas') return env
 	const mode = config?.composePreview?.mode
-	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image') return mode
-	return 'canvas'
+	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image' || mode === 'canvas') return mode
+	return 'ffmpeg_jpeg'
 }
 
 /**
@@ -55,8 +55,10 @@ function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 	return {
 		...prev,
 		mode:
-			prev.mode === 'ffmpeg_jpeg' || prev.mode === 'caspar_image' ? prev.mode : 'canvas',
-		fps: clampComposePreviewFps(prev.fps, defaults.fps ?? 2),
+			prev.mode === 'ffmpeg_jpeg' || prev.mode === 'caspar_image' || prev.mode === 'canvas'
+				? prev.mode
+				: 'ffmpeg_jpeg',
+		fps: clampComposePreviewFps(prev.fps, defaults.fps ?? 25),
 		resolutionScale: normalizeResolutionScale(prev.resolutionScale),
 		jpegQuality: clampJpegQuality(prev.jpegQuality, defaults.jpegQuality ?? 10),
 		tickIntervalMs:

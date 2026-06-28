@@ -185,6 +185,23 @@ else
 	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skipping Companion clone checks"
 fi
 
+# --- Calamares (install-to-disk on live ISO) ---
+EMBED_CALAMARES="${HIGHASCG_ISO_EMBED_CALAMARES:-1}"
+if [[ "$EMBED_CALAMARES" == "1" ]]; then
+	if command -v calamares >/dev/null 2>&1 && [[ -x /usr/bin/calamares || -x "$(command -v calamares)" ]]; then
+		ok "Calamares present ($(calamares --version 2>/dev/null | head -1 || echo installed))"
+	else
+		fail "Calamares missing — run tools/eggs/live-usb/install-eggs-calamares.sh before produce"
+	fi
+	if command -v eggs >/dev/null 2>&1 && eggs calamares --help >/dev/null 2>&1; then
+		ok "eggs calamares CLI available"
+	else
+		fail "eggs calamares not available — run install-eggs-calamares.sh"
+	fi
+else
+	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skipping Calamares checks"
+fi
+
 # --- boot branding ready ---
 BRANDING="${HERE}/branding/splash.png"
 THEME_SPLASH="${HERE}/highascg-eggs-theme/theme/livecd/splash.png"

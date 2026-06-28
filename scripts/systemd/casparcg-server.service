@@ -1,0 +1,27 @@
+[Unit]
+Description=CasparCG Server (HighAsCG playout)
+After=network.target nodm.service casparcg-scanner.service
+Wants=casparcg-scanner.service nodm.service
+ConditionPathExists=/home/casparcg/highascg/run.sh
+StartLimitIntervalSec=300
+StartLimitBurst=8
+
+[Service]
+Type=simple
+User=casparcg
+Group=casparcg
+UMask=002
+WorkingDirectory=/home/casparcg/highascg
+Environment=CASPAR_SYSTEMD_SERVICE=1
+Environment=CASPAR_INHIBIT_FILE=/run/highascg/inhibit-caspar-autostart
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/casparcg/.Xauthority
+ExecStart=/home/casparcg/highascg/run.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+KillMode=mixed
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

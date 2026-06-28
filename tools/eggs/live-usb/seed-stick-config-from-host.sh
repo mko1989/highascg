@@ -18,8 +18,8 @@ USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"
 MP="${HIGHASCG_EXFAT_ROOT:-/home/casparcg/exfat}"
 DEV="${1:-}"
 
-if [[ "${HIGHASCG_SEED_STICK_CONFIG:-1}" == "0" ]]; then
-	echo "==> Skip stick config seed (HIGHASCG_SEED_STICK_CONFIG=0)"
+if [[ "${HIGHASCG_SEED_STICK_CONFIG:-0}" == "0" ]]; then
+	echo "==> Skip stick config seed (HIGHASCG_SEED_STICK_CONFIG=0; use seed-stick-factory-config.sh for factory defaults)"
 	exit 0
 fi
 

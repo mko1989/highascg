@@ -50,6 +50,12 @@ function hashConfig(cfg) {
  */
 function startReplicationService(ctx, wsInfo = {}) {
 	_ctx = ctx
+	try {
+		const { ensureLocalReplicationSelfId } = require('./replication-local-identity')
+		ensureLocalReplicationSelfId(ctx)
+	} catch {
+		/* optional */
+	}
 	const repl = getReplicationConfig(ctx.config)
 	const roleState = new RoleState()
 	roleState.configure({ enabled: repl.enabled, role: repl.role })
@@ -122,6 +128,15 @@ function startReplicationService(ctx, wsInfo = {}) {
 	if (repl.enabled && repl.peer.host) {
 		const { reloadReplicationFromConfig } = require('./replication-reload')
 		reloadReplicationFromConfig(ctx)
+		try {
+			const { ensureReplicationSshKey, ensurePeerAuthorizedKeyFromConfig } = require('./replication-ssh-setup')
+			ensureReplicationSshKey(ctx.log)
+			ensurePeerAuthorizedKeyFromConfig(ctx)
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[replication] SSH key boot prepare: ${e?.message || e}`)
+			}
+		}
 		void (async () => {
 			try {
 				const { forcePeerPing } = require('./replication-refresh')
@@ -401,9 +416,9 @@ async function buildReplicationStatus(ctx) {
 		disconnectPolicy: repl.disconnectPolicy,
 		syncClock: repl.syncClock,
 		clockOffsetMs: runtime?.clockOffsetMs ?? 0,
-		peer: { host: repl.peer.host, port: repl.peer.port },
-		peerSelfId: peerPing?.selfId || peerPing?.hostname || null,
-		peerHostname: peerPing?.hostname || null,
+		peer: repl.enabled && repl.peer?.host ? { host: repl.peer.host, port: repl.peer.port } : { host: '', port: repl.peer.port || 4200 },
+		peerSelfId: repl.enabled ? peerPing?.selfId || peerPing?.hostname || null : null,
+		peerHostname: repl.enabled ? peerPing?.hostname || null : null,
 		peerReachable: peerHttpReachable,
 		peerLinkReady,
 		peerHttpReachable,

@@ -30,6 +30,7 @@ const { replicationDefaults } = require('./defaults-replication')
  * @property {{ host: string, port: number, connectTimeoutMs?: number }} peerCaspar
  * @property {{ enabled?: boolean, confirmLooks?: boolean, maxUnconfirmed?: number }} amcpFanout
  * @property {{ enabled?: boolean, softThresholdMs?: number, hardThresholdMs?: number, sampleIntervalMs?: number, minCorrectionIntervalMs?: number, maxCorrectionsPerMinute?: number }} playheadSync
+ * @property {string} peerSshPublicKey
  */
 
 /**
@@ -107,6 +108,7 @@ function normalizeReplicationConfig(raw) {
 				),
 			}
 		})(),
+		peerSshPublicKey: String(o.peerSshPublicKey || '').trim(),
 	}
 }
 

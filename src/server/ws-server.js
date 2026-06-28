@@ -8,6 +8,8 @@
 const WebSocket = require('ws')
 const { dispatchStructuredAmcp, isStructuredAmcpMessage } = require('./ws-amcp-dispatch')
 const { dispatchCatalogWsMessage } = require('./ws-catalog-handlers')
+const { getCompanionBridgeRegistry } = require('../companion-bridge/registry')
+const { WS: COMPANION_WS } = require('../companion-bridge/contract')
 
 /**
  * @typedef {object} WsAppContext
@@ -163,6 +165,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	}
 
 	ctx._wsBroadcast = broadcast
+	ctx.companionBridge = getCompanionBridgeRegistry()
  
 	// Hook into StateManager for real-time push
 	if (ctx.state && typeof ctx.state.on === 'function') {
@@ -200,20 +203,22 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const onUpgrade = (req, socket, head) => {
 		const urlRaw = req.url || ''
 		const p = urlRaw.split('?')[0]
-		log(`[WS Upgrade] Attempt for path: ${p}`)
 		const isReplPath = p === '/api/replication/ws'
 		const isWsPath =
 			p === '/api/ws' ||
 			p === '/ws' ||
 			/^\/instance\/[^/]+\/api\/ws$/.test(p) ||
 			/^\/instance\/[^/]+\/ws$/.test(p)
-		log(`[WS Upgrade] isWsPath: ${isWsPath} isReplPath: ${isReplPath}`)
+		if (isReplPath || isWsPath) {
+			log(`[WS Upgrade] Attempt for path: ${p}`)
+		}
 		if (isReplPath) {
 			try {
 				const qs = new URL(urlRaw, 'http://127.0.0.1')
 				const token = qs.searchParams.get('token') || ''
 				const replToken = ctx.config?.replication?.peer?.token || ''
-				if (!replToken || token !== replToken) {
+				const replEnabled = !!ctx.config?.replication?.enabled
+				if (!replEnabled || !replToken || token !== replToken) {
 					socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
 					socket.destroy()
 					return
@@ -311,6 +316,16 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					if (typeof ctx.log === 'function') ctx.log('debug', 'Multiview layout synced from web UI')
 				} else if (msg.type === 'selection_sync' && msg.data) {
 					if (typeof ctx.setUiSelection === 'function') ctx.setUiSelection(ctx, msg.data)
+				} else if (msg.type === COMPANION_WS.COMPANION_HELLO && msg.data) {
+					if (getCompanionBridgeRegistry().register(ws, msg.data)) {
+						ws.send(safeStringify({ type: 'companion.hello_ack', data: { ok: true } }))
+						if (typeof ctx.log === 'function') {
+							ctx.log(
+								'debug',
+								`[companion] hello instance=${String(msg.data.instanceId || '').slice(0, 32) || 'unknown'}`,
+							)
+						}
+					}
 				} else if (msg.type === 'scene_deck_sync' && msg.data) {
 					const { mergeDeckSyncIntoProject, buildSceneDeckForApi } = require('../engine/project-scenes')
 					const merged = mergeDeckSyncIntoProject(ctx, msg.data)
@@ -333,6 +348,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 
 		ws.on('close', () => {
 			clients.delete(ws)
+			getCompanionBridgeRegistry().unregister(ws)
 			notifyOperatorClientCount()
 		})
 	})

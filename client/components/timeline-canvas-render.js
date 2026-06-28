@@ -10,6 +10,7 @@ import {
 } from '../lib/timeline-track-heights.js'
 import { fmtTimecode } from './timeline-canvas-utils.js'
 import { drawTimelineClip } from './timeline-canvas-clip.js'
+import { loadCompanionFlagThumb, setCompanionFlagThumbInvalidate, getCachedCompanionFlagThumb } from '../lib/companion-button-preview-url.js'
 
 export const RULER_H = 30
 export const HEADER_W = 112
@@ -44,7 +45,7 @@ export function resizeTimelineCanvas(container, canvas) {
  * @param {(...a: any[]) => string | null | undefined} [deps.getThumbnailUrl]
  * @param {(...a: any[]) => string | null | undefined} [deps.getWaveformUrl]
  * @param {() => number | null | undefined} [deps.getSourceDurationMs]
- * @param {(name: string) => boolean} [deps.isAudioOnlySource]
+ * @param {() => void} [deps.schedDraw]
  */
 export function drawTimelineCanvas(deps) {
 	const {
@@ -69,12 +70,14 @@ export function drawTimelineCanvas(deps) {
 		isAudioOnlySource,
 	} = deps
 
+	if (schedDraw) setCompanionFlagThumbInvalidate(schedDraw)
+
 	const tl = getTimeline()
 	const pb = getPlayback()
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 	drawBackground(ctx, canvas)
 	drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX)
-	if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection)
+	if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection, schedDraw)
 	if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource)
 	drawPlayhead(ctx, canvas, pb, xAt, RULER_H)
 	drawHeaders(ctx, canvas, tl, scrollY, layerAt)
@@ -155,16 +158,46 @@ function drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX) {
 	}
 }
 
-function drawFlags(ctx, canvas, tl, xAt, getFlagSel) {
+function drawFlags(ctx, canvas, tl, xAt, getFlagSel, schedDraw) {
 	const flags = tl.flags
 	if (!flags?.length) return
 	const sel = getFlagSel?.()
+	const thumbSize = 28
 	for (const f of flags) {
 		const x = xAt(f.timeMs)
 		if (x < HEADER_W - 2 || x > canvas.width + 2) continue
 		const t = f.type || 'pause'
 		const color = t === 'play' ? '#3fb950' : t === 'jump' ? '#a371f7' : t === 'companion_press' ? '#f0a030' : '#f85149'
 		const isSel = sel && sel.timelineId === tl.id && sel.flagId === f.id
+
+		if (t === 'companion_press') {
+			const page = f.companionPage ?? 1
+			const row = f.companionRow ?? 0
+			const col = f.companionColumn ?? 0
+			const ty = Math.max(2, RULER_H - thumbSize - 4)
+			let img = getCachedCompanionFlagThumb(page, row, col)
+			if (!img) {
+				loadCompanionFlagThumb(page, row, col, () => schedDraw?.())
+			} else if (!img.complete) {
+				img.addEventListener('load', () => schedDraw?.(), { once: true })
+			}
+			img = getCachedCompanionFlagThumb(page, row, col)
+			if (img?.complete && img.naturalWidth) {
+				ctx.drawImage(img, x - thumbSize / 2, ty, thumbSize, thumbSize)
+			} else {
+				ctx.fillStyle = '#21262d'
+				ctx.fillRect(x - thumbSize / 2, ty, thumbSize, thumbSize)
+				ctx.fillStyle = '#8b949e'
+				ctx.font = `9px ${UI_FONT_FAMILY}`
+				ctx.textAlign = 'center'
+				ctx.fillText(`${page}/${row}/${col}`, x, ty + thumbSize / 2 + 3)
+			}
+			ctx.strokeStyle = isSel ? '#58a6ff' : color
+			ctx.lineWidth = 2
+			ctx.strokeRect(x - thumbSize / 2, ty, thumbSize, thumbSize)
+			continue
+		}
+
 		ctx.strokeStyle = isSel ? '#58a6ff' : color
 		ctx.lineWidth = isSel ? 2 : 1
 		ctx.beginPath()

@@ -277,6 +277,7 @@ ConditionPathIsMountPoint=/home/casparcg/exfat
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+TimeoutStartSec=300
 User=root
 Group=root
 Environment=HIGHASCG_SERVICE_USER=${USER_CASPAR}

@@ -22,7 +22,23 @@ HIGHASCG_INTEGRATION_PORT=8099 HIGHASCG_EXPECT_CASPAR=1 node --test tools/smoke/
 ```
 If `HIGHASCG_EXPECT_CASPAR=1` is passed, it strictly asserts that `GET /api/state` returns HTTP `200` and `scene.deck` shapes exist. Otherwise, it tolerates `503` (offline).
 
-## 2. CasparCG Live Smoke Script
+## 2. Mixer effects catalog smoke (WO-74)
+
+File: `tools/smoke/smoke-mixer-effects-catalog.test.js`
+
+Offline parity for all **13** Sources browser mixer effects — client params → AMCP line builders → REST `/api/mixer/*`:
+
+```bash
+npm run smoke:mixer-effects
+```
+
+Cases covered:
+- Effect catalog completeness (`effect-registry.js`)
+- Client `effectToAmcpLines` vs server look-take + timeline playback builders
+- REST `POST /api/mixer/{command}` and `POST /api/mixer/effect` AMCP capture
+- Primary/advanced schema partition per effect type
+
+## 3. CasparCG Live Smoke Script
 File: `tools/smoke/smoke-caspar.js`
 
 A fast bash/Node script to quickly verify HTTP routing when a real CasparCG instance is attached. 
@@ -36,7 +52,7 @@ node tools/smoke/smoke-caspar.js 4200
 2. `GET /api/__smoke_not_a_route__` must return `404` (proving unknown routes aren't swallowed by 503 error handlers).
 3. `POST /api/raw` with `{ "cmd": "VERSION" }` succeeds and returns a JSON wrapper containing AMCP data.
 
-## 3. Project volume sync tests
+## 4. Project volume sync tests
 File: `tools/smoke/smoke-project-volume-sync.test.js`
 
 Offline unit tests for catalog merge logic in `src/engine/project-volume-sync.js`:

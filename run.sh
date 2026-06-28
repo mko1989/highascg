@@ -18,6 +18,10 @@
 #   CASPAR_BOOT_HANG_SEC          kill if AMCP never comes up during initial boot (default: 180)
 #   CASPAR_RESPAWN=1              relaunch after *any* exit (debug / crash recovery)
 #   CASPAR_RESTART_SLEEP          seconds between respawns when CASPAR_RESPAWN=1 (default: 5)
+#   CASPAR_RESTART_SLEEP_MAX      cap for exponential backoff (default: 120)
+#   CASPAR_CRASH_LOOP_WINDOW_SEC  rapid-fail window (default: 120)
+#   CASPAR_CRASH_LOOP_MAX         failures in window before long backoff log (default: 6)
+#   CASPAR_CRASH_LOOP_GIVEUP      stop autostart after this many rapid failures (default: 18)
 #
 # If RESTART hangs inside casparcg (no exit), pkill the main process or reboot.
 
@@ -30,6 +34,9 @@ trap 'rm -f "$CASPAR_RUNSH_PIDFILE"' EXIT INT TERM
 CASPAR_LIB="${CASPAR_LIB:-$CASPAR_ROOT/lib}"
 export LD_LIBRARY_PATH="$CASPAR_LIB"
 unset LD_PRELOAD
+# Screen consumers need X11 — systemd units omit nodm session env unless set explicitly (WO-73).
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/casparcg/.Xauthority}"
 
 CONFIG_PATH="${CASPAR_CONFIG:-${CASPAR_CONFIG_PATH:-$CASPAR_ROOT/config/casparcg.config}}"
 CASPAR_BIN="${CASPAR_BIN:-$CASPAR_ROOT/bin/casparcg}"
@@ -37,9 +44,19 @@ CASPAR_BIN="${CASPAR_BIN:-$CASPAR_ROOT/bin/casparcg}"
 # shellcheck source=casparcg-supervisor-lib.sh
 . "${CASPAR_ROOT}/tools/runtime/casparcg-supervisor-lib.sh"
 
+INHIBIT_FILE="${CASPAR_INHIBIT_FILE:-/run/highascg/inhibit-caspar-autostart}"
+if [ -f "$INHIBIT_FILE" ]; then
+	caspar_supervisor_log "[run.sh] inhibited ($INHIBIT_FILE) — not starting CasparCG"
+	exit 0
+fi
+
 # Some builds exit 1 (not 5) after AMCP RESTART when boost logs local_endpoint during teardown.
 # 137/143/130: SIGKILL/SIGTERM/HUP from operator or bridge kill — still relaunch via run.sh.
 RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134 137 143 130}"
+if [ "${CASPAR_SYSTEMD_SERVICE:-0}" = "1" ]; then
+	# systemd stop sends SIGTERM (143) — must not relaunch when operator stops the unit.
+	RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134}"
+fi
 RESPAWN_SLEEP="${CASPAR_RESTART_SLEEP:-5}"
 
 is_restart_code() {
@@ -54,7 +71,17 @@ is_restart_code() {
 
 prepare_restart() {
 	caspar_ensure_fully_stopped
-	caspar_clear_cef_cache
+}
+
+after_restart_exit() {
+	_ec="$1"
+	caspar_cleanup_after_exit "$_ec"
+	caspar_prepare_restart_after_exit "$_ec"
+	_backoff=0
+	caspar_crash_loop_backoff "$_ec" || _backoff=$?
+	if [ "$_backoff" -eq 2 ]; then
+		exit 0
+	fi
 }
 
 run_one() {
@@ -67,6 +94,9 @@ run_one() {
 	_boot_n=0
 	while kill -0 "$_child" 2>/dev/null; do
 		if caspar_amcp_listening; then
+			if [ "$_saw_amcp" -eq 0 ]; then
+				caspar_crash_loop_reset
+			fi
 			_saw_amcp=1
 			_down_n=0
 			_boot_n=0
@@ -107,21 +137,26 @@ caspar_cleanup_after_exit() {
 
 if [ "${CASPAR_RESPAWN:-0}" = "1" ]; then
 	while true; do
+		if [ -f "$INHIBIT_FILE" ]; then
+			caspar_supervisor_log "[run.sh] inhibited during loop — exiting"
+			exit 0
+		fi
 		prepare_restart
 		run_one "$@"
 		ec=$?
-		caspar_cleanup_after_exit "$ec"
-		caspar_supervisor_log "[run.sh] casparcg exited ${ec}, respawning in ${RESPAWN_SLEEP}s"
-		sleep "$RESPAWN_SLEEP"
+		after_restart_exit "$ec"
 	done
 else
 	while true; do
+		if [ -f "$INHIBIT_FILE" ]; then
+			caspar_supervisor_log "[run.sh] inhibited during loop — exiting"
+			exit 0
+		fi
 		prepare_restart
 		run_one "$@"
 		ec=$?
 		if is_restart_code "$ec"; then
-			caspar_cleanup_after_exit "$ec"
-			caspar_supervisor_log "[run.sh] casparcg exited ${ec} (restart), relaunching"
+			after_restart_exit "$ec"
 			continue
 		fi
 		exit "$ec"

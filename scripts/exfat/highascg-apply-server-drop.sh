@@ -29,7 +29,21 @@ log() {
 MARKER_RETAIN=/etc/highascg/server-update-retain-drop
 MARKER_CONSUME=/etc/highascg/server-update-consume-drop
 
+drop_on_operator_stick_exfat() {
+	local path="${1:-}"
+	[[ -n "$path" ]] || return 1
+	local mp label
+	mp="$(findmnt -T "$path" -no TARGET 2>/dev/null || true)"
+	[[ -n "$mp" ]] || return 1
+	label="$(findmnt -no LABEL "$mp" 2>/dev/null || true)"
+	[[ "$label" == "HIGHASCGEXF" ]]
+}
+
 should_retain_drop() {
+	local drop_root="${1:-}"
+	if drop_on_operator_stick_exfat "$drop_root"; then
+		return 0
+	fi
 	if [[ "${HIGHASCG_SERVER_UPDATE_RETAIN_DROP:-}" == "1" ]]; then
 		return 0
 	fi
@@ -325,7 +339,7 @@ main() {
 	retain) retain=1 ;;
 	consume) retain=0 ;;
 	auto)
-		if should_retain_drop; then
+		if should_retain_drop "$drop_root"; then
 			retain=1
 		else
 			retain=0

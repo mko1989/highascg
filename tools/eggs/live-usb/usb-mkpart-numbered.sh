@@ -9,6 +9,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=usb-env.sh
 source "${HERE}/usb-env.sh"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
 
 DEV="${1:?}"
 NUM="${2:?}"
@@ -97,8 +99,8 @@ done
 if [[ ! -b "$PART_NODE" ]]; then
 	echo "Partition node ${PART_NODE} missing after sfdisk; current layout:" >&2
 	sfdisk -l "$DEV" >&2 || true
-	"$PARTED" -s "$DEV" unit MiB print >&2 || true
-	lsblk "$DEV" >&2 || true
+	timeout 15 "$PARTED" -s "$DEV" unit MiB print >&2 || true
+	usb_lsblk_safe "$DEV" 5 >&2 || true
 	exit 1
 fi
 # stdout is only the device path (callers capture with $(...)).

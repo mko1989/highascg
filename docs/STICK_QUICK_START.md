@@ -13,7 +13,7 @@ Prepare a **bootable HighAsCG USB stick** on **Windows** or **macOS**: flash the
 | **Boot image** (written by Etcher) | `highascg` | Live Linux + CasparCG — **do not delete or reformat** |
 | **Operator data** (you create this) | **`HIGHASCGEXF`** | Configs, media, server updates — must be **exactly** this label (11 characters) |
 
-On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`, applies any server drop in `drop-update/`, syncs `configs/`, and starts the operator UI at **`http://<playout-ip>:4200/`**.
+On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`, applies any server drop in `drop-update/`, syncs `configs/`, and starts the operator UI at **`http://<playout-ip>/`** (nginx proxies port 80 → `:4200`; direct URL **`http://<playout-ip>:4200/`** also works).
 
 ---
 
@@ -199,7 +199,7 @@ Safely eject the stick when copying finishes.
 
 After boot:
 
-- Operator UI: **`http://127.0.0.1:4200/`** on the playout box, or **`http://<playout-ip>:4200/`** from another machine on the LAN
+- Operator UI: **`http://127.0.0.1/`** or **`http://<playout-ip>/`** from another machine on the LAN (port 80 → `:4200`); **`http://<playout-ip>:4200/`** works directly too
 - Confirm the stick mounted: Settings → exFAT sync, or on the machine run `lsblk -f` and look for **`HIGHASCGEXF`**
 
 ---

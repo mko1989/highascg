@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install NOPASSWD sudoers for HighAsCG Web UI (nodm restart, reboot, optional eggs calamares).
+# Install NOPASSWD sudoers for HighAsCG Web UI (nodm restart, reboot, Calamares, Caspar systemd).
 #
 #   sudo bash scripts/setup/12-passwordless-sudo.sh [casparcg]
 #
@@ -27,18 +27,30 @@ cat >"$TMP" <<EOF
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl restart nodm, /usr/bin/systemctl restart nodm
 ${USER_CASPAR} ALL=(root) NOPASSWD: /sbin/reboot, /usr/sbin/reboot
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl reboot, /usr/bin/systemctl reboot
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/bin/launch-calamares.sh
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/bin/caspar-systemd-control.sh
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl start casparcg-scanner.service, /usr/bin/systemctl start casparcg-scanner.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop casparcg-scanner.service, /usr/bin/systemctl stop casparcg-scanner.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl restart casparcg-scanner.service, /usr/bin/systemctl restart casparcg-scanner.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl start casparcg-server.service, /usr/bin/systemctl start casparcg-server.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop casparcg-server.service, /usr/bin/systemctl stop casparcg-server.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl restart casparcg-server.service, /usr/bin/systemctl restart casparcg-server.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl is-active casparcg-scanner.service, /usr/bin/systemctl is-active casparcg-scanner.service
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl is-active casparcg-server.service, /usr/bin/systemctl is-active casparcg-server.service
 EOF
 
 if command -v eggs >/dev/null 2>&1 && [ -x /usr/bin/eggs ]; then
-	echo "${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/eggs calamares" >>"$TMP"
+	cat >>"$TMP" <<EOF
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/eggs calamares
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/eggs calamares --install *
+EOF
 fi
 
 visudo -cf "$TMP" >/dev/null
 install -m 0440 -o root -g root "$TMP" "$DEST"
 
 echo "OK: $DEST"
-echo "     nodm restart, reboot$(command -v eggs >/dev/null 2>&1 && [ -x /usr/bin/eggs ] && echo ', eggs calamares' || echo '')"
+echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control$(command -v eggs >/dev/null 2>&1 && [ -x /usr/bin/eggs ] && echo ', eggs calamares (+ --install)' || echo '')"
 echo
 echo "Verify as ${USER_CASPAR}:"
-echo "  sudo -u ${USER_CASPAR} sudo -n /usr/bin/systemctl restart nodm"
-echo "  sudo -u ${USER_CASPAR} sudo -n /usr/bin/true"
+echo "  sudo -u ${USER_CASPAR} sudo -n /usr/local/bin/caspar-systemd-control.sh status"

@@ -52,7 +52,11 @@ export async function importProjectWithHardwareReconcile(project, deps) {
 		deps.onNameSync?.(deps.projectState.getProjectName())
 		window.dispatchEvent(new Event('project-loaded'))
 		syncProjectMediaContextFromProject(project)
-		if (deps.source !== 'server-bootstrap' && deps.source !== 'server-reconnect') {
+		if (
+			deps.source !== 'server-bootstrap' &&
+			deps.source !== 'server-reconnect' &&
+			deps.source !== 'load-modal'
+		) {
 			void refreshProjectMediaContext().then(() => {
 				const hint = formatProjectMediaUploadHint()
 				if (hint) deps.showToast?.(hint, 'info')

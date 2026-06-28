@@ -12,6 +12,7 @@
 # Env:
 #   HIGHASCG_NVIDIA_DRIVER=595   override (default: /etc/highascg/nvidia-iso-driver or 595)
 #   USB_DEVICE=/dev/sda          whole disk to flash (default /dev/sda)
+#   HIGHASCG_OVERNIGHT=1         skip "Press Enter" prompts at end (unattended)
 #   BASENAME=highascg-nvidia-595 ISO basename prefix (default from driver)
 #   TMUX_SESSION=highascg-eggs   tmux session name
 #
@@ -115,6 +116,7 @@ set -euo pipefail
 export HIGHASCG_NVIDIA_DRIVER=${DRV}
 export BASENAME=${BASENAME}
 export USB_DEVICE=${USB}
+export HIGHASCG_OVERNIGHT=${HIGHASCG_OVERNIGHT:-0}
 REPO=${REPO}
 LOG=${LOG}
 exec > >(tee -a "\$LOG") 2>&1
@@ -132,6 +134,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 cd "\$REPO"
+
+echo "==> Waiting for sudo (run once in any terminal: sudo -v)"
+until sudo -n true 2>/dev/null; do
+	sleep 10
+done
+echo "==> sudo credentials cached at \$(date -Is)"
 
 echo "==> Preflight: eggs exclude.list + liveroot safety"
 sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list" \
@@ -158,7 +166,9 @@ if [[ "\$build_rc" -ne 0 ]]; then
 	echo "  log: \${LOG}"
 	echo "  fix issues above, then rerun: bash \$REPO/work/run-eggs-clone-flash-tmux.sh"
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	read -r -p "Press Enter to close this tmux window… "
+	if [[ "\${HIGHASCG_OVERNIGHT:-0}" != "1" ]]; then
+		read -r -p "Press Enter to close this tmux window… "
+	fi
 	exit "\$build_rc"
 fi
 
@@ -168,7 +178,9 @@ echo "Stick layout on \${USB_DEVICE}:"
 lsblk -f "\$USB_DEVICE" || true
 echo "Verify: bash \$REPO/tools/eggs/live-usb/verify-config-persistence.sh"
 echo "Log: \${LOG}"
-read -r -p "Press Enter to close this tmux window… "
+if [[ "\${HIGHASCG_OVERNIGHT:-0}" != "1" ]]; then
+	read -r -p "Press Enter to close this tmux window… "
+fi
 RUNEOF
 chmod 0755 "$RUNNER"
 

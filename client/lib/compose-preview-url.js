@@ -7,8 +7,8 @@ import { settingsState } from './settings-state.js'
  */
 export function resolveComposePreviewMode() {
 	const mode = settingsState.getSettings()?.composePreview?.mode
-	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image') return mode
-	return 'canvas'
+	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image' || mode === 'canvas') return mode
+	return 'ffmpeg_jpeg'
 }
 
 /**

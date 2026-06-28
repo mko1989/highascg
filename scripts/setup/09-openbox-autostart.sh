@@ -100,6 +100,11 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/disp
     (xterm -e 'bash -c "echo X11-only: CasparCG not started.; echo Resume: sudo highascg-display-mode normal; read"') &
   fi
 else
+  if systemctl is-active --quiet casparcg-server.service 2>/dev/null; then
+    : # WO-73: Caspar owned by systemd — Openbox autostart must not duplicate scanner/run.sh
+  elif systemctl is-enabled --quiet casparcg-server.service 2>/dev/null; then
+    : # enabled but not active yet — skip legacy autostart
+  else
   _runpid=/tmp/caspar-runsh.pid
   if [ -f "\$_runpid" ] && kill -0 "\$(cat "\$_runpid")" 2>/dev/null; then
     exit 0
@@ -111,6 +116,7 @@ else
     # Use CASPAR_RESPAWN=1 only while debugging CEF crashes.
     [ -x ./run.sh ] && exec ./run.sh >> /tmp/caspar.log 2>&1
   ) &
+  fi
 fi
 AST
 chmod +x "/home/${USER_CASPAR}/.config/openbox/autostart"

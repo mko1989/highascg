@@ -33,6 +33,7 @@ function replicationDefaults() {
 			minCorrectionIntervalMs: 2000,
 			maxCorrectionsPerMinute: 6,
 		},
+		peerSshPublicKey: '',
 	}
 }
 

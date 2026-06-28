@@ -35,5 +35,7 @@ fi
 
 bash "${HERE}/stop-and-unmount-wo47-for-eggs-produce.sh"
 
+bash "${HERE}/verify-calamares-installed.sh"
+
 echo "    liveroot: ${LIVEROOT} — left untouched"
 echo "OK: preflight complete — safe to run eggs produce"

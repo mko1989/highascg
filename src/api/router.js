@@ -127,8 +127,12 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 
 	if (method === 'GET') {
-		const companionGet = routesCompanion.handleGet(p, ctx)
+		const companionGet = await routesCompanion.handleGet(p, ctx)
 		if (companionGet) return companionGet
+	}
+	if (method === 'POST') {
+		const companionPost = await routesCompanion.handlePost(p, body, ctx)
+		if (companionPost) return companionPost
 	}
 	if (method === 'GET') {
 		const replGet = await routesReplication.handleGet(p, ctx, req)
@@ -172,7 +176,8 @@ async function routeRequest(method, path, body, ctx, req) {
 			p === '/api/system/gui-launch' ||
 			p === '/api/system/gpu-ports-reset' ||
 			p === '/api/system/xrandr-layout/apply' ||
-			p === '/api/system/network/apply')
+			p === '/api/system/network/apply' ||
+			p === '/api/system/network/reset')
 	) {
 		const r = await routesSystemHardware.hardwareHandlePost(p, body, ctx)
 		if (r) return r
@@ -369,6 +374,10 @@ async function routeRequest(method, path, body, ctx, req) {
 	}
 	if (method === 'GET' && (p === '/api/project' || p === '/api/project/')) {
 		const r = await routesData.handleProjectGet(ctx)
+		if (r) return r
+	}
+	if (method === 'GET' && p.startsWith('/api/project/file/')) {
+		const r = await routesData.handleProjectFile(p)
 		if (r) return r
 	}
 

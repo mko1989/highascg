@@ -20,6 +20,8 @@ const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
 const { normalizeNetworkSettings } = require('../config/network-settings')
 const { normalizeProjectFps, applyProjectFpsToInheritedOutputs, resolveProjectFps } = require('../config/project-fps')
+const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
+const { mergeCompanionSettings } = require('../companion/companion-config')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -126,7 +128,10 @@ async function handlePost(path, body, ctx) {
 	if (settings.casparServer) { cfg.casparServer = { ...defaults.casparServer, ...cfg.casparServer, ...settings.casparServer }; normalizeCasparServerConfigPath(cfg.casparServer); warnings.push(...validateDecklinkCasparSlice(cfg.casparServer).warnings) }
 	if (settings.dmx) cfg.dmx = { ...defaults.dmx, ...settings.dmx }
 	if (settings.rtmp) cfg.rtmp = normalizeRtmpConfig({ ...defaults.rtmp, ...(cfg.rtmp || {}), ...settings.rtmp })
-	if (settings.companion) cfg.companion = { host: String(settings.companion.host || '127.0.0.1').trim(), port: parseInt(settings.companion.port, 10) || 8000 }
+	if (settings.companion) {
+		cfg.companion = mergeCompanionSettings(settings.companion, cfg.companion)
+		getSatellitePreviewClient().configure(cfg)
+	}
 	if (settings.screenDestinations) cfg.screenDestinations = normalizeScreenDestinations(settings.screenDestinations)
 	else if (settings.tandemTopology && typeof settings.tandemTopology === 'object') {
 		cfg.screenDestinations = normalizeScreenDestinations({

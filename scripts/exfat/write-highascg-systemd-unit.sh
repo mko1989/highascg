@@ -31,26 +31,26 @@ if [[ ! -f "${HIGHASCG_HOME}/package.json" ]]; then
 	echo "Note: ${HIGHASCG_HOME}/package.json not present yet — enabling highascg.service anyway (skipped at boot until synced)." >&2
 fi
 
-if [[ -f /etc/systemd/system/home-casparcg-exfat.mount ]] &&
+	if [[ -f /etc/systemd/system/home-casparcg-exfat.mount ]] &&
 	[[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
 	AF_LIST="network.target home-casparcg-exfat.mount"
-	WA_LIST=""
 	if [[ -f /etc/systemd/system/home-casparcg-highascg-media-exfat.mount ]]; then
 		AF_LIST="$AF_LIST home-casparcg-highascg-media-exfat.mount"
 	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-bootstrap.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-bootstrap.service"
-		WA_LIST="$WA_LIST highascg-exfat-bootstrap.service"
+	fi
+	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
+		AF_LIST="$AF_LIST highascg-exfat-boot.service"
 	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-server-update.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-server-update.service"
-		WA_LIST="${WA_LIST:+$WA_LIST }highascg-exfat-server-update.service"
 	fi
 	AF_LIST="$AF_LIST highascg-exfat-sync.service"
-	WA_LIST="${WA_LIST:+$WA_LIST }highascg-exfat-sync.service"
+	# After= only — do not Wants= server-update/sync (deadlock: update calls
+	# systemctl start highascg while start highascg waits for update to finish).
 	read -r -d '' HIGHASCG_UNIT_DEPS <<EUD || true
 After=${AF_LIST}
-Wants=${WA_LIST}
 EUD
 else
 	HIGHASCG_UNIT_DEPS="After=network.target"

@@ -79,6 +79,13 @@ need_pkg exfatprogs "sudo apt install exfatprogs (or run prepare-eggs-clone-with
 need_pkg parted "sudo apt install parted"
 need_pkg python3 "sudo apt install python3"
 need_pkg rsync "sudo apt install rsync"
+if dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -qE '(install|hold) ok installed'; then
+	ok "package nginx (port 80 proxy)"
+else
+	fail "missing package nginx — sudo bash ${HERE}/prepare-eggs-clone-with-exfat.sh"
+fi
+
+bash "${HERE}/verify-highascg-stick-boot.sh"
 
 getent passwd "$USER_CASPAR" >/dev/null 2>&1 && ok "user ${USER_CASPAR}" \
 	|| fail "missing user ${USER_CASPAR} — sudo bash ${REPO_ROOT}/scripts/setup/05-caspar-deps.sh"
@@ -119,6 +126,24 @@ if [[ -d "${HIGHASCG_ROOT}/node_modules" ]]; then
 	ok "node_modules present (embed-server ISO)"
 else
 	fail "missing ${HIGHASCG_ROOT}/node_modules — sudo bash ${REPO_ROOT}/scripts/setup/07-node-highascg.sh"
+fi
+
+EMBED_CALAMARES="${HIGHASCG_ISO_EMBED_CALAMARES:-1}"
+if [[ "$EMBED_CALAMARES" == "1" ]]; then
+	if command -v calamares >/dev/null 2>&1 && [[ -x /usr/bin/calamares ]]; then
+		ok "Calamares /usr/bin/calamares ($(calamares --version 2>/dev/null | head -1 || echo installed))"
+	else
+		fail "Calamares missing — sudo bash ${HERE}/install-eggs-calamares.sh (eggs produce warns without it)"
+	fi
+	if dpkg-query -W -f='${Status}' calamares 2>/dev/null | grep -qE '(install|hold) ok installed'; then
+		ok "dpkg calamares"
+	else
+		fail "dpkg calamares not installed — sudo bash ${HERE}/install-eggs-calamares.sh"
+	fi
+	[[ -d /etc/calamares ]] && ok "/etc/calamares" \
+		|| fail "missing /etc/calamares — sudo bash ${HERE}/install-eggs-calamares.sh"
+else
+	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skipping Calamares checks"
 fi
 
 if ss -tln 2>/dev/null | grep -q ':5250 '; then

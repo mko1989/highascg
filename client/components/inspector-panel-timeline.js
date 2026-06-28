@@ -12,6 +12,14 @@ import { getContentResolution, fetchMediaContentResolution } from '../lib/mixer-
 import { settingsState } from '../lib/settings-state.js'
 import { appendAudioInspectorGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
+import {
+	parseCompanionLocationInput,
+	formatCompanionLocation,
+	parseCompanionCoordField,
+	flagCompanionCoords,
+} from '../lib/companion-location-parse.js'
+import { companionButtonPreviewUrl } from '../lib/companion-button-preview-url.js'
+import { openCompanionButtonPickerModal } from './companion-button-picker-modal.js'
 
 export async function syncTimelineToServer() {
 	const tl = timelineState.getActive()
@@ -164,33 +172,133 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	companionTitle.style.marginTop = '4px'
 	companionWrap.appendChild(companionTitle)
 
-	const makeNumField = (labelText, propName, defaultVal) => {
+	const coords = flagCompanionCoords(flag)
+
+	const previewWrap = document.createElement('div')
+	previewWrap.className = 'companion-inspector-preview'
+	const previewImg = document.createElement('img')
+	previewImg.className = 'companion-inspector-preview__img'
+	previewImg.alt = 'Companion button preview'
+	previewImg.width = 72
+	previewImg.height = 72
+	previewImg.src = companionButtonPreviewUrl(coords.page, coords.row, coords.column)
+	previewWrap.appendChild(previewImg)
+	companionWrap.appendChild(previewWrap)
+
+	const refreshPreviewImg = () => {
+		const tl = timelineState.getActive()
+		const f = tl?.flags?.find((x) => x.id === flagId) || flag
+		const c = flagCompanionCoords(f)
+		previewImg.src = companionButtonPreviewUrl(c.page, c.row, c.column, Date.now())
+	}
+
+	const applyCoords = (page, row, column) => {
+		timelineState.updateFlag(timelineId, flagId, {
+			companionPage: page,
+			companionRow: row,
+			companionColumn: column,
+		})
+		syncTimelineToServer()
+		refreshPreviewImg()
+	}
+
+	const locWrap = document.createElement('div')
+	locWrap.className = 'inspector-field'
+	const locLab = document.createElement('label')
+	locLab.className = 'inspector-field__label'
+	locLab.textContent = 'Location (page row column)'
+	const locInp = document.createElement('input')
+	locInp.type = 'text'
+	locInp.className = 'inspector-field__input'
+	locInp.placeholder = '1 0 2'
+	locInp.value = formatCompanionLocation(coords.page, coords.row, coords.column)
+	locInp.addEventListener('change', () => {
+		const parsed = parseCompanionLocationInput(locInp.value)
+		if (!parsed) {
+			locInp.value = formatCompanionLocation(coords.page, coords.row, coords.column)
+			return
+		}
+		locInp.value = formatCompanionLocation(parsed.page, parsed.row, parsed.column)
+		pageInp.value = String(parsed.page)
+		rowInp.value = String(parsed.row)
+		colInp.value = String(parsed.column)
+		applyCoords(parsed.page, parsed.row, parsed.column)
+	})
+	locLab.appendChild(locInp)
+	locWrap.appendChild(locLab)
+	companionWrap.appendChild(locWrap)
+
+	const makeCoordField = (labelText, propName, defaultVal, allowNegative) => {
 		const fw = document.createElement('div')
 		fw.className = 'inspector-field'
 		const fl = document.createElement('label')
 		fl.className = 'inspector-field__label'
 		fl.textContent = labelText
 		const fi = document.createElement('input')
-		fi.type = 'number'
+		fi.type = 'text'
+		fi.inputMode = 'numeric'
 		fi.className = 'inspector-field__input'
-		fi.min = '0'
 		fi.value = flag[propName] != null ? String(flag[propName]) : String(defaultVal)
 		fi.addEventListener('change', () => {
-			const v = parseInt(fi.value, 10)
-			timelineState.updateFlag(timelineId, flagId, { [propName]: Number.isFinite(v) ? Math.max(0, v) : defaultVal })
-			syncTimelineToServer()
+			const page =
+				propName === 'companionPage'
+					? parseCompanionCoordField(fi.value, { min: 1 })
+					: parseCompanionCoordField(pageInp.value, { min: 1 })
+			const row =
+				propName === 'companionRow'
+					? parseCompanionCoordField(fi.value, { allowNegative: true })
+					: parseCompanionCoordField(rowInp.value, { allowNegative: true })
+			const column =
+				propName === 'companionColumn'
+					? parseCompanionCoordField(fi.value, { allowNegative: true })
+					: parseCompanionCoordField(colInp.value, { allowNegative: true })
+			if (page == null || row == null || column == null) {
+				fi.value = flag[propName] != null ? String(flag[propName]) : String(defaultVal)
+				return
+			}
+			pageInp.value = String(page)
+			rowInp.value = String(row)
+			colInp.value = String(column)
+			locInp.value = formatCompanionLocation(page, row, column)
+			applyCoords(page, row, column)
 		})
 		fl.appendChild(fi)
 		fw.appendChild(fl)
-		return fw
+		return fi
 	}
-	companionWrap.appendChild(makeNumField('Page', 'companionPage', 1))
-	companionWrap.appendChild(makeNumField('Row', 'companionRow', 0))
-	companionWrap.appendChild(makeNumField('Column', 'companionColumn', 0))
+
+	const pageInp = makeCoordField('Page (1+)', 'companionPage', 1, false)
+	const rowInp = makeCoordField('Row (0+)', 'companionRow', 0, true)
+	const colInp = makeCoordField('Column (0+)', 'companionColumn', 0, true)
+	companionWrap.appendChild(pageInp.parentElement)
+	companionWrap.appendChild(rowInp.parentElement)
+	companionWrap.appendChild(colInp.parentElement)
+
+	const btnRow = document.createElement('div')
+	btnRow.className = 'companion-inspector-actions'
+	const pickBtn = document.createElement('button')
+	pickBtn.type = 'button'
+	pickBtn.className = 'inspector-btn-sm'
+	pickBtn.textContent = 'Choose button…'
+	pickBtn.addEventListener('click', () => {
+		openCompanionButtonPickerModal({
+			initial: flagCompanionCoords(flag),
+			onSelect: ({ page, row, column }) => {
+				pageInp.value = String(page)
+				rowInp.value = String(row)
+				colInp.value = String(column)
+				locInp.value = formatCompanionLocation(page, row, column)
+				applyCoords(page, row, column)
+			},
+		})
+	})
+	btnRow.appendChild(pickBtn)
+	companionWrap.appendChild(btnRow)
 
 	const companionHint = document.createElement('p')
 	companionHint.className = 'inspector-field inspector-field--hint'
-	companionHint.textContent = 'Sends POST to the configured Companion instance (see Settings > Companion tab).'
+	companionHint.textContent =
+		'HTTP press on playback (Settings → Companion). Preview uses Companion Satellite when enabled.'
 	companionWrap.appendChild(companionHint)
 	grp.appendChild(companionWrap)
 
@@ -509,6 +617,14 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 
 	renderEffectsGroup(root, {
 		effects: clip.effects || [],
+		liveApplyContext: {
+			kind: 'timeline_clip',
+			stateStore: deps.stateStore,
+			timelineId,
+			layerIdx,
+			clipId,
+			clip,
+		},
 		onUpdate: (newEffects) => {
 			timelineState.updateClip(timelineId, layerIdx, clipId, { effects: newEffects })
 			syncTimelineToServer()

@@ -17,6 +17,9 @@
 | 69 | [69_WO_CLEAN_SLATE_FULL_RESET.md](./69_WO_CLEAN_SLATE_FULL_RESET.md) | Draft | Clean-slate reset — wipe internal projects/config; fail-safe skip for all mount-linked media (bridge/USB/drive) |
 | 71 | [71_WO_LOOK_PGM_PLAYBACK_THUMBNAIL_CACHE.md](./71_WO_LOOK_PGM_PLAYBACK_THUMBNAIL_CACHE.md) | Draft | PGM playback thumbnail cache (~5 s or mid-clip), GUI deck + Companion per-look image, event-driven |
 | 72 | [72_WO_COMPANION_COMPOSE_PREVIEW_LAYOUT_AND_POLISH.md](./72_WO_COMPANION_COMPOSE_PREVIEW_LAYOUT_AND_POLISH.md) | Draft | Companion: look label polish, seam-safe quadrant badges, preview traffic gate, custom mosaics, map-only channels |
+| 73 | [73_WO_CALAMARES_SYSTEMD_CASPAR_NUCLEAR.md](./73_WO_CALAMARES_SYSTEMD_CASPAR_NUCLEAR.md) | Phase A–D shipped | Calamares on eggs ISO; systemd Caspar+scanner; Nuclear install + stop/start Caspar |
+| 74 | [74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md](./74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md) | Shipped | Mixer effects smoke (13→AMCP); inspector primary/advanced params; live PGM/timeline apply |
+| 75 | [75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md](./75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md) | In progress | Companion timeline flags: coords + page picker + Satellite previews shipped; manual QA vs real Companion open |
 
 ## WO-33 — Device view (split)
 

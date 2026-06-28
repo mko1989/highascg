@@ -176,6 +176,69 @@ dd_iso_with_progress() {
 	return "$dd_rc"
 }
 
+# After dd/mkpart, USB sticks often hang plain lsblk/partprobe — never block the flash script.
+usb_reread_partition_table() {
+	local dev="$1"
+	local dev_base partn i
+	dev_base="$(basename "$dev")"
+	echo "==> Reread partition table on ${dev} (USB-safe)…" >&2
+	sync
+	timeout 10 blockdev --rereadpt "$dev" 2>/dev/null || true
+	timeout 10 partprobe "$dev" 2>/dev/null || true
+	timeout 10 partx -u "$dev" 2>/dev/null || partx --update "$dev" 2>/dev/null || true
+	udevadm settle --timeout=20 2>/dev/null || true
+	for i in $(seq 1 25); do
+		for partn in 2 3 4; do
+			[[ -b "${dev}${partn}" ]] && return 0
+		done
+		sleep 1
+	done
+	echo "WARN: partition nodes slow to appear on ${dev} (continuing)" >&2
+}
+
+usb_print_partition_summary() {
+	local dev="$1"
+	echo "--- blkid ${dev}* ---" >&2
+	blkid "${dev}"?* 2>/dev/null || blkid "$dev" 2>/dev/null || true
+	if command -v parted >/dev/null 2>&1; then
+		echo "--- parted ${dev} ---" >&2
+		timeout 15 parted -s "$dev" unit MiB print 2>/dev/null || true
+	fi
+}
+
+# Args: DEV [timeout_seconds]
+usb_lsblk_safe() {
+	local dev="${1:?}"
+	local t="${2:-8}"
+	local out rc=0
+	if out="$(timeout "$t" lsblk -f "$dev" 2>&1)"; then
+		printf '%s\n' "$out"
+		return 0
+	fi
+	rc=$?
+	if [[ "$rc" -eq 124 ]]; then
+		echo "WARN: lsblk timed out after ${t}s on ${dev} (common USB quirk after dd)" >&2
+	else
+		echo "WARN: lsblk failed on ${dev}: ${out}" >&2
+	fi
+	usb_print_partition_summary "$dev"
+	return 0
+}
+
+usb_mount_label_safe() {
+	local label="${1:?}" mp="$2" i
+	for i in $(seq 1 20); do
+		if mount -L "$label" "$mp" 2>/dev/null; then
+			return 0
+		fi
+		udevadm settle --timeout=5 2>/dev/null || true
+		sleep 1
+	done
+	echo "ERROR: mount -L ${label} ${mp} failed after 20s" >&2
+	blkid -L "$label" 2>/dev/null || blkid | grep -i "$label" || true
+	return 1
+}
+
 run_dd_flash() {
 	local iso="$1" dev="$2"
 	[[ "$(id -u)" -eq 0 ]] || {
@@ -198,8 +261,7 @@ run_dd_flash() {
 	echo "Writing ISO → $dev (bs=4M) …"
 	dd_iso_with_progress "$iso" "$dev" 4M || return 1
 	sync
-	partprobe "$dev"
-	sleep 1
-	lsblk "$dev"
+	usb_reread_partition_table "$dev"
+	usb_lsblk_safe "$dev"
 	echo "dd finished."
 }

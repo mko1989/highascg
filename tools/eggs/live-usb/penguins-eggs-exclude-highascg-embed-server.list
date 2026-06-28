@@ -16,11 +16,9 @@ usr/src/*
 opt/nvidia-pool
 opt/nvidia-pool/*
 
-# Browser UI (operator workstation / Electron — not on playout ISO)
+# Browser UI sources (Vite build inputs — not served on playout; dist-web/ is baked on ISO)
 home/casparcg/highascg/client
 home/casparcg/highascg/client/*
-home/casparcg/highascg/dist-web
-home/casparcg/highascg/dist-web/*
 home/casparcg/highascg/deprecated
 home/casparcg/highascg/deprecated/*
 home/casparcg/highascg/work

@@ -47,7 +47,7 @@ async function handleGet(path, ctx) {
 			decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
 			casparServer: cs,
 			screen_count: resolveMainScreenCount(cfg),
-			companion: cfg.companion || { host: '127.0.0.1', port: 8000 },
+			companion: { ...defaults.companion, ...(cfg.companion || {}) },
 			screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph),
 			gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology,
 			screen_1_system_id: cfg.screen_1_system_id ?? '', screen_2_system_id: cfg.screen_2_system_id ?? '', screen_3_system_id: cfg.screen_3_system_id ?? '', screen_4_system_id: cfg.screen_4_system_id ?? '', screen_1_os_mode: cfg.screen_1_os_mode ?? '', screen_2_os_mode: cfg.screen_2_os_mode ?? '', screen_3_os_mode: cfg.screen_3_os_mode ?? '', screen_4_os_mode: cfg.screen_4_os_mode ?? '', screen_1_os_backend: cfg.screen_1_os_backend ?? 'xrandr', screen_2_os_backend: cfg.screen_2_os_backend ?? 'xrandr', screen_3_os_backend: cfg.screen_3_os_backend ?? 'xrandr', screen_4_os_backend: cfg.screen_4_os_backend ?? 'xrandr', screen_1_os_rate: cfg.screen_1_os_rate ?? '', screen_2_os_rate: cfg.screen_2_os_rate ?? '', screen_3_os_rate: cfg.screen_3_os_rate ?? '', screen_4_os_rate: cfg.screen_4_os_rate ?? '',

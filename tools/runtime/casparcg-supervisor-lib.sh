@@ -12,12 +12,108 @@ caspar_supervisor_log() {
 	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_msg" >>"$_log"
 }
 
+caspar_crash_state_file() {
+	if [ -n "${CASPAR_CRASH_STATE:-}" ]; then
+		printf '%s\n' "$CASPAR_CRASH_STATE"
+		return 0
+	fi
+	if [ -d /run/highascg ] 2>/dev/null; then
+		printf '%s\n' "/run/highascg/caspar-crash-loop.state"
+		return 0
+	fi
+	printf '%s\n' "/tmp/caspar-crash-loop.state"
+}
+
+caspar_crash_is_hard_fail_code() {
+	_ec="$1"
+	case "$_ec" in
+	134 | 139 | 136 | 11) return 0 ;;
+	esac
+	return 1
+}
+
+caspar_crash_loop_reset() {
+	_state="$(caspar_crash_state_file)"
+	rm -f "$_state" 2>/dev/null || true
+}
+
+# After rapid GPU/CEF aborts, back off and eventually stop auto-relaunch (inhibit).
+caspar_crash_loop_backoff() {
+	_ec="$1"
+	_now="$(date +%s)"
+	_window="${CASPAR_CRASH_LOOP_WINDOW_SEC:-120}"
+	_max="${CASPAR_CRASH_LOOP_MAX:-6}"
+	_base_sleep="${CASPAR_RESTART_SLEEP:-5}"
+	_max_sleep="${CASPAR_RESTART_SLEEP_MAX:-120}"
+	_giveup="${CASPAR_CRASH_LOOP_GIVEUP:-18}"
+	_state="$(caspar_crash_state_file)"
+	_streak=0
+	_last=0
+	_last_ec=0
+	if [ -f "$_state" ]; then
+		set -- $(cat "$_state" 2>/dev/null)
+		_streak="${1:-0}"
+		_last="${2:-0}"
+		_last_ec="${3:-0}"
+	fi
+	if [ "$_last" -gt 0 ] && [ $((_now - _last)) -le "$_window" ]; then
+		_streak=$((_streak + 1))
+	else
+		_streak=1
+	fi
+	printf '%s %s %s\n' "$_streak" "$_now" "$_ec" >"$_state" 2>/dev/null || true
+
+	if [ "$_streak" -ge "$_giveup" ]; then
+		_inhibit="${CASPAR_INHIBIT_FILE:-/run/highascg/inhibit-caspar-autostart}"
+		mkdir -p "$(dirname "$_inhibit")" 2>/dev/null || true
+		printf '%s\n' "caspar crash loop give-up ec=${_ec} streak=${_streak} at $(date -Is)" >"$_inhibit" 2>/dev/null || true
+		caspar_supervisor_log "[run.sh] crash loop give-up (${_streak} failures) — inhibiting Caspar autostart (${_inhibit})"
+		return 2
+	fi
+
+	_pow=0
+	if [ "$_streak" -gt 1 ]; then
+		_pow=$((_streak - 1))
+		[ "$_pow" -gt 6 ] && _pow=6
+	fi
+	_sleep=$_base_sleep
+	_mult=1
+	_i=0
+	while [ "$_i" -lt "$_pow" ]; do
+		_mult=$((_mult * 2))
+		_i=$((_i + 1))
+	done
+	_sleep=$((_base_sleep * _mult))
+	[ "$_sleep" -gt "$_max_sleep" ] && _sleep="$_max_sleep"
+	if caspar_crash_is_hard_fail_code "$_ec"; then
+		_extra=$((_streak * 2))
+		_sleep=$((_sleep + _extra))
+		[ "$_sleep" -gt "$_max_sleep" ] && _sleep="$_max_sleep"
+	fi
+	if [ "$_streak" -ge "$_max" ]; then
+		caspar_supervisor_log "[run.sh] crash loop (${_streak}/${_max} in ${_window}s, ec=${_ec}) — backing off ${_sleep}s"
+	else
+		caspar_supervisor_log "[run.sh] casparcg exited ${_ec} (restart ${_streak}/${_max}), waiting ${_sleep}s"
+	fi
+	sleep "$_sleep"
+	return 0
+}
+
+caspar_prepare_restart_after_exit() {
+	_ec="$1"
+	caspar_ensure_fully_stopped
+	if caspar_crash_is_hard_fail_code "$_ec"; then
+		caspar_clear_cef_cache
+	fi
+}
+
 caspar_amcp_listening() {
 	ss -tlnp 2>/dev/null | grep -qE ":${CASPAR_AMCP_PORT}\\b"
 }
 
 caspar_cmdline() {
 	_pid="$1"
+	[ -d "/proc/${_pid}" ] || return 0
 	tr '\0' ' ' </proc/"$_pid"/cmdline 2>/dev/null || true
 }
 
@@ -40,6 +136,7 @@ caspar_is_main_process() {
 
 caspar_list_main_pids() {
 	for _pid in $(pgrep -f "${CASPAR_BIN}" 2>/dev/null) $(pgrep -f "casparcg-server" 2>/dev/null); do
+		[ -d "/proc/${_pid}" ] || continue
 		_cmd="$(caspar_cmdline "$_pid")"
 		caspar_is_main_process "$_cmd" || continue
 		printf '%s\n' "$_pid"
@@ -58,6 +155,7 @@ caspar_kill_main_processes() {
 # All casparcg PIDs for this install (main + CEF children).
 caspar_list_all_pids() {
 	for _pid in $(pgrep -f "${CASPAR_BIN}" 2>/dev/null) $(pgrep -f "casparcg-server" 2>/dev/null); do
+		[ -d "/proc/${_pid}" ] || continue
 		_cmd="$(caspar_cmdline "$_pid")"
 		case "$_cmd" in
 		*"${CASPAR_ROOT}"* | *"${CONFIG_PATH}"*) printf '%s\n' "$_pid" ;;

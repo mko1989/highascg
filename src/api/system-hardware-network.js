@@ -8,7 +8,9 @@ const { normalizeNetworkSettings, isAllowedEthernetIface, isValidIpv4 } = requir
 const { buildNetworkStatus } = require('../system/network-inventory')
 
 const APPLY_SCRIPT = '/usr/local/lib/highascg/highascg-network-apply.sh'
+const RESET_SCRIPT = '/usr/local/lib/highascg/highascg-network-reset.sh'
 const REPO_APPLY_SCRIPT = path.join(__dirname, '../../tools/runtime/highascg-network-apply.sh')
+const REPO_RESET_SCRIPT = path.join(__dirname, '../../tools/runtime/highascg-network-reset.sh')
 
 /**
  * @param {object} ctx
@@ -113,4 +115,54 @@ function handleNetworkApplyPost(body, ctx) {
 	}
 }
 
-module.exports = { handleNetworkGet, handleNetworkApplyPost }
+/**
+ * @param {string} body
+ * @param {object} ctx
+ */
+function handleNetworkResetPost(body, ctx) {
+	const b = parseBody(body)
+	const prev = normalizeNetworkSettings(ctx.config?.network, ctx.config?.network)
+	const ifaceRaw = b?.interface ?? b?.primaryInterface ?? prev.primaryInterface
+	const iface = String(ifaceRaw || '').trim()
+	if (iface && !isAllowedEthernetIface(iface)) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid Ethernet interface' }) }
+	}
+
+	const script = fs.existsSync(RESET_SCRIPT) ? RESET_SCRIPT : REPO_RESET_SCRIPT
+	if (!fs.existsSync(script)) {
+		return {
+			status: 503,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Network reset helper not installed', script }),
+		}
+	}
+
+	const args = iface ? [iface] : []
+	let log = ''
+	try {
+		log = execFileSync('sudo', ['-n', script, ...args], { encoding: 'utf8', timeout: 45000 })
+	} catch (e) {
+		const err = e && typeof e === 'object' ? e : {}
+		const stderr = String(err.stderr || err.stdout || err.message || e)
+		const needsSudo = /password|a password is required|not allowed/i.test(stderr)
+		return {
+			status: needsSudo ? 503 : 500,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				error: needsSudo
+					? 'Network reset requires passwordless sudo for highascg-network-reset.sh'
+					: 'Network reset failed',
+				log: stderr,
+			}),
+		}
+	}
+
+	const status = buildNetworkStatus(prev)
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ok: true, log, ...status }),
+	}
+}
+
+module.exports = { handleNetworkGet, handleNetworkApplyPost, handleNetworkResetPost }

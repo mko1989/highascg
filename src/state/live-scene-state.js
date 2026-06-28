@@ -112,6 +112,11 @@ function broadcastSceneLive(ctx) {
 		path: 'channelMap',
 		value: buildChannelMap(ctx),
 	})
+	try {
+		require('../companion-bridge/look-air-frames').onSceneLiveBroadcast(ctx)
+	} catch {
+		/* companion bridge optional */
+	}
 }
 
 /**

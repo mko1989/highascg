@@ -116,13 +116,29 @@ async function fetchPeerProjectMediaManifest(ctx, pingJson) {
 		return { ok: false, error: 'replication not paired' }
 	}
 	const { peerHttpRequest } = require('./peer-client')
-	const res = await peerHttpRequest(repl.peer, '/api/replication/project-media-manifest')
+
+	const tryManifest = async () =>
+		peerHttpRequest(repl.peer, '/api/replication/project-media-manifest')
+
+	let res = await tryManifest()
+
+	if (res.status === 401) {
+		const { realignPairTokenFromPeer, pushPairTokenToPeer } = require('./replication-pair-token')
+		const rt = require('./replication-service').getReplicationRuntime(ctx)
+		const role = rt?.roleState?.getRole() || getReplicationConfig(ctx.config).role
+		const fixed =
+			role === 'leader' ? await pushPairTokenToPeer(ctx) : await realignPairTokenFromPeer(ctx)
+		if (fixed.ok && fixed.updated) {
+			res = await tryManifest()
+		}
+	}
+
 	if (res.ok && res.json) {
 		return { ok: true, manifest: res.json, source: 'manifest' }
 	}
 
 	const peerMedia = pingJson?.projectMedia || null
-	if (res.status === 404 && peerMedia?.signature) {
+	if ((res.status === 404 || res.status === 401) && peerMedia?.signature) {
 		return {
 			ok: true,
 			manifest: {
@@ -133,6 +149,16 @@ async function fetchPeerProjectMediaManifest(ctx, pingJson) {
 			},
 			source: 'ping',
 			signatureOnly: true,
+		}
+	}
+
+	if (res.status === 401) {
+		return {
+			ok: false,
+			error:
+				'peer rejected replication token (401) — Disconnect and Connect hot backup again on both boxes',
+			tokenMismatch: true,
+			httpStatus: 401,
 		}
 	}
 
@@ -270,7 +296,9 @@ async function compareProjectMediaWithPeer(ctx, opts = {}) {
 		slug: local.slug || peer.slug || '',
 		role,
 		leaderShouldPush:
-			role === 'leader' && (!cmp.inSync || !signaturesMatch) && (cmp.localOnly.length > 0 || cmp.mismatched.length > 0),
+			role === 'leader' &&
+			(!cmp.inSync || !signaturesMatch) &&
+			(cmp.localOnly.length > 0 || cmp.peerOnly.length > 0 || cmp.mismatched.length > 0),
 		followerShouldPull:
 			role === 'follower' &&
 			(!cmp.inSync || !signaturesMatch) &&

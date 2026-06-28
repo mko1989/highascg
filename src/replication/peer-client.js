@@ -110,7 +110,6 @@ function startPeerClient(ctx, runtime) {
 		const now = Date.now()
 		if (res.ok && res.json) {
 			if (repl.pairId && res.json.pairId && res.json.pairId !== repl.pairId) {
-				peerFailStreak += 1
 				runtime.peerReachable = false
 				runtime.lastPeerPingError = 'pair id mismatch'
 				if (typeof ctx.log === 'function') {
@@ -125,9 +124,14 @@ function startPeerClient(ctx, runtime) {
 				(localRole === 'leader' && peerRole && peerRole !== 'follower') ||
 				(localRole === 'follower' && peerRole && peerRole !== 'leader')
 			) {
-				peerFailStreak += 1
 				runtime.peerReachable = false
 				runtime.lastPeerPingError = `unexpected peer role: ${peerRole || '?'}`
+				if (typeof ctx.log === 'function') {
+					ctx.log(
+						'warn',
+						`[replication] peer ${repl.peer.host} role ${peerRole || '?'} (expected ${localRole === 'leader' ? 'follower' : 'leader'}) — check peer IP in hot backup settings`,
+					)
+				}
 				return
 			}
 

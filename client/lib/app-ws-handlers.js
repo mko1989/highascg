@@ -15,6 +15,7 @@ import {
 	ingestStreamingChannelWsEvent,
 } from './streaming-channel-state.js'
 import { ingestComposePreviewWs } from '../components/preview-canvas-compose-snapshot.js'
+import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
 
 /**
  * @param {unknown} data
@@ -87,6 +88,10 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('streaming_channel', (data) => ingestStreamingChannelWsEvent(data))
 
 	ws.on('compose.preview', (data) => ingestComposePreviewWs(data))
+
+	ws.on('companion.buttonPreview', () => {
+		invalidateCompanionFlagThumbs()
+	})
 
 	ws.on('global_border_sync', (data) => {
 		ingestArtnetGlobalBorderSync(sceneState, data)

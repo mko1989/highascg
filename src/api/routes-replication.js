@@ -332,8 +332,9 @@ async function handlePost(path, body, ctx, req) {
 		try {
 			const project = await loadFullProject()
 			const out = await syncProjectMediaToPeer(ctx, project, { direction })
+			const status = out.ok || out.skipped ? 200 : out.authFailed ? 503 : 500
 			return {
-				status: out.ok || out.skipped ? 200 : 500,
+				status,
 				headers: JSON_HEADERS,
 				body: jsonBody(out),
 			}
@@ -460,6 +461,27 @@ async function handlePost(path, body, ctx, req) {
 
 	if (path === '/api/replication/pair-credentials') {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(generatePairingCredentials()) }
+	}
+
+	if (path === '/api/replication/realign-pair-token') {
+		const { handleRealignPairToken } = require('../replication/replication-pair-token')
+		const out = handleRealignPairToken(ctx, payload, req)
+		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
+	}
+
+	if (path === '/api/replication/apply-pair-token') {
+		const { handleApplyPairToken } = require('../replication/replication-pair-token')
+		const out = handleApplyPairToken(ctx, payload, req)
+		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
+	}
+
+	if (path === '/api/replication/exchange-ssh') {
+		if (!replicationTokenOk(ctx, req, payload)) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
+		}
+		const { handleExchangeReplicationSsh } = require('../replication/replication-ssh-setup')
+		const out = handleExchangeReplicationSsh(ctx, payload)
+		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
 	}
 
 	if (path === '/api/replication/project') {

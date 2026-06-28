@@ -50,6 +50,7 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 | **`/usr/local/lib/highascg/highascg-webui-server-update.sh`** | `--source <extract-dir>` | Web UI server update (WO-66) |
 | **`/usr/bin/eggs`** | `calamares` | `src/api/routes-system-setup.js` (DISPLAY often `:0`) |
 | **`/usr/local/lib/highascg/highascg-network-apply.sh`** | fixed `dhcp` / `static` + allow-listed iface args | WO-59 **Apply network** (`POST /api/system/network/apply`) |
+| **`/usr/local/lib/highascg/highascg-network-reset.sh`** | optional `[iface]` | **Reset network** (`POST /api/system/network/reset`) — DHCP renew / reconnect |
 
 **WO-66 Web UI server update** (install helper via `install-exfat-systemd-units.sh`, then sudoers):
 
@@ -58,13 +59,21 @@ echo 'casparcg ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-webui-serve
 sudo visudo -cf /etc/sudoers.d/highascg-webui-server-update
 ```
 
-**WO-59 network helper** (install manually until wired in `install-phase4.sh`):
+**WO-59 network helpers** (install manually until wired in `install-phase4.sh`):
 
 ```bash
-sudo install -m 755 tools/runtime/highascg-network-apply.sh /usr/local/lib/highascg/highascg-network-apply.sh
-echo 'casparcg ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-network-apply.sh' | sudo tee /etc/sudoers.d/highascg-network
-sudo visudo -cf /etc/sudoers.d/highascg-network
+sudo bash scripts/runtime/install-network-apply.sh casparcg
 ```
+
+Installs **`highascg-network-apply.sh`** and **`highascg-network-reset.sh`** with matching sudoers.
+
+**Optional power button** (short press = network reset, hold 3s = shutdown):
+
+```bash
+sudo bash scripts/setup/14-power-button-network-reset.sh
+```
+
+Uses **`evtest`** + **`logind` `HandlePowerKey=ignore`**. Only enable on kiosk/playout boxes where accidental shutdown is acceptable.
 
 Uses **NetworkManager (`nmcli`)** on the live image (NM active; netplan files present but NM owns connections).
 

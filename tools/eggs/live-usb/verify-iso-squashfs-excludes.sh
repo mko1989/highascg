@@ -25,15 +25,31 @@ warn() {
 
 echo "==> verify squashfs excludes: $SQ"
 
-# Full listing — unsquashfs -l "$SQ" <subdir> does not filter reliably.
+# pipefail + `grep -q` on a large `unsquashfs -l` stream: early match closes the pipe,
+# unsquashfs exits SIGPIPE, and the pipeline status becomes failure (false negative).
+squash_grep_list() {
+	local pattern="$1"
+	shift
+	local rc=0
+	set +o pipefail
+	unsquashfs -l "$SQ" "$@" 2>/dev/null | grep -qE "$pattern" || rc=$?
+	set -o pipefail
+	[[ "$rc" -eq 0 ]]
+}
+
+squash_has_path() {
+	local rel="${1#./}"
+	rel="${rel%/}"
+	squash_grep_list "^squashfs-root/${rel}$" "$rel"
+}
+
 squash_has_tree() {
 	local prefix="${1%/}"
-	# Match directory itself or any path beneath it (unsquashfs -l may list the dir without a trailing child).
-	unsquashfs -l "$SQ" 2>/dev/null | grep -qE "^squashfs-root/${prefix}(/|$)"
+	squash_grep_list "^squashfs-root/${prefix}(/|\$)" "$prefix"
 }
 
 # Root-level swap file (not usr/bin/live-swapfile or kernel headers)
-if unsquashfs -l "$SQ" 2>/dev/null | grep -m1 -qE '^squashfs-root/(swapfile|swap\.img)$'; then
+if squash_grep_list '^squashfs-root/(swapfile|swap\.img)$'; then
 	bad "root swapfile or swap.img is inside squashfs"
 else
 	ok "no root /swapfile or /swap.img in squashfs"
@@ -70,6 +86,11 @@ else
 	else
 		warn "missing node_modules — embed-server ISO may not boot standalone"
 	fi
+	if squash_has_path 'home/casparcg/highascg/dist-web/index.html'; then
+		ok "present: home/casparcg/highascg/dist-web/index.html (operator UI on :4200)"
+	else
+		bad "missing dist-web/index.html — run install-iso-defaults.sh (HIGHASCG_ISO_BUILD_WEB=1) before produce"
+	fi
 fi
 
 # Companion + highpass-highascg module (when embed is on — default).
@@ -78,7 +99,7 @@ if [[ "${HIGHASCG_ISO_EMBED_COMPANION:-1}" == "1" ]]; then
 		'home/casparcg/companion/companion_headless.sh' \
 		'home/casparcg/.config/companion/modules/highpass-highascg/main.js' \
 		'etc/systemd/system/companion.service'; do
-		if unsquashfs -l "$SQ" 2>/dev/null | grep -qF "squashfs-root/${needle}"; then
+		if squash_has_path "$needle"; then
 			ok "present: ${needle}"
 		else
 			bad "missing from squashfs: ${needle} — run prepare-companion-for-eggs-clone.sh before produce"
@@ -88,7 +109,17 @@ else
 	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skip Companion squashfs checks"
 fi
 
-if unsquashfs -l "$SQ" 2>/dev/null | grep -qE '^squashfs-root/usr_[0-9]/'; then
+if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
+	if squash_has_path 'usr/bin/calamares'; then
+		ok "present: /usr/bin/calamares (install-to-disk)"
+	else
+		bad "missing /usr/bin/calamares — run install-eggs-calamares.sh before produce"
+	fi
+else
+	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skip Calamares squashfs checks"
+fi
+
+if squash_grep_list '^squashfs-root/usr_[0-9]/'; then
 	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — reboot and rerun full eggs produce (never rm /home/eggs)"
 fi
 

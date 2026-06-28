@@ -95,7 +95,7 @@ function onReplicationStatus(st) {
 	if (!_paired) {
 		_parity = null
 		_warnedPeerNeedsUpdate = false
-	} else if (!wasPaired) {
+	} else if (!wasPaired || (_parity == null && _role === 'leader')) {
 		void refreshProjectMediaParity()
 	}
 	notifyUi()

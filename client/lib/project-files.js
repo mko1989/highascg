@@ -148,7 +148,7 @@ export async function loadProjectFileById(id) {
 	}
 
 	try {
-		const postRes = await api.post('/api/project/load', { id })
+		const postRes = await api.post('/api/project/load', { slug: id })
 		const fromPost = normalizeProjectPayload(postRes)
 		if (fromPost) return fromPost
 	} catch {

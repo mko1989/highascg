@@ -34,6 +34,7 @@ export const CHROMA_KEY_TYPES = ['None', 'Green', 'Blue']
  * @property {number} [decimals] - Decimal places
  * @property {string[]} [options] - Select options
  * @property {*} [default] - Default value
+ * @property {boolean} [primary] - When false, param is shown under Advanced in inspector (default true)
  */
 
 /**
@@ -101,11 +102,11 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'levels',
 		defaults: { minIn: 0, maxIn: 1, gamma: 1, minOut: 0, maxOut: 1 },
 		schema: [
-			{ key: 'minIn', label: 'Min In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0 },
-			{ key: 'maxIn', label: 'Max In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1 },
-			{ key: 'gamma', label: 'Gamma', type: 'float', min: 0, max: 4, step: 0.01, decimals: 2, default: 1 },
-			{ key: 'minOut', label: 'Min Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0 },
-			{ key: 'maxOut', label: 'Max Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1 },
+			{ key: 'minIn', label: 'Min In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: true },
+			{ key: 'maxIn', label: 'Max In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: true },
+			{ key: 'gamma', label: 'Gamma', type: 'float', min: 0, max: 4, step: 0.01, decimals: 2, default: 1, primary: true },
+			{ key: 'minOut', label: 'Min Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: false },
+			{ key: 'maxOut', label: 'Max Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: false },
 		],
 	},
 	{
@@ -116,11 +117,11 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'chroma',
 		defaults: { key: 'None', threshold: 0.34, softness: 0.44, spill: 1, blur: 0 },
 		schema: [
-			{ key: 'key', label: 'Key', type: 'select', options: CHROMA_KEY_TYPES, default: 'None' },
-			{ key: 'threshold', label: 'Threshold', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.34 },
-			{ key: 'softness', label: 'Softness', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.44 },
-			{ key: 'spill', label: 'Spill', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1 },
-			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 0 },
+			{ key: 'key', label: 'Key', type: 'select', options: CHROMA_KEY_TYPES, default: 'None', primary: true },
+			{ key: 'threshold', label: 'Threshold', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.34, primary: true },
+			{ key: 'softness', label: 'Softness', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.44, primary: true },
+			{ key: 'spill', label: 'Spill', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, primary: false },
+			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 0, primary: false },
 		],
 	},
 	{
@@ -159,14 +160,14 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'perspective',
 		defaults: { ulX: 0, ulY: 0, urX: 1, urY: 0, lrX: 1, lrY: 1, llX: 0, llY: 1 },
 		schema: [
-			{ key: 'ulX', label: 'Upper-Left X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'ulY', label: 'Upper-Left Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'urX', label: 'Upper-Right X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1 },
-			{ key: 'urY', label: 'Upper-Right Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'lrX', label: 'Lower-Right X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1 },
-			{ key: 'lrY', label: 'Lower-Right Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1 },
-			{ key: 'llX', label: 'Lower-Left X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'llY', label: 'Lower-Left Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1 },
+			{ key: 'ulX', label: 'Upper-Left X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0, primary: false },
+			{ key: 'ulY', label: 'Upper-Left Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0, primary: false },
+			{ key: 'urX', label: 'Upper-Right X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1, primary: false },
+			{ key: 'urY', label: 'Upper-Right Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0, primary: false },
+			{ key: 'lrX', label: 'Lower-Right X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1, primary: false },
+			{ key: 'lrY', label: 'Lower-Right Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1, primary: false },
+			{ key: 'llX', label: 'Lower-Left X', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 0, primary: false },
+			{ key: 'llY', label: 'Lower-Left Y', type: 'float', min: -1, max: 2, step: 0.01, decimals: 3, default: 1, primary: false },
 		],
 	},
 	{
@@ -221,6 +222,24 @@ export const MIXER_EFFECTS = [
  * @type {Map<string, EffectDefinition>}
  */
 export const EFFECT_MAP = new Map(MIXER_EFFECTS.map((e) => [e.type, e]))
+
+/**
+ * Primary inspector params (shown by default).
+ * @param {EffectDefinition} def
+ * @returns {EffectParamSchema[]}
+ */
+export function effectPrimarySchema(def) {
+	return (def?.schema || []).filter((s) => s.primary !== false)
+}
+
+/**
+ * Advanced inspector params (collapsible section).
+ * @param {EffectDefinition} def
+ * @returns {EffectParamSchema[]}
+ */
+export function effectAdvancedSchema(def) {
+	return (def?.schema || []).filter((s) => s.primary === false)
+}
 
 /**
  * Category ordering for the Effects tab in the sources panel.

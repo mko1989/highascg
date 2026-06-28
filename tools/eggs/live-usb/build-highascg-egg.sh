@@ -64,6 +64,7 @@ Name=en* eth*
 
 [Network]
 DHCP=yes
+LinkLocalAddressing=ipv4
 MulticastDNS=yes
 IPv6AcceptRA=yes
 NETEOF

@@ -93,16 +93,16 @@ export function getMainModalHtml() {
 						<div class="settings-group">
 							<label for="set-compose-preview-mode">Preview source</label>
 							<select id="set-compose-preview-mode">
-								<option value="canvas">Canvas thumbnails (legacy)</option>
 								<option value="ffmpeg_jpeg">Caspar JPEG — ffmpeg writes file (recommended)</option>
+								<option value="canvas">Canvas thumbnails (legacy)</option>
 								<option value="caspar_image">Caspar ADD IMAGE tick (legacy)</option>
 							</select>
 							<p class="settings-note">JPEG mode embeds a low-cost ffmpeg consumer in Caspar config — no AMCP spam. Apply Caspar config after changing FPS or resolution.</p>
 						</div>
 						<div id="set-compose-preview-ffmpeg-fields">
 							<div class="settings-group">
-								<label for="set-compose-preview-fps">Update rate: <strong id="set-compose-preview-fps-val">2</strong> fps</label>
-								<input type="range" id="set-compose-preview-fps" min="1" max="30" step="1" value="2" style="width:100%;max-width:24rem" />
+								<label for="set-compose-preview-fps">Update rate: <strong id="set-compose-preview-fps-val">25</strong> fps</label>
+								<input type="range" id="set-compose-preview-fps" min="1" max="30" step="1" value="25" style="width:100%;max-width:24rem" />
 							</div>
 							<div class="settings-group">
 								<label for="set-compose-preview-scale">Resolution (relative to channel)</label>
@@ -140,7 +140,15 @@ export function getMainModalHtml() {
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>
 						<div class="settings-group"><label>Companion Host</label><input type="text" id="set-companion-host" placeholder="127.0.0.1"></div>
-						<div class="settings-group"><label>Companion Port</label><input type="number" id="set-companion-port" placeholder="8000"></div>
+						<div class="settings-group"><label>Companion Port (HTTP press)</label><input type="number" id="set-companion-port" placeholder="8000"></div>
+						<div class="settings-group checkbox">
+							<label><input type="checkbox" id="set-companion-satellite-enabled" checked /> Satellite preview (button images)</label>
+						</div>
+						<div class="settings-group"><label>Satellite Host</label><input type="text" id="set-companion-satellite-host" placeholder="same as Companion host"></div>
+						<div class="settings-group"><label>Satellite Port</label><input type="number" id="set-companion-satellite-port" placeholder="16622"></div>
+						<div class="settings-group"><label>Preview bitmap size (px)</label><input type="number" id="set-companion-preview-size" placeholder="72" min="32" max="512"></div>
+						<div class="settings-group"><label>Page picker grid size</label><input type="number" id="set-companion-picker-grid" placeholder="8" min="1" max="16"></div>
+						<p class="settings-note">Timeline <code>companion_press</code> flags use HTTP for triggers. Button previews use Companion Satellite — see <code>docs/reference/companion-satellite-api.md</code>.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-media-usb">
 						<h3 class="settings-category">Media disk mount (live / internal)</h3>
@@ -257,6 +265,19 @@ export function getMainModalHtml() {
 							<button type="button" class="btn btn--secondary" id="set-nuclear-restart-wm">Restart window manager (nodm)</button>
 							<button type="button" class="btn btn--primary" id="set-nuclear-reboot">Reboot host</button>
 						</div>
+						<h4 class="settings-subhead">Install to disk</h4>
+						<p class="settings-note">Launch the Calamares graphical installer on <code>:0</code> (needs a connected screen). Use after booting the live USB to copy HighAsCG onto internal storage.</p>
+						<div class="settings-group">
+							<button type="button" class="btn btn--secondary" id="set-nuclear-install-disk">Install to disk (Calamares)</button>
+						</div>
+						<h4 class="settings-subhead">CasparCG playout</h4>
+						<p class="settings-note" id="set-nuclear-caspar-status">Caspar status: unknown</p>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem">
+							<button type="button" class="btn btn--secondary" id="set-nuclear-caspar-stop">Stop CasparCG</button>
+							<button type="button" class="btn btn--secondary" id="set-nuclear-caspar-start">Start CasparCG</button>
+							<button type="button" class="btn btn--secondary" id="set-nuclear-caspar-restart">Restart CasparCG</button>
+						</div>
+						<p class="settings-note">Stop shuts down playout without autorestart until you start again (systemd units).</p>
 						<p class="settings-note" id="set-nuclear-status"></p>
 					</div>
 				</div>

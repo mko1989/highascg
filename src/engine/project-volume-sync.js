@@ -5,6 +5,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
+const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
 
 const PROJECTS_SUBDIR = 'projects'
 const AUTOSAVE_SUBDIR = '_autosave'
@@ -221,6 +222,7 @@ function pushProjectSlugToVolumes(slug, opts = {}) {
  * @param {string} slug
  */
 function pullProjectSlugFromUsbIfNewer(slug) {
+	if (!shouldAllowExfatPullShowData()) return false
 	const roots = getProjectRoots()
 	if (!roots.usb || !isVolumeMountedSync(roots.usb)) return false
 	const s = String(slug || '').trim()
@@ -235,6 +237,7 @@ function pullProjectSlugFromUsbIfNewer(slug) {
  * @param {string} slug
  */
 function pullAutosaveSlugFromVolumesIfNewer(slug) {
+	if (!shouldAllowExfatPullShowData()) return false
 	const roots = getProjectRoots()
 	const s = String(slug || '').trim()
 	if (!s) return false

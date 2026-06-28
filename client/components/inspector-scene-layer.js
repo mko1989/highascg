@@ -175,6 +175,13 @@ export function renderSceneLayerInspector(deps, sel) {
 
 	renderEffectsGroup(root, {
 		effects: layer.effects || [],
+		liveApplyContext: {
+			kind: 'scene_layer',
+			sceneState,
+			stateStore,
+			sceneId,
+			layerIndex,
+		},
 		onUpdate: (newEffects) => {
 			sceneState.patchLayer(sceneId, layerIndex, { effects: newEffects })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))

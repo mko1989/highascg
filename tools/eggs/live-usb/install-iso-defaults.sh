@@ -2,7 +2,7 @@
 # Bake ISO-first defaults on the eggs build host before `eggs produce --clone`.
 #
 # - Caspar: config/casparcg.config from config/casparcg.config.iso
-# - HighAsCG: production node_modules for server embed (dist-web/ via exFAT drop-update; WO-52 serves UI on :4200)
+# HighAsCG: production node_modules for server embed; dist-web/ baked on ISO (operator UI on :4200)
 #
 # Usage (repo root):
 #   bash tools/eggs/live-usb/install-iso-defaults.sh
@@ -14,7 +14,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 HIGHASCG_ROOT="${HIGHASCG_ROOT:-/home/casparcg/highascg}"
 EMBED="${HIGHASCG_ISO_EMBED_SERVER:-1}"
-BUILD_WEB="${HIGHASCG_ISO_BUILD_WEB:-0}"
+BUILD_WEB="${HIGHASCG_ISO_BUILD_WEB:-1}"
 
 if [[ ! -f "${REPO_ROOT}/package.json" ]]; then
 	echo "Expected highascg repo at ${REPO_ROOT}" >&2
@@ -48,7 +48,12 @@ if [[ "$BUILD_WEB" == "1" ]]; then
 	else
 		run_as_caspar 'npm install'
 	fi
-	echo "==> build:client: run npm run build:client in repo root (client/ → dist-web/)"
+	echo "==> npm run build:client (client/ → dist-web/ on ISO squashfs)"
+	run_as_caspar 'npm run build:client'
+	[[ -f "${HIGHASCG_ROOT}/dist-web/index.html" ]] || {
+		echo "ERROR: dist-web/index.html missing after build:client" >&2
+		exit 1
+	}
 	echo "==> npm prune --omit=dev --omit=optional (production node_modules for squashfs)"
 	run_as_caspar 'export NPM_CONFIG_LOGLEVEL=error; npm prune --omit=dev --omit=optional'
 else
@@ -59,7 +64,7 @@ else
 	else
 		run_as_caspar 'export NODE_ENV=production NPM_CONFIG_LOGLEVEL=error; npm install --omit=dev --omit=optional'
 	fi
-	echo "==> HIGHASCG_ISO_BUILD_WEB=0 — no dist-web on squashfs (deploy dist-web/ via exFAT drop-update; server serves UI on :4200)"
+	echo "==> HIGHASCG_ISO_BUILD_WEB=0 — no dist-web on squashfs (use drop-update/ on exFAT for UI)"
 fi
 
 echo "==> ISO embed server ready under ${HIGHASCG_ROOT} (package.json + node_modules present)"

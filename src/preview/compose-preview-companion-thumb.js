@@ -6,6 +6,9 @@ const path = require('path')
 const { spawn } = require('child_process')
 const cache = require('./compose-preview-cache')
 const { resolveMonitoredChannels } = require('./compose-preview-mode')
+const { composePreviewImageKey } = require('../companion-bridge/contract')
+const { getCompanionBridgeRegistry } = require('../companion-bridge/registry')
+const { buildLookAirFrameUpdates } = require('../companion-bridge/look-air-frames')
 
 /** @type {Map<number, string>} */
 const _lastContentHash = new Map()
@@ -55,8 +58,7 @@ function companionThumbIntervalMs(config) {
  * @returns {string}
  */
 function getCompanionPreviewVariableKey(channel) {
-	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	return `compose_preview_ch${ch}_image`
+	return composePreviewImageKey(channel)
 }
 
 /**
@@ -174,6 +176,12 @@ async function processCompanionPreviewFrame(ctx, channel, sourceMtimeMs) {
 	const ch = parseInt(String(channel), 10)
 	const cfg = ctx?.config || {}
 	if (!isCompanionThumbEnabled(cfg)) return
+	const registry = getCompanionBridgeRegistry()
+	if (!registry.shouldPushAnyPreview()) return
+
+	const monitored = resolveMonitoredChannels(cfg)
+	if (!registry.shouldPushChannelImage(ch, monitored)) return
+
 	const source = cache.resolvePreviewImagePath(cfg, ch)
 	if (!source?.path) return
 
@@ -201,13 +209,19 @@ async function processCompanionPreviewFrame(ctx, channel, sourceMtimeMs) {
 
 	const key = getCompanionPreviewVariableKey(ch)
 	const dataUri = jpegBufferToDataUri(jpeg)
-	const { splitCompanionThumbQuadrants, quadrantVariableKey } = require('./compose-preview-companion-quadrants')
-	const quads = splitCompanionThumbQuadrants(jpeg)
 	/** @type {Record<string, string>} */
 	const batch = { [key]: dataUri }
-	for (const [quad, uri] of Object.entries(quads)) {
-		if (uri) batch[quadrantVariableKey(ch, quad)] = uri
+
+	if (registry.shouldPushQuadrants()) {
+		const { splitCompanionThumbQuadrants, quadrantVariableKey } = require('./compose-preview-companion-quadrants')
+		const quads = splitCompanionThumbQuadrants(jpeg)
+		for (const [quad, uri] of Object.entries(quads)) {
+			if (uri) batch[quadrantVariableKey(ch, quad)] = uri
+		}
 	}
+
+	Object.assign(batch, buildLookAirFrameUpdates(ctx, ch, dataUri))
+
 	if (ctx?.state && typeof ctx.state.setVariablesImmediate === 'function') {
 		ctx.state.setVariablesImmediate(batch)
 	} else if (ctx?.state && typeof ctx.state.setVariableImmediate === 'function') {

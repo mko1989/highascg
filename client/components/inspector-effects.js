@@ -3,11 +3,19 @@
  * Renders editors for mixer effects on scene layers and timeline clips.
  *
  * @see 22_WO_MIXER_EFFECTS.md T2.1–T2.3
+ * @see 74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md
  * @see effect-registry.js for definitions
  */
 
 import { createDragInput } from './inspector-common.js'
-import { MIXER_EFFECTS, EFFECT_MAP, createEffectInstance, EFFECT_CATEGORIES } from '../lib/effect-registry.js'
+import {
+	MIXER_EFFECTS,
+	EFFECT_MAP,
+	createEffectInstance,
+	effectPrimarySchema,
+	effectAdvancedSchema,
+} from '../lib/effect-registry.js'
+import { scheduleLiveEffectApply } from '../lib/effect-apply-live.js'
 
 /**
  * Render a single parameter editor based on schema type.
@@ -72,20 +80,44 @@ function renderParamEditor(container, schema, currentValue, onChange) {
 }
 
 /**
+ * @param {HTMLElement} container
+ * @param {import('../lib/effect-registry.js').EffectDefinition} def
+ * @param {{ type: string, params: object }} effect
+ * @param {import('../lib/effect-registry.js').EffectParamSchema[]} schemaFields
+ * @param {(params: object) => void} onParamsChange
+ */
+function renderEffectParamBlock(container, def, effect, schemaFields, onParamsChange) {
+	for (const schema of schemaFields) {
+		const curVal = effect.params?.[schema.key] ?? schema.default
+		renderParamEditor(container, schema, curVal, (newVal) => {
+			const updated = { ...effect.params, [schema.key]: newVal }
+			onParamsChange(updated)
+		})
+	}
+}
+
+/**
  * Render the full editor for one effect instance.
  * @param {HTMLElement} container
  * @param {{ type: string, params: object }} effect
  * @param {(params: object) => void} onChange - Called with updated params
  * @param {() => void} onRemove - Called when user clicks remove
+ * @param {import('../lib/effect-apply-live.js').SceneLayerLiveContext | import('../lib/effect-apply-live.js').TimelineClipLiveContext | null} [liveApplyContext]
  */
-export function renderEffectEditor(container, effect, onChange, onRemove) {
+export function renderEffectEditor(container, effect, onChange, onRemove, liveApplyContext = null) {
 	const def = EFFECT_MAP.get(effect.type)
 	if (!def) return
+
+	const notifyChange = (updatedParams) => {
+		onChange(updatedParams)
+		if (liveApplyContext) {
+			scheduleLiveEffectApply(liveApplyContext, effect.type, updatedParams)
+		}
+	}
 
 	const card = document.createElement('div')
 	card.className = 'inspector-effect-card'
 
-	// Header row: icon + label + remove button
 	const header = document.createElement('div')
 	header.className = 'inspector-effect-card__header'
 	const title = document.createElement('span')
@@ -105,16 +137,31 @@ export function renderEffectEditor(container, effect, onChange, onRemove) {
 	header.appendChild(removeBtn)
 	card.appendChild(header)
 
-	// Parameter editors
+	const primaryFields = effectPrimarySchema(def)
+	const advancedFields = effectAdvancedSchema(def)
+
 	const paramsBlock = document.createElement('div')
 	paramsBlock.className = 'inspector-effect-card__params'
-	for (const schema of def.schema) {
-		const curVal = effect.params?.[schema.key] ?? schema.default
-		renderParamEditor(paramsBlock, schema, curVal, (newVal) => {
-			const updated = { ...effect.params, [schema.key]: newVal }
-			onChange(updated)
-		})
+
+	if (primaryFields.length > 0) {
+		renderEffectParamBlock(paramsBlock, def, effect, primaryFields, notifyChange)
 	}
+
+	if (advancedFields.length > 0) {
+		const details = document.createElement('details')
+		details.className = 'inspector-effect-card__advanced'
+		if (primaryFields.length === 0) details.open = true
+		const summary = document.createElement('summary')
+		summary.className = 'inspector-effect-card__advanced-summary'
+		summary.textContent = primaryFields.length === 0 ? 'Parameters' : 'Advanced'
+		details.appendChild(summary)
+		const advancedBlock = document.createElement('div')
+		advancedBlock.className = 'inspector-effect-card__advanced-params'
+		renderEffectParamBlock(advancedBlock, def, effect, advancedFields, notifyChange)
+		details.appendChild(advancedBlock)
+		paramsBlock.appendChild(details)
+	}
+
 	card.appendChild(paramsBlock)
 	container.appendChild(card)
 }
@@ -125,20 +172,19 @@ export function renderEffectEditor(container, effect, onChange, onRemove) {
  * @param {object} opts
  * @param {Array<{ type: string, params: object }>} opts.effects - Current effects array
  * @param {(effects: Array) => void} opts.onUpdate - Called with the updated effects array
+ * @param {import('../lib/effect-apply-live.js').SceneLayerLiveContext | import('../lib/effect-apply-live.js').TimelineClipLiveContext | null} [opts.liveApplyContext]
  */
-export function renderEffectsGroup(root, { effects, onUpdate }) {
+export function renderEffectsGroup(root, { effects, onUpdate, liveApplyContext = null }) {
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-effects-group'
 	grp.innerHTML = '<div class="inspector-group__title">Mixer Effects</div>'
 
-	// Drop zone
 	const dropZone = document.createElement('div')
 	dropZone.className = 'inspector-effects-dropzone'
 	dropZone.textContent = '⊕ Drop effect here'
 
 	dropZone.addEventListener('dragover', (e) => {
 		try {
-			// Accept effect drops
 			e.preventDefault()
 			e.dataTransfer.dropEffect = 'copy'
 			dropZone.classList.add('inspector-effects-dropzone--active')
@@ -154,58 +200,64 @@ export function renderEffectsGroup(root, { effects, onUpdate }) {
 			const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}')
 			if (data.type !== 'effect' || !data.value) return
 			const existing = effects || []
-			// Don't add duplicate of same type (except perspective/levels which could make sense doubled)
 			const alreadyHas = existing.some((fx) => fx.type === data.value)
 			if (alreadyHas) return
 			const instance = createEffectInstance(data.value)
 			if (!instance) return
-			onUpdate([...existing, instance])
+			const next = [...existing, instance]
+			onUpdate(next)
+			if (liveApplyContext) {
+				scheduleLiveEffectApply(liveApplyContext, instance.type, instance.params)
+			}
 		} catch (err) {
 			console.warn('[Inspector] Effect drop failed:', err)
 		}
 	})
 	grp.appendChild(dropZone)
 
-	// Dropdown for adding effects
 	const sel = document.createElement('select')
 	sel.className = 'inspector-field__select'
 	sel.style.marginTop = '8px'
 	sel.style.width = '100%'
 	sel.setAttribute('aria-label', 'Select effect to add')
-	
+
 	const defOpt = document.createElement('option')
 	defOpt.value = ''
 	defOpt.textContent = '⊕ Choose effect to add...'
 	sel.appendChild(defOpt)
-	
+
 	for (const fx of MIXER_EFFECTS) {
 		const o = document.createElement('option')
 		o.value = fx.type
 		o.textContent = `${fx.icon} ${fx.label}`
 		sel.appendChild(o)
 	}
-	
+
 	sel.addEventListener('change', () => {
 		const type = sel.value
 		if (!type) return
 		const existing = effects || []
 		const alreadyHas = existing.some((fx) => fx.type === type)
 		if (alreadyHas) {
-			sel.value = '' // reset
+			sel.value = ''
 			return
 		}
 		const instance = createEffectInstance(type)
 		if (!instance) return
 		onUpdate([...existing, instance])
-		sel.value = '' // reset after adding
+		if (liveApplyContext) {
+			scheduleLiveEffectApply(liveApplyContext, instance.type, instance.params)
+		}
+		sel.value = ''
 	})
 	grp.appendChild(sel)
 
-	// Render existing effects
 	const list = effects || []
 	for (let i = 0; i < list.length; i++) {
 		const fx = list[i]
-		renderEffectEditor(grp, fx,
+		renderEffectEditor(
+			grp,
+			fx,
 			(newParams) => {
 				const updated = [...list]
 				updated[i] = { ...fx, params: newParams }
@@ -215,6 +267,7 @@ export function renderEffectsGroup(root, { effects, onUpdate }) {
 				const updated = list.filter((_, idx) => idx !== i)
 				onUpdate(updated)
 			},
+			liveApplyContext,
 		)
 	}
 

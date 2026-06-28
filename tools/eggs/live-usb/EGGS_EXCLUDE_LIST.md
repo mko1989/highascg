@@ -58,7 +58,7 @@ grep antigravity /etc/penguins-eggs.d/exclude.list
 
 ## What HighAsCG excludes (summary)
 
-**Default (`HIGHASCG_ISO_EMBED_SERVER=1` on prepare):** use **`penguins-eggs-exclude-highascg-embed-server.list`** — server runtime stays on ISO; **`client/`** sources and dev trees omitted. **WO-52:** operator UI is **`dist-web/`** on playout via **`drop-update/`**, not a remote laptop.
+**Default (`HIGHASCG_ISO_EMBED_SERVER=1` on prepare):** use **`penguins-eggs-exclude-highascg-embed-server.list`** — server runtime + **`dist-web/`** (built UI) stay on ISO; **`client/`** sources and dev trees omitted. exFAT holds **operator configs/media** and optional **`drop-update/`** hotfixes — not required for first boot UI.
 
 **WO‑47 only (`HIGHASCG_ISO_EMBED_SERVER=0`):**
 

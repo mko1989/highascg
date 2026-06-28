@@ -58,10 +58,15 @@ elif [[ "${HIGHASCG_FORCE_SCANNER:-0}" == "1" ]] || ! command -v casparcg-scanne
 	}
 fi
 
-log "Disable stock casparcg-server systemd unit (we use openbox autostart)"
-systemctl stop casparcg-server 2>/dev/null || true
-systemctl disable casparcg-server 2>/dev/null || true
-rm -f /etc/systemd/system/casparcg-server.service
+log "CasparCG systemd units (WO-73 — replace Openbox autostart ownership)"
+if [[ -f "${SCRIPT_DIR}/13-caspar-systemd-units.sh" ]]; then
+	bash "${SCRIPT_DIR}/13-caspar-systemd-units.sh" "$USER_CASPAR" || {
+		echo "  note: 13-caspar-systemd-units.sh failed (non-fatal on partial install)" >&2
+	}
+else
+	systemctl stop casparcg-server 2>/dev/null || true
+	systemctl disable casparcg-server 2>/dev/null || true
+fi
 
 if [[ -f "${PLAYOUT}/media/casparcg.config.ftd" && ! -f "${PLAYOUT}/config/casparcg.config" ]]; then
 	cp -a "${PLAYOUT}/media/casparcg.config.ftd" "${PLAYOUT}/config/casparcg.config"

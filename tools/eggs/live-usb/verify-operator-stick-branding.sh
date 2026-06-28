@@ -4,6 +4,10 @@
 # Usage: sudo bash tools/eggs/live-usb/verify-operator-stick-branding.sh /dev/sdX [/path/to.iso]
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
+
 DEV="${1:?Usage: sudo $0 /dev/sdX [/path/to.iso]}"
 ISO="${2:-}"
 
@@ -29,7 +33,7 @@ warn() {
 }
 
 echo "==> Stick: $DEV"
-lsblk -f "$DEV" || true
+usb_lsblk_safe "$DEV" || true
 
 # Sample first ~4 GiB (covers hybrid ISO + GRUB cfg strings)
 sample="$(mktemp)"
@@ -37,10 +41,10 @@ trap 'rm -f "$sample"' EXIT
 dd if="$DEV" of="$sample" bs=1M count=4096 status=none 2>/dev/null || \
 	dd if="$DEV" of="$sample" bs=1M count=2048 status=none
 
-if grep -aq 'HIGHASCG Live' "$sample"; then
-	ok "block device contains HIGHASCG GRUB menu text"
+if grep -aiq 'highascg live' "$sample"; then
+	ok "block device contains HighAsCG GRUB/isolinux menu text"
 else
-	bad "no HIGHASCG Live string on stick — wrong ISO flashed or hybrid ISO damaged (re-dd)"
+	bad "no HighAsCG Live string on stick — wrong ISO flashed or hybrid ISO damaged (re-dd)"
 fi
 
 if grep -aq 'set theme=/boot/grub/theme.cfg' "$sample"; then

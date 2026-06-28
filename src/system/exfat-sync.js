@@ -23,6 +23,7 @@ const {
 	syncPairBootPreferExfat,
 } = require('./exfat-sync-fs')
 const { getExfatMountStatus, getExfatSyncDashboard } = require('./exfat-sync-status')
+const { shouldSyncShowDataPairFromExfat } = require('../replication/replication-show-authority')
 
 /** @type {Map<string, { mounted: boolean, source?: string, fstype?: string, target: string }>} */
 const mountCache = new Map()
@@ -158,6 +159,18 @@ async function syncOnePair(p, map, opts) {
 	const bootPrefer = String(p.bootPrefer || '').toLowerCase()
 	const excludes = p.exclude || []
 	const exPred = (rel) => isExcluded(rel, excludes)
+	const blockExfatToProject = !shouldSyncShowDataPairFromExfat(id)
+	const fileSyncOpts = {
+		...(boot ? { bootPreferExfat: bootPrefer === 'exfat' } : {}),
+		...(blockExfatToProject ? { blockExfatToProject: true } : {}),
+	}
+
+	if (blockExfatToProject) {
+		log(
+			'info',
+			`[exfat-sync] ${id}: skip volume → project (replication leader owns active show; push to stick still allowed)`,
+		)
+	}
 
 	let copied = 0
 	let skipped = 0
@@ -175,8 +188,12 @@ async function syncOnePair(p, map, opts) {
 		return { copied: 0, skipped: 0, errors: [`${id}: ${e instanceof Error ? e.message : e}`] }
 	}
 
+	if (blockExfatToProject && boot && bootPrefer === 'exfat') {
+		return { copied: 0, skipped: 1, errors: [] }
+	}
+
 	if (boot && bootPrefer === 'exfat') {
-		const br = syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, id, exPred, syncOneFilePair)
+		const br = syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, id, exPred, syncOneFilePair, fileSyncOpts)
 		log('info', `[exfat-sync] boot ${id} (${p.volume}): volume → project only (copied=${br.copied})`)
 		return br
 	}
@@ -202,7 +219,7 @@ async function syncOnePair(p, map, opts) {
 
 	if (exSt?.isFile() || prSt?.isFile()) {
 		const rel = path.basename(exfatRel) || id
-		const r = syncOneFilePair(exfatAbs, projectAbs, direction, dryRun, id, rel, boot ? { bootPreferExfat: bootPrefer === 'exfat' } : undefined)
+		const r = syncOneFilePair(exfatAbs, projectAbs, direction, dryRun, id, rel, fileSyncOpts)
 		return { copied: r.copied, skipped: r.skipped, errors: r.error ? [r.error] : [] }
 	}
 
@@ -233,7 +250,7 @@ async function syncOnePair(p, map, opts) {
 			stB = fs.statSync(b)
 		} catch {}
 		if (stA?.isDirectory() || stB?.isDirectory()) continue
-		const r = syncOneFilePair(a, b, direction, dryRun, id, rel, boot ? { bootPreferExfat: bootPrefer === 'exfat' } : undefined)
+		const r = syncOneFilePair(a, b, direction, dryRun, id, rel, fileSyncOpts)
 		copied += r.copied
 		skipped += r.skipped
 		if (r.error) errors.push(r.error)

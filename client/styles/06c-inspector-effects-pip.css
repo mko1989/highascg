@@ -65,6 +65,29 @@
 .inspector-effect-card__params .inspector-field {
 	padding: 2px 0;
 }
+.inspector-effect-card__advanced {
+	margin-top: 4px;
+	border-top: 1px dashed rgba(139, 92, 246, 0.2);
+	padding-top: 4px;
+}
+.inspector-effect-card__advanced-summary {
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--text-muted, #8b949e);
+	cursor: pointer;
+	user-select: none;
+	list-style: none;
+	padding: 2px 0 4px;
+}
+.inspector-effect-card__advanced-summary::-webkit-details-marker {
+	display: none;
+}
+.inspector-effect-card__advanced-params {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-top: 2px;
+}
 
 /* PIP overlay inspector (WO-25) */
 .inspector-pip-overlay-group {

@@ -144,7 +144,7 @@ async function applyInspectorEffect(amcp, channel, layer, body) {
 				defer,
 			)
 		case 'grid':
-			return amcp.mixer.mixerGrid(channel, p.resolution, duration, tween, defer)
+			return amcp.mixer.mixerGrid(channel, layer, p.resolution, duration, tween, defer)
 		case 'keyer':
 			return amcp.mixer.mixerKeyer(channel, layer, p.enabled ? 1 : 0)
 		case 'rotation':
@@ -433,6 +433,23 @@ async function handleMixer(path, body, ctx) {
 		case 'rotation':
 			r = await amcp.mixer.mixerRotation(channel, layer, b.degrees, b.duration, b.tween, b.defer)
 			break
+		case 'perspective':
+			r = await amcp.mixer.mixerPerspective(
+				channel,
+				layer,
+				b.ulX,
+				b.ulY,
+				b.urX,
+				b.urY,
+				b.lrX,
+				b.lrY,
+				b.llX,
+				b.llY,
+				b.duration,
+				b.tween,
+				b.defer,
+			)
+			break
 		case 'volume':
 			r = await amcp.mixer.mixerVolume(channel, layer, b.volume, b.duration, b.tween, b.defer)
 			break
@@ -440,7 +457,7 @@ async function handleMixer(path, body, ctx) {
 			r = await amcp.mixer.mixerMastervolume(channel, b.volume, b.duration, b.tween, b.defer)
 			break
 		case 'grid':
-			r = await amcp.mixer.mixerGrid(channel, b.resolution, b.duration, b.tween, b.defer)
+			r = await amcp.mixer.mixerGrid(channel, layer, b.resolution, b.duration, b.tween, b.defer)
 			break
 		case 'commit':
 			r = await amcp.mixer.mixerCommit(channel)

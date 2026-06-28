@@ -17,6 +17,7 @@ const {
 } = require('../media/project-media-root')
 const projectStore = require('../engine/project-store')
 const { runRsync } = require('./rsync-exec')
+const { resolveReplicationSshIdentityPath } = require('./replication-ssh-setup')
 
 function rsyncRemoteRoot() {
 	return String(process.env.HIGHASCG_REPL_RSYNC_REMOTE_ROOT || REPO_ROOT).replace(/\/+$/, '')
@@ -27,10 +28,32 @@ function rsyncSshUser() {
 }
 
 function rsyncSshOpts() {
-	return String(
+	const identity =
+		String(process.env.HIGHASCG_REPL_RSYNC_IDENTITY_FILE || '').trim() || resolveReplicationSshIdentityPath()
+	const identityOpt = identity ? `-i ${identity}` : ''
+	const base =
 		process.env.HIGHASCG_REPL_RSYNC_SSH_OPTS ||
-			'-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15',
-	).trim()
+		'-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15'
+	return [base, identityOpt].filter(Boolean).join(' ').trim()
+}
+
+/**
+ * @param {string} err
+ * @param {{ direction?: string, peerHost?: string }} ctx
+ */
+function rsyncAuthHint(err, ctx = {}) {
+	const msg = String(err || '')
+	if (!/permission denied|publickey|authentication failed|host key verification failed/i.test(msg)) {
+		return null
+	}
+	const peer = ctx.peerHost || 'peer'
+	const user = rsyncSshUser()
+	const dir = ctx.direction === 'pull' ? 'pull from leader' : 'push to follower'
+	return (
+		`SSH auth failed for ${user}@${peer} (${dir}). ` +
+		`Install passwordless keys on BOTH boxes: PEER=${peer} bash scripts/replication/setup-replication-ssh.sh ` +
+		`(leader needs follower's pubkey in ~/.ssh/authorized_keys; follower needs leader's too).`
+	)
 }
 
 /**
@@ -170,9 +193,13 @@ async function runProjectMediaRsync(direction, peerHost, relPaths, opts = {}) {
 	}
 
 	if (errors.length) {
+		const errorText = errors.join('; ')
+		const hint = rsyncAuthHint(errorText, { direction, peerHost: peerHost })
 		return {
 			ok: false,
-			error: errors.join('; '),
+			error: errorText,
+			hint,
+			authFailed: !!hint,
 			direction,
 			relPaths,
 			files: transferred,
@@ -245,7 +272,7 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 		}
 	}
 
-	const out = await runProjectMediaRsync(direction, peerHost, plan.relPaths, {
+	let out = await runProjectMediaRsync(direction, peerHost, plan.relPaths, {
 		log: opts.log || ctx.log,
 		onProgress: (progress) => {
 			if (!runtime) return
@@ -263,6 +290,25 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 			}
 		},
 	})
+
+	if (out.authFailed) {
+		try {
+			const { exchangeReplicationSshWithPeer } = require('./replication-ssh-setup')
+			const exchanged = await exchangeReplicationSshWithPeer(ctx)
+			if (exchanged.ok && typeof ctx.log === 'function') {
+				ctx.log('info', '[replication] re-exchanged SSH keys with peer — retrying media rsync')
+			}
+			if (exchanged.ok) {
+				out = await runProjectMediaRsync(direction, peerHost, plan.relPaths, {
+					log: opts.log || ctx.log,
+				})
+			}
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[replication] SSH re-exchange failed: ${e?.message || e}`)
+			}
+		}
+	}
 
 	const result = {
 		...out,
@@ -289,10 +335,12 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 			`[replication] project media rsync ${direction} ok — ${plan.relPaths.length} path(s) slug=${plan.slug || '?'}`,
 		)
 	} else if (!out.ok && !out.skipped && typeof ctx.log === 'function') {
-		ctx.log('warn', `[replication] project media rsync ${direction} failed: ${out.error || 'unknown'}`)
+		const note = out.hint || out.error || 'unknown'
+		ctx.log('warn', `[replication] project media rsync ${direction} failed: ${note}`)
 	}
 
-	return result
+	const authFailed = !!out.authFailed
+	return { ...result, authFailed, hint: out.hint || null }
 }
 
 module.exports = {

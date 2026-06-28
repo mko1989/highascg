@@ -19,6 +19,8 @@ DEV=""
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=usb-env.sh
 source "${HERE}/usb-env.sh"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
 MKPART_SH="${HERE}/usb-mkpart-numbered.sh"
 RESTORE_ESP_SH="${HERE}/usb-restore-esp-flags.sh"
 SLOTS_PY="${HERE}/usb-partition-slots.py"
@@ -370,15 +372,14 @@ bash "$RESTORE_ESP_SH" "$DEV"
 
 if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
 	echo "Could not resolve exFAT partition (slot ${EXFAT_NUM}) under $DEV." >&2
-	lsblk "$DEV"
+	usb_lsblk_safe "$DEV"
 	exit 6
 fi
 
 echo "Formatting $LASTPART → exFAT LABEL=$EXFAT_LABEL"
 wipefs -a "$LASTPART" 2>/dev/null || true
 mkfs.exfat -L "$EXFAT_LABEL" "$LASTPART"
-partprobe "$DEV"
-sleep 1
+usb_reread_partition_table "$DEV"
 blkid "$LASTPART" || true
 
 echo "Done. WO-47 USB expects LABEL=HIGHASCGEXF in home-casparcg-exfat.mount (install via install-phase4 / install-exfat-systemd-units.sh)."

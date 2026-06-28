@@ -97,7 +97,7 @@ else
 	echo "(-y) Skipping interactive confirmation."
 fi
 
-echo "==> 1/3 Unmount and flash ISO (dd)"
+echo "==> 1/5 Unmount and flash ISO (dd)"
 bash "${HERE}/unmount-usb-for-partitioning.sh" "$DEV" 2>/dev/null || true
 umount "${DEV}"?* 2>/dev/null || true
 # Build host often mounts stick exFAT at ~/exfat — blocks partition/format.
@@ -123,26 +123,33 @@ dd_iso_with_progress "$ISO" "$DEV" 4M
 echo "Flushing to stick…" >&2
 sync
 echo "ISO write complete."
-partprobe "$DEV"
-sleep 2
-lsblk -f "$DEV"
+usb_reread_partition_table "$DEV"
+usb_lsblk_safe "$DEV"
 
-echo "==> 2/4 exFAT + operator layout (finish-operator-stick, no persistence)"
+echo "==> 2/5 exFAT + operator layout (finish-operator-stick, no persistence)"
 export HIGHASCG_EXFAT_ONLY=1
 export EXFAT_FILL_DISK=1
 bash "${HERE}/install-exfat-sync-map.sh"
 bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale
 
-echo "==> 3/4 Push running config → fresh HIGHASCGEXF (configs/, state JSON)"
-bash "${HERE}/seed-stick-config-from-host.sh" "$DEV"
+echo "==> 3/5 Factory starter configs on HIGHASCGEXF (not build-host GPU layout)"
+if [[ "${HIGHASCG_SEED_STICK_CONFIG:-0}" == "1" ]]; then
+	echo "    HIGHASCG_SEED_STICK_CONFIG=1 — pushing running host config (includes device graph)"
+	bash "${HERE}/seed-stick-config-from-host.sh" "$DEV"
+else
+	bash "${HERE}/seed-stick-factory-config.sh" "$DEV"
+fi
 
-echo "==> 4/4 Verify boot layout"
+echo "==> 4/5 Seed drop-update/ (dist-web + server for live UI on stick boot)"
+bash "${HERE}/seed-stick-drop-update-from-host.sh" "$DEV"
+
+echo "==> 5/5 Verify boot layout"
 bash "${HERE}/usb-restore-esp-flags.sh" "$DEV"
 bash "${HERE}/verify-operator-stick-branding.sh" "$DEV" "$ISO"
-if ! "$PARTED" -s "$DEV" unit MiB print 2>/dev/null | grep -qi esp; then
+if ! timeout 15 "$PARTED" -s "$DEV" unit MiB print 2>/dev/null | grep -qi esp; then
 	echo "WARNING: no ESP flag in partition table — stick may not boot. Re-dd and rerun." >&2
 fi
-lsblk -f "$DEV"
+usb_lsblk_safe "$DEV"
 echo "Expected: ESP on slot 2, exFAT HIGHASCGEXF on slot 3 (sda3) — no persistence partition."
 echo "Boot GRUB → Live (config/state on exFAT only)"
 echo "Operator data on LABEL=HIGHASCGEXF (drop-update/, configs/, media/, …)"

@@ -250,7 +250,7 @@ export function showLoadProjectModal(opts = {}) {
 			onNameSync,
 			onApplyServerProject:
 				entry && !entry.legacy
-					? () => api.post('/api/project/load', { id: entry.id })
+					? () => api.post('/api/project/load', { slug: entry.id })
 					: undefined,
 			source: 'load-modal',
 		}

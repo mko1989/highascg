@@ -59,12 +59,17 @@ stop_service() {
 }
 
 start_service() {
-	if [[ -f "${DST}/package.json" ]]; then
-		log "starting $SERVICE"
-		systemctl start "$SERVICE" 2>/dev/null || true
-	else
+	if [[ ! -f "${DST}/package.json" ]]; then
 		log "no ${DST}/package.json — not starting $SERVICE"
+		return 0
 	fi
+	if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+		log "$SERVICE already active (skip start)"
+		return 0
+	fi
+	# --no-block: avoid deadlock when highascg.service Wants= this unit (legacy units).
+	log "queue $SERVICE (--no-block)"
+	systemctl start --no-block "$SERVICE" 2>/dev/null || true
 }
 
 main() {

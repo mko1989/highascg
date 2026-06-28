@@ -132,6 +132,7 @@ Real-time detection and tracking of performers on stage using camera inputs. **P
 | 22 | [22_WO_MIXER_EFFECTS.md](./22_WO_MIXER_EFFECTS.md) | Mixer Effects: Effects tab, drag-and-drop, inspector editors (blend, crop, chroma, levels, etc.) |
 | 23 | [23_WO_HTML_WEBPAGE_SOURCE.md](./23_WO_HTML_WEBPAGE_SOURCE.md) | HTML Webpage Source: Live tab item, URL inspector, CasparCG HTML producer |
 | 24 | [24_WO_COMPANION_BUTTON_PRESS.md](./24_WO_COMPANION_BUTTON_PRESS.md) | Companion Button Press: Timeline flag action, HTTP press API, settings tab |
+| 75 | [75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md](./75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md) | Timeline Companion button preview keyframes (Satellite subscribe + HTTP press) |
 
 ---
 *Created: 2026-04-04 | Updated: 2026-04-12 | Project: HighAsCG Migration*

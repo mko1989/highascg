@@ -11,8 +11,9 @@ set -euo pipefail
 #   HIGHASCG_ROOT=/home/casparcg/highascg   deployed tree path (must contain package.json)
 #   HIGHASCG_ISO_EMBED_SERVER=1             bake server+node_modules into squashfs (default 1)
 #   HIGHASCG_ISO_EMBED_COMPANION=1          bake Companion + highpass-highascg module (default 1)
-#   HIGHASCG_ISO_BUILD_WEB=0                skip dist-web on squashfs (default; deploy via drop-update)
-#   HIGHASCG_ISO_BUILD_WEB=1                legacy: build dist-web on imaging host before clone
+#   HIGHASCG_ISO_EMBED_CALAMARES=1          bake Calamares for install-to-disk (default 1)
+#   HIGHASCG_ISO_BUILD_WEB=1                bake dist-web/ on squashfs (default — UI works at first boot)
+#   HIGHASCG_ISO_BUILD_WEB=0                omit dist-web; deploy UI via exFAT drop-update/ only
 #   HIGHASCG_ISO_EMBED_SERVER=0             WO-47 only: omit Node tree; use exFAT drop-update/
 #   SKIP_APT=1                               skip apt install (you already installed packages)
 #   SKIP_MERGE_EGGS_EXCLUDES=1              do not merge penguins-eggs exclude fragment
@@ -47,7 +48,7 @@ SKIP_APT="${SKIP_APT:-0}"
 SKIP_MERGE_EGGS_EXCLUDES="${SKIP_MERGE_EGGS_EXCLUDES:-0}"
 SKIP_HIGHASCG_SYSTEMD_RESTART="${SKIP_HIGHASCG_SYSTEMD_RESTART:-0}"
 HIGHASCG_ISO_EMBED_SERVER="${HIGHASCG_ISO_EMBED_SERVER:-1}"
-HIGHASCG_ISO_BUILD_WEB="${HIGHASCG_ISO_BUILD_WEB:-0}"
+HIGHASCG_ISO_BUILD_WEB="${HIGHASCG_ISO_BUILD_WEB:-1}"
 SKIP_STRIP_HOST_SWAP="${SKIP_STRIP_HOST_SWAP:-0}"
 
 if [[ "$SKIP_STRIP_HOST_SWAP" != "1" ]]; then
@@ -57,13 +58,17 @@ fi
 
 if [[ "$SKIP_APT" != "1" ]]; then
 	echo "==> apt: packages for WO-47 + stick tooling (offline-safe on target)"
-	export DEBIAN_FRONTEND=noninteractive
-	apt-get update -qq
-	apt-get install -y --no-install-recommends exfatprogs parted python3 rsync
+	# shellcheck source=apt-with-stale-eggs-repo-fallback.sh
+	source "${HERE}/apt-with-stale-eggs-repo-fallback.sh"
+	highascg_apt_update
+	highascg_apt_install exfatprogs parted python3 rsync nginx
 fi
 
 echo "==> ISO defaults (Caspar config + optional embedded server)"
 bash "${HERE}/install-iso-defaults.sh"
+
+echo "==> dist-web for ISO squashfs + optional stick drop-update seed"
+bash "${HERE}/ensure-dist-web-for-stick-seed.sh" "$USER_CASPAR"
 
 if [[ "${HIGHASCG_SKIP_BOOT_BRANDING_IN_PREPARE:-0}" != "1" ]]; then
 	echo "==> eggs GRUB/isolinux theme (persistence on default boot entry)"
@@ -77,6 +82,9 @@ bash "${HERE}/ensure-empty-live-usb-dirs.sh"
 
 echo "==> Companion + highpass-highascg module (clone into squashfs)"
 bash "${REPO_ROOT}/tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
+
+echo "==> Calamares (install-to-disk GUI on live ISO)"
+bash "${HERE}/install-eggs-calamares.sh"
 
 echo "==> playout mount stubs under ${HIGHASCG_ROOT}"
 GRP=$(id -gn "$USER_CASPAR")
@@ -103,6 +111,9 @@ echo "  installed /etc/highascg/server-update-retain-drop (live USB — keep dro
 
 echo "==> HighAsCG service unit ordering (depends on WO-47 when present)"
 bash "${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh" "$USER_CASPAR"
+
+echo "==> nginx :80 → :4200 (operator UI without port in browser URL)"
+bash "${REPO_ROOT}/scripts/runtime/install-highascg-web-proxy.sh"
 LIVE_BOOT_DROPIN="${HERE}/systemd/highascg.service.d-20-live-boot.conf.example"
 if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 	install -d /etc/systemd/system/highascg.service.d

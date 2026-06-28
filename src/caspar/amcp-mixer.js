@@ -65,8 +65,28 @@ class AmcpMixer {
 	 */
 	mixerChroma(channel, layer, opts) {
 		if (opts === undefined) return this._mixer(channel, layer, 'CHROMA')
-		let p = opts.enable ? opts.enable : '0' // wait, chroma param is 'color' (or 'green' / 'blue') or target hue etc. Actually CasparCG 2.2 chroma is CHROMA enable target_hue ... wait, the wiki says MIXER CHROMA.
-		// Wiki typically says: MIXER ch-layer CHROMA [enable:0,1] [target_hue] [hue_width] [min_saturation] [min_brightness] [softness] [spill_suppress] [spill_suppress_saturation] [show_mask:0,1]
+		const cl = chLayer(channel, layer)
+		// CasparCG Client format (WO-22): CHROMA key threshold softness spill blur
+		if (
+			opts.key !== undefined ||
+			opts.threshold !== undefined ||
+			opts.spill !== undefined ||
+			opts.blur !== undefined
+		) {
+			const key = opts.key ?? 'None'
+			const threshold = opts.threshold ?? 0.34
+			const softness = opts.softness ?? 0.44
+			const spill = opts.spill ?? 1
+			const blur = opts.blur ?? 0
+			return this._client._invokeTyped(
+				'mixerChroma',
+				{ channel: Number(channel), layer: Number(layer), key, threshold, softness, spill, blur },
+				`MIXER ${cl} CHROMA ${param(key)} ${threshold} ${softness} ${spill} ${blur}`,
+				'MIXER',
+			)
+		}
+		// Legacy hue-based chroma (CasparCG 2.2+ style)
+		let p = opts.enable ? opts.enable : '0'
 		if (opts.enable !== undefined) p = opts.enable ? '1' : '0'
 		const args = []
 		if (opts.targetHue !== undefined) args.push(opts.targetHue)
@@ -77,7 +97,6 @@ class AmcpMixer {
 		if (opts.spillSuppress !== undefined) args.push(opts.spillSuppress)
 		if (opts.spillSuppressSaturation !== undefined) args.push(opts.spillSuppressSaturation)
 		if (opts.showMask !== undefined) args.push(opts.showMask ? '1' : '0')
-		
 		if (args.length > 0) p += ' ' + args.join(' ')
 		return this._mixer(channel, layer, `CHROMA ${p}`)
 	}
@@ -85,10 +104,11 @@ class AmcpMixer {
 	mixerBlend(channel, layer, mode) {
 		if (mode === undefined) return this._mixer(channel, layer, 'BLEND')
 		const cl = chLayer(channel, layer)
+		const modeArg = param(String(mode).toUpperCase())
 		return this._client._invokeTyped(
 			'mixerBlend',
 			{ channel: Number(channel), layer: Number(layer), value: mode },
-			`MIXER ${cl} BLEND ${param(mode)}`,
+			`MIXER ${cl} BLEND ${modeArg}`,
 			'MIXER',
 		)
 	}
@@ -127,7 +147,12 @@ class AmcpMixer {
 	 */
 	mixerLevels(channel, layer, opts) {
 		if (opts === undefined) return this._mixer(channel, layer, 'LEVELS')
-		let p = `${opts.minInput} ${opts.maxInput} ${opts.gamma} ${opts.minOutput} ${opts.maxOutput}`
+		const minInput = opts.minInput ?? opts.minIn ?? 0
+		const maxInput = opts.maxInput ?? opts.maxIn ?? 1
+		const gamma = opts.gamma ?? 1
+		const minOutput = opts.minOutput ?? opts.minOut ?? 0
+		const maxOutput = opts.maxOutput ?? opts.maxOut ?? 1
+		let p = `${minInput} ${maxInput} ${gamma} ${minOutput} ${maxOutput}`
 		if (opts.duration != null) p += ` ${opts.duration}`
 		if (opts.tween) p += ` ${param(opts.tween)}`
 		if (opts.defer) p += ' DEFER'
@@ -216,12 +241,13 @@ class AmcpMixer {
 		return this._send(`MIXER ${parseInt(channel, 10)} STRAIGHT_ALPHA_OUTPUT ${enable ? 1 : 0}`, 'MIXER')
 	}
 
-	mixerGrid(channel, resolution, duration, tween, defer) {
+	mixerGrid(channel, layer, resolution, duration, tween, defer) {
+		const cl = layer != null && layer !== '' ? chLayer(channel, layer) : String(parseInt(channel, 10))
 		let p = String(parseInt(resolution, 10))
 		if (duration != null) p += ` ${duration}`
 		if (tween) p += ` ${param(tween)}`
 		if (defer) p += ' DEFER'
-		return this._send(`MIXER ${parseInt(channel, 10)} GRID ${p}`, 'MIXER')
+		return this._send(`MIXER ${cl} GRID ${p}`, 'MIXER')
 	}
 
 	mixerCommit(channel) {

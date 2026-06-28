@@ -10,6 +10,7 @@ const {
 const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { ensureGpuPhysicalTopologyFromXrandr } = require('../utils/gpu-topology-xrandr')
+const { ensureDeviceGraphHardwareSyncFromLive } = require('./device-graph-boot-sync')
 
 const DEFAULT_PATH = '/tmp/highascg-system-inventory.json'
 
@@ -182,7 +183,16 @@ function writeSystemInventoryFile(log, config, opts) {
 				log,
 			})
 		}
-		const payload = buildPayload(config)
+		let payload = buildPayload(config)
+		if (config && typeof config === 'object') {
+			const dg = ensureDeviceGraphHardwareSyncFromLive({
+				config,
+				configManager: opts?.configManager || null,
+				payload,
+				log,
+			})
+			if (dg?.updated) payload = buildPayload(config)
+		}
 		const body = JSON.stringify(payload, null, 2) + '\n'
 		fs.writeFileSync(p, body, 'utf8')
 		if (typeof log === 'function') {

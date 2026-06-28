@@ -79,6 +79,7 @@ export function showSettingsModal(initialTab) {
 			})
 		}
 		if (tabName === 'live-audio' && refreshLiveAudioPanel) void refreshLiveAudioPanel()
+		if (tabName === 'nuclear' && typeof refreshNuclearSetup === 'function') void refreshNuclearSetup()
 	}
 
 	modal.querySelector('#system-hw-nvidia-refresh')?.addEventListener('click', () => void MountHw.refreshSystemHardwarePanel(modal))
@@ -104,6 +105,8 @@ export function showSettingsModal(initialTab) {
 	modal.querySelector('#settings-close').onclick = close; modal.querySelector('#settings-cancel').onclick = close
 
 	const nuclearStatus = modal.querySelector('#set-nuclear-status')
+	const casparStatusEl = modal.querySelector('#set-nuclear-caspar-status')
+	const installDiskBtn = modal.querySelector('#set-nuclear-install-disk')
 	const getNuclearPassword = () => (modal.querySelector('#set-nuclear-action-password') || {}).value || ''
 	const postNuclear = async (path) => {
 		if (nuclearStatus) nuclearStatus.textContent = 'Running...'
@@ -114,6 +117,34 @@ export function showSettingsModal(initialTab) {
 			if (nuclearStatus) nuclearStatus.textContent = e?.message || String(e)
 		}
 	}
+	const postNuclearJson = async (path) => {
+		if (nuclearStatus) nuclearStatus.textContent = 'Running...'
+		try {
+			const res = await api.post(path, { password: getNuclearPassword() })
+			if (nuclearStatus) nuclearStatus.textContent = res?.note || 'Done.'
+			return res
+		} catch (e) {
+			if (nuclearStatus) nuclearStatus.textContent = e?.message || String(e)
+			return null
+		}
+	}
+	const refreshNuclearSetup = async () => {
+		try {
+			const setup = await api.get('/api/system/setup')
+			const cal = setup?.calamares || {}
+			if (installDiskBtn) {
+				installDiskBtn.disabled = cal.installed !== true
+				installDiskBtn.title = cal.installed ? '' : 'Calamares not installed on this system'
+			}
+			const cs = setup?.casparService || {}
+			if (casparStatusEl) {
+				const inh = cs.inhibited ? ' (stopped — autorestart off)' : ''
+				casparStatusEl.textContent = `Caspar scanner: ${cs.scanner || '?'} · server: ${cs.server || '?'}${inh}`
+			}
+		} catch {
+			if (casparStatusEl) casparStatusEl.textContent = 'Caspar status: unavailable'
+		}
+	}
 	modal.querySelector('#set-nuclear-restart-wm')?.addEventListener('click', async () => {
 		await postNuclear('/api/system/setup/restart-window-manager')
 	})
@@ -121,6 +152,25 @@ export function showSettingsModal(initialTab) {
 		if (!window.confirm('Reboot host now? This will interrupt all outputs.')) return
 		await postNuclear('/api/system/setup/reboot')
 	})
+	installDiskBtn?.addEventListener('click', async () => {
+		if (!window.confirm('Open Calamares disk installer on the local display (:0)?')) return
+		await postNuclearJson('/api/system/setup/install')
+	})
+	modal.querySelector('#set-nuclear-caspar-stop')?.addEventListener('click', async () => {
+		if (!window.confirm('Stop CasparCG now? Output stops until you start it again.')) return
+		await postNuclearJson('/api/system/setup/caspar/stop')
+		void refreshNuclearSetup()
+	})
+	modal.querySelector('#set-nuclear-caspar-start')?.addEventListener('click', async () => {
+		await postNuclearJson('/api/system/setup/caspar/start')
+		void refreshNuclearSetup()
+	})
+	modal.querySelector('#set-nuclear-caspar-restart')?.addEventListener('click', async () => {
+		if (!window.confirm('Restart CasparCG now? Brief output interruption.')) return
+		await postNuclearJson('/api/system/setup/caspar/restart')
+		void refreshNuclearSetup()
+	})
+	void refreshNuclearSetup()
 
 	const hwNvStatus = modal.querySelector('#system-hw-nvidia-status')
 	const decklinkStatusLine = modal.querySelector('#decklink-status-line')

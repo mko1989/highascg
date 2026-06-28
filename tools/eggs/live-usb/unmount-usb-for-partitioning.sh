@@ -3,6 +3,10 @@
 # Usage: sudo bash tools/eggs/live-usb/unmount-usb-for-partitioning.sh /dev/sdX
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
+
 DEV="${1:?pass whole disk e.g. /dev/sda}"
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -33,7 +37,7 @@ done < <(findmnt -rn -S "$DEV" -o TARGET 2>/dev/null | awk '{ print length, $0 }
 while read -r pt; do
 	[[ -n "$pt" ]] || continue
 	umount "$pt" 2>/dev/null || umount -l "$pt" 2>/dev/null || true
-done < <(lsblk -nrpo PATH "$DEV" 2>/dev/null || true)
+done < <(timeout 8 lsblk -nrpo PATH "$DEV" 2>/dev/null || true)
 
 sleep 1
 

@@ -9,6 +9,13 @@ const { reconcileFromLeader } = require('./replication-reconcile')
 const { peerHttpRequest, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
 const { loadFullProject } = require('../engine/project-scenes')
 const { getCasparEndpointForPeer } = require('./caspar-endpoint')
+const {
+	ensureReplicationSshKey,
+	prepareReplicationSshForPairing,
+	installPeerAuthorizedKey,
+	ensurePeerAuthorizedKeyFromConfig,
+	testReplicationSshToPeer,
+} = require('./replication-ssh-setup')
 
 async function disconnectToStandalone(ctx, runtime, opts = {}) {
 	const repl = getReplicationConfig(ctx.config)
@@ -27,6 +34,12 @@ async function disconnectToStandalone(ctx, runtime, opts = {}) {
 	runtime.roleState.configure({ enabled: false, role: 'auto' })
 	runtime.peerReachable = false
 	runtime.lastPeerPingAt = 0
+	runtime.lastPeerPing = null
+	runtime.lastPeerPingError = null
+	runtime.peerInstanceId = null
+	runtime.peerLeaderEpoch = null
+	runtime.peerLiveStateSeq = 0
+	runtime.peerLastAppliedSeq = null
 	const { reloadReplicationFromConfig } = require('./replication-reload')
 	reloadReplicationFromConfig(ctx)
 	if (typeof ctx.log === 'function') ctx.log('info', `[replication] standalone (${opts.reason || 'disconnect'})`)
@@ -37,7 +50,8 @@ async function disconnectToStandalone(ctx, runtime, opts = {}) {
 
 async function becomeLeaderAvailable(ctx) {
 	const repl = getReplicationConfig(ctx.config)
-	const selfId = repl.selfId || os.hostname()
+	const { ensureLocalReplicationSelfId } = require('./replication-local-identity')
+	const selfId = ensureLocalReplicationSelfId(ctx) || repl.selfId || os.hostname()
 	const nextRepl = normalizeReplicationConfig({ ...repl, selfId, leaderAvailable: true })
 	if (ctx.configManager) {
 		const cfg = { ...ctx.configManager.get(), replication: nextRepl }
@@ -46,6 +60,19 @@ async function becomeLeaderAvailable(ctx) {
 	}
 	const { reloadReplicationFromConfig } = require('./replication-reload')
 	reloadReplicationFromConfig(ctx)
+	if (typeof ctx.log === 'function') {
+		ctx.log(
+			'info',
+			'[replication] leader available — active show on this box is authoritative (USB stick project/state will not overwrite leader)',
+		)
+	}
+	try {
+		ensureReplicationSshKey(ctx.log)
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', `[replication] SSH key prepare: ${e?.message || e}`)
+		}
+	}
 	return { ok: true, replication: nextRepl }
 }
 
@@ -82,7 +109,8 @@ async function connectToLeader(ctx, runtime, opts) {
 
 	const pairId = String(ping.json.pairId || '').trim() || crypto.randomUUID()
 	const token = crypto.randomBytes(24).toString('hex')
-	const selfId = getReplicationConfig(ctx.config).selfId || os.hostname()
+	const { ensureLocalReplicationSelfId } = require('./replication-local-identity')
+	const selfId = ensureLocalReplicationSelfId(ctx) || getReplicationConfig(ctx.config).selfId || os.hostname()
 	const syncthingDeviceId = (await getLocalSyncthingDeviceId()) || ''
 	const followerCaspar = getCasparEndpointForPeer(ctx.config)
 
@@ -109,6 +137,15 @@ async function connectToLeader(ctx, runtime, opts) {
 	runtime.roleState.configure({ enabled: true, role: 'follower' })
 	runtime.roleState.forceRole('follower')
 
+	let followerSshPublicKey = ''
+	try {
+		followerSshPublicKey = ensureReplicationSshKey(ctx.log).publicKeyLine
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', `[replication] follower SSH key: ${e?.message || e}`)
+		}
+	}
+
 	const register = await peerHttpRequest(
 		{ host: leaderHost, port: leaderPort, token: '' },
 		'/api/replication/register-follower',
@@ -122,6 +159,7 @@ async function connectToLeader(ctx, runtime, opts) {
 				followerCasparHost: followerCaspar.host,
 				followerCasparPort: followerCaspar.port,
 				syncthingDeviceId,
+				sshPublicKey: followerSshPublicKey,
 			},
 			timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
 		},
@@ -140,6 +178,20 @@ async function connectToLeader(ctx, runtime, opts) {
 	const leaderToken = register.json?.token || token
 	const leaderSyncthingId = register.json?.syncthingDeviceId || ping.json.syncthingDeviceId || ''
 
+	if (register.json?.sshPublicKey) {
+		try {
+			prepareReplicationSshForPairing(ctx, {
+				peerPublicKey: register.json.sshPublicKey,
+				log: ctx.log,
+			})
+			testReplicationSshToPeer(leaderHost, ctx.log)
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[replication] follower SSH trust leader: ${e?.message || e}`)
+			}
+		}
+	}
+
 	const nextRepl = normalizeReplicationConfig({
 		...preRepl,
 		pairId: register.json?.pairId || pairId,
@@ -155,7 +207,7 @@ async function connectToLeader(ctx, runtime, opts) {
 	if (runtime.peerClient?.start) runtime.peerClient.start()
 	if (runtime.peerWsClient?.start) runtime.peerWsClient.start()
 
-	void runFollowerPostConnectSync(ctx, runtime, leaderSyncthingId)
+	await runFollowerPostConnectSync(ctx, runtime, leaderSyncthingId)
 	const { reloadReplicationFromConfig } = require('./replication-reload')
 	reloadReplicationFromConfig(ctx)
 
@@ -166,6 +218,7 @@ async function connectToLeader(ctx, runtime, opts) {
 }
 
 async function runFollowerPostConnectSync(ctx, runtime, _leaderSyncthingId) {
+	ensurePeerAuthorizedKeyFromConfig(ctx)
 	try {
 		await reconcileFromLeader(ctx, runtime)
 	} catch (e) {
@@ -191,6 +244,33 @@ async function registerFollowerOnLeader(ctx, body) {
 	const followerHost = String(body.followerHost || body.peerHost || '').trim()
 	const followerSyncthingId = String(body.syncthingDeviceId || '').trim()
 	if (!followerHost) return { ok: false, error: 'followerHost required' }
+
+	const prevHost = String(repl.peer?.host || '').trim()
+	if (prevHost && prevHost !== followerHost && typeof ctx.log === 'function') {
+		ctx.log('info', `[replication] follower IP updated ${prevHost} → ${followerHost}`)
+	}
+
+	let leaderSshPublicKey = ''
+	try {
+		const prepared = prepareReplicationSshForPairing(ctx, {
+			peerPublicKey: body.sshPublicKey,
+			log: ctx.log,
+		})
+		leaderSshPublicKey = prepared.local.publicKeyLine
+		if (body.sshPublicKey) {
+			testReplicationSshToPeer(followerHost, ctx.log)
+		}
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', `[replication] leader SSH pairing: ${e?.message || e}`)
+		}
+		try {
+			leaderSshPublicKey = ensureReplicationSshKey(ctx.log).publicKeyLine
+			if (body.sshPublicKey) installPeerAuthorizedKey(body.sshPublicKey, { log: ctx.log })
+		} catch {
+			/* ignore */
+		}
+	}
 
 	const followerCasparHost = String(body.followerCasparHost || body.peerCasparHost || followerHost).trim()
 	const followerCasparPort =
@@ -224,6 +304,7 @@ async function registerFollowerOnLeader(ctx, body) {
 		pairId,
 		token,
 		syncthingDeviceId: leaderSyncthingId,
+		sshPublicKey: leaderSshPublicKey,
 		follower: { host: followerHost, selfId: followerSelfId },
 	}
 
@@ -242,7 +323,7 @@ async function registerFollowerOnLeader(ctx, body) {
 		ctx.log('info', `[replication] follower registered: ${followerSelfId || followerHost}`)
 	}
 
-	void runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId)
+	await runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId)
 
 	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
 	notifyReplicationStatusChanged(ctx, 'follower-registered')
@@ -252,6 +333,7 @@ async function registerFollowerOnLeader(ctx, body) {
 
 async function runLeaderPostRegisterSync(ctx, runtime, _followerSyncthingId) {
 	if (!runtime) return
+	ensurePeerAuthorizedKeyFromConfig(ctx)
 	try {
 		const { reconcileAllToPeer } = require('./replication-reconcile')
 		await reconcileAllToPeer(ctx, runtime)

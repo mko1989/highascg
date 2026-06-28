@@ -1,0 +1,18 @@
+[Unit]
+Description=CasparCG media scanner (port 8000)
+After=network.target
+ConditionPathExists=/usr/bin/casparcg-scanner
+
+[Service]
+Type=simple
+User=casparcg
+Group=casparcg
+UMask=002
+WorkingDirectory=/home/casparcg/highascg
+ExecStart=/usr/bin/casparcg-scanner
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

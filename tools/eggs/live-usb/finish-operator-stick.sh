@@ -14,6 +14,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=usb-env.sh
 source "${HERE}/usb-env.sh"
+# shellcheck source=flash-stick-common.sh
+source "${HERE}/flash-stick-common.sh"
 PRUNE=false
 DEV=""
 ISO=""
@@ -99,7 +101,7 @@ if [[ "${HIGHASCG_LEGACY_UNION_PERSIST:-0}" == "1" ]]; then
 	has_persistence=0
 	while read -r _ lab; do
 		[[ "$lab" == "persistence" ]] && has_persistence=1
-	done < <(lsblk -nrpo NAME,LABEL "$DEV" 2>/dev/null || true)
+	done < <(timeout 8 lsblk -nrpo NAME,LABEL "$DEV" 2>/dev/null || true)
 	if [[ "$has_persistence" -eq 0 ]]; then
 		echo "==> LEGACY: union persistence (${PERSIST_SIZE_MIB} MiB) — before exFAT"
 		export HIGHASCG_EXFAT_ONLY=0
@@ -124,7 +126,7 @@ echo "==> exFAT data partition (HIGHASCGEXF) — MBR slot ${EXFAT_NUM}, fills di
 bash "${HERE}/add-exfat-data-partition.sh" "$DEV"
 
 MP=$(mktemp -d /tmp/highascg-exfat-seed.XXXXXX)
-mount -L HIGHASCGEXF "$MP"
+usb_mount_label_safe HIGHASCGEXF "$MP"
 df -h "$MP"
 bash "${HERE}/strip-legacy-exfat-sim.sh" "$MP"
 bash "${HERE}/seed-exfat-operator-layout.sh" "$MP"
@@ -134,7 +136,7 @@ rmdir "$MP"
 
 echo
 echo "Done. Verify:"
-echo "  lsblk -f $DEV"
+echo "  lsblk -f $DEV   (or re-run flash script — lsblk may hang on USB; use blkid ${DEV}*)"
 echo "  exFAT (HIGHASCGEXF) on MBR slot ${EXFAT_NUM} — no LABEL=persistence"
 echo "Boot GRUB → Live (plain RAM overlay; durable config on exFAT only)"
 bash "$UNMASK_SH"

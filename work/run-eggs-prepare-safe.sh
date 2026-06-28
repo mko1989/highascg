@@ -8,6 +8,7 @@
 #   sudo bash work/run-eggs-prepare-safe.sh
 #
 # Install missing pieces (one-shot):
+#   sudo bash work/bring-up-eggs-produce-host.sh   # Calamares + full verify
 #   sudo bash work/install-eggs-host-prereqs.sh
 # Or step-by-step: scripts/setup/README.md + prepare-eggs-clone-with-exfat.sh
 #

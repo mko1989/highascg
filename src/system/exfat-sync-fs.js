@@ -48,6 +48,7 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel,
 	let copied = 0
 	let skipped = 0
 	const bootPreferExfat = !!(syncOpts && syncOpts.bootPreferExfat)
+	const blockExfatToProject = !!(syncOpts && syncOpts.blockExfatToProject)
 	/** @type {fs.Stats | null} */
 	let stA = null
 	/** @type {fs.Stats | null} */
@@ -63,12 +64,13 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel,
 	if (!hasA && !hasB) return { copied: 0, skipped: 1 }
 	try {
 		if (bootPreferExfat && hasA) {
+			if (blockExfatToProject) return { copied: 0, skipped: 1 }
 			if (dryRun) return { copied: 1, skipped: 0 }
 			copyFilePreserveTimes(pathExfat, pathProject)
 			return { copied: 1, skipped: 0 }
 		}
 		if (hasA && !hasB) {
-			if (direction === 'to_exfat') return { copied: 0, skipped: 1 }
+			if (direction === 'to_exfat' || blockExfatToProject) return { copied: 0, skipped: 1 }
 			if (dryRun) return { copied: 1, skipped: 0 }
 			copyFilePreserveTimes(pathExfat, pathProject)
 			return { copied: 1, skipped: 0 }
@@ -83,7 +85,7 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel,
 			const mtA = /** @type {fs.Stats} */ (stA).mtimeMs
 			const mtB = /** @type {fs.Stats} */ (stB).mtimeMs
 			if (mtA > mtB) {
-				if (direction === 'to_project') return { copied: 0, skipped: 1 }
+				if (direction === 'to_project' || blockExfatToProject) return { copied: 0, skipped: 1 }
 				if (dryRun) return { copied: 1, skipped: 0 }
 				copyFilePreserveTimes(pathExfat, pathProject)
 				return { copied: 1, skipped: 0 }
@@ -96,7 +98,7 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel,
 			}
 			if (/** @type {fs.Stats} */ (stA).size !== /** @type {fs.Stats} */ (stB).size) {
 				if (/** @type {fs.Stats} */ (stA).size > /** @type {fs.Stats} */ (stB).size) {
-					if (direction === 'to_project') return { copied: 0, skipped: 1 }
+					if (direction === 'to_project' || blockExfatToProject) return { copied: 0, skipped: 1 }
 					if (dryRun) return { copied: 1, skipped: 0 }
 					copyFilePreserveTimes(pathExfat, pathProject)
 					return { copied: 1, skipped: 0 }
@@ -117,7 +119,7 @@ function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel,
 	return { copied: 0, skipped: 0 }
 }
 
-function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, syncOneFilePairFn) {
+function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, syncOneFilePairFn, syncOpts = {}) {
 	let copied = 0
 	let skipped = 0
 	/** @type {string[]} */
@@ -128,10 +130,9 @@ function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, s
 	} catch {
 		return { copied: 0, skipped: 1, errors }
 	}
+	const pairOpts = { bootPreferExfat: true, ...syncOpts }
 	if (exSt.isFile()) {
-		const r = syncOneFilePairFn(exfatAbs, projectAbs, 'both', dryRun, pairId, path.basename(exfatAbs), {
-			bootPreferExfat: true,
-		})
+		const r = syncOneFilePairFn(exfatAbs, projectAbs, 'both', dryRun, pairId, path.basename(exfatAbs), pairOpts)
 		return { copied: r.copied, skipped: r.skipped, errors: r.error ? [r.error] : [] }
 	}
 	if (!exSt.isDirectory()) return { copied: 0, skipped: 1, errors }
@@ -145,7 +146,7 @@ function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, s
 			continue
 		}
 		if (stA.isDirectory()) continue
-		const r = syncOneFilePairFn(a, b, 'both', dryRun, pairId, rel, { bootPreferExfat: true })
+		const r = syncOneFilePairFn(a, b, 'both', dryRun, pairId, rel, pairOpts)
 		copied += r.copied
 		skipped += r.skipped
 		if (r.error) errors.push(r.error)
