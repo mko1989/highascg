@@ -1,6 +1,15 @@
 'use strict'
 
+const fs = require('fs')
 const { canonicalMediaBasenameKey } = require('../utils/media-browser-dedupe')
+const { resolveSafe } = require('./local-media-paths')
+const {
+	expandMediaIdToMediaRoot,
+	getActiveProjectSlug,
+	getProjectMediaRoot,
+	isProjectScopedMediaEnabled,
+	normalizeMediaIdForProject,
+} = require('./project-media-root')
 
 /** Last-segment extensions Caspar strips from CLS media ids. */
 const MEDIA_FILE_EXT = /\.(mov|mp4|mxf|mkv|avi|webm|m4v|mpg|mpeg|png|jpe?g|tga|gif|bmp|svg|wav|mp3|aac|m4a|flac|ts|m2ts|mts)$/i
@@ -89,9 +98,78 @@ function resolveCasparCinfMediaId(id, ctx) {
 	return clsId
 }
 
+/**
+ * Clips that must not be rewritten for LOADBG/PLAY (routes, HTML, templates, URLs).
+ * @param {string} id
+ * @returns {boolean}
+ */
+function isPassthroughAmcpClip(id) {
+	const s = normalizeCasparMediaPath(id)
+	if (!s) return true
+	if (/^route:\/\//i.test(s)) return true
+	if (/^\[HTML\]/i.test(s)) return true
+	if (/^https?:\/\//i.test(s)) return true
+	if (/^ndi:\/\//i.test(s)) return true
+	if (/^CASPARCG-/i.test(s)) return true
+	return false
+}
+
+/**
+ * True when the clip file is on disk under media/projects/<slug>/ (not just media root).
+ * @param {string} raw
+ * @param {string} slug
+ * @param {{ config?: object, persistence?: object } | null | undefined} ctx
+ * @returns {boolean}
+ */
+function clipFileExistsUnderProjectRoot(raw, slug, ctx) {
+	if (!raw || !slug || !ctx?.config) return false
+	const projectRoot = getProjectMediaRoot(ctx.config, ctx.persistence, slug)
+	if (!projectRoot) return false
+	const rel = normalizeMediaIdForProject(raw, slug, ctx.config)
+	if (!rel) return false
+	const abs = resolveSafe(projectRoot, rel)
+	if (!abs) return false
+	try {
+		return fs.statSync(abs).isFile()
+	} catch {
+		return false
+	}
+}
+
+/**
+ * Scene/project clip value → Caspar CLS id for LOADBG/PLAY/CINF.
+ * Basenames like `252166.mp4` expand to `PROJECTS/<SLUG>/252166` when the file lives
+ * under that project folder. Clips at media root (e.g. preview renders) keep root CLS ids.
+ * @param {string} id
+ * @param {{ CHOICES_MEDIAFILES?: Array<{ id?: string, label?: string }>, config?: object, persistence?: object } | null | undefined} [ctx]
+ * @returns {string}
+ */
+function resolveClipForAmcpLoad(id, ctx) {
+	const raw = normalizeCasparMediaPath(id)
+	if (!raw || isPassthroughAmcpClip(raw)) return raw
+
+	const fromCatalog = resolveCasparCinfMediaId(raw, ctx)
+	if (fromCatalog.includes('/')) return fromCatalog
+
+	if (ctx?.config && isProjectScopedMediaEnabled(ctx.config)) {
+		const slug = getActiveProjectSlug(ctx.persistence)
+		if (slug) {
+			const expanded = expandMediaIdToMediaRoot(raw, slug, ctx.config)
+			const clsId = toCasparClsMediaId(expanded)
+			if (clsId.includes('/') && clipFileExistsUnderProjectRoot(raw, slug, ctx)) {
+				return clsId
+			}
+		}
+	}
+
+	return fromCatalog
+}
+
 module.exports = {
 	normalizeCasparMediaPath,
 	stripMediaFileExtension,
 	toCasparClsMediaId,
 	resolveCasparCinfMediaId,
+	isPassthroughAmcpClip,
+	resolveClipForAmcpLoad,
 }

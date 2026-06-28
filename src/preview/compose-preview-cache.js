@@ -283,15 +283,15 @@ async function handleComposePreviewCompanionGet(ctx, channel, query = {}) {
 	if (inm && String(inm).trim() === etag) {
 		return { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache' } }
 	}
-	return {
-		status: 200,
-		headers: {
-			'Content-Type': 'image/png',
-			'Cache-Control': 'no-cache',
-			ETag: etag,
-		},
-		body: buf,
-	}
+		return {
+			status: 200,
+			headers: {
+				'Content-Type': 'image/jpeg',
+				'Cache-Control': 'no-cache',
+				ETag: etag,
+			},
+			body: buf,
+		}
 }
 
 module.exports = {

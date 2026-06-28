@@ -7,9 +7,12 @@ const {
 	isFfmpegJpegComposePreview,
 	resolveMonitoredChannels,
 } = require('./compose-preview-mode')
+const { clampComposePreviewFps } = require('./compose-preview-ffmpeg-args')
 
 /** @type {NodeJS.Timeout | null} */
 let _watchTimer = null
+/** @type {number} */
+let _watchPollMs = 40
 /** @type {Map<number, number>} */
 const _lastMtime = new Map()
 /** Serializes start/stop so async stop cannot kill receivers after a overlapping start. */
@@ -56,7 +59,7 @@ function startFfmpegJpegComposePreview(ctx) {
 		const channels = resolveMonitoredChannels(ctx.config)
 		ctx.log?.(
 			'info',
-			`[compose-preview] ffmpeg_jpeg starting (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.resolutionScale ?? 'half'}, direct FILE)`,
+			`[compose-preview] ffmpeg_jpeg starting (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.companionThumbEnabled ? `thumb${cp.companionThumbSize ?? 144}` : cp.resolutionScale ?? 'half'}, pollMs=${resolveMtimePollMs(ctx.config)}, direct FILE)`,
 		)
 		await consumer.attachAllComposeFileConsumers(ctx)
 		startMtimeWatch(ctx)
@@ -72,13 +75,27 @@ function stopFfmpegJpegComposePreview(ctx) {
 }
 
 /**
+ * Poll interval aligned with compose preview fps / tickIntervalMs (25 fps → 40 ms).
+ * @param {object} [config]
+ * @returns {number}
+ */
+function resolveMtimePollMs(config) {
+	const cp = config?.composePreview || {}
+	const tickMs = parseInt(String(cp.tickIntervalMs ?? ''), 10)
+	if (Number.isFinite(tickMs) && tickMs >= 40 && tickMs <= 1000) return tickMs
+	const fps = clampComposePreviewFps(cp.fps, 25)
+	return Math.max(40, Math.floor(1000 / fps))
+}
+
+/**
  * @param {object} ctx
  */
 function startMtimeWatch(ctx) {
 	if (_watchTimer) return
+	_watchPollMs = resolveMtimePollMs(ctx?.config)
 	_watchTimer = setInterval(() => {
 		void pollMtimeAndBroadcast(ctx)
-	}, 50)
+	}, _watchPollMs)
 	if (_watchTimer.unref) _watchTimer.unref()
 }
 
@@ -129,6 +146,7 @@ function getFfmpegJpegComposePreviewStats(config) {
 	return {
 		mode: 'ffmpeg_jpeg',
 		channels,
+		pollIntervalMs: _watchPollMs,
 		files,
 		consumers: consumer.getComposeConsumerStats(config),
 		companionThumb: companionThumb.getCompanionThumbStats(config),

@@ -124,8 +124,8 @@ export function getMainModalHtml() {
 						</div>
 						<div id="set-compose-preview-tick-fields">
 							<div class="settings-group">
-								<label for="set-compose-preview-tick-ms">Capture interval: <strong id="set-compose-preview-tick-ms-val">125</strong> ms</label>
-								<input type="range" id="set-compose-preview-tick-ms" min="100" max="1000" step="25" value="125" style="width:100%;max-width:24rem" />
+								<label for="set-compose-preview-tick-ms">Capture interval: <strong id="set-compose-preview-tick-ms-val">40</strong> ms</label>
+								<input type="range" id="set-compose-preview-tick-ms" min="40" max="1000" step="25" value="40" style="width:100%;max-width:24rem" />
 								<p class="settings-note">ADD IMAGE mode only. Unchanged channels are never captured.</p>
 							</div>
 						</div>

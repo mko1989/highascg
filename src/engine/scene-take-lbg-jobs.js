@@ -20,6 +20,7 @@ const {
 	baseTypeStripAnimateSuffix,
 } = require('./scene-transition')
 const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const { resolveClipForAmcpLoad } = require('../media/caspar-cls-id')
 
 async function buildTakeJobs(opts) {
 	const {
@@ -94,6 +95,7 @@ async function buildTakeJobs(opts) {
 			clip = '[HTML] black'
 		}
 		if (!clip) continue
+		clip = resolveClipForAmcpLoad(clip, self)
 
 		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
 

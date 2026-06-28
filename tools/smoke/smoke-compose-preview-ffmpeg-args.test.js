@@ -33,6 +33,17 @@ describe('compose-preview-ffmpeg-args', () => {
 		assert.match(chain, /format=yuvj420p/)
 	})
 
+	it('buildComposeFfmpegFilterChain uses thumb scale when companionThumbEnabled', () => {
+		const chain = buildComposeFfmpegFilterChain({
+			fps: 25,
+			companionThumbEnabled: true,
+			companionThumbSize: 144,
+		})
+		assert.match(chain, /scale=144:144:force_original_aspect_ratio=decrease,pad=144:144:-1:-1/)
+		assert.match(chain, /fps=25/)
+		assert.doesNotMatch(chain, /iw\/2/)
+	})
+
 	it('buildComposeStreamConsumerArgs uses mpegts with stereo downmix (no -an)', () => {
 		const args = buildComposeStreamConsumerArgs({ fps: 2, resolutionScale: 'half', jpegQuality: 10 })
 		assert.match(args, /-format mpegts/)

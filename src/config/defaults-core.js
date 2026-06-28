@@ -59,7 +59,7 @@ function coreDefaults() {
 		composePreview: {
 			mode: 'canvas',
 			tickHz: 8,
-			tickIntervalMs: 125,
+			tickIntervalMs: 40,
 			fps: 2,
 			resolutionScale: 'half',
 			jpegQuality: 10,

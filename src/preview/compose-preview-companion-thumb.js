@@ -1,15 +1,20 @@
 'use strict'
 
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const cache = require('./compose-preview-cache')
 const { resolveMonitoredChannels } = require('./compose-preview-mode')
 
-/** @type {Map<number, number>} */
-const _lastSourceMtime = new Map()
+/** @type {Map<number, string>} */
+const _lastContentHash = new Map()
 /** @type {Map<number, Promise<void>>} */
 const _inFlight = new Map()
+/** @type {Map<number, boolean>} */
+const _pendingUpdate = new Map()
+/** @type {Map<number, number>} */
+const _latestSourceMtime = new Map()
 /** @type {Map<number, { mtimeMs: number, updatedAt: number, bytes: number }>} */
 const _lastVarMeta = new Map()
 /** @type {Map<number, Buffer>} */
@@ -31,8 +36,8 @@ const isCompanionPreviewEnabled = isCompanionThumbEnabled
  * @returns {number}
  */
 function companionThumbSize(config) {
-	const n = parseInt(String(config?.composePreview?.companionThumbSize ?? 144), 10)
-	return Number.isFinite(n) ? Math.max(32, Math.min(512, n)) : 144
+	const n = parseInt(String(config?.composePreview?.companionThumbSize ?? 72), 10)
+	return Number.isFinite(n) ? Math.max(32, Math.min(512, n)) : 72
 }
 
 /**
@@ -83,42 +88,26 @@ function ffmpegBinary(config) {
 	return config?.streaming?.ffmpeg_path || process.env.FFMPEG_PATH || 'ffmpeg'
 }
 
-function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms))
+/**
+ * @param {Buffer} buf
+ * @returns {string}
+ */
+function hashJpegBuffer(buf) {
+	return crypto.createHash('sha1').update(buf).digest('hex')
 }
 
 /**
- * Wait until Caspar/ffmpeg has finished writing the preview JPEG (image2 -update 1).
+ * Read Caspar preview JPEG (already thumb-sized when companionThumbEnabled).
  * @param {string} filePath
- * @param {number} [minSize]
- * @returns {Promise<import('fs').Stats | null>}
+ * @returns {Promise<Buffer | null>}
  */
-async function waitForStablePreviewFile(filePath, minSize = 256) {
-	let prev = null
-	for (let i = 0; i < 8; i++) {
-		let st
-		try {
-			st = await fs.promises.stat(filePath)
-		} catch {
-			return null
-		}
-		if (st.size < minSize) {
-			await sleep(30)
-			continue
-		}
-		if (prev && prev.size === st.size && prev.mtimeMs === st.mtimeMs) {
-			await sleep(40)
-			try {
-				const again = await fs.promises.stat(filePath)
-				if (again.size === st.size && again.mtimeMs === st.mtimeMs) return again
-			} catch {
-				return null
-			}
-		}
-		prev = { size: st.size, mtimeMs: st.mtimeMs }
-		await sleep(30)
+async function readPreviewJpeg(filePath) {
+	try {
+		const buf = await fs.promises.readFile(filePath)
+		return buf.length >= 64 ? buf : null
+	} catch {
+		return null
 	}
-	return prev ? fs.promises.stat(filePath).catch(() => null) : null
 }
 
 /**
@@ -148,7 +137,9 @@ function resizePreviewToPngBuffer(config, sourcePath, size) {
 				'-f',
 				'image2pipe',
 				'-vcodec',
-				'png',
+				'mjpeg',
+				'-q:v',
+				'6',
 				'pipe:1',
 			],
 			{ stdio: ['ignore', 'pipe', 'pipe'] },
@@ -167,15 +158,85 @@ function resizePreviewToPngBuffer(config, sourcePath, size) {
 }
 
 /**
- * @param {Buffer} png
+ * @param {Buffer} img
  * @returns {string}
  */
-function pngBufferToDataUri(png) {
-	return `data:image/png;base64,${png.toString('base64')}`
+function jpegBufferToDataUri(img) {
+	return `data:image/jpeg;base64,${img.toString('base64')}`
 }
 
-/** @deprecated alias */
-const jpegBufferToDataUri = pngBufferToDataUri
+/**
+ * @param {object} ctx
+ * @param {number} channel
+ * @param {number} [sourceMtimeMs]
+ */
+async function processCompanionPreviewFrame(ctx, channel, sourceMtimeMs) {
+	const ch = parseInt(String(channel), 10)
+	const cfg = ctx?.config || {}
+	if (!isCompanionThumbEnabled(cfg)) return
+	const source = cache.resolvePreviewImagePath(cfg, ch)
+	if (!source?.path) return
+
+	let jpeg = await readPreviewJpeg(source.path)
+	if (!jpeg) return
+
+	const hash = hashJpegBuffer(jpeg)
+	if (hash === _lastContentHash.get(ch)) return
+	_lastContentHash.set(ch, hash)
+
+	_lastJpegBuffer.set(ch, jpeg)
+	_lastVarMeta.set(ch, {
+		mtimeMs: sourceMtimeMs ?? Date.now(),
+		updatedAt: Date.now(),
+		bytes: jpeg.length,
+	})
+
+	const outPath = resolveCompanionThumbOutputPath(cfg, ch)
+	if (outPath) {
+		void fs.promises
+			.mkdir(path.dirname(outPath), { recursive: true })
+			.then(() => fs.promises.writeFile(outPath, jpeg))
+			.catch(() => {})
+	}
+
+	const key = getCompanionPreviewVariableKey(ch)
+	const dataUri = jpegBufferToDataUri(jpeg)
+	const { splitCompanionThumbQuadrants, quadrantVariableKey } = require('./compose-preview-companion-quadrants')
+	const quads = splitCompanionThumbQuadrants(jpeg)
+	/** @type {Record<string, string>} */
+	const batch = { [key]: dataUri }
+	for (const [quad, uri] of Object.entries(quads)) {
+		if (uri) batch[quadrantVariableKey(ch, quad)] = uri
+	}
+	if (ctx?.state && typeof ctx.state.setVariablesImmediate === 'function') {
+		ctx.state.setVariablesImmediate(batch)
+	} else if (ctx?.state && typeof ctx.state.setVariableImmediate === 'function') {
+		for (const [k, v] of Object.entries(batch)) {
+			ctx.state.setVariableImmediate(k, v)
+		}
+	} else if (ctx?.state && typeof ctx.state.setVariable === 'function') {
+		for (const [k, v] of Object.entries(batch)) {
+			ctx.state.setVariable(k, v)
+		}
+	} else if (typeof ctx.log === 'function') {
+		ctx.log('warn', `[companion-preview] ch${ch}: ctx.state missing — variable not set`)
+	}
+}
+
+/**
+ * Drain pending updates for a channel (latest-wins while in flight).
+ * @param {object} ctx
+ * @param {number} channel
+ */
+async function drainCompanionPreviewUpdates(ctx, channel) {
+	const ch = parseInt(String(channel), 10)
+	while (_pendingUpdate.get(ch)) {
+		_pendingUpdate.set(ch, false)
+		const mtimeMs = _latestSourceMtime.get(ch)
+		await processCompanionPreviewFrame(ctx, ch, mtimeMs)
+	}
+	_inFlight.delete(ch)
+}
 
 /**
  * @param {object} ctx
@@ -185,67 +246,14 @@ const jpegBufferToDataUri = pngBufferToDataUri
 function onComposePreviewUpdated(ctx, channel, sourceMtimeMs) {
 	const ch = parseInt(String(channel), 10)
 	if (!Number.isFinite(ch) || ch < 1) return Promise.resolve()
-	const prev = _inFlight.get(ch)
-	if (prev) return prev
 
-	const run = (async () => {
-		const cfg = ctx?.config || {}
-		if (!isCompanionThumbEnabled(cfg)) return
-		const source = cache.resolvePreviewImagePath(cfg, ch)
-		if (!source?.path) return
-		let st
-		try {
-			st = await waitForStablePreviewFile(source.path)
-		} catch {
-			return
-		}
-		if (!st || st.size < 256) return
-		const mtimeMs = sourceMtimeMs ?? st.mtimeMs
-		const prevMtime = _lastSourceMtime.get(ch) || 0
-		if (mtimeMs <= prevMtime) return
+	if (sourceMtimeMs != null) _latestSourceMtime.set(ch, sourceMtimeMs)
+	_pendingUpdate.set(ch, true)
+	const existing = _inFlight.get(ch)
+	if (existing) return existing
 
-		let png = await resizePreviewToPngBuffer(cfg, source.path, companionThumbSize(cfg))
-		if (!png || png.length < 64) {
-			await sleep(60)
-			png = await resizePreviewToPngBuffer(cfg, source.path, companionThumbSize(cfg))
-		}
-		if (!png || png.length < 64) {
-			if (typeof ctx.log === 'function') {
-				ctx.log(
-					'warn',
-					`[companion-preview] ch${ch}: ffmpeg resize failed (${source.path}, format=${source.format || 'unknown'})`,
-				)
-			}
-			return
-		}
-
-		_lastSourceMtime.set(ch, mtimeMs)
-		_lastJpegBuffer.set(ch, png)
-		_lastVarMeta.set(ch, { mtimeMs, updatedAt: Date.now(), bytes: png.length })
-
-		const outPath = resolveCompanionThumbOutputPath(cfg, ch)
-		if (outPath) {
-			try {
-				await fs.promises.mkdir(path.dirname(outPath), { recursive: true })
-				await fs.promises.writeFile(outPath, png)
-			} catch (e) {
-				if (typeof ctx.log === 'function') {
-					ctx.log('debug', `[companion-preview] ch${ch}: disk write: ${e?.message || e}`)
-				}
-			}
-		}
-
-		const key = getCompanionPreviewVariableKey(ch)
-		const dataUri = pngBufferToDataUri(png)
-		if (ctx?.state && typeof ctx.state.setVariableImmediate === 'function') {
-			ctx.state.setVariableImmediate(key, dataUri)
-		} else if (ctx?.state && typeof ctx.state.setVariable === 'function') {
-			ctx.state.setVariable(key, dataUri)
-		} else if (typeof ctx.log === 'function') {
-			ctx.log('warn', `[companion-preview] ch${ch}: ctx.state missing — variable not set`)
-		}
-	})().finally(() => {
-		if (_inFlight.get(ch) === run) _inFlight.delete(ch)
+	const run = drainCompanionPreviewUpdates(ctx, ch).catch(() => {
+		_inFlight.delete(ch)
 	})
 
 	_inFlight.set(ch, run)
@@ -260,7 +268,7 @@ async function bootstrapCompanionPreviewVariables(ctx) {
 	const cfg = ctx?.config || {}
 	if (!isCompanionThumbEnabled(cfg)) return
 	for (const ch of resolveMonitoredChannels(cfg)) {
-		_lastSourceMtime.delete(ch)
+		_lastContentHash.delete(ch)
 		await onComposePreviewUpdated(ctx, ch)
 	}
 }
@@ -271,9 +279,11 @@ async function bootstrapCompanionPreviewVariables(ctx) {
 function clearCompanionPreviewVariables(ctx) {
 	const cfg = ctx?.config || {}
 	for (const ch of resolveMonitoredChannels(cfg)) {
-		_lastSourceMtime.delete(ch)
+		_lastContentHash.delete(ch)
 		_lastJpegBuffer.delete(ch)
 		_lastVarMeta.delete(ch)
+		_pendingUpdate.delete(ch)
+		_latestSourceMtime.delete(ch)
 		const key = getCompanionPreviewVariableKey(ch)
 		if (ctx?.state && typeof ctx.state.setVariableImmediate === 'function') {
 			ctx.state.setVariableImmediate(key, '')
@@ -289,6 +299,8 @@ function startCompanionThumbTimer(_ctx) {}
 /** @deprecated */
 function stopCompanionThumbTimer() {
 	_inFlight.clear()
+	_pendingUpdate.clear()
+	_latestSourceMtime.clear()
 }
 
 /**
@@ -346,7 +358,6 @@ module.exports = {
 	getCompanionThumbBasename,
 	resolveCompanionThumbOutputPath,
 	jpegBufferToDataUri,
-	pngBufferToDataUri,
 	resizePreviewToPngBuffer,
 	onComposePreviewUpdated,
 	bootstrapCompanionPreviewVariables,

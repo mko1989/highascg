@@ -60,9 +60,9 @@ function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 		resolutionScale: normalizeResolutionScale(prev.resolutionScale),
 		jpegQuality: clampJpegQuality(prev.jpegQuality, defaults.jpegQuality ?? 10),
 		tickIntervalMs:
-			Number.isFinite(tickIntervalMs) && tickIntervalMs >= 100 && tickIntervalMs <= 1000
-				? Math.round(tickIntervalMs / 25) * 25
-				: prev.tickIntervalMs ?? defaults.tickIntervalMs ?? 125,
+			Number.isFinite(tickIntervalMs) && tickIntervalMs >= 40 && tickIntervalMs <= 1000
+				? Math.round(tickIntervalMs / 25) * 25 || 40
+				: prev.tickIntervalMs ?? defaults.tickIntervalMs ?? 40,
 		embedConsumersInCasparConfig: prev.embedConsumersInCasparConfig !== false,
 		pauseConsumerWhenIdle: prev.pauseConsumerWhenIdle === true,
 		companionThumbEnabled: prev.companionThumbEnabled === true,

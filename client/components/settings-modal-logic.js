@@ -19,8 +19,8 @@ export function syncEditorDefaultsFromModal(modal) {
 /** @param {number} ms */
 function clampComposePreviewTickMs(ms) {
 	const n = parseInt(String(ms), 10)
-	if (!Number.isFinite(n)) return 125
-	return Math.max(100, Math.min(1000, Math.round(n / 25) * 25))
+	if (!Number.isFinite(n)) return 40
+	return Math.max(40, Math.min(1000, Math.round(n / 25) * 25 || 40))
 }
 
 /** @param {number} fps */

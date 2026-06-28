@@ -136,6 +136,27 @@ class StateManager extends EventEmitter {
 	}
 
 	/**
+	 * Push several variable updates in one WebSocket `variable_update` (compose preview).
+	 * @param {Record<string, any>} batch
+	 */
+	setVariablesImmediate(batch) {
+		if (!batch || typeof batch !== 'object') return
+		/** @type {Record<string, string>} */
+		const changed = {}
+		for (const [key, value] of Object.entries(batch)) {
+			const strVal = value == null ? '' : String(value)
+			if (this.variables[key] === strVal) continue
+			this.variables[key] = strVal
+			this._pendingVarChanges.delete(key)
+			this._emit(`variables.${key}`, strVal)
+			changed[key] = strVal
+		}
+		if (Object.keys(changed).length > 0) {
+			this.emit('variables', changed)
+		}
+	}
+
+	/**
 	 * Parse INFO channel XML and update channels state.
 	 * @param {number} channel - Channel number
 	 * @param {string} xml - Raw INFO response XML

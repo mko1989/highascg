@@ -60,14 +60,29 @@ function buildScaleFilter(resolutionScale) {
 }
 
 /**
- * @param {{ fps?: number, resolutionScale?: string }} opts
+ * Square thumb for Companion Stream Deck buttons (letterboxed, aspect preserved).
+ * Caspar rejects pad offsets like (ow-iw)/2; -1:-1 centers in this ffmpeg build.
+ * @param {number} size
+ */
+function buildCompanionThumbScaleFilter(size) {
+	const s = Math.max(32, Math.min(512, parseInt(String(size), 10) || 144))
+	return `scale=${s}:${s}:force_original_aspect_ratio=decrease,pad=${s}:${s}:-1:-1`
+}
+
+/**
+ * @param {{ fps?: number, resolutionScale?: string, companionThumbEnabled?: boolean, companionThumbSize?: number }} opts
  * @returns {string}
  */
 function buildComposeFfmpegFilterChain(opts = {}) {
+	const fps = clampComposePreviewFps(opts.fps, 2)
+	if (opts.companionThumbEnabled) {
+		const thumb = buildCompanionThumbScaleFilter(opts.companionThumbSize ?? 144)
+		return `${thumb},format=yuvj420p,fps=${fps}`
+	}
 	const parts = []
 	const scale = buildScaleFilter(opts.resolutionScale ?? 'half')
 	if (scale) parts.push(scale)
-	parts.push('format=yuvj420p', `fps=${clampComposePreviewFps(opts.fps, 2)}`)
+	parts.push('format=yuvj420p', `fps=${fps}`)
 	return parts.join(',')
 }
 
@@ -80,6 +95,8 @@ function buildComposeFfmpegConsumerArgs(composePreview = {}) {
 	const filter = buildComposeFfmpegFilterChain({
 		fps: composePreview.fps,
 		resolutionScale: composePreview.resolutionScale,
+		companionThumbEnabled: composePreview.companionThumbEnabled === true,
+		companionThumbSize: composePreview.companionThumbSize,
 	})
 	const q = clampJpegQuality(composePreview.jpegQuality, 10)
 	return `-filter:v ${filter} -codec:v mjpeg -q:v ${q} -format image2 -update 1`
@@ -146,6 +163,7 @@ module.exports = {
 	clampJpegQuality,
 	normalizeResolutionScale,
 	buildScaleFilter,
+	buildCompanionThumbScaleFilter,
 	buildComposeFfmpegFilterChain,
 	buildComposeFfmpegConsumerArgs,
 	buildComposeStreamConsumerArgs,
