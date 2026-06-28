@@ -3,8 +3,9 @@
   <p><strong>CasparCG playout control — unified client + server on one Ubuntu host.</strong></p>
   
   <p>
-    <a href="https://mko1989.github.io/highascg/"><strong>📚 Read the Wiki</strong></a> ·
+    <a href="docs/STICK_QUICK_START.md"><strong>🔌 Stick quick start</strong></a> ·
     <a href="https://highascg.dpdns.org/"><strong>💿 Download the ISO</strong></a> ·
+    <a href="https://mko1989.github.io/highascg/"><strong>📚 Read the Wiki</strong></a> ·
     <a href="https://github.com/mko1989/highascg-client"><strong>🖥️ Electron launcher</strong></a> (optional)
   </p>
 </div>

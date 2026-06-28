@@ -17,7 +17,7 @@ trap cleanup EXIT
 bash "${HERE}/seed-exfat-operator-layout.sh" "$STAGE"
 node "${HERE}/write-exfat-starter-bundle.js" "$STAGE"
 # zip skips empty directories — keep placeholders so operators see the full tree
-for d in drop-config media templates "snapshots/rear-panels" drop-update/applied; do
+for d in drop-config media templates projects projects/_autosave "snapshots/rear-panels" drop-update/applied; do
 	touch "${STAGE}/${d}/.gitkeep"
 done
 
