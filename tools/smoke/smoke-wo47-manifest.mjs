@@ -56,12 +56,12 @@ assert.ok(isoCaspar.includes('<borderless>true</borderless>'), 'casparcg.config.
 assert.ok(isoCaspar.includes('<windowed>true</windowed>'), 'casparcg.config.iso: windowed')
 
 mustContain(excludesPath, rsyncNeedles)
-assert.ok(existsSync(join(root, 'scripts/highascg-exfat-bootstrap.sh')))
+assert.ok(existsSync(join(root, 'scripts/exfat/highascg-exfat-bootstrap.sh')))
 assert.ok(existsSync(join(root, 'tools/eggs/live-usb/install-iso-defaults.sh')))
 assert.ok(existsSync(join(root, 'docs/WO47_ISO_VS_EXFAT.md')))
-assert.ok(existsSync(join(root, 'tools/release/make-github-release-launcher.sh')))
+assert.ok(existsSync(join(root, 'client/tools/release/make-github-release-launcher.sh')))
 
-const archiveCommon = readFileSync(join(root, 'scripts/archive-common.sh'), 'utf8')
+const archiveCommon = readFileSync(join(root, 'scripts/lib/archive-common.sh'), 'utf8')
 assert.ok(archiveCommon.includes('archive_common_server_tar_excludes'), 'archive-common: server tar excludes UI')
 
 console.log('wo47 manifest: OK')
