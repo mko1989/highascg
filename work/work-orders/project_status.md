@@ -8,6 +8,11 @@
 | 57 | [57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md](./57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md) | Draft | Caspar ADD IMAGE tick compose preview — fixed basename, dirty-channel gate (not PRINT/WebRTC) |
 | 58 | [58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md](./58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md) | Draft | Caspar ffmpeg consumer → JPG file (direct write, channel-relative scale) — no ADD IMAGE tick, no UDP relay |
 | 59 | [59_WO_DEVICE_VIEW_SERVER_INSPECTOR_FPS_NETWORK.md](./59_WO_DEVICE_VIEW_SERVER_INSPECTOR_FPS_NETWORK.md) | In progress | Device View server inspector — project default fps, Ethernet IP auto/manual, factory reset only |
+| 60 | [60_WO_CG_ONLY_LOOKS_DECK_VISUAL.md](./60_WO_CG_ONLY_LOOKS_DECK_VISUAL.md) | In progress | CG-only looks — dark blue / purple / green–yellow deck cards; checkerboard alpha CG thumbnails |
+| 62 | [62_WO_PROJECT_SCOPED_MEDIA_ROOT.md](./62_WO_PROJECT_SCOPED_MEDIA_ROOT.md) | Draft | Project-scoped media write root under `media/projects/<slug>/` |
+| 64 | [64_WO_HOT_BACKUP_AMCP_FANOUT.md](./64_WO_HOT_BACKUP_AMCP_FANOUT.md) | Phase A–C shipped | Leader AMCP fan-out to follower Caspar (2026-06-27) |
+| 65 | [65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md](./65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md) | Draft | Playhead sync, fan-out robustness, failover v2 (WO-64 follow-on) |
+| 63 | [63_WO_LOOKS_DECK_LIVE_COMPOSE_PREVIEW_THUMBS.md](./63_WO_LOOKS_DECK_LIVE_COMPOSE_PREVIEW_THUMBS.md) | In progress | Looks deck cards show live compose preview when on PGM/PRV (Companion parity); edit mode keeps legacy thumbs |
 
 ## WO-33 — Device view (split)
 

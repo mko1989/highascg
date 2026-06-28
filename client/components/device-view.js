@@ -104,6 +104,10 @@ let mounted = false; export function initDeviceView(root) {
 	const getCOCtx = () => ({ cableOverlay, bands: rearPanel, surfaceEl: wrap, lastPayload, hoveredEdgeId, selectedEdgeId, selectedConnectorId, selectEdgeById, cableSourceId, cablePointer, messiness: messinessSlider.value })
 	const rIntoInsp = (fn) => {
 		const h = gHost || inspector
+		if (gHost) {
+			gHost.classList.add('device-view-inspector-host')
+			if (gHost.id === 'panel-inspector-scroll') h.classList.add('panel-inspector__scroll')
+		}
 		renderPreservingFocus(h, () => {
 			h.innerHTML = ''
 			fn(h)
@@ -517,7 +521,7 @@ let mounted = false; export function initDeviceView(root) {
 			},
 			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
 		})
-	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message, true) }); editCasparBtn.onclick = () => showCasparConfigModal().then(() => load()); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
+	refreshBtn.onclick = load; resetBtn.onclick = resetCabling; applyCasparBtn.onclick = () => Actions.applyCasparConfig().then(r => { setCasparRestartDirty(false); setStatus(statusEl, r.message || 'Caspar config applied', true) }).catch(e => setStatus(statusEl, e?.message || String(e), false)); editCasparBtn.onclick = () => showCasparConfigModal().then(() => load()); window.onresize = () => renderCableOverlay(getCOCtx()); clearCableBtn.onclick = () => { cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }
 	destAdd.onclick = () => {
 		const list = Array.isArray(lastPayload?.screenDestinations?.destinations)
 			? lastPayload.screenDestinations.destinations
@@ -558,6 +562,7 @@ let mounted = false; export function initDeviceView(root) {
 	window.addEventListener('highascg-device-view-reload', load);
 	window.addEventListener('highascg-device-view-focus-connector', (ev) => { const cid = String(ev?.detail?.connectorId || '').trim(); if (cid) focusConnectorById(cid) }); 
 	window.addEventListener('highascg-device-view-focus-device', (ev) => { if (ev.detail?.deviceId) selectDevice(ev.detail.deviceId, lastPayload?.live) });
+	window.addEventListener('highascg-device-view-focus-server', () => selectDevice(CASPAR_HOST, lastPayload?.live));
 	window.addEventListener('highascg-caspar-restart-dirty', () => setCasparRestartDirty(true))
 	void load()
 }

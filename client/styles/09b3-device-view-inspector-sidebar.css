@@ -259,6 +259,56 @@
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+.device-view__replication-section {
+	min-width: 0;
+}
+.device-view__replication-status {
+	word-break: break-word;
+	line-height: 1.45;
+}
+.device-view__replication-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+	max-height: min(42vh, 360px);
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding-right: 2px;
+	scrollbar-gutter: stable;
+}
+.device-view__replication-actions .header-btn {
+	width: 100%;
+	max-width: 100%;
+	margin-top: 0;
+	box-sizing: border-box;
+	white-space: normal;
+	text-align: center;
+	font-size: 11px;
+	padding: 5px 8px;
+	line-height: 1.35;
+}
+.device-view__replication-local-note {
+	margin-bottom: 4px;
+}
+.device-view__replication-leader-pick .device-view__destinations-type {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+#panel-inspector .device-view__server-inspector {
+	min-width: 0;
+}
+#panel-inspector-scroll.device-view-inspector-host {
+	flex: 1 1 0;
+	min-height: 0;
+	max-height: 100%;
+	overflow-x: hidden;
+	overflow-y: auto;
 }
 .device-view__inspector-section {
 	margin-top: 10px;

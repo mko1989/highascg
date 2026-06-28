@@ -151,7 +151,7 @@ class AmcpClient extends EventEmitter {
 					self.log('debug', `AMCP → ${trimmed}`)
 				}
 				recordAmcpHistory(self, trimmed)
-				
+
 				if (typeof self.socket.send === 'function') {
 					// AmcpConnectionAdapter or legacy TcpClient — responses via AmcpProtocol callbacks
 					self.socket.send(trimmed)
@@ -171,6 +171,13 @@ class AmcpClient extends EventEmitter {
 					})
 				} else {
 					throw new Error('AMCP socket has no send method')
+				}
+
+				try {
+					const { fanoutSingleCommand } = require('../replication/amcp-fanout')
+					fanoutSingleCommand(trimmed)
+				} catch {
+					/* replication optional */
 				}
 
 				timeoutHandle = setTimeout(() => {
@@ -311,6 +318,12 @@ class AmcpClient extends EventEmitter {
 					if (settled) return
 					settled = true
 					if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+					try {
+						const { fanoutSingleCommand } = require('../replication/amcp-fanout')
+						fanoutSingleCommand(originalCmdString)
+					} catch {
+						/* replication optional */
+					}
 					if (!norm.ok) reject(new Error(norm.data || 'AMCP error'))
 					else resolve(norm)
 				}).catch(err => {

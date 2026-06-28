@@ -6,6 +6,8 @@ import { timelineState } from '../lib/timeline-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { getLiveThumbnailUrl, getThumbnailUrl, getLiveThumbnailChannelForSource } from '../lib/thumbnail-url.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
+import { drawCgOnlyLookDeckThumb } from './cg-only-look-deck-thumb.js'
+import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { drawComposePrvPgmCellEdgeBar, drawDualComposeCellPreview, drawOutputCanvasBounds } from './preview-canvas-draw-base.js'
 import {
 	drawComposeSnapshotCell,
@@ -13,6 +15,8 @@ import {
 	resolveComposeChannelForCell,
 	subscribeComposePreviewRefresh,
 } from './preview-canvas-compose-snapshot.js'
+import { resolveComposeChannelForEditingScene } from '../lib/compose-preview-url.js'
+import { resolveLookAirComposeChannel } from '../lib/look-air-compose-channel.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
 import { isMediaOrFileSource, dataTransferOffersDeckMedia, parseDraggableSourcesPayload } from './scenes-shared.js'
 import { renderSceneDeck } from './scene-list.js'
@@ -26,7 +30,7 @@ import * as Logic from './scenes-editor-logic.js'
 import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { formatFps } from './sources-panel-helpers.js'
-import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
+import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 
 export function initScenesEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -95,7 +99,24 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			prv: `prv_${Math.max(1, prvCh || pgmCh)}`,
 		}
 	}
-	const getResolution = () => Logic.getResolutionForScreen(sceneState.activeScreenIndex, sceneState, stateStore)
+	const resolveComposeScene = () => {
+		const id = sceneState.editingSceneId || sceneState.previewSceneId
+		return id ? sceneState.getScene(id) : null
+	}
+	const getResolution = () => {
+		const scene = resolveComposeScene()
+		const mainIdx = scene ? resolveMainIndexForScene(scene, sceneState) : sceneState.activeScreenIndex
+		return Logic.getResolutionForScreen(mainIdx, sceneState, stateStore)
+	}
+	const getEditBusChannelForComposeScene = () => {
+		const scene = resolveComposeScene()
+		const cm = getChannelMap()
+		return (
+			resolveLookStackChannelForBus(cm, sceneState, scene, 'edit') ??
+			getPreviewChannel() ??
+			getPlaybackChannel()
+		)
+	}
 	const getPreviewOutputResolution = () => { const cm = getChannelMap(); return cm.previewResolutions?.[sceneState.activeScreenIndex] ?? cm.programResolutions?.[sceneState.activeScreenIndex] ?? { w: 1920, h: 1080 } }
 
 	const previewRuntime = createScenesPreviewRuntime({
@@ -308,73 +329,96 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 					drawOutputCanvasBounds(c, r.w, r.h); drawSceneComposeStack(c, r.w, r.h, { scene: scene || { layers: [] }, selectedLayerIndex: scene?.id === sceneState.editingSceneId ? selectedLayerIndex : null, isLive: false, skipBg: true, composePrvPgmLayout: layout, composeDualStreamPreview: true, getThumbUrl: s => getThumbForSource(s, thumbCh), onThumbLoaded: () => previewPanel.scheduleDraw() })
 				}); drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell }); return
 			}
-			const id = sceneState.editingSceneId || sceneState.previewSceneId; const scene = id ? sceneState.getScene(id) : null
+			const scene = resolveComposeScene()
 			if (isSnapshotComposePreview()) {
-				const cm = getChannelMap()
-				const mainIdx = sceneState.activeScreenIndex
-				const ch = resolveComposeChannelForCell({ composeCell: 'pgm', composeScreenIdx: mainIdx }, cm, mainIdx)
+				const { channel: ch } = resolveComposeChannelForEditingScene(scene, sceneState, getChannelMap())
 				if (ch) {
 					drawComposeSnapshotCell(ctx, W, H, ch, { onLoaded: () => previewPanel.scheduleDraw() })
 					return
 				}
 			}
-			drawSceneComposeStack(ctx, W, H, { scene: scene || { layers: [] }, selectedLayerIndex, isLive, composePrvPgmLayout: layout, composeDualStreamPreview: isDual, getThumbUrl: s => getThumbForSource(s, getPreviewChannel() || getPlaybackChannel()), onThumbLoaded: () => previewPanel.scheduleDraw() })
+			drawSceneComposeStack(ctx, W, H, { scene: scene || { layers: [] }, selectedLayerIndex, isLive, composePrvPgmLayout: layout, composeDualStreamPreview: isDual, getThumbUrl: s => getThumbForSource(s, getEditBusChannelForComposeScene()), onThumbLoaded: () => previewPanel.scheduleDraw() })
 		}
 	})
 	bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPanel, splitPx })
-	subscribeComposePreviewRefresh(() => previewPanel?.scheduleDraw?.())
+
+	/** @param {HTMLCanvasElement} c */
+	function paintDeckThumb(c) {
+		const id = c.dataset.sceneId
+		const scene = id ? sceneState.getScene(id) : null
+		if (!scene) return
+		const main = Number.isFinite(Number(c.dataset.deckMain))
+			? parseInt(c.dataset.deckMain, 10)
+			: 0
+		const res = Logic.getResolutionForScreen(main, sceneState, stateStore)
+		const cw = SCENE_CARD_THUMB_W
+		const ch = Math.round((cw * res.h) / res.w)
+		if (c.width !== cw) {
+			c.width = cw
+			c.height = ch
+		}
+		const ctx = c.getContext('2d')
+		const cm = getChannelMap()
+		const sceneLive = stateStore.getState()?.scene?.live || {}
+
+		if (isSnapshotComposePreview()) {
+			const air = resolveLookAirComposeChannel(scene.id, main, sceneState, cm, sceneLive)
+			if (air?.channel) {
+				drawComposeSnapshotCell(ctx, cw, ch, air.channel, { onLoaded: () => previewPanel.scheduleDraw() })
+				return
+			}
+		}
+
+		if (isCgOnlyLook(scene)) {
+			drawCgOnlyLookDeckThumb(ctx, cw, ch, scene, {
+				onRepaint: () => {
+					previewPanel.scheduleDraw()
+					if (!c.isConnected) return
+					requestAnimationFrame(() => {
+						if (!c.isConnected) return
+						paintDeckThumb(c)
+					})
+				},
+			})
+			return
+		}
+
+		const getDeckThumbUrl = s => {
+			const prv = cm.previewChannels?.[main]
+			const fallback = cm.programChannels?.[main] ?? cm.playbackChannels?.[main] ?? getProgramChannel()
+			const thumbCh =
+				prv != null && Number.isFinite(Number(prv)) && Number(prv) > 0 ? Number(prv) : Number(fallback)
+			return getThumbForSource(s, thumbCh)
+		}
+
+		drawSceneComposeStack(ctx, cw, ch, {
+			scene,
+			selectedLayerIndex: null,
+			getThumbUrl: getDeckThumbUrl,
+			onThumbLoaded: () => {
+				previewPanel.scheduleDraw()
+				if (!c.isConnected) return
+				requestAnimationFrame(() => {
+					if (!c.isConnected) return
+					paintDeckThumb(c)
+				})
+			},
+			deckThumbnailMode: true,
+		})
+	}
+
+	function repaintDeckThumbs() {
+		if (sceneState.editingSceneId) return
+		mainHost.querySelectorAll('.scenes-card__thumb-canvas').forEach(paintDeckThumb)
+	}
 
 	const render = () => {
 		const preserveDeckScroll = !sceneState.editingSceneId
 		const prevScrollTop = preserveDeckScroll ? mainHost.scrollTop : 0
 		const prevScrollLeft = preserveDeckScroll ? mainHost.scrollLeft : 0
 		tabsHost.innerHTML = ''
-		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getPreviewChannel()), getPreviewChannelForLiveThumb: getPreviewChannel }), selectedLayerIndexRef, showScenesToast })
-		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, outputAspect: getResolution().w / getResolution().h, paintDeckThumb: c => {
-			const id = c.dataset.sceneId; const scene = id ? sceneState.getScene(id) : null; if (!scene) return
-			const res = c.dataset.deckMain ? Logic.getResolutionForScreen(parseInt(c.dataset.deckMain, 10), sceneState, stateStore) : getResolution()
-			const cw = SCENE_CARD_THUMB_W; const ch = Math.round((cw * res.h) / res.w)
-			if (c.width !== cw) { c.width = cw; c.height = ch }
-			drawSceneComposeStack(c.getContext('2d'), cw, ch, {
-				scene,
-				selectedLayerIndex: null,
-				getThumbUrl: s => {
-					const main = Number.isFinite(Number(c.dataset.deckMain)) ? parseInt(c.dataset.deckMain, 10) : sceneState.activeScreenIndex
-					const cm = getChannelMap()
-					const prv = cm.previewChannels?.[main]
-					const fallback = cm.programChannels?.[main] ?? cm.playbackChannels?.[main] ?? getProgramChannel()
-					const thumbCh =
-						prv != null && Number.isFinite(Number(prv)) && Number(prv) > 0 ? Number(prv) : Number(fallback)
-					return getThumbForSource(s, thumbCh)
-				},
-				onThumbLoaded: () => {
-					previewPanel.scheduleDraw()
-					if (!c.isConnected) return
-					requestAnimationFrame(() => {
-						if (!c.isConnected) return
-						const sid = c.dataset.sceneId
-						const scn = sid ? sceneState.getScene(sid) : null
-						if (!scn) return
-						drawSceneComposeStack(c.getContext('2d'), cw, ch, {
-							scene: scn,
-							selectedLayerIndex: null,
-							getThumbUrl: s => {
-								const main = Number.isFinite(Number(c.dataset.deckMain)) ? parseInt(c.dataset.deckMain, 10) : sceneState.activeScreenIndex
-								const cm = getChannelMap()
-								const prv = cm.previewChannels?.[main]
-								const fallback = cm.programChannels?.[main] ?? cm.playbackChannels?.[main] ?? getProgramChannel()
-								const thumbCh =
-									prv != null && Number.isFinite(Number(prv)) && Number(prv) > 0 ? Number(prv) : Number(fallback)
-								return getThumbForSource(s, thumbCh)
-							},
-							onThumbLoaded: () => previewPanel.scheduleDraw(),
-							deckThumbnailMode: true,
-						})
-					})
-				},
-				deckThumbnailMode: true,
-			})
-		}, takeSceneToProgram, showToast: showScenesToast, dispatchLayerSelect, previewPanel, sendSceneToPreviewCard: sendSceneToPreviewWithTimelineClear, clearPreviewBusForMain: previewRuntime.clearPreviewBusForMain, selectedLayerIndexRef,
+		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getEditBusChannelForComposeScene()), getPreviewChannelForLiveThumb: getEditBusChannelForComposeScene }), selectedLayerIndexRef, showScenesToast })
+		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, getSceneLive: () => stateStore.getState()?.scene?.live || {}, outputAspect: getResolution().w / getResolution().h, paintDeckThumb, takeSceneToProgram, showToast: showScenesToast, dispatchLayerSelect, previewPanel, sendSceneToPreviewCard: sendSceneToPreviewWithTimelineClear, clearPreviewBusForMain: previewRuntime.clearPreviewBusForMain, selectedLayerIndexRef,
 		onDeckMediaDropAccept: dataTransferOffersDeckMedia,
 		onDeckMediaDrop,
 		globalTakeFromPreview,
@@ -394,6 +438,11 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			render()
 		})
 	}
+
+	subscribeComposePreviewRefresh(() => {
+		previewPanel?.scheduleDraw?.()
+		repaintDeckThumbs()
+	})
 
 	onDeckMediaDrop = async (mainCol, e) => {
 		const dt = e.dataTransfer

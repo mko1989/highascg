@@ -5,6 +5,7 @@ const path = require('path')
 
 const { REPO_ROOT } = require('../repo-paths')
 const projectStore = require('./project-store')
+const { ensureProjectMediaDir, normalizeProjectMediaRefs } = require('../media/project-media-root')
 const { pushProjectSlugToVolumes } = require('./project-volume-sync')
 
 /** Debounce disk writes from WebSocket `scene_deck_sync` (default 750ms). */
@@ -267,10 +268,12 @@ function persistProject(ctx, project, opts = {}) {
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const slug = projectStore.projectSlugFromName(project.name)
 	projectStore.migrateLegacySingleProject(persistence)
-	const stamped = projectStore.withProjectSlug(project, slug)
+	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
+	const stamped = projectStore.withProjectSlug(normalized, slug)
 	try {
 		projectStore.writeProjectFile(slug, stamped)
 		projectStore.setActiveSlug(persistence, slug)
+		ensureProjectMediaDir(ctx.config, slug, persistence)
 	} catch (e) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('warn', '[project] projects/ write: ' + (e?.message || e))

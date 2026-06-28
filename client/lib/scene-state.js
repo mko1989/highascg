@@ -24,6 +24,7 @@ import {
 	sceneStateGetGlobalBorderPreset,
 	sceneStateSetGlobalBorder,
 } from './scene-state-global-border.js'
+import { syncMainSlotsFromSceneLive } from './scene-live-main-sync.js'
 import { applySceneLayerDefaults } from './editor-defaults.js'
 import {
 	isAutoTransitionDuration,
@@ -339,17 +340,29 @@ export class SceneState {
 
 	applyServerLiveChannels(channels, channelMap) {
 		if (!channels || !channelMap?.programChannels?.length) return
-		let any = false
-		channelMap.programChannels.forEach((ch, idx) => {
-			const sid = String(channels[String(ch)]?.sceneId || '')
-			if (sid && this.getScene(sid) && this.liveSceneIdByMain[idx] !== sid) {
-				this.liveSceneIdByMain[idx] = sid
+		const { liveSceneIdByMain, previewSceneIdByMain, changed, previewChanged } = syncMainSlotsFromSceneLive(
+			channels,
+			channelMap,
+			(id) => !!this.getScene(id),
+			{
+				liveSceneIdByMain: this.liveSceneIdByMain,
+				previewSceneIdByMain: this.previewSceneIdByMain,
+			},
+		)
+		if (!changed) return
+		this.liveSceneIdByMain = liveSceneIdByMain
+		this.previewSceneIdByMain = previewSceneIdByMain
+		for (let m = 0; m < 4; m++) {
+			const sid = this.liveSceneIdByMain[m]
+			if (sid) {
 				const s = this.getScene(sid)
-				if (s) this.liveSceneSnapshotsByMain[idx] = JSON.parse(JSON.stringify(s))
-				any = true
+				this.liveSceneSnapshotsByMain[m] = s ? JSON.parse(JSON.stringify(s)) : null
+			} else {
+				this.liveSceneSnapshotsByMain[m] = null
 			}
-		})
-		if (any) this._softSave()
+		}
+		this._softSave()
+		if (previewChanged) this._emit('previewScene')
 	}
 
 	getScene(id) { return id ? this.scenes.find((s) => String(s.id) === String(id)) || null : null }

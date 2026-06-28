@@ -5,6 +5,8 @@
 import { mountLookTransitionControls } from './scenes-shared.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
+import { isCgOnlyLook } from '../lib/scene-look-kind.js'
+import { resolveBusLookIdsForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
 
 /**
@@ -28,6 +30,7 @@ function isScenesDeckColBlankClick(target, colRoot) {
  * @param {import('../lib/scene-state.js').SceneState} ctx.sceneState
  * @param {() => number} ctx.getScreenCount
  * @param {() => object} [ctx.getChannelMap]
+ * @param {() => Record<string, { sceneId?: string }>} [ctx.getSceneLive]
  * @param {number} [ctx.outputAspect] - program width/height for look card thumb framing
  * @param {(canvas: HTMLCanvasElement) => void} ctx.paintDeckThumb
  * @param {(sceneId: string, forceCut: boolean) => Promise<void>} ctx.takeSceneToProgram
@@ -48,6 +51,7 @@ export function renderSceneDeck(ctx) {
 		sceneState,
 		getScreenCount,
 		getChannelMap = () => ({}),
+		getSceneLive = () => ({}),
 		outputAspect,
 		paintDeckThumb,
 		takeSceneToProgram,
@@ -296,15 +300,27 @@ export function renderSceneDeck(ctx) {
 		}
 
 		for (const sc of scenes) {
-			const onPreview = sceneState.getPreviewSceneIdForMain(col) === sc.id
-			const onPgm = sceneState.getLiveSceneIdForMain(col) === sc.id
+			const sceneLive = getSceneLive() || {}
+			const sceneExists = (id) => !!sceneState.getScene(id)
+			const { pgmLookId, prvLookId } = resolveBusLookIdsForMain(
+				col,
+				sceneLive,
+				cm,
+				sceneExists,
+				sceneState,
+			)
+			const onPgm = pgmLookId === sc.id
+			const onPreview = !onPgm && prvLookId === sc.id
 			const isGlobal = sc.mainScope === 'all'
+			const cgOnly = isCgOnlyLook(sc)
+			// Scoped looks: live/preview styling only on the main they belong to (already filtered by getScenesForMain).
 			const card = document.createElement('div')
 			card.className =
 				'scenes-card' +
 				(onPgm ? ' scenes-card--live' : '') +
 				(onPreview ? ' scenes-card--preview' : '') +
-				(isGlobal ? ' scenes-card--global' : '')
+				(isGlobal ? ' scenes-card--global' : '') +
+				(cgOnly ? ' scenes-card--cg-only' : '')
 			card.innerHTML = `
 			<div class="scenes-card__header">
 				<input type="text" class="scenes-card__name-input" maxlength="120" spellcheck="false" aria-label="Look name" />
@@ -415,8 +431,7 @@ export function renderSceneDeck(ctx) {
 			const thumbCanvas = card.querySelector('.scenes-card__thumb-canvas')
 			if (thumbCanvas) {
 				thumbCanvas.dataset.sceneId = sc.id
-				if (screenCount > 1) thumbCanvas.dataset.deckMain = String(col)
-				else delete thumbCanvas.dataset.deckMain
+				thumbCanvas.dataset.deckMain = String(col)
 				paintDeckThumb(thumbCanvas)
 			}
 			grid.appendChild(card)

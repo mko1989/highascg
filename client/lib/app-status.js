@@ -1,10 +1,32 @@
 /**
  * Status bar and network info logic for the main app.
  */
+import { getSameOriginApiUrl } from './api-origin.js'
+
+let _eyeRefreshGen = 0
+
 export function casparAmcpConnectedFromState(st) {
 	const raw = st?.caspar
-	const conn = raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
-	return !!(conn && conn.connected) && !conn.skipped
+	if (!raw || typeof raw !== 'object') return false
+	if (raw.skipped) return false
+	const nested =
+		raw.connection && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : null
+	if (nested && typeof nested.connected === 'boolean') {
+		if (nested.skipped) return false
+		return nested.connected
+	}
+	return !!raw.connected
+}
+
+/** Local Caspar AMCP status from this page's playout host only (ignores A/B API overrides). */
+export async function fetchLocalCasparConnectionStatus() {
+	const res = await fetch(getSameOriginApiUrl('/api/state'), {
+		credentials: 'same-origin',
+		cache: 'no-store',
+	})
+	if (!res.ok) throw new Error(`HTTP ${res.status}`)
+	const st = await res.json()
+	return casparAmcpConnectedFromState(st)
 }
 
 export function updateNetworkInfo() {
@@ -51,9 +73,24 @@ export function updateConnectionStatus(connected, error, { ws, httpConnected, st
 	}
 }
 
-export function refreshCasparConnectionEye(connectionEye, stateStore) {
+/**
+ * Connection eye = local HighAsCG + Caspar health only (never hot-backup peer reachability).
+ * @param {{ wsConnected?: boolean, httpConnected?: boolean }} [connectivity]
+ */
+export function refreshCasparConnectionEye(connectionEye, stateStore, connectivity = {}) {
 	if (!connectionEye) return
-	const st = stateStore.getState(); const raw = st?.caspar
-	const conn = raw && typeof raw.connection === 'object' && raw.connection !== null ? raw.connection : raw
-	connectionEye.setConnected(!!(conn && conn.connected) && !conn.skipped)
+	const gen = ++_eyeRefreshGen
+	void (async () => {
+		try {
+			const casparOk = await fetchLocalCasparConnectionStatus()
+			if (gen !== _eyeRefreshGen) return
+			connectionEye.setConnected(casparOk)
+			return
+		} catch {
+			/* fall through to WS snapshot */
+		}
+		if (gen !== _eyeRefreshGen) return
+		const highascgOk = !!(connectivity.wsConnected || connectivity.httpConnected)
+		connectionEye.setConnected(highascgOk && casparAmcpConnectedFromState(stateStore.getState()))
+	})()
 }

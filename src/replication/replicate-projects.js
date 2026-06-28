@@ -2,10 +2,64 @@
 
 const fs = require('fs')
 const path = require('path')
-const { stripDeviceLocalFromProject } = require('../config/config-classify')
+const { stripDeviceLocalFromProject, mergeSharedProjectIntoLocal } = require('../config/config-classify')
 const projectStore = require('../engine/project-store')
+const { persistProject } = require('../engine/project-scenes')
+const { scheduleProjectSyncBroadcast } = require('../api/routes-data')
 const { getReplicationConfig } = require('../config/replication-config')
-const { peerPost } = require('./peer-client')
+const { peerPost, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
+const { applyHardwareConfigToCtx } = require('../engine/project-hardware-config')
+const {
+	seedProjectHardwareFromLocalProfile,
+	applyLocalMachineProfileToConfig,
+	regenerateFollowerCasparFromDeviceView,
+} = require('./follower-machine-profile')
+
+/**
+ * Activate a replicated project on this server (disk + in-memory deck + UI broadcast).
+ * @param {object} ctx
+ * @param {object} merged
+ * @param {string} slug
+ */
+async function commitReplicatedProject(ctx, merged, slug) {
+	const persistence = ctx.persistence || require('../utils/persistence')
+	const activeSlug = String(slug || projectStore.projectSlugFromName(merged?.name) || '').trim()
+	if (!activeSlug) return merged
+	const previousSlug = projectStore.getActiveSlug(persistence)
+	const slugChanged = String(previousSlug || '') !== activeSlug
+
+	projectStore.setActiveSlug(persistence, activeSlug)
+	persistProject(ctx, merged, { writeAutosave: true, pushVolumes: false })
+
+	applyLocalMachineProfileToConfig(ctx, merged?.hardwareConfig)
+	if (merged?.hardwareConfig?.screenDestinations) {
+		applyHardwareConfigToCtx(ctx, { screenDestinations: merged.hardwareConfig.screenDestinations })
+	}
+
+	let caspar = null
+	// Only regenerate/restart Caspar when the active show slug changes — not on every leader save.
+	if (slugChanged) {
+		try {
+			caspar = await regenerateFollowerCasparFromDeviceView(ctx)
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', '[replication] follower caspar regenerate: ' + (e?.message || e))
+			}
+		}
+	}
+
+	if (typeof ctx.log === 'function') {
+		let casparNote = 'caspar unchanged (use Regenerate Caspar from Device View after wiring outputs)'
+		if (slugChanged) {
+			casparNote = caspar?.ok
+				? 'casparcg.config regenerated from local Device View'
+				: 'caspar regenerate skipped or failed — use Regenerate Caspar from Device View'
+		}
+		ctx.log('info', `[replication] Show synced (active slug=${activeSlug}). ${casparNote}.`)
+	}
+	scheduleProjectSyncBroadcast(ctx, merged)
+	return merged
+}
 
 /**
  * @param {object} ctx
@@ -24,8 +78,23 @@ async function pushProjectToPeer(ctx, runtime, project) {
 		project: stripDeviceLocalFromProject(project),
 	}
 
-	const res = await peerPost(repl.peer, '/api/replication/project', payload)
-	if (res.ok) runtime.projectsPushed += 1
+	const res = await peerPost(repl.peer, '/api/replication/project', payload, {
+		timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
+	})
+	if (res.ok) {
+		runtime.projectsPushed += 1
+		try {
+			const { syncProjectMediaViaSyncthing } = require('./sync-project-media')
+			const { getLocalSyncthingDeviceId } = require('./syncthing-client')
+			const peerPing = await require('./peer-client').peerPing(repl.peer)
+			const followerSyncthingId = peerPing.json?.syncthingDeviceId
+			if (followerSyncthingId) {
+				await syncProjectMediaViaSyncthing(project, followerSyncthingId, { asLeader: true })
+			}
+		} catch {
+			/* optional syncthing refresh */
+		}
+	}
 	return { ok: res.ok, status: res.status, error: res.error }
 }
 
@@ -42,14 +111,30 @@ async function receiveProjectFromPeer(ctx, body) {
 	const project = body.project
 	if (!project || typeof project !== 'object') return { ok: false, error: 'missing project' }
 
+	// Defense in depth: never apply machine profile from peer (device graph, GPU ports, caspar host).
+	const safeProject = stripDeviceLocalFromProject(project)
+
 	const filePath = projectStore.projectFilePath(slug)
 	fs.mkdirSync(path.dirname(filePath), { recursive: true })
-	fs.writeFileSync(filePath, JSON.stringify(project, null, 2), 'utf8')
+
+	let existing = null
+	try {
+		if (fs.existsSync(filePath)) {
+			existing = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+		}
+	} catch {
+		existing = null
+	}
+
+	existing = seedProjectHardwareFromLocalProfile(ctx, existing)
+
+	const merged = mergeSharedProjectIntoLocal(existing, safeProject)
+	await commitReplicatedProject(ctx, merged, slug)
 
 	if (typeof ctx.log === 'function') {
-		ctx.log('info', `[replication] received project slug=${slug}`)
+		ctx.log('info', `[replication] received project slug=${slug} (active)`)
 	}
-	return { ok: true, slug }
+	return { ok: true, slug, activeSlug: slug }
 }
 
 /**
@@ -69,4 +154,4 @@ async function reconcileProjectsToPeer(ctx, runtime) {
 	}
 }
 
-module.exports = { pushProjectToPeer, receiveProjectFromPeer, reconcileProjectsToPeer }
+module.exports = { pushProjectToPeer, receiveProjectFromPeer, reconcileProjectsToPeer, commitReplicatedProject }

@@ -182,6 +182,47 @@
 	margin-top: 6px;
 }
 
+.sources-project-media-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px 10px;
+	margin: 6px 0 4px;
+	padding: 6px 8px;
+	font-size: 0.76rem;
+	background: rgba(88, 166, 255, 0.07);
+	border: 1px solid rgba(88, 166, 255, 0.22);
+	border-radius: var(--radius);
+}
+
+.sources-project-media-bar__info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.sources-project-media-bar__label {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.sources-project-media-bar__path {
+	font-family: ui-monospace, monospace;
+	color: var(--text-muted, #9ca3af);
+	word-break: break-all;
+}
+
+.sources-project-media-bar__filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+}
+
 .sources-media-footer__row {
 	display: flex;
 	flex-direction: row;

@@ -44,9 +44,13 @@ class RoleState extends EventEmitter {
 
 		if (!this._replicationEnabled) {
 			next = 'standalone'
-		} else if (this._configuredRole === 'leader' || this._forcedRole === 'leader') {
+		} else if (this._forcedRole === 'leader') {
 			next = 'leader'
-		} else if (this._configuredRole === 'follower' || this._forcedRole === 'follower') {
+		} else if (this._forcedRole === 'follower') {
+			next = 'follower'
+		} else if (this._configuredRole === 'leader') {
+			next = 'leader'
+		} else if (this._configuredRole === 'follower') {
 			next = 'follower'
 		} else if (this._operatorWsClients >= 1) {
 			next = 'leader'

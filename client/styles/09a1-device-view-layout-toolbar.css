@@ -28,6 +28,17 @@
 .device-view__side {
 	position: sticky;
 	top: 12px;
+	align-self: start;
+	max-height: calc(100vh - var(--header-h, 48px) - 24px);
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
+}
+.device-view__inspector {
+	max-height: calc(100vh - var(--header-h, 48px) - 24px);
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
 }
 .device-view__toolbar {
 	display: flex;

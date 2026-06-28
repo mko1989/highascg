@@ -11,6 +11,11 @@ import { applyProjectHardware } from './project-hardware-apply.js'
 import { getHardwarePolicy } from './project-hardware-policy.js'
 import { showProjectHardwareReconcileModal } from '../components/project-hardware-reconcile-modal.js'
 import { runPostImportMediaReconcile } from './project-media-reconcile.js'
+import {
+	syncProjectMediaContextFromProject,
+	refreshProjectMediaContext,
+	formatProjectMediaUploadHint,
+} from './project-media-context.js'
 
 const BANNER_ID = 'highascg-hardware-keep-live-banner'
 
@@ -46,6 +51,13 @@ export async function importProjectWithHardwareReconcile(project, deps) {
 		)
 		deps.onNameSync?.(deps.projectState.getProjectName())
 		window.dispatchEvent(new Event('project-loaded'))
+		syncProjectMediaContextFromProject(project)
+		if (deps.source !== 'server-bootstrap' && deps.source !== 'server-reconnect') {
+			void refreshProjectMediaContext().then(() => {
+				const hint = formatProjectMediaUploadHint()
+				if (hint) deps.showToast?.(hint, 'info')
+			})
+		}
 		void runPostImportMediaReconcile(project, {
 			offline: deps.offline,
 			stateStore: deps.stateStore,

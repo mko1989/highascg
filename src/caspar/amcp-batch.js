@@ -221,6 +221,12 @@ function runBeginCommitBatch(client, lines, options) {
 				connection.log('debug', `AMCP → BEGIN…COMMIT (${lines.length} cmd${lines.length === 1 ? '' : 's'})`)
 			}
 			connection.socket.send(payload)
+			try {
+				const { fanoutBatchPayload } = require('../replication/amcp-fanout')
+				fanoutBatchPayload(payload)
+			} catch {
+				/* replication optional */
+			}
 			return p
 		})
 		.catch((e) => {

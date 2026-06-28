@@ -49,6 +49,7 @@ const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
+const routesCgThumb = require('./routes-cg-thumb')
 const routesReplication = require('./routes-replication')
 const routesPrivateSync = require('./routes-private-sync')
 const moduleRegistry = require('../module-registry')
@@ -392,7 +393,14 @@ async function routeRequest(method, path, body, ctx, req) {
 		if (r) return r
 	}
 
+	if (method === 'POST' && p === '/api/cg-thumb/render') {
+		const r = await routesCgThumb.handlePost(p, body, ctx)
+		if (r) return r
+	}
+
 	if (method === 'GET') {
+		const cgtr = await routesCgThumb.handleGet(p, query, ctx)
+		if (cgtr) return cgtr
 		const cpr = await routesComposePreview.handleGet(p, query, ctx)
 		if (cpr) return cpr
 		const tr = await routesMedia.handleThumbnail(p, query, ctx)

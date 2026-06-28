@@ -17,6 +17,7 @@ const {
 	injectHardwareConfigToProject,
 	applyHardwareConfigFromProject,
 } = require('../engine/project-hardware-config')
+const { ensureProjectMediaDir, getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null
@@ -106,6 +107,7 @@ async function handleProject(path, body, ctx) {
 			}
 		}
 		persistProject(ctx, project, { writeAutosave: true })
+		ensureProjectMediaDir(ctx.config, slug)
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)
 		} else if (ctx.artnetReceiver) {
@@ -146,7 +148,7 @@ async function handleProject(path, body, ctx) {
 			(project.slug && String(project.slug).trim()) ||
 			projectStore.projectSlugFromName(project.name)
 		projectStore.setActiveSlug(persistence, activeSlug)
-		
+		ensureProjectMediaDir(ctx.config, activeSlug)
 		applyHardwareConfigFromProject(ctx, project)
 		try {
 			const { ensureLiveAudioRouting } = require('../config/routing-setup')
@@ -217,12 +219,23 @@ async function handleProjectList(ctx) {
 	const activeSlug = projectStore.getActiveSlug(persistence)
 	const { getProjectRoots, isVolumeMountedSync } = require('../engine/project-volume-sync')
 	const roots = getProjectRoots()
+	const activeProjectMedia =
+		activeSlug && ctx.config
+			? {
+					relId: getProjectMediaRelId(activeSlug),
+					absPath: getProjectMediaRoot(ctx.config, persistence, activeSlug),
+				}
+			: null
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
 		body: jsonBody({
 			activeSlug: activeSlug || null,
-			projects,
+			activeProjectMedia,
+			projects: projects.map((p) => ({
+				...p,
+				mediaFolder: p.slug ? getProjectMediaRelId(p.slug) : null,
+			})),
 			volumes: {
 				usb: {
 					mount: roots.usb,

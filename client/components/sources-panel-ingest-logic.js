@@ -4,9 +4,11 @@
 import { api, getApiBase } from '../lib/api-client.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
 
-export async function uploadFiles(files, { setStatus, showProgress, updateProgress, refreshCallback }) {
+export async function uploadFiles(files, { setStatus, showProgress, updateProgress, refreshCallback, uploadSubdir = '' }) {
 	if (!files?.length) return
-	const fd = new FormData(); for (const f of files) fd.append('file', f, f.name)
+	const fd = new FormData()
+	for (const f of files) fd.append('file', f, f.name)
+	if (uploadSubdir) fd.append('path', uploadSubdir)
 	setStatus(`Uploading ${files.length} file(s)…`, 'info'); showProgress(true)
 	try {
 		const res = await postFormDataWithProgress(getApiBase() + '/api/ingest/upload', fd, (l, t) => { if (t > 0) updateProgress(Math.min(100, Math.round((l / t) * 100))); else updateProgress(null) })

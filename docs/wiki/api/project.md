@@ -54,6 +54,19 @@ Legacy **`/api/data/*`** → **410 Gone** — use project routes instead.
 
 Sync map pairs: `usb-projects` (`direction: to_project`, boot pull only) and `bridge-projects` (`direction: both`).
 
+### Project-scoped media (WO-62)
+
+When `projectScopedMedia.enabled` is true (Settings → Media), each active project gets a dedicated folder under the Caspar media root:
+
+| Path | Role |
+|------|------|
+| `<media_root>/projects/<slug>/` | Default upload/import target while project is active |
+| `<media_root>/stock/`, other folders | Shared library — still browsable and usable in looks |
+
+**Portable show kit:** copy `~/highascg/projects/<slug>.json` plus `media/projects/<slug>/` to another machine, load the project — clips referenced with project-relative ids resolve under the same folder layout.
+
+`GET /api/project/list` returns `activeProjectMedia: { relId, absPath }` and each project row may include `mediaFolder: "projects/<slug>"`.
+
 ---
 
 The `project` object is the same envelope the operator UI saves:

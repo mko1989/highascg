@@ -32,6 +32,9 @@ function coreDefaults() {
 			overwritePolicy: 'rename',
 			verifyHash: false,
 		},
+		projectScopedMedia: {
+			enabled: true,
+		},
 		local_template_path: '',
 		server: {
 			httpPort: 4200,

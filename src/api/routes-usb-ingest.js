@@ -8,6 +8,7 @@ const path = require('path')
 const defaults = require('../config/defaults')
 const { JSON_HEADERS, jsonBody, parseBody, parseQueryString } = require('./response')
 const usbDrives = require('../media/usb-drives')
+const { getDefaultIngestSubdir } = require('../media/project-media-root')
 
 /**
  * @param {object} cfg
@@ -187,6 +188,9 @@ async function handleImport(ctx, body) {
 	if (!drive) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Drive not found' }) }
 
 	let targetSubdir = targetSubdirExtra.trim()
+	if (!targetSubdir) {
+		targetSubdir = getDefaultIngestSubdir(ctx.config)
+	}
 	if (!targetSubdir && uCfg.defaultSubfolder) {
 		targetSubdir = usbDrives.formatImportSubdirTemplate(uCfg.defaultSubfolder, drive)
 	}

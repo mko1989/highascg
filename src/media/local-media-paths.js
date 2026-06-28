@@ -126,6 +126,14 @@ function resolveMediaFileOnDisk(config, filename) {
 		}
 	}
 	const cfg = config || {}
+	const projectCandidates = (() => {
+		try {
+			const pmr = require('./project-media-root')
+			return pmr.getProjectMediaResolveCandidates(cfg, idNorm)
+		} catch {
+			return []
+		}
+	})()
 	const bases = []
 	const cfgPath = (cfg.local_media_path || '').trim()
 	if (cfgPath) bases.push(path.resolve(cfgPath))
@@ -136,7 +144,7 @@ function resolveMediaFileOnDisk(config, filename) {
 		const r = path.resolve(b)
 		if (seenBases.has(r)) continue
 		seenBases.add(r)
-		for (const cand of candidates) {
+		for (const cand of [...projectCandidates, ...candidates]) {
 			const fp = resolveSafe(r, cand)
 			if (!fp) continue
 			try {

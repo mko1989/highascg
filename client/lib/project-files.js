@@ -76,9 +76,10 @@ export async function fetchProjectFileList() {
 	try {
 		const res = await api.get('/api/project/list')
 		if (res && typeof res === 'object') {
-			const r = /** @type {Record<string, unknown>} */ (res)
-			if (r.activeId != null) activeId = String(r.activeId)
-			const files = normalizeProjectFileList(res)
+		const r = /** @type {Record<string, unknown>} */ (res)
+		if (r.activeId != null) activeId = String(r.activeId)
+		if (!activeId && r.activeSlug != null) activeId = String(r.activeSlug)
+		const files = normalizeProjectFileList(res)
 			if (files.length) {
 				if (!activeId) {
 					const active = files.find((f) => f.active)

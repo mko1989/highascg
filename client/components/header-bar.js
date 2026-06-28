@@ -22,12 +22,14 @@ import { getAppWs } from '../lib/app-runtime.js'
 import { flushSceneDeckSync } from '../lib/app-scene-deck.js'
 import { initConfigStrip } from './header-bar-config-strip.js'
 import { projectFileIdFromName } from '../lib/project-files.js'
+import { normalizeProjectMediaRefs } from '../lib/project-media-context.js'
 import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.js'
 import { showLoadProjectModal } from './load-project-modal.js'
 import { applyDefaultUntitledProjectLocally } from '../lib/default-project.js'
 
 import { initLedTestCard } from './header-bar-led-test.js'
 import { initStreamingBadge } from './header-bar-streaming.js'
+import { initReplicationBadge } from './header-bar-replication.js'
 
 /**
  * @param {HTMLElement} headerEl - Header element (contains title + status)
@@ -105,7 +107,8 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	}
 
 	async function saveToServer() {
-		const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+		project = normalizeProjectMediaRefs(project)
 		const id = projectFileIdFromName(project.name || projectState.getProjectName())
 		try {
 			await api.post('/api/project/save', { project, id })
@@ -232,6 +235,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	
 	initLedTestCard(ledTestWrap, stateStore)
 	initStreamingBadge(ledTestWrap)
+	initReplicationBadge(ledTestWrap)
 
 	const audioGroup = createHeaderAudioMonitor(stateStore)
 

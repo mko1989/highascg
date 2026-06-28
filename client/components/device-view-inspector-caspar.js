@@ -6,6 +6,7 @@ import { setStatus } from './device-view-ui-utils.js'
 import { buildInspectorTable } from './device-view-ui-utils.js'
 import { STANDARD_PROJECT_FPS, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 import { api } from '../lib/api-client.js'
+import { renderReplicationInspector } from './device-view-inspector-replication.js'
 
 /**
  * @param {HTMLElement} host
@@ -17,13 +18,16 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 	const projectFps = resolveProjectFpsFromSettings(s)
 	const networkCfg = s.network && typeof s.network === 'object' ? s.network : {}
 
-	host.className = 'device-view__server-inspector'
+	// Keep #panel-inspector-scroll layout classes (panel-inspector__scroll); content lives in inner shell.
 	host.innerHTML = ''
+	const shell = document.createElement('div')
+	shell.className = 'device-view__server-inspector'
+	host.append(shell)
 
 	const title = document.createElement('p')
 	title.className = 'device-view__inspector-title'
 	title.textContent = 'Server'
-	host.append(title)
+	shell.append(title)
 
 	const rows = [
 		{ label: 'Hostname', value: String(live?.host?.hostname || '-') },
@@ -31,7 +35,7 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 		{ label: 'AMCP', value: live?.caspar?.connected ? 'connected' : 'disconnected' },
 		{ label: 'Host', value: String(live?.caspar?.host || s?.caspar?.host || '-') },
 	]
-	host.append(buildInspectorTable(rows))
+	shell.append(buildInspectorTable(rows))
 
 	const projectSec = document.createElement('div')
 	projectSec.className = 'device-view__inspector-section'
@@ -77,7 +81,7 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 		}
 	}
 	projectSec.append(saveFpsBtn)
-	host.append(projectSec)
+	shell.append(projectSec)
 
 	const netSec = document.createElement('div')
 	netSec.className = 'device-view__inspector-section'
@@ -157,7 +161,9 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 	}
 
 	netSec.append(ifaceLab, modeWrap, staticBox, applyNetBtn)
-	host.append(netSec)
+	shell.append(netSec)
+
+	renderReplicationInspector(shell, { statusEl, load })
 
 	async function refreshNetwork() {
 		try {
@@ -220,7 +226,7 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 		}
 	}
 	danger.append(factoryResetBtn)
-	host.append(danger)
+	shell.append(danger)
 }
 
 /**

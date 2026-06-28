@@ -19,7 +19,7 @@ const {
 	sendPipOverlayLinesSerial,
 } = require('./pip-overlay')
 const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
-const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines } = require('./scene-template-cg')
+const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
 const { remapIntraLookRoutesForTakeChannel, sendStaggeredTakePlays } = require('./scene-route-deps')
@@ -206,7 +206,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	}
 
 	if (takeJobs.length === 0 && exitLayers.length === 0) {
-		return { ok: true, takeMode: 'pgm-only', diff: diff }
+		return { ok: true, takeMode: 'pgm-only', layersApplied: 0, takeJobs: 0, diff: diff }
 	}
 
 	const flatMixer = []
@@ -254,6 +254,13 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	for (const job of takeJobs) {
 		if (!job.templateCg) continue
 		try {
+			const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
+				channel,
+				job.layer.layerNumber,
+				job.templateCg,
+				self,
+			)
+			if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
 			const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
 			if (lines.length > 0) {
 				self.log?.(
@@ -338,6 +345,8 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	return {
 		ok: true,
 		takeMode: 'pgm-only',
+		layersApplied: takeJobs.length,
+		takeJobs: takeJobs.length,
 		diff: {
 			update: diff.update.length,
 			enter: diff.enter.length,

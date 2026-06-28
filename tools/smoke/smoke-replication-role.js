@@ -28,3 +28,10 @@ test('fixed leader role override', () => {
 	rs.setOperatorWsClientCount(0)
 	assert.equal(rs.getRole(), 'leader')
 })
+
+test('forced follower overrides configured leader', () => {
+	const rs = new RoleState()
+	rs.configure({ enabled: true, role: 'leader' })
+	rs.forceRole('follower')
+	assert.equal(rs.getRole(), 'follower')
+})

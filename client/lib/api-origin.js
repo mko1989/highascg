@@ -27,10 +27,57 @@ function pageUsesBundledApiProxy() {
 	return String(location.port) === String(WEBUI_PORT)
 }
 
+/** Operator UI served from the playout server (dist-web on :4200). Always use same-origin API/WS. */
+function pageIsPlayoutServerUi() {
+	if (typeof location === 'undefined') return false
+	if (pageUsesBundledApiProxy()) return false
+	const port = location.port || (location.protocol === 'https:' ? '443' : '80')
+	return port === '4200' || port === '80' || port === '443'
+}
+
+/**
+ * When true, ignore A/B hot-backup API overrides — UI is served from (or proxied for) this playout host.
+ * Connection eyes and local health must never follow a peer profile in these contexts.
+ */
+function shouldForceSameOriginApi() {
+	if (pageUsesBundledApiProxy()) return true
+	if (getCompanionPathPrefix()) return true
+	if (pageIsPlayoutServerUi()) return true
+	return false
+}
+
 function readMetaApiOrigin() {
 	if (typeof document === 'undefined') return ''
 	const el = document.querySelector('meta[name="highascg-api-origin"]')
 	return normalizeOrigin(el?.content || '')
+}
+
+function readStoredProfileOrigin() {
+	if (typeof localStorage === 'undefined') return ''
+	try {
+		return normalizeOrigin(localStorage.getItem('highascg_api_origin_override') || '')
+	} catch {
+		return ''
+	}
+}
+
+/**
+ * Persist API origin override (A/B host profiles, manual failover reconnect).
+ * @param {string} origin
+ */
+export function setApiOriginOverride(origin) {
+	// Never persist cross-host overrides when the UI is served from the playout box itself.
+	if (pageIsPlayoutServerUi() || getCompanionPathPrefix()) return
+	const normalized = normalizeOrigin(origin)
+	if (typeof globalThis !== 'undefined') {
+		globalThis.__HIGHASCG_API_ORIGIN__ = normalized
+	}
+	try {
+		if (normalized) localStorage.setItem('highascg_api_origin_override', normalized)
+		else localStorage.removeItem('highascg_api_origin_override')
+	} catch {
+		/* ignore */
+	}
 }
 
 /**
@@ -59,7 +106,10 @@ function reconcileOriginWithPage(origin) {
  * @returns {string}
  */
 export function getApiOrigin() {
-	if (pageUsesBundledApiProxy()) return ''
+	if (shouldForceSameOriginApi()) return ''
+
+	const stored = readStoredProfileOrigin()
+	if (stored) return reconcileOriginWithPage(stored)
 
 	if (typeof globalThis !== 'undefined' && globalThis.__HIGHASCG_API_ORIGIN__) {
 		return reconcileOriginWithPage(globalThis.__HIGHASCG_API_ORIGIN__)
@@ -127,4 +177,28 @@ export function getWsUrl() {
 	if (typeof location === 'undefined') return `ws://127.0.0.1:4200${companion}/api/ws`
 	const pageOrigin = location.origin.replace(/^http/, 'ws')
 	return `${pageOrigin}${companion}/api/ws`
+}
+
+/**
+ * Absolute same-page API URL — never uses A/B host profile overrides.
+ * Use for local health indicators (connection eye) so backup peer routing cannot skew them.
+ * @param {string} path e.g. `/api/state`
+ * @returns {string}
+ */
+export function getSameOriginApiUrl(path) {
+	const p = path.startsWith('/') ? path : `/${path}`
+	const companion = getCompanionPathPrefix()
+	if (typeof location === 'undefined') return p
+	return `${location.origin}${companion}${p}`
+}
+
+/** Drop stale failover override when the UI is on the playout host itself. */
+export function clearStaleApiOriginOverrideOnPlayoutUi() {
+	if (!shouldForceSameOriginApi()) return
+	if (typeof globalThis !== 'undefined') globalThis.__HIGHASCG_API_ORIGIN__ = ''
+	try {
+		localStorage.removeItem('highascg_api_origin_override')
+	} catch {
+		/* ignore */
+	}
 }

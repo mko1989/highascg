@@ -226,6 +226,7 @@ export function createTakeSceneToProgram(deps) {
 				}
 			}
 			deps.stateStore.applyChange('scene.live', mergedLive)
+			sceneState.applyServerLiveChannels(mergedLive, cm)
 			deps.primePreviewSnapshotFromScene(sceneId)
 			if (touched.length === 0) {
 				deps.showToast(

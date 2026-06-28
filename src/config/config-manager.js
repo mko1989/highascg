@@ -20,6 +20,7 @@ const MODULAR_KEYS = [
 	'dmx',
 	'rtmp',
 	'usbIngest',
+	'projectScopedMedia',
 	'streamingChannel',
 	'recordOutputs',
 	'audioOutputs',

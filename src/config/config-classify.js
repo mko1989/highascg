@@ -2,10 +2,22 @@
 
 const { SYSTEM_DISPLAY_KEYS } = require('../api/settings-os')
 
+/** Routing/output definitions in project hardwareConfig — per-machine on hot backup (Caspar consumer count). */
+const SHOW_ROUTING_HARDWARE_SLICES = [
+	'audioRouting',
+	'streamingChannel',
+	'dmx',
+	'recordOutputs',
+	'streamOutputs',
+	'audioOutputs',
+	'rtmp',
+]
+
 /** Top-level config keys that are device-local and must never replicate. */
 const DEVICE_TOP_LEVEL_KEYS = new Set([
 	'caspar',
 	'casparServer',
+	'deviceGraph',
 	'gpuPhysicalTopology',
 	'server',
 	'host_stats',
@@ -17,7 +29,6 @@ const DEVICE_TOP_LEVEL_KEYS = new Set([
 
 /** Top-level keys treated as shared show data. */
 const SHOW_TOP_LEVEL_KEYS = new Set([
-	'deviceGraph',
 	'screenDestinations',
 	'audioRouting',
 	'streamingChannel',
@@ -80,14 +91,62 @@ function stripDeviceLocalFromProject(project) {
 		delete hc.casparServer
 		delete hc.gpuPhysicalTopology
 		delete hc.fingerprint
+		delete hc.deviceGraph
+		for (const key of SHOW_ROUTING_HARDWARE_SLICES) {
+			delete hc[key]
+		}
 	}
 	return p
+}
+
+const DEVICE_HARDWARE_SLICES = [
+	'osDisplay',
+	'casparServer',
+	'gpuPhysicalTopology',
+	'fingerprint',
+	'deviceGraph',
+]
+
+/** Show output definitions replicated leader → follower (channel ids/modes must match). */
+const SHOW_DESTINATION_SLICES = ['screenDestinations']
+
+/** Slices the follower keeps from its on-disk project when merging leader show data. */
+const FOLLOWER_LOCAL_PROJECT_SLICES = [...DEVICE_HARDWARE_SLICES, ...SHOW_ROUTING_HARDWARE_SLICES]
+
+/**
+ * Merge leader shared project into follower's on-disk project, preserving device-local hardware.
+ * @param {object|null} existing
+ * @param {object} incoming
+ * @returns {object}
+ */
+function mergeSharedProjectIntoLocal(existing, incoming) {
+	if (!incoming || typeof incoming !== 'object') return existing || incoming
+	const merged = JSON.parse(JSON.stringify(incoming))
+	if (!existing || typeof existing !== 'object') return merged
+
+	const existingHc = existing.hardwareConfig
+	const incomingHc = merged.hardwareConfig
+	if (existingHc && typeof existingHc === 'object') {
+		merged.hardwareConfig = {
+			...(incomingHc && typeof incomingHc === 'object' ? incomingHc : {}),
+		}
+		for (const slice of FOLLOWER_LOCAL_PROJECT_SLICES) {
+			if (existingHc[slice] !== undefined) merged.hardwareConfig[slice] = existingHc[slice]
+		}
+	}
+
+	return merged
 }
 
 module.exports = {
 	classifyConfigKey,
 	splitConfigForReplication,
 	stripDeviceLocalFromProject,
+	mergeSharedProjectIntoLocal,
 	DEVICE_TOP_LEVEL_KEYS,
 	SHOW_TOP_LEVEL_KEYS,
+	DEVICE_HARDWARE_SLICES,
+	SHOW_DESTINATION_SLICES,
+	SHOW_ROUTING_HARDWARE_SLICES,
+	FOLLOWER_LOCAL_PROJECT_SLICES,
 }

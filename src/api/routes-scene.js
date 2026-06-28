@@ -21,6 +21,30 @@ function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** Stamp + WS broadcast at PGM take start so hot backup mirrors leader transitions in sync. */
+function announceProgramTakeToReplication(ctx, mainIdx, inc, forceCut) {
+	if (mainIdx < 0 || !inc?.id) return Date.now()
+	const rt = ctx._replication
+	if (!rt || rt.roleState?.getRole() !== 'leader') return Date.now()
+	const takeUpdatedAt = Date.now()
+	const { announceLeaderProgramTake } = require('../replication/live-state-feed')
+	announceLeaderProgramTake(rt, ctx, {
+		screenIdx: mainIdx + 1,
+		sceneId: String(inc.id),
+		forceCut: !!forceCut,
+		takeUpdatedAt,
+	})
+	return takeUpdatedAt
+}
+
+function liveEntryFromTake(inc, takeUpdatedAt) {
+	return {
+		sceneId: String(inc.id),
+		scene: stripEphemeralTakeFields(inc),
+		updatedAt: takeUpdatedAt,
+	}
+}
+
 /** Remove take-only fields from stored live scene JSON. */
 function stripEphemeralTakeFields(scene) {
 	if (!scene || typeof scene !== 'object') return scene
@@ -244,6 +268,7 @@ async function handleSceneTake(body, ctx) {
 				return previewExchangePromise
 			}
 
+			const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
 			await runSceneTakeLbg(ctx.amcp, {
 				...takeOpts,
 				channel,
@@ -254,7 +279,7 @@ async function handleSceneTake(body, ctx) {
 				skipLayerVisualEquality: true,
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
-				liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
+				liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 			}
 
 			// Bus exchange: previous PGM look on PRV — runs only after PGM take finishes (no AMCP race with the PGM mix).
@@ -276,9 +301,10 @@ async function handleSceneTake(body, ctx) {
 		// PGM-only (and any layout without a real preview bus): there is no separate PRV stack to
 		// pre-build looks on, so live JSON often matches the incoming look while Caspar still needs
 		// a fresh PLAY (re-take, recovery, or first air). Skip the layerVisuallyEqual no-op shortcut.
+		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
 		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly })
 		if (inc && typeof inc === 'object' && inc.id) {
-			liveSceneState.setChannel(channel, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
+			liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}
 		liveSceneState.broadcastSceneLive(ctx)
 	}
@@ -307,13 +333,6 @@ async function handleSceneTake(body, ctx) {
 	}
 
 	const matrix = playbackTracker.getMatrixForState(ctx)
-	if (typeof ctx.markReplicationLiveStateDirty === 'function') {
-		try {
-			ctx.markReplicationLiveStateDirty()
-		} catch {
-			/* ignore */
-		}
-	}
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

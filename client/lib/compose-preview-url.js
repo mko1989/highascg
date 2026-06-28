@@ -1,4 +1,5 @@
 import { getApiBase } from './api-client.js'
+import { resolveMainIndexForScene } from './look-stack-amcp-channel.js'
 import { settingsState } from './settings-state.js'
 
 /**
@@ -88,4 +89,24 @@ export function resolveComposeChannelForCell(meta, channelMap, fallbackScreenIdx
 		return pgm != null && pgm > 0 ? pgm : pgm ?? 1
 	}
 	return pgm != null && pgm > 0 ? pgm : 1
+}
+
+/**
+ * Caspar channel + main index for the compose preview of a look being edited or previewed.
+ * Matches {@link resolveLookStackChannelForBus} edit routing (PRV unless edit-on-PGM).
+ * @param {{ mainScope?: string } | null | undefined} scene
+ * @param {{ activeScreenIndex?: number, editOnPgm?: boolean }} sceneState
+ * @param {{ programChannels?: number[], previewChannels?: number[] } | null | undefined} channelMap
+ * @returns {{ mainIdx: number, channel: number | null, cell: 'pgm' | 'prv' }}
+ */
+export function resolveComposeChannelForEditingScene(scene, sceneState, channelMap) {
+	const mainIdx = scene
+		? resolveMainIndexForScene(scene, sceneState)
+		: Math.max(0, sceneState?.activeScreenIndex ?? 0)
+	const cell = sceneState?.editOnPgm ? 'pgm' : 'prv'
+	let channel = resolveComposeChannelForCell({ composeCell: cell, composeScreenIdx: mainIdx }, channelMap, mainIdx)
+	if ((!channel || channel <= 0) && cell === 'prv') {
+		channel = resolveComposeChannelForCell({ composeCell: 'pgm', composeScreenIdx: mainIdx }, channelMap, mainIdx)
+	}
+	return { mainIdx, channel: channel != null && channel > 0 ? channel : null, cell }
 }

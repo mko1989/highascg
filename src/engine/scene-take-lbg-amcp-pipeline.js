@@ -16,7 +16,7 @@ const {
 	buildGlobalBorderUpdateLines,
 	buildGlobalBorderOpacityFadeLine,
 } = require('./pip-overlay')
-const { buildSceneTemplateCgAmcpLines } = require('./scene-template-cg')
+const { buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
 const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
@@ -319,6 +319,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			}
 			for (const job of takeJobs) {
 				if (!job.templateCg) continue
+				const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
+					channel,
+					job.layer.layerNumber,
+					job.templateCg,
+					self,
+				)
+				if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
 				const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
 				if (lines.length > 0) {
 					if (typeof self.log === 'function') {

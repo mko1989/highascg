@@ -12,6 +12,7 @@
 .panel {
 	width: var(--panel-w);
 	min-width: var(--panel-w);
+	min-height: 0;
 	background: var(--bg-panel);
 	border-right: 1px solid var(--border);
 	display: flex;
@@ -38,6 +39,18 @@
 	flex-shrink: 0;
 	border-right: none;
 	border-left: 1px solid var(--border);
+}
+
+/* Right inspector: never grow past viewport — inner scroll owns overflow */
+#panel-inspector:not(.panel--collapsed) {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	max-height: calc(100vh - var(--header-h, 48px));
+	overflow: hidden;
+}
+#panel-inspector .panel__header {
+	flex: 0 0 auto;
 }
 
 /* Side resize handles: 6px hit target, 1px subtle line (hover brightens) */
@@ -181,17 +194,24 @@
 #panel-inspector:not(.panel--collapsed) .panel-inspector__body {
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 0;
 	min-height: 0;
 	overflow: hidden;
 	padding: 0;
 }
 #panel-inspector .panel-inspector__scroll {
-	flex: 1;
+	flex: 1 1 0;
 	min-height: 0;
-	overflow: auto;
+	max-height: 100%;
+	overflow-x: hidden;
+	overflow-y: auto;
 	padding: 16px;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-gutter: stable;
 }
 #panel-inspector .panel-inspector__audio {
+	flex: 0 0 auto;
 	flex-shrink: 0;
 	min-height: 0;
 }
@@ -211,6 +231,7 @@
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
+	min-height: 0;
 	background: var(--bg-dark);
 }
 

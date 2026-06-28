@@ -105,13 +105,22 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	out.layout.persisted = !!layoutRes.persisted
 	out.layout.preXrandrCommand = layoutRes.xrandrCommand || null
 
-	if (!layoutRes.persisted && !layoutRes.xrandrCommand) {
+	const layoutScriptRequired =
+		canvasCheck.reason !== 'no_planned_heads' && !!layoutRes.xrandrCommand
+	if (layoutScriptRequired && !layoutRes.persisted) {
+		log('warn', '[Full apply] Planned GPU layout exists but apply-layout.sh was not persisted')
 		return {
 			...out,
 			ok: false,
 			step: 'layout_persist',
 			message: 'Config written but apply-layout.sh was not persisted.',
 		}
+	}
+	if (canvasCheck.reason === 'no_planned_heads') {
+		log(
+			'info',
+			'[Full apply] No GPU screen heads in plan — skipping apply-layout.sh; continuing with Caspar restart',
+		)
 	}
 
 	if (needsNodm) {

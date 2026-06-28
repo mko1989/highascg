@@ -632,3 +632,71 @@
 .media-reconcile-banner__dismiss:hover {
 	opacity: 1;
 }
+
+.replication-status-banner {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 9002;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.75rem 1rem;
+	padding: 10px 16px;
+	background: rgba(30, 60, 120, 0.94);
+	color: #fff;
+	font-size: 0.88rem;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+.replication-status-banner--hidden {
+	display: none;
+}
+.replication-status-banner--leader {
+	background: rgba(20, 100, 60, 0.94);
+}
+.replication-status-banner--follower {
+	background: rgba(30, 60, 120, 0.94);
+}
+.replication-status-banner--warn {
+	background: rgba(140, 90, 20, 0.94);
+}
+.replication-status-banner__badge {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+.replication-status-banner__warn {
+	color: #ffe082;
+}
+.replication-status-banner__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+.replication-status-banner__btn {
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.15);
+	color: inherit;
+	padding: 4px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+.replication-status-banner__btn--ghost {
+	opacity: 0.85;
+}
+.replication-status-banner__dismiss {
+	border: none;
+	background: transparent;
+	color: inherit;
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 6px;
+	opacity: 0.75;
+}
+.replication-status-banner__dismiss:hover {
+	opacity: 1;
+}

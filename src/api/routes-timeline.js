@@ -9,6 +9,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getChannelMap } = require('../config/routing')
 const liveSceneState = require('../state/live-scene-state')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
+const { notifyTimelineReplication } = require('../replication/replication-hooks')
 
 /**
  * @param {string} method
@@ -32,9 +33,13 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 
 	if (method === 'POST' && path === '/api/timelines') {
 		if (b.id && eng.get(b.id)) {
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody(eng.update(b.id, b)) }
+			const tl = eng.update(b.id, b)
+			notifyTimelineReplication(ctx, b.id, tl)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(tl) }
 		}
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody(eng.create(b)) }
+		const tl = eng.create(b)
+		notifyTimelineReplication(ctx, tl.id, tl)
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(tl) }
 	}
 
 	const m = path.match(/^\/api\/timelines\/([^/]+)(?:\/([^/]+))?$/)
@@ -53,10 +58,12 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 			if (!tl) {
 				tl = eng.create({ ...b, id })
 			}
+			notifyTimelineReplication(ctx, id, tl)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(tl) }
 		}
 		if (method === 'DELETE') {
 			eng.delete(id)
+			notifyTimelineReplication(ctx, id, null, { deleted: true })
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 		}
 	}

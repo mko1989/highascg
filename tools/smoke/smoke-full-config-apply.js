@@ -6,23 +6,6 @@ const Module = require('node:module')
 
 const steps = []
 
-function mockOsConfig() {
-	return {
-		applyX11Layout(config, opts = {}) {
-			steps.push(`xrandr live=${opts.live !== false} persist=${opts.persist !== false}`)
-			return {
-				applied: opts.live !== false,
-				persisted: opts.persist !== false,
-				xrandrCommand: opts.persist !== false || opts.live !== false ? 'DISPLAY=:0 xrandr --mock' : null,
-			}
-		},
-		restartDisplayManager() {
-			steps.push('nodm restart')
-			return true
-		},
-	}
-}
-
 function mockDisplayWait() {
 	return {
 		async waitForDisplayStable() {
@@ -44,27 +27,24 @@ function mockCasparRestart() {
 		async waitForAmcpDisconnect() {
 			return true
 		},
-		async finishCasparAfterApply() {
-			steps.push('caspar restart')
-			return { attempted: true, restartSent: true, disconnected: true, reconnected: true }
-		},
 		async reloadCasparAfterConfigWrite() {
 			steps.push('caspar restart')
 			return { attempted: true, restartSent: true, disconnected: true, reconnected: true }
 		},
-		async sendRestartAndWaitForCaspar() {
-			steps.push('caspar restart')
-			return { restartSent: true, disconnected: true, reconnected: true }
-		},
-		resolveReconnectWaitMs() {
-			return 1000
-		},
 	}
 }
 
-function mockCanvasCheck(needed) {
+function mockCanvasCheck(needed, reason) {
 	return {
 		needsNodmRestartForLayout() {
+			if (reason === 'no_planned_heads') {
+				return {
+					needed: false,
+					plannedCanvas: { width: 0, height: 0 },
+					currentCanvas: null,
+					reason: 'no_planned_heads',
+				}
+			}
 			return {
 				needed,
 				plannedCanvas: needed ? { width: 12000, height: 1080 } : { width: 8960, height: 1080 },
@@ -75,14 +55,30 @@ function mockCanvasCheck(needed) {
 	}
 }
 
-async function runApply(canvasNeeded) {
+async function runApply(canvasNeeded, canvasReason) {
 	steps.length = 0
 	const origLoad = Module._load
 	Module._load = function (request, parent, isMain) {
-		if (request.endsWith('/os-config')) return mockOsConfig()
+		if (request.endsWith('/os-config')) {
+			return {
+				applyX11Layout(config, opts = {}) {
+					steps.push(`xrandr live=${opts.live !== false} persist=${opts.persist !== false}`)
+					const noHeads = canvasReason === 'no_planned_heads'
+					return {
+						applied: opts.live !== false && !noHeads,
+						persisted: opts.persist !== false && !noHeads,
+						xrandrCommand: noHeads ? null : 'DISPLAY=:0 xrandr --mock',
+					}
+				},
+				restartDisplayManager() {
+					steps.push('nodm restart')
+					return true
+				},
+			}
+		}
 		if (request.endsWith('/display-stable-wait')) return mockDisplayWait()
 		if (request.endsWith('/caspar-restart')) return mockCasparRestart()
-		if (request.endsWith('/xrandr-layout-verify')) return mockCanvasCheck(canvasNeeded)
+		if (request.endsWith('/xrandr-layout-verify')) return mockCanvasCheck(canvasNeeded, canvasReason)
 		if (request.endsWith('/x-display-session')) {
 			return {
 				async applyOperatorDisplaySession() {
@@ -146,5 +142,17 @@ test('full apply: canvas expansion — nodm, live xrandr, kill autostart, AMCP r
 		'kill caspar',
 		'caspar restart',
 		'nvidia display policy',
+	])
+})
+
+test('full apply: no planned GPU heads — skip layout script, still restart Caspar', async () => {
+	const res = await runApply(false, 'no_planned_heads')
+	assert.equal(res.ok, true)
+	assert.deepEqual(steps, [
+		'write caspar',
+		'xrandr live=false persist=true',
+		'xrandr live=true persist=false',
+		'operator display session',
+		'caspar restart',
 	])
 })

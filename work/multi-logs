@@ -1,0 +1,208 @@
+[2026-06-14 17:34:16.412] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:25.129] (HACG) [info] [HTTP Server Upgrade] Event fired for path: /api/ws
+[2026-06-14 17:34:25.129] (HACG) [info] [WS Upgrade] Attempt for path: /api/ws
+[2026-06-14 17:34:25.129] (HACG) [info] [WS Upgrade] isWsPath: true
+[2026-06-14 17:34:25.129] (HACG) [info] [WS] client connected
+[2026-06-14 17:34:25.129] (HACG) [info] [Startup LED test] Skipping auto-clear on Web UI connection (manual toggle enabled).
+[2026-06-14 17:34:25.143] (HACG) [error] Got error INTERNAL_SERVER_ERROR: 501 CLS FAILED
+[2026-06-14 17:34:25.143] (HACG) [warn] Media CLS/TLS refresh failed: 501 CLS FAILED
+[2026-06-14 17:34:25.146] (HACG) [error] Got error INTERNAL_SERVER_ERROR: 501 CLS FAILED
+[2026-06-14 17:34:25.146] (HACG) [warn] Media CLS/TLS refresh failed: 501 CLS FAILED
+[2026-06-14 17:34:25.397] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:38.063] (HACG) [info] [scene-take] scene=b1062b97-f743-4b89-84fb-5d454c3e89c0 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:38.063] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:38.063] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:38.282] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:39.282] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:40.358] (HACG) [info] [scene-take] scene=4fbe385f-de3e-4b92-977e-2a1dfa19dd79 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:40.358] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:40.358] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:40.553] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:41.561] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:43.814] (HACG) [info] [scene-take] scene=4fbe385f-de3e-4b92-977e-2a1dfa19dd79 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:43.814] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:43.814] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:45.019] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:46.137] (HACG) [info] [scene-take] scene=b1062b97-f743-4b89-84fb-5d454c3e89c0 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:46.138] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:46.138] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:46.352] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:47.356] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:48.152] (HACG) [info] [scene-take] scene=4fbe385f-de3e-4b92-977e-2a1dfa19dd79 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:48.153] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:48.153] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:48.349] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:49.354] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:50.021] (HACG) [info] [scene-take] scene=b1062b97-f743-4b89-84fb-5d454c3e89c0 (Look 2) scope=n/a ch=1 main=1 bus1=n/a bus2=n/a forceCut=false
+[2026-06-14 17:34:50.021] (HACG) [info] [scene-take] direct-program path ch=1 (no pgm/prv bus exchange)
+[2026-06-14 17:34:50.021] (HACG) [info] [scene-take-lbg] merge=false shouldRunBankCrossfade=false fadeDur=12 currentMapSize=0
+[2026-06-14 17:34:50.235] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+[2026-06-14 17:34:51.240] (HACG) [info] [WS] Incoming: {"type":"scene_deck_sync","data":{"looks":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","mainScope":"0"},{"id":"4fbe385f-de3e-4b92-977e-2a1dfa19dd79","name":"Look 2","mainScope":"0"}],"sceneSnapshots":[{"id":"b1062b97-f743-4b89-84fb-5d454c3e89c0","name":"Look 2","layers":[{"layerNumb...
+
+[2026-06-14 17:31:17.984] [info]    Received message from 127.0.0.1: MIXER 1-110 CLEAR\r\n
+[2026-06-14 17:31:17.984] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:17.987] [info]    Received message from 127.0.0.1: LOADBG 1-110 "422 test 2.png" MIX 12 linear SEEK 7972\r\n
+[2026-06-14 17:31:18.009] [info]    image_producer[media/422 test 2.png] Initialized
+[2026-06-14 17:31:18.010] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:31:18.010] [info]    Received message from 127.0.0.1: MIXER 1-110 FILL 0 0 1 1 0\r\n
+[2026-06-14 17:31:18.010] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:18.091] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:31:18.091] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:18.091] [info]    Received message from 127.0.0.1: PLAY 1-110\r\n
+[2026-06-14 17:31:18.091] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:31:18.338] [info]    image_producer[media/422 test 2.png] Destroyed.
+[2026-06-14 17:31:20.286] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-06-14 17:31:20.286] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:20.287] [info]    Received message from 127.0.0.1: LOADBG 1-10 testowe/forest_jester-dv.mov LOOP MIX 12 linear SEEK 14865\r\n
+[2026-06-14 17:31:20.289] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:31:20.289] [info]    Received message from 127.0.0.1: MIXER 1-10 FILL 0.3125 0.2777777777777778 0.375 0.4444444444444444 0\r\n
+[2026-06-14 17:31:20.289] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:20.370] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:31:20.370] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:31:20.370] [info]    Received message from 127.0.0.1: PLAY 1-10\r\n
+[2026-06-14 17:31:20.370] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:31:20.408] [warning] ffmpeg[testowe/forest_jester-dv.mov|0.0000/-287.5000] Latency: 2
+[2026-06-14 17:31:20.621] [info]    ffmpeg[media/testowe/forest_jester-dv.mov|269/490] Destroyed.
+[2026-06-14 17:34:25.142] [info]    Received message from 127.0.0.1: CLS\r\n
+[2026-06-14 17:34:25.142] [error]   Failed to connect to media-scanner. Is it running? 
+[2026-06-14 17:34:25.142] [error]   Reason: Connection refused
+[2026-06-14 17:34:25.142] [info]    Sent message to 127.0.0.1:501 CLS FAILED\r\n
+[2026-06-14 17:34:25.145] [info]    Received message from 127.0.0.1: CLS\r\n
+[2026-06-14 17:34:25.145] [error]   Failed to connect to media-scanner. Is it running? 
+[2026-06-14 17:34:25.145] [error]   Reason: Connection refused
+[2026-06-14 17:34:25.146] [info]    Sent message to 127.0.0.1:501 CLS FAILED\r\n
+[2026-06-14 17:34:25.175] [info]    Received message from 127.0.0.1: CG 1-999 CLEAR\r\n
+[2026-06-14 17:34:25.175] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-06-14 17:34:25.213] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:25.214] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:26.647] [info]    Received message from 127.0.0.1: MIXER 1-10 OPACITY 0 25 linear\r\n
+[2026-06-14 17:34:26.647] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:26.650] [info]    Received message from 127.0.0.1: MIXER 1-110 OPACITY 0 25 linear\r\n
+[2026-06-14 17:34:26.651] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:26.651] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:26.651] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:27.351] [info]    Received message from 127.0.0.1: CLEAR 1\r\n
+[2026-06-14 17:34:27.352] [info]    image_producer[media/422 test 2.png] Destroyed.
+[2026-06-14 17:34:27.352] [info]    ffmpeg[media/testowe/forest_jester-dv.mov|0/-14375] Destroyed.
+[2026-06-14 17:34:27.352] [info]    Sent message to 127.0.0.1:202 CLEAR OK\r\n
+[2026-06-14 17:34:27.355] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:27.355] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:38.065] [info]    Received message from 127.0.0.1: MIXER 1-110 CLEAR\r\n
+[2026-06-14 17:34:38.065] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:38.068] [info]    Received message from 127.0.0.1: LOADBG 1-110 "422 test 2.png" MIX 12 linear SEEK 0\r\n
+[2026-06-14 17:34:38.089] [info]    image_producer[media/422 test 2.png] Initialized
+[2026-06-14 17:34:38.090] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:38.091] [info]    Received message from 127.0.0.1: MIXER 1-110 FILL 0 0 1 1 0\r\n
+[2026-06-14 17:34:38.091] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:38.171] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:38.171] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:38.172] [info]    Received message from 127.0.0.1: PLAY 1-110\r\n
+[2026-06-14 17:34:38.172] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:40.359] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-06-14 17:34:40.359] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:40.363] [info]    Received message from 127.0.0.1: LOADBG 1-10 testowe/forest_jester-dv.mov LOOP MIX 12 linear SEEK 0\r\n
+[2026-06-14 17:34:40.364] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:40.364] [info]    Received message from 127.0.0.1: MIXER 1-10 FILL 0.3125 0.2777777777777778 0.375 0.4444444444444444 0\r\n
+[2026-06-14 17:34:40.364] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:40.445] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:40.445] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:40.446] [info]    Received message from 127.0.0.1: PLAY 1-10\r\n
+[2026-06-14 17:34:40.446] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:40.456] [warning] ffmpeg[testowe/forest_jester-dv.mov|0.0000/9.8000] Latency: 0
+[2026-06-14 17:34:43.815] [info]    Received message from 127.0.0.1: MIXER 1-110 CLEAR\r\n
+[2026-06-14 17:34:43.815] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:43.818] [info]    Received message from 127.0.0.1: LOADBG 1-110 testowe/forest_jester-dv.mov LOOP MIX 12 linear SEEK 9770\r\n
+[2026-06-14 17:34:43.819] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:43.820] [info]    Received message from 127.0.0.1: MIXER 1-110 FILL 0.3125 0.2777777777777778 0.375 0.4444444444444444 0\r\n
+[2026-06-14 17:34:43.820] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:43.900] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:43.900] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:43.900] [info]    Received message from 127.0.0.1: PLAY 1-110\r\n
+[2026-06-14 17:34:43.900] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:43.934] [warning] ffmpeg[testowe/forest_jester-dv.mov|0.0000/-185.6000] Latency: 2
+[2026-06-14 17:34:44.147] [info]    image_producer[media/422 test 2.png] Destroyed.
+[2026-06-14 17:34:46.139] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-06-14 17:34:46.139] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:46.142] [info]    Received message from 127.0.0.1: LOADBG 1-10 "422 test 2.png" MIX 12 linear SEEK 16843\r\n
+[2026-06-14 17:34:46.164] [info]    image_producer[media/422 test 2.png] Initialized
+[2026-06-14 17:34:46.165] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:46.165] [info]    Received message from 127.0.0.1: MIXER 1-10 FILL 0 0 1 1 0\r\n
+[2026-06-14 17:34:46.165] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:46.245] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:46.245] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:46.245] [info]    Received message from 127.0.0.1: PLAY 1-10\r\n
+[2026-06-14 17:34:46.245] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:46.494] [info]    ffmpeg[media/testowe/forest_jester-dv.mov|301/490] Destroyed.
+[2026-06-14 17:34:48.154] [info]    Received message from 127.0.0.1: MIXER 1-110 CLEAR\r\n
+[2026-06-14 17:34:48.154] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:48.157] [info]    Received message from 127.0.0.1: LOADBG 1-110 testowe/forest_jester-dv.mov LOOP MIX 12 linear SEEK 0\r\n
+[2026-06-14 17:34:48.158] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:48.159] [info]    Received message from 127.0.0.1: MIXER 1-110 FILL 0.3125 0.2777777777777778 0.375 0.4444444444444444 0\r\n
+[2026-06-14 17:34:48.159] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:48.239] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:48.240] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:48.240] [info]    Received message from 127.0.0.1: PLAY 1-110\r\n
+[2026-06-14 17:34:48.240] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:48.243] [warning] ffmpeg[testowe/forest_jester-dv.mov|0.0000/9.8000] Latency: 0
+[2026-06-14 17:34:48.478] [info]    ffmpeg[media/testowe/forest_jester-dv.mov|0/-9280] Destroyed.
+[2026-06-14 17:34:50.022] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-06-14 17:34:50.022] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:50.025] [info]    Received message from 127.0.0.1: LOADBG 1-10 "422 test 2.png" MIX 12 linear SEEK 0\r\n
+[2026-06-14 17:34:50.047] [info]    image_producer[media/422 test 2.png] Initialized
+[2026-06-14 17:34:50.048] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-06-14 17:34:50.048] [info]    Received message from 127.0.0.1: MIXER 1-10 FILL 0 0 1 1 0\r\n
+[2026-06-14 17:34:50.048] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:50.129] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-06-14 17:34:50.129] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-06-14 17:34:50.129] [info]    Received message from 127.0.0.1: PLAY 1-10\r\n
+[2026-06-14 17:34:50.129] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-06-14 17:34:50.377] [info]    image_producer[media/422 test 2.png] Destroyed.
+
+
+&w=80&t=2 (3ms)
+[Electron Main] [proxy 15:34:25.537] → GET /api/media  ⇒  192.168.0.18:4200/api/media
+[Electron Main] [proxy 15:34:25.699] ← 200 GET /api/media (162ms)
+[Electron Main] [proxy 15:34:26.235] → GET /api/media  ⇒  192.168.0.18:4200/api/media
+[Electron Main] [proxy 15:34:26.395] ← 200 GET /api/media (160ms)
+[Electron Main] [proxy 15:34:26.420] → POST /api/ftb  ⇒  192.168.0.18:4200/api/ftb
+[Electron Main] [proxy 15:34:27.134] ← 200 POST /api/ftb (714ms)
+[Electron Main] [proxy 15:34:30.067] → POST /api/project/autosave  ⇒  192.168.0.18:4200/api/project/autosave
+[Electron Main] [proxy 15:34:30.077] ← 200 POST /api/project/autosave (10ms)
+[Electron Main] [proxy 15:34:37.820] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:37.825] ← 200 POST /api/timelines/tmq8513gcxbs/stop (5ms)
+[Electron Main] [proxy 15:34:37.837] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:37.950] ← 200 POST /api/scene/take (114ms)
+[Electron Main] [proxy 15:34:40.120] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:40.123] ← 200 POST /api/timelines/tmq8513gcxbs/stop (3ms)
+[Electron Main] [proxy 15:34:40.131] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:40.226] ← 200 POST /api/scene/take (95ms)
+[Electron Main] [proxy 15:34:43.567] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:43.572] ← 200 POST /api/timelines/tmq8513gcxbs/stop (5ms)
+[Electron Main] [proxy 15:34:43.588] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:43.679] ← 200 POST /api/scene/take (91ms)
+[Electron Main] [proxy 15:34:45.231] → POST /api/project/autosave  ⇒  192.168.0.18:4200/api/project/autosave
+[Electron Main] [proxy 15:34:45.242] ← 200 POST /api/project/autosave (11ms)
+[Electron Main] [proxy 15:34:45.903] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:45.906] ← 200 POST /api/timelines/tmq8513gcxbs/stop (3ms)
+[Electron Main] [proxy 15:34:45.911] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:46.023] ← 200 POST /api/scene/take (112ms)
+[Electron Main] [proxy 15:34:47.919] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:47.922] ← 200 POST /api/timelines/tmq8513gcxbs/stop (3ms)
+[Electron Main] [proxy 15:34:47.927] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:48.019] ← 200 POST /api/scene/take (92ms)
+[Electron Main] [proxy 15:34:49.786] → POST /api/timelines/tmq8513gcxbs/stop  ⇒  192.168.0.18:4200/api/timelines/tmq8513gcxbs/stop
+[Electron Main] [proxy 15:34:49.789] ← 200 POST /api/timelines/tmq8513gcxbs/stop (3ms)
+[Electron Main] [proxy 15:34:49.794] → POST /api/scene/take  ⇒  192.168.0.18:4200/api/scene/take
+[Electron Main] [proxy 15:34:49.907] ← 200 POST /api/scene/take (113ms)
+[Electron Main] [proxy 15:34:51.518] → GET /api/host-stats  ⇒  192.168.0.18:4200/api/host-stats
+[Electron Main] [proxy 15:34:51.545] ← 200 GET /api/host-stats (27ms)
+[Electron Main] [proxy 15:34:51.853] → GET /api/logs?lines=500&caspar=0  ⇒  192.168.0.18:4200/api/logs?lines=500&caspar=0
+[Electron Main] [proxy 15:34:51.854] → GET /api/logs?lines=500&highascg=0  ⇒  192.168.0.18:4200/api/logs?lines=500&highascg=0
+[Electron Main] [proxy 15:34:51.857] ← 200 GET /api/logs?lines=500&caspar=0 (4ms)
+[Electron Main] [proxy 15:34:51.863] ← 200 GET /api/logs?lines=500&highascg=0 (9ms)
+[Electron Main] [proxy 15:34:53.856] → GET /api/logs?lines=500&highascg=0  ⇒  192.168.0.18:4200/api/logs?lines=500&highascg=0
+[Electron Main] [proxy 15:34:53.860] ← 200 GET /api/logs?lines=500&highascg=0 (4ms)
+[Electron Main] [proxy 15:34:54.912] → POST /api/project/autosave  ⇒  192.168.0.18:4200/api/project/autosave
+[Electron Main] [proxy 15:34:54.923] ← 200 POST /api/project/autosave (11ms)
+[Electron Main] [proxy 15:35:24.905] → POST /api/project/autosave  ⇒  192.168.0.18:4200/api/project/autosave
+[Electron Main] [proxy 15:35:24.920] ← 200 POST /api/project/autosave (15ms)

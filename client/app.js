@@ -16,6 +16,7 @@ import { initMultiviewEditor } from './components/multiview-editor.js'
 import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { projectFileIdFromName } from './lib/project-files.js'
+import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
 import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
@@ -47,9 +48,12 @@ import { markLocalProjectSaved } from './lib/project-remote-sync.js'
 
 
 import * as Status from './lib/app-status.js'
+import { clearStaleApiOriginOverrideOnPlayoutUi } from './lib/api-origin.js'
 import * as Handlers from './lib/app-ws-handlers.js'
 import * as SceneDeck from './lib/app-scene-deck.js'
-import * as MvSync from './lib/app-multiview-sync.js'
+import { initReplicationUiState } from './lib/replication-ui-state.js'
+
+clearStaleApiOriginOverrideOnPlayoutUi()
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()
@@ -79,7 +83,11 @@ const appLogic = {
 		if (now && !_casparAmcpConnected) document.dispatchEvent(new CustomEvent('mv-caspar-amcp-connected'))
 		_casparAmcpConnected = now
 	},
-	refreshEye: () => Status.refreshCasparConnectionEye(connectionEye, stateStore),
+	refreshEye: () =>
+		Status.refreshCasparConnectionEye(connectionEye, stateStore, {
+			wsConnected: ws.connected,
+			httpConnected,
+		}),
 	refreshStatusLine: () => Status.refreshStatusLine(stateStore, ws, httpConnected),
 	updateStatus: (connected, error) => Status.updateConnectionStatus(connected, error, { ws, httpConnected, stateStore }),
 	onConnect: () => {
@@ -166,6 +174,7 @@ async function init() {
 		e.preventDefault(); showSettingsModal()
 	})
 	initTabs(); initWorkspaceLayout()
+	initReplicationUiState()
 	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState })
 	_oscClient = new OscClient({ wsClient: ws })
 	window.highascg_osc_client = _oscClient
@@ -185,7 +194,8 @@ async function init() {
 		}
 		autosaveInFlight = (async () => {
 			try {
-				const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+				let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+				project = normalizeProjectMediaRefs(project)
 				await api.post('/api/project/autosave', { project })
 				const d = new Date()
 				const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -251,7 +261,8 @@ async function init() {
 	sceneState.on('persisted', () => {
 		if (!canPushProjectToServer()) return
 		appLogic.scheduleSceneDeckSync()
-		const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+		project = normalizeProjectMediaRefs(project)
 		const id = projectFileIdFromName(project.name || projectState.getProjectName())
 		markLocalProjectSaved()
 		api.post('/api/project/save', { project, id })

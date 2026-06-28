@@ -125,6 +125,9 @@ export function buildSettingsPayload(modal) {
 			overwritePolicy: (modal.querySelector('#set-usb-policy') || {}).value ?? 'rename',
 			verifyHash: !!(modal.querySelector('#set-usb-verify') || {}).checked,
 		},
+		projectScopedMedia: {
+			enabled: !!(modal.querySelector('#set-project-scoped-media') || {}).checked,
+		},
 		streamingChannel: (() => {
 			const prevSch = prevAll.streamingChannel || {}
 			const ovr = (modal.querySelector('#set-streaming-ch-override') || {}).value?.trim?.() || ''
@@ -164,6 +167,8 @@ export function hydrateSettings(modal, cfg) {
 	const lmp = modal.querySelector('#set-local-media-path'); if (lmp) lmp.value = cfg.local_media_path || ''
 	const u = cfg.usbIngest || {}
 	const usbEn = modal.querySelector('#set-usb-enabled'); if (usbEn) usbEn.checked = u.enabled !== false
+	const psm = cfg.projectScopedMedia || {}
+	const psmEl = modal.querySelector('#set-project-scoped-media'); if (psmEl) psmEl.checked = psm.enabled !== false
 	const usbSub = modal.querySelector('#set-usb-subfolder'); if (usbSub) usbSub.value = u.defaultSubfolder || ''
 	const usbPol = modal.querySelector('#set-usb-policy'); if (usbPol) usbPol.value = ['skip', 'overwrite', 'rename'].includes(u.overwritePolicy) ? u.overwritePolicy : 'rename'
 	const usbVer = modal.querySelector('#set-usb-verify'); if (usbVer) usbVer.checked = !!u.verifyHash

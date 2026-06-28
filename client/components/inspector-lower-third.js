@@ -5,7 +5,7 @@
 
 import { api } from '../lib/api-client.js'
 import { sceneState } from '../lib/scene-state.js'
-import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
+import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import {
 	isLowerThirdSource,
 	deriveTemplateId,
@@ -419,9 +419,15 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	function getRouting() {
 		const cm = stateStore?.getState?.()?.channelMap || {}
 		const scene = sceneState.getScene(sceneId)
-		const targetCh = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit') || 1
+		const mIdx = resolveMainIndexForScene(scene, sceneState)
+		const targetCh =
+			resolveLookStackChannelForBus(cm, sceneState, scene, 'edit', mIdx) ??
+			Number(cm.programChannels?.[mIdx] ?? cm.playbackChannels?.[mIdx])
+		if (!Number.isFinite(targetCh) || targetCh <= 0) {
+			console.warn('[lower-third] No Caspar channel for main', mIdx + 1)
+		}
 		return {
-			channel: targetCh,
+			channel: Number.isFinite(targetCh) && targetCh > 0 ? targetCh : Number(cm.programChannels?.[0] ?? 1),
 			layer: layer.layerNumber || 20,
 			templateHostLayer: 1,
 		}

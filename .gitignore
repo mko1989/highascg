@@ -34,7 +34,7 @@ dist/
 CasparCG_Enhanced-main/
 cef-cache/
 bin/
-media/
+/media/
 /lib/
 _media/
 data/
@@ -77,3 +77,16 @@ From_client/
 !scripts/deprecated/
 logs_lap/
 CT-SS-master/
+
+# Syncthing conflict copies (never commit)
+*.sync-conflict-*
+
+# Local Caspar config backups / duplicates
+config/casparcg.config.bak.*
+config/*copy.config
+
+# Runtime scratch / local timelines (like projects/)
+.w
+work/logs/
+work/multi-logs/
+timelines/

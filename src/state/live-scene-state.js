@@ -11,6 +11,16 @@ const { buildChannelMap } = require('../config/channel-map-from-ctx')
 
 const KEY = 'liveScenesByProgramChannel'
 
+/** @type {((channel: number, entry: { sceneId: string, scene: object, updatedAt: number }) => void)|null} */
+let _onProgramChange = null
+
+/**
+ * @param {(channel: number, entry: { sceneId: string, scene: object, updatedAt: number }) => void|null} fn
+ */
+function onProgramChange(fn) {
+	_onProgramChange = typeof fn === 'function' ? fn : null
+}
+
 function _all() {
 	const raw = persistence.get(KEY)
 	return raw && typeof raw === 'object' ? raw : {}
@@ -40,9 +50,16 @@ function setChannel(channel, entry) {
 	all[ch] = {
 		sceneId: entry.sceneId,
 		scene: entry.scene,
-		updatedAt: Date.now(),
+		updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
 	}
 	persistence.set(KEY, all)
+	if (_onProgramChange) {
+		try {
+			_onProgramChange(n, all[ch])
+		} catch {
+			/* ignore */
+		}
+	}
 }
 
 /**
@@ -121,5 +138,6 @@ module.exports = {
 	invalidateIfProgramChannel,
 	broadcastSceneLive,
 	notifyProgramMutationMayInvalidateLive,
+	onProgramChange,
 	KEY,
 }

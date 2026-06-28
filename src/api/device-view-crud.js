@@ -18,9 +18,17 @@ function saveConfig(ctx, patch) {
 	if (!ctx.configManager) {
 		if (typeof ctx.log === 'function') ctx.log('warn', '[device-view] configManager missing; graph/destination changes are not persisted to disk')
 		Object.assign(ctx.config, patch)
-		return true
+	} else {
+		ctx.configManager.save({ ...ctx.configManager.get(), ...patch })
+		if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
 	}
-	return ctx.configManager.save({ ...ctx.configManager.get(), ...patch })
+	try {
+		const { onDeviceConfigSaved } = require('../replication/follower-machine-profile')
+		onDeviceConfigSaved(ctx, patch)
+	} catch {
+		/* optional */
+	}
+	return true
 }
 
 function handleAddDestination(j, ctx) {

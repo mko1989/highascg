@@ -10,7 +10,9 @@ const { layerHasContent } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const fs = require('fs')
 const path = require('path')
-const { getMediaIngestBasePath, scanMediaRecursiveForBrowser } = require('../media/local-media')
+const { getMediaIngestBasePath } = require('../media/local-media')
+const { buildProjectMediaManifest } = require('../media/project-media-root')
+const { loadFullProject } = require('../engine/project-scenes')
 const persistence = require('../utils/persistence')
 const { buildConfigXml, mergeAudioRoutingIntoConfig } = require('../config/config-generator')
 const { resolveCasparConfigWritePath } = require('./routes-caspar-config')
@@ -245,25 +247,8 @@ async function handleBundle(ctx) {
 	const casparcgConfig = buildConfigXml(mergedConfig, screenCount)
 	
 	const mediaBase = getMediaIngestBasePath(config)
-	const mediaManifest = []
-	if (mediaBase && fs.existsSync(mediaBase)) {
-		const files = scanMediaRecursiveForBrowser(mediaBase, 20000)
-		for (const relPath of files) {
-			const fullPath = path.join(mediaBase, relPath)
-			try {
-				const stat = fs.statSync(fullPath)
-				if (stat.isFile()) {
-					mediaManifest.push({
-						path: relPath,
-						size: stat.size,
-						mtime: stat.mtimeMs
-					})
-				}
-			} catch (e) {
-				// skip
-			}
-		}
-	}
+	const project = loadFullProject()
+	const mediaManifest = buildProjectMediaManifest(config, persistence, project)
 
 	return {
 		status: 200,

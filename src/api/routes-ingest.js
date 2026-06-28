@@ -12,6 +12,7 @@ const busboy = require('busboy')
 const unzipper = require('unzipper')
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { resolveSafe, getMediaIngestBasePath } = require('../media/local-media')
+const { getIngestEffectiveBase } = require('../media/project-media-root')
 
 /**
  * @param {object} ctx
@@ -131,8 +132,7 @@ async function handleUpload(req, res, ctx) {
 
 		bb.on('file', (name, file, info) => {
 			const { filename } = info
-			// If path field was provided, use it to resolve safe path
-			const effectiveBase = targetSubdir ? path.join(mediaBase, targetSubdir) : mediaBase
+			const effectiveBase = getIngestEffectiveBase(config, targetSubdir)
 			
 			// Ensure target subdir exists (sequential upload means we can do this here)
 			try {
@@ -185,11 +185,21 @@ async function handleUpload(req, res, ctx) {
  * body: { url: string }
  */
 async function handleDownload(body, ctx) {
-	const { url } = typeof body === 'object' ? body : JSON.parse(body || '{}')
+	let parsedBody = {}
+	if (typeof body === 'object' && body) parsedBody = body
+	else {
+		try {
+			parsedBody = JSON.parse(body || '{}')
+		} catch {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
+		}
+	}
+	const { url } = parsedBody
 	if (!url) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'url required' }) }
 
 	const config = ctx.config || {}
-	const mediaBase = getMediaIngestBasePath(config)
+	const downloadSubdir = typeof parsedBody.path === 'string' ? parsedBody.path : ''
+	const downloadBase = getIngestEffectiveBase(config, downloadSubdir)
 
 	if (isWeTransferUrl(url)) {
 		const wt = getWetransfert()
@@ -200,9 +210,9 @@ async function handleDownload(body, ctx) {
 				body: jsonBody({ error: 'WeTransfer support is not available (missing wetransfert module)' }),
 			}
 		}
-		if (!fs.existsSync(mediaBase)) {
+		if (!fs.existsSync(downloadBase)) {
 			try {
-				fs.mkdirSync(mediaBase, { recursive: true })
+				fs.mkdirSync(downloadBase, { recursive: true })
 			} catch (e) {
 				return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: `Could not create media folder: ${e.message}` }) }
 			}
@@ -215,7 +225,7 @@ async function handleDownload(body, ctx) {
 			message: 'Queued: WeTransfer download…',
 			error: null,
 		})
-		ingestLog(ctx, 'info', `WeTransfer download starting → ${mediaBase}`)
+		ingestLog(ctx, 'info', `WeTransfer download starting → ${downloadBase}`)
 		;(async () => {
 			try {
 				setDownloadState(ctx, {
@@ -224,7 +234,7 @@ async function handleDownload(body, ctx) {
 					message: 'Connecting to WeTransfer (resolving link)…',
 					progress: null,
 				})
-				await wt.download(url, mediaBase).onProgress((p) => {
+				await wt.download(url, downloadBase).onProgress((p) => {
 					const n = parseFloat(p)
 					const pct = Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n * 100))) : null
 					setDownloadState(ctx, {
@@ -270,13 +280,13 @@ async function handleDownload(body, ctx) {
 	} catch (e) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid URL' }) }
 	}
-	const savePath = resolveSafe(mediaBase, filename)
+	const savePath = resolveSafe(downloadBase, filename)
 
 	if (!savePath) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid URL/path' }) }
 
-	if (!fs.existsSync(mediaBase)) {
+	if (!fs.existsSync(downloadBase)) {
 		try {
-			fs.mkdirSync(mediaBase, { recursive: true })
+			fs.mkdirSync(downloadBase, { recursive: true })
 		} catch (e) {
 			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: `Could not create media folder: ${e.message}` }) }
 		}

@@ -8,7 +8,7 @@
 
 const { param } = require('../caspar/amcp-utils')
 const { isTemplateClip } = require('../state/playback-tracker-media')
-const { resolveTemplateCgHostLayer } = require('./cg-routing')
+const { resolveTemplateCgHostLayer, channelMapFromCtx } = require('./cg-routing')
 
 /**
  * @param {object} layer
@@ -113,6 +113,44 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec) {
 }
 
 /**
+ * Clear template CG host layer on a single channel (no ADD).
+ * @param {number} channel
+ * @param {number} logicalOrHostLayer
+ * @param {string} cgName
+ * @returns {string[]}
+ */
+function buildSceneTemplateCgClearLines(channel, logicalOrHostLayer, cgName) {
+	const name = String(cgName || '').trim()
+	if (!name) return []
+	const hostLayer = resolveTemplateCgHostLayer(logicalOrHostLayer, name)
+	const cl = `${channel}-${hostLayer}`
+	return [`CG ${cl} CLEAR`]
+}
+
+/**
+ * When taking template CG on one program output, clear the same overlay slot on other PGM channels
+ * so stale lower-thirds / HTML from preview edits do not stay on air elsewhere.
+ * @param {number} targetChannel
+ * @param {number} logicalOrHostLayer
+ * @param {{ cgName: string }} spec
+ * @param {object} [ctx]
+ * @returns {string[]}
+ */
+function buildClearTemplateCgOnOtherProgramChannelsLines(targetChannel, logicalOrHostLayer, spec, ctx) {
+	const target = Number(targetChannel)
+	if (!Number.isFinite(target) || target <= 0) return []
+	const map = channelMapFromCtx(ctx)
+	const programs = Array.isArray(map.programChannels) ? map.programChannels : []
+	const lines = []
+	for (const ch of programs) {
+		const n = Number(ch)
+		if (!Number.isFinite(n) || n <= 0 || n === target) continue
+		lines.push(...buildSceneTemplateCgClearLines(n, logicalOrHostLayer, spec?.cgName))
+	}
+	return lines
+}
+
+/**
  * @param {object} layer
  * @param {string} tlsId
  * @param {object} [ctx]
@@ -135,6 +173,8 @@ module.exports = {
 	resolveCgTemplateName,
 	extractTemplateCgData,
 	buildSceneTemplateCgAmcpLines,
+	buildSceneTemplateCgClearLines,
+	buildClearTemplateCgOnOtherProgramChannelsLines,
 	buildSceneTemplateCgSpec,
 	resolveTemplateCgHostLayer,
 }

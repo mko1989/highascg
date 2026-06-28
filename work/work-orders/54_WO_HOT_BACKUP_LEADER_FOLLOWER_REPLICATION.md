@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft (planning)
+**Status:** In progress (server + client core complete 2026-06-27; E2E hardware verification pending)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 **Builds on:**
 - [15_WO_CLIENT_SERVER_SYNC.md](./15_WO_CLIENT_SERVER_SYNC.md) — manifest diff + sequential media ingest (`/api/project/diff`, `/api/ingest/upload`, `/api/project/apply-bundle`)
@@ -43,11 +43,13 @@ The single most important design decision. Every config key and data file falls 
 
 | Tier | Examples | Replicated leader→follower? | Owner |
 |------|----------|------------------------------|-------|
-| **Show data (shared)** | `projects/*.json` (scenes, looks, routing intent), timelines, media files, `screenDestinations` *logical* bindings, audio routing intent | **Yes — continuously** | Leader is source of truth |
-| **Device-local (per box)** | `osDisplay` (`screen_N_system_id`, `screen_N_os_*`, `multiview_os_*`), `gpuPhysicalTopology`, DeckLink device numbers, `casparServer` host/port/configPath, ALSA/PortAudio device names, `general.json` ports | **Never** | Each box owns its own |
-| **Live playout state (hot)** | Active sceneId per channel, timeline playback id + position + play/pause, mixer/transition state | **Yes — streamed** | Leader streams; follower mirrors/armed |
+| **Show data (shared)** | `projects/*.json` (scenes, looks, routing intent), timelines, media files, audio/stream **definitions** (logical), Companion maps | **Yes — continuously** | Leader is source of truth |
+| **Machine profile (per box)** | Device View **device graph** (rear panel, **cables**), **screen destinations** wiring, `osDisplay` / `screen_N_system_id`, GPU layout, DeckLink numbers, `casparServer` host/port, ALSA/PortAudio device names, `general.json` ports | **Never** | Each box owns its own — backup may be unwired or differently wired |
+| **Live playout state (hot)** | Active sceneId per channel, timeline playback id + position + play/pause, mixer/transition state | **Yes — streamed** | Leader streams; follower mirrors on **its own** channel map |
 
-The existing `hardwareConfig` split (WO-49, `src/engine/project-hardware-config.js`) already separates `deviceGraph` / `screenDestinations` (mostly show) from `osDisplay` / `casparServer` (mostly device). **This WO formalizes the boundary** into a single `classifyConfigKey()` module so replication and failover never copy device-local fields.
+> **2026-06-27:** `deviceGraph` and `screenDestinations` moved from show → **machine profile** (WO-61 §2). See [61_WO_RSYNC_PEER_SYNC_AND_NETWORK_SETTINGS.md](./61_WO_RSYNC_PEER_SYNC_AND_NETWORK_SETTINGS.md).
+
+The existing `hardwareConfig` split (WO-49, `src/engine/project-hardware-config.js`) and **`config-classify.js`** (`stripDeviceLocalFromProject`, `mergeSharedProjectIntoLocal`) enforce this boundary so replication and failover never copy machine profile fields. See [61_WO §2](./61_WO_RSYNC_PEER_SYNC_AND_NETWORK_SETTINGS.md).
 
 ```mermaid
 flowchart LR
@@ -163,13 +165,68 @@ flowchart LR
 **Decided (2026-06-19, user):**
 
 1. **Follower default mode = `mirror`** (follower Caspar actively outputs the same content live on its own ports); `armed` is opt-in.
-2. **Promotion = auto on leader disconnect (default) AND manual.** Auto-promote fires after `HIGHASCG_REPL_FAILOVER_MS` of lost heartbeat; manual promote available any time. Split-brain handled by `leaderEpoch` fencing (T4.3).
+2. ~~**Promotion = auto on leader disconnect (default) AND manual.**~~ **Superseded 2026-06-27** — see §6b.
+
+**Decided (2026-06-27, user — operator UX revision):**
+
+See **§9 Operator workflow (normative)** for full spec. Summary:
+
+1. **Device View server inspector** — primary UX (not CLI/curl). Leader: **Become leader** sets `leaderAvailable`. Follower: mode dropdown + **Scan for leaders** + pick from list + **Connect**.
+2. **Syncthing via REST API** — no manual GUI pairing. `syncthing-client.js` adds devices/folders programmatically. Media = **project-referenced clips only** via `media/.replication-active/` staging hardlinks + folder `highascg-project-media`.
+3. **CT-SS / SyncPlay-style clock** — live intent carries `applyAtLeaderTimeMs`; follower schedules apply using ping-derived clock offset (`sync-clock.js`, reference `CT-SS-master/`). Default `scheduledApply: true`, `syncClock: ct-ss`.
+4. **Disconnect → both standalone** — if link lost and both survive, **each keeps playing locally** (`disconnectPolicy: standalone`, `autoPromote: false`). No silent takeover.
+5. **Connect triggers full sync** — running project + timelines + referenced media, then live-state mirror stream.
 
 **Still open:**
 
-3. **Media direction** — leader→follower only, or bidirectional so prep on either box converges? v1: leader→follower only.
-4. **Transport for live state** — dedicated WS (proposed) vs piggyback existing `/api/ws` channel with a peer auth flag.
-5. **`HIGHASCG_REPL_FAILOVER_MS` value** — needs tuning on real hardware to balance fast failover vs false positives on transient network blips (start ~5000ms).
+- mDNS discovery vs subnet scan only (v1: subnet scan via `GET /api/replication/leaders`)
+- Full NTP-grade clock sync vs ping-offset approximation (v1: ping offset + CT-SS lead time)
+- Template/html assets in looks (v1: media clips only in Syncthing staging; templates via project JSON)
+
+---
+
+## 9. Operator workflow (normative, 2026-06-27)
+
+### Leader box
+
+1. Device View → click **Server** (rear panel).
+2. Hot backup section → mode **Leader** → **Become leader**.
+3. Sets `replication.leaderAvailable: true` (advertises on ping + LAN scan).
+4. When a follower connects: accepts via `POST /api/replication/register-follower`, configures Syncthing sendonly staging, pushes project/timelines.
+
+### Follower box
+
+1. Device View → **Server** inspector.
+2. Mode **Follower** → **Scan for leaders** → dropdown lists hosts with `leaderAvailable`.
+3. **Connect to leader** → pairs, pulls project/timelines, receives referenced media via Syncthing, enables CT-SS scheduled mirror.
+4. Follower Caspar mirrors leader playout on **its own** outputs (device-local ports unchanged).
+
+### Disconnect / link loss
+
+- **Manual:** **Disconnect (standalone)** on either box.
+- **Automatic:** after `HIGHASCG_REPL_FAILOVER_MS` without peer ping → `disconnectToStandalone()` — replication disabled, each machine continues independent playout (**no gap** on either side that survived).
+
+### Phase 7 — Operator UX (Device View)
+
+- [x] **T7.1** Server inspector hot backup section (`device-view-inspector-replication.js`)
+- [x] **T7.2** `POST /api/replication/become-leader`, `/stop-leader`, `/connect`, `/disconnect`
+- [x] **T7.3** `GET /api/replication/leaders` — LAN scan for `leaderAvailable` nodes
+- [ ] **T7.4** mDNS / persistent leader registry (optional v2)
+- [ ] **T7.5** E2E: two boxes, different wiring, connect/disconnect/reconnect without visible glitch
+
+### Phase 8 — Syncthing API automation
+
+- [x] **T8.1** `syncthing-client.js` — config read/write, add device, add folder
+- [x] **T8.2** `sync-project-media.js` — staging dir + referenced clips only
+- [x] **T8.3** Template assets in staging (`templates/` subdir + `installTemplatesFromStaging`)
+- [ ] **T8.4** Smoke test with mock Syncthing REST
+
+### Phase 9 — CT-SS scheduled mirror
+
+- [x] **T9.1** `applyAtLeaderTimeMs` in live-state packets
+- [x] **T9.2** `sync-clock.js` — offset from ping `serverTimeMs`
+- [ ] **T9.3** Integrate native CT-SS listener if LiveCode stack ported to Node
+- [ ] **T9.4** Measure lag on two real boxes; tune `scheduledApplyLeadMs`
 
 ---
 
@@ -205,4 +262,23 @@ flowchart LR
 - **Promotion = auto-on-leader-disconnect (default) + manual.** Updated **T4.2** to support both: auto-promote after `HIGHASCG_REPL_FAILOVER_MS` lost heartbeat (gated by `replication.autoPromote`, default true), plus manual `POST /api/replication/promote` for planned switchover.
 - Because both `mirror` + auto-promote are now defaults, **split-brain fencing is mandatory** — hardened **T4.3** to use `pairId` + monotonic `leaderEpoch` (lower epoch yields on rejoin) and documented the brief dual-output window during a partition (acceptable for a non-genlocked backup).
 - Updated §6: decisions 1 & 2 resolved; remaining open items are media direction, live-state transport, and tuning `HIGHASCG_REPL_FAILOVER_MS`.
-- **Instructions for next agent:** unchanged — build Phase 0 + Phase 1 first; Phase 3 should default `followerMode:"mirror"` and Phase 4 should default `autoPromote:true` per these decisions.
+### 2026-06-27 — Remaining WO-54 workflow implemented
+
+- **Server:** fixed `mirror-apply` channel mapping (screen index → local `programCh`); live intent now keyed by screen index; timeline mirror apply; project merge on receive preserves device-local hardware; timeline CRUD hooks; leader export + follower pull reconcile; epoch demotion wired in peer client; forced role precedence fix in `role-state.js`; Syncthing API key from `~/.config/syncthing/config.xml`.
+- **Client (Phase 5):** replication status banner, A/B host profiles, promote/failover button, device-profile incomplete warning.
+- **Tests:** added `smoke-replication-showdata`, `-livestate`, `-failover` (14 tests, all passing).
+- **Docs:** expanded `docs/reference/hot-backup-replication.md` runbook.
+- **Instructions for next agent:** E2E on two boxes (T7.5): Become leader → Scan → Connect → verify mirror + media staging; pull network cable → both standalone without stop; optional mDNS (T7.4) and template staging (T8.3).
+
+### 2026-06-27 — Operator UX + Syncthing API + CT-SS + standalone disconnect
+
+- Reworked per user: **Device View** server inspector is primary UX (`become-leader`, leader scan dropdown, connect/disconnect).
+- **Syncthing REST** automation (`syncthing-client.js`) — no manual GUI pairing; referenced media only via `sync-project-media.js` staging.
+- **CT-SS-style** scheduled apply: `applyAtLeaderTimeMs` + ping clock offset (`sync-clock.js`); reference `CT-SS-master/`.
+- **Disconnect policy:** both machines return **standalone** on link loss (`autoPromote: false`, `disconnectPolicy: standalone`).
+- New API: `/become-leader`, `/stop-leader`, `/connect`, `/disconnect`, `/register-follower`, `/leaders`.
+- **2026-06-27 (cont.)** Template staging in Syncthing folder; hot reload via `replication-reload.js`; Syncthing HOME fix for systemd.
+
+### 2026-06-27 — WO-64 AMCP fan-out mirror spec (extends Phase 3)
+
+Field testing showed WO-54 **live-state re-take mirror** is insufficient: missed transitions, ~3 s lag, **8–9 s drift** on 60 s clips. See **[64_WO_HOT_BACKUP_AMCP_FANOUT.md](./64_WO_HOT_BACKUP_AMCP_FANOUT.md)** — primary air sync becomes **leader → follower Caspar AMCP fan-out**; project/media sync follows **confirmed look** play. Phase 3 (`mirror-apply`) retained as legacy `mirrorTransport: live-state` only.

@@ -1,8 +1,8 @@
 /**
  * Connection Eye Indicator — eye-only SVGs.
- * Green = Caspar AMCP TCP is connected. Red = AMCP down or `--no-caspar`.
+ * Green = this page's playout host has Caspar AMCP connected. Red = local AMCP down or `--no-caspar`.
  * Preshow/offline mode (`setOffline`) does not force green — use status line / tooltip for that.
- * Not the browser WebSocket to HighAsCG.
+ * Ignores hot-backup A/B host profiles; not backup peer reachability.
  * Blink: left closed → right closed → open (sequential).
  * For ~5s after AMCP connects, the green character uses random open / left / right frames at random
  * intervals (separate from the 30s blink), then normal blinking resumes.
@@ -96,7 +96,7 @@ export function createConnectionEye(container) {
 	el.className = 'connection-eye'
 	el.title = ''
 	el.setAttribute('role', 'img')
-	el.setAttribute('aria-label', 'Caspar AMCP connection status')
+	el.setAttribute('aria-label', 'Local Caspar AMCP connection status')
 
 	const img = document.createElement('img')
 	img.className = 'connection-eye__img'

@@ -175,6 +175,7 @@ export function getMainModalHtml() {
 						<hr style="border:none;border-top:1px solid rgba(255,255,255,0.12);margin:1rem 0" />
 						<h3 class="settings-category">USB media import</h3>
 						<div class="settings-group"><label>CasparCG Media Path</label><input type="text" id="set-local-media-path" placeholder="/home/casparcg/highascg/media"></div>
+						<div class="settings-group checkbox"><label><input type="checkbox" id="set-project-scoped-media" checked /> Default uploads to active project folder (<code>media/projects/&lt;slug&gt;/</code>)</label></div>
 						<div class="settings-group checkbox"><label><input type="checkbox" id="set-usb-enabled" checked /> Enable USB import</label></div>
 						<div class="settings-group"><label>Default subfolder template</label><input type="text" id="set-usb-subfolder" placeholder="usb/{label}/{date}"></div>
 						<div class="settings-group"><label>When file already exists</label><select id="set-usb-policy"><option value="rename">Rename</option><option value="skip">Skip</option><option value="overwrite">Overwrite</option></select></div>

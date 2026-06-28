@@ -54,6 +54,12 @@ function startPeerWsClient(ctx, runtime) {
 		}
 
 		ws.on('open', () => {
+			try {
+				const { resetMirrorApplyDedup } = require('./mirror-apply')
+				resetMirrorApplyDedup()
+			} catch {
+				/* ignore */
+			}
 			if (typeof ctx.log === 'function') ctx.log('info', '[replication] peer live-state ws connected')
 		})
 		ws.on('message', (raw) => {
@@ -81,7 +87,7 @@ function startPeerWsClient(ctx, runtime) {
 
 	if (runtime.roleState.getRole() === 'follower') connect()
 
-	return { stop, connect }
+	return { stop, connect, start: connect }
 }
 
 module.exports = { startPeerWsClient }
