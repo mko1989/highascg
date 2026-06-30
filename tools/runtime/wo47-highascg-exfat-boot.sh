@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # WO-52 bridge (HIGHASCGDAT) then WO-47 USB (HIGHASCGEXF). Both optional — RAM-only boot is fine.
+# Shipped under tools/runtime/ for playout hosts (ISO excludes ~/highascg/scripts/*).
 set -euo pipefail
 
 USB_LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
@@ -106,8 +107,6 @@ if systemctl cat home-casparcg-highascg-media-exfat.mount &>/dev/null; then
 fi
 
 if systemctl cat highascg-exfat-sync.service &>/dev/null; then
-	# Must be --no-block: exfat-sync.service After=highascg-exfat-boot.service.
-	# A blocking start here deadlocks until TimeoutStartSec (90s) then highascg starts late.
 	log "Queueing highascg-exfat-sync.service (--no-block; highascg.service waits on it)"
 	systemctl start --no-block highascg-exfat-sync.service 2>>"$LOG" || log "WARN: queue exfat-sync failed"
 else

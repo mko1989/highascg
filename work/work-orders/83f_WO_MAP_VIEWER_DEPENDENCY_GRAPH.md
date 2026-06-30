@@ -315,43 +315,43 @@ class ForceLayout {
 
 ### Phase A: Edge rendering
 
-- [ ] **T1** Add SVG overlay element to `map.html` with arrowhead marker definition.
-- [ ] **T2** Implement `renderEdges(currentNode)` — iterate file nodes' `meta.imports`, match to sibling nodes, call `renderEdge()`.
-- [ ] **T3** Implement `renderEdge(svg, fromCard, toCard, type)` — Bezier curve SVG path with arrowhead.
-- [ ] **T4** Implement `getCardAnchor(cardEl, side)` — compute anchor point relative to grid.
-- [ ] **T5** Classify edges: internal (same module), cross-module (different module), external (node_modules).
-- [ ] **T6** Style edges per §2.6 CSS (solid/dashed/dotted, color-coded, semi-transparent).
-- [ ] **T7** Re-render edges on window resize and after pan/zoom transform changes.
-- [ ] **T8** Clear edges when navigating to a non-file-level view.
+- [x] **T1** Add SVG overlay element to `map.html` with arrowhead marker definition.
+- [x] **T2** Implement `renderEdges(currentNode)` — iterate file nodes' `meta.imports`, match to sibling nodes, call `renderEdge()`.
+- [x] **T3** Implement `renderEdge(svg, fromCard, toCard, type)` — Bezier curve SVG path with arrowhead.
+- [x] **T4** Implement `getCardAnchor(cardEl, side)` — compute anchor point relative to grid.
+- [x] **T5** Classify edges: internal (same module), cross-module (different module), external (node_modules).
+- [x] **T6** Style edges per §2.6 CSS (solid/dashed/dotted, color-coded, semi-transparent).
+- [x] **T7** Re-render edges on window resize and after pan/zoom transform changes.
+- [x] **T8** Clear edges when navigating to a non-file-level view.
 
 ### Phase B: Hover highlighting
 
-- [ ] **T9** Implement card hover → highlight connected edges + connected cards, dim unrelated.
-- [ ] **T10** Implement edge hover → highlight source/target cards, show tooltip.
-- [ ] **T11** Clear highlighting on mouseout.
-- [ ] **T12** Add `map-card--hotspot` class to files with `importedByCount ≥ 10`.
+- [x] **T9** Implement card hover → highlight connected edges + connected cards, dim unrelated.
+- [x] **T10** Implement edge hover → highlight source/target cards, show tooltip.
+- [x] **T11** Clear highlighting on mouseout.
+- [x] **T12** Add `map-card--hotspot` class to files with `importedByCount ≥ 10`.
 
 ### Phase C: Toggle controls
 
-- [ ] **T13** Add "Show dependencies" checkbox to toolbar; wire toggle to edge visibility.
-- [ ] **T14** Add "Cross-module edges" checkbox; wire toggle to cross-module edge rendering.
-- [ ] **T15** Persist toggle state in `localStorage`.
+- [x] **T13** Add "Show dependencies" checkbox to toolbar; wire toggle to edge visibility.
+- [x] **T14** Add "Cross-module edges" checkbox; wire toggle to cross-module edge rendering.
+- [x] **T15** Persist toggle state in `localStorage`.
 
 ### Phase D: Flat graph mode
 
-- [ ] **T16** Add "Graph View" toggle button to toolbar.
-- [ ] **T17** Implement `flattenSubtree(node)` — collect all file nodes from the current subtree.
-- [ ] **T18** Implement `ForceLayout` class per §5.3 — spring-based physics simulation.
-- [ ] **T19** Render flat graph: position cards absolutely using layout positions, draw all edges.
-- [ ] **T20** Toggle back to hierarchical view: restore grid layout, clear force positions.
-- [ ] **T21** Ensure drill-down still works from flat graph (clicking a file opens its functions).
+- [x] **T16** Add "Graph View" toggle button to toolbar.
+- [x] **T17** Implement `flattenSubtree(node)` — collect all file nodes from the current subtree.
+- [x] **T18** Implement `ForceLayout` class per §5.3 — spring-based physics simulation.
+- [x] **T19** Render flat graph: position cards absolutely using layout positions, draw all edges.
+- [x] **T20** Toggle back to hierarchical view: restore grid layout, clear force positions.
+- [x] **T21** Ensure drill-down still works from flat graph (clicking a file opens its functions).
 
 ### Phase E: Visual polish
 
-- [ ] **T22** Add dependency count badges to file cards (← imports, → imported-by).
-- [ ] **T23** Animate edges appearing/disappearing (fade in/out on toggle).
-- [ ] **T24** Add edge tooltip on hover: "filename.js → target.js".
-- [ ] **T25** Ensure edges are not rendered during drill-in/out animations (wait for animation end).
+- [x] **T22** Add dependency count badges to file cards (← imports, → imported-by).
+- [x] **T23** Animate edges appearing/disappearing (fade in/out on toggle).
+- [x] **T24** Add edge tooltip on hover: "filename.js → target.js".
+- [x] **T25** Ensure edges are not rendered during drill-in/out animations (wait for animation end).
 
 ---
 
@@ -379,6 +379,17 @@ class ForceLayout {
 - Ensure 83b/83c cross-reference data is present (`meta.imports`, `meta.importedBy`).
 - Start with Phase A (T1–T8): basic edge rendering at file level.
 - The force-directed layout (Phase D) is the most complex piece — implement it last.
+
+### 2026-06-30 — Dependency Edge Render & Flat Graph
+**Work Done:**
+- Completed all tasks from Phase A through E.
+- Implemented `DependencyGraph` class and integrated it into `MapExplorer`.
+- Added SVG arrows for internal and cross-module dependencies.
+- Added force-directed flat graph mode.
+- Added hover states and badges for edge endpoints.
+
+**Instructions for Next Agent:**
+- This WO is complete. Proceed to WO-83g for integration and hosting.
 
 ---
 *Work Order created: 2026-06-29 | Parent: [WO-83](./83_WO_INTERACTIVE_PROJECT_MAP.md)*

@@ -23,7 +23,7 @@ Or double-click `docs/wiki-site/index.html`. All page content is embedded in `as
 
 | Page | Contents |
 |------|----------|
-| [**install/calamares-install-to-disk.md**](install/calamares-install-to-disk.md) | **Calamares** — launch, pick disk, **Erase** vs manual **`bios_grub`** + `/` |
+| [**install/calamares-install-to-disk.md**](install/calamares-install-to-disk.md) | **Calamares** — **disable CSM**, launch, pick disk, **Erase** vs manual **`bios_grub`** + `/` |
 | [../CALAMARES_INSTALL_TO_DISK.md](../CALAMARES_INSTALL_TO_DISK.md) | Full install guide (partition tables, rsync 11, session.log) |
 
 ## API reference (OpenAPI-style)

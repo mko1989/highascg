@@ -38,13 +38,18 @@ section "highascg.service unit + drop-ins"
 systemctl cat highascg.service 2>/dev/null | head -35 || true
 
 if [[ -f /usr/local/lib/highascg/highascg-exfat-boot.sh ]]; then
-	if grep -q 'systemctl start --no-block' /usr/local/lib/highascg/highascg-exfat-boot.sh 2>/dev/null; then
+	if ! bash -n /usr/local/lib/highascg/highascg-exfat-boot.sh 2>/dev/null; then
+		echo "FAIL: /usr/local/lib/highascg/highascg-exfat-boot.sh bash syntax error"
+		echo "      Fix: sudo bash ${ROOT}/tools/runtime/patch-wo47-exfat-boot-scripts.sh"
+	elif grep -q 'systemctl start --no-block' /usr/local/lib/highascg/highascg-exfat-boot.sh 2>/dev/null; then
 		echo "OK: installed exfat-boot uses --no-block (no 180s deadlock)"
 	else
 		echo "WARN: /usr/local/lib/highascg/highascg-exfat-boot.sh still uses blocking systemctl start"
 		echo "      Fix: sudo bash ${ROOT}/scripts/install-exfat-systemd-units.sh"
 		echo "           sudo bash ${ROOT}/scripts/write-highascg-systemd-unit.sh"
 	fi
+else
+	echo "WARN: missing /usr/local/lib/highascg/highascg-exfat-boot.sh"
 fi
 
 section "Apply fix (root)"

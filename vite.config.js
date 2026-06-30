@@ -397,7 +397,6 @@ export default defineConfig(({ mode }) => {
 				input: {
 					main: path.join(clientDir, 'index.html'),
 					setup: path.join(clientDir, 'setup.html'),
-					map: path.join(clientDir, 'map.html'),
 				},
 				external: [
 					'three',

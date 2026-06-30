@@ -172,6 +172,16 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing calamares-l10n-helper.sh — run install-eggs-calamares.sh"
 	fi
+	if squash_has_path 'usr/libexec/calamares/calamares-logs-helper.sh'; then
+		if unsquashfs -cat "$SQ" usr/libexec/calamares/calamares-logs-helper.sh 2>/dev/null \
+			| grep -q 'HighAsCG — offline-safe'; then
+			ok "present: /usr/libexec/calamares/calamares-logs-helper.sh (avoids end-of-install exit 1)"
+		else
+			bad "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh / patch-iso-squashfs-calamares.sh"
+		fi
+	else
+		bad "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
+	fi
 	if squash_has_path 'etc/calamares/modules/shellprocess@boot_reconfigure.conf'; then
 		if unsquashfs -cat "$SQ" etc/calamares/modules/shellprocess@boot_reconfigure.conf 2>/dev/null \
 			| grep -q '/usr/sbin/dpkg-reconfigure'; then
@@ -184,6 +194,23 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 		ok "present: /usr/local/lib/highascg/probe-internal-storage.sh (NVMe/VMD for Calamares)"
 	else
 		bad "missing probe-internal-storage.sh — run install-storage-drivers-for-iso.sh"
+	fi
+	if unsquashfs -cat "$SQ" var/lib/dpkg/status 2>/dev/null | grep -qE '^Package: grub-pc$'; then
+		ok "present: grub-pc in squashfs (Legacy BIOS Calamares bootloader)"
+	else
+		bad "missing grub-pc in squashfs — run install-grub-for-calamares-iso.sh before produce"
+	fi
+	kver="$(unsquashfs -cat "$SQ" etc/highascg/pinned-kernel 2>/dev/null | tr -d '[:space:]' || echo '6.8.0-117-generic')"
+	if unsquashfs -cat "$SQ" var/lib/dpkg/status 2>/dev/null | grep -qF "Package: linux-headers-${kver}"; then
+		ok "present: linux-headers-${kver} in squashfs (DeckLink/NVIDIA DKMS)"
+	else
+		bad "missing linux-headers-${kver} in squashfs — run install-kernel-headers-for-dkms-iso.sh before produce"
+	fi
+	if unsquashfs -cat "$SQ" etc/calamares/modules/before_bootloader_context.conf 2>/dev/null \
+		| grep -q 'grub-pc'; then
+		ok "present: before_bootloader_context installs grub-pc on BIOS firmware"
+	else
+		bad "before_bootloader_context missing BIOS grub-pc — run fix-calamares-shellprocess.sh"
 	fi
 	if squash_has_path 'usr/local/bin/caspar-systemd-cleanup.sh'; then
 		ok "present: /usr/local/bin/caspar-systemd-cleanup.sh (orphan caspar cleanup)"

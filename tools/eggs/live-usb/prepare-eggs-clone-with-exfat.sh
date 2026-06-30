@@ -85,8 +85,14 @@ bash "${REPO_ROOT}/tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
 echo "==> Calamares (install-to-disk GUI on live ISO)"
 bash "${HERE}/install-eggs-calamares.sh"
 
+echo "==> GRUB BIOS + EFI (Calamares bootloader on Legacy and UEFI)"
+bash "${HERE}/install-grub-for-calamares-iso.sh"
+
 echo "==> Storage drivers (NVMe/VMD for Calamares partition page)"
 bash "${HERE}/install-storage-drivers-for-iso.sh"
+
+echo "==> Kernel headers + DKMS tools (DeckLink / NVIDIA on installed playout)"
+bash "${HERE}/install-kernel-headers-for-dkms-iso.sh"
 
 echo "==> playout mount stubs under ${HIGHASCG_ROOT}"
 GRP=$(id -gn "$USER_CASPAR")

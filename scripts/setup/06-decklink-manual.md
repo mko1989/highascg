@@ -47,6 +47,23 @@ On boot, `highascg-decklink-install.service` installs when needed and **skips** 
 both packages are already installed at that version or newer. Log:
 `/var/log/highascg/decklink-install.log`
 
+**DKMS requires kernel headers** for the **running** kernel (`linux-headers-$(uname -r)`).
+Factory ISO / Calamares installs should include them; if `dpkg -i desktopvideo_*.deb` reports
+*“kernel headers … cannot be found”*:
+
+```bash
+sudo apt update
+sudo apt install -y linux-headers-$(uname -r) build-essential dkms
+sudo /usr/local/lib/highascg/decklink-install-from-exfat.sh
+# or rebuild modules manually:
+sudo dkms install -m blackmagic -v "$(dpkg-query -W -f='${Version}' desktopvideo)" -k "$(uname -r)"
+sudo dkms install -m blackmagic-io -v "$(dpkg-query -W -f='${Version}' desktopvideo)" -k "$(uname -r)"
+sudo modprobe blackmagic_io
+```
+
+The install script (`decklink-install-from-exfat.sh`) **auto-installs headers** via apt when
+network is available, before running `dpkg -i`.
+
 Manual run: `sudo /usr/local/lib/highascg/decklink-install-from-exfat.sh --dry-run`
 
 **SSH / installer (build host or internal disk):**

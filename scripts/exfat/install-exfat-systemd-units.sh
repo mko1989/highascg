@@ -345,7 +345,7 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-TimeoutStartSec=120
+TimeoutStartSec=300
 Environment=HIGHASCG_EXFAT_BOOT_WAIT_SEC=30
 ExecStart=${BOOT_SH_DST}
 

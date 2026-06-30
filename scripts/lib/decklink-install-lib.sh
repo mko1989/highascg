@@ -114,6 +114,7 @@ decklink_install_vendor_pair() {
 	local main_deb="${1:-}"
 	local gui_deb="${2:-}"
 	[[ -f "$main_deb" ]] || return 1
+	decklink_ensure_dkms_prereqs || return 1
 	if [[ -n "$gui_deb" && -f "$gui_deb" ]]; then
 		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb" || {
 			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
@@ -125,6 +126,66 @@ decklink_install_vendor_pair() {
 			DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb"
 		}
 	fi
+	decklink_rebuild_blackmagic_dkms || true
 	modprobe blackmagic_io 2>/dev/null || true
+	modprobe blackmagic 2>/dev/null || true
 	return 0
+}
+
+# True when /lib/modules/$KREL/build is usable for DKMS (DeckLink, NVIDIA, …).
+decklink_kernel_headers_ready() {
+	local krel="${1:-$(uname -r)}"
+	[[ -n "$krel" ]] || return 1
+	[[ -e "/lib/modules/${krel}/build/Makefile" ]] && return 0
+	[[ -e "/lib/modules/${krel}/build/include/linux/version.h" ]] && return 0
+	return 1
+}
+
+# Install linux-headers for the running kernel before desktopvideo postinst runs DKMS.
+decklink_ensure_dkms_prereqs() {
+	local krel hdr_pkg
+	krel="$(uname -r)"
+	if decklink_kernel_headers_ready "$krel"; then
+		return 0
+	fi
+	if ! command -v apt-get >/dev/null 2>&1; then
+		echo "ERROR: linux-headers-${krel} required for DeckLink DKMS — apt-get missing" >&2
+		return 1
+	fi
+	hdr_pkg="linux-headers-${krel}"
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -qq 2>/dev/null || apt-get update -qq || true
+	apt-get install -y --no-install-recommends \
+		"${hdr_pkg}" \
+		build-essential \
+		dkms \
+		gcc \
+		make \
+		|| {
+			echo "ERROR: failed to install ${hdr_pkg} (network or apt repo required)" >&2
+			return 1
+		}
+	if ! decklink_kernel_headers_ready "$krel"; then
+		echo "ERROR: ${hdr_pkg} installed but /lib/modules/${krel}/build still missing" >&2
+		return 1
+	fi
+	return 0
+}
+
+# Re-run DKMS when desktopvideo postinst failed (common when headers were missing on first dpkg).
+decklink_rebuild_blackmagic_dkms() {
+	local krel ver mod
+	krel="$(uname -r)"
+	ver="$(decklink_pkg_installed_version desktopvideo || true)"
+	[[ -n "$ver" ]] || return 0
+	command -v dkms >/dev/null 2>&1 || return 0
+	for mod in blackmagic blackmagic-io; do
+		if dkms status -m "$mod" -v "$ver" -k "$krel" -a 2>/dev/null | grep -q ': installed'; then
+			continue
+		fi
+		dkms install -m "$mod" -v "$ver" -k "$krel" 2>/dev/null \
+			|| dkms build -m "$mod" -v "$ver" -k "$krel" 2>/dev/null \
+			|| true
+		dkms install -m "$mod" -v "$ver" -k "$krel" 2>/dev/null || true
+	done
 }

@@ -398,57 +398,57 @@ Show current level stats in the header:
 
 ### Phase A: Hosting & routing
 
-- [ ] **T1** Add `/map` route handler to `src/server/http-server.js` per §2.1.
-- [ ] **T2** Verify: `http://localhost:4200/map` serves `client/map.html` (dev) or `dist-web/map.html` (built).
-- [ ] **T3** Verify: static assets (`map-explorer.js`, `map-explorer.css`, `map-data.json`) load correctly from `/map`.
+- [x] **T1** Add `/map` route handler to `src/server/http-server.js` per §2.1.
+- [x] **T2** Verify: `http://localhost:4200/map` serves `client/map.html` (dev) or `dist-web/map.html` (built).
+- [x] **T3** Verify: static assets (`map-explorer.js`, `map-explorer.css`, `map-data.json`) load correctly from `/map`.
 
 ### Phase B: Vite multi-page
 
-- [ ] **T4** Update `vite.config.js` to include `map.html` as a multi-page entry per §3.1.
-- [ ] **T5** Run `npm run build:client` and verify `dist-web/map.html` exists with correct asset paths.
-- [ ] **T6** Verify HMR works: `npm run dev:client`, edit `map-explorer.js`, confirm hot reload.
+- [x] **T4** Update `vite.config.js` to include `map.html` as a multi-page entry per §3.1.
+- [x] **T5** Run `npm run build:client` and verify `dist-web/map.html` exists with correct asset paths.
+- [x] **T6** Verify HMR works: `npm run dev:client`, edit `map-explorer.js`, confirm hot reload.
 
 ### Phase C: Build workflow
 
-- [ ] **T7** Add `"map:generate"` script to `package.json` (if not already from 83a).
-- [ ] **T8** Wire `map:generate` into `build:client` (prebuild or explicit `&&`).
-- [ ] **T9** Add `client/assets/map-data.json` and `dist-web/assets/map-data.json` to `.gitignore`.
-- [ ] **T10** Test full pipeline: `npm run build:client` → generates map data → builds client → `dist-web/map.html` works.
+- [x] **T7** Add `"map:generate"` script to `package.json` (if not already from 83a).
+- [x] **T8** Wire `map:generate` into `build:client` (prebuild or explicit `&&`).
+- [x] **T9** Add `client/assets/map-data.json` and `dist-web/assets/map-data.json` to `.gitignore`.
+- [x] **T10** Test full pipeline: `npm run build:client` → generates map data → builds client → `dist-web/map.html` works.
 
 ### Phase D: Header bar link
 
-- [ ] **T11** Add "🗺️ Map" link to `client/components/header-bar.js` per §5.
-- [ ] **T12** Style the link per §5.2.
-- [ ] **T13** Verify: clicking "Map" in the header opens `/map` in a new tab.
+- [x] **T11** Add "🗺️ Map" link to `client/components/header-bar.js` per §5.
+- [x] **T12** Style the link per §5.2.
+- [x] **T13** Verify: clicking "Map" in the header opens `/map` in a new tab.
 
 ### Phase E: Deep link sharing
 
-- [ ] **T14** Implement `copyNodeLink(node)` — build URL with hash, copy to clipboard.
-- [ ] **T15** Add "🔗 Copy Link" button to metadata sidebar.
-- [ ] **T16** Add toast notification on copy success.
-- [ ] **T17** Verify: copied URL opens the map at the correct node when pasted into a new browser tab.
+- [x] **T14** Implement `copyNodeLink(node)` — build URL with hash, copy to clipboard.
+- [x] **T15** Add "🔗 Copy Link" button to metadata sidebar.
+- [x] **T16** Add toast notification on copy success.
+- [x] **T17** Verify: copied URL opens the map at the correct node when pasted into a new browser tab.
 
 ### Phase F: Visual polish
 
-- [ ] **T18** Apply glassmorphism refinements from §7.1 (frosted header, gradient background, card glow).
-- [ ] **T19** Implement level title flash animation from §7.2.
-- [ ] **T20** Implement staggered card entrance from §7.3.
-- [ ] **T21** Add node count + layer depth stats to header from §7.4.
-- [ ] **T22** Review overall aesthetic: consistent spacing, no visual glitches, smooth 60fps animations.
+- [x] **T18** Apply glassmorphism refinements from §7.1 (frosted header, gradient background, card glow).
+- [x] **T19** Implement level title flash animation from §7.2.
+- [x] **T20** Implement staggered card entrance from §7.3.
+- [x] **T21** Add node count + layer depth stats to header from §7.4.
+- [x] **T22** Review overall aesthetic: consistent spacing, no visual glitches, smooth 60fps animations.
 
 ### Phase G: Responsive / tablet
 
-- [ ] **T23** Apply responsive CSS breakpoints from §8.1 (1024px, 768px, 480px).
-- [ ] **T24** Implement bottom-sheet sidebar for tablet portrait (slide up from bottom).
-- [ ] **T25** Implement touch interactions from §8.2 (tap, long-press, swipe).
-- [ ] **T26** Test on iPad / tablet viewport (1024×768, 768×1024 portrait).
-- [ ] **T27** Verify: map is fully usable on a 768px viewport without horizontal scroll.
+- [x] **T23** Apply responsive CSS breakpoints from §8.1 (1024px, 768px, 480px).
+- [x] **T24** Implement bottom-sheet sidebar for tablet portrait (slide up from bottom).
+- [x] **T25** Implement touch interactions from §8.2 (tap, long-press, swipe).
+- [x] **T26** Test on iPad / tablet viewport (1024×768, 768×1024 portrait).
+- [x] **T27** Verify: map is fully usable on a 768px viewport without horizontal scroll.
 
 ### Phase H: Documentation
 
-- [ ] **T28** Update `docs/ARCHITECTURE.md` — add a "Project Map" section referencing `/map`.
-- [ ] **T29** Add a section to `docs/README.md` about the interactive map.
-- [ ] **T30** Add `## Map` section to `README.md` at repo root (brief description + link).
+- [x] **T28** Update `docs/ARCHITECTURE.md` — add a "Project Map" section referencing `/map`.
+- [x] **T29** Add a section to `docs/README.md` about the interactive map.
+- [x] **T30** Add `## Map` section to `README.md` at repo root (brief description + link).
 
 ---
 
@@ -476,6 +476,22 @@ Show current level stats in the header:
 - This WO should be done last (after 83a–83f are functional).
 - Start with Phase A (hosting) and Phase B (Vite) — getting the map served at `/map` is the #1 priority.
 - Phase F (polish) and Phase G (responsive) can be parallelized.
+
+### 2026-06-30 — Final Integration & Polish
+**Work Done:**
+- Completed all tasks from Phase A through H.
+- Implemented `/map` route in HTTP server.
+- Configured Vite multi-page build to output `map.html` and assets.
+- Integrated `npm run map:generate` into the `build:client` and `prebuild:client` pipeline.
+- Added map link to header bar and styled it.
+- Added "Copy Link" capability with toast notification.
+- Refined UI with glassmorphism, depth stats, staggered animations, and level titles.
+- Implemented responsive CSS and bottom-sheet sliding sidebar for mobile/tablet.
+- Updated docs (`README.md`, `docs/README.md`, `docs/ARCHITECTURE.md`).
+
+**Instructions for Next Agent:**
+- This WO is complete.
+- The epic WO-83 is completely finished. No further action is required unless the user requests specific tweaks or bugfixes.
 
 ---
 *Work Order created: 2026-06-29 | Parent: [WO-83](./83_WO_INTERACTIVE_PROJECT_MAP.md)*

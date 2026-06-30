@@ -623,9 +623,11 @@ For a permanent machine, use §8 (Calamares) instead of relying on live overlay 
 
 Once booted into the live environment, you can install the system permanently.
 
-**Canonical guide:** [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) — disk selection, **Erase disk**, manual **UEFI ESP** vs **Legacy BIOS `bios_grub`** + **`/`**, common failures (`rsync` 11, wrong USB/exFAT target).
+**Canonical guide:** [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) — **disable CSM** (UEFI install), disk selection, **Erase disk**, manual **UEFI ESP** vs Legacy **`bios_grub`** + **`/`**, common failures (`rsync` 11, bootloader error 1).
 
 ### 8.1 Calamares (recommended on live ISO)
+
+**Before opening Calamares:** in firmware, **disable CSM** (Compatibility Support Module / Legacy boot) and boot the stick from the **UEFI:** entry. With CSM on, Calamares often runs in Legacy mode and **GRUB install fails** (error code 1). Confirm: `[ -d /sys/firmware/efi ] && echo UEFI`.
 
 From the operator UI: **Settings → Nuclear → Install to disk**, or:
 

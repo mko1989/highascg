@@ -103,12 +103,21 @@ fi
 
 if [[ -x /usr/libexec/calamares/calamares-l10n-helper.sh ]]; then
 	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null; then
-		ok "/usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe)"
+		ok "Calamares l10n helper patched (offline-safe)"
 	else
-		fail "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		bad "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
 	fi
 else
-	fail "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
+	bad "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
+fi
+if [[ -x /usr/libexec/calamares/calamares-logs-helper.sh ]]; then
+	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-logs-helper.sh 2>/dev/null; then
+		ok "Calamares logs helper patched (avoids end-of-install exit 1)"
+	else
+		bad "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+	fi
+else
+	bad "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
 fi
 
 if [[ "$FAIL" -gt 0 ]]; then

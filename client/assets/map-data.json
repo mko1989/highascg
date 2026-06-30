@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated": "2026-06-30T13:56:45.829Z",
+  "generated": "2026-06-30T21:08:24.089Z",
   "generatorVersion": "1.0.0",
   "repo": "highascg",
   "stats": {
@@ -9820,7 +9820,7 @@
                   "path": "src/api/routes-ingest.js",
                   "absPath": "/home/casparcg/highascg/src/api/routes-ingest.js",
                   "lines": 427,
-                  "bytes": 11625,
+                  "bytes": 11632,
                   "imports": [
                     {
                       "target": "fs",
@@ -43298,7 +43298,7 @@
                   "path": "src/media/caspar-cls-id.js",
                   "absPath": "/home/casparcg/highascg/src/media/caspar-cls-id.js",
                   "lines": 176,
-                  "bytes": 5256,
+                  "bytes": 5259,
                   "imports": [
                     {
                       "target": "fs",
@@ -44408,8 +44408,8 @@
                 "meta": {
                   "path": "src/media/local-media-paths.js",
                   "absPath": "/home/casparcg/highascg/src/media/local-media-paths.js",
-                  "lines": 225,
-                  "bytes": 5596,
+                  "lines": 226,
+                  "bytes": 5604,
                   "imports": [
                     {
                       "target": "path",
@@ -44433,7 +44433,7 @@
                       "target": "./project-media-root",
                       "resolved": "src/media/project-media-root.js",
                       "internal": true,
-                      "line": 131
+                      "line": 132
                     }
                   ],
                   "exports": [
@@ -44481,8 +44481,8 @@
                     "description": "",
                     "meta": {
                       "name": "resolveSafe",
-                      "line": 219,
-                      "endLine": 219,
+                      "line": 220,
+                      "endLine": 220,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -44520,8 +44520,8 @@
                     "description": "",
                     "meta": {
                       "name": "getMediaIngestBasePath",
-                      "line": 220,
-                      "endLine": 220,
+                      "line": 221,
+                      "endLine": 221,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -44549,8 +44549,8 @@
                     "description": "",
                     "meta": {
                       "name": "normalizeMediaIdKey",
-                      "line": 221,
-                      "endLine": 221,
+                      "line": 222,
+                      "endLine": 222,
                       "exported": true
                     }
                   },
@@ -44561,8 +44561,8 @@
                     "description": "",
                     "meta": {
                       "name": "resolveMediaFileOnDisk",
-                      "line": 222,
-                      "endLine": 222,
+                      "line": 223,
+                      "endLine": 223,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -44585,8 +44585,8 @@
                     "description": "",
                     "meta": {
                       "name": "scanMediaRecursiveForBrowser",
-                      "line": 223,
-                      "endLine": 223,
+                      "line": 224,
+                      "endLine": 224,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -46124,8 +46124,8 @@
                 "meta": {
                   "path": "src/network/tailscale-service.js",
                   "absPath": "/home/casparcg/highascg/src/network/tailscale-service.js",
-                  "lines": 418,
-                  "bytes": 12112,
+                  "lines": 430,
+                  "bytes": 12406,
                   "imports": [
                     {
                       "target": "fs",
@@ -46161,7 +46161,7 @@
                       "target": "../api/system-hardware-gui",
                       "resolved": "src/api/system-hardware-gui.js",
                       "internal": true,
-                      "line": 362
+                      "line": 374
                     }
                   ],
                   "exports": [
@@ -46206,8 +46206,8 @@
                     "description": "",
                     "meta": {
                       "name": "getTailscaleStatus",
-                      "line": 406,
-                      "endLine": 406,
+                      "line": 418,
+                      "endLine": 418,
                       "exported": true
                     }
                   },
@@ -46218,8 +46218,8 @@
                     "description": "",
                     "meta": {
                       "name": "getPublicTailscaleSummary",
-                      "line": 407,
-                      "endLine": 407,
+                      "line": 419,
+                      "endLine": 419,
                       "exported": true
                     }
                   },
@@ -46230,8 +46230,8 @@
                     "description": "",
                     "meta": {
                       "name": "setTailscaleEnabled",
-                      "line": 408,
-                      "endLine": 408,
+                      "line": 420,
+                      "endLine": 420,
                       "exported": true
                     }
                   },
@@ -46242,8 +46242,8 @@
                     "description": "",
                     "meta": {
                       "name": "startTailscaleLogin",
-                      "line": 409,
-                      "endLine": 409,
+                      "line": 421,
+                      "endLine": 421,
                       "exported": true
                     }
                   },
@@ -46254,8 +46254,8 @@
                     "description": "",
                     "meta": {
                       "name": "spawnOperatorTailscaleLogin",
-                      "line": 410,
-                      "endLine": 410,
+                      "line": 422,
+                      "endLine": 422,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -46273,8 +46273,8 @@
                     "description": "",
                     "meta": {
                       "name": "saveTailscalePrefs",
-                      "line": 411,
-                      "endLine": 411,
+                      "line": 423,
+                      "endLine": 423,
                       "exported": true
                     }
                   },
@@ -46285,8 +46285,8 @@
                     "description": "",
                     "meta": {
                       "name": "logoutTailscale",
-                      "line": 412,
-                      "endLine": 412,
+                      "line": 424,
+                      "endLine": 424,
                       "exported": true
                     }
                   },
@@ -46297,8 +46297,8 @@
                     "description": "",
                     "meta": {
                       "name": "maybeAutoLoginOnBoot",
-                      "line": 413,
-                      "endLine": 413,
+                      "line": 425,
+                      "endLine": 425,
                       "exported": true
                     }
                   },
@@ -46309,8 +46309,8 @@
                     "description": "",
                     "meta": {
                       "name": "loadTailscaleConfig",
-                      "line": 414,
-                      "endLine": 414,
+                      "line": 426,
+                      "endLine": 426,
                       "exported": true
                     }
                   },
@@ -46321,8 +46321,8 @@
                     "description": "",
                     "meta": {
                       "name": "parseStatusJson",
-                      "line": 415,
-                      "endLine": 415,
+                      "line": 427,
+                      "endLine": 427,
                       "exported": true
                     }
                   },
@@ -46333,8 +46333,8 @@
                     "description": "",
                     "meta": {
                       "name": "assertSafeAuthUrl",
-                      "line": 416,
-                      "endLine": 416,
+                      "line": 428,
+                      "endLine": 428,
                       "exported": true
                     }
                   }
@@ -58422,8 +58422,8 @@
                 "meta": {
                   "path": "src/server/http-server.js",
                   "absPath": "/home/casparcg/highascg/src/server/http-server.js",
-                  "lines": 337,
-                  "bytes": 11623,
+                  "lines": 338,
+                  "bytes": 11624,
                   "imports": [
                     {
                       "target": "http",
@@ -58528,8 +58528,8 @@
                     "description": "",
                     "meta": {
                       "name": "startHttpServer",
-                      "line": 330,
-                      "endLine": 330,
+                      "line": 331,
+                      "endLine": 331,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -58552,8 +58552,8 @@
                     "description": "",
                     "meta": {
                       "name": "stopHttpServer",
-                      "line": 331,
-                      "endLine": 331,
+                      "line": 332,
+                      "endLine": 332,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -58571,8 +58571,8 @@
                     "description": "",
                     "meta": {
                       "name": "serveWebApp",
-                      "line": 332,
-                      "endLine": 332,
+                      "line": 333,
+                      "endLine": 333,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -58600,8 +58600,8 @@
                     "description": "",
                     "meta": {
                       "name": "mapInstanceStaticPath",
-                      "line": 333,
-                      "endLine": 333,
+                      "line": 334,
+                      "endLine": 334,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -58624,8 +58624,8 @@
                     "description": "",
                     "meta": {
                       "name": "defaultRouteApi",
-                      "line": 334,
-                      "endLine": 334,
+                      "line": 335,
+                      "endLine": 335,
                       "exported": true,
                       "relatedWOs": [
                         {
@@ -58643,8 +58643,8 @@
                     "description": "",
                     "meta": {
                       "name": "getLanIPv4Addresses",
-                      "line": 335,
-                      "endLine": 335,
+                      "line": 336,
+                      "endLine": 336,
                       "exported": true
                     }
                   }
@@ -91893,7 +91893,7 @@
                       "path": "client/components/usb-import-modal.js",
                       "absPath": "/home/casparcg/highascg/client/components/usb-import-modal.js",
                       "lines": 467,
-                      "bytes": 16365,
+                      "bytes": 16372,
                       "imports": [
                         {
                           "target": "../lib/api-client.js",
@@ -92804,12 +92804,13 @@
                     "meta": {
                       "path": "client/components/map-explorer.js",
                       "absPath": "/home/casparcg/highascg/client/components/map-explorer.js",
-                      "lines": 265,
-                      "bytes": 9092,
+                      "lines": 1179,
+                      "bytes": 44476,
                       "imports": [],
                       "exports": [],
                       "routeCount": 0,
                       "wsEvents": [],
+                      "large": true,
                       "importedBy": [],
                       "importedByCount": 0,
                       "importCount": 0,
@@ -112678,7 +112679,7 @@
                       "path": "client/lib/media-ext.js",
                       "absPath": "/home/casparcg/highascg/client/lib/media-ext.js",
                       "lines": 129,
-                      "bytes": 4435,
+                      "bytes": 4441,
                       "imports": [],
                       "exports": [
                         "isStillImageFilename",
@@ -119498,8 +119499,8 @@
                 "meta": {
                   "path": "client/styles/01a-base-theme-header-connection.css",
                   "absPath": "/home/casparcg/highascg/client/styles/01a-base-theme-header-connection.css",
-                  "lines": 576,
-                  "bytes": 10749,
+                  "lines": 604,
+                  "bytes": 11279,
                   "imports": [],
                   "exports": [],
                   "routeCount": 0,
@@ -119999,8 +120000,8 @@
                 "meta": {
                   "path": "client/styles/08b-modals-settings.css",
                   "absPath": "/home/casparcg/highascg/client/styles/08b-modals-settings.css",
-                  "lines": 358,
-                  "bytes": 6453,
+                  "lines": 362,
+                  "bytes": 6512,
                   "imports": [],
                   "exports": [],
                   "routeCount": 0,
@@ -120347,8 +120348,8 @@
                 "meta": {
                   "path": "client/styles/map-explorer.css",
                   "absPath": "/home/casparcg/highascg/client/styles/map-explorer.css",
-                  "lines": 355,
-                  "bytes": 6737,
+                  "lines": 801,
+                  "bytes": 15990,
                   "imports": [],
                   "exports": [],
                   "routeCount": 0,

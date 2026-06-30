@@ -13,7 +13,7 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 | [MANUAL_INSTALL.md](MANUAL_INSTALL.md) | Production install on Ubuntu (`scripts/install.sh`) |
 | [STICK_QUICK_START.md](STICK_QUICK_START.md) | **Operator stick prep** — download ISO, Etcher, exFAT, starter zip, BIOS |
 | [LIVE_USB_IMAGE.md](LIVE_USB_IMAGE.md) | Build / flash / boot a live USB from a running host |
-| [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) | **Install to internal disk** — Calamares, UEFI ESP, **`bios_grub`** + `/`, troubleshooting |
+| [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) | **Install to internal disk** — **disable CSM**, Calamares, UEFI ESP, **`bios_grub`** + `/`, troubleshooting |
 | [ISO_CONTENTS.md](ISO_CONTENTS.md) | What is inside the Eggs live ISO (OS → Caspar → HighAsCG) |
 | [DEV_RELEASE_GITHUB.md](DEV_RELEASE_GITHUB.md) | GitHub prereleases (alpha tarball, full ISO+tarball) |
 | [WO47_ISO_VS_EXFAT.md](WO47_ISO_VS_EXFAT.md) | ISO squashfs vs exFAT stick payload (modular updates) |

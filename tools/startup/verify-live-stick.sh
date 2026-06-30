@@ -219,8 +219,18 @@ elif [[ -f "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" 
 else
 	bad "Calamares shellprocess not patched — rebuild ISO after fix-calamares-shellprocess.sh"
 fi
+if [[ -d /sys/firmware/efi ]]; then
+	ok "firmware: UEFI (Calamares needs ESP /boot/efi on target)"
+else
+	warn "firmware: Legacy BIOS — disable CSM in firmware and boot UEFI USB entry before Calamares (avoids bootloader error 1)"
+	if dpkg-query -W -f='${Status}' grub-pc 2>/dev/null | grep -qE '(install|hold) ok installed'; then
+		ok "grub-pc installed (BIOS bootloader)"
+	else
+		bad "grub-pc missing — Legacy BIOS install will fail; rebuild ISO (install-grub-for-calamares-iso.sh) or boot stick in UEFI"
+	fi
+fi
 	echo "  Manual GUI test (local console): sudo -n /usr/local/bin/launch-calamares.sh"
-	echo "  Partitioning (bios_grub + /, UEFI ESP): docs/CALAMARES_INSTALL_TO_DISK.md"
+	echo "  Partitioning (disable CSM, UEFI ESP, Legacy bios_grub): docs/CALAMARES_INSTALL_TO_DISK.md"
 	echo "  Storage probe: sudo /usr/local/lib/highascg/probe-internal-storage.sh --check"
 	echo "  API test: curl -s http://127.0.0.1:4200/api/system/setup | jq .calamares"
 echo "  API launch: curl -s -X POST http://127.0.0.1:4200/api/system/setup/install -H 'Content-Type: application/json' -d '{}'"

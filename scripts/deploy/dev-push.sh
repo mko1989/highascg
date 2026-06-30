@@ -14,6 +14,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT}/scripts/lib/archive-common.sh"
 cd "$ROOT"
 
+_DEPLOY_HOST_OVERRIDE="${DEPLOY_HOST:-}"
+_DEPLOY_USER_OVERRIDE="${DEPLOY_USER:-}"
+_DEPLOY_PATH_OVERRIDE="${DEPLOY_PATH:-}"
+_DEPLOY_REMOTE_SUDO_OVERRIDE="${DEPLOY_REMOTE_SUDO:-}"
+
 if [[ -f .env.deploy ]]; then
 	set -a
 	# shellcheck source=/dev/null
@@ -21,13 +26,17 @@ if [[ -f .env.deploy ]]; then
 	set +a
 fi
 
-DEPLOY_HOST="${DEPLOY_HOST:-192.168.0.2}"
-DEPLOY_USER="${DEPLOY_USER:-casparcg}"
-DEPLOY_PATH="${DEPLOY_PATH:-/home/casparcg/highascg}"
+DEPLOY_HOST="${_DEPLOY_HOST_OVERRIDE:-${DEPLOY_HOST:-192.168.0.2}}"
+DEPLOY_USER="${_DEPLOY_USER_OVERRIDE:-${DEPLOY_USER:-casparcg}}"
+DEPLOY_PATH="${_DEPLOY_PATH_OVERRIDE:-${DEPLOY_PATH:-/home/casparcg/highascg}}"
 DEPLOY_REMOTE_TMP="${DEPLOY_REMOTE_TMP:-/tmp/highascg-deploy-${DEPLOY_USER}.tgz}"
 DEPLOY_USE_SCP="${DEPLOY_USE_SCP:-0}"
 DEPLOY_USE_SFTP="${DEPLOY_USE_SFTP:-0}"
-DEPLOY_REMOTE_SUDO="${DEPLOY_REMOTE_SUDO:-0}"
+if [[ -n "${_DEPLOY_REMOTE_SUDO_OVERRIDE}" ]]; then
+	DEPLOY_REMOTE_SUDO="${_DEPLOY_REMOTE_SUDO_OVERRIDE}"
+else
+	DEPLOY_REMOTE_SUDO="${DEPLOY_REMOTE_SUDO:-0}"
+fi
 DEPLOY_SSH_PASSWORD="${DEPLOY_SSH_PASSWORD:-}"
 DEPLOY_SUDO_PASSWORD="${DEPLOY_SUDO_PASSWORD:-}"
 REMOTE="${DEPLOY_USER}@${DEPLOY_HOST}"
@@ -93,20 +102,21 @@ tar czf "$TMP" "${local_excludes[@]}" .
 PATH_Q=$(printf '%q' "$DEPLOY_PATH")
 TGZ_Q=$(printf '%q' "$DEPLOY_REMOTE_TMP")
 INDEX_Q=$(printf '%q' "${DEPLOY_PATH}/index.js")
+PKG_Q=$(printf '%q' "${DEPLOY_PATH}/package.json")
 
-REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
+REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name 'media' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; if [[ ! -d ${PATH_Q}/node_modules ]]; then (cd ${PATH_Q} && npm ci --omit=dev); fi; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
 if [[ "$DEPLOY_REMOTE_SUDO" == "1" ]]; then
 	if [[ -n "$DEPLOY_SUDO_PASSWORD" ]]; then
 		SUDO_PW_SQ=${DEPLOY_SUDO_PASSWORD//\'/\'\"\'\"\'}
 		REMOTE_EXTRACT_CMD="printf '%s\n' '${SUDO_PW_SQ}' | sudo -S -p '' bash -c $(printf '%q' "$REMOTE_INNER")"
-		REMOTE_VERIFY_CMD="printf '%s\n' '${SUDO_PW_SQ}' | sudo -S -p '' test -f ${INDEX_Q}"
+		REMOTE_VERIFY_CMD="printf '%s\n' '${SUDO_PW_SQ}' | sudo -S -p '' sh -c 'test -f ${INDEX_Q} && test -f ${PKG_Q}'"
 	else
 		REMOTE_EXTRACT_CMD="sudo bash -c $(printf '%q' "$REMOTE_INNER")"
-		REMOTE_VERIFY_CMD="sudo test -f ${INDEX_Q}"
+		REMOTE_VERIFY_CMD="sudo test -f ${INDEX_Q} && sudo test -f ${PKG_Q}"
 	fi
 else
 	REMOTE_EXTRACT_CMD="$REMOTE_INNER"
-	REMOTE_VERIFY_CMD="test -f ${INDEX_Q}"
+	REMOTE_VERIFY_CMD="test -f ${INDEX_Q} && test -f ${PKG_Q}"
 fi
 
 if [[ "$DEPLOY_USE_SFTP" == "1" ]]; then
@@ -123,7 +133,7 @@ fi
 "${SSH_BASE[@]}" "${SSH_TTY[@]}" "${SSH_OPTS[@]}" "$REMOTE" "$REMOTE_EXTRACT_CMD"
 
 if ! "${SSH_BASE[@]}" "${SSH_TTY[@]}" "${SSH_OPTS[@]}" "$REMOTE" "$REMOTE_VERIFY_CMD"; then
-	echo "ERROR: ${DEPLOY_PATH}/index.js missing after extract."
+	echo "ERROR: ${DEPLOY_PATH}/index.js or package.json missing after extract."
 	exit 1
 fi
 

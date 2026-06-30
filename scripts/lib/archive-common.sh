@@ -83,7 +83,7 @@ archive_common_deploy_tar_excludes() {
 		--exclude=.highascg-previs
 		--exclude='config/*.json'
 	)
-	archive_common_bulk_tar_excludes _ex
+	archive_common_bulk_tar_excludes "$1"
 }
 
 # Server tarball: never ship client/ sources; dist-web/ included unless RELEASE_SERVER_ONLY=1.
@@ -126,10 +126,10 @@ archive_common_apply_deploy_packaging_rules() {
 	local root="$1"
 	local -n _ex=$2
 	if [[ "${DEPLOY_SERVER_ONLY:-0}" == "1" ]]; then
-		RELEASE_SERVER_ONLY=1 archive_common_server_tar_excludes _ex
+		RELEASE_SERVER_ONLY=1 archive_common_server_tar_excludes "$2"
 		return 0
 	fi
-	archive_common_apply_client_packaging_rules "$root" _ex
+	archive_common_apply_client_packaging_rules "$root" "$2"
 }
 
 # After build: exclude client/ unless ARCHIVE_INCLUDE_CLIENT_SOURCES=1.
@@ -140,7 +140,7 @@ archive_common_apply_client_packaging_rules() {
 		return 0
 	fi
 	if [[ -f "${root}/dist-web/index.html" ]]; then
-		archive_common_exclude_client_sources _ex
+		archive_common_exclude_client_sources "$2"
 	fi
 }
 

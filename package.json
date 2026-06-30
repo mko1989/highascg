@@ -10,6 +10,7 @@
 		"start": "node index.js",
 		"dev": "node --watch index.js",
 		"build:client": "vite build",
+		"build:map": "npm run map:generate && vite build -c vite.map.config.js",
 		"dev:client": "vite --host",
 		"start:headless": "HIGHASCG_HEADLESS=true node index.js",
 		"dev:headless": "HIGHASCG_HEADLESS=true node --watch index.js",

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Ensure ~/highascg/config is writable by casparcg (exfat-sync runs as casparcg).
-# ISO snapshots often have root-owned JSON from reset-iso-operator-config on the build host.
-#
-# Installed by install-exfat-systemd-units.sh; runs before highascg-exfat-sync.service.
+# Shipped under tools/runtime/ for playout hosts (ISO excludes ~/highascg/scripts/*).
 set -uo pipefail
 
 USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"

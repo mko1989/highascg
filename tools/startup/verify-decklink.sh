@@ -23,7 +23,17 @@ LOG=/var/log/highascg/decklink-install.log
 
 echo "=== DeckLink / Desktop Video (WO-92) ==="
 echo "  host: $(hostname)"
+echo "  kernel: $(uname -r)"
 echo "  time: $(date -Is)"
+
+KREL="$(uname -r)"
+if [[ -e "/lib/modules/${KREL}/build/Makefile" ]]; then
+	ok "kernel headers for DKMS: /lib/modules/${KREL}/build"
+elif dpkg-query -W -f='${Status}' "linux-headers-${KREL}" 2>/dev/null | grep -qE '(install|hold) ok'; then
+	bad "linux-headers-${KREL} dpkg installed but /lib/modules/${KREL}/build missing — reinstall headers"
+else
+	bad "linux-headers-${KREL} missing — DeckLink DKMS will fail (apt install linux-headers-${KREL} build-essential dkms)"
+fi
 
 if lspci 2>/dev/null | grep -qi blackmagic; then
 	ok "PCI Blackmagic/DeckLink device present"
