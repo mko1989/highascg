@@ -248,23 +248,29 @@ export function showLoadProjectModal(opts = {}) {
 			stateStore,
 			showToast,
 			onNameSync,
-			onApplyServerProject:
-				entry && !entry.legacy
-					? () => api.post('/api/project/load', { slug: entry.id })
-					: undefined,
 			source: 'load-modal',
 		}
 	}
 
 	async function finishImport(project, entry) {
+		if (entry && !entry.legacy) {
+			await api.post('/api/project/load', { slug: entry.id, applyHardware: false })
+		}
 		const result = await importProjectWithHardwareReconcile(project, importDeps(entry))
 		if (result === 'cancelled') return
+		if (entry && !entry.legacy) {
+			await api.post('/api/project/load', { slug: entry.id, applyHardware: true })
+			document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
+			showToast?.(
+				'Device View loaded from project — verify cabling and Apply Caspar config when ready.',
+				'info',
+			)
+		}
 		markServerProjectSynced()
 		const appWs = getAppWs()
 		if (appWs) flushSceneDeckSync(appWs, sceneState)
 		onLoaded?.()
-		if (result === 'full') showToast?.('Loaded with project hardware', 'success')
-		else showToast?.('Loaded (looks only)', 'success')
+		showToast?.('Project loaded', 'success')
 		close()
 	}
 

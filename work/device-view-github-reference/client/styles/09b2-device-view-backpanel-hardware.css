@@ -1,0 +1,257 @@
+/* WO-33 — device view backpanel & hardware grid */
+.device-view__band {
+	border: 1px solid var(--color-border, #2a2a32);
+	border-radius: 8px;
+	padding: 8px 10px;
+	background: var(--color-panel, #1a1a1f);
+}
+.device-view__band h3 {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin: 0 0 6px;
+	opacity: 0.85;
+}
+.device-view__band--caspar h3 {
+	margin-bottom: 4px;
+}
+.device-view__ports {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.device-view__backpanel {
+	position: relative;
+	margin: 2px 0 8px;
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	border-radius: 8px;
+	overflow: visible;
+	background: linear-gradient(180deg, #20242b 0%, #15181d 100%);
+	height: auto;
+	min-height: auto;
+	padding: 8px 10px;
+}
+.device-view__backpanel img {
+	display: block;
+	width: 100%;
+	height: auto;
+	opacity: 0.9;
+}
+.device-view__backpanel-label {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 12px;
+	text-align: center;
+	font-size: 12px;
+	opacity: 0.75;
+}
+.device-view__backpanel--caspar {
+	min-height: auto;
+	--rear-label-gutter: 72px;
+	padding: 8px calc(10px + var(--rear-label-gutter));
+	background:
+		linear-gradient(180deg, rgba(17, 24, 39, 0.8), rgba(30, 41, 59, 0.65)),
+		repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 22px);
+}
+.device-view__backpanel-metal {
+	display: none;
+}
+.device-view__backpanel-slots {
+	position: relative;
+	display: grid;
+	grid-template-columns: max-content max-content max-content;
+	justify-content: center;
+	column-gap: var(--rear-label-gutter, 72px);
+	row-gap: 6px;
+	z-index: 1;
+	width: 100%;
+}
+.device-view__backpanel-slot {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	overflow: visible;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	padding: 0;
+	box-shadow: none;
+	width: fit-content;
+	max-width: 100%;
+}
+.device-view__backpanel-slot::before {
+	display: none;
+}
+.device-view__backpanel-slot-title {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 700;
+	opacity: 1;
+	margin-bottom: 4px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+}
+.device-view__backpanel-slot-plus {
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 4px;
+	color: #fff;
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	transition: all 0.2s;
+	margin-left: 4px;
+}
+.device-view__backpanel-slot-plus:hover {
+	background: rgba(255, 255, 255, 0.25);
+	border-color: #3b82f6;
+	color: #3b82f6;
+}
+.device-view__backpanel-slot-apply {
+	background: rgba(255, 60, 60, 0.1);
+	border: 1px solid rgba(255, 60, 60, 0.3);
+	color: #ff6060;
+	border-radius: 4px;
+	padding: 4px 8px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	transition: all 0.2s;
+}
+.device-view__backpanel-slot-apply:hover {
+	background: rgba(255, 60, 60, 0.2);
+	border-color: #ff6060;
+	box-shadow: 0 0 10px rgba(255, 60, 60, 0.2);
+}
+.device-view__backpanel-slot-apply:active {
+	transform: scale(0.95);
+}
+.device-view__backpanel-slot-apply svg {
+	display: block;
+	transition: transform 0.5s ease;
+}
+.device-view__backpanel-slot-apply:hover svg {
+	transform: rotate(180deg);
+}
+.device-view__backpanel-controls {
+	position: relative;
+	margin-top: 8px;
+	display: flex;
+	justify-content: flex-end;
+	z-index: 10;
+}
+.device-view__backpanel-slot-connectors {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 5px 6px;
+	border: 1px solid rgba(148, 163, 184, 0.4);
+	border-radius: 4px;
+	background: url('../assets/metal.webp') repeat center;
+	background-size: 100px;
+	box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+	width: fit-content;
+	max-width: fit-content;
+	margin: 0 auto;
+	overflow: visible;
+}
+.device-view__backpanel-slot-connectors .device-view__panel-marker {
+	margin: 2px 0;
+	min-height: 0;
+}
+.device-view__backpanel-slot-connectors .device-view__panel-marker-label {
+	max-width: var(--rear-label-gutter, 72px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.device-view__gpu-folder {
+	margin-top: 8px;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+.device-view__gpu-folder summary {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.6);
+	background: rgba(0, 0, 0, 0.4);
+	padding: 4px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	list-style: none;
+	display: inline-block;
+	transition: background 0.2s, color 0.2s;
+	text-align: center;
+	border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.device-view__gpu-folder summary::-webkit-details-marker {
+	display: none;
+}
+.device-view__gpu-folder summary:hover {
+	background: rgba(0, 0, 0, 0.6);
+	color: rgba(255, 255, 255, 0.9);
+	border-color: rgba(148, 163, 184, 0.4);
+}
+.device-view__gpu-folder-list {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	margin-top: 8px;
+}
+
+.device-view__backpanel-column {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+.device-view__backpanel-column:nth-child(1) {
+	align-items: flex-end;
+}
+.device-view__backpanel-column:nth-child(2) {
+	align-items: center;
+}
+.device-view__backpanel-column:nth-child(3) {
+	align-items: flex-start;
+}
+.device-view__backpanel-connector-row {
+	display: grid;
+	grid-template-columns: 18px 1fr;
+	align-items: center;
+	gap: 4px;
+}
+.device-view__backpanel-connector-row small {
+	font-size: 10px;
+	opacity: 0.82;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.device-view__backpanel-connector-icon {
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+	opacity: 0.95;
+}

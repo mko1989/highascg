@@ -12,7 +12,6 @@ export const DEFAULT_EDITOR_DEFAULTS = {
 	},
 	timeline: {
 		loopAlways: false,
-		startBehaviour: 'beginning',
 		contentFit: 'native',
 	},
 	transition: {
@@ -34,8 +33,6 @@ export function mergeEditorDefaults(partial) {
 	const coord = p.coordinateOrigin === 'center' ? 'center' : 'topLeft'
 	const startScene =
 		scene.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
-	const startTl =
-		timeline.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
 	const fitScene = SCENE_CONTENT_FIT_VALUES.has(scene.contentFit) ? scene.contentFit : 'native'
 	const fitTl = SCENE_CONTENT_FIT_VALUES.has(timeline.contentFit) ? timeline.contentFit : 'native'
 	return {
@@ -47,7 +44,6 @@ export function mergeEditorDefaults(partial) {
 		},
 		timeline: {
 			loopAlways: !!timeline.loopAlways,
-			startBehaviour: startTl,
 			contentFit: fitTl,
 		},
 		transition: {

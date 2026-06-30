@@ -1,3 +1,7 @@
+#settings-modal.modal-overlay {
+	backdrop-filter: none;
+}
+
 .modal-footer {
 	padding: 16px 20px;
 	border-top: 1px solid var(--border);
@@ -143,6 +147,33 @@
 	margin-bottom: 16px;
 }
 
+.companion-connection-status {
+	margin-bottom: 12px;
+}
+
+.companion-connection-status__row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+
+.companion-connection-status__label {
+	font-size: 0.82rem;
+	color: var(--text-muted);
+}
+
+.companion-connection-status__detail {
+	margin: 0;
+	font-style: normal;
+	line-height: 1.45;
+}
+
+.btn--sm {
+	font-size: 0.78rem;
+	padding: 4px 10px;
+}
+
 /* ALSA hardware mixer (alsamixer-style) in Live audio settings */
 .alsa-mixer-panel__toolbar {
 	display: flex;
@@ -249,4 +280,82 @@
 	font-size: 0.8rem;
 	color: var(--text-muted);
 	cursor: pointer;
+}
+
+.variables-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+
+.variables-table-container {
+	overflow-x: auto;
+	min-width: 0;
+}
+
+.variables-table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	font-size: 0.85rem;
+}
+
+.variables-table th,
+.variables-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+
+.variables-table .var-key {
+	width: 34%;
+	word-break: break-all;
+	font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.variables-table .var-value {
+	max-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--font-mono, ui-monospace, monospace);
+	color: var(--text-muted);
+}
+
+.variables-table th.var-action,
+.variables-table td.var-action {
+	width: 2rem;
+	padding: 6px 4px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.var-copy-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.65rem;
+	height: 1.65rem;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.var-copy-btn:hover {
+	color: var(--text);
+	background: var(--bg-dark);
+}
+
+.var-copy-btn svg {
+	width: 0.85rem;
+	height: 0.85rem;
+}
+
+.var-copy-btn--copied {
+	color: #6fcf97;
+	border-color: #6fcf97;
 }

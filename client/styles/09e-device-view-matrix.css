@@ -1,0 +1,129 @@
+.device-view-matrix__table {
+	border-collapse: collapse;
+	background-color: #1a1a24;
+	color: #e2e8f0;
+	font-size: 12px;
+	margin: 16px;
+	position: relative;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+	border-radius: 6px;
+}
+
+.device-view-matrix__th-sink,
+.device-view-matrix__th-source,
+.device-view-matrix__th-corner {
+	background-color: #272736;
+	color: #94a3b8;
+	font-weight: 500;
+	border: 1px solid #334155;
+	padding: 8px;
+}
+
+.device-view-matrix__th-corner {
+	border-top-left-radius: 6px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	font-size: 10px;
+}
+
+.device-view-matrix__th--clickable {
+	cursor: pointer;
+	transition: background-color 0.1s, color 0.1s;
+}
+
+.device-view-matrix__th--clickable:hover {
+	background-color: #334155;
+	color: #f8fafc;
+}
+
+.device-view-matrix__th-sink {
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+	white-space: nowrap;
+	padding-bottom: 12px;
+	padding-top: 12px;
+	text-align: right;
+	vertical-align: bottom;
+}
+
+.device-view-matrix__th-sink small,
+.device-view-matrix__th-source small {
+	font-size: 9px;
+	opacity: 0.6;
+	text-transform: uppercase;
+}
+
+.device-view-matrix__th-source {
+	text-align: left;
+	min-width: 150px;
+}
+
+.device-view-matrix__cell {
+	border: 1px solid #334155;
+	width: 32px;
+	height: 32px;
+	text-align: center;
+	vertical-align: middle;
+	cursor: pointer;
+	position: relative;
+	transition: background-color 0.15s;
+}
+
+.matrix-dot {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background-color: #10b981; /* active connection green */
+	margin: 0 auto;
+	box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+	transition: transform 0.1s, opacity 0.1s;
+}
+
+.matrix-dot--empty {
+	background-color: transparent;
+	border: 2px solid #475569;
+	box-shadow: none;
+	opacity: 0.3;
+}
+
+.device-view-matrix__cell:hover .matrix-dot--empty {
+	opacity: 0.8;
+	transform: scale(1.1);
+}
+
+.device-view-matrix__cell:hover .matrix-dot:not(.matrix-dot--empty) {
+	background-color: #ef4444; /* red on hover to indicate disconnect */
+	box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+/* --- Crosshair Hover Effect --- */
+/* Highlighting the row and column */
+.device-view-matrix__table {
+	overflow: hidden;
+}
+
+.device-view-matrix__cell::after {
+	content: '';
+	position: absolute;
+	background-color: rgba(255, 255, 255, 0.05);
+	left: 0;
+	top: -10000px;
+	height: 20000px;
+	width: 100%;
+	z-index: 1;
+	pointer-events: none;
+	display: none;
+}
+
+.device-view-matrix__cell:hover::after {
+	display: block;
+}
+
+.device-view-matrix__table tbody tr:hover {
+	background-color: rgba(255, 255, 255, 0.05);
+}
+
+.device-view-matrix__table tbody tr:hover .device-view-matrix__th-source {
+	background-color: #334155;
+	color: #e2e8f0;
+}

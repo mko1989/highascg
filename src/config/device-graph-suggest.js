@@ -262,6 +262,53 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			connectors.push({ id: `dst_in_${did}`, deviceId: DEST_DEVICE_ID, kind: 'destination_in', label: String(item?.label || did).slice(0, 120), externalRef: did })
 		}
 	}
+
+	// WO-88: virtual host-channel destinations (webpage / NDI / per-input hosts) for cabling + matrix.
+	const HOST_DEST_ROLES = new Set([
+		'inputs_host',
+		'streaming_channel',
+		'extra_audio',
+		'decklink_input',
+		'live_audio_input',
+		'webpage_host',
+		'ndi_host',
+	])
+	const { hostChannelDestinationId, listHostLiveChannelEntries } = require('./host-live-sources')
+	const ensureHostDestConnector = (destId, label, casparMeta = {}) => {
+		if (!destId) return
+		const connectorId = `dst_in_${destId}`
+		if (connectors.some((c) => c.id === connectorId)) return
+		if (!devices.some((d) => d.id === DEST_DEVICE_ID)) {
+			devices.push({ id: DEST_DEVICE_ID, role: 'destinations', label: 'Screen destinations' })
+		}
+		connectors.push({
+			id: connectorId,
+			deviceId: DEST_DEVICE_ID,
+			kind: 'destination_in',
+			label: String(label || destId).slice(0, 120),
+			externalRef: destId,
+			...(Object.keys(casparMeta).length ? { caspar: casparMeta } : {}),
+		})
+	}
+	for (const entry of listHostLiveChannelEntries(appConfig || {})) {
+		const destId = hostChannelDestinationId(entry.kind, entry.channel, entry.sourceId)
+		ensureHostDestConnector(destId, entry.label, {
+			hostRole: entry.kind,
+			hostChannel: entry.channel,
+			hostLayer: entry.layer,
+			sourceId: entry.sourceId,
+		})
+	}
+	const channelOrder = Array.isArray(live?.caspar?.generatedChannelOrder) ? live.caspar.generatedChannelOrder : []
+	for (const row of channelOrder) {
+		const role = String(row?.role || '').trim()
+		if (!HOST_DEST_ROLES.has(role)) continue
+		const ch = parseInt(String(row?.ch ?? ''), 10)
+		if (!Number.isFinite(ch) || ch < 1) continue
+		const destId = hostChannelDestinationId(role, ch, row.sourceId ?? row.slot)
+		const label = String(row?.label || '').trim() || destId
+		ensureHostDestConnector(destId, label, { hostRole: role, hostChannel: ch, ...(row.slot != null ? { slot: row.slot } : {}) })
+	}
 	// Ensure DeckLink ports from graph are represented even if detection fails
 	const graphConnectors = Array.isArray(appConfig?.deviceGraph?.connectors) ? appConfig.deviceGraph.connectors : []
 	for (const c of graphConnectors) {

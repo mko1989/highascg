@@ -5,17 +5,17 @@
 	<title>PIP Router</title>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
-		html, body {
-			width: 100%; height: 100%;
-			overflow: hidden;
-			background: transparent !important;
-		}
-		#root {
-			position: absolute;
-			inset: 0;
-			pointer-events: none;
-			overflow: hidden;
-		}
+	html, body {
+		width: 100%; height: 100%;
+		overflow: visible;
+		background: transparent !important;
+	}
+	#root {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: visible;
+	}
 		#pip-frame {
 			position: absolute;
 			left: calc(var(--il, 0) * 100%);
@@ -31,18 +31,7 @@
 			inset: 0;
 			border-radius: inherit;
 			pointer-events: none;
-		}
-		
-		.effect-layer.side-inside {
-			box-sizing: border-box;
-			border: var(--bw) solid var(--bc);
-			margin: 0;
-		}
-		
-		.effect-layer.side-outside {
-			box-sizing: content-box;
-			border: var(--bw) solid var(--bc);
-			margin: calc(var(--bw) * -1);
+			background: transparent;
 		}
 
 		.glow-layer {
@@ -66,6 +55,11 @@
 	var frame = document.getElementById('pip-frame')
 	var state = { inner: { l: 0, t: 0, w: 1, h: 1 }, radius: 0, effects: [] }
 
+	function normalizeSide(s) {
+		var v = String(s != null ? s : 'outside').trim().toLowerCase()
+		return v === 'inside' ? 'inside' : 'outside'
+	}
+
 	function apply() {
 		var inn = state.inner || { l: 0, t: 0, w: 1, h: 1 }
 		frame.style.setProperty('--il', String(inn.l))
@@ -83,9 +77,14 @@
 			el.className = 'effect-layer'
 			
 			if (eff.type === 'border') {
-				el.classList.add('side-' + (p.side || 'outside'))
-				el.style.setProperty('--bw', (p.width || 4) + 'px')
-				el.style.setProperty('--bc', p.color || '#e63946')
+				var side = normalizeSide(p.side)
+				var bw = Math.max(0, Number(p.width) || 4)
+				var bc = p.color || '#e63946'
+				if (side === 'inside') {
+					el.style.boxShadow = 'inset 0 0 0 ' + bw + 'px ' + bc
+				} else {
+					el.style.boxShadow = '0 0 0 ' + bw + 'px ' + bc
+				}
 			}
 			
 			if (eff.type === 'glow') {
@@ -93,7 +92,7 @@
 				el.style.setProperty('--gi', (p.intensity || 15) + 'px')
 				el.style.setProperty('--gw', (p.width || 0) + 'px')
 				el.style.setProperty('--gc', p.color || '#e63946')
-				el.style.setProperty('--gside', p.side === 'inside' ? 'inset' : '')
+				el.style.setProperty('--gside', normalizeSide(p.side) === 'inside' ? 'inset' : '')
 				if (p.pulse) {
 					el.classList.add('glow-pulse')
 					el.style.setProperty('--gps', (p.pulseSpeed || 2) + 's')
@@ -102,8 +101,8 @@
 			}
 
 			if (eff.type === 'shadow') {
-				var side = p.side === 'inside' ? 'inset ' : ''
-				el.style.boxShadow = side + (p.offsetX || 5) + 'px ' + (p.offsetY || 5) + 'px ' + (p.blur || 20) + 'px ' + (p.spread || 0) + 'px ' + (p.color || 'rgba(0,0,0,0.6)')
+				var shadowSide = normalizeSide(p.side) === 'inside' ? 'inset ' : ''
+				el.style.boxShadow = shadowSide + (p.offsetX || 5) + 'px ' + (p.offsetY || 5) + 'px ' + (p.blur || 20) + 'px ' + (p.spread || 0) + 'px ' + (p.color || 'rgba(0,0,0,0.6)')
 			}
 			
 			frame.appendChild(el)

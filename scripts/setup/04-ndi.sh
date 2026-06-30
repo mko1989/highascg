@@ -40,6 +40,24 @@ else
 	chmod +x Install_NDI_SDK_v6_Linux.sh
 	./Install_NDI_SDK_v6_Linux.sh --accept-license || true
 
+	# Archive NDI license for ISO / licenses/ bundle (WO-90)
+	LIC_REPO="${REPO_ROOT}/licenses/third-party"
+	mkdir -p "${LIC_REPO}"
+	for ndi_lic in \
+		"NDI SDK for Linux/NDI License Agreement.pdf" \
+		"NDI SDK for Linux/NDI License Agreement.txt" \
+		"NDI SDK for Linux/Documentation/NDI License Agreement.pdf"; do
+		if [[ -f "/tmp/${ndi_lic}" ]]; then
+			cp -f "/tmp/${ndi_lic}" "${LIC_REPO}/ndi-sdk-license-from-install.$(basename "${ndi_lic}")"
+			ok "archived NDI license → licenses/third-party/"
+			break
+		fi
+	done
+	if [[ ! -s "${LIC_REPO}/ndi-sdk-license-agreement.pdf" ]]; then
+		curl -fsSL -o "${LIC_REPO}/ndi-sdk-license-agreement.pdf" \
+			'https://downloads.ndi.tv/SDK/NDI_SDK/NDI%20License%20Agreement.pdf' 2>/dev/null || true
+	fi
+
 	NDI_LIB_SRC=""
 	if [[ -d "NDI SDK for Linux/lib/x86_64-linux-gnu" ]]; then
 		NDI_LIB_SRC=$(find "NDI SDK for Linux/lib/x86_64-linux-gnu" -maxdepth 1 -type f -name 'libndi.so.6.*' 2>/dev/null | head -1)

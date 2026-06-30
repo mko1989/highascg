@@ -145,7 +145,8 @@ main() {
 		if ! "$APPLY_SH" "${apply_args[@]}"; then
 			log "apply failed — starting previous tree if present"
 			start_service
-			exit 1
+			# Exit 0: ISO/squashfs tree may still be valid; avoid systemd failed on stick boot.
+			exit 0
 		fi
 
 		start_service

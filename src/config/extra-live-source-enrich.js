@@ -132,6 +132,14 @@ function enrichExtraLiveSource(item, ctx) {
 		}
 		out.thumbnailChannel = parsed.channel
 		out.thumbnailLayer = parsed.layer
+	} else if (routeType === 'webpage_host' || routeType === 'ndi_host') {
+		const hostCh = parseInt(String(out.hostChannel ?? parsed.channel), 10)
+		const hostLayer = parseInt(String(out.hostLayer ?? parsed.layer ?? 1), 10) || 1
+		if (Number.isFinite(hostCh) && hostCh >= 1) {
+			out.thumbnailChannel = hostCh
+			out.thumbnailLayer = hostLayer
+		}
+		if (!out.resolution) out.resolution = formatResolution(chRes.w, chRes.h)
 	} else if (routeType === 'decklink' || out.decklinkSlot != null) {
 		const cm = buildChannelMap(ctx)
 		const slot = Number(out.decklinkSlot) || parsed.layer || 1

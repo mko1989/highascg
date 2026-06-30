@@ -34,10 +34,19 @@ const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('../engine/audio-route')
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
 const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
+const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
+
+function notifyCefInteractiveAfterAmcp(lines, ctx) {
+	try {
+		const { notifyCefInteractiveAmcpLines } = require('../system/cef-interactive-bridge')
+		const log = typeof ctx?.log === 'function' ? (level, msg) => ctx.log(level, msg) : () => {}
+		notifyCefInteractiveAmcpLines(Array.isArray(lines) ? lines : [lines], ctx?.config || {}, log)
+	} catch (_) {}
+}
 
 function applyAmcpLineNormalizations(lines, ctx) {
 	const cfg = ctx?.config || {}
-	return normalizeDecklinkPlayAmcpLines(lines, cfg)
+	return normalizeClipPlayAmcpLines(normalizeDecklinkPlayAmcpLines(lines, cfg), ctx)
 }
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
@@ -86,6 +95,7 @@ async function handlePost(path, body, ctx) {
 			const lines = applyAmcpLineNormalizations(applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx), ctx)
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
+			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
 		case '/api/amcp/raw-batch': {
@@ -115,6 +125,7 @@ async function handlePost(path, body, ctx) {
 			for (const line of lines) {
 				await amcp.raw(line)
 			}
+			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -290,6 +301,7 @@ async function handlePost(path, body, ctx) {
 				}
 			}
 			const r = await amcp.raw(line)
+			notifyCefInteractiveAfterAmcp([line], ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		default:

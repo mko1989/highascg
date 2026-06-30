@@ -189,7 +189,8 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						job.f,
 						self,
 						nextPipContentLayerInTake(takeJobs, job.pLayer),
-						currentMap.get(job.layer.layerNumber) || null
+						currentMap.get(job.layer.layerNumber) || null,
+						job.layer?.rotation ?? 0,
 					)
 					if (lines.length > 0) pipAddLines.push(...lines)
 				} catch (e) {

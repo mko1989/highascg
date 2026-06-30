@@ -25,7 +25,9 @@ Host systemd units (WO-47/52): **`scripts/exfat/install-exfat-systemd-units.sh`*
 
 ## Verify / diagnose
 
-`audit-eggs-clone-host.sh`, `verify-eggs-prepare-host.sh`, `verify-iso-squashfs-excludes.sh`, `verify-iso-boot-branding.sh`, `verify-live-stick.sh`, `diagnose-exfat-volumes.sh`, `diagnose-highascg-startup.sh`
+`audit-eggs-clone-host.sh`, `verify-eggs-prepare-host.sh`, `verify-iso-squashfs-excludes.sh`, `verify-iso-boot-branding.sh`, `diagnose-exfat-volumes.sh`, `diagnose-highascg-startup.sh`
+
+Post-boot stick QA (on booted machine, baked in squashfs): `tools/startup/run-health-checks.sh`
 
 ## Docs
 

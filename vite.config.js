@@ -394,6 +394,11 @@ export default defineConfig(({ mode }) => {
 			assetsInlineLimit: 4096,
 			chunkSizeWarningLimit: 600,
 			rollupOptions: {
+				input: {
+					main: path.join(clientDir, 'index.html'),
+					setup: path.join(clientDir, 'setup.html'),
+					map: path.join(clientDir, 'map.html'),
+				},
 				external: [
 					'three',
 					'grapesjs',
@@ -404,6 +409,17 @@ export default defineConfig(({ mode }) => {
 				output: {
 					manualChunks(id) {
 						if (!id.includes('/client/')) return undefined
+						// Shared libs used by both device-view and scenes chunks — must not live in either
+						// or Rollup creates a circular import (TDZ: "can't access lexical declaration before initialization").
+						if (
+							id.includes('/lib/settings-state.js') ||
+							id.includes('/lib/api-client.js') ||
+							id.includes('/lib/api-origin.js') ||
+							id.includes('/lib/editor-defaults-constants.js') ||
+							id.includes('/lib/program-audio-layouts.js')
+						) {
+							return 'shared'
+						}
 						if (id.includes('/components/device-view') || id.includes('/lib/device-view-')) return 'device-view'
 						if (
 							id.includes('/components/scenes-') ||

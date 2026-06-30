@@ -76,11 +76,14 @@ async function pushLivePipOverlaysToProgram(ctx, pipOverlays) {
 		programChannels[Math.min(screenIdx, Math.max(0, programChannels.length - 1))] ?? 1
 	const contentLayer = layer.layerNumber ?? 10
 	const fill = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+	const rotation = layer.rotation ?? 0
 	const nextContentLayer = nextPipContentLayerInScene(scene?.layers, contentLayer)
 
 	const list = Array.isArray(pipOverlays) ? pipOverlays.filter((o) => o && o.type) : []
 	const key = `${sceneId}:${layerIndex}`
-	const struct = list.map((o) => o.type).join('|')
+	const struct = list
+		.map((o) => `${o.type}:${String(o.params?.side ?? 'outside').trim().toLowerCase()}`)
+		.join('|')
 	const prevShape = _pipLiveShape.get(key)
 	const sameShape = prevShape && prevShape.struct === struct && prevShape.len === list.length
 
@@ -100,7 +103,9 @@ async function pushLivePipOverlaysToProgram(ctx, pipOverlays) {
 					layer: contentLayer,
 					stackIndex: i,
 					overlay: list[i],
+					overlays: list,
 					fill,
+					rotation,
 					nextContentLayer,
 				})
 			}
@@ -112,7 +117,9 @@ async function pushLivePipOverlaysToProgram(ctx, pipOverlays) {
 					layer: contentLayer,
 					stackIndex: i,
 					overlay: list[i],
+					overlays: list,
 					fill,
+					rotation,
 					nextContentLayer,
 				})
 			}
@@ -333,13 +340,19 @@ function renderPipOverlayCard(
  * @param {{ type: string, params: object }[]} opts.pipOverlays
  * @param {(pipOverlays: { type: string, params: object }[]) => void} opts.onUpdate
  * @param {{ sceneState: object, stateStore: object, sceneId: string, layerIndex: number }} [opts.livePushContext]
+ * @param {() => void} [opts.rerenderSceneLayer] — refresh inspector after add/remove/reorder/type change (not param tweaks).
  */
-export function renderPipOverlayGroup(root, { pipOverlays, onUpdate, livePushContext }) {
+export function renderPipOverlayGroup(root, { pipOverlays, onUpdate, livePushContext, rerenderSceneLayer }) {
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-pip-overlay-group'
 	grp.innerHTML = '<div class="inspector-group__title">PIP Overlays</div>'
 
 	const list = Array.isArray(pipOverlays) ? pipOverlays : []
+
+	const notifyStructureChange = (updated) => {
+		onUpdate(updated)
+		if (typeof rerenderSceneLayer === 'function') rerenderSceneLayer()
+	}
 
 	for (let i = 0; i < list.length; i++) {
 		const ov = list[i]
@@ -351,26 +364,28 @@ export function renderPipOverlayGroup(root, { pipOverlays, onUpdate, livePushCon
 			(next) => {
 				const updated = [...list]
 				updated[i] = next
-				onUpdate(updated)
+				const typeChanged = next?.type !== ov?.type
+				if (typeChanged) notifyStructureChange(updated)
+				else onUpdate(updated)
 				if (livePushContext) scheduleLivePipOverlayPush(livePushContext, updated)
 			},
 			() => {
 				const updated = list.filter((_, idx) => idx !== i)
-				onUpdate(updated)
+				notifyStructureChange(updated)
 				if (livePushContext) scheduleLivePipOverlayPush(livePushContext, updated)
 			},
 			() => {
 				if (i <= 0) return
 				const updated = [...list]
 				;[updated[i - 1], updated[i]] = [updated[i], updated[i - 1]]
-				onUpdate(updated)
+				notifyStructureChange(updated)
 				if (livePushContext) scheduleLivePipOverlayPush(livePushContext, updated)
 			},
 			() => {
 				if (i >= list.length - 1) return
 				const updated = [...list]
 				;[updated[i], updated[i + 1]] = [updated[i + 1], updated[i]]
-				onUpdate(updated)
+				notifyStructureChange(updated)
 				if (livePushContext) scheduleLivePipOverlayPush(livePushContext, updated)
 			},
 		)
@@ -414,7 +429,7 @@ export function renderPipOverlayGroup(root, { pipOverlays, onUpdate, livePushCon
 		const inst = createPipOverlayInstance(v)
 		if (inst) {
 			const updated = [...list, inst]
-			onUpdate(updated)
+			notifyStructureChange(updated)
 			if (livePushContext) scheduleLivePipOverlayPush(livePushContext, updated)
 		}
 	})

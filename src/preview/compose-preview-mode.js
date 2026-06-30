@@ -9,14 +9,14 @@ const {
 
 /**
  * @param {object} [config]
- * @returns {'canvas' | 'caspar_image' | 'ffmpeg_jpeg'}
+ * @returns {'canvas' | 'ffmpeg_jpeg'}
  */
 function resolveComposePreviewMode(config) {
 	const env = process.env.HIGHASCG_COMPOSE_PREVIEW_MODE
-	if (env === 'ffmpeg_jpeg' || env === 'caspar_image' || env === 'canvas') return env
+	if (env === 'ffmpeg_jpeg' || env === 'canvas') return env
 	const mode = config?.composePreview?.mode
-	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image' || mode === 'canvas') return mode
-	return 'ffmpeg_jpeg'
+	if (mode === 'ffmpeg_jpeg' || mode === 'canvas') return mode
+	return 'canvas'
 }
 
 /**
@@ -31,17 +31,8 @@ function isFfmpegJpegComposePreview(config) {
  * @param {object} [config]
  * @returns {boolean}
  */
-function isCasparImageComposePreview(config) {
-	return resolveComposePreviewMode(config) === 'caspar_image'
-}
-
-/**
- * @param {object} [config]
- * @returns {boolean}
- */
 function isSnapshotComposePreview(config) {
-	const mode = resolveComposePreviewMode(config)
-	return mode === 'ffmpeg_jpeg' || mode === 'caspar_image'
+	return isFfmpegJpegComposePreview(config)
 }
 
 /**
@@ -51,20 +42,12 @@ function isSnapshotComposePreview(config) {
  */
 function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 	const prev = { ...defaults, ...composePreview }
-	const tickIntervalMs = parseInt(String(prev.tickIntervalMs ?? ''), 10)
 	return {
 		...prev,
-		mode:
-			prev.mode === 'ffmpeg_jpeg' || prev.mode === 'caspar_image' || prev.mode === 'canvas'
-				? prev.mode
-				: 'ffmpeg_jpeg',
+		mode: prev.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : 'canvas',
 		fps: clampComposePreviewFps(prev.fps, defaults.fps ?? 25),
 		resolutionScale: normalizeResolutionScale(prev.resolutionScale),
 		jpegQuality: clampJpegQuality(prev.jpegQuality, defaults.jpegQuality ?? 10),
-		tickIntervalMs:
-			Number.isFinite(tickIntervalMs) && tickIntervalMs >= 40 && tickIntervalMs <= 1000
-				? Math.round(tickIntervalMs / 25) * 25 || 40
-				: prev.tickIntervalMs ?? defaults.tickIntervalMs ?? 40,
 		embedConsumersInCasparConfig: prev.embedConsumersInCasparConfig !== false,
 		pauseConsumerWhenIdle: prev.pauseConsumerWhenIdle === true,
 		companionThumbEnabled: prev.companionThumbEnabled === true,
@@ -123,7 +106,6 @@ function isMonitoredComposeChannel(config, channel) {
 module.exports = {
 	resolveComposePreviewMode,
 	isFfmpegJpegComposePreview,
-	isCasparImageComposePreview,
 	isSnapshotComposePreview,
 	normalizeComposePreviewSettings,
 	resolveMonitoredChannels,

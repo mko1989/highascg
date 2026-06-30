@@ -89,6 +89,33 @@ Set `replication.mediaTransport` to `syncthing` to use the old path:
 
 Bulk file sync between boxes can also use **full rsync mirror** (WO-61 / `push-backup-box.sh DEPLOY_MODE=mirror`).
 
+## Project files, autosave, and replication (WO-76)
+
+Each box keeps its own on-disk project tree under `~/highascg/projects/`:
+
+| File | Scope | Replicated leader → follower? |
+|------|--------|----------------------------|
+| `projects/<slug>.json` | Named save (explicit Save) | **Yes** — HTTP project push sends **main file at save time** (`stripDeviceLocalFromProject`) |
+| `projects/_autosave/<slug>.json` | Debounced draft for **that slug only** | **No** — local per box; not part of replication POST body |
+| Active slug (`.highascg-state.json`) | Which show is live | Follower sets active slug when receiving leader project |
+
+**Boot / USB / bridge (exFAT):**
+
+- `exfat-sync --boot` can pull `projects/` **including `_autosave/`** into the working directory on **non-leader** boxes (`shouldAllowExfatPullShowData`).
+- **Leader** with `leaderAvailable` / `role: leader` **blocks** stick/bridge from overwriting the active show.
+- Autosave pull (`pullAutosaveSlugFromVolumesIfNewer`) runs only for the **requested slug** — `_autosave/<slug>.json` never bleeds across slugs.
+
+**Operator expectations:**
+
+| Action | Leader | Follower |
+|--------|--------|----------|
+| Edit looks → autosave | Local `_autosave/<active>.json` + optional USB push | Own local autosave only |
+| Explicit Save | Main JSON pushed to follower on save hook | Receives show slice; **keeps local Device View / GPU map** |
+| Load another project (UI) | Main file only (no autosave merge) | Same — not driven by replication |
+| Server restart (active slug) | Merges main + autosave for **active slug only** | Same |
+
+See also: [wiki project API](../wiki/api/project.md) — `POST /api/project/load` autosave merge rules.
+
 ## CT-SS / time-aligned mirror
 
 Live intent packets include `applyAtLeaderTimeMs`. The follower estimates clock offset from ping (`serverTimeMs`) and applies takes at the aligned wall time — same approach as [CT-SS SyncPlay](../../CT-SS-master/reade.md).

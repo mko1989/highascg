@@ -10,7 +10,7 @@ const {
 	handleComposePreviewMetaGet,
 	handleComposePreviewPngGet,
 } = require('../../src/preview/compose-preview-cache')
-const composeTick = require('../../src/preview/compose-preview-tick')
+const { normalizeComposePreviewSettings } = require('../../src/preview/compose-preview-mode')
 
 describe('compose-preview-dirty', () => {
 	it('starts clean — shouldCapture false until bump', () => {
@@ -82,10 +82,9 @@ describe('compose-preview API', () => {
 		assert.ok(res.headers.ETag)
 	})
 
-	it('isComposePreviewEnabled — default canvas', () => {
-		assert.equal(composeTick.isComposePreviewEnabled({ composePreview: { mode: 'canvas' } }), false)
-		assert.equal(composeTick.isComposePreviewEnabled({ composePreview: { mode: 'caspar_image' } }), true)
-		assert.equal(composeTick.isComposePreviewEnabled({ composePreview: { mode: 'ffmpeg_jpeg' } }), false)
-		assert.equal(composeTick.isFfmpegJpegComposePreview({ composePreview: { mode: 'ffmpeg_jpeg' } }), true)
+	it('normalizeComposePreviewSettings migrates caspar_image to canvas', () => {
+		assert.equal(normalizeComposePreviewSettings({ mode: 'canvas' }).mode, 'canvas')
+		assert.equal(normalizeComposePreviewSettings({ mode: 'caspar_image' }).mode, 'canvas')
+		assert.equal(normalizeComposePreviewSettings({ mode: 'ffmpeg_jpeg' }).mode, 'ffmpeg_jpeg')
 	})
 })

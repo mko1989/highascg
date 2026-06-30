@@ -4,6 +4,9 @@
 
 import { api } from './api-client.js'
 import { projectFileIdFromName } from './project-files.js'
+import { forEachProjectMediaSource } from './project-media-refs.js'
+import { projectState } from './project-state.js'
+import { settingsState } from './settings-state.js'
 import {
 	getProjectMediaRelId,
 	projectMediaIdPrefixesForSlug,
@@ -17,7 +20,42 @@ let _ctx = {
 	projectName: '',
 }
 
+/** @type {object | null} */
+let _settings = null
+
 const SKIP_VALUE_RE = /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i
+
+/**
+ * @param {object} [settings]
+ * @returns {object | null}
+ */
+function resolveSettings(settings) {
+	return settings || _settings || settingsState.getSettings() || null
+}
+
+/**
+ * Slug for the project currently open in the UI (not necessarily server activeSlug).
+ * @returns {string}
+ */
+function getClientProjectSlug() {
+	const name = projectState.getProjectName()
+	return name ? projectFileIdFromName(name) : ''
+}
+
+/**
+ * @param {string} slug
+ * @param {object} [settings]
+ * @param {string} [projectName]
+ */
+function applySlugToContext(slug, settings, projectName) {
+	const s = String(slug || '').trim()
+	const cfg = resolveSettings(settings)
+	setProjectMediaContext({
+		activeSlug: s,
+		mediaFolder: s && cfg ? getProjectMediaRelId(s, cfg) : s ? `projects/${s}` : '',
+		projectName: projectName != null ? String(projectName) : s,
+	})
+}
 
 /**
  * @returns {{ activeSlug: string, mediaFolder: string, projectScopedEnabled: boolean, projectName: string }}
@@ -68,6 +106,7 @@ export async function refreshProjectMediaContext() {
 	}
 	try {
 		settings = await api.get('/api/settings')
+		_settings = settings
 		if (settings?.projectScopedMedia) {
 			setProjectMediaContext({ projectScopedEnabled: settings.projectScopedMedia.enabled !== false })
 		}
@@ -76,6 +115,10 @@ export async function refreshProjectMediaContext() {
 	}
 	if (_ctx.activeSlug && !_ctx.mediaFolder && settings) {
 		setProjectMediaContext({ mediaFolder: getProjectMediaRelId(_ctx.activeSlug, settings) })
+	}
+	const clientSlug = getClientProjectSlug()
+	if (clientSlug) {
+		applySlugToContext(clientSlug, settings, projectState.getProjectName())
 	}
 	return getProjectMediaContext()
 }
@@ -87,20 +130,26 @@ export async function refreshProjectMediaContext() {
 export function syncProjectMediaContextFromProject(project, settings) {
 	if (!project || typeof project !== 'object') return
 	const slug = String(project.slug || projectFileIdFromName(project.name) || '').trim()
-	setProjectMediaContext({
-		activeSlug: slug,
-		mediaFolder: slug ? getProjectMediaRelId(slug, settings) : '',
-		projectName: String(project.name || slug),
-	})
+	applySlugToContext(slug, settings, String(project.name || slug))
+}
+
+/** Sync upload target from the in-memory project name (e.g. New project, rename). */
+export function syncProjectMediaContextFromClient(settings) {
+	const name = projectState.getProjectName()
+	const slug = name ? projectFileIdFromName(name) : ''
+	applySlugToContext(slug, settings, name)
 }
 
 /**
  * Default ingest subdir relative to media root (empty = flat root).
+ * Uses the UI project name so uploads land in the correct folder even before server save/load.
  * @returns {string}
  */
 export function getDefaultUploadSubdir() {
-	if (!_ctx.projectScopedEnabled || !_ctx.mediaFolder) return ''
-	return _ctx.mediaFolder
+	if (!_ctx.projectScopedEnabled) return ''
+	const slug = getClientProjectSlug() || _ctx.activeSlug
+	if (!slug) return ''
+	return getProjectMediaRelId(slug, resolveSettings())
 }
 
 /**
@@ -132,7 +181,13 @@ function normalizeSourceRef(source, slug, settings) {
 	if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live') return
 	const value = String(source.value || '').trim()
 	if (!value || SKIP_VALUE_RE.test(value)) return
-	source.value = normalizeMediaIdForProject(value, slug, settings)
+	const normalized = normalizeMediaIdForProject(value, slug, settings)
+	if (normalized !== value) {
+		source.value = normalized
+		if (source.label != null && String(source.label).trim() === value) {
+			source.label = normalized
+		}
+	}
 }
 
 /**
@@ -147,35 +202,7 @@ export function normalizeProjectMediaRefs(project, settings) {
 	if (!slug) return project
 
 	const next = structuredClone(project)
-	const scenesBlock = next.scenes
-	const sceneList = Array.isArray(scenesBlock)
-		? scenesBlock
-		: Array.isArray(scenesBlock?.scenes)
-			? scenesBlock.scenes
-			: scenesBlock && typeof scenesBlock === 'object'
-				? Object.values(scenesBlock)
-				: []
-
-	for (const scene of sceneList) {
-		for (const layer of scene?.layers || []) {
-			normalizeSourceRef(layer.source, slug, settings)
-			for (const item of layer.playlist || []) normalizeSourceRef(item, slug, settings)
-		}
-	}
-
-	const timelinesBlock = next.timelines
-	const timelineList = Array.isArray(timelinesBlock)
-		? timelinesBlock
-		: Array.isArray(timelinesBlock?.timelines)
-			? timelinesBlock.timelines
-			: []
-
-	for (const tl of timelineList) {
-		for (const layer of tl?.layers || []) {
-			for (const clip of layer?.clips || []) normalizeSourceRef(clip?.source, slug, settings)
-		}
-	}
-
+	forEachProjectMediaSource(next, (source) => normalizeSourceRef(source, slug, settings))
 	return next
 }
 

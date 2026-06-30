@@ -79,6 +79,20 @@ export class SceneState {
 	get previewSceneId() { return this.previewSceneIdByMain[this.activeScreenIndex] ?? null }
 	getLiveSceneIdForMain(mainIdx) { return this.liveSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
 	getLiveSceneSnapshot(mainIdx) { return this.liveSceneSnapshotsByMain[Math.max(0, Math.min(3, mainIdx))] || null }
+
+	/** Re-copy live PGM snapshots from deck looks after media path rewrites (all mains). */
+	refreshLiveSnapshotsFromScenes() {
+		for (let m = 0; m < 4; m++) {
+			const sid = this.liveSceneIdByMain[m]
+			if (!sid) {
+				this.liveSceneSnapshotsByMain[m] = null
+				continue
+			}
+			const s = this.getScene(sid)
+			this.liveSceneSnapshotsByMain[m] = s ? JSON.parse(JSON.stringify(s)) : null
+		}
+	}
+
 	getPreviewSceneIdForMain(mainIdx) { return this.previewSceneIdByMain[Math.max(0, Math.min(3, mainIdx))] ?? null }
 
 	_getCanvas(screenIdx) {

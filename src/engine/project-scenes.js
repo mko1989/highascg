@@ -42,6 +42,23 @@ function scheduleDeckSyncPersist(ctx, project) {
 }
 
 /**
+ * Load one project slug from disk.
+ * @param {string} slug
+ * @param {{ mergeAutosave?: boolean }} [opts] — when true, merge `_autosave/<slug>.json` via `pickNewerFullProject`
+ * @returns {object | null}
+ */
+function loadProjectForSlug(slug, opts = {}) {
+	const s = String(slug || '').trim()
+	if (!s) return null
+	const fromFile = projectStore.readProjectFile(s)
+	if (!opts.mergeAutosave) return fromFile
+	const fromAutosave =
+		projectStore.readAutosaveFile(s) || projectStore.readLegacyAutosaveIfMatches(s)
+	if (fromAutosave) return pickNewerFullProject(fromFile, fromAutosave)
+	return fromFile
+}
+
+/**
  * Active project: `projects/<activeSlug>.json`, merged only with autosave for the **same** slug.
  * Other slugs on disk are left untouched when the name changes.
  * @returns {object | null}
@@ -63,11 +80,7 @@ function loadFullProject() {
 		if (!fromFile) return null
 		const activeSlug =
 			slug || projectStore.projectSlugFromName(fromFile.name) || String(fromFile.slug || '')
-		const fromAutosave =
-			projectStore.readAutosaveFile(activeSlug) ||
-			projectStore.readLegacyAutosaveIfMatches(activeSlug)
-		if (fromAutosave) return pickNewerFullProject(fromFile, fromAutosave)
-		return fromFile
+		return loadProjectForSlug(activeSlug, { mergeAutosave: true }) || fromFile
 	} catch (_) {
 		return null
 	}
@@ -512,6 +525,7 @@ function mergeDeckSyncIntoProject(ctx, data) {
 
 module.exports = {
 	loadFullProject,
+	loadProjectForSlug,
 	pickNewerFullProject,
 	projectSceneCount,
 	loadProjectScenes,

@@ -12,6 +12,7 @@ set -euo pipefail
 }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 # shellcheck source=eggs-liveroot-safety.sh
 source "${HERE}/eggs-liveroot-safety.sh"
 STRICT="${HIGHASCG_AUDIT_STRICT:-1}"
@@ -43,22 +44,32 @@ else
 	ok "no eggs liveroot bind mounts (safe to run eggs produce — never rm ${LIVEROOT})"
 fi
 
-# --- swap: must not be active; file may stay on disk if excluded ---
+# --- swap: file may stay on disk (and even active on build host) when exclude.list omits it ---
+swap_listed_in_exclude() {
+	local name="$1"
+	[[ -f "$EXCLUDE" ]] && grep -qF "$name" "$EXCLUDE"
+}
+
 for sw in /swap.img /swapfile; do
+	sw_name="${sw#/}"
 	if swapon --show 2>/dev/null | grep -qF "$sw"; then
-		fail "swap is active: $sw — run strip-host-swap-for-live-iso.sh prepare"
+		if swap_listed_in_exclude "$sw_name"; then
+			warn "swap is active: $sw — excluded from squashfs (OK for produce); optional: strip-host-swap-for-live-iso.sh prepare (swapoff + drop fstab swap lines for live boot)"
+		else
+			fail "swap is active: $sw — add to exclude.list or run strip-host-swap-for-live-iso.sh prepare"
+		fi
 	else
 		ok "swap not active: $sw"
 	fi
-done
-if [[ -f /swapfile ]]; then
-	SZ="$(du -h /swapfile | awk '{print $1}')"
-	if [[ -f "$EXCLUDE" ]] && grep -qE '^swapfile$|^swap\.img$' "$EXCLUDE"; then
-		ok "/swapfile on disk (${SZ}) — listed in exclude.list (will not be in squashfs)"
-	else
-		fail "/swapfile exists (${SZ}) but not excluded in ${EXCLUDE}"
+	if [[ -f "$sw" ]]; then
+		SZ="$(du -h "$sw" 2>/dev/null | awk '{print $1}')"
+		if swap_listed_in_exclude "$sw_name"; then
+			ok "$sw on disk (${SZ}) — listed in exclude.list (will not be in squashfs)"
+		else
+			fail "$sw exists (${SZ}) but not excluded in ${EXCLUDE}"
+		fi
 	fi
-fi
+done
 
 # --- WO-47 volumes: warn only when path is an actual mount point (not merely on /) ---
 for mp in /home/casparcg/highascg/media/bridge /home/casparcg/highascg/media/exfat /home/casparcg/exfat /home/casparcg/bridge; do
@@ -175,10 +186,10 @@ if [[ "$EMBED_COMPANION" == "1" ]]; then
 	else
 		fail "missing /etc/systemd/system/companion.service — run prepare-companion-for-eggs-clone.sh"
 	fi
-	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/companion' "$EXCLUDE"; then
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/companion(/|$)' "$EXCLUDE"; then
 		fail "exclude.list omits /home/casparcg/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
-	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion' "$EXCLUDE"; then
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion(/|$)' "$EXCLUDE"; then
 		fail "exclude.list omits .config/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
 else
@@ -218,6 +229,58 @@ if [[ "$THEME_ALT" == *highascg* ]]; then
 	ok "Plymouth default: highascg"
 else
 	warn "Plymouth default is not highascg (${THEME_ALT:-unset}) — run install-highascg-plymouth-theme.sh"
+fi
+
+# --- third-party licenses (WO-90) ---
+MANIFEST="${REPO_ROOT}/licenses/manifest.json"
+if [[ -f "$MANIFEST" ]]; then
+	ok "licenses/manifest.json present"
+	if command -v jq &>/dev/null && jq -e '.components[] | select(.id=="ndi-sdk")' "$MANIFEST" &>/dev/null; then
+		ok "manifest includes NDI SDK entry"
+	else
+		warn "manifest missing ndi-sdk — run tools/release/collect-third-party-licenses.sh after 04-ndi.sh"
+	fi
+else
+	warn "missing ${MANIFEST} — run: bash tools/release/collect-third-party-licenses.sh"
+fi
+BMD_EULA="${REPO_ROOT}/licenses/third-party/blackmagic-desktopvideo-EULA.txt"
+ISO_FORBID="${HIGHASCG_ISO_FORBID_DECKLINK:-1}"
+
+decklink_excludes_in_exclude_list() {
+	[[ -f "$EXCLUDE" ]] || return 1
+	local needle
+	for needle in \
+		usr/lib/blackmagic \
+		var/lib/dkms/blackmagic \
+		lib/udev/rules.d/55-blackmagic.rules; do
+		grep -qF "$needle" "$EXCLUDE" || return 1
+	done
+	return 0
+}
+
+if [[ "$ISO_FORBID" == "1" ]]; then
+	if decklink_excludes_in_exclude_list; then
+		ok "DeckLink exclude.list present (WO-92 — BMD omitted from squashfs)"
+	else
+		fail "DeckLink excludes missing in ${EXCLUDE} — run prepare or merge penguins-eggs-exclude-decklink.list"
+	fi
+	if dpkg-query -W desktopvideo &>/dev/null; then
+		ok "desktopvideo on build host — stays installed locally, masked from ISO by exclude.list"
+	elif [[ "${HIGHASCG_SKIP_DECKLINK_CHECK:-0}" == "1" ]]; then
+		warn "desktopvideo not installed (HIGHASCG_SKIP_DECKLINK_CHECK=1)"
+	else
+		ok "desktopvideo not on build host — ISO ships without DeckLink (operator decklink/ on exFAT)"
+	fi
+elif dpkg-query -W desktopvideo &>/dev/null; then
+	if [[ -f "$BMD_EULA" ]]; then
+		ok "desktopvideo embedded — BMD EULA in licenses/ (legacy HIGHASCG_ISO_FORBID_DECKLINK=0)"
+	else
+		fail "desktopvideo installed but ${BMD_EULA} missing — run collect-third-party-licenses.sh"
+	fi
+elif [[ "${HIGHASCG_SKIP_DECKLINK_CHECK:-0}" == "1" ]]; then
+	warn "desktopvideo not installed (HIGHASCG_SKIP_DECKLINK_CHECK=1)"
+else
+	fail "desktopvideo not installed — set HIGHASCG_ISO_FORBID_DECKLINK=1 (default) or install BMD for legacy embedded ISO"
 fi
 
 echo ""

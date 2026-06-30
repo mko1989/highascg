@@ -1,0 +1,401 @@
+/**
+ * Port Bands Rendering for Device View.
+ */
+import { appendCableAffordance } from './device-view-cable-affordance.js'
+import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
+import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
+import { setStatus } from './device-view-ui-utils.js'
+import * as Actions from './device-view-actions.js'
+import { renderCasparBand } from './device-view-caspar-render.js'
+import { renderMappingsBand } from './device-view-mappings-render.js'
+
+/**
+ * @param {'left' | 'right'} [dotSide] — input/sink ports: dot on the left; output/source: right (default)
+ */
+function addPortNodeDot(portEl, connectorId, onPortStartCable, key, data, dotSide = 'right') {
+	if (!portEl || !connectorId) return
+	appendCableAffordance(portEl, { connectorId, portKey: key, data, onPortStartCable })
+	const dot = document.createElement('span')
+	dot.className = 'device-view__connector-dot' + (dotSide === 'left' ? ' device-view__connector-dot--left' : '')
+	dot.title = 'Start or complete cable at this connector'
+	dot.setAttribute('data-connector-id', connectorId)
+	dot.addEventListener('click', (ev) => {
+		ev.preventDefault()
+		ev.stopPropagation()
+		if (onPortStartCable) onPortStartCable(key, connectorId, data)
+	})
+	portEl.appendChild(dot)
+	if (dotSide === 'left') portEl.classList.add('device-view__port--connector-dot-left')
+}
+
+export function renderDeckLinkBand(ctx) {
+	const {
+		live,
+		lastPayload,
+		resolveConnectorId,
+		isConnectorVisible,
+		selectedKey,
+		cableSourceId,
+		onPortClick,
+		onPortStartCable,
+	} = ctx
+	const dlBand = document.createElement('div')
+	dlBand.className = 'device-view__band device-view__band--decklink'
+	const hTop = document.createElement('h3')
+	hTop.textContent = 'DeckLink'
+	dlBand.appendChild(hTop)
+
+	function appendSubtitle(text) {
+		const h = document.createElement('h4')
+		h.className = 'device-view__band-subtitle'
+		h.textContent = text
+		dlBand.appendChild(h)
+		const ports = document.createElement('div')
+		ports.className = 'device-view__ports device-view__ports--decklink-group'
+		dlBand.appendChild(ports)
+		return ports
+	}
+
+	const inPorts = appendSubtitle('Inputs & capture')
+	const outPorts = appendSubtitle('Program & multiview outputs')
+	const normalizeIoDirection = (value) => normalizeDecklinkIoDirection(
+		typeof value === 'string' ? value : { ioDirection: value }
+	)
+
+	const ins = live.decklink?.inputs || []
+	const outs = live.decklink?.screenOutputs || []
+	const mvd = live.decklink?.multiviewDevice
+	const ioPorts = (lastPayload?.suggested?.connectors || []).filter((c) => c?.kind === 'decklink_io')
+	const ioBySlot = new Map()
+	for (const io of ioPorts) {
+		const slot = (Number(io?.index) || 0) + 1
+		if (slot > 0) ioBySlot.set(slot, io)
+	}
+	const renderedIoIds = new Set()
+
+	for (const i of ins) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		const st = decklinkInputState(i)
+		b.className = 'device-view__port' + stateClass(st.level)
+		const k = `decklink_in:${i.slot}:${i.device}`
+		b.dataset.portKey = k
+		const io = ioBySlot.get(Number(i?.slot) || 0) || null
+		const cid = String(io?.id || resolveConnectorId('decklink_in', { input: i }) || '').trim()
+		if (!cid || !isConnectorVisible(cid)) continue
+		if (cid) b.setAttribute('data-connector-id', cid)
+		if (io?.id) renderedIoIds.add(io.id)
+		const ioDir = normalizeIoDirection(io?.caspar?.ioDirection ?? i?.ioDirection)
+		b.appendChild(Object.assign(document.createElement('span'), {
+			textContent: io
+				? `${io.label || io.id} (${ioDir === 'unassigned' ? 'UNASSIGNED' : ioDir.toUpperCase()})`
+				: `In ${i.slot}`,
+		}))
+		b.appendChild(Object.assign(document.createElement('small'), { textContent: `device ${i.device} · ${st.text}` }))
+		if (io?.id) {
+			b.draggable = true
+			b.addEventListener('dragstart', (ev) => {
+				if (!ev.dataTransfer) return
+				ev.dataTransfer.effectAllowed = 'copyMove'
+				ev.dataTransfer.setData(
+					'application/x-highascg-connector',
+					JSON.stringify({ connectorId: io.id, kind: 'decklink_io' })
+				)
+			})
+		}
+		if (i?.message) b.title = String(i.message)
+		b.addEventListener('click', () => onPortClick(k, cid, { type: 'decklink_in', input: i }))
+		// When SDI is used as live input, hide cable dot in Device View.
+		// Dot reappears when ioDirection switches away from "in".
+		if (ioDir !== 'in') addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_in', input: i }, 'left')
+		if (selectedKey === k) b.classList.add('device-view__port--selected')
+		if (cableSourceId && cid === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		if (ioDir === 'in') inPorts.append(b)
+		else outPorts.append(b)
+	}
+
+	for (const o of outs) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		const off = Number(o?.device || 0) <= 0
+		b.className = 'device-view__port' + stateClass(off ? 'off' : 'ok')
+		const k = `decklink_out:screen:${o.screen}`
+		b.dataset.portKey = k
+		const cid = String(resolveConnectorId('decklink_out', { output: o }) || '').trim()
+		if (!cid || !isConnectorVisible(cid)) continue
+		if (cid) b.setAttribute('data-connector-id', cid)
+		b.appendChild(Object.assign(document.createElement('span'), { textContent: `Screen ${o.screen} → DL` }))
+		b.appendChild(Object.assign(document.createElement('small'), { textContent: o.device ? `device ${o.device}` : 'device 0 (off)' }))
+		b.addEventListener('click', () => onPortClick(k, cid, { type: 'decklink_out', output: o }))
+		addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_out', output: o }, 'left')
+		if (selectedKey === k) b.classList.add('device-view__port--selected')
+		if (cableSourceId && cid === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		outPorts.append(b)
+	}
+
+	if (mvd != null && parseInt(String(mvd), 10) > 0) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		b.className = 'device-view__port device-view__port--ok'
+		const k = `decklink_mv:mv:${mvd}`
+		b.dataset.portKey = k
+		const cid = String(resolveConnectorId('decklink_mv', {}) || '').trim()
+		if (cid && isConnectorVisible(cid)) {
+			if (cid) b.setAttribute('data-connector-id', cid)
+			b.appendChild(Object.assign(document.createElement('span'), { textContent: 'Multiview → DL' }))
+			b.appendChild(Object.assign(document.createElement('small'), { textContent: 'device ' + mvd }))
+			b.addEventListener('click', () => onPortClick(k, cid, { type: 'decklink_mv', multiviewDevice: mvd }))
+			addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_mv', multiviewDevice: mvd }, 'left')
+			if (selectedKey === k) b.classList.add('device-view__port--selected')
+			if (cableSourceId && cid === cableSourceId) b.classList.add('device-view__port--cable-armed')
+			outPorts.append(b)
+		}
+	}
+	for (const io of ioPorts) {
+		if (renderedIoIds.has(io.id)) continue
+		const b = document.createElement('button')
+		b.type = 'button'
+		const dir = normalizeIoDirection(io?.caspar?.ioDirection)
+		b.className = 'device-view__port' + stateClass(dir === 'out' ? 'ok' : dir === 'in' ? 'warn' : 'off')
+		const k = `decklink_io:${io.id}`
+		b.dataset.portKey = k
+		const ioId = String(io.id || '').trim()
+		if (!ioId || !isConnectorVisible(ioId)) continue
+		b.setAttribute('data-connector-id', ioId)
+		b.title = `${io.label || io.id} — SDI I/O slot, direction ${dir === 'unassigned' ? 'unassigned' : dir} (device ${io.externalRef || 0})`
+		b.appendChild(Object.assign(document.createElement('span'), {
+			textContent: `${io.label || io.id} (${dir === 'unassigned' ? 'UNASSIGNED' : dir.toUpperCase()})`,
+		}))
+		b.appendChild(Object.assign(document.createElement('small'), { textContent: `device ${io.externalRef || 0}` }))
+		b.draggable = true
+		b.addEventListener('dragstart', (ev) => {
+			if (!ev.dataTransfer) return
+			ev.dataTransfer.effectAllowed = 'copyMove'
+			ev.dataTransfer.setData(
+				'application/x-highascg-connector',
+				JSON.stringify({ connectorId: io.id, kind: 'decklink_io' })
+			)
+		})
+		b.addEventListener('click', () => onPortClick(k, ioId, { type: 'decklink_io', connector: io }))
+		addPortNodeDot(b, ioId, onPortStartCable, k, { type: 'decklink_io', connector: io }, dir === 'in' ? 'right' : 'left')
+		if (selectedKey === k) b.classList.add('device-view__port--selected')
+		if (cableSourceId && ioId === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		if (dir === 'in') inPorts.append(b)
+		else outPorts.append(b)
+	}
+
+	if (!ins.length && !outs.length && !(mvd > 0) && !ioPorts.length) {
+		inPorts.appendChild(
+			Object.assign(document.createElement('p'), {
+				className: 'device-view__note',
+				textContent: 'No DeckLink connectors detected yet. Use “Sync from hardware” to refresh enumeration.',
+			})
+		)
+	}
+	return dlBand
+}
+
+export function renderStreamingBand(ctx) {
+	const { lastPayload, isConnectorVisible, selectedKey, cableSourceId, onPortClick, onPortStartCable, onAddStreamOutput } = ctx
+	const streamBand = document.createElement('div')
+	streamBand.className = 'device-view__band'
+	streamBand.innerHTML = '<div class="device-view__destinations-head"><h3 style="margin:0">Stream outputs</h3><button type="button" class="header-btn" data-add-stream>+</button></div><div class="device-view__ports" data-stream-ports></div>'
+	const ports = streamBand.querySelector('[data-stream-ports]')
+	const addBtn = streamBand.querySelector('[data-add-stream]')
+	if (addBtn) addBtn.addEventListener('click', () => { if (typeof onAddStreamOutput === 'function') onAddStreamOutput() })
+	const streams = (lastPayload?.suggested?.connectors || []).filter((c) => c?.kind === 'stream_out')
+	if (!streams.length) {
+		ports.appendChild(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'No stream outputs configured.' }))
+		return streamBand
+	}
+	for (const s of streams) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		b.className = 'device-view__port'
+		const key = `stream_out:${s.id}`
+		b.dataset.portKey = key
+		if (!isConnectorVisible(s.id)) continue
+		b.setAttribute('data-connector-id', s.id)
+		b.appendChild(Object.assign(document.createElement('span'), { textContent: s.label || s.id }))
+		b.appendChild(Object.assign(document.createElement('small'), { textContent: 'RTMP output' }))
+		b.addEventListener('click', () => onPortClick(key, s.id, { type: 'stream_out', connector: s }))
+		addPortNodeDot(b, s.id, onPortStartCable, key, { type: 'stream_out', connector: s }, 'left')
+		if (selectedKey === key) b.classList.add('device-view__port--selected')
+		if (cableSourceId && s.id === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		ports.appendChild(b)
+	}
+	return streamBand
+}
+
+export function renderRecordingBand(ctx) {
+	const { lastPayload, isConnectorVisible, selectedKey, cableSourceId, onPortClick, onPortStartCable, onAddRecordOutput } = ctx
+	const recBand = document.createElement('div')
+	recBand.className = 'device-view__band'
+	recBand.innerHTML = '<div class="device-view__destinations-head"><h3 style="margin:0">Record outputs</h3><button type="button" class="header-btn" data-add-record>+</button></div><div class="device-view__ports" data-record-ports></div>'
+	const ports = recBand.querySelector('[data-record-ports]')
+	const addBtn = recBand.querySelector('[data-add-record]')
+	if (addBtn) addBtn.addEventListener('click', () => { if (typeof onAddRecordOutput === 'function') onAddRecordOutput() })
+	const outputs = (lastPayload?.suggested?.connectors || []).filter((c) => c?.kind === 'record_out')
+	if (!outputs.length) {
+		ports.appendChild(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'No record outputs configured.' }))
+		return recBand
+	}
+	for (const s of outputs) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		b.className = 'device-view__port'
+		const key = `record_out:${s.id}`
+		b.dataset.portKey = key
+		if (!isConnectorVisible(s.id)) continue
+		b.setAttribute('data-connector-id', s.id)
+		b.appendChild(Object.assign(document.createElement('span'), { textContent: s.label || s.id }))
+		b.appendChild(Object.assign(document.createElement('small'), { textContent: 'FILE record output' }))
+		b.addEventListener('click', () => onPortClick(key, s.id, { type: 'record_out', connector: s }))
+		addPortNodeDot(b, s.id, onPortStartCable, key, { type: 'record_out', connector: s }, 'left')
+		if (selectedKey === key) b.classList.add('device-view__port--selected')
+		if (cableSourceId && s.id === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		ports.appendChild(b)
+	}
+	return recBand
+}
+
+export function appendSegment(parent, title) {
+	const sec = document.createElement('section')
+	sec.className = 'device-view__segment'
+	const body = document.createElement('div')
+	body.className = 'device-view__segment-body'
+	const t = String(title || '').trim()
+	if (t) {
+		const h = document.createElement('h2')
+		h.className = 'device-view__segment-title'
+		h.textContent = t
+		sec.append(h, body)
+	} else {
+		sec.append(body)
+	}
+	parent.append(sec)
+	return body
+}
+
+export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, statusEl, load, setCasparRestartDirty }) {
+	mappingPanel.innerHTML = ''; rearPanel.innerHTML = ''; const live = ctx.live; if (!live) return
+	const internalCtx = {
+		...ctx,
+		currentSettings,
+		statusEl,
+		load,
+		setCasparRestartDirty,
+		onAddStreamOutput: async () => {
+			try {
+				const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true, type: 'rtmp', name: 'Str1', quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
+				const idx = cur.length + 1;
+				const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
+				await Actions.saveSettingsPatch({ streamOutputs: next });
+				setStatus(statusEl, `Added stream output Str${idx}`, true);
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onAddRecordOutput: async () => {
+			try {
+				const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : [{ id: 'rec_1', label: 'Rec1', enabled: true, name: 'Rec1', source: 'program_1', crf: 26 }];
+				const idx = cur.length + 1;
+				const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, name: `Rec${idx}`, source: 'program_1', crf: 26 }];
+				await Actions.saveSettingsPatch({ recordOutputs: next });
+				setStatus(statusEl, `Added record output Rec${idx}`, true);
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onRemoveStreamOutput: async (id) => {
+			try {
+				const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : []
+				const next = cur.filter(s => String(s.id) !== String(id))
+				await Actions.saveSettingsPatch({ streamOutputs: next })
+				setStatus(statusEl, 'Stream output removed', true)
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onRemoveRecordOutput: async (id) => {
+			try {
+				const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : []
+				const next = cur.filter(s => String(s.id) !== String(id))
+				await Actions.saveSettingsPatch({ recordOutputs: next })
+				setStatus(statusEl, 'Record output removed', true)
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onAddAudioOutput: async () => {
+			try {
+				const cur = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : [];
+				const idx = cur.length + 1;
+				const next = [...cur, { id: `audio_${idx}`, label: `Audio ${idx}`, enabled: true, deviceName: '', channelLayout: 'stereo' }];
+				await Actions.saveSettingsPatch({ audioOutputs: next });
+				setStatus(statusEl, `Added audio output Audio ${idx}`, true);
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onRemoveAudioOutput: async (id) => {
+			try {
+				const cur = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : []
+				const next = cur.filter(s => String(s.id) !== String(id))
+				await Actions.saveSettingsPatch({ audioOutputs: next })
+				setStatus(statusEl, 'Audio output removed', true)
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onAddMappingNode: async () => {
+			try {
+				await Actions.addMappingNode()
+				setCasparRestartDirty?.(true)
+				setStatus(statusEl, 'Added pixel mapping node', true)
+				await load()
+			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		mappingPersist: async (work) => {
+			try {
+				const r = await work()
+				if (!r?.ok) {
+					setStatus(statusEl, r?.error || 'Mapping save failed', false)
+					return
+				}
+				setCasparRestartDirty?.(true)
+				setStatus(statusEl, 'Mapping updated', true)
+				await load()
+			} catch (e) {
+				setStatus(statusEl, e?.message || String(e), false)
+			}
+		},
+		onApplyGpuSettings: async () => {
+			try {
+				setStatus(statusEl, 'Applying GPU layout...', true)
+				const res = await Actions.applyOsSettings()
+				if (res?.ok) {
+					const applied = !!res.layoutApplied
+					const persisted = !!res.layoutPersisted
+					const cmd = typeof res.xrandrCommand === 'string' && res.xrandrCommand.trim() ? res.xrandrCommand.trim() : ''
+					if (applied && persisted) {
+						setStatus(statusEl, cmd ? `Applied xrandr and persisted.\n${cmd}` : 'Applied xrandr layout and persisted reboot script', true)
+					} else if (applied && !persisted) {
+						setStatus(statusEl, cmd ? `xrandr applied; persist failed.\n${cmd}` : 'xrandr layout applied, but persisting the reboot script failed (check server logs / sudo)', false)
+					} else {
+						setStatus(
+							statusEl,
+							cmd
+								? `No xrandr apply reported.\nPlanned: ${cmd}`
+								: 'Apply-os finished but no xrandr change ran (no mapped outputs, xrandr query failed, or apply failed — see server [OS-Config] / [settings-os] logs). Settings were still saved.',
+							false
+						)
+					}
+				} else {
+					throw new Error(res?.error || 'Apply failed')
+				}
+				await load()
+			} catch (e) { setStatus(statusEl, e?.message || String(e), false) }
+		}
+	}
+	const proc = appendSegment(mappingPanel, '')
+	proc.append(renderMappingsBand(internalCtx))
+
+	const eq = appendSegment(rearPanel, '')
+	eq.parentElement?.classList.add('device-view__segment--rear-only')
+	eq.append(renderCasparBand(internalCtx))
+}

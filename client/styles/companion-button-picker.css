@@ -13,6 +13,15 @@
 	background: #161b22;
 }
 
+.companion-inspector-preview--missing .companion-inspector-preview__img {
+	opacity: 0.35;
+}
+
+.companion-inspector-preview-status--warn,
+.companion-picker-status--warn {
+	color: #f0a030;
+}
+
 .companion-inspector-actions {
 	display: flex;
 	gap: 8px;

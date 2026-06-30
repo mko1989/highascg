@@ -204,7 +204,8 @@ Side effects: persists via `persistProject`, optional Art-Net reconfigure, debou
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `slug` | string | Project file slug; omit to load active slug |
+| `slug` | string | Project file slug; omit to load **active** slug |
+| `applyHardware` | boolean | When `true`, write `hardwareConfig` into server config (default **false** — verify Device View and apply manually) |
 
 ```bash
 curl -s -X POST http://127.0.0.1:4200/api/project/load \
@@ -215,7 +216,14 @@ curl -s -X POST http://127.0.0.1:4200/api/project/load \
 **200** — full project object.  
 **404** — `{ "error": "No project stored" }`.
 
-Sets active slug in persistence.
+Sets active slug in persistence. Does **not** apply project hardware to the server unless `applyHardware: true`.
+
+**Autosave merge:**
+
+| Request | Merges `_autosave/<slug>.json`? |
+|---------|----------------------------------|
+| Omit `slug` (active project / reboot bootstrap) | **Yes** — same as `GET /api/project` (`pickNewerFullProject`) |
+| `slug` set (explicit load of another show) | **No** — main `projects/<slug>.json` only |
 
 ---
 

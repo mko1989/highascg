@@ -2,9 +2,47 @@
  * Companion page grid picker for timeline companion_press flags (WO-75).
  */
 import { api, getApiBase } from '../lib/api-client.js'
-import { formatCompanionLocation } from '../lib/companion-location-parse.js'
 
 const MODAL_ID = 'companion-button-picker-modal'
+
+/**
+ * @param {HTMLImageElement} img
+ * @param {string} url
+ * @param {() => void} onReady
+ * @param {() => void} onGiveUp
+ */
+function loadPreviewImgWithRetry(img, url, onReady, onGiveUp) {
+	let retries = 0
+	const maxRetries = 15
+	const attempt = () => {
+		img.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`
+	}
+	img.onload = () => onReady()
+	img.onerror = () => {
+		retries += 1
+		if (retries < maxRetries) {
+			setTimeout(attempt, 400)
+		} else {
+			onGiveUp()
+		}
+	}
+	attempt()
+}
+
+/**
+ * @param {number} page
+ * @param {number} timeoutMs
+ */
+async function waitForPagePreviews(page, timeoutMs = 8000) {
+	const start = Date.now()
+	while (Date.now() - start < timeoutMs) {
+		const st = await api.get(`/api/companion/page-preview/${page}/status`)
+		const ready = (st.cells || []).filter((c) => c.ready).length
+		if (ready > 0) return st
+		await new Promise((r) => setTimeout(r, 300))
+	}
+	return api.get(`/api/companion/page-preview/${page}/status`).catch(() => ({ cells: [] }))
+}
 
 /**
  * @param {{
@@ -55,7 +93,29 @@ export function openCompanionButtonPickerModal(opts = {}) {
 	const statusEl = modal.querySelector('[data-status]')
 	const pageInp = modal.querySelector('[data-page]')
 
+	const refreshCellImage = (row, column) => {
+		const btn = gridEl.querySelector(`[data-row="${row}"][data-col="${column}"]`)
+		if (!btn) return
+		const img = btn.querySelector('img')
+		if (!img) return
+		const url = `${getApiBase()}/api/companion/button-preview/${page}/${row}/${column}.jpg`
+		loadPreviewImgWithRetry(
+			img,
+			url,
+			() => btn.classList.remove('companion-picker-cell--empty'),
+			() => btn.classList.add('companion-picker-cell--empty'),
+		)
+	}
+
+	const onPreviewWs = (e) => {
+		const d = e.detail
+		if (!d || d.page !== page) return
+		refreshCellImage(d.row, d.column)
+	}
+	window.addEventListener('companion-button-preview', onPreviewWs)
+
 	const close = () => {
+		window.removeEventListener('companion-button-preview', onPreviewWs)
 		if (sessionId) {
 			void api.post('/api/companion/page-preview/unsubscribe', { sessionId }).catch(() => {})
 		}
@@ -71,23 +131,28 @@ export function openCompanionButtonPickerModal(opts = {}) {
 	const renderGrid = (cells) => {
 		gridEl.innerHTML = ''
 		const byKey = new Map(cells.map((c) => [`${c.row}/${c.column}`, c]))
+		const readyCount = cells.filter((c) => c.ready).length
 		for (let row = 0; row < gridSize; row++) {
 			for (let column = 0; column < gridSize; column++) {
 				const cell = byKey.get(`${row}/${column}`) || { row, column }
 				const btn = document.createElement('button')
 				btn.type = 'button'
 				btn.className = 'companion-picker-cell'
+				btn.dataset.row = String(row)
+				btn.dataset.col = String(column)
 				if (page === selected.page && row === selected.row && column === selected.column) {
 					btn.classList.add('companion-picker-cell--selected')
 				}
 				btn.title = `${page}/${row}/${column}`
 				const img = document.createElement('img')
 				img.alt = cell.text || btn.title
-				img.loading = 'lazy'
-				img.src = `${getApiBase()}/api/companion/button-preview/${page}/${row}/${column}.jpg?t=${cell.mtimeMs || Date.now()}`
-				img.onerror = () => {
-					btn.classList.add('companion-picker-cell--empty')
-				}
+				const url = `${getApiBase()}/api/companion/button-preview/${page}/${row}/${column}.jpg`
+				loadPreviewImgWithRetry(
+					img,
+					url,
+					() => btn.classList.remove('companion-picker-cell--empty'),
+					() => btn.classList.add('companion-picker-cell--empty'),
+				)
 				btn.appendChild(img)
 				const cap = document.createElement('span')
 				cap.className = 'companion-picker-cell__label'
@@ -101,25 +166,47 @@ export function openCompanionButtonPickerModal(opts = {}) {
 				gridEl.appendChild(btn)
 			}
 		}
-		statusEl.textContent = `Page ${page} — click a button to bind this timeline flag.`
+		statusEl.classList.remove('companion-picker-status--warn')
+		statusEl.textContent =
+			readyCount > 0
+				? `Page ${page} — ${readyCount}/${gridSize * gridSize} previews loaded. Click a button to bind.`
+				: `Page ${page} — waiting for Companion previews…`
 	}
 
 	const loadPage = async () => {
 		pageInp.value = String(page)
+		statusEl.classList.remove('companion-picker-status--warn')
 		statusEl.textContent = 'Subscribing to Companion page previews…'
+		gridEl.innerHTML = ''
 		try {
 			if (sessionId) {
 				await api.post('/api/companion/page-preview/unsubscribe', { sessionId })
 				sessionId = null
 			}
-			const sub = await api.post('/api/companion/page-preview/subscribe', { page, sessionId: crypto.randomUUID() })
+			const sub = await api.post('/api/companion/page-preview/subscribe', { page })
+			if (!sub?.ok) {
+				statusEl.classList.add('companion-picker-status--warn')
+				statusEl.textContent =
+					sub?.hint ||
+					(sub?.reason === 'subscriptions_disabled'
+						? 'Enable Button Subscriptions API in Companion Settings (not only the Satellite server).'
+						: 'Companion Satellite preview unavailable.')
+				return
+			}
 			sessionId = sub.sessionId
 			gridSize = sub.gridSize || 8
 			gridEl.style.setProperty('--companion-picker-cols', String(gridSize))
-			const st = await api.get(`/api/companion/page-preview/${page}/status`)
+			statusEl.textContent = 'Loading button images from Companion…'
+			const st = await waitForPagePreviews(page)
 			renderGrid(st.cells || [])
 		} catch (e) {
-			statusEl.textContent = `Preview unavailable: ${e.message || e}. Enable Companion Satellite (port 16622) in Settings.`
+			statusEl.classList.add('companion-picker-status--warn')
+			const msg = e?.message || String(e)
+			const friendly =
+				/crypto\.randomUUID|secure context/i.test(msg)
+					? 'Browser blocked session id on HTTP — rebuild client (server assigns session id now).'
+					: msg
+			statusEl.textContent = `Preview unavailable: ${friendly} Check HighAsCG server is running and Companion Satellite is enabled.`
 			gridEl.innerHTML = ''
 		}
 	}

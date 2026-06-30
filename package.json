@@ -2,19 +2,22 @@
 	"name": "highascg",
 	"version": "2026.05.20",
 	"description": "HighAsCG — standalone CasparCG control server (migrated from companion-module-casparcg-server)",
+	"license": "AGPL-3.0-or-later",
+	"author": "HighPass Marcin Wardecki <m.wardecki89@gmail.com>",
 	"type": "commonjs",
 	"main": "index.js",
 	"scripts": {
 		"start": "node index.js",
 		"dev": "node --watch index.js",
 		"build:client": "vite build",
-		"dev:client": "vite",
+		"dev:client": "vite --host",
 		"start:headless": "HIGHASCG_HEADLESS=true node index.js",
 		"dev:headless": "HIGHASCG_HEADLESS=true node --watch index.js",
 		"deploy:dev": "bash scripts/dev-push.sh",
 		"clean:eggs-host": "bash scripts/clean-eggs-dev-host.sh",
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
+		"map:generate": "node tools/map/generate-map-data.js",
 		"wiki:build": "node tools/wiki/build-wiki.js",
 		"wiki:open": "xdg-open docs/wiki-site/index.html 2>/dev/null || open docs/wiki-site/index.html 2>/dev/null || echo 'Open docs/wiki-site/index.html in your browser'",
 		"smoke:wiki": "node --test tools/smoke/smoke-wiki.test.js",
@@ -33,14 +36,18 @@
 		"smoke:log-record": "node --test tools/smoke/smoke-log-record.test.js tools/smoke/smoke-logs-modal-pane.test.js",
 		"smoke:logs-modal-toggles": "node tools/smoke/smoke-logs-modal-toggles.mjs",
 		"smoke:project-media-root": "node --test tools/smoke/smoke-project-media-root.test.js",
+		"smoke:media-browser": "node --test tools/smoke/smoke-media-browser-router.test.js",
 		"test:device-graph": "node --test tools/smoke/smoke-device-graph.js",
 		"test:device-snapshot": "node --test tools/smoke/smoke-device-snapshot.js",
-		"test:replication": "node --test tools/smoke/smoke-config-classify.js tools/smoke/smoke-replication-role.js tools/smoke/smoke-replication-showdata.js tools/smoke/smoke-replication-livestate.js tools/smoke/smoke-replication-failover.js tools/smoke/smoke-replication-media-staging.js tools/smoke/smoke-replication-scene-lookup.js tools/smoke/smoke-replication-follower-profile.js tools/smoke/smoke-replication-mirror-apply.js tools/smoke/smoke-replication-caspar-output.js tools/smoke/smoke-replication-sync-clock.js tools/smoke/smoke-replication-reconcile.js tools/smoke/smoke-replication-amcp-fanout.js tools/smoke/smoke-replication-playhead-sync.js",
+		"test:replication": "node --test tools/smoke/smoke-config-classify.js tools/smoke/smoke-replication-role.js tools/smoke/smoke-replication-showdata.js tools/smoke/smoke-replication-livestate.js tools/smoke/smoke-replication-failover.js tools/smoke/smoke-replication-media-staging.js tools/smoke/smoke-replication-scene-lookup.js tools/smoke/smoke-replication-follower-profile.js tools/smoke/smoke-replication-mirror-apply.js tools/smoke/smoke-replication-caspar-output.js tools/smoke/smoke-replication-sync-clock.js tools/smoke/smoke-replication-reconcile.js tools/smoke/smoke-replication-amcp-fanout.js tools/smoke/smoke-replication-playhead-sync.js tools/smoke/smoke-replication-project-push-debounce.test.js",
+		"test:companion-hot-backup": "node --test tools/smoke/smoke-companion-hot-backup-failover.test.js test/companion-control-status.test.js",
 		"test:private-volume": "node --test tools/smoke/smoke-private-volume-sync.js",
 		"test:project-hardware-config": "node --test tools/smoke/smoke-project-hardware-config.test.js",
 		"test:os-layout-w40": "node --test tools/smoke/smoke-os-layout-w40.js",
 		"test:mapping-gpu-os-layout": "node --test tools/smoke/smoke-mapping-gpu-os-layout.js",
 		"test:xrandr-custom-mode": "node --test tools/smoke/smoke-xrandr-custom-mode.js",
+		"test:xrandr-persist-script": "node --test tools/smoke/smoke-xrandr-persist-script.js",
+		"test:os-mode-source": "node --test tools/smoke/smoke-os-mode-source.js",
 		"test:gpu-modetest": "node --test tools/smoke/smoke-gpu-modetest.test.js",
 		"test:gpu-topology": "node --test tools/smoke/smoke-gpu-topology.test.js",
 		"test:modeline-timings": "node --test tools/smoke/smoke-modeline-timings.js",
@@ -54,6 +61,7 @@
 		"test:highascg": "node --test tools/smoke/highascg-health-api-amcp.test.js",
 		"smoke:mixer-effects": "node --test tools/smoke/smoke-mixer-effects-catalog.test.js",
 		"test:highascg:live": "node --test tools/smoke/highascg-live-amcp.test.js",
+		"test:highascg:live:cef": "node --test --test-force-exit tools/smoke/smoke-cef-cdp-input.live.test.js tools/smoke/smoke-cef-interactive-bridge.live.test.js tools/smoke/smoke-cef-host-focus-api.live.test.js",
 		"test:highascg:live:http": "node --test tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:live:all": "node --test tools/smoke/highascg-live-amcp.test.js tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:migration": "node --test --test-force-exit tools/smoke/smoke-amcp-migration-parity.test.js tools/smoke/smoke-amcp-batch-library.test.js tools/smoke/smoke-amcp-send-after.test.js tools/smoke/smoke-amcp-offline-migration.test.js tools/smoke/highascg-health-api-amcp.test.js",
@@ -68,7 +76,9 @@
 		"exfat:starter-zip": "bash tools/eggs/live-usb/pack-exfat-starter-zip.sh",
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
 		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh",
-		"eggs:clone-flash-tmux": "bash work/run-eggs-clone-flash-tmux.sh --attach"
+		"eggs:clone-flash-tmux": "bash work/run-eggs-clone-flash-tmux.sh --attach",
+		"deploy:mirror-tmux": "bash work/run-deploy-mirror-tmux.sh --attach",
+		"deploy:parallel-eggs-sync": "bash work/run-parallel-eggs-and-sync.sh"
 	},
 	"engines": {
 		"node": ">=20"
@@ -82,6 +92,7 @@
 		"jpeg-js": "^0.4.4",
 		"osc": "^2.4.5",
 		"pngjs": "^7.0.0",
+		"puppeteer": "^25.1.0",
 		"sacn": "^4.6.2",
 		"unzipper": "^0.12.3",
 		"wetransfert": "^2.4.0",
@@ -95,8 +106,9 @@
 		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {
+		"acorn": "^8.17.0",
+		"acorn-walk": "^8.3.5",
 		"electron": "^30.5.1",
-		"puppeteer": "^25.1.0",
 		"vite": "^6.4.3"
 	}
 }

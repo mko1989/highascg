@@ -127,3 +127,50 @@ test('applyHardwareConfigFromProject skips empty hardwareConfig', () => {
 	assert.equal(cfg.screenDestinations.destinations.length, 1)
 	assert.ok(ctx.logs.some((l) => l.includes('Skipped empty hardwareConfig')))
 })
+
+test('apply-hardware route applies routing extras from hardwareConfig', async () => {
+	const routesData = require('../../src/api/routes-data')
+	const defaults = require('../../src/config/defaults')
+	const cfg = JSON.parse(JSON.stringify(defaults))
+	cfg.audioRouting = { version: 1, channels: [{ id: 'pgm1', label: 'PGM 1' }] }
+	cfg.deviceGraph = {
+		version: 1,
+		devices: [],
+		connectors: [{ id: 'gpu_p0', kind: 'gpu_out', label: 'GPU 0' }],
+		edges: [],
+	}
+	cfg.screenDestinations = {
+		version: 1,
+		destinations: [
+			{
+				id: 'dst_pgm1',
+				label: 'PGM 1',
+				mainScreenIndex: 0,
+				mode: 'pgm_only',
+				videoMode: '1080p5000',
+				width: 1920,
+				height: 1080,
+				fps: 50,
+				caspar: { bus: 'pgm' },
+			},
+		],
+		edidNotes: '',
+	}
+	const ctx = {
+		config: cfg,
+		configManager: {
+			get: () => cfg,
+			save: (next) => Object.assign(cfg, next),
+		},
+	}
+	const hc = phc.buildHardwareConfigFromConfig(cfg, fakePersistence)
+	hc.audioRouting = { version: 1, channels: [{ id: 'saved', label: 'Saved PGM' }] }
+
+	const res = await routesData.handleProject('/api/project/apply-hardware', JSON.stringify({ hardwareConfig: hc }), ctx)
+	assert.equal(res.status, 200)
+	const body = JSON.parse(res.body)
+	assert.equal(body.ok, true)
+	assert.equal(body.applied, true)
+	assert.equal(cfg.audioRouting.channels[0].id, 'saved')
+	assert.equal(cfg.deviceGraph.connectors.length, 1)
+})

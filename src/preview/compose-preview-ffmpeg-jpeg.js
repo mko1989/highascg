@@ -75,14 +75,12 @@ function stopFfmpegJpegComposePreview(ctx) {
 }
 
 /**
- * Poll interval aligned with compose preview fps / tickIntervalMs (25 fps → 40 ms).
+ * Poll interval aligned with compose preview fps (25 fps → 40 ms).
  * @param {object} [config]
  * @returns {number}
  */
 function resolveMtimePollMs(config) {
 	const cp = config?.composePreview || {}
-	const tickMs = parseInt(String(cp.tickIntervalMs ?? ''), 10)
-	if (Number.isFinite(tickMs) && tickMs >= 40 && tickMs <= 1000) return tickMs
 	const fps = clampComposePreviewFps(cp.fps, 25)
 	return Math.max(40, Math.floor(1000 / fps))
 }

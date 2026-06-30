@@ -7,8 +7,9 @@
 'use strict'
 
 const { getChannelResolutionForChannel } = require('./scene-native-fill')
-const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
+const { sendAmcpLinesSequential, inferProgramChannelFromAmcpLines } = require('../caspar/amcp-batch')
 const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
+const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 
 const utils = require('./pip-overlay-utils')
 const globalBorder = require('./global-border')
@@ -25,12 +26,35 @@ const {
 	buildPipOverlayCgPayload,
 	overlayLayerSlot,
 	shouldStripPipSlotBeforeAdd,
+	computePipOverlayPlacement,
+	computePipRouterPlacement,
 } = utils
+
+function pipOverlayMixerLines(cl, mixFill, contentRotation = 0) {
+	const casparFill = fillForSceneLayerRotationAnchor(mixFill, contentRotation)
+	const lines = [
+		deferMixerAmcpLine(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`),
+		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
+		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`),
+	]
+	lines.push(...sceneLayerRotationMixerLines(cl, contentRotation, { deferRotation: true }))
+	return lines
+}
 
 /**
  * Build AMCP commands to apply a PIP overlay on a scene layer.
  */
-function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, contentFill, appCtx, stackIndex = 0, nextContentLayer) {
+function buildPipOverlayAmcpLines(
+	overlay,
+	channel,
+	contentPhysicalLayer,
+	contentFill,
+	appCtx,
+	stackIndex = 0,
+	nextContentLayer,
+	contentRotation = 0,
+	allOverlays,
+) {
 	if (!overlay?.type) return []
 	const template = TEMPLATE_MAP[overlay.type]
 	if (!template) return []
@@ -38,24 +62,26 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
 	const chW = res?.w > 0 ? res.w : 1920
 	const chH = res?.h > 0 ? res.h : 1080
+	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
 
-	const cf = normalizeContentFill(contentFill)
-	const pParams = mergeOverlayParams(overlay)
-	const side = String(pParams.side || 'outside').toLowerCase()
-	const forceExpanded = side === 'outside'
-	const outset = outsetPxForPipOverlay(overlay)
-
-	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
+	const placement = computePipOverlayPlacement(
+		overlay,
+		contentFill,
+		chW,
+		chH,
+		contentPhysicalLayer,
+		stackIndex,
+		nextContentLayer,
+		stack,
+	)
+	const { mixFill, oLayer } = placement
+	const cl = `${channel}-${oLayer}`
+	const data = buildPipOverlayCgPayload(overlay, placement)
+	const out = []
 	const p = Number(contentPhysicalLayer)
 	const idx = stackIndex | 0
 	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
 
-	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
-	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
-	const cl = `${channel}-${oLayer}`
-	const data = buildPipOverlayCgPayload(overlay, inner)
-	const out = []
-	
 	if (aligned) {
 		const leg = overlayLayerSlot(p, idx)
 		if (Number.isFinite(leg) && leg !== oLayer) {
@@ -65,9 +91,9 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 	}
 	out.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${data.replace(/"/g, '\\"')}"`,
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
-		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
-		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`)
+		`CG ${cl} PLAY 0`,
+		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
+		...pipOverlayMixerLines(cl, mixFill, contentRotation),
 	)
 	return out
 }
@@ -75,17 +101,17 @@ function buildPipOverlayAmcpLines(overlay, channel, contentPhysicalLayer, conten
 /**
  * AMCP lines for every overlay in order (index 0 = bottom of stack).
  */
-function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer, prevSceneLayer) {
+function buildPipOverlayAmcpLinesAll(
+	overlays,
+	channel,
+	contentPhysicalLayer,
+	contentFill,
+	appCtx,
+	nextContentLayer,
+	prevSceneLayer,
+	contentRotation = 0,
+) {
 	if (!Array.isArray(overlays) || overlays.length === 0) return []
-
-	if (overlays.length > 1) {
-		const prevPips = pipOverlaysFromLayer(prevSceneLayer)
-		if (prevPips.length > 1) {
-			return buildPipOverlayRouterUpdateLines(channel, contentPhysicalLayer, overlays, contentFill, appCtx, nextContentLayer)
-		} else {
-			return buildPipOverlayRouterAmcpLines(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer)
-		}
-	}
 
 	const lines = []
 	const prevPips = pipOverlaysFromLayer(prevSceneLayer)
@@ -94,7 +120,8 @@ function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, co
 			overlays[i] &&
 			prevPips[i] &&
 			overlays[i].type &&
-			String(overlays[i].type) === String(prevPips[i].type)
+			String(overlays[i].type) === String(prevPips[i].type) &&
+			utils.effectivePipOverlaySide(overlays[i]) === utils.effectivePipOverlaySide(prevPips[i])
 		) {
 			const chunk = buildPipOverlayUpdateLines(
 				channel,
@@ -103,11 +130,23 @@ function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, co
 				contentFill,
 				appCtx,
 				i,
-				nextContentLayer
+				nextContentLayer,
+				contentRotation,
+				overlays,
 			)
 			lines.push(...chunk)
-		} else {
-			const chunk = buildPipOverlayAmcpLines(overlays[i], channel, contentPhysicalLayer, contentFill, appCtx, i, nextContentLayer)
+		} else if (overlays[i]) {
+			const chunk = buildPipOverlayAmcpLines(
+				overlays[i],
+				channel,
+				contentPhysicalLayer,
+				contentFill,
+				appCtx,
+				i,
+				nextContentLayer,
+				contentRotation,
+				overlays,
+			)
 			lines.push(...chunk)
 		}
 	}
@@ -117,113 +156,113 @@ function buildPipOverlayAmcpLinesAll(overlays, channel, contentPhysicalLayer, co
 /**
  * CG UPDATE with recomputed inner (call with same contentFill as video layer).
  */
-function buildPipOverlayUpdateLines(channel, contentPhysicalLayer, overlay, contentFill, appCtx, stackIndex = 0, nextContentLayer) {
+function buildPipOverlayUpdateLines(
+	channel,
+	contentPhysicalLayer,
+	overlay,
+	contentFill,
+	appCtx,
+	stackIndex = 0,
+	nextContentLayer,
+	contentRotation = 0,
+	allOverlays,
+) {
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
 	const cl = `${channel}-${oLayer}`
 	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
 	const chW = res?.w > 0 ? res.w : 1920
 	const chH = res?.h > 0 ? res.h : 1080
-	const cf = normalizeContentFill(contentFill)
-	const pParamsU = mergeOverlayParams(overlay)
-	const sideU = String(pParamsU.side || 'outside').toLowerCase()
-	const forceExpandedU = sideU === 'outside'
-	const outsetU = outsetPxForPipOverlay(overlay)
-
-	const p = Number(contentPhysicalLayer)
-	const idxU = stackIndex | 0
-	const alignedU = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idxU
-
-	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
-	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
-	const data = buildPipOverlayCgPayload(overlay, inner)
-	return [
-		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
-	]
+	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
+	const placement = computePipOverlayPlacement(
+		overlay,
+		contentFill,
+		chW,
+		chH,
+		contentPhysicalLayer,
+		stackIndex,
+		nextContentLayer,
+		stack,
+	)
+	const data = buildPipOverlayCgPayload(overlay, placement)
+	return [`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`, ...pipOverlayMixerLines(cl, placement.mixFill, contentRotation)]
 }
 
 /**
  * Collapses all overlays for a layer into a single "router" command.
  */
-function buildPipOverlayRouterAmcpLines(overlays, channel, contentPhysicalLayer, contentFill, appCtx, nextContentLayer) {
+function buildPipOverlayRouterAmcpLines(
+	overlays,
+	channel,
+	contentPhysicalLayer,
+	contentFill,
+	appCtx,
+	nextContentLayer,
+	contentRotation = 0,
+) {
 	if (!Array.isArray(overlays) || overlays.length === 0) return []
 
 	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
 	const chW = res?.w > 0 ? res.w : 1920
 	const chH = res?.h > 0 ? res.h : 1080
-	const cf = normalizeContentFill(contentFill)
-
-	let maxOutset = 0
-	let anyOutside = false
-	for (const o of overlays) {
-		const p = mergeOverlayParams(o)
-		if (p.side === 'outside') {
-			anyOutside = true
-			maxOutset = Math.max(maxOutset, outsetPxForPipOverlay(o))
-		}
-	}
-
-	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
-	const p = Number(contentPhysicalLayer)
-	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP
-
-	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
-	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+	const { inner, mixFill, oLayer, effects } = computePipRouterPlacement(
+		overlays,
+		contentFill,
+		chW,
+		chH,
+		contentPhysicalLayer,
+		nextContentLayer,
+	)
 
 	const cl = `${channel}-${oLayer}`
 	const data = JSON.stringify({
 		inner,
 		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
-		effects: overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
+		effects: effects || overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
 	})
 
 	return [
 		`CG ${cl} ADD 0 "pip_router" 1 "${data.replace(/"/g, '\\"')}"`,
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
-		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
-		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`),
+		`CG ${cl} PLAY 0`,
+		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
+		...pipOverlayMixerLines(cl, mixFill, contentRotation),
 	]
 }
 
 /**
  * Update the router command.
  */
-function buildPipOverlayRouterUpdateLines(channel, contentPhysicalLayer, overlays, contentFill, appCtx, nextContentLayer) {
+function buildPipOverlayRouterUpdateLines(
+	channel,
+	contentPhysicalLayer,
+	overlays,
+	contentFill,
+	appCtx,
+	nextContentLayer,
+	contentRotation = 0,
+) {
 	if (!Array.isArray(overlays) || overlays.length === 0) return []
 
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
 	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
 	const chW = res?.w > 0 ? res.w : 1920
 	const chH = res?.h > 0 ? res.h : 1080
-	const cf = normalizeContentFill(contentFill)
-
-	let maxOutset = 0
-	let anyOutside = false
-	for (const o of overlays) {
-		const p = mergeOverlayParams(o)
-		if (p.side === 'outside') {
-			anyOutside = true
-			maxOutset = Math.max(maxOutset, outsetPxForPipOverlay(o))
-		}
-	}
-
-	const p = Number(contentPhysicalLayer)
-	const alignedU = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP
-
-	const inner = { l: cf.x, t: cf.y, w: cf.scaleX, h: cf.scaleY }
-	const mixFill = { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+	const { inner, mixFill, effects } = computePipRouterPlacement(
+		overlays,
+		contentFill,
+		chW,
+		chH,
+		contentPhysicalLayer,
+		nextContentLayer,
+	)
 
 	const cl = `${channel}-${oLayer}`
 	const data = JSON.stringify({
 		inner,
 		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
-		effects: overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
+		effects: effects || overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
 	})
 
-	return [
-		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${mixFill.x} ${mixFill.y} ${mixFill.scaleX} ${mixFill.scaleY} 0`),
-	]
+	return [`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`, ...pipOverlayMixerLines(cl, mixFill, contentRotation)]
 }
 
 /**
@@ -327,6 +366,13 @@ async function sendPipOverlayLinesSerial(amcp, lines) {
 	const clean = dedupeAmcpLineOrderPreserving(lines)
 	if (clean.length === 0) return
 	await sendAmcpLinesSequential(clean, amcp)
+	const ch = inferProgramChannelFromAmcpLines(clean)
+	if (
+		ch != null &&
+		clean.some((line) => /\bDEFER\b/i.test(line) && /^MIXER\s+\d+-\d+\s+/i.test(String(line).trim()))
+	) {
+		await amcp.mixerCommit(ch)
+	}
 }
 
 module.exports = {

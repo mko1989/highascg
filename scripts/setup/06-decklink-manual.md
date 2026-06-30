@@ -29,6 +29,28 @@ sudo highascg-display-mode x11-only   # if command exists from full install
 
 ## Install
 
+**From exFAT / bridge (live USB stick):** copy `.deb` files from the tarball
+`deb/x86_64/` into `decklink/` on the USB stick (`HIGHASCGEXF`) or bridge disk
+(`HIGHASCGDAT`):
+
+```text
+decklink/desktopvideo_<version>_amd64.deb       ← required for Caspar decklink I/O
+decklink/desktopvideo-gui_<version>_amd64.deb   ← optional (Setup / Updater GUI)
+```
+
+**`desktopvideo` alone is enough** when the DeckLink card is on appropriate firmware
+and Caspar channel settings are already correct. Without `desktopvideo-gui`, Settings
+→ **Desktop Video Setup** / **Updater** report that the GUI is not installed — playout
+is unaffected.
+
+On boot, `highascg-decklink-install.service` installs when needed and **skips** when
+both packages are already installed at that version or newer. Log:
+`/var/log/highascg/decklink-install.log`
+
+Manual run: `sudo /usr/local/lib/highascg/decklink-install-from-exfat.sh --dry-run`
+
+**SSH / installer (build host or internal disk):**
+
 ```bash
 cd /tmp
 tar -xzf Blackmagic_Desktop_Video_Linux_*.tar.gz

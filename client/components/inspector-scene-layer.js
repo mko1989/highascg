@@ -192,10 +192,11 @@ export function renderSceneLayerInspector(deps, sel) {
 	renderPipOverlayGroup(root, {
 		pipOverlays: getPipOverlaysFromLayer(layer),
 		livePushContext: { sceneState, stateStore, sceneId, layerIndex },
+		rerenderSceneLayer: () => rerenderSceneLayer(sel),
 		onUpdate: (next) => {
 			sceneState.patchLayer(sceneId, layerIndex, { pipOverlays: next })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
-			// Do not rerenderSceneLayer here: <input type="color"> would unmount on every input and close the native picker.
+			// Param-only edits: avoid rerender (color picker unmounts). Structural changes rerender via renderPipOverlayGroup.
 		},
 	})
 

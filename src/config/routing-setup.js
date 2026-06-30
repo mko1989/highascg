@@ -210,7 +210,7 @@ async function setupMultiview(self, layout) {
 
 function syncAllTemplatesToDestination(self, destDir, label) {
 	if (!destDir || !fs.existsSync(destDir)) return 0
-	const srcRoot = path.join(REPO_ROOT, 'templates'); if (!fs.existsSync(srcRoot)) return 0
+	const srcRoot = path.join(REPO_ROOT, 'template'); if (!fs.existsSync(srcRoot)) return 0
 	let n = 0; for (const ent of fs.readdirSync(srcRoot, { withFileTypes: true })) {
 		if (!ent.isFile() || ent.name.startsWith('.')) continue
 		try { fs.copyFileSync(path.join(srcRoot, ent.name), path.join(destDir, ent.name)); n++ } catch {}
@@ -264,6 +264,8 @@ async function setupAllRouting(self) {
 			await applyMultiviewLayout(self._multiviewLayout, self)
 		} catch {}
 	}
+	const { setupHostLiveSources } = require('./host-live-sources-setup')
+	await setupHostLiveSources(self)
 	if (map.streamingCh != null && self.amcp) {
 		// Attach mode: `streamingCh` is an existing program/preview bus — it already has output; do not layer route:// on it.
 		if (map.streamingAttachToChannel == null) {

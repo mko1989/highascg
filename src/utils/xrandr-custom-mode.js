@@ -2,6 +2,7 @@
 
 const { execFileSync } = require('child_process')
 const { runTimingGenerator, parseModelineFromGeneratorOutput } = require('./modeline-timings')
+const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 
 /** @param {string} text */
 function parseModelineFromCvtOutput(text) {
@@ -71,18 +72,34 @@ function pickBestExistingModeForPlan(plannedWxH, avail, safeRate) {
 }
 
 function readCreateMissingModes(config) {
-	if (!config || typeof config !== 'object') return false
+	if (!config || typeof config !== 'object') return true
 	const k = 'os_xrandr_create_missing_modes'
-	if (Object.prototype.hasOwnProperty.call(config, k)) {
-		const v = config[k]
-		return v === true || v === 'true' || v === 1 || v === '1'
+	let v
+	if (Object.prototype.hasOwnProperty.call(config, k)) v = config[k]
+	else {
+		const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
+		if (cs && Object.prototype.hasOwnProperty.call(cs, k)) v = cs[k]
 	}
-	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
-	if (cs && Object.prototype.hasOwnProperty.call(cs, k)) {
-		const v = cs[k]
-		return v === true || v === 'true' || v === 1 || v === '1'
-	}
-	return false
+	if (v === false || v === 'false' || v === 0 || v === '0') return false
+	if (v === true || v === 'true' || v === 1 || v === '1') return true
+	return true
+}
+
+/**
+ * Whether apply should register a new RandR mode (CVT/newmode/addmode).
+ * Driven by operator choice: **Custom** → create; **EDID list pick** → use token as-is.
+ *
+ * @param {object} config
+ * @param {'edid'|'custom'} osModeSource
+ * @param {string} plannedMode bare WxH from layout when custom
+ * @returns {boolean}
+ */
+function shouldCreateXrandrModeForPlan(config, osModeSource, plannedMode) {
+	if (String(osModeSource || '').toLowerCase() === 'edid') return false
+	if (String(osModeSource || '').toLowerCase() !== 'custom') return false
+	const planned = String(plannedMode || '').trim()
+	if (!/^\d+x\d+$/i.test(planned)) return false
+	return readCreateMissingModes(config)
 }
 
 /**
@@ -127,12 +144,11 @@ function stripExistingXrandrModeByName(p) {
 }
 
 /**
- * Create an xrandr mode via `cvt` + `--newmode` + `--addmode` when EDID does not list it.
- * If the mode name already exists (e.g. reapplied layout), switches the output away, `--delmode` / `--rmmode`, then recreates.
- * @param {{ output: string, width: number, height: number, refreshHz: number, env: NodeJS.ProcessEnv, logger?: object, availableModes?: Set<string>, timingKind?: string }} args
- * @returns {string|null} xrandr mode name (e.g. `1920x1080_50.00`) or null on failure
+ * Compute CVT/GTF modeline for WxH×Hz without touching xrandr (persist script + preview parity).
+ * @param {{ width: number, height: number, refreshHz: number, env?: NodeJS.ProcessEnv, timingKind?: string, logger?: object }} args
+ * @returns {{ modeName: string, timings: string[], width: number, height: number, refreshHz: number, timingKind: 'cvt'|'cvt_r'|'gtf' } | null}
  */
-function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger, availableModes, timingKind }) {
+function computeModelineForWxH({ width, height, refreshHz, env, timingKind, logger }) {
 	const W = parseInt(String(width), 10)
 	const H = parseInt(String(height), 10)
 	const r = Number(refreshHz)
@@ -140,19 +156,38 @@ function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger
 	const hz = Number.isFinite(r) && r > 0 && r < 240 ? r : 60
 	const kindRaw = String(timingKind || 'cvt').toLowerCase().replace(/-/g, '_')
 	const kind = kindRaw === 'gtf' ? 'gtf' : kindRaw === 'cvt_r' ? 'cvt_r' : 'cvt'
-	let cvtText = ''
+	let genText = ''
 	try {
-		cvtText = runTimingGenerator(kind, W, H, hz, env)
+		genText = runTimingGenerator(kind, W, H, hz, env)
 	} catch (e) {
-		if (logger) logger.warn(`[OS-Config] ${kind} modeline generator failed: ${e.message}`)
+		if (logger && logger.warn) logger.warn(`[OS-Config] ${kind} modeline generator failed: ${e.message}`)
 		return null
 	}
-	const parsed = parseModelineFromCvtOutput(cvtText)
+	const parsed = parseModelineFromCvtOutput(genText)
 	if (!parsed) {
-		if (logger) logger.warn(`[OS-Config] Could not parse Modeline from ${kind} output`)
+		if (logger && logger.warn) logger.warn(`[OS-Config] Could not parse Modeline from ${kind} output`)
 		return null
 	}
-	const { modeName, timings } = parsed
+	return {
+		modeName: parsed.modeName,
+		timings: parsed.timings,
+		width: W,
+		height: H,
+		refreshHz: hz,
+		timingKind: kind,
+	}
+}
+
+/**
+ * Create an xrandr mode via `cvt` + `--newmode` + `--addmode` when EDID does not list it.
+ * If the mode name already exists (e.g. reapplied layout), switches the output away, `--delmode` / `--rmmode`, then recreates.
+ * @param {{ output: string, width: number, height: number, refreshHz: number, env: NodeJS.ProcessEnv, logger?: object, availableModes?: Set<string>, timingKind?: string }} args
+ * @returns {string|null} xrandr mode name (e.g. `1920x1080_50.00`) or null on failure
+ */
+function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger, availableModes, timingKind }) {
+	const plan = computeModelineForWxH({ width, height, refreshHz, env, timingKind, logger })
+	if (!plan) return null
+	const { modeName, timings } = plan
 	const newmodeArgs = ['--display', ':0', '--newmode', modeName, ...timings]
 	let didReplace = false
 	try {
@@ -187,15 +222,19 @@ function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger
 	}
 	if (logger) {
 		const tag = didReplace ? 'replaced' : 'registered'
-		logger.info(`[OS-Config] ${tag} custom mode ${modeName} on ${output} (${W}x${H} @ ${hz} Hz) via ${kind}`)
+		logger.info(
+			`[OS-Config] ${tag} custom mode ${modeName} on ${output} (${plan.width}x${plan.height} @ ${plan.refreshHz} Hz) via ${plan.timingKind}`
+		)
 	}
 	return modeName
 }
 
 module.exports = {
 	parseModelineFromCvtOutput,
+	computeModelineForWxH,
 	tryAddXrandrModeFromCvt,
 	readCreateMissingModes,
+	shouldCreateXrandrModeForPlan,
 	pickStripFallbackMode,
 	pickBestExistingModeForPlan,
 	rateHintFromModeSuffix,

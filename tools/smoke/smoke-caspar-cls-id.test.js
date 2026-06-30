@@ -18,11 +18,9 @@ test('toCasparClsMediaId: already CLS id is unchanged', () => {
 	assert.equal(toCasparClsMediaId('BRIDGE/EXFAT/MAIN SCREEN'), 'BRIDGE/EXFAT/MAIN SCREEN')
 })
 
-test('stripMediaFileExtension: nested wav path', () => {
-	assert.equal(
-		stripMediaFileExtension('testowe/foo/PK BACK TRACK.wav'),
-		'testowe/foo/PK BACK TRACK',
-	)
+test('stripMediaFileExtension: QuickTime .qt container', () => {
+	assert.equal(stripMediaFileExtension('clips/intro.qt'), 'clips/intro')
+	assert.equal(toCasparClsMediaId('clips/intro.qt'), 'CLIPS/INTRO')
 })
 
 test('resolveCasparCinfMediaId: prefers exact CLS catalog row', () => {
@@ -66,4 +64,20 @@ test('resolveClipForAmcpLoad: prefers CLS catalog row over expansion', () => {
 		persistence: { get: () => 'untitled777' },
 	}
 	assert.equal(resolveClipForAmcpLoad('clip.mov', ctx), 'PROJECTS/EVENING/CLIP')
+})
+
+const { normalizeClipPlayAmcpLine } = require('../../src/caspar/amcp-clip-resolve')
+
+test('normalizeClipPlayAmcpLine: expands project basename in PLAY', () => {
+	const ctx = {
+		config: { projectScopedMedia: { enabled: true } },
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled888' : null) },
+	}
+	const line = normalizeClipPlayAmcpLine('PLAY 2-10 "MAIN SCREEN.png"', ctx)
+	assert.equal(line, 'PLAY 2-10 "PROJECTS/UNTITLED888/MAIN SCREEN"')
+})
+
+test('normalizeClipPlayAmcpLine: leaves route clips unchanged', () => {
+	const line = normalizeClipPlayAmcpLine('PLAY 2-20 route://1-10', null)
+	assert.equal(line, 'PLAY 2-20 route://1-10')
 })

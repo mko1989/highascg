@@ -9,7 +9,7 @@ function casparScreenDefaults(n, ndiName) {
 		[`${p}windowed`]: true,
 		/** NVIDIA: keep true; driver Sync to VBlank must be off — docs/reference/screen-consumer-vsync-nvidia.md */
 		[`${p}vsync`]: true,
-		[`${p}borderless`]: false,
+		[`${p}borderless`]: true,
 		[`${p}always_on_top`]: false,
 		[`${p}decklink_device`]: 0,
 		[`${p}decklink_key_device`]: 0,
@@ -69,7 +69,7 @@ function casparServerDefaults() {
 		multiview_force_linear_filter: false,
 		decklink_inputs_host_channel_enabled: false,
 		decklink_input_count: 0,
-		decklink_inputs_host: 'multiview_if_match',
+		decklink_inputs_host: 'dedicated',
 		decklink_input_1_device: 0,
 		decklink_input_2_device: 0,
 		decklink_input_3_device: 0,

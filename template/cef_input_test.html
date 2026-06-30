@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>CEF input test</title>
+	<style>
+		* { box-sizing: border-box; margin: 0; }
+		html, body { width: 100%; height: 100%; font: 48px/1.2 sans-serif; }
+		body {
+			display: flex; flex-direction: column; align-items: center; justify-content: center;
+			background: #c0392b; color: #fff; text-align: center; cursor: pointer;
+		}
+		#keys { font-size: 28px; margin-top: 1rem; opacity: 0.9; }
+	</style>
+</head>
+<body tabindex="0">
+	<div id="msg">CLICK ME — count: 0</div>
+	<div id="keys">keys: (none)</div>
+	<script>
+		let n = 0
+		const msg = document.getElementById('msg')
+		const keys = document.getElementById('keys')
+		const colors = ['#c0392b', '#27ae60', '#2980b9', '#8e44ad', '#d35400']
+		function bump() {
+			n++
+			document.body.style.background = colors[n % colors.length]
+			msg.textContent = 'CLICK ME — count: ' + n
+		}
+		document.body.addEventListener('click', bump)
+		document.body.addEventListener('keydown', (e) => {
+			keys.textContent = 'keys: ' + e.key
+			if (e.key === ' ' || e.key === 'Enter') bump()
+		})
+		window.__cefInputTest = () => ({ count: n, bg: document.body.style.background })
+	</script>
+</body>
+</html>

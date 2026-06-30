@@ -4,7 +4,7 @@ set -euo pipefail
 
 USB_LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
 MP="${HIGHASCG_EXFAT_ROOT:-/home/casparcg/exfat}"
-WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-8}"
+WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-5}"
 LOG=/var/log/highascg-exfat-boot.log
 
 log() {
@@ -20,10 +20,7 @@ log() {
 mkdir -p "$(dirname "$LOG")"
 touch "$LOG"
 
-if systemctl cat highascg-bridge-boot.service &>/dev/null; then
-	log "Starting highascg-bridge-boot.service (LABEL=HIGHASCGDAT when present)"
-	systemctl start highascg-bridge-boot.service 2>>"$LOG" || log "WARN: bridge-boot failed or skipped"
-fi
+# highascg-bridge-boot.service runs before this unit (systemd After=); do not wait again here.
 
 USB_DEV="/dev/disk/by-label/${USB_LABEL}"
 if ! findmnt -n "$MP" &>/dev/null; then
@@ -79,6 +76,11 @@ done
 if systemctl cat highascg-exfat-server-update.service &>/dev/null; then
 	log "Starting highascg-exfat-server-update.service (blocking — apply drop-update/ before highascg)"
 	systemctl start highascg-exfat-server-update.service 2>>"$LOG" || log "WARN: server-update failed or skipped"
+fi
+
+if systemctl cat highascg-decklink-install.service &>/dev/null; then
+	log "Starting highascg-decklink-install.service (operator Desktop Video debs on decklink/)"
+	systemctl start highascg-decklink-install.service 2>>"$LOG" || log "WARN: decklink-install failed or skipped"
 fi
 
 if systemctl cat home-casparcg-highascg-media-exfat.mount &>/dev/null; then

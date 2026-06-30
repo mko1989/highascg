@@ -60,15 +60,34 @@ rsync_drop_members() {
 	local dest="$1"
 	mkdir -p "$dest"
 	local members=(index.js package.json package-lock.json src config template scripts tools/runtime dist-web)
-	local m
+	local m src parent
 	for m in "${members[@]}"; do
-		[[ -e "${REPO_ROOT}/${m}" ]] || continue
-		rsync -a --delete "${REPO_ROOT}/${m}" "${dest}/"
+		src="${REPO_ROOT}/${m}"
+		[[ -e "$src" ]] || continue
+		if [[ -d "$src" ]]; then
+			parent="$(dirname "$m")"
+			[[ "$parent" != "." ]] && mkdir -p "${dest}/${parent}"
+			rsync -a --delete "${src%/}/" "${dest}/${m}/"
+		else
+			rsync -a "$src" "${dest}/"
+		fi
 	done
 	if [[ -f "${REPO_ROOT}/BUILD_STAMP" ]]; then
 		install -m 0644 -o root -g root "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
 	fi
 	chown -R "${USER_CASPAR}:${USER_CASPAR}" "$dest" 2>/dev/null || true
+}
+
+verify_drop_update_seed() {
+	local root="$1"
+	local req f
+	for req in package.json index.js src dist-web/index.html tools/runtime/exfat-sync-cli.js; do
+		f="${root}/${req}"
+		[[ -e "$f" ]] || {
+			echo "ERROR: seed incomplete — missing drop-update/${req}" >&2
+			exit 1
+		}
+	done
 }
 
 apply_remote() {
@@ -84,6 +103,7 @@ apply_remote() {
 	trap cleanup_remote EXIT
 
 	rsync_drop_members "${tmp_dir}/drop-update"
+	verify_drop_update_seed "${tmp_dir}/drop-update"
 
 	echo "==> SSH to ${REMOTE} (enter password once if prompted — reused for rsync + apply)"
 	ssh -o ControlMaster=yes -o ControlPath="$socket" -o ControlPersist=120 -f -N "$REMOTE"
@@ -142,14 +162,7 @@ apply_local_exfat() {
 	echo "==> Seed ${MP}/drop-update/ (server + dist-web for live UI)"
 	rsync_drop_members "${MP}/drop-update"
 	sync
-	[[ -f "${MP}/drop-update/package.json" ]] || {
-		echo "ERROR: seed failed — ${MP}/drop-update/package.json missing" >&2
-		exit 1
-	}
-	[[ -f "${MP}/drop-update/dist-web/index.html" ]] || {
-		echo "ERROR: seed failed — ${MP}/drop-update/dist-web/index.html missing" >&2
-		exit 1
-	}
+	verify_drop_update_seed "${MP}/drop-update"
 	echo "OK: drop-update seeded — $(findmnt -n -o SOURCE "$MP")"
 	echo "    $(find "${MP}/drop-update" -type f 2>/dev/null | wc -l) files on stick (retain mode — safe on build host)"
 }

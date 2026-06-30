@@ -22,7 +22,7 @@ import { getAppWs } from '../lib/app-runtime.js'
 import { flushSceneDeckSync } from '../lib/app-scene-deck.js'
 import { initConfigStrip } from './header-bar-config-strip.js'
 import { projectFileIdFromName } from '../lib/project-files.js'
-import { normalizeProjectMediaRefs } from '../lib/project-media-context.js'
+import { normalizeProjectMediaRefs, syncProjectMediaContextFromClient } from '../lib/project-media-context.js'
 import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.js'
 import { showLoadProjectModal } from './load-project-modal.js'
 import { applyDefaultUntitledProjectLocally } from '../lib/default-project.js'
@@ -49,11 +49,16 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	nameInp.placeholder = 'Project name'
 	nameInp.value = projectState.getProjectName()
 	nameInp.title = 'Project name'
+	const syncMediaFolderForName = () => {
+		syncProjectMediaContextFromClient(settingsState.getSettings())
+	}
 	nameInp.addEventListener('change', () => {
 		projectState.setProjectName(nameInp.value)
+		syncMediaFolderForName()
 	})
 	nameInp.addEventListener('blur', () => {
 		projectState.setProjectName(nameInp.value)
+		syncMediaFolderForName()
 	})
 	nameWrap.appendChild(nameInp)
 
@@ -228,7 +233,6 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	settingsBtn.title = 'Application Settings (Ctrl+,)'
 	settingsBtn.setAttribute('aria-label', 'Application settings')
 	settingsBtn.addEventListener('click', () => showSettingsModal())
-
 
 	const ledTestWrap = document.createElement('div')
 	ledTestWrap.className = 'header-led-test'

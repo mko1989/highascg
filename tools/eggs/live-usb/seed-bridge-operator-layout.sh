@@ -13,6 +13,7 @@ mkdir -p \
 	"${ROOT}/projects" \
 	"${ROOT}/projects/_autosave" \
 	"${ROOT}/drop-config" \
+	"${ROOT}/decklink" \
 	"${ROOT}/.private"
 
 README="${ROOT}/README.txt"
@@ -27,6 +28,21 @@ HighAsCG bridge partition (LABEL=HIGHASCGDAT)
   .private/     Per-machine Tailscale/Syncthing/replication secrets (not in configs/)
 
 Format: mkfs.exfat -L HIGHASCGDAT /dev/sdXN
+EOF
+fi
+
+README_DECKLINK="${ROOT}/decklink/README.txt"
+mkdir -p "${ROOT}/decklink"
+if [[ ! -f "$README_DECKLINK" ]]; then
+	cat >"$README_DECKLINK" <<'EOF'
+DeckLink Desktop Video — operator .deb files from Blackmagic tarball deb/x86_64/:
+
+  desktopvideo_<version>_amd64.deb       required for Caspar decklink I/O
+  desktopvideo-gui_<version>_amd64.deb    optional — Setup / Updater GUI only
+
+Installed at boot when needed (skipped if already on system).
+desktopvideo alone is enough when card firmware is current; without desktopvideo-gui
+the Settings Desktop Video Setup button reports GUI not installed.
 EOF
 fi
 

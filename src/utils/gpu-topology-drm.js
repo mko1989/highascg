@@ -449,6 +449,7 @@ function discoverGpuPhysicalTopologyFromDrm(opts = {}) {
  * @returns {{ rows: object[], source: string, cards?: string[] } | null}
  */
 function discoverGpuPhysicalTopology(opts = {}) {
+	const cfg = opts.config && typeof opts.config === 'object' ? opts.config : {}
 	let xrandrRaw = opts.xrandrRaw
 	if (xrandrRaw == null) {
 		try {
@@ -457,9 +458,21 @@ function discoverGpuPhysicalTopology(opts = {}) {
 		} catch {
 			xrandrRaw = ''
 		}
+		if (!xrandrRaw) {
+			try {
+				const { readBootXrandrSnapshot } = require('./boot-xrandr-snapshot')
+				xrandrRaw = readBootXrandrSnapshot()?.raw || ''
+			} catch {
+				xrandrRaw = ''
+			}
+		}
 	}
 
-	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr(xrandrRaw)
+	const xrandrOpts = {
+		flatPorts: cfg.gpuPhysicalFlatXrandrPorts === true,
+		pairAdjacentDp: cfg.gpuPhysicalPairAdjacentDp !== false,
+	}
+	const fromXrandr = discoverGpuPhysicalTopologyFromXrandr(xrandrRaw, xrandrOpts)
 	if (fromXrandr?.length) {
 		return { rows: fromXrandr, source: 'xrandr', cards: ['card0'] }
 	}

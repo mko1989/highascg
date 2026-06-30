@@ -15,6 +15,50 @@ function isTimelineTabActive() {
 }
 
 /**
+ * Snap targets: timeline bounds, playhead, flag times, clip in/out edges.
+ * @param {object} tl
+ * @param {{ position?: number }|null|undefined} playback
+ * @param {{ clipId?: string, flagId?: string }} [exclude]
+ */
+function buildTimelineSnapCandidates(tl, playback, exclude = {}) {
+	const candidates = new Set([0, tl.duration || 0])
+	const nowPointer = playback?.position
+	if (nowPointer != null && Number.isFinite(nowPointer)) {
+		candidates.add(Math.round(nowPointer))
+	}
+	for (const f of tl.flags || []) {
+		if (exclude.flagId && f.id === exclude.flagId) continue
+		candidates.add(Math.round(f.timeMs))
+	}
+	for (const layer of tl.layers || []) {
+		for (const c of layer.clips || []) {
+			if (exclude.clipId && c.id === exclude.clipId) continue
+			candidates.add(Math.round(c.startTime))
+			candidates.add(Math.round(c.startTime + (c.duration || 0)))
+		}
+	}
+	return Array.from(candidates).sort((a, b) => a - b)
+}
+
+/** @param {number[]} candidates sorted ascending */
+function prevSnapPoint(candidates, currentMs, epsilon = 1) {
+	let best = null
+	for (const t of candidates) {
+		if (t < currentMs - epsilon) best = t
+		else break
+	}
+	return best
+}
+
+/** @param {number[]} candidates sorted ascending */
+function nextSnapPoint(candidates, currentMs, epsilon = 1) {
+	for (const t of candidates) {
+		if (t > currentMs + epsilon) return t
+	}
+	return null
+}
+
+/**
  * @param {ReturnType<typeof import('../lib/timeline-state.js').timelineState.getTimeline>} getSel
  */
 function freshClipSelection(getSelectedClip) {
@@ -141,26 +185,69 @@ function handleTimelineEditorKeydown(e, deps) {
 		if (tl) {
 			e.preventDefault()
 			const pb = getPlayback()
-			const current = pb.position
-			const edges = new Set([0, tl.duration || 0])
-			for (const l of tl.layers || []) {
-				for (const c of l.clips || []) {
-					edges.add(c.startTime)
-					edges.add(c.startTime + c.duration)
-				}
-			}
-			const sorted = Array.from(edges).sort((a, b) => a - b)
-			let targetMs = null
-			if (e.key === 'ArrowRight') {
-				targetMs = sorted.find((t) => t > current + 1)
-			} else {
-				targetMs = sorted.slice().reverse().find((t) => t < current - 1)
-			}
-			if (targetMs != null) {
-				api.post(`/api/timelines/${encodeURIComponent(tl.id)}/seek`, { ms: targetMs }).catch(() => {})
+			const current = Math.round(pb.position)
+			const candidates = buildTimelineSnapCandidates(tl, pb)
+			const target =
+				e.key === 'ArrowRight' ? nextSnapPoint(candidates, current) : prevSnapPoint(candidates, current)
+			if (target != null) {
+				pb.position = target
+				redrawTimelineView()
+				api.post(`/api/timelines/${encodeURIComponent(tl.id)}/seek`, { ms: target }).catch(() => {})
 			}
 		}
 		return
+	}
+
+	if (!inField && e.altKey && !e.shiftKey && !mod && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+		const tl = timelineState.getActive()
+		if (!tl) return
+		const pb = getPlayback()
+		const flagSel = getSelectedFlagDetail()
+		const clipSel = freshClipSelection(getSelectedClip)
+
+		if (flagSel?.flagId && flagSel.timelineId === tl.id) {
+			const flag = tl.flags?.find((f) => f.id === flagSel.flagId)
+			if (!flag) return
+			const candidates = buildTimelineSnapCandidates(tl, pb, { flagId: flag.id })
+			const current = Math.round(flag.timeMs)
+			const target =
+				e.key === 'ArrowRight' ? nextSnapPoint(candidates, current) : prevSnapPoint(candidates, current)
+			if (target == null) return
+			e.preventDefault()
+			const clamped = Math.max(0, Math.min(target, tl.duration || 0))
+			timelineState.updateFlag(tl.id, flag.id, { timeMs: clamped })
+			const updated = timelineState.getTimeline(tl.id)?.flags?.find((f) => f.id === flag.id) || {
+				...flag,
+				timeMs: clamped,
+			}
+			const fd = { timelineId: tl.id, flagId: flag.id, flag: updated }
+			setSelectedFlagDetail(fd)
+			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: fd }))
+			void getSyncToServer()(tl)
+			redrawTimelineView()
+			return
+		}
+
+		if (clipSel && clipSel.timelineId === tl.id) {
+			const { timelineId, layerIdx, clipId, clip } = clipSel
+			const candidates = buildTimelineSnapCandidates(tl, pb, { clipId })
+			const current = Math.round(clip.startTime)
+			const target =
+				e.key === 'ArrowRight' ? nextSnapPoint(candidates, current) : prevSnapPoint(candidates, current)
+			if (target == null) return
+			e.preventDefault()
+			const maxStart = Math.max(0, (tl.duration || 0) - (clip.duration || 0))
+			const newStart = Math.max(0, Math.min(target, maxStart))
+			timelineState.updateClip(timelineId, layerIdx, clipId, { startTime: newStart })
+			void getSyncToServer()(tl)
+			redrawTimelineView()
+			const refreshed = freshClipSelection(getSelectedClip)
+			if (refreshed) {
+				setSelectedClip(refreshed)
+				window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: refreshed }))
+			}
+			return
+		}
 	}
 
 	if (!inField && !e.shiftKey && !mod && !e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {

@@ -342,11 +342,11 @@ ensure_highascg_caspar_launcher() {
     }
 
     local run_dest="${root}/run.sh"
-    local run_canonical="${SCRIPT_DIR}/tools/runtime/casparcg-run.sh"
+    local run_canonical="${SCRIPT_DIR}/run.sh"
     if [ -f "$run_canonical" ]; then
         run_src="$run_canonical"
-    elif [ -f "${SCRIPT_DIR}/run.sh" ]; then
-        run_src="${SCRIPT_DIR}/run.sh"
+    elif [ -f "${SCRIPT_DIR}/tools/runtime/casparcg-run.sh" ]; then
+        run_src="${SCRIPT_DIR}/tools/runtime/casparcg-run.sh"
     else
         run_src=""
     fi

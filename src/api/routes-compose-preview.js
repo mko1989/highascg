@@ -7,9 +7,12 @@ const {
 	handleComposePreviewPngGet,
 	handleComposePreviewCompanionGet,
 } = require('../preview/compose-preview-cache')
-const composeTick = require('../preview/compose-preview-tick')
 const ffmpegJpeg = require('../preview/compose-preview-ffmpeg-jpeg')
-const { isSnapshotComposePreview, resolveComposePreviewMode } = require('../preview/compose-preview-mode')
+const {
+	isSnapshotComposePreview,
+	resolveComposePreviewMode,
+	resolveMonitoredChannels,
+} = require('../preview/compose-preview-mode')
 
 /**
  * @param {string} path
@@ -37,10 +40,8 @@ async function handleGet(path, query, ctx) {
 			body: jsonBody({
 				enabled: isSnapshotComposePreview(ctx.config),
 				mode,
-				...(mode === 'ffmpeg_jpeg'
-					? ffmpegJpeg.getFfmpegJpegComposePreviewStats(ctx.config)
-					: composeTick.getComposePreviewStats(ctx.config)),
-				channels: composeTick.resolveMonitoredChannels(ctx.config),
+				...ffmpegJpeg.getFfmpegJpegComposePreviewStats(ctx.config),
+				channels: resolveMonitoredChannels(ctx.config),
 			}),
 		}
 	}
@@ -54,15 +55,8 @@ async function handleGet(path, query, ctx) {
  */
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/compose-preview/refresh') return null
-	const channels = composeTick.resolveMonitoredChannels(ctx.config)
-	if (resolveComposePreviewMode(ctx.config) === 'ffmpeg_jpeg') {
-		await ffmpegJpeg.startFfmpegJpegComposePreview(ctx)
-	} else {
-		composeTick.forceAllDirty(channels)
-		if (ctx.amcp && composeTick.isComposePreviewTickEnabled(ctx.config)) {
-			await composeTick.runComposePreviewTick(ctx)
-		}
-	}
+	const channels = resolveMonitoredChannels(ctx.config)
+	await ffmpegJpeg.startFfmpegJpegComposePreview(ctx)
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

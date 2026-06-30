@@ -60,6 +60,23 @@ function isStreamingChannelSettingsConfig(p) {
 }
 
 /**
+ * @param {object | null | undefined} prev
+ * @param {unknown} next
+ * @param {'rtmp' | 'record'} kind
+ */
+function mergeOutputSlice(prev, next, kind) {
+	const n = normalizeOutputSlice(next, kind)
+	if (!prev || typeof prev !== 'object') return n
+	const out = { ...n }
+	if (!Array.isArray(out.logs) && Array.isArray(prev.logs)) out.logs = prev.logs
+	if (out.lastError == null && prev.lastError != null) out.lastError = prev.lastError
+	if (out.url == null && prev.url != null) out.url = prev.url
+	if (kind === 'record' && out.path == null && prev.path != null) out.path = prev.path
+	if (kind === 'record' && out.channel == null && prev.channel != null) out.channel = prev.channel
+	return out
+}
+
+/**
  * @param {unknown} slice
  * @param {'rtmp' | 'record'} kind
  */
@@ -80,6 +97,7 @@ function normalizeOutputSlice(slice, kind) {
 		outputId: isActive ? outputId || activeOutputs[0] || null : null,
 		activeOutputs: isActive ? activeOutputs : [],
 		...(kind === 'record' && s.path != null ? { path: String(s.path) } : {}),
+		...(s.lastError != null ? { lastError: String(s.lastError) } : {}),
 		...(Array.isArray(s.logs) ? { logs: s.logs } : {}),
 	}
 }
@@ -162,8 +180,21 @@ export function setStreamingChannelStatus(next, opts = {}) {
 	if (!norm) return
 	if (opts.merge && status) {
 		status = {
-			rtmp: norm.rtmp?.active ? norm.rtmp : status.rtmp?.active ? status.rtmp : norm.rtmp,
-			record: norm.record?.active ? norm.record : status.record?.active ? status.record : norm.record,
+			rtmp: norm.rtmp?.active
+				? mergeOutputSlice(status.rtmp, norm.rtmp, 'rtmp')
+				: status.rtmp?.active
+					? status.rtmp
+					: mergeOutputSlice(status.rtmp, norm.rtmp, 'rtmp'),
+			record: norm.record?.active
+				? mergeOutputSlice(status.record, norm.record, 'record')
+				: status.record?.active
+					? status.record
+					: mergeOutputSlice(status.record, norm.record, 'record'),
+		}
+	} else if (status) {
+		status = {
+			rtmp: mergeOutputSlice(status.rtmp, norm.rtmp, 'rtmp'),
+			record: mergeOutputSlice(status.record, norm.record, 'record'),
 		}
 	} else {
 		status = norm

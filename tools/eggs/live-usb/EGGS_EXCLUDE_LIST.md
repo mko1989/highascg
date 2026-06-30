@@ -70,8 +70,9 @@ grep antigravity /etc/penguins-eggs.d/exclude.list
 | `media/*`, `log/`, `cef-cache/`, `data/` | Runtime on machine |
 | `home/casparcg/exfat/*` | Mounted at boot (WO-47) |
 | Tailscale state (`var/snap`, `snap/`, `root/snap/`, `var/lib`) | Not cloned (avoid stealing builder node) |
+| Blackmagic Desktop Video (`usr/lib/blackmagic`, DKMS modules, …) | **Not cloned** — build host may keep `desktopvideo`; operator installs from exFAT `decklink/` (WO-92) |
 
-**Stays on ISO:** Factory **`config/*.json`** (from `defaults.js` at build time), **`config/casparcg.config`** (from `casparcg.config.iso`), `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc. **Not** the build host’s operator JSON or **`.env`**.
+**Stays on ISO:** Factory **`config/*.json`** (from `defaults.js` at build time), **`config/casparcg.config`** (from `casparcg.config.iso`), `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc. **Not** the build host’s operator JSON or **`.env`**. **Not** DeckLink/BMD when `HIGHASCG_ISO_FORBID_DECKLINK=1` (default).
 
 See [`docs/WO47_ISO_VS_EXFAT.md`](../../../docs/WO47_ISO_VS_EXFAT.md).
 

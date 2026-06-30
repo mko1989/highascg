@@ -9,6 +9,7 @@ const defaults = require('../config/defaults')
 const { JSON_HEADERS, jsonBody, parseBody, parseQueryString } = require('./response')
 const usbDrives = require('../media/usb-drives')
 const { getDefaultIngestSubdir } = require('../media/project-media-root')
+const persistence = require('../utils/persistence')
 
 /**
  * @param {object} cfg
@@ -189,7 +190,7 @@ async function handleImport(ctx, body) {
 
 	let targetSubdir = targetSubdirExtra.trim()
 	if (!targetSubdir) {
-		targetSubdir = getDefaultIngestSubdir(ctx.config)
+		targetSubdir = getDefaultIngestSubdir(ctx.config, persistence)
 	}
 	if (!targetSubdir && uCfg.defaultSubfolder) {
 		targetSubdir = usbDrives.formatImportSubdirTemplate(uCfg.defaultSubfolder, drive)

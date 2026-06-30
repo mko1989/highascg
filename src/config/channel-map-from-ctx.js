@@ -65,6 +65,7 @@ function buildChannelMap(ctx) {
 		mode: m.mode,
 		route: m.route,
 		label: m.label,
+		sourceId: m.sourceId,
 		resolution: pickRes(m.channel),
 	}))
 	const decklinkInputChannels = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
@@ -102,6 +103,9 @@ function buildChannelMap(ctx) {
 		inputChannels,
 		decklinkInputChannels,
 		liveAudioInputChannels,
+		hostLiveChannels: Array.isArray(map.hostLiveChannels) ? map.hostLiveChannels : [],
+		webpageHostChannels: Array.isArray(map.webpageHostChannels) ? map.webpageHostChannels : [],
+		ndiHostChannels: Array.isArray(map.ndiHostChannels) ? map.ndiHostChannels : [],
 	}
 }
 

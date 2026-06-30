@@ -1,4 +1,6 @@
 import { buildInspectorTable, roleLabel } from './device-view-ui-utils.js'
+import { mountWebpageHostPageControls } from './inspector-webpage-host.js'
+import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 
@@ -293,21 +295,62 @@ export function renderDestinationInspector(args) {
 		removeDestination,
 		updateDestinationOutputLayer,
 		currentSettings,
+		lastPayload,
+		onWebpageHostApplied,
 	} = args
 	const projectDefaultMode = defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(currentSettings))
 
 	if (mode === 'host_channel' || d?.virtual === true) {
 		const role = d?.hostRole || intent?.hostRole
+		const ch = d?.casparChannel ?? intent?.pgmChannel
+		const inputEntry = (Array.isArray(lastPayload?.live?.caspar?.channelMap?.inputChannels)
+			? lastPayload.live.caspar.channelMap.inputChannels
+			: []
+		).find((e) => Number(e?.channel) === Number(ch) && (e?.kind === role || !role))
+		const extraLive = Array.isArray(lastPayload?.extraLiveSources) ? lastPayload.extraLiveSources : []
+		const liveSource =
+			extraLive.find((x) => {
+				const sid = String(x?.sourceId || '').trim()
+				if (!sid) return false
+				return String(d?.id || '') === `host_webpage_${sid}` || String(d?.id || '') === `host_ndi_${sid}`
+			}) ||
+			extraLive.find(
+				(x) =>
+					Number(x?.hostChannel) === Number(ch) &&
+					(x?.routeType === role || x?.hostRole === role),
+			) ||
+			null
 		const rows = [
 			{ label: 'Label', value: String(d?.label || d?.id || 'Host channel') },
 			{ label: 'Type', value: roleLabel({ role }) },
-			{ label: 'Caspar channel', value: String(d?.casparChannel ?? intent?.pgmChannel ?? '-') },
+			{ label: 'Caspar channel', value: String(ch ?? '-') },
 		]
+		if (inputEntry?.layer != null) rows.push({ label: 'Host layer', value: String(inputEntry.layer) })
+		if (inputEntry?.route) rows.push({ label: 'Route', value: String(inputEntry.route) })
+		if (liveSource?.sourceId) rows.push({ label: 'Source ID', value: String(liveSource.sourceId) })
+		if (role === 'ndi_host' && liveSource?.ndiName) {
+			rows.push({ label: 'NDI name', value: String(liveSource.ndiName) })
+		}
 		host.append(buildInspectorTable(rows))
+		if (role === 'webpage_host' && liveSource) {
+			mountWebpageHostPageControls(host, {
+				source: liveSource,
+				onApplied: (r) => {
+					if (Array.isArray(r?.extraLiveSources)) {
+						lastPayload.extraLiveSources = r.extraLiveSources
+					}
+					onWebpageHostApplied?.(r, liveSource)
+				},
+			})
+		}
 		const note = document.createElement('p')
 		note.className = 'device-view__note'
 		note.textContent =
-			role === 'decklink_input'
+			role === 'webpage_host'
+				? 'Persistent webpage host — Caspar plays HTML with LOOP on this channel. Drag route:// onto PGM or multiview for on-air; clearing the route does not destroy page state. Cable to Record or Stream to capture this bus.'
+				: role === 'ndi_host'
+					? 'Dedicated NDI host channel — the feed plays once here; on-air uses route:// only. Cable to Record or Stream to capture this NDI source directly.'
+					: role === 'decklink_input'
 				? 'Dedicated DeckLink input host channel. Cable this destination to Record or Stream on the rear panel to capture that input directly.'
 				: role === 'live_audio_input'
 					? 'Dedicated live-audio input host channel. Cable to Record or Stream to capture that ALSA/USB input bus.'
@@ -317,6 +360,9 @@ export function renderDestinationInspector(args) {
 					? 'Encode / streaming bus — RTMP and file record consumers attach here. Cable another destination (e.g. PGM) into Stream on the rear panel, or cable this host channel to Record to file from the encode bus.'
 					: 'Auxiliary Caspar channel. Cable to Record or Stream outputs on the rear panel.'
 		host.append(note)
+		if (role === 'ndi_host') {
+			host.append(createNdiAttributionElement('device-view__note ndi-attribution'))
+		}
 		if (mappedOutputEdges.length) {
 			const outputMapWrap = document.createElement('div')
 			outputMapWrap.className = 'device-view__kv'
@@ -350,7 +396,11 @@ export function renderDestinationInspector(args) {
 		{ label: 'Mode', value: mode === 'pgm_only' ? 'PGM only' : (mode === 'multiview' ? 'Multiview' : 'PGM/PRV') },
 		{ label: 'Main index', value: String(d?.mainScreenIndex ?? 0) },
 		...(mode !== 'multiview' && mode !== 'stream'
-			? [{ label: 'Audio layout', value: String(d?.audioLayout || 'stereo') }]
+			? [{
+				label: 'Audio outputs',
+				value: PROGRAM_LAYOUT_OPTIONS.find((o) => o.value === String(d?.audioLayout || 'stereo'))?.label
+					|| String(d?.audioLayout || 'stereo'),
+			}]
 			: []),
 		{ label: 'Video mode', value: String(d?.videoMode || '1080p5000') },
 		{ label: 'Resolution', value: `${Math.max(64, parseInt(String(d?.width ?? 1920), 10) || 1920)}x${Math.max(64, parseInt(String(d?.height ?? 1080), 10) || 1080)}` },
@@ -374,6 +424,12 @@ export function renderDestinationInspector(args) {
 		summaryValByLabel.get('Video mode')?.replaceChildren(document.createTextNode(String(mode)))
 		summaryValByLabel.get('Resolution')?.replaceChildren(document.createTextNode(`${width}x${height}`))
 		summaryValByLabel.get('FPS')?.replaceChildren(document.createTextNode(String(fps)))
+	}
+	const syncAudioOutputsSummary = (layoutId) => {
+		const opt = PROGRAM_LAYOUT_OPTIONS.find((o) => o.value === String(layoutId || 'stereo'))
+		summaryValByLabel.get('Audio outputs')?.replaceChildren(
+			document.createTextNode(opt?.label || String(layoutId || 'stereo')),
+		)
 	}
 	const edits = document.createElement('div')
 	edits.className = 'device-view__inspector-links'
@@ -441,9 +497,11 @@ export function renderDestinationInspector(args) {
 	modeSel.value = mode === 'pgm_only' ? 'pgm_only' : (mode === 'multiview' ? 'multiview' : 'pgm_prv')
 	modeSel.addEventListener('change', () => patchDestination(d.id, { mode: modeSel.value }))
 
+	const audioOutputsFieldId = `dest_audio_outputs_${String(d?.id || 'dest').replace(/[^a-zA-Z0-9_-]/g, '_')}`
 	const audioLayoutSel = document.createElement('select')
+	audioLayoutSel.id = audioOutputsFieldId
 	audioLayoutSel.className = 'device-view__destinations-type'
-	audioLayoutSel.title = 'Caspar program bus width for this destination (mixer pairs, channel-layout in config)'
+	audioLayoutSel.title = 'Number of audio output channels for this destination (program bus width)'
 	for (const o of PROGRAM_LAYOUT_OPTIONS) {
 		const opt = document.createElement('option')
 		opt.value = o.value
@@ -453,7 +511,10 @@ export function renderDestinationInspector(args) {
 	audioLayoutSel.value = PROGRAM_LAYOUT_OPTIONS.some((o) => o.value === String(d?.audioLayout || 'stereo'))
 		? String(d?.audioLayout || 'stereo')
 		: 'stereo'
-	audioLayoutSel.addEventListener('change', () => patchDestination(d.id, { audioLayout: audioLayoutSel.value }))
+	audioLayoutSel.addEventListener('change', () => {
+		patchDestination(d.id, { audioLayout: audioLayoutSel.value })
+		syncAudioOutputsSummary(audioLayoutSel.value)
+	})
 
 	const vmSel = document.createElement('select')
 	vmSel.className = 'device-view__destinations-type'
@@ -562,12 +623,17 @@ export function renderDestinationInspector(args) {
 
 	edits.append(nameIn, mainIn, modeSel)
 	if (mode !== 'multiview' && mode !== 'stream') {
+		const audioOutputsWrap = Object.assign(document.createElement('div'), {
+			style: 'display:flex; flex-direction:column; gap:4px; width:100%',
+		})
 		const audioLab = Object.assign(document.createElement('label'), {
 			className: 'device-view__inspector-label',
-			textContent: 'Program audio layout',
+			htmlFor: audioOutputsFieldId,
+			textContent: 'Audio outputs',
 			style: 'font-size:10px;opacity:.7',
 		})
-		edits.append(audioLab, audioLayoutSel)
+		audioOutputsWrap.append(audioLab, audioLayoutSel)
+		edits.append(audioOutputsWrap)
 	}
 	edits.append(vmSel, widthIn, heightIn, fpsIn, rm)
 	host.append(

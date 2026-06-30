@@ -65,14 +65,8 @@ fi
 	echo "Not a block device: $DEV" >&2
 	exit 1
 }
-while read -r pt; do
-	[[ -n "$pt" ]] || continue
-	if findmnt -n "$pt" &>/dev/null; then
-		echo "Refusing: $pt is mounted. Unmount first." >&2
-		findmnt "$pt"
-		exit 1
-	fi
-done < <(lsblk -nrpo PATH "$DEV")
+
+usb_quiesce_stick_for_partitioning "$DEV"
 
 command -v mkfs.exfat >/dev/null 2>&1 || {
 	echo "Missing mkfs.exfat (install package exfatprogs on Debian/Ubuntu)." >&2
@@ -354,6 +348,8 @@ if [[ "$DRY" == true ]]; then
 	exit 0
 fi
 
+usb_quiesce_stick_for_partitioning "$DEV"
+
 LASTPART="$(bash "$MKPART_SH" "$DEV" "$EXFAT_NUM" exfat "$STARTMIB" "$ENDMIB" | tail -n1)"
 FALLBACK_PART="${DEV}${EXFAT_NUM}"
 if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
@@ -377,8 +373,7 @@ if [[ -z "$LASTPART" || ! -b "$LASTPART" ]]; then
 fi
 
 echo "Formatting $LASTPART → exFAT LABEL=$EXFAT_LABEL"
-wipefs -a "$LASTPART" 2>/dev/null || true
-mkfs.exfat -L "$EXFAT_LABEL" "$LASTPART"
+usb_mkfs_exfat_labeled "$LASTPART" "$EXFAT_LABEL"
 usb_reread_partition_table "$DEV"
 blkid "$LASTPART" || true
 

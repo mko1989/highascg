@@ -10,6 +10,7 @@ const {
 	resolveMultiviewDimsFromTopology,
 	resolveScreenDimsFromTopology,
 } = require('./os-layout-calculator-helpers')
+const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 
 /**
  * @param {object} config
@@ -47,11 +48,15 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 
 		const rawOsMode = data.osMode && String(data.osMode).trim()
 		const explicitPixelOsMode = /^\d+x\d+$/i.test(rawOsMode || '')
+		const osModeSource =
+			p.kind === 'screen' ? resolveEffectiveOsModeSource(config, p.n, { osMode: rawOsMode, casparMode: data.casparMode }) : 'edid'
 		const cm = String(data.casparMode || '').trim()
 
 		let modeForXrandr = ''
 		let usedCasparOverStaleOsPixel = false
-		if (forceOsRes) {
+		if (osModeSource === 'edid' && rawOsMode) {
+			modeForXrandr = rawOsMode
+		} else if (forceOsRes) {
 			if (explicitPixelOsMode && rawOsMode) {
 				modeForXrandr = rawOsMode
 			} else if (cm === 'custom') {
@@ -171,6 +176,8 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 			mode: modeForXrandr,
 			rate: effectiveRate,
 			backend: data.osBackend,
+			screenIndex: p.kind === 'screen' ? p.n : null,
+			osModeSource,
 		}
 
 		if (p.kind === 'screen') results.screens[p.n] = info

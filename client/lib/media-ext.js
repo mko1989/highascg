@@ -4,7 +4,7 @@
 
 const STILL_IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'])
 const VIDEO_EXT = new Set([
-	'mov', 'mp4', 'mxf', 'avi', 'mkv', 'webm', 'mpg', 'mpeg', 'm2v', 'm4v', 'wmv', 'flv', 'ts', 'm2ts',
+	'mov', 'qt', 'mp4', 'mxf', 'avi', 'mkv', 'webm', 'mpg', 'mpeg', 'm2v', 'm4v', 'wmv', 'flv', 'ts', 'm2ts',
 ])
 const AUDIO_EXT = new Set(['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'wma'])
 

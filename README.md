@@ -138,3 +138,19 @@ npm run smoke -- 4200
 npm run smoke:caspar -- 4200
 curl -sf http://127.0.0.1:4200/ | head -5   # expect HTML when dist-web present
 ```
+
+---
+
+## License
+
+**HighAsCG** is free software: you may use, modify, and redistribute it under the terms of the **[GNU Affero General Public License v3.0 or later](LICENSE)** (AGPL-3.0).
+
+Copyright © 2024–2026 HighPass Marcin Wardecki
+
+**What that means in practice:**
+
+- You can run, study, change, and share HighAsCG.
+- If you **distribute** HighAsCG (or a modified version) — including on a live ISO or playout image — you must provide the **corresponding source** under the same license.
+- If users **interact with a modified version over a network** (for example the operator web UI on port 4200), you must offer them a way to obtain that version’s **source code**.
+
+Third-party components bundled in the ISO (Ubuntu, NVIDIA, DeckLink, CasparCG, npm dependencies, etc.) remain under their own licenses; see WO-90 / future `licenses/` manifest for notices.

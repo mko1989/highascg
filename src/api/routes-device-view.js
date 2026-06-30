@@ -10,7 +10,7 @@ const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const Snapshot = require('./device-view-snapshot')
 const Apply = require('./device-view-apply')
 const CRUD = require('./device-view-crud')
-const { enrichExtraLiveSource } = require('../config/extra-live-source-enrich')
+const { enrichExtraLiveSource, enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 
 /**
  * Merge patch into on-disk config and refresh `ctx.config` from ConfigManager (same as `change` listener).
@@ -85,6 +85,10 @@ async function handleGet(path, ctx, query) {
 			live,
 			suggested: suggestConnectorsAndDevicesFromLive(live, ctx.config || {}),
 			screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
+			extraLiveSources: enrichExtraLiveSources(
+				Array.isArray(ctx.config?.extraLiveSources) ? ctx.config.extraLiveSources : [],
+				ctx,
+			),
 			audioOutputs: Array.isArray(ctx.config?.audioOutputs) ? ctx.config.audioOutputs : [],
 			mappingTemplates: Array.isArray(ctx.config?.mappingTemplates) ? ctx.config.mappingTemplates : [],
 		})
@@ -149,19 +153,48 @@ async function handlePost(body, ctx) {
 	} else if (j.addExtraLiveSource) {
 		const list = Array.isArray(ctx.config.extraLiveSources) ? [...ctx.config.extraLiveSources] : []
 		const item = j.addExtraLiveSource
-		if (item && item.value) {
-			const enriched = enrichExtraLiveSource(item, ctx)
-			const existing = list.findIndex(x => x.value === enriched.value)
-			if (existing >= 0) list[existing] = enriched
-			else list.push(enriched)
-			if (persistConfigPatch(ctx, { extraLiveSources: list })) {
-				ctx.config.extraLiveSources = list
-				res = { ok: true, extraLiveSources: list.map((x) => enrichExtraLiveSource(x, ctx)) }
-				if (typeof ctx._wsBroadcast === 'function') {
-					ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
+		if (item && (item.value || item.ndiName || item.templateOrUrl)) {
+			try {
+				const { normalizeToHostLiveSource } = require('../config/host-live-sources')
+				const normalized = normalizeToHostLiveSource(item, ctx)
+				const enriched = enrichExtraLiveSource(normalized, ctx)
+				const existing = list.findIndex(
+					(x) => x.value === enriched.value || (enriched.sourceId && x.sourceId === enriched.sourceId),
+				)
+				if (existing >= 0) list[existing] = enriched
+				else list.push(enriched)
+				if (persistConfigPatch(ctx, { extraLiveSources: list })) {
+					ctx.config.extraLiveSources = list
+					let playResult = null
+					let casparApply = null
+					try {
+						const { playHostLiveSourceNow } = require('../config/host-live-sources-setup')
+						const { isHostLiveSource } = require('../config/host-live-sources')
+						const { applyCasparConfigForHostLiveIfNeeded } = require('../config/host-live-sources-caspar')
+						if (isHostLiveSource(enriched)) {
+							casparApply = await applyCasparConfigForHostLiveIfNeeded(ctx)
+						}
+						if (ctx.amcp && isHostLiveSource(enriched)) {
+							playResult = await playHostLiveSourceNow(ctx, enriched)
+						}
+					} catch (e) {
+						playResult = { ok: false, error: e?.message || String(e) }
+					}
+					res = {
+						ok: true,
+						extraLiveSources: list.map((x) => enrichExtraLiveSource(x, ctx)),
+						hostLivePlay: playResult,
+						hostLiveCasparApply: casparApply,
+						casparRestartRecommended: !!(casparApply?.needed && !casparApply?.applied),
+					}
+					if (typeof ctx._wsBroadcast === 'function') {
+						ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
+					}
+				} else {
+					res = { status: 503, error: 'Failed to save config' }
 				}
-			} else {
-				res = { status: 503, error: 'Failed to save config' }
+			} catch (e) {
+				res = { status: 400, error: e?.message || String(e) }
 			}
 		}
 	} else if (j.removeExtraLiveSource) {

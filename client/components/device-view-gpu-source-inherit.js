@@ -144,23 +144,25 @@ export function gpuOutputBindingFromCableSource(lastPayload, sourceId) {
 
 /**
  * POST /api/settings patch: inherit destination/mapping feed timing on a Caspar screen consumer.
- * @param {number} screenN 1-based screen index
+ * @param {number} screenN 1-based Caspar screen index (video mode)
  * @param {{ videoMode: string, width: number, height: number, fps: number }} source
+ * @param {number} [portN] physical rear-port index for window chrome keys (defaults to screenN)
  * @param {{ windowed?: boolean, borderless?: boolean, vsync?: boolean }} [consumerOverrides]
  */
-export function gpuScreenInheritedSettingsPatch(screenN, source, consumerOverrides = {}) {
-	const n = Math.max(1, Number(screenN) || 1)
+export function gpuScreenInheritedSettingsPatch(screenN, source, portN = screenN, consumerOverrides = {}) {
+	const screen = Math.max(1, Number(screenN) || 1)
+	const port = Math.max(1, Number(portN) || screen)
 	const mode = String(source?.videoMode || '1080p5000').trim() || '1080p5000'
 	const width = Math.max(64, parseInt(String(source?.width ?? 1920), 10) || 1920)
 	const height = Math.max(64, parseInt(String(source?.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(source?.fps ?? 50)) || 50)
 	return {
 		casparServer: {
-			...screenConsumerCasparPatch(n, consumerOverrides),
-			[`screen_${n}_mode`]: mode,
-			[`screen_${n}_custom_width`]: width,
-			[`screen_${n}_custom_height`]: height,
-			[`screen_${n}_custom_fps`]: fps,
+			...screenConsumerCasparPatch(port, consumerOverrides),
+			[`screen_${screen}_mode`]: mode,
+			[`screen_${screen}_custom_width`]: width,
+			[`screen_${screen}_custom_height`]: height,
+			[`screen_${screen}_custom_fps`]: fps,
 		},
 	}
 }

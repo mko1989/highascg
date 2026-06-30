@@ -196,6 +196,21 @@ function main() {
 			}
 			appCtx.state.setVariable('offline_mode', config.offline_mode ? 'true' : 'false')
 			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onConfigChange()
+			try {
+				const { syncOperatorPointerConfine } = require('./src/system/pointer-confine')
+				syncOperatorPointerConfine(config, { log: (level, msg) => appCtx.log(level, msg) })
+			} catch (e) {
+				appCtx.log('warn', `[Pointer confine] Config sync failed: ${e?.message || e}`)
+			}
+			try {
+				const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
+				void syncCefInteractiveBridge(config, {
+					log: (level, msg) => appCtx.log(level, msg),
+					amcp: appCtx.amcp,
+				})
+			} catch (e) {
+				appCtx.log('warn', `[CEF bridge] Config sync failed: ${e?.message || e}`)
+			}
 		})
 
 		let casparConn = null; if (!cli.noCaspar) {
@@ -257,6 +272,27 @@ function main() {
 			if (typeof appCtx.markReplicationLiveStateDirty === 'function') appCtx.markReplicationLiveStateDirty()
 		})
 		moduleRegistry.bootAll(appCtx)
+		try {
+			const { syncOperatorPointerConfine } = require('./src/system/pointer-confine')
+			syncOperatorPointerConfine(config, { log: (level, msg) => appCtx.log(level, msg) })
+		} catch (e) {
+			appCtx.log('warn', `[Pointer confine] Boot sync failed: ${e?.message || e}`)
+		}
+		try {
+			const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
+			void syncCefInteractiveBridge(config, {
+				log: (level, msg) => appCtx.log(level, msg),
+				amcp: appCtx.amcp,
+			})
+		} catch (e) {
+			appCtx.log('warn', `[CEF bridge] Boot sync failed: ${e?.message || e}`)
+		}
+		setTimeout(() => {
+			const { maybeAutoLoginOnBoot } = require('./src/network/tailscale-service')
+			void maybeAutoLoginOnBoot({ log: (level, msg) => appCtx.log(level, msg) }).catch((e) => {
+				appCtx.log('warn', `[tailscale] Boot auto-login: ${e?.message || e}`)
+			})
+		}, 4000)
 		appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
 
 		if (casparConn && !config.offline_mode) {
@@ -282,6 +318,15 @@ function main() {
 					startOscPlaybackInfoSupplement(appCtx)
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
+					try {
+						const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
+						void syncCefInteractiveBridge(config, {
+							log: (level, msg) => appCtx.log(level, msg),
+							amcp: appCtx.amcp,
+						})
+					} catch (e) {
+						appCtx.log('warn', `[CEF bridge] Caspar connect sync failed: ${e?.message || e}`)
+					}
 				} else if (payload.connected === false) {
 					wasConnected = false
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparDisconnected()

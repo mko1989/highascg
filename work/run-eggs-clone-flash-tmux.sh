@@ -119,6 +119,23 @@ export USB_DEVICE=${USB}
 export HIGHASCG_OVERNIGHT=${HIGHASCG_OVERNIGHT:-0}
 REPO=${REPO}
 LOG=${LOG}
+
+# sudo -v in another terminal does NOT apply here (timestamp is per-tty). Re-exec as root
+# once in THIS tmux pane — attach and enter password when prompted.
+if [[ "\${1:-}" != "--as-root" ]] && [[ \$(id -u) -ne 0 ]]; then
+	echo "==> Need root for eggs produce — enter sudo password in THIS tmux window if prompted"
+	echo "    (sudo -v in a different terminal will not unblock this pane)"
+	exec sudo -E env \\
+		HIGHASCG_NVIDIA_DRIVER="\${HIGHASCG_NVIDIA_DRIVER}" \\
+		BASENAME="\${BASENAME}" \\
+		USB_DEVICE="\${USB_DEVICE}" \\
+		HIGHASCG_OVERNIGHT="\${HIGHASCG_OVERNIGHT}" \\
+		REPO="\${REPO}" \\
+		LOG="\${LOG}" \\
+		bash "\$0" --as-root
+fi
+[[ "\${1:-}" == "--as-root" ]] && shift
+
 exec > >(tee -a "\$LOG") 2>&1
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -135,17 +152,18 @@ echo
 
 cd "\$REPO"
 
-echo "==> Waiting for sudo (run once in any terminal: sudo -v)"
-until sudo -n true 2>/dev/null; do
-	sleep 10
-done
-echo "==> sudo credentials cached at \$(date -Is)"
+echo "==> Running as root (uid=\$(id -u)) at \$(date -Is)"
+
+echo "==> Prepare host for produce (swap off + umount exFAT/bridge)"
+bash "\$REPO/tools/eggs/live-usb/stop-and-unmount-wo47-for-eggs-produce.sh"
+bash "\$REPO/tools/eggs/live-usb/strip-host-swap-for-live-iso.sh" prepare
 
 echo "==> Preflight: eggs exclude.list + liveroot safety"
-sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list" \
+HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list" \\
 	bash "\$REPO/tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh" --replace
-# Refuse if a prior interrupted eggs produce left live /usr bind-mounted under liveroot.
-sudo bash "\$REPO/tools/eggs/live-usb/audit-eggs-clone-host.sh"
+HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-decklink.list" \\
+	bash "\$REPO/tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh"
+bash "\$REPO/tools/eggs/live-usb/audit-eggs-clone-host.sh"
 
 # Stop stack before umount/clone (build script also stops highascg during squashfs pack).
 systemctl stop highascg.service 2>/dev/null || true
@@ -154,7 +172,7 @@ sleep 1
 
 echo "==> Phase 1+2: eggs produce --clone + dd + exFAT partition 3 (HIGHASCGEXF)"
 set +e
-sudo -E HIGHASCG_NVIDIA_DRIVER="\$HIGHASCG_NVIDIA_DRIVER" BASENAME="\$BASENAME" \
+HIGHASCG_NVIDIA_DRIVER="\$HIGHASCG_NVIDIA_DRIVER" BASENAME="\$BASENAME" \\
 	bash "\$REPO/tools/eggs/live-usb/build-produce-flash-stick.sh" -y --usb "\$USB_DEVICE"
 build_rc=\$?
 set -e

@@ -1,5 +1,6 @@
 import { api } from '../lib/api-client.js'
 import { sceneState } from '../lib/scene-state.js'
+import { showAppToast } from '../lib/app-toast.js'
 import {
 	buildLiveSources,
 	decklinkSlotStatusMessage,
@@ -18,6 +19,7 @@ export function renderLiveTab(listEl, {
 	liveAudioConfigured,
 	extraSources = [],
 	connectors = [],
+	hostOperatorFullscreen = null,
 }) {
 	const base = buildLiveSources(channelMap, connectors, liveAudioConfigured)
 	const existing = new Set(base.map((s) => String(s.value || '')))
@@ -35,6 +37,7 @@ export function renderLiveTab(listEl, {
 		sources: sources.map((s) => ({ value: s.value, label: s.label, res: s.resolution, type: s.type })),
 		status: decklinkInputsStatus,
 		liveAudioStatus: liveAudioInputsStatus,
+		operatorFs: hostOperatorFullscreen?.sourceId || null,
 	})
 	if (listEl._lastRenderKey === renderKey) return
 	listEl._lastRenderKey = renderKey
@@ -49,13 +52,20 @@ export function renderLiveTab(listEl, {
 		hintParts.push('Live audio: configure in Settings → live audio, then drag onto looks.')
 	}
 	if (sources.some(s => s.routeType === 'layer')) hintParts.push('Layer routes: Looks row ↗ (default = PGM; Shift+↗ = edit bus, Ctrl+↗ = PRV). Drag onto another layer.')
+	if (sources.some((s) => s.routeType === 'webpage_host')) {
+		hintParts.push('Webpage hosts: click a tile to edit the page URL in the Inspector; ⛶ routes video to the operator monitor.')
+	}
 	if (hintParts.length) listEl.innerHTML = `<p class="sources-live-hint">${hintParts.join(' ')}</p>`
 	sources.forEach(s => {
 		const el = document.createElement('div')
 		
 		const metaItems = [s.resolution, s.fps ? `${s.fps} fps` : '']
-		if (s.type === 'ndi') {
-			metaItems.push(s.useDirect ? 'Direct' : 'Routed')
+		if (s.routeType === 'webpage_host' || s.routeType === 'ndi_host') {
+			if (s.hostChannel != null) metaItems.push(`host ch ${s.hostChannel}`)
+			metaItems.push(s.value || '')
+		}
+		if (s.type === 'ndi' && s.routeType !== 'ndi_host' && s.useDirect) {
+			metaItems.push('Direct (legacy)')
 		}
 		if (s.type === 'browser' && s.browserAsCg) {
 			metaItems.push('CG template')
@@ -194,7 +204,7 @@ export function renderLiveTab(listEl, {
 		}
 
 		const dragExtra = { resolution: s.resolution, fps: s.fps, routeType: s.routeType, screenIdx: s.screenIdx }
-		const skipThumbHint = s.type === 'ndi' && s.useDirect === true
+		const skipThumbHint = s.type === 'ndi' && s.useDirect === true && s.routeType !== 'ndi_host'
 		if (
 			!skipThumbHint &&
 			s.thumbnailChannel != null &&
@@ -206,6 +216,18 @@ export function renderLiveTab(listEl, {
 		if (s.useDirect != null) dragExtra.useDirect = s.useDirect
 		if (s.browserAsCg === true) dragExtra.browserAsCg = true
 		makeDraggable(el, s.type, s.value, s.label, dragExtra)
+
+		if (s.routeType === 'webpage_host' && s.interactiveCapable !== false) {
+			el.style.cursor = 'pointer'
+			el.addEventListener('click', (e) => {
+				if (e.target.closest('button, input, a')) return
+				window.dispatchEvent(
+					new CustomEvent('webpage-host-select', {
+						detail: { sourceId: s.sourceId, value: s.value, hostChannel: s.hostChannel },
+					}),
+				)
+			})
+		}
 		
 		if (s.value && s.value.includes('playback_timers.html')) {
 			el.style.cursor = 'pointer'
@@ -286,6 +308,64 @@ export function renderLiveTab(listEl, {
 				btnGroup.appendChild(removeBtn)
 			}
 			
+			el.appendChild(btnGroup)
+		} else if (s.routeType === 'webpage_host' && s.interactiveCapable !== false) {
+			const btnGroup = document.createElement('div')
+			btnGroup.className = 'source-item__live-actions'
+			const isFs =
+				hostOperatorFullscreen?.active &&
+				String(hostOperatorFullscreen?.sourceId || '') === String(s.sourceId || '')
+			const fsBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: `source-item__live-btn source-item__live-btn--fullscreen${isFs ? ' source-item__live-btn--active' : ''}`,
+				title: isFs
+					? 'Take off operator monitor (host channel keeps playing)'
+					: 'Route to operator monitor fullscreen',
+				textContent: isFs ? '⛶ Off' : '⛶',
+			})
+			fsBtn.onclick = async (e) => {
+				e.stopPropagation()
+				fsBtn.disabled = true
+				try {
+					const r = await api.post('/api/host-live/operator-fullscreen', {
+						action: 'toggle',
+						sourceId: s.sourceId,
+						value: s.value,
+					})
+					if (typeof window.__highascgApplyHostOperatorFullscreen === 'function') {
+						window.__highascgApplyHostOperatorFullscreen(r.hostOperatorFullscreen ?? null, r.cefFocusTarget ?? null)
+					}
+					if (r?.message) showAppToast(r.message, 'info')
+				} catch (err) {
+					showAppToast(err?.message || String(err), 'error')
+				} finally {
+					fsBtn.disabled = false
+				}
+			}
+			btnGroup.append(fsBtn)
+			const removeBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: 'source-item__live-btn source-item__live-btn--remove',
+				title: 'Remove from Live tab',
+				textContent: 'Remove',
+			})
+			removeBtn.onclick = async (e) => {
+				e.stopPropagation()
+				if (!confirm(`Remove webpage host "${s.label}"? Host channel will stop when removed from config.`)) return
+				removeBtn.disabled = true
+				try {
+					if (isFs) {
+						await api.post('/api/host-live/operator-fullscreen', { action: 'off', sourceId: s.sourceId })
+					}
+					const rm = await api.post('/api/device-view', { removeExtraLiveSource: { value: s.value } })
+					if (Array.isArray(rm?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+						window.__highascgApplyExtraLiveSources(rm.extraLiveSources)
+					}
+				} finally {
+					removeBtn.disabled = false
+				}
+			}
+			btnGroup.append(removeBtn)
 			el.appendChild(btnGroup)
 		} else if (s.type === 'ndi' || s.type === 'browser' || s.routeType === 'layer') {
 			const btnGroup = document.createElement('div'); btnGroup.className = 'source-item__live-actions'

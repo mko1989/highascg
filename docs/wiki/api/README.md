@@ -99,6 +99,7 @@ WebSocket message shapes are not duplicated here; see [osc-integration.md](../..
 | CG | [cg.md](cg.md) |
 | Project | [project.md](project.md) |
 | State & media | [state-and-media.md](state-and-media.md) |
+| Tailscale | [network-tailscale.md](network-tailscale.md) |
 
 ## Quick example
 

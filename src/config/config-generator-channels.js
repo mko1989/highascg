@@ -10,6 +10,7 @@ const {
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
 	buildInputChannel,
+	buildHostLiveChannel,
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 } = require('./config-generator-consumer-attach')
@@ -113,7 +114,11 @@ function buildChannelsSection(config, routeMap) {
 
 	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).
 	for (const entry of plan.inputChannels) {
-		setChannelXml(entry.channel, buildInputChannel(config, entry))
+		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host') {
+			setChannelXml(entry.channel, buildHostLiveChannel(config, entry))
+		} else {
+			setChannelXml(entry.channel, buildInputChannel(config, entry))
+		}
 	}
 	// Legacy: empty inputs-host channel only when the host toggle is on with no real inputs.
 	if (plan.inputChannels.length === 0) {

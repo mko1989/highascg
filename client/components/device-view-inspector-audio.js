@@ -198,7 +198,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	const layoutLab = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'PortAudio output layout', style: 'font-size:10px;opacity:.7' })
 	const busNote = Object.assign(document.createElement('p'), {
 		className: 'device-view__note small',
-		textContent: 'Caspar program bus width (mixer pairs) is set on each screen destination — select the destination and use Program audio layout.',
+		textContent: 'Caspar program bus width (mixer pairs) is set on each screen destination — select the destination and use Audio outputs.',
 		style: 'margin:0;opacity:.75',
 	})
 	const bufferLab = Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Buffer frames', style: 'font-size:10px;opacity:.7' })

@@ -16,8 +16,8 @@ describe('project-store slug', () => {
 	})
 
 	it('legacy autosave is ignored when slug does not match', () => {
-		const { readLegacyAutosaveIfMatches } = require('../../src/engine/project-store')
-		// No file / mismatch returns null without throwing
+		const { readLegacyAutosaveIfMatches, readAutosaveFile } = require('../../src/engine/project-store')
 		assert.equal(readLegacyAutosaveIfMatches('nonexistent_slug_xyz'), null)
+		assert.equal(readAutosaveFile('nonexistent_slug_xyz'), null)
 	})
 })

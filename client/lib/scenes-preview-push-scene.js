@@ -10,7 +10,7 @@ import { settingsState } from './settings-state.js'
 import { resolveLayerFillForAmcp } from './mixer-fill.js'
 import { shouldApplyStraightAlphaKeyer } from './media-ext.js'
 import { buildPipOverlayAmcpLinesAll, buildPipOverlayRemoveLines, buildPipOverlayRemoveStaleSlots } from './pip-overlay-amcp.js'
-import { getPipOverlaysFromLayer, resolvePipOverlayCasparLayer } from './pip-overlay-registry.js'
+import { getPipOverlaysFromLayer, resolvePipOverlayCasparLayer, PIP_OVERLAY_MAX_STACK } from './pip-overlay-registry.js'
 import { effectToAmcpLines } from './effect-registry.js'
 import { amcpParam, chLayerAmcp } from '../components/scenes-shared.js'
 import {
@@ -22,7 +22,7 @@ import {
 } from './scenes-preview-look-stack.js'
 import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot } from './scenes-preview-snapshot.js'
-import { syncPreviewLiveToServer } from './scene-live-sync.js'
+import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
 
 /**
  * @param {object} opts
@@ -92,6 +92,13 @@ export async function pushSceneToPreviewImpl(opts) {
 
 		let lastComputedFills = new Map()
 		let lastPreviewCh = null
+		const pipCgReadyKeys = new Set(
+			lastPreviewContentSnapshot?.pipCgKeys instanceof Set
+				? lastPreviewContentSnapshot.pipCgKeys
+				: Array.isArray(lastPreviewContentSnapshot?.pipCgKeys)
+					? lastPreviewContentSnapshot.pipCgKeys
+					: [],
+		)
 
 		for (const mIdx of targetIdxs) {
 			const prvRes =
@@ -113,6 +120,11 @@ export async function pushSceneToPreviewImpl(opts) {
 				Number(lastPreviewChannel) === Number(previewCh)
 			const geometryOnly = isGeometryOnlyPreview(lastPreviewContentSnapshot, scene) && sameSceneOnSamePrv
 			const incrementalPreviewEdit = sameSceneOnSamePrv
+			if (!incrementalPreviewEdit) {
+				for (const k of [...pipCgReadyKeys]) {
+					if (String(k).startsWith(`${previewCh}-`)) pipCgReadyKeys.delete(k)
+				}
+			}
 			const layerNumsPip = (scene.layers || []).map((l) => Number(l.layerNumber)).filter((n) => n > 0)
 			const nextPipLayerInPreview = (L) => {
 				const a = layerNumsPip.filter((n) => n > L)
@@ -157,6 +169,11 @@ export async function pushSceneToPreviewImpl(opts) {
 				for (const ln of [...layersToReset].sort((a, b) => a - b)) {
 					const dl = chLayerAmcp(previewCh, ln)
 					queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, ln, 10000))
+					const nextP = nextPipLayerInPreview(ln)
+					for (let pi = 0; pi < PIP_OVERLAY_MAX_STACK; pi++) {
+						const oR = resolvePipOverlayCasparLayer(ln, pi, nextP)
+						if (Number.isFinite(oR)) pipCgReadyKeys.delete(`${previewCh}-${oR}`)
+					}
 				}
 			}
 
@@ -199,11 +216,22 @@ export async function pushSceneToPreviewImpl(opts) {
 				const prevKeyer = prevMeta?.keyer
 				const prevVol = prevMeta?.volume
 
-				if (!prevFill || prevFill.x !== f.x || prevFill.y !== f.y || prevFill.scaleX !== f.scaleX || prevFill.scaleY !== f.scaleY) {
-					mixerPart.push(`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 1 DEFER`)
+				const rot = layer.rotation ?? 0
+				const casparFill = fillForSceneLayerRotationAnchor(f, rot)
+				const prevCasparFill =
+					prevFill != null ? fillForSceneLayerRotationAnchor(prevFill, prevRot ?? 0) : null
+
+				if (
+					!prevCasparFill ||
+					prevCasparFill.x !== casparFill.x ||
+					prevCasparFill.y !== casparFill.y ||
+					prevCasparFill.scaleX !== casparFill.scaleX ||
+					prevCasparFill.scaleY !== casparFill.scaleY
+				) {
+					mixerPart.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 1 DEFER`)
 				}
-				if (prevRot === undefined || prevRot !== (layer.rotation ?? 0)) {
-					mixerPart.push(`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0 DEFER`)
+				if (prevRot === undefined || prevRot !== rot) {
+					mixerPart.push(...sceneLayerRotationMixerLines(cl, rot, { deferRotation: true }))
 				}
 				if (prevOp === undefined || prevOp !== (layer.opacity ?? 1)) {
 					mixerPart.push(`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0 DEFER`)
@@ -245,9 +273,8 @@ export async function pushSceneToPreviewImpl(opts) {
 					}
 					queue.push(
 						playCmd,
-						`MIXER ${cl} ANCHOR 0 0 DEFER`,
-						`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 1 DEFER`,
-						`MIXER ${cl} ROTATION ${layer.rotation ?? 0} 0 DEFER`,
+						...sceneLayerRotationMixerLines(cl, rot, { deferRotation: true }),
+						`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 1 DEFER`,
 						`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0 DEFER`,
 						`MIXER ${cl} KEYER ${curKeyer}`,
 						`MIXER ${cl} VOLUME ${vol} DEFER`,
@@ -276,13 +303,15 @@ export async function pushSceneToPreviewImpl(opts) {
 								{ w: prvRes.w, h: prvRes.h },
 								nextP,
 								prevPip,
+								pipCgReadyKeys,
+								layer.rotation ?? 0,
 							),
 						)
 					} else if ((prevPip?.length ?? 0) > 0) {
-						queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, []))
+						queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, [], pipCgReadyKeys))
 					}
 				} else {
-					queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, pipOverlays))
+					queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, pipOverlays, pipCgReadyKeys))
 					if (pipOverlays.length > 0) {
 						queue.push(
 							...buildPipOverlayAmcpLinesAll(
@@ -293,6 +322,8 @@ export async function pushSceneToPreviewImpl(opts) {
 								{ w: prvRes.w, h: prvRes.h },
 								nextP,
 								prevPip,
+								pipCgReadyKeys,
+								layer.rotation ?? 0,
 							),
 						)
 					}
@@ -364,6 +395,7 @@ export async function pushSceneToPreviewImpl(opts) {
 			(scene.layers || []).filter((l) => l.source?.value).map((l) => Number(l.layerNumber)),
 		)
 		const nextLastPreviewContentSnapshot = buildPreviewContentSnapshot(sceneId, scene, lastComputedFills)
+		nextLastPreviewContentSnapshot.pipCgKeys = new Set(pipCgReadyKeys)
 		const nextLastPreviewChannel = Number(lastPreviewCh)
 
 		return {

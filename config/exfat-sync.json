@@ -24,7 +24,7 @@
 			"direction": "both",
 			"bootPrefer": "exfat",
 			"pushOnSave": true,
-			"exclude": ["replication.json", "replication-local-machine.json", "replication-local-identity.json"]
+			"exclude": []
 		},
 		{
 			"id": "bridge-drop-config",
@@ -77,7 +77,7 @@
 			"direction": "to_project",
 			"bootPrefer": "exfat",
 			"pushOnSave": true,
-			"exclude": ["replication.json", "replication-local-machine.json", "replication-local-identity.json"]
+			"exclude": []
 		},
 		{
 			"id": "usb-drop-config",

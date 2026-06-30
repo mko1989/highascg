@@ -180,7 +180,15 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 					}
 					const th = Number(data.thumbnailChannel)
 					if (Number.isFinite(th) && th > 0) src.thumbnailChannel = th
-					if (data.useDirect != null) src.useDirect = data.useDirect === true || data.useDirect === 'true'
+					if (
+						data.useDirect != null &&
+						!(String(data.value || '').trim().toLowerCase().startsWith('route://'))
+					) {
+						src.useDirect = data.useDirect === true || data.useDirect === 'true'
+					}
+					if (src.type === 'ndi' && String(src.value || '').trim().toLowerCase().startsWith('route://')) {
+						delete src.useDirect
+					}
 					sceneState.setLayerSource(scene.id, realIdx, src)
 					if (src.type === 'live_audio') {
 						sceneState.patchLayer(scene.id, realIdx, { opacity: 0 })

@@ -79,6 +79,7 @@ export function drawTimelineCanvas(deps) {
 	drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX)
 	if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection, schedDraw)
 	if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource)
+	if (tl) drawFlagTrails(ctx, canvas, tl, xAt, getFlagSelection)
 	drawPlayhead(ctx, canvas, pb, xAt, RULER_H)
 	drawHeaders(ctx, canvas, tl, scrollY, layerAt)
 }
@@ -167,7 +168,7 @@ function drawFlags(ctx, canvas, tl, xAt, getFlagSel, schedDraw) {
 		const x = xAt(f.timeMs)
 		if (x < HEADER_W - 2 || x > canvas.width + 2) continue
 		const t = f.type || 'pause'
-		const color = t === 'play' ? '#3fb950' : t === 'jump' ? '#a371f7' : t === 'companion_press' ? '#f0a030' : '#f85149'
+		const color = flagTypeColor(t)
 		const isSel = sel && sel.timelineId === tl.id && sel.flagId === f.id
 
 		if (t === 'companion_press') {
@@ -216,6 +217,38 @@ function drawFlags(ctx, canvas, tl, xAt, getFlagSel, schedDraw) {
 			ctx.lineWidth = 2
 			ctx.stroke()
 		}
+	}
+}
+
+function flagTypeColor(type) {
+	const t = type || 'pause'
+	if (t === 'play') return '#3fb950'
+	if (t === 'jump') return '#a371f7'
+	if (t === 'companion_press') return '#f0a030'
+	return '#f85149'
+}
+
+/** Vertical flag markers through all tracks (below ruler). */
+function drawFlagTrails(ctx, canvas, tl, xAt, getFlagSel) {
+	const flags = tl.flags
+	if (!flags?.length) return
+	const sel = getFlagSel?.()
+	const sx = (x) => Math.round(x) + 0.5
+	for (const f of flags) {
+		const x = xAt(f.timeMs)
+		if (x < HEADER_W - 2 || x > canvas.width + 2) continue
+		const color = flagTypeColor(f.type)
+		const isSel = sel && sel.timelineId === tl.id && sel.flagId === f.id
+		ctx.save()
+		ctx.strokeStyle = isSel ? 'rgba(88, 166, 255, 0.7)' : color
+		ctx.globalAlpha = isSel ? 0.85 : 0.45
+		ctx.lineWidth = isSel ? 2 : 1
+		ctx.setLineDash(isSel ? [] : [5, 4])
+		ctx.beginPath()
+		ctx.moveTo(sx(x), RULER_H)
+		ctx.lineTo(sx(x), canvas.height)
+		ctx.stroke()
+		ctx.restore()
 	}
 }
 

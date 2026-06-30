@@ -15,6 +15,13 @@ export const DEFAULT_SEND_TO = { preview: true, program: false, screenIdx: 0 }
 /** Ms after last clip/flag end when auto-growing `timeline.duration`. */
 const CONTENT_END_PADDING_MS = 2000
 
+/** @type {readonly ['pause', 'play', 'jump', 'companion_press']} */
+const FLAG_TYPES = ['pause', 'play', 'jump', 'companion_press']
+
+function isValidFlagType(type) {
+	return FLAG_TYPES.includes(type)
+}
+
 /**
  * @param {object | null | undefined} raw
  * @returns {{ preview: boolean, program: boolean, screenIdx: number | null }}
@@ -208,7 +215,7 @@ class TimelineStateManager {
 		return tl.sendTo
 	}
 
-	// ── Timeline flags (playhead markers: pause / play / jump) ────────────────
+	// ── Timeline flags (playhead markers: pause / play / jump / companion_press) ─
 
 	addFlag(timelineId, opts) {
 		const tl = this.getTimeline(timelineId)
@@ -217,8 +224,7 @@ class TimelineStateManager {
 		const flag = {
 			id: flagUid(),
 			timeMs: Math.max(0, opts?.timeMs ?? 0),
-			/** @type {'pause'|'play'|'jump'} */
-			type: opts?.type && ['pause', 'play', 'jump'].includes(opts.type) ? opts.type : 'pause',
+			type: opts?.type && isValidFlagType(opts.type) ? opts.type : 'pause',
 			jumpTimeMs: opts?.jumpTimeMs,
 			jumpFlagId: opts?.jumpFlagId || undefined,
 			label: typeof opts?.label === 'string' ? opts.label : '',
@@ -236,7 +242,7 @@ class TimelineStateManager {
 		const f = tl.flags.find((x) => x.id === flagId)
 		if (!f) return null
 		Object.assign(f, changes)
-		if (f.type && !['pause', 'play', 'jump'].includes(f.type)) f.type = 'pause'
+		if (f.type && !isValidFlagType(f.type)) f.type = 'pause'
 		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
 		this.expandDurationToContent(timelineId)
 		this._save()

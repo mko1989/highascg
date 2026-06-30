@@ -38,6 +38,7 @@ Or double-click `docs/wiki-site/index.html`. All page content is embedded in `as
 | [api/timelines-multiview.md](api/timelines-multiview.md) | Multiview, NDI |
 | [api/streaming-audio-osc.md](api/streaming-audio-osc.md) | WebRTC streams, RTMP/record, audio routing, OSC |
 | [api/system-settings-hardware.md](api/system-settings-hardware.md) | Settings, GPU, Caspar config, logs, exFAT sync, device view |
+| [**api/network-tailscale.md**](api/network-tailscale.md) | **Tailscale** — status, login, operator-monitor UI |
 | [api/ingest-usb-plugins.md](api/ingest-usb-plugins.md) | Ingest, USB import, plugins, optional modules |
 
 Legacy single-file overview (partial): [../api-reference.md](../api-reference.md) — prefer the wiki for completeness.

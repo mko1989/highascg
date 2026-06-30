@@ -239,6 +239,87 @@ usb_mount_label_safe() {
 	return 1
 }
 
+# Block WO-47 automount while repartitioning / mkfs on the operator USB stick.
+usb_mask_exfat_automount() {
+	systemctl mask --runtime highascg-exfat-arrive.service 2>/dev/null || true
+	systemctl mask --runtime home-casparcg-exfat.mount 2>/dev/null || true
+	systemctl mask --runtime home-casparcg-highascg-media-exfat.mount 2>/dev/null || true
+	systemctl stop highascg-exfat-sync.service highascg-exfat-arrive.service \
+		highascg-exfat-server-update.service 2>/dev/null || true
+	systemctl stop home-casparcg-highascg-media-exfat.mount home-casparcg-exfat.mount 2>/dev/null || true
+}
+
+usb_umount_disk_partitions() {
+	local dev="${1:?}"
+	local mnt pt
+	while read -r mnt; do
+		[[ -n "$mnt" ]] || continue
+		umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null || true
+	done < <(findmnt -rn -S "$dev" -o TARGET 2>/dev/null | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
+	while read -r pt; do
+		[[ -n "$pt" ]] || continue
+		umount "$pt" 2>/dev/null || umount -l "$pt" 2>/dev/null || true
+	done < <(timeout 8 lsblk -nrpo PATH "$dev" 2>/dev/null || true)
+	for mp in /home/casparcg/exfat /home/casparcg/highascg/media/exfat; do
+		if findmnt -n -o SOURCE "$mp" 2>/dev/null | grep -q "^${dev}"; then
+			umount "$mp" 2>/dev/null || umount -l "$mp" 2>/dev/null || true
+		fi
+	done
+	sync
+	udevadm settle --timeout=10 2>/dev/null || true
+}
+
+usb_quiesce_stick_for_partitioning() {
+	usb_mask_exfat_automount
+	usb_umount_disk_partitions "$1"
+}
+
+# Unmount + wipe stale signatures before mkfs. Residual HIGHASCGEXF labels trigger systemd/udev mounts.
+usb_prepare_partition_for_mkfs() {
+	local part="${1:?}"
+	local label="${2:-}"
+	usb_mask_exfat_automount
+	umount "$part" 2>/dev/null || umount -l "$part" 2>/dev/null || true
+	if [[ -n "$label" ]]; then
+		while read -r mnt; do
+			[[ -n "$mnt" ]] || continue
+			umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null || true
+		done < <(findmnt -rn -o TARGET -L "$label" 2>/dev/null || true)
+	fi
+	wipefs -a "$part" 2>/dev/null || true
+	udevadm trigger --subsystem-match=block --action=change 2>/dev/null || true
+	udevadm settle --timeout=15 2>/dev/null || true
+	sleep 1
+}
+
+usb_partition_has_exfat_label() {
+	local part="${1:?}" label="${2:?}"
+	[[ "$(blkid -s TYPE -o value "$part" 2>/dev/null || true)" == exfat ]] \
+		&& [[ "$(blkid -s LABEL -o value "$part" 2>/dev/null || true)" == "$label" ]]
+}
+
+usb_mkfs_exfat_labeled() {
+	local part="${1:?}" label="${2:?}"
+	local attempt rc=1
+	for attempt in 1 2; do
+		usb_prepare_partition_for_mkfs "$part" "$label"
+		if mkfs.exfat -L "$label" "$part"; then
+			return 0
+		fi
+		rc=$?
+		if [[ "$attempt" -eq 1 ]]; then
+			echo "WARN: mkfs.exfat busy on ${part} — quiesced WO-47 automount; retrying…" >&2
+		fi
+	done
+	if usb_partition_has_exfat_label "$part" "$label"; then
+		echo "Note: ${part} already exFAT LABEL=${label} (format skipped — partition was auto-mounted during mkpart)." >&2
+		return 0
+	fi
+	echo "exFAT format fail on ${part}!" >&2
+	findmnt -S "$part" 2>/dev/null >&2 || true
+	return "$rc"
+}
+
 run_dd_flash() {
 	local iso="$1" dev="$2"
 	[[ "$(id -u)" -eq 0 ]] || {

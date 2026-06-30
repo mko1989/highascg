@@ -42,6 +42,10 @@ const req = http.request(
 						process.exit(1)
 					}
 				}
+				if (!Array.isArray(j.rtmp?.logs) || !Array.isArray(j.record?.logs)) {
+					console.error('[streaming-ch] rtmp.logs and record.logs must be arrays')
+					process.exit(1)
+				}
 				console.log(
 					`[streaming-ch] OK — ch=${j.channel} video=${j.route} audio=${j.audioSource} -> ${j.audioRoute} split=${j.splitAvRouted}`
 				)

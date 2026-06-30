@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Outside border: expanded MIXER FILL + inner hole; box-shadow outward on .pip-frame — see docs/reference/pip-overlay-outside-border.md -->
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -7,14 +8,15 @@
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		html, body {
 			width: 100%; height: 100%;
-			overflow: hidden;
+			overflow: visible;
 			background: transparent !important;
 		}
 		#root {
 			position: absolute;
 			inset: 0;
 			pointer-events: none;
-			overflow: hidden;
+			overflow: visible;
+			opacity: var(--layer-o, 1);
 		}
 		.pip-frame {
 			position: absolute;
@@ -23,17 +25,17 @@
 			width: calc(var(--iw) * 100%);
 			height: calc(var(--ih) * 100%);
 			border-radius: var(--r, 0);
-			opacity: var(--o, 1);
 			pointer-events: none;
-			border: var(--w) solid var(--c);
+			box-sizing: border-box;
+			overflow: visible;
+			background: transparent;
+		}
+		/* Outside: ring grows outward from the content edge into the expanded CG canvas margin. */
+		.pip-frame.side-outside {
+			box-shadow: 0 0 0 var(--w) var(--c);
 		}
 		.pip-frame.side-inside {
-			box-sizing: border-box;
-			margin: 0;
-		}
-		.pip-frame.side-outside {
-			box-sizing: content-box;
-			margin: calc(var(--w) * -1);
+			box-shadow: inset 0 0 0 var(--w) var(--c);
 		}
 	</style>
 </head>
@@ -49,23 +51,27 @@
 		color: '#e63946',
 		radius: 0,
 		opacity: 1,
-		side: 'inside',
+		side: 'outside',
 		liveFile: null,
 	}
 
 	var livePollId = null
 	var lastLiveRaw = ''
+	var layoutKey = ''
 
 	function clamp01(x) {
 		var n = Number(x)
 		return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
 	}
 
+	function normalizeSide(s) {
+		var v = String(s != null ? s : 'outside').trim().toLowerCase()
+		return v === 'inside' ? 'inside' : 'outside'
+	}
+
 	function hasMargin(inn) {
 		if (!inn) return false
-		var w = inn.w != null ? inn.w : 0
-		var h = inn.h != null ? inn.h : 0
-		return w > 0 && h > 0
+		return (inn.w || 0) > 0 && (inn.h || 0) > 0
 	}
 
 	function normalizeSlice(s) {
@@ -86,21 +92,6 @@
 		return slices.map(normalizeSlice).filter(hasMargin)
 	}
 
-	function styleFrame(frame, inn) {
-		if (!frame || !inn) return
-		frame.style.setProperty('--il', String(inn.l))
-		frame.style.setProperty('--it', String(inn.t))
-		frame.style.setProperty('--iw', String(inn.w))
-		frame.style.setProperty('--ih', String(inn.h))
-		frame.style.setProperty('--w', state.width + 'px')
-		frame.style.setProperty('--c', state.color)
-		frame.style.setProperty('--r', state.radius + 'px')
-		frame.style.setProperty('--o', String(state.opacity))
-		frame.className = 'pip-frame side-' + (state.side || 'inside')
-	}
-
-	var layoutKey = ''
-
 	function sliceLayoutKey(slices) {
 		var out = []
 		for (var i = 0; i < slices.length; i++) {
@@ -110,22 +101,34 @@
 		return out.join('|')
 	}
 
+	function styleFrame(frame, inn) {
+		frame.style.setProperty('--il', String(inn.l))
+		frame.style.setProperty('--it', String(inn.t))
+		frame.style.setProperty('--iw', String(inn.w))
+		frame.style.setProperty('--ih', String(inn.h))
+		frame.style.setProperty('--w', Math.max(0, Number(state.width) || 0) + 'px')
+		frame.style.setProperty('--c', state.color || '#e63946')
+		frame.style.setProperty('--r', Math.max(0, Number(state.radius) || 0) + 'px')
+		frame.className = 'pip-frame side-' + normalizeSide(state.side)
+	}
+
 	function render() {
+		root.style.setProperty('--layer-o', String(clamp01(state.opacity)))
 		var slices = activeSlices()
-		var key = sliceLayoutKey(slices)
+		var key = sliceLayoutKey(slices) + '|' + normalizeSide(state.side) + '|' + state.width + '|' + state.color
 		var frames = root.querySelectorAll('.pip-frame')
 		if (key !== layoutKey || frames.length !== slices.length) {
 			root.innerHTML = ''
-			slices.forEach(function () {
+			for (var i = 0; i < slices.length; i++) {
 				var frame = document.createElement('div')
 				frame.className = 'pip-frame'
 				root.appendChild(frame)
-			})
+			}
 			layoutKey = key
 			frames = root.querySelectorAll('.pip-frame')
 		}
-		for (var i = 0; i < slices.length; i++) {
-			if (frames[i]) styleFrame(frames[i], slices[i])
+		for (var j = 0; j < slices.length; j++) {
+			if (frames[j]) styleFrame(frames[j], slices[j])
 		}
 	}
 
@@ -139,7 +142,7 @@
 		if (d.color != null) state.color = String(d.color)
 		if (d.radius != null) state.radius = parseFloat(d.radius) || 0
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
-		if (d.side != null) state.side = String(d.side)
+		if (d.side != null) state.side = normalizeSide(d.side)
 		if (d.inner && typeof d.inner === 'object') {
 			state.inner = {
 				l: clamp01(d.inner.l),

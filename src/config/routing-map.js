@@ -330,6 +330,22 @@ function getChannelMap(config, activeBuses = null) {
 		}
 	}
 
+	const { mergeHostLiveChannelsIntoRouting } = require('./host-live-sources')
+	const hostMerge = mergeHostLiveChannelsIntoRouting(config, nextCh)
+	for (const entry of hostMerge.entries) {
+		inputChannels.push({
+			kind: entry.kind,
+			slot: 0,
+			channel: entry.channel,
+			layer: entry.layer,
+			mode: entry.mode,
+			route: entry.route,
+			label: entry.label,
+			sourceId: entry.sourceId,
+		})
+	}
+	nextCh = hostMerge.nextCh
+
 	const result = {
 		screenCount,
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
@@ -376,6 +392,9 @@ function getChannelMap(config, activeBuses = null) {
 		liveAudioInputChannels,
 		decklinkInputMode,
 		liveAudioInputMode,
+		hostLiveChannels: hostMerge.entries,
+		webpageHostChannels: hostMerge.entries.filter((e) => e.kind === 'webpage_host').map((e) => e.channel),
+		ndiHostChannels: hostMerge.entries.filter((e) => e.kind === 'ndi_host').map((e) => e.channel),
 	}
 
 	return result

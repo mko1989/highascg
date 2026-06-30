@@ -21,10 +21,20 @@ Modeline "1920x1080_60.00"  173.00  1920 2048 2248 2576  1080 1083 1088 1120 -hs
 	assert.equal(p.timings[0], '173.00')
 })
 
-test('readCreateMissingModes reads root and casparServer', () => {
-	assert.equal(readCreateMissingModes({}), false)
+test('readCreateMissingModes defaults on; explicit false disables', () => {
+	assert.equal(readCreateMissingModes({}), true)
 	assert.equal(readCreateMissingModes({ os_xrandr_create_missing_modes: true }), true)
 	assert.equal(readCreateMissingModes({ casparServer: { os_xrandr_create_missing_modes: '1' } }), true)
+	assert.equal(readCreateMissingModes({ os_xrandr_create_missing_modes: false }), false)
+	assert.equal(readCreateMissingModes({ casparServer: { os_xrandr_create_missing_modes: '0' } }), false)
+})
+
+test('shouldCreateXrandrModeForPlan: EDID source never creates; custom always creates', () => {
+	const { shouldCreateXrandrModeForPlan } = require('../../src/utils/xrandr-custom-mode')
+	assert.equal(shouldCreateXrandrModeForPlan({}, 'edid', '5120x1024'), false)
+	assert.equal(shouldCreateXrandrModeForPlan({}, 'custom', '5120x1024'), true)
+	assert.equal(shouldCreateXrandrModeForPlan({ os_xrandr_create_missing_modes: false }, 'custom', '5120x1024'), false)
+	assert.equal(shouldCreateXrandrModeForPlan({}, 'custom', '1920x1080_60.00'), false)
 })
 
 test('pickStripFallbackMode prefers first WxH in set', () => {

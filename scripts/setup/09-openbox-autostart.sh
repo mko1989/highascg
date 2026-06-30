@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 9: Openbox autostart — scanner + run.sh (CASPAR_RESPAWN=1) on nodm :0.
+# Step 9: Openbox autostart — X session only (layout, NVIDIA policy). Caspar + scanner = systemd (WO-73).
 #
 #   sudo bash scripts/setup/09-openbox-autostart.sh
 #   sudo systemctl restart nodm   # or reboot
@@ -45,8 +45,16 @@ EOF
 
 	install -m 755 "${PLAYOUT}/tools/runtime/highascg-nvidia-x-apply.sh" /usr/local/bin/highascg-nvidia-x-apply.sh
 	chmod 755 /usr/local/bin/highascg-nvidia-x-apply.sh
-	ok "nvidia-x-apply installed"
+	install -m 755 "${PLAYOUT}/tools/runtime/confine-cursor.py" /usr/local/bin/confine-cursor.py
+	chmod 755 /usr/local/bin/confine-cursor.py
+	install -m 755 "${PLAYOUT}/tools/runtime/confine-pointer-barriers.py" /usr/local/bin/confine-pointer-barriers.py
+	chmod 755 /usr/local/bin/confine-pointer-barriers.py
+	ok "nvidia-x-apply + confine-pointer-barriers installed"
 fi
+
+install -m 755 "${PLAYOUT}/tools/runtime/capture-boot-xrandr.sh" /usr/local/bin/highascg-capture-boot-xrandr.sh
+chmod 755 /usr/local/bin/highascg-capture-boot-xrandr.sh
+ok "boot xrandr capture installed"
 
 log "highascg-display-mode helper"
 cat >/usr/local/bin/highascg-display-mode <<EOF
@@ -70,6 +78,23 @@ mkdir -p /etc/highascg
 
 log "Openbox autostart for ${USER_CASPAR}"
 mkdir -p "/home/${USER_CASPAR}/.config/openbox"
+
+# WO-73: when casparcg-server.service is installed, Openbox must not reference run.sh at all.
+if [[ -f /etc/systemd/system/casparcg-server.service ]]; then
+	CASPAR_PLAYOUT_BLOCK='# WO-73: playout via casparcg-server.service + casparcg-scanner.service (systemd).'
+else
+	CASPAR_PLAYOUT_BLOCK="$(cat <<LEGACY
+  # Legacy fallback when casparcg-server.service is not installed (no scanner here).
+  exec 9>>/tmp/caspar-runsh.lock
+  flock -n 9 || exit 0
+  (
+    cd ${PLAYOUT} || exit 0
+    [ -x ./run.sh ] && exec ./run.sh >> /tmp/caspar.log 2>&1
+  ) &
+LEGACY
+)"
+fi
+
 cat >"/home/${USER_CASPAR}/.config/openbox/autostart" <<AST
 #!/bin/bash
 export DISPLAY=:0
@@ -78,17 +103,30 @@ export XAUTHORITY=/home/${USER_CASPAR}/.Xauthority
 xset s off
 xset s noblank
 xset -dpms
-unclutter -idle 1 -root &
+unclutter -idle 2 -root &
 
-# xrandr (apply-layout) resets MetaMode — run layout first, then NVIDIA policy (with retries).
+# GPU port names for Device View (before apply-layout mutates modes).
+if [ -x "${PLAYOUT}/tools/runtime/capture-boot-xrandr.sh" ]; then
+  HIGHASCG_REPO="${PLAYOUT}" "${PLAYOUT}/tools/runtime/capture-boot-xrandr.sh" || true
+elif [ -x /usr/local/bin/highascg-capture-boot-xrandr.sh ]; then
+  HIGHASCG_REPO="${PLAYOUT}" /usr/local/bin/highascg-capture-boot-xrandr.sh || true
+fi
+
+# xrandr (apply-layout) resets MetaMode — layout first, then one NVIDIA policy pass with retries.
 _layout="\${HOME}/.config/highascg/apply-layout.sh"
 if [ -x "\$_layout" ]; then
   "\$_layout"
 elif [ -x /etc/highascg/apply-layout.sh ]; then
   /etc/highascg/apply-layout.sh
 fi
-( sleep 6; [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh ) &
-( sleep 18; [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh ) &
+(
+  sleep 6
+  for _nv in 1 2; do
+    [ -x /usr/local/bin/highascg-nvidia-x-apply.sh ] && /usr/local/bin/highascg-nvidia-x-apply.sh
+    [ "\$_nv" -eq 2 ] && break
+    sleep 12
+  done
+) &
 
 if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/display-mode; then
   if command -v BlackmagicDesktopVideoSetup >/dev/null 2>&1; then
@@ -100,30 +138,18 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/disp
     (xterm -e 'bash -c "echo X11-only: CasparCG not started.; echo Resume: sudo highascg-display-mode normal; read"') &
   fi
 else
-  if systemctl is-active --quiet casparcg-server.service 2>/dev/null; then
-    : # WO-73: Caspar owned by systemd — Openbox autostart must not duplicate scanner/run.sh
-  elif systemctl is-enabled --quiet casparcg-server.service 2>/dev/null; then
-    : # enabled but not active yet — skip legacy autostart
-  else
-  _runpid=/tmp/caspar-runsh.pid
-  if [ -f "\$_runpid" ] && kill -0 "\$(cat "\$_runpid")" 2>/dev/null; then
-    exit 0
-  fi
-  (
-    cd ${PLAYOUT} || exit 0
-    command -v casparcg-scanner >/dev/null && casparcg-scanner &
-    # run.sh relaunches on AMCP RESTART and kills hung teardown (CASPAR_RESTART_HANG_SEC).
-    # Use CASPAR_RESPAWN=1 only while debugging CEF crashes.
-    [ -x ./run.sh ] && exec ./run.sh >> /tmp/caspar.log 2>&1
-  ) &
-  fi
+${CASPAR_PLAYOUT_BLOCK}
 fi
 AST
 chmod +x "/home/${USER_CASPAR}/.config/openbox/autostart"
 chown -R "${USER_CASPAR}:${USER_CASPAR}" "/home/${USER_CASPAR}/.config"
 
-systemctl enable nodm 2>/dev/null || true
-systemctl restart nodm 2>/dev/null || true
+if [[ "${OPENBOX_SKIP_NODM_RESTART:-0}" != "1" ]]; then
+	systemctl enable nodm 2>/dev/null || true
+	systemctl restart nodm 2>/dev/null || true
+else
+	ok "skipped nodm restart (OPENBOX_SKIP_NODM_RESTART=1)"
+fi
 
 echo
 ok "autostart → /home/${USER_CASPAR}/.config/openbox/autostart"

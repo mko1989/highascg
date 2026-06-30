@@ -58,7 +58,7 @@ export function renderConnectorInspector(h, conn, ctx, {
 	} else if (conn?.kind === 'stream_out') {
 		renderStreamOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, setCasparRestartDirty, onRemoveStreamOutput })
 	} else if (conn?.kind === 'record_out') {
-		renderRecordOutControls(h, conn, { currentSettings, statusEl, load, setCasparRestartDirty, onRemoveRecordOutput })
+		renderRecordOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, onRemoveRecordOutput })
 	} else if (conn?.kind === 'audio_out') {
 		renderAudioOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, onRemoveAudioOutput })
 	} else if (conn?.kind === 'gpu_out' || conn?.kind === 'gpu_output') {

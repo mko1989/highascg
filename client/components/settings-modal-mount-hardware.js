@@ -1,9 +1,8 @@
 /**
- * Settings modal: media mount, exFAT sync table, system hardware (NVIDIA), DeckLink summaries.
+ * Settings modal: exFAT sync table, system operator display, DeckLink summaries.
  */
 import { api } from '../lib/api-client.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
-import { settingsState } from '../lib/settings-state.js'
 
 function escapeHtml(s) {
 	return String(s || '')
@@ -21,57 +20,6 @@ function exfatPairStatus(row) {
 	if (row.exfatIsDirectory && row.projectIsDirectory) return 'directory ↔ directory'
 	if (row.exfatIsFile || row.projectIsFile) return 'file pair'
 	return 'ok'
-}
-
-export async function refreshMediaMountPanel(modal) {
-	const sel = modal.querySelector('#media-mount-part-select')
-	const line = modal.querySelector('#media-mount-status-line')
-	const applyBtn = modal.querySelector('#media-mount-apply-btn')
-	if (!sel || !line) return
-	const prev = sel.value
-	line.textContent = 'Loading…'
-	try {
-		const [dRes, mRes] = await Promise.all([
-			api.get('/api/usb/drives').catch((e) => { throw e }),
-			api.get('/api/system/media-mount/status').catch(() => null),
-		])
-		const devices = Array.isArray(dRes?.drives) ? dRes.drives : []
-		sel.innerHTML = '<option value="">— select —</option>'
-		for (const d of devices) {
-			const rm = d.removable ? 'removable' : 'internal'
-			const lbl = [d.label, d.mountpoint ? ` @ ${d.mountpoint}` : ''].join('').trim()
-			const pathStr = d.device || d.mountpoint || ''
-			const fsTypeStr = d.fsType || d.fstype || ''
-			const txt =
-				`[${rm}] ${pathStr} ${d.size || ''} ${fsTypeStr}${lbl ? ' — ' + lbl : ''}`
-					.replace(/\s+/g, ' ')
-					.trim()
-			const opt = document.createElement('option')
-			opt.value = d.id || d.uuid
-			opt.textContent = txt
-			sel.appendChild(opt)
-		}
-		if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev
-		const lines = []
-		if (mRes?.unsupported) lines.push('Drive list unavailable on this platform.')
-		if (mRes?.mounted)
-			lines.push(`Mounted: ${mRes.source || '?'} (${mRes.fstype || '?'})  uuid=${mRes.uuid || '?'}`)
-		else if (mRes?.inheritsFromFilesystem)
-			lines.push(
-				`On host filesystem (${mRes.inheritsFromFilesystem}); no partition mounted solely at /home/casparcg/highascg/media/drive.`,
-			)
-		else if (!mRes)
-			lines.push('Mount status endpoint not available.')
-		else lines.push('Folder is not separately mounted.')
-		if (mRes?.savedUuid)
-			lines.push(
-				`Saved at startup: ${mRes.savedUuid}${mRes.savedKernelName ? ` (${mRes.savedKernelName})` : ''}`,
-			)
-		line.textContent = lines.join(' · ')
-		if (applyBtn) applyBtn.disabled = !sel.value
-	} catch (e) {
-		line.textContent = formatSettingsFetchError(e, '/api/usb/drives')
-	}
 }
 
 function formatSettingsFetchError(err, path) {
@@ -127,21 +75,20 @@ export async function refreshExfatSyncPanel(modal) {
 }
 
 export async function refreshSystemHardwarePanel(modal) {
-	const summary = modal.querySelector('#system-hw-nvidia-summary')
-	const stat = modal.querySelector('#system-hw-nvidia-status')
-	if (!summary) return
-	summary.textContent = 'Loading…'
+	const operatorDisplay = modal.querySelector('#system-hw-operator-display')
+	if (!operatorDisplay) return
+	operatorDisplay.textContent = 'Loading operator display…'
 	try {
-		const r = await api.get('/api/system/gpu-nvidia')
-		const lines = []
-		if (Array.isArray(r?.nvidiaSmiLines) && r.nvidiaSmiLines.length)
-			r.nvidiaSmiLines.forEach((l) => lines.push(`nvidia-smi: ${l}`))
-		if (r?.loadedModuleVersion) lines.push(`modinfo nvidia version: ${r.loadedModuleVersion}`)
-		if (r?.dpkgDriverLine) lines.push(`dpkg: ${r.dpkgDriverLine}`)
-		summary.textContent = lines.length ? lines.join('\n') : '(no NVIDIA probes — GPU driver not loaded?)'
-		if (stat) stat.textContent = ''
+		const od = await api.get('/api/system/operator-display').catch(() => null)
+		const bits = [od?.summary || 'Operator display unknown.']
+		if (Array.isArray(od?.interactiveAllowance) && od.interactiveAllowance.length) {
+			bits.push(`Interactive Caspar heads (also allowed when confining): ${od.interactiveAllowance.join(', ')}.`)
+		}
+		if (od?.confineActive) bits.push('Pointer confine: active.')
+		else if (od?.confineDesired) bits.push('Pointer confine: enabled on operator GPU port (Device View).')
+		operatorDisplay.textContent = bits.join(' ')
 	} catch (e) {
-		summary.textContent = e?.message || String(e)
+		operatorDisplay.textContent = e?.message || String(e)
 	}
 }
 
@@ -168,54 +115,8 @@ export async function refreshDecklinkPanel(modal) {
 	}
 }
 
-export function openMediaMountDestructiveConfirm(onDecision) {
-	const ov = document.createElement('div')
-	ov.className = 'modal-overlay'
-	ov.setAttribute('data-media-mount-confirm', '')
-	ov.innerHTML = `
-			<div class="modal-content settings-modal" style="max-width:28rem">
-				<div class="modal-header"><h2>Mount partition</h2></div>
-				<div class="modal-body settings-body">
-					<p class="settings-note">This will <strong>permanently delete</strong> all files currently under <code>/home/casparcg/highascg/media/drive</code> on this host, then mount the selected partition at that path. Anything that only lived in that folder (not on the disk you select) will be gone.</p>
-					<div class="settings-group checkbox">
-						<label><input type="checkbox" id="media-mount-ack-delete" /> I understand existing files in that folder will be deleted</label>
-					</div>
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn--secondary" data-media-mount-cancel>Cancel</button>
-					<button type="button" class="btn btn--primary" data-media-mount-run>Mount and save UUID</button>
-				</div>
-			</div>`
-	document.body.appendChild(ov)
-	const cleanup = () => {
-		try {
-			ov.remove()
-		} catch {}
-	}
-	ov.querySelector('[data-media-mount-cancel]')?.addEventListener('click', () => {
-		cleanup()
-		onDecision(false)
-	})
-	ov.addEventListener('click', ev => {
-		if (ev.target === ov) {
-			cleanup()
-			onDecision(false)
-		}
-	})
-	ov.querySelector('[data-media-mount-run]')?.addEventListener('click', () => {
-		const chk = ov.querySelector('#media-mount-ack-delete')
-		if (!(chk && chk.checked)) {
-			window.alert('Check the acknowledgement box first.')
-			return
-		}
-		cleanup()
-		onDecision(true)
-	})
-}
-
-/** Media (USB) tab: refresh, dry-run, partition select, destructive mount apply. */
+/** Media (USB) tab: exFAT sync refresh and dry-run. */
 export function wireMediaUsbMountListeners(modal) {
-	modal.querySelector('#media-mount-refresh-btn')?.addEventListener('click', () => void refreshMediaMountPanel(modal))
 	modal.querySelector('#exfat-sync-refresh-btn')?.addEventListener('click', () => void refreshExfatSyncPanel(modal))
 	modal.querySelector('#exfat-sync-dryrun-btn')?.addEventListener('click', async () => {
 		const line = modal.querySelector('#exfat-sync-status-line')
@@ -229,30 +130,5 @@ export function wireMediaUsbMountListeners(modal) {
 		} catch (e) {
 			if (line) line.textContent = e?.message || String(e)
 		}
-	})
-	modal.querySelector('#media-mount-part-select')?.addEventListener('change', e => {
-		const applyBtn = modal.querySelector('#media-mount-apply-btn')
-		if (applyBtn) applyBtn.disabled = !(e.target && e.target.value)
-	})
-	modal.querySelector('#media-mount-apply-btn')?.addEventListener('click', () => {
-		const uuid = modal.querySelector('#media-mount-part-select')?.value
-		if (!uuid) return
-		openMediaMountDestructiveConfirm(async ok => {
-			if (!ok) return
-			const st = modal.querySelector('#media-mount-status-line')
-			if (st) st.textContent = 'Mounting…'
-			try {
-				const res = await api.post('/api/system/media-mount', { uuid, confirm: 'DELETE_MEDIA' })
-				if (st)
-					st.textContent =
-						res?.source ?
-							`Mounted ${res.source}. UUID saved (${res.uuid}). Use Refresh in Sources → Media if clips do not appear.`
-						:	'Mounted. UUID saved.'
-				await settingsState.load()
-				await refreshMediaMountPanel(modal)
-			} catch (e) {
-				if (st) st.textContent = e?.message || String(e)
-			}
-		})
 	})
 }

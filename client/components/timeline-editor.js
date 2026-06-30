@@ -222,6 +222,8 @@ export function initTimelineEditor(root, stateStore) {
 		startPlaybackLoop,
 		setServerTick: (pos) => anchorPlayhead(pos),
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
+		setSelectedClip: (v) => { selectedClip = v },
+		setSelectedFlagDetail: (v) => { selectedFlagDetail = v },
 	})
 	const { buildTransport, updateTimecode, syncToServer, updateSendTo, togglePlay } = transportApi
 	syncToServerRef.fn = syncToServer

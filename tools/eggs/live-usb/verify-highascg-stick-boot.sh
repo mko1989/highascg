@@ -12,6 +12,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 HIGHASCG_ROOT="${HIGHASCG_ROOT:-/home/casparcg/highascg}"
+USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"
+AUTOSTART="/home/${USER_CASPAR}/.config/openbox/autostart"
 FAIL=0
 
 fail() {
@@ -43,7 +45,9 @@ if [[ -f "$UNIT" ]]; then
 fi
 
 [[ -x "$UPDATE_SH" ]] || fail "missing ${UPDATE_SH} — run install-exfat-systemd-units.sh"
-if [[ -f "$UPDATE_SH" ]] && grep -q 'start --no-block.*highascg' "$UPDATE_SH"; then
+if [[ -f "$UPDATE_SH" ]] \
+	&& grep -q 'start --no-block' "$UPDATE_SH" \
+	&& grep -qE 'SERVICE=highascg\.service|start --no-block.*highascg' "$UPDATE_SH"; then
 	ok "server-update uses --no-block start for highascg"
 else
 	fail "${UPDATE_SH} missing --no-block highascg start — reinstall from repo"
@@ -75,6 +79,27 @@ if grep -q 'WorkingDirectory=/home/casparcg/highascg' /etc/systemd/system/caspar
 	ok "casparcg-scanner WorkingDirectory set"
 else
 	fail "casparcg-scanner missing WorkingDirectory — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"
+fi
+
+if [[ -f /etc/systemd/system/casparcg-server.service ]] \
+	&& systemctl is-enabled --quiet casparcg-server.service 2>/dev/null \
+	&& [[ -f "$AUTOSTART" ]]; then
+	if grep -vE '^\s*#' "$AUTOSTART" | grep -q 'casparcg-scanner'; then
+		fail "Openbox autostart still starts casparcg-scanner — sudo bash ${REPO_ROOT}/scripts/setup/sync-caspar-supervisor-wiring.sh"
+	elif grep -vE '^\s*#' "$AUTOSTART" | grep -qE 'exec \./run\.sh|\./run\.sh >>'; then
+		fail "Openbox autostart still starts run.sh — sudo bash ${REPO_ROOT}/scripts/setup/sync-caspar-supervisor-wiring.sh"
+	else
+		ok "Openbox autostart does not duplicate systemd Caspar"
+	fi
+else
+	ok "Openbox autostart does not duplicate systemd Caspar (or legacy mode)"
+fi
+
+_run_ct="$(pgrep -cf 'run\.sh' 2>/dev/null || echo 0)"
+if [[ "${_run_ct:-0}" -le 1 ]]; then
+	ok "at most one run.sh supervisor (${_run_ct})"
+else
+	fail "multiple run.sh supervisors (${_run_ct}) — sync wiring and restart casparcg-server"
 fi
 
 echo ""

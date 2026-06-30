@@ -155,7 +155,7 @@ function startReplicationService(ctx, wsInfo = {}) {
 
 	ctx._replication = runtime
 	ctx.onProjectSavedForReplication = (project) => {
-		void pushProjectToPeer(ctx, runtime, project)
+		void pushProjectToPeer(ctx, runtime, project, { reason: 'save' })
 	}
 	ctx.markReplicationLiveStateDirty = () => markLiveStateDirty(runtime, ctx)
 
@@ -164,6 +164,11 @@ function startReplicationService(ctx, wsInfo = {}) {
 }
 
 function stopReplicationService(ctx) {
+	try {
+		require('./project-push-debounce').cancelScheduledProjectPushToPeer()
+	} catch {
+		/* optional */
+	}
 	const rt = ctx?._replication || _runtime
 	if (rt?.peerClient) rt.peerClient.stop()
 	if (rt?.peerWsClient) rt.peerWsClient.stop()

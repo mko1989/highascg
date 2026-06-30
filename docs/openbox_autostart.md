@@ -1,6 +1,15 @@
-# Openbox autostart — CasparCG + HighAsCG (reference)
+# Openbox autostart — X session only (layout, NVIDIA). Caspar + scanner = systemd (WO-73).
 
-## Why `sudo systemctl restart nodm` did not stop Caspar
+**Current installer:** `scripts/setup/09-openbox-autostart.sh` writes `~/.config/openbox/autostart` for the Caspar user. It does **not** start `casparcg-scanner` or `run.sh` when `casparcg-scanner.service` / `casparcg-server.service` are enabled (`scripts/setup/13-caspar-systemd-units.sh`).
+
+- **`casparcg-scanner.service`** — `After=network.target` only (no X, no nodm).
+- **`casparcg-server.service`** — runs `run.sh` under systemd.
+
+Sync wiring: `sudo bash scripts/setup/sync-caspar-supervisor-wiring.sh`
+
+---
+
+## Why `sudo systemctl restart nodm` did not stop Caspar (legacy)
 
 1. **Background `&`** — The `while true; do … done &` block detaches from Openbox. After a nodm/X restart, those processes are **not always** in the same process tree as the new session; old loops can **keep running** (orphaned or still under a surviving user manager).
 2. **Autostart runs again** — Each new X session executes `autostart` again, so you get **another** `while true` loop → **another** Caspar main process while the old one may still be alive.
@@ -78,7 +87,7 @@ Notes:
 2. **After unclean restart:**  
    If you see **more than one** main `casparcg-server-2.5 … casparcg.config` without `--type=`, kill all mains as above once, then let **one** autostart loop respawn Caspar (or restart nodm after the kill).
 
-3. **Long term:** Consider running Caspar as a **systemd user** or **system** unit (`Restart=on-failure`, single instance) and keep Openbox only for X utilities — avoids duplicate loops entirely.
+3. **Long term (current):** Caspar runs as **systemd** units (`casparcg-scanner.service`, `casparcg-server.service`); Openbox handles X utilities and display layout only.
 
 ---
 

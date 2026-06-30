@@ -43,6 +43,10 @@ export function roleLabel(item) {
 			return 'Extra audio'
 		case 'streaming_channel':
 			return 'Streaming channel'
+		case 'webpage_host':
+			return 'Webpage host'
+		case 'ndi_host':
+			return 'NDI host'
 		default:
 			return String(item.role || 'channel')
 	}

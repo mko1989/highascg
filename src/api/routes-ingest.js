@@ -13,6 +13,7 @@ const unzipper = require('unzipper')
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { resolveSafe, getMediaIngestBasePath } = require('../media/local-media')
 const { getIngestEffectiveBase } = require('../media/project-media-root')
+const persistence = require('../utils/persistence')
 
 /**
  * @param {object} ctx
@@ -132,7 +133,7 @@ async function handleUpload(req, res, ctx) {
 
 		bb.on('file', (name, file, info) => {
 			const { filename } = info
-			const effectiveBase = getIngestEffectiveBase(config, targetSubdir)
+			const effectiveBase = getIngestEffectiveBase(config, targetSubdir, persistence)
 			
 			// Ensure target subdir exists (sequential upload means we can do this here)
 			try {
@@ -199,7 +200,7 @@ async function handleDownload(body, ctx) {
 
 	const config = ctx.config || {}
 	const downloadSubdir = typeof parsedBody.path === 'string' ? parsedBody.path : ''
-	const downloadBase = getIngestEffectiveBase(config, downloadSubdir)
+	const downloadBase = getIngestEffectiveBase(config, downloadSubdir, persistence)
 
 	if (isWeTransferUrl(url)) {
 		const wt = getWetransfert()
@@ -408,7 +409,7 @@ async function handleIngestPreview(query, ctx) {
 	// Dynamic content type detection
 	const ext = path.extname(fullPath).toLowerCase()
 	let contentType = 'application/octet-stream'
-	if (['.mp4', '.mov', '.mxf', '.mkv'].includes(ext)) contentType = 'video/quicktime'
+	if (['.mp4', '.mov', '.qt', '.mxf', '.mkv'].includes(ext)) contentType = 'video/quicktime'
 	if (['.png', '.jpg', '.jpeg', '.tga'].includes(ext)) contentType = 'image/png'
 
 	return {

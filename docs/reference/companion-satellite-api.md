@@ -36,4 +36,13 @@ Companion responds with `SUB-STATE` including base64 **8-bit RGB** `BITMAP` at t
 
 ## Enable Satellite in Companion
 
-In Companion: **Settings → Connections → Satellite** — enable the Satellite server (TCP port 16622 by default). Firewall must allow HighAsCG → Companion on that port (localhost is typical).
+In Companion **Settings**:
+
+1. **Satellite server** — enable TCP (default port **16622**). This alone is not enough for HighAsCG previews.
+2. **Button Subscriptions API** — must be **enabled**. Companion advertises this as `CAPS SUBSCRIPTIONS=1`. If disabled, Companion returns `SUBSCRIPTIONS=0` and `ADD-SUB ERROR MESSAGE="Subscriptions not enabled"`.
+
+HighAsCG checks `/api/companion/button-preview/status` — `previewAvailable: false` with `reason: subscriptions_disabled` means step 2 is missing.
+
+Firewall must allow HighAsCG → Companion on the Satellite TCP port (localhost is typical).
+
+**Note:** HTTP press (timeline trigger) does not need Button Subscriptions — only preview bitmaps and the page picker do.

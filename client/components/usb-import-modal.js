@@ -4,9 +4,10 @@
  */
 
 import { api } from '../lib/api-client.js'
+import { getDefaultUploadSubdir } from '../lib/project-media-context.js'
 
 const MEDIA_EXT = new Set([
-	'.mp4', '.mov', '.mxf', '.mkv', '.webm', '.avi', '.m4v', '.mpg', '.mpeg', '.wmv',
+	'.mp4', '.mov', '.qt', '.mxf', '.mkv', '.webm', '.avi', '.m4v', '.mpg', '.mpeg', '.wmv',
 	'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tga', '.svg',
 	'.wav', '.mp3', '.aac', '.m4a', '.flac', '.aiff', '.ogg',
 	'.zip',
@@ -393,9 +394,11 @@ export function showUsbImportModal(opts = {}) {
 		progressBar.style.width = '0%'
 		progressMeta.textContent = 'Starting…'
 		try {
+			const targetSubdir = getDefaultUploadSubdir()
 			const resp = await api.post('/api/usb/import', {
 				driveId: currentDriveId,
 				items: [...selected],
+				...(targetSubdir ? { targetSubdir } : {}),
 			})
 			if (resp.error && !resp.ok) throw new Error(resp.error)
 			stopPoll()

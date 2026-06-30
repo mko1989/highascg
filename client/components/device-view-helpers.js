@@ -270,6 +270,7 @@ export function friendlyConnectorLabel(lastPayload, connectorId) {
 	if (conn?.kind === 'destination_in') {
 		const did = String(conn?.externalRef || '').trim()
 		const hostDest = did.startsWith('host_') ? findScreenDestinationById(lastPayload, did) : null
+		if (hostDest?.label) return String(hostDest.label)
 		if (hostDest?.casparChannel != null) return `host_ch${hostDest.casparChannel}`
 		const intents = Array.isArray(lastPayload?.live?.caspar?.destinationIntent?.items) ? lastPayload.live.caspar.destinationIntent.items : []
 		const intent = intents.find((x) => String(x?.id || '').trim() === did) || null

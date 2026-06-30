@@ -286,7 +286,7 @@ Pins/URLs: `scripts/lib/install-config.sh` (`URL_CEF_BINARY_TAR`, `URL_SCANNER_D
 - NVIDIA GL env (`__GL_SYNC_TO_VBLANK=0`, PowerMizer max)
 - `highascg-nvidia-x-apply.sh` — SyncToVBlank off + **Force Composition Pipeline on all outputs**
 - `highascg-display-mode` helper (`normal` | `x11-only`)
-- Openbox autostart: **casparcg-scanner** + **`run.sh`** with `CASPAR_RESPAWN=1`
+- Openbox autostart: X layout + NVIDIA only; **casparcg-scanner** + **`run.sh`** via systemd (`13-caspar-systemd-units.sh`)
 - flock guard (single Caspar instance)
 - Enables/restarts **nodm**
 

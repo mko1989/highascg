@@ -9,6 +9,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const persistence = require('../utils/persistence')
 const {
 	loadFullProject,
+	loadProjectForSlug,
 	validateIncomingProject,
 	persistProject,
 } = require('../engine/project-scenes')
@@ -16,6 +17,8 @@ const projectStore = require('../engine/project-store')
 const {
 	injectHardwareConfigToProject,
 	applyHardwareConfigFromProject,
+	applyHardwareConfigToCtx,
+	hardwareConfigHasOperatorData,
 } = require('../engine/project-hardware-config')
 const { ensureProjectMediaDir, getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')
 
@@ -144,8 +147,12 @@ async function handleProject(path, body, ctx) {
 					: ''
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = reqSlug || projectStore.getActiveSlug(persistence)
-		let project = slug ? projectStore.readProjectFile(slug) : null
-		if (!project && !reqSlug) project = await loadProjectMerged(ctx)
+		let project = null
+		if (reqSlug) {
+			project = loadProjectForSlug(reqSlug, { mergeAutosave: false })
+		} else {
+			project = await loadProjectMerged(ctx)
+		}
 		if (!project) {
 			return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'No project stored' }) }
 		}
@@ -155,7 +162,9 @@ async function handleProject(path, body, ctx) {
 			projectStore.projectSlugFromName(project.name)
 		projectStore.setActiveSlug(persistence, activeSlug)
 		ensureProjectMediaDir(ctx.config, activeSlug)
-		applyHardwareConfigFromProject(ctx, project)
+		if (b.applyHardware === true) {
+			applyHardwareConfigFromProject(ctx, project)
+		}
 		try {
 			const { ensureLiveAudioRouting } = require('../config/routing-setup')
 			void ensureLiveAudioRouting(ctx).catch((e) => {
@@ -168,6 +177,58 @@ async function handleProject(path, body, ctx) {
 		}
 
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(project) }
+	}
+	if (path === '/api/project/apply-hardware') {
+		const hc =
+			b.hardwareConfig && typeof b.hardwareConfig === 'object'
+				? b.hardwareConfig
+				: b.project?.hardwareConfig && typeof b.project.hardwareConfig === 'object'
+					? b.project.hardwareConfig
+					: null
+		if (!hc) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: false, error: 'Missing hardwareConfig' }),
+			}
+		}
+		if (!hardwareConfigHasOperatorData(hc)) {
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, applied: false, skipped: 'empty hardwareConfig' }),
+			}
+		}
+		const applied = applyHardwareConfigToCtx(ctx, hc)
+		if (!applied) {
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: false, error: 'Failed to apply hardwareConfig' }),
+			}
+		}
+		try {
+			const { ensureLiveAudioRouting } = require('../config/routing-setup')
+			void ensureLiveAudioRouting(ctx).catch((e) => {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', `[project] Live audio routing: ${e?.message || e}`)
+				}
+			})
+		} catch {
+			/* optional */
+		}
+		if (typeof ctx._wsBroadcast === 'function') {
+			try {
+				ctx._wsBroadcast('change', { path: 'hardwareConfig', value: { applied: true } })
+			} catch {
+				/* optional */
+			}
+		}
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: true, applied: true }),
+		}
 	}
 	if (path === '/api/project/autosave') {
 		const project = b.project
@@ -210,6 +271,14 @@ async function handleProject(path, body, ctx) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {
 				ctx.artnetReceiver.reconfigure()
+			}
+			try {
+				const { scheduleProjectPushToPeer } = require('../replication/project-push-debounce')
+				scheduleProjectPushToPeer(ctx, project)
+			} catch (e) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', '[replication] autosave schedule push: ' + (e?.message || e))
+				}
 			}
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 		} catch (e) {

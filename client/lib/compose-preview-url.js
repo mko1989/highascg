@@ -3,19 +3,12 @@ import { resolveMainIndexForScene } from './look-stack-amcp-channel.js'
 import { settingsState } from './settings-state.js'
 
 /**
- * @returns {'canvas' | 'caspar_image' | 'ffmpeg_jpeg'}
+ * @returns {'canvas' | 'ffmpeg_jpeg'}
  */
 export function resolveComposePreviewMode() {
 	const mode = settingsState.getSettings()?.composePreview?.mode
-	if (mode === 'ffmpeg_jpeg' || mode === 'caspar_image' || mode === 'canvas') return mode
-	return 'ffmpeg_jpeg'
-}
-
-/**
- * @returns {boolean}
- */
-export function isCasparImageComposePreview() {
-	return resolveComposePreviewMode() === 'caspar_image'
+	if (mode === 'ffmpeg_jpeg' || mode === 'canvas') return mode
+	return 'canvas'
 }
 
 /**
@@ -29,8 +22,7 @@ export function isFfmpegJpegComposePreview() {
  * @returns {boolean}
  */
 export function isSnapshotComposePreview() {
-	const mode = resolveComposePreviewMode()
-	return mode === 'ffmpeg_jpeg' || mode === 'caspar_image'
+	return isFfmpegJpegComposePreview()
 }
 
 /**

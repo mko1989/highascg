@@ -34,7 +34,7 @@ import { getVariableStore } from './lib/variable-state.js'
 import { projectState } from './lib/project-state.js'
 import { timelineState } from './lib/timeline-state.js'
 import { initOptionalModules } from './lib/optional-modules.js'
-import { initDeviceView } from './components/device-view.js'
+import { initDeviceView, onDeviceViewTabActivated } from './components/device-view.js'
 import { initAudioMixerView } from './components/audio-mixer-view.js'
 import { placeholderState } from './lib/placeholder-state.js'
 import {
@@ -51,6 +51,7 @@ import * as Status from './lib/app-status.js'
 import { clearStaleApiOriginOverrideOnPlayoutUi } from './lib/api-origin.js'
 import * as Handlers from './lib/app-ws-handlers.js'
 import * as SceneDeck from './lib/app-scene-deck.js'
+import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
@@ -125,7 +126,10 @@ function initTabs() {
 			window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: false } }))
 		}
 		if (['scenes', 'multiview', 'pixelmap', 'timeline'].includes(target)) requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(`${target === 'pixelmap' ? 'px' : (target === 'multiview' ? 'mv' : target)}-tab-activated`)))
-		if (target === 'device-view') initDeviceView(document.getElementById('tab-device-view'))
+		if (target === 'device-view') {
+			initDeviceView(document.getElementById('tab-device-view'))
+			onDeviceViewTabActivated()
+		}
 		if (target === 'audio-mixer-view') initAudioMixerView(document.getElementById('tab-audio-mixer-view'), stateStore)
 		window.dispatchEvent(new CustomEvent('highascg-workspace-tab-activated', { detail: { tab: target } }))
 	}
@@ -364,6 +368,10 @@ async function init() {
 	/** Live tab: POST /api/device-view can return before WS change is applied; bridge for instant list updates. */
 	window.__highascgApplyExtraLiveSources = (list) => {
 		if (Array.isArray(list)) stateStore.applyChange('extraLiveSources', list)
+	}
+	window.__highascgApplyHostOperatorFullscreen = (hostState, cefFocusTarget) => {
+		stateStore.applyChange('hostOperatorFullscreen', hostState)
+		stateStore.applyChange('cefFocusTarget', cefFocusTarget ?? null)
 	}
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, {
 		getOscClient: () => _oscClient,

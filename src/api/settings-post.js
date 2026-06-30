@@ -162,6 +162,12 @@ async function handlePost(path, body, ctx) {
 			.sort((a, b) => a.slotOrder - b.slotOrder)
 	}
 	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
+	if (settings.operatorTools) {
+		cfg.operatorTools = {
+			...defaults.operatorTools,
+			pointerConfineMultiview: settings.operatorTools.pointerConfineMultiview === true,
+		}
+	}
 	if (settings.projectScopedMedia) {
 		const { normalizeProjectMediaLocation } = require('../media/project-media-location')
 		cfg.projectScopedMedia = {
@@ -303,11 +309,24 @@ async function handlePost(path, body, ctx) {
 	const mainCount = resolveMainScreenCount(cfg); cfg.screen_count = mainCount; if (!cfg.casparServer) cfg.casparServer = { ...defaults.casparServer }; cfg.casparServer.screen_count = mainCount
 
 	if (ctx.configManager) {
-		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, composePreview: { ...defaults.composePreview, ...(cfg.composePreview || {}) }, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, projectScopedMedia: { ...defaults.projectScopedMedia, ...(cfg.projectScopedMedia || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []), local_media_path: cfg.local_media_path, machineProfile: cfg.machineProfile || { ...defaults.machineProfile }, network: normalizeNetworkSettings(cfg.network, defaults.network) }
+		const cur = ctx.configManager.get(); const newConfig = { ...cur, screen_count: cfg.screen_count, caspar: cfg.caspar, streaming: { ...cfg.streaming }, periodic_sync_interval_sec: cfg.periodic_sync_interval_sec, periodic_sync_interval_sec_osc: cfg.periodic_sync_interval_sec_osc, osc_info_supplement_ms: cfg.osc_info_supplement_ms, osc: pickOscForPersistence(cfg.osc), ui: cfg.ui || defaults.ui, composePreview: { ...defaults.composePreview, ...(cfg.composePreview || {}) }, audioRouting: cfg.audioRouting || defaults.audioRouting, offline_mode: cfg.offline_mode, dmx: { ...defaults.dmx, ...(cfg.dmx || {}) }, casparServer: cfg.casparServer || defaults.casparServer, companion: cfg.companion || { host: '127.0.0.1', port: 8000 }, screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph), gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology, rtmp: normalizeRtmpConfig(cfg.rtmp), usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) }, operatorTools: { ...defaults.operatorTools, ...(cfg.operatorTools || {}) }, projectScopedMedia: { ...defaults.projectScopedMedia, ...(cfg.projectScopedMedia || {}) }, streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }, streamOutputs: Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : (Array.isArray(cur.streamOutputs) ? cur.streamOutputs : []), recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : (Array.isArray(cur.recordOutputs) ? cur.recordOutputs : (Array.isArray(defaults.recordOutputs) ? defaults.recordOutputs : [])), audioOutputs: Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : (Array.isArray(cur.audioOutputs) ? cur.audioOutputs : []), local_media_path: cfg.local_media_path, machineProfile: cfg.machineProfile || { ...defaults.machineProfile }, network: normalizeNetworkSettings(cfg.network, defaults.network) }
 		delete newConfig.mediaMount
 		delete newConfig.streaming._effectiveBasePort; delete newConfig.streaming._casparHost
 		for (const k of SYSTEM_DISPLAY_KEYS) { if (settings[k] !== undefined) { if (cfg[k] !== undefined) newConfig[k] = cfg[k]; else delete newConfig[k] } }
+		const { migrateHostLiveSourcesConfig } = require('../config/host-live-sources-migrate')
+		const hostLiveMig = migrateHostLiveSourcesConfig(newConfig, ctx)
+		if (hostLiveMig.changed) {
+			newConfig.extraLiveSources = hostLiveMig.extraLiveSources
+			if (hostLiveMig.casparServerPatch && Object.keys(hostLiveMig.casparServerPatch).length) {
+				newConfig.casparServer = { ...newConfig.casparServer, ...hostLiveMig.casparServerPatch }
+			}
+		}
+		if (hostLiveMig.warnings.length) warnings.push(...hostLiveMig.warnings)
 		ctx.configManager.save(newConfig)
+		const { syncOperatorPointerConfine } = require('../system/pointer-confine')
+		syncOperatorPointerConfine(newConfig, { log: (level, msg) => ctx.log?.(level, msg) })
+		const { syncCefInteractiveBridge } = require('../system/cef-interactive-bridge')
+		void syncCefInteractiveBridge(newConfig, { log: (level, msg) => ctx.log?.(level, msg), amcp: ctx.amcp })
 	}
 
 	let oscRestarted = false; if (settings.osc && typeof ctx.restartOscSubsystem === 'function') { ctx.restartOscSubsystem(); oscRestarted = true }

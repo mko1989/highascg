@@ -9,15 +9,19 @@ import { getOptionalSettingsTabs } from '../lib/optional-modules.js'
 import * as Templates from './settings-modal-templates.js'
 import * as Logic from './settings-modal-logic.js'
 import * as MountHw from './settings-modal-mount-hardware.js'
+import * as Companion from './settings-modal-companion.js'
 import * as SystemUpdates from './settings-modal-system-updates.js'
 import { wireDiagnosticsPanel } from './settings-modal-diagnostics.js'
+import { wireTailscalePanel } from './settings-modal-tailscale.js'
 import { mountLiveAudioSettingsPanel } from './settings-live-audio-panel.js'
+import { syncNuclearPasswordVisibility, getNuclearPasswordFromModal } from '../lib/settings-nuclear-shared.js'
 export function showSettingsModal(initialTab) {
 	if (document.getElementById('settings-modal')) return
 	const modal = document.createElement('div')
 	modal.id = 'settings-modal'; modal.className = 'modal-overlay'
 	modal.innerHTML = Templates.getMainModalHtml()
 	document.body.appendChild(modal)
+	syncNuclearPasswordVisibility(modal)
 
 	const optionalTabDefs = getOptionalSettingsTabs()
 	const optionalById = new Map(optionalTabDefs.map(t => [t.id, t]))
@@ -26,6 +30,8 @@ export function showSettingsModal(initialTab) {
 	let liveAudioMounted = false
 	/** @type {(() => Promise<void>) | null} */
 	let refreshLiveAudioPanel = null
+	/** @type {ReturnType<typeof Companion.wireCompanionConnectionStatus> | null} */
+	let companionConnectionCtl = null
 	const tabsRow = modal.querySelector('.settings-tabs'); const varTab = tabsRow?.querySelector('[data-tab="variables"]')
 	const panesRow = modal.querySelector('.settings-panes'); const varPane = modal.querySelector('#settings-pane-variables')
 	
@@ -37,17 +43,21 @@ export function showSettingsModal(initialTab) {
 	})
 
 	MountHw.wireMediaUsbMountListeners(modal)
-	SystemUpdates.wireSystemUpdatesPanel(modal, { getNuclearPassword: () => (modal.querySelector('#set-nuclear-action-password') || {}).value || '' })
+	companionConnectionCtl = Companion.wireCompanionConnectionStatus(modal)
+	SystemUpdates.wireSystemUpdatesPanel(modal, { getNuclearPassword: () => getNuclearPasswordFromModal(modal) })
 	wireDiagnosticsPanel(modal)
+	wireTailscalePanel(modal)
 
 	modal.querySelector('#set-compose-preview-mode')?.addEventListener('change', () => Logic.syncComposePreviewModeVisibility(modal))
-	modal.querySelector('#set-compose-preview-tick-ms')?.addEventListener('input', () => Logic.syncComposePreviewTickLabel(modal))
 	modal.querySelector('#set-compose-preview-fps')?.addEventListener('input', () => Logic.syncComposePreviewFpsLabel(modal))
 	modal.querySelector('#set-compose-preview-jpeg-q')?.addEventListener('input', () => Logic.syncComposePreviewJpegQualityLabel(modal))
+	modal.querySelector('#set-nuclear-require-pass')?.addEventListener('change', () => syncNuclearPasswordVisibility(modal))
 
 	function activateSettingsTab(tabName) {
 		const exists = !!modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
 		if (!exists) tabName = 'defaults'
+		const prevActive = modal.querySelector('.settings-tab.active')?.dataset?.tab
+		if (prevActive === 'companion') companionConnectionCtl?.onTabInactive()
 		modal.querySelectorAll('.settings-tab, .settings-pane').forEach(x => x.classList.remove('active'))
 		const btn = modal.querySelector(`.settings-tab[data-tab="${tabName}"]`)
 		const pane = modal.querySelector(`#settings-pane-${tabName}`)
@@ -63,26 +73,24 @@ export function showSettingsModal(initialTab) {
 				console.warn('[settings-modal] optional mount failed:', tabName, e)
 			}
 		}
-		if (tabName === 'media-usb') {
-			void MountHw.refreshMediaMountPanel(modal)
-			void MountHw.refreshExfatSyncPanel(modal)
-		}
+		if (tabName === 'media-usb') void MountHw.refreshExfatSyncPanel(modal)
 		if (tabName === 'system-updates') void SystemUpdates.refreshSystemUpdatesPanel(modal)
 		if (tabName === 'system-hardware') void MountHw.refreshSystemHardwarePanel(modal)
 		if (tabName === 'decklink') void MountHw.refreshDecklinkPanel(modal)
 		if (tabName === 'live-audio' && pane && !liveAudioMounted) {
 			liveAudioMounted = true
 			void mountLiveAudioSettingsPanel(pane, {
-				getLaunchPassword: () => (modal.querySelector('#set-nuclear-action-password') || {}).value || '',
+				getLaunchPassword: () => getNuclearPasswordFromModal(modal),
 			}).then((refresh) => {
 				if (typeof refresh === 'function') refreshLiveAudioPanel = refresh
 			})
 		}
 		if (tabName === 'live-audio' && refreshLiveAudioPanel) void refreshLiveAudioPanel()
+		if (tabName === 'companion') companionConnectionCtl?.onTabActive()
 		if (tabName === 'nuclear' && typeof refreshNuclearSetup === 'function') void refreshNuclearSetup()
+		modal.dispatchEvent(new CustomEvent('settings-tab-activated', { detail: { tab: tabName } }))
 	}
 
-	modal.querySelector('#system-hw-nvidia-refresh')?.addEventListener('click', () => void MountHw.refreshSystemHardwarePanel(modal))
 	modal.querySelector('#decklink-refresh-btn')?.addEventListener('click', () => void MountHw.refreshDecklinkPanel(modal))
 
 	modal.querySelector('.settings-tabs')?.addEventListener('click', e => {
@@ -90,14 +98,10 @@ export function showSettingsModal(initialTab) {
 	})
 
 	const close = () => {
+		companionConnectionCtl?.dispose()
 		optionalDisposers.forEach(d => {
 			try {
 				d()
-			} catch {}
-		})
-		document.querySelectorAll('[data-media-mount-confirm]').forEach(el => {
-			try {
-				el.remove()
 			} catch {}
 		})
 		modal.remove()
@@ -107,7 +111,7 @@ export function showSettingsModal(initialTab) {
 	const nuclearStatus = modal.querySelector('#set-nuclear-status')
 	const casparStatusEl = modal.querySelector('#set-nuclear-caspar-status')
 	const installDiskBtn = modal.querySelector('#set-nuclear-install-disk')
-	const getNuclearPassword = () => (modal.querySelector('#set-nuclear-action-password') || {}).value || ''
+	const getNuclearPassword = () => getNuclearPasswordFromModal(modal)
 	const postNuclear = async (path) => {
 		if (nuclearStatus) nuclearStatus.textContent = 'Running...'
 		try {
@@ -133,8 +137,16 @@ export function showSettingsModal(initialTab) {
 			const setup = await api.get('/api/system/setup')
 			const cal = setup?.calamares || {}
 			if (installDiskBtn) {
-				installDiskBtn.disabled = cal.installed !== true
-				installDiskBtn.title = cal.installed ? '' : 'Calamares not installed on this system'
+				const canLaunch = cal.installed === true && cal.sudoLaunchAvailable !== false
+				installDiskBtn.disabled = !canLaunch
+				if (!cal.installed) {
+					installDiskBtn.title = 'Calamares not installed on this system'
+				} else if (cal.sudoLaunchAvailable === false) {
+					installDiskBtn.title =
+						'Passwordless sudo for Calamares not configured — run: sudo bash scripts/setup/12-passwordless-sudo.sh'
+				} else {
+					installDiskBtn.title = ''
+				}
 			}
 			const cs = setup?.casparService || {}
 			if (casparStatusEl) {
@@ -159,7 +171,9 @@ export function showSettingsModal(initialTab) {
 	modal.querySelector('#set-nuclear-caspar-stop')?.addEventListener('click', async () => {
 		if (!window.confirm('Stop CasparCG now? Output stops until you start it again.')) return
 		await postNuclearJson('/api/system/setup/caspar/stop')
-		void refreshNuclearSetup()
+		setTimeout(() => void refreshNuclearSetup(), 3000)
+		setTimeout(() => void refreshNuclearSetup(), 30000)
+		setTimeout(() => void refreshNuclearSetup(), 90000)
 	})
 	modal.querySelector('#set-nuclear-caspar-start')?.addEventListener('click', async () => {
 		await postNuclearJson('/api/system/setup/caspar/start')
@@ -168,15 +182,17 @@ export function showSettingsModal(initialTab) {
 	modal.querySelector('#set-nuclear-caspar-restart')?.addEventListener('click', async () => {
 		if (!window.confirm('Restart CasparCG now? Brief output interruption.')) return
 		await postNuclearJson('/api/system/setup/caspar/restart')
-		void refreshNuclearSetup()
+		setTimeout(() => void refreshNuclearSetup(), 3000)
+		setTimeout(() => void refreshNuclearSetup(), 30000)
+		setTimeout(() => void refreshNuclearSetup(), 90000)
 	})
 	void refreshNuclearSetup()
 
-	const hwNvStatus = modal.querySelector('#system-hw-nvidia-status')
 	const decklinkStatusLine = modal.querySelector('#decklink-status-line')
+	const operatorStatus = modal.querySelector('#system-hw-operator-status')
 	async function guiLaunch(action) {
 		const st =
-			action === 'nvidia-settings' ? hwNvStatus || modal.querySelector('#system-hw-nvidia-status')
+			action === 'firefox' || action === 'file-manager' ? operatorStatus
 			:	decklinkStatusLine || modal.querySelector('#decklink-status-line')
 		if (st) st.textContent = 'Launching…'
 		try {
@@ -184,14 +200,15 @@ export function showSettingsModal(initialTab) {
 				action,
 				password: getNuclearPassword(),
 			})
-			if (st) st.textContent = res?.exe ? `Started: ${res.exe}` : 'Started.'
+			if (st) st.textContent = res?.raised ? 'Raised existing window.' : res?.exe ? `Started: ${res.exe}` : 'Started.'
 		} catch (e) {
 			if (st) st.textContent = e?.message || String(e)
 		}
 	}
-	modal.querySelector('#system-hw-nvidia-settings')?.addEventListener('click', () => void guiLaunch('nvidia-settings'))
-	modal.querySelector('#decklink-dv-setup')?.addEventListener('click', () => void guiLaunch('DesktopVideoSetup'))
-	modal.querySelector('#decklink-dv-updater')?.addEventListener('click', () => void guiLaunch('DesktopVideoUpdater'))
+	modal.querySelector('#system-hw-open-firefox')?.addEventListener('click', () => void guiLaunch('firefox'))
+	modal.querySelector('#system-hw-open-file-manager')?.addEventListener('click', () => void guiLaunch('file-manager'))
+	modal.querySelector('#decklink-dv-setup')?.addEventListener('click', () => void guiLaunch('desktopvideo_setup'))
+	modal.querySelector('#decklink-dv-updater')?.addEventListener('click', () => void guiLaunch('desktop_video_updater'))
 
 	let autosaveSuspended = true
 	const saveStatusEl = modal.querySelector('#settings-save-status')

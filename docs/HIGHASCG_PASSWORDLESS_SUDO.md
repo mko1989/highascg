@@ -83,10 +83,11 @@ Uses **NetworkManager (`nmcli`)** on the live image (NM active; netplan files pr
 
 ---
 
-## Settings → **system** / **decklink** (WO-39)
+## Settings → **system** / **decklink** / **Tailscale** (WO-39 / WO-91)
 
 - **NVIDIA:** read-only **`GET /api/system/gpu-nvidia`** (ISO branch stamp + GPU guide). Driver switching via Settings was removed — use the correct single-driver ISO. **Screen consumer vsync:** NVIDIA **Sync to VBlank off** + Caspar **vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md).
 - **GUI launch:** **`POST /api/system/gui-launch`** spawns allow-listed apps on **`:0`** with **`XAUTHORITY`** from **`getXAuthority()`** — **no sudo** when binaries are executable for the service user.
+- **Tailscale (WO-91):** **`GET /api/network/tailscale/status`**, **`POST /api/network/tailscale/login`**, **`POST /api/network/tailscale/enable`**, etc. — see [reference/tailscale-integration.md](reference/tailscale-integration.md). Requires passwordless **`sudo tailscale up`**, **`sudo tailscale logout`**, and **`systemctl … tailscaled`** / **`snap.tailscale.tailscaled`**.
 
 ---
 
@@ -94,7 +95,6 @@ Uses **NetworkManager (`nmcli`)** on the live image (NM active; netplan files pr
 
 These are **supposed** to stay interactive or polkit-gated:
 
-- **`sudo tailscale up`** (login / auth URL)
 - **`sudo apt upgrade`** (general system changes)
 - **`sudo eggs produce`** (image build — run on a build host, not from the playout Web UI)
 

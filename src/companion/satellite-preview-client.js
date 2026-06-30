@@ -32,13 +32,30 @@ class SatellitePreviewClient extends EventEmitter {
 	}
 
 	getStatus() {
+		const cfg = this._config
+		let reason = null
+		let hint = null
+		if (!cfg?.satelliteEnabled) {
+			reason = 'satellite_disabled'
+			hint = 'Enable Satellite preview in HighAsCG Settings → Companion.'
+		} else if (!this._connected) {
+			reason = 'satellite_not_connected'
+			hint = `Cannot reach Companion Satellite at ${cfg.satelliteHost}:${cfg.satellitePort} (TCP). Check Companion → Settings → Satellite is enabled.`
+		} else if (!this._subscriptionsSupported) {
+			reason = 'subscriptions_disabled'
+			hint =
+				'In Companion Settings, enable **Button Subscriptions API** (Satellite server alone is not enough). HighAsCG uses ADD-SUB for button previews — same API as the Elgato app.'
+		}
 		return {
 			ok: true,
+			previewAvailable: !!(cfg?.satelliteEnabled && this._connected && this._subscriptionsSupported),
 			satelliteConnected: this._connected,
 			subscriptionsSupported: this._subscriptionsSupported,
 			subscriptions: this._refs.size,
-			satelliteHost: this._config?.satelliteHost,
-			satellitePort: this._config?.satellitePort,
+			satelliteHost: cfg?.satelliteHost,
+			satellitePort: cfg?.satellitePort,
+			reason,
+			hint,
 		}
 	}
 
@@ -79,7 +96,12 @@ class SatellitePreviewClient extends EventEmitter {
 			const ok = await this._ensureConnected()
 			if (!ok || !this._subscriptionsSupported) {
 				this._refs.delete(key)
-				return { ok: false, reason: 'satellite_unavailable' }
+				const cfgNow = this._config || cfg
+				let reason = 'satellite_unavailable'
+				if (!cfgNow?.satelliteEnabled) reason = 'satellite_disabled'
+				else if (!this._connected) reason = 'satellite_not_connected'
+				else if (!this._subscriptionsSupported) reason = 'subscriptions_disabled'
+				return { ok: false, reason, hint: this.getStatus().hint }
 			}
 			this._sendAddSub(cfg, page, row, column)
 		}
@@ -120,12 +142,21 @@ class SatellitePreviewClient extends EventEmitter {
 		const colMin = grid?.colMin ?? 0
 		const colMax = grid?.colMax ?? size - 1
 		const keys = new Set()
+		const coords = []
 		for (let r = rowMin; r <= rowMax; r++) {
 			for (let c = colMin; c <= colMax; c++) {
-				const key = locationKey(page, r, c)
-				keys.add(key)
-				await this.ensureSubscribed(config, page, r, c)
+				coords.push({ row: r, column: c })
+				keys.add(locationKey(page, r, c))
 			}
+		}
+		const BATCH = 16
+		for (let i = 0; i < coords.length; i += BATCH) {
+			const chunk = coords.slice(i, i + BATCH)
+			const results = await Promise.all(
+				chunk.map(({ row, column }) => this.ensureSubscribed(config, page, row, column)),
+			)
+			const failed = results.find((r) => !r.ok)
+			if (failed) return failed
 		}
 		this._sessions.set(sessionId, keys)
 		return { ok: true, page, cells: keys.size }

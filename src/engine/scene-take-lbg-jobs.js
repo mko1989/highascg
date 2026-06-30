@@ -4,7 +4,7 @@ const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
 const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
-const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
+const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 const { buildSceneTemplateCgSpec } = require('./scene-template-cg')
 const {
@@ -200,10 +200,10 @@ async function buildTakeJobs(opts) {
 
 		// Always emit FILL: fill-canvas (and similar) often resolves to 0,0,1,1 — skipping looks like an
 		// "identity" no-op but leaves the previous clip's MIXER FILL on the layer until something else overwrites it.
-		mixerLines.push(`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} ${fillTail}`)
-		if (layer.rotation) {
-			mixerLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
-		}
+		const rot = layer.rotation ?? 0
+		const casparFill = fillForSceneLayerRotationAnchor(f, rot)
+		mixerLines.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} ${fillTail}`)
+		mixerLines.push(...sceneLayerRotationMixerLines(cl, rot))
 		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
 		if (!incomingStartsHidden && layer.opacity != null && layer.opacity !== 1) {
 			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity} 0`)
@@ -233,8 +233,8 @@ async function buildTakeJobs(opts) {
 
 		for (let i = 0; i < mixerLines.length; i++) {
 			const line = String(mixerLines[i] || '')
-			// Keep FILL immediate so geometry is applied before PLAY and not gated by COMMIT.
-			if (/^\s*MIXER\s+\d+-\d+\s+FILL\b/i.test(line)) continue
+			// Keep FILL + ANCHOR immediate so geometry/pivot apply before PLAY and are not gated by COMMIT.
+			if (/^\s*MIXER\s+\d+-\d+\s+(FILL|ANCHOR)\b/i.test(line)) continue
 			mixerLines[i] = deferMixerAmcpLine(line)
 		}
 

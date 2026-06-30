@@ -52,7 +52,9 @@ async function handleApply(body, ctx) {
 	if (!overlay?.type || !fill) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'overlay and fill required' }) }
 	}
-	const lines = buildPipOverlayAmcpLines(overlay, channel, layer, fill, ctx, stackIndex, nextContentLayer)
+	const contentRotation = Number(b.rotation) || 0
+	const overlays = Array.isArray(b.overlays) ? b.overlays : null
+	const lines = buildPipOverlayAmcpLines(overlay, channel, layer, fill, ctx, stackIndex, nextContentLayer, contentRotation, overlays)
 	if (lines.length === 0) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Unknown overlay type' }) }
 	}
@@ -87,7 +89,9 @@ async function handleUpdate(body, ctx) {
 	const stackIndex = Number.isFinite(Number(b.stackIndex)) ? Math.max(0, Math.floor(Number(b.stackIndex))) : 0
 	const nextL = b.nextContentLayer
 	const nextContentLayer = nextL == null || nextL === '' ? undefined : Number(nextL)
-	const lines = buildPipOverlayUpdateLines(channel, layer, overlay, fill, ctx, stackIndex, nextContentLayer)
+	const contentRotation = Number(b.rotation) || 0
+	const overlays = Array.isArray(b.overlays) ? b.overlays : null
+	const lines = buildPipOverlayUpdateLines(channel, layer, overlay, fill, ctx, stackIndex, nextContentLayer, contentRotation, overlays)
 	try {
 		await sendPipOverlayLinesSerial(ctx.amcp, lines)
 		await ctx.amcp.mixerCommit(channel)

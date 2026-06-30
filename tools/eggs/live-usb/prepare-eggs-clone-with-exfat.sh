@@ -114,6 +114,12 @@ bash "${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh" "$USER_CASPAR"
 
 echo "==> nginx :80 → :4200 (operator UI without port in browser URL)"
 bash "${REPO_ROOT}/scripts/runtime/install-highascg-web-proxy.sh"
+
+if [[ "${SKIP_HIGHASCG_POWER_BUTTON:-0}" != "1" ]]; then
+	echo "==> power button (short=network reset, hold 3s=shutdown)"
+	bash "${REPO_ROOT}/scripts/setup/14-power-button-network-reset.sh"
+fi
+
 LIVE_BOOT_DROPIN="${HERE}/systemd/highascg.service.d-20-live-boot.conf.example"
 if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 	install -d /etc/systemd/system/highascg.service.d
@@ -130,10 +136,25 @@ if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 		echo "==> merge HighAsCG eggs excludes (WO-47 — server from exFAT drop-update/)"
 	fi
 	bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh" --replace
+	echo "==> merge DeckLink excludes (WO-92 — mask BMD on build host, omit from ISO)"
+	HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${HERE}/penguins-eggs-exclude-decklink.list" \
+		bash "${HERE}/merge-penguins-eggs-exclude-highascg.sh"
 fi
 
 echo "==> clone host audit (swap inactive, no nvidia-pool, exclude.list)"
 bash "${HERE}/audit-eggs-clone-host.sh"
+
+echo "==> Caspar supervisor wiring (systemd owns run.sh; Openbox trimmed)"
+bash "${REPO_ROOT}/scripts/setup/sync-caspar-supervisor-wiring.sh" "$USER_CASPAR"
+
+echo "==> passwordless sudo (Nuclear Install to disk + Calamares on :0)"
+bash "${REPO_ROOT}/scripts/setup/12-passwordless-sudo.sh" "$USER_CASPAR"
+
+echo "==> fast boot (cap network wait-online; mask networkd-wait-online)"
+bash "${REPO_ROOT}/scripts/boot/install-fast-boot-network.sh"
+
+echo "==> post-boot QA scripts (tools/startup → squashfs; tools/eggs is excluded)"
+bash "${HERE}/verify-startup-on-host.sh"
 
 echo ""
 echo "==> Ready for clone snapshot:"

@@ -62,7 +62,6 @@ export function applyTimelineClipDefaults(clip) {
 		clip.loopAlways = false
 		clip.loop = false
 	}
-	clip.startBehaviour = t.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
 	clip.contentFit = t.contentFit
 }
 
@@ -92,7 +91,6 @@ export function collectEditorDefaultsFromModal(modal) {
 	const sceneStart = modal.querySelector('#ed-scene-start')?.value
 	const sceneFit = modal.querySelector('#ed-scene-content-fit')?.value
 	const tlLoop = !!(modal.querySelector('#ed-timeline-loop-always') || {}).checked
-	const tlStart = modal.querySelector('#ed-timeline-start')?.value
 	const tlFit = modal.querySelector('#ed-timeline-content-fit')?.value
 	const trType = modal.querySelector('#ed-transition-type')?.value
 	const trDur = modal.querySelector('#ed-transition-duration')?.value
@@ -106,7 +104,6 @@ export function collectEditorDefaultsFromModal(modal) {
 		},
 		timeline: {
 			loopAlways: tlLoop,
-			startBehaviour: tlStart,
 			contentFit: tlFit,
 		},
 		transition: {
@@ -135,8 +132,6 @@ export function hydrateEditorDefaultsModal(modal, ed, fps) {
 	if (sceneFitEl) sceneFitEl.innerHTML = contentFitOptionsHtml(d.scene.contentFit)
 	const tlLoopEl = modal.querySelector('#ed-timeline-loop-always')
 	if (tlLoopEl) tlLoopEl.checked = d.timeline.loopAlways
-	const tlStartEl = modal.querySelector('#ed-timeline-start')
-	if (tlStartEl) tlStartEl.value = d.timeline.startBehaviour
 	const tlFitEl = modal.querySelector('#ed-timeline-content-fit')
 	if (tlFitEl) tlFitEl.innerHTML = contentFitOptionsHtml(d.timeline.contentFit)
 	const trTypeEl = modal.querySelector('#ed-transition-type')

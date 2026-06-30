@@ -3,7 +3,13 @@
  */
 import * as Actions from './device-view-actions.js'
 import { setStatus } from './device-view-ui-utils.js'
-import { applyStreamingChannelActionResponse } from '../lib/streaming-channel-state.js'
+import {
+	applyStreamingChannelActionResponse,
+	getStreamingChannelStatus,
+	refreshStreamingChannelStatus,
+	subscribeStreamingChannelStatus,
+} from '../lib/streaming-channel-state.js'
+import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
 
 function savedStreamOutput(currentSettings, conn) {
 	const rows = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : []
@@ -18,7 +24,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		Object.assign(document.createElement('p'), {
 			className: 'device-view__note',
 			textContent:
-				'Configure RTMP/SRT/NDI/UDP here. Save settings → Apply Caspar config. Cable from a destination to set the source channel.',
+				'Configure RTMP/SRT/NDI/UDP here. Saved settings apply on next Start stream. Cable from a destination to set the source channel.',
 		}),
 	)
 
@@ -64,8 +70,9 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		className: 'device-view__status',
 		style: 'white-space:pre-wrap;max-height:180px;overflow:auto;width:100%;margin-top:6px',
 	})
+	let liveStatus = streamingStatus || getStreamingChannelStatus()
 	const renderStreamLogs = () => {
-		const list = Array.isArray(streamingStatus?.rtmp?.logs) ? streamingStatus.rtmp.logs : []
+		const list = Array.isArray(liveStatus?.rtmp?.logs) ? liveStatus.rtmp.logs : []
 		if (!list.length) {
 			logBox.textContent = 'No stream logs yet.'
 			return
@@ -81,10 +88,13 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			})
 		logBox.textContent = lines.join('\n')
 	}
+	const ndiAttribution = createNdiAttributionElement('device-view__note ndi-attribution')
+	ndiAttribution.style.display = String(streamType.value || 'rtmp') === 'ndi' ? '' : 'none'
 	const updateTypeVisibility = () => {
 		const t = String(streamType.value || 'rtmp')
 		urlIn.style.display = t === 'ndi' ? 'none' : ''
 		keyIn.style.display = t === 'rtmp' ? '' : 'none'
+		ndiAttribution.style.display = t === 'ndi' ? '' : 'none'
 	}
 	updateTypeVisibility()
 	streamType.addEventListener('change', updateTypeVisibility)
@@ -112,14 +122,13 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			audioBitrateKbps: Math.max(32, parseInt(String(aBitrateIn.value || '128'), 10) || 128),
 		}
 		await Actions.saveSettingsPatch({ streamOutputs: next })
-		setCasparRestartDirty(true)
 		await load()
 	}
 	startBtn.onclick = async () => {
 		try {
 			const t = String(streamType.value || 'rtmp').toLowerCase()
 			if (t !== 'rtmp') {
-				setStatus(statusEl, `Start for ${t.toUpperCase()} is not wired yet. Save settings and apply Caspar config.`, false)
+				setStatus(statusEl, `Start for ${t.toUpperCase()} is not wired yet. Save settings first.`, false)
 				return
 			}
 			const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : []
@@ -139,8 +148,10 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			const sc = currentSettings?.streamingChannel && typeof currentSettings.streamingChannel === 'object'
 				? currentSettings.streamingChannel
 				: {}
-			if (!(sc.enabled === true || sc.enabled === 'true')) {
+			const wasStreamingChEnabled = sc.enabled === true || sc.enabled === 'true'
+			if (!wasStreamingChEnabled) {
 				await Actions.saveSettingsPatch({ streamingChannel: { ...sc, enabled: true } })
+				setCasparRestartDirty(true)
 			}
 			const res = await Actions.startStreamingChannelRtmp({
 				outputId: String(conn.id),
@@ -156,8 +167,10 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			applyStreamingChannelActionResponse(res, { action: 'start_stream', outputId: String(conn.id) })
 			setStatus(statusEl, 'Streaming started', true)
 			document.dispatchEvent(new CustomEvent('highascg-streaming-changed'))
-			await load()
+			await refreshStreamingChannelStatus()
+			liveStatus = getStreamingChannelStatus()
 			renderStreamLogs()
+			await load()
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
 	stopBtn.onclick = async () => {
@@ -166,8 +179,10 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			applyStreamingChannelActionResponse(res, { action: 'stop_stream' })
 			setStatus(statusEl, 'Streaming stopped', true)
 			document.dispatchEvent(new CustomEvent('highascg-streaming-changed'))
-			await load()
+			await refreshStreamingChannelStatus()
+			liveStatus = getStreamingChannelStatus()
 			renderStreamLogs()
+			await load()
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
 	const removeBtn = Object.assign(document.createElement('button'), {
@@ -187,7 +202,20 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 	}
 	wrapCtl.append(streamType, nameIn, urlIn, keyIn, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
+	h.append(ndiAttribution)
 	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Stream log' }))
 	h.append(logBox)
 	renderStreamLogs()
+	if (logBox._streamStatusUnsub) {
+		try {
+			logBox._streamStatusUnsub()
+		} catch {
+			/* ignore */
+		}
+	}
+	logBox._streamStatusUnsub = subscribeStreamingChannelStatus((st) => {
+		if (!st) return
+		liveStatus = st
+		renderStreamLogs()
+	})
 }

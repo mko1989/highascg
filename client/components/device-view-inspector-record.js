@@ -3,14 +3,32 @@
  */
 import * as Actions from './device-view-actions.js'
 import { setStatus } from './device-view-ui-utils.js'
-import { applyStreamingChannelActionResponse } from '../lib/streaming-channel-state.js'
+import {
+	applyStreamingChannelActionResponse,
+	getStreamingChannelStatus,
+	refreshStreamingChannelStatus,
+	subscribeStreamingChannelStatus,
+} from '../lib/streaming-channel-state.js'
 
 function savedRecordOutput(currentSettings, conn) {
 	const rows = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : []
 	return rows.find((x) => String(x?.id || '') === String(conn?.id || '')) || {}
 }
 
-export function renderRecordOutControls(h, conn, { currentSettings, statusEl, load, setCasparRestartDirty, onRemoveRecordOutput }) {
+function formatLogLines(list) {
+	return list
+		.slice(-20)
+		.map((x) => {
+			const ts = String(x?.ts || '').replace('T', ' ').replace('Z', '')
+			const lvl = String(x?.level || 'info').toUpperCase()
+			const msg = String(x?.message || '')
+			const extra = x?.extra && typeof x.extra === 'object' ? ` ${JSON.stringify(x.extra)}` : ''
+			return `[${ts}] [${lvl}] ${msg}${extra}`
+		})
+		.join('\n')
+}
+
+export function renderRecordOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, onRemoveRecordOutput }) {
 	const saved = savedRecordOutput(currentSettings, conn)
 	const caspar = conn?.caspar && typeof conn.caspar === 'object' ? conn.caspar : {}
 
@@ -18,7 +36,7 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 		Object.assign(document.createElement('p'), {
 			className: 'device-view__note',
 			textContent:
-				'Configure file recording here. Save settings → Apply Caspar config. Cable from a destination to set the source channel.',
+				'Configure file recording here. Saved settings apply on next Start record. Cable from a destination to set the source channel.',
 		}),
 	)
 
@@ -53,6 +71,15 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save record settings' })
 	const startBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Start record' })
 	const stopBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Stop record' })
+	const logBox = Object.assign(document.createElement('pre'), {
+		className: 'device-view__status',
+		style: 'white-space:pre-wrap;max-height:180px;overflow:auto;width:100%;margin-top:6px',
+	})
+	let liveStatus = streamingStatus || getStreamingChannelStatus()
+	const renderRecordLogs = () => {
+		const list = Array.isArray(liveStatus?.record?.logs) ? liveStatus.record.logs : []
+		logBox.textContent = list.length ? formatLogLines(list) : 'No record logs yet.'
+	}
 	saveBtn.onclick = async () => {
 		const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : []
 		const idx = cur.findIndex((x) => String(x?.id || '') === String(conn.id || ''))
@@ -73,7 +100,6 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 			audioBitrateKbps: Math.max(32, parseInt(String(aBitrateIn.value || '128'), 10) || 128),
 		}
 		await Actions.saveSettingsPatch({ recordOutputs: next })
-		setCasparRestartDirty?.(true)
 		await load()
 	}
 	startBtn.onclick = async () => {
@@ -91,6 +117,9 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 			applyStreamingChannelActionResponse(res, { action: 'start_record', outputId: String(conn.id) })
 			setStatus(statusEl, `Recording started (${conn.id})`, true)
 			document.dispatchEvent(new CustomEvent('highascg-streaming-changed'))
+			await refreshStreamingChannelStatus()
+			liveStatus = getStreamingChannelStatus()
+			renderRecordLogs()
 			await load()
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
@@ -100,6 +129,9 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 			applyStreamingChannelActionResponse(res, { action: 'stop_record', outputId: String(conn.id) })
 			setStatus(statusEl, `Recording stopped (${conn.id})`, true)
 			document.dispatchEvent(new CustomEvent('highascg-streaming-changed'))
+			await refreshStreamingChannelStatus()
+			liveStatus = getStreamingChannelStatus()
+			renderRecordLogs()
 			await load()
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
@@ -120,5 +152,20 @@ export function renderRecordOutControls(h, conn, { currentSettings, statusEl, lo
 	}
 	wrapCtl.append(nameIn, crfIn, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
+	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Record log' }))
+	h.append(logBox)
+	renderRecordLogs()
+	if (logBox._recordStatusUnsub) {
+		try {
+			logBox._recordStatusUnsub()
+		} catch {
+			/* ignore */
+		}
+	}
+	logBox._recordStatusUnsub = subscribeStreamingChannelStatus((st) => {
+		if (!st) return
+		liveStatus = st
+		renderRecordLogs()
+	})
 	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Use cable from destination to choose which channel this record output captures.' }))
 }

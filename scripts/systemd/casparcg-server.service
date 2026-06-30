@@ -3,6 +3,8 @@ Description=CasparCG Server (HighAsCG playout)
 After=network.target nodm.service casparcg-scanner.service
 Wants=casparcg-scanner.service nodm.service
 ConditionPathExists=/home/casparcg/highascg/run.sh
+ConditionPathExists=/home/casparcg/highascg/bin/casparcg
+ConditionPathExists=/home/casparcg/highascg/config/casparcg.config
 StartLimitIntervalSec=300
 StartLimitBurst=8
 
@@ -11,9 +13,17 @@ Type=simple
 User=casparcg
 Group=casparcg
 UMask=002
+RuntimeDirectory=highascg
+RuntimeDirectoryMode=0755
 WorkingDirectory=/home/casparcg/highascg
+Environment=CASPAR_ROOT=/home/casparcg/highascg
+Environment=CASPAR_BIN=/home/casparcg/highascg/bin/casparcg
+Environment=CASPAR_LIB=/home/casparcg/highascg/lib
+Environment=CASPAR_CONFIG_PATH=/home/casparcg/highascg/config/casparcg.config
+Environment=CASPAR_PORT_FREE_WAIT_SEC=30
 Environment=CASPAR_SYSTEMD_SERVICE=1
 Environment=CASPAR_INHIBIT_FILE=/run/highascg/inhibit-caspar-autostart
+Environment=CASPAR_CRASH_STATE=/run/highascg/caspar-crash-loop.state
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/casparcg/.Xauthority
 ExecStart=/home/casparcg/highascg/run.sh

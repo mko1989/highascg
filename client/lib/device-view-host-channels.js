@@ -13,6 +13,8 @@ export const HOST_CHANNEL_DEST_ROLES = new Set([
 	'extra_audio',
 	'decklink_input',
 	'live_audio_input',
+	'webpage_host',
+	'ndi_host',
 ])
 
 /**
@@ -35,6 +37,14 @@ export function hostChannelDestinationId(role, ch, slot) {
 		const s = parseInt(String(slot ?? ''), 10)
 		return s >= 1 ? `host_live_audio_input_${s}` : `host_live_audio_ch_${ch}`
 	}
+	if (r === 'webpage_host') {
+		const sid = String(slot ?? ch ?? '').trim()
+		return sid ? `host_webpage_${sid}` : `host_webpage_ch_${ch}`
+	}
+	if (r === 'ndi_host') {
+		const sid = String(slot ?? ch ?? '').trim()
+		return sid ? `host_ndi_${sid}` : `host_ndi_ch_${ch}`
+	}
 	return `host_${r}_${ch}`
 }
 
@@ -52,6 +62,14 @@ export function defaultHostChannelLabel(row) {
 	if (role === 'live_audio_input' && slot != null) {
 		return ch != null ? `Live audio input ${slot} (ch ${ch})` : `Live audio input ${slot}`
 	}
+	if (role === 'webpage_host') {
+		const name = row?.label || row?.sourceId || 'Webpage'
+		return ch != null ? `Webpage: ${name} (ch ${ch})` : `Webpage: ${name}`
+	}
+	if (role === 'ndi_host') {
+		const name = row?.label || row?.sourceId || 'NDI'
+		return ch != null ? `NDI: ${name} (ch ${ch})` : `NDI: ${name}`
+	}
 	const base = roleLabel({ role, mainIndex: 0 })
 	return ch != null ? `${base} (ch ${ch})` : base
 }
@@ -66,12 +84,14 @@ export function normalizeHostChannelDestination(item) {
 	if (!HOST_CHANNEL_DEST_ROLES.has(role)) return null
 	const ch = parseInt(String(item.casparChannel ?? item.ch ?? item.pgmChannel ?? ''), 10)
 	if (!Number.isFinite(ch) || ch < 1) return null
-	const slot = parseInt(String(item.slot ?? item.inputSlot ?? ''), 10)
+	const slot = parseInt(String(item.slot ?? item.inputSlot ?? item.sourceId ?? ''), 10)
 	const id =
 		String(item.id || '').trim() ||
 		(role === 'decklink_input' || role === 'live_audio_input'
 			? hostChannelDestinationId(role, ch, Number.isFinite(slot) ? slot : undefined)
-			: hostChannelDestinationId(role, ch))
+			: role === 'webpage_host' || role === 'ndi_host'
+				? hostChannelDestinationId(role, ch, item.sourceId || item.id)
+				: hostChannelDestinationId(role, ch))
 	return {
 		id,
 		label: String(item.label || defaultHostChannelLabel({ role, ch, slot })).trim() || id,
@@ -79,6 +99,7 @@ export function normalizeHostChannelDestination(item) {
 		hostRole: role,
 		casparChannel: ch,
 		virtual: true,
+		...(item.sourceId ? { sourceId: String(item.sourceId) } : {}),
 		...(Number.isFinite(slot) && slot >= 1 ? { inputSlot: slot } : {}),
 	}
 }
@@ -234,6 +255,32 @@ export function listDecklinkAndLiveInputHostDestinations(payload) {
 }
 
 /**
+ * WO-88: host destinations for webpage / NDI live sources (dedicated Caspar channels).
+ * @param {object | null | undefined} payload
+ * @returns {object[]}
+ */
+export function listHostLiveSourceDestinations(payload) {
+	const cm = payload?.live?.caspar?.channelMap
+	if (!cm || typeof cm !== 'object') return []
+	const hostEntries = (Array.isArray(cm.inputChannels) ? cm.inputChannels : []).filter(
+		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host',
+	)
+	const out = []
+	for (const entry of hostEntries) {
+		const role = entry.kind === 'webpage_host' ? 'webpage_host' : 'ndi_host'
+		const dest = normalizeHostChannelDestination({
+			hostRole: role,
+			casparChannel: entry.channel,
+			sourceId: entry.sourceId,
+			label: entry.label || defaultHostChannelLabel({ role, ch: entry.channel, label: entry.label, sourceId: entry.sourceId }),
+			id: hostChannelDestinationId(role, entry.channel, entry.sourceId),
+		})
+		if (dest) out.push(dest)
+	}
+	return out
+}
+
+/**
  * Host-channel destinations for Device View (from API intent, generatedChannelOrder, or live inputs).
  * @param {object | null | undefined} payload — GET /api/device-view
  * @returns {object[]}
@@ -261,7 +308,8 @@ export function listHostChannelDestinations(payload) {
 	}
 
 	const fromInputs = listDecklinkAndLiveInputHostDestinations(payload)
-	return mergeHostDestinations([fromIntent, fromOrder, fromInputs])
+	const fromHostLive = listHostLiveSourceDestinations(payload)
+	return mergeHostDestinations([fromIntent, fromOrder, fromInputs, fromHostLive])
 }
 
 /**

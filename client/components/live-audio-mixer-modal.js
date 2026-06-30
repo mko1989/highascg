@@ -1,5 +1,5 @@
 /**
- * Audio Mixer "+" modal — the only UI for adding/configuring ALSA live inputs.
+ * Audio Mixer "+" modal — configure/remove ALSA live inputs (add via Sources → Live +).
  * Capture runs on dedicated Caspar input channels; PGM uses route:// from those channels.
  */
 import { api } from '../lib/api-client.js'

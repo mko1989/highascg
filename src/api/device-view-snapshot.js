@@ -171,7 +171,18 @@ function buildGeneratedChannelOrder(ctx) {
 		out.push({ ch, role: 'multiview', mainIndex: i })
 	})
 	for (const entry of Array.isArray(map.inputChannels) ? map.inputChannels : []) {
-		out.push({ ch: entry.channel, role: entry.kind === 'live_audio' ? 'live_audio_input' : 'decklink_input', slot: entry.slot })
+		const role =
+			entry.kind === 'live_audio'
+				? 'live_audio_input'
+				: entry.kind === 'webpage_host'
+					? 'webpage_host'
+					: entry.kind === 'ndi_host'
+						? 'ndi_host'
+						: 'decklink_input'
+		const row = { ch: entry.channel, role, slot: entry.slot }
+		if (entry.sourceId) row.sourceId = entry.sourceId
+		if (entry.label) row.label = entry.label
+		out.push(row)
 	}
 	for (const ch of map.audioOnlyChannels || []) out.push({ ch: ch, role: 'extra_audio' })
 	if (map.streamingCh != null) {

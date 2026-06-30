@@ -11,13 +11,13 @@ export function getMainModalHtml() {
 			<div class="modal-body settings-body">
 				<div class="settings-tabs">
 					<button class="settings-tab active" data-tab="defaults">Defaults</button>
-					<button class="settings-tab" data-tab="simulation">Simulation</button>
 					<button class="settings-tab" data-tab="companion">Companion</button>
 					<button class="settings-tab" data-tab="media-usb">media/usb</button>
 					<button class="settings-tab" data-tab="system-updates">updates</button>
 					<button class="settings-tab" data-tab="system-hardware">system</button>
 					<button class="settings-tab" data-tab="decklink">decklink</button>
 					<button class="settings-tab" data-tab="diagnostics">Diagnostics</button>
+					<button class="settings-tab" data-tab="tailscale">Tailscale</button>
 					<button class="settings-tab" data-tab="live-audio">Live audio</button>
 					<button class="settings-tab" data-tab="variables">Variables</button>
 					<button class="settings-tab" data-tab="nuclear">Nuclear</button>
@@ -54,13 +54,6 @@ export function getMainModalHtml() {
 							<label><input type="checkbox" id="ed-timeline-loop-always" /> Loop always</label>
 						</div>
 						<div class="settings-group">
-							<label for="ed-timeline-start">Start behaviour</label>
-							<select id="ed-timeline-start">
-								<option value="beginning">Start from beginning (trim in)</option>
-								<option value="relativeToPrevious">Continue from previous / timeline playhead</option>
-							</select>
-						</div>
-						<div class="settings-group">
 							<label for="ed-timeline-content-fit">Content sizing</label>
 							<select id="ed-timeline-content-fit"></select>
 						</div>
@@ -93,13 +86,12 @@ export function getMainModalHtml() {
 						<div class="settings-group">
 							<label for="set-compose-preview-mode">Preview source</label>
 							<select id="set-compose-preview-mode">
-								<option value="ffmpeg_jpeg">Caspar JPEG — ffmpeg writes file (recommended)</option>
-								<option value="canvas">Canvas thumbnails (legacy)</option>
-								<option value="caspar_image">Caspar ADD IMAGE tick (legacy)</option>
+								<option value="canvas">Canvas thumbnails</option>
+								<option value="ffmpeg_jpeg">Caspar JPEG — ffmpeg writes file</option>
 							</select>
-							<p class="settings-note">JPEG mode embeds a low-cost ffmpeg consumer in Caspar config — no AMCP spam. Apply Caspar config after changing FPS or resolution.</p>
 						</div>
 						<div id="set-compose-preview-ffmpeg-fields">
+							<p class="settings-note">JPEG mode embeds a low-cost ffmpeg consumer in Caspar config. Apply Caspar config after changing FPS or resolution.</p>
 							<div class="settings-group">
 								<label for="set-compose-preview-fps">Update rate: <strong id="set-compose-preview-fps-val">25</strong> fps</label>
 								<input type="range" id="set-compose-preview-fps" min="1" max="30" step="1" value="25" style="width:100%;max-width:24rem" />
@@ -122,23 +114,17 @@ export function getMainModalHtml() {
 								<p class="settings-note">Pushes <code>compose_preview_ch{N}_image</code> data-URI variables at compose preview rate (same fps). In Companion, set a button image to <code>$(highascg_compose_preview_ch1_image)</code>.</p>
 							</div>
 						</div>
-						<div id="set-compose-preview-tick-fields">
-							<div class="settings-group">
-								<label for="set-compose-preview-tick-ms">Capture interval: <strong id="set-compose-preview-tick-ms-val">40</strong> ms</label>
-								<input type="range" id="set-compose-preview-tick-ms" min="40" max="1000" step="25" value="40" style="width:100%;max-width:24rem" />
-								<p class="settings-note">ADD IMAGE mode only. Unchanged channels are never captured.</p>
-							</div>
-						</div>
-					</div>
-					<div class="settings-pane" id="settings-pane-simulation">
-						<h3 class="settings-category">Simulation</h3>
-						<div class="settings-group checkbox">
-							<label><input type="checkbox" id="set-offline-mode"> Simulation / Offline Mode (Simulate CasparCG playback)</label>
-						</div>
-						<p class="settings-note">Placeholder panel for simulation workflow. More controls will be added here.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>
+						<div class="companion-connection-status" id="companion-connection-status" aria-live="polite">
+							<div class="companion-connection-status__row">
+								<span class="status-dot" id="companion-connection-dot" aria-hidden="true"></span>
+								<span class="companion-connection-status__label" id="companion-connection-label">Not checked</span>
+								<button type="button" class="btn btn--secondary btn--sm" id="companion-connection-refresh">Check</button>
+							</div>
+							<p class="settings-note companion-connection-status__detail" id="companion-connection-detail"></p>
+						</div>
 						<div class="settings-group"><label>Companion Host</label><input type="text" id="set-companion-host" placeholder="127.0.0.1"></div>
 						<div class="settings-group"><label>Companion Port (HTTP press)</label><input type="number" id="set-companion-port" placeholder="8000"></div>
 						<div class="settings-group checkbox">
@@ -148,18 +134,9 @@ export function getMainModalHtml() {
 						<div class="settings-group"><label>Satellite Port</label><input type="number" id="set-companion-satellite-port" placeholder="16622"></div>
 						<div class="settings-group"><label>Preview bitmap size (px)</label><input type="number" id="set-companion-preview-size" placeholder="72" min="32" max="512"></div>
 						<div class="settings-group"><label>Page picker grid size</label><input type="number" id="set-companion-picker-grid" placeholder="8" min="1" max="16"></div>
-						<p class="settings-note">Timeline <code>companion_press</code> flags use HTTP for triggers. Button previews use Companion Satellite — see <code>docs/reference/companion-satellite-api.md</code>.</p>
+						<p class="settings-note">Timeline <code>companion_press</code> flags use HTTP for triggers. Button previews use Companion Satellite <code>ADD-SUB</code> — in Companion you must enable both the <strong>Satellite server</strong> (port 16622) and <strong>Button Subscriptions API</strong>. See <code>docs/reference/companion-satellite-api.md</code>.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-media-usb">
-						<h3 class="settings-category">Media disk mount (live / internal)</h3>
-						<p class="settings-note">Fixed folder: <code>/home/casparcg/highascg/media/drive</code>. Mounting deletes <strong>all files</strong> currently in that folder (not recoverable here), then mounts the chosen partition there. Other paths under <code>media/</code> are unchanged. The partition UUID is saved and remounted automatically when HighAsCG starts (<code>sudo</code> helper + <code>sudoers.d</code> required — see <code>docs/HIGHASCG_PASSWORDLESS_SUDO.md</code> / installer). After you change the mount while CasparCG is already running, <strong>restart CasparCG</strong>; stop playback first if umount reports the device is busy.</p>
-						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
-							<label for="media-mount-part-select" style="flex:1 1 100%">Partition</label>
-							<button type="button" class="btn btn--secondary" id="media-mount-refresh-btn" style="flex:0">Refresh drives</button>
-							<select id="media-mount-part-select" style="flex:1 1 12rem;min-width:14rem"><option value="">— select —</option></select>
-							<button type="button" class="btn btn--primary" id="media-mount-apply-btn" disabled style="flex:0">Mount…</button>
-						</div>
-						<p class="settings-note" id="media-mount-status-line" style="margin-top:0.25rem"></p>
 						<h3 class="settings-category">exFAT ↔ project sync</h3>
 						<p class="settings-note">Expect the data partition at <code>/home/casparcg/exfat</code> (see <code>tools/eggs/live-usb/systemd/home-casparcg-exfat.mount.example</code>). Map: <code>HIGHASCG_EXFAT_SYNC_MAP</code>, then <code>/etc/highascg/exfat-sync.json</code>, then repo <code>config/exfat-sync.json</code>. Per file, newer <code>mtime</code> wins; deletes are not synced.</p>
 						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
@@ -216,13 +193,12 @@ export function getMainModalHtml() {
 						<pre class="settings-note" id="system-updates-log" style="white-space:pre-wrap;max-height:12rem;overflow:auto;font-size:0.78rem;line-height:1.35;background:rgba(0,0,0,0.2);padding:0.5rem;border-radius:0.35rem;margin:0.5rem 0 0"></pre>
 					</div>
 					<div class="settings-pane" id="settings-pane-system-hardware">
-						<h3 class="settings-category">NVIDIA GPU</h3>
-						<pre class="settings-note" id="system-hw-nvidia-summary" style="white-space:pre-wrap;max-height:10rem;overflow:auto;font-size:0.8rem;line-height:1.35;background:rgba(0,0,0,0.2);padding:0.5rem;border-radius:0.35rem;margin:0.25rem 0">Loading…</pre>
-						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-top:0.5rem">
-							<button type="button" class="btn btn--secondary" id="system-hw-nvidia-settings" style="flex:0">nvidia-settings :0</button>
-							<button type="button" class="btn btn--secondary" id="system-hw-nvidia-refresh" style="flex:0">Refresh</button>
+						<p class="settings-note" id="system-hw-operator-display" style="margin-top:0.35rem">Loading operator display…</p>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-top:0.35rem">
+							<button type="button" class="btn btn--secondary" id="system-hw-open-firefox">Open browser</button>
+							<button type="button" class="btn btn--secondary" id="system-hw-open-file-manager">Open file manager</button>
 						</div>
-						<p class="settings-note" id="system-hw-nvidia-status" style="margin-top:0.35rem"></p>
+						<p class="settings-note" id="system-hw-operator-status" style="margin-top:0.35rem"></p>
 					</div>
 					<div class="settings-pane" id="settings-pane-decklink">
 						<h3 class="settings-category">Blackmagic DeckLink</h3>
@@ -245,6 +221,44 @@ export function getMainModalHtml() {
 						<p class="settings-note" id="settings-diagnostics-status" style="margin-top:0.35rem"></p>
 						<p class="settings-note">Same bundle as the <strong>Support bundle</strong> button in the connection-eye logs modal. Use after a failure or before contacting support.</p>
 					</div>
+					<div class="settings-pane" id="settings-pane-tailscale">
+						<h3 class="settings-category">Tailscale</h3>
+						<p class="settings-note">Reach this playout box over your tailnet. If nuclear password protection is on, set the password under <strong>Nuclear</strong> first.</p>
+						<p class="settings-note" id="tailscale-status-line">Loading…</p>
+						<dl class="settings-kv" style="margin:0.5rem 0 1rem;font-size:0.9rem">
+							<dt>Tailnet IPv4</dt><dd id="tailscale-ipv4">—</dd>
+							<dt>Machine</dt><dd id="tailscale-hostname">—</dd>
+							<dt>Daemon</dt><dd id="tailscale-daemon">—</dd>
+							<dt>Login URL</dt><dd><span id="tailscale-auth-url">—</span> <a id="tailscale-auth-link" href="#" target="_blank" rel="noopener" style="display:none">open</a></dd>
+						</dl>
+						<div class="settings-group checkbox">
+							<label><input type="checkbox" id="tailscale-enabled" /> Enable Tailscale service</label>
+						</div>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+							<button type="button" class="btn btn--primary" id="tailscale-login">Log in</button>
+							<button type="button" class="btn btn--secondary" id="tailscale-login-operator">Open on operator monitor</button>
+							<button type="button" class="btn btn--secondary" id="tailscale-copy-url">Copy login URL</button>
+							<button type="button" class="btn btn--secondary" id="tailscale-logout">Log out</button>
+							<a class="btn btn--secondary" id="tailscale-admin-link" href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener">Admin console</a>
+						</div>
+						<details class="settings-group" style="margin-top:1rem">
+							<summary>Advanced</summary>
+							<div class="settings-group checkbox" style="margin-top:0.5rem">
+								<label><input type="checkbox" id="tailscale-auto-login" /> Auto-login on boot when needed</label>
+							</div>
+							<div class="settings-group checkbox">
+								<label><input type="checkbox" id="tailscale-operator-assist" checked /> Open login page on operator monitor when available</label>
+							</div>
+							<div class="settings-group checkbox">
+								<label><input type="checkbox" id="tailscale-accept-routes" /> Accept subnet routes</label>
+							</div>
+							<div class="settings-group">
+								<label>Hostname (optional)</label>
+								<input type="text" id="tailscale-hostname-input" placeholder="leave empty for default" autocomplete="off">
+							</div>
+							<button type="button" class="btn btn--secondary" id="tailscale-save-prefs">Save preferences</button>
+						</details>
+					</div>
 					<div class="settings-pane" id="settings-pane-live-audio"></div>
 					<div class="settings-pane" id="settings-pane-variables"></div>
 					<div class="settings-pane" id="settings-pane-nuclear">
@@ -253,13 +267,9 @@ export function getMainModalHtml() {
 						<div class="settings-group checkbox">
 							<label><input type="checkbox" id="set-nuclear-require-pass" /> Require password for nuclear actions</label>
 						</div>
-						<div class="settings-group">
+						<div class="settings-group" id="set-nuclear-password-fields">
 							<label>Nuclear password</label>
-							<input type="password" id="set-nuclear-password" placeholder="Optional (only used when checkbox is on)" autocomplete="new-password">
-						</div>
-						<div class="settings-group">
-							<label>Action password</label>
-							<input type="password" id="set-nuclear-action-password" placeholder="Enter only if required" autocomplete="off">
+							<input type="password" id="set-nuclear-password" placeholder="Required for nuclear actions when enabled" autocomplete="new-password">
 						</div>
 						<div class="settings-group">
 							<button type="button" class="btn btn--secondary" id="set-nuclear-restart-wm">Restart window manager (nodm)</button>

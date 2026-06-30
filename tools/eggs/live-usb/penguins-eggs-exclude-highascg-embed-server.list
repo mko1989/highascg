@@ -44,7 +44,7 @@ home/casparcg/highascg/docs/*
 home/casparcg/highascg/lib/libcef_dll
 home/casparcg/highascg/lib/libcef_dll/*
 
-# tools/ except runtime/ (exfat-sync, Caspar helpers)
+# tools/ except runtime/ + startup/ (exfat-sync, Caspar helpers, post-boot QA on stick)
 home/casparcg/highascg/tools/eggs
 home/casparcg/highascg/tools/eggs/*
 home/casparcg/highascg/tools/smoke
@@ -68,14 +68,26 @@ home/casparcg/highascg/refs
 home/casparcg/highascg/dist
 home/casparcg/highascg/.github
 home/casparcg/highascg/.github/*
+home/casparcg/highascg/CT-SS-master
+home/casparcg/highascg/CT-SS-master/*
 
 # exFAT mountpoint (empty in ISO)
 home/casparcg/exfat
 home/casparcg/exfat/*
 
+# Companion dev tree (production tarball is ~/companion only)
+home/casparcg/companion-module-dev
+home/casparcg/companion-module-dev/*
+
+# Snap user state (Firefox etc. on build host — not playout)
+home/casparcg/snap
+home/casparcg/snap/*
+
 # casparcg build-host dotfiles (not .xsession)
 home/casparcg/.cache
 home/casparcg/.cache/*
+home/casparcg/Downloads
+home/casparcg/Downloads/*
 home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor

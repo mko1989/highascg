@@ -19,6 +19,7 @@ Old one-off scripts under `scripts/` are **deprecated** — see [../deprecated/R
 | 7 | `07-node-highascg.sh` | no |
 | 8 | `08-caspar-cef-scanner.sh` | no |
 | 9 | `09-openbox-autostart.sh` | restart nodm |
+| 15 | `15-licenses-install.sh` | no — installs `licenses/` → `/usr/share/doc/highascg/licenses` |
 
 **Chrome window on boot?** HighAsCG paints an HTML test template via CEF. Playout uses `HIGHASCG_NO_STARTUP_LED_TEST=1` in `highascg.service.d/10-headless.conf` (see `highascg-headless.env.conf`).
 

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-06-28T10:41:18.213Z",
+  "generatedAt": "2026-06-30T12:35:34.749Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -96,10 +96,10 @@
     },
     {
       "id": "openbox_autostart",
-      "title": "Openbox autostart — CasparCG + HighAsCG (reference)",
+      "title": "Openbox autostart — X session only (layout, NVIDIA). Caspar + scanner = systemd (WO-73).",
       "file": "openbox_autostart.md",
       "category": "Installation",
-      "description": "1. **Background `&`** — The `while true; do … done &` block detaches from Openbox. After a nodm/X restart, those processes are **not always** in the same proces",
+      "description": "**Current installer:** `scripts/setup/09-openbox-autostart.sh` writes `~/.config/openbox/autostart` for the Caspar user. It does **not** start `casparcg-scanner",
       "order": 25
     },
     {
@@ -285,6 +285,15 @@
       "order": 53
     },
     {
+      "id": "wiki--api--network-tailscale",
+      "title": "Tailscale network API",
+      "file": "wiki/api/network-tailscale.md",
+      "category": "API reference",
+      "group": "System & hardware",
+      "description": "**Caspar:** not required.",
+      "order": 53.5
+    },
+    {
       "id": "wiki--api--ingest-usb-plugins",
       "title": "Ingest, USB, plugins & modules",
       "file": "wiki/api/ingest-usb-plugins.md",
@@ -455,6 +464,22 @@
       "order": 80
     },
     {
+      "id": "reference--cef-interactive-bridge",
+      "title": "CEF interactive bridge (operator X11 → CDP)",
+      "file": "reference/cef-interactive-bridge.md",
+      "category": "Reference",
+      "description": "Operator mouse/keyboard on the multiview (or interactive screen consumer) is forwarded to embedded CEF HTML via Chrome DevTools Protocol. Host-channel webpages ",
+      "order": 80
+    },
+    {
+      "id": "reference--companion-satellite-api",
+      "title": "Companion Satellite API (HighAsCG reference)",
+      "file": "reference/companion-satellite-api.md",
+      "category": "Reference",
+      "description": "HighAsCG uses Bitfocus Companion’s **Satellite API** for **button preview bitmaps** (WO-75). Timeline **press/trigger** stays on the **HTTP Remote Control API**",
+      "order": 80
+    },
+    {
       "id": "reference--GPU_SCREEN_CONSUMER_AND_XRANDR",
       "title": "GPU output, screen consumers, and X11 (xrandr) — intended interaction",
       "file": "reference/GPU_SCREEN_CONSUMER_AND_XRANDR.md",
@@ -484,6 +509,14 @@
       "file": "reference/amcp-pgm-look-take-pipeline.md",
       "category": "Reference",
       "description": "`POST /api/scene/take` runs `runSceneTakeLbg` on the Caspar program channel (and optionally the paired preview channel). This document is the **command order** ",
+      "order": 80
+    },
+    {
+      "id": "reference--pip-overlay-outside-border",
+      "title": "PIP overlay — outside border (canonical model)",
+      "file": "reference/pip-overlay-outside-border.md",
+      "category": "Reference",
+      "description": "**Status:** Canonical reference (2026-06-29). Do not regress this without updating this doc and `tools/smoke/smoke-pip-overlay-placement.test.js`.",
       "order": 80
     },
     {
@@ -540,6 +573,14 @@
       "file": "reference/sudo_and_audio_setup.md",
       "category": "Reference",
       "description": "**Avoid `NOPASSWD: ALL` for `casparcg`.** Use narrow **`/etc/sudoers.d/`** fragments (see **`docs/HIGHASCG_PASSWORDLESS_SUDO.md`**): media mount helper, optiona",
+      "order": 80
+    },
+    {
+      "id": "reference--tailscale-integration",
+      "title": "Tailscale integration (WO-91)",
+      "file": "reference/tailscale-integration.md",
+      "category": "Reference",
+      "description": "HighAsCG controls Tailscale from **Settings → Tailscale** and exposes HTTP APIs for status, login, and operator-monitor browser assist.",
       "order": 80
     },
     {
@@ -620,6 +661,14 @@
       "file": "ISO_CONTENTS.sync-conflict-20260624-110508-S5R6E5O.md",
       "category": "Reference",
       "description": "What is inside the **penguins-eggs** hybrid ISO produced by **`tools/eggs/live-usb/build-highascg-egg.sh`** (or **`make-dev-github-release-iso-quick.sh`**).",
+      "order": 900
+    },
+    {
+      "id": "STICK_QUICK_START",
+      "title": "HighAsCG playout stick — quick start",
+      "file": "STICK_QUICK_START.md",
+      "category": "Reference",
+      "description": "Prepare a **bootable HighAsCG USB stick** on **Windows** or **macOS**: flash the live ISO, add the operator **exFAT** partition, copy the starter folder layout,",
       "order": 900
     },
     {

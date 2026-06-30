@@ -57,4 +57,24 @@ describe('gpu physical map', () => {
 		assert.equal(byId.gpu_p3.runtime.xrandrName, 'DP-4')
 		assert.equal(map.ports.filter((p) => p.unmapped).length, 0)
 	})
+
+	it('uses flat topology for four DP-only laptop outputs (no A/B banks)', () => {
+		const raw = [
+			'DP-0 connected primary 1920x1080+0+0',
+			'DP-1 disconnected',
+			'DP-2 disconnected',
+			'DP-3 disconnected',
+		].join('\n')
+		const rows = discoverGpuPhysicalTopologyFromXrandr(raw)
+		assert.equal(rows.length, 4)
+		assert.deepEqual(
+			rows.map((r) => ({ id: r.physicalPortId, dpA: r.dpA, dpB: r.dpB })),
+			[
+				{ id: 'gpu_p0', dpA: 'DP-0', dpB: '' },
+				{ id: 'gpu_p1', dpA: 'DP-1', dpB: '' },
+				{ id: 'gpu_p2', dpA: 'DP-2', dpB: '' },
+				{ id: 'gpu_p3', dpA: 'DP-3', dpB: '' },
+			],
+		)
+	})
 })

@@ -21,6 +21,8 @@ import { resolveTransitionDuration, transitionDurationForFps } from '../lib/tran
  * @param {() => void} deps.startPlaybackLoop
  * @param {(n: number) => void} deps.setServerTick
  * @param {() => void} [deps.maybeFollowPlayhead]
+ * @param {(v: object|null) => void} [deps.setSelectedClip]
+ * @param {(v: object|null) => void} [deps.setSelectedFlagDetail]
  */
 export function createTimelineTransport(deps) {
 	const {
@@ -34,6 +36,8 @@ export function createTimelineTransport(deps) {
 		startPlaybackLoop,
 		setServerTick,
 		maybeFollowPlayhead,
+		setSelectedClip,
+		setSelectedFlagDetail,
 	} = deps
 
 	async function syncToServer(tl) {
@@ -241,7 +245,13 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-add-flag')?.addEventListener('click', () => {
 			const t = timelineState.getActive()
 			if (!t) return
-			timelineState.addFlag(t.id, { timeMs: Math.round(playback.position), type: 'pause' })
+			const flag = timelineState.addFlag(t.id, { timeMs: Math.round(playback.position), type: 'pause' })
+			if (!flag) return
+			setSelectedClip?.(null)
+			const fd = { timelineId: t.id, flagId: flag.id, flag }
+			setSelectedFlagDetail?.(fd)
+			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: null }))
+			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: fd }))
 			syncToServer(timelineState.getActive())
 			redrawTimelineView()
 		})

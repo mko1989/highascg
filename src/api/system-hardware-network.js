@@ -165,4 +165,23 @@ function handleNetworkResetPost(body, ctx) {
 	}
 }
 
-module.exports = { handleNetworkGet, handleNetworkApplyPost, handleNetworkResetPost }
+/**
+ * @param {string} _body
+ * @param {object} ctx
+ */
+async function handleNetworkRefreshSplashIpPost(_body, ctx) {
+	const { refreshStartupLedTestIps } = require('../bootstrap/startup-led-test-pattern')
+	const result = await refreshStartupLedTestIps(ctx)
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody(result),
+	}
+}
+
+module.exports = {
+	handleNetworkGet,
+	handleNetworkApplyPost,
+	handleNetworkResetPost,
+	handleNetworkRefreshSplashIpPost,
+}

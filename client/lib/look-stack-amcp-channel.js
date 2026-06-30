@@ -28,7 +28,7 @@ export function resolveMainIndexForScene(scene, sceneState, overrideMainIdx) {
  * @param {object} cm - `channelMap` from state
  * @param {{ activeScreenIndex?: number, editOnPgm?: boolean }} sceneState
  * @param {{ mainScope?: string } | null | undefined} scene
- * @param {'edit' | 'pgm' | 'prv'} busMode — `edit` = respect editOnPgm + PRV-first; `pgm` / `prv` = force that bus (null on PGM-only when PRV is unavailable)
+ * @param {'edit' | 'pgm' | 'prv'} busMode — `edit` = mapped PRV (null on PGM-only); `pgm` / `prv` = force that bus
  * @param {number} [overrideMainIdx] — deck column when operating on a scoped look from a specific main
  * @returns {number | null}
  */
@@ -47,11 +47,6 @@ export function resolveLookStackChannelForBus(cm, sceneState, scene, busMode, ov
 		return Number.isFinite(prv) && prv > 0 ? prv : null
 	}
 	// edit — same as resolvePreviewAmcpChannel(mIdx, false)
-	if (sceneState?.editOnPgm) {
-		return Number.isFinite(pgm) && pgm > 0 ? pgm : null
-	}
-	if (!isPreviewBusAvailable(map, mIdx)) {
-		return Number.isFinite(pgm) && pgm > 0 ? pgm : null
-	}
+	if (!isPreviewBusAvailable(map, mIdx)) return null
 	return Number.isFinite(prv) && prv > 0 ? prv : null
 }

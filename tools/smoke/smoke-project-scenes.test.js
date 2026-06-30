@@ -7,7 +7,9 @@ const {
 	validateIncomingProject,
 	sceneIdSet,
 	pickNewerFullProject,
+	loadProjectForSlug,
 } = require('../../src/engine/project-scenes')
+const projectStore = require('../../src/engine/project-store')
 
 function projectWithIds(ids, savedAt = '2026-05-30T10:00:00.000Z') {
 	return {
@@ -66,6 +68,44 @@ describe('pickNewerFullProject', () => {
 		const persist = projectWithIds(['a', 'b'], '2026-05-30T09:00:00.000Z')
 		const emptyAutosave = projectWithIds([], '2026-05-30T12:00:00.000Z')
 		assert.equal(pickNewerFullProject(persist, emptyAutosave), persist)
+	})
+})
+
+describe('loadProjectForSlug', () => {
+	it('mergeAutosave false returns main file even when autosave is newer', () => {
+		const main = projectWithIds(['a'], '2026-05-30T09:00:00.000Z')
+		const autosave = projectWithIds(['a', 'b'], '2026-05-30T12:00:00.000Z')
+		const origRead = projectStore.readProjectFile
+		const origAuto = projectStore.readAutosaveFile
+		const origLegacy = projectStore.readLegacyAutosaveIfMatches
+		try {
+			projectStore.readProjectFile = () => main
+			projectStore.readAutosaveFile = () => autosave
+			projectStore.readLegacyAutosaveIfMatches = () => null
+			assert.equal(loadProjectForSlug('demo_show', { mergeAutosave: false }), main)
+		} finally {
+			projectStore.readProjectFile = origRead
+			projectStore.readAutosaveFile = origAuto
+			projectStore.readLegacyAutosaveIfMatches = origLegacy
+		}
+	})
+
+	it('mergeAutosave true returns newer autosave when main is older', () => {
+		const main = projectWithIds(['a'], '2026-05-30T09:00:00.000Z')
+		const autosave = projectWithIds(['a', 'b'], '2026-05-30T12:00:00.000Z')
+		const origRead = projectStore.readProjectFile
+		const origAuto = projectStore.readAutosaveFile
+		const origLegacy = projectStore.readLegacyAutosaveIfMatches
+		try {
+			projectStore.readProjectFile = () => main
+			projectStore.readAutosaveFile = () => autosave
+			projectStore.readLegacyAutosaveIfMatches = () => null
+			assert.equal(loadProjectForSlug('demo_show', { mergeAutosave: true }), autosave)
+		} finally {
+			projectStore.readProjectFile = origRead
+			projectStore.readAutosaveFile = origAuto
+			projectStore.readLegacyAutosaveIfMatches = origLegacy
+		}
 	})
 })
 

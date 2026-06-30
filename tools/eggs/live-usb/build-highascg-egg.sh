@@ -12,6 +12,7 @@ set -euo pipefail
 }
 
 BR="${HIGHASCG_NVIDIA_DRIVER:-}"
+export HIGHASCG_ISO_FORBID_DECKLINK="${HIGHASCG_ISO_FORBID_DECKLINK:-1}"
 case "$BR" in
 535 | 580 | 595) ;;
 *)
@@ -89,6 +90,14 @@ bash "${HERE}/reset-iso-operator-config.sh"
 
 echo "==> Clone host audit (swap, nvidia-pool, excludes, branding)"
 bash "${HERE}/audit-eggs-clone-host.sh"
+
+echo "==> Third-party license bundle (NVIDIA / NDI / DeckLink notices)"
+bash "${REPO_ROOT}/tools/release/collect-third-party-licenses.sh"
+if [[ -f "${REPO_ROOT}/licenses/manifest.json" ]]; then
+	bash "${REPO_ROOT}/scripts/setup/15-licenses-install.sh"
+else
+	echo "WARN: licenses/manifest.json missing after collect" >&2
+fi
 
 bash "${HERE}/pre-produce-preflight.sh"
 

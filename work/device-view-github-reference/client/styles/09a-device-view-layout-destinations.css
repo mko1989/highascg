@@ -1,0 +1,6 @@
+/**
+ * Device view layout + destinations — style entrypoint (split for maintainability).
+ */
+@import url('./09a1-device-view-layout-toolbar.css');
+@import url('./09a2-device-view-destinations-visual.css');
+@import url('./09a3-device-view-segments-mapping.css');

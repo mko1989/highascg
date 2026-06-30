@@ -8,6 +8,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=lib/install-operator-firefox.sh
+source "${SCRIPT_DIR}/lib/install-operator-firefox.sh"
 
 require_root
 
@@ -29,7 +31,10 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	libx11-6 libxrandr2 libxinerama1 libxi6 libxcursor1 \
 	avahi-daemon \
 	xserver-xorg-input-all xserver-xorg-input-libinput \
-	nodm openbox unclutter xterm xdotool
+	nodm openbox unclutter xterm xdotool thunar python3-xlib
+
+log "Operator browser (Firefox)"
+install_operator_firefox "$PLAYOUT" "$USER_CASPAR" || true
 
 if command -v nvidia-smi >/dev/null 2>&1 || dpkg-query -W -f='${Status}' nvidia-settings 2>/dev/null | grep -q 'install ok installed'; then
 	log "NVIDIA tools (nvidia-settings + python3 for composition-pipeline MetaMode patch)"

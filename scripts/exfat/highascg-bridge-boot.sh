@@ -5,8 +5,8 @@ set -euo pipefail
 LABEL="${BRIDGE_LABEL:-HIGHASCGDAT}"
 MP="${HIGHASCG_BRIDGE_ROOT:-/home/casparcg/bridge}"
 DEV="/dev/disk/by-label/${LABEL}"
-# NVMe often enumerates after USB live boot; 8s was too short on laptop playout boxes.
-WAIT_SEC="${HIGHASCG_BRIDGE_BOOT_WAIT_SEC:-45}"
+# NVMe may lag USB live boot; keep short when absent (full wait only if label appears late).
+WAIT_SEC="${HIGHASCG_BRIDGE_BOOT_WAIT_SEC:-12}"
 LOG=/var/log/highascg-bridge-boot.log
 
 log() {

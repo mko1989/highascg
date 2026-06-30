@@ -7,6 +7,7 @@ import { sceneState } from '../lib/scene-state.js'
 import {
 	collectOpenalAudioRoutingFromModal,
 } from './settings-modal-caspar-collect.js'
+import { syncNuclearPasswordVisibility } from '../lib/settings-nuclear-shared.js'
 
 /** Push Defaults tab values into settingsState so new layers/clips use them before autosave completes. */
 export function syncEditorDefaultsFromModal(modal) {
@@ -16,25 +17,11 @@ export function syncEditorDefaultsFromModal(modal) {
 	return editorDefaults
 }
 
-/** @param {number} ms */
-function clampComposePreviewTickMs(ms) {
-	const n = parseInt(String(ms), 10)
-	if (!Number.isFinite(n)) return 40
-	return Math.max(40, Math.min(1000, Math.round(n / 25) * 25 || 40))
-}
-
 /** @param {number} fps */
 function clampComposePreviewFps(fps) {
 	const n = parseInt(String(fps), 10)
 	if (!Number.isFinite(n)) return 2
 	return Math.max(1, Math.min(30, n))
-}
-
-export function syncComposePreviewTickLabel(modal) {
-	const range = modal.querySelector('#set-compose-preview-tick-ms')
-	const label = modal.querySelector('#set-compose-preview-tick-ms-val')
-	if (!range || !label) return
-	label.textContent = String(clampComposePreviewTickMs(range.value))
 }
 
 export function syncComposePreviewFpsLabel(modal) {
@@ -59,11 +46,9 @@ export function syncComposePreviewJpegQualityLabel(modal) {
 }
 
 export function syncComposePreviewModeVisibility(modal) {
-	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'ffmpeg_jpeg'
+	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'canvas'
 	const ffmpegFields = modal.querySelector('#set-compose-preview-ffmpeg-fields')
-	const tickFields = modal.querySelector('#set-compose-preview-tick-fields')
 	if (ffmpegFields) ffmpegFields.style.display = mode === 'ffmpeg_jpeg' ? '' : 'none'
-	if (tickFields) tickFields.style.display = mode === 'caspar_image' ? '' : 'none'
 }
 
 export function buildSettingsPayload(modal) {
@@ -89,7 +74,6 @@ export function buildSettingsPayload(modal) {
 		},
 		periodic_sync_interval_sec: prevAll.periodic_sync_interval_sec ?? '',
 		periodic_sync_interval_sec_osc: prevAll.periodic_sync_interval_sec_osc ?? '',
-		offline_mode: modal.querySelector('#set-offline-mode')?.checked ?? !!prevAll.offline_mode,
 		osc: {
 			listenPort: modal.querySelector('#set-osc-port')?.value ?? prevAll.osc?.listenPort ?? 6251,
 			listenAddress: modal.querySelector('#set-osc-bind')?.value ?? prevAll.osc?.listenAddress ?? '0.0.0.0',
@@ -114,11 +98,10 @@ export function buildSettingsPayload(modal) {
 		audioRouting: { ...prevAr, ...openalAr },
 		composePreview: {
 			...(prevAll.composePreview || {}),
-			mode: modal.querySelector('#set-compose-preview-mode')?.value ?? prevAll.composePreview?.mode ?? 'ffmpeg_jpeg',
+			mode: modal.querySelector('#set-compose-preview-mode')?.value ?? prevAll.composePreview?.mode ?? 'canvas',
 			fps: clampComposePreviewFps(modal.querySelector('#set-compose-preview-fps')?.value ?? prevAll.composePreview?.fps ?? 25),
 			resolutionScale: modal.querySelector('#set-compose-preview-scale')?.value ?? prevAll.composePreview?.resolutionScale ?? 'half',
 			jpegQuality: clampComposePreviewJpegQuality(modal.querySelector('#set-compose-preview-jpeg-q')?.value ?? prevAll.composePreview?.jpegQuality ?? 10),
-			tickIntervalMs: clampComposePreviewTickMs(modal.querySelector('#set-compose-preview-tick-ms')?.value ?? prevAll.composePreview?.tickIntervalMs ?? 125),
 			companionThumbEnabled: !!(modal.querySelector('#set-compose-preview-companion-thumb') || {}).checked,
 		},
 		dmx: JSON.parse(JSON.stringify(settingsState.getSettings()?.dmx || { enabled: false, debugLogDmx: false, fps: 25, fixtures: [] })),
@@ -129,6 +112,9 @@ export function buildSettingsPayload(modal) {
 			defaultSubfolder: (modal.querySelector('#set-usb-subfolder') || {}).value?.trim() ?? '',
 			overwritePolicy: (modal.querySelector('#set-usb-policy') || {}).value ?? 'rename',
 			verifyHash: !!(modal.querySelector('#set-usb-verify') || {}).checked,
+		},
+		operatorTools: {
+			pointerConfineMultiview: false,
 		},
 		projectScopedMedia: {
 			enabled: !!(modal.querySelector('#set-project-scoped-media') || {}).checked,
@@ -154,6 +140,7 @@ export function buildSettingsPayload(modal) {
 			}
 		})(),
 	}
+	delete settings.offline_mode
 	return settings
 }
 
@@ -162,7 +149,6 @@ export function hydrateSettings(modal, cfg) {
 	hydrateEditorDefaultsModal(modal, cfg.editorDefaults, fps)
 	const casparHostEl = modal.querySelector('#set-caspar-host'); if (casparHostEl) casparHostEl.value = cfg.caspar.host
 	const casparPortEl = modal.querySelector('#set-caspar-port'); if (casparPortEl) casparPortEl.value = cfg.caspar.port
-	const offlineModeEl = modal.querySelector('#set-offline-mode'); if (offlineModeEl) offlineModeEl.checked = !!cfg.offline_mode
 	const osc = cfg.osc || {}
 	const oscPortEl = modal.querySelector('#set-osc-port'); if (oscPortEl) oscPortEl.value = osc.listenPort ?? 6251
 	const oscBindEl = modal.querySelector('#set-osc-bind'); if (oscBindEl) oscBindEl.value = osc.listenAddress || '0.0.0.0'
@@ -210,13 +196,11 @@ export function hydrateSettings(modal, cfg) {
 	const ui = cfg.ui || {}
 	const nr = modal.querySelector('#set-nuclear-require-pass'); if (nr) nr.checked = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
 	const np = modal.querySelector('#set-nuclear-password'); if (np) np.value = String(ui.nuclearPassword || '')
+	syncNuclearPasswordVisibility(modal)
 	const cp = cfg.composePreview || {}
 	const cpMode = modal.querySelector('#set-compose-preview-mode')
 	if (cpMode) {
-		const m =
-			cp.mode === 'ffmpeg_jpeg' || cp.mode === 'caspar_image' || cp.mode === 'canvas'
-				? cp.mode
-				: 'ffmpeg_jpeg'
+		const m = cp.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : 'canvas'
 		cpMode.value = m
 	}
 	syncComposePreviewModeVisibility(modal)
@@ -234,12 +218,6 @@ export function hydrateSettings(modal, cfg) {
 	if (cpJq) {
 		cpJq.value = String(clampComposePreviewJpegQuality(cp.jpegQuality ?? 10))
 		syncComposePreviewJpegQualityLabel(modal)
-	}
-	const cpTick = modal.querySelector('#set-compose-preview-tick-ms')
-	if (cpTick) {
-		const ms = clampComposePreviewTickMs(cp.tickIntervalMs ?? (cp.tickHz ? Math.floor(1000 / cp.tickHz) : 125))
-		cpTick.value = String(ms)
-		syncComposePreviewTickLabel(modal)
 	}
 	const cpCompanion = modal.querySelector('#set-compose-preview-companion-thumb')
 	if (cpCompanion) cpCompanion.checked = cp.companionThumbEnabled === true

@@ -10,6 +10,7 @@ const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
 const { audioFilterParam } = require('../caspar/amcp-utils')
 const { shouldApplyStraightAlphaKeyer } = require('./scene-take-lbg-helpers')
+const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 
 function clipPath(layer) {
 	const v = layer.source && layer.source.value
@@ -189,12 +190,12 @@ async function runSceneTake(amcp, opts) {
 			playLine,
 		]
 
-		if (f.x !== 0 || f.y !== 0 || f.scaleX !== 1 || f.scaleY !== 1) {
-			buildLines.push(`MIXER ${cl} FILL ${f.x} ${f.y} ${f.scaleX} ${f.scaleY} 0`)
+		const rot = layer.rotation ?? 0
+		const casparFill = fillForSceneLayerRotationAnchor(f, rot)
+		if (casparFill.x !== 0 || casparFill.y !== 0 || casparFill.scaleX !== 1 || casparFill.scaleY !== 1) {
+			buildLines.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`)
 		}
-		if (layer.rotation) {
-			buildLines.push(`MIXER ${cl} ROTATION ${layer.rotation} 0`)
-		}
+		buildLines.push(...sceneLayerRotationMixerLines(cl, rot))
 		if (opStart !== 1) {
 			buildLines.push(`MIXER ${cl} OPACITY ${opStart} 0`)
 		}

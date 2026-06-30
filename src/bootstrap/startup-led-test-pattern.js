@@ -205,7 +205,13 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	clearRetryTimer()
 	persistence.set(DONE_KEY, bootId)
 	appCtx._startupLedTestChannelIndices = withTarget.map((c) => c.index)
+	appCtx._startupLedTestChannels = withTarget
 	appCtx._ledTestPatternActive = true
+	if (typeof appCtx._wsBroadcast === 'function' && typeof appCtx.getState === 'function') {
+		try {
+			appCtx._wsBroadcast('change', { path: 'ledTestPatternActive', value: true })
+		} catch (_) {}
+	}
 
 	if (appCtx._webUiClientConnected) {
 		await tryClearStartupLedTestForWebUi(appCtx)
@@ -293,6 +299,83 @@ function notifyWebSocketClientConnected(appCtx) {
 	scheduleWebUiStartupClearRetries(appCtx)
 }
 
+function buildStartupLedTestUpdateCommands(withTarget, ipLines, config) {
+	const flat = []
+	for (const ch of withTarget) {
+		const gpu = resolveGpuConnectorLabelForChannel(config || {}, ch.index)
+		const payload = buildStartupPayload({
+			resolutionLabel: ch.resolutionLabel,
+			screenWidth: ch.screenWidth,
+			screenHeight: ch.screenHeight,
+			videoMode: ch.videoMode,
+			gpuConnectorId: gpu.gpuConnectorId,
+			connectorLabel:
+				gpu.connectorLabel ||
+				`PGM ch ${ch.index}${ch.videoMode ? ` · ${ch.videoMode}` : ''}`,
+			ipLines,
+		})
+		const json = JSON.stringify(payload)
+		const escaped = json.replace(/"/g, '\\"')
+		const cl = `${ch.index}-${STARTUP_LED_TEST_LAYER}`
+		flat.push(`CG ${cl} UPDATE 0 "${escaped}"`)
+	}
+	return flat
+}
+
+/**
+ * Re-read LAN IPv4 and CG UPDATE layer 999 splash (e.g. after network reset).
+ * @param {object} appCtx
+ * @returns {Promise<{ ok: boolean, reason?: string, ipLines?: string[], error?: string }>}
+ */
+async function refreshStartupLedTestIps(appCtx) {
+	if (!appCtx?._ledTestPatternActive) {
+		return { ok: false, reason: 'no_active_splash' }
+	}
+	if (appCtx._ledTestLayer999ClearedAfterWebUi) {
+		return { ok: false, reason: 'splash_cleared' }
+	}
+
+	let withTarget = appCtx._startupLedTestChannels
+	if (!Array.isArray(withTarget) || withTarget.length === 0) {
+		const indices = appCtx._startupLedTestChannelIndices
+		if (Array.isArray(indices) && indices.length > 0) {
+			const xml = appCtx.gatheredInfo?.infoConfig
+			if (xml && String(xml).trim()) {
+				const channels = await parseServerChannels(xml)
+				const byIndex = new Map(channels.map((c) => [c.index, c]))
+				withTarget = indices.map((i) => byIndex.get(i)).filter(Boolean)
+			}
+		}
+	}
+	if (!withTarget?.length) {
+		return { ok: false, reason: 'no_channels' }
+	}
+
+	const amcp = appCtx.amcp
+	if (!amcp?.batchSendChunked || !amcp.isConnected) {
+		return { ok: false, reason: 'amcp_not_connected' }
+	}
+
+	const ipLines = getLanIPv4Addresses()
+	const flat = buildStartupLedTestUpdateCommands(withTarget, ipLines, appCtx.config)
+	try {
+		await amcp.batchSendChunked(flat, { skipMixerPreCommit: true })
+		for (const ch of withTarget) {
+			try {
+				await amcp.mixerCommit(ch.index)
+			} catch (_) {}
+		}
+	} catch (e) {
+		const msg = e?.message || String(e)
+		appCtx.log?.('warn', `[Startup LED test] Splash IP refresh: ${msg}`)
+		return { ok: false, reason: 'amcp_failed', error: msg }
+	}
+
+	const ipMsg = ipLines.length ? ipLines.join(', ') : '(no LAN IPv4)'
+	appCtx.log?.('info', `[Startup LED test] Splash IP refresh on layer ${STARTUP_LED_TEST_LAYER}: ${ipMsg}`)
+	return { ok: true, ipLines }
+}
+
 function buildStartupLedTestFlatCommands(withTarget, ipLines, config) {
 	const flat = []
 	for (const ch of withTarget) {
@@ -351,11 +434,14 @@ function clearStartupLedTestTimers() {
 
 module.exports = {
 	runStartupLedTestPatternIfNeeded,
+	refreshStartupLedTestIps,
 	clearStartupLedTestTimers,
 	getMachineBootIdentity,
 	STARTUP_LED_TEST_LAYER,
 	TEMPLATE_NAME,
 	channelsForLedTestOutput,
+	buildStartupLedTestUpdateCommands,
 	notifyWebSocketClientConnected,
+	clearLedTestLayerOnChannels,
 	tryClearStartupLedTestForWebUi,
 }

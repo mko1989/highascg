@@ -19,6 +19,7 @@ const {
 	sendPipOverlayLinesSerial,
 } = require('./pip-overlay')
 const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
+const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
@@ -67,10 +68,10 @@ function buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw) {
 	const targetOpacity = job.layer.muted ? 0 : job.layer.opacity != null ? job.layer.opacity : 1
 	const keyer = shouldApplyStraightAlphaKeyer(job.clip, !!job.layer.straightAlpha) ? 1 : 0
 	const animTail = pgmOnlyMixerAnimTail(isAnimate, fadeDur, fadeTw)
-	const lines = [`MIXER ${cl} FILL ${job.f.x} ${job.f.y} ${job.f.scaleX} ${job.f.scaleY} ${animTail}`]
-	if (job.layer.rotation) {
-		lines.push(`MIXER ${cl} ROTATION ${job.layer.rotation} ${animTail}`)
-	}
+	const rot = job.layer.rotation ?? 0
+	const casparFill = fillForSceneLayerRotationAnchor(job.f, rot)
+	const lines = [`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} ${animTail}`]
+	lines.push(...sceneLayerRotationMixerLines(cl, rot, { rotationTail: ` ${animTail}` }))
 	if (isAnimate && fadeDur > 0) {
 		lines.push(`MIXER ${cl} OPACITY ${targetOpacity} ${animTail}`)
 	} else if (targetOpacity !== 1) {
@@ -290,6 +291,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 				self,
 				nextP,
 				prev || null,
+				job.layer?.rotation ?? 0,
 			)
 			if (lines.length) await sendPipOverlayLinesSerial(amcp, lines)
 		} catch (e) {

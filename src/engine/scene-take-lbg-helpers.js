@@ -1,9 +1,10 @@
-'use strict'
-
-const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga', 'dpx'])
+const { sceneLayerRotationMixerLines } = require('./scene-layer-rotation-amcp')
 
 /** Containers/codecs Caspar ffmpeg often plays with an alpha channel (QT Animation, ProRes 4444, VP9, …). */
 const STRAIGHT_ALPHA_VIDEO_EXT = new Set(['mov', 'webm', 'mkv', 'mxf'])
+
+/** Still image formats that may carry straight alpha (premultiplied keyer off). */
+const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga'])
 
 const STILL_IMAGE_LOADBG_NO_TRANSITION_EXT = new Set([
 	'png',
@@ -44,7 +45,7 @@ function buildEffectAmcpLines(type, params, cl) {
 		case 'keyer':
 			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
 		case 'rotation':
-			return [`MIXER ${cl} ROTATION ${p.degrees ?? 0} 0`]
+			return sceneLayerRotationMixerLines(cl, p.degrees ?? 0)
 		case 'anchor':
 			return [`MIXER ${cl} ANCHOR ${p.x ?? 0} ${p.y ?? 0} 0`]
 		default:

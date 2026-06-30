@@ -63,6 +63,7 @@ Device View **Apply resolution** sends **`apply-os`** a body that includes both 
 |---------|----------|
 | Layout / `modeForXrandr`, override, topology | `src/utils/os-layout-calculator.js` |
 | xrandr execution, mode availability, CVT | `src/utils/os-config.js`, `src/utils/xrandr-custom-mode.js` |
+| Cold-boot custom mode script | `src/utils/xrandr-persist-script.js` → `~/.config/highascg/apply-layout.sh` |
 | apply-os merge + save | `src/api/settings-os.js` |
 | Full settings merge | `src/api/settings-post.js` (`mergeSystemDisplaySettings`) |
 | GPU inspector screen index + apply payload | `client/components/device-view-inspector-gpu.js` |
@@ -75,10 +76,31 @@ Device View **Apply resolution** sends **`apply-os`** a body that includes both 
 
 1. Cable **destination** → **`gpu_out`**; confirm **screen `N`** in the inspector title matches the destination **main index** you intend.  
 2. **Override off** — xrandr follows **destination video mode**; EDID row is a hint / alternate OS apply path (“Use detected display mode”).  
-3. **Override on** — set **Video mode** (and optional custom timing); **Apply resolution**; confirm logs show **`plan id=<connector> mode=<WxH>`** matching **1080p** (or your choice), not the old link resolution.  
-4. If the monitor has no matching mode line, enable **`os_xrandr_create_missing_modes`** and appropriate **timing source** (CVT/GTF) so the server can create a line before applying.
+3. **Override on** — set **Video mode** to **Custom** (or a standard mode); **Apply resolution**; confirm logs show **`plan id=<connector> mode=<WxH>`** matching your choice, not the old link resolution.  
+4. **OS output** dropdown: pick a mode from **EDID** (uses that xrandr token as-is) or **Custom** (registers RandR mode at WxH×Hz via CVT — e.g. 1080p50 when EDID only lists 60 Hz). Stored as `screen_N_os_mode_source`.  
 5. **NVIDIA + screen consumer:** **Sync to VBlank off** in `nvidia-settings`, **vsync on** on the Caspar screen consumer — see **[screen-consumer-vsync-nvidia.md](screen-consumer-vsync-nvidia.md)**.
 
 ---
 
-*Last updated: 2026-06-03 — vsync checklist added; layout behaviour as of 2026-05-15.*
+## 7. Custom modes and cold boot (WO-80)
+
+When the planned WxH is **not** already listed for the output (`xrandr --query`), Apply GPU automatically:
+
+1. Runs **`cvt` / `gtf`** → **`xrandr --newmode`** → **`--addmode`** (live), then **`--output … --mode`**.
+2. Persists the same sequence into **`~/.config/highascg/apply-layout.sh`** (and `/etc/highascg/apply-layout.sh` when sudo allows): all **`--newmode`** lines first (one per unique mode name), then **`--addmode`** per output, then the combined layout command, then primary/mouse/NVIDIA policy lines.
+
+**EDID / System resolution dropdown** — reuses the selected xrandr mode token (`screen_N_os_mode_source=edid`); no `newmode` step.
+
+**Custom** in the same dropdown — registers RandR mode at operator WxH×Hz (`screen_N_os_mode_source=custom`), even when EDID lists the same pixel size at a different refresh.
+
+Opt-out only: **`os_xrandr_create_missing_modes: false`** disables custom registration (nearest-EDID fallback).
+
+Boot script lines use `2>/dev/null || true` so re-login is idempotent when modes already exist.
+
+Last apply metadata: **`data/runtime/xrandr-custom-modes-last-apply.json`** (support bundle field `plannedCustomModes`).
+
+Regression: `npm run test:xrandr-persist-script`, `npm run test:xrandr-custom-mode`.
+
+---
+
+*Last updated: 2026-06-29 — WO-80 cold-boot custom mode persistence.*

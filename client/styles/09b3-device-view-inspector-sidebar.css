@@ -216,15 +216,6 @@
 	display: none;
 }
 @media (max-width: 768px) {
-	.device-view__layout {
-		grid-template-columns: 1fr !important;
-	}
-	.device-view--external-inspector .device-view__layout {
-		grid-template-columns: 1fr !important;
-	}
-	.device-view__panel-row {
-		grid-template-columns: 1fr;
-	}
 	.device-view__side {
 		position: static;
 	}

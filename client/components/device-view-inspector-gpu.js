@@ -32,7 +32,9 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const keyStretch = `screen_${portN}_stretch`
 	const keyKeyOnly = `screen_${portN}_key_only`
 	const keyAlwaysOnTop = isMultiviewOutput ? 'multiview_always_on_top' : `screen_${portN}_always_on_top`
-	const keyInteractive = `screen_${portN}_interactive`
+	const keyInteractive = isMultiviewOutput ? 'multiview_interactive' : `screen_${portN}_interactive`
+	const keyOperatorMonitor = `screen_${portN}_operator_monitor`
+	const keyNvidiaSync = `screen_${portN}_nvidia_sync_to_display`
 	const keySbsKey = `screen_${portN}_sbs_key`
 	const keyColourSpace = `screen_${portN}_colour_space`
 	const keyForceLinear = `screen_${portN}_force_linear_filter`
@@ -61,6 +63,8 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		? (seedMultiviewAlwaysOnTop ? false : multiviewAlwaysOnTopFromCasparServer(cs))
 		: cs[keyAlwaysOnTop] !== false && cs[keyAlwaysOnTop] !== 'false'
 	const interactiveOn = cs[keyInteractive] === true || cs[keyInteractive] === 'true'
+	const operatorMonitorOn = cs[keyOperatorMonitor] === true || cs[keyOperatorMonitor] === 'true'
+	const nvidiaSyncOn = cs[keyNvidiaSync] === true || cs[keyNvidiaSync] === 'true'
 	const sbsKeyOn = cs[keySbsKey] === true || cs[keySbsKey] === 'true'
 	const colourSpaceVal = String(cs[keyColourSpace] || 'RGB')
 	const forceLinearOn = cs[keyForceLinear] !== false && cs[keyForceLinear] !== 'false'
@@ -110,7 +114,27 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	}
 	const { ck: keyOnlyCk, inp: keyOnlyIn } = mkCk('Key only', keyOnlyOn, 'Output only key channel')
 	const { ck: aotCk, inp: aotIn } = mkCk('Always on top', alwaysOnTopOn, 'Keep window always on top')
-	const { ck: interactiveCk, inp: interactiveIn } = mkCk('Interactive', interactiveOn, 'Allow mouse/keyboard interaction')
+	const { ck: interactiveCk, inp: interactiveIn } = mkCk(
+		'Interactive',
+		interactiveOn,
+		'Caspar interactive mouse/keyboard on this screen consumer (confine also allows pointer here)',
+	)
+	const { ck: operatorMonitorCk, inp: operatorMonitorIn } = mkCk(
+		'Operator monitor',
+		operatorMonitorOn,
+		'Primary X11 output, confine cursor here, and enable interactive on this consumer',
+	)
+	const { ck: nvidiaSyncCk, inp: nvidiaSyncIn } = mkCk(
+		'NVIDIA sync to display',
+		nvidiaSyncOn,
+		'NVIDIA OpenGL/XVideo sync-to-display target (often PGM, not the operator monitor)',
+	)
+	operatorMonitorIn.addEventListener('change', () => {
+		if (operatorMonitorIn.checked) {
+			interactiveIn.checked = true
+		}
+		runSave()
+	})
 	const { ck: sbsKeyCk, inp: sbsKeyIn } = mkCk('SBS Key', sbsKeyOn, 'Side-by-side key')
 	const { ck: forceLinearCk, inp: forceLinearIn } = mkCk('Force linear filter', forceLinearOn, 'Force linear filtering')
 	const { ck: mipmapsCk, inp: mipmapsIn } = mkCk('Enable mipmaps', mipmapsOn, 'Enable mipmaps for scaling')
@@ -171,21 +195,39 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		detectedDisplay,
 	} = gpuUi
 
-	const buildAdvancedPatch = () => ({
-		[keyStretch]: stretchSel.value,
-		[keyKeyOnly]: !!keyOnlyIn.checked,
-		[keyAlwaysOnTop]: !!aotIn.checked,
-		[keyInteractive]: !!interactiveIn.checked,
-		[keySbsKey]: !!sbsKeyIn.checked,
-		[keyColourSpace]: colourSpaceSel.value,
-		[keyForceLinear]: !!forceLinearIn.checked,
-		[keyMipmaps]: !!mipmapsIn.checked,
-		[keyHighBitdepth]: !!highBitdepthIn.checked,
-		[keyName]: nameIn.value.trim(),
-		[keyAspectRatio]: arIn.value.trim(),
-		[keyPosX]: parseInt(posXIn.value, 10) || 0,
-		[keyPosY]: parseInt(posYIn.value, 10) || 0,
-	})
+	const buildAdvancedPatch = () => {
+		const interactiveVal = operatorMonitorIn.checked ? true : !!interactiveIn.checked
+		const patch = {
+			[keyStretch]: stretchSel.value,
+			[keyKeyOnly]: !!keyOnlyIn.checked,
+			[keyAlwaysOnTop]: !!aotIn.checked,
+			[keySbsKey]: !!sbsKeyIn.checked,
+			[keyColourSpace]: colourSpaceSel.value,
+			[keyForceLinear]: !!forceLinearIn.checked,
+			[keyMipmaps]: !!mipmapsIn.checked,
+			[keyHighBitdepth]: !!highBitdepthIn.checked,
+			[keyName]: nameIn.value.trim(),
+			[keyAspectRatio]: arIn.value.trim(),
+			[keyPosX]: parseInt(posXIn.value, 10) || 0,
+			[keyPosY]: parseInt(posYIn.value, 10) || 0,
+		}
+		if (isMultiviewOutput) {
+			patch.multiview_interactive = interactiveVal
+		} else {
+			patch[keyInteractive] = interactiveVal
+		}
+		if (operatorMonitorIn.checked) {
+			for (let p = 1; p <= 4; p++) patch[`screen_${p}_operator_monitor`] = p === portN
+		} else {
+			patch[keyOperatorMonitor] = false
+		}
+		if (nvidiaSyncIn.checked) {
+			for (let p = 1; p <= 4; p++) patch[`screen_${p}_nvidia_sync_to_display`] = p === portN
+		} else {
+			patch[keyNvidiaSync] = false
+		}
+		return patch
+	}
 
 	async function saveCasparSettings() {
 		const selectedMode = String(modeSel.value || '1080p5000').trim()
@@ -203,7 +245,16 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 			},
 		})
 		setCasparRestartDirty(true)
-		setStatus(statusEl, `GPU port ${portN} (Caspar screen ${screenN}) saved`, true)
+		const interactiveNow = !!interactiveIn.checked || !!operatorMonitorIn.checked
+		setStatus(
+			statusEl,
+			operatorMonitorIn.checked
+				? `GPU port ${portN}: operator monitor — primary + confine + interactive (apply OS layout + Caspar restart)`
+				: interactiveNow
+					? `GPU port ${portN}: interactive on — Caspar mouse input (Caspar restart for <interactive>)`
+					: `GPU port ${portN} (Caspar screen ${screenN}) saved`,
+			true,
+		)
 	}
 
 	async function saveGlobalOsSettings() {
@@ -250,6 +301,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 				[keySystemId]: null, [keyOsMode]: null, [keyOsRate]: null, [keyOsBackend]: null,
 				[keyOsTimingSource]: null,
 				[keyStretch]: null, [keyKeyOnly]: null, [keyAlwaysOnTop]: null, [keyInteractive]: null,
+				[keyOperatorMonitor]: null, [keyNvidiaSync]: null,
 				[keySbsKey]: null, [keyColourSpace]: null, [keyForceLinear]: null, [keyMipmaps]: null,
 				[keyHighBitdepth]: null,
 				[keyName]: null, [keyAspectRatio]: null, [keyPosX]: null, [keyPosY]: null,
@@ -273,7 +325,8 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	minimalToggleRow.append(
 		mkSmallCk(fullscreenCk), mkSmallCk(windowedCk), mkSmallCk(borderCk), mkSmallCk(vsyncCk),
 		mkSmallCk(keyOnlyCk), mkSmallCk(aotCk),
-		mkSmallCk(interactiveCk), mkSmallCk(sbsKeyCk), mkSmallCk(forceLinearCk), mkSmallCk(mipmapsCk), mkSmallCk(highBitdepthCk),
+		mkSmallCk(operatorMonitorCk), mkSmallCk(interactiveCk), mkSmallCk(nvidiaSyncCk),
+		mkSmallCk(sbsKeyCk), mkSmallCk(forceLinearCk), mkSmallCk(mipmapsCk), mkSmallCk(highBitdepthCk),
 	)
 
 	const videoModeHdr = Object.assign(document.createElement('div'), {

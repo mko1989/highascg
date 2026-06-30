@@ -133,6 +133,9 @@ Real-time detection and tracking of performers on stage using camera inputs. **P
 | 23 | [23_WO_HTML_WEBPAGE_SOURCE.md](./23_WO_HTML_WEBPAGE_SOURCE.md) | HTML Webpage Source: Live tab item, URL inspector, CasparCG HTML producer |
 | 24 | [24_WO_COMPANION_BUTTON_PRESS.md](./24_WO_COMPANION_BUTTON_PRESS.md) | Companion Button Press: Timeline flag action, HTTP press API, settings tab |
 | 75 | [75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md](./75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md) | Timeline Companion button preview keyframes (Satellite subscribe + HTTP press) |
+| 83 | [83_WO_INTERACTIVE_PROJECT_MAP.md](./83_WO_INTERACTIVE_PROJECT_MAP.md) | Interactive zoomable project architecture map: OS → services → modules → files → functions |
+| 84 | [84_WO_ROUTER_REFACTOR.md](./84_WO_ROUTER_REFACTOR.md) | Router Refactor: Replace 500+ line if/else stack with declarative route registry |
+| 85 | [85_WO_DEVICE_VIEW_SIMPLE_POLISH.md](./85_WO_DEVICE_VIEW_SIMPLE_POLISH.md) | Device View Polish: Simple view multi-column, cable routing half-star shape, performance optimization |
 
 ---
-*Created: 2026-04-04 | Updated: 2026-04-12 | Project: HighAsCG Migration*
+*Created: 2026-04-04 | Updated: 2026-06-29 | Project: HighAsCG Migration*

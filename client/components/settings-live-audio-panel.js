@@ -181,7 +181,7 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 
 		mainEl.innerHTML = `
 			<h3 class="settings-category">Live audio (ALSA / USB)</h3>
-			<p class="settings-note">Configure capture devices and PGM routing defaults here. To <strong>add or remove</strong> live audio inputs, use the <strong>+</strong> button in the Audio Mixer tab.</p>
+			<p class="settings-note">Configure capture devices and PGM routing defaults here. To <strong>add</strong> live audio inputs, use <strong>Sources → Live → +</strong> or the Audio Mixer tab. Remove slots in the Audio Mixer.</p>
 			<div id="live-audio-status" class="settings-note" style="margin-bottom:0.75rem"></div>
 
 			<input type="hidden" id="live-audio-slot-count" value="${ui.count}" />

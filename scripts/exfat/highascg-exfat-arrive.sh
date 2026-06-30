@@ -53,6 +53,7 @@ start_unit highascg-exfat-media-prep.service
 start_unit home-casparcg-highascg-media-exfat.mount
 # Block until drop-update apply finishes — late USB must not start highascg on stale squashfs.
 start_unit highascg-exfat-server-update.service 1
+start_unit highascg-decklink-install.service 1
 start_unit highascg-exfat-sync.service
 
 log "pipeline finished for ${EXFAT_MP}"

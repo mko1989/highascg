@@ -184,11 +184,13 @@ Extend existing `GET /api/system/setup` tailscale block or add dedicated routes 
 
 ### 5.2 Tasks — Tailscale
 
-- [ ] **T2.1** `config/network-sync.json` schema + `src/config/network-sync-config.js`.
-- [ ] **T2.2** `src/network/tailscale-service.js` — status, enable/disable, login (sudo helpers with fixed commands only).
-- [ ] **T2.3** Sudoers fragment for `tailscale up`, `tailscale status` (narrow); document in `docs/HIGHASCG_PASSWORDLESS_SUDO.md`.
-- [ ] **T2.4** Settings UI: Tailscale section — toggle, status, **Log in**, admin link, tailnet IPv4 display.
-- [ ] **T2.5** Installer hook: ensure `tailscale` package on ISO / `scripts/setup/` (optional package).
+> **Delegated to WO-91 (2026-06-30):** Tailscale control shipped in [91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md](91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md). Config uses dedicated `config/tailscale.json` (not `network-sync.json`).
+
+- [x] **T2.1** ~~`config/network-sync.json`~~ → **`config/tailscale.json`** + `src/config/tailscale-config.js` (WO-91).
+- [x] **T2.2** `src/network/tailscale-service.js` — status, enable/disable, login (WO-91).
+- [x] **T2.3** Sudoers documented in `docs/HIGHASCG_PASSWORDLESS_SUDO.md` (WO-91).
+- [x] **T2.4** Settings UI: Tailscale tab — toggle, status, Log in, operator monitor, admin link, IPv4 (WO-91).
+- [ ] **T2.5** Installer hook: ensure `tailscale` package on ISO / `scripts/setup/` — **still optional**; not part of WO-91 v1 (package assumed present on playout images).
 
 ---
 
@@ -277,6 +279,14 @@ Decided **2026-06-27 (user):** Config sync must be **smart** — leader pushes s
 ---
 
 ## 11. Work Log
+
+### 2026-06-30 — Tailscale delegated to WO-91 (agent)
+
+- **T2.1–T2.4** satisfied by [WO-91](91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md): `config/tailscale.json`, `tailscale-service.js`, API `/api/network/tailscale/*`, Settings → Tailscale tab, operator-monitor Firefox login, `setup.html` alignment.
+- **T2.5** remains open (optional ISO/setup installer hook for `tailscale` package).
+- WO-61 §5 requirements largely met; Syncthing/rsync sections unchanged.
+
+**Instructions for Next Agent:** Continue **T1.x** (rsync) and **T3.x** (Syncthing); do not re-implement Tailscale unless WO-91 gaps are found.
 
 ### 2026-06-27 — T0.3–T0.6 complete (agent)
 

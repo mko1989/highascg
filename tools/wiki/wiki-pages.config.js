@@ -34,6 +34,7 @@ module.exports = [
 	{ match: /^wiki\/api\/timelines-multiview\.md$/, category: 'API reference', order: 51, group: 'Timelines & streaming' },
 	{ match: /^wiki\/api\/streaming-audio-osc\.md$/, category: 'API reference', order: 52, group: 'Timelines & streaming' },
 	{ match: /^wiki\/api\/system-settings-hardware\.md$/, category: 'API reference', order: 53, group: 'System & hardware' },
+	{ match: /^wiki\/api\/network-tailscale\.md$/, category: 'API reference', order: 53.5, group: 'System & hardware' },
 	{ match: /^wiki\/api\/ingest-usb-plugins\.md$/, category: 'API reference', order: 54, group: 'System & hardware' },
 	{ match: /^api-reference\.md$/, category: 'API reference', order: 55, group: 'Overview', title: 'Legacy API overview' },
 	{ match: /^osc-integration\.md$/, category: 'Integration', order: 60 },

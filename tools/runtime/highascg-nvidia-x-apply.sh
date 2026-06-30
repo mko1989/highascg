@@ -36,6 +36,27 @@ done
 nvidia-settings -a "[gpu:0]/SyncToVBlank=0" 2>/dev/null || true
 nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true
 
+_apply_sync_to_display() {
+	_out="${HIGHASCG_NVIDIA_SYNC_OUTPUT:-}"
+	[ -n "$_out" ] || return 0
+	command -v python3 >/dev/null 2>&1 || return 0
+	_dpy=$(nvidia-settings -q dpys 2>/dev/null | python3 - "$_out" <<'PY'
+import re, sys
+name = sys.argv[1]
+for line in sys.stdin:
+    m = re.search(r"\[(\d+)\].*\(" + re.escape(name) + r"\)", line)
+    if m:
+        print(m.group(1))
+        break
+PY
+) || true
+	[ -n "$_dpy" ] || return 0
+	nvidia-settings -a "[screen:0]/XVideoSyncToDisplayID=${_dpy}" 2>/dev/null || true
+	nvidia-settings --save 2>/dev/null || true
+}
+
+_apply_sync_to_display
+
 _patch_metamode() {
 	_raw_meta=$(nvidia-settings -q CurrentMetaMode -t 2>/dev/null) || _raw_meta=""
 	[ -n "$_raw_meta" ] || return 1

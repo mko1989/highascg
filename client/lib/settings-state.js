@@ -53,11 +53,10 @@ export const settingsState = {
 		},
 		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '' },
 		composePreview: {
-			mode: 'ffmpeg_jpeg',
+			mode: 'canvas',
 			fps: 25,
 			resolutionScale: 'half',
 			jpegQuality: 10,
-			tickIntervalMs: 40,
 			basenamePrefix: 'highascg_preview',
 			channels: 'compose_visible',
 			companionThumbEnabled: true,

@@ -42,4 +42,12 @@ describe('project-volume-sync catalog merge', () => {
 		assert.equal(merged[0].name, 'Newer')
 		assert.equal(merged[0].source, 'local')
 	})
+
+	it('autosave pull targets one slug path only (contract)', () => {
+		const { AUTOSAVE_SUBDIR } = require('../../src/engine/project-volume-sync')
+		const slug = 'my_show'
+		const autosaveRel = path.join('projects', AUTOSAVE_SUBDIR, `${slug}.json`)
+		assert.match(autosaveRel, /projects\/_autosave\/my_show\.json$/)
+		assert.doesNotMatch(autosaveRel, /other_show/)
+	})
 })

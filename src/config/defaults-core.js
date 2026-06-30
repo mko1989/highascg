@@ -32,6 +32,12 @@ function coreDefaults() {
 			overwritePolicy: 'rename',
 			verifyHash: false,
 		},
+		operatorTools: {
+			pointerConfineMultiview: false,
+			cefInteractiveBridge: true,
+			cefInteractiveLayer: 999,
+			cefRemoteDebuggingPort: 9222,
+		},
 		projectScopedMedia: {
 			enabled: true,
 			location: 'internal',
@@ -57,9 +63,7 @@ function coreDefaults() {
 			nuclearPassword: '',
 		},
 		composePreview: {
-			mode: 'ffmpeg_jpeg',
-			tickHz: 8,
-			tickIntervalMs: 40,
+			mode: 'canvas',
 			fps: 25,
 			resolutionScale: 'half',
 			jpegQuality: 10,

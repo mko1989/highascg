@@ -14,6 +14,8 @@ import { markLocalProjectSaved } from './project-remote-sync.js'
 import { markServerProjectSynced, resetServerProjectSync } from './server-project-sync.js'
 import { getAppWs } from './app-runtime.js'
 import { flushSceneDeckSync } from './app-scene-deck.js'
+import { syncProjectMediaContextFromClient } from './project-media-context.js'
+import { settingsState } from './settings-state.js'
 
 export const DEFAULT_PROJECT_NAME = 'Untitled'
 const PROJECT_VERSION = 2
@@ -76,6 +78,7 @@ export function applyDefaultUntitledProjectLocally(opts = {}) {
 		{ silent },
 	)
 	programOutputState.resetForNewProject({ silent })
+	syncProjectMediaContextFromClient(settingsState.getSettings())
 	if (emitLoaded) window.dispatchEvent(new Event('project-loaded'))
 }
 

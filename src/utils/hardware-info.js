@@ -74,84 +74,107 @@ function getDisplaysXrandrVerboseRaw() {
 	}
 }
 
+/**
+ * Parse `xrandr --query` text into display rows (connected heads only).
+ * @param {string} stdout
+ * @returns {{ displays: object[], raw: string }}
+ */
+function parseXrandrQueryRaw(stdout) {
+	const lines = String(stdout || '').split('\n')
+	const displays = []
+	let cur = null
+
+	function pushCur() {
+		if (cur && cur.connected) displays.push(cur)
+		cur = null
+	}
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+		const head = line.match(/^(\S+)\s+(connected|disconnected)\b/)
+		if (head) {
+			pushCur()
+			const name = head[1]
+			const connected = head[2] === 'connected'
+			if (!connected) continue
+			cur = {
+				name,
+				connected: true,
+				resolution: 'unknown',
+				x: 0,
+				y: 0,
+				refreshHz: null,
+				modes: [],
+			}
+			const geom = line.match(/(\d+)x(\d+)\+(\d+)\+(\d+)/)
+			if (geom) {
+				cur.resolution = `${geom[1]}x${geom[2]}`
+				cur.x = parseInt(geom[3], 10)
+				cur.y = parseInt(geom[4], 10)
+			}
+			continue
+		}
+		if (cur && cur.connected && /^\s/.test(line) && /\d+x\d+/.test(line)) {
+			const full = line.match(/^\s+(\S+)\s+(.+)$/)
+			if (full) {
+				const modeToken = full[1]
+				if (/^\d+x\d+/i.test(modeToken)) {
+					const dim = modeToken.match(/^(\d+)x(\d+)/i)
+					if (dim) {
+						const w = parseInt(dim[1], 10)
+						const h = parseInt(dim[2], 10)
+						const rest = full[2]
+						const tokens = rest.trim().split(/\s+/)
+						for (const tok of tokens) {
+							const hz = parseFloat(tok.replace(/[^0-9.]/g, ''))
+							if (!Number.isFinite(hz) || hz <= 0) continue
+							const isCurrent = tok.includes('*')
+							const key = `${modeToken}@${hz}`
+							if (!cur.modes.some((x) => `${x.randrMode}@${x.hz}` === key)) {
+								cur.modes.push({
+									width: w,
+									height: h,
+									hz,
+									current: isCurrent,
+									randrMode: modeToken,
+								})
+							}
+							if (isCurrent) cur.refreshHz = hz
+						}
+					}
+				}
+			}
+		}
+	}
+	pushCur()
+	return { displays, raw: String(stdout || '') }
+}
+
 function getDisplaysXrandrDetailed() {
 	try {
 		const stdout = execSync('xrandr --query', {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
 		}).toString()
-		const lines = stdout.split('\n')
-		const displays = []
-		let cur = null
-
-		function pushCur() {
-			if (cur && cur.connected) displays.push(cur)
-			cur = null
+		if (String(stdout || '').trim()) {
+			return parseXrandrQueryRaw(stdout)
 		}
-
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i]
-			const head = line.match(/^(\S+)\s+(connected|disconnected)\b/)
-			if (head) {
-				pushCur()
-				const name = head[1]
-				const connected = head[2] === 'connected'
-				if (!connected) continue
-				cur = {
-					name,
-					connected: true,
-					resolution: 'unknown',
-					x: 0,
-					y: 0,
-					refreshHz: null,
-					modes: [],
-				}
-				const geom = line.match(/(\d+)x(\d+)\+(\d+)\+(\d+)/)
-				if (geom) {
-					cur.resolution = `${geom[1]}x${geom[2]}`
-					cur.x = parseInt(geom[3], 10)
-					cur.y = parseInt(geom[4], 10)
-				}
-				continue
-			}
-			if (cur && cur.connected && /^\s/.test(line) && /\d+x\d+/.test(line)) {
-				const full = line.match(/^\s+(\S+)\s+(.+)$/)
-				if (full) {
-					const modeToken = full[1]
-					if (/^\d+x\d+/i.test(modeToken)) {
-						const dim = modeToken.match(/^(\d+)x(\d+)/i)
-						if (dim) {
-							const w = parseInt(dim[1], 10)
-							const h = parseInt(dim[2], 10)
-							const rest = full[2]
-							const tokens = rest.trim().split(/\s+/)
-							for (const tok of tokens) {
-								const hz = parseFloat(tok.replace(/[^0-9.]/g, ''))
-								if (!Number.isFinite(hz) || hz <= 0) continue
-								const isCurrent = tok.includes('*')
-								const key = `${modeToken}@${hz}`
-								if (!cur.modes.some((x) => `${x.randrMode}@${x.hz}` === key)) {
-									cur.modes.push({
-										width: w,
-										height: h,
-										hz,
-										current: isCurrent,
-										randrMode: modeToken,
-									})
-								}
-								if (isCurrent) cur.refreshHz = hz
-							}
-						}
-					}
-				}
-			}
-		}
-		pushCur()
-		return { displays, raw: stdout }
 	} catch (e) {
 		console.error(`[Hardware-Info] getDisplaysXrandrDetailed failed:`, e.message)
-		return null
 	}
+
+	try {
+		const { readBootXrandrSnapshot } = require('./boot-xrandr-snapshot')
+		const boot = readBootXrandrSnapshot()
+		if (boot?.raw) {
+			const parsed = parseXrandrQueryRaw(boot.raw)
+			return { ...parsed, source: 'boot-snapshot', bootPath: boot.path }
+		}
+	} catch {
+		/* optional */
+	}
+
+	return null
 }
 
 /**

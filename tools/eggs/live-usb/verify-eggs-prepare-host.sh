@@ -87,6 +87,10 @@ fi
 
 bash "${HERE}/verify-highascg-stick-boot.sh"
 
+bash "${HERE}/verify-startup-on-host.sh"
+
+bash "${REPO_ROOT}/tools/runtime/verify-power-button-setup.sh"
+
 getent passwd "$USER_CASPAR" >/dev/null 2>&1 && ok "user ${USER_CASPAR}" \
 	|| fail "missing user ${USER_CASPAR} — sudo bash ${REPO_ROOT}/scripts/setup/05-caspar-deps.sh"
 

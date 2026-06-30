@@ -59,7 +59,7 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/api/system/setup` | Setup wizard state |
+| GET | `/api/system/setup` | Setup wizard state (includes compact `tailscale` block) |
 | POST | `/api/system/setup/restart-window-manager` | nodm restart (password) |
 | POST | `/api/system/setup/restart-app` | Restart HighAsCG Node process |
 | POST | `/api/system/setup/reboot` | Reboot host (password) |
@@ -144,6 +144,50 @@ unzip -l support.zip
 ```
 
 Same bundle as the **Support bundle** button in the connection-eye logs modal, or **Settings → Diagnostics**. Use after a failure or before contacting support.
+
+## Host live sources & CEF interactive
+
+**Caspar:** optional for focus/targets; required for mouse/keyboard/eval.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/host-live/operator-fullscreen` | Operator fullscreen video route state |
+| POST | `/api/host-live/operator-fullscreen` | Toggle fullscreen route (`{ sourceId, action }`) |
+| GET | `/api/host-live/migration` | Preview legacy NDI/browser migration |
+| POST | `/api/host-live/migration` | Apply migration (`{ migrateHostLiveSources: true }`) |
+| GET | `/api/cef-interactive/targets` | Focusable webpage hosts + CDP attach status |
+| POST | `/api/cef-interactive/focus` | Bind CDP focus (`{ sourceId, zoneId? }`) |
+| DELETE | `/api/cef-interactive/focus` | Clear CDP focus (host channel keeps playing) |
+| POST | `/api/cef-interactive/mouse` | `{ sourceId?, type, x, y, button?, coordsNormalized? }` |
+| POST | `/api/cef-interactive/keyboard` | `{ sourceId?, type, keysym?, text?, key?, modifiers? }` |
+| POST | `/api/cef-interactive/eval` | `{ sourceId?, expression }` — evaluate JS in CEF page |
+
+```bash
+curl -s http://127.0.0.1:4200/api/cef-interactive/targets | jq .
+curl -s -X POST http://127.0.0.1:4200/api/cef-interactive/focus \
+  -H 'Content-Type: application/json' \
+  -d '{"sourceId":"webpage_slido"}'
+curl -s -X POST http://127.0.0.1:4200/api/cef-interactive/mouse \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"mousedown","x":0.5,"y":0.5,"coordsNormalized":true}'
+```
+
+Requires `operatorTools.cefInteractiveBridge: true` and `remote-debugging-port` in `casparcg.config`. Operator fullscreen (WO-88) sets `cefFocusTarget` automatically; the focus API is for automation and Web UI without X11.
+
+## Tailscale
+
+**Caspar:** not required.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/network/tailscale/status` | Status + `config/tailscale.json` |
+| POST | `/api/network/tailscale/enable` | `{ enabled: boolean }` |
+| POST | `/api/network/tailscale/login` | Start interactive login |
+| POST | `/api/network/tailscale/login-operator-ui` | Login + Firefox on operator `:0` |
+| POST | `/api/network/tailscale/prefs` | Save tailscale preferences |
+| POST | `/api/network/tailscale/logout` | Log out of tailnet |
+
+Full request/response examples: [**network-tailscale.md**](network-tailscale.md).
 
 ---
 

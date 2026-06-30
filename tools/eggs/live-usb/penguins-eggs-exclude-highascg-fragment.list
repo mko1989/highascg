@@ -81,6 +81,8 @@ home/casparcg/exfat/*
 # casparcg build-host dotfiles (not .xsession)
 home/casparcg/.cache
 home/casparcg/.cache/*
+home/casparcg/Downloads
+home/casparcg/Downloads/*
 home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor

@@ -36,6 +36,10 @@ describe('media browser API (router, no AMCP)', () => {
 		return routeRequest('POST', path, JSON.stringify(body), ctx, null)
 	}
 
+	async function get(path) {
+		return routeRequest('GET', path, null, ctx, null)
+	}
+
 	it('POST /api/media/mkdir works without Caspar', async () => {
 		const r = await post('/api/media/mkdir', { path: 'testdir' })
 		assert.equal(r.status, 200)

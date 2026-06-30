@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# DeckLink Desktop Video — discover operator .deb drops on exFAT/bridge (WO-92).
+# Sourced by scripts/runtime/decklink-install-from-exfat.sh and smoke tests.
+
+decklink_version_gte() {
+	local a="${1:-}"
+	local b="${2:-}"
+	[[ -n "$a" && -n "$b" ]] || return 1
+	[[ "$(printf '%s\n' "$a" "$b" | sort -V | head -n1)" == "$b" ]]
+}
+
+# @param basename e.g. desktopvideo_16.0.1a2_amd64.deb
+decklink_deb_version_from_basename() {
+	local base="${1:-}"
+	case "$base" in
+		desktopvideo-gui_*) echo "$base" | sed -nE 's/^desktopvideo-gui_(.+)_amd64\.deb$/\1/p' ;;
+		desktopvideo_*) echo "$base" | sed -nE 's/^desktopvideo_(.+)_amd64\.deb$/\1/p' ;;
+		*) echo "" ;;
+	esac
+}
+
+decklink_pkg_installed_version() {
+	local pkg="${1:-}"
+	local v
+	v="$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null | head -1 || true)"
+	[[ -n "$v" ]] || return 1
+	v="${v#*:}"
+	printf '%s' "$v"
+}
+
+decklink_both_packages_installed_at_least() {
+	local target_ver="${1:-}"
+	local v_main v_gui
+	[[ -n "$target_ver" ]] || return 1
+	v_main="$(decklink_pkg_installed_version desktopvideo || true)"
+	[[ -n "$v_main" ]] || return 1
+	if ! decklink_version_gte "$v_main" "$target_ver"; then
+		return 1
+	fi
+	v_gui="$(decklink_pkg_installed_version desktopvideo-gui || true)"
+	if [[ -n "$v_gui" ]]; then
+		decklink_version_gte "$v_gui" "$target_ver"
+	else
+		return 0
+	fi
+}
+
+# Prints mounted …/decklink directories (USB exFAT then bridge), one per line.
+decklink_vendor_search_dirs() {
+	local mp
+	for mp in /home/casparcg/exfat /home/casparcg/bridge; do
+		if mountpoint -q "$mp" 2>/dev/null && [[ -d "${mp}/decklink" ]]; then
+			printf '%s\n' "${mp}/decklink"
+		fi
+	done
+}
+
+# Sets DECKLINK_VENDOR_MAIN_DEB, DECKLINK_VENDOR_GUI_DEB, DECKLINK_VENDOR_VERSION, DECKLINK_VENDOR_DIR.
+# Returns 0 when a matching pair is found.
+decklink_find_newest_vendor_pair() {
+	DECKLINK_VENDOR_MAIN_DEB=""
+	DECKLINK_VENDOR_GUI_DEB=""
+	DECKLINK_VENDOR_VERSION=""
+	DECKLINK_VENDOR_DIR=""
+
+	local dir f base ver gui_deb
+	local best_ver="" best_main="" best_gui="" best_dir=""
+
+	while IFS= read -r dir; do
+		[[ -n "$dir" ]] || continue
+		for f in "$dir"/desktopvideo_*.deb; do
+			[[ -f "$f" ]] || continue
+			base="$(basename "$f")"
+			[[ "$base" == desktopvideo-gui_* ]] && continue
+			ver="$(decklink_deb_version_from_basename "$base")"
+			[[ -n "$ver" ]] || continue
+			gui_deb="${dir}/desktopvideo-gui_${ver}_amd64.deb"
+			if [[ ! -f "$gui_deb" ]]; then
+				gui_deb=""
+			fi
+			if [[ -z "$best_ver" ]] || [[ "$(printf '%s\n' "$ver" "$best_ver" | sort -V | tail -1)" == "$ver" ]]; then
+				best_ver="$ver"
+				best_main="$f"
+				best_gui="$gui_deb"
+				best_dir="$dir"
+			fi
+		done
+	done < <(decklink_vendor_search_dirs)
+
+	[[ -n "$best_main" && -n "$best_ver" ]] || return 1
+	DECKLINK_VENDOR_MAIN_DEB="$best_main"
+	DECKLINK_VENDOR_GUI_DEB="${best_gui:-}"
+	DECKLINK_VENDOR_VERSION="$best_ver"
+	DECKLINK_VENDOR_DIR="$best_dir"
+	return 0
+}
+
+# @param reason_var_name — name of variable to set with skip/install reason (optional)
+decklink_needs_install_from_vendor() {
+	local reason_var="${1:-}"
+	decklink_find_newest_vendor_pair || {
+		[[ -n "$reason_var" ]] && printf -v "$reason_var" "no vendor debs in ~/exfat/decklink or ~/bridge/decklink"
+		return 1
+	}
+	if decklink_both_packages_installed_at_least "$DECKLINK_VENDOR_VERSION"; then
+		[[ -n "$reason_var" ]] && printf -v "$reason_var" "already installed (>= ${DECKLINK_VENDOR_VERSION})"
+		return 1
+	fi
+	[[ -n "$reason_var" ]] && printf -v "$reason_var" "install or upgrade to ${DECKLINK_VENDOR_VERSION}"
+	return 0
+}
+
+decklink_install_vendor_pair() {
+	local main_deb="${1:-}"
+	local gui_deb="${2:-}"
+	[[ -f "$main_deb" ]] || return 1
+	if [[ -n "$gui_deb" && -f "$gui_deb" ]]; then
+		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb" || {
+			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+			DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb"
+		}
+	else
+		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" || {
+			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+			DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb"
+		}
+	fi
+	modprobe blackmagic_io 2>/dev/null || true
+	return 0
+}

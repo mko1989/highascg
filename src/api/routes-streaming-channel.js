@@ -6,32 +6,136 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { getChannelMap, resolveStreamingChannelRoute, resolveStreamingChannelRouteForRole } = require('../config/routing')
+const { getChannelMap } = require('../config/routing')
 const { buildStreamingRtmpAddParams } = require('../streaming/streaming-channel-ffmpeg')
+const {
+	buildStreamingChannelStatusPayload,
+	sanitizeLogExtra,
+} = require('../streaming/streaming-channel-status')
+const streamLog = require('../utils/buffered-logger').streaming
 const { param } = require('../caspar/amcp-utils')
 const path = require('path')
+const { getMediaIngestBasePath } = require('../media/local-media')
 
 const STREAMING_RTMP_CONSUMER_INDEX = 97
 const STREAMING_RECORD_CONSUMER_INDEX = 96
+const LOG_RING_MAX = 80
 
 function ensureStreamLogStore(ctx) {
 	if (!ctx._streamingChannelLogs || typeof ctx._streamingChannelLogs !== 'object') {
-		ctx._streamingChannelLogs = { rtmp: [] }
+		ctx._streamingChannelLogs = { rtmp: [], record: [] }
 	}
 	if (!Array.isArray(ctx._streamingChannelLogs.rtmp)) ctx._streamingChannelLogs.rtmp = []
+	if (!Array.isArray(ctx._streamingChannelLogs.record)) ctx._streamingChannelLogs.record = []
 	return ctx._streamingChannelLogs
 }
 
-function pushRtmpLog(ctx, level, message, extra) {
+function trimLogRing(store, key) {
+	if (!Array.isArray(store[key])) store[key] = []
+	if (store[key].length > LOG_RING_MAX) store[key] = store[key].slice(-LOG_RING_MAX)
+}
+
+function logToBufferedCategory(level, message, extra) {
+	const suffix = extra && typeof extra === 'object' ? ` ${JSON.stringify(extra)}` : ''
+	const line = `[Streaming channel] ${message}${suffix}`
+	const fn = streamLog[String(level)] || streamLog.info
+	fn(line)
+}
+
+function broadcastStreamingChannelStatus(ctx) {
+	if (typeof ctx._wsBroadcast !== 'function') return
+	ctx._wsBroadcast(
+		'streaming_channel',
+		buildStreamingChannelStatusPayload(ctx, {
+			rtmpConsumerIndex: STREAMING_RTMP_CONSUMER_INDEX,
+			recordConsumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+		}),
+	)
+}
+
+/**
+ * @param {object} config
+ * @param {string | null | undefined} absPath
+ */
+function absPathToMediaId(config, absPath) {
+	if (!absPath) return ''
+	const base = getMediaIngestBasePath(config)
+	const rel = path.relative(base, absPath)
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return path.basename(String(absPath))
+	return rel.replace(/\\/g, '/')
+}
+
+/**
+ * @param {object} ctx
+ * @param {string | null | undefined} absPath
+ */
+function broadcastRecordStopped(ctx, absPath) {
+	if (typeof ctx._wsBroadcast !== 'function' || !absPath) return
+	ctx._wsBroadcast('record_stopped', {
+		mediaId: absPathToMediaId(ctx.config || {}, absPath),
+		absPath,
+	})
+}
+
+function pushKindLog(ctx, kind, level, message, extra) {
 	const store = ensureStreamLogStore(ctx)
+	const safeExtra = extra ? sanitizeLogExtra(extra) : undefined
 	const row = {
 		ts: new Date().toISOString(),
 		level: String(level || 'info'),
 		message: String(message || ''),
-		...(extra && typeof extra === 'object' ? { extra } : {}),
+		...(safeExtra && typeof safeExtra === 'object' ? { extra: safeExtra } : {}),
 	}
-	store.rtmp.push(row)
-	if (store.rtmp.length > 80) store.rtmp = store.rtmp.slice(-80)
+	store[kind].push(row)
+	trimLogRing(store, kind)
+	logToBufferedCategory(level, message, safeExtra)
+	broadcastStreamingChannelStatus(ctx)
+}
+
+function pushRtmpLog(ctx, level, message, extra) {
+	pushKindLog(ctx, 'rtmp', level, message, extra)
+}
+
+function pushRecordLog(ctx, level, message, extra) {
+	pushKindLog(ctx, 'record', level, message, extra)
+}
+
+function parseStreamStatusPollMs() {
+	const n = parseInt(String(process.env.HIGHASCG_STREAM_STATUS_POLL_MS || ''), 10)
+	return Number.isFinite(n) && n >= 5000 ? n : 0
+}
+
+function stopStreamingStatusPoll(ctx) {
+	if (ctx._streamingChannelRtmpPollTimer) {
+		clearInterval(ctx._streamingChannelRtmpPollTimer)
+		ctx._streamingChannelRtmpPollTimer = null
+	}
+}
+
+function startStreamingStatusPoll(ctx) {
+	stopStreamingStatusPoll(ctx)
+	const ms = parseStreamStatusPollMs()
+	if (!ms || !ctx.streamingChannelRtmp?.active) return
+	ctx._streamingChannelRtmpPollTimer = setInterval(() => {
+		void pollRtmpHealth(ctx)
+	}, ms)
+}
+
+async function pollRtmpHealth(ctx) {
+	if (!ctx.streamingChannelRtmp?.active || !ctx.amcp) return
+	const map = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
+	const ch = map.streamingCh
+	if (ch == null) return
+	try {
+		const info = await ctx.amcp.info(ch)
+		const blob = info?.data == null ? '' : Array.isArray(info.data) ? info.data.join('\n') : String(info.data)
+		const hasFfmpeg = /ffmpeg|stream consumer|<stream>/i.test(blob)
+		pushRtmpLog(ctx, 'debug', `Health ch${ch}: ${hasFfmpeg ? 'STREAM consumer seen in INFO' : 'no STREAM consumer in INFO'}`, {
+			channel: ch,
+		})
+	} catch (e) {
+		pushRtmpLog(ctx, 'warn', `Health ch${ch}: INFO query failed`, { error: e?.message || String(e) })
+	}
 }
 
 function joinCasparMediaFile(dir, file) {
@@ -154,35 +258,15 @@ function isRemoveNotFoundError(err) {
  * @param {object} ctx
  */
 function handleGet(ctx) {
-	const map = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
-	const rtmp = ctx.streamingChannelRtmp || { active: false }
-	const rec = ctx.streamingChannelRecord || { active: false }
-	const logs = ensureStreamLogStore(ctx)
-	const vRoute = resolveStreamingChannelRoute(ctx.config || {})
-	const aRoute = resolveStreamingChannelRouteForRole(ctx.config || {}, 'audio')
-	const sc = ctx.config?.streamingChannel && typeof ctx.config.streamingChannel === 'object' ? ctx.config.streamingChannel : {}
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({
-			enabled: map.streamingCh != null,
-			channel: map.streamingCh,
-			contentLayer: map.streamingContentLayer,
-			videoSource: sc.videoSource ?? 'program_1',
-			audioSource: sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : String(sc.audioSource),
-			route: vRoute,
-			audioRoute: aRoute,
-			splitAvRouted: vRoute && aRoute && vRoute !== aRoute && map.streamingContentLayer >= 2,
-			rtmp: {
-				active: !!rtmp.active,
-				url: rtmp.url || null,
-				outputId: rtmp.outputId || null,
-				consumerIndex: rtmp.consumerIndex ?? STREAMING_RTMP_CONSUMER_INDEX,
-				lastError: rtmp.lastError || null,
-				logs: logs.rtmp,
-			},
-			record: { active: !!rec.active, path: rec.path || null, outputId: rec.outputId || null },
-		}),
+		body: jsonBody(
+			buildStreamingChannelStatusPayload(ctx, {
+				rtmpConsumerIndex: STREAMING_RTMP_CONSUMER_INDEX,
+				recordConsumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+			}),
+		),
 	}
 }
 
@@ -248,8 +332,9 @@ async function handlePostRtmp(body, ctx) {
 				})
 			}
 			ctx.streamingChannelRtmp = { active: true, url: built.url, consumerIndex: usedIndex, lastError: null, outputId: outputId || null }
-			ctx.log?.('info', `[Streaming channel] RTMP started ch${ch}: ${built.url}`)
+			ctx.log?.('info', `[Streaming channel] RTMP started ch${ch}`)
 			pushRtmpLog(ctx, 'info', `RTMP started on ch${ch}`, { url: built.url, consumerIndex: usedIndex })
+			startStreamingStatusPoll(ctx)
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -260,6 +345,7 @@ async function handlePostRtmp(body, ctx) {
 			ctx.streamingChannelRtmp = { ...ctx.streamingChannelRtmp, active: false, lastError: msg }
 			ctx.log?.('warn', `[Streaming channel] RTMP start failed: ${msg}`)
 			pushRtmpLog(ctx, 'error', `RTMP start failed on ch${ch}`, { error: msg, command: addNoIdxCmd })
+			stopStreamingStatusPoll(ctx)
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 		}
 	}
@@ -280,6 +366,7 @@ async function handlePostRtmp(body, ctx) {
 			res = await ctx.amcp.raw(`REMOVE ${ch} STREAM ${param(url)}`)
 		}
 		ctx.streamingChannelRtmp = { active: false, url: null, consumerIndex: idx, lastError: null }
+		stopStreamingStatusPoll(ctx)
 		ctx.log?.('info', `[Streaming channel] RTMP stopped ch${ch}`)
 		pushRtmpLog(ctx, 'info', `RTMP stopped on ch${ch}`, { url })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, active: false, amcp: res }) }
@@ -287,10 +374,12 @@ async function handlePostRtmp(body, ctx) {
 		const msg = e?.message || String(e)
 		if (isRemoveNotFoundError(e)) {
 			ctx.streamingChannelRtmp = { active: false, url: null, consumerIndex: null, lastError: null }
+			stopStreamingStatusPoll(ctx)
 			pushRtmpLog(ctx, 'warn', `RTMP stop fallback: stream already absent on ch${ch}`, { url, error: msg })
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, active: false, warning: msg }) }
 		}
 		ctx.streamingChannelRtmp = { active: false, url: null, consumerIndex: null, lastError: msg }
+		stopStreamingStatusPoll(ctx)
 		pushRtmpLog(ctx, 'error', `RTMP stop failed on ch${ch}`, { url, error: msg })
 		return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 	}
@@ -327,6 +416,7 @@ async function handlePostRecord(body, ctx) {
 				: 26
 		const dir = await resolveCasparMediaDir(ctx)
 		if (!dir) {
+			pushRecordLog(ctx, 'error', 'Record start failed: could not resolve Caspar media folder', { outputId })
 			return {
 				status: 502,
 				headers: JSON_HEADERS,
@@ -345,10 +435,19 @@ async function handlePostRecord(body, ctx) {
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
 		})
 		const paramsAfterPath = `${param(fileName)} ${args}`
+		const addCmd = `ADD ${ch}-${STREAMING_RECORD_CONSUMER_INDEX} FILE ${paramsAfterPath}`
+		pushRecordLog(ctx, 'info', `Record start requested on ch${ch}`, { path: absPath, outputId: outputId || null, crf })
 		try {
 			const res = await ctx.amcp.basic.add(ch, 'FILE', paramsAfterPath, STREAMING_RECORD_CONSUMER_INDEX)
-			ctx.streamingChannelRecord = { active: true, path: absPath, channel: ch, outputId: outputId || null }
+			ctx.streamingChannelRecord = {
+				active: true,
+				path: absPath,
+				channel: ch,
+				outputId: outputId || null,
+				lastError: null,
+			}
 			ctx.log?.('info', `[Streaming channel] Record started ch${ch} → ${absPath}`)
+			pushRecordLog(ctx, 'info', `Record started on ch${ch}`, { path: absPath, outputId: outputId || null })
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -356,7 +455,9 @@ async function handlePostRecord(body, ctx) {
 			}
 		} catch (e) {
 			const msg = e?.message || String(e)
+			ctx.streamingChannelRecord = { ...ctx.streamingChannelRecord, active: false, lastError: msg }
 			ctx.log?.('warn', `[Streaming channel] Record start failed: ${msg}`)
+			pushRecordLog(ctx, 'error', `Record start failed on ch${ch}`, { error: msg, command: addCmd })
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 		}
 	}
@@ -364,19 +465,26 @@ async function handlePostRecord(body, ctx) {
 	if (!ctx.streamingChannelRecord.active) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Not recording' }) }
 	}
+	const recCh = ctx.streamingChannelRecord.channel ?? ch
 	try {
-		const res = await ctx.amcp.basic.remove(ch, null, STREAMING_RECORD_CONSUMER_INDEX)
+		const res = await ctx.amcp.basic.remove(recCh, null, STREAMING_RECORD_CONSUMER_INDEX)
 		const outPath = ctx.streamingChannelRecord.path
-		ctx.streamingChannelRecord = { active: false, path: null, channel: null }
-		ctx.log?.('info', `[Streaming channel] Record stopped ch${ch}`)
+		ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: null }
+		ctx.log?.('info', `[Streaming channel] Record stopped ch${recCh}`)
+		pushRecordLog(ctx, 'info', `Record stopped on ch${recCh}`, { path: outPath })
+		broadcastRecordStopped(ctx, outPath)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, recording: false, path: outPath, amcp: res }) }
 	} catch (e) {
 		const msg = e?.message || String(e)
 		if (isRemoveNotFoundError(e)) {
-			ctx.streamingChannelRecord = { active: false, path: null, channel: null }
+			const outPath = ctx.streamingChannelRecord.path
+			ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: null }
+			pushRecordLog(ctx, 'warn', `Record stop fallback: file consumer already absent on ch${recCh}`, { path: outPath, error: msg })
+			broadcastRecordStopped(ctx, outPath)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, recording: false, warning: msg }) }
 		}
-		ctx.streamingChannelRecord = { active: false, path: null, channel: null }
+		ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: msg }
+		pushRecordLog(ctx, 'error', `Record stop failed on ch${recCh}`, { error: msg })
 		return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 	}
 }
@@ -397,6 +505,9 @@ async function handle(method, p, body, ctx) {
 module.exports = {
 	handle,
 	handleGet,
+	broadcastStreamingChannelStatus,
+	pushRtmpLog,
+	pushRecordLog,
 	STREAMING_RTMP_CONSUMER_INDEX,
 	STREAMING_RECORD_CONSUMER_INDEX,
 }

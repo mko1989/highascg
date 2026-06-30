@@ -167,6 +167,7 @@ HIGHASCGEXF/
   projects/
   snapshots/rear-panels/
   templates/
+  decklink/               ← optional DeckLink vendor debs (see below)
   README.txt
 ```
 
@@ -185,6 +186,27 @@ unzip -o HIGHASCGEXF-starter-layout.zip -d /Volumes/HIGHASCGEXF
 Safely eject the stick when copying finishes.
 
 > **Optional later:** extract a [GitHub server release](https://github.com/mko1989/highascg/releases) (`highascg-server_*.tar.gz`) into `drop-update/` so `drop-update/package.json` exists. The starter zip alone is enough for a first boot test with the embedded ISO server tree.
+
+### DeckLink drivers (optional — operator-supplied)
+
+The public ISO does **not** ship Blackmagic Desktop Video. If the playout machine has a DeckLink card, copy vendor packages into **`decklink/`** on the stick (create the folder if your starter zip predates it):
+
+```
+HIGHASCGEXF/decklink/
+  desktopvideo_<version>_amd64.deb          ← required for Caspar decklink I/O
+  desktopvideo-gui_<version>_amd64.deb      ← optional (Setup / Updater GUI)
+```
+
+Download [Desktop Video for Linux](https://www.blackmagicdesign.com/support/family/capture-and-playback), extract the tarball, and copy from `deb/x86_64/`.
+
+| Package | Needed for playout? | Purpose |
+|---------|---------------------|---------|
+| **`desktopvideo`** | **Yes** (when using DeckLink) | Kernel driver, `libDeckLinkAPI.so`, firmware / CLI update tools |
+| **`desktopvideo-gui`** | **No** | Blackmagic Desktop Video **Setup** and **Updater** GUI only |
+
+**`desktopvideo` alone is enough** when the card is already on appropriate firmware and Caspar channel settings in `configs/` are sufficient. Without `desktopvideo-gui`, Settings → **Desktop Video Setup** / **Updater** report *GUI not installed* — playout is unaffected.
+
+On boot, HighAsCG installs from `decklink/` when needed (`highascg-decklink-install.service`). See `decklink/README.txt` on the volume.
 
 ---
 

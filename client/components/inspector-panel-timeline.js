@@ -20,6 +20,57 @@ import {
 } from '../lib/companion-location-parse.js'
 import { companionButtonPreviewUrl } from '../lib/companion-button-preview-url.js'
 import { openCompanionButtonPickerModal } from './companion-button-picker-modal.js'
+import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
+
+/**
+ * Prominent timeline position row (SMPTE + ms) directly under the inspector title.
+ * @param {HTMLElement} root
+ * @param {{ timeMs: number, fps?: number, maxMs?: number, onCommit: (ms: number) => void }} opts
+ */
+function appendTimelineInspectorPosition(root, { timeMs, fps = 25, maxMs, onCommit }) {
+	const row = document.createElement('div')
+	row.className = 'inspector-timeline-position'
+
+	const lab = document.createElement('label')
+	lab.className = 'inspector-timeline-position__label'
+	lab.textContent = 'Position'
+
+	const tcInp = document.createElement('input')
+	tcInp.type = 'text'
+	tcInp.className = 'inspector-field__input inspector-math-input'
+	tcInp.spellcheck = false
+	tcInp.value = fmtSmpte(timeMs, fps)
+	tcInp.title = 'SMPTE (HH:MM:SS:FF), ++500 / --500 offset, or plain ms'
+
+	const msHint = document.createElement('span')
+	msHint.className = 'inspector-timeline-position__ms'
+	msHint.textContent = `${Math.round(timeMs)} ms`
+
+	const commit = () => {
+		const parsed = parseTcInput(tcInp.value, timeMs, maxMs, fps)
+		if (parsed == null) {
+			tcInp.value = fmtSmpte(timeMs, fps)
+			return
+		}
+		const clamped = Math.max(0, Math.min(parsed, maxMs ?? 999999999))
+		tcInp.value = fmtSmpte(clamped, fps)
+		msHint.textContent = `${Math.round(clamped)} ms`
+		if (clamped !== timeMs) onCommit(clamped)
+	}
+
+	tcInp.addEventListener('change', commit)
+	tcInp.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			tcInp.blur()
+		}
+	})
+
+	lab.appendChild(tcInp)
+	row.appendChild(lab)
+	row.appendChild(msHint)
+	root.appendChild(row)
+}
 
 export async function syncTimelineToServer() {
 	const tl = timelineState.getActive()
@@ -51,6 +102,20 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	title.className = 'inspector-title'
 	title.textContent = 'Timeline flag'
 	root.appendChild(title)
+
+	const fps = tl?.fps || 25
+	const dur = tl?.duration ?? 999999
+	appendTimelineInspectorPosition(root, {
+		timeMs: flag.timeMs,
+		fps,
+		maxMs: dur,
+		onCommit: (ms) => {
+			timelineState.updateFlag(timelineId, flagId, { timeMs: ms })
+			syncTimelineToServer()
+			window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+			renderTimelineFlagInspector(deps, timelineId, flagId)
+		},
+	})
 
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group'
@@ -91,26 +156,6 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	typeLab.appendChild(typeSel)
 	typeWrap.appendChild(typeLab)
 	grp.appendChild(typeWrap)
-
-	const timeWrap = document.createElement('div')
-	timeWrap.className = 'inspector-field'
-	const timeLab = document.createElement('label')
-	timeLab.className = 'inspector-field__label'
-	timeLab.textContent = 'Time (ms)'
-	const timeInp = document.createElement('input')
-	timeInp.type = 'text'
-	timeInp.className = 'inspector-field__input inspector-math-input'
-	timeInp.value = String(Math.round(flag.timeMs))
-	timeInp.addEventListener('change', () => {
-		const v = parseNumberInput(timeInp.value, flag.timeMs)
-		const dur = tl?.duration ?? 999999
-		timelineState.updateFlag(timelineId, flagId, { timeMs: Math.max(0, Math.min(v, dur)) })
-		syncTimelineToServer()
-		renderTimelineFlagInspector(deps, timelineId, flagId)
-	})
-	timeLab.appendChild(timeInp)
-	timeWrap.appendChild(timeLab)
-	grp.appendChild(timeWrap)
 
 	const showJump = (flag.type || 'pause') === 'jump'
 	const jumpWrap = document.createElement('div')
@@ -182,8 +227,16 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	previewImg.width = 72
 	previewImg.height = 72
 	previewImg.src = companionButtonPreviewUrl(coords.page, coords.row, coords.column)
+	previewImg.onerror = () => {
+		previewWrap.classList.add('companion-inspector-preview--missing')
+	}
 	previewWrap.appendChild(previewImg)
 	companionWrap.appendChild(previewWrap)
+
+	const previewStatus = document.createElement('p')
+	previewStatus.className = 'inspector-field inspector-field--hint companion-inspector-preview-status'
+	previewStatus.textContent = 'Checking Companion preview…'
+	companionWrap.appendChild(previewStatus)
 
 	const refreshPreviewImg = () => {
 		const tl = timelineState.getActive()
@@ -293,13 +346,66 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 		})
 	})
 	btnRow.appendChild(pickBtn)
+
+	const testPressBtn = document.createElement('button')
+	testPressBtn.type = 'button'
+	testPressBtn.className = 'inspector-btn-sm'
+	testPressBtn.textContent = 'Test press'
+	testPressBtn.title = 'Send Companion HTTP press (down + release), same as playhead crossing this flag'
+	testPressBtn.addEventListener('click', async () => {
+		const page = parseCompanionCoordField(pageInp.value, { min: 1 })
+		const row = parseCompanionCoordField(rowInp.value, { allowNegative: true })
+		const column = parseCompanionCoordField(colInp.value, { allowNegative: true })
+		if (page == null || row == null || column == null) {
+			previewStatus.classList.add('companion-inspector-preview-status--warn')
+			previewStatus.textContent = 'Invalid page / row / column for test press.'
+			return
+		}
+		testPressBtn.disabled = true
+		const prevLabel = testPressBtn.textContent
+		testPressBtn.textContent = 'Pressing…'
+		try {
+			const r = await api.post('/api/companion/button-preview/test-press', { page, row, column })
+			if (r?.ok) {
+				previewStatus.classList.remove('companion-inspector-preview-status--warn')
+				previewStatus.textContent = `Test press sent to ${formatCompanionLocation(page, row, column)}.`
+			} else {
+				previewStatus.classList.add('companion-inspector-preview-status--warn')
+				previewStatus.textContent = `Test press failed: ${r?.error || `Companion HTTP ${r?.status ?? 'error'}`}`
+			}
+		} catch (e) {
+			previewStatus.classList.add('companion-inspector-preview-status--warn')
+			previewStatus.textContent = `Test press failed: ${e?.message || e}`
+		} finally {
+			testPressBtn.disabled = false
+			testPressBtn.textContent = prevLabel
+		}
+	})
+	btnRow.appendChild(testPressBtn)
+
 	companionWrap.appendChild(btnRow)
 
-	const companionHint = document.createElement('p')
-	companionHint.className = 'inspector-field inspector-field--hint'
-	companionHint.textContent =
-		'HTTP press on playback (Settings → Companion). Preview uses Companion Satellite when enabled.'
-	companionWrap.appendChild(companionHint)
+	void api.get('/api/companion/button-preview/status').then((st) => {
+		if (!previewStatus.isConnected) return
+		if (st?.previewAvailable) {
+			previewStatus.textContent = 'Preview via Companion Satellite (Button Subscriptions API).'
+			return
+		}
+		previewStatus.classList.add('companion-inspector-preview-status--warn')
+		previewStatus.textContent =
+			st?.hint ||
+			'Companion button preview unavailable. Enable Satellite + Button Subscriptions API in Companion Settings.'
+		if (st?.reason === 'subscriptions_disabled') {
+			pickBtn.disabled = true
+			pickBtn.title = 'Enable Button Subscriptions API in Companion Settings'
+		}
+	}).catch(() => {
+		if (previewStatus.isConnected) {
+			previewStatus.classList.add('companion-inspector-preview-status--warn')
+			previewStatus.textContent = 'Could not reach HighAsCG Companion preview status.'
+		}
+	})
+
 	grp.appendChild(companionWrap)
 
 	const del = document.createElement('button')
@@ -340,6 +446,25 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		const layer = tl?.layers?.[layerIdx]
 		return layer?.clips?.find((c) => c.id === clipId) || clip
 	}
+
+	function redrawClipInspector() {
+		renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, freshClip())
+	}
+
+	const tl = timelineState.getTimeline(timelineId)
+	const fps = tl?.fps || 25
+	const dur = tl?.duration ?? 999999
+	appendTimelineInspectorPosition(root, {
+		timeMs: freshClip().startTime ?? 0,
+		fps,
+		maxMs: dur,
+		onCommit: (ms) => {
+			timelineState.updateClip(timelineId, layerIdx, clipId, { startTime: ms })
+			syncTimelineToServer()
+			window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+			redrawClipInspector()
+		},
+	})
 
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group'
@@ -399,10 +524,6 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 			}
 		},
 	})
-
-	function redrawClipInspector() {
-		renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, freshClip())
-	}
 
 	async function reapplyClipFrameForContentFit() {
 		const c = freshClip()

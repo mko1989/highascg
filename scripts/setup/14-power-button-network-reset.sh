@@ -45,6 +45,8 @@ Wants=systemd-logind.service
 Type=simple
 Environment=HIGHASCG_NETWORK_RESET_SCRIPT=${RESET_DST}
 Environment=HIGHASCG_POWER_HOLD_SEC=3
+Environment=HIGHASCG_SPLASH_IP_REFRESH_SEC=5
+Environment=HIGHASCG_HTTP_PORT=4200
 ExecStart=${LISTEN_DST}
 Restart=on-failure
 RestartSec=3
@@ -59,6 +61,6 @@ systemctl restart systemd-logind.service 2>/dev/null || true
 systemctl restart highascg-power-button.service
 
 echo "OK: power button handler enabled"
-echo "     short press → ${RESET_DST}"
+echo "     short press → ${RESET_DST}, then splash IP refresh after 5s"
 echo "     hold 3s     → systemctl poweroff"
 echo "     status: systemctl status highascg-power-button.service"

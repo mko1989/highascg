@@ -18,6 +18,7 @@ import {
 import { resolveComposeChannelForEditingScene } from '../lib/compose-preview-url.js'
 import { resolveLookAirComposeChannel } from '../lib/look-air-compose-channel.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
+import { getDefaultUploadSubdir } from '../lib/project-media-context.js'
 import { isMediaOrFileSource, dataTransferOffersDeckMedia, parseDraggableSourcesPayload } from './scenes-shared.js'
 import { renderSceneDeck } from './scene-list.js'
 import { createScenesPreviewRuntime } from './scenes-preview-runtime.js'
@@ -251,6 +252,8 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		}
 		const fd = new FormData()
 		for (const f of files) fd.append('file', f, f.name)
+		const uploadSubdir = getDefaultUploadSubdir()
+		if (uploadSubdir) fd.append('path', uploadSubdir)
 		try {
 			await postFormDataWithProgress(getApiBase() + '/api/ingest/upload', fd, () => {})
 		} catch (err) {
@@ -502,7 +505,15 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			}
 			const th = Number(data.thumbnailChannel)
 			if (Number.isFinite(th) && th > 0) src.thumbnailChannel = th
-			if (data.useDirect != null) src.useDirect = data.useDirect === true || data.useDirect === 'true'
+			if (
+				data.useDirect != null &&
+				!(String(data.value || '').trim().toLowerCase().startsWith('route://'))
+			) {
+				src.useDirect = data.useDirect === true || data.useDirect === 'true'
+			}
+			if (src.type === 'ndi' && String(src.value || '').trim().toLowerCase().startsWith('route://')) {
+				delete src.useDirect
+			}
 			sceneState.setLayerSource(id, idx, src)
 			await applyNativeFillForSource(idx, {
 				type: data.type || 'media',

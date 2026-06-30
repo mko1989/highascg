@@ -1,5 +1,8 @@
 /**
  * PIP overlay utilities and helpers.
+ *
+ * Outside-border placement model (expanded MIXER FILL + inner content hole):
+ * @see docs/reference/pip-overlay-outside-border.md
  */
 
 'use strict'
@@ -126,7 +129,7 @@ function mergeOverlayParams(overlay) {
 
 /** Defaults for CG JSON when scene/global state omits keys (matches web `pip-overlay-registry` defaults). */
 const PIP_OVERLAY_PARAM_DEFAULTS = {
-	border: { width: 4, color: '#e63946', radius: 0, opacity: 1, side: 'inside' },
+	border: { width: 4, color: '#e63946', radius: 0, opacity: 1, side: 'outside' },
 	shadow: {
 		blur: 20,
 		offsetX: 5,
@@ -151,7 +154,7 @@ const PIP_OVERLAY_PARAM_DEFAULTS = {
 		glowColor: '#ff6b6b',
 		glowWidth: 5,
 		roundedTips: false,
-		side: 'inside',
+		side: 'outside',
 		opacity: 1,
 	},
 	glow: {
@@ -221,8 +224,12 @@ function outsetPxForPipOverlay(overlay) {
 	switch (overlay?.type) {
 		case 'border':
 			return Math.max(0, Number(p.width) || 4)
-		case 'edge_strip':
-			return Math.max(1, Number(p.thickness) || 3)
+		case 'edge_strip': {
+			const th = Math.max(1, Number(p.thickness) || 3)
+			if (p.glow === false) return th
+			const gw = Math.max(0, Number(p.glowWidth) || 0)
+			return Math.max(th, Math.ceil(th / 2 + gw + 4))
+		}
 		case 'shadow': {
 			const blur = Number(p.blur) || 0
 			const ox = Math.abs(Number(p.offsetX) || 0)
@@ -266,8 +273,138 @@ function innerRectInOverlayNorm(contentFill, overlayFill) {
 	}
 }
 
-function buildPipOverlayCgPayload(overlay, inner) {
-	return JSON.stringify({ ...mergeOverlayParams(overlay), inner })
+function isOutsideSide(overlay) {
+	const p = mergeOverlayParams(overlay)
+	const side = String(p.side != null ? p.side : 'outside')
+		.trim()
+		.toLowerCase()
+	return side !== 'inside'
+}
+
+function effectivePipOverlaySide(overlay) {
+	return isOutsideSide(overlay) ? 'outside' : 'inside'
+}
+
+/**
+ * Outside overlays stack outward from content: lower indices = further out (glow),
+ * higher indices = closer to content (border). Each CG layer expands to fit the
+ * full stack; this slot draws only in [ringInnerPx, ringOuterPx).
+ */
+function computeOutsideStackBands(overlays, stackIndex) {
+	const list = Array.isArray(overlays) ? overlays : []
+	let below = 0
+	let my = 0
+	let above = 0
+	for (let i = 0; i < list.length; i++) {
+		if (!list[i] || !isOutsideSide(list[i])) continue
+		const px = outsetPxForPipOverlay(list[i])
+		if (i < stackIndex) below += px
+		else if (i === stackIndex) my = px
+		else above += px
+	}
+	return {
+		ringInnerPx: below,
+		ringOuterPx: below + my,
+		totalOutsetPx: below + my + above,
+	}
+}
+
+function sumOutsideOutsetPx(overlays) {
+	const list = Array.isArray(overlays) ? overlays : []
+	let total = 0
+	for (const o of list) {
+		if (!o || !isOutsideSide(o)) continue
+		total += outsetPxForPipOverlay(o)
+	}
+	return total
+}
+
+function buildPipOverlayCgPayload(overlay, placement) {
+	const params = mergePipOverlayParamsWithDefaults(overlay)
+	params.side = effectivePipOverlaySide(overlay)
+	const inner = placement?.inner || placement
+	const out = { ...params, inner }
+	if (placement && placement.ringInnerPx != null) out.ringInnerPx = placement.ringInnerPx
+	if (placement && placement.ringOuterPx != null) out.ringOuterPx = placement.ringOuterPx
+	if (placement && placement.totalOutsetPx != null) out.totalOutsetPx = placement.totalOutsetPx
+	return JSON.stringify(out)
+}
+
+/**
+ * Channel-normalized FILL + template inner rect for one PIP overlay slot.
+ * @param {object[]} [allOverlays] — full stack (required for correct outside banding)
+ * @returns {{ inner: object, mixFill: object, oLayer: number, ringInnerPx?: number, ringOuterPx?: number, totalOutsetPx?: number }}
+ */
+function computePipOverlayPlacement(
+	overlay,
+	contentFill,
+	chW,
+	chH,
+	contentPhysicalLayer,
+	stackIndex = 0,
+	nextContentLayer,
+	allOverlays,
+) {
+	const cf = normalizeContentFill(contentFill)
+	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
+	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
+	const p = Number(contentPhysicalLayer)
+	const idx = stackIndex | 0
+	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
+
+	if (!isOutsideSide(overlay)) {
+		return { inner: { l: 0, t: 0, w: 1, h: 1 }, mixFill: cf, oLayer }
+	}
+
+	const bands = computeOutsideStackBands(stack, stackIndex)
+	const overlayFill = expandFillOutward(cf, bands.totalOutsetPx, chW, chH)
+	return {
+		inner: innerRectInOverlayNorm(cf, overlayFill),
+		mixFill: overlayFill,
+		oLayer,
+		ringInnerPx: bands.ringInnerPx,
+		ringOuterPx: bands.ringOuterPx,
+		totalOutsetPx: bands.totalOutsetPx,
+	}
+}
+
+/**
+ * Combined placement when multiple overlays route through pip_router (max outside outset).
+ */
+function computePipRouterPlacement(overlays, contentFill, chW, chH, contentPhysicalLayer, nextContentLayer) {
+	const cf = normalizeContentFill(contentFill)
+	const stack = Array.isArray(overlays) ? overlays : []
+	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
+	const totalOutset = sumOutsideOutsetPx(stack)
+	const anyOutside = totalOutset > 0
+
+	if (!anyOutside) {
+		return {
+			inner: { l: 0, t: 0, w: 1, h: 1 },
+			mixFill: cf,
+			oLayer,
+		}
+	}
+
+	const overlayFill = expandFillOutward(cf, totalOutset, chW, chH)
+	const effects = stack.map((o, i) => {
+		const bands = computeOutsideStackBands(stack, i)
+		const params = {
+			...mergePipOverlayParamsWithDefaults(o),
+			side: effectivePipOverlaySide(o),
+			ringInnerPx: bands.ringInnerPx,
+			ringOuterPx: bands.ringOuterPx,
+		}
+		return { type: o.type, params }
+	})
+
+	return {
+		inner: innerRectInOverlayNorm(cf, overlayFill),
+		mixFill: overlayFill,
+		oLayer,
+		totalOutsetPx: totalOutset,
+		effects,
+	}
 }
 
 module.exports = {
@@ -290,4 +427,10 @@ module.exports = {
 	expandFillOutward,
 	innerRectInOverlayNorm,
 	buildPipOverlayCgPayload,
+	computePipOverlayPlacement,
+	computePipRouterPlacement,
+	computeOutsideStackBands,
+	sumOutsideOutsetPx,
+	isOutsideSide,
+	effectivePipOverlaySide,
 }

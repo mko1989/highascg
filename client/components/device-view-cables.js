@@ -95,25 +95,21 @@ export function connectorCenter(surfaceEl, connId) {
 }
 
 const CABLE_COLORS = [
-	'#2f3e46', // Charcoal / dark slate
-	'#4a5759', // Matte gray-blue
-	'#b07d62', // Rust orange
-	'#8b5e66', // Matte terracotta / dusty red
-	'#586f7c', // Slate blue
-	'#cca43d', // Dull mustard gold
-	'#556b2f', // Olive green
-	'#6c567b', // Muted lavender/plum
-	'#4a7c59', // Sage green
-	'#385a64', // Deep teal/navy
-	'#dcd6cd', // Muted cream/beige
-	'#7d4060', // Dusty magenta/plum
+	'#FF3333', '#FF6633', '#FF9933', '#FFCC33', '#FFFF33',
+	'#CCFF33', '#99FF33', '#66FF33', '#33FF33', '#33FF66',
+	'#33FF99', '#33FFCC', '#33FFFF', '#33CCFF', '#3399FF',
+	'#3366FF', '#3333FF', '#6633FF', '#9933FF', '#CC33FF',
+	'#FF33FF', '#FF33CC', '#FF3399', '#FF3366', '#FF0055',
+	'#D2691E', '#FF1493', '#00CED1', '#32CD32', '#9400D3',
+	'#1E90FF', '#FF8C00'
 ]
 function getCableColor(id) {
 	if (!id) return '#94a3b8'
 	const s = String(id)
 	let h = 0
 	for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i)
-	return CABLE_COLORS[Math.abs(h) % CABLE_COLORS.length]
+	// We do a small prime multiplier so adjacent hashes map to widely different colors
+	return CABLE_COLORS[(Math.abs(h) * 7) % CABLE_COLORS.length]
 }
 
 function srand(n, seed) {
@@ -306,6 +302,62 @@ function buildCable(x1, y1, x2, y2, loops, seed) {
 	return pts
 }
 
+/** 
+ * Context mapper for Simple View cables.
+ * Counts cables per port to calculate radial fanning angles.
+ */
+function buildSmoothSimpleMap(edges, surface) {
+	const portEdges = new Map()
+	
+	for (const e of edges) {
+		if (e.sourceId) {
+			if (!portEdges.has(e.sourceId)) portEdges.set(e.sourceId, [])
+			portEdges.get(e.sourceId).push(e.id)
+		}
+		if (e.sinkId) {
+			if (!portEdges.has(e.sinkId)) portEdges.set(e.sinkId, [])
+			portEdges.get(e.sinkId).push(e.id)
+		}
+	}
+	
+	// Sort edge ids to guarantee deterministic spread order
+	portEdges.forEach(arr => arr.sort())
+	
+	return { portEdges }
+}
+
+/**
+ * Renders a smooth Cubic Bezier S-Curve with radial "star-shaped" fanning.
+ */
+function buildSmoothSimpleCable(e, a, b, mapCtx) {
+	const srcCluster = mapCtx.portEdges.get(e.sourceId) || [e.id]
+	const sinkCluster = mapCtx.portEdges.get(e.sinkId) || [e.id]
+	
+	const srcIdx = srcCluster.indexOf(e.id)
+	const sinkIdx = sinkCluster.indexOf(e.id)
+	
+	const x1 = a.x, y1 = a.y
+	const x2 = b.x, y2 = b.y
+	
+	// Tension is based on horizontal distance. 
+	const tension = Math.max(80, Math.abs(x2 - x1) * 0.5)
+	
+	// Fan out radially in a half-star shape. Max spread angle ~60 degrees.
+	const spreadStep = Math.PI / 10 // 18 degrees per step
+	const srcAngle = srcCluster.length > 1 ? (srcIdx - (srcCluster.length - 1) / 2) * spreadStep : 0
+	const sinkAngle = sinkCluster.length > 1 ? (sinkIdx - (sinkCluster.length - 1) / 2) * spreadStep : 0
+	
+	// Control points angled from the exit/entry
+	const cp1x = x1 + tension * Math.cos(srcAngle)
+	const cp1y = y1 + tension * Math.sin(srcAngle)
+	
+	const cp2x = x2 - tension * Math.cos(sinkAngle)
+	const cp2y = y2 + tension * Math.sin(sinkAngle)
+	
+	return {
+		d: `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`
+	}
+}
 
 const cableCache = new Map()
 function getOrBuild(id, x1, y1, x2, y2, loops) {
@@ -331,6 +383,7 @@ export function renderCableOverlay(ctx) {
 		cableSourceId,
 		cablePointer,
 		messiness,
+		simpleWiring,
 	} = ctx
 
 	const group = cableOverlay.querySelector('[data-cable-lines]')
@@ -352,6 +405,8 @@ export function renderCableOverlay(ctx) {
 	const edges = lastPayload?.graph?.edges || []
 	const keyFillEdges = collectDecklinkKeyFillVirtualEdges(lastPayload)
 	const numLoops = parseInt(messiness) || 0
+	
+	const simpleWiringMap = simpleWiring ? buildSmoothSimpleMap(edges, surface) : null
 
 	const drawCable = (e, { decklinkKeyFill = false } = {}) => {
 		if (!e || !e.sourceId || !e.sinkId) return
@@ -360,8 +415,13 @@ export function renderCableOverlay(ctx) {
 		if (!a || !b) return
 
 		const keyFillLink = decklinkKeyFill ? buildDecklinkKeyFillSideLink(a.x, a.y, b.x, b.y, w, h) : null
-		const pts = decklinkKeyFill ? keyFillLink.pts : getOrBuild(e.id, a.x, a.y, b.x, b.y, numLoops)
-		const d = 'M ' + pts.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ')
+		const routeData = decklinkKeyFill
+			? { pts: keyFillLink.pts }
+			: simpleWiring
+				? buildSmoothSimpleCable(e, a, b, simpleWiringMap)
+				: { pts: getOrBuild(e.id, a.x, a.y, b.x, b.y, numLoops) }
+				
+		const d = routeData.d || ('M ' + routeData.pts.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L '))
 
 		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
 		path.setAttribute('d', d)
@@ -398,8 +458,14 @@ export function renderCableOverlay(ctx) {
 		const a = connectorCenter(surface, cableSourceId)
 		if (a) {
 			const b = { x: cablePointer.x, y: cablePointer.y }
-			const pts = buildCable(a.x, a.y, b.x, b.y, numLoops, 99)
-			const d = 'M ' + pts.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ')
+			
+			// Mock edge for ghost cable
+			const ghostEdge = { id: 'ghost', sourceId: cableSourceId, sinkId: 'ghost-sink' }
+			const routeData = simpleWiring
+				? buildSmoothSimpleCable(ghostEdge, a, b, simpleWiringMap)
+				: { pts: buildCable(a.x, a.y, b.x, b.y, numLoops, 99) }
+				
+			const d = routeData.d || ('M ' + routeData.pts.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L '))
 			const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'path')
 			ghost.setAttribute('d', d)
 			ghost.setAttribute('class', 'device-view__cable-line device-view__cable-line--active')

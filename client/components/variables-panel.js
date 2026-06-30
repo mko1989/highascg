@@ -1,16 +1,28 @@
 /**
- * Variables Panel — searchable list of system variables + optional custom labels (WO-10).
+ * Variables Panel — searchable list of system variables.
  */
 
 import { getVariableStore } from '../lib/variable-state.js'
 import { getAppWs } from '../lib/app-runtime.js'
-import { api } from '../lib/api-client.js'
 
 function escAttr(s) {
 	return String(s)
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
 		.replace(/"/g, '&quot;')
+}
+
+const DISPLAY_VALUE_MAX = 56
+
+/** Shorten huge values (e.g. base64 images) for table display. */
+function formatDisplayValue(v) {
+	if (v == null) return { text: '', title: '' }
+	const s = typeof v === 'string' ? v : JSON.stringify(v)
+	if (s.length <= DISPLAY_VALUE_MAX) return { text: s, title: '' }
+	return {
+		text: `${s.slice(0, DISPLAY_VALUE_MAX - 1)}…`,
+		title: `${s.length.toLocaleString()} characters`,
+	}
 }
 
 /**
@@ -21,22 +33,8 @@ export async function mountVariablesPanel(container) {
 	const store = ws ? getVariableStore(ws) : null
 	if (!store) return
 
-	let customLabels = {}
-
-	async function refreshLabels() {
-		try {
-			const r = await api.get('/api/variables/custom')
-			customLabels = r.labels && typeof r.labels === 'object' ? r.labels : {}
-		} catch {
-			customLabels = {}
-		}
-	}
-
-	await refreshLabels()
-
 	container.innerHTML = `
 		<div class="variables-panel">
-			<p class="settings-note" style="margin-bottom:0.75rem">Custom labels are saved on this machine and shown beside keys (e.g. for documentation). Clear a field to remove.</p>
 			<div class="variables-header">
 				<input type="text" id="var-search" placeholder="Search variables..." class="var-search-input">
 				<div class="var-filters">
@@ -51,9 +49,8 @@ export async function mountVariablesPanel(container) {
 					<thead>
 						<tr>
 							<th>Variable Key</th>
-							<th>Custom label</th>
 							<th>Value</th>
-							<th>Action</th>
+							<th class="var-action" aria-hidden="true"></th>
 						</tr>
 					</thead>
 					<tbody id="variables-tbody"></tbody>
@@ -80,42 +77,28 @@ export async function mountVariablesPanel(container) {
 		tbody.innerHTML = filtered
 			.map((k) => {
 				const clip = `$(highascg:${k})`
-				const lab = customLabels[k] || ''
+				const { text, title } = formatDisplayValue(vars[k])
+				const titleAttr = title ? ` title="${escAttr(title)}"` : ''
 				return `<tr>
 					<td class="var-key">${escAttr(clip)}</td>
-					<td><input type="text" class="var-label-input" data-var-key="${escAttr(k)}" value="${escAttr(lab)}" placeholder="—" /></td>
-					<td class="var-value">${escAttr(vars[k])}</td>
-					<td><button type="button" class="btn-copy" data-key="${escAttr(clip)}">Copy Key</button></td>
+					<td class="var-value"${titleAttr}>${escAttr(text)}</td>
+					<td class="var-action"><button type="button" class="var-copy-btn" data-key="${escAttr(clip)}" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5V3h.5A1.5 1.5 0 0 1 14 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 12.5v-10Zm1 0V3h5.5a.5.5 0 0 0 .5-.5v-.5h-5a.5.5 0 0 0-.5.5ZM5 4.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5Z"/></svg></button></td>
 				</tr>`
 			})
 			.join('')
 
-		tbody.querySelectorAll('.btn-copy').forEach((btn) => {
+		tbody.querySelectorAll('.var-copy-btn').forEach((btn) => {
 			btn.onclick = () => {
 				const key = btn.getAttribute('data-key') || ''
 				navigator.clipboard.writeText(key)
-				const original = btn.innerText
-				btn.innerText = 'Copied!'
+				btn.classList.add('var-copy-btn--copied')
+				btn.setAttribute('title', 'Copied!')
+				btn.setAttribute('aria-label', 'Copied!')
 				setTimeout(() => {
-					btn.innerText = original
+					btn.classList.remove('var-copy-btn--copied')
+					btn.setAttribute('title', 'Copy key')
+					btn.setAttribute('aria-label', 'Copy key')
 				}, 1000)
-			}
-		})
-
-		tbody.querySelectorAll('.var-label-input').forEach((inp) => {
-			inp.onblur = async () => {
-				const key = inp.getAttribute('data-var-key')
-				if (!key) return
-				const val = inp.value.trim()
-				const prev = customLabels[key] || ''
-				if (val === prev) return
-				try {
-					await api.post('/api/variables/custom', { labels: { [key]: val || null } })
-					if (val) customLabels[key] = val
-					else delete customLabels[key]
-				} catch (e) {
-					console.warn('[VariablesPanel] save label failed', e)
-				}
 			}
 		})
 	}

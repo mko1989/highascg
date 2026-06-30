@@ -163,7 +163,7 @@ export function appendCasparRearPanelMarkers({
 
 		marker.innerHTML = `
 			<div class="device-view__panel-status-glow"></div>
-			<img src="${iconPath}" class="device-view__panel-connector-img" alt="${kind}" />
+			<img src="${iconPath}" class="device-view__panel-connector-img" alt="${kind}" width="36" height="36" />
 			<span class="device-view__panel-marker-label ${labelDirClass}">${it.labelHtml || it.label}</span>
 		`
 

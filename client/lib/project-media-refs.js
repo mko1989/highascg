@@ -5,6 +5,68 @@
 const SKIP_VALUE_RE = /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i
 
 /**
+ * @param {object} project
+ * @returns {object[]}
+ */
+export function listProjectScenes(project) {
+	const scenesBlock = project?.scenes
+	if (Array.isArray(scenesBlock)) return scenesBlock
+	if (Array.isArray(scenesBlock?.scenes)) return scenesBlock.scenes
+	return []
+}
+
+/**
+ * @param {object} project
+ * @returns {object[]}
+ */
+export function listProjectTimelines(project) {
+	const timelinesBlock = project?.timelines
+	if (Array.isArray(timelinesBlock)) return timelinesBlock
+	if (Array.isArray(timelinesBlock?.timelines)) return timelinesBlock.timelines
+	return []
+}
+
+/**
+ * Visit every layer/playlist/timeline clip media source in a project export.
+ * @param {object} project
+ * @param {(source: object) => void} visit
+ */
+export function forEachProjectMediaSource(project, visit) {
+	if (!project || typeof project !== 'object' || typeof visit !== 'function') return
+
+	for (const scene of listProjectScenes(project)) {
+		for (const layer of scene?.layers || []) {
+			if (layer?.source) visit(layer.source)
+			for (const item of layer?.playlist || []) {
+				if (item) visit(item)
+			}
+		}
+	}
+
+	for (const tl of listProjectTimelines(project)) {
+		for (const layer of tl?.layers || []) {
+			for (const clip of layer?.clips || []) {
+				if (clip?.source) visit(clip.source)
+			}
+		}
+	}
+
+	const scenesBlock = project.scenes
+	const layerPresets = Array.isArray(scenesBlock?.layerPresets) ? scenesBlock.layerPresets : []
+	for (const preset of layerPresets) {
+		const data = preset?.data
+		if (data?.source) visit(data.source)
+		for (const item of data?.playlist || []) {
+			if (item) visit(item)
+		}
+	}
+
+	for (const cell of project.multiview?.cells || []) {
+		if (cell?.source && typeof cell.source === 'object') visit(cell.source)
+	}
+}
+
+/**
  * @param {object | null | undefined} source
  * @param {Set<string>} media
  * @param {Set<string>} templates
@@ -30,19 +92,6 @@ function addSourceRef(source, media, templates) {
 }
 
 /**
- * @param {object | null | undefined} layer
- * @param {Set<string>} media
- * @param {Set<string>} templates
- */
-function walkSceneLayer(layer, media, templates) {
-	if (!layer || typeof layer !== 'object') return
-	addSourceRef(layer.source, media, templates)
-	for (const item of layer.playlist || []) {
-		addSourceRef(item, media, templates)
-	}
-}
-
-/**
  * @param {object} project
  * @returns {{ media: string[], templates: string[] }}
  */
@@ -53,33 +102,7 @@ export function collectProjectAssetRefs(project) {
 		return { media: [], templates: [] }
 	}
 
-	const scenesBlock = project.scenes
-	const sceneList = Array.isArray(scenesBlock)
-		? scenesBlock
-		: Array.isArray(scenesBlock?.scenes)
-			? scenesBlock.scenes
-			: []
-
-	for (const scene of sceneList) {
-		for (const layer of scene?.layers || []) {
-			walkSceneLayer(layer, media, templates)
-		}
-	}
-
-	const timelinesBlock = project.timelines
-	const timelineList = Array.isArray(timelinesBlock)
-		? timelinesBlock
-		: Array.isArray(timelinesBlock?.timelines)
-			? timelinesBlock.timelines
-			: []
-
-	for (const tl of timelineList) {
-		for (const layer of tl?.layers || []) {
-			for (const clip of layer?.clips || []) {
-				addSourceRef(clip?.source, media, templates)
-			}
-		}
-	}
+	forEachProjectMediaSource(project, (source) => addSourceRef(source, media, templates))
 
 	return {
 		media: [...media].sort((a, b) => a.localeCompare(b)),

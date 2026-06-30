@@ -18,27 +18,7 @@ DEV="${1:?pass whole disk e.g. /dev/sda}"
 	exit 1
 }
 
-# Prevent udev arrive + automount from re-attaching the stick during partitioning.
-systemctl mask --runtime highascg-exfat-arrive.service 2>/dev/null || true
-systemctl mask --runtime home-casparcg-exfat.mount 2>/dev/null || true
-systemctl mask --runtime home-casparcg-highascg-media-exfat.mount 2>/dev/null || true
-
-systemctl stop highascg-exfat-sync.service highascg-exfat-arrive.service \
-	highascg-exfat-server-update.service 2>/dev/null || true
-systemctl stop home-casparcg-highascg-media-exfat.mount 2>/dev/null || true
-systemctl stop home-casparcg-exfat.mount 2>/dev/null || true
-
-# Bind mounts and subpaths first (longest TARGET first).
-while read -r mnt; do
-	[[ -n "$mnt" ]] || continue
-	umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null || true
-done < <(findmnt -rn -S "$DEV" -o TARGET 2>/dev/null | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
-
-while read -r pt; do
-	[[ -n "$pt" ]] || continue
-	umount "$pt" 2>/dev/null || umount -l "$pt" 2>/dev/null || true
-done < <(timeout 8 lsblk -nrpo PATH "$DEV" 2>/dev/null || true)
-
+usb_quiesce_stick_for_partitioning "$DEV"
 sleep 1
 
 if findmnt -rn -S "$DEV" &>/dev/null; then

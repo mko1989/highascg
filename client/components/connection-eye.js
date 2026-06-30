@@ -6,7 +6,7 @@
  * Blink: left closed → right closed → open (sequential).
  * For ~5s after AMCP connects, the green character uses random open / left / right frames at random
  * intervals (separate from the 30s blink), then normal blinking resumes.
- * Hover: panel with CPU load, GPU (nvidia-smi on server), media disk + folder usage.
+ * Hover: panel with CPU load, GPU (nvidia-smi on server), media volume usage.
  */
 import { apiGet } from '../lib/api-client.js'
 
@@ -74,11 +74,6 @@ function buildTooltipText(data) {
 		)
 	} else {
 		lines.push('Media volume: —')
-	}
-	if (m?.folderUsedBytes != null) {
-		lines.push(`Media folder: ${formatBytes(m.folderUsedBytes)} (${m.path || ''})`)
-	} else if (data?.mode === 'production' && m?.path && m?.folderScanEnabled === false) {
-		lines.push('Media folder size: off (enable on server if needed)')
 	}
 
 	lines.push('—')

@@ -8,6 +8,8 @@
  * @see 22_WO_MIXER_EFFECTS.md
  */
 
+import { sceneLayerRotationMixerLines } from './scene-layer-rotation-amcp.js'
+
 /**
  * Blend modes available in CasparCG.
  * @type {string[]}
@@ -349,7 +351,7 @@ export function effectToAmcpLines(effectType, params, cl) {
 		case 'keyer':
 			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
 		case 'rotation':
-			return [`MIXER ${cl} ROTATION ${p.degrees} 0`]
+			return sceneLayerRotationMixerLines(cl, p.degrees ?? 0)
 		case 'anchor':
 			return [`MIXER ${cl} ANCHOR ${p.x} ${p.y} 0`]
 		default:

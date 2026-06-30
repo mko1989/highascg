@@ -122,6 +122,7 @@
 				const ly = layers[key];
 				const f = ly?.file;
 				if (f && (f.name || f.path)) {
+					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly)) continue;
 					if (n > bestN) {
 						bestN = n;
 						bestState = ly;

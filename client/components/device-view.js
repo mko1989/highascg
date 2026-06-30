@@ -16,6 +16,7 @@ import { setStatus, buildInspectorTable, connectorIdFromEvent, renderPreservingF
 import { renderCableOverlay } from './device-view-cables.js'
 import { renderDestinations } from './device-view-destinations-ui.js'
 import { renderBands } from './device-view-bands-render.js'
+import { renderMatrix } from './device-view-matrix.js'
 import { renderDeviceInspector, renderEdgeInspector } from './device-view-inspector-render.js'
 import * as Actions from './device-view-actions.js'
 import { getStreamingChannelStatus } from '../lib/streaming-channel-state.js'
@@ -43,8 +44,16 @@ import {
 	mergeSettingsPatches,
 	resolveCableSourceResolution,
 } from '../lib/device-view-gpu-source-inherit.js'
+import { readSimpleWiring, writeSimpleWiring } from '../lib/device-view-simple-wiring-prefs.js'
 
-let mounted = false; export function initDeviceView(root) {
+let mounted = false
+let onTabActivated = null
+
+export function onDeviceViewTabActivated() {
+	onTabActivated?.()
+}
+
+export function initDeviceView(root) {
 	if (!root || mounted) return; mounted = true; root.innerHTML = ''
 	const wrap = document.createElement('div'); wrap.className = 'device-view'
 	const header = document.createElement('div'); header.className = 'device-view__header'
@@ -67,7 +76,102 @@ let mounted = false; export function initDeviceView(root) {
 	const messinessSlider = Object.assign(document.createElement('input'), { type: 'range', min: '0', max: '2', value: '0', id: 'cable-messiness', style: 'width: 40px; height: 8px; cursor: pointer;' })
 	const messinessVal = Object.assign(document.createElement('span'), { textContent: '0', style: 'margin-left: 6px; font-size: 11px; font-weight: 600;' })
 	messinessSlider.oninput = () => { messinessVal.textContent = messinessSlider.value; updateUI() }
-	cableRow.append(clearCableBtn, messinessLabel, messinessSlider, messinessVal)
+	const messinessWrap = document.createElement('span')
+	messinessWrap.className = 'device-view__messiness-wrap'
+	messinessWrap.append(messinessLabel, messinessSlider, messinessVal)
+	const simpleLabel = Object.assign(document.createElement('label'), {
+		className: 'device-view__simple-wiring-toggle',
+		title: 'Compact node layout and straight cable lines on the rear panel.',
+	})
+	const simpleWiringCk = Object.assign(document.createElement('input'), { type: 'checkbox' })
+	simpleWiringCk.checked = readSimpleWiring()
+	const simpleText = document.createElement('span')
+	simpleText.textContent = ' Node view'
+	simpleLabel.append(simpleWiringCk, simpleText)
+
+	const matrixLabel = Object.assign(document.createElement('label'), {
+		className: 'device-view__matrix-view-toggle',
+		title: 'Dense Dante-style routing matrix.',
+		style: 'margin-left: 14px;'
+	})
+	const matrixCk = Object.assign(document.createElement('input'), { type: 'checkbox' })
+	matrixCk.checked = window.localStorage.getItem('device-view-matrix') === 'true'
+	const matrixText = document.createElement('span')
+	matrixText.textContent = ' Matrix view'
+	matrixLabel.append(matrixCk, matrixText)
+	function syncSimpleWiringMode() {
+		const on = !!simpleWiringCk.checked
+		writeSimpleWiring(on)
+		wrap.classList.toggle('device-view--simple-wiring', on)
+		updateMessinessVisibility()
+	}
+	function beginViewModeTransition() {
+		wrap.style.opacity = '0'
+	}
+
+	function endViewModeTransition() {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				updateUI()
+				wrap.style.opacity = ''
+			})
+		})
+	}
+
+	function applyViewModeChange() {
+		beginViewModeTransition()
+		syncSimpleWiringMode()
+		syncMatrixMode()
+		if (lastPayload) {
+			renderFromState()
+			endViewModeTransition()
+		} else {
+			void load().then(() => endViewModeTransition())
+		}
+	}
+
+	simpleWiringCk.addEventListener('change', () => {
+		if (simpleWiringCk.checked) matrixCk.checked = false
+		applyViewModeChange()
+	})
+	
+	function syncMatrixMode() {
+		const on = !!matrixCk.checked
+		window.localStorage.setItem('device-view-matrix', on ? 'true' : 'false')
+		wrap.classList.toggle('device-view--matrix-view', on)
+		if (on) {
+			simpleLabel.style.display = 'none'
+			matrixHost.style.display = ''
+			destPanel.style.display = 'none'
+			rearPanel.style.display = 'none'
+			mappingPanel.style.display = 'none'
+			cableOverlay.style.display = 'none'
+		} else {
+			simpleLabel.style.display = ''
+			matrixHost.style.display = 'none'
+			destPanel.style.display = ''
+			rearPanel.style.display = ''
+			mappingPanel.style.display = ''
+			cableOverlay.style.display = ''
+		}
+		updateMessinessVisibility()
+	}
+	
+	function updateMessinessVisibility() {
+		if (matrixCk.checked || simpleWiringCk.checked) {
+			messinessWrap.style.display = 'none'
+		} else {
+			messinessWrap.style.display = ''
+		}
+	}
+
+	matrixCk.addEventListener('change', () => {
+		if (matrixCk.checked) simpleWiringCk.checked = false
+		applyViewModeChange()
+	})
+	
+
+	cableRow.append(clearCableBtn, messinessWrap, simpleLabel, matrixLabel)
 	const destPanel = document.createElement('div'); destPanel.className = 'device-view__destinations'
 	const destHead = document.createElement('div'); destHead.className = 'device-view__destinations-head'
 	const destTitle = Object.assign(document.createElement('span'), { className: 'device-view__note', textContent: 'Screen destinations' })
@@ -77,12 +181,16 @@ let mounted = false; export function initDeviceView(root) {
 	const rearPanel = document.createElement('div'); rearPanel.className = 'device-view__rear-column'
 	const cableOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); cableOverlay.classList.add('device-view__cable-overlay'); cableOverlay.innerHTML = '<g data-cable-lines></g>'
 	const edgesHost = document.createElement('div'); edgesHost.className = 'device-view__edges-host'
+	const matrixHost = document.createElement('div'); matrixHost.className = 'device-view__matrix-host'; matrixHost.style.display = 'none'
 	const inspector = document.createElement('div'); inspector.className = 'device-view__inspector'
 	const statusEl = document.createElement('div'); statusEl.className = 'device-view__status'
 	const layout = document.createElement('div'); layout.className = 'device-view__layout'
 	const side = document.createElement('aside'); side.className = 'device-view__side'; side.append(inspector)
 	rearPanel.append(edgesHost)
-	layout.append(destPanel, mappingPanel, rearPanel, side); wrap.append(cableOverlay, header, cableRow, Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Cable mode: connect channels to outputs. Apply Caspar config restarts CasparCG.' }), layout, statusEl); root.append(wrap)
+	layout.append(destPanel, mappingPanel, rearPanel, matrixHost, side); wrap.append(cableOverlay, header, cableRow, Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Cable mode: connect channels to outputs. Apply Caspar config restarts CasparCG.' }), layout, statusEl); root.append(wrap)
+
+	syncSimpleWiringMode()
+	syncMatrixMode()
 
 	let lastPayload = null; let selectedKey = null; let selectedConnectorId = null; let selectedEdgeId = null; let selectedDestinationId = null; let selectedDeviceId = null; let cableSourceId = null; let hoveredEdgeId = null; let casparRestartDirty = false
 	let cablePointer = null; let suppressDocCableClickUntil = 0; let currentSettings = null; let streamingStatus = null
@@ -106,7 +214,20 @@ let mounted = false; export function initDeviceView(root) {
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
 	const gHost = document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body'); if (gHost) wrap.classList.add('device-view--external-inspector')
-	const getCOCtx = () => ({ cableOverlay, bands: rearPanel, surfaceEl: wrap, lastPayload, hoveredEdgeId, selectedEdgeId, selectedConnectorId, selectEdgeById, cableSourceId, cablePointer, messiness: messinessSlider.value })
+	const getCOCtx = () => ({
+		cableOverlay,
+		bands: rearPanel,
+		surfaceEl: wrap,
+		lastPayload,
+		hoveredEdgeId,
+		selectedEdgeId,
+		selectedConnectorId,
+		selectEdgeById,
+		cableSourceId,
+		cablePointer,
+		messiness: messinessSlider.value,
+		simpleWiring: simpleWiringCk.checked,
+	})
 	const rIntoInsp = (fn) => {
 		const h = gHost || inspector
 		if (gHost) {
@@ -230,6 +351,10 @@ let mounted = false; export function initDeviceView(root) {
 			removeDestination: (did) => Actions.removeDestination(did).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }),
 			currentSettings,
 			updateDestinationOutputLayer,
+			lastPayload,
+			onWebpageHostApplied: () => {
+				if (selectedDestinationId) selectDestinationById(selectedDestinationId)
+			},
 		}))
 		updateUI()
 	}
@@ -242,11 +367,19 @@ let mounted = false; export function initDeviceView(root) {
 	}
 
 	function updateUI() {
-		for (const el of wrap.querySelectorAll('.device-view__port--selected, .device-view__port--cable-armed, .device-view__connector-target--valid, .device-view__connector-target--invalid')) el.classList.remove('device-view__port--selected', 'device-view__port--cable-armed', 'device-view__connector-target--valid', 'device-view__connector-target--invalid')
+		for (const el of wrap.querySelectorAll('.device-view__port--selected, .device-view__port--cable-armed, .device-view__connector-target--valid, .device-view__connector-target--invalid, .device-view__simple-node--selected, .device-view__simple-node--armed')) {
+			el.classList.remove('device-view__port--selected', 'device-view__port--cable-armed', 'device-view__connector-target--valid', 'device-view__connector-target--invalid', 'device-view__simple-node--selected', 'device-view__simple-node--armed')
+		}
 		if (selectedKey) wrap.querySelector(`[data-port-key="${selectedKey}"]`)?.classList.add('device-view__port--selected')
-		if (selectedConnectorId) wrap.querySelector(`[data-connector-id="${selectedConnectorId}"]`)?.classList.add('device-view__port--selected')
+		if (selectedConnectorId) {
+			const sel = wrap.querySelector(`[data-connector-id="${selectedConnectorId}"]`)
+			sel?.classList.add('device-view__port--selected')
+			sel?.closest('.device-view__simple-node')?.classList.add('device-view__simple-node--selected')
+		}
 		if (cableSourceId) {
-			wrap.querySelector(`[data-connector-id="${cableSourceId}"]`)?.classList.add('device-view__port--cable-armed')
+			const armed = wrap.querySelector(`[data-connector-id="${cableSourceId}"]`)
+			armed?.classList.add('device-view__port--cable-armed')
+			armed?.closest('.device-view__simple-node')?.classList.add('device-view__simple-node--armed')
 			const source = String(cableSourceId)
 			for (const el of wrap.querySelectorAll('[data-connector-id]')) {
 				const targetId = String(el.getAttribute('data-connector-id') || '').trim(); if (!targetId || targetId === source) continue
@@ -476,9 +609,112 @@ let mounted = false; export function initDeviceView(root) {
 	window.addEventListener('highascg-device-view-update-payload', (ev) => {
 		if (ev.detail?.graph) {
 			lastPayload = { ...lastPayload, graph: ev.detail.graph }
-			render()
+			renderFromState()
 		}
 	})
+
+	function renderEdgesList() {
+		edgesHost.innerHTML = ''
+		const edges = lastPayload?.graph?.edges || []
+		if (!edges.length) return edges
+		const b = Object.assign(document.createElement('div'), { className: 'device-view__band' })
+		b.append(Object.assign(document.createElement('h3'), { textContent: 'Cables' }))
+		const ul = Object.assign(document.createElement('ul'), { className: 'device-view__edge-list' })
+		edges.forEach((e) => {
+			const li = Object.assign(document.createElement('li'), {
+				className: `device-view__edge-item ${selectedEdgeId === e.id ? 'device-view__edge-item--selected' : ''}`,
+			})
+			li.onmouseenter = () => {
+				hoveredEdgeId = e.id
+				renderCableOverlay(getCOCtx())
+			}
+			li.onmouseleave = () => {
+				hoveredEdgeId = null
+				renderCableOverlay(getCOCtx())
+			}
+			li.onclick = () => selectEdgeById(e.id)
+			li.append(
+				Object.assign(document.createElement('span'), {
+					textContent: `${friendlyConnectorLabel(lastPayload, e.sourceId)} → ${friendlyConnectorLabel(lastPayload, e.sinkId)} `,
+				})
+			)
+			ul.append(li)
+		})
+		b.append(ul)
+		edgesHost.append(b)
+		return edges
+	}
+
+	function restoreInspectorSelection(edges) {
+		const activeInsp = gHost || inspector
+		const hasFocus = activeInsp && activeInsp.querySelector('input:focus, select:focus, textarea:focus')
+		if (hasFocus) return
+		if (selectedEdgeId) {
+			if (edges.some((e) => String(e?.id || '') === String(selectedEdgeId))) selectEdgeById(selectedEdgeId)
+			else selectedEdgeId = null
+		}
+		if (!selectedEdgeId && selectedConnectorId) {
+			const conn = connectorById(lastPayload, selectedConnectorId)
+			if (conn) selectKey(selectedKey || `conn:${selectedConnectorId}`, { connectorId: selectedConnectorId, connector: conn, type: conn.kind || 'connector' })
+			else {
+				selectedConnectorId = null
+				selectedKey = null
+			}
+		}
+		if (!selectedEdgeId && !selectedConnectorId && selectedDestinationId) selectDestinationById(selectedDestinationId)
+		if (!selectedEdgeId && !selectedConnectorId && !selectedDestinationId && selectedDeviceId) {
+			const dev = (lastPayload?.graph?.devices || []).find((d) => String(d?.id || '') === String(selectedDeviceId))
+			if (dev) selectDevice(selectedDeviceId, lastPayload?.live)
+			else selectedDeviceId = null
+		}
+	}
+
+	function renderFromState({ restoreInspector = false } = {}) {
+		if (!lastPayload) return
+		renderDestinations({
+			destBody,
+			lastPayload,
+			highlightDestinationIntent: () => {},
+			clearChipHighlights: () => {},
+			renderIntoInspector: rIntoInsp,
+			selectDestinationById,
+			patchDestination: (id, p) => Actions.patchDestination(id, p).then(() => { setCasparRestartDirty(true); return load() }),
+			removeDestination: (id) => Actions.removeDestination(id).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }),
+			applyPlan: () => Actions.applyDeviceViewPlan({ applyCaspar: true }).then(() => { setCasparRestartDirty(false); return load() }),
+			resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(lastPayload, d),
+			cableSourceId,
+			onDestinationPortClick: (connectorId) => beginOrCompleteCable('dest:' + connectorId, connectorId, {}),
+			onDecklinkDropToDestinationOutput: (connectorId, d, intent) => setDecklinkAsDestinationOutput(connectorId, d, intent),
+			updateDestinationOutputLayer,
+			requestCableOverlayRender: () => renderCableOverlay(getCOCtx()),
+		})
+		if (matrixCk.checked) {
+			renderMatrix(matrixHost, lastPayload, pushUndo, setCasparRestartDirty, load, selectKey, selectDestinationById)
+		} else {
+			renderBands(
+				mappingPanel,
+				rearPanel,
+				{
+					live: lastPayload.live,
+					lastPayload,
+					resolveConnectorId: (t, d) => resolveConnectorId(lastPayload, t, d),
+					isConnectorVisible: (id) => isConnectorVisible(lastPayload, id),
+					selectedKey,
+					cableSourceId,
+					onPortClick: selectKey,
+					onPortStartCable: beginOrCompleteCable,
+					selectDevice,
+					selectedConnectorId,
+					simpleWiring: simpleWiringCk.checked,
+				},
+				{ currentSettings, statusEl, load, setCasparRestartDirty }
+			)
+			rearPanel.append(edgesHost)
+		}
+		const edges = renderEdgesList()
+		if (restoreInspector) restoreInspectorSelection(edges)
+		requestAnimationFrame(() => updateUI())
+	}
 
 	async function load() {
 		try {
@@ -490,25 +726,11 @@ let mounted = false; export function initDeviceView(root) {
 					? Promise.resolve(cachedStream)
 					: Actions.getStreamingChannelStatus().catch(() => null),
 			])
-			lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null, _settings: settings }; currentSettings = settings; streamingStatus = stream
-			renderDestinations({ destBody, lastPayload, highlightDestinationIntent: () => {}, clearChipHighlights: () => {}, renderIntoInspector: rIntoInsp, selectDestinationById, patchDestination: (id, p) => Actions.patchDestination(id, p).then(() => { setCasparRestartDirty(true); return load() }), removeDestination: (id) => Actions.removeDestination(id).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }), applyPlan: () => Actions.applyDeviceViewPlan({ applyCaspar: true }).then(() => { setCasparRestartDirty(false); return load() }), resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(lastPayload, d), cableSourceId, onDestinationPortClick: (connectorId) => beginOrCompleteCable('dest:' + connectorId, connectorId, {}), onDecklinkDropToDestinationOutput: (connectorId, d, intent) => setDecklinkAsDestinationOutput(connectorId, d, intent), updateDestinationOutputLayer, requestCableOverlayRender: () => renderCableOverlay(getCOCtx()) })
-			renderBands(mappingPanel, rearPanel, { live: lastPayload.live, lastPayload, resolveConnectorId: (t, d) => resolveConnectorId(lastPayload, t, d), isConnectorVisible: (id) => isConnectorVisible(lastPayload, id), selectedKey, cableSourceId, onPortClick: selectKey, onPortStartCable: beginOrCompleteCable, selectDevice, selectedConnectorId }, { currentSettings, statusEl, load, setCasparRestartDirty }); rearPanel.append(edgesHost)
-			edgesHost.innerHTML = ''; const edges = lastPayload?.graph?.edges || []; if (edges.length) { const b = Object.assign(document.createElement('div'), { className: 'device-view__band' }); b.append(Object.assign(document.createElement('h3'), { textContent: 'Cables' })); const ul = Object.assign(document.createElement('ul'), { className: 'device-view__edge-list' }); edges.forEach(e => { const li = Object.assign(document.createElement('li'), { className: `device-view__edge-item ${selectedEdgeId === e.id ? 'device-view__edge-item--selected' : ''}` }); li.onmouseenter = () => { hoveredEdgeId = e.id; renderCableOverlay(getCOCtx()) }; li.onmouseleave = () => { hoveredEdgeId = null; renderCableOverlay(getCOCtx()) }; li.onclick = () => selectEdgeById(e.id); li.append(Object.assign(document.createElement('span'), { textContent: `${friendlyConnectorLabel(lastPayload, e.sourceId)} → ${friendlyConnectorLabel(lastPayload, e.sinkId)} ` })); ul.append(li) }); b.append(ul); edgesHost.append(b) }
-			const activeInsp = gHost || inspector
-			const hasFocus = activeInsp && activeInsp.querySelector('input:focus, select:focus, textarea:focus')
-			if (!hasFocus) {
-				if (selectedEdgeId) { if (edges.some((e) => String(e?.id || '') === String(selectedEdgeId))) selectEdgeById(selectedEdgeId); else selectedEdgeId = null }
-				if (!selectedEdgeId && selectedConnectorId) { const conn = connectorById(lastPayload, selectedConnectorId); if (conn) selectKey(selectedKey || `conn:${selectedConnectorId}`, { connectorId: selectedConnectorId, connector: conn, type: conn.kind || 'connector' }); else { selectedConnectorId = null; selectedKey = null } }
-				if (!selectedEdgeId && !selectedConnectorId && selectedDestinationId) { selectDestinationById(selectedDestinationId) }
-				if (!selectedEdgeId && !selectedConnectorId && !selectedDestinationId && selectedDeviceId) {
-					const dev = (lastPayload?.graph?.devices || []).find((d) => String(d?.id || '') === String(selectedDeviceId))
-					if (dev) selectDevice(selectedDeviceId, lastPayload?.live)
-					else selectedDeviceId = null
-				}
-			}
+			lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null, _settings: settings }
+			currentSettings = settings
+			streamingStatus = stream
+			renderFromState({ restoreInspector: true })
 			setStatus(statusEl, `Updated ${lastPayload?.live?.host?.collectedAt || ''}`, true)
-			// Ensure cables and highlights are rendered after the DOM has been populated and laid out
-			requestAnimationFrame(() => updateUI())
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
 	saveSnapBtn.onclick = () =>
@@ -588,5 +810,11 @@ let mounted = false; export function initDeviceView(root) {
 	window.addEventListener('highascg-device-view-focus-device', (ev) => { if (ev.detail?.deviceId) selectDevice(ev.detail.deviceId, lastPayload?.live) });
 	window.addEventListener('highascg-device-view-focus-server', () => selectDevice(CASPAR_HOST, lastPayload?.live));
 	window.addEventListener('highascg-caspar-restart-dirty', () => setCasparRestartDirty(true))
+	syncSimpleWiringMode()
+	onTabActivated = () => {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => renderCableOverlay(getCOCtx()))
+		})
+	}
 	void load()
 }

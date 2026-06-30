@@ -2,6 +2,7 @@
 
 const { audioRouteToAudioFilter } = require('./audio-route')
 const { audioFilterParam } = require('../caspar/amcp-utils')
+const { sceneLayerRotationMixerLines } = require('./scene-layer-rotation-amcp')
 
 /**
  * Reset Caspar mixer transforms that persist on a layer (crop, color, key, etc.).
@@ -55,7 +56,7 @@ function buildEffectAmcpLinesPlayback(type, params, cl) {
 		case 'keyer':
 			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
 		case 'rotation':
-			return [`MIXER ${cl} ROTATION ${p.degrees ?? 0} 0`]
+			return sceneLayerRotationMixerLines(cl, p.degrees ?? 0)
 		case 'anchor':
 			return [`MIXER ${cl} ANCHOR ${p.x ?? 0} ${p.y ?? 0} 0`]
 		default:

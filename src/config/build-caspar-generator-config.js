@@ -465,6 +465,8 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	applyDecklinkOverridesToScreens(merged, appConfig || {})
 	applyScreenConsumerOverridesFromCabling(merged, appConfig || {})
 	applyMultiviewOutputOverridesFromCabling(merged, appConfig || {})
+	const { applyPhysicalPortConsumerFlagsToScreens } = require('./screen-consumer-port-resolve')
+	applyPhysicalPortConsumerFlagsToScreens(merged, appConfig || {})
 	reconcileDecklinkScreenConsumerFlags(merged)
 	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
@@ -482,6 +484,7 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 			: {}),
 	}
 	merged.screenDestinations = normalizeScreenDestinations(appConfig?.screenDestinations)
+	merged.extraLiveSources = Array.isArray(appConfig?.extraLiveSources) ? appConfig.extraLiveSources : []
 	
 	// Attach layout-related bits for buildChannelsSection -> calculateLayoutPositions
 	merged.deviceGraph = appConfig && appConfig.deviceGraph

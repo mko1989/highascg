@@ -10,6 +10,7 @@ const os = require('os')
 /** @type {Set<string>} */
 const SCAN_EXT = new Set([
 	'.mov',
+	'.qt',
 	'.mp4',
 	'.mxf',
 	'.mkv',

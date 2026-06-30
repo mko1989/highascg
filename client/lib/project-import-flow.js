@@ -7,7 +7,7 @@ import {
 	fetchLiveHardwareContext,
 	hasProjectHardwareConfig,
 } from './project-hardware-mismatch.js'
-import { applyProjectHardware } from './project-hardware-apply.js'
+import { applyProjectHardware, applyServerHardwareConfigOnly } from './project-hardware-apply.js'
 import { getHardwarePolicy } from './project-hardware-policy.js'
 import { showProjectHardwareReconcileModal } from '../components/project-hardware-reconcile-modal.js'
 import { runPostImportMediaReconcile } from './project-media-reconcile.js'
@@ -16,6 +16,7 @@ import {
 	refreshProjectMediaContext,
 	formatProjectMediaUploadHint,
 } from './project-media-context.js'
+import { settingsState } from './settings-state.js'
 
 const BANNER_ID = 'highascg-hardware-keep-live-banner'
 
@@ -51,15 +52,11 @@ export async function importProjectWithHardwareReconcile(project, deps) {
 		)
 		deps.onNameSync?.(deps.projectState.getProjectName())
 		window.dispatchEvent(new Event('project-loaded'))
-		syncProjectMediaContextFromProject(project)
-		if (
-			deps.source !== 'server-bootstrap' &&
-			deps.source !== 'server-reconnect' &&
-			deps.source !== 'load-modal'
-		) {
+		syncProjectMediaContextFromProject(project, settingsState.getSettings())
+		if (deps.source !== 'server-bootstrap' && deps.source !== 'server-reconnect') {
 			void refreshProjectMediaContext().then(() => {
 				const hint = formatProjectMediaUploadHint()
-				if (hint) deps.showToast?.(hint, 'info')
+				if (hint && deps.source !== 'load-modal') deps.showToast?.(hint, 'info')
 			})
 		}
 		void runPostImportMediaReconcile(project, {
@@ -68,6 +65,26 @@ export async function importProjectWithHardwareReconcile(project, deps) {
 			showToast: deps.showToast,
 			source: deps.source,
 		})
+	}
+
+	// Unified client: load restores Device View on the server but does not restart Caspar (WO-76).
+	if (deps.source === 'load-modal' || deps.source === 'file') {
+		importLooks()
+		if (deps.source === 'file') {
+			try {
+				const applied = await applyServerHardwareConfigOnly(project.hardwareConfig)
+				if (applied) {
+					deps.showToast?.(
+						'Device View loaded from project — verify cabling and Apply Caspar config when ready.',
+						'info',
+					)
+				}
+			} catch (e) {
+				deps.showToast?.(`Device View config not applied: ${e?.message || e}`, 'error')
+			}
+		}
+		hideKeepLiveBanner()
+		return 'looks_only'
 	}
 
 	const hw = project.hardwareConfig

@@ -18,6 +18,7 @@ mkdir -p \
 	"${ROOT}/projects/_autosave" \
 	"${ROOT}/projects/_autosave" \
 	"${ROOT}/snapshots/rear-panels" \
+	"${ROOT}/decklink" \
 	"${ROOT}/.private"
 
 README_PRIVATE="${ROOT}/.private/README.txt"
@@ -51,6 +52,27 @@ Persistent install (consume mode):
   - ~/highascg/ survives reboot on internal disk
 
 Operator UI: http://<playout-ip>:4200/
+EOF
+
+README_DECKLINK="${ROOT}/decklink/README.txt"
+mkdir -p "${ROOT}/decklink"
+cat >"$README_DECKLINK" <<'EOF'
+Blackmagic Desktop Video (DeckLink) — operator-supplied packages
+
+HighAsCG does not ship DeckLink drivers on the public ISO. Download Desktop Video
+for Linux from Blackmagic, extract the tarball, and copy from deb/x86_64/:
+
+  desktopvideo_<version>_amd64.deb       required for Caspar decklink I/O
+  desktopvideo-gui_<version>_amd64.deb    optional — Setup / Updater GUI only
+
+Place them in this folder (decklink/ on the USB stick or bridge disk).
+On boot, HighAsCG installs when needed and skips if already installed.
+
+desktopvideo alone is enough when the DeckLink card firmware is current and
+Caspar channel settings are already correct. Without desktopvideo-gui, Settings
+→ Desktop Video Setup / Updater show "GUI not installed" — playout is unaffected.
+
+https://www.blackmagicdesign.com/support/family/capture-and-playback
 EOF
 
 if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then

@@ -11,10 +11,10 @@ export const PORTAUDIO_LAYOUT_OPTIONS = [
 ]
 
 export const PROGRAM_LAYOUT_OPTIONS = [
-	{ value: 'stereo', label: 'Stereo (2ch)', channels: 2 },
-	{ value: '4ch', label: '4-Channel', channels: 4 },
-	{ value: '8ch', label: '8-Channel', channels: 8 },
-	{ value: '16ch', label: '16-Channel', channels: 16 },
+	{ value: 'stereo', label: '2 channels', channels: 2 },
+	{ value: '4ch', label: '4 channels', channels: 4 },
+	{ value: '8ch', label: '8 channels', channels: 8 },
+	{ value: '16ch', label: '16 channels', channels: 16 },
 ]
 
 /**

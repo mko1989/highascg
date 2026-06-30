@@ -14,7 +14,6 @@ function editorDefaultsDefaults() {
 		},
 		timeline: {
 			loopAlways: false,
-			startBehaviour: 'beginning',
 			contentFit: 'native',
 		},
 		transition: {
@@ -65,7 +64,6 @@ function normalizeEditorDefaults(input, existing) {
 		...tlIn,
 	}
 	out.timeline.loopAlways = !!out.timeline.loopAlways
-	out.timeline.startBehaviour = normalizeStartBehaviour(out.timeline.startBehaviour)
 	const tlFit = String(out.timeline.contentFit || def.timeline.contentFit).trim()
 	out.timeline.contentFit = CONTENT_FITS.has(tlFit) ? tlFit : def.timeline.contentFit
 

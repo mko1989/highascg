@@ -115,8 +115,71 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing /usr/bin/calamares — run install-eggs-calamares.sh before produce"
 	fi
+	if squash_has_path 'usr/local/bin/launch-calamares.sh'; then
+		ok "present: /usr/local/bin/launch-calamares.sh"
+	else
+		bad "missing launch-calamares.sh — re-run prepare-eggs-clone-with-exfat.sh (sync-caspar-supervisor-wiring)"
+	fi
+	if squash_has_path 'etc/sudoers.d/highascg'; then
+		ok "present: /etc/sudoers.d/highascg (Nuclear + Calamares NOPASSWD)"
+	else
+		bad "missing /etc/sudoers.d/highascg — re-run prepare-eggs-clone-with-exfat.sh (12-passwordless-sudo)"
+	fi
+	if squash_has_path 'usr/local/lib/highascg/highascg-tailscale-up.sh'; then
+		ok "present: /usr/local/lib/highascg/highascg-tailscale-up.sh (Tailscale login)"
+	else
+		bad "missing tailscale helper — re-run prepare-eggs-clone-with-exfat.sh (12-passwordless-sudo)"
+	fi
+	if squash_has_path 'etc/calamares/branding/highascg-eggs-theme/branding.desc'; then
+		ok "present: /etc/calamares/branding/highascg-eggs-theme/branding.desc"
+	else
+		bad "missing Calamares branding — run install-eggs-calamares.sh before produce"
+	fi
+	if squash_has_path 'etc/calamares/branding/highascg-eggs-theme/highascg-eggs-theme-logo.png'; then
+		ok "present: /etc/calamares/branding/highascg-eggs-theme/highascg-eggs-theme-logo.png"
+	elif squash_has_path 'etc/calamares/branding/highascg-eggs-theme/eggs-logo.png'; then
+		bad "only eggs-logo.png in squashfs — run install-eggs-calamares.sh (branding fix not baked)"
+	else
+		bad "missing Calamares logo in squashfs — run install-eggs-calamares.sh"
+	fi
+	if squash_has_path 'usr/local/lib/highascg/fix-calamares-branding.sh'; then
+		ok "present: /usr/local/lib/highascg/fix-calamares-branding.sh"
+	else
+		bad "missing Calamares branding fixer — run install-eggs-calamares.sh before produce"
+	fi
 else
 	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skip Calamares squashfs checks"
+fi
+
+if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "1" ]]; then
+	for needle in \
+		'home/casparcg/highascg/tools/startup/run-health-checks.sh' \
+		'home/casparcg/highascg/tools/startup/verify-live-stick.sh' \
+		'home/casparcg/highascg/tools/startup/verify-passwordless-sudo.sh' \
+		'home/casparcg/highascg/tools/startup/stick-boot-test/run-stick-boot-tests.sh'; do
+		if squash_has_path "$needle"; then
+			ok "present: ${needle} (post-boot QA on stick)"
+		else
+			bad "missing ${needle} — re-run eggs produce (tools/startup on host now; ISO squashfs is from last clone)"
+		fi
+	done
+else
+	ok "HIGHASCG_ISO_EMBED_SERVER=0 — skip tools/startup squashfs checks"
+fi
+
+if [[ "${HIGHASCG_ISO_FORBID_DECKLINK:-1}" == "1" ]]; then
+	for needle in \
+		'usr/lib/blackmagic' \
+		'var/lib/dkms/blackmagic' \
+		'lib/udev/rules.d/55-blackmagic.rules'; do
+		if squash_has_tree "$needle"; then
+			bad "DeckLink path in squashfs (WO-92): ${needle} — merge penguins-eggs-exclude-decklink.list and rebuild"
+		else
+			ok "absent (DeckLink): ${needle}"
+		fi
+	done
+else
+	ok "HIGHASCG_ISO_FORBID_DECKLINK=0 — skip DeckLink squashfs absence checks"
 fi
 
 if squash_grep_list '^squashfs-root/usr_[0-9]/'; then

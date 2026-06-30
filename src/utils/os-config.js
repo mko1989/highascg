@@ -7,11 +7,16 @@ const { execSync } = require('child_process')
 const logger = require('./buffered-logger').osDisplay
 const { getXAuthority, getGpuConnectorInventory } = require('./hardware-info')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
-const { readCreateMissingModes, tryAddXrandrModeFromCvt, pickBestExistingModeForPlan } = require('./xrandr-custom-mode')
+const { readCreateMissingModes, tryAddXrandrModeFromCvt, computeModelineForWxH, shouldCreateXrandrModeForPlan } = require('./xrandr-custom-mode')
 const { readOsTimingSourceForOutput } = require('./modeline-timings')
 const { resolveSysIdToXrandrOutput, looksLikeDrmConnectorName } = require('./xrandr-output-resolve')
 const { verifyXrandrMatchesLayout } = require('./xrandr-layout-verify')
 const { buildOperatorDisplaySessionShellLines, applyOperatorDisplaySession } = require('./x-display-session')
+const {
+	CustomXrandrModeRegistry,
+	buildApplyLayoutScriptContent,
+	customModesToApplyMeta,
+} = require('./xrandr-persist-script')
 
 
 
@@ -50,6 +55,7 @@ function applyX11Layout(config, opts = {}) {
 	logger.info(`[OS-Config] applyX11Layout start live=${live} persist=${persist}`)
 	const layout = calculateLayoutPositions(config)
 	const xrandrParts = []
+	const customModeRegistry = new CustomXrandrModeRegistry()
 	let xrandrQueryOut = ''
 	/** @type {Map<string, Set<string>>} */
 	const availableModesByOutput = new Map()
@@ -121,47 +127,63 @@ function applyX11Layout(config, opts = {}) {
 			availableModesByOutput.set(safeSysId, avail)
 		}
 		const plannedMode = String(info.mode || '').trim()
-		const allowCreate = readCreateMissingModes(config)
+		const osModeSource = String(info.osModeSource || 'edid').toLowerCase() === 'custom' ? 'custom' : 'edid'
 		let resolvedMode = plannedMode
 		let usedCvtCreate = false
-		let existingToken =
-			plannedMode && /^\d+x\d+$/i.test(plannedMode) ? pickBestExistingModeForPlan(plannedMode, avail, safeRate) : null
-		if (!existingToken && plannedMode && avail.has(plannedMode)) existingToken = plannedMode
-		if (existingToken) {
-			resolvedMode = existingToken
-			if (existingToken !== plannedMode) {
-				logger.info(
-					`[OS-Config] Using existing xrandr mode for ${safeSysId}: planned=${plannedMode} --mode ${existingToken}`
+
+		if (osModeSource === 'edid') {
+			if (plannedMode && avail.size > 0 && !avail.has(plannedMode)) {
+				logger.warn(
+					`[OS-Config] EDID mode ${plannedMode} not listed for ${safeSysId} — applying token anyway (source=edid)`
 				)
 			}
-		}
-		if (avail && plannedMode && allowCreate && /^\d+x\d+$/i.test(plannedMode) && !existingToken) {
-			const wm = plannedMode.match(/^(\d+)x(\d+)$/i)
-			if (wm) {
-				const cw = parseInt(wm[1], 10)
-				const ch = parseInt(wm[2], 10)
-		const timingKind = readOsTimingSourceForOutput(config, safeSysId)
-				const created = tryAddXrandrModeFromCvt({
-					output: safeSysId,
-					width: cw,
-					height: ch,
-					refreshHz: safeRate != null ? safeRate : 60,
-					env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
-					logger,
-					availableModes: avail,
-					timingKind,
-				})
-				if (created) {
-					avail.add(created)
-					const bare = created.match(/^(\d+x\d+)/i)
-					if (bare) avail.add(bare[1])
-					resolvedMode = created
-					usedCvtCreate = true
+		} else {
+			const allowCreate = shouldCreateXrandrModeForPlan(config, osModeSource, plannedMode)
+			if (avail && allowCreate) {
+				const wm = plannedMode.match(/^(\d+)x(\d+)$/i)
+				if (wm) {
+					const cw = parseInt(wm[1], 10)
+					const ch = parseInt(wm[2], 10)
+					const timingKind = readOsTimingSourceForOutput(config, safeSysId)
+					const xEnv = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
+					const modelinePlan = computeModelineForWxH({
+						width: cw,
+						height: ch,
+						refreshHz: safeRate != null ? safeRate : 60,
+						env: xEnv,
+						timingKind,
+						logger,
+					})
+					if (modelinePlan) {
+						customModeRegistry.register(safeSysId, modelinePlan)
+					}
+					const created = tryAddXrandrModeFromCvt({
+						output: safeSysId,
+						width: cw,
+						height: ch,
+						refreshHz: safeRate != null ? safeRate : 60,
+						env: xEnv,
+						logger,
+						availableModes: avail,
+						timingKind,
+					})
+					if (created) {
+						avail.add(created)
+						const bare = created.match(/^(\d+x\d+)/i)
+						if (bare) avail.add(bare[1])
+						resolvedMode = created
+						usedCvtCreate = true
+					}
 				}
+			} else if (!allowCreate && plannedMode) {
+				resolvedMode = pickBestAvailableMode(plannedMode, avail)
 			}
 		}
-		if (!resolvedMode || !avail.has(resolvedMode)) {
-			resolvedMode = pickBestAvailableMode(plannedMode, avail)
+
+		if (osModeSource === 'custom' && !usedCvtCreate && plannedMode && /^\d+x\d+$/i.test(plannedMode)) {
+			if (!resolvedMode || !avail.has(resolvedMode)) {
+				resolvedMode = pickBestAvailableMode(plannedMode, avail)
+			}
 		}
 		if (resolvedMode && plannedMode && resolvedMode !== plannedMode) {
 			if (usedCvtCreate) {
@@ -180,7 +202,7 @@ function applyX11Layout(config, opts = {}) {
 		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y} --mode ${modeArg}`
 		const xPartWithRate = safeRate != null ? `${xPart} --rate ${Math.round(safeRate * 100) / 100}` : xPart
 		logger.info(
-			`[OS-Config] xrandr head: output=${safeSysId} pos=${info.x}x${info.y} mode=${modeArg || '(empty)'} planned=${plannedMode || '(none)'} rate=${safeRate != null ? Math.round(safeRate * 100) / 100 : '(none)'}`
+			`[OS-Config] xrandr head: output=${safeSysId} pos=${info.x}x${info.y} mode=${modeArg || '(empty)'} planned=${plannedMode || '(none)'} source=${osModeSource} rate=${safeRate != null ? Math.round(safeRate * 100) / 100 : '(none)'}`
 		)
 		xrandrParts.push(xPartWithRate)
 	}
@@ -212,7 +234,7 @@ function applyX11Layout(config, opts = {}) {
 	if (xcmd) xrandrCommand = `DISPLAY=:0 ${xcmd}`
 
 	if (persist && xcmd) {
-		persisted = persistLayoutScript(xcmd, config, layout)
+		persisted = persistLayoutScript(xcmd, config, layout, customModeRegistry.toArray())
 	}
 
 	if (live && xcmd) {
@@ -291,16 +313,43 @@ function applyX11Layout(config, opts = {}) {
 
 	logger.info('[OS-Config] applyX11Layout end')
 	const verify = applied ? verifyXrandrMatchesLayout(layout, { inventory: connectorInventory, config }) : null
-	return { applied, persisted, xrandrCommand, verify }
+	return {
+		applied,
+		persisted,
+		xrandrCommand,
+		verify,
+		customModes: customModeRegistry.toArray(),
+	}
 }
 
-function persistLayoutScript(cmd, config, layout) {
+function writeCustomModesApplyMeta(customModes) {
+	try {
+		const { REPO_ROOT } = require('../repo-paths')
+		const dir = path.join(REPO_ROOT, 'data', 'runtime')
+		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+		const metaPath = path.join(dir, 'xrandr-custom-modes-last-apply.json')
+		fs.writeFileSync(metaPath, JSON.stringify(customModesToApplyMeta(customModes), null, 2), 'utf8')
+		logger.info(`[OS-Config] Wrote custom mode apply meta to ${metaPath}`)
+	} catch (e) {
+		logger.warn(`[OS-Config] Failed to write custom mode apply meta: ${e.message}`)
+	}
+}
+
+function persistLayoutScript(cmd, config, layout, customModes = []) {
 	try {
 		logger.info('[OS-Config] Persisting layout startup script')
 		const xauth = getXAuthority()
 		const sessionLines = config ? buildOperatorDisplaySessionShellLines(config, layout) : []
-		const scriptContent = `#!/bin/bash\n# Generated by HighAsCG\nexport DISPLAY=:0\nexport XAUTHORITY=${xauth}\n${cmd}\n${sessionLines.join('\n')}\n`
-		
+		const scriptContent = buildApplyLayoutScriptContent({
+			xauth,
+			xrandrLayoutCmd: cmd,
+			customModes,
+			sessionLines,
+		})
+		if (customModes.length > 0) {
+			logger.info(`[OS-Config] Persisting ${customModes.length} custom xrandr mode(s) in apply-layout.sh`)
+			writeCustomModesApplyMeta(customModes)
+		}
 		const home = process.env.HOME || '/home/casparcg'
 		const userConfigDir = path.join(home, '.config', 'highascg')
 		const userScriptPath = path.join(userConfigDir, 'apply-layout.sh')

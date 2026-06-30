@@ -89,8 +89,11 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 
 	ws.on('compose.preview', (data) => ingestComposePreviewWs(data))
 
-	ws.on('companion.buttonPreview', () => {
+	ws.on('companion.buttonPreview', (data) => {
 		invalidateCompanionFlagThumbs()
+		try {
+			window.dispatchEvent(new CustomEvent('companion-button-preview', { detail: data }))
+		} catch { /* non-browser */ }
 	})
 
 	ws.on('global_border_sync', (data) => {

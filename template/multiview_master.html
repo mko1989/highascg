@@ -32,6 +32,7 @@
 </head>
 <body>
 	<canvas id="cv" width="1920" height="1080"></canvas>
+	<script src="multiview-playback-osc.js"></script>
 	<script>
 		const W = 1920;
 		const H = 1080;
@@ -133,6 +134,7 @@
 				const ly = layers[key];
 				const f = ly?.file;
 				if (f && (f.name || f.path)) {
+					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly)) continue;
 					if (n > bestN) {
 						bestN = n;
 						bestState = ly;

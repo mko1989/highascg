@@ -1,0 +1,3 @@
+# staged 2026-06-30T10:38:50+00:00 on highascg-nvidia-595
+scanner_deb=casparcg-scanner_1.4.0-ubuntu1_amd64.deb
+scanner_sha256=16567d4ad22e5ff0b2bd6b051a5ff411fea3f22e35dc08cf0c67cf0f957232bb

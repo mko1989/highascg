@@ -43,6 +43,7 @@ function deployMultiviewTemplates(ctx) {
 		'multiview_overlay.html',
 		'multiview_overlay.css',
 		'multiview_overlay.js',
+		'multiview-playback-osc.js',
 		'color_bg.html',
 	]) {
 		try {
@@ -118,6 +119,22 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 	const infoXml = opts.infoXml ?? null
 
 	deployMultiviewTemplates(ctx)
+
+	/** Drop stale LED test layer 999 on routed PGM/PRV sources when test pattern is not active. */
+	if (!ctx._ledTestPatternActive) {
+		const routed = new Set()
+		for (const cell of layout) {
+			const route = routeForCell(cell, map, inputsCh, previewChannels)
+			const m = String(route || '').match(/^route:\/\/(\d+)/i)
+			if (!m) continue
+			const routeCh = parseInt(m[1], 10)
+			if (programChannels.includes(routeCh) || previewChannels.includes(routeCh)) routed.add(routeCh)
+		}
+		if (routed.size > 0) {
+			const { clearLedTestLayerOnChannels } = require('../bootstrap/startup-led-test-pattern')
+			await clearLedTestLayerOnChannels(ctx.amcp, [...routed], ctx.log?.bind(ctx))
+		}
+	}
 
 	/** Live resolutions for PGM/PRV contain-fill (ultrawide / custom canvas, e.g. 15360×1728). */
 	let cmForMv = null

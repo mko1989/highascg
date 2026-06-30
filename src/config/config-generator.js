@@ -77,6 +77,21 @@ ${customVideoModes.join('\n')}
 	const ndiAutoLoad =
 		config.ndi_auto_load === false || config.ndi_auto_load === 'false' ? 'false' : 'true'
 
+	const ot = config?.operatorTools || {}
+	const bridgeOn = ot.cefInteractiveBridge !== false && ot.cefInteractiveBridge !== 'false'
+	const fromEnv = parseInt(String(process.env.HIGHASCG_CEF_DEBUG_PORT || ''), 10)
+	const fromCfg = parseInt(String(ot.cefRemoteDebuggingPort ?? ''), 10)
+	let cefDebugPort = 0
+	if (bridgeOn) {
+		if (Number.isFinite(fromEnv) && fromEnv > 0) cefDebugPort = fromEnv
+		else if (Number.isFinite(fromCfg) && fromCfg > 0) cefDebugPort = fromCfg
+		else cefDebugPort = 9222
+	}
+	const cefDebugPortXml =
+		cefDebugPort > 0
+			? `\n        <remote-debugging-port>${cefDebugPort}</remote-debugging-port>`
+			: ''
+
 	return `<configuration>
     <paths>
         <media-path>media/</media-path>
@@ -96,7 +111,7 @@ ${oscXml}
     <ndi><auto-load>${ndiAutoLoad}</auto-load></ndi>
     <decklink/>
     <html>
-        <enable-gpu>false</enable-gpu>
+        <enable-gpu>false</enable-gpu>${cefDebugPortXml}
     </html>
 </configuration>`
 }

@@ -17,11 +17,33 @@ caspar_crash_state_file() {
 		printf '%s\n' "$CASPAR_CRASH_STATE"
 		return 0
 	fi
-	if [ -d /run/highascg ] 2>/dev/null; then
+	if [ -d /run/highascg ] 2>/dev/null && [ -w /run/highascg ] 2>/dev/null; then
 		printf '%s\n' "/run/highascg/caspar-crash-loop.state"
 		return 0
 	fi
-	printf '%s\n' "/tmp/caspar-crash-loop.state"
+	_home="${HOME:-}"
+	if [ -z "$_home" ] || [ "$_home" = "/" ]; then
+		_home="$(getent passwd "${HIGHASCG_SERVICE_USER:-casparcg}" 2>/dev/null | cut -d: -f6)"
+	fi
+	[ -n "$_home" ] || _home="/tmp"
+	printf '%s\n' "${_home}/.cache/highascg/caspar-crash-loop.state"
+}
+
+caspar_inhibit_file() {
+	if [ -n "${CASPAR_INHIBIT_FILE:-}" ]; then
+		printf '%s\n' "$CASPAR_INHIBIT_FILE"
+		return 0
+	fi
+	if [ -d /run/highascg ] 2>/dev/null && [ -w /run/highascg ] 2>/dev/null; then
+		printf '%s\n' "/run/highascg/inhibit-caspar-autostart"
+		return 0
+	fi
+	_home="${HOME:-}"
+	if [ -z "$_home" ] || [ "$_home" = "/" ]; then
+		_home="$(getent passwd "${HIGHASCG_SERVICE_USER:-casparcg}" 2>/dev/null | cut -d: -f6)"
+	fi
+	[ -n "$_home" ] || _home="/tmp"
+	printf '%s\n' "${_home}/.cache/highascg/inhibit-caspar-autostart"
 }
 
 caspar_crash_is_hard_fail_code() {
@@ -61,11 +83,12 @@ caspar_crash_loop_backoff() {
 	else
 		_streak=1
 	fi
+	mkdir -p "$(dirname "$_state")" 2>/dev/null || true
 	printf '%s %s %s\n' "$_streak" "$_now" "$_ec" >"$_state" 2>/dev/null || true
 
 	if [ "$_streak" -ge "$_giveup" ]; then
-		_inhibit="${CASPAR_INHIBIT_FILE:-/run/highascg/inhibit-caspar-autostart}"
-		mkdir -p "$(dirname "$_inhibit")" 2>/dev/null || true
+		_inhibit="$(caspar_inhibit_file)"
+		mkdir -p "$(dirname "$_state")" "$(dirname "$_inhibit")" 2>/dev/null || true
 		printf '%s\n' "caspar crash loop give-up ec=${_ec} streak=${_streak} at $(date -Is)" >"$_inhibit" 2>/dev/null || true
 		caspar_supervisor_log "[run.sh] crash loop give-up (${_streak} failures) — inhibiting Caspar autostart (${_inhibit})"
 		return 2
@@ -210,13 +233,16 @@ caspar_ensure_fully_stopped() {
 }
 
 # Wait until AMCP port is free before the next casparcg start.
-# If the port stays busy (zombie listener / hung teardown), kill main caspar after max wait.
 caspar_wait_amcp_port_free() {
-	_max="${CASPAR_PORT_FREE_WAIT_SEC:-90}"
+	_max="${CASPAR_PORT_FREE_WAIT_SEC:-30}"
 	_n=0
 	while caspar_amcp_listening; do
 		_n=$((_n + 1))
 		if [ "$_n" -ge "$_max" ]; then
+			if caspar_list_main_pids | grep -q . && [ "${CASPAR_KILL_FAST:-}" != "1" ]; then
+				caspar_supervisor_log "[supervisor] AMCP :${CASPAR_AMCP_PORT} still busy with live casparcg after ${_max}s — skip kill (duplicate supervisor or adopt path)"
+				break
+			fi
 			caspar_supervisor_log "[supervisor] AMCP :${CASPAR_AMCP_PORT} still busy after ${_max}s — killing casparcg tree"
 			caspar_kill_all_processes TERM
 			sleep 3

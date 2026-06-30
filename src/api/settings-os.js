@@ -19,6 +19,7 @@ const SYSTEM_DISPLAY_KEYS = [
 	'screen_1_os_backend', 'screen_2_os_backend', 'screen_3_os_backend', 'screen_4_os_backend',
 	'screen_1_os_rate', 'screen_2_os_rate', 'screen_3_os_rate', 'screen_4_os_rate',
 	'screen_1_os_timing_source', 'screen_2_os_timing_source', 'screen_3_os_timing_source', 'screen_4_os_timing_source',
+	'screen_1_os_mode_source', 'screen_2_os_mode_source', 'screen_3_os_mode_source', 'screen_4_os_mode_source',
 	'screen_1_os_x', 'screen_2_os_x', 'screen_3_os_x', 'screen_4_os_x',
 	'screen_1_os_y', 'screen_2_os_y', 'screen_3_os_y', 'screen_4_os_y',
 	'x11_horizontal_swap', 'multiview_system_id', 'multiview_os_mode', 'multiview_os_rate', 'multiview_os_backend',
@@ -62,6 +63,11 @@ function mergeSystemDisplaySettings(ctx, s) {
 		if (s[ots] !== undefined) {
 			const t = String(s[ots] || 'cvt').trim().toLowerCase().replace(/-/g, '_')
 			ctx.config[ots] = t === 'gtf' ? 'gtf' : t === 'cvt_r' ? 'cvt_r' : 'cvt'
+		}
+		const oms = `screen_${n}_os_mode_source`
+		if (s[oms] !== undefined) {
+			const v = String(s[oms] || '').trim().toLowerCase()
+			ctx.config[oms] = v === 'custom' ? 'custom' : v === 'edid' ? 'edid' : ''
 		}
 		const ox = `screen_${n}_os_x`; if (s[ox] !== undefined) { const x = parseInt(s[ox], 10); if (Number.isFinite(x)) ctx.config[ox] = x; else delete ctx.config[ox] }
 		const oy = `screen_${n}_os_y`; if (s[oy] !== undefined) { const y = parseInt(s[oy], 10); if (Number.isFinite(y)) ctx.config[oy] = y; else delete ctx.config[oy] }

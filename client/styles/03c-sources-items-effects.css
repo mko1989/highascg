@@ -317,6 +317,11 @@
 	color: #f85149;
 	background: rgba(248, 81, 73, 0.08);
 }
+.source-item__live-btn--fullscreen.source-item__live-btn--active {
+	border-color: #58a6ff;
+	color: #58a6ff;
+	background: rgba(88, 166, 255, 0.12);
+}
 .source-item__live-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;

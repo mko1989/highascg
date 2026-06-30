@@ -20,6 +20,19 @@
 | 73 | [73_WO_CALAMARES_SYSTEMD_CASPAR_NUCLEAR.md](./73_WO_CALAMARES_SYSTEMD_CASPAR_NUCLEAR.md) | Phase A–D shipped | Calamares on eggs ISO; systemd Caspar+scanner; Nuclear install + stop/start Caspar |
 | 74 | [74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md](./74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md) | Shipped | Mixer effects smoke (13→AMCP); inspector primary/advanced params; live PGM/timeline apply |
 | 75 | [75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md](./75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md) | In progress | Companion timeline flags: coords + page picker + Satellite previews shipped; manual QA vs real Companion open |
+| 76 | [76_WO_PROJECT_LOAD_AUTOSAVE_HARDWARE_GPU_BOOT.md](./76_WO_PROJECT_LOAD_AUTOSAVE_HARDWARE_GPU_BOOT.md) | Shipped | Autosave merge, looks-only load, boot xrandr GPU snapshot, replication docs/tests |
+| 77 | [77_WO_STICK_BOOT_QA_TEST_SUITE.md](./77_WO_STICK_BOOT_QA_TEST_SUITE.md) | Phase A shipped | Read-only post-boot stick QA — `tools/runtime/stick-boot-test/` (10 modules) |
+| 78 | [78_WO_REPLICATION_TRUST_HOSTNAME_AND_RSYNC_SSH.md](./78_WO_REPLICATION_TRUST_HOSTNAME_AND_RSYNC_SSH.md) | Draft | MAC-based `highascg####`, background handshake, rsync-only SSH, pair in project |
+| 79 | [79_WO_LEADER_AUTOSAVE_LIVE_REPLICATION.md](./79_WO_LEADER_AUTOSAVE_LIVE_REPLICATION.md) | Phase A shipped | Debounced leader autosave → follower project push |
+| 79 | [79_WO_DUAL_PANE_FILE_BROWSER_AND_WETRANSFER_PUSH.md](./79_WO_DUAL_PANE_FILE_BROWSER_AND_WETRANSFER_PUSH.md) | In progress | MC-style file browser shipped; cloud Share via Puppeteer (login + live QA pending) |
+| 80 | [80_WO_XRANDR_CUSTOM_MODE_FORCE_RESOLUTION.md](./80_WO_XRANDR_CUSTOM_MODE_FORCE_RESOLUTION.md) | Phase A shipped | xrandr custom mode order (newmode/addmode), WxH×fps from Web UI, cold-boot apply-layout persistence |
+| 81 | [81_WO_STREAM_RECORD_LOGS_AND_NO_RESTART_DIRTY.md](./81_WO_STREAM_RECORD_LOGS_AND_NO_RESTART_DIRTY.md) | Phase A–C shipped | Stream/record logs in inspector; no false Apply dirty on output CRUD |
+| 82 | [82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md](./82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md) | Phase A–D shipped | Simple wiring mode + no full reload on tab switch / partial save |
+| 88 | [88_WO_HOST_CHANNEL_LIVE_SOURCES.md](./88_WO_HOST_CHANNEL_LIVE_SOURCES.md) | Draft | Dedicated host channel per webpage/NDI/DeckLink; Device View matrix; operator video fullscreen route |
+| 89 | [89_WO_CEF_OPERATOR_CONTROL.md](./89_WO_CEF_OPERATOR_CONTROL.md) | Draft | CEF X11 bridge retarget to host CDP tab; HTTP API; depends on WO-88 registry |
+| 90 | [90_WO_ISO_THIRD_PARTY_LICENSES_FOLDER.md](./90_WO_ISO_THIRD_PARTY_LICENSES_FOLDER.md) | In progress | `licenses/` + COMPLIANCE-ISO (NVIDIA/NDI/BMD); collector + ISO build hook |
+| 91 | [91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md](./91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md) | Phase A–D shipped | Tailscale Settings tab + API + operator-monitor login; wiki API docs; live QA pending |
+| 92 | [92_WO_DECKLINK_EXFAT_VENDOR_INSTALL.md](./92_WO_DECKLINK_EXFAT_VENDOR_INSTALL.md) | Draft | Operator-supplied BMD tarball on exFAT `vendor/decklink/`; idempotent boot install + API (no DeckLink in ISO) |
 
 ## WO-33 — Device view (split)
 
@@ -33,6 +46,7 @@
 | 33e | [33e_WO_DEVICE_VIEW_EDID_MATCH_AND_APPLY.md](./33e_WO_DEVICE_VIEW_EDID_MATCH_AND_APPLY.md) | Draft | 2026-04-23 |
 | 33f | [33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md](./33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md) | Draft | 2026-04-23 |
 | 33g | [33g_WO_DEVICE_VIEW_QA_DOCS_ACCESSIBILITY.md](./33g_WO_DEVICE_VIEW_QA_DOCS_ACCESSIBILITY.md) | In progress | 2026-04-24 |
+| 82 | [82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md](./82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md) | Phase A–D shipped | 2026-06-29 |
 
 ### WO-33 recent updates (2026-04-24)
 

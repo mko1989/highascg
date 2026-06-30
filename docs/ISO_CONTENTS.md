@@ -112,8 +112,9 @@ Settings UI: **Application Settings → system** can apply another branch from t
 
 | Item | Notes |
 |------|------|
-| **Packages** | **`desktopvideo`** + **`desktopvideo-gui`** (from Blackmagic Desktop Video `.deb` tarball on build host) |
-| **Kernel module** | **DKMS `blackmagic_io`** (must be present on build host at clone time for ISO to carry it) |
+| **Packages** | **`desktopvideo`** + **`desktopvideo-gui`** (from Blackmagic Desktop Video `.deb` on build host — **required** for ISO) |
+| **License on ISO** | `licenses/third-party/blackmagic-desktopvideo-EULA.txt` → `/usr/share/doc/highascg/licenses/` |
+| **Kernel module** | **DKMS `blackmagic_io`** (must be present on build host at clone time) |
 | **Setup GUI** | `desktopvideo_setup` — autostart in **`x11-only`** mode; optional in normal mode after delay |
 | **Build warning** | `build-operator-stick.sh` / docs warn if **`desktopvideo*`** missing on clone source |
 
@@ -222,6 +223,23 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 |------|------|
 | **Live networking** | **systemd-networkd** + DHCP on `en*` / `eth*` (egg build) |
 | **UFW** (if configured on build host) | Often **5250** AMCP, **6250**, **8000** scanner, **4200** HighAsCG |
+
+---
+
+## Third-party licenses (WO-90)
+
+| Path | Role |
+|------|------|
+| **`/usr/share/doc/highascg/licenses/`** | NVIDIA, NDI, Blackmagic, FFmpeg, … notices + `manifest.json` |
+| **`~/highascg/licenses`** | Symlink to system path when `15-licenses-install.sh` ran |
+| **`licenses/COMPLIANCE-ISO.md`** (in repo) | **Read before shipping ISO** — NVIDIA (OK with notice), NDI (OK with EULA + UI attribution), DeckLink (**caution**) |
+
+Regenerate before `eggs produce`:
+
+```bash
+bash tools/release/collect-third-party-licenses.sh
+sudo bash scripts/setup/15-licenses-install.sh
+```
 
 ---
 

@@ -7,6 +7,7 @@ import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { setStatus } from './device-view-ui-utils.js'
 import * as Actions from './device-view-actions.js'
 import { renderCasparBand } from './device-view-caspar-render.js'
+import { renderCasparBandSimple } from './device-view-caspar-render-simple.js'
 import { renderMappingsBand } from './device-view-mappings-render.js'
 
 /**
@@ -397,5 +398,5 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 
 	const eq = appendSegment(rearPanel, '')
 	eq.parentElement?.classList.add('device-view__segment--rear-only')
-	eq.append(renderCasparBand(internalCtx))
+	eq.append(ctx.simpleWiring ? renderCasparBandSimple(internalCtx) : renderCasparBand(internalCtx))
 }

@@ -26,7 +26,6 @@ const {
 	handleLiveThumbnailCapturePost,
 } = require('../media/live-thumbnail-cache')
 const { runMediaClsTlsRefresh } = require('../utils/periodic-sync')
-
 function cinfResponseToStr(data) {
 	if (data == null) return ''
 	if (Array.isArray(data)) return data.join('\n')

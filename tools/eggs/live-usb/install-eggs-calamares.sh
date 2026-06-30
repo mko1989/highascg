@@ -8,8 +8,14 @@
 #   sudo bash tools/eggs/live-usb/install-eggs-calamares.sh
 #
 # Optional env:
-#   HIGHASCG_ISO_EMBED_CALAMARES=0   skip (default 1)
+#   HIGHASCG_ISO_EMBED_CALAMARES=0        skip (default 1)
+#   HIGHASCG_FORCE_CALAMARES_REAPPLY=1    re-run eggs calamares even when verify passes
+#
+# Note: penguins-eggs 26.6.2 inverts `eggs calamares --nointeractive` — that flag
+# *forces* the "Select yes to continue..." prompt instead of skipping it. Do not pass -n.
 set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
 
 if [[ "$(id -u)" -ne 0 ]]; then
 	echo "Run as root: sudo bash $0" >&2
@@ -23,9 +29,12 @@ if [[ "$EMBED" != "1" ]]; then
 fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
+FIX_SRC="${REPO_ROOT}/tools/runtime/fix-calamares-branding.sh"
+FIX_DST=/usr/local/lib/highascg/fix-calamares-branding.sh
 
 if ! command -v eggs >/dev/null 2>&1; then
 	echo "ERROR: penguins-eggs (eggs) not installed — install eggs before Calamares bake" >&2
@@ -37,16 +46,32 @@ fi
 	exit 1
 }
 
-if command -v calamares >/dev/null 2>&1 \
+[[ -f "$FIX_SRC" ]] || {
+	echo "ERROR: missing ${FIX_SRC}" >&2
+	exit 1
+}
+
+install -d /usr/local/lib/highascg
+install -m 0755 "$FIX_SRC" "$FIX_DST"
+
+run_branding_fix() {
+	bash "$FIX_DST"
+}
+
+if [[ "${HIGHASCG_FORCE_CALAMARES_REAPPLY:-0}" != "1" ]] \
+	&& bash "${HERE}/verify-calamares-installed.sh" >/dev/null 2>&1; then
+	echo "==> Calamares already installed and verified (skip eggs calamares re-apply)"
+	echo "     force re-apply: HIGHASCG_FORCE_CALAMARES_REAPPLY=1"
+elif command -v calamares >/dev/null 2>&1 \
 	&& dpkg-query -W -f='${Status}' calamares 2>/dev/null | grep -qE '(install|hold) ok installed' \
 	&& [[ -d /etc/calamares ]]; then
 	echo "==> Calamares already installed ($(calamares --version 2>/dev/null | head -1 || echo calamares))"
-	echo "==> Re-applying eggs calamares config (theme + policies)"
-	eggs calamares --install --nointeractive --verbose --theme="${THEME_ABS}"
+	echo "==> Re-applying eggs calamares config (theme + policies; no --install)"
+	eggs calamares --policies --verbose --theme="${THEME_ABS}"
 else
 	echo "==> Calamares for eggs produce (graphical install-to-disk on live ISO)"
 	echo "==> eggs calamares --install (apt packages + incubator + policies)"
-	eggs calamares --install --nointeractive --verbose --theme="${THEME_ABS}"
+	eggs calamares --install --verbose --theme="${THEME_ABS}"
 fi
 
 if ! command -v calamares >/dev/null 2>&1; then
@@ -64,6 +89,9 @@ if [[ ! -d /etc/calamares ]]; then
 	exit 1
 fi
 
+echo "==> Calamares branding logo (eggs 26.6.2 name mismatch — bake before squashfs clone)"
+run_branding_fix
+
 calamares_polkit_policy() {
 	local p
 	for p in \
@@ -78,7 +106,7 @@ calamares_polkit_policy() {
 }
 
 if ! calamares_polkit_policy >/dev/null; then
-	echo "ERROR: Calamares polkit policy missing (expected com.github.calamares.calamares.policy or io.calamares.calamares.policy)" >&2
+	echo "ERROR: Calamares polkit policy missing" >&2
 	exit 1
 fi
 
@@ -91,7 +119,11 @@ if ! eggs calamares --help >/dev/null 2>&1; then
 	exit 1
 fi
 
+echo "==> Calamares verify (must pass before eggs produce)"
+bash "${HERE}/verify-calamares-installed.sh"
+
 echo "OK: Calamares ready ($(calamares --version 2>/dev/null | head -1 || echo calamares))"
 echo "     theme: ${THEME_ABS}"
 echo "     config: /etc/calamares"
 echo "     polkit: $(calamares_polkit_policy)"
+echo "     branding fixer: ${FIX_DST}"

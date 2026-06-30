@@ -33,11 +33,6 @@ function defaultTopology() {
  * @returns {{ rows: object[], source: string }}
  */
 function resolvePhysicalTopology(cfg, gpuModel) {
-	const probed = discoverGpuPhysicalTopology({ config: cfg })
-	if (probed?.rows?.length) {
-		return { rows: probed.rows, source: probed.source }
-	}
-
 	const arr = Array.isArray(cfg?.gpuPhysicalTopology) ? cfg.gpuPhysicalTopology : null
 	if (arr?.length) {
 		const out = []
@@ -52,11 +47,18 @@ function resolvePhysicalTopology(cfg, gpuModel) {
 				dpB: normalizePortName(row.dpB),
 				connectorNumber: Number.isFinite(Number(row.connectorNumber)) ? Number(row.connectorNumber) : null,
 				location: Number.isFinite(Number(row.location)) ? Number(row.location) : null,
+				...(row.drmName ? { drmName: row.drmName } : {}),
+				...(row.drmCard ? { drmCard: row.drmCard } : {}),
 			})
 		}
 		if (out.length) {
 			return { rows: out.sort((a, b) => a.slotOrder - b.slotOrder), source: 'config' }
 		}
+	}
+
+	const probed = discoverGpuPhysicalTopology({ config: cfg })
+	if (probed?.rows?.length) {
+		return { rows: probed.rows, source: probed.source }
 	}
 
 	if (gpuModel) {

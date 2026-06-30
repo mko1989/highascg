@@ -130,7 +130,7 @@ function previewChannelForMain(cm, mIdx) {
 
 /**
  * Caspar channel used for look-stack preview AMCP (L10+, PIPs, etc.).
- * On PGM-only outputs returns null unless {@link sceneState.editOnPgm} is enabled.
+ * On PGM-only outputs returns null (preview AMCP is PRV-only; air via Take).
  * @param {object} sceneState
  * @param {() => object} getChannelMap
  * @param {number} mIdx
@@ -142,10 +142,6 @@ export function resolvePreviewAmcpChannel(sceneState, getChannelMap, mIdx, force
 	if (!isPreviewBusAvailable(cm, mIdx)) return null
 	if (forcePrvBus) {
 		return previewChannelForMain(cm, mIdx)
-	}
-	if (sceneState.editOnPgm) {
-		const pgm = Number(cm.programChannels?.[mIdx] ?? cm.playbackChannels?.[mIdx])
-		return Number.isFinite(pgm) && pgm > 0 ? pgm : null
 	}
 	return previewChannelForMain(cm, mIdx)
 }

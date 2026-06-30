@@ -14,6 +14,11 @@ const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { enrichMediaListWithCinfAndProbe } = require('../utils/media-snapshot-cinf')
 const { buildSceneDeckForApi, loadProjectScenes } = require('../engine/project-scenes')
 const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
+const { getHostOperatorFullscreenSnapshot } = require('./host-operator-fullscreen')
+const {
+	migrateExtraLiveSourcesList,
+	collectHostLiveConfigWarnings,
+} = require('../config/host-live-sources-migrate')
 
 /**
  * @param {object} ctx — app context (state, config, gatheredInfo, …)
@@ -87,6 +92,11 @@ function getState(ctx, opts = {}) {
 		if (Array.isArray(scenes?.globalBorders)) globalBorders = scenes.globalBorders
 	} catch (_) {}
 
+	const hostLiveMig = migrateExtraLiveSourcesList(Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [], {
+		config: cfg,
+		...ctx,
+	})
+
 	return {
 		...base,
 		screenDestinations: normalizeScreenDestinations(cfg.screenDestinations),
@@ -112,7 +122,9 @@ function getState(ctx, opts = {}) {
 		localMediaEnabled: !!(cfg.local_media_path || '').trim(),
 		configComparison: ctx._configComparison || null,
 		ui: cfg.ui || {},
-		extraLiveSources: enrichExtraLiveSources(Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [], ctx),
+		extraLiveSources: enrichExtraLiveSources(hostLiveMig.list, ctx),
+		hostLiveMigrationWarnings: [...collectHostLiveConfigWarnings(cfg), ...hostLiveMig.warnings],
+		...getHostOperatorFullscreenSnapshot(ctx),
 		osc:
 			base.osc !== undefined
 				? base.osc

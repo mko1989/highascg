@@ -172,22 +172,14 @@ export function initLedTestCard(container, stateStore) {
 		})()
 	})
 
-	let ledTestSyncedFromServer = false
-	const unsubscribe = stateStore?.on?.('*', () => {
-		if (ledTestSyncedFromServer) return
+	stateStore?.on?.('*', () => {
 		const st = stateStore.getState()
-		if (!st?.channelMap && st.ledTestPatternActive === undefined) return
-
-		ledTestSyncedFromServer = true
-		unsubscribe?.()
+		if (st.ledTestPatternActive === undefined) return
 
 		const serverActive = !!st.ledTestPatternActive
+		if (ledTestCb.checked === serverActive) return
+
 		ledTestCb.checked = serverActive
 		localStorage.setItem('highascg_led_test_enabled', serverActive ? 'true' : 'false')
-
-		// Reflect server state only — never auto-enable test pattern on connect/refresh.
-		if (!serverActive) {
-			void applyLedTest(false)
-		}
 	})
 }

@@ -33,15 +33,20 @@ fi
 
 	if [[ -f /etc/systemd/system/home-casparcg-exfat.mount ]] &&
 	[[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
-	AF_LIST="network.target home-casparcg-exfat.mount"
+	AF_LIST="network.target"
+	if [[ -f /etc/systemd/system/highascg-bridge-boot.service ]]; then
+		AF_LIST="$AF_LIST highascg-bridge-boot.service"
+	fi
+	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
+		AF_LIST="$AF_LIST highascg-exfat-boot.service"
+	else
+		AF_LIST="$AF_LIST home-casparcg-exfat.mount"
+	fi
 	if [[ -f /etc/systemd/system/home-casparcg-highascg-media-exfat.mount ]]; then
 		AF_LIST="$AF_LIST home-casparcg-highascg-media-exfat.mount"
 	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-bootstrap.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-bootstrap.service"
-	fi
-	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
-		AF_LIST="$AF_LIST highascg-exfat-boot.service"
 	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-server-update.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-server-update.service"

@@ -49,6 +49,8 @@ APPLY_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-apply-server-drop.sh"
 WEBUI_UPDATE_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-webui-server-update.sh"
 BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-boot.sh"
 BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-bridge-boot.sh"
+DECKLINK_INSTALL_SH_SRC="${REPO_ROOT}/scripts/runtime/decklink-install-from-exfat.sh"
+DECKLINK_INSTALL_LIB_SRC="${REPO_ROOT}/scripts/lib/decklink-install-lib.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
 SEED_BRIDGE_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-bridge-operator-layout.sh"
 LEGACY_USB_MEDIA_BIND="${HIGHASCG_LEGACY_USB_MEDIA_BIND:-0}"
@@ -60,6 +62,9 @@ APPLY_SH_DST=/usr/local/lib/highascg/highascg-apply-server-drop.sh
 WEBUI_UPDATE_SH_DST=/usr/local/lib/highascg/highascg-webui-server-update.sh
 BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
 BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
+DECKLINK_INSTALL_SH_DST=/usr/local/lib/highascg/decklink-install-from-exfat.sh
+DECKLINK_INSTALL_LIB_DST=/usr/local/lib/highascg/decklink-install-lib.sh
+decklink_install_svc="highascg-decklink-install.service"
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
 BOOT_EXCLUDE_DST=/etc/highascg/bootstrap-rsync-excludes.txt
 UPDATE_EXCLUDE_SRC="${REPO_ROOT}/config/server-update-rsync-excludes.txt"
@@ -78,6 +83,8 @@ install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/
 [[ -f "$WEBUI_UPDATE_SH_SRC" ]] && install -m 0755 -o root -g root "$WEBUI_UPDATE_SH_SRC" "$WEBUI_UPDATE_SH_DST"
 [[ -f "$BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
 [[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
+[[ -f "$DECKLINK_INSTALL_LIB_SRC" ]] && install -m 0644 -o root -g root "$DECKLINK_INSTALL_LIB_SRC" "$DECKLINK_INSTALL_LIB_DST"
+[[ -f "$DECKLINK_INSTALL_SH_SRC" ]] && install -m 0755 -o root -g root "$DECKLINK_INSTALL_SH_SRC" "$DECKLINK_INSTALL_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
 	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
 	echo "installed ${UDEV_RULE_DST}"
@@ -197,7 +204,7 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-TimeoutStartSec=120
+TimeoutStartSec=60
 ExecStart=${BRIDGE_BOOT_SH_DST}
 
 [Install]
@@ -309,7 +316,7 @@ cat > /etc/systemd/system/highascg-exfat-sync.service <<SVCEOF
 Description=HighAsCG bridge/USB mtime sync (WO-47 + WO-52)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=network-pre.target home-casparcg-bridge.mount ${bridge_media_mount} home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} highascg-fix-config-permissions.service highascg-bridge-boot.service highascg-exfat-boot.service
+After=home-casparcg-bridge.mount ${bridge_media_mount} home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} ${decklink_install_svc} highascg-fix-config-permissions.service highascg-bridge-boot.service highascg-exfat-boot.service
 Before=highascg.service
 ConditionPathExists=/home/casparcg/highascg/tools/runtime/exfat-sync-cli.js
 
@@ -338,7 +345,7 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-TimeoutStartSec=90
+TimeoutStartSec=45
 ExecStart=${BOOT_SH_DST}
 
 [Install]
@@ -382,6 +389,27 @@ ExecStart=${ARRIVE_SH_DST}
 WantedBy=multi-user.target
 ARRIVEEOF
 
+cat > "/etc/systemd/system/${decklink_install_svc}" <<DECKLINKEOF
+[Unit]
+Description=Install DeckLink Desktop Video from exFAT/bridge decklink/ (WO-92)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+After=home-casparcg-bridge.mount home-casparcg-exfat.mount ${update_svc} highascg-bridge-boot.service highascg-exfat-boot.service
+Before=casparcg-scanner.service casparcg-server.service highascg.service highascg-exfat-sync.service
+ConditionPathExists=${DECKLINK_INSTALL_SH_DST}
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=300
+User=root
+Group=root
+ExecStart=${DECKLINK_INSTALL_SH_DST} --boot
+
+[Install]
+WantedBy=multi-user.target
+DECKLINKEOF
+
 # Wrong name refused bind at media/bridge (Where= mismatch).
 rm -f /etc/systemd/system/home-casparcg-highascg-media.mount
 
@@ -401,6 +429,7 @@ ENABLE_UNITS=(
 	highascg-bridge-boot.service
 	highascg-exfat-boot.service
 	"${update_svc}"
+	"${decklink_install_svc}"
 	highascg-fix-config-permissions.service
 	highascg-exfat-sync.service
 	"${prep_svc}"
@@ -454,5 +483,8 @@ echo "  ${FIX_CFG_DST}"
 echo "  /etc/systemd/system/highascg-exfat-sync.service"
 echo "  /etc/systemd/system/highascg-exfat-boot.service"
 echo "  ${BOOT_SH_DST}"
+echo "  /etc/systemd/system/${decklink_install_svc}"
+echo "  ${DECKLINK_INSTALL_SH_DST}"
+echo "  ${DECKLINK_INSTALL_LIB_DST}"
 echo "  /etc/systemd/system/${arrive_svc}"
 echo "Re-run: sudo bash ${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh ${USER_CASPAR}"

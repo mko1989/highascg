@@ -16,12 +16,12 @@ Add **PIP overlay effects** — customizable borders, drop shadows, and animated
 Unlike WO-22 mixer effects (which use `MIXER` AMCP commands on the source layer itself), PIP overlay effects are **separate CasparCG layers** that composite HTML graphics on top of or around the PIP content.
 
 **Key principles:**
-- Each PIP overlay effect is an **HTML template** deployed to Caspar's `/opt/casparcg/template/` directory
+- Each PIP overlay effect is an **HTML template** deployed to Caspar's template path (repo `template/`, synced on routing setup)
 - HighAsCG **auto-deploys** templates and **verifies** their presence on connect (like `black.html` and `multiview_overlay.html`)
 - Effects are **customizable** — border width, color, corner radius, shadow blur/offset, animated strip speed/color
 - Effects use `CG ADD` + `CG UPDATE` to apply and adjust parameters in real-time
-- The overlay layer sits **above** the PIP content layer using `MIXER FILL` matching the PIP's position
-- Data model: `layer.pipOverlay` object on scene layers, persisted in scene state
+- The overlay CG layer uses **expanded `MIXER FILL`** when `side: 'outside'` (larger than video); see [pip-overlay-outside-border.md](../../docs/reference/pip-overlay-outside-border.md)
+- Data model: `layer.pipOverlays[]` on scene layers, persisted in scene state
 
 ---
 
@@ -195,6 +195,14 @@ pipOverlay: {
 ---
 
 ## Work Log
+
+### 2026-06-29 — Outside border model locked down
+
+- **Canonical doc:** [docs/reference/pip-overlay-outside-border.md](../../docs/reference/pip-overlay-outside-border.md) — expanded `MIXER FILL` + `inner` content hole + `box-shadow` outward on `.pip-frame`. Lists anti-patterns (do not regress).
+- **Placement:** `expandFillOutward` + `innerRectInOverlayNorm`; `effectivePipOverlaySide` + forced `side` in CG JSON; per-slot templates (no `pip_router` collapse on take).
+- **Templates:** `pip_border.html` matches `pip_glow` box-shadow model; `sendPipOverlayLinesSerial` commits DEFER mixer.
+- **Tests:** `tools/smoke/smoke-pip-overlay-placement.test.js` extended (AMCP FILL, multi-overlay, template contract).
+- **Instructions for Next Agent:** Read `pip-overlay-outside-border.md` before changing placement, templates, or `buildPipOverlayAmcpLinesAll`. Global border still forces `side: inside` only.
 
 ### 2026-04-22 — Agent (T5 live PGM sync + WO closure)
 

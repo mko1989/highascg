@@ -30,10 +30,21 @@ for unit in casparcg-scanner.service casparcg-server.service; do
 	}
 done
 
-# WO-47 ordering: start Caspar after exFAT sync when those units exist.
-AF_LIST="network.target casparcg-scanner.service"
+# WO-47 ordering: Caspar after exFAT boot chain + X session (nodm) + scanner.
+AF_LIST="network.target nodm.service casparcg-scanner.service"
 if [[ -f /etc/systemd/system/highascg-exfat-sync.service ]]; then
-	AF_LIST="home-casparcg-exfat.mount highascg-exfat-sync.service ${AF_LIST}"
+	if [[ -f /etc/systemd/system/highascg-bridge-boot.service ]]; then
+		AF_LIST="highascg-bridge-boot.service ${AF_LIST}"
+	fi
+	if [[ -f /etc/systemd/system/highascg-exfat-boot.service ]]; then
+		AF_LIST="highascg-exfat-boot.service ${AF_LIST}"
+	else
+		AF_LIST="home-casparcg-exfat.mount ${AF_LIST}"
+	fi
+	AF_LIST="highascg-exfat-sync.service ${AF_LIST}"
+fi
+if [[ -f /etc/systemd/system/highascg-decklink-install.service ]]; then
+	AF_LIST="highascg-decklink-install.service ${AF_LIST}"
 fi
 
 SERVER_UNIT="${SYSTEMD_SRC}/casparcg-server.service"
@@ -54,7 +65,7 @@ install -m 0755 "${RUNTIME_SRC}/launch-calamares.sh" /usr/local/bin/launch-calam
 install -m 0755 "${RUNTIME_SRC}/caspar-systemd-control.sh" /usr/local/bin/caspar-systemd-control.sh
 
 mkdir -p /run/highascg
-chmod 0755 /run/highascg
+chown "${USER_CASPAR}:${USER_CASPAR}" /run/highascg 2>/dev/null || chmod 1777 /run/highascg 2>/dev/null || true
 
 if [[ -x "${PLAYOUT}/run.sh" ]]; then
 	chown "${USER_CASPAR}:${USER_CASPAR}" "${PLAYOUT}/run.sh" 2>/dev/null || true
@@ -74,6 +85,12 @@ fi
 if [[ -x "${PLAYOUT}/run.sh" ]]; then
 	systemctl enable casparcg-server.service
 	ok "enabled casparcg-server.service"
+fi
+
+if [[ -f "${SCRIPT_DIR}/09-openbox-autostart.sh" ]]; then
+	OPENBOX_SKIP_NODM_RESTART=1 bash "${SCRIPT_DIR}/09-openbox-autostart.sh" || {
+		echo "  note: Openbox autostart refresh failed" >&2
+	}
 fi
 
 echo

@@ -9,6 +9,7 @@ const os = require('os')
 const fs = require('fs')
 const { execSync, execFileSync, spawn } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { getPublicTailscaleSummary } = require('../network/tailscale-service')
 const { getXAuthority } = require('../utils/hardware-info')
 
 const CALAMARES_BIN = '/usr/bin/calamares'
@@ -74,11 +75,13 @@ function detectCalamaresStatus() {
 		}
 	}
 	const launchable = calamaresInstalled || eggsCalamares
+	const sudoLaunchAvailable = calamaresInstalled && calamaresSudoLaunchAvailable()
 	return {
 		installed: calamaresInstalled,
 		binary: calamaresInstalled ? CALAMARES_BIN : eggsCalamares ? `${EGGS_BIN} calamares` : null,
 		eggsAvailable: eggsCalamares,
 		launchable,
+		sudoLaunchAvailable,
 	}
 }
 
@@ -135,31 +138,7 @@ async function handleGet(path, ctx) {
 	const interfaces = listIPv4Interfaces()
 	const primary = interfaces[0]?.address || '127.0.0.1'
 
-	let tailscale = { ipv4: null, statusLine: null, needsLogin: null }
-	try {
-		const ip = execSync('tailscale ip -4 2>/dev/null', { encoding: 'utf8', timeout: 4000 }).trim()
-		tailscale.ipv4 = ip || null
-	} catch {
-		tailscale.ipv4 = null
-	}
-	if (!tailscale.ipv4) {
-		const tsIf = interfaces.find((i) => i.name === 'tailscale0' || /^100\./.test(i.address))
-		if (tsIf) tailscale.ipv4 = tsIf.address
-	}
-	try {
-		tailscale.statusLine = execSync('tailscale status --self 2>/dev/null | head -1', {
-			encoding: 'utf8',
-			timeout: 4000,
-		}).trim()
-	} catch {
-		tailscale.statusLine = null
-	}
-	try {
-		const st = execSync('tailscale status 2>/dev/null', { encoding: 'utf8', timeout: 4000 })
-		tailscale.needsLogin = /NeedsLogin|Please log in|Log in/i.test(st)
-	} catch {
-		tailscale.needsLogin = !tailscale.ipv4
-	}
+	const tailscale = getPublicTailscaleSummary()
 
 	const syncthingGui = `http://${primary}:8384`
 	const adminUrls = {
@@ -190,9 +169,10 @@ async function handleGet(path, ctx) {
 			},
 			tailscaleInstructions: {
 				summary:
-					'Tailscale has no local web UI. On the server run: sudo tailscale up — then open the printed URL to log in. Use the admin link below to manage machines.',
+					'Configure Tailscale from Settings → Tailscale, or use the login URL below. Admin console link manages machines on your tailnet.',
 				cliLogin: 'sudo tailscale up',
 				webAdmin: adminUrls.tailscaleAdmin,
+				settingsTab: 'tailscale',
 			},
 			adminUrls,
 		}),
@@ -211,11 +191,11 @@ function checkNuclearPassword(body, ctx) {
 	return { ok: true }
 }
 
-function runSudoNoPrompt(candidates) {
+function runSudoNoPrompt(candidates, timeoutMs = 15000) {
 	let lastErr = null
 	for (const c of candidates) {
 		try {
-			const out = execFileSync('sudo', ['-n', c.bin, ...c.args], { encoding: 'utf8', timeout: 15000 })
+			const out = execFileSync('sudo', ['-n', c.bin, ...c.args], { encoding: 'utf8', timeout: timeoutMs })
 			return { ok: true, command: `${c.bin} ${c.args.join(' ')}`.trim(), output: String(out || '').trim() }
 		} catch (e) {
 			lastErr = e
@@ -227,14 +207,36 @@ function runSudoNoPrompt(candidates) {
 
 /**
  * @param {string[]} args
+ * @param {{ timeoutMs?: number }} [opts]
  * @returns {{ ok: boolean, output?: string, error?: string }}
  */
-function runCasparControl(args) {
+function runCasparControl(args, opts = {}) {
 	if (!isExecutable(CASPAR_CONTROL)) {
 		return { ok: false, error: 'caspar-systemd-control.sh not installed — run scripts/setup/13-caspar-systemd-units.sh' }
 	}
-	const r = runSudoNoPrompt([{ bin: CASPAR_CONTROL, args }])
+	const timeoutMs = opts.timeoutMs ?? 15000
+	const r = runSudoNoPrompt([{ bin: CASPAR_CONTROL, args }], timeoutMs)
 	return r.ok ? r : { ok: false, error: r.error }
+}
+
+/**
+ * Fire-and-forget Caspar control (stop/restart can exceed systemd TimeoutStopSec).
+ * @param {string[]} args
+ */
+function runCasparControlDetached(args) {
+	if (!isExecutable(CASPAR_CONTROL)) {
+		return { ok: false, error: 'caspar-systemd-control.sh not installed — run scripts/setup/13-caspar-systemd-units.sh' }
+	}
+	try {
+		const child = spawn('sudo', ['-n', CASPAR_CONTROL, ...args], {
+			detached: true,
+			stdio: 'ignore',
+		})
+		child.unref()
+		return { ok: true }
+	} catch (e) {
+		return { ok: false, error: e?.message || 'Launch failed' }
+	}
 }
 
 /**
@@ -251,10 +253,37 @@ function parseCasparControlOutput(text) {
 	return out
 }
 
-function launchCalamaresAsync() {
+function calamaresSudoLaunchAvailable() {
+	if (!isExecutable(LAUNCH_CALAMARES)) return false
+	try {
+		const out = execFileSync('sudo', ['-n', '-l'], { encoding: 'utf8', timeout: 4000 })
+		return out.includes('launch-calamares.sh')
+	} catch {
+		return false
+	}
+}
+
+function launchCalamaresAsync(ctx) {
 	const calamares = detectCalamaresStatus()
 	if (!calamares.installed) {
 		return { ok: false, status: 503, error: 'Calamares not installed. Run eggs calamares --install on the build host.' }
+	}
+
+	if (!isExecutable(LAUNCH_CALAMARES)) {
+		return {
+			ok: false,
+			status: 503,
+			error: 'launch-calamares.sh not installed — run scripts/setup/13-caspar-systemd-units.sh',
+		}
+	}
+
+	if (!calamaresSudoLaunchAvailable()) {
+		return {
+			ok: false,
+			status: 502,
+			error:
+				'Passwordless sudo for Calamares is not configured. On the playout host run: sudo bash scripts/setup/12-passwordless-sudo.sh && sudo bash scripts/setup/13-caspar-systemd-units.sh',
+		}
 	}
 
 	const env = {
@@ -264,28 +293,21 @@ function launchCalamaresAsync() {
 	}
 	unsetWayland(env)
 
-	if (isExecutable(LAUNCH_CALAMARES)) {
-		try {
-			const child = spawn('sudo', ['-n', LAUNCH_CALAMARES], {
-				detached: true,
-				stdio: 'ignore',
-				env,
-			})
-			child.unref()
-			return { ok: true, action: 'install', mode: 'launch-calamares.sh' }
-		} catch (e) {
-			return { ok: false, status: 502, error: e?.message || 'Launch failed' }
-		}
-	}
-
 	try {
-		const child = spawn('sudo', ['-n', EGGS_BIN, 'calamares'], {
+		const child = spawn('sudo', ['-n', LAUNCH_CALAMARES], {
 			detached: true,
 			stdio: 'ignore',
 			env,
 		})
 		child.unref()
-		return { ok: true, action: 'install', mode: 'eggs calamares' }
+		if (ctx?.config) {
+			const { scheduleGuiWindowPosition } = require('../utils/x-display-session')
+			const log = (level, msg) => {
+				if (typeof ctx.log === 'function') ctx.log(level, msg)
+			}
+			scheduleGuiWindowPosition('calamares', ctx.config, { log })
+		}
+		return { ok: true, action: 'install', mode: 'launch-calamares.sh' }
 	} catch (e) {
 		return { ok: false, status: 502, error: e?.message || 'Launch failed' }
 	}
@@ -344,7 +366,7 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	if (path === '/api/system/setup/install') {
-		const launched = launchCalamaresAsync()
+		const launched = launchCalamaresAsync(ctx)
 		if (!launched.ok) {
 			return {
 				status: launched.status || 502,
@@ -359,20 +381,24 @@ async function handlePost(path, body, ctx) {
 				ok: true,
 				action: 'install',
 				mode: launched.mode,
-				note: 'Calamares launched on DISPLAY :0. Connect a screen or use local console.',
+				note: 'Calamares installer opening on the operator display (:0).',
 			}),
 		}
 	}
 
 	if (path === '/api/system/setup/caspar/stop') {
-		const r = runCasparControl(['stop'])
+		const r = runCasparControlDetached(['stop'])
 		if (!r.ok) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: r.error }) }
 		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, action: 'caspar-stop', caspar: parseCasparControlOutput(r.output) }),
+			body: jsonBody({
+				ok: true,
+				action: 'caspar-stop',
+				note: 'Stop sent. CasparCG may take up to 2 minutes to fully exit (systemd TimeoutStopSec).',
+			}),
 		}
 	}
 	if (path === '/api/system/setup/caspar/start') {
@@ -387,14 +413,18 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	if (path === '/api/system/setup/caspar/restart') {
-		const r = runCasparControl(['restart'])
+		const r = runCasparControlDetached(['restart'])
 		if (!r.ok) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: r.error }) }
 		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, action: 'caspar-restart', caspar: parseCasparControlOutput(r.output) }),
+			body: jsonBody({
+				ok: true,
+				action: 'caspar-restart',
+				note: 'Restart sent. CasparCG may take up to 2 minutes to stop before coming back.',
+			}),
 		}
 	}
 

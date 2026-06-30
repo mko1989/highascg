@@ -17,6 +17,7 @@ import {
 import { renderSceneLayerInspector, renderMultiviewInspector, renderSceneInspector, renderGlobalBorderInspector } from './inspector-panel-views.js'
 import { renderLayerPresetsMode, renderLookPresetsMode } from './inspector-panel-presets-modes.js'
 import { renderLiveAudioInputInspector } from './inspector-live-audio-input.js'
+import { renderWebpageHostInspector } from './inspector-webpage-host.js'
 import { renderPreservingFocus } from './device-view-ui-utils.js'
 
 const INSPECTOR_MODE_STORAGE = 'hacg_inspector_panel_mode'
@@ -119,6 +120,8 @@ export function initInspectorPanel(root, stateStore) {
 				return `globalBorder:${data.screenIndex}`
 			case 'liveAudioInput':
 				return `liveAudioInput:${data.slot}`
+			case 'webpageHost':
+				return `webpageHost:${data.sourceId || data.value || data.hostChannel || ''}`
 			default:
 				return String(data.type || '')
 		}
@@ -174,6 +177,11 @@ export function initInspectorPanel(root, stateStore) {
 		}
 		if (data.type === 'liveAudioInput' && data.slot != null) {
 			renderLiveAudioInputInspector(root, stateStore, data, { onClearSelection: () => update(null) })
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+		if (data.type === 'webpageHost') {
+			renderWebpageHostInspector(root, stateStore, data)
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
@@ -343,6 +351,28 @@ export function initInspectorPanel(root, stateStore) {
 		if (d == null) {
 			if (selection?.type === 'liveAudioInput') update(null)
 		}
+	})
+
+	window.addEventListener('webpage-host-select', (e) => {
+		const d = e.detail
+		if (d && (d.sourceId || d.value || d.hostChannel != null)) {
+			update({
+				type: 'webpageHost',
+				sourceId: d.sourceId,
+				value: d.value,
+				hostChannel: d.hostChannel,
+			})
+			return
+		}
+		if (d == null) {
+			if (selection?.type === 'webpageHost') update(null)
+		}
+	})
+
+	stateStore.on('extraLiveSources', () => {
+		if (panelMode !== 'inspector' || selection?.type !== 'webpageHost') return
+		if (root.querySelector('.inspector-webpage-host__url:focus')) return
+		renderWebpageHostInspector(root, stateStore, selection)
 	})
 
 	// Art-Net live updates: throttled, no sceneState `change`, skip while typing in inspector.

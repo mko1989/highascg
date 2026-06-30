@@ -98,17 +98,59 @@ function parseXrandrAllOutputs(raw) {
 }
 
 /**
- * Build stable gpu_p* rows from xrandr (all DP/HDMI outputs, connected or not).
- * @param {string} [raw] optional xrandr --query; fetched when omitted
+ * One physical port per xrandr output (laptop GPUs without A/B dual-mode lanes).
+ * @param {string} raw
  * @returns {Array<{ physicalPortId: string, slotOrder: number, dpA: string, dpB: string, connectorNumber: number, location: number }> | null}
  */
-function discoverGpuPhysicalTopologyFromXrandr(raw) {
+function discoverGpuPhysicalTopologyFromXrandrFlat(raw) {
+	const outputs = parseXrandrVideoOutputNames(raw)
+	if (!outputs.length) return null
+	return outputs.map((name, i) => ({
+		physicalPortId: `gpu_p${i}`,
+		slotOrder: i,
+		dpA: normalizePortName(name),
+		dpB: '',
+		connectorNumber: i,
+		location: i,
+	}))
+}
+
+/**
+ * Laptop / simple GPU: ≤4 DP-only xrandr outputs — one jack per line (no A/B pairing).
+ * @param {string[]} outputs raw xrandr names
+ * @param {string[][]} pairs canonical A/B groups
+ * @param {{ flatPorts?: boolean, pairAdjacentDp?: boolean }} [opts]
+ */
+function prefersFlatXrandrTopology(outputs, pairs, opts = {}) {
+	if (opts.flatPorts === true) return true
+	if (opts.pairAdjacentDp === false) return true
+	if (!outputs.length || outputs.length > 4) return false
+	const allDp = outputs.every((n) => /^DP-/i.test(String(n).replace(/^card\d+-/i, '')))
+	if (!allDp) return false
+	return pairs.length > 0 && pairs.length * 2 === outputs.length
+}
+
+/**
+ * Build stable gpu_p* rows from xrandr (all DP/HDMI outputs, connected or not).
+ * @param {string} [raw] optional xrandr --query; fetched when omitted
+ * @param {{ flatPorts?: boolean, pairAdjacentDp?: boolean }} [opts]
+ * @returns {Array<{ physicalPortId: string, slotOrder: number, dpA: string, dpB: string, connectorNumber: number, location: number }> | null}
+ */
+function discoverGpuPhysicalTopologyFromXrandr(raw, opts = {}) {
 	let query = raw
 	if (query == null || query === '') {
 		try {
 			query = getDisplaysXrandrDetailed()?.raw || ''
 		} catch {
 			query = ''
+		}
+		if (!query) {
+			try {
+				const { readBootXrandrSnapshot } = require('./boot-xrandr-snapshot')
+				query = readBootXrandrSnapshot()?.raw || ''
+			} catch {
+				query = ''
+			}
 		}
 	}
 	if (!query) return null
@@ -126,6 +168,10 @@ function discoverGpuPhysicalTopologyFromXrandr(raw) {
 		if (seenPairs.has(key)) continue
 		seenPairs.add(key)
 		pairs.push(pArr)
+	}
+
+	if (prefersFlatXrandrTopology(outputs, pairs, opts)) {
+		return discoverGpuPhysicalTopologyFromXrandrFlat(query)
 	}
 
 	return pairs.map((pArr, i) => ({
@@ -205,6 +251,8 @@ module.exports = {
 	parseXrandrVideoOutputNames,
 	parseXrandrConnectedNames,
 	parseXrandrAllOutputs,
+	prefersFlatXrandrTopology,
+	discoverGpuPhysicalTopologyFromXrandrFlat,
 	discoverGpuPhysicalTopologyFromXrandr,
 	topologyRowsEqual,
 	ensureGpuPhysicalTopologyFromXrandr,

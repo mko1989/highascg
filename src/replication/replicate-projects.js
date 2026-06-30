@@ -71,12 +71,14 @@ async function commitReplicatedProject(ctx, merged, slug) {
  * @param {object} ctx
  * @param {import('./replication-service').ReplicationRuntime} runtime
  * @param {object} project
+ * @param {{ reason?: 'save'|'autosave'|'reconcile' }} [opts]
  */
-async function pushProjectToPeer(ctx, runtime, project) {
+async function pushProjectToPeer(ctx, runtime, project, opts = {}) {
 	if (runtime.roleState.getRole() !== 'leader') return { ok: false, skipped: true }
 	const repl = getReplicationConfig(ctx.config)
 	if (!repl.enabled || !repl.peer.host) return { ok: false, skipped: true }
 
+	const reason = opts.reason || 'save'
 	const slug = projectStore.getActiveSlug(ctx.persistence || require('../utils/persistence'))
 	const payload = {
 		pairId: repl.pairId,
@@ -89,6 +91,9 @@ async function pushProjectToPeer(ctx, runtime, project) {
 	})
 	if (res.ok) {
 		runtime.projectsPushed += 1
+		if (typeof ctx.log === 'function') {
+			ctx.log('info', `[replication] project push (${reason}) ok slug=${slug || '?'}`)
+		}
 		try {
 			await require('./sync-project-media').syncProjectMediaToPeer(ctx, project, { direction: 'push' })
 		} catch (e) {
@@ -96,6 +101,11 @@ async function pushProjectToPeer(ctx, runtime, project) {
 				ctx.log('warn', '[replication] project media sync: ' + (e?.message || e))
 			}
 		}
+	} else if (typeof ctx.log === 'function') {
+		ctx.log(
+			'warn',
+			`[replication] project push (${reason}) failed slug=${slug || '?'}: ${res.error || res.status || 'unknown'}`,
+		)
 	}
 	return { ok: res.ok, status: res.status, error: res.error }
 }
@@ -148,7 +158,7 @@ async function reconcileProjectsToPeer(ctx, runtime) {
 	try {
 		const { loadFullProject } = require('../engine/project-scenes')
 		const project = await loadFullProject()
-		await pushProjectToPeer(ctx, runtime, project)
+		await pushProjectToPeer(ctx, runtime, project, { reason: 'reconcile' })
 	} catch (e) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('warn', '[replication] reconcile projects: ' + (e?.message || e))

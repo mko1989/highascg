@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>settings nuclear password harness</title>
+	<style>
+		body { font-family: sans-serif; background: #111; color: #ddd; padding: 1rem; }
+		.settings-group { margin: 0.75rem 0; }
+		.settings-group label { display: block; margin-bottom: 0.25rem; }
+		input[type="password"] { width: 240px; padding: 4px 8px; }
+	</style>
+</head>
+<body>
+	<div id="settings-modal">
+		<div class="settings-pane active" id="settings-pane-nuclear">
+			<div class="settings-group checkbox">
+				<label><input type="checkbox" id="set-nuclear-require-pass" /> Require password for nuclear actions</label>
+			</div>
+			<div class="settings-group" id="set-nuclear-password-fields">
+				<label for="set-nuclear-password">Nuclear password</label>
+				<input type="password" id="set-nuclear-password" placeholder="Required for nuclear actions when enabled" autocomplete="new-password">
+			</div>
+		</div>
+	</div>
+	<script type="module">
+		import { syncNuclearPasswordVisibility, getNuclearPasswordFromModal } from '/client/lib/settings-nuclear-shared.js'
+
+		const modal = document.getElementById('settings-modal')
+		syncNuclearPasswordVisibility(modal)
+		modal.querySelector('#set-nuclear-require-pass')?.addEventListener('change', () => {
+			syncNuclearPasswordVisibility(modal)
+		})
+		window.__settingsNuclearReady = true
+		window.__getNuclearPassword = () => getNuclearPasswordFromModal(modal)
+	</script>
+</body>
+</html>

@@ -84,7 +84,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const windowed = casparBoolEnabled(config[`screen_${n}_windowed`], true)
 	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], true)
 	const alwaysOnTop = casparBoolEnabled(config[`screen_${n}_always_on_top`], false)
-	const borderless = casparBoolEnabled(config[`screen_${n}_borderless`], false)
+	const borderless = casparBoolEnabled(config[`screen_${n}_borderless`], true)
 
 	const posX = parseOptionalPixel(config[`screen_${n}_x`], ctx.cumulativeX)
 	const posY = parseOptionalPixel(config[`screen_${n}_y`], 0)
@@ -417,6 +417,28 @@ function buildInputChannel(config, entry) {
 }
 
 /**
+ * WO-88: dedicated host channel for webpage / NDI live sources (no consumers; producer via AMCP).
+ * @param {Record<string, unknown>} config
+ * @param {{ kind: string, channel: number, layer: number, mode: string, label?: string, sourceId?: string }} entry
+ */
+function buildHostLiveChannel(config, entry) {
+	void config
+	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
+	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
+	const role =
+		entry?.kind === 'ndi_host'
+			? `NDI host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} NDI …; route:// for on-air)`
+			: `Webpage host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} [HTML] … LOOP; route:// for on-air)`
+	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
+            <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
+            <consumers/>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
+        </channel>`
+}
+
+/**
  * @param {Record<string, unknown>} config
  * @param {number|null|undefined} casparChannelNum
  */
@@ -451,6 +473,7 @@ module.exports = {
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
 	buildInputChannel,
+	buildHostLiveChannel,
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 }
