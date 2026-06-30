@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-06-30T12:35:34.749Z",
+  "generatedAt": "2026-06-30T20:28:23.669Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -69,6 +69,22 @@
       "category": "Installation",
       "description": "> **Goal:** Capture the entire running production server — Ubuntu 24.04 LTS, NVIDIA",
       "order": 21
+    },
+    {
+      "id": "CALAMARES_INSTALL_TO_DISK",
+      "title": "Install HighAsCG to internal disk (Calamares)",
+      "file": "CALAMARES_INSTALL_TO_DISK.md",
+      "category": "Installation",
+      "description": "Graphical **install-to-disk** from the live USB stick using **Calamares** (eggs integration). Use this for a **permanent playout machine** — not for preparing t",
+      "order": 21.5
+    },
+    {
+      "id": "wiki--install--calamares-install-to-disk",
+      "title": "Calamares install to disk",
+      "file": "wiki/install/calamares-install-to-disk.md",
+      "category": "Installation",
+      "description": "Install HighAsCG from the **live USB stick** onto an **internal SSD/HDD/NVMe** using the graphical Calamares wizard.",
+      "order": 21.6
     },
     {
       "id": "ISO_CONTENTS",

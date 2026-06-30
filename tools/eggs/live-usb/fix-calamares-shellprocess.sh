@@ -3,6 +3,7 @@
 # check-language-support missing offline, update-grub without path).
 #
 #   sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh
+#   HIGHASCG_CALAMARES_ROOT=/home/eggs/mnt/squashfs-calamares-patch-root sudo bash ...
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -12,8 +13,21 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
-MOD=/etc/calamares/modules
-LIB=/usr/libexec/calamares
+ROOT="${HIGHASCG_CALAMARES_ROOT:-}"
+MOD="${ROOT}/etc/calamares/modules"
+LIB="${ROOT}/usr/libexec/calamares"
+SBIN="${ROOT}/usr/sbin"
+
+if [[ -n "$ROOT" ]]; then
+	echo "==> Calamares shellprocess fix target: ${ROOT} (squashfs unpack / liveroot)"
+else
+	MOD=/etc/calamares/modules
+	LIB=/usr/libexec/calamares
+	SBIN=/usr/sbin
+	echo "==> Calamares shellprocess fix target: live system (/)"
+fi
+
+mkdir -p "$MOD" "$LIB" "$SBIN"
 
 echo "==> Calamares shellprocess: full paths for chroot (mkinitramfs, dpkg-reconfigure)"
 
@@ -51,7 +65,6 @@ EOF
 
 L10N_SRC="${REPO_ROOT}/tools/runtime/calamares-l10n-helper.sh"
 NOMODESET_SRC="${REPO_ROOT}/tools/runtime/calamares-nomodeset-helper.sh"
-install -d "$LIB"
 if [[ -f "$L10N_SRC" ]]; then
 	install -m 0755 "$L10N_SRC" "${LIB}/calamares-l10n-helper.sh"
 	echo "==> installed ${LIB}/calamares-l10n-helper.sh (offline-safe)"
@@ -61,11 +74,11 @@ if [[ -f "$NOMODESET_SRC" ]]; then
 	echo "==> installed ${LIB}/calamares-nomodeset.sh (/usr/sbin/update-grub)"
 fi
 
-if [[ ! -x /usr/sbin/cleanup.sh ]]; then
+if [[ ! -x "${SBIN}/cleanup.sh" ]]; then
 	CLEANUP_SRC="/usr/lib/penguins-eggs/conf/distros/noble/calamares/calamares-modules/cleanup/cleanup.sh"
 	if [[ -f "$CLEANUP_SRC" ]]; then
-		install -m 0755 "$CLEANUP_SRC" /usr/sbin/cleanup.sh
-		echo "==> installed /usr/sbin/cleanup.sh"
+		install -m 0755 "$CLEANUP_SRC" "${SBIN}/cleanup.sh"
+		echo "==> installed ${SBIN}/cleanup.sh"
 	fi
 fi
 

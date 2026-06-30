@@ -41,6 +41,7 @@ if [[ "${SKIP_STRIP_HOST_SWAP:-0}" != "1" ]]; then
 fi
 
 echo "==> Calamares shellprocess fixes (last chance before squashfs clone — avoids install exit 127)"
+echo "     note: eggs produce regenerates /etc/calamares; patch-iso-squashfs-calamares.sh runs after produce"
 bash "${HERE}/fix-calamares-shellprocess.sh"
 
 bash "${HERE}/verify-calamares-installed.sh"

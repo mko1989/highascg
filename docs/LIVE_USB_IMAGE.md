@@ -615,7 +615,7 @@ HighAsCG **no longer waits** on partition mount at startup — **`systemctl rest
 
 ### 7.3 Install to internal disk (optional)
 
-For a permanent machine, use §8 (Calamares / `eggs calamares`) instead of relying on live overlay or exFAT.
+For a permanent machine, use §8 (Calamares) instead of relying on live overlay or exFAT. **Full guide:** [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md).
 
 ---
 
@@ -623,25 +623,27 @@ For a permanent machine, use §8 (Calamares / `eggs calamares`) instead of relyi
 
 Once booted into the live environment, you can install the system permanently.
 
-### 8.1 Using Krill (Text Installer — penguins-eggs)
+**Canonical guide:** [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) — disk selection, **Erase disk**, manual **UEFI ESP** vs **Legacy BIOS `bios_grub`** + **`/`**, common failures (`rsync` 11, wrong USB/exFAT target).
+
+### 8.1 Calamares (recommended on live ISO)
+
+From the operator UI: **Settings → Nuclear → Install to disk**, or:
 
 ```bash
-sudo eggs krill
+sudo -n /usr/local/bin/launch-calamares.sh
 ```
 
-Krill provides a text-based wizard:
-1. Select target disk (e.g., `/dev/sda`, `/dev/nvme0n1`)
-2. Choose partitioning (auto or manual)
-3. Set hostname, timezone, user accounts
-4. Install — copies the live filesystem to the target disk
-5. Install GRUB bootloader
-6. Reboot
+**Pick the internal disk** (Kingston, NVMe, …) — **not** the USB stick or its **exFAT** partition (`HIGHASCGEXF`, often `sda3` on the stick). Use `lsblk -o NAME,SIZE,MODEL,TRAN` and `sudo /usr/local/lib/highascg/probe-internal-storage.sh --check` before opening Calamares.
 
-### 8.2 Using Calamares (Graphical — if available)
+**Easiest:** **Erase disk and install** on the internal drive. Swap: **none**.
 
-```bash
-sudo eggs calamares
-```
+**Manual partitioning (Legacy BIOS + GPT):** one **1–2 MiB** partition, **unformatted**, flag **`bios_grub`**, plus **ext4** mounted **`/`**. Without `bios_grub`, partition/GRUB steps often fail.
+
+**Manual partitioning (UEFI):** **fat32** **≥ 300 MiB** → **`/boot/efi`** (flags **boot**, **esp**), plus **ext4** **`/`**.
+
+### 8.2 Krill (text installer — eggs build host only)
+
+`eggs krill` is available on the **eggs build machine**, not on the live ISO (`penguins-eggs` is excluded from squashfs). On the stick, use **Calamares** (§8.1).
 
 ### 8.3 Manual Installation (for the manual ISO method)
 

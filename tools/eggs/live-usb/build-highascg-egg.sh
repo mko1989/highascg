@@ -124,6 +124,9 @@ systemctl stop highascg.service companion.service 2>/dev/null || true
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
 
+echo "==> Patch Calamares in squashfs (eggs produce regenerates /etc/calamares after preflight)"
+bash "${HERE}/patch-iso-squashfs-calamares.sh"
+
 echo "==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)"
 # Fresh produce already cloned host /usr into squashfs — skip 25 min squashfs rebuild.
 HIGHASCG_SKIP_SQUASHFS_REFRESH=1 bash "${HERE}/inject-iso-boot-branding.sh"

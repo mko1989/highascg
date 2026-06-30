@@ -63,7 +63,7 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 | POST | `/api/system/setup/restart-window-manager` | nodm restart (password) |
 | POST | `/api/system/setup/restart-app` | Restart HighAsCG Node process |
 | POST | `/api/system/setup/reboot` | Reboot host (password) |
-| POST | `/api/system/setup/install` | Launch Calamares installer |
+| POST | `/api/system/setup/install` | Launch Calamares installer — see [Calamares install guide](../../CALAMARES_INSTALL_TO_DISK.md) |
 | GET | `/api/system/caspar-arm` | Staged Caspar armed? |
 | POST | `/api/system/caspar-arm` | Arm Caspar start |
 | DELETE | `/api/system/caspar-arm` | Disarm |

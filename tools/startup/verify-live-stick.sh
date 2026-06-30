@@ -220,6 +220,7 @@ else
 	bad "Calamares shellprocess not patched — rebuild ISO after fix-calamares-shellprocess.sh"
 fi
 	echo "  Manual GUI test (local console): sudo -n /usr/local/bin/launch-calamares.sh"
+	echo "  Partitioning (bios_grub + /, UEFI ESP): docs/CALAMARES_INSTALL_TO_DISK.md"
 	echo "  Storage probe: sudo /usr/local/lib/highascg/probe-internal-storage.sh --check"
 	echo "  API test: curl -s http://127.0.0.1:4200/api/system/setup | jq .calamares"
 echo "  API launch: curl -s -X POST http://127.0.0.1:4200/api/system/setup/install -H 'Content-Type: application/json' -d '{}'"

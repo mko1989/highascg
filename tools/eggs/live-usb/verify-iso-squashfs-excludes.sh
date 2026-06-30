@@ -152,7 +152,7 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 			| grep -q '/usr/sbin/mkinitramfs'; then
 			ok "present: shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs (avoids exit 127)"
 		else
-			bad "shellprocess@mkinitramfs not patched — run install-eggs-calamares.sh (fix-calamares-shellprocess)"
+			bad "shellprocess@mkinitramfs not patched — eggs produce overwrote preflight; run patch-iso-squashfs-calamares.sh"
 		fi
 	else
 		bad "missing etc/calamares/modules/shellprocess@mkinitramfs.conf"

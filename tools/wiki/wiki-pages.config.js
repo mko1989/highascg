@@ -9,6 +9,8 @@ module.exports = [
 	{ match: /^MODULES\.md$/, category: 'Getting started', order: 12 },
 	{ match: /^MANUAL_INSTALL\.md$/, category: 'Installation', order: 20 },
 	{ match: /^LIVE_USB_IMAGE\.md$/, category: 'Installation', order: 21 },
+	{ match: /^CALAMARES_INSTALL_TO_DISK\.md$/, category: 'Installation', order: 21.5 },
+	{ match: /^wiki\/install\/calamares-install-to-disk\.md$/, category: 'Installation', order: 21.6, title: 'Calamares install (wiki)' },
 	{ match: /^ISO_CONTENTS\.md$/, category: 'Installation', order: 22 },
 	{ match: /^DEV_RELEASE_GITHUB\.md$/, category: 'Installation', order: 23 },
 	{ match: /^BOOT_EMERGENCY_RECOVERY\.md$/, category: 'Installation', order: 24 },
