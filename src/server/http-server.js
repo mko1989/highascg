@@ -45,6 +45,30 @@ function mapInstanceStaticPath(requestPath) {
 	return rest
 }
 
+const MAP_PATHS = [
+	path.join(__dirname, '..', '..', 'dist-web', 'map.html'),
+	path.join(__dirname, '..', '..', 'client', 'map.html')
+]
+
+async function serveMap() {
+	for (const mapPath of MAP_PATHS) {
+		if (fs.existsSync(mapPath)) {
+			const body = await fs.promises.readFile(mapPath, 'utf8')
+			return {
+				status: 200,
+				headers: {
+					'Content-Type': 'text/html; charset=utf-8',
+					'Cache-Control': 'no-cache, no-store, must-revalidate',
+					'Pragma': 'no-cache',
+					'Expires': '0'
+				},
+				body
+			}
+		}
+	}
+	return { status: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Map page not available' }) }
+}
+
 /**
  * @param {string} requestPath
  * @param {{
@@ -235,6 +259,8 @@ function startHttpServer(options) {
 				const qs = qIdx >= 0 ? rawPath.slice(qIdx) : ''
 				const routedPath = reqPathForRouting + qs
 				result = await routeApi(req.method || 'GET', routedPath, body, req)
+			} else if (reqPathForRouting === '/map' || reqPathForRouting === '/map/') {
+				result = await serveMap()
 			} else if (isHeadlessMode()) {
 				result = {
 					status: 404,

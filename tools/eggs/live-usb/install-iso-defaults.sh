@@ -41,7 +41,21 @@ run_as_caspar() {
 	fi
 }
 
+PAUSE_HELPER="${HERE}/pause-heavy-services-for-iso-build.sh"
+pause_for_build() {
+	if [[ "$(id -u)" -eq 0 ]] && [[ -f "$PAUSE_HELPER" ]]; then
+		bash "$PAUSE_HELPER" pause
+	fi
+}
+restore_after_build() {
+	if [[ "$(id -u)" -eq 0 ]] && [[ -f "$PAUSE_HELPER" ]]; then
+		bash "$PAUSE_HELPER" restore
+	fi
+}
+
 if [[ "$BUILD_WEB" == "1" ]]; then
+	pause_for_build
+	trap restore_after_build EXIT
 	echo "==> npm ci (includes devDeps for Vite build)"
 	if [[ -f "${HIGHASCG_ROOT}/package-lock.json" ]]; then
 		run_as_caspar 'npm ci'
@@ -49,7 +63,10 @@ if [[ "$BUILD_WEB" == "1" ]]; then
 		run_as_caspar 'npm install'
 	fi
 	echo "==> npm run build:client (client/ → dist-web/ on ISO squashfs)"
-	run_as_caspar 'npm run build:client'
+	# Cap Node heap during Vite — full dev graph + source maps can spike RAM on a busy build host.
+	run_as_caspar 'export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"; npm run build:client'
+	restore_after_build
+	trap - EXIT
 	[[ -f "${HIGHASCG_ROOT}/dist-web/index.html" ]] || {
 		echo "ERROR: dist-web/index.html missing after build:client" >&2
 		exit 1

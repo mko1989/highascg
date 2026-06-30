@@ -1,0 +1,16 @@
+[Unit]
+Description=HighAsCG internal storage probe (NVMe/VMD for Calamares)
+Documentation=file:/usr/share/doc/highascg-wo47/EXFAT_DATA_ZERO_TOUCH.md
+DefaultDependencies=no
+After=systemd-udev-settle.service local-fs.target
+Before=nodm.service highascg.service
+ConditionPathExists=/usr/local/lib/highascg/probe-internal-storage.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=60
+ExecStart=/usr/local/lib/highascg/probe-internal-storage.sh
+
+[Install]
+WantedBy=multi-user.target

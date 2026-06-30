@@ -102,6 +102,7 @@ fi
 bash "${HERE}/pre-produce-preflight.sh"
 
 echo "==> Finalize GRUB splash + Plymouth initramfs (must run immediately before eggs produce)"
+bash "${HERE}/install-storage-drivers-for-iso.sh"
 bash "${HERE}/finalize-boot-branding-for-eggs-produce.sh"
 
 sample="$(file -b /usr/share/plymouth/themes/highascg/throbber-0001.png 2>/dev/null || true)"
@@ -117,8 +118,8 @@ THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 	exit 1
 }
 
-echo "==> Stop highascg during squashfs (avoid .highascg-state.json changing mid-pack)"
-systemctl stop highascg.service 2>/dev/null || true
+echo "==> Stop highascg + companion during squashfs (avoid state changing mid-pack; free RAM)"
+systemctl stop highascg.service companion.service 2>/dev/null || true
 
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"

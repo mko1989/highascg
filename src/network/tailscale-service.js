@@ -284,19 +284,31 @@ function runSudo(candidates, timeoutMs = 20000) {
 function setTailscaleEnabled(enabled) {
 	saveTailscaleConfig({ enabled })
 	if (enabled) {
-		return runSudo([
+		/** @type {Array<{bin: string, args: string[]}>} */
+		const candidates = [
 			{ bin: '/bin/systemctl', args: ['enable', '--now', 'tailscaled'] },
 			{ bin: '/usr/bin/systemctl', args: ['enable', '--now', 'tailscaled'] },
-			{ bin: '/bin/systemctl', args: ['start', 'snap.tailscale.tailscaled.service'] },
-			{ bin: '/usr/bin/systemctl', args: ['start', 'snap.tailscale.tailscaled.service'] },
-		])
+		]
+		if (!fs.existsSync('/usr/bin/tailscale') && fs.existsSync('/snap/bin/tailscale')) {
+			candidates.push(
+				{ bin: '/bin/systemctl', args: ['start', 'snap.tailscale.tailscaled.service'] },
+				{ bin: '/usr/bin/systemctl', args: ['start', 'snap.tailscale.tailscaled.service'] },
+			)
+		}
+		return runSudo(candidates)
 	}
-	return runSudo([
+	/** @type {Array<{bin: string, args: string[]}>} */
+	const stopCandidates = [
 		{ bin: '/bin/systemctl', args: ['stop', 'tailscaled'] },
 		{ bin: '/usr/bin/systemctl', args: ['stop', 'tailscaled'] },
-		{ bin: '/bin/systemctl', args: ['stop', 'snap.tailscale.tailscaled.service'] },
-		{ bin: '/usr/bin/systemctl', args: ['stop', 'snap.tailscale.tailscaled.service'] },
-	])
+	]
+	if (fs.existsSync('/snap/bin/tailscale')) {
+		stopCandidates.push(
+			{ bin: '/bin/systemctl', args: ['stop', 'snap.tailscale.tailscaled.service'] },
+			{ bin: '/usr/bin/systemctl', args: ['stop', 'snap.tailscale.tailscaled.service'] },
+		)
+	}
+	return runSudo(stopCandidates)
 }
 
 /**
@@ -335,16 +347,18 @@ async function startTailscaleLogin(prefs) {
 			}
 			const r = runSudo([
 				{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] },
-				{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) },
-				{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) },
+				...(fs.existsSync('/usr/bin/tailscale')
+					? [{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]
+					: [{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]),
 			])
 			if (!r.ok) return { ok: false, error: r.error }
 		}
 	} else {
 		const r = runSudo([
 			{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] },
-			{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) },
-			{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) },
+			...(fs.existsSync('/usr/bin/tailscale')
+				? [{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]
+				: [{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]),
 		])
 		if (!r.ok) return { ok: false, error: r.error }
 	}

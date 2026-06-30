@@ -32,8 +32,15 @@ FAIL=0
 
 echo "=== 1. Union persistence (OS overlay on USB) ==="
 echo "cmdline: $(cat /proc/cmdline)"
+EXFAT_ONLY=0
+if blkid -L HIGHASCGEXF &>/dev/null && ! blkid -L persistence &>/dev/null; then
+	EXFAT_ONLY=1
+	ok "WO-47 exFAT-only stick (HIGHASCGEXF, no union persistence partition — config on exFAT)"
+fi
 if grep -qw persistence /proc/cmdline 2>/dev/null; then
 	ok "kernel booted with persistence (USB / union overlay)"
+elif [[ "$EXFAT_ONLY" -eq 1 ]]; then
+	ok "exFAT-only layout — union persistence not required (durable config on HIGHASCGEXF)"
 elif grep -q cow_spacesize /proc/cmdline 2>/dev/null; then
 	warn "cmdline has cow_spacesize but NOT persistence — OS changes use RAM overlay (2G), not LABEL=persistence partition"
 	bad "rebuild ISO with highascg-eggs-theme + reflash; boot entry must include persistence kernel param"
@@ -125,10 +132,16 @@ for sp in /run/live/medium/boot/grub/splash.png /lib/live/mount/medium/boot/grub
 	[[ -f "$sp" ]] && ok "ISO splash.png on medium ($(stat -c '%s bytes' "$sp"))" && break
 done
 INITRD=""
-for i in /boot/initrd.img /boot/initrd.img-*; do
-	[[ -f "$i" ]] && INITRD="$i" && break
-done
-[[ -z "$INITRD" ]] && shopt -s nullglob && for i in /run/live/medium/live/initrd*.img; do INITRD="$i"; break; done && shopt -u nullglob
+if [[ -d /run/live/medium ]]; then
+	shopt -s nullglob
+	for i in /run/live/medium/live/initrd*.img; do INITRD="$i"; break; done
+	shopt -u nullglob
+fi
+if [[ -z "$INITRD" ]]; then
+	for i in /boot/initrd.img /boot/initrd.img-*; do
+		[[ -f "$i" ]] && INITRD="$i" && break
+	done
+fi
 if [[ -n "$INITRD" ]] && command -v lsinitramfs >/dev/null 2>&1; then
 	if initrd_contains "$INITRD" 'usr/share/plymouth/themes/highascg'; then
 		ok "initrd has plymouth theme highascg"
@@ -179,14 +192,36 @@ if [[ -f "${BRAND}/branding.desc" ]]; then
 	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
 	if [[ -n "$icon" ]] && [[ -f "${BRAND}/${icon}" ]]; then
 		ok "Calamares branding logo ${icon}"
+	elif [[ -x /usr/local/lib/highascg/fix-calamares-branding.sh ]]; then
+		echo "  repairing Calamares branding (eggs logo name mismatch)…"
+		if sudo /usr/local/lib/highascg/fix-calamares-branding.sh 2>/dev/null \
+			&& [[ -f "${BRAND}/${icon}" ]]; then
+			ok "Calamares branding logo ${icon} (repaired)"
+		else
+			bad "Calamares branding logo missing (${icon:-unknown}) — sudo bash tools/eggs/live-usb/install-eggs-calamares.sh"
+		fi
 	else
-		bad "Calamares branding logo missing (${icon:-unknown}) — on build host: sudo bash tools/eggs/live-usb/install-eggs-calamares.sh; on stick: sudo ln -sf eggs-logo.png ${BRAND}/highascg-eggs-theme-logo.png"
+		bad "Calamares branding logo missing (${icon:-unknown}) — rebuild ISO after install-eggs-calamares.sh"
 	fi
 else
 	bad "Calamares branding.desc missing — ISO built without install-eggs-calamares.sh"
 fi
-echo "  Manual GUI test (local console): sudo -n /usr/local/bin/launch-calamares.sh"
-echo "  API test: curl -s http://127.0.0.1:4200/api/system/setup | jq .calamares"
+if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+	ok "Calamares shellprocess patched (exit-127 fix)"
+elif [[ -f "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" ]]; then
+	echo "  applying Calamares shellprocess fix (chroot PATH / offline l10n)…"
+	if sudo bash "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" 2>/dev/null \
+		&& grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+		ok "Calamares shellprocess patched (exit-127 fix, applied from repo)"
+	else
+		bad "Calamares shellprocess not patched — rebuild ISO or sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh"
+	fi
+else
+	bad "Calamares shellprocess not patched — rebuild ISO after fix-calamares-shellprocess.sh"
+fi
+	echo "  Manual GUI test (local console): sudo -n /usr/local/bin/launch-calamares.sh"
+	echo "  Storage probe: sudo /usr/local/lib/highascg/probe-internal-storage.sh --check"
+	echo "  API test: curl -s http://127.0.0.1:4200/api/system/setup | jq .calamares"
 echo "  API launch: curl -s -X POST http://127.0.0.1:4200/api/system/setup/install -H 'Content-Type: application/json' -d '{}'"
 
 echo

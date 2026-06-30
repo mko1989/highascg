@@ -35,6 +35,14 @@ The Node service on port **4200** serves **both** the REST/WebSocket API and the
 
 ---
 
+## 🗺️ Interactive Project Map
+
+HighAsCG includes a built-in interactive architecture map that visualizes the entire codebase, file dependencies, and cross-references.
+- **View it at**: `http://<playout-ip>:4200/map` (or via the "Map" link in the header bar).
+- **Features**: Force-directed dependency graph, full-text search, deep linking, and cross-module referencing.
+
+---
+
 ## 🚀 Getting Started
 
 ### Requirements

@@ -4,7 +4,11 @@ set -euo pipefail
 
 USB_LABEL="${EXFAT_LABEL:-HIGHASCGEXF}"
 MP="${HIGHASCG_EXFAT_ROOT:-/home/casparcg/exfat}"
-WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-5}"
+if [[ -d /run/live ]]; then
+	WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-30}"
+else
+	WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-12}"
+fi
 LOG=/var/log/highascg-exfat-boot.log
 
 log() {
@@ -20,10 +24,9 @@ log() {
 mkdir -p "$(dirname "$LOG")"
 touch "$LOG"
 
-# highascg-bridge-boot.service runs before this unit (systemd After=); do not wait again here.
-
-USB_DEV="/dev/disk/by-label/${USB_LABEL}"
-if ! findmnt -n "$MP" &>/dev/null; then
+if findmnt -n "$MP" &>/dev/null; then
+	log "Already mounted: $MP ($(findmnt -n -o SOURCE,FSTYPE "$MP")) — continue pipeline"
+else
 	log "Waiting up to ${WAIT_SEC}s for USB exFAT label ${USB_LABEL}"
 	found=0
 	for ((i = 0; i < WAIT_SEC; i++)); do
@@ -47,13 +50,14 @@ if ! findmnt -n "$MP" &>/dev/null; then
 			mount -t exfat -o "defaults,uid=${uid},gid=${gid},umask=002" "$USB_DEV" "$MP" \
 				|| mount -o "defaults,uid=${uid},gid=${gid},umask=002" "$USB_DEV" "$MP" \
 				|| {
-					log "ERROR: mount failed for $USB_DEV on $MP"
-					exit 1
+					log "WARN: direct mount failed — trying home-casparcg-exfat.mount"
+					systemctl reset-failed home-casparcg-exfat.mount 2>>"$LOG" || true
+					systemctl start home-casparcg-exfat.mount 2>>"$LOG" || true
 				}
 		fi
 	fi
 
-	for ((i = 0; i < 30; i++)); do
+	for ((i = 0; i < 45; i++)); do
 		findmnt -n "$MP" &>/dev/null && break
 		sleep 1
 	done

@@ -89,6 +89,28 @@ else
 	fail "passwordless sudo for Calamares missing — sudo bash ${REPO_ROOT}/scripts/setup/12-passwordless-sudo.sh ${USER_CASPAR}"
 fi
 
+if [[ -x /usr/sbin/cleanup.sh ]]; then
+	ok "/usr/sbin/cleanup.sh (Calamares cleanup job)"
+else
+	fail "missing /usr/sbin/cleanup.sh — run fix-calamares-shellprocess.sh"
+fi
+
+if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+	ok "shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs"
+else
+	fail "shellprocess@mkinitramfs not patched — run fix-calamares-shellprocess.sh"
+fi
+
+if [[ -x /usr/libexec/calamares/calamares-l10n-helper.sh ]]; then
+	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null; then
+		ok "/usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe)"
+	else
+		fail "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+	fi
+else
+	fail "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
+fi
+
 if [[ "$FAIL" -gt 0 ]]; then
 	echo "Calamares verify FAILED (${FAIL} error(s))." >&2
 	exit 1

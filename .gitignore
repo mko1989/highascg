@@ -32,6 +32,10 @@ data/waveforms/
 dist-web/
 dist/
 
+# Generated map data
+client/assets/map-data.json
+dist-web/assets/map-data.json
+
 # Local/runtime-heavy folders (never commit)
 CasparCG_Enhanced-main/
 cef-cache/

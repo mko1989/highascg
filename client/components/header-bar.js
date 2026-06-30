@@ -262,9 +262,16 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		autosaveIndicator.style.opacity = '1'
 	})
 
+	const mapLink = document.createElement('a');
+	mapLink.href = '/map';
+	mapLink.target = '_blank';
+	mapLink.className = 'header-bar__map-link';
+	mapLink.innerHTML = '🗺️ Map';
+	mapLink.title = 'Project Architecture Map';
+
 	const leftWrap = document.createElement('div')
 	leftWrap.className = 'header-left'
-	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn, autosaveIndicator)
+	leftWrap.append(nameWrap, saveBtn, loadBtn, newProjectBtn, mapLink, autosaveIndicator)
 
 	const midWrap = document.createElement('div')
 	midWrap.className = 'header-mid'

@@ -64,6 +64,16 @@ run_verify_live_stick() {
 	bash "${HERE}/verify-live-stick.sh" || FAIL=$((FAIL + 1))
 }
 
+run_verify_decklink() {
+	banner "DeckLink / Desktop Video (WO-92)"
+	bash "${HERE}/verify-decklink.sh" || FAIL=$((FAIL + 1))
+}
+
+run_verify_storage() {
+	banner "Storage / NVMe (Calamares install-to-disk)"
+	bash "${HERE}/verify-storage-drivers.sh" || FAIL=$((FAIL + 1))
+}
+
 run_stick_boot_qa() {
 	banner "Stick boot QA modules"
 	bash "${HERE}/stick-boot-test/run-stick-boot-tests.sh" "${STICK_ARGS[@]}" || FAIL=$((FAIL + 1))
@@ -84,6 +94,8 @@ else
 	run_verify_passwordless_sudo
 	run_verify_caspar_autostart
 	run_verify_live_stick
+	run_verify_storage
+	run_verify_decklink
 	run_stick_boot_qa
 fi
 

@@ -63,6 +63,7 @@ install -m 0644 "$TMP_SERVER" /etc/systemd/system/casparcg-server.service
 install -d /usr/local/bin
 install -m 0755 "${RUNTIME_SRC}/launch-calamares.sh" /usr/local/bin/launch-calamares.sh
 install -m 0755 "${RUNTIME_SRC}/caspar-systemd-control.sh" /usr/local/bin/caspar-systemd-control.sh
+install -m 0755 "${RUNTIME_SRC}/caspar-systemd-cleanup.sh" /usr/local/bin/caspar-systemd-cleanup.sh
 
 mkdir -p /run/highascg
 chown "${USER_CASPAR}:${USER_CASPAR}" /run/highascg 2>/dev/null || chmod 1777 /run/highascg 2>/dev/null || true

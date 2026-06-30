@@ -18,6 +18,7 @@ Everything ships from **this repository** ([highascg](https://github.com/mko1989
 | Path | Role |
 |------|------|
 | **`client/`** | **Canonical operator UI sources** (dashboard, scenes, device view, timeline, settings) |
+| **`client/map.html`** | **Interactive Project Map** sources (served at `/map`) |
 | **`dist-web/`** | Vite production build — **what playout serves** at `/` |
 | **`src/`**, **`index.js`** | Node API bridge (Caspar, OS, WebSocket, config) |
 | **`client/tools/electron-launcher/`** | Electron hub sources — packaged separately as [**highascg-client**](https://github.com/mko1989/highascg-client) |

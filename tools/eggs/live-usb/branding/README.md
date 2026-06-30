@@ -56,6 +56,14 @@ After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highas
 
 If you still see **penguins** at the GRUB menu or **terminal text** during boot, the ISO was built without that step (or without `branding/splash.png`). Rebuild with `sudo npm run eggs:build` and re-flash.
 
+### GRUB menu: cannot see which entry is highlighted
+
+**Symptom:** Labels visible but the selected row looks identical to the others.
+
+**Cause:** `item_color` and `selected_item_color` were both `white`; only a subtle background shift marked selection.
+
+**Fix (in repo):** selected row = bright blue bar (`94, 179, 255`) + dark text (`#0c1220`); unselected = light gray (`#b8c4d8`). Text fallback: `menu_color_highlight=black/light-cyan`. Rebuild and re-flash.
+
 ### GRUB menu: blank black panel (no entry labels)
 
 **Symptom:** Wallpaper visible but a dark rectangle covers the menu; no white text / no selectable lines.

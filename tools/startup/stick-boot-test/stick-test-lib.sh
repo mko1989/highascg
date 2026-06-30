@@ -41,9 +41,18 @@ st_is_live_session() {
 }
 
 st_exfat_label_mounted() {
-	local mp
+	local mp dev
 	mp="$(findmnt -n -o TARGET -L HIGHASCGEXF 2>/dev/null || true)"
-	[[ -n "$mp" ]]
+	if [[ -n "$mp" ]]; then
+		return 0
+	fi
+	if mountpoint -q "${EXFAT}" 2>/dev/null; then
+		dev="$(findmnt -n -o SOURCE "${EXFAT}" 2>/dev/null || true)"
+		if [[ "$dev" == *HIGHASCGEXF* ]] || blkid -s LABEL -o value "$dev" 2>/dev/null | grep -qx HIGHASCGEXF; then
+			return 0
+		fi
+	fi
+	return 1
 }
 
 st_summary() {

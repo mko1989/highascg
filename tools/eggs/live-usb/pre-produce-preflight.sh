@@ -35,6 +35,14 @@ fi
 
 bash "${HERE}/stop-and-unmount-wo47-for-eggs-produce.sh"
 
+if [[ "${SKIP_STRIP_HOST_SWAP:-0}" != "1" ]]; then
+	echo "==> strip host swap for live ISO (swapoff + drop fstab lines — right before produce)"
+	bash "${HERE}/strip-host-swap-for-live-iso.sh" prepare
+fi
+
+echo "==> Calamares shellprocess fixes (last chance before squashfs clone — avoids install exit 127)"
+bash "${HERE}/fix-calamares-shellprocess.sh"
+
 bash "${HERE}/verify-calamares-installed.sh"
 
 echo "    liveroot: ${LIVEROOT} — left untouched"

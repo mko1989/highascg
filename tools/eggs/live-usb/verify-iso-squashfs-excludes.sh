@@ -147,6 +147,49 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing Calamares branding fixer — run install-eggs-calamares.sh before produce"
 	fi
+	if squash_has_path 'etc/calamares/modules/shellprocess@mkinitramfs.conf'; then
+		if unsquashfs -cat "$SQ" etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null \
+			| grep -q '/usr/sbin/mkinitramfs'; then
+			ok "present: shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs (avoids exit 127)"
+		else
+			bad "shellprocess@mkinitramfs not patched — run install-eggs-calamares.sh (fix-calamares-shellprocess)"
+		fi
+	else
+		bad "missing etc/calamares/modules/shellprocess@mkinitramfs.conf"
+	fi
+	if squash_has_path 'usr/sbin/cleanup.sh'; then
+		ok "present: /usr/sbin/cleanup.sh (Calamares cleanup job)"
+	else
+		bad "missing /usr/sbin/cleanup.sh — run install-eggs-calamares.sh (fix-calamares-shellprocess)"
+	fi
+	if squash_has_path 'usr/libexec/calamares/calamares-l10n-helper.sh'; then
+		if unsquashfs -cat "$SQ" usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null \
+			| grep -q 'HighAsCG — offline-safe'; then
+			ok "present: /usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe l10n)"
+		else
+			bad "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh before produce"
+		fi
+	else
+		bad "missing calamares-l10n-helper.sh — run install-eggs-calamares.sh"
+	fi
+	if squash_has_path 'etc/calamares/modules/shellprocess@boot_reconfigure.conf'; then
+		if unsquashfs -cat "$SQ" etc/calamares/modules/shellprocess@boot_reconfigure.conf 2>/dev/null \
+			| grep -q '/usr/sbin/dpkg-reconfigure'; then
+			ok "present: shellprocess@boot_reconfigure uses /usr/sbin/dpkg-reconfigure"
+		else
+			bad "shellprocess@boot_reconfigure not patched — run fix-calamares-shellprocess.sh before produce"
+		fi
+	fi
+	if squash_has_path 'usr/local/lib/highascg/probe-internal-storage.sh'; then
+		ok "present: /usr/local/lib/highascg/probe-internal-storage.sh (NVMe/VMD for Calamares)"
+	else
+		bad "missing probe-internal-storage.sh — run install-storage-drivers-for-iso.sh"
+	fi
+	if squash_has_path 'usr/local/bin/caspar-systemd-cleanup.sh'; then
+		ok "present: /usr/local/bin/caspar-systemd-cleanup.sh (orphan caspar cleanup)"
+	else
+		bad "missing caspar-systemd-cleanup.sh — re-run sync-caspar-supervisor-wiring.sh"
+	fi
 else
 	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skip Calamares squashfs checks"
 fi
@@ -156,6 +199,7 @@ if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "1" ]]; then
 		'home/casparcg/highascg/tools/startup/run-health-checks.sh' \
 		'home/casparcg/highascg/tools/startup/verify-live-stick.sh' \
 		'home/casparcg/highascg/tools/startup/verify-passwordless-sudo.sh' \
+		'home/casparcg/highascg/tools/startup/verify-decklink.sh' \
 		'home/casparcg/highascg/tools/startup/stick-boot-test/run-stick-boot-tests.sh'; do
 		if squash_has_path "$needle"; then
 			ok "present: ${needle} (post-boot QA on stick)"

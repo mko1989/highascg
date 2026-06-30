@@ -7,6 +7,7 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 | Document | Topic |
 |----------|--------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **Unified playout stack** — API + `dist-web/` on `:4200`, same machine |
+| [Interactive Map](/map) | **Project Map** — Visual architecture graph (served at `/map` at runtime) |
 | [PLAN_SERVER_CLIENT_SPLIT.md](PLAN_SERVER_CLIENT_SPLIT.md) | Historical WO-51 headless plan (superseded by WO-52) |
 | [../from_client/AGENT_SERVER_CLIENT_MERGE.md](../from_client/AGENT_SERVER_CLIENT_MERGE.md) | **WO-52** deploy checklist — API + UI on playout |
 | [MANUAL_INSTALL.md](MANUAL_INSTALL.md) | Production install on Ubuntu (`scripts/install.sh`) |

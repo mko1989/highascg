@@ -92,6 +92,9 @@ fi
 echo "==> Calamares branding logo (eggs 26.6.2 name mismatch — bake before squashfs clone)"
 run_branding_fix
 
+echo "==> Calamares shellprocess fixes (chroot PATH / offline l10n — avoid exit 127)"
+bash "${HERE}/fix-calamares-shellprocess.sh"
+
 calamares_polkit_policy() {
 	local p
 	for p in \
@@ -121,6 +124,14 @@ fi
 
 echo "==> Calamares verify (must pass before eggs produce)"
 bash "${HERE}/verify-calamares-installed.sh"
+
+BRANDING_UNIT="${REPO_ROOT}/scripts/systemd/highascg-calamares-branding.service"
+if [[ -f "$BRANDING_UNIT" ]]; then
+	install -m 0644 "$BRANDING_UNIT" /etc/systemd/system/highascg-calamares-branding.service
+	systemctl daemon-reload
+	systemctl enable highascg-calamares-branding.service
+	echo "==> enabled highascg-calamares-branding.service (boot-time logo repair)"
+fi
 
 echo "OK: Calamares ready ($(calamares --version 2>/dev/null | head -1 || echo calamares))"
 echo "     theme: ${THEME_ABS}"

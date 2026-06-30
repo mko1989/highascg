@@ -51,10 +51,9 @@ HIGHASCG_ISO_EMBED_SERVER="${HIGHASCG_ISO_EMBED_SERVER:-1}"
 HIGHASCG_ISO_BUILD_WEB="${HIGHASCG_ISO_BUILD_WEB:-1}"
 SKIP_STRIP_HOST_SWAP="${SKIP_STRIP_HOST_SWAP:-0}"
 
-if [[ "$SKIP_STRIP_HOST_SWAP" != "1" ]]; then
-	echo "==> strip host swap from live USB payload (prepare; restore after eggs produce)"
-	bash "${HERE}/strip-host-swap-for-live-iso.sh" prepare
-fi
+# Swap is stripped in pre-produce-preflight.sh (or build-highascg-egg.sh) immediately before
+# eggs produce — NOT here. swapoff at prepare start caused OOM during npm ci / vite build when
+# Companion/highascg were still running (kernel log: swapoff invoked oom-killer).
 
 if [[ "$SKIP_APT" != "1" ]]; then
 	echo "==> apt: packages for WO-47 + stick tooling (offline-safe on target)"
@@ -85,6 +84,9 @@ bash "${REPO_ROOT}/tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
 
 echo "==> Calamares (install-to-disk GUI on live ISO)"
 bash "${HERE}/install-eggs-calamares.sh"
+
+echo "==> Storage drivers (NVMe/VMD for Calamares partition page)"
+bash "${HERE}/install-storage-drivers-for-iso.sh"
 
 echo "==> playout mount stubs under ${HIGHASCG_ROOT}"
 GRP=$(id -gn "$USER_CASPAR")
@@ -149,6 +151,9 @@ bash "${REPO_ROOT}/scripts/setup/sync-caspar-supervisor-wiring.sh" "$USER_CASPAR
 
 echo "==> passwordless sudo (Nuclear Install to disk + Calamares on :0)"
 bash "${REPO_ROOT}/scripts/setup/12-passwordless-sudo.sh" "$USER_CASPAR"
+
+echo "==> Tailscale apt daemon (mask snap unit from build host clone)"
+bash "${REPO_ROOT}/scripts/setup/install-tailscale-deb-for-iso.sh"
 
 echo "==> fast boot (cap network wait-online; mask networkd-wait-online)"
 bash "${REPO_ROOT}/scripts/boot/install-fast-boot-network.sh"

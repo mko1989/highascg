@@ -904,6 +904,16 @@ class MapExplorer {
         this.gridEl.innerHTML = '';
         this.dependencyGraph.clear();
         
+        if (!this.isFlatGraph && node !== this.data?.root) {
+            const titleEl = document.createElement('div');
+            titleEl.className = 'map-level-title';
+            titleEl.textContent = node.label;
+            this.viewportEl.appendChild(titleEl);
+            setTimeout(() => {
+                if (titleEl.parentNode) titleEl.remove();
+            }, 800);
+        }
+        
         if (this.isFlatGraph) {
             this.gridEl.classList.add('map-grid--flat-graph');
         } else {
@@ -914,6 +924,11 @@ class MapExplorer {
         
         if (this.isFlatGraph) {
             nodesToRender = this.getFlatTreeFiles(node);
+        }
+        
+        const statsEl = document.getElementById('map-header-stats');
+        if (statsEl) {
+            statsEl.innerHTML = `<span class="map-header__count">${nodesToRender.length} nodes</span><span class="map-header__depth">· Layer ${this.path.length}</span>`;
         }
         
         if (nodesToRender.length === 0) {
@@ -1090,6 +1105,7 @@ class MapExplorer {
             <header class="map-sidebar__header">
                 <h2 class="map-sidebar__title">${node.label}</h2>
                 <span class="map-sidebar__kind">${node.kind}</span>
+                <button class="map-sidebar__copy-link" title="Copy link to this node">🔗 Copy Link</button>
             </header>
             <p class="map-sidebar__description">${node.description || ''}</p>
             <section class="map-sidebar__meta">
@@ -1098,6 +1114,57 @@ class MapExplorer {
         `;
 
         this.sidebarEl.classList.remove('map-sidebar--collapsed');
+        
+        this.sidebarEl.querySelector('.map-sidebar__copy-link').addEventListener('click', () => {
+            this.copyNodeLink(node);
+        });
+    }
+
+    buildPathToNode(node) {
+        const search = (curr, target, currentPath) => {
+            if (curr.id === target.id) return [...currentPath, curr];
+            if (!curr.children) return null;
+            for (const child of curr.children) {
+                const found = search(child, target, [...currentPath, curr]);
+                if (found) return found;
+            }
+            return null;
+        };
+        return search(this.data.root, node, []) || [];
+    }
+
+    copyNodeLink(node) {
+        const path = this.buildPathToNode(node);
+        const hash = '#/' + path.map(n => encodeURIComponent(n.id)).join('/');
+        const url = window.location.origin + '/map' + hash;
+        navigator.clipboard.writeText(url).then(() => {
+            this.showToast('Link copied!');
+        });
+    }
+
+    showToast(msg) {
+        let container = document.getElementById('map-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'map-toast-container';
+            container.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.style.cssText = 'background:rgba(139,92,246,0.9);color:white;padding:12px 20px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.5);opacity:0;transform:translateY(10px);transition:all 0.3s;';
+        toast.textContent = msg;
+        container.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     hideSidebar() {

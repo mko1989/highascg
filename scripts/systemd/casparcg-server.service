@@ -27,10 +27,11 @@ Environment=CASPAR_CRASH_STATE=/run/highascg/caspar-crash-loop.state
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/casparcg/.Xauthority
 ExecStart=/home/casparcg/highascg/run.sh
+ExecStopPost=-/usr/local/bin/caspar-systemd-cleanup.sh
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=120
-KillMode=mixed
+KillMode=control-group
 KillSignal=SIGTERM
 
 [Install]

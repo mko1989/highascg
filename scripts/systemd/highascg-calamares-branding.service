@@ -1,0 +1,14 @@
+[Unit]
+Description=HighAsCG Calamares branding logo repair (eggs 26.6.2 name mismatch)
+Documentation=file:/usr/share/doc/highascg-wo47/EXFAT_DATA_ZERO_TOUCH.md
+Before=nodm.service
+ConditionPathExists=/usr/bin/calamares
+ConditionPathExists=/usr/local/lib/highascg/fix-calamares-branding.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/highascg/fix-calamares-branding.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

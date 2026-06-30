@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # test-06-caspar-supervisor.sh
 st_section "06 Caspar supervisor (single instance)"
-_run_n="$(pgrep -cf 'run\.sh' 2>/dev/null || echo 0)"
+_run_n="$(pgrep -f 'run\.sh' 2>/dev/null | wc -l | tr -d ' ')"
+_run_n="${_run_n:-0}"
 _main_n=0
 while read -r line; do
 	case "$line" in

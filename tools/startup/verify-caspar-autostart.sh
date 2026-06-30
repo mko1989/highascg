@@ -18,7 +18,15 @@ for u in casparcg-scanner.service casparcg-server.service; do
 		en="$(systemctl is-enabled "$u" 2>/dev/null || echo ?)"
 		ac="$(systemctl is-active "$u" 2>/dev/null || echo ?)"
 		if [[ "$en" == "enabled" ]]; then ok "${u} enabled"; else bad "${u} not enabled (${en})"; fi
-		if [[ "$ac" == "active" ]]; then ok "${u} active"; else bad "${u} not active (${ac})"; fi
+		if [[ "$ac" == "active" ]]; then
+			ok "${u} active"
+		elif [[ "$u" == "casparcg-server.service" ]] && [[ "$ac" != "active" ]] && [[ ! -f /run/highascg/inhibit-caspar-autostart ]]; then
+			limit="$(systemctl show "$u" -p Result --value 2>/dev/null || true)"
+			bad "${u} not active (${ac}) — try: sudo systemctl reset-failed ${u}; sudo systemctl start ${u}"
+			[[ -n "$limit" && "$limit" != "success" ]] && warn "${u} Result=${limit}"
+		else
+			bad "${u} not active (${ac})"
+		fi
 	else
 		bad "${u} not installed — run: sudo bash scripts/setup/sync-caspar-supervisor-wiring.sh"
 	fi
