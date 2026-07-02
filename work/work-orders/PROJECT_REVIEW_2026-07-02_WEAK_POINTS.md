@@ -48,4 +48,4 @@
 ### 2026-07-02 — Remediation complete
 
 - WOs 96–105 landed on `main`; `npm run test:ci` green (89 tests).
-- **Instructions for Next Agent:** None required for this review cycle. Optional: push 19+ commits to `origin/main`; T103.5 CSP / T104.7 manual smoke remain nice-to-have.
+- **Instructions for Next Agent:** Remediation complete. Optional: push to `origin/main`; T104.7 manual smoke; stricter CSP without `unsafe-inline`.

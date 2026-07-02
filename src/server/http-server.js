@@ -10,6 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
 const { mergeCors } = require('./cors')
+const { mergeSecurityHeaders } = require('./security-headers')
 const { isHeadlessMode } = require('./headless-mode')
 const { readRequestBody } = require('./http-body')
 
@@ -31,6 +32,16 @@ const MIME = {
 
 /** Must be read as binary — utf8 would corrupt fonts, images, etc. */
 const BINARY_EXT = new Set(['.woff', '.woff2', '.ttf', '.otf', '.eot', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.cur'])
+
+/**
+ * @param {Record<string, string>} headers
+ * @param {string} ext
+ * @param {{ html?: boolean }} [opts]
+ */
+function withUiSecurityHeaders(headers, ext, opts = {}) {
+	const isHtml = opts.html === true || ext === '.html' || String(headers['Content-Type'] || '').includes('text/html')
+	return mergeSecurityHeaders(headers, { html: isHtml })
+}
 
 /**
  * Companion-style UI prefix: `/instance/<id>/app.js` → `/app.js` for static resolution.
@@ -104,7 +115,7 @@ async function serveWebApp(requestPath, dirs) {
 					return { status: 200, headers: { 'Content-Type': contentType }, body }
 				}
 				const body = await fs.promises.readFile(resolved, 'utf8')
-				const headers = { 'Content-Type': contentType }
+				const headers = withUiSecurityHeaders({ 'Content-Type': contentType }, ext)
 				if (ext === '.html' || ext === '.js' || ext === '.css' || ext === '.mjs') {
 					headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
 					headers['Pragma'] = 'no-cache'
@@ -132,7 +143,7 @@ async function serveWebApp(requestPath, dirs) {
 			return { status: 200, headers: { 'Content-Type': contentType }, body }
 		}
 		const body = await fs.promises.readFile(fullPath, 'utf8')
-		const headers = { 'Content-Type': contentType }
+		const headers = withUiSecurityHeaders({ 'Content-Type': contentType }, ext)
 		if (ext === '.html' || ext === '.js' || ext === '.css' || ext === '.mjs') {
 			headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
 			headers['Pragma'] = 'no-cache'
@@ -145,13 +156,17 @@ async function serveWebApp(requestPath, dirs) {
 				const body = await fs.promises.readFile(path.join(dirs.webDir, 'index.html'), 'utf8')
 				return {
 					status: 200,
-					headers: {
-						'Content-Type': 'text/html',
-						'Cache-Control': 'no-cache, no-store, must-revalidate',
-						'Pragma': 'no-cache',
-						'Expires': '0'
-					},
-					body
+					headers: withUiSecurityHeaders(
+						{
+							'Content-Type': 'text/html',
+							'Cache-Control': 'no-cache, no-store, must-revalidate',
+							Pragma: 'no-cache',
+							Expires: '0',
+						},
+						'.html',
+						{ html: true },
+					),
+					body,
 				}
 			} catch {
 				return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' }

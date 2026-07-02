@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Mostly complete — batches 1–2 done; optional CSP (T103.5) deferred
+**Status:** Complete — batches 1–2 + CSP (T103.5) done (2026-07-02)
 **Priority:** **High** — stored XSS plausible from media names / device labels / OSC values
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -73,7 +73,7 @@ Server-controlled strings that reach the operator UI — media filenames, device
 - [x] **T103.2** Fix high-risk sites: `map-explorer.js`, `device-view-matrix.js`, `device-view-inspector-replication.js`, `inspector-lower-third.js`.
 - [x] **T103.3** Sweep remaining files in the 78-file set (prioritize server/OSC/spreadsheet data); prefer `textContent` for labels. *(Batch 2: playlist, device-view decklink/GPU, config strip, live-input, replication banner, media reconcile, audio mixer routing — full sweep still open for low-risk static templates.)*
 - [x] **T103.4** ESLint/custom rule for unescaped `innerHTML` interpolation (warn → error) — wire into WO-99.
-- [ ] **T103.5** (Optional) CSP header from server; verify against Vite/Three/GrapesJS.
+- [x] **T103.5** (Optional) CSP header from server; verify against Vite/Three/GrapesJS.
 - [x] **T103.6** Server-side filename/OSC-name sanitization at ingest (angle brackets stripped in `resolveSafe`).
 - [x] **T103.7** XSS smoke test: upload media named `<img src=x onerror=...>`, craft OSC var with `<>` → assert rendered escaped in map/device-view/sources panels. *(Unit smoke for malicious filename markup; browser E2E deferred.)*
 
@@ -117,3 +117,11 @@ Server-controlled strings that reach the operator UI — media filenames, device
 - Escaped server/user strings in: `inspector-layer-playlist.js` (media filenames), `device-view-inspector-decklink.js`, `device-view-inspector-gpu-layout-editor.js`, `header-bar-config-strip.js`, `live-input-modal.js` (DeckLink label + ALSA devices), `replication-status-banner.js`, `project-media-reconcile.js`, `audio-mixer-view-console.js` (routing labels).
 - Extended `smoke-dom-escape.test.js` with malicious-filename playlist markup case (T103.7 unit level).
 - **Instructions for Next Agent:** Remaining innerHTML sites are mostly static UI chrome or numeric-only; optional CSP (T103.5). Mark WO-103 done when satisfied or continue low-priority static-template audit.
+
+### 2026-07-02 — WO-103 T103.5 CSP defense-in-depth
+
+- `src/server/security-headers.js` — CSP + `X-Content-Type-Options` + `Referrer-Policy` on UI static responses.
+- `http-server.serveWebApp` applies headers to `client/` shell (not Caspar `/templates/`).
+- Env: `HIGHASCG_CSP=0` disables; `HIGHASCG_CSP_REPORT_ONLY=1` uses report-only header.
+- `smoke-security-headers.test.js` — policy shape + index.html integration.
+- **Instructions for Next Agent:** WO-103 complete. Stricter CSP (no `unsafe-inline`) needs removing innerHTML `onerror=` handlers first.
