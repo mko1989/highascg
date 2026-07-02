@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed in 2026-07-02 project review; not yet actioned
+**Status:** In progress — T98.0–T98.5 and T98.7 complete; T98.2 committed in logical batches; T98.6 documented
 **Priority:** **High** — a fresh clone of `main` does not boot
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -97,11 +97,11 @@ find . -path ./node_modules -prune -o -name '*.bak' -print
 
 - [x] **T98.0** Review + logically commit the 5 untracked runtime modules **with** their smoke tests. *(Started: modules + supporting runtime/test files staged; smokes green.)*
 - [x] **T98.1** Clean-clone boot verification (`npm ci` + `node index.js --no-http` or smoke) from a fresh checkout. *(Index-snapshot require-check green for critical modules.)*
-- [ ] **T98.2** Review the remaining 89 modified files; commit or revert deliberately (no silent drift).
+- [x] **T98.2** Review the remaining 89 modified files; commit or revert deliberately (no silent drift). *(7 logical commits on `main`; see work log.)*
 - [x] **T98.3** Diff + delete 21 `src/` + 3 `client/` sync-conflict files and `router.js.bak`. *(Deleted 62+ sync-conflict files/dirs + `.bak`; verified none remain.)*
 - [x] **T98.4** Delete `[object Object].tmp` and stray `correct-timeline-playback.md` notes.
 - [x] **T98.5** Find + fix the code path producing `[object Object].tmp`; add guard. *(Root cause: `ConfigManager` monolithic save with non-string `configPath` → `${obj}.tmp`; added constructor/path guards.)*
-- [ ] **T98.6** Decide + document large-binary policy (in-repo vs LFS/release); update `.gitignore` if moving.
+- [x] **T98.6** Decide + document large-binary policy (in-repo vs LFS/release); update `.gitignore` if moving. *(Keep vendor `.deb`/PDFs in-repo; `work/` tracked; added `dist-map/` to `.gitignore`.)*
 - [x] **T98.7** Add CI guardrail: no untracked `require()` targets; no sync-conflict files (feeds WO-99). *(Added `tools/ci/check-require-integrity.js` + `npm run verify:repo-integrity`; fixed broken `host-live-webpage` require.)*
 
 ---
@@ -148,3 +148,18 @@ find . -path ./node_modules -prune -o -name '*.bak' -print
 - Added `tools/ci/check-require-integrity.js` and `npm run verify:repo-integrity` (sync-conflict scan, stray `.bak`/`[object Object].tmp`, relative `require()` resolution). Fixed real bug flagged by checker: `src/api/host-live-webpage.js` now requires `../config/host-live-sources`.
 - `npm run verify:repo-integrity` passes; `smoke-config-manager-path.test.js` passes.
 - **Instructions for Next Agent:** T98.2 remains — review/commit the ~89 modified files in logical batches (replication, timeline, client UI, etc.). T98.6 (large-binary policy) still open. When ready, create commits (runtime modules batch + hygiene batch) — nothing committed yet in this WO pass.
+
+### 2026-07-02 — T98.2 commits + T98.6 policy (continued)
+
+- Committed all previously modified work in 7 logical batches on `main`:
+  1. `03c6887` — WO-98 clean-clone boot fix (missing modules, integrity checker, config guard)
+  2. `9aa4996` — replication trust / hot-backup (WO-78)
+  3. `1dbba7f` — timeline enhancements (WO-93)
+  4. `24d446b` — scene-take transitions
+  5. `e19cefc` — routing / streaming / device-graph
+  6. `ef6a5ae` — operator client UI
+  7. `0160b7f` — eggs / stick-boot / deploy
+  8. `7d6b96b` — project review remediation WOs (93–105)
+- Documented large-binary policy (keep in-repo; no history rewrite).
+- Added `dist-map/` to `.gitignore` (generated map build output).
+- **Instructions for Next Agent:** WO-98 acceptance criteria are met except optional full `npm ci && npm start` on a fresh clone in CI (WO-99). Mark WO-98 complete after verifying clean clone boot on another host or in CI.

@@ -31,6 +31,7 @@ data/waveforms/
 # Vite production bundle (built from client/ via npm run build:client)
 dist-web/
 dist/
+dist-map/
 
 # Generated map data
 client/assets/map-data.json
