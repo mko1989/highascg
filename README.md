@@ -147,6 +147,36 @@ npm run smoke:caspar -- 4200
 curl -sf http://127.0.0.1:4200/ | head -5   # expect HTML when dist-web present
 ```
 
+### CI / contributor checks (WO-99)
+
+GitHub Actions runs on every push/PR to `main` (`.github/workflows/ci.yml`):
+
+```bash
+npm run verify:repo-integrity   # no sync-conflicts, require() targets resolve
+npm run lint                    # ESLint (warnings allowed in v1)
+npm run format:check            # Prettier on CI/tooling files (gradual tree adoption)
+npm run test:ci                 # curated offline smoke tests (~1–3 min)
+node tools/ci/npm-audit-ci.js   # high/critical audit (xlsx optional exception documented)
+```
+
+Run the full local pipeline:
+
+```bash
+npm run ci:local
+```
+
+Optional pre-push hook:
+
+```bash
+cp scripts/hooks/pre-push.sample .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+```
+
+Broader offline suite (slow, not in default CI):
+
+```bash
+npm run test:ci:full
+```
+
 ---
 
 ## License

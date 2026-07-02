@@ -18,6 +18,12 @@
 		"clean:eggs-host": "bash scripts/clean-eggs-dev-host.sh",
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
 		"verify:repo-integrity": "node tools/ci/check-require-integrity.js",
+		"lint": "npx eslint .",
+		"format:check": "npx prettier --check tools/ci eslint.config.js .prettierrc.json",
+		"format:write:ci": "npx prettier --write tools/ci eslint.config.js .prettierrc.json",
+		"test:ci": "node tools/ci/run-offline-tests.js",
+		"test:ci:full": "node tools/ci/run-offline-tests-full.js",
+		"ci:local": "bash scripts/ci/run-local-ci.sh",
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
 		"map:generate": "node tools/map/generate-map-data.js",
 		"wiki:build": "node tools/wiki/build-wiki.js",
@@ -98,7 +104,7 @@
 		"sacn": "^4.6.2",
 		"unzipper": "^0.12.3",
 		"wetransfert": "^2.4.0",
-		"ws": "^8.18.0",
+		"ws": "^8.21.0",
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
@@ -107,10 +113,17 @@
 		"three": "^0.184.0",
 		"xlsx": "^0.18.5"
 	},
+	"overrides": {
+		"ws": "^8.21.0"
+	},
 	"devDependencies": {
+		"@eslint/js": "^9.39.2",
 		"acorn": "^8.17.0",
 		"acorn-walk": "^8.3.5",
 		"electron": "^30.5.1",
+		"eslint": "^9.39.2",
+		"globals": "^16.5.0",
+		"prettier": "^3.6.2",
 		"vite": "^6.4.3"
 	}
 }

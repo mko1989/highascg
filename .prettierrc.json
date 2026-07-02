@@ -1,0 +1,14 @@
+{
+	"useTabs": true,
+	"tabWidth": 1,
+	"singleQuote": true,
+	"semi": false,
+	"trailingComma": "es5",
+	"printWidth": 120,
+	"overrides": [
+		{
+			"files": ["index.js"],
+			"options": { "semi": true }
+		}
+	]
+}

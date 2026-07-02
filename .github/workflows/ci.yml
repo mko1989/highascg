@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Repo integrity
+        run: npm run verify:repo-integrity
+
+      - name: Boot check (no-http)
+        run: node index.js --no-http
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier (CI-scoped)
+        run: npm run format:check
+
+      - name: Offline tests
+        run: npm run test:ci
+
+      - name: npm audit
+        run: node tools/ci/npm-audit-ci.js

@@ -1,0 +1,17 @@
+node_modules/
+dist-web/
+dist/
+dist-map/
+cef-cache/
+vendor/
+docs/
+work/
+docs/
+.reference/
+CT-SS-master/
+client/assets/map-data.json
+client/assets/wiki-bundle.js
+docs/wiki-site/
+package-lock.json
+*.min.js
+*.sync-conflict-*

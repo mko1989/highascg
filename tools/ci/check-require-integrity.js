@@ -88,15 +88,9 @@ function checkRequires() {
 			const req = m[1]
 			if (!req.startsWith('.')) continue
 			const resolved = path.resolve(path.dirname(file), req)
-			const candidates = [
-				resolved,
-				`${resolved}.js`,
-				path.join(resolved, 'index.js'),
-			]
+			const candidates = [resolved, `${resolved}.js`, path.join(resolved, 'index.js')]
 			if (!candidates.some((c) => fs.existsSync(c))) {
-				errors.push(
-					`unresolved require in ${path.relative(REPO_ROOT, file)}: '${req}'`,
-				)
+				errors.push(`unresolved require in ${path.relative(REPO_ROOT, file)}: '${req}'`)
 			}
 		}
 	}

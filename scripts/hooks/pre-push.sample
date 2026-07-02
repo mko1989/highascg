@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Optional git pre-push hook — install:
+#   cp scripts/hooks/pre-push.sample .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+npm run verify:repo-integrity
+npm run lint
+npm run test:ci
+echo "[pre-push] OK"
