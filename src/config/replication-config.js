@@ -31,6 +31,7 @@ const { replicationDefaults } = require('./defaults-replication')
  * @property {{ enabled?: boolean, confirmLooks?: boolean, maxUnconfirmed?: number }} amcpFanout
  * @property {{ enabled?: boolean, softThresholdMs?: number, hardThresholdMs?: number, sampleIntervalMs?: number, minCorrectionIntervalMs?: number, maxCorrectionsPerMinute?: number }} playheadSync
  * @property {string} peerSshPublicKey
+ * @property {string} peerDevicePublicKey
  */
 
 /**
@@ -109,6 +110,7 @@ function normalizeReplicationConfig(raw) {
 			}
 		})(),
 		peerSshPublicKey: String(o.peerSshPublicKey || '').trim(),
+		peerDevicePublicKey: String(o.peerDevicePublicKey || '').trim(),
 	}
 }
 

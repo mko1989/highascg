@@ -45,6 +45,12 @@ async function disconnectToStandalone(ctx, runtime, opts = {}) {
 	if (typeof ctx.log === 'function') ctx.log('info', `[replication] standalone (${opts.reason || 'disconnect'})`)
 	const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
 	notifyReplicationStatusChanged(ctx, 'disconnect')
+	try {
+		const { clearHotBackupOnActiveProject } = require('./project-hot-backup')
+		void clearHotBackupOnActiveProject(ctx)
+	} catch {
+		/* optional */
+	}
 	return { ok: true, reason: opts.reason || 'disconnect' }
 }
 
@@ -146,6 +152,13 @@ async function connectToLeader(ctx, runtime, opts) {
 		}
 	}
 
+	const {
+		buildRegisterHandshakeExtras,
+		verifyLeaderRegisterResponse,
+		persistPeerDevicePublicKey,
+	} = require('./replication-handshake')
+	const handshakeExtras = buildRegisterHandshakeExtras(ctx, { pairId, role: 'follower' })
+
 	const register = await peerHttpRequest(
 		{ host: leaderHost, port: leaderPort, token: '' },
 		'/api/replication/register-follower',
@@ -160,6 +173,7 @@ async function connectToLeader(ctx, runtime, opts) {
 				followerCasparPort: followerCaspar.port,
 				syncthingDeviceId,
 				sshPublicKey: followerSshPublicKey,
+				...handshakeExtras,
 			},
 			timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
 		},
@@ -170,10 +184,19 @@ async function connectToLeader(ctx, runtime, opts) {
 			error:
 				register.error === 'timeout'
 					? 'Leader register timed out — check leader load and retry Connect'
-					: register.error || 'register-follower failed',
+					: register.json?.error || register.error || 'register-follower failed',
 			status: register.status,
 		}
 	}
+
+	const leaderHandshake = verifyLeaderRegisterResponse(register.json, {
+		pairId: register.json?.pairId || pairId,
+		nonce: handshakeExtras.handshake.nonce,
+	})
+	if (!leaderHandshake.ok) {
+		return { ok: false, error: leaderHandshake.error || 'leader handshake verification failed', status: 403 }
+	}
+	persistPeerDevicePublicKey(ctx, leaderHandshake.devicePublicKey)
 
 	const leaderToken = register.json?.token || token
 	const leaderSyncthingId = register.json?.syncthingDeviceId || ping.json.syncthingDeviceId || ''
@@ -182,6 +205,7 @@ async function connectToLeader(ctx, runtime, opts) {
 		try {
 			prepareReplicationSshForPairing(ctx, {
 				peerPublicKey: register.json.sshPublicKey,
+				fromHost: leaderHost,
 				log: ctx.log,
 			})
 			testReplicationSshToPeer(leaderHost, ctx.log)
@@ -239,6 +263,15 @@ async function registerFollowerOnLeader(ctx, body) {
 	const repl = getReplicationConfig(ctx.config)
 	if (!repl.leaderAvailable) return { ok: false, error: 'leader not available' }
 
+	const {
+		verifyRegisterFollowerRequest,
+		buildLeaderRegisterHandshakeResponse,
+	} = require('./replication-handshake')
+	const auth = verifyRegisterFollowerRequest(body, ctx?.log)
+	if (!auth.ok) {
+		return { ok: false, status: auth.status || 403, error: auth.error || 'register-follower rejected' }
+	}
+
 	const pairId = String(body.pairId || repl.pairId || '').trim() || crypto.randomUUID()
 	const token = String(body.token || repl.peer.token || '').trim() || crypto.randomBytes(24).toString('hex')
 	const followerHost = String(body.followerHost || body.peerHost || '').trim()
@@ -254,6 +287,7 @@ async function registerFollowerOnLeader(ctx, body) {
 	try {
 		const prepared = prepareReplicationSshForPairing(ctx, {
 			peerPublicKey: body.sshPublicKey,
+			fromHost: followerHost,
 			log: ctx.log,
 		})
 		leaderSshPublicKey = prepared.local.publicKeyLine
@@ -266,7 +300,7 @@ async function registerFollowerOnLeader(ctx, body) {
 		}
 		try {
 			leaderSshPublicKey = ensureReplicationSshKey(ctx.log).publicKeyLine
-			if (body.sshPublicKey) installPeerAuthorizedKey(body.sshPublicKey, { log: ctx.log })
+			if (body.sshPublicKey) installPeerAuthorizedKey(body.sshPublicKey, { log: ctx.log, fromHost: followerHost })
 		} catch {
 			/* ignore */
 		}
@@ -285,6 +319,7 @@ async function registerFollowerOnLeader(ctx, body) {
 		pairId,
 		peer: { host: followerHost, port: body.followerPort || 4200, token },
 		peerCaspar: { host: followerCasparHost, port: followerCasparPort, connectTimeoutMs: 5000 },
+		peerDevicePublicKey: auth.devicePublicKey,
 		mirrorTransport: 'amcp-fanout',
 		autoPromote: false,
 		disconnectPolicy: 'standalone',
@@ -306,6 +341,7 @@ async function registerFollowerOnLeader(ctx, body) {
 		syncthingDeviceId: leaderSyncthingId,
 		sshPublicKey: leaderSshPublicKey,
 		follower: { host: followerHost, selfId: followerSelfId },
+		...buildLeaderRegisterHandshakeResponse(ctx, { pairId, nonce: auth.nonce }),
 	}
 
 	const runtime = ctx._replication
@@ -321,6 +357,15 @@ async function registerFollowerOnLeader(ctx, body) {
 
 	if (typeof ctx.log === 'function') {
 		ctx.log('info', `[replication] follower registered: ${followerSelfId || followerHost}`)
+	}
+
+	try {
+		const { applyLeaderHotBackupFromRegister } = require('./project-hot-backup')
+		await applyLeaderHotBackupFromRegister(ctx, body)
+	} catch (e) {
+		if (typeof ctx.log === 'function') {
+			ctx.log('warn', `[replication] project hotBackup: ${e?.message || e}`)
+		}
 	}
 
 	await runLeaderPostRegisterSync(ctx, runtime, followerSyncthingId)

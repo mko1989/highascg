@@ -56,19 +56,17 @@ install_self_in_authorized_keys() {
 
 install_peer_key_file() {
 	local f="${1:?peer pubkey file}"
+	local from_host="${2:-}"
 	mkdir -p "$HOME/.ssh"
 	chmod 700 "$HOME/.ssh"
-	touch "$HOME/.ssh/authorized_keys"
-	chmod 600 "$HOME/.ssh/authorized_keys"
 	local line
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		[[ -z "$line" || "$line" =~ ^# ]] && continue
-		if grep -qF "$line" "$HOME/.ssh/authorized_keys" 2>/dev/null; then
-			echo "==> Already authorized: ${line:0:60}…"
-		else
-			echo "$line" >>"$HOME/.ssh/authorized_keys"
-			echo "==> Installed peer key: ${line:0:60}…"
-		fi
+		HOME="$HOME" node -e "
+			const { installPeerAuthorizedKey } = require('${REPO_ROOT}/src/replication/replication-ssh-setup');
+			const out = installPeerAuthorizedKey(process.argv[1], { fromHost: process.argv[2] || '' });
+			if (!out.ok) { console.error(out.error || 'install failed'); process.exit(1); }
+		" "$line" "$from_host"
 	done <"$f"
 }
 
@@ -101,10 +99,8 @@ copy_id_to_peer() {
 test_peer() {
 	local peer="$1"
 	local ssh_opts=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i "$KEY")
-	echo "==> Test SSH ${REPL_USER}@${peer}"
-	ssh "${ssh_opts[@]}" "${REPL_USER}@${peer}" 'echo "SSH ok on $(hostname)"'
-	echo "==> Test rsync round-trip (dry listing)"
-	rsync -avzn -e "ssh ${ssh_opts[*]}" "${REPL_USER}@${peer}:${REPO_ROOT}/media/" /dev/null 2>/dev/null || true
+	echo "==> Test rsync SSH probe ${REPL_USER}@${peer}"
+	rsync -avzn --dry-run -e "ssh ${ssh_opts[*]}" "${REPL_USER}@${peer}:${REPO_ROOT}/media/" /dev/null
 }
 
 if [[ "${1:-}" == "--show-pubkey" ]]; then
@@ -115,7 +111,7 @@ fi
 
 if [[ "${1:-}" == "--install-peer-key" ]]; then
 	[[ -n "${2:-}" && -f "$2" ]] || usage
-	install_peer_key_file "$2"
+	install_peer_key_file "$2" "${PEER:-}"
 	exit 0
 fi
 

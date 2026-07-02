@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — operator decisions recorded 2026-06-29; implementation not started  
+**Status:** In progress — Phase A–D shipped 2026-07-01; Phase E single-box QA automated  
 **Priority:** High (LAN pairing today grants full `casparcg` shell; poor machine labels)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -161,45 +161,45 @@ Store **who this show is paired with** for operator clarity and cross-machine re
 
 ### Phase A — Hardware ID + hostname
 
-- [ ] **T78.1** `src/system/hardware-identity.js` — MAC → 4-digit decimal (variant A)
-- [ ] **T78.2** First-boot / bridge start: `hostnamectl set-hostname highascg####`
-- [ ] **T78.3** Align `replication.selfId` + `machine-identity.js` with hostname
-- [ ] **T78.4** Device View: show hardware id + hostname
-- [ ] **T78.5** Ping + replication status: `hardwareId`, `appId`
-- [ ] **T78.6** Migrate `highascg-nvidia-*` hosts
+- [x] **T78.1** `src/system/hardware-identity.js` — MAC → 4-digit decimal (variant A)
+- [x] **T78.2** First-boot / bridge start: `hostnamectl set-hostname highascg####`
+- [x] **T78.3** Align `replication.selfId` + `machine-identity.js` with hostname
+- [x] **T78.4** Device View: show hardware id + hostname
+- [x] **T78.5** Ping + replication status: `hardwareId`, `appId`
+- [x] **T78.6** Migrate `highascg-nvidia-*` hosts
 
 ### Phase B — rsync-only SSH
 
-- [ ] **T78.7** `highascg-replication-ssh` wrapper + installer
-- [ ] **T78.8** Forced-command in `installPeerAuthorizedKey()`
-- [ ] **T78.9** Rsync-only SSH probe; smoke test
+- [x] **T78.7** `highascg-replication-ssh` wrapper + installer
+- [x] **T78.8** Forced-command in `installPeerAuthorizedKey()`
+- [x] **T78.9** Rsync-only SSH probe; smoke test
 
 ### Phase C — Background handshake (no approval)
 
-- [ ] **T78.10** `device-identity.js` — signing key
-- [ ] **T78.11** Sign/verify in `register-follower` (background); reject non-HighAsCG
-- [ ] **T78.12** Token repair endpoints require valid token or fresh handshake
-- [ ] **T78.13** Fix `project-media-manifest` auth inversion
+- [x] **T78.10** `device-identity.js` — signing key
+- [x] **T78.11** Sign/verify in `register-follower` (background); reject non-HighAsCG
+- [x] **T78.12** Token repair endpoints require valid token or fresh handshake
+- [x] **T78.13** Fix `project-media-manifest` auth inversion
 
 ### Phase D — Project pair metadata
 
-- [ ] **T78.14** `project.hotBackup` read/write on connect/disconnect
-- [ ] **T78.15** Include in `stripDeviceLocalFromProject` export (show tier)
-- [ ] **T78.16** Inspector + docs
+- [x] **T78.14** `project.hotBackup` read/write on connect/disconnect
+- [x] **T78.15** Include in `stripDeviceLocalFromProject` export (show tier)
+- [x] **T78.16** Inspector + docs
 
 ### Phase E — Docs + QA
 
-- [ ] **T78.17** Update `hot-backup-replication.md`
-- [ ] **T78.18** Two-box QA: instant connect, no approval, rsync works, shell blocked
+- [x] **T78.17** Update `hot-backup-replication.md`
+- [x] **T78.18** Two-box QA: instant connect, no approval, rsync works, shell blocked *(single-box automated; peer checks via `REPL_QA_PEER` after pair)*
 
 ---
 
 ## 8. Acceptance
 
-- [ ] **A78.1** Hostname `highascg####` from primary MAC; stable across reboot.
-- [ ] **A78.2** Connect with `leaderAvailable` — no approval UI; token + SSH complete in background.
-- [ ] **A78.3** Non-HighAsCG register does not install SSH keys.
-- [ ] **A78.4** Rsync works; replication key cannot open shell.
+- [ ] **A78.1** Hostname `highascg####` from primary MAC; stable across reboot. *(hardware id + target hostname verified; `hostnamectl` needs root on this box)*
+- [ ] **A78.2** Connect with `leaderAvailable` — no approval UI; token + SSH complete in background. *(manual two-box)*
+- [x] **A78.3** Non-HighAsCG register does not install SSH keys. *(smoke + `replication-pair-qa.sh --register-reject-test`)*
+- [ ] **A78.4** Rsync works; replication key cannot open shell. *(wrapper smoke PASS; peer rsync probe needs paired second box)*
 - [ ] **A78.5** Project shows paired peer `highascg####` on both boxes after connect.
 - [ ] **A78.6** Inspector lists peer by hardware id + hostname.
 
@@ -234,3 +234,58 @@ Store **who this show is paired with** for operator clarity and cross-machine re
 - Split autosave live sync to [79_WO_LEADER_AUTOSAVE_LIVE_REPLICATION.md](./79_WO_LEADER_AUTOSAVE_LIVE_REPLICATION.md).
 
 **Instructions for next agent:** Phase A (MAC hostname) unblocks §6 pair labels. Phase C must not add approval UI. See WO-79 for autosave push gap.
+
+### 2026-07-01 — Phase A shipped (hardware ID + hostname)
+
+- Added `src/system/hardware-identity.js` — MAC variant A → `highascg####`, persisted in `config/hardware-identity.json`.
+- Bridge start calls `ensureHardwareHostname()` from `index.js` (migrates `highascg-nvidia-*` via `hostnamectl` / `sudo -n`).
+- `replication-local-identity.js` + `machine-identity.js` align `selfId` with hardware hostname.
+- Ping (`/api/replication/ping`), replication status, system inventory, and Device View show `hardwareId` + `appId`.
+- exFAT config sync excludes `hardware-identity.json` (with replication local files).
+- Smoke: `tools/smoke/smoke-hardware-identity.test.js`.
+
+**Instructions for next agent:** Phase B (rsync-only SSH wrapper) is next security slice. Hostname apply needs root or passwordless `hostnamectl` on deployed boxes — document in installer if missing.
+
+### 2026-07-01 — Phase B shipped (rsync-only SSH)
+
+- Added `tools/runtime/highascg-replication-ssh.sh` — forced-command wrapper (`rsync --server` only, `media/` + `template/` paths).
+- `installPeerAuthorizedKey()` writes `from="peer-ip",command="…highascg-replication-ssh"` with port/X11/agent/pty disabled; upgrades legacy plain keys on re-pair.
+- `testReplicationSshToPeer()` uses rsync dry-run probe (shell `echo` probe removed).
+- Installer: `scripts/replication/install-replication-ssh-wrapper.sh` → `/usr/local/bin/highascg-replication-ssh`.
+- Pairing passes peer IP for `from=` refresh (`connect-pair.js`).
+- Extended `tools/smoke/smoke-replication-ssh-setup.test.js`.
+
+**Instructions for next agent:** Phase C (signed background handshake + `device-identity.js`) — no approval UI. Install wrapper on ISO: `sudo bash scripts/replication/install-replication-ssh-wrapper.sh`.
+
+### 2026-07-01 — Phase C shipped (signed background handshake)
+
+- Added `src/system/device-identity.js` — per-box ed25519 key in `config/device-identity.json` (exFAT excluded).
+- Added `src/replication/replication-handshake.js` — sign/verify `{nonce,pairId,hardwareId,role}` for register + repair.
+- `register-follower` requires `appId=highascg`, semver floor, signed follower handshake; leader response signed; stores `peerDevicePublicKey`.
+- `connectToLeader` sends/verifies handshake in background (no operator steps).
+- Token repair (`realign-pair-token`, `apply-pair-token`, `exchange-ssh`) accepts valid token **or** signed repair handshake (peer IP fallback for transition).
+- Fixed `project-media-manifest` auth inversion — require token when replication pair is configured.
+- Smoke: `tools/smoke/smoke-replication-handshake.test.js`.
+
+**Instructions for next agent:** Phase D — `project.hotBackup` in show slice on connect/disconnect. Re-pair existing boxes to populate `peerDevicePublicKey` and upgrade SSH forced-command keys.
+
+### 2026-07-01 — Phase D shipped (project.hotBackup)
+
+- Added `src/replication/project-hot-backup.js` — build/apply/clear `project.hotBackup` on leader register and disconnect.
+- Leader writes metadata before post-register project push so follower receives show-tier pair info.
+- `GET /api/replication/status` includes `projectHotBackup` with `peerLabel` for UI.
+- Header L/F badge shows **Paired with highascg####**; Device View hot backup panel lists peer hostname + hardware id.
+- Client helpers: `client/lib/hot-backup-project.js`.
+- Docs: `docs/reference/hot-backup-replication.md` — `project.hotBackup` schema + replication path.
+- Smoke: `tools/smoke/smoke-project-hot-backup.test.js`.
+
+**Instructions for next agent:** Phase E — two-box QA (T78.18): instant connect, rsync works, shell blocked, paired labels on both boxes. Re-pair existing deployments for `peerDevicePublicKey`, forced-command SSH, and `hotBackup`. Install wrapper: `sudo bash scripts/replication/install-replication-ssh-wrapper.sh`.
+
+### 2026-07-01 — Phase E single-box QA (automated)
+
+- Added `tools/runtime/replication-pair-qa.sh` — local smoke, optional `--register-reject-test`, peer checks via `REPL_QA_PEER`.
+- Added stick-boot module `test-11-replication-trust.sh` (WO-78 identity + smoke).
+- Docs: QA commands in `docs/reference/hot-backup-replication.md`.
+- **This box (`highascg-nvidia-595`):** hardware id `7579` / target `highascg7579`, wrapper installed, ping + smoke PASS; hostname WARN (needs `sudo hostnamectl set-hostname highascg7579`).
+
+**Instructions for next agent:** Run two-box verification after re-pair: `REPL_QA_PEER=<other-ip> bash tools/runtime/replication-pair-qa.sh`. Restart `highascg.service` on deployed boxes so live bridge matches WO-78 register/handshake code. Apply hostname on each box with passwordless `hostnamectl` or manual sudo.

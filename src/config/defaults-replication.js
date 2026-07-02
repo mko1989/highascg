@@ -34,6 +34,7 @@ function replicationDefaults() {
 			maxCorrectionsPerMinute: 6,
 		},
 		peerSshPublicKey: '',
+		peerDevicePublicKey: '',
 	}
 }
 

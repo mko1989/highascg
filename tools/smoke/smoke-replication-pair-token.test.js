@@ -97,4 +97,5 @@ test('exfat-sync map excludes replication.json on usb-modular-config', () => {
 	assert.ok(pair)
 	assert.ok(pair.exclude.includes('replication.json'))
 	assert.ok(pair.exclude.includes('replication-local-identity.json'))
+	assert.ok(pair.exclude.includes('hardware-identity.json'))
 })

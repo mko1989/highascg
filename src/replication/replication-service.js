@@ -237,6 +237,8 @@ function buildPeerBox(runtime, peerPing, repl) {
 		port: repl.peer.port || 4200,
 		selfId: ping.selfId || null,
 		hostname: ping.hostname || null,
+		hardwareId: ping.hardwareId || null,
+		appId: ping.appId || null,
 		reachable: !!runtime?.peerReachable,
 		pingAgeMs: runtime?.lastPeerPingAt ? Date.now() - runtime.lastPeerPingAt : null,
 		role: ping.role || null,
@@ -265,9 +267,18 @@ function buildLocalBox(ctx, runtime, repl) {
 	} catch {
 		channelMap = null
 	}
+	let localIdentity = { hardwareId: null, appId: 'highascg', hostname: os.hostname() }
+	try {
+		const { getHardwareIdentityPingFields } = require('../system/hardware-identity')
+		localIdentity = getHardwareIdentityPingFields()
+	} catch {
+		/* optional */
+	}
 	return {
 		selfId: repl.selfId,
-		hostname: os.hostname(),
+		hostname: localIdentity.hostname,
+		hardwareId: localIdentity.hardwareId,
+		appId: localIdentity.appId,
 		role: runtime?.roleState?.getRole() || 'standalone',
 		configHash: hashConfig(ctx.config),
 		channelMap,
@@ -409,6 +420,22 @@ async function buildReplicationStatus(ctx) {
 		companion = null
 	}
 
+	let projectHotBackup = null
+	try {
+		const { loadFullProject } = require('../engine/project-scenes')
+		const { hotBackupPeerLabel } = require('./project-hot-backup')
+		const project = loadFullProject()
+		projectHotBackup = project?.hotBackup || null
+		if (projectHotBackup) {
+			projectHotBackup = {
+				...projectHotBackup,
+				peerLabel: hotBackupPeerLabel(projectHotBackup, role),
+			}
+		}
+	} catch {
+		projectHotBackup = null
+	}
+
 	return {
 		enabled: repl.enabled,
 		configured: replicationPairConfigured(repl),
@@ -424,6 +451,8 @@ async function buildReplicationStatus(ctx) {
 		peer: repl.enabled && repl.peer?.host ? { host: repl.peer.host, port: repl.peer.port } : { host: '', port: repl.peer.port || 4200 },
 		peerSelfId: repl.enabled ? peerPing?.selfId || peerPing?.hostname || null : null,
 		peerHostname: repl.enabled ? peerPing?.hostname || null : null,
+		peerHardwareId: repl.enabled ? peerPing?.hardwareId || null : null,
+		peerAppId: repl.enabled ? peerPing?.appId || null : null,
 		peerReachable: peerHttpReachable,
 		peerLinkReady,
 		peerHttpReachable,
@@ -471,6 +500,7 @@ async function buildReplicationStatus(ctx) {
 		promotedAt: runtime?.promotedAt || null,
 		promoteReason: runtime?.promoteReason || null,
 		companion,
+		projectHotBackup,
 	}
 }
 

@@ -66,12 +66,17 @@ async function realignPairTokenFromPeer(ctx) {
 		return { ok: false, error: 'not paired' }
 	}
 	const { peerHttpRequest } = require('./peer-client')
+	const { buildRepairHandshakeBody } = require('./replication-handshake')
 	const res = await peerHttpRequest(
 		{ host: repl.peer.host, port: repl.peer.port || 4200, token: '' },
 		'/api/replication/realign-pair-token',
 		{
 			method: 'POST',
-			body: { pairId: repl.pairId, selfId: repl.selfId },
+			body: {
+				pairId: repl.pairId,
+				selfId: repl.selfId,
+				...buildRepairHandshakeBody(ctx, { pairId: repl.pairId, role: 'follower' }),
+			},
 			timeoutMs: 8000,
 		},
 	)
@@ -104,12 +109,17 @@ async function pushPairTokenToPeer(ctx) {
 	const token = String(repl.peer.token || '').trim()
 	if (!token) return { ok: false, error: 'no pair token on leader' }
 	const { peerHttpRequest } = require('./peer-client')
+	const { buildRepairHandshakeBody } = require('./replication-handshake')
 	const res = await peerHttpRequest(
 		{ host: repl.peer.host, port: repl.peer.port || 4200, token: '' },
 		'/api/replication/apply-pair-token',
 		{
 			method: 'POST',
-			body: { pairId: repl.pairId, token },
+			body: {
+				pairId: repl.pairId,
+				token,
+				...buildRepairHandshakeBody(ctx, { pairId: repl.pairId, role: 'leader' }),
+			},
 			timeoutMs: 8000,
 		},
 	)

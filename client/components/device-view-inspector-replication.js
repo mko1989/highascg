@@ -5,6 +5,7 @@ import { api } from '../lib/api-client.js'
 import { setStatus, buildInspectorTable } from './device-view-ui-utils.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { refreshReplicationStatusSoon, getReplicationInspectorMode, setReplicationInspectorMode } from '../lib/replication-ui-state.js'
+import { hotBackupPairedTitle, hotBackupPeerBoxForViewer } from '../lib/hot-backup-project.js'
 
 /**
  * @param {HTMLElement} host
@@ -18,6 +19,10 @@ export function renderReplicationInspector(host, ctx) {
 	const statusLine = document.createElement('p')
 	statusLine.className = 'device-view__note small device-view__replication-status'
 	statusLine.textContent = 'Loading replication status…'
+
+	const projectPairLine = document.createElement('p')
+	projectPairLine.className = 'device-view__note small device-view__replication-project-pair'
+	projectPairLine.hidden = true
 
 	const connectionDetails = document.createElement('details')
 	connectionDetails.className = 'device-view__inspector-section device-view__replication-connection'
@@ -143,7 +148,7 @@ export function renderReplicationInspector(host, ctx) {
 		textContent: 'Disconnect (standalone)',
 	})
 	btnRow.append(scanBtn, becomeBtn, stopLeaderBtn, connectBtn, disconnectBtn, reloadLocalBtn)
-	sec.append(statusLine, connectionDetails, outputWarnLine, localWiringNote, modeLab, leaderPick, btnRow)
+	sec.append(statusLine, projectPairLine, connectionDetails, outputWarnLine, localWiringNote, modeLab, leaderPick, btnRow)
 	host.append(sec)
 
 	let lastStatus = null
@@ -271,6 +276,7 @@ export function renderReplicationInspector(host, ctx) {
 
 		const rows = [
 			{ label: roleLabel, value: peer.hostname || peer.selfId || peer.host || '—' },
+			{ label: 'Hardware ID', value: peer.hardwareId || st.peerHardwareId || '—' },
 			{ label: 'Address', value: `${peer.host}:${peer.port || 4200}` },
 			{
 				label: 'Peer status',
@@ -342,6 +348,7 @@ export function renderReplicationInspector(host, ctx) {
 			.join(', ')
 		return [
 			{ label: 'This server', value: local.hostname || local.selfId || '—' },
+			{ label: 'Hardware ID', value: local.hardwareId || '—' },
 			{ label: 'Role', value: local.role || st.role || '—' },
 			{ label: 'PGM channels', value: pgm },
 			{ label: 'PRV channels', value: prv || '—' },
@@ -493,6 +500,23 @@ export function renderReplicationInspector(host, ctx) {
 		syncConnectionPanel(st)
 	}
 
+	function syncProjectPairLine(st) {
+		const hb = st?.projectHotBackup
+		if (!hb || !st?.enabled) {
+			projectPairLine.hidden = true
+			projectPairLine.textContent = ''
+			return
+		}
+		const title = hotBackupPairedTitle(hb, st.role) || (hb.peerLabel ? `Paired with ${hb.peerLabel}` : '')
+		const peer = hotBackupPeerBoxForViewer(hb, st.role)
+		const details = []
+		if (peer?.hostname) details.push(peer.hostname)
+		if (peer?.hardwareId) details.push(`ID ${String(peer.hardwareId).padStart(4, '0')}`)
+		if (peer?.host) details.push(peer.host)
+		projectPairLine.textContent = [title, details.length ? details.join(' · ') : ''].filter(Boolean).join(' — ')
+		projectPairLine.hidden = !projectPairLine.textContent
+	}
+
 	function formatStatus(st) {
 		if (!st) return 'Replication unavailable'
 		const parts = [`Role: ${st.role || 'standalone'}`]
@@ -585,6 +609,7 @@ export function renderReplicationInspector(host, ctx) {
 		try {
 			lastStatus = await api.get('/api/replication/status')
 			statusLine.textContent = formatStatus(lastStatus)
+			syncProjectPairLine(lastStatus)
 			syncFollowerPanel(lastStatus)
 			if (lastStatus.enabled) {
 				localWiringNote.hidden = false

@@ -37,11 +37,47 @@ Leader pushes **show content** and **screen destination definitions**. The follo
 
 | Tier | Examples | Leader → follower? | Mechanism |
 |------|----------|-------------------|-----------|
-| **Show content** | Looks/scenes, timelines, referenced media, templates, **screen destinations** (output ids, modes, video modes), logical routing intent (`audioRouting`, stream/record **definitions**, DMX, Companion maps) | **Yes** | HTTP project/timeline push + pull; optional Syncthing for media |
+| **Show content** | Looks/scenes, timelines, referenced media, templates, **screen destinations** (output ids, modes, video modes), logical routing intent (`audioRouting`, stream/record **definitions**, DMX, Companion maps), **`project.hotBackup`** (paired peer hardware id + hostname) | **Yes** | HTTP project/timeline push + pull; optional Syncthing for media |
 | **Machine profile** | Device View **device graph** (cables, rear panel), `osDisplay` / `screen_N_system_id`, GPU layout, DeckLink numbers, `casparServer` host/port | **Never** | `config-classify.js` strip on push, merge preserves local on receive |
 | **Live playout** | Active scene, timeline position, mixer | **Yes** | WS `/api/replication/ws` + CT-SS scheduled apply on **follower's** channel map |
 
 Implementation: `src/config/config-classify.js` — `stripDeviceLocalFromProject`, `mergeSharedProjectIntoLocal`, `splitConfigForReplication`.
+
+### Project pair metadata (`project.hotBackup`, WO-78)
+
+When paired, the **active project** stores show-tier pair metadata (replicated leader → follower):
+
+```json
+{
+  "hotBackup": {
+    "pairId": "uuid",
+    "role": "leader",
+    "self": { "hardwareId": "1234", "hostname": "highascg1234", "host": "10.0.0.5" },
+    "peer": { "hardwareId": "7579", "hostname": "highascg7579", "host": "10.0.0.12" },
+    "pairedAt": "2026-07-01T12:00:00.000Z"
+  }
+}
+```
+
+- Written on the **leader** when a follower registers (`applyLeaderHotBackupFromRegister`), then pushed with the project slice.
+- Cleared locally when either box returns to **standalone** (manual disconnect or peer lost).
+- UI: header badge shows **Paired with highascg####**; Device View → Hot backup lists peer hostname + hardware id.
+- Follower UI resolves the paired box via `hotBackupPeerBoxForViewer` (stored metadata is leader-canonical).
+
+Hardware ids come from the primary Ethernet MAC (`highascg####` hostnames). Re-pair after upgrading to populate metadata on existing pairs.
+
+**Hostname apply:** bridge start calls `ensureHardwareHostname()`; if the system hostname is still a clone ISO name (`highascg-nvidia-*`), set it once with root: `sudo hostnamectl set-hostname highascg####` (#### = `hardwareId` from Device View or `config/hardware-identity.json`).
+
+### WO-78 QA
+
+| Scope | Command |
+|-------|---------|
+| Single box (smoke + identity) | `bash ~/highascg/tools/runtime/replication-pair-qa.sh` |
+| Register rejection probe | `bash ~/highascg/tools/runtime/replication-pair-qa.sh --register-reject-test` |
+| Post-pair two-box | `REPL_QA_PEER=<other-box-ip> bash ~/highascg/tools/runtime/replication-pair-qa.sh` |
+| Stick boot module | included as test `11` in `tools/startup/stick-boot-test/run-stick-boot-tests.sh` |
+
+Install rsync-only SSH wrapper on **both** boxes before pairing: `sudo bash scripts/replication/install-replication-ssh-wrapper.sh`.
 
 ### Audited replication paths (WO-61 T0.3)
 
@@ -133,7 +169,7 @@ Config: `scheduledApply: true`, `syncClock: ct-ss`, `scheduledApplyLeadMs: 1500`
 | `GET /api/replication/leaders` | LAN scan for available leaders |
 | `POST /api/replication/connect` | Follower joins a leader |
 | `POST /api/replication/disconnect` | Return to standalone |
-| `GET /api/replication/status` | Role, peer, media %, lag, clock offset, `companion` control-plane |
+| `GET /api/replication/status` | Role, peer, media %, lag, clock offset, `companion` control-plane, `projectHotBackup` |
 | `GET /api/companion/control-status` | Lightweight Companion routing hint (`acceptsCompanionControl`, `suggestedCompanionTarget`) |
 
 ### Companion hot backup (WO-70)

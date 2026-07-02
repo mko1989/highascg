@@ -4,8 +4,11 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { spawnSync } = require('child_process')
+const { REPO_ROOT } = require('../repo-paths')
 
 const DEFAULT_KEY_BASENAME = 'highascg_replication'
+const INSTALLED_WRAPPER_PATH = '/usr/local/bin/highascg-replication-ssh'
+const REPO_WRAPPER_PATH = path.join(REPO_ROOT, 'tools/runtime/highascg-replication-ssh.sh')
 
 /**
  * @returns {string}
@@ -31,6 +34,106 @@ function normalizeSshPublicKeyLine(line) {
 	if (!/^[A-Za-z0-9+/=]+$/.test(key)) return null
 	const comment = parts.slice(2).join(' ') || 'highascg-replication-peer'
 	return `${type} ${key} ${comment}`.trim()
+}
+
+function resolveReplicationSshWrapperPath() {
+	if (fs.existsSync(INSTALLED_WRAPPER_PATH)) return INSTALLED_WRAPPER_PATH
+	if (fs.existsSync(REPO_WRAPPER_PATH)) return REPO_WRAPPER_PATH
+	return INSTALLED_WRAPPER_PATH
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function shellDoubleQuote(value) {
+	return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+/**
+ * Strip authorized_keys option prefix, leaving type key [comment].
+ * @param {string} line
+ * @returns {string}
+ */
+function stripAuthorizedKeyOptions(line) {
+	const s = String(line || '').trim()
+	if (!s) return ''
+	if (/^(ssh-|ecdsa-)/.test(s)) return s
+	const m = s.match(/\s(ssh-(?:ed25519|rsa)|ecdsa-sha2-nistp256)\s+/)
+	if (!m || m.index == null) return s
+	return s.slice(m.index + 1).trim()
+}
+
+/**
+ * @param {string} line
+ * @returns {string | null}
+ */
+function extractSshPublicKeyMaterial(line) {
+	const normalized = normalizeSshPublicKeyLine(stripAuthorizedKeyOptions(line))
+	if (!normalized) return null
+	const parts = normalized.split(/\s+/)
+	return `${parts[0]} ${parts[1]}`
+}
+
+/**
+ * @param {string} publicKeyLine
+ * @param {{ fromHost?: string, useForcedCommand?: boolean }} [opts]
+ * @returns {string | null}
+ */
+function buildForcedCommandAuthorizedKeysEntry(publicKeyLine, opts = {}) {
+	const line = normalizeSshPublicKeyLine(publicKeyLine)
+	if (!line) return null
+	if (opts.useForcedCommand === false) return line
+
+	const wrapper = resolveReplicationSshWrapperPath()
+	/** @type {string[]} */
+	const options = []
+	const fromHost = String(opts.fromHost || '').trim()
+	if (fromHost && fromHost !== '127.0.0.1' && fromHost !== '::1') {
+		options.push(`from=${shellDoubleQuote(fromHost)}`)
+	}
+	options.push(`command=${shellDoubleQuote(wrapper)}`)
+	options.push('no-port-forwarding')
+	options.push('no-X11-forwarding')
+	options.push('no-agent-forwarding')
+	options.push('no-pty')
+	return `${options.join(',')} ${line}`
+}
+
+/**
+ * @param {string} authPath
+ * @param {string} publicKeyLine
+ * @param {{ fromHost?: string, log?: (level: string, msg: string) => void }} [opts]
+ */
+function upsertPeerAuthorizedKey(authPath, publicKeyLine, opts = {}) {
+	const entry = buildForcedCommandAuthorizedKeysEntry(publicKeyLine, { fromHost: opts.fromHost })
+	if (!entry) return { ok: false, error: 'invalid ssh public key' }
+
+	const material = extractSshPublicKeyMaterial(publicKeyLine)
+	const lines = fs.existsSync(authPath)
+		? fs.readFileSync(authPath, 'utf8').split('\n')
+		: []
+	const kept = lines.filter((raw) => {
+		const trimmed = raw.trim()
+		if (!trimmed || trimmed.startsWith('#')) return true
+		if (!material) return true
+		return extractSshPublicKeyMaterial(trimmed) !== material
+	})
+	while (kept.length && !kept[kept.length - 1].trim()) kept.pop()
+	const hadEntry = lines.some((raw) => {
+		const trimmed = raw.trim()
+		return trimmed && extractSshPublicKeyMaterial(trimmed) === material
+	})
+	const alreadyPresent = hadEntry && lines.some((raw) => raw.trim() === entry)
+	if (alreadyPresent) {
+		return { ok: true, installed: false, alreadyPresent: true, entry }
+	}
+	const next = [...kept, entry].join('\n') + '\n'
+	fs.writeFileSync(authPath, next, { mode: 0o600 })
+	if (typeof opts.log === 'function') {
+		opts.log('info', `[replication] authorized replication SSH key (${entry.slice(0, 72)}…)`)
+	}
+	return { ok: true, installed: true, alreadyPresent: false, upgraded: hadEntry, entry }
 }
 
 /**
@@ -89,27 +192,28 @@ function resolveReplicationSshIdentityPath() {
 
 /**
  * @param {string} publicKeyLine
- * @param {{ log?: (level: string, msg: string) => void }} [opts]
+ * @param {{ log?: (level: string, msg: string) => void, fromHost?: string }} [opts]
  */
 function installPeerAuthorizedKey(publicKeyLine, opts = {}) {
-	const line = normalizeSshPublicKeyLine(publicKeyLine)
-	if (!line) return { ok: false, error: 'invalid ssh public key' }
-
 	const authPath = path.join(os.homedir(), '.ssh', 'authorized_keys')
 	ensureSshDir(replicationSshKeyPath())
 	if (!fs.existsSync(authPath)) fs.writeFileSync(authPath, '', { mode: 0o600 })
 	else fs.chmodSync(authPath, 0o600)
+	return upsertPeerAuthorizedKey(authPath, publicKeyLine, opts)
+}
 
-	const existing = fs.readFileSync(authPath, 'utf8')
-	if (existing.split('\n').some((l) => l.trim() === line)) {
-		return { ok: true, installed: false, alreadyPresent: true }
-	}
+function rsyncRemoteRoot() {
+	return String(process.env.HIGHASCG_REPL_RSYNC_REMOTE_ROOT || REPO_ROOT).replace(/\/+$/, '')
+}
 
-	fs.appendFileSync(authPath, `${line}\n`, { mode: 0o600 })
-	if (typeof opts.log === 'function') {
-		opts.log('info', `[replication] authorized SSH key for peer (${line.slice(0, 40)}…)`)
-	}
-	return { ok: true, installed: true, alreadyPresent: false }
+function rsyncSshOptsForProbe() {
+	const identity =
+		String(process.env.HIGHASCG_REPL_RSYNC_IDENTITY_FILE || '').trim() || resolveReplicationSshIdentityPath()
+	const identityOpt = identity ? `-i ${identity}` : ''
+	const base =
+		process.env.HIGHASCG_REPL_RSYNC_SSH_OPTS ||
+		'-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15'
+	return [base, identityOpt].filter(Boolean).join(' ').trim()
 }
 
 /**
@@ -120,7 +224,7 @@ function ensurePeerAuthorizedKeyFromConfig(ctx) {
 	const repl = require('../config/replication-config').getReplicationConfig(ctx?.config)
 	const line = String(repl.peerSshPublicKey || '').trim()
 	if (!line) return { ok: true, skipped: true }
-	return installPeerAuthorizedKey(line, { log: ctx?.log })
+	return installPeerAuthorizedKey(line, { log: ctx?.log, fromHost: repl.peer?.host })
 }
 
 /**
@@ -141,14 +245,17 @@ function persistPeerSshPublicKey(ctx, peerPublicKeyLine) {
 /**
  * Exchange SSH keys during leader/follower pairing (no sudo — casparcg ~/.ssh only).
  * @param {object} ctx
- * @param {{ peerPublicKey?: string, log?: Function }} opts
+ * @param {{ peerPublicKey?: string, log?: Function, fromHost?: string }} opts
  */
 function prepareReplicationSshForPairing(ctx, opts = {}) {
 	const log = opts.log || ctx?.log
 	const local = ensureReplicationSshKey(log)
 	let peerInstall = null
 	if (opts.peerPublicKey) {
-		peerInstall = installPeerAuthorizedKey(opts.peerPublicKey, { log })
+		const fromHost =
+			String(opts.fromHost || '').trim() ||
+			String(require('../config/replication-config').getReplicationConfig(ctx?.config).peer?.host || '').trim()
+		peerInstall = installPeerAuthorizedKey(opts.peerPublicKey, { log, fromHost })
 		if (peerInstall.ok) persistPeerSshPublicKey(ctx, opts.peerPublicKey)
 	}
 	return { local, peerInstall }
@@ -164,24 +271,18 @@ function testReplicationSshToPeer(peerHost, log) {
 	const keyPath = resolveReplicationSshIdentityPath()
 	if (!keyPath) return { ok: false, error: 'replication SSH key missing' }
 	const user = String(process.env.HIGHASCG_REPL_RSYNC_USER || 'casparcg').trim() || 'casparcg'
-	const sshArgs = [
-		'-o',
-		'BatchMode=yes',
-		'-o',
-		'StrictHostKeyChecking=accept-new',
-		'-o',
-		'ConnectTimeout=10',
-		'-i',
-		keyPath,
-		`${user}@${host}`,
-		'echo highascg-replication-ssh-ok',
-	]
-	const res = spawnSync('ssh', sshArgs, { encoding: 'utf8', timeout: 15000 })
-	const ok = res.status === 0 && /highascg-replication-ssh-ok/.test(res.stdout || '')
+	const remoteRoot = rsyncRemoteRoot()
+	const remote = `${user}@${host}:${path.posix.join(remoteRoot, 'media/')}`
+	const sshCommand = `ssh ${rsyncSshOptsForProbe()}`
+	const res = spawnSync('rsync', ['-avzn', '--dry-run', '-e', sshCommand, remote, '/dev/null'], {
+		encoding: 'utf8',
+		timeout: 20000,
+	})
+	const ok = res.status === 0
 	if (!ok && typeof log === 'function') {
 		log(
 			'warn',
-			`[replication] SSH probe ${user}@${host} failed: ${(res.stderr || res.stdout || '').trim() || res.status}`,
+			`[replication] rsync SSH probe ${user}@${host} failed: ${(res.stderr || res.stdout || '').trim() || res.status}`,
 		)
 	}
 	return { ok, stderr: res.stderr, stdout: res.stdout }
@@ -193,19 +294,41 @@ function testReplicationSshToPeer(peerHost, log) {
  */
 async function exchangeReplicationSshWithPeer(ctx) {
 	const repl = require('../config/replication-config').getReplicationConfig(ctx?.config)
-	if (!repl.enabled || !repl.peer?.host || !repl.peer?.token) {
+	if (!repl.enabled || !repl.peer?.host || !repl.pairId) {
 		return { ok: false, error: 'replication not paired' }
 	}
 	const local = ensureReplicationSshKey(ctx?.log)
 	const { peerHttpRequest, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
-	const res = await peerHttpRequest(repl.peer, '/api/replication/exchange-ssh', {
+	const { buildRepairHandshakeBody } = require('./replication-handshake')
+	const rt = require('./replication-service').getReplicationRuntime(ctx)
+	const role = rt?.roleState?.getRole() || repl.role
+	const repairRole = role === 'leader' ? 'leader' : 'follower'
+	const repairBody = buildRepairHandshakeBody(ctx, { pairId: repl.pairId, role: repairRole })
+
+	let res = await peerHttpRequest(repl.peer, '/api/replication/exchange-ssh', {
 		method: 'POST',
-		body: { sshPublicKey: local.publicKeyLine },
+		body: { sshPublicKey: local.publicKeyLine, ...repairBody },
 		timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
 	})
-	if (!res.ok) return { ok: false, error: res.error || 'exchange-ssh failed' }
+	if (res.status === 401) {
+		res = await peerHttpRequest(
+			{ host: repl.peer.host, port: repl.peer.port || 4200, token: '' },
+			'/api/replication/exchange-ssh',
+			{
+				method: 'POST',
+				body: { sshPublicKey: local.publicKeyLine, ...repairBody },
+				timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
+			},
+		)
+	}
+	if (!res.ok) return { ok: false, error: res.error || res.json?.error || 'exchange-ssh failed' }
 	if (res.json?.sshPublicKey) {
-		prepareReplicationSshForPairing(ctx, { peerPublicKey: res.json.sshPublicKey, log: ctx?.log })
+		const latest = require('../config/replication-config').getReplicationConfig(ctx?.config)
+		prepareReplicationSshForPairing(ctx, {
+			peerPublicKey: res.json.sshPublicKey,
+			fromHost: latest.peer?.host,
+			log: ctx?.log,
+		})
 	}
 	return { ok: true, sshPublicKey: res.json?.sshPublicKey || '' }
 }
@@ -221,6 +344,7 @@ function handleExchangeReplicationSsh(ctx, body) {
 	try {
 		const prepared = prepareReplicationSshForPairing(ctx, {
 			peerPublicKey: body?.sshPublicKey,
+			fromHost: repl.peer?.host,
 			log: ctx?.log,
 		})
 		return { ok: true, sshPublicKey: prepared.local.publicKeyLine }
@@ -232,6 +356,9 @@ function handleExchangeReplicationSsh(ctx, body) {
 module.exports = {
 	replicationSshKeyPath,
 	normalizeSshPublicKeyLine,
+	resolveReplicationSshWrapperPath,
+	buildForcedCommandAuthorizedKeysEntry,
+	extractSshPublicKeyMaterial,
 	ensureReplicationSshKey,
 	resolveReplicationSshIdentityPath,
 	installPeerAuthorizedKey,

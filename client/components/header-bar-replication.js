@@ -2,6 +2,7 @@
  * Header hot-backup badge — L / F circle (like stream/rec indicators).
  */
 import { subscribeReplicationStatus } from '../lib/replication-ui-state.js'
+import { hotBackupPairedTitle } from '../lib/hot-backup-project.js'
 
 /**
  * @param {HTMLElement} container — usually .header-stream-state sibling wrap
@@ -65,6 +66,16 @@ export function initReplicationBadge(container) {
 		b.setAttribute('aria-label', title)
 		b.addEventListener('click', focusHotBackupInspector)
 		wrap.appendChild(b)
+
+		const pairedTitle = hotBackupPairedTitle(status.projectHotBackup, role)
+		if (pairedTitle) {
+			const paired = document.createElement('span')
+			paired.className = 'header-replication-paired'
+			paired.textContent = pairedTitle
+			paired.title = pairedTitle
+			wrap.appendChild(paired)
+		}
+
 		wrap.hidden = false
 	}
 

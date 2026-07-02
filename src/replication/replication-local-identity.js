@@ -10,6 +10,19 @@ const { getReplicationConfig, normalizeReplicationConfig } = require('../config/
 const LOCAL_IDENTITY_PATH = path.join(REPO_ROOT, 'config', 'replication-local-identity.json')
 
 /**
+ * @returns {string|null}
+ */
+function getHardwareHostnameSelfId() {
+	try {
+		const { getHardwareIdentity } = require('../system/hardware-identity')
+		const hw = getHardwareIdentity()
+		return hw?.hostname ? String(hw.hostname).trim() : null
+	} catch {
+		return null
+	}
+}
+
+/**
  * @returns {{ selfId: string, createdAt?: string } | null}
  */
 function readLocalIdentityFile() {
@@ -44,6 +57,23 @@ function writeLocalIdentityFile(selfId) {
  * @returns {string}
  */
 function getOrCreateLocalReplicationSelfId(ctx, opts = {}) {
+	const hwHostname = getHardwareHostnameSelfId()
+	if (hwHostname) {
+		const file = readLocalIdentityFile()
+		if (file?.selfId === hwHostname) return hwHostname
+		writeLocalIdentityFile(hwHostname)
+		if (opts.persistToReplication !== false && ctx?.configManager && ctx?.config) {
+			const repl = getReplicationConfig(ctx.config)
+			if (repl.selfId !== hwHostname) {
+				const next = normalizeReplicationConfig({ ...repl, selfId: hwHostname })
+				const cfg = { ...ctx.configManager.get(), replication: next }
+				ctx.configManager.save(cfg)
+				Object.assign(ctx.config, ctx.configManager.get())
+			}
+		}
+		return hwHostname
+	}
+
 	const file = readLocalIdentityFile()
 	if (file?.selfId) return file.selfId
 

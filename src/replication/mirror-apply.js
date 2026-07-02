@@ -60,7 +60,7 @@ async function applyTimelinePlayback(ctx, timelinePb) {
 
 	eng.setLoop(id, !!timelinePb.loop)
 	const pos = timelinePb.position != null ? Number(timelinePb.position) : 0
-	if (timelinePb.sendTo && typeof timelinePb.sendTo === 'object') eng.setSendTo(timelinePb.sendTo)
+	if (timelinePb.sendTo && typeof timelinePb.sendTo === 'object') eng.setSendTo(timelinePb.sendTo, id)
 	eng.play(id, Number.isFinite(pos) && pos >= 0 ? pos : 0)
 }
 
