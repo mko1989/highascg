@@ -3,7 +3,7 @@
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
-const { execSync } = require('child_process')
+const { execSync, execFileSync } = require('child_process')
 const logger = require('./buffered-logger').osDisplay
 const { getXAuthority, getGpuConnectorInventory } = require('./hardware-info')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
@@ -17,6 +17,12 @@ const {
 	buildApplyLayoutScriptContent,
 	customModesToApplyMeta,
 } = require('./xrandr-persist-script')
+const {
+	assertSafeXrandrModeToken,
+	buildXrandrLayoutArgv,
+	formatXrandrLayoutShellCommand,
+	formatXrandrArgvForLog,
+} = require('./xrandr-safety')
 
 
 
@@ -24,7 +30,7 @@ const {
 function sleepSyncMs(ms) {
 	if (!(ms > 0)) return
 	try {
-		execSync(`sleep ${Math.max(0.05, ms / 1000)}`, { stdio: 'ignore' })
+		execFileSync('sleep', [String(Math.max(0.05, ms / 1000))], { stdio: 'ignore' })
 	} catch (_) {
 		/* best effort */
 	}
@@ -54,7 +60,8 @@ function applyX11Layout(config, opts = {}) {
 	const persist = opts.persist !== false
 	logger.info(`[OS-Config] applyX11Layout start live=${live} persist=${persist}`)
 	const layout = calculateLayoutPositions(config)
-	const xrandrParts = []
+	/** @type {Array<{ output: string, x: number, y: number, mode: string, rate?: number|null }>} */
+	const xrandrHeads = []
 	const customModeRegistry = new CustomXrandrModeRegistry()
 	let xrandrQueryOut = ''
 	/** @type {Map<string, Set<string>>} */
@@ -197,18 +204,35 @@ function applyX11Layout(config, opts = {}) {
 			}
 		}
 
-		// Include --mode for strict enforcement as requested by user
 		const modeArg = String(resolvedMode || info.mode || '').trim()
-		const xPart = `--output ${safeSysId} --pos ${info.x}x${info.y} --mode ${modeArg}`
-		const xPartWithRate = safeRate != null ? `${xPart} --rate ${Math.round(safeRate * 100) / 100}` : xPart
+		if (!modeArg) {
+			logger.warn(`[OS-Config] Skipping ${safeSysId}: empty xrandr mode`)
+			return
+		}
+		try {
+			assertSafeXrandrModeToken(modeArg)
+		} catch (e) {
+			logger.warn(`[OS-Config] Skipping unsafe xrandr mode for ${safeSysId}: ${e.message}`)
+			return
+		}
 		logger.info(
-			`[OS-Config] xrandr head: output=${safeSysId} pos=${info.x}x${info.y} mode=${modeArg || '(empty)'} planned=${plannedMode || '(none)'} source=${osModeSource} rate=${safeRate != null ? Math.round(safeRate * 100) / 100 : '(none)'}`
+			`[OS-Config] xrandr head: output=${safeSysId} pos=${info.x}x${info.y} mode=${modeArg} planned=${plannedMode || '(none)'} source=${osModeSource} rate=${safeRate != null ? Math.round(safeRate * 100) / 100 : '(none)'}`
 		)
-		xrandrParts.push(xPartWithRate)
+		xrandrHeads.push({
+			output: safeSysId,
+			x: info.x,
+			y: info.y,
+			mode: modeArg,
+			rate: safeRate,
+		})
 	}
 
 	try {
-		xrandrQueryOut = execSync('xrandr --display :0 --query', { env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() } }).toString()
+		xrandrQueryOut = execFileSync(
+			'xrandr',
+			['--display', ':0', '--query'],
+			{ env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }, encoding: 'utf8' },
+		).toString()
 		const parsed = parseOutputModes(xrandrQueryOut)
 		for (const [out, modes] of parsed.entries()) availableModesByOutput.set(out, modes)
 	} catch (e) { logger.warn(`[OS-Config] Failed to query connected outputs: ${e.message}`) }
@@ -230,14 +254,23 @@ function applyX11Layout(config, opts = {}) {
 	let persisted = false
 	/** @type {string|null} */
 	let xrandrCommand = null
-	const xcmd = xrandrParts.length > 0 ? `xrandr --display :0 ${xrandrParts.join(' ')}` : null
-	if (xcmd) xrandrCommand = `DISPLAY=:0 ${xcmd}`
-
-	if (persist && xcmd) {
-		persisted = persistLayoutScript(xcmd, config, layout, customModeRegistry.toArray())
+	/** @type {string[]|null} */
+	let xrandrArgv = null
+	if (xrandrHeads.length > 0) {
+		try {
+			xrandrArgv = buildXrandrLayoutArgv(xrandrHeads)
+			xrandrCommand = formatXrandrLayoutShellCommand(xrandrArgv)
+		} catch (e) {
+			logger.warn(`[OS-Config] xrandr layout argv rejected: ${e.message}`)
+		}
 	}
 
-	if (live && xcmd) {
+	if (persist && xrandrCommand) {
+		persisted = persistLayoutScript(xrandrCommand, config, layout, customModeRegistry.toArray())
+	}
+
+	if (live && xrandrArgv) {
+		const xrandrLog = formatXrandrArgvForLog(xrandrArgv)
 		// NVIDIA RandR often rejects the first combined CRTC reconfig with BadMatch when
 		// transitioning from a wedged/narrower canvas, then accepts the *identical* command on
 		// retry (observed on highascg-nvidia-595). Retry on failure before giving up.
@@ -246,8 +279,8 @@ function applyX11Layout(config, opts = {}) {
 		let lastErr = null
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
-				logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xcmd}`)
-				const out = execSync(xcmd, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
+				logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xrandrLog}`)
+				const out = execFileSync('xrandr', xrandrArgv, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
 				const trimmed = String(out || '').trim()
 				if (trimmed) {
 					const cap = 8000
@@ -368,17 +401,20 @@ function persistLayoutScript(cmd, config, layout, customModes = []) {
 		try {
 			const tmp = path.join(os.tmpdir(), `highascg-apply-layout-${process.pid}.sh`)
 			fs.writeFileSync(tmp, scriptContent, { encoding: 'utf8', mode: 0o755 })
-			execSync(`sudo -n install -d /etc/highascg && sudo -n install -m 755 ${JSON.stringify(tmp)} /etc/highascg/apply-layout.sh`, {
+			execFileSync('sudo', ['-n', 'install', '-d', '/etc/highascg'], { stdio: 'ignore' })
+			execFileSync('sudo', ['-n', 'install', '-m', '755', tmp, '/etc/highascg/apply-layout.sh'], {
 				stdio: 'ignore',
 			})
 			try {
 				fs.unlinkSync(tmp)
 			} catch (_) {}
 			const xsessionHook = '/etc/highascg/apply-layout.sh &'
-			execSync(
-				`if [ -d /etc/X11/Xsession.d ]; then printf '%s\\n' ${JSON.stringify(xsessionHook)} | sudo -n tee /etc/X11/Xsession.d/99highascg-layout >/dev/null; fi`,
-				{ stdio: 'ignore' }
-			)
+			if (fs.existsSync('/etc/X11/Xsession.d')) {
+				execFileSync('sudo', ['-n', 'tee', '/etc/X11/Xsession.d/99highascg-layout'], {
+					input: `${xsessionHook}\n`,
+					stdio: ['pipe', 'ignore', 'ignore'],
+				})
+			}
 			logger.info('[OS-Config] Persisted system-wide layout to /etc/highascg/apply-layout.sh')
 		} catch (sysErr) {
 			logger.info(`[OS-Config] System-wide layout persistence skipped (requires sudo): ${sysErr.message}`)
@@ -430,10 +466,10 @@ export XAUTHORITY=${xauth}
 		try {
 			const tmp = path.join(os.tmpdir(), `highascg-apply-layout-clear-${process.pid}.sh`)
 			fs.writeFileSync(tmp, scriptContent, { encoding: 'utf8', mode: 0o755 })
-			execSync(
-				`sudo -n install -d /etc/highascg && sudo -n install -m 755 ${JSON.stringify(tmp)} /etc/highascg/apply-layout.sh`,
-				{ stdio: 'ignore' },
-			)
+			execFileSync('sudo', ['-n', 'install', '-d', '/etc/highascg'], { stdio: 'ignore' })
+			execFileSync('sudo', ['-n', 'install', '-m', '755', tmp, '/etc/highascg/apply-layout.sh'], {
+				stdio: 'ignore',
+			})
 			try {
 				fs.unlinkSync(tmp)
 			} catch (_) {}
@@ -463,11 +499,10 @@ function checkXrandrLayout(config) {
  * Requires passwordless sudo for the node user.
  */
 function restartDisplayManager() {
-	// Use sudo -n to fail fast if password is required
 	const cmd = 'sudo -n systemctl restart nodm'
 	logger.info(`[OS-Config] Restarting display manager: ${cmd}`)
 	try {
-		execSync(cmd, { stdio: 'inherit' })
+		execFileSync('sudo', ['-n', 'systemctl', 'restart', 'nodm'], { stdio: 'inherit' })
 		return true
 	} catch (e) {
 		logger.error(`[OS-Config] Failed to restart nodm (requires passwordless sudo): ${e.message}`)

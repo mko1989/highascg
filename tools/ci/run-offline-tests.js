@@ -27,6 +27,8 @@ const FILES = [
 	'tools/smoke/smoke-streaming-channel-status.test.js',
 	'tools/smoke/smoke-api-auth.test.js',
 	'tools/smoke/smoke-settings-nuclear-password.test.js',
+	'tools/smoke/smoke-zip-slip.test.js',
+	'tools/smoke/smoke-xrandr-mode-validation.test.js',
 	'tools/smoke/smoke-wiki.test.js',
 	'test/companion-control-status.test.js',
 ]

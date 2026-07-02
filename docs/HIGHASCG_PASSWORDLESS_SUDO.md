@@ -51,6 +51,11 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 | **`/usr/bin/eggs`** | `calamares` | `src/api/routes-system-setup.js` (DISPLAY often `:0`) |
 | **`/usr/local/lib/highascg/highascg-network-apply.sh`** | fixed `dhcp` / `static` + allow-listed iface args | WO-59 **Apply network** (`POST /api/system/network/apply`) |
 | **`/usr/local/lib/highascg/highascg-network-reset.sh`** | optional `[iface]` | **Reset network** (`POST /api/system/network/reset`) — DHCP renew / reconnect |
+| **`/usr/local/lib/highascg/highascg-tailscale-up.sh`** | *(none — reads `config/tailscale.json`)* | WO-91 / WO-97 pinned Tailscale bring-up |
+| **`/usr/bin/tailscale`** | `logout` | `src/network/tailscale-service.js` |
+| **`/snap/bin/tailscale`** | `logout` | Same |
+
+**Removed (WO-97, 2026-07-02):** `tailscale up` and `tailscale up *` NOPASSWD wildcards — use **`highascg-tailscale-up.sh`** only. **`eggs calamares --install *`** removed (build-host root task only).
 
 **WO-66 Web UI server update** (install helper via `install-exfat-systemd-units.sh`, then sudoers):
 

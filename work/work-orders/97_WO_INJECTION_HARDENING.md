@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — issues confirmed in 2026-07-02 security review; fixes not implemented
+**Status:** Complete (v1) — Zip-Slip, sudoers, xrandr argv, subprocess hardening (2026-07-02)
 **Priority:** **High** — three concrete injection/pivot paths; amplified by WO-96 (no auth)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -78,14 +78,14 @@ Apply to **both** the upload path (~160) and the download path (~355). Reject sy
 
 ## 4. Tasks
 
-- [ ] **T97.0** Zip-Slip guard in `routes-ingest.js` (upload + download paths); reject `..`/absolute/symlink entries; entry-count + total-size caps.
-- [ ] **T97.1** Smoke test `tools/smoke/smoke-zip-slip.test.js` — crafted archive cannot escape target dir.
-- [ ] **T97.2** Remove `tailscale up *` / `eggs ... *` wildcards; add pinned helper or exact arg entries; re-run sudoers `visudo -c`.
-- [ ] **T97.3** Audit + document all NOPASSWD entries in `docs/HIGHASCG_PASSWORDLESS_SUDO.md`.
-- [ ] **T97.4** `os-config.js` xrandr → `execFileSync` arg arrays; strict `modeArg` validation.
-- [ ] **T97.5** `os-config.js` sudo-persistence pipelines → arg arrays / helper.
-- [ ] **T97.6** `audio-devices.js`, `gpu-modetest.js` → `execFileSync` arg arrays.
-- [ ] **T97.7** Smoke test asserting invalid mode token is rejected (no shell metachar reaches xrandr).
+- [x] **T97.0** Zip-Slip guard in `routes-ingest.js` (upload + download paths); reject `..`/absolute/symlink entries; entry-count + total-size caps.
+- [x] **T97.1** Smoke test `tools/smoke/smoke-zip-slip.test.js` — crafted archive cannot escape target dir.
+- [x] **T97.2** Remove `tailscale up *` / `eggs ... *` wildcards; add pinned helper or exact arg entries; re-run sudoers `visudo -c`.
+- [x] **T97.3** Audit + document all NOPASSWD entries in `docs/HIGHASCG_PASSWORDLESS_SUDO.md`.
+- [x] **T97.4** `os-config.js` xrandr → `execFileSync` arg arrays; strict `modeArg` validation.
+- [x] **T97.5** `os-config.js` sudo-persistence pipelines → arg arrays / helper.
+- [x] **T97.6** `audio-devices.js`, `gpu-modetest.js` → `execFileSync` arg arrays.
+- [x] **T97.7** Smoke test asserting invalid mode token is rejected (no shell metachar reaches xrandr).
 
 ---
 
@@ -105,3 +105,13 @@ Apply to **both** the upload path (~160) and the download path (~355). Reject sy
 
 - Captured findings F3/F4/F5 into concrete remediation tasks.
 - **Instructions for Next Agent:** T97.0/T97.1 (Zip-Slip) are the fastest high-value fix — do them first. T97.2/T97.3 (sudoers) need testing on a live egg/stick before shipping. Coordinate sudoers changes with [96_WO_API_WS_AUTHENTICATION.md](./96_WO_API_WS_AUTHENTICATION.md) since auth reduces remote reachability of these paths.
+
+### 2026-07-02 — WO-97 implementation (agent)
+
+- `src/utils/safe-unzip.js` — Zip-Slip, symlink, size caps; wired in `routes-ingest.js` (from WO-96).
+- `src/utils/xrandr-safety.js` + `os-config.js` — `execFileSync` arg arrays, mode token validation, sudo install via argv.
+- `scripts/setup/12-passwordless-sudo.sh` — removed `tailscale up *` and `eggs calamares --install *`; Tailscale via `highascg-tailscale-up.sh` only.
+- `tailscale-service.js` — sudo bring-up uses pinned helper only.
+- `audio-devices.js`, `gpu-modetest.js` — `execFileSync` arg arrays.
+- Smoke: `smoke-zip-slip.test.js`, `smoke-xrandr-mode-validation.test.js`; docs updated.
+- **Instructions for Next Agent:** Re-run `sudo bash scripts/setup/12-passwordless-sudo.sh` on deployed sticks to apply sudoers. Commit WO-97 batch when user asks.

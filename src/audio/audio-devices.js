@@ -6,7 +6,7 @@
 
 const os = require('os')
 const path = require('path')
-const { execSync } = require('child_process')
+const { execSync, execFileSync } = require('child_process')
 
 const CACHE_TTL_MS = 30000
 /** @type {{ at: number, payload: object } | null} */
@@ -34,7 +34,7 @@ function execAplay(args) {
 	}
 	for (const bin of APLAY_BINS) {
 		try {
-			return execSync(`${bin} ${args}`, opts)
+			return execFileSync(bin, String(args).trim().split(/\s+/).filter(Boolean), opts)
 		} catch {
 			/* try next */
 		}
@@ -54,7 +54,7 @@ function execPwCliListNodes() {
 	}
 	for (const bin of PW_CLI_BINS) {
 		try {
-			return execSync(`${bin} list-objects Node`, opts)
+			return execFileSync(bin, ['list-objects', 'Node'], opts)
 		} catch {
 			/* try next */
 		}

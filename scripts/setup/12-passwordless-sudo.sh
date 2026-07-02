@@ -52,25 +52,17 @@ ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop tailscaled, /usr/bin/sys
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl start snap.tailscale.tailscaled.service, /usr/bin/systemctl start snap.tailscale.tailscaled.service
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop snap.tailscale.tailscaled.service, /usr/bin/systemctl stop snap.tailscale.tailscaled.service
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/tailscale logout, /snap/bin/tailscale logout
-${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/tailscale up
-${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/tailscale up *
-${USER_CASPAR} ALL=(root) NOPASSWD: /snap/bin/tailscale up
-${USER_CASPAR} ALL=(root) NOPASSWD: /snap/bin/tailscale up *
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-tailscale-up.sh
 EOF
 
-if command -v eggs >/dev/null 2>&1 && [ -x /usr/bin/eggs ]; then
-	cat >>"$TMP" <<EOF
-${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/eggs calamares
-${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/eggs calamares --install *
-EOF
-fi
+# eggs calamares --install runs as root on the build host only (install-eggs-calamares.sh).
+# Do not grant NOPASSWD wildcards — WO-97.
 
 visudo -cf "$TMP" >/dev/null
 install -m 0440 -o root -g root "$TMP" "$DEST"
 
 echo "OK: $DEST"
-echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale, operator-snap-home$(command -v eggs >/dev/null 2>&1 && [ -x /usr/bin/eggs ] && echo ', eggs calamares (+ --install)' || echo '')"
+echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home"
 echo
 echo "Verify as ${USER_CASPAR}:"
 echo "  sudo -u ${USER_CASPAR} sudo -n /usr/local/bin/caspar-systemd-control.sh status"

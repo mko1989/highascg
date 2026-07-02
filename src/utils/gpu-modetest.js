@@ -1,6 +1,6 @@
 'use strict'
 
-const { execSync } = require('child_process')
+const { execFileSync } = require('child_process')
 const fs = require('fs')
 
 function normalizePortName(v) {
@@ -77,11 +77,10 @@ function edidMatchKey(edid) {
  */
 function runModetestConnectorsRaw(opts = {}) {
 	try {
-		const parts = []
+		const args = ['-c']
 		const driver = String(opts.driverModule || '').trim()
-		if (driver) parts.push('-M', driver)
-		parts.push('-c')
-		const out = execSync(`modetest ${parts.map((p) => (/\s/.test(p) ? `"${p}"` : p)).join(' ')} 2>&1`, {
+		if (driver) args.unshift('-M', driver)
+		const out = execFileSync('modetest', args, {
 			encoding: 'utf8',
 			timeout: opts.timeoutMs ?? 10000,
 			maxBuffer: 8 * 1024 * 1024,

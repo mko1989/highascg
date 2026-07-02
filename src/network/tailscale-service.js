@@ -345,21 +345,11 @@ async function startTailscaleLogin(prefs) {
 			if (msg.includes('login access denied') || msg.includes('403')) {
 				return { ok: true, authUrl: null, state: afterErr.backendState, connected: afterErr.connected }
 			}
-			const r = runSudo([
-				{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] },
-				...(fs.existsSync('/usr/bin/tailscale')
-					? [{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]
-					: [{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]),
-			])
+			const r = runSudo([{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] }])
 			if (!r.ok) return { ok: false, error: r.error }
 		}
 	} else {
-		const r = runSudo([
-			{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] },
-			...(fs.existsSync('/usr/bin/tailscale')
-				? [{ bin: '/usr/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]
-				: [{ bin: '/snap/bin/tailscale', args: buildTailscaleUpArgs(cfg) }]),
-		])
+		const r = runSudo([{ bin: '/usr/local/lib/highascg/highascg-tailscale-up.sh', args: [] }])
 		if (!r.ok) return { ok: false, error: r.error }
 	}
 	await new Promise((r) => setTimeout(r, 800))
