@@ -183,6 +183,16 @@
 			return list;
 		}
 
+		function getDynamicCellLabel(cell) {
+			if ((cell.type === 'pgm' || cell.type === 'prv') && typeof cell.screenIdx === 'number') {
+				if (channelMap && channelMap.virtualMainChannels && channelMap.virtualMainChannels[cell.screenIdx] && channelMap.virtualMainChannels[cell.screenIdx].name) {
+					const name = channelMap.virtualMainChannels[cell.screenIdx].name;
+					return `${cell.type === 'pgm' ? 'PGM' : 'PRV'} · ${name}`;
+				}
+			}
+			return cell.label || '';
+		}
+
 		function colorsForType(t) {
 			if (t === 'pgm') return { border: '#e63946', solid: '#c92a2a', prog: '#ffffff' };
 			if (t === 'prv') return { border: '#2a9d8f', solid: '#0d9488', prog: '#a7f3d0' };
@@ -333,7 +343,7 @@
 					const solidH = lh > 0 ? lh : titleBarH;
 					ctx.fillStyle = c.solid;
 					ctx.fillRect(lx, ly, lw, solidH);
-					drawCenteredTitle(cell.label || '', lx, ly, lw, solidH);
+					drawCenteredTitle(getDynamicCellLabel(cell), lx, ly, lw, solidH);
 					continue;
 				}
 
@@ -353,7 +363,7 @@
 
 				ctx.fillStyle = c.solid;
 				ctx.fillRect(lx, ly, lw, titleBarH);
-				drawCenteredTitle(cell.label || '', lx, ly, lw, titleBarH);
+				drawCenteredTitle(getDynamicCellLabel(cell), lx, ly, lw, titleBarH);
 
 				const dockW = Math.min(lw - 8, Math.max(200, lw * 0.5));
 				const dockX = lx + (lw - dockW) / 2;

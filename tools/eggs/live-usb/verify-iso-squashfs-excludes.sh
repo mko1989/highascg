@@ -48,6 +48,22 @@ squash_has_tree() {
 	squash_grep_list "^squashfs-root/${prefix}(/|\$)" "$prefix"
 }
 
+# unsquashfs -cat streams large files; grep -q closes early → SIGPIPE (141) with pipefail.
+squash_cat_grep() {
+	local file="$1"
+	local pattern="$2"
+	local fixed="${3:-0}"
+	local rc=0
+	set +o pipefail
+	if [[ "$fixed" == "1" ]]; then
+		unsquashfs -cat "$SQ" "$file" 2>/dev/null | grep -qF "$pattern" || rc=$?
+	else
+		unsquashfs -cat "$SQ" "$file" 2>/dev/null | grep -qE "$pattern" || rc=$?
+	fi
+	set -o pipefail
+	[[ "$rc" -eq 0 ]]
+}
+
 # Root-level swap file (not usr/bin/live-swapfile or kernel headers)
 if squash_grep_list '^squashfs-root/(swapfile|swap\.img)$'; then
 	bad "root swapfile or swap.img is inside squashfs"
@@ -195,13 +211,13 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing probe-internal-storage.sh — run install-storage-drivers-for-iso.sh"
 	fi
-	if unsquashfs -cat "$SQ" var/lib/dpkg/status 2>/dev/null | grep -qE '^Package: grub-pc$'; then
+	if squash_cat_grep 'var/lib/dpkg/status' '^Package: grub-pc$'; then
 		ok "present: grub-pc in squashfs (Legacy BIOS Calamares bootloader)"
 	else
 		bad "missing grub-pc in squashfs — run install-grub-for-calamares-iso.sh before produce"
 	fi
 	kver="$(unsquashfs -cat "$SQ" etc/highascg/pinned-kernel 2>/dev/null | tr -d '[:space:]' || echo '6.8.0-117-generic')"
-	if unsquashfs -cat "$SQ" var/lib/dpkg/status 2>/dev/null | grep -qF "Package: linux-headers-${kver}"; then
+	if squash_cat_grep 'var/lib/dpkg/status' "Package: linux-headers-${kver}" 1; then
 		ok "present: linux-headers-${kver} in squashfs (DeckLink/NVIDIA DKMS)"
 	else
 		bad "missing linux-headers-${kver} in squashfs — run install-kernel-headers-for-dkms-iso.sh before produce"

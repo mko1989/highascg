@@ -5,9 +5,9 @@
 # Runs inside a detached tmux session so you can attach/detach during the long build.
 #
 # Usage:
-#   bash work/run-eggs-clone-flash-tmux.sh              # start detached session
-#   bash work/run-eggs-clone-flash-tmux.sh --attach     # start and attach
-#   bash work/run-eggs-clone-flash-tmux.sh --attach-only # attach existing session
+#   bash work/run-eggs-clone-flash-tmux.sh              # sudo once here, then detached tmux
+#   bash work/run-eggs-clone-flash-tmux.sh --attach     # start and attach (sudo tmux attach)
+#   bash work/run-eggs-clone-flash-tmux.sh --attach-only
 #
 # Env:
 #   HIGHASCG_NVIDIA_DRIVER=595   override (default: /etc/highascg/nvidia-iso-driver or 595)
@@ -20,12 +20,30 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIVE_USB="${REPO}/tools/eggs/live-usb"
+INNER="${REPO}/work/run-eggs-clone-flash-inner.sh"
 SESSION="${TMUX_SESSION:-highascg-eggs}"
 USB="${USB_DEVICE:-/dev/sda}"
 ATTACH=false
 ATTACH_ONLY=false
 LOG=""
+
+tmux_has_session() {
+	local s="$1"
+	tmux has-session -t "$s" 2>/dev/null && return 0
+	sudo tmux has-session -t "$s" 2>/dev/null
+}
+
+tmux_attach_session() {
+	local s="$1"
+	if tmux has-session -t "$s" 2>/dev/null; then
+		exec tmux attach -t "$s"
+	fi
+	if sudo tmux has-session -t "$s" 2>/dev/null; then
+		exec sudo tmux attach -t "$s"
+	fi
+	echo "No tmux session: $s" >&2
+	exit 1
+}
 
 usage() {
 	sed -n '2,18p' "$0" | tail -n +2
@@ -37,6 +55,7 @@ while [[ $# -gt 0 ]]; do
 		-h | --help) usage 0 ;;
 		--attach) ATTACH=true ;;
 		--attach-only) ATTACH_ONLY=true ;;
+		--as-root) ;; # internal: after sudo re-exec
 		--usb)
 			USB="${2:?}"
 			shift
@@ -55,13 +74,13 @@ command -v tmux >/dev/null || {
 }
 
 if "$ATTACH_ONLY"; then
-	exec tmux attach -t "$SESSION"
+	tmux_attach_session "$SESSION"
 fi
 
-if tmux has-session -t "$SESSION" 2>/dev/null; then
+if tmux_has_session "$SESSION"; then
 	echo "tmux session already running: $SESSION" >&2
-	echo "  tmux attach -t $SESSION" >&2
-	echo "  tmux kill-session -t $SESSION   # to restart" >&2
+	echo "  tmux attach -t $SESSION   # or: sudo tmux attach -t $SESSION" >&2
+	echo "  tmux kill-session -t $SESSION   # or: sudo tmux kill-session -t $SESSION" >&2
 	exit 1
 fi
 
@@ -80,7 +99,8 @@ esac
 
 BASENAME="${BASENAME:-highascg-nvidia-${DRV}}"
 mkdir -p "${REPO}/work"
-LOG="${REPO}/work/eggs-clone-flash-$(date +%Y%m%d-%H%M%S).log"
+LOG="${LOG:-${REPO}/work/eggs-clone-flash-$(date +%Y%m%d-%H%M%S).log}"
+touch "$LOG"
 
 ROOT_DEV="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
 if [[ -n "$ROOT_DEV" ]] && lsblk -no PKNAME "$ROOT_DEV" 2>/dev/null | grep -qxF "${USB#/dev/}"; then
@@ -102,113 +122,41 @@ if ! command -v eggs >/dev/null; then
 	exit 1
 fi
 
-# Build script runs prepare-eggs-clone-with-exfat.sh (merge exclude.list + WO-47 stubs).
 EXCLUDE_FILE="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
 if [[ ! -f "$EXCLUDE_FILE" ]]; then
 	echo "Note: ${EXCLUDE_FILE} missing — prepare step will install from tools/eggs/live-usb/exclude.list" >&2
 fi
 
-RUNNER="$(mktemp)"
-trap 'rm -f "$RUNNER"' EXIT
-cat >"$RUNNER" <<RUNEOF
-#!/usr/bin/env bash
-set -euo pipefail
-export HIGHASCG_NVIDIA_DRIVER=${DRV}
-export BASENAME=${BASENAME}
-export USB_DEVICE=${USB}
-export HIGHASCG_OVERNIGHT=${HIGHASCG_OVERNIGHT:-0}
-REPO=${REPO}
-LOG=${LOG}
+[[ -x "$INNER" ]] || chmod 0755 "$INNER"
 
-# sudo -v in another terminal does NOT apply here (timestamp is per-tty). Re-exec as root
-# once in THIS tmux pane — attach and enter password when prompted.
-if [[ "\${1:-}" != "--as-root" ]] && [[ \$(id -u) -ne 0 ]]; then
-	echo "==> Need root for eggs produce — enter sudo password in THIS tmux window if prompted"
-	echo "    (sudo -v in a different terminal will not unblock this pane)"
-	exec sudo -E env \\
-		HIGHASCG_NVIDIA_DRIVER="\${HIGHASCG_NVIDIA_DRIVER}" \\
-		BASENAME="\${BASENAME}" \\
-		USB_DEVICE="\${USB_DEVICE}" \\
-		HIGHASCG_OVERNIGHT="\${HIGHASCG_OVERNIGHT}" \\
-		REPO="\${REPO}" \\
-		LOG="\${LOG}" \\
-		bash "\$0" --as-root
-fi
-[[ "\${1:-}" == "--as-root" ]] && shift
-
-exec > >(tee -a "\$LOG") 2>&1
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "HighAsCG eggs clone + flash"
-echo "  started:  \$(date -Is)"
-echo "  host:     \$(hostname)"
-echo "  driver:   \${HIGHASCG_NVIDIA_DRIVER}"
-echo "  basename: \${BASENAME}"
-echo "  usb:      \${USB_DEVICE}"
-echo "  log:      \${LOG}"
-echo "  excludes: ${EXCLUDE_FILE} (merged by prepare-eggs-clone-with-exfat.sh)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
-
-cd "\$REPO"
-
-echo "==> Running as root (uid=\$(id -u)) at \$(date -Is)"
-
-echo "==> Prepare host for produce (swap off + umount exFAT/bridge)"
-bash "\$REPO/tools/eggs/live-usb/stop-and-unmount-wo47-for-eggs-produce.sh"
-bash "\$REPO/tools/eggs/live-usb/strip-host-swap-for-live-iso.sh" prepare
-
-echo "==> Preflight: eggs exclude.list + liveroot safety"
-HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list" \\
-	bash "\$REPO/tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh" --replace
-HIGHASCG_EGGS_EXCLUDE_FRAGMENT="\$REPO/tools/eggs/live-usb/penguins-eggs-exclude-decklink.list" \\
-	bash "\$REPO/tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh"
-bash "\$REPO/tools/eggs/live-usb/audit-eggs-clone-host.sh"
-
-# Stop stack before umount/clone (build script also stops highascg during squashfs pack).
-systemctl stop highascg.service 2>/dev/null || true
-pkill -u casparcg -f '/home/casparcg/highascg/bin/casparcg' 2>/dev/null || true
-sleep 1
-
-echo "==> Phase 1+2: eggs produce --clone + dd + exFAT partition 3 (HIGHASCGEXF)"
-set +e
-HIGHASCG_NVIDIA_DRIVER="\$HIGHASCG_NVIDIA_DRIVER" BASENAME="\$BASENAME" \\
-	bash "\$REPO/tools/eggs/live-usb/build-produce-flash-stick.sh" -y --usb "\$USB_DEVICE"
-build_rc=\$?
-set -e
-
-echo
-if [[ "\$build_rc" -ne 0 ]]; then
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "BUILD FAILED (exit \$build_rc) at \$(date -Is)"
-	echo "  log: \${LOG}"
-	echo "  fix issues above, then rerun: bash \$REPO/work/run-eggs-clone-flash-tmux.sh"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	if [[ "\${HIGHASCG_OVERNIGHT:-0}" != "1" ]]; then
-		read -r -p "Press Enter to close this tmux window… "
-	fi
-	exit "\$build_rc"
+# Sudo once in THIS terminal — tmux runs as root (no password prompt inside detached pane).
+if [[ "$(id -u)" -ne 0 ]]; then
+	echo "==> Need root for eggs produce — enter sudo password now (not inside tmux)"
+	exec sudo -E env \
+		HIGHASCG_NVIDIA_DRIVER="$DRV" \
+		BASENAME="$BASENAME" \
+		USB_DEVICE="$USB" \
+		HIGHASCG_OVERNIGHT="${HIGHASCG_OVERNIGHT:-0}" \
+		REPO="$REPO" \
+		LOG="$LOG" \
+		EXCLUDE_FILE="$EXCLUDE_FILE" \
+		TMUX_SESSION="$SESSION" \
+		HIGHASCG_ATTACH="${ATTACH}" \
+		bash "$0" --as-root "$@"
 fi
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Done: \$(date -Is)"
-echo "Stick layout on \${USB_DEVICE}:"
-lsblk -f "\$USB_DEVICE" || true
-echo "Verify: bash \$REPO/tools/eggs/live-usb/verify-config-persistence.sh"
-echo "Log: \${LOG}"
-if [[ "\${HIGHASCG_OVERNIGHT:-0}" != "1" ]]; then
-	read -r -p "Press Enter to close this tmux window… "
-fi
-RUNEOF
-chmod 0755 "$RUNNER"
+ATTACH="${HIGHASCG_ATTACH:-$ATTACH}"
 
-tmux new-session -d -s "$SESSION" -n build "bash '$RUNNER'"
+tmux new-session -d -s "$SESSION" -n build \
+	"env HIGHASCG_NVIDIA_DRIVER='$DRV' BASENAME='$BASENAME' USB_DEVICE='$USB' HIGHASCG_OVERNIGHT='${HIGHASCG_OVERNIGHT:-0}' REPO='$REPO' LOG='$LOG' EXCLUDE_FILE='$EXCLUDE_FILE' bash '$INNER'; rc=\$?; echo; echo 'Runner exited '\$rc' at '\$(date -Is); echo 'Log: $LOG'; if [[ '${HIGHASCG_OVERNIGHT:-0}' != '1' ]]; then read -r -p 'Press Enter… '; fi; exit \$rc"
+tmux set-option -t "$SESSION" remain-on-exit on 2>/dev/null || true
 
-echo "Started tmux session: $SESSION"
+echo "Started tmux session: $SESSION (root tmux server)"
 echo "  log: $LOG"
-echo "  attach:  tmux attach -t $SESSION"
+echo "  attach:  sudo tmux attach -t $SESSION"
 echo "  detach:  Ctrl-b d"
-echo "  kill:    tmux kill-session -t $SESSION"
+echo "  kill:    sudo tmux kill-session -t $SESSION"
+echo "  tail:    tail -f $LOG"
 echo
 echo "Pipeline:"
 echo "  1. prepare-eggs-clone-with-exfat.sh (WO-47 + merge eggs exclude.list)"
@@ -219,5 +167,5 @@ echo "  5. exFAT HIGHASCGEXF on ${USB}3 (finish-operator-stick.sh)"
 echo
 
 if "$ATTACH"; then
-	exec tmux attach -t "$SESSION"
+	exec sudo tmux attach -t "$SESSION"
 fi

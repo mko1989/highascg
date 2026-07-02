@@ -40,6 +40,7 @@ TESTS=(
 	test-08-highascg-ui.sh
 	test-09-openbox-wiring.sh
 	test-10-boot-journal.sh
+	test-11-replication-trust.sh
 )
 
 if "$LIST_ONLY"; then

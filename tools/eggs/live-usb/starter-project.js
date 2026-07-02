@@ -8,6 +8,7 @@
 const path = require('path')
 
 const REPO_ROOT = path.resolve(__dirname, '../../..')
+const { normalizeDeviceGraph } = require(path.join(REPO_ROOT, 'src/config/device-graph-core'))
 
 const STARTER_PROJECT_NAME = 'New project 1'
 const STARTER_PROJECT_SLUG = 'new_project_1'
@@ -38,10 +39,20 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 		],
 		edidNotes: '',
 	})
+	config.screen_count = 1
+	config.deviceGraph = normalizeDeviceGraph({
+		version: 1,
+		devices: [{ id: 'caspar_host', role: 'caspar_host', label: 'Caspar / HighAsCG host' }],
+		connectors: [],
+		edges: [],
+		layout: {},
+	})
 	if (config.casparServer && typeof config.casparServer === 'object') {
 		config.casparServer.screen_count = 1
+		config.casparServer.multiview_enabled = false
+		config.casparServer.multiview_screen_consumer = false
+		config.casparServer.multiview_decklink_device = 0
 	}
-	config.screen_count = 1
 	return config
 }
 

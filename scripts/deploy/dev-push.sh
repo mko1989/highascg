@@ -2,6 +2,8 @@
 # Dev deploy: tar the unified repo → upload to /tmp on the playout host → ssh and extract.
 # Includes dist-web/ (built operator UI) by default. UI sources: client/ in this repo.
 #
+# Preserves machine-local paths on the target (never in tarball): bin/, lib/, cef-cache/, media/, config/, .env.
+#
 # Config: `.env.deploy` in repo root, or export DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, …
 # See comments in this file for DEPLOY_USE_SFTP, DEPLOY_REMOTE_SUDO, passwords, etc.
 #
@@ -104,7 +106,7 @@ TGZ_Q=$(printf '%q' "$DEPLOY_REMOTE_TMP")
 INDEX_Q=$(printf '%q' "${DEPLOY_PATH}/index.js")
 PKG_Q=$(printf '%q' "${DEPLOY_PATH}/package.json")
 
-REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name 'media' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; if [[ ! -d ${PATH_Q}/node_modules ]]; then (cd ${PATH_Q} && npm ci --omit=dev); fi; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
+REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name 'media' ! -name 'bin' ! -name 'lib' ! -name 'cef-cache' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; if [[ ! -d ${PATH_Q}/node_modules ]]; then (cd ${PATH_Q} && npm ci --omit=dev); fi; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
 if [[ "$DEPLOY_REMOTE_SUDO" == "1" ]]; then
 	if [[ -n "$DEPLOY_SUDO_PASSWORD" ]]; then
 		SUDO_PW_SQ=${DEPLOY_SUDO_PASSWORD//\'/\'\"\'\"\'}
