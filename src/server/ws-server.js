@@ -233,6 +233,18 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		}
 		if (isWsPath) {
 			try {
+				const { checkWebSocketAuth, isOriginAllowed } = require('../server/auth')
+				if (!isOriginAllowed(req, ctx?.config)) {
+					socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+					socket.destroy()
+					return
+				}
+				const auth = checkWebSocketAuth(req, ctx)
+				if (!auth.ok) {
+					socket.write(`HTTP/1.1 ${auth.status || 401} Unauthorized\r\n\r\n`)
+					socket.destroy()
+					return
+				}
 				wss.handleUpgrade(req, socket, head, (ws) => {
 					wss.emit('connection', ws, req)
 				})

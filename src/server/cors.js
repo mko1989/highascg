@@ -1,6 +1,7 @@
 'use strict'
 
 const { isHeadlessMode } = require('./headless-mode')
+const { isEnforceAuthActive, isOriginAllowed } = require('./auth')
 
 /** @type {Record<string, string>} */
 const BASE = {
@@ -40,6 +41,28 @@ function parseAllowedOrigins() {
  * @returns {Record<string, string>}
  */
 function corsHeadersForRequest(req) {
+	if (isEnforceAuthActive(null)) {
+		if (!isOriginAllowed(req, null)) {
+			return {
+				'Access-Control-Allow-Methods': BASE['Access-Control-Allow-Methods'],
+				'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+				Vary: 'Origin',
+			}
+		}
+		const origin = req?.headers?.origin ? String(req.headers.origin) : ''
+		if (origin && origin !== 'null') {
+			return {
+				'Access-Control-Allow-Origin': origin,
+				'Access-Control-Allow-Methods': BASE['Access-Control-Allow-Methods'],
+				'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+				Vary: 'Origin',
+			}
+		}
+		return {
+			'Access-Control-Allow-Methods': BASE['Access-Control-Allow-Methods'],
+			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+		}
+	}
 	const allowed = parseAllowedOrigins()
 	const origin = req?.headers?.origin ? String(req.headers.origin) : ''
 	if (!origin || origin === 'null') {

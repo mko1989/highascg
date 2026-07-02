@@ -56,10 +56,21 @@ const routesCgThumb = require('./routes-cg-thumb')
 const routesReplication = require('./routes-replication')
 const routesCompanion = require('./routes-companion')
 const routesPrivateSync = require('./routes-private-sync')
+const routesAuth = require('./routes-auth')
 const moduleRegistry = require('../module-registry')
 const { RouteRegistry } = require('./route-registry')
+const { checkHttpAuth } = require('../server/auth')
 
 const routes = new RouteRegistry()
+
+// Auth (public when enforcement is on)
+routes.get('/api/auth/status', ({ path, ctx, req }) => routesAuth.handleGet(path, ctx, req), { requireCaspar: false })
+routes.post('/api/auth/login', ({ path, body, ctx, req }) => routesAuth.handlePost(path, body, ctx, req), {
+	requireCaspar: false,
+})
+routes.post('/api/auth/logout', ({ path, body, ctx, req }) => routesAuth.handlePost(path, body, ctx, req), {
+	requireCaspar: false,
+})
 
 // --- OFFLINE SAFE ROUTES (requireCaspar: false) ---
 // Note: Plugins and Modules are handled before dispatch dynamically
@@ -359,6 +370,15 @@ async function routeRequest(method, path, body, ctx, req) {
 
 	if (!p.startsWith('/api/')) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Not found' }) }
+	}
+
+	const authResult = checkHttpAuth(method, p, req, ctx)
+	if (!authResult.ok) {
+		return {
+			status: authResult.status || 401,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: false, error: authResult.error || 'Unauthorized' }),
+		}
 	}
 
 	if (method === 'POST' && p === '/api/selection') {

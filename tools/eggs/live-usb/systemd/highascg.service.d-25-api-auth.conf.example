@@ -1,0 +1,8 @@
+# WO-96: enable API token auth on production ISO / eggs clone hosts.
+# Installed by prepare-eggs-clone-with-exfat.sh when HIGHASCG_EGG_ENFORCE_AUTH != 0.
+#
+# Per-install token is generated on first highascg start → .private/api-token
+# Recovery: bash tools/runtime/print-api-token.sh
+
+[Service]
+Environment=HIGHASCG_ENFORCE_AUTH=1

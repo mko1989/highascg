@@ -49,6 +49,7 @@ const MODULAR_KEYS = [
 	'companion',
 	'plugins',
 	'replication',
+	'security',
 ]
 
 class ConfigManager extends EventEmitter {
@@ -114,6 +115,15 @@ class ConfigManager extends EventEmitter {
 				}
 				this.config = finalizeScreenDestinationsConfig(this._merge(defaults, bootstrap))
 				this.save(this.config)
+			}
+			const { migrateUiNuclearPassword } = require('../utils/nuclear-password')
+			if (this.config.ui && typeof this.config.ui === 'object') {
+				const mig = migrateUiNuclearPassword(this.config.ui)
+				if (mig.changed) {
+					this.config.ui = mig.ui
+					this.save(this.config, { emitChange: false })
+					this.logger.info('[Config] Migrated ui.nuclearPassword to scrypt hash')
+				}
 			}
 			this.isLoaded = true
 			this.emit('load', this.config)

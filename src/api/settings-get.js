@@ -16,15 +16,15 @@ const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
 const { normalizeNetworkSettings } = require('../config/network-settings')
 const { resolveProjectFps } = require('../config/project-fps')
+const { redactObject } = require('../support/redact-settings')
+const { getExpectedApiToken } = require('../server/auth')
 
 async function handleGet(path, ctx) {
 	if (path !== '/api/settings') return null
 	const cfg = ctx.config
 	const cs = { ...defaults.casparServer, ...cfg.casparServer }
 	normalizeCasparServerConfigPath(cs)
-	return {
-		status: 200, headers: JSON_HEADERS,
-		body: jsonBody({
+	const payload = {
 			caspar: { host: cfg.caspar.host, port: cfg.caspar.port },
 			streaming: { enabled: cfg.streaming.enabled, quality: cfg.streaming.quality, resolution: cfg.streaming.resolution, fps: cfg.streaming.fps, maxBitrate: cfg.streaming.maxBitrate, basePort: cfg.streaming.basePort, autoRelocateBasePort: cfg.streaming.autoRelocateBasePort !== false, effectiveBasePort: cfg.streaming._effectiveBasePort ?? cfg.streaming.basePort, ffmpeg_path: cfg.streaming.ffmpeg_path, hardware_accel: cfg.streaming.hardware_accel, captureMode: cfg.streaming.captureMode || 'udp', ndiNamingMode: cfg.streaming.ndiNamingMode || 'auto', ndiSourcePattern: cfg.streaming.ndiSourcePattern || 'CasparCG Channel {ch}', ndiChannelNames: cfg.streaming.ndiChannelNames || {}, localCaptureDevice: cfg.streaming.localCaptureDevice || 'auto', x11Display: cfg.streaming.x11Display || ':0', drmDevice: cfg.streaming.drmDevice || '/dev/dri/card0' },
 			server: { httpPort: cfg.server.httpPort, bindAddress: cfg.server.bindAddress },
@@ -101,7 +101,16 @@ async function handleGet(path, ctx) {
 				defaultProjectFps: resolveProjectFps(cfg),
 			},
 			network: normalizeNetworkSettings(cfg.network, defaults.network),
-		})
+			security: {
+				enforceAuth: !!(cfg.security && cfg.security.enforceAuth),
+				exposeToNetwork: cfg.security?.exposeToNetwork !== false,
+				hasApiToken: !!getExpectedApiToken(cfg),
+			},
+		}
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody(redactObject(payload)),
 	}
 }
 

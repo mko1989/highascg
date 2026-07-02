@@ -7,6 +7,8 @@ import { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
 
 export { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
 
+const FETCH_CREDENTIALS = { credentials: 'include' }
+
 function requestBase() {
 	return getApiBase()
 }
@@ -16,7 +18,7 @@ export async function apiGet(path) {
 	if (path === '/api/media' && window.stateStore?.isOffline?.()) {
 		const placeholders = window.placeholderState?.getAll() || []
 		try {
-			const res = await fetch(requestBase() + path)
+			const res = await fetch(requestBase() + path, FETCH_CREDENTIALS)
 			if (res.ok) {
 				const ct = res.headers.get('content-type') || ''
 				if (ct.includes('application/json')) {
@@ -29,7 +31,7 @@ export async function apiGet(path) {
 		}
 	}
 	const url = requestBase() + path
-	const res = await fetch(url)
+	const res = await fetch(url, FETCH_CREDENTIALS)
 	if (!res.ok) {
 		let detail = res.statusText
 		try {
@@ -65,6 +67,7 @@ export async function apiPost(path, body = {}) {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: typeof body === 'string' ? body : JSON.stringify(body),
+		...FETCH_CREDENTIALS,
 	})
 	if (!res.ok) {
 		let detail = res.statusText
@@ -95,6 +98,7 @@ export async function apiPut(path, body = {}) {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: typeof body === 'string' ? body : JSON.stringify(body),
+		...FETCH_CREDENTIALS,
 	})
 	if (!res.ok) {
 		let detail = res.statusText

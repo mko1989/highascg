@@ -11,6 +11,10 @@ const { execSync, execFileSync, spawn } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getPublicTailscaleSummary } = require('../network/tailscale-service')
 const { getXAuthority } = require('../utils/hardware-info')
+const {
+	verifyNuclearPasswordFromUi,
+	hasConfiguredNuclearPassword,
+} = require('../utils/nuclear-password')
 
 const CALAMARES_BIN = '/usr/bin/calamares'
 const EGGS_BIN = '/usr/bin/eggs'
@@ -183,11 +187,14 @@ function checkNuclearPassword(body, ctx) {
 	const cfgUi = ctx?.config?.ui && typeof ctx.config.ui === 'object' ? ctx.config.ui : {}
 	const requirePassword = cfgUi.nuclearRequirePassword === true || cfgUi.nuclearRequirePassword === 'true'
 	if (!requirePassword) return { ok: true }
-	const expected = String(cfgUi.nuclearPassword || '')
-	if (!expected) return { ok: false, status: 403, error: 'Nuclear password required but not configured.' }
+	if (!hasConfiguredNuclearPassword(cfgUi)) {
+		return { ok: false, status: 403, error: 'Nuclear password required but not configured.' }
+	}
 	const b = parseBody(body)
 	const provided = String(b?.password || '')
-	if (provided !== expected) return { ok: false, status: 403, error: 'Invalid password.' }
+	if (!verifyNuclearPasswordFromUi(provided, cfgUi)) {
+		return { ok: false, status: 403, error: 'Invalid password.' }
+	}
 	return { ok: true }
 }
 

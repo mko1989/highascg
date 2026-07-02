@@ -25,6 +25,8 @@ const FILES = [
 	'tools/smoke/smoke-device-graph-multiview-suggest.test.js',
 	'tools/smoke/smoke-config-classify.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
+	'tools/smoke/smoke-api-auth.test.js',
+	'tools/smoke/smoke-settings-nuclear-password.test.js',
 	'tools/smoke/smoke-wiki.test.js',
 	'test/companion-control-status.test.js',
 ]

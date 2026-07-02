@@ -6,8 +6,10 @@ import { settingsState } from './settings-state.js'
 
 function nuclearPassword() {
 	const ui = settingsState.getSettings()?.ui || {}
-	if (ui.nuclearRequirePassword) return String(ui.nuclearPassword || '')
-	return ''
+	if (!ui.nuclearRequirePassword) return ''
+	const p = String(ui.nuclearPassword || '')
+	if (!p || p === '[REDACTED]') return ''
+	return p
 }
 
 /**

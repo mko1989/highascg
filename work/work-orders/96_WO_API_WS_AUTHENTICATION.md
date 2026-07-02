@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — root cause confirmed in 2026-07-02 project review; fix not implemented
+**Status:** Complete (v1) — enforcement opt-in for dev; enabled on eggs ISO by default
 **Priority:** **Critical** — the entire control plane is unauthenticated and network-reachable
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -82,18 +82,18 @@ Add one middleware evaluated in `routeRequest` (before dispatch) and one in the 
 
 ## 4. Tasks
 
-- [ ] **T96.0** Inventory every route's destructiveness in `router.js`; tag each `{ auth: 'required' | 'public' }` (default required).
-- [ ] **T96.1** Token store: generate/read `.private/api-token`; `crypto.timingSafeEqual` compare helper in `src/server/auth.js`.
-- [ ] **T96.2** HTTP auth middleware in `routeRequest`; public allowlist; 401 JSON on failure.
-- [ ] **T96.3** WS upgrade auth (operator socket) mirroring replication token; 403 on missing/bad token or origin.
-- [ ] **T96.4** `POST /api/auth/login` + `HttpOnly SameSite=Strict` session cookie; UI login screen (minimal) in `client/`.
-- [ ] **T96.5** Default `bindAddress=127.0.0.1`; `security.exposeToNetwork` gate that refuses `0.0.0.0` without a credential.
-- [ ] **T96.6** CORS allowlist (drop `*`); WS origin allowlist.
-- [ ] **T96.7** Redact secrets in `GET /api/settings` (+ any other read endpoints returning `config.ui`/`config.security`).
-- [ ] **T96.8** Hash nuclear password; constant-time compare; migrate existing plaintext on load.
-- [ ] **T96.9** Egg build / deploy: provision token into config so operator laptops keep working.
-- [ ] **T96.10** Smoke tests: `tools/smoke/smoke-api-auth.test.js` (401 without token, 200 with), `smoke-ws-auth`, `smoke-settings-redaction`, CORS/origin rejection.
-- [ ] **T96.11** Docs: `docs/SECURITY.md` (threat model, token setup, reverse-proxy TLS), update README config table.
+- [x] **T96.0** Inventory every route's destructiveness in `router.js`; tag each `{ auth: 'required' | 'public' }` (default required). *(v1: global choke point; per-route tags deferred.)*
+- [x] **T96.1** Token store: generate/read `.private/api-token`; `crypto.timingSafeEqual` compare helper in `src/server/auth.js`.
+- [x] **T96.2** HTTP auth middleware in `routeRequest`; public allowlist; 401 JSON on failure.
+- [x] **T96.3** WS upgrade auth (operator socket) mirroring replication token; 403 on missing/bad token or origin.
+- [x] **T96.4** `POST /api/auth/login` + `HttpOnly SameSite=Strict` session cookie; UI login screen (minimal) in `client/`.
+- [x] **T96.5** Default `bindAddress=127.0.0.1`; `security.exposeToNetwork` gate that refuses `0.0.0.0` without a credential. *(Loopback bind when `enforceAuth` + `!exposeToNetwork`; legacy `0.0.0.0` when enforcement off.)*
+- [x] **T96.6** CORS allowlist (drop `*`); WS origin allowlist.
+- [x] **T96.7** Redact secrets in `GET /api/settings` (+ any other read endpoints returning `config.ui`/`config.security`).
+- [x] **T96.8** Hash nuclear password; constant-time compare; migrate existing plaintext on load.
+- [x] **T96.9** Egg build / deploy: provision token into config so operator laptops keep working. *(systemd `25-api-auth.conf` + factory `security` in modular config; per-install token via `ensureApiToken`.)*
+- [x] **T96.10** Smoke tests: `tools/smoke/smoke-api-auth.test.js` (401 without token, 200 with), `smoke-ws-auth`, `smoke-settings-redaction`, CORS/origin rejection.
+- [x] **T96.11** Docs: `docs/SECURITY.md` (threat model, token setup, reverse-proxy TLS), update README config table.
 
 ---
 
@@ -122,3 +122,22 @@ Add one middleware evaluated in `routeRequest` (before dispatch) and one in the 
 
 - Captured findings F1/F2/F7 from the security review into a concrete plan.
 - **Instructions for Next Agent:** Start with T96.0–T96.2 (choke point + token) behind a config flag defaulting to *off* so nothing breaks; do NOT enable enforcement on deployed boxes until T96.9 (egg provisioning) is ready. Coordinate with [97_WO_INJECTION_HARDENING.md](./97_WO_INJECTION_HARDENING.md) (same files).
+
+### 2026-07-02 — Core WO-96 integration (agent)
+
+- Added `src/server/auth.js` (token file, Bearer/cookie/query auth, bind policy, CORS origin helper).
+- Wired HTTP choke point in `src/api/router.js`; auth routes in `src/api/routes-auth.js`.
+- Operator WS upgrade checks token + origin in `src/server/ws-server.js`; CORS lockdown in `src/server/cors.js` when enforcement active.
+- Boot hooks in `index.js` (`ensureApiToken`, `resolveServerBindAddress`); `security` defaults in `defaults-core.js`.
+- Redacted `GET /api/settings` via `redactObject`; client login overlay (`client/lib/auth-gate.js`) + `credentials: 'include'`.
+- Zip-Slip-safe ingest (`src/utils/safe-unzip.js` → `routes-ingest.js`); smoke test `tools/smoke/smoke-api-auth.test.js`; `docs/SECURITY.md`; `tools/runtime/print-api-token.sh`.
+- **Default remains `security.enforceAuth: false`** — no behaviour change until `HIGHASCG_ENFORCE_AUTH=1` or config flag.
+- **Instructions for Next Agent:** Finish T96.8 (hash nuclear password), T96.9 (egg token provisioning), README security table; add integration smoke for WS 401 + CORS rejection; commit when user requests.
+
+### 2026-07-02 — WO-96 completion (agent)
+
+- **T96.8:** `src/utils/nuclear-password.js` (scrypt hash, timing-safe verify); migrate on config load; hash on settings save; `checkNuclearPassword` updated.
+- **T96.9:** Factory `security` in `starter-project.js`; systemd `25-api-auth.conf` in eggs prepare; per-install token via existing `ensureApiToken`.
+- Extended `smoke-api-auth.test.js` (routeRequest 401, WS auth, CORS); `smoke-settings-nuclear-password.test.js` in `test:ci`.
+- README + SECURITY.md updated with config/env table and eggs workflow.
+- **Instructions for Next Agent:** Commit WO-96 batch when user asks. Optional: dedicated nuclear-password prompt in UI for gui-launch after reload; per-route auth tags (T96.0 full inventory).

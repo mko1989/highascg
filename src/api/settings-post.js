@@ -22,6 +22,7 @@ const { normalizeNetworkSettings } = require('../config/network-settings')
 const { normalizeProjectFps, applyProjectFpsToInheritedOutputs, resolveProjectFps } = require('../config/project-fps')
 const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
 const { mergeCompanionSettings } = require('../companion/companion-config')
+const { mergeUiNuclearPasswordSettings } = require('../utils/nuclear-password')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -45,7 +46,12 @@ async function handlePost(path, body, ctx) {
 		if (o.emitIntervalMs) cfg.osc.emitIntervalMs = parseInt(o.emitIntervalMs, 10); if (o.staleTimeoutMs) cfg.osc.staleTimeoutMs = parseInt(o.staleTimeoutMs, 10); if (o.wsDeltaBroadcast !== undefined) cfg.osc.wsDeltaBroadcast = !!o.wsDeltaBroadcast
 		ctx.config.osc = normalizeOscConfig(cfg)
 	}
-	if (settings.ui) cfg.ui = { ...defaults.ui, ...cfg.ui, ...settings.ui }
+	if (settings.ui) {
+		cfg.ui = mergeUiNuclearPasswordSettings(
+			{ ...defaults.ui, ...cfg.ui, ...settings.ui },
+			cfg.ui,
+		)
+	}
 	if (settings.composePreview && typeof settings.composePreview === 'object') {
 		const prev = cfg.composePreview || {}
 		const { normalizeComposePreviewSettings } = require('../preview/compose-preview-mode')

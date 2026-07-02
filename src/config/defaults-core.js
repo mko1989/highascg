@@ -48,6 +48,11 @@ function coreDefaults() {
 			wsPort: 4200,
 			bindAddress: '0.0.0.0',
 		},
+		security: {
+			enforceAuth: false,
+			exposeToNetwork: true,
+			apiToken: '',
+		},
 		osc: {
 			enabled: true,
 			listenPort: 6251,
@@ -61,6 +66,7 @@ function coreDefaults() {
 			rundownPlaybackTimer: true,
 			nuclearRequirePassword: false,
 			nuclearPassword: '',
+			nuclearPasswordHash: '',
 		},
 		composePreview: {
 			mode: 'canvas',

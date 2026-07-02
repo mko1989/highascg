@@ -73,12 +73,40 @@ function main() {
 
 	const configManager = new ConfigManager(configPath, configLogger)
 	let config
+	const auth = require('./src/server/auth')
+	function applyAuthAndBindPolicy(cfg, cliArgs) {
+		auth.setAuthRuntime({ enforceAuth: auth.isEnforceAuthActive(cfg) })
+		auth.ensureApiToken({
+			config: cfg,
+			log: (level, msg) => {
+				if (level === 'error') logger.error(msg)
+				else if (level === 'warn') logger.warn(msg)
+				else logger.info(msg)
+			},
+		})
+		const bindLog = (level, msg) => {
+			if (level === 'error') logger.error(msg)
+			else if (level === 'warn') logger.warn(msg)
+			else logger.info(msg)
+		}
+		if (!auth.validateExposurePolicy(cfg, bindLog)) {
+			cfg.server = { ...cfg.server, bindAddress: '127.0.0.1' }
+		} else {
+			cfg.server = {
+				...cfg.server,
+				bindAddress: auth.resolveServerBindAddress(cfg, cliArgs.bindAddress),
+			}
+		}
+		return cfg
+	}
 	try {
 		configManager.load()
 		config = Config.buildConfig(cli, configManager)
+		config = applyAuthAndBindPolicy(config, cli)
 	} catch (e) {
 		logger.error(`[Main] Configuration failed to load: ${e.message}. Falling back to hardcoded defaults (Safe Mode).`)
 		config = { ...require('./src/config/defaults') }
+		config = applyAuthAndBindPolicy(config, cli)
 	}
 
 	logger.info('Config: ' + JSON.stringify(config, null, 2))
@@ -87,6 +115,7 @@ function main() {
 	try {
 		function syncRuntimeConfigFromManager() {
 			Object.assign(config, Config.buildConfig(cli, configManager))
+			applyAuthAndBindPolicy(config, cli)
 		}
 
 		const state = new StateManager({ logger: debugLog })

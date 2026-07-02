@@ -139,6 +139,21 @@ export class WsClient {
 		}
 	}
 
+	/** Force a fresh connection (e.g. after login sets session cookie). */
+	reconnectNow() {
+		this.reconnectAttempts = 0
+		if (this.maxReconnectAttempts <= 0) this.maxReconnectAttempts = 10
+		if (this.ws) {
+			try {
+				this.ws.close()
+			} catch {
+				/* ignore */
+			}
+			this.ws = null
+		}
+		this._connect()
+	}
+
 	get connected() {
 		return this.ws && this.ws.readyState === WebSocket.OPEN
 	}

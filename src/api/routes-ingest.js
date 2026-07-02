@@ -9,7 +9,7 @@ const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const busboy = require('busboy')
-const unzipper = require('unzipper')
+const { extractZipSafely } = require('../utils/safe-unzip')
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { resolveSafe, getMediaIngestBasePath } = require('../media/local-media')
 const { getIngestEffectiveBase } = require('../media/project-media-root')
@@ -152,16 +152,17 @@ async function handleUpload(req, res, ctx) {
 			file.pipe(writeStream)
 
 			writeStream.on('finish', () => {
-				// Always unzip if it's a zip
 				if (path.extname(savePath).toLowerCase() === '.zip') {
 					console.log(`[Ingest] Unzipping ${filename}...`)
 					const zipDir = path.dirname(savePath)
-					fs.createReadStream(savePath)
-						.pipe(unzipper.Extract({ path: zipDir }))
-						.on('close', () => {
+					void extractZipSafely(savePath, zipDir)
+						.then(() => {
 							console.log(`[Ingest] Unzipped ${filename}, removing archive.`)
 							fs.unlink(savePath, () => {})
 							if (ctx.runMediaLibraryQueryCycle) ctx.runMediaLibraryQueryCycle()
+						})
+						.catch((err) => {
+							console.error(`[Ingest] Zip extract failed: ${err?.message || err}`)
 						})
 				} else {
 					if (ctx.runMediaLibraryQueryCycle) ctx.runMediaLibraryQueryCycle()
@@ -350,12 +351,7 @@ async function handleDownload(body, ctx) {
 					message: `Unpacking ${filename}…`,
 				})
 				ingestLog(ctx, 'info', `Unzipping ${filename}`)
-				await new Promise((resolve, reject) => {
-					fs.createReadStream(savePath)
-						.pipe(unzipper.Extract({ path: path.dirname(savePath) }))
-						.on('close', resolve)
-						.on('error', reject)
-				})
+				await extractZipSafely(savePath, path.dirname(savePath))
 				fs.unlink(savePath, () => {})
 			}
 			setDownloadState(ctx, {

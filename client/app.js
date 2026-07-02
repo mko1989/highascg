@@ -53,8 +53,11 @@ import * as Handlers from './lib/app-ws-handlers.js'
 import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
+import { ensureAuthGate } from './lib/auth-gate.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
+
+await ensureAuthGate()
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()

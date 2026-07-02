@@ -135,6 +135,13 @@ if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 	echo "  installed 20-live-boot.conf (faster AMCP settle + startup testcard)"
 fi
 
+API_AUTH_DROPIN="${HERE}/systemd/highascg.service.d-25-api-auth.conf.example"
+if [[ "${HIGHASCG_EGG_ENFORCE_AUTH:-1}" != "0" ]] && [[ -f "$API_AUTH_DROPIN" ]]; then
+	install -d /etc/systemd/system/highascg.service.d
+	install -m 0644 "$API_AUTH_DROPIN" /etc/systemd/system/highascg.service.d/25-api-auth.conf
+	echo "  installed 25-api-auth.conf (HIGHASCG_ENFORCE_AUTH=1 — token in .private/api-token on first boot)"
+fi
+
 if [[ "$SKIP_MERGE_EGGS_EXCLUDES" != "1" ]]; then
 	if [[ "$HIGHASCG_ISO_EMBED_SERVER" == "1" ]]; then
 		export HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${HERE}/penguins-eggs-exclude-highascg-embed-server.list"

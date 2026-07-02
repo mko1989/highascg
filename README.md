@@ -80,10 +80,24 @@ Defaults live in `config/`. Override via environment variables:
 | `HTTP_PORT` | HTTP server port | `4200` |
 | `HIGHASCG_HEADLESS` | API only (no `dist-web/`) | **unset** (serve UI) |
 | `BIND_ADDRESS` | Listen address | `0.0.0.0` |
+| `HIGHASCG_ENFORCE_AUTH` | Require API token for `/api/*` and operator WS (`1`/`true`) | **unset** (open API) |
+| `HIGHASCG_CORS_ORIGINS` | Extra allowed CORS origins when auth is enforced (comma-separated) | **unset** |
 | `OSC_LISTEN_PORT` | OSC UDP port | `6251` |
 | `CASPAR_ARM_FILE` | Staged Caspar startup arm file | `/home/casparcg/highascg/data/caspar-armed` |
 
 CLI flags: `node index.js --help`.
+
+**API authentication** (opt-in): set `HIGHASCG_ENFORCE_AUTH=1` or `security.enforceAuth` in config. Token is stored in `.private/api-token` (generated on first boot). See [`docs/SECURITY.md`](docs/SECURITY.md).
+
+Modular config key `security`:
+
+| Field | Purpose | Default |
+|-------|---------|---------|
+| `enforceAuth` | Require token for API/WS | `false` |
+| `exposeToNetwork` | Allow `0.0.0.0` bind when auth is on | `true` |
+| `apiToken` | Optional inline token (prefer `.private/api-token`) | `""` |
+
+Production ISO / eggs images enable auth via systemd drop-in (`25-api-auth.conf`) and factory `security.enforceAuth` in modular config.
 
 ---
 

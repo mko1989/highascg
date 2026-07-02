@@ -195,7 +195,11 @@ export function hydrateSettings(modal, cfg) {
 	const schDl = modal.querySelector('#set-streaming-ch-decklink'); if (schDl) schDl.value = String(sch.decklinkDevice ?? 0)
 	const ui = cfg.ui || {}
 	const nr = modal.querySelector('#set-nuclear-require-pass'); if (nr) nr.checked = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
-	const np = modal.querySelector('#set-nuclear-password'); if (np) np.value = String(ui.nuclearPassword || '')
+	const np = modal.querySelector('#set-nuclear-password')
+	if (np) {
+		const raw = String(ui.nuclearPassword || '')
+		np.value = raw === '[REDACTED]' ? '' : raw
+	}
 	syncNuclearPasswordVisibility(modal)
 	const cp = cfg.composePreview || {}
 	const cpMode = modal.querySelector('#set-compose-preview-mode')

@@ -4,6 +4,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const { syncNuclearPasswordVisibility, getNuclearPasswordFromModal } = require('../../client/lib/settings-nuclear-shared.js')
 const { checkNuclearPassword } = require('../../src/api/routes-system-setup')
+const { hashNuclearPassword } = require('../../src/utils/nuclear-password')
 
 function mockModal({ requirePassword = false, nuclearPassword = '' } = {}) {
 	const fields = { style: { display: '' } }
@@ -54,14 +55,25 @@ test('checkNuclearPassword rejects missing configured password', () => {
 })
 
 test('checkNuclearPassword rejects wrong password', () => {
-	const ctx = { config: { ui: { nuclearRequirePassword: true, nuclearPassword: 'hunter2' } } }
+	const hash = hashNuclearPassword('hunter2')
+	const ctx = {
+		config: { ui: { nuclearRequirePassword: true, nuclearPassword: '', nuclearPasswordHash: hash } },
+	}
 	const r = checkNuclearPassword({ password: 'wrong' }, ctx)
 	assert.equal(r.ok, false)
 	assert.equal(r.status, 403)
 	assert.match(r.error, /Invalid password/)
 })
 
-test('checkNuclearPassword accepts matching password', () => {
+test('checkNuclearPassword accepts matching password (scrypt hash)', () => {
+	const hash = hashNuclearPassword('hunter2')
+	const ctx = {
+		config: { ui: { nuclearRequirePassword: true, nuclearPassword: '', nuclearPasswordHash: hash } },
+	}
+	assert.deepEqual(checkNuclearPassword({ password: 'hunter2' }, ctx), { ok: true })
+})
+
+test('checkNuclearPassword accepts legacy plaintext until migrated', () => {
 	const ctx = { config: { ui: { nuclearRequirePassword: true, nuclearPassword: 'hunter2' } } }
 	assert.deepEqual(checkNuclearPassword({ password: 'hunter2' }, ctx), { ok: true })
 })
