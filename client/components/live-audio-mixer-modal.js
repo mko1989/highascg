@@ -27,14 +27,7 @@ import {
 	dedicatedInputRoute,
 	pgmDestLayerForSlot,
 } from '../lib/live-audio-routing.js'
-
-function esc(s) {
-	return String(s ?? '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {import('../lib/state-store.js').StateStore} stateStore
@@ -75,7 +68,7 @@ export async function showLiveAudioMixerModal(stateStore) {
 	try {
 		await mountLiveAudioMixerPanel(container, stateStore)
 	} catch (e) {
-		container.innerHTML = `<p class="status-error">Error: ${esc(e?.message || e)}</p>`
+		container.innerHTML = `<p class="status-error">Error: ${escapeHtml(e?.message || e)}</p>`
 	}
 }
 
@@ -151,17 +144,17 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 			const entry = liveAudioInputForSlot(cm, i)
 			const route = entry?.route
 			const dedicatedHint = route
-				? `Dedicated input: ch ${entry.channel} · capture on <code>${esc(route)}</code>`
+				? `Dedicated input: ch ${entry.channel} · capture on <code>${escapeHtml(route)}</code>`
 				: '<span class="status-warn">No dedicated channel yet — save, then Apply + restart Caspar in Device View.</span>'
 			const destLayer = pgmDestLayerForSlot(i, ui)
 			const enabledTargets = ui.routeTargets?.[i - 1] || getMultiPlayTargets(i)
 			const enabledChannels = new Set(enabledTargets.map((t) => Number(t.channel)))
 
 			let optHtml = opts
-				.map((o) => `<option value="${esc(o.value)}"${o.value === cur ? ' selected' : ''}>${esc(o.label)}</option>`)
+				.map((o) => `<option value="${escapeHtml(o.value)}"${o.value === cur ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
 				.join('')
 			if (cur && !opts.some((o) => o.value === cur)) {
-				optHtml += `<option value="${esc(cur)}" selected>${esc(cur)} (saved)</option>`
+				optHtml += `<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)} (saved)</option>`
 			}
 
 			const routeBtns = pgmChs
@@ -180,7 +173,7 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 						<button type="button" class="btn btn--secondary live-audio-mixer-remove" data-slot-index="${i - 1}" style="padding:4px 10px;font-size:0.75rem">Remove</button>
 					</div>
 					<label>Label</label>
-					<input type="text" id="live-audio-mixer-slot-${i}-label" value="${esc(label)}" placeholder="Live audio ${i}" style="width:100%;margin-bottom:0.5rem" />
+					<input type="text" id="live-audio-mixer-slot-${i}-label" value="${escapeHtml(label)}" placeholder="Live audio ${i}" style="width:100%;margin-bottom:0.5rem" />
 					<label>Capture device</label>
 					<select id="live-audio-mixer-slot-${i}-device" style="width:100%;margin-bottom:0.5rem">${optHtml}</select>
 					<p class="settings-note small" style="margin:0 0 0.5rem">${dedicatedHint}</p>

@@ -11,20 +11,10 @@ import {
 	ltDisplayNameFromId,
 	normalizeLtTemplateId,
 } from './cg-studio-lt-presets.js'
+import { escapeHtml } from './dom-escape.js'
 
 const GSAP_SRC = '../CasparCG-Guide-HTML-Template-master/node_modules/gsap/dist/gsap.js'
 const LT_ENGINE_SRC = 'lt-engine.js'
-
-/**
- * @param {string} html
- */
-function escapeHtml(text) {
-	return String(text || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
 
 /**
  * @param {Record<string, unknown>} data

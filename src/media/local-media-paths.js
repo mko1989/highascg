@@ -40,6 +40,7 @@ const HIDDEN_MEDIA_DIRS = new Set(['tb', '.tb'])
 function resolveSafe(basePath, filename) {
 	if (!basePath || typeof basePath !== 'string') return null
 	const cleanFilename = (filename || '')
+		.replace(/[<>]/g, '')
 		.replace(/\.\./g, '')
 		.split(/[/\\]/)
 		.filter(Boolean)

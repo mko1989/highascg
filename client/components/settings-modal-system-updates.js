@@ -2,13 +2,7 @@
  * Settings → Updates tab (WO-66): build stamp, GitHub release check, apply.
  */
 import { api } from '../lib/api-client.js'
-
-function escapeHtml(s) {
-	return String(s || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 let pollTimer = null
 

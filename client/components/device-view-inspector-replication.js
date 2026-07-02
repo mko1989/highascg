@@ -6,6 +6,7 @@ import { setStatus, buildInspectorTable } from './device-view-ui-utils.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { refreshReplicationStatusSoon, getReplicationInspectorMode, setReplicationInspectorMode } from '../lib/replication-ui-state.js'
 import { hotBackupPairedTitle, hotBackupPeerBoxForViewer } from '../lib/hot-backup-project.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} host
@@ -432,7 +433,7 @@ export function renderReplicationInspector(host, ctx) {
 		const localRole = st.role || 'standalone'
 		const peerRole = st.peerBox?.role || (localRole === 'leader' ? 'follower' : 'leader')
 		const peerLabel = peerRole === 'leader' ? 'Leader' : peerRole === 'follower' ? 'Follower' : 'Peer'
-		connectionSummary.innerHTML = `<strong>Connection</strong> — ${localRole} ↔ ${peerLabel}`
+		connectionSummary.innerHTML = `<strong>Connection</strong> — ${escapeHtml(localRole)} ↔ ${escapeHtml(peerLabel)}`
 
 		const cp = st.channelParity || {}
 		channelParityLine.hidden = false

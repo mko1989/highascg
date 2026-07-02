@@ -12,14 +12,7 @@ import {
 import { listInputChannels } from '../lib/input-channels.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { mountAlsaMixerPanel } from './settings-alsa-mixer-panel.js'
-
-function esc(s) {
-	return String(s ?? '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} container
@@ -37,7 +30,7 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 		try {
 			refreshAlsaMixer = await mountAlsaMixerPanel(alsaMount, opts)
 		} catch (e) {
-			alsaMount.innerHTML = `<p class="status-error">ALSA mixer failed: ${esc(e?.message || e)}</p>`
+			alsaMount.innerHTML = `<p class="status-error">ALSA mixer failed: ${escapeHtml(e?.message || e)}</p>`
 		}
 	}
 
@@ -108,12 +101,12 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 			const show = i <= ui.count
 			const cur = ui.slots[i - 1] || ''
 			const cfg = configured.find((s) => s && Number(s.slot) === i)
-			const routeHint = cfg?.route ? `<span class="settings-note small" style="display:block;margin-top:0.25rem">${esc(cfg.route)}</span>` : ''
+			const routeHint = cfg?.route ? `<span class="settings-note small" style="display:block;margin-top:0.25rem">${escapeHtml(cfg.route)}</span>` : ''
 			let optHtml = opts
-				.map((o) => `<option value="${esc(o.value)}"${o.value === cur ? ' selected' : ''}>${esc(o.label)}</option>`)
+				.map((o) => `<option value="${escapeHtml(o.value)}"${o.value === cur ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
 				.join('')
 			if (cur && !opts.some((o) => o.value === cur)) {
-				optHtml += `<option value="${esc(cur)}" selected>${esc(cur)} (saved)</option>`
+				optHtml += `<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)} (saved)</option>`
 			}
 			html += `
 				<div class="settings-group live-audio-slot-row" data-slot="${i}" style="display:${show ? 'block' : 'none'};margin-bottom:0.75rem">
@@ -148,22 +141,22 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 		]
 		if (st && typeof st === 'object') {
 			if (st.enabled === false && st.reason) {
-				lines.push(`<span class="status-warn">${esc(st.reason)}</span>`)
+				lines.push(`<span class="status-warn">${escapeHtml(st.reason)}</span>`)
 			}
 			if (Array.isArray(st.started) && st.started.length) {
 				lines.push(
-					`<span class="status-ok">Started: ${st.started.map((x) => esc(x.slot != null ? `slot ${x.slot}` : x.layer)).join(', ')}</span>`
+					`<span class="status-ok">Started: ${st.started.map((x) => escapeHtml(x.slot != null ? `slot ${x.slot}` : x.layer)).join(', ')}</span>`
 				)
 			}
 			if (Array.isArray(st.failed) && st.failed.length) {
 				lines.push(
-					`<span class="status-warn">Failed: ${st.failed.map((x) => esc(x.message || x.slot || x.layer)).join('; ')}</span>`
+					`<span class="status-warn">Failed: ${st.failed.map((x) => escapeHtml(x.message || x.slot || x.layer)).join('; ')}</span>`
 				)
 			}
 		}
 		const preview = liveState?.configured?.audioPreview || liveState?.audioPreview
 		if (preview?.enabled && preview?.channel != null) {
-			lines.push(`<span>Headphones bus: ch ${preview.channel} (${esc(preview.bus || 'preview')})</span>`)
+			lines.push(`<span>Headphones bus: ch ${preview.channel} (${escapeHtml(preview.bus || 'preview')})</span>`)
 		}
 		el.innerHTML = lines.join('<br>')
 	}
@@ -222,7 +215,7 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 			<div class="settings-group">
 				<label>OpenAL device (optional)</label>
 				<select id="live-audio-preview-device" style="width:100%">
-					${previewDevices.map((o) => `<option value="${esc(o.value)}"${o.value === ui.audioPreviewDevice ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+					${previewDevices.map((o) => `<option value="${escapeHtml(o.value)}"${o.value === ui.audioPreviewDevice ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
 				</select>
 			</div>
 			<div class="settings-group">
@@ -302,7 +295,7 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 		await Promise.all([loadDevices(false), loadLiveInputs(), settingsState.load()])
 		renderPanel()
 	} catch (e) {
-		if (mainEl) mainEl.innerHTML = `<p class="status-error">Failed to load live audio settings: ${esc(e?.message || e)}</p>`
+		if (mainEl) mainEl.innerHTML = `<p class="status-error">Failed to load live audio settings: ${escapeHtml(e?.message || e)}</p>`
 	}
 
 	return async function refresh() {

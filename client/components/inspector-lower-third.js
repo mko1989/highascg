@@ -24,6 +24,7 @@ import {
 	normalizeLowerThirdRoster,
 	parseSpreadsheetFile,
 } from '../lib/lower-third-roster-import.js'
+import { escapeAttr } from '../lib/dom-escape.js'
 
 /** @type {{ id: string, name: string, htmlPath: string, available: boolean }[] | null} */
 let _cachedTemplates = null
@@ -545,8 +546,4 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 			window.dispatchEvent(new CustomEvent('highascg-lower-third-state', { detail: res.state }))
 		}
 	}
-}
-
-function escAttr(s) {
-	return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

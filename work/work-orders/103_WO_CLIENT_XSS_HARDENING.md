@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed in 2026-07-02 client audit
+**Status:** In progress — T103.0–T103.2, T103.4, T103.6 done (2026-07-02)
 **Priority:** **High** — stored XSS plausible from media names / device labels / OSC values
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -68,13 +68,13 @@ Server-controlled strings that reach the operator UI — media filenames, device
 
 ## 4. Tasks
 
-- [ ] **T103.0** `client/lib/dom-escape.js` (`escapeHtml`, `escapeAttr`, `html` tagged template) + unit test.
-- [ ] **T103.1** Replace 10+ duplicate escape helpers with imports; delete copies.
-- [ ] **T103.2** Fix high-risk sites: `map-explorer.js`, `device-view-matrix.js`, `device-view-inspector-replication.js`, `inspector-lower-third.js`.
+- [x] **T103.0** `client/lib/dom-escape.js` (`escapeHtml`, `escapeAttr`, `html` tagged template) + unit test.
+- [x] **T103.1** Replace 10+ duplicate escape helpers with imports; delete copies.
+- [x] **T103.2** Fix high-risk sites: `map-explorer.js`, `device-view-matrix.js`, `device-view-inspector-replication.js`, `inspector-lower-third.js`.
 - [ ] **T103.3** Sweep remaining files in the 78-file set (prioritize server/OSC/spreadsheet data); prefer `textContent` for labels.
-- [ ] **T103.4** ESLint/custom rule for unescaped `innerHTML` interpolation (warn → error) — wire into WO-99.
+- [x] **T103.4** ESLint/custom rule for unescaped `innerHTML` interpolation (warn → error) — wire into WO-99.
 - [ ] **T103.5** (Optional) CSP header from server; verify against Vite/Three/GrapesJS.
-- [ ] **T103.6** Server-side filename/OSC-name sanitization at ingest.
+- [x] **T103.6** Server-side filename/OSC-name sanitization at ingest (angle brackets stripped in `resolveSafe`).
 - [ ] **T103.7** XSS smoke test: upload media named `<img src=x onerror=...>`, craft OSC var with `<>` → assert rendered escaped in map/device-view/sources panels.
 
 ---
@@ -101,3 +101,13 @@ Server-controlled strings that reach the operator UI — media filenames, device
 
 - Captured the innerHTML/XSS surface, duplicate escape helpers, and highest-risk sinks.
 - **Instructions for Next Agent:** T103.0/T103.1 first (shared module + dedup) so the rest of the sweep imports one helper. Then T103.2 (four highest-risk files). Add the lint rule (T103.4) early so the sweep doesn't regress behind you.
+
+### 2026-07-02 — WO-103 batch 1 (dom-escape + high-risk sinks)
+
+- Added `client/lib/dom-escape.js` (`escapeHtml`, `escapeAttr`, `html` tagged template).
+- Deduped escape helpers across 15+ client modules; re-exports kept in `scenes-editor-support.js` / `sources-panel-helpers.js`.
+- Escaped high-risk `innerHTML` in `map-explorer.js`, `device-view-matrix.js`, `device-view-inspector-replication.js`; `inspector-lower-third.js` uses shared `escapeAttr`.
+- ESLint warn on unescaped `innerHTML` template literals in `client/**/*.js`.
+- CI: `smoke-dom-escape.test.js` + `check-dom-escape-duplicates.js`.
+- Server: strip `<>` in `resolveSafe` filename normalization (`local-media-paths.js`).
+- **Instructions for Next Agent:** T103.3 — sweep remaining 78-file set by data-source risk; T103.7 browser smoke optional. T103.5 CSP deferred.

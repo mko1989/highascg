@@ -5,14 +5,7 @@
 
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
-
-function esc(s) {
-	return String(s ?? '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {object[]} extras
@@ -56,13 +49,13 @@ export function mountWebpageHostPageControls(container, { source, onApplied }) {
 	section.innerHTML = `
 		<div class="inspector-section__title">Page</div>
 		<div class="inspector-field" style="margin-bottom:8px">
-			<input type="text" class="inspector-math-input inspector-webpage-host__url" style="width:100%;box-sizing:border-box" spellcheck="false" placeholder="https://example.com/" value="${esc(source.playArg || source.templateOrUrl || '')}" />
+			<input type="text" class="inspector-math-input inspector-webpage-host__url" style="width:100%;box-sizing:border-box" spellcheck="false" placeholder="https://example.com/" value="${escapeHtml(source.playArg || source.templateOrUrl || '')}" />
 		</div>
 		<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 			<button type="button" class="btn btn--secondary inspector-webpage-host__reload">Reload</button>
 		</div>
 		<p class="settings-note" style="margin:8px 0 0">
-			Updates the URL on host ch ${esc(source.hostChannel ?? '?')} and replays <code>LOOP</code>. Route and channel stay the same.
+			Updates the URL on host ch ${escapeHtml(source.hostChannel ?? '?')} and replays <code>LOOP</code>. Route and channel stay the same.
 		</p>
 	`
 
@@ -131,17 +124,17 @@ export function renderWebpageHostInspector(root, stateStore, selection) {
 			<div class="inspector-section__title">Live webpage source</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Label</div>
-				<div class="inspector-field__value">${esc(source.label || source.sourceId || 'Webpage')}</div>
+				<div class="inspector-field__value">${escapeHtml(source.label || source.sourceId || 'Webpage')}</div>
 			</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Host channel</div>
-				<div class="inspector-field__value">Ch ${esc(source.hostChannel ?? '?')} · L${esc(source.hostLayer ?? 1)}</div>
+				<div class="inspector-field__value">Ch ${escapeHtml(source.hostChannel ?? '?')} · L${escapeHtml(source.hostLayer ?? 1)}</div>
 			</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Route</div>
-				<div class="inspector-field__value"><code>${esc(source.value || '')}</code></div>
+				<div class="inspector-field__value"><code>${escapeHtml(source.value || '')}</code></div>
 			</div>
-			${source.sourceId ? `<div class="inspector-field"><div class="inspector-field__label">Source ID</div><div class="inspector-field__value">${esc(source.sourceId)}</div></div>` : ''}
+			${source.sourceId ? `<div class="inspector-field"><div class="inspector-field__label">Source ID</div><div class="inspector-field__value">${escapeHtml(source.sourceId)}</div></div>` : ''}
 		</div>
 	`
 

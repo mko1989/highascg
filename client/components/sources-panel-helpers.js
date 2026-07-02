@@ -213,11 +213,7 @@ export function iconFor(type) {
 	return icons[type] || '•'
 }
 
-export function escapeHtml(s) {
-	const div = document.createElement('div')
-	div.textContent = s
-	return div.innerHTML
-}
+export { escapeHtml } from '../lib/dom-escape.js'
 
 export function truncate(s, len) {
 	if (!s || s.length <= len) return s

@@ -6,14 +6,7 @@ import { buildLiveAudioConfigBody, readLiveAudioCasparSettings, LIVE_AUDIO_MAX_S
 import { refreshLiveAudioConfigured } from '../lib/live-audio-state.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { clearRouteFromChannel } from '../lib/live-audio-routing.js'
-
-function esc(s) {
-	return String(s ?? '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} root
@@ -40,15 +33,15 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 			</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Dedicated channel</div>
-				<div class="inspector-field__value">${ch != null ? `Ch ${esc(ch)}` : '(not allocated — restart Caspar after Apply)'}</div>
+				<div class="inspector-field__value">${ch != null ? `Ch ${escapeHtml(ch)}` : '(not allocated — restart Caspar after Apply)'}</div>
 			</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Layer</div>
-				<div class="inspector-field__value">${ln != null ? `L${esc(ln)}` : '—'}</div>
+				<div class="inspector-field__value">${ln != null ? `L${escapeHtml(ln)}` : '—'}</div>
 			</div>
 			<div class="inspector-field">
 				<div class="inspector-field__label">Device</div>
-				<div class="inspector-field__value">${device ? esc(device) : '— none —'}</div>
+				<div class="inspector-field__value">${device ? escapeHtml(device) : '— none —'}</div>
 			</div>
 			<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
 				<button type="button" class="btn btn--secondary" data-live-audio-stop ${ch == null || ln == null ? 'disabled' : ''}>Stop</button>

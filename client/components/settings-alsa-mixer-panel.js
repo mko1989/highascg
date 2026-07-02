@@ -10,14 +10,7 @@ import {
 	normalizeAlsaMixerPayload,
 	setAlsaMixerControl,
 } from '../lib/alsa-mixer-api.js'
-
-function esc(s) {
-	return String(s ?? '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} container
@@ -68,7 +61,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 				? cards
 				: [{ card: selected, name: `Card ${selected}` }]
 		cardSel.innerHTML = list
-			.map((c) => `<option value="${c.card}"${Number(c.card) === Number(selected) ? ' selected' : ''}>${esc(c.name)} (${c.card})</option>`)
+			.map((c) => `<option value="${c.card}"${Number(c.card) === Number(selected) ? ' selected' : ''}>${escapeHtml(c.name)} (${c.card})</option>`)
 			.join('')
 	}
 
@@ -78,7 +71,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 		const { controls } = normalizeAlsaMixerPayload(lastPayload)
 		const visible = controls.filter((c) => alsaControlMatchesView(c, view))
 		if (!visible.length) {
-			controlsEl.innerHTML = `<p class="settings-note">No ${esc(view)} controls on this card.</p>`
+			controlsEl.innerHTML = `<p class="settings-note">No ${escapeHtml(view)} controls on this card.</p>`
 			return
 		}
 
@@ -94,14 +87,14 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 				const items = Array.isArray(ctrl.items) ? ctrl.items : []
 				const cur = String(ctrl.item ?? ctrl.value ?? '')
 				html += `
-					<div class="alsa-mixer-panel__row" data-name="${esc(name)}">
-						<div class="alsa-mixer-panel__label" title="${esc(channels)}">${esc(name)}</div>
-						<select class="alsa-mixer-panel__enum" data-name="${esc(name)}">
+					<div class="alsa-mixer-panel__row" data-name="${escapeHtml(name)}">
+						<div class="alsa-mixer-panel__label" title="${escapeHtml(channels)}">${escapeHtml(name)}</div>
+						<select class="alsa-mixer-panel__enum" data-name="${escapeHtml(name)}">
 							${items
 								.map((it) => {
 									const v = String(typeof it === 'object' ? it.value ?? it.name : it)
 									const label = String(typeof it === 'object' ? it.label ?? it.name ?? v : it)
-									return `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`
+									return `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(label)}</option>`
 								})
 								.join('')}
 						</select>
@@ -112,10 +105,10 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			if (ty === 'boolean' || ty === 'switch') {
 				const on = !!(ctrl.value ?? ctrl.on)
 				html += `
-					<div class="alsa-mixer-panel__row" data-name="${esc(name)}">
-						<div class="alsa-mixer-panel__label">${esc(name)}</div>
+					<div class="alsa-mixer-panel__row" data-name="${escapeHtml(name)}">
+						<div class="alsa-mixer-panel__label">${escapeHtml(name)}</div>
 						<label class="alsa-mixer-panel__bool">
-							<input type="checkbox" class="alsa-mixer-panel__switch" data-name="${esc(name)}" ${on ? 'checked' : ''} />
+							<input type="checkbox" class="alsa-mixer-panel__switch" data-name="${escapeHtml(name)}" ${on ? 'checked' : ''} />
 							<span>${on ? 'On' : 'Off'}</span>
 						</label>
 					</div>`
@@ -124,11 +117,11 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 
 			const pct = alsaControlPercent(ctrl)
 			html += `
-				<div class="alsa-mixer-panel__row alsa-mixer-panel__row--volume" data-name="${esc(name)}">
-					<div class="alsa-mixer-panel__label" title="${esc(channels)}">${esc(name)}</div>
-					<button type="button" class="alsa-mixer-panel__mute${muted ? ' alsa-mixer-panel__mute--active' : ''}" data-name="${esc(name)}" title="Mute">${muted ? 'M' : '—'}</button>
-					<input type="range" class="alsa-mixer-panel__slider" min="0" max="100" value="${pct}" data-name="${esc(name)}" aria-label="${esc(name)} volume" />
-					<span class="alsa-mixer-panel__val">${pct}%${dB ? ` · ${esc(dB)}` : ''}</span>
+				<div class="alsa-mixer-panel__row alsa-mixer-panel__row--volume" data-name="${escapeHtml(name)}">
+					<div class="alsa-mixer-panel__label" title="${escapeHtml(channels)}">${escapeHtml(name)}</div>
+					<button type="button" class="alsa-mixer-panel__mute${muted ? ' alsa-mixer-panel__mute--active' : ''}" data-name="${escapeHtml(name)}" title="Mute">${muted ? 'M' : '—'}</button>
+					<input type="range" class="alsa-mixer-panel__slider" min="0" max="100" value="${pct}" data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)} volume" />
+					<span class="alsa-mixer-panel__val">${pct}%${dB ? ` · ${escapeHtml(dB)}` : ''}</span>
 				</div>`
 		}
 		controlsEl.innerHTML = html
@@ -218,7 +211,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			if (controlsEl) {
 				controlsEl.innerHTML = `
 					<p class="settings-note status-warn">
-						Could not load ALSA mixer (${esc(msg)}).
+						Could not load ALSA mixer (${escapeHtml(msg)}).
 						If the playout server is older, use <strong>Launch alsamixer</strong> or run <code>alsamixer</code> on the host.
 					</p>`
 			}

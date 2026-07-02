@@ -1,3 +1,5 @@
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
+
 const KIND_COLORS = {
     'subsystem': '#58a6ff',
     'application': '#3fb950',
@@ -727,25 +729,36 @@ class MapExplorer {
     }
 
     highlightText(text, query) {
-        if (!query) return text;
+        const raw = String(text ?? '');
+        if (!query) return escapeHtml(raw);
         const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-        if (terms.length === 0) return text;
-        
+        if (terms.length === 0) return escapeHtml(raw);
+
         const regex = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-        return text.replace(regex, '<mark class="map-search__highlight">$1</mark>');
+        let out = '';
+        let last = 0;
+        let m;
+        const re = new RegExp(regex.source, regex.flags);
+        while ((m = re.exec(raw)) !== null) {
+            out += escapeHtml(raw.slice(last, m.index));
+            out += `<mark class="map-search__highlight">${escapeHtml(m[1])}</mark>`;
+            last = m.index + m[0].length;
+        }
+        out += escapeHtml(raw.slice(last));
+        return out;
     }
 
     renderSearchResults() {
         const query = this.searchInput.value;
         this.searchResults.innerHTML = this.currentSearchResults.map((res, idx) => {
-            const pathStr = res.path.map(n => n.label).join(' › ');
+            const pathStr = res.path.map(n => escapeHtml(n.label)).join(' › ');
             return `
                 <div class="map-search__result ${idx === this.searchActiveIndex ? 'map-search__result--active' : ''}" role="option" data-index="${idx}">
                     <div class="map-search__result-content">
                         <span class="map-search__result-label">${this.highlightText(res.node.label, query)}</span>
                         <span class="map-search__result-path">${pathStr}</span>
                     </div>
-                    <span class="map-search__result-kind">${res.node.kind}</span>
+                    <span class="map-search__result-kind">${escapeHtml(res.node.kind)}</span>
                 </div>
             `;
         }).join('');
@@ -1003,8 +1016,8 @@ class MapExplorer {
             
             card.innerHTML = `
                 <div class="map-card__content">
-                    <h3 class="map-card__label" title="${child.label}">${child.label}</h3>
-                    <p class="map-card__description" title="${child.description || ''}">${child.description || ''}</p>
+                    <h3 class="map-card__label" title="${escapeAttr(child.label)}">${escapeHtml(child.label)}</h3>
+                    <p class="map-card__description" title="${escapeAttr(child.description || '')}">${escapeHtml(child.description || '')}</p>
                     <div class="map-card__badges">${childBadge}${depBadges}</div>
                 </div>
             `;
@@ -1088,14 +1101,16 @@ class MapExplorer {
         if (node.meta) {
             metaHtml = '<dl>';
             for (const [key, value] of Object.entries(node.meta)) {
-                let displayVal = Array.isArray(value) ? value.join(', ') : value;
+                let displayVal;
                 if (key === 'relatedWOs') {
-                    displayVal = value.map(v => `${v.wo}: ${v.title}`).join('<br>');
+                    displayVal = value.map(v => `${escapeHtml(v.wo)}: ${escapeHtml(v.title)}`).join('<br>');
                 } else if (key === 'imports' || key === 'importedBy') {
-                    // display length
-                    displayVal = `${value.length} items`;
+                    displayVal = escapeHtml(`${value.length} items`);
+                } else {
+                    const raw = Array.isArray(value) ? value.join(', ') : value;
+                    displayVal = escapeHtml(String(raw ?? ''));
                 }
-                metaHtml += `<dt>${key}</dt><dd><code>${displayVal}</code></dd>`;
+                metaHtml += `<dt>${escapeHtml(key)}</dt><dd><code>${displayVal}</code></dd>`;
             }
             metaHtml += '</dl>';
         }
@@ -1103,11 +1118,11 @@ class MapExplorer {
         this.sidebarEl.innerHTML = `
             <button class="map-sidebar__close" aria-label="Close">&times;</button>
             <header class="map-sidebar__header">
-                <h2 class="map-sidebar__title">${node.label}</h2>
-                <span class="map-sidebar__kind">${node.kind}</span>
+                <h2 class="map-sidebar__title">${escapeHtml(node.label)}</h2>
+                <span class="map-sidebar__kind">${escapeHtml(node.kind)}</span>
                 <button class="map-sidebar__copy-link" title="Copy link to this node">🔗 Copy Link</button>
             </header>
-            <p class="map-sidebar__description">${node.description || ''}</p>
+            <p class="map-sidebar__description">${escapeHtml(node.description || '')}</p>
             <section class="map-sidebar__meta">
                 ${metaHtml}
             </section>

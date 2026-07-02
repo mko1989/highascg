@@ -32,11 +32,19 @@ const FILES = [
 	'tools/smoke/smoke-http-body-limit.test.js',
 	'tools/smoke/smoke-parse-body-strict.test.js',
 	'tools/smoke/smoke-persistence-immediate.test.js',
+	'tools/smoke/smoke-dom-escape.test.js',
 	'tools/smoke/smoke-wiki.test.js',
 	'test/companion-control-status.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)
+
+const dupCheck = spawnSync(process.execPath, [path.join(__dirname, 'check-dom-escape-duplicates.js')], {
+	cwd: REPO_ROOT,
+	stdio: 'inherit',
+})
+if (dupCheck.status !== 0) process.exit(dupCheck.status === null ? 1 : dupCheck.status)
+
 const result = spawnSync(process.execPath, ['--test', ...FILES], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',

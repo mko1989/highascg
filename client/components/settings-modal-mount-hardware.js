@@ -3,14 +3,7 @@
  */
 import { api } from '../lib/api-client.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
-
-function escapeHtml(s) {
-	return String(s || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../lib/dom-escape.js'
 
 function exfatPairStatus(row) {
 	if (row.pairError) return row.pairError

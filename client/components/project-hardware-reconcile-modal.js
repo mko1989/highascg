@@ -3,6 +3,7 @@
  */
 import { openLoadDeviceSnapshotModal } from './device-view-snapshot-modals.js'
 import { setHardwarePolicy } from '../lib/project-hardware-policy.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * @typedef {'apply_saved' | 'keep_live' | 'device_view' | 'load_snapshot' | 'cancel'} ReconcileChoice
@@ -117,12 +118,4 @@ export function showProjectHardwareReconcileModal(opts) {
 			if (e.target === modal) close('cancel')
 		})
 	})
-}
-
-function escapeHtml(s) {
-	return String(s || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
 }

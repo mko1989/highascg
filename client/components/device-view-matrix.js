@@ -1,6 +1,7 @@
 import * as Actions from './device-view-actions.js'
 import { connectorById } from './device-view-helpers.js'
 import { listAllScreenDestinationsForDeviceView } from '../lib/device-view-host-channels.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 function extractMatrixPorts(payload) {
 	const sources = []
@@ -137,7 +138,7 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 	sinks.forEach(sink => {
 		const th = document.createElement('th')
 		th.className = 'device-view-matrix__th-sink device-view-matrix__th--clickable'
-		th.innerHTML = `<span>${sink.label}</span><br><small>${sink.group}</small>`
+		th.innerHTML = `<span>${escapeHtml(sink.label)}</span><br><small>${escapeHtml(sink.group)}</small>`
 		th.addEventListener('click', () => {
 			if (sink.id.startsWith('dst_in_')) {
 				selectDestinationById(sink.id.replace('dst_in_', ''))
@@ -159,7 +160,7 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 		// Source label on the LEFT
 		const thSrc = document.createElement('th')
 		thSrc.className = 'device-view-matrix__th-source device-view-matrix__th--clickable'
-		thSrc.innerHTML = `<span>${src.label}</span><br><small>${src.group}</small>`
+		thSrc.innerHTML = `<span>${escapeHtml(src.label)}</span><br><small>${escapeHtml(src.group)}</small>`
 		thSrc.addEventListener('click', () => {
 			if (src.id.startsWith('dst_in_')) {
 				selectDestinationById(src.id.replace('dst_in_', ''))

@@ -1,13 +1,4 @@
-export function escapeHtml(s) {
-	return String(s)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-}
-
-export function escapeAttr(s) {
-	return String(s).replace(/"/g, '&quot;')
-}
+export { escapeHtml, escapeAttr } from './dom-escape.js'
 
 /**
  * Shorten a media filename for narrow audio-mixer labels.

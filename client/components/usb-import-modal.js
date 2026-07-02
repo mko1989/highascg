@@ -5,6 +5,7 @@
 
 import { api } from '../lib/api-client.js'
 import { getDefaultUploadSubdir } from '../lib/project-media-context.js'
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
 const MEDIA_EXT = new Set([
 	'.mp4', '.mov', '.qt', '.mxf', '.mkv', '.webm', '.avi', '.m4v', '.mpg', '.mpeg', '.wmv',
@@ -209,17 +210,6 @@ export function showUsbImportModal(opts = {}) {
 			}
 			showError(e?.message || String(e))
 		}
-	}
-
-	function escapeHtml(s) {
-		return String(s)
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-	}
-	function escapeAttr(s) {
-		return escapeHtml(s).replace(/'/g, '&#39;')
 	}
 
 	async function fetchBrowse() {

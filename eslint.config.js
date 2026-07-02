@@ -68,6 +68,15 @@ module.exports = [
 			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
 			'no-empty': ['warn', { allowEmptyCatch: false }],
 			'no-undef': 'off',
+			'no-restricted-syntax': [
+				'warn',
+				{
+					selector:
+						'AssignmentExpression[left.property.name="innerHTML"] > TemplateLiteral:not(:has(CallExpression[callee.name="escapeHtml"])):not(:has(CallExpression[callee.name="escapeAttr"])):not(:has(CallExpression[callee.name="html"]))',
+					message:
+						'Escape interpolations with escapeHtml/escapeAttr from client/lib/dom-escape.js before assigning to innerHTML (WO-103).',
+				},
+			],
 		},
 	},
 ]

@@ -3,6 +3,7 @@
  */
 
 import { dmxState } from '../lib/dmx-state.js'
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} root
@@ -94,17 +95,4 @@ export function renderFixtureInspector(root, onDraw) {
 		onDraw?.()
 		renderFixtureInspector(root, onDraw)
 	})
-}
-
-function escapeHtml(s) {
-	return String(s)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-}
-
-function escapeAttr(s) {
-	return String(s)
-		.replace(/&/g, '&amp;')
-		.replace(/"/g, '&quot;')
 }

@@ -4,13 +4,7 @@
 
 import { getVariableStore } from '../lib/variable-state.js'
 import { getAppWs } from '../lib/app-runtime.js'
-
-function escAttr(s) {
-	return String(s)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/"/g, '&quot;')
-}
+import { escapeAttr } from '../lib/dom-escape.js'
 
 const DISPLAY_VALUE_MAX = 56
 

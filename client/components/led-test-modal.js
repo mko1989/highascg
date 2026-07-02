@@ -2,6 +2,8 @@
  * LED wall test card — modal for grid parameters (template: led_grid_test.html).
  */
 
+import { escapeHtml } from '../lib/dom-escape.js'
+
 const LS = {
 	cols: 'highascg_led_test_cols',
 	rows: 'highascg_led_test_rows',
@@ -306,12 +308,4 @@ export function showLedTestModal(onApplied, stateStore) {
 	modal.addEventListener('click', (e) => {
 		if (e.target === modal) close()
 	})
-}
-
-function escapeHtml(s) {
-	return String(s || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
 }

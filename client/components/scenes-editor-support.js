@@ -26,11 +26,7 @@ export function showScenesToast(msg, type = 'info') {
 	setTimeout(() => toast.remove(), 6000)
 }
 
-export function escapeHtml(s) {
-	const div = document.createElement('div')
-	div.textContent = s
-	return div.innerHTML
-}
+export { escapeHtml } from '../lib/dom-escape.js'
 
 const SPLIT_LS = 'casparcg_scenes_preview_split_px'
 
