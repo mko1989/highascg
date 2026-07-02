@@ -151,7 +151,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			const tlId = layer.source.value
 			if (tlId && self.timelineEngine) {
 				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
-				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx })
+				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx }, tlId)
 				self.timelineEngine.setLoop(tlId, !!layer.loop)
 				self.timelineEngine.play(tlId, 0)
 			}

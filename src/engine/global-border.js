@@ -112,7 +112,7 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	lines.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${escaped}"`,
 		`CG ${cl} PLAY 0`,
-		`CG ${cl} UPDATE ${updateDur} "${escaped}"`,
+		`CG ${cl} UPDATE 0 "${escaped}"`,
 		deferMixerAmcpLine(`MIXER ${cl} FILL 0 0 1 1 0`),
 		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
 	)
@@ -132,7 +132,7 @@ function buildGlobalBorderUpdateLines(channel, layer, overlay, opts) {
 	const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))
 	// After ADD+PLAY warmed the Flash layer (`buildGlobalBorderAmcpLines`), params should move via UPDATE only —
 	// repeating PLAY each drag step spams Caspar logs and stalls CEF.
-	return [`CG ${cl} UPDATE ${updateDur} "${escaped}"`]
+	return [`CG ${cl} UPDATE 0 "${escaped}"`]
 }
 
 function buildGlobalBorderOpacityFadeLine(channel, layer, targetOpacity, durationFrames, tween) {

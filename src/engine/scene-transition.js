@@ -267,7 +267,7 @@ async function runTimelineOnlyTake(self, opts) {
 		} catch {}
 	}
 
-	eng.setSendTo({ preview: true, program: true, screenIdx })
+	eng.setSendTo({ preview: true, program: true, screenIdx }, tlId)
 	eng.setLoop(tlId, !!(withTl && withTl.loop))
 	eng.play(tlId, 0)
 	await amcp.mixerCommit(channel)

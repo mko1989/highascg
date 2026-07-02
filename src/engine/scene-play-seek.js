@@ -282,6 +282,7 @@ function resolveTimelineClipFrame(clip, ms, tl, self, opts = {}) {
 	}
 
 	let implicitLoop = false
+	let loopSpanFrames = 0
 	if (!isRoute && src) {
 		const durMs = resolveClipDurationMs(self, src)
 		if (durMs != null && durMs > 0) {
@@ -291,6 +292,7 @@ function resolveTimelineClipFrame(clip, ms, tl, self, opts = {}) {
 				const spanMs = (spanFrames * 1000) / fps
 				if (clip.duration > spanMs + 0.5) {
 					implicitLoop = true
+					loopSpanFrames = spanFrames
 					if (!atEntry || sb !== 'beginning') {
 						frame = inFrames + (relativeFrame % spanFrames)
 					}
@@ -307,6 +309,7 @@ function resolveTimelineClipFrame(clip, ms, tl, self, opts = {}) {
 	return {
 		frame,
 		implicitLoop,
+		loopSpanFrames,
 		isRoute,
 		relativeFrame,
 		inFrames,
