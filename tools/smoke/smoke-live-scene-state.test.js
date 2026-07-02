@@ -23,8 +23,6 @@ test('createAppContext exposes CHOICES getters backed by StateManager', () => {
 		state,
 		persistence: { get: () => null, set: () => {} },
 		configManager: { factoryReset: () => false },
-		programLayerBankByChannel: {},
-		sceneDeck: { looks: [] },
 		multiviewLayout: null,
 		casparHost: '127.0.0.1',
 		casparPort: 5250,
@@ -35,6 +33,27 @@ test('createAppContext exposes CHOICES getters backed by StateManager', () => {
 	state.updateFromCLS(['"a.mp4" MOV'])
 	assert.equal(ctx.CHOICES_MEDIAFILES.length, 1)
 	assert.equal(ctx.CHOICES_MEDIAFILES[0].id, 'a.mp4')
+	assert.ok(ctx.liveDeck)
+	assert.deepEqual(ctx.sceneDeck.looks, [])
+})
+
+test('LiveDeckState persists banks and scene deck', () => {
+	const { createLiveDeckState } = require('../../src/state/live-deck-state')
+	const store = {}
+	const persistence = {
+		get: (k) => store[k],
+		set: (k, v) => {
+			store[k] = v
+		},
+	}
+	const liveDeck = createLiveDeckState(persistence)
+	liveDeck.replaceProgramLayerBanks({ '1': { layers: [] } })
+	liveDeck.persistProgramLayerBanks()
+	assert.deepEqual(store.programLayerBankByChannel, { '1': { layers: [] } })
+
+	liveDeck.setSceneDeck({ looks: [{ id: 'x' }], previewSceneId: 'p1' })
+	assert.equal(store.scene_deck.previewSceneId, 'p1')
+	assert.equal(store.scene_deck.looks[0].id, 'x')
 })
 
 test('live-scene-state serializes concurrent setChannel on same channel', async () => {

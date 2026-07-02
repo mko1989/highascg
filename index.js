@@ -35,6 +35,8 @@ const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
 const { ArtnetReceiver } = require('./src/artnet/artnet-receiver')
 const { createAppContext } = require('./src/app-context')
+const { setSceneLiveBroadcastHooks } = require('./src/state/live-scene-state')
+const { onSceneLiveBroadcast } = require('./src/companion-bridge/look-air-frames')
 
 const Args = require('./src/bootstrap/args'); const Config = require('./src/bootstrap/config'); const Modules = require('./src/bootstrap/modules'); const Shutdown = require('./src/bootstrap/shutdown')
 const { REPO_ROOT, resolveWebDir } = require('./src/repo-paths')
@@ -122,25 +124,12 @@ function main() {
 		}
 
 		const state = new StateManager({ logger: debugLog })
-		const pBanks = persistence.get('programLayerBankByChannel')
-		const pSceneDeck = persistence.get('scene_deck')
 		const appCtx = createAppContext({
 			config,
 			state,
 			persistence,
 			configManager,
-			programLayerBankByChannel:
-				pBanks && typeof pBanks === 'object' && !Array.isArray(pBanks) ? { ...pBanks } : {},
 			multiviewLayout: persistence.get('multiviewLayout') || null,
-			sceneDeck:
-				pSceneDeck && typeof pSceneDeck === 'object' && Array.isArray(pSceneDeck.looks)
-					? {
-							looks: pSceneDeck.looks,
-							previewSceneId: String(pSceneDeck.previewSceneId || '').trim() || null,
-							layerPresets: pSceneDeck.layerPresets || [],
-							lookPresets: pSceneDeck.lookPresets || [],
-						}
-					: { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] },
 			casparHost: config.caspar.host,
 			casparPort: config.caspar.port,
 			log: (level, msg) => {
@@ -177,6 +166,7 @@ function main() {
 				}
 			},
 		})
+		setSceneLiveBroadcastHooks({ onSceneLiveBroadcast })
 		try {
 			const { ensureHardwareHostname } = require('./src/system/hardware-identity')
 			const hw = ensureHardwareHostname(appCtx)

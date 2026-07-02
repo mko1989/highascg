@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** In progress — Phases A, B (partial), C done (2026-07-02)
+**Status:** Done — Phases A–D (2026-07-02)
 **Priority:** **Medium-High** — maintainability/correctness, not an outage; do incrementally
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -76,8 +76,8 @@
 - [x] **T100.2** Convert `CHOICES_MEDIAFILES`/`CHOICES_TEMPLATES` to StateManager-backed getters; migrate readers; delete legacy arrays.
 - [x] **T100.3** Single CLS/media update path on `StateManager`; delete duplicates in `handlers.js` / `query-cycle` / `periodic-sync`.
 - [x] **T100.4** Serialize `live-scene-state` mutations (async mutex/queue); concurrency smoke test.
-- [ ] **T100.5** Extract `LiveDeckState` (banks + scene deck) with explicit API; inject into appCtx.
-- [ ] **T100.6** Replace hot-path lazy `require()` in pointer-confine / CEF bridge / companion bridge with injected deps.
+- [x] **T100.5** Extract `LiveDeckState` (banks + scene deck) with explicit API; inject into appCtx.
+- [x] **T100.6** Replace hot-path lazy `require()` in pointer-confine / CEF bridge / companion bridge with injected deps.
 - [x] **T100.7** Doc: `docs/ARCHITECTURE.md` — appCtx contract, state ownership diagram.
 
 ---
@@ -114,3 +114,12 @@
 - `live-scene-state.js` mutations serialized via `async-serial-queue.js`; `smoke-live-scene-state.test.js`.
 - `docs/ARCHITECTURE.md` appCtx / state ownership section.
 - **Instructions for Next Agent:** T100.5 `LiveDeckState` extraction and T100.6 lazy-require injection are optional follow-ups; remediation WOs 96–105 are otherwise complete.
+
+### 2026-07-02 — WO-100 Phase D (T100.5 + T100.6)
+
+- Added `src/state/live-deck-state.js` (`createLiveDeckState`, normalize + persist for PGM banks and scene deck).
+- `createAppContext` builds `liveDeck` from persistence; `programLayerBankByChannel` / `sceneDeck` are accessors over it.
+- `index.js` no longer loads banks/deck inline; `scene-transition.persistProgramLayerBanks` routes through `liveDeck`.
+- `live-scene-state.setSceneLiveBroadcastHooks` + boot registration in `index.js` (companion bridge); lazy require kept as fallback.
+- Smoke: `LiveDeckState` persist test in `smoke-live-scene-state.test.js`; `docs/ARCHITECTURE.md` updated.
+- **Instructions for Next Agent:** WO-100 complete. Optional: route remaining direct `persistence.set('scene_deck')` in `project-scenes.js` through `liveDeck.persistSceneDeck()`.

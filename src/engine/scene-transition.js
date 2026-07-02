@@ -24,6 +24,10 @@ function physicalProgramLayer(sceneLayerNum, bank) {
 }
 
 function persistProgramLayerBanks(self) {
+	if (self?.liveDeck?.persistProgramLayerBanks) {
+		self.liveDeck.persistProgramLayerBanks()
+		return
+	}
 	if (!self?.programLayerBankByChannel) return
 	try {
 		const persistence = require('../utils/persistence')

@@ -12,8 +12,18 @@ const { runSerialized } = require('../utils/async-serial-queue')
 
 const KEY = 'liveScenesByProgramChannel'
 
+/** @type {((ctx: object) => void)|null} */
+let _onSceneLiveBroadcast = null
+
 /** @type {((channel: number, entry: { sceneId: string, scene: object, updatedAt: number }) => void)|null} */
 let _onProgramChange = null
+
+/**
+ * @param {{ onSceneLiveBroadcast?: (ctx: object) => void }} hooks
+ */
+function setSceneLiveBroadcastHooks(hooks) {
+	_onSceneLiveBroadcast = typeof hooks?.onSceneLiveBroadcast === 'function' ? hooks.onSceneLiveBroadcast : null
+}
 
 /**
  * @param {(channel: number, entry: { sceneId: string, scene: object, updatedAt: number }) => void|null} fn
@@ -120,7 +130,8 @@ function broadcastSceneLive(ctx) {
 		value: buildChannelMap(ctx),
 	})
 	try {
-		require('../companion-bridge/look-air-frames').onSceneLiveBroadcast(ctx)
+		if (_onSceneLiveBroadcast) _onSceneLiveBroadcast(ctx)
+		else require('../companion-bridge/look-air-frames').onSceneLiveBroadcast(ctx)
 	} catch {
 		/* companion bridge optional */
 	}
@@ -151,5 +162,6 @@ module.exports = {
 	broadcastSceneLive,
 	notifyProgramMutationMayInvalidateLive,
 	onProgramChange,
+	setSceneLiveBroadcastHooks,
 	KEY,
 }

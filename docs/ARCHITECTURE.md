@@ -125,7 +125,7 @@ The Node process builds one **`appCtx`** via `src/app-context.js` → `createApp
 | Media / template catalog | `StateManager` (`src/state/state-manager.js`) | CLS/TLS → `updateFromCLS` / `updateFromTLS` only |
 | `CHOICES_MEDIAFILES` / `CHOICES_TEMPLATES` on `appCtx` | **Getters** over `StateManager` | Legacy readers; do not mutate |
 | Program scene map | `live-scene-state.js` | Serialized RMW via `async-serial-queue` |
-| `programLayerBankByChannel`, `sceneDeck` | Fields on `appCtx` (future: `LiveDeckState` module) | Persisted via `persistence` |
+| `programLayerBankByChannel`, `sceneDeck` | `LiveDeckState` (`src/state/live-deck-state.js`) on `appCtx.liveDeck` | Back-compat via `appCtx` getters/setters; persist via module API |
 | Operator snapshot | `get-state.js` | Merges `appCtx` + `StateManager` at request time |
 
 ```mermaid
