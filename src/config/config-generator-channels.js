@@ -18,19 +18,33 @@ const { parseOptionalPixel } = require('./config-generator-utils')
 
 /**
  * Caspar multiview `<screen>` x — OS layout planner first, then mapping GPU bbox (WO-40a), not PGM channel width strip.
+ * When multiview shares a GPU with record-only mains (no Caspar `<screen>` on PGM), use the Caspar consumer strip origin (0).
  * @param {Record<string, unknown>} config
  * @param {ReturnType<import('../utils/os-layout-calculator').calculateLayoutPositions>} layout
  * @param {number} mvIndex 1-based
  * @param {number} cumulativeX fallback when no planner / mapping hint
+ * @param {{ screenHasConsumer?: Record<number, boolean> }} [opts]
  */
-function resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX) {
+function resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX, opts = {}) {
 	const n = mvIndex
 	const keyed = config[`multiview_${n}_x`] ?? config.multiview_x
 	if (keyed !== undefined && keyed !== null && String(keyed).trim() !== '') {
 		return parseOptionalPixel(keyed, cumulativeX)
 	}
 	const mvInfo = layout?.multiview?.[n]
-	if (mvInfo && Number.isFinite(mvInfo.x)) return mvInfo.x
+	if (mvInfo && Number.isFinite(mvInfo.x)) {
+		const mvSys = String(mvInfo.sysId || '').trim()
+		if (mvSys) {
+			const sameGpuScreens = Object.entries(layout.screens || {}).filter(
+				([, info]) => info && String(info.sysId || '').trim() === mvSys,
+			)
+			if (sameGpuScreens.length > 0) {
+				const anyConsumer = sameGpuScreens.some(([idx]) => opts.screenHasConsumer?.[parseInt(idx, 10)])
+				return anyConsumer ? mvInfo.x : cumulativeX
+			}
+		}
+		return mvInfo.x
+	}
 	const bbox = layout?.mappingGpuBBox
 	const hasMapGpu = Array.isArray(layout?.mappingGpuOutputs) && layout.mappingGpuOutputs.length > 0
 	if (hasMapGpu && bbox && Number.isFinite(bbox.maxX)) {
@@ -58,8 +72,8 @@ function buildChannelsSection(config, routeMap) {
 	const customModeIds = new Set()
 	let cumulativeX = 0
 	let nextDevice = 1
-	/** True if any main-screen PGM pair emits a Caspar screen consumer (not DeckLink-only / disabled). */
-	let anyMainScreenHasScreenConsumer = false
+	/** @type {Record<number, boolean>} */
+	const screenHasConsumer = {}
 
 	const { calculateLayoutPositions } = require('../utils/os-config')
 	const layout = calculateLayoutPositions(config)
@@ -84,7 +98,7 @@ function buildChannelsSection(config, routeMap) {
 			setChannelXml(routeMap.switcherBusChannels[s.n - 1], pair.bus2Xml)
 		}
 		if (pair.hasScreenConsumer) {
-			anyMainScreenHasScreenConsumer = true
+			screenHasConsumer[s.n] = true
 			cumulativeX += s.dims.width
 			nextDevice++
 		}
@@ -95,7 +109,7 @@ function buildChannelsSection(config, routeMap) {
 		const mvs = Array.isArray(plan.multiviews) ? plan.multiviews : []
 		mvs.forEach((mvPlan, idx) => {
 			const mvIndex = idx + 1
-			const mvDefaultX = resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX)
+			const mvDefaultX = resolveMultiviewConsumerX(config, layout, mvIndex, cumulativeX, { screenHasConsumer })
 			const mv = buildMultiviewChannel(config, routeMap, { 
 				n: mvIndex,
 				dims: mvPlan.dims,
@@ -167,4 +181,4 @@ function buildChannelsSection(config, routeMap) {
 	return { channelsXml, customVideoModes }
 }
 
-module.exports = { buildChannelsSection }
+module.exports = { buildChannelsSection, resolveMultiviewConsumerX }

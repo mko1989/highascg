@@ -284,6 +284,8 @@ async function buildLiveSnapshot(ctx) {
 	return {
 		host: {
 			hostname: inv?.payload?.host?.hostname || os.hostname(),
+			hardwareId: inv?.payload?.host?.hardwareId || null,
+			mac: inv?.payload?.host?.mac || null,
 			platform: process.platform,
 			collectedAt: new Date().toISOString(),
 		},

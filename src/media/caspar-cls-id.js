@@ -107,6 +107,7 @@ function isPassthroughAmcpClip(id) {
 	const s = normalizeCasparMediaPath(id)
 	if (!s) return true
 	if (/^route:\/\//i.test(s)) return true
+	if (/^alsa:\/\//i.test(s)) return true
 	if (/^\[HTML\]/i.test(s)) return true
 	if (/^https?:\/\//i.test(s)) return true
 	if (/^ndi:\/\//i.test(s)) return true

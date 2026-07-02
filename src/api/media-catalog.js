@@ -56,7 +56,13 @@ function getRawMediaCatalog(ctx) {
  * @returns {{ id: string, label: string }[]}
  */
 function getTemplateCatalog(ctx) {
-	return (ctx.CHOICES_TEMPLATES || []).map((c) => ({ id: c.id, label: c.label }))
+	const fromChoices = (ctx.CHOICES_TEMPLATES || []).map((c) => ({ id: c.id, label: c.label }))
+	if (fromChoices.length > 0) return fromChoices
+	const fromState = ctx.state?.getState?.()?.templates
+	if (Array.isArray(fromState) && fromState.length > 0) {
+		return fromState.map((c) => ({ id: c.id, label: c.label }))
+	}
+	return fromChoices
 }
 
 /**

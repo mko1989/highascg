@@ -510,10 +510,27 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	// Keep Caspar screen consumer window coords aligned with the xrandr planner.
 	try {
 		const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+		const { resolveMultiviewConsumerX } = require('./config-generator-channels')
 		const { resolvePixelMapFeedToProgramScreen } = require('./pixel-mapping-config')
 		const layout = calculateLayoutPositions(merged)
 		const mv1 = layout?.multiview?.[1]
-		if (mv1 && Number.isFinite(mv1.x)) merged.multiview_x = mv1.x
+		const sc = Math.min(16, Math.max(1, parseInt(String(merged.screen_count || 1), 10) || 1))
+		/** @type {Record<number, boolean>} */
+		const screenHasConsumer = {}
+		let casparScreenCumulativeX = 0
+		for (let n = 1; n <= sc; n++) {
+			const wantsScreen =
+				merged[`screen_${n}_screen_consumer`] === true || merged[`screen_${n}_screen_consumer`] === 'true'
+			if (wantsScreen) screenHasConsumer[n] = true
+			if (!wantsScreen) continue
+			const head = layout?.screens?.[n]
+			if (head && Number.isFinite(head.width) && head.width > 0) casparScreenCumulativeX += head.width
+		}
+		if (mv1 && Number.isFinite(mv1.x)) {
+			merged.multiview_x = resolveMultiviewConsumerX(merged, layout, 1, casparScreenCumulativeX, {
+				screenHasConsumer,
+			})
+		}
 		if (mv1 && Number.isFinite(mv1.y)) merged.multiview_y = mv1.y
 		const mappingFeedScreens = new Set()
 		const devices = Array.isArray(merged.deviceGraph?.devices) ? merged.deviceGraph.devices : []

@@ -137,6 +137,54 @@ test('multiview caspar x follows OS layout when no main emits a screen consumer'
 	assert.equal(m[2], '0')
 })
 
+test('multiview caspar x is 0 when only multiview has a screen consumer on shared GPU', () => {
+	const app = clone(defaults)
+	app.screen_count = 2
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 2,
+		screen_1_mode: '1080p5000',
+		screen_2_mode: '2160p5000',
+		multiview_enabled: true,
+		multiview_output_mode: 'screen_only',
+		multiview_mode: '1080p5000',
+		streamingChannel: { enabled: false },
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'pgm1', label: 'PGM 1', mainScreenIndex: 0, mode: 'pgm_only', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+			{ id: 'pgm2', label: 'PGM 2', mainScreenIndex: 1, mode: 'pgm_only', videoMode: '2160p5000', width: 3840, height: 2160, fps: 50 },
+			{ id: 'mv1', label: 'Multiview 1', mainScreenIndex: 0, mode: 'multiview', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_pgm1', kind: 'destination_in', externalRef: 'pgm1' },
+			{ id: 'dst_in_pgm2', kind: 'destination_in', externalRef: 'pgm2' },
+			{ id: 'dst_in_mv1', kind: 'destination_in', externalRef: 'mv1' },
+			{ id: 'rec_1', kind: 'record_out' },
+			{ id: 'rec_2', kind: 'record_out' },
+			{ id: 'gpu_p2', kind: 'gpu_out', externalRef: 'DP-4' },
+		],
+		edges: [
+			{ sourceId: 'dst_in_pgm1', sinkId: 'rec_1' },
+			{ sourceId: 'dst_in_pgm2', sinkId: 'rec_2' },
+			{ sourceId: 'dst_in_mv1', sinkId: 'gpu_p2' },
+		],
+	}
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_screen_consumer, false)
+	assert.equal(flat.screen_2_screen_consumer, false)
+	const xml = buildConfigXml(flat)
+	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>[\s\S]*?<x>(\d+)<\/x>/)
+	assert.ok(mv, 'multiview screen consumer')
+	assert.equal(mv[1], '0', 'record-only PGMs must not push multiview off the GPU origin')
+})
+
 test('WO-53: each DeckLink input gets its own dedicated channel (never bundled onto MVR)', () => {
 	const cfg = clone(defaults)
 	cfg.screen_count = 2
@@ -231,6 +279,8 @@ test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest sta
 		live_audio_input_count: 1,
 		live_audio_input_1_device: 'hw:1,0',
 		inputs_channel_mode: '1080p5000',
+		live_audio_inputs_channel_mode: '',
+		live_audio_input_channel_mode: '',
 		decklink_inputs_host: 'dedicated',
 	}
 	app.streamingChannel = { ...app.streamingChannel, enabled: false }
@@ -252,6 +302,11 @@ test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest sta
 	assert.match(xml, /DeckLink input 1/, 'DeckLink input channel comment present')
 	assert.match(xml, /Live audio input 1/, 'live audio input channel comment present')
 	assert.match(xml, new RegExp(`<video-mode>${lowest}</video-mode>`), 'cheap ALSA channel uses lowest standard mode')
+	// UI saves live_audio_inputs_channel_mode (with trailing "s"); routing must honour it.
+	const hi = clone(app)
+	hi.casparServer = { ...hi.casparServer, live_audio_inputs_channel_mode: '1080p5000' }
+	const mapHi = getChannelMap(buildCasparGeneratorFlatConfig(hi))
+	assert.equal(mapHi.inputChannels[2].mode, '1080p5000', 'live_audio_inputs_channel_mode overrides PAL default')
 	// No inputs configured → no input channels.
 	const off = clone(flat)
 	off.decklink_input_count = 0

@@ -251,6 +251,7 @@ routes.post('/api/project/save', ({ path, body, ctx }) => routesData.handleProje
 routes.post('/api/project/load', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/autosave', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/apply-hardware', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
+routes.post('/api/project/new', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/project/list', ({ ctx }) => routesData.handleProjectList(ctx), { requireCaspar: false })
 routes.get('/api/project', ({ ctx }) => routesData.handleProjectGet(ctx), { requireCaspar: false })

@@ -100,6 +100,8 @@ function casparServerDefaults() {
 		live_audio_pgm_audio_only: true,
 		/** Fly-add `ADD ch-96 STREAM … -format null` on every channel so OSC audio meters tick. */
 		live_audio_meter_null_consumer: true,
+		/** When true (default), capture via external ffmpeg ALSA→UDP; Caspar PLAY udp:// (alsa:// input is unsupported on this build). */
+		live_audio_capture_bridge: true,
 		/** When capture hw matches PortAudio output hw, use dsnoop (non-exclusive capture). */
 		live_audio_capture_dsnoop: true,
 		/** FFmpeg `-buffer_size` on PLAY alsa://… (bytes). Set 0 to disable. */

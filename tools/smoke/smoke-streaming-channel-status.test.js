@@ -21,11 +21,14 @@ test('redactAmcpStreamCommand masks key inside quoted STREAM url', () => {
 	)
 })
 
-test('buildStreamingChannelStatusPayload includes record.logs array', () => {
+test('buildStreamingChannelStatusPayload includes record.logs and activeOutputs', () => {
 	const ctx = {
 		config: { streamingChannel: { enabled: true, videoSource: 'program_1' }, screen_count: 1 },
 		streamingChannelRtmp: { active: false },
-		streamingChannelRecord: { active: true, path: '/media/rec.mp4', outputId: 'rec_1' },
+		streamingChannelRecords: {
+			rec_1: { active: true, path: '/media/a.mp4', outputId: 'rec_1', channel: 3, consumerIndex: 96 },
+			rec_2: { active: true, path: '/media/b.mp4', outputId: 'rec_2', channel: 5, consumerIndex: 96 },
+		},
 		_streamingChannelLogs: {
 			rtmp: [{ ts: 't', level: 'info', message: 'x' }],
 			record: [{ ts: 't', level: 'info', message: 'rec start' }],
@@ -35,5 +38,7 @@ test('buildStreamingChannelStatusPayload includes record.logs array', () => {
 	assert.ok(Array.isArray(p.rtmp.logs))
 	assert.ok(Array.isArray(p.record.logs))
 	assert.equal(p.record.logs.length, 1)
+	assert.deepEqual(p.record.activeOutputs.sort(), ['rec_1', 'rec_2'])
+	assert.equal(p.record.active, true)
 	assert.equal(p.rtmp.url, null)
 })

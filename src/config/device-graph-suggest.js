@@ -1,5 +1,6 @@
 'use strict'
 
+const { destinationsFromConfig } = require('./screen-destinations')
 const { normalizeDeviceGraph } = require('./device-graph-core')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS, slug } = require('./device-graph-constants')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('./decklink-io-direction')
@@ -182,8 +183,21 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		}
 	}
 
-	const mvItem = Array.isArray(live?.caspar?.generatedChannelOrder) ? live.caspar.generatedChannelOrder.find((x) => x?.role === 'multiview') : null
-	if (live?.caspar?.multiviewEnabled || mvItem) connectors.push({ id: 'caspar_mv_out', deviceId: DEFAULT_DEVICE_ID, kind: 'caspar_mv_out', label: 'Multiview channel (virtual)', externalRef: String(live?.caspar?.multiviewChannel ?? mvItem?.ch ?? '') })
+	const mvDestCount = (destinationsFromConfig(appConfig) || []).filter(
+		(d) => d && String(d.mode || '').toLowerCase() === 'multiview',
+	).length
+	const mvItem = Array.isArray(live?.caspar?.generatedChannelOrder)
+		? live.caspar.generatedChannelOrder.find((x) => x?.role === 'multiview')
+		: null
+	if (mvDestCount > 0 && (live?.caspar?.multiviewEnabled || mvItem)) {
+		connectors.push({
+			id: 'caspar_mv_out',
+			deviceId: DEFAULT_DEVICE_ID,
+			kind: 'caspar_mv_out',
+			label: 'Multiview channel (virtual)',
+			externalRef: String(live?.caspar?.multiviewChannel ?? mvItem?.ch ?? ''),
+		})
+	}
 	const streamOutputsRaw = appConfig && Array.isArray(appConfig.streamOutputs) && appConfig.streamOutputs.length ? appConfig.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true }]
 	for (let i = 0; i < streamOutputsRaw.length; i++) {
 		const so = streamOutputsRaw[i] || {}

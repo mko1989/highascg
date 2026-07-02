@@ -1,7 +1,7 @@
 'use strict'
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
+const { STANDARD_VIDEO_MODES, resolveLiveAudioInputChannelMode } = require('./config-modes')
 const { effectiveStandardVideoModeId } = require('./config-generator-mode-helpers')
 const {
 	parseOptionalPixel,
@@ -357,7 +357,7 @@ function buildInputsHostChannel(config, decklinkCount, liveAudioCount, inputsHos
 	const hostCh = decklinkCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled === true
 	if (!hostCh) return ''
 	const modeId = effectiveStandardVideoModeId(
-		config.live_audio_inputs_channel_mode || config.inputs_channel_mode
+		resolveLiveAudioInputChannelMode(config) || config.inputs_channel_mode,
 	)
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	return `${channelXmlComment(`Caspar channel ${ch}: Live INPUT host (DeckLink PLAY … DECKLINK; ALSA PLAY … alsa:// on layers 10+). Empty consumers is normal.`)}        <channel>

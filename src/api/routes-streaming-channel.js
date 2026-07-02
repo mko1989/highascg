@@ -225,6 +225,45 @@ function resolveRecordOutputConfig(config, outputId) {
 	return outputs.find((x) => String(x?.id || '') === String(outputId || '')) || outputs[0] || null
 }
 
+function ensureRecordSessions(ctx) {
+	if (!ctx.streamingChannelRecords || typeof ctx.streamingChannelRecords !== 'object') {
+		ctx.streamingChannelRecords = {}
+	}
+	const legacy = ctx.streamingChannelRecord
+	if (legacy?.active) {
+		const key = String(legacy.outputId || '_legacy').trim() || '_legacy'
+		if (!ctx.streamingChannelRecords[key]?.active) {
+			ctx.streamingChannelRecords[key] = {
+				active: true,
+				path: legacy.path || null,
+				channel: legacy.channel ?? null,
+				outputId: legacy.outputId || key,
+				lastError: legacy.lastError || null,
+				consumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+			}
+		}
+	}
+	return ctx.streamingChannelRecords
+}
+
+function recordSessionKey(outputId, outCfg) {
+	const id = String(outputId || outCfg?.id || '').trim()
+	return id || '_default'
+}
+
+function allocateRecordConsumerIndex(sessions, ch) {
+	const used = new Set()
+	for (const s of Object.values(sessions)) {
+		if (s?.active && s.channel === ch && Number.isFinite(Number(s.consumerIndex))) {
+			used.add(Number(s.consumerIndex))
+		}
+	}
+	for (let idx = STREAMING_RECORD_CONSUMER_INDEX; idx >= 90; idx--) {
+		if (!used.has(idx)) return idx
+	}
+	return null
+}
+
 function resolveRecordSourceChannel(ctx, outputId) {
 	const config = ctx.config || {}
 	const map = getChannelMap(config, ctx.switcherOutputBusByChannel)
@@ -403,11 +442,24 @@ async function handlePostRecord(body, ctx) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'No recording source channel available' }) }
 	}
 
-	if (!ctx.streamingChannelRecord) ctx.streamingChannelRecord = { active: false, path: null }
+	const sessions = ensureRecordSessions(ctx)
+	const sessionKey = recordSessionKey(outputId, outCfg)
 
 	if (action === 'start') {
-		if (ctx.streamingChannelRecord.active) {
-			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Already recording — stop first' }) }
+		if (sessions[sessionKey]?.active) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: `Record output ${sessionKey} is already recording — stop it first` }),
+			}
+		}
+		const consumerIndex = allocateRecordConsumerIndex(sessions, ch)
+		if (consumerIndex == null) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: `No free FILE consumer slot on channel ${ch} (max ${STREAMING_RECORD_CONSUMER_INDEX - 89} simultaneous records per channel)` }),
+			}
 		}
 		const crf = b.crf != null && Number.isFinite(Number(b.crf))
 			? Math.min(51, Math.max(18, Math.round(Number(b.crf))))
@@ -435,56 +487,119 @@ async function handlePostRecord(body, ctx) {
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
 		})
 		const paramsAfterPath = `${param(fileName)} ${args}`
-		const addCmd = `ADD ${ch}-${STREAMING_RECORD_CONSUMER_INDEX} FILE ${paramsAfterPath}`
-		pushRecordLog(ctx, 'info', `Record start requested on ch${ch}`, { path: absPath, outputId: outputId || null, crf })
+		const addCmd = `ADD ${ch}-${consumerIndex} FILE ${paramsAfterPath}`
+		pushRecordLog(ctx, 'info', `Record start requested on ch${ch}`, { path: absPath, outputId: sessionKey, crf, consumerIndex })
 		try {
-			const res = await ctx.amcp.basic.add(ch, 'FILE', paramsAfterPath, STREAMING_RECORD_CONSUMER_INDEX)
-			ctx.streamingChannelRecord = {
+			const res = await ctx.amcp.basic.add(ch, 'FILE', paramsAfterPath, consumerIndex)
+			sessions[sessionKey] = {
 				active: true,
 				path: absPath,
 				channel: ch,
-				outputId: outputId || null,
+				outputId: sessionKey,
 				lastError: null,
+				consumerIndex,
 			}
-			ctx.log?.('info', `[Streaming channel] Record started ch${ch} → ${absPath}`)
-			pushRecordLog(ctx, 'info', `Record started on ch${ch}`, { path: absPath, outputId: outputId || null })
+			ctx.streamingChannelRecord = sessions[sessionKey]
+			ctx.log?.('info', `[Streaming channel] Record started ch${ch} → ${absPath} (${sessionKey})`)
+			pushRecordLog(ctx, 'info', `Record started on ch${ch}`, { path: absPath, outputId: sessionKey, consumerIndex })
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, recording: true, path: absPath, channel: ch, crf, amcp: res }),
+				body: jsonBody({
+					ok: true,
+					recording: true,
+					path: absPath,
+					channel: ch,
+					outputId: sessionKey,
+					crf,
+					amcp: res,
+					status: buildStreamingChannelStatusPayload(ctx, {
+						rtmpConsumerIndex: STREAMING_RTMP_CONSUMER_INDEX,
+						recordConsumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+					}),
+				}),
 			}
 		} catch (e) {
 			const msg = e?.message || String(e)
-			ctx.streamingChannelRecord = { ...ctx.streamingChannelRecord, active: false, lastError: msg }
+			sessions[sessionKey] = { active: false, path: null, channel: ch, outputId: sessionKey, lastError: msg, consumerIndex }
+			ctx.streamingChannelRecord = { active: false, path: null }
 			ctx.log?.('warn', `[Streaming channel] Record start failed: ${msg}`)
-			pushRecordLog(ctx, 'error', `Record start failed on ch${ch}`, { error: msg, command: addCmd })
+			pushRecordLog(ctx, 'error', `Record start failed on ch${ch}`, { error: msg, command: addCmd, outputId: sessionKey })
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 		}
 	}
 
-	if (!ctx.streamingChannelRecord.active) {
+	const session = sessions[sessionKey]
+	if (!session?.active) {
+		const fallbackKey = Object.keys(sessions).find((k) => sessions[k]?.active)
+		if (!outputId && fallbackKey) {
+			return await handlePostRecord(JSON.stringify({ action: 'stop', outputId: fallbackKey }), ctx)
+		}
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Not recording' }) }
 	}
-	const recCh = ctx.streamingChannelRecord.channel ?? ch
+	const recCh = session.channel ?? ch
+	const recIdx = Number.isFinite(Number(session.consumerIndex))
+		? Number(session.consumerIndex)
+		: STREAMING_RECORD_CONSUMER_INDEX
 	try {
-		const res = await ctx.amcp.basic.remove(recCh, null, STREAMING_RECORD_CONSUMER_INDEX)
-		const outPath = ctx.streamingChannelRecord.path
-		ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: null }
-		ctx.log?.('info', `[Streaming channel] Record stopped ch${recCh}`)
-		pushRecordLog(ctx, 'info', `Record stopped on ch${recCh}`, { path: outPath })
+		const res = await ctx.amcp.basic.remove(recCh, null, recIdx)
+		const outPath = session.path
+		sessions[sessionKey] = { active: false, path: null, channel: null, outputId: sessionKey, lastError: null, consumerIndex: recIdx }
+		const anyActive = Object.values(sessions).some((s) => s?.active)
+		ctx.streamingChannelRecord = anyActive
+			? Object.values(sessions).find((s) => s?.active) || { active: false, path: null }
+			: { active: false, path: null }
+		ctx.log?.('info', `[Streaming channel] Record stopped ch${recCh} (${sessionKey})`)
+		pushRecordLog(ctx, 'info', `Record stopped on ch${recCh}`, { path: outPath, outputId: sessionKey })
 		broadcastRecordStopped(ctx, outPath)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, recording: false, path: outPath, amcp: res }) }
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				ok: true,
+				recording: false,
+				path: outPath,
+				outputId: sessionKey,
+				amcp: res,
+				status: buildStreamingChannelStatusPayload(ctx, {
+					rtmpConsumerIndex: STREAMING_RTMP_CONSUMER_INDEX,
+					recordConsumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+				}),
+			}),
+		}
 	} catch (e) {
 		const msg = e?.message || String(e)
 		if (isRemoveNotFoundError(e)) {
-			const outPath = ctx.streamingChannelRecord.path
-			ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: null }
-			pushRecordLog(ctx, 'warn', `Record stop fallback: file consumer already absent on ch${recCh}`, { path: outPath, error: msg })
+			const outPath = session.path
+			sessions[sessionKey] = { active: false, path: null, channel: null, outputId: sessionKey, lastError: null, consumerIndex: recIdx }
+			const anyActive = Object.values(sessions).some((s) => s?.active)
+			ctx.streamingChannelRecord = anyActive
+				? Object.values(sessions).find((s) => s?.active) || { active: false, path: null }
+				: { active: false, path: null }
+			pushRecordLog(ctx, 'warn', `Record stop fallback: file consumer already absent on ch${recCh}`, {
+				path: outPath,
+				error: msg,
+				outputId: sessionKey,
+			})
 			broadcastRecordStopped(ctx, outPath)
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, recording: false, warning: msg }) }
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					ok: true,
+					recording: false,
+					warning: msg,
+					outputId: sessionKey,
+					status: buildStreamingChannelStatusPayload(ctx, {
+						rtmpConsumerIndex: STREAMING_RTMP_CONSUMER_INDEX,
+						recordConsumerIndex: STREAMING_RECORD_CONSUMER_INDEX,
+					}),
+				}),
+			}
 		}
+		sessions[sessionKey] = { active: false, path: null, channel: null, outputId: sessionKey, lastError: msg, consumerIndex: recIdx }
 		ctx.streamingChannelRecord = { active: false, path: null, channel: null, lastError: msg }
-		pushRecordLog(ctx, 'error', `Record stop failed on ch${recCh}`, { error: msg })
+		pushRecordLog(ctx, 'error', `Record stop failed on ch${recCh}`, { error: msg, outputId: sessionKey })
 		return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 	}
 }

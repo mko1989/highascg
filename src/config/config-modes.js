@@ -189,6 +189,28 @@ function getLowestStandardVideoModeId() {
 }
 
 /**
+ * Video mode for dedicated ALSA input channels (WO-53).
+ * Accepts both setting keys: `live_audio_inputs_channel_mode` (UI/settings) and
+ * `live_audio_input_channel_mode` (legacy). Empty → cheapest integer-fps standard mode (PAL).
+ * @param {Record<string, unknown>} [config]
+ * @returns {string}
+ */
+function resolveLiveAudioInputChannelMode(config) {
+	if (!config || typeof config !== 'object') return getLowestStandardVideoModeId()
+	const cs = config.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
+	const read = (key) => {
+		if (cs && Object.prototype.hasOwnProperty.call(cs, key)) return cs[key]
+		if (Object.prototype.hasOwnProperty.call(config, key)) return config[key]
+		return undefined
+	}
+	const raw = String(
+		read('live_audio_inputs_channel_mode') ?? read('live_audio_input_channel_mode') ?? '',
+	).trim()
+	if (raw && STANDARD_VIDEO_MODES[raw]) return raw
+	return getLowestStandardVideoModeId()
+}
+
+/**
  * @returns {Array<{ id: string, label: string }>}
  */
 function getStandardModeChoices() {
@@ -210,4 +232,5 @@ module.exports = {
 	getExtraAudioModeDimensions,
 	getStandardModeChoices,
 	getLowestStandardVideoModeId,
+	resolveLiveAudioInputChannelMode,
 }

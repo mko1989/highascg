@@ -55,7 +55,18 @@ function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 	const recordIdx = opts.recordConsumerIndex ?? 96
 	const map = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
 	const rtmp = ctx.streamingChannelRtmp || { active: false }
-	const rec = ctx.streamingChannelRecord || { active: false }
+	const recordSessions =
+		ctx.streamingChannelRecords && typeof ctx.streamingChannelRecords === 'object'
+			? ctx.streamingChannelRecords
+			: {}
+	const legacyRec = ctx.streamingChannelRecord || { active: false }
+	const activeRecordEntries = Object.entries(recordSessions).filter(([, s]) => s?.active)
+	if (!activeRecordEntries.length && legacyRec.active) {
+		const key = String(legacyRec.outputId || '_legacy').trim() || '_legacy'
+		activeRecordEntries.push([key, legacyRec])
+	}
+	const activeRecordOutputs = activeRecordEntries.map(([id]) => id)
+	const primaryRec = activeRecordEntries[0]?.[1] || legacyRec
 	const logs =
 		ctx._streamingChannelLogs && typeof ctx._streamingChannelLogs === 'object'
 			? ctx._streamingChannelLogs
@@ -84,11 +95,18 @@ function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 			logs: Array.isArray(logs.rtmp) ? logs.rtmp : [],
 		},
 		record: {
-			active: !!rec.active,
-			path: rec.path || null,
-			outputId: rec.outputId || null,
-			channel: rec.channel ?? null,
-			lastError: rec.lastError || null,
+			active: activeRecordOutputs.length > 0,
+			activeOutputs: activeRecordOutputs,
+			path: primaryRec.path || null,
+			outputId: primaryRec.outputId || activeRecordOutputs[0] || null,
+			channel: primaryRec.channel ?? null,
+			lastError: primaryRec.lastError || null,
+			sessions: activeRecordEntries.map(([id, s]) => ({
+				outputId: id,
+				path: s.path || null,
+				channel: s.channel ?? null,
+				consumerIndex: s.consumerIndex ?? recordIdx,
+			})),
 			logs: Array.isArray(logs.record) ? logs.record : [],
 		},
 	}

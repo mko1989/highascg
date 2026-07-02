@@ -243,10 +243,7 @@ function getChannelMap(config, activeBuses = null) {
 	const _modes = require('./config-modes')
 	const decklinkInputModeRaw = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000').trim()
 	const decklinkInputMode = _modes.STANDARD_VIDEO_MODES[decklinkInputModeRaw] ? decklinkInputModeRaw : '1080p5000'
-	const liveAudioModeRaw = String(readCasparSetting(config, 'live_audio_input_channel_mode') ?? '').trim()
-	const liveAudioInputMode = _modes.STANDARD_VIDEO_MODES[liveAudioModeRaw]
-		? liveAudioModeRaw
-		: _modes.getLowestStandardVideoModeId()
+	const liveAudioInputMode = _modes.resolveLiveAudioInputChannelMode(config)
 	const LIVE_AUDIO_INPUT_LAYER = 10
 
 	const inputsOnMvr = false // WO-53: inputs are never bundled onto the MVR/preview host channel.
