@@ -10,6 +10,7 @@ import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { alsaCaptureDeviceOptions, readLiveAudioCasparSettings } from '../lib/live-audio-inputs.js'
 import { settingsState } from '../lib/settings-state.js'
 import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
 function suggestLiveInputChannel(cm) {
 	if (!cm || typeof cm !== 'object') return 5
@@ -132,7 +133,8 @@ export function showLiveInputModal(stateStore) {
 			const slot = parseInt(String(modal.querySelector('#live-input-layer-dl')?.value || '1'), 10) || 1
 			const entry = decklinkInputForSlot(channelMap, slot)
 			if (entry?.channel != null) {
-				hintEl.innerHTML = `DeckLink slot <strong>${slot}</strong> plays on dedicated channel <strong>${entry.channel}</strong> (layer ${entry.layer ?? slot}). Drag <strong>${entry.label || 'DeckLink ' + slot}</strong> from Sources → Live — do not start a second <code>DECKLINK</code> producer for the same device.`
+				const deckLabel = entry.label || `DeckLink ${slot}`
+				hintEl.innerHTML = `DeckLink slot <strong>${slot}</strong> plays on dedicated channel <strong>${entry.channel}</strong> (layer ${entry.layer ?? slot}). Drag <strong>${escapeHtml(deckLabel)}</strong> from Sources → Live — do not start a second <code>DECKLINK</code> producer for the same device.`
 			} else {
 				hintEl.innerHTML =
 					'Set <strong>decklink_input_count</strong> in Settings, apply Caspar config, and restart. Each input slot gets its own Caspar channel.'
@@ -201,7 +203,7 @@ export function showLiveInputModal(stateStore) {
 			const devices = Array.isArray(r?.devices) ? r.devices : []
 			if (!sel) return
 			sel.innerHTML = alsaCaptureDeviceOptions(devices)
-				.map((o) => `<option value="${String(o.value).replace(/"/g, '&quot;')}">${o.label}</option>`)
+				.map((o) => `<option value="${escapeAttr(o.value)}">${escapeHtml(o.label)}</option>`)
 				.join('')
 			if (st) st.textContent = devices.length ? `${devices.length} device(s)` : 'No ALSA capture devices found'
 			syncLiveAudioSlotHint()

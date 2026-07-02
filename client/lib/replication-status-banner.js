@@ -12,6 +12,7 @@ import {
 	switchToPeerProfile,
 } from './connection-profiles.js'
 import { setApiOriginOverride } from './api-origin.js'
+import { escapeHtml } from './dom-escape.js'
 
 const BANNER_ID = 'highascg-replication-status-banner'
 const POLL_MS = 3000
@@ -70,7 +71,7 @@ function renderBanner(status, settings) {
 	const profileIncomplete = role === 'follower' && settings && !deviceProfileComplete(settings)
 
 	const parts = [
-		`<span class="replication-status-banner__badge">${role.toUpperCase()}</span>`,
+		`<span class="replication-status-banner__badge">${escapeHtml(role.toUpperCase())}</span>`,
 		`<span>Peer: ${peerOk ? 'online' : 'offline'}</span>`,
 		`<span>Media: ${mediaPct}%</span>`,
 		`<span>Live lag: ${lag}</span>`,

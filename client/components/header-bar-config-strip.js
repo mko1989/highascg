@@ -1,6 +1,7 @@
 /**
  * Header bar config comparison strip.
  */
+import { escapeHtml } from '../lib/dom-escape.js'
 
 export function initConfigStrip(headerEl, serverBtn) {
 	const strip = document.createElement('div')
@@ -44,7 +45,9 @@ export function initConfigStrip(headerEl, serverBtn) {
 			const s = c.serverChannels?.[i]
 			const m = c.moduleChannels?.[i]
 			const tr = document.createElement('tr')
-			tr.innerHTML = `<td>${s?.index ?? m?.index ?? i + 1}</td><td>${m ? `${m.role}: ${m.videoMode || '—'}` : '—'}</td><td>${s ? `${s.videoMode || '—'}${s.hasScreen ? ' (screen)' : ''}` : '—'}</td>`
+			const modCell = m ? `${escapeHtml(m.role)}: ${escapeHtml(m.videoMode || '—')}` : '—'
+			const srvCell = s ? `${escapeHtml(s.videoMode || '—')}${s.hasScreen ? ' (screen)' : ''}` : '—'
+			tr.innerHTML = `<td>${s?.index ?? m?.index ?? i + 1}</td><td>${modCell}</td><td>${srvCell}</td>`
 			tbody.appendChild(tr)
 		}
 		issuesEl.innerHTML = ''

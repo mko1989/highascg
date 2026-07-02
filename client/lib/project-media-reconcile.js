@@ -3,6 +3,7 @@
  */
 import { api } from './api-client.js'
 import { collectProjectAssetRefs } from './project-media-refs.js'
+import { escapeHtml, escapeAttr } from './dom-escape.js'
 
 const BANNER_ID = 'highascg-missing-media-banner'
 
@@ -177,8 +178,8 @@ export function showMissingMediaBanner(report) {
 	el.id = BANNER_ID
 	el.className = 'media-reconcile-banner'
 	el.innerHTML =
-		`<span class="media-reconcile-banner__text"><strong>Missing assets</strong> — ${parts.join(' and ')} not found on this server.` +
-		` <span class="media-reconcile-banner__preview" title="${preview.map((p) => String(p).replace(/"/g, '&quot;')).join('\n')}">${preview.map((p) => String(p).replace(/</g, '&lt;')).join(' · ')}${more}</span></span>` +
+		`<span class="media-reconcile-banner__text"><strong>Missing assets</strong> — ${escapeHtml(parts.join(' and '))} not found on this server.` +
+		` <span class="media-reconcile-banner__preview" title="${escapeAttr(preview.join('\n'))}">${preview.map((p) => escapeHtml(p)).join(' · ')}${escapeHtml(more)}</span></span>` +
 		'<button type="button" class="media-reconcile-banner__link">Open Media</button>' +
 		'<button type="button" class="media-reconcile-banner__dismiss" aria-label="Dismiss">×</button>'
 

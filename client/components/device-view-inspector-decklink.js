@@ -13,6 +13,7 @@ import {
 import { decklinkInputForSlot, decklinkSlotFromConnector, routeForDecklinkSlot } from '../lib/input-channels.js'
 import { STANDARD_VIDEO_MODES } from './device-view-destinations-inspector.js'
 import { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } from '../lib/decklink-io-direction.js'
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
 const DECKLINK_LATENCY_OPTIONS = ['normal', 'low', 'default']
 const DECKLINK_COLOR_SPACE_OPTIONS = ['bt709', 'bt601', 'bt2020']
@@ -394,9 +395,9 @@ function renderDecklinkRearOrderEditor(h, { lastPayload, load }) {
 			const left = Object.assign(document.createElement('div'), {
 				style: 'font-size:11px; display:flex; flex-direction:column; gap:2px; min-width:0; flex:1',
 			})
-			left.innerHTML = `<span style="opacity:0.75;font-size:10px">Slot ${index + 1}</span><strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${labelForId(
+			left.innerHTML = `<span style="opacity:0.75;font-size:10px">Slot ${index + 1}</span><strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(labelForId(
 				id
-			)}</strong><span style="opacity:0.55;font-size:9px;font-family:ui-monospace,monospace">${id}</span>`
+			))}</strong><span style="opacity:0.55;font-size:9px;font-family:ui-monospace,monospace">${escapeHtml(id)}</span>`
 
 			const grip = Object.assign(document.createElement('span'), {
 				textContent: '≡',

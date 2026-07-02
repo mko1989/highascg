@@ -1,5 +1,6 @@
 import { sceneState } from '../lib/scene-state.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
 export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {
 	const grp = document.createElement('div')
@@ -144,13 +145,13 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 					? getThumbnailUrl(item.value, 80, 2)
 					: null
 			const thumbHtml = thumbUrl
-				? `<img src="${thumbUrl}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2224%22><rect width=%22100%%22 height=%22100%%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2210%22>${isImg ? '🖼️' : '🎬'}</text></svg>'" style="width: 32px; height: 20px; object-fit: cover; border-radius: 2px; border: 1px solid var(--border); margin-right: 8px;"/>`
+				? `<img src="${escapeAttr(thumbUrl)}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2224%22><rect width=%22100%%22 height=%22100%%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2210%22>${isImg ? '🖼️' : '🎬'}</text></svg>'" style="width: 32px; height: 20px; object-fit: cover; border-radius: 2px; border: 1px solid var(--border); margin-right: 8px;"/>`
 				: `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:20px;margin-right:8px;border-radius:2px;border:1px solid var(--border);background:var(--bg-elevated,#21262d);font-size:10px;color:var(--text-muted,#8b949e);">•</span>`
-			
+			const itemLabel = item.label || item.value || ''
 			itemRow.innerHTML = `
 				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 8px; user-select: none;">⋮⋮</span>
 				${thumbHtml}
-				<span class="playlist-item-name" title="${item.label || item.value}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${item.label || item.value}</span>
+				<span class="playlist-item-name" title="${escapeAttr(itemLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${escapeHtml(itemLabel)}</span>
 				<div style="display: flex; align-items: center; gap: 4px; margin-right: 8px;" title="Duration in seconds (used for static images, or to limit video playback)">
 					<input type="number" class="playlist-item-duration" value="${item.duration ?? 5}" min="1" max="3600" style="width: 42px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.75rem; text-align: center; padding: 1px;"/>
 					<span style="font-size: 0.7rem; color: var(--text-muted);">s</span>

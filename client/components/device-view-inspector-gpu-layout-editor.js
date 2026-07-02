@@ -11,6 +11,7 @@ import {
 } from '../lib/device-view-gpu-port-list.js'
 import { setStatus } from './device-view-ui-utils.js'
 import { exportGpuLayoutFile, saveGpuLayoutToStorage } from './device-view-caspar-render-gpu-doc-listeners.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
  * When the Caspar device band is in edit mode, append the GPU layout drag/drop editor to `wrapCtl`.
@@ -107,7 +108,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 			})
 
 			const header = Object.assign(document.createElement('div'), { style: 'display:flex; justify-content:space-between; font-size:10px; opacity:0.8;' })
-			header.innerHTML = `<span><strong>Socket ${index + 1}</strong> (${item.label})</span><span>≡</span>`
+			header.innerHTML = `<span><strong>Socket ${index + 1}</strong> (${escapeHtml(item.label)})</span><span>≡</span>`
 
 			row.addEventListener('dragstart', (ev) => {
 				ev.dataTransfer.setData('application/x-highascg-inspector-gpu-slot', String(index))

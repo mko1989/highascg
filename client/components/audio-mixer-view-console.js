@@ -259,7 +259,7 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 				const matrixButtonsHtml = routes
 					.map((rt) => {
 						const active = rt.value === r.audioRoute
-						return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" data-route="${rt.value}" title="Route to ${rt.label}">${rt.label}</button>`
+						return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" data-route="${escapeAttr(rt.value)}" title="Route to ${escapeAttr(rt.label)}">${escapeHtml(rt.label)}</button>`
 					})
 					.join('')
 				const labelTitle = r.labelTitle || r.label
