@@ -12,6 +12,7 @@ import { programOutputState } from './program-output-state.js'
 import { projectFileIdFromName } from './project-files.js'
 import { markLocalProjectSaved } from './project-remote-sync.js'
 import { markServerProjectSynced, resetServerProjectSync, applyServerRuntimeState } from './server-project-sync.js'
+import { syncComposePreviewClientChannels } from '../components/preview-canvas-compose-snapshot.js'
 import { getAppWs, getAppStateStore, getAppLogic, getAppVariableStore } from './app-runtime.js'
 import { flushSceneDeckSync } from './app-scene-deck.js'
 import { syncProjectMediaContextFromClient } from './project-media-context.js'
@@ -194,6 +195,12 @@ export async function startNewProject(opts = {}) {
 			sceneState.setCanvasResolutions(state.channelMap.programResolutions)
 			programOutputState.setCanvasResolutions(state.channelMap.programResolutions)
 			if (stateStore) stateStore.applyChange('channelMap', state.channelMap)
+		}
+		if (state?.channelMap) {
+			syncComposePreviewClientChannels([
+				...(state.channelMap.programChannels || []),
+				...(state.channelMap.previewChannels || []),
+			])
 		}
 	} catch (e) {
 		console.warn('[HighAsCG] GET /api/state after new project:', e?.message || e)

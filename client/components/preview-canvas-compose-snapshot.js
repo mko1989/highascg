@@ -129,6 +129,35 @@ export function subscribeComposePreviewRefresh(fn) {
 }
 
 /**
+ * Clear client-side compose preview image cache (e.g. after routing / new project).
+ * @param {number[]} [keepChannels] — when set, only drop channels not in this list
+ */
+export function resetComposePreviewClientCache(keepChannels) {
+	if (Array.isArray(keepChannels) && keepChannels.length) {
+		const keep = new Set(
+			keepChannels.map((c) => Math.max(1, parseInt(String(c), 10) || 0)).filter((c) => c > 0),
+		)
+		for (const ch of [..._cache.keys()]) {
+			if (!keep.has(ch)) _cache.delete(ch)
+		}
+	} else {
+		_cache.clear()
+	}
+	stopPollIfIdle()
+}
+
+/**
+ * @param {number[]} channels
+ */
+export function syncComposePreviewClientChannels(channels) {
+	const list = (channels || [])
+		.map((c) => Math.max(1, parseInt(String(c), 10) || 0))
+		.filter((c) => c > 0)
+	resetComposePreviewClientCache(list)
+	for (const ch of list) trackComposePreviewChannel(ch)
+}
+
+/**
  * Track a channel for meta polling (lightweight — PNG only when etag changes).
  * @param {number} channel
  */

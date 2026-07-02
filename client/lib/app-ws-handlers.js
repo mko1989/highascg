@@ -14,7 +14,7 @@ import {
 	ingestStreamingChannelChange,
 	ingestStreamingChannelWsEvent,
 } from './streaming-channel-state.js'
-import { ingestComposePreviewWs } from '../components/preview-canvas-compose-snapshot.js'
+import { ingestComposePreviewWs, syncComposePreviewClientChannels } from '../components/preview-canvas-compose-snapshot.js'
 import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
 
@@ -71,6 +71,14 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 			if (data.value?.programResolutions) {
 				sceneState.setCanvasResolutions(data.value.programResolutions)
 				programOutputState?.setCanvasResolutions?.(data.value.programResolutions)
+			}
+			const cm = data.value
+			if (cm) {
+				const channels = [
+					...(Array.isArray(cm.programChannels) ? cm.programChannels : []),
+					...(Array.isArray(cm.previewChannels) ? cm.previewChannels : []),
+				]
+				syncComposePreviewClientChannels(channels)
 			}
 			appLogic.scheduleMultiviewRefresh()
 		}

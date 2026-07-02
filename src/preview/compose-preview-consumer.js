@@ -68,6 +68,9 @@ async function ensureComposePreviewJpgStub(config, channel) {
 	}
 }
 
+/** @type {Set<number>} */
+const _everAttachedChannels = new Set()
+
 /**
  * @param {object} ctx
  * @param {number} channel
@@ -132,6 +135,7 @@ async function attachComposeFileConsumer(ctx, channel) {
 			throw new Error(res.error || 'ADD FILE failed')
 		}
 		_channels.set(ch, { attached: true, attachedAt: Date.now(), lastError: undefined })
+		_everAttachedChannels.add(ch)
 		ctx.log?.(
 			'info',
 			`[compose-preview] ch${ch} FILE consumer → ${getComposePreviewJpgBasename(cfg, ch)} (direct image2)`,
@@ -159,21 +163,16 @@ async function attachAllComposeFileConsumers(ctx) {
  * @param {object} ctx
  */
 async function detachAllComposeFileConsumers(ctx) {
-	if (!ctx?.amcp?.isConnected) {
-		_channels.clear()
-		return
-	}
-	const channels = [..._channels.keys()]
-	if (channels.length === 0) {
-		for (const ch of resolveMonitoredChannels(ctx?.config || {})) {
-			await removeComposeConsumers(ctx, ch)
-		}
-	} else {
+	const channels = new Set(_everAttachedChannels)
+	for (const ch of _channels.keys()) channels.add(ch)
+	for (const ch of resolveMonitoredChannels(ctx?.config || {})) channels.add(ch)
+	if (ctx?.amcp?.isConnected) {
 		for (const ch of channels) {
 			await removeComposeConsumers(ctx, ch)
 		}
 	}
 	_channels.clear()
+	_everAttachedChannels.clear()
 	if (ctx) ctx.log?.('debug', '[compose-preview] FILE consumers removed')
 }
 
@@ -196,6 +195,19 @@ function getComposeConsumerStats(config) {
 
 function resetComposeConsumerState() {
 	_channels.clear()
+	_everAttachedChannels.clear()
+}
+
+/**
+ * Drop tracked channels not in the current channel map (e.g. after new project / routing shrink).
+ * @param {object} ctx
+ */
+async function refreshComposePreviewConsumers(ctx) {
+	if (!ctx) return
+	await detachAllComposeFileConsumers(ctx)
+	if (isFfmpegJpegComposePreview(ctx.config)) {
+		await attachAllComposeFileConsumers(ctx)
+	}
 }
 
 module.exports = {
@@ -207,6 +219,7 @@ module.exports = {
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
 	detachAllComposeFileConsumers,
+	refreshComposePreviewConsumers,
 	getComposeConsumerStats,
 	resetComposeConsumerState,
 }

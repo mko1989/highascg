@@ -210,6 +210,16 @@ async function handleProject(path, body, ctx) {
 					if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project push: ' + (e?.message || e))
 				}
 			}
+			try {
+				const { refreshComposePreviewConsumers } = require('../preview/compose-preview-consumer')
+				void refreshComposePreviewConsumers(ctx).catch((e) => {
+					if (typeof ctx.log === 'function') {
+						ctx.log('warn', `[compose-preview] refresh after new project: ${e?.message || e}`)
+					}
+				})
+			} catch {
+				/* optional */
+			}
 			return {
 				status: 200,
 				headers: JSON_HEADERS,

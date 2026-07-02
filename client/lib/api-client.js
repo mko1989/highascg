@@ -40,6 +40,8 @@ export async function apiGet(path) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				else if (j?.message) detail = j.message
+				else if (j?.detail) detail = j.detail
 				if (j?.path) detail += '\n' + j.path
 				if (j?.hint) detail += '\n\n' + j.hint
 			}
@@ -77,6 +79,8 @@ export async function apiPost(path, body = {}) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				else if (j?.message) detail = j.message
+				else if (j?.detail) detail = j.detail
 				if (j?.path) detail += '\n' + j.path
 				if (j?.hint) detail += '\n\n' + j.hint
 			}
@@ -108,6 +112,8 @@ export async function apiPut(path, body = {}) {
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
+				else if (j?.message) detail = j.message
+				else if (j?.detail) detail = j.detail
 				if (j?.path) detail += '\n' + j.path
 				if (j?.hint) detail += '\n\n' + j.hint
 			}

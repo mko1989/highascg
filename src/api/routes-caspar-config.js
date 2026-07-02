@@ -185,6 +185,7 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 		headers: JSON_HEADERS,
 		body: jsonBody({
 			ok: fullApply.ok,
+			error: fullApply.ok ? undefined : fullApply.message || `Full apply failed at ${fullApply.step || 'unknown'}`,
 			path: fullApply.caspar?.path,
 			restartSent: !!fullApply.casparRestart?.restartSent,
 			disconnected: !!fullApply.casparRestart?.disconnected,

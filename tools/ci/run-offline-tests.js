@@ -29,6 +29,7 @@ const FILES = [
 	'tools/smoke/smoke-settings-nuclear-password.test.js',
 	'tools/smoke/smoke-zip-slip.test.js',
 	'tools/smoke/smoke-xrandr-mode-validation.test.js',
+	'tools/smoke/smoke-os-config-persist.test.js',
 	'tools/smoke/smoke-http-body-limit.test.js',
 	'tools/smoke/smoke-parse-body-strict.test.js',
 	'tools/smoke/smoke-persistence-immediate.test.js',

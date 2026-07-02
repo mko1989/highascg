@@ -326,9 +326,9 @@ function applyX11Layout(config, opts = {}) {
 		} else if (lastErr) {
 			logger.error(`[OS-Config] xrandr apply failed after ${maxAttempts} attempts: ${lastErr.message}`)
 		}
-	} else if (!live && xcmd) {
+	} else if (!live && xrandrCommand) {
 		logger.info('[OS-Config] Skipping live xrandr push (persist-only)')
-	} else if (xrandrParts.length === 0) {
+	} else if (xrandrHeads.length === 0) {
 		logger.warn('[OS-Config] No xrandr outputs to apply')
 	}
 	

@@ -56,7 +56,8 @@ async function handleGet(path, query, ctx) {
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/compose-preview/refresh') return null
 	const channels = resolveMonitoredChannels(ctx.config)
-	await ffmpegJpeg.startFfmpegJpegComposePreview(ctx)
+	const { refreshComposePreviewConsumers } = require('../preview/compose-preview-consumer')
+	await refreshComposePreviewConsumers(ctx)
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
