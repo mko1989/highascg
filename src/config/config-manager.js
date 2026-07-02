@@ -10,6 +10,24 @@ const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-ma
 /**
  * Top-level keys that should be saved to separate files when in modular mode.
  */
+/** @param {unknown} configPath */
+function assertConfigPathString(configPath) {
+	if (typeof configPath !== 'string' || !configPath.trim()) {
+		throw new TypeError(
+			`ConfigManager configPath must be a non-empty string, got ${typeof configPath}`,
+		)
+	}
+}
+
+/** @param {unknown} filePath @param {string} [label] */
+function assertFilePathString(filePath, label = 'filePath') {
+	if (typeof filePath !== 'string' || !filePath.trim()) {
+		throw new TypeError(
+			`ConfigManager ${label} must be a non-empty string, got ${typeof filePath}`,
+		)
+	}
+}
+
 const MODULAR_KEYS = [
 	'caspar',
 	'server',
@@ -40,6 +58,7 @@ class ConfigManager extends EventEmitter {
 	 */
 	constructor(configPath, logger) {
 		super()
+		assertConfigPathString(configPath)
 		this.configPath = configPath
 		this.logger = logger || console
 		this.config = { ...defaults }
@@ -119,6 +138,7 @@ class ConfigManager extends EventEmitter {
 				this._saveModular(this.configPath, newConfig)
 				this.logger.info(`[Config] Saved modular config to ${this.configPath}`)
 			} else {
+				assertConfigPathString(this.configPath)
 				const data = JSON.stringify(newConfig, null, 2)
 				const tmp = `${this.configPath}.tmp`
 				fs.writeFileSync(tmp, data, 'utf8')
@@ -239,6 +259,7 @@ class ConfigManager extends EventEmitter {
 	 * Helper for atomic file write.
 	 */
 	_atomicWrite(filePath, data) {
+		assertFilePathString(filePath, 'atomic write path')
 		const tmp = `${filePath}.tmp`
 		fs.writeFileSync(tmp, data, 'utf8')
 		fs.renameSync(tmp, filePath)

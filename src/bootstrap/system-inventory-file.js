@@ -125,11 +125,23 @@ function buildPayload(config) {
 	const displays = getDisplayDetails() || []
 	const connectors = getGpuConnectorInventory() || []
 	const physicalMap = buildGpuPhysicalMap({ config: config || {}, displays, connectors })
+	let hardwareId = null
+	let hardwareMac = null
+	try {
+		const { getHardwareIdentity } = require('../system/hardware-identity')
+		const hw = getHardwareIdentity({ networkCfg: config?.network })
+		hardwareId = hw?.hardwareId || null
+		hardwareMac = hw?.mac || null
+	} catch {
+		/* optional */
+	}
 	return {
 		version: 1,
 		collectedAt: new Date().toISOString(),
 		host: {
 			hostname: os.hostname(),
+			hardwareId,
+			mac: hardwareMac,
 			platform: process.platform,
 			release: os.release(),
 			arch: process.arch,

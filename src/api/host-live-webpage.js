@@ -84,7 +84,7 @@ async function playWebpageHostNow(ctx, item) {
 	clearStableCefPages()
 	const playResult = await playHostLiveSourceNow(ctx, item)
 	try {
-		const { amcpCommandsForHostLiveSource } = require('./host-live-sources')
+		const { amcpCommandsForHostLiveSource } = require('../config/host-live-sources')
 		notifyCefInteractiveAmcpLines(amcpCommandsForHostLiveSource(item), ctx.config || {}, (level, msg) =>
 			ctx.log?.(level, msg),
 		)

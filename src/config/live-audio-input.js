@@ -185,11 +185,7 @@ function resolveLiveAudioCaptureBaseUri(cfg, slot) {
 
 	const portAudioHws = listPortAudioHwIdentities(cfg)
 	const shared = portAudioHws.includes(captureHw)
-	const forceDsnoop =
-		readCasparSetting(cfg, 'live_audio_capture_dsnoop') === true ||
-		readCasparSetting(cfg, 'live_audio_capture_dsnoop') === 'true'
-
-	if (shared || forceDsnoop) {
+	if (shared) {
 		return normalizeAlsaCaptureUri(`dsnoop:${captureHw}`)
 	}
 	return configured
@@ -197,11 +193,16 @@ function resolveLiveAudioCaptureBaseUri(cfg, slot) {
 
 /**
  * Ordered PLAY clip variants (primary + fallbacks) for recovery after ffmpeg open failures.
+ * When capture bridge is enabled, only the UDP ingest clip is used (Caspar cannot open alsa://).
  * @param {object} cfg
  * @param {number} slot
  * @returns {string[]}
  */
 function listLiveAudioPlayClipVariants(cfg, slot) {
+	const { isLiveAudioBridgeEnabled, liveAudioBridgePlayClip } = require('../audio/live-audio-bridge')
+	if (isLiveAudioBridgeEnabled(cfg)) {
+		return [liveAudioBridgePlayClip(slot)]
+	}
 	const configured = resolveLiveAudioInputDevice(cfg, slot)
 	if (!configured) return []
 	const hw = parseAlsaHwIdentity(configured)
@@ -227,9 +228,11 @@ function listLiveAudioPlayClipVariants(cfg, slot) {
 /**
  * @param {object} cfg
  * @param {number} slot
- * @returns {string|null} AMCP PLAY clip (alsa://…)
+ * @returns {string|null} AMCP PLAY clip (udp://… when bridge enabled, else alsa://…)
  */
 function resolveLiveAudioPlayClip(cfg, slot) {
+	const { isLiveAudioBridgeEnabled, liveAudioBridgePlayClip } = require('../audio/live-audio-bridge')
+	if (isLiveAudioBridgeEnabled(cfg)) return liveAudioBridgePlayClip(slot)
 	const uri = resolveLiveAudioCaptureBaseUri(cfg, slot)
 	if (!uri) return null
 	return appendAlsaBufferSizeToClip(uri, cfg)

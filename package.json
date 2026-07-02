@@ -17,6 +17,7 @@
 		"deploy:dev": "bash scripts/dev-push.sh",
 		"clean:eggs-host": "bash scripts/clean-eggs-dev-host.sh",
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
+		"verify:repo-integrity": "node tools/ci/check-require-integrity.js",
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
 		"map:generate": "node tools/map/generate-map-data.js",
 		"wiki:build": "node tools/wiki/build-wiki.js",

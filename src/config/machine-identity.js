@@ -9,6 +9,13 @@ const os = require('os')
  * @returns {string}
  */
 function getMachineId(ctx) {
+	try {
+		const { getHardwareIdentity } = require('../system/hardware-identity')
+		const hw = getHardwareIdentity({ networkCfg: ctx?.config?.network })
+		if (hw?.hostname) return sanitizeMachineId(hw.hostname)
+	} catch {
+		/* optional */
+	}
 	const cfg = ctx?.config || ctx?.configManager?.get?.() || {}
 	const repl = cfg.replication?.selfId
 	if (repl && String(repl).trim()) return sanitizeMachineId(String(repl).trim())

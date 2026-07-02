@@ -2,21 +2,30 @@
 
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { listConfiguredLiveAudioSlots, listLiveAudioPlayClipVariants } = require('../config/live-audio-input')
+const { isLiveAudioBridgeEnabled, restartLiveAudioBridge } = require('./live-audio-bridge')
 
 const DEFAULT_VERIFY_MS = 450
 const DEFAULT_CLEAR_SETTLE_MS = 150
 
 /**
- * Caspar returns PLAY OK before ffmpeg finishes opening ALSA; detect dead producers via INFO.
+ * Caspar returns PLAY OK before ffmpeg finishes opening; detect dead producers via INFO.
  * @param {string} infoText
  */
 function isLiveAlsaLayerHealthy(infoText) {
 	const text = String(infoText || '')
 	if (!text.trim()) return false
-	if (!/alsa:\/\//i.test(text)) return false
+	const isUdpBridge = /udp:\/\/127\.0\.0\.1:\d+/i.test(text)
+	if (!/alsa:\/\//i.test(text) && !isUdpBridge) return false
 	if (/<type>\s*empty\s*<\/type>/i.test(text)) return false
 	if (/\btype\s+empty\b/i.test(text)) return false
-	if (/cannot open audio device|device or resource busy|input\/output error/i.test(text)) return false
+	if (/cannot open audio device|device or resource busy|input\/output error|protocol not found/i.test(text)) return false
+	if (/non-existing PPS|decode_slice_header error|no frame!/i.test(text)) return false
+	if (isUdpBridge) {
+		if (!/<type>\s*ffmpeg\s*<\/type>/i.test(text) && !/\btype\s+ffmpeg\b/i.test(text)) return false
+		const times = [...text.matchAll(/<time>([^<]+)<\/time>/gi)].map((m) => parseFloat(m[1]))
+		const cur = times[0]
+		return Number.isFinite(cur) && cur > 0.15
+	}
 	if (/<type>\s*ffmpeg\s*<\/type>/i.test(text)) return true
 	if (/\btype\s+ffmpeg\b/i.test(text)) return true
 	if (/\bffmpeg\b/i.test(text) && /alsa:\/\//i.test(text)) return true
@@ -63,10 +72,18 @@ async function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
 	const verifyMs = opts.verifyMs ?? DEFAULT_VERIFY_MS
 	const clearSettleMs = opts.clearSettleMs ?? DEFAULT_CLEAR_SETTLE_MS
 	const log = opts.log !== false && typeof ctx.log === 'function'
+	const bridgeEnabled = isLiveAudioBridgeEnabled(ctx?.config)
 
 	for (let i = 0; i < variants.length; i++) {
 		const clip = variants[i]
 		const clipLabel = String(clip).split(/\s+/)[0]
+		if (bridgeEnabled) {
+			const bridged = await restartLiveAudioBridge(ctx, slot.slot)
+			if (!bridged) {
+				if (log) ctx.log('warn', `[live-audio] slot ${slot.slot} ffmpeg ALSA bridge failed to start`)
+				continue
+			}
+		}
 		try {
 			await ctx.amcp.raw(`CLEAR ${cl}`)
 		} catch (_) {}

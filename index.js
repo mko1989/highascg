@@ -30,7 +30,7 @@ const { startReplicationService, stopReplicationService } = require('./src/repli
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
 const { startCasparAmcpWatchdog } = require('./src/bootstrap/caspar-amcp-watchdog')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
-const { runConnectionQueryCycle, runMediaLibraryQueryCycle } = require('./src/utils/query-cycle')
+const { runConnectionQueryCycle, runMediaLibraryQueryCycle, bindAppCtxAmcpTransport } = require('./src/utils/query-cycle')
 const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
 const { ArtnetReceiver } = require('./src/artnet/artnet-receiver')
@@ -121,6 +121,18 @@ function main() {
 				}
 			},
 		}
+		try {
+			const { ensureHardwareHostname } = require('./src/system/hardware-identity')
+			const hw = ensureHardwareHostname(appCtx)
+			if (hw.hostnameApplied) {
+				appCtx.log('info', `[hardware-identity] applied hostname ${hw.identity.hostname}`)
+			} else if (hw.hostnameError) {
+				appCtx.log('warn', `[hardware-identity] hostname not applied: ${hw.hostnameError}`)
+			}
+		} catch (e) {
+			appCtx.log('warn', `[hardware-identity] ${e?.message || e}`)
+		}
+
 		writeSystemInventoryFile(appCtx.log, config, { configManager }); const invSec = Math.max(0, parseInt(process.env.HIGHASCG_SYSTEM_INVENTORY_REFRESH_SEC || '0', 10) || 0)
 		if (invSec > 0) {
 			appCtx._startupInventoryInterval = setInterval(
@@ -217,6 +229,7 @@ function main() {
 			const hMs = parseInt(process.env.HIGHASCG_AMCP_HEALTH_MS || '0', 10) || 0; const sMs = parseInt(process.env.HIGHASCG_AMCP_CONNECT_SETTLE_MS || '600', 10) || 600
 			casparConn = new ConnectionManager({ host: config.caspar.host, port: config.caspar.port, config, log: appCtx.log, healthIntervalMs: hMs, healthConnectDelayMs: sMs })
 			appCtx.amcp = casparConn.amcp; appCtx.casparConnection = casparConn
+			bindAppCtxAmcpTransport(appCtx, casparConn)
 			casparConn.context.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
 			casparConn.context.gatheredInfo = appCtx.gatheredInfo
 		}

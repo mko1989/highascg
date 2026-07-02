@@ -16,6 +16,41 @@ const { broadcastWsStateSnapshot } = require('../api/get-state')
 /** Skip redundant INFO XML parse for Companion variables when body unchanged (PF-04). */
 const _channelXmlForVariables = new Map()
 
+/**
+ * Share Caspar AMCP socket + response routing with `appCtx` so {@link attachEnqueueQueue}
+ * callbacks receive the same lines as {@link AmcpClient} (`/api/raw`, `amcp.query.*`).
+ * Without this, CLS/TLS query cycles register on a separate `response_callback` and never populate catalogs.
+ * @param {object} appCtx
+ * @param {{ context?: object }} connectionManager
+ */
+function bindAppCtxAmcpTransport(appCtx, connectionManager) {
+	const connCtx = connectionManager?.context
+	if (!appCtx || !connCtx) return
+	appCtx.socket = connCtx.socket
+	appCtx.response_callback = connCtx.response_callback
+	appCtx._resetAmcpProtocol = connCtx._resetAmcpProtocol
+	Object.defineProperty(appCtx, '_pendingResponseKey', {
+		enumerable: true,
+		configurable: true,
+		get() {
+			return connCtx._pendingResponseKey
+		},
+		set(v) {
+			connCtx._pendingResponseKey = v
+		},
+	})
+	Object.defineProperty(appCtx, '_amcpBatchDrain', {
+		enumerable: true,
+		configurable: true,
+		get() {
+			return connCtx._amcpBatchDrain
+		},
+		set(v) {
+			connCtx._amcpBatchDrain = v
+		},
+	})
+}
+
 function scheduleStartupHqThumbnailPrewarm(self) {
 	if (self?._hqThumbStartupPrewarmDone) return
 	if (self?._hqThumbPrewarmInFlight) return
@@ -355,6 +390,7 @@ function updateChannelVariablesFromXml(ctx, ch, xmlStr) {
 module.exports = {
 	responseToStr,
 	attachEnqueueQueue,
+	bindAppCtxAmcpTransport,
 	runMediaLibraryQueryCycle,
 	runConnectionQueryCycle,
 	updateChannelVariablesFromXml,

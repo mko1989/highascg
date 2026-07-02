@@ -21,6 +21,7 @@ const {
 	hardwareConfigHasOperatorData,
 } = require('../engine/project-hardware-config')
 const { ensureProjectMediaDir, getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')
+const { createNewProject } = require('../engine/new-project')
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null
@@ -177,6 +178,50 @@ async function handleProject(path, body, ctx) {
 		}
 
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(project) }
+	}
+	if (path === '/api/project/new') {
+		try {
+			const { project, slug } = createNewProject(ctx)
+			if (ctx.artnetReceiver?.reconfigureFromProject) {
+				ctx.artnetReceiver.reconfigureFromProject(project)
+			} else if (ctx.artnetReceiver) {
+				ctx.artnetReceiver.reconfigure()
+			}
+			if (typeof ctx._wsBroadcast === 'function') {
+				try {
+					ctx._wsBroadcast('change', { path: 'hardwareConfig', value: { applied: true } })
+					scheduleProjectSyncBroadcast(ctx, project)
+					if (typeof ctx.getState === 'function') {
+						const st = ctx.getState()
+						if (st?.channelMap) {
+							ctx._wsBroadcast('change', { path: 'channelMap', value: st.channelMap })
+						}
+					}
+				} catch (e) {
+					if (typeof ctx.log === 'function') {
+						ctx.log('warn', '[project] WebSocket broadcast failed: ' + (e?.message || e))
+					}
+				}
+			}
+			if (typeof ctx.onProjectSavedForReplication === 'function') {
+				try {
+					ctx.onProjectSavedForReplication(project)
+				} catch (e) {
+					if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project push: ' + (e?.message || e))
+				}
+			}
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, slug, activeSlug: slug, project }),
+			}
+		} catch (e) {
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: false, error: e?.message || 'New project failed' }),
+			}
+		}
 	}
 	if (path === '/api/project/apply-hardware') {
 		const hc =

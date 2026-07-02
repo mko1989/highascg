@@ -33,10 +33,12 @@ function replicationTokenOk(ctx, req, body) {
 	return !!(repl.peer.token && token === repl.peer.token)
 }
 
-function replicationPeerRequest(req) {
-	const hdr = req?.headers?.['x-highascg-replication-token']
-	const token = String(Array.isArray(hdr) ? hdr[0] : hdr || '').trim()
-	return !!token
+function replicationPeerAuthOk(ctx, req, body, opts = {}) {
+	if (replicationTokenOk(ctx, req, body)) return { ok: true, method: 'token' }
+	const { verifyReplicationRepairRequest } = require('../replication/replication-handshake')
+	const repair = verifyReplicationRepairRequest(ctx, body, req, opts)
+	if (repair.ok) return repair
+	return { ok: false, error: repair.error || 'unauthorized' }
 }
 
 function rejectIfLeader(ctx) {
@@ -101,13 +103,22 @@ async function handleGet(path, ctx, req) {
 		} catch {
 			projectMedia = null
 		}
+		let pingIdentity = { appId: 'highascg', hardwareId: null, hostname: os.hostname() }
+		try {
+			const { getHardwareIdentityPingFields } = require('../system/hardware-identity')
+			pingIdentity = getHardwareIdentityPingFields()
+		} catch {
+			/* optional */
+		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				selfId: repl.selfId,
 				pairId: repl.pairId,
-				hostname: os.hostname(),
+				hostname: pingIdentity.hostname,
+				hardwareId: pingIdentity.hardwareId,
+				appId: pingIdentity.appId,
 				role: rt?.roleState?.getRole() || 'standalone',
 				leaderAvailable: !!repl.leaderAvailable,
 				appVersion: pkg.version,
@@ -144,7 +155,8 @@ async function handleGet(path, ctx, req) {
 	}
 
 	if (path === '/api/replication/project-media-manifest') {
-		if (replicationPeerRequest(req) && !replicationTokenOk(ctx, req, {})) {
+		const repl = getReplicationConfig(ctx.config)
+		if (replicationPairConfigured(repl) && !replicationTokenOk(ctx, req, {})) {
 			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
 		}
 		try {
@@ -400,7 +412,8 @@ async function handlePost(path, body, ctx, req) {
 
 	if (path === '/api/replication/register-follower') {
 		const out = await registerFollowerOnLeader(ctx, payload)
-		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
+		const status = out.ok ? 200 : out.status || 400
+		return { status, headers: JSON_HEADERS, body: jsonBody(out) }
 	}
 
 	if (path === '/api/replication/setup') {
@@ -464,20 +477,29 @@ async function handlePost(path, body, ctx, req) {
 	}
 
 	if (path === '/api/replication/realign-pair-token') {
+		const auth = replicationPeerAuthOk(ctx, req, payload, { expectedRole: 'follower' })
+		if (!auth.ok) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: auth.error || 'unauthorized' }) }
+		}
 		const { handleRealignPairToken } = require('../replication/replication-pair-token')
 		const out = handleRealignPairToken(ctx, payload, req)
 		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
 	}
 
 	if (path === '/api/replication/apply-pair-token') {
+		const auth = replicationPeerAuthOk(ctx, req, payload, { expectedRole: 'leader' })
+		if (!auth.ok) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: auth.error || 'unauthorized' }) }
+		}
 		const { handleApplyPairToken } = require('../replication/replication-pair-token')
 		const out = handleApplyPairToken(ctx, payload, req)
 		return { status: out.ok ? 200 : 400, headers: JSON_HEADERS, body: jsonBody(out) }
 	}
 
 	if (path === '/api/replication/exchange-ssh') {
-		if (!replicationTokenOk(ctx, req, payload)) {
-			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
+		const auth = replicationPeerAuthOk(ctx, req, payload)
+		if (!auth.ok) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: auth.error || 'unauthorized' }) }
 		}
 		const { handleExchangeReplicationSsh } = require('../replication/replication-ssh-setup')
 		const out = handleExchangeReplicationSsh(ctx, payload)
