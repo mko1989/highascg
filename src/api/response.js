@@ -17,6 +17,22 @@ function parseBody(body) {
 	}
 }
 
+/**
+ * Strict JSON parse for routes that should return 400 on malformed bodies (WO-101).
+ * @returns {{ ok: true, value: unknown } | { ok: false, error: string }}
+ */
+function parseBodyStrict(body) {
+	if (body == null || body === '') return { ok: true, value: {} }
+	if (typeof body === 'object' && !Buffer.isBuffer(body)) return { ok: true, value: body }
+	try {
+		const s = Buffer.isBuffer(body) ? body.toString('utf8') : String(body)
+		if (!String(s).trim()) return { ok: true, value: {} }
+		return { ok: true, value: JSON.parse(s) }
+	} catch (e) {
+		return { ok: false, error: e instanceof Error ? e.message : String(e) }
+	}
+}
+
 function parseQueryString(qs) {
 	const o = {}
 	if (!qs || typeof qs !== 'string') return o
@@ -35,4 +51,4 @@ function parseQueryString(qs) {
 	return o
 }
 
-module.exports = { JSON_HEADERS, jsonBody, parseBody, parseQueryString }
+module.exports = { JSON_HEADERS, jsonBody, parseBody, parseBodyStrict, parseQueryString }

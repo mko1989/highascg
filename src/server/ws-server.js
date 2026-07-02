@@ -35,8 +35,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const log = options.log || (() => {})
 	const intervalMs = options.stateBroadcastIntervalMs ?? 0
 	const clients = new Set()
-	const wss = new WebSocket.Server({ noServer: true })
-	const replWss = new WebSocket.Server({ noServer: true })
+	const wss = new WebSocket.Server({ noServer: true, maxPayload: wsMaxPayload })
+	const replWss = new WebSocket.Server({ noServer: true, maxPayload: wsMaxPayload })
 
 	function notifyOperatorClientCount() {
 		try {
@@ -50,6 +50,12 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const logLineMaxHzRaw = parseInt(process.env.HIGHASCG_WS_LOG_LINE_MAX_HZ || '50', 10)
 	const logLineMaxHz = Number.isFinite(logLineMaxHzRaw) ? logLineMaxHzRaw : 50
 	const LOG_LINE_WINDOW_MS = 1000
+	const wsMaxPayloadRaw = parseInt(process.env.HIGHASCG_WS_MAX_PAYLOAD || String(8 * 1024 * 1024), 10)
+	const wsMaxPayload = Number.isFinite(wsMaxPayloadRaw) && wsMaxPayloadRaw > 0 ? wsMaxPayloadRaw : 8 * 1024 * 1024
+	const wsMaxBufferedRaw = parseInt(process.env.HIGHASCG_WS_MAX_BUFFERED_BYTES || String(8 * 1024 * 1024), 10)
+	const wsMaxBufferedBytes =
+		Number.isFinite(wsMaxBufferedRaw) && wsMaxBufferedRaw > 0 ? wsMaxBufferedRaw : 8 * 1024 * 1024
+	const SKIP_WHEN_BUFFERED_EVENTS = new Set(['change', 'log_line', 'timeline.tick', 'variable_update'])
 	/** @type {number[]} */
 	const logLineTimestamps = []
 	let logLineThrottleWarnAt = 0
@@ -113,6 +119,22 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const STATE_BYTES_WARN = parseInt(process.env.HIGHASCG_WS_FULL_STATE_BYTES || '0', 10) || 0
 	let lastStatePayloadWarnAt = 0
 
+	function sendToClient(ws, msg, event) {
+		if (ws.readyState !== WebSocket.OPEN) return
+		const buffered = ws.bufferedAmount || 0
+		if (buffered > wsMaxBufferedBytes) {
+			if (SKIP_WHEN_BUFFERED_EVENTS.has(event)) return
+			try {
+				ws.terminate()
+			} catch (_) {}
+			clients.delete(ws)
+			getCompanionBridgeRegistry().unregister(ws)
+			log(`[WS] terminated slow client (buffered ${buffered} B)`)
+			return
+		}
+		ws.send(msg)
+	}
+
 	function broadcast(event, data) {
 		if (event === 'log_line' && !logLineSendAllowed()) return
 		const msg = safeStringify({ type: event, data })
@@ -129,7 +151,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 			}
 		}
 		for (const ws of clients) {
-			if (ws.readyState === WebSocket.OPEN) ws.send(msg)
+			sendToClient(ws, msg, event)
 		}
 	}
 
@@ -296,7 +318,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				const msg = JSON.parse(trimmed)
 				
 				if (typeof ctx.log === 'function') {
-					ctx.log('info', `[WS] Incoming: ${trimmed.length > 300 ? trimmed.slice(0, 300) + '...' : trimmed}`)
+					ctx.log('debug', `[WS] Incoming type=${String(msg.type || 'unknown')} len=${trimmed.length}`)
 				}
 
 				if (msg.type === 'amcp' && msg.cmd) {
@@ -429,6 +451,13 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 			try {
 				replWss.close()
 			} catch (_) {}
+			try {
+				wss.close()
+			} catch (_) {}
+			if (stateChangeTimer) {
+				clearTimeout(stateChangeTimer)
+				stateChangeTimer = null
+			}
 			if (ctx._wsBroadcast === broadcast) delete ctx._wsBroadcast
 		},
 	}

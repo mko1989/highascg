@@ -24,6 +24,15 @@ const FLUSH_DEBOUNCE_MS = Math.max(
 	Math.min(60_000, parseInt(process.env.HIGHASCG_PERSISTENCE_FLUSH_MS || '200', 10) || 200),
 )
 
+/** Keys flushed immediately (on-air / operator-critical). */
+const IMMEDIATE_KEYS = new Set([
+	'liveScenesByProgramChannel',
+	'scene_deck',
+	'multiviewLayout',
+	'web_project_active_slug',
+	'programLayerBankByChannel',
+])
+
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _saveTimer = null
 
@@ -103,7 +112,16 @@ function set(key, value) {
 	} else {
 		_cache[key] = value
 	}
-	_scheduleSave()
+	if (IMMEDIATE_KEYS.has(key)) {
+		_writeToDisk()
+	} else {
+		_scheduleSave()
+	}
+}
+
+/** Write-through for on-air-critical keys (WO-101). */
+function setImmediate(key, value) {
+	set(key, value)
 }
 
 function remove(key) {
@@ -117,6 +135,7 @@ function getAll() {
 module.exports = {
 	get,
 	set,
+	setImmediate,
 	remove,
 	getAll,
 	bindAmcp,

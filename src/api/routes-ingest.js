@@ -15,6 +15,14 @@ const { resolveSafe, getMediaIngestBasePath } = require('../media/local-media')
 const { getIngestEffectiveBase } = require('../media/project-media-root')
 const persistence = require('../utils/persistence')
 
+function readMaxUploadBytes() {
+	const raw = process.env.HIGHASCG_MAX_UPLOAD_BYTES
+	const fallback = 200 * 1024 * 1024 * 1024
+	if (raw == null || raw === '') return fallback
+	const n = parseInt(String(raw), 10)
+	return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
 /**
  * @param {object} ctx
  * @param {'debug'|'info'|'warn'|'error'} level
@@ -123,7 +131,10 @@ async function handleUpload(req, res, ctx) {
 			}
 		}
 
-		const bb = busboy({ headers: req.headers })
+		const bb = busboy({
+			headers: req.headers,
+			limits: { fileSize: readMaxUploadBytes(), files: 64 },
+		})
 		let fileCount = 0
 		let targetSubdir = ''
 

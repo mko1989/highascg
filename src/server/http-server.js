@@ -11,6 +11,7 @@ const path = require('path')
 const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
 const { mergeCors } = require('./cors')
 const { isHeadlessMode } = require('./headless-mode')
+const { readRequestBody } = require('./http-body')
 
 const MIME = {
 	'.html': 'text/html',
@@ -220,7 +221,16 @@ function startHttpServer(options) {
 			const isMultipart = contentType.startsWith('multipart/')
 			let body = ''
 			if (!isIngestUpload && !isMultipart) {
-				for await (const chunk of req) body += chunk
+				try {
+					body = await readRequestBody(req)
+				} catch (e) {
+					if (e && e.code === 'BODY_TOO_LARGE') {
+						res.writeHead(413, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))
+						res.end(JSON.stringify({ error: 'Payload too large' }))
+						return
+					}
+					throw e
+				}
 			}
 
 			let result
@@ -289,7 +299,9 @@ function startHttpServer(options) {
 			if (typeof routeUpgrade !== 'function') return
 			const handled = await routeUpgrade(req, socket, head)
 			if (!handled) return
-		} catch {
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e)
+			log(`[HTTP Server Upgrade] error: ${msg}`)
 			return
 		}
 	})

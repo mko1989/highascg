@@ -8,7 +8,7 @@ const path = require('path'); const os = require('os'); const fs = require('fs')
 const { createLogger } = require('./src/utils/logger'); const logBuffer = require('./src/utils/log-buffer')
 const { config: configLogger } = require('./src/utils/buffered-logger')
 const { StateManager } = require('./src/state/state-manager')
-const { startHttpServer } = require('./src/server/http-server'); const { attachWebSocketServer } = require('./src/server/ws-server')
+const { startHttpServer, stopHttpServer } = require('./src/server/http-server'); const { attachWebSocketServer } = require('./src/server/ws-server')
 const { startUsbHotplugWatcher } = require('./src/media/usb-drives'); const { routeRequest, getState } = require('./src/api/router')
 const persistence = require('./src/utils/persistence'); const { TimelineEngine } = require('./src/engine/timeline-engine')
 const { ClipEndFadeWatcher } = require('./src/engine/clip-end-fade'); const { ConnectionManager } = require('./src/caspar/connection-manager')
@@ -62,8 +62,10 @@ loadRepoDotEnv()
 const WEB_DIR = resolveWebDir(REPO_ROOT)
 
 const logger = createLogger({ minLevel: 'info', onLine: logBuffer.appendHighasLine }); const debugLog = createLogger({ minLevel: 'debug', onLine: logBuffer.appendHighasLine })
+const { installProcessGuards } = require('./src/bootstrap/process-guards')
 
 function main() {
+	installProcessGuards({ logger, persistence })
 	const cli = Args.parseArgs(process.argv); if (cli.help) { Args.printHelp(); process.exit(0) }
 	let configPath = process.env.HIGHASCG_CONFIG_PATH ? path.resolve(process.env.HIGHASCG_CONFIG_PATH) : path.join(REPO_ROOT, 'highascg.config.json')
 	const modularDir = path.join(REPO_ROOT, 'config')
@@ -404,6 +406,16 @@ function main() {
 				routeApi: (m, p, b, r) => routeRequest(m, p, b, safeCtx, r),
 				log: m => logger.info(`[SafeMode HTTP] ${m}`) 
 			})
+			const safeShutdown = () => {
+				try {
+					persistence.flushSync()
+				} catch (e) {
+					logger.warn(`[SafeMode] persistence flush: ${e?.message || e}`)
+				}
+				stopHttpServer(httpServer, () => process.exit(0))
+			}
+			process.on('SIGINT', safeShutdown)
+			process.on('SIGTERM', safeShutdown)
 			logger.info(`[SafeMode] UI active on port ${config.server.httpPort}. Use the web interface to fix configuration.`)
 		} catch (inner) {
 			logger.error(`[Main] Safe Mode fallback also failed: ${inner.message}. Exiting.`)

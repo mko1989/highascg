@@ -71,6 +71,10 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 				const { stopCefInteractiveBridge } = require('../system/cef-interactive-bridge')
 				stopCefInteractiveBridge()
 			} catch (_) {}
+			try {
+				const { stopPointerConfine } = require('../system/pointer-confine')
+				stopPointerConfine()
+			} catch (_) {}
 
 			try {
 				flushDeckSyncPersist()

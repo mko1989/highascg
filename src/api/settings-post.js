@@ -9,7 +9,7 @@ const { normalizeAudioRouting } = require('../config/config-generator')
 const { normalizeCasparServerConfigPath } = require('./routes-caspar-config')
 const { normalizeOscConfig } = require('../osc/osc-config')
 const { startOscPlaybackInfoSupplement } = require('../utils/periodic-sync')
-const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const { normalizeRtmpConfig } = require('../config/rtmp-output')
 const { validateDecklinkCasparSlice, validateDecklinkOutputResolution } = require('../config/decklink-config-validate')
 const { resolveMainScreenCount } = require('../config/routing')
@@ -26,7 +26,18 @@ const { mergeUiNuclearPasswordSettings } = require('../utils/nuclear-password')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
-	const settings = parseBody(body); if (!settings || typeof settings !== 'object') return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid settings' }) }
+	const parsed = parseBodyStrict(body)
+	if (!parsed.ok) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Invalid JSON body', detail: parsed.error }),
+		}
+	}
+	const settings = parsed.value
+	if (!settings || typeof settings !== 'object') {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid settings' }) }
+	}
 	const warnings = []; const sideEffects = []; const oldC = { ...ctx.config.caspar }; const oldS = { ...ctx.config.streaming }
 
 	const cfg = ctx.config; if (settings.caspar) { if (settings.caspar.host) cfg.caspar.host = settings.caspar.host; if (settings.caspar.port) cfg.caspar.port = parseInt(settings.caspar.port, 10) }

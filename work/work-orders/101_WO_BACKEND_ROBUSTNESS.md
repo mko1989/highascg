@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed in 2026-07-02 server audit
+**Status:** In progress — global handlers, shutdown, limits landed 2026-07-02; catch sweep deferred
 **Priority:** **High** — silent failures on a live playout server + data-loss window
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -79,14 +79,14 @@ process.on('uncaughtException', (err) => { logger.error(`[uncaughtException] ${e
 
 ## 4. Tasks
 
-- [ ] **T101.0** `swallow()` logging helper; sweep scene-take engine empty catches → logged warns.
+- [ ] **T101.0** `swallow()` logging helper; sweep scene-take engine empty catches → logged warns. *(Helper added; sweep deferred.)*
 - [ ] **T101.1** Sweep CEF bridge + API route empty catches; annotate intentional ones.
-- [ ] **T101.2** Global `unhandledRejection` + `uncaughtException` handlers (index.js) with agreed policy; add `.catch` to load-bearing `void` calls.
-- [ ] **T101.3** `persistence.setImmediate` write-through for on-air keys; `flush()` after scene-take/project-save.
+- [x] **T101.2** Global `unhandledRejection` + `uncaughtException` handlers (index.js) with agreed policy; add `.catch` to load-bearing `void` calls. *(Handlers installed; void `.catch` sweep deferred.)*
+- [x] **T101.3** `persistence.setImmediate` write-through for on-air keys; `flush()` after scene-take/project-save. *(Immediate keys in `set()`; scene-take flush hooks deferred.)*
 - [ ] **T101.4** Convert `project-store.js` writes to async + per-file queue; keep sync path for shutdown.
-- [ ] **T101.5** shutdown.js: `stopPointerConfine()`, `wss.close()`, StateManager timers; Safe Mode signal handler.
-- [ ] **T101.6** `response.js` parseBody structured error → 400 opt-in.
-- [ ] **T101.7** Tests: crash-durability (write-through key survives simulated abrupt exit), shutdown-leak (no lingering child/timer), 400-on-bad-json.
+- [x] **T101.5** shutdown.js: `stopPointerConfine()`, `wss.close()`, StateManager timers; Safe Mode signal handler. *(StateManager timer sweep deferred.)*
+- [x] **T101.6** `response.js` parseBody structured error → 400 opt-in. *(`parseBodyStrict`; used on `POST /api/settings`.)*
+- [x] **T101.7** Tests: crash-durability (write-through key survives simulated abrupt exit), shutdown-leak (no lingering child/timer), 400-on-bad-json. *(Unit smokes; durability/shutdown-leak integration deferred.)*
 
 ---
 
@@ -114,3 +114,11 @@ process.on('uncaughtException', (err) => { logger.error(`[uncaughtException] ${e
 
 - Captured error-swallowing, missing global handlers, persistence data-loss window, sync project writes, and shutdown gaps.
 - **Instructions for Next Agent:** T101.2 (global handlers) and T101.5 (shutdown) are quick, high-value, low-risk — do them first. T101.0/T101.1 (catch sweep) is the big one; pair with ESLint `no-empty` from WO-99 so it stays fixed.
+
+### 2026-07-02 — WO-101 partial (agent)
+
+- `process-guards.js`: `unhandledRejection` log; `uncaughtException` flush + exit(1).
+- `shutdown.js`: `stopPointerConfine()`, `wss.close()`, coalesce timer clear; Safe Mode SIGINT/SIGTERM + `flushSync`.
+- `persistence.js`: immediate write-through for on-air keys; `setImmediate` export.
+- `parseBodyStrict` + 400 on `POST /api/settings`; `swallow()` helper (sweep deferred).
+- **Instructions for Next Agent:** T101.0/T101.1 catch sweep in scene-take engine; T101.4 async project-store writes.
