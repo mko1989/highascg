@@ -391,6 +391,7 @@ export default defineConfig(({ mode }) => {
 		build: {
 			outDir: '../dist-web',
 			emptyOutDir: true,
+			target: 'es2022',
 			assetsInlineLimit: 4096,
 			chunkSizeWarningLimit: 600,
 			rollupOptions: {
