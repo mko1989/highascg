@@ -74,14 +74,18 @@ export function drawTimelineCanvas(deps) {
 
 	const tl = getTimeline()
 	const pb = getPlayback()
-	ctx.clearRect(0, 0, canvas.width, canvas.height)
-	drawBackground(ctx, canvas)
-	drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX)
-	if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection, schedDraw)
-	if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource)
-	if (tl) drawFlagTrails(ctx, canvas, tl, xAt, getFlagSelection)
-	drawPlayhead(ctx, canvas, pb, xAt, RULER_H)
-	drawHeaders(ctx, canvas, tl, scrollY, layerAt)
+	try {
+		ctx.clearRect(0, 0, canvas.width, canvas.height)
+		drawBackground(ctx, canvas)
+		drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX)
+		if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection, schedDraw)
+		if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource)
+		if (tl) drawFlagTrails(ctx, canvas, tl, xAt, getFlagSelection)
+		drawPlayhead(ctx, canvas, pb, xAt, RULER_H)
+		drawHeaders(ctx, canvas, tl, scrollY, layerAt)
+	} catch (err) {
+		console.warn('[timeline-canvas] draw failed:', err?.message || err)
+	}
 }
 
 function drawBackground(ctx, canvas) {

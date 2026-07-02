@@ -33,7 +33,35 @@ import {
 
 export function initTimelineEditor(root, stateStore) {
 	let redrawTimelineView = () => {}
-	let playback = { playing: false, position: 0, timelineId: null, loop: false }
+	/** @type {Map<string, { playing: boolean, position: number, timelineId: string, loop: boolean }>} */
+	const playbackById = new Map()
+	/** @type {Map<string, { serverTickPos: number, serverTickAt: number }>} */
+	const clockById = new Map()
+
+	function defaultPlayback(tlId) {
+		return { playing: false, position: 0, timelineId: tlId, loop: false }
+	}
+
+	function ensurePlayback(tlId) {
+		if (!tlId) return defaultPlayback(null)
+		let pb = playbackById.get(tlId)
+		if (!pb) {
+			pb = defaultPlayback(tlId)
+			playbackById.set(tlId, pb)
+		}
+		return pb
+	}
+
+	function getPlayback() {
+		const tl = timelineState.getActive()
+		return tl?.id ? ensurePlayback(tl.id) : defaultPlayback(null)
+	}
+
+	function getClock(tlId) {
+		if (!clockById.has(tlId)) clockById.set(tlId, { serverTickPos: 0, serverTickAt: 0 })
+		return clockById.get(tlId)
+	}
+
 	let selectedClip = null  // { layerIdx, clipId, timelineId, clip }
 	let selectedFlagDetail = null // { timelineId, flagId, flag }
 	/** @type {{ layerIdx: number, clip: object } | null} */
@@ -51,51 +79,60 @@ export function initTimelineEditor(root, stateStore) {
 
 	// Playhead clock — uses Date.now() to match server timeline-playback (_p0 + Date.now() - _t0).
 	// Extrapolate between WS ticks (~165 ms); never pull the UI playhead backward during play.
-	let serverTickPos = 0
-	let serverTickAt = 0
 	let playLoopRaf = null
 	/** Server more than this ahead of client → snap (seek / tab resume). */
 	const TICK_AHEAD_SNAP_MS = 80
 	/** Ignore server reports this far behind extrapolated time (network latency). */
 	const TICK_LATENCY_MS = 35
 
-	function clientPlayheadMs() {
-		return serverTickPos + (Date.now() - serverTickAt)
+	function clientPlayheadMs(tlId) {
+		const id = tlId ?? timelineState.getActive()?.id
+		if (!id) return 0
+		const c = getClock(id)
+		return c.serverTickPos + (Date.now() - c.serverTickAt)
 	}
 
-	function anchorPlayhead(ms) {
-		serverTickPos = ms
-		serverTickAt = Date.now()
+	function anchorPlayhead(ms, tlId) {
+		const id = tlId ?? timelineState.getActive()?.id
+		if (!id) return
+		const c = getClock(id)
+		c.serverTickPos = ms
+		c.serverTickAt = Date.now()
 	}
 
 	/** Re-anchor from a server tick without backward jumps during playback. */
-	function applyServerTick(serverMs) {
+	function applyServerTick(serverMs, tlId) {
+		const id = tlId ?? timelineState.getActive()?.id
+		if (!id) return
+		const c = getClock(id)
 		const now = Date.now()
-		const extrapolated = serverTickPos + (now - serverTickAt)
+		const extrapolated = c.serverTickPos + (now - c.serverTickAt)
 		if (serverMs - extrapolated > TICK_AHEAD_SNAP_MS) {
-			serverTickPos = serverMs
+			c.serverTickPos = serverMs
 		} else if (serverMs >= extrapolated - TICK_LATENCY_MS) {
-			serverTickPos = serverMs
+			c.serverTickPos = serverMs
 		} else {
-			serverTickPos = extrapolated
+			c.serverTickPos = extrapolated
 		}
-		serverTickAt = now
+		c.serverTickAt = now
 	}
 
 	function maybeFollowPlayhead() {
 		if (!view.follow) return
+		const playback = getPlayback()
 		canvas.followPlayhead(playback.position, { playing: playback.playing })
 	}
 
 	function startPlaybackLoop() {
 		if (playLoopRaf) return
 		const loop = () => {
+			const playback = getPlayback()
 			if (!playback.playing) {
 				playLoopRaf = null
 				return
 			}
 			const tl = timelineState.getActive()
-			const pos = clientPlayheadMs()
+			const pos = clientPlayheadMs(tl?.id)
 			playback.position = tl ? Math.min(pos, tl.duration) : pos
 			maybeFollowPlayhead()
 			updateTimecode()
@@ -190,7 +227,7 @@ export function initTimelineEditor(root, stateStore) {
 	const canvas = initTimelineCanvas(bodyEl, createTimelineCanvasHandlers({
 		stateStore,
 		sceneState,
-		getPlayback: () => playback,
+		getPlayback,
 		getView: () => view,
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		getSelectedClip: () => selectedClip,
@@ -214,16 +251,26 @@ export function initTimelineEditor(root, stateStore) {
 	const transportApi = createTimelineTransport({
 		transportEl,
 		stateStore,
-		playback,
+		getPlayback,
 		view,
 		canvas,
 		redrawTimelineView,
 		stopPlaybackLoop,
 		startPlaybackLoop,
-		setServerTick: (pos) => anchorPlayhead(pos),
+		setServerTick: (pos) => anchorPlayhead(pos, timelineState.getActive()?.id),
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		setSelectedClip: (v) => { selectedClip = v },
 		setSelectedFlagDetail: (v) => { selectedFlagDetail = v },
+		onTimelineSwitch: async () => {
+			const tl = timelineState.getActive()
+			if (!tl?.id) return
+			const pb = ensurePlayback(tl.id)
+			anchorPlayhead(pb.position, tl.id)
+			canvas.setPlayheadPosition(pb.position)
+			if (pb.playing) startPlaybackLoop()
+			else stopPlaybackLoop()
+			await syncPlaybackFromServer()
+		},
 	})
 	const { buildTransport, updateTimecode, syncToServer, updateSendTo, togglePlay } = transportApi
 	syncToServerRef.fn = syncToServer
@@ -253,15 +300,16 @@ export function initTimelineEditor(root, stateStore) {
 			} else {
 				await updateSendTo()
 			}
-			if (typeof pb.loop === 'boolean') playback.loop = pb.loop
-			if (pb.timelineId != null) playback.timelineId = pb.timelineId
+			if (typeof pb.loop === 'boolean') ensurePlayback(tl.id).loop = pb.loop
+			const local = ensurePlayback(tl.id)
+			if (pb.timelineId != null) local.timelineId = pb.timelineId
 			if (typeof pb.position === 'number') {
-				playback.position = pb.position
-				anchorPlayhead(pb.position)
+				local.position = pb.position
+				anchorPlayhead(pb.position, tl.id)
 				canvas.setPlayheadPosition(pb.position)
 			}
 			if (typeof pb.playing === 'boolean') {
-				playback.playing = pb.playing
+				local.playing = pb.playing
 				if (pb.playing) {
 					startPlaybackLoop()
 				} else {
@@ -306,18 +354,19 @@ export function initTimelineEditor(root, stateStore) {
 			const cm = stateStore.getState()?.channelMap || {}
 			const pgmCh = cm.programChannels?.[s] ?? null
 			const prvCh = cm.previewChannels?.[s] ?? null
+			const labelBase = cm.virtualMainChannels?.[s]?.name || `Screen ${s + 1}`
 			const defs = [{
 				id: `pgm_${s + 1}`,
 				role: 'pgm',
 				mainIndex: s,
-				label: `PGM ${s + 1}${pgmCh != null ? ` (ch ${pgmCh})` : ''}`,
+				label: `PGM · ${labelBase}${pgmCh != null ? ` (ch ${pgmCh})` : ''}`,
 			}]
 			if (prvCh != null) {
 				defs.push({
 					id: `prv_${s + 1}`,
 					role: 'prv',
 					mainIndex: s,
-					label: `PRV ${s + 1} (ch ${prvCh})`,
+					label: `PRV · ${labelBase} (ch ${prvCh})`,
 				})
 			}
 			return defs
@@ -353,7 +402,7 @@ export function initTimelineEditor(root, stateStore) {
 			// --- legacy canvas compose (WO-57: keep until caspar_image sign-off) ---
 			drawTimelineStack(ctx, W, H, {
 				timelineState,
-				getPlayback: () => playback,
+				getPlayback,
 				isLive,
 				composePrvPgmLayout: meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr',
 				composeDualStreamPreview: meta.composeDualStreamPreview === true,
@@ -386,7 +435,7 @@ export function initTimelineEditor(root, stateStore) {
 	attachTimelineEditorInput(root, bodyEl, {
 		stateStore,
 		sceneState,
-		getPlayback: () => playback,
+		getPlayback,
 		getSelectedClip: () => selectedClip,
 		setSelectedClip: (v) => { selectedClip = v },
 		getSelectedFlagDetail: () => selectedFlagDetail,
@@ -404,15 +453,18 @@ export function initTimelineEditor(root, stateStore) {
 
 	function onTick(data) {
 		if (!data?.timelineId) return
-		const tl = timelineState.getActive()
-		if (tl?.id !== data.timelineId) return
-		if (typeof data.position === 'number') applyServerTick(data.position)
-		if (playback.playing) {
-			const pos = clientPlayheadMs()
-			playback.position = tl ? Math.min(pos, tl.duration) : pos
+		const local = ensurePlayback(data.timelineId)
+		if (typeof data.position === 'number') applyServerTick(data.position, data.timelineId)
+		const active = timelineState.getActive()
+		const isActive = active?.id === data.timelineId
+		if (local.playing || isActive) {
+			const tl = isActive ? active : timelineState.timelines.find((t) => t.id === data.timelineId)
+			const pos = clientPlayheadMs(data.timelineId)
+			local.position = tl ? Math.min(pos, tl.duration) : pos
 		}
-		if (!playback.playing) {
-			playback.playing = true
+		if (!isActive) return
+		if (!local.playing) {
+			local.playing = true
 			canvas.resetFollowScroll?.()
 			buildTransport()
 			startPlaybackLoop()
@@ -421,27 +473,28 @@ export function initTimelineEditor(root, stateStore) {
 	}
 
 	function onPlayback(pb) {
-		if (!pb) return
+		if (!pb?.timelineId) return
+		const local = ensurePlayback(pb.timelineId)
 		if (pb.sendTo && typeof pb.sendTo === 'object') {
-			Object.assign(view.sendTo, pb.sendTo)
+			timelineState.setSendTo(pb.timelineId, pb.sendTo)
 			const active = timelineState.getActive()
-			if (active?.id) timelineState.setSendTo(active.id, view.sendTo)
+			if (active?.id === pb.timelineId) Object.assign(view.sendTo, pb.sendTo)
 		}
-		const wasPlaying = playback.playing
-		playback.playing = !!pb.playing
-		playback.loop = !!pb.loop
-		if (pb.timelineId != null) playback.timelineId = pb.timelineId
+		const wasPlaying = local.playing
+		local.playing = !!pb.playing
+		local.loop = !!pb.loop
+		local.timelineId = pb.timelineId
+		if (typeof pb.position === 'number') anchorPlayhead(pb.position, pb.timelineId)
+		local.position = clientPlayheadMs(pb.timelineId)
+		const active = timelineState.getActive()
+		if (active?.id !== pb.timelineId) return
 		if (pb.playing) {
-			anchorPlayhead(pb.position ?? 0)
-			playback.position = serverTickPos
 			maybeFollowPlayhead()
 			if (!wasPlaying) startPlaybackLoop()
 		} else {
-			anchorPlayhead(pb.position ?? 0)
-			playback.position = serverTickPos
 			stopPlaybackLoop()
 			maybeFollowPlayhead()
-			canvas.setPlayheadPosition(playback.position)
+			canvas.setPlayheadPosition(local.position)
 		}
 		buildTransport()
 		redrawTimelineView()

@@ -85,8 +85,9 @@ export function initTimelineCanvas(container, opts) {
 		/** @type {(timelineId: string, heights: number[], isFinal?: boolean) => void} */
 		onLayerHeightsChange,
 		onKeyframeDragEnd,
-		/** Persist clip move/resize after drag (not on mere click-to-select). */
 		onClipDragEnd,
+		onMoveLayer,
+		onLayerDragEnd,
 	} = opts
 
 	const thumbCache = new Map() // url -> HTMLImageElement (or 'loading' | 'error')
@@ -217,9 +218,10 @@ export function initTimelineCanvas(container, opts) {
 
 		const li = layerAt(cy, tl)
 
-		// Left-click on layer header → open layer inspector
+		// Left-click on layer header → drag layer or open inspector
 		if (cx < HEADER_W && li >= 0 && li < tl.layers.length && e.button === 0) {
 			canvas.dataset.lastClicked = 'header'
+			drag = { type: 'layer-move', layerIdx: li, startClientY: e.clientY }
 			onLayerClick?.(tl.id, li, tl.layers[li])
 			return
 		}
@@ -297,6 +299,16 @@ export function initTimelineCanvas(container, opts) {
 			return
 		}
 
+		if (drag.type === 'layer-move' && tl) {
+			const targetLi = layerAt(cy, tl)
+			if (targetLi >= 0 && targetLi < tl.layers.length && targetLi !== drag.layerIdx) {
+				onMoveLayer?.(drag.layerIdx, targetLi)
+				drag.layerIdx = targetLi
+				schedDraw()
+			}
+			return
+		}
+
 		if (drag.type === 'flag-move' && tl && onMoveFlagTime) {
 			const clamped = Math.max(0, Math.min(ms, tl.duration))
 			onMoveFlagTime(tl.id, drag.flagId, clamped)
@@ -355,7 +367,14 @@ export function initTimelineCanvas(container, opts) {
 			}
 
 			newStart = Math.max(0, newStart)
-			onMoveClip(drag.layerIdx, drag.clipId, newStart)
+
+			const targetLi = layerAt(cy, tl)
+			const validTargetLi = targetLi >= 0 && targetLi < tl.layers.length ? targetLi : drag.layerIdx
+			
+			onMoveClip(drag.layerIdx, drag.clipId, newStart, validTargetLi)
+			if (validTargetLi !== drag.layerIdx) {
+				drag.layerIdx = validTargetLi
+			}
 		} else if (drag.type === 'clip-resize') {
 			// Timeline snapping candidates
 			const snapThresholdPx = 8
@@ -442,6 +461,7 @@ export function initTimelineCanvas(container, opts) {
 
 	canvas.addEventListener('mouseup', () => {
 		const wasDivider = drag?.type === 'layer-divider'
+		const wasLayerDrag = drag?.type === 'layer-move'
 		const wasKeyframeDrag = drag?.type === 'keyframe-drag'
 		const wasClipDrag = drag?.type === 'clip-move' || drag?.type === 'clip-resize'
 		const tl0 = getTimeline()
@@ -452,6 +472,9 @@ export function initTimelineCanvas(container, opts) {
 		if (wasDivider && tl0 && onLayerHeightsChange) {
 			ensureLayerHeights(tl0)
 			onLayerHeightsChange(tl0.id, [...tl0.layerHeights], true)
+		}
+		if (wasLayerDrag && tl0 && onLayerDragEnd) {
+			onLayerDragEnd(tl0.id)
 		}
 		if (wasKeyframeDrag && tl0 && onKeyframeDragEnd) {
 			onKeyframeDragEnd(tl0.id)

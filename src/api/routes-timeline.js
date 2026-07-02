@@ -70,10 +70,15 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 
 	if (method === 'POST') {
 		switch (action) {
-			case 'play':
-				if (b.sendTo && typeof b.sendTo === 'object') eng.setSendTo(b.sendTo)
+			case 'play': {
+				const tl = eng.get(id)
+				if (!tl) {
+					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
+				}
+				if (b.sendTo && typeof b.sendTo === 'object') eng.setSendTo(b.sendTo, id)
 				eng.play(id, b.from != null ? Number(b.from) : null)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+			}
 			case 'take': {
 				const map = getChannelMap(ctx?.config || {})
 				const screenCount = map?.screenCount || 1
@@ -100,9 +105,9 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 					liveSceneState.clearChannel(programCh)
 				}
 
-				const pb = eng.getPlayback()
-				const pos = pb?.timelineId === id ? pb.position ?? 0 : 0
-				eng.setSendTo({ preview: true, program: true, screenIdx: b.screenIdx === 'all' ? null : b.screenIdx })
+				const pb = eng.getPlayback(id)
+				const pos = pb?.position ?? 0
+				eng.setSendTo({ preview: true, program: true, screenIdx: b.screenIdx === 'all' ? null : b.screenIdx }, id)
 				eng.setLoop(id, !!pb?.loop)
 				eng.play(id, pos)
 				liveSceneState.broadcastSceneLive(ctx)
@@ -119,12 +124,19 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (Number.isNaN(ms) || ms < 0) {
 					return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'ms required (number >= 0)' }) }
 				}
+				if (!eng.get(id)) {
+					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
+				}
 				eng.seek(id, ms)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 			}
-			case 'sendto':
-				eng.setSendTo(b)
+			case 'sendto': {
+				if (!eng.get(id)) {
+					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
+				}
+				eng.setSendTo(b, id)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+			}
 			case 'loop':
 				eng.setLoop(id, !!b.loop)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
@@ -134,7 +146,10 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 	}
 
 	if (method === 'GET' && action === 'state') {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody(eng.getPlayback()) }
+		if (!eng.get(id)) {
+			return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(eng.getPlayback(id)) }
 	}
 
 	return null

@@ -12,12 +12,43 @@ const {
 } = require('./timeline-playback-helpers')
 const timelinePlaybackAmcp = require('./timeline-playback-amcp')
 
+function createPlaybackCell(position = 0) {
+	const t = Date.now()
+	return { position, playing: false, loop: false, _t0: t, _p0: position }
+}
+
+function cellNowMs(cell) {
+	if (!cell?.playing) return cell?.position ?? 0
+	return cell._p0 + (Date.now() - cell._t0)
+}
+
+function setCellPosition(cell, pos) {
+	cell.position = pos
+	cell._p0 = pos
+	cell._t0 = Date.now()
+}
+
 /** @param {new (self: object) => object} TimelineEngineClass */
 function applyPlaybackMixin(TimelineEngineClass) {
 	Object.assign(TimelineEngineClass.prototype, {
 		...timelinePlaybackAmcp,
+
+		_pbFor(id) {
+			let cell = this._playbackById.get(id)
+			if (!cell) {
+				cell = createPlaybackCell(0)
+				this._playbackById.set(id, cell)
+			}
+			return cell
+		},
+
+		_sendToFor(id) {
+			const tl = id ? this.timelines.get(id) : null
+			if (tl?.sendTo && typeof tl.sendTo === 'object') return tl.sendTo
+			return { preview: true, program: false, screenIdx: 0 }
+		},
 		addKeyframeAtNow(timelineId, layerIdx, property, value) {
-			const tl = this.timelines.get(timelineId || this._pb?.timelineId)
+			const tl = this.timelines.get(timelineId || this._airTimelineId)
 			if (!tl) return null
 			const ms = this._nowMs()
 			const layer = tl.layers[layerIdx]
@@ -40,7 +71,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 		},
 
 		adjustClipFillDelta(timelineId, layerIdx, axis, delta, aspectLocked) {
-			const tl = this.timelines.get(timelineId || this._pb?.timelineId)
+			const tl = this.timelines.get(timelineId || this._airTimelineId)
 			if (!tl) return null
 			const layer = tl.layers[layerIdx]
 			if (!layer) return null
@@ -48,7 +79,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			const clip = this._clipAt(layer, ms)
 			if (!clip) return null
 			const localMs = Math.round(ms - clip.startTime)
-			const screenIdx = this._pb?.sendTo?.screenIdx ?? 0
+			const screenIdx = this._sendToFor(timelineId || this._airTimelineId)?.screenIdx ?? 0
 			const { w, h } = getProgramResolutionForScreen(this.self, screenIdx)
 			const base = this._clipFillBaseNormalized(clip, w, h)
 			let rect = clip.fillPx
@@ -86,7 +117,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 				(k) => !(FILL_PROPS.includes(k.property) && Math.abs(k.time - localMs) < 0.5)
 			)
 			this._emitChange()
-			if (this._pb?.timelineId === tl.id) this._applyAt(tl.id, ms, true)
+			if (this._airTimelineId === tl.id) this._applyAt(tl.id, ms, true)
 			return {
 				fill_x: nx / w,
 				fill_y: ny / h,
@@ -96,7 +127,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 		},
 
 		captureKeyframeAtNow(timelineId, layerIdx, param) {
-			const tl = this.timelines.get(timelineId || this._pb?.timelineId)
+			const tl = this.timelines.get(timelineId || this._airTimelineId)
 			if (!tl) return false
 			const layer = tl.layers[layerIdx]
 			if (!layer) return false
@@ -143,7 +174,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 
 			clip.keyframes.sort((a, b) => a.time - b.time || String(a.property).localeCompare(String(b.property)))
 			this._emitChange()
-			if (this._pb?.timelineId === tl.id) this._applyAt(tl.id, ms, true)
+			if (this._airTimelineId === tl.id) this._applyAt(tl.id, ms, true)
 			return true
 		},
 
@@ -212,108 +243,144 @@ function applyPlaybackMixin(TimelineEngineClass) {
 
 		play(id, fromMs) {
 			const tl = this.timelines.get(id)
-			if (!tl) return
-			const wasPaused = this._pb?.timelineId === id && !this._pb?.playing && this._prevKey.size > 0
-			// Resume from server pause position — client `from` can lag WS ticks and would rewind a few frames.
-			const pos = wasPaused
-				? (this._pb.position ?? 0)
-				: fromMs != null
-					? fromMs
-					: this._pb?.timelineId === id
-						? this._pb.position
-						: 0
+			if (!tl) {
+				const msg = `[Timeline] play(${id}): timeline not on server`
+				if (typeof this.self?.log === 'function') this.self.log('warn', msg)
+				else console.warn(msg)
+				return
+			}
+			const cell = this._pbFor(id)
+			const prevAir = this._airTimelineId
+			const wasPausedResume = prevAir === id && this._canResumePlayback(id)
+
 			if (this._ticker) clearInterval(this._ticker)
-			if (wasPaused) {
-				this._resumeAll()
-			} else {
+
+			if (prevAir && prevAir !== id) {
+				const prevCell = this._pbFor(prevAir)
+				if (prevCell.playing) {
+					setCellPosition(prevCell, cellNowMs(prevCell))
+					prevCell.playing = false
+					this._emitPb(prevAir)
+				}
+				const prevTl = this.timelines.get(prevAir)
+				if (prevTl && this.self?.amcp) {
+					const prevCh = this._channelsFor(this._sendToFor(prevAir))
+					this._stopAll(prevTl, prevCh)
+				}
 				this._prevKey = new Map()
 				this._lastKfValues.clear()
 				this._lastKfSegment.clear()
 			}
-			this._lastTickPositionMs = undefined
-			this._pb = {
-				timelineId: id,
-				position: pos,
-				playing: true,
-				loop: this._pb?.loop ?? false,
-				sendTo: this._pb?.sendTo || { preview: true, program: false, screenIdx: 0 },
-				_t0: Date.now(),
-				_p0: pos,
+
+			const pos = wasPausedResume
+				? (cell.position ?? 0)
+				: fromMs != null
+					? fromMs
+					: cell.position ?? 0
+
+			this._airTimelineId = id
+			setCellPosition(cell, pos)
+			cell.playing = true
+
+			if (wasPausedResume) {
+				this._resumeAll()
+			} else {
+				if (prevAir === id) {
+					this._prevKey = new Map()
+					this._lastKfValues.clear()
+					this._lastKfSegment.clear()
+				}
+				this._applyAt(id, pos, true)
 			}
-			if (!wasPaused) this._applyAt(id, pos, true)
+
+			this._lastTickPositionMs = undefined
 			this._ticker = setInterval(() => this._tick(), TICK_MS)
-			this._emitPb()
+			this._emitPb(id)
 		},
 
 		pause(id) {
-			if (!this._pb || this._pb.timelineId !== id) return
-			if (this._ticker) {
-				clearInterval(this._ticker)
-				this._ticker = null
+			const cell = this._pbFor(id)
+			if (!cell.playing && this._airTimelineId !== id) return
+			if (this._airTimelineId === id) {
+				if (this._ticker) {
+					clearInterval(this._ticker)
+					this._ticker = null
+				}
+				this._lastTickPositionMs = undefined
+				const now = cellNowMs(cell)
+				setCellPosition(cell, now)
+				cell.playing = false
+				this._pauseAll()
+			} else {
+				setCellPosition(cell, cellNowMs(cell))
+				cell.playing = false
 			}
-			this._lastTickPositionMs = undefined
-			const now = this._nowMs()
-			this._pb = { ...this._pb, position: now, _p0: now, _t0: Date.now(), playing: false }
-			this._pauseAll()
-			this._emitPb()
+			this._emitPb(id)
 		},
 
 		stop(id, opts) {
-			if (!this._pb) return
-			if (this._ticker) {
-				clearInterval(this._ticker)
-				this._ticker = null
+			if (!id) return
+			const cell = this._pbFor(id)
+			if (this._airTimelineId === id) {
+				if (this._ticker) {
+					clearInterval(this._ticker)
+					this._ticker = null
+				}
+				this._lastTickPositionMs = undefined
+				const tl = this.timelines.get(id)
+				if (tl && !opts?.skipAmcp) this._stopAll(tl)
+				this._prevKey = new Map()
+				this._lastKfValues.clear()
+				this._lastKfSegment.clear()
+				this._airTimelineId = null
 			}
-			this._lastTickPositionMs = undefined
-			const saved = this._pb
-			this._pb = { ...saved, position: 0, playing: false, _p0: 0, _t0: Date.now() }
-			const tl = this.timelines.get(saved.timelineId)
-			if (tl && !opts?.skipAmcp) this._stopAll(tl)
-			this._prevKey = new Map()
-			this._lastKfValues.clear()
-			this._lastKfSegment.clear()
-			this._emitPb()
+			setCellPosition(cell, 0)
+			cell.playing = false
+			this._emitPb(id)
 		},
 
 		seek(id, ms) {
 			const tl = this.timelines.get(id)
 			if (!tl) return
+			const cell = this._pbFor(id)
 			const pos = Math.max(0, Math.min(ms, tl.duration))
-			if (!this._pb || this._pb.timelineId !== id) {
-				this._pb = {
-					timelineId: id,
-					position: pos,
-					playing: false,
-					loop: false,
-					// Keep last sendTo when switching timelines; else PRV-only default (same as transport).
-					sendTo: this._pb?.sendTo || { preview: true, program: false, screenIdx: 0 },
-					_t0: Date.now(),
-					_p0: pos,
-				}
-			} else {
-				const samePausedPos =
-					!this._pb.playing && Math.abs((this._pb.position ?? 0) - pos) < 1
-				this._pb = { ...this._pb, position: pos, _p0: pos, _t0: Date.now() }
-				if (this._pb.playing) this._lastTickPositionMs = pos
-				if (samePausedPos) {
-					this._emitPb()
-					return
-				}
+
+			if (this._airTimelineId !== id) {
+				setCellPosition(cell, pos)
+				cell.playing = false
+				this._emitPb(id)
+				return
+			}
+
+			const samePausedPos = !cell.playing && Math.abs((cell.position ?? 0) - pos) < 1
+			setCellPosition(cell, pos)
+			if (cell.playing) this._lastTickPositionMs = pos
+			if (samePausedPos) {
+				this._emitPb(id)
+				return
+			}
+			// While playing, Caspar runs at 1× — ignore redundant seeks at the same transport frame.
+			if (cell.playing && !this._timelineSeekFrameChanged(id, pos)) {
+				this._emitPb(id)
+				return
 			}
 			this._applyAt(id, pos, true)
-			this._emitPb()
+			this._emitPb(id)
 		},
 
-		setSendTo(sendTo) {
-			const oldCh = this._pb ? this._channelsFor(this._pb.sendTo) : []
-			if (!this._pb) this._pb = { position: 0, playing: false, loop: false, sendTo, _t0: Date.now(), _p0: 0 }
-			else this._pb = { ...this._pb, sendTo }
-			const newCh = this._channelsFor(sendTo)
-			const removed = oldCh.filter((c) => !newCh.includes(c))
-			if (removed.length > 0) {
-				const tl = this.timelines.get(this._pb?.timelineId)
-				const self = this.self
-				if (tl && self?.amcp) {
+		setSendTo(sendTo, timelineId) {
+			const tid = timelineId ?? this._airTimelineId
+			if (!tid) return
+			const tl = this.timelines.get(tid)
+			const oldSt = this._sendToFor(tid)
+			const oldCh = this._channelsFor(oldSt)
+			if (tl) tl.sendTo = { ...oldSt, ...sendTo }
+			const newSt = this._sendToFor(tid)
+			const newCh = this._channelsFor(newSt)
+			if (this._airTimelineId === tid) {
+				const removed = oldCh.filter((c) => !newCh.includes(c))
+				if (removed.length > 0 && tl && this.self?.amcp) {
+					const self = this.self
 					for (const ch of removed) {
 						for (let li = 0; li < tl.layers.length; li++) {
 							const caspLayer = this._caspLayer(ch, li)
@@ -329,58 +396,71 @@ function applyPlaybackMixin(TimelineEngineClass) {
 					}
 				}
 			}
-			this._emitPb()
+			this._emitPb(tid)
 		},
 
 		setLoop(id, loop) {
-			if (this._pb?.timelineId === id) this._pb = { ...this._pb, loop }
+			this._pbFor(id).loop = !!loop
+			this._emitPb(id)
 		},
 
-		getPlayback() {
-			if (!this._pb) return null
-			const { _t0, _p0, ...rest } = this._pb
-			return { ...rest, position: this._nowMs() }
+		getPlayback(id) {
+			const tid = id ?? this._airTimelineId
+			if (!tid) return null
+			const cell = this._pbFor(tid)
+			const { _t0, _p0, ...rest } = cell
+			return {
+				...rest,
+				timelineId: tid,
+				sendTo: this._sendToFor(tid),
+				position: cellNowMs(cell),
+			}
 		},
 
 		_tick() {
-			const pb = this._pb
-			if (!pb?.playing) return
-			const tl = this.timelines.get(pb.timelineId)
+			const airId = this._airTimelineId
+			if (!airId) return
+			const cell = this._pbFor(airId)
+			if (!cell.playing) return
+			const tl = this.timelines.get(airId)
 			if (!tl) return
-			let ms = this._nowMs()
-			const prevMs = this._lastTickPositionMs != null ? this._lastTickPositionMs : pb._p0
-			if (this._processTimelineFlags(pb.timelineId, prevMs, ms)) return
-			ms = this._nowMs()
+			let ms = cellNowMs(cell)
+			const prevMs = this._lastTickPositionMs != null ? this._lastTickPositionMs : cell._p0
+			if (this._processTimelineFlags(airId, prevMs, ms)) return
+			ms = cellNowMs(cell)
 			if (ms >= tl.duration) {
-				if (pb.loop) {
-					this.play(pb.timelineId, 0)
+				if (cell.loop) {
+					this.play(airId, 0)
 					return
 				}
-				this.stop(pb.timelineId)
+				this.stop(airId)
 				return
 			}
-			this._pb.position = ms
+			cell.position = ms
 			// UI tick updates playhead only; AMCP transport runs on clip/state changes (not every 40ms).
-			this._syncAmcpOnTimelineTick(pb.timelineId, ms)
-			this.emit('tick', { timelineId: pb.timelineId, position: ms })
+			this._syncAmcpOnTimelineTick(airId, ms)
+			this.emit('tick', { timelineId: airId, position: ms })
 			const ctx = this.self
 			if (ctx && typeof ctx._wsBroadcast === 'function') {
 				const t = Date.now()
 				if (!this._lastTimelineTickSent || t - this._lastTimelineTickSent >= TIMELINE_TICK_BROADCAST_MS) {
 					this._lastTimelineTickSent = t
-					ctx._wsBroadcast('timeline.tick', { timelineId: pb.timelineId, position: ms })
+					ctx._wsBroadcast('timeline.tick', { timelineId: airId, position: ms })
 				}
 			}
 			this._lastTickPositionMs = ms
 		},
 
-		_nowMs() {
-			if (!this._pb?.playing) return this._pb?.position ?? 0
-			return this._pb._p0 + (Date.now() - this._pb._t0)
+		_nowMs(id) {
+			const tid = id ?? this._airTimelineId
+			if (!tid) return 0
+			return cellNowMs(this._pbFor(tid))
 		},
 
-		_emitPb() {
-			this.emit('playback', this.getPlayback())
+		_emitPb(id) {
+			const tid = id ?? this._airTimelineId
+			if (!tid) return
+			this.emit('playback', this.getPlayback(tid))
 		},
 	})
 }

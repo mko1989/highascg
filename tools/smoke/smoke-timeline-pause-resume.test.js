@@ -59,7 +59,7 @@ function makeEngine() {
 	eng.pause(tl.id)
 	const pausedPos = eng.getPlayback().position
 	eng.play(tl.id, 1000)
-	assert.strictEqual(eng._pb._p0, pausedPos, 'resume must ignore stale client fromMs')
+	assert.strictEqual(eng._pbFor(tl.id)._p0, pausedPos, 'resume must ignore stale client fromMs')
 	eng.stop(tl.id, { skipAmcp: true })
 }
 

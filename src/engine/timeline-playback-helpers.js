@@ -108,8 +108,8 @@ const TICK_MS = 40
 /** WS `timeline.tick` throttle — client extrapolates between ticks; ~150–180ms reduces jitter over high-latency links. */
 const TIMELINE_TICK_BROADCAST_MS = 165
 /**
- * Stretched-timeline clips (file shorter than clip duration) need occasional SEEK to stay locked.
- * Separate from {@link TICK_MS} — transport AMCP must not run on every UI tick.
+ * Stretched-timeline clips (file shorter than clip duration) loop in Caspar via PLAY LOOP.
+ * CALL SEEK only on loop-boundary crossings — not every UI tick (see timeline-playback-amcp.js).
  */
 const TIMELINE_AMCP_DRIFT_MS = 500
 

@@ -10,7 +10,6 @@ const {
 	playAfSuffix,
 	timelineClipTransportStale,
 	TIMELINE_LAYER_BASE,
-	TIMELINE_AMCP_DRIFT_MS,
 } = require('./timeline-playback-helpers')
 const {
 	mergedFillKeyframeTimes,
@@ -37,14 +36,60 @@ function clipTransportMeta(clip, ms, tl, self, opts = {}) {
 		isRoute: transport.isRoute,
 		frame: transport.frame,
 		implicitLoop: transport.implicitLoop,
+		loopSpanFrames: transport.loopSpanFrames,
+		inFrames: transport.inFrames,
 		loopClip: !!(clip.loopAlways || clip.loop),
 		loopAlways: !!clip.loopAlways,
 	}
 }
 
 module.exports = {
+	_canResumePlayback(id) {
+		if (this._airTimelineId !== id) return false
+		const cell = this._pbFor(id)
+		if (cell.playing || this._prevKey.size === 0) return false
+		const tl = this.timelines.get(id)
+		if (!tl) return false
+		const ms = cell.position ?? 0
+		const channels = this._channels()
+		for (let li = 0; li < tl.layers.length; li++) {
+			const clip = this._clipAt(tl.layers[li], ms)
+			if (!clip) continue
+			for (const ch of channels) {
+				const key = `${ch}-${this._caspLayer(ch, li)}`
+				const prev = this._prevKey.get(key)
+				if (!prev?.clipId || prev.clipId !== clip.id) return false
+			}
+		}
+		return true
+	},
+
 	_caspLayer(_ch, li) {
 		return TIMELINE_LAYER_BASE + li
+	},
+
+	/** True when an explicit seek would change Caspar transport frame on any active layer. */
+	_timelineSeekFrameChanged(id, ms) {
+		const tl = this.timelines.get(id)
+		if (!tl) return false
+		const channels = this._channels()
+		for (let li = 0; li < tl.layers.length; li++) {
+			const clip = this._clipAt(tl.layers[li], ms)
+			if (!clip) continue
+			for (const ch of channels) {
+				const caspLayer = this._caspLayer(ch, li)
+				const key = `${ch}-${caspLayer}`
+				const prev = this._prevKey.get(key)
+				const meta = clipTransportMeta(clip, ms, tl, this.self, {
+					atEntry: false,
+					channel: ch,
+					physicalLayer: caspLayer,
+				})
+				if (!prev?.clipId || prev.clipId !== clip.id) return true
+				if (prev.frame !== meta.frame) return true
+			}
+		}
+		return false
 	},
 
 	/**
@@ -54,30 +99,29 @@ module.exports = {
 	 * @param {boolean} force scrub / explicit seek — sends PLAY|LOAD|SEEK for active clips
 	 */
 	_applyAt(id, ms, force) {
-		this._syncAmcpLayers(id, ms, { force: !!force, allowDriftSeek: false })
+		this._syncAmcpLayers(id, ms, { force: !!force })
 	},
 
 	/**
-	 * Called from {@link TimelineEngine#_tick} only — clip enter/exit, throttled drift SEEK for stretched clips,
-	 * and keyframed mixer once per keyframe segment (tween duration = ms to end keyframe). Does not PLAY/SEEK every tick.
+	 * Called from {@link TimelineEngine#_tick} only — clip enter/exit and keyframed mixer segments.
+	 * Does not PLAY/SEEK every tick (stretched clips loop via PLAY LOOP on transport start).
 	 */
 	_syncAmcpOnTimelineTick(id, ms) {
-		this._syncAmcpLayers(id, ms, { force: false, allowDriftSeek: true })
+		this._syncAmcpLayers(id, ms, { force: false })
 	},
 
 	/**
 	 * @param {string} id
 	 * @param {number} ms
-	 * @param {{ force?: boolean, allowDriftSeek?: boolean }} opts
+	 * @param {{ force?: boolean }} opts
 	 */
 	_syncAmcpLayers(id, ms, opts) {
 		const tl = this.timelines.get(id)
 		const self = this.self
 		if (!tl || !self?.amcp) return
 		const force = !!opts.force
-		const allowDriftSeek = !!opts.allowDriftSeek
 		const channels = this._channels()
-		const playing = this._pb?.playing ?? false
+		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
 
 		for (let li = 0; li < tl.layers.length; li++) {
@@ -96,18 +140,18 @@ module.exports = {
 					const atEntry = transportStale && !force
 					const transportOpts = { atEntry, channel: ch, physicalLayer: caspLayer }
 					const meta = clipTransportMeta(clip, ms, tl, self, transportOpts)
-					const driftMeta = atEntry ? meta : clipTransportMeta(clip, ms, tl, self, { atEntry: false, channel: ch, physicalLayer: caspLayer })
-					// Full STOP+PLAY only when clip/route changes, first load, or seek while playing.
-					// Paused scrub on an already-loaded clip uses CALL SEEK to avoid a black flash.
+					// Full STOP+PLAY on clip/route change, first load, or play()/seek while transport running.
 					const needsFullTransport = transportStale || (force && playing)
-					const needsPausedSeek =
+					const needsScrubSeek =
 						force &&
-						!playing &&
 						prev?.clipId === clip.id &&
 						!transportStale &&
 						prev.frame !== meta.frame &&
 						!meta.isRoute &&
 						!meta.loopAlways
+					const needsPausedSeek = needsScrubSeek && !playing
+					// Playing scrub: STOP+PLAY once at the new frame — never CALL SEEK (decoder stutter).
+					const needsPlayingScrub = needsScrubSeek && playing
 					let transportSent = false
 
 					if (meta.loopAlways) {
@@ -121,25 +165,9 @@ module.exports = {
 					} else if (needsPausedSeek) {
 						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(() => {})
 						transportSent = true
-					} else if (
-						allowDriftSeek &&
-						playing &&
-						driftMeta.implicitLoop &&
-						!driftMeta.isRoute &&
-						prev?.clipId === clip.id
-					) {
-						const now = Date.now()
-						const driftDue = !prev.lastDriftAt || now - prev.lastDriftAt >= TIMELINE_AMCP_DRIFT_MS
-						if (driftDue && prev.frame !== driftMeta.frame) {
-							self.amcp.call(ch, caspLayer, 'SEEK', String(driftMeta.frame)).catch(() => {})
-							transportSent = true
-							this._prevKey.set(key, {
-								clipId: clip.id,
-								audioRoute: clipAudioRoute(clip),
-								frame: driftMeta.frame,
-								lastDriftAt: now,
-							})
-						}
+					} else if (needsPlayingScrub) {
+						this._sendClipTransport(ch, caspLayer, clip, meta, { playing: true, startTransport: true })
+						transportSent = true
 					}
 
 					if (transportSent && (force || transportStale)) {
@@ -156,11 +184,10 @@ module.exports = {
 							clipId: clip.id,
 							audioRoute: clipAudioRoute(clip),
 							frame: transportSent ? meta.frame : (prev?.frame ?? meta.frame),
-							lastDriftAt:
-								transportSent && driftMeta.implicitLoop
-									? Date.now()
-									: prev?.lastDriftAt,
 						})
+					} else if (playing && !force && prev?.clipId === clip.id) {
+						// Track expected file frame during 1× play without CALL SEEK every tick.
+						this._prevKey.set(key, { ...prev, frame: meta.frame })
 					}
 
 					if (
@@ -195,7 +222,7 @@ module.exports = {
 	 */
 	_programLayoutForPlayback() {
 		const { resolveConfigProgramLayout } = require('./audio-route')
-		const screenIdx = this._pb?.sendTo?.screenIdx
+		const screenIdx = this._sendToFor(this._airTimelineId)?.screenIdx
 		const mainIndex =
 			screenIdx === null || screenIdx === 'all' || screenIdx === undefined
 				? 0
@@ -236,7 +263,7 @@ module.exports = {
 			if (meta.isRoute) {
 				self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${afSuffix}`).catch(() => {})
 			} else if (playing || meta.loopClip) {
-				const loopStr = meta.loopClip ? ' LOOP' : ''
+				const loopStr = meta.loopClip || meta.implicitLoop ? ' LOOP' : ''
 				self.amcp
 					.raw(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`)
 					.catch(() => {})
@@ -470,7 +497,7 @@ module.exports = {
 	},
 
 	_channels() {
-		return this._channelsFor(this._pb?.sendTo)
+		return this._channelsFor(this._sendToFor(this._airTimelineId))
 	},
 
 	_timelineLayerIndex(caspLayer) {
@@ -481,9 +508,10 @@ module.exports = {
 	_pauseAll() {
 		const self = this.self
 		if (!self?.amcp) return
-		const tl = this.timelines.get(this._pb?.timelineId)
+		const airId = this._airTimelineId
+		const tl = airId ? this.timelines.get(airId) : null
 		if (!tl) return
-		const ms = this._nowMs()
+		const ms = this._nowMs(airId)
 		for (const key of this._prevKey.keys()) {
 			const [ch, caspLayer] = key.split('-').map(Number)
 			if (isNaN(ch) || isNaN(caspLayer)) continue
@@ -499,9 +527,10 @@ module.exports = {
 	_resumeAll() {
 		const self = this.self
 		if (!self?.amcp) return
-		const tl = this.timelines.get(this._pb?.timelineId)
+		const airId = this._airTimelineId
+		const tl = airId ? this.timelines.get(airId) : null
 		if (!tl) return
-		const ms = this._nowMs()
+		const ms = this._nowMs(airId)
 		for (const key of this._prevKey.keys()) {
 			const [ch, caspLayer] = key.split('-').map(Number)
 			if (isNaN(ch) || isNaN(caspLayer)) continue
@@ -514,10 +543,10 @@ module.exports = {
 		}
 	},
 
-	_stopAll(tl) {
+	_stopAll(tl, channelsOverride) {
 		const self = this.self
 		if (!self?.amcp) return
-		const channels = this._channels()
+		const channels = channelsOverride ?? this._channels()
 		for (let li = 0; li < tl.layers.length; li++) {
 			for (const ch of channels) {
 				self.amcp.stop(ch, this._caspLayer(ch, li)).catch(() => {})

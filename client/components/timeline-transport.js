@@ -13,7 +13,7 @@ import { resolveTransitionDuration, transitionDurationForFps } from '../lib/tran
  * @param {object} deps
  * @param {HTMLElement} deps.transportEl
  * @param {import('../lib/state-store.js').StateStore} deps.stateStore
- * @param {object} deps.playback - mutated in place
+ * @param {() => object} deps.getPlayback - active timeline playback (mutated in place)
  * @param {object} deps.view
  * @param {ReturnType<import('./timeline-canvas.js').initTimelineCanvas>} deps.canvas
  * @param {() => void} deps.redrawTimelineView
@@ -23,12 +23,13 @@ import { resolveTransitionDuration, transitionDurationForFps } from '../lib/tran
  * @param {() => void} [deps.maybeFollowPlayhead]
  * @param {(v: object|null) => void} [deps.setSelectedClip]
  * @param {(v: object|null) => void} [deps.setSelectedFlagDetail]
+ * @param {(nextId: string) => void | Promise<void>} [deps.onTimelineSwitch]
  */
 export function createTimelineTransport(deps) {
 	const {
 		transportEl,
 		stateStore,
-		playback,
+		getPlayback,
 		view,
 		canvas,
 		redrawTimelineView,
@@ -38,6 +39,7 @@ export function createTimelineTransport(deps) {
 		maybeFollowPlayhead,
 		setSelectedClip,
 		setSelectedFlagDetail,
+		onTimelineSwitch,
 	} = deps
 
 	async function syncToServer(tl) {
@@ -61,6 +63,7 @@ export function createTimelineTransport(deps) {
 	function updateTimecode() {
 		const tl = timelineState.getActive()
 		const fps = tl?.fps || 25
+		const playback = getPlayback()
 		const tcCur = document.getElementById('tl-tc-cur')
 		const tcTot = document.getElementById('tl-tc-tot')
 		if (tcCur && !tcCur.matches(':focus')) tcCur.value = fmtSmpte(playback.position, fps)
@@ -70,6 +73,7 @@ export function createTimelineTransport(deps) {
 	async function doSeek(ms) {
 		const tl = timelineState.getActive()
 		if (!tl) return
+		const playback = getPlayback()
 		playback.position = ms
 		canvas.setPlayheadPosition(ms)
 		maybeFollowPlayhead?.()
@@ -90,6 +94,7 @@ export function createTimelineTransport(deps) {
 	async function togglePlay() {
 		const tl = timelineState.getActive()
 		if (!tl) return
+		const playback = getPlayback()
 		if (playback.playing) {
 			playback.playing = false
 			stopPlaybackLoop()
@@ -97,17 +102,17 @@ export function createTimelineTransport(deps) {
 			redrawTimelineView()
 			await api.post(`/api/timelines/${tl.id}/pause`).catch(() => {})
 		} else {
-			const resumingFromPause = playback.timelineId === tl.id && !playback.playing
-			// Skip redundant PUT on resume — it used to force CALL SEEK + full mixer reset while paused.
-			if (!resumingFromPause) {
-				await syncToServer(tl)
-			}
-			await api.post(`/api/timelines/${tl.id}/sendto`, view.sendTo).catch(() => {})
 			const fromMs = Math.max(0, Math.round(playback.position))
 			playback.position = fromMs
-			// Ruler/keyboard seek while paused already synced frames — RESUME only, no STOP+PLAY flash.
-			if (!resumingFromPause) {
-				await api.post(`/api/timelines/${tl.id}/seek`, { ms: fromMs }).catch(() => {})
+			canvas.setPlayheadPosition(fromMs)
+			try {
+				await syncToServer(tl)
+				await api.post(`/api/timelines/${tl.id}/seek`, { ms: fromMs })
+				await api.post(`/api/timelines/${tl.id}/sendto`, view.sendTo)
+				await api.post(`/api/timelines/${tl.id}/play`, { from: fromMs, sendTo: view.sendTo })
+			} catch (err) {
+				console.warn('[Timeline] play failed:', err?.message || err)
+				return
 			}
 			setServerTick(fromMs)
 			playback.playing = true
@@ -115,14 +120,13 @@ export function createTimelineTransport(deps) {
 			buildTransport()
 			startPlaybackLoop()
 			redrawTimelineView()
-			const playBody = resumingFromPause ? { sendTo: view.sendTo } : { from: fromMs, sendTo: view.sendTo }
-			await api.post(`/api/timelines/${tl.id}/play`, playBody).catch(() => {})
 		}
 	}
 
 	async function doStop() {
 		const tl = timelineState.getActive()
 		if (!tl) return
+		const playback = getPlayback()
 		playback.playing = false
 		stopPlaybackLoop()
 		playback.position = 0
@@ -144,6 +148,7 @@ export function createTimelineTransport(deps) {
 		const fps = projectFps()
 		const defaultDur = transitionDurationForFps(fps)
 		const tl = timelineState.getActive()
+		const playback = getPlayback()
 		if (view.takeTransition?.type) {
 			view.takeTransition.type = migrateTransitionTypeToAnimate(view.takeTransition.type)
 		}
@@ -166,6 +171,7 @@ export function createTimelineTransport(deps) {
 			<div class="tl-tb">
 				<div class="tl-tb-group">
 					<select class="tl-select" id="tl-select">${tlSelector}</select>
+					<button class="tl-btn" id="tl-rename-tl" title="Rename timeline">✎</button>
 					<button class="tl-btn" id="tl-new-tl" title="New timeline">+</button>
 				</div>
 				<div class="tl-tb-group tl-tb-transport">
@@ -223,9 +229,21 @@ export function createTimelineTransport(deps) {
 				Object.assign(view.sendTo, timelineState.getSendTo(next.id))
 				await updateSendTo()
 			}
+			await onTimelineSwitch?.(e.target.value)
 			buildTransport()
 			canvas.zoomFit()
 			redrawTimelineView()
+		})
+		transportEl.querySelector('#tl-rename-tl')?.addEventListener('click', () => {
+			const t = timelineState.getActive()
+			if (!t) return
+			const newName = prompt('Rename timeline', t.name)
+			if (newName != null && newName.trim()) {
+				timelineState.updateTimeline(t.id, { name: newName.trim() })
+				syncToServer(timelineState.getActive())
+				buildTransport()
+				redrawTimelineView()
+			}
 		})
 		transportEl.querySelector('#tl-new-tl')?.addEventListener('click', () => {
 			timelineState.createTimeline({ name: `Timeline ${timelineState.timelines.length + 1}` })
@@ -237,6 +255,7 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-play')?.addEventListener('click', togglePlay)
 		transportEl.querySelector('#tl-stop')?.addEventListener('click', doStop)
 		transportEl.querySelector('#tl-loop')?.addEventListener('click', async () => {
+			const playback = getPlayback()
 			playback.loop = !playback.loop
 			buildTransport()
 			const t = timelineState.getActive()
@@ -245,6 +264,7 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-add-flag')?.addEventListener('click', () => {
 			const t = timelineState.getActive()
 			if (!t) return
+			const playback = getPlayback()
 			const flag = timelineState.addFlag(t.id, { timeMs: Math.round(playback.position), type: 'pause' })
 			if (!flag) return
 			setSelectedClip?.(null)

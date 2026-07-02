@@ -203,9 +203,10 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 			}
 			im.onerror = () => {
 				thumbCache.set(thumbUrl, 'error')
+				schedDraw?.()
 			}
 			im.src = thumbUrl
-		} else if (img && img !== 'loading' && img !== 'error') {
+		} else if (img && img !== 'loading' && img !== 'error' && img.complete && img.naturalWidth > 0) {
 			ctx.save()
 			ctx.beginPath()
 			roundRect(ctx, tx, ty, thumbSize, thumbSize, 2)

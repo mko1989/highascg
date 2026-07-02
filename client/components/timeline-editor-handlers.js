@@ -102,6 +102,11 @@ export function createTimelineCanvasHandlers(deps) {
 			const clamped = Math.max(0, Math.min(ms, tl.duration))
 			applySeekPosition(clamped)
 			maybeFollowPlayhead?.()
+			// During play, UI-only until mouseup — server CALL SEEK every 100ms stutters Caspar decode.
+			if (getPlayback().playing) {
+				redrawTimelineView()
+				return
+			}
 			// Throttle SEEK API during drag (~100ms) to avoid flooding CasparCG
 			const now = Date.now()
 			if (!_seekThrottleLast || now - _seekThrottleLast >= 100) {
@@ -208,10 +213,14 @@ export function createTimelineCanvasHandlers(deps) {
 				}
 			})()
 		},
-		onMoveClip(layerIdx, clipId, newStartTime) {
+		onMoveClip(layerIdx, clipId, newStartTime, targetLayerIdx) {
 			const tl = timelineState.getActive()
 			if (!tl) return
-			timelineState.updateClip(tl.id, layerIdx, clipId, { startTime: newStartTime })
+			const actualLayerIdx = targetLayerIdx != null ? targetLayerIdx : layerIdx
+			if (targetLayerIdx != null && targetLayerIdx !== layerIdx) {
+				timelineState.moveClipToLayer(tl.id, clipId, layerIdx, targetLayerIdx)
+			}
+			timelineState.updateClip(tl.id, actualLayerIdx, clipId, { startTime: newStartTime })
 			// Sync deferred to mouseup — avoid flooding API during drag
 		},
 		onResizeClip(layerIdx, clipId, changes) {
@@ -226,19 +235,21 @@ export function createTimelineCanvasHandlers(deps) {
 			const clamped = Math.max(0, Math.min(timelineMs, tl.duration))
 			pb.position = clamped
 			updateTimecode()
-			const now = Date.now()
-			if (!_seekThrottleLast || now - _seekThrottleLast >= 100) {
-				_seekThrottleLast = now
-				if (_seekThrottleId) clearTimeout(_seekThrottleId)
-				_seekThrottleId = null
-				api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
-			} else if (!_seekThrottleId) {
-				_seekThrottleId = setTimeout(() => {
+			if (!pb.playing) {
+				const now = Date.now()
+				if (!_seekThrottleLast || now - _seekThrottleLast >= 100) {
+					_seekThrottleLast = now
+					if (_seekThrottleId) clearTimeout(_seekThrottleId)
 					_seekThrottleId = null
-					_seekThrottleLast = Date.now()
-					const t = timelineState.getActive()
-					if (t) api.post(`/api/timelines/${t.id}/seek`, { ms: getPlayback().position }).catch(notifyTimelineSeekFailed)
-				}, 100)
+					api.post(`/api/timelines/${tl.id}/seek`, { ms: clamped }).catch(notifyTimelineSeekFailed)
+				} else if (!_seekThrottleId) {
+					_seekThrottleId = setTimeout(() => {
+						_seekThrottleId = null
+						_seekThrottleLast = Date.now()
+						const t = timelineState.getActive()
+						if (t) api.post(`/api/timelines/${t.id}/seek`, { ms: getPlayback().position }).catch(notifyTimelineSeekFailed)
+					}, 100)
+				}
 			}
 			redrawTimelineView()
 			getPreviewPanel()?.scheduleDraw?.()
@@ -314,6 +325,16 @@ export function createTimelineCanvasHandlers(deps) {
 				const pb = getPlayback()
 				api.post(`/api/timelines/${tl.id}/seek`, { ms: pb.position }).catch(notifyTimelineSeekFailed)
 			})
+		},
+		onMoveLayer(fromIdx, toIdx) {
+			const tl = timelineState.getActive()
+			if (!tl) return
+			timelineState.reorderLayer(tl.id, fromIdx, toIdx)
+		},
+		onLayerDragEnd(timelineId) {
+			const tl = timelineState.getActive()
+			if (!tl || tl.id !== timelineId) return
+			void getSyncToServer()(tl)
 		},
 		onClipDragEnd(timelineId) {
 			const tl = timelineState.getActive()

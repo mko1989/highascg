@@ -18,7 +18,10 @@ class TimelineEngine extends EventEmitter {
 		super()
 		this.self = self
 		this.timelines = new Map()
-		this._pb = null
+		/** @type {Map<string, { position: number, playing: boolean, loop: boolean, _t0: number, _p0: number }>} */
+		this._playbackById = new Map()
+		/** Timeline id currently driving AMCP + ticker (only one on air at a time). */
+		this._airTimelineId = null
 		this._ticker = null
 		this._prevKey = new Map()
 		this._lastKfValues = new Map()
@@ -58,29 +61,30 @@ class TimelineEngine extends EventEmitter {
 		if (!this.timelines.has(id)) return null
 		const updated = { ...tl, id }
 		this.timelines.set(id, updated)
-		if (updated.sendTo && typeof updated.sendTo === 'object' && this._pb?.timelineId === id) {
-			this.setSendTo(updated.sendTo)
+		if (updated.sendTo && typeof updated.sendTo === 'object' && this._airTimelineId === id) {
+			this.setSendTo(updated.sendTo, id)
 		}
 		this._emitChange()
 		// Clip edits (e.g. audioRoute) must refresh PLAY/LOAD+AF while this timeline is on air.
 		// Never force=true here — redundant PUTs (sync before resume, mouseup) must not CALL SEEK or STOP+PLAY.
 		// Stale transport / changed mixer values are picked up via timelineClipTransportStale and value diffs.
-		if (this._pb?.timelineId === id && this.self?.amcp) {
+		if (this._airTimelineId === id && this.self?.amcp) {
 			const ms = this._nowMs()
-			this._syncAmcpLayers(id, ms, { force: false, allowDriftSeek: false })
+			this._syncAmcpLayers(id, ms, { force: false })
 		}
 		return this.timelines.get(id)
 	}
 
 	delete(id) {
-		if (this._pb?.timelineId === id) this.stop(id)
+		if (this._airTimelineId === id) this.stop(id)
+		this._playbackById.delete(id)
 		this.timelines.delete(id)
 		this._emitChange()
 	}
 
 	/** Program canvas size for current playback sendTo (screen index). */
 	_programResolutionForPlayback() {
-		const screenIdx = this._pb?.sendTo?.screenIdx ?? 0
+		const screenIdx = this._sendToFor(this._airTimelineId)?.screenIdx ?? 0
 		return getProgramResolutionForScreen(this.self, screenIdx)
 	}
 

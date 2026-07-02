@@ -258,6 +258,23 @@ class TimelineStateManager {
 
 	// ── Layer ops ─────────────────────────────────────────────────────────────
 
+	reorderLayer(id, fromIdx, toIdx) {
+		const tl = this.getTimeline(id)
+		if (!tl || fromIdx < 0 || fromIdx >= tl.layers.length || toIdx < 0 || toIdx >= tl.layers.length) return false
+		if (fromIdx === toIdx) return true
+		
+		const layer = tl.layers.splice(fromIdx, 1)[0]
+		tl.layers.splice(toIdx, 0, layer)
+		
+		if (Array.isArray(tl.layerHeights)) {
+			const h = tl.layerHeights.splice(fromIdx, 1)[0]
+			tl.layerHeights.splice(toIdx, 0, h)
+		}
+		
+		this._save()
+		return true
+	}
+
 	addLayer(id, name) {
 		const tl = this.getTimeline(id)
 		if (!tl) return null
@@ -298,6 +315,18 @@ class TimelineStateManager {
 	}
 
 	// ── Clip ops ──────────────────────────────────────────────────────────────
+
+	moveClipToLayer(id, clipId, fromLayerIdx, toLayerIdx) {
+		const tl = this.getTimeline(id)
+		if (!tl || !tl.layers[fromLayerIdx] || !tl.layers[toLayerIdx]) return null
+		const fromLayer = tl.layers[fromLayerIdx]
+		const clipIdx = fromLayer.clips.findIndex(c => c.id === clipId)
+		if (clipIdx < 0) return null
+		const clip = fromLayer.clips.splice(clipIdx, 1)[0]
+		tl.layers[toLayerIdx].clips.push(clip)
+		this._save()
+		return clip
+	}
 
 	addClip(id, layerIdx, source, startTime, duration) {
 		const tl = this.getTimeline(id)
