@@ -8,13 +8,32 @@ import { getWsUrl } from './api-origin.js'
 
 export { getWsUrl } from './api-origin.js'
 
+/**
+ * Exponential backoff with jitter for reconnect scheduling (WO-104).
+ * @param {number} attempt 1-based reconnect attempt
+ * @param {{ baseInterval?: number, maxInterval?: number, jitterMax?: number }} [opts]
+ */
+export function computeWsReconnectDelay(attempt, opts = {}) {
+	const baseInterval = opts.baseInterval ?? 1000
+	const maxInterval = opts.maxInterval ?? 30000
+	const jitterMax = opts.jitterMax ?? 1000
+	const n = Math.max(1, attempt)
+	const exp = Math.min(maxInterval, baseInterval * 2 ** Math.min(n - 1, 5))
+	const jitter = Math.floor(Math.random() * Math.min(jitterMax, exp * 0.2))
+	return exp + jitter
+}
+
 export class WsClient {
 	constructor(options = {}) {
 		this.url = options.url || getWsUrl()
-		this.reconnectInterval = options.reconnectInterval ?? 3000
-		this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10
+		this.reconnectInterval = options.reconnectInterval ?? 1000
+		this.maxReconnectInterval = options.maxReconnectInterval ?? 30000
+		this.maxReconnectAttempts = options.maxReconnectAttempts ?? Infinity
+		this.amcpTimeoutMs = options.amcpTimeoutMs ?? 10000
 		this.ws = null
 		this.reconnectAttempts = 0
+		this._reconnectTimer = null
+		this._stopped = false
 		this.listeners = new Map()
 		this._connect()
 	}
@@ -46,19 +65,38 @@ export class WsClient {
 		this._send(obj)
 	}
 
-	sendAmcp(cmd) {
-		return new Promise((resolve) => {
-			const id = Date.now() + '-' + Math.random().toString(36).slice(2)
-			let unsub
+	_waitAmcpResult(id, timeoutMs = this.amcpTimeoutMs) {
+		return new Promise((resolve, reject) => {
+			let unsub = null
+			let timer = null
+			const cleanup = () => {
+				if (unsub) {
+					unsub()
+					unsub = null
+				}
+				if (timer) {
+					clearTimeout(timer)
+					timer = null
+				}
+			}
 			const handler = (msg) => {
 				if (msg.type === 'amcp_result' && msg.id === id) {
-					if (unsub) unsub()
+					cleanup()
 					resolve(msg.data)
 				}
 			}
 			unsub = this.on('message', handler)
-			this._send({ type: 'amcp', cmd, id })
+			timer = setTimeout(() => {
+				cleanup()
+				reject(new Error(`AMCP timeout after ${timeoutMs}ms`))
+			}, timeoutMs)
 		})
+	}
+
+	sendAmcp(cmd) {
+		const id = Date.now() + '-' + Math.random().toString(36).slice(2)
+		this._send({ type: 'amcp', cmd, id })
+		return this._waitAmcpResult(id)
 	}
 
 	/**
@@ -67,18 +105,9 @@ export class WsClient {
 	 * @returns {Promise<unknown>}
 	 */
 	sendAmcpStructured(payload) {
-		return new Promise((resolve) => {
-			const id = Date.now() + '-' + Math.random().toString(36).slice(2)
-			let unsub
-			const handler = (msg) => {
-				if (msg.type === 'amcp_result' && msg.id === id) {
-					if (unsub) unsub()
-					resolve(msg.data)
-				}
-			}
-			unsub = this.on('message', handler)
-			this._send({ ...payload, id })
-		})
+		const id = Date.now() + '-' + Math.random().toString(36).slice(2)
+		this._send({ ...payload, id })
+		return this._waitAmcpResult(id)
 	}
 
 	_connect() {
@@ -126,13 +155,26 @@ export class WsClient {
 	}
 
 	_reconnect() {
-		if (this.reconnectAttempts >= this.maxReconnectAttempts) return
+		if (this._stopped) return
+		if (Number.isFinite(this.maxReconnectAttempts) && this.reconnectAttempts >= this.maxReconnectAttempts) return
 		this.reconnectAttempts++
-		setTimeout(() => this._connect(), this.reconnectInterval)
+		const delay = computeWsReconnectDelay(this.reconnectAttempts, {
+			baseInterval: this.reconnectInterval,
+			maxInterval: this.maxReconnectInterval,
+		})
+		if (this._reconnectTimer) clearTimeout(this._reconnectTimer)
+		this._reconnectTimer = setTimeout(() => {
+			this._reconnectTimer = null
+			this._connect()
+		}, delay)
 	}
 
 	close() {
-		this.maxReconnectAttempts = 0
+		this._stopped = true
+		if (this._reconnectTimer) {
+			clearTimeout(this._reconnectTimer)
+			this._reconnectTimer = null
+		}
 		if (this.ws) {
 			this.ws.close()
 			this.ws = null
@@ -141,8 +183,12 @@ export class WsClient {
 
 	/** Force a fresh connection (e.g. after login sets session cookie). */
 	reconnectNow() {
+		this._stopped = false
 		this.reconnectAttempts = 0
-		if (this.maxReconnectAttempts <= 0) this.maxReconnectAttempts = 10
+		if (this._reconnectTimer) {
+			clearTimeout(this._reconnectTimer)
+			this._reconnectTimer = null
+		}
 		if (this.ws) {
 			try {
 				this.ws.close()
@@ -158,4 +204,3 @@ export class WsClient {
 		return this.ws && this.ws.readyState === WebSocket.OPEN
 	}
 }
-

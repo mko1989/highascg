@@ -2,6 +2,7 @@ import { multiviewState } from '../lib/multiview-state.js'
 import { api } from '../lib/api-client.js'
 import { linearGainToCasparDb } from '../lib/audio-volume-scale.js'
 import { streamState } from '../lib/stream-state.js'
+import { getAppStateStore } from '../lib/app-runtime.js'
 
 export async function applyMultiviewAudioFocus() {
 	const cells = multiviewState.getCells()
@@ -9,7 +10,7 @@ export async function applyMultiviewAudioFocus() {
 	if (!targetId) return
 
 	const n = multiviewState.currentIndex || 1
-	const cm = (window.stateStore?.getState()?.channelMap || {})
+	const cm = (getAppStateStore()?.getState()?.channelMap || {})
 	const mvChs = Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : [])
 	const MV_CH = mvChs[n - 1] || 3
 

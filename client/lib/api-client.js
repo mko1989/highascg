@@ -4,6 +4,7 @@
  */
 
 import { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
+import { getAppStateStore } from './app-runtime.js'
 
 export { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
 
@@ -15,7 +16,7 @@ function requestBase() {
 
 /** @param {string} path Absolute path starting with `/api/` */
 export async function apiGet(path) {
-	if (path === '/api/media' && window.stateStore?.isOffline?.()) {
+	if (path === '/api/media' && getAppStateStore()?.isOffline?.()) {
 		const placeholders = window.placeholderState?.getAll() || []
 		try {
 			const res = await fetch(requestBase() + path, FETCH_CREDENTIALS)

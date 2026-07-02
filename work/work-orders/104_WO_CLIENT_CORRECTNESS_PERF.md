@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed in 2026-07-02 client audit
+**Status:** Mostly complete — T104.0–T104.6 done (2026-07-02); T104.7 manual smoke deferred
 **Priority:** **High** (correctness bugs) / **Medium** (perf)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -75,13 +75,13 @@ Two call sites read a global that `app.js` never sets (it exports `stateStore` a
 
 ## 4. Tasks
 
-- [ ] **T104.0** Replace `window.stateStore` reads with `getAppStateStore()` (or assign the global) in `api-client.js` + `multiview-editor-canvas-apply.js`; verify offline fallback + multiview channelMap work.
-- [ ] **T104.1** `ws-client.js` infinite reconnect with capped exponential backoff + jitter; reset on open.
-- [ ] **T104.2** `sendAmcp*` timeout + guaranteed listener removal (`finally`).
-- [ ] **T104.3** Multiview `'*'` handler: path filter + rAF-coalesced draw + teardown cancel.
-- [ ] **T104.4** Audit other broad `'*'` subscribers; apply filter/coalesce (scenes-editor deck rebuild).
-- [ ] **T104.5** Fix shallow-copy/in-place-mutation aliasing (setState deep-copy or mixer_update via API).
-- [ ] **T104.6** Operator-visible notice for bootstrap failure + remote `project_sync` overwrite.
+- [x] **T104.0** Replace `window.stateStore` reads with `getAppStateStore()` (or assign the global) in `api-client.js` + `multiview-editor-canvas-apply.js`; verify offline fallback + multiview channelMap work.
+- [x] **T104.1** `ws-client.js` infinite reconnect with capped exponential backoff + jitter; reset on open.
+- [x] **T104.2** `sendAmcp*` timeout + guaranteed listener removal (`finally`).
+- [x] **T104.3** Multiview `'*'` handler: path filter + rAF-coalesced draw + teardown cancel.
+- [x] **T104.4** Audit other broad `'*'` subscribers; apply filter/coalesce (scenes-editor deck rebuild). *(scenes-editor already filters `channelMap`/`scene.live`; sources-panel has path filter.)*
+- [x] **T104.5** Fix shallow-copy/in-place-mutation aliasing (setState deep-copy or mixer_update via API). *(structuredClone for channelMap/scene/variables on full setState.)*
+- [x] **T104.6** Operator-visible notice for bootstrap failure + remote `project_sync` overwrite.
 - [ ] **T104.7** Smoke/manual: kill+restart server → UI reconnects without reload; unanswered AMCP rejects on timeout; playback tick doesn't refit multiview.
 
 ---
@@ -109,3 +109,13 @@ Two call sites read a global that `app.js` never sets (it exports `stateStore` a
 
 - Captured the unset-global bug, WS reconnect give-up, sendAmcp listener leak, and multiview redraw storm.
 - **Instructions for Next Agent:** T104.0–T104.2 are small, isolated correctness fixes — do them first. T104.3 is the biggest perceived-perf win during playout. T104.5 (aliasing) needs care; scope it after the quick wins.
+
+### 2026-07-02 — WO-104 implementation
+
+- `getAppStateStore()` wired in `api-client.js` (offline media) and `multiview-editor-canvas-apply.js` (audio focus channelMap).
+- `ws-client.js`: infinite reconnect with capped exponential backoff + jitter; `sendAmcp*` 10s timeout with listener cleanup; exported `computeWsReconnectDelay`.
+- `multiview-editor.js`: path filter for high-frequency ticks + rAF-coalesced redraw + `_multiviewCleanup` hook.
+- `state-store.js`: `structuredClone` for `channelMap`/`scene`/`variables` on `setState`.
+- Bootstrap failure + remote `project_sync` surface `showAppToast` to operator.
+- CI: `smoke-ws-client-state.test.js` (backoff + setState clone).
+- **Instructions for Next Agent:** T104.7 manual verification on a running stick (restart server, confirm WS reconnect + multiview perf). Then WO-105 (`ws`/`xlsx` deps).

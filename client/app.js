@@ -54,6 +54,7 @@ import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { ensureAuthGate } from './lib/auth-gate.js'
+import { showAppToast } from './lib/app-toast.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
 
@@ -409,6 +410,7 @@ async function init() {
 		if (!settings?.offline_mode) void refreshLiveAudioConfigured(stateStore)
 	} catch (err) {
 		console.warn('[HighAsCG] Bootstrap failed:', err.message)
+		showAppToast(`Failed to load server state: ${err?.message || err}`, 'error')
 	}
 }
 

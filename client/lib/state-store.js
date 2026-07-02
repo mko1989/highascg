@@ -91,7 +91,14 @@ export class StateStore {
 	}
 
 	setState(full) {
-		this._state = typeof full === 'object' && full !== null ? { ...full } : {}
+		if (typeof full !== 'object' || full === null) {
+			this._state = {}
+		} else {
+			this._state = { ...full }
+			if (full.channelMap != null) this._state.channelMap = structuredClone(full.channelMap)
+			if (full.scene != null) this._state.scene = structuredClone(full.scene)
+			if (full.variables != null) this._state.variables = structuredClone(full.variables)
+		}
 		this._emit('*', null)
 
 		// Cache on full state update

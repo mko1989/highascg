@@ -16,6 +16,7 @@ import {
 } from './streaming-channel-state.js'
 import { ingestComposePreviewWs } from '../components/preview-canvas-compose-snapshot.js'
 import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
+import { showAppToast } from './app-toast.js'
 
 /**
  * @param {unknown} data
@@ -111,7 +112,10 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		try {
 			projectState.importProject(project, sceneState, timelineState, multiviewState, programOutputState, { silent: true })
 			window.dispatchEvent(new Event('project-loaded'))
-		} catch (e) { console.warn('[HighAsCG] project_sync failed:', e.message) }
+			showAppToast('Show file updated from server (remote sync)', 'warn')
+		} catch (e) {
+			console.warn('[HighAsCG] project_sync failed:', e.message)
+		}
 	})
 
 	ws.on('mixer_update', (data) => {

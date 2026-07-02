@@ -215,5 +215,34 @@ export function initMultiviewEditor(root, stateStore) {
 	}
 	document.addEventListener('keydown', onKeyDown)
 
-	stateStore.on('*', () => { syncOverlay(); updateToolbar(); refit(); draw() }); draw()
+	const IGNORE_STATE_PATHS = new Set([
+		'timeline.tick',
+		'timeline.playback',
+		'variables',
+		'logs',
+		'log_line',
+		'dmx:colors',
+	])
+	let stateRedrawTimer = null
+	const scheduleStateRedraw = () => {
+		if (stateRedrawTimer) return
+		stateRedrawTimer = requestAnimationFrame(() => {
+			stateRedrawTimer = null
+			syncOverlay()
+			updateToolbar()
+			refit()
+			draw()
+		})
+	}
+	const unsubState = stateStore.on('*', (path) => {
+		if (path && IGNORE_STATE_PATHS.has(path)) return
+		scheduleStateRedraw()
+	})
+	root._multiviewCleanup = () => {
+		document.removeEventListener('keydown', onKeyDown)
+		if (stateRedrawTimer) cancelAnimationFrame(stateRedrawTimer)
+		unsubState?.()
+		if (liveView) liveView.destroy()
+	}
+	draw()
 }
