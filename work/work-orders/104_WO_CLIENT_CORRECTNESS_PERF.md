@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Mostly complete — T104.0–T104.6 done (2026-07-02); T104.7 manual smoke deferred
+**Status:** Complete — T104.0–T104.7 done (2026-07-02)
 **Priority:** **High** (correctness bugs) / **Medium** (perf)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -82,7 +82,7 @@ Two call sites read a global that `app.js` never sets (it exports `stateStore` a
 - [x] **T104.4** Audit other broad `'*'` subscribers; apply filter/coalesce (scenes-editor deck rebuild). *(scenes-editor already filters `channelMap`/`scene.live`; sources-panel has path filter.)*
 - [x] **T104.5** Fix shallow-copy/in-place-mutation aliasing (setState deep-copy or mixer_update via API). *(structuredClone for channelMap/scene/variables on full setState.)*
 - [x] **T104.6** Operator-visible notice for bootstrap failure + remote `project_sync` overwrite.
-- [ ] **T104.7** Smoke/manual: kill+restart server → UI reconnects without reload; unanswered AMCP rejects on timeout; playback tick doesn't refit multiview.
+- [x] **T104.7** Smoke/manual: kill+restart server → UI reconnects without reload; unanswered AMCP rejects on timeout; playback tick doesn't refit multiview.
 
 ---
 
@@ -119,3 +119,9 @@ Two call sites read a global that `app.js` never sets (it exports `stateStore` a
 - Bootstrap failure + remote `project_sync` surface `showAppToast` to operator.
 - CI: `smoke-ws-client-state.test.js` (backoff + setState clone).
 - **Instructions for Next Agent:** T104.7 manual verification on a running stick (restart server, confirm WS reconnect + multiview perf). Then WO-105 (`ws`/`xlsx` deps).
+
+### 2026-07-02 — WO-104 T104.7 smoke + ws-server startup fix
+
+- `smoke-ws-restart-reconnect.test.js`: kill/restart server → same `WsClient` reconnects; `sendAmcp` timeout + listener cleanup; multiview `timeline.tick` filter assertion.
+- Fixed `ws-server.js` TDZ bug (`wsMaxPayload` used before initialization) that broke normal startup and WS attach.
+- **Instructions for Next Agent:** None for WO-104.

@@ -35,6 +35,16 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const log = options.log || (() => {})
 	const intervalMs = options.stateBroadcastIntervalMs ?? 0
 	const clients = new Set()
+
+	const logLineMaxHzRaw = parseInt(process.env.HIGHASCG_WS_LOG_LINE_MAX_HZ || '50', 10)
+	const logLineMaxHz = Number.isFinite(logLineMaxHzRaw) ? logLineMaxHzRaw : 50
+	const LOG_LINE_WINDOW_MS = 1000
+	const wsMaxPayloadRaw = parseInt(process.env.HIGHASCG_WS_MAX_PAYLOAD || String(8 * 1024 * 1024), 10)
+	const wsMaxPayload = Number.isFinite(wsMaxPayloadRaw) && wsMaxPayloadRaw > 0 ? wsMaxPayloadRaw : 8 * 1024 * 1024
+	const wsMaxBufferedRaw = parseInt(process.env.HIGHASCG_WS_MAX_BUFFERED_BYTES || String(8 * 1024 * 1024), 10)
+	const wsMaxBufferedBytes =
+		Number.isFinite(wsMaxBufferedRaw) && wsMaxBufferedRaw > 0 ? wsMaxBufferedRaw : 8 * 1024 * 1024
+
 	const wss = new WebSocket.Server({ noServer: true, maxPayload: wsMaxPayload })
 	const replWss = new WebSocket.Server({ noServer: true, maxPayload: wsMaxPayload })
 
@@ -47,14 +57,6 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		}
 	}
 
-	const logLineMaxHzRaw = parseInt(process.env.HIGHASCG_WS_LOG_LINE_MAX_HZ || '50', 10)
-	const logLineMaxHz = Number.isFinite(logLineMaxHzRaw) ? logLineMaxHzRaw : 50
-	const LOG_LINE_WINDOW_MS = 1000
-	const wsMaxPayloadRaw = parseInt(process.env.HIGHASCG_WS_MAX_PAYLOAD || String(8 * 1024 * 1024), 10)
-	const wsMaxPayload = Number.isFinite(wsMaxPayloadRaw) && wsMaxPayloadRaw > 0 ? wsMaxPayloadRaw : 8 * 1024 * 1024
-	const wsMaxBufferedRaw = parseInt(process.env.HIGHASCG_WS_MAX_BUFFERED_BYTES || String(8 * 1024 * 1024), 10)
-	const wsMaxBufferedBytes =
-		Number.isFinite(wsMaxBufferedRaw) && wsMaxBufferedRaw > 0 ? wsMaxBufferedRaw : 8 * 1024 * 1024
 	const SKIP_WHEN_BUFFERED_EVENTS = new Set(['change', 'log_line', 'timeline.tick', 'variable_update'])
 	/** @type {number[]} */
 	const logLineTimestamps = []
