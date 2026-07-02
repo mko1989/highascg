@@ -71,7 +71,20 @@ To disable enforcement temporarily: unset `HIGHASCG_ENFORCE_AUTH` and set `secur
 
 Each stick generates a **unique** token on first `highascg` start (`ensureApiToken`). Operators recover it with `print-api-token.sh` on the box.
 
+## Dependency audit policy
+
+CI runs `node tools/ci/npm-audit-ci.js`, which fails on **high** or **critical** advisories in production dependencies (`npm audit --omit=dev`).
+
+| Package | Notes |
+|---------|--------|
+| `ws` | Direct + transitive (via `osc`, `puppeteer`) pinned to **8.21.0+** via `package.json` `overrides`. |
+| `exceljs` | Optional — lower-third roster `.xlsx` import only. Parses with a **2 MB** size cap and **15 s** timeout; row objects use null prototypes and unsafe keys (`__proto__`, etc.) are stripped. |
+| Legacy `.xls` | Not supported — operators should save as `.xlsx` or CSV. |
+
+Run locally: `node tools/ci/npm-audit-ci.js`
+
 ## Related work
 
 - WO-96: API/WS authentication (this document)
 - WO-97: Zip-Slip-safe ingest extraction (`src/utils/safe-unzip.js`)
+- WO-105: Dependency audit policy and roster import hardening (this section)

@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed via `npm audit` in 2026-07-02 review
+**Status:** Complete — 2026-07-02 (ws/overrides in WO-99; xlsx migrated to exceljs)
 **Priority:** **Medium** — no known active exploit path in our usage, but high-severity advisories
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -67,13 +67,13 @@
 
 ## 4. Tasks
 
-- [ ] **T105.0** Bump direct `ws` to fixed version; smoke-test operator + replication WS (`smoke:*` WS tests).
-- [ ] **T105.1** `overrides` to force fixed `ws` under `osc`; re-audit; test OSC receive (`smoke:project-fps-network`, OSC listener).
-- [ ] **T105.2** Resolve `form-data` transitive; test upload path.
-- [ ] **T105.3** Decide `xlsx` strategy (migrate vs pin+sandbox); implement; test roster import with a benign and a malformed spreadsheet.
-- [ ] **T105.4** Sandbox + size/time caps for spreadsheet parsing if `xlsx` retained.
-- [ ] **T105.5** CI `npm audit --audit-level=high` with documented exceptions (feeds WO-99).
-- [ ] **T105.6** Update `package.json` notes / `docs/SECURITY.md` with dependency policy + residual risks.
+- [x] **T105.0** Bump direct `ws` to fixed version; smoke-test operator + replication WS (`smoke:*` WS tests).
+- [x] **T105.1** `overrides` to force fixed `ws` under `osc`; re-audit; test OSC receive (`smoke:project-fps-network`, OSC listener).
+- [x] **T105.2** Resolve `form-data` transitive; test upload path.
+- [x] **T105.3** Decide `xlsx` strategy (migrate vs pin+sandbox); implement; test roster import with a benign and a malformed spreadsheet. *(Migrated to `exceljs` optionalDependency.)*
+- [x] **T105.4** Sandbox + size/time caps for spreadsheet parsing if `xlsx` retained. *(2 MB cap, 15s timeout, null-proto rows, unsafe key strip — applies to CSV + xlsx.)*
+- [x] **T105.5** CI `npm audit --audit-level=high` with documented exceptions (feeds WO-99). *(Removed xlsx exception; audit clean after migration.)*
+- [x] **T105.6** Update `package.json` notes / `docs/SECURITY.md` with dependency policy + residual risks.
 
 ---
 
@@ -99,3 +99,11 @@
 
 - Recorded the 4 advisories, the `osc`-downgrade trap, and the no-fix `xlsx` situation with mitigation options.
 - **Instructions for Next Agent:** T105.0–T105.2 (`ws`/`form-data` via `overrides`) are straightforward — do first and re-audit. T105.3 (`xlsx`) is the judgement call: recommend migrating roster import off `xlsx` since it handles uploaded files.
+
+### 2026-07-02 — WO-105 complete
+
+- `ws@8.21.0` direct + `overrides` (done in WO-99); `form-data` resolved.
+- Removed `xlsx`; roster import uses optional `exceljs@^4.4.0` with 2 MB / 15s parse guards and prototype-pollution-safe row keys.
+- `npm-audit-ci.js` no longer allowlists xlsx; `smoke-lower-third-roster.test.js` added.
+- `docs/SECURITY.md` dependency policy section.
+- **Instructions for Next Agent:** WO-100 (backend appCtx) remains if architecture refactor is still desired. All review WOs 96–105 are addressed.

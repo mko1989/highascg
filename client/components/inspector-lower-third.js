@@ -112,7 +112,7 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	importLabel.textContent = 'Import Excel / CSV'
 	const importInput = document.createElement('input')
 	importInput.type = 'file'
-	importInput.accept = '.xlsx,.xls,.csv,.txt'
+	importInput.accept = '.xlsx,.csv,.txt'
 	importInput.className = 'inspector-lt-roster__file'
 	importLabel.appendChild(importInput)
 	const rosterMeta = document.createElement('span')

@@ -170,7 +170,7 @@ npm run verify:repo-integrity   # no sync-conflicts, require() targets resolve
 npm run lint                    # ESLint (warnings allowed in v1)
 npm run format:check            # Prettier on CI/tooling files (gradual tree adoption)
 npm run test:ci                 # curated offline smoke tests (~1–3 min)
-node tools/ci/npm-audit-ci.js   # high/critical audit (xlsx optional exception documented)
+node tools/ci/npm-audit-ci.js   # high/critical production audit (see docs/SECURITY.md)
 ```
 
 Run the full local pipeline:

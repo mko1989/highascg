@@ -2,12 +2,9 @@
 'use strict'
 
 /**
- * npm audit wrapper for CI — allows documented exceptions (WO-105).
- * Fails on high/critical except optional xlsx (no upstream fix; roster import only).
+ * npm audit wrapper for CI — fails on high/critical production advisories (WO-105).
  */
 const { execSync } = require('child_process')
-
-const ALLOWED_OPTIONAL = new Set(['xlsx'])
 
 function main() {
 	let payload
@@ -25,24 +22,6 @@ function main() {
 	for (const [name, info] of Object.entries(vulns)) {
 		const sev = info.severity || ''
 		if (sev !== 'high' && sev !== 'critical') continue
-		const top = name.split('>').pop().trim()
-		const isOptionalOnly =
-			ALLOWED_OPTIONAL.has(top) &&
-			info.via &&
-			Array.isArray(info.via) &&
-			info.via.every((v) => typeof v === 'string' || ALLOWED_OPTIONAL.has(v.name))
-		if (isOptionalOnly && ALLOWED_OPTIONAL.has(top)) {
-			console.warn(`[npm-audit-ci] allowed optional advisory: ${name} (${sev})`)
-			continue
-		}
-		if (ALLOWED_OPTIONAL.has(top) && info.isDirect === false) {
-			// xlsx only appears as optional root optionalDependency
-			const chain = JSON.stringify(info)
-			if (chain.includes('xlsx')) {
-				console.warn(`[npm-audit-ci] allowed optional xlsx chain: ${name}`)
-				continue
-			}
-		}
 		blocking.push(`${name} (${sev})`)
 	}
 
