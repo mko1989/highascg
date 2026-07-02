@@ -7,6 +7,7 @@ const { REPO_ROOT } = require('../repo-paths')
 const projectStore = require('./project-store')
 const { ensureProjectMediaDir, normalizeProjectMediaRefs } = require('../media/project-media-root')
 const { pushProjectSlugToVolumes } = require('./project-volume-sync')
+const { persistSceneDeckForCtx } = require('../state/live-deck-state')
 
 /** Debounce disk writes from WebSocket `scene_deck_sync` (default 750ms). */
 const SCENE_DECK_SYNC_DEBOUNCE_MS = Math.max(
@@ -462,14 +463,7 @@ function persistProject(ctx, project, opts = {}) {
 			previewSceneId:
 				prevPreview != null && String(prevPreview).trim() ? String(prevPreview).trim() : deck.previewSceneId,
 		}
-		try {
-			persistence.set('scene_deck', {
-				looks: deck.looks,
-				previewSceneId: ctx.sceneDeck.previewSceneId,
-				layerPresets: deck.layerPresets,
-				lookPresets: deck.lookPresets,
-			})
-		} catch (_) {}
+		persistSceneDeckForCtx(ctx)
 	}
 	return true
 }

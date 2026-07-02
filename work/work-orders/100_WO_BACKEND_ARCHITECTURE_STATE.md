@@ -122,4 +122,4 @@
 - `index.js` no longer loads banks/deck inline; `scene-transition.persistProgramLayerBanks` routes through `liveDeck`.
 - `live-scene-state.setSceneLiveBroadcastHooks` + boot registration in `index.js` (companion bridge); lazy require kept as fallback.
 - Smoke: `LiveDeckState` persist test in `smoke-live-scene-state.test.js`; `docs/ARCHITECTURE.md` updated.
-- **Instructions for Next Agent:** WO-100 complete. Optional: route remaining direct `persistence.set('scene_deck')` in `project-scenes.js` through `liveDeck.persistSceneDeck()`.
+- **Instructions for Next Agent:** WO-100 complete. All remediation WOs 96–105 done.

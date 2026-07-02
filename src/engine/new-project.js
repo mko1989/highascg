@@ -12,6 +12,7 @@ const {
 const { persistProject } = require('./project-scenes')
 const { ensureProjectMediaDir } = require('../media/project-media-root')
 const projectStore = require('./project-store')
+const { persistSceneDeckForCtx } = require('../state/live-deck-state')
 const { buildFactoryModularConfig } = require('../../tools/eggs/live-usb/starter-project')
 
 const DEFAULT_PROJECT_NAME = 'Untitled'
@@ -102,11 +103,7 @@ function createNewProject(ctx) {
 		layerPresets: [],
 		lookPresets: [],
 	}
-	try {
-		persistence.set('scene_deck', ctx.sceneDeck)
-	} catch {
-		/* optional */
-	}
+	persistSceneDeckForCtx(ctx)
 	try {
 		persistence.set('multiviewLayout', null)
 		ctx._multiviewLayout = null

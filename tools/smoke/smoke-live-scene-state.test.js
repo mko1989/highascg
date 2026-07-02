@@ -56,6 +56,17 @@ test('LiveDeckState persists banks and scene deck', () => {
 	assert.equal(store.scene_deck.looks[0].id, 'x')
 })
 
+test('persistSceneDeckForCtx persists plain test ctx without liveDeck', () => {
+	const { persistSceneDeckForCtx } = require('../../src/state/live-deck-state')
+	const store = {}
+	const ctx = {
+		persistence: { get: (k) => store[k], set: (k, v) => { store[k] = v } },
+		sceneDeck: { looks: [{ id: 't' }], previewSceneId: 'pv', layerPresets: [], lookPresets: [] },
+	}
+	persistSceneDeckForCtx(ctx)
+	assert.equal(store.scene_deck.previewSceneId, 'pv')
+})
+
 test('live-scene-state serializes concurrent setChannel on same channel', async () => {
 	const persistence = require('../../src/utils/persistence')
 	const { _resetSerializedQueueForTests } = require('../../src/utils/async-serial-queue')

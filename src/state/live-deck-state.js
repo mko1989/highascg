@@ -99,6 +99,31 @@ class LiveDeckState {
 }
 
 /**
+ * Persist `ctx.sceneDeck` when ctx is a plain object (tests); appCtx setter handles liveDeck.
+ * @param {{ liveDeck?: LiveDeckState, sceneDeck?: object, persistence?: { set: (k: string, v: unknown) => void } }} ctx
+ */
+function persistSceneDeckForCtx(ctx) {
+	if (ctx?.liveDeck?.persistSceneDeck) return
+	const d = ctx?.sceneDeck
+	if (!d || typeof d !== 'object') return
+	const persistence = ctx.persistence || require('../utils/persistence')
+	try {
+		persistence.set(PERSIST_DECK_KEY, {
+			looks: Array.isArray(d.looks) ? d.looks : [],
+			previewSceneId:
+				d.previewSceneId != null && String(d.previewSceneId).trim()
+					? String(d.previewSceneId).trim()
+					: null,
+			layerPresets: Array.isArray(d.layerPresets) ? d.layerPresets : [],
+			lookPresets: Array.isArray(d.lookPresets) ? d.lookPresets : [],
+			...(Array.isArray(d.sceneSnapshots) ? { sceneSnapshots: d.sceneSnapshots } : {}),
+		})
+	} catch {
+		/* optional */
+	}
+}
+
+/**
  * @param {{ get: (key: string) => unknown, set: (key: string, value: unknown) => void }} persistence
  */
 function createLiveDeckState(persistence) {
@@ -108,6 +133,7 @@ function createLiveDeckState(persistence) {
 module.exports = {
 	LiveDeckState,
 	createLiveDeckState,
+	persistSceneDeckForCtx,
 	normalizeProgramLayerBanks,
 	normalizeSceneDeck,
 	PERSIST_BANKS_KEY,
