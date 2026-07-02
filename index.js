@@ -34,6 +34,7 @@ const { runConnectionQueryCycle, runMediaLibraryQueryCycle, bindAppCtxAmcpTransp
 const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
 const { ArtnetReceiver } = require('./src/artnet/artnet-receiver')
+const { createAppContext } = require('./src/app-context')
 
 const Args = require('./src/bootstrap/args'); const Config = require('./src/bootstrap/config'); const Modules = require('./src/bootstrap/modules'); const Shutdown = require('./src/bootstrap/shutdown')
 const { REPO_ROOT, resolveWebDir } = require('./src/repo-paths')
@@ -121,13 +122,38 @@ function main() {
 		}
 
 		const state = new StateManager({ logger: debugLog })
-		const pBanks = persistence.get('programLayerBankByChannel'); const pSceneDeck = persistence.get('scene_deck')
-		const appCtx = {
-			config, state, variables: state.variables, gatheredInfo: { channelIds: [], channelStatusLines: {}, channelXml: {}, infoConfig: '', infoPaths: '', infoSystem: '', decklinkFromConfig: {} },
-			CHOICES_MEDIAFILES: [], CHOICES_TEMPLATES: [], mediaDetails: {}, programLayerBankByChannel: (pBanks && typeof pBanks === 'object' && !Array.isArray(pBanks)) ? { ...pBanks } : {},
-			_multiviewLayout: persistence.get('multiviewLayout') || null,
-			sceneDeck: (pSceneDeck && typeof pSceneDeck === 'object' && Array.isArray(pSceneDeck.looks)) ? { looks: pSceneDeck.looks, previewSceneId: String(pSceneDeck.previewSceneId || '').trim() || null, layerPresets: pSceneDeck.layerPresets || [], lookPresets: pSceneDeck.lookPresets || [] } : { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] },
-			persistence, amcp: null, timelineEngine: null, oscState: null, _casparStatus: { connected: false, host: config.caspar.host, port: config.caspar.port }, configManager, samplingManager: null,
+		const pBanks = persistence.get('programLayerBankByChannel')
+		const pSceneDeck = persistence.get('scene_deck')
+		const appCtx = createAppContext({
+			config,
+			state,
+			persistence,
+			configManager,
+			programLayerBankByChannel:
+				pBanks && typeof pBanks === 'object' && !Array.isArray(pBanks) ? { ...pBanks } : {},
+			multiviewLayout: persistence.get('multiviewLayout') || null,
+			sceneDeck:
+				pSceneDeck && typeof pSceneDeck === 'object' && Array.isArray(pSceneDeck.looks)
+					? {
+							looks: pSceneDeck.looks,
+							previewSceneId: String(pSceneDeck.previewSceneId || '').trim() || null,
+							layerPresets: pSceneDeck.layerPresets || [],
+							lookPresets: pSceneDeck.lookPresets || [],
+						}
+					: { looks: [], previewSceneId: null, layerPresets: [], lookPresets: [] },
+			casparHost: config.caspar.host,
+			casparPort: config.caspar.port,
+			log: (level, msg) => {
+				const l =
+					level === 'error'
+						? logger.error
+						: level === 'warn'
+							? logger.warn
+							: level === 'info'
+								? logger.info
+								: debugLog.debug
+				l(msg)
+			},
 			resetConfigToDefaults: () => {
 				const ok = configManager.factoryReset()
 				if (ok) {
@@ -141,7 +167,6 @@ function main() {
 				}
 				return ok
 			},
-			log: (level, msg) => { const l = level === 'error' ? logger.error : (level === 'warn' ? logger.warn : (level === 'info' ? logger.info : debugLog.debug)); l(msg) },
 			setUiSelection: (ctx, data) => {
 				try {
 					if (!ctx?.state || typeof applyUiSelectionPayloadToVariables !== 'function') return
@@ -151,7 +176,7 @@ function main() {
 					ctx.log?.('warn', `[selection] ${m}`)
 				}
 			},
-		}
+		})
 		try {
 			const { ensureHardwareHostname } = require('./src/system/hardware-identity')
 			const hw = ensureHardwareHostname(appCtx)

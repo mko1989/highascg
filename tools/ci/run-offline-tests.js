@@ -35,6 +35,7 @@ const FILES = [
 	'tools/smoke/smoke-dom-escape.test.js',
 	'tools/smoke/smoke-ws-client-state.test.js',
 	'tools/smoke/smoke-lower-third-roster.test.js',
+	'tools/smoke/smoke-live-scene-state.test.js',
 	'tools/smoke/smoke-wiki.test.js',
 	'test/companion-control-status.test.js',
 ]

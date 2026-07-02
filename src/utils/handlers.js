@@ -6,29 +6,20 @@
 'use strict'
 
 /**
- * @param {{ CHOICES_MEDIAFILES?: Array<{ id: string, label: string }>, variables?: object, setVariableValues?: (o: object) => void, init_actions?: () => void }} ctx
+ * @param {{ state?: { updateFromCLS?: (data: string[]) => void, getState?: () => { media?: unknown[] } }, variables?: object, setVariableValues?: (o: object) => void, init_actions?: () => void }} ctx
  * @param {string[]} data
  */
 function handleCLS(ctx, data) {
-	if (!ctx.CHOICES_MEDIAFILES) ctx.CHOICES_MEDIAFILES = []
-	ctx.CHOICES_MEDIAFILES.length = 0
 	ctx._clsRawLines = data || []
-	for (let i = 0; i < (data || []).length; ++i) {
-		const match = data[i].match(/^"([^"]+)"/)
-		if (match && match.length > 1) {
-			const file = match[1].replace(/\\/g, '\\\\')
-			ctx.CHOICES_MEDIAFILES.push({ label: file, id: file })
-		}
+	if (ctx.state?.updateFromCLS) {
+		ctx.state.updateFromCLS(data)
 	}
-	if (ctx.variables) ctx.variables.media_count = String(ctx.CHOICES_MEDIAFILES.length)
-	if (typeof ctx.setVariableValues === 'function') ctx.setVariableValues({ media_count: ctx.variables.media_count })
+	const count = ctx.state?.getState?.()?.media?.length ?? 0
+	if (ctx.variables) ctx.variables.media_count = String(count)
+	if (typeof ctx.setVariableValues === 'function') ctx.setVariableValues({ media_count: ctx.variables?.media_count })
 	if (typeof ctx.init_actions === 'function') ctx.init_actions()
 }
 
-/**
- * @param {{ CHOICES_TEMPLATES?: Array<{ id: string, label: string }>, variables?: object, setVariableValues?: (o: object) => void, init_actions?: () => void }} ctx
- * @param {string[]} data
- */
 /**
  * @param {Array<string>} data - TLS response lines
  * @returns {Array<{ id: string, label: string }>}
@@ -52,14 +43,22 @@ function parseTlsLines(data) {
 	return templates
 }
 
+/**
+ * @param {{ state?: { updateFromTLS?: (data: string[]) => void, getState?: () => { templates?: unknown[] } }, variables?: object, setVariableValues?: (o: object) => void, init_actions?: () => void }} ctx
+ * @param {string[]} data
+ */
 function handleTLS(ctx, data) {
-	if (!ctx.CHOICES_TEMPLATES) ctx.CHOICES_TEMPLATES = []
-	ctx.CHOICES_TEMPLATES.length = 0
-	for (const row of parseTlsLines(data)) {
-		ctx.CHOICES_TEMPLATES.push(row)
+	if (ctx.state?.updateFromTLS) {
+		ctx.state.updateFromTLS(data)
+	} else {
+		const templates = parseTlsLines(data)
+		if (!Object.getOwnPropertyDescriptor(ctx, 'CHOICES_TEMPLATES')?.get) {
+			ctx.CHOICES_TEMPLATES = templates
+		}
 	}
-	if (ctx.variables) ctx.variables.template_count = String(ctx.CHOICES_TEMPLATES.length)
-	if (typeof ctx.setVariableValues === 'function') ctx.setVariableValues({ template_count: ctx.variables.template_count })
+	const count = ctx.state?.getState?.()?.templates?.length ?? parseTlsLines(data).length
+	if (ctx.variables) ctx.variables.template_count = String(count)
+	if (typeof ctx.setVariableValues === 'function') ctx.setVariableValues({ template_count: ctx.variables?.template_count })
 	if (typeof ctx.init_actions === 'function') ctx.init_actions()
 }
 

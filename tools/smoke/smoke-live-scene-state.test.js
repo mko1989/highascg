@@ -1,0 +1,64 @@
+'use strict'
+
+const test = require('node:test')
+const assert = require('node:assert/strict')
+
+test('handleCLS updates StateManager media (single catalog path)', () => {
+	const { handleCLS } = require('../../src/utils/handlers')
+	const { StateManager } = require('../../src/state/state-manager')
+	const state = new StateManager()
+	const ctx = { state, variables: {} }
+	handleCLS(ctx, ['"clip1.mov" MOV 12345'])
+	assert.equal(state.getState().media.length, 1)
+	assert.equal(state.getState().media[0].id, 'clip1.mov')
+	assert.equal(ctx.variables.media_count, '1')
+})
+
+test('createAppContext exposes CHOICES getters backed by StateManager', () => {
+	const { createAppContext } = require('../../src/app-context')
+	const { StateManager } = require('../../src/state/state-manager')
+	const state = new StateManager()
+	const ctx = createAppContext({
+		config: { caspar: { host: '127.0.0.1', port: 5250 } },
+		state,
+		persistence: { get: () => null, set: () => {} },
+		configManager: { factoryReset: () => false },
+		programLayerBankByChannel: {},
+		sceneDeck: { looks: [] },
+		multiviewLayout: null,
+		casparHost: '127.0.0.1',
+		casparPort: 5250,
+		log: () => {},
+		resetConfigToDefaults: () => false,
+		setUiSelection: () => {},
+	})
+	state.updateFromCLS(['"a.mp4" MOV'])
+	assert.equal(ctx.CHOICES_MEDIAFILES.length, 1)
+	assert.equal(ctx.CHOICES_MEDIAFILES[0].id, 'a.mp4')
+})
+
+test('live-scene-state serializes concurrent setChannel on same channel', async () => {
+	const persistence = require('../../src/utils/persistence')
+	const { _resetSerializedQueueForTests } = require('../../src/utils/async-serial-queue')
+	const live = require('../../src/state/live-scene-state')
+
+	_resetSerializedQueueForTests()
+	persistence.set(live.KEY, {})
+
+	const delay = (ms) => new Promise((r) => setTimeout(r, ms))
+
+	await Promise.all([
+		(async () => {
+			await delay(10)
+			await live.setChannel(1, { sceneId: 'a', scene: { id: 'a' } })
+		})(),
+		(async () => {
+			await delay(0)
+			await live.setChannel(2, { sceneId: 'b', scene: { id: 'b' } })
+		})(),
+	])
+
+	const all = live.getAll()
+	assert.equal(all['1'].sceneId, 'a')
+	assert.equal(all['2'].sceneId, 'b')
+})

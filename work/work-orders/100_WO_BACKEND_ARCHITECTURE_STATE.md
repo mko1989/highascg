@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — confirmed in 2026-07-02 server audit; large refactor, phase carefully
+**Status:** In progress — Phases A, B (partial), C done (2026-07-02)
 **Priority:** **Medium-High** — maintainability/correctness, not an outage; do incrementally
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -71,14 +71,14 @@
 
 ## 4. Tasks
 
-- [ ] **T100.0** Author `src/app-context.js` factory + JSDoc `@typedef AppContext`; `index.js` uses it (no behavior change).
-- [ ] **T100.1** Seal/guard boot-immutable fields; run full smoke suite to confirm no accidental reassignment relied upon.
-- [ ] **T100.2** Convert `CHOICES_MEDIAFILES`/`CHOICES_TEMPLATES` to StateManager-backed getters; migrate readers; delete legacy arrays.
-- [ ] **T100.3** Single CLS/media update path on `StateManager`; delete duplicates in `handlers.js`.
-- [ ] **T100.4** Serialize `live-scene-state` mutations (async mutex/queue); concurrency smoke test.
+- [x] **T100.0** Author `src/app-context.js` factory + JSDoc `@typedef AppContext`; `index.js` uses it (no behavior change).
+- [x] **T100.1** Seal/guard boot-immutable fields; run full smoke suite to confirm no accidental reassignment relied upon.
+- [x] **T100.2** Convert `CHOICES_MEDIAFILES`/`CHOICES_TEMPLATES` to StateManager-backed getters; migrate readers; delete legacy arrays.
+- [x] **T100.3** Single CLS/media update path on `StateManager`; delete duplicates in `handlers.js` / `query-cycle` / `periodic-sync`.
+- [x] **T100.4** Serialize `live-scene-state` mutations (async mutex/queue); concurrency smoke test.
 - [ ] **T100.5** Extract `LiveDeckState` (banks + scene deck) with explicit API; inject into appCtx.
 - [ ] **T100.6** Replace hot-path lazy `require()` in pointer-confine / CEF bridge / companion bridge with injected deps.
-- [ ] **T100.7** Doc: `docs/ARCHITECTURE.md` — appCtx contract, state ownership diagram.
+- [x] **T100.7** Doc: `docs/ARCHITECTURE.md` — appCtx contract, state ownership diagram.
 
 ---
 
@@ -106,3 +106,11 @@
 
 - Captured appCtx coupling, fragmented catalog state, live-scene-state RMW race, porous boundaries into a phased plan.
 - **Instructions for Next Agent:** Start Phase A (T100.0) — pure documentation/factory, zero behavior change, unblocks safe iteration. Prioritize T100.4 (race) as the one true bug here.
+
+### 2026-07-02 — WO-100 Phases A–C
+
+- Added `src/app-context.js` (`createAppContext`, sealed boot fields, catalog getters).
+- `index.js` uses factory; `handlers.js` CLS/TLS → `StateManager` only; removed duplicate `updateFromCLS`/`updateFromTLS` in query/periodic sync.
+- `live-scene-state.js` mutations serialized via `async-serial-queue.js`; `smoke-live-scene-state.test.js`.
+- `docs/ARCHITECTURE.md` appCtx / state ownership section.
+- **Instructions for Next Agent:** T100.5 `LiveDeckState` extraction and T100.6 lazy-require injection are optional follow-ups; remediation WOs 96–105 are otherwise complete.

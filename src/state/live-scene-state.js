@@ -8,6 +8,7 @@
 const persistence = require('../utils/persistence')
 const { getChannelMap } = require('../config/routing')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
+const { runSerialized } = require('../utils/async-serial-queue')
 
 const KEY = 'liveScenesByProgramChannel'
 
@@ -40,26 +41,29 @@ function getChannel(channel) {
 
 /**
  * @param {number|string} channel
- * @param {{ sceneId: string, scene: object }} entry
+ * @param {{ sceneId: string, scene: object, updatedAt?: number }} entry
+ * @returns {Promise<void>}
  */
 function setChannel(channel, entry) {
-	const n = parseInt(channel, 10)
-	if (!Number.isFinite(n) || n < 1) return
-	const ch = String(n)
-	const all = { ..._all() }
-	all[ch] = {
-		sceneId: entry.sceneId,
-		scene: entry.scene,
-		updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
-	}
-	persistence.set(KEY, all)
-	if (_onProgramChange) {
-		try {
-			_onProgramChange(n, all[ch])
-		} catch {
-			/* ignore */
+	return runSerialized(() => {
+		const n = parseInt(channel, 10)
+		if (!Number.isFinite(n) || n < 1) return
+		const ch = String(n)
+		const all = { ..._all() }
+		all[ch] = {
+			sceneId: entry.sceneId,
+			scene: entry.scene,
+			updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
 		}
-	}
+		persistence.set(KEY, all)
+		if (_onProgramChange) {
+			try {
+				_onProgramChange(n, all[ch])
+			} catch {
+				/* ignore */
+			}
+		}
+	})
 }
 
 /**
@@ -71,14 +75,17 @@ function getAll() {
 
 /**
  * @param {number|string} channel
+ * @returns {Promise<void>}
  */
 function clearChannel(channel) {
-	const n = parseInt(channel, 10)
-	if (!Number.isFinite(n) || n < 1) return
-	const ch = String(n)
-	const all = { ..._all() }
-	delete all[ch]
-	persistence.set(KEY, all)
+	return runSerialized(() => {
+		const n = parseInt(channel, 10)
+		if (!Number.isFinite(n) || n < 1) return
+		const ch = String(n)
+		const all = { ..._all() }
+		delete all[ch]
+		persistence.set(KEY, all)
+	})
 }
 
 /**
@@ -94,7 +101,7 @@ function invalidateIfProgramChannel(config, channel) {
 	for (let i = 0; i < map.screenCount; i++) programs.push(map.programCh(i + 1))
 	if (!programs.includes(n)) return false
 	if (!getChannel(n)) return false
-	clearChannel(n)
+	void clearChannel(n)
 	return true
 }
 

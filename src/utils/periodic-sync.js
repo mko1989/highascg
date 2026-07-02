@@ -250,14 +250,12 @@ async function runMediaClsTlsRefresh(self) {
 		try {
 			const clsRes = await self.amcp.query.cls()
 			handlers.handleCLS(self, clsRes?.data)
-			self.state.updateFromCLS(clsRes?.data)
 			scheduleHqThumbnailPrewarmFromCls(self)
 			const n = self.state?.getState?.()?.media?.length ?? self.CHOICES_MEDIAFILES?.length ?? 0
 			if (typeof self.log === 'function') self.log('info', `Media library CLS/TLS: ${n} media item(s) from server`)
 			const tlsRes = await self.amcp.query.tls()
 			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails || {})
 			handlers.handleTLS(self, tlsRes?.data)
-			self.state.updateFromTLS(tlsRes?.data)
 			const tCount = self.CHOICES_TEMPLATES?.length ?? 0
 			if (typeof self.log === 'function') self.log('info', `Template library TLS: ${tCount} template(s) from server`)
 			broadcastTemplateCatalog(self)

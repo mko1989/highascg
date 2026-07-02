@@ -116,6 +116,29 @@ When counting lines or auditing “server code”, exclude **`work/`**, **`tools
 
 ---
 
+## Server `appCtx` and state ownership (WO-100)
+
+The Node process builds one **`appCtx`** via `src/app-context.js` → `createAppContext()` (wired from `index.js`). Subsystems receive this bag; core references (`config`, `state`, `persistence`, `configManager`) are sealed after boot.
+
+| Data | Owner | Notes |
+|------|--------|--------|
+| Media / template catalog | `StateManager` (`src/state/state-manager.js`) | CLS/TLS → `updateFromCLS` / `updateFromTLS` only |
+| `CHOICES_MEDIAFILES` / `CHOICES_TEMPLATES` on `appCtx` | **Getters** over `StateManager` | Legacy readers; do not mutate |
+| Program scene map | `live-scene-state.js` | Serialized RMW via `async-serial-queue` |
+| `programLayerBankByChannel`, `sceneDeck` | Fields on `appCtx` (future: `LiveDeckState` module) | Persisted via `persistence` |
+| Operator snapshot | `get-state.js` | Merges `appCtx` + `StateManager` at request time |
+
+```mermaid
+flowchart LR
+  CLS[AMCP CLS/TLS] --> SM[StateManager]
+  SM --> GET[get-state / WS]
+  appCtx[appCtx getters] --> GET
+  take[scene take] --> LSS[live-scene-state]
+  LSS --> persistence[(persistence)]
+```
+
+---
+
 ## Distribution
 
 | Artifact | Contents |

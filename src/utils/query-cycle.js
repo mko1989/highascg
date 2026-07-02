@@ -147,7 +147,6 @@ function runMediaLibraryQueryCycle(ctx) {
 
 	self.enqueue('CLS', null, 'CLS', (data) => {
 		handlers.handleCLS(self, data)
-		self.state.updateFromCLS(data)
 		scheduleStartupHqThumbnailPrewarm(self)
 		const queryCinf = self.config && self.config.query_cinf !== false
 		const maxCinf = Math.max(0, parseInt(String(self.config?.max_cinf ?? 100), 10))
@@ -166,7 +165,6 @@ function runMediaLibraryQueryCycle(ctx) {
 		self.enqueue('TLS', null, 'TLS', (data) => {
 			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails)
 			handlers.handleTLS(self, data)
-			self.state.updateFromTLS(data)
 			broadcastTemplateCatalog(self)
 		})
 		self.runCommandQueue()
@@ -199,7 +197,6 @@ function runConnectionQueryCycle(ctx) {
 
 	self.enqueue('CLS', null, 'CLS', (data) => {
 		handlers.handleCLS(self, data)
-		self.state.updateFromCLS(data)
 		scheduleStartupHqThumbnailPrewarm(self)
 		const queryCinf = self.config && self.config.query_cinf !== false
 		const maxCinf = Math.max(0, parseInt(String(self.config?.max_cinf ?? 100), 10))
@@ -218,7 +215,6 @@ function runConnectionQueryCycle(ctx) {
 		self.enqueue('TLS', null, 'TLS', (data) => {
 			if (self.state && self.mediaDetails) self.state.updateMediaDetails(self.mediaDetails)
 			handlers.handleTLS(self, data)
-			self.state.updateFromTLS(data)
 			broadcastTemplateCatalog(self)
 			self.enqueue('VERSION', null, 'VERSION', (line) => {
 				const v = responseToStr(line)
