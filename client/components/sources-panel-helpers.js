@@ -186,6 +186,23 @@ export function renderSourceList(container, items, sourceType, filter, onPreview
 		el.innerHTML = `
 			<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 32))}</span>
 		`
+		if (sourceType === 'timeline') {
+			el.addEventListener('contextmenu', (e) => {
+				e.preventDefault()
+				const newName = prompt('Rename timeline', label)
+				if (newName != null && newName.trim()) {
+					timelineState.updateTimeline(id, { name: newName.trim() })
+					api.put(`/api/timelines/${id}`, timelineState.getTimeline(id)).catch(() => {})
+					const tl = timelineState.getTimeline(id)
+					if (tl) {
+						el.querySelector('.source-item__label').textContent = truncate(tl.name, 32)
+						el.querySelector('.source-item__label').title = tl.name
+						el.dataset.sourceLabel = tl.name
+					}
+					window.dispatchEvent(new Event('timeline-redraw-request'))
+				}
+			})
+		}
 		makeDraggable(el, sourceType, id, label)
 		container.appendChild(el)
 	})
@@ -342,7 +359,9 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 		const res = programResolutions[i]
 		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
 		const fps = res?.fps != null ? formatFps(res.fps) : ''
-		sources.push({ type: 'route', routeType: 'pgm', value: `route://${ch}`, label: `Program ${i + 1}`, resolution, fps })
+		const labelBase = channelMap.virtualMainChannels?.[i]?.name
+		const label = labelBase ? `PGM: ${labelBase}` : `Program ${i + 1}`
+		sources.push({ type: 'route', routeType: 'pgm', value: `route://${ch}`, label, resolution, fps })
 	})
 	previewChannels.forEach((ch, i) => {
 		if ((previewEnabledByMain[i] === false) || ch == null) return
@@ -350,7 +369,9 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
 		const fps = res?.fps != null ? formatFps(res.fps) : ''
 		// Full channel composite (black L9 + content L10+). Do not use route://N-11 — layer numbers match PGM now.
-		sources.push({ type: 'route', routeType: 'prv', value: `route://${ch}`, label: `Preview ${i + 1}`, resolution, fps })
+		const labelBase = channelMap.virtualMainChannels?.[i]?.name
+		const label = labelBase ? `PRV: ${labelBase}` : `Preview ${i + 1}`
+		sources.push({ type: 'route', routeType: 'prv', value: `route://${ch}`, label, resolution, fps })
 	})
 	for (let i = 1; i <= decklinkCount; i++) {
 		const entry = decklinkInputForSlot(channelMap, i)

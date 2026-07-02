@@ -75,6 +75,49 @@ function extractMatrixPorts(payload) {
 export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirty, loadCallback, selectKey, selectDestinationById) {
 	matrixHost.innerHTML = ''
 	
+	const toolbar = document.createElement('div')
+	toolbar.className = 'device-view-matrix__toolbar'
+	toolbar.style.cssText = 'padding: 8px 12px; display: flex; gap: 8px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05);'
+	
+	const addDestBtn = document.createElement('button')
+	addDestBtn.className = 'header-btn'
+	addDestBtn.textContent = '+ Destination'
+	addDestBtn.onclick = () => { Actions.addDestination({ mode: 'pgm_prv' }).then(() => loadCallback()) }
+
+	const addStreamBtn = document.createElement('button')
+	addStreamBtn.className = 'header-btn'
+	addStreamBtn.textContent = '+ Stream'
+	addStreamBtn.onclick = async () => {
+		try {
+			const cur = Array.isArray(payload?.settings?.streamOutputs) ? payload.settings.streamOutputs : []
+			const idx = cur.length + 1
+			const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }]
+			await Actions.saveSettingsPatch({ streamOutputs: next })
+			loadCallback()
+		} catch(e) {}
+	}
+	
+	const addRecordBtn = document.createElement('button')
+	addRecordBtn.className = 'header-btn'
+	addRecordBtn.textContent = '+ Record'
+	addRecordBtn.onclick = async () => {
+		try {
+			const cur = Array.isArray(payload?.settings?.recordOutputs) ? payload.settings.recordOutputs : []
+			const idx = cur.length + 1
+			const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, type: 'h264', name: `Rec${idx}`, quality: 'medium' }]
+			await Actions.saveSettingsPatch({ recordOutputs: next })
+			loadCallback()
+		} catch(e) {}
+	}
+	
+	const addMapBtn = document.createElement('button')
+	addMapBtn.className = 'header-btn'
+	addMapBtn.textContent = '+ Pixel Map'
+	addMapBtn.onclick = () => { Actions.addMappingNode().then(() => loadCallback()) }
+
+	toolbar.append(addDestBtn, addStreamBtn, addRecordBtn, addMapBtn)
+	matrixHost.appendChild(toolbar)
+
 	const { sources, sinks } = extractMatrixPorts(payload)
 	const edges = Array.isArray(payload?.graph?.edges) ? payload.graph.edges : []
 	

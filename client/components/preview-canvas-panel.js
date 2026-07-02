@@ -485,7 +485,20 @@ export function initPreviewPanel(host, options) {
 		if (collapsed) return; const { w, h } = getOutputResolution(); if (resEl) resEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
-		if (!composePrvPgmLayoutToggle) { canv.width = Math.round(w * dpr); canv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); canv.style.width = `${Math.floor(w * Math.min(cw / w, ch / h))}px`; canv.style.height = `${Math.floor(h * Math.min(cw / w, ch / h))}px`; draw(ctx, w, h, isLive, {}); renderDestinationLayoutOverlay(); return }
+		if (!composePrvPgmLayoutToggle) {
+			canv.width = Math.round(w * dpr)
+			canv.height = Math.round(h * dpr)
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+			canv.style.width = `${Math.floor(w * Math.min(cw / w, ch / h))}px`
+			canv.style.height = `${Math.floor(h * Math.min(cw / w, ch / h))}px`
+			try {
+				draw(ctx, w, h, isLive, {})
+			} catch (err) {
+				console.warn('[preview] compose draw failed:', err?.message || err)
+			}
+			renderDestinationLayoutOverlay()
+			return
+		}
 		if (isLive) { if (offTimer) clearTimeout(offTimer); offTimer = null; root.classList.remove('preview-panel--compose-offline', 'preview-panel--compose-border-fade-out'); prevLive = true }
 		else { if (prevLive) { root.classList.add('preview-panel--compose-border-fade-out'); offTimer = setTimeout(() => { root.classList.add('preview-panel--compose-offline'); root.classList.remove('preview-panel--compose-border-fade-out'); offTimer = null; scheduleDraw() }, BORDER_FADE) } else if (!offTimer) root.classList.add('preview-panel--compose-offline'); prevLive = false }
 		rebuildComposeCellsIfNeeded()
@@ -543,15 +556,19 @@ export function initPreviewPanel(host, options) {
 			item.canvas.width = Math.max(1, Math.round(wCell * dpr))
 			item.canvas.height = Math.max(1, Math.round(hCell * dpr))
 			if (item.ctx) item.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-			draw(item.ctx, w, h, false, {
-				layout,
-				composeCell: item.role,
-				composePrvPgmLayoutToggle: true,
-				composeDualStreamPreview: true,
-				composeCellViewport: { w: wCell, h: hCell },
-				composeScreenIdx: item.mainIndex,
-				composeCellZoom: item.zoom || 1.0,
-			})
+			try {
+				draw(item.ctx, w, h, false, {
+					layout,
+					composeCell: item.role,
+					composePrvPgmLayoutToggle: true,
+					composeDualStreamPreview: true,
+					composeCellViewport: { w: wCell, h: hCell },
+					composeScreenIdx: item.mainIndex,
+					composeCellZoom: item.zoom || 1.0,
+				})
+			} catch (err) {
+				console.warn('[preview] compose cell draw failed:', err?.message || err)
+			}
 		}
 		renderDestinationLayoutOverlay()
 	}

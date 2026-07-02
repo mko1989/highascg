@@ -107,6 +107,7 @@ export function renderDeviceInspector(host, deviceId, live, dev, opts = {}) {
 			{ label: 'AMCP port', value: String(live?.caspar?.port || '-') },
 			{ label: 'Connected', value: live?.caspar?.connected ? 'yes' : 'no' },
 			{ label: 'Hostname', value: String(live?.host?.hostname || '-') },
+			{ label: 'Hardware ID', value: String(live?.host?.hardwareId || '-') },
 			{ label: 'Platform', value: String(live?.host?.platform || '-') },
 			{ label: 'Arch', value: String(live?.host?.arch || '-') },
 			{ label: 'Destinations', value: String(intent.length) },

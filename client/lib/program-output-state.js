@@ -201,20 +201,29 @@ export class ProgramOutputState {
 	}
 
 	resetForNewProject(opts = {}) {
-		const res = this._getCanvasResolution(this._screenIdx())
-		this.layerNames = Array.from({ length: DEFAULT_LAYER_COUNT }, (_, i) => `Layer ${i + 1}`)
-		this.layerSettings = Array.from({ length: DEFAULT_LAYER_COUNT }, () => defaultLayerSetting(res))
-		this._applyCanvasSizeToUnsetDefaults(this._screenIdx())
-		if (opts.silent) {
+		this.resetAllMainsForNewProject(opts)
+	}
+
+	resetAllMainsForNewProject(opts = {}) {
+		const MAIN_COUNT = 4
+		const active = this._screenIdx()
+		for (let screenIdx = 0; screenIdx < MAIN_COUNT; screenIdx++) {
+			const res = this._getCanvasResolution(screenIdx)
+			const layerNames = Array.from({ length: DEFAULT_LAYER_COUNT }, (_, i) => `Layer ${i + 1}`)
+			const layerSettings = Array.from({ length: DEFAULT_LAYER_COUNT }, () => defaultLayerSetting(res))
 			try {
 				localStorage.setItem(
-					storageKey(this._screenIdx()),
-					JSON.stringify({ layerNames: this.layerNames, layerSettings: this.layerSettings }),
+					storageKey(screenIdx),
+					JSON.stringify({ layerNames, layerSettings }),
 				)
 			} catch {}
-		} else {
-			this._save()
+			if (screenIdx === active) {
+				this.layerNames = layerNames
+				this.layerSettings = layerSettings
+				this._applyCanvasSizeToUnsetDefaults(screenIdx)
+			}
 		}
+		if (!opts.silent) this._emit('change', null)
 	}
 
 	/**

@@ -14,10 +14,22 @@ import {
 	findClipAtTime,
 	lerpKeyframeProperty,
 	getThumbnailEntry,
+	isThumbnailImageDrawable,
 	drawImageCover,
 	drawImageContainInRect,
 	drawLayerWithBoundaryTransparency,
 } from './preview-canvas-draw-base.js'
+
+/** @param {object | null | undefined} source */
+function sourceFallbackLabel(source) {
+	const t = String(source?.type || '').toLowerCase()
+	if (t === 'timeline') return 'Timeline'
+	if (t === 'route' || t === 'live' || /^route:\/\//i.test(String(source?.value || ''))) return 'Live'
+	if (t === 'ndi') return 'NDI'
+	if (t === 'browser') return 'Browser'
+	if (t === 'live_audio') return 'Audio in'
+	return (source?.label || source?.value || 'Source').slice(0, 24)
+}
 
 /**
  * Scene / look editor stack — normalized FILL per layer, optional selection highlight.
@@ -114,7 +126,7 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 			const url = src && getThumbUrl ? getThumbUrl(src) : null
 			if (url) {
 				const { img, ready, failed } = getThumbnailEntry(url, onThumbLoaded)
-				if (ready && !failed) {
+				if (ready && !failed && isThumbnailImageDrawable(img)) {
 					ctx.save()
 					ctx.beginPath()
 					ctx.rect(px, py, pw, ph)
@@ -130,19 +142,15 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 						ctx.drawImage(img, px, py, pw, ph)
 					}
 					ctx.restore()
+				} else if (failed) {
+					drawPreviewStatusText(ctx, px, py, pw, ph, 'No preview')
 				} else {
-					ctx.fillStyle = 'rgba(48, 54, 61, 0.9)'
-					ctx.fillRect(px, py, pw, ph)
+					drawPreviewStatusText(ctx, px, py, pw, ph, 'Loading…')
 				}
 			} else if (src?.isPlaceholder || src?.type === 'placeholder' || src?.template || layer.template) {
 				drawPlaceholderFill(ctx, px, py, pw, ph, src || { template: layer.template })
 			} else if (src?.value) {
-				ctx.fillStyle = 'rgba(48, 54, 61, 0.85)'
-				ctx.fillRect(px, py, pw, ph)
-				ctx.fillStyle = '#8b949e'
-				ctx.font = `${Math.max(11, Math.round(pw / 14))}px ${UI_FONT_FAMILY}`
-				const label = (src.label || src.value || '').slice(0, 24)
-				ctx.fillText(label, px + 6, py + Math.min(22, ph * 0.25))
+				drawPreviewStatusText(ctx, px, py, pw, ph, sourceFallbackLabel(src))
 			} else {
 				ctx.fillStyle = 'rgba(22, 27, 34, 0.45)'
 				ctx.fillRect(px, py, pw, ph)
@@ -431,7 +439,7 @@ export function drawTimelineStack(ctx, W, H, opts) {
 				)
 			} else if (url) {
 				const { img, ready, failed } = getThumbnailEntry(url, onThumbLoaded)
-				if (ready && !failed) {
+				if (ready && !failed && isThumbnailImageDrawable(img)) {
 					ctx.save()
 					ctx.beginPath()
 					ctx.rect(x, y, w, h)
@@ -453,12 +461,7 @@ export function drawTimelineStack(ctx, W, H, opts) {
 			} else if (clip.source?.isPlaceholder) {
 				drawPlaceholderFill(ctx, x, y, w, h, clip.source)
 			} else {
-				ctx.fillStyle = 'rgba(48, 54, 61, 0.85)'
-				ctx.fillRect(x, y, w, h)
-				ctx.fillStyle = '#8b949e'
-				ctx.font = `${Math.max(11, Math.round(w / 14))}px ${UI_FONT_FAMILY}`
-				const label = (clip.source.label || clip.source.value || '').slice(0, 24)
-				ctx.fillText(label, x + 6, y + Math.min(22, h * 0.25))
+				drawPreviewStatusText(ctx, x, y, w, h, sourceFallbackLabel(clip.source))
 			}
 
 			ctx.strokeStyle = color

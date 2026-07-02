@@ -392,17 +392,26 @@ export function invalidateThumbnailCache(urlSubstring) {
  * @param {() => void} onReady
  * @returns {{ img: HTMLImageElement, ready: boolean }}
  */
+const _FAILED_THUMB = { img: null, ready: false, failed: true }
+
 export function getThumbnailEntry(url, onReady) {
+	if (!url || typeof url !== 'string') return _FAILED_THUMB
 	let e = _thumbCache.get(url)
 	if (!e) {
 		const img = new Image()
 		img.crossOrigin = 'anonymous'
 		e = { img, ready: false, failed: false }
 		img.onload = () => {
+			if (!img.naturalWidth || !img.naturalHeight) {
+				e.failed = true
+				onReady?.()
+				return
+			}
 			e.ready = true
 			onReady?.()
 		}
 		img.onerror = () => {
+			if (e.failed) return
 			e.failed = true
 			onReady?.()
 		}
@@ -410,6 +419,11 @@ export function getThumbnailEntry(url, onReady) {
 		_thumbCache.set(url, e)
 	}
 	return e
+}
+
+/** @param {HTMLImageElement | null | undefined} img */
+export function isThumbnailImageDrawable(img) {
+	return !!(img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0)
 }
 
 export function drawImageCover(ctx, img, x, y, w, h) {

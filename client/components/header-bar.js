@@ -17,7 +17,7 @@ import { showPublishModal } from './publish-modal.js'
 import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'
 import { createHeaderAudioMonitor } from './header-bar-audio.js'
 import { markLocalProjectSaved } from '../lib/project-remote-sync.js'
-import { markServerProjectSynced, resetServerProjectSync } from '../lib/server-project-sync.js'
+import { markServerProjectSynced } from '../lib/server-project-sync.js'
 import { getAppWs } from '../lib/app-runtime.js'
 import { flushSceneDeckSync } from '../lib/app-scene-deck.js'
 import { initConfigStrip } from './header-bar-config-strip.js'
@@ -25,7 +25,7 @@ import { projectFileIdFromName } from '../lib/project-files.js'
 import { normalizeProjectMediaRefs, syncProjectMediaContextFromClient } from '../lib/project-media-context.js'
 import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.js'
 import { showLoadProjectModal } from './load-project-modal.js'
-import { applyDefaultUntitledProjectLocally } from '../lib/default-project.js'
+import { startNewProject } from '../lib/default-project.js'
 
 import { initLedTestCard } from './header-bar-led-test.js'
 import { initStreamingBadge } from './header-bar-streaming.js'
@@ -192,12 +192,18 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	newProjectBtn.type = 'button'
 	newProjectBtn.className = 'header-btn'
 	newProjectBtn.textContent = 'New project'
-	newProjectBtn.title = 'Discard the current project in memory and start empty (save first if you need a file)'
-	function startFreshProject() {
-		if (!confirm('Start a fresh project? Unsaved changes in memory will be lost.')) return
-		resetServerProjectSync()
-		applyDefaultUntitledProjectLocally()
-		nameInp.value = projectState.getProjectName()
+	newProjectBtn.title = 'Start a fresh project with empty looks and one PGM screen destination'
+	async function startFreshProject() {
+		if (!confirm('Start a fresh project? Unsaved changes will be lost. Screen destinations reset to one PGM.')) return
+		newProjectBtn.disabled = true
+		try {
+			await startNewProject({ showToast: (msg, type) => window.showToast?.(msg, type) })
+			nameInp.value = projectState.getProjectName()
+		} catch (e) {
+			window.showToast?.(e?.message || 'New project failed', 'error')
+		} finally {
+			newProjectBtn.disabled = false
+		}
 	}
 	newProjectBtn.addEventListener('click', (e) => {
 		e.preventDefault()

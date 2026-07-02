@@ -4,7 +4,7 @@
 import { sceneState } from '../lib/scene-state.js'
 import { timelineState } from '../lib/timeline-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
-import { getLiveThumbnailUrl, getThumbnailUrl, getLiveThumbnailChannelForSource } from '../lib/thumbnail-url.js'
+import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
 import { drawCgOnlyLookDeckThumb } from './cg-only-look-deck-thumb.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
@@ -86,12 +86,11 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		}
 	}
 	const getThumbForSource = (source, channelForLive) => {
-		if (!source || !source.value) return null
-		if (isMediaOrFileSource(source)) return getThumbnailUrl(source.value, SCENE_THUMB_MAX_W, 0)
-		const ch = getLiveThumbnailChannelForSource(source, channelForLive)
-		// No PRV bus and source does not encode a route:// or thumbnailChannel: avoid wrong-channel stills.
-		if (ch == null || ch <= 0) return null
-		return getLiveThumbnailUrl(ch)
+		return resolveSourceThumbnailUrl(source, {
+			maxWidth: SCENE_THUMB_MAX_W,
+			seekSec: 0,
+			channelForLive,
+		})
 	}
 	const getComposeStreamNames = () => {
 		const pgmCh = getPlaybackChannel()
@@ -598,6 +597,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		if (sceneId) {
 			sceneState.setEditOnPgm(true)
 			sceneState.setEditingScene(sceneId)
+			if (typeof window.highascgActivateWorkspaceTab === 'function') {
+				window.highascgActivateWorkspaceTab('cg-studio')
+			}
 		} else {
 			showScenesToast('No active look on this PGM channel to edit.', 'error')
 		}

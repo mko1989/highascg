@@ -255,10 +255,6 @@ export function applyStreamingChannelActionResponse(res, hint = {}) {
 		setStreamingChannelStatus({ ...prev, rtmp: { ...INACTIVE } })
 		return
 	}
-	if (hint.action === 'stop_record') {
-		setStreamingChannelStatus({ ...prev, record: { ...INACTIVE } })
-		return
-	}
 	if (hint.action === 'start_stream' && hint.outputId) {
 		setStreamingChannelStatus({
 			...prev,
@@ -266,10 +262,35 @@ export function applyStreamingChannelActionResponse(res, hint = {}) {
 		})
 		return
 	}
-	if (hint.action === 'start_record' && hint.outputId) {
+	if (hint.action === 'stop_record' && !hint.outputId) {
+		setStreamingChannelStatus({ ...prev, record: { ...INACTIVE } })
+		return
+	}
+	if (hint.action === 'stop_record' && hint.outputId) {
+		const prevRec = prev.record || { ...INACTIVE }
+		const outs = new Set(Array.isArray(prevRec.activeOutputs) ? prevRec.activeOutputs.map(String) : [])
+		if (prevRec.active && prevRec.outputId) outs.add(String(prevRec.outputId))
+		outs.delete(String(hint.outputId))
+		const nextOuts = [...outs]
 		setStreamingChannelStatus({
 			...prev,
-			record: { active: true, outputId: hint.outputId, activeOutputs: [hint.outputId] },
+			record: {
+				active: nextOuts.length > 0,
+				outputId: nextOuts[0] || null,
+				activeOutputs: nextOuts,
+			},
+		})
+		return
+	}
+	if (hint.action === 'start_record' && hint.outputId) {
+		const prevRec = prev.record || { ...INACTIVE }
+		const outs = new Set(Array.isArray(prevRec.activeOutputs) ? prevRec.activeOutputs.map(String) : [])
+		if (prevRec.active && prevRec.outputId) outs.add(String(prevRec.outputId))
+		outs.add(String(hint.outputId))
+		const nextOuts = [...outs]
+		setStreamingChannelStatus({
+			...prev,
+			record: { active: true, outputId: hint.outputId, activeOutputs: nextOuts },
 		})
 	}
 }

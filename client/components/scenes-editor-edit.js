@@ -2,8 +2,9 @@
  * Edit view rendering for Scenes Editor.
  */
 import { defaultTransition as defaultTransitionDef } from '../lib/scene-state.js'
-import { mountLookTransitionControls } from './scenes-shared.js'
+import { mountLookTransitionControls, parseDraggableSourcesPayload, parseRouteChannelLayer } from './scenes-shared.js'
 import { appendLayerPresetBar, appendSceneLayerStripRows } from './scene-layer-row.js'
+import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 
@@ -21,6 +22,18 @@ function mainIdxForScene(scene, sceneState) {
 		if (Number.isFinite(n) && n >= 0) return n
 	}
 	return sceneState.activeScreenIndex ?? 0
+}
+
+function sourcePayloadForFill(data) {
+	return {
+		type: data.type || 'media',
+		value: data.value,
+		label: data.label,
+		resolution: data.resolution,
+		isPlaceholder: data.isPlaceholder,
+		template: data.template,
+		browserAsCg: data.browserAsCg,
+	}
 }
 
 export function renderEdit(ctx) {
@@ -75,6 +88,58 @@ export function renderEdit(ctx) {
 	const mainRow = document.createElement('div'); mainRow.className = 'scenes-edit-main'
 	const layerStrip = document.createElement('div'); layerStrip.className = 'scenes-layer-strip'
 	layerStrip.innerHTML = '<div class="scenes-layer-strip__title">Layers (bottom → top)</div>'
+	
+	layerStrip.addEventListener('dragover', (e) => {
+		e.preventDefault()
+		e.dataTransfer.dropEffect = 'copy'
+		layerStrip.classList.add('scenes-layer-strip--dropping')
+	})
+	layerStrip.addEventListener('dragleave', (e) => {
+		if (!e.relatedTarget || !layerStrip.contains(e.relatedTarget)) layerStrip.classList.remove('scenes-layer-strip--dropping')
+	})
+	layerStrip.addEventListener('drop', (e) => {
+		e.preventDefault()
+		layerStrip.classList.remove('scenes-layer-strip--dropping')
+		const items = parseDraggableSourcesPayload(e.dataTransfer)
+		if (items.length) {
+			void (async () => {
+				for (const data of items) {
+					if (!data?.value || !sceneState.editingSceneId) continue
+					
+					const parsed = parseRouteChannelLayer(data.value)
+					const cm = stateStore?.getState?.()?.channelMap || {}
+					const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
+					
+					const idx = sceneState.addLayer(scene.id)
+					if (idx < 0) continue
+					
+					const added = sceneState.getScene(scene.id)?.layers?.[idx]
+					const targetLn = added?.layerNumber
+					
+					if (parsed && ch != null && parsed.channel === ch && targetLn != null && parsed.layer === targetLn) {
+						sceneState.removeLayer(scene.id, idx)
+						continue
+					}
+					
+					const srcType = data.type || 'media'
+					sceneState.setLayerSource(scene.id, idx, {
+						...data,
+						type: srcType,
+						value: data.value,
+						label: data.label || data.value,
+					})
+					if (srcType === 'live_audio') sceneState.patchLayer(scene.id, idx, { opacity: 0 })
+					
+					await applyNativeFillForSource(idx, sourcePayloadForFill(data))
+					
+					const updated = sceneState.getScene(scene.id)
+					const layer = updated?.layers?.[idx]
+					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: idx, layer })
+					schedulePreviewPush()
+				}
+			})()
+		}
+	})
 
 	const renderFn = () => renderEdit(ctx)
 	appendSceneLayerStripRows(layerStrip, { scene, dispatchLayerSelect, render: renderFn, showToast: showScenesToast, schedulePreviewPush, selectedLayerIndexRef, sceneState, stateStore, escapeHtml, applyNativeFillForSource, buildLayerRouteLiveSourceItem })

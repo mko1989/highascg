@@ -34,7 +34,21 @@ export function renderLiveTab(listEl, {
 	const sources = [...extras, ...base]
 
 	const renderKey = JSON.stringify({
-		sources: sources.map((s) => ({ value: s.value, label: s.label, res: s.resolution, type: s.type })),
+		channelMap: {
+			program: channelMap?.programChannels || [],
+			preview: channelMap?.previewChannels || [],
+			decklinkCount: channelMap?.decklinkCount ?? 0,
+			liveAudioCount: channelMap?.liveAudioCount ?? 0,
+			multiviewCh: channelMap?.multiviewCh ?? null,
+		},
+		sources: sources.map((s) => ({
+			value: s.value,
+			label: s.label,
+			res: s.resolution,
+			type: s.type,
+			routeType: s.routeType,
+		})),
+		connectors: connectors.map((c) => c?.id).filter(Boolean),
 		status: decklinkInputsStatus,
 		liveAudioStatus: liveAudioInputsStatus,
 		operatorFs: hostOperatorFullscreen?.sourceId || null,

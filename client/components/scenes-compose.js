@@ -13,6 +13,17 @@ import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
 import { showScenesToast } from './scenes-editor-support.js'
 export { createComposeDragHandlers } from './scenes-compose-handlers.js'
 
+/** @param {object | null | undefined} source @param {string} [text] */
+function makeLayerSourcePlaceholder(source, text) {
+	const ph = document.createElement('div')
+	ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--empty'
+	const t = String(source?.type || '').toLowerCase()
+	if (t === 'timeline') ph.textContent = text || 'Timeline'
+	else if (t === 'route' || t === 'live' || /^route:\/\//i.test(String(source?.value || ''))) ph.textContent = text || 'Live'
+	else ph.textContent = text || (source?.label || source?.value || 'Source').slice(0, 24)
+	return ph
+}
+
 /**
  * Build source object for fill math (drag payload may include `resolution` from media list / ffprobe).
  * @param {{ type?: string, value?: string, label?: string, resolution?: string }} data
@@ -219,6 +230,9 @@ export function renderComposeScene(scene, opts) {
 			img.alt = ''
 			img.src = getThumbnailUrl(layer.source.value, SCENE_THUMB_MAX_W, 0)
 			img.draggable = false
+			img.addEventListener('error', () => {
+				img.replaceWith(makeLayerSourcePlaceholder(layer.source, 'No preview'))
+			})
 			inner.appendChild(img)
 		} else if (typeof getThumbUrlForLayerSource === 'function') {
 			const liveUrl = getThumbUrlForLayerSource(layer.source)
@@ -230,6 +244,9 @@ export function renderComposeScene(scene, opts) {
 				img.alt = ''
 				img.src = liveUrl
 				img.draggable = false
+				img.addEventListener('error', () => {
+					img.replaceWith(makeLayerSourcePlaceholder(layer.source, 'No preview'))
+				})
 				wrap.appendChild(img)
 				const btn = document.createElement('button')
 				btn.type = 'button'
@@ -268,15 +285,10 @@ export function renderComposeScene(scene, opts) {
 				wrap.appendChild(btn)
 				inner.appendChild(wrap)
 			} else {
-				const ph = document.createElement('div')
-				ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--empty'
-				ph.textContent = 'Drop source'
-				inner.appendChild(ph)
+				inner.appendChild(makeLayerSourcePlaceholder(layer.source))
 			}
 		} else {
-			const ph = document.createElement('div')
-			ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--empty'
-			ph.textContent = 'Drop source'
+			const ph = makeLayerSourcePlaceholder(layer.source, 'Drop source')
 			inner.appendChild(ph)
 		}
 

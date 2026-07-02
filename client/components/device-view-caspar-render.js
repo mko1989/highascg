@@ -347,25 +347,7 @@ export function renderCasparBand(ctx) {
 		})
 	}
 
-	const panelControls = document.createElement('div')
-	panelControls.className = 'device-view__backpanel-controls'
-	const applyBtn = document.createElement('button')
-	applyBtn.type = 'button'
-	applyBtn.className = 'device-view__backpanel-slot-apply'
-	applyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> <span>Apply GPU Layout</span>`
-	applyBtn.title = 'Apply GPU-driven X11 layout and persist for reboot'
-	applyBtn.addEventListener('click', async (ev) => {
-		ev.preventDefault()
-		ev.stopPropagation()
-		if (!confirm('Apply GPU output layout now and persist for reboot?')) return
-		try {
-			await ctx.onApplyGpuSettings?.()
-		} catch (e) {
-			console.error('[device-view] onApplyGpuSettings', e)
-		}
-	})
-	panelControls.appendChild(applyBtn)
-	casparBand.appendChild(panelControls)
+
 
 	const markerItems = buildCasparRearMarkerLayoutItems(slots, casparConnectors)
 

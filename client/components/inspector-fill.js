@@ -8,7 +8,7 @@ import { api } from '../lib/api-client.js'
 import { multiviewState } from '../lib/multiview-state.js'
 import { createMathInput } from '../lib/math-input.js'
 import { createDragInput } from './inspector-common.js'
-import { fillInspectorPositionMeta } from '../lib/coordinate-origin.js'
+import { fillInspectorPositionMeta, displayPositionFromStoredPx } from '../lib/coordinate-origin.js'
 import { getCellOverlayType, resolveSourceAspectRatio, solveCellDimensions } from './multiview-editor-canvas.js'
 
 import { SCENE_CONTENT_FIT_OPTIONS } from '../lib/scene-content-fit.js'
@@ -93,7 +93,32 @@ export function appendLayerAlignButtons(parent, onAlign) {
 export function appendSceneLayerFillGroup(root, opts) {
 	const { res, pxRect, patchFillPx, patchFillAlign, layer, sceneId, layerIndex, sceneState, stateStore } = opts
 
+	let contentFitApplySeq = 0
+	/** @type {ReturnType<typeof createDragInput> | null} */
+	let xInpRef = null
+	/** @type {ReturnType<typeof createDragInput> | null} */
+	let yInpRef = null
+	/** @type {ReturnType<typeof createDragInput> | null} */
+	let wInpRef = null
+	/** @type {ReturnType<typeof createDragInput> | null} */
+	let hInpRef = null
+
+	function syncGeometryInputsFromLayer() {
+		const sc = sceneState.getScene(sceneId)
+		const L = sc?.layers?.[layerIndex]
+		if (!L || !xInpRef || !yInpRef || !wInpRef || !hInpRef) return
+		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		const fill = L.fill || fullFill()
+		const pxRectStored = fillToPixelRect(fill, canvas)
+		const disp = displayPositionFromStoredPx(pxRectStored, canvas)
+		xInpRef.setValue(Math.round(disp.x), false)
+		yInpRef.setValue(Math.round(disp.y), false)
+		wInpRef.setValue(Math.max(1, Math.round(disp.w)), false)
+		hInpRef.setValue(Math.max(1, Math.round(disp.h)), false)
+	}
+
 	async function reapplyLayerFrameForContentFit() {
+		const seq = ++contentFitApplySeq
 		const sc = sceneState.getScene(sceneId)
 		const L = sc?.layers?.[layerIndex]
 		if (!L?.source?.value) return
@@ -104,11 +129,13 @@ export function appendSceneLayerFillGroup(root, opts) {
 			sceneState.activeScreenIndex,
 			() => api.get('/api/media'),
 		)
+		if (seq !== contentFitApplySeq) return
 		if (!cr?.w || !cr?.h) return
 		const fit = L.contentFit || 'native'
 		const rect = sceneLayerPixelRectForContentFit(canvas.width, canvas.height, cr.w, cr.h, fit)
 		sceneState.patchLayer(sceneId, layerIndex, { fill: pixelRectToFill(rect, canvas) })
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		syncGeometryInputsFromLayer()
 	}
 
 	const posMeta = fillInspectorPositionMeta()
@@ -125,7 +152,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 
 	appendLayerAlignButtons(fillGrp, patchFillAlign)
 
-	const xInp = createDragInput({
+	const xInp = (xInpRef = createDragInput({
 		label: posMeta.xLabel,
 		value: Math.round(pxRect.x),
 		min: -999999,
@@ -133,8 +160,8 @@ export function appendSceneLayerFillGroup(root, opts) {
 		step: 1,
 		decimals: 0,
 		onChange: (v) => patchFillPx({ x: v }),
-	})
-	const yInp = createDragInput({
+	}))
+	const yInp = (yInpRef = createDragInput({
 		label: posMeta.yLabel,
 		value: Math.round(pxRect.y),
 		min: -999999,
@@ -142,8 +169,8 @@ export function appendSceneLayerFillGroup(root, opts) {
 		step: 1,
 		decimals: 0,
 		onChange: (v) => patchFillPx({ y: v }),
-	})
-	const wInp = createDragInput({
+	}))
+	const wInp = (wInpRef = createDragInput({
 		label: 'Width',
 		value: Math.max(1, Math.round(pxRect.w)),
 		min: 1,
@@ -158,8 +185,8 @@ export function appendSceneLayerFillGroup(root, opts) {
 				hInp.setValue(nh, false)
 			}
 		},
-	})
-	const hInp = createDragInput({
+	}))
+	const hInp = (hInpRef = createDragInput({
 		label: 'Height',
 		value: Math.max(1, Math.round(pxRect.h)),
 		min: 1,
@@ -174,7 +201,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 				wInp.setValue(nw, false)
 			}
 		},
-	})
+	}))
 	fillGrp.appendChild(xInp.wrap)
 	fillGrp.appendChild(yInp.wrap)
 	fillGrp.appendChild(wInp.wrap)

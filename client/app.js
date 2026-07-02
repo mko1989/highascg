@@ -182,7 +182,7 @@ async function init() {
 	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState })
 	_oscClient = new OscClient({ wsClient: ws })
 	window.highascg_osc_client = _oscClient
-	setAppRuntime({ ws, osc: _oscClient })
+	setAppRuntime({ ws, osc: _oscClient, stateStore, appLogic, getVariableStore: () => getVariableStore(ws) })
 
 	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
 

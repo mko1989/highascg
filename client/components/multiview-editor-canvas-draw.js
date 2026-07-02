@@ -107,7 +107,13 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 		const timersUnder = !!multiviewState.showTimersUnderLabels
 		const isScreen = ovType === 'pgm' || ovType === 'prv'
 		const labelBg = LABEL_BAR_BG[ovType] || LABEL_BAR_BG.route
-		const displayLabel = ((c.source ? (c.source.label || c.source.value) : c.label) || c.id || '') + getResolutionSuffix(c, channelMap)
+		let baseLabel = (c.source ? (c.source.label || c.source.value) : c.label) || c.id || ''
+		if (isScreen && typeof c.screenIdx === 'number') {
+			if (channelMap.virtualMainChannels?.[c.screenIdx]?.name) {
+				baseLabel = `${ovType === 'pgm' ? 'PGM' : 'PRV'} · ${channelMap.virtualMainChannels[c.screenIdx].name}`
+			}
+		}
+		const displayLabel = baseLabel + getResolutionSuffix(c, channelMap)
 		const shortLabel = displayLabel.length > 36 ? displayLabel.slice(0, 33) + '…' : displayLabel
 
 		if (timersUnder && isScreen) {

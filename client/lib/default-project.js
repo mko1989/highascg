@@ -11,11 +11,12 @@ import { multiviewState } from './multiview-state.js'
 import { programOutputState } from './program-output-state.js'
 import { projectFileIdFromName } from './project-files.js'
 import { markLocalProjectSaved } from './project-remote-sync.js'
-import { markServerProjectSynced, resetServerProjectSync } from './server-project-sync.js'
-import { getAppWs } from './app-runtime.js'
+import { markServerProjectSynced, resetServerProjectSync, applyServerRuntimeState } from './server-project-sync.js'
+import { getAppWs, getAppStateStore, getAppLogic, getAppVariableStore } from './app-runtime.js'
 import { flushSceneDeckSync } from './app-scene-deck.js'
 import { syncProjectMediaContextFromClient } from './project-media-context.js'
 import { settingsState } from './settings-state.js'
+import { placeholderState } from './placeholder-state.js'
 
 export const DEFAULT_PROJECT_NAME = 'Untitled'
 const PROJECT_VERSION = 2
@@ -30,7 +31,7 @@ export function buildDefaultSceneExportData() {
 		previewSceneIdByMain: [null, null, null, null],
 		activeScreenIndex: 0,
 		globalDefaultTransition: { ...defaultTransition() },
-		mainEditorVisible: [true, true, true, true],
+		mainEditorVisible: [true, false, false, false],
 		layerPresets: [],
 		lookPresets: [],
 		globalBorders: [null, null, null, null],
@@ -53,6 +54,7 @@ export function buildDefaultUntitledProject() {
 			bgColor: '#000000',
 			showTimersUnderLabels: false,
 		},
+		placeholders: [],
 	}
 }
 
@@ -77,7 +79,8 @@ export function applyDefaultUntitledProjectLocally(opts = {}) {
 		},
 		{ silent },
 	)
-	programOutputState.resetForNewProject({ silent })
+	programOutputState.resetAllMainsForNewProject({ silent })
+	placeholderState.loadFromData([])
 	syncProjectMediaContextFromClient(settingsState.getSettings())
 	if (emitLoaded) window.dispatchEvent(new Event('project-loaded'))
 }
@@ -150,4 +153,61 @@ export async function performFactoryReset() {
 	resetServerProjectSync()
 	await api.post('/api/config/reset', { reset: true })
 	await saveDefaultUntitledProjectToServer({ force: true })
+}
+
+/**
+ * New project — empty show + starter routing (1× PGM) on server and client.
+ * @param {{ showToast?: (msg: string, type?: string) => void }} [opts]
+ * @returns {Promise<object>} saved project payload
+ */
+export async function startNewProject(opts = {}) {
+	resetServerProjectSync()
+	const res = await api.post('/api/project/new', {})
+	if (!res?.ok || !res?.project) {
+		throw new Error(res?.error || 'New project failed')
+	}
+
+	const project = res.project
+	projectState.importProject(project, sceneState, timelineState, multiviewState, programOutputState, {
+		silent: true,
+	})
+	sceneState.setEditingScene(null)
+	programOutputState.resetAllMainsForNewProject({ silent: true })
+	placeholderState.loadFromData([])
+
+	await settingsState.load()
+	document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
+
+	try {
+		const state = await api.get('/api/state')
+		const stateStore = getAppStateStore()
+		const appLogic = getAppLogic()
+		if (state && stateStore && appLogic) {
+			applyServerRuntimeState(state, {
+				stateStore,
+				sceneState,
+				programOutputState,
+				appLogic,
+				getVariableStore: () => getAppVariableStore(),
+			})
+		} else if (state?.channelMap?.programResolutions) {
+			sceneState.setCanvasResolutions(state.channelMap.programResolutions)
+			programOutputState.setCanvasResolutions(state.channelMap.programResolutions)
+			if (stateStore) stateStore.applyChange('channelMap', state.channelMap)
+		}
+	} catch (e) {
+		console.warn('[HighAsCG] GET /api/state after new project:', e?.message || e)
+	}
+
+	multiviewState.switchTo(1)
+	document.dispatchEvent(new CustomEvent('highascg-device-view-reload'))
+
+	markLocalProjectSaved()
+	markServerProjectSynced()
+	const appWs = getAppWs()
+	if (appWs) flushSceneDeckSync(appWs, sceneState)
+	syncProjectMediaContextFromClient(settingsState.getSettings())
+	window.dispatchEvent(new Event('project-loaded'))
+	opts.showToast?.('New project started', 'success')
+	return project
 }

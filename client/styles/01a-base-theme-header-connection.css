@@ -173,6 +173,16 @@ optgroup {
 	display: none !important;
 }
 
+.header-replication-paired {
+	font-size: 10px;
+	font-weight: 600;
+	color: #c9d1d9;
+	white-space: nowrap;
+	max-width: 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .header-replication-indicator {
 	width: 24px;
 	height: 24px;

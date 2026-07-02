@@ -99,7 +99,9 @@ export class ProjectState {
 		if (po && programOutputState?.loadFromData) programOutputState.loadFromData(po, { silent })
 		if (data.timelines && timelineState?.loadFromData) timelineState.loadFromData(data.timelines, { silent })
 		if (data.multiview && multiviewState?.loadFromData) multiviewState.loadFromData(data.multiview, { silent })
-		if (data.placeholders && window.placeholderState?.loadFromData) window.placeholderState.loadFromData(data.placeholders)
+		if ('placeholders' in data && window.placeholderState?.loadFromData) {
+			window.placeholderState.loadFromData(Array.isArray(data.placeholders) ? data.placeholders : [])
+		}
 		this._emit('imported')
 		return true
 	}

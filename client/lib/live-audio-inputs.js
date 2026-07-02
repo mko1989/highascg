@@ -183,6 +183,7 @@ export function buildLiveAudioConfigBody(ui) {
 		live_audio_pgm_audio_only: ui.pgmAudioOnly,
 		live_audio_inputs_host_channel_enabled: ui.hostChannelEnabled,
 		live_audio_inputs_channel_mode: ui.inputsChannelMode,
+		live_audio_input_channel_mode: ui.inputsChannelMode,
 		audio_preview_enabled: ui.audioPreviewEnabled,
 		audio_preview_bus: ui.audioPreviewBus,
 		audio_preview_screen: ui.audioPreviewScreen,

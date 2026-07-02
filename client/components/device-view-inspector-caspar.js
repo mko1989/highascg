@@ -31,6 +31,7 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 
 	const rows = [
 		{ label: 'Hostname', value: String(live?.host?.hostname || '-') },
+		{ label: 'Hardware ID', value: String(live?.host?.hardwareId || '-') },
 		{ label: 'Platform', value: String(live?.host?.platform || '-') },
 		{ label: 'AMCP', value: live?.caspar?.connected ? 'connected' : 'disconnected' },
 		{ label: 'Host', value: String(live?.caspar?.host || s?.caspar?.host || '-') },

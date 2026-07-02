@@ -57,3 +57,51 @@ export function getLiveThumbnailUrl(channel, cacheBust) {
 	}
 	return base
 }
+
+/**
+ * @param {{ type?: string, value?: string, isPlaceholder?: boolean }} source
+ * @returns {boolean}
+ */
+export function isMediaOrFileSourceValue(source) {
+	if (!source?.value) return false
+	if (source.isPlaceholder || source.type === 'placeholder') return false
+	const t = String(source.type || '').toLowerCase()
+	return (t === 'media' || t === 'file')
+}
+
+/**
+ * Resolve a deck/compose thumbnail URL for a layer or clip source.
+ * Returns null when no static thumbnail applies (timeline, templates, direct NDI, etc.).
+ * @param {object | null | undefined} source
+ * @param {{ maxWidth?: number, seekSec?: number, channelForLive?: number | null, cacheBust?: number | string }} [opts]
+ * @returns {string | null}
+ */
+export function resolveSourceThumbnailUrl(source, opts = {}) {
+	if (!source?.value) return null
+	const maxW = opts.maxWidth ?? 960
+	const seekSec = opts.seekSec ?? 0
+	const channelForLive = opts.channelForLive ?? null
+
+	if (isMediaOrFileSourceValue(source)) {
+		return getThumbnailUrl(source.value, maxW, seekSec)
+	}
+
+	const t = String(source.type || '').toLowerCase()
+	if (t === 'timeline' || t === 'template' || t === 'cg' || t === 'html') return null
+	if (source.isPlaceholder || t === 'placeholder') return null
+
+	const ch = getLiveThumbnailChannelForSource(source, channelForLive)
+	if (ch == null || ch <= 0) return null
+
+	const v = String(source.value || '').trim()
+	const isRoutable =
+		t === 'route' ||
+		t === 'live' ||
+		t === 'live_audio' ||
+		t === 'ndi' ||
+		t === 'browser' ||
+		/^route:\/\//i.test(v)
+	if (!isRoutable) return null
+
+	return getLiveThumbnailUrl(ch, opts.cacheBust)
+}
