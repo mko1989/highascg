@@ -188,7 +188,7 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 			const active = st.active
 			const applied = st.appliedMode || 'unknown'
 			netStatus.textContent = active
-				? `Current: ${active.address || 'no IPv4'} · ${applied} · ${active.operstate || 'link?'}`
+				? `Current: ${active.address || 'no IPv4'} · ${applied} · ${active.operstate || 'link?'} · config: ${st.source || 'default'}`
 				: 'No active Ethernet interface detected'
 			const cfgMode = networkCfg.mode === 'static' ? 'static' : 'dhcp'
 			const pick = st.appliedMode === 'static' || st.appliedMode === 'dhcp' ? st.appliedMode : cfgMode

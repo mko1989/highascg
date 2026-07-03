@@ -41,6 +41,7 @@ TESTS=(
 	test-09-openbox-wiring.sh
 	test-10-boot-journal.sh
 	test-11-replication-trust.sh
+	test-12-exfat-network-conf.sh
 )
 
 if "$LIST_ONLY"; then

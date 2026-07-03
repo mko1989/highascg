@@ -15,6 +15,74 @@ const { getMediaIngestBasePath, resolveMediaFileOnDisk } = require('./local-medi
 /** @type {Map<number, Promise<{ ok: boolean, error?: string }>>} */
 const _captureLocks = new Map()
 
+/** @type {Map<number, ReturnType<typeof setTimeout>>} */
+const _refreshTimers = new Map()
+
+/**
+ * @param {object} [config]
+ * @returns {number}
+ */
+function resolveLiveThumbnailTtlMs(config) {
+	const n = parseInt(String(config?.live_thumbnail_ttl_ms ?? config?.liveThumbnail?.ttlMs ?? 30000), 10)
+	return Number.isFinite(n) ? Math.max(0, Math.min(600000, n)) : 30000
+}
+
+/**
+ * @param {{ capturedAt?: string } | null | undefined} meta
+ * @param {number} ttlMs
+ * @returns {boolean}
+ */
+function isLiveThumbnailMetaStale(meta, ttlMs) {
+	if (ttlMs <= 0) return false
+	if (!meta?.capturedAt) return true
+	const t = Date.parse(meta.capturedAt)
+	if (!Number.isFinite(t)) return true
+	return Date.now() - t > ttlMs
+}
+
+/**
+ * @param {object} [config]
+ * @param {number} channel
+ */
+function invalidateLiveThumbnailCache(config, channel) {
+	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	const dest = cachePngPath(config || {}, ch)
+	const metaDest = cacheMetaPath(config || {}, ch)
+	try {
+		if (fs.existsSync(dest)) fs.unlinkSync(dest)
+	} catch {
+		/* ok */
+	}
+	try {
+		if (fs.existsSync(metaDest)) fs.unlinkSync(metaDest)
+	} catch {
+		/* ok */
+	}
+}
+
+/**
+ * Debounced PRINT refresh after bus/scene activity (WO-110).
+ * @param {object} ctx
+ * @param {number} channel
+ * @param {number} [delayMs]
+ */
+function scheduleLiveThumbnailRefresh(ctx, channel, delayMs) {
+	const cfg = ctx?.config || {}
+	if (cfg.live_thumbnail_refresh_on_bus === false) return
+	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	if (!ctx?.amcp?.isConnected) return
+	const delay = Math.max(150, parseInt(String(delayMs ?? cfg.live_thumbnail_refresh_delay_ms ?? 600), 10) || 600)
+	const prev = _refreshTimers.get(ch)
+	if (prev) clearTimeout(prev)
+	_refreshTimers.set(
+		ch,
+		setTimeout(() => {
+			_refreshTimers.delete(ch)
+			void captureLiveThumbnailToCache(ctx, ch, { force: true }).catch(() => {})
+		}, delay),
+	)
+}
+
 /**
  * @param {object} [config]
  * @returns {string}
@@ -173,10 +241,14 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 
 	const dest = cachePngPath(cfg, ch)
 	const metaDest = cacheMetaPath(cfg, ch)
+	const ttlMs = resolveLiveThumbnailTtlMs(cfg)
 	if (!force && fs.existsSync(dest)) {
 		try {
 			const st = await fs.promises.stat(dest)
-			if (st.size > 100) return { ok: true, path: dest, cached: true }
+			const meta = readMeta(cfg, ch)
+			if (st.size > 100 && !isLiveThumbnailMetaStale(meta, ttlMs)) {
+				return { ok: true, path: dest, cached: true }
+			}
 		} catch {
 			/* re-capture */
 		}
@@ -295,15 +367,19 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 		stat && stat.size > 32 ? `W/"${Math.floor(stat.mtimeMs)}-${stat.size}"` : null
 
 	if (stat && stat.size > 32 && !force) {
-		const buf = await fs.promises.readFile(dest)
-		return {
-			status: 200,
-			headers: {
-				'Content-Type': 'image/png',
-				'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
-				...(etag ? { ETag: etag } : {}),
-			},
-			body: buf,
+		const meta = readMeta(cfg, ch)
+		const ttlMs = resolveLiveThumbnailTtlMs(cfg)
+		if (!isLiveThumbnailMetaStale(meta, ttlMs)) {
+			const buf = await fs.promises.readFile(dest)
+			return {
+				status: 200,
+				headers: {
+					'Content-Type': 'image/png',
+					'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+					...(etag ? { ETag: etag } : {}),
+				},
+				body: buf,
+			}
 		}
 	}
 
@@ -430,4 +506,8 @@ module.exports = {
 	handleLiveThumbnailCapturePost,
 	handleLiveThumbnailUploadPost,
 	readMeta,
+	resolveLiveThumbnailTtlMs,
+	isLiveThumbnailMetaStale,
+	invalidateLiveThumbnailCache,
+	scheduleLiveThumbnailRefresh,
 }

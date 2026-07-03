@@ -3,6 +3,7 @@
 st_section "05 systemd WO-47 chain"
 units=(
 	highascg-exfat-boot.service
+	highascg-exfat-network-apply.service
 	highascg-exfat-server-update.service
 	highascg-exfat-sync.service
 	highascg.service

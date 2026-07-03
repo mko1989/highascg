@@ -8,7 +8,54 @@ set -euo pipefail
 TARGET="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FRAG="${HIGHASCG_EGGS_EXCLUDE_FRAGMENT:-${HERE}/penguins-eggs-exclude-highascg-fragment.list}"
+EMBED_FRAG="${HERE}/penguins-eggs-exclude-highascg-embed-server.list"
 MARKER="# --- HighAsCG tools/eggs/live-usb: merge-penguins-eggs-exclude-highascg.sh ---"
+
+# WO-47-only: omit Node server from squashfs (exFAT drop-update/). Must not remain when
+# embedding server + dist-web on the ISO (embed-server fragment).
+WO47_SERVER_EXCLUDES=(
+	home/casparcg/highascg/index.js
+	home/casparcg/highascg/package.json
+	home/casparcg/highascg/package-lock.json
+	home/casparcg/highascg/npm-shrinkwrap.json
+	home/casparcg/highascg/src
+	home/casparcg/highascg/src/*
+	home/casparcg/highascg/scripts
+	home/casparcg/highascg/scripts/*
+	home/casparcg/highascg/tools
+	home/casparcg/highascg/tools/*
+	home/casparcg/highascg/dist-web
+	home/casparcg/highascg/dist-web/*
+	home/casparcg/highascg/node_modules
+	home/casparcg/highascg/node_modules/*
+)
+
+strip_wo47_server_excludes() {
+	local file="$1"
+	local tmp removed=0
+	tmp="$(mktemp)"
+	while IFS= read -r line || [[ -n "${line:-}" ]]; do
+		local skip=0
+		for pat in "${WO47_SERVER_EXCLUDES[@]}"; do
+			if [[ "$line" == "$pat" ]]; then
+				skip=1
+				removed=$((removed + 1))
+				break
+			fi
+		done
+		[[ "$skip" -eq 1 ]] && continue
+		printf '%s\n' "$line"
+	done <"$file" >"$tmp"
+	mv "$tmp" "$file"
+	if [[ "$removed" -gt 0 ]]; then
+		echo "Stripped $removed WO-47 server exclude line(s) from: $file" >&2
+	fi
+}
+
+using_embed_server_fragment() {
+	[[ "$(readlink -f "$FRAG" 2>/dev/null || realpath "$FRAG" 2>/dev/null || echo "$FRAG")" == \
+		"$(readlink -f "$EMBED_FRAG" 2>/dev/null || realpath "$EMBED_FRAG" 2>/dev/null || echo "$EMBED_FRAG")" ]]
+}
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   echo "Usage: sudo $0 [--replace]"
   echo "  Appends to ${TARGET} (set EGGS_EXCLUDE_LIST to override)."
@@ -40,6 +87,9 @@ if [[ "$REPLACE" -eq 1 ]]; then
   awk '/^# --- HighAsCG tools\/(live-usb|eggs\/live-usb):/ { exit } { print }' "$TARGET" >"$tmp"
   mv "$tmp" "$TARGET"
   echo "Removed prior HighAsCG exclude blocks from: $TARGET" >&2
+fi
+if using_embed_server_fragment; then
+  strip_wo47_server_excludes "$TARGET"
 fi
 if grep -qF "$MARKER" "$TARGET" 2>/dev/null && [[ "$REPLACE" -eq 0 ]]; then
   added=0

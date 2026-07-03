@@ -3,7 +3,6 @@
 # Location: /etc/penguins-eggs.d/exclude.list
 #
 # penguins-eggs master template + HighAsCG WO-47 fragment (single block).
-# Install: sudo cp ~/highascg/tools/eggs/live-usb/exclude.list /etc/penguins-eggs.d/exclude.list
 #
 ######################################################################################################
 
@@ -110,38 +109,9 @@ swapfile
 # Single-driver ISO — no multi-branch deb pool (WO single-nvidia-driver-per-iso)
 opt/nvidia-pool
 opt/nvidia-pool/*
-home/casparcg/highascg/index.js
-home/casparcg/highascg/package.json
-home/casparcg/highascg/package-lock.json
-home/casparcg/highascg/npm-shrinkwrap.json
-home/casparcg/highascg/src
-home/casparcg/highascg/src/*
-home/casparcg/highascg/scripts
-home/casparcg/highascg/scripts/*
-home/casparcg/highascg/tools
-home/casparcg/highascg/tools/*
-home/casparcg/highascg/client
-home/casparcg/highascg/client/*
-home/casparcg/highascg/dist-web
-home/casparcg/highascg/dist-web/*
-home/casparcg/highascg/node_modules
-home/casparcg/highascg/node_modules/*
-home/casparcg/highascg/deprecated
-home/casparcg/highascg/deprecated/*
-home/casparcg/highascg/work
-home/casparcg/highascg/work/*
-home/casparcg/highascg/examples
-home/casparcg/highascg/examples/*
-home/casparcg/highascg/samples
-home/casparcg/highascg/samples/*
-home/casparcg/highascg/scratch
-home/casparcg/highascg/scratch/*
-home/casparcg/highascg/audio_testing
-home/casparcg/highascg/audio_testing/*
-home/casparcg/highascg/for_client
-home/casparcg/highascg/for_client/*
-home/casparcg/highascg/From_client
-home/casparcg/highascg/From_client/*
+# WO-47 server-tree excludes (index.js, src/, node_modules/, dist-web/, …) live in
+# penguins-eggs-exclude-highascg-fragment.list — merged only when HIGHASCG_ISO_EMBED_SERVER=0.
+# Embed-server ISOs merge penguins-eggs-exclude-highascg-embed-server.list instead.
 home/casparcg/highascg/media/*
 home/casparcg/highascg/_media
 home/casparcg/highascg/log

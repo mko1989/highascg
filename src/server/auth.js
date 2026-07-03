@@ -29,8 +29,11 @@ function getSecurityConfig(config) {
 
 function isEnforceAuthActive(config) {
 	if (_runtimeEnforceAuth != null) return _runtimeEnforceAuth
+	const sec = getSecurityConfig(config)
+	// Explicit config opt-out overrides systemd/env (HIGHASCG_ENFORCE_AUTH).
+	if (!sec.enforceAuth) return false
 	if (truthyEnv(process.env.HIGHASCG_ENFORCE_AUTH)) return true
-	return getSecurityConfig(config).enforceAuth
+	return sec.enforceAuth
 }
 
 /** @param {{ enforceAuth?: boolean }} opts */

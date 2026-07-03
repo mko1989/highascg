@@ -8,6 +8,7 @@ const {
 	applyProjectFpsToInheritedOutputs,
 } = require('../../src/config/project-fps')
 const { normalizeNetworkSettings, isAllowedEthernetIface, isValidIpv4 } = require('../../src/config/network-settings')
+const { resolveNetworkConfigSource } = require('../../src/system/network-inventory')
 
 assert.strictEqual(normalizeProjectFps(50), 50)
 assert.strictEqual(normalizeProjectFps(49.9), 50)
@@ -34,5 +35,11 @@ assert.strictEqual(isValidIpv4('999.1.1.1'), false)
 const net = normalizeNetworkSettings({ mode: 'static', primaryInterface: 'eth0', static: { address: '10.0.0.2' } }, {})
 assert.strictEqual(net.mode, 'static')
 assert.strictEqual(net.primaryInterface, 'eth0')
+
+assert.strictEqual(resolveNetworkConfigSource(null).source, 'default')
+assert.strictEqual(
+	resolveNetworkConfigSource({ mode: 'static', primaryInterface: 'eth0', static: { address: '10.0.0.2' } }).source,
+	'ui',
+)
 
 console.log('smoke-project-fps-network: OK')

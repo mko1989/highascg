@@ -3,6 +3,7 @@
 const cache = require('./compose-preview-cache')
 const consumer = require('./compose-preview-consumer')
 const companionThumb = require('./compose-preview-companion-thumb')
+const composeActivity = require('./compose-preview-activity')
 const {
 	isFfmpegJpegComposePreview,
 	resolveMonitoredChannels,
@@ -15,6 +16,8 @@ let _watchTimer = null
 let _watchPollMs = 40
 /** @type {Map<number, number>} */
 const _lastMtime = new Map()
+/** Deferred broadcast while channel is settling (WO-110). @type {Map<number, number>} */
+const _deferredMtime = new Map()
 /** Serializes start/stop so async stop cannot kill receivers after a overlapping start. */
 let _lifecycleChain = Promise.resolve()
 /**
@@ -63,6 +66,7 @@ async function stopFfmpegJpegComposePreviewInternal(ctx) {
 	companionThumb.stopCompanionThumbTimer()
 	companionThumb.clearCompanionPreviewVariables(ctx)
 	_lastMtime.clear()
+	_deferredMtime.clear()
 	if (ctx) {
 		await consumer.detachAllComposeFileConsumers(ctx)
 		ctx.log?.('debug', '[compose-preview] ffmpeg_jpeg stopped')
@@ -93,7 +97,7 @@ function startFfmpegJpegComposePreview(ctx) {
 		const channels = resolveMonitoredChannels(ctx.config)
 		ctx.log?.(
 			'info',
-			`[compose-preview] ffmpeg_jpeg starting (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.companionThumbEnabled ? `thumb${cp.companionThumbSize ?? 144}` : cp.resolutionScale ?? 'half'}, pollMs=${resolveMtimePollMs(ctx.config)}, direct FILE)`,
+			`[compose-preview] ffmpeg_jpeg starting (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.resolutionScale ?? 'half'}, companionThumb=${cp.companionThumbEnabled ? cp.companionThumbSize ?? 144 : 'off'}, pollMs=${resolveMtimePollMs(ctx.config)}, direct FILE)`,
 		)
 		await consumer.attachAllComposeFileConsumers(ctx)
 		startMtimeWatch(ctx)
@@ -134,6 +138,29 @@ function startMtimeWatch(ctx) {
 
 /**
  * @param {object} ctx
+ * @param {object} cfg
+ * @param {number} ch
+ * @param {{ format: string, path: string }} resolved
+ * @param {import('fs').Stats} st
+ */
+function broadcastComposePreviewFrame(ctx, cfg, ch, resolved, st) {
+	_lastMtime.set(ch, st.mtimeMs)
+	_deferredMtime.delete(ch)
+	if (typeof ctx._wsBroadcast === 'function') {
+		ctx._wsBroadcast('compose.preview', {
+			channel: ch,
+			format: resolved.format,
+			etag: cache.etagFromStat(st),
+			url: `/api/compose-preview/${ch}.${resolved.format === 'jpeg' ? 'jpg' : 'png'}`,
+		})
+	}
+	if (companionThumb.isCompanionThumbEnabled(cfg)) {
+		void companionThumb.onComposePreviewUpdated(ctx, ch, st.mtimeMs)
+	}
+}
+
+/**
+ * @param {object} ctx
  */
 async function pollMtimeAndBroadcast(ctx) {
 	if (!isFfmpegJpegComposePreview(ctx?.config)) return
@@ -144,19 +171,24 @@ async function pollMtimeAndBroadcast(ctx) {
 		try {
 			const st = await require('fs').promises.stat(resolved.path)
 			const prev = _lastMtime.get(ch) || 0
-			if (st.mtimeMs <= prev) continue
-			_lastMtime.set(ch, st.mtimeMs)
-			if (typeof ctx._wsBroadcast === 'function') {
-				ctx._wsBroadcast('compose.preview', {
-					channel: ch,
-					format: resolved.format,
-					etag: cache.etagFromStat(st),
-					url: `/api/compose-preview/${ch}.${resolved.format === 'jpeg' ? 'jpg' : 'png'}`,
-				})
+			const deferred = _deferredMtime.get(ch) || 0
+			const hasNewFrame = st.mtimeMs > prev
+			const hasDeferred = deferred > 0
+
+			if (!hasNewFrame && !hasDeferred) continue
+
+			if (!composeActivity.isComposePreviewSettled(ch)) {
+				if (hasNewFrame) _deferredMtime.set(ch, Math.max(deferred, st.mtimeMs))
+				continue
 			}
-			if (companionThumb.isCompanionThumbEnabled(cfg)) {
-				void companionThumb.onComposePreviewUpdated(ctx, ch, st.mtimeMs)
+
+			const mtimeMs = Math.max(st.mtimeMs, deferred)
+			if (mtimeMs <= prev) {
+				_deferredMtime.delete(ch)
+				continue
 			}
+
+			broadcastComposePreviewFrame(ctx, cfg, ch, resolved, { ...st, mtimeMs })
 		} catch {
 			/* file not ready */
 		}

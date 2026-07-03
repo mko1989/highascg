@@ -151,6 +151,11 @@ function notifyProgramMutationMayInvalidateLive(ctx, channel, opts = {}) {
 	} catch {
 		/* WO-57 optional */
 	}
+	try {
+		require('../media/live-thumbnail-cache').scheduleLiveThumbnailRefresh(ctx, channel)
+	} catch {
+		/* optional */
+	}
 	if (!invalidateIfProgramChannel(ctx?.config, channel)) return false
 	broadcastSceneLive(ctx)
 	return true

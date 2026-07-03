@@ -45,11 +45,15 @@ function sourcePayloadForFill(data) {
  * @returns {(layerIndex: number, data: { type?: string, value?: string, label?: string, resolution?: string }) => Promise<void>}
  */
 export function createApplyNativeFillForSource(opts) {
-	const { sceneState, getCanvas, stateStore } = opts
+	const { sceneState, getResolution, stateStore } = opts
 	return async function applyNativeFillForSource(layerIndex, data) {
 		const scene = sceneState.getScene(sceneState.editingSceneId)
 		if (!scene?.layers[layerIndex] || !data?.value) return
-		const canvas = getCanvas()
+		const res = typeof getResolution === 'function' ? getResolution() : null
+		const canvas = {
+			width: res?.w > 0 ? res.w : stateStore?.getState?.()?.channelMap?.programResolutions?.[0]?.w || 1920,
+			height: res?.h > 0 ? res.h : stateStore?.getState?.()?.channelMap?.programResolutions?.[0]?.h || 1080,
+		}
 		const source = sourcePayloadForFill(data)
 		const layer = scene.layers[layerIndex]
 		const contentFit = layer.contentFit || 'native'

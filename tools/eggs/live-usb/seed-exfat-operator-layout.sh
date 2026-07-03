@@ -19,6 +19,7 @@ mkdir -p \
 	"${ROOT}/projects/_autosave" \
 	"${ROOT}/snapshots/rear-panels" \
 	"${ROOT}/decklink" \
+	"${ROOT}/network" \
 	"${ROOT}/.private"
 
 README_PRIVATE="${ROOT}/.private/README.txt"
@@ -74,6 +75,38 @@ Caspar channel settings are already correct. Without desktopvideo-gui, Settings
 
 https://www.blackmagicdesign.com/support/family/capture-and-playback
 EOF
+
+README_NETWORK="${ROOT}/network/README.txt"
+SAMPLE_NETWORK="${ROOT}/network/network.conf"
+mkdir -p "${ROOT}/network"
+cat >"$README_NETWORK" <<'EOF'
+Operator network settings — edit network.conf on the USB stick from any PC.
+
+  network/network.conf   DHCP or static IPv4 (plain text, Notepad-friendly)
+
+After saving, reboot the playout box or re-plug the USB stick.
+Settings apply before the Web UI starts. Invalid values are skipped (fail-safe).
+
+See network.conf for examples. Device View can also change IP at runtime;
+exFAT file wins on the next cold boot.
+EOF
+
+if [[ ! -f "$SAMPLE_NETWORK" ]]; then
+	cat >"$SAMPLE_NETWORK" <<'EOF'
+# HighAsCG network — edit on exFAT stick, save, reboot
+# mode: dhcp | static
+mode=dhcp
+
+# Optional — auto-detect if omitted (first wired NIC with carrier)
+# interface=enp3s0
+
+# --- static only (when mode=static) ---
+# address=192.168.1.50
+# prefix=24
+# gateway=192.168.1.1
+# dns=192.168.1.1,8.8.8.8
+EOF
+fi
 
 if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
 	grp="$(id -gn "$USER_CASPAR")"

@@ -35,7 +35,8 @@
 | 92 | [92_WO_DECKLINK_EXFAT_VENDOR_INSTALL.md](./92_WO_DECKLINK_EXFAT_VENDOR_INSTALL.md) | Draft | Operator-supplied BMD tarball on exFAT `vendor/decklink/`; idempotent boot install + API (no DeckLink in ISO) |
 | 93 | [93_WO_TIMELINE_ENHANCEMENTS.md](./93_WO_TIMELINE_ENHANCEMENTS.md) | Draft | Timeline labels, clip/layer drag-and-drop reorder |
 | 94 | [94_WO_ETHERNET_LINK_LOCAL_FALLBACK.md](./94_WO_ETHERNET_LINK_LOCAL_FALLBACK.md) | Draft | NM link-local fallback when DHCP absent (egg networkd has it; runtime does not) |
-| 95 | [95_WO_EXFAT_NETWORK_CONFIG_FILE.md](./95_WO_EXFAT_NETWORK_CONFIG_FILE.md) | Draft | exFAT `network/network.conf` — operator DHCP/static IP at boot |
+| 95 | [95_WO_EXFAT_NETWORK_CONFIG_FILE.md](./95_WO_EXFAT_NETWORK_CONFIG_FILE.md) | In progress | exFAT `network/network.conf` — operator DHCP/static IP at boot (T95.1–T95.3 shipped) |
+| 110 | [110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md](./110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md) | In progress | Looks canvas thumb fixes (T110.1/3/5–7 shipped); WO-94/95 stick network pending |
 
 ## WO-33 — Device view (split)
 

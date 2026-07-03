@@ -2,10 +2,26 @@ import { defineConfig, loadEnv } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { WEBUI_PORT } from './client/lib/webui-port.js'
 
 const repoDir = path.dirname(fileURLToPath(import.meta.url))
 const clientDir = path.join(repoDir, 'client')
+
+function readWebUiPort() {
+	for (const rel of ['client/lib/webui-port.json', 'webui-port.json']) {
+		const p = path.join(repoDir, rel)
+		if (!fs.existsSync(p)) continue
+		try {
+			const cfg = JSON.parse(fs.readFileSync(p, 'utf8'))
+			const port = Number(cfg.port)
+			if (port > 0) return port
+		} catch {
+			/* try next */
+		}
+	}
+	return 4350
+}
+
+const WEBUI_PORT = readWebUiPort()
 
 const STATIC_MIME = {
 	'.svg': 'image/svg+xml',

@@ -91,7 +91,7 @@ sudo bash tools/eggs/live-usb/merge-penguins-eggs-exclude-highascg.sh --replace
 | **`/swap.img`** (often 8 GiB on disk) | `swap.img`, `swapfile`, `swap/*` | **No** — omit works |
 | **`var/cache/*`** (apt, etc.) | eggs master `var/cache/*` | **No** |
 | **`home/casparcg/.cache`** | `home/casparcg/.cache/*` | **No** |
-| **`~/highascg/node_modules`** | `home/casparcg/highascg/node_modules/*` | **No** |
+| **`~/highascg/node_modules`** | WO-47 fragment only | **Yes** on embed-server ISO (`HIGHASCG_ISO_EMBED_SERVER=1`) |
 | **`~/highascg/cef-cache`** | `cef-cache`, `cef-cache/*` | **No** |
 
 `strip-host-swap-for-live-iso.sh prepare` only **swapoff** and removes **`/swap.img` from fstab** so the live system does not try to use swap on boot. It does **not** delete `/swap.img` on the build disk (that is fine — excludes keep it out of the ISO).

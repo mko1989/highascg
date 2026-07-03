@@ -97,10 +97,15 @@ if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "0" ]]; then
 		ok "absent: home/casparcg/highascg/node_modules"
 	fi
 else
+	if squash_has_path 'home/casparcg/highascg/index.js'; then
+		ok "present: home/casparcg/highascg/index.js"
+	else
+		bad "missing index.js — WO-47 exclude lines may still be in /etc/penguins-eggs.d/exclude.list"
+	fi
 	if squash_has_tree 'home/casparcg/highascg/node_modules'; then
 		ok "present: home/casparcg/highascg/node_modules (embed-server ISO)"
 	else
-		warn "missing node_modules — embed-server ISO may not boot standalone"
+		bad "missing node_modules — embed-server ISO will not boot (check exclude.list WO-47 lines)"
 	fi
 	if squash_has_path 'home/casparcg/highascg/dist-web/index.html'; then
 		ok "present: home/casparcg/highascg/dist-web/index.html (operator UI on :4200)"

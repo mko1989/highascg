@@ -238,7 +238,15 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	const selectedLayerIndexRef = { get current() { return selectedLayerIndex }, set current(v) { selectedLayerIndex = v } }
 	const dispatchLayerSelect = detail => { selectedLayerIndex = detail?.layerIndex ?? null; window.dispatchEvent(new CustomEvent('scene-layer-select', { detail })); previewPanel.scheduleDraw(); scheduleRender() }
 
-	const applyNativeFillForSource = createApplyNativeFillForSource({ sceneState, getCanvas: () => sceneState.getCanvasForScreen(sceneState.activeScreenIndex), stateStore })
+	const applyNativeFillForSource = createApplyNativeFillForSource({
+		sceneState,
+		stateStore,
+		getResolution: () => {
+			const scene = resolveComposeScene()
+			const mainIdx = scene ? resolveMainIndexForScene(scene, sceneState) : sceneState.activeScreenIndex
+			return Logic.getResolutionForScreen(mainIdx, sceneState, stateStore)
+		},
+	})
 	const { startDrag, startRotate, startScale, startEdgeResize } = createComposeDragHandlers(sceneState, previewRuntime.schedulePreviewPush)
 
 	const DECK_DROP_EXT = /\.(mp4|mpe?g|m4v|mov|mxf|mkv|webm|avi|wmv|ts|mts|m2t|m2v|png|jpe?g|gif|webp|bmp|tiff?|dpx|exr|wav|mp3|aac|flac|ogg|m4a)$/i

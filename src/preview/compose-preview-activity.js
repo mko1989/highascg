@@ -247,6 +247,22 @@ function onTimelinePlaying() {}
 function onTimelinePaused() {}
 
 /**
+ * True when compose preview WS broadcast is allowed (transition settle complete).
+ * @param {number|string} channel
+ * @returns {boolean}
+ */
+function isComposePreviewSettled(channel) {
+	const st = _st(channel)
+	if (!st) return true
+	const now = Date.now()
+	if (st.mode === 'settling') {
+		if (now < st.settleUntil) return false
+		st.mode = 'idle'
+	}
+	return true
+}
+
+/**
  * @param {object} ctx
  * @param {number|string} channel
  * @param {number} tickIntervalMs
@@ -358,6 +374,7 @@ module.exports = {
 	onSceneTake,
 	onTimelinePlaying,
 	onTimelinePaused,
+	isComposePreviewSettled,
 	shouldCaptureOnTick,
 	onCaptureComplete,
 	requestInitialCapture,

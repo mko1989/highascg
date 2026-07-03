@@ -12,7 +12,7 @@ if st_exfat_label_mounted; then
 else
 	st_fail "HIGHASCGEXF not mounted"
 fi
-for d in configs drop-config drop-update media templates; do
+for d in configs drop-config drop-update media templates network; do
 	if [[ -d "${EXFAT}/${d}" ]]; then
 		st_ok "exFAT/${d}/ present"
 	else

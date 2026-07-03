@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — design only  
+**Status:** In progress — T95.1–T95.3 shipped (2026-07-03)  
 **Priority:** **Medium** — field operators need IP without Web UI or Device View on first boot  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -107,12 +107,12 @@ Optional: merge into highascg.config.json network.* for UI parity
 
 ## 5. Tasks
 
-- [ ] **T95.0** Bikeshed path: `network/network.conf` vs `network.conf` at exFAT root — prefer **`network/network.conf`** + README
-- [ ] **T95.1** Parser script + install via `scripts/exfat/install-exfat-systemd-units.sh`
-- [ ] **T95.2** systemd unit + hook in `highascg-exfat-arrive.sh` when file mtime changes
-- [ ] **T95.3** Seed sample + README in `seed-exfat-operator-layout.sh`
-- [ ] **T95.4** API: `GET /api/system/network` notes `source: exfat|ui|default`; optional POST to write back to exFAT (v2)
-- [ ] **T95.5** Docs: `tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`, `client/tools/live-usb/USB_STICK_AFTER_FLASH.md`
+- [x] **T95.0** Bikeshed path: `network/network.conf` vs `network.conf` at exFAT root — prefer **`network/network.conf`** + README
+- [x] **T95.1** Parser script + install via `scripts/exfat/install-exfat-systemd-units.sh`
+- [x] **T95.2** systemd unit + hook in `highascg-exfat-arrive.sh` when file mtime changes
+- [x] **T95.3** Seed sample + README in `seed-exfat-operator-layout.sh`
+- [x] **T95.4** API: `GET /api/system/network` notes `source: exfat|ui|default`; optional POST to write back to exFAT (v2)
+- [x] **T95.5** Docs: `tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`, `client/tools/live-usb/USB_STICK_AFTER_FLASH.md`
 - [ ] **T95.6** QA: edit stick on Windows → static IP; edit → dhcp; missing file → WO-94 fallback
 
 ---
@@ -132,3 +132,22 @@ Optional: merge into highascg.config.json network.* for UI parity
 
 - Proposed INI format, path, boot ordering, integration with WO-59 helpers.
 - **Instructions for Next Agent:** Implement T95.1–T95.3 after WO-94 link-local fallback lands (dhcp mode depends on it).
+
+### 2026-07-03 — T95.1–T95.3 implementation
+
+- Added `scripts/exfat/highascg-exfat-network-apply.sh` — INI parser, validation, content-hash idempotency, delegates to `highascg-network-apply.sh`.
+- Wired `highascg-exfat-network-apply.service` in `install-exfat-systemd-units.sh` (After exFAT mount, Before server-update/highascg).
+- Hot-plug: `highascg-exfat-arrive.sh` + `highascg-exfat-boot.sh` queue network apply.
+- Seeded `network/network.conf` sample + README in `seed-exfat-operator-layout.sh`.
+- Stick boot QA: `test-03` checks `network/` folder; `test-05` checks new systemd unit.
+- WO-94 partial: `highascg-network-apply.sh` dhcp branch now sets `ipv4.link-local 2` (NM fallback).
+- **Instructions for Next Agent:** Run `sudo bash scripts/exfat/install-exfat-systemd-units.sh` + `sudo bash scripts/runtime/install-network-apply.sh` on a rig; QA T95.6 on real stick. T95.4 (API source tag) and T95.5 (docs) remain.
+
+### 2026-07-03 — T95.4–T95.5 (API source + docs)
+
+- `GET /api/system/network` now returns **`source`**, **`exfatConfPresent`**, **`exfatConfPath`** via `resolveNetworkConfigSource()` in `network-inventory.js`.
+- Apply paths record source: exfat script writes **`exfat`**; **`POST /api/system/network/apply`** writes **`ui`**.
+- Device View server inspector shows **`config: exfat|ui|default`** in network status line.
+- Docs: **`EXFAT_DATA_ZERO_TOUCH.md`** (boot order + operator network section); **`USB_STICK_AFTER_FLASH.md`** (`network/` folder + Windows/macOS seeding).
+- Stick boot QA: **`test-12-exfat-network-conf.sh`**.
+- **Instructions for Next Agent:** Field QA T95.6 on a stick (Windows edit → static → reboot → `GET /api/system/network` shows `source: exfat`). Optional v2: POST to write UI config back to exFAT.

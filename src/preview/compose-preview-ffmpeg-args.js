@@ -70,15 +70,12 @@ function buildCompanionThumbScaleFilter(size) {
 }
 
 /**
- * @param {{ fps?: number, resolutionScale?: string, companionThumbEnabled?: boolean, companionThumbSize?: number }} opts
+ * Main compose preview filter chain — always channel-relative scale (WO-110: Companion square is derived server-side).
+ * @param {{ fps?: number, resolutionScale?: string }} opts
  * @returns {string}
  */
 function buildComposeFfmpegFilterChain(opts = {}) {
 	const fps = clampComposePreviewFps(opts.fps, 2)
-	if (opts.companionThumbEnabled) {
-		const thumb = buildCompanionThumbScaleFilter(opts.companionThumbSize ?? 144)
-		return `${thumb},format=yuvj420p,fps=${fps}`
-	}
 	const parts = []
 	const scale = buildScaleFilter(opts.resolutionScale ?? 'half')
 	if (scale) parts.push(scale)
@@ -95,8 +92,6 @@ function buildComposeFfmpegConsumerArgs(composePreview = {}) {
 	const filter = buildComposeFfmpegFilterChain({
 		fps: composePreview.fps,
 		resolutionScale: composePreview.resolutionScale,
-		companionThumbEnabled: composePreview.companionThumbEnabled === true,
-		companionThumbSize: composePreview.companionThumbSize,
 	})
 	const q = clampJpegQuality(composePreview.jpegQuality, 10)
 	return `-filter:v ${filter} -codec:v mjpeg -q:v ${q} -format image2 -update 1`

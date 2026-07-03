@@ -51,6 +51,7 @@ BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-boot.sh"
 BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-bridge-boot.sh"
 DECKLINK_INSTALL_SH_SRC="${REPO_ROOT}/scripts/runtime/decklink-install-from-exfat.sh"
 DECKLINK_INSTALL_LIB_SRC="${REPO_ROOT}/scripts/lib/decklink-install-lib.sh"
+NETWORK_APPLY_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-network-apply.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
 SEED_BRIDGE_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-bridge-operator-layout.sh"
 LEGACY_USB_MEDIA_BIND="${HIGHASCG_LEGACY_USB_MEDIA_BIND:-0}"
@@ -64,7 +65,9 @@ BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
 BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
 DECKLINK_INSTALL_SH_DST=/usr/local/lib/highascg/decklink-install-from-exfat.sh
 DECKLINK_INSTALL_LIB_DST=/usr/local/lib/highascg/decklink-install-lib.sh
+NETWORK_APPLY_SH_DST=/usr/local/lib/highascg/highascg-exfat-network-apply.sh
 decklink_install_svc="highascg-decklink-install.service"
+network_apply_svc="highascg-exfat-network-apply.service"
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
 BOOT_EXCLUDE_DST=/etc/highascg/bootstrap-rsync-excludes.txt
 UPDATE_EXCLUDE_SRC="${REPO_ROOT}/config/server-update-rsync-excludes.txt"
@@ -85,6 +88,7 @@ install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/
 [[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
 [[ -f "$DECKLINK_INSTALL_LIB_SRC" ]] && install -m 0644 -o root -g root "$DECKLINK_INSTALL_LIB_SRC" "$DECKLINK_INSTALL_LIB_DST"
 [[ -f "$DECKLINK_INSTALL_SH_SRC" ]] && install -m 0755 -o root -g root "$DECKLINK_INSTALL_SH_SRC" "$DECKLINK_INSTALL_SH_DST"
+[[ -f "$NETWORK_APPLY_SH_SRC" ]] && install -m 0755 -o root -g root "$NETWORK_APPLY_SH_SRC" "$NETWORK_APPLY_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
 	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
 	echo "installed ${UDEV_RULE_DST}"
@@ -316,7 +320,7 @@ cat > /etc/systemd/system/highascg-exfat-sync.service <<SVCEOF
 Description=HighAsCG bridge/USB mtime sync (WO-47 + WO-52)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=home-casparcg-bridge.mount ${bridge_media_mount} home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} ${decklink_install_svc} highascg-fix-config-permissions.service highascg-bridge-boot.service highascg-exfat-boot.service
+After=home-casparcg-bridge.mount ${bridge_media_mount} home-casparcg-exfat.mount ${bind_mount_esc} ${update_svc} ${network_apply_svc} ${decklink_install_svc} highascg-fix-config-permissions.service highascg-bridge-boot.service highascg-exfat-boot.service
 Before=highascg.service
 ConditionPathExists=/home/casparcg/highascg/tools/runtime/exfat-sync-cli.js
 
@@ -390,12 +394,34 @@ ExecStart=${ARRIVE_SH_DST}
 WantedBy=multi-user.target
 ARRIVEEOF
 
+cat > "/etc/systemd/system/${network_apply_svc}" <<NETAPPLYEOF
+[Unit]
+Description=Apply operator network config from exFAT network/network.conf (WO-95)
+Documentation=${DOC_URI}
+DefaultDependencies=no
+After=home-casparcg-exfat.mount highascg-exfat-boot.service
+Before=${update_svc} ${decklink_install_svc} highascg.service highascg-exfat-sync.service
+ConditionPathIsMountPoint=/home/casparcg/exfat
+ConditionPathExists=${NETWORK_APPLY_SH_DST}
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=60
+User=root
+Group=root
+ExecStart=${NETWORK_APPLY_SH_DST} --boot
+
+[Install]
+WantedBy=multi-user.target
+NETAPPLYEOF
+
 cat > "/etc/systemd/system/${decklink_install_svc}" <<DECKLINKEOF
 [Unit]
 Description=Install DeckLink Desktop Video from exFAT/bridge decklink/ (WO-92)
 Documentation=${DOC_URI}
 DefaultDependencies=no
-After=home-casparcg-bridge.mount home-casparcg-exfat.mount ${update_svc} highascg-bridge-boot.service highascg-exfat-boot.service
+After=home-casparcg-bridge.mount home-casparcg-exfat.mount ${network_apply_svc} ${update_svc} highascg-bridge-boot.service highascg-exfat-boot.service
 Before=casparcg-scanner.service casparcg-server.service highascg.service highascg-exfat-sync.service
 ConditionPathExists=${DECKLINK_INSTALL_SH_DST}
 
@@ -429,6 +455,7 @@ systemctl reset-failed highascg-bridge-arrive.service 2>/dev/null || true
 ENABLE_UNITS=(
 	highascg-bridge-boot.service
 	highascg-exfat-boot.service
+	"${network_apply_svc}"
 	"${update_svc}"
 	"${decklink_install_svc}"
 	highascg-fix-config-permissions.service
@@ -484,6 +511,8 @@ echo "  ${FIX_CFG_DST}"
 echo "  /etc/systemd/system/highascg-exfat-sync.service"
 echo "  /etc/systemd/system/highascg-exfat-boot.service"
 echo "  ${BOOT_SH_DST}"
+echo "  /etc/systemd/system/${network_apply_svc}"
+echo "  ${NETWORK_APPLY_SH_DST}"
 echo "  /etc/systemd/system/${decklink_install_svc}"
 echo "  ${DECKLINK_INSTALL_SH_DST}"
 echo "  ${DECKLINK_INSTALL_LIB_DST}"

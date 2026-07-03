@@ -242,6 +242,9 @@ async function runSceneTake(amcp, opts) {
 	try {
 		require('../preview/compose-preview-activity').onSceneTake(channel, fadeDur, framerate)
 	} catch (_) {}
+	try {
+		require('../media/live-thumbnail-cache').scheduleLiveThumbnailRefresh(ctx, channel, fadeDur > 0 ? Math.ceil((fadeDur / framerate) * 1000) + 600 : 600)
+	} catch (_) {}
 
 	if (shouldRunBankCrossfade) {
 		const crossfadeLines = []

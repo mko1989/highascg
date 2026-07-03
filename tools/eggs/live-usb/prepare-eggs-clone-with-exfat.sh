@@ -136,7 +136,7 @@ if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 fi
 
 API_AUTH_DROPIN="${HERE}/systemd/highascg.service.d-25-api-auth.conf.example"
-if [[ "${HIGHASCG_EGG_ENFORCE_AUTH:-1}" != "0" ]] && [[ -f "$API_AUTH_DROPIN" ]]; then
+if [[ "${HIGHASCG_EGG_ENFORCE_AUTH:-0}" == "1" ]] && [[ -f "$API_AUTH_DROPIN" ]]; then
 	install -d /etc/systemd/system/highascg.service.d
 	install -m 0644 "$API_AUTH_DROPIN" /etc/systemd/system/highascg.service.d/25-api-auth.conf
 	echo "  installed 25-api-auth.conf (HIGHASCG_ENFORCE_AUTH=1 — token in .private/api-token on first boot)"

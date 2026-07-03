@@ -76,6 +76,11 @@ for unit in highascg-exfat-media-prep.service; do
 	fi
 done
 
+if systemctl cat highascg-exfat-network-apply.service &>/dev/null; then
+	log "Queueing highascg-exfat-network-apply.service (--no-block)"
+	systemctl start --no-block highascg-exfat-network-apply.service 2>>"$LOG" || log "WARN: queue exfat-network-apply failed"
+fi
+
 if systemctl cat highascg-exfat-server-update.service &>/dev/null; then
 	log "Queueing highascg-exfat-server-update.service (--no-block; exfat-sync waits on it)"
 	systemctl start --no-block highascg-exfat-server-update.service 2>>"$LOG" || log "WARN: queue server-update failed"

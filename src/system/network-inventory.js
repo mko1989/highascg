@@ -1,8 +1,14 @@
 'use strict'
 
+const fs = require('fs')
+const crypto = require('crypto')
 const os = require('os')
 const { execFileSync } = require('child_process')
 const { isAllowedEthernetIface } = require('../config/network-settings')
+
+const EXFAT_NETWORK_CONF = '/home/casparcg/exfat/network/network.conf'
+const EXFAT_NETWORK_HASH = '/var/lib/highascg/last-exfat-network.hash'
+const NETWORK_CONFIG_SOURCE = '/var/lib/highascg/network-config-source'
 
 /**
  * @returns {Array<{ name: string, address: string | null, mac: string, internal: boolean, operstate: string | null }>}
@@ -95,6 +101,71 @@ function readNmcliMode(iface) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {string | null}
+ */
+function hashFileSync(filePath) {
+	try {
+		const buf = fs.readFileSync(filePath)
+		return crypto.createHash('sha256').update(buf).digest('hex')
+	} catch {
+		return null
+	}
+}
+
+/**
+ * @param {object} [networkCfg]
+ * @returns {{ source: 'exfat' | 'ui' | 'default', exfatConfPresent: boolean, exfatConfPath: string | null }}
+ */
+function resolveNetworkConfigSource(networkCfg) {
+	let exfatConfPresent = false
+	try {
+		exfatConfPresent = fs.existsSync(EXFAT_NETWORK_CONF)
+	} catch {
+		exfatConfPresent = false
+	}
+
+	let source = 'default'
+	try {
+		if (fs.existsSync(NETWORK_CONFIG_SOURCE)) {
+			const recorded = fs.readFileSync(NETWORK_CONFIG_SOURCE, 'utf8').trim().toLowerCase()
+			if (recorded === 'exfat' || recorded === 'ui') source = recorded
+		}
+	} catch {
+		/* ignore */
+	}
+
+	if (source === 'default' && exfatConfPresent) {
+		const cur = hashFileSync(EXFAT_NETWORK_CONF)
+		let prev = null
+		try {
+			if (fs.existsSync(EXFAT_NETWORK_HASH)) {
+				prev = fs.readFileSync(EXFAT_NETWORK_HASH, 'utf8').trim()
+			}
+		} catch {
+			prev = null
+		}
+		if (cur && prev && cur === prev) source = 'exfat'
+	}
+
+	if (source === 'default') {
+		const cfg = networkCfg && typeof networkCfg === 'object' ? networkCfg : null
+		const hasUiConfig =
+			!!cfg &&
+			((cfg.primaryInterface && isAllowedEthernetIface(cfg.primaryInterface)) ||
+				cfg.mode === 'static' ||
+				(cfg.static && typeof cfg.static === 'object' && String(cfg.static.address || '').trim()))
+		if (hasUiConfig) source = 'ui'
+	}
+
+	return {
+		source,
+		exfatConfPresent,
+		exfatConfPath: exfatConfPresent ? EXFAT_NETWORK_CONF : null,
+	}
+}
+
+/**
  * @param {object} [networkCfg]
  * @returns {object}
  */
@@ -109,6 +180,7 @@ function buildNetworkStatus(networkCfg) {
 		null
 	const active = primary ? interfaces.find((i) => i.name === primary) || null : null
 	const nm = primary ? readNmcliMode(primary) : { mode: 'unknown', connection: null }
+	const sourceInfo = resolveNetworkConfigSource(networkCfg)
 	return {
 		interfaces,
 		primaryInterface: primary,
@@ -116,6 +188,9 @@ function buildNetworkStatus(networkCfg) {
 		appliedMode: nm.mode,
 		connectionName: nm.connection,
 		configured: networkCfg || null,
+		source: sourceInfo.source,
+		exfatConfPresent: sourceInfo.exfatConfPresent,
+		exfatConfPath: sourceInfo.exfatConfPath,
 	}
 }
 
@@ -123,4 +198,6 @@ module.exports = {
 	listEthernetInterfaces,
 	buildNetworkStatus,
 	readNmcliMode,
+	resolveNetworkConfigSource,
+	hashFileSync,
 }

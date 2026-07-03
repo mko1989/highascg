@@ -32,6 +32,12 @@ describe('compose-preview-activity', () => {
 		const ctx = mockOscCtx({})
 		activity.onProgramMutation(ctx, 1, { transition: 'MIX', durationFrames: 50 })
 		assert.equal(activity.shouldCaptureOnTick(ctx, 1, 125), false)
+		assert.equal(activity.isComposePreviewSettled(1), false)
+	})
+
+	it('isComposePreviewSettled is true for untracked channel', () => {
+		activity.reset()
+		assert.equal(activity.isComposePreviewSettled(99), true)
 	})
 
 	it('OSC remaining > 0 keeps tick captures active', () => {

@@ -11,6 +11,16 @@ const APPLY_SCRIPT = '/usr/local/lib/highascg/highascg-network-apply.sh'
 const RESET_SCRIPT = '/usr/local/lib/highascg/highascg-network-reset.sh'
 const REPO_APPLY_SCRIPT = path.join(__dirname, '../../tools/runtime/highascg-network-apply.sh')
 const REPO_RESET_SCRIPT = path.join(__dirname, '../../tools/runtime/highascg-network-reset.sh')
+const NETWORK_CONFIG_SOURCE = '/var/lib/highascg/network-config-source'
+
+function recordNetworkConfigSource(source) {
+	try {
+		fs.mkdirSync(path.dirname(NETWORK_CONFIG_SOURCE), { recursive: true })
+		fs.writeFileSync(NETWORK_CONFIG_SOURCE, `${source}\n`, 'utf8')
+	} catch {
+		/* best-effort — GET still infers source */
+	}
+}
 
 /**
  * @param {object} ctx
@@ -98,6 +108,8 @@ function handleNetworkApplyPost(body, ctx) {
 			}),
 		}
 	}
+
+	recordNetworkConfigSource('ui')
 
 	if (ctx.config) {
 		ctx.config.network = network

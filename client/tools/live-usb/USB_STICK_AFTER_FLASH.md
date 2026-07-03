@@ -51,15 +51,31 @@ HIGHASCGEXF/
   drop-update/              ← server release (package.json here)
   drop-update/applied/      ← optional stamp dir after apply
   drop-config/              ← optional site config export
+  network/                  ← operator DHCP/static IP (network.conf)
   update/server/            ← optional extra server payloads
   sim/highascg/             ← simulation only (server tree + package.json)
   media/
   templates/
   configs/
   snapshots/rear-panels/
+  decklink/                 ← optional BMD Desktop Video .deb files
 ```
 
 **Do not** put the **client** repo alone into `sim/highascg` for simulation — that path expects the **playout server** tree (`package.json` with server `main`). Use the server tarball from your server release pipeline.
+
+### Network without the Web UI (WO-95)
+
+Create **`network/network.conf`** on the stick (or edit the sample from **`seed-exfat-operator-layout.sh`**):
+
+```ini
+mode=dhcp
+# mode=static
+# address=192.168.1.50
+# prefix=24
+# gateway=192.168.1.1
+```
+
+Reboot the playout box after saving. On Windows, add **`network\`** under the exFAT volume alongside **`drop-update\`**, etc.
 
 ---
 
@@ -187,13 +203,17 @@ Use `finish-operator-stick.sh` or the step-by-step block in **Linux build host**
    drop-update\
    drop-update\applied\
    drop-config\
+   network\
    update\server\
    sim\highascg\
    media\
    templates\
    configs\
    snapshots\rear-panels\
+   decklink\
    ```
+
+   Create **`network\network.conf`** with `mode=dhcp` or static fields (see **Network without the Web UI** above).
 
 5. Extract **`highascg-server_*.tar.gz`** so **`package.json`** is at `E:\drop-update\package.json`.
 6. Optional simulation: extract the **same server** tarball into `E:\sim\highascg\` (not the client-only repo).
@@ -241,7 +261,7 @@ Then seed folders (see **Partitioning** tab in `npm run launcher` or):
 
 ```bash
 VOL="/Volumes/HIGHASCGEXF"
-mkdir -p "$VOL/drop-update" "$VOL/sim/highascg" "$VOL/drop-config" "$VOL/media" \
+mkdir -p "$VOL/drop-update" "$VOL/sim/highascg" "$VOL/drop-config" "$VOL/network" "$VOL/media" \
   "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
 tar -xzf ~/Downloads/highascg-server.tar.gz -C "$VOL/drop-update"
 tar -xzf ~/Downloads/highascg-server.tar.gz -C "$VOL/sim/highascg"   # optional sim

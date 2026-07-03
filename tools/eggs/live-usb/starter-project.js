@@ -53,7 +53,7 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 		config.casparServer.multiview_screen_consumer = false
 		config.casparServer.multiview_decklink_device = 0
 	}
-	const eggEnforce = process.env.HIGHASCG_EGG_ENFORCE_AUTH !== '0'
+	const eggEnforce = process.env.HIGHASCG_EGG_ENFORCE_AUTH === '1'
 	config.security = {
 		enforceAuth: eggEnforce,
 		exposeToNetwork: true,

@@ -4,7 +4,7 @@ HighAsCG mounts cross-platform data at **`/home/casparcg/exfat`** by **volume la
 
 **Same label on every operator stick** lets the correct volume attach whether the machine boots from internal disk or from the USB: plug the stick **before** **`local-fs`** if you need it on HDD boots.
 
-Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-media-prep.service`** → **`home-casparcg-highascg-media-exfat.mount`** (bind) → **`highascg-exfat-server-update.service`** (**`drop-update/`** → **`~/highascg`**) → **`highascg-exfat-sync.service`** (**`drop-config/`** mtime sync; **skipped** if **`tools/runtime/exfat-sync-cli.js`** missing) → **`highascg.service`** (**`ConditionPathExists=package.json`**). Matrix: **[`docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md)**.
+Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-media-prep.service`** → **`home-casparcg-highascg-media-exfat.mount`** (bind) → **`highascg-exfat-network-apply.service`** (**`network/network.conf`** → NM/static or DHCP) → **`highascg-exfat-server-update.service`** (**`drop-update/`** → **`~/highascg`**) → **`highascg-exfat-sync.service`** (**`drop-config/`** mtime sync; **skipped** if **`tools/runtime/exfat-sync-cli.js`** missing) → **`highascg.service`** (**`ConditionPathExists=package.json`**). Matrix: **[`docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md)**.
 
 ---
 
@@ -66,7 +66,29 @@ Optional: **`EXFAT_SIZE_MIB=8192`** before **`add-exfat-data-partition.sh`** to 
 
 1. Boot from the stick (default GRUB entry = **Live with persistence** if the ISO was built with **`install-eggs-live-grub-theme.sh`**). See **`tools/live-usb/FLASH_AND_PERSIST.md`**. exFAT mount/sync runs whenever **`HIGHASCGEXF`** is present, even on the no-persistence menu entry.
 
-2. On boot with **`HIGHASCGEXF`** present: **mount → bind → server-update (`drop-update/`) → mtime sync (node)** — see **[`docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md)** — then **`highascg.service`** if **`package.json`** exists.
+2. On boot with **`HIGHASCGEXF`** present: **mount → bind → network apply (`network/network.conf`) → server-update (`drop-update/`) → mtime sync (node)** — see **[`docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md)** — then **`highascg.service`** if **`package.json`** exists.
+
+### Operator network file (WO-95)
+
+Edit **`network/network.conf`** on the stick from any OS (Windows Notepad, macOS TextEdit, Linux). Plain INI — no shell required:
+
+```ini
+# mode: dhcp | static
+mode=dhcp
+
+# Optional — auto-detect first wired NIC with carrier
+# interface=enp3s0
+
+# Static only:
+# address=192.168.1.50
+# prefix=24
+# gateway=192.168.1.1
+# dns=192.168.1.1,8.8.8.8
+```
+
+Save → reboot or re-plug USB. **`highascg-exfat-network-apply.service`** runs after mount and before the Web UI. Invalid values are skipped (fail-safe). **`GET /api/system/network`** reports **`source: exfat|ui|default`** — exFAT wins on cold boot; Device View **Apply network** sets **`ui`** until the next boot.
+
+Sample + README are seeded by **`seed-exfat-operator-layout.sh`**.
 
 3. **Settings → media/usb → exFAT sync** shows the map and pair status; **Dry-run sync** is safe to click anytime.
 
@@ -90,6 +112,7 @@ You **may** edit **`/etc/highascg/exfat-sync.json`** (or **`config/exfat-sync.js
 | **`media/exfat`** not wired | **`journalctl -b -u home-casparcg-highascg-media-exfat.mount`**, **`journalctl -b -u highascg-exfat-media-prep.service`** — **`home-casparcg-exfat.mount`** must be active (`findmnt`). Re-run **`install-exfat-systemd-units.sh`**. |
 | Mount fails at boot | `journalctl -b -u home-casparcg-exfat.mount`; install **`exfatprogs`** / kernel exfat on the image. |
 | Wrong owner on exFAT | Re-run **`sudo bash scripts/install-exfat-systemd-units.sh casparcg`** on the **cloned** system, then `daemon-reload`. |
+| Network not applied from stick | Check **`/home/casparcg/exfat/network/network.conf`**; **`journalctl -b -u highascg-exfat-network-apply.service`**; ensure **`scripts/runtime/install-network-apply.sh`** ran (NM helper + sudoers). |
 | Stick won't boot after **`add-exfat-data-partition.sh`** | Usually exFAT was placed **inside the hybrid ISO** because **`parted`** showed a too-small end for partition 1 (e.g. only the ESP). The script now uses **max(`parted`, `/sys/block/.../start`+`size`)** and re-applies **`boot`/`esp`/`lba`** flags after **`mkpart`**. If the stick was already damaged, **re-`dd` the ISO** and run the updated script. |
 
 ### **Portable newer app than the boot partition**
@@ -102,6 +125,7 @@ Boot sync (**`highascg-exfat-sync.service`**) applies **`configs/` ↔ `~/highas
 
 | Path | Role |
 |------|------|
+| `scripts/exfat/highascg-exfat-network-apply.sh` | Parses **`network/network.conf`** on exFAT; calls NM apply helper. |
 | `scripts/install-exfat-systemd-units.sh` | Writes mount, media bind chain, sync units (label + uid/gid). |
 | `tools/live-usb/add-exfat-data-partition.sh` | Creates exFAT partition (**`mkpart … ntfs`** for MBR type **0x07**) + **`mkfs.exfat -L HIGHASCGEXF`**; placement uses **max(parted, sysfs)** so the slice starts after the real ISO extent. |
 | `tools/live-usb/add-union-persistence-partition.sh` | ext4 persistence to end of disk (after exFAT if you followed §3). |

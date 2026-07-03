@@ -99,7 +99,7 @@ function hashJpegBuffer(buf) {
 }
 
 /**
- * Read Caspar preview JPEG (already thumb-sized when companionThumbEnabled).
+ * Read main compose preview JPEG from disk.
  * @param {string} filePath
  * @returns {Promise<Buffer | null>}
  */
@@ -118,8 +118,8 @@ async function readPreviewJpeg(filePath) {
  * @param {number} size
  * @returns {Promise<Buffer | null>}
  */
-function resizePreviewToPngBuffer(config, sourcePath, size) {
-	const vf = `scale=${size}:${size}:force_original_aspect_ratio=decrease,pad=${size}:${size}:(ow-iw)/2:(oh-ih)/2`
+function resizePreviewToSquareJpegBuffer(config, sourcePath, size) {
+	const vf = `scale=${size}:${size}:force_original_aspect_ratio=decrease,pad=${size}:${size}:-1:-1`
 	return new Promise((resolve) => {
 		const chunks = []
 		const errChunks = []
@@ -185,7 +185,11 @@ async function processCompanionPreviewFrame(ctx, channel, sourceMtimeMs) {
 	const source = cache.resolvePreviewImagePath(cfg, ch)
 	if (!source?.path) return
 
-	let jpeg = await readPreviewJpeg(source.path)
+	const thumbSize = companionThumbSize(cfg)
+	let jpeg = await resizePreviewToSquareJpegBuffer(cfg, source.path, thumbSize)
+	if (!jpeg) {
+		jpeg = await readPreviewJpeg(source.path)
+	}
 	if (!jpeg) return
 
 	const hash = hashJpegBuffer(jpeg)
@@ -372,7 +376,8 @@ module.exports = {
 	getCompanionThumbBasename,
 	resolveCompanionThumbOutputPath,
 	jpegBufferToDataUri,
-	resizePreviewToPngBuffer,
+	resizePreviewToSquareJpegBuffer,
+	resizePreviewToPngBuffer: resizePreviewToSquareJpegBuffer,
 	onComposePreviewUpdated,
 	bootstrapCompanionPreviewVariables,
 	clearCompanionPreviewVariables,

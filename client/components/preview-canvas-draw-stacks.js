@@ -138,8 +138,8 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					} else if (cf === 'horizontal' || cf === 'vertical') {
 						drawImageCover(ctx, img, px, py, pw, ph)
 					} else {
-						/* native & fill-canvas: fill rect matches engine layer box (1:1 with PGM); thumb is stretched to that rect (same AR as source). */
-						ctx.drawImage(img, px, py, pw, ph)
+						/* native & fill-canvas: contain in layer box (matches DOM object-fit and Caspar native FILL). */
+						drawImageContainInRect(ctx, img, px, py, pw, ph)
 					}
 					ctx.restore()
 				} else if (failed) {
