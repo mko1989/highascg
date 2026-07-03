@@ -3,7 +3,9 @@
  */
 import * as Actions from './device-view-actions.js'
 import { setStatus } from './device-view-ui-utils.js'
-import { resolveGpuPhysicalScreenIndex, resolveGpuScreenNumber, gpuOutputIsMultiviewBound } from './device-view-inspector-gpu-resolve.js'
+import { resolveGpuPhysicalScreenIndex, resolveGpuScreenNumber, gpuOutputIsMultiviewBound, resolveGpuDetectedDisplay } from './device-view-inspector-gpu-resolve.js'
+import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { edidMonitorLabel } from '../lib/device-view-gpu-port-utils.js'
 import { appendGpuLayoutEditorIfEditMode } from './device-view-inspector-gpu-layout-editor.js'
 import { populateGpuVideoModelineSection } from './device-view-inspector-gpu-video-modeline.js'
 import {
@@ -17,6 +19,35 @@ import {
 	multiviewConsumerDefaultsSettingsPatch,
 	shouldSeedMultiviewAlwaysOnTopDefault,
 } from '../lib/screen-consumer-defaults.js'
+
+export function buildGpuInspectorSummaryRows(conn, { lastPayload } = {}) {
+	const display = resolveGpuDetectedDisplay(conn, lastPayload)
+	const canonicalId = gpuPhysicalPortCableId(conn?.id || '')
+	const ports = Array.isArray(lastPayload?.live?.gpu?.physicalMap?.ports) ? lastPayload.live.gpu.physicalMap.ports : []
+	const portRow = ports.find((p) => String(p?.physicalPortId || '').trim() === canonicalId) || null
+	const rt = portRow?.runtime && typeof portRow.runtime === 'object' ? portRow.runtime : {}
+	const edid = display?.monitor || display?.edid?.parsed || rt.monitor || null
+	const monitorName = edidMonitorLabel(edid)
+	const serial = String(edid?.serial || '').trim()
+	const nativeMode =
+		String(edid?.preferredMode || '').trim() ||
+		(display?.resolution && Number.isFinite(display?.refreshHz)
+			? `${display.resolution} @ ${display.refreshHz} Hz`
+			: display?.resolution || '')
+	const osOutput = String(rt.xrandrName || rt.activePort || display?.name || '').trim() || '—'
+	const status = display?.connected || rt.connected ? 'Connected' : 'Disconnected'
+	const warnings = (Array.isArray(lastPayload?.live?.warnings) ? lastPayload.live.warnings : [])
+		.filter((w) => /gpu_enum|edid_/i.test(String(w || '')))
+	return [
+		{ label: 'Rear port', value: conn?.label || conn?.id || '—' },
+		{ label: 'OS output', value: osOutput },
+		{ label: 'Monitor', value: monitorName || (status === 'Connected' ? 'No EDID received' : '—'), strong: !!monitorName },
+		{ label: 'Serial', value: serial || '—' },
+		{ label: 'Native mode', value: nativeMode || '—' },
+		{ label: 'Status', value: status },
+		...(warnings.length ? [{ label: 'GPU warnings', value: warnings.join('; ') }] : []),
+	]
+}
 
 export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, connectorCtx }) {
 	const cs = currentSettings?.casparServer && typeof currentSettings.casparServer === 'object' ? currentSettings.casparServer : {}
@@ -368,6 +399,8 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		Object.assign(document.createElement('div'), { className: 'device-view__row', style: 'margin: 4px 0', innerHTML: `<small style="font-size:10px; opacity:0.6">Physical: ${detectedDisplay ? `<strong>${detectedDisplay.name}</strong>` : '<em>None</em>'}${portN !== screenN ? ` · rear port ${portN} · Caspar screen ${screenN}` : ` · port / Caspar screen ${portN}`}</small>` }),
 		osBackendWrap,
 		Object.assign(document.createElement('hr'), { className: 'device-view__hr' }),
+		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'EDID override', style: 'font-size:10px;opacity:.7' }),
+		edidIn,
 		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Stretch', style: 'font-size:10px;opacity:.7' }), stretchSel,
 		Object.assign(document.createElement('label'), { className: 'device-view__inspector-label', textContent: 'Colour Space', style: 'font-size:10px;opacity:.7' }), colourSpaceSel,
 		nameIn, arIn, posRow,

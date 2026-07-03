@@ -259,6 +259,12 @@ async function buildLiveSnapshot(ctx) {
 	const gpuConnectors = getGpuConnectorInventory() || []
 	const sanitizedGpuConnectors = (Array.isArray(gpuConnectors) ? gpuConnectors : [])
 		.filter((c) => !isPseudoGpuConnectorName(c?.shortName || c?.name))
+	try {
+		const { probeGpuEdidCatalog } = require('../utils/gpu-edid-probe')
+		for (const w of probeGpuEdidCatalog().warnings || []) warnings.push(w)
+	} catch {
+		/* optional */
+	}
 	const gpuPhysicalMap = buildGpuPhysicalMap({
 		config: ctx.config || {},
 		displays: decoratedDisplays,
@@ -297,7 +303,9 @@ async function buildLiveSnapshot(ctx) {
 			modes: (d.modes || []).slice(0, 64),
 				casparScreenIndex: d.casparScreenIndex,
 				casparMode: d.casparMode,
-				connected: d.connected
+				connected: d.connected,
+				edid: d.edid || { raw: '', parsed: null },
+				monitor: d.monitor || d.edid?.parsed || null,
 			})),
 			connectors: sanitizedGpuConnectors,
 			physicalMap: gpuPhysicalMap,

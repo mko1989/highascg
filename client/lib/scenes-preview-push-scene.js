@@ -23,6 +23,7 @@ import {
 import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot } from './scenes-preview-snapshot.js'
 import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
+import { syncPreviewLiveToServer } from './scene-live-sync.js'
 
 /**
  * @param {object} opts
@@ -383,13 +384,6 @@ export async function pushSceneToPreviewImpl(opts) {
 		for (const mIdx of pendingPreviewMainIds) {
 			sceneState.setPreviewSceneId(sceneId, mIdx)
 		}
-		for (const mIdx of pendingPreviewMainIds) {
-			try {
-				await syncPreviewLiveToServer(sceneId, mIdx, { sceneState, stateStore })
-			} catch (e) {
-				console.warn('Preview live sync failed:', e?.message || e)
-			}
-		}
 
 		const nextLastPreviewLayers = new Set(
 			(scene.layers || []).filter((l) => l.source?.value).map((l) => Number(l.layerNumber)),
@@ -397,6 +391,14 @@ export async function pushSceneToPreviewImpl(opts) {
 		const nextLastPreviewContentSnapshot = buildPreviewContentSnapshot(sceneId, scene, lastComputedFills)
 		nextLastPreviewContentSnapshot.pipCgKeys = new Set(pipCgReadyKeys)
 		const nextLastPreviewChannel = Number(lastPreviewCh)
+
+		for (const mIdx of pendingPreviewMainIds) {
+			try {
+				await syncPreviewLiveToServer(sceneId, mIdx, { sceneState, stateStore })
+			} catch (e) {
+				console.warn('Preview live sync failed:', e?.message || e)
+			}
+		}
 
 		return {
 			lastPreviewLayers: nextLastPreviewLayers,

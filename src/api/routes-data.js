@@ -12,6 +12,7 @@ const {
 	loadProjectForSlug,
 	validateIncomingProject,
 	persistProject,
+	enrichProjectScenesFromLiveDeck,
 } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
 const {
@@ -72,6 +73,25 @@ function scheduleProjectSyncBroadcast(ctx, project) {
 /** Full project object — same shape as POST /api/project/save body `project`. */
 const PROJECT_DISK_KEY = 'web_project'
 
+/**
+ * Move slug to trash and notify replication peers (WO-106).
+ * @param {object} ctx
+ * @param {string} slug
+ * @param {{ reason?: string, replacementSlug?: string | null }} [opts]
+ */
+function retireSlugWithReplication(ctx, slug, opts = {}) {
+	const s = String(slug || '').trim()
+	if (!s) return false
+	const moved = projectStore.retireProjectSlug(s)
+	try {
+		const { notifyProjectSlugRetired } = require('../replication/project-tombstone')
+		notifyProjectSlugRetired(ctx, { slug: s, reason: opts.reason || 'delete', replacementSlug: opts.replacementSlug })
+	} catch {
+		/* replication optional */
+	}
+	return moved
+}
+
 async function loadProjectMerged(_ctx) {
 	return loadFullProject()
 }
@@ -110,7 +130,27 @@ async function handleProject(path, body, ctx) {
 				}),
 			}
 		}
-		persistProject(ctx, project, { writeAutosave: true })
+		try {
+			persistProject(ctx, project, { writeAutosave: true })
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('error', '[project] save persist failed: ' + (e?.message || e))
+			}
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'Project save failed', detail: e?.message || String(e) }),
+			}
+		}
+		if (prevSlug && prevSlug !== slug) {
+			try {
+				retireSlugWithReplication(ctx, prevSlug, { reason: 'rename', replacementSlug: slug })
+			} catch (e) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('warn', `[project] retire previous slug ${prevSlug}: ${e?.message || e}`)
+				}
+			}
+		}
 		ensureProjectMediaDir(ctx.config, slug)
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)
@@ -149,8 +189,16 @@ async function handleProject(path, body, ctx) {
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = reqSlug || projectStore.getActiveSlug(persistence)
 		let project = null
+		let recoveredFromAutosave = false
 		if (reqSlug) {
-			project = loadProjectForSlug(reqSlug, { mergeAutosave: false })
+			const fromFile = loadProjectForSlug(reqSlug, { mergeAutosave: false })
+			const merged = loadProjectForSlug(reqSlug, { mergeAutosave: true })
+			project = merged
+			if (fromFile && merged && merged !== fromFile) {
+				const tMain = Date.parse(fromFile.savedAt || '') || 0
+				const tMerged = Date.parse(merged.savedAt || '') || 0
+				recoveredFromAutosave = tMerged > tMain
+			}
 		} else {
 			project = await loadProjectMerged(ctx)
 		}
@@ -177,7 +225,14 @@ async function handleProject(path, body, ctx) {
 			/* optional */
 		}
 
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody(project) }
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				...project,
+				...(recoveredFromAutosave ? { _recoveredFromAutosave: true } : {}),
+			}),
+		}
 	}
 	if (path === '/api/project/new') {
 		try {
@@ -285,11 +340,65 @@ async function handleProject(path, body, ctx) {
 			body: jsonBody({ ok: true, applied: true }),
 		}
 	}
+	if (path === '/api/project/rename') {
+		const fromSlug = String(b.fromSlug || b.slug || '').trim()
+		const newName = String(b.name || b.newName || '').trim()
+		if (!fromSlug || !newName) {
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'Missing fromSlug and name' }),
+			}
+		}
+		const toSlug = projectStore.projectSlugFromName(newName)
+		const existing = projectStore.readProjectFile(fromSlug)
+		if (!existing) {
+			return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Project not found' }) }
+		}
+		if (fromSlug === toSlug) {
+			const renamed = { ...existing, name: newName, savedAt: new Date().toISOString() }
+			try {
+				persistProject(ctx, renamed, { writeAutosave: true })
+			} catch (e) {
+				return {
+					status: 500,
+					headers: JSON_HEADERS,
+					body: jsonBody({ error: e?.message || 'Rename failed' }),
+				}
+			}
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, slug: toSlug, activeSlug: toSlug }),
+			}
+		}
+		const renamed = {
+			...existing,
+			name: newName,
+			savedAt: new Date().toISOString(),
+		}
+		try {
+			persistProject(ctx, renamed, { writeAutosave: true })
+			retireSlugWithReplication(ctx, fromSlug, { reason: 'rename', replacementSlug: toSlug })
+		} catch (e) {
+			return {
+				status: 500,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: e?.message || 'Rename failed' }),
+			}
+		}
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: true, slug: toSlug, activeSlug: toSlug, previousSlug: fromSlug }),
+		}
+	}
 	if (path === '/api/project/autosave') {
-		const project = b.project
+		let project = b.project
 		if (!project || typeof project !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
+		project = enrichProjectScenesFromLiveDeck(project, ctx)
 		injectHardwareConfigToProject(ctx, project)
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.projectSlugFromName(project.name)
@@ -321,7 +430,16 @@ async function handleProject(path, body, ctx) {
 			}
 		}
 		try {
-			persistProject(ctx, project, { writeAutosave: true })
+			const result = persistProject(ctx, project, { writeAutosave: true })
+			if (prevSlug && prevSlug !== slug) {
+				try {
+					retireSlugWithReplication(ctx, prevSlug, { reason: 'rename', replacementSlug: slug })
+				} catch (e) {
+					if (typeof ctx.log === 'function') {
+						ctx.log('warn', `[project] retire previous slug ${prevSlug}: ${e?.message || e}`)
+					}
+				}
+			}
 			if (ctx.artnetReceiver?.reconfigureFromProject) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {
@@ -335,8 +453,15 @@ async function handleProject(path, body, ctx) {
 					ctx.log('warn', '[replication] autosave schedule push: ' + (e?.message || e))
 				}
 			}
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+			return {
+				status: 200,
+				headers: JSON_HEADERS,
+				body: jsonBody({ ok: true, slug: result.slug, activeSlug: result.slug }),
+			}
 		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('error', '[project] autosave persist failed: ' + (e?.message || e))
+			}
 			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e.message }) }
 		}
 	}
@@ -364,6 +489,7 @@ async function handleProjectList(ctx) {
 			activeProjectMedia,
 			projects: projects.map((p) => ({
 				...p,
+				active: p.slug === activeSlug,
 				mediaFolder: p.slug ? getProjectMediaRelId(p.slug, ctx.config) : null,
 			})),
 			volumes: {
@@ -417,6 +543,33 @@ async function handleProjectFile(path) {
 	return { status: 200, headers: JSON_HEADERS, body }
 }
 
+async function handleProjectDelete(path) {
+	const m = path.match(/^\/api\/project\/([^/]+)$/)
+	if (!m) return null
+	const slug = decodeURIComponent(m[1]).trim()
+	if (!slug || slug === 'list' || slug === 'file' || slug === 'save' || slug === 'load') {
+		return null
+	}
+	projectStore.migrateLegacySingleProject(persistence)
+	const existing = projectStore.readProjectFile(slug)
+	if (!existing) {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Project not found' }) }
+	}
+	const activeSlug = projectStore.getActiveSlug(persistence)
+	if (activeSlug === slug) {
+		return {
+			status: 409,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'Cannot delete the active project — load another project first' }),
+		}
+	}
+	const moved = retireSlugWithReplication(ctx, slug, { reason: 'delete' })
+	if (!moved) {
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'Failed to move project to trash' }) }
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, slug, trashed: true }) }
+}
+
 async function handleData(path, body, ctx) {
 	const m = path.match(/^\/api\/data\/([^/]+)$/)
 	if (!m) return null
@@ -434,6 +587,7 @@ module.exports = {
 	handleProjectGet,
 	handleProjectFile,
 	handleProjectList,
+	handleProjectDelete,
 	handleData,
 	loadProjectMerged,
 	flushProjectSyncBroadcast,

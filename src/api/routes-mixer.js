@@ -8,8 +8,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const persistence = require('../utils/persistence')
 const { scheduleProjectSyncBroadcast } = require('./routes-data')
-const { resolveSceneById } = require('../engine/project-scenes')
-const PROJECT_DISK_KEY = 'web_project'
+const { resolveSceneById, loadFullProject, persistProject } = require('../engine/project-scenes')
 
 /**
  * @param {{ amcp: import('../caspar/amcp-client').AmcpClient }} ctx
@@ -187,7 +186,7 @@ function updateProjectStateFromSelection(ctx, property, value) {
 	}
 
 	const layerIdx = parseInt(layerIdxStr, 10)
-	const project = persistence.get(PROJECT_DISK_KEY)
+	const project = loadFullProject()
 	if (!project || !project.scenes || !Array.isArray(project.scenes.scenes)) {
 		return null
 	}
@@ -286,7 +285,14 @@ function updateProjectStateFromSelection(ctx, property, value) {
 	if (ctx._projectSaveTimer) clearTimeout(ctx._projectSaveTimer)
 	ctx._projectSaveTimer = setTimeout(() => {
 		ctx._projectSaveTimer = null
-		persistence.set(PROJECT_DISK_KEY, project)
+		project.savedAt = new Date().toISOString()
+		try {
+			persistProject(ctx, project, { writeAutosave: true, pushVolumes: false })
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', '[mixer] project persist failed: ' + (e?.message || e))
+			}
+		}
 	}, 1000)
 
 	if (typeof ctx._wsBroadcast === 'function') {

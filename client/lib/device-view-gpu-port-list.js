@@ -46,6 +46,11 @@ export {
 	readGpuLayoutPrefs,
 } from './device-view-gpu-port-layout-prefs.js'
 export {
+	migrateLegacyGpuLayoutPrefsToServer,
+	GPU_CUSTOM_LAYOUT_BAK_KEY,
+	GPU_LAYOUT_MIGRATED_KEY,
+} from './device-view-gpu-port-migrate.js'
+export {
 	buildGpuEntriesFromTopology,
 	buildRawGpuPortEntriesFromLive,
 	collectGpuConnectorIdsInGraph,
@@ -56,8 +61,8 @@ export {
 	resolveGpuSlotIdFromSavedLayout,
 } from './device-view-gpu-port-merge.js'
 export {
-	defaultClientGpuTopology,
 	detectRtx2030QuadFromLive,
+	gpuTopologyMismatchActive,
 	reconcileTopologyWithLiveDisplays,
 	resolveEffectiveGpuTopology,
 	resolveTopologyForDeviceView,
@@ -84,8 +89,7 @@ import {
 	mergeGpuLayoutEntriesWithPrefs,
 } from './device-view-gpu-port-merge.js'
 import {
-	reconcileTopologyWithLiveDisplays,
-	resolveEffectiveGpuTopology,
+	resolveTopologyForDeviceView,
 } from './device-view-gpu-port-topology.js'
 import { consolidateBracketSplitEntries, displaysMatchingPairs, isPrimaryTopologySocket } from './device-view-gpu-port-utils.js'
 
@@ -120,9 +124,9 @@ export function buildGpuSelectablePortEntries({
 	hideDisconnectedByDefault = null,
 }) {
 	const prefs = layoutPrefs ?? readGpuLayoutPrefs()
-	const topology = reconcileTopologyWithLiveDisplays(
-		resolveEffectiveGpuTopology(savedTopology, prefs),
-		live,
+	const topology = resolveTopologyForDeviceView(
+		{ live, gpuPhysicalTopology: savedTopology },
+		null,
 	)
 	let base = buildGpuEntriesFromTopology(topology, live, suggestedGpuOuts, graphGpuOuts)
 
@@ -148,7 +152,7 @@ export function buildGpuSelectablePortEntries({
 	})
 }
 
-export function entryToRearPanelGpuItem(entry, connectedDisplays = [], connectors = []) {
+export function entryToRearPanelGpuItem(entry, connectedDisplays = [], connectors = [], socketCount) {
 	const pairs = Array.isArray(entry.pairs) ? entry.pairs : []
 	const hits = displaysMatchingPairs(pairs, connectedDisplays, connectors)
 	const livePresent = !!(entry.livePresent || hits.length > 0)
@@ -163,10 +167,12 @@ export function entryToRearPanelGpuItem(entry, connectedDisplays = [], connector
 		index: entry.index,
 		connected,
 		livePresent,
-		topologySlot: entry.topologySlot === true || isPrimaryTopologySocket(entry.connectorId),
+		topologySlot: entry.topologySlot === true || isPrimaryTopologySocket(entry.connectorId, socketCount),
 		hidden: entry.hidden,
 		pairs,
 		monitor: entry.monitor || '',
+		edidSerial: entry.edidSerial || '',
+		edidPreferredMode: entry.edidPreferredMode || '',
 		resolution: entry.resolution || '',
 		refreshHz: entry.refreshHz,
 		inDeviceGraph,

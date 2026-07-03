@@ -8,6 +8,9 @@ import {
 /** @type {Map<number, { img: HTMLImageElement, etag: string | null, loading: boolean }>} */
 const _cache = new Map()
 
+/** @type {string} */
+let _trackedChannelSig = ''
+
 let _pollTimer = null
 /** @type {Set<(channel: number) => void>} */
 const _listeners = new Set()
@@ -143,6 +146,7 @@ export function resetComposePreviewClientCache(keepChannels) {
 	} else {
 		_cache.clear()
 	}
+	_trackedChannelSig = ''
 	stopPollIfIdle()
 }
 
@@ -153,21 +157,26 @@ export function syncComposePreviewClientChannels(channels) {
 	const list = (channels || [])
 		.map((c) => Math.max(1, parseInt(String(c), 10) || 0))
 		.filter((c) => c > 0)
+	const sig = [...new Set(list)].sort((a, b) => a - b).join(',')
+	if (sig === _trackedChannelSig) return
+	_trackedChannelSig = sig
 	resetComposePreviewClientCache(list)
-	for (const ch of list) trackComposePreviewChannel(ch)
+	for (const ch of list) trackComposePreviewChannel(ch, { poll: true })
 }
 
 /**
  * Track a channel for meta polling (lightweight — PNG only when etag changes).
  * @param {number} channel
+ * @param {{ poll?: boolean }} [opts]
  */
-export function trackComposePreviewChannel(channel) {
+export function trackComposePreviewChannel(channel, opts = {}) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	if (!_cache.has(ch)) {
+	const hadEntry = _cache.has(ch)
+	if (!hadEntry) {
 		_cache.set(ch, { img: new Image(), etag: null, loading: false })
 	}
 	ensurePoll()
-	void pollChannelMeta(ch)
+	if (opts.poll !== false && !hadEntry) void pollChannelMeta(ch)
 }
 
 /**

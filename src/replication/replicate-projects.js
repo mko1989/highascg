@@ -94,13 +94,9 @@ async function pushProjectToPeer(ctx, runtime, project, opts = {}) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('info', `[replication] project push (${reason}) ok slug=${slug || '?'}`)
 		}
-		try {
-			await require('./sync-project-media').syncProjectMediaToPeer(ctx, project, { direction: 'push' })
-		} catch (e) {
-			if (typeof ctx.log === 'function') {
-				ctx.log('warn', '[replication] project media sync: ' + (e?.message || e))
-			}
-		}
+		// Media intentionally NOT synced here: project saves happen mid-show and media
+		// transfers cost disk/network. Spreading media is explicit — leader pushes or
+		// follower pulls via the replication media-sync action.
 	} else if (typeof ctx.log === 'function') {
 		ctx.log(
 			'warn',

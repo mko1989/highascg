@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-06-30T20:56:05.559Z",
+  "generatedAt": "2026-07-02T16:29:33.890Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -624,62 +624,6 @@
       "order": 81
     },
     {
-      "id": "DEV_RELEASE_GITHUB.sync-conflict-20260624-110533-S5R6E5O",
-      "title": "Dev GitHub releases (ISO + portable tarball)",
-      "file": "DEV_RELEASE_GITHUB.sync-conflict-20260624-110533-S5R6E5O.md",
-      "category": "Reference",
-      "description": "Use this flow when you have a **build host or workstation** running the repo (typically with `node_modules` already installed). Two modes:",
-      "order": 900
-    },
-    {
-      "id": "EXFAT_SERVER_UPDATE.sync-conflict-20260624-110447-S5R6E5O",
-      "title": "exFAT server updates (`drop-update/`)",
-      "file": "EXFAT_SERVER_UPDATE.sync-conflict-20260624-110447-S5R6E5O.md",
-      "category": "Reference",
-      "description": "For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node server** by dropping files on the stick — without reflashing the image.",
-      "order": 900
-    },
-    {
-      "id": "ARCHITECTURE.sync-conflict-20260624-110518-S5R6E5O",
-      "title": "HighAsCG architecture — server bridge and client",
-      "file": "ARCHITECTURE.sync-conflict-20260624-110518-S5R6E5O.md",
-      "category": "Reference",
-      "description": "**Status:** Canonical reference (2026-06-03)",
-      "order": 900
-    },
-    {
-      "id": "decoupled_architecture_list.sync-conflict-20260624-110546-S5R6E5O",
-      "title": "HighAsCG Decoupled Service Architecture",
-      "file": "decoupled_architecture_list.sync-conflict-20260624-110546-S5R6E5O.md",
-      "category": "Reference",
-      "description": "This document defines the strict boundary of responsibilities between the **Headless Backend (Service Engine)** and the **Decoupled Frontend (Single-Page Applic",
-      "order": 900
-    },
-    {
-      "id": "README.sync-conflict-20260624-110503-S5R6E5O",
-      "title": "HighAsCG documentation",
-      "file": "README.sync-conflict-20260624-110503-S5R6E5O.md",
-      "category": "Reference",
-      "description": "Operator and integrator docs live at the **top level** of this folder. Deeper material is grouped by audience.",
-      "order": 900
-    },
-    {
-      "id": "wiki--api--README.sync-conflict-20260624-110541-S5R6E5O",
-      "title": "HighAsCG HTTP API",
-      "file": "wiki/api/README.sync-conflict-20260624-110541-S5R6E5O.md",
-      "category": "Reference",
-      "description": "HighAsCG exposes a **JSON REST API** on the playout server. The operator UI ([highascg-client](https://github.com/mko1989/highascg-client)) and Companion module",
-      "order": 900
-    },
-    {
-      "id": "ISO_CONTENTS.sync-conflict-20260624-110508-S5R6E5O",
-      "title": "HighAsCG live ISO — contents reference",
-      "file": "ISO_CONTENTS.sync-conflict-20260624-110508-S5R6E5O.md",
-      "category": "Reference",
-      "description": "What is inside the **penguins-eggs** hybrid ISO produced by **`tools/eggs/live-usb/build-highascg-egg.sh`** (or **`make-dev-github-release-iso-quick.sh`**).",
-      "order": 900
-    },
-    {
       "id": "STICK_QUICK_START",
       "title": "HighAsCG playout stick — quick start",
       "file": "STICK_QUICK_START.md",
@@ -688,19 +632,11 @@
       "order": 900
     },
     {
-      "id": "MODULES.sync-conflict-20260624-110458-S5R6E5O",
-      "title": "Optional modules (Previs / Tracking / Auto-follow)",
-      "file": "MODULES.sync-conflict-20260624-110458-S5R6E5O.md",
+      "id": "SECURITY",
+      "title": "HighAsCG security model",
+      "file": "SECURITY.md",
       "category": "Reference",
-      "description": "HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the o",
-      "order": 900
-    },
-    {
-      "id": "PLAN_SERVER_CLIENT_SPLIT.sync-conflict-20260624-110453-S5R6E5O",
-      "title": "Plan: Permanent server / client split",
-      "file": "PLAN_SERVER_CLIENT_SPLIT.sync-conflict-20260624-110453-S5R6E5O.md",
-      "category": "Reference",
-      "description": "**Status:** Phase 3–4 complete (server/client split shipped)",
+      "description": "HighAsCG exposes an HTTP API and operator WebSocket on the playout server. By default **authentication is not enforced** so existing deployments keep working. W",
       "order": 900
     }
   ]

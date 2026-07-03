@@ -1,9 +1,9 @@
 /**
  * Default empty project — shared by New project, factory reset, and server bootstrap fallbacks.
  */
+import emptyProjectTemplate from '../../data/default-empty-project.json'
 import { api } from './api-client.js'
 import { fetchProjectFromServer } from './project-load.js'
-import { defaultTransition } from './scene-state-helpers.js'
 import { projectState } from './project-state.js'
 import { sceneState } from './scene-state.js'
 import { timelineState } from './timeline-state.js'
@@ -20,42 +20,18 @@ import { settingsState } from './settings-state.js'
 import { placeholderState } from './placeholder-state.js'
 
 export const DEFAULT_PROJECT_NAME = 'Untitled'
-const PROJECT_VERSION = 2
 
 /** @returns {object} Scene export blob for an empty deck. */
 export function buildDefaultSceneExportData() {
-	return {
-		scenes: [],
-		liveSceneId: null,
-		previewSceneId: null,
-		liveSceneIdByMain: [null, null, null, null],
-		previewSceneIdByMain: [null, null, null, null],
-		activeScreenIndex: 0,
-		globalDefaultTransition: { ...defaultTransition() },
-		mainEditorVisible: [true, false, false, false],
-		layerPresets: [],
-		lookPresets: [],
-		globalBorders: [null, null, null, null],
-	}
+	const scenes = emptyProjectTemplate.scenes
+	return JSON.parse(JSON.stringify(scenes))
 }
 
 /** @returns {object} Full project JSON for an empty Untitled project. */
 export function buildDefaultUntitledProject() {
 	return {
-		version: PROJECT_VERSION,
-		name: DEFAULT_PROJECT_NAME,
+		...JSON.parse(JSON.stringify(emptyProjectTemplate)),
 		savedAt: new Date().toISOString(),
-		scenes: buildDefaultSceneExportData(),
-		timelines: { timelines: [], activeId: null },
-		multiview: {
-			cells: [],
-			canvasWidth: 1920,
-			canvasHeight: 1080,
-			showOverlay: true,
-			bgColor: '#000000',
-			showTimersUnderLabels: false,
-		},
-		placeholders: [],
 	}
 }
 

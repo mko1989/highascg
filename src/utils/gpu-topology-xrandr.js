@@ -214,7 +214,7 @@ function ensureGpuPhysicalTopologyFromXrandr(opts) {
 	const config = opts?.config
 	const log = opts?.log
 	const { discoverGpuPhysicalTopology } = require('./gpu-topology-drm')
-	const probe = discoverGpuPhysicalTopology({ config })
+	const probe = discoverGpuPhysicalTopology({ config, xrandrRaw: opts.xrandrRaw })
 	const discovered = probe?.rows || null
 	const source = probe?.source || 'unknown'
 	if (!discovered?.length) {
@@ -224,6 +224,16 @@ function ensureGpuPhysicalTopologyFromXrandr(opts) {
 	const cur = Array.isArray(config?.gpuPhysicalTopology) ? config.gpuPhysicalTopology : []
 	if (topologyRowsEqual(cur, discovered)) {
 		return { topology: discovered, updated: false, source }
+	}
+
+	if (config?.gpuPhysicalTopologyOperatorSaved && cur.length) {
+		if (typeof log === 'function') {
+			log(
+				'warn',
+				`[gpu-topology] operator-saved layout differs from ${source} discovery — not overwriting config (review in Device View)`,
+			)
+		}
+		return { topology: cur, updated: false, source, suggested: discovered }
 	}
 
 	config.gpuPhysicalTopology = discovered

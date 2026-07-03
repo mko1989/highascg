@@ -325,6 +325,13 @@ function finishConnectionGather(self) {
 	r.catch((e) => {
 		if (typeof self.log === 'function') self.log('debug', 'Live scene reconcile: ' + (e?.message || e))
 	})
+	// Seed the channel×layer playback matrix from the INFO XML gathered on connect, so
+	// teardown targeting knows what actually plays even across service restarts.
+	require('../state/playback-tracker')
+		.reconcilePlaybackMatrixFromGatheredXml(self)
+		.catch((e) => {
+			if (typeof self.log === 'function') self.log('debug', 'Playback matrix seed: ' + (e?.message || e))
+		})
 	if (typeof self.startPeriodicSync === 'function') self.startPeriodicSync(self)
 	broadcastWsStateSnapshot(self)
 }

@@ -33,6 +33,10 @@ function maxGpuPIndex(physicalPorts, suggestedGpuOuts) {
  */
 export function resolveExpectedGpuPhysicalPortCount(live, physicalPorts, suggestedGpuOuts) {
 	const map = live?.gpu?.physicalMap || {}
+	const eff = map.effectiveTopology
+	if (Array.isArray(eff) && eff.length) {
+		return Math.min(8, eff.length)
+	}
 	for (const key of ['totalPorts', 'portCount', 'physicalPortCount', 'connectorCount']) {
 		const n = Number(map[key])
 		if (Number.isFinite(n) && n > 0) return Math.min(8, n)
@@ -40,9 +44,15 @@ export function resolveExpectedGpuPhysicalPortCount(live, physicalPorts, suggest
 	const inv = countUsableGpuConnectorInventory(live)
 	const fromMaxId = maxGpuPIndex(physicalPorts, suggestedGpuOuts) + 1
 	let expected = Math.max(physicalPorts.length, inv, fromMaxId)
-	// Quad-output cards: DRM may report 3 dual-DP groups while the backplate has 4 sockets — only infer a 4th
-	// when inventory or saved connector ids already imply it (avoid phantom gpu_p3 on 3-port DRM maps).
-	if (!hasDrmGpuPhysicalMap(live) && physicalPorts.length === 3 && fromMaxId <= 3 && inv >= 4) {
+	const canonicalPorts = physicalPorts.filter((p) =>
+		/^gpu_p\d+$/i.test(String(p?.physicalPortId || '')),
+	)
+	if (
+		!hasServerGpuPhysicalMap(live) &&
+		canonicalPorts.length === 3 &&
+		fromMaxId <= 3 &&
+		inv >= 4
+	) {
 		expected = Math.max(expected, 4)
 	}
 	try {
@@ -75,21 +85,23 @@ export function displaysMatchingPairs(pairs, displays, connectors) {
 	return hits
 }
 
-export function isPrimaryTopologySocket(id) {
+export function isPrimaryTopologySocket(id, socketCount) {
 	const m = /^gpu_p(\d+)$/i.exec(String(id || '').trim())
 	if (!m) return false
-	return parseInt(m[1], 10) < RTX_20_30_SOCKET_COUNT
+	const limit =
+		Number.isFinite(socketCount) && socketCount > 0 ? socketCount : RTX_20_30_SOCKET_COUNT
+	return parseInt(m[1], 10) < limit
 }
 
-/** @param {object} [live] */
-export function hasDrmGpuPhysicalMap(live) {
+/** True when the server published canonical gpu_pN physical map rows. */
+export function hasServerGpuPhysicalMap(live) {
 	const physicalPorts = Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : []
-	const topologySource = String(live?.gpu?.physicalMap?.topologySource || '').trim().toLowerCase()
-	return (
-		physicalPorts.length > 0 &&
-		(topologySource === 'drm' ||
-			physicalPorts.some((p) => /^gpu_p\d+(_\d+)?$/i.test(String(p?.physicalPortId || ''))))
-	)
+	return physicalPorts.some((p) => /^gpu_p\d+$/i.test(String(p?.physicalPortId || '')))
+}
+
+/** @deprecated Use hasServerGpuPhysicalMap — name retained for existing imports. */
+export function hasDrmGpuPhysicalMap(live) {
+	return hasServerGpuPhysicalMap(live)
 }
 
 /**
@@ -102,6 +114,13 @@ export function collectGpuPortNameOptions(live) {
 	const add = (v) => {
 		const s = String(v || '').trim()
 		if (s && !/^none$/i.test(s)) names.add(s)
+	}
+	const effectiveTopology = live?.gpu?.physicalMap?.effectiveTopology
+	if (Array.isArray(effectiveTopology)) {
+		for (const row of effectiveTopology) {
+			add(row?.dpA)
+			add(row?.dpB)
+		}
 	}
 	const physicalPorts = Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : []
 	for (const p of physicalPorts) {
@@ -116,13 +135,20 @@ export function collectGpuPortNameOptions(live) {
 		add(rt.xrandrName)
 		add(rt.displayName)
 	}
+	for (const c of Array.isArray(live?.gpu?.connectors) ? live.gpu.connectors : []) {
+		add(c?.shortName)
+		add(c?.name)
+		add(c?.xrandrName)
+	}
 	for (const d of Array.isArray(live?.gpu?.displays) ? live.gpu.displays : []) {
 		add(d?.name)
 	}
-	for (let i = 0; i < 8; i++) add(`DP-${i}`)
-	for (let i = 0; i < 4; i++) add(`HDMI-${i}`)
-	add('EDP-1')
-	add('EDP-1-1')
+	if (names.size === 0) {
+		for (let i = 0; i < 8; i++) add(`DP-${i}`)
+		for (let i = 0; i < 4; i++) add(`HDMI-${i}`)
+		add('EDP-1')
+		add('EDP-1-1')
+	}
 
 	const rank = (s) => {
 		const u = String(s).toUpperCase()
@@ -144,12 +170,23 @@ export function iconForPortHints(...parts) {
 	return '/assets/display-port-icon.svg'
 }
 
+export function edidMonitorLabel(mon) {
+	if (!mon || typeof mon !== 'object') return ''
+	return String(mon.monitorName || '').trim()
+}
+
 export function labelForPhysicalPort(p) {
 	const pairLabel = String(p?.pair?.name || '').trim() || String(p?.physicalPortId || '').trim()
 	const rt = p?.runtime && typeof p.runtime === 'object' ? p.runtime : {}
-	const mon = String(rt.xrandrName || rt.displayName || rt.activePort || '').trim()
-	if (rt.connected && mon) return `${pairLabel} · ${mon}`
-	return pairLabel
+	const edidName = edidMonitorLabel(rt.monitor)
+	const xr = String(rt.xrandrName || rt.displayName || rt.activePort || '').trim()
+	if (!rt.connected) return pairLabel
+	const parts = [pairLabel]
+	if (xr) parts.push(xr)
+	if (edidName) parts.push(edidName)
+	const res = String(rt.resolution || '').trim()
+	if (res && res !== 'unknown') parts.push(res)
+	return parts.join(' · ')
 }
 
 export function gpuPhysicalPortCableId(connectorOrSlotId) {

@@ -138,7 +138,7 @@ export function appendCasparRearPanelMarkers({
 		}
 
 		const monitorPart = it.kind === 'gpu_out'
-			? ` · ${it.connected ? 'connected' : 'disconnected'}${it.monitor ? ` · ${it.monitor}` : ''}${it.resolution ? ` · ${it.resolution}` : ''}${Number.isFinite(it.refreshHz) ? ` @ ${it.refreshHz}Hz` : ''}`
+			? ` · ${it.connected ? 'connected' : 'disconnected'}${it.monitor ? ` · ${it.monitor}` : ''}${it.edidSerial ? ` · serial ${it.edidSerial}` : ''}${it.edidPreferredMode ? ` · native ${it.edidPreferredMode}` : ''}${it.resolution ? ` · ${it.resolution}` : ''}${Number.isFinite(it.refreshHz) ? ` @ ${it.refreshHz}Hz` : ''}`
 			: ''
 		const unmappedGpu = it.kind === 'gpu_out' && it.isVirtual
 		marker.title = unmappedGpu

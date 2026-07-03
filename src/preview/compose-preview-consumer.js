@@ -176,6 +176,17 @@ async function detachAllComposeFileConsumers(ctx) {
 	if (ctx) ctx.log?.('debug', '[compose-preview] FILE consumers removed')
 }
 
+/**
+ * True when every monitored channel currently has its FILE consumer attached.
+ * @param {object} config
+ * @returns {boolean}
+ */
+function allComposeConsumersAttached(config) {
+	const channels = resolveMonitoredChannels(config || {})
+	if (!channels.length) return false
+	return channels.every((ch) => !!_channels.get(ch)?.attached)
+}
+
 function getComposeConsumerStats(config) {
 	const channels = resolveMonitoredChannels(config || {})
 	const byChannel = {}
@@ -218,6 +229,7 @@ module.exports = {
 	buildComposeStreamAddParams,
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
+	allComposeConsumersAttached,
 	detachAllComposeFileConsumers,
 	refreshComposePreviewConsumers,
 	getComposeConsumerStats,

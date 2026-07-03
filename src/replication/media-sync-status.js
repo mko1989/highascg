@@ -1,20 +1,9 @@
 'use strict'
 
-const { getReplicationConfig } = require('../config/replication-config')
-const { getMediaSyncStatus: getSyncthingMediaSyncStatus } = require('./syncthing-media-status')
-
 /**
  * @param {object} ctx
  */
 async function getReplicationMediaSyncStatus(ctx) {
-	const repl = getReplicationConfig(ctx?.config || {})
-	const transport = repl.mediaTransport || 'rsync'
-
-	if (transport === 'syncthing') {
-		const st = await getSyncthingMediaSyncStatus(repl.syncthingMediaFolderId)
-		return { ...st, transport: 'syncthing' }
-	}
-
 	const runtime = require('./replication-service').getReplicationRuntime(ctx)
 	const last = runtime?.lastMediaSync
 	if (!last) {

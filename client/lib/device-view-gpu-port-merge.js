@@ -5,7 +5,6 @@ import {
 	entryFromTopologyRow,
 } from './device-view-gpu-port-entries.js'
 import { readGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'
-import { resolveEffectiveGpuTopology } from './device-view-gpu-port-topology.js'
 import { getLastGpuLayoutTraceSeq } from './device-view-gpu-port-trace-state.js'
 import { displaysMatchingPairs, isPrimaryTopologySocket } from './device-view-gpu-port-utils.js'
 
@@ -15,19 +14,10 @@ import { displaysMatchingPairs, isPrimaryTopologySocket } from './device-view-gp
  * @param {{ byId?: Map<string, object> }} [prefs]
  * @param {object[] | null} [savedTopology]
  */
-export function resolveGpuSlotIdFromSavedLayout(pairs, prefs = null, savedTopology = null) {
+export function resolveGpuSlotIdFromSavedLayout(pairs, _prefs = null, savedTopology = null) {
 	const want = new Set((pairs || []).map((p) => normRandrCaspar(p)).filter(Boolean))
 	if (!want.size) return ''
-	const byId = prefs?.byId || readGpuLayoutPrefs().byId
-	for (const [slotId, item] of byId) {
-		const canonical = String(slotId).replace(/__.*$/i, '')
-		if (!/^gpu_p\d+$/i.test(canonical)) continue
-		const itemPairs = Array.isArray(item?.pairs) ? item.pairs : []
-		for (const p of itemPairs) {
-			if (want.has(normRandrCaspar(p))) return canonical
-		}
-	}
-	for (const row of resolveEffectiveGpuTopology(savedTopology, prefs)) {
+	for (const row of Array.isArray(savedTopology) ? savedTopology : []) {
 		const canonical = String(row?.physicalPortId || '').trim()
 		if (!/^gpu_p\d+$/i.test(canonical)) continue
 		for (const p of [row.dpA, row.dpB].filter(Boolean)) {
@@ -52,14 +42,11 @@ export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisc
 	)
 	const liveIds = new Set(entries.map((e) => String(e.connectorId || e.layoutSlotId || '').trim()).filter(Boolean))
 	const byIdRaw = prefs?.byId || new Map()
-	const orderIds = [
-		...new Set([
-			...(prefs?.orderIds || []),
-			...byIdRaw.keys(),
-			...(topology || []).map((t) => String(t?.physicalPortId || '').trim()),
-		]),
-	].filter((id) => /^gpu_p\d+$/i.test(String(id).trim()))
+	const orderIds = (topology || [])
+		.map((t) => String(t?.physicalPortId || '').trim())
+		.filter((id) => /^gpu_p\d+$/i.test(id))
 	const decisions = []
+	const socketCount = Array.isArray(topology) && topology.length ? topology.length : undefined
 	const merged = entries.map((entry) => {
 		const id = String(entry.connectorId || entry.layoutSlotId || '').trim()
 		const saved = byIdRaw.get(id)
@@ -75,28 +62,10 @@ export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisc
 			hidden = !!entry.hidden
 			hiddenReason = hidden ? 'entry.hidden' : 'visible (default)'
 		}
-		const pairs =
-			Array.isArray(saved?.pairs) && saved.pairs.length ? [...saved.pairs] : entry.pairs
+		const pairs = entry.pairs
 		let livePresent = !!entry.livePresent
 		let connected = !!entry.connected
 		let monitor = entry.monitor || ''
-		if (Array.isArray(saved?.pairs) && saved.pairs.length) {
-			const hits = displaysMatchingPairs(pairs, connectedDisplays, connectors)
-			if (hits.length) {
-				livePresent = true
-				monitor = hits[0].name
-				const disp = (connectedDisplays || []).find(
-					(d) => normRandrCaspar(d?.name) === hits[0].name,
-				)
-				const res = String(disp?.resolution || '').trim()
-				connected = !!(res && res !== 'unknown')
-			} else if (connectedNames.size) {
-				livePresent = pairs.some((p) => connectedNames.has(normRandrCaspar(p)))
-				connected = livePresent
-				const active = pairs.find((p) => connectedNames.has(normRandrCaspar(p)))
-				if (active) monitor = String(active).trim()
-			}
-		}
 		decisions.push({
 			id,
 			hidden,
@@ -116,7 +85,7 @@ export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisc
 			monitor,
 			label: saved?.label ? String(saved.label) : entry.label,
 			pairs,
-			topologySlot: entry.topologySlot === true || isPrimaryTopologySocket(id),
+			topologySlot: entry.topologySlot === true || isPrimaryTopologySocket(id, socketCount),
 		}
 	})
 	for (const savedId of byIdRaw.keys()) {
@@ -148,11 +117,6 @@ export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisc
 			: entryFromInferredPhysicalPort(parseInt(m[1], 10), [], connectedDisplays, topology)
 		if (saved?.pairs?.length) {
 			inferred.pairs = [...saved.pairs]
-			if (connectedNames.size) {
-				inferred.connected = inferred.pairs.some((p) => connectedNames.has(normRandrCaspar(p)))
-				const active = inferred.pairs.find((p) => connectedNames.has(normRandrCaspar(p)))
-				if (active) inferred.monitor = String(active).trim()
-			}
 		}
 		if (saved?.label) inferred.label = String(saved.label)
 		if (saved?.hidden != null) inferred.hidden = !!saved.hidden

@@ -263,10 +263,12 @@ routes.post('/api/project/load', ({ path, body, ctx }) => routesData.handleProje
 routes.post('/api/project/autosave', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/apply-hardware', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/new', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
+routes.post('/api/project/rename', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/project/list', ({ ctx }) => routesData.handleProjectList(ctx), { requireCaspar: false })
 routes.get('/api/project', ({ ctx }) => routesData.handleProjectGet(ctx), { requireCaspar: false })
 routes.get('/api/project/file/*', ({ path }) => routesData.handleProjectFile(path), { requireCaspar: false }) // It handles wildcard itself
+routes.delete('/api/project/*', ({ path }) => routesData.handleProjectDelete(path), { requireCaspar: false })
 routes.get('/api/project/*', ({ path, query, ctx }) => routesProject.handleGet(path, query, ctx), { requireCaspar: false })
 routes.post('/api/project/*', ({ path, body, ctx }) => routesProject.handlePost(path, body, ctx), { requireCaspar: false })
 

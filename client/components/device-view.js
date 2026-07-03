@@ -19,6 +19,8 @@ import { renderBands } from './device-view-bands-render.js'
 import { renderMatrix } from './device-view-matrix.js'
 import { renderDeviceInspector, renderEdgeInspector } from './device-view-inspector-render.js'
 import * as Actions from './device-view-actions.js'
+import { migrateLegacyGpuLayoutPrefsToServer } from '../lib/device-view-gpu-port-list.js'
+import { gpuTopologyMismatchActive } from '../lib/device-view-gpu-port-topology.js'
 import { getStreamingChannelStatus } from '../lib/streaming-channel-state.js'
 import { renderConnectorInspector, renderCasparSettingsInspector } from './device-view-inspectors.js'
 import { showLogsModal } from './logs-modal.js'
@@ -44,6 +46,7 @@ import {
 	mergeSettingsPatches,
 	resolveCableSourceResolution,
 } from '../lib/device-view-gpu-source-inherit.js'
+import { getAppWs } from '../lib/app-runtime.js'
 import { readSimpleWiring, writeSimpleWiring } from '../lib/device-view-simple-wiring-prefs.js'
 
 let mounted = false
@@ -669,8 +672,32 @@ export function initDeviceView(root) {
 		}
 	}
 
+	let topologyBannerEl = null
+
+	function updateTopologyMismatchBanner() {
+		if (!wrap || !lastPayload) return
+		const show = gpuTopologyMismatchActive(lastPayload)
+		if (!show) {
+			if (topologyBannerEl) {
+				topologyBannerEl.remove()
+				topologyBannerEl = null
+			}
+			return
+		}
+		if (!topologyBannerEl) {
+			topologyBannerEl = Object.assign(document.createElement('div'), {
+				className: 'device-view__gpu-topology-banner device-view__note',
+				style: 'background:#432;color:#fc9;padding:6px 10px;margin:4px 0;border-radius:4px',
+			})
+			wrap.insertBefore(topologyBannerEl, layout)
+		}
+		topologyBannerEl.textContent =
+			'Detected GPU wiring differs from saved layout — open a GPU port in the inspector and use the layout editor to review.'
+	}
+
 	function renderFromState({ restoreInspector = false } = {}) {
 		if (!lastPayload) return
+		updateTopologyMismatchBanner()
 		renderDestinations({
 			destBody,
 			lastPayload,
@@ -718,6 +745,8 @@ export function initDeviceView(root) {
 
 	async function load() {
 		try {
+			getAppWs()?.send?.({ type: 'device_view_subscribe' })
+			await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
 			const cachedStream = getStreamingChannelStatus()
 			const [payload, settings, stream] = await Promise.all([
 				Actions.loadDeviceView(),
@@ -817,4 +846,5 @@ export function initDeviceView(root) {
 		})
 	}
 	void load()
+	getAppWs()?.send?.({ type: 'device_view_subscribe' })
 }

@@ -1,4 +1,4 @@
-import { hasDrmGpuPhysicalMap, readGpuLayoutPrefs, resolveEffectiveGpuTopology } from '../lib/device-view-gpu-port-list.js'
+import { hasDrmGpuPhysicalMap, resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-list.js'
 import { findScreenDestinationById } from '../lib/device-view-host-channels.js'
 import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
 import { isDecklinkIoIn, isDecklinkIoOut, isDecklinkIoOutputSink } from '../lib/decklink-io-direction.js'
@@ -42,10 +42,7 @@ export function connectorById(payload, id) {
 			}
 		}
 		const p = ports.find((x) => String(x?.physicalPortId || '').trim() === sid) || null
-		const topo = resolveEffectiveGpuTopology(
-			payload?.gpuPhysicalTopology || payload?.settings?.gpuPhysicalTopology,
-			readGpuLayoutPrefs(),
-		)
+		const topo = resolveTopologyForDeviceView(payload, payload?._settings)
 		const topoRow = topo.find((t) => String(t?.physicalPortId || '').trim() === sid) || null
 		const pairName = String(p?.pair?.name || '').trim()
 		const active = String(p?.runtime?.activePort || '').trim()
@@ -228,10 +225,7 @@ export function isConnectorVisible(lastPayload, id) {
 		const ports = lastPayload?.live?.gpu?.physicalMap?.ports || []
 		if (ports.some((p) => String(p?.physicalPortId || '').trim() === sid)) return true
 		if (/^gpu_p\d+$/i.test(sid)) {
-			const topo = resolveEffectiveGpuTopology(
-				lastPayload?.gpuPhysicalTopology || lastPayload?.settings?.gpuPhysicalTopology,
-				readGpuLayoutPrefs(),
-			)
+			const topo = resolveTopologyForDeviceView(lastPayload, lastPayload?._settings)
 			if (topo.some((t) => String(t?.physicalPortId || '').trim() === sid)) return true
 		}
 		if (/^gpu_p\d+__/i.test(sid)) {

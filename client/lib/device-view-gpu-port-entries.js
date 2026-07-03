@@ -6,18 +6,26 @@ import {
 	traceGpuLayoutRawComplete,
 	traceGpuLayoutSkip,
 } from './device-view-gpu-layout-debug.js'
-import { defaultClientGpuTopology } from './device-view-gpu-port-topology.js'
 import { setLastGpuLayoutTraceSeq } from './device-view-gpu-port-trace-state.js'
 import {
 	displaysMatchingPairs,
 	gpuSplitConnectorId,
-	hasDrmGpuPhysicalMap,
+	hasServerGpuPhysicalMap,
 	iconForPortHints,
 	isPrimaryTopologySocket,
 	labelForPhysicalPort,
 	resolveExpectedGpuPhysicalPortCount,
 	consolidateBracketSplitEntries,
+	edidMonitorLabel,
 } from './device-view-gpu-port-utils.js'
+
+function monitorLabelFromRuntime(rt, display) {
+	const fromRt = edidMonitorLabel(rt?.monitor)
+	if (fromRt) return fromRt
+	const fromDisp = edidMonitorLabel(display?.monitor || display?.edid?.parsed)
+	if (fromDisp) return fromDisp
+	return String(rt?.xrandrName || rt?.displayName || rt?.activePort || display?.name || '').trim()
+}
 
 function labelForTopologyPairs(pairs) {
 	const list = (pairs || []).filter(Boolean).map(String)
@@ -30,7 +38,7 @@ function labelForTopologyPairs(pairs) {
 	return `DP ${list.map((p) => p.replace(/^DP-/i, '')).join('/')}`
 }
 
-export function entryFromTopologyRow(row, displays, connectors, suggestedGpuOuts, index, graphGpuOuts = []) {
+export function entryFromTopologyRow(row, displays, connectors, suggestedGpuOuts, index, graphGpuOuts = [], socketCount) {
 	const id = String(row?.physicalPortId || '').trim()
 	const pairs = [row?.dpA, row?.dpB].filter(Boolean).map(String)
 	const hits = displaysMatchingPairs(pairs, displays, connectors)
@@ -57,10 +65,10 @@ export function entryFromTopologyRow(row, displays, connectors, suggestedGpuOuts
 		index,
 		connected: hasMode,
 		livePresent: connected,
-		topologySlot: isPrimaryTopologySocket(id),
+		topologySlot: isPrimaryTopologySocket(id, socketCount),
 		hidden: false,
 		pairs,
-		monitor: active ? String(active).trim() : '',
+		monitor: active ? monitorLabelFromRuntime(disp ? { monitor: disp.monitor || disp.edid?.parsed } : null, disp) : '',
 		resolution,
 		refreshHz: Number.isFinite(Number(disp?.refreshHz)) ? Number(disp.refreshHz) : null,
 		icon: iconForPortHints(...pairs),
@@ -77,7 +85,7 @@ export function buildGpuEntriesFromTopology(topology, live, suggestedGpuOuts = [
 		(a, b) => (Number(a?.slotOrder) || 0) - (Number(b?.slotOrder) || 0),
 	)
 	return sorted.map((row, index) =>
-		entryFromTopologyRow(row, displays, connectors, suggestedGpuOuts, index, graphGpuOuts),
+		entryFromTopologyRow(row, displays, connectors, suggestedGpuOuts, index, graphGpuOuts, sorted.length),
 	)
 }
 
@@ -111,7 +119,7 @@ function entryFromPhysicalPortSide(p, probeConn, index, suggestedConnector = nul
 		connected,
 		hidden: false,
 		pairs: [shortName],
-		monitor: isActive ? String(rt.xrandrName || rt.displayName || shortName).trim() : '',
+		monitor: isActive ? monitorLabelFromRuntime(rt, null) : '',
 		resolution: isActive ? String(rt.resolution || '').trim() : '',
 		refreshHz: isActive && Number.isFinite(Number(rt.refreshHz)) ? Number(rt.refreshHz) : null,
 		icon: iconForPortHints(shortName),
@@ -148,6 +156,7 @@ function entryFromPhysicalPort(p, index) {
 	const rt = p?.runtime && typeof p.runtime === 'object' ? p.runtime : {}
 	const pairs = [p?.pair?.dpA, p?.pair?.dpB].filter(Boolean).map(String)
 	const connected = !!rt.connected
+	const mon = rt.monitor && typeof rt.monitor === 'object' ? rt.monitor : null
 	return {
 		connectorId: id,
 		layoutSlotId: id,
@@ -157,7 +166,9 @@ function entryFromPhysicalPort(p, index) {
 		connected,
 		hidden: false,
 		pairs,
-		monitor: String(rt.xrandrName || rt.displayName || rt.activePort || '').trim(),
+		monitor: monitorLabelFromRuntime(rt, null),
+		edidSerial: String(mon?.serial || '').trim(),
+		edidPreferredMode: String(mon?.preferredMode || '').trim(),
 		resolution: String(rt.resolution || '').trim(),
 		refreshHz: Number.isFinite(Number(rt.refreshHz)) ? Number(rt.refreshHz) : null,
 		icon: iconForPortHints(p?.pair?.dpA, p?.pair?.dpB, p?.pair?.name, rt.activePort),
@@ -244,9 +255,9 @@ export function entryFromInferredPhysicalPort(portIndex, suggestedGpuOuts, displ
 	const id = `gpu_p${portIndex}`
 	const existing = (suggestedGpuOuts || []).find((c) => String(c?.id || '').trim() === id)
 	if (existing) return entryFromSuggested(existing, displays, 0, null)
-	const topoRow = (topology || defaultClientGpuTopology()).find(
-		(t) => String(t?.physicalPortId || '').trim() === id,
-	)
+	const topoRow = Array.isArray(topology)
+		? topology.find((t) => String(t?.physicalPortId || '').trim() === id)
+		: null
 	const pairs = topoRow
 		? [topoRow.dpA, topoRow.dpB].filter(Boolean).map(String)
 		: [`DP-${portIndex * 2}`, `DP-${portIndex * 2 + 1}`]
@@ -282,6 +293,10 @@ export function collectGpuConnectorIdsInGraph(suggestedGpuOuts = [], graphGpuOut
 export function buildRawGpuPortEntriesFromLive(live, suggestedGpuOuts = [], graphGpuOuts = []) {
 	const physicalPorts = Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : []
 	const displays = Array.isArray(live?.gpu?.displays) ? live.gpu.displays : []
+	const resolvedTopology = Array.isArray(live?.gpu?.physicalMap?.effectiveTopology)
+		? live.gpu.physicalMap.effectiveTopology
+		: []
+	const socketCount = resolvedTopology.length || undefined
 	const entries = []
 	const seenIds = new Set()
 	const seq = traceGpuLayoutBuildStart(live, suggestedGpuOuts, { physicalPorts, displays })
@@ -363,7 +378,7 @@ export function buildRawGpuPortEntriesFromLive(live, suggestedGpuOuts = [], grap
 		traceGpuLayoutSkip(seq, 'physical', 'no physicalMap.ports or suggested gpu_out', {})
 	}
 
-	const drmMap = hasDrmGpuPhysicalMap(live)
+	const drmMap = hasServerGpuPhysicalMap(live)
 	if (drmMap && displays.length) {
 		traceGpuLayoutSkip(seq, 'display', 'skipped display rows (DRM physical map is canonical)', {
 			displayCount: displays.length,
@@ -402,7 +417,7 @@ export function buildRawGpuPortEntriesFromLive(live, suggestedGpuOuts = [], grap
 		const m = /^gpu_p(\d+)$/i.exec(id)
 		if (!m) continue
 		push(
-			entryFromInferredPhysicalPort(parseInt(m[1], 10), suggestedGpuOuts, displays),
+			entryFromInferredPhysicalPort(parseInt(m[1], 10), suggestedGpuOuts, displays, resolvedTopology),
 			'inferred-suggested',
 		)
 	}
@@ -412,7 +427,7 @@ export function buildRawGpuPortEntriesFromLive(live, suggestedGpuOuts = [], grap
 		for (let i = 0; i < expectedPorts; i++) {
 			const id = `gpu_p${i}`
 			if (seenIds.has(id)) continue
-			push(entryFromInferredPhysicalPort(i, suggestedGpuOuts, displays), 'inferred-port')
+			push(entryFromInferredPhysicalPort(i, suggestedGpuOuts, displays, resolvedTopology), 'inferred-port')
 		}
 	}
 

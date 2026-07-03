@@ -51,6 +51,9 @@ export function renderCasparBand(ctx) {
 		.filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'gpu_out')
 		.filter((c, i, arr) => arr.findIndex((x) => x?.id === c?.id) === i)
 	const gpuPhysicalPorts = Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : []
+	const gpuEffectiveTopology = Array.isArray(live?.gpu?.physicalMap?.effectiveTopology)
+		? live.gpu.physicalMap.effectiveTopology
+		: []
 	const deckIo = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_io')
 	const deckOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_out')
 	const streamOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'stream_out')
@@ -83,12 +86,14 @@ export function renderCasparBand(ctx) {
 		savedTopology: ctx.currentSettings?.gpuPhysicalTopology || lastPayload?.gpuPhysicalTopology || null,
 		hideDisconnectedByDefault: false,
 	})
+	const socketCount = gpuListEntries.filter((e) => /^gpu_p\d+$/i.test(String(e?.connectorId || ''))).length || undefined
 	const gpuLayoutItems = layoutItemsFromGpuEntries(gpuListEntries)
 
 	bindCasparGpuLayoutDocumentListeners({
 		casparOverlay,
 		customGpuItems: gpuLayoutItems,
 		gpuPhysicalPorts,
+		gpuEffectiveTopology,
 		gpuOuts,
 		live,
 		resolveStatusClass,
@@ -96,7 +101,7 @@ export function renderCasparBand(ctx) {
 	})
 
 	const items = gpuListEntries.map((entry) =>
-		entryToRearPanelGpuItem(entry, connectedDisplays, gpuInventory),
+		entryToRearPanelGpuItem(entry, connectedDisplays, gpuInventory, socketCount),
 	)
 
 	slots.push({ title: 'GPU', items })
@@ -253,7 +258,12 @@ export function renderCasparBand(ctx) {
 						const connected = firstItem.pairs.some((pName) =>
 							connectedDisplays.some((d) => d.connected && normRandrCaspar(d.name) === normRandrCaspar(pName))
 						)
-						const canonicalId = resolveCanonicalGpuConnectorId(firstItem.pairs, gpuPhysicalPorts, gpuOuts) || firstItem.id
+						const canonicalId = resolveCanonicalGpuConnectorId(
+							firstItem.pairs,
+							gpuPhysicalPorts,
+							gpuOuts,
+							gpuEffectiveTopology,
+						) || firstItem.id
 						const connectorCtx = {
 							type: 'gpu_out',
 							connector: { id: canonicalId, kind: 'gpu_out', label: firstItem.label, layoutSlotId: firstItem.id, isVirtual: !connected, pairs: firstItem.pairs },

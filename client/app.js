@@ -15,7 +15,6 @@ import { initInspectorPanel } from './components/inspector-panel.js'
 import { initMultiviewEditor } from './components/multiview-editor.js'
 import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
-import { projectFileIdFromName } from './lib/project-files.js'
 import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
@@ -44,8 +43,6 @@ import {
 	setOfflineBootstrapMode,
 	shouldResyncOnWsConnect,
 } from './lib/server-project-sync.js'
-import { markLocalProjectSaved } from './lib/project-remote-sync.js'
-
 
 import * as Status from './lib/app-status.js'
 import { clearStaleApiOriginOverrideOnPlayoutUi } from './lib/api-origin.js'
@@ -204,12 +201,19 @@ async function init() {
 			try {
 				let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
 				project = normalizeProjectMediaRefs(project, settingsState.getSettings())
-				await api.post('/api/project/autosave', { project })
+				const res = await api.post('/api/project/autosave', { project })
+				if (res?.slug && projectState.setProjectSlug) projectState.setProjectSlug(res.slug)
 				const d = new Date()
 				const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 				document.dispatchEvent(new CustomEvent('project-autosaved', { detail: { time: timeStr } }))
 			} catch (e) {
-				console.warn('[HighAsCG] Auto-save failed:', e.message)
+				const reason = e?.body?.reason || e?.reason || e?.message || String(e)
+				console.warn('[HighAsCG] Auto-save failed:', reason)
+				document.dispatchEvent(
+					new CustomEvent('project-autosave-failed', {
+						detail: { reason, status: e?.status },
+					}),
+				)
 			} finally {
 				autosaveInFlight = null
 				if (autosavePending) {
@@ -272,12 +276,6 @@ async function init() {
 	sceneState.on('persisted', () => {
 		if (!canPushProjectToServer()) return
 		appLogic.scheduleSceneDeckSync()
-		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
-		project = normalizeProjectMediaRefs(project, settingsState.getSettings())
-		const id = projectFileIdFromName(project.name || projectState.getProjectName())
-		markLocalProjectSaved()
-		api.post('/api/project/save', { project, id })
-			.catch(e => console.warn('[HighAsCG] Main save failed:', e.message))
 		void flushAutosave()
 	})
 	timelineState.on('change', scheduleAutosave)

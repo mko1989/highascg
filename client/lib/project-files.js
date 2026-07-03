@@ -16,6 +16,9 @@ import { normalizeProjectPayload } from './project-load.js'
  * @property {number|null} sizeBytes
  * @property {boolean} active
  * @property {boolean} [legacy] — synthetic row from GET /api/project when list API missing
+ * @property {boolean} [conflict] — Syncthing or duplicate slug variants exist
+ * @property {string[]} [conflictSlugs]
+ * @property {boolean} [corrupt] — unreadable JSON on disk
  */
 
 const LEGACY_CURRENT_ID = '__current__'
@@ -49,6 +52,9 @@ export function normalizeProjectFileEntry(entry) {
 					: null,
 		sizeBytes: typeof e.sizeBytes === 'number' ? e.sizeBytes : typeof e.size === 'number' ? e.size : null,
 		active: e.active === true || e.isActive === true,
+		conflict: e.conflict === true,
+		conflictSlugs: Array.isArray(e.conflictSlugs) ? e.conflictSlugs.map(String) : undefined,
+		corrupt: e.corrupt === true || e.error === 'corrupt',
 	}
 }
 
@@ -254,16 +260,29 @@ export function formatProjectFileSize(bytes) {
 }
 
 /**
+ * Server-authoritative slug (matches `projectSlugFromName` in project-store.js).
  * @param {string} [name]
  * @returns {string}
  */
 export function projectFileIdFromName(name) {
-	return (
-		String(name || 'project')
-			.trim()
-			.toLowerCase()
-			.replace(/[^\w.-]+/g, '_') || 'project'
-	)
+	let s = String(name || '')
+		.trim()
+		.toLowerCase()
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_+|_+$/g, '')
+	if (!s) s = 'untitled'
+	return s.slice(0, 80)
+}
+
+/**
+ * @param {string} slug
+ */
+export async function deleteProjectFile(slug) {
+	const id = String(slug || '').trim()
+	if (!id) throw new Error('Missing project slug')
+	return api.delete(`/api/project/${encodeURIComponent(id)}`)
 }
 
 export { LEGACY_CURRENT_ID }

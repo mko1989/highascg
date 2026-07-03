@@ -38,14 +38,10 @@ async function buildGpuDisplaySnapshot(ctx) {
 		physicalMap = { error: e instanceof Error ? e.message : String(e) }
 	}
 
-	let gpuLayout = null
-	try {
-		const { handleGpuLayoutGet } = require('../api/system-hardware-gpu-layout')
-		const res = await handleGpuLayoutGet()
-		if (res?.body) gpuLayout = JSON.parse(String(res.body))
-	} catch (e) {
-		gpuLayout = { error: e instanceof Error ? e.message : String(e) }
-	}
+	// Legacy alias — support bundle consumers should use physicalMap (WO-108).
+	const gpuLayout = physicalMap && !physicalMap.error
+		? { deprecated: true, note: 'Use physicalMap; GET /api/system/gpu-layout is deprecated', physicalMap }
+		: null
 
 	let bootXrandr = null
 	try {

@@ -103,10 +103,10 @@ On connect and when the leader pushes project updates, HighAsCG syncs **project-
 
 | Role | Direction | When |
 |------|-----------|------|
-| Leader | push → backup | After follower registers; after each project push |
-| Follower | pull ← leader | After reconcile on connect |
+| Leader | push → backup | Explicit push (media sync button / API) or connect flow |
+| Follower | pull ← leader | Explicit pull (media sync button / API) or connect flow |
 
-Config: `replication.mediaTransport` — **`rsync`** (default) or `syncthing` (legacy).
+Media is **not** synced automatically on project saves — spreading media is a deliberate operator action based on the project media folder (`media/projects/<slug>/`).
 
 Env (optional): `HIGHASCG_REPL_RSYNC_USER` (default `casparcg`), `HIGHASCG_REPL_RSYNC_REMOTE_ROOT` (default repo root), `HIGHASCG_REPL_RSYNC_SSH_OPTS`, `HIGHASCG_REPL_RSYNC_TIMEOUT_MS`.
 
@@ -114,14 +114,11 @@ Manual: `POST /api/replication/sync-project-media` with optional `{ "direction":
 
 **Requires** passwordless SSH between boxes (same as `scripts/deploy/push-backup-box.sh`).
 
-### Legacy: Syncthing staging (optional)
-
-Set `replication.mediaTransport` to `syncthing` to use the old path:
-
-1. Leader builds `media/.replication-active/` with hardlinks to referenced clips.
-2. Syncthing REST API shares staging as `highascg-project-media`.
-
-**Exclude** `media/.replication-active/` from manual Syncthing shares of `media/`.
+> **Removed (2026-07):** the legacy Syncthing `media/.replication-active/` staging-folder
+> workflow. It hardlinked/copied every referenced clip into a hidden folder at the media
+> root on each project save; those copies entered Caspar's CLS catalog and clip resolution
+> could rewrite PLAY lines to the staged copies. Media now spreads only from
+> `media/projects/<slug>/` via explicit rsync push/pull.
 
 Bulk file sync between boxes can also use **full rsync mirror** (WO-61 / `push-backup-box.sh DEPLOY_MODE=mirror`).
 

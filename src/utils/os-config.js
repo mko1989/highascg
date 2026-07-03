@@ -303,6 +303,9 @@ function applyX11Layout(config, opts = {}) {
 			}
 		}
 		if (applied) {
+			try {
+				require('./hardware-info').invalidateXrandrCache()
+			} catch (_) {}
 			const verify = verifyXrandrMatchesLayout(layout, { inventory: connectorInventory, config })
 			if (!verify.ok) {
 				for (const m of verify.mismatches) {

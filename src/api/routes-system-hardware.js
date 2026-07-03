@@ -45,7 +45,7 @@ async function hardwareHandlePost(p, body, ctx) {
 		const { handlePointerConfinePost } = require('./system-hardware-gui')
 		return handlePointerConfinePost(body, ctx)
 	}
-	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset()
+	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset(body, ctx)
 	if (p === '/api/system/xrandr-layout/apply') return handleXrandrLayoutApplyPost(ctx)
 	if (p === '/api/system/identify-displays') return handleIdentifyDisplaysPost(body, ctx)
 	if (p === '/api/system/network/apply') return handleNetworkApplyPost(body, ctx)

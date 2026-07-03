@@ -68,6 +68,7 @@ export function buildInspectorTable(rows) {
 		const v = document.createElement('span')
 		v.className = 'device-view__kv-val'
 		v.textContent = r.value
+		if (r.strong) v.style.fontWeight = '600'
 		item.append(k, v)
 		list.append(item)
 	}

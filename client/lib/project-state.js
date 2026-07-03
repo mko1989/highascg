@@ -11,6 +11,7 @@ const SERVER_STORE_NAME = 'casparcg_web_project'
 export class ProjectState {
 	constructor(options = {}) {
 		this.projectName = ''
+		this.projectSlug = ''
 		this._listeners = new Map()
 		this._loadName()
 	}
@@ -36,6 +37,14 @@ export class ProjectState {
 
 	getProjectName() {
 		return this.projectName
+	}
+
+	getProjectSlug() {
+		return this.projectSlug
+	}
+
+	setProjectSlug(slug) {
+		this.projectSlug = String(slug || '').trim()
 	}
 
 	on(key, fn) {
@@ -94,6 +103,7 @@ export class ProjectState {
 		const silent = !!opts.silent
 		const name = data.name
 		if (name) this.setProjectName(name)
+		if (data.slug) this.setProjectSlug(data.slug)
 		if (data.scenes && sceneState?.loadFromData) sceneState.loadFromData(data.scenes, { silent })
 		const po = data.programOutput || data.dashboard
 		if (po && programOutputState?.loadFromData) programOutputState.loadFromData(po, { silent })

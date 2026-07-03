@@ -29,6 +29,7 @@ const IMMEDIATE_KEYS = new Set([
 	'liveScenesByProgramChannel',
 	'scene_deck',
 	'multiviewLayout',
+	'web_project',
 	'web_project_active_slug',
 	'programLayerBankByChannel',
 ])

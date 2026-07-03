@@ -152,6 +152,12 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		}
 	})
 
+	ws.on('gpu_topology_changed', () => {
+		try {
+			window.dispatchEvent(new Event('highascg-device-view-reload'))
+		} catch { /* non-browser */ }
+	})
+
 	ws.on('connect', () => {
 		appLogic.updateStatus(true, null); appLogic.refreshEye()
 		appLogic.scheduleMultiviewRefresh()

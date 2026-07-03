@@ -117,18 +117,21 @@ function invalidateIfProgramChannel(config, channel) {
 
 /**
  * @param {{ _wsBroadcast?: (type: string, payload: object) => void, programLayerBankByChannel?: object }} ctx
+ * @param {{ skipChannelMap?: boolean }} [opts]
  */
-function broadcastSceneLive(ctx) {
+function broadcastSceneLive(ctx, opts = {}) {
 	if (!ctx?._wsBroadcast) return
 	ctx._wsBroadcast('change', { path: 'scene.live', value: getAll() })
 	ctx._wsBroadcast('change', {
 		path: 'scene.programLayerBankByChannel',
 		value: ctx.programLayerBankByChannel || {},
 	})
-	ctx._wsBroadcast('change', {
-		path: 'channelMap',
-		value: buildChannelMap(ctx),
-	})
+	if (opts.skipChannelMap !== true) {
+		ctx._wsBroadcast('change', {
+			path: 'channelMap',
+			value: buildChannelMap(ctx),
+		})
+	}
 	try {
 		if (_onSceneLiveBroadcast) _onSceneLiveBroadcast(ctx)
 		else require('../companion-bridge/look-air-frames').onSceneLiveBroadcast(ctx)

@@ -4,13 +4,8 @@
 import * as Actions from './device-view-actions.js'
 import { setStatus } from './device-view-ui-utils.js'
 import { resolveCableSourceResolution } from '../lib/device-view-gpu-source-inherit.js'
-import {
-	gpuPhysicalPortCableId,
-	readGpuLayoutPrefs,
-	resolveEffectiveGpuTopology,
-} from '../lib/device-view-gpu-port-list.js'
-import { resolveGpuScreenNumber } from './device-view-inspector-gpu-resolve.js'
-import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
+import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { resolveGpuScreenNumber, resolveGpuDetectedDisplay } from './device-view-inspector-gpu-resolve.js'
 import {
 	STANDARD_VIDEO_MODES,
 	casparVideoModeToOsModeAndRate,
@@ -136,6 +131,9 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		return ports.find((p) => String(p?.physicalPortId || '').trim() === canonicalId) || null
 	})()
 
+	const detectedDisplay = resolveGpuDetectedDisplay(conn, lastPayload)
+	const edidParsed = detectedDisplay?.monitor || detectedDisplay?.edid?.parsed || null
+
 	const readDim = (suffix, fallback) => {
 		const k = `screen_${screenN}_${suffix}`
 		return cs[k] ?? currentSettings?.casparServer?.[k] ?? fallback
@@ -147,53 +145,6 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 			style: 'font-size:10px; opacity:0.6; margin:2px 0 4px',
 			textContent: `${source.label || source.id}: ${inherited.width}×${inherited.height} @ ${inherited.fps} Hz`,
 		})
-	}
-
-	const detectDisplayForConnector = () => {
-		const ports = Array.isArray(lastPayload?.live?.gpu?.physicalMap?.ports) ? lastPayload.live.gpu.physicalMap.ports : []
-		const displays = Array.isArray(lastPayload?.live?.gpu?.displays) ? lastPayload.live.gpu.displays : []
-		const canonicalId = gpuPhysicalPortCableId(conn?.id || '')
-		const byId = ports.find((p) => String(p?.physicalPortId || '').trim() === canonicalId) || null
-		const topo = resolveEffectiveGpuTopology(
-			lastPayload?.gpuPhysicalTopology || lastPayload?.settings?.gpuPhysicalTopology,
-			readGpuLayoutPrefs(),
-		)
-		const topoRow = topo.find((t) => String(t?.physicalPortId || '').trim() === canonicalId) || null
-		const pairNames = []
-		if (topoRow) {
-			if (topoRow.dpA) pairNames.push(String(topoRow.dpA).trim())
-			if (topoRow.dpB) pairNames.push(String(topoRow.dpB).trim())
-		} else if (byId?.pair) {
-			if (byId.pair.dpA) pairNames.push(String(byId.pair.dpA).trim())
-			if (byId.pair.dpB) pairNames.push(String(byId.pair.dpB).trim())
-		} else if (conn?.gpuPhysical?.pair) {
-			if (conn.gpuPhysical.pair.dpA) pairNames.push(String(conn.gpuPhysical.pair.dpA).trim())
-			if (conn.gpuPhysical.pair.dpB) pairNames.push(String(conn.gpuPhysical.pair.dpB).trim())
-		}
-		const findDisplay = (name) => {
-			const want = normRandrCaspar(name)
-			if (!want) return null
-			return displays.find((x) => normRandrCaspar(x?.name) === want) || null
-		}
-		if (byId) {
-			const activePort = String(byId?.runtime?.activePort || byId?.runtime?.xrandrName || '').trim()
-			if (activePort) {
-				const activeNorm = normRandrCaspar(activePort)
-				if (pairNames.some((p) => normRandrCaspar(p) === activeNorm)) {
-					const d = findDisplay(activePort)
-					if (d) return d
-				}
-			}
-		}
-		for (const name of pairNames) {
-			const d = findDisplay(name)
-			if (d?.connected) return d
-		}
-		for (const name of pairNames) {
-			const d = findDisplay(name)
-			if (d) return d
-		}
-		return null
 	}
 
 	const formatModeOption = (m) => {
@@ -212,7 +163,6 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		}
 	}
 
-	const detectedDisplay = detectDisplayForConnector()
 	const portModes = (Array.isArray(detectedDisplay?.modes) ? detectedDisplay.modes : [])
 		.map(formatModeOption)
 		.filter(Boolean)
@@ -405,16 +355,28 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	overrideResRow.append(overrideResIn, document.createTextNode('Override'))
 	overrideResRow.title = 'Use Caspar Video mode for layout when cabled to a destination (see WO-40)'
 
+	const edidName = String(edidParsed?.monitorName || '').trim()
+	const edidSerial = String(edidParsed?.serial || '').trim()
+	const edidHeadline = Object.assign(document.createElement('div'), {
+		className: 'device-view__inspector-label',
+		style: `font-size:11px; margin-top:8px; font-weight:600;${edidName ? '' : ' color:#c90;'}`,
+		textContent: edidName
+			? `EDID: ${edidName}${edidSerial ? ` (${edidSerial})` : ''}`
+			: detectedDisplay?.connected
+				? 'No EDID received'
+				: 'No display connected',
+	})
+
 	const displayLabel = detectedDisplay?.name ? String(detectedDisplay.name) : ''
 	const systemResolutionLbl = Object.assign(document.createElement('div'), {
 		className: 'device-view__inspector-label',
-		textContent: displayLabel ? `OS output (${displayLabel}) — EDID or Custom` : 'OS output — EDID or Custom',
+		textContent: displayLabel ? `Detected modes on ${displayLabel}` : 'Detected modes (from display)',
 		style: 'font-size:10px; opacity:0.7; margin-top:8px',
 	})
 	const systemResolutionBlock = Object.assign(document.createElement('div'), {
 		style: 'display:flex; flex-direction:column; gap:4px',
 	})
-	systemResolutionBlock.append(systemResolutionLbl, displayModeSelect, osCustomRow, overrideResRow)
+	systemResolutionBlock.append(edidHeadline, systemResolutionLbl, displayModeSelect, osCustomRow, overrideResRow)
 
 	const timingRow = Object.assign(document.createElement('div'), {
 		className: 'device-view__inspector-timing-row',

@@ -8,12 +8,15 @@ let documentListenersBound = false
 function onGpuLayoutChanged(e) {
 	const ctx = listenerCtx
 	if (!ctx) return
-	const { customGpuItems, gpuPhysicalPorts, gpuOuts, casparOverlay, resolveStatusClass, getGpuEditMode } = ctx
+	const { customGpuItems, gpuPhysicalPorts, gpuEffectiveTopology, gpuOuts, casparOverlay, resolveStatusClass, getGpuEditMode } = ctx
+	const effectiveTopology = gpuEffectiveTopology || []
 	const { id, pairs, label, hidden } = e.detail || {}
 	const item =
 		customGpuItems.find((x) => x.id === id) ||
 		customGpuItems.find(
-			(x) => resolveCanonicalGpuConnectorId(x.pairs, gpuPhysicalPorts, gpuOuts) === String(id || '').trim(),
+			(x) =>
+				resolveCanonicalGpuConnectorId(x.pairs, gpuPhysicalPorts, gpuOuts, effectiveTopology) ===
+				String(id || '').trim(),
 		)
 	if (!item) return
 
@@ -28,7 +31,7 @@ function onGpuLayoutChanged(e) {
 	const canonicalId =
 		/^gpu_p\d+$/i.test(slotId)
 			? slotId
-			: resolveCanonicalGpuConnectorId(item.pairs, gpuPhysicalPorts, gpuOuts) || item.id
+			: resolveCanonicalGpuConnectorId(item.pairs, gpuPhysicalPorts, gpuOuts, effectiveTopology) || item.id
 	const connectedDisplays = ctx.live?.gpu?.displays || []
 	const connected = item.pairs.some((pName) =>
 		connectedDisplays.some((d) => d.connected && normRandrCaspar(d.name) === normRandrCaspar(pName)),

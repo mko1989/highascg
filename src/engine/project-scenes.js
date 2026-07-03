@@ -73,6 +73,9 @@ function loadFullProject() {
 		if (!fromFile) {
 			const project = persistence.get('web_project')
 			if (project && typeof project === 'object') {
+				console.warn(
+					'[project] loadFullProject: using deprecated web_project mirror fallback — re-save via header Save or fix projects/<slug>.json',
+				)
 				fromFile = project
 				const inferred = projectStore.projectSlugFromName(project.name)
 				if (inferred && !slug) projectStore.setActiveSlug(persistence, inferred)
@@ -412,28 +415,49 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 }
 
 /**
+ * Prefer live WS-synced deck scenes over a possibly stale autosave export (WO-106).
+ * @param {object} project
+ * @param {object} ctx
+ * @returns {object}
+ */
+function enrichProjectScenesFromLiveDeck(project, ctx) {
+	if (!project || typeof project !== 'object' || !ctx?.sceneDeck) return project
+	const deck = ctx.sceneDeck
+	const snaps = Array.isArray(deck.sceneSnapshots) ? deck.sceneSnapshots : null
+	if (!snaps?.length) return project
+	const envelope =
+		project.scenes && typeof project.scenes === 'object'
+			? { ...project.scenes }
+			: { scenes: [], layerPresets: [], lookPresets: [] }
+	envelope.scenes = snaps
+	if (deck.previewSceneId != null && String(deck.previewSceneId).trim()) {
+		envelope.previewSceneId = String(deck.previewSceneId).trim()
+	}
+	if (Array.isArray(deck.layerPresets)) envelope.layerPresets = deck.layerPresets
+	if (Array.isArray(deck.lookPresets)) envelope.lookPresets = deck.lookPresets
+	return { ...project, scenes: envelope }
+}
+
+/**
  * Persist project + optional autosave file; update in-memory deck mirror (no WS broadcast).
+ * Main file write must succeed before mirror/autosave updates (WO-106).
  * @param {object} ctx
  * @param {object} project
  * @param {{ writeAutosave?: boolean, pushVolumes?: boolean }} [opts]
- * @returns {boolean}
+ * @returns {{ ok: true, slug: string }}
  */
 function persistProject(ctx, project, opts = {}) {
-	if (!ctx || !project || typeof project !== 'object') return false
+	if (!ctx || !project || typeof project !== 'object') {
+		throw new Error('Invalid project persist payload')
+	}
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const slug = projectStore.projectSlugFromName(project.name)
 	projectStore.migrateLegacySingleProject(persistence)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
-	try {
-		projectStore.writeProjectFile(slug, stamped)
-		projectStore.setActiveSlug(persistence, slug)
-		ensureProjectMediaDir(ctx.config, slug, persistence)
-	} catch (e) {
-		if (typeof ctx.log === 'function') {
-			ctx.log('warn', '[project] projects/ write: ' + (e?.message || e))
-		}
-	}
+	projectStore.writeProjectFile(slug, stamped)
+	projectStore.setActiveSlug(persistence, slug)
+	ensureProjectMediaDir(ctx.config, slug, persistence)
 	persistence.set('web_project', stamped)
 	if (opts.writeAutosave !== false) {
 		try {
@@ -465,7 +489,7 @@ function persistProject(ctx, project, opts = {}) {
 		}
 		persistSceneDeckForCtx(ctx)
 	}
-	return true
+	return { ok: true, slug }
 }
 
 /**
@@ -529,6 +553,7 @@ module.exports = {
 	isProjectSaveNewerOrEqual,
 	isLikelyStaleProjectReplace,
 	validateIncomingProject,
+	enrichProjectScenesFromLiveDeck,
 	sceneIdSet,
 	persistProject,
 	mergeDeckSyncIntoProject,

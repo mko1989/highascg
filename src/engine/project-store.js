@@ -11,8 +11,10 @@ const {
 
 const PROJECTS_DIR = path.join(REPO_ROOT, 'projects')
 const AUTOSAVE_SUBDIR = '_autosave'
+const TRASH_SUBDIR = '_trash'
 const ACTIVE_SLUG_KEY = 'web_project_active_slug'
 const LEGACY_AUTOSAVE_PATH = path.join(REPO_ROOT, 'autosave.json')
+const SYNC_CONFLICT_RE = /^(.+)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]+$/
 
 /**
  * @param {string} name
@@ -71,11 +73,69 @@ function migrateLegacySingleProject(persistence) {
 	if (!legacy || typeof legacy !== 'object') return
 	const slug = projectSlugFromName(legacy.name)
 	try {
-		fs.writeFileSync(projectFilePath(slug), JSON.stringify(legacy, null, 2), 'utf8')
+		writeProjectFile(slug, legacy)
 		setActiveSlug(persistence, slug)
 	} catch (e) {
 		console.warn('[project-store] legacy migrate failed:', e.message)
 	}
+}
+
+/**
+ * @param {string} filename — e.g. `show.json` or `show.sync-conflict-….json`
+ */
+function parseProjectListFilename(filename) {
+	if (!filename || !filename.endsWith('.json')) return null
+	const stem = filename.slice(0, -5)
+	const conflict = stem.match(SYNC_CONFLICT_RE)
+	if (conflict) {
+		return { slug: stem, baseSlug: conflict[1], isSyncConflict: true }
+	}
+	if (stem.includes('.corrupt-')) {
+		const baseSlug = stem.split('.corrupt-')[0]
+		return { slug: stem, baseSlug, isCorrupt: true }
+	}
+	return { slug: stem, baseSlug: stem, isSyncConflict: false, isCorrupt: false }
+}
+
+/**
+ * Move an unreadable project file aside so list/load can report it.
+ * @param {string} filePath
+ */
+function quarantineCorruptFile(filePath) {
+	if (!filePath || !fs.existsSync(filePath)) return null
+	const ts = new Date().toISOString().replace(/[:.]/g, '-')
+	const quarantinePath = `${filePath}.corrupt-${ts}`
+	try {
+		fs.renameSync(filePath, quarantinePath)
+		return quarantinePath
+	} catch (e) {
+		console.warn('[project-store] quarantine failed:', e.message)
+		return null
+	}
+}
+
+/**
+ * Move main + autosave for a slug into `projects/_trash/` (not hard delete).
+ * @param {string} slug
+ */
+function retireProjectSlug(slug) {
+	const s = String(slug || '').trim()
+	if (!s) return false
+	ensureProjectsDir()
+	const trashDir = path.join(PROJECTS_DIR, TRASH_SUBDIR, `${s}-${Date.now()}`)
+	fs.mkdirSync(trashDir, { recursive: true })
+	let moved = false
+	const main = projectFilePath(s)
+	if (fs.existsSync(main)) {
+		fs.renameSync(main, path.join(trashDir, `${s}.json`))
+		moved = true
+	}
+	const autosave = autosaveFilePath(s)
+	if (fs.existsSync(autosave)) {
+		fs.renameSync(autosave, path.join(trashDir, `${s}.autosave.json`))
+		moved = true
+	}
+	return moved
 }
 
 /**
@@ -92,7 +152,9 @@ function readProjectFile(slug) {
 	try {
 		const project = JSON.parse(fs.readFileSync(p, 'utf8'))
 		return project && typeof project === 'object' ? project : null
-	} catch {
+	} catch (e) {
+		quarantineCorruptFile(p)
+		console.warn(`[project-store] corrupt project quarantined (${slug}): ${e?.message || e}`)
 		return null
 	}
 }
@@ -201,9 +263,14 @@ function loadProjectBySlug(persistence, slug) {
 
 module.exports = {
 	PROJECTS_DIR,
+	AUTOSAVE_SUBDIR,
+	TRASH_SUBDIR,
 	ACTIVE_SLUG_KEY,
 	LEGACY_AUTOSAVE_PATH,
 	projectSlugFromName,
+	parseProjectListFilename,
+	quarantineCorruptFile,
+	retireProjectSlug,
 	projectsDir,
 	projectFilePath,
 	autosaveFilePath,

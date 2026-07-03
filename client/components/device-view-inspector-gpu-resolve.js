@@ -1,4 +1,6 @@
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-topology.js'
+import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
 
 /**
  * Caspar screen index (1–4) from the physical rear jack (gpu_p0 → 1, gpu_p2 → 3).
@@ -69,4 +71,49 @@ export function gpuOutputIsMultiviewBound(conn, lastPayload) {
 	const dests = lastPayload?.screenDestinations?.destinations || []
 	const d = dests.find((x) => String(x?.id || '') === dstId)
 	return !!d && String(d.mode || '').toLowerCase() === 'multiview'
+}
+
+/** Live RandR display row for a rear GPU jack (topology pair → active output). */
+export function resolveGpuDetectedDisplay(conn, lastPayload) {
+	const ports = Array.isArray(lastPayload?.live?.gpu?.physicalMap?.ports) ? lastPayload.live.gpu.physicalMap.ports : []
+	const displays = Array.isArray(lastPayload?.live?.gpu?.displays) ? lastPayload.live.gpu.displays : []
+	const canonicalId = gpuPhysicalPortCableId(conn?.id || '')
+	const byId = ports.find((p) => String(p?.physicalPortId || '').trim() === canonicalId) || null
+	const topo = resolveTopologyForDeviceView(lastPayload, lastPayload?._settings)
+	const topoRow = topo.find((t) => String(t?.physicalPortId || '').trim() === canonicalId) || null
+	const pairNames = []
+	if (topoRow) {
+		if (topoRow.dpA) pairNames.push(String(topoRow.dpA).trim())
+		if (topoRow.dpB) pairNames.push(String(topoRow.dpB).trim())
+	} else if (byId?.pair) {
+		if (byId.pair.dpA) pairNames.push(String(byId.pair.dpA).trim())
+		if (byId.pair.dpB) pairNames.push(String(byId.pair.dpB).trim())
+	} else if (conn?.gpuPhysical?.pair) {
+		if (conn.gpuPhysical.pair.dpA) pairNames.push(String(conn.gpuPhysical.pair.dpA).trim())
+		if (conn.gpuPhysical.pair.dpB) pairNames.push(String(conn.gpuPhysical.pair.dpB).trim())
+	}
+	const findDisplay = (name) => {
+		const want = normRandrCaspar(name)
+		if (!want) return null
+		return displays.find((x) => normRandrCaspar(x?.name) === want) || null
+	}
+	if (byId) {
+		const activePort = String(byId?.runtime?.activePort || byId?.runtime?.xrandrName || '').trim()
+		if (activePort) {
+			const activeNorm = normRandrCaspar(activePort)
+			if (pairNames.some((p) => normRandrCaspar(p) === activeNorm)) {
+				const d = findDisplay(activePort)
+				if (d) return d
+			}
+		}
+	}
+	for (const name of pairNames) {
+		const d = findDisplay(name)
+		if (d?.connected) return d
+	}
+	for (const name of pairNames) {
+		const d = findDisplay(name)
+		if (d) return d
+	}
+	return null
 }

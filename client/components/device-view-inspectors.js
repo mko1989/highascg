@@ -8,7 +8,7 @@ import { renderDeckLinkIoControls } from './device-view-inspector-decklink.js'
 import { renderStreamOutControls } from './device-view-inspector-stream.js'
 import { renderRecordOutControls } from './device-view-inspector-record.js'
 import { renderAudioOutControls } from './device-view-inspector-audio.js'
-import { renderGpuOutControls } from './device-view-inspector-gpu.js'
+import { renderGpuOutControls, buildGpuInspectorSummaryRows } from './device-view-inspector-gpu.js'
 import { renderCasparSettingsInspector } from './device-view-inspector-caspar.js'
 import { renderMappingConnectorControls } from './device-view-inspector-mapping.js'
 
@@ -47,7 +47,9 @@ export function renderConnectorInspector(h, conn, ctx, {
 		})
 	)
 
-	if (!isGpu && !isDecklinkPort) {
+	if (isGpu) {
+		h.append(buildInspectorTable(buildGpuInspectorSummaryRows(conn, { lastPayload })))
+	} else if (!isDecklinkPort) {
 		const rows = readableConnectorRows(conn, ctx)
 		rows.push({ label: 'Out cables', value: String(summary.out.length) }, { label: 'In cables', value: String(summary.in.length) })
 		h.append(buildInspectorTable(rows))

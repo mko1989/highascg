@@ -77,7 +77,7 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	titleField.className = 'inspector-field'
 	titleField.innerHTML = `
 		<label class="inspector-field__label">Title
-			<input type="text" class="inspector-field__input" id="lt-title" value="${escAttr(cfg.title)}" placeholder="Primary line" style="flex:1;min-width:0;max-width:100%" />
+			<input type="text" class="inspector-field__input" id="lt-title" value="${escapeAttr(cfg.title)}" placeholder="Primary line" style="flex:1;min-width:0;max-width:100%" />
 		</label>
 	`
 	grp.appendChild(titleField)
@@ -87,7 +87,7 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	subField.className = 'inspector-field'
 	subField.innerHTML = `
 		<label class="inspector-field__label">Subtitle
-			<input type="text" class="inspector-field__input" id="lt-subtitle" value="${escAttr(cfg.subtitle)}" placeholder="Secondary line" style="flex:1;min-width:0;max-width:100%" />
+			<input type="text" class="inspector-field__input" id="lt-subtitle" value="${escapeAttr(cfg.subtitle)}" placeholder="Secondary line" style="flex:1;min-width:0;max-width:100%" />
 		</label>
 	`
 	grp.appendChild(subField)
@@ -183,7 +183,7 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 		const headers = roster?.headers || []
 		const opts = [`<option value="">— ${label} —</option>`]
 		for (const h of headers) {
-			opts.push(`<option value="${escAttr(h)}"${value === h ? ' selected' : ''}>${escAttr(h)}</option>`)
+			opts.push(`<option value="${escapeAttr(h)}"${value === h ? ' selected' : ''}>${escapeAttr(h)}</option>`)
 		}
 		return `<label class="inspector-lt-roster__map-field">
 			<span class="inspector-lt-roster__map-label">${label}</span>
@@ -290,7 +290,7 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	fontField.className = 'inspector-field'
 	const activeFont = String(cfg.fontFamily || 'arial').toLowerCase()
 	const fontOpts = LOWER_THIRD_FONT_OPTIONS.map(
-		(f) => `<option value="${escAttr(f.id)}"${activeFont === f.id ? ' selected' : ''}>${escAttr(f.label)}</option>`,
+		(f) => `<option value="${escapeAttr(f.id)}"${activeFont === f.id ? ' selected' : ''}>${escapeAttr(f.label)}</option>`,
 	).join('')
 	fontField.innerHTML = `
 		<label class="inspector-field__label inspector-lt-label--stacked">Font
@@ -320,19 +320,19 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	metricsRow.innerHTML = `
 		<label class="inspector-lt-metric">
 			<span class="inspector-lt-metric__label">Title px</span>
-			<input type="number" class="inspector-lt-num" id="lt-title-size" min="8" max="200" step="1" value="${escAttr(String(cfg.titleFontSize ?? 46))}" />
+			<input type="number" class="inspector-lt-num" id="lt-title-size" min="8" max="200" step="1" value="${escapeAttr(String(cfg.titleFontSize ?? 46))}" />
 		</label>
 		<label class="inspector-lt-metric">
 			<span class="inspector-lt-metric__label">Sub px</span>
-			<input type="number" class="inspector-lt-num" id="lt-subtitle-size" min="8" max="120" step="1" value="${escAttr(String(cfg.subtitleFontSize ?? 27))}" />
+			<input type="number" class="inspector-lt-num" id="lt-subtitle-size" min="8" max="120" step="1" value="${escapeAttr(String(cfg.subtitleFontSize ?? 27))}" />
 		</label>
 		<label class="inspector-lt-metric">
 			<span class="inspector-lt-metric__label">Scale %</span>
-			<input type="number" class="inspector-lt-num" id="lt-render-scale" min="25" max="300" step="5" value="${escAttr(String(cfg.renderScale ?? 100))}" />
+			<input type="number" class="inspector-lt-num" id="lt-render-scale" min="25" max="300" step="5" value="${escapeAttr(String(cfg.renderScale ?? 100))}" />
 		</label>
 		<label class="inspector-lt-metric">
 			<span class="inspector-lt-metric__label">Hold s</span>
-			<input type="number" class="inspector-lt-num" id="lt-display-sec" min="0" step="0.5" value="${escAttr(String(cfg.displayDurationSec ?? 10))}" />
+			<input type="number" class="inspector-lt-num" id="lt-display-sec" min="0" step="0.5" value="${escapeAttr(String(cfg.displayDurationSec ?? 10))}" />
 		</label>
 	`
 	grp.appendChild(metricsRow)
@@ -349,11 +349,11 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	colorRow.innerHTML = `
 		<label class="inspector-lt-color">
 			<span class="inspector-lt-color__label">Text</span>
-			<input type="color" class="inspector-field__color" id="lt-text-color" value="${escAttr(cfg.textColor || '#ffffff')}" />
+			<input type="color" class="inspector-field__color" id="lt-text-color" value="${escapeAttr(cfg.textColor || '#ffffff')}" />
 		</label>
 		<label class="inspector-lt-color">
 			<span class="inspector-lt-color__label">Accent</span>
-			<input type="color" class="inspector-field__color" id="lt-primary-color" value="${escAttr(cfg.primaryColor || '#4fc3f7')}" />
+			<input type="color" class="inspector-field__color" id="lt-primary-color" value="${escapeAttr(cfg.primaryColor || '#4fc3f7')}" />
 		</label>
 	`
 	grp.appendChild(colorRow)

@@ -78,13 +78,6 @@ async function reconcileFromLeader(ctx, runtime) {
 		project: projRes.json.project,
 	})
 
-	try {
-		const { installTemplatesFromStaging } = require('./sync-project-media')
-		installTemplatesFromStaging()
-	} catch {
-		/* optional */
-	}
-
 	patchInitialSync(runtime, { phase: 'pull_timelines', percent: 40 })
 
 	const tlRes = await peerHttpRequest(repl.peer, '/api/replication/export/timelines', {

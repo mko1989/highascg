@@ -422,6 +422,7 @@ function probeModetestConnectors(opts = {}) {
 
 module.exports = {
 	listDrmGpuCards,
+	normalizePortName,
 	normalizeEdidHex,
 	edidMatchKey,
 	runModetestConnectorsRaw,

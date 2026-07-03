@@ -72,11 +72,11 @@ export async function mountVariablesPanel(container) {
 			.map((k) => {
 				const clip = `$(highascg:${k})`
 				const { text, title } = formatDisplayValue(vars[k])
-				const titleAttr = title ? ` title="${escAttr(title)}"` : ''
+				const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
 				return `<tr>
-					<td class="var-key">${escAttr(clip)}</td>
-					<td class="var-value"${titleAttr}>${escAttr(text)}</td>
-					<td class="var-action"><button type="button" class="var-copy-btn" data-key="${escAttr(clip)}" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5V3h.5A1.5 1.5 0 0 1 14 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 12.5v-10Zm1 0V3h5.5a.5.5 0 0 0 .5-.5v-.5h-5a.5.5 0 0 0-.5.5ZM5 4.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5Z"/></svg></button></td>
+					<td class="var-key">${escapeAttr(clip)}</td>
+					<td class="var-value"${titleAttr}>${escapeAttr(text)}</td>
+					<td class="var-action"><button type="button" class="var-copy-btn" data-key="${escapeAttr(clip)}" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5V3h.5A1.5 1.5 0 0 1 14 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 12.5v-10Zm1 0V3h5.5a.5.5 0 0 0 .5-.5v-.5h-5a.5.5 0 0 0-.5.5ZM5 4.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5Z"/></svg></button></td>
 				</tr>`
 			})
 			.join('')

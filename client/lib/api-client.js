@@ -35,18 +35,22 @@ export async function apiGet(path) {
 	const res = await fetch(url, FETCH_CREDENTIALS)
 	if (!res.ok) {
 		let detail = res.statusText
+		let parsed = null
 		try {
 			const ct = res.headers.get('content-type') || ''
 			if (ct.includes('application/json')) {
-				const j = await res.json()
-				if (j?.error) detail = j.error
-				else if (j?.message) detail = j.message
-				else if (j?.detail) detail = j.detail
-				if (j?.path) detail += '\n' + j.path
-				if (j?.hint) detail += '\n\n' + j.hint
+				parsed = await res.json()
+				if (parsed?.error) detail = parsed.error
+				else if (parsed?.message) detail = parsed.message
+				else if (parsed?.detail) detail = parsed.detail
+				if (parsed?.path) detail += '\n' + parsed.path
+				if (parsed?.hint) detail += '\n\n' + parsed.hint
 			}
 		} catch {}
-		throw new Error(`HTTP ${res.status}: ${detail}`)
+		const err = new Error(`HTTP ${res.status}: ${detail}`)
+		err.status = res.status
+		if (parsed?.reason) err.reason = parsed.reason
+		throw err
 	}
 	const ct = res.headers.get('content-type') || ''
 	if (ct.includes('application/json')) return res.json()
@@ -74,18 +78,22 @@ export async function apiPost(path, body = {}) {
 	})
 	if (!res.ok) {
 		let detail = res.statusText
+		let parsed = null
 		try {
 			const ct = res.headers.get('content-type') || ''
 			if (ct.includes('application/json')) {
-				const j = await res.json()
-				if (j?.error) detail = j.error
-				else if (j?.message) detail = j.message
-				else if (j?.detail) detail = j.detail
-				if (j?.path) detail += '\n' + j.path
-				if (j?.hint) detail += '\n\n' + j.hint
+				parsed = await res.json()
+				if (parsed?.error) detail = parsed.error
+				else if (parsed?.message) detail = parsed.message
+				else if (parsed?.detail) detail = parsed.detail
+				if (parsed?.path) detail += '\n' + parsed.path
+				if (parsed?.hint) detail += '\n\n' + parsed.hint
 			}
 		} catch {}
-		throw new Error(`HTTP ${res.status}: ${detail}`)
+		const err = new Error(`HTTP ${res.status}: ${detail}`)
+		err.status = res.status
+		if (parsed?.reason) err.reason = parsed.reason
+		throw err
 	}
 	const ct = res.headers.get('content-type') || ''
 	if (ct.includes('application/json')) {
@@ -107,15 +115,39 @@ export async function apiPut(path, body = {}) {
 	})
 	if (!res.ok) {
 		let detail = res.statusText
+		let parsed = null
+		try {
+			const ct = res.headers.get('content-type') || ''
+			if (ct.includes('application/json')) {
+				parsed = await res.json()
+				if (parsed?.error) detail = parsed.error
+				else if (parsed?.message) detail = parsed.message
+				else if (parsed?.detail) detail = parsed.detail
+				if (parsed?.path) detail += '\n' + parsed.path
+				if (parsed?.hint) detail += '\n\n' + parsed.hint
+			}
+		} catch {}
+		const err = new Error(`HTTP ${res.status}: ${detail}`)
+		err.status = res.status
+		if (parsed?.reason) err.reason = parsed.reason
+		throw err
+	}
+	const ct = res.headers.get('content-type') || ''
+	if (ct.includes('application/json')) return res.json()
+	return res.text()
+}
+
+export async function apiDelete(path) {
+	const url = requestBase() + path
+	const res = await fetch(url, { method: 'DELETE', ...FETCH_CREDENTIALS })
+	if (!res.ok) {
+		let detail = res.statusText
 		try {
 			const ct = res.headers.get('content-type') || ''
 			if (ct.includes('application/json')) {
 				const j = await res.json()
 				if (j?.error) detail = j.error
 				else if (j?.message) detail = j.message
-				else if (j?.detail) detail = j.detail
-				if (j?.path) detail += '\n' + j.path
-				if (j?.hint) detail += '\n\n' + j.hint
 			}
 		} catch {}
 		throw new Error(`HTTP ${res.status}: ${detail}`)
@@ -129,6 +161,7 @@ export const api = {
 	get: apiGet,
 	post: apiPost,
 	put: apiPut,
+	delete: apiDelete,
 	getApiBase,
 	getApiOrigin,
 	resolveApiUrl,

@@ -13,16 +13,30 @@ function normalizeAmcpCommandLines(cmds) {
 }
 
 /**
- * Replace preview/client per-layer CLEAR storms with `CLEAR <channel>` before send.
+ * Targeted teardown, then coalescing fallback:
+ * 1. Drop per-layer STOP/CLEAR lines for layers the playback matrix knows are empty.
+ * 2. Any remaining per-layer CLEAR storm (untracked channels) collapses to `CLEAR <channel>`.
  * @param {string[]} lines
  * @param {object} [ctx]
  */
 function applyClearCoalescing(lines, ctx) {
-	const { lines: coalesced, coalesced: did, channels } = coalescePerLayerClearStorm(lines)
+	let targeted = lines
+	let targetedChannels = new Set()
+	try {
+		const { targetTeardownLines } = require('../caspar/amcp-teardown-targeting')
+		const res = targetTeardownLines(lines, ctx)
+		targeted = res.lines
+		targetedChannels = res.targetedChannels
+	} catch (_) {
+		targeted = lines
+	}
+	const { lines: coalesced, coalesced: did, channels } = coalescePerLayerClearStorm(targeted, {
+		skipChannels: targetedChannels,
+	})
 	if (did && typeof ctx?.log === 'function') {
 		ctx.log(
 			'warn',
-			`[AMCP] coalesced ${lines.length} per-layer CLEAR/STOP lines → CLEAR ${channels.join(', ')} (use CLEAR <channel> instead of layer sweeps)`,
+			`[AMCP] coalesced ${targeted.length} per-layer CLEAR/STOP lines → CLEAR ${channels.join(', ')} (use CLEAR <channel> instead of layer sweeps)`,
 		)
 	}
 	return coalesced
@@ -95,6 +109,7 @@ async function handlePost(path, body, ctx) {
 			const lines = applyAmcpLineNormalizations(applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx), ctx)
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
+			playbackTracker.recordAmcpLines(ctx, lines)
 			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
@@ -125,6 +140,7 @@ async function handlePost(path, body, ctx) {
 			for (const line of lines) {
 				await amcp.raw(line)
 			}
+			playbackTracker.recordAmcpLines(ctx, lines)
 			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return {
 				status: 200,
@@ -301,6 +317,7 @@ async function handlePost(path, body, ctx) {
 				}
 			}
 			const r = await amcp.raw(line)
+			playbackTracker.recordAmcpLines(ctx, [line])
 			notifyCefInteractiveAfterAmcp([line], ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}

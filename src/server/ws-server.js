@@ -362,6 +362,22 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 							)
 						}
 					}
+				} else if (msg.type === 'device_view_subscribe') {
+					try {
+						const { subscribeDeviceViewGpuWatch } = require('../bootstrap/gpu-drm-hotplug-watch')
+						subscribeDeviceViewGpuWatch(ctx)
+					} catch {
+						/* optional */
+					}
+					ws.send(safeStringify({ type: 'device_view_subscribe_ok', id: msg.id }))
+				} else if (msg.type === 'device_view_unsubscribe') {
+					try {
+						const { unsubscribeDeviceViewGpuWatch } = require('../bootstrap/gpu-drm-hotplug-watch')
+						unsubscribeDeviceViewGpuWatch()
+					} catch {
+						/* optional */
+					}
+					ws.send(safeStringify({ type: 'device_view_unsubscribe_ok', id: msg.id }))
 				} else if (msg.type === 'scene_deck_sync' && msg.data) {
 					const { mergeDeckSyncIntoProject, buildSceneDeckForApi } = require('../engine/project-scenes')
 					const merged = mergeDeckSyncIntoProject(ctx, msg.data)

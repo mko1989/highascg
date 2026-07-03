@@ -6,34 +6,28 @@ export function normRandrCaspar(v) {
 	return String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
 }
 
-function layoutSlotIdForPairs(pairs) {
+function layoutSlotIdForPairs(pairs, effectiveTopology) {
 	const want = new Set((pairs || []).map((p) => normRandrCaspar(p)).filter(Boolean))
 	if (!want.size) return ''
-	try {
-		const raw = localStorage.getItem('gpu_custom_layout')
-		const arr = raw ? JSON.parse(raw) : null
-		if (!Array.isArray(arr)) return ''
-		for (const item of arr) {
-			const slotId = String(item?.id || '').replace(/__.*$/i, '')
+	if (Array.isArray(effectiveTopology)) {
+		for (const row of effectiveTopology) {
+			const slotId = String(row?.physicalPortId || '').trim()
 			if (!/^gpu_p\d+$/i.test(slotId)) continue
-			const itemPairs = Array.isArray(item?.pairs) ? item.pairs : []
-			for (const p of itemPairs) {
+			for (const p of [row.dpA, row.dpB].filter(Boolean)) {
 				if (want.has(normRandrCaspar(p))) return slotId
 			}
 		}
-	} catch {
-		/* ignore */
 	}
 	return ''
 }
 
 /**
  * Map a UI slot's RandR pair to the canonical graph connector id (e.g. gpu_p0).
- * Saved rear-panel layout wins over server physicalMap when pairs were reassigned.
+ * Server effectiveTopology is authoritative for pair → socket mapping.
  */
-export function resolveCanonicalGpuConnectorId(pairs, physicalPorts, suggestedGpuOuts) {
+export function resolveCanonicalGpuConnectorId(pairs, physicalPorts, suggestedGpuOuts, effectiveTopology = null) {
 	if (!Array.isArray(pairs) || !pairs.length) return ''
-	const fromLayout = layoutSlotIdForPairs(pairs)
+	const fromLayout = layoutSlotIdForPairs(pairs, effectiveTopology)
 	if (fromLayout) return fromLayout
 	const set = new Set(pairs.map((p) => normRandrCaspar(p)).filter(Boolean))
 	if (set.size === 0) return ''

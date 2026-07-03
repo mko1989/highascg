@@ -17,6 +17,29 @@ let _watchPollMs = 40
 const _lastMtime = new Map()
 /** Serializes start/stop so async stop cannot kill receivers after a overlapping start. */
 let _lifecycleChain = Promise.resolve()
+/**
+ * Signature of the currently running consumer setup. Config saves trigger subsystem
+ * reloads several times per show; a REMOVE/ADD FILE cycle on the live PGM channel
+ * causes a visible output hitch, so restarts are skipped when nothing relevant changed.
+ * @type {string | null}
+ */
+let _runningSignature = null
+
+/**
+ * @param {object} [config]
+ * @returns {string | null}
+ */
+function computeComposeRunSignature(config) {
+	if (!isFfmpegJpegComposePreview(config)) return null
+	const cp = config?.composePreview || {}
+	const channelParts = resolveMonitoredChannels(config).map(
+		(ch) => `${ch}:${consumer.buildComposeFileAddParams(config, ch)}`,
+	)
+	const thumb = companionThumb.isCompanionThumbEnabled(config)
+		? `on:${cp.companionThumbSize ?? ''}`
+		: 'off'
+	return `${channelParts.join('|')};poll=${resolveMtimePollMs(config)};thumb=${thumb}`
+}
 
 /**
  * @param {() => Promise<void>} fn
@@ -32,6 +55,7 @@ function enqueueComposePreviewLifecycle(fn) {
  * @param {object} [ctx]
  */
 async function stopFfmpegJpegComposePreviewInternal(ctx) {
+	_runningSignature = null
 	if (_watchTimer) {
 		clearInterval(_watchTimer)
 		_watchTimer = null
@@ -52,6 +76,16 @@ async function stopFfmpegJpegComposePreviewInternal(ctx) {
  */
 function startFfmpegJpegComposePreview(ctx) {
 	return enqueueComposePreviewLifecycle(async () => {
+		const sig = computeComposeRunSignature(ctx?.config)
+		if (
+			sig &&
+			sig === _runningSignature &&
+			_watchTimer &&
+			consumer.allComposeConsumersAttached(ctx?.config)
+		) {
+			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg unchanged — skipping consumer recycle')
+			return
+		}
 		await stopFfmpegJpegComposePreviewInternal(ctx)
 		if (!isFfmpegJpegComposePreview(ctx?.config)) return
 		await cache.ensurePreviewDir(ctx.config).catch(() => {})
@@ -63,6 +97,7 @@ function startFfmpegJpegComposePreview(ctx) {
 		)
 		await consumer.attachAllComposeFileConsumers(ctx)
 		startMtimeWatch(ctx)
+		_runningSignature = sig
 		await companionThumb.bootstrapCompanionPreviewVariables(ctx)
 	})
 }

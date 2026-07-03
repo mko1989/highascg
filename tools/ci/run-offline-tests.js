@@ -12,9 +12,14 @@ const path = require('path')
 const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const FILES = [
+	'tools/smoke/smoke-edid-parse.test.js',
+	'tools/smoke/smoke-gpu-edid-pipeline.test.js',
+	'tools/smoke/smoke-gpu-topology-boot.test.js',
+	'tools/smoke/smoke-gpu-topology-ssot.test.js',
 	'tools/smoke/smoke-config-manager-path.test.js',
 	'tools/smoke/smoke-hardware-identity.test.js',
 	'tools/smoke/smoke-new-project.test.js',
+	'tools/smoke/smoke-project-pipeline-hardening.test.js',
 	'tools/smoke/smoke-replication-handshake.test.js',
 	'tools/smoke/smoke-project-hot-backup.test.js',
 	'tools/smoke/smoke-replication-pair-token.test.js',
@@ -30,6 +35,7 @@ const FILES = [
 	'tools/smoke/smoke-zip-slip.test.js',
 	'tools/smoke/smoke-xrandr-mode-validation.test.js',
 	'tools/smoke/smoke-os-config-persist.test.js',
+	'tools/smoke/smoke-preview-push-import.test.js',
 	'tools/smoke/smoke-http-body-limit.test.js',
 	'tools/smoke/smoke-parse-body-strict.test.js',
 	'tools/smoke/smoke-persistence-immediate.test.js',

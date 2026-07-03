@@ -105,13 +105,19 @@ export async function bootstrapFromServer(deps) {
 				stateStore,
 				source: deps.source || 'server-bootstrap',
 			})
+			markServerProjectSynced()
+		} else if (!project || (typeof project === 'object' && !Object.keys(project).length)) {
+			// Fresh server with no saved project yet — allow outbound sync.
+			markServerProjectSynced()
+		} else {
+			console.warn('[HighAsCG] Server project missing version — blocking push until reload')
 		}
 	} catch (e) {
 		console.warn('[HighAsCG] Server project load failed:', e?.message || e)
 	} finally {
-		// Allow scene_deck_sync / autosave even when project fetch or import fails.
-		markServerProjectSynced()
-		appLogic.scheduleSceneDeckSync?.()
+		if (isServerProjectSynced()) {
+			appLogic.scheduleSceneDeckSync?.()
+		}
 	}
 
 	return state

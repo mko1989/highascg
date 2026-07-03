@@ -116,10 +116,26 @@ function resolveInteractiveLayer(config) {
 	return 999
 }
 
+/**
+ * Cheap config-only check: is any screen/multiview marked interactive at all?
+ * Must run before {@link listInteractiveZones} — zone listing walks the OS layout
+ * calculator into live xrandr queries, far too expensive for per-AMCP hooks.
+ * @param {object} config
+ * @returns {boolean}
+ */
+function anyInteractiveConfigured(config) {
+	if (multiviewInteractiveEnabled(config)) return true
+	for (let n = 1; n <= 8; n++) {
+		if (screenInteractiveEnabled(config, n)) return true
+	}
+	return false
+}
+
 function bridgeEnabledInConfig(config) {
 	if (envDisabled()) return false
 	const ot = config?.operatorTools
 	if (ot?.cefInteractiveBridge === false || ot?.cefInteractiveBridge === 'false') return false
+	if (!anyInteractiveConfigured(config)) return false
 	if (readCefDebugPortFromCasparXml() <= 0) return false
 	return listInteractiveZones(config).length > 0
 }

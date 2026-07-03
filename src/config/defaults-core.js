@@ -3,6 +3,7 @@
 const { casparServerDefaults } = require('./defaults-caspar-server')
 const { editorDefaultsDefaults } = require('./editor-defaults')
 const { replicationDefaults } = require('./defaults-replication')
+const { resolveDefaultTopologyForGpu } = require('../utils/known-gpu-topology')
 
 /** Top-level defaults excluding casparServer (merged in defaults.js). */
 function coreDefaults() {
@@ -223,12 +224,7 @@ function coreDefaults() {
 			version: 1,
 			edidNotes: '',
 		},
-		gpuPhysicalTopology: [
-			{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 0, location: 0 },
-			{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
-			{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 2, location: 2 },
-			{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 3, location: 3 },
-		],
+		gpuPhysicalTopology: resolveDefaultTopologyForGpu(null),
 		deviceGraph: {
 			version: 1,
 			devices: [{ id: 'caspar_host', role: 'caspar_host', label: 'Caspar / HighAsCG host' }],

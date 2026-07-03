@@ -477,6 +477,12 @@ function discoverGpuPhysicalTopology(opts = {}) {
 		return { rows: fromXrandr, source: 'xrandr', cards: ['card0'] }
 	}
 
+	const fromDrm = discoverGpuPhysicalTopologyFromDrm(opts)
+	if (fromDrm?.length) {
+		const cards = [...new Set(fromDrm.map((r) => r.drmCard).filter(Boolean))]
+		return { rows: fromDrm, source: 'drm', cards: cards.length ? cards : ['card0'] }
+	}
+
 	return null
 }
 

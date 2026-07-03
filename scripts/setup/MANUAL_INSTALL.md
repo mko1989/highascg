@@ -56,6 +56,9 @@ sudo bash scripts/setup/07-node-highascg.sh
 sudo bash scripts/setup/08-caspar-cef-scanner.sh
 sudo bash scripts/setup/09-openbox-autostart.sh
 
+# 10 — Performance policy (governor + no auto-upgrades)
+sudo bash scripts/setup/10-playout-performance.sh
+
 # 11 — Optional host boot branding
 sudo bash scripts/setup/11-boot-branding.sh && sudo reboot
 sudo bash scripts/setup/verify-boot-branding.sh
@@ -298,6 +301,41 @@ sudo systemctl restart nodm
 **Logs:** `/tmp/caspar.log`
 
 **DeckLink GUI:** `sudo highascg-display-mode x11-only`
+
+---
+
+## Step 10 — Playout performance policy (governor + no auto-upgrades)
+
+**Script:** `10-playout-performance.sh`  
+**Reboot:** no
+
+**What it does:**
+
+- Installs **`highascg-cpu-performance.service`** — sets the cpufreq **governor** and
+  **energy_performance_preference** to `performance` on every boot (and keeps turbo
+  enabled). The Ubuntu default `powersave` governor ramps clocks lazily and causes
+  latency spikes on TAKE / stream start.
+- **Disables unattended-upgrades** and masks the `apt-daily` / `apt-daily-upgrade`
+  timers. Automatic kernel/NVIDIA/ffmpeg upgrades mid-show can break playout —
+  update manually in maintenance windows only.
+
+```bash
+sudo bash scripts/setup/10-playout-performance.sh
+```
+
+**Verify:**
+
+```bash
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # performance
+systemctl list-timers | grep apt                             # no output
+systemctl is-enabled unattended-upgrades                     # disabled/masked
+```
+
+**Manual updates in a maintenance window:**
+
+```bash
+sudo apt update && sudo apt upgrade   # kernel/NVIDIA stay pinned (steps 1 & 3)
+```
 
 ---
 

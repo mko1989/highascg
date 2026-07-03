@@ -15,6 +15,8 @@ const projectStore = require('./project-store')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
 const { buildFactoryModularConfig } = require('../../tools/eggs/live-usb/starter-project')
 
+const EMPTY_PROJECT_TEMPLATE = require('../../data/default-empty-project.json')
+
 const DEFAULT_PROJECT_NAME = 'Untitled'
 const PROJECT_VERSION = 2
 
@@ -24,34 +26,11 @@ const PROJECT_VERSION = 2
  */
 function buildNewUntitledProject(hardwareConfig) {
 	return {
+		...JSON.parse(JSON.stringify(EMPTY_PROJECT_TEMPLATE)),
 		version: PROJECT_VERSION,
 		name: DEFAULT_PROJECT_NAME,
 		savedAt: new Date().toISOString(),
 		hardwareConfig,
-		scenes: {
-			scenes: [],
-			liveSceneIdByMain: [null, null, null, null],
-			previewSceneIdByMain: [null, null, null, null],
-			liveSceneId: null,
-			previewSceneId: null,
-			activeScreenIndex: 0,
-			globalDefaultTransition: { type: 'MIX', duration: 12, tween: 'linear' },
-			mainEditorVisible: [true, false, false, false],
-			layerPresets: [],
-			lookPresets: [],
-			globalBorders: [null, null, null, null],
-		},
-		timelines: { timelines: [], activeId: null },
-		multiview: {
-			cells: [],
-			canvasWidth: 1920,
-			canvasHeight: 1080,
-			showOverlay: true,
-			bgColor: '#000000',
-			showTimersUnderLabels: false,
-		},
-		programOutput: null,
-		placeholders: [],
 	}
 }
 

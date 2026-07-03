@@ -546,7 +546,7 @@ function handlePreviewLiveRegister(body, ctx) {
 
 	const sceneId = String(scene.id || sceneIdRaw)
 	liveSceneState.setChannel(previewCh, { sceneId, scene: stripEphemeralTakeFields(scene) })
-	liveSceneState.broadcastSceneLive(ctx)
+	liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

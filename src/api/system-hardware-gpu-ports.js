@@ -1,14 +1,17 @@
 /**
- * POST /api/system/gpu-ports-reset — xrandr HDMI/DP pair hints for GPU inspector (WO-39).
+ * POST /api/system/gpu-ports-reset — rediscover GPU port pairs (WO-39, WO-108).
+ * Body: `{ persist?: boolean }` — when true, writes discovered topology to server config.
  */
 
 'use strict'
 
-const { JSON_HEADERS, jsonBody } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { discoverGpuPhysicalTopology } = require('../utils/gpu-topology-drm')
 
-function handleGpuPortsReset() {
-	const probe = discoverGpuPhysicalTopology({})
+function handleGpuPortsReset(body, ctx) {
+	const parsed = parseBody(body) || {}
+	const persist = parsed.persist === true
+	const probe = discoverGpuPhysicalTopology({ config: ctx?.config || {} })
 	const topology = probe?.rows || []
 	const pairs = topology.map((row) => {
 		const dpA = row.dpA || ''
@@ -28,10 +31,27 @@ function handleGpuPortsReset() {
 		}
 	})
 
+	let persisted = false
+	if (persist && topology.length && ctx?.configManager) {
+		const cm = ctx.configManager
+		const config = cm.get()
+		config.gpuPhysicalTopology = topology.map((row) => ({ ...row }))
+		config.gpuPhysicalTopologyOperatorSaved = true
+		cm.save(config)
+		persisted = true
+	}
+
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, pairs, source: probe?.source || null, cards: probe?.cards || [] }),
+		body: jsonBody({
+			ok: true,
+			pairs,
+			topology,
+			source: probe?.source || null,
+			cards: probe?.cards || [],
+			persisted,
+		}),
 	}
 }
 

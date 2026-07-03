@@ -212,6 +212,9 @@ class StateManager extends EventEmitter {
 			const line = String(data[i] || '')
 			const match = line.match(/^"([^"]+)"/)
 			if (!match || !match[1]) continue
+			// Hidden dot-folders (e.g. stale .REPLICATION-ACTIVE staging) must never enter the
+			// media catalog — basename clip resolution would rewrite PLAY lines to those copies.
+			if (match[1].split(/[\\/]+/).some((seg) => seg.startsWith('.'))) continue
 			const file = match[1].replace(/\\/g, '\\\\')
 			const item = { id: file, label: file }
 			const rest = line.slice(match[0].length).trim()

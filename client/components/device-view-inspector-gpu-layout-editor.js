@@ -38,6 +38,74 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 	)
 	const portNameOptions = collectGpuPortNameOptions(live)
 
+	const formatLayoutRows = (items) =>
+		(items || [])
+			.map((item) => {
+				const pairs = (item.pairs || []).filter(Boolean).join(', ') || '(empty)'
+				return `  ${item.id}: ${pairs}`
+			})
+			.join('\n')
+
+	const unmappedContainer = Object.assign(document.createElement('div'), {
+		style: 'margin-top: 8px; display: none; flex-direction: column; gap: 6px;',
+	})
+
+	const renderUnmapped = () => {
+		unmappedContainer.innerHTML = ''
+		const unmapped = (live?.gpu?.physicalMap?.ports || []).filter((p) => p?.unmapped)
+		if (!unmapped.length) {
+			unmappedContainer.style.display = 'none'
+			return
+		}
+		unmappedContainer.style.display = 'flex'
+		const heading = Object.assign(document.createElement('div'), {
+			style: 'font-size: 11px; color: #f0ad4e; font-weight: bold;',
+			textContent: 'Unmapped live displays — assign to a socket',
+		})
+		unmappedContainer.append(heading)
+		const socketIds = customGpuItems.map((x) => x.id).filter((id) => /^gpu_p\d+$/i.test(id))
+		for (const port of unmapped) {
+			const displayName = String(
+				port?.runtime?.xrandrName || port?.runtime?.activePort || port?.pair?.dpA || '',
+			).trim()
+			if (!displayName) continue
+			const row = Object.assign(document.createElement('div'), {
+				style: 'display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:11px;',
+			})
+			const label = Object.assign(document.createElement('span'), {
+				textContent: displayName,
+				style: 'min-width: 80px;',
+			})
+			const sel = Object.assign(document.createElement('select'), {
+				className: 'device-view__destinations-type',
+				style: 'flex:1; min-width: 100px;',
+			})
+			sel.innerHTML = socketIds
+				.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`)
+				.join('')
+			const assignBtn = Object.assign(document.createElement('button'), {
+				className: 'header-btn',
+				textContent: 'Assign',
+				title: 'Map this display onto the selected socket and save topology',
+			})
+			assignBtn.onclick = async () => {
+				const targetId = sel.value
+				const item = customGpuItems.find((x) => x.id === targetId)
+				if (!item) return
+				const pairs = Array.isArray(item.pairs) ? [...item.pairs] : []
+				if (!pairs[0]) pairs[0] = displayName
+				else if (!pairs[1] && pairs[0] !== displayName) pairs[1] = displayName
+				else pairs[0] = displayName
+				item.pairs = pairs.filter(Boolean)
+				await saveAndRefresh()
+				renderList()
+				renderUnmapped()
+			}
+			row.append(label, sel, assignBtn)
+			unmappedContainer.append(row)
+		}
+	}
+
 	editGroup.innerHTML =
 		'<div style="font-weight:bold; margin-bottom: 6px; font-size: 11px; color: #aaa;">GPU layout — one row per <em>physical</em> socket. Port A/B are RandR alternates on the same jack (only one cable per slot).</div>'
 
@@ -191,6 +259,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 			row.append(header, portRow, hideCk)
 			listContainer.append(row)
 		})
+		renderUnmapped()
 	}
 
 	renderList()
@@ -259,30 +328,48 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 		}
 	}
 	resetLayoutBtn.onclick = async () => {
-		if (!confirm('Clear saved GPU layout and rebuild from detected outputs?')) return
-		clearGpuLayoutPrefs()
-		let serverNote = ''
+		let res = null
 		try {
-			const res = await Actions.resetGpuLayout()
-			if (res?.pairs?.length) {
-				localStorage.setItem(GPU_CUSTOM_LAYOUT_KEY, JSON.stringify(res.pairs))
-				serverNote = ' Server xrandr layout applied.'
-			}
+			res = await Actions.resetGpuLayout()
 		} catch (e) {
 			console.warn('gpu-ports-reset unavailable', e)
 		}
-		customGpuItems = buildGpuLayoutItemsFromLive(live, gpuOuts)
+		const discoveredPairs = res?.pairs
+		if (!discoveredPairs?.length) {
+			if (!confirm('No discovered topology from server. Clear saved layout and rebuild from live data?')) return
+			clearGpuLayoutPrefs()
+			customGpuItems = buildGpuLayoutItemsFromLive(live, gpuOuts, lastPayload?.gpuPhysicalTopology || null)
+			renderList()
+			renderUnmapped()
+			if (statusEl) {
+				setStatus(statusEl, 'GPU layout reset from live data (server discovery unavailable).', true)
+			}
+			if (load) await load()
+			return
+		}
+		const currentRows = formatLayoutRows(customGpuItems)
+		const discoveredRows = formatLayoutRows(discoveredPairs)
+		const diffMsg = `Current saved layout:\n${currentRows || '  (empty)'}\n\nDiscovered layout:\n${discoveredRows}\n\nReplace with discovered layout and save to server?`
+		if (!confirm(diffMsg)) return
+		clearGpuLayoutPrefs()
+		customGpuItems = mergeLoadedGpuLayout(discoveredPairs)
+		try {
+			const persistRes = await Actions.resetGpuLayout({ persist: true })
+			if (!persistRes?.persisted) {
+				const topo = gpuLayoutItemsToPhysicalTopology(customGpuItems)
+				if (topo.length) await Actions.saveGpuPhysicalTopology(topo)
+			}
+		} catch (e) {
+			console.warn('[device-view] gpu topology persist failed', e)
+		}
 		renderList()
+		renderUnmapped()
 		if (statusEl) {
-			setStatus(
-				statusEl,
-				`GPU layout reset from detected outputs.${serverNote || ' (Server xrandr reset route not available on this host.)'}`,
-				true,
-			)
+			setStatus(statusEl, 'GPU layout reset from discovery and saved to server.', true)
 		}
 		if (load) await load()
 	}
 
-	editGroup.append(listContainer, bulkRow, actionsRow)
+	editGroup.append(listContainer, unmappedContainer, bulkRow, actionsRow)
 	wrapCtl.append(editGroup)
 }

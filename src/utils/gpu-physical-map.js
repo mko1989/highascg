@@ -1,12 +1,16 @@
 'use strict'
 
-const fs = require('fs')
-const path = require('path')
 const { getGpuModel } = require('./hardware-info')
+const { resolveDefaultTopologyForGpu } = require('./known-gpu-topology')
 const {
 	normalizePortName,
 } = require('./gpu-topology-xrandr')
 const { discoverGpuPhysicalTopology, cardFromDrmName } = require('./gpu-topology-drm')
+const {
+	normalizeTopologyRows,
+	reconcileTopologyWithLiveDisplays,
+	topologyDiffers,
+} = require('./gpu-topology-reconcile')
 const { resolveDisplayByDrmHeuristic } = require('./gpu-display-alias')
 
 function canonicalPairName(a, b) {
@@ -16,15 +20,6 @@ function canonicalPairName(a, b) {
 	if (!aa) return bb
 	if (!bb) return aa
 	return [aa, bb].sort().join('/')
-}
-
-function defaultTopology() {
-	return [
-		{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 0, location: 0 },
-		{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
-		{ physicalPortId: 'gpu_p2', slotOrder: 2, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 2, location: 2 },
-		{ physicalPortId: 'gpu_p3', slotOrder: 3, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 3, location: 3 },
-	]
 }
 
 /**
@@ -61,22 +56,12 @@ function resolvePhysicalTopology(cfg, gpuModel) {
 		return { rows: probed.rows, source: probed.source }
 	}
 
-	if (gpuModel) {
-		try {
-			const { REPO_ROOT } = require('../repo-paths')
-			const knownPath = path.join(REPO_ROOT, 'data/known-gpus.json')
-			if (fs.existsSync(knownPath)) {
-				const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'))
-				if (known[gpuModel]) {
-					return { rows: known[gpuModel], source: 'known-gpu' }
-				}
-			}
-		} catch (e) {
-			console.error(`[gpu-physical-map] Failed to load known-gpus.json:`, e.message)
-		}
+	const knownRows = resolveDefaultTopologyForGpu(gpuModel)
+	if (knownRows.length) {
+		return { rows: knownRows, source: gpuModel ? 'known-gpu' : 'default' }
 	}
 
-	return { rows: defaultTopology(), source: 'default' }
+	return { rows: [], source: 'default' }
 }
 
 function drmLookupKey(name) {
@@ -86,6 +71,9 @@ function drmLookupKey(name) {
 function buildGpuPhysicalMap({ config, displays, connectors }) {
 	const gpuModel = getGpuModel()
 	const { rows: topology, source: topologySource } = resolvePhysicalTopology(config, gpuModel)
+	const savedConfig = Array.isArray(config?.gpuPhysicalTopology) ? config.gpuPhysicalTopology : []
+	const probe = discoverGpuPhysicalTopology({ config })
+	const discoveredRows = probe?.rows || null
 	const displayList = (Array.isArray(displays) ? displays : [])
 		.map((d) => (d && typeof d === 'object' ? d : null))
 		.filter(Boolean)
@@ -202,6 +190,8 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 				candidatePorts: [a, b].filter(Boolean),
 				connected,
 				displayName: activeDisplay?.name || t.drmName || '',
+				monitor: activeDisplay?.monitor || activeDisplay?.edid?.parsed || null,
+				edid: activeDisplay?.edid || null,
 				resolution: activeDisplay?.resolution || '',
 				refreshHz: Number.isFinite(activeDisplay?.refreshHz) ? activeDisplay.refreshHz : null,
 				casparScreenIndex: activeDisplay?.casparScreenIndex || null,
@@ -240,6 +230,8 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 				candidatePorts: [key],
 				connected: true,
 				displayName: display.name || '',
+				monitor: display.monitor || display.edid?.parsed || null,
+				edid: display.edid || null,
 				resolution: display.resolution || '',
 				refreshHz: Number.isFinite(display.refreshHz) ? display.refreshHz : null,
 				casparScreenIndex: display.casparScreenIndex || null,
@@ -258,10 +250,29 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 
 	const cards = [...new Set(ports.map((p) => p.drmCard).filter(Boolean))]
 
+	const baseForReconcile =
+		topologySource === 'config' && savedConfig.length ? savedConfig : topology
+	const effectiveTopology = reconcileTopologyWithLiveDisplays(
+		baseForReconcile,
+		displayList,
+		discoveredRows,
+	)
+	let suggestedTopology = null
+	if (
+		savedConfig.length &&
+		discoveredRows?.length &&
+		config?.gpuPhysicalTopologyOperatorSaved &&
+		topologyDiffers(savedConfig, discoveredRows)
+	) {
+		suggestedTopology = normalizeTopologyRows(discoveredRows)
+	}
+
 	return {
 		topologySource,
 		cards,
 		ports,
+		effectiveTopology,
+		...(suggestedTopology ? { suggestedTopology, topologyMismatch: true } : {}),
 	}
 }
 

@@ -6,11 +6,12 @@ const { execFileSync } = require('child_process')
 const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
 const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
+const projectStore = require('./project-store')
 
 const PROJECTS_SUBDIR = 'projects'
 const AUTOSAVE_SUBDIR = '_autosave'
 
-/** @typedef {{ slug: string, name: string, savedAt: string | null, path: string, source: string }} ProjectCatalogEntry */
+/** @typedef {{ slug: string, name: string, savedAt: string | null, path: string, source: string, sizeBytes?: number, conflict?: boolean, conflictSlugs?: string[], corrupt?: boolean, error?: string, isSyncConflict?: boolean, baseSlug?: string }} ProjectCatalogEntry */
 
 function isVolumeMountedSync(mountPath) {
 	if (process.platform !== 'linux') return false
@@ -46,6 +47,73 @@ function volumeProjectsDir(mountRoot) {
 }
 
 /**
+ * Group Syncthing conflict copies under their base slug for the load modal.
+ * @param {ProjectCatalogEntry[]} entries
+ */
+function finalizeProjectCatalog(entries) {
+	/** @type {Map<string, ProjectCatalogEntry>} */
+	const byBase = new Map()
+	/** @type {Map<string, string[]>} */
+	const conflictSlugsByBase = new Map()
+
+	for (const entry of entries) {
+		if (entry.corrupt || entry.error === 'corrupt') {
+			byBase.set(`__corrupt__${entry.slug}`, entry)
+			continue
+		}
+		const base = entry.baseSlug || entry.slug
+		if (entry.isSyncConflict) {
+			const list = conflictSlugsByBase.get(base) || []
+			list.push(entry.slug)
+			conflictSlugsByBase.set(base, list)
+			const prev = byBase.get(base)
+			if (!prev) {
+				byBase.set(base, {
+					...entry,
+					slug: base,
+					conflict: true,
+					conflictSlugs: [...list],
+				})
+				continue
+			}
+			prev.conflict = true
+			prev.conflictSlugs = [...list]
+			const tNew = Date.parse(entry.savedAt || '') || 0
+			const tOld = Date.parse(prev.savedAt || '') || 0
+			if (tNew > tOld) {
+				prev.savedAt = entry.savedAt
+				prev.path = entry.path
+				prev.sizeBytes = entry.sizeBytes
+			}
+			continue
+		}
+		const prev = byBase.get(base)
+		if (prev) {
+			prev.conflict = true
+			const extra = conflictSlugsByBase.get(base) || []
+			prev.conflictSlugs = [...new Set([...(prev.conflictSlugs || []), ...extra])]
+			const tNew = Date.parse(entry.savedAt || '') || 0
+			const tOld = Date.parse(prev.savedAt || '') || 0
+			if (tNew > tOld || !prev.path) {
+				prev.savedAt = entry.savedAt
+				prev.path = entry.path
+				prev.sizeBytes = entry.sizeBytes
+				prev.name = entry.name
+				prev.source = entry.source
+			}
+		} else {
+			const extra = conflictSlugsByBase.get(base)
+			byBase.set(base, {
+				...entry,
+				slug: base,
+				...(extra?.length ? { conflict: true, conflictSlugs: [...extra] } : {}),
+			})
+		}
+	}
+	return [...byBase.values()]
+}
+
+/**
  * @param {string} projectsDir
  * @param {string} source
  * @returns {ProjectCatalogEntry[]}
@@ -63,22 +131,59 @@ function scanProjectsDir(projectsDir, source) {
 	for (const ent of names) {
 		if (!ent.endsWith('.json')) continue
 		if (ent.startsWith('.')) continue
-		const slug = ent.slice(0, -5)
+		const parsed = projectStore.parseProjectListFilename(ent)
+		if (!parsed) continue
+		const { slug, baseSlug, isSyncConflict, isCorrupt } = parsed
 		if (!slug || slug === AUTOSAVE_SUBDIR) continue
 		const p = path.join(projectsDir, ent)
+		let sizeBytes = null
+		try {
+			sizeBytes = fs.statSync(p).size
+		} catch {
+			sizeBytes = null
+		}
+		if (isCorrupt) {
+			out.push({
+				slug,
+				name: baseSlug || slug,
+				savedAt: null,
+				path: p,
+				source,
+				sizeBytes,
+				corrupt: true,
+				error: 'corrupt',
+				baseSlug,
+			})
+			continue
+		}
 		let project
 		try {
 			project = JSON.parse(fs.readFileSync(p, 'utf8'))
-		} catch {
+		} catch (e) {
+			projectStore.quarantineCorruptFile(p)
+			out.push({
+				slug: baseSlug || slug,
+				name: baseSlug || slug,
+				savedAt: null,
+				path: p,
+				source,
+				sizeBytes,
+				corrupt: true,
+				error: 'corrupt',
+				baseSlug: baseSlug || slug,
+			})
 			continue
 		}
 		if (!project || typeof project !== 'object') continue
 		out.push({
 			slug,
-			name: String(project.name || slug),
+			name: String(project.name || baseSlug || slug),
 			savedAt: project.savedAt || null,
 			path: p,
 			source,
+			sizeBytes,
+			isSyncConflict: !!isSyncConflict,
+			baseSlug: baseSlug || slug,
 		})
 	}
 	return out
@@ -141,13 +246,18 @@ function listProjectsFromVolumes() {
 	}
 
 	const merged = mergeProjectCatalogs(lists, { usbMounted })
-	return merged.map(({ slug, name, savedAt, path: filePath, source }) => ({
-		slug,
-		name,
-		savedAt,
-		path: filePath,
-		source,
-	}))
+	return finalizeProjectCatalog(merged).map(
+		({ slug, name, savedAt, path: filePath, source, sizeBytes, conflict, conflictSlugs, corrupt, error }) => ({
+			slug,
+			name,
+			savedAt,
+			path: filePath,
+			source,
+			sizeBytes: sizeBytes ?? null,
+			...(conflict ? { conflict: true, conflictSlugs: conflictSlugs || [] } : {}),
+			...(corrupt ? { corrupt: true, error: error || 'corrupt' } : {}),
+		}),
+	)
 }
 
 function copyIfExists(src, dst) {
@@ -276,6 +386,7 @@ module.exports = {
 	volumeProjectsDir,
 	scanProjectsDir,
 	mergeProjectCatalogs,
+	finalizeProjectCatalog,
 	listProjectsFromVolumes,
 	pushProjectSlugToVolumes,
 	pullProjectSlugFromUsbIfNewer,

@@ -150,7 +150,39 @@ function parseXrandrQueryRaw(stdout) {
 	return { displays, raw: String(stdout || '') }
 }
 
+/**
+ * `xrandr --query` hits the live X server (the one Caspar's screen consumers render on);
+ * uncached calls several times per second visibly stutter playout. Short TTL keeps hot
+ * paths (AMCP notify hooks, layout lookups) off X; call {@link invalidateXrandrCache}
+ * after applying a new layout.
+ */
+const XRANDR_CACHE_TTL_MS = Math.max(
+	0,
+	parseInt(process.env.HIGHASCG_XRANDR_CACHE_TTL_MS || '3000', 10) || 3000,
+)
+/** @type {{ at: number, value: object | null } | null} */
+let _xrandrCache = null
+
+function invalidateXrandrCache() {
+	_xrandrCache = null
+	try {
+		const { invalidateGpuEdidCache } = require('./gpu-edid-probe')
+		invalidateGpuEdidCache()
+	} catch {
+		/* optional */
+	}
+}
+
 function getDisplaysXrandrDetailed() {
+	if (_xrandrCache && Date.now() - _xrandrCache.at < XRANDR_CACHE_TTL_MS) {
+		return _xrandrCache.value
+	}
+	const value = getDisplaysXrandrDetailedUncached()
+	_xrandrCache = { at: Date.now(), value }
+	return value
+}
+
+function getDisplaysXrandrDetailedUncached() {
 	try {
 		const stdout = execSync('xrandr --query', {
 			stdio: ['ignore', 'pipe', 'ignore'],
@@ -212,46 +244,58 @@ function parseXrandrAllOutputs(raw) {
  * GPU connector list from live xrandr --query (connected and disconnected DP/HDMI outputs).
  */
 function getGpuConnectorInventory() {
+	const { probeGpuEdidCatalog, attachEdidToConnector } = require('./gpu-edid-probe')
+	const catalog = probeGpuEdidCatalog()
 	const xr = getDisplaysXrandrDetailed()
 	const outputs = parseXrandrAllOutputs(xr?.raw || '')
-	return outputs.map((o) => ({
-		name: o.name,
-		shortName: o.name,
-		connected: !!o.connected,
-		type: /^HDMI/i.test(o.name) ? 'hdmi' : 'displayport',
-		modetestId: null,
-		drmCard: 'card0',
-		modes: [],
-		edid: '',
-		xrandrName: o.name,
-		matchMethod: 'xrandr',
-		sizeMm: null,
-	}))
+	return outputs.map((o) =>
+		attachEdidToConnector(
+			{
+				name: o.name,
+				shortName: o.name,
+				connected: !!o.connected,
+				type: /^HDMI/i.test(o.name) ? 'hdmi' : 'displayport',
+				modetestId: null,
+				drmCard: catalog.defaultCard || 'card0',
+				modes: [],
+				xrandrName: o.name,
+				matchMethod: 'xrandr',
+				sizeMm: null,
+			},
+			catalog,
+		),
+	)
 }
 
 /**
  * Connected displays with resolution, position, refresh rate, and modes from xrandr.
  */
 function getDisplayDetails() {
+	const { probeGpuEdidCatalog, edidForXrandrOutput } = require('./gpu-edid-probe')
+	const catalog = probeGpuEdidCatalog()
 	const xr = getDisplaysXrandrDetailed()
-	const displays = (xr?.displays || []).map((d) => ({
-		...d,
-		drmName: '',
-		drmConnector: '',
-		drmCard: 'card0',
-		modetestId: null,
-		xrandrName: d.name,
-		matchMethod: 'xrandr',
-		edid: '',
-		modes: (d.modes || []).map((m) => ({
-			width: m.width,
-			height: m.height,
-			hz: m.hz,
-			current: !!m.current,
-			preferred: false,
-			modetestIndex: null,
-		})),
-	}))
+	const displays = (xr?.displays || []).map((d) => {
+		const ed = edidForXrandrOutput(d.name, { connected: d.connected, catalog })
+		return {
+			...d,
+			drmName: '',
+			drmConnector: '',
+			drmCard: ed.drmCard || catalog.defaultCard || 'card0',
+			modetestId: null,
+			xrandrName: d.name,
+			matchMethod: 'xrandr',
+			edid: { raw: ed.raw, parsed: ed.parsed },
+			monitor: ed.parsed,
+			modes: (d.modes || []).map((m) => ({
+				width: m.width,
+				height: m.height,
+				hz: m.hz,
+				current: !!m.current,
+				preferred: false,
+				modetestIndex: null,
+			})),
+		}
+	})
 
 	return displays
 		.filter((d) => !isGpuConnectorPseudoName(d?.name))
@@ -298,6 +342,7 @@ module.exports = {
 	getXAuthority,
 	getDisplaysXrandr,
 	getDisplaysXrandrDetailed,
+	invalidateXrandrCache,
 	getDisplaysXrandrVerboseRaw,
 	getGpuConnectorInventory,
 	getConnectedDisplayNames,

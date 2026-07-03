@@ -21,7 +21,7 @@ import { markServerProjectSynced } from '../lib/server-project-sync.js'
 import { getAppWs } from '../lib/app-runtime.js'
 import { flushSceneDeckSync } from '../lib/app-scene-deck.js'
 import { initConfigStrip } from './header-bar-config-strip.js'
-import { projectFileIdFromName } from '../lib/project-files.js'
+import { fetchProjectFileContentById, projectFileIdFromName } from '../lib/project-files.js'
 import { normalizeProjectMediaRefs, syncProjectMediaContextFromClient } from '../lib/project-media-context.js'
 import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.js'
 import { showLoadProjectModal } from './load-project-modal.js'
@@ -114,9 +114,9 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	async function saveToServer() {
 		let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
 		project = normalizeProjectMediaRefs(project, settingsState.getSettings())
-		const id = projectFileIdFromName(project.name || projectState.getProjectName())
 		try {
-			await api.post('/api/project/save', { project, id })
+			const res = await api.post('/api/project/save', { project })
+			if (res?.slug) projectState.setProjectSlug(res.slug)
 			markLocalProjectSaved()
 			markServerProjectSynced()
 			showHeaderToast('Saved', 'success')
@@ -125,15 +125,24 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		}
 	}
 
-	function saveToFile() {
-		const project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
-		const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
-		const url = URL.createObjectURL(blob)
-		const a = document.createElement('a')
-		a.href = url
-		a.download = (project.name || 'project').replace(/\s+/g, '_') + '.json'
-		a.click()
-		URL.revokeObjectURL(url)
+	async function saveToFile() {
+		const slug = projectState.getProjectSlug() || projectFileIdFromName(projectState.getProjectName())
+		try {
+			const project = slug ? await fetchProjectFileContentById(slug) : null
+			const payload =
+				project && typeof project === 'object'
+					? project
+					: projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
+			const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+			const url = URL.createObjectURL(blob)
+			const a = document.createElement('a')
+			a.href = url
+			a.download = (payload.name || projectState.getProjectName() || 'project').replace(/\s+/g, '_') + '.json'
+			a.click()
+			URL.revokeObjectURL(url)
+		} catch (e) {
+			showHeaderToast('Download failed: ' + (e?.message || e), 'error')
+		}
 	}
 
 	function loadFromFile(file) {
@@ -265,6 +274,13 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	autosaveIndicator.style.cssText = 'font-size: 11px; opacity: 0; color: #a1a1aa; margin-left: 8px; transition: opacity 0.5s ease; white-space: nowrap; user-select: none;'
 	window.addEventListener('project-autosaved', (ev) => {
 		autosaveIndicator.textContent = 'Autosaved at ' + ev.detail.time
+		autosaveIndicator.style.color = '#a1a1aa'
+		autosaveIndicator.style.opacity = '1'
+	})
+	window.addEventListener('project-autosave-failed', (ev) => {
+		const reason = ev.detail?.reason || 'unknown error'
+		autosaveIndicator.textContent = 'Autosave failed: ' + reason
+		autosaveIndicator.style.color = '#f87171'
 		autosaveIndicator.style.opacity = '1'
 	})
 

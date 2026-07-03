@@ -9,6 +9,7 @@ const {
 	hashConfig,
 } = require('../replication/replication-service')
 const { receiveProjectFromPeer } = require('../replication/replicate-projects')
+const { receiveProjectTombstoneFromPeer } = require('../replication/project-tombstone')
 const { receiveTimelineFromPeer } = require('../replication/replicate-timelines')
 const { promoteToLeader, generatePairingCredentials, leaderYield } = require('../replication/promote')
 const { getReplicationMediaSyncStatus } = require('../replication/media-sync-status')
@@ -513,6 +514,20 @@ async function handlePost(path, body, ctx, req) {
 		const leaderReject = rejectIfLeader(ctx)
 		if (leaderReject) return leaderReject
 		const out = await receiveProjectFromPeer(ctx, payload)
+		return {
+			status: out.ok ? 200 : 400,
+			headers: JSON_HEADERS,
+			body: jsonBody(out),
+		}
+	}
+
+	if (path === '/api/replication/project-tombstone') {
+		if (!replicationTokenOk(ctx, req, payload)) {
+			return { status: 401, headers: JSON_HEADERS, body: jsonBody({ error: 'invalid replication token' }) }
+		}
+		const leaderReject = rejectIfLeader(ctx)
+		if (leaderReject) return leaderReject
+		const out = await receiveProjectTombstoneFromPeer(ctx, payload)
 		return {
 			status: out.ok ? 200 : 400,
 			headers: JSON_HEADERS,

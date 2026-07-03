@@ -1,5 +1,10 @@
 'use strict'
 
+/**
+ * GET /api/system/gpu-layout — legacy GPU port layout (deprecated WO-108).
+ * Prefer live.gpu.physicalMap from GET /api/device-view or buildGpuPhysicalMap server-side.
+ */
+
 const fs = require('fs')
 const path = require('path')
 const { promisify } = require('util')
@@ -29,9 +34,9 @@ async function getInstalledGpuName() {
 }
 
 /**
- * Physical GPU ports from modetest connector inventory.
+ * Physical GPU ports from live connector inventory (xrandr + EDID).
  */
-function getPhysicalPortsFromModetest() {
+function getPhysicalPortsFromXrandrInventory() {
 	const connectors = getGpuConnectorInventory() || []
 	const ports = connectors.map((c, i) => {
 		const connectorName = String(c.shortName || c.name || '').replace(/^card\d+-/i, '')
@@ -80,7 +85,7 @@ async function handleGpuLayoutGet() {
 
 	const gpuName = await getInstalledGpuName()
 
-	const drmPorts = getPhysicalPortsFromModetest()
+	const drmPorts = getPhysicalPortsFromXrandrInventory()
 
 	// Try finding an exact or fuzzy match in the database.
 	let match = null

@@ -51,8 +51,11 @@ export function buildCasparRearPanelData(ctx) {
 		savedTopology: ctx.currentSettings?.gpuPhysicalTopology || lastPayload?.gpuPhysicalTopology || null,
 		hideDisconnectedByDefault: false,
 	})
+	const socketCount = gpuListEntries.filter((e) => /^gpu_p\d+$/i.test(String(e?.connectorId || ''))).length || undefined
 	const gpuLayoutItems = layoutItemsFromGpuEntries(gpuListEntries)
-	const items = gpuListEntries.map((entry) => entryToRearPanelGpuItem(entry, connectedDisplays, gpuInventory))
+	const items = gpuListEntries.map((entry) =>
+		entryToRearPanelGpuItem(entry, connectedDisplays, gpuInventory, socketCount),
+	)
 
 	slots.push({ title: 'GPU', items })
 	let decklinkRearOrderIds = []
@@ -116,6 +119,9 @@ export function buildCasparRearPanelData(ctx) {
 		deckOut,
 		gpuOuts,
 		gpuPhysicalPorts: Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : [],
+		gpuEffectiveTopology: Array.isArray(live?.gpu?.physicalMap?.effectiveTopology)
+			? live.gpu.physicalMap.effectiveTopology
+			: [],
 		connectedDisplays,
 	}
 }

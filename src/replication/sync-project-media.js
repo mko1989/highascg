@@ -2,15 +2,7 @@
 
 const fs = require('fs')
 const path = require('path')
-const { collectProjectAssetRefs } = require('./project-media-refs')
-const { resolveTemplateFile } = require('./template-resolve')
-const { getMediaIngestBasePath } = require('../media/local-media')
 const { expandMediaIdToMediaRoot } = require('../media/project-media-root')
-const projectStore = require('../engine/project-store')
-const { ensureRemoteDevice, ensureSharedFolder, scanFolder } = require('./syncthing-client')
-const { REPO_ROOT } = require('../repo-paths')
-
-const ACTIVE_MEDIA_FOLDER_ID = 'highascg-project-media'
 
 function resolveMediaFile(ref, mediaBase, slug, config) {
 	const raw = String(ref || '').trim()
@@ -33,170 +25,21 @@ function resolveMediaFile(ref, mediaBase, slug, config) {
 	return null
 }
 
-function emptyDir(dir) {
-	if (!fs.existsSync(dir)) return
-	for (const name of fs.readdirSync(dir)) {
-		if (name === '.stfolder') continue
-		const p = path.join(dir, name)
-		try {
-			const st = fs.statSync(p)
-			if (st.isDirectory()) emptyDir(p)
-			fs.rmSync(p, { recursive: true, force: true })
-		} catch {
-			/* ignore */
-		}
-	}
-}
-
-function linkOrCopyFile(src, dest) {
-	fs.mkdirSync(path.dirname(dest), { recursive: true })
-	try {
-		if (fs.existsSync(dest)) fs.unlinkSync(dest)
-		fs.linkSync(src, dest)
-		return true
-	} catch {
-		try {
-			fs.copyFileSync(src, dest)
-			return true
-		} catch {
-			return false
-		}
-	}
-}
-
 /**
- * @param {object} project
- * @param {string} [mediaBase]
- * @param {object} [config]
- */
-function rebuildProjectMediaStaging(project, mediaBase, config) {
-	const base = mediaBase || getMediaIngestBasePath(config)
-	const staging = path.join(base, '.replication-active')
-	const mediaDir = path.join(staging, 'media')
-	const templatesDir = path.join(staging, 'templates')
-	fs.mkdirSync(staging, { recursive: true })
-	emptyDir(staging)
-
-	const refs = collectProjectAssetRefs(project)
-	const slug = String(project.slug || projectStore.projectSlugFromName(project.name) || '').trim()
-	let linkedMedia = 0
-	let linkedTemplates = 0
-
-	for (const ref of refs.media) {
-		const src = resolveMediaFile(ref, base, slug, config)
-		if (!src) continue
-		const dest = path.join(mediaDir, path.basename(src))
-		if (linkOrCopyFile(src, dest)) linkedMedia += 1
-	}
-
-	for (const ref of refs.templates) {
-		const src = resolveTemplateFile(ref)
-		if (!src) continue
-		const rel = path.relative(path.join(REPO_ROOT, 'template'), src)
-		const dest = path.join(templatesDir, rel)
-		if (linkOrCopyFile(src, dest)) linkedTemplates += 1
-	}
-
-	return {
-		staging,
-		linkedMedia,
-		linkedTemplates,
-		refs: refs.media,
-		templateRefs: refs.templates,
-	}
-}
-
-/**
- * Copy synced templates from staging into repo template/ (follower after Syncthing).
- * @param {string} [stagingRoot]
- */
-function installTemplatesFromStaging(stagingRoot) {
-	const base = stagingRoot || path.join(getMediaIngestBasePath(), '.replication-active')
-	const srcRoot = path.join(base, 'templates')
-	if (!fs.existsSync(srcRoot)) return { installed: 0 }
-
-	let installed = 0
-	const walk = (dir, rel = '') => {
-		for (const name of fs.readdirSync(dir)) {
-			const full = path.join(dir, name)
-			const relPath = rel ? `${rel}/${name}` : name
-			const st = fs.statSync(full)
-			if (st.isDirectory()) {
-				walk(full, relPath)
-				continue
-			}
-			if (!name.endsWith('.html')) continue
-			const dest = path.join(REPO_ROOT, 'template', relPath)
-			if (linkOrCopyFile(full, dest)) installed += 1
-		}
-	}
-	walk(srcRoot)
-	return { installed }
-}
-
-async function syncProjectMediaViaSyncthing(project, remoteDeviceId, opts = {}) {
-	const base = getMediaIngestBasePath()
-	const { staging, linkedMedia, linkedTemplates, refs, templateRefs } = rebuildProjectMediaStaging(project, base)
-	if (!remoteDeviceId) return { ok: false, error: 'remote syncthing device id required' }
-
-	await ensureRemoteDevice(remoteDeviceId, 'highascg-peer')
-	const folderType = opts.asLeader ? 'sendonly' : 'receiveonly'
-	const out = await ensureSharedFolder(ACTIVE_MEDIA_FOLDER_ID, staging, [remoteDeviceId], folderType)
-	await scanFolder(ACTIVE_MEDIA_FOLDER_ID)
-
-	if (!opts.asLeader) {
-		try {
-			installTemplatesFromStaging(staging)
-		} catch {
-			/* optional */
-		}
-	}
-
-	return {
-		ok: out.ok,
-		transport: 'syncthing',
-		folderId: ACTIVE_MEDIA_FOLDER_ID,
-		staging,
-		linkedMedia,
-		linkedTemplates,
-		refs,
-		templateRefs,
-		error: out.error,
-	}
-}
-
-/**
- * Sync active project media + templates to/from peer (default: rsync over SSH).
+ * Sync active project media + templates to/from peer via rsync over SSH.
+ * Project media lives in media/projects/<slug>/ and spreads only on explicit
+ * push/pull — the old `.replication-active` staging-folder workflow was removed
+ * (it duplicated clips at the media root and hijacked clip resolution).
  * @param {object} ctx
  * @param {object} project
- * @param {{ direction?: 'push'|'pull'|'auto', asLeader?: boolean }} [opts]
+ * @param {{ direction?: 'push'|'pull'|'auto' }} [opts]
  */
 async function syncProjectMediaToPeer(ctx, project, opts = {}) {
-	const repl = require('../config/replication-config').getReplicationConfig(ctx.config)
-	const transport = repl.mediaTransport || 'rsync'
-
-	if (transport === 'syncthing') {
-		const { getLocalSyncthingDeviceId } = require('./syncthing-client')
-		const { peerPing } = require('./peer-client')
-		let remoteDeviceId = ''
-		if (opts.asLeader || repl.role === 'leader') {
-			const ping = await peerPing(repl.peer)
-			remoteDeviceId = ping.json?.syncthingDeviceId || ''
-		} else {
-			remoteDeviceId = (await getLocalSyncthingDeviceId()) || ''
-		}
-		return syncProjectMediaViaSyncthing(project, remoteDeviceId, opts)
-	}
-
 	const { rsyncProjectMediaToPeer } = require('./sync-project-media-rsync')
 	return rsyncProjectMediaToPeer(ctx, project, opts)
 }
 
 module.exports = {
-	ACTIVE_MEDIA_FOLDER_ID,
-	rebuildProjectMediaStaging,
-	installTemplatesFromStaging,
-	syncProjectMediaViaSyncthing,
 	syncProjectMediaToPeer,
 	resolveMediaFile,
 }

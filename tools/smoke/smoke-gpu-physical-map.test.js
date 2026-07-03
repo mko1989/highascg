@@ -56,6 +56,24 @@ describe('gpu physical map', () => {
 		assert.equal(byId.gpu_p2.runtime.xrandrName, 'DP-2')
 		assert.equal(byId.gpu_p3.runtime.xrandrName, 'DP-4')
 		assert.equal(map.ports.filter((p) => p.unmapped).length, 0)
+		assert.ok(Array.isArray(map.effectiveTopology))
+		assert.equal(map.effectiveTopology.length, 4)
+		assert.equal(map.effectiveTopology[1].dpA, 'HDMI-0')
+	})
+
+	it('sets suggestedTopology when operator-saved config differs from discovery', () => {
+		const discovered = discoverGpuPhysicalTopologyFromXrandr(NVIDIA_595_XRANDR)
+		const config = {
+			gpuPhysicalTopologyOperatorSaved: true,
+			gpuPhysicalTopology: [
+				{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-99', dpB: 'DP-98', connectorNumber: 0, location: 0 },
+				...discovered.slice(1),
+			],
+		}
+		const map = buildGpuPhysicalMap({ config, displays: [], connectors: [] })
+		assert.equal(map.topologyMismatch, true)
+		assert.ok(Array.isArray(map.suggestedTopology))
+		assert.equal(map.suggestedTopology[0].dpA, 'DP-0')
 	})
 
 	it('uses flat topology for four DP-only laptop outputs (no A/B banks)', () => {

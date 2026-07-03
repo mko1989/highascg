@@ -246,12 +246,12 @@ export async function addMappingNode() {
 }
 
 /**
- * Ask the playout server to re-query xrandr/DRM (optional). Returns null when the route is missing.
- * Client UI should still clear `gpu_custom_layout` and refresh from `live.gpu` when this fails.
+ * Ask the playout server to re-query GPU topology discovery.
+ * @param {{ persist?: boolean }} [opts]
  */
-export async function resetGpuLayout() {
+export async function resetGpuLayout(opts = {}) {
 	try {
-		return await api.post('/api/system/gpu-ports-reset')
+		return await api.post('/api/system/gpu-ports-reset', opts)
 	} catch {
 		return null
 	}

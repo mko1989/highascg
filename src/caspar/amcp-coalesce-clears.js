@@ -14,11 +14,12 @@ function isLayerTeardownLine(line) {
  * Collapse large per-layer CLEAR/STOP storms (preview UI, multiview, timeline leftovers) into `CLEAR <ch>`.
  * Surgical 1–3 layer clears are left untouched.
  * @param {string[]} lines
- * @param {{ minTeardownLines?: number }} [opts]
+ * @param {{ minTeardownLines?: number, skipChannels?: Set<number> }} [opts] - skipChannels: channels whose per-layer lines are already targeted (playback tracker) — never blanket those
  * @returns {{ lines: string[], coalesced: boolean, channels: number[] }}
  */
 function coalescePerLayerClearStorm(lines, opts = {}) {
 	const minTeardownLines = Math.max(2, parseInt(String(opts.minTeardownLines ?? 6), 10) || 6)
+	const skipChannels = opts.skipChannels instanceof Set ? opts.skipChannels : null
 	/** @type {Map<number, number[]>} */
 	const indicesByCh = new Map()
 
@@ -29,6 +30,7 @@ function coalescePerLayerClearStorm(lines, opts = {}) {
 		if (!m) continue
 		const ch = parseInt(m[1], 10)
 		if (!Number.isFinite(ch) || ch < 1) continue
+		if (skipChannels && skipChannels.has(ch)) continue
 		if (!indicesByCh.has(ch)) indicesByCh.set(ch, [])
 		indicesByCh.get(ch).push(i)
 	}

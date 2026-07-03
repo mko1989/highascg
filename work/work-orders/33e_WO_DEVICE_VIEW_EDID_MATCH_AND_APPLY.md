@@ -1,7 +1,7 @@
 # WO-33e — Device view: EDID / timing match, warn, suggest, and apply flow
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Status:** Superseded by [WO-107](./107_WO_GPU_EDID_PIPELINE_AND_INSPECTOR_VISIBILITY.md) for GPU output EDID retrieval, parsing, and Device View display. The cable mismatch / apply-to-settings flow in this WO remains open and should be rebased on `live.gpu.*.edid.parsed` from WO-107.  
 **Prerequisites:** [33c](./33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md); [33d](./33d_WO_DEVICE_VIEW_PIXELHUE_CABLING.md) for PH-reported **sink** timing
 
 ---

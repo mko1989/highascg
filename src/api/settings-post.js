@@ -177,6 +177,7 @@ async function handlePost(path, body, ctx) {
 			})
 			.filter(Boolean)
 			.sort((a, b) => a.slotOrder - b.slotOrder)
+		cfg.gpuPhysicalTopologyOperatorSaved = true
 	}
 	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
 	if (settings.operatorTools) {

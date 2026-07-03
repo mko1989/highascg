@@ -4,10 +4,11 @@
 
 import {
 	downloadProjectFile,
-	fetchProjectFileContentById,
+	deleteProjectFile,
 	fetchProjectFileList,
 	formatProjectFileDate,
 	formatProjectFileSize,
+	loadProjectFileById,
 } from '../lib/project-files.js'
 import { api } from '../lib/api-client.js'
 import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.js'
@@ -75,6 +76,8 @@ export function showLoadProjectModal(opts = {}) {
 				<button type="button" class="btn btn--secondary" id="load-project-cancel">Cancel</button>
 				<button type="button" class="btn btn--secondary" id="load-project-refresh" title="Refresh file list">Refresh</button>
 				<button type="button" class="btn btn--secondary" id="load-project-download" disabled>Download</button>
+				<button type="button" class="btn btn--secondary" id="load-project-delete" disabled title="Move project file to server trash">Delete</button>
+				<button type="button" class="btn btn--secondary" id="load-project-rename" disabled title="Rename project file on server">Rename</button>
 				<button type="button" class="btn btn--secondary" id="load-project-file">Local JSON…</button>
 				<button type="button" class="btn btn--primary" id="load-project-load" disabled>Load selected</button>
 			</div>
@@ -107,6 +110,8 @@ export function showLoadProjectModal(opts = {}) {
 	const actionLoadingEl = modal.querySelector('#load-project-action-loading')
 	const loadBtn = modal.querySelector('#load-project-load')
 	const downloadBtn = modal.querySelector('#load-project-download')
+	const deleteBtn = modal.querySelector('#load-project-delete')
+	const renameBtn = modal.querySelector('#load-project-rename')
 
 	function setStatus(msg, isError = false) {
 		if (!statusEl) return
@@ -118,8 +123,12 @@ export function showLoadProjectModal(opts = {}) {
 
 	function setActionLoading(on) {
 		if (actionLoadingEl) actionLoadingEl.hidden = !on
-		if (loadBtn) loadBtn.disabled = on || !selectedId
-		if (downloadBtn) downloadBtn.disabled = on || !selectedId
+		const entry = getSelectedEntry()
+		const blocked = entry?.corrupt
+		if (loadBtn) loadBtn.disabled = on || !selectedId || blocked
+		if (downloadBtn) downloadBtn.disabled = on || !selectedId || blocked
+		if (deleteBtn) deleteBtn.disabled = on || !selectedId || entry?.legacy || entry?.active || blocked
+		if (renameBtn) renameBtn.disabled = on || !selectedId || entry?.legacy || entry?.active || blocked
 		const refreshBtn = modal.querySelector('#load-project-refresh')
 		const fileBtn = modal.querySelector('#load-project-file')
 		if (refreshBtn) refreshBtn.disabled = on
@@ -132,8 +141,12 @@ export function showLoadProjectModal(opts = {}) {
 
 	function selectFile(id) {
 		selectedId = id
-		if (loadBtn) loadBtn.disabled = !id
-		if (downloadBtn) downloadBtn.disabled = !id
+		const entry = getSelectedEntry()
+		const blocked = entry?.corrupt
+		if (loadBtn) loadBtn.disabled = !id || blocked
+		if (downloadBtn) downloadBtn.disabled = !id || blocked
+		if (deleteBtn) deleteBtn.disabled = !id || entry?.legacy || entry?.active || blocked
+		if (renameBtn) renameBtn.disabled = !id || entry?.legacy || entry?.active || blocked
 		listBodyEl?.querySelectorAll('tr[data-file-id]').forEach((row) => {
 			const rid = row.getAttribute('data-file-id')
 			row.classList.toggle('load-project-modal__row--selected', rid === id)
@@ -180,6 +193,20 @@ export function showLoadProjectModal(opts = {}) {
 				tag.className = 'load-project-modal__tag load-project-modal__tag--active'
 				tag.textContent = 'active'
 				tdName.append(' ', tag)
+			}
+			if (f.conflict) {
+				const tag = document.createElement('span')
+				tag.className = 'load-project-modal__tag load-project-modal__tag--conflict'
+				tag.textContent = 'sync conflict'
+				tag.title = (f.conflictSlugs || []).join(', ')
+				tdName.append(' ', tag)
+			}
+			if (f.corrupt) {
+				const tag = document.createElement('span')
+				tag.className = 'load-project-modal__tag load-project-modal__tag--error'
+				tag.textContent = 'corrupt'
+				tdName.append(' ', tag)
+				tr.classList.add('load-project-modal__row--corrupt')
 			}
 			const fileHint = document.createElement('div')
 			fileHint.className = 'load-project-modal__filename'
@@ -253,6 +280,8 @@ export function showLoadProjectModal(opts = {}) {
 	}
 
 	async function finishImport(project, entry) {
+		const recovered = project?._recoveredFromAutosave === true
+		if (recovered && project) delete project._recoveredFromAutosave
 		if (entry && !entry.legacy) {
 			await api.post('/api/project/load', { slug: entry.id, applyHardware: false })
 		}
@@ -270,6 +299,9 @@ export function showLoadProjectModal(opts = {}) {
 		const appWs = getAppWs()
 		if (appWs) flushSceneDeckSync(appWs, sceneState)
 		onLoaded?.()
+		if (recovered) {
+			showToast?.('Recovered newer autosaved work for this project', 'info')
+		}
 		showToast?.('Project loaded', 'success')
 		close()
 	}
@@ -301,7 +333,7 @@ export function showLoadProjectModal(opts = {}) {
 		setStatus('')
 		setActionLoading(true)
 		try {
-			const project = await fetchProjectFileContentById(entry.id)
+			const project = await loadProjectFileById(entry.id)
 			await finishImport(project, entry)
 		} catch (e) {
 			const msg = e?.message || String(e)
@@ -329,11 +361,53 @@ export function showLoadProjectModal(opts = {}) {
 		}
 	}
 
+	async function deleteSelected() {
+		const entry = getSelectedEntry()
+		if (!entry || entry.legacy || entry.active || entry.corrupt) return
+		if (!confirm(`Move “${entry.name}” to server trash? This cannot be undone from the UI.`)) return
+		setStatus('')
+		setActionLoading(true)
+		try {
+			await deleteProjectFile(entry.id)
+			showToast?.('Project moved to trash', 'success')
+			selectedId = null
+			await refreshList()
+		} catch (e) {
+			const msg = e?.message || String(e)
+			setStatus(msg, true)
+			showToast?.('Delete failed: ' + msg, 'error')
+		} finally {
+			setActionLoading(false)
+		}
+	}
+
+	async function renameSelected() {
+		const entry = getSelectedEntry()
+		if (!entry || entry.legacy || entry.active || entry.corrupt) return
+		const newName = prompt('New project name:', entry.name)
+		if (!newName || !String(newName).trim() || String(newName).trim() === entry.name) return
+		setStatus('')
+		setActionLoading(true)
+		try {
+			await api.post('/api/project/rename', { fromSlug: entry.id, name: String(newName).trim() })
+			showToast?.('Project renamed', 'success')
+			await refreshList()
+		} catch (e) {
+			const msg = e?.message || String(e)
+			setStatus(msg, true)
+			showToast?.('Rename failed: ' + msg, 'error')
+		} finally {
+			setActionLoading(false)
+		}
+	}
+
 	modal.querySelector('#load-project-close')?.addEventListener('click', close)
 	modal.querySelector('#load-project-cancel')?.addEventListener('click', close)
 	modal.querySelector('#load-project-refresh')?.addEventListener('click', () => void refreshList())
 	modal.querySelector('#load-project-load')?.addEventListener('click', () => void loadSelected())
 	modal.querySelector('#load-project-download')?.addEventListener('click', () => void downloadSelected())
+	modal.querySelector('#load-project-delete')?.addEventListener('click', () => void deleteSelected())
+	modal.querySelector('#load-project-rename')?.addEventListener('click', () => void renameSelected())
 	modal.querySelector('#load-project-file')?.addEventListener('click', () => fileInput.click())
 	modal.addEventListener('click', (e) => {
 		if (e.target === modal) close()
