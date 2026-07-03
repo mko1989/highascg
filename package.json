@@ -85,6 +85,7 @@
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
 		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh",
 		"eggs:clone-flash-tmux": "bash work/run-eggs-clone-flash-tmux.sh --attach",
+		"eggs:clone-flash": "sudo -E bash work/run-eggs-clone-flash.sh -y",
 		"deploy:mirror-tmux": "bash work/run-deploy-mirror-tmux.sh --attach",
 		"deploy:parallel-eggs-sync": "bash work/run-parallel-eggs-and-sync.sh"
 	},

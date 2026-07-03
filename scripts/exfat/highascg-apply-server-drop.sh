@@ -150,7 +150,7 @@ stamp_unchanged_skip() {
 	local src_stamp dest_stamp
 	src_stamp="$(read_build_stamp "$src" 2>/dev/null || true)"
 	dest_stamp="$(read_build_stamp "$dest" 2>/dev/null || true)"
-	[[ -n "$src_stamp" && -n "$dest_stamp" && "$src_stamp" == "$dest_stamp" && -f "${dest}/dist-web/index.html" ]]
+	[[ -n "$src_stamp" && -n "$dest_stamp" && "$src_stamp" == "$dest_stamp" && -f "${dest}/dist-web/index.html" && -x "${dest}/bin/casparcg" ]]
 }
 
 apply_server_drop() {
@@ -190,11 +190,15 @@ apply_server_drop() {
 	[[ -f "$excludes" ]] && xtra+=(--exclude-from="$excludes")
 	log "rsync ${src}/ → ${staging}/"
 	rsync "${xtra[@]}" -rlptgoD --delete "${src%/}/" "${staging%/}/"
-	log "rsync ${staging}/ → ${dest}/"
+	log "merge ${staging}/ → ${dest}/ (no --delete — preserves bin/, lib/, …)"
 	mkdir -p "$dest"
-	rsync "${xtra[@]}" -rlptgoD --delete "${staging%/}/" "${dest%/}/"
+	rsync "${xtra[@]}" -rlptgoD "${staging%/}/" "${dest%/}/"
 	rm -rf "$staging"
 	chown -R "${user_name}:${grp}" "${dest%/}" || true
+
+	if [[ ! -x "${dest}/bin/casparcg" ]]; then
+		log "WARN: ${dest}/bin/casparcg missing — restore from ISO/install (not in server drops)"
+	fi
 
 	echo "${src_stamp}" >"${dest}/BUILD_STAMP"
 	echo "${src_stamp}" >"${dest}/.highascg-build-stamp"

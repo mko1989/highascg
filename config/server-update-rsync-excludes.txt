@@ -1,13 +1,24 @@
 # rsync excludes: exfat drop-update/ → ~/highascg (server drop, WO-52)
 # dist-web/ IS deployed from the drop (unified playout UI on :4200)
+# bin/ + lib/ ship on ISO/install — never removed by server drop merge
 client/
 node_modules/
 .git/
+bin/
 media/
 cef-cache/
 log/
 data/
 lib/
+run.sh
+work/
+projects/
+tools/eggs/
+tools/release/
+tools/smoke/
+.private/
 config/casparcg.config
 .highascg-state.json
 .module-state.json
+.highascg-build-stamp
+BUILD_STAMP
