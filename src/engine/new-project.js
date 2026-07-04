@@ -15,7 +15,7 @@ const projectStore = require('./project-store')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
 const { buildFactoryModularConfig } = require('../config/factory-starter')
 
-const EMPTY_PROJECT_TEMPLATE = require('../../data/default-empty-project.json')
+const EMPTY_PROJECT_TEMPLATE = require('../config/default-empty-project.json')
 
 const DEFAULT_PROJECT_NAME = 'Untitled'
 const PROJECT_VERSION = 2
