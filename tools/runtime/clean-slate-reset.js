@@ -100,7 +100,7 @@ function resetProjects(projectsDir, dryRun) {
 		attachStarterHardwareConfig,
 		buildStarterPersistenceState,
 		buildFactoryModularConfig,
-	} = require('../eggs/live-usb/starter-project')
+	} = require('../../src/config/factory-starter')
 	const defaults = require('../../src/config/defaults')
 
 	const {
@@ -168,7 +168,7 @@ function resetConfig(configDir, stash, dryRun) {
 		finalizeScreenDestinationsConfig,
 		normalizeScreenDestinations,
 	} = require('../../src/config/screen-destinations')
-	const { buildFactoryModularConfig } = require('../eggs/live-usb/starter-project')
+	const { buildFactoryModularConfig } = require('../../src/config/factory-starter')
 
 	const factoryConfig = buildFactoryModularConfig(
 		defaults,

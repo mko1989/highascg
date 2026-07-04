@@ -13,7 +13,7 @@ const { persistProject } = require('./project-scenes')
 const { ensureProjectMediaDir } = require('../media/project-media-root')
 const projectStore = require('./project-store')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
-const { buildFactoryModularConfig } = require('../../tools/eggs/live-usb/starter-project')
+const { buildFactoryModularConfig } = require('../config/factory-starter')
 
 const EMPTY_PROJECT_TEMPLATE = require('../../data/default-empty-project.json')
 
