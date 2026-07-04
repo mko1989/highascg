@@ -21,7 +21,11 @@ describe('gpu topology boot persist', () => {
 			],
 		}
 		const saved = [...config.gpuPhysicalTopology]
-		const result = ensureGpuPhysicalTopologyFromXrandr({ config, log: () => {} })
+		const result = ensureGpuPhysicalTopologyFromXrandr({
+			config,
+			log: () => {},
+			xrandrRaw: NVIDIA_595_XRANDR,
+		})
 		assert.equal(result.updated, false)
 		assert.ok(topologyRowsEqual(config.gpuPhysicalTopology, saved))
 		assert.ok(Array.isArray(result.suggested))

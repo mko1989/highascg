@@ -14,6 +14,10 @@ const path = require('path')
 const WebSocket = require('ws')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
+const SKIP_SERVER_INTEGRATION =
+	process.env.CI === 'true' ||
+	process.env.GITHUB_ACTIONS === 'true' ||
+	process.env.HIGHASCG_SKIP_SERVER_INTEGRATION === '1'
 
 /**
  * @param {number} port
@@ -75,7 +79,10 @@ function stopProcess(child) {
 	})
 }
 
-test('WsClient reconnects after server kill + restart without new client instance', async () => {
+test(
+	'WsClient reconnects after server kill + restart without new client instance',
+	{ skip: SKIP_SERVER_INTEGRATION && 'spawns full HighAsCG server (~60s); run locally without CI=1' },
+	async () => {
 	const port = 18000 + Math.floor(Math.random() * 1000)
 	let child = startHighascg(port)
 	try {
@@ -137,9 +144,13 @@ test('WsClient reconnects after server kill + restart without new client instanc
 	} finally {
 		await stopProcess(child)
 	}
-})
+},
+)
 
-test('sendAmcp rejects on timeout when server does not reply', async () => {
+test(
+	'sendAmcp rejects on timeout when server does not reply',
+	{ skip: SKIP_SERVER_INTEGRATION && 'spawns mock WS server; run locally without CI=1' },
+	async () => {
 	const server = http.createServer()
 	const wss = new WebSocket.Server({ noServer: true })
 	server.on('upgrade', (req, socket, head) => {
@@ -189,7 +200,8 @@ test('sendAmcp rejects on timeout when server does not reply', async () => {
 		server.close(() => resolve())
 		wss.close()
 	})
-})
+},
+)
 
 test('multiview editor ignores timeline.tick and coalesces redraw via rAF', async () => {
 	const src = await fs.promises.readFile(
