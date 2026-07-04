@@ -53,6 +53,13 @@ const beginSeek = resolvePlaySeekFramesForSceneLayer(
 )
 assert.strictEqual(beginSeek, 0)
 
+const staleClientSeek = resolvePlaySeekFramesForSceneLayer(
+	{ startBehaviour: 'beginning', playSeekFrames: 142520 },
+	matrixCtx,
+	{ channel: 1, layerNumber: 10, physicalLayer: 10, fps: 50, forceCut: false, phys, activeBank: 'a', incoming: { layers: [{ layerNumber: 10, startBehaviour: 'beginning' }] } }
+)
+assert.strictEqual(staleClientSeek, 0, 'beginning must ignore stale playSeekFrames from transition take')
+
 const tl = { fps: 25, layers: [{ clips: [{ id: 'c1', source: { value: 'a.mp4' }, startTime: 0, duration: 10000, inPoint: 12, startBehaviour: 'beginning' }] }] }
 const clip = tl.layers[0].clips[0]
 const entry = resolveTimelineClipFrame(clip, 4000, tl, {}, { atEntry: true, channel: 1, physicalLayer: 5 })

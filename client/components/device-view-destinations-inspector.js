@@ -1,6 +1,8 @@
 import { buildInspectorTable, roleLabel } from './device-view-ui-utils.js'
 import { mountWebpageHostPageControls } from './inspector-webpage-host.js'
 import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
+import { findExtraLiveSourceForHostDestination, decklinkSlotFromHostDestination } from '../lib/device-view-host-channels.js'
+import { removeDecklinkInputSlot } from '../lib/decklink-add-input.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 
@@ -297,6 +299,7 @@ export function renderDestinationInspector(args) {
 		currentSettings,
 		lastPayload,
 		onWebpageHostApplied,
+		onHostInputRemoved,
 	} = args
 	const projectDefaultMode = defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(currentSettings))
 
@@ -308,18 +311,7 @@ export function renderDestinationInspector(args) {
 			: []
 		).find((e) => Number(e?.channel) === Number(ch) && (e?.kind === role || !role))
 		const extraLive = Array.isArray(lastPayload?.extraLiveSources) ? lastPayload.extraLiveSources : []
-		const liveSource =
-			extraLive.find((x) => {
-				const sid = String(x?.sourceId || '').trim()
-				if (!sid) return false
-				return String(d?.id || '') === `host_webpage_${sid}` || String(d?.id || '') === `host_ndi_${sid}`
-			}) ||
-			extraLive.find(
-				(x) =>
-					Number(x?.hostChannel) === Number(ch) &&
-					(x?.routeType === role || x?.hostRole === role),
-			) ||
-			null
+		const liveSource = findExtraLiveSourceForHostDestination(d, role, ch, extraLive)
 		const rows = [
 			{ label: 'Label', value: String(d?.label || d?.id || 'Host channel') },
 			{ label: 'Type', value: roleLabel({ role }) },
@@ -354,6 +346,8 @@ export function renderDestinationInspector(args) {
 				? 'Dedicated DeckLink input host channel. Cable this destination to Record or Stream on the rear panel to capture that input directly.'
 				: role === 'live_audio_input'
 					? 'Dedicated live-audio input host channel. Cable to Record or Stream to capture that ALSA/USB input bus.'
+					: role === 'v4l2_input'
+						? 'Dedicated USB / V4L2 video host channel. FFmpeg bridge feeds MPEG-TS into Caspar; cable to Record or Stream to capture that input directly.'
 					: role === 'inputs_host'
 				? 'Dedicated inputs host bus — Caspar plays DeckLink / live audio here so layers can route:// it everywhere. Cable this to Record or Stream on the rear panel to capture that bus directly.'
 				: role === 'streaming_channel'
@@ -387,6 +381,43 @@ export function renderDestinationInspector(args) {
 				outputMapWrap.appendChild(row)
 			}
 			host.append(outputMapWrap)
+		}
+		if (role === 'decklink_input') {
+			const rmBtn = document.createElement('button')
+			rmBtn.type = 'button'
+			rmBtn.className = 'header-btn'
+			rmBtn.style.marginTop = '10px'
+			rmBtn.textContent = 'Remove DeckLink input'
+			rmBtn.addEventListener('click', async () => {
+				const slot = decklinkSlotFromHostDestination(d)
+				if (!slot) return
+				const label = String(d?.label || `DeckLink input ${slot}`)
+				if (
+					!confirm(
+						`Remove "${label}"?\n\nStops SDI capture, removes the live source, clears cables from this host channel, and frees the DeckLink port.`,
+					)
+				) {
+					return
+				}
+				rmBtn.disabled = true
+				try {
+					const r = await removeDecklinkInputSlot(null, {
+						slot,
+						connectorId: liveSource?.connectorId,
+						liveSourceValue: liveSource?.value,
+						destinationId: String(d?.id || ''),
+					})
+					if (typeof onHostInputRemoved === 'function') {
+						await onHostInputRemoved(d, r)
+					} else {
+						await removeDestination(d.id)
+					}
+				} catch (e) {
+					window.alert(e?.message || String(e))
+					rmBtn.disabled = false
+				}
+			})
+			host.append(rmBtn)
 		}
 		return
 	}

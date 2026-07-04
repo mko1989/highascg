@@ -1,0 +1,66 @@
+        <div class="guide-intro">
+          <h2>How to Flash the HighAsCG Live ISO</h2>
+          <p>Flashing writes the core Linux operating system structure onto the USB stick, allowing the studio rack node to boot from it. We recommend using <strong>Balena Etcher</strong> for flashing on both Windows and macOS.</p>
+        </div>
+
+        <div class="steps-container">
+          <!-- Step 1 -->
+          <div class="guide-step-card">
+            <div class="step-num">01</div>
+            <div class="step-content">
+              <h3>Load the HighAsCG ISO</h3>
+              <p>Download the official <code>highascg_*.iso</code> build. Open Balena Etcher and click <strong>Flash from file</strong> to select the ISO image.</p>
+              
+              <!-- SCREENSHOT PLACEHOLDER -->
+              <div class="screenshot-placeholder">
+                <img src="images/flash_step1_load_iso.png" alt="Loading ISO in Etcher" onerror="this.style.display='none'">
+                <div class="placeholder-overlay">
+                  <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                  <span class="placeholder-title">Screenshot: Loading ISO in Etcher</span>
+                  <span class="placeholder-subtitle">Click 'Flash from file' and select highascg_amd64.iso</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="guide-step-card">
+            <div class="step-num">02</div>
+            <div class="step-content">
+              <h3>Select the Target USB Drive</h3>
+              <p>Click <strong>Select target</strong> and choose your plugged USB flash drive. <strong>CAUTION:</strong> Triple check that you select the correct removable USB drive by model and capacity to prevent erasing other data.</p>
+              
+              <!-- SCREENSHOT PLACEHOLDER -->
+              <div class="screenshot-placeholder">
+                <img src="images/flash_step2_select_usb.png" alt="Target USB Selection" onerror="this.style.display='none'">
+                <div class="placeholder-overlay">
+                  <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                  <span class="placeholder-title">Screenshot: Target USB Selection</span>
+                  <span class="placeholder-subtitle">Select the flash drive (minimum 16GB recommended)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="guide-step-card">
+            <div class="step-num">03</div>
+            <div class="step-content">
+              <h3>Flash and Verify</h3>
+              <p>Click <strong>Flash!</strong>. The OS will prompt for administrator permission. Etcher will burn the partitions and run a verification pass. Once complete, you can close Etcher.</p>
+              <div class="alert alert-warning">
+                <strong>IMPORTANT:</strong> Do not format or touch any partitions yet when prompted by Windows/macOS. Proceed to the Partitioning tab first.
+              </div>
+
+              <!-- SCREENSHOT PLACEHOLDER -->
+              <div class="screenshot-placeholder">
+                <img src="images/flash_step3_verify_success.png" alt="Flashing Verification Success" onerror="this.style.display='none'">
+                <div class="placeholder-overlay">
+                  <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                  <span class="placeholder-title">Screenshot: Flashing Verification Success</span>
+                  <span class="placeholder-subtitle">Wait for 'Flash Complete!' status banner</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>

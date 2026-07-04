@@ -96,7 +96,7 @@ export function connectorById(payload, id) {
  */
 export function connectorRole(c) {
 	if (!c) return 'other'
-	if (c.deviceId === CASPAR_HOST && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out')) return 'caspar_out'
+	if (c.deviceId === CASPAR_HOST && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out' || c.kind === 'v4l2_out')) return 'caspar_out'
 	if (c.deviceId === CASPAR_HOST && c.kind === 'decklink_io') {
 		if (isDecklinkIoOut(c) || isDecklinkIoOutputSink(c)) return 'caspar_out'
 		if (isDecklinkIoIn(c)) return 'caspar_in'
@@ -204,11 +204,10 @@ export function resolveConnectorId(lastPayload, type, data) {
 		}
 		return gpus[data.index]?.id || ''
 	}
-	if (type === 'decklink_in') {
-		const slot = parseInt(String(data?.input?.slot ?? 0), 10) || 0
-		const io = sc.find(c => c.kind === 'decklink_io' && Number(c?.index) === Math.max(0, slot - 1))
-		if (io?.id) return io.id
-		return sc.find(c => c.id === 'dli_' + slot)?.id || ''
+	if (type === 'decklink_io' || type === 'decklink_in') {
+		const slot = parseInt(String(data?.input?.slot ?? data?.slot ?? 0), 10) || 0
+		const io = sc.find((c) => c.kind === 'decklink_io' && Number(c?.index) === Math.max(0, slot - 1))
+		return io?.id || ''
 	}
 	if (type === 'decklink_out') return sc.find(c => c.id === 'dlo_s' + data.output.screen)?.id || ''
 	if (type === 'decklink_mv') return sc.find(c => c.id === 'dlo_mv')?.id || ''
@@ -282,6 +281,9 @@ export function friendlyConnectorLabel(lastPayload, connectorId) {
 		const n = id.match(/(\d+)/)?.[1]
 		return n ? `str${n}` : (conn?.label || id)
 	}
+	if (conn?.kind === 'v4l2_out') {
+		return String(conn?.label || 'Virtual cam')
+	}
 	if (conn?.kind === 'record_out') {
 		const n = id.match(/(\d+)/)?.[1]
 		return n ? `rec${n}` : (conn?.label || id)
@@ -298,7 +300,7 @@ export function friendlyConnectorLabel(lastPayload, connectorId) {
 		const name = String(conn?.label || conn?.externalRef || '')
 		return name ? `gpu_${name}` : id
 	}
-	if (conn?.kind === 'decklink_io' || conn?.kind === 'decklink_out' || conn?.kind === 'decklink_in') {
+	if (conn?.kind === 'decklink_io' || conn?.kind === 'decklink_out') {
 		const ext = parseInt(String(conn?.externalRef ?? ''), 10)
 		if (Number.isFinite(ext) && ext > 0) return `decklink_${ext}`
 		const slotFromId = id.match(/(?:^|_)(\d+)$/)?.[1]

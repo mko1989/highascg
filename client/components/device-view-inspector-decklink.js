@@ -14,6 +14,7 @@ import { decklinkInputForSlot, decklinkSlotFromConnector, routeForDecklinkSlot }
 import { STANDARD_VIDEO_MODES } from './device-view-destinations-inspector.js'
 import { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } from '../lib/decklink-io-direction.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
+import { addDecklinkInputSlot } from '../lib/decklink-add-input.js'
 
 const DECKLINK_LATENCY_OPTIONS = ['normal', 'low', 'default']
 const DECKLINK_COLOR_SPACE_OPTIONS = ['bt709', 'bt601', 'bt2020']
@@ -617,49 +618,24 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 			activateBtn.disabled = true
 
 			try {
-				await Actions.updateConnector(conn.id, { caspar: { ioDirection: 'in' } })
-
-				const refetched = await Actions.loadDeviceView()
-				const newMap = refetched?.live?.caspar?.channelMap || refetched?.suggested?.channelMap || {}
-				const entry = decklinkInputForSlot(newMap, slot)
-				const layer = entry?.layer ?? slot
-				const playCh = entry?.channel
-
-				if (playCh != null && devNum > 0) {
-					try {
-						await api.post('/api/raw', { cmd: `PLAY ${playCh}-${layer} DECKLINK ${devNum}` })
-					} catch (e) {
-						console.warn('[decklink-input] immediate PLAY failed', e)
-					}
-
-					const routeValue = entry?.route || routeForDecklinkSlot(newMap, slot)
-					if (routeValue) {
-						const liveSource = {
-							value: routeValue,
-							type: 'route',
-							routeType: 'decklink',
-							label: entry?.label || `DeckLink ${slot}`,
-							decklinkSlot: slot,
-							inputsChannel: playCh,
-							inputsLayer: layer,
-							decklinkDevice: devNum,
-							connectorId: conn.id,
-						}
-						try {
-							const addRes = await api.post('/api/device-view', { addExtraLiveSource: liveSource })
-							if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
-								window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
-							}
-						} catch (e) {
-							console.warn('[decklink-input] add extra live source failed', e)
-						}
-					}
-				} else {
-					setStatus(statusEl, `Port marked input. Set decklink_input_count ≥ ${slot} and restart Caspar.`, false)
+				const dev = Math.max(1, devNum || slot)
+				const r = await addDecklinkInputSlot(null, { device: dev, slot })
+				if (!r.ok) {
+					setCasparRestartDirty(true)
+					setStatus(statusEl, r.error || `Port ${devNum}: failed to start input.`, false)
+					activateBtn.disabled = false
+					return
 				}
-
+				if (Array.isArray(r.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+					window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+				}
 				setCasparRestartDirty(true)
-				setStatus(statusEl, playCh != null ? `Port ${devNum} is input on ch ${playCh}.` : `Port ${devNum} is input.`, true)
+				const applyNote = r.casparApply?.ok
+					? ' Caspar restarted.'
+					: r.casparRestartNeeded
+						? ' Apply Caspar config and restart if the input does not appear.'
+						: ''
+				setStatus(statusEl, `Port ${devNum} is input on ch ${r.hostChannel}.${applyNote}`, true)
 				await load()
 			} catch (e) {
 				setStatus(statusEl, `Failed: ${e?.message || e}`, false)

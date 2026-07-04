@@ -107,6 +107,8 @@ function normalizeDeviceGraph(raw) {
 		if (!c) return false
 		const kind = String(c.kind || '')
 		if (kind === 'ph_in' || kind === 'ph_out') return false
+		// Legacy logical capture nodes — DeckLink inputs use dedicated host channels (route://) only.
+		if (kind === 'decklink_in' || /^dli_\d+$/i.test(String(c.id || ''))) return false
 		return String(c.deviceId || '') !== legacyMixerGraphDeviceId
 	})
 	const strippedConnIds = new Set(connsFinal.map((c) => c.id))

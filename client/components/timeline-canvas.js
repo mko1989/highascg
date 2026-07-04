@@ -3,6 +3,7 @@
  * Scroll: vertical wheel = zoom (time axis at cursor). Horizontal wheel / trackpad = pan time.
  * Alt+vertical = pan layers. Shift+vertical = horizontal time pan (for mice without horizontal wheel).
  * Ruler click/drag = seek (sends SEEK command on every move event).
+ * Empty track click = deselect only (playhead moves on ruler only).
  * Clip drag = move clip. Clip edge drag = resize.
  * @see main_plan.md Prompt 17
  */
@@ -77,6 +78,8 @@ export function initTimelineCanvas(container, opts) {
 		onSelectKeyframe,
 		/** Double-click clip body: add keyframe at playhead/click time (local ms). */
 		onDblClickAddKeyframe,
+		/** Double-click empty header/track row: insert layer below that row (or append). */
+		onAddLayer,
 		onMoveKeyframe,
 		onSelectFlag,
 		onMoveFlagTime,
@@ -257,10 +260,9 @@ export function initTimelineCanvas(container, opts) {
 		} else {
 			canvas.dataset.lastClicked = 'track'
 			onSelectClip(null)
-			// Click empty track = move playhead (same as ruler seek)
-			drag = { type: 'seek' }
-			lastSeekMs = Math.max(0, tl ? Math.min(ms, tl.duration) : ms)
-			onSeek(lastSeekMs)
+			if (li >= 0 && li < tl.layers.length) {
+				onLayerClick?.(tl.id, li, tl.layers[li])
+			}
 		}
 		schedDraw()
 	})
@@ -508,29 +510,48 @@ export function initTimelineCanvas(container, opts) {
 		drag = null
 	})
 
-	// Right-click on layer header → context menu (rename, add layer, remove layer)
+	// Double-click: keyframe on clip, or add layer in empty header/track space
 	canvas.addEventListener('dblclick', (e) => {
-		if (!onDblClickAddKeyframe) return
+		if (!onDblClickAddKeyframe && !onAddLayer) return
 		const rect = canvas.getBoundingClientRect()
 		const cx = e.clientX - rect.left
 		const cy = e.clientY - rect.top
-		if (cx < HEADER_W || cy < RULER_H) return
+		if (cy < RULER_H) return
 		const tl = getTimeline()
 		if (!tl) return
 		const li = layerAt(cy, tl)
-		if (li < 0 || li >= tl.layers.length) return
 		const ms = msAt(cx)
-		const clip = hitClip(tl, li, ms)
-		if (!clip) return
-		e.preventDefault()
-		const localMs = Math.max(0, Math.min(Math.round(ms - clip.startTime), clip.duration || 0))
-		onDblClickAddKeyframe({
-			timelineId: tl.id,
-			layerIdx: li,
-			clipId: clip.id,
-			clip,
-			localMs,
-		})
+
+		if (cx >= HEADER_W && li >= 0) {
+			if (li < tl.layers.length) {
+				const clip = hitClip(tl, li, ms)
+				if (clip && onDblClickAddKeyframe) {
+					e.preventDefault()
+					const localMs = Math.max(0, Math.min(Math.round(ms - clip.startTime), clip.duration || 0))
+					onDblClickAddKeyframe({
+						timelineId: tl.id,
+						layerIdx: li,
+						clipId: clip.id,
+						clip,
+						localMs,
+					})
+					return
+				}
+				if (!clip && onAddLayer) {
+					e.preventDefault()
+					onAddLayer(tl.id, li)
+				}
+			} else if (onAddLayer) {
+				e.preventDefault()
+				onAddLayer(tl.id, tl.layers.length - 1)
+			}
+			return
+		}
+
+		if (cx < HEADER_W && onAddLayer && li >= 0) {
+			e.preventDefault()
+			onAddLayer(tl.id, li >= tl.layers.length ? tl.layers.length - 1 : li)
+		}
 	})
 
 	canvas.addEventListener('contextmenu', (e) => {

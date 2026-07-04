@@ -4,7 +4,14 @@
  */
 
 import { roleLabel } from '../components/device-view-ui-utils.js'
-import { decklinkInputForSlot, listInputChannels } from './input-channels.js'
+import { decklinkInputForSlot, listInputChannels, decklinkSlotFromConnector } from './input-channels.js'
+import { normalizeDecklinkIoDirection } from './decklink-io-direction.js'
+import {
+	effectiveChannelMap,
+	reconcileHostChannelDestination,
+	reconcileExtraLiveSourceChannel,
+} from './planned-channel-map.js'
+import { getAppStateStore } from './app-runtime.js'
 
 /** Roles that become cable sources under Screen destinations → Host channels. */
 export const HOST_CHANNEL_DEST_ROLES = new Set([
@@ -13,6 +20,7 @@ export const HOST_CHANNEL_DEST_ROLES = new Set([
 	'extra_audio',
 	'decklink_input',
 	'live_audio_input',
+	'v4l2_input',
 	'webpage_host',
 	'ndi_host',
 ])
@@ -36,6 +44,10 @@ export function hostChannelDestinationId(role, ch, slot) {
 	if (r === 'live_audio_input') {
 		const s = parseInt(String(slot ?? ''), 10)
 		return s >= 1 ? `host_live_audio_input_${s}` : `host_live_audio_ch_${ch}`
+	}
+	if (r === 'v4l2_input') {
+		const s = parseInt(String(slot ?? ''), 10)
+		return s >= 1 ? `host_v4l2_input_${s}` : `host_v4l2_ch_${ch}`
 	}
 	if (r === 'webpage_host') {
 		const sid = String(slot ?? ch ?? '').trim()
@@ -61,6 +73,10 @@ export function defaultHostChannelLabel(row) {
 	}
 	if (role === 'live_audio_input' && slot != null) {
 		return ch != null ? `Live audio input ${slot} (ch ${ch})` : `Live audio input ${slot}`
+	}
+	if (role === 'v4l2_input' && slot != null) {
+		const name = row?.label || 'USB video'
+		return ch != null ? `USB: ${name} (ch ${ch})` : `USB: ${name}`
 	}
 	if (role === 'webpage_host') {
 		const name = row?.label || row?.sourceId || 'Webpage'
@@ -101,6 +117,7 @@ export function normalizeHostChannelDestination(item) {
 		virtual: true,
 		...(item.sourceId ? { sourceId: String(item.sourceId) } : {}),
 		...(Number.isFinite(slot) && slot >= 1 ? { inputSlot: slot } : {}),
+		...(item.devicePath ? { devicePath: String(item.devicePath) } : {}),
 	}
 }
 
@@ -138,6 +155,19 @@ function isDecklinkInputSlotLive(row) {
 }
 
 /**
+ * @param {object | null | undefined} payload
+ * @returns {object}
+ */
+function casparSettingsFromPayload(payload) {
+	return (
+		payload?.settings?.casparServer ||
+		payload?._settings?.casparServer ||
+		payload?.live?.caspar?.channelMap ||
+		{}
+	)
+}
+
+/**
  * Whether a DeckLink slot should appear as a host-channel destination.
  * @param {object | null | undefined} payload
  * @param {number} slot — 1-based
@@ -148,11 +178,24 @@ export function isDecklinkInputSlotActive(payload, slot) {
 	const inputs = Array.isArray(payload?.live?.decklink?.inputs) ? payload.live.decklink.inputs : []
 	const live = inputs.find((i) => Number(i?.slot) === n)
 	if (live) return isDecklinkInputSlotLive(live)
-	const cs = payload?.settings?.casparServer || payload?.live?.caspar?.channelMap || {}
-	const dir = String(cs[`decklink_input_${n}_direction`] || 'in').toLowerCase()
-	if (dir === 'out') return false
-	const count = Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0)
-	return n <= count
+
+	const cs = casparSettingsFromPayload(payload)
+	const configuredCount = Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0)
+
+	const connectors = [
+		...(Array.isArray(payload?.graph?.connectors) ? payload.graph.connectors : []),
+		...(Array.isArray(payload?.suggested?.connectors) ? payload.suggested.connectors : []),
+	]
+	const ioConn = connectors.find((c) => c?.kind === 'decklink_io' && decklinkSlotFromConnector(c) === n)
+	if (ioConn) return normalizeDecklinkIoDirection(ioConn.caspar) === 'in'
+
+	if (configuredCount === 0) return false
+
+	const dir = normalizeDecklinkIoDirection({ ioDirection: cs[`decklink_input_${n}_direction`] })
+	if (dir !== 'in') return false
+	const device = parseInt(String(cs[`decklink_input_${n}_device`] ?? 0), 10) || 0
+	if (device <= 0) return false
+	return n <= configuredCount
 }
 
 /** @param {object} cm @param {Set<number>} activeSlots */
@@ -162,13 +205,19 @@ function resolvedDecklinkSlotCount(cm, activeSlots) {
 	return Math.max(configured, ...activeSlots)
 }
 
+/** @param {object | null | undefined} payload */
+function channelMapForHostChannels(payload) {
+	const live = getAppStateStore()?.getState?.()?.channelMap || payload?.live?.caspar?.channelMap || null
+	return effectiveChannelMap({ payload, settings: payload?._settings, liveChannelMap: live })
+}
+
 /**
  * Host destinations for configured DeckLink / live-audio inputs (device view + channel map).
  * @param {object | null | undefined} payload
  * @returns {object[]}
  */
 export function listDecklinkAndLiveInputHostDestinations(payload) {
-	const cm = payload?.live?.caspar?.channelMap
+	const cm = channelMapForHostChannels(payload)
 	if (!cm || typeof cm !== 'object') return []
 
 	const activeSlots = activeDecklinkInputSlots(payload)
@@ -251,6 +300,19 @@ export function listDecklinkAndLiveInputHostDestinations(payload) {
 		}
 	}
 
+	const v4l2Entries = listInputChannels(cm).filter((e) => e.kind === 'v4l2')
+	if (v4l2Entries.length) {
+		for (const entry of v4l2Entries) {
+			const dest = normalizeHostChannelDestination({
+				role: 'v4l2_input',
+				ch: entry.channel,
+				slot: entry.slot,
+				label: entry.label || `USB video ${entry.slot}`,
+			})
+			if (dest) out.push(dest)
+		}
+	}
+
 	return out
 }
 
@@ -260,7 +322,7 @@ export function listDecklinkAndLiveInputHostDestinations(payload) {
  * @returns {object[]}
  */
 export function listHostLiveSourceDestinations(payload) {
-	const cm = payload?.live?.caspar?.channelMap
+	const cm = channelMapForHostChannels(payload)
 	if (!cm || typeof cm !== 'object') return []
 	const hostEntries = (Array.isArray(cm.inputChannels) ? cm.inputChannels : []).filter(
 		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host',
@@ -309,31 +371,185 @@ export function listHostChannelDestinations(payload) {
 
 	const fromInputs = listDecklinkAndLiveInputHostDestinations(payload)
 	const fromHostLive = listHostLiveSourceDestinations(payload)
-	return mergeHostDestinations([fromIntent, fromOrder, fromInputs, fromHostLive])
+	const cm = channelMapForHostChannels(payload)
+	return mergeHostDestinations([fromInputs, fromHostLive, fromOrder, fromIntent]).map((dest) =>
+		reconcileHostChannelDestination(dest, cm),
+	)
 }
 
 /**
- * Merge persisted screen destinations with virtual host-channel rows.
+ * Persisted screen destinations from config (excludes auto-detected host channels).
  * @param {object | null | undefined} payload
  * @returns {object[]}
  */
-export function listAllScreenDestinationsForDeviceView(payload) {
+export function listPersistedScreenDestinations(payload) {
 	const raw = Array.isArray(payload?.screenDestinations?.destinations) ? payload.screenDestinations.destinations : []
 	const seen = new Set()
-	const user = []
+	const out = []
 	for (const d of raw) {
 		const id = String(d?.id || '').trim()
 		if (!id || seen.has(id)) continue
 		seen.add(id)
-		user.push(d)
+		out.push(d)
 	}
-	const host = listHostChannelDestinations(payload).filter((d) => {
-		if (seen.has(d.id)) return false
-		seen.add(d.id)
-		return true
-	})
-	return [...user, ...host]
+	return out
 }
+
+/**
+ * Host channels available to add via the destination picker (not yet persisted).
+ * @param {object | null | undefined} payload
+ * @returns {object[]}
+ */
+export function listAvailableHostChannelDestinations(payload) {
+	const persistedIds = new Set(listPersistedScreenDestinations(payload).map((d) => String(d?.id || '')))
+	return listHostChannelDestinations(payload).filter((d) => d?.id && !persistedIds.has(String(d.id)))
+}
+
+const SCREEN_DEST_TYPE_OPTIONS = [
+	{ value: 'pgm_prv', label: 'PGM/PRV' },
+	{ value: 'pgm_only', label: 'PGM only' },
+	{ value: 'multiview', label: 'Multiview' },
+]
+
+/**
+ * Fill the Screen destinations + picker with screen modes and available host channels.
+ * @param {HTMLSelectElement} selectEl
+ * @param {object | null | undefined} payload
+ */
+export function populateDestinationTypeSelect(selectEl, payload) {
+	if (!selectEl) return
+	selectEl.replaceChildren()
+	for (const row of SCREEN_DEST_TYPE_OPTIONS) {
+		const opt = document.createElement('option')
+		opt.value = row.value
+		opt.textContent = row.label
+		selectEl.appendChild(opt)
+	}
+	const available = listAvailableHostChannelDestinations(payload)
+	if (!available.length) return
+	const sep = document.createElement('option')
+	sep.disabled = true
+	sep.textContent = '— Host channels —'
+	selectEl.appendChild(sep)
+	for (const h of available) {
+		const opt = document.createElement('option')
+		opt.value = `host:${h.id}`
+		opt.textContent = String(h.label || h.id)
+		selectEl.appendChild(opt)
+	}
+}
+
+/**
+ * Merge persisted screen destinations with auto-detected host-channel rows (DeckLink, NDI, USB…).
+ * Auto host rows get the same destination cards + dst_in_* output ports as PGM/MV for cabling to Record/Stream.
+ * @param {object | null | undefined} payload
+ * @returns {object[]}
+ */
+export function listAllScreenDestinationsForDeviceView(payload) {
+	const persisted = listPersistedScreenDestinations(payload)
+	const persistedIds = new Set(persisted.map((d) => String(d?.id || '')))
+	const screen = persisted.filter((d) => String(d?.mode || '') !== 'host_channel' && d?.virtual !== true)
+	const pinnedHost = persisted.filter((d) => String(d?.mode || '') === 'host_channel' || d?.virtual === true)
+	const autoHost = listHostChannelDestinations(payload).filter((h) => h?.id && !persistedIds.has(String(h.id)))
+	return [...screen, ...pinnedHost, ...autoHost]
+}
+
+/**
+ * @param {object | null | undefined} dest
+ * @returns {number | null}
+ */
+export function decklinkSlotFromHostDestination(dest) {
+	const slot = parseInt(String(dest?.inputSlot ?? ''), 10)
+	if (Number.isFinite(slot) && slot >= 1) return slot
+	const m = String(dest?.id || '').match(/^host_decklink_input_(\d+)$/)
+	return m ? parseInt(m[1], 10) || null : null
+}
+
+/**
+ * @param {object | null | undefined} dest
+ * @param {string} role
+ * @param {number | undefined} ch
+ * @param {object[]} extraLive
+ * @returns {object | null}
+ */
+export function findExtraLiveSourceForHostDestination(dest, role, ch, extraLive) {
+	const list = Array.isArray(extraLive) ? extraLive : []
+	if (role === 'decklink_input') {
+		const slot = decklinkSlotFromHostDestination(dest)
+		if (slot != null) {
+			const bySlot = list.find((x) => x?.routeType === 'decklink' && Number(x.decklinkSlot) === slot)
+			if (bySlot) return bySlot
+		}
+		if (ch != null) {
+			return list.find((x) => x?.routeType === 'decklink' && Number(x.inputsChannel) === Number(ch)) || null
+		}
+		return null
+	}
+	const sid = String(dest?.sourceId || '').trim()
+	if (sid) {
+		const byId = list.find((x) => String(x?.sourceId || '').trim() === sid)
+		if (byId) return byId
+	}
+	if (ch != null) {
+		return (
+			list.find(
+				(x) =>
+					Number(x?.hostChannel ?? x?.inputsChannel) === Number(ch) &&
+					(x?.routeType === role || x?.hostRole === role),
+			) || null
+		)
+	}
+	return null
+}
+
+/**
+ * Map an extra live source row to its virtual host destination id (if any).
+ * @param {object | null | undefined} x
+ * @returns {string | null}
+ */
+export function hostDestinationIdForExtraLiveSource(x) {
+	if (!x || typeof x !== 'object') return null
+	const routeType = String(x?.routeType || '').toLowerCase()
+	const ch = parseInt(String(x?.inputsChannel ?? x?.hostChannel ?? ''), 10)
+	if (routeType === 'decklink' && x.decklinkSlot != null) {
+		return hostChannelDestinationId('decklink_input', Number.isFinite(ch) ? ch : 1, x.decklinkSlot)
+	}
+	if (routeType === 'live_audio' && x.liveAudioSlot != null) {
+		return hostChannelDestinationId('live_audio_input', Number.isFinite(ch) ? ch : 1, x.liveAudioSlot)
+	}
+	if (routeType === 'v4l2' && x.v4l2Slot != null) {
+		return hostChannelDestinationId('v4l2_input', Number.isFinite(ch) ? ch : 1, x.v4l2Slot)
+	}
+	if (routeType === 'webpage_host' || routeType === 'ndi_host') {
+		const role = routeType === 'webpage_host' ? 'webpage_host' : 'ndi_host'
+		const sid = String(x?.sourceId || x?.hostSourceId || '').trim()
+		return hostChannelDestinationId(role, Number.isFinite(ch) ? ch : 1, sid || undefined)
+	}
+	return null
+}
+
+/**
+ * Attach GET /api/settings caspar block so host-channel detection matches server config.
+ * @param {object | null | undefined} payload
+ * @param {object | null | undefined} settings
+ * @returns {object | null | undefined}
+ */
+export function mergeSettingsIntoDeviceViewPayload(payload, settings) {
+	if (!payload || typeof payload !== 'object') return payload
+	if (!settings || typeof settings !== 'object') return payload
+	const casparServer = settings.casparServer || settings
+	return {
+		...payload,
+		_settings: settings,
+		settings: {
+			...(payload.settings && typeof payload.settings === 'object' ? payload.settings : {}),
+			casparServer,
+			...(settings.channelMap ? { channelMap: settings.channelMap } : {}),
+		},
+	}
+}
+
+export { reconcileExtraLiveSourceChannel } from './planned-channel-map.js'
 
 /**
  * Token stored on recordOutputs[].source / streamingChannel.videoSource when cabled from a host destination.

@@ -4,6 +4,8 @@ const { destinationsFromConfig } = require('./screen-destinations')
 const { normalizeDeviceGraph } = require('./device-graph-core')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS, slug } = require('./device-graph-constants')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('./decklink-io-direction')
+const { normalizeVirtualCameraConfig } = require('../virtual-output/v4l2-bridge-config')
+const { effectiveAlsaCardId } = require('../virtual-output/v4l2-bridge-audio-sink')
 
 function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	const devices = [{ id: DEFAULT_DEVICE_ID, role: 'caspar_host', label: 'Caspar / HighAsCG host' }]
@@ -125,9 +127,6 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		if (isNaN(slot)) continue
 		const ioDirection = normalizeDecklinkIoDirection({ ioDirection: i?.ioDirection })
 		addDecklinkPort(slot, i.device, 'decklink_io', `SDI ${slot}`, { caspar: { ioDirection } })
-		if (ioDirection === 'in') {
-			connectors.push({ id: `dli_${slot}`, deviceId: DEFAULT_DEVICE_ID, kind: 'decklink_in', index: slot - 1, label: `Mixer In ${slot}`, externalRef: String(i.device) })
-		}
 	}
 	
 	for (const o of live?.decklink?.screenOutputs || []) {
@@ -156,9 +155,6 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		const dir = normalizeDecklinkIoDirection({ ioDirection: cs[`decklink_input_${i}_direction`] })
 		if (dir === DECKLINK_IO_UNASSIGNED) continue
 		addDecklinkPort(i, dev, 'decklink_io', `SDI ${i}`, { caspar: { ioDirection: dir } })
-		if (dir === 'in' && !connectors.some(c => c.id === `dli_${i}`)) {
-			connectors.push({ id: `dli_${i}`, deviceId: DEFAULT_DEVICE_ID, kind: 'decklink_in', index: i - 1, label: `Mixer In ${i}`, externalRef: String(dev) })
-		}
 	}
 	const cfgScreenCount = Math.max(1, parseInt(String(cs.screen_count || 1), 10))
 	for (let i = 1; i <= cfgScreenCount; i++) {
@@ -170,6 +166,22 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	const cfgMvd = parseInt(String(cs.multiview_decklink_device), 10)
 	if (Number.isFinite(cfgMvd) && cfgMvd > 0) {
 		addDecklinkPort(99, cfgMvd, 'decklink_io', 'SDI (MVR)', { caspar: { ioDirection: 'out', bus: 'multiview' } })
+	}
+
+	const v4l2Count = Math.max(0, parseInt(String(cs.v4l2_input_count || 0), 10))
+	for (let i = 1; i <= v4l2Count; i++) {
+		const devPath = String(cs[`v4l2_input_${i}_device`] || '').trim()
+		if (!devPath) continue
+		const label = String(cs[`v4l2_input_${i}_label`] || '').trim() || `USB video ${i}`
+		connectors.push({
+			id: `v4li_${i}`,
+			deviceId: DEFAULT_DEVICE_ID,
+			kind: 'v4l2_in',
+			index: i - 1,
+			label,
+			externalRef: devPath,
+			caspar: { ioDirection: 'in', v4l2Slot: i },
+		})
 	}
 
 	// Hardware discovery: show any unassigned physical decklink devices from the server log/probe
@@ -223,6 +235,27 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 				encoderPreset: String(so.encoderPreset || 'veryfast').toLowerCase(),
 				audioCodec: String(so.audioCodec || 'aac').toLowerCase(),
 				audioBitrateKbps: Math.max(32, parseInt(String(so.audioBitrateKbps ?? 128), 10) || 128),
+			},
+		})
+	}
+	const vc = appConfig?.virtualCamera
+	if (vc && typeof vc === 'object' && vc.showInDeviceView !== false) {
+		const normalized = normalizeVirtualCameraConfig(vc)
+		connectors.push({
+			id: 'vcam_1',
+			deviceId: DEFAULT_DEVICE_ID,
+			kind: 'v4l2_out',
+			index: 0,
+			label: String(normalized.label || 'Virtual cam').slice(0, 120),
+			externalRef: String(normalized.device || '/dev/video10'),
+			caspar: {
+				channel: normalized.channel,
+				fps: normalized.fps,
+				width: normalized.width,
+				height: normalized.height,
+				audioEnabled: normalized.audioEnabled,
+				alsaLoopbackCardId: normalized.alsaLoopbackCardId,
+				captureDevice: `hw:${effectiveAlsaCardId(normalized.alsaLoopbackCardId)},1,0`,
 			},
 		})
 	}
@@ -284,6 +317,7 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		'extra_audio',
 		'decklink_input',
 		'live_audio_input',
+		'v4l2_input',
 		'webpage_host',
 		'ndi_host',
 	])
@@ -314,9 +348,15 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		})
 	}
 	const channelOrder = Array.isArray(live?.caspar?.generatedChannelOrder) ? live.caspar.generatedChannelOrder : []
+	const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
+	const configuredDecklinkInputSlots = new Set(resolveDecklinkInputSlots(appConfig || {}))
 	for (const row of channelOrder) {
 		const role = String(row?.role || '').trim()
 		if (!HOST_DEST_ROLES.has(role)) continue
+		if (role === 'decklink_input') {
+			const slot = parseInt(String(row?.slot ?? ''), 10)
+			if (!Number.isFinite(slot) || slot < 1 || !configuredDecklinkInputSlots.has(slot)) continue
+		}
 		const ch = parseInt(String(row?.ch ?? ''), 10)
 		if (!Number.isFinite(ch) || ch < 1) continue
 		const destId = hostChannelDestinationId(role, ch, row.sourceId ?? row.slot)

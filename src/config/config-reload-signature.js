@@ -34,6 +34,10 @@ function pickSubsystemReloadSnapshot(config) {
 			host: config.caspar && typeof config.caspar === 'object' ? config.caspar.host : undefined,
 			port: config.caspar && typeof config.caspar === 'object' ? config.caspar.port : undefined,
 		},
+		composePreview:
+			config.composePreview && typeof config.composePreview === 'object'
+				? config.composePreview
+				: undefined,
 		offline_mode: !!config.offline_mode,
 		periodic_sync_interval_sec: config.periodic_sync_interval_sec,
 		periodic_sync_interval_sec_osc: config.periodic_sync_interval_sec_osc,

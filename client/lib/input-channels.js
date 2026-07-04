@@ -27,6 +27,33 @@ export function decklinkInputForSlot(cm, slot) {
 	return null
 }
 
+export const V4L2_HOST_LAYER = 1
+
+/**
+ * @param {object | null | undefined} cm
+ * @param {number} slot
+ */
+export function v4l2InputForSlot(cm, slot) {
+	const n = Number(slot)
+	if (!Number.isFinite(n) || n < 1) return null
+	const entry = (cm?.inputChannels || []).find((e) => e && e.kind === 'v4l2' && e.slot === n)
+	if (entry) return entry
+	const ch = cm?.v4l2InputChannels?.[n - 1]
+	if (ch == null) return null
+	return {
+		kind: 'v4l2',
+		slot: n,
+		channel: ch,
+		layer: V4L2_HOST_LAYER,
+		route: `route://${ch}-${V4L2_HOST_LAYER}`,
+	}
+}
+
+/** @param {object | null | undefined} cm */
+export function routeForV4l2Slot(cm, slot) {
+	return v4l2InputForSlot(cm, slot)?.route ?? null
+}
+
 /**
  * @param {object | null | undefined} cm
  * @param {number} slot — 1-based live-audio slot
@@ -77,6 +104,11 @@ export function listInputChannels(cm) {
 		const e = liveAudioInputForSlot(cm, i)
 		if (e) out.push(e)
 	}
+	const v4l2Count = Math.max(0, parseInt(String(cm.v4l2InputCount ?? '0'), 10) || 0)
+	for (let i = 1; i <= v4l2Count; i++) {
+		const e = v4l2InputForSlot(cm, i)
+		if (e) out.push(e)
+	}
 	return out
 }
 
@@ -102,12 +134,19 @@ export function isLiveAudioInputChannel(cm, channel) {
 	return (cm?.inputChannels || []).some((e) => e?.kind === 'live_audio' && e.channel === ch)
 }
 
+export function isV4l2InputChannel(cm, channel) {
+	const ch = Number(channel)
+	if (!Number.isFinite(ch)) return false
+	if (Array.isArray(cm?.v4l2InputChannels) && cm.v4l2InputChannels.includes(ch)) return true
+	return (cm?.inputChannels || []).some((e) => e?.kind === 'v4l2' && e.channel === ch)
+}
+
 /**
  * @param {object | null | undefined} cm
  * @param {number} channel
  */
 export function isAnyInputChannel(cm, channel) {
-	return isDecklinkInputChannel(cm, channel) || isLiveAudioInputChannel(cm, channel)
+	return isDecklinkInputChannel(cm, channel) || isLiveAudioInputChannel(cm, channel) || isV4l2InputChannel(cm, channel)
 }
 
 /**

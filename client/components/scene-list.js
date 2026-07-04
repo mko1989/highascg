@@ -6,7 +6,7 @@ import { mountLookTransitionControls } from './scenes-shared.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
-import { resolveBusLookIdsForMain } from '../lib/scene-live-main-sync.js'
+import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 
@@ -203,6 +203,21 @@ export function renderSceneDeck(ctx) {
 		sceneState.switchScreen(col)
 	}
 
+	function bindDeckBlankClearPrv(colEl, col) {
+		if (typeof clearPreviewBusForMain !== 'function' || !isPreviewBusAvailable(cm, col)) return
+
+		colEl.addEventListener('click', (e) => {
+			if (e.defaultPrevented) return
+			if (!isScenesDeckColBlankClick(e.target, colEl)) return
+			const sceneLive = getSceneLive() || {}
+			const sceneExists = (id) => !!sceneState.getScene(id)
+			if (!hasPreviewLookForMain(col, sceneLive, cm, sceneExists, sceneState)) return
+			e.preventDefault()
+			ensureMainForColumn(col)
+			void clearPreviewBusForMain(col, { full: true })
+		})
+	}
+
 	/**
 	 * @param {number} col
 	 * @param {object[]} scenes
@@ -294,6 +309,9 @@ export function renderSceneDeck(ctx) {
 
 		const grid = document.createElement('div')
 		grid.className = 'scenes-deck'
+		if (isPreviewBusAvailable(cm, col)) {
+			grid.title = 'Click empty space to clear preview for this screen'
+		}
 		if (scenes.length === 0) {
 			const empty = document.createElement('div')
 			empty.className = 'scenes-deck__empty scenes-deck__empty--tight scenes-deck__empty--clear-prv'
@@ -458,15 +476,7 @@ export function renderSceneDeck(ctx) {
 		})
 		grid.appendChild(addTile)
 
-		if (typeof clearPreviewBusForMain === 'function' && isPreviewBusAvailable(cm, col)) {
-			colEl.addEventListener('click', (e) => {
-				if (e.defaultPrevented) return
-				if (!isScenesDeckColBlankClick(e.target, colEl)) return
-				e.preventDefault()
-				ensureMainForColumn(col)
-				void clearPreviewBusForMain(col, { full: true })
-			})
-		}
+		bindDeckBlankClearPrv(colEl, col)
 
 		if (typeof onDeckMediaDrop === 'function' && typeof onDeckMediaDropAccept === 'function') {
 			grid.addEventListener(

@@ -81,14 +81,37 @@ function applyMediaSourceValue(source, newValue) {
  * @param {string} folder
  * @param {string} slug
  * @param {object} [settings]
- * @param {string[]} projectRefs
- * @param {Array<{ id?: string }>} mediaList
  * @returns {Map<string, string>}
  */
-function buildGatherRefMap(idsToMove, folder, slug, settings, projectRefs, mediaList) {
+function buildMovedTargetMap(idsToMove, folder, slug, settings) {
+	/** @type {Map<string, string>} */
+	const map = new Map()
+	for (const oldId of idsToMove || []) {
+		const leaf = oldId.split('/').pop() || oldId
+		const target = normalizeMediaIdForProject(`${folder}/${leaf}`, slug, settings)
+		const key = normId(oldId)
+		if (key && target) map.set(key, target)
+		const leafKey = normId(leaf)
+		if (leafKey && target && !map.has(leafKey)) map.set(leafKey, target)
+	}
+	return map
+}
+
+/**
+ * @param {string[]} idsToMove
+ * @param {string} folder
+ * @param {string} slug
+ * @param {object} [settings]
+ * @param {string[]} projectRefs
+ * @param {Array<{ id?: string }>} preMoveMediaList
+ * @param {Array<{ id?: string }>} [postMoveMediaList]
+ * @returns {Map<string, string>}
+ */
+function buildGatherRefMap(idsToMove, folder, slug, settings, projectRefs, preMoveMediaList, postMoveMediaList) {
 	/** @type {Map<string, string>} */
 	const map = new Map()
 	const moved = new Set(idsToMove.map((id) => normId(id)))
+	const movedTargets = buildMovedTargetMap(idsToMove, folder, slug, settings)
 
 	const add = (from, to) => {
 		const f = normId(from)
@@ -96,20 +119,19 @@ function buildGatherRefMap(idsToMove, folder, slug, settings, projectRefs, media
 		if (f && t) map.set(f, t)
 	}
 
-	for (const oldId of idsToMove) {
-		const leaf = oldId.split('/').pop() || oldId
-		add(oldId, normalizeMediaIdForProject(`${folder}/${leaf}`, slug, settings))
-		const leafOnly = normId(leaf)
-		if (leafOnly) add(leafOnly, normalizeMediaIdForProject(`${folder}/${leaf}`, slug, settings))
+	for (const [from, to] of movedTargets) {
+		add(from, to)
 	}
 
 	for (const ref of projectRefs) {
-		const catalogId = resolveRefToCatalogId(ref, mediaList, folder)
+		const catalogId =
+			resolveRefToCatalogId(ref, preMoveMediaList, folder) ||
+			resolveRefToCatalogId(ref, postMoveMediaList, folder)
 		if (!catalogId || !moved.has(normId(catalogId))) continue
-		const leaf = catalogId.split('/').pop() || catalogId
-		const normalized = normalizeMediaIdForProject(`${folder}/${leaf}`, slug, settings)
-		add(ref, normalized)
-		add(catalogId, normalized)
+		const target = movedTargets.get(normId(catalogId)) || movedTargets.get(normId(catalogId.split('/').pop() || ''))
+		if (!target) continue
+		add(ref, target)
+		add(catalogId, target)
 	}
 
 	return map
@@ -117,57 +139,72 @@ function buildGatherRefMap(idsToMove, folder, slug, settings, projectRefs, media
 
 /**
  * @param {object | null | undefined} source
- * @param {Map<string, string>} refMap
+ * @returns {boolean}
  */
-function rewriteSourceRef(source, refMap) {
+function isGatherableMediaSource(source) {
 	if (!source || typeof source !== 'object') return false
 	const t = String(source.type || 'media').toLowerCase()
 	if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live') return false
 	const value = normId(source.value)
-	if (!value || SKIP_VALUE_RE.test(value)) return false
-	if (!refMap.has(value)) return false
-	applyMediaSourceValue(source, refMap.get(value))
+	return !!value && !SKIP_VALUE_RE.test(value)
+}
+
+/**
+ * @param {object | null | undefined} source
+ * @param {Map<string, string>} refMap
+ * @param {Map<string, string>} movedTargets
+ * @param {string} folder
+ * @param {string} slug
+ * @param {object} [settings]
+ * @param {Array<{ id?: string }>} mediaList
+ * @returns {boolean}
+ */
+function rewriteSourceAfterGather(source, refMap, movedTargets, folder, slug, settings, mediaList) {
+	if (!isGatherableMediaSource(source)) return false
+	const value = normId(source.value)
+	let next = refMap.get(value) || null
+
+	if (!next) {
+		const catalogId = resolveRefToCatalogId(value, mediaList, folder)
+		if (catalogId) {
+			next =
+				movedTargets.get(normId(catalogId)) ||
+				movedTargets.get(normId(catalogId.split('/').pop() || '')) ||
+				null
+			if (!next && isInsideProjectFolder(catalogId, folder)) {
+				next = normalizeMediaIdForProject(catalogId, slug, settings)
+			}
+		}
+	}
+
+	if (!next) {
+		const leaf = value.split('/').pop() || value
+		next = movedTargets.get(normId(leaf)) || null
+	}
+
+	if (!next || normId(next) === value) return false
+	applyMediaSourceValue(source, next)
 	return true
 }
 
 /**
- * Point every look/timeline source at the project-relative id when the file lives in the project folder.
+ * Rewrite look/timeline/multiview sources after files were gathered into the project folder.
  * @param {object} project
+ * @param {Map<string, string>} refMap
+ * @param {Map<string, string>} movedTargets
  * @param {string} folder
  * @param {string} slug
  * @param {object} [settings]
  * @param {Array<{ id?: string }>} mediaList
  */
-function alignProjectMediaRefsToFolder(project, folder, slug, settings, mediaList) {
+function rewriteProjectPathsAfterGather(project, refMap, movedTargets, folder, slug, settings, mediaList) {
+	if (!refMap.size && !movedTargets.size) return project
 	const next = structuredClone(project)
 	let changed = false
 	forEachProjectMediaSource(next, (source) => {
-		const t = String(source.type || 'media').toLowerCase()
-		if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live') return
-		const value = normId(source.value)
-		if (!value || SKIP_VALUE_RE.test(value)) return
-		const catalogId = resolveRefToCatalogId(value, mediaList, folder)
-		if (!catalogId || !isInsideProjectFolder(catalogId, folder)) return
-		const normalized = normalizeMediaIdForProject(catalogId, slug, settings)
-		if (normId(source.value) !== normId(normalized)) {
-			applyMediaSourceValue(source, normalized)
+		if (rewriteSourceAfterGather(source, refMap, movedTargets, folder, slug, settings, mediaList)) {
 			changed = true
 		}
-	})
-	return changed ? next : project
-}
-
-/**
- * @param {object} project
- * @param {Map<string, string>} refMap
- * @returns {object}
- */
-function applyGatherRefMapToProject(project, refMap) {
-	if (!refMap.size) return project
-	const next = structuredClone(project)
-	let changed = false
-	forEachProjectMediaSource(next, (source) => {
-		if (rewriteSourceRef(source, refMap)) changed = true
 	})
 	return changed ? next : project
 }
@@ -243,11 +280,32 @@ export async function executeGatherProjectMedia(plan, opts = {}) {
 	if (typeof opts.refreshMedia === 'function') {
 		await opts.refreshMedia()
 	}
+	try {
+		await api.post('/api/media/refresh', {})
+	} catch {
+		/* optional — GET /api/media still rescans on many builds */
+	}
 	const freshMediaList = await fetchFreshMediaList(mediaList)
 
-	const refMap = buildGatherRefMap(idsToMove || [], folder, slug, settings, projectRefs, mediaList)
-	let projectUpdated = applyGatherRefMapToProject(project, refMap)
-	projectUpdated = alignProjectMediaRefsToFolder(projectUpdated, folder, slug, settings, freshMediaList)
+	const movedTargets = buildMovedTargetMap(idsToMove || [], folder, slug, settings)
+	const refMap = buildGatherRefMap(
+		idsToMove || [],
+		folder,
+		slug,
+		settings,
+		projectRefs,
+		mediaList,
+		freshMediaList,
+	)
+	let projectUpdated = rewriteProjectPathsAfterGather(
+		project,
+		refMap,
+		movedTargets,
+		folder,
+		slug,
+		settings,
+		freshMediaList,
+	)
 	projectUpdated = normalizeProjectMediaRefs(projectUpdated, settings)
 
 	const pathsUpdated = JSON.stringify(projectUpdated) !== before
@@ -257,7 +315,7 @@ export async function executeGatherProjectMedia(plan, opts = {}) {
 		failed: transfer.failed,
 		skipped,
 		pathsUpdated,
-		projectUpdated: pathsUpdated ? projectUpdated : null,
+		projectUpdated: pathsUpdated || transfer.ok > 0 ? projectUpdated : null,
 		errors: transfer.errors || [],
 	}
 }
@@ -274,4 +332,12 @@ export async function executeGatherProjectMedia(plan, opts = {}) {
 export async function gatherProjectMediaIntoFolder(opts, runOpts) {
 	const plan = planGatherProjectMediaIntoFolder(opts)
 	return executeGatherProjectMedia(plan, runOpts)
+}
+
+export const __test = {
+	buildGatherRefMap,
+	buildMovedTargetMap,
+	rewriteProjectPathsAfterGather,
+	resolveRefToCatalogId,
+	normId,
 }

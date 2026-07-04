@@ -6,6 +6,7 @@ import { buildInspectorTable } from './device-view-ui-utils.js'
 import { readableConnectorRows } from './device-view-inspector-render.js'
 import { renderDeckLinkIoControls } from './device-view-inspector-decklink.js'
 import { renderStreamOutControls } from './device-view-inspector-stream.js'
+import { renderVirtualCamOutControls } from './device-view-inspector-virtual-cam.js'
 import { renderRecordOutControls } from './device-view-inspector-record.js'
 import { renderAudioOutControls } from './device-view-inspector-audio.js'
 import { renderGpuOutControls, buildGpuInspectorSummaryRows } from './device-view-inspector-gpu.js'
@@ -24,6 +25,7 @@ export function renderConnectorInspector(h, conn, ctx, {
 	onRemoveStreamOutput,
 	onRemoveRecordOutput,
 	onRemoveAudioOutput,
+	onRemoveVirtualCamOutput,
 }) {
 	if (!conn || typeof conn !== 'object' || !conn.id) {
 		h.append(
@@ -59,6 +61,8 @@ export function renderConnectorInspector(h, conn, ctx, {
 		renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty })
 	} else if (conn?.kind === 'stream_out') {
 		renderStreamOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, setCasparRestartDirty, onRemoveStreamOutput })
+	} else if (conn?.kind === 'v4l2_out') {
+		renderVirtualCamOutControls(h, conn, { currentSettings, statusEl, load, onRemoveVirtualCamOutput })
 	} else if (conn?.kind === 'record_out') {
 		renderRecordOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, onRemoveRecordOutput })
 	} else if (conn?.kind === 'audio_out') {

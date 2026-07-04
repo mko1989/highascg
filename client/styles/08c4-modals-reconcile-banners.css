@@ -1,0 +1,203 @@
+/* Project hardware reconcile modal (WO — hardware persistence) */
+.hardware-reconcile-modal {
+	max-width: 34rem;
+}
+.hardware-reconcile-modal__lead {
+	margin: 0 0 12px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+.hardware-reconcile-modal__diff {
+	margin: 0 0 12px;
+	padding-left: 1.1rem;
+	max-height: 14rem;
+	overflow: auto;
+	font-size: 0.88rem;
+	line-height: 1.4;
+}
+.hardware-reconcile-modal__diff-item {
+	margin-bottom: 0.35rem;
+}
+.hardware-reconcile-modal__diff-item--hard {
+	color: #f85149;
+}
+.hardware-reconcile-modal__diff-item--soft {
+	color: var(--text-muted);
+}
+.hardware-reconcile-modal__remember {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.85rem;
+	margin: 0 0 8px;
+	cursor: pointer;
+}
+.hardware-reconcile-modal__policy {
+	width: 100%;
+	margin-bottom: 8px;
+	padding: 6px 8px;
+	border-radius: var(--radius);
+	border: 1px solid var(--border);
+	background: var(--bg-elevated);
+	color: var(--text);
+}
+.hardware-reconcile-modal__footer-note {
+	margin: 0;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	line-height: 1.35;
+}
+.hardware-reconcile-modal__actions {
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.hardware-reconcile-banner {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	z-index: 9000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.75rem 1rem;
+	padding: 10px 16px;
+	background: rgba(180, 120, 0, 0.92);
+	color: #111;
+	font-size: 0.88rem;
+	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+}
+.hardware-reconcile-banner__link {
+	border: 1px solid rgba(0, 0, 0, 0.35);
+	background: rgba(255, 255, 255, 0.35);
+	padding: 4px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+.hardware-reconcile-banner__dismiss {
+	border: none;
+	background: transparent;
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 6px;
+	opacity: 0.7;
+}
+.hardware-reconcile-banner__dismiss:hover {
+	opacity: 1;
+}
+
+.media-reconcile-banner {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 9001;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.75rem 1rem;
+	padding: 10px 16px;
+	background: rgba(180, 50, 50, 0.94);
+	color: #fff;
+	font-size: 0.88rem;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+.media-reconcile-banner__preview {
+	opacity: 0.92;
+	font-size: 0.82rem;
+}
+.media-reconcile-banner__link {
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.15);
+	color: inherit;
+	padding: 4px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+.media-reconcile-banner__dismiss {
+	border: none;
+	background: transparent;
+	color: inherit;
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 6px;
+	opacity: 0.75;
+}
+.media-reconcile-banner__dismiss:hover {
+	opacity: 1;
+}
+
+.replication-status-banner {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 9002;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0.75rem 1rem;
+	padding: 10px 16px;
+	background: rgba(30, 60, 120, 0.94);
+	color: #fff;
+	font-size: 0.88rem;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+.replication-status-banner--hidden {
+	display: none;
+}
+.replication-status-banner--leader {
+	background: rgba(20, 100, 60, 0.94);
+}
+.replication-status-banner--follower {
+	background: rgba(30, 60, 120, 0.94);
+}
+.replication-status-banner--warn {
+	background: rgba(140, 90, 20, 0.94);
+}
+.replication-status-banner__badge {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+.replication-status-banner__warn {
+	color: #ffe082;
+}
+.replication-status-banner__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+.replication-status-banner__btn {
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.15);
+	color: inherit;
+	padding: 4px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.85rem;
+}
+.replication-status-banner__btn--ghost {
+	opacity: 0.85;
+}
+.replication-status-banner__dismiss {
+	border: none;
+	background: transparent;
+	color: inherit;
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 6px;
+	opacity: 0.75;
+}
+.replication-status-banner__dismiss:hover {
+	opacity: 1;
+}

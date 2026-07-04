@@ -1,18 +1,21 @@
-# rsync excludes: exfat drop-update/ → ~/highascg (server drop, WO-52)
-# dist-web/ IS deployed from the drop (unified playout UI on :4200)
-# bin/ + lib/ ship on ISO/install — never removed by server drop merge
+# rsync excludes: exfat/drop-update/ → ~/highascg (server-only drop)
+# Never overwrite or remove ISO/install artifacts (see apply script: merge-only, no --delete on dest).
 client/
+dist-web/
+audio_testing/
+for_client/
+From_client/
 node_modules/
 .git/
 bin/
+lib/
 media/
 cef-cache/
 log/
 data/
-lib/
-run.sh
-work/
 projects/
+work/
+run.sh
 tools/eggs/
 tools/release/
 tools/smoke/

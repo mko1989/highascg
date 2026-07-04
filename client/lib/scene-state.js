@@ -9,6 +9,8 @@ import {
 	newId,
 	LOOK_LAYER_FIRST,
 	LOOK_LAYER_STEP,
+	LOOK_LAYER_MAX,
+	isValidLookLayerNumber,
 } from './scene-state-helpers.js'
 
 import * as Persistence from './scene-state-persistence-logic.js'
@@ -50,6 +52,8 @@ export {
 	defaultLayerConfig,
 	LOOK_LAYER_FIRST,
 	LOOK_LAYER_STEP,
+	LOOK_LAYER_MAX,
+	isValidLookLayerNumber,
 } from './scene-state-helpers.js'
 
 export class SceneState {
@@ -68,6 +72,8 @@ export class SceneState {
 		this.lookPresets = []
 		this.globalBorders = [null, null, null, null]
 		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
+		this.mainEditorVisibleScreenCount = 1
+		this.mainEditorVisibilityMigrated = false
 		this.isInteracting = false
 		this.editOnPgm = false
 		this._listeners = new Map()
@@ -106,10 +112,19 @@ export class SceneState {
 		const next = resolutions.map((r) => r?.w > 0 && r?.h > 0 ? { w: r.w, h: r.h, fps: r.fps ?? 50 } : { ...Persistence.FALLBACK_RESOLUTION })
 		if (Persistence.getCanvasResolutionsEqual(this._canvasResolutions, next)) return
 		this._canvasResolutions = next
+		const visChanged = Persistence.ensureMainEditorVisibleForScreenCount(this, next.length)
 		this._applyFpsAwareGlobalDefaultTransition()
 		this._save()
 		this._emit('screenChange')
 		this._emit('change')
+		void visChanged
+	}
+
+	syncMainEditorVisibleToScreenCount(screenCount) {
+		if (Persistence.ensureMainEditorVisibleForScreenCount(this, screenCount)) {
+			this._save()
+			this._emit('change')
+		}
 	}
 
 	getCanvasForScreen(screenIdx = this.activeScreenIndex) { return this._getCanvas(screenIdx) }
@@ -149,7 +164,10 @@ export class SceneState {
 			}
 		} catch {}
 		this.scenes = []; this.liveSceneIdByMain = [null, null, null, null]; this.previewSceneIdByMain = [null, null, null, null]
-		this.mainEditorVisible = Persistence.defaultMainEditorVisible(); this.layerPresets = []; this.lookPresets = []
+		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
+		this.mainEditorVisibleScreenCount = 1
+		this.mainEditorVisibilityMigrated = false
+		this.layerPresets = []; this.lookPresets = []
 		this.armedScreenIndices = [this.activeScreenIndex]
 	}
 
@@ -223,6 +241,7 @@ export class SceneState {
 		const d = [...this.mainEditorVisible]
 		d[mainIdx] = !this.isMainEditorVisible(mainIdx)
 		this.mainEditorVisible = d
+		this.mainEditorVisibilityMigrated = true
 		this._save()
 	}
 
@@ -421,6 +440,14 @@ export class SceneState {
 		if (!s?.layers?.length) return
 		const next = LayerLogic.reorderLayers(s.layers, fromVisualIndex, toVisualIndex, LOOK_LAYER_FIRST, LOOK_LAYER_STEP)
 		if (next) { s.layers = next; this._save() }
+	}
+
+	setLayerNumber(sceneId, layerIndex, layerNumber) {
+		const s = this.getScene(sceneId)
+		if (!s?.layers?.length) return { ok: false, reason: 'Look not found' }
+		const result = LayerLogic.setLayerNumberOnLayer(s.layers, layerIndex, layerNumber)
+		if (result.ok && result.changed) this._save()
+		return result
 	}
 
 	setLayerSource(sceneId, layerIndex, source) {

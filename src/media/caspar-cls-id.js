@@ -1,6 +1,7 @@
 'use strict'
 
 const fs = require('fs')
+const path = require('path')
 const { canonicalMediaBasenameKey } = require('../utils/media-browser-dedupe')
 const { resolveSafe } = require('./local-media-paths')
 const {
@@ -133,14 +134,59 @@ function clipFileExistsUnderProjectRoot(raw, slug, ctx) {
 	const projectRoot = getProjectMediaRoot(ctx.config, ctx.persistence, slug)
 	if (!projectRoot) return false
 	const rel = normalizeMediaIdForProject(raw, slug, ctx.config)
-	if (!rel) return false
-	const abs = resolveSafe(projectRoot, rel)
-	if (!abs) return false
-	try {
-		return fs.statSync(abs).isFile()
-	} catch {
-		return false
+	if (rel) {
+		const abs = resolveSafe(projectRoot, rel)
+		if (abs) {
+			try {
+				if (fs.statSync(abs).isFile()) return true
+			} catch {
+				/* try extension / stem resolution below */
+			}
+		}
 	}
+	const { resolveMediaFileOnDisk } = require('./local-media-paths')
+	const expanded = expandMediaIdToMediaRoot(raw, slug, ctx.config)
+	const abs =
+		resolveMediaFileOnDisk(ctx.config, expanded) ||
+		resolveMediaFileOnDisk(ctx.config, raw) ||
+		null
+	if (!abs) return false
+	const relToProject = path.relative(projectRoot, abs)
+	return Boolean(relToProject && !relToProject.startsWith('..') && !path.isAbsolute(relToProject))
+}
+
+/**
+ * Locate clip on disk under media/ and return its Caspar CLS id (handles basename-only refs
+ * and project paths when active slug or CLS catalog disagree with on-disk layout).
+ * @param {string} raw
+ * @param {object} [config]
+ * @returns {string | null}
+ */
+function resolveClipFromMediaDisk(raw, config) {
+	if (!raw || !config) return null
+	const { resolveMediaFileOnDisk, getMediaIngestBasePath } = require('./local-media-paths')
+	const attempts = []
+	const seen = new Set()
+	const add = (id) => {
+		const s = normalizeCasparMediaPath(id)
+		if (!s || seen.has(s)) return
+		seen.add(s)
+		attempts.push(s)
+	}
+	add(raw)
+	const norm = normalizeCasparMediaPath(raw)
+	if (norm.includes('/')) add(stripMediaFileExtension(norm))
+	const leaf = stripMediaFileExtension(norm).split('/').pop()
+	if (leaf) add(leaf)
+	for (const attempt of attempts) {
+		const abs = resolveMediaFileOnDisk(config, attempt)
+		if (!abs) continue
+		const mediaRoot = getMediaIngestBasePath(config)
+		const rel = path.relative(mediaRoot, abs).replace(/\\/g, '/')
+		if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue
+		return toCasparClsMediaId(rel)
+	}
+	return null
 }
 
 /**
@@ -168,10 +214,12 @@ function resolveClipForAmcpLoad(id, ctx) {
 		}
 	}
 
-	const fromCatalog = resolveCasparCinfMediaId(raw, ctx)
-	if (fromCatalog.includes('/')) return fromCatalog
+	const fromDisk = resolveClipFromMediaDisk(raw, ctx?.config)
+	if (fromDisk) return fromDisk
 
-	return fromCatalog
+	const fromCatalog = resolveCasparCinfMediaId(raw, ctx)
+	if (isPassthroughAmcpClip(fromCatalog)) return fromCatalog
+	return toCasparClsMediaId(fromCatalog)
 }
 
 module.exports = {

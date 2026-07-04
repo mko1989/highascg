@@ -6,7 +6,7 @@ const { isDecklinkIoOutputSink, isDecklinkIoIn } = require('./decklink-io-direct
 
 function isCasparOutputConnector(c) {
 	const ioOut = c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && isDecklinkIoOutputSink(c)
-	return !!(c && c.deviceId === DEFAULT_DEVICE_ID && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out' || ioOut))
+	return !!(c && c.deviceId === DEFAULT_DEVICE_ID && (c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out' || c.kind === 'v4l2_out' || ioOut))
 }
 function isDestinationInputConnector(c) { return !!(c && c.deviceId === DEST_DEVICE_ID && c.kind === 'destination_in') }
 function isDecklinkIoInputConnector(c) { return !!(c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && isDecklinkIoIn(c)) }

@@ -33,7 +33,9 @@ function validateDecklinkCasparSlice(casparServerSlice) {
 	}
 
 	const used = new Map()
-	for (let i = 1; i <= map.decklinkCount; i++) {
+	const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
+	const inputSlots = resolveDecklinkInputSlots({ casparServer: cs })
+	for (const i of inputSlots) {
 		const dev = resolveDecklinkInputDeviceIndex({ casparServer: cs }, i)
 		if (outputDevices.has(dev)) {
 			warnings.push(

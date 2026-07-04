@@ -1,5 +1,5 @@
 /** Look layer inspector (fill, mixer, playlist, effects, PIP overlays, take options). */
-import { sceneState } from '../lib/scene-state.js'
+import { sceneState, LOOK_LAYER_FIRST, LOOK_LAYER_MAX } from '../lib/scene-state.js'
 import { fillToPixelRect, pixelRectToFill, fullFill } from '../lib/fill-math.js'
 import { applyFillPxPatch, displayPositionFromStoredPx } from '../lib/coordinate-origin.js'
 import { getContentResolution } from '../lib/mixer-fill.js'
@@ -14,6 +14,7 @@ import { showScenesToast } from './scenes-editor-support.js'
 import { getResolutionForScreen } from './inspector-channel-resolution.js'
 import { renderLayerPlaylistGroup } from './inspector-layer-playlist.js'
 import { appendLiveAudioSourceGroup } from './inspector-live-audio-source.js'
+import { createStepperInput } from './inspector-common.js'
 
 let activeInteractionAr = null
 let activeInteractionTimer = null
@@ -42,10 +43,35 @@ export function renderSceneLayerInspector(deps, sel) {
 	const pxRect = displayPositionFromStoredPx(pxRectStored, canvas)
 
 	root.innerHTML = ''
-	const title = document.createElement('div')
-	title.className = 'inspector-title'
-	title.textContent = `Layer ${layer.layerNumber} (look)`
-	root.appendChild(title)
+
+	function applyLayerNumber(nextNum) {
+		const result = sceneState.setLayerNumber(sceneId, layerIndex, nextNum)
+		if (!result.ok) {
+			showScenesToast(result.reason || 'Could not change layer index', 'warn')
+			return false
+		}
+		if (result.changed) {
+			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		}
+		return true
+	}
+
+	const layerIndexStepper = createStepperInput({
+		label: 'Layer index',
+		value: Number(layer.layerNumber) || LOOK_LAYER_FIRST,
+		min: LOOK_LAYER_FIRST,
+		max: LOOK_LAYER_MAX,
+		step: 1,
+		shiftStep: 10,
+		onChange: (n) => {
+			if (!applyLayerNumber(n)) {
+				const L = sceneState.getScene(sceneId)?.layers?.[layerIndex]
+				layerIndexStepper.setValue(Number(L?.layerNumber) || LOOK_LAYER_FIRST)
+			}
+		},
+		onInvalid: (msg) => showScenesToast(msg, 'warn'),
+	})
+	root.appendChild(layerIndexStepper.row)
 
 	const canPasteInsp = sceneState.hasLayerStyleClipboard()
 	const styleGrp = document.createElement('div')

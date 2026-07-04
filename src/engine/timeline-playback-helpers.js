@@ -113,6 +113,22 @@ const TIMELINE_TICK_BROADCAST_MS = 165
  */
 const TIMELINE_AMCP_DRIFT_MS = 500
 
+/** Match client `normalizeSendTo` — program is opt-in; preview defaults on. */
+function normalizeTimelineSendTo(raw) {
+	if (!raw || typeof raw !== 'object') return { preview: true, program: false, screenIdx: 0 }
+	const screenIdx =
+		raw.screenIdx === null || raw.screenIdx === 'all'
+			? null
+			: Number.isFinite(Number(raw.screenIdx))
+				? Number(raw.screenIdx)
+				: 0
+	return {
+		preview: raw.preview !== false,
+		program: !!raw.program,
+		screenIdx,
+	}
+}
+
 module.exports = {
 	buildEffectAmcpLinesPlayback,
 	mixerEffectNeutralLines,
@@ -124,4 +140,5 @@ module.exports = {
 	TICK_MS,
 	TIMELINE_TICK_BROADCAST_MS,
 	TIMELINE_AMCP_DRIFT_MS,
+	normalizeTimelineSendTo,
 }

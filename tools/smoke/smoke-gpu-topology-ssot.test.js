@@ -8,7 +8,10 @@ const {
 } = require('../../src/utils/known-gpu-topology')
 const { buildGpuPhysicalMap } = require('../../src/utils/gpu-physical-map')
 const { handleGpuPortsReset } = require('../../src/api/system-hardware-gpu-ports')
-const { topologyDiffers } = require('../../src/utils/gpu-topology-reconcile')
+const {
+	topologyDiffers,
+	reconcileTopologyWithLiveDisplays,
+} = require('../../src/utils/gpu-topology-reconcile')
 const { physicalPortIndexFromGpuConnector } = require('../../src/config/screen-consumer-port-resolve')
 const { discoverGpuPhysicalTopologyFromXrandr } = require('../../src/utils/gpu-topology-xrandr')
 
@@ -48,6 +51,23 @@ describe('gpu topology SSOT (WO-108)', () => {
 		}
 		const map = buildGpuPhysicalMap({ config, displays: [], connectors: [] })
 		assert.equal(map.effectiveTopology.length, 2)
+	})
+
+	it('reconcile does not assign the same live DP pair to two rear sockets', () => {
+		const saved = resolveDefaultTopologyForGpu(null)
+		const discovered = resolveDefaultTopologyForGpu('NVIDIA RTX PRO 4000 Blackwell')
+		const displays = [
+			{ name: 'DP-3', connected: true, resolution: '1920x1080' },
+			{ name: 'DP-4', connected: true, resolution: '1920x1080' },
+		]
+		const eff = reconcileTopologyWithLiveDisplays(saved, displays, discovered)
+		const pairKeys = eff.map((r) => `${r.dpA}/${r.dpB}`)
+		const dp23Count = pairKeys.filter((k) => k === 'DP-2/DP-3').length
+		assert.equal(dp23Count, 1, `expected one DP-2/DP-3 socket, got ${dp23Count}: ${pairKeys.join(', ')}`)
+		const connectedSockets = eff.filter((r) =>
+			[r.dpA, r.dpB].some((p) => p === 'DP-3' || p === 'DP-4'),
+		)
+		assert.equal(connectedSockets.length, 2)
 	})
 
 	it('creates gpu_unmapped rows for unmatched connected displays', () => {

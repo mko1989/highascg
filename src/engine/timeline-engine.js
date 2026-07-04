@@ -124,13 +124,14 @@ class TimelineEngine extends EventEmitter {
 
 	_lerp(kfs, t) {
 		if (!kfs.length) return null
-		if (t <= kfs[0].time) return kfs[0].value
 		const last = kfs[kfs.length - 1]
 		if (t >= last.time) return last.value
+		if (t < kfs[0].time) return null
 		for (let i = 0; i < kfs.length - 1; i++) {
 			const a = kfs[i],
 				b = kfs[i + 1]
 			if (t >= a.time && t <= b.time) {
+				if (b.time === a.time) return b.value
 				return a.value + ((b.value - a.value) * (t - a.time)) / (b.time - a.time)
 			}
 		}

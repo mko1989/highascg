@@ -5,9 +5,12 @@ import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { patchGraphWithMissingCableConnectors } from '../lib/device-view-cable-preflight.js'
 import { resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-list.js'
+import { FACTORY_RESET_GPU_LAYOUT_KEY } from '../lib/device-view-gpu-port-constants.js'
 
-export async function loadDeviceView() {
-	return await api.get('/api/device-view')
+export async function loadDeviceView(opts = {}) {
+	const freshGpu = opts?.freshGpu === true || opts?.freshGpu === '1'
+	const q = freshGpu ? '?freshGpu=1' : ''
+	return await api.get(`/api/device-view${q}`)
 }
 
 export async function applyDeviceSnapshot(snapshot, opts = {}) {
@@ -67,10 +70,18 @@ export async function removeDestination(id) {
 
 export async function addDestination(typeOrOptions) {
 	const o = typeOrOptions && typeof typeOrOptions === 'object' ? typeOrOptions : { type: typeOrOptions }
-	const t = o.type === 'pgm_only' ? 'pgm_only' : (o.type === 'multiview' ? 'multiview' : 'pgm_prv')
+	const t = o.type === 'pgm_only' ? 'pgm_only' : (o.type === 'multiview' ? 'multiview' : (o.type === 'host_channel' ? 'host_channel' : 'pgm_prv'))
 	const mainScreenIndex = Number.isFinite(Number(o.mainScreenIndex)) ? Number(o.mainScreenIndex) : undefined
 	const addDestination = { type: t }
 	if (mainScreenIndex != null) addDestination.mainScreenIndex = Math.max(0, mainScreenIndex)
+	if (t === 'host_channel') {
+		if (o.id) addDestination.id = String(o.id)
+		if (o.hostRole) addDestination.hostRole = String(o.hostRole)
+		if (o.casparChannel != null) addDestination.casparChannel = o.casparChannel
+		if (o.inputSlot != null) addDestination.inputSlot = o.inputSlot
+		if (o.sourceId) addDestination.sourceId = String(o.sourceId)
+		if (o.label) addDestination.label = String(o.label)
+	}
 	return await api.post('/api/device-view', { addDestination })
 }
 

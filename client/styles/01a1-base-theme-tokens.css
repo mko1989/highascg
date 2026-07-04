@@ -1,0 +1,65 @@
+/**
+ * CasparCG web client — base styles.
+ * Dark theme, broadcast-oriented UI.
+ * @see main_plan.md Prompt 11
+ */
+
+@font-face {
+	font-family: 'Rewir';
+	src:
+		url('../fonts/Rewir-Light.woff') format('woff'),
+		url('../fonts/Rewir-Light.ttf') format('truetype');
+	font-weight: 300;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--font-ui: 'Rewir', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--bg-dark: #0d1117;
+	--bg-panel: #161b22;
+	--bg-elevated: #21262d;
+	--border: #30363d;
+	--text: #e6edf3;
+	--text-muted: #8b949e;
+	--accent: #58a6ff;
+	--accent-hover: #79b8ff;
+	/* Used by audio meter + status dots (inline style references these names) */
+	--accent-green: #2ecc71;
+	--accent-red: #e74c3c;
+	--success: #3fb950;
+	--warn: #d29922;
+	--error: #f85149;
+	--radius: 6px;
+	--header-h: 48px;
+	--panel-w: 260px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-ui);
+	background: var(--bg-dark);
+	color: var(--text);
+	line-height: 1.5;
+	height: 100vh;
+	overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea,
+optgroup {
+	font-family: inherit;
+}
+
+.app {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+

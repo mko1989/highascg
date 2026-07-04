@@ -115,13 +115,13 @@ export function appendCasparRearPanelMarkers({
 
 		const kind = String(it.kind || '')
 		if (it.kind === 'gpu_out') marker.classList.add('device-view__panel-marker--gpu')
-		if (it.kind === 'decklink_in') marker.classList.add('device-view__panel-marker--dli')
 		if (it.kind === 'decklink_out' || it.kind === 'decklink_io') marker.classList.add('device-view__panel-marker--dlo')
-		const isDecklinkRearSlot = it.kind === 'decklink_io' || it.kind === 'decklink_in' || it.kind === 'decklink_out'
+		const isDecklinkRearSlot = it.kind === 'decklink_io' || it.kind === 'decklink_out'
 		if (isDecklinkRearSlot) marker.classList.add('device-view__panel-marker--decklink-rear-slot')
 		if (it.kind === 'stream_out') marker.classList.add('device-view__panel-marker--stream')
 		if (it.kind === 'record_out') marker.classList.add('device-view__panel-marker--record')
 		if (it.kind === 'audio_out') marker.classList.add('device-view__panel-marker--audio')
+		if (it.kind === 'v4l2_in') marker.classList.add('device-view__panel-marker--v4l2')
 		if (it.kind === 'decklink_ref') marker.classList.add('device-view__panel-marker--decklink-ref')
 		if (it.isVirtual) marker.classList.add('device-view__panel-marker--virtual')
 		if (it.hidden) {
@@ -179,12 +179,12 @@ export function appendCasparRearPanelMarkers({
 				marker.setAttribute('data-layout-slot-id', it.layoutSlotId)
 			}
 			if (isDecklinkRearSlot) {
-				marker.draggable = getDecklinkEditMode() || it.kind === 'decklink_io' || it.kind === 'decklink_in'
+				marker.draggable = getDecklinkEditMode() || it.kind === 'decklink_io'
 				marker.addEventListener('dragstart', (ev) => {
 					if (getDecklinkEditMode()) {
 						ev.dataTransfer.setData('application/x-highascg-decklink-rear', JSON.stringify({ connectorId: it.connectorId }))
 						ev.dataTransfer.effectAllowed = 'move'
-					} else if (it.kind === 'decklink_io' || it.kind === 'decklink_in') {
+					} else if (it.kind === 'decklink_io') {
 						ev.dataTransfer.setData('application/x-highascg-connector', JSON.stringify({ connectorId: it.connectorId, kind: it.kind }))
 						ev.dataTransfer.effectAllowed = 'copyLink'
 					}

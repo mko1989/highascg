@@ -39,15 +39,12 @@ export function renderTemplatesBrowser(container, templates, filter) {
 			el.innerHTML = `
 				<span class="source-item__kind-pill" title="HTML / Flash template">FT</span>
 				<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 36))}</span>
-				<button type="button" class="source-item__edit-template-btn" title="Edit in CG Studio">Edit</button>
+				<button type="button" class="source-item__edit-template-btn" title="Edit in CG Studio (Electron launcher → Open CG Studio)">Edit</button>
 			`
 			el.querySelector('.source-item__edit-template-btn').addEventListener('click', (e) => {
 				e.preventDefault()
 				e.stopPropagation()
-				const derivedId = id.match(/lt-[\w-]+/i)?.[0]?.toLowerCase() || ''
-				if (derivedId) {
-					window.dispatchEvent(new CustomEvent('highascg-cg-studio-edit-template', { detail: { id: derivedId } }))
-				}
+				window.open('http://127.0.0.1:4300/', '_blank', 'noopener,noreferrer')
 			})
 		} else {
 			el.innerHTML = `

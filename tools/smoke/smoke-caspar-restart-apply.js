@@ -1,5 +1,6 @@
 'use strict'
 
+const fs = require('node:fs')
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
@@ -22,6 +23,20 @@ test('reloadCasparAfterConfigWrite: no amcp client', async () => {
 		disconnected: true,
 		reconnected: false,
 	})
+})
+
+test('caspar-restart exports systemd fallback helpers', () => {
+	const mod = require('../../src/utils/caspar-restart')
+	assert.equal(typeof mod.isCasparSystemdServerActive, 'function')
+	assert.equal(typeof mod.restartCasparViaSystemd, 'function')
+	assert.equal(typeof mod.isCasparSystemdControlInstalled, 'function')
+})
+
+test('reloadCasparAfterConfigWrite triggers systemd when supervisor down', () => {
+	const src = fs.readFileSync(require('path').join(__dirname, '../../src/utils/caspar-restart.js'), 'utf8')
+	assert.match(src, /restartCasparViaSystemd/)
+	assert.match(src, /casparcg-server inactive/)
+	assert.match(src, /post-nodm path/)
 })
 
 test('full-config-apply imports reloadCasparAfterConfigWrite', () => {

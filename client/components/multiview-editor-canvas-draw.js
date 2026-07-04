@@ -6,8 +6,6 @@ import {
 	getCellOverlayType,
 	getResolutionSuffix,
 } from './multiview-editor-canvas-layout.js'
-import { getCellOuterRect } from './multiview-editor-canvas-interaction.js'
-
 const CELL_COLORS = { pgm: '#e63946', prv: '#2a9d8f', decklink: '#457b9d', ndi: '#457b9d' }
 const LABEL_BAR_BG = { pgm: '#c92a2a', prv: '#0d9488', decklink: '#2563eb', ndi: '#2563eb', route: '#2563eb' }
 
@@ -63,7 +61,7 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 		const isDropTarget = dropHoverId === c.id
 		const programChannels = channelMap.programChannels || []
 		const previewChannels = channelMap.previewChannels || []
-		const ovType = getCellOverlayType(c, programChannels, previewChannels)
+		const ovType = getCellOverlayType(c, programChannels, previewChannels, channelMap)
 		const isTimers = ovType === 'timers'
 		const borderColor = CELL_COLORS[ovType] || '#8b949e'
 
@@ -86,8 +84,7 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 			ctx.strokeStyle = '#58a6ff'
 			ctx.lineWidth = 1
 			ctx.setLineDash([4, 3])
-			const outer = getCellOuterRect(c, channelMap)
-			ctx.strokeRect(outer.x, outer.y, outer.w, outer.h)
+			ctx.strokeRect(c.x, c.y, c.w, c.h)
 			ctx.restore()
 		}
 

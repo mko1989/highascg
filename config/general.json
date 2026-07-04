@@ -58,24 +58,24 @@
     {
       "physicalPortId": "gpu_p1",
       "slotOrder": 1,
-      "dpA": "HDMI-0",
-      "dpB": "HDMI-1",
+      "dpA": "DP-2",
+      "dpB": "DP-3",
       "connectorNumber": 1,
       "location": 1
     },
     {
       "physicalPortId": "gpu_p2",
       "slotOrder": 2,
-      "dpA": "DP-2",
-      "dpB": "DP-3",
+      "dpA": "DP-4",
+      "dpB": "DP-5",
       "connectorNumber": 2,
       "location": 2
     },
     {
       "physicalPortId": "gpu_p3",
       "slotOrder": 3,
-      "dpA": "DP-4",
-      "dpB": "DP-5",
+      "dpA": "DP-6",
+      "dpB": "DP-7",
       "connectorNumber": 3,
       "location": 3
     }
@@ -93,5 +93,56 @@
       "dns": []
     }
   },
-  "screen_count": 1
+  "extraLiveSources": [
+    {
+      "type": "route",
+      "routeType": "decklink",
+      "value": "route://5-4",
+      "label": "DeckLink 4",
+      "decklinkSlot": 4,
+      "inputsChannel": 5,
+      "inputsLayer": 4,
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_4",
+      "resolution": "1920×1080",
+      "fps": "50",
+      "thumbnailChannel": 5,
+      "thumbnailLayer": 4
+    }
+  ],
+  "gpuPhysicalTopologyOperatorSaved": false,
+  "screen_count": 2,
+  "streaming": {
+    "enabled": false,
+    "protocol": "UDP",
+    "captureMode": "udp",
+    "localCaptureDevice": "auto",
+    "x11Display": ":0",
+    "ndiNamingMode": "auto",
+    "ndiSourcePattern": "CasparCG Channel {ch}",
+    "ndiChannelNames": {},
+    "quality": "medium",
+    "basePort": 40000,
+    "hardwareAccel": true,
+    "maxBitrate": 2000,
+    "resolution": "half",
+    "fps": 25,
+    "drmDevice": "/dev/dri/card0",
+    "autoRelocateBasePort": true
+  },
+  "periodic_sync_interval_sec": null,
+  "periodic_sync_interval_sec_osc": null,
+  "screen_1_system_id": "",
+  "screen_2_system_id": "",
+  "screen_3_system_id": "",
+  "screen_4_system_id": "",
+  "screen_1_os_mode": "",
+  "screen_2_os_mode": "",
+  "screen_3_os_mode": "",
+  "screen_4_os_mode": "",
+  "screen_1_os_backend": "xrandr",
+  "screen_2_os_backend": "xrandr",
+  "screen_3_os_backend": "xrandr",
+  "screen_4_os_backend": "xrandr",
+  "multiview_os_backend": "xrandr"
 }

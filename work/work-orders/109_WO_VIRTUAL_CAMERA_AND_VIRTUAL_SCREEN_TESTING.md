@@ -7,7 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Not started
+**Status:** Partially superseded by [137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md](./137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md) (2026-07-04) — single virtual cam output, Device View, API, sudo wrapper shipped; multi-output pool + virtual screens remain here.
 **Priority:** Medium — enables Zoom/Teams/WebRTC testing and headless ffmpeg source development without extra hardware
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md), operator request 2026-07-02 (v4l2loopback install blocked by DKMS; desire for first-class HighAsCG sinks)
 
@@ -214,9 +214,8 @@ DISPLAY=:90 ffmpeg -f lavfi -i smptebars=size=1920x1080:rate=25 -f null - &
 
 ## Work Log
 
-### 2026-07-02 — Initial WO (virtual camera / virtual screen testing lab)
+### 2026-07-04 — WO-137 subset shipped (virtual camera output)
 
-- Captured operator goal: **dynamic HighAsCG sink** for V4L2 virtual camera (no reboot persistence), **passwordless sudo** for loopback setup, and **virtual desktops** as Caspar ffmpeg inputs.
-- Documented current pain: manual `v4l2loopback-dkms` / DKMS conflict on nvidia-595 box; ad-hoc FFmpeg bridge; no Device View representation.
-- Proposed `v4l2_out` + `virtual_screen_in` connector kinds, backend managers, pinned sudo wrappers (WO-97), and phased tasks T109.1–T109.18.
-- **Instructions for Next Agent:** Start **T109.1–T109.4** (config + sudo wrappers + loopback manager + ffmpeg bridge) as a vertical slice before UI — prove `/dev/videoN` + bridge from Caspar screen consumer on the live box. Then T109.6–T109.7 for Device View sink. Phase B (virtual screens) can parallel after Xvfb manager lands.
+- [137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md](./137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md) delivered the first vertical slice: single `virtualCamera` config, REST API, Device View `v4l2_out` connector + inspector, JPEG→ffmpeg→v4l2loopback bridge, ALSA loopback audio, passwordless sudo wrapper for `v4l2loopback` + `snd-aloop`.
+- **Still in WO-109:** multi virtual cam outputs (`virtualCameraOutputs[]`), virtual screen / Xvfb inputs, dynamic device pool allocation beyond `/dev/video10`.
+- **Instructions for Next Agent:** Treat WO-109 Phase A virtual-screen tasks as independent; extend multi-output only when product needs a second Zoom feed.

@@ -89,7 +89,7 @@ test('createNewProject resets routing and persists empty Untitled project', () =
 		assert.equal(slug, 'untitled')
 		assert.equal(project.name, 'Untitled')
 		assert.deepEqual(project.scenes.scenes, [])
-		assert.deepEqual(project.scenes.mainEditorVisible, [true, false, false, false])
+		assert.deepEqual(project.scenes.mainEditorVisible, [true, true, true, true])
 		assert.equal(ctx.config.screenDestinations.destinations.length, 1)
 		assert.equal(ctx.config.casparServer.screen_count, 1)
 		assert.equal(ctx.config.casparServer.multiview_enabled, false)

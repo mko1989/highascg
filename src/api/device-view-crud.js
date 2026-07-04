@@ -47,8 +47,39 @@ function handleAddDestination(j, ctx) {
 	const top = normalizeScreenDestinations(ctx.config?.screenDestinations)
 	const now = Date.now().toString(36)
 	let seq = 1; while (top.destinations.some(d => d.id === `dst_${now}_${seq}`)) seq++
-	const id = `dst_${now}_${seq}`; const nextMain = Math.max(0, parseInt(j.addDestination.mainScreenIndex, 10) || 0)
 	const reqType = String(j.addDestination.type || 'pgm_prv')
+
+	if (reqType === 'host_channel' || j.addDestination.hostRole) {
+		const presetId = String(j.addDestination.id || '').trim()
+		const hostRole = String(j.addDestination.hostRole || '').trim()
+		const casparChannel = parseInt(String(j.addDestination.casparChannel ?? ''), 10)
+		if (!hostRole || !Number.isFinite(casparChannel) || casparChannel < 1) {
+			return { error: 'host_channel requires hostRole and casparChannel' }
+		}
+		const id = presetId || `host_${hostRole}_${casparChannel}`
+		if (top.destinations.some((d) => String(d?.id || '') === id)) {
+			return { error: 'Host channel already added', id }
+		}
+		const inputSlot = parseInt(String(j.addDestination.inputSlot ?? ''), 10)
+		top.destinations.push({
+			id,
+			label: String(j.addDestination.label || '').trim() || id,
+			mode: 'host_channel',
+			hostRole,
+			casparChannel,
+			virtual: true,
+			mainScreenIndex: 0,
+			caspar: { bus: 'pgm' },
+			...(Number.isFinite(inputSlot) && inputSlot >= 1 ? { inputSlot } : {}),
+			...(j.addDestination.sourceId ? { sourceId: String(j.addDestination.sourceId) } : {}),
+		})
+		const next = normalizeScreenDestinations(top)
+		ctx.config.screenDestinations = next
+		saveConfig(ctx, { screenDestinations: next })
+		return { ok: true, screenDestinations: next, addedId: id }
+	}
+
+	const id = `dst_${now}_${seq}`; const nextMain = Math.max(0, parseInt(j.addDestination.mainScreenIndex, 10) || 0)
 	const mode =
 		reqType === 'pgm_only'
 			? 'pgm_only'
@@ -213,12 +244,12 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 				const devNumRaw = parseInt(String(c1?.externalRef ?? c0?.externalRef ?? 0), 10)
 				const devNum = Number.isFinite(devNumRaw) && devNumRaw > 0 ? devNumRaw : slot
 				if (ioDirection === 'in') {
-					const currentCount = Math.min(8, Math.max(0, parseInt(String(cs.decklink_input_count ?? 0), 10) || 0))
 					cs[`decklink_input_${slot}_direction`] = 'in'
-					cs.decklink_input_count = Math.max(currentCount, slot)
 					if ((parseInt(String(cs[`decklink_input_${slot}_device`] ?? 0), 10) || 0) <= 0) {
 						cs[`decklink_input_${slot}_device`] = devNum
 					}
+					const { recomputeDecklinkInputCount } = require('../config/decklink-input-slots')
+					cs.decklink_input_count = recomputeDecklinkInputCount(cs)
 				} else {
 					clearDecklinkInputSlot(cs, slot, devNum)
 					cs[`decklink_input_${slot}_direction`] = ioDirection

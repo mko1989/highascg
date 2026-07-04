@@ -48,6 +48,9 @@ fi
 	if [[ -f /etc/systemd/system/highascg-exfat-bootstrap.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-bootstrap.service"
 	fi
+	if [[ -f /etc/systemd/system/highascg-hardware-hostname.service ]]; then
+		AF_LIST="$AF_LIST highascg-hardware-hostname.service"
+	fi
 	if [[ -f /etc/systemd/system/highascg-exfat-server-update.service ]]; then
 		AF_LIST="$AF_LIST highascg-exfat-server-update.service"
 	fi

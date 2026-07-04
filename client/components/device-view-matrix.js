@@ -1,7 +1,10 @@
 import * as Actions from './device-view-actions.js'
 import { connectorById } from './device-view-helpers.js'
-import { listAllScreenDestinationsForDeviceView } from '../lib/device-view-host-channels.js'
+import { listAllScreenDestinationsForDeviceView, listHostChannelDestinations } from '../lib/device-view-host-channels.js'
 import { escapeHtml } from '../lib/dom-escape.js'
+import { getAppStateStore } from '../lib/app-runtime.js'
+import { showLiveInputModal } from './live-input-modal.js'
+import { saveVirtualCameraConfig } from '../lib/virtual-camera-state.js'
 
 function extractMatrixPorts(payload) {
 	const sources = []
@@ -16,12 +19,18 @@ function extractMatrixPorts(payload) {
 		else sinks.push(port)
 	}
 
-	// 1. Screen + virtual host destinations (matrix sources / left column)
+	// 1. Screen destinations + pinned host channels (matrix sources / left column)
 	const dests = listAllScreenDestinationsForDeviceView(payload)
+	const seenDestIds = new Set()
 	for (const d of dests) {
 		const isHost = String(d?.mode || '') === 'host_channel' || d?.virtual === true
 		const group = isHost ? 'Host channels' : 'Destinations'
+		seenDestIds.add(String(d?.id || ''))
 		addPort(`dst_in_${d.id}`, d.label || d.id, true, group)
+	}
+	for (const h of listHostChannelDestinations(payload)) {
+		if (!h?.id || seenDestIds.has(String(h.id))) continue
+		addPort(`dst_in_${h.id}`, h.label || h.id, true, 'Host channels')
 	}
 
 	// 2. Pixel Maps — split: in on top (sink), each out on left (source)
@@ -45,12 +54,13 @@ function extractMatrixPorts(payload) {
 	for (const c of sug) {
 		if (!c || !c.id) continue
 		const label = c.label || c.externalRef || c.id
-		const isSink = c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'decklink_io' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out'
-		const isSrc = c.kind === 'decklink_in' || c.kind === 'audio_in'
+		const isSink = c.kind === 'gpu_out' || c.kind === 'decklink_out' || c.kind === 'decklink_io' || c.kind === 'caspar_mv_out' || c.kind === 'stream_out' || c.kind === 'record_out' || c.kind === 'audio_out' || c.kind === 'v4l2_out'
+		const isSrc = c.kind === 'audio_in' || c.kind === 'v4l2_in'
 		
 		let group = 'Outputs'
 		if (c.kind.includes('decklink')) group = 'DeckLink'
 		if (c.kind.includes('gpu')) group = 'GPU'
+		if (c.kind === 'v4l2_in') group = 'USB video'
 		if (c.kind.includes('stream') || c.kind.includes('record')) group = 'Streams/Records'
 		
 		if (isSink) addPort(c.id, label, false, group)
@@ -116,7 +126,40 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 	addMapBtn.textContent = '+ Pixel Map'
 	addMapBtn.onclick = () => { Actions.addMappingNode().then(() => loadCallback()) }
 
-	toolbar.append(addDestBtn, addStreamBtn, addRecordBtn, addMapBtn)
+	const addLiveBtn = document.createElement('button')
+	addLiveBtn.className = 'header-btn'
+	addLiveBtn.textContent = '+ Live input'
+	addLiveBtn.onclick = () => {
+		const store = getAppStateStore()
+		if (!store) return
+		showLiveInputModal(store, { onAdded: () => loadCallback() })
+	}
+
+	const addVcamBtn = document.createElement('button')
+	addVcamBtn.className = 'header-btn'
+	addVcamBtn.textContent = '+ Virtual cam'
+	addVcamBtn.onclick = async () => {
+		try {
+			await saveVirtualCameraConfig(
+				{
+					showInDeviceView: true,
+					label: 'Virtual cam',
+					channel: 1,
+					device: '/dev/video10',
+					width: 1920,
+					height: 1080,
+					fps: 50,
+					audioEnabled: true,
+				},
+				{ persist: true },
+			)
+			loadCallback()
+		} catch {
+			/* ignore */
+		}
+	}
+
+	toolbar.append(addDestBtn, addLiveBtn, addStreamBtn, addRecordBtn, addVcamBtn, addMapBtn)
 	matrixHost.appendChild(toolbar)
 
 	const { sources, sinks } = extractMatrixPorts(payload)

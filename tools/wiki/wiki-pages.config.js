@@ -38,6 +38,7 @@ module.exports = [
 	{ match: /^wiki\/api\/system-settings-hardware\.md$/, category: 'API reference', order: 53, group: 'System & hardware' },
 	{ match: /^wiki\/api\/network-tailscale\.md$/, category: 'API reference', order: 53.5, group: 'System & hardware' },
 	{ match: /^wiki\/api\/ingest-usb-plugins\.md$/, category: 'API reference', order: 54, group: 'System & hardware' },
+	{ match: /^wiki\/integration\/usb-v4l2-input\.md$/, category: 'Integration', order: 60, title: 'USB / V4L2 video input' },
 	{ match: /^api-reference\.md$/, category: 'API reference', order: 55, group: 'Overview', title: 'Legacy API overview' },
 	{ match: /^osc-integration\.md$/, category: 'Integration', order: 60 },
 	{ match: /^companion-websocket-catalog-bootstrap\.md$/, category: 'Integration', order: 61 },

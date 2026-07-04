@@ -52,11 +52,12 @@ export function resolveCanonicalGpuConnectorId(pairs, physicalPorts, suggestedGp
 
 export function casparRearKindTitle(kind) {
 	if (kind === 'gpu_out') return 'GPU / program bus output'
-	if (kind === 'decklink_in') return 'DeckLink input (capture)'
 	if (kind === 'decklink_out') return 'DeckLink program output'
 	if (kind === 'caspar_mv_out') return 'Multiview channel output'
 	if (kind === 'audio_out') return 'Audio output'
 	if (kind === 'audio_in') return 'Audio input'
+	if (kind === 'v4l2_in') return 'USB video input (V4L2)'
+	if (kind === 'v4l2_out') return 'Virtual camera (v4l2loopback)'
 	return kind || 'connector'
 }
 
@@ -64,6 +65,8 @@ export function casparRearKindToIcon(kind) {
 	if (kind === 'gpu_out') return '/assets/hdmi-port-icon.svg'
 	if (kind?.startsWith('decklink') || kind === 'caspar_mv_out') return '/assets/bnc_female_axis.svg'
 	if (kind === 'audio_out') return '/assets/jack-svg.svg'
+	if (kind === 'v4l2_in') return '/assets/hdmi-port-icon.svg'
+	if (kind === 'v4l2_out') return '/assets/hdmi-port-icon.svg'
 	if (kind === 'stream_out') return '/assets/ethernet-port-icon.svg'
 	if (kind === 'record_out') return '/assets/record-port-icon.svg'
 	return '/assets/bnc_female_axis.svg'
@@ -91,12 +94,16 @@ export function createCasparRearMarkerStatusResolver({ live, lastPayload }) {
 				return stateClass('warn')
 			}
 		}
-		if (it.kind === 'decklink_in' || (it.kind === 'decklink_io' && isDecklinkIoIn(conn))) {
+		if (it.kind === 'decklink_io' && isDecklinkIoIn(conn)) {
 			const st = live.decklink?.inputs?.find((x) => String(x.device) === String(conn.externalRef))
 			if (st) return stateClass(decklinkInputState(st).level)
 		}
 		if (it.kind === 'stream_out') {
 			const active = !!(live.streaming?.activeOutputs?.some((id) => String(id) === String(it.connectorId)))
+			return stateClass(active ? 'ok' : 'off')
+		}
+		if (it.kind === 'v4l2_out') {
+			const active = !!(live?.virtualCamera?.running || live?.virtualCameraStatus?.running)
 			return stateClass(active ? 'ok' : 'off')
 		}
 		if (it.kind === 'record_out') {

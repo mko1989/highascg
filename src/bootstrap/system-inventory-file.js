@@ -88,22 +88,22 @@ function parseDecklinkDevicesFromCasparLog(text) {
 			continue
 		}
 		if (!inBlock) continue
-		const m = line.match(/-\s*(.+?)\s*\[(\d+)\](?:\s*\(([^)]+)\))?/i)
+		// Require "- DeckLink … [N] (persistentId)" — loose "- … [N]" also matches ffmpeg h264 ([27]…)
+		// and log timestamps like "07-04 …".
+		const m = line.match(/-\s*(DeckLink[^[]*?)\s*\[(\d+)\]\s*\((\d+)\)/i)
 		if (m) {
 			const label = String(m[1] || '').trim()
 			const index = parseInt(String(m[2] || ''), 10)
 			if (!label || !Number.isFinite(index) || index < 1) continue
-			const key = `${index}:${label.toLowerCase()}`
-			if (seen.has(key)) continue
-			seen.add(key)
+			if (seen.has(index)) continue
+			seen.add(index)
 			const item = { index, label }
 			const rawId = String(m[3] || '').trim()
 			if (rawId) item.rawId = rawId
 			out.push(item)
 			continue
 		}
-		// End of block after first non-device line following parsed entries.
-		if (out.length > 0 && !/^\s*\[/.test(line)) break
+		if (/Initialized decklink module/i.test(line)) break
 	}
 	return out.sort((a, b) => a.index - b.index)
 }

@@ -54,3 +54,20 @@ export async function refreshSceneLiveFromServer(sceneState, stateStore) {
 	sceneState.applyServerLiveChannels(channels, stateStore.getState()?.channelMap)
 	return data
 }
+
+/**
+ * Clear PRV look registration on server scene.live (metadata only — no AMCP).
+ * @param {number} mainIdx
+ * @param {{ sceneState?: object, stateStore?: object }} [opts]
+ */
+export async function clearPreviewLiveOnServer(mainIdx, opts = {}) {
+	const { sceneState, stateStore } = opts
+	const mIdx = Math.max(0, parseInt(String(mainIdx), 10) || 0)
+	const res = await api.post('/api/scene/live/preview/clear', { mainIndex: mIdx })
+	if (stateStore && res?.sceneLive != null) {
+		const channels = normalizeSceneLiveEntries(res.sceneLive)
+		stateStore.applyChange('scene.live', channels)
+		sceneState?.applyServerLiveChannels(channels, stateStore.getState()?.channelMap)
+	}
+	return res
+}

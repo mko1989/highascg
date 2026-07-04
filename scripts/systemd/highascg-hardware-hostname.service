@@ -1,0 +1,16 @@
+[Unit]
+Description=HighAsCG hardware hostname (highascg#### from MAC)
+Documentation=file:/usr/share/doc/highascg-wo47/EXFAT_DATA_ZERO_TOUCH.md
+DefaultDependencies=no
+After=systemd-udev-settle.service network-pre.target
+Before=highascg.service tailscaled.service
+ConditionPathExists=/home/casparcg/highascg/package.json
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=30
+ExecStart=/usr/local/lib/highascg/highascg-apply-hardware-hostname.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -53,7 +53,7 @@ export const settingsState = {
 		},
 		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '' },
 		composePreview: {
-			mode: 'canvas',
+			mode: 'ffmpeg_jpeg',
 			fps: 25,
 			resolutionScale: 'half',
 			jpegQuality: 10,

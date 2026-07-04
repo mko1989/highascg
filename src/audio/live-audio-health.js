@@ -7,6 +7,21 @@ const { isLiveAudioBridgeEnabled, restartLiveAudioBridge } = require('./live-aud
 const DEFAULT_VERIFY_MS = 450
 const DEFAULT_CLEAR_SETTLE_MS = 150
 
+function infoHasFfmpegProducer(text) {
+	const t = String(text || '')
+	return (
+		/<type>\s*ffmpeg\s*<\/type>/i.test(t) ||
+		/\btype\s+ffmpeg\b/i.test(t) ||
+		/<producer>\s*ffmpeg\s*<\/producer>/i.test(t) ||
+		/\bproducer\s+ffmpeg\b/i.test(t)
+	)
+}
+
+function infoForegroundBlock(text) {
+	const m = String(text || '').match(/<foreground>[\s\S]*?<\/foreground>/i)
+	return m ? m[0] : String(text || '')
+}
+
 /**
  * Caspar returns PLAY OK before ffmpeg finishes opening; detect dead producers via INFO.
  * @param {string} infoText
@@ -15,20 +30,20 @@ function isLiveAlsaLayerHealthy(infoText) {
 	const text = String(infoText || '')
 	if (!text.trim()) return false
 	const isUdpBridge = /udp:\/\/127\.0\.0\.1:\d+/i.test(text)
+	const fg = infoForegroundBlock(text)
 	if (!/alsa:\/\//i.test(text) && !isUdpBridge) return false
-	if (/<type>\s*empty\s*<\/type>/i.test(text)) return false
-	if (/\btype\s+empty\b/i.test(text)) return false
+	if (/<type>\s*empty\s*<\/type>/i.test(fg)) return false
+	if (/\btype\s+empty\b/i.test(fg)) return false
 	if (/cannot open audio device|device or resource busy|input\/output error|protocol not found/i.test(text)) return false
 	if (/non-existing PPS|decode_slice_header error|no frame!/i.test(text)) return false
 	if (isUdpBridge) {
-		if (!/<type>\s*ffmpeg\s*<\/type>/i.test(text) && !/\btype\s+ffmpeg\b/i.test(text)) return false
-		const times = [...text.matchAll(/<time>([^<]+)<\/time>/gi)].map((m) => parseFloat(m[1]))
+		if (!infoHasFfmpegProducer(fg)) return false
+		const times = [...fg.matchAll(/<time>([^<]+)<\/time>/gi)].map((m) => parseFloat(m[1]))
 		const cur = times[0]
 		return Number.isFinite(cur) && cur > 0.15
 	}
-	if (/<type>\s*ffmpeg\s*<\/type>/i.test(text)) return true
-	if (/\btype\s+ffmpeg\b/i.test(text)) return true
-	if (/\bffmpeg\b/i.test(text) && /alsa:\/\//i.test(text)) return true
+	if (infoHasFfmpegProducer(fg)) return true
+	if (/\bffmpeg\b/i.test(fg) && /alsa:\/\//i.test(fg)) return true
 	return false
 }
 

@@ -20,7 +20,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -y
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	curl wget git jq unzip rsync software-properties-common \
 	alsa-utils libportaudio2 portaudio19-dev \
-	ffmpeg libdrm2 libdrm-tests \
+	ffmpeg libdrm2 libdrm-tests v4l-utils \
 	libopengl0 libgl1 libegl1 \
 	libglew2.2 \
 	libsfml-graphics2.6 libsfml-window2.6 libsfml-system2.6 \

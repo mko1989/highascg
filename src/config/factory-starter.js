@@ -70,7 +70,7 @@ function buildStarterProject() {
 			previewSceneId: null,
 			activeScreenIndex: 0,
 			globalDefaultTransition: { type: 'MIX', duration: 12, tween: 'linear' },
-			mainEditorVisible: [true, false, false, false],
+			mainEditorVisible: [true, true, true, true],
 			layerPresets: [],
 			lookPresets: [],
 			globalBorders: [null, null, null, null],

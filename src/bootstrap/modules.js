@@ -32,17 +32,6 @@ function buildVendorDirs(logger) {
 			out['/vendor/html-to-image/'] = htmlToImageRoot
 		}
 	} catch {}
-	if (moduleRegistry.isLoaded && moduleRegistry.isLoaded('cg-studio')) {
-		const grapesRoot = path.join(REPO_ROOT, 'node_modules', 'grapesjs')
-		try {
-			if (fs.existsSync(path.join(grapesRoot, 'dist', 'grapes.mjs'))) {
-				out['/vendor/grapesjs/'] = grapesRoot
-			} else {
-				logger.warn('[modules] cg-studio enabled but `grapesjs` is not installed — run `npm install --include=optional`.')
-				out['/vendor/grapesjs/'] = grapesRoot
-			}
-		} catch {}
-	}
 	return out
 }
 

@@ -1,27 +1,12 @@
 'use strict'
 
-/**
- * Legacy streaming lifecycle — browser preview UDP/go2rtc removed.
- * On connect/restart we only strip stale Caspar STREAM/NDI consumers from older configs.
- */
-function createStreamingLifecycle({
-	appCtx,
-	config,
-	logger,
-	getChannelMap,
-	addStreamingConsumers,
-	removeStreamingConsumers,
-	resolveFreeStreamingBasePort,
-	prepareNdiStreaming,
-	resolveCaptureTier,
-}) {
-	void logger
-	void addStreamingConsumers
-	void resolveFreeStreamingBasePort
-	void prepareNdiStreaming
-	void resolveCaptureTier
+const { removeStalePreviewStreamConsumers } = require('../streaming/caspar-ffmpeg-setup')
 
-	function buildStreamingTargets(basePort) {
+/**
+ * On Caspar connect/restart, strip stale preview STREAM/NDI consumers from older configs.
+ */
+function createStreamingLifecycle({ appCtx, config, getChannelMap }) {
+	function buildStalePreviewTargets(basePort) {
 		const cm = getChannelMap(config)
 		const targets = []
 		const pgmCh = cm.programChannels?.[0] ?? 1
@@ -32,42 +17,21 @@ function createStreamingLifecycle({
 		return targets
 	}
 
-	let streamingTargets = buildStreamingTargets(config.streaming.basePort)
+	let stalePreviewTargets = buildStalePreviewTargets(config.streaming.basePort)
 
-	async function startStreamingSubsystem() {
-		appCtx.streamingPipelineReady = false
-		streamingTargets = buildStreamingTargets(config.streaming.basePort)
-		if (config.streaming.enabled) {
-			appCtx.log(
-				'info',
-				'[Streaming] Live preview UDP/WebRTC was removed — Settings → Streaming no longer adds Caspar STREAM consumers. Use stream outputs / streaming channel for RTMP.',
-			)
-		}
+	async function cleanupStalePreviewConsumers() {
+		stalePreviewTargets = buildStalePreviewTargets(config.streaming.basePort)
 		if (!appCtx.amcp?.isConnected) return
 		try {
-			await removeStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
+			await removeStalePreviewStreamConsumers(appCtx.amcp, stalePreviewTargets, config.streaming)
 		} catch (e) {
-			appCtx.log('warn', `[Streaming] stale consumer cleanup: ${e?.message || e}`)
+			appCtx.log('warn', `[Streaming] stale preview consumer cleanup: ${e?.message || e}`)
 		}
 	}
 
 	async function stopStreamingSubsystem() {
-		try {
-			appCtx.streamingPipelineReady = false
-			if (appCtx.amcp) await removeStreamingConsumers(appCtx.amcp, streamingTargets, config.streaming)
-		} catch (e) {
-			appCtx.log('warn', `[Streaming] stopStreamingSubsystem: ${e?.message || e}`)
-		}
-	}
-
-	async function runStreamingRestart() {
-		await stopStreamingSubsystem()
-		const delayMs = Math.max(
-			0,
-			parseInt(process.env.HIGHASCG_STREAMING_RESTART_DELAY_MS || '500', 10) || 500
-		)
-		if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
-		await startStreamingSubsystem()
+		appCtx.streamingPipelineReady = false
+		if (appCtx.amcp) await cleanupStalePreviewConsumers()
 	}
 
 	let streamingChain = Promise.resolve()
@@ -80,18 +44,10 @@ function createStreamingLifecycle({
 
 	function toggleStreaming(enabled) {
 		config.streaming.enabled = enabled
-		return enqueueStreaming(async () => {
-			if (enabled) {
-				appCtx.log(
-					'warn',
-					'[Streaming] Preview streaming toggle ignored — UDP/WebRTC preview removed. RTMP: stream outputs or /api/streaming-channel/rtmp.',
-				)
-			}
-			await runStreamingRestart()
-		})
+		return enqueueStreaming(cleanupStalePreviewConsumers)
 	}
 
-	const restartStreaming = () => enqueueStreaming(runStreamingRestart)
+	const restartStreaming = () => enqueueStreaming(cleanupStalePreviewConsumers)
 
 	function streamingRestartSignature(cfg) {
 		const s = cfg.streaming || {}
@@ -99,6 +55,7 @@ function createStreamingLifecycle({
 			casparHost: cfg.caspar?.host,
 			casparPort: cfg.caspar?.port,
 			enabled: !!s.enabled,
+			basePort: s.basePort,
 		})
 	}
 	let lastStreamingRestartSig = streamingRestartSignature(config)
@@ -111,22 +68,21 @@ function createStreamingLifecycle({
 		if (streamingChanged) {
 			clearTimeout(streamingReloadTimer)
 			streamingReloadTimer = setTimeout(() => {
-				void runStreamingRestart()
+				void cleanupStalePreviewConsumers()
 			}, 400)
 		}
 	}
 
 	function handleCasparConnected() {
-		void startStreamingSubsystem()
+		appCtx.streamingPipelineReady = false
+		void cleanupStalePreviewConsumers()
 	}
 
 	return {
 		get streamingTargets() {
-			return streamingTargets
+			return stalePreviewTargets
 		},
-		startStreamingSubsystem,
 		stopStreamingSubsystem,
-		runStreamingRestart,
 		enqueueStreaming,
 		toggleStreaming,
 		restartStreaming,

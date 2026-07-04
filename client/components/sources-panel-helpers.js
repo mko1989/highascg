@@ -1,10 +1,11 @@
 import { api, getApiBase } from '../lib/api-client.js'
 import { assetUrl } from '../lib/api-origin.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
-import { decklinkInputForSlot, liveAudioInputForSlot } from '../lib/input-channels.js'
+import { decklinkInputForSlot, liveAudioInputForSlot, v4l2InputForSlot, listInputChannels, decklinkSlotFromConnector } from '../lib/input-channels.js'
 import { liveAudioSlotStatusMessage } from '../lib/live-audio-inputs.js'
+import { v4l2SlotStatusMessage } from '../lib/v4l2-inputs.js'
 
-export { liveAudioSlotStatusMessage }
+export { liveAudioSlotStatusMessage, v4l2SlotStatusMessage }
 
 /** @param {string | null} cd */
 function parseContentDispositionFilename(cd) {
@@ -326,7 +327,7 @@ function pruneRedundantMediaDirs(items) {
 	})
 }
 
-export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
+export function buildLiveSources(channelMap, connectors, liveAudioConfigured, v4l2Configured) {
 	const sources = []
 	
 	// Built-in System Timers Template source
@@ -346,6 +347,7 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 		previewChannels = [],
 		decklinkCount = 0,
 		liveAudioCount = 0,
+		v4l2InputCount = 0,
 		programResolutions = [],
 		audioOnlyChannels = [],
 		audioOnlyResolutions = [],
@@ -369,14 +371,13 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 		const label = labelBase ? `PRV: ${labelBase}` : `Preview ${i + 1}`
 		sources.push({ type: 'route', routeType: 'prv', value: `route://${ch}`, label, resolution, fps })
 	})
-	for (let i = 1; i <= decklinkCount; i++) {
-		const entry = decklinkInputForSlot(channelMap, i)
-		if (!entry) continue
+	for (const entry of listInputChannels(channelMap).filter((e) => e?.kind === 'decklink')) {
+		const i = entry.slot
 		const conn = connectors.find(
 			(c) =>
 				(c.kind === 'decklink_io' || c.kind === 'decklink') &&
 				c.caspar?.ioDirection === 'in' &&
-				c.index === i - 1,
+				(c.index === i - 1 || decklinkSlotFromConnector(c) === i),
 		)
 		const res = entry.resolution
 		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
@@ -392,7 +393,7 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 			inputsChannel: entry.channel,
 			inputsLayer: entry.layer,
 			connectorId: conn?.id,
-			decklinkDevice: conn?.externalRef != null ? parseInt(String(conn.externalRef), 10) : i - 1,
+			decklinkDevice: conn?.externalRef != null ? parseInt(String(conn.externalRef), 10) : i,
 		})
 	}
 	const cfgSlots = Array.isArray(liveAudioConfigured?.configured?.slots)
@@ -415,6 +416,27 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured) {
 			liveAudioSlot: i,
 			inputsChannel: entry.channel,
 			inputsLayer: entry.layer,
+		})
+	}
+	const v4l2CfgSlots = Array.isArray(v4l2Configured?.configured?.slots) ? v4l2Configured.configured.slots : []
+	for (let i = 1; i <= v4l2InputCount; i++) {
+		const entry = v4l2InputForSlot(channelMap, i)
+		if (!entry) continue
+		const cfg = v4l2CfgSlots.find((s) => s && Number(s.slot) === i)
+		const res = entry.resolution || cfg?.resolution
+		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : cfg?.width && cfg?.height ? `${cfg.width}×${cfg.height}` : ''
+		const fps = res?.fps != null ? formatFps(res.fps) : cfg?.fps ? formatFps(cfg.fps) : ''
+		sources.push({
+			type: 'route',
+			routeType: 'v4l2',
+			value: entry.route || cfg?.route,
+			label: cfg?.label || entry.label || `USB video ${i}`,
+			resolution,
+			fps,
+			v4l2Slot: i,
+			inputsChannel: entry.channel,
+			inputsLayer: entry.layer,
+			devicePath: cfg?.device,
 		})
 	}
 	audioOnlyChannels.forEach((ch, i) => {

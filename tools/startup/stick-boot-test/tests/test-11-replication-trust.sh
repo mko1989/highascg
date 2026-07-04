@@ -8,6 +8,16 @@ else
 	st_fail "missing /usr/local/bin/highascg-replication-ssh — run: sudo bash scripts/replication/install-replication-ssh-wrapper.sh"
 fi
 
+if systemctl cat highascg-hardware-hostname.service &>/dev/null; then
+	if systemctl is-enabled highascg-hardware-hostname.service &>/dev/null; then
+		st_ok "highascg-hardware-hostname.service enabled"
+	else
+		st_warn "highascg-hardware-hostname.service present but not enabled — sudo bash scripts/setup/16-hardware-hostname-boot.sh"
+	fi
+else
+	st_fail "missing highascg-hardware-hostname.service — sudo bash scripts/setup/16-hardware-hostname-boot.sh"
+fi
+
 if [[ -f "${PLAYOUT}/config/hardware-identity.json" ]]; then
 	st_ok "hardware-identity.json present"
 else
@@ -29,7 +39,7 @@ if command -v node >/dev/null 2>&1 && [[ -f "${PLAYOUT}/src/system/hardware-iden
 		elif [[ "$(hostname)" =~ ^highascg[0-9]{4}$ ]]; then
 			st_ok "system hostname $(hostname) (hardware target ${target_host})"
 		else
-			st_warn "hostname $(hostname) ≠ ${target_host} — needs root: sudo hostnamectl set-hostname ${target_host}"
+			st_warn "hostname $(hostname) ≠ ${target_host} — run: sudo systemctl start highascg-hardware-hostname.service"
 		fi
 	else
 		st_warn "could not read hardware identity via node"

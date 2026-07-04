@@ -66,7 +66,7 @@ When paired, the **active project** stores show-tier pair metadata (replicated l
 
 Hardware ids come from the primary Ethernet MAC (`highascg####` hostnames). Re-pair after upgrading to populate metadata on existing pairs.
 
-**Hostname apply:** bridge start calls `ensureHardwareHostname()`; if the system hostname is still a clone ISO name (`highascg-nvidia-*`), set it once with root: `sudo hostnamectl set-hostname highascg####` (#### = `hardwareId` from Device View or `config/hardware-identity.json`).
+**Hostname apply:** `highascg-hardware-hostname.service` runs at boot (before `highascg.service`) and migrates clone ISO names (`highascg-nvidia-*`) → `highascg####`. Bridge start also calls `ensureHardwareHostname()` as a fallback. Install on existing hosts: `sudo bash scripts/setup/16-hardware-hostname-boot.sh`; apply once: `sudo systemctl start highascg-hardware-hostname.service`.
 
 ### WO-78 QA
 

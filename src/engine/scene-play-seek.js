@@ -196,12 +196,6 @@ function resolvePlaySeekFramesForSceneLayer(layer, ctx, opts) {
 	const activeBank = opts.activeBank
 	const incoming = opts.incoming
 
-	if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
-		const f = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
-		rememberLastPlayFrame(ctx, channel, layerNumber, f)
-		return f
-	}
-
 	const timelineCtx = getActiveTimelineForTake(ctx)
 	const layers = incoming?.layers || []
 	const layerIdx = layers.findIndex((l) => l.layerNumber === layerNumber)
@@ -228,7 +222,16 @@ function resolvePlaySeekFramesForSceneLayer(layer, ctx, opts) {
 		}
 	}
 
-	if (sb === 'beginning') return 0
+	if (sb === 'beginning') {
+		rememberLastPlayFrame(ctx, channel, layerNumber, 0)
+		return 0
+	}
+
+	if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
+		const f = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
+		rememberLastPlayFrame(ctx, channel, layerNumber, f)
+		return f
+	}
 
 	if (!forceCut) {
 		const live = getLivePlayheadFrames(ctx, channel, onAirPhys, fps)

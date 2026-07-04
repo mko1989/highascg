@@ -290,7 +290,7 @@ export function renderTimelineLayerInspector(root, { timelineId, layerIdx, layer
 	addBtn.className = 'inspector-btn-sm'
 	addBtn.textContent = 'Add layer below'
 	addBtn.addEventListener('click', () => {
-		timelineState.addLayer(timelineId, `Layer ${layerIdx + 2}`)
+		timelineState.insertLayerBelow(timelineId, layerIdx)
 		syncTimelineToServer()
 		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 	})

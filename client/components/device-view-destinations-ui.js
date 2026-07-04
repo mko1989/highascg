@@ -5,6 +5,8 @@ import { destinationRectLabel } from './device-view-ui-utils.js'
 import { edgeOutputLayer } from './device-view-destinations-inspector.js'
 import { friendlyConnectorLabel } from './device-view-helpers.js'
 import { listAllScreenDestinationsForDeviceView } from '../lib/device-view-host-channels.js'
+import { hostChannelsPendingApplyForPayload } from '../lib/planned-channel-map.js'
+import { getAppStateStore } from '../lib/app-runtime.js'
 
 function getDestinationConnectionLabel(edge, lastPayload, connectorById) {
 	const id = String(edge?.sinkId || '').trim()
@@ -20,10 +22,13 @@ function getDestinationConnectionLabel(edge, lastPayload, connectorById) {
 	if (conn?.kind === 'stream_out') {
 		return `Stream ${label}`
 	}
+	if (conn?.kind === 'v4l2_out') {
+		return `Virtual cam ${label}`
+	}
 	if (conn?.kind === 'record_out') {
 		return `Record ${label}`
 	}
-	if (conn?.kind === 'decklink_io' || conn?.kind === 'decklink_out' || conn?.kind === 'decklink_in') {
+	if (conn?.kind === 'decklink_io' || conn?.kind === 'decklink_out') {
 		const num = label.match(/(\d+)/)?.[1] || ''
 		return `DeckLink ${num || label}`
 	}
@@ -108,8 +113,12 @@ export function renderDestinations(ctx) {
 	}
 
 	const destinationsRaw = listAllScreenDestinationsForDeviceView(lastPayload)
-	const userDestCount = (Array.isArray(lastPayload?.screenDestinations?.destinations) ? lastPayload.screenDestinations.destinations : []).length
-	const hostDestCount = destinationsRaw.length - userDestCount
+	const hostChannelsPending = hostChannelsPendingApplyForPayload(
+		lastPayload,
+		getAppStateStore()?.getState?.()?.channelMap,
+	)
+	const screenDestCount = destinationsRaw.filter((d) => String(d?.mode || '') !== 'host_channel' && d?.virtual !== true).length
+	const hostDestCount = destinationsRaw.filter((d) => String(d?.mode || '') === 'host_channel' || d?.virtual === true).length
 	const seenDestinationIds = new Set()
 	const destinationsList = destinationsRaw.filter((d) => {
 		const id = String(d?.id || '').trim()
@@ -124,7 +133,7 @@ export function renderDestinations(ctx) {
 	if (!destinationsList.length) {
 		const p = document.createElement('p')
 		p.className = 'device-view__note'
-		p.textContent = 'No destinations yet. Use + and choose PGM/PRV, PGM only, or Multiview.'
+		p.textContent = 'No destinations yet. Use + to add PGM/PRV, PGM only, Multiview, or a host channel (DeckLink, USB, NDI…).'
 		destBody.appendChild(p)
 		return
 	}
@@ -135,11 +144,11 @@ export function renderDestinations(ctx) {
 	let hostHeadingAdded = false
 	for (const d of destinationsList) {
 		const isHost = String(d?.mode || '') === 'host_channel' || d?.virtual === true
-		if (isHost && hostDestCount > 0 && !hostHeadingAdded && userDestCount > 0) {
+		if (isHost && hostDestCount > 0 && !hostHeadingAdded) {
 			hostHeadingAdded = true
 			const hostHead = document.createElement('div')
 			hostHead.className = 'device-view__destinations-host-heading'
-			hostHead.textContent = 'Input & host channels'
+			hostHead.textContent = screenDestCount > 0 ? 'Input & host channels' : 'Host channels'
 			container.appendChild(hostHead)
 		}
 		const destCardWrap = document.createElement('div')
@@ -155,7 +164,7 @@ export function renderDestinations(ctx) {
 		title.textContent = String(d?.label || d?.id || 'Destination')
 		const subtitle = document.createElement('small')
 		subtitle.textContent = isHost
-			? `HOST · ch ${d?.casparChannel ?? intent?.pgmChannel ?? '?'}`
+			? `HOST · ch ${d?.casparChannel ?? intent?.pgmChannel ?? '?'}${hostChannelsPending ? ' (planned)' : ''}`
 			: destinationRectLabel(d)
 		
 		const ports = document.createElement('div')

@@ -62,6 +62,37 @@ export function getComposePreviewMetaUrl(channel) {
 }
 
 /**
+ * Caspar PGM/PRV channels used for compose-preview JPEG polling (not MVR / live inputs).
+ * @param {{ screenCount?: number, programChannels?: number[], previewChannels?: number[], previewEnabledByMain?: boolean[], multiviewCh?: number, multiviewChannels?: number[] } | null | undefined} cm
+ * @returns {number[]}
+ */
+export function resolveComposePreviewChannelsFromChannelMap(cm = {}) {
+	const ch = new Set()
+	const push = (n) => {
+		const v = parseInt(String(n), 10)
+		if (Number.isFinite(v) && v > 0) ch.add(v)
+	}
+	const mv = new Set()
+	for (const c of cm.multiviewChannels || []) mv.add(Number(c))
+	if (cm.multiviewCh != null) mv.add(Number(cm.multiviewCh))
+
+	const screenCount = Math.max(1, cm.screenCount || cm.programChannels?.length || 1)
+	for (let i = 0; i < screenCount; i++) {
+		if (cm.previewEnabledByMain?.[i] === false) {
+			push(cm.programChannels?.[i])
+			continue
+		}
+		push(cm.programChannels?.[i])
+		push(cm.previewChannels?.[i])
+	}
+	for (const n of mv) {
+		if (Number.isFinite(n) && n > 0) ch.delete(n)
+	}
+	const out = [...ch].sort((a, b) => a - b)
+	return out.length ? out : [1]
+}
+
+/**
  * Resolve Caspar channel for a compose cell from channelMap.
  * @param {{ composeCell?: string, composeScreenIdx?: number }} meta
  * @param {{ programChannels?: number[], previewChannels?: number[] } | null | undefined} channelMap

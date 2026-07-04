@@ -1,0 +1,386 @@
+import {
+	connectorById,
+	connectorRole,
+	orderEdgeForDeviceView,
+	friendlyConnectorLabel,
+} from './device-view-helpers.js'
+import { setStatus } from './device-view-ui-utils.js'
+import { renderCableOverlay } from './device-view-cables.js'
+import { describeCableRejection, cableReasonFromError } from '../lib/device-view-cable-messages.js'
+import { isUnknownCableConnectorError, resolveCableEdgeIds, findGpuSinkCableConflict } from '../lib/device-view-cable-resolve.js'
+import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { resolveGpuPhysicalScreenIndex, resolveGpuScreenNumber } from './device-view-inspector-gpu-resolve.js'
+import {
+	screenConsumerSeedSettingsPatch,
+	shouldSeedScreenConsumerDefaults,
+	multiviewConsumerDefaultsSettingsPatch,
+	shouldSeedMultiviewAlwaysOnTopDefault,
+} from '../lib/screen-consumer-defaults.js'
+import {
+	gpuOutputBindingFromCableSource,
+	gpuScreenInheritedSettingsPatch,
+	mergeSettingsPatches,
+	resolveCableSourceResolution,
+} from '../lib/device-view-gpu-source-inherit.js'
+import { cableSinkAffectsCasparRestart } from '../lib/caspar-restart-dirty-policy.js'
+import * as Actions from './device-view-actions.js'
+
+export function registerDeviceViewCable(ctx) {
+	const { refs, state } = ctx
+	const { wrap, clearCableBtn, messinessSlider, simpleWiringCk, cableOverlay, rearPanel, statusEl } = refs
+
+	ctx.getCOCtx = () => ({
+		cableOverlay,
+		bands: rearPanel,
+		surfaceEl: wrap,
+		lastPayload: state.lastPayload,
+		hoveredEdgeId: state.hoveredEdgeId,
+		selectedEdgeId: state.selectedEdgeId,
+		selectedConnectorId: state.selectedConnectorId,
+		selectEdgeById: ctx.selectEdgeById,
+		cableSourceId: state.cableSourceId,
+		cablePointer: state.cablePointer,
+		messiness: messinessSlider.value,
+		simpleWiring: simpleWiringCk.checked,
+	})
+
+	ctx.pushUndo = () => {
+		if (!state.lastPayload?.graph || !state.currentSettings?.screenDestinations) return
+		state.undoStack.push({
+			graph: JSON.parse(JSON.stringify(state.lastPayload.graph)),
+			screenDestinations: JSON.parse(
+				JSON.stringify(
+					state.currentSettings.screenDestinations ||
+						state.lastPayload.screenDestinations ||
+						{ version: 1, destinations: [], edidNotes: '' },
+				),
+			),
+		})
+		if (state.undoStack.length > 50) state.undoStack.shift()
+	}
+
+	ctx.undoLastCableAction = async () => {
+		if (!state.undoStack.length) {
+			setStatus(statusEl, 'Nothing to undo', false)
+			return
+		}
+		const { graph, screenDestinations } = state.undoStack.pop()
+		try {
+			await Actions.saveSettingsPatch({ deviceGraph: graph, screenDestinations })
+			ctx.setCasparRestartDirty(true)
+			await ctx.load()
+			setStatus(statusEl, 'Undo successful', true)
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.updateUI = () => {
+		for (const el of wrap.querySelectorAll(
+			'.device-view__port--selected, .device-view__port--cable-armed, .device-view__connector-target--valid, .device-view__connector-target--invalid, .device-view__simple-node--selected, .device-view__simple-node--armed',
+		)) {
+			el.classList.remove(
+				'device-view__port--selected',
+				'device-view__port--cable-armed',
+				'device-view__connector-target--valid',
+				'device-view__connector-target--invalid',
+				'device-view__simple-node--selected',
+				'device-view__simple-node--armed',
+			)
+		}
+		if (state.selectedKey) wrap.querySelector(`[data-port-key="${state.selectedKey}"]`)?.classList.add('device-view__port--selected')
+		if (state.selectedConnectorId) {
+			const sel = wrap.querySelector(`[data-connector-id="${state.selectedConnectorId}"]`)
+			sel?.classList.add('device-view__port--selected')
+			sel?.closest('.device-view__simple-node')?.classList.add('device-view__simple-node--selected')
+		}
+		if (state.cableSourceId) {
+			const armed = wrap.querySelector(`[data-connector-id="${state.cableSourceId}"]`)
+			armed?.classList.add('device-view__port--cable-armed')
+			armed?.closest('.device-view__simple-node')?.classList.add('device-view__simple-node--armed')
+			const source = String(state.cableSourceId)
+			for (const el of wrap.querySelectorAll('[data-connector-id]')) {
+				const targetId = String(el.getAttribute('data-connector-id') || '').trim()
+				if (!targetId || targetId === source) continue
+				const allowed = !!orderEdgeForDeviceView(source, targetId, (cid) => connectorById(state.lastPayload, cid))
+				el.classList.add(allowed ? 'device-view__connector-target--valid' : 'device-view__connector-target--invalid')
+			}
+		}
+		clearCableBtn.style.display = state.cableSourceId ? '' : 'none'
+		renderCableOverlay(ctx.getCOCtx())
+	}
+
+	ctx.beginOrCompleteCable = (k, c, d) => {
+		if (!c) return
+		if (state.cableSourceId && state.cableSourceId !== c) {
+			void ctx.tryAddCable(c)
+			return
+		}
+		const conn = connectorById(state.lastPayload, c)
+		const role = connectorRole(conn)
+		if (role !== 'destination_out' && role !== 'caspar_out' && role !== 'pixel_mapping_out') {
+			setStatus(statusEl, 'Cable can start only from destination output or output connector.', false)
+			return
+		}
+		ctx.selectKey(k, { ...d, connectorId: c })
+		state.cableSourceId = c
+		state.suppressDocCableClickUntil = Date.now() + 100
+		ctx.updateUI()
+		setStatus(statusEl, 'Cable armed: click another connector dot to connect', true)
+	}
+
+	ctx.tryAddCable = async (id) => {
+		const o = orderEdgeForDeviceView(state.cableSourceId, id, (cid) => connectorById(state.lastPayload, cid))
+		if (!o) {
+			setStatus(statusEl, 'These connectors cannot be cabled together (wrong roles or direction).', false)
+			state.cableSourceId = null
+			state.cablePointer = null
+			ctx.updateUI()
+			return
+		}
+		const resolved = resolveCableEdgeIds(state.lastPayload, o.sourceId, o.sinkId)
+		const sinkConflict = findGpuSinkCableConflict(state.lastPayload, resolved.sinkId)
+		if (sinkConflict) {
+			const sinkLabel = friendlyConnectorLabel(state.lastPayload, resolved.sinkId)
+			const srcLabel = friendlyConnectorLabel(state.lastPayload, sinkConflict.sourceId)
+			const clickedPort = gpuPhysicalPortCableId(id)
+			const bracketNote =
+				clickedPort &&
+				resolved.sinkId &&
+				clickedPort === resolved.sinkId &&
+				/__/.test(String(id))
+					? ' (DP A/B names on the same physical socket share one cable slot)'
+					: ''
+			setStatus(
+				statusEl,
+				`${sinkLabel} already has a cable from ${srcLabel}. Remove that cable first.${bracketNote}`,
+				false,
+			)
+			state.cableSourceId = null
+			state.cablePointer = null
+			ctx.focusConnectorById(id)
+			ctx.updateUI()
+			return
+		}
+		try {
+			ctx.pushUndo()
+			const preflight = await Actions.ensureCableConnectorsInSavedGraph(
+				state.lastPayload,
+				state.currentSettings,
+				resolved.sourceId,
+				resolved.sinkId,
+			)
+			if (preflight?.graph) state.lastPayload.graph = preflight.graph
+			if (preflight?.fresh) {
+				state.lastPayload = {
+					...preflight.fresh,
+					gpuPhysicalTopology: state.lastPayload.gpuPhysicalTopology,
+				}
+			}
+			let res
+			try {
+				res = await Actions.addCable(resolved.sourceId, resolved.sinkId)
+			} catch (firstErr) {
+				if (!isUnknownCableConnectorError(firstErr?.message || firstErr)) throw firstErr
+				const recovered = await Actions.recoverDeviceGraphForCable(
+					state.lastPayload,
+					state.currentSettings,
+					resolved.sourceId,
+					resolved.sinkId,
+				)
+				if (recovered.topology) {
+					state.lastPayload = { ...state.lastPayload, gpuPhysicalTopology: recovered.topology }
+					if (state.currentSettings) {
+						state.currentSettings = { ...state.currentSettings, gpuPhysicalTopology: recovered.topology }
+					}
+				}
+				if (recovered.fresh) {
+					state.lastPayload = {
+						...recovered.fresh,
+						gpuPhysicalTopology: recovered.topology || state.lastPayload.gpuPhysicalTopology,
+					}
+				} else if (recovered.graph) {
+					state.lastPayload.graph = recovered.graph
+				}
+				res = await Actions.addCable(resolved.sourceId, resolved.sinkId)
+			}
+			if (res?.error) {
+				setStatus(
+					statusEl,
+					`${describeCableRejection(res.error)} (${resolved.sourceId} → ${resolved.sinkId})`,
+					false,
+				)
+				state.cableSourceId = null
+				state.cablePointer = null
+				ctx.focusConnectorById(id)
+				ctx.updateUI()
+				return
+			}
+			if (res?.graph) state.lastPayload.graph = res.graph
+			const sinkConn = connectorById(state.lastPayload, resolved.sinkId)
+			if (sinkConn?.kind === 'gpu_out' && state.currentSettings) {
+				const cs =
+					state.currentSettings.casparServer && typeof state.currentSettings.casparServer === 'object'
+						? state.currentSettings.casparServer
+						: {}
+				const screenN = resolveGpuScreenNumber(sinkConn, state.lastPayload)
+				const portN = resolveGpuPhysicalScreenIndex(sinkConn, state.lastPayload)
+				const source = resolveCableSourceResolution(state.lastPayload, resolved.sourceId)
+				const outputBinding = gpuOutputBindingFromCableSource(state.lastPayload, resolved.sourceId)
+				const isMultiviewOutput = outputBinding?.type === 'multiview'
+				const settingsPatches = []
+				if (shouldSeedScreenConsumerDefaults(cs, portN)) {
+					settingsPatches.push(screenConsumerSeedSettingsPatch(cs, portN))
+				}
+				if (isMultiviewOutput && shouldSeedMultiviewAlwaysOnTopDefault(cs)) {
+					settingsPatches.push(multiviewConsumerDefaultsSettingsPatch())
+				}
+				if (source) {
+					settingsPatches.push(gpuScreenInheritedSettingsPatch(screenN, source))
+				}
+				if (settingsPatches.length) {
+					await Actions.saveSettingsPatch(mergeSettingsPatches(...settingsPatches))
+				}
+				if (source) {
+					const connectorPatch = { caspar: { mode: source.videoMode } }
+					if (outputBinding) connectorPatch.caspar.outputBinding = outputBinding
+					await Actions.updateConnector(resolved.sinkId, connectorPatch)
+				}
+			}
+			state.cableSourceId = null
+			state.cablePointer = null
+			if (cableSinkAffectsCasparRestart(sinkConn)) {
+				ctx.setCasparRestartDirty(true)
+			}
+			ctx.load()
+		} catch (e) {
+			setStatus(statusEl, cableReasonFromError(e), false)
+			state.cableSourceId = null
+			state.cablePointer = null
+			ctx.focusConnectorById(id)
+			ctx.updateUI()
+		}
+	}
+
+	ctx.removeEdge = async (id) => {
+		try {
+			ctx.pushUndo()
+			const res = await Actions.removeEdge(id)
+			if (res?.graph) state.lastPayload.graph = res.graph
+			if (state.selectedEdgeId === id) state.selectedEdgeId = null
+			ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.resetCabling = async () => {
+		if (!confirm('Are you sure you want to remove ALL cable connections?')) return
+		try {
+			ctx.pushUndo()
+			const res = await Actions.removeAllEdges()
+			if (res?.graph) state.lastPayload.graph = res.graph
+			state.selectedEdgeId = null
+			ctx.setCasparRestartDirty(true)
+			ctx.load()
+			setStatus(statusEl, 'All cabling removed', true)
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.updateDestinationOutputLayer = async (edgeId, outputLayer) => {
+		if (!state.lastPayload?.graph || !edgeId) return
+		const g = JSON.parse(JSON.stringify(state.lastPayload.graph))
+		const edges = Array.isArray(g.edges) ? g.edges : []
+		const idx = edges.findIndex((e) => String(e?.id || '') === String(edgeId))
+		if (idx < 0) return
+		edges[idx].note = JSON.stringify({
+			outputLayer: Math.max(1, parseInt(String(outputLayer || 1), 10) || 1),
+		})
+		g.edges = edges
+		try {
+			await Actions.saveDeviceGraph(g)
+			ctx.setCasparRestartDirty(true)
+			ctx.load()
+		} catch (e) {
+			setStatus(statusEl, `Output mapping update failed: ${e.message}`, false)
+		}
+	}
+
+	ctx.setDecklinkAsDestinationOutput = async (connectorId, destination, intent) => {
+		if (!connectorId) return
+		try {
+			const mode = String(destination?.mode || intent?.mode || 'pgm_prv')
+			const mainIdx = Number.isFinite(intent?.mainScreenIndex)
+				? intent.mainScreenIndex
+				: Math.max(0, parseInt(String(destination?.mainScreenIndex ?? 0), 10) || 0)
+			const outputBinding =
+				mode === 'multiview' ? { type: 'multiview' } : { type: 'screen', index: Math.max(1, mainIdx + 1) }
+			await Actions.updateConnector(connectorId, { caspar: { ioDirection: 'out', outputBinding } })
+			setStatus(statusEl, `DeckLink ${connectorId} mapped to destination output`, true)
+			ctx.setCasparRestartDirty(true)
+			await ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	async function pruneConnectorFromGraph(connectorId) {
+		const cid = String(connectorId || '').trim()
+		if (!cid || !state.lastPayload?.graph) return
+		const g = JSON.parse(JSON.stringify(state.lastPayload.graph))
+		g.edges = (Array.isArray(g.edges) ? g.edges : []).filter(
+			(e) => String(e.sourceId) !== cid && String(e.sinkId) !== cid,
+		)
+		g.connectors = (Array.isArray(g.connectors) ? g.connectors : []).filter((c) => String(c?.id) !== cid)
+		await Actions.saveDeviceGraph(g)
+		if (state.selectedConnectorId === cid) {
+			state.selectedConnectorId = null
+			state.selectedKey = null
+		}
+	}
+
+	ctx.removeStreamOutputConnector = async (id) => {
+		const cid = String(id || '').trim()
+		if (!cid) return
+		try {
+			const cur = Array.isArray(state.currentSettings?.streamOutputs) ? state.currentSettings.streamOutputs : []
+			await Actions.saveSettingsPatch({ streamOutputs: cur.filter((s) => String(s?.id) !== cid) })
+			await pruneConnectorFromGraph(cid)
+			setStatus(statusEl, 'Stream output removed', true)
+			await ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.removeRecordOutputConnector = async (id) => {
+		const cid = String(id || '').trim()
+		if (!cid) return
+		try {
+			const cur = Array.isArray(state.currentSettings?.recordOutputs) ? state.currentSettings.recordOutputs : []
+			await Actions.saveSettingsPatch({ recordOutputs: cur.filter((s) => String(s?.id) !== cid) })
+			await pruneConnectorFromGraph(cid)
+			setStatus(statusEl, 'Record output removed', true)
+			await ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.removeAudioOutputConnector = async (id) => {
+		const cid = String(id || '').trim()
+		if (!cid) return
+		try {
+			const cur = Array.isArray(state.currentSettings?.audioOutputs) ? state.currentSettings.audioOutputs : []
+			await Actions.saveSettingsPatch({ audioOutputs: cur.filter((s) => String(s?.id) !== cid) })
+			await pruneConnectorFromGraph(cid)
+			ctx.setCasparRestartDirty(true)
+			setStatus(statusEl, 'Audio output removed', true)
+			await ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+}

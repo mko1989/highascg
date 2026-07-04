@@ -174,6 +174,31 @@ function chromeReserveForCellLayout(c, ovType, useTimersDock) {
 }
 
 /**
+ * Native content resolution for PGM/PRV and dedicated input routes.
+ */
+function resolveCellContentResolution(cell, ovType, cmForMv, programChannels, previewChannels) {
+	if (ovType === 'pgm') {
+		const si = inferPgmScreen(cell, programChannels) - 1
+		const res = cmForMv?.programResolutions?.[si]
+		if (res?.w > 0 && res?.h > 0) return res
+	}
+	if (ovType === 'prv') {
+		const si = inferPrvScreen(cell, previewChannels) - 1
+		const res = cmForMv?.previewResolutions?.[si] || cmForMv?.programResolutions?.[si]
+		if (res?.w > 0 && res?.h > 0) return res
+	}
+	const src = cell?.source?.value || cell?.source || ''
+	if (typeof src === 'string' && src.startsWith('route://')) {
+		const ch = parseInt(String(src).replace(/^route:\/\//, '').split('-')[0], 10)
+		if (!isNaN(ch)) {
+			const entry = (cmForMv?.inputChannels || []).find((e) => e && e.channel === ch)
+			if (entry?.resolution?.w > 0 && entry?.resolution?.h > 0) return entry.resolution
+		}
+	}
+	return null
+}
+
+/**
  * Load HTML overlay template onto a CasparCG channel stage.
  */
 async function loadOverlayTemplate(inst, mvCh, overlayLayer, jsonData) {
@@ -214,5 +239,6 @@ module.exports = {
 	inferPrvScreen,
 	containFillInPictureRect,
 	chromeReserveForCellLayout,
+	resolveCellContentResolution,
 	loadOverlayTemplate,
 }

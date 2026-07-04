@@ -3,12 +3,18 @@
  */
 
 import { api } from '../lib/api-client.js'
-import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'
+import { showLedTestModal, getLedTestSettings } from './led-test-modal.js'
+import {
+	applyLedTestPattern,
+	isLedTestMasterEnabled,
+	setLedTestMasterEnabled,
+} from '../lib/led-test-apply.js'
 
 export function initLedTestCard(container, stateStore) {
 	const ledTestCb = document.createElement('input')
 	ledTestCb.type = 'checkbox'
 	ledTestCb.id = 'header-led-test-cb'
+	ledTestCb.checked = isLedTestMasterEnabled()
 	ledTestCb.title = 'Show LED test card on all program channels (layer 999): screens + resolution + IPs by default; full grid per channel in Test card…'
 
 	const ledTestBtn = document.createElement('button')
@@ -18,6 +24,9 @@ export function initLedTestCard(container, stateStore) {
 	ledTestBtn.title = 'Grid size and labels'
 
 	let ftbBusy = false
+	let ledTestApplyBusy = false
+	let ledTestServerSyncDone = false
+
 	const ftbBtn = document.createElement('button')
 	ftbBtn.type = 'button'
 	ftbBtn.className = 'header-btn header-btn--ftb'
@@ -28,129 +37,64 @@ export function initLedTestCard(container, stateStore) {
 	container.appendChild(ledTestBtn)
 	container.appendChild(ftbBtn)
 
-	async function applyLedTest(enabled) {
+	async function applyLedTest(enabled, options = {}) {
+		ledTestApplyBusy = true
 		try {
-			const s = getLedTestSettings(stateStore)
-			const { gridByChannel: _g, channelsEnabled: _c, ...rest } = s
-			const st = stateStore?.getState?.() || {}
-			const programChannelsRaw = Array.isArray(st?.channelMap?.programChannels) ? st.channelMap.programChannels : [1]
-			const programChannels = [...new Set(programChannelsRaw.map((x) => parseInt(String(x), 10)).filter((n) => Number.isFinite(n) && n > 0))]
-			const mvCh = parseInt(String(st?.channelMap?.multiviewCh ?? ''), 10)
-			
-			const activeChs = Object.entries(s.channelsEnabled || {})
-				.filter(([, v]) => v === true)
-				.map(([k]) => parseInt(k, 10))
-			const gridChs = Object.entries(s.gridByChannel || {})
-				.filter(([, v]) => v === true)
-				.map(([k]) => parseInt(k, 10))
-			const channelsToApply = [...activeChs, ...gridChs]
-			const uniqueChannels = [...new Set(channelsToApply)].filter((n) => Number.isFinite(n) && n > 0)
-			
-			let targets = []
-			if (enabled) {
-				if (!uniqueChannels.length) {
+			const { failures, targets } = await applyLedTestPattern(stateStore, enabled, {
+				...options,
+				onAllFailed: () => {
+					setLedTestMasterEnabled(false)
 					ledTestCb.checked = false
-					localStorage.setItem('highascg_led_test_enabled', 'false')
+				},
+			})
+			if (enabled && failures.length > 0) {
+				if (failures.length === targets.length) {
 					alert(
-						'LED test card: choose at least one channel under Test card… → “Enable test card on channel”, then try again.',
+						'LED test card: failed on all outputs.\n' +
+							failures.map((f) => `ch ${f.channel}: ${f.message}`).join('\n'),
 					)
-					return
-				}
-				targets = uniqueChannels
-			} else {
-				targets = [...new Set([...programChannels, ...(Number.isFinite(mvCh) && mvCh > 0 ? [mvCh] : []), ...uniqueChannels])].filter((n) => Number.isFinite(n) && n > 0)
-			}
-			const failures = []
-
-			for (const channel of targets) {
-				const row = st?.configComparison?.serverChannels?.find((x) => x.index === channel)
-				const cs = st?.settings?.casparServer && typeof st.settings.casparServer === 'object'
-					? st.settings.casparServer
-					: st?.config?.casparServer && typeof st.config.casparServer === 'object'
-						? st.config.casparServer
-						: {}
-				let connectorLabel = ''
-				const progIdx = programChannels.indexOf(channel)
-
-				if (progIdx >= 0) {
-					const screenNo = progIdx + 1
-					const screenSystemId = String(cs[`screen_${screenNo}_system_id`] || '').trim()
-					const osMode = String(cs[`screen_${screenNo}_os_mode`] || '').trim()
-					const osRateRaw = parseFloat(String(cs[`screen_${screenNo}_os_rate`] ?? ''))
-					const osRate = Number.isFinite(osRateRaw) && osRateRaw > 0 ? osRateRaw : null
-					const xrandrPart = [osMode, osRate != null ? `${osRate}Hz` : ''].filter(Boolean).join(' @ ')
-					const deck = parseInt(String(cs[`screen_${progIdx + 1}_decklink_device`] ?? 0), 10) || 0
-					connectorLabel = `Output: Screen ${screenNo} (PGM ch ${channel})`
-					if (screenSystemId) connectorLabel += ` · ${screenSystemId}`
-					if (xrandrPart) connectorLabel += ` · ${xrandrPart}`
-					if (deck > 0) connectorLabel += ` · DeckLink ${deck}`
-					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
-				} else if (Number.isFinite(mvCh) && channel === mvCh) {
-					const mvDeck = parseInt(String(cs.multiview_decklink_device ?? 0), 10) || 0
-					const mvSystemId = String(cs.multiview_system_id || '').trim()
-					const mvOsMode = String(cs.multiview_os_mode || '').trim()
-					const mvOsRateRaw = parseFloat(String(cs.multiview_os_rate ?? ''))
-					const mvOsRate = Number.isFinite(mvOsRateRaw) && mvOsRateRaw > 0 ? mvOsRateRaw : null
-					const mvXrandrPart = [mvOsMode, mvOsRate != null ? `${mvOsRate}Hz` : ''].filter(Boolean).join(' @ ')
-					connectorLabel = `Output: Multiview (ch ${channel})`
-					if (mvSystemId) connectorLabel += ` · ${mvSystemId}`
-					if (mvXrandrPart) connectorLabel += ` · ${mvXrandrPart}`
-					if (mvDeck > 0) connectorLabel += ` · DeckLink ${mvDeck}`
-					else if (row?.hasScreen) connectorLabel += ' · Screen consumer'
-				}
-
-				const payload = {
-					enabled,
-					...rest,
-					channel,
-					showLedGrid: getLedTestShowGridForChannel(channel),
-					showCircle: s.showCircle !== false,
-					showCross: s.showCross !== false,
-					connectorLabel,
-				}
-				if (row) {
-					payload.resolutionLabel = row.resolutionLabel
-					payload.resolutionWidth = row.screenWidth
-					payload.resolutionHeight = row.screenHeight
-					payload.videoMode = row.videoMode
-				}
-				try {
-					await api.post('/api/led-test-card', payload)
-				} catch (err) {
-					failures.push({ channel, message: err?.message || String(err) })
 				}
 			}
-
-			if (enabled && failures.length === targets.length) {
+		} catch (e) {
+			if (e?.code === 'NO_CHANNELS') {
+				setLedTestMasterEnabled(false)
 				ledTestCb.checked = false
-				localStorage.setItem('highascg_led_test_enabled', 'false')
-				alert(
-					'LED test card: failed on all outputs.\n' +
-						failures.map((f) => `ch ${f.channel}: ${f.message}`).join('\n')
-				)
+				alert(e.message)
 				return
 			}
-			if (enabled && failures.length > 0) {
-				console.warn(
-					'LED test card: partial failure',
-					failures.map((f) => `ch ${f.channel}: ${f.message}`).join('; ')
-				)
-			}
-			localStorage.setItem('highascg_led_test_enabled', enabled ? 'true' : 'false')
-		} catch (e) {
+			setLedTestMasterEnabled(false)
 			ledTestCb.checked = false
-			localStorage.setItem('highascg_led_test_enabled', 'false')
 			alert('LED test card: ' + (e?.message || e))
+		} finally {
+			ledTestApplyBusy = false
 		}
 	}
 
 	ledTestCb.addEventListener('change', () => {
-		void applyLedTest(!!ledTestCb.checked)
+		const enabled = !!ledTestCb.checked
+		setLedTestMasterEnabled(enabled)
+		void applyLedTest(enabled)
 	})
 
 	ledTestBtn.addEventListener('click', () => {
-		showLedTestModal(() => {
-			if (ledTestCb.checked) void applyLedTest(true)
+		showLedTestModal((event) => {
+			if (event?.type === 'channel') {
+				if (event.enabled) {
+					setLedTestMasterEnabled(true)
+					ledTestCb.checked = true
+				} else {
+					const s = getLedTestSettings(stateStore)
+					const anyOn = Object.values(s.channelsEnabled || {}).some((v) => v === true)
+					if (!anyOn) {
+						setLedTestMasterEnabled(false)
+						ledTestCb.checked = false
+					}
+				}
+				void applyLedTest(event.enabled, { channels: [event.channel] })
+				return
+			}
+			if (!isLedTestMasterEnabled()) return
+			void applyLedTest(true)
 		}, stateStore)
 	})
 
@@ -161,8 +105,8 @@ export function initLedTestCard(container, stateStore) {
 			ftbBtn.disabled = true
 			try {
 				await api.post('/api/ftb', {})
+				setLedTestMasterEnabled(false)
 				ledTestCb.checked = false
-				localStorage.setItem('highascg_led_test_enabled', 'false')
 			} catch (e) {
 				alert('FTB: ' + (e?.message || e))
 			} finally {
@@ -172,14 +116,17 @@ export function initLedTestCard(container, stateStore) {
 		})()
 	})
 
+	// One-time sync from server on connect (startup splash). Do not fight user toggles afterward.
 	stateStore?.on?.('*', () => {
+		if (ledTestApplyBusy || ledTestServerSyncDone) return
 		const st = stateStore.getState()
-		if (st.ledTestPatternActive === undefined) return
-
-		const serverActive = !!st.ledTestPatternActive
-		if (ledTestCb.checked === serverActive) return
-
-		ledTestCb.checked = serverActive
-		localStorage.setItem('highascg_led_test_enabled', serverActive ? 'true' : 'false')
+		if (st.ledTestPatternActive !== true) return
+		if (isLedTestMasterEnabled()) {
+			ledTestServerSyncDone = true
+			return
+		}
+		ledTestServerSyncDone = true
+		setLedTestMasterEnabled(true)
+		ledTestCb.checked = true
 	})
 }

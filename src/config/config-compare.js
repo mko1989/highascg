@@ -99,7 +99,12 @@ function buildModuleChannelExpectation(config) {
 	}
 	// WO-53: one dedicated channel per live input (DeckLink = full mode, ALSA = cheap mode).
 	for (const entry of Array.isArray(map.inputChannels) ? map.inputChannels : []) {
-		const role = entry.kind === 'live_audio' ? `Live audio input ${entry.slot}` : `DeckLink input ${entry.slot}`
+		const role =
+			entry.kind === 'live_audio'
+				? `Live audio input ${entry.slot}`
+				: entry.kind === 'v4l2'
+					? `V4L2 / USB video input ${entry.slot}`
+					: `DeckLink input ${entry.slot}`
 		list.push({ index: entry.channel, role, videoMode: String(entry.mode || '1080p5000'), hasScreen: false })
 	}
 	const extraN = map.audioOnlyChannels?.length ?? 0

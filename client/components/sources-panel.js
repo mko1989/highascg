@@ -20,8 +20,11 @@ import * as Ingest from './sources-panel-ingest-logic.js'
 import { renderLiveTab } from './sources-panel-live-render.js'
 import { showPlaceholderModal } from './placeholder-modal.js'
 import { refreshLiveAudioConfigured } from '../lib/live-audio-state.js'
+import { refreshV4l2Configured } from '../lib/v4l2-input-state.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
-import { decklinkInputForSlot, decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { effectiveChannelMap } from '../lib/planned-channel-map.js'
+import { addDecklinkInputSlot } from '../lib/decklink-add-input.js'
 import { copyMediaFiles, deleteMediaFiles, formatMediaOpResult, moveMediaFiles } from '../lib/media-file-ops.js'
 import { showMediaFolderPicker, listMediaFolders } from './media-folder-picker-modal.js'
 import {
@@ -47,6 +50,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	async function refreshLiveTabFromServer() {
 		invalidateLiveTabRender()
 		liveAudioConfiguredCache = await fetchLiveAudioConfigured()
+		v4l2ConfiguredCache = await fetchV4l2Configured()
 		try {
 			const st = await api.get('/api/state')
 			if (st && stateStore) {
@@ -56,6 +60,9 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 				}
 				if (st.liveAudioInputsStatus !== undefined) {
 					stateStore.applyChange('liveAudioInputsStatus', st.liveAudioInputsStatus)
+				}
+				if (st.v4l2InputsStatus !== undefined) {
+					stateStore.applyChange('v4l2InputsStatus', st.v4l2InputsStatus)
 				}
 				if (Array.isArray(st.extraLiveSources)) {
 					stateStore.applyChange('extraLiveSources', st.extraLiveSources)
@@ -89,6 +96,8 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	let mediaWithProbe = null
 	/** @type {object | null} */
 	let liveAudioConfiguredCache = null
+	/** @type {object | null} */
+	let v4l2ConfiguredCache = null
 	const collapsedFolders = new Set()
 	let filterProjectOnly = false
 	let projectMediaCtx = getProjectMediaContext()
@@ -96,6 +105,10 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	async function fetchLiveAudioConfigured() {
 		liveAudioConfiguredCache = await refreshLiveAudioConfigured(stateStore)
 		return liveAudioConfiguredCache
+	}
+	async function fetchV4l2Configured() {
+		v4l2ConfiguredCache = await refreshV4l2Configured(stateStore)
+		return v4l2ConfiguredCache
 	}
 	const selectedMedia = new Set()
 	let lastSelectedMediaId = null
@@ -207,6 +220,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 				)
 				sceneState.refreshLiveSnapshotsFromScenes()
 				sceneState._save()
+				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 				window.dispatchEvent(new Event('project-loaded'))
 			}
 			if (result.failed > 0) {
@@ -240,7 +254,13 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		})
 	})
 	document.addEventListener('highascg-device-view-reload', scheduleLiveTabRefresh)
+	window.addEventListener('highascg-caspar-restart-dirty', () => {
+		void settingsState.load().then(() => scheduleLiveTabRefresh())
+	})
 	document.addEventListener('highascg-live-audio-configured', () => {
+		if (currentTab === 'live') render()
+	})
+	document.addEventListener('highascg-v4l2-configured', () => {
 		if (currentTab === 'live') render()
 	})
 
@@ -348,7 +368,6 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		if (!connectorId) return
 		setStatus(`Mapping ${connectorId} as live input…`, 'info')
 		try {
-			await api.post('/api/device-view', { updateConnector: { id: connectorId, patch: { caspar: { ioDirection: 'in' } } } })
 			const payload = await api.get('/api/device-view')
 			const connectors = [
 				...(Array.isArray(payload?.graph?.connectors) ? payload.graph.connectors : []),
@@ -356,38 +375,19 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 			]
 			const c = connectors.find((x) => String(x?.id || '') === connectorId) || null
 			const slot = decklinkSlotFromConnector(c || { index: parseInt(String(connectorId).replace(/^dli_/, ''), 10) - 1 })
-			const dev = Math.max(0, parseInt(String(c?.externalRef ?? 0), 10) || 0)
-			const cm = stateStore.getState()?.channelMap || {}
-			const entry = decklinkInputForSlot(cm, slot)
-			if (entry?.channel == null) {
+			const dev = Math.max(1, parseInt(String(c?.externalRef ?? slot), 10) || slot)
+			const r = await addDecklinkInputSlot(stateStore, { device: dev, slot })
+			if (!r.ok) {
 				markCasparRestartDirty()
-				setStatus(`Mapped ${connectorId} to input. Set decklink_input_count ≥ ${slot} and restart Caspar.`, 'ok')
+				setStatus(r.error || `Failed to map ${connectorId}`, 'error')
 				return
 			}
-			const layer = entry.layer ?? slot
-			const cl = `${entry.channel}-${layer}`
-			await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-			await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
-			await api.post('/api/raw', { cmd: `PLAY ${cl} DECKLINK ${dev}` })
-			const routeVal = entry.route || `route://${cl}`
-			const item = {
-				type: 'route',
-				routeType: 'decklink',
-				value: routeVal,
-				label: entry.label || `decklink ${slot}`,
-				decklinkSlot: slot,
-				inputsChannel: entry.channel,
-				inputsLayer: layer,
-				connectorId,
-				decklinkDevice: dev,
-			}
-			const addRes = await api.post('/api/device-view', { addExtraLiveSource: item })
-			if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
-				window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
+			if (Array.isArray(r.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+				window.__highascgApplyExtraLiveSources(r.extraLiveSources)
 			}
 			markCasparRestartDirty()
-			setStatus(`Live source ready: ${routeVal} (${connectorId})`, 'ok')
-			showDecklinkDropHint(`route://${cl}`, connectorId)
+			setStatus(`Live source ready: ${r.route} (${connectorId})`, 'ok')
+			showDecklinkDropHint(r.route, connectorId)
 			activateTab('live')
 		} catch (e) {
 			setStatus(e?.message || String(e), 'error')
@@ -519,12 +519,23 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		else if (currentTab === 'live') {
 			unwatchUsbBadge()
 			const liveCfg = s.liveAudioConfigured || liveAudioConfiguredCache
-			if (!liveCfg) void fetchLiveAudioConfigured().then(() => render())
+			const v4l2Cfg = s.v4l2Configured || v4l2ConfiguredCache
+			if (!liveCfg || !v4l2Cfg) {
+				void Promise.all([
+					!liveCfg ? fetchLiveAudioConfigured() : Promise.resolve(),
+					!v4l2Cfg ? fetchV4l2Configured() : Promise.resolve(),
+				]).then(() => render())
+			}
 			renderLiveTab(listEl, {
-				channelMap: s.channelMap || {},
+				channelMap: effectiveChannelMap({
+					settings: settingsState.getSettings(),
+					liveChannelMap: s.channelMap,
+				}),
 				decklinkInputsStatus: s.decklinkInputsStatus,
 				liveAudioInputsStatus: s.liveAudioInputsStatus,
+				v4l2InputsStatus: s.v4l2InputsStatus,
 				liveAudioConfigured: liveCfg,
+				v4l2Configured: v4l2Cfg,
 				extraSources: s.extraLiveSources || [],
 				connectors: liveConnectorsCache.length ? liveConnectorsCache : s.connectors || [],
 				hostOperatorFullscreen: s.hostOperatorFullscreen || null,

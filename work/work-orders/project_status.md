@@ -37,6 +37,7 @@
 | 94 | [94_WO_ETHERNET_LINK_LOCAL_FALLBACK.md](./94_WO_ETHERNET_LINK_LOCAL_FALLBACK.md) | Draft | NM link-local fallback when DHCP absent (egg networkd has it; runtime does not) |
 | 95 | [95_WO_EXFAT_NETWORK_CONFIG_FILE.md](./95_WO_EXFAT_NETWORK_CONFIG_FILE.md) | In progress | exFAT `network/network.conf` — operator DHCP/static IP at boot (T95.1–T95.3 shipped) |
 | 110 | [110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md](./110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md) | In progress | Looks canvas thumb fixes (T110.1/3/5–7 shipped); WO-94/95 stick network pending |
+| 121 | [121_WO_USB_WEBCAM_V4L2_INPUT.md](./121_WO_USB_WEBCAM_V4L2_INPUT.md) | In progress | USB/UVC webcam input — Phase A shipped (bridge + API + Settings tab); Device View / Live tab pending |
 
 ## WO-33 — Device view (split)
 

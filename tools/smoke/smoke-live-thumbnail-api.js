@@ -26,7 +26,7 @@ test('GET live thumbnail — 404 JSON when no cache (JSON_HEADERS defined)', asy
 	assert.equal(res.status, 404)
 	assert.equal(res.headers['Content-Type'], 'application/json; charset=utf-8')
 	const body = JSON.parse(String(res.body))
-	assert.equal(body.error, 'No live thumbnail cached')
+	assert.equal(body.error, 'No cached live thumbnail')
 	assert.equal(body.channel, 3)
 })
 
@@ -54,11 +54,13 @@ test('GET live thumbnail — 200 serves cached PNG', async () => {
 		'hex',
 	)
 	const dest = cachePngPath(ctx.config, 5)
+	const metaDest = path.join(path.dirname(dest), 'ch-5.json')
 	await fs.promises.mkdir(path.dirname(dest), { recursive: true })
 	await fs.promises.writeFile(dest, png)
+	await fs.promises.writeFile(metaDest, JSON.stringify({ channel: 5, capturedAt: new Date().toISOString() }))
 	const res = await handleLiveThumbnailGet(ctx, 5, {})
 	assert.equal(res.status, 200)
 	assert.equal(res.headers['Content-Type'], 'image/png')
-	assert.equal(res.headers['Cache-Control'], 'no-cache')
+	assert.match(res.headers['Cache-Control'], /max-age=86400/)
 	assert.ok(Buffer.isBuffer(res.body))
 })

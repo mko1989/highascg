@@ -27,6 +27,8 @@ const routesAudio = require('./routes-audio')
 const routesProject = require('./routes-project')
 const routesLedTestCard = require('./routes-led-test-card')
 const routesComposePreview = require('./routes-compose-preview')
+const routesVirtualCamera = require('./routes-virtual-camera')
+const routesV4l2Input = require('./routes-v4l2-input')
 const { applyUiSelectionPayloadToVariables } = require('./apply-ui-selection-variables')
 const routesFtb = require('./routes-ftb')
 const routesSystemStaged = require('./routes-system-staged')
@@ -122,6 +124,9 @@ routes.get('/api/system/gpu-layout', ({ path, ctx }) => routesSystemHardware.har
 routes.get('/api/system/xrandr-layout', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/network', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/operator-display', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
+routes.get('/api/system/v4l2-devices', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })
+routes.get('/api/v4l2-inputs', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })
+routes.get('/api/v4l2-inputs/status', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })
 
 routes.post('/api/system/gpu-nvidia/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gui-launch', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
@@ -153,6 +158,8 @@ routes.get('/api/system/version', ({ path, ctx, query }) => routesSystemUpdate.h
 routes.get('/api/system/update/*', ({ path, ctx, query }) => routesSystemUpdate.handleGet(path, ctx, query), { requireCaspar: false })
 routes.get('/api/system/update', ({ path, ctx, query }) => routesSystemUpdate.handleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/system/update/apply', ({ path, body, ctx }) => routesSystemUpdate.handlePost(path, body, ctx), { requireCaspar: false })
+
+routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { requireCaspar: false })
 
 // Scene live
 routes.get('/api/scene/live', ({ ctx }) => {
@@ -284,6 +291,13 @@ routes.post('/api/media/cinf', ({ path, body, ctx, req, query }) => routesMedia.
 routes.post('/api/thumbnail/live/capture', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/thumbnail/live/upload', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/compose-preview/refresh', ({ path, body, ctx }) => routesComposePreview.handlePost(path, body, ctx), { requireCaspar: false })
+routes.get('/api/virtual-camera/status', ({ path, ctx }) => routesVirtualCamera.handleGet(path, ctx), { requireCaspar: false })
+routes.get('/api/virtual-camera', ({ path, ctx }) => routesVirtualCamera.handleGet(path, ctx), { requireCaspar: false })
+routes.post('/api/virtual-camera/config', ({ path, body, ctx }) => routesVirtualCamera.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/virtual-camera/start', ({ path, body, ctx }) => routesVirtualCamera.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/v4l2-inputs/apply', ({ path, body, ctx }) => routesV4l2Input.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/v4l2-inputs/config', ({ path, body, ctx }) => routesV4l2Input.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/virtual-camera/stop', ({ path, body, ctx }) => routesVirtualCamera.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/cg-thumb/render', ({ path, body, ctx }) => routesCgThumb.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/cg-thumb/*', ({ path, query, ctx }) => routesCgThumb.handleGet(path, query, ctx), { requireCaspar: false })
@@ -345,6 +359,8 @@ routes.post('/api/data/*', ({ path, body, ctx }) => routesData.handlePost(path, 
 routes.post('/api/media/*', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: true })
 
 routes.post('/api/multiview/*', ({ path, body, ctx }) => routesMultiview.handlePost(path, body, ctx), { requireCaspar: true })
+routes.post('/api/scene/live/preview/clear', ({ body, ctx }) =>
+	routesScene.handlePost('/api/scene/live/preview/clear', body, ctx), { requireCaspar: false })
 routes.post('/api/scene/*', ({ path, body, ctx }) => routesScene.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/misc/*', ({ path, body, ctx }) => routesMisc.handlePost(path, body, ctx), { requireCaspar: true })
 

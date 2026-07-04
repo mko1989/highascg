@@ -25,9 +25,14 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 		try {
 			clearStartupLedTestTimers()
 			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onShutdown()
+			if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onShutdown()
 			try {
 				const { stopAllLiveAudioBridges } = require('../audio/live-audio-bridge')
 				stopAllLiveAudioBridges()
+			} catch (_) {}
+			try {
+				const { stopAllV4l2InputBridges } = require('../capture/v4l2-input-bridge')
+				stopAllV4l2InputBridges()
 			} catch (_) {}
 			clearPeriodicSyncTimer(appCtx)
 			if (appCtx._systemVarsInterval) clearInterval(appCtx._systemVarsInterval)

@@ -36,6 +36,7 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 │           NDI (libndi in tree + ~/highascg/lib copies)     │
 ├─────────────────────────────────────────────────────────────┤
 │  FFmpeg, systemd-networkd, optional NetworkManager stack    │
+│  v4l-utils (`v4l2-ctl`) — USB/V4L2 webcam enumeration       │
 ├─────────────────────────────────────────────────────────────┤
 │  Ubuntu 24.04 LTS (Noble) — linux-generic, systemd, GRUB    │
 └─────────────────────────────────────────────────────────────┘

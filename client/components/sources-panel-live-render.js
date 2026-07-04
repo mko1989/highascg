@@ -7,8 +7,10 @@ import {
 	escapeHtml,
 	liveAudioSlotStatusMessage,
 	makeDraggable,
+	v4l2SlotStatusMessage,
 } from './sources-panel-helpers.js'
 import { migrateLegacyInputRoute } from '../lib/input-channels.js'
+import { reconcileExtraLiveSourceChannel } from '../lib/device-view-host-channels.js'
 import { getLiveThumbnailChannelForSource, getLiveThumbnailUrl } from '../lib/thumbnail-url.js'
 import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
 
@@ -16,20 +18,27 @@ export function renderLiveTab(listEl, {
 	channelMap,
 	decklinkInputsStatus,
 	liveAudioInputsStatus,
+	v4l2InputsStatus,
 	liveAudioConfigured,
+	v4l2Configured,
 	extraSources = [],
 	connectors = [],
 	hostOperatorFullscreen = null,
 }) {
-	const base = buildLiveSources(channelMap, connectors, liveAudioConfigured)
+	const base = buildLiveSources(channelMap, connectors, liveAudioConfigured, v4l2Configured)
 	const existing = new Set(base.map((s) => String(s.value || '')))
 	const extras = Array.isArray(extraSources)
 		? extraSources
 				.filter((s) => s && s.value && !existing.has(String(s.value)))
-				.map((s) => ({
-					...s,
-					value: migrateLegacyInputRoute(channelMap, s.value),
-				}))
+				.map((s) =>
+					reconcileExtraLiveSourceChannel(
+						{
+							...s,
+							value: migrateLegacyInputRoute(channelMap, s.value),
+						},
+						channelMap,
+					),
+				)
 		: []
 	const sources = [...extras, ...base]
 
@@ -39,6 +48,7 @@ export function renderLiveTab(listEl, {
 			preview: channelMap?.previewChannels || [],
 			decklinkCount: channelMap?.decklinkCount ?? 0,
 			liveAudioCount: channelMap?.liveAudioCount ?? 0,
+			v4l2InputCount: channelMap?.v4l2InputCount ?? 0,
 			multiviewCh: channelMap?.multiviewCh ?? null,
 		},
 		sources: sources.map((s) => ({
@@ -51,6 +61,7 @@ export function renderLiveTab(listEl, {
 		connectors: connectors.map((c) => c?.id).filter(Boolean),
 		status: decklinkInputsStatus,
 		liveAudioStatus: liveAudioInputsStatus,
+		v4l2Status: v4l2InputsStatus,
 		operatorFs: hostOperatorFullscreen?.sourceId || null,
 	})
 	if (listEl._lastRenderKey === renderKey) return
@@ -65,6 +76,9 @@ export function renderLiveTab(listEl, {
 	if (sources.some((s) => s.routeType === 'live_audio')) {
 		hintParts.push('Live audio: configure in Settings → live audio, then drag onto looks.')
 	}
+	if (sources.some((s) => s.routeType === 'v4l2')) {
+		hintParts.push('USB video: configure in Settings → USB video, then drag route:// onto PGM or multiview.')
+	}
 	if (sources.some(s => s.routeType === 'layer')) hintParts.push('Layer routes: Looks row ↗ (default = PGM; Shift+↗ = edit bus, Ctrl+↗ = PRV). Drag onto another layer.')
 	if (sources.some((s) => s.routeType === 'webpage_host')) {
 		hintParts.push('Webpage hosts: click a tile to edit the page URL in the Inspector; ⛶ routes video to the operator monitor.')
@@ -74,6 +88,9 @@ export function renderLiveTab(listEl, {
 		const el = document.createElement('div')
 		
 		const metaItems = [s.resolution, s.fps ? `${s.fps} fps` : '']
+		if (s.routeType === 'v4l2' && s.devicePath) {
+			metaItems.unshift(String(s.devicePath))
+		}
 		if (s.routeType === 'webpage_host' || s.routeType === 'ndi_host') {
 			if (s.hostChannel != null) metaItems.push(`host ch ${s.hostChannel}`)
 			metaItems.push(s.value || '')
@@ -91,6 +108,8 @@ export function renderLiveTab(listEl, {
 			slotMsg = decklinkSlotStatusMessage(decklinkInputsStatus, s.decklinkSlot)
 		} else if (s.routeType === 'live_audio' && s.liveAudioSlot != null) {
 			slotMsg = liveAudioSlotStatusMessage(liveAudioInputsStatus, s.liveAudioSlot)
+		} else if (s.routeType === 'v4l2' && s.v4l2Slot != null) {
+			slotMsg = v4l2SlotStatusMessage(v4l2InputsStatus, s.v4l2Slot)
 		}
 		
 		const ch = getLiveThumbnailChannelForSource(s)
@@ -283,6 +302,26 @@ export function renderLiveTab(listEl, {
 				applyBtn.disabled = true
 				try {
 					await api.post('/api/audio/live-inputs/apply', {})
+				} finally {
+					applyBtn.disabled = false
+				}
+			}
+			btnGroup.appendChild(applyBtn)
+			el.appendChild(btnGroup)
+		} else if (s.routeType === 'v4l2' && s.inputsChannel != null && s.v4l2Slot != null) {
+			const btnGroup = document.createElement('div')
+			btnGroup.className = 'source-item__live-actions'
+			const applyBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: 'source-item__live-btn',
+				title: 'Re-apply FFmpeg bridge + PLAY on host channel',
+				textContent: 'Apply',
+			})
+			applyBtn.onclick = async (e) => {
+				e.stopPropagation()
+				applyBtn.disabled = true
+				try {
+					await api.post('/api/v4l2-inputs/apply', {})
 				} finally {
 					applyBtn.disabled = false
 				}

@@ -16,6 +16,16 @@ const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../con
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { listPortAudioDevices } = require('../audio/audio-devices')
 const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
+const { resolveDecklinkInputSlots } = require('../config/decklink-input-slots')
+
+/** Drop phantom rows from loose caspar-log parsing (e.g. ffmpeg h264 `[27]` codec bytes). */
+function sanitizeDecklinkHardwareConnectors(connectors) {
+	return (Array.isArray(connectors) ? connectors : []).filter((c) => {
+		const idx = parseInt(String(c?.index), 10)
+		const label = String(c?.label || '')
+		return Number.isFinite(idx) && idx >= 1 && idx <= 32 && /decklink/i.test(label)
+	})
+}
 
 function isPseudoGpuConnectorName(name) {
 	const s = String(name || '').trim().toLowerCase()
@@ -63,12 +73,16 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 	if (hardwareCount > 0) n = hardwareCount
 	else n = 0
 	n = Math.min(8, Math.max(0, n))
+	const configuredInputSlots = new Set(resolveDecklinkInputSlots(ctx.config || {}))
 	const rt = ctx._decklinkInputsStatus; const inputs = []
 	const routeMap = getChannelMap(ctx.config || {})
 	for (let i = 1; i <= n; i++) {
 		const device = parseInt(String(cs[`decklink_input_${i}_device`] ?? 0), 10) || 0
 		const resolvedDevice = resolveDecklinkInputDeviceIndex(ctx.config || {}, i)
-		const inputEntry = (routeMap.inputChannels || []).find((e) => e.kind === 'decklink' && Number(e.slot) === i)
+		const slotConfiguredAsInput = configuredInputSlots.has(i)
+		const inputEntry = slotConfiguredAsInput
+			? (routeMap.inputChannels || []).find((e) => e.kind === 'decklink' && Number(e.slot) === i)
+			: null
 		const graphConn = graphConnectors.find((c) => {
 			if (c?.kind !== 'decklink_io') return false
 			const slotFromIndex = (parseInt(String(c.index ?? -1), 10) || 0) + 1
@@ -78,7 +92,7 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		let ioDirection = DECKLINK_IO_UNASSIGNED
 		if (graphConn?.caspar) {
 			ioDirection = normalizeDecklinkIoDirection(graphConn.caspar)
-		} else if (device > 0 || resolvedDevice > 0) {
+		} else if (slotConfiguredAsInput && (device > 0 || resolvedDevice > 0)) {
 			ioDirection = normalizeDecklinkIoDirection({ ioDirection: cs[`decklink_input_${i}_direction`] })
 		}
 		const fail = (rt?.failed || []).find(x => Number(x?.layer) === i); let state = 'ready', message = ''
@@ -145,8 +159,29 @@ function buildDestinationCasparIntent(ctx) {
 	const list = destinationsFromConfig(ctx.config || {}); const map = getChannelMap(ctx.config || {})
 	const items = []; let pgmOnlyCount = 0, generatedPreviewCount = 0
 	for (const d of list) {
-		if (!d) continue; const mainIdx = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
+		if (!d) continue
 		const modeRaw = String(d.mode || 'pgm_prv')
+		if (modeRaw === 'host_channel') {
+			const ch = parseInt(String(d.casparChannel ?? ''), 10)
+			items.push({
+				id: String(d.id || ''),
+				label: String(d.label || d.id || ''),
+				mainScreenIndex: 0,
+				mode: 'host_channel',
+				hostRole: String(d.hostRole || ''),
+				casparChannel: Number.isFinite(ch) ? ch : null,
+				pgmChannel: Number.isFinite(ch) ? ch : null,
+				previewChannelIntended: null,
+				previewChannelGenerated: null,
+				previewChannelGeneratedEnabled: false,
+				videoMode: '',
+				width: null,
+				height: null,
+				fps: null,
+			})
+			continue
+		}
+		const mainIdx = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
 		const mode = modeRaw === 'pgm_only' ? 'pgm_only' : (modeRaw === 'multiview' ? 'multiview' : (modeRaw === 'stream' ? 'stream' : 'pgm_prv'))
 		const pgmCh = mode === 'multiview' ? (map.multiviewCh ?? null) : (map.programChannels?.[mainIdx] ?? null)
 		const prvGen = (mode === 'multiview' || mode === 'stream') ? null : (map.previewChannels?.[mainIdx] ?? null)
@@ -174,11 +209,13 @@ function buildGeneratedChannelOrder(ctx) {
 		const role =
 			entry.kind === 'live_audio'
 				? 'live_audio_input'
-				: entry.kind === 'webpage_host'
-					? 'webpage_host'
-					: entry.kind === 'ndi_host'
-						? 'ndi_host'
-						: 'decklink_input'
+				: entry.kind === 'v4l2'
+					? 'v4l2_input'
+					: entry.kind === 'webpage_host'
+						? 'webpage_host'
+						: entry.kind === 'ndi_host'
+							? 'ndi_host'
+							: 'decklink_input'
 		const row = { ch: entry.channel, role, slot: entry.slot }
 		if (entry.sourceId) row.sourceId = entry.sourceId
 		if (entry.label) row.label = entry.label
@@ -201,7 +238,10 @@ async function buildLiveSnapshot(ctx) {
 	try { displays = getDisplayDetails() || [] } catch (e) { warnings.push(`gpu_enum: ${e.message}`) }
 	let decklinkHw =
 		inv?.payload?.decklink && Array.isArray(inv.payload.decklink.connectors)
-			? inv.payload.decklink
+			? {
+				...inv.payload.decklink,
+				connectors: sanitizeDecklinkHardwareConnectors(inv.payload.decklink.connectors),
+			}
 			: { source: 'none', connectors: [] }
 	if (!decklinkHw.connectors.length) {
 		try {
@@ -218,6 +258,10 @@ async function buildLiveSnapshot(ctx) {
 		} else if (fromCasparLog?.warning) {
 			warnings.push(`decklink_log_parse: ${fromCasparLog.warning}`)
 		}
+	}
+	decklinkHw = {
+		...decklinkHw,
+		connectors: sanitizeDecklinkHardwareConnectors(decklinkHw?.connectors),
 	}
 	if (decklinkHw?.warning) warnings.push(`decklink_log: ${decklinkHw.warning}`)
 	if ((!Array.isArray(decklinkHw?.connectors) || decklinkHw.connectors.length === 0) && ctx.gatheredInfo?.decklinkFromConfig) {
@@ -316,6 +360,7 @@ async function buildLiveSnapshot(ctx) {
 			devices: genericAudioDevices,
 		},
 		caspar,
+		virtualCamera: require('./routes-virtual-camera').getStatusPayload(ctx),
 		warnings,
 	}
 }

@@ -28,6 +28,13 @@ jobs:
           source: ./docs
           destination: ./_site
 
+      - name: Build and inject Project Map
+        run: |
+          npm ci
+          npx vite build -c vite.map.config.js
+          mkdir -p _site/map
+          cp -r dist-map/* _site/map/
+
       - uses: actions/upload-pages-artifact@v3
 
   deploy:

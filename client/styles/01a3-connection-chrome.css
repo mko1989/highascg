@@ -1,0 +1,195 @@
+/* PGM clip time (OSC, topmost layer) — left of connection eye */
+.header-pgm-timer-wrap {
+	flex: 1 1 0;
+	min-width: 0;
+	max-width: min(100%, 18rem);
+	overflow: hidden;
+	text-align: right;
+}
+
+.header-pgm-timer-chips {
+	display: inline-flex;
+	gap: 4px;
+	margin-bottom: 2px;
+}
+
+.header-pgm-timer-chip {
+	border: 1px solid var(--border, #3a3a3a);
+	background: transparent;
+	color: var(--text-muted, #9ca3af);
+	font-size: 10px;
+	line-height: 1;
+	padding: 2px 5px;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+.header-pgm-timer-chip--active {
+	color: var(--text, #fff);
+	border-color: var(--accent, #58a6ff);
+	background: color-mix(in srgb, var(--accent, #58a6ff) 20%, transparent);
+}
+
+/* Beats injected .playback-timer { min-width: 8em } from playback-timer.js */
+.header__status .playback-timer.header-pgm-timer {
+	font-size: 11px;
+	line-height: 1.25;
+	min-width: 0;
+	width: 100%;
+	max-width: 100%;
+}
+
+.header__status .header-pgm-timer .playback-timer__row {
+	min-width: 0;
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Headphones + menu stay visible when the timer competes for width */
+.header-right .header-audio {
+	flex-shrink: 0;
+}
+
+.header__status .connection-eye-wrap {
+	flex-shrink: 0;
+	position: relative;
+	z-index: 20;
+}
+
+.header__status .connection-eye {
+	flex-shrink: 0;
+	min-width: 72px;
+	min-height: 28px;
+}
+
+.header__status .connection-eye__img {
+	width: 72px;
+	height: 28px;
+}
+
+/* Server config vs module (FEAT-1) */
+.server-config-strip {
+	background: var(--bg-elevated);
+	border-bottom: 1px solid var(--border);
+	padding: 10px 16px 12px;
+	font-size: 0.8rem;
+	max-height: 50vh;
+	overflow: auto;
+}
+
+.server-config-strip__summary {
+	font-weight: 600;
+	margin-bottom: 8px;
+}
+
+.server-config-strip__summary--ok {
+	color: var(--accent, #58a6ff);
+}
+
+.server-config-strip__summary--warn {
+	color: #e6a23c;
+}
+
+.server-config-strip__table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 8px;
+	font-size: 0.75rem;
+}
+
+.server-config-strip__table th,
+.server-config-strip__table td {
+	border: 1px solid var(--border);
+	padding: 4px 8px;
+	text-align: left;
+}
+
+.server-config-strip__table th {
+	background: var(--bg-dark);
+}
+
+.server-config-strip__issues {
+	margin: 0 0 8px 1.2em;
+	padding: 0;
+	color: #e6a23c;
+}
+
+.server-config-strip__hint {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 0.75rem;
+}
+
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	animation: pulse 1.5s infinite;
+}
+
+.status-dot.connected {
+	background: var(--success);
+	animation: none;
+}
+
+.status-dot.disconnected {
+	background: var(--error);
+	animation: none;
+}
+
+/* Connection Eye — eye-only SVGs (see connection-eye.js).
+   Fixed box: blink frames have wider aspect than open; avoids layout jump on src swap. */
+.connection-eye {
+	min-width: 120px;
+	min-height: 44px;
+	cursor: help;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.connection-eye__img {
+	display: block;
+	box-sizing: border-box;
+	width: 120px;
+	height: 44px;
+	object-fit: contain;
+	object-position: center;
+}
+
+/* Offline draft mode: uses the dedicated eyes_blue assets (no CSS filter tint required) */
+.connection-eye.offline .connection-eye__img {
+	filter: none;
+}
+
+/* Position (fixed) and placement are set in connection-eye.js so the header does not reflow. */
+.connection-eye-tooltip {
+	min-width: 14rem;
+	max-width: min(28rem, calc(100vw - 16px));
+	max-height: min(70vh, 28rem);
+	overflow: auto;
+	padding: 10px 12px;
+	box-sizing: border-box;
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	font-variant-numeric: tabular-nums;
+	color: var(--text, #e6edf3);
+	background: var(--bg-elevated, #21262d);
+	border: 1px solid var(--border, #30363d);
+	border-radius: 8px;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+	z-index: 10050;
+}
+
+.connection-eye-tooltip[hidden] {
+	display: none !important;
+}
+
+@keyframes pulse {
+	50% { opacity: 0.5; }
+}

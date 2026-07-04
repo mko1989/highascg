@@ -165,7 +165,7 @@ export function initMultiviewEditor(root, stateStore) {
 					const ratio = resolveSourceAspectRatio(c, getCM())
 					const programChannels = getCM().programChannels || []
 					const previewChannels = getCM().previewChannels || []
-					const ovType = getCellOverlayType(c, programChannels, previewChannels)
+					const ovType = getCellOverlayType(c, programChannels, previewChannels, getCM())
 					const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
 					if (handleStr.includes('e') || handleStr.includes('w')) {
 						const solved = solveCellDimensions(w, ch, ratio, 'width', ovType, showTimersUnderLabels)
@@ -190,7 +190,25 @@ export function initMultiviewEditor(root, stateStore) {
 	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
 	canvas.ondragleave = () => { dropHoverId = null; draw() }
 	canvas.ondrop = e => { e.preventDefault(); dropHoverId = null; const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); let c = getCellAt(x, y, getCM()), data; try { data = JSON.parse(e.dataTransfer.getData('application/json')) } catch { const v = e.dataTransfer.getData('text/plain'); if (v) data = { type: 'media', value: v, label: v } }; if (!data?.value) { draw(); return }
-		if (!c) { const mw = multiviewState.canvasWidth, mh = multiviewState.canvasHeight; if (x < 0 || x > mw || y < 0 || y > mh) { draw(); return }; let cw = Math.round(mw / 4), ch = Math.round(mh / 4); if (data.resolution) { const m = String(data.resolution).match(/(\d+)[×x](\d+)/i); if (m) { const sw = parseInt(m[1]), sh = parseInt(m[2]), rat = sw / sh; cw = Math.min(mw / 4, mw); ch = Math.round(cw / rat); if (ch > mh) { ch = mh; cw = Math.round(ch * rat) } } }
+		if (!c) { const mw = multiviewState.canvasWidth, mh = multiviewState.canvasHeight; if (x < 0 || x > mw || y < 0 || y > mh) { draw(); return }
+			const routeType = data.routeType || data.type || 'media'
+			let cw = Math.round(mw / 4)
+			let ch = Math.round(mh / 4)
+			let ratio = 16 / 9
+			if (data.resolution) {
+				const m = String(data.resolution).match(/(\d+)[×x](\d+)/i)
+				if (m) ratio = parseInt(m[1], 10) / parseInt(m[2], 10)
+			}
+			if (['route', 'pgm', 'prv', 'decklink', 'live_audio', 'v4l2'].includes(routeType)) {
+				const solved = solveCellDimensions(cw, cw, ratio, 'width', routeType, multiviewState.showTimersUnderLabels)
+				cw = solved.w
+				ch = solved.h
+				if (ch > mh) {
+					const fit = solveCellDimensions(cw, mh, ratio, 'height', routeType, multiviewState.showTimersUnderLabels)
+					cw = fit.w
+					ch = fit.h
+				}
+			}
 		c = multiviewState.addCell({ type: data.routeType || data.type, label: data.label || data.value, x: Math.max(0, Math.min(mw - cw, x - cw / 2)), y: Math.max(0, Math.min(mh - ch, y - ch / 2)), w: cw, h: ch, source: { value: data.value, type: data.type || 'media', label: data.label || data.value }, aspectLocked: true }); selectedId = c.id }
 		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); flushApply()
 	}

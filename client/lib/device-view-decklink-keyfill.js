@@ -4,7 +4,7 @@
 import { CASPAR_HOST } from '../components/device-view-helpers.js'
 import { isDecklinkIoOut } from './decklink-io-direction.js'
 
-const DECKLINK_KINDS = new Set(['decklink_io', 'decklink_out', 'decklink_in'])
+const DECKLINK_KINDS = new Set(['decklink_io', 'decklink_out'])
 
 export function decklinkConnectorByDeviceIndex(payload, deviceIndex) {
 	const n = parseInt(String(deviceIndex ?? ''), 10)

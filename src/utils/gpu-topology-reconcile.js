@@ -49,6 +49,16 @@ function bracketHasLiveRandr(connected, dpA, dpB) {
 	return (a && connected.has(a)) || (b && connected.has(b))
 }
 
+/** Canonical key for a dual-lane physical jack (DP-2/DP-3, HDMI-0/HDMI-1, …). */
+function topologyPairKey(dpA, dpB) {
+	const a = normRandr(dpA)
+	const b = normRandr(dpB)
+	if (!a && !b) return ''
+	if (!b) return a
+	if (!a) return b
+	return [a, b].sort().join('/')
+}
+
 /**
  * Align stale saved pair → gpu_pN rows with live RandR (server-side).
  * @param {object[]} topology saved / config rows
@@ -64,17 +74,34 @@ function reconcileTopologyWithLiveDisplays(topology, displays, discoveredRows = 
 		normalizeTopologyRows(discoveredRows || []).map((r) => [r.physicalPortId, r]),
 	)
 
-	return merged.map((row, idx) => {
-		if (bracketHasLiveRandr(connected, row.dpA, row.dpB)) return { ...row, slotOrder: idx }
+	const result = merged.map((row, idx) => ({ ...row, slotOrder: idx }))
+	const claimedPairs = new Set()
+
+	// Saved brackets that already match live RandR win the pair (prevents duplicate jacks).
+	for (const row of result) {
+		if (!bracketHasLiveRandr(connected, row.dpA, row.dpB)) continue
+		const pk = topologyPairKey(row.dpA, row.dpB)
+		if (pk) claimedPairs.add(pk)
+	}
+
+	return result.map((row, idx) => {
+		if (bracketHasLiveRandr(connected, row.dpA, row.dpB)) {
+			return { ...row, slotOrder: idx }
+		}
 		const def = discoveredById.get(row.physicalPortId)
 		if (def && bracketHasLiveRandr(connected, def.dpA, def.dpB)) {
+			const pk = topologyPairKey(def.dpA, def.dpB)
+			if (pk && claimedPairs.has(pk)) {
+				return { ...row, slotOrder: idx }
+			}
+			if (pk) claimedPairs.add(pk)
 			return {
 				...row,
 				dpA: def.dpA,
 				dpB: def.dpB,
 				slotOrder: idx,
-				connectorNumber: idx,
-				location: idx,
+				connectorNumber: Number.isFinite(Number(row.connectorNumber)) ? row.connectorNumber : idx,
+				location: Number.isFinite(Number(row.location)) ? row.location : idx,
 			}
 		}
 		return { ...row, slotOrder: idx }

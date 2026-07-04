@@ -73,7 +73,12 @@ rsync_drop_members() {
 		fi
 	done
 	if [[ -f "${REPO_ROOT}/BUILD_STAMP" ]]; then
-		install -m 0644 -o root -g root "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
+		# exFAT cannot store Unix ownership — skip -o/-g on that filesystem.
+		if findmnt -T "$dest" -no FSTYPE 2>/dev/null | grep -qxF exfat; then
+			install -m 0644 "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
+		else
+			install -m 0644 -o root -g root "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
+		fi
 	fi
 	chown -R "${USER_CASPAR}:${USER_CASPAR}" "$dest" 2>/dev/null || true
 }

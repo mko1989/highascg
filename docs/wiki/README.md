@@ -48,4 +48,10 @@ Or double-click `docs/wiki-site/index.html`. All page content is embedded in `as
 | [**api/network-tailscale.md**](api/network-tailscale.md) | **Tailscale** — status, login, operator-monitor UI |
 | [api/ingest-usb-plugins.md](api/ingest-usb-plugins.md) | Ingest, USB import, plugins, optional modules |
 
+## Integration
+
+| Page | Contents |
+|------|----------|
+| [**integration/usb-v4l2-input.md**](integration/usb-v4l2-input.md) | **USB / V4L2** — ATEM, webcams, FFmpeg bridge, operator setup |
+
 Legacy single-file overview (partial): [../api-reference.md](../api-reference.md) — prefer the wiki for completeness.

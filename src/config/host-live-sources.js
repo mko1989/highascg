@@ -80,6 +80,7 @@ function usedCasparChannels(config) {
 	;(map.audioOnlyChannels || []).forEach(push)
 	;(map.decklinkInputChannels || []).forEach(push)
 	;(map.liveAudioInputChannels || []).forEach(push)
+	;(map.v4l2InputChannels || []).forEach(push)
 	;(map.inputChannels || []).forEach((e) => push(e.channel))
 	for (const item of listExtraLiveSources(config)) {
 		push(item.hostChannel)
@@ -299,6 +300,10 @@ function hostChannelDestinationId(role, ch, slotOrSourceId) {
 	if (r === 'live_audio_input') {
 		const s = parseInt(String(slotOrSourceId ?? ''), 10)
 		return s >= 1 ? `host_live_audio_input_${s}` : `host_live_audio_ch_${ch}`
+	}
+	if (r === 'v4l2_input') {
+		const s = parseInt(String(slotOrSourceId ?? ''), 10)
+		return s >= 1 ? `host_v4l2_input_${s}` : `host_v4l2_ch_${ch}`
 	}
 	if (r === 'webpage_host') {
 		const sid = String(slotOrSourceId ?? ch ?? '').trim()

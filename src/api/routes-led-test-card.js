@@ -21,6 +21,17 @@ const HOST_LAYER = 0
  */
 const MULTIVIEW_TEMPLATE_HOST_FALLBACK = 10
 
+function broadcastLedTestPatternActive(ctx, active) {
+	ctx._ledTestPatternActive = !!active
+	try {
+		if (typeof ctx._wsBroadcast === 'function') {
+			ctx._wsBroadcast('change', { path: 'ledTestPatternActive', value: !!active })
+		}
+	} catch {
+		/* ignore */
+	}
+}
+
 /**
  * @param {string} path
  * @param {string} body
@@ -47,7 +58,9 @@ async function handlePost(path, body, ctx) {
 				/* ignore if nothing on layer */
 			}
 			await amcp.mixer.mixerCommit(channel)
-			ctx._ledTestPatternActive = false
+			if (b.masterOff === true) {
+				broadcastLedTestPatternActive(ctx, false)
+			}
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, channel, layer: TEST_LAYER }) }
 		}
 
@@ -179,7 +192,7 @@ async function handlePost(path, body, ctx) {
 		await amcp.mixer.mixerOpacity?.(channel, TEST_LAYER, 1).catch(() => {})
 		await amcp.mixer.mixerCommit(channel)
 
-		ctx._ledTestPatternActive = true
+		broadcastLedTestPatternActive(ctx, true)
 
 		return {
 			status: 200,

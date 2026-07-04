@@ -29,6 +29,7 @@ module.exports = {
 	resolveDecklinkInputDeviceIndex: routingMapLib.resolveDecklinkInputDeviceIndex,
 	setupInputsChannel: Setup.setupInputsChannel,
 	setupLiveAudioInputs: Setup.setupLiveAudioInputs,
+	setupV4l2Inputs: Setup.setupV4l2Inputs,
 	setupLiveAudioPgmRoutes: Setup.setupLiveAudioPgmRoutes,
 	setupAudioPreviewBus: Setup.setupAudioPreviewBus,
 	setupPreviewChannel: Setup.setupPreviewChannel,
@@ -40,4 +41,6 @@ module.exports = {
 	resolveLiveAudioRouteString: require('./live-audio-input').resolveLiveAudioRouteString,
 	normalizeAlsaCaptureUri: require('./live-audio-input').normalizeAlsaCaptureUri,
 	ensureLiveAudioRouting: Setup.ensureLiveAudioRouting,
+	ensureV4l2InputRouting: Setup.ensureV4l2InputRouting,
+	listConfiguredV4l2Slots: require('../capture/v4l2-input-config').listConfiguredV4l2Slots,
 }

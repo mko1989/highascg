@@ -59,6 +59,14 @@ async function handleGet(path, ctx, query) {
 	} catch {
 		/* optional */
 	}
+	if (query?.freshGpu === '1' || query?.fresh === '1') {
+		try {
+			const { invalidateXrandrCache } = require('../utils/hardware-info')
+			invalidateXrandrCache()
+		} catch {
+			/* optional */
+		}
+	}
 	const live = await Snapshot.buildLiveSnapshot(ctx)
 	if (path === '/api/device-view/snapshot') {
 		return {

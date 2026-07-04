@@ -5,7 +5,6 @@ const assert = require('node:assert/strict')
 const {
 	buildComposeFfmpegConsumerArgs,
 	buildComposeFfmpegFilterChain,
-	buildComposeStreamConsumerArgs,
 	buildScaleFilter,
 	clampComposePreviewFps,
 	normalizeResolutionScale,
@@ -26,11 +25,12 @@ describe('compose-preview-ffmpeg-args', () => {
 		assert.equal(buildScaleFilter('full'), null)
 	})
 
-	it('buildComposeFfmpegFilterChain includes fps and yuvj420p', () => {
+	it('buildComposeFfmpegFilterChain uses yuvj420p for mjpeg FILE consumer', () => {
 		const chain = buildComposeFfmpegFilterChain({ fps: 5, resolutionScale: 'half' })
 		assert.match(chain, /scale=iw\/2:ih\/2/)
 		assert.match(chain, /fps=5/)
 		assert.match(chain, /format=yuvj420p/)
+		assert.match(chain, /in_range=limited:out_range=full/)
 	})
 
 	it('buildComposeFfmpegFilterChain ignores companionThumbEnabled (square derived server-side, WO-110)', () => {
@@ -45,21 +45,13 @@ describe('compose-preview-ffmpeg-args', () => {
 		assert.doesNotMatch(chain, /pad=144:144/)
 	})
 
-	it('buildComposeStreamConsumerArgs uses mpegts with stereo downmix (no -an)', () => {
-		const args = buildComposeStreamConsumerArgs({ fps: 2, resolutionScale: 'half', jpegQuality: 10 })
-		assert.match(args, /-format mpegts/)
-		assert.match(args, /-codec:v libx264/)
-		assert.match(args, /-filter:a aformat=channel_layouts=stereo/)
-		assert.doesNotMatch(args, /-an/)
-	})
-
 	it('buildComposeFfmpegConsumerArgs keeps image2 for static config embed', () => {
 		const args = buildComposeFfmpegConsumerArgs({ fps: 2, resolutionScale: 'half', jpegQuality: 10 })
 		assert.match(args, /-format image2 -update 1/)
 		assert.match(args, /-codec:v mjpeg/)
 		assert.match(args, /format=yuvj420p/)
-		assert.match(args, /-q:v 10/)
-		assert.doesNotMatch(args, /-q:v:v/)
+		assert.match(args, /-q:v:v 10/)
+		assert.doesNotMatch(args, /format=yuv420p/)
 	})
 
 	it('buildComposePreviewFfmpegConsumerXml embeds path when static config enabled', () => {

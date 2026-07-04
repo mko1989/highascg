@@ -538,15 +538,27 @@ function addExport(fileNode, name, kind, nodeAst, lines) {
 function crossReferenceWorkOrders(allNodes, workOrderDir) {
     if (!fs.existsSync(workOrderDir)) return;
     
-    const woFiles = fs.readdirSync(workOrderDir).filter(f => f.endsWith('.md'));
+    function getFiles(dir, files = []) {
+        for (const file of fs.readdirSync(dir)) {
+            const fullPath = path.join(dir, file);
+            if (fs.statSync(fullPath).isDirectory()) {
+                getFiles(fullPath, files);
+            } else if (fullPath.endsWith('.md')) {
+                files.push(path.relative(workOrderDir, fullPath));
+            }
+        }
+        return files;
+    }
+    const woFiles = getFiles(workOrderDir);
     const woIndex = {}; 
 
     for (const woFile of woFiles) {
-        const match = woFile.match(/^(\d+[a-z]?)_WO_/);
+        const basename = path.basename(woFile);
+        const match = basename.match(/^(\d+[a-z]?)_WO_/);
         if (!match) continue;
         const woNum = match[1];
         const content = fs.readFileSync(path.join(workOrderDir, woFile), 'utf8');
-        const title = (content.split('\n').find(l => l.startsWith('# ')) || '').replace(/^#\s*/, '') || woFile;
+        const title = (content.split('\n').find(l => l.startsWith('# ')) || '').replace(/^#\s*/, '') || basename;
 
         for (const node of allNodes) {
             const searchTerms = [

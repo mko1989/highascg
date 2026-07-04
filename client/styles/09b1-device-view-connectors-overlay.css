@@ -195,6 +195,17 @@
 	border: 1px solid rgba(148, 163, 184, 0.9);
 	background: #111827;
 	z-index: 10;
+	cursor: pointer;
+}
+.device-view__connector-dot::before {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 28px;
+	height: 28px;
+	transform: translate(-50%, -50%);
+	border-radius: 999px;
 }
 .device-view__panel-marker .device-view__connector-dot--left {
 	/* No longer using side-anchored dots for rear panel markers */

@@ -284,7 +284,7 @@ export function appendMultiviewPositionSize(root, { cellId, cell, stateStore }) 
 	const cm = stateStore?.getState()?.channelMap || {}
 	const programChannels = cm.programChannels || []
 	const previewChannels = cm.previewChannels || []
-	const ovType = getCellOverlayType(cell, programChannels, previewChannels)
+	const ovType = getCellOverlayType(cell, programChannels, previewChannels, cm)
 
 	const lockWrap = document.createElement('div')
 	lockWrap.className = 'inspector-field inspector-row'

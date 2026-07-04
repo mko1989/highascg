@@ -23,7 +23,6 @@
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
-		"grapesjs": "^0.21.2",
 		"three": "^0.184.0"
 	}
 }

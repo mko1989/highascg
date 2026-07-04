@@ -20,6 +20,8 @@ import { renderMatrix } from './device-view-matrix.js'
 import { renderDeviceInspector, renderEdgeInspector } from './device-view-inspector-render.js'
 import * as Actions from './device-view-actions.js'
 import { migrateLegacyGpuLayoutPrefsToServer } from '../lib/device-view-gpu-port-list.js'
+import { FACTORY_RESET_GPU_LAYOUT_KEY } from '../lib/device-view-gpu-port-constants.js'
+import { settingsState } from '../lib/settings-state.js'
 import { gpuTopologyMismatchActive } from '../lib/device-view-gpu-port-topology.js'
 import { getStreamingChannelStatus } from '../lib/streaming-channel-state.js'
 import { renderConnectorInspector, renderCasparSettingsInspector } from './device-view-inspectors.js'
@@ -27,7 +29,7 @@ import { showLogsModal } from './logs-modal.js'
 import { describeCableRejection, cableReasonFromError } from '../lib/device-view-cable-messages.js'
 import { isUnknownCableConnectorError, resolveCableEdgeIds, findGpuSinkCableConflict } from '../lib/device-view-cable-resolve.js'
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
-import { findScreenDestinationById } from '../lib/device-view-host-channels.js'
+import { findScreenDestinationById, populateDestinationTypeSelect, listHostChannelDestinations, mergeSettingsIntoDeviceViewPayload } from '../lib/device-view-host-channels.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
 import { renderDestinationInspector } from './device-view-destinations-inspector.js'
 import { openSaveDeviceSnapshotModal, openLoadDeviceSnapshotModal } from './device-view-snapshot-modals.js'
@@ -48,6 +50,8 @@ import {
 } from '../lib/device-view-gpu-source-inherit.js'
 import { getAppWs } from '../lib/app-runtime.js'
 import { readSimpleWiring, writeSimpleWiring } from '../lib/device-view-simple-wiring-prefs.js'
+import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
+import { renderLiveSourcesBand, openAddLiveSourceModal } from './device-view-live-sources-render.js'
 
 let mounted = false
 let onTabActivated = null
@@ -178,8 +182,14 @@ export function initDeviceView(root) {
 	const destPanel = document.createElement('div'); destPanel.className = 'device-view__destinations'
 	const destHead = document.createElement('div'); destHead.className = 'device-view__destinations-head'
 	const destTitle = Object.assign(document.createElement('span'), { className: 'device-view__note', textContent: 'Screen destinations' })
-	const destAdd = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: '+' }); const destType = document.createElement('select'); destType.innerHTML = '<option value="pgm_prv">PGM/PRV</option><option value="pgm_only">PGM only</option><option value="multiview">Multiview</option>'
-	destHead.append(destTitle, destType, destAdd); const destBody = document.createElement('div'); destBody.className = 'device-view__destinations-body'; destPanel.append(destHead, destBody)
+	const destAdd = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: '+' })
+	const destType = document.createElement('select')
+	destHead.append(destTitle, destType, destAdd)
+	const destBody = document.createElement('div')
+	destBody.className = 'device-view__destinations-body'
+	const destLiveHost = document.createElement('div')
+	destLiveHost.className = 'device-view__live-sources-host'
+	destPanel.append(destHead, destBody, destLiveHost)
 	const mappingPanel = document.createElement('div'); mappingPanel.className = 'device-view__mappings-column'
 	const rearPanel = document.createElement('div'); rearPanel.className = 'device-view__rear-column'
 	const cableOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); cableOverlay.classList.add('device-view__cable-overlay'); cableOverlay.innerHTML = '<g data-cable-lines></g>'
@@ -197,6 +207,7 @@ export function initDeviceView(root) {
 
 	let lastPayload = null; let selectedKey = null; let selectedConnectorId = null; let selectedEdgeId = null; let selectedDestinationId = null; let selectedDeviceId = null; let cableSourceId = null; let hoveredEdgeId = null; let casparRestartDirty = false
 	let cablePointer = null; let suppressDocCableClickUntil = 0; let currentSettings = null; let streamingStatus = null
+	let cableOverlayRafPending = false
 	const undoStack = []
 	function pushUndo() {
 		if (!lastPayload?.graph || !currentSettings?.screenDestinations) return
@@ -314,6 +325,7 @@ export function initDeviceView(root) {
 				onRemoveStreamOutput: removeStreamOutputConnector,
 				onRemoveRecordOutput: removeRecordOutputConnector,
 				onRemoveAudioOutput: removeAudioOutputConnector,
+				onRemoveVirtualCamOutput: removeVirtualCamOutputConnector,
 			})
 		)
 		updateUI()
@@ -352,6 +364,35 @@ export function initDeviceView(root) {
 			connectorById,
 			patchDestination: (did, patch) => Actions.patchDestination(did, patch).then(() => { setCasparRestartDirty(true); return load() }),
 			removeDestination: (did) => Actions.removeDestination(did).then(() => { selectedDestinationId = null; setCasparRestartDirty(true); return load() }),
+			onHostInputRemoved: async (_dest, removeResult) => {
+				selectedDestinationId = null
+				selectedConnectorId = null
+				selectedKey = null
+				setCasparRestartDirty(true)
+				try {
+					await settingsState.load()
+				} catch {
+					/* best-effort */
+				}
+				if (removeResult?.payload) {
+					lastPayload = mergeSettingsIntoDeviceViewPayload(
+						{ ...lastPayload, ...removeResult.payload },
+						settingsState.getSettings?.() || currentSettings,
+					)
+				}
+				rIntoInsp((h) => {
+					h.replaceChildren(
+						Object.assign(document.createElement('p'), {
+							className: 'device-view__status',
+							textContent: 'DeckLink input removed.',
+						}),
+					)
+				})
+				renderFromState({ restoreInspector: false })
+				updateUI()
+				await load({ restoreInspector: false })
+				setStatus(statusEl, 'DeckLink input removed', true)
+			},
 			currentSettings,
 			updateDestinationOutputLayer,
 			lastPayload,
@@ -609,6 +650,23 @@ export function initDeviceView(root) {
 		}
 	}
 
+	async function removeVirtualCamOutputConnector(id) {
+		const cid = String(id || 'vcam_1').trim() || 'vcam_1'
+		try {
+			try {
+				await stopVirtualCamera({ persist: false })
+			} catch {
+				/* best-effort stop before hide */
+			}
+			await saveVirtualCameraConfig({ showInDeviceView: false, enabled: false }, { persist: true })
+			await pruneConnectorFromGraph(cid)
+			setStatus(statusEl, 'Virtual camera output removed', true)
+			await load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
 	window.addEventListener('highascg-device-view-update-payload', (ev) => {
 		if (ev.detail?.graph) {
 			lastPayload = { ...lastPayload, graph: ev.detail.graph }
@@ -697,6 +755,7 @@ export function initDeviceView(root) {
 
 	function renderFromState({ restoreInspector = false } = {}) {
 		if (!lastPayload) return
+		populateDestinationTypeSelect(destType, lastPayload)
 		updateTopologyMismatchBanner()
 		renderDestinations({
 			destBody,
@@ -715,6 +774,15 @@ export function initDeviceView(root) {
 			updateDestinationOutputLayer,
 			requestCableOverlayRender: () => renderCableOverlay(getCOCtx()),
 		})
+		destLiveHost.innerHTML = ''
+		destLiveHost.append(
+			renderLiveSourcesBand({
+				lastPayload,
+				selectedKey,
+				onPortClick: selectKey,
+				onAddLiveSource: () => openAddLiveSourceModal({ load, statusEl, setStatusFn: setStatus }),
+			}),
+		)
 		if (matrixCk.checked) {
 			renderMatrix(matrixHost, lastPayload, pushUndo, setCasparRestartDirty, load, selectKey, selectDestinationById)
 		} else {
@@ -743,22 +811,43 @@ export function initDeviceView(root) {
 		requestAnimationFrame(() => updateUI())
 	}
 
-	async function load() {
+	async function load(opts = {}) {
 		try {
 			getAppWs()?.send?.({ type: 'device_view_subscribe' })
-			await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
+			let freshGpu = opts.freshGpu === true
+			try {
+				if (!freshGpu && sessionStorage.getItem(FACTORY_RESET_GPU_LAYOUT_KEY)) {
+					freshGpu = true
+				}
+			} catch {
+				/* ignore */
+			}
+			await settingsState.load().catch(() => {})
+			if (!freshGpu) {
+				await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
+			}
 			const cachedStream = getStreamingChannelStatus()
 			const [payload, settings, stream] = await Promise.all([
-				Actions.loadDeviceView(),
+				Actions.loadDeviceView({ freshGpu }),
 				Actions.loadSettings(),
 				cachedStream
 					? Promise.resolve(cachedStream)
 					: Actions.getStreamingChannelStatus().catch(() => null),
 			])
-			lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null, _settings: settings }
+			if (freshGpu) {
+				try {
+					sessionStorage.removeItem(FACTORY_RESET_GPU_LAYOUT_KEY)
+				} catch {
+					/* ignore */
+				}
+			}
+			lastPayload = mergeSettingsIntoDeviceViewPayload(
+				{ ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null },
+				settings,
+			)
 			currentSettings = settings
 			streamingStatus = stream
-			renderFromState({ restoreInspector: true })
+			renderFromState({ restoreInspector: opts.restoreInspector !== false })
 			setStatus(statusEl, `Updated ${lastPayload?.live?.host?.collectedAt || ''}`, true)
 		} catch (e) { setStatus(statusEl, e.message, false) }
 	}
@@ -798,11 +887,28 @@ export function initDeviceView(root) {
 		setStatus(statusEl, 'Cable mode cancelled', true)
 	}
 	destAdd.onclick = () => {
-		const list = Array.isArray(lastPayload?.screenDestinations?.destinations)
-			? lastPayload.screenDestinations.destinations
-			: []
+		const rawType = destType.value
+		if (String(rawType || '').startsWith('host:')) {
+			const hostId = rawType.slice(5)
+			const host = listHostChannelDestinations(lastPayload).find((h) => String(h?.id || '') === hostId)
+			if (!host) {
+				setStatus(statusEl, 'Host channel no longer available — refresh and try again.', false)
+				return
+			}
+			void Actions.addDestination({
+				type: 'host_channel',
+				id: host.id,
+				label: host.label,
+				hostRole: host.hostRole,
+				casparChannel: host.casparChannel,
+				inputSlot: host.inputSlot,
+				sourceId: host.sourceId,
+			}).then(() => load())
+			return
+		}
+		const list = listPersistedScreenDestinationsFromPayload(lastPayload)
 		const highest = Math.max(-1, ...list.map((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)))
-		const type = destType.value
+		const type = rawType
 		const newMainIdx = type === 'multiview' ? 0 : highest + 1
 		const newScreenN = type === 'multiview' ? 0 : newMainIdx + 1
 		void Actions.addDestination({
@@ -823,7 +929,20 @@ export function initDeviceView(root) {
 			load()
 		})
 	}
-	window.addEventListener('pointermove', (ev) => { if (cableSourceId) { const br = wrap.getBoundingClientRect(); cablePointer = { x: ev.clientX - br.left, y: ev.clientY - br.top }; renderCableOverlay(getCOCtx()) } })
+	function listPersistedScreenDestinationsFromPayload(payload) {
+		return Array.isArray(payload?.screenDestinations?.destinations) ? payload.screenDestinations.destinations : []
+	}
+	window.addEventListener('pointermove', (ev) => {
+		if (!cableSourceId) return
+		const br = wrap.getBoundingClientRect()
+		cablePointer = { x: ev.clientX - br.left, y: ev.clientY - br.top }
+		if (cableOverlayRafPending) return
+		cableOverlayRafPending = true
+		requestAnimationFrame(() => {
+			cableOverlayRafPending = false
+			if (cableSourceId) renderCableOverlay(getCOCtx())
+		})
+	})
 	document.addEventListener('keydown', (ev) => {
 		const isZ = ev.key?.toLowerCase() === 'z'; const isUndo = isZ && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey
 		if (isUndo) { ev.preventDefault(); ev.stopPropagation(); void undoLastCableAction(); return }
@@ -832,7 +951,7 @@ export function initDeviceView(root) {
 			ev.preventDefault(); ev.stopPropagation(); void removeEdge(selectedEdgeId)
 		}
 	})
-	document.addEventListener('click', (ev) => { if (!cableSourceId || Date.now() < suppressDocCableClickUntil) return; const targetId = connectorIdFromEvent(ev); if (targetId) { if (targetId !== cableSourceId) { ev.preventDefault(); ev.stopPropagation(); void tryAddCable(targetId) }; return }; cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }, true)
+	document.addEventListener('click', (ev) => { if (!cableSourceId || Date.now() < suppressDocCableClickUntil) return; const targetId = connectorIdFromEvent(ev, wrap); if (targetId) { if (targetId !== cableSourceId) { ev.preventDefault(); ev.stopPropagation(); void tryAddCable(targetId) }; return }; cableSourceId = null; cablePointer = null; updateUI(); setStatus(statusEl, 'Cable mode cancelled', true) }, true)
 	document.addEventListener('highascg-settings-applied', load); 
 	window.addEventListener('highascg-device-view-reload', load);
 	window.addEventListener('highascg-device-view-focus-connector', (ev) => { const cid = String(ev?.detail?.connectorId || '').trim(); if (cid) focusConnectorById(cid) }); 

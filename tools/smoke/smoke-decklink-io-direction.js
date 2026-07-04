@@ -36,6 +36,24 @@ test('hardware discovery creates unassigned decklink_io ports', () => {
 	assert.equal(sug.connectors.some((c) => c.kind === 'decklink_in'), false)
 })
 
+test('configured DeckLink input does not create legacy decklink_in connectors', () => {
+	const sug = suggestConnectorsAndDevicesFromLive(
+		{ gpu: { displays: [] }, decklink: { inputs: [], screenOutputs: [], multiviewDevice: 0 } },
+		{
+			casparServer: {
+				decklink_input_count: 4,
+				decklink_input_4_device: 4,
+				decklink_input_4_direction: 'in',
+			},
+		},
+	)
+	assert.equal(sug.connectors.some((c) => c.kind === 'decklink_in'), false)
+	const sdi4 = sug.connectors.find((c) => c.id === 'dlsdi_4')
+	assert.ok(sdi4)
+	assert.equal(sdi4.kind, 'decklink_io')
+	assert.equal(normalizeDecklinkIoDirection(sdi4.caspar), 'in')
+})
+
 test('destination may cable to unassigned SDI and promotes to output', () => {
 	const graph = {
 		version: 1,

@@ -335,7 +335,13 @@ class ConfigManager extends EventEmitter {
 				}
 				this.logger.info(`[Config] Purged config at ${this.configPath}`)
 			}
-			this.config = { ...defaults }
+			this.config = finalizeScreenDestinationsConfig({
+				...defaults,
+				extraLiveSources: [],
+				deviceGraph: defaults.deviceGraph,
+				gpuPhysicalTopologyOperatorSaved: false,
+			})
+			this.save(this.config, { emitChange: false })
 			this.emit('change', this.config)
 			return true
 		} catch (e) {

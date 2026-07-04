@@ -14,7 +14,12 @@ import {
 	ingestStreamingChannelChange,
 	ingestStreamingChannelWsEvent,
 } from './streaming-channel-state.js'
-import { ingestComposePreviewWs, syncComposePreviewClientChannels } from '../components/preview-canvas-compose-snapshot.js'
+import {
+	ingestComposePreviewWs,
+	syncComposePreviewClientChannels,
+	syncComposePreviewFromChannelMap,
+} from '../components/preview-canvas-compose-snapshot.js'
+import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-url.js'
 import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
 
@@ -50,6 +55,9 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('state', (data) => {
 		stateStore.setState(data)
 		applyWsStateSideEffects(data, { sceneState, programOutputState, appLogic })
+		if (data?.channelMap) {
+			syncComposePreviewFromChannelMap(data.channelMap)
+		}
 		if (data?.catalogDeferred) {
 			void loadDeferredCatalogOverWs(ws, stateStore, (full) =>
 				applyWsStateSideEffects(full, { sceneState, programOutputState, appLogic }),
@@ -74,11 +82,7 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 			}
 			const cm = data.value
 			if (cm) {
-				const channels = [
-					...(Array.isArray(cm.programChannels) ? cm.programChannels : []),
-					...(Array.isArray(cm.previewChannels) ? cm.previewChannels : []),
-				]
-				syncComposePreviewClientChannels(channels)
+				syncComposePreviewClientChannels(resolveComposePreviewChannelsFromChannelMap(cm))
 			}
 			appLogic.scheduleMultiviewRefresh()
 		}

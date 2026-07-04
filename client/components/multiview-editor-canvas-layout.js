@@ -1,4 +1,5 @@
 import { multiviewState } from '../lib/multiview-state.js'
+import { inputChannelResolution } from '../lib/input-channels.js'
 
 /** Must match `MV_TIMER_TITLE_PX` in `src/api/multiview-layout-helper.js` (timers-under-labels chrome). */
 const MV_TIMER_TITLE_PX = 28
@@ -37,7 +38,7 @@ function inferPrvScreen(cell, previewChannels) {
 	return idM?.[1] != null ? parseInt(idM[1], 10) + 1 : 1
 }
 
-export function getCellOverlayType(c, programChannels, previewChannels) {
+export function getCellOverlayType(c, programChannels, previewChannels, cm = {}) {
 	const src = c?.source?.value || c?.source || ''
 	if (typeof src === 'string' && src.includes('playback_timers.html')) return 'timers'
 	if (typeof src === 'string' && src.startsWith('route://')) {
@@ -46,6 +47,9 @@ export function getCellOverlayType(c, programChannels, previewChannels) {
 		if (!isNaN(ch)) {
 			if (programChannels.includes(ch)) return 'pgm'
 			if (previewChannels.includes(ch)) return 'prv'
+			const decklinkInputChannels = cm.decklinkInputChannels || []
+			const inputsCh = cm.inputsCh
+			if (decklinkInputChannels.includes(ch) || (inputsCh != null && ch === inputsCh)) return 'decklink'
 		}
 	}
 	const lbl = (c?.label || '').toLowerCase()
@@ -57,7 +61,7 @@ export function getCellOverlayType(c, programChannels, previewChannels) {
 export function getResolutionSuffix(cell, cm = {}) {
 	const programChannels = cm.programChannels || []
 	const previewChannels = cm.previewChannels || []
-	const ovType = getCellOverlayType(cell, programChannels, previewChannels)
+	const ovType = getCellOverlayType(cell, programChannels, previewChannels, cm)
 
 	let resolvedCh = null
 	let isPgm = false
@@ -81,6 +85,33 @@ export function getResolutionSuffix(cell, cm = {}) {
 	return ''
 }
 
+/** Native content resolution for PGM/PRV and dedicated input routes (DeckLink, V4L2, etc.). */
+export function resolveCellSourceResolution(cell, cm = {}) {
+	const programChannels = cm.programChannels || []
+	const previewChannels = cm.previewChannels || []
+	const ovType = getCellOverlayType(cell, programChannels, previewChannels, cm)
+
+	if (ovType === 'pgm') {
+		const idx = inferPgmScreen(cell, programChannels) - 1
+		const res = cm.programResolutions?.[idx]
+		if (res?.w > 0 && res?.h > 0) return res
+	} else if (ovType === 'prv') {
+		const idx = inferPrvScreen(cell, previewChannels) - 1
+		const res = cm.previewResolutions?.[idx] || cm.programResolutions?.[idx]
+		if (res?.w > 0 && res?.h > 0) return res
+	}
+
+	const src = cell?.source?.value || cell?.source || ''
+	if (typeof src === 'string' && src.startsWith('route://')) {
+		const ch = parseInt(String(src).replace(/^route:\/\//, '').split('-')[0], 10)
+		if (!isNaN(ch)) {
+			const res = inputChannelResolution(cm, ch)
+			if (res?.w > 0 && res?.h > 0) return res
+		}
+	}
+	return null
+}
+
 export function getContainedVideoRect(c, cm = {}) {
 	const W = 1920
 	const H = 1080
@@ -97,7 +128,7 @@ export function getContainedVideoRect(c, cm = {}) {
 	const showTimersUnderLabels = !!multiviewState.showTimersUnderLabels
 	const programChannels = cm.programChannels || []
 	const previewChannels = cm.previewChannels || []
-	const ovType = getCellOverlayType(c, programChannels, previewChannels)
+	const ovType = getCellOverlayType(c, programChannels, previewChannels, cm)
 	const isScreen = ovType === 'pgm' || ovType === 'prv'
 
 	let labelSize = 0
@@ -125,21 +156,9 @@ export function getContainedVideoRect(c, cm = {}) {
 	let vw = adjustedW
 	let vh = adjustedH
 
-	let resolvedCh = null
-	let isPgm = false
-	let isPrv = false
-	if (ovType === 'pgm') {
-		isPgm = true
-		resolvedCh = inferPgmScreen(c, programChannels)
-	} else if (ovType === 'prv') {
-		isPrv = true
-		resolvedCh = inferPrvScreen(c, previewChannels)
-	}
-
-	if (c.aspectLocked !== false && resolvedCh && isScreen) {
-		const idx = resolvedCh - 1
-		const res = isPgm ? cm.programResolutions?.[idx] : (cm.previewResolutions?.[idx] || cm.programResolutions?.[idx])
-		if (res && res.w > 0 && res.h > 0) {
+	if (c.aspectLocked !== false) {
+		const res = resolveCellSourceResolution(c, cm)
+		if (res?.w > 0 && res?.h > 0) {
 			const s = Math.min(adjustedW / res.w, adjustedH / res.h)
 			const dispW = res.w * s
 			const dispH = res.h * s
@@ -166,27 +185,9 @@ export function getContainedVideoRect(c, cm = {}) {
 }
 
 export function resolveSourceAspectRatio(cell, cm = {}) {
-	const programChannels = cm.programChannels || []
-	const previewChannels = cm.previewChannels || []
-	const ovType = getCellOverlayType(cell, programChannels, previewChannels)
-
-	let resolvedCh = null
-	let isPgm = false
-	if (ovType === 'pgm') {
-		isPgm = true
-		resolvedCh = inferPgmScreen(cell, programChannels)
-	} else if (ovType === 'prv') {
-		resolvedCh = inferPrvScreen(cell, previewChannels)
-	}
-
-	if (resolvedCh) {
-		const idx = resolvedCh - 1
-		const res = isPgm ? cm.programResolutions?.[idx] : (cm.previewResolutions?.[idx] || cm.programResolutions?.[idx])
-		if (res && res.w > 0 && res.h > 0) {
-			return res.w / res.h
-		}
-	}
-	return (cell.w && cell.h) ? cell.w / cell.h : 16 / 9
+	const res = resolveCellSourceResolution(cell, cm)
+	if (res?.w > 0 && res?.h > 0) return res.w / res.h
+	return 16 / 9
 }
 
 export function solveCellDimensions(w, h, ratio, lockType, ovType, showTimersUnderLabels) {

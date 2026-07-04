@@ -74,6 +74,31 @@ export function applyFillPxPatch(storedRect, partial, canvas) {
 	return next
 }
 
+/**
+ * Align a top-left pixel rect within the program canvas (same modes as look layer inspector).
+ * @param {{ x: number, y: number, w: number, h: number }} rect
+ * @param {{ width?: number, height?: number, w?: number, h?: number }} canvas
+ * @param {'left' | 'right' | 'top' | 'bottom' | 'center-h' | 'center-v' | 'center'} mode
+ */
+export function alignStoredPxRect(rect, canvas, mode) {
+	const { w: cw, h: ch } = canvasDims(canvas)
+	const w = Math.max(1, rect.w)
+	const h = Math.max(1, rect.h)
+	let x = rect.x
+	let y = rect.y
+	if (mode === 'left') x = 0
+	else if (mode === 'right') x = cw - w
+	else if (mode === 'top') y = 0
+	else if (mode === 'bottom') y = ch - h
+	else if (mode === 'center-h') x = (cw - w) / 2
+	else if (mode === 'center-v') y = (ch - h) / 2
+	else if (mode === 'center') {
+		x = (cw - w) / 2
+		y = (ch - h) / 2
+	}
+	return { x: Math.round(x), y: Math.round(y), w, h }
+}
+
 /** Labels for position fields in inspector. */
 export function fillInspectorPositionMeta() {
 	if (isCenterOrigin()) {

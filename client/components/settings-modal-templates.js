@@ -19,6 +19,7 @@ export function getMainModalHtml() {
 					<button class="settings-tab" data-tab="diagnostics">Diagnostics</button>
 					<button class="settings-tab" data-tab="tailscale">Tailscale</button>
 					<button class="settings-tab" data-tab="live-audio">Live audio</button>
+					<button class="settings-tab" data-tab="usb-video">USB video</button>
 					<button class="settings-tab" data-tab="variables">Variables</button>
 					<button class="settings-tab" data-tab="nuclear">Nuclear</button>
 				</div>
@@ -260,6 +261,7 @@ export function getMainModalHtml() {
 						</details>
 					</div>
 					<div class="settings-pane" id="settings-pane-live-audio"></div>
+					<div class="settings-pane" id="settings-pane-usb-video"></div>
 					<div class="settings-pane" id="settings-pane-variables"></div>
 					<div class="settings-pane" id="settings-pane-nuclear">
 						<h3 class="settings-category">Danger zone</h3>

@@ -280,64 +280,6 @@ class Minimap {
     }
 }
 
-class ForceLayout {
-    constructor(nodes, edges, width, height) {
-        this.nodes = nodes.map(n => ({
-            ...n,
-            x: Math.random() * width,
-            y: Math.random() * height,
-            vx: 0, vy: 0
-        }));
-        this.edges = edges;
-        this.width = width;
-        this.height = height;
-    }
-
-    tick(iterations = 100) {
-        for (let i = 0; i < iterations; i++) {
-            for (let a = 0; a < this.nodes.length; a++) {
-                for (let b = a + 1; b < this.nodes.length; b++) {
-                    const dx = this.nodes[b].x - this.nodes[a].x;
-                    const dy = this.nodes[b].y - this.nodes[a].y;
-                    const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-                    const force = 5000 / (dist * dist);
-                    const fx = (dx / dist) * force;
-                    const fy = (dy / dist) * force;
-                    this.nodes[a].vx -= fx;
-                    this.nodes[a].vy -= fy;
-                    this.nodes[b].vx += fx;
-                    this.nodes[b].vy += fy;
-                }
-            }
-
-            for (const edge of this.edges) {
-                const a = this.nodes.find(n => n.id === edge.from);
-                const b = this.nodes.find(n => n.id === edge.to);
-                if (!a || !b) continue;
-                const dx = b.x - a.x;
-                const dy = b.y - a.y;
-                const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-                const force = dist * 0.01;
-                const fx = (dx / dist) * force;
-                const fy = (dy / dist) * force;
-                a.vx += fx;
-                a.vy += fy;
-                b.vx -= fx;
-                b.vy -= fy;
-            }
-
-            for (const node of this.nodes) {
-                node.vx *= 0.85;
-                node.vy *= 0.85;
-                node.x += node.vx;
-                node.y += node.vy;
-                node.x = Math.max(50, Math.min(this.width - 50, node.x));
-                node.y = Math.max(50, Math.min(this.height - 50, node.y));
-            }
-        }
-        return this.nodes;
-    }
-}
 
 class DependencyGraph {
     constructor(explorer) {
@@ -543,7 +485,6 @@ class MapExplorer {
         this.data = null;
         this.currentNode = null;
         this.path = [];
-        this.isFlatGraph = false;
         
         this.gridEl = document.getElementById('map-grid');
         this.viewportEl = document.getElementById('map-viewport');
@@ -560,7 +501,7 @@ class MapExplorer {
         this.zoomOutBtn = document.getElementById('map-zoom-out');
         this.zoomLevelLabel = document.getElementById('map-zoom-level');
         
-        this.flatGraphBtn = document.getElementById('map-toggle-flat');
+
         
         this.panZoom = new PanZoom(this.viewportEl, this.gridEl);
         this.minimap = new Minimap(document.getElementById('map-minimap'), this);
@@ -613,10 +554,8 @@ class MapExplorer {
             } else if (e.key === 'Backspace' && document.activeElement.tagName !== 'INPUT') {
                 this.navigateUp();
             } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && document.activeElement.tagName !== 'INPUT') {
-                if (!this.isFlatGraph) {
-                    e.preventDefault();
-                    this.handleArrowNavigation(e.key);
-                }
+                e.preventDefault();
+                this.handleArrowNavigation(e.key);
             } else if (e.key === '+' || e.key === '=') {
                 this.panZoom.setZoom(this.panZoom.scale * 1.2);
             } else if (e.key === '-') {
@@ -671,12 +610,7 @@ class MapExplorer {
         this.zoomInBtn.addEventListener('click', () => this.panZoom.setZoom(this.panZoom.scale * 1.2));
         this.zoomOutBtn.addEventListener('click', () => this.panZoom.setZoom(this.panZoom.scale / 1.2));
         this.zoomResetBtn.addEventListener('click', () => this.panZoom.resetView());
-        
-        this.flatGraphBtn.addEventListener('click', () => {
-            this.isFlatGraph = !this.isFlatGraph;
-            this.flatGraphBtn.classList.toggle('active', this.isFlatGraph);
-            this.renderLevel(this.currentNode, false);
-        });
+
     }
 
     handleArrowNavigation(key) {
@@ -879,11 +813,6 @@ class MapExplorer {
         this.path.pop();
         this.updateHash();
         
-        // Turn off flat graph when navigating up
-        if (this.isFlatGraph) {
-            this.isFlatGraph = false;
-            this.flatGraphBtn.classList.remove('active');
-        }
         
         this.navigateToPath(this.path.map(n => n.id), true);
     }
@@ -902,22 +831,14 @@ class MapExplorer {
         });
     }
     
-    getFlatTreeFiles(root) {
-        const files = [];
-        const walk = (n) => {
-            if (n.kind === 'file') files.push(n);
-            if (n.children) n.children.forEach(walk);
-        }
-        walk(root);
-        return files;
-    }
+
 
     renderLevel(node, isBack = false) {
         this.panZoom.resetView(); 
         this.gridEl.innerHTML = '';
         this.dependencyGraph.clear();
         
-        if (!this.isFlatGraph && node !== this.data?.root) {
+        if (node !== this.data?.root) {
             const titleEl = document.createElement('div');
             titleEl.className = 'map-level-title';
             titleEl.textContent = node.label;
@@ -927,17 +848,9 @@ class MapExplorer {
             }, 800);
         }
         
-        if (this.isFlatGraph) {
-            this.gridEl.classList.add('map-grid--flat-graph');
-        } else {
-            this.gridEl.classList.remove('map-grid--flat-graph');
-        }
+        this.gridEl.classList.remove('map-grid--flat-graph');
         
         let nodesToRender = node.children || [];
-        
-        if (this.isFlatGraph) {
-            nodesToRender = this.getFlatTreeFiles(node);
-        }
         
         const statsEl = document.getElementById('map-header-stats');
         if (statsEl) {
@@ -953,43 +866,8 @@ class MapExplorer {
             return;
         }
         
-        let layoutNodes = [];
-        if (this.isFlatGraph) {
-            // Build edges
-            const edges = [];
-            for (const n of nodesToRender) {
-                if (n.meta?.imports) {
-                    for (const imp of n.meta.imports) {
-                        if (imp.internal) {
-                            const target = this.dependencyGraph.allFileNodesMap.get(imp.resolved);
-                            if (target && nodesToRender.find(tr => tr.id === target.id)) {
-                                edges.push({ from: n.id, to: target.id });
-                            }
-                        }
-                    }
-                }
-            }
-            
-            const area = nodesToRender.length * 40000;
-            const side = Math.max(1000, Math.sqrt(area));
-            
-            const layout = new ForceLayout(nodesToRender, edges, side, side);
-            layoutNodes = layout.tick(150); // Fixed iterations
-            
-            this.gridEl.style.width = `${side}px`;
-            this.gridEl.style.height = `${side}px`;
-            
-            // Adjust PanZoom to center the flat graph initially
-            const vpRect = this.viewportEl.getBoundingClientRect();
-            const scale = Math.min(vpRect.width / side, vpRect.height / side, 1);
-            this.panZoom.scale = scale;
-            this.panZoom.translateX = (vpRect.width - side * scale) / 2;
-            this.panZoom.translateY = (vpRect.height - side * scale) / 2;
-            this.panZoom.applyTransform();
-        } else {
-            this.gridEl.style.width = '';
-            this.gridEl.style.height = '';
-        }
+        this.gridEl.style.width = '';
+        this.gridEl.style.height = '';
 
         nodesToRender.forEach((child, index) => {
             const badgeCount = child.children ? child.children.length : 0;
@@ -1022,18 +900,10 @@ class MapExplorer {
                 </div>
             `;
             
-            if (this.isFlatGraph) {
-                const ln = layoutNodes.find(n => n.id === child.id);
-                if (ln) {
-                    card.style.left = `${ln.x}px`;
-                    card.style.top = `${ln.y}px`;
-                }
-            }
+
 
             card.addEventListener('click', () => {
                 if (child.children && child.children.length > 0) {
-                    this.isFlatGraph = false;
-                    this.flatGraphBtn.classList.remove('active');
                     this.drillInto(child);
                 } else {
                     this.showSidebar(child);
@@ -1049,11 +919,9 @@ class MapExplorer {
             card.addEventListener('mouseenter', () => this.dependencyGraph.handleCardHover(card, true));
             card.addEventListener('mouseleave', () => this.dependencyGraph.handleCardHover(card, false));
 
-            if (!this.isFlatGraph) {
-                const animationClass = isBack ? 'map-card--back-entering' : 'map-card--entering';
-                card.classList.add(animationClass);
-                card.style.animationDelay = `${Math.min(index * 20, 200)}ms`;
-            }
+            const animationClass = isBack ? 'map-card--back-entering' : 'map-card--entering';
+            card.classList.add(animationClass);
+            card.style.animationDelay = `${Math.min(index * 20, 200)}ms`;
 
             this.gridEl.appendChild(card);
         });
@@ -1062,7 +930,7 @@ class MapExplorer {
             setTimeout(() => {
                 this.minimap.render();
                 this.dependencyGraph.renderEdges(nodesToRender);
-            }, this.isFlatGraph ? 0 : 250); // wait for enter animation if not flat
+            }, 250); // wait for enter animation
         });
     }
 
@@ -1076,8 +944,7 @@ class MapExplorer {
             
             span.addEventListener('click', () => {
                 if (index < this.path.length - 1) {
-                    this.isFlatGraph = false;
-                    this.flatGraphBtn.classList.remove('active');
+
                     
                     const newPathIds = this.path.slice(0, index + 1).map(n => n.id);
                     this.updateHash();

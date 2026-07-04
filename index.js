@@ -14,17 +14,15 @@ const persistence = require('./src/utils/persistence'); const { TimelineEngine }
 const { ClipEndFadeWatcher } = require('./src/engine/clip-end-fade'); const { ConnectionManager } = require('./src/caspar/connection-manager')
 const { normalizeOscConfig } = require('./src/osc/osc-config'); const { OscState } = require('./src/osc/osc-state')
 const { OscListener } = require('./src/osc/osc-listener'); const { applyOscSnapshotToVariables, clearOscVariables } = require('./src/osc/osc-variables')
-const { resolveCaptureTier } = require('./src/streaming/stream-capture-tier')
-const { addStreamingConsumers, removeStreamingConsumers } = require('./src/streaming/caspar-ffmpeg-setup')
-const { resolveFreeStreamingBasePort } = require('./src/streaming/streaming-udp-ports'); const { prepareNdiStreaming } = require('./src/streaming/ndi-resolve')
 const { startPeriodicSync, startOscPlaybackInfoSupplement } = require('./src/utils/periodic-sync')
 const { ConfigManager } = require('./src/config/config-manager'); const { refreshConfigComparison } = require('./src/config/config-compare')
 const { hashSubsystemReload } = require('./src/config/config-reload-signature')
 const { SamplingManager } = require('./src/sampling/dmx-sampling')
-const { getChannelMap, setupAllRouting } = require('./src/config/routing')
+const { getChannelMap, setupAllRouting, setupInputsChannel } = require('./src/config/routing')
 const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
 const { createComposePreviewLifecycle } = require('./src/bootstrap/compose-preview-lifecycle')
+const { createV4l2BridgeLifecycle } = require('./src/bootstrap/v4l2-bridge-lifecycle')
 const { notifyWebSocketClientConnected, tryClearStartupLedTestForWebUi } = require('./src/bootstrap/startup-led-test-pattern'); const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
 const { startReplicationService, stopReplicationService } = require('./src/replication/replication-service')
 const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
@@ -147,11 +145,36 @@ function main() {
 				const ok = configManager.factoryReset()
 				if (ok) {
 					syncRuntimeConfigFromManager()
+					if (appCtx.gatheredInfo && typeof appCtx.gatheredInfo === 'object') {
+						appCtx.gatheredInfo.decklinkFromConfig = {}
+					}
+					try {
+						const { resetGpuPhysicalTopologyForFactoryReset } = require('./src/bootstrap/gpu-topology-factory-reset')
+						resetGpuPhysicalTopologyForFactoryReset(configManager, (level, msg) => appCtx.log(level, msg))
+						syncRuntimeConfigFromManager()
+					} catch (e) {
+						debugLog.warn(`[Config] Factory reset: GPU layout sync failed: ${e?.message || e}`)
+					}
+					try {
+						const { writeSystemInventoryFile } = require('./src/bootstrap/system-inventory-file')
+						writeSystemInventoryFile(appCtx.log, config, { configManager })
+					} catch (e) {
+						debugLog.warn(`[Config] Factory reset: could not refresh system inventory: ${e?.message || e}`)
+					}
 					try {
 						const { clearPersistedOsLayout } = require('./src/utils/os-config')
 						clearPersistedOsLayout({ reason: 'factory reset' })
 					} catch (e) {
 						debugLog.warn(`[Config] Factory reset: could not clear OS layout script: ${e?.message || e}`)
+					}
+					void setupInputsChannel(appCtx).catch((e) => {
+						appCtx.log('warn', `[Config] Factory reset decklink status: ${e?.message || e}`)
+					})
+					try {
+						const { clearPersistedMultiviewLayout } = require('./src/state/clear-multiview-layout')
+						clearPersistedMultiviewLayout(appCtx)
+					} catch (e) {
+						debugLog.warn(`[Config] Factory reset: could not clear multiview layout: ${e?.message || e}`)
 					}
 				}
 				return ok
@@ -198,6 +221,7 @@ function main() {
 		appCtx.reconcileAfterInfoGather = reconcileAfterInfoGather
 		
 		appCtx._composePreviewLifecycle = createComposePreviewLifecycle({ appCtx })
+		appCtx._v4l2BridgeLifecycle = createV4l2BridgeLifecycle({ appCtx })
 		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
 			appCtx.artnetReceiver.init()
@@ -209,7 +233,7 @@ function main() {
 			appCtx.state.setVariable('app_uptime', `${uptime}s`); appCtx.state.setVariable('app_memory_usage', `${mem}MB`)
 		}, 5000)
 
-		const { stopStreamingSubsystem, toggleStreaming, restartStreaming, enqueueStreaming, handleCasparConnected, handleConfigReload } = createStreamingLifecycle({ appCtx, config, logger, getChannelMap, addStreamingConsumers, removeStreamingConsumers, resolveFreeStreamingBasePort, prepareNdiStreaming, resolveCaptureTier })
+		const { stopStreamingSubsystem, toggleStreaming, restartStreaming, enqueueStreaming, handleCasparConnected, handleConfigReload } = createStreamingLifecycle({ appCtx, config, getChannelMap })
 		appCtx.toggleStreaming = toggleStreaming; appCtx.restartStreaming = restartStreaming; appCtx.enqueueStreaming = enqueueStreaming
 		const fetchInfo = createFetchServerInfoConfigAndBroadcast({
 			appCtx,
@@ -237,6 +261,7 @@ function main() {
 			const nextSig = hashSubsystemReload(config)
 			if (!forceReload && subsystemReloadSig !== null && nextSig === subsystemReloadSig) {
 				logger.info('[Config] Applied file change; subsystem recycle skipped (Caspar / OSC / streaming / DMX signature unchanged).')
+				if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onConfigChange()
 				return
 			}
 			subsystemReloadSig = nextSig
@@ -254,6 +279,7 @@ function main() {
 			}
 			appCtx.state.setVariable('offline_mode', config.offline_mode ? 'true' : 'false')
 			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onConfigChange()
+			if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onConfigChange()
 			try {
 				const { syncOperatorPointerConfine } = require('./src/system/pointer-confine')
 				syncOperatorPointerConfine(config, { log: (level, msg) => appCtx.log(level, msg) })
@@ -377,6 +403,7 @@ function main() {
 					startOscPlaybackInfoSupplement(appCtx)
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
+					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparConnected()
 					try {
 						const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
 						void syncCefInteractiveBridge(config, {
@@ -389,6 +416,7 @@ function main() {
 				} else if (payload.connected === false) {
 					wasConnected = false
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparDisconnected()
+					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparDisconnected()
 					;(require('./src/utils/periodic-sync')).clearPeriodicSyncTimer(appCtx)
 					;(require('./src/audio/meter-health')).stopLiveInputMeterHealthWatch(appCtx)
 					if (appCtx.clipEndFadeWatcher) appCtx.clipEndFadeWatcher.cancelAll()

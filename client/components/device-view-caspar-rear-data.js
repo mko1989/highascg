@@ -29,15 +29,19 @@ export function buildCasparRearPanelData(ctx) {
 	const deckIo = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_io')
 	const deckOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_out')
 	const streamOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'stream_out')
+	const v4l2Out = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'v4l2_out')
 	const recordOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'record_out')
 	const audioOuts = (lastPayload?.suggested?.connectors || []).filter(
 		(c) => c && c.deviceId === CASPAR_HOST && (c.kind === 'audio_out' || c.kind === 'audio_in'),
+	)
+	const v4l2Ins = (lastPayload?.suggested?.connectors || []).filter(
+		(c) => c && c.deviceId === CASPAR_HOST && c.kind === 'v4l2_in',
 	)
 	const casparConnectors = (lastPayload?.suggested?.connectors || []).filter(
 		(c) =>
 			c &&
 			c.deviceId === CASPAR_HOST &&
-			['gpu_out', 'decklink_out', 'decklink_in', 'audio_out', 'audio_in', 'stream_out', 'record_out'].includes(c.kind),
+			['gpu_out', 'decklink_out', 'audio_out', 'audio_in', 'v4l2_in', 'v4l2_out', 'stream_out', 'record_out'].includes(c.kind),
 	)
 
 	const slots = []
@@ -80,9 +84,32 @@ export function buildCasparRearPanelData(ctx) {
 			})
 		}
 	}
+	if (v4l2Ins.length) {
+		slots.push({
+			title: 'USB video',
+			items: v4l2Ins.map((c) => ({
+				id: c.id,
+				icon: '/assets/hdmi-port-icon.svg',
+				label: c.label || c.id,
+				kind: 'v4l2_in',
+				index: c.index != null ? Number(c.index) : null,
+				devicePath: c.externalRef || '',
+			})),
+		})
+	}
 	slots.push({
 		title: 'Stream',
 		items: streamOut.map((c) => ({ id: c.id, icon: '/assets/ethernet-port-icon.svg', label: c.label || c.id, kind: 'stream_out' })),
+	})
+	slots.push({
+		title: 'Virtual cam',
+		items: v4l2Out.map((c) => ({
+			id: c.id,
+			icon: '/assets/hdmi-port-icon.svg',
+			label: c.label || c.id,
+			kind: 'v4l2_out',
+			devicePath: c.externalRef || '',
+		})),
 	})
 	slots.push({
 		title: 'Record',
@@ -117,6 +144,7 @@ export function buildCasparRearPanelData(ctx) {
 		decklinkRearOrderIds,
 		deckIo,
 		deckOut,
+		v4l2Ins,
 		gpuOuts,
 		gpuPhysicalPorts: Array.isArray(live?.gpu?.physicalMap?.ports) ? live.gpu.physicalMap.ports : [],
 		gpuEffectiveTopology: Array.isArray(live?.gpu?.physicalMap?.effectiveTopology)

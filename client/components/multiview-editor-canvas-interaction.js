@@ -1,5 +1,4 @@
 import { multiviewState } from '../lib/multiview-state.js'
-import { getContainedVideoRect, getCellOverlayType } from './multiview-editor-canvas-layout.js'
 
 const HANDLE_SIZE = 8
 
@@ -26,20 +25,9 @@ export function toCanvas(x, y, offsetX, offsetY, scale) {
 	return { x: (x - offsetX) / scale, y: (y - offsetY) / scale }
 }
 
-export function getCellOuterRect(cell, cm = {}) {
-	const programChannels = cm.programChannels || []
-	const previewChannels = cm.previewChannels || []
-	const ovType = getCellOverlayType(cell, programChannels, previewChannels)
-	if (ovType === 'timers') {
-		return { x: cell.x, y: cell.y, w: cell.w, h: cell.h }
-	}
-	const rect = getContainedVideoRect(cell, cm)
-	return {
-		x: rect.x - 3,
-		y: rect.y - 3,
-		w: rect.w + 6,
-		h: rect.h + 6 + rect.lh,
-	}
+/** Interactive bounds for move/resize — full cell frame (video + label + chrome), not letterboxed picture. */
+export function getCellOuterRect(cell) {
+	return { x: cell.x, y: cell.y, w: cell.w, h: cell.h }
 }
 
 export function getCellAt(canvasX, canvasY, cm = {}) {
@@ -68,19 +56,25 @@ export function cursorForResizeHandle(h) {
 
 export function getResizeHandle(cell, canvasX, canvasY, scale, cm = {}) {
 	const tol = HANDLE_SIZE / scale
-	const { x, y, w, h } = getCellOuterRect(cell, cm)
-	const handles = [
-		['se', x + w - tol, y + h - tol, x + w + tol, y + h + tol],
-		['sw', x - tol, y + h - tol, x + tol, y + h + tol],
-		['ne', x + w - tol, y - tol, x + w + tol, y + tol],
-		['nw', x - tol, y - tol, x + tol, y + tol],
-		['e', x + w - tol, y + h / 2 - tol, x + w + tol, y + h / 2 + tol],
-		['w', x - tol, y + h / 2 - tol, x + tol, y + h / 2 + tol],
-		['s', x + w / 2 - tol, y + h - tol, x + w / 2 + tol, y + h + tol],
-		['n', x + w / 2 - tol, y - tol, x + w / 2 + tol, y + tol],
-	]
-	for (const [name, x1, y1, x2, y2] of handles) {
-		if (canvasX >= x1 && canvasX <= x2 && canvasY >= y1 && canvasY <= y2) return name
-	}
+	const { x, y, w, h } = getCellOuterRect(cell)
+	const insideX = canvasX > x + tol && canvasX < x + w - tol
+	const insideY = canvasY > y + tol && canvasY < y + h - tol
+	if (insideX && insideY) return null
+
+	const nearLeft = canvasX >= x - tol && canvasX <= x + tol
+	const nearRight = canvasX >= x + w - tol && canvasX <= x + w + tol
+	const nearTop = canvasY >= y - tol && canvasY <= y + tol
+	const nearBottom = canvasY >= y + h - tol && canvasY <= y + h + tol
+	const withinY = canvasY >= y - tol && canvasY <= y + h + tol
+	const withinX = canvasX >= x - tol && canvasX <= x + w + tol
+
+	if (nearRight && nearBottom) return 'se'
+	if (nearLeft && nearBottom) return 'sw'
+	if (nearRight && nearTop) return 'ne'
+	if (nearLeft && nearTop) return 'nw'
+	if (nearRight && withinY) return 'e'
+	if (nearLeft && withinY) return 'w'
+	if (nearBottom && withinX) return 's'
+	if (nearTop && withinX) return 'n'
 	return null
 }

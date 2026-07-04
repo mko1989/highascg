@@ -1,0 +1,292 @@
+        <div class="guide-intro">
+          <h2>Setting up the exFAT Partition</h2>
+          <p>After flashing, you must create a readable exFAT partition in the leftover unallocated space at the end of the stick. This partition carrying your offline simulator files and configurations must be labelled exactly <strong><code>HIGHASCGEXF</code></strong>.</p>
+
+          <div class="alert alert-info">
+            <strong>USB Playout Stick Architecture (Three Layers Required):</strong>
+            <p>Production playout sticks must be partitioned with the following layout:</p>
+            <ul class="alert-list">
+              <li><strong>Layer 1 (Boot Live ISO):</strong> ~5 GiB hybrid ISO partition (Label: <code>highascg</code>) — <em>Do not format or delete.</em></li>
+              <li><strong>Layer 2 (Live Persistence):</strong> 2 GiB ext4 partition (Label: <code>persistence</code>) — <em>OS overlay (drivers, configs, home).</em></li>
+              <li><strong>Layer 3 (Operator Data):</strong> Rest of the disk formatted as exFAT (Label: <code>HIGHASCGEXF</code>) — <em>Server updates, media, and simulation files.</em></li>
+            </ul>
+            <p class="alert-subtext">The manual steps below focus on partition creation and mounting for the exFAT data partition (Layer 3) to seed your simulator configurations and operator files.</p>
+          </div>
+          
+          <!-- Inner OS Tabs Toggle -->
+          <div class="inner-tabs">
+            <button class="inner-tab active" data-os="windows">Windows Setup</button>
+            <button class="inner-tab" data-os="macos">macOS Setup</button>
+          </div>
+        </div>
+
+        <!-- Windows Sub-guide -->
+        <div class="os-guide active" id="guide-windows">
+          <div class="steps-container">
+            <div class="guide-step-card">
+              <div class="step-num">01</div>
+              <div class="step-content">
+                <h3>Open Disk Management</h3>
+                <p>Press <code>Win + X</code> and select <strong>Disk Management</strong>. Look for your USB drive under the lower list (labeled <strong>Removable</strong>). Do not touch NVMe Disk 0.</p>
+                
+                <div class="screenshot-placeholder">
+                  <img src="images/win_partition_step1_disk_mgmt.png" alt="Disk Management Layout" onerror="this.style.display='none'">
+                  <div class="placeholder-overlay">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    <span class="placeholder-title">Screenshot: Disk Management Layout</span>
+                    <span class="placeholder-subtitle">Locate the USB Disk showing black unallocated region at the right</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">02</div>
+              <div class="step-content">
+                <h3>Create New Simple Volume</h3>
+                <p>Right-click the black bar showing <strong>Unallocated space</strong> at the very end of your USB disk, and select <strong>New Simple Volume...</strong></p>
+                
+                <div class="screenshot-placeholder">
+                  <img src="images/win_partition_step2_new_volume.png" alt="Unallocated Simple Volume Wizard" onerror="this.style.display='none'">
+                  <div class="placeholder-overlay">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    <span class="placeholder-title">Screenshot: Unallocated Right-Click Context Menu</span>
+                    <span class="placeholder-subtitle">Click 'New Simple Volume...' wizard command</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">03</div>
+              <div class="step-content">
+                <h3>Format Options & exFAT Label</h3>
+                <p>Follow the wizard. At the formatting step, select <strong>File system: exFAT</strong>. In <strong>Volume label</strong>, type exactly <strong><code>HIGHASCGEXF</code></strong> (case-sensitive, no spaces, 11-char limit).</p>
+                
+                <div class="screenshot-placeholder">
+                  <img src="images/win_partition_step3_format_exfat.png" alt="Simple Volume Format settings" onerror="this.style.display='none'">
+                  <div class="placeholder-overlay">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    <span class="placeholder-title">Screenshot: Simple Volume Formatting Settings</span>
+                    <span class="placeholder-subtitle">Ensure exFAT format and 'HIGHASCGEXF' label are typed correctly</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">04</div>
+              <div class="step-content">
+                <h3>Seed Folders & App Payload</h3>
+                <p>Open the new drive in File Explorer. Create folders inside: <code>sim/highascg</code>, <code>drop-config</code>, <code>media</code>, <code>templates</code>, and <code>configs</code>. Unzip the HighAsCG release zip directly inside <code>sim/highascg/</code>, so that <code>package.json</code> sits directly under that path.</p>
+                
+                <div class="screenshot-placeholder">
+                  <img src="images/win_partition_step4_folder_layout.png" alt="Root exFAT File Layout" onerror="this.style.display='none'">
+                  <div class="placeholder-overlay">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    <span class="placeholder-title">Screenshot: Root exFAT File Layout</span>
+                    <span class="placeholder-subtitle">Verify E:\sim\highascg\package.json file sits in the tree</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- macOS Sub-guide (Terminal — transparent steps after hybrid ISO flash) -->
+        <div class="os-guide" id="guide-macos">
+          <div class="steps-container">
+            <div class="guide-step-card guide-step-card--info">
+              <div class="step-num">✓</div>
+              <div class="step-content">
+                <h3>What this does (and does not do)</h3>
+                <p class="step-note safe">You already flashed the boot ISO. These steps add a <strong>second partition</strong> for operator files — they do <strong>not</strong> re-flash the stick.</p>
+                <p class="step-note warn">Replace <span class="inline-code">disk2</span> in every command with <em>your</em> USB id from step 1. Never use internal disks (<span class="inline-code">disk0</span>, <span class="inline-code">disk1</span>).</p>
+                <p class="step-note">Only grey boxes with a <strong>Copy</strong> button are commands to paste in Terminal. Explanations and sample output are plain text — do not paste those.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <h3>List external USB disks (read-only)</h3>
+                <p class="step-note safe">Safe — only prints information.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil list external physical</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note">Pick the row that matches your stick capacity (e.g. 32&nbsp;GB). Note the whole-disk id (<span class="inline-code">disk2</span>) — not a slice like <span class="inline-code">disk2s2</span>.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <h3>Understand the layout (diskutil — read-only)</h3>
+                <p class="step-note safe">Safe — only lists partitions on your stick.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil list disk2</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note warn">macOS often shows only a tiny <span class="inline-code">0xEF</span> slice (~17&nbsp;MB) plus “(free space)”. The ~5.5&nbsp;GB ISO still occupies the start of the stick — that space is <strong>not</strong> safe for exFAT.</p>
+                <p class="step-note">Typical output (example — do not paste):</p>
+                <div class="sample-output">   0: FDisk_partition_scheme    *31.5 GB    disk2
+   1: 0xEF                       16.8 MB    disk2s2
+      (free space)                 31.4 GB    -</div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <h3>Choose a safe start (MiB / sectors)</h3>
+                <p class="step-note">In Finder, check ISO size. Round <strong>up</strong> to the next whole gigabyte, then multiply by 1024 for MiB.</p>
+                <table class="start-mib-table">
+                  <thead><tr><th>ISO size (approx.)</th><th>Start at (GiB)</th><th>EXFAT_START_MIB</th></tr></thead>
+                  <tbody>
+                    <tr><td>≤ 5.5 GB (current build)</td><td>6 GiB</td><td><strong>6144</strong></td></tr>
+                    <tr><td>≤ 6.5 GB</td><td>7 GiB</td><td>7168</td></tr>
+                    <tr><td>≤ 7.5 GB</td><td>8 GiB</td><td>8192</td></tr>
+                  </tbody>
+                </table>
+                <p class="step-note">Example: 5.4&nbsp;GB ISO → 6&nbsp;GiB → <strong>6144</strong> MiB. When in doubt, pick a <em>larger</em> start.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">4</div>
+              <div class="step-content">
+                <h3>Read disk total sector size (read-only)</h3>
+                <p class="step-note safe">Safe — only prints information about your disk.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil info disk2</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note">Look for the line: <strong><code>Disk Size: ... (exactly N 512-Byte-Sectors)</code></strong>.</p>
+                <p class="step-note">Calculate sectors manually:</p>
+                <ul class="alert-list">
+                  <li><strong>START_SECTOR</strong>: Type exactly <code>12582912</code> (for standard 6 GiB offset).</li>
+                  <li><strong>END_SECTOR</strong>: Subtract 1 from the total number of sectors <strong><code>N</code></strong> (e.g. <code>61440000 - 1 = 61439999</code>).</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">5</div>
+              <div class="step-content">
+                <h3>Unmount the stick (before editing MBR)</h3>
+                <p class="step-note warn">Unmounts volumes on the USB so the partition table can be edited safely.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil unmountDisk disk2</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">6</div>
+              <div class="step-content">
+                <h3>Add MBR entry with fdisk (interactive)</h3>
+                <p class="step-note warn">Opens an editor on the USB partition table. Use <strong>exit</strong> to leave without saving if something looks wrong. Use <strong>write</strong> only after <strong>print</strong> looks correct.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">sudo fdisk -e /dev/rdisk2</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note">Type each line below, press <strong>Return</strong> after each. Do <strong>not</strong> paste the whole list at once.</p>
+                <ol class="fdisk-type-list">
+                  <li><strong>print</strong> — review table; on hybrid ISO sticks slots 1–3 are often used by the live image</li>
+                  <li><strong>edit N</strong> — use the <strong>last</strong> free MBR slot from <strong>print</strong> (often <strong>edit 4</strong>, not <strong>edit 2</strong>)</li>
+                  <li><strong>07</strong> — partition type (Windows NTFS/exFAT family)</li>
+                  <li>When asked CHS vs <strong>sector offsets</strong>, choose <strong>sectors</strong> (not CHS defaults)</li>
+                  <li>Start sector: value of <strong>START_SECTOR</strong> from step 4 (e.g. 12582912 for 6&nbsp;GiB)</li>
+                  <li>End sector: value of <strong>END_SECTOR</strong> from step 4</li>
+                  <li><strong>print</strong> — confirm new row; boot ISO slice must be unchanged</li>
+                  <li><strong>write</strong> — confirm <strong>y</strong> if prompted</li>
+                  <li><strong>exit</strong> — leave fdisk (not <strong>quit</strong>, which can write again)</li>
+                </ol>
+                <p class="step-note">If macOS asks for a reboot after write, answer yes and re-plug the stick before step 7.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">7</div>
+              <div class="step-content">
+                <h3>Verify the new slice (read-only)</h3>
+                <p class="step-note safe">Safe — lists disks again. Find the <strong>new</strong> line (size ~25&nbsp;GB); note its slice id.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil list disk2</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note">Often <span class="inline-code">disk2s1</span> or <span class="inline-code">disk2s3</span> — use <em>your</em> new slice in step 8.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">8</div>
+              <div class="step-content">
+                <h3>Format only the new slice as exFAT</h3>
+                <p class="step-note warn">Replace <span class="inline-code">disk2s4</span> with <em>your</em> slice from step 7 (often <span class="inline-code">disk2s1</span> or <span class="inline-code">disk2s4</span>). Formats <strong>that slice only</strong> — not the whole <span class="inline-code">disk2</span>.</p>
+                <p class="step-note">After <span class="inline-code">fdisk</span>, macOS may list the slice as <strong>Windows_NTFS</strong> with no filesystem yet. <span class="inline-code">diskutil eraseVolume</span> often fails with <strong>-5343 no such partition</strong> — use <span class="inline-code">newfs_exfat</span> instead (built into macOS).</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">sudo newfs_exfat -v HIGHASCGEXF /dev/rdisk2s4</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note safe">When done, Finder should show <strong>HIGHASCGEXF</strong> at <span class="inline-code">/Volumes/HIGHASCGEXF</span>. If it does not mount:</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil mount disk2s4</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note warn">If Finder shows <strong>HIGHASCGEXF 1</strong> (macOS name clash — another <span class="inline-code">HIGHASCGEXF</span> was already mounted), eject other copies of the stick, then rename so the mount path and volume label match the expected name:</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">diskutil rename "HIGHASCGEXF 1" HIGHASCGEXF</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">9</div>
+              <div class="step-content">
+                <h3>Create operator folders</h3>
+                <p class="step-note">Creates standard directories inside the exFAT volume root directory manually.</p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">mkdir -p /Volumes/HIGHASCGEXF/{sim/highascg,drop-config,media,templates,configs,snapshots/rear-panels}</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note">Note: If your volume mounted as <span class="inline-code">HIGHASCGEXF 1</span> instead, replace the path above with <span class="inline-code">/Volumes/HIGHASCGEXF\ 1/</span>.</p>
+              </div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-num">10</div>
+              <div class="step-content">
+                <h3>Copy the HighAsCG release</h3>
+                <p class="step-note">Choose one method to seed files into the volume. Edit the source paths as needed.</p>
+                <p class="step-note"><strong>From unpacked folder:</strong></p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">ditto "/path/to/highascg-main/." "/Volumes/HIGHASCGEXF/sim/highascg"</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note"><strong>From tarball:</strong></p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">tar -xzf ~/Downloads/highascg_*.tar.gz -C "/Volumes/HIGHASCGEXF/sim/highascg"</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+                <p class="step-note"><strong>Verify package.json exists:</strong></p>
+                <div class="cmd-copy">
+                  <pre class="cmd-copy-pre">test -f "/Volumes/HIGHASCGEXF/sim/highascg/package.json" &amp;&amp; echo OK</pre>
+                  <button type="button" class="cmd-copy-btn">Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-step-card guide-step-card--secondary">
+              <div class="step-num">?</div>
+              <div class="step-content">
+                <h3>Optional: Disk Utility (only if Partition is not greyed out)</h3>
+                <p class="step-note">Some GPT sticks can use Disk Utility: View → Show All Devices → physical USB → Partition → ExFAT slice named <span class="inline-code">HIGHASCGEXF</span>. If Partition is disabled, use the Terminal steps above.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>

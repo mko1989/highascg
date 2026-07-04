@@ -1,0 +1,113 @@
+.led-test-modal {
+	max-width: 28rem;
+	width: 92%;
+}
+
+.led-test-modal__section {
+	margin-bottom: 0.75rem;
+}
+
+.led-test-modal__section-title {
+	font-size: 0.72rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	margin-bottom: 0.35rem;
+}
+
+.led-test-modal__muted {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	margin: 0;
+}
+
+.led-test-modal__grid-ch-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.led-test-modal__grid-ch {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.82rem;
+	color: var(--text);
+}
+
+.led-test-modal__checks--inline {
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-bottom: 0.35rem;
+}
+
+.led-test-modal__hint {
+	font-size: 0.82rem;
+	color: var(--text-muted);
+	margin: 0 0 0.75rem;
+	line-height: 1.4;
+}
+
+.led-test-modal__hint code {
+	font-size: 0.78rem;
+}
+
+.led-test-modal__grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.5rem 1rem;
+	margin-bottom: 0.75rem;
+}
+
+.led-test-modal__grid label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	color: var(--text);
+}
+
+.led-test-modal__grid input {
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.85rem;
+}
+
+.led-test-modal__full {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	margin-bottom: 0.5rem;
+	color: var(--text);
+}
+
+.led-test-modal__full input {
+	padding: 4px 8px;
+	background: var(--bg-dark);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+}
+
+.led-test-modal__checks {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	font-size: 0.82rem;
+	color: var(--text-muted);
+	margin-bottom: 0.75rem;
+}
+
+.led-test-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 0.25rem;
+}
+

@@ -1,6 +1,7 @@
 /**
  * Scenes / Looks editor — deck of looks, drill-in per-scene compose with live PRV preview.
  */
+import { settingsState } from '../lib/settings-state.js'
 import { sceneState } from '../lib/scene-state.js'
 import { timelineState } from '../lib/timeline-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
@@ -14,8 +15,9 @@ import {
 	isSnapshotComposePreview,
 	resolveComposeChannelForCell,
 	subscribeComposePreviewRefresh,
+	syncComposePreviewFromChannelMap,
 } from './preview-canvas-compose-snapshot.js'
-import { resolveComposeChannelForEditingScene } from '../lib/compose-preview-url.js'
+import { resolveComposeChannelForEditingScene, resolveComposePreviewMode } from '../lib/compose-preview-url.js'
 import { resolveLookAirComposeChannel } from '../lib/look-air-compose-channel.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
 import { getDefaultUploadSubdir } from '../lib/project-media-context.js'
@@ -405,6 +407,25 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				drawComposeSnapshotCell(ctx, cw, ch, air.channel, { onLoaded: () => previewPanel.scheduleDraw() })
 				return
 			}
+			if (scene.id === sceneState.editingSceneId) {
+				const { channel: editCh } = resolveComposeChannelForEditingScene(scene, sceneState, cm)
+				if (editCh) {
+					drawComposeSnapshotCell(ctx, cw, ch, editCh, { onLoaded: () => previewPanel.scheduleDraw() })
+					return
+				}
+			}
+			const previewId = sceneState.getPreviewSceneIdForMain(main)
+			if (previewId === scene.id) {
+				const previewCh = resolveComposeChannelForCell(
+					{ composeCell: 'prv', composeScreenIdx: main },
+					cm,
+					main,
+				)
+				if (previewCh) {
+					drawComposeSnapshotCell(ctx, cw, ch, previewCh, { onLoaded: () => previewPanel.scheduleDraw() })
+					return
+				}
+			}
 		}
 
 		if (isCgOnlyLook(scene)) {
@@ -421,13 +442,12 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			return
 		}
 
-		const getDeckThumbUrl = s => {
-			const prv = cm.previewChannels?.[main]
-			const fallback = cm.programChannels?.[main] ?? cm.playbackChannels?.[main] ?? getProgramChannel()
-			const thumbCh =
-				prv != null && Number.isFinite(Number(prv)) && Number(prv) > 0 ? Number(prv) : Number(fallback)
-			return getThumbForSource(s, thumbCh)
-		}
+		const getDeckThumbUrl = s =>
+			resolveSourceThumbnailUrl(s, {
+				maxWidth: SCENE_THUMB_MAX_W,
+				seekSec: 0,
+				deckIdleMode: true,
+			})
 
 		drawSceneComposeStack(ctx, cw, ch, {
 			scene,
@@ -482,6 +502,21 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		previewPanel?.scheduleDraw?.()
 		repaintDeckThumbs()
 	})
+
+	let composePreviewMode = resolveComposePreviewMode()
+	function refreshComposePreviewAfterSettings() {
+		syncComposePreviewFromChannelMap(getChannelMap())
+		previewPanel?.scheduleDraw?.()
+		repaintDeckThumbs()
+	}
+	settingsState.subscribe(() => {
+		const next = resolveComposePreviewMode()
+		if (next === composePreviewMode) return
+		composePreviewMode = next
+		refreshComposePreviewAfterSettings()
+	})
+	document.addEventListener('highascg-settings-applied', refreshComposePreviewAfterSettings)
+	syncComposePreviewFromChannelMap(getChannelMap())
 
 	onDeckMediaDrop = async (mainCol, e) => {
 		const dt = e.dataTransfer
@@ -591,6 +626,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	sceneState.on('editingChange', scheduleRender); sceneState.on('screenChange', () => { previewPanel.scheduleDraw(); scheduleRender() })
 	document.addEventListener('scenes-refresh-preview', () => { previewRuntime.scheduleFlushPreviewFromInspector(); previewPanel.scheduleDraw() })
 	document.addEventListener('scenes-tab-activated', async () => {
+		const cm = getChannelMap()
+		const screenCount = Math.max(1, cm.screenCount ?? sceneState._canvasResolutions?.length ?? 1)
+		sceneState.syncMainEditorVisibleToScreenCount(screenCount)
 		// Do not STOP timeline here — that clears PGM/PRV AMCP layers. Timeline is stopped only when
 		// previewing a look (sendSceneToPreviewWithTimelineClear) or when taking a look to program.
 		previewPanel.scheduleDraw()
@@ -606,7 +644,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			sceneState.setEditOnPgm(true)
 			sceneState.setEditingScene(sceneId)
 			if (typeof window.highascgActivateWorkspaceTab === 'function') {
-				window.highascgActivateWorkspaceTab('cg-studio')
+				window.highascgActivateWorkspaceTab('scenes')
 			}
 		} else {
 			showScenesToast('No active look on this PGM channel to edit.', 'error')

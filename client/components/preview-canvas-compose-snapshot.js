@@ -3,7 +3,11 @@ import {
 	getComposePreviewUrl,
 	isSnapshotComposePreview,
 	resolveComposeChannelForCell,
+	resolveComposePreviewChannelsFromChannelMap,
 } from '../lib/compose-preview-url.js'
+
+/** @type {Set<number>} — channels whose meta returned 404 (no JPEG yet); skip poll spam */
+const _metaUnavailable = new Set()
 
 /** @type {Map<number, { img: HTMLImageElement, etag: string | null, loading: boolean }>} */
 const _cache = new Map()
@@ -86,6 +90,7 @@ export function ingestComposePreviewWs(data) {
 	const ch = parseInt(String(data?.channel ?? ''), 10)
 	const etag = data?.etag != null ? String(data.etag) : null
 	if (!Number.isFinite(ch) || ch < 1 || !etag) return
+	_metaUnavailable.delete(ch)
 	trackComposePreviewChannel(ch)
 	void loadComposePreviewImage(ch, etag)
 }
@@ -95,6 +100,7 @@ export function ingestComposePreviewWs(data) {
  */
 async function pollChannelMeta(channel) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
+	if (_metaUnavailable.has(ch)) return
 	let entry = _cache.get(ch)
 	if (!entry) {
 		entry = { img: new Image(), etag: null, loading: false }
@@ -103,7 +109,11 @@ async function pollChannelMeta(channel) {
 	if (entry.loading) return
 	try {
 		const res = await fetch(getComposePreviewMetaUrl(ch), { cache: 'no-store' })
-		if (!res.ok) return
+		if (!res.ok) {
+			if (res.status === 404) _metaUnavailable.add(ch)
+			return
+		}
+		_metaUnavailable.delete(ch)
 		const meta = await res.json()
 		const etag = meta?.etag ? String(meta.etag) : null
 		if (!etag || etag === entry.etag) return
@@ -141,10 +151,14 @@ export function resetComposePreviewClientCache(keepChannels) {
 			keepChannels.map((c) => Math.max(1, parseInt(String(c), 10) || 0)).filter((c) => c > 0),
 		)
 		for (const ch of [..._cache.keys()]) {
-			if (!keep.has(ch)) _cache.delete(ch)
+			if (!keep.has(ch)) {
+				_cache.delete(ch)
+				_metaUnavailable.delete(ch)
+			}
 		}
 	} else {
 		_cache.clear()
+		_metaUnavailable.clear()
 	}
 	_trackedChannelSig = ''
 	stopPollIfIdle()
@@ -153,6 +167,15 @@ export function resetComposePreviewClientCache(keepChannels) {
 /**
  * @param {number[]} channels
  */
+/**
+ * Track compose-preview JPEG channels from server channelMap (bootstrap + WS state).
+ * @param {{ programChannels?: number[], previewChannels?: number[], decklinkInputChannels?: number[], v4l2InputChannels?: number[], hostLiveChannels?: { channel?: number }[], inputChannels?: { channel?: number }[] } | null | undefined} channelMap
+ */
+export function syncComposePreviewFromChannelMap(channelMap) {
+	if (!channelMap || typeof channelMap !== 'object') return
+	syncComposePreviewClientChannels(resolveComposePreviewChannelsFromChannelMap(channelMap))
+}
+
 export function syncComposePreviewClientChannels(channels) {
 	const list = (channels || [])
 		.map((c) => Math.max(1, parseInt(String(c), 10) || 0))

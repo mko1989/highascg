@@ -554,6 +554,73 @@ function handlePreviewLiveRegister(body, ctx) {
 	}
 }
 
+/**
+ * POST /api/scene/live/preview/clear — stop PRV look-stack layers and drop server live map entry.
+ */
+async function handlePreviewLiveClear(body, ctx) {
+	const b = parseBody(body)
+	const routeMap = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
+	let mainIdx = b.mainIndex != null ? parseInt(b.mainIndex, 10) : -1
+	if (mainIdx < 0 && b.mainScreenIndex != null) {
+		mainIdx = parseInt(b.mainScreenIndex, 10) - 1
+	}
+
+	let previewCh = null
+	if (mainIdx >= 0) {
+		previewCh = resolvePreviewChannel(routeMap, mainIdx, null)
+	}
+	if (!previewCh && b.channel != null) {
+		const ch = parseInt(b.channel, 10)
+		const previews = (routeMap.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
+		if (previews.includes(ch)) previewCh = ch
+	}
+	if (!previewCh) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				error:
+					'Preview channel not found for mainIndex (PGM-only destination or invalid mainIndex). Pass mainIndex or preview channel.',
+			}),
+		}
+	}
+
+	let clearedAmcp = false
+	if (ctx.amcp) {
+		try {
+			await clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx)
+			clearedAmcp = true
+		} catch (e) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[scene-preview-clear] AMCP clear failed ch=${previewCh}: ${e?.message || e}`)
+			}
+		}
+	}
+
+	const hadEntry = !!liveSceneState.getChannel(previewCh)
+	if (hadEntry) {
+		await liveSceneState.clearChannel(previewCh)
+	}
+
+	if (clearedAmcp || hadEntry) {
+		liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
+	}
+
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({
+			ok: true,
+			cleared: clearedAmcp || hadEntry,
+			clearedAmcp,
+			clearedLive: hadEntry,
+			previewChannel: previewCh,
+			mainIndex: mainIdx,
+			sceneLive: liveSceneState.getAll(),
+		}),
+	}
+}
+
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
 		if (!ctx.amcp) return null
@@ -561,6 +628,9 @@ async function handlePost(path, body, ctx) {
 	}
 	if (path === '/api/scene/live/preview') {
 		return handlePreviewLiveRegister(body, ctx)
+	}
+	if (path === '/api/scene/live/preview/clear') {
+		return handlePreviewLiveClear(body, ctx)
 	}
 	if (path === '/api/scene/border-lines') {
 		return handleBorderLines(body, ctx)
@@ -571,4 +641,4 @@ async function handlePost(path, body, ctx) {
 	return null
 }
 
-module.exports = { handlePost, handleSceneTake, handlePreviewLiveRegister }
+module.exports = { handlePost, handleSceneTake, handlePreviewLiveRegister, handlePreviewLiveClear }

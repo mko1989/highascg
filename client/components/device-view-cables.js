@@ -458,17 +458,15 @@ export function renderCableOverlay(ctx) {
 		const a = connectorCenter(surface, cableSourceId)
 		if (a) {
 			const b = { x: cablePointer.x, y: cablePointer.y }
-			
-			// Mock edge for ghost cable
+			// Ghost cable while dragging: lightweight path only (no physics sim per pointermove).
 			const ghostEdge = { id: 'ghost', sourceId: cableSourceId, sinkId: 'ghost-sink' }
 			const routeData = simpleWiring
 				? buildSmoothSimpleCable(ghostEdge, a, b, simpleWiringMap)
-				: { pts: buildCable(a.x, a.y, b.x, b.y, numLoops, 99) }
-				
+				: { d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} L ${b.x.toFixed(1)} ${b.y.toFixed(1)}` }
 			const d = routeData.d || ('M ' + routeData.pts.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L '))
 			const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'path')
 			ghost.setAttribute('d', d)
-			ghost.setAttribute('class', 'device-view__cable-line device-view__cable-line--active')
+			ghost.setAttribute('class', 'device-view__cable-line device-view__cable-line--active device-view__cable-line--ghost')
 			ghost.setAttribute('stroke-dasharray', '5 4')
 			group.append(ghost)
 		}

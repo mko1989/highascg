@@ -61,7 +61,8 @@ function invalidateLiveThumbnailCache(config, channel) {
 }
 
 /**
- * Debounced PRINT refresh after bus/scene activity (WO-110).
+ * Debounced cache invalidation after bus/scene activity (WO-110).
+ * Does not run Caspar PRINT — use POST /api/thumbnail/live/capture or the Sources ↻ button.
  * @param {object} ctx
  * @param {number} channel
  * @param {number} [delayMs]
@@ -70,7 +71,6 @@ function scheduleLiveThumbnailRefresh(ctx, channel, delayMs) {
 	const cfg = ctx?.config || {}
 	if (cfg.live_thumbnail_refresh_on_bus === false) return
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	if (!ctx?.amcp?.isConnected) return
 	const delay = Math.max(150, parseInt(String(delayMs ?? cfg.live_thumbnail_refresh_delay_ms ?? 600), 10) || 600)
 	const prev = _refreshTimers.get(ch)
 	if (prev) clearTimeout(prev)
@@ -78,7 +78,7 @@ function scheduleLiveThumbnailRefresh(ctx, channel, delayMs) {
 		ch,
 		setTimeout(() => {
 			_refreshTimers.delete(ch)
-			void captureLiveThumbnailToCache(ctx, ch, { force: true }).catch(() => {})
+			invalidateLiveThumbnailCache(cfg, ch)
 		}, delay),
 	)
 }
@@ -369,17 +369,19 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 	if (stat && stat.size > 32 && !force) {
 		const meta = readMeta(cfg, ch)
 		const ttlMs = resolveLiveThumbnailTtlMs(cfg)
-		if (!isLiveThumbnailMetaStale(meta, ttlMs)) {
-			const buf = await fs.promises.readFile(dest)
-			return {
-				status: 200,
-				headers: {
-					'Content-Type': 'image/png',
-					'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
-					...(etag ? { ETag: etag } : {}),
-				},
-				body: buf,
-			}
+		const stale = isLiveThumbnailMetaStale(meta, ttlMs)
+		const buf = await fs.promises.readFile(dest)
+		return {
+			status: 200,
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': stale
+					? 'private, max-age=0, must-revalidate'
+					: 'private, max-age=86400, stale-while-revalidate=604800',
+				...(stale ? { 'X-Live-Thumb-Stale': '1' } : {}),
+				...(etag ? { ETag: etag } : {}),
+			},
+			body: buf,
 		}
 	}
 
@@ -389,31 +391,43 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				error: 'No cached live thumbnail',
-				hint: 'POST /api/thumbnail/live/capture with { "channel": N } or GET with defaults (lazy capture)',
+				hint: 'POST /api/thumbnail/live/capture with { "channel": N } or use the ↻ button in Sources → Live',
 				channel: ch,
 			}),
 		}
 	}
 
-	const cap = await captureLiveThumbnailToCache(ctx, ch, { force: true })
-	if (!cap.ok || !cap.path) {
+	if (force) {
+		const cap = await captureLiveThumbnailToCache(ctx, ch, { force: true })
+		if (!cap.ok || !cap.path) {
+			return {
+				status: 502,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: cap.error || 'Capture failed', channel: ch }),
+			}
+		}
+		const buf = await fs.promises.readFile(cap.path)
+		const st2 = await fs.promises.stat(cap.path)
+		const etag2 = `W/"${Math.floor(st2.mtimeMs)}-${st2.size}"`
 		return {
-			status: 502,
-			headers: JSON_HEADERS,
-			body: jsonBody({ error: cap.error || 'Capture failed', channel: ch }),
+			status: 200,
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+				ETag: etag2,
+			},
+			body: buf,
 		}
 	}
-	const buf = await fs.promises.readFile(cap.path)
-	const st2 = await fs.promises.stat(cap.path)
-	const etag2 = `W/"${Math.floor(st2.mtimeMs)}-${st2.size}"`
+
 	return {
-		status: 200,
-		headers: {
-			'Content-Type': 'image/png',
-			'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
-			ETag: etag2,
-		},
-		body: buf,
+		status: 404,
+		headers: JSON_HEADERS,
+		body: jsonBody({
+			error: 'No cached live thumbnail',
+			hint: 'POST /api/thumbnail/live/capture with { "channel": N }',
+			channel: ch,
+		}),
 	}
 }
 

@@ -40,6 +40,15 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 | GET | `/api/system/gpu-nvidia` | NVIDIA probe |
 | GET | `/api/system/gpu-layout` | GPU port layout |
 | GET | `/api/system/decklink` | Decklink status |
+| GET | `/api/system/v4l2-devices` | V4L2 capture devices (`?refresh=1`) |
+| GET | `/api/v4l2-inputs` | USB video input config + bridge status |
+| POST | `/api/v4l2-inputs/config` | Persist V4L2 slot settings |
+| POST | `/api/v4l2-inputs/apply` | Start bridges + PLAY on host channels |
+| GET | `/api/virtual-camera` | Virtual cam config + runtime status |
+| GET | `/api/virtual-camera/status` | Alias |
+| POST | `/api/virtual-camera/config` | Persist virtual cam settings |
+| POST | `/api/virtual-camera/start` | Start v4l2loopback bridge (+ optional ALSA mic) |
+| POST | `/api/virtual-camera/stop` | Stop bridge |
 | POST | `/api/system/gpu-nvidia/apply` | Apply NVIDIA layout |
 | POST | `/api/system/gpu-ports-reset` | Reset port mapping |
 | POST | `/api/system/gui-launch` | Launch GUI helper |

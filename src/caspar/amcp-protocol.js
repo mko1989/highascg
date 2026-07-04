@@ -179,7 +179,14 @@ class AmcpProtocol {
 						return
 				}
 				if (error && this._amcpState === ACMP_STATE.NEXT) {
-					this.log('error', 'Got error ' + RETCODE2TYPE[code] + ': ' + line)
+					const statusUpper = (status || '').toUpperCase()
+					const optionalRemoveMiss =
+						code === RETCODE.MEDIAFILE_NOT_FOUND && statusUpper.includes('REMOVE')
+					if (optionalRemoveMiss) {
+						this.log('debug', 'AMCP optional remove (absent): ' + line)
+					} else {
+						this.log('error', 'Got error ' + RETCODE2TYPE[code] + ': ' + line)
+					}
 				}
 				const cbKey =
 					status &&

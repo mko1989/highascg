@@ -50,6 +50,10 @@
 	color: var(--text);
 	text-transform: none;
 	letter-spacing: normal;
+	max-width: 100%;
+	width: 100%;
+	min-width: 14ch;
+	box-sizing: border-box;
 }
 
 .inspector-timeline-position__ms {

@@ -73,7 +73,7 @@ export function isMediaOrFileSourceValue(source) {
  * Resolve a deck/compose thumbnail URL for a layer or clip source.
  * Returns null when no static thumbnail applies (timeline, templates, direct NDI, etc.).
  * @param {object | null | undefined} source
- * @param {{ maxWidth?: number, seekSec?: number, channelForLive?: number | null, cacheBust?: number | string }} [opts]
+ * @param {{ maxWidth?: number, seekSec?: number, channelForLive?: number | null, cacheBust?: number | string, deckIdleMode?: boolean }} [opts]
  * @returns {string | null}
  */
 export function resolveSourceThumbnailUrl(source, opts = {}) {
@@ -85,6 +85,9 @@ export function resolveSourceThumbnailUrl(source, opts = {}) {
 	if (isMediaOrFileSourceValue(source)) {
 		return getThumbnailUrl(source.value, maxW, seekSec)
 	}
+
+	// Idle look deck cards: media thumbs only — never full-bus PRINT stills (WO-63).
+	if (opts.deckIdleMode) return null
 
 	const t = String(source.type || '').toLowerCase()
 	if (t === 'timeline' || t === 'template' || t === 'cg' || t === 'html') return null

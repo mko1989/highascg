@@ -13,9 +13,15 @@ const lookStackUrl = pathToFileURL(
 	path.join(repoRoot, 'client/lib/scenes-preview-look-stack.js'),
 ).href
 const lookBusUrl = pathToFileURL(path.join(repoRoot, 'client/lib/look-stack-amcp-channel.js')).href
+const timelineSendToUrl = pathToFileURL(
+	path.join(repoRoot, 'client/lib/timeline-state-model.js'),
+).href
 
 const { isPreviewBusAvailable, resolvePreviewAmcpChannel } = await import(lookStackUrl)
 const { resolveLookStackChannelForBus } = await import(lookBusUrl)
+const { coerceTimelineSendTo, defaultTimelineSendTo, previewBusAvailableForSendTo } = await import(
+	timelineSendToUrl,
+)
 
 const pgmOnlyMap = {
 	screenCount: 1,
@@ -87,5 +93,20 @@ ok(
 	resolveLookStackChannelForBus(pgmOnlyMap, sceneState, { mainScope: '0' }, 'edit') === null,
 	'look stack edit mode stays off PGM on pgm_only',
 )
+
+const prvDefault = { preview: true, program: false, screenIdx: 0 }
+ok(
+	previewBusAvailableForSendTo(pgmOnlyMap, prvDefault) === false,
+	'timeline dest has no PRV bus on pgm_only',
+)
+const coerced = coerceTimelineSendTo(pgmOnlyMap, { ...prvDefault })
+ok(coerced.preview === false && coerced.program === true, 'timeline sendTo coerces to PGM on pgm_only')
+const coercedDefault = defaultTimelineSendTo(pgmOnlyMap)
+ok(
+	coercedDefault.preview === false && coercedDefault.program === true,
+	'timeline default sendTo is PGM on pgm_only',
+)
+const kept = coerceTimelineSendTo(pgmPrvMap, { ...prvDefault })
+ok(kept.preview === true && kept.program === false, 'timeline sendTo stays PRV on pgm_prv')
 
 process.exit(failed > 0 ? 1 : 0)

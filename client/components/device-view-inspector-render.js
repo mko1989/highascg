@@ -42,22 +42,12 @@ export function readableConnectorRows(connector, ctx) {
 			{ label: 'Port', value: String(connector.externalRef ?? '?') },
 			{ label: 'Direction', value: dirLabel }
 		)
-	} else if (connector.kind === 'decklink_in') {
+	} else if (connector.kind === 'v4l2_in') {
 		rows.push(
-			{ label: 'Type', value: 'DeckLink input' },
-			{ label: 'DeckLink device', value: String(connector.externalRef ?? ctx?.input?.device ?? '0') },
-			{ label: 'Slot', value: String((ctx?.input?.slot ?? connector?.index + 1) || '?') },
-			{ label: 'Signal state', value: String(ctx?.input?.state || 'unknown') },
-			{ label: 'Status message', value: String(ctx?.input?.message || '-') },
-			{
-				label: 'Inputs host',
-				value:
-					ctx?.input?.hostingChannel != null
-						? `ch ${ctx.input.hostingChannel}${ctx?.input?.hostLabel ? ` (${ctx.input.hostLabel})` : ''}`
-						: '-',
-			}
+			{ label: 'Type', value: 'USB video input (V4L2)' },
+			{ label: 'Device', value: String(connector.externalRef ?? '-') },
+			{ label: 'Slot', value: String((connector?.caspar?.v4l2Slot ?? (Number(connector?.index) || 0) + 1) || '?') },
 		)
-
 	} else if (connector.kind === 'record_out') {
 		rows.push(
 			{ label: 'Type', value: 'Record output (FILE consumer)' },

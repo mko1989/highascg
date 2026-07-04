@@ -6,6 +6,7 @@ import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './de
 import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { setStatus } from './device-view-ui-utils.js'
 import * as Actions from './device-view-actions.js'
+import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
 import { renderCasparBand } from './device-view-caspar-render.js'
 import { renderCasparBandSimple } from './device-view-caspar-render-simple.js'
 import { renderMappingsBand } from './device-view-mappings-render.js'
@@ -79,10 +80,10 @@ export function renderDeckLinkBand(ctx) {
 		b.type = 'button'
 		const st = decklinkInputState(i)
 		b.className = 'device-view__port' + stateClass(st.level)
-		const k = `decklink_in:${i.slot}:${i.device}`
+		const k = `decklink_io:in:${i.slot}:${i.device}`
 		b.dataset.portKey = k
 		const io = ioBySlot.get(Number(i?.slot) || 0) || null
-		const cid = String(io?.id || resolveConnectorId('decklink_in', { input: i }) || '').trim()
+		const cid = String(io?.id || resolveConnectorId('decklink_io', { input: i, slot: i.slot }) || '').trim()
 		if (!cid || !isConnectorVisible(cid)) continue
 		if (cid) b.setAttribute('data-connector-id', cid)
 		if (io?.id) renderedIoIds.add(io.id)
@@ -105,10 +106,10 @@ export function renderDeckLinkBand(ctx) {
 			})
 		}
 		if (i?.message) b.title = String(i.message)
-		b.addEventListener('click', () => onPortClick(k, cid, { type: 'decklink_in', input: i }))
+		b.addEventListener('click', () => onPortClick(k, cid, { type: 'decklink_io', input: i }))
 		// When SDI is used as live input, hide cable dot in Device View.
 		// Dot reappears when ioDirection switches away from "in".
-		if (ioDir !== 'in') addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_in', input: i }, 'left')
+		if (ioDir !== 'in') addPortNodeDot(b, cid, onPortStartCable, k, { type: 'decklink_io', input: i }, 'left')
 		if (selectedKey === k) b.classList.add('device-view__port--selected')
 		if (cableSourceId && cid === cableSourceId) b.classList.add('device-view__port--cable-armed')
 		if (ioDir === 'in') inPorts.append(b)
@@ -228,6 +229,46 @@ export function renderStreamingBand(ctx) {
 	return streamBand
 }
 
+export function renderVirtualCamBand(ctx) {
+	const { lastPayload, isConnectorVisible, selectedKey, cableSourceId, onPortClick, onPortStartCable, onAddVirtualCamOutput, live } = ctx
+	const band = document.createElement('div')
+	band.className = 'device-view__band'
+	band.innerHTML =
+		'<div class="device-view__destinations-head"><h3 style="margin:0">Virtual camera</h3><button type="button" class="header-btn" data-add-vcam>+</button></div><div class="device-view__ports" data-vcam-ports></div>'
+	const ports = band.querySelector('[data-vcam-ports]')
+	const addBtn = band.querySelector('[data-add-vcam]')
+	if (addBtn) addBtn.addEventListener('click', () => { if (typeof onAddVirtualCamOutput === 'function') onAddVirtualCamOutput() })
+	const vcams = (lastPayload?.suggested?.connectors || []).filter((c) => c?.kind === 'v4l2_out')
+	if (!vcams.length) {
+		ports.appendChild(
+			Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'No virtual camera output — click + to add.' }),
+		)
+		return band
+	}
+	for (const s of vcams) {
+		const b = document.createElement('button')
+		b.type = 'button'
+		b.className = 'device-view__port'
+		const key = `v4l2_out:${s.id}`
+		b.dataset.portKey = key
+		if (!isConnectorVisible(s.id)) continue
+		b.setAttribute('data-connector-id', s.id)
+		const running = !!(live?.virtualCamera?.running || live?.virtualCameraStatus?.running)
+		b.appendChild(Object.assign(document.createElement('span'), { textContent: s.label || s.id }))
+		b.appendChild(
+			Object.assign(document.createElement('small'), {
+				textContent: running ? `Live · ${s.externalRef || '/dev/video10'}` : String(s.externalRef || 'v4l2loopback'),
+			}),
+		)
+		b.addEventListener('click', () => onPortClick(key, s.id, { type: 'v4l2_out', connector: s }))
+		addPortNodeDot(b, s.id, onPortStartCable, key, { type: 'v4l2_out', connector: s }, 'left')
+		if (selectedKey === key) b.classList.add('device-view__port--selected')
+		if (cableSourceId && s.id === cableSourceId) b.classList.add('device-view__port--cable-armed')
+		ports.appendChild(b)
+	}
+	return band
+}
+
 export function renderRecordingBand(ctx) {
 	const { lastPayload, isConnectorVisible, selectedKey, cableSourceId, onPortClick, onPortStartCable, onAddRecordOutput } = ctx
 	const recBand = document.createElement('div')
@@ -342,6 +383,50 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				setStatus(statusEl, 'Audio output removed', true)
 				await load()
 			} catch (e) { setStatus(statusEl, e.message, false) }
+		},
+		onAddVirtualCamOutput: async () => {
+			try {
+				await saveVirtualCameraConfig(
+					{
+						showInDeviceView: true,
+						label: 'Virtual cam',
+						channel: 1,
+						device: '/dev/video10',
+						width: 1920,
+						height: 1080,
+						fps: 50,
+						audioEnabled: true,
+					},
+					{ persist: true },
+				)
+				setStatus(statusEl, 'Virtual camera output added', true)
+				await load()
+			} catch (e) {
+				setStatus(statusEl, e.message, false)
+			}
+		},
+		onRemoveVirtualCamOutput: async (id) => {
+			const cid = String(id || 'vcam_1').trim() || 'vcam_1'
+			try {
+				try {
+					await stopVirtualCamera({ persist: false })
+				} catch {
+					/* best-effort */
+				}
+				await saveVirtualCameraConfig({ showInDeviceView: false, enabled: false }, { persist: true })
+				const g = lastPayload?.graph ? JSON.parse(JSON.stringify(lastPayload.graph)) : null
+				if (g) {
+					g.edges = (Array.isArray(g.edges) ? g.edges : []).filter(
+						(e) => String(e.sourceId) !== cid && String(e.sinkId) !== cid,
+					)
+					g.connectors = (Array.isArray(g.connectors) ? g.connectors : []).filter((c) => String(c?.id) !== cid)
+					await Actions.saveDeviceGraph(g)
+				}
+				setStatus(statusEl, 'Virtual camera output removed', true)
+				await load()
+			} catch (e) {
+				setStatus(statusEl, e.message, false)
+			}
 		},
 		onAddMappingNode: async () => {
 			try {

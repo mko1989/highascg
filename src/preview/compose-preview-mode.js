@@ -63,7 +63,33 @@ function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 }
 
 /**
- * Channels that may appear in compose preview cells (PRV + PGM per screen).
+ * All Caspar channels that should receive compose-preview JPEG FILE consumers.
+ * @param {ReturnType<typeof getChannelMap>} map
+ * @returns {number[]}
+ */
+function collectComposePreviewChannelsFromMap(map) {
+	const ch = new Set()
+	const push = (n) => {
+		const v = parseInt(String(n), 10)
+		if (Number.isFinite(v) && v > 0) ch.add(v)
+	}
+	const screenCount = Math.max(1, map?.screenCount || 1)
+	for (let i = 0; i < screenCount; i++) {
+		const prv = map?.previewCh?.(i + 1) ?? map?.previewChannels?.[i]
+		const pgm = map?.programCh?.(i + 1) ?? map?.programChannels?.[i]
+		if (prv != null && prv > 0) push(prv)
+		if (pgm != null && pgm > 0) push(pgm)
+	}
+	for (const c of map?.decklinkInputChannels || []) push(c)
+	for (const c of map?.v4l2InputChannels || []) push(c)
+	for (const entry of map?.hostLiveChannels || []) push(entry?.channel)
+	for (const entry of map?.inputChannels || []) push(entry?.channel)
+	if (ch.size === 0) ch.add(1)
+	return [...ch].sort((a, b) => a - b)
+}
+
+/**
+ * Channels that may appear in compose preview cells (PRV + PGM per screen, plus live input/host channels).
  * @param {object} config
  * @returns {number[]}
  */
@@ -71,17 +97,7 @@ function resolveMonitoredChannels(config) {
 	const cp = config?.composePreview || {}
 	if (cp.channels === 'compose_visible' || cp.channels == null) {
 		try {
-			const map = getChannelMap(config)
-			const ch = new Set()
-			const n = Math.max(1, map?.screenCount || 1)
-			for (let i = 0; i < n; i++) {
-				const prv = map?.previewCh?.(i + 1) ?? map?.previewChannels?.[i]
-				const pgm = map?.programCh?.(i + 1) ?? map?.programChannels?.[i]
-				if (prv != null && prv > 0) ch.add(prv)
-				if (pgm != null && pgm > 0) ch.add(pgm)
-			}
-			if (ch.size === 0) ch.add(1)
-			return [...ch].sort((a, b) => a - b)
+			return collectComposePreviewChannelsFromMap(getChannelMap(config))
 		} catch {
 			return [1]
 		}
@@ -108,6 +124,7 @@ module.exports = {
 	isFfmpegJpegComposePreview,
 	isSnapshotComposePreview,
 	normalizeComposePreviewSettings,
+	collectComposePreviewChannelsFromMap,
 	resolveMonitoredChannels,
 	isMonitoredComposeChannel,
 }

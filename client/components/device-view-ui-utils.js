@@ -39,6 +39,8 @@ export function roleLabel(item) {
 			return 'DeckLink input'
 		case 'live_audio_input':
 			return 'Live audio input'
+		case 'v4l2_input':
+			return 'USB video input'
 		case 'extra_audio':
 			return 'Extra audio'
 		case 'streaming_channel':
@@ -81,10 +83,40 @@ export function setStatus(el, msg, ok) {
 	el.className = 'device-view__status' + (ok ? ' device-view__status--ok' : ' device-view__status--err')
 }
 
+const CONNECTOR_HIT_RADIUS_PX = 22
+
+/**
+ * Nearest connector dot/port within a forgiving click radius (device view surface).
+ * @param {number} clientX
+ * @param {number} clientY
+ * @param {HTMLElement | null | undefined} surfaceEl
+ * @param {number} [maxDistance]
+ * @returns {string}
+ */
+export function findNearestConnectorId(clientX, clientY, surfaceEl, maxDistance = CONNECTOR_HIT_RADIUS_PX) {
+	if (!surfaceEl || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return ''
+	let bestId = ''
+	let bestDist = maxDistance
+	for (const el of surfaceEl.querySelectorAll('[data-connector-id]')) {
+		const id = String(el.getAttribute('data-connector-id') || '').trim()
+		if (!id) continue
+		const r = el.getBoundingClientRect()
+		if (!r.width && !r.height) continue
+		const cx = r.left + r.width / 2
+		const cy = r.top + r.height / 2
+		const d = Math.hypot(clientX - cx, clientY - cy)
+		if (d <= bestDist) {
+			bestDist = d
+			bestId = id
+		}
+	}
+	return bestId
+}
+
 /**
  * Extracts a connector ID from a DOM event by checking paths, closest elements, and points.
  */
-export function connectorIdFromEvent(ev) {
+export function connectorIdFromEvent(ev, surfaceEl = null) {
 	const readConnectorId = (node) => {
 		if (!node || typeof node.getAttribute !== 'function') return ''
 		return String(node.getAttribute('data-connector-id') || '').trim()
@@ -112,7 +144,11 @@ export function connectorIdFromEvent(ev) {
 			}
 		}
 	}
-	return ''
+	const surface =
+		surfaceEl ||
+		(t && typeof t.closest === 'function' ? t.closest('.device-view') : null) ||
+		document.querySelector('.device-view')
+	return findNearestConnectorId(clientX, clientY, surface)
 }
 
 export function renderPreservingFocus(container, renderFn) {

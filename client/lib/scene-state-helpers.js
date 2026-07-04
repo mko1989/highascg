@@ -7,6 +7,14 @@ import {
 /** Main look clips on PGM/PRV use 10, 20, 30…; layers 1–9 are reserved (e.g. black CG, channel chrome); 11–19 sit above layer 10 for PIP/CG, 21–29 above 20, etc. */
 export const LOOK_LAYER_FIRST = 10
 export const LOOK_LAYER_STEP = 10
+/** Bank-A look stack upper bound (timeline uses 200+). */
+export const LOOK_LAYER_MAX = 99
+
+/** @param {number} n */
+export function isValidLookLayerNumber(n) {
+	const num = Math.round(Number(n))
+	return Number.isFinite(num) && num >= LOOK_LAYER_FIRST && num <= LOOK_LAYER_MAX
+}
 
 /** @returns {import('./fill-math.js').FillLike} */
 function defaultFill() {

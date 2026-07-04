@@ -80,6 +80,17 @@ function defaultLayer(name) {
 	return { id: uid(), name: name || 'Layer', clips: [] }
 }
 
+/** Next unused default name (Layer 1, Layer 2, …) even after renames or gaps. */
+export function nextLayerDisplayName(tl) {
+	const layers = Array.isArray(tl?.layers) ? tl.layers : []
+	let maxNum = 0
+	for (const l of layers) {
+		const m = String(l?.name || '').match(/^Layer\s+(\d+)$/i)
+		if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10))
+	}
+	return `Layer ${Math.max(maxNum, layers.length) + 1}`
+}
+
 function flagUid() {
 	return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 }
@@ -278,7 +289,7 @@ class TimelineStateManager {
 	addLayer(id, name) {
 		const tl = this.getTimeline(id)
 		if (!tl) return null
-		const layer = defaultLayer(name || `Layer ${tl.layers.length + 1}`)
+		const layer = defaultLayer(name || nextLayerDisplayName(tl))
 		tl.layers.push(layer)
 		ensureLayerHeights(tl)
 		this._save()
@@ -288,13 +299,24 @@ class TimelineStateManager {
 	insertLayer(id, afterIdx, name) {
 		const tl = this.getTimeline(id)
 		if (!tl) return null
-		const layer = defaultLayer(name || `Layer ${afterIdx + 2}`)
+		const layer = defaultLayer(name || nextLayerDisplayName(tl))
 		ensureLayerHeights(tl)
 		tl.layers.splice(afterIdx + 1, 0, layer)
 		tl.layerHeights.splice(afterIdx + 1, 0, DEFAULT_LAYER_H)
 		ensureLayerHeights(tl)
 		this._save()
 		return layer
+	}
+
+	/** Insert below `layerIdx`, or append when index is out of range. */
+	insertLayerBelow(id, layerIdx) {
+		const tl = this.getTimeline(id)
+		if (!tl) return null
+		const name = nextLayerDisplayName(tl)
+		if (layerIdx == null || layerIdx < 0 || layerIdx >= tl.layers.length) {
+			return this.addLayer(id, name)
+		}
+		return this.insertLayer(id, layerIdx, name)
 	}
 
 	removeLayer(id, layerIdx) {

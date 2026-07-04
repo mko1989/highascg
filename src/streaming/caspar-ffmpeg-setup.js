@@ -76,36 +76,6 @@ function amcpRawWithTimeout(amcp, cmd, ms = 8000) {
 }
 
 /**
- * After Caspar ADD STREAM, ffmpeg may exit quickly; compare INFO a few seconds later.
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {Array<{channel: number, port: number}>} targets
- * @param {number} [delayMs]
- */
-function scheduleVerifyUdpStreams(amcp, targets, delayMs = 2500) {
-	if (!amcp || !targets.length) return
-	setTimeout(() => {
-		void (async () => {
-			for (const t of targets) {
-				const uri = `udp://127.0.0.1:${t.port}`
-				try {
-					const info = await amcp.info(t.channel)
-					const text = amcpInfoText(info)
-					const hasUdp = text.includes(uri)
-					streamLog.info(
-						`[Streaming] VERIFY ch${t.channel} port ${t.port}: INFO contains ${uri} → ${hasUdp} (INFO length ${text.length})`
-					)
-					if (!hasUdp) {
-						streamLog.warn(`[Streaming] VERIFY ch${t.channel} INFO excerpt:\n${truncate(text, 900)}`)
-					}
-				} catch (e) {
-					streamLog.warn(`[Streaming] VERIFY ch${t.channel} failed: ${e?.message || e}`)
-				}
-			}
-		})()
-	}, delayMs)
-}
-
-/**
  * Builds the ffmpeg arguments for the CasparCG ADD STREAM command.
  * Caspar expects: ADD n STREAM <output_url> <ffmpeg args…>.
  * **Must use `-format mpegts`**, not `-f mpegts`: Caspar's ffmpeg_consumer maps `-name value` into an options
@@ -162,31 +132,15 @@ function buildFfmpegArgs(config) {
 }
 
 /**
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {Array<{channel: number, port: number}>} targets
- * @param {Object} config (from stream-config)
- */
-async function addStreamingConsumers(amcp, targets, config) {
-	void amcp
-	void targets
-	void config
-	// Preview UDP / go2rtc WebRTC pipeline removed — do not add MPEG-TS STREAM consumers.
-	streamLog.info('[Streaming] addStreamingConsumers: preview UDP/WebRTC removed (no STREAM consumers added)')
-}
-
-/**
+ * Strip stale preview STREAM/NDI consumers left from older HighAsCG configs.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {Array<{channel: number, port: number}>} targets
  * @param {Object} [config]
  */
-async function removeStreamingConsumers(amcp, targets, config) {
-	if (!amcp || !amcp.isConnected) {
-		streamLog.warn('[Streaming] removeStreamingConsumers: AMCP not connected — skip')
-		return
-	}
+async function removeStalePreviewStreamConsumers(amcp, targets, config) {
+	if (!amcp || !amcp.isConnected) return
 
 	const tier = config ? resolveCaptureTier(config.captureMode || 'udp', config._casparHost || '127.0.0.1') : 'udp'
-	streamLog.info(`[Streaming] removeStreamingConsumers: tier=${tier}`)
 
 	for (const t of targets) {
 		if (tier === 'ndi') {
@@ -225,6 +179,5 @@ module.exports = {
 	getActiveStreamUris,
 	amcpInfoText,
 	truncate,
-	addStreamingConsumers,
-	removeStreamingConsumers,
+	removeStalePreviewStreamConsumers,
 }

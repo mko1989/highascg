@@ -12,12 +12,21 @@ import { programOutputState } from './program-output-state.js'
 import { projectFileIdFromName } from './project-files.js'
 import { markLocalProjectSaved } from './project-remote-sync.js'
 import { markServerProjectSynced, resetServerProjectSync, applyServerRuntimeState } from './server-project-sync.js'
-import { syncComposePreviewClientChannels } from '../components/preview-canvas-compose-snapshot.js'
+import { syncComposePreviewFromChannelMap } from '../components/preview-canvas-compose-snapshot.js'
 import { getAppWs, getAppStateStore, getAppLogic, getAppVariableStore } from './app-runtime.js'
 import { flushSceneDeckSync } from './app-scene-deck.js'
 import { syncProjectMediaContextFromClient } from './project-media-context.js'
 import { settingsState } from './settings-state.js'
 import { placeholderState } from './placeholder-state.js'
+import {
+	GPU_CUSTOM_LAYOUT_BAK_KEY,
+	GPU_LAYOUT_MIGRATED_KEY,
+} from './device-view-gpu-port-migrate.js'
+import {
+	GPU_REAR_PORT_COUNT_OVERRIDE_KEY,
+	FACTORY_RESET_GPU_LAYOUT_KEY,
+} from './device-view-gpu-port-constants.js'
+import { clearGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'
 
 export const DEFAULT_PROJECT_NAME = 'Untitled'
 
@@ -130,6 +139,18 @@ export async function performFactoryReset() {
 	resetServerProjectSync()
 	await api.post('/api/config/reset', { reset: true })
 	await saveDefaultUntitledProjectToServer({ force: true })
+	try {
+		clearGpuLayoutPrefs()
+		localStorage.removeItem(GPU_CUSTOM_LAYOUT_BAK_KEY)
+		localStorage.removeItem(GPU_LAYOUT_MIGRATED_KEY)
+		localStorage.removeItem(GPU_REAR_PORT_COUNT_OVERRIDE_KEY)
+		sessionStorage.setItem(FACTORY_RESET_GPU_LAYOUT_KEY, String(Date.now()))
+	} catch {
+		/* ignore */
+	}
+	await settingsState.load().catch(() => {})
+	document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
+	document.dispatchEvent(new CustomEvent('highascg-device-view-reload'))
 }
 
 /**
@@ -173,10 +194,7 @@ export async function startNewProject(opts = {}) {
 			if (stateStore) stateStore.applyChange('channelMap', state.channelMap)
 		}
 		if (state?.channelMap) {
-			syncComposePreviewClientChannels([
-				...(state.channelMap.programChannels || []),
-				...(state.channelMap.previewChannels || []),
-			])
+			syncComposePreviewFromChannelMap(state.channelMap)
 		}
 	} catch (e) {
 		console.warn('[HighAsCG] GET /api/state after new project:', e?.message || e)

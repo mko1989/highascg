@@ -20,13 +20,18 @@ function normalizeDestination(d) {
 				? 'multiview'
 				: modeRaw === 'stream'
 					? 'stream'
-					: 'pgm_prv'
+					: modeRaw === 'host_channel'
+						? 'host_channel'
+						: 'pgm_prv'
 	const width = Math.max(64, parseInt(String(d.width ?? 1920), 10) || 1920)
 	const height = Math.max(64, parseInt(String(d.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(d.fps ?? 50)) || 50)
 	const videoMode = String(d.videoMode || '1080p5000').trim() || '1080p5000'
 	const std = videoMode !== 'custom' ? STANDARD_VIDEO_MODES[videoMode] : null
-	return {
+	const hostRole = String(d.hostRole || '').trim()
+	const casparChannel = parseInt(String(d.casparChannel ?? ''), 10)
+	const inputSlot = parseInt(String(d.inputSlot ?? ''), 10)
+	const base = {
 		id,
 		label,
 		mainScreenIndex,
@@ -52,6 +57,14 @@ function normalizeDestination(d) {
 				}
 				: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' },
 	}
+	if (mode === 'host_channel') {
+		base.virtual = true
+		if (hostRole) base.hostRole = hostRole
+		if (Number.isFinite(casparChannel) && casparChannel >= 1) base.casparChannel = casparChannel
+		if (Number.isFinite(inputSlot) && inputSlot >= 1) base.inputSlot = inputSlot
+		if (d.sourceId) base.sourceId = String(d.sourceId)
+	}
+	return base
 }
 
 function normalizeScreenDestinations(raw) {

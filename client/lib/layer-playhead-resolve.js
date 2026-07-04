@@ -60,8 +60,6 @@ export function readCurrentDurationFramesFromVariables(vars, channel, layerNumbe
 		`caspar_ch${ch}_l${ln}_current_duration`,
 		`caspar_layer_${ln}_ch${ch}_current_duration`,
 		`osc_ch${ch}_layer${ln}_current_duration`,
-		`layer_${ln}_current_duration`,
-		`current_duration`,
 	]
 	if (bank) {
 		exact.unshift(
@@ -88,6 +86,7 @@ export function readCurrentDurationFramesFromVariables(vars, channel, layerNumbe
 		if (kl.includes(lns)) score += 4
 		if (kl.includes(`layer${lns}`) || kl.includes(`l${lns}`)) score += 2
 		if (kl.includes(`ch${chs}`) || kl.includes(`channel${chs}`)) score += 3
+		else continue
 		if (bankS && kl.includes(bankS)) score += 2
 		if (score > bestScore) {
 			const fr = parseCurrentDurationToFrames(v, fps)

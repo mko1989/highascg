@@ -81,9 +81,54 @@ test('resolveClipForAmcpLoad: active project folder wins over CLS basename match
 	)
 })
 
+test('resolveClipForAmcpLoad: project basename without extension expands to CLS id', () => {
+	const ctx = {
+		config: {
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
+	}
+	assert.equal(resolveClipForAmcpLoad('02_BUMPER', ctx), 'PROJECTS/TETST/02_BUMPER')
+})
+
+	test('resolveClipForAmcpLoad: CLS catalog basename match returns uppercase CLS id', () => {
+		const ctx = {
+			CHOICES_MEDIAFILES: [{ id: 'projects/tetst/02_BUMPER.mp4', label: 'projects/tetst/02_BUMPER.mp4' }],
+			config: { projectScopedMedia: { enabled: true } },
+			persistence: { get: () => 'other_project' },
+		}
+		assert.equal(resolveClipForAmcpLoad('02_BUMPER', ctx), 'PROJECTS/TETST/02_BUMPER')
+	})
+
+	test('resolveClipForAmcpLoad: disk layout wins when active slug mismatches project folder', () => {
+		const ctx = {
+			config: {
+				projectScopedMedia: { enabled: true },
+				local_media_path: require('path').join(__dirname, '../../media'),
+			},
+			persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled' : null) },
+			CHOICES_MEDIAFILES: [],
+		}
+		assert.equal(resolveClipForAmcpLoad('02_BUMPER.mp4', ctx), 'PROJECTS/TETST/02_BUMPER')
+		assert.equal(resolveClipForAmcpLoad('02_BUMPER', ctx), 'PROJECTS/TETST/02_BUMPER')
+	})
+
 const { normalizeClipPlayAmcpLine } = require('../../src/caspar/amcp-clip-resolve')
 
 test('normalizeClipPlayAmcpLine: expands project basename in PLAY', () => {
+	const ctx = {
+		config: {
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
+	}
+	const line = normalizeClipPlayAmcpLine('PLAY 2-10 "02_BUMPER"', ctx)
+	assert.equal(line, 'PLAY 2-10 "PROJECTS/TETST/02_BUMPER"')
+})
+
+test('normalizeClipPlayAmcpLine: expands quoted basename with extension in PLAY', () => {
 	const ctx = {
 		config: { projectScopedMedia: { enabled: true } },
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled888' : null) },

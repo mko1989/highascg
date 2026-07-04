@@ -10,6 +10,7 @@ const { readDecklinkKeyFillFromConnectorCaspar, writeDecklinkKeyFillToCasparServ
 const {
 	collectDestinationOutputEdges,
 	applyStreamRecordMappingsFromGraph,
+	applyVirtualCameraMappingsFromGraph,
 } = require('../config/device-graph-output-mapping')
 const { getDestinationOutputWiring } = require('../config/device-graph-destination-wiring')
 const { destinationsFromConfig } = require('../config/screen-destinations')
@@ -24,15 +25,29 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 		screenDestinations: ctx.config?.screenDestinations,
 		streamingChannel: { ...((ctx.config && ctx.config.streamingChannel) || {}) },
 		recordOutputs: Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs.map((x) => ({ ...x })) : [],
+		virtualCamera: { ...((ctx.config && ctx.config.virtualCamera) || {}) },
 	}
 	const streamRecordRes = applyStreamRecordMappingsFromGraph(streamSync)
+	const vcamRes = applyVirtualCameraMappingsFromGraph(streamSync)
 	const nextStreaming = streamSync.streamingChannel
 	const nextRecordOutputs = streamSync.recordOutputs
+	const nextVirtualCamera = streamSync.virtualCamera
 	const warnings = []
 	const groupedByTarget = new Map()
 
 	for (const item of destinationEdges) {
 		const sink = item.sink
+		if (sink.kind === 'v4l2_out') {
+			plan.actions.push({
+				kind: 'virtual_camera_mapping',
+				destinationId: item.destinationId,
+				target: String(sink.id || 'vcam_1'),
+				videoSource: item.videoSource,
+				layer: item.layer,
+				edgeId: String(item.edge?.id || ''),
+			})
+			continue
+		}
 		if (sink.kind === 'stream_out' || sink.kind === 'record_out') {
 			if (sink.kind === 'stream_out') {
 				plan.actions.push({
@@ -129,6 +144,7 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 	const changed = JSON.stringify(nextCaspar) !== JSON.stringify(ctx.config?.casparServer || {})
 	const streamChanged = streamRecordRes.changed || JSON.stringify(nextStreaming) !== JSON.stringify((ctx.config && ctx.config.streamingChannel) || {})
 	const recordChanged = streamRecordRes.changed || JSON.stringify(nextRecordOutputs) !== JSON.stringify(Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs : [])
+	const vcamChanged = vcamRes.changed || JSON.stringify(nextVirtualCamera) !== JSON.stringify(ctx.config?.virtualCamera || {})
 	if (changed) {
 		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), casparServer: nextCaspar })
 		ctx.config.casparServer = nextCaspar
@@ -142,7 +158,11 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), recordOutputs: nextRecordOutputs })
 		ctx.config.recordOutputs = nextRecordOutputs
 	}
-	return { changed: changed || streamChanged || recordChanged, warnings }
+	if (vcamChanged) {
+		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), virtualCamera: nextVirtualCamera })
+		ctx.config.virtualCamera = nextVirtualCamera
+	}
+	return { changed: changed || streamChanged || recordChanged || vcamChanged, warnings }
 }
 
 function buildApplyDryRunPlan(ctx) {

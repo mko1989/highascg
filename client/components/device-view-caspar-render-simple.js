@@ -10,7 +10,9 @@ import { buildCasparRearPanelData } from './device-view-caspar-rear-data.js'
 function sectionTitleForItem(it) {
 	const k = it.kind
 	if (k === 'gpu_out') return 'GPU'
-	if (k === 'decklink_io' || k === 'decklink_in' || k === 'decklink_out') return 'DeckLink'
+	if (k === 'decklink_io' || k === 'decklink_out') return 'DeckLink'
+	if (k === 'v4l2_in') return 'USB video'
+	if (k === 'v4l2_out') return 'Virtual cam'
 	if (k === 'stream_out') return 'Stream'
 	if (k === 'record_out') return 'Record'
 	if (k === 'audio_out') return 'Audio'
@@ -18,12 +20,11 @@ function sectionTitleForItem(it) {
 }
 
 function isInputKind(kind, connectorId, lastPayload) {
-	if (kind === 'decklink_in') return true
 	if (kind === 'decklink_io') {
 		const conn = connectorById(lastPayload, connectorId)
 		return conn ? isDecklinkIoIn(conn) : false
 	}
-	return kind === 'audio_in'
+	return kind === 'audio_in' || kind === 'v4l2_in'
 }
 
 function statusSubtitle(it, live, lastPayload) {
@@ -49,6 +50,9 @@ function statusSubtitle(it, live, lastPayload) {
 	if (it.kind === 'stream_out') {
 		const active = !!(live.streaming?.activeOutputs?.some((id) => String(id) === String(it.connectorId)))
 		return active ? 'Streaming' : 'Idle'
+	}
+	if (it.kind === 'v4l2_out') {
+		return live?.virtualCamera?.running ? 'Live' : 'Idle'
 	}
 	if (it.kind === 'record_out') {
 		const active = !!(live.recording?.activeOutputs?.some((id) => String(id) === String(it.connectorId)))
@@ -88,6 +92,7 @@ export function renderCasparBandSimple(ctx) {
 		onAddStreamOutput,
 		onAddRecordOutput,
 		onAddAudioOutput,
+		onAddVirtualCamOutput,
 	} = ctx
 
 	const { markerItems, resolveStatusClass } = buildCasparRearPanelData(ctx)
@@ -100,12 +105,13 @@ export function renderCasparBandSimple(ctx) {
 	stack.className = 'device-view__simple-nodes-stack'
 	band.appendChild(stack)
 
-	const slotOrder = ['GPU', 'DeckLink', 'Stream', 'Record', 'Audio']
+	const slotOrder = ['GPU', 'DeckLink', 'USB video', 'Virtual cam', 'Stream', 'Record', 'Audio']
+	const alwaysShowWithAdd = new Set(['Stream', 'Record', 'Audio', 'Virtual cam'])
 	for (const title of slotOrder) {
 		const sectionItems = markerItems.filter(
 			(it) => it.connectorId && !it.hidden && it.kind !== 'decklink_ref' && sectionTitleForItem(it) === title,
 		)
-		if (!sectionItems.length) continue
+		if (!sectionItems.length && !alwaysShowWithAdd.has(title)) continue
 
 		const section = document.createElement('section')
 		section.className = 'device-view__simple-section'
@@ -116,7 +122,7 @@ export function renderCasparBandSimple(ctx) {
 		headTitle.textContent = title
 		head.appendChild(headTitle)
 
-		if (title === 'Stream' || title === 'Record' || title === 'Audio') {
+		if (title === 'Stream' || title === 'Record' || title === 'Audio' || title === 'Virtual cam') {
 			const plus = document.createElement('button')
 			plus.type = 'button'
 			plus.className = 'device-view__backpanel-slot-plus'
@@ -127,6 +133,7 @@ export function renderCasparBandSimple(ctx) {
 				ev.stopPropagation()
 				if (title === 'Stream') onAddStreamOutput?.()
 				else if (title === 'Record') onAddRecordOutput?.()
+				else if (title === 'Virtual cam') onAddVirtualCamOutput?.()
 				else onAddAudioOutput?.()
 			})
 			head.appendChild(plus)
@@ -135,6 +142,15 @@ export function renderCasparBandSimple(ctx) {
 
 		const list = document.createElement('div')
 		list.className = 'device-view__simple-section-list'
+
+		if (!sectionItems.length && alwaysShowWithAdd.has(title)) {
+			list.appendChild(
+				Object.assign(document.createElement('p'), {
+					className: 'device-view__note',
+					textContent: 'None yet — click + to add.',
+				}),
+			)
+		}
 
 		for (const it of sectionItems) {
 			const kind = String(it.kind || '')
@@ -200,7 +216,7 @@ export function renderCasparBandSimple(ctx) {
 				onPortClick(portKey, cableId, connectorCtx)
 			})
 
-			if (kind === 'decklink_io' || kind === 'decklink_in') {
+			if (kind === 'decklink_io') {
 				node.draggable = true
 				node.addEventListener('dragstart', (ev) => {
 					if (!ev.dataTransfer) return

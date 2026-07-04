@@ -60,7 +60,7 @@ if [[ "$SKIP_APT" != "1" ]]; then
 	# shellcheck source=apt-with-stale-eggs-repo-fallback.sh
 	source "${HERE}/apt-with-stale-eggs-repo-fallback.sh"
 	highascg_apt_update
-	highascg_apt_install exfatprogs parted python3 rsync nginx
+	highascg_apt_install exfatprogs parted python3 rsync nginx v4l-utils
 fi
 
 echo "==> ISO defaults (Caspar config + optional embedded server)"
@@ -90,6 +90,9 @@ bash "${HERE}/install-grub-for-calamares-iso.sh"
 
 echo "==> Storage drivers (NVMe/VMD for Calamares partition page)"
 bash "${HERE}/install-storage-drivers-for-iso.sh"
+
+echo "==> Hardware hostname boot (highascg#### from MAC, WO-78)"
+bash "${REPO_ROOT}/scripts/setup/16-hardware-hostname-boot.sh" "$USER_CASPAR"
 
 echo "==> Kernel headers + DKMS tools (DeckLink / NVIDIA on installed playout)"
 bash "${HERE}/install-kernel-headers-for-dkms-iso.sh"

@@ -3,7 +3,6 @@
 const { channelXmlComment } = require('./config-generator-xml-comments')
 const { layoutChannelCount } = require('./config-modes')
 const { casparChannelLayoutId, DISCRETE_8CH_LAYOUT_ID } = require('./audio-channel-layouts')
-const { buildFfmpegArgs, casparUdpStreamUri } = require('../streaming/caspar-ffmpeg-setup')
 const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
 const {
 	buildComposeFfmpegConsumerArgs,
@@ -130,18 +129,6 @@ function buildScreenFfmpegConsumersXml(config, screenIdx1) {
                 </ffmpeg-consumer>`
 	}
 	return xml
-}
-
-/**
- * @param {Record<string, unknown>} config - App config
- * @param {number} port - UDP destination port (same URI as AMCP ADD STREAM)
- * @returns {string} XML for an <ffmpeg> consumer
- */
-function buildStreamingFfmpegConsumerXml(config, port) {
-	void config
-	void port
-	// Preview UDP/WebRTC STREAM consumers removed — do not embed in generated casparcg.config.
-	return ''
 }
 
 /**
@@ -487,7 +474,6 @@ module.exports = {
 	defaultFfmpegAudioArgs,
 	buildAudioLayoutsXml,
 	buildScreenFfmpegConsumersXml,
-	buildStreamingFfmpegConsumerXml,
 	buildComposePreviewFfmpegConsumerXml,
 	buildExtraAudioFfmpegConsumersXml,
 	channelLayoutElementXml,

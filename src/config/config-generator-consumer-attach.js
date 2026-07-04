@@ -5,7 +5,6 @@ const { STANDARD_VIDEO_MODES, resolveLiveAudioInputChannelMode } = require('./co
 const { effectiveStandardVideoModeId } = require('./config-generator-mode-helpers')
 const {
 	parseOptionalPixel,
-	buildStreamingFfmpegConsumerXml,
 	buildComposePreviewFfmpegConsumerXml,
 	buildScreenFfmpegConsumersXml,
 	buildExtraAudioFfmpegConsumersXml,
@@ -144,8 +143,6 @@ function buildScreenPairChannels(config, routeMap, ctx) {
                 </ndi>`
 	}
 
-	const streamingBasePort = parseInt(String(config.streaming?.basePort || '10000'), 10) || 10000
-	const pgmStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 1)
 	const pgmChNum = routeMap.programCh(n)
 	const composePgmXml = buildComposePreviewFfmpegConsumerXml(config, pgmChNum)
 	const rtmpPgmXml = buildRtmpFfmpegConsumersForChannel(config, pgmChNum)
@@ -168,21 +165,20 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 
 	const pgmXml = `${channelXmlComment(`Caspar channel ${pgmChNum}: Screen ${n} program output (PGM)`)}        <channel>
             <video-mode>${pgmChannelModeId}</video-mode>${layoutXml}
-            <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${pgmStreamingXml}${profConsumersXml}${rtmpPgmXml}
+            <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${profConsumersXml}${rtmpPgmXml}
             </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>
         </channel>`
 
-	const prvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + (n - 1) * 3 + 2)
 	const prvSystemAudioXml = buildPreviewSystemAudioXml(config, n)
 	const prvChNum = routeMap.previewCh(n)
 	const composePrvXml = buildComposePreviewFfmpegConsumerXml(config, prvChNum)
 	const rtmpPrvXml = buildRtmpFfmpegConsumersForChannel(config, prvChNum)
 	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)`)}        <channel>
             <video-mode>${dims.modeId}</video-mode>
-            <consumers>${composePrvXml}${prvStreamingXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
+            <consumers>${composePrvXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>
@@ -245,54 +241,39 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	const portAudioXml = buildPortAudioConsumerXml(config, `multiview_${n}`)
 	const systemAudioXml = buildProgramSystemAudioXml(config, `multiview_${n}`)
 
-	const streamingOn = config.streaming && config.streaming.enabled !== false && config.streaming.enabled !== 'false'
-	const streamingBasePort = parseInt(String(config.streaming?.basePort || '10000'), 10) || 10000
-	const mvStreamingXml = buildStreamingFfmpegConsumerXml(config, streamingBasePort + 3 + (n - 1) * 3)
-
 	const mvDlDev = parseInt(String(config[`multiview_${n}_decklink_device`] || config.multiview_decklink_device || '0'), 10) || 0
 	let mvProfile = String(config[`multiview_${n}_output_mode`] || config.multiview_output_mode || '').trim()
 	if (!mvProfile) {
 		if (mvDlDev > 0) {
-			mvProfile = streamingOn ? 'decklink_stream' : 'decklink_only'
+			mvProfile = 'decklink_only'
 		} else {
-			const legacy = (config[`multiview_${n}_screen_consumer`] ?? config.multiview_screen_consumer) === false || 
+			const legacy = (config[`multiview_${n}_screen_consumer`] ?? config.multiview_screen_consumer) === false ||
 			               (config[`multiview_${n}_screen_consumer`] ?? config.multiview_screen_consumer) === 'false'
-			mvProfile = legacy ? 'stream_only' : 'screen_stream'
+			mvProfile = legacy ? 'disabled' : 'screen_only'
 		}
 	}
 
 	let includeScreen = false
-	let includeStream = false
 	let includeDeck = false
 	switch (mvProfile) {
 		case 'disabled':
-			break
 		case 'stream_only':
-			includeStream = streamingOn
 			break
 		case 'screen_only':
+		case 'screen_stream':
 			includeScreen = true
 			break
 		case 'decklink_only':
+		case 'decklink_stream':
 			includeDeck = mvDlDev > 0
 			break
 		case 'screen_decklink':
-			includeScreen = true
-			includeDeck = mvDlDev > 0
-			break
-		case 'decklink_stream':
-			includeStream = streamingOn
-			includeDeck = mvDlDev > 0
-			break
 		case 'screen_stream_decklink':
 			includeScreen = true
-			includeStream = streamingOn
 			includeDeck = mvDlDev > 0
 			break
-		case 'screen_stream':
 		default:
 			includeScreen = true
-			includeStream = streamingOn
 			break
 	}
 
@@ -313,8 +294,7 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 					})
 				})()
 			: ''
-	const streamBlock = includeStream ? mvStreamingXml : ''
-	
+
 	const mvChs = Array.isArray(routeMap.multiviewChannels) ? routeMap.multiviewChannels : [routeMap.multiviewCh]
 	const mvChNum = mvChs[n - 1] || null
 	const rtmpMvXml = mvChNum != null ? buildRtmpFfmpegConsumersForChannel(config, mvChNum) : ''
@@ -331,7 +311,7 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	const mvChLabel = mvChNum != null && Number.isFinite(Number(mvChNum)) ? mvChNum : '?'
 	const xml = `${channelXmlComment(`Caspar channel ${mvChLabel}: Multiview output #${n}`)}        <channel>
             <video-mode>${channelModeId}</video-mode>
-            <consumers>${screenBlock}${systemAudioXml}${portAudioXml}${streamBlock}${deckBlock}${rtmpMvXml}
+            <consumers>${screenBlock}${systemAudioXml}${portAudioXml}${deckBlock}${rtmpMvXml}
             </consumers>
             <mixer>
                 <audio-osc>false</audio-osc>
@@ -400,16 +380,19 @@ function buildExtraAudioChannel(config, i, dims, casparChannelNum) {
  * @param {{ kind: string, slot: number, channel: number, layer: number, mode: string, label: string }} entry
  */
 function buildInputChannel(config, entry) {
-	void config
 	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
 	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
+	const composeXml = Number.isFinite(Number(entry?.channel)) ? buildComposePreviewFfmpegConsumerXml(config, entry.channel) : ''
 	const role =
 		entry?.kind === 'live_audio'
 			? `Live audio input ${entry?.slot} (ALSA PLAY … alsa:// on layer ${entry?.layer}; cheap channel, isolated VU)`
-			: `DeckLink input ${entry?.slot} (PLAY ${ch}-${entry?.layer} DECKLINK <device>; dedicated channel, isolated VU)`
+			: entry?.kind === 'v4l2'
+				? `V4L2 / USB video input ${entry?.slot} (PLAY ${ch}-${entry?.layer} udp://…; dedicated channel)`
+				: `DeckLink input ${entry?.slot} (PLAY ${ch}-${entry?.layer} DECKLINK <device>; dedicated channel, isolated VU)`
 	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
             <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
-            <consumers/>
+            <consumers>${composeXml}
+            </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>
@@ -422,16 +405,17 @@ function buildInputChannel(config, entry) {
  * @param {{ kind: string, channel: number, layer: number, mode: string, label?: string, sourceId?: string }} entry
  */
 function buildHostLiveChannel(config, entry) {
-	void config
 	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
 	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
+	const composeXml = Number.isFinite(Number(entry?.channel)) ? buildComposePreviewFfmpegConsumerXml(config, entry.channel) : ''
 	const role =
 		entry?.kind === 'ndi_host'
 			? `NDI host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} NDI …; route:// for on-air)`
 			: `Webpage host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} [HTML] … LOOP; route:// for on-air)`
 	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
             <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
-            <consumers/>
+            <consumers>${composeXml}
+            </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>

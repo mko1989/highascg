@@ -1,5 +1,6 @@
 'use strict'
 
+const fs = require('fs')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const path = require('path')
@@ -8,6 +9,8 @@ const { REPO_ROOT } = require('../repo-paths')
 const execFileAsync = promisify(execFile)
 
 const DEFAULT_AMCP_PORT = parseInt(String(process.env.CASPAR_AMCP_PORT || '5250'), 10) || 5250
+const CASPAR_SYSTEMD_CONTROL = '/usr/local/bin/caspar-systemd-control.sh'
+const CASPAR_SERVER_UNIT = 'casparcg-server.service'
 
 function sleep(ms) {
 	return new Promise((r) => setTimeout(r, ms))
@@ -164,6 +167,50 @@ function casparKillEnv(casparRoot) {
 	}
 }
 
+function isCasparSystemdControlInstalled() {
+	return fs.existsSync(CASPAR_SYSTEMD_CONTROL)
+}
+
+/**
+ * @returns {Promise<boolean>}
+ */
+async function isCasparSystemdServerActive() {
+	try {
+		const { stdout } = await execFileAsync('systemctl', ['is-active', CASPAR_SERVER_UNIT], {
+			timeout: 5000,
+			encoding: 'utf8',
+		})
+		const st = String(stdout || '').trim()
+		return st === 'active' || st === 'activating'
+	} catch {
+		return false
+	}
+}
+
+/**
+ * Restart casparcg-server via passwordless sudo helper (Nuclear tab wiring).
+ * @param {Function} log
+ * @returns {Promise<boolean>}
+ */
+async function restartCasparViaSystemd(log) {
+	if (!isCasparSystemdControlInstalled()) {
+		log('warn', '[Caspar restart] caspar-systemd-control.sh missing — cannot systemd restart')
+		return false
+	}
+	try {
+		await execFileAsync('sudo', ['-n', CASPAR_SYSTEMD_CONTROL, 'restart'], {
+			timeout: 120_000,
+			encoding: 'utf8',
+		})
+		log('info', '[Caspar restart] systemd casparcg-server restart triggered')
+		return true
+	} catch (e) {
+		const detail = e?.stderr ? String(e.stderr).trim() : e?.message || String(e)
+		log('warn', `[Caspar restart] systemd restart failed: ${detail}`)
+		return false
+	}
+}
+
 /**
  * Force-kill the main casparcg binary when AMCP RESTART does not complete teardown.
  * @param {object} ctx
@@ -288,6 +335,9 @@ async function sendRestartAndWaitForCaspar(ctx, opts = {}) {
 	if (!reconnected && !(await isAmcpPortListening())) {
 		log('warn', `[Caspar restart] AMCP still down after ${reconnectMs}ms — killing hung casparcg`)
 		await killStuckCasparMainProcess(ctx)
+		if (!(await isCasparSystemdServerActive())) {
+			await restartCasparViaSystemd(log)
+		}
 		reconnected = await waitForAmcpReady(ctx, Math.min(reconnectMs, 30_000), waitOpts)
 		if (reconnected) {
 			log('info', '[Caspar restart] AMCP reconnected after kill')
@@ -364,6 +414,20 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 	}
 
 	nudgeCasparConnectionReconnect(ctx)
+
+	const supervisorDown = !(await isCasparSystemdServerActive())
+	if (supervisorDown || skipRestartCommand) {
+		if (supervisorDown) {
+			log(
+				'info',
+				'[Caspar restart] Apply: casparcg-server inactive (e.g. nodm restart) — starting via systemd',
+			)
+		} else {
+			log('info', '[Caspar restart] Apply: post-nodm path — ensuring casparcg-server via systemd')
+		}
+		await restartCasparViaSystemd(log)
+	}
+
 	log('info', '[Caspar restart] Apply: waiting for run.sh relaunch…')
 
 	let reconnected =
@@ -372,6 +436,9 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 	if (!reconnected && !(await isAmcpPortListening())) {
 		log('warn', `[Caspar restart] Apply: no AMCP after ${reconnectMs}ms — kill + short retry`)
 		await killStuckCasparMainProcess(ctx)
+		if (!(await isCasparSystemdServerActive())) {
+			await restartCasparViaSystemd(log)
+		}
 		reconnected = await waitForAmcpReady(ctx, Math.min(reconnectMs, 20_000), waitOpts)
 	}
 
@@ -401,6 +468,9 @@ module.exports = {
 	isAmcpTcpConnected,
 	isAmcpPortListening,
 	isCasparMainProcessRunning,
+	isCasparSystemdServerActive,
+	isCasparSystemdControlInstalled,
+	restartCasparViaSystemd,
 	waitForAmcpReady,
 	waitForAmcpTcp: waitForAmcpReady,
 	waitForAmcpDisconnect,

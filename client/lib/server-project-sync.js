@@ -6,6 +6,7 @@ import { api } from './api-client.js'
 import { fetchProjectFromServer } from './project-load.js'
 import { importProjectWithHardwareReconcile } from './project-import-flow.js'
 import { normalizeGlobalBordersArray } from './scene-state-global-border.js'
+import { syncComposePreviewFromChannelMap } from '../components/preview-canvas-compose-snapshot.js'
 
 let synced = false
 let offlineMode = false
@@ -54,6 +55,9 @@ export function applyServerRuntimeState(state, ctx) {
 	if (state.scene?.live) sceneState.applyServerLiveChannels(state.scene.live, state.channelMap)
 	if (Array.isArray(state.scene?.globalBorders)) {
 		sceneState.globalBorders = normalizeGlobalBordersArray(state.scene.globalBorders)
+	}
+	if (state.channelMap) {
+		syncComposePreviewFromChannelMap(state.channelMap)
 	}
 }
 

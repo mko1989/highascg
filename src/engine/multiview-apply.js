@@ -20,6 +20,7 @@ const {
 	inferPrvScreen,
 	containFillInPictureRect,
 	chromeReserveForCellLayout,
+	resolveCellContentResolution,
 	loadOverlayTemplate,
 } = require('./multiview-layout-helper')
 
@@ -224,13 +225,9 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 				vw: adjustedW / MV_STAGE_W,
 				vh: adjustedH / MV_STAGE_H,
 			}
-			if (cell.aspectLocked !== false && cmForMv && (ovType === 'pgm' || ovType === 'prv')) {
-				const si = ovType === 'pgm' ? inferPgmScreen(cell, programChannels) - 1 : inferPrvScreen(cell, previewChannels) - 1
-				const res =
-					ovType === 'pgm'
-						? cmForMv.programResolutions?.[si]
-						: cmForMv.previewResolutions?.[si] || cmForMv.programResolutions?.[si]
-				if (res && res.w > 0 && res.h > 0) {
+			if (cell.aspectLocked !== false && cmForMv) {
+				const res = resolveCellContentResolution(cell, ovType, cmForMv, programChannels, previewChannels)
+				if (res?.w > 0 && res?.h > 0) {
 					fill = containFillInPictureRect(res.w, res.h, adjustedX, adjustedY, adjustedW, adjustedH)
 				}
 			}

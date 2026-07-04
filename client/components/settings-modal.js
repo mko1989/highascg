@@ -14,6 +14,7 @@ import * as SystemUpdates from './settings-modal-system-updates.js'
 import { wireDiagnosticsPanel } from './settings-modal-diagnostics.js'
 import { wireTailscalePanel } from './settings-modal-tailscale.js'
 import { mountLiveAudioSettingsPanel } from './settings-live-audio-panel.js'
+import { mountV4l2InputsSettingsPanel } from './settings-v4l2-inputs-panel.js'
 import { syncNuclearPasswordVisibility, getNuclearPasswordFromModal } from '../lib/settings-nuclear-shared.js'
 export function showSettingsModal(initialTab) {
 	if (document.getElementById('settings-modal')) return
@@ -30,6 +31,9 @@ export function showSettingsModal(initialTab) {
 	let liveAudioMounted = false
 	/** @type {(() => Promise<void>) | null} */
 	let refreshLiveAudioPanel = null
+	let usbVideoMounted = false
+	/** @type {(() => Promise<void>) | null} */
+	let refreshUsbVideoPanel = null
 	/** @type {ReturnType<typeof Companion.wireCompanionConnectionStatus> | null} */
 	let companionConnectionCtl = null
 	const tabsRow = modal.querySelector('.settings-tabs'); const varTab = tabsRow?.querySelector('[data-tab="variables"]')
@@ -86,6 +90,13 @@ export function showSettingsModal(initialTab) {
 			})
 		}
 		if (tabName === 'live-audio' && refreshLiveAudioPanel) void refreshLiveAudioPanel()
+		if (tabName === 'usb-video' && pane && !usbVideoMounted) {
+			usbVideoMounted = true
+			void mountV4l2InputsSettingsPanel(pane).then((refresh) => {
+				if (typeof refresh === 'function') refreshUsbVideoPanel = refresh
+			})
+		}
+		if (tabName === 'usb-video' && refreshUsbVideoPanel) void refreshUsbVideoPanel()
 		if (tabName === 'companion') companionConnectionCtl?.onTabActive()
 		if (tabName === 'nuclear' && typeof refreshNuclearSetup === 'function') void refreshNuclearSetup()
 		modal.dispatchEvent(new CustomEvent('settings-tab-activated', { detail: { tab: tabName } }))

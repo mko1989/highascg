@@ -12,6 +12,7 @@ const { startOscPlaybackInfoSupplement } = require('../utils/periodic-sync')
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const { normalizeRtmpConfig } = require('../config/rtmp-output')
 const { validateDecklinkCasparSlice, validateDecklinkOutputResolution } = require('../config/decklink-config-validate')
+const { validateV4l2CasparSlice } = require('../capture/v4l2-input-config-validate')
 const { resolveMainScreenCount } = require('../config/routing')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const { normalizeDeviceGraph } = require('../config/device-graph')
@@ -66,10 +67,12 @@ async function handlePost(path, body, ctx) {
 	if (settings.composePreview && typeof settings.composePreview === 'object') {
 		const prev = cfg.composePreview || {}
 		const { normalizeComposePreviewSettings } = require('../preview/compose-preview-mode')
-		const next = normalizeComposePreviewSettings(
-			{ ...prev, ...settings.composePreview },
-			defaults.composePreview,
-		)
+		const merged = { ...prev, ...settings.composePreview }
+		// Full settings POST from the client must not revert mode when composePreview.mode is omitted.
+		if (settings.composePreview.mode === undefined && prev.mode) {
+			merged.mode = prev.mode
+		}
+		const next = normalizeComposePreviewSettings(merged, defaults.composePreview)
 		const modeChanged = prev.mode !== next.mode
 		const ffmpegParamsChanged =
 			prev.fps !== next.fps ||
@@ -142,7 +145,7 @@ async function handlePost(path, body, ctx) {
 			}
 		}
 	}
-	if (settings.casparServer) { cfg.casparServer = { ...defaults.casparServer, ...cfg.casparServer, ...settings.casparServer }; normalizeCasparServerConfigPath(cfg.casparServer); warnings.push(...validateDecklinkCasparSlice(cfg.casparServer).warnings) }
+	if (settings.casparServer) { cfg.casparServer = { ...defaults.casparServer, ...cfg.casparServer, ...settings.casparServer }; normalizeCasparServerConfigPath(cfg.casparServer); warnings.push(...validateDecklinkCasparSlice(cfg.casparServer).warnings); warnings.push(...validateV4l2CasparSlice(cfg.casparServer).warnings) }
 	if (settings.dmx) cfg.dmx = { ...defaults.dmx, ...settings.dmx }
 	if (settings.rtmp) cfg.rtmp = normalizeRtmpConfig({ ...defaults.rtmp, ...(cfg.rtmp || {}), ...settings.rtmp })
 	if (settings.companion) {

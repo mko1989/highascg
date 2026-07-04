@@ -18,6 +18,7 @@ import {
 import { buildPreviewContentSnapshot } from '../lib/scenes-preview-snapshot.js'
 import { pushSceneToPreviewImpl } from '../lib/scenes-preview-push-scene.js'
 import { createScenesPreviewGlobalBorder } from '../lib/scenes-preview-global-border.js'
+import { clearPreviewLiveOnServer } from '../lib/scene-live-sync.js'
 
 const PREVIEW_PUSH_DEBOUNCE_MS = 16
 
@@ -265,49 +266,59 @@ export function createScenesPreviewRuntime(opts) {
 		if (!separatePrv || !prvCh) return
 
 		const previewCh = prvCh
-		const queue = []
-		const occupied = getOccupiedPreviewLookLayersFromState(stateStore, previewCh)
-		if (Number(lastPreviewChannel) === Number(previewCh) && lastPreviewLayers) {
-			for (const n of lastPreviewLayers) {
-				if (Number.isFinite(n) && n >= PREVIEW_SCENE_LAYER_MIN && n < 10000) occupied.add(n)
+		let clearedViaServer = false
+		try {
+			const res = await clearPreviewLiveOnServer(mIdx, { sceneState, stateStore })
+			clearedViaServer = !!(res?.cleared || res?.clearedAmcp)
+		} catch (e) {
+			console.warn('Clear preview: server clear failed, falling back to client AMCP:', e?.message || e)
+		}
+
+		if (!clearedViaServer) {
+			const queue = []
+			const occupied = getOccupiedPreviewLookLayersFromState(stateStore, previewCh)
+			if (Number(lastPreviewChannel) === Number(previewCh) && lastPreviewLayers) {
+				for (const n of lastPreviewLayers) {
+					if (Number.isFinite(n) && n >= PREVIEW_SCENE_LAYER_MIN && n < 10000) occupied.add(n)
+				}
 			}
-		}
-		if (opts.full) {
-			for (const n of allMatrixLayersOnPreviewChannel(stateStore, previewCh)) occupied.add(n)
-			for (let ti = 0; ti < TIMELINE_LAYER_CLEAR_COUNT; ti++) occupied.add(TIMELINE_LAYER_BASE + ti)
-			for (const n of defaultLookDecadeLayersForSweep()) occupied.add(n)
-		}
-
-		for (const ln of [...occupied].sort((a, b) => a - b)) {
-			const dl = chLayerAmcp(previewCh, ln)
-			queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, ln, 10000))
-		}
-
-		const gb = sceneState.getGlobalBorderForScreen(mIdx)
-		const mirror = gb?.mirrorBorderOnPrv === true
-		const include997 =
-			mirror || lastGlobalBorderPushMeta.has(borderMetaKey(previewCh, GB_LAYER_PRV_MIRROR))
-
-		if (include997) {
-			try {
-				const borderRes = await api.post('/api/scene/border-lines', {
-					channel: previewCh,
-					layer: GB_LAYER_PRV_MIRROR,
-					border: borderPayloadForBorderLines(gb, false),
-					isUpdate: false,
-				})
-				const raw = borderRes?.lines
-				if (Array.isArray(raw) && raw.length > 0) queue.push(...raw)
-			} catch (e) {
-				console.warn('Failed to clear PRV border mirror:', e?.message || e)
+			if (opts.full) {
+				for (const n of allMatrixLayersOnPreviewChannel(stateStore, previewCh)) occupied.add(n)
+				for (let ti = 0; ti < TIMELINE_LAYER_CLEAR_COUNT; ti++) occupied.add(TIMELINE_LAYER_BASE + ti)
+				for (const n of defaultLookDecadeLayersForSweep()) occupied.add(n)
 			}
-			lastGlobalBorderPushMeta.delete(borderMetaKey(previewCh, GB_LAYER_PRV_MIRROR))
-		}
 
-		const commitLine = `MIXER ${previewCh} COMMIT`
-		queue.push(commitLine)
-		if (queue.some((l) => l !== commitLine)) {
-			await postAmcpPreviewPipeline(queue)
+			for (const ln of [...occupied].sort((a, b) => a - b)) {
+				const dl = chLayerAmcp(previewCh, ln)
+				queue.push(`STOP ${dl}`, `MIXER ${dl} CLEAR`, ...buildPipOverlayRemoveLines(previewCh, ln, 10000))
+			}
+
+			const gb = sceneState.getGlobalBorderForScreen(mIdx)
+			const mirror = gb?.mirrorBorderOnPrv === true
+			const include997 =
+				mirror || lastGlobalBorderPushMeta.has(borderMetaKey(previewCh, GB_LAYER_PRV_MIRROR))
+
+			if (include997) {
+				try {
+					const borderRes = await api.post('/api/scene/border-lines', {
+						channel: previewCh,
+						layer: GB_LAYER_PRV_MIRROR,
+						border: borderPayloadForBorderLines(gb, false),
+						isUpdate: false,
+					})
+					const raw = borderRes?.lines
+					if (Array.isArray(raw) && raw.length > 0) queue.push(...raw)
+				} catch (e) {
+					console.warn('Failed to clear PRV border mirror:', e?.message || e)
+				}
+				lastGlobalBorderPushMeta.delete(borderMetaKey(previewCh, GB_LAYER_PRV_MIRROR))
+			}
+
+			const commitLine = `MIXER ${previewCh} COMMIT`
+			queue.push(commitLine)
+			if (queue.some((l) => l !== commitLine)) {
+				await postAmcpPreviewPipeline(queue)
+			}
 		}
 
 		if (Number(lastPreviewChannel) === Number(previewCh)) {

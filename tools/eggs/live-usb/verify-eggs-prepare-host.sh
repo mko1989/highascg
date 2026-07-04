@@ -106,6 +106,7 @@ need_path /etc/highascg/exfat-sync.json \
 
 for unit in \
 	highascg.service \
+	highascg-hardware-hostname.service \
 	highascg-exfat-arrive.service \
 	highascg-exfat-server-update.service; do
 	[[ -f "/etc/systemd/system/${unit}" ]] && ok "systemd unit ${unit}" \

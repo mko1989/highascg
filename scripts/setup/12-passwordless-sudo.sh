@@ -22,6 +22,9 @@ mkdir -p /usr/local/lib/highascg
 if [[ -f "$PLAYOUT/tools/runtime/highascg-tailscale-up.sh" ]]; then
 	install -m 0755 -o root -g root "$PLAYOUT/tools/runtime/highascg-tailscale-up.sh" /usr/local/lib/highascg/highascg-tailscale-up.sh
 fi
+if [[ -f "$PLAYOUT/tools/runtime/highascg-vcam-modules-up.sh" ]]; then
+	install -m 0755 -o root -g root "$PLAYOUT/tools/runtime/highascg-vcam-modules-up.sh" /usr/local/lib/highascg/highascg-vcam-modules-up.sh
+fi
 
 DEST=/etc/sudoers.d/highascg
 TMP="$(mktemp)"
@@ -53,6 +56,7 @@ ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl start snap.tailscale.tailscal
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop snap.tailscale.tailscaled.service, /usr/bin/systemctl stop snap.tailscale.tailscaled.service
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/tailscale logout, /snap/bin/tailscale logout
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-tailscale-up.sh
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-vcam-modules-up.sh
 EOF
 
 # eggs calamares --install runs as root on the build host only (install-eggs-calamares.sh).

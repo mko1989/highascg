@@ -2,8 +2,9 @@ import { timelineState } from '../lib/timeline-state.js'
 import { api } from '../lib/api-client.js'
 import { parseNumberInput } from '../lib/math-input.js'
 import { createDragInput } from './inspector-common.js'
-import { applyFillPxPatch, displayPositionFromStoredPx, fillInspectorPositionMeta } from '../lib/coordinate-origin.js'
+import { applyFillPxPatch, alignStoredPxRect, displayPositionFromStoredPx, fillInspectorPositionMeta } from '../lib/coordinate-origin.js'
 import { SCENE_CONTENT_FIT_OPTIONS } from '../lib/scene-content-fit.js'
+import { appendLayerAlignButtons } from './inspector-fill.js'
 import { appendTimelineClipKeyframes } from './inspector-fill-timeline.js'
 import { sceneState } from '../lib/scene-state.js'
 import { getClipBasePixelRect } from '../lib/timeline-clip-interp.js'
@@ -597,6 +598,14 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 		redrawClipInspector()
 	}
+	function patchFillAlign(mode) {
+		const next = alignStoredPxRect(pxRectForClip(), canvas, mode)
+		timelineState.updateClip(timelineId, layerIdx, clipId, { fillPx: next })
+		syncTimelineToServer()
+		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+		redrawClipInspector()
+	}
+	appendLayerAlignButtons(transGrp, patchFillAlign)
 	const pxStored = pxRectForClip()
 	const px = displayPositionFromStoredPx(pxStored, canvas)
 	const xInp = createDragInput({

@@ -52,6 +52,7 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 | **`/usr/local/lib/highascg/highascg-network-apply.sh`** | fixed `dhcp` / `static` + allow-listed iface args | WO-59 **Apply network** (`POST /api/system/network/apply`) |
 | **`/usr/local/lib/highascg/highascg-network-reset.sh`** | optional `[iface]` | **Reset network** (`POST /api/system/network/reset`) — DHCP renew / reconnect |
 | **`/usr/local/lib/highascg/highascg-tailscale-up.sh`** | *(none — reads `config/tailscale.json`)* | WO-91 / WO-97 pinned Tailscale bring-up |
+| **`/usr/local/lib/highascg/highascg-vcam-modules-up.sh`** | *(none — reads `/run/highascg/vcam-modules.conf`)* | WO-137 virtual camera — `v4l2loopback` + `snd-aloop` |
 | **`/usr/bin/tailscale`** | `logout` | `src/network/tailscale-service.js` |
 | **`/snap/bin/tailscale`** | `logout` | Same |
 
@@ -81,6 +82,14 @@ sudo bash scripts/setup/14-power-button-network-reset.sh
 Uses **`evtest`** + **`logind` `HandlePowerKey=ignore`**. Only enable on kiosk/playout boxes where accidental shutdown is acceptable.
 
 Uses **NetworkManager (`nmcli`)** on the live image (NM active; netplan files present but NM owns connections).
+
+**WO-137 virtual camera modules** (install via setup script):
+
+```bash
+sudo bash scripts/setup/12-passwordless-sudo.sh
+```
+
+Installs **`highascg-vcam-modules-up.sh`** with matching sudoers. HighAsCG writes **`/run/highascg/vcam-modules.conf`** then runs **`sudo -n /usr/local/lib/highascg/highascg-vcam-modules-up.sh`** on virtual cam start. See [wiki/integration/virtual-camera-output.md](wiki/integration/virtual-camera-output.md).
 
 **Not `sudo -n` today (interactive sudo):**
 

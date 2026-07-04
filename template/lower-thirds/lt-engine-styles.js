@@ -1,0 +1,336 @@
+'use strict';
+
+/** Data/style/XML helpers for lt-engine (WO-120). */
+window.LTEngineStyles = (function () {
+    let ctx = {};
+    function C() { return ctx; }
+    function setContext(c) { ctx = c; }
+
+    const STYLE_KEYS = new Set([
+        'primaryColor', 'textColor', 'panelColor', 'gradientMid', 'gradientEnd',
+        'position', 'marginX', 'marginY', 'opacity',
+        'titleFontSize', 'subtitleFontSize', 'titleFontWeight', 'letterSpacing', 'textTransform',
+        'blurAmount', 'displayDurationSec', 'speed', 'customFont',
+    ]);
+
+    function isStudioMode() {
+        try {
+            return new URLSearchParams(window.location.search).get('studio') === '1';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function clearDisplayTimer() {
+        if (displayTimer) {
+            clearTimeout(displayTimer);
+            displayTimer = null;
+        }
+    }
+
+    function syncStyleFromActiveData() {
+        const step = C().data[C().activeStep];
+        if (!step || typeof step !== 'object') return;
+        STYLE_KEYS.forEach((key) => {
+            if (step[key] != null && step[key] !== '') {
+                C().style[key] = step[key];
+            }
+        });
+    }
+
+    function normalizeUpdatePayload(raw) {
+        let parsed;
+        if (typeof raw === 'string' && raw.trim().startsWith('<')) {
+            parsed = parseCasparXML(raw);
+        } else {
+            try {
+                parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch (error) {
+                C().handleError(error);
+                return null;
+            }
+        }
+        if (!parsed || typeof parsed !== 'object') return null;
+
+        if (parsed.data != null || parsed.style != null) {
+            return {
+                data: parsed.data != null
+                    ? (Array.isArray(parsed.data) ? parsed.data : [parsed.data])
+                    : null,
+                style: parsed.style && typeof parsed.style === 'object' ? { ...parsed.style } : {},
+            };
+        }
+
+        const dataObj = {};
+        const styleObj = {};
+        Object.entries(parsed).forEach(([key, value]) => {
+            if (STYLE_KEYS.has(key)) styleObj[key] = value;
+            else dataObj[key] = value;
+        });
+        return {
+            data: Object.keys(dataObj).length ? [dataObj] : null,
+            style: styleObj,
+        };
+    }
+
+    function readDisplayDurationSec() {
+        syncStyleFromActiveData();
+        const raw = C().style.displayDurationSec;
+        if (raw === 0 || raw === '0') return 0;
+        const n = parseFloat(raw);
+        if (!Number.isFinite(n)) return 10;
+        return Math.max(0, n);
+    }
+
+    function scheduleDisplayStop() {
+        if (isStudioMode()) return;
+        clearDisplayTimer();
+        const durationSec = readDisplayDurationSec();
+        if (durationSec <= 0) return;
+        displayTimer = setTimeout(() => {
+            displayTimer = null;
+            if (state === 2) stop();
+        }, durationSec * 1000);
+    }
+
+    /* ── helpers ─────────────────────────────────────────────── */
+
+    function getComputedStyle(elem, styles) {
+        const cs = window.getComputedStyle(elem);
+        const arr = Array.isArray(styles) ? styles : [styles];
+        return arr.map(s => {
+            let v = cs.getPropertyValue(s);
+            if (typeof v === 'string' && v.includes('px'))
+                v = Number(v.replace('px', ''));
+            return v;
+        });
+    }
+
+    function executePlayOutCommand() {
+        animationQueue[0]()
+            .then(() => {
+                animationQueue.splice(0, 1);
+                if (animationQueue.length) executePlayOutCommand();
+            })
+            .catch(C().handleError);
+    }
+
+    function addPlayOutCommand(prom) {
+        if (animationQueue.length < animationThreshold && prom) {
+            animationQueue.push(prom);
+            if (animationQueue.length === animationThreshold)
+                handleWarning('Animation threshold met');
+        }
+        if (animationQueue.length === 1) executePlayOutCommand();
+    }
+
+    /* ── C().data / C().style ────────────────────────────────────────── */
+
+    function applyData() {
+        if (typeof C().cfg.applyData === 'function') {
+            C().cfg.applyData(C().data[C().activeStep]);
+            return;
+        }
+        const container = document.querySelector(C().cfg.containerSel);
+        const title = container.querySelector(C().cfg.titleSel || 'h1');
+        const subtitle = container.querySelector(C().cfg.subtitleSel || 'p');
+        
+        const stepData = C().data[C().activeStep] || {};
+        let primaryText = '';
+        let secondaryText = '';
+        
+        if (stepData.f0 !== undefined) {
+            primaryText = stepData.f0;
+        } else if (stepData.name !== undefined) {
+            primaryText = stepData.name;
+        } else if (stepData.title !== undefined && stepData.name === undefined) {
+            primaryText = stepData.title;
+        } else {
+            primaryText = stepData.title || '';
+        }
+        
+        if (stepData.f1 !== undefined) {
+            secondaryText = stepData.f1;
+        } else if (stepData.subtitle !== undefined) {
+            secondaryText = stepData.subtitle;
+        } else if (stepData.name !== undefined && stepData.title !== undefined) {
+            secondaryText = stepData.title;
+        } else if (stepData.role !== undefined) {
+            secondaryText = stepData.role;
+        } else if (stepData.description !== undefined) {
+            secondaryText = stepData.description;
+        }
+        
+        if (title) title.textContent = primaryText || '';
+        if (subtitle) subtitle.textContent = secondaryText || '';
+    }
+
+    function applyStyles() {
+        if (C().style.customFont) {
+            let styleEl = document.getElementById('lt-custom-font-C().style');
+            if (!styleEl) {
+                styleEl = document.createElement('C().style');
+                styleEl.id = 'lt-custom-font-C().style';
+                document.head.appendChild(styleEl);
+            }
+            // Add a timestamp or encode URI to handle paths
+            styleEl.innerHTML = `@font-face {
+                font-family: 'LTCustomFont';
+                src: url('../fonts/${C().style.customFont}');
+            }`;
+            // Apply it to the body or container
+            document.body.C().style.fontFamily = "'LTCustomFont', 'Arial', sans-serif";
+        } else {
+            // Revert to original if removed
+            const styleEl = document.getElementById('lt-custom-font-C().style');
+            if (styleEl) styleEl.innerHTML = '';
+            document.body.C().style.fontFamily = "'Arial', 'Helvetica Neue', sans-serif";
+        }
+
+        // Apply global animation speed if gsap is available
+        if (window.gsap && window.gsap.globalTimeline) {
+            gsap.globalTimeline.timeScale(C().style.speed ? Number(C().style.speed) : 1);
+        }
+
+        // Apply position positioning on the main container
+        if (C().cfg.containerSel) {
+            const container = document.querySelector(C().cfg.containerSel);
+            if (container) {
+                // Reset inline margins to prevent accumulation
+                container.C().style.marginLeft = '';
+                container.C().style.marginRight = '';
+                container.C().style.margin = '';
+                
+                const pos = (C().style.position || 'left').toLowerCase();
+                if (pos === 'center') {
+                    container.C().style.marginLeft = 'auto';
+                    container.C().style.marginRight = 'auto';
+                } else if (pos === 'right') {
+                    container.C().style.marginLeft = 'auto';
+                } else {
+                    // Default to left
+                    container.C().style.marginRight = 'auto';
+                }
+                if (C().style.marginX != null || C().style.marginY != null) {
+                    const mx = C().style.marginX != null && C().style.marginX !== '' ? Number(C().style.marginX) : 77;
+                    const my = C().style.marginY != null && C().style.marginY !== '' ? Number(C().style.marginY) : 43;
+                    if (Number.isFinite(mx) && Number.isFinite(my)) {
+                        container.C().style.margin = my + 'px ' + mx + 'px';
+                    }
+                }
+                if (C().style.opacity != null && C().style.opacity !== '') {
+                    const op = Number(C().style.opacity);
+                    if (Number.isFinite(op)) container.C().style.opacity = String(Math.max(0, Math.min(1, op)));
+                }
+            }
+        }
+
+        applyTypographyOverrides();
+        applyBlurOverride();
+
+        if (typeof C().cfg.applyStyles === 'function') {
+            C().cfg.applyStyles(C().style);
+            return;
+        }
+    }
+
+    function applyTypographyOverrides() {
+        const titleSel = C().cfg.titleSel || 'h1';
+        const subtitleSel = C().cfg.subtitleSel || 'p';
+        const rules = [];
+        if (C().style.titleFontSize != null && C().style.titleFontSize !== '') {
+            rules.push(titleSel + ' { font-size: ' + Number(C().style.titleFontSize) + 'px !important; }');
+        }
+        if (C().style.subtitleFontSize != null && C().style.subtitleFontSize !== '') {
+            rules.push(subtitleSel + ' { font-size: ' + Number(C().style.subtitleFontSize) + 'px !important; }');
+        }
+        if (C().style.titleFontWeight != null && C().style.titleFontWeight !== '') {
+            rules.push(titleSel + ' { font-weight: ' + C().style.titleFontWeight + ' !important; }');
+        }
+        if (C().style.letterSpacing != null && C().style.letterSpacing !== '') {
+            rules.push(titleSel + ' { letter-spacing: ' + C().style.letterSpacing + ' !important; }');
+            rules.push(subtitleSel + ' { letter-spacing: ' + C().style.letterSpacing + ' !important; }');
+        }
+        if (C().style.textTransform) {
+            rules.push(titleSel + ' { text-transform: ' + C().style.textTransform + ' !important; }');
+            rules.push(subtitleSel + ' { text-transform: ' + C().style.textTransform + ' !important; }');
+        }
+        let el = document.getElementById('lt-studio-typography');
+        if (!rules.length) {
+            if (el) el.textContent = '';
+            return;
+        }
+        if (!el) {
+            el = document.createElement('C().style');
+            el.id = 'lt-studio-typography';
+            document.head.appendChild(el);
+        }
+        el.textContent = rules.join('\n');
+    }
+
+    function applyBlurOverride() {
+        if (C().style.blurAmount == null || C().style.blurAmount === '' || !C().cfg.containerSel) return;
+        const panel = document.querySelector(C().cfg.containerSel + ' .glass-panel');
+        if (panel) panel.C().style.backdropFilter = 'blur(' + Number(C().style.blurAmount) + 'px)';
+    }
+
+    function parseCasparXML(xml) {
+        const dataObj = {};
+        const parser = /<componentData\s+id=["']([^"']+)["']>\s*<value>([\s\S]*?)<\/value>/gi;
+        let match;
+        while ((match = parser.exec(xml)) !== null) {
+            dataObj[match[1]] = match[2].trim();
+        }
+        
+        let title = '';
+        let subtitle = '';
+        
+        if (dataObj.f0 !== undefined) {
+            title = dataObj.f0;
+        } else if (dataObj.name !== undefined) {
+            title = dataObj.name;
+        } else if (dataObj.title !== undefined && dataObj.name === undefined) {
+            title = dataObj.title;
+        } else {
+            title = dataObj.title || '';
+        }
+        
+        if (dataObj.f1 !== undefined) {
+            subtitle = dataObj.f1;
+        } else if (dataObj.subtitle !== undefined) {
+            subtitle = dataObj.subtitle;
+        } else if (dataObj.name !== undefined && dataObj.title !== undefined) {
+            subtitle = dataObj.title;
+        } else if (dataObj.role !== undefined) {
+            subtitle = dataObj.role;
+        } else if (dataObj.description !== undefined) {
+            subtitle = dataObj.description;
+        }
+        
+        const styleObj = {};
+        if (dataObj.primaryColor) styleObj.primaryColor = dataObj.primaryColor;
+        if (dataObj.textColor) styleObj.textColor = dataObj.textColor;
+        if (dataObj.position) styleObj.position = dataObj.position;
+        if (dataObj.speed) styleObj.speed = dataObj.speed;
+        if (dataObj.customFont) styleObj.customFont = dataObj.customFont;
+        if (dataObj.displayDurationSec != null) styleObj.displayDurationSec = dataObj.displayDurationSec;
+        
+        return {
+            data: { ...dataObj, title, subtitle },
+            style: styleObj
+        };
+    }
+
+    return {
+        setContext,
+        STYLE_KEYS,
+        syncStyleFromActiveData,
+        normalizeUpdatePayload,
+        getComputedStyle,
+        applyData,
+        applyStyles,
+        applyTypographyOverrides,
+        applyBlurOverride,
+        parseCasparXML,
+    };
+})();

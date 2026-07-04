@@ -89,21 +89,8 @@ export async function initOptionalModules(ctx) {
 		injectStylesheet(styleUrl)
 	}
 
-	if (_state.enabled.includes('cg-studio')) {
-		try {
-			const mod = await import('../assets/modules/cg-studio/entry.js')
-			if (mod && typeof mod.default === 'function') {
-				await mod.default(_state.context)
-			}
-		} catch (e) {
-			const msg = e && e.message ? e.message : String(e)
-			console.warn('[optional-modules] cg-studio bundle failed:', msg)
-			failed.push({ name: 'cg-studio', error: msg })
-		}
-	}
-
 	for (const url of _state.bundles) {
-		if (!url || url.includes('cg-studio')) continue
+		if (!url) continue
 		const bundleUrl =
 			url.startsWith('http://') || url.startsWith('https://')
 				? url

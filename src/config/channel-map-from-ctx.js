@@ -8,6 +8,10 @@ const { getChannelMap } = require('./routing')
 const { buildChannelResolutionMap } = require('./server-info-config')
 const { resolveProgramAudioLayoutsForConfig } = require('./program-audio-layouts')
 const { resolveProjectFps } = require('./project-fps')
+const {
+	configuredDecklinkInputCount,
+	decklinkInputsConfiguredInSettings,
+} = require('./decklink-input-slots')
 
 /**
  * @param {object} ctx — app context (`config`, `gatheredInfo`, …)
@@ -34,19 +38,26 @@ function buildChannelMap(ctx) {
 	const programResolutions = programChannels.map((ch) => pickRes(ch))
 	const previewResolutions = previewChannels.map((ch) => pickRes(ch))
 	const dlFromConfig = ctx.gatheredInfo?.decklinkFromConfig || {}
-	const cfgDlExplicitZero = cfg.decklink_input_count != null && String(cfg.decklink_input_count) === '0'
-	const decklinkCount = map.decklinkCount > 0 ? map.decklinkCount : cfgDlExplicitZero ? 0 : (dlFromConfig.decklinkCount ?? 0)
+	const configuredDlCount = configuredDecklinkInputCount(cfg)
+	const trustSavedConfig = decklinkInputsConfiguredInSettings(cfg)
+	const decklinkCount =
+		map.decklinkCount > 0
+			? map.decklinkCount
+			: trustSavedConfig
+				? (configuredDlCount ?? 0)
+				: (dlFromConfig.decklinkCount ?? 0)
 	const liveAudioCount = map.liveAudioCount > 0 ? map.liveAudioCount : 0
+	const v4l2InputCount = map.v4l2InputCount > 0 ? map.v4l2InputCount : 0
 	const inputsCh =
-		map.decklinkCount > 0 || liveAudioCount > 0 || map.inputsHostChannelEnabled
+		map.decklinkCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || map.inputsHostChannelEnabled
 			? map.inputsCh
-			: cfgDlExplicitZero
-				? null
+			: trustSavedConfig
+				? map.inputsCh ?? null
 				: (dlFromConfig.inputsCh ?? null)
+	const inputsResolution = trustSavedConfig ? null : (dlFromConfig.inputsResolution ?? null)
 	const { normalizeAudioPreview, resolveAudioPreviewChannel } = require('./audio-preview')
 	const audioPreview = normalizeAudioPreview(cfg)
 	const audioPreviewCh = resolveAudioPreviewChannel(cfg, map)
-	const inputsResolution = dlFromConfig.inputsResolution ?? null
 
 	const channelResolutionsByChannel = {}
 	for (const k of Object.keys(serverByCh)) {
@@ -70,6 +81,7 @@ function buildChannelMap(ctx) {
 	}))
 	const decklinkInputChannels = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
 	const liveAudioInputChannels = Array.isArray(map.liveAudioInputChannels) ? map.liveAudioInputChannels : []
+	const v4l2InputChannels = Array.isArray(map.v4l2InputChannels) ? map.v4l2InputChannels : []
 
 	return {
 		screenCount: map.screenCount,
@@ -77,6 +89,7 @@ function buildChannelMap(ctx) {
 		virtualMainChannels: map.virtualMainChannels || [],
 		decklinkCount,
 		liveAudioCount,
+		v4l2InputCount,
 		decklinkInputsHost: map.decklinkInputsHost || 'dedicated',
 		inputsOnMvr: !!map.inputsOnMvr,
 		audioPreview,
@@ -103,6 +116,7 @@ function buildChannelMap(ctx) {
 		inputChannels,
 		decklinkInputChannels,
 		liveAudioInputChannels,
+		v4l2InputChannels,
 		hostLiveChannels: Array.isArray(map.hostLiveChannels) ? map.hostLiveChannels : [],
 		webpageHostChannels: Array.isArray(map.webpageHostChannels) ? map.webpageHostChannels : [],
 		ndiHostChannels: Array.isArray(map.ndiHostChannels) ? map.ndiHostChannels : [],

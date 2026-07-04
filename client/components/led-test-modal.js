@@ -99,7 +99,7 @@ export function getLedTestShowGridForChannel(channel) {
 }
 
 /**
- * @param {() => void} [onApplied]
+ * @param {(event?: { type?: string, channel?: number, enabled?: boolean }) => void} [onApplied]
  * @param {import('../lib/state-store.js').StateStore} [stateStore]
  */
 export function showLedTestModal(onApplied, stateStore) {
@@ -205,10 +205,6 @@ export function showLedTestModal(onApplied, stateStore) {
 					<label><input type="checkbox" id="led-test-panel-idx" /> Panel R×C labels (grid mode)</label>
 					<label><input type="checkbox" id="led-test-spec" /> Resolution line (footer, grid mode)</label>
 				</div>
-				<div class="led-test-modal__actions">
-					<button type="button" class="btn btn--secondary" id="led-test-cancel">Cancel</button>
-					<button type="button" class="btn" id="led-test-save">Save</button>
-				</div>
 			</div>
 		</div>
 	`
@@ -247,7 +243,10 @@ export function showLedTestModal(onApplied, stateStore) {
 	}
 
 	syncBouncingCharUi()
-	patternSel.addEventListener('change', syncBouncingCharUi)
+	patternSel.addEventListener('change', () => {
+		syncBouncingCharUi()
+		persistAndApply()
+	})
 
 	const gridMap = { ...s.gridByChannel }
 	modal.querySelectorAll('[data-led-grid-ch]').forEach((inp) => {
@@ -261,10 +260,12 @@ export function showLedTestModal(onApplied, stateStore) {
 	})
 
 	function close() {
+		clearTimeout(settingsApplyTimer)
+		clearTimeout(labelDebounce)
 		modal.remove()
 	}
 
-	function save() {
+	function collectSettings() {
 		const nextGrid = { ...loadGridByChannel() }
 		modal.querySelectorAll('[data-led-grid-ch]').forEach((inp) => {
 			const ch = inp.getAttribute('data-led-grid-ch')
@@ -276,12 +277,9 @@ export function showLedTestModal(onApplied, stateStore) {
 		const nextShow = {}
 		modal.querySelectorAll('[data-led-show-ch]').forEach((inp) => {
 			const ch = inp.getAttribute('data-led-show-ch')
-			if (ch != null) {
-				if (inp.checked) nextShow[ch] = true
-				else nextShow[ch] = false
-			}
+			if (ch != null) nextShow[ch] = inp.checked
 		})
-		const next = {
+		return {
 			cols: Math.max(1, parseInt(cols.value, 10) || 1),
 			rows: Math.max(1, parseInt(rows.value, 10) || 1),
 			panelWidth: Math.max(1, parseInt(pw.value, 10) || 1),
@@ -297,14 +295,57 @@ export function showLedTestModal(onApplied, stateStore) {
 			pattern: patternSel.value,
 			charCount: Math.max(1, Math.min(48, parseInt(charCountInp.value, 10) || 1)),
 		}
-		saveLedTestSettings(next)
-		close()
-		if (typeof onApplied === 'function') onApplied()
 	}
 
+	function persistAndApply(event) {
+		saveLedTestSettings(collectSettings())
+		if (typeof onApplied !== 'function') return
+		if (event?.type === 'channel') {
+			onApplied(event)
+			return
+		}
+		scheduleSettingsApply()
+	}
+
+	let settingsApplyTimer = null
+	function scheduleSettingsApply() {
+		clearTimeout(settingsApplyTimer)
+		settingsApplyTimer = setTimeout(() => {
+			settingsApplyTimer = null
+			if (typeof onApplied === 'function') onApplied()
+		}, 400)
+	}
+
+	let labelDebounce = null
+	function persistAndApplyDebounced() {
+		clearTimeout(labelDebounce)
+		labelDebounce = setTimeout(() => persistAndApply(), 300)
+	}
+
+	for (const el of [cols, rows, pw, ph, charCountInp]) {
+		el.addEventListener('change', () => persistAndApply())
+	}
+	label.addEventListener('input', persistAndApplyDebounced)
+	label.addEventListener('change', () => persistAndApply())
+
+	for (const el of [centerChar, panelIdx, spec, circleCb, crossCb]) {
+		el.addEventListener('change', () => persistAndApply())
+	}
+
+	modal.querySelectorAll('[data-led-grid-ch]').forEach((inp) => {
+		inp.addEventListener('change', () => persistAndApply())
+	})
+
+	modal.querySelectorAll('[data-led-show-ch]').forEach((inp) => {
+		inp.addEventListener('change', () => {
+			const ch = parseInt(inp.getAttribute('data-led-show-ch') || '', 10)
+			persistAndApply(
+				Number.isFinite(ch) && ch > 0 ? { type: 'channel', channel: ch, enabled: inp.checked } : undefined,
+			)
+		})
+	})
+
 	modal.querySelector('#led-test-close').addEventListener('click', close)
-	modal.querySelector('#led-test-cancel').addEventListener('click', close)
-	modal.querySelector('#led-test-save').addEventListener('click', save)
 	modal.addEventListener('click', (e) => {
 		if (e.target === modal) close()
 	})

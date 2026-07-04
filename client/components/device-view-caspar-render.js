@@ -57,11 +57,13 @@ export function renderCasparBand(ctx) {
 	const deckIo = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_io')
 	const deckOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_out')
 	const streamOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'stream_out')
+	const v4l2Out = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'v4l2_out')
 	const recordOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'record_out')
 	const audioOuts = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && (c.kind === 'audio_out' || c.kind === 'audio_in'))
+	const v4l2Ins = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'v4l2_in')
 	const audioInventory = Array.isArray(live?.audio?.portaudio) ? live.audio.portaudio : []
 	const casparConnectors = (lastPayload?.suggested?.connectors || []).filter(
-		(c) => c && c.deviceId === CASPAR_HOST && ['gpu_out', 'decklink_out', 'decklink_in', 'audio_out', 'audio_in', 'stream_out', 'record_out'].includes(c.kind)
+		(c) => c && c.deviceId === CASPAR_HOST && ['gpu_out', 'decklink_out', 'audio_out', 'audio_in', 'v4l2_in', 'v4l2_out', 'stream_out', 'record_out'].includes(c.kind)
 	)
 
 	const slots = []
@@ -127,9 +129,30 @@ export function renderCasparBand(ctx) {
 			})
 		}
 	}
+	if (v4l2Ins.length) {
+		slots.push({
+			title: 'USB video',
+			items: v4l2Ins.map((c) => ({
+				id: c.id,
+				icon: '/assets/hdmi-port-icon.svg',
+				label: c.label || c.id,
+				kind: 'v4l2_in',
+				index: c.index != null ? Number(c.index) : null,
+			})),
+		})
+	}
 	slots.push({
 		title: 'Stream',
 		items: streamOut.map((c) => ({ id: c.id, icon: '/assets/ethernet-port-icon.svg', label: c.label || c.id, kind: 'stream_out' })),
+	})
+	slots.push({
+		title: 'Virtual cam',
+		items: v4l2Out.map((c) => ({
+			id: c.id,
+			icon: '/assets/hdmi-port-icon.svg',
+			label: c.label || c.id,
+			kind: 'v4l2_out',
+		})),
 	})
 	slots.push({
 		title: 'Record',
@@ -310,7 +333,7 @@ export function renderCasparBand(ctx) {
 				titleEl.appendChild(editBtn)
 			}
 
-			if (slot.title === 'Stream' || slot.title === 'Record' || slot.title === 'Audio') {
+			if (slot.title === 'Stream' || slot.title === 'Record' || slot.title === 'Audio' || slot.title === 'Virtual cam') {
 				const plus = document.createElement('button')
 				plus.type = 'button'
 				plus.className = 'device-view__backpanel-slot-plus'
@@ -321,6 +344,7 @@ export function renderCasparBand(ctx) {
 					ev.stopPropagation()
 					if (slot.title === 'Stream') ctx.onAddStreamOutput?.()
 					else if (slot.title === 'Record') ctx.onAddRecordOutput?.()
+					else if (slot.title === 'Virtual cam') ctx.onAddVirtualCamOutput?.()
 					else ctx.onAddAudioOutput?.()
 				})
 				titleEl.appendChild(plus)

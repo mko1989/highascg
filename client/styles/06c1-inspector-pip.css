@@ -1,0 +1,46 @@
+/* PIP overlay inspector (WO-25) */
+.inspector-pip-overlay-group {
+	border-top: 1px solid var(--border, #30363d);
+	padding-top: 8px;
+}
+.inspector-pip-overlay-params {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 4px;
+}
+.inspector-pip-overlay-params .inspector-field {
+	padding: 2px 0;
+}
+.inspector-field__color {
+	width: 28px;
+	height: 22px;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 3px;
+	padding: 0;
+	margin-left: 6px;
+	cursor: pointer;
+	background: transparent;
+	vertical-align: middle;
+}
+.inspector-btn {
+	display: inline-block;
+	padding: 4px 10px;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 4px;
+	background: var(--bg-2, #21262d);
+	color: var(--text, #c9d1d9);
+	font-size: 0.78rem;
+	cursor: pointer;
+	transition: background 0.12s, border-color 0.12s;
+}
+.inspector-btn:hover { background: var(--bg-3, #30363d); }
+.inspector-btn--danger {
+	color: #f85149;
+	border-color: rgba(248, 81, 73, 0.3);
+}
+.inspector-btn--danger:hover {
+	background: rgba(248, 81, 73, 0.12);
+	border-color: #f85149;
+}
+

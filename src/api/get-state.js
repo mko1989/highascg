@@ -105,6 +105,8 @@ function getState(ctx, opts = {}) {
 		/** Last DeckLink input PLAY summary after AMCP connect (WO-28); null until first routing setup. */
 		decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
 		liveAudioInputsStatus: ctx._liveAudioInputsStatus ?? null,
+		v4l2InputsStatus: ctx._v4l2InputsStatus ?? null,
+		virtualCameraStatus: require('./routes-virtual-camera').getStatusPayload(ctx),
 		channelMap,
 		scene: {
 			live: liveSceneState.getAll(),

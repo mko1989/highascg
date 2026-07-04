@@ -5,7 +5,7 @@
 #   DISPLAY, XAUTHORITY — required for screen consumers on :0
 #
 # Optional:
-#   CASPAR_RESTART_EXIT_CODES   default: 5 139 1 134 (systemd); +137 143 130 without CASPAR_SYSTEMD_SERVICE=1
+#   CASPAR_RESTART_EXIT_CODES   default: 5 139 1 134 0 (systemd); +137 143 130 without CASPAR_SYSTEMD_SERVICE=1
 #   CASPAR_RESPAWN=1            relaunch after any exit (debug)
 #   CASPAR_RESTART_GRACE_SEC    pause before start (default 2)
 #   CASPAR_RESTART_SLEEP        pause after crash/restart (default 5)
@@ -50,7 +50,8 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 
 if [ "${CASPAR_SYSTEMD_SERVICE:-0}" = "1" ]; then
-	RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134}"
+	# Include 0: X session loss (nodm restart) can exit casparcg cleanly; still relaunch.
+	RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134 0}"
 else
 	RESTART_CODES="${CASPAR_RESTART_EXIT_CODES:-5 139 1 134 137 143 130}"
 fi

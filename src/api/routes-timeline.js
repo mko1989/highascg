@@ -107,7 +107,13 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 
 				const pb = eng.getPlayback(id)
 				const pos = pb?.position ?? 0
-				eng.setSendTo({ preview: true, program: true, screenIdx: b.screenIdx === 'all' ? null : b.screenIdx }, id)
+				const screenIdx =
+					b.screenIdx === null || b.screenIdx === 'all'
+						? null
+						: Number.isFinite(Number(b.screenIdx))
+							? Number(b.screenIdx)
+							: 0
+				eng.setSendTo({ preview: false, program: true, screenIdx }, id)
 				eng.setLoop(id, !!pb?.loop)
 				eng.play(id, pos)
 				liveSceneState.broadcastSceneLive(ctx)

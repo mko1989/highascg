@@ -8,6 +8,7 @@
  */
 
 import { timelineState } from '../lib/timeline-state.js'
+import { coerceTimelineSendTo, defaultTimelineSendTo } from '../lib/timeline-state-model.js'
 import { sceneState } from '../lib/scene-state.js'
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
@@ -18,6 +19,7 @@ import {
 	isSnapshotComposePreview,
 	resolveComposeChannelForCell,
 	subscribeComposePreviewRefresh,
+	syncComposePreviewFromChannelMap,
 } from './preview-canvas-compose-snapshot.js'
 import { drawComposePrvPgmCellEdgeBar } from './preview-canvas-draw-base.js'
 import { createTimelineTransport } from './timeline-transport.js'
@@ -64,15 +66,17 @@ export function initTimelineEditor(root, stateStore) {
 
 	let selectedClip = null  // { layerIdx, clipId, timelineId, clip }
 	let selectedFlagDetail = null // { timelineId, flagId, flag }
+	/** Target layer for paste (layer header click or clip selection). */
+	let selectedLayer = null // { timelineId, layerIdx, layer }
 	/** @type {{ layerIdx: number, clip: object } | null} */
 	let _clipBoard = null
 	/** @type {object | null} */
 	let _flagBoard = null
 	let previewPanel = null
 	// sendTo.screenIdx: 0-based screen index, null = all screens
-	// Default PRV only — avoid sending timeline to program until the user enables PGM or uses Take / scene take.
+	// Default PRV only — PGM-only outputs are coerced to program in syncSendToWithChannelMap.
 	const view = {
-		sendTo: { preview: true, program: false, screenIdx: 0 },
+		sendTo: defaultTimelineSendTo(stateStore.getState()?.channelMap || null),
 		follow: true,
 		takeTransition: { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) },
 	}
@@ -232,6 +236,8 @@ export function initTimelineEditor(root, stateStore) {
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		getSelectedClip: () => selectedClip,
 		setSelectedClip: (v) => { selectedClip = v },
+		getSelectedLayer: () => selectedLayer,
+		setSelectedLayer: (v) => { selectedLayer = v },
 		getSelectedFlagDetail: () => selectedFlagDetail,
 		setSelectedFlagDetail: (v) => { selectedFlagDetail = v },
 		redrawTimelineView: () => redrawTimelineView(),
@@ -278,6 +284,7 @@ export function initTimelineEditor(root, stateStore) {
 	function applyPersistedSendTo(tl) {
 		if (!tl?.id) return
 		Object.assign(view.sendTo, timelineState.getSendTo(tl.id))
+		coerceTimelineSendTo(stateStore.getState()?.channelMap || null, view.sendTo)
 	}
 
 	/** Align Dest PRV/PGM with server playback state. */
@@ -296,6 +303,7 @@ export function initTimelineEditor(root, stateStore) {
 			// While playing, server routing is authoritative (may differ from saved project).
 			if (pb.playing && pb.sendTo && typeof pb.sendTo === 'object') {
 				Object.assign(view.sendTo, pb.sendTo)
+				coerceTimelineSendTo(stateStore.getState()?.channelMap || null, view.sendTo)
 				timelineState.setSendTo(tl.id, view.sendTo)
 			} else {
 				await updateSendTo()
@@ -423,6 +431,7 @@ export function initTimelineEditor(root, stateStore) {
 		previewHost.style.display = ''
 		if (tlSplitHandle) tlSplitHandle.style.display = ''
 		root.classList.remove('tl-editor-root--no-preview')
+		syncComposePreviewFromChannelMap(stateStore.getState()?.channelMap)
 		previewPanel?.scheduleDraw?.()
 	}
 	streamState.subscribe(syncTimelinePreviewVisibility)
@@ -438,6 +447,8 @@ export function initTimelineEditor(root, stateStore) {
 		getPlayback,
 		getSelectedClip: () => selectedClip,
 		setSelectedClip: (v) => { selectedClip = v },
+		getSelectedLayer: () => selectedLayer,
+		setSelectedLayer: (v) => { selectedLayer = v },
 		getSelectedFlagDetail: () => selectedFlagDetail,
 		setSelectedFlagDetail: (v) => { selectedFlagDetail = v },
 		getClipBoard: () => _clipBoard,
@@ -503,6 +514,10 @@ export function initTimelineEditor(root, stateStore) {
 	stateStore.on('timeline.tick', (data) => onTick(data))
 	stateStore.on('timeline.playback', (pb) => onPlayback(pb))
 	stateStore.on('channelMap', () => {
+		coerceTimelineSendTo(stateStore.getState()?.channelMap || null, view.sendTo)
+		const tl = timelineState.getActive()
+		if (tl) timelineState.setSendTo(tl.id, view.sendTo)
+		void updateSendTo()
 		buildTransport()
 		redrawTimelineView()
 	})

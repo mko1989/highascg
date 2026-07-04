@@ -112,6 +112,148 @@ export function createDragInput(opts) {
 	}
 }
 
+/**
+ * Numeric field with up/down step buttons (for discrete indices, counts, etc.).
+ * @param {{
+ *   label: string,
+ *   value: number,
+ *   min?: number,
+ *   max?: number,
+ *   step?: number,
+ *   shiftStep?: number,
+ *   onChange: (value: number) => void,
+ *   onInvalid?: (reason: string) => void,
+ * }} opts
+ */
+export function createStepperInput(opts) {
+	const {
+		label,
+		value,
+		min = -Infinity,
+		max = Infinity,
+		step = 1,
+		shiftStep = step * 10,
+		onChange,
+		onInvalid,
+	} = opts
+
+	const row = document.createElement('div')
+	row.className = 'inspector-layer-index'
+
+	const lab = document.createElement('label')
+	lab.className = 'inspector-layer-index__label'
+	lab.textContent = label
+
+	const control = document.createElement('div')
+	control.className = 'inspector-layer-index__control'
+
+	const inp = document.createElement('input')
+	inp.type = 'text'
+	inp.inputMode = 'numeric'
+	inp.className = 'inspector-layer-index__input inspector-math-input'
+	inp.setAttribute('aria-label', label)
+
+	const steps = document.createElement('div')
+	steps.className = 'inspector-layer-index__steps'
+
+	const upBtn = document.createElement('button')
+	upBtn.type = 'button'
+	upBtn.className = 'inspector-layer-index__step-btn'
+	upBtn.textContent = '▲'
+	upBtn.title = `Increase (${step}; Shift = ${shiftStep})`
+	upBtn.setAttribute('aria-label', `Increase ${label}`)
+
+	const downBtn = document.createElement('button')
+	downBtn.type = 'button'
+	downBtn.className = 'inspector-layer-index__step-btn'
+	downBtn.textContent = '▼'
+	downBtn.title = `Decrease (${step}; Shift = ${shiftStep})`
+	downBtn.setAttribute('aria-label', `Decrease ${label}`)
+
+	let lastCommitted =
+		typeof value === 'number' && !Number.isNaN(value) ? Math.round(value) : min !== -Infinity ? min : 0
+
+	function formatVal(v) {
+		return String(Math.round(v))
+	}
+
+	function clamp(n) {
+		return Math.max(min, Math.min(max, Math.round(n)))
+	}
+
+	function commitNumber(n, triggerChange = true) {
+		const next = clamp(n)
+		inp.value = formatVal(next)
+		if (next !== lastCommitted) {
+			lastCommitted = next
+			if (triggerChange) onChange?.(next)
+		}
+	}
+
+	function commitFromField() {
+		const raw = parseNumberInput(inp.value, NaN)
+		if (Number.isNaN(raw)) {
+			inp.value = formatVal(lastCommitted)
+			onInvalid?.('Enter a valid number')
+			return
+		}
+		const rounded = Math.round(raw)
+		if (rounded < min || rounded > max) {
+			inp.value = formatVal(lastCommitted)
+			onInvalid?.(`Value must be between ${min} and ${max}`)
+			return
+		}
+		commitNumber(rounded)
+	}
+
+	function nudge(dir, shiftKey) {
+		const delta = (shiftKey ? shiftStep : step) * dir
+		commitNumber(lastCommitted + delta)
+	}
+
+	inp.value = formatVal(lastCommitted)
+	inp.addEventListener('change', commitFromField)
+	inp.addEventListener('blur', commitFromField)
+	inp.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			inp.blur()
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault()
+			nudge(1, e.shiftKey)
+		} else if (e.key === 'ArrowDown') {
+			e.preventDefault()
+			nudge(-1, e.shiftKey)
+		}
+	})
+
+	upBtn.addEventListener('click', (e) => {
+		e.preventDefault()
+		nudge(1, e.shiftKey)
+	})
+	downBtn.addEventListener('click', (e) => {
+		e.preventDefault()
+		nudge(-1, e.shiftKey)
+	})
+
+	steps.appendChild(upBtn)
+	steps.appendChild(downBtn)
+	control.appendChild(inp)
+	control.appendChild(steps)
+	lab.appendChild(control)
+	row.appendChild(lab)
+
+	return {
+		row,
+		input: inp,
+		setValue: (v, triggerChange = false) => {
+			lastCommitted = clamp(v)
+			inp.value = formatVal(lastCommitted)
+			if (triggerChange) onChange?.(lastCommitted)
+		},
+	}
+}
+
 export const KF_PROPERTIES = [
 	{ value: 'opacity', label: 'Opacity', min: 0, max: 1, default: 1 },
 	{ value: 'volume', label: 'Volume', min: 0, max: 2, default: 1 },

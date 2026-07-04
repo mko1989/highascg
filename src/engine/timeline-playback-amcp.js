@@ -10,6 +10,7 @@ const {
 	playAfSuffix,
 	timelineClipTransportStale,
 	TIMELINE_LAYER_BASE,
+	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
 const {
 	mergedFillKeyframeTimes,
@@ -420,9 +421,11 @@ module.exports = {
 		const segIdx = keyframeSegmentIndex(times, localMs)
 		const kSeg = `${ch}-${layer}-${prop}-seg`
 		const prevSeg = this._lastKfSegment.get(kSeg)
-		const inSpan = playing && times.length >= 2 && segIdx >= 0 && segIdx < times.length - 1
-
-		const segChanged = inSpan && prevSeg !== segIdx
+		const inAnimatedSegment = times.length >= 2 && segIdx >= 0 && segIdx < times.length - 1
+		const atSegmentStart = inAnimatedSegment && localMs <= times[segIdx] + 2
+		const scheduleSegmentTween = (playing || (force && atSegmentStart)) && inAnimatedSegment
+		const segChanged = scheduleSegmentTween && prevSeg !== segIdx
+		const inSpan = playing && inAnimatedSegment
 
 		if (segChanged) {
 			const t0 = times[segIdx]
@@ -470,9 +473,9 @@ module.exports = {
 	},
 
 	_channelsFor(sendTo) {
-		const st = sendTo || {}
-		const previewOn = st.preview !== false
-		const programOn = st.program !== false
+		const st = normalizeTimelineSendTo(sendTo)
+		const previewOn = st.preview
+		const programOn = st.program
 		let map = null
 		try {
 			map = this.self?.config ? getChannelMap(this.self.config) : null

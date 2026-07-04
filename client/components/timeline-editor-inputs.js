@@ -1,7 +1,6 @@
 'use strict'
 
 import { timelineState } from '../lib/timeline-state.js'
-import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
 import { pixelsToNormalized } from '../lib/fill-math.js'
 import { clipPixelRectAtLocalTime, interpClipProp } from '../lib/timeline-clip-interp.js'
 import { api } from '../lib/api-client.js'
@@ -58,9 +57,23 @@ function nextSnapPoint(candidates, currentMs, epsilon = 1) {
 	return null
 }
 
-/**
- * @param {ReturnType<typeof import('../lib/timeline-state.js').timelineState.getTimeline>} getSel
- */
+/** @param {object} tl @param {{ layerIdx?: number }} clipBoard @param {() => { timelineId?: string, layerIdx?: number } | null | undefined} getSelectedLayer */
+function resolvePasteLayerIdx(tl, clipBoard, getSelectedLayer) {
+	const sel = getSelectedLayer?.()
+	if (
+		sel?.timelineId === tl.id &&
+		typeof sel.layerIdx === 'number' &&
+		sel.layerIdx >= 0 &&
+		sel.layerIdx < tl.layers.length
+	) {
+		return sel.layerIdx
+	}
+	if (typeof clipBoard.layerIdx === 'number' && clipBoard.layerIdx >= 0) {
+		return Math.min(clipBoard.layerIdx, tl.layers.length - 1)
+	}
+	return Math.max(0, tl.layers.length - 1)
+}
+
 function freshClipSelection(getSelectedClip) {
 	const sel = getSelectedClip()
 	if (!sel?.timelineId || sel.clipId == null || typeof sel.layerIdx !== 'number') return null
@@ -85,6 +98,7 @@ function handleTimelineEditorKeydown(e, deps) {
 		getPlayback,
 		getSelectedClip,
 		setSelectedClip,
+		getSelectedLayer,
 		getSelectedFlagDetail,
 		setSelectedFlagDetail,
 		getClipBoard,
@@ -121,7 +135,7 @@ function handleTimelineEditorKeydown(e, deps) {
 		const _clipBoard = getClipBoard()
 		const _flagBoard = getFlagBoard()
 		if (tl && _clipBoard?.clip) {
-			const li = Math.min(_clipBoard.layerIdx, tl.layers.length - 1)
+			const li = resolvePasteLayerIdx(tl, _clipBoard, getSelectedLayer)
 			if (li >= 0) {
 				e.preventDefault()
 				const pb = getPlayback()
@@ -139,11 +153,6 @@ function handleTimelineEditorKeydown(e, deps) {
 					window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: sel }))
 					void getSyncToServer()(timelineState.getActive())
 					redrawTimelineView()
-					void (async () => {
-						await applyTimelineClipLayoutFromMedia(newClip, timelineState, tl.id, li, newClip.id, stateStore, sceneState)
-						void getSyncToServer()(timelineState.getActive())
-						redrawTimelineView()
-					})()
 				}
 			}
 		} else if (tl && _flagBoard) {

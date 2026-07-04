@@ -96,3 +96,31 @@ export function resolveBusLookIdsForMain(mainIdx, sceneLive, channelMap, sceneEx
 	if (prvLookId && pgmLookId && prvLookId === pgmLookId) prvLookId = null
 	return { pgmLookId, prvLookId }
 }
+
+/**
+ * Whether this main has a look staged on PRV (server scene.live or client preview slot).
+ * Uses the PRV channel entry directly so a look on PGM+PRV still counts as clearable preview.
+ * @param {number} mainIdx
+ * @param {Record<string, { sceneId?: string }>} sceneLive
+ * @param {{ programChannels?: number[], previewChannels?: number[] }} channelMap
+ * @param {(id: string) => boolean} sceneExists
+ * @param {{ getPreviewSceneIdForMain?: (idx: number) => string | null }} [sceneStateFallback]
+ * @returns {boolean}
+ */
+export function hasPreviewLookForMain(mainIdx, sceneLive, channelMap, sceneExists, sceneStateFallback) {
+	const idx = Math.max(0, parseInt(String(mainIdx), 10) || 0)
+	const programs = Array.isArray(channelMap?.programChannels) ? channelMap.programChannels : []
+	const previews = Array.isArray(channelMap?.previewChannels) ? channelMap.previewChannels : []
+	const pgmCh = programs[idx]
+	const prvCh = previews[idx]
+	const hasSeparatePrv =
+		prvCh != null && Number(prvCh) > 0 && Number(prvCh) !== Number(pgmCh)
+	if (!hasSeparatePrv) return false
+
+	const live = sceneLive && typeof sceneLive === 'object' ? sceneLive : {}
+	const prvSidRaw = String(live[String(prvCh)]?.sceneId || '').trim()
+	if (prvSidRaw && sceneExists(prvSidRaw)) return true
+
+	const sid = sceneStateFallback?.getPreviewSceneIdForMain?.(idx)
+	return sid != null && String(sid).trim() !== '' && sceneExists(String(sid))
+}

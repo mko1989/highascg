@@ -8,9 +8,6 @@ const {
 } = require('../streaming/caspar-ffmpeg-setup')
 const {
 	buildComposeFfmpegConsumerArgs,
-	buildComposeStreamConsumerArgs,
-	composePreviewStreamUri,
-	composePreviewUdpPort,
 	getComposePreviewJpgAmcpPath,
 	getComposePreviewJpgBasename,
 } = require('./compose-preview-ffmpeg-args')
@@ -21,10 +18,10 @@ const {
 
 /** Dedicated AMCP slot for compose preview FILE (jpeg) consumer. */
 const COMPOSE_FILE_CONSUMER_INDEX = 701
-/** Legacy UDP relay slot — remove when migrating from STREAM fallback. */
-const COMPOSE_STREAM_CONSUMER_INDEX = 98
-/** Legacy ADD IMAGE slot — remove when switching to ffmpeg_jpeg. */
-const COMPOSE_IMAGE_CONSUMER_INDEX = 700
+/** Legacy slots — removed on attach/detach when migrating older installs. */
+const LEGACY_COMPOSE_CONSUMER_INDICES = [98, 700]
+/** Stale UDP compose preview STREAM consumers (52100 + channel). */
+const LEGACY_COMPOSE_UDP_PORT_BASE = 52100
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -40,17 +37,6 @@ function buildComposeFileAddParams(config, channel) {
 	const path = getComposePreviewJpgAmcpPath(config, channel)
 	const args = buildComposeFfmpegConsumerArgs(cp)
 	return `${path} ${args}`
-}
-
-/**
- * @param {object} config
- * @param {number} channel
- */
-function buildComposeStreamAddParams(config, channel) {
-	const cp = config?.composePreview || {}
-	const uri = composePreviewStreamUri(channel)
-	const args = buildComposeStreamConsumerArgs(cp)
-	return `${uri} ${args}`
 }
 
 /**
@@ -78,14 +64,10 @@ const _everAttachedChannels = new Set()
 async function removeComposeConsumers(ctx, channel) {
 	if (!ctx?.amcp?.isConnected) return
 	const ch = parseInt(String(channel), 10)
-	const port = composePreviewUdpPort(ch)
-	const variants = casparUdpStreamUriVariantsForRemove(port)
+	const legacyPort = LEGACY_COMPOSE_UDP_PORT_BASE + ch
+	const variants = casparUdpStreamUriVariantsForRemove(legacyPort)
 	if (ctx.amcp.basic?.remove) {
-		for (const idx of [
-			COMPOSE_FILE_CONSUMER_INDEX,
-			COMPOSE_STREAM_CONSUMER_INDEX,
-			COMPOSE_IMAGE_CONSUMER_INDEX,
-		]) {
+		for (const idx of [COMPOSE_FILE_CONSUMER_INDEX, ...LEGACY_COMPOSE_CONSUMER_INDICES]) {
 			try {
 				await ctx.amcp.basic.remove(ch, null, idx)
 			} catch {
@@ -96,15 +78,11 @@ async function removeComposeConsumers(ctx, channel) {
 	try {
 		const active = await getActiveStreamUris(ctx.amcp, ch)
 		for (const u of active) {
-			if (variants.includes(u) || u.includes(`:${port}`)) {
+			if (variants.includes(u) || u.includes(`:${legacyPort}`)) {
 				try {
-					await ctx.amcp.raw(`REMOVE ${ch}-${COMPOSE_STREAM_CONSUMER_INDEX} STREAM ${u}`)
+					await ctx.amcp.raw(`REMOVE ${ch} STREAM ${u}`)
 				} catch {
-					try {
-						await ctx.amcp.raw(`REMOVE ${ch} STREAM ${u}`)
-					} catch {
-						/* ok */
-					}
+					/* ok */
 				}
 			}
 		}
@@ -215,18 +193,13 @@ function resetComposeConsumerState() {
  */
 async function refreshComposePreviewConsumers(ctx) {
 	if (!ctx) return
-	await detachAllComposeFileConsumers(ctx)
-	if (isFfmpegJpegComposePreview(ctx.config)) {
-		await attachAllComposeFileConsumers(ctx)
-	}
+	const { startFfmpegJpegComposePreview } = require('./compose-preview-ffmpeg-jpeg')
+	await startFfmpegJpegComposePreview(ctx)
 }
 
 module.exports = {
 	COMPOSE_FILE_CONSUMER_INDEX,
-	COMPOSE_STREAM_CONSUMER_INDEX,
-	COMPOSE_IMAGE_CONSUMER_INDEX,
 	buildComposeFileAddParams,
-	buildComposeStreamAddParams,
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
 	allComposeConsumersAttached,

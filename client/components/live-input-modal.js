@@ -1,14 +1,19 @@
 /**
- * Modal: add live inputs (DeckLink, NDI, webpage host, live audio).
- * DeckLink: dedicated channel per slot. NDI/browser/live audio: host channel + route:// for on-air.
+ * Modal: add live inputs (DeckLink, NDI, webpage host, live audio, USB video).
+ * DeckLink: dedicated channel per slot. NDI/browser/live audio/v4l2: host channel + route:// for on-air.
  */
 
 import { api } from '../lib/api-client.js'
-import { decklinkInputForSlot, liveAudioInputForSlot } from '../lib/input-channels.js'
+import { decklinkInputForSlot, liveAudioInputForSlot, v4l2InputForSlot, decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { addLiveAudioInputSlot, pickLiveAudioSlotForDevice } from '../lib/live-audio-add-input.js'
+import { addV4l2InputSlot, pickV4l2SlotForDevice } from '../lib/v4l2-add-input.js'
+import { addDecklinkInputSlot } from '../lib/decklink-add-input.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { alsaCaptureDeviceOptions, readLiveAudioCasparSettings } from '../lib/live-audio-inputs.js'
+import { readV4l2CasparSettings, v4l2AlsaDeviceOptions, v4l2CaptureDeviceOptions } from '../lib/v4l2-inputs.js'
 import { settingsState } from '../lib/settings-state.js'
+import { effectiveChannelMap, casparHostChannelsPendingApply } from '../lib/planned-channel-map.js'
 import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 
@@ -24,17 +29,24 @@ function suggestLiveInputChannel(cm) {
 
 /**
  * @param {import('../lib/state-store.js').default} stateStore
+ * @param {{ onAdded?: () => void }} [options]
  */
-export function showLiveInputModal(stateStore) {
+export function showLiveInputModal(stateStore, options = {}) {
 	const existing = document.getElementById('live-input-modal')
-	if (existing) {
-		existing.remove()
-		return
-	}
+	if (existing) existing.remove()
 
-	const channelMap = stateStore.getState()?.channelMap || {}
+	const channelMap = effectiveChannelMap({
+		settings: settingsState.getSettings(),
+		liveChannelMap: stateStore.getState()?.channelMap,
+	})
 	const defaultCh = suggestLiveInputChannel(channelMap)
-	const decklinkCount = channelMap.decklinkCount ?? 0
+
+	function decklinkChannelMap() {
+		return effectiveChannelMap({
+			settings: settingsState.getSettings(),
+			liveChannelMap: stateStore.getState()?.channelMap,
+		})
+	}
 
 	const modal = document.createElement('div')
 	modal.id = 'live-input-modal'
@@ -54,6 +66,7 @@ export function showLiveInputModal(stateStore) {
 						<option value="ndi">NDI</option>
 						<option value="browser">Web Browser</option>
 						<option value="live_audio">Live Audio</option>
+						<option value="usb_video">USB Video (V4L2)</option>
 					</select>
 				</div>
 				<div class="settings-group" id="live-input-ch-row" style="display:none;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
@@ -67,15 +80,15 @@ export function showLiveInputModal(stateStore) {
 					</div>
 				</div>
 				<div class="settings-group" id="live-input-decklink-ch-fixed" style="display:none">
-					<p class="settings-note" style="margin:0">DeckLink channel (locked): <strong id="live-input-ch-fixed-val"></strong> — drag the route tile from Sources → Live onto PGM, preview, or multiview.</p>
-					<div style="margin-top:0.5rem">
-						<label>Layer (input slot)</label>
-						<input type="number" id="live-input-layer-dl" min="1" max="99" value="1" style="width:5rem" />
-					</div>
+					<p class="settings-note" style="margin:0">Caspar host channel: <strong id="live-input-ch-fixed-val"></strong> <span id="live-input-ch-planned-note" class="settings-note"></span></p>
 				</div>
 				<div class="settings-group" id="live-input-decklink-wrap">
-					<label>Decklink device index</label>
-					<input type="number" id="live-input-decklink-dev" min="0" max="32" value="0" style="width:5rem" />
+					<label>SDI port</label>
+					<div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+						<select id="live-input-decklink-slot" style="min-width:10rem;max-width:100%"></select>
+						<span id="live-input-decklink-port-status" class="settings-note"></span>
+					</div>
+					<input type="hidden" id="live-input-layer-dl" value="1" />
 				</div>
 				<div class="settings-group" id="live-input-ndi-wrap" style="display:none">
 					<label>NDI source</label>
@@ -107,6 +120,37 @@ export function showLiveInputModal(stateStore) {
 					<input type="text" id="live-input-audio-manual" placeholder="alsa://hw:1,0" style="width:100%" />
 					<p class="settings-note" id="live-input-audio-slot-hint" style="margin:0.5rem 0 0"></p>
 				</div>
+				<div class="settings-group" id="live-input-v4l2-wrap" style="display:none">
+					<label>USB / V4L2 capture device</label>
+					<div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-bottom:0.35rem">
+						<button type="button" class="btn btn--secondary" id="live-input-v4l2-refresh">Refresh devices</button>
+						<span id="live-input-v4l2-discover-status" class="settings-note"></span>
+					</div>
+					<select id="live-input-v4l2-select" style="width:100%;max-width:100%;margin-bottom:0.35rem"></select>
+					<label style="font-size:12px">Or type device path manually</label>
+					<input type="text" id="live-input-v4l2-manual" placeholder="/dev/video0" style="width:100%" />
+					<label style="margin-top:0.5rem">Label (optional)</label>
+					<input type="text" id="live-input-v4l2-label" placeholder="ATEM PGM" style="width:100%" />
+					<div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-top:0.5rem">
+						<div>
+							<label>Format</label>
+							<select id="live-input-v4l2-format">
+								<option value="auto">auto</option>
+								<option value="mjpeg">mjpeg</option>
+								<option value="yuyv422">yuyv422</option>
+							</select>
+						</div>
+						<div>
+							<label>FPS (0=auto)</label>
+							<input type="number" id="live-input-v4l2-fps" min="0" max="120" value="0" style="width:5rem" />
+						</div>
+					</div>
+					<p class="settings-note" id="live-input-v4l2-slot-hint" style="margin:0.5rem 0 0"></p>
+					<label style="margin-top:0.5rem">Audio (optional)</label>
+					<select id="live-input-v4l2-audio-select" style="width:100%;max-width:100%"></select>
+					<label style="font-size:12px;margin-top:0.35rem;display:block">Or type ALSA device manually</label>
+					<input type="text" id="live-input-v4l2-audio-manual" placeholder="none or hw:3,0" style="width:100%" />
+				</div>
 				<div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
 					<button type="button" class="btn btn--primary" id="live-input-play">Add live source</button>
 					<span id="live-input-status" class="settings-note"></span>
@@ -122,22 +166,110 @@ export function showLiveInputModal(stateStore) {
 	const ndiWrap = modal.querySelector('#live-input-ndi-wrap')
 	const browserWrap = modal.querySelector('#live-input-browser-wrap')
 	const liveAudioWrap = modal.querySelector('#live-input-live-audio-wrap')
+	const v4l2Wrap = modal.querySelector('#live-input-v4l2-wrap')
 	const chRow = modal.querySelector('#live-input-ch-row')
 	const dlChFixed = modal.querySelector('#live-input-decklink-ch-fixed')
 	const chFixedVal = modal.querySelector('#live-input-ch-fixed-val')
+	const chPlannedNote = modal.querySelector('#live-input-ch-planned-note')
+
+	function syncDecklinkHostChannelHint() {
+		const slot = selectedDecklinkSlot()
+		const cm = decklinkChannelMap()
+		const entry = decklinkInputForSlot(cm, slot)
+		const pending = casparHostChannelsPendingApply(
+			settingsState.getSettings()?.channelMap,
+			stateStore.getState()?.channelMap,
+		)
+		if (chFixedVal) {
+			chFixedVal.textContent = entry?.channel != null ? String(entry.channel) : '—'
+		}
+		if (chPlannedNote) {
+			chPlannedNote.textContent =
+				entry?.channel != null
+					? pending
+						? '(planned — Apply Caspar config to activate)'
+						: '— drag the route tile from Sources → Live onto PGM, preview, or multiview.'
+					: '(Apply Caspar config to allocate)'
+		}
+	}
+
+	function selectedDecklinkSlot() {
+		const sel = modal.querySelector('#live-input-decklink-slot')
+		const n = parseInt(String(sel?.value || modal.querySelector('#live-input-layer-dl')?.value || '1'), 10)
+		return Number.isFinite(n) && n >= 1 ? n : 1
+	}
+
+	function syncDecklinkFromPort() {
+		const layerDl = modal.querySelector('#live-input-layer-dl')
+		const slot = selectedDecklinkSlot()
+		if (layerDl) layerDl.value = String(slot)
+		syncDecklinkHostChannelHint()
+		syncHint()
+	}
+
+	async function refreshDecklinkPorts() {
+		const sel = modal.querySelector('#live-input-decklink-slot')
+		const st = modal.querySelector('#live-input-decklink-port-status')
+		if (!sel) return
+		const prev = sel.value
+		if (st) st.textContent = 'Loading ports…'
+		try {
+			const dv = await api.get('/api/device-view')
+			const seen = new Set()
+			const connectors = [
+				...(Array.isArray(dv?.graph?.connectors) ? dv.graph.connectors : []),
+				...(Array.isArray(dv?.suggested?.connectors) ? dv.suggested.connectors : []),
+			]
+				.filter((c) => c?.kind === 'decklink_io')
+				.filter((c) => {
+					const slot = decklinkSlotFromConnector(c)
+					if (seen.has(slot)) return false
+					seen.add(slot)
+					return true
+				})
+				.sort((a, b) => decklinkSlotFromConnector(a) - decklinkSlotFromConnector(b))
+
+			sel.replaceChildren()
+			if (!connectors.length) {
+				for (let i = 1; i <= 4; i++) {
+					const opt = document.createElement('option')
+					opt.value = String(i)
+					opt.textContent = `SDI ${i}`
+					sel.appendChild(opt)
+				}
+				if (st) st.textContent = 'No DeckLink detected — pick a port number.'
+			} else {
+				for (const c of connectors) {
+					const slot = decklinkSlotFromConnector(c)
+					const dir = normalizeDecklinkIoDirection(c?.caspar)
+					const role =
+						dir === 'in' ? ' · input' : dir === 'out' ? ' · output' : ''
+					const opt = document.createElement('option')
+					opt.value = String(slot)
+					opt.textContent = `${c.label || `SDI ${slot}`}${role}`
+					sel.appendChild(opt)
+				}
+				if (st) st.textContent = `${connectors.length} port(s) from Device View`
+			}
+			if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev
+			syncDecklinkFromPort()
+		} catch (e) {
+			if (st) st.textContent = e?.message || String(e)
+		}
+	}
 
 	function syncHint() {
 		if (!hintEl) return
 		const k = kindSel?.value || 'decklink'
 		if (k === 'decklink') {
-			const slot = parseInt(String(modal.querySelector('#live-input-layer-dl')?.value || '1'), 10) || 1
-			const entry = decklinkInputForSlot(channelMap, slot)
+			const slot = selectedDecklinkSlot()
+			const entry = decklinkInputForSlot(decklinkChannelMap(), slot)
 			if (entry?.channel != null) {
 				const deckLabel = entry.label || `DeckLink ${slot}`
 				hintEl.innerHTML = `DeckLink slot <strong>${slot}</strong> plays on dedicated channel <strong>${entry.channel}</strong> (layer ${entry.layer ?? slot}). Drag <strong>${escapeHtml(deckLabel)}</strong> from Sources → Live — do not start a second <code>DECKLINK</code> producer for the same device.`
 			} else {
 				hintEl.innerHTML =
-					'Set <strong>decklink_input_count</strong> in Settings, apply Caspar config, and restart. Each input slot gets its own Caspar channel.'
+					'Registers a <strong>dedicated Caspar host channel</strong> for this SDI port and adds a Live source tile. HighAsCG updates DeckLink input count in config — use <strong>Apply Caspar config</strong> in Device View when you are ready to restart and start capture.'
 			}
 		} else if (k === 'ndi') {
 			hintEl.innerHTML =
@@ -145,6 +277,9 @@ export function showLiveInputModal(stateStore) {
 		} else if (k === 'live_audio') {
 			hintEl.innerHTML =
 				'Live audio gets a <strong>dedicated Caspar host channel</strong> (cheapest video mode, audio-only — no video consumers). ALSA capture runs once on that channel; drag <code>route://</code> from Sources → Live onto PGM or multiview for on-air.'
+		} else if (k === 'usb_video') {
+			hintEl.innerHTML =
+				'USB / V4L2 video gets a <strong>dedicated Caspar host channel</strong>. FFmpeg captures from the device and Caspar plays MPEG-TS via UDP; drag <code>route://</code> from Sources → Live onto PGM or multiview. Apply Caspar config when adding a new slot.'
 		} else {
 			const cg = modal.querySelector('#live-input-browser-as-cg')?.checked
 			hintEl.innerHTML = cg
@@ -159,20 +294,15 @@ export function showLiveInputModal(stateStore) {
 		if (ndiWrap) ndiWrap.style.display = k === 'ndi' ? 'block' : 'none'
 		if (browserWrap) browserWrap.style.display = k === 'browser' ? 'block' : 'none'
 		if (liveAudioWrap) liveAudioWrap.style.display = k === 'live_audio' ? 'block' : 'none'
+		if (v4l2Wrap) v4l2Wrap.style.display = k === 'usb_video' ? 'block' : 'none'
 		const useFixed = k === 'decklink'
 		if (chRow) chRow.style.display = 'none'
 		if (dlChFixed) dlChFixed.style.display = useFixed ? 'block' : 'none'
-		if (useFixed) {
-			const slot = parseInt(String(modal.querySelector('#live-input-layer-dl')?.value || '1'), 10) || 1
-			const entry = decklinkInputForSlot(channelMap, slot)
-			if (chFixedVal) chFixedVal.textContent = entry?.channel != null ? String(entry.channel) : '(not allocated)'
-		}
-		const layerDl = modal.querySelector('#live-input-layer-dl')
-		if (layerDl && decklinkCount > 0) {
-			layerDl.max = String(Math.min(99, decklinkCount))
-		}
+		if (useFixed) syncDecklinkHostChannelHint()
 		syncHint()
+		if (k === 'decklink') void refreshDecklinkPorts()
 		if (k === 'live_audio') syncLiveAudioSlotHint()
+		if (k === 'usb_video') syncV4l2SlotHint()
 	}
 
 	function syncLiveAudioSlotHint() {
@@ -191,6 +321,53 @@ export function showLiveInputModal(stateStore) {
 				: `Will use slot ${slot}. Apply Caspar config if this is a new channel.`
 		} catch (e) {
 			el.textContent = e?.message || String(e)
+		}
+	}
+
+	function syncV4l2SlotHint() {
+		const el = modal.querySelector('#live-input-v4l2-slot-hint')
+		if (!el) return
+		const ui = readV4l2CasparSettings(settingsState.getSettings()?.casparServer || {})
+		const manual = (modal.querySelector('#live-input-v4l2-manual')?.value || '').trim()
+		const sel = modal.querySelector('#live-input-v4l2-select')
+		const device = manual || (sel?.value || '').trim()
+		try {
+			const { slot } = pickV4l2SlotForDevice(ui, device || '/dev/video0')
+			const entry = v4l2InputForSlot(channelMap, slot)
+			const ch = entry?.channel
+			el.textContent = ch != null
+				? `Will use slot ${slot} on host ch ${ch} (${entry?.route || 'route://…'}).`
+				: `Will use slot ${slot}. Apply Caspar config if this is a new channel.`
+		} catch (e) {
+			el.textContent = e?.message || String(e)
+		}
+	}
+
+	async function refreshV4l2Devices() {
+		const st = modal.querySelector('#live-input-v4l2-discover-status')
+		const sel = modal.querySelector('#live-input-v4l2-select')
+		const audioSel = modal.querySelector('#live-input-v4l2-audio-select')
+		if (st) st.textContent = 'Scanning…'
+		try {
+			const [v4l2r, audior] = await Promise.all([
+				api.get('/api/system/v4l2-devices?refresh=1'),
+				api.get('/api/audio/devices?refresh=1'),
+			])
+			const devices = Array.isArray(v4l2r?.devices) ? v4l2r.devices : []
+			const alsa = Array.isArray(audior?.devices) ? audior.devices : []
+			if (!sel) return
+			sel.innerHTML = v4l2CaptureDeviceOptions(devices)
+				.map((o) => `<option value="${escapeAttr(o.value)}"${o.disabled ? ' disabled' : ''}>${escapeHtml(o.label)}</option>`)
+				.join('')
+			if (audioSel) {
+				audioSel.innerHTML = v4l2AlsaDeviceOptions(alsa)
+					.map((o) => `<option value="${escapeAttr(o.value)}">${escapeHtml(o.label)}</option>`)
+					.join('')
+			}
+			if (st) st.textContent = devices.length ? `${devices.length} video, ${alsa.length} audio device(s)` : 'No V4L2 capture devices found'
+			syncV4l2SlotHint()
+		} catch (e) {
+			if (st) st.textContent = e?.message || String(e)
 		}
 	}
 
@@ -214,13 +391,21 @@ export function showLiveInputModal(stateStore) {
 	kindSel?.addEventListener('change', () => {
 		syncKind()
 		if (kindSel?.value === 'live_audio') void refreshAudioDevices()
+		if (kindSel?.value === 'usb_video') void refreshV4l2Devices()
 	})
-	modal.querySelector('#live-input-layer-dl')?.addEventListener('input', syncKind)
+	modal.querySelector('#live-input-decklink-slot')?.addEventListener('change', syncDecklinkFromPort)
 	modal.querySelector('#live-input-browser-as-cg')?.addEventListener('change', syncHint)
 	modal.querySelector('#live-input-audio-refresh')?.addEventListener('click', () => void refreshAudioDevices())
 	modal.querySelector('#live-input-audio-select')?.addEventListener('change', syncLiveAudioSlotHint)
 	modal.querySelector('#live-input-audio-manual')?.addEventListener('input', syncLiveAudioSlotHint)
+	modal.querySelector('#live-input-v4l2-refresh')?.addEventListener('click', () => void refreshV4l2Devices())
+	modal.querySelector('#live-input-v4l2-select')?.addEventListener('change', syncV4l2SlotHint)
+	modal.querySelector('#live-input-v4l2-manual')?.addEventListener('input', syncV4l2SlotHint)
 	syncKind()
+	void settingsState.load().then(() => {
+		syncDecklinkFromPort()
+		syncKind()
+	})
 	const ndiAttrHost = modal.querySelector('#live-input-ndi-attribution')
 	if (ndiAttrHost) ndiAttrHost.appendChild(createNdiAttributionElement())
 
@@ -256,6 +441,18 @@ export function showLiveInputModal(stateStore) {
 		document.removeEventListener('keydown', onKey)
 		modal.remove()
 	}
+
+	function finishAdded() {
+		if (typeof options.onAdded === 'function') {
+			try {
+				options.onAdded()
+			} catch (e) {
+				console.warn('[live-input-modal] onAdded failed', e)
+			}
+		}
+		setTimeout(close, 1500)
+	}
+
 	function onKey(e) {
 		if (e.key === 'Escape') close()
 	}
@@ -268,6 +465,8 @@ export function showLiveInputModal(stateStore) {
 
 	modal.querySelector('#live-input-play')?.addEventListener('click', async () => {
 		const statusEl = modal.querySelector('#live-input-status')
+		const playBtn = modal.querySelector('#live-input-play')
+		if (playBtn?.dataset.submitting === '1') return
 		const setStatus = (t, err) => {
 			if (statusEl) {
 				statusEl.textContent = t
@@ -276,32 +475,56 @@ export function showLiveInputModal(stateStore) {
 		}
 		setStatus('')
 		const k = kindSel?.value || 'decklink'
+
+		if (k === 'decklink') {
+			const slot = selectedDecklinkSlot()
+			if (!Number.isFinite(slot) || slot < 1) {
+				setStatus('Pick an SDI port', true)
+				return
+			}
+			if (playBtn) {
+				playBtn.disabled = true
+				playBtn.dataset.submitting = '1'
+			}
+			setStatus(`Registering DeckLink SDI port ${slot}…`, false)
+			try {
+				const r = await addDecklinkInputSlot(stateStore, { slot })
+				if (!r.ok) {
+					setStatus(r.error || 'Failed to add DeckLink input', true)
+					return
+				}
+				if (Array.isArray(r.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+					window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+				}
+				if (r.casparRestartNeeded || r.pendingApply) markCasparRestartDirty()
+				const applyMsg = r.pendingApply || r.casparRestartNeeded
+					? ' Apply Caspar config and restart in Device View to start capture.'
+					: ''
+				const againMsg = r.alreadyConfigured ? ' (capture refreshed on existing host channel.)' : ''
+				const chMsg =
+					r.hostChannel != null
+						? `host channel ${r.hostChannel}`
+						: 'host channel (after apply)'
+				setStatus(`DeckLink input slot ${r.slot} · ${chMsg} · ${r.route || ''}.${applyMsg}${againMsg}`, false)
+				finishAdded()
+			} catch (e) {
+				setStatus(e?.message || String(e), true)
+			} finally {
+				if (playBtn) {
+					playBtn.disabled = false
+					delete playBtn.dataset.submitting
+				}
+			}
+			return
+		}
+
 		let ch
 		let layer
-		if (k === 'decklink') {
-			const slot = parseInt(String(modal.querySelector('#live-input-layer-dl')?.value || '1'), 10)
-			if (!Number.isFinite(slot) || slot < 1) {
-				setStatus('Invalid slot', true)
-				return
-			}
-			if (decklinkCount > 0 && slot > decklinkCount) {
-				setStatus(`Slot must be 1–${decklinkCount} for configured input slots`, true)
-				return
-			}
-			const entry = decklinkInputForSlot(channelMap, slot)
-			if (entry?.channel == null) {
-				setStatus(`No dedicated channel for DeckLink slot ${slot}. Set decklink_input_count and restart Caspar.`, true)
-				return
-			}
-			ch = entry.channel
-			layer = entry.layer ?? slot
-		} else {
-			ch = parseInt(String(modal.querySelector('#live-input-ch')?.value || '1'), 10)
-			layer = parseInt(String(modal.querySelector('#live-input-layer')?.value || '1'), 10)
-			if (!Number.isFinite(ch) || ch < 1 || !Number.isFinite(layer) || layer < 0) {
-				setStatus('Invalid channel/layer', true)
-				return
-			}
+		ch = parseInt(String(modal.querySelector('#live-input-ch')?.value || '1'), 10)
+		layer = parseInt(String(modal.querySelector('#live-input-layer')?.value || '1'), 10)
+		if (!Number.isFinite(ch) || ch < 1 || !Number.isFinite(layer) || layer < 0) {
+			setStatus('Invalid channel/layer', true)
+			return
 		}
 		if (k === 'ndi') {
 			const sel = modal.querySelector('#live-input-ndi-select')
@@ -337,7 +560,7 @@ export function showLiveInputModal(stateStore) {
 						? ' Apply Caspar config and restart for new host channel.'
 						: ''
 				setStatus(`Added to Live Sources.${hostMsg}${applyMsg}`, false)
-				setTimeout(close, 1500)
+				finishAdded()
 			} catch (e) {
 				setStatus(e?.message || String(e), true)
 			}
@@ -376,7 +599,7 @@ export function showLiveInputModal(stateStore) {
 							? ' Apply Caspar config and restart for new host channel.'
 							: ''
 				setStatus(`Added to Live Sources.${hostMsg}${applyMsg}`, false)
-				setTimeout(close, 1500)
+				finishAdded()
 			} catch (e) {
 				setStatus(e?.message || String(e), true)
 			}
@@ -408,7 +631,7 @@ export function showLiveInputModal(stateStore) {
 						? ' Apply Caspar config and restart for the new host channel.'
 						: ''
 				setStatus(`Live audio slot ${r.slot} added.${hostMsg}${applyMsg}`, false)
-				setTimeout(close, 1800)
+				finishAdded()
 			} catch (e) {
 				setStatus(e?.message || String(e), true)
 			} finally {
@@ -417,18 +640,53 @@ export function showLiveInputModal(stateStore) {
 			return
 		}
 
-		if (k !== 'decklink') return
-
-		let cmd
-		if (k === 'decklink') {
-			const dev = parseInt(String(modal.querySelector('#live-input-decklink-dev')?.value || '0'), 10) || 0
-			cmd = `PLAY ${ch}-${layer} DECKLINK ${dev}`
+		if (k === 'usb_video') {
+			const manual = (modal.querySelector('#live-input-v4l2-manual')?.value || '').trim()
+			const sel = modal.querySelector('#live-input-v4l2-select')
+			const device = manual || (sel?.value || '').trim()
+			if (!device) {
+				setStatus('Pick a capture device or enter a device path', true)
+				return
+			}
+			const label = (modal.querySelector('#live-input-v4l2-label')?.value || '').trim()
+			const format = (modal.querySelector('#live-input-v4l2-format')?.value || 'auto').trim()
+			const fps = parseInt(String(modal.querySelector('#live-input-v4l2-fps')?.value || '0'), 10) || 0
+			const audioManual = (modal.querySelector('#live-input-v4l2-audio-manual')?.value || '').trim()
+			const audioSel = modal.querySelector('#live-input-v4l2-audio-select')
+			const audio =
+				audioManual ||
+				(audioSel?.value && audioSel.value !== 'none' ? String(audioSel.value).trim() : '') ||
+				'none'
+			const playBtn = modal.querySelector('#live-input-play')
+			if (playBtn) playBtn.disabled = true
 			try {
-				await api.post('/api/raw', { cmd })
-				setStatus('OK — ' + cmd, false)
+				const r = await addV4l2InputSlot(stateStore, {
+					device,
+					...(label ? { label } : {}),
+					...(format && format !== 'auto' ? { format } : {}),
+					...(fps > 0 ? { fps } : {}),
+					...(audio && audio !== 'none' ? { audio } : {}),
+				})
+				document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
+				document.dispatchEvent(new CustomEvent('highascg-v4l2-configured', { detail: r.v4l2Configured }))
+				const hostMsg = r?.hostLivePlay?.ok
+					? ` Capture started on ch ${r.hostChannel ?? '?'}.`
+					: r?.hostLivePlay?.error
+						? ` Capture: ${r.hostLivePlay.error}`
+						: ''
+				const applyMsg = r?.casparApply?.ok
+					? ' Caspar config updated and restarted.'
+					: r?.casparRestartNeeded
+						? ' Apply Caspar config and restart for the new host channel.'
+						: ''
+				setStatus(`USB video slot ${r.slot} added.${hostMsg}${applyMsg}`, false)
+				finishAdded()
 			} catch (e) {
 				setStatus(e?.message || String(e), true)
+			} finally {
+				if (playBtn) playBtn.disabled = false
 			}
+			return
 		}
 	})
 }

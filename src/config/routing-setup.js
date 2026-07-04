@@ -20,6 +20,8 @@ const {
 const { ensureAllMeterNullConsumers } = require('../audio/meter-null-consumer')
 const { startLiveInputMeterHealthWatch, repairLiveInputMetersIfStale } = require('../audio/meter-health')
 const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
+const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
+const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
 
 async function setupInputsChannel(self) {
 	const channelMap = routingMap.getChannelMap(self.config)
@@ -30,7 +32,7 @@ async function setupInputsChannel(self) {
 			enabled: false,
 			reason: !self.amcp
 				? 'amcp_disconnected'
-				: !map.decklinkCount
+				: !channelMap.decklinkCount
 					? 'decklink_inputs_disabled'
 					: decklinkEntries.length === 0
 						? 'no_inputs_channel'
@@ -104,6 +106,52 @@ async function setupLiveAudioInputs(self) {
 		failed,
 	}
 	self.log('info', `Live ALSA inputs: ${playOk}/${playable.length} PLAY on dedicated channel(s) ${playable.map((s) => s.channel).join(', ')}`)
+}
+
+async function setupV4l2Inputs(self) {
+	const { count, slots } = listConfiguredV4l2Slots(self.config)
+	const playable = slots.filter((s) => Number.isFinite(Number(s.channel)))
+	if (!self.amcp || count <= 0 || playable.length === 0) {
+		self._v4l2InputsStatus = {
+			updatedAt: Date.now(),
+			enabled: false,
+			reason: !self.amcp ? 'amcp_disconnected' : count <= 0 ? 'v4l2_inputs_disabled' : 'no_device_configured',
+		}
+		return
+	}
+	const failed = []
+	let playOk = 0
+	for (const slot of playable) {
+		const res = await playV4l2ClipWithRecovery(self, slot, { log: true })
+		if (res.ok) playOk++
+		else {
+			failed.push({
+				slot: slot.slot,
+				channel: slot.channel,
+				layer: slot.layer,
+				device: slot.device,
+				message: res.reason || 'play_failed',
+			})
+		}
+	}
+	self._v4l2InputsStatus = {
+		updatedAt: Date.now(),
+		enabled: true,
+		requestedSlots: count,
+		scheduledPlays: playable.length,
+		playSucceeded: playOk,
+		slots: playable.map((s) => ({
+			slot: s.slot,
+			channel: s.channel,
+			layer: s.layer,
+			device: s.device,
+			label: s.label,
+			clip: s.clip,
+			route: s.route,
+		})),
+		failed,
+	}
+	self.log('info', `V4L2 inputs: ${playOk}/${playable.length} PLAY on dedicated channel(s) ${playable.map((s) => s.channel).join(', ')}`)
 }
 
 async function setupLiveAudioPgmRoutes(self) {
@@ -239,9 +287,11 @@ async function setupAllRouting(self) {
 			}
 		} catch {}
 	}
+	// Always run so _decklinkInputsStatus clears when decklink inputs are disabled (e.g. factory reset).
+	await setupInputsChannel(self)
 	if (map.inputsEnabled) {
-		if (map.decklinkCount > 0) await setupInputsChannel(self)
 		await setupLiveAudioInputs(self)
+		await setupV4l2Inputs(self)
 		await setupLiveAudioPgmRoutes(self)
 	}
 	await setupAudioPreviewBus(self)
@@ -305,11 +355,19 @@ async function ensureLiveAudioRouting(ctx) {
 	return { ok: true, status: ctx._liveAudioInputsStatus ?? null }
 }
 
+async function ensureV4l2InputRouting(ctx) {
+	if (!ctx?.amcp) return { ok: false, reason: 'amcp_disconnected' }
+	await setupV4l2Inputs(ctx)
+	return { ok: true, status: ctx._v4l2InputsStatus ?? null }
+}
+
 module.exports = {
 	setupInputsChannel,
 	setupLiveAudioInputs,
+	setupV4l2Inputs,
 	setupLiveAudioPgmRoutes,
 	ensureLiveAudioRouting,
+	ensureV4l2InputRouting,
 	setupAudioPreviewBus,
 	setupPreviewChannel,
 	setupMultiview,

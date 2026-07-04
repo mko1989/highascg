@@ -2,9 +2,55 @@
   "version": 1,
   "destinations": [
     {
-      "id": "dst_pgm_1",
-      "label": "PGM 1",
+      "id": "dst_mr6mopxd_1",
+      "label": "PGM/PRV 1",
       "mainScreenIndex": 0,
+      "mode": "pgm_prv",
+      "audioLayout": "stereo",
+      "videoMode": "custom",
+      "width": 3072,
+      "height": 1728,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": false,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    },
+    {
+      "id": "dst_mr6mp0g6_1",
+      "label": "Multiview 1",
+      "mainScreenIndex": 0,
+      "mode": "multiview",
+      "audioLayout": "stereo",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": true,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    },
+    {
+      "id": "dst_mr6mp27s_1",
+      "label": "PGM 2",
+      "mainScreenIndex": 1,
       "mode": "pgm_only",
       "audioLayout": "stereo",
       "videoMode": "1080p5000",

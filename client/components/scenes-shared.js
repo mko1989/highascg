@@ -345,7 +345,17 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 	for (let i = 0; i < layers.length; i++) {
 		const sl = sceneLayers[i]
 		let frames = null
-		if (seekOpts?.transitionTake && playheadBase && sl?.layerNumber != null && sl?.source?.value) {
+		const sceneSb =
+			sl?.startBehaviour === 'beginning' || sl?.startBehaviour === 'relativeToPrevious'
+				? sl.startBehaviour
+				: undefined
+		if (
+			seekOpts?.transitionTake &&
+			playheadBase &&
+			sl?.layerNumber != null &&
+			sl?.source?.value &&
+			sceneSb !== 'beginning'
+		) {
 			const live = getLiveLayerPlayheadFrames({
 				...playheadBase,
 				layerNumber: sl.layerNumber,

@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "str_1",
+    "label": "Str1",
+    "enabled": true,
+    "type": "rtmp",
+    "name": "Str1",
+    "quality": "medium",
+    "rtmpServerUrl": "",
+    "streamKey": "",
+    "srtUrl": "",
+    "udpUrl": "",
+    "videoCodec": "h264",
+    "videoBitrateKbps": 4500,
+    "encoderPreset": "veryfast",
+    "audioCodec": "aac",
+    "audioBitrateKbps": 128
+  }
+]

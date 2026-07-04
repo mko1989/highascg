@@ -160,13 +160,16 @@ function getChannelMap(config, activeBuses = null) {
 		: resolvePreviewEnabledByMain(config, screenCount) || Array.from({ length: screenCount }, () => true)
 
 	const decklinkCount = Math.min(8, Math.max(0, parseInt(String(config?.decklink_input_count ?? cs.decklink_input_count ?? 0), 10) || 0))
+	const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
+	const decklinkInputSlots = resolveDecklinkInputSlots(config)
 	const liveAudioCount = Math.min(8, Math.max(0, parseInt(String(config?.live_audio_input_count ?? cs.live_audio_input_count ?? 0), 10) || 0))
+	const v4l2InputCount = Math.min(8, Math.max(0, parseInt(String(config?.v4l2_input_count ?? cs.v4l2_input_count ?? 0), 10) || 0))
 	const inputsHostChannelEnabled =
 		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === true ||
 		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === 'true' ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === true ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === 'true'
-	const inputsEnabled = decklinkCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled
+	const inputsEnabled = decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled
 	const extraAudioCount = Math.min(4, Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0))
 
 	const programChannels = []; const previewChannels = []
@@ -243,15 +246,18 @@ function getChannelMap(config, activeBuses = null) {
 	const _modes = require('./config-modes')
 	const decklinkInputModeRaw = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000').trim()
 	const decklinkInputMode = _modes.STANDARD_VIDEO_MODES[decklinkInputModeRaw] ? decklinkInputModeRaw : '1080p5000'
+	const v4l2InputModeRaw = String(
+		readCasparSetting(config, 'v4l2_input_channel_mode') || readCasparSetting(config, 'inputs_channel_mode') || '1080p5000',
+	).trim()
+	const v4l2InputMode = _modes.STANDARD_VIDEO_MODES[v4l2InputModeRaw] ? v4l2InputModeRaw : decklinkInputMode
 	const liveAudioInputMode = _modes.resolveLiveAudioInputChannelMode(config)
 	const LIVE_AUDIO_INPUT_LAYER = 10
+	const V4L2_HOST_LAYER = 1
 
 	const inputsOnMvr = false // WO-53: inputs are never bundled onto the MVR/preview host channel.
 	const inputChannels = []
 	const decklinkInputChannels = []
-	for (let i = 1; i <= decklinkCount; i++) {
-		const dir = String(readCasparSetting(config, `decklink_input_${i}_direction`) ?? 'in').toLowerCase()
-		if (dir === 'out') continue
+	for (const i of decklinkInputSlots) {
 		const channel = nextCh++
 		decklinkInputChannels.push(channel)
 		inputChannels.push({
@@ -279,10 +285,24 @@ function getChannelMap(config, activeBuses = null) {
 			label: `Live audio ${i}`,
 		})
 	}
+	const v4l2InputChannels = []
+	for (let i = 1; i <= v4l2InputCount; i++) {
+		const channel = nextCh++
+		v4l2InputChannels.push(channel)
+		inputChannels.push({
+			kind: 'v4l2',
+			slot: i,
+			channel,
+			layer: V4L2_HOST_LAYER,
+			mode: v4l2InputMode,
+			route: getRouteString(channel, V4L2_HOST_LAYER),
+			label: String(readCasparSetting(config, `v4l2_input_${i}_label`) || `USB video ${i}`).trim() || `USB video ${i}`,
+		})
+	}
 	// Legacy: explicit empty inputs-host toggle with no real inputs configured.
 	let legacyHostCh = null
-	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0) legacyHostCh = nextCh++
-	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? legacyHostCh ?? null
+	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0 && v4l2InputCount === 0) legacyHostCh = nextCh++
+	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? v4l2InputChannels[0] ?? legacyHostCh ?? null
 
 	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
 	
@@ -347,7 +367,7 @@ function getChannelMap(config, activeBuses = null) {
 		screenCount,
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
 		multiviewEnabled: multiviewChannels.length > 0,
-		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled,
+		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,
 		inputsOnMvr,
 		decklinkInputsHost,
 		decklinkCount: effectiveDecklinkInputCount,
@@ -381,14 +401,17 @@ function getChannelMap(config, activeBuses = null) {
 		streamingContentLayer: Math.max(1, parseInt(String(sc.contentLayer ?? 10), 10) || 10),
 		inputsHostChannelEnabled,
 		liveAudioCount,
+		v4l2InputCount,
 		useVirtual,
 		virtualMainChannels,
 		multiviewChannels,
 		inputChannels,
 		decklinkInputChannels,
 		liveAudioInputChannels,
+		v4l2InputChannels,
 		decklinkInputMode,
 		liveAudioInputMode,
+		v4l2InputMode,
 		hostLiveChannels: hostMerge.entries,
 		webpageHostChannels: hostMerge.entries.filter((e) => e.kind === 'webpage_host').map((e) => e.channel),
 		ndiHostChannels: hostMerge.entries.filter((e) => e.kind === 'ndi_host').map((e) => e.channel),

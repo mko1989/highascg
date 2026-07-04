@@ -1,0 +1,15 @@
+/* Multiview tab */
+#tab-multiview.active {
+	display: flex;
+	flex-direction: column;
+	margin: -24px;
+	overflow: hidden;
+}
+
+/* Placeholder */
+.placeholder {
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	margin: 0;
+}
+

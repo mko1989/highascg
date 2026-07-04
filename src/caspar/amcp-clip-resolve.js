@@ -65,6 +65,7 @@ function normalizeClipPlayAmcpLine(line, ctx) {
 	if (clip.startsWith('[HTML]')) return raw
 	if (isPassthroughAmcpClip(clip)) return raw
 	if (/^DECKLINK\b/i.test(clip)) return raw
+	if (/^v4l2:\/\//i.test(clip)) return raw
 
 	const clipCtx = {
 		CHOICES_MEDIAFILES: ctx?.CHOICES_MEDIAFILES,

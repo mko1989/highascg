@@ -9,6 +9,7 @@ const {
 	parseResolutionAspect,
 	TICK_MS,
 	TIMELINE_TICK_BROADCAST_MS,
+	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
 const timelinePlaybackAmcp = require('./timeline-playback-amcp')
 
@@ -44,7 +45,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 
 		_sendToFor(id) {
 			const tl = id ? this.timelines.get(id) : null
-			if (tl?.sendTo && typeof tl.sendTo === 'object') return tl.sendTo
+			if (tl?.sendTo && typeof tl.sendTo === 'object') return normalizeTimelineSendTo(tl.sendTo)
 			return { preview: true, program: false, screenIdx: 0 }
 		},
 		addKeyframeAtNow(timelineId, layerIdx, property, value) {
@@ -346,8 +347,30 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			const pos = Math.max(0, Math.min(ms, tl.duration))
 
 			if (this._airTimelineId !== id) {
+				const prevAir = this._airTimelineId
+				if (prevAir && prevAir !== id) {
+					const prevCell = this._pbFor(prevAir)
+					if (prevCell.playing) {
+						setCellPosition(prevCell, cellNowMs(prevCell))
+						prevCell.playing = false
+						this._emitPb(prevAir)
+					}
+					const prevTl = this.timelines.get(prevAir)
+					if (prevTl && this.self?.amcp) {
+						this._stopAll(prevTl, this._channelsFor(this._sendToFor(prevAir)))
+					}
+				}
+				if (this._ticker) {
+					clearInterval(this._ticker)
+					this._ticker = null
+				}
+				this._airTimelineId = id
+				this._prevKey = new Map()
+				this._lastKfValues.clear()
+				this._lastKfSegment.clear()
 				setCellPosition(cell, pos)
 				cell.playing = false
+				this._applyAt(id, pos, true)
 				this._emitPb(id)
 				return
 			}
@@ -374,9 +397,15 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			const tl = this.timelines.get(tid)
 			const oldSt = this._sendToFor(tid)
 			const oldCh = this._channelsFor(oldSt)
-			if (tl) tl.sendTo = { ...oldSt, ...sendTo }
+			if (tl) tl.sendTo = normalizeTimelineSendTo({ ...oldSt, ...sendTo })
 			const newSt = this._sendToFor(tid)
 			const newCh = this._channelsFor(newSt)
+			const routingChanged =
+				oldSt.preview !== newSt.preview ||
+				oldSt.program !== newSt.program ||
+				oldSt.screenIdx !== newSt.screenIdx ||
+				oldCh.length !== newCh.length ||
+				oldCh.some((c, i) => c !== newCh[i])
 			if (this._airTimelineId === tid) {
 				const removed = oldCh.filter((c) => !newCh.includes(c))
 				if (removed.length > 0 && tl && this.self?.amcp) {
@@ -394,6 +423,11 @@ function applyPlaybackMixin(TimelineEngineClass) {
 							}
 						}
 					}
+				}
+				if (routingChanged && tl) {
+					const cell = this._pbFor(tid)
+					const pos = cell.playing ? cellNowMs(cell) : (cell.position ?? 0)
+					this._applyAt(tid, pos, true)
 				}
 			}
 			this._emitPb(tid)

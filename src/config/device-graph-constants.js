@@ -2,7 +2,7 @@
 
 const DEFAULT_DEVICE_ID = 'caspar_host'
 const DEST_DEVICE_ID = 'destinations'
-const AUTO_CASPAR_KINDS = new Set(['gpu_out', 'decklink_in', 'decklink_out'])
+const AUTO_CASPAR_KINDS = new Set(['gpu_out', 'decklink_out'])
 
 function slug(s) {
 	return String(s || 'x')

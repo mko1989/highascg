@@ -1,6 +1,8 @@
 'use strict'
 
 const { normalizeDeviceGraph, isCasparOutputConnector } = require('./device-graph')
+const { normalizeVirtualCameraConfig } = require('../virtual-output/v4l2-bridge-config')
+const { resolveInputTargetToChannel } = require('./rtmp-output')
 const { normalizeScreenDestinations } = require('./screen-destinations')
 
 /**
@@ -161,9 +163,33 @@ function applyStreamRecordMappingsFromGraph(config) {
 	return { changed }
 }
 
+/**
+ * When a destination is cabled to v4l2_out, set virtualCamera.channel from that destination's video source.
+ * @param {object} config - mutated in place
+ * @returns {{ changed: boolean, channel?: number, videoSource?: string }}
+ */
+function applyVirtualCameraMappingsFromGraph(config) {
+	if (!config || typeof config !== 'object') return { changed: false }
+	const edges = collectDestinationOutputEdges(config).filter((e) => e.sink.kind === 'v4l2_out')
+	if (!edges.length) return { changed: false }
+
+	const winner = edges.slice().sort((a, b) => a.layer - b.layer)[0]
+	if (!winner) return { changed: false }
+
+	const ch = resolveInputTargetToChannel(config, winner.videoSource)
+	if (ch == null || !Number.isFinite(ch) || ch < 1) return { changed: false }
+
+	const cur = normalizeVirtualCameraConfig(config.virtualCamera)
+	if (cur.channel === ch) return { changed: false, channel: ch, videoSource: winner.videoSource }
+
+	config.virtualCamera = normalizeVirtualCameraConfig({ ...cur, channel: ch })
+	return { changed: true, channel: ch, videoSource: winner.videoSource }
+}
+
 module.exports = {
 	readEdgeOutputLayer,
 	destinationToVideoSource,
 	collectDestinationOutputEdges,
 	applyStreamRecordMappingsFromGraph,
+	applyVirtualCameraMappingsFromGraph,
 }

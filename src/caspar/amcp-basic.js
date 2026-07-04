@@ -59,7 +59,20 @@ class AmcpBasic {
 	 * @param {string} [clip]
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
+	_resolveClipForAmcp(clip) {
+		if (clip == null || clip === '') return clip
+		const ctx = this._client._context
+		if (!ctx) return clip
+		try {
+			const { resolveClipForAmcpLoad } = require('../media/caspar-cls-id')
+			return resolveClipForAmcpLoad(String(clip), ctx)
+		} catch {
+			return clip
+		}
+	}
+
 	loadbg(channel, layer, clip, opts = {}) {
+		clip = this._resolveClipForAmcp(clip)
 		const plan = buildClipCommandPlan('LOADBG', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-loadbg', plan)
 		const cmd = serializeClipCommandPlan(plan)
@@ -74,6 +87,7 @@ class AmcpBasic {
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
 	load(channel, layer, clip, opts = {}) {
+		clip = this._resolveClipForAmcp(clip)
 		const plan = buildClipCommandPlan('LOAD', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-load', plan)
 		const cmd = serializeClipCommandPlan(plan)
@@ -88,6 +102,7 @@ class AmcpBasic {
 	 * @param {import('./amcp-types').PlayOptions} [opts]
 	 */
 	play(channel, layer, clip, opts = {}) {
+		clip = this._resolveClipForAmcp(clip)
 		const plan = buildClipCommandPlan('PLAY', channel, layer, clip, opts)
 		maybeLogPlannedClipCommand(this._client, 'basic-play', plan)
 		const cmd = serializeClipCommandPlan(plan)

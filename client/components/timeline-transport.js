@@ -3,6 +3,7 @@
  */
 
 import { timelineState } from '../lib/timeline-state.js'
+import { coerceTimelineSendTo, defaultTimelineSendTo, previewBusAvailableForSendTo } from '../lib/timeline-state-model.js'
 import { TRANSITION_TYPES, TRANSITION_TWEENS, TRANSITION_TYPE_LABELS, migrateTransitionTypeToAnimate } from '../lib/program-output-state.js'
 import { api } from '../lib/api-client.js'
 import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
@@ -42,6 +43,15 @@ export function createTimelineTransport(deps) {
 		onTimelineSwitch,
 	} = deps
 
+	function getChannelMap() {
+		return stateStore.getState()?.channelMap || null
+	}
+
+	/** PGM-only destinations: route to program; PRV dest is not offered. */
+	function syncSendToWithChannelMap() {
+		coerceTimelineSendTo(getChannelMap(), view.sendTo)
+	}
+
 	async function syncToServer(tl) {
 		if (!tl) return
 		try {
@@ -56,6 +66,7 @@ export function createTimelineTransport(deps) {
 	async function updateSendTo() {
 		const tl = timelineState.getActive()
 		if (!tl) return
+		syncSendToWithChannelMap()
 		timelineState.setSendTo(tl.id, view.sendTo)
 		await api.post(`/api/timelines/${tl.id}/sendto`, view.sendTo).catch(() => {})
 	}
@@ -166,6 +177,11 @@ export function createTimelineTransport(deps) {
 		const allSelected = view.sendTo.screenIdx === null
 		const allOpt = screenCount > 1 ? `<option value="all" ${allSelected ? 'selected' : ''}>All screens</option>` : ''
 		const screenSel = `<select class="tl-select tl-select-sm" id="tl-screen">${allOpt}${screenOpts}</select>`
+		syncSendToWithChannelMap()
+		const prvAvailable = previewBusAvailableForSendTo(cm, view.sendTo)
+		const prvChk = prvAvailable
+			? `<label class="tl-chk"><input type="checkbox" id="tl-s-prev" ${view.sendTo.preview ? 'checked' : ''}> PRV</label>`
+			: ''
 
 		transportEl.innerHTML = `
 			<div class="tl-tb">
@@ -198,8 +214,8 @@ export function createTimelineTransport(deps) {
 				<div class="tl-tb-group tl-tb-dest">
 					<span class="tl-tb-label">Dest:</span>
 					${screenSel}
-					<label class="tl-chk"><input type="checkbox" id="tl-s-prev" ${view.sendTo.preview ? 'checked' : ''}> PRV</label>
-					<label class="tl-chk"><input type="checkbox" id="tl-s-pgm" ${view.sendTo.program ? 'checked' : ''}> PGM</label>
+					${prvChk}
+					<label class="tl-chk"><input type="checkbox" id="tl-s-pgm" ${view.sendTo.program ? 'checked' : ''}${prvAvailable ? '' : ' checked disabled'}> PGM</label>
 				</div>
 				<div class="tl-tb-group tl-tb-take">
 					<select class="tl-select tl-select-sm" id="tl-take-trans" title="Take transition">
@@ -227,6 +243,7 @@ export function createTimelineTransport(deps) {
 			const next = timelineState.getActive()
 			if (next) {
 				Object.assign(view.sendTo, timelineState.getSendTo(next.id))
+				syncSendToWithChannelMap()
 				await updateSendTo()
 			}
 			await onTimelineSwitch?.(e.target.value)
@@ -246,7 +263,12 @@ export function createTimelineTransport(deps) {
 			}
 		})
 		transportEl.querySelector('#tl-new-tl')?.addEventListener('click', () => {
-			timelineState.createTimeline({ name: `Timeline ${timelineState.timelines.length + 1}` })
+			const tl = timelineState.createTimeline({
+				name: `Timeline ${timelineState.timelines.length + 1}`,
+				sendTo: defaultTimelineSendTo(getChannelMap()),
+			})
+			Object.assign(view.sendTo, timelineState.getSendTo(tl.id))
+			void updateSendTo()
 			buildTransport()
 			canvas.zoomFit()
 		})
@@ -304,7 +326,9 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-screen')?.addEventListener('change', (e) => {
 			const v = e.target.value
 			view.sendTo.screenIdx = v === 'all' ? null : parseInt(v, 10)
+			syncSendToWithChannelMap()
 			updateSendTo()
+			buildTransport()
 			redrawTimelineView()
 		})
 		transportEl.querySelector('#tl-s-prev')?.addEventListener('change', (e) => { view.sendTo.preview = e.target.checked; updateSendTo() })
@@ -323,10 +347,10 @@ export function createTimelineTransport(deps) {
 				// Force playout to use latest clip fields (audioRoute, volume, etc.) before take.
 				await syncToServer(t)
 
-				// Force UI to show it's now on PGM (and off PRV)
+				// Take routes timeline to PGM only (PRV dest off).
 				view.sendTo.program = true
 				view.sendTo.preview = false
-				updateSendTo()
+				await updateSendTo()
 				buildTransport()
 				redrawTimelineView()
 				

@@ -84,8 +84,8 @@ function createNewProject(ctx) {
 	}
 	persistSceneDeckForCtx(ctx)
 	try {
-		persistence.set('multiviewLayout', null)
-		ctx._multiviewLayout = null
+		const { clearPersistedMultiviewLayout } = require('../state/clear-multiview-layout')
+		clearPersistedMultiviewLayout(ctx)
 	} catch {
 		/* optional */
 	}

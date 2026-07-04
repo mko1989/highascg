@@ -15,6 +15,64 @@ export function defaultMainEditorVisible() {
 	return [true, true, true, true]
 }
 
+/** @deprecated Legacy new-project default — only Screen 1 column visible. */
+export const LEGACY_MAIN_EDITOR_VISIBLE = Object.freeze([true, false, false, false])
+
+/**
+ * @param {boolean[] | undefined} arr
+ * @returns {boolean}
+ */
+export function isLegacyMainEditorVisible(arr) {
+	if (!Array.isArray(arr) || arr.length < 4) return false
+	return arr[0] === true && arr[1] === false && arr[2] === false && arr[3] === false
+}
+
+/**
+ * Ensure each configured main has its look column visible (legacy projects hid screens 2–4).
+ * @param {{ mainEditorVisible?: boolean[], mainEditorVisibleScreenCount?: number, mainEditorVisibilityMigrated?: boolean }} state
+ * @param {number} screenCount
+ * @returns {boolean} true when visibility array changed
+ */
+export function ensureMainEditorVisibleForScreenCount(state, screenCount) {
+	const n = Math.max(1, Math.min(4, Number(screenCount) || 1))
+	const d = [...(state.mainEditorVisible?.length ? state.mainEditorVisible : defaultMainEditorVisible())]
+	while (d.length < 4) d.push(true)
+	let changed = false
+
+	const prevCount =
+		typeof state.mainEditorVisibleScreenCount === 'number' && state.mainEditorVisibleScreenCount >= 1
+			? Math.min(4, state.mainEditorVisibleScreenCount)
+			: isLegacyMainEditorVisible(d)
+				? 1
+				: n
+
+	if (!state.mainEditorVisibilityMigrated && isLegacyMainEditorVisible(d) && n > 1) {
+		for (let i = 1; i < n; i++) {
+			if (d[i] !== true) {
+				d[i] = true
+				changed = true
+			}
+		}
+		state.mainEditorVisibilityMigrated = true
+	}
+
+	if (n > prevCount) {
+		for (let i = prevCount; i < n; i++) {
+			if (d[i] === false) {
+				d[i] = true
+				changed = true
+			}
+		}
+	}
+
+	state.mainEditorVisibleScreenCount = n
+
+	if (changed) {
+		state.mainEditorVisible = d.slice(0, 4)
+	}
+	return changed
+}
+
 function normSceneIdSlot(v) {
 	if (v == null || v === '') return null
 	const s = String(v).trim()
@@ -71,6 +129,14 @@ export function applyPersistedData(state, data) {
 	} else {
 		state.mainEditorVisible = defaultMainEditorVisible()
 	}
+
+	state.mainEditorVisibleScreenCount =
+		typeof data.mainEditorVisibleScreenCount === 'number' && data.mainEditorVisibleScreenCount >= 1
+			? Math.min(4, data.mainEditorVisibleScreenCount)
+			: isLegacyMainEditorVisible(state.mainEditorVisible)
+				? 1
+				: state.mainEditorVisible.filter(Boolean).length || 1
+	state.mainEditorVisibilityMigrated = data.mainEditorVisibilityMigrated === true
 	
 	if (Array.isArray(data.layerPresets)) {
 		state.layerPresets = data.layerPresets
@@ -112,6 +178,8 @@ export function getPersistPayload(state) {
 		activeScreenIndex: state.activeScreenIndex,
 		globalDefaultTransition: state.globalDefaultTransition,
 		mainEditorVisible: state.mainEditorVisible,
+		mainEditorVisibleScreenCount: state.mainEditorVisibleScreenCount,
+		mainEditorVisibilityMigrated: state.mainEditorVisibilityMigrated === true,
 		layerPresets: state.layerPresets,
 		lookPresets: state.lookPresets,
 		globalBorders: state.globalBorders,

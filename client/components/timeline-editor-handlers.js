@@ -69,6 +69,8 @@ export function createTimelineCanvasHandlers(deps) {
 		getView,
 		getSelectedClip,
 		setSelectedClip,
+		getSelectedLayer,
+		setSelectedLayer,
 		getSelectedFlagDetail,
 		setSelectedFlagDetail,
 		redrawTimelineView,
@@ -137,6 +139,10 @@ export function createTimelineCanvasHandlers(deps) {
 		},
 		onSelectClip(info) {
 			setSelectedClip(info)
+			if (info?.timelineId != null && typeof info.layerIdx === 'number') {
+				const layer = timelineState.getTimeline(info.timelineId)?.layers?.[info.layerIdx]
+				setSelectedLayer?.({ timelineId: info.timelineId, layerIdx: info.layerIdx, layer })
+			}
 			setSelectedFlagDetail(null)
 			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: info }))
@@ -290,11 +296,17 @@ export function createTimelineCanvasHandlers(deps) {
 			showLayerContextMenu(clientX, clientY, timelineId, layerIdx, layer)
 		},
 		onLayerClick(timelineId, layerIdx, layer) {
+			setSelectedLayer?.({ timelineId, layerIdx, layer })
 			setSelectedClip(null)
 			setSelectedFlagDetail(null)
 			window.dispatchEvent(new CustomEvent('timeline-flag-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: null }))
 			window.dispatchEvent(new CustomEvent('timeline-layer-select', { detail: { timelineId, layerIdx, layer } }))
+		},
+		onAddLayer(timelineId, layerIdx) {
+			timelineState.insertLayerBelow(timelineId, layerIdx)
+			void getSyncToServer()(timelineState.getActive())
+			redrawTimelineView()
 		},
 		onSelectKeyframe(info) {
 			window.dispatchEvent(new CustomEvent('timeline-keyframe-select', { detail: info }))
@@ -398,7 +410,7 @@ export function createShowLayerContextMenu(deps) {
 			close()
 		})
 		menu.querySelector('[data-action="add"]').addEventListener('click', () => {
-			timelineState.addLayer(timelineId, `Layer ${layerIdx + 2}`)
+			timelineState.insertLayerBelow(timelineId, layerIdx)
 			void getSyncToServer()(timelineState.getActive())
 			redrawTimelineView()
 			close()

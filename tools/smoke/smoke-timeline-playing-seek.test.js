@@ -189,13 +189,14 @@ function callSeeks(calls) {
 	eng.play(tl.id, 0)
 	eng.pause(tl.id)
 	eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, tl.id)
+	await flushAmcp()
+	const applyOnSendTo = amcpCalls.filter((c) => c.type === 'raw' && (/\bPLAY\b/.test(c.cmd) || /\bLOAD\b/.test(c.cmd)))
+	assert.ok(applyOnSendTo.length >= 1, 'setSendTo to PGM applies transport on new channel')
 	amcpCalls.length = 0
 	eng.play(tl.id, null)
 	await flushAmcp()
 	const resumes = amcpCalls.filter((c) => c.type === 'resume')
-	const plays = amcpCalls.filter((c) => c.type === 'raw' && /PLAY\b/.test(c.cmd))
-	assert.strictEqual(resumes.length, 0, 'new PGM dest must not RESUME-only')
-	assert.ok(plays.length >= 1, 'new PGM dest must PLAY transport')
+	assert.ok(resumes.length >= 1, 'resume after pause uses RESUME on armed layers')
 	eng.stop(tl.id, { skipAmcp: true })
 }
 

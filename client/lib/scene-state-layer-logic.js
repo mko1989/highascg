@@ -1,7 +1,14 @@
 /**
  * Layer logic for SceneState.
  */
-import { defaultFill, defaultLayerConfig, newId } from './scene-state-helpers.js'
+import {
+	defaultFill,
+	defaultLayerConfig,
+	newId,
+	LOOK_LAYER_FIRST,
+	LOOK_LAYER_MAX,
+	isValidLookLayerNumber,
+} from './scene-state-helpers.js'
 import { getPipOverlaysFromLayer } from './pip-overlay-registry.js'
 
 export function getLayerStyleDataFromLayer(l) {
@@ -68,6 +75,30 @@ export function importLayerPresetsFromServer(presets, list) {
 		.filter((p) => p && typeof p.id === 'string' && typeof p.name === 'string' && p.data && typeof p.data === 'object')
 		.map((p) => ({ id: p.id, name: p.name, data: p.data }))
 	return next.length > 0 ? next : null
+}
+
+/**
+ * @param {import('./scene-state.js').LayerConfig[]} layers
+ * @param {number} layerIndex
+ * @param {number} newNumber
+ * @returns {{ ok: boolean, changed?: boolean, reason?: string }}
+ */
+export function setLayerNumberOnLayer(layers, layerIndex, newNumber) {
+	if (!Array.isArray(layers) || layerIndex < 0 || layerIndex >= layers.length) {
+		return { ok: false, reason: 'Layer not found' }
+	}
+	const num = Math.round(Number(newNumber))
+	if (!isValidLookLayerNumber(num)) {
+		return { ok: false, reason: `Layer index must be ${LOOK_LAYER_FIRST}–${LOOK_LAYER_MAX}` }
+	}
+	const dup = layers.findIndex((l, i) => i !== layerIndex && Number(l.layerNumber) === num)
+	if (dup >= 0) {
+		return { ok: false, reason: `Layer ${num} is already used in this look` }
+	}
+	const L = layers[layerIndex]
+	if (Number(L.layerNumber) === num) return { ok: true, changed: false }
+	L.layerNumber = num
+	return { ok: true, changed: true }
 }
 
 export function reorderLayers(layers, fromVisualIndex, toVisualIndex, LOOK_LAYER_FIRST, LOOK_LAYER_STEP) {

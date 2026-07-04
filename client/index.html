@@ -20,7 +20,6 @@
 			"three": "/vendor/three/build/three.module.js",
 			"three/": "/vendor/three/",
 			"three/addons/": "/vendor/three/examples/jsm/",
-			"grapesjs": "/vendor/grapesjs/dist/grapes.mjs",
 			"html-to-image": "/vendor/html-to-image/es/index.js"
 		}
 	}
@@ -45,14 +44,11 @@
 				three: vp('/vendor/three/build/three.module.js'),
 				'three/': vp('/vendor/three/'),
 				'three/addons/': vp('/vendor/three/examples/jsm/'),
-				grapesjs: vp('/vendor/grapesjs/dist/grapes.mjs'),
 				'html-to-image': vp('/vendor/html-to-image/es/index.js')
 			}
 		};
 		var s = document.getElementById('highascg-importmap');
 		if (s) s.textContent = JSON.stringify(map);
-		var css = document.querySelector('link[href*="grapes.min.css"]');
-		if (css) css.href = vp('/vendor/grapesjs/dist/css/grapes.min.css');
 	})();
 	</script>
 </head>

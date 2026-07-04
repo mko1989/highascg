@@ -80,8 +80,10 @@ async function stopFfmpegJpegComposePreviewInternal(ctx) {
  */
 function startFfmpegJpegComposePreview(ctx) {
 	return enqueueComposePreviewLifecycle(async () => {
+		const wantFfmpeg = isFfmpegJpegComposePreview(ctx?.config)
 		const sig = computeComposeRunSignature(ctx?.config)
 		if (
+			wantFfmpeg &&
 			sig &&
 			sig === _runningSignature &&
 			_watchTimer &&
@@ -91,7 +93,14 @@ function startFfmpegJpegComposePreview(ctx) {
 			return
 		}
 		await stopFfmpegJpegComposePreviewInternal(ctx)
-		if (!isFfmpegJpegComposePreview(ctx?.config)) return
+		if (!wantFfmpeg) {
+			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg not enabled after stop — skip attach')
+			return
+		}
+		if (!ctx?.amcp?.isConnected) {
+			ctx?.log?.('warn', '[compose-preview] ffmpeg_jpeg start skipped — AMCP not connected')
+			return
+		}
 		await cache.ensurePreviewDir(ctx.config).catch(() => {})
 		const cp = ctx.config?.composePreview || {}
 		const channels = resolveMonitoredChannels(ctx.config)
