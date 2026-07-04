@@ -112,6 +112,25 @@ else
 	else
 		bad "missing dist-web/index.html — run install-iso-defaults.sh (HIGHASCG_ISO_BUILD_WEB=1) before produce"
 	fi
+	for needle in \
+		'home/casparcg/highascg/src/config/factory-starter.js' \
+		'home/casparcg/highascg/src/config/default-empty-project.json'; do
+		if squash_has_path "$needle"; then
+			ok "present: ${needle} (highascg new-project boot)"
+		else
+			bad "missing ${needle} — highascg.service will crash on boot"
+		fi
+	done
+	if squash_cat_grep 'home/casparcg/highascg/src/engine/new-project.js' '../config/factory-starter' 1; then
+		ok "new-project.js uses src/config/factory-starter (not tools/eggs/)"
+	else
+		bad "new-project.js still requires tools/eggs/starter-project — fix before produce"
+	fi
+	if squash_has_tree 'home/casparcg/highascg/tools/eggs'; then
+		warn "tools/eggs present in squashfs (unexpected on embed-server ISO)"
+	else
+		ok "absent: home/casparcg/highascg/tools/eggs (runtime uses src/config/)"
+	fi
 fi
 
 # Companion + highpass-highascg module (when embed is on — default).

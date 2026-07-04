@@ -125,7 +125,12 @@ echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA drive
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
 
 echo "==> Patch Calamares in squashfs (eggs produce regenerates /etc/calamares after preflight)"
-bash "${HERE}/patch-iso-squashfs-calamares.sh"
+if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
+	# Required for install-to-disk: unsquashfs → fix shellprocess → mksquashfs (~5–15 min).
+	bash "${HERE}/patch-iso-squashfs-calamares.sh"
+else
+	echo "     skip: HIGHASCG_ISO_EMBED_CALAMARES=0 (no Calamares in ISO)"
+fi
 
 echo "==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)"
 # Fresh produce already cloned host /usr into squashfs — skip 25 min squashfs rebuild.
