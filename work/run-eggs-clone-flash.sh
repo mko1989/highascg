@@ -133,12 +133,18 @@ cleanup() {
 trap cleanup EXIT
 
 if ! "$FLASH_ONLY"; then
+	echo "==> Prepare host for produce (umount exFAT/bridge, swap fstab)"
+	bash "${LIVE_USB}/stop-and-unmount-wo47-for-eggs-produce.sh"
+	bash "${LIVE_USB}/strip-host-swap-for-live-iso.sh" prepare
+
 	echo "==> Preflight: merge eggs excludes + audit"
 	HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${LIVE_USB}/penguins-eggs-exclude-highascg-embed-server.list" \
 		bash "${LIVE_USB}/merge-penguins-eggs-exclude-highascg.sh" --replace
+	HIGHASCG_EGGS_EXCLUDE_FRAGMENT="${LIVE_USB}/penguins-eggs-exclude-decklink.list" \
+		bash "${LIVE_USB}/merge-penguins-eggs-exclude-highascg.sh"
 	bash "${LIVE_USB}/audit-eggs-clone-host.sh"
 
-	systemctl stop highascg.service 2>/dev/null || true
+	systemctl stop highascg.service companion.service 2>/dev/null || true
 	pkill -u casparcg -f '/home/casparcg/highascg/bin/casparcg' 2>/dev/null || true
 	sleep 1
 fi
