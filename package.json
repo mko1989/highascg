@@ -102,31 +102,36 @@
 		"jpeg-js": "^0.4.4",
 		"osc": "^2.4.5",
 		"pngjs": "^7.0.0",
-		"puppeteer": "^25.1.0",
+		"puppeteer": "^25.3.0",
 		"sacn": "^4.6.2",
-		"unzipper": "^0.12.3",
+		"unzipper": "^0.12.5",
 		"wetransfert": "^2.4.0",
 		"ws": "^8.21.0",
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
-		"grapesjs": "^0.22.5",
+		"exceljs": "^4.4.0",
+		"grapesjs": "^0.23.2",
 		"naudiodon": "^2.3.6",
-		"three": "^0.184.0",
-		"exceljs": "^4.4.0"
+		"three": "^0.185.1"
 	},
 	"overrides": {
 		"ws": "^8.21.0",
-		"uuid": "^11.1.0"
+		"uuid": "^11.1.0",
+		"exceljs": {
+			"archiver": "^8.0.0",
+			"fast-csv": "^5.0.7",
+			"unzipper": "^0.12.5"
+		}
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.39.2",
+		"@eslint/js": "^10.0.1",
 		"acorn": "^8.17.0",
 		"acorn-walk": "^8.3.5",
-		"electron": "^30.5.1",
-		"eslint": "^9.39.2",
-		"globals": "^16.5.0",
-		"prettier": "^3.6.2",
-		"vite": "^6.4.3"
+		"electron": "^43.0.0",
+		"eslint": "^10.6.0",
+		"globals": "^17.7.0",
+		"prettier": "^3.9.4",
+		"vite": "^8.1.3"
 	}
 }
