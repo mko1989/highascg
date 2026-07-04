@@ -213,14 +213,23 @@ function deferMixerAmcpLine(line) {
 	return `${s} DEFER`
 }
 
-function pipOverlayMixerLines(cl, mixFill, contentRotation = 0) {
+function pipOverlayMixerLines(cl, mixFill, contentRotation = 0, opts = {}) {
+	const deferMixer = opts.deferMixer !== false
+	const mixTail = deferMixer ? ' DEFER' : ' 0'
 	const casparFill = fillForSceneLayerRotationAnchor(mixFill, contentRotation)
 	const lines = [
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`),
-		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
-		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`),
+		deferMixer
+			? deferMixerAmcpLine(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`)
+			: `MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`,
+		deferMixer ? deferMixerAmcpLine(`MIXER ${cl} KEYER 0`) : `MIXER ${cl} KEYER 0`,
+		deferMixer ? deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`) : `MIXER ${cl} OPACITY 1`,
 	]
-	lines.push(...sceneLayerRotationMixerLines(cl, contentRotation, { deferRotation: true }))
+	lines.push(
+		...sceneLayerRotationMixerLines(cl, contentRotation, {
+			deferRotation: deferMixer,
+			rotationTail: deferMixer ? undefined : ' 0',
+		}),
+	)
 	return lines
 }
 
@@ -359,6 +368,7 @@ export function buildPipOverlayAmcpLinesAll(
 			old &&
 			cur.type === old.type &&
 			effectivePipOverlaySide(cur) === effectivePipOverlaySide(old) &&
+			!isOutsideSide(cur) &&
 			cgReady
 		) {
 			const chunk = buildPipOverlayUpdateLines(
@@ -374,6 +384,11 @@ export function buildPipOverlayAmcpLinesAll(
 			)
 			lines.push(...chunk)
 		} else if (cur) {
+			if (isOutsideSide(cur) && cgKey) {
+				const cl = `${ch}-${oLayer}`
+				lines.push(`CG ${cl} CLEAR`, `MIXER ${cl} CLEAR`)
+				if (pipCgReadyKeys) pipCgReadyKeys.delete(cgKey)
+			}
 			const chunk = buildPipOverlayAmcpLines(
 				cur,
 				channel,

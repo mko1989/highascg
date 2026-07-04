@@ -30,14 +30,24 @@ const {
 	computePipRouterPlacement,
 } = utils
 
-function pipOverlayMixerLines(cl, mixFill, contentRotation = 0) {
+/**
+ * @param {{ deferMixer?: boolean }} [opts] — default immediate FILL (outside borders need expanded MIXER FILL on air).
+ */
+function pipOverlayMixerLines(cl, mixFill, contentRotation = 0, opts = {}) {
+	const deferMixer = opts.deferMixer === true
+	const mixTail = deferMixer ? ' DEFER' : ' 0'
 	const casparFill = fillForSceneLayerRotationAnchor(mixFill, contentRotation)
 	const lines = [
-		deferMixerAmcpLine(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`),
-		deferMixerAmcpLine(`MIXER ${cl} KEYER 0`),
-		deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`),
+		`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY}${mixTail}`,
+		deferMixer ? deferMixerAmcpLine(`MIXER ${cl} KEYER 0`) : `MIXER ${cl} KEYER 0`,
+		deferMixer ? deferMixerAmcpLine(`MIXER ${cl} OPACITY 1`) : `MIXER ${cl} OPACITY 1`,
 	]
-	lines.push(...sceneLayerRotationMixerLines(cl, contentRotation, { deferRotation: true }))
+	lines.push(
+		...sceneLayerRotationMixerLines(cl, contentRotation, {
+			deferRotation: deferMixer,
+			rotationTail: deferMixer ? undefined : ' 0',
+		}),
+	)
 	return lines
 }
 
@@ -116,17 +126,19 @@ function buildPipOverlayAmcpLinesAll(
 	const lines = []
 	const prevPips = pipOverlaysFromLayer(prevSceneLayer)
 	for (let i = 0; i < overlays.length && i < PIP_OVERLAY_MAX_STACK; i++) {
-		if (
-			overlays[i] &&
+		const cur = overlays[i]
+		const canUpdateInPlace =
+			cur &&
 			prevPips[i] &&
-			overlays[i].type &&
-			String(overlays[i].type) === String(prevPips[i].type) &&
-			utils.effectivePipOverlaySide(overlays[i]) === utils.effectivePipOverlaySide(prevPips[i])
-		) {
+			cur.type &&
+			String(cur.type) === String(prevPips[i].type) &&
+			utils.effectivePipOverlaySide(cur) === utils.effectivePipOverlaySide(prevPips[i]) &&
+			!utils.isOutsideSide(cur)
+		if (canUpdateInPlace) {
 			const chunk = buildPipOverlayUpdateLines(
 				channel,
 				contentPhysicalLayer,
-				overlays[i],
+				cur,
 				contentFill,
 				appCtx,
 				i,
@@ -135,9 +147,14 @@ function buildPipOverlayAmcpLinesAll(
 				overlays,
 			)
 			lines.push(...chunk)
-		} else if (overlays[i]) {
+		} else if (cur) {
+			const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, i, nextContentLayer)
+			if (utils.isOutsideSide(cur) && Number.isFinite(oLayer)) {
+				const cl = `${channel}-${oLayer}`
+				lines.push(`CG ${cl} CLEAR`, `MIXER ${cl} CLEAR`)
+			}
 			const chunk = buildPipOverlayAmcpLines(
-				overlays[i],
+				cur,
 				channel,
 				contentPhysicalLayer,
 				contentFill,

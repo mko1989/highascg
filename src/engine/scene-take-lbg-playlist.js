@@ -6,6 +6,7 @@
 
 const { pathsMatch, normPath } = require('../state/live-scene-reconcile')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-transition')
+const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
 
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	// Register the global OSC playlist handler on self.oscState exactly once!
@@ -182,7 +183,8 @@ function queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx) {
 	if (typeof self.log === 'function') {
 		self.log('info', `[Playlist] Preloading next item ${nextIdx} (${nextItem.value}) on ${channel}-${pLayer} with AUTO`)
 	}
-	self.amcp.loadbg(channel, pLayer, nextItem.value, loadOpts).catch((err) => {
+	const clip = resolveSceneClipForAmcp(nextItem.value, self)
+	self.amcp.loadbg(channel, pLayer, clip, loadOpts).catch((err) => {
 		if (typeof self.log === 'function') {
 			self.log('warn', `[Playlist] Preload failed on ${channel}-${pLayer}: ${err?.message || err}`)
 		}
@@ -241,7 +243,8 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 
 	void (async () => {
 		try {
-			await self.amcp.loadbg(channel, pLayer, nextItem.value, loadOpts)
+			const clip = resolveSceneClipForAmcp(nextItem.value, self)
+			await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
 			await self.amcp.play(channel, pLayer)
 
 			// Update index state immediately so that it triggers correctly on next update

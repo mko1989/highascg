@@ -60,6 +60,34 @@ test('normalizeTransitionForPgmOnly keeps +Animate and upgrades plain MIX to MIX
 	})
 })
 
+test('pgm-only take resolves project-scoped basename before LOADBG', async () => {
+	const amcp = mockAmcp()
+	const self = {
+		...minimalSelf(),
+		config: {
+			...minimalSelf().config,
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
+	}
+	const incoming = {
+		id: 'look_bumper',
+		defaultTransition: { type: 'CUT', duration: 0, tween: 'linear' },
+		layers: [{ layerNumber: 10, source: { type: 'media', value: '02_BUMPER.mp4' }, loop: true }],
+	}
+	await runSceneTakePgmOnly(amcp, {
+		self,
+		channel: 1,
+		currentScene: null,
+		incomingScene: incoming,
+		forceCut: true,
+		framerate: 25,
+	})
+	const load = amcp.log.find((e) => e.cmd === 'LOADBG')
+	assert.equal(load?.clip, 'PROJECTS/TETST/02_BUMPER')
+})
+
 test('pgm-only animate take: LOADBG → FILL → COMMIT → PLAY on layer 10 only; no upfront STOP', async () => {
 	const amcp = mockAmcp()
 	const self = minimalSelf()

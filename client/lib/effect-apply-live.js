@@ -69,6 +69,7 @@ function resolveLiveEffectTarget(ctx) {
 	if (ctx.kind === 'scene_layer') {
 		const { sceneState, stateStore, sceneId, layerIndex } = ctx
 		if (sceneState.liveSceneId !== sceneId) return null
+		if (sceneState.editingSceneId === sceneId) return null
 		const scene = sceneState.getScene(sceneId)
 		const layer = scene?.layers?.[layerIndex]
 		if (!layer) return null

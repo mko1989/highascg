@@ -28,6 +28,7 @@
 		top: calc(var(--it) * 100%);
 		width: calc(var(--iw) * 100%);
 		height: calc(var(--ih) * 100%);
+		pointer-events: none;
 	}
 	svg {
 		width: 100%;
@@ -101,10 +102,15 @@
 		return slices.map(normalizeSlice).filter(hasMargin)
 	}
 
+	function normalizeSide(s) {
+		var v = String(s != null ? s : 'outside').trim().toLowerCase()
+		return v === 'inside' ? 'inside' : 'outside'
+	}
+
 	function render() {
 		root.innerHTML = ''
 		kfEl.textContent = ''
-		
+
 		var slices = activeSlices()
 		if (slices.length === 0) return
 
@@ -114,14 +120,8 @@
 		var n = Math.max(1, Math.min(12, Math.round(Number(state.count))))
 		var L = Math.max(2, Math.min(98, state.length))
 		var gap = 100 - L
-			var th = state.thickness || 3
-			var side = state.side || 'outside'
-			var ri = Math.max(0, Number(state.ringInnerPx) || 0)
-			var ro = Math.max(ri + th, Number(state.ringOuterPx) || (side === 'outside' ? th + (state.glow ? (state.glowWidth || 0) + 4 : 0) : th))
-			var band = Math.max(th, ro - ri)
-			var strokePad = th / 2
-			var glowPad = state.glow ? Math.min(Math.max(0, band - th), (state.glowWidth || 0) + 4) : 0
-			var vbPad = side === 'outside' ? strokePad + glowPad : strokePad
+		var th = state.thickness || 3
+		var side = normalizeSide(state.side)
 
 		var animName = 'pes_anim'
 		var offEnd = cw ? '-100' : '100'
@@ -131,86 +131,8 @@
 		var screenH = window.innerHeight || 1080
 
 		slices.forEach(function (inn) {
-			var side = state.side || 'outside'
-			var th = state.thickness || 3
-			var ri = Math.max(0, Number(state.ringInnerPx) || 0)
-			var ro = Math.max(ri + th, Number(state.ringOuterPx) || (side === 'outside' ? th + (state.glow ? (state.glowWidth || 0) + 4 : 0) : th))
-			var band = Math.max(th, ro - ri)
-			var strokePad = th / 2
-			var glowPad = state.glow ? Math.min(Math.max(0, band - th), (state.glowWidth || 0) + 4) : 0
-			var vbPad = side === 'outside' ? strokePad + glowPad : strokePad
-
-			if (side === 'outside') {
-				var host = document.createElement('div')
-				host.className = 'pip-slice'
-				host.style.opacity = String(clamp01(state.opacity))
-
-				var x = inn.l * screenW
-				var y = inn.t * screenH
-				var wPx = Math.max(1, inn.w * screenW)
-				var hPx = Math.max(1, inn.h * screenH)
-				var vbX = -vbPad
-				var vbY = -vbPad
-				var vbW = screenW + 2 * vbPad
-				var vbH = screenH + 2 * vbPad
-				var viewBox = vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH
-				var rx = x - strokePad
-				var ry = y - strokePad
-				var rw = wPx + 2 * strokePad
-				var rh = hPx + 2 * strokePad
-
-				var svg = document.createElementNS(NS, 'svg')
-				svg.setAttribute('viewBox', viewBox)
-				svg.setAttribute('preserveAspectRatio', 'none')
-
-				var svgGlow = null
-				if (state.glow) {
-					svgGlow = document.createElementNS(NS, 'svg')
-					svgGlow.setAttribute('viewBox', viewBox)
-					svgGlow.setAttribute('preserveAspectRatio', 'none')
-					svgGlow.style.position = 'absolute'
-					svgGlow.style.inset = '0'
-					svgGlow.style.filter = 'blur(' + (state.glowWidth || 5) + 'px)'
-					host.appendChild(svgGlow)
-				}
-				svg.style.position = 'absolute'
-				svg.style.inset = '0'
-
-				function createRect(stroke, width, opacity, delay, rxVal, ryVal, rwVal, rhVal) {
-					var r = document.createElementNS(NS, 'rect')
-					r.setAttribute('x', String(rxVal))
-					r.setAttribute('y', String(ryVal))
-					r.setAttribute('width', String(rwVal))
-					r.setAttribute('height', String(rhVal))
-					r.setAttribute('fill', 'none')
-					r.setAttribute('stroke', stroke)
-					r.setAttribute('stroke-width', width)
-					r.setAttribute('stroke-linecap', state.roundedTips ? 'round' : 'butt')
-					r.style.vectorEffect = 'non-scaling-stroke'
-					r.setAttribute('pathLength', '100')
-					r.setAttribute('stroke-dasharray', L + ' ' + gap)
-					r.style.animation = animName + ' ' + dur + 's linear infinite'
-					r.style.animationDelay = delay + 's'
-					if (opacity < 1) r.setAttribute('opacity', String(opacity))
-					return r
-				}
-
-				for (var i = 0; i < n; i++) {
-					var delay = (-(i / n) * dur).toFixed(3)
-					if (state.glow && svgGlow) {
-						var gw = state.glowWidth || 5
-						svgGlow.appendChild(createRect(state.glowColor, th + gw * 1.2, 0.55, delay, rx, ry, rw, rh))
-					}
-					svg.appendChild(createRect(state.color, th, 1, delay, rx, ry, rw, rh))
-				}
-
-				host.appendChild(svg)
-				root.appendChild(host)
-				return
-			}
-
-			var wPx = inn.w * screenW
-			var hPx = inn.h * screenH
+			var wPx = Math.max(1, inn.w * screenW)
+			var hPx = Math.max(1, inn.h * screenH)
 
 			var wrap = document.createElement('div')
 			wrap.className = 'svg-container'
@@ -219,26 +141,29 @@
 			wrap.style.setProperty('--iw', String(inn.w))
 			wrap.style.setProperty('--ih', String(inn.h))
 			wrap.style.opacity = String(clamp01(state.opacity))
+			wrap.style.overflow = side === 'inside' ? 'hidden' : 'visible'
 
-			var vbX = 0
-			var vbY = 0
-			var vbW = wPx
-			var vbH = hPx
 			var rx
 			var ry
 			var rw
 			var rh
+			if (side === 'inside') {
+				rx = th / 2
+				ry = th / 2
+				rw = Math.max(0, wPx - th)
+				rh = Math.max(0, hPx - th)
+			} else {
+				rx = -th / 2
+				ry = -th / 2
+				rw = wPx + th
+				rh = hPx + th
+			}
 
-			wrap.style.overflow = 'hidden'
-			rx = strokePad
-			ry = strokePad
-			rw = Math.max(0, wPx - th)
-			rh = Math.max(0, hPx - th)
-
-			var viewBox = vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH
+			var viewBox = '0 0 ' + wPx + ' ' + hPx
 
 			var svg = document.createElementNS(NS, 'svg')
 			svg.setAttribute('viewBox', viewBox)
+			svg.setAttribute('preserveAspectRatio', 'none')
 			svg.style.position = 'absolute'
 			svg.style.inset = '0'
 
@@ -246,6 +171,7 @@
 			if (state.glow) {
 				svgGlow = document.createElementNS(NS, 'svg')
 				svgGlow.setAttribute('viewBox', viewBox)
+				svgGlow.setAttribute('preserveAspectRatio', 'none')
 				svgGlow.style.position = 'absolute'
 				svgGlow.style.inset = '0'
 				svgGlow.style.filter = 'blur(' + (state.glowWidth || 5) + 'px)'
@@ -259,7 +185,6 @@
 				r.setAttribute('y', String(ryVal))
 				r.setAttribute('width', String(rwVal))
 				r.setAttribute('height', String(rhVal))
-				
 				r.setAttribute('fill', 'none')
 				r.setAttribute('stroke', stroke)
 				r.setAttribute('stroke-width', width)
@@ -273,13 +198,13 @@
 				return r
 			}
 
-			for (var j = 0; j < n; j++) {
-				var delayIn = (-(j / n) * dur).toFixed(3)
+			for (var i = 0; i < n; i++) {
+				var delay = (-(i / n) * dur).toFixed(3)
 				if (state.glow && svgGlow) {
-					var gwIn = state.glowWidth || 5
-					svgGlow.appendChild(createRect(state.glowColor, th + gwIn * 1.2, 0.55, delayIn, rx, ry, rw, rh))
+					var gw = state.glowWidth || 5
+					svgGlow.appendChild(createRect(state.glowColor, th + gw * 1.2, 0.55, delay, rx, ry, rw, rh))
 				}
-				svg.appendChild(createRect(state.color, th, 1, delayIn, rx, ry, rw, rh))
+				svg.appendChild(createRect(state.color, th, 1, delay, rx, ry, rw, rh))
 			}
 
 			wrap.appendChild(svg)
@@ -303,7 +228,7 @@
 		if (d.glowColor != null) state.glowColor = String(d.glowColor)
 		if (d.glowWidth != null) state.glowWidth = parseFloat(d.glowWidth)
 		if (d.roundedTips != null) state.roundedTips = !!d.roundedTips
-		if (d.side != null) state.side = String(d.side)
+		if (d.side != null) state.side = normalizeSide(d.side)
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 		if (d.ringInnerPx != null) state.ringInnerPx = Math.max(0, parseFloat(d.ringInnerPx) || 0)
 		if (d.ringOuterPx != null) state.ringOuterPx = Math.max(0, parseFloat(d.ringOuterPx) || 0)

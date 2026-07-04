@@ -18,7 +18,13 @@ const {
 	pipOverlaysFromLayer,
 	sendPipOverlayLinesSerial,
 } = require('./pip-overlay')
-const { clipPath, shouldApplyStraightAlphaKeyer, buildEffectAmcpLines, chLayerAmcp } = require('./scene-take-lbg-helpers')
+const {
+	clipPath,
+	resolveSceneClipForAmcp,
+	shouldApplyStraightAlphaKeyer,
+	buildEffectAmcpLines,
+	chLayerAmcp,
+} = require('./scene-take-lbg-helpers')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
@@ -168,6 +174,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 				clip
 		}
 		if (!clip) continue
+		clip = resolveSceneClipForAmcp(clip, self)
 
 		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
 

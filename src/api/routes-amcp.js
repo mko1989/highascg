@@ -49,6 +49,7 @@ const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = requir
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
 const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
 const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
+const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
 
 function notifyCefInteractiveAfterAmcp(lines, ctx) {
 	try {
@@ -150,6 +151,7 @@ async function handlePost(path, body, ctx) {
 		}
 		case '/api/play': {
 			const { clip, transition, duration, tween, loop, auto, parameters, audioFilter, audioRoute } = b
+			const resolvedClip = resolveSceneClipForAmcp(clip, ctx)
 			const opts = { loop: !!loop, auto: !!auto }
 			if (transition && transition !== 'CUT') opts.transition = transition
 			if (duration != null) opts.duration = duration
@@ -160,17 +162,18 @@ async function handlePost(path, body, ctx) {
 				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
-			const r = await amcp.play(channel, layer, clip, opts)
-			playbackTracker.recordPlay(ctx, channel, layer, clip, { loop: !!loop })
+			const r = await amcp.play(channel, layer, resolvedClip, opts)
+			playbackTracker.recordPlay(ctx, channel, layer, resolvedClip, { loop: !!loop })
 			notifyProgramMutationMayInvalidateLive(ctx, channel, {
 				transition: transition || 'CUT',
 				durationFrames: duration,
-				clip,
+				clip: resolvedClip,
 			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
 		}
 		case '/api/loadbg': {
 			const { clip, transition, duration, tween, loop, auto, parameters, audioFilter, audioRoute } = b
+			const resolvedClip = resolveSceneClipForAmcp(clip, ctx)
 			const opts = { loop: !!loop, auto: !!auto }
 			if (transition && transition !== 'CUT') opts.transition = transition
 			if (duration != null) opts.duration = duration
@@ -181,16 +184,17 @@ async function handlePost(path, body, ctx) {
 				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
-			const r = await amcp.loadbg(channel, layer, clip, opts)
+			const r = await amcp.loadbg(channel, layer, resolvedClip, opts)
 			notifyProgramMutationMayInvalidateLive(ctx, channel, {
 				transition: transition || 'CUT',
 				durationFrames: duration,
-				clip,
+				clip: resolvedClip,
 			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/load': {
 			const { clip, transition, duration, tween, loop, parameters, audioFilter, audioRoute } = b
+			const resolvedClip = resolveSceneClipForAmcp(clip, ctx)
 			const opts = { loop: !!loop }
 			if (transition && transition !== 'CUT') opts.transition = transition
 			if (duration != null) opts.duration = duration
@@ -201,11 +205,11 @@ async function handlePost(path, body, ctx) {
 				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
-			const r = await amcp.load(channel, layer, clip, opts)
+			const r = await amcp.load(channel, layer, resolvedClip, opts)
 			notifyProgramMutationMayInvalidateLive(ctx, channel, {
 				transition: transition || 'CUT',
 				durationFrames: duration,
-				clip,
+				clip: resolvedClip,
 			})
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}

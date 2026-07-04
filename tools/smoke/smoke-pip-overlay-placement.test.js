@@ -121,6 +121,20 @@ test('effectivePipOverlaySide treats empty side as outside', () => {
 	assert.equal(effectivePipOverlaySide({ type: 'border', params: { side: 'inside' } }), 'inside')
 })
 
+test('outside overlay stack always re-ADDs with immediate expanded FILL', () => {
+	const overlay = { type: 'edge_strip', params: { thickness: 8, side: 'outside' } }
+	const prevLayer = { pipOverlays: [overlay] }
+	const lines = buildPipOverlayAmcpLinesAll([overlay], 2, 10, fill, { config: {} }, 20, prevLayer, 0)
+	const joined = lines.join('\n')
+	assert.ok(joined.includes('CG 2-11 CLEAR'))
+	assert.ok(joined.includes('CG 2-11 ADD'))
+	assert.ok(!/^CG 2-11 UPDATE/m.test(joined) || joined.includes('CG 2-11 ADD'))
+	const fillLine = lines.find((l) => /^MIXER 2-11 FILL /.test(l))
+	assert.ok(fillLine)
+	assert.doesNotMatch(fillLine, /DEFER/)
+	assert.ok(Number(fillLine.split(/\s+/)[5]) > fill.scaleX)
+})
+
 test('pip_border template uses box-shadow outside pattern (CEF-safe)', () => {
 	const tpl = fs.readFileSync(path.join(__dirname, '../../template/pip_border.html'), 'utf8')
 	assert.match(tpl, /\.pip-frame\.side-outside\s*\{[^}]*box-shadow:\s*0\s+0\s+0/)

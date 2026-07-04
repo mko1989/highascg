@@ -46,24 +46,39 @@ test('resolveClipForAmcpLoad: project basename expands to CLS id', () => {
 	assert.equal(resolveClipForAmcpLoad('252166.mp4', ctx), 'PROJECTS/UNTITLED777/252166')
 })
 
-test('resolveClipForAmcpLoad: basename at media root stays root CLS id', () => {
+test('resolveClipForAmcpLoad: basename at media root stays root CLS id when not in project folder', () => {
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
 			local_media_path: require('path').join(__dirname, '../../media'),
 		},
-		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled777' : null) },
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'no_such_project_folder' : null) },
 	}
 	assert.equal(resolveClipForAmcpLoad('3825579625-preview.mp4', ctx), '3825579625-PREVIEW')
 })
 
-test('resolveClipForAmcpLoad: prefers CLS catalog row over expansion', () => {
+test('resolveClipForAmcpLoad: prefers CLS catalog row when clip is not in active project folder', () => {
 	const ctx = {
 		CHOICES_MEDIAFILES: [{ id: 'PROJECTS/EVENING/CLIP', label: 'PROJECTS/EVENING/CLIP' }],
 		config: { projectScopedMedia: { enabled: true } },
 		persistence: { get: () => 'untitled777' },
 	}
 	assert.equal(resolveClipForAmcpLoad('clip.mov', ctx), 'PROJECTS/EVENING/CLIP')
+})
+
+test('resolveClipForAmcpLoad: active project folder wins over CLS basename match elsewhere', () => {
+	const ctx = {
+		CHOICES_MEDIAFILES: [{ id: 'BRIDGE/FIDELITY BRAND FILM - PL', label: 'BRIDGE/FIDELITY BRAND FILM - PL' }],
+		config: {
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
+	}
+	assert.equal(
+		resolveClipForAmcpLoad('Fidelity Brand Film - PL.mp4', ctx),
+		'PROJECTS/TETST/FIDELITY BRAND FILM - PL',
+	)
 })
 
 const { normalizeClipPlayAmcpLine } = require('../../src/caspar/amcp-clip-resolve')

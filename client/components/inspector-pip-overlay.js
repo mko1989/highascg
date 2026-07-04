@@ -8,6 +8,8 @@
 
 import { createDragInput } from './inspector-common.js'
 import { api } from '../lib/api-client.js'
+import { resolveLayerFillForAmcp } from '../lib/mixer-fill.js'
+import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import {
 	PIP_OVERLAYS,
 	PIP_OVERLAY_MAP,
@@ -37,13 +39,15 @@ function nextPipContentLayerInScene(layers, contentLayer) {
 }
 
 /**
- * When the edited look is **on program**, push PIP overlay param / stack changes to Caspar (CG UPDATE or re-apply).
+ * When the edited look is **on program** and **not** open in the look editor, push overlay changes to Caspar.
+ * While editing, preview refresh / Take apply changes — never leak draft overlays onto PGM.
  * @param {{ sceneState: import('../lib/scene-state.js').SceneState, stateStore: object, sceneId: string, layerIndex: number }} ctx
  * @param {{ type: string, params: object }[]} pipOverlays
  */
 export function scheduleLivePipOverlayPush(ctx, pipOverlays) {
 	if (!ctx?.sceneState || !ctx?.stateStore || ctx.sceneId == null || ctx.layerIndex == null) return
 	if (ctx.sceneState.liveSceneId !== ctx.sceneId) return
+	if (ctx.sceneState.editingSceneId === ctx.sceneId) return
 
 	const key = `${ctx.sceneId}:${ctx.layerIndex}`
 	const prevT = _pipLiveTimers.get(key)
@@ -64,18 +68,33 @@ export function scheduleLivePipOverlayPush(ctx, pipOverlays) {
 async function pushLivePipOverlaysToProgram(ctx, pipOverlays) {
 	const { sceneState, stateStore, sceneId, layerIndex } = ctx
 	if (sceneState.liveSceneId !== sceneId) return
+	if (sceneState.editingSceneId === sceneId) return
 
 	const scene = sceneState.getScene(sceneId)
 	const layer = scene?.layers?.[layerIndex]
 	if (!layer) return
 
-	const screenIdx = sceneState.activeScreenIndex ?? 0
+	const mainIdx = resolveMainIndexForScene(scene, sceneState)
 	const cm = stateStore.getState()?.channelMap || {}
-	const programChannels = cm.programChannels || [1]
 	const programCh =
-		programChannels[Math.min(screenIdx, Math.max(0, programChannels.length - 1))] ?? 1
+		Number(cm.programChannels?.[mainIdx] ?? cm.playbackChannels?.[mainIdx]) || 1
 	const contentLayer = layer.layerNumber ?? 10
-	const fill = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+	const progRes = cm.programResolutions?.[mainIdx] ?? { w: 1920, h: 1080 }
+	const targetCanvas = {
+		width: progRes.w > 0 ? progRes.w : 1920,
+		height: progRes.h > 0 ? progRes.h : 1080,
+		framerate: progRes.fps ?? 50,
+	}
+	const authoringCanvas = sceneState.getCanvasForScreen(mainIdx)
+	// Match video-layer MIXER FILL (content-fit) — required for outside borders (expanded CG canvas).
+	const fill = await resolveLayerFillForAmcp(
+		layer,
+		stateStore,
+		mainIdx,
+		targetCanvas,
+		undefined,
+		authoringCanvas,
+	)
 	const rotation = layer.rotation ?? 0
 	const nextContentLayer = nextPipContentLayerInScene(scene?.layers, contentLayer)
 

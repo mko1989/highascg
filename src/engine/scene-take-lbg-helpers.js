@@ -1,4 +1,5 @@
 const { sceneLayerRotationMixerLines } = require('./scene-layer-rotation-amcp')
+const { resolveClipForAmcpLoad } = require('../media/caspar-cls-id')
 
 /** Containers/codecs Caspar ffmpeg often plays with an alpha channel (QT Animation, ProRes 4444, VP9, …). */
 const STRAIGHT_ALPHA_VIDEO_EXT = new Set(['mov', 'webm', 'mkv', 'mxf'])
@@ -58,6 +59,18 @@ function clipPath(layer) {
 	return v != null ? String(v) : ''
 }
 
+/**
+ * Scene/project stored clip → Caspar CLS id (project folder, then catalog).
+ * @param {string} clip
+ * @param {{ config?: object, persistence?: object, CHOICES_MEDIAFILES?: unknown } | null | undefined} ctx
+ * @returns {string}
+ */
+function resolveSceneClipForAmcp(clip, ctx) {
+	const raw = clip != null ? String(clip).trim() : ''
+	if (!raw) return raw
+	return resolveClipForAmcpLoad(raw, ctx)
+}
+
 function chLayerAmcp(channel, layer) {
 	const c = parseInt(channel, 10)
 	return `${c}-${parseInt(layer, 10)}`
@@ -81,6 +94,7 @@ function shouldApplyStraightAlphaKeyer(clip, straightAlpha) {
 module.exports = {
 	buildEffectAmcpLines,
 	clipPath,
+	resolveSceneClipForAmcp,
 	chLayerAmcp,
 	extFromPath,
 	shouldApplyStraightAlphaKeyer,

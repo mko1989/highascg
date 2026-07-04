@@ -107,7 +107,13 @@ function isPassthroughAmcpClip(id) {
 	const s = normalizeCasparMediaPath(id)
 	if (!s) return true
 	if (/^route:\/\//i.test(s)) return true
-	if (/^alsa:\/\//i.test(s)) return true
+	if (/^alsa:/i.test(s)) return true
+	if (/^v4l2:/i.test(s)) return true
+	if (/^udp:/i.test(s)) return true
+	if (/^dshow:/i.test(s)) return true
+	if (/^iec61883:/i.test(s)) return true
+	if (/^rtsp:/i.test(s)) return true
+	if (/^rtmp:/i.test(s)) return true
 	if (/^\[HTML\]/i.test(s)) return true
 	if (/^https?:\/\//i.test(s)) return true
 	if (/^ndi:\/\//i.test(s)) return true
@@ -149,9 +155,8 @@ function resolveClipForAmcpLoad(id, ctx) {
 	const raw = normalizeCasparMediaPath(id)
 	if (!raw || isPassthroughAmcpClip(raw)) return raw
 
-	const fromCatalog = resolveCasparCinfMediaId(raw, ctx)
-	if (fromCatalog.includes('/')) return fromCatalog
-
+	// Prefer active project folder when the file is on disk there (WO-62). After restart,
+	// CLS catalog basename matches (e.g. BRIDGE/…) must not override project-scoped refs.
 	if (ctx?.config && isProjectScopedMediaEnabled(ctx.config)) {
 		const slug = getActiveProjectSlug(ctx.persistence)
 		if (slug) {
@@ -162,6 +167,9 @@ function resolveClipForAmcpLoad(id, ctx) {
 			}
 		}
 	}
+
+	const fromCatalog = resolveCasparCinfMediaId(raw, ctx)
+	if (fromCatalog.includes('/')) return fromCatalog
 
 	return fromCatalog
 }
