@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Optional kiosk power button: short press = network reset, hold 3s = shutdown.
+# Optional kiosk power button: short press = network reset, hold >=3s = shutdown.
+# Shutdown starts once the hold threshold is reached; release anytime after that.
 # Requires logind HandlePowerKey=ignore (see scripts/setup/14-power-button-network-reset.sh).
 set -euo pipefail
 
@@ -8,11 +9,22 @@ SPLASH_IP_REFRESH_SEC="${HIGHASCG_SPLASH_IP_REFRESH_SEC:-5}"
 HTTP_PORT="${HIGHASCG_HTTP_PORT:-4200}"
 HOLD_SEC="${HIGHASCG_POWER_HOLD_SEC:-3}"
 KEY_CODE="${HIGHASCG_POWER_KEY_CODE:-116}" # KEY_POWER
+LONG_PRESS_MARK=/run/highascg/power-long-press-fired
+HOLD_MS=$((HOLD_SEC * 1000))
 
 if ! command -v evtest >/dev/null 2>&1; then
 	echo "evtest not installed — install evtest package" >&2
 	exit 1
 fi
+
+now_ms() {
+	local s ns
+	if read -r s ns < <(date +%s%N 2>/dev/null); then
+		echo $((s * 1000 + ns / 1000000))
+	else
+		echo $(($(date +%s) * 1000))
+	fi
+}
 
 _event_has_key_power() {
 	local dev="$1"
@@ -34,7 +46,6 @@ _find_power_events_from_proc() {
 
 find_power_event_dev() {
 	local ev dev
-	# Prefer ACPI "Power Button" nodes (not lid/sleep keys that also expose KEY_POWER).
 	for ev in $(_find_power_events_from_proc '^N: Name="Power Button"'); do
 		dev="/dev/input/${ev}"
 		if _event_has_key_power "$dev"; then
@@ -63,10 +74,10 @@ DEV="$(find_power_event_dev)" || {
 	exit 1
 }
 
-logger -t highascg-power "listening on $DEV (short=network reset, ${HOLD_SEC}s=shutdown)"
+logger -t highascg-power "listening on $DEV (short=network reset, hold>=${HOLD_SEC}s=shutdown)"
 
 shutdown_job=""
-press_ts=0
+press_ts_ms=0
 
 cancel_shutdown() {
 	if [[ -n "${shutdown_job:-}" ]]; then
@@ -77,17 +88,22 @@ cancel_shutdown() {
 }
 
 do_shutdown() {
-	local reason="${1:-power held ${HOLD_SEC}s}"
+	local reason="${1:-power held >= ${HOLD_SEC}s}"
 	cancel_shutdown
-	logger -t highascg-power "${reason} — shutting down"
-	systemctl poweroff
+	mkdir -p /run/highascg
+	touch "$LONG_PRESS_MARK"
+	logger -t highascg-power "${reason} — poweroff"
+	# Kiosk: bypass inhibitor locks (updates, user sessions).
+	systemctl poweroff --force --no-block 2>/dev/null || shutdown -h now
 }
 
 schedule_shutdown() {
 	cancel_shutdown
 	(
 		sleep "$HOLD_SEC"
-		do_shutdown "power held ${HOLD_SEC}s (still pressed)"
+		if [[ ! -f "$LONG_PRESS_MARK" ]]; then
+			do_shutdown "power held >= ${HOLD_SEC}s"
+		fi
 	) &
 	shutdown_job=$!
 }
@@ -115,26 +131,36 @@ on_short_press() {
 	schedule_splash_ip_refresh
 }
 
+on_press() {
+	rm -f "$LONG_PRESS_MARK"
+	press_ts_ms=$(now_ms)
+	schedule_shutdown
+}
+
+on_release() {
+	cancel_shutdown
+	if [[ -f "$LONG_PRESS_MARK" ]]; then
+		press_ts_ms=0
+		return
+	fi
+	if [[ "$press_ts_ms" -gt 0 ]]; then
+		local held_ms=$(( $(now_ms) - press_ts_ms ))
+		if [[ "$held_ms" -ge "$HOLD_MS" ]]; then
+			do_shutdown "power held ${held_ms}ms (released)"
+		else
+			on_short_press
+		fi
+	fi
+	press_ts_ms=0
+}
+
 while IFS= read -r line; do
 	case "$line" in
 	*"EV_KEY"*"code ${KEY_CODE}"*"value 1"*)
-		press_ts=$(date +%s)
-		schedule_shutdown
+		on_press
 		;;
 	*"EV_KEY"*"code ${KEY_CODE}"*"value 0"*)
-		held=0
-		if [[ "$press_ts" -gt 0 ]]; then
-			held=$(($(date +%s) - press_ts))
-		fi
-		if [[ "$press_ts" -gt 0 && "$held" -ge "$HOLD_SEC" ]]; then
-			do_shutdown "power held ${held}s (released)"
-		else
-			cancel_shutdown
-			if [[ "$press_ts" -gt 0 ]]; then
-				on_short_press
-			fi
-		fi
-		press_ts=0
+		on_release
 		;;
 	esac
 done < <(evtest --grab "$DEV" 2>&1)

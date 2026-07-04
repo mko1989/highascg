@@ -37,7 +37,7 @@ EOF
 
 cat >"$UNIT" <<EOF
 [Unit]
-Description=HighAsCG power button (short=network reset, 3s=shutdown)
+Description=HighAsCG power button (short=network reset, hold>=3s=shutdown)
 After=systemd-logind.service systemd-networkd.service NetworkManager.service
 Wants=systemd-logind.service
 
@@ -62,5 +62,5 @@ systemctl restart highascg-power-button.service
 
 echo "OK: power button handler enabled"
 echo "     short press → ${RESET_DST}, then splash IP refresh after 5s"
-echo "     hold 3s     → systemctl poweroff"
+echo "     hold >=3s  → systemctl poweroff (release after shutdown starts is OK)"
 echo "     status: systemctl status highascg-power-button.service"
