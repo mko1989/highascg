@@ -1,0 +1,15 @@
+[
+  {
+    "id": "rec_1",
+    "label": "Rec1",
+    "enabled": true,
+    "name": "Rec1",
+    "source": "program_1",
+    "crf": 26,
+    "videoCodec": "h264",
+    "videoBitrateKbps": 4500,
+    "encoderPreset": "veryfast",
+    "audioCodec": "aac",
+    "audioBitrateKbps": 128
+  }
+]

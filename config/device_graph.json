@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "devices": [
+    {
+      "id": "caspar_host",
+      "role": "caspar_host",
+      "label": "Caspar / HighAsCG host"
+    }
+  ],
+  "connectors": [],
+  "edges": []
+}

@@ -1,0 +1,5 @@
+{
+  "enforceAuth": false,
+  "exposeToNetwork": true,
+  "apiToken": ""
+}

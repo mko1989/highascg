@@ -1,0 +1,97 @@
+{
+  "amcp_batch": false,
+  "amcp_max_batch_commands": 64,
+  "amcp_mixer_commit_before_amcp_batch": true,
+  "offline_mode": false,
+  "screen_1_force_os_resolution": false,
+  "screen_2_force_os_resolution": false,
+  "screen_3_force_os_resolution": false,
+  "screen_4_force_os_resolution": false,
+  "host_stats": {
+    "scan_folder": false
+  },
+  "osc_info_supplement_ms": null,
+  "hq_thumbnail_prewarm_on_start": true,
+  "hq_thumbnail_prewarm_on_media_refresh": true,
+  "operatorTools": {
+    "pointerConfineMultiview": false,
+    "cefInteractiveBridge": true,
+    "cefInteractiveLayer": 999,
+    "cefRemoteDebuggingPort": 9222
+  },
+  "local_template_path": "",
+  "composePreview": {
+    "mode": "canvas",
+    "fps": 25,
+    "resolutionScale": "half",
+    "jpegQuality": 10,
+    "basenamePrefix": "highascg_preview",
+    "maxWidth": 480,
+    "channels": "compose_visible",
+    "embedConsumersInCasparConfig": true,
+    "attachViaAmcp": true,
+    "pauseConsumerWhenIdle": false,
+    "companionThumbEnabled": true,
+    "companionThumbSize": 144,
+    "companionThumbIntervalMs": 1000
+  },
+  "live_thumbnail_ttl_ms": 30000,
+  "live_thumbnail_refresh_on_bus": true,
+  "live_thumbnail_refresh_delay_ms": 600,
+  "x11_horizontal_swap": false,
+  "multiview_system_id": "",
+  "multiview_os_mode": "",
+  "multiview_os_rate": "",
+  "cgStudio": {
+    "httpPort": 4300,
+    "bindAddress": "127.0.0.1"
+  },
+  "gpuPhysicalTopology": [
+    {
+      "physicalPortId": "gpu_p0",
+      "slotOrder": 0,
+      "dpA": "DP-0",
+      "dpB": "DP-1",
+      "connectorNumber": 0,
+      "location": 0
+    },
+    {
+      "physicalPortId": "gpu_p1",
+      "slotOrder": 1,
+      "dpA": "HDMI-0",
+      "dpB": "HDMI-1",
+      "connectorNumber": 1,
+      "location": 1
+    },
+    {
+      "physicalPortId": "gpu_p2",
+      "slotOrder": 2,
+      "dpA": "DP-2",
+      "dpB": "DP-3",
+      "connectorNumber": 2,
+      "location": 2
+    },
+    {
+      "physicalPortId": "gpu_p3",
+      "slotOrder": 3,
+      "dpA": "DP-4",
+      "dpB": "DP-5",
+      "connectorNumber": 3,
+      "location": 3
+    }
+  ],
+  "machineProfile": {
+    "defaultProjectFps": 50
+  },
+  "network": {
+    "primaryInterface": "",
+    "mode": "dhcp",
+    "static": {
+      "address": "",
+      "prefixLength": 24,
+      "gateway": "",
+      "dns": []
+    }
+  },
+  "screen_count": 1
+}

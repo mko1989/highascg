@@ -10,10 +10,7 @@ const path = require('path')
 const REPO = path.resolve(__dirname, '../..')
 const CLIENT = path.join(REPO, 'client')
 
-const ALLOW = new Set([
-	path.join(CLIENT, 'lib/dom-escape.js'),
-	path.join(CLIENT, 'setup.html'),
-])
+const ALLOW = new Set([path.join(CLIENT, 'lib/dom-escape.js'), path.join(CLIENT, 'setup.html')])
 
 function walk(dir, out = []) {
 	for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {

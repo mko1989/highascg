@@ -163,6 +163,12 @@ curl -sf http://127.0.0.1:4200/ | head -5   # expect HTML when dist-web present
 
 ### CI / contributor checks (WO-99)
 
+Factory defaults in `config/` are tracked in git so clean clones and CI can boot. Regenerate after changing `src/config/defaults*` or factory-starter:
+
+```bash
+npm run config:write-defaults
+```
+
 GitHub Actions runs on every push/PR to `main` (`.github/workflows/ci.yml`):
 
 ```bash

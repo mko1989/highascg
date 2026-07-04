@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "destinations": [
+    {
+      "id": "dst_pgm_1",
+      "label": "PGM 1",
+      "mainScreenIndex": 0,
+      "mode": "pgm_only",
+      "audioLayout": "stereo",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": true,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    }
+  ],
+  "edidNotes": ""
+}

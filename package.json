@@ -17,6 +17,7 @@
 		"deploy:dev": "bash scripts/dev-push.sh",
 		"clean:eggs-host": "bash scripts/clean-eggs-dev-host.sh",
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
+		"config:write-defaults": "node tools/ci/write-repo-default-config.js",
 		"verify:repo-integrity": "node tools/ci/check-require-integrity.js",
 		"lint": "npx eslint .",
 		"format:check": "npx prettier --check tools/ci eslint.config.js .prettierrc.json",

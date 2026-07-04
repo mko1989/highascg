@@ -71,11 +71,36 @@ config/casparcg.config
 tools/live-usb/flash-iso.conf
 tools/eggs/live-usb/flash-iso.conf
 
-# User-specific runtime configs (keep defaults/examples in source, ignore live overrides)
+# Runtime configs: factory defaults tracked in git (regenerate: npm run config:write-defaults)
 config/*.json
-!config/*.example.json
-!config/default*.json
+!config/general.json
+!config/caspar.json
+!config/server.json
+!config/osc.json
+!config/ui.json
+!config/editor_defaults.json
+!config/audio_routing.json
+!config/dmx.json
+!config/rtmp.json
+!config/usb_ingest.json
+!config/project_scoped_media.json
+!config/streaming_channel.json
+!config/record_outputs.json
+!config/audio_outputs.json
+!config/stream_outputs.json
+!config/caspar_server.json
+!config/screen_destinations.json
+!config/device_graph.json
+!config/companion.json
+!config/plugins.json
+!config/replication.json
+!config/security.json
 !config/exfat-sync.json
+# Machine-local config (never commit)
+config/hardware-identity.json
+config/replication-local-identity.json
+config/tailscale.json
+config/.highascg-state.json
 
 # Local-only trees (never on GitHub)
 audio_testing/

@@ -1,0 +1,39 @@
+{
+  "programLayout": "stereo",
+  "programOutput": "default",
+  "programAlsaDevice": "",
+  "programFfmpegPath": "",
+  "programFfmpegArgs": "",
+  "monitorOutput": "default",
+  "monitorAlsaDevice": "",
+  "monitorFfmpegPath": "",
+  "monitorFfmpegArgs": "",
+  "browserMonitor": "pgm",
+  "programSystemAudioDevices": [
+    "",
+    "",
+    "",
+    ""
+  ],
+  "previewSystemAudioEnabled": [
+    false,
+    false,
+    false,
+    false
+  ],
+  "previewSystemAudioDevices": [
+    "",
+    "",
+    "",
+    ""
+  ],
+  "audioPreview": {
+    "enabled": false,
+    "bus": "preview_1",
+    "screenIndex": 1,
+    "deviceName": "",
+    "soloLayerStart": 1,
+    "soloLayerCount": 8,
+    "defaultSource": "preview_1"
+  }
+}

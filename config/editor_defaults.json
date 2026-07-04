@@ -1,0 +1,17 @@
+{
+  "coordinateOrigin": "topLeft",
+  "scene": {
+    "loop": false,
+    "startBehaviour": "beginning",
+    "contentFit": "native"
+  },
+  "timeline": {
+    "loopAlways": false,
+    "contentFit": "native"
+  },
+  "transition": {
+    "type": "MIX",
+    "duration": 12,
+    "tween": "linear"
+  }
+}
