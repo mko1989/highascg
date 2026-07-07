@@ -1,6 +1,6 @@
 # WO-141 — Commit partitioning, stash resolution, mirror push, status docs
 
-**Status:** Planned
+**Status:** Done except mirror push (2026-07-07) — backup box 192.168.0.25 unreachable/powered off; run `DEPLOY_RSYNC_EXCLUDE='media/.replication-*,**/*.tmp' bash work/run-deploy-mirror-tmux.sh --attach` when it's up, then the remote bootstrap per the script header. Everything else complete: main fast-forwarded to the 6-commit partition + hygiene commits, gates green, stash resolved, status docs updated. Note: `config/*.json` (7 files) is live runtime churn, deliberately uncommitted; `docs/wiki-site` also self-regenerates with timestamps — consider gitignoring both classes (owner decision).
 **Priority:** High (integration step — closes the stabilization)
 **Date:** 2026-07-07
 **Depends on:** WO-138, WO-139, WO-140 all accepted.
