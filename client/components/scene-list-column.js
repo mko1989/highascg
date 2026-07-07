@@ -2,7 +2,6 @@
  * Scenes deck — single main column (look cards, FTB, global border, media drop).
  */
 
-import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
@@ -136,7 +135,13 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 		if (scenes.length === 0) {
 			const empty = document.createElement('div')
 			empty.className = 'scenes-deck__empty scenes-deck__empty--tight scenes-deck__empty--clear-prv'
-			empty.innerHTML = `<p>No looks for ${escapeHtml(mainLabel(col))}.</p><p class="scenes-deck__hint">Use + to add, drop media from Sources or your desktop to start a look, or use “all mains” and create a global look.</p>`
+			const emptyLine = document.createElement('p')
+			emptyLine.textContent = `No looks for ${mainLabel(col)}.`
+			const emptyHint = document.createElement('p')
+			emptyHint.className = 'scenes-deck__hint'
+			emptyHint.textContent = 'Use + to add, drop media from Sources or your desktop to start a look, or use “all mains” and create a global look.'
+			empty.appendChild(emptyLine)
+			empty.appendChild(emptyHint)
 			empty.title = 'Clear preview for this screen (stops looks on the PRV channel when it is separate from PGM)'
 			grid.appendChild(empty)
 		}
@@ -164,22 +169,71 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				(isGlobal ? ' scenes-card--global' : '') +
 				(cgOnly ? ' scenes-card--cg-only' : '')
 			card.dataset.sceneId = String(sc.id)
-			card.innerHTML = `
-			<div class="scenes-card__header">
-				<input type="text" class="scenes-card__name-input" maxlength="120" spellcheck="false" aria-label="Look name" />
-				<div class="scenes-card__header-actions">
-					<button type="button" class="scenes-card__icon-btn" data-action="duplicate" title="Duplicate look" aria-label="Duplicate look">⧉</button>
-					<button type="button" class="scenes-card__icon-btn scenes-card__icon-btn--danger" data-action="delete" title="Delete look" aria-label="Delete look">🗑</button>
-				</div>
-			</div>
-			<button type="button" class="scenes-card__thumb" data-action="prv" aria-label="Send to preview">
-				<canvas class="scenes-card__thumb-canvas"></canvas>
-			</button>
-			<div class="scenes-card__footer">
-				<button type="button" class="scenes-btn scenes-btn--take scenes-btn--sm scenes-btn--icon" data-action="take" title="Take live (LOADBG + transition + PLAY)" aria-label="Take live">▶</button>
-				<button type="button" class="scenes-btn scenes-btn--sm" data-action="cut" title="Hard cut" aria-label="Hard cut">CUT</button>
-				<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-action="edit" title="Edit look" aria-label="Edit look">⚙</button>
-			</div>`
+			const header = document.createElement('div')
+			header.className = 'scenes-card__header'
+			const nameInput = document.createElement('input')
+			nameInput.type = 'text'
+			nameInput.className = 'scenes-card__name-input'
+			nameInput.maxLength = 120
+			nameInput.spellcheck = false
+			nameInput.setAttribute('aria-label', 'Look name')
+			const headerActions = document.createElement('div')
+			headerActions.className = 'scenes-card__header-actions'
+			const duplicateBtn = document.createElement('button')
+			duplicateBtn.type = 'button'
+			duplicateBtn.className = 'scenes-card__icon-btn'
+			duplicateBtn.dataset.action = 'duplicate'
+			duplicateBtn.title = 'Duplicate look'
+			duplicateBtn.setAttribute('aria-label', 'Duplicate look')
+			duplicateBtn.textContent = '⧉'
+			const deleteBtn = document.createElement('button')
+			deleteBtn.type = 'button'
+			deleteBtn.className = 'scenes-card__icon-btn scenes-card__icon-btn--danger'
+			deleteBtn.dataset.action = 'delete'
+			deleteBtn.title = 'Delete look'
+			deleteBtn.setAttribute('aria-label', 'Delete look')
+			deleteBtn.textContent = '🗑'
+			headerActions.appendChild(duplicateBtn)
+			headerActions.appendChild(deleteBtn)
+			header.appendChild(nameInput)
+			header.appendChild(headerActions)
+			const thumbBtn = document.createElement('button')
+			thumbBtn.type = 'button'
+			thumbBtn.className = 'scenes-card__thumb'
+			thumbBtn.dataset.action = 'prv'
+			thumbBtn.setAttribute('aria-label', 'Send to preview')
+			const thumbCanvas = document.createElement('canvas')
+			thumbCanvas.className = 'scenes-card__thumb-canvas'
+			thumbBtn.appendChild(thumbCanvas)
+			const footer = document.createElement('div')
+			footer.className = 'scenes-card__footer'
+			const takeBtn = document.createElement('button')
+			takeBtn.type = 'button'
+			takeBtn.className = 'scenes-btn scenes-btn--take scenes-btn--sm scenes-btn--icon'
+			takeBtn.dataset.action = 'take'
+			takeBtn.title = 'Take live (LOADBG + transition + PLAY)'
+			takeBtn.setAttribute('aria-label', 'Take live')
+			takeBtn.textContent = '▶'
+			const cutBtn = document.createElement('button')
+			cutBtn.type = 'button'
+			cutBtn.className = 'scenes-btn scenes-btn--sm'
+			cutBtn.dataset.action = 'cut'
+			cutBtn.title = 'Hard cut'
+			cutBtn.setAttribute('aria-label', 'Hard cut')
+			cutBtn.textContent = 'CUT'
+			const editBtn = document.createElement('button')
+			editBtn.type = 'button'
+			editBtn.className = 'scenes-btn scenes-btn--sm scenes-btn--icon'
+			editBtn.dataset.action = 'edit'
+			editBtn.title = 'Edit look'
+			editBtn.setAttribute('aria-label', 'Edit look')
+			editBtn.textContent = '⚙'
+			footer.appendChild(takeBtn)
+			footer.appendChild(cutBtn)
+			footer.appendChild(editBtn)
+			card.appendChild(header)
+			card.appendChild(thumbBtn)
+			card.appendChild(footer)
 
 			const nameIn = card.querySelector('.scenes-card__name-input')
 			if (nameIn) {
@@ -261,21 +315,21 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 					if (sceneState.editingSceneId === sc.id) sceneState.setEditingScene(null)
 				}
 			})
-			const header = card.querySelector('.scenes-card__header')
-			if (header) {
-				header.addEventListener('click', (e) => e.stopPropagation())
-				header.addEventListener('pointerdown', (e) => e.stopPropagation())
+			const headerEl = card.querySelector('.scenes-card__header')
+			if (headerEl) {
+				headerEl.addEventListener('click', (e) => e.stopPropagation())
+				headerEl.addEventListener('pointerdown', (e) => e.stopPropagation())
 			}
-			const footer = card.querySelector('.scenes-card__footer')
-			if (footer) {
-				footer.addEventListener('click', (e) => e.stopPropagation())
-				footer.addEventListener('pointerdown', (e) => e.stopPropagation())
+			const footerEl = card.querySelector('.scenes-card__footer')
+			if (footerEl) {
+				footerEl.addEventListener('click', (e) => e.stopPropagation())
+				footerEl.addEventListener('pointerdown', (e) => e.stopPropagation())
 			}
-			const thumbCanvas = card.querySelector('.scenes-card__thumb-canvas')
-			if (thumbCanvas) {
-				thumbCanvas.dataset.sceneId = sc.id
-				thumbCanvas.dataset.deckMain = String(col)
-				paintDeckThumb(thumbCanvas)
+			const thumbCanvasEl = card.querySelector('.scenes-card__thumb-canvas')
+			if (thumbCanvasEl) {
+				thumbCanvasEl.dataset.sceneId = sc.id
+				thumbCanvasEl.dataset.deckMain = String(col)
+				paintDeckThumb(thumbCanvasEl)
 			}
 			grid.appendChild(card)
 		}

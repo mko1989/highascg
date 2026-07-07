@@ -7,7 +7,6 @@
 
 import {
 	PIP_OVERLAY_ALIGN_GAP,
-	PIP_OVERLAY_LAYER_OFFSET,
 	PIP_OVERLAY_MAX_STACK,
 	overlayLayerSlot,
 	resolvePipOverlayCasparLayer,
@@ -106,23 +105,6 @@ function innerRectInOverlayNorm(contentFill, overlayFill) {
 }
 
 /** @param {{ x: number, y: number, scaleX: number, scaleY: number }} contentFill */
-function innerRectPipLocalFromOutset(contentFill, bPx, chW, chH) {
-	const w = Math.max(1, chW)
-	const h = Math.max(1, chH)
-	const b = Math.max(0, bPx)
-	const rw = w * contentFill.scaleX
-	const rh = h * contentFill.scaleY
-	if (!(rw > 0) || !(rh > 0)) {
-		return { l: 0, t: 0, w: 1, h: 1 }
-	}
-	const il = b / rw
-	const it = b / rh
-	if (!(il * 2 < 1) || !(it * 2 < 1) || !Number.isFinite(il) || !Number.isFinite(it)) {
-		return { l: 0, t: 0, w: 1, h: 1 }
-	}
-	return { l: il, t: it, w: 1 - 2 * il, h: 1 - 2 * it }
-}
-
 function isOutsideSide(overlay) {
 	const p = mergeOverlayParams(overlay)
 	const side = String(p.side != null ? p.side : 'outside')
@@ -173,9 +155,6 @@ function computePipOverlayPlacement(
 	const cf = normalizeContentFill(contentFill)
 	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
-	const p = Number(contentPhysicalLayer)
-	const idx = stackIndex | 0
-	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
 
 	if (!isOutsideSide(overlay)) {
 		const inner = { l: 0, t: 0, w: 1, h: 1 }
@@ -215,7 +194,6 @@ function deferMixerAmcpLine(line) {
 
 function pipOverlayMixerLines(cl, mixFill, contentRotation = 0, opts = {}) {
 	const deferMixer = opts.deferMixer !== false
-	const mixTail = deferMixer ? ' DEFER' : ' 0'
 	const casparFill = fillForSceneLayerRotationAnchor(mixFill, contentRotation)
 	const lines = [
 		deferMixer

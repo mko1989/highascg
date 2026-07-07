@@ -52,7 +52,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 		phys,
 	} = ctx
 
-	if (exitMedia.length === 0 && !needsBorderOnlyTeardown) return
+	if (exitMedia.length === 0 && !needsBorderOnlyTeardown && !ctx.activeTimelineIdToFadeOut) return
 
 	let teardownWait = 0
 	if (fadeClockStart != null && fadeDur > 0) {

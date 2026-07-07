@@ -4,7 +4,7 @@
 
 'use strict'
 
-const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { JSON_HEADERS, jsonBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { layerHasContent } = require('../engine/scene-transition')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
@@ -135,11 +135,11 @@ async function handleSyncPush(ctx) {
 }
 
 async function handleManifestDiff(body, ctx) {
-	let incomingManifest = []
+	let incomingManifest
 	try {
 		const parsed = typeof body === 'string' ? JSON.parse(body) : body
 		incomingManifest = parsed.mediaManifest || []
-	} catch (e) {
+	} catch {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 	}
 
@@ -160,7 +160,7 @@ async function handleManifestDiff(body, ctx) {
 					requiredMedia.push(item.path)
 				}
 			}
-		} catch (e) {
+		} catch {
 			requiredMedia.push(item.path)
 		}
 	}
@@ -173,10 +173,10 @@ async function handleManifestDiff(body, ctx) {
 }
 
 async function handleApplyBundle(body, ctx) {
-	let payload = {}
+	let payload
 	try {
 		payload = typeof body === 'string' ? JSON.parse(body) : body
-	} catch (e) {
+	} catch {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid bundle payload' }) }
 	}
 
@@ -225,7 +225,9 @@ async function handleApplyBundle(body, ctx) {
 	if (ctx.amcp) {
 		try {
 			await ctx.amcp.query.restart()
-		} catch (e) {}
+		} catch (_) {
+			// Best-effort restart; ignore failures during bundle apply.
+		}
 	}
 
 	return {
@@ -251,7 +253,6 @@ async function handleBundle(ctx) {
 	const mergedConfig = mergeAudioRoutingIntoConfig(config)
 	const casparcgConfig = buildConfigXml(mergedConfig, screenCount)
 	
-	const mediaBase = getMediaIngestBasePath(config)
 	const project = loadFullProject()
 	const mediaManifest = buildProjectMediaManifest(config, persistence, project)
 

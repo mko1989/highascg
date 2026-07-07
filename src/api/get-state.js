@@ -4,8 +4,6 @@
 
 'use strict'
 
-const fs = require('fs')
-const path = require('path')
 const liveSceneState = require('../state/live-scene-state')
 const playbackTracker = require('../state/playback-tracker')
 const { parseCinfMedia } = require('../media/cinf-parse')
@@ -90,7 +88,9 @@ function getState(ctx, opts = {}) {
 	try {
 		const scenes = loadProjectScenes()
 		if (Array.isArray(scenes?.globalBorders)) globalBorders = scenes.globalBorders
-	} catch (_) {}
+	} catch (_) {
+		// Ignore project-scene load failures and fall back to the current state snapshot.
+	}
 
 	const hostLiveMig = migrateExtraLiveSourcesList(Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [], {
 		config: cfg,

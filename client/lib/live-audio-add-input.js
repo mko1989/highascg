@@ -12,7 +12,6 @@ import {
 } from './live-audio-inputs.js'
 import { liveAudioInputForSlot } from './input-channels.js'
 import { applyLiveAudioCapture } from './live-audio-routing.js'
-import { applyCasparConfig } from '../components/device-view-actions.js'
 
 /**
  * Pick the next slot for a new device: first empty within count, else append.
@@ -62,20 +61,11 @@ export async function addLiveAudioInputSlot(stateStore, { device }) {
 	const casparRestartNeeded = count > prevUi.count
 	if (casparRestartNeeded) markCasparRestartDirty()
 
-	let casparApply = null
-	if (casparRestartNeeded) {
-		try {
-			casparApply = await applyCasparConfig()
-		} catch (e) {
-			casparApply = { ok: false, error: e?.message || String(e) }
-		}
-	}
-
 	let livePayload = await refreshLiveAudioConfigured(stateStore)
 	let entry = liveAudioInputForSlot(channelMapForLiveAudio(stateStore, livePayload), slot)
 
 	let hostLivePlay = null
-	if (entry?.route) {
+	if (entry?.route && !casparRestartNeeded) {
 		try {
 			hostLivePlay = await applyLiveAudioCapture()
 		} catch (e) {
@@ -88,8 +78,8 @@ export async function addLiveAudioInputSlot(stateStore, { device }) {
 		slot,
 		hostChannel: entry?.channel ?? null,
 		route: entry?.route ?? null,
-		casparRestartNeeded: casparRestartNeeded && !(casparApply?.ok || casparApply?.restarted),
-		casparApply,
+		casparRestartNeeded,
+		pendingApply: casparRestartNeeded,
 		hostLivePlay,
 		liveAudioConfigured: livePayload,
 	}

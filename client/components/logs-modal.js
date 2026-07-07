@@ -9,81 +9,21 @@ import { api, getApiBase } from '../lib/api-client.js'
 import { getAppWs } from '../lib/app-runtime.js'
 import { settingsState } from '../lib/settings-state.js'
 import {
+	attachLogsCategoryFilter,
+	buildLogsQuery,
+	DEFAULT_CATEGORIES,
+	DEFAULT_LEVELS,
+	LOG_FILTER_ICON,
+	matchesFilter,
+	recordFromWsPayload,
+} from './logs-modal-filter.js'
+import {
 	applyLogsPaneVisibility,
 	downloadSupportBundleFromApi,
 	setLogsToggleStyles,
 } from '../lib/logs-modal-shared.js'
 
 const POLL_MS = 2000
-
-/** @type {{ id: string, label: string }[]} */
-const LOG_CATEGORIES = [
-	{ id: 'system', label: 'System' },
-	{ id: 'config', label: 'Config' },
-	{ id: 'os-display', label: 'OS / xrandr' },
-	{ id: 'amcp', label: 'AMCP' },
-	{ id: 'playback', label: 'Playback' },
-	{ id: 'streaming', label: 'Streaming' },
-	{ id: 'audio', label: 'Audio' },
-	{ id: 'network', label: 'Network' },
-	{ id: 'artnet', label: 'Art-Net' },
-	{ id: 'replication', label: 'Replication' },
-	{ id: 'websocket', label: 'WebSocket' },
-	{ id: 'device', label: 'Device' },
-	{ id: 'sync', label: 'Sync' },
-	{ id: 'debug', label: 'Debug' },
-]
-
-const DEFAULT_CATEGORIES = new Set(LOG_CATEGORIES.filter((c) => c.id !== 'debug').map((c) => c.id))
-const DEFAULT_LEVELS = new Set(['info', 'warn', 'error'])
-
-const LOG_FILTER_ICON = `<svg class="logs-modal__filter-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`
-
-/**
- * @param {Set<string>} categories
- * @param {Set<string>} levels
- * @param {number} [lineCount]
- */
-function buildLogsQuery(categories, levels, lineCount = 500) {
-	const params = new URLSearchParams()
-	params.set('lines', String(lineCount))
-	params.set('caspar', '0')
-	params.set(
-		'categories',
-		categories.size ? [...categories].join(',') : '__none__',
-	)
-	params.set('levels', [...levels].join(','))
-	return `/api/logs?${params.toString()}`
-}
-
-/**
- * @param {unknown} payload
- */
-function recordFromWsPayload(payload) {
-	if (typeof payload === 'string') return { line: payload, level: 'info', category: 'system' }
-	if (payload && typeof payload === 'object') {
-		const p = /** @type {{ line?: string, message?: string, level?: string, category?: string }} */ (payload)
-		return {
-			line: p.line || p.message || '',
-			level: p.level || 'info',
-			category: p.category || 'system',
-		}
-	}
-	return null
-}
-
-/**
- * @param {{ level?: string, category?: string }} record
- * @param {Set<string>} categories
- * @param {Set<string>} levels
- */
-function matchesFilter(record, categories, levels) {
-	if (!record) return false
-	if (!categories.size) return false
-	if (!categories.has(record.category)) return false
-	if (levels.size && !levels.has(record.level)) return false
-	return true
-}
 
 /**
  * @param {HTMLElement} modal
@@ -114,6 +54,7 @@ export function showLogsModal() {
 	let activeCategories = new Set(DEFAULT_CATEGORIES)
 	/** @type {Set<string>} */
 	let activeLevels = new Set(DEFAULT_LEVELS)
+	let categoryFilterCleanup = null
 
 	const modal = document.createElement('div')
 	modal.id = 'logs-modal'
@@ -193,11 +134,6 @@ export function showLogsModal() {
 	const panesEmpty = modal.querySelector('#logs-panes-empty')
 	const amcpInput = modal.querySelector('#logs-amcp-cmd')
 	const categoryDrop = modal.querySelector('#logs-category-drop')
-	const categoryToggle = modal.querySelector('#logs-category-toggle')
-	const categoryMenu = modal.querySelector('#logs-category-menu')
-	const categoryList = modal.querySelector('#logs-category-list')
-	const categoryAllInp = modal.querySelector('#logs-category-all')
-	const categoryAllLabel = modal.querySelector('#logs-category-all-label')
 	const filtersEl = modal.querySelector('#logs-filters')
 
 	function casparAmcpTargetLabel() {
@@ -356,94 +292,6 @@ export function showLogsModal() {
 		}
 	}
 
-	function categoryFilterTitle() {
-		const n = activeCategories.size
-		const total = LOG_CATEGORIES.length
-		if (n === total) return 'Categories: all'
-		if (n === 0) return 'Categories: none selected'
-		return `Categories: ${n} of ${total}`
-	}
-
-	function syncCategoryAllCheckbox() {
-		if (!categoryAllInp) return
-		const total = LOG_CATEGORIES.length
-		const n = activeCategories.size
-		const allSelected = n === total
-		categoryAllInp.checked = allSelected
-		categoryAllInp.indeterminate = n > 0 && n < total
-		if (categoryAllLabel) {
-			categoryAllLabel.textContent = allSelected ? 'Disable all' : 'Enable all'
-		}
-	}
-
-	function syncCategoryCheckboxes() {
-		if (!categoryList) return
-		categoryList.querySelectorAll('input[data-category]').forEach((inp) => {
-			const id = inp.getAttribute('data-category')
-			if (id) inp.checked = activeCategories.has(id)
-		})
-		syncCategoryAllCheckbox()
-		const title = categoryFilterTitle()
-		if (categoryToggle) {
-			categoryToggle.setAttribute('title', title)
-			categoryToggle.setAttribute('aria-label', title)
-			const n = activeCategories.size
-			categoryToggle.classList.toggle('logs-modal__filter-btn--active', n < LOG_CATEGORIES.length)
-		}
-	}
-
-	function setCategoryDropdownOpen(open) {
-		if (!categoryMenu || !categoryToggle) return
-		categoryMenu.hidden = !open
-		categoryToggle.setAttribute('aria-expanded', open ? 'true' : 'false')
-		categoryToggle.classList.toggle('logs-modal__filter-btn--open', open)
-	}
-
-	function initCategoryDropdown() {
-		if (!categoryList) return
-		categoryList.innerHTML = ''
-		for (const cat of LOG_CATEGORIES) {
-			const label = document.createElement('label')
-			label.className = 'logs-modal__cat-item'
-			label.innerHTML = `<input type="checkbox" data-category="${cat.id}" /><span>${cat.label}</span>`
-			const inp = label.querySelector('input')
-			inp?.addEventListener('change', () => {
-				if (!inp) return
-				if (inp.checked) activeCategories.add(cat.id)
-				else activeCategories.delete(cat.id)
-				syncCategoryCheckboxes()
-				scheduleFilterReload()
-			})
-			categoryList.appendChild(label)
-		}
-
-		categoryAllInp?.addEventListener('change', () => {
-			if (categoryAllInp.checked) {
-				activeCategories = new Set(LOG_CATEGORIES.map((c) => c.id))
-			} else {
-				activeCategories = new Set()
-			}
-			syncCategoryCheckboxes()
-			scheduleFilterReload()
-		})
-
-		categoryToggle?.addEventListener('click', (e) => {
-			e.stopPropagation()
-			setCategoryDropdownOpen(categoryMenu?.hidden ?? true)
-		})
-
-		categoryMenu?.addEventListener('click', (e) => e.stopPropagation())
-
-		document.addEventListener('click', onCategoryDropOutside)
-		modal._categoryDropOutside = onCategoryDropOutside
-
-		function onCategoryDropOutside() {
-			setCategoryDropdownOpen(false)
-		}
-
-		syncCategoryCheckboxes()
-	}
-
 	function readLevelsFromUi() {
 		/** @type {Set<string>} */
 		const next = new Set()
@@ -552,15 +400,16 @@ export function showLogsModal() {
 		stopPoll()
 		teardownWsLivePush()
 		if (filterReloadTimer) clearTimeout(filterReloadTimer)
-		if (modal._categoryDropOutside) {
-			document.removeEventListener('click', modal._categoryDropOutside)
-		}
+		if (categoryFilterCleanup) categoryFilterCleanup()
 		modal.remove()
 	}
 
 	modal.querySelector('#logs-modal-close')?.addEventListener('click', close)
 
-	initCategoryDropdown()
+	categoryFilterCleanup = attachLogsCategoryFilter(modal, {
+		activeCategories,
+		onFilterChange: scheduleFilterReload,
+	}).cleanup
 	setToggleStyles(modal, highOn, casparOn)
 	syncPaneVisibility()
 	setupWsLivePush()

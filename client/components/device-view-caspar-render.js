@@ -32,10 +32,19 @@ export function renderCasparBand(ctx) {
 	const casparBand = document.createElement('div')
 	casparBand.className = 'device-view__band device-view__band--caspar'
 	if (gpuEditMode) casparBand.classList.add('device-view--edit-mode')
-	const cc = live.caspar
-	casparBand.innerHTML = `<h3>Rear panel</h3><div class="device-view__backpanel device-view__backpanel--caspar"><div class="device-view__backpanel-slots" data-caspar-slots></div><div class="device-view__backpanel-overlay" data-caspar-overlay></div></div>`
 
-	const slotsEl = casparBand.querySelector('[data-caspar-slots]')
+	const titleEl = document.createElement('h3')
+	titleEl.textContent = 'Rear panel'
+	const backpanelEl = document.createElement('div')
+	backpanelEl.className = 'device-view__backpanel device-view__backpanel--caspar'
+	const slotsEl = document.createElement('div')
+	slotsEl.className = 'device-view__backpanel-slots'
+	slotsEl.dataset.casparSlots = ''
+	const overlayEl = document.createElement('div')
+	overlayEl.className = 'device-view__backpanel-overlay'
+	overlayEl.dataset.casparOverlay = ''
+	backpanelEl.append(slotsEl, overlayEl)
+	casparBand.append(titleEl, backpanelEl)
 	const casparOverlay = casparBand.querySelector('[data-caspar-overlay]')
 	const gpuInventoryRaw = Array.isArray(live?.gpu?.connectors) ? live.gpu.connectors : []
 	const gpuInventory = gpuInventoryRaw.filter((inv) => {
@@ -61,21 +70,11 @@ export function renderCasparBand(ctx) {
 	const recordOut = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'record_out')
 	const audioOuts = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && (c.kind === 'audio_out' || c.kind === 'audio_in'))
 	const v4l2Ins = (lastPayload?.suggested?.connectors || []).filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'v4l2_in')
-	const audioInventory = Array.isArray(live?.audio?.portaudio) ? live.audio.portaudio : []
 	const casparConnectors = (lastPayload?.suggested?.connectors || []).filter(
 		(c) => c && c.deviceId === CASPAR_HOST && ['gpu_out', 'decklink_out', 'audio_out', 'audio_in', 'v4l2_in', 'v4l2_out', 'stream_out', 'record_out'].includes(c.kind)
 	)
 
 	const slots = []
-	const shortDp = (v) => String(v || '').trim().toUpperCase().replace(/^DP-?/i, '')
-	const normGpuName = (v) => String(v || '').trim().replace(/^card\d+-/i, '').toLowerCase()
-	const gpuConnectorIdFromName = (v) => {
-		const base = String(v || '').trim().replace(/^card\d+-/i, '')
-		if (!base) return ''
-		return `gpu_${base.toUpperCase()}`
-	}
-	const gpuDisplays = Array.isArray(live?.gpu?.displays) ? live.gpu.displays : []
-
 	const resolveStatusClass = createCasparRearMarkerStatusResolver({ live, lastPayload })
 
 	const connectedDisplays = live?.gpu?.displays || []
@@ -204,8 +203,22 @@ export function renderCasparBand(ctx) {
 				const editBtn = document.createElement('button')
 				editBtn.type = 'button'
 				editBtn.className = 'device-view__backpanel-slot-edit'
-				editBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`
 				editBtn.title = 'Edit GPU layout — reorder ports, Show all, or Reset Layout (xrandr)'
+				const editIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+				editIcon.setAttribute('viewBox', '0 0 24 24')
+				editIcon.setAttribute('width', '14')
+				editIcon.setAttribute('height', '14')
+				editIcon.setAttribute('fill', 'none')
+				editIcon.setAttribute('stroke', 'currentColor')
+				editIcon.setAttribute('stroke-width', '2')
+				editIcon.setAttribute('stroke-linecap', 'round')
+				editIcon.setAttribute('stroke-linejoin', 'round')
+				const editPath1 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+				editPath1.setAttribute('d', 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7')
+				const editPath2 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+				editPath2.setAttribute('d', 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z')
+				editIcon.append(editPath1, editPath2)
+				editBtn.appendChild(editIcon)
 				editBtn.style.marginLeft = '8px'
 				editBtn.style.cursor = 'pointer'
 				editBtn.style.background = 'none'
@@ -302,7 +315,6 @@ export function renderCasparBand(ctx) {
 				const editBtn = document.createElement('button')
 				editBtn.type = 'button'
 				editBtn.className = 'device-view__backpanel-slot-edit'
-				editBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`
 				editBtn.title =
 					'Edit DeckLink port order — drag markers on the rear panel, or use Save / Export / Load in the inspector (same as GPU layout).'
 				editBtn.style.marginLeft = '8px'

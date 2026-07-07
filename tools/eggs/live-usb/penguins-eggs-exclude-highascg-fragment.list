@@ -74,7 +74,17 @@ home/casparcg/highascg/dist
 home/casparcg/highascg/.github
 home/casparcg/highascg/.github/*
 
-# exFAT mountpoint (empty in ISO)
+# Build-host sync copies (not needed on live system)
+home/casparcg/bridge
+home/casparcg/bridge/*
+home/casparcg/companion
+home/casparcg/companion/*
+home/casparcg/highascg-backup-box.tgz
+home/casparcg/highascg-wiki-map
+home/casparcg/highascg-wiki-map/*
+home/casparcg/highascg-mirror-push.log
+home/casparcg/0x200014
+home/casparcg/0x200014/*
 home/casparcg/exfat
 home/casparcg/exfat/*
 
@@ -83,6 +93,8 @@ home/casparcg/.cache
 home/casparcg/.cache/*
 home/casparcg/Downloads
 home/casparcg/Downloads/*
+home/casparcg/.copilot
+home/casparcg/.copilot/*
 home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor

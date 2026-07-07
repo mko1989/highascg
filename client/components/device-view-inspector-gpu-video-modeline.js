@@ -2,7 +2,6 @@
  * Video mode, EDID/xrandr display selection, timing + modeline preview, and "use detected display mode".
  */
 import * as Actions from './device-view-actions.js'
-import { setStatus } from './device-view-ui-utils.js'
 import { resolveCableSourceResolution } from '../lib/device-view-gpu-source-inherit.js'
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
 import { resolveGpuScreenNumber, resolveGpuDetectedDisplay } from './device-view-inspector-gpu-resolve.js'
@@ -93,7 +92,7 @@ function listSiblingGpuPortsOnCasparScreen(conn, lastPayload, casparScreenN) {
 }
 
 export function populateGpuVideoModelineSection(wrapCtl, ctx) {
-	const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN, statusEl, load } = ctx
+	const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN } = ctx
 	const projectMode = resolveDefaultVideoMode(currentSettings)
 	const runSave = () => void saveRef.invoke?.()
 	const runOsSave = () => void osSaveRef?.invoke?.()
@@ -203,7 +202,12 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const displayModeId = String(resolvedVideoMode?.modeId || projectMode)
 	const isStandardMode = displayModeId !== 'custom' && STANDARD_VIDEO_MODES.includes(displayModeId)
 	const modeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
-	modeSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`
+	for (const opt of [{ value: 'custom', label: 'Custom' }, ...STANDARD_VIDEO_MODES.map((m) => ({ value: m, label: m }))]) {
+		const option = document.createElement('option')
+		option.value = opt.value
+		option.textContent = opt.label
+		modeSel.appendChild(option)
+	}
 	modeSel.value = isStandardMode ? displayModeId : 'custom'
 
 	const customWidthIn = Object.assign(document.createElement('input'), {
@@ -569,11 +573,6 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		scheduleModelinePreview()
 		runSave()
 	})
-
-	const readSelectedOsModeAndRate = () => {
-		const os = readOsResolutionFromUi()
-		return { mode: os.mode, rate: os.rate }
-	}
 
 	const buildOutputPatchFromSelection = () => {
 		const fields = {

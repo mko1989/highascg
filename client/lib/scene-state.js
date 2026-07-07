@@ -9,8 +9,6 @@ import {
 	newId,
 	LOOK_LAYER_FIRST,
 	LOOK_LAYER_STEP,
-	LOOK_LAYER_MAX,
-	isValidLookLayerNumber,
 } from './scene-state-helpers.js'
 
 import * as Persistence from './scene-state-persistence-logic.js'

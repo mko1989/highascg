@@ -4,6 +4,7 @@
 import { sceneLayerPixelRectForContentFit } from './fill-math.js'
 import { fetchMediaContentResolution } from './mixer-fill.js'
 import { api } from './api-client.js'
+import { getTimelineProgramCanvas } from './timeline-program-canvas.js'
 
 /**
  * Sets clip.fillPx from canvas size, clip.contentFit, and resolved media resolution.
@@ -25,14 +26,15 @@ export async function applyTimelineClipLayoutFromMedia(
 	stateStore,
 	sceneState,
 ) {
-	const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+	const canvas = getTimelineProgramCanvas(timelineId, sceneState, stateStore)
 	const cw = canvas.width > 0 ? canvas.width : 1920
 	const ch = canvas.height > 0 ? canvas.height : 1080
+	const screenIdx = canvas.screenIdx ?? 0
 	const cf = clip.contentFit || 'native'
 	const cr = await fetchMediaContentResolution(
 		clip.source,
 		stateStore,
-		sceneState.activeScreenIndex,
+		screenIdx,
 		() => api.get('/api/media'),
 	)
 	if (!cr?.w || !cr.h) {

@@ -245,9 +245,7 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 				const devNum = Number.isFinite(devNumRaw) && devNumRaw > 0 ? devNumRaw : slot
 				if (ioDirection === 'in') {
 					cs[`decklink_input_${slot}_direction`] = 'in'
-					if ((parseInt(String(cs[`decklink_input_${slot}_device`] ?? 0), 10) || 0) <= 0) {
-						cs[`decklink_input_${slot}_device`] = devNum
-					}
+					cs[`decklink_input_${slot}_device`] = devNum
 					const { recomputeDecklinkInputCount } = require('../config/decklink-input-slots')
 					cs.decklink_input_count = recomputeDecklinkInputCount(cs)
 				} else {
@@ -328,7 +326,16 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 	next.connectors[idx] = c1
 	ctx.config.deviceGraph = normalizeDeviceGraph(next)
 	saveConfig(ctx, { deviceGraph: ctx.config.deviceGraph, ...(ctx.config.casparServer ? { casparServer: ctx.config.casparServer } : {}) })
-	scheduleDeviceViewCasparSyncIfNeeded(ctx)
+	const finalDir = c0.kind === 'decklink_io' ? normalizeDecklinkIoDirection(c1.caspar) : null
+	const outputTouched =
+		c0.kind === 'decklink_io' &&
+		(finalDir === 'out' ||
+			patch?.caspar?.outputBinding != null ||
+			patch?.caspar?.decklinkKeyDevice != null ||
+			patch?.caspar?.decklinkKeyFill != null ||
+			patch?.caspar?.decklinkKeyer != null ||
+			patch?.caspar?.bus != null)
+	if (outputTouched) scheduleDeviceViewCasparSyncIfNeeded(ctx)
 	if (typeof ctx.augmentGraphWithSources === 'function') ctx.augmentGraphWithSources(ctx.config.deviceGraph, liveSnapshot)
 	return { ok: true, graph: ctx.config.deviceGraph, updatedConnectorId: id }
 }

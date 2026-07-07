@@ -1,7 +1,7 @@
 /**
  * Geometry and picking helpers for Previs scene.
  */
-import { tagScreenMesh, readScreenTag, traverseMeshes } from './previs-mesh-info.js'
+import { readScreenTag, traverseMeshes } from './previs-mesh-info.js'
 
 export function collectTaggedMeshes(root) { const out = []; traverseMeshes(root, m => { if (readScreenTag(m)) out.push(m) }); return out }
 

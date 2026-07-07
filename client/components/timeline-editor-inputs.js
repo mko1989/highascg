@@ -3,6 +3,7 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { pixelsToNormalized } from '../lib/fill-math.js'
 import { clipPixelRectAtLocalTime, interpClipProp } from '../lib/timeline-clip-interp.js'
+import { getTimelineProgramResolution } from '../lib/timeline-program-canvas.js'
 import { api } from '../lib/api-client.js'
 
 /** Clip keyframe shortcuts — work from timeline canvas or inspector fields. */
@@ -332,10 +333,7 @@ function handleTimelineEditorKeydown(e, deps) {
 			const pb = getPlayback()
 			const localMs = Math.max(0, Math.round(pb.position - clip.startTime))
 			const time = Math.min(localMs, clip.duration)
-			const screenIdx = timelineState.getActive()?.screenIdx ?? 0
-			const res = stateStore.getState()?.channelMap?.programResolutions?.[screenIdx] || { w: 1920, h: 1080 }
-			const W = res.w || 1920
-			const H = res.h || 1080
+			const { w: W, h: H, screenIdx } = getTimelineProgramResolution(timelineId, sceneState, stateStore)
 
 			if (k === 'p') {
 				const current = clipPixelRectAtLocalTime(clip, time, W, H, stateStore, screenIdx)

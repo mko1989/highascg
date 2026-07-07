@@ -3,7 +3,7 @@
  */
 
 import { dmxState } from '../lib/dmx-state.js'
-import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
+import { escapeAttr } from '../lib/dom-escape.js'
 
 /**
  * @param {HTMLElement} root

@@ -4,7 +4,6 @@
 import { settingsState } from './settings-state.js'
 import { defaultTransition } from './scene-state-helpers.js'
 import {
-	DEFAULT_EDITOR_DEFAULTS,
 	mergeEditorDefaults,
 	contentFitOptionsHtml,
 } from './editor-defaults-constants.js'

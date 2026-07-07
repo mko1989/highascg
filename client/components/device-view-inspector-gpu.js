@@ -14,7 +14,6 @@ import {
 	screenConsumerDefaultsSettingsPatch,
 	screenConsumerKeysUnset,
 	screenConsumerSeedCasparPatch,
-	shouldSeedScreenConsumerDefaults,
 	multiviewAlwaysOnTopFromCasparServer,
 	multiviewConsumerDefaultsSettingsPatch,
 	shouldSeedMultiviewAlwaysOnTopDefault,
@@ -49,7 +48,7 @@ export function buildGpuInspectorSummaryRows(conn, { lastPayload } = {}) {
 	]
 }
 
-export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, connectorCtx }) {
+export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, connectorCtx: _connectorCtx }) {
 	const cs = currentSettings?.casparServer && typeof currentSettings.casparServer === 'object' ? currentSettings.casparServer : {}
 	// Video mode follows Caspar graph binding; per-jack consumer/OS keys follow rear port order.
 	const screenN = resolveGpuScreenNumber(conn, lastPayload)
@@ -200,15 +199,12 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	})
 
 	const {
-		inherited,
 		cableFeedNote,
 		casparScreenNote,
 		modeSel,
 		customWidthIn,
 		customHeightIn,
 		customFpsIn,
-		overrideResIn,
-		timingSel,
 		buildGlobalOsSettingsPatchForSave,
 		keyMode,
 		keyCustomWidth,

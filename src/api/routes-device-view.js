@@ -172,24 +172,26 @@ async function handlePost(body, ctx) {
 				const { normalizeToHostLiveSource } = require('../config/host-live-sources')
 				const normalized = normalizeToHostLiveSource(item, ctx)
 				const enriched = enrichExtraLiveSource(normalized, ctx)
-				const existing = list.findIndex(
+				const existingIdx = list.findIndex(
 					(x) => x.value === enriched.value || (enriched.sourceId && x.sourceId === enriched.sourceId),
 				)
-				if (existing >= 0) list[existing] = enriched
+				const isNewEntry = existingIdx < 0
+				if (existingIdx >= 0) list[existingIdx] = enriched
 				else list.push(enriched)
 				if (persistConfigPatch(ctx, { extraLiveSources: list })) {
 					ctx.config.extraLiveSources = list
 					let playResult = null
-					let casparApply = null
+					let casparRestartRecommended = false
 					try {
 						const { playHostLiveSourceNow } = require('../config/host-live-sources-setup')
 						const { isHostLiveSource } = require('../config/host-live-sources')
-						const { applyCasparConfigForHostLiveIfNeeded } = require('../config/host-live-sources-caspar')
+						const { hostLiveCasparChannelsOutOfDate } = require('../config/host-live-sources-caspar')
 						if (isHostLiveSource(enriched)) {
-							casparApply = await applyCasparConfigForHostLiveIfNeeded(ctx)
-						}
-						if (ctx.amcp && isHostLiveSource(enriched)) {
-							playResult = await playHostLiveSourceNow(ctx, enriched)
+							const casparCheck = hostLiveCasparChannelsOutOfDate(ctx)
+							casparRestartRecommended = isNewEntry && !!casparCheck.needed
+							if (ctx.amcp && (!casparCheck.needed || !isNewEntry)) {
+								playResult = await playHostLiveSourceNow(ctx, enriched)
+							}
 						}
 					} catch (e) {
 						playResult = { ok: false, error: e?.message || String(e) }
@@ -198,8 +200,8 @@ async function handlePost(body, ctx) {
 						ok: true,
 						extraLiveSources: list.map((x) => enrichExtraLiveSource(x, ctx)),
 						hostLivePlay: playResult,
-						hostLiveCasparApply: casparApply,
-						casparRestartRecommended: !!(casparApply?.needed && !casparApply?.applied),
+						casparRestartRecommended,
+						pendingApply: casparRestartRecommended,
 					}
 					if (typeof ctx._wsBroadcast === 'function') {
 						ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })

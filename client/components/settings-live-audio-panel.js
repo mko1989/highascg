@@ -261,15 +261,27 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 		mainEl.querySelector('#live-audio-save-config')?.addEventListener('click', async () => {
 			const ui = readUiFromDom()
 			if (ui.count > 0) ui.hostChannelEnabled = true
+			const prevCount = readLiveAudioCasparSettings(settingsState.getSettings()?.casparServer || {}).count
 			setActionStatus('Saving…', true)
 			try {
 				await api.post('/api/audio/live-inputs/config', buildLiveAudioConfigBody(ui))
 				await settingsState.load()
-				markCasparRestartDirty()
+				if (ui.count !== prevCount) markCasparRestartDirty()
+				else {
+					try {
+						await api.post('/api/audio/live-inputs/apply', {})
+					} catch {
+						/* channel may not exist until first apply */
+					}
+				}
 				await loadLiveInputs()
 				renderStatus()
 				renderSlotRows(readUiFromDom())
-				setActionStatus('Saved. Regenerate Caspar config in Device View (Apply turns orange) and restart if slot count changed.', true)
+				const restartHint =
+					ui.count !== prevCount
+						? ' Regenerate Caspar config in Device View (Apply turns orange) and restart if slot count changed.'
+						: ' Capture re-applied on existing host channel(s).'
+				setActionStatus(`Saved.${restartHint}`, true)
 				document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
 				document.dispatchEvent(new CustomEvent('highascg-live-audio-configured', { detail: liveState }))
 			} catch (e) {

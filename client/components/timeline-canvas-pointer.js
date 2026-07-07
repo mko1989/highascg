@@ -46,6 +46,7 @@ export function attachTimelinePointerEvents(canvas, api) {
 		onLayerClick,
 		onSelectKeyframe,
 		onDblClickAddKeyframe,
+		onAddLayer,
 		onMoveKeyframe,
 		onSelectFlag,
 		onMoveFlagTime,
@@ -155,9 +156,9 @@ export function attachTimelinePointerEvents(canvas, api) {
 		} else {
 			canvas.dataset.lastClicked = 'track'
 			onSelectClip(null)
-			api.drag = { type: 'seek' }
-			api.lastSeekMs = Math.max(0, tl ? Math.min(ms, tl.duration) : ms)
-			onSeek(api.lastSeekMs)
+			if (li >= 0 && li < tl.layers.length) {
+				onLayerClick?.(tl.id, li, tl.layers[li])
+			}
 		}
 		schedDraw()
 	})
@@ -323,27 +324,46 @@ export function attachTimelinePointerEvents(canvas, api) {
 	})
 
 	canvas.addEventListener('dblclick', (e) => {
-		if (!onDblClickAddKeyframe) return
+		if (!onDblClickAddKeyframe && !onAddLayer) return
 		const rect = canvas.getBoundingClientRect()
 		const cx = e.clientX - rect.left
 		const cy = e.clientY - rect.top
-		if (cx < HEADER_W || cy < RULER_H) return
+		if (cy < RULER_H) return
 		const tl = getTimeline()
 		if (!tl) return
 		const li = layerAt(cy, tl)
-		if (li < 0 || li >= tl.layers.length) return
 		const ms = msAt(cx)
-		const clip = hitClip(tl, li, ms)
-		if (!clip) return
-		e.preventDefault()
-		const localMs = Math.max(0, Math.min(Math.round(ms - clip.startTime), clip.duration || 0))
-		onDblClickAddKeyframe({
-			timelineId: tl.id,
-			layerIdx: li,
-			clipId: clip.id,
-			clip,
-			localMs,
-		})
+
+		if (cx >= HEADER_W && li >= 0) {
+			if (li < tl.layers.length) {
+				const clip = hitClip(tl, li, ms)
+				if (clip && onDblClickAddKeyframe) {
+					e.preventDefault()
+					const localMs = Math.max(0, Math.min(Math.round(ms - clip.startTime), clip.duration || 0))
+					onDblClickAddKeyframe({
+						timelineId: tl.id,
+						layerIdx: li,
+						clipId: clip.id,
+						clip,
+						localMs,
+					})
+					return
+				}
+				if (!clip && onAddLayer) {
+					e.preventDefault()
+					onAddLayer(tl.id, li)
+				}
+			} else if (onAddLayer) {
+				e.preventDefault()
+				onAddLayer(tl.id, tl.layers.length - 1)
+			}
+			return
+		}
+
+		if (cx < HEADER_W && onAddLayer && li >= 0) {
+			e.preventDefault()
+			onAddLayer(tl.id, li >= tl.layers.length ? tl.layers.length - 1 : li)
+		}
 	})
 
 	canvas.addEventListener('contextmenu', (e) => {

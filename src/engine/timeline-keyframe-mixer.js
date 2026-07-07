@@ -1,5 +1,7 @@
 'use strict'
 
+const { param } = require('../caspar/amcp-utils')
+
 /** Properties that map to a single MIXER FILL command. */
 const FILL_KF_PROPS = ['fill_x', 'fill_y', 'scale_x', 'scale_y']
 
@@ -88,6 +90,52 @@ function shouldSendInstantKeyframeMixer(opts) {
 	return !opts.inTweenSpan
 }
 
+/**
+ * AMCP lines for an opacity/volume segment tween (instant start + DEFER end).
+ * @param {number} ch
+ * @param {number} layer
+ * @param {number} startVal
+ * @param {number} endVal
+ * @param {number} dur frames
+ * @param {string} [tween]
+ * @returns {string[]}
+ */
+function buildDeferredSegmentMixerLines(ch, layer, keyword, startVal, endVal, dur, tween) {
+	const cl = `${ch}-${layer}`
+	const lines = [`MIXER ${cl} ${keyword} ${startVal} 0`]
+	let p = `${endVal} ${dur}`
+	if (tween) p += ` ${param(tween)}`
+	lines.push(`MIXER ${cl} ${keyword} ${p} DEFER`)
+	return lines
+}
+
+/**
+ * Active opacity segment at clip-local ms (for priming before PLAY on take).
+ * @param {{ keyframes?: Array<{ property: string, time: number, easing?: string }> }} clip
+ * @param {number} localMs
+ * @param {number} fps
+ * @param {(clip: object, prop: string, t: number, def: number) => number} interp
+ * @param {number} [holdValue]
+ * @returns {{ startVal: number, endVal: number, dur: number, tween: string, segIdx: number } | null}
+ */
+function opacitySegmentAtLocalMs(clip, localMs, fps, interp, holdValue = 1) {
+	const kfs = (clip.keyframes || [])
+		.filter((k) => k.property === 'opacity')
+		.sort((a, b) => a.time - b.time)
+	const times = kfs.map((k) => k.time)
+	const segIdx = keyframeSegmentIndex(times, localMs)
+	const inAnimatedSegment = times.length >= 2 && segIdx >= 0 && segIdx < times.length - 1
+	const atSegmentStart = inAnimatedSegment && localMs <= times[segIdx] + 2
+	if (!atSegmentStart) return null
+	const t0 = times[segIdx]
+	const t1 = times[segIdx + 1]
+	const startVal = interp(clip, 'opacity', localMs > t0 + 2 ? localMs : t0, holdValue)
+	const endVal = interp(clip, 'opacity', t1, holdValue)
+	const dur = msToMixerFrames(Math.max(1, t1 - t0), fps)
+	const tween = mapKeyframeTween(easingAtTime(clip, 'opacity', t1))
+	return { startVal, endVal, dur, tween, segIdx }
+}
+
 module.exports = {
 	FILL_KF_PROPS,
 	mergedFillKeyframeTimes,
@@ -97,4 +145,6 @@ module.exports = {
 	fillTweenForSegmentEnd,
 	mapKeyframeTween,
 	shouldSendInstantKeyframeMixer,
+	buildDeferredSegmentMixerLines,
+	opacitySegmentAtLocalMs,
 }

@@ -210,7 +210,7 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	locWrap.appendChild(locLab)
 	companionWrap.appendChild(locWrap)
 
-	const makeCoordField = (labelText, propName, defaultVal, allowNegative) => {
+	const makeCoordField = (labelText, propName, defaultVal, _allowNegative) => {
 		const fw = document.createElement('div')
 		fw.className = 'inspector-field'
 		const fl = document.createElement('label')

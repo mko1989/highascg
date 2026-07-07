@@ -16,7 +16,7 @@ import { getContentResolution } from './mixer-fill.js'
 export function interpClipProp(clip, localMs, prop, defVal) {
 	const kfs = (clip.keyframes || []).filter((k) => k.property === prop).sort((a, b) => a.time - b.time)
 	if (!kfs.length) return defVal
-	if (localMs <= kfs[0].time) return kfs[0].value
+	if (localMs < kfs[0].time) return defVal
 	const last = kfs[kfs.length - 1]
 	if (localMs >= last.time) return last.value
 	for (let i = 0; i < kfs.length - 1; i++) {

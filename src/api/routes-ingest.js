@@ -7,7 +7,6 @@
 
 const fs = require('fs')
 const path = require('path')
-const { spawn } = require('child_process')
 const busboy = require('busboy')
 const { extractZipSafely } = require('../utils/safe-unzip')
 const { JSON_HEADERS, jsonBody } = require('./response')
@@ -149,7 +148,9 @@ async function handleUpload(req, res, ctx) {
 			// Ensure target subdir exists (sequential upload means we can do this here)
 			try {
 				if (!fs.existsSync(effectiveBase)) fs.mkdirSync(effectiveBase, { recursive: true })
-			} catch (e) {}
+			} catch {
+				/* best-effort mkdir before upload */
+			}
 
 			const savePath = resolveSafe(effectiveBase, filename)
 
@@ -198,7 +199,7 @@ async function handleUpload(req, res, ctx) {
  * body: { url: string }
  */
 async function handleDownload(body, ctx) {
-	let parsedBody = {}
+	let parsedBody
 	if (typeof body === 'object' && body) parsedBody = body
 	else {
 		try {
@@ -290,7 +291,7 @@ async function handleDownload(body, ctx) {
 	let filename
 	try {
 		filename = path.basename(new URL(url).pathname) || 'downloaded_asset'
-	} catch (e) {
+	} catch {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid URL' }) }
 	}
 	const savePath = resolveSafe(downloadBase, filename)

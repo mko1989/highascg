@@ -1,5 +1,5 @@
 /**
- * Timeline canvas — rendering + interaction.
+ * Timeline canvas — rendering + interaction orchestrator.
  * Scroll: vertical wheel = zoom (time axis at cursor). Horizontal wheel / trackpad = pan time.
  * Alt+vertical = pan layers. Shift+vertical = horizontal time pan (for mice without horizontal wheel).
  * Ruler click/drag = seek (sends SEEK command on every move event).
@@ -12,47 +12,22 @@ import {
 	ensureLayerHeights,
 	totalTracksHeight,
 	layerIndexAtCanvasY,
-	hitLayerDivider,
-	layerHeightAt,
-	trackTopForLayer,
 } from '../lib/timeline-track-heights.js'
 import {
 	RULER_H,
 	HEADER_W,
 	resizeTimelineCanvas,
 	drawTimelineCanvas,
-	hitClip,
-	edgeZone,
-	hitFlag,
-	hitKeyframe,
-	applyLayerDividerMouseMove,
 } from './timeline-canvas-render.js'
+import { attachTimelinePointerEvents } from './timeline-canvas-pointer.js'
+import {
+	MIN_PX_MS,
+	MAX_PX_MS,
+	ZOOM_FACTOR,
+	attachTimelineWheelAndDrop,
+} from './timeline-canvas-wheel.js'
 
 export { fmtSmpte, parseTcInput } from './timeline-canvas-utils.js'
-
-function snapValue(val, candidates, threshold) {
-	let bestDiff = threshold
-	let bestCandidate = val
-	for (const c of candidates) {
-		const diff = Math.abs(val - c)
-		if (diff < bestDiff) {
-			bestDiff = diff
-			bestCandidate = c
-		}
-	}
-	return bestCandidate
-}
-
-
-/** Minimum zoom: px per ms (lower = more zoomed out). 0.0001 ≈ 100px per 1000s. */
-const MIN_PX_MS = 0.0001
-const MAX_PX_MS = 5.0   // 5000px/s
-/** Toolbar zoom +/- buttons */
-const ZOOM_FACTOR = 1.18
-/** Per wheel “step” (smaller than old 1.35 — trackpads emit many events) */
-const WHEEL_ZOOM_STEP = 1.1
-/** Accumulate this much delta (px, mode 0) or lines before applying one zoom step */
-const WHEEL_ZOOM_ACCUM_THRESHOLD = 50
 
 export function initTimelineCanvas(container, opts) {
 	const {
@@ -65,27 +40,21 @@ export function initTimelineCanvas(container, opts) {
 		onDropSource,
 		onMoveClip,
 		onResizeClip,
-		/** While trimming a clip, report timeline ms at the active edge so preview can seek (WO 21). */
 		onClipResizePreview,
 		onLayerContextMenu,
 		onLayerClick,
 		getThumbnailUrl,
 		getWaveformUrl,
-		/** Media file duration (ms) for waveform trim mapping; null if unknown. */
 		getSourceDurationMs,
-		/** Skip video thumbnail when source is audio-only (filename / CLS type). */
 		isAudioOnlySource,
 		onSelectKeyframe,
-		/** Double-click clip body: add keyframe at playhead/click time (local ms). */
 		onDblClickAddKeyframe,
-		/** Double-click empty header/track row: insert layer below that row (or append). */
 		onAddLayer,
 		onMoveKeyframe,
 		onSelectFlag,
 		onMoveFlagTime,
 		getClipSelection,
 		getFlagSelection,
-		/** @type {(timelineId: string, heights: number[], isFinal?: boolean) => void} */
 		onLayerHeightsChange,
 		onKeyframeDragEnd,
 		onClipDragEnd,
@@ -93,77 +62,94 @@ export function initTimelineCanvas(container, opts) {
 		onLayerDragEnd,
 	} = opts
 
-	const thumbCache = new Map() // url -> HTMLImageElement (or 'loading' | 'error')
-	const waveformCache = new Map() // url -> number[] peaks (or 'loading' | 'error')
+	const thumbCache = new Map()
+	const waveformCache = new Map()
 
 	container.innerHTML = '<canvas class="tl-canvas"></canvas>'
 	const canvas = container.querySelector('canvas')
 	const ctx = canvas.getContext('2d')
 
-	let pxPerMs = 0.1     // zoom: pixels per millisecond
-	let scrollX = 0       // ms offset of the left edge of the track area
-	let scrollY = 0       // px offset of track area top
-	let drag = null       // active drag state
-	let lastSeekMs = 0    // last seek position (for onSeekEnd flush)
-	let hoverClip = null  // { layerIdx, clipId } — for cursor changes
 	let raf = null
-	let wheelZoomAccum = 0
-	let wheelZoomLastSign = 0
-	/** True while playback follow is incrementally scrolling (playhead pinned near right edge). */
-	let followAutoScroll = false
-	let followLastMs = 0
 
-	function clampScrollX(ms) {
-		const tl = getTimeline()
-		const trackW = canvas.width - HEADER_W
-		const maxScroll = tl && trackW > 0 && pxPerMs > 0
-			? Math.max(0, tl.duration - trackW / pxPerMs)
-			: 0
-		scrollX = Math.max(0, Math.min(maxScroll, ms))
+	const api = {
+		pxPerMs: 0.1,
+		scrollX: 0,
+		scrollY: 0,
+		drag: null,
+		lastSeekMs: 0,
+		wheelZoomAccum: 0,
+		wheelZoomLastSign: 0,
+		followAutoScroll: false,
+		followLastMs: 0,
+		HEADER_W,
+		getTimeline,
+		getPlayback,
+		getView,
+		onSeek,
+		onSeekEnd,
+		onSelectClip,
+		onDropSource,
+		onMoveClip,
+		onResizeClip,
+		onClipResizePreview,
+		onLayerContextMenu,
+		onLayerClick,
+		onSelectKeyframe,
+		onDblClickAddKeyframe,
+		onAddLayer,
+		onMoveKeyframe,
+		onSelectFlag,
+		onMoveFlagTime,
+		onLayerHeightsChange,
+		onKeyframeDragEnd,
+		onClipDragEnd,
+		onMoveLayer,
+		onLayerDragEnd,
+		msAt(canvasX) {
+			return (canvasX - HEADER_W) / api.pxPerMs + api.scrollX
+		},
+		xAt(ms) {
+			return HEADER_W + (ms - api.scrollX) * api.pxPerMs
+		},
+		layerAt(canvasY, tl) {
+			if (!tl) return 0
+			return layerIndexAtCanvasY(tl, canvasY, api.scrollY, RULER_H)
+		},
+		maxScrollY(tl) {
+			if (!tl) return 0
+			return Math.max(0, totalTracksHeight(tl) - (canvas.height - RULER_H))
+		},
+		clampScrollX(ms) {
+			const tl = getTimeline()
+			const trackW = canvas.width - HEADER_W
+			const maxScroll = tl && trackW > 0 && api.pxPerMs > 0
+				? Math.max(0, tl.duration - trackW / api.pxPerMs)
+				: 0
+			api.scrollX = Math.max(0, Math.min(maxScroll, ms))
+		},
+		schedDraw: null,
 	}
-
-	// ── Coordinate helpers ────────────────────────────────────────────────────
-
-	function msAt(canvasX) {
-		return (canvasX - HEADER_W) / pxPerMs + scrollX
-	}
-
-	function xAt(ms) {
-		return HEADER_W + (ms - scrollX) * pxPerMs
-	}
-
-	function layerAt(canvasY, tl) {
-		if (!tl) return 0
-		return layerIndexAtCanvasY(tl, canvasY, scrollY, RULER_H)
-	}
-
-	function maxScrollY(tl) {
-		if (!tl) return 0
-		return Math.max(0, totalTracksHeight(tl) - (canvas.height - RULER_H))
-	}
-
-	// ── Drawing ───────────────────────────────────────────────────────────────
 
 	function draw() {
 		resizeTimelineCanvas(container, canvas)
 		const tl = getTimeline()
 		if (tl) {
 			ensureLayerHeights(tl)
-			const m = maxScrollY(tl)
-			if (scrollY > m) scrollY = m
+			const m = api.maxScrollY(tl)
+			if (api.scrollY > m) api.scrollY = m
 		}
 		drawTimelineCanvas({
 			ctx,
 			canvas,
 			getTimeline,
 			getPlayback,
-			xAt,
-			layerAt,
-			scrollX,
-			scrollY,
-			pxPerMs,
-			drag,
-			schedDraw,
+			xAt: api.xAt.bind(api),
+			layerAt: api.layerAt.bind(api),
+			scrollX: api.scrollX,
+			scrollY: api.scrollY,
+			pxPerMs: api.pxPerMs,
+			drag: api.drag,
+			schedDraw: api.schedDraw,
 			thumbCache,
 			waveformCache,
 			getClipSelection,
@@ -175,489 +161,23 @@ export function initTimelineCanvas(container, opts) {
 		})
 	}
 
-	// ── Events ────────────────────────────────────────────────────────────────
-
-	canvas.addEventListener('mousedown', (e) => {
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const cy = e.clientY - rect.top
-		const ms = msAt(cx)
-		const tl = getTimeline()
-
-		// Ruler → flag drag or seek
-		if (cy < RULER_H) {
-			canvas.dataset.lastClicked = 'ruler'
-			const hf = tl ? hitFlag(tl, cx, cy, xAt) : null
-			if (hf && tl) {
-				onSelectFlag?.({ timelineId: tl.id, flagId: hf.flag.id, flag: hf.flag })
-				drag = { type: 'flag-move', flagId: hf.flag.id, origMs: ms }
-				lastSeekMs = Math.max(0, hf.flag.timeMs)
-				schedDraw()
-				return
-			}
-			drag = { type: 'seek' }
-			lastSeekMs = Math.max(0, ms)
-			onSeek(lastSeekMs)
-			schedDraw()
-			return
-		}
-
-		if (!tl) return
-		ensureLayerHeights(tl)
-
-		const divIdx = hitLayerDivider(cy, tl, scrollY, RULER_H)
-		if (divIdx != null && e.button === 0 && onLayerHeightsChange) {
-			canvas.dataset.lastClicked = 'divider'
-			drag = {
-				type: 'layer-divider',
-				dividerIdx: divIdx,
-				origHeights: [...tl.layerHeights],
-				startClientY: e.clientY,
-				shiftKey: e.shiftKey,
-			}
-			schedDraw()
-			return
-		}
-
-		const li = layerAt(cy, tl)
-
-		// Left-click on layer header → drag layer or open inspector
-		if (cx < HEADER_W && li >= 0 && li < tl.layers.length && e.button === 0) {
-			canvas.dataset.lastClicked = 'header'
-			drag = { type: 'layer-move', layerIdx: li, startClientY: e.clientY }
-			onLayerClick?.(tl.id, li, tl.layers[li])
-			return
-		}
-		const clip = li < tl.layers.length ? hitClip(tl, li, ms) : null
-
-		if (clip) {
-			canvas.dataset.lastClicked = 'clip'
-			const trackY = trackTopForLayer(tl, li, scrollY, RULER_H)
-			const kfIdx = hitKeyframe(clip, trackY, layerHeightAt(tl, li), cx, cy, canvas, xAt, pxPerMs)
-			if (kfIdx != null && onSelectKeyframe) {
-				onSelectClip({ layerIdx: li, clipId: clip.id, timelineId: tl.id, clip })
-				onSelectKeyframe({ timelineId: tl.id, layerIdx: li, clipId: clip.id, keyframeIdx: kfIdx, keyframe: clip.keyframes[kfIdx] })
-				drag = { type: 'keyframe-drag', layerIdx: li, clipId: clip.id, keyframeIdx: kfIdx, origTime: clip.keyframes[kfIdx].time, origMs: ms }
-			} else {
-				const edge = edgeZone(clip, ms, pxPerMs)
-				onSelectClip({ layerIdx: li, clipId: clip.id, timelineId: tl.id, clip })
-				if (edge) {
-					drag = {
-						type: 'clip-resize',
-						edge,
-						layerIdx: li,
-						clipId: clip.id,
-						origStart: clip.startTime,
-						origDur: clip.duration,
-						origMs: ms,
-						origInPoint: clip.inPoint ?? 0,
-					}
-				} else {
-					drag = { type: 'clip-move', layerIdx: li, clipId: clip.id,
-						origStart: clip.startTime, origMs: ms }
-				}
-			}
-		} else {
-			canvas.dataset.lastClicked = 'track'
-			onSelectClip(null)
-			if (li >= 0 && li < tl.layers.length) {
-				onLayerClick?.(tl.id, li, tl.layers[li])
-			}
-		}
-		schedDraw()
-	})
-
-	canvas.addEventListener('mousemove', (e) => {
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const cy = e.clientY - rect.top
-		const ms = msAt(cx)
-		const tl = getTimeline()
-
-		if (!drag) {
-			// Update cursor based on hover
-			if (cy < RULER_H) {
-				const hf = tl ? hitFlag(tl, cx, cy, xAt) : null
-				canvas.style.cursor = hf ? 'pointer' : 'col-resize'
-			} else if (tl) {
-				ensureLayerHeights(tl)
-				if (onLayerHeightsChange && hitLayerDivider(cy, tl, scrollY, RULER_H) != null) {
-					canvas.style.cursor = 'ns-resize'
-				} else {
-					const li = layerAt(cy, tl)
-					const clip = li < tl.layers.length ? hitClip(tl, li, ms) : null
-					if (clip) {
-						canvas.style.cursor = edgeZone(clip, ms, pxPerMs) ? 'ew-resize' : 'grab'
-					} else {
-						canvas.style.cursor = 'default'
-					}
-				}
-			}
-			return
-		}
-
-		if (drag.type === 'layer-divider' && tl && onLayerHeightsChange) {
-			applyLayerDividerMouseMove(drag, e.clientY, tl, onLayerHeightsChange, schedDraw)
-			return
-		}
-
-		if (drag.type === 'layer-move' && tl) {
-			const targetLi = layerAt(cy, tl)
-			if (targetLi >= 0 && targetLi < tl.layers.length && targetLi !== drag.layerIdx) {
-				onMoveLayer?.(drag.layerIdx, targetLi)
-				drag.layerIdx = targetLi
-				schedDraw()
-			}
-			return
-		}
-
-		if (drag.type === 'flag-move' && tl && onMoveFlagTime) {
-			const clamped = Math.max(0, Math.min(ms, tl.duration))
-			onMoveFlagTime(tl.id, drag.flagId, clamped)
-		} else if (drag.type === 'seek') {
-			const clamped = Math.max(0, tl ? Math.min(ms, tl.duration) : ms)
-			lastSeekMs = clamped
-			onSeek(clamped)
-		} else if (drag.type === 'clip-move') {
-			const delta = ms - drag.origMs
-			const rawStart = drag.origStart + delta
-			const clip = tl.layers[drag.layerIdx]?.clips?.find((c) => c.id === drag.clipId)
-			const dur = clip ? clip.duration : drag.origDur
-
-			// Timeline snapping candidates
-			const snapThresholdPx = 8
-			const thresholdMs = snapThresholdPx / pxPerMs
-			const candidates = [0, tl.duration]
-			const pb = getPlayback()
-			const nowPointer = (pb && pb.position != null) ? Number(pb.position) : null
-			if (nowPointer != null) {
-				candidates.push(nowPointer)
-			}
-			for (const f of tl.flags || []) {
-				candidates.push(f.timeMs)
-			}
-			for (let lIdx = 0; lIdx < tl.layers.length; lIdx++) {
-				const layer = tl.layers[lIdx]
-				for (const c of layer.clips || []) {
-					if (lIdx === drag.layerIdx && c.id === drag.clipId) continue
-					candidates.push(c.startTime, c.startTime + c.duration)
-				}
-			}
-
-			let snapStart = snapValue(rawStart, candidates, thresholdMs)
-			let snapEnd = snapValue(rawStart + dur, candidates, thresholdMs) - dur
-
-			let newStart = rawStart
-			if (Math.abs(snapStart - rawStart) <= Math.abs(snapEnd - rawStart)) {
-				if (Math.abs(snapStart - rawStart) < thresholdMs) newStart = snapStart
-			} else {
-				if (Math.abs(snapEnd - rawStart) < thresholdMs) newStart = snapEnd
-			}
-
-			// Prioritize now pointer snapping with a slightly larger threshold (14px)
-			if (nowPointer != null) {
-				const nowThresholdMs = 14 / pxPerMs
-				const distStart = Math.abs(rawStart - nowPointer)
-				const distEnd = Math.abs(rawStart + dur - nowPointer)
-				if (distStart < nowThresholdMs || distEnd < nowThresholdMs) {
-					if (distStart <= distEnd) {
-						newStart = nowPointer
-					} else {
-						newStart = nowPointer - dur
-					}
-				}
-			}
-
-			newStart = Math.max(0, newStart)
-
-			const targetLi = layerAt(cy, tl)
-			const validTargetLi = targetLi >= 0 && targetLi < tl.layers.length ? targetLi : drag.layerIdx
-			
-			onMoveClip(drag.layerIdx, drag.clipId, newStart, validTargetLi)
-			if (validTargetLi !== drag.layerIdx) {
-				drag.layerIdx = validTargetLi
-			}
-		} else if (drag.type === 'clip-resize') {
-			// Timeline snapping candidates
-			const snapThresholdPx = 8
-			const thresholdMs = snapThresholdPx / pxPerMs
-			const candidates = [0, tl.duration]
-			const pb = getPlayback()
-			const nowPointer = (pb && pb.position != null) ? Number(pb.position) : null
-			if (nowPointer != null) {
-				candidates.push(nowPointer)
-			}
-			for (const f of tl.flags || []) {
-				candidates.push(f.timeMs)
-			}
-			for (let lIdx = 0; lIdx < tl.layers.length; lIdx++) {
-				const layer = tl.layers[lIdx]
-				for (const c of layer.clips || []) {
-					if (lIdx === drag.layerIdx && c.id === drag.clipId) continue
-					candidates.push(c.startTime, c.startTime + c.duration)
-				}
-			}
-
-			if (drag.edge === 'left') {
-				const rawStart = ms
-				const bestStart = snapValue(rawStart, candidates, thresholdMs)
-				let newStart = Math.abs(bestStart - rawStart) < thresholdMs ? bestStart : Math.max(0, rawStart)
-				
-				// Snap to nowpointer with 14px threshold
-				if (nowPointer != null) {
-					const nowThresholdMs = 14 / pxPerMs
-					if (Math.abs(rawStart - nowPointer) < nowThresholdMs) {
-						newStart = nowPointer
-					}
-				}
-
-				const newDur = drag.origStart + drag.origDur - newStart
-				if (newDur > 200) {
-					const fps = Math.max(1, tl?.fps || 25)
-					const deltaMs = newStart - drag.origStart
-					const deltaFrames = Math.floor((deltaMs * fps) / 1000)
-					const newInPoint = Math.max(0, (drag.origInPoint ?? 0) + deltaFrames)
-					onResizeClip(drag.layerIdx, drag.clipId, {
-						startTime: newStart,
-						duration: newDur,
-						inPoint: newInPoint,
-					})
-					onClipResizePreview?.({ edge: 'left', timelineMs: newStart, layerIdx: drag.layerIdx, clipId: drag.clipId })
-				}
-			} else {
-				const rawEnd = ms
-				const bestEnd = snapValue(rawEnd, candidates, thresholdMs)
-				let newEnd = Math.abs(bestEnd - rawEnd) < thresholdMs ? bestEnd : rawEnd
-
-				// Snap to nowpointer with 14px threshold
-				if (nowPointer != null) {
-					const nowThresholdMs = 14 / pxPerMs
-					if (Math.abs(rawEnd - nowPointer) < nowThresholdMs) {
-						newEnd = nowPointer
-					}
-				}
-
-				const newDur = Math.max(200, newEnd - drag.origStart)
-				const changes = { duration: newDur }
-				// Extending right: play from source frame 0 for the new length (restart from file start).
-				if (newDur > drag.origDur) {
-					changes.inPoint = 0
-				}
-				onResizeClip(drag.layerIdx, drag.clipId, changes)
-				onClipResizePreview?.({
-					edge: 'right',
-					timelineMs: drag.origStart + newDur,
-					layerIdx: drag.layerIdx,
-					clipId: drag.clipId,
-				})
-			}
-		} else if (drag.type === 'keyframe-drag' && onMoveKeyframe && tl) {
-			const clip = tl.layers[drag.layerIdx]?.clips?.find((c) => c.id === drag.clipId)
-			if (clip) {
-				const newTime = Math.max(0, Math.min(ms - clip.startTime, clip.duration))
-				onMoveKeyframe(tl.id, drag.layerIdx, drag.clipId, drag.keyframeIdx, newTime)
-			}
-		}
-		schedDraw()
-	})
-
-	canvas.addEventListener('mouseup', () => {
-		const wasDivider = drag?.type === 'layer-divider'
-		const wasLayerDrag = drag?.type === 'layer-move'
-		const wasKeyframeDrag = drag?.type === 'keyframe-drag'
-		const wasClipDrag = drag?.type === 'clip-move' || drag?.type === 'clip-resize'
-		const tl0 = getTimeline()
-		if (drag?.type === 'seek' && onSeekEnd) {
-			const tl = getTimeline()
-			if (tl) onSeekEnd(Math.max(0, Math.min(lastSeekMs, tl.duration)))
-		}
-		if (wasDivider && tl0 && onLayerHeightsChange) {
-			ensureLayerHeights(tl0)
-			onLayerHeightsChange(tl0.id, [...tl0.layerHeights], true)
-		}
-		if (wasLayerDrag && tl0 && onLayerDragEnd) {
-			onLayerDragEnd(tl0.id)
-		}
-		if (wasKeyframeDrag && tl0 && onKeyframeDragEnd) {
-			onKeyframeDragEnd(tl0.id)
-		}
-		if (wasClipDrag && tl0 && onClipDragEnd) {
-			const li = drag.layerIdx
-			const clip = tl0.layers?.[li]?.clips?.find((c) => c.id === drag.clipId)
-			let changed = false
-			if (clip && drag.type === 'clip-move') {
-				changed = clip.startTime !== drag.origStart
-			} else if (clip && drag.type === 'clip-resize') {
-				changed =
-					clip.startTime !== drag.origStart ||
-					clip.duration !== drag.origDur ||
-					(clip.inPoint ?? 0) !== (drag.origInPoint ?? 0)
-			}
-			if (changed) onClipDragEnd(tl0.id)
-		}
-		drag = null
-		canvas.style.cursor = 'default'
-		schedDraw()
-	})
-	canvas.addEventListener('mouseleave', () => {
-		if (drag?.type === 'layer-divider') {
-			const tl = getTimeline()
-			if (tl && onLayerHeightsChange) {
-				ensureLayerHeights(tl)
-				onLayerHeightsChange(tl.id, [...tl.layerHeights], true)
-			}
-		}
-		drag = null
-	})
-
-	// Double-click: keyframe on clip, or add layer in empty header/track space
-	canvas.addEventListener('dblclick', (e) => {
-		if (!onDblClickAddKeyframe && !onAddLayer) return
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const cy = e.clientY - rect.top
-		if (cy < RULER_H) return
-		const tl = getTimeline()
-		if (!tl) return
-		const li = layerAt(cy, tl)
-		const ms = msAt(cx)
-
-		if (cx >= HEADER_W && li >= 0) {
-			if (li < tl.layers.length) {
-				const clip = hitClip(tl, li, ms)
-				if (clip && onDblClickAddKeyframe) {
-					e.preventDefault()
-					const localMs = Math.max(0, Math.min(Math.round(ms - clip.startTime), clip.duration || 0))
-					onDblClickAddKeyframe({
-						timelineId: tl.id,
-						layerIdx: li,
-						clipId: clip.id,
-						clip,
-						localMs,
-					})
-					return
-				}
-				if (!clip && onAddLayer) {
-					e.preventDefault()
-					onAddLayer(tl.id, li)
-				}
-			} else if (onAddLayer) {
-				e.preventDefault()
-				onAddLayer(tl.id, tl.layers.length - 1)
-			}
-			return
-		}
-
-		if (cx < HEADER_W && onAddLayer && li >= 0) {
-			e.preventDefault()
-			onAddLayer(tl.id, li >= tl.layers.length ? tl.layers.length - 1 : li)
-		}
-	})
-
-	canvas.addEventListener('contextmenu', (e) => {
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const cy = e.clientY - rect.top
-		if (cx >= HEADER_W || cy < RULER_H) return
-		const tl = getTimeline()
-		if (!tl) return
-		const li = layerAt(cy, tl)
-		if (li < 0 || li >= tl.layers.length) return
-		e.preventDefault()
-		onLayerContextMenu?.(tl.id, li, tl.layers[li], e.clientX, e.clientY)
-	})
-
-	canvas.addEventListener('wheel', (e) => {
-		e.preventDefault()
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const tl = getTimeline()
-		const dx = e.deltaX
-		const dy = e.deltaY
-
-		// Alt + vertical wheel = pan layers up/down
-		if (e.altKey && Math.abs(dy) >= Math.abs(dx)) {
-			wheelZoomAccum = 0
-			wheelZoomLastSign = 0
-			const maxY = maxScrollY(tl)
-			scrollY = Math.max(0, Math.min(maxY, scrollY + dy * 0.5))
-			schedDraw()
-			return
-		}
-
-		// Shift + vertical wheel = horizontal time pan (wheel-only mice)
-		if (e.shiftKey && !e.altKey && Math.abs(dy) >= Math.abs(dx)) {
-			wheelZoomAccum = 0
-			wheelZoomLastSign = 0
-			scrollX = Math.max(0, scrollX + dy / pxPerMs * 0.5)
-			schedDraw()
-			return
-		}
-
-		// Dominant horizontal delta = pan time axis (trackpad two-finger horizontal, etc.)
-		if (Math.abs(dx) > Math.abs(dy)) {
-			wheelZoomAccum = 0
-			wheelZoomLastSign = 0
-			scrollX = Math.max(0, scrollX + dx / pxPerMs * 0.5)
-			schedDraw()
-			return
-		}
-
-		// Vertical wheel (incl. pinch-zoom with Ctrl on macOS) = zoom centred on cursor X.
-		// Accumulate delta so one physical scroll gesture ≈ one step (trackpads fire many events).
-		const dyNorm = e.deltaMode === 1 ? dy * 16 : e.deltaMode === 2 ? dy * 400 : dy
-		const sign = Math.sign(dyNorm)
-		if (sign !== 0 && sign !== wheelZoomLastSign) wheelZoomAccum = 0
-		wheelZoomLastSign = sign || wheelZoomLastSign
-		wheelZoomAccum += dyNorm
-		if (Math.abs(wheelZoomAccum) < WHEEL_ZOOM_ACCUM_THRESHOLD) {
-			schedDraw()
-			return
-		}
-		wheelZoomAccum = 0
-		const msUnder = msAt(cx)
-		const factor = dyNorm > 0 ? 1 / WHEEL_ZOOM_STEP : WHEEL_ZOOM_STEP
-		pxPerMs = Math.max(MIN_PX_MS, Math.min(MAX_PX_MS, pxPerMs * factor))
-		scrollX = Math.max(0, msUnder - (cx - HEADER_W) / pxPerMs)
-		schedDraw()
-	}, { passive: false })
-
-	// Drag-drop from sources panel
-	canvas.addEventListener('dragover', (e) => {
-		e.preventDefault()
-		e.dataTransfer.dropEffect = 'copy'
-	})
-
-	canvas.addEventListener('drop', (e) => {
-		e.preventDefault()
-		const rect = canvas.getBoundingClientRect()
-		const cx = e.clientX - rect.left
-		const cy = e.clientY - rect.top
-		let source = null
-		try { source = JSON.parse(e.dataTransfer.getData('application/json')) } catch { return }
-		if (!source?.value) return
-		const ms = Math.max(0, msAt(cx))
-		const tl = getTimeline()
-		const li = tl ? Math.max(0, Math.min(layerAt(cy, tl), tl.layers.length)) : 0
-		onDropSource(source, li, ms)
-		schedDraw()
-	})
-
-	// ── Animation loop ────────────────────────────────────────────────────────
-
 	function schedDraw() {
 		if (raf) return
-		raf = requestAnimationFrame(() => { raf = null; draw() })
+		raf = requestAnimationFrame(() => {
+			raf = null
+			draw()
+		})
 	}
+	api.schedDraw = schedDraw
+
+	attachTimelinePointerEvents(canvas, api)
+	attachTimelineWheelAndDrop(canvas, api)
 
 	window.addEventListener('resize', schedDraw)
 	schedDraw()
 
-	// ── Public API ────────────────────────────────────────────────────────────
-
 	return {
 		redraw: schedDraw,
-		/** Called when the containing tab becomes visible. Forces a fresh resize + redraw. */
 		notifyVisible() {
 			const r = container.getBoundingClientRect()
 			const w = Math.round(r.width)
@@ -668,64 +188,59 @@ export function initTimelineCanvas(container, opts) {
 			}
 			schedDraw()
 		},
-		setPlayheadPosition(_ms) { schedDraw() },
+		setPlayheadPosition(_ms) {
+			schedDraw()
+		},
 		zoom(dir) {
-			pxPerMs = Math.max(MIN_PX_MS, Math.min(MAX_PX_MS, pxPerMs * (dir > 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR)))
+			api.pxPerMs = Math.max(MIN_PX_MS, Math.min(MAX_PX_MS, api.pxPerMs * (dir > 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR)))
 			schedDraw()
 		},
 		zoomFit() {
 			const tl = getTimeline()
 			if (!tl) return
-			pxPerMs = Math.max(MIN_PX_MS, (canvas.width - HEADER_W - 20) / tl.duration)
-			scrollX = 0; scrollY = 0
+			api.pxPerMs = Math.max(MIN_PX_MS, (canvas.width - HEADER_W - 20) / tl.duration)
+			api.scrollX = 0
+			api.scrollY = 0
 			schedDraw()
 		},
-		/**
-		 * Keep the playhead visible. During playback, only scroll once the playhead nears
-		 * the viewport edge — then advance scroll by delta time so the playhead stays pinned
-		 * without re-scrolling the entire canvas every frame.
-		 * @param {number} ms
-		 * @param {{ playing?: boolean }} [opts]
-		 */
 		followPlayhead(ms, opts = {}) {
 			const trackW = canvas.width - HEADER_W
-			if (trackW <= 0 || pxPerMs <= 0) return
+			if (trackW <= 0 || api.pxPerMs <= 0) return
 
 			const margin = 80
 			const rightEdge = canvas.width - margin
 			const leftEdge = HEADER_W + margin
 
-			if (opts.playing && followAutoScroll) {
-				scrollX += ms - followLastMs
-				followLastMs = ms
-				clampScrollX(scrollX)
-				// Stop auto-scroll if the playhead is no longer near the right edge (seek/zoom).
-				if (xAt(ms) < rightEdge - 24) followAutoScroll = false
+			if (opts.playing && api.followAutoScroll) {
+				api.scrollX += ms - api.followLastMs
+				api.followLastMs = ms
+				api.clampScrollX(api.scrollX)
+				if (api.xAt(ms) < rightEdge - 24) api.followAutoScroll = false
 				return
 			}
 
-			followLastMs = ms
-			const x = xAt(ms)
+			api.followLastMs = ms
+			const x = api.xAt(ms)
 
 			if (x > rightEdge) {
 				if (opts.playing) {
-					followAutoScroll = true
-					scrollX = ms - (rightEdge - HEADER_W) / pxPerMs
-					clampScrollX(scrollX)
+					api.followAutoScroll = true
+					api.scrollX = ms - (rightEdge - HEADER_W) / api.pxPerMs
+					api.clampScrollX(api.scrollX)
 				} else {
-					followAutoScroll = false
-					clampScrollX(ms - (trackW - margin) / pxPerMs)
+					api.followAutoScroll = false
+					api.clampScrollX(ms - (trackW - margin) / api.pxPerMs)
 				}
 			} else if (x < leftEdge) {
-				followAutoScroll = false
-				clampScrollX(ms - margin / pxPerMs)
+				api.followAutoScroll = false
+				api.clampScrollX(ms - margin / api.pxPerMs)
 			} else {
-				followAutoScroll = false
+				api.followAutoScroll = false
 			}
 		},
 		resetFollowScroll() {
-			followAutoScroll = false
-			followLastMs = 0
+			api.followAutoScroll = false
+			api.followLastMs = 0
 		},
 	}
 }

@@ -1,7 +1,7 @@
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { classifyMediaItem } from '../lib/media-ext.js'
-import { escapeHtml, truncate, getExtension, formatDuration, formatFps, makeDraggable, attachMediaModifierClick } from './sources-panel-helpers.js'
+import { escapeHtml, getExtension, formatDuration, formatFps, makeDraggable, attachMediaModifierClick } from './sources-panel-helpers.js'
 
 function folderSegmentKey(segment) {
 	return String(segment || '').toLowerCase()

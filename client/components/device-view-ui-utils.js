@@ -172,7 +172,8 @@ export function renderPreservingFocus(container, renderFn) {
 				selectionStart = active.selectionStart
 				selectionEnd = active.selectionEnd
 			}
-		} catch (e) {
+		} catch (_e) {
+			/* selection read unsupported */
 		} finally {
 			if (needsTypeHack) {
 				active.type = originalType
@@ -233,7 +234,7 @@ export function renderPreservingFocus(container, renderFn) {
 					if (isFullSelection) {
 						try {
 							matched.select()
-						} catch (e) {}
+						} catch (_e) { /* select() unsupported */ }
 					} else if (!needsTypeHack) {
 						try {
 							if (typeof matched.setSelectionRange === 'function') {
@@ -241,7 +242,7 @@ export function renderPreservingFocus(container, renderFn) {
 								const end = Math.min(activeDesc.selectionEnd, matched.value.length)
 								matched.setSelectionRange(start, end)
 							}
-						} catch (e) {}
+						} catch (_e) { /* select() unsupported */ }
 					}
 				}, 0)
 			}

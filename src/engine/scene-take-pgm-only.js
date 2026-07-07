@@ -151,6 +151,20 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		`[scene-take-pgm-only] ch=${channel} animate=${isAnimate} fadeDur=${fadeDur} exitLayers=${exitLayers.length} incomingLayers=${incomingSorted.length}`,
 	)
 
+	let activeTimelineIdToFadeOut = null
+	if (self.timelineEngine) {
+		const pbNow = self.timelineEngine.getPlayback()
+		if (pbNow?.timelineId) {
+			const isPlayingOnThisChannel = self.timelineEngine._channelsFor(pbNow.sendTo).includes(channel)
+			const exitingTimeline = exitLayers.find(
+				(l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId
+			)
+			if (exitingTimeline || isPlayingOnThisChannel) {
+				activeTimelineIdToFadeOut = pbNow.timelineId
+			}
+		}
+	}
+
 	const takeJobs = []
 	for (const layer of incomingSorted) {
 		if (layer.source?.type === 'timeline') {
@@ -213,7 +227,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		})
 	}
 
-	if (takeJobs.length === 0 && exitLayers.length === 0) {
+	if (takeJobs.length === 0 && exitLayers.length === 0 && !activeTimelineIdToFadeOut) {
 		return { ok: true, takeMode: 'pgm-only', layersApplied: 0, takeJobs: 0, diff: diff }
 	}
 
@@ -223,6 +237,20 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
 		}
 		flatMixer.push(...buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw))
+	}
+
+	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
+		const tl = self.timelineEngine.timelines.get(activeTimelineIdToFadeOut)
+		if (tl) {
+			const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+			const { param } = require('../caspar/amcp-utils')
+			let tail = `0 ${fadeDur}`
+			if (fadeTw) tail += ` ${param(fadeTw)}`
+			for (let li = 0; li < tl.layers.length; li++) {
+				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
+				flatMixer.push(`MIXER ${cl} OPACITY ${tail} DEFER`)
+			}
+		}
 	}
 
 	if (flatMixer.length > 0) {
@@ -315,36 +343,43 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		} catch (_) {}
 	}
 
-	if (exitLayers.length > 0) {
+	if (exitLayers.length > 0 || activeTimelineIdToFadeOut) {
 		if (fadeMs > 0) {
 			await new Promise((r) => setTimeout(r, Math.ceil(fadeMs) + 5))
 		}
-		const teardownLines = []
-		for (const layer of exitLayers) {
-			const ln = Number(layer.layerNumber)
-			// Same physical slot is being re-taken — Caspar already swapped on PLAY; do not clear it.
-			if (Number.isFinite(ln) && incomingLayerNums.has(ln)) continue
-			const pOut = physicalLayer(layer.layerNumber)
-			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
-			const cl = chLayerAmcp(channel, pOut)
-			teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
-			try {
-				const nextP = nextPipContentLayerInScene(opts.currentScene?.layers, layer.layerNumber)
-				const pipN = pipOverlaysFromLayer(layer).length
-				if (pipN > 0) {
-					teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextP, pipN))
-				}
-			} catch (_) {}
-			try {
-				playbackTracker.recordStop(self, channel, pOut)
-			} catch (_) {}
+		
+		if (exitLayers.length > 0) {
+			const teardownLines = []
+			for (const layer of exitLayers) {
+				const ln = Number(layer.layerNumber)
+				// Same physical slot is being re-taken — Caspar already swapped on PLAY; do not clear it.
+				if (Number.isFinite(ln) && incomingLayerNums.has(ln)) continue
+				const pOut = physicalLayer(layer.layerNumber)
+				if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
+				const cl = chLayerAmcp(channel, pOut)
+				teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
+				try {
+					const nextP = nextPipContentLayerInScene(opts.currentScene?.layers, layer.layerNumber)
+					const pipN = pipOverlaysFromLayer(layer).length
+					if (pipN > 0) {
+						teardownLines.push(...buildPipOverlayRemoveLines(channel, pOut, nextP, pipN))
+					}
+				} catch (_) {}
+				try {
+					playbackTracker.recordStop(self, channel, pOut)
+				} catch (_) {}
+			}
+			if (teardownLines.length > 0) {
+				try {
+					await sendPipOverlayLinesSerial(amcp, teardownLines)
+				} catch (_) {}
+				await amcp.mixerCommit(channel).catch(() => {})
+			}
 		}
-		if (teardownLines.length > 0) {
-			try {
-				await sendPipOverlayLinesSerial(amcp, teardownLines)
-			} catch (_) {}
-			await amcp.mixerCommit(channel).catch(() => {})
-		}
+	}
+
+	if (activeTimelineIdToFadeOut) {
+		self.timelineEngine.stop(activeTimelineIdToFadeOut)
 	}
 
 	if (takeJobs.length > 0) {

@@ -4,7 +4,8 @@
 
 import { api } from '../lib/api-client.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
-import { decklinkInputForSlot, decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { addDecklinkInputSlot } from '../lib/decklink-add-input.js'
 
 export function parseDecklinkDrop(ev) {
 	const raw = ev?.dataTransfer?.getData('application/x-highascg-connector') || ''
@@ -50,38 +51,19 @@ export function attachDecklinkDropHandlers(listEl, ctx) {
 			]
 			const c = connectors.find((x) => String(x?.id || '') === connectorId) || null
 			const slot = decklinkSlotFromConnector(c || { index: parseInt(String(connectorId).replace(/^dli_/, ''), 10) - 1 })
-			const dev = Math.max(0, parseInt(String(c?.externalRef ?? 0), 10) || 0)
-			const cm = stateStore.getState()?.channelMap || {}
-			const entry = decklinkInputForSlot(cm, slot)
-			if (entry?.channel == null) {
+			const dev = Math.max(1, parseInt(String(c?.externalRef ?? slot), 10) || slot)
+			const r = await addDecklinkInputSlot(stateStore, { device: dev, slot })
+			if (!r.ok) {
 				markCasparRestartDirty()
-				setStatus(`Mapped ${connectorId} to input. Set decklink_input_count ≥ ${slot} and restart Caspar.`, 'ok')
+				setStatus(r.error || `Failed to map ${connectorId}`, 'error')
 				return
 			}
-			const layer = entry.layer ?? slot
-			const cl = `${entry.channel}-${layer}`
-			await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-			await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
-			await api.post('/api/raw', { cmd: `PLAY ${cl} DECKLINK ${dev}` })
-			const routeVal = entry.route || `route://${cl}`
-			const item = {
-				type: 'route',
-				routeType: 'decklink',
-				value: routeVal,
-				label: entry.label || `decklink ${slot}`,
-				decklinkSlot: slot,
-				inputsChannel: entry.channel,
-				inputsLayer: layer,
-				connectorId,
-				decklinkDevice: dev,
+			if (Array.isArray(r.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+				window.__highascgApplyExtraLiveSources(r.extraLiveSources)
 			}
-			const addRes = await api.post('/api/device-view', { addExtraLiveSource: item })
-			if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
-				window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
-			}
-			markCasparRestartDirty()
-			setStatus(`Live source ready: ${routeVal} (${connectorId})`, 'ok')
-			showDecklinkDropHint(`route://${cl}`, connectorId)
+			if (r.casparRestartNeeded || r.pendingApply) markCasparRestartDirty()
+			setStatus(`Live source ready: ${r.route} (${connectorId})`, 'ok')
+			showDecklinkDropHint(r.route, connectorId)
 			activateTab('live')
 		} catch (e) {
 			setStatus(e?.message || String(e), 'error')

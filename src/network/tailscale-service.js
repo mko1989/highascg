@@ -2,8 +2,7 @@
 
 const fs = require('fs')
 const http = require('http')
-const path = require('path')
-const { execFileSync, spawn } = require('child_process')
+const { execFileSync } = require('child_process')
 const { loadTailscaleConfig, saveTailscaleConfig } = require('../config/tailscale-config')
 
 const LOCAL_API_HOST = 'local-tailscaled.sock'
@@ -42,7 +41,7 @@ function execFileSafe(bin, args, timeoutMs = 8000) {
 	} catch (e) {
 		const out = String(e?.stdout || e?.stderr || e?.message || '').trim()
 		const err = new Error(out || 'Command failed')
-		/** @type {any} */ (err).code = e?.code
+		err.code = e?.code
 		throw err
 	}
 }
@@ -209,7 +208,7 @@ function getTailscaleStatus(opts = {}) {
 	const daemon = detectTailscaleDaemon()
 	const config = opts.includeConfig ? loadTailscaleConfig() : undefined
 	/** @type {object|null} */
-	let statusJson = null
+	let statusJson
 	const socketPath = resolveTailscaleSocket()
 	if (socketPath) {
 		try {
@@ -312,22 +311,9 @@ function setTailscaleEnabled(enabled) {
 }
 
 /**
- * @param {Partial<import('../config/tailscale-config').DEFAULTS>} prefs
- */
-function buildTailscaleUpArgs(prefs) {
-	/** @type {string[]} */
-	const args = ['up']
-	const hostname = String(prefs.hostname || '').trim()
-	if (hostname) args.push('--hostname', hostname)
-	if (prefs.acceptRoutes === true) args.push('--accept-routes')
-	return args
-}
-
-/**
  * @param {Partial<import('../config/tailscale-config').DEFAULTS>} [prefs]
  */
-async function startTailscaleLogin(prefs) {
-	const cfg = { ...loadTailscaleConfig(), ...prefs }
+async function startTailscaleLogin(_prefs) {
 	const before = getTailscaleStatus()
 	if (before.connected) {
 		return { ok: true, authUrl: null, state: before.backendState, connected: true }

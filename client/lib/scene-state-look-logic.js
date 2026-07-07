@@ -3,8 +3,6 @@
  */
 import {
 	defaultTransition,
-	migrateScene,
-	newId,
 } from './scene-state-helpers.js'
 import {
 	buildLowerThirdCasparCgData,

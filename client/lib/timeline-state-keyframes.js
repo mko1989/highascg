@@ -51,7 +51,7 @@ export const timelineKeyframeMethods = {
 
 	removeScaleKeyframe(id, layerIdx, clipId, time) {
 		this.removeKeyframe(id, layerIdx, clipId, 'scale_x', time)
-		this.removeKeyframe(id, layerIdx, clipId, 'fill_y', time)
+		this.removeKeyframe(id, layerIdx, clipId, 'scale_y', time)
 	},
 
 	clearKeyframeRange(id, layerIdx, clipId, property, fromMs, toMs) {

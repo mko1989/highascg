@@ -5,6 +5,12 @@
 
 'use strict'
 
+function _logDebug(self, msg) {
+	if (typeof self?.log === 'function') {
+		self.log('debug', `[Scene] ${msg}`)
+	}
+}
+
 const { resolveMaxBatchCommands } = require('../caspar/amcp-batch')
 const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
@@ -169,21 +175,30 @@ async function clearPhysicalLookLayers(amcp, ch, physicalLayers, self) {
 			for (const L of layers) {
 				try {
 					playbackTracker.recordStop(self, ch, L)
-				} catch (_) {}
+				} catch (err) {
+					_logDebug(self, `recordStop ${ch}-${L} failed: ${err.message}`)
+				}
 			}
 		}
-	} catch {
+	} catch (batchErr) {
+		_logDebug(self, `batchSend clear failed (${ch}): ${batchErr.message}, falling back to individual stops`)
 		for (const L of layers) {
 			try {
 				await amcp.stop(ch, L)
-			} catch (_) {}
+			} catch (stopErr) {
+				_logDebug(self, `STOP ${ch}-${L} failed: ${stopErr.message}`)
+			}
 			try {
 				await amcp.mixerClear(ch, L)
-			} catch (_) {}
+			} catch (clearErr) {
+				_logDebug(self, `MIXER CLEAR ${ch}-${L} failed: ${clearErr.message}`)
+			}
 			if (self) {
 				try {
 					playbackTracker.recordStop(self, ch, L)
-				} catch (_) {}
+				} catch (recordErr) {
+					_logDebug(self, `recordStop ${ch}-${L} failed: ${recordErr.message}`)
+				}
 			}
 		}
 	}
@@ -234,15 +249,39 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 	const layers = collectOccupiedLookLayersOnChannel(self || {}, ch).filter(
 		(L) => !shouldSkipLookTeardownOnPhysicalLayer(self, ch, L),
 	)
-	if (layers.length === 0) return
+	
+	// Add global border layers and any missing pip overlay slots to be safe.
+	// Since taking the timeline completely takes over the screen, we must aggressively teardown the look stack.
+	const layersToClear = new Set(layers)
+	if (self) {
+		try {
+			const entry = liveSceneState.getChannel(ch)
+			const sceneLayers = entry?.scene?.layers || []
+			const bank = normalizeProgramLayerBank(self?.programLayerBankByChannel?.[String(ch)])
+			const { pipOverlaysFromLayer, resolvePipOverlayCasparLayer } = require('./pip-overlay')
+			for (const layer of sceneLayers) {
+				const phys = physicalProgramLayer(layer.layerNumber, bank)
+				const pipN = pipOverlaysFromLayer(layer).length
+				for (let i = 0; i < pipN; i++) {
+					const oR = resolvePipOverlayCasparLayer(phys, i)
+					if (Number.isFinite(oR)) layersToClear.add(oR)
+				}
+			}
+		} catch (_) {}
+	}
+	layersToClear.add(998)
+	layersToClear.add(996)
 
-	const chunkSize = Math.floor(resolveMaxBatchCommands(amcp._context) / 2)
-	for (let i = 0; i < layers.length; i += chunkSize) {
-		const chunk = layers.slice(i, i + chunkSize)
+	const layersArray = [...layersToClear].sort((a, b) => a - b)
+	if (layersArray.length === 0) return
+
+	const chunkSize = Math.floor(resolveMaxBatchCommands(amcp._context) / 3)
+	for (let i = 0; i < layersArray.length; i += chunkSize) {
+		const chunk = layersArray.slice(i, i + chunkSize)
 		const lines = []
 		for (const L of chunk) {
 			const cl = `${ch}-${L}`
-			lines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+			lines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 		}
 		if (lines.length === 0) continue
 		try {
@@ -251,21 +290,30 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 				for (const L of chunk) {
 					try {
 						playbackTracker.recordStop(self, ch, L)
-					} catch (_) {}
+					} catch (recordErr) {
+						_logDebug(self, `recordStop ${ch}-${L} failed: ${recordErr.message}`)
+					}
 				}
 			}
-		} catch {
+		} catch (batchErr) {
+			_logDebug(self, `batchSend clear failed (${ch}): ${batchErr.message}, falling back to individual stops`)
 			for (const L of chunk) {
 				try {
 					await amcp.stop(ch, L)
-				} catch (_) {}
+				} catch (stopErr) {
+					_logDebug(self, `STOP ${ch}-${L} failed: ${stopErr.message}`)
+				}
 				try {
 					await amcp.mixerClear(ch, L)
-				} catch (_) {}
+				} catch (clearErr) {
+					_logDebug(self, `MIXER CLEAR ${ch}-${L} failed: ${clearErr.message}`)
+				}
 				if (self) {
 					try {
 						playbackTracker.recordStop(self, ch, L)
-					} catch (_) {}
+					} catch (recordErr) {
+						_logDebug(self, `recordStop ${ch}-${L} failed: ${recordErr.message}`)
+					}
 				}
 			}
 		}

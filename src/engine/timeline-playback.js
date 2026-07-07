@@ -11,7 +11,9 @@ const {
 	TIMELINE_TICK_BROADCAST_MS,
 	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
-const timelinePlaybackAmcp = require('./timeline-playback-amcp')
+const timelinePlaybackAmcpSend = require('./timeline-playback-amcp-send')
+const timelinePlaybackAmcpSchedule = require('./timeline-playback-amcp-schedule')
+const timelinePlaybackRuntime = require('./timeline-playback-runtime')
 
 function createPlaybackCell(position = 0) {
 	const t = Date.now()
@@ -32,7 +34,9 @@ function setCellPosition(cell, pos) {
 /** @param {new (self: object) => object} TimelineEngineClass */
 function applyPlaybackMixin(TimelineEngineClass) {
 	Object.assign(TimelineEngineClass.prototype, {
-		...timelinePlaybackAmcp,
+		...timelinePlaybackAmcpSchedule,
+		...timelinePlaybackAmcpSend,
+		...timelinePlaybackRuntime,
 
 		_pbFor(id) {
 			let cell = this._playbackById.get(id)
@@ -190,6 +194,42 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			return null
 		},
 
+		_fireCompanionPress(flag) {
+			const page = flag.companionPage ?? 1
+			const row = flag.companionRow ?? 0
+			const col = flag.companionColumn ?? 0
+
+			// Try Satellite API first (primary)
+			let satelliteOk = false
+			try {
+				const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
+				getSatellitePreviewClient().pressButton(page, row, col)
+				satelliteOk = true
+			} catch (_err) {
+				// Satellite unavailable, will fall back to HTTP
+			}
+
+			// Fall back to HTTP API if satellite failed
+			if (!satelliteOk) {
+				const comp = this.self?.config?.companion || {}
+				const host = comp.host || '127.0.0.1'
+				const port = comp.port || 8000
+				const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
+
+				fetch(url, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: '{}',
+				}).catch((err) => {
+					if (typeof this.self?.log === 'function') {
+						this.self.log('warn', `[Timeline] Companion press HTTP fallback failed: ${err.message}`)
+					} else {
+						console.warn('[Timeline] Companion press HTTP fallback failed:', err.message)
+					}
+				})
+			}
+		},
+
 		/**
 		 * When the playhead crosses a flag time (prevMs < flag.timeMs <= ms), run the action.
 		 * @returns {boolean} True if playback state changed such that this _tick should stop (pause / play restart).
@@ -215,25 +255,11 @@ function applyPlaybackMixin(TimelineEngineClass) {
 						const target = this._resolveJumpTarget(f, tl)
 						if (target != null) this.seek(tlId, target)
 					}
-					// Companion button press — fire-and-forget HTTP POST (WO-24)
 					if (t === 'companion_press') {
-						const comp = this.self?.config?.companion || {}
-						const host = comp.host || '127.0.0.1'
-						const port = comp.port || 8000
-						const page = f.companionPage ?? 1
-						const row = f.companionRow ?? 0
-						const col = f.companionColumn ?? 0
-						const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
-						fetch(url, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: '{}',
-						}).catch((err) => {
-							if (typeof this.self?.log === 'function') {
-								this.self.log('warn', `[Timeline] Companion press failed: ${err.message}`)
-							} else {
-								console.warn('[Timeline] Companion press failed:', err.message)
-							}
+						// Dispatch off-tick to prevent blocking playback sync; guard against stale execution
+						const capturedId = tlId
+						setImmediate(() => {
+							if (this._airTimelineId === capturedId) this._fireCompanionPress(f)
 						})
 					}
 					return false
@@ -242,260 +268,6 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			return false
 		},
 
-		play(id, fromMs) {
-			const tl = this.timelines.get(id)
-			if (!tl) {
-				const msg = `[Timeline] play(${id}): timeline not on server`
-				if (typeof this.self?.log === 'function') this.self.log('warn', msg)
-				else console.warn(msg)
-				return
-			}
-			const cell = this._pbFor(id)
-			const prevAir = this._airTimelineId
-			const wasPausedResume = prevAir === id && this._canResumePlayback(id)
-
-			if (this._ticker) clearInterval(this._ticker)
-
-			if (prevAir && prevAir !== id) {
-				const prevCell = this._pbFor(prevAir)
-				if (prevCell.playing) {
-					setCellPosition(prevCell, cellNowMs(prevCell))
-					prevCell.playing = false
-					this._emitPb(prevAir)
-				}
-				const prevTl = this.timelines.get(prevAir)
-				if (prevTl && this.self?.amcp) {
-					const prevCh = this._channelsFor(this._sendToFor(prevAir))
-					this._stopAll(prevTl, prevCh)
-				}
-				this._prevKey = new Map()
-				this._lastKfValues.clear()
-				this._lastKfSegment.clear()
-			}
-
-			const pos = wasPausedResume
-				? (cell.position ?? 0)
-				: fromMs != null
-					? fromMs
-					: cell.position ?? 0
-
-			this._airTimelineId = id
-			setCellPosition(cell, pos)
-			cell.playing = true
-
-			if (wasPausedResume) {
-				this._resumeAll()
-			} else {
-				if (prevAir === id) {
-					this._prevKey = new Map()
-					this._lastKfValues.clear()
-					this._lastKfSegment.clear()
-				}
-				this._applyAt(id, pos, true)
-			}
-
-			this._lastTickPositionMs = undefined
-			this._ticker = setInterval(() => this._tick(), TICK_MS)
-			this._emitPb(id)
-		},
-
-		pause(id) {
-			const cell = this._pbFor(id)
-			if (!cell.playing && this._airTimelineId !== id) return
-			if (this._airTimelineId === id) {
-				if (this._ticker) {
-					clearInterval(this._ticker)
-					this._ticker = null
-				}
-				this._lastTickPositionMs = undefined
-				const now = cellNowMs(cell)
-				setCellPosition(cell, now)
-				cell.playing = false
-				this._pauseAll()
-			} else {
-				setCellPosition(cell, cellNowMs(cell))
-				cell.playing = false
-			}
-			this._emitPb(id)
-		},
-
-		stop(id, opts) {
-			if (!id) return
-			const cell = this._pbFor(id)
-			if (this._airTimelineId === id) {
-				if (this._ticker) {
-					clearInterval(this._ticker)
-					this._ticker = null
-				}
-				this._lastTickPositionMs = undefined
-				const tl = this.timelines.get(id)
-				if (tl && !opts?.skipAmcp) this._stopAll(tl)
-				this._prevKey = new Map()
-				this._lastKfValues.clear()
-				this._lastKfSegment.clear()
-				this._airTimelineId = null
-			}
-			setCellPosition(cell, 0)
-			cell.playing = false
-			this._emitPb(id)
-		},
-
-		seek(id, ms) {
-			const tl = this.timelines.get(id)
-			if (!tl) return
-			const cell = this._pbFor(id)
-			const pos = Math.max(0, Math.min(ms, tl.duration))
-
-			if (this._airTimelineId !== id) {
-				const prevAir = this._airTimelineId
-				if (prevAir && prevAir !== id) {
-					const prevCell = this._pbFor(prevAir)
-					if (prevCell.playing) {
-						setCellPosition(prevCell, cellNowMs(prevCell))
-						prevCell.playing = false
-						this._emitPb(prevAir)
-					}
-					const prevTl = this.timelines.get(prevAir)
-					if (prevTl && this.self?.amcp) {
-						this._stopAll(prevTl, this._channelsFor(this._sendToFor(prevAir)))
-					}
-				}
-				if (this._ticker) {
-					clearInterval(this._ticker)
-					this._ticker = null
-				}
-				this._airTimelineId = id
-				this._prevKey = new Map()
-				this._lastKfValues.clear()
-				this._lastKfSegment.clear()
-				setCellPosition(cell, pos)
-				cell.playing = false
-				this._applyAt(id, pos, true)
-				this._emitPb(id)
-				return
-			}
-
-			const samePausedPos = !cell.playing && Math.abs((cell.position ?? 0) - pos) < 1
-			setCellPosition(cell, pos)
-			if (cell.playing) this._lastTickPositionMs = pos
-			if (samePausedPos) {
-				this._emitPb(id)
-				return
-			}
-			// While playing, Caspar runs at 1× — ignore redundant seeks at the same transport frame.
-			if (cell.playing && !this._timelineSeekFrameChanged(id, pos)) {
-				this._emitPb(id)
-				return
-			}
-			this._applyAt(id, pos, true)
-			this._emitPb(id)
-		},
-
-		setSendTo(sendTo, timelineId) {
-			const tid = timelineId ?? this._airTimelineId
-			if (!tid) return
-			const tl = this.timelines.get(tid)
-			const oldSt = this._sendToFor(tid)
-			const oldCh = this._channelsFor(oldSt)
-			if (tl) tl.sendTo = normalizeTimelineSendTo({ ...oldSt, ...sendTo })
-			const newSt = this._sendToFor(tid)
-			const newCh = this._channelsFor(newSt)
-			const routingChanged =
-				oldSt.preview !== newSt.preview ||
-				oldSt.program !== newSt.program ||
-				oldSt.screenIdx !== newSt.screenIdx ||
-				oldCh.length !== newCh.length ||
-				oldCh.some((c, i) => c !== newCh[i])
-			if (this._airTimelineId === tid) {
-				const removed = oldCh.filter((c) => !newCh.includes(c))
-				if (removed.length > 0 && tl && this.self?.amcp) {
-					const self = this.self
-					for (const ch of removed) {
-						for (let li = 0; li < tl.layers.length; li++) {
-							const caspLayer = this._caspLayer(ch, li)
-							self.amcp.stop(ch, caspLayer).catch(() => {})
-							this._prevKey.delete(`${ch}-${caspLayer}`)
-							for (const pk of this._lastKfValues.keys()) {
-								if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
-							}
-							for (const pk of this._lastKfSegment.keys()) {
-								if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfSegment.delete(pk)
-							}
-						}
-					}
-				}
-				if (routingChanged && tl) {
-					const cell = this._pbFor(tid)
-					const pos = cell.playing ? cellNowMs(cell) : (cell.position ?? 0)
-					this._applyAt(tid, pos, true)
-				}
-			}
-			this._emitPb(tid)
-		},
-
-		setLoop(id, loop) {
-			this._pbFor(id).loop = !!loop
-			this._emitPb(id)
-		},
-
-		getPlayback(id) {
-			const tid = id ?? this._airTimelineId
-			if (!tid) return null
-			const cell = this._pbFor(tid)
-			const { _t0, _p0, ...rest } = cell
-			return {
-				...rest,
-				timelineId: tid,
-				sendTo: this._sendToFor(tid),
-				position: cellNowMs(cell),
-			}
-		},
-
-		_tick() {
-			const airId = this._airTimelineId
-			if (!airId) return
-			const cell = this._pbFor(airId)
-			if (!cell.playing) return
-			const tl = this.timelines.get(airId)
-			if (!tl) return
-			let ms = cellNowMs(cell)
-			const prevMs = this._lastTickPositionMs != null ? this._lastTickPositionMs : cell._p0
-			if (this._processTimelineFlags(airId, prevMs, ms)) return
-			ms = cellNowMs(cell)
-			if (ms >= tl.duration) {
-				if (cell.loop) {
-					this.play(airId, 0)
-					return
-				}
-				this.stop(airId)
-				return
-			}
-			cell.position = ms
-			// UI tick updates playhead only; AMCP transport runs on clip/state changes (not every 40ms).
-			this._syncAmcpOnTimelineTick(airId, ms)
-			this.emit('tick', { timelineId: airId, position: ms })
-			const ctx = this.self
-			if (ctx && typeof ctx._wsBroadcast === 'function') {
-				const t = Date.now()
-				if (!this._lastTimelineTickSent || t - this._lastTimelineTickSent >= TIMELINE_TICK_BROADCAST_MS) {
-					this._lastTimelineTickSent = t
-					ctx._wsBroadcast('timeline.tick', { timelineId: airId, position: ms })
-				}
-			}
-			this._lastTickPositionMs = ms
-		},
-
-		_nowMs(id) {
-			const tid = id ?? this._airTimelineId
-			if (!tid) return 0
-			return cellNowMs(this._pbFor(tid))
-		},
-
-		_emitPb(id) {
-			const tid = id ?? this._airTimelineId
-			if (!tid) return
-			this.emit('playback', this.getPlayback(tid))
-		},
 	})
 }
 

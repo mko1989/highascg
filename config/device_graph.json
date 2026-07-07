@@ -43,7 +43,7 @@
       "label": "Rec1",
       "caspar": {
         "name": "Rec1",
-        "source": "program_2",
+        "source": "program_1",
         "crf": 26,
         "videoCodec": "h264",
         "videoBitrateKbps": 4500,
@@ -54,19 +54,20 @@
       "externalRef": "record_1"
     },
     {
+      "id": "dst_in_dst_pgm_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM 1",
+      "externalRef": "dst_pgm_1"
+    },
+    {
       "id": "dlsdi_1",
       "deviceId": "caspar_host",
       "kind": "decklink_io",
       "index": 0,
       "label": "DeckLink 1",
       "caspar": {
-        "ioDirection": "out",
-        "bus": "pgm",
-        "mainIndex": 0,
-        "outputBinding": {
-          "type": "screen",
-          "index": 1
-        }
+        "ioDirection": "unassigned"
       },
       "externalRef": "1"
     },
@@ -99,49 +100,16 @@
       "index": 3,
       "label": "DeckLink 4",
       "caspar": {
-        "ioDirection": "in"
+        "ioDirection": "unassigned"
       },
       "externalRef": "4"
     },
     {
-      "id": "caspar_mv_out",
-      "deviceId": "caspar_host",
-      "kind": "caspar_mv_out",
-      "label": "Multiview channel (virtual)",
-      "externalRef": "4"
-    },
-    {
-      "id": "dst_in_dst_mr6mopxd_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM/PRV 1",
-      "externalRef": "dst_mr6mopxd_1"
-    },
-    {
-      "id": "dst_in_dst_mr6mp0g6_1",
+      "id": "dst_in_dst_mraumeh9_1",
       "deviceId": "destinations",
       "kind": "destination_in",
       "label": "Multiview 1",
-      "externalRef": "dst_mr6mp0g6_1"
-    },
-    {
-      "id": "dst_in_dst_mr6mp27s_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM 2",
-      "externalRef": "dst_mr6mp27s_1"
-    },
-    {
-      "id": "dst_in_host_decklink_input_4",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "DeckLink 4",
-      "caspar": {
-        "hostRole": "decklink_input",
-        "hostChannel": 5,
-        "slot": 4
-      },
-      "externalRef": "host_decklink_input_4"
+      "externalRef": "dst_mraumeh9_1"
     },
     {
       "id": "gpu_p0",
@@ -161,7 +129,11 @@
       "label": "P1",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 1
+        "mainIndex": 0,
+        "mode": "1080p5000",
+        "outputBinding": {
+          "type": "multiview"
+        }
       },
       "externalRef": "DP-3"
     },
@@ -172,7 +144,7 @@
       "label": "P2",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 0
+        "mainIndex": 1
       },
       "externalRef": "DP-4"
     },
@@ -186,33 +158,25 @@
         "mainIndex": 0
       },
       "externalRef": "DP-6/DP-7"
+    },
+    {
+      "id": "caspar_mv_out",
+      "deviceId": "caspar_host",
+      "kind": "caspar_mv_out",
+      "label": "Multiview channel (virtual)",
+      "externalRef": "3"
     }
   ],
   "edges": [
     {
-      "id": "e_dst_in_dst_mr6mp0g6_1_gpu_p1",
-      "sourceId": "dst_in_dst_mr6mp0g6_1",
-      "sinkId": "gpu_p1"
-    },
-    {
-      "id": "e_dst_in_dst_mr6mopxd_1_gpu_p2",
-      "sourceId": "dst_in_dst_mr6mopxd_1",
+      "id": "e_dst_in_dst_pgm_1_gpu_p2",
+      "sourceId": "dst_in_dst_pgm_1",
       "sinkId": "gpu_p2"
     },
     {
-      "id": "e_dst_in_dst_mr6mopxd_1_dlsdi_1",
-      "sourceId": "dst_in_dst_mr6mopxd_1",
-      "sinkId": "dlsdi_1"
-    },
-    {
-      "id": "e_dst_in_dst_mr6mp27s_1_rec_1",
-      "sourceId": "dst_in_dst_mr6mp27s_1",
-      "sinkId": "rec_1"
-    },
-    {
-      "id": "e_dst_in_dst_mr6mp27s_1_str_1",
-      "sourceId": "dst_in_dst_mr6mp27s_1",
-      "sinkId": "str_1"
+      "id": "e_dst_in_dst_mraumeh9_1_gpu_p1",
+      "sourceId": "dst_in_dst_mraumeh9_1",
+      "sinkId": "gpu_p1"
     }
   ]
 }

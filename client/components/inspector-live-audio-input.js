@@ -1,11 +1,8 @@
 import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { liveAudioInputForSlot } from '../lib/input-channels.js'
-import { clearMultiPlayTargets, clearPlayTarget, getMultiPlayTargets } from '../lib/live-audio-play-targets.js'
-import { buildLiveAudioConfigBody, readLiveAudioCasparSettings, LIVE_AUDIO_MAX_SLOTS } from '../lib/live-audio-inputs.js'
-import { refreshLiveAudioConfigured } from '../lib/live-audio-state.js'
-import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
-import { clearRouteFromChannel } from '../lib/live-audio-routing.js'
+import { readLiveAudioCasparSettings, LIVE_AUDIO_MAX_SLOTS } from '../lib/live-audio-inputs.js'
+import { removeLiveAudioInputSlot } from '../lib/live-audio-remove-input.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 
 /**
@@ -74,34 +71,7 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 			if (!confirm(`Remove live audio slot ${slot}?`)) return
 			rmBtn.disabled = true
 			try {
-					// Stop all active program-route play targets for this slot (may include multiple channels).
-					const multiTargets = getMultiPlayTargets(slot)
-					for (const t of multiTargets) {
-						await clearRouteFromChannel(t.channel, t.layer).catch(() => {})
-					}
-					clearMultiPlayTargets(slot)
-
-					if (ch != null && ln != null) {
-						const cl = `${ch}-${ln}`
-						await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-						await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
-					}
-
-				// Clear local play target (stale UI rows often come from this)
-				clearPlayTarget(slot)
-
-				// Clear slot device in settings and trim trailing empty slots in count
-				const next = readLiveAudioCasparSettings(settingsState.getSettings()?.casparServer || {})
-				const slots = Array.isArray(next.slots) ? [...next.slots] : Array.from({ length: LIVE_AUDIO_MAX_SLOTS }, () => '')
-				slots[slot - 1] = ''
-				let count = Math.max(0, Math.min(LIVE_AUDIO_MAX_SLOTS, next.count || 0))
-				while (count > 0 && !String(slots[count - 1] || '').trim()) count--
-				const payload = { ...next, slots, count, hostChannelEnabled: count > 0 ? true : next.hostChannelEnabled }
-
-				await api.post('/api/audio/live-inputs/config', buildLiveAudioConfigBody(payload))
-				await settingsState.load()
-				markCasparRestartDirty()
-				await refreshLiveAudioConfigured(stateStore)
+				await removeLiveAudioInputSlot(stateStore, slot)
 				deps?.onClearSelection?.()
 			} catch (e) {
 				alert(e?.message || String(e))
@@ -111,4 +81,3 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 		})
 	}
 }
-

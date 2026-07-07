@@ -83,6 +83,45 @@ async function playDecklinkOnHost(entry, resolvedSlot, devNum) {
 }
 
 /**
+ * Change the Caspar DeckLink device index on an existing input host channel (AMCP only).
+ * @param {import('./state-store.js').StateStore | null} stateStore
+ * @param {{ slot: number, device: number, connectorId?: string, value?: string }} payload
+ */
+export async function changeDecklinkInputDevice(stateStore, { slot, device, connectorId, value }) {
+	const resolvedSlot = parseInt(String(slot ?? ''), 10) || 0
+	const devNum = parseInt(String(device ?? ''), 10) || 0
+	if (resolvedSlot < 1) throw new Error('Invalid DeckLink input slot')
+	if (devNum < 1) throw new Error('DeckLink device index must be ≥ 1')
+
+	const r = await api.post('/api/host-live/decklink', {
+		action: 'update',
+		slot: resolvedSlot,
+		decklinkDevice: devNum,
+		...(connectorId ? { connectorId } : {}),
+		...(value ? { value } : {}),
+	})
+	if (Array.isArray(r?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+		window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+	}
+	return r
+}
+
+/**
+ * Replay DeckLink capture on an existing input host channel.
+ * @param {{ slot: number, connectorId?: string, value?: string }} payload
+ */
+export async function reloadDecklinkInputDevice({ slot, connectorId, value }) {
+	const resolvedSlot = parseInt(String(slot ?? ''), 10) || 0
+	if (resolvedSlot < 1) throw new Error('Invalid DeckLink input slot')
+	return api.post('/api/host-live/decklink', {
+		action: 'reload',
+		slot: resolvedSlot,
+		...(connectorId ? { connectorId } : {}),
+		...(value ? { value } : {}),
+	})
+}
+
+/**
  * @param {import('./state-store.js').StateStore | null} stateStore
  * @param {{ device?: number, slot?: number }} payload — prefer `slot` (SDI port); Caspar device index comes from the connector.
  */
@@ -158,11 +197,34 @@ export async function addDecklinkInputSlot(stateStore, { device, slot }) {
 	}
 
 	if (alreadyInput && existingTile && channelLive) {
-		await playDecklinkOnHost(runtimeEntry, resolvedSlot, devNum)
 		const routeValue =
 			runtimeEntry.route ||
 			routeForDecklinkSlot(channelMapFromPayload(stateStore, dv), resolvedSlot) ||
 			`route://${runtimeEntry.channel}-${runtimeEntry.layer ?? resolvedSlot}`
+		const prevDevice = parseInt(String(existingTile.decklinkDevice ?? 0), 10) || 0
+		if (prevDevice !== devNum) {
+			const changeRes = await api.post('/api/host-live/decklink', {
+				action: 'update',
+				slot: resolvedSlot,
+				decklinkDevice: devNum,
+				connectorId,
+				value: routeValue,
+			})
+			if (Array.isArray(changeRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+				window.__highascgApplyExtraLiveSources(changeRes.extraLiveSources)
+			}
+			return {
+				ok: true,
+				slot: resolvedSlot,
+				hostChannel: runtimeEntry.channel,
+				route: routeValue,
+				connectorId,
+				casparRestartNeeded: false,
+				extraLiveSources: changeRes?.extraLiveSources ?? existingExtras,
+				alreadyConfigured: true,
+			}
+		}
+		await playDecklinkOnHost(runtimeEntry, resolvedSlot, devNum)
 		return {
 			ok: true,
 			slot: resolvedSlot,

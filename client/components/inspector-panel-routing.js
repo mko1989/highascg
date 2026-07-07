@@ -17,6 +17,8 @@ import {
 } from './inspector-panel-views.js'
 import { renderLiveAudioInputInspector } from './inspector-live-audio-input.js'
 import { renderWebpageHostInspector } from './inspector-webpage-host.js'
+import { renderNdiHostInspector } from './inspector-ndi-host.js'
+import { renderV4l2InputInspector } from './inspector-v4l2-input.js'
 import { renderFixtureInspector } from './fixture-inspector.js'
 
 /**
@@ -87,6 +89,16 @@ export function renderInspectorSelection(ctx) {
 		scheduleSelectionSync(stateStore, selection)
 		return
 	}
+	if (data.type === 'ndiHost') {
+		renderNdiHostInspector(root, stateStore, data, { onClearSelection })
+		scheduleSelectionSync(stateStore, selection)
+		return
+	}
+	if (data.type === 'v4l2Input' && data.slot != null) {
+		renderV4l2InputInspector(root, stateStore, data, { onClearSelection })
+		scheduleSelectionSync(stateStore, selection)
+		return
+	}
 	if (data.type === 'timelineClip' && data.timelineId && data.layerIdx != null && data.clipId && data.clip) {
 		renderTimelineClipInspector(
 			{ root, stateStore, getTimelinePlaybackPos },
@@ -151,6 +163,10 @@ export function inspectorSelectionKey(data) {
 			return `liveAudioInput:${data.slot}`
 		case 'webpageHost':
 			return `webpageHost:${data.sourceId || data.value || data.hostChannel || ''}`
+		case 'ndiHost':
+			return `ndiHost:${data.sourceId || data.value || data.hostChannel || ''}`
+		case 'v4l2Input':
+			return `v4l2Input:${data.slot}`
 		default:
 			return String(data.type || '')
 	}

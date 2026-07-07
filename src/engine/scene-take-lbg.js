@@ -90,12 +90,16 @@ async function runSceneTakeLbg(amcp, opts) {
 	// diff.update = same layer slot, new content — handled by LOADBG/PLAY; never STOP/CLEAR that slot in teardown.
 	const exitCandidates = [...(diff.exit || [])]
 
+	let activeTimelineIdToFadeOut = null
 	if (self.timelineEngine) {
 		const pbNow = self.timelineEngine.getPlayback()
 		if (pbNow?.timelineId) {
-			const exitingTimeline = diff.exit.find((l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId)
-			if (exitingTimeline) {
-				self.timelineEngine.stop(pbNow.timelineId)
+			const isPlayingOnThisChannel = self.timelineEngine._channelsFor(pbNow.sendTo).includes(channel)
+			const exitingTimeline = diff.exit.find(
+				(l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId
+			)
+			if (exitingTimeline || isPlayingOnThisChannel) {
+				activeTimelineIdToFadeOut = pbNow.timelineId
 			}
 		}
 	}
@@ -104,7 +108,7 @@ async function runSceneTakeLbg(amcp, opts) {
 	const fadeTw = globalT.tween
 	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
 	const isMergeTransition = isLayerAnimateTakeTransition(globalT.type)
-	const shouldRunBankCrossfade = fadeDur > 0 && currentMap.size > 0 && !isMergeTransition
+	const shouldRunBankCrossfade = fadeDur > 0 && (currentMap.size > 0 || activeTimelineIdToFadeOut) && !isMergeTransition
 	let fadeClockStart = null
 	let transitionStartedNotified = false
 	function notifyProgramTransitionStarted() {
@@ -181,20 +185,35 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	const currentSceneLayers = opts.currentScene?.layers
 
-	if (exitMedia.length > 0 && fadeDur > 0 && !shouldRunBankCrossfade && !isMergeTransition) {
-		const fadeLines = []
+	const timelineFadeLines = []
+	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
+		const tl = self.timelineEngine.timelines.get(activeTimelineIdToFadeOut)
+		if (tl) {
+			const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+			const { param } = require('../caspar/amcp-utils')
+			let tail = `0 ${fadeDur}`
+			if (fadeTw) tail += ` ${param(fadeTw)}`
+			for (let li = 0; li < tl.layers.length; li++) {
+				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
+				timelineFadeLines.push(`MIXER ${cl} OPACITY ${tail} DEFER`)
+			}
+		}
+	}
+
+	if ((exitMedia.length > 0 || timelineFadeLines.length > 0) && fadeDur > 0 && !shouldRunBankCrossfade && !isMergeTransition) {
+		const fadeLines = [...timelineFadeLines]
 		for (const layer of exitMedia) {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
 			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
 			const cl = `${channel}-${pOut}`
 			let p = `0 ${fadeDur}`
-			if (fadeTw) p += ` ${param(fadeTw)}`
+			if (fadeTw) p += ` ${require('../caspar/amcp-utils').param(fadeTw)}`
 			fadeLines.push(`MIXER ${cl} OPACITY ${p}`)
 			try {
-				const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
-				const pipN = pipOverlaysFromLayer(layer).length
+				const nextL = require('./pip-overlay').nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
+				const pipN = require('./pip-overlay').pipOverlaysFromLayer(layer).length
 				if (pipN > 0) {
-					fadeLines.push(...buildPipOverlayOpacityFadeDeferLines(channel, pOut, p, nextL, pipN))
+					fadeLines.push(...require('./pip-overlay').buildPipOverlayOpacityFadeDeferLines(channel, pOut, p, nextL, pipN))
 				}
 			} catch (_) {}
 		}
@@ -256,6 +275,20 @@ async function runSceneTakeLbg(amcp, opts) {
 		currentGbLayer,
 	})
 
+	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
+		const tl = self.timelineEngine.timelines.get(activeTimelineIdToFadeOut)
+		if (tl) {
+			const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+			const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
+			let tail = `0 ${fadeDur}`
+			if (fadeTw) tail += ` ${param(fadeTw)}`
+			for (let li = 0; li < tl.layers.length; li++) {
+				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
+				mergeMixerExtras.push(deferMixerAmcpLine(`MIXER ${cl} OPACITY ${tail}`))
+			}
+		}
+	}
+
 	const fadeClockRef = { start: fadeClockStart }
 	await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
 		self,
@@ -306,7 +339,12 @@ async function runSceneTakeLbg(amcp, opts) {
 		activeBank,
 		inactiveBank,
 		phys,
+		activeTimelineIdToFadeOut,
 	})
+
+	if (activeTimelineIdToFadeOut) {
+		self.timelineEngine.stop(activeTimelineIdToFadeOut)
+	}
 
 	if (!isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0)) {
 		self.programLayerBankByChannel[chKey] = inactiveBank

@@ -23,9 +23,6 @@ function addPortNodeDot(portEl, connectorId, onPortStartCable, key, data, dotSid
 export function renderMappingsBand(ctx) {
 	const {
 		lastPayload,
-		selectedKey,
-		cableSourceId,
-		onPortClick,
 		onPortStartCable,
 		onAddMappingNode,
 		mappingPersist,

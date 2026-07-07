@@ -7,7 +7,6 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const {
-	verifyHandshakeFields,
 	verifyRegisterFollowerRequest,
 	buildLeaderRegisterHandshakeResponse,
 	verifyLeaderRegisterResponse,
@@ -63,25 +62,12 @@ test('register-follower rejects unknown appId', () => {
 })
 
 test('repair handshake accepts signed request from stored peer key', () => {
-	const follower = ensureDeviceIdentity()
+	ensureDeviceIdentity()
 	const leader = crypto.generateKeyPairSync('ed25519')
 	const leaderPublic = leader.publicKey.export({ type: 'spki', format: 'pem' }).toString()
 	const pairId = 'pair-test'
 	const nonce = 'abc123'
-	const handshake = {
-		nonce,
-		pairId,
-		hardwareId: '9999',
-		role: 'leader',
-		signature: require('../../src/replication/replication-handshake').signHandshakeFields({
-			nonce,
-			pairId,
-			hardwareId: '9999',
-			role: 'leader',
-		}),
-	}
 	// Re-sign with leader key manually for test
-	const { signMessage } = require('../../src/system/device-identity')
 	const leaderPrivate = leader.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
 	const msg = require('../../src/replication/replication-handshake').canonicalHandshakeMessage({
 		nonce,

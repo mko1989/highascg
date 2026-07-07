@@ -306,5 +306,3 @@ module.exports = {
 	normalizeProgramLayerBank,
 	persistProgramLayerBanks,
 }
-
-module.exports.runSceneTake = require('./scene-take').runSceneTake

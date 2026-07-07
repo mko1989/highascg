@@ -5,7 +5,7 @@
 import { api } from '../lib/api-client.js'
 import { postAmcpPreviewPipeline } from '../lib/amcp-preview-batch.js'
 import { buildPipOverlayRemoveLines } from '../lib/pip-overlay-amcp.js'
-import { amcpParam, chLayerAmcp, buildIncomingScenePayload } from './scenes-shared.js'
+import { chLayerAmcp, buildIncomingScenePayload } from './scenes-shared.js'
 import {
 	allMatrixLayersOnPreviewChannel,
 	defaultLookDecadeLayersForSweep,

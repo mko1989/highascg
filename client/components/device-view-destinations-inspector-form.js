@@ -1,13 +1,13 @@
-import { buildInspectorTable, roleLabel } from './device-view-ui-utils.js'
-import { mountWebpageHostPageControls } from './inspector-webpage-host.js'
-import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
+import { buildInspectorTable } from './device-view-ui-utils.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
+import { renderHostChannelDestinationInspector } from './device-view-destinations-inspector-host-channel.js'
 import {
 	STANDARD_VIDEO_MODES,
 	CASPAR_VIDEO_MODE_SPECS,
 	edgeOutputLayer,
 } from './device-view-destinations-inspector-modes.js'
+
 export function renderDestinationInspector(args) {
 	const {
 		host,
@@ -18,103 +18,26 @@ export function renderDestinationInspector(args) {
 		connectorById,
 		patchDestination,
 		removeDestination,
-		updateDestinationOutputLayer,
 		currentSettings,
 		lastPayload,
 		onWebpageHostApplied,
+		onHostInputRemoved,
 	} = args
 	const projectDefaultMode = defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(currentSettings))
 
-	if (mode === 'host_channel' || d?.virtual === true) {
-		const role = d?.hostRole || intent?.hostRole
-		const ch = d?.casparChannel ?? intent?.pgmChannel
-		const inputEntry = (Array.isArray(lastPayload?.live?.caspar?.channelMap?.inputChannels)
-			? lastPayload.live.caspar.channelMap.inputChannels
-			: []
-		).find((e) => Number(e?.channel) === Number(ch) && (e?.kind === role || !role))
-		const extraLive = Array.isArray(lastPayload?.extraLiveSources) ? lastPayload.extraLiveSources : []
-		const liveSource =
-			extraLive.find((x) => {
-				const sid = String(x?.sourceId || '').trim()
-				if (!sid) return false
-				return String(d?.id || '') === `host_webpage_${sid}` || String(d?.id || '') === `host_ndi_${sid}`
-			}) ||
-			extraLive.find(
-				(x) =>
-					Number(x?.hostChannel) === Number(ch) &&
-					(x?.routeType === role || x?.hostRole === role),
-			) ||
-			null
-		const rows = [
-			{ label: 'Label', value: String(d?.label || d?.id || 'Host channel') },
-			{ label: 'Type', value: roleLabel({ role }) },
-			{ label: 'Caspar channel', value: String(ch ?? '-') },
-		]
-		if (inputEntry?.layer != null) rows.push({ label: 'Host layer', value: String(inputEntry.layer) })
-		if (inputEntry?.route) rows.push({ label: 'Route', value: String(inputEntry.route) })
-		if (liveSource?.sourceId) rows.push({ label: 'Source ID', value: String(liveSource.sourceId) })
-		if (role === 'ndi_host' && liveSource?.ndiName) {
-			rows.push({ label: 'NDI name', value: String(liveSource.ndiName) })
-		}
-		host.append(buildInspectorTable(rows))
-		if (role === 'webpage_host' && liveSource) {
-			mountWebpageHostPageControls(host, {
-				source: liveSource,
-				onApplied: (r) => {
-					if (Array.isArray(r?.extraLiveSources)) {
-						lastPayload.extraLiveSources = r.extraLiveSources
-					}
-					onWebpageHostApplied?.(r, liveSource)
-				},
-			})
-		}
-		const note = document.createElement('p')
-		note.className = 'device-view__note'
-		note.textContent =
-			role === 'webpage_host'
-				? 'Persistent webpage host — Caspar plays HTML with LOOP on this channel. Drag route:// onto PGM or multiview for on-air; clearing the route does not destroy page state. Cable to Record or Stream to capture this bus.'
-				: role === 'ndi_host'
-					? 'Dedicated NDI host channel — the feed plays once here; on-air uses route:// only. Cable to Record or Stream to capture this NDI source directly.'
-					: role === 'decklink_input'
-				? 'Dedicated DeckLink input host channel. Cable this destination to Record or Stream on the rear panel to capture that input directly.'
-				: role === 'live_audio_input'
-					? 'Dedicated live-audio input host channel. Cable to Record or Stream to capture that ALSA/USB input bus.'
-					: role === 'v4l2_input'
-						? 'Dedicated USB / V4L2 video host channel. FFmpeg bridge feeds MPEG-TS into Caspar; cable to Record or Stream to capture that input directly.'
-					: role === 'inputs_host'
-				? 'Dedicated inputs host bus — Caspar plays DeckLink / live audio here so layers can route:// it everywhere. Cable this to Record or Stream on the rear panel to capture that bus directly.'
-				: role === 'streaming_channel'
-					? 'Encode / streaming bus — RTMP and file record consumers attach here. Cable another destination (e.g. PGM) into Stream on the rear panel, or cable this host channel to Record to file from the encode bus.'
-					: 'Auxiliary Caspar channel. Cable to Record or Stream outputs on the rear panel.'
-		host.append(note)
-		if (role === 'ndi_host') {
-			host.append(createNdiAttributionElement('device-view__note ndi-attribution'))
-		}
-		if (mappedOutputEdges.length) {
-			const outputMapWrap = document.createElement('div')
-			outputMapWrap.className = 'device-view__kv'
-			const outputMapTitle = document.createElement('div')
-			outputMapTitle.className = 'device-view__kv-row'
-			outputMapTitle.innerHTML = '<span class="device-view__kv-key">Cabled to</span><span class="device-view__kv-val"></span>'
-			outputMapWrap.appendChild(outputMapTitle)
-			for (const edge of mappedOutputEdges) {
-				const c = connectorById.get(String(edge?.sinkId || '')) || null
-				const row = document.createElement('div')
-				row.className = 'device-view__kv-row'
-				const btn = document.createElement('button')
-				btn.type = 'button'
-				btn.className = 'device-view__inspector-link-btn'
-				btn.textContent = String(c?.label || edge?.sinkId || 'Output')
-				btn.onclick = () => {
-					window.dispatchEvent(new CustomEvent('highascg-device-view-focus-connector', {
-						detail: { connectorId: edge.sinkId },
-					}))
-				}
-				row.append(btn)
-				outputMapWrap.appendChild(row)
-			}
-			host.append(outputMapWrap)
-		}
+	if (renderHostChannelDestinationInspector({
+		host,
+		d,
+		mode,
+		intent,
+		mappedOutputEdges,
+		connectorById,
+		removeDestination,
+		currentSettings,
+		lastPayload,
+		onWebpageHostApplied,
+		onHostInputRemoved,
+	})) {
 		return
 	}
 
@@ -220,7 +143,16 @@ export function renderDestinationInspector(args) {
 
 	const modeSel = document.createElement('select')
 	modeSel.className = 'device-view__destinations-type'
-	modeSel.innerHTML = '<option value="pgm_prv">PGM/PRV</option><option value="pgm_only">PGM only</option><option value="multiview">Multiview</option>'
+	for (const opt of [
+		{ value: 'pgm_prv', label: 'PGM/PRV' },
+		{ value: 'pgm_only', label: 'PGM only' },
+		{ value: 'multiview', label: 'Multiview' },
+	]) {
+		const option = document.createElement('option')
+		option.value = opt.value
+		option.textContent = opt.label
+		modeSel.appendChild(option)
+	}
 	modeSel.value = mode === 'pgm_only' ? 'pgm_only' : (mode === 'multiview' ? 'multiview' : 'pgm_prv')
 	modeSel.addEventListener('change', () => patchDestination(d.id, { mode: modeSel.value }))
 
@@ -245,7 +177,12 @@ export function renderDestinationInspector(args) {
 
 	const vmSel = document.createElement('select')
 	vmSel.className = 'device-view__destinations-type'
-	vmSel.innerHTML = `<option value="custom">Custom</option>${STANDARD_VIDEO_MODES.map((m) => `<option value="${m}">${m}</option>`).join('')}`
+	for (const opt of [{ value: 'custom', label: 'Custom' }, ...STANDARD_VIDEO_MODES.map((m) => ({ value: m, label: m }))]) {
+		const option = document.createElement('option')
+		option.value = opt.value
+		option.textContent = opt.label
+		vmSel.appendChild(option)
+	}
 	const currentMode = String(
 		d?.videoMode || (d?.inheritsProjectFps !== false ? projectDefaultMode : '1080p5000'),
 	)

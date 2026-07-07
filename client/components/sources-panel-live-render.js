@@ -13,6 +13,7 @@ import { migrateLegacyInputRoute } from '../lib/input-channels.js'
 import { reconcileExtraLiveSourceChannel } from '../lib/device-view-host-channels.js'
 import { getLiveThumbnailChannelForSource, getLiveThumbnailUrl } from '../lib/thumbnail-url.js'
 import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
+import { removeExtraLiveHostSource } from '../lib/extra-live-source-remove.js'
 
 export function renderLiveTab(listEl, {
 	channelMap,
@@ -77,11 +78,16 @@ export function renderLiveTab(listEl, {
 		hintParts.push('Live audio: configure in Settings → live audio, then drag onto looks.')
 	}
 	if (sources.some((s) => s.routeType === 'v4l2')) {
-		hintParts.push('USB video: configure in Settings → USB video, then drag route:// onto PGM or multiview.')
+		hintParts.push('USB video: click a tile to inspect or remove; drag route:// onto PGM or multiview.')
 	}
-	if (sources.some(s => s.routeType === 'layer')) hintParts.push('Layer routes: Looks row ↗ (default = PGM; Shift+↗ = edit bus, Ctrl+↗ = PRV). Drag onto another layer.')
+	if (sources.some((s) => s.routeType === 'layer')) {
+		hintParts.push('Layer routes: Looks row ↗ (default = PGM; Shift+↗ = edit bus, Ctrl+↗ = PRV). Drag onto another layer.')
+	}
 	if (sources.some((s) => s.routeType === 'webpage_host')) {
 		hintParts.push('Webpage hosts: click a tile to edit the page URL in the Inspector; ⛶ routes video to the operator monitor.')
+	}
+	if (sources.some((s) => s.routeType === 'ndi_host')) {
+		hintParts.push('NDI hosts: click a tile to inspect and remove in the Inspector panel.')
 	}
 	if (hintParts.length) listEl.innerHTML = `<p class="sources-live-hint">${hintParts.join(' ')}</p>`
 	sources.forEach(s => {
@@ -309,6 +315,11 @@ export function renderLiveTab(listEl, {
 			btnGroup.appendChild(applyBtn)
 			el.appendChild(btnGroup)
 		} else if (s.routeType === 'v4l2' && s.inputsChannel != null && s.v4l2Slot != null) {
+			el.style.cursor = 'pointer'
+			el.addEventListener('click', (e) => {
+				if (e.target.closest('button, input, a')) return
+				window.dispatchEvent(new CustomEvent('v4l2-input-select', { detail: { slot: s.v4l2Slot } }))
+			})
 			const btnGroup = document.createElement('div')
 			btnGroup.className = 'source-item__live-actions'
 			const applyBtn = Object.assign(document.createElement('button'), {
@@ -420,7 +431,38 @@ export function renderLiveTab(listEl, {
 			}
 			btnGroup.append(removeBtn)
 			el.appendChild(btnGroup)
-		} else if (s.type === 'ndi' || s.type === 'browser' || s.routeType === 'layer') {
+		} else if (s.routeType === 'ndi_host') {
+			el.style.cursor = 'pointer'
+			el.addEventListener('click', (e) => {
+				if (e.target.closest('button, input, a')) return
+				window.dispatchEvent(
+					new CustomEvent('ndi-host-select', {
+						detail: { sourceId: s.sourceId, value: s.value, hostChannel: s.hostChannel },
+					}),
+				)
+			})
+			const btnGroup = document.createElement('div')
+			btnGroup.className = 'source-item__live-actions'
+			const removeBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: 'source-item__live-btn source-item__live-btn--remove',
+				title: 'Remove from Live tab',
+				textContent: 'Remove',
+			})
+			removeBtn.onclick = async (e) => {
+				e.stopPropagation()
+				if (!confirm(`Remove NDI source "${s.label}"?`)) return
+				removeBtn.disabled = true
+				try {
+					await removeExtraLiveHostSource(s)
+					window.dispatchEvent(new CustomEvent('ndi-host-select', { detail: null }))
+				} finally {
+					removeBtn.disabled = false
+				}
+			}
+			btnGroup.append(removeBtn)
+			el.appendChild(btnGroup)
+		} else if ((s.type === 'ndi' && s.routeType !== 'ndi_host') || s.type === 'browser' || s.routeType === 'layer') {
 			const btnGroup = document.createElement('div'); btnGroup.className = 'source-item__live-actions'
 			const removeBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'source-item__live-btn source-item__live-btn--remove', title: `Remove from Live tab`, textContent: 'Remove' })
 			removeBtn.onclick = async (e) => {

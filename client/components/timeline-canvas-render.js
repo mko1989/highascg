@@ -93,7 +93,7 @@ function drawBackground(ctx, canvas) {
 	ctx.fillRect(0, 0, canvas.width, canvas.height)
 }
 
-function drawHeaders(ctx, canvas, tl, scrollY, layerAt) {
+function drawHeaders(ctx, canvas, tl, scrollY, _layerAt) {
 	ctx.fillStyle = '#161b22'
 	ctx.fillRect(0, RULER_H, HEADER_W, canvas.height - RULER_H)
 	ctx.fillStyle = '#0d1117'
@@ -375,10 +375,8 @@ export function hitFlag(tl, cx, cy, xAt) {
 }
 
 /** Returns keyframe index if (cx, cy) hits a keyframe diamond, else null. */
-export function hitKeyframe(clip, trackY, trackH, cx, cy, canvas, xAt, pxPerMs) {
+export function hitKeyframe(clip, trackY, trackH, cx, cy, canvas, xAt, _pxPerMs) {
 	if (!clip.keyframes?.length) return null
-	const x = xAt(clip.startTime)
-	const w = Math.max(3, clip.duration * pxPerMs)
 	const { y, h } = clipRowRect(canvas, trackY, trackH)
 	if (h < 8) return null
 	const ky = y + h - 7
