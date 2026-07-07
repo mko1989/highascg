@@ -126,30 +126,6 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 }
 
 /**
- * Prefer live WS-synced deck scenes over a possibly stale autosave export (WO-106).
- * @param {object} project
- * @param {object} ctx
- * @returns {object}
- */
-function enrichProjectScenesFromLiveDeck(project, ctx) {
-	if (!project || typeof project !== 'object' || !ctx?.sceneDeck) return project
-	const deck = ctx.sceneDeck
-	const snaps = Array.isArray(deck.sceneSnapshots) ? deck.sceneSnapshots : null
-	if (!snaps?.length) return project
-	const envelope =
-		project.scenes && typeof project.scenes === 'object'
-			? { ...project.scenes }
-			: { scenes: [], layerPresets: [], lookPresets: [] }
-	envelope.scenes = snaps
-	if (deck.previewSceneId != null && String(deck.previewSceneId).trim()) {
-		envelope.previewSceneId = String(deck.previewSceneId).trim()
-	}
-	if (Array.isArray(deck.layerPresets)) envelope.layerPresets = deck.layerPresets
-	if (Array.isArray(deck.lookPresets)) envelope.lookPresets = deck.lookPresets
-	return { ...project, scenes: envelope }
-}
-
-/**
  * Persist project + optional autosave file; update in-memory deck mirror (no WS broadcast).
  * Main file write must succeed before mirror/autosave updates (WO-106).
  * @param {object} ctx

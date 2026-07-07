@@ -4,6 +4,7 @@ import { liveAudioInputForSlot, v4l2InputForSlot, listInputChannels, decklinkSlo
 import { liveAudioSlotStatusMessage } from '../lib/live-audio-inputs.js'
 import { v4l2SlotStatusMessage } from '../lib/v4l2-inputs.js'
 import { normalizeMediaIdForMatch } from '../lib/mixer-fill.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 export { liveAudioSlotStatusMessage, v4l2SlotStatusMessage }
 

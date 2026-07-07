@@ -349,12 +349,21 @@ export default defineConfig(({ mode }) => {
 						if (!id.includes('/client/')) return undefined
 						// Shared libs used by both device-view and scenes chunks — must not live in either
 						// or Rollup creates a circular import (TDZ: "can't access lexical declaration before initialization").
+						// Members must only import other shared members (leaf modules) — a shared module importing
+						// a main-chunk module recreates the chunk cycle (WO-138).
 						if (
 							id.includes('/lib/settings-state.js') ||
 							id.includes('/lib/api-client.js') ||
 							id.includes('/lib/api-origin.js') ||
 							id.includes('/lib/editor-defaults-constants.js') ||
-							id.includes('/lib/program-audio-layouts.js')
+							id.includes('/lib/program-audio-layouts.js') ||
+							// deps of the members above (plug shared -> main leaks, WO-138):
+							id.includes('/lib/app-runtime.js') ||
+							id.includes('/lib/scene-content-fit.js') ||
+							id.includes('/lib/audio-channel-layouts.js') ||
+							// leaf draw helpers used by main (timeline compose libs) and scenes (WO-138):
+							id.includes('/lib/ui-font.js') ||
+							id.includes('/components/preview-canvas-draw-base.js')
 						) {
 							return 'shared'
 						}

@@ -112,6 +112,13 @@
       "externalRef": "dst_mraumeh9_1"
     },
     {
+      "id": "caspar_mv_out",
+      "deviceId": "caspar_host",
+      "kind": "caspar_mv_out",
+      "label": "Multiview channel (virtual)",
+      "externalRef": "3"
+    },
+    {
       "id": "gpu_p0",
       "deviceId": "caspar_host",
       "kind": "gpu_out",
@@ -129,11 +136,7 @@
       "label": "P1",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 0,
-        "mode": "1080p5000",
-        "outputBinding": {
-          "type": "multiview"
-        }
+        "mainIndex": 1
       },
       "externalRef": "DP-3"
     },
@@ -144,7 +147,7 @@
       "label": "P2",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 1
+        "mainIndex": 0
       },
       "externalRef": "DP-4"
     },
@@ -158,13 +161,6 @@
         "mainIndex": 0
       },
       "externalRef": "DP-6/DP-7"
-    },
-    {
-      "id": "caspar_mv_out",
-      "deviceId": "caspar_host",
-      "kind": "caspar_mv_out",
-      "label": "Multiview channel (virtual)",
-      "externalRef": "3"
     }
   ],
   "edges": [

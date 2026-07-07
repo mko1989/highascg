@@ -415,6 +415,7 @@ export function createTimelineTransport(deps) {
 		doSeek,
 		syncToServer,
 		updateSendTo,
+		syncSendToWithChannelMap,
 		togglePlay,
 		doStop,
 	}

@@ -1,4 +1,4 @@
-import { normRandrCaspar } from '../components/device-view-caspar-render-helpers.js'
+import { normRandrCaspar } from './device-view-randr-norm.js'
 import { GPU_REAR_PORT_COUNT_OVERRIDE_KEY, RTX_20_30_SOCKET_COUNT } from './device-view-gpu-port-constants.js'
 
 /** Same filter as device-view Caspar rear panel for `live.gpu.connectors`. */

@@ -1,6 +1,6 @@
 import { hasDrmGpuPhysicalMap, resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-list.js'
 import { findScreenDestinationById } from '../lib/device-view-host-channels.js'
-import { normRandrCaspar } from './device-view-caspar-render-helpers.js'
+import { normRandrCaspar } from '../lib/device-view-randr-norm.js'
 import { isDecklinkIoIn, isDecklinkIoOut, isDecklinkIoOutputSink } from '../lib/decklink-io-direction.js'
 
 export const CASPAR_HOST = 'caspar_host'

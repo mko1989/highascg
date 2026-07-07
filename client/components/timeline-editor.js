@@ -135,7 +135,7 @@ export function initTimelineEditor(root, stateStore) {
 	const canvas = initTimelineCanvas(bodyEl, createTimelineCanvasHandlers({
 		stateStore,
 		sceneState,
-		getPlayback,
+		getPlayback: () => getPlayback(),
 		getView: () => view,
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		getSelectedClip: () => selectedClip,
@@ -199,7 +199,7 @@ export function initTimelineEditor(root, stateStore) {
 			await syncPlaybackFromServer()
 		},
 	})
-	const { buildTransport, updateTimecode, syncToServer, updateSendTo, togglePlay } = transportApi
+	const { buildTransport, updateTimecode, syncToServer, updateSendTo, syncSendToWithChannelMap, togglePlay } = transportApi
 	updateTimecodeFn = updateTimecode
 	syncToServerRef.fn = syncToServer
 
