@@ -79,6 +79,12 @@ home/casparcg/exfat/*
 home/casparcg/companion-module-dev
 home/casparcg/companion-module-dev/*
 
+# Build-host working files (not needed on playout)
+home/casparcg/highascg-backup-box.tgz
+home/casparcg/highascg-wiki-map
+home/casparcg/highascg-wiki-map/*
+home/casparcg/highascg-mirror-push.log
+
 # Snap user state (Firefox etc. on build host — not playout)
 home/casparcg/snap
 home/casparcg/snap/*

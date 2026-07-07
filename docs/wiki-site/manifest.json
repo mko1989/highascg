@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-07-04T09:42:41.336Z",
+  "generatedAt": "2026-07-07T17:59:16.549Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -336,6 +336,14 @@
       "order": 60
     },
     {
+      "id": "wiki--integration--usb-v4l2-input",
+      "title": "USB / V4L2 video input",
+      "file": "wiki/integration/usb-v4l2-input.md",
+      "category": "Integration",
+      "description": "Capture UVC webcams and USB switchers (e.g. **ATEM Mini Pro ISO**) on a dedicated Caspar host channel. By default Caspar opens the device directly via **`PLAY …",
+      "order": 60
+    },
+    {
       "id": "companion-websocket-catalog-bootstrap",
       "title": "Companion module: WebSocket slim bootstrap & catalog loading",
       "file": "companion-websocket-catalog-bootstrap.md",
@@ -637,6 +645,14 @@
       "file": "SECURITY.md",
       "category": "Reference",
       "description": "HighAsCG exposes an HTTP API and operator WebSocket on the playout server. By default **authentication is not enforced** so existing deployments keep working. W",
+      "order": 900
+    },
+    {
+      "id": "wiki--integration--virtual-camera-output",
+      "title": "Virtual camera output (v4l2loopback)",
+      "file": "wiki/integration/virtual-camera-output.md",
+      "category": "Reference",
+      "description": "Feed Caspar program output to **Zoom**, **OBS**, or other apps as a **V4L2 webcam** plus an optional **ALSA virtual mic**. HighAsCG uses the same safe JPEG buff",
       "order": 900
     }
   ]

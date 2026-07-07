@@ -124,12 +124,19 @@ home/casparcg/highascg/refs
 home/casparcg/highascg/dist
 home/casparcg/highascg/.github
 home/casparcg/highascg/.github/*
+# Build-host sync copies (not needed on live system)
+home/casparcg/bridge
+home/casparcg/bridge/*
 home/casparcg/exfat
 home/casparcg/exfat/*
+home/casparcg/0x200014
+home/casparcg/0x200014/*
 home/casparcg/.cache
 home/casparcg/.cache/*
 home/casparcg/Downloads
 home/casparcg/Downloads/*
+home/casparcg/.copilot
+home/casparcg/.copilot/*
 home/casparcg/.cursor-server
 home/casparcg/.cursor-server/*
 home/casparcg/.cursor

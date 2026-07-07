@@ -22,7 +22,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INNER="${REPO}/work/run-eggs-clone-flash-inner.sh"
 SESSION="${TMUX_SESSION:-highascg-eggs}"
-USB="${USB_DEVICE:-/dev/sda}"
+USB="${USB_DEVICE:-/dev/sdb}"
 ATTACH=false
 ATTACH_ONLY=false
 LOG=""

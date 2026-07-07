@@ -1,0 +1,4903 @@
+{
+  "generated": "2026-07-05T10:14:26.937Z",
+  "root": "/home/casparcg/highascg",
+  "largeFiles": {
+    "threshold": 500,
+    "count": 50,
+    "byTopFolder": {
+      "client": 24,
+      "src": 18,
+      "tools": 3,
+      "template": 3,
+      "scripts": 2
+    },
+    "bySubFolder": {
+      "client/components": 19,
+      "src/system": 1,
+      "tools/smoke": 2,
+      "src/utils": 3,
+      "src/api": 5,
+      "client/lib": 4,
+      "client/tools": 1,
+      "tools/map": 1,
+      "src/config": 2,
+      "template": 3,
+      "src/engine": 3,
+      "src/audio": 1,
+      "src/replication": 1,
+      "src/media": 1,
+      "scripts": 2,
+      "src/caspar": 1
+    },
+    "files": [
+      {
+        "rel": "client/components/map-explorer.js",
+        "lines": 1061,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/device-view.js",
+        "lines": 952,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/device-view-inspector-replication.js",
+        "lines": 828,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/inspector-panel-timeline.js",
+        "lines": 787,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/device-view-destinations-inspector.js",
+        "lines": 778,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "src/system/cef-interactive-bridge.js",
+        "lines": 769,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/system"
+      },
+      {
+        "rel": "tools/smoke/smoke-config-generator-routing.js",
+        "lines": 763,
+        "ext": ".js",
+        "top": "tools",
+        "sub": "tools/smoke"
+      },
+      {
+        "rel": "client/components/timeline-canvas.js",
+        "lines": 732,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "src/utils/x-display-session.js",
+        "lines": 720,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/utils"
+      },
+      {
+        "rel": "client/components/sources-panel.js",
+        "lines": 689,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/live-input-modal.js",
+        "lines": 687,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/scenes-editor.js",
+        "lines": 681,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink.js",
+        "lines": 679,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "tools/smoke/smoke-mapping-gpu-os-layout.js",
+        "lines": 676,
+        "ext": ".js",
+        "top": "tools",
+        "sub": "tools/smoke"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu-video-modeline.js",
+        "lines": 645,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "lines": 645,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/api"
+      },
+      {
+        "rel": "src/api/routes-streaming-channel.js",
+        "lines": 629,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/api"
+      },
+      {
+        "rel": "client/components/preview-canvas-panel.js",
+        "lines": 627,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/lib/timeline-state.js",
+        "lines": 622,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/lib"
+      },
+      {
+        "rel": "client/tools/electron-launcher/renderer.js",
+        "lines": 611,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/tools"
+      },
+      {
+        "rel": "src/api/routes-data.js",
+        "lines": 596,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/api"
+      },
+      {
+        "rel": "tools/map/ast-scanner.js",
+        "lines": 591,
+        "ext": ".js",
+        "top": "tools",
+        "sub": "tools/map"
+      },
+      {
+        "rel": "src/config/build-caspar-generator-config.js",
+        "lines": 590,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/config"
+      },
+      {
+        "rel": "client/components/timeline-editor.js",
+        "lines": 579,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "template/lower-thirds/lt-engine.js",
+        "lines": 579,
+        "ext": ".js",
+        "top": "template",
+        "sub": "template"
+      },
+      {
+        "rel": "client/lib/device-view-host-channels.js",
+        "lines": 578,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/lib"
+      },
+      {
+        "rel": "client/components/logs-modal.js",
+        "lines": 571,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "src/engine/project-scenes.js",
+        "lines": 564,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/engine"
+      },
+      {
+        "rel": "src/engine/timeline-playback-amcp.js",
+        "lines": 562,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/engine"
+      },
+      {
+        "rel": "src/audio/alsa-mixer.js",
+        "lines": 560,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/audio"
+      },
+      {
+        "rel": "client/components/scene-list.js",
+        "lines": 558,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "template/lower-thirds/lt-engine-from-client/lt-engine copy.js",
+        "lines": 557,
+        "ext": ".js",
+        "top": "template",
+        "sub": "template"
+      },
+      {
+        "rel": "src/api/routes-replication.js",
+        "lines": 556,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/api"
+      },
+      {
+        "rel": "src/config/decklink-output-resolve.js",
+        "lines": 555,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/config"
+      },
+      {
+        "rel": "client/components/audio-mixer-panel.js",
+        "lines": 554,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/inspector-lower-third.js",
+        "lines": 550,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/components/inspector-panel.js",
+        "lines": 548,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "src/replication/replication-service.js",
+        "lines": 547,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/replication"
+      },
+      {
+        "rel": "client/components/audio-mixer-view-console.js",
+        "lines": 540,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/components"
+      },
+      {
+        "rel": "client/lib/scene-state.js",
+        "lines": 540,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/lib"
+      },
+      {
+        "rel": "src/api/routes-mixer.js",
+        "lines": 530,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/api"
+      },
+      {
+        "rel": "src/media/live-thumbnail-cache.js",
+        "lines": 528,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/media"
+      },
+      {
+        "rel": "src/utils/os-config.js",
+        "lines": 525,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/utils"
+      },
+      {
+        "rel": "template/led_grid_test.js",
+        "lines": 523,
+        "ext": ".js",
+        "top": "template",
+        "sub": "template"
+      },
+      {
+        "rel": "scripts/exfat/install-exfat-systemd-units.sh",
+        "lines": 521,
+        "ext": ".sh",
+        "top": "scripts",
+        "sub": "scripts"
+      },
+      {
+        "rel": "scripts/lib/install-helpers.sh",
+        "lines": 519,
+        "ext": ".sh",
+        "top": "scripts",
+        "sub": "scripts"
+      },
+      {
+        "rel": "src/caspar/amcp-client.js",
+        "lines": 506,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/caspar"
+      },
+      {
+        "rel": "src/engine/timeline-playback.js",
+        "lines": 503,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/engine"
+      },
+      {
+        "rel": "src/utils/gpu-topology-drm.js",
+        "lines": 503,
+        "ext": ".js",
+        "top": "src",
+        "sub": "src/utils"
+      },
+      {
+        "rel": "client/lib/pip-overlay-amcp.js",
+        "lines": 501,
+        "ext": ".js",
+        "top": "client",
+        "sub": "client/lib"
+      }
+    ]
+  },
+  "unused": {
+    "totalEslintNoUnusedVars": 295,
+    "likelyDeadImports": [
+      {
+        "rel": "client/components/device-view-actions.js",
+        "line": 8,
+        "col": 10,
+        "kind": "binding",
+        "name": "FACTORY_RESET_GPU_LAYOUT_KEY",
+        "message": "'FACTORY_RESET_GPU_LAYOUT_KEY' is defined but never used.",
+        "context": "import { FACTORY_RESET_GPU_LAYOUT_KEY } from '../lib/device-view-gpu-port-constants.js'"
+      },
+      {
+        "rel": "client/components/device-view-bands-render.js",
+        "line": 5,
+        "col": 10,
+        "kind": "binding",
+        "name": "CASPAR_HOST",
+        "message": "'CASPAR_HOST' is defined but never used.",
+        "context": "import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'"
+      },
+      {
+        "rel": "client/components/device-view-bands-render.js",
+        "line": 5,
+        "col": 55,
+        "kind": "binding",
+        "name": "connectorById",
+        "message": "'connectorById' is defined but never used.",
+        "context": "import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'"
+      },
+      {
+        "rel": "client/components/device-view-events.js",
+        "line": 11,
+        "col": 10,
+        "kind": "binding",
+        "name": "getAppWs",
+        "message": "'getAppWs' is defined but never used.",
+        "context": "import { getAppWs } from '../lib/app-runtime.js'"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink.js",
+        "line": 16,
+        "col": 22,
+        "kind": "binding",
+        "name": "escapeAttr",
+        "message": "'escapeAttr' is defined but never used.",
+        "context": "import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu-video-modeline.js",
+        "line": 5,
+        "col": 10,
+        "kind": "binding",
+        "name": "setStatus",
+        "message": "'setStatus' is defined but never used.",
+        "context": "import { setStatus } from './device-view-ui-utils.js'"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu.js",
+        "line": 17,
+        "col": 2,
+        "kind": "binding",
+        "name": "shouldSeedScreenConsumerDefaults",
+        "message": "'shouldSeedScreenConsumerDefaults' is defined but never used.",
+        "context": "shouldSeedScreenConsumerDefaults,"
+      },
+      {
+        "rel": "client/components/device-view.js",
+        "line": 4,
+        "col": 10,
+        "kind": "binding",
+        "name": "showSettingsModal",
+        "message": "'showSettingsModal' is defined but never used.",
+        "context": "import { showSettingsModal } from './settings-modal.js'"
+      },
+      {
+        "rel": "client/components/device-view.js",
+        "line": 15,
+        "col": 21,
+        "kind": "binding",
+        "name": "buildInspectorTable",
+        "message": "'buildInspectorTable' is defined but never used.",
+        "context": "import { setStatus, buildInspectorTable, connectorIdFromEvent, renderPreservingFocus } from './device-view-ui-utils.js'"
+      },
+      {
+        "rel": "client/components/device-view.js",
+        "line": 28,
+        "col": 10,
+        "kind": "binding",
+        "name": "showLogsModal",
+        "message": "'showLogsModal' is defined but never used.",
+        "context": "import { showLogsModal } from './logs-modal.js'"
+      },
+      {
+        "rel": "client/components/device-view.js",
+        "line": 38,
+        "col": 2,
+        "kind": "binding",
+        "name": "screenConsumerDefaultsSettingsPatch",
+        "message": "'screenConsumerDefaultsSettingsPatch' is defined but never used.",
+        "context": "screenConsumerDefaultsSettingsPatch,"
+      },
+      {
+        "rel": "client/components/fixture-inspector.js",
+        "line": 6,
+        "col": 10,
+        "kind": "binding",
+        "name": "escapeHtml",
+        "message": "'escapeHtml' is defined but never used.",
+        "context": "import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 15,
+        "col": 10,
+        "kind": "binding",
+        "name": "showSyncModal",
+        "message": "'showSyncModal' is defined but never used.",
+        "context": "import { showSyncModal } from './sync-modal.js'"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 16,
+        "col": 10,
+        "kind": "binding",
+        "name": "showPublishModal",
+        "message": "'showPublishModal' is defined but never used.",
+        "context": "import { showPublishModal } from './publish-modal.js'"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 17,
+        "col": 10,
+        "kind": "binding",
+        "name": "showLedTestModal",
+        "message": "'showLedTestModal' is defined but never used.",
+        "context": "import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 17,
+        "col": 28,
+        "kind": "binding",
+        "name": "getLedTestSettings",
+        "message": "'getLedTestSettings' is defined but never used.",
+        "context": "import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 17,
+        "col": 48,
+        "kind": "binding",
+        "name": "getLedTestShowGridForChannel",
+        "message": "'getLedTestShowGridForChannel' is defined but never used.",
+        "context": "import { showLedTestModal, getLedTestSettings, getLedTestShowGridForChannel } from './led-test-modal.js'"
+      },
+      {
+        "rel": "client/components/inspector-fill-timeline.js",
+        "line": 5,
+        "col": 30,
+        "kind": "binding",
+        "name": "normalizedToPixels",
+        "message": "'normalizedToPixels' is defined but never used.",
+        "context": "import { pixelsToNormalized, normalizedToPixels } from '../lib/fill-math.js'"
+      },
+      {
+        "rel": "client/components/inspector-panel.js",
+        "line": 4,
+        "col": 10,
+        "kind": "binding",
+        "name": "api",
+        "message": "'api' is defined but never used.",
+        "context": "import { api } from '../lib/api-client.js'"
+      },
+      {
+        "rel": "client/components/preview-canvas-panel.js",
+        "line": 8,
+        "col": 13,
+        "kind": "binding",
+        "name": "MathH",
+        "message": "'MathH' is defined but never used.",
+        "context": "import * as MathH from './preview-panel-math.js'"
+      },
+      {
+        "rel": "client/components/scenes-editor.js",
+        "line": 24,
+        "col": 10,
+        "kind": "binding",
+        "name": "isMediaOrFileSource",
+        "message": "'isMediaOrFileSource' is defined but never used.",
+        "context": "import { isMediaOrFileSource, dataTransferOffersDeckMedia, parseDraggableSourcesPayload } from './scenes-shared.js'"
+      },
+      {
+        "rel": "client/components/scenes-preview-runtime.js",
+        "line": 8,
+        "col": 10,
+        "kind": "binding",
+        "name": "amcpParam",
+        "message": "'amcpParam' is defined but never used.",
+        "context": "import { amcpParam, chLayerAmcp, buildIncomingScenePayload } from './scenes-shared.js'"
+      },
+      {
+        "rel": "client/components/scenes-preview-runtime.js",
+        "line": 27,
+        "col": 49,
+        "kind": "assignment",
+        "name": "getPreviewChannel",
+        "message": "'getPreviewChannel' is assigned a value but never used.",
+        "context": "const { sceneState, stateStore, getChannelMap, getPreviewChannel, getPreviewOutputResolution, flushSceneDeckSync } = opts"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 3,
+        "col": 10,
+        "kind": "binding",
+        "name": "getThumbnailUrl",
+        "message": "'getThumbnailUrl' is defined but never used.",
+        "context": "import { getThumbnailUrl } from '../lib/thumbnail-url.js'"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 4,
+        "col": 10,
+        "kind": "binding",
+        "name": "decklinkInputForSlot",
+        "message": "'decklinkInputForSlot' is defined but never used.",
+        "context": "import { decklinkInputForSlot, liveAudioInputForSlot, v4l2InputForSlot, listInputChannels, decklinkSlotFromConnector } from '../lib/input-ch"
+      },
+      {
+        "rel": "client/components/sources-panel-media.js",
+        "line": 4,
+        "col": 22,
+        "kind": "binding",
+        "name": "truncate",
+        "message": "'truncate' is defined but never used.",
+        "context": "import { escapeHtml, truncate, getExtension, formatDuration, formatFps, makeDraggable, attachMediaModifierClick } from './sources-panel-help"
+      },
+      {
+        "rel": "client/components/sources-panel-project-gather.js",
+        "line": 5,
+        "col": 10,
+        "kind": "binding",
+        "name": "api",
+        "message": "'api' is defined but never used.",
+        "context": "import { api } from '../lib/api-client.js'"
+      },
+      {
+        "rel": "client/components/timeline-editor-handlers.js",
+        "line": 4,
+        "col": 24,
+        "kind": "binding",
+        "name": "getContentResolution",
+        "message": "'getContentResolution' is defined but never used.",
+        "context": "import { findMediaRow, getContentResolution } from '../lib/mixer-fill.js'"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-merge.js",
+        "line": 7,
+        "col": 10,
+        "kind": "binding",
+        "name": "readGpuLayoutPrefs",
+        "message": "'readGpuLayoutPrefs' is defined but never used.",
+        "context": "import { readGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-merge.js",
+        "line": 9,
+        "col": 10,
+        "kind": "binding",
+        "name": "displaysMatchingPairs",
+        "message": "'displaysMatchingPairs' is defined but never used.",
+        "context": "import { displaysMatchingPairs, isPrimaryTopologySocket } from './device-view-gpu-port-utils.js'"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-topology.js",
+        "line": 2,
+        "col": 10,
+        "kind": "binding",
+        "name": "readGpuLayoutPrefs",
+        "message": "'readGpuLayoutPrefs' is defined but never used.",
+        "context": "import { readGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'"
+      },
+      {
+        "rel": "client/lib/device-view-host-channels.js",
+        "line": 12,
+        "col": 2,
+        "kind": "binding",
+        "name": "reconcileExtraLiveSourceChannel",
+        "message": "'reconcileExtraLiveSourceChannel' is defined but never used.",
+        "context": "reconcileExtraLiveSourceChannel,"
+      },
+      {
+        "rel": "client/lib/editor-defaults.js",
+        "line": 7,
+        "col": 2,
+        "kind": "binding",
+        "name": "DEFAULT_EDITOR_DEFAULTS",
+        "message": "'DEFAULT_EDITOR_DEFAULTS' is defined but never used.",
+        "context": "DEFAULT_EDITOR_DEFAULTS,"
+      },
+      {
+        "rel": "client/lib/led-test-apply.js",
+        "line": 40,
+        "col": 26,
+        "kind": "assignment",
+        "name": "_g",
+        "message": "'_g' is assigned a value but never used.",
+        "context": "const { gridByChannel: _g, channelsEnabled: _c, ...rest } = s"
+      },
+      {
+        "rel": "client/lib/led-test-apply.js",
+        "line": 40,
+        "col": 47,
+        "kind": "assignment",
+        "name": "_c",
+        "message": "'_c' is assigned a value but never used.",
+        "context": "const { gridByChannel: _g, channelsEnabled: _c, ...rest } = s"
+      },
+      {
+        "rel": "client/lib/pip-overlay-amcp.js",
+        "line": 10,
+        "col": 2,
+        "kind": "binding",
+        "name": "PIP_OVERLAY_LAYER_OFFSET",
+        "message": "'PIP_OVERLAY_LAYER_OFFSET' is defined but never used.",
+        "context": "PIP_OVERLAY_LAYER_OFFSET,"
+      },
+      {
+        "rel": "client/lib/previs-scene-utils.js",
+        "line": 4,
+        "col": 10,
+        "kind": "binding",
+        "name": "tagScreenMesh",
+        "message": "'tagScreenMesh' is defined but never used.",
+        "context": "import { tagScreenMesh, readScreenTag, traverseMeshes } from './previs-mesh-info.js'"
+      },
+      {
+        "rel": "client/lib/project-import-flow.js",
+        "line": 4,
+        "col": 10,
+        "kind": "binding",
+        "name": "api",
+        "message": "'api' is defined but never used.",
+        "context": "import { api } from './api-client.js'"
+      },
+      {
+        "rel": "client/lib/scene-state-layer-logic.js",
+        "line": 6,
+        "col": 2,
+        "kind": "binding",
+        "name": "defaultLayerConfig",
+        "message": "'defaultLayerConfig' is defined but never used.",
+        "context": "defaultLayerConfig,"
+      },
+      {
+        "rel": "client/lib/scene-state-layer-logic.js",
+        "line": 7,
+        "col": 2,
+        "kind": "binding",
+        "name": "newId",
+        "message": "'newId' is defined but never used.",
+        "context": "newId,"
+      },
+      {
+        "rel": "client/lib/scene-state-look-logic.js",
+        "line": 6,
+        "col": 2,
+        "kind": "binding",
+        "name": "migrateScene",
+        "message": "'migrateScene' is defined but never used.",
+        "context": "migrateScene,"
+      },
+      {
+        "rel": "client/lib/scene-state-look-logic.js",
+        "line": 7,
+        "col": 2,
+        "kind": "binding",
+        "name": "newId",
+        "message": "'newId' is defined but never used.",
+        "context": "newId,"
+      },
+      {
+        "rel": "client/lib/scene-state.js",
+        "line": 12,
+        "col": 2,
+        "kind": "binding",
+        "name": "LOOK_LAYER_MAX",
+        "message": "'LOOK_LAYER_MAX' is defined but never used.",
+        "context": "LOOK_LAYER_MAX,"
+      },
+      {
+        "rel": "client/lib/scene-state.js",
+        "line": 13,
+        "col": 2,
+        "kind": "binding",
+        "name": "isValidLookLayerNumber",
+        "message": "'isValidLookLayerNumber' is defined but never used.",
+        "context": "isValidLookLayerNumber,"
+      },
+      {
+        "rel": "client/lib/timeline-compose-preview.js",
+        "line": 5,
+        "col": 10,
+        "kind": "binding",
+        "name": "timelineComposeCellShowsTimeline",
+        "message": "'timelineComposeCellShowsTimeline' is defined but never used.",
+        "context": "import { timelineComposeCellShowsTimeline } from './timeline-state-model.js'"
+      },
+      {
+        "rel": "index.js",
+        "line": 7,
+        "col": 37,
+        "kind": "assignment",
+        "name": "os",
+        "message": "'os' is assigned a value but never used.",
+        "context": "const path = require('path'); const os = require('os'); const fs = require('fs')"
+      },
+      {
+        "rel": "src/api/device-view-crud.js",
+        "line": 6,
+        "col": 31,
+        "kind": "assignment",
+        "name": "validateDeviceGraph",
+        "message": "'validateDeviceGraph' is assigned a value but never used.",
+        "context": "const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDe"
+      },
+      {
+        "rel": "src/api/device-view-crud.js",
+        "line": 17,
+        "col": 9,
+        "kind": "assignment",
+        "name": "normalizeDecklinkIoDirection",
+        "message": "'normalizeDecklinkIoDirection' is assigned a value but never used.",
+        "context": "const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')"
+      },
+      {
+        "rel": "src/api/device-view-snapshot.js",
+        "line": 17,
+        "col": 9,
+        "kind": "assignment",
+        "name": "listPortAudioDevices",
+        "message": "'listPortAudioDevices' is assigned a value but never used.",
+        "context": "const { listPortAudioDevices } = require('../audio/audio-devices')"
+      },
+      {
+        "rel": "src/api/get-state.js",
+        "line": 7,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      },
+      {
+        "rel": "src/api/get-state.js",
+        "line": 8,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/api/host-operator-fullscreen.js",
+        "line": 3,
+        "col": 9,
+        "kind": "assignment",
+        "name": "getChannelMap",
+        "message": "'getChannelMap' is assigned a value but never used.",
+        "context": "const { getChannelMap } = require('../config/routing')"
+      },
+      {
+        "rel": "src/api/routes-amcp.js",
+        "line": 50,
+        "col": 9,
+        "kind": "assignment",
+        "name": "normalizeDecklinkPlayAmcpLine",
+        "message": "'normalizeDecklinkPlayAmcpLine' is assigned a value but never used.",
+        "context": "const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')"
+      },
+      {
+        "rel": "src/api/routes-cg-thumb.js",
+        "line": 4,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/api/routes-companion-preview.js",
+        "line": 3,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      },
+      {
+        "rel": "src/api/routes-companion-preview.js",
+        "line": 4,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/api/routes-data-project-read.js",
+        "line": 5,
+        "col": 26,
+        "kind": "assignment",
+        "name": "loadProjectForSlug",
+        "message": "'loadProjectForSlug' is assigned a value but never used.",
+        "context": "const { loadFullProject, loadProjectForSlug } = require('../engine/project-scenes')"
+      },
+      {
+        "rel": "src/api/routes-ingest.js",
+        "line": 10,
+        "col": 9,
+        "kind": "assignment",
+        "name": "spawn",
+        "message": "'spawn' is assigned a value but never used.",
+        "context": "const { spawn } = require('child_process')"
+      },
+      {
+        "rel": "src/api/routes-mixer.js",
+        "line": 9,
+        "col": 7,
+        "kind": "assignment",
+        "name": "persistence",
+        "message": "'persistence' is assigned a value but never used.",
+        "context": "const persistence = require('../utils/persistence')"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 7,
+        "col": 33,
+        "kind": "assignment",
+        "name": "parseBody",
+        "message": "'parseBody' is assigned a value but never used.",
+        "context": "const { JSON_HEADERS, jsonBody, parseBody } = require('./response')"
+      },
+      {
+        "rel": "src/api/routes-scene-shared.js",
+        "line": 11,
+        "col": 13,
+        "kind": "assignment",
+        "name": "playSeekFrames",
+        "message": "'playSeekFrames' is assigned a value but never used.",
+        "context": "const { playSeekFrames, ...rest } = L"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 11,
+        "col": 26,
+        "kind": "assignment",
+        "name": "normalizeTransition",
+        "message": "'normalizeTransition' is assigned a value but never used.",
+        "context": "const { layerHasContent, normalizeTransition, resolveChannelFramerateForMixerTween } = require('../engine/scene-transition')"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 14,
+        "col": 24,
+        "kind": "assignment",
+        "name": "getRouteString",
+        "message": "'getRouteString' is assigned a value but never used.",
+        "context": "const { getChannelMap, getRouteString } = require('../config/routing')"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 21,
+        "col": 10,
+        "kind": "binding",
+        "name": "sleep",
+        "message": "'sleep' is defined but never used.",
+        "context": "function sleep(ms) {"
+      },
+      {
+        "rel": "src/artnet/artnet-output.js",
+        "line": 12,
+        "col": 25,
+        "kind": "assignment",
+        "name": "_t",
+        "message": "'_t' is assigned a value but never used.",
+        "context": "const { enabled, type: _t, ...paramRest } = params"
+      },
+      {
+        "rel": "src/audio/audio-devices.js",
+        "line": 7,
+        "col": 7,
+        "kind": "assignment",
+        "name": "os",
+        "message": "'os' is assigned a value but never used.",
+        "context": "const os = require('os')"
+      },
+      {
+        "rel": "src/audio/audio-devices.js",
+        "line": 9,
+        "col": 9,
+        "kind": "assignment",
+        "name": "execSync",
+        "message": "'execSync' is assigned a value but never used.",
+        "context": "const { execSync, execFileSync } = require('child_process')"
+      },
+      {
+        "rel": "src/capture/v4l2-input-bridge.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "readCasparSetting",
+        "message": "'readCasparSetting' is assigned a value but never used.",
+        "context": "const { readCasparSetting } = require('../config/routing-map')"
+      },
+      {
+        "rel": "src/capture/v4l2-input-health.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "listConfiguredV4l2Slots",
+        "message": "'listConfiguredV4l2Slots' is assigned a value but never used.",
+        "context": "const { listConfiguredV4l2Slots, listV4l2PlayClipVariants } = require('./v4l2-input-config')"
+      },
+      {
+        "rel": "src/config/config-generator-channels.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "STANDARD_VIDEO_MODES",
+        "message": "'STANDARD_VIDEO_MODES' is assigned a value but never used.",
+        "context": "const { STANDARD_VIDEO_MODES } = require('./config-modes')"
+      },
+      {
+        "rel": "src/config/device-graph-suggest.js",
+        "line": 5,
+        "col": 63,
+        "kind": "assignment",
+        "name": "slug",
+        "message": "'slug' is assigned a value but never used.",
+        "context": "const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS, slug } = require('./device-graph-constants')"
+      },
+      {
+        "rel": "src/config/host-live-sources-caspar.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "isHostLiveSource",
+        "message": "'isHostLiveSource' is assigned a value but never used.",
+        "context": "const { isHostLiveSource, listHostLiveChannelEntries } = require('./host-live-sources')"
+      },
+      {
+        "rel": "src/config/host-live-sources.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "getModeDimensions",
+        "message": "'getModeDimensions' is assigned a value but never used.",
+        "context": "const { getModeDimensions } = require('./config-modes')"
+      },
+      {
+        "rel": "src/engine/global-border.js",
+        "line": 7,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      },
+      {
+        "rel": "src/engine/project-hardware-config.js",
+        "line": 32,
+        "col": 24,
+        "kind": "assignment",
+        "name": "_slice",
+        "message": "'_slice' is assigned a value but never used.",
+        "context": "const { casparServer: _slice, ...osDisplay } = sp"
+      },
+      {
+        "rel": "src/engine/project-scenes.js",
+        "line": 3,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      },
+      {
+        "rel": "src/engine/project-scenes.js",
+        "line": 4,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/engine/project-scenes.js",
+        "line": 6,
+        "col": 9,
+        "kind": "assignment",
+        "name": "REPO_ROOT",
+        "message": "'REPO_ROOT' is assigned a value but never used.",
+        "context": "const { REPO_ROOT } = require('../repo-paths')"
+      },
+      {
+        "rel": "src/engine/scene-take-lbg.js",
+        "line": 27,
+        "col": 9,
+        "kind": "assignment",
+        "name": "PGM_BANK_B_OFFSET",
+        "message": "'PGM_BANK_B_OFFSET' is assigned a value but never used.",
+        "context": "const { PGM_BANK_B_OFFSET } = require('./scene-transition')"
+      },
+      {
+        "rel": "src/engine/scene-take-pgm-only.js",
+        "line": 8,
+        "col": 9,
+        "kind": "assignment",
+        "name": "sendAmcpLinesSequential",
+        "message": "'sendAmcpLinesSequential' is assigned a value but never used.",
+        "context": "const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')"
+      },
+      {
+        "rel": "src/engine/scene-take.js",
+        "line": 39,
+        "col": 10,
+        "kind": "binding",
+        "name": "extFromPath",
+        "message": "'extFromPath' is defined but never used.",
+        "context": "function extFromPath(filename) {"
+      },
+      {
+        "rel": "src/media/live-thumbnail-cache-capture.js",
+        "line": 18,
+        "col": 9,
+        "kind": "assignment",
+        "name": "swallow",
+        "message": "'swallow' is assigned a value but never used.",
+        "context": "const { swallow } = require('../utils/swallow')"
+      },
+      {
+        "rel": "src/media/live-thumbnail-cache-handlers.js",
+        "line": 7,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/network/tailscale-service.js",
+        "line": 5,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/network/tailscale-service.js",
+        "line": 6,
+        "col": 23,
+        "kind": "assignment",
+        "name": "spawn",
+        "message": "'spawn' is assigned a value but never used.",
+        "context": "const { execFileSync, spawn } = require('child_process')"
+      },
+      {
+        "rel": "src/osc/osc-listener.js",
+        "line": 4,
+        "col": 9,
+        "kind": "assignment",
+        "name": "OscState",
+        "message": "'OscState' is assigned a value but never used.",
+        "context": "const { OscState } = require('./osc-state')"
+      },
+      {
+        "rel": "src/replication/connect-pair.js",
+        "line": 10,
+        "col": 9,
+        "kind": "assignment",
+        "name": "loadFullProject",
+        "message": "'loadFullProject' is assigned a value but never used.",
+        "context": "const { loadFullProject } = require('../engine/project-scenes')"
+      },
+      {
+        "rel": "src/replication/peer-client.js",
+        "line": 4,
+        "col": 7,
+        "kind": "assignment",
+        "name": "os",
+        "message": "'os' is assigned a value but never used.",
+        "context": "const os = require('os')"
+      },
+      {
+        "rel": "src/replication/project-media-parity.js",
+        "line": 4,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "src/replication/replication-pair-token.js",
+        "line": 3,
+        "col": 31,
+        "kind": "assignment",
+        "name": "normalizeReplicationConfig",
+        "message": "'normalizeReplicationConfig' is assigned a value but never used.",
+        "context": "const { getReplicationConfig, normalizeReplicationConfig } = require('../config/replication-config')"
+      },
+      {
+        "rel": "src/replication/replication-reconcile.js",
+        "line": 5,
+        "col": 9,
+        "kind": "assignment",
+        "name": "pushProjectToPeer",
+        "message": "'pushProjectToPeer' is assigned a value but never used.",
+        "context": "const { pushProjectToPeer, reconcileProjectsToPeer, receiveProjectFromPeer } = require('./replicate-projects')"
+      },
+      {
+        "rel": "src/replication/replication-reconcile.js",
+        "line": 7,
+        "col": 36,
+        "kind": "assignment",
+        "name": "scheduleLiveIntentApply",
+        "message": "'scheduleLiveIntentApply' is assigned a value but never used.",
+        "context": "const { applyLiveIntentOnFollower, scheduleLiveIntentApply } = require('./mirror-apply')"
+      },
+      {
+        "rel": "src/replication/replication-service.js",
+        "line": 8,
+        "col": 58,
+        "kind": "assignment",
+        "name": "normalizeReplicationConfig",
+        "message": "'normalizeReplicationConfig' is assigned a value but never used.",
+        "context": "const { getReplicationConfig, replicationPairConfigured, normalizeReplicationConfig } = require('../config/replication-config')"
+      },
+      {
+        "rel": "src/replication/replication-service.js",
+        "line": 10,
+        "col": 28,
+        "kind": "assignment",
+        "name": "reconcileProjectsToPeer",
+        "message": "'reconcileProjectsToPeer' is assigned a value but never used.",
+        "context": "const { pushProjectToPeer, reconcileProjectsToPeer } = require('./replicate-projects')"
+      },
+      {
+        "rel": "src/replication/replication-show-authority.js",
+        "line": 6,
+        "col": 37,
+        "kind": "assignment",
+        "name": "replicationPairConfigured",
+        "message": "'replicationPairConfigured' is assigned a value but never used.",
+        "context": "const { normalizeReplicationConfig, replicationPairConfigured } = require('../config/replication-config')"
+      },
+      {
+        "rel": "src/system/cef-interactive-bridge-events.js",
+        "line": 18,
+        "col": 22,
+        "kind": "assignment",
+        "name": "shouldTraceX11Event",
+        "message": "'shouldTraceX11Event' is assigned a value but never used.",
+        "context": "const { bridgeTrace, shouldTraceX11Event } = require('./cef-interactive-trace')"
+      },
+      {
+        "rel": "src/utils/os-config-xrandr-apply.js",
+        "line": 7,
+        "col": 9,
+        "kind": "assignment",
+        "name": "readCreateMissingModes",
+        "message": "'readCreateMissingModes' is assigned a value but never used.",
+        "context": "const { readCreateMissingModes, tryAddXrandrModeFromCvt, computeModelineForWxH, shouldCreateXrandrModeForPlan } = require('./xrandr-custom-m"
+      },
+      {
+        "rel": "src/utils/os-config.js",
+        "line": 6,
+        "col": 9,
+        "kind": "assignment",
+        "name": "execSync",
+        "message": "'execSync' is assigned a value but never used.",
+        "context": "const { execSync, execFileSync } = require('child_process')"
+      },
+      {
+        "rel": "src/utils/os-config.js",
+        "line": 10,
+        "col": 9,
+        "kind": "assignment",
+        "name": "readCreateMissingModes",
+        "message": "'readCreateMissingModes' is assigned a value but never used.",
+        "context": "const { readCreateMissingModes, tryAddXrandrModeFromCvt, computeModelineForWxH, shouldCreateXrandrModeForPlan } = require('./xrandr-custom-m"
+      },
+      {
+        "rel": "src/utils/x-display-session.js",
+        "line": 5,
+        "col": 19,
+        "kind": "assignment",
+        "name": "spawn",
+        "message": "'spawn' is assigned a value but never used.",
+        "context": "const { execFile, spawn } = require('child_process')"
+      },
+      {
+        "rel": "src/utils/xrandr-custom-mode.js",
+        "line": 5,
+        "col": 9,
+        "kind": "assignment",
+        "name": "resolveEffectiveOsModeSource",
+        "message": "'resolveEffectiveOsModeSource' is assigned a value but never used.",
+        "context": "const { resolveEffectiveOsModeSource } = require('./os-mode-source')"
+      },
+      {
+        "rel": "src/virtual-output/v4l2-kernel-modules.js",
+        "line": 5,
+        "col": 19,
+        "kind": "assignment",
+        "name": "execFileSync",
+        "message": "'execFileSync' is assigned a value but never used.",
+        "context": "const { execFile, execFileSync } = require('child_process')"
+      },
+      {
+        "rel": "tools/map/timing-test.js",
+        "line": 8,
+        "col": 9,
+        "kind": "assignment",
+        "name": "modules",
+        "message": "'modules' is assigned a value but never used.",
+        "context": "const { modules, allFiles } = scanServerModules(repoRoot);"
+      },
+      {
+        "rel": "tools/map/timing-test.js",
+        "line": 12,
+        "col": 9,
+        "kind": "assignment",
+        "name": "clientChildren",
+        "message": "'clientChildren' is assigned a value but never used.",
+        "context": "const { clientChildren, allClientNodes } = scanClientModules(repoRoot);"
+      },
+      {
+        "rel": "tools/smoke/smoke-amcp-batch-library.test.js",
+        "line": 6,
+        "col": 23,
+        "kind": "assignment",
+        "name": "after",
+        "message": "'after' is assigned a value but never used.",
+        "context": "const { describe, it, after } = require('node:test')"
+      },
+      {
+        "rel": "tools/smoke/smoke-cef-interactive-api.test.js",
+        "line": 3,
+        "col": 23,
+        "kind": "assignment",
+        "name": "beforeEach",
+        "message": "'beforeEach' is assigned a value but never used.",
+        "context": "const { describe, it, beforeEach, afterEach } = require('node:test')"
+      },
+      {
+        "rel": "tools/smoke/smoke-cef-interactive-bridge.live.test.js",
+        "line": 14,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      },
+      {
+        "rel": "tools/smoke/smoke-companion-satellite-preview.test.js",
+        "line": 7,
+        "col": 7,
+        "kind": "assignment",
+        "name": "path",
+        "message": "'path' is assigned a value but never used.",
+        "context": "const path = require('path')"
+      },
+      {
+        "rel": "tools/smoke/smoke-media-browser-router.test.js",
+        "line": 39,
+        "col": 17,
+        "kind": "binding",
+        "name": "get",
+        "message": "'get' is defined but never used.",
+        "context": "async function get(path) {"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-follower-profile.js",
+        "line": 5,
+        "col": 7,
+        "kind": "assignment",
+        "name": "fs",
+        "message": "'fs' is assigned a value but never used.",
+        "context": "const fs = require('fs')"
+      }
+    ],
+    "otherUnusedBindings": [
+      {
+        "rel": "client/assets/modules/previs/entry.js",
+        "line": 42,
+        "col": 48,
+        "kind": "parameter",
+        "name": "ctx",
+        "message": "'ctx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export default async function initPrevisModule(ctx) {"
+      },
+      {
+        "rel": "client/components/audio-mixer-view-console.js",
+        "line": 41,
+        "col": 58,
+        "kind": "parameter",
+        "name": "root",
+        "message": "'root' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputsListEl, mastersListEl }) {"
+      },
+      {
+        "rel": "client/components/device-view-cables.js",
+        "line": 309,
+        "col": 38,
+        "kind": "parameter",
+        "name": "surface",
+        "message": "'surface' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function buildSmoothSimpleMap(edges, surface) {"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render-simple.js",
+        "line": 30,
+        "col": 35,
+        "kind": "parameter",
+        "name": "lastPayload",
+        "message": "'lastPayload' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function statusSubtitle(it, live, lastPayload) {"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 35,
+        "col": 8,
+        "kind": "assignment",
+        "name": "cc",
+        "message": "'cc' is assigned a value but never used.",
+        "context": "const cc = live.caspar"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 64,
+        "col": 8,
+        "kind": "assignment",
+        "name": "audioInventory",
+        "message": "'audioInventory' is assigned a value but never used.",
+        "context": "const audioInventory = Array.isArray(live?.audio?.portaudio) ? live.audio.portaudio : []"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 70,
+        "col": 8,
+        "kind": "assignment",
+        "name": "shortDp",
+        "message": "'shortDp' is assigned a value but never used.",
+        "context": "const shortDp = (v) => String(v || '').trim().toUpperCase().replace(/^DP-?/i, '')"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 71,
+        "col": 8,
+        "kind": "assignment",
+        "name": "normGpuName",
+        "message": "'normGpuName' is assigned a value but never used.",
+        "context": "const normGpuName = (v) => String(v || '').trim().replace(/^card\\d+-/i, '').toLowerCase()"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 72,
+        "col": 8,
+        "kind": "assignment",
+        "name": "gpuConnectorIdFromName",
+        "message": "'gpuConnectorIdFromName' is assigned a value but never used.",
+        "context": "const gpuConnectorIdFromName = (v) => {"
+      },
+      {
+        "rel": "client/components/device-view-caspar-render.js",
+        "line": 77,
+        "col": 8,
+        "kind": "assignment",
+        "name": "gpuDisplays",
+        "message": "'gpuDisplays' is assigned a value but never used.",
+        "context": "const gpuDisplays = Array.isArray(live?.gpu?.displays) ? live.gpu.displays : []"
+      },
+      {
+        "rel": "client/components/device-view-destinations-inspector-form.js",
+        "line": 21,
+        "col": 3,
+        "kind": "assignment",
+        "name": "updateDestinationOutputLayer",
+        "message": "'updateDestinationOutputLayer' is assigned a value but never used.",
+        "context": "updateDestinationOutputLayer,"
+      },
+      {
+        "rel": "client/components/device-view-destinations-inspector.js",
+        "line": 302,
+        "col": 3,
+        "kind": "assignment",
+        "name": "updateDestinationOutputLayer",
+        "message": "'updateDestinationOutputLayer' is assigned a value but never used.",
+        "context": "updateDestinationOutputLayer,"
+      },
+      {
+        "rel": "client/components/device-view-destinations-ui.js",
+        "line": 62,
+        "col": 11,
+        "kind": "binding",
+        "name": "addChipKey",
+        "message": "'addChipKey' is defined but never used.",
+        "context": "function addChipKey(key, el) {"
+      },
+      {
+        "rel": "client/components/device-view-destinations-ui.js",
+        "line": 286,
+        "col": 32,
+        "kind": "parameter",
+        "name": "ev",
+        "message": "'ev' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "b.addEventListener('click', (ev) => {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-audio.js",
+        "line": 42,
+        "col": 8,
+        "kind": "assignment",
+        "name": "audioRouting",
+        "message": "'audioRouting' is assigned a value but never used.",
+        "context": "const audioRouting = currentSettings?.audioRouting && typeof currentSettings.audioRouting === 'object'"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink-input.js",
+        "line": 46,
+        "col": 15,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink-input.js",
+        "line": 56,
+        "col": 14,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink.js",
+        "line": 563,
+        "col": 15,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-decklink.js",
+        "line": 573,
+        "col": 14,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu-video-modeline.js",
+        "line": 96,
+        "col": 90,
+        "kind": "assignment",
+        "name": "statusEl",
+        "message": "'statusEl' is assigned a value but never used.",
+        "context": "const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN, statusEl, load } = ctx"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu-video-modeline.js",
+        "line": 96,
+        "col": 100,
+        "kind": "assignment",
+        "name": "load",
+        "message": "'load' is assigned a value but never used.",
+        "context": "const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN, statusEl, load } = ctx"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu-video-modeline.js",
+        "line": 573,
+        "col": 8,
+        "kind": "assignment",
+        "name": "readSelectedOsModeAndRate",
+        "message": "'readSelectedOsModeAndRate' is assigned a value but never used.",
+        "context": "const readSelectedOsModeAndRate = () => {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu.js",
+        "line": 52,
+        "col": 118,
+        "kind": "parameter",
+        "name": "connectorCtx",
+        "message": "'connectorCtx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty, connectorCtx }) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu.js",
+        "line": 203,
+        "col": 3,
+        "kind": "assignment",
+        "name": "inherited",
+        "message": "'inherited' is assigned a value but never used.",
+        "context": "inherited,"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu.js",
+        "line": 210,
+        "col": 3,
+        "kind": "assignment",
+        "name": "overrideResIn",
+        "message": "'overrideResIn' is assigned a value but never used.",
+        "context": "overrideResIn,"
+      },
+      {
+        "rel": "client/components/device-view-inspector-gpu.js",
+        "line": 211,
+        "col": 3,
+        "kind": "assignment",
+        "name": "timingSel",
+        "message": "'timingSel' is assigned a value but never used.",
+        "context": "timingSel,"
+      },
+      {
+        "rel": "client/components/device-view-inspector-mapping.js",
+        "line": 318,
+        "col": 75,
+        "kind": "parameter",
+        "name": "statusEl",
+        "message": "'statusEl' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderMappingConnectorControls(host, conn, { lastPayload, statusEl, load, setCasparRestartDirty, nodeId }) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-mapping.js",
+        "line": 318,
+        "col": 85,
+        "kind": "parameter",
+        "name": "load",
+        "message": "'load' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderMappingConnectorControls(host, conn, { lastPayload, statusEl, load, setCasparRestartDirty, nodeId }) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-mapping.js",
+        "line": 318,
+        "col": 91,
+        "kind": "parameter",
+        "name": "setCasparRestartDirty",
+        "message": "'setCasparRestartDirty' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderMappingConnectorControls(host, conn, { lastPayload, statusEl, load, setCasparRestartDirty, nodeId }) {"
+      },
+      {
+        "rel": "client/components/device-view-inspector-replication.js",
+        "line": 77,
+        "col": 8,
+        "kind": "assignment",
+        "name": "followerSec",
+        "message": "'followerSec' is assigned a value but never used.",
+        "context": "const followerSec = connectionDetails"
+      },
+      {
+        "rel": "client/components/device-view-inspector-replication.js",
+        "line": 78,
+        "col": 8,
+        "kind": "assignment",
+        "name": "followerTableHost",
+        "message": "'followerTableHost' is assigned a value but never used.",
+        "context": "const followerTableHost = peerTableHost"
+      },
+      {
+        "rel": "client/components/device-view-inspector-replication.js",
+        "line": 79,
+        "col": 8,
+        "kind": "assignment",
+        "name": "followerWarnLine",
+        "message": "'followerWarnLine' is assigned a value but never used.",
+        "context": "const followerWarnLine = connectionWarnLine"
+      },
+      {
+        "rel": "client/components/device-view-mappings-render.js",
+        "line": 26,
+        "col": 3,
+        "kind": "assignment",
+        "name": "selectedKey",
+        "message": "'selectedKey' is assigned a value but never used.",
+        "context": "selectedKey,"
+      },
+      {
+        "rel": "client/components/device-view-mappings-render.js",
+        "line": 27,
+        "col": 3,
+        "kind": "assignment",
+        "name": "cableSourceId",
+        "message": "'cableSourceId' is assigned a value but never used.",
+        "context": "cableSourceId,"
+      },
+      {
+        "rel": "client/components/device-view-mappings-render.js",
+        "line": 28,
+        "col": 3,
+        "kind": "assignment",
+        "name": "onPortClick",
+        "message": "'onPortClick' is assigned a value but never used.",
+        "context": "onPortClick,"
+      },
+      {
+        "rel": "client/components/device-view-matrix.js",
+        "line": 108,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch(e) {}"
+      },
+      {
+        "rel": "client/components/device-view-matrix.js",
+        "line": 121,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch(e) {}"
+      },
+      {
+        "rel": "client/components/device-view-snapshot-modals.js",
+        "line": 73,
+        "col": 10,
+        "kind": "assignment",
+        "name": "backdrop",
+        "message": "'backdrop' is assigned a value but never used.",
+        "context": "const { backdrop, close } = modalShell('Save device snapshot', body, actions)"
+      },
+      {
+        "rel": "client/components/device-view-ui-utils.js",
+        "line": 175,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/device-view-ui-utils.js",
+        "line": 236,
+        "col": 16,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "client/components/device-view-ui-utils.js",
+        "line": 244,
+        "col": 16,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "client/components/header-bar.js",
+        "line": 222,
+        "col": 32,
+        "kind": "parameter",
+        "name": "cfg",
+        "message": "'cfg' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function updateSyncVisibility(cfg) {"
+      },
+      {
+        "rel": "client/components/inspector-fill.js",
+        "line": 94,
+        "col": 10,
+        "kind": "assignment",
+        "name": "res",
+        "message": "'res' is assigned a value but never used.",
+        "context": "const { res, pxRect, patchFillPx, patchFillAlign, layer, sceneId, layerIndex, sceneState, stateStore } = opts"
+      },
+      {
+        "rel": "client/components/inspector-layer-playlist.js",
+        "line": 5,
+        "col": 103,
+        "kind": "parameter",
+        "name": "stateStore",
+        "message": "'stateStore' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {"
+      },
+      {
+        "rel": "client/components/inspector-layer-playlist.js",
+        "line": 130,
+        "col": 27,
+        "kind": "parameter",
+        "name": "idx",
+        "message": "'idx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "playlist.forEach((item, idx) => {"
+      },
+      {
+        "rel": "client/components/inspector-panel-timeline-flag.js",
+        "line": 213,
+        "col": 59,
+        "kind": "parameter",
+        "name": "allowNegative",
+        "message": "'allowNegative' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "const makeCoordField = (labelText, propName, defaultVal, allowNegative) => {"
+      },
+      {
+        "rel": "client/components/inspector-panel-timeline.js",
+        "line": 286,
+        "col": 59,
+        "kind": "parameter",
+        "name": "allowNegative",
+        "message": "'allowNegative' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "const makeCoordField = (labelText, propName, defaultVal, allowNegative) => {"
+      },
+      {
+        "rel": "client/components/led-test-modal.js",
+        "line": 50,
+        "col": 8,
+        "kind": "assignment",
+        "name": "st",
+        "message": "'st' is assigned a value but never used.",
+        "context": "const st = typeof stateStore?.getState === 'function' ? stateStore.getState() : {}"
+      },
+      {
+        "rel": "client/components/live-audio-mixer-modal.js",
+        "line": 101,
+        "col": 9,
+        "kind": "assignment",
+        "name": "cm",
+        "message": "'cm' is assigned a value but never used.",
+        "context": "const cm = stateStore.getState()?.channelMap || {}"
+      },
+      {
+        "rel": "client/components/load-project-modal.js",
+        "line": 268,
+        "col": 22,
+        "kind": "parameter",
+        "name": "entry",
+        "message": "'entry' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function importDeps(entry) {"
+      },
+      {
+        "rel": "client/components/logs-modal-filter.js",
+        "line": 83,
+        "col": 8,
+        "kind": "assignment",
+        "name": "categoryDrop",
+        "message": "'categoryDrop' is assigned a value but never used.",
+        "context": "const categoryDrop = modal.querySelector('#logs-category-drop')"
+      },
+      {
+        "rel": "client/components/multiview-editor-canvas-interaction.js",
+        "line": 57,
+        "col": 64,
+        "kind": "assignment",
+        "name": "cm",
+        "message": "'cm' is assigned a value but never used. Allowed unused args must match /^_/u.",
+        "context": "export function getResizeHandle(cell, canvasX, canvasY, scale, cm = {}) {"
+      },
+      {
+        "rel": "client/components/multiview-editor-canvas-layout.js",
+        "line": 74,
+        "col": 3,
+        "kind": "assignment",
+        "name": "isPrv",
+        "message": "'isPrv' is assigned a value but never used.",
+        "context": "isPrv = true"
+      },
+      {
+        "rel": "client/components/multiview-editor.js",
+        "line": 37,
+        "col": 10,
+        "kind": "assignment",
+        "name": "prevVal",
+        "message": "'prevVal' is assigned a value but never used.",
+        "context": "const prevVal = sel.value"
+      },
+      {
+        "rel": "client/components/pixel-map-editor.js",
+        "line": 9,
+        "col": 42,
+        "kind": "parameter",
+        "name": "stateStore",
+        "message": "'stateStore' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function initPixelMapEditor(root, stateStore) {"
+      },
+      {
+        "rel": "client/components/playback-timer.js",
+        "line": 240,
+        "col": 49,
+        "kind": "parameter",
+        "name": "layerNum",
+        "message": "'layerNum' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function paintPlaybackDisplay(ctx, displayFile, layerNum) {"
+      },
+      {
+        "rel": "client/components/preview-canvas-draw-base.js",
+        "line": 245,
+        "col": 9,
+        "kind": "assignment",
+        "name": "labelY",
+        "message": "'labelY' is assigned a value but never used.",
+        "context": "const labelY = Math.min(16, Math.max(9, edge))"
+      },
+      {
+        "rel": "client/components/preview-canvas-draw-base.js",
+        "line": 264,
+        "col": 9,
+        "kind": "assignment",
+        "name": "labelY",
+        "message": "'labelY' is assigned a value but never used.",
+        "context": "const labelY = Math.min(16, Math.max(9, edge))"
+      },
+      {
+        "rel": "client/components/preview-canvas-panel.js",
+        "line": 29,
+        "col": 507,
+        "kind": "assignment",
+        "name": "cGutter",
+        "message": "'cGutter' is assigned a value but never used.",
+        "context": "const btn = root.querySelector('.preview-panel__toggle'); const cLayoutBtn = root.querySelector('.preview-panel__compose-layout'); const res"
+      },
+      {
+        "rel": "client/components/preview-canvas-panel.js",
+        "line": 98,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "client/components/preview-canvas-panel.js",
+        "line": 127,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "client/components/previs-inspector-sections.js",
+        "line": 5,
+        "col": 7,
+        "kind": "assignment",
+        "name": "formatBytes",
+        "message": "'formatBytes' is assigned a value but never used.",
+        "context": "const formatBytes = (n) => (!n || !isFinite(n)) ? '—' : (n < 1024) ? `${n} B` : (n < 1048576) ? `${(n/1024).toFixed(1)} KB` : `${(n/1048576)"
+      },
+      {
+        "rel": "client/components/previs-uv-editor.js",
+        "line": 39,
+        "col": 8,
+        "kind": "assignment",
+        "name": "ratio",
+        "message": "'ratio' is assigned a value but never used.",
+        "context": "const ratio = vc.height > 0 ? vc.width / vc.height : 16 / 9"
+      },
+      {
+        "rel": "client/components/publish-modal.js",
+        "line": 165,
+        "col": 9,
+        "kind": "assignment",
+        "name": "remoteMeta",
+        "message": "'remoteMeta' is assigned a value but never used.",
+        "context": "const remoteMeta = await fetch(`${targetUrl}/api/settings`).then(r => r.json())"
+      },
+      {
+        "rel": "client/components/publish-modal.js",
+        "line": 168,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/scene-list.js",
+        "line": 83,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/scene-list.js",
+        "line": 179,
+        "col": 34,
+        "kind": "parameter",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "btn.addEventListener('click', (e) => {"
+      },
+      {
+        "rel": "client/components/scene-list.js",
+        "line": 551,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "client/components/scenes-editor-deck-thumb.js",
+        "line": 23,
+        "col": 3,
+        "kind": "assignment",
+        "name": "getProgramChannel",
+        "message": "'getProgramChannel' is assigned a value but never used.",
+        "context": "getProgramChannel,"
+      },
+      {
+        "rel": "client/components/scenes-editor-deck-thumb.js",
+        "line": 24,
+        "col": 3,
+        "kind": "assignment",
+        "name": "getThumbForSource",
+        "message": "'getThumbForSource' is assigned a value but never used.",
+        "context": "getThumbForSource,"
+      },
+      {
+        "rel": "client/components/settings-live-audio-panel.js",
+        "line": 168,
+        "col": 9,
+        "kind": "assignment",
+        "name": "deviceOpts",
+        "message": "'deviceOpts' is assigned a value but never used.",
+        "context": "const deviceOpts = alsaCaptureDeviceOptions(captureDevices)"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 69,
+        "col": 10,
+        "kind": "binding",
+        "name": "classifyMediaItem",
+        "message": "'classifyMediaItem' is defined but never used.",
+        "context": "import { classifyMediaItem } from '../lib/media-ext.js'"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 71,
+        "col": 10,
+        "kind": "binding",
+        "name": "MIXER_EFFECTS",
+        "message": "'MIXER_EFFECTS' is defined but never used.",
+        "context": "import { MIXER_EFFECTS, EFFECT_CATEGORIES } from '../lib/effect-registry.js'"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 71,
+        "col": 25,
+        "kind": "binding",
+        "name": "EFFECT_CATEGORIES",
+        "message": "'EFFECT_CATEGORIES' is defined but never used.",
+        "context": "import { MIXER_EFFECTS, EFFECT_CATEGORIES } from '../lib/effect-registry.js'"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 157,
+        "col": 34,
+        "kind": "parameter",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "el.addEventListener('dragend', (e) => {"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 165,
+        "col": 72,
+        "kind": "parameter",
+        "name": "onPreview",
+        "message": "'onPreview' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function renderSourceList(container, items, sourceType, filter, onPreview) {"
+      },
+      {
+        "rel": "client/components/sources-panel-helpers.js",
+        "line": 348,
+        "col": 3,
+        "kind": "assignment",
+        "name": "decklinkCount",
+        "message": "'decklinkCount' is assigned a value but never used.",
+        "context": "decklinkCount = 0,"
+      },
+      {
+        "rel": "client/components/sources-panel-live-render.js",
+        "line": 297,
+        "col": 10,
+        "kind": "assignment",
+        "name": "cl",
+        "message": "'cl' is assigned a value but never used.",
+        "context": "const cl = s.inputsLayer != null ? `${s.inputsChannel}-${s.inputsLayer}` : String(s.inputsChannel)"
+      },
+      {
+        "rel": "client/components/sources-panel-render.js",
+        "line": 36,
+        "col": 3,
+        "kind": "assignment",
+        "name": "setMediaWithProbe",
+        "message": "'setMediaWithProbe' is assigned a value but never used.",
+        "context": "setMediaWithProbe,"
+      },
+      {
+        "rel": "client/components/sources-panel.js",
+        "line": 117,
+        "col": 8,
+        "kind": "assignment",
+        "name": "sendToPrv",
+        "message": "'sendToPrv' is assigned a value but never used.",
+        "context": "const sendToPrv = async (s) => { const ch = (stateStore.getState()?.channelMap?.previewChannels?.[0] ?? 2); try { await api.post('/api/play'"
+      },
+      {
+        "rel": "client/components/timeline-canvas-render.js",
+        "line": 96,
+        "col": 48,
+        "kind": "parameter",
+        "name": "layerAt",
+        "message": "'layerAt' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function drawHeaders(ctx, canvas, tl, scrollY, layerAt) {"
+      },
+      {
+        "rel": "client/components/timeline-canvas-render.js",
+        "line": 380,
+        "col": 8,
+        "kind": "assignment",
+        "name": "x",
+        "message": "'x' is assigned a value but never used.",
+        "context": "const x = xAt(clip.startTime)"
+      },
+      {
+        "rel": "client/components/timeline-canvas-render.js",
+        "line": 381,
+        "col": 8,
+        "kind": "assignment",
+        "name": "w",
+        "message": "'w' is assigned a value but never used.",
+        "context": "const w = Math.max(3, clip.duration * pxPerMs)"
+      },
+      {
+        "rel": "client/components/timeline-canvas.js",
+        "line": 61,
+        "col": 3,
+        "kind": "assignment",
+        "name": "getView",
+        "message": "'getView' is assigned a value but never used.",
+        "context": "getView,"
+      },
+      {
+        "rel": "client/components/timeline-canvas.js",
+        "line": 108,
+        "col": 6,
+        "kind": "assignment",
+        "name": "hoverClip",
+        "message": "'hoverClip' is assigned a value but never used.",
+        "context": "let hoverClip = null  // { layerIdx, clipId } — for cursor changes"
+      },
+      {
+        "rel": "client/components/timeline-editor-handlers.js",
+        "line": 72,
+        "col": 3,
+        "kind": "assignment",
+        "name": "getSelectedLayer",
+        "message": "'getSelectedLayer' is assigned a value but never used.",
+        "context": "getSelectedLayer,"
+      },
+      {
+        "rel": "client/lib/app-ws-handlers.js",
+        "line": 48,
+        "col": 139,
+        "kind": "parameter",
+        "name": "variableStore",
+        "message": "'variableStore' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, va"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-entries.js",
+        "line": 299,
+        "col": 8,
+        "kind": "assignment",
+        "name": "socketCount",
+        "message": "'socketCount' is assigned a value but never used.",
+        "context": "const socketCount = resolvedTopology.length || undefined"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-merge.js",
+        "line": 36,
+        "col": 123,
+        "kind": "assignment",
+        "name": "connectors",
+        "message": "'connectors' is assigned a value but never used. Allowed unused args must match /^_/u.",
+        "context": "export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisconnected = false, connectedDisplays = [], connectors = [], t"
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-merge.js",
+        "line": 37,
+        "col": 8,
+        "kind": "assignment",
+        "name": "connectedNames",
+        "message": "'connectedNames' is assigned a value but never used.",
+        "context": "const connectedNames = new Set("
+      },
+      {
+        "rel": "client/lib/device-view-gpu-port-topology.js",
+        "line": 34,
+        "col": 61,
+        "kind": "parameter",
+        "name": "live",
+        "message": "'live' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "export function reconcileTopologyWithLiveDisplays(topology, live) {"
+      },
+      {
+        "rel": "client/lib/logs-modal-shared.js",
+        "line": 96,
+        "col": 61,
+        "kind": "assignment",
+        "name": "opts",
+        "message": "'opts' is assigned a value but never used. Allowed unused args must match /^_/u.",
+        "context": "export async function downloadSupportBundleFromApi(apiBase, opts = {}) {"
+      },
+      {
+        "rel": "client/lib/lower-third-roster-import.js",
+        "line": 13,
+        "col": 7,
+        "kind": "assignment",
+        "name": "NONE",
+        "message": "'NONE' is assigned a value but never used.",
+        "context": "const NONE = ''"
+      },
+      {
+        "rel": "client/lib/pip-overlay-amcp.js",
+        "line": 109,
+        "col": 10,
+        "kind": "binding",
+        "name": "innerRectPipLocalFromOutset",
+        "message": "'innerRectPipLocalFromOutset' is defined but never used.",
+        "context": "function innerRectPipLocalFromOutset(contentFill, bPx, chW, chH) {"
+      },
+      {
+        "rel": "client/lib/pip-overlay-amcp.js",
+        "line": 178,
+        "col": 8,
+        "kind": "assignment",
+        "name": "aligned",
+        "message": "'aligned' is assigned a value but never used.",
+        "context": "const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx"
+      },
+      {
+        "rel": "client/lib/pip-overlay-amcp.js",
+        "line": 218,
+        "col": 8,
+        "kind": "assignment",
+        "name": "mixTail",
+        "message": "'mixTail' is assigned a value but never used.",
+        "context": "const mixTail = deferMixer ? ' DEFER' : ' 0'"
+      },
+      {
+        "rel": "client/lib/project-state.js",
+        "line": 12,
+        "col": 14,
+        "kind": "assignment",
+        "name": "options",
+        "message": "'options' is assigned a value but never used. Allowed unused args must match /^_/u.",
+        "context": "constructor(options = {}) {"
+      },
+      {
+        "rel": "client/lib/scene-state-layer-logic.js",
+        "line": 131,
+        "col": 10,
+        "kind": "assignment",
+        "name": "fill",
+        "message": "'fill' is assigned a value but never used.",
+        "context": "const { fill, fadeOnEnd, startBehaviour, ...rest } = patch"
+      },
+      {
+        "rel": "client/lib/scene-state-layer-logic.js",
+        "line": 131,
+        "col": 16,
+        "kind": "assignment",
+        "name": "fadeOnEnd",
+        "message": "'fadeOnEnd' is assigned a value but never used.",
+        "context": "const { fill, fadeOnEnd, startBehaviour, ...rest } = patch"
+      },
+      {
+        "rel": "client/lib/scene-state-preset-actions.js",
+        "line": 118,
+        "col": 19,
+        "kind": "assignment",
+        "name": "_t",
+        "message": "'_t' is assigned a value but never used.",
+        "context": "const { tandem: _t, ...rest } = patch"
+      },
+      {
+        "rel": "client/lib/scenes-preview-global-border.js",
+        "line": 179,
+        "col": 11,
+        "kind": "assignment",
+        "name": "mirrorBorderOnPrv",
+        "message": "'mirrorBorderOnPrv' is assigned a value but never used.",
+        "context": "const { mirrorBorderOnPrv, borderPresets, pgmAirSnapshot, ...rest } = gb"
+      },
+      {
+        "rel": "client/lib/scenes-preview-global-border.js",
+        "line": 179,
+        "col": 30,
+        "kind": "assignment",
+        "name": "borderPresets",
+        "message": "'borderPresets' is assigned a value but never used.",
+        "context": "const { mirrorBorderOnPrv, borderPresets, pgmAirSnapshot, ...rest } = gb"
+      },
+      {
+        "rel": "client/lib/scenes-preview-global-border.js",
+        "line": 179,
+        "col": 45,
+        "kind": "assignment",
+        "name": "pgmAirSnapshot",
+        "message": "'pgmAirSnapshot' is assigned a value but never used.",
+        "context": "const { mirrorBorderOnPrv, borderPresets, pgmAirSnapshot, ...rest } = gb"
+      },
+      {
+        "rel": "src/api/device-view-decklink-wiring.js",
+        "line": 7,
+        "col": 2,
+        "kind": "assignment",
+        "name": "parseDecklinkDeviceIndex",
+        "message": "'parseDecklinkDeviceIndex' is assigned a value but never used.",
+        "context": "parseDecklinkDeviceIndex,"
+      },
+      {
+        "rel": "src/api/route-registry.js",
+        "line": 84,
+        "col": 16,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/api/routes-data-project-handlers.js",
+        "line": 114,
+        "col": 9,
+        "kind": "assignment",
+        "name": "slug",
+        "message": "'slug' is assigned a value but never used.",
+        "context": "const slug = reqSlug || projectStore.getActiveSlug(persistence)"
+      },
+      {
+        "rel": "src/api/routes-data.js",
+        "line": 74,
+        "col": 7,
+        "kind": "assignment",
+        "name": "PROJECT_DISK_KEY",
+        "message": "'PROJECT_DISK_KEY' is assigned a value but never used.",
+        "context": "const PROJECT_DISK_KEY = 'web_project'"
+      },
+      {
+        "rel": "src/api/routes-data.js",
+        "line": 190,
+        "col": 9,
+        "kind": "assignment",
+        "name": "slug",
+        "message": "'slug' is assigned a value but never used.",
+        "context": "const slug = reqSlug || projectStore.getActiveSlug(persistence)"
+      },
+      {
+        "rel": "src/api/routes-data.js",
+        "line": 573,
+        "col": 33,
+        "kind": "parameter",
+        "name": "body",
+        "message": "'body' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function handleData(path, body, ctx) {"
+      },
+      {
+        "rel": "src/api/routes-data.js",
+        "line": 573,
+        "col": 39,
+        "kind": "parameter",
+        "name": "ctx",
+        "message": "'ctx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function handleData(path, body, ctx) {"
+      },
+      {
+        "rel": "src/api/routes-exfat-sync.js",
+        "line": 9,
+        "col": 32,
+        "kind": "parameter",
+        "name": "ctx",
+        "message": "'ctx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function handleGet(path, ctx) {"
+      },
+      {
+        "rel": "src/api/routes-ingest.js",
+        "line": 152,
+        "col": 13,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "src/api/routes-ingest.js",
+        "line": 293,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/api/routes-media.js",
+        "line": 387,
+        "col": 9,
+        "kind": "assignment",
+        "name": "b",
+        "message": "'b' is assigned a value but never used.",
+        "context": "const b = typeof body === 'object' ? body : JSON.parse(body || '{}') // body is usually parsed by caller, wait... parseBody is in response.j"
+      },
+      {
+        "rel": "src/api/routes-ndi.js",
+        "line": 10,
+        "col": 37,
+        "kind": "parameter",
+        "name": "query",
+        "message": "'query' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function handleGet(path, ctx, query) {"
+      },
+      {
+        "rel": "src/api/routes-pip-overlay.js",
+        "line": 14,
+        "col": 2,
+        "kind": "assignment",
+        "name": "PIP_OVERLAY_TEMPLATE_FILES",
+        "message": "'PIP_OVERLAY_TEMPLATE_FILES' is assigned a value but never used.",
+        "context": "PIP_OVERLAY_TEMPLATE_FILES,"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 142,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 163,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 179,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 228,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {}"
+      },
+      {
+        "rel": "src/api/routes-project.js",
+        "line": 254,
+        "col": 8,
+        "kind": "assignment",
+        "name": "mediaBase",
+        "message": "'mediaBase' is assigned a value but never used.",
+        "context": "const mediaBase = getMediaIngestBasePath(config)"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 19,
+        "col": 7,
+        "kind": "assignment",
+        "name": "OUT_PRIMARY_LAYER",
+        "message": "'OUT_PRIMARY_LAYER' is assigned a value but never used.",
+        "context": "const OUT_PRIMARY_LAYER = 1"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 55,
+        "col": 13,
+        "kind": "assignment",
+        "name": "playSeekFrames",
+        "message": "'playSeekFrames' is assigned a value but never used.",
+        "context": "const { playSeekFrames, ...rest } = L"
+      },
+      {
+        "rel": "src/api/routes-scene.js",
+        "line": 62,
+        "col": 10,
+        "kind": "binding",
+        "name": "sameSceneId",
+        "message": "'sameSceneId' is defined but never used.",
+        "context": "function sameSceneId(a, b) {"
+      },
+      {
+        "rel": "src/api/routes-streaming-channel-rtmp.js",
+        "line": 135,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e1",
+        "message": "'e1' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e1) {"
+      },
+      {
+        "rel": "src/api/routes-streaming-channel.js",
+        "line": 404,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e1",
+        "message": "'e1' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e1) {"
+      },
+      {
+        "rel": "src/api/routes-usb-ingest.js",
+        "line": 200,
+        "col": 8,
+        "kind": "assignment",
+        "name": "cancelFn",
+        "message": "'cancelFn' is assigned a value but never used.",
+        "context": "const cancelFn = () => {"
+      },
+      {
+        "rel": "src/api/system-hardware-gpu-layout.js",
+        "line": 29,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "err",
+        "message": "'err' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (err) {"
+      },
+      {
+        "rel": "src/api/system-hardware-gpu-layout.js",
+        "line": 82,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "err",
+        "message": "'err' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (err) {"
+      },
+      {
+        "rel": "src/api/system-hardware-identify-displays.js",
+        "line": 169,
+        "col": 49,
+        "kind": "parameter",
+        "name": "ctx",
+        "message": "'ctx' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function handleIdentifyDisplaysPost(body, ctx) {"
+      },
+      {
+        "rel": "src/caspar/amcp-client-transport.js",
+        "line": 154,
+        "col": 11,
+        "kind": "assignment",
+        "name": "p",
+        "message": "'p' is assigned a value but never used.",
+        "context": "const { p, execute } = this._sendPrepare(cmd, responseKey)"
+      },
+      {
+        "rel": "src/caspar/amcp-client.js",
+        "line": 266,
+        "col": 11,
+        "kind": "assignment",
+        "name": "p",
+        "message": "'p' is assigned a value but never used.",
+        "context": "const { p, execute } = this._sendPrepare(cmd, responseKey)"
+      },
+      {
+        "rel": "src/config/routing-map.js",
+        "line": 172,
+        "col": 8,
+        "kind": "assignment",
+        "name": "inputsEnabled",
+        "message": "'inputsEnabled' is assigned a value but never used.",
+        "context": "const inputsEnabled = decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled"
+      },
+      {
+        "rel": "src/engine/global-border.js",
+        "line": 13,
+        "col": 7,
+        "kind": "assignment",
+        "name": "REPO_ROOT",
+        "message": "'REPO_ROOT' is assigned a value but never used.",
+        "context": "const REPO_ROOT = path.resolve(__dirname, '..', '..')"
+      },
+      {
+        "rel": "src/engine/global-border.js",
+        "line": 111,
+        "col": 8,
+        "kind": "assignment",
+        "name": "updateDur",
+        "message": "'updateDur' is assigned a value but never used.",
+        "context": "const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))"
+      },
+      {
+        "rel": "src/engine/global-border.js",
+        "line": 132,
+        "col": 8,
+        "kind": "assignment",
+        "name": "updateDur",
+        "message": "'updateDur' is assigned a value but never used.",
+        "context": "const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))"
+      },
+      {
+        "rel": "src/engine/pip-overlay-utils.js",
+        "line": 353,
+        "col": 8,
+        "kind": "assignment",
+        "name": "aligned",
+        "message": "'aligned' is assigned a value but never used.",
+        "context": "const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx"
+      },
+      {
+        "rel": "src/engine/pip-overlay.js",
+        "line": 24,
+        "col": 2,
+        "kind": "assignment",
+        "name": "normalizeContentFill",
+        "message": "'normalizeContentFill' is assigned a value but never used.",
+        "context": "normalizeContentFill,"
+      },
+      {
+        "rel": "src/engine/pip-overlay.js",
+        "line": 25,
+        "col": 2,
+        "kind": "assignment",
+        "name": "outsetPxForPipOverlay",
+        "message": "'outsetPxForPipOverlay' is assigned a value but never used.",
+        "context": "outsetPxForPipOverlay,"
+      },
+      {
+        "rel": "src/engine/project-volume-sync.js",
+        "line": 162,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/engine/scene-transition.js",
+        "line": 79,
+        "col": 10,
+        "kind": "binding",
+        "name": "pipOverlaysStable",
+        "message": "'pipOverlaysStable' is defined but never used.",
+        "context": "function pipOverlaysStable(layer) {"
+      },
+      {
+        "rel": "src/engine/timeline-playback.js",
+        "line": 445,
+        "col": 12,
+        "kind": "assignment",
+        "name": "_t0",
+        "message": "'_t0' is assigned a value but never used.",
+        "context": "const { _t0, _p0, ...rest } = cell"
+      },
+      {
+        "rel": "src/engine/timeline-playback.js",
+        "line": 445,
+        "col": 17,
+        "kind": "assignment",
+        "name": "_p0",
+        "message": "'_p0' is assigned a value but never used.",
+        "context": "const { _t0, _p0, ...rest } = cell"
+      },
+      {
+        "rel": "src/network/tailscale-service.js",
+        "line": 317,
+        "col": 10,
+        "kind": "binding",
+        "name": "buildTailscaleUpArgs",
+        "message": "'buildTailscaleUpArgs' is defined but never used.",
+        "context": "function buildTailscaleUpArgs(prefs) {"
+      },
+      {
+        "rel": "src/network/tailscale-service.js",
+        "line": 330,
+        "col": 8,
+        "kind": "assignment",
+        "name": "cfg",
+        "message": "'cfg' is assigned a value but never used.",
+        "context": "const cfg = { ...loadTailscaleConfig(), ...prefs }"
+      },
+      {
+        "rel": "src/replication/replication-pair-token.js",
+        "line": 141,
+        "col": 42,
+        "kind": "parameter",
+        "name": "req",
+        "message": "'req' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function handleApplyPairToken(ctx, body, req) {"
+      },
+      {
+        "rel": "src/sampling/dmx-output.js",
+        "line": 94,
+        "col": 14,
+        "kind": "assignment",
+        "name": "sender",
+        "message": "'sender' is assigned a value but never used.",
+        "context": "for (const sender of this.sacnSenders.values()) {"
+      },
+      {
+        "rel": "src/server/http-server.js",
+        "line": 185,
+        "col": 49,
+        "kind": "parameter",
+        "name": "body",
+        "message": "'body' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function defaultRouteApi(method, reqPath, body, _req) {"
+      },
+      {
+        "rel": "src/server/ws-server.js",
+        "line": 412,
+        "col": 31,
+        "kind": "assignment",
+        "name": "broadcastLiveState",
+        "message": "'broadcastLiveState' is assigned a value but never used.",
+        "context": "const { snapshotLiveState, broadcastLiveState } = require('../replication/live-state-feed')"
+      },
+      {
+        "rel": "src/state/state-manager.js",
+        "line": 179,
+        "col": 21,
+        "kind": "assignment",
+        "name": "_fp",
+        "message": "'_fp' is assigned a value but never used.",
+        "context": "const { fgFps: _fp, ...rest } = l"
+      },
+      {
+        "rel": "src/system/cef-interactive-bridge.js",
+        "line": 23,
+        "col": 2,
+        "kind": "assignment",
+        "name": "findCefPage",
+        "message": "'findCefPage' is assigned a value but never used.",
+        "context": "findCefPage,"
+      },
+      {
+        "rel": "src/system/exfat-sync-fs.js",
+        "line": 48,
+        "col": 6,
+        "kind": "assignment",
+        "name": "copied",
+        "message": "'copied' is assigned a value but never used.",
+        "context": "let copied = 0"
+      },
+      {
+        "rel": "src/system/exfat-sync-fs.js",
+        "line": 49,
+        "col": 6,
+        "kind": "assignment",
+        "name": "skipped",
+        "message": "'skipped' is assigned a value but never used.",
+        "context": "let skipped = 0"
+      },
+      {
+        "rel": "src/system/exfat-sync-map.js",
+        "line": 46,
+        "col": 8,
+        "kind": "assignment",
+        "name": "version",
+        "message": "'version' is assigned a value but never used.",
+        "context": "const version = Number(raw.version) || 1"
+      },
+      {
+        "rel": "src/system/pointer-confine.js",
+        "line": 63,
+        "col": 10,
+        "kind": "binding",
+        "name": "barrierLogShowsActive",
+        "message": "'barrierLogShowsActive' is defined but never used.",
+        "context": "function barrierLogShowsActive() {"
+      },
+      {
+        "rel": "src/system/pointer-confine.js",
+        "line": 282,
+        "col": 62,
+        "kind": "parameter",
+        "name": "opts",
+        "message": "'opts' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {"
+      },
+      {
+        "rel": "src/system/pointer-confine.js",
+        "line": 282,
+        "col": 68,
+        "kind": "parameter",
+        "name": "layout",
+        "message": "'layout' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {"
+      },
+      {
+        "rel": "src/utils/decklink-enum.js",
+        "line": 387,
+        "col": 12,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "src/utils/gpu-edid-probe.js",
+        "line": 80,
+        "col": 58,
+        "kind": "parameter",
+        "name": "byEdidKey",
+        "message": "'byEdidKey' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function guessDrmCardFromSysfs(xrandrName, sysfsEntries, byEdidKey) {"
+      },
+      {
+        "rel": "src/utils/periodic-sync.js",
+        "line": 301,
+        "col": 16,
+        "kind": "binding",
+        "name": "runPeriodicInfoConfigRefresh",
+        "message": "'runPeriodicInfoConfigRefresh' is defined but never used.",
+        "context": "async function runPeriodicInfoConfigRefresh(self) {"
+      },
+      {
+        "rel": "src/utils/query-cycle.js",
+        "line": 359,
+        "col": 20,
+        "kind": "assignment",
+        "name": "_f",
+        "message": "'_f' is assigned a value but never used.",
+        "context": "const { fgFps: _f, ...layer } = entry"
+      },
+      {
+        "rel": "src/utils/x-display-session-runtime.js",
+        "line": 152,
+        "col": 34,
+        "kind": "parameter",
+        "name": "env",
+        "message": "'env' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function resolveXdotoolBin(env) {"
+      },
+      {
+        "rel": "src/utils/x-display-session.js",
+        "line": 516,
+        "col": 34,
+        "kind": "parameter",
+        "name": "env",
+        "message": "'env' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "async function resolveXdotoolBin(env) {"
+      },
+      {
+        "rel": "src/utils/xrandr-custom-mode.js",
+        "line": 212,
+        "col": 11,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "tools/ci/check-require-integrity.js",
+        "line": 15,
+        "col": 7,
+        "kind": "assignment",
+        "name": "SCAN_ROOTS",
+        "message": "'SCAN_ROOTS' is assigned a value but never used.",
+        "context": "const SCAN_ROOTS = ['src', 'client', 'index.js', 'tools']"
+      },
+      {
+        "rel": "tools/map/ast-scanner.js",
+        "line": 352,
+        "col": 14,
+        "kind": "catch-binding",
+        "name": "e",
+        "message": "'e' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (e) {"
+      },
+      {
+        "rel": "tools/runtime/clean-slate-reset.js",
+        "line": 59,
+        "col": 10,
+        "kind": "binding",
+        "name": "rmRf",
+        "message": "'rmRf' is defined but never used.",
+        "context": "function rmRf(p, dryRun) {"
+      },
+      {
+        "rel": "tools/smoke/query-test.js",
+        "line": 9,
+        "col": 16,
+        "kind": "catch-binding",
+        "name": "err",
+        "message": "'err' is defined but never used. Allowed unused caught errors must match /^_/u.",
+        "context": "} catch (err) {"
+      },
+      {
+        "rel": "tools/smoke/smoke-companion-press.mjs",
+        "line": 16,
+        "col": 7,
+        "kind": "assignment",
+        "name": "b",
+        "message": "'b' is assigned a value but never used.",
+        "context": "let b = ''"
+      },
+      {
+        "rel": "tools/smoke/smoke-decklink-enum.js",
+        "line": 7,
+        "col": 2,
+        "kind": "assignment",
+        "name": "probeDecklinkFromCasparLog",
+        "message": "'probeDecklinkFromCasparLog' is assigned a value but never used.",
+        "context": "probeDecklinkFromCasparLog,"
+      },
+      {
+        "rel": "tools/smoke/smoke-decklink-enum.js",
+        "line": 20,
+        "col": 7,
+        "kind": "assignment",
+        "name": "screensOnlyLog",
+        "message": "'screensOnlyLog' is assigned a value but never used.",
+        "context": "const screensOnlyLog = `"
+      },
+      {
+        "rel": "tools/smoke/smoke-full-config-apply.js",
+        "line": 61,
+        "col": 36,
+        "kind": "parameter",
+        "name": "parent",
+        "message": "'parent' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "Module._load = function (request, parent, isMain) {"
+      },
+      {
+        "rel": "tools/smoke/smoke-full-config-apply.js",
+        "line": 61,
+        "col": 44,
+        "kind": "parameter",
+        "name": "isMain",
+        "message": "'isMain' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "Module._load = function (request, parent, isMain) {"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-caspar-output.js",
+        "line": 60,
+        "col": 39,
+        "kind": "assignment",
+        "name": "assessFollowerCasparOutputReadiness",
+        "message": "'assessFollowerCasparOutputReadiness' is assigned a value but never used.",
+        "context": "const { repairFollowerDecklinkGraph, assessFollowerCasparOutputReadiness } = require('../../src/replication/follower-caspar-output')"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-handshake.test.js",
+        "line": 10,
+        "col": 2,
+        "kind": "assignment",
+        "name": "verifyHandshakeFields",
+        "message": "'verifyHandshakeFields' is assigned a value but never used.",
+        "context": "verifyHandshakeFields,"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-handshake.test.js",
+        "line": 66,
+        "col": 8,
+        "kind": "assignment",
+        "name": "follower",
+        "message": "'follower' is assigned a value but never used.",
+        "context": "const follower = ensureDeviceIdentity()"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-handshake.test.js",
+        "line": 71,
+        "col": 8,
+        "kind": "assignment",
+        "name": "handshake",
+        "message": "'handshake' is assigned a value but never used.",
+        "context": "const handshake = {"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-handshake.test.js",
+        "line": 84,
+        "col": 10,
+        "kind": "assignment",
+        "name": "signMessage",
+        "message": "'signMessage' is assigned a value but never used.",
+        "context": "const { signMessage } = require('../../src/system/device-identity')"
+      },
+      {
+        "rel": "tools/smoke/smoke-replication-show-authority.test.js",
+        "line": 11,
+        "col": 2,
+        "kind": "assignment",
+        "name": "shouldAllowExfatPullShowData",
+        "message": "'shouldAllowExfatPullShowData' is assigned a value but never used.",
+        "context": "shouldAllowExfatPullShowData,"
+      },
+      {
+        "rel": "tools/smoke/smoke-scene-exit-orphans.test.js",
+        "line": 62,
+        "col": 8,
+        "kind": "assignment",
+        "name": "incoming",
+        "message": "'incoming' is assigned a value but never used.",
+        "context": "const incoming = {"
+      },
+      {
+        "rel": "tools/smoke/smoke-scene-take-pgm-only.test.js",
+        "line": 118,
+        "col": 8,
+        "kind": "assignment",
+        "name": "commitLines",
+        "message": "'commitLines' is assigned a value but never used.",
+        "context": "const commitLines = amcp.log.filter((e) => e.cmd === 'RAW' && e.line === 'MIXER 1 COMMIT')"
+      },
+      {
+        "rel": "tools/smoke/smoke-timeline-pause-resume.test.js",
+        "line": 48,
+        "col": 8,
+        "kind": "assignment",
+        "name": "pausedPos",
+        "message": "'pausedPos' is assigned a value but never used.",
+        "context": "const pausedPos = eng.getPlayback().position"
+      },
+      {
+        "rel": "tools/smoke/smoke-timeline-per-id-playback.test.js",
+        "line": 27,
+        "col": 7,
+        "kind": "assignment",
+        "name": "tl1",
+        "message": "'tl1' is assigned a value but never used.",
+        "context": "const tl1 = eng.create({ id: 'tl1', duration: 60000, fps: 25, layers: [{ id: 'l1', clips: [clip] }] })"
+      },
+      {
+        "rel": "tools/smoke/smoke-timeline-per-id-playback.test.js",
+        "line": 28,
+        "col": 7,
+        "kind": "assignment",
+        "name": "tl2",
+        "message": "'tl2' is assigned a value but never used.",
+        "context": "const tl2 = eng.create({ id: 'tl2', duration: 60000, fps: 25, layers: [{ id: 'l2', clips: [{ ...clip, id: 'c2' }] }] })"
+      },
+      {
+        "rel": "vite.config.js",
+        "line": 84,
+        "col": 33,
+        "kind": "parameter",
+        "name": "apiOrigin",
+        "message": "'apiOrigin' is defined but never used. Allowed unused args must match /^_/u.",
+        "context": "function vendorImportMapEntries(apiOrigin) {"
+      }
+    ],
+    "byFile": {
+      "client/components/sources-panel-helpers.js": 8,
+      "client/components/device-view-caspar-render.js": 6,
+      "client/components/header-bar.js": 6,
+      "src/api/routes-project.js": 6,
+      "src/api/routes-scene.js": 6,
+      "client/components/device-view-inspector-gpu.js": 5,
+      "client/components/device-view-inspector-gpu-video-modeline.js": 4,
+      "client/components/device-view.js": 4,
+      "client/components/preview-canvas-panel.js": 4,
+      "client/lib/device-view-gpu-port-merge.js": 4,
+      "client/lib/pip-overlay-amcp.js": 4,
+      "client/lib/scene-state-layer-logic.js": 4,
+      "src/api/routes-data.js": 4,
+      "src/engine/global-border.js": 4,
+      "src/network/tailscale-service.js": 4,
+      "tools/smoke/smoke-replication-handshake.test.js": 4,
+      "client/components/device-view-inspector-decklink.js": 3,
+      "client/components/device-view-inspector-mapping.js": 3,
+      "client/components/device-view-inspector-replication.js": 3,
+      "client/components/device-view-mappings-render.js": 3,
+      "client/components/device-view-ui-utils.js": 3,
+      "client/components/scene-list.js": 3,
+      "client/components/timeline-canvas-render.js": 3,
+      "client/lib/scenes-preview-global-border.js": 3,
+      "src/api/routes-ingest.js": 3,
+      "src/engine/project-scenes.js": 3,
+      "src/system/pointer-confine.js": 3,
+      "client/components/device-view-bands-render.js": 2,
+      "client/components/device-view-destinations-ui.js": 2,
+      "client/components/device-view-inspector-decklink-input.js": 2,
+      "client/components/device-view-matrix.js": 2,
+      "client/components/inspector-layer-playlist.js": 2,
+      "client/components/preview-canvas-draw-base.js": 2,
+      "client/components/publish-modal.js": 2,
+      "client/components/scenes-editor-deck-thumb.js": 2,
+      "client/components/scenes-preview-runtime.js": 2,
+      "client/components/timeline-canvas.js": 2,
+      "client/components/timeline-editor-handlers.js": 2,
+      "client/lib/device-view-gpu-port-topology.js": 2,
+      "client/lib/led-test-apply.js": 2,
+      "client/lib/scene-state-look-logic.js": 2,
+      "client/lib/scene-state.js": 2,
+      "src/api/device-view-crud.js": 2,
+      "src/api/get-state.js": 2,
+      "src/api/routes-companion-preview.js": 2,
+      "src/api/system-hardware-gpu-layout.js": 2,
+      "src/audio/audio-devices.js": 2,
+      "src/engine/pip-overlay.js": 2,
+      "src/engine/timeline-playback.js": 2,
+      "src/replication/replication-pair-token.js": 2,
+      "src/replication/replication-reconcile.js": 2,
+      "src/replication/replication-service.js": 2,
+      "src/system/exfat-sync-fs.js": 2,
+      "src/utils/os-config.js": 2,
+      "src/utils/x-display-session.js": 2,
+      "src/utils/xrandr-custom-mode.js": 2,
+      "tools/map/timing-test.js": 2,
+      "tools/smoke/smoke-decklink-enum.js": 2,
+      "tools/smoke/smoke-full-config-apply.js": 2,
+      "tools/smoke/smoke-timeline-per-id-playback.test.js": 2,
+      "client/assets/modules/previs/entry.js": 1,
+      "client/components/audio-mixer-view-console.js": 1,
+      "client/components/device-view-actions.js": 1,
+      "client/components/device-view-cables.js": 1,
+      "client/components/device-view-caspar-render-simple.js": 1,
+      "client/components/device-view-destinations-inspector-form.js": 1,
+      "client/components/device-view-destinations-inspector.js": 1,
+      "client/components/device-view-events.js": 1,
+      "client/components/device-view-inspector-audio.js": 1,
+      "client/components/device-view-snapshot-modals.js": 1,
+      "client/components/fixture-inspector.js": 1,
+      "client/components/inspector-fill-timeline.js": 1,
+      "client/components/inspector-fill.js": 1,
+      "client/components/inspector-panel-timeline-flag.js": 1,
+      "client/components/inspector-panel-timeline.js": 1,
+      "client/components/inspector-panel.js": 1,
+      "client/components/led-test-modal.js": 1,
+      "client/components/live-audio-mixer-modal.js": 1,
+      "client/components/load-project-modal.js": 1,
+      "client/components/logs-modal-filter.js": 1,
+      "client/components/multiview-editor-canvas-interaction.js": 1,
+      "client/components/multiview-editor-canvas-layout.js": 1,
+      "client/components/multiview-editor.js": 1,
+      "client/components/pixel-map-editor.js": 1,
+      "client/components/playback-timer.js": 1,
+      "client/components/previs-inspector-sections.js": 1,
+      "client/components/previs-uv-editor.js": 1,
+      "client/components/scenes-editor.js": 1,
+      "client/components/settings-live-audio-panel.js": 1,
+      "client/components/sources-panel-live-render.js": 1,
+      "client/components/sources-panel-media.js": 1,
+      "client/components/sources-panel-project-gather.js": 1,
+      "client/components/sources-panel-render.js": 1,
+      "client/components/sources-panel.js": 1,
+      "client/lib/app-ws-handlers.js": 1,
+      "client/lib/device-view-gpu-port-entries.js": 1,
+      "client/lib/device-view-host-channels.js": 1,
+      "client/lib/editor-defaults.js": 1,
+      "client/lib/logs-modal-shared.js": 1,
+      "client/lib/lower-third-roster-import.js": 1,
+      "client/lib/previs-scene-utils.js": 1,
+      "client/lib/project-import-flow.js": 1,
+      "client/lib/project-state.js": 1,
+      "client/lib/scene-state-preset-actions.js": 1,
+      "client/lib/timeline-compose-preview.js": 1,
+      "index.js": 1,
+      "src/api/device-view-decklink-wiring.js": 1,
+      "src/api/device-view-snapshot.js": 1,
+      "src/api/host-operator-fullscreen.js": 1,
+      "src/api/route-registry.js": 1,
+      "src/api/routes-amcp.js": 1,
+      "src/api/routes-cg-thumb.js": 1,
+      "src/api/routes-data-project-handlers.js": 1,
+      "src/api/routes-data-project-read.js": 1,
+      "src/api/routes-exfat-sync.js": 1,
+      "src/api/routes-media.js": 1,
+      "src/api/routes-mixer.js": 1,
+      "src/api/routes-ndi.js": 1,
+      "src/api/routes-pip-overlay.js": 1,
+      "src/api/routes-scene-shared.js": 1,
+      "src/api/routes-streaming-channel-rtmp.js": 1,
+      "src/api/routes-streaming-channel.js": 1,
+      "src/api/routes-usb-ingest.js": 1,
+      "src/api/system-hardware-identify-displays.js": 1,
+      "src/artnet/artnet-output.js": 1,
+      "src/capture/v4l2-input-bridge.js": 1,
+      "src/capture/v4l2-input-health.js": 1,
+      "src/caspar/amcp-client-transport.js": 1,
+      "src/caspar/amcp-client.js": 1,
+      "src/config/config-generator-channels.js": 1,
+      "src/config/device-graph-suggest.js": 1,
+      "src/config/host-live-sources-caspar.js": 1,
+      "src/config/host-live-sources.js": 1,
+      "src/config/routing-map.js": 1,
+      "src/engine/pip-overlay-utils.js": 1,
+      "src/engine/project-hardware-config.js": 1,
+      "src/engine/project-volume-sync.js": 1,
+      "src/engine/scene-take-lbg.js": 1,
+      "src/engine/scene-take-pgm-only.js": 1,
+      "src/engine/scene-take.js": 1,
+      "src/engine/scene-transition.js": 1,
+      "src/media/live-thumbnail-cache-capture.js": 1,
+      "src/media/live-thumbnail-cache-handlers.js": 1,
+      "src/osc/osc-listener.js": 1,
+      "src/replication/connect-pair.js": 1,
+      "src/replication/peer-client.js": 1,
+      "src/replication/project-media-parity.js": 1,
+      "src/replication/replication-show-authority.js": 1,
+      "src/sampling/dmx-output.js": 1,
+      "src/server/http-server.js": 1,
+      "src/server/ws-server.js": 1,
+      "src/state/state-manager.js": 1,
+      "src/system/cef-interactive-bridge-events.js": 1,
+      "src/system/cef-interactive-bridge.js": 1,
+      "src/system/exfat-sync-map.js": 1,
+      "src/utils/decklink-enum.js": 1,
+      "src/utils/gpu-edid-probe.js": 1,
+      "src/utils/os-config-xrandr-apply.js": 1,
+      "src/utils/periodic-sync.js": 1,
+      "src/utils/query-cycle.js": 1,
+      "src/utils/x-display-session-runtime.js": 1,
+      "src/virtual-output/v4l2-kernel-modules.js": 1,
+      "tools/ci/check-require-integrity.js": 1,
+      "tools/map/ast-scanner.js": 1,
+      "tools/runtime/clean-slate-reset.js": 1,
+      "tools/smoke/query-test.js": 1,
+      "tools/smoke/smoke-amcp-batch-library.test.js": 1,
+      "tools/smoke/smoke-cef-interactive-api.test.js": 1,
+      "tools/smoke/smoke-cef-interactive-bridge.live.test.js": 1,
+      "tools/smoke/smoke-companion-press.mjs": 1,
+      "tools/smoke/smoke-companion-satellite-preview.test.js": 1,
+      "tools/smoke/smoke-media-browser-router.test.js": 1,
+      "tools/smoke/smoke-replication-caspar-output.js": 1,
+      "tools/smoke/smoke-replication-follower-profile.js": 1,
+      "tools/smoke/smoke-replication-show-authority.test.js": 1,
+      "tools/smoke/smoke-scene-exit-orphans.test.js": 1,
+      "tools/smoke/smoke-scene-take-pgm-only.test.js": 1,
+      "tools/smoke/smoke-timeline-pause-resume.test.js": 1,
+      "vite.config.js": 1
+    }
+  },
+  "likelyUnusedExports": [
+    {
+      "rel": "client/assets/modules/autofollow/entry.js",
+      "name": "initAutofollowModule",
+      "line": 14,
+      "type": "default-fn",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/assets/modules/previs/entry.js",
+      "name": "initPrevisModule",
+      "line": 42,
+      "type": "default-fn",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/assets/modules/tracking/entry.js",
+      "name": "initTrackingModule",
+      "line": 15,
+      "type": "default-fn",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-console-input-groups.js",
+      "name": "renderConsoleInputGroups",
+      "line": 30,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-console-live-inputs.js",
+      "name": "renderConsoleLiveInputs",
+      "line": 32,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-console-masters.js",
+      "name": "renderConsoleMasterStrips",
+      "line": 26,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-panel-input-layers.js",
+      "name": "renderInspectorProgramInputLayers",
+      "line": 30,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-panel-live-inputs.js",
+      "name": "renderInspectorLiveInputs",
+      "line": 32,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-panel-masters.js",
+      "name": "renderInspectorMasterBuses",
+      "line": 26,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/audio-mixer-panel-sync.js",
+      "name": "syncFaderUIFromGain",
+      "line": 31,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/cg-only-look-deck-thumb.js",
+      "name": "drawAlphaCheckerboard",
+      "line": 18,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/cg-only-look-deck-thumb.js",
+      "name": "clearCgOnlyLookDeckThumbCache",
+      "line": 199,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "applyDeviceSnapshot",
+      "line": 16,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "buildDeviceSnapshotEnvelope",
+      "line": 24,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "getCasparConfigOverride",
+      "line": 94,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "saveCasparConfigOverride",
+      "line": 98,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "syncDeviceGraphFromLive",
+      "line": 116,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-actions.js",
+      "name": "getPgmRecordStatus",
+      "line": 222,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-bands-render.js",
+      "name": "renderDeckLinkBand",
+      "line": 33,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-bands-render.js",
+      "name": "renderStreamingBand",
+      "line": 200,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-bands-render.js",
+      "name": "renderVirtualCamBand",
+      "line": 232,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-bands-render.js",
+      "name": "renderRecordingBand",
+      "line": 272,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-cable.js",
+      "name": "registerDeviceViewCable",
+      "line": 28,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-events.js",
+      "name": "attachDeviceViewEvents",
+      "line": 14,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-inspector-decklink-input.js",
+      "name": "renderDecklinkInputSection",
+      "line": 16,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-inspector-decklink-output.js",
+      "name": "renderDecklinkOutputSection",
+      "line": 465,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-inspector-gpu-modeline-apply.js",
+      "name": "wireGpuModelinePreviewAndPatches",
+      "line": 17,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-inspector-replication-controls.js",
+      "name": "wireReplicationInspector",
+      "line": 26,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-render.js",
+      "name": "registerDeviceViewRender",
+      "line": 14,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-selection.js",
+      "name": "registerDeviceViewSelection",
+      "line": 10,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-toolbar.js",
+      "name": "buildDeviceViewShell",
+      "line": 7,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-toolbar.js",
+      "name": "registerViewMode",
+      "line": 177,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/device-view-ui-utils.js",
+      "name": "findNearestConnectorId",
+      "line": 96,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/inspector-effects.js",
+      "name": "renderEffectEditor",
+      "line": 107,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/inspector-lower-third-roster.js",
+      "name": "appendLowerThirdRoster",
+      "line": 24,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/inspector-lower-third-templates.js",
+      "name": "fetchLowerThirdTemplates",
+      "line": 11,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/inspector-panel-routing.js",
+      "name": "renderInspectorSelection",
+      "line": 36,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/led-test-modal.js",
+      "name": "saveLedTestSettings",
+      "line": 72,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/logs-modal-filter.js",
+      "name": "attachLogsCategoryFilter",
+      "line": 82,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/pixel-mapping-browser.js",
+      "name": "renderMappingBrowser",
+      "line": 6,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/playback-timer.js",
+      "name": "playbackFileLabel",
+      "line": 50,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/playback-timer.js",
+      "name": "mountPlaybackTimer",
+      "line": 91,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/playback-timer.js",
+      "name": "pickTopLayerStateForPlayback",
+      "line": 313,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/preview-canvas-compose-snapshot.js",
+      "name": "resetComposePreviewClientCache",
+      "line": 148,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/preview-canvas-destination-overlay.js",
+      "name": "createDestinationLayoutOverlay",
+      "line": 7,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/preview-panel-math.js",
+      "name": "fitComposePairRect",
+      "line": 5,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/preview-panel-math.js",
+      "name": "composeCellLogicalDimensions",
+      "line": 13,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scene-list-column.js",
+      "name": "appendSceneDeckColumn",
+      "line": 30,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scenes-editor-deck-drop.js",
+      "name": "createDeckMediaDropHandler",
+      "line": 10,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scenes-editor-deck-thumb.js",
+      "name": "createDeckThumbPainter",
+      "line": 18,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scenes-editor-layer-route.js",
+      "name": "createBuildLayerRouteLiveSourceItem",
+      "line": 11,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scenes-editor-logic.js",
+      "name": "lookRecallItemsFromPreset",
+      "line": 42,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/scenes-editor-support.js",
+      "name": "renderScreenTabs",
+      "line": 255,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/scenes-shared.js",
+      "name": "playSeekFramesFromClip",
+      "line": 184,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/scenes-shared.js",
+      "name": "playSeekFramesForSceneLayerFromTimeline",
+      "line": 248,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-decklink-drop.js",
+      "name": "attachDecklinkDropHandlers",
+      "line": 38,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-helpers.js",
+      "name": "iconFor",
+      "line": 212,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-helpers.js",
+      "name": "formatFileSize",
+      "line": 245,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-media-selection.js",
+      "name": "createMediaSelection",
+      "line": 14,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-project-gather.js",
+      "name": "createProjectMediaGather",
+      "line": 35,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/sources-panel-render.js",
+      "name": "createSourcesPanelRender",
+      "line": 20,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/timeline-canvas-pointer.js",
+      "name": "attachTimelinePointerEvents",
+      "line": 31,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/timeline-canvas-render.js",
+      "name": "clipRowRect",
+      "line": 342,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/components/timeline-canvas-wheel.js",
+      "name": "attachTimelineWheelAndDrop",
+      "line": 15,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/components/timeline-editor-preview.js",
+      "name": "initTimelineEditorPreview",
+      "line": 35,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/api-client.js",
+      "name": "apiPut",
+      "line": 108,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/api-client.js",
+      "name": "apiDelete",
+      "line": 140,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/app-status.js",
+      "name": "fetchLocalCasparConnectionStatus",
+      "line": 22,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-bus-meters.js",
+      "name": "MAX_BUS_METER_CHANNELS",
+      "line": 4,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-bus-meters.js",
+      "name": "busMeterFillKey",
+      "line": 17,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-fader-bind.js",
+      "name": "unityFaderPercent",
+      "line": 6,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-meter-eligibility.js",
+      "name": "oscLayerIsPlaying",
+      "line": 103,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-meter-eligibility.js",
+      "name": "oscLayerHasAudio",
+      "line": 129,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-meter-eligibility.js",
+      "name": "oscLayerEligibleForMeter",
+      "line": 164,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-rows.js",
+      "name": "layerHasMixerAudio",
+      "line": 10,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/audio-mixer-state.js",
+      "name": "getLayerRoute",
+      "line": 59,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-state.js",
+      "name": "setLayerRoute",
+      "line": 68,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-state.js",
+      "name": "getAllLayerRoutes",
+      "line": 77,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-state.js",
+      "name": "clearSolos",
+      "line": 110,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/audio-mixer-volume-api.js",
+      "name": "buildAudioVolumeAmcpCommands",
+      "line": 11,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/compose-preview-url.js",
+      "name": "getComposePreviewCompanionUrl",
+      "line": 47,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/default-project.js",
+      "name": "buildDefaultSceneExportData",
+      "line": 34,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/default-project.js",
+      "name": "buildDefaultUntitledProject",
+      "line": 40,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/default-project.js",
+      "name": "applyDefaultUntitledProjectLocally",
+      "line": 51,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/default-project.js",
+      "name": "saveDefaultUntitledProjectToServer",
+      "line": 120,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-decklink-keyfill.js",
+      "name": "decklinkConnectorByDeviceIndex",
+      "line": 9,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-gpu-layout-debug.js",
+      "name": "dumpGpuLayoutServerPayload",
+      "line": 283,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-host-channels.js",
+      "name": "HOST_CHANNEL_DEST_ROLES",
+      "line": 17,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-host-channels.js",
+      "name": "listDecklinkAndLiveInputHostDestinations",
+      "line": 219,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-host-channels.js",
+      "name": "listHostLiveSourceDestinations",
+      "line": 324,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-host-channels.js",
+      "name": "listPersistedScreenDestinations",
+      "line": 385,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/device-view-host-channels.js",
+      "name": "hostChannelVideoSourceToken",
+      "line": 561,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/device-view-refresh.js",
+      "name": "syncDeviceViewSettingsCache",
+      "line": 32,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/editor-defaults.js",
+      "name": "getCoordinateOrigin",
+      "line": 23,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/effect-registry.js",
+      "name": "BLEND_MODES",
+      "line": 17,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/effect-registry.js",
+      "name": "CHROMA_KEY_TYPES",
+      "line": 26,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/fill-math.js",
+      "name": "pixelRegionFill",
+      "line": 30,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/input-channels.js",
+      "name": "routeForV4l2Slot",
+      "line": 53,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/input-channels.js",
+      "name": "isLiveAudioInputChannel",
+      "line": 130,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/input-channels.js",
+      "name": "isV4l2InputChannel",
+      "line": 137,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/layer-playhead-resolve.js",
+      "name": "resolveProgramCasparChannel",
+      "line": 16,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/layer-playhead-resolve.js",
+      "name": "readCurrentDurationFramesFromVariables",
+      "line": 54,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/live-audio-inputs.js",
+      "name": "liveAudioHostLayer",
+      "line": 13,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/live-audio-inputs.js",
+      "name": "liveAudioPgmLayer",
+      "line": 20,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/live-audio-inputs.js",
+      "name": "resolveInputsHostChannel",
+      "line": 56,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/live-audio-inputs.js",
+      "name": "resolveLiveAudioSlotCount",
+      "line": 73,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/live-audio-inputs.js",
+      "name": "liveAudioSlotDisplayLabel",
+      "line": 95,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/live-audio-play-targets.js",
+      "name": "getPlayTarget",
+      "line": 35,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/live-audio-play-targets.js",
+      "name": "defaultPlayTarget",
+      "line": 164,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/live-audio-play-targets.js",
+      "name": "resolvePlayTarget",
+      "line": 186,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/logs-modal-shared.js",
+      "name": "fetchSupportBundle",
+      "line": 53,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/lower-third-cg-data.js",
+      "name": "resolveLowerThirdFontStack",
+      "line": 34,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/lower-third-cg-data.js",
+      "name": "lowerThirdConfigHasEditorContent",
+      "line": 281,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/lower-third-roster-import.js",
+      "name": "ROSTER_PARSE_TIMEOUT_MS",
+      "line": 8,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/lower-third-roster-import.js",
+      "name": "buildPrimaryLine",
+      "line": 92,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/mapping-node-service.js",
+      "name": "proposeMappingOutputLayout",
+      "line": 90,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/mapping-node-service.js",
+      "name": "collectPixelMapOutConnectorIds",
+      "line": 126,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/mapping-node-service.js",
+      "name": "pruneEdgesForRemovedMappingOutputs",
+      "line": 155,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/math-input.js",
+      "name": "evaluateMath",
+      "line": 5,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/media-ext.js",
+      "name": "classifyMediaKind",
+      "line": 80,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/mixer-fill.js",
+      "name": "isFullCanvasFill",
+      "line": 136,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/mixer-fill.js",
+      "name": "isMixerFillReasonable",
+      "line": 150,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/mixer-fill.js",
+      "name": "isFullScaleWithNonZeroOrigin",
+      "line": 164,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/ndi-attribution.js",
+      "name": "NDI_TRADEMARK_NOTICE",
+      "line": 5,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/operator-gui-launch.js",
+      "name": "launchOperatorGui",
+      "line": 19,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/operator-gui-launch.js",
+      "name": "setOperatorPointerConfine",
+      "line": 34,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/optional-modules-registry.js",
+      "name": "getOptionalModuleDef",
+      "line": 14,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/optional-modules.js",
+      "name": "isModuleEnabled",
+      "line": 125,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/optional-modules.js",
+      "name": "getOptionalModuleState",
+      "line": 129,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/pip-overlay-amcp.js",
+      "name": "pipOverlayClearAmcpLinesForContentRange",
+      "line": 483,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/previs-mesh-info.js",
+      "name": "findTaggedScreenMeshes",
+      "line": 289,
+      "type": "re-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/previs-mesh-info.js",
+      "name": "setMeshInteractive",
+      "line": 289,
+      "type": "re-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/previs-state.js",
+      "name": "PREVIS_DEFAULT_UI",
+      "line": 426,
+      "type": "re-export",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/previs-uv-mapper.js",
+      "name": "ledPanelSizeMeters",
+      "line": 376,
+      "type": "re-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/previs-uv-mapper.js",
+      "name": "rotate2D",
+      "line": 376,
+      "type": "re-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-files.js",
+      "name": "normalizeProjectFileList",
+      "line": 65,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-hardware-mismatch.js",
+      "name": "liveGraphFromContext",
+      "line": 49,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-hardware-mismatch.js",
+      "name": "liveDisplaysFromContext",
+      "line": 65,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-hardware-mismatch.js",
+      "name": "isLikelySameMachine",
+      "line": 147,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-hardware-mismatch.js",
+      "name": "diffDeviceGraphs",
+      "line": 166,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-hardware-mismatch.js",
+      "name": "buildDeviceSnapshotFromHardwareConfig",
+      "line": 422,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/project-import-flow.js",
+      "name": "showKeepLiveBanner",
+      "line": 172,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-import-flow.js",
+      "name": "noteHardwareIncludedInSave",
+      "line": 200,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/project-media-context.js",
+      "name": "isMediaInActiveProject",
+      "line": 213,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-media-gather.js",
+      "name": "gatherProjectMediaIntoFolder",
+      "line": 332,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/project-media-reconcile.js",
+      "name": "reconcileProjectMedia",
+      "line": 85,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-media-reconcile.js",
+      "name": "showMissingMediaBanner",
+      "line": 159,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-media-refs.js",
+      "name": "listProjectScenes",
+      "line": 11,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-media-refs.js",
+      "name": "listProjectTimelines",
+      "line": 22,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/project-state.js",
+      "name": "SERVER_STORE_NAME",
+      "line": 121,
+      "type": "re-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/replication-media-spread.js",
+      "name": "noteMediaListForReplication",
+      "line": 149,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/replication-status-banner.js",
+      "name": "initReplicationStatusBanner",
+      "line": 150,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/replication-status-banner.js",
+      "name": "stopReplicationStatusBanner",
+      "line": 158,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/replication-ui-state.js",
+      "name": "getReplicationStatus",
+      "line": 29,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/replication-ui-state.js",
+      "name": "bindReplicationWsPush",
+      "line": 115,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/replication-ui-state.js",
+      "name": "stopReplicationUiState",
+      "line": 128,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/scene-state-layer-ops.js",
+      "name": "mixinSceneStateLayerOps",
+      "line": 10,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/scenes-preview-look-stack.js",
+      "name": "layersToClearBeforePgmTake",
+      "line": 46,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/scenes-preview-look-stack.js",
+      "name": "buildClearLookStackLayerCommands",
+      "line": 72,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/screen-consumer-defaults.js",
+      "name": "MULTIVIEW_CONSUMER_DEFAULTS",
+      "line": 13,
+      "type": "const",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/screen-consumer-defaults.js",
+      "name": "legacyBorderedWindowConsumer",
+      "line": 60,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/streaming-channel-state.js",
+      "name": "normalizeStreamingChannelStatus",
+      "line": 109,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/thumbnail-url.js",
+      "name": "isMediaOrFileSourceValue",
+      "line": 65,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/timeline-program-canvas.js",
+      "name": "resolveTimelineScreenIdx",
+      "line": 11,
+      "type": "function",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/lib/timeline-state-clips.js",
+      "name": "timelineClipMethods",
+      "line": 13,
+      "type": "const",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/timeline-state-keyframes.js",
+      "name": "timelineKeyframeMethods",
+      "line": 5,
+      "type": "const",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/timeline-state-model.js",
+      "name": "findClipOnTimeline",
+      "line": 163,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/timeline-state-model.js",
+      "name": "findClipAtTimeOnTimeline",
+      "line": 169,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/timeline-state-model.js",
+      "name": "normalizeLoadedTimelines",
+      "line": 178,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/lib/virtual-camera-state.js",
+      "name": "applyVirtualCameraStatusFromState",
+      "line": 51,
+      "type": "function",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "client/tools/electron-launcher/lib-paths.js",
+      "name": "getRepoRoot",
+      "line": 34,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/tools/electron-launcher/lib-paths.js",
+      "name": "resolveDistWeb",
+      "line": 34,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "client/tools/electron-launcher/renderer-partials.js",
+      "name": "injectLauncherPartials",
+      "line": 15,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/audio/live-audio-bridge.js",
+      "name": "liveAudioBridgeStatus",
+      "line": 243,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/audio/meter-null-consumer.js",
+      "name": "removeMeterNullConsumer",
+      "line": 163,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/companion-bridge/contract.js",
+      "name": "composePreviewQuadrantKey",
+      "line": 113,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/companion-bridge/contract.js",
+      "name": "companionVariableId",
+      "line": 113,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/companion-bridge/look-air-frames.js",
+      "name": "resetLookAirFrames",
+      "line": 253,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/config/config-classify.js",
+      "name": "SHOW_DESTINATION_SLICES",
+      "line": 141,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/config/decklink-input-slots.js",
+      "name": "isLegacyImplicitDecklinkInputSlot",
+      "line": 129,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/config/program-audio-layouts.js",
+      "name": "resolveCabledLayoutsByMain",
+      "line": 110,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/config/routing.js",
+      "name": "routeToLayer",
+      "line": 21,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/caspar-channel-clear.js",
+      "name": "isMultiviewCasparChannel",
+      "line": 62,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/global-border.js",
+      "name": "GLOBAL_BORDER_LAYER_PGM_A",
+      "line": 201,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/global-border.js",
+      "name": "GLOBAL_BORDER_LAYER_PGM_B",
+      "line": 201,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/pip-overlay.js",
+      "name": "buildPipOverlayRouterAmcpLines",
+      "line": 395,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/pip-overlay.js",
+      "name": "buildPipOverlayRouterUpdateLines",
+      "line": 395,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/project-store.js",
+      "name": "loadProjectBySlug",
+      "line": 264,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/scene-native-fill.js",
+      "name": "nativeFillNorm",
+      "line": 372,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/scene-play-seek.js",
+      "name": "elapsedFramesFromPlayback",
+      "line": 323,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/scene-take-lbg-helpers.js",
+      "name": "STILL_IMAGE_LOADBG_NO_TRANSITION_EXT",
+      "line": 94,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/scene-transition.js",
+      "name": "runTimelineOnlyTake",
+      "line": 291,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/engine/timeline-playback-helpers.js",
+      "name": "TIMELINE_AMCP_DRIFT_MS",
+      "line": 132,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/module-registry.js",
+      "name": "listNames",
+      "line": 244,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/plugins/plugin-manager.js",
+      "name": "getKnownPluginIds",
+      "line": 193,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-activity.js",
+      "name": "channelHasPlayingVideo",
+      "line": 362,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-activity.js",
+      "name": "onTimelinePlaying",
+      "line": 362,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-activity.js",
+      "name": "onTimelinePaused",
+      "line": 362,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-activity.js",
+      "name": "requestInitialCapture",
+      "line": 362,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-cache.js",
+      "name": "waitForPngStable",
+      "line": 297,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-cache.js",
+      "name": "sha256File",
+      "line": 297,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-companion-thumb.js",
+      "name": "isCompanionPreviewEnabled",
+      "line": 370,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-companion-thumb.js",
+      "name": "resizePreviewToPngBuffer",
+      "line": 370,
+      "type": "cjs-export",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "src/preview/compose-preview-companion-thumb.js",
+      "name": "startCompanionThumbTimer",
+      "line": 370,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-dirty.js",
+      "name": "markCaptureFailed",
+      "line": 142,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-dirty.js",
+      "name": "getLastHash",
+      "line": 142,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-dirty.js",
+      "name": "forceAllDirty",
+      "line": 142,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/preview/compose-preview-ffmpeg-args.js",
+      "name": "buildCompanionThumbScaleFilter",
+      "line": 120,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/follower-caspar-output.js",
+      "name": "repairFollowerDecklinkOutput",
+      "line": 324,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/follower-machine-profile.js",
+      "name": "scheduleFollowerDeviceViewCasparSync",
+      "line": 234,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/project-media-parity.js",
+      "name": "invalidateProjectMediaPingCache",
+      "line": 312,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/replication-service-runtime.js",
+      "name": "getReplicationCtx",
+      "line": 47,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/replication-service-runtime.js",
+      "name": "getReplicationRuntimeRef",
+      "line": 47,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/replication-service-runtime.js",
+      "name": "setReplicationRuntime",
+      "line": 47,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/replication-service-runtime.js",
+      "name": "clearReplicationRuntime",
+      "line": 47,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/show-revision-reconcile.js",
+      "name": "maybeReconcileShowRevisionFromPing",
+      "line": 61,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/show-revision-reconcile.js",
+      "name": "noteFollowerAppliedShowRevision",
+      "line": 61,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/syncthing-client.js",
+      "name": "ensureRemoteDevice",
+      "line": 129,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/syncthing-client.js",
+      "name": "ensureSharedFolder",
+      "line": 129,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/replication/syncthing-media-status.js",
+      "name": "getMediaSyncStatus",
+      "line": 129,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/server/cors.js",
+      "name": "corsHeaders",
+      "line": 97,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/streaming/ndi-resolve.js",
+      "name": "prepareNdiStreaming",
+      "line": 214,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/streaming/ndi-resolve.js",
+      "name": "validateFfmpegNdiInput",
+      "line": 214,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/system/exfat-sync.js",
+      "name": "DEFAULT_EXFAT_ROOT",
+      "line": 312,
+      "type": "cjs-export",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "src/utils/caspar-restart.js",
+      "name": "waitForAmcpTcp",
+      "line": 467,
+      "type": "cjs-export",
+      "sameFileRefs": 1
+    },
+    {
+      "rel": "src/utils/caspar-restart.js",
+      "name": "sendRestartAndWaitForCaspar",
+      "line": 467,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/caspar-restart.js",
+      "name": "finishCasparAfterApply",
+      "line": 467,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/decklink-enum.js",
+      "name": "parseDecklinkDevicesFromFfmpegText",
+      "line": 394,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/gpu-modetest.js",
+      "name": "modetestModesToDisplayModes",
+      "line": 423,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/log-buffer.js",
+      "name": "setMaxLines",
+      "line": 86,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/persistence.js",
+      "name": "bindAmcp",
+      "line": 136,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/persistence.js",
+      "name": "hydrateFromAmcp",
+      "line": 136,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/utils/xrandr-output-resolve.js",
+      "name": "resolveLayoutHeadSysId",
+      "line": 197,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "src/virtual-output/v4l2-bridge-cache.js",
+      "name": "getV4l2BridgeJpgAmcpPath",
+      "line": 64,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "work/audio_testing/lib/env.js",
+      "name": "resolveChannels",
+      "line": 108,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "work/audio_testing/lib/ffmpeg-rtp-bridge.js",
+      "name": "startAlsaToRtpBridge",
+      "line": 66,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "work/audio_testing/lib/ffmpeg-rtp-bridge.js",
+      "name": "stopBridge",
+      "line": 66,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "work/audio_testing/lib/harness.js",
+      "name": "connectAmcp",
+      "line": 93,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    },
+    {
+      "rel": "work/audio_testing/lib/harness.js",
+      "name": "decklinkPlayCmd",
+      "line": 93,
+      "type": "cjs-export",
+      "sameFileRefs": 2
+    }
+  ]
+}
