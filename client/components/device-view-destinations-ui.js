@@ -59,10 +59,6 @@ export function renderDestinations(ctx) {
 	/** @type {Map<string, HTMLElement[]>} */
 	const destinationByKey = new Map()
 
-	function addChipKey(key, el) {
-		if (!chipByKey.has(key)) chipByKey.set(key, [])
-		chipByKey.get(key).push(el)
-	}
 	function addDestinationKey(key, el) {
 		if (!destinationByKey.has(key)) destinationByKey.set(key, [])
 		destinationByKey.get(key).push(el)
@@ -283,7 +279,7 @@ export function renderDestinations(ctx) {
 		
 		b.addEventListener('mouseenter', () => localHighlightIntent(intent))
 		b.addEventListener('mouseleave', () => localClearHighlights())
-		b.addEventListener('click', (ev) => {
+		b.addEventListener('click', (_ev) => {
 			localHighlightIntent(intent)
 			if (typeof selectDestinationById === 'function') {
 				selectDestinationById(d.id)

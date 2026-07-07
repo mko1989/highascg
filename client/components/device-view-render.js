@@ -9,12 +9,28 @@ import { migrateLegacyGpuLayoutPrefsToServer } from '../lib/device-view-gpu-port
 import { gpuTopologyMismatchActive } from '../lib/device-view-gpu-port-topology.js'
 import { getStreamingChannelStatus } from '../lib/streaming-channel-state.js'
 import { getAppWs } from '../lib/app-runtime.js'
+import { FACTORY_RESET_GPU_LAYOUT_KEY } from '../lib/device-view-gpu-port-constants.js'
+import { settingsState } from '../lib/settings-state.js'
+import { populateDestinationTypeSelect, mergeSettingsIntoDeviceViewPayload } from '../lib/device-view-host-channels.js'
+import { renderLiveSourcesBand, openAddLiveSourceModal } from './device-view-live-sources-render.js'
 import * as Actions from './device-view-actions.js'
 
 export function registerDeviceViewRender(ctx) {
 	const { refs, state, gHost } = ctx
-	const { wrap, layout, destBody, mappingPanel, rearPanel, edgesHost, matrixHost, matrixCk, simpleWiringCk, statusEl } =
-		refs
+	const {
+		wrap,
+		layout,
+		destBody,
+		destLiveHost,
+		destType,
+		mappingPanel,
+		rearPanel,
+		edgesHost,
+		matrixHost,
+		matrixCk,
+		simpleWiringCk,
+		statusEl,
+	} = refs
 
 	let topologyBannerEl = null
 
@@ -106,6 +122,7 @@ export function registerDeviceViewRender(ctx) {
 
 	ctx.renderFromState = ({ restoreInspector = false } = {}) => {
 		if (!state.lastPayload) return
+		populateDestinationTypeSelect(destType, state.lastPayload)
 		updateTopologyMismatchBanner()
 		renderDestinations({
 			destBody,
@@ -138,6 +155,22 @@ export function registerDeviceViewRender(ctx) {
 			updateDestinationOutputLayer: ctx.updateDestinationOutputLayer,
 			requestCableOverlayRender: () => renderCableOverlay(ctx.getCOCtx()),
 		})
+		if (destLiveHost) {
+			destLiveHost.innerHTML = ''
+			destLiveHost.append(
+				renderLiveSourcesBand({
+					lastPayload: state.lastPayload,
+					selectedKey: state.selectedKey,
+					onPortClick: ctx.selectKey,
+					onAddLiveSource: () =>
+						openAddLiveSourceModal({
+							load: ctx.load,
+							statusEl,
+							setStatusFn: setStatus,
+						}),
+				}),
+			)
+		}
 		if (matrixCk.checked) {
 			renderMatrix(
 				matrixHost,
@@ -179,20 +212,41 @@ export function registerDeviceViewRender(ctx) {
 		requestAnimationFrame(() => ctx.updateUI())
 	}
 
-	ctx.load = async () => {
+	ctx.load = async (opts = {}) => {
 		try {
 			getAppWs()?.send?.({ type: 'device_view_subscribe' })
-			await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
+			let freshGpu = opts.freshGpu === true
+			try {
+				if (!freshGpu && sessionStorage.getItem(FACTORY_RESET_GPU_LAYOUT_KEY)) {
+					freshGpu = true
+				}
+			} catch {
+				/* ignore */
+			}
+			await settingsState.load().catch(() => {})
+			if (!freshGpu) {
+				await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
+			}
 			const cachedStream = getStreamingChannelStatus()
 			const [payload, settings, stream] = await Promise.all([
-				Actions.loadDeviceView(),
+				Actions.loadDeviceView({ freshGpu }),
 				Actions.loadSettings(),
 				cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
 			])
-			state.lastPayload = { ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null, _settings: settings }
+			if (freshGpu) {
+				try {
+					sessionStorage.removeItem(FACTORY_RESET_GPU_LAYOUT_KEY)
+				} catch {
+					/* ignore */
+				}
+			}
+			state.lastPayload = mergeSettingsIntoDeviceViewPayload(
+				{ ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null },
+				settings,
+			)
 			state.currentSettings = settings
 			state.streamingStatus = stream
-			ctx.renderFromState({ restoreInspector: true })
+			ctx.renderFromState({ restoreInspector: opts.restoreInspector !== false })
 			setStatus(statusEl, `Updated ${state.lastPayload?.live?.host?.collectedAt || ''}`, true)
 		} catch (e) {
 			setStatus(statusEl, e.message, false)

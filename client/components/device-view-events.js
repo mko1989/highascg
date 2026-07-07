@@ -4,12 +4,11 @@ import { CASPAR_HOST } from './device-view-helpers.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
 import { openSaveDeviceSnapshotModal, openLoadDeviceSnapshotModal } from './device-view-snapshot-modals.js'
 import { resolveProjectFpsFromSettings, defaultVideoModeForProjectFps } from '../lib/project-fps.js'
-import { populateDestinationTypeSelect, listHostChannelDestinations } from '../lib/device-view-host-channels.js'
+import { listHostChannelDestinations } from '../lib/device-view-host-channels.js'
 import {
 	screenConsumerSeedSettingsPatch,
 	shouldSeedScreenConsumerDefaults,
 } from '../lib/screen-consumer-defaults.js'
-import { getAppWs } from '../lib/app-runtime.js'
 import * as Actions from './device-view-actions.js'
 
 export function attachDeviceViewEvents(ctx) {

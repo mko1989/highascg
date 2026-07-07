@@ -2,7 +2,7 @@
  * Port Bands Rendering for Device View.
  */
 import { appendCableAffordance } from './device-view-cable-affordance.js'
-import { CASPAR_HOST, decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
+import { decklinkInputState, stateClass } from './device-view-helpers.js'
 import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { setStatus } from './device-view-ui-utils.js'
 import * as Actions from './device-view-actions.js'

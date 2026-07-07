@@ -1,10 +1,9 @@
 import { decklinkInputState, stateClass, connectorById } from './device-view-helpers.js'
 import { isDecklinkIoIn, isDecklinkIoOut } from '../lib/decklink-io-direction.js'
+import { normRandrCaspar } from '../lib/device-view-randr-norm.js'
 
-/** RandR names may be DP-0 or card0-DP-0 depending on source. */
-export function normRandrCaspar(v) {
-	return String(v || '').trim().toUpperCase().replace(/^CARD\d+-/i, '')
-}
+// Re-exported for existing importers; canonical home is lib/device-view-randr-norm.js (WO-138).
+export { normRandrCaspar }
 
 function layoutSlotIdForPairs(pairs, effectiveTopology) {
 	const want = new Set((pairs || []).map((p) => normRandrCaspar(p)).filter(Boolean))

@@ -44,6 +44,18 @@ export function coerceTimelineSendTo(cm, sendTo) {
 	return sendTo
 }
 
+/**
+ * Whether canvas timeline compose should paint the edit stack on a PRV/PGM cell.
+ * @param {{ preview?: boolean, program?: boolean } | null | undefined} sendTo
+ * @param {'pgm' | 'prv' | string | undefined} composeCell
+ */
+export function timelineComposeCellShowsTimeline(sendTo, composeCell) {
+	if (!composeCell) return true
+	if (composeCell === 'prv') return sendTo?.preview !== false
+	if (composeCell === 'pgm') return !!sendTo?.program
+	return true
+}
+
 export function defaultTimelineSendTo(cm) {
 	return coerceTimelineSendTo(cm, { ...DEFAULT_SEND_TO })
 }

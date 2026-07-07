@@ -1,9 +1,11 @@
 import { parseNumberInput } from '../lib/math-input.js'
 import { timelineState } from '../lib/timeline-state.js'
+import { sceneState } from '../lib/scene-state.js'
 import { KF_PROPERTIES, KF_PROP_MAP } from './inspector-common.js'
-import { pixelsToNormalized, normalizedToPixels } from '../lib/fill-math.js'
+import { pixelsToNormalized } from '../lib/fill-math.js'
 import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
 import { displayPxFromStoredNorm, storedNormFromDisplayPx, isCenterOrigin } from '../lib/coordinate-origin.js'
+import { getTimelineProgramResolution } from '../lib/timeline-program-canvas.js'
 
 /**
  * Timeline clip keyframes + add-keyframe UI (after title + basic clip fields).
@@ -19,10 +21,7 @@ export function appendTimelineClipKeyframes(root, opts) {
 		stateStore,
 	} = opts
 
-	const screenIdx = timelineState.getActive()?.screenIdx ?? 0
-	const res = stateStore.getState()?.channelMap?.programResolutions?.[screenIdx] || { w: 1920, h: 1080 }
-	const W = res.w || 1920
-	const H = res.h || 1080
+	const { w: W, h: H, screenIdx } = getTimelineProgramResolution(timelineId, sceneState, stateStore)
 
 	// Keyframes: build grouped position (fill_x+fill_y) and scale (scale_x+scale_y) by time
 	const allKfs = clip.keyframes || []

@@ -13,6 +13,10 @@ import {
 	subscribeComposePreviewRefresh,
 	syncComposePreviewFromChannelMap,
 } from './preview-canvas-compose-snapshot.js'
+import {
+	drawTimelineComposeInactiveCell,
+	timelineComposeCellShowsTimeline,
+} from '../lib/timeline-compose-preview.js'
 import { drawComposePrvPgmCellEdgeBar } from './preview-canvas-draw-base.js'
 import { streamState } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
@@ -102,6 +106,18 @@ export function initTimelineEditorPreview(opts) {
 					drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
 					return
 				}
+			}
+			if (
+				meta.composeDualStreamPreview === true &&
+				meta.composeCell &&
+				!timelineComposeCellShowsTimeline(view.sendTo, meta.composeCell)
+			) {
+				drawTimelineComposeInactiveCell(ctx, meta, {
+					stateStore,
+					view,
+					onRedraw: () => previewPanel.scheduleDraw(),
+				})
+				return
 			}
 			drawTimelineStack(ctx, W, H, {
 				timelineState,

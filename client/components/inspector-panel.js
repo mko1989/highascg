@@ -1,7 +1,6 @@
 /** Inspector panel — selected item properties. @see main_plan.md Prompt 14 */
 
 import { sceneState } from '../lib/scene-state.js'
-import { api } from '../lib/api-client.js'
 import { multiviewState } from '../lib/multiview-state.js'
 import { scheduleSelectionSync } from '../lib/selection-sync.js'
 import { renderTimelineLayerInspector } from './inspector-mixer.js'
@@ -18,7 +17,10 @@ import { renderSceneLayerInspector, renderMultiviewInspector, renderSceneInspect
 import { renderLayerPresetsMode, renderLookPresetsMode } from './inspector-panel-presets-modes.js'
 import { renderLiveAudioInputInspector } from './inspector-live-audio-input.js'
 import { renderWebpageHostInspector } from './inspector-webpage-host.js'
+import { renderNdiHostInspector } from './inspector-ndi-host.js'
+import { renderV4l2InputInspector } from './inspector-v4l2-input.js'
 import { renderPreservingFocus } from './device-view-ui-utils.js'
+import { attachInspectorLiveSourceSelectionEvents } from './inspector-panel-live-source-events.js'
 
 const INSPECTOR_MODE_STORAGE = 'hacg_inspector_panel_mode'
 const INSPECTOR_MODES = new Set(['inspector', 'layerPresets', 'lookPresets'])
@@ -117,6 +119,10 @@ export function initInspectorPanel(root, stateStore) {
 				return `liveAudioInput:${data.slot}`
 			case 'webpageHost':
 				return `webpageHost:${data.sourceId || data.value || data.hostChannel || ''}`
+			case 'ndiHost':
+				return `ndiHost:${data.sourceId || data.value || data.hostChannel || ''}`
+			case 'v4l2Input':
+				return `v4l2Input:${data.slot}`
 			default:
 				return String(data.type || '')
 		}
@@ -163,6 +169,16 @@ export function initInspectorPanel(root, stateStore) {
 		}
 		if (data.type === 'webpageHost') {
 			renderWebpageHostInspector(root, stateStore, data)
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+		if (data.type === 'ndiHost') {
+			renderNdiHostInspector(root, stateStore, data, { onClearSelection: () => update(null) })
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+		if (data.type === 'v4l2Input' && data.slot != null) {
+			renderV4l2InputInspector(root, stateStore, data, { onClearSelection: () => update(null) })
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
@@ -320,40 +336,18 @@ export function initInspectorPanel(root, stateStore) {
 		}
 	})
 
-	window.addEventListener('live-audio-input-select', (e) => {
-		const d = e.detail
-		if (d && d.slot != null) {
-			const s = parseInt(String(d.slot), 10)
-			if (Number.isFinite(s) && s >= 1) {
-				update({ type: 'liveAudioInput', slot: Math.floor(s) })
-				return
-			}
-		}
-		if (d == null) {
-			if (selection?.type === 'liveAudioInput') update(null)
-		}
-	})
-
-	window.addEventListener('webpage-host-select', (e) => {
-		const d = e.detail
-		if (d && (d.sourceId || d.value || d.hostChannel != null)) {
-			update({
-				type: 'webpageHost',
-				sourceId: d.sourceId,
-				value: d.value,
-				hostChannel: d.hostChannel,
-			})
-			return
-		}
-		if (d == null) {
-			if (selection?.type === 'webpageHost') update(null)
-		}
-	})
+	attachInspectorLiveSourceSelectionEvents({ update, getSelection: () => selection })
 
 	stateStore.on('extraLiveSources', () => {
-		if (panelMode !== 'inspector' || selection?.type !== 'webpageHost') return
-		if (root.querySelector('.inspector-webpage-host__url:focus')) return
-		renderWebpageHostInspector(root, stateStore, selection)
+		if (panelMode !== 'inspector') return
+		if (selection?.type === 'webpageHost' && root.querySelector('.inspector-webpage-host__url:focus')) return
+		if (selection?.type === 'webpageHost') {
+			renderWebpageHostInspector(root, stateStore, selection)
+			return
+		}
+		if (selection?.type === 'ndiHost') {
+			renderNdiHostInspector(root, stateStore, selection, { onClearSelection: () => update(null) })
+		}
 	})
 
 	// Art-Net live updates: throttled, no sceneState `change`, skip while typing in inspector.

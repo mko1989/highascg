@@ -1,5 +1,4 @@
-import { normRandrCaspar } from '../components/device-view-caspar-render-helpers.js'
-import { readGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'
+import { normRandrCaspar } from './device-view-randr-norm.js'
 
 function connectedLiveRandrNames(live) {
 	const out = new Set()

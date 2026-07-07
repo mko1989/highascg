@@ -176,7 +176,10 @@ export function createScenesPreviewGlobalBorder(deps) {
 
 	function stripMirrorFromBorderPayload(gb) {
 		if (!gb || typeof gb !== 'object') return gb
-		const { mirrorBorderOnPrv, borderPresets, pgmAirSnapshot, ...rest } = gb
+		const rest = { ...gb }
+		delete rest.mirrorBorderOnPrv
+		delete rest.borderPresets
+		delete rest.pgmAirSnapshot
 		return rest
 	}
 

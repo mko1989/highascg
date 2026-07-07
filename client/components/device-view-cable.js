@@ -23,6 +23,7 @@ import {
 	resolveCableSourceResolution,
 } from '../lib/device-view-gpu-source-inherit.js'
 import { cableSinkAffectsCasparRestart } from '../lib/caspar-restart-dirty-policy.js'
+import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
 import * as Actions from './device-view-actions.js'
 
 export function registerDeviceViewCable(ctx) {
@@ -348,6 +349,7 @@ export function registerDeviceViewCable(ctx) {
 			const cur = Array.isArray(state.currentSettings?.streamOutputs) ? state.currentSettings.streamOutputs : []
 			await Actions.saveSettingsPatch({ streamOutputs: cur.filter((s) => String(s?.id) !== cid) })
 			await pruneConnectorFromGraph(cid)
+			ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Stream output removed', true)
 			await ctx.load()
 		} catch (e) {
@@ -362,6 +364,7 @@ export function registerDeviceViewCable(ctx) {
 			const cur = Array.isArray(state.currentSettings?.recordOutputs) ? state.currentSettings.recordOutputs : []
 			await Actions.saveSettingsPatch({ recordOutputs: cur.filter((s) => String(s?.id) !== cid) })
 			await pruneConnectorFromGraph(cid)
+			ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Record output removed', true)
 			await ctx.load()
 		} catch (e) {
@@ -378,6 +381,23 @@ export function registerDeviceViewCable(ctx) {
 			await pruneConnectorFromGraph(cid)
 			ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Audio output removed', true)
+			await ctx.load()
+		} catch (e) {
+			setStatus(statusEl, e.message, false)
+		}
+	}
+
+	ctx.removeVirtualCamOutputConnector = async (id) => {
+		const cid = String(id || 'vcam_1').trim() || 'vcam_1'
+		try {
+			try {
+				await stopVirtualCamera({ persist: false })
+			} catch {
+				/* best-effort stop before hide */
+			}
+			await saveVirtualCameraConfig({ showInDeviceView: false, enabled: false }, { persist: true })
+			await pruneConnectorFromGraph(cid)
+			setStatus(statusEl, 'Virtual camera output removed', true)
 			await ctx.load()
 		} catch (e) {
 			setStatus(statusEl, e.message, false)

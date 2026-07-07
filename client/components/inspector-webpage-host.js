@@ -6,6 +6,7 @@
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { escapeHtml } from '../lib/dom-escape.js'
+import { removeExtraLiveHostSource } from '../lib/extra-live-source-remove.js'
 
 /**
  * @param {object[]} extras
@@ -135,6 +136,9 @@ export function renderWebpageHostInspector(root, stateStore, selection) {
 				<div class="inspector-field__value"><code>${escapeHtml(source.value || '')}</code></div>
 			</div>
 			${source.sourceId ? `<div class="inspector-field"><div class="inspector-field__label">Source ID</div><div class="inspector-field__value">${escapeHtml(source.sourceId)}</div></div>` : ''}
+			<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+				<button type="button" class="btn btn--danger inspector-webpage-host__remove">Remove</button>
+			</div>
 		</div>
 	`
 
@@ -148,5 +152,21 @@ export function renderWebpageHostInspector(root, stateStore, selection) {
 				urlInput.value = String(next.playArg || next.templateOrUrl || '')
 			}
 		},
+	})
+
+	root.querySelector('.inspector-webpage-host__remove')?.addEventListener('click', async () => {
+		const label = String(source.label || source.playArg || 'Webpage host')
+		if (!confirm(`Remove "${label}" from Live sources?`)) return
+		const btn = root.querySelector('.inspector-webpage-host__remove')
+		if (btn) btn.disabled = true
+		try {
+			const hostOperatorFullscreen = stateStore.getState()?.hostOperatorFullscreen
+			await removeExtraLiveHostSource(source, hostOperatorFullscreen)
+			showAppToast('Webpage host removed.', 'info')
+			window.dispatchEvent(new CustomEvent('webpage-host-select', { detail: null }))
+		} catch (err) {
+			showAppToast(err?.message || String(err), 'error')
+			if (btn) btn.disabled = false
+		}
 	})
 }

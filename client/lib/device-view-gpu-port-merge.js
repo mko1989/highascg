@@ -1,12 +1,11 @@
-import { normRandrCaspar } from '../components/device-view-caspar-render-helpers.js'
+import { normRandrCaspar } from './device-view-randr-norm.js'
 import { traceGpuLayoutMergeComplete } from './device-view-gpu-layout-debug.js'
 import {
 	entryFromInferredPhysicalPort,
 	entryFromTopologyRow,
 } from './device-view-gpu-port-entries.js'
-import { readGpuLayoutPrefs } from './device-view-gpu-port-layout-prefs.js'
 import { getLastGpuLayoutTraceSeq } from './device-view-gpu-port-trace-state.js'
-import { displaysMatchingPairs, isPrimaryTopologySocket } from './device-view-gpu-port-utils.js'
+import { isPrimaryTopologySocket } from './device-view-gpu-port-utils.js'
 
 /**
  * Map RandR pair names to layout slot id (gpu_pN) from saved rear-panel layout or settings topology.

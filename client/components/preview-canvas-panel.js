@@ -5,8 +5,8 @@ import { initLiveView, initDualComposeLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 import { api } from '../lib/api-client.js'
-import * as MathH from './preview-panel-math.js'
 import * as ResizeH from './preview-panel-resize.js'
+import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
 
 const G = 6; const BORDER_FADE = 400
 
@@ -23,10 +23,44 @@ export function initPreviewPanel(host, options) {
 	const root = document.createElement('div'); root.className = 'preview-panel' + (collapsed ? ' preview-panel--collapsed' : '') + (fillParentHeight ? ' preview-panel--fill' : '') + (composePrvPgmLayoutToggle ? ' preview-panel--compose-dual' : '')
 	const cCls = layout === 'tb' ? 'preview-panel__compose-pair--tb' : 'preview-panel__compose-pair--lr'
 	const bodyCls = 'preview-panel__body' + (fillParentHeight ? ' preview-panel__body--fill' : '')
-	root.innerHTML = `<div class="preview-panel__header"><button class="preview-panel__toggle" aria-expanded="${!collapsed}"></button><span class="preview-panel__title">${title}</span><button class="preview-panel__compose-layout" hidden></button><span class="preview-panel__res"></span><button class="preview-panel__grab">PRT PGM</button></div><div class="${bodyCls}"${fillParentHeight ? '' : ` style="height:${bodyH}px"`}><div class="preview-panel__resize"></div><div class="preview-panel__canvas-outer">${composePrvPgmLayoutToggle ? `<div class="preview-panel__canvas-wrap"><div class="preview-panel__compose-pair ${cCls}"><div class="preview-panel__compose-cell preview-panel__compose-cell--prv"><div class="preview-panel__video-container" data-preview-webrtc="prv"></div><canvas class="preview-panel__canvas" data-compose-canvas="prv"></canvas></div><div class="preview-panel__compose-gutter"></div><div class="preview-panel__compose-cell preview-panel__compose-cell--pgm"><div class="preview-panel__video-container" data-preview-webrtc="pgm"></div><canvas class="preview-panel__canvas" data-compose-canvas="pgm"></canvas></div></div></div>` : `<div class="preview-panel__canvas-wrap"><div class="preview-panel__video-container"></div><canvas class="preview-panel__canvas"></canvas></div>`}<div class="preview-panel__visual-layout-overlay" style="display:none;position:absolute;inset:8px;pointer-events:none;"></div></div></div>`
+	const headerEl = document.createElement('div'); headerEl.className = 'preview-panel__header'
+	const toggleBtn = document.createElement('button'); toggleBtn.className = 'preview-panel__toggle'; toggleBtn.setAttribute('aria-expanded', String(!collapsed))
+	const titleEl = document.createElement('span'); titleEl.className = 'preview-panel__title'; titleEl.textContent = title
+	const composeLayoutBtn = document.createElement('button'); composeLayoutBtn.className = 'preview-panel__compose-layout'; composeLayoutBtn.hidden = true
+	const resEl = document.createElement('span'); resEl.className = 'preview-panel__res'
+	const grabBtn = document.createElement('button'); grabBtn.className = 'preview-panel__grab'; grabBtn.textContent = 'PRT PGM'
+	headerEl.append(toggleBtn, titleEl, composeLayoutBtn, resEl, grabBtn)
+	const bodyEl = document.createElement('div'); bodyEl.className = bodyCls; if (!fillParentHeight) bodyEl.style.height = `${bodyH}px`
+	const resizeEl = document.createElement('div'); resizeEl.className = 'preview-panel__resize'
+	const canvasOuterEl = document.createElement('div'); canvasOuterEl.className = 'preview-panel__canvas-outer'
+	if (composePrvPgmLayoutToggle) {
+		const wrapEl = document.createElement('div'); wrapEl.className = 'preview-panel__canvas-wrap'
+		const pairEl = document.createElement('div'); pairEl.className = `preview-panel__compose-pair ${cCls}`
+		const prvCell = document.createElement('div'); prvCell.className = 'preview-panel__compose-cell preview-panel__compose-cell--prv'
+		const prvVideo = document.createElement('div'); prvVideo.className = 'preview-panel__video-container'; prvVideo.dataset.previewWebrtc = 'prv'
+		const prvCanvas = document.createElement('canvas'); prvCanvas.className = 'preview-panel__canvas'; prvCanvas.dataset.composeCanvas = 'prv'
+		prvCell.append(prvVideo, prvCanvas)
+		const gutterEl = document.createElement('div'); gutterEl.className = 'preview-panel__compose-gutter'
+		const pgmCell = document.createElement('div'); pgmCell.className = 'preview-panel__compose-cell preview-panel__compose-cell--pgm'
+		const pgmVideo = document.createElement('div'); pgmVideo.className = 'preview-panel__video-container'; pgmVideo.dataset.previewWebrtc = 'pgm'
+		const pgmCanvas = document.createElement('canvas'); pgmCanvas.className = 'preview-panel__canvas'; pgmCanvas.dataset.composeCanvas = 'pgm'
+		pgmCell.append(pgmVideo, pgmCanvas)
+		pairEl.append(prvCell, gutterEl, pgmCell)
+		wrapEl.appendChild(pairEl)
+		canvasOuterEl.appendChild(wrapEl)
+	} else {
+		const wrapEl = document.createElement('div'); wrapEl.className = 'preview-panel__canvas-wrap'
+		const videoEl = document.createElement('div'); videoEl.className = 'preview-panel__video-container'
+		const canvasEl = document.createElement('canvas'); canvasEl.className = 'preview-panel__canvas'
+		wrapEl.append(videoEl, canvasEl)
+		canvasOuterEl.appendChild(wrapEl)
+	}
+	const layoutOverlay = document.createElement('div'); layoutOverlay.className = 'preview-panel__visual-layout-overlay'; layoutOverlay.style.display = 'none'; layoutOverlay.style.position = 'absolute'; layoutOverlay.style.inset = '8px'; layoutOverlay.style.pointerEvents = 'none'
+	bodyEl.append(resizeEl, canvasOuterEl, layoutOverlay)
+	root.append(headerEl, bodyEl)
 	host.appendChild(root)
 
-	const btn = root.querySelector('.preview-panel__toggle'); const cLayoutBtn = root.querySelector('.preview-panel__compose-layout'); const resEl = root.querySelector('.preview-panel__res'); const grabBtn = root.querySelector('.preview-panel__grab'); const body = root.querySelector('.preview-panel__body'); const resizeH = root.querySelector('.preview-panel__resize'); const wrap = root.querySelector('.preview-panel__canvas-wrap'); const cPairEl = root.querySelector('.preview-panel__compose-pair'); const cGutter = root.querySelector('.preview-panel__compose-gutter'); const layoutOverlay = root.querySelector('.preview-panel__visual-layout-overlay')
+	const btn = root.querySelector('.preview-panel__toggle'); const cLayoutBtn = root.querySelector('.preview-panel__compose-layout'); const resStatusEl = root.querySelector('.preview-panel__res'); const grabBtnEl = root.querySelector('.preview-panel__grab'); const body = root.querySelector('.preview-panel__body'); const resizeH = root.querySelector('.preview-panel__resize'); const wrap = root.querySelector('.preview-panel__canvas-wrap'); const cPairEl = root.querySelector('.preview-panel__compose-pair'); const layoutOverlayEl = root.querySelector('.preview-panel__visual-layout-overlay')
 	const prvVC = root.querySelector('[data-preview-webrtc="prv"]'); const pgmVC = root.querySelector('[data-preview-webrtc="pgm"]'); const VC = root.querySelector('.preview-panel__video-container')
 	const canv = root.querySelector('.preview-panel__canvas')
 	const ctx = canv?.getContext('2d')
@@ -95,7 +129,9 @@ export function initPreviewPanel(host, options) {
 		let saved = {}
 		try {
 			saved = JSON.parse(localStorage.getItem(kW) || '{}')
-		} catch (e) {}
+		} catch (_) {
+			// Fall back to an empty storage object when weights cannot be parsed.
+		}
 
 		// Fallback/Legacy support:
 		if (n === 2 && localStorage.getItem(kS) !== null) {
@@ -124,7 +160,9 @@ export function initPreviewPanel(host, options) {
 		let saved = {}
 		try {
 			saved = JSON.parse(localStorage.getItem(kW) || '{}')
-		} catch (e) {}
+		} catch (_) {
+			// Fall back to an empty storage object when weights cannot be parsed.
+		}
 		defs.forEach((d, idx) => {
 			saved[d.id] = newWeights[idx]
 		})
@@ -306,183 +344,14 @@ export function initPreviewPanel(host, options) {
 	}
 
 	let rafDraw = null; let prevLive = false; let offTimer = null; let liveView = null; let pollTimer = null
-	let destinationLayoutRenderKey = ''
 	const scheduleDraw = () => { if (rafDraw == null) rafDraw = requestAnimationFrame(() => { rafDraw = null; paint() }) }
-	const renderDestinationLayoutOverlay = () => {
-		if (!showDestinationVisualOverlay || !layoutOverlay) return
-		const cfg = settingsState.getSettings() || {}
-		const dests = Array.isArray(cfg?.screenDestinations?.destinations) ? cfg.screenDestinations.destinations : []
-		const graphLayout = cfg?.deviceGraph?.layout && typeof cfg.deviceGraph.layout === 'object' ? cfg.deviceGraph.layout : {}
-		const cm = stateStore?.getState?.()?.channelMap || {}
-		const boxes = []
-		const fallbackDests = []
-		for (const d of dests) {
-			if (!d) continue
-			const mode = String(d.mode || '')
-			if (mode === 'multiview' || mode === 'stream') continue
-			const id = String(d.id || '').trim()
-			if (!id) continue
-			const lay = graphLayout[id] || {}
-			const hasExplicitLayout = Number.isFinite(Number(lay.x)) && Number.isFinite(Number(lay.y))
-			const w = Math.max(120, Number(lay.w) || 120)
-			const h = Math.max(70, Number(lay.h) || 70)
-			const x = Math.max(0, Number(lay.x) || 0)
-			const y = Math.max(0, Number(lay.y) || 0)
-			const main = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
-			const pgm = cm.programChannels?.[main] ?? null
-			const prv = cm.previewChannels?.[main] ?? null
-			const box = {
-				id,
-				mode: String(d.mode || 'pgm_prv'),
-				mainIndex: main,
-				x,
-				y,
-				w,
-				h,
-				label: String(d.label || id),
-				sub: d.mode === 'pgm_only'
-					? `Screen ${main + 1} · PGM ch ${pgm ?? '?'}`
-					: `Screen ${main + 1} · PGM ch ${pgm ?? '?'} · PRV ch ${prv ?? pgm ?? '?'}`,
-				pgmCh: pgm,
-				prvCh: prv || pgm,
-			}
-			boxes.push(box)
-			if (!hasExplicitLayout) fallbackDests.push(box)
-		}
-		// If destination layout was never saved, auto-tile so all destinations are visible (not stacked at 0,0).
-		if (fallbackDests.length) {
-			const cols = Math.max(1, Math.ceil(Math.sqrt(fallbackDests.length)))
-			const cellW = 1920
-			const cellH = 1080
-			for (let i = 0; i < fallbackDests.length; i++) {
-				const b = fallbackDests[i]
-				const col = i % cols
-				const row = Math.floor(i / cols)
-				b.x = col * cellW
-				b.y = row * cellH
-				b.w = Math.max(120, b.w)
-				b.h = Math.max(70, b.h)
-			}
-		}
-		if (!boxes.length) {
-			layoutOverlay.style.display = 'none'
-			layoutOverlay.innerHTML = ''
-			destinationLayoutRenderKey = ''
-			return
-		}
-		let maxX = 0; let maxY = 0
-		for (const b of boxes) { maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h) }
-		const ow = Math.max(120, layoutOverlay.clientWidth); const oh = Math.max(80, layoutOverlay.clientHeight)
-		const sx = ow / Math.max(1, maxX); const sy = oh / Math.max(1, maxY); const s = Math.min(sx, sy)
-		const renderKey = JSON.stringify({
-			ow,
-			oh,
-			mv: cm.multiviewCh ?? null,
-			boxes: boxes.map((b) => ({
-				id: b.id,
-				mode: b.mode,
-				x: Math.round(b.x * s),
-				y: Math.round(b.y * s),
-				w: Math.max(90, Math.round(b.w * s)),
-				h: Math.max(48, Math.round(b.h * s)),
-				pgmCh: b.pgmCh ?? null,
-				prvCh: b.prvCh ?? null,
-			})),
-		})
-		if (renderKey === destinationLayoutRenderKey) return
-		destinationLayoutRenderKey = renderKey
-		layoutOverlay.innerHTML = ''
-		layoutOverlay.style.display = ''
-		layoutOverlay.style.background = 'rgba(0,0,0,0.26)'
-		layoutOverlay.style.borderRadius = '8px'
-		const renderedIds = new Set()
-		for (const b of boxes) {
-			renderedIds.add(b.id)
-			const el = document.createElement('div')
-			el.style.position = 'absolute'
-			el.style.left = `${Math.round(b.x * s)}px`
-			el.style.top = `${Math.round(b.y * s)}px`
-			el.style.width = `${Math.max(90, Math.round(b.w * s))}px`
-			el.style.height = `${Math.max(48, Math.round(b.h * s))}px`
-			el.style.border = '1px solid rgba(88,166,255,0.65)'
-			el.style.background = 'rgba(13,17,23,0.32)'
-			el.style.borderRadius = '8px'
-			el.style.color = 'rgba(230,237,243,0.92)'
-			el.style.fontSize = '11px'
-			el.style.lineHeight = '1.2'
-			el.style.padding = '4px 6px'
-			el.style.boxSizing = 'border-box'
-			const title = document.createElement('strong')
-			title.style.display = 'block'
-			title.style.whiteSpace = 'nowrap'
-			title.style.overflow = 'hidden'
-			title.style.textOverflow = 'ellipsis'
-			title.textContent = b.label
-			const sub = document.createElement('small')
-			sub.style.opacity = '0.9'
-			sub.textContent = b.sub
-			el.append(title, sub)
-			const frame = document.createElement('div')
-			frame.style.position = 'absolute'
-			frame.style.left = '6px'
-			frame.style.right = '6px'
-			frame.style.top = '24px'
-			frame.style.bottom = '6px'
-			frame.style.border = '1px solid rgba(255,255,255,0.2)'
-			frame.style.background = 'rgba(0,0,0,0.35)'
-			frame.style.borderRadius = '4px'
-			frame.style.overflow = 'hidden'
-			el.appendChild(frame)
-			if (b.mode === 'pgm_only') {
-				const single = document.createElement('div')
-				single.style.position = 'absolute'
-				single.style.inset = '0'
-				single.style.display = 'flex'
-				single.style.alignItems = 'center'
-				single.style.justifyContent = 'center'
-				single.style.fontSize = '10px'
-				single.style.color = 'rgba(255,255,255,0.78)'
-				single.textContent = `PGM · ch ${b.pgmCh ?? '?'}`
-				frame.appendChild(single)
-			} else {
-				const pgmPane = document.createElement('div')
-				pgmPane.style.position = 'absolute'
-				pgmPane.style.left = '0'
-				pgmPane.style.top = '0'
-				pgmPane.style.bottom = '0'
-				pgmPane.style.width = '50%'
-				pgmPane.style.display = 'flex'
-				pgmPane.style.alignItems = 'center'
-				pgmPane.style.justifyContent = 'center'
-				pgmPane.style.fontSize = '10px'
-				pgmPane.style.color = 'rgba(255,255,255,0.78)'
-				pgmPane.textContent = `PGM ${b.pgmCh ?? '?'}`
-				const prvPane = document.createElement('div')
-				prvPane.style.position = 'absolute'
-				prvPane.style.right = '0'
-				prvPane.style.top = '0'
-				prvPane.style.bottom = '0'
-				prvPane.style.width = '50%'
-				prvPane.style.display = 'flex'
-				prvPane.style.alignItems = 'center'
-				prvPane.style.justifyContent = 'center'
-				prvPane.style.fontSize = '10px'
-				prvPane.style.color = 'rgba(255,255,255,0.78)'
-				prvPane.textContent = `PRV ${b.prvCh ?? b.pgmCh ?? '?'}`
-				const sep = document.createElement('div')
-				sep.style.position = 'absolute'
-				sep.style.left = '50%'
-				sep.style.top = '0'
-				sep.style.bottom = '0'
-				sep.style.width = '1px'
-				sep.style.background = 'rgba(255,255,255,0.26)'
-				frame.append(pgmPane, prvPane, sep)
-			}
-			layoutOverlay.appendChild(el)
-		}
-	}
+	const renderDestinationLayoutOverlay = createDestinationLayoutOverlay({
+		layoutOverlay: layoutOverlayEl,
+		stateStore,
+		showDestinationVisualOverlay,
+	})
 	const paint = () => {
-		if (collapsed) return; const { w, h } = getOutputResolution(); if (resEl) resEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
+		if (collapsed) return; const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
 		if (!composePrvPgmLayoutToggle) {
@@ -534,14 +403,11 @@ export function initPreviewPanel(host, options) {
 
 			composeCells.forEach((item, idx) => {
 				const wPct = weights[idx] ?? (1 / n)
-				let cw, ch
 				if (layout === 'lr') {
-					cw = Math.round(availableW * wPct)
-					ch = fitH
+					const cw = Math.round(availableW * wPct)
 					item.cellEl.style.cssText = `flex:0 0 ${cw}px;width:${cw}px;height:100%`
 				} else {
-					cw = fitW
-					ch = Math.round(availableH * wPct)
+					const ch = Math.round(availableH * wPct)
 					item.cellEl.style.cssText = `flex:0 0 ${ch}px;height:${ch}px;width:100%`
 				}
 			})
@@ -592,7 +458,7 @@ export function initPreviewPanel(host, options) {
 	}
 
 	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); updateLive() }
-	btn.onclick = () => setColl(!collapsed); grabBtn.onclick = async () => { try { grabBtn.classList.add('busy'); await api.post('/api/amcp/print', { channel: options.getProgramChannel?.() || 1 }); grabBtn.classList.remove('busy'); grabBtn.classList.add('ok'); setTimeout(() => grabBtn.classList.remove('ok'), 1000) } catch { grabBtn.classList.add('err'); setTimeout(() => grabBtn.classList.remove('err'), 2000) } }
+	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = async () => { try { grabBtnEl.classList.add('busy'); await api.post('/api/amcp/print', { channel: options.getProgramChannel?.() || 1 }); grabBtnEl.classList.remove('busy'); grabBtnEl.classList.add('ok'); setTimeout(() => grabBtnEl.classList.remove('ok'), 1000) } catch { grabBtnEl.classList.add('err'); setTimeout(() => grabBtnEl.classList.remove('err'), 2000) } }
 	if (composePrvPgmLayoutToggle) {
 		cLayoutBtn.hidden = false; const syncB = () => { cLayoutBtn.textContent = layout === 'tb' ? 'Stack' : 'Side'; cPairEl.classList.remove('preview-panel__compose-pair--lr', 'preview-panel__compose-pair--tb'); cPairEl.classList.add(layout === 'tb' ? 'preview-panel__compose-pair--tb' : 'preview-panel__compose-pair--lr') }
 		syncB(); cLayoutBtn.onclick = () => { layout = layout === 'tb' ? 'lr' : 'tb'; localStorage.setItem(kL, layout); syncB(); scheduleDraw() }

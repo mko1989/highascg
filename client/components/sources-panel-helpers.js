@@ -1,9 +1,10 @@
 import { api, getApiBase } from '../lib/api-client.js'
 import { assetUrl } from '../lib/api-origin.js'
-import { getThumbnailUrl } from '../lib/thumbnail-url.js'
-import { decklinkInputForSlot, liveAudioInputForSlot, v4l2InputForSlot, listInputChannels, decklinkSlotFromConnector } from '../lib/input-channels.js'
+import { liveAudioInputForSlot, v4l2InputForSlot, listInputChannels, decklinkSlotFromConnector } from '../lib/input-channels.js'
 import { liveAudioSlotStatusMessage } from '../lib/live-audio-inputs.js'
 import { v4l2SlotStatusMessage } from '../lib/v4l2-inputs.js'
+import { normalizeMediaIdForMatch } from '../lib/mixer-fill.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 export { liveAudioSlotStatusMessage, v4l2SlotStatusMessage }
 
@@ -34,7 +35,7 @@ async function downloadLocalMediaFile(id, fallbackLabel) {
 		try {
 			const j = await res.json()
 			if (j?.error) detail = j.error
-		} catch {}
+		} catch (_e) { /* response body not JSON */ }
 		throw new Error(`HTTP ${res.status}: ${detail}`)
 	}
 	const lenStr = res.headers.get('content-length')
@@ -66,9 +67,6 @@ async function downloadLocalMediaFile(id, fallbackLabel) {
 		setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
 	}
 }
-import { classifyMediaItem } from '../lib/media-ext.js'
-import { normalizeMediaIdForMatch } from '../lib/mixer-fill.js'
-import { MIXER_EFFECTS, EFFECT_CATEGORIES } from '../lib/effect-registry.js'
 
 
 /**
@@ -154,7 +152,7 @@ export function makeDraggable(el, sourceType, sourceValue, label, extra = {}) {
 				: { type: 'media', value: sourceValue, label: label || sourceValue }
 		}
 	})
-	el.addEventListener('dragend', (e) => {
+	el.addEventListener('dragend', (_e) => {
 		el.target?.classList.remove('dragging') || el.classList.remove('dragging')
 		if (sourceType === 'media') delete globalThis.__highascgMediaDragPayload
 	})
@@ -162,7 +160,7 @@ export function makeDraggable(el, sourceType, sourceValue, label, extra = {}) {
 	el.dataset.extra = JSON.stringify(extra)
 }
 
-export function renderSourceList(container, items, sourceType, filter, onPreview) {
+export function renderSourceList(container, items, sourceType, filter, _onPreview) {
 	const filtered = filter ? items.filter((i) => (i.label || i.id || i).toLowerCase().includes(filter.toLowerCase())) : items
 	
 	const renderKey = JSON.stringify({
@@ -345,7 +343,6 @@ export function buildLiveSources(channelMap, connectors, liveAudioConfigured, v4
 	const {
 		programChannels = [],
 		previewChannels = [],
-		decklinkCount = 0,
 		liveAudioCount = 0,
 		v4l2InputCount = 0,
 		programResolutions = [],

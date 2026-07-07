@@ -21,7 +21,6 @@ export function createDeckThumbPainter(ctx) {
 		stateStore,
 		getChannelMap,
 		getProgramChannel,
-		getThumbForSource,
 		previewPanel,
 		mainHost,
 	} = ctx

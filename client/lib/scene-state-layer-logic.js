@@ -3,8 +3,6 @@
  */
 import {
 	defaultFill,
-	defaultLayerConfig,
-	newId,
 	LOOK_LAYER_FIRST,
 	LOOK_LAYER_MAX,
 	isValidLookLayerNumber,
@@ -128,7 +126,7 @@ export function patchLayer(L, patch) {
 		L.fill = f
 	}
 	if (patch.fadeOnEnd) L.fadeOnEnd = { ...(L.fadeOnEnd || { enabled: false, frames: 12 }), ...patch.fadeOnEnd }
-	const { fill, fadeOnEnd, startBehaviour, ...rest } = patch
+	const { startBehaviour, ...rest } = patch
 	Object.assign(L, rest)
 	if ('startBehaviour' in patch) {
 		if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour

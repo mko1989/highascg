@@ -21,6 +21,10 @@ import {
 	subscribeComposePreviewRefresh,
 	syncComposePreviewFromChannelMap,
 } from './preview-canvas-compose-snapshot.js'
+import {
+	drawTimelineComposeInactiveCell,
+	timelineComposeCellShowsTimeline,
+} from '../lib/timeline-compose-preview.js'
 import { drawComposePrvPgmCellEdgeBar } from './preview-canvas-draw-base.js'
 import { createTimelineTransport } from './timeline-transport.js'
 import { streamState } from '../lib/stream-state.js'
@@ -32,37 +36,10 @@ import {
 	createShowLayerContextMenu,
 	attachTimelineEditorInput,
 } from './timeline-editor-handlers.js'
+import { createTimelinePlaybackRuntime } from './timeline-editor-playback.js'
 
 export function initTimelineEditor(root, stateStore) {
 	let redrawTimelineView = () => {}
-	/** @type {Map<string, { playing: boolean, position: number, timelineId: string, loop: boolean }>} */
-	const playbackById = new Map()
-	/** @type {Map<string, { serverTickPos: number, serverTickAt: number }>} */
-	const clockById = new Map()
-
-	function defaultPlayback(tlId) {
-		return { playing: false, position: 0, timelineId: tlId, loop: false }
-	}
-
-	function ensurePlayback(tlId) {
-		if (!tlId) return defaultPlayback(null)
-		let pb = playbackById.get(tlId)
-		if (!pb) {
-			pb = defaultPlayback(tlId)
-			playbackById.set(tlId, pb)
-		}
-		return pb
-	}
-
-	function getPlayback() {
-		const tl = timelineState.getActive()
-		return tl?.id ? ensurePlayback(tl.id) : defaultPlayback(null)
-	}
-
-	function getClock(tlId) {
-		if (!clockById.has(tlId)) clockById.set(tlId, { serverTickPos: 0, serverTickAt: 0 })
-		return clockById.get(tlId)
-	}
 
 	let selectedClip = null  // { layerIdx, clipId, timelineId, clip }
 	let selectedFlagDetail = null // { timelineId, flagId, flag }
@@ -79,79 +56,6 @@ export function initTimelineEditor(root, stateStore) {
 		sendTo: defaultTimelineSendTo(stateStore.getState()?.channelMap || null),
 		follow: true,
 		takeTransition: { ...getDefaultTransitionFromEditor(sceneState.getCanvasForScreen(0).framerate) },
-	}
-
-	// Playhead clock — uses Date.now() to match server timeline-playback (_p0 + Date.now() - _t0).
-	// Extrapolate between WS ticks (~165 ms); never pull the UI playhead backward during play.
-	let playLoopRaf = null
-	/** Server more than this ahead of client → snap (seek / tab resume). */
-	const TICK_AHEAD_SNAP_MS = 80
-	/** Ignore server reports this far behind extrapolated time (network latency). */
-	const TICK_LATENCY_MS = 35
-
-	function clientPlayheadMs(tlId) {
-		const id = tlId ?? timelineState.getActive()?.id
-		if (!id) return 0
-		const c = getClock(id)
-		return c.serverTickPos + (Date.now() - c.serverTickAt)
-	}
-
-	function anchorPlayhead(ms, tlId) {
-		const id = tlId ?? timelineState.getActive()?.id
-		if (!id) return
-		const c = getClock(id)
-		c.serverTickPos = ms
-		c.serverTickAt = Date.now()
-	}
-
-	/** Re-anchor from a server tick without backward jumps during playback. */
-	function applyServerTick(serverMs, tlId) {
-		const id = tlId ?? timelineState.getActive()?.id
-		if (!id) return
-		const c = getClock(id)
-		const now = Date.now()
-		const extrapolated = c.serverTickPos + (now - c.serverTickAt)
-		if (serverMs - extrapolated > TICK_AHEAD_SNAP_MS) {
-			c.serverTickPos = serverMs
-		} else if (serverMs >= extrapolated - TICK_LATENCY_MS) {
-			c.serverTickPos = serverMs
-		} else {
-			c.serverTickPos = extrapolated
-		}
-		c.serverTickAt = now
-	}
-
-	function maybeFollowPlayhead() {
-		if (!view.follow) return
-		const playback = getPlayback()
-		canvas.followPlayhead(playback.position, { playing: playback.playing })
-	}
-
-	function startPlaybackLoop() {
-		if (playLoopRaf) return
-		const loop = () => {
-			const playback = getPlayback()
-			if (!playback.playing) {
-				playLoopRaf = null
-				return
-			}
-			const tl = timelineState.getActive()
-			const pos = clientPlayheadMs(tl?.id)
-			playback.position = tl ? Math.min(pos, tl.duration) : pos
-			maybeFollowPlayhead()
-			updateTimecode()
-			redrawTimelineView()
-			playLoopRaf = requestAnimationFrame(loop)
-		}
-		playLoopRaf = requestAnimationFrame(loop)
-	}
-
-	function stopPlaybackLoop() {
-		if (playLoopRaf) {
-			cancelAnimationFrame(playLoopRaf)
-			playLoopRaf = null
-		}
-		canvas.resetFollowScroll?.()
 	}
 
 	root.innerHTML = `
@@ -231,7 +135,7 @@ export function initTimelineEditor(root, stateStore) {
 	const canvas = initTimelineCanvas(bodyEl, createTimelineCanvasHandlers({
 		stateStore,
 		sceneState,
-		getPlayback,
+		getPlayback: () => getPlayback(),
 		getView: () => view,
 		maybeFollowPlayhead: () => maybeFollowPlayhead(),
 		getSelectedClip: () => selectedClip,
@@ -253,6 +157,23 @@ export function initTimelineEditor(root, stateStore) {
 		canvas.redraw()
 		previewPanel?.scheduleDraw?.()
 	}
+	let updateTimecodeFn = () => {}
+	const {
+		ensurePlayback,
+		getPlayback,
+		clientPlayheadMs,
+		anchorPlayhead,
+		applyServerTick,
+		maybeFollowPlayhead,
+		startPlaybackLoop,
+		stopPlaybackLoop,
+	} = createTimelinePlaybackRuntime({
+		timelineState,
+		canvas,
+		getRedrawTimelineView: () => redrawTimelineView,
+		getUpdateTimecode: () => updateTimecodeFn,
+		getView: () => view,
+	})
 
 	const transportApi = createTimelineTransport({
 		transportEl,
@@ -278,7 +199,8 @@ export function initTimelineEditor(root, stateStore) {
 			await syncPlaybackFromServer()
 		},
 	})
-	const { buildTransport, updateTimecode, syncToServer, updateSendTo, togglePlay } = transportApi
+	const { buildTransport, updateTimecode, syncToServer, updateSendTo, syncSendToWithChannelMap, togglePlay } = transportApi
+	updateTimecodeFn = updateTimecode
 	syncToServerRef.fn = syncToServer
 
 	function applyPersistedSendTo(tl) {
@@ -296,7 +218,8 @@ export function initTimelineEditor(root, stateStore) {
 			const pb = await api.get(`/api/timelines/${encodeURIComponent(tl.id)}/state`)
 			if (!pb || typeof pb !== 'object') {
 				await syncToServer(tl)
-				await updateSendTo()
+				// Don't call updateSendTo() here — viewing the timeline tab should never trigger routing to pgm
+				syncSendToWithChannelMap()
 				buildTransport()
 				return
 			}
@@ -305,9 +228,9 @@ export function initTimelineEditor(root, stateStore) {
 				Object.assign(view.sendTo, pb.sendTo)
 				coerceTimelineSendTo(stateStore.getState()?.channelMap || null, view.sendTo)
 				timelineState.setSendTo(tl.id, view.sendTo)
-			} else {
-				await updateSendTo()
 			}
+			// When NOT playing, don't route to pgm — viewing the timeline tab should only sync UI state, not trigger AMCP routing
+			syncSendToWithChannelMap()
 			if (typeof pb.loop === 'boolean') ensurePlayback(tl.id).loop = pb.loop
 			const local = ensurePlayback(tl.id)
 			if (pb.timelineId != null) local.timelineId = pb.timelineId
@@ -329,7 +252,8 @@ export function initTimelineEditor(root, stateStore) {
 		} catch {
 			/* timeline may not exist on server until first save/play */
 			await syncToServer(tl).catch(() => {})
-			await updateSendTo()
+			// Don't call updateSendTo() — viewing the timeline tab should never trigger routing to pgm
+			syncSendToWithChannelMap()
 			buildTransport()
 			redrawTimelineView()
 		}
@@ -406,6 +330,18 @@ export function initTimelineEditor(root, stateStore) {
 					drawComposePrvPgmCellEdgeBar(ctx, cellW, cellH, { layout, cell: meta.composeCell })
 					return
 				}
+			}
+			if (
+				meta.composeDualStreamPreview === true &&
+				meta.composeCell &&
+				!timelineComposeCellShowsTimeline(view.sendTo, meta.composeCell)
+			) {
+				drawTimelineComposeInactiveCell(ctx, meta, {
+					stateStore,
+					view,
+					onRedraw: () => previewPanel.scheduleDraw(),
+				})
+				return
 			}
 			// --- legacy canvas compose (WO-57: keep until caspar_image sign-off) ---
 			drawTimelineStack(ctx, W, H, {

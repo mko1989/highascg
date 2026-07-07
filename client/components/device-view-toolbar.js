@@ -104,7 +104,9 @@ export function buildDeviceViewShell(root) {
 	destHead.append(destTitle, destType, destAdd)
 	const destBody = document.createElement('div')
 	destBody.className = 'device-view__destinations-body'
-	destPanel.append(destHead, destBody)
+	const destLiveHost = document.createElement('div')
+	destLiveHost.className = 'device-view__live-sources-host'
+	destPanel.append(destHead, destBody, destLiveHost)
 
 	const mappingPanel = document.createElement('div')
 	mappingPanel.className = 'device-view__mappings-column'
@@ -161,6 +163,7 @@ export function buildDeviceViewShell(root) {
 		matrixCk,
 		destPanel,
 		destBody,
+		destLiveHost,
 		destAdd,
 		destType,
 		mappingPanel,

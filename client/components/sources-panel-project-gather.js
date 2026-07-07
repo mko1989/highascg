@@ -2,7 +2,6 @@
  * Sources panel — project media bar and gather-into-folder workflow.
  */
 
-import { api } from '../lib/api-client.js'
 import { projectState } from '../lib/project-state.js'
 import { sceneState } from '../lib/scene-state.js'
 import { timelineState } from '../lib/timeline-state.js'

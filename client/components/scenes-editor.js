@@ -3,12 +3,9 @@
  */
 import { settingsState } from '../lib/settings-state.js'
 import { sceneState } from '../lib/scene-state.js'
-import { timelineState } from '../lib/timeline-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
-import { drawCgOnlyLookDeckThumb } from './cg-only-look-deck-thumb.js'
-import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { drawComposePrvPgmCellEdgeBar, drawDualComposeCellPreview, drawOutputCanvasBounds } from './preview-canvas-draw-base.js'
 import {
 	drawComposeSnapshotCell,
@@ -18,24 +15,25 @@ import {
 	syncComposePreviewFromChannelMap,
 } from './preview-canvas-compose-snapshot.js'
 import { resolveComposeChannelForEditingScene, resolveComposePreviewMode } from '../lib/compose-preview-url.js'
-import { resolveLookAirComposeChannel } from '../lib/look-air-compose-channel.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
 import { getDefaultUploadSubdir } from '../lib/project-media-context.js'
-import { isMediaOrFileSource, dataTransferOffersDeckMedia, parseDraggableSourcesPayload } from './scenes-shared.js'
+import { dataTransferOffersDeckMedia } from './scenes-shared.js'
 import { renderSceneDeck } from './scene-list.js'
 import { createScenesPreviewRuntime } from './scenes-preview-runtime.js'
 import { createApplyNativeFillForSource, createComposeDragHandlers, renderComposeScene } from './scenes-compose.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
-import { SCENE_THUMB_MAX_W, SCENE_CARD_THUMB_W, showScenesToast, appendScenesEditorShell, bindScenesPreviewSplitDrag, createTakeSceneToProgram } from './scenes-editor-support.js'
+import { SCENE_THUMB_MAX_W, showScenesToast, appendScenesEditorShell, bindScenesPreviewSplitDrag, createTakeSceneToProgram } from './scenes-editor-support.js'
 import { LOOK_PRESET_RECALL_PGM, LOOK_PRESET_RECALL_PRV } from '../lib/look-preset-events.js'
-
 import * as Logic from './scenes-editor-logic.js'
 import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
-import { formatFps } from './sources-panel-helpers.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
+import { createBuildLayerRouteLiveSourceItem } from './scenes-editor-layer-route.js'
+import { createDeckMediaDropHandler } from './scenes-editor-deck-drop.js'
+import { createDeckThumbPainter } from './scenes-editor-deck-thumb.js'
+import { createPreviewActions } from './scenes-editor-preview-actions.js'
 
 export function initScenesEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -45,55 +43,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	const getPlaybackChannel = () => getChannelMap().playbackChannels?.[sceneState.activeScreenIndex] ?? getProgramChannel()
 	const getPreviewChannel = () => getChannelMap().previewChannels?.[sceneState.activeScreenIndex] ?? null
 
-	/**
-	 * Caspar channel where look-stack layers are played for {@link scene} (matches preview AMCP target).
-	 * @param {import('../lib/scene-state.js').Scene} scene
-	 * @param {number} layerNumber
-	 * @param {{ forceBus?: 'edit' | 'pgm' | 'prv' }} [opts]
-	 * @returns {{ item: object } | { error: string }}
-	 */
-	function buildLayerRouteLiveSourceItem(scene, layerNumber, opts = {}) {
-		const cm = getChannelMap()
-		const forceBus = opts.forceBus || 'pgm'
-		const ch = resolveLookStackChannelForBus(cm, sceneState, scene, forceBus)
-		if (!Number.isFinite(ch) || ch <= 0) {
-			return { error: 'No Caspar preview/program channel for this screen. Check routing in Settings.' }
-		}
-		const ln = Number(layerNumber)
-		if (!Number.isFinite(ln) || ln < 1) return { error: 'Invalid layer number.' }
-		const screenCount = Math.max(1, cm.screenCount ?? 1)
-		const scope = String(scene?.mainScope || 'all')
-		const mIdx =
-			scope === 'all'
-				? (sceneState.activeScreenIndex ?? 0)
-				: Math.min(Math.max(parseInt(scope, 10) || 0, 0), screenCount - 1)
-		const res = cm.previewResolutions?.[mIdx] || cm.programResolutions?.[mIdx]
-		const resolution = res?.w && res?.h ? `${res.w}×${res.h}` : ''
-		const fps = res?.fps != null ? formatFps(res.fps) : ''
-		const value = `route://${ch}-${ln}`
-		const busTag = forceBus === 'pgm' ? ' PGM' : forceBus === 'prv' ? ' PRV' : ''
-		const lookName = String(scene?.name || '').trim() || 'Untitled look'
-		return {
-			item: {
-				type: 'route',
-				routeType: 'layer',
-				value,
-				label: `Route: Ch${ch} L${ln}${busTag} · ${lookName}`,
-				lookId: scene?.id || '',
-				lookName,
-				resolution,
-				fps,
-				thumbnailChannel: ch,
-			},
-		}
-	}
-	const getThumbForSource = (source, channelForLive) => {
-		return resolveSourceThumbnailUrl(source, {
-			maxWidth: SCENE_THUMB_MAX_W,
-			seekSec: 0,
-			channelForLive,
-		})
-	}
+	const buildLayerRouteLiveSourceItem = createBuildLayerRouteLiveSourceItem({ sceneState, getChannelMap })
+	const getThumbForSource = (source, channelForLive) =>
+		resolveSourceThumbnailUrl(source, { maxWidth: SCENE_THUMB_MAX_W, seekSec: 0, channelForLive })
 	const getComposeStreamNames = () => {
 		const pgmCh = getPlaybackChannel()
 		const prvCh = getPreviewChannel()
@@ -185,17 +137,10 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		}
 	}
 
-	async function stopActiveTimelineOnServer() {
-		const tl = timelineState.getActive()
-		if (!tl?.id) return
-		await api.post(`/api/timelines/${encodeURIComponent(tl.id)}/stop`).catch(() => {})
-	}
-
-	/** Stops timeline AMCP on PRV/PGM targets, then queues look preview (avoids timeline composited under looks). */
-	async function sendSceneToPreviewWithTimelineClear(sceneId, opts) {
-		await stopActiveTimelineOnServer()
-		previewRuntime.sendSceneToPreviewCard(sceneId, opts)
-	}
+	const { stopActiveTimelineOnServer, sendSceneToPreviewWithTimelineClear } = createPreviewActions({
+		api,
+		previewRuntime,
+	})
 
 	const globalTakeFromPreview = async () => {
 		const armed = sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
@@ -270,7 +215,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			return null
 		}
 		await api.post('/api/media/refresh', { ensureHqThumbs: false }).catch(() => {})
-		let list = []
+		let list
 		for (let attempt = 0; attempt < 10; attempt++) {
 			await new Promise((r) => setTimeout(r, attempt === 0 ? 100 : 220))
 			try {
@@ -382,93 +327,14 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	})
 	bindScenesPreviewSplitDrag({ splitHandle, previewHost, previewPanel, splitPx })
 
-	/** @param {HTMLCanvasElement} c */
-	function paintDeckThumb(c) {
-		const id = c.dataset.sceneId
-		const scene = id ? sceneState.getScene(id) : null
-		if (!scene) return
-		const main = Number.isFinite(Number(c.dataset.deckMain))
-			? parseInt(c.dataset.deckMain, 10)
-			: 0
-		const res = Logic.getResolutionForScreen(main, sceneState, stateStore)
-		const cw = SCENE_CARD_THUMB_W
-		const ch = Math.round((cw * res.h) / res.w)
-		if (c.width !== cw) {
-			c.width = cw
-			c.height = ch
-		}
-		const ctx = c.getContext('2d')
-		const cm = getChannelMap()
-		const sceneLive = stateStore.getState()?.scene?.live || {}
-
-		if (isSnapshotComposePreview()) {
-			const air = resolveLookAirComposeChannel(scene.id, main, sceneState, cm, sceneLive)
-			if (air?.channel) {
-				drawComposeSnapshotCell(ctx, cw, ch, air.channel, { onLoaded: () => previewPanel.scheduleDraw() })
-				return
-			}
-			if (scene.id === sceneState.editingSceneId) {
-				const { channel: editCh } = resolveComposeChannelForEditingScene(scene, sceneState, cm)
-				if (editCh) {
-					drawComposeSnapshotCell(ctx, cw, ch, editCh, { onLoaded: () => previewPanel.scheduleDraw() })
-					return
-				}
-			}
-			const previewId = sceneState.getPreviewSceneIdForMain(main)
-			if (previewId === scene.id) {
-				const previewCh = resolveComposeChannelForCell(
-					{ composeCell: 'prv', composeScreenIdx: main },
-					cm,
-					main,
-				)
-				if (previewCh) {
-					drawComposeSnapshotCell(ctx, cw, ch, previewCh, { onLoaded: () => previewPanel.scheduleDraw() })
-					return
-				}
-			}
-		}
-
-		if (isCgOnlyLook(scene)) {
-			drawCgOnlyLookDeckThumb(ctx, cw, ch, scene, {
-				onRepaint: () => {
-					previewPanel.scheduleDraw()
-					if (!c.isConnected) return
-					requestAnimationFrame(() => {
-						if (!c.isConnected) return
-						paintDeckThumb(c)
-					})
-				},
-			})
-			return
-		}
-
-		const getDeckThumbUrl = s =>
-			resolveSourceThumbnailUrl(s, {
-				maxWidth: SCENE_THUMB_MAX_W,
-				seekSec: 0,
-				deckIdleMode: true,
-			})
-
-		drawSceneComposeStack(ctx, cw, ch, {
-			scene,
-			selectedLayerIndex: null,
-			getThumbUrl: getDeckThumbUrl,
-			onThumbLoaded: () => {
-				previewPanel.scheduleDraw()
-				if (!c.isConnected) return
-				requestAnimationFrame(() => {
-					if (!c.isConnected) return
-					paintDeckThumb(c)
-				})
-			},
-			deckThumbnailMode: true,
-		})
-	}
-
-	function repaintDeckThumbs() {
-		if (sceneState.editingSceneId) return
-		mainHost.querySelectorAll('.scenes-card__thumb-canvas').forEach(paintDeckThumb)
-	}
+	const { paintDeckThumb, repaintDeckThumbs } = createDeckThumbPainter({
+		sceneState,
+		stateStore,
+		getChannelMap,
+		getProgramChannel,
+		previewPanel,
+		mainHost,
+	})
 
 	const render = () => {
 		commitPendingLookNameEdits(mainHost, sceneState)
@@ -518,67 +384,17 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	document.addEventListener('highascg-settings-applied', refreshComposePreviewAfterSettings)
 	syncComposePreviewFromChannelMap(getChannelMap())
 
-	onDeckMediaDrop = async (mainCol, e) => {
-		const dt = e.dataTransfer
-		let payloads = []
-		if (dt?.files?.length) {
-			payloads = (await ingestDeckDroppedFiles(dt.files)) || []
-		} else {
-			payloads = parseDraggableSourcesPayload(dt)
-		}
-		if (!payloads.length) return
-
-		if (mainCol !== sceneState.activeScreenIndex) sceneState.switchScreen(mainCol)
-
-		const nScreens = Math.max(1, getScreenCount())
-		const mainScope = nScreens < 2 ? String(0) : String(mainCol)
-		const id = sceneState.addScene(undefined, { mainScope })
-		sceneState.setEditingScene(id)
-		selectedLayerIndexRef.current = null
-		dispatchLayerSelect(null)
-
-		for (const data of payloads) {
-			const idx = sceneState.addLayer(id)
-			const src = {
-				...data,
-				type: data.type || 'media',
-				value: data.value,
-				label: data.label || data.value,
-			}
-			const th = Number(data.thumbnailChannel)
-			if (Number.isFinite(th) && th > 0) src.thumbnailChannel = th
-			if (
-				data.useDirect != null &&
-				!(String(data.value || '').trim().toLowerCase().startsWith('route://'))
-			) {
-				src.useDirect = data.useDirect === true || data.useDirect === 'true'
-			}
-			if (src.type === 'ndi' && String(src.value || '').trim().toLowerCase().startsWith('route://')) {
-				delete src.useDirect
-			}
-			sceneState.setLayerSource(id, idx, src)
-			await applyNativeFillForSource(idx, {
-				type: data.type || 'media',
-				value: data.value,
-				label: data.label,
-				resolution: data.resolution,
-			})
-			try {
-				await captureOnDemandForDroppedSource(data)
-			} catch {
-				/* noop */
-			}
-		}
-
-		const scene = sceneState.getScene(id)
-		const lastIdx = (scene?.layers?.length ?? 1) - 1
-		const lastLayer = scene?.layers?.[lastIdx]
-		if (lastLayer) {
-			dispatchLayerSelect({ sceneId: id, layerIndex: lastIdx, layer: lastLayer })
-		}
-		previewRuntime.schedulePreviewPush()
-		scheduleRender()
-	}
+	onDeckMediaDrop = createDeckMediaDropHandler({
+		sceneState,
+		getScreenCount,
+		ingestDeckDroppedFiles,
+		dispatchLayerSelect,
+		selectedLayerIndexRef,
+		applyNativeFillForSource,
+		captureOnDemandForDroppedSource,
+		previewRuntime,
+		scheduleRender,
+	})
 
 	// Including `scene.live`: take-to-PGM updates `sceneState` silently and applies `scene.live` only — deck PRV/PGM borders read live IDs from sceneState.
 	stateStore.on('*', path => { if (['channelMap', 'scene.live', '*'].includes(path)) scheduleRender() })

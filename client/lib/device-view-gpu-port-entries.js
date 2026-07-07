@@ -1,4 +1,4 @@
-import { normRandrCaspar } from '../components/device-view-caspar-render-helpers.js'
+import { normRandrCaspar } from './device-view-randr-norm.js'
 import {
 	isGpuLayoutDebugEnabled,
 	traceGpuLayoutAdd,

@@ -315,7 +315,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 	host.appendChild(actions)
 }
 
-export function renderMappingConnectorControls(host, conn, { lastPayload, statusEl, load, setCasparRestartDirty, nodeId }) {
+export function renderMappingConnectorControls(host, conn, { lastPayload, nodeId }) {
 	const graph = lastPayload?.graph
 	const node = findMappingNode(graph, nodeId)
 	if (!node) {

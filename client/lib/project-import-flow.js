@@ -1,7 +1,6 @@
 /**
  * Import project JSON with hardware reconcile (looks-only vs full hardware apply).
  */
-import { api } from './api-client.js'
 import {
 	detectHardwareMismatch,
 	fetchLiveHardwareContext,

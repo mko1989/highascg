@@ -12,6 +12,8 @@ import { renderLiveTab } from './sources-panel-live-render.js'
 import { filterMediaForActiveProject } from '../lib/project-media-context.js'
 import { refreshLiveAudioConfigured } from '../lib/live-audio-state.js'
 import { refreshV4l2Configured } from '../lib/v4l2-input-state.js'
+import { settingsState } from '../lib/settings-state.js'
+import { effectiveChannelMap } from '../lib/planned-channel-map.js'
 import { copyMediaFiles, formatMediaOpResult, moveMediaFiles } from '../lib/media-file-ops.js'
 
 /**
@@ -33,13 +35,14 @@ export function createSourcesPanelRender(ctx) {
 		setFilter,
 		getFilterProjectOnly,
 		getMediaWithProbe,
-		setMediaWithProbe,
 		collapsedFolders,
 		selectedMedia,
 		visibleMediaOrder,
 		liveConnectorsCache,
 		getLiveAudioConfiguredCache,
 		setLiveAudioConfiguredCache,
+		getV4l2ConfiguredCache,
+		setV4l2ConfiguredCache,
 		refreshProjectMediaBar,
 		refreshMedia,
 		setStatus,
@@ -53,6 +56,12 @@ export function createSourcesPanelRender(ctx) {
 	async function fetchLiveAudioConfigured() {
 		const cfg = await refreshLiveAudioConfigured(stateStore)
 		setLiveAudioConfiguredCache(cfg)
+		return cfg
+	}
+
+	async function fetchV4l2Configured() {
+		const cfg = await refreshV4l2Configured(stateStore)
+		setV4l2ConfiguredCache(cfg)
 		return cfg
 	}
 
@@ -125,10 +134,17 @@ export function createSourcesPanelRender(ctx) {
 			unwatchUsbBadge()
 			const liveCfg = s.liveAudioConfigured || getLiveAudioConfiguredCache()
 			const v4l2Cfg = s.v4l2Configured || getV4l2ConfiguredCache?.()
-			if (!liveCfg) void fetchLiveAudioConfigured().then(() => render())
-			if (!v4l2Cfg && getV4l2ConfiguredCache) void refreshV4l2Configured(stateStore).then(() => render())
+			if (!liveCfg || !v4l2Cfg) {
+				void Promise.all([
+					!liveCfg ? fetchLiveAudioConfigured() : Promise.resolve(),
+					!v4l2Cfg ? fetchV4l2Configured() : Promise.resolve(),
+				]).then(() => render())
+			}
 			renderLiveTab(listEl, {
-				channelMap: s.channelMap || {},
+				channelMap: effectiveChannelMap({
+					settings: settingsState.getSettings(),
+					liveChannelMap: s.channelMap,
+				}),
 				decklinkInputsStatus: s.decklinkInputsStatus,
 				liveAudioInputsStatus: s.liveAudioInputsStatus,
 				v4l2InputsStatus: s.v4l2InputsStatus,

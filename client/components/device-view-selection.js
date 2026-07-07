@@ -115,6 +115,7 @@ export function registerDeviceViewSelection(ctx) {
 				onRemoveStreamOutput: ctx.removeStreamOutputConnector,
 				onRemoveRecordOutput: ctx.removeRecordOutputConnector,
 				onRemoveAudioOutput: ctx.removeAudioOutputConnector,
+				onRemoveVirtualCamOutput: ctx.removeVirtualCamOutputConnector,
 			}),
 		)
 		ctx.updateUI()

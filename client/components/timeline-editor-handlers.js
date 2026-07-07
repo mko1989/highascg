@@ -1,7 +1,7 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { interpClipProp } from '../lib/timeline-clip-interp.js'
 import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
-import { findMediaRow, getContentResolution } from '../lib/mixer-fill.js'
+import { findMediaRow } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { createEffectInstance } from '../lib/effect-registry.js'

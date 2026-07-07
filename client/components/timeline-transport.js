@@ -69,6 +69,7 @@ export function createTimelineTransport(deps) {
 		syncSendToWithChannelMap()
 		timelineState.setSendTo(tl.id, view.sendTo)
 		await api.post(`/api/timelines/${tl.id}/sendto`, view.sendTo).catch(() => {})
+		redrawTimelineView()
 	}
 
 	function updateTimecode() {
@@ -347,19 +348,20 @@ export function createTimelineTransport(deps) {
 				// Force playout to use latest clip fields (audioRoute, volume, etc.) before take.
 				await syncToServer(t)
 
-				// Take routes timeline to PGM only (PRV dest off).
+				// Take API routes to PGM and applies transition — avoid stopping preview first.
 				view.sendTo.program = true
 				view.sendTo.preview = false
-				await updateSendTo()
-				buildTransport()
-				redrawTimelineView()
-				
+
 				await api.post(`/api/timelines/${t.id}/take`, {
-					transition: trans.type || 'CUT',
+					transition: trans.type || 'MIX',
 					duration: resolveTransitionDuration(trans.duration, fps),
 					tween: trans.tween || 'linear',
 					screenIdx: view.sendTo.screenIdx,
 				}).catch(() => {})
+
+				await updateSendTo()
+				buildTransport()
+				redrawTimelineView()
 			}
 		})
 
@@ -413,6 +415,7 @@ export function createTimelineTransport(deps) {
 		doSeek,
 		syncToServer,
 		updateSendTo,
+		syncSendToWithChannelMap,
 		togglePlay,
 		doStop,
 	}

@@ -1,13 +1,15 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { api } from '../lib/api-client.js'
 import { createDragInput } from './inspector-common.js'
-import { applyFillPxPatch, displayPositionFromStoredPx, fillInspectorPositionMeta } from '../lib/coordinate-origin.js'
+import { applyFillPxPatch, alignStoredPxRect, displayPositionFromStoredPx, fillInspectorPositionMeta } from '../lib/coordinate-origin.js'
 import { SCENE_CONTENT_FIT_OPTIONS } from '../lib/scene-content-fit.js'
+import { appendLayerAlignButtons } from './inspector-fill.js'
 import { appendTimelineClipKeyframes } from './inspector-fill-timeline.js'
 import { sceneState } from '../lib/scene-state.js'
 import { getClipBasePixelRect } from '../lib/timeline-clip-interp.js'
-import { fillToPixelRect, pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
+import { sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { getContentResolution, fetchMediaContentResolution } from '../lib/mixer-fill.js'
+import { getTimelineProgramCanvas } from '../lib/timeline-program-canvas.js'
 import { settingsState } from '../lib/settings-state.js'
 import { appendAudioInspectorGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
@@ -119,22 +121,88 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 	async function reapplyClipFrameForContentFit() {
 		const c = freshClip()
 		if (!c?.source?.value) return
-		const cv = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		const cv = getTimelineProgramCanvas(timelineId, sceneState, stateStore)
 		const cw = cv.width > 0 ? cv.width : 1920
 		const ch = cv.height > 0 ? cv.height : 1080
+		const screenIdx = cv.screenIdx ?? 0
 		const cr = await fetchMediaContentResolution(
 			c.source,
 			stateStore,
-			sceneState.activeScreenIndex,
+			screenIdx,
 			() => api.get('/api/media'),
 		)
 		if (!cr?.w || !cr.h) return
 		const fit = c.contentFit || 'native'
 		const rect = sceneLayerPixelRectForContentFit(cw, ch, cr.w, cr.h, fit)
+		clearClipTransformKeyframes()
 		timelineState.updateClip(timelineId, layerIdx, clipId, {
 			fillPx: { x: rect.x, y: rect.y, w: rect.w, h: rect.h },
 		})
-		syncTimelineToServer()
+		await refreshTimelineClipGeometryOnServer()
+		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+		redrawClipInspector()
+	}
+
+	const canvas = getTimelineProgramCanvas(timelineId, sceneState, stateStore)
+	const programScreenIdx = canvas.screenIdx ?? 0
+
+	async function refreshTimelineClipGeometryOnServer() {
+		await syncTimelineToServer()
+		const pb = stateStore.getState()?.timeline?.playback
+		const active =
+			pb?.timelineId === timelineId ||
+			(!pb?.timelineId && timelineState.getActive()?.id === timelineId)
+		if (active) {
+			const ms = Math.max(
+				0,
+				Math.round(pb?.position ?? getTimelinePlaybackPos?.() ?? 0),
+			)
+			await api
+				.post(`/api/timelines/${encodeURIComponent(timelineId)}/seek`, { ms })
+				.catch(() => {})
+		}
+	}
+
+	function clearClipTransformKeyframes() {
+		for (const prop of ['fill_x', 'fill_y', 'scale_x', 'scale_y']) {
+			timelineState.clearKeyframesByProperty(timelineId, layerIdx, clipId, prop)
+		}
+	}
+	function pxRectForClip() {
+		const c = freshClip()
+		const fp = c.fillPx
+		if (fp && fp.w > 0 && fp.h > 0) {
+			return { x: fp.x, y: fp.y, w: fp.w, h: fp.h }
+		}
+		return getClipBasePixelRect(c, canvas.width, canvas.height, stateStore, programScreenIdx)
+	}
+	function applyFillPx(partial) {
+		const c = freshClip()
+		const stored = pxRectForClip()
+		let next = applyFillPxPatch({ ...stored }, partial, canvas)
+		if (c.aspectLocked !== false) {
+			const cr = c.source ? getContentResolution(c.source, stateStore, programScreenIdx) : null
+			const ar =
+				cr && cr.w > 0 && cr.h > 0 ? cr.w / cr.h : stored.w > 0 && stored.h > 0 ? stored.w / stored.h : 16 / 9
+			if (partial.w != null && partial.h == null) {
+				next.h = Math.max(1, Math.round(next.w / ar))
+			} else if (partial.h != null && partial.w == null) {
+				next.w = Math.max(1, Math.round(next.h * ar))
+			}
+		}
+		clearClipTransformKeyframes()
+		timelineState.updateClip(timelineId, layerIdx, clipId, {
+			fillPx: { x: next.x, y: next.y, w: next.w, h: next.h },
+		})
+		void refreshTimelineClipGeometryOnServer()
+		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+		redrawClipInspector()
+	}
+	function patchFillAlign(mode) {
+		const next = alignStoredPxRect(pxRectForClip(), canvas, mode)
+		clearClipTransformKeyframes()
+		timelineState.updateClip(timelineId, layerIdx, clipId, { fillPx: next })
+		void refreshTimelineClipGeometryOnServer()
 		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 		redrawClipInspector()
 	}
@@ -150,44 +218,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		sub.textContent = posMeta.subtitle
 		transGrp.appendChild(sub)
 	}
-	const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
-	function pxRectForClip() {
-		const c = freshClip()
-		const fp = c.fillPx
-		if (fp && fp.w > 0 && fp.h > 0) {
-			return { x: fp.x, y: fp.y, w: fp.w, h: fp.h }
-		}
-		return getClipBasePixelRect(c, canvas.width, canvas.height, stateStore, sceneState.activeScreenIndex)
-	}
-	function applyFillPx(partial) {
-		const c = freshClip()
-		const baseRect =
-			c.fillPx && c.fillPx.w > 0 && c.fillPx.h > 0
-				? { x: c.fillPx.x, y: c.fillPx.y, w: c.fillPx.w, h: c.fillPx.h }
-				: getClipBasePixelRect(c, canvas.width, canvas.height, stateStore, sceneState.activeScreenIndex)
-		const f = pixelRectToFill(
-			{ x: baseRect.x, y: baseRect.y, w: baseRect.w, h: baseRect.h },
-			canvas,
-		)
-		const r = fillToPixelRect(f, canvas)
-		let next = applyFillPxPatch({ x: r.x, y: r.y, w: r.w, h: r.h }, partial, canvas)
-		if (c.aspectLocked !== false) {
-			const cr = c.source ? getContentResolution(c.source, stateStore, sceneState.activeScreenIndex) : null
-			const ar =
-				cr && cr.w > 0 && cr.h > 0 ? cr.w / cr.h : r.w > 0 && r.h > 0 ? r.w / r.h : 16 / 9
-			if (partial.w != null && partial.h == null) {
-				next.h = Math.max(1, Math.round(next.w / ar))
-			} else if (partial.h != null && partial.w == null) {
-				next.w = Math.max(1, Math.round(next.h * ar))
-			}
-		}
-		timelineState.updateClip(timelineId, layerIdx, clipId, {
-			fillPx: { x: next.x, y: next.y, w: next.w, h: next.h },
-		})
-		syncTimelineToServer()
-		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
-		redrawClipInspector()
-	}
+	appendLayerAlignButtons(transGrp, patchFillAlign)
 	const pxStored = pxRectForClip()
 	const px = displayPositionFromStoredPx(pxStored, canvas)
 	const xInp = createDragInput({

@@ -5,7 +5,6 @@ import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { patchGraphWithMissingCableConnectors } from '../lib/device-view-cable-preflight.js'
 import { resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-list.js'
-import { FACTORY_RESET_GPU_LAYOUT_KEY } from '../lib/device-view-gpu-port-constants.js'
 
 export async function loadDeviceView(opts = {}) {
 	const freshGpu = opts?.freshGpu === true || opts?.freshGpu === '1'

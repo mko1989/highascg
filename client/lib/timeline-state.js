@@ -5,82 +5,24 @@
  */
 
 import { ensureLayerHeights, DEFAULT_LAYER_H } from './timeline-track-heights.js'
-import { applyTimelineClipDefaults } from './editor-defaults.js'
+import {
+	STORAGE_KEY,
+	DEFAULT_SEND_TO,
+	normalizeSendTo,
+	ensureTimelineSendTo,
+	defaultClip,
+	defaultLayer,
+	defaultTimeline,
+	flagUid,
+	uid,
+	isValidFlagType,
+	normalizeLoadedTimelines,
+	findClipOnTimeline,
+} from './timeline-state-model.js'
+import { timelineClipMethods } from './timeline-state-clips.js'
+import { timelineKeyframeMethods } from './timeline-state-keyframes.js'
 
-const STORAGE_KEY = 'casparcg_timelines_v1'
-
-/** Default timeline output routing (PRV-only until PGM or Take). */
-export const DEFAULT_SEND_TO = { preview: true, program: false, screenIdx: 0 }
-
-/** Ms after last clip/flag end when auto-growing `timeline.duration`. */
-const CONTENT_END_PADDING_MS = 2000
-
-/** @type {readonly ['pause', 'play', 'jump', 'companion_press']} */
-const FLAG_TYPES = ['pause', 'play', 'jump', 'companion_press']
-
-function isValidFlagType(type) {
-	return FLAG_TYPES.includes(type)
-}
-
-/**
- * @param {object | null | undefined} raw
- * @returns {{ preview: boolean, program: boolean, screenIdx: number | null }}
- */
-export function normalizeSendTo(raw) {
-	if (!raw || typeof raw !== 'object') return { ...DEFAULT_SEND_TO }
-	const screenIdx =
-		raw.screenIdx === null || raw.screenIdx === 'all'
-			? null
-			: Number.isFinite(Number(raw.screenIdx))
-				? Number(raw.screenIdx)
-				: DEFAULT_SEND_TO.screenIdx
-	return {
-		preview: raw.preview !== false,
-		program: !!raw.program,
-		screenIdx,
-	}
-}
-
-function ensureTimelineSendTo(tl) {
-	if (!tl || typeof tl !== 'object') return
-	tl.sendTo = normalizeSendTo(tl.sendTo)
-}
-
-function uid() {
-	return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-}
-
-function defaultClip(source, startTime, duration) {
-	const clip = {
-		id: uid(),
-		source: source || null,
-		startTime: startTime || 0,
-		duration: duration || 5000,
-		inPoint: 0,
-		outPoint: null,
-		keyframes: [],
-		audioRoute: '1+2',
-		muted: false,
-		volume: 1,
-		/** When true (default), changing W or H keeps media aspect when known — same as look editor. */
-		aspectLocked: true,
-		/** @type {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */
-		contentFit: 'native',
-		/**
-		 * When taking a look to program: seek media from trim start, or match timeline playhead on this layer.
-		 * @type {'beginning' | 'relativeToPrevious'}
-		 */
-		startBehaviour: 'beginning',
-	}
-	applyTimelineClipDefaults(clip)
-	return clip
-}
-
-function defaultLayer(name) {
-	return { id: uid(), name: name || 'Layer', clips: [] }
-}
-
-/** Next unused default name (Layer 1, Layer 2, …) even after renames or gaps. */
+/** Next unused default name (Layer 1, Layer 2, ...) even after renames or gaps. */
 export function nextLayerDisplayName(tl) {
 	const layers = Array.isArray(tl?.layers) ? tl.layers : []
 	let maxNum = 0
@@ -89,44 +31,6 @@ export function nextLayerDisplayName(tl) {
 		if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10))
 	}
 	return `Layer ${Math.max(maxNum, layers.length) + 1}`
-}
-
-function flagUid() {
-	return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-}
-
-function defaultTimeline(opts) {
-	return {
-		id: opts?.id || uid(),
-		name: opts?.name || 'Timeline',
-		duration: opts?.duration || 30000,
-		fps: opts?.fps || 25,
-		flags: Array.isArray(opts?.flags) ? opts.flags : [],
-		sendTo: normalizeSendTo(opts?.sendTo),
-		layers: opts?.layers || [
-			defaultLayer('Layer 1'),
-			defaultLayer('Layer 2'),
-			defaultLayer('Layer 3'),
-		],
-	}
-}
-
-/**
- * Latest end time of any clip or flag (ms).
- * @param {object} tl
- */
-function computeContentEndMs(tl) {
-	let end = 0
-	for (const layer of tl.layers || []) {
-		for (const c of layer.clips || []) {
-			const e = (c.startTime || 0) + (c.duration || 0)
-			if (e > end) end = e
-		}
-	}
-	for (const f of tl.flags || []) {
-		if (typeof f.timeMs === 'number' && f.timeMs > end) end = f.timeMs
-	}
-	return end
 }
 
 class TimelineStateManager {
@@ -143,7 +47,7 @@ class TimelineStateManager {
 		}
 	}
 
-	// ── Timeline CRUD ─────────────────────────────────────────────────────────
+	// -- Timeline CRUD ----------------------------------------------------------
 
 	createTimeline(opts) {
 		const tl = defaultTimeline(opts)
@@ -160,23 +64,6 @@ class TimelineStateManager {
 		Object.assign(tl, changes)
 		this._save()
 		return tl
-	}
-
-	/**
-	 * If clips/flags extend past `tl.duration`, grow duration (same padding as drop/paste).
-	 * @param {string} timelineId
-	 * @returns {boolean} True if duration was increased
-	 */
-	expandDurationToContent(timelineId) {
-		const tl = this.getTimeline(timelineId)
-		if (!tl) return false
-		const contentEnd = computeContentEndMs(tl)
-		const target = Math.ceil(contentEnd + CONTENT_END_PADDING_MS)
-		if (target > tl.duration) {
-			tl.duration = target
-			return true
-		}
-		return false
 	}
 
 	deleteTimeline(id) {
@@ -226,7 +113,7 @@ class TimelineStateManager {
 		return tl.sendTo
 	}
 
-	// ── Timeline flags (playhead markers: pause / play / jump / companion_press) ─
+	// -- Timeline flags (playhead markers: pause / play / jump / companion_press) --
 
 	addFlag(timelineId, opts) {
 		const tl = this.getTimeline(timelineId)
@@ -267,21 +154,21 @@ class TimelineStateManager {
 		this._save()
 	}
 
-	// ── Layer ops ─────────────────────────────────────────────────────────────
+	// -- Layer ops --------------------------------------------------------------
 
 	reorderLayer(id, fromIdx, toIdx) {
 		const tl = this.getTimeline(id)
 		if (!tl || fromIdx < 0 || fromIdx >= tl.layers.length || toIdx < 0 || toIdx >= tl.layers.length) return false
 		if (fromIdx === toIdx) return true
-		
+
 		const layer = tl.layers.splice(fromIdx, 1)[0]
 		tl.layers.splice(toIdx, 0, layer)
-		
+
 		if (Array.isArray(tl.layerHeights)) {
 			const h = tl.layerHeights.splice(fromIdx, 1)[0]
 			tl.layerHeights.splice(toIdx, 0, h)
 		}
-		
+
 		this._save()
 		return true
 	}
@@ -336,205 +223,7 @@ class TimelineStateManager {
 		return tl.layers[layerIdx]
 	}
 
-	// ── Clip ops ──────────────────────────────────────────────────────────────
-
-	moveClipToLayer(id, clipId, fromLayerIdx, toLayerIdx) {
-		const tl = this.getTimeline(id)
-		if (!tl || !tl.layers[fromLayerIdx] || !tl.layers[toLayerIdx]) return null
-		const fromLayer = tl.layers[fromLayerIdx]
-		const clipIdx = fromLayer.clips.findIndex(c => c.id === clipId)
-		if (clipIdx < 0) return null
-		const clip = fromLayer.clips.splice(clipIdx, 1)[0]
-		tl.layers[toLayerIdx].clips.push(clip)
-		this._save()
-		return clip
-	}
-
-	addClip(id, layerIdx, source, startTime, duration) {
-		const tl = this.getTimeline(id)
-		if (!tl || !tl.layers[layerIdx]) return null
-		const clip = defaultClip(source, startTime, duration)
-		tl.layers[layerIdx].clips.push(clip)
-		this.expandDurationToContent(id)
-		this._save()
-		return clip
-	}
-
-	updateClip(id, layerIdx, clipId, changes) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return null
-		Object.assign(clip, changes)
-		this.expandDurationToContent(id)
-		this._save()
-		return clip
-	}
-
-	/**
-	 * Drop media onto an existing clip: swap file/source + duration; keep layout, keyframes, effects, etc.
-	 * Resets trim (in/out) for the new file.
-	 * @param {string} id
-	 * @param {number} layerIdx
-	 * @param {string} clipId
-	 * @param {object} source
-	 * @param {number} durationMs
-	 */
-	replaceClipSource(id, layerIdx, clipId, source, durationMs) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return null
-		const duration = Math.max(1, Number(durationMs) || 5000)
-		clip.source = source || null
-		clip.duration = duration
-		clip.inPoint = 0
-		clip.outPoint = null
-		for (const kf of clip.keyframes || []) {
-			if (kf.time > duration) kf.time = duration
-		}
-		this.expandDurationToContent(id)
-		this._save()
-		return clip
-	}
-
-	/** Clip under timeline ms on a layer (first match). */
-	findClipAtTime(id, layerIdx, timeMs) {
-		const layer = this.getTimeline(id)?.layers?.[layerIdx]
-		if (!layer?.clips?.length) return null
-		const t = Number(timeMs) || 0
-		return (
-			layer.clips.find((c) => t >= c.startTime && t < c.startTime + (c.duration || 0)) || null
-		)
-	}
-
-	/**
-	 * Deep-clone a clip object, assign a new id, set startTime, append to layer.
-	 * @param {object} clip — plain clip object (e.g. from JSON clone)
-	 */
-	insertClipClone(timelineId, layerIdx, clip, startTime) {
-		const tl = this.getTimeline(timelineId)
-		if (!tl?.layers[layerIdx] || !clip) return null
-		const c = JSON.parse(JSON.stringify(clip))
-		c.id = uid()
-		c.startTime = Math.max(0, startTime)
-		tl.layers[layerIdx].clips.push(c)
-		this.expandDurationToContent(timelineId)
-		this._save()
-		return c
-	}
-
-	/** Clone flag fields with a new id and time (jumpFlagId cleared — re-link in UI if needed). */
-	duplicateFlag(timelineId, flag, timeMs) {
-		const tl = this.getTimeline(timelineId)
-		if (!tl || !flag) return null
-		if (!Array.isArray(tl.flags)) tl.flags = []
-		const f = {
-			...JSON.parse(JSON.stringify(flag)),
-			id: flagUid(),
-			timeMs: Math.max(0, timeMs),
-			jumpFlagId: undefined,
-		}
-		tl.flags.push(f)
-		tl.flags.sort((a, b) => a.timeMs - b.timeMs)
-		this.expandDurationToContent(timelineId)
-		this._save()
-		return f
-	}
-
-	removeClip(id, layerIdx, clipId) {
-		const tl = this.getTimeline(id)
-		if (!tl?.layers[layerIdx]) return
-		const layer = tl.layers[layerIdx]
-		const i = layer.clips.findIndex((c) => c.id === clipId)
-		if (i >= 0) layer.clips.splice(i, 1)
-		this._save()
-	}
-
-	// ── Keyframe ops ──────────────────────────────────────────────────────────
-
-	/**
-	 * Add a keyframe to a clip. Keeps keyframes sorted by time.
-	 * If a keyframe with same time+property exists, it is replaced.
-	 */
-	addKeyframe(id, layerIdx, clipId, kf) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return null
-		clip.keyframes = (clip.keyframes || []).filter(
-			(k) => !(k.property === kf.property && k.time === kf.time)
-		)
-		clip.keyframes.push(kf)
-		clip.keyframes.sort((a, b) => a.time - b.time)
-		this._save()
-		return kf
-	}
-
-	/** Remove a single keyframe by property + time. */
-	removeKeyframe(id, layerIdx, clipId, property, time) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return
-		clip.keyframes = (clip.keyframes || []).filter(
-			(k) => !(k.property === property && Math.abs(k.time - time) < 0.5)
-		)
-		this._save()
-	}
-
-	/** Remove all keyframes with a given property from a clip. */
-	clearKeyframesByProperty(id, layerIdx, clipId, property) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return
-		clip.keyframes = (clip.keyframes || []).filter((k) => k.property !== property)
-		this._save()
-	}
-
-	/** Add position keyframe (x,y) at given time — stores both fill_x and fill_y. */
-	addPositionKeyframe(id, layerIdx, clipId, time, x, y) {
-		const t = Math.max(0, time)
-		this.addKeyframe(id, layerIdx, clipId, { time: t, property: 'fill_x', value: x ?? 0, easing: 'linear' })
-		this.addKeyframe(id, layerIdx, clipId, { time: t, property: 'fill_y', value: y ?? 0, easing: 'linear' })
-	}
-
-	/** Add scale keyframe (locked: both x and y same value) at given time. */
-	addScaleKeyframe(id, layerIdx, clipId, time, s) {
-		const v = Math.max(0, Math.min(4, s ?? 1))
-		const t = Math.max(0, time)
-		this.addKeyframe(id, layerIdx, clipId, { time: t, property: 'scale_x', value: v, easing: 'linear' })
-		this.addKeyframe(id, layerIdx, clipId, { time: t, property: 'scale_y', value: v, easing: 'linear' })
-	}
-
-	/** Remove position keyframes at given time (removes both fill_x and fill_y). */
-	removePositionKeyframe(id, layerIdx, clipId, time) {
-		this.removeKeyframe(id, layerIdx, clipId, 'fill_x', time)
-		this.removeKeyframe(id, layerIdx, clipId, 'fill_y', time)
-	}
-
-	/** Remove scale keyframes at given time (removes both scale_x and scale_y). */
-	removeScaleKeyframe(id, layerIdx, clipId, time) {
-		this.removeKeyframe(id, layerIdx, clipId, 'scale_x', time)
-		this.removeKeyframe(id, layerIdx, clipId, 'scale_y', time)
-	}
-
-	/** Remove opacity keyframes in given time range [fromMs, toMs]. */
-	clearKeyframeRange(id, layerIdx, clipId, property, fromMs, toMs) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip) return
-		clip.keyframes = (clip.keyframes || []).filter(
-			(k) => !(k.property === property && k.time >= fromMs && k.time <= toMs)
-		)
-		this._save()
-	}
-
-	/** Move keyframe at index to new time (for drag). Clamps to 0..clip.duration. */
-	updateKeyframeTime(id, layerIdx, clipId, keyframeIdx, newTime) {
-		const clip = this._findClip(id, layerIdx, clipId)
-		if (!clip?.keyframes?.[keyframeIdx]) return null
-		const kf = clip.keyframes[keyframeIdx]
-		const clamped = Math.max(0, Math.min(newTime, clip.duration || 999999))
-		if (clamped === kf.time) return kf
-		clip.keyframes.splice(keyframeIdx, 1)
-		clip.keyframes.push({ ...kf, time: clamped })
-		clip.keyframes.sort((a, b) => a.time - b.time)
-		this._save()
-		return clip.keyframes.find((k) => k.property === kf.property && k.time === clamped)
-	}
-
-	// ── Persistence ───────────────────────────────────────────────────────────
+	// -- Persistence ------------------------------------------------------------
 
 	_save() {
 		try {
@@ -552,16 +241,7 @@ class TimelineStateManager {
 	loadFromData(data, opts = {}) {
 		if (!data || !Array.isArray(data.timelines)) return
 		this.timelines = data.timelines.length ? data.timelines : [defaultTimeline()]
-		for (const tl of this.timelines) {
-			if (!Array.isArray(tl.flags)) tl.flags = []
-			ensureLayerHeights(tl)
-			ensureTimelineSendTo(tl)
-			for (const layer of tl.layers || []) {
-				for (const c of layer.clips || []) {
-					if (c.startBehaviour == null) c.startBehaviour = 'beginning'
-				}
-			}
-		}
+		normalizeLoadedTimelines(this.timelines)
 		this.activeId = data.activeId || this.timelines[0]?.id || null
 		if (opts.silent) {
 			try {
@@ -580,16 +260,7 @@ class TimelineStateManager {
 				if (Array.isArray(data.timelines) && data.timelines.length) {
 					this.timelines = data.timelines
 					this.activeId = data.activeId || data.timelines[0]?.id || null
-					for (const tl of this.timelines) {
-						if (!Array.isArray(tl.flags)) tl.flags = []
-						ensureLayerHeights(tl)
-						ensureTimelineSendTo(tl)
-						for (const layer of tl.layers || []) {
-							for (const c of layer.clips || []) {
-								if (c.startBehaviour == null) c.startBehaviour = 'beginning'
-							}
-						}
-					}
+					normalizeLoadedTimelines(this.timelines)
 				}
 			}
 		} catch {}
@@ -600,7 +271,10 @@ class TimelineStateManager {
 		this._listeners.get(key).push(fn)
 		return () => {
 			const fns = this._listeners.get(key)
-			if (fns) { const i = fns.indexOf(fn); if (i >= 0) fns.splice(i, 1) }
+			if (fns) {
+				const i = fns.indexOf(fn)
+				if (i >= 0) fns.splice(i, 1)
+			}
 		}
 	}
 
@@ -611,11 +285,14 @@ class TimelineStateManager {
 
 	_findClip(id, layerIdx, clipId) {
 		const tl = this.getTimeline(id)
-		if (!tl?.layers[layerIdx]) return null
-		return tl.layers[layerIdx].clips.find((c) => c.id === clipId) || null
+		if (!tl) return null
+		return findClipOnTimeline(tl, layerIdx, clipId)
 	}
 }
 
+Object.assign(TimelineStateManager.prototype, timelineClipMethods)
+Object.assign(TimelineStateManager.prototype, timelineKeyframeMethods)
+
 export const timelineState = new TimelineStateManager()
-export { defaultClip, defaultLayer, defaultTimeline, flagUid, uid }
+export { DEFAULT_SEND_TO, normalizeSendTo, defaultClip, defaultLayer, defaultTimeline, flagUid, uid }
 export default TimelineStateManager
