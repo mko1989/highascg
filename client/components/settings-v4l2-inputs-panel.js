@@ -266,14 +266,27 @@ export async function mountV4l2InputsSettingsPanel(container) {
 		mainEl.querySelector('#v4l2-save-config')?.addEventListener('click', async () => {
 			setActionStatus('Saving…', true)
 			try {
-				const r = await api.post('/api/v4l2-inputs/config', buildV4l2ConfigBody(readUiFromDom()))
+				const prevUi = readV4l2CasparSettings(settingsState.getSettings()?.casparServer || {})
+				const nextUi = readUiFromDom()
+				const r = await api.post('/api/v4l2-inputs/config', buildV4l2ConfigBody(nextUi))
 				await settingsState.load()
-				markCasparRestartDirty()
+				if (nextUi.count !== prevUi.count) markCasparRestartDirty()
+				else {
+					try {
+						await api.post('/api/v4l2-inputs/apply', {})
+					} catch {
+						/* channel may not exist until first apply */
+					}
+				}
 				await loadV4l2Inputs()
 				renderStatus()
 				const warns = Array.isArray(r?.warnings) ? r.warnings.filter(Boolean) : []
 				const warnMsg = warns.length ? ` Warnings: ${warns.join(' ')}` : ''
-				setActionStatus(`Saved.${warnMsg} Apply Caspar config + restart if slot count changed.`, !warns.length)
+				const restartHint =
+					nextUi.count !== prevUi.count
+						? ' Apply Caspar config + restart if slot count changed.'
+						: ' Capture re-applied on existing host channel(s).'
+				setActionStatus(`Saved.${warnMsg}${restartHint}`, !warns.length)
 				document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
 				document.dispatchEvent(new CustomEvent('highascg-v4l2-configured', { detail: liveState }))
 			} catch (e) {

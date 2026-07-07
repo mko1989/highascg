@@ -2,6 +2,7 @@
 
 const { getChannelMap, getRouteString } = require('./routing-map')
 const { getModeDimensions } = require('./config-modes')
+const { normalizeNdiSourceName, ndiDisplayLabel, buildNdiHostPlayCommands } = require('./ndi-playback')
 
 /** Default layer for webpage / NDI host producers (WO-88). */
 const HOST_LAYER = 1
@@ -176,9 +177,8 @@ function normalizeWebpageHostSource(item, ctx) {
 function normalizeNdiHostSource(item, ctx) {
 	const config = ctx?.config || {}
 	const raw = String(item.ndiName || item.value || item.label || '').trim()
-	if (!raw) throw new Error('NDI source name required')
-	const ndiName = raw.startsWith('ndi://') ? raw : raw.includes('"') ? raw : `ndi://${raw}`
-	const display = raw.startsWith('ndi://') ? raw.substring(6).replace(/\/"([^"]+)"/, ' $1') : raw
+	const ndiName = normalizeNdiSourceName(raw)
+	const display = ndiDisplayLabel(ndiName)
 
 	let hostChannel = parseInt(String(item.hostChannel ?? ''), 10)
 	if (!Number.isFinite(hostChannel) || hostChannel < 1) {
@@ -273,10 +273,7 @@ function amcpCommandsForHostLiveSource(item) {
 		]
 	}
 	if (isNdiHostCandidate(item)) {
-		const name = String(item.ndiName || item.value || '').trim()
-		if (!name) return []
-		const esc = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-		return [`PLAY ${ch}-${layer} NDI "${esc}"`, `MIXER ${ch} COMMIT`]
+		return buildNdiHostPlayCommands(ch, layer, item.ndiName || item.value || '')
 	}
 	return []
 }

@@ -5,6 +5,8 @@ const { handleHostOperatorFullscreen, getHostOperatorFullscreenSnapshot } = requ
 const { migrateHostLiveSourcesConfig } = require('../config/host-live-sources-migrate')
 const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 const { handleWebpageHostLive } = require('./host-live-webpage')
+const { handleNdiHostLive } = require('./host-live-ndi')
+const { handleDecklinkHostLive } = require('./host-live-decklink')
 
 /**
  * @param {string} path
@@ -101,4 +103,38 @@ async function handleWebpagePost(body, ctx) {
 	}
 }
 
-module.exports = { handleGet, handlePost, handleWebpagePost }
+/**
+ * @param {string} body
+ * @param {object} ctx
+ */
+async function handleNdiPost(body, ctx) {
+	const j = parseBody(body) || {}
+	const res = await handleNdiHostLive(ctx, j)
+	if (res.status) {
+		return { status: res.status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: res.error }) }
+	}
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody(res),
+	}
+}
+
+/**
+ * @param {string} body
+ * @param {object} ctx
+ */
+async function handleDecklinkPost(body, ctx) {
+	const j = parseBody(body) || {}
+	const res = await handleDecklinkHostLive(ctx, j)
+	if (res.status) {
+		return { status: res.status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: res.error }) }
+	}
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody(res),
+	}
+}
+
+module.exports = { handleGet, handlePost, handleWebpagePost, handleNdiPost, handleDecklinkPost }

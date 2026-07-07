@@ -11,7 +11,6 @@ import {
 	V4L2_MAX_SLOTS,
 } from './v4l2-inputs.js'
 import { v4l2InputForSlot } from './input-channels.js'
-import { applyCasparConfig } from '../components/device-view-actions.js'
 
 /**
  * @param {ReturnType<typeof readV4l2CasparSettings>} ui
@@ -76,20 +75,11 @@ export async function addV4l2InputSlot(stateStore, payload) {
 	const casparRestartNeeded = count > prevUi.count
 	if (casparRestartNeeded) markCasparRestartDirty()
 
-	let casparApply = null
-	if (casparRestartNeeded) {
-		try {
-			casparApply = await applyCasparConfig()
-		} catch (e) {
-			casparApply = { ok: false, error: e?.message || String(e) }
-		}
-	}
-
 	let livePayload = await refreshV4l2Configured(stateStore)
 	let entry = v4l2InputForSlot(channelMapForV4l2(stateStore, livePayload), slot)
 
 	let hostLivePlay = null
-	if (entry?.route) {
+	if (entry?.route && !casparRestartNeeded) {
 		try {
 			hostLivePlay = await api.post('/api/v4l2-inputs/apply', {})
 		} catch (e) {
@@ -102,8 +92,8 @@ export async function addV4l2InputSlot(stateStore, payload) {
 		slot,
 		hostChannel: entry?.channel ?? null,
 		route: entry?.route ?? null,
-		casparRestartNeeded: casparRestartNeeded && !(casparApply?.ok || casparApply?.restarted),
-		casparApply,
+		casparRestartNeeded,
+		pendingApply: casparRestartNeeded,
 		hostLivePlay,
 		v4l2Configured: livePayload,
 	}
