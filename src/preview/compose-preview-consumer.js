@@ -2,6 +2,7 @@
 
 const fs = require('fs')
 const cache = require('./compose-preview-cache')
+const blocklist = require('./compose-preview-blocklist')
 const {
 	casparUdpStreamUriVariantsForRemove,
 	getActiveStreamUris,
@@ -25,10 +26,20 @@ const LEGACY_COMPOSE_UDP_PORT_BASE = 52100
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** @type {Map<number, { attached: boolean, lastError?: string, attachedAt?: number }>} */
+/** @type {Map<number, { attached: boolean, signature?: string, lastError?: string, attachedAt?: number }>} */
 const _channels = new Map()
 
 /**
+ * Legacy-index cleanup (REMOVE 98/700 + stale UDP STREAM) runs once per channel per
+ * process instead of on every recycle (WO-144 T144.3 — was constant benign REMOVE noise).
+ * @type {Set<number>}
+ */
+const _legacySweptChannels = new Set()
+
+/**
+ * Per-channel consumer signature = the exact ADD FILE params. Attach/detach is
+ * diff-based against this (WO-144 T144.2) so an unchanged channel — especially the
+ * on-air PGM channel — is never recycled (REMOVE/ADD causes a visible output hitch).
  * @param {object} config
  * @param {number} channel
  */
@@ -58,16 +69,17 @@ async function ensureComposePreviewJpgStub(config, channel) {
 const _everAttachedChannels = new Set()
 
 /**
+ * Remove legacy consumer slots (98/700) + stale UDP STREAM consumers left by older
+ * installs. Gated to once per channel per process (WO-144).
  * @param {object} ctx
- * @param {number} channel
+ * @param {number} ch
  */
-async function removeComposeConsumers(ctx, channel) {
+async function sweepLegacyComposeConsumers(ctx, ch) {
+	if (_legacySweptChannels.has(ch)) return
+	_legacySweptChannels.add(ch)
 	if (!ctx?.amcp?.isConnected) return
-	const ch = parseInt(String(channel), 10)
-	const legacyPort = LEGACY_COMPOSE_UDP_PORT_BASE + ch
-	const variants = casparUdpStreamUriVariantsForRemove(legacyPort)
 	if (ctx.amcp.basic?.remove) {
-		for (const idx of [COMPOSE_FILE_CONSUMER_INDEX, ...LEGACY_COMPOSE_CONSUMER_INDICES]) {
+		for (const idx of LEGACY_COMPOSE_CONSUMER_INDICES) {
 			try {
 				await ctx.amcp.basic.remove(ch, null, idx)
 			} catch {
@@ -75,6 +87,8 @@ async function removeComposeConsumers(ctx, channel) {
 			}
 		}
 	}
+	const legacyPort = LEGACY_COMPOSE_UDP_PORT_BASE + ch
+	const variants = casparUdpStreamUriVariantsForRemove(legacyPort)
 	try {
 		const active = await getActiveStreamUris(ctx.amcp, ch)
 		for (const u of active) {
@@ -95,6 +109,23 @@ async function removeComposeConsumers(ctx, channel) {
  * @param {object} ctx
  * @param {number} channel
  */
+async function removeComposeConsumers(ctx, channel) {
+	if (!ctx?.amcp?.isConnected) return
+	const ch = parseInt(String(channel), 10)
+	await sweepLegacyComposeConsumers(ctx, ch)
+	if (ctx.amcp.basic?.remove) {
+		try {
+			await ctx.amcp.basic.remove(ch, null, COMPOSE_FILE_CONSUMER_INDEX)
+		} catch {
+			/* ok if absent */
+		}
+	}
+}
+
+/**
+ * @param {object} ctx
+ * @param {number} channel
+ */
 async function attachComposeFileConsumer(ctx, channel) {
 	const ch = parseInt(String(channel), 10)
 	if (!Number.isFinite(ch) || ch < 1) return
@@ -103,16 +134,26 @@ async function attachComposeFileConsumer(ctx, channel) {
 		return
 	}
 	const cfg = ctx.config || {}
+	const params = buildComposeFileAddParams(cfg, ch)
+	if (blocklist.isComposeChannelBlocklisted(ch, params)) {
+		ctx.log?.('debug', `[compose-preview] ch${ch} blocklisted — skipping ADD (preview unavailable)`)
+		return
+	}
+	if (blocklist.isComposeChannelBlocklisted(ch)) {
+		// Signature changed since rejection — config change re-arms one probe.
+		blocklist.clearComposeChannelBlocklist(ch)
+		blocklist.broadcastComposeBlocklistChange(ctx, ch, false)
+		ctx.log?.('info', `[compose-preview] ch${ch} blocklist cleared (consumer args changed) — reprobing`)
+	}
 	await ensureComposePreviewJpgStub(cfg, ch)
 	await removeComposeConsumers(ctx, ch)
 	await delay(150)
-	const params = buildComposeFileAddParams(cfg, ch)
 	try {
 		const res = await ctx.amcp.basic.add(ch, 'FILE', params, COMPOSE_FILE_CONSUMER_INDEX)
 		if (res && res.ok === false) {
-			throw new Error(res.error || 'ADD FILE failed')
+			throw new Error(res.error || res.data || 'ADD FILE failed')
 		}
-		_channels.set(ch, { attached: true, attachedAt: Date.now(), lastError: undefined })
+		_channels.set(ch, { attached: true, signature: params, attachedAt: Date.now(), lastError: undefined })
 		_everAttachedChannels.add(ch)
 		ctx.log?.(
 			'info',
@@ -121,8 +162,59 @@ async function attachComposeFileConsumer(ctx, channel) {
 	} catch (e) {
 		const msg = e?.message || String(e)
 		_channels.set(ch, { attached: false, lastError: msg })
-		ctx.log?.('warn', `[compose-preview] ch${ch} ADD FILE failed: ${msg}`)
+		if (blocklist.isPermanentAddRejection(msg)) {
+			blocklist.blocklistComposeChannel(ch, { reason: msg, signature: params })
+			blocklist.broadcastComposeBlocklistChange(ctx, ch, true, msg)
+			ctx.log?.(
+				'warn',
+				`[compose-preview] ch${ch} ADD FILE rejected (${msg}) — blocklisted, preview unavailable on ch ${ch} until config change or restart`,
+			)
+		} else {
+			ctx.log?.('warn', `[compose-preview] ch${ch} ADD FILE failed: ${msg}`)
+		}
 	}
+}
+
+/**
+ * Diff-based reconcile of desired vs running FILE consumers (WO-144 T144.2).
+ * Only channels whose ADD params changed (or that are new/missing) get REMOVE/ADD;
+ * channels with an unchanged signature — including the on-air PGM channel — produce
+ * zero AMCP commands. Blocklisted channels are not retried while their signature
+ * is unchanged.
+ * @param {object} ctx
+ * @returns {Promise<{ attached: number, detached: number, unchanged: number, blocked: number }>}
+ */
+async function syncComposeFileConsumers(ctx) {
+	const out = { attached: 0, detached: 0, unchanged: 0, blocked: 0 }
+	if (!isFfmpegJpegComposePreview(ctx?.config)) return out
+	if (!ctx?.amcp?.isConnected) return out
+	const cfg = ctx.config || {}
+	const desired = resolveMonitoredChannels(cfg)
+	const desiredSet = new Set(desired)
+	const known = new Set([..._channels.keys(), ..._everAttachedChannels])
+	for (const ch of known) {
+		if (desiredSet.has(ch)) continue
+		await removeComposeConsumers(ctx, ch)
+		_channels.delete(ch)
+		_everAttachedChannels.delete(ch)
+		out.detached++
+	}
+	for (const ch of desired) {
+		const sig = buildComposeFileAddParams(cfg, ch)
+		const st = _channels.get(ch)
+		if (st?.attached && st.signature === sig) {
+			out.unchanged++
+			continue
+		}
+		if (blocklist.isComposeChannelBlocklisted(ch, sig)) {
+			out.blocked++
+			continue
+		}
+		await attachComposeFileConsumer(ctx, ch)
+		if (_channels.get(ch)?.attached) out.attached++
+		else if (blocklist.isComposeChannelBlocklisted(ch)) out.blocked++
+	}
+	return out
 }
 
 /**
@@ -131,10 +223,7 @@ async function attachComposeFileConsumer(ctx, channel) {
 async function attachAllComposeFileConsumers(ctx) {
 	if (!isFfmpegJpegComposePreview(ctx?.config)) return
 	if (!ctx?.amcp?.isConnected) return
-	const channels = resolveMonitoredChannels(ctx.config)
-	for (const ch of channels) {
-		await attachComposeFileConsumer(ctx, ch)
-	}
+	await syncComposeFileConsumers(ctx)
 }
 
 /**
@@ -155,6 +244,23 @@ async function detachAllComposeFileConsumers(ctx) {
 }
 
 /**
+ * True when every monitored channel is settled: FILE consumer attached with the
+ * current signature, or blocklisted for the current signature (nothing to retry).
+ * @param {object} config
+ * @returns {boolean}
+ */
+function composeConsumersSettled(config) {
+	const channels = resolveMonitoredChannels(config || {})
+	if (!channels.length) return false
+	return channels.every((ch) => {
+		const sig = buildComposeFileAddParams(config, ch)
+		const st = _channels.get(ch)
+		if (st?.attached && st.signature === sig) return true
+		return blocklist.isComposeChannelBlocklisted(ch, sig)
+	})
+}
+
+/**
  * True when every monitored channel currently has its FILE consumer attached.
  * @param {object} config
  * @returns {boolean}
@@ -171,15 +277,23 @@ function getComposeConsumerStats(config) {
 	for (const ch of channels) {
 		const st = _channels.get(ch) || { attached: false }
 		const resolved = cache.resolvePreviewImagePath(config, ch)
+		const blockEntry = blocklist.getComposeBlocklistEntry(ch)
 		byChannel[ch] = {
 			attached: !!st.attached,
 			lastError: st.lastError || null,
 			attachedAt: st.attachedAt || null,
+			blocklisted: !!blockEntry,
+			blocklistReason: blockEntry ? blockEntry.reason : null,
 			amcpPath: getComposePreviewJpgAmcpPath(config, ch),
 			file: resolved ? { format: resolved.format, path: resolved.path } : null,
 		}
 	}
-	return { consumerIndex: COMPOSE_FILE_CONSUMER_INDEX, transport: 'file_image2', byChannel }
+	return {
+		consumerIndex: COMPOSE_FILE_CONSUMER_INDEX,
+		transport: 'file_image2',
+		blocklistedChannels: blocklist.getComposeBlocklistedChannels(),
+		byChannel,
+	}
 }
 
 function resetComposeConsumerState() {
@@ -187,8 +301,14 @@ function resetComposeConsumerState() {
 	_everAttachedChannels.clear()
 }
 
+/** Test-only: re-arm the once-per-process legacy sweep. */
+function resetComposeLegacySweep() {
+	_legacySweptChannels.clear()
+}
+
 /**
- * Drop tracked channels not in the current channel map (e.g. after new project / routing shrink).
+ * Reconcile consumers after config save / project load / routing shrink.
+ * Delegates to the diff-based ffmpeg_jpeg start (zero AMCP traffic when unchanged).
  * @param {object} ctx
  */
 async function refreshComposePreviewConsumers(ctx) {
@@ -202,9 +322,12 @@ module.exports = {
 	buildComposeFileAddParams,
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
+	syncComposeFileConsumers,
 	allComposeConsumersAttached,
+	composeConsumersSettled,
 	detachAllComposeFileConsumers,
 	refreshComposePreviewConsumers,
 	getComposeConsumerStats,
 	resetComposeConsumerState,
+	resetComposeLegacySweep,
 }

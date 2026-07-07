@@ -9,6 +9,9 @@ import {
 /** @type {Set<number>} — channels whose meta returned 404 (no JPEG yet); skip poll spam */
 const _metaUnavailable = new Set()
 
+/** @type {Map<number, string>} — server-blocklisted channels (ADD rejected, WO-144): ch → reason */
+const _blocklisted = new Map()
+
 /** @type {Map<number, { img: HTMLImageElement, etag: string | null, loading: boolean }>} */
 const _cache = new Map()
 
@@ -88,11 +91,28 @@ function stopPollIfIdle() {
 export function ingestComposePreviewWs(data) {
 	if (!isSnapshotComposePreview()) return
 	const ch = parseInt(String(data?.channel ?? ''), 10)
+	if (!Number.isFinite(ch) || ch < 1) return
+	// Blocklist push (WO-144) shares the `compose.preview` event; no etag payload.
+	if (data?.blocklisted !== undefined) {
+		if (data.blocklisted) _blocklisted.set(ch, String(data.reason || 'ADD rejected'))
+		else _blocklisted.delete(ch)
+		notifyComposePreviewListeners(ch)
+		return
+	}
 	const etag = data?.etag != null ? String(data.etag) : null
-	if (!Number.isFinite(ch) || ch < 1 || !etag) return
+	if (!etag) return
 	_metaUnavailable.delete(ch)
+	_blocklisted.delete(ch)
 	trackComposePreviewChannel(ch)
 	void loadComposePreviewImage(ch, etag)
+}
+
+/**
+ * @param {number} channel
+ * @returns {boolean}
+ */
+export function isComposePreviewChannelBlocklisted(channel) {
+	return _blocklisted.has(parseInt(String(channel), 10))
 }
 
 /**
@@ -154,11 +174,13 @@ export function resetComposePreviewClientCache(keepChannels) {
 			if (!keep.has(ch)) {
 				_cache.delete(ch)
 				_metaUnavailable.delete(ch)
+				_blocklisted.delete(ch)
 			}
 		}
 	} else {
 		_cache.clear()
 		_metaUnavailable.clear()
+		_blocklisted.clear()
 	}
 	_trackedChannelSig = ''
 	stopPollIfIdle()
@@ -216,6 +238,14 @@ export function drawComposeSnapshotCell(ctx, cellW, cellH, channel, opts = {}) {
 	const entry = _cache.get(ch)
 	ctx.fillStyle = '#0a0a0c'
 	ctx.fillRect(0, 0, cellW, cellH)
+	if (_blocklisted.has(ch)) {
+		ctx.fillStyle = '#a66'
+		ctx.font = '12px system-ui,sans-serif'
+		ctx.textAlign = 'center'
+		ctx.textBaseline = 'middle'
+		ctx.fillText(`preview unavailable on ch ${ch}`, cellW / 2, cellH / 2)
+		return
+	}
 	if (entry?.img?.complete && entry.img.naturalWidth > 0) {
 		const iw = entry.img.naturalWidth
 		const ih = entry.img.naturalHeight

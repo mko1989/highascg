@@ -8,6 +8,7 @@ const {
 	handleComposePreviewCompanionGet,
 } = require('../preview/compose-preview-cache')
 const ffmpegJpeg = require('../preview/compose-preview-ffmpeg-jpeg')
+const { getComposeBlocklistStats } = require('../preview/compose-preview-blocklist')
 const {
 	isSnapshotComposePreview,
 	resolveComposePreviewMode,
@@ -42,6 +43,7 @@ async function handleGet(path, query, ctx) {
 				mode,
 				...ffmpegJpeg.getFfmpegJpegComposePreviewStats(ctx.config),
 				channels: resolveMonitoredChannels(ctx.config),
+				blocklist: getComposeBlocklistStats(),
 			}),
 		}
 	}
@@ -61,7 +63,7 @@ async function handlePost(path, body, ctx) {
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, channels }),
+		body: jsonBody({ ok: true, channels, blocklist: getComposeBlocklistStats() }),
 	}
 }
 

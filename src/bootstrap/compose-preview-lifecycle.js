@@ -74,6 +74,8 @@ function createComposePreviewLifecycle({ appCtx }) {
 		void ffmpegJpeg.stopFfmpegJpegComposePreview(appCtx)
 		activity.reset()
 		require('../preview/compose-preview-dirty').reset()
+		// WO-144: blocklist is process-scoped — cleared on service shutdown/restart.
+		require('../preview/compose-preview-blocklist').resetComposeBlocklist()
 	}
 
 	return {

@@ -76,42 +76,46 @@ async function stopFfmpegJpegComposePreviewInternal(ctx) {
 }
 
 /**
+ * Diff-based start/reconcile (WO-144 T144.2): never detach-all/attach-all on config
+ * save / project load — only channels whose per-channel ADD signature changed are
+ * recycled by {@link consumer.syncComposeFileConsumers}. An unchanged on-air PGM
+ * channel therefore produces zero REMOVE/ADD (no output hitch).
  * @param {object} ctx
  */
 function startFfmpegJpegComposePreview(ctx) {
 	return enqueueComposePreviewLifecycle(async () => {
 		const wantFfmpeg = isFfmpegJpegComposePreview(ctx?.config)
-		const sig = computeComposeRunSignature(ctx?.config)
-		if (
-			wantFfmpeg &&
-			sig &&
-			sig === _runningSignature &&
-			_watchTimer &&
-			consumer.allComposeConsumersAttached(ctx?.config)
-		) {
-			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg unchanged — skipping consumer recycle')
-			return
-		}
-		await stopFfmpegJpegComposePreviewInternal(ctx)
 		if (!wantFfmpeg) {
-			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg not enabled after stop — skip attach')
+			await stopFfmpegJpegComposePreviewInternal(ctx)
+			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg not enabled — stopped')
 			return
 		}
 		if (!ctx?.amcp?.isConnected) {
 			ctx?.log?.('warn', '[compose-preview] ffmpeg_jpeg start skipped — AMCP not connected')
 			return
 		}
+		const sig = computeComposeRunSignature(ctx?.config)
+		if (sig && sig === _runningSignature && _watchTimer && consumer.composeConsumersSettled(ctx?.config)) {
+			ctx?.log?.('debug', '[compose-preview] ffmpeg_jpeg unchanged — skipping consumer recycle')
+			return
+		}
 		await cache.ensurePreviewDir(ctx.config).catch(() => {})
 		const cp = ctx.config?.composePreview || {}
 		const channels = resolveMonitoredChannels(ctx.config)
+		const res = await consumer.syncComposeFileConsumers(ctx)
+		pruneMtimeState(channels)
+		syncMtimeWatch(ctx)
+		_runningSignature = sig
 		ctx.log?.(
 			'info',
-			`[compose-preview] ffmpeg_jpeg starting (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.resolutionScale ?? 'half'}, companionThumb=${cp.companionThumbEnabled ? cp.companionThumbSize ?? 144 : 'off'}, pollMs=${resolveMtimePollMs(ctx.config)}, direct FILE)`,
+			`[compose-preview] ffmpeg_jpeg sync (channels=${channels.join(',')}, fps=${cp.fps ?? 2}, scale=${cp.resolutionScale ?? 'half'}, companionThumb=${cp.companionThumbEnabled ? cp.companionThumbSize ?? 144 : 'off'}, pollMs=${resolveMtimePollMs(ctx.config)}, attached=${res.attached}, unchanged=${res.unchanged}, detached=${res.detached}, blocked=${res.blocked})`,
 		)
-		await consumer.attachAllComposeFileConsumers(ctx)
-		startMtimeWatch(ctx)
-		_runningSignature = sig
-		await companionThumb.bootstrapCompanionPreviewVariables(ctx)
+		if (companionThumb.isCompanionThumbEnabled(ctx.config)) {
+			await companionThumb.bootstrapCompanionPreviewVariables(ctx)
+		} else {
+			companionThumb.stopCompanionThumbTimer()
+			companionThumb.clearCompanionPreviewVariables(ctx)
+		}
 	})
 }
 
@@ -143,6 +147,31 @@ function startMtimeWatch(ctx) {
 		void pollMtimeAndBroadcast(ctx)
 	}, _watchPollMs)
 	if (_watchTimer.unref) _watchTimer.unref()
+}
+
+/**
+ * Keep the mtime watch running across diff-based reconciles; restart only when the
+ * poll interval actually changed.
+ * @param {object} ctx
+ */
+function syncMtimeWatch(ctx) {
+	const pollMs = resolveMtimePollMs(ctx?.config)
+	if (_watchTimer && _watchPollMs === pollMs) return
+	if (_watchTimer) {
+		clearInterval(_watchTimer)
+		_watchTimer = null
+	}
+	startMtimeWatch(ctx)
+}
+
+/**
+ * Drop mtime bookkeeping for channels no longer monitored (routing shrink).
+ * @param {number[]} channels
+ */
+function pruneMtimeState(channels) {
+	const keep = new Set(channels)
+	for (const ch of [..._lastMtime.keys()]) if (!keep.has(ch)) _lastMtime.delete(ch)
+	for (const ch of [..._deferredMtime.keys()]) if (!keep.has(ch)) _deferredMtime.delete(ch)
 }
 
 /**
