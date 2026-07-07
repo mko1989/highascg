@@ -6,9 +6,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { getChannelMap } = require('../config/routing')
-const liveSceneState = require('../state/live-scene-state')
-const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
+const { runTimelineDirectTake } = require('../engine/timeline-take')
 const { notifyTimelineReplication } = require('../replication/replication-hooks')
 
 /**
@@ -80,44 +78,22 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 			}
 			case 'take': {
-				const map = getChannelMap(ctx?.config || {})
-				const screenCount = map?.screenCount || 1
-				const targetIdxs = (b.screenIdx === null || b.screenIdx === 'all')
-					? Array.from({ length: screenCount }, (_, i) => i)
-					: [Math.max(0, parseInt(b.screenIdx, 10) || 0)]
-				
 				if (!ctx.amcp) {
 					return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 				}
-				const tl = eng.get(id)
-				if (!tl) {
+				if (!eng.get(id)) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
-
-				for (const sIdx of targetIdxs) {
-					const programCh = map?.programCh?.(sIdx + 1) ?? 1
-					const previewCh = map?.previewCh?.(sIdx + 1) ?? 2
-					// Strip look stacks (1–99, 110–199) so timeline output (200+) is not covered by look/CG layers.
-					await clearSceneProgramLookStackLayers(ctx.amcp, programCh, ctx)
-					await clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx)
-					await ctx.amcp.mixerCommit(programCh)
-					await ctx.amcp.mixerCommit(previewCh)
-					liveSceneState.clearChannel(programCh)
+				try {
+					const result = await runTimelineDirectTake(ctx, eng, id, b)
+					return { status: 200, headers: JSON_HEADERS, body: jsonBody(result) }
+				} catch (err) {
+					return {
+						status: 500,
+						headers: JSON_HEADERS,
+						body: jsonBody({ error: err?.message || 'Take failed' }),
+					}
 				}
-
-				const pb = eng.getPlayback(id)
-				const pos = pb?.position ?? 0
-				const screenIdx =
-					b.screenIdx === null || b.screenIdx === 'all'
-						? null
-						: Number.isFinite(Number(b.screenIdx))
-							? Number(b.screenIdx)
-							: 0
-				eng.setSendTo({ preview: false, program: true, screenIdx }, id)
-				eng.setLoop(id, !!pb?.loop)
-				eng.play(id, pos)
-				liveSceneState.broadcastSceneLive(ctx)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 			}
 			case 'pause':
 				eng.pause(id)

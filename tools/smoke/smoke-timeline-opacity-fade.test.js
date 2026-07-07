@@ -5,6 +5,7 @@ const { TimelineEngine } = require('../../src/engine/timeline-engine')
 
 function makeEngine() {
 	const mixerCalls = []
+	const batchLines = []
 	const self = {
 		config: { screen_count: 1 },
 		amcp: {
@@ -20,10 +21,13 @@ function makeEngine() {
 			},
 			mixerVolume: () => Promise.resolve(),
 			mixerCommit: () => Promise.resolve(),
-			batchSendChunked: () => Promise.resolve(),
+			batchSendChunked: (lines) => {
+				for (const line of lines || []) batchLines.push(line)
+				return Promise.resolve()
+			},
 		},
 	}
-	return { eng: new TimelineEngine(self), mixerCalls }
+	return { eng: new TimelineEngine(self), mixerCalls, batchLines }
 }
 
 {
@@ -55,7 +59,7 @@ function makeEngine() {
 }
 
 {
-	const { eng, mixerCalls } = makeEngine()
+	const { eng, batchLines } = makeEngine()
 	const clip = {
 		id: 'c1',
 		startTime: 0,
@@ -73,14 +77,13 @@ function makeEngine() {
 		layers: [{ id: 'l1', name: 'Layer 1', clips: [clip] }],
 	})
 	eng._airTimelineId = tl.id
-	eng._applyClipMixer(1, 201, clip, 0, { force: true, playing: false, fps: 25 })
-	const opacityCalls = mixerCalls.filter((c) => c.layer === 201)
-	assert.ok(opacityCalls.length >= 2, 'fade-in schedules start + tween before play')
-	assert.strictEqual(opacityCalls[0].opacity, 0)
-	assert.strictEqual(opacityCalls[0].duration, 0)
-	assert.strictEqual(opacityCalls[1].opacity, 1)
-	assert.strictEqual(opacityCalls[1].duration, 13)
-	assert.strictEqual(opacityCalls[1].tween, 'linear')
+	// scheduleLeadTween = take entry (WO-139): the lead opacity segment is batched as
+	// instant start + DEFER tween, fired by the take orchestrator's single MIXER COMMIT.
+	eng._applyClipMixer(1, 201, clip, 0, { force: true, playing: false, fps: 25, scheduleLeadTween: true })
+	const opacityLines = batchLines.filter((l) => l.includes(' OPACITY '))
+	assert.ok(opacityLines.length >= 2, 'fade-in schedules start + DEFER tween')
+	assert.match(opacityLines[0], /OPACITY 0 0/)
+	assert.match(opacityLines[1], /OPACITY 1 13 linear DEFER/)
 }
 
 console.log('smoke-timeline-opacity-fade: OK')
