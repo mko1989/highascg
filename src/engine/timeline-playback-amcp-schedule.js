@@ -144,7 +144,9 @@ module.exports = {
 		}
 
 		sent =
-			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps) || sent
+			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps, {
+				scheduleLeadTween: !!opts.scheduleLeadTween,
+			}) || sent
 		const volDef = clip.volume != null ? clip.volume : 1
 		const volVal = clip.muted ? 0 : this._interpProp(clip, 'volume', localMs, volDef)
 		sent =
@@ -177,7 +179,10 @@ module.exports = {
 
 	/**
 	 * Opacity/volume keyframes: one tweened MIXER per segment while playing.
-	 * @param {{ isVolume?: boolean }} extra
+	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean }} extra — scheduleLeadTween:
+	 *   take entry (WO-139): batch the current opacity segment as instant-start + DEFER tween so
+	 *   the clip fade-in fires on the take orchestrator's single MIXER COMMIT (frame-locked with
+	 *   the look crossfade) instead of an instant value that ticks animate later.
 	 */
 	_applyKeyedMixerProp(ch, layer, clip, prop, localMs, holdValue, playing, force, fps, extra = {}) {
 		const self = this.self
@@ -189,6 +194,32 @@ module.exports = {
 		const kSeg = `${ch}-${layer}-${prop}-seg`
 		const prevSeg = this._lastKfSegment.get(kSeg)
 		const inSpan = playing && times.length >= 2 && segIdx >= 0 && segIdx < times.length - 1
+
+		if (
+			extra.scheduleLeadTween &&
+			!extra.isVolume &&
+			force &&
+			times.length >= 2 &&
+			segIdx >= 0 &&
+			segIdx < times.length - 1
+		) {
+			const t0 = times[segIdx]
+			const t1 = times[segIdx + 1]
+			const startVal = this._interpProp(clip, prop, localMs, holdValue)
+			const endVal = this._interpProp(clip, prop, t1, holdValue)
+			const dur = msToMixerFrames(Math.max(1, t1 - Math.max(t0, localMs)), fps)
+			const tween = mapKeyframeTween(easingAtTime(clip, prop, t1))
+			const cl = `${ch}-${layer}`
+			self.amcp
+				.batchSendChunked(
+					[`MIXER ${cl} OPACITY ${startVal} 0`, `MIXER ${cl} OPACITY ${endVal} ${dur} ${tween} DEFER`],
+					{ skipMixerPreCommit: true },
+				)
+				.catch(() => {})
+			this._lastKfSegment.set(kSeg, segIdx)
+			this._lastKfValues.set(`${ch}-${layer}-${prop}`, endVal)
+			return true
+		}
 
 		const segChanged = inSpan && prevSeg !== segIdx
 

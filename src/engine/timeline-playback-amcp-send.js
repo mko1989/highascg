@@ -85,8 +85,8 @@ module.exports = {
 	 * @param {number} ms position
 	 * @param {boolean} force scrub / explicit seek — sends PLAY|LOAD|SEEK for active clips
 	 */
-	_applyAt(id, ms, force) {
-		this._syncAmcpLayers(id, ms, { force: !!force })
+	_applyAt(id, ms, force, opts) {
+		this._syncAmcpLayers(id, ms, { force: !!force, take: !!opts?.take })
 	},
 
 	/**
@@ -100,13 +100,16 @@ module.exports = {
 	/**
 	 * @param {string} id
 	 * @param {number} ms
-	 * @param {{ force?: boolean }} opts
+	 * @param {{ force?: boolean, take?: boolean }} opts — take: program take entry; lead
+	 *   opacity keyframe segments are batched as DEFER tweens and the MIXER COMMIT is left
+	 *   to the take orchestrator so clip fades fire frame-locked with the take crossfade (WO-139).
 	 */
 	_syncAmcpLayers(id, ms, opts) {
 		const tl = this.timelines.get(id)
 		const self = this.self
 		if (!tl || !self?.amcp) return
 		const force = !!opts.force
+		const take = !!opts.take
 		const channels = this._channels()
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
@@ -181,6 +184,7 @@ module.exports = {
 							force,
 							playing,
 							fps: Math.max(1, tl.fps || 25),
+							scheduleLeadTween: take,
 						})
 					) {
 						mixerDirty.add(ch)
@@ -200,10 +204,12 @@ module.exports = {
 			}
 		}
 
-		for (const ch of mixerDirty) {
-			self.amcp.mixerCommit(ch).catch(_err => {
-				this._logDebug(`MIXER COMMIT ${ch} failed: ${_err.message}`)
-			})
+		if (!take) {
+			for (const ch of mixerDirty) {
+				self.amcp.mixerCommit(ch).catch(_err => {
+					this._logDebug(`MIXER COMMIT ${ch} failed: ${_err.message}`)
+				})
+			}
 		}
 	},
 

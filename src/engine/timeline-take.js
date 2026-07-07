@@ -79,6 +79,31 @@ function collectTimelinePhysicalLayers(tl) {
 }
 
 /**
+ * Physical layers whose active clip at `pos` still has an opacity keyframe segment ahead —
+ * the clip's own fade animates MIXER OPACITY there, so the layer-level take fade must skip them.
+ * @param {import('./timeline-engine').TimelineEngine} eng
+ * @param {object} tl timeline model
+ * @param {number} pos playhead ms
+ * @returns {Set<number>}
+ */
+function collectClipOpacityFadeLayers(eng, tl, pos) {
+	const set = new Set()
+	if (!tl?.layers?.length) return set
+	for (let i = 0; i < tl.layers.length; i++) {
+		const clip = typeof eng?._clipAt === 'function' ? eng._clipAt(tl.layers[i], pos) : null
+		if (!clip) continue
+		const times = (clip.keyframes || [])
+			.filter((k) => k.property === 'opacity')
+			.map((k) => k.time)
+			.sort((a, b) => a - b)
+		if (times.length >= 2 && pos - clip.startTime < times[times.length - 1]) {
+			set.add(TIMELINE_LAYER_BASE + i)
+		}
+	}
+	return set
+}
+
+/**
  * @param {object} ctx
  * @param {import('./timeline-engine').TimelineEngine} eng
  * @param {string} tlId
@@ -124,28 +149,55 @@ async function runTimelineDirectTake(ctx, eng, tlId, body) {
 	eng._lastKfValues.clear()
 	eng._lastKfSegment.clear()
 
-	// Timeline on PGM first (clip opacity keyframes); looks fade underneath on lower layers.
+	const tlPhysicalLayers = collectTimelinePhysicalLayers(tl)
+	// Layers whose active clip animates its own opacity via keyframes: the clip's scheduled
+	// lead tween owns MIXER OPACITY there — the layer-level take fade must not overwrite it.
+	const clipFadeLayers = collectClipOpacityFadeLayers(eng, tl, pos)
+
+	// Preset opacity BEFORE PLAY so new content cannot flash full-bright for one AMCP
+	// round-trip (WO-139 flash race). MIX: start at 0 and fade in. CUT: force 1 so a stale
+	// 0 left by an earlier fade-out cannot make the take invisible.
+	const presetOpacity = forceCut ? 1 : 0
+	for (const sIdx of targetIdxs) {
+		const programCh = map?.programCh?.(sIdx + 1) ?? 1
+		const lines = tlPhysicalLayers.map((L) => `MIXER ${programCh}-${L} OPACITY ${presetOpacity} 0`)
+		if (lines.length) await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
+	}
+
+	// Timeline on PGM first; clip lead-opacity tweens are batched DEFERred (not committed yet).
 	await eng.playForTake(tlId, pos)
 
 	const fadeWaits = []
-	const tlPhysicalLayers = collectTimelinePhysicalLayers(tl)
 	for (const sIdx of targetIdxs) {
 		const programCh = map?.programCh?.(sIdx + 1) ?? 1
 		const fr = Math.max(1, resolveChannelFramerateForMixerTween(ctx, programCh, fps))
 
-		if (!forceCut) {
-			// Fade in timeline layers
-			if (tlPhysicalLayers.length) {
-				await fadePhysicalLayersIn(amcp, programCh, tlPhysicalLayers, globalT.duration, globalT.tween)
-			}
-			// Fade out look layers
-			const lookLayers = collectOccupiedLookLayersOnChannel(ctx, programCh)
-			if (lookLayers.length) {
-				await fadePhysicalLayersOut(amcp, programCh, lookLayers, globalT.duration, globalT.tween)
-			}
-			if (tlPhysicalLayers.length || lookLayers.length) {
-				fadeWaits.push(waitMs((globalT.duration / fr) * 1000))
-			}
+		if (forceCut) {
+			// Fire the clip lead tweens scheduled by playForTake (no layer crossfade on CUT).
+			await amcp.mixerCommit(programCh).catch(() => {})
+			continue
+		}
+
+		// One batch + one COMMIT per channel: timeline fade-in and look fade-out start on the
+		// same frame, together with the clip lead tweens scheduled by playForTake (WO-139).
+		const lines = []
+		for (const L of tlPhysicalLayers) {
+			if (clipFadeLayers.has(L)) continue
+			let p = `1 ${globalT.duration}`
+			if (globalT.tween) p += ` ${param(globalT.tween)}`
+			lines.push(`MIXER ${programCh}-${L} OPACITY ${p} DEFER`)
+		}
+		const lookLayers = collectOccupiedLookLayersOnChannel(ctx, programCh)
+		for (const L of lookLayers) {
+			let p = `0 ${globalT.duration}`
+			if (globalT.tween) p += ` ${param(globalT.tween)}`
+			lines.push(`MIXER ${programCh}-${L} OPACITY ${p} DEFER`)
+		}
+		if (lines.length) await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
+		if (lines.length || clipFadeLayers.size) {
+			await amcp.mixerCommit(programCh)
+			// 3-frame margin so Node timer jitter cannot tear down a layer mid-tween.
+			fadeWaits.push(waitMs(((globalT.duration + 3) / fr) * 1000))
 		}
 	}
 

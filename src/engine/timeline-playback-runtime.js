@@ -109,7 +109,10 @@ module.exports = {
 		setCellPosition(cell, pos)
 		cell.playing = true
 
-		this._applyAt(id, pos, true)
+		// take: clip lead-opacity segments are batched as DEFER tweens and NOT committed here —
+		// the take orchestrator (runTimelineDirectTake) issues one MIXER COMMIT per channel so
+		// clip fade-ins fire frame-locked with the look crossfade (WO-139).
+		this._applyAt(id, pos, true, { take: true })
 
 		this._lastTickPositionMs = undefined
 		this._ticker = setInterval(() => this._tick(), TICK_MS)

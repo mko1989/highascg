@@ -77,7 +77,9 @@ function makeEngine() {
 		layers: [{ id: 'l1', name: 'Layer 1', clips: [clip] }],
 	})
 	eng._airTimelineId = tl.id
-	eng._applyClipMixer(1, 201, clip, 0, { force: true, playing: false, fps: 25 })
+	// scheduleLeadTween = take entry (WO-139): the lead opacity segment is batched as
+	// instant start + DEFER tween, fired by the take orchestrator's single MIXER COMMIT.
+	eng._applyClipMixer(1, 201, clip, 0, { force: true, playing: false, fps: 25, scheduleLeadTween: true })
 	const opacityLines = batchLines.filter((l) => l.includes(' OPACITY '))
 	assert.ok(opacityLines.length >= 2, 'fade-in schedules start + DEFER tween')
 	assert.match(opacityLines[0], /OPACITY 0 0/)
