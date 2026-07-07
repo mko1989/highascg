@@ -77,13 +77,17 @@ function playAfSuffix(clip, programLayout) {
 
 /**
  * True when Caspar transport (PLAY/LOAD + AF) must be re-sent for this layer.
- * @param {{ clipId?: string, audioRoute?: string } | null | undefined} prev
+ * @param {{ clipId?: string, src?: string, audioRoute?: string, loopAlways?: boolean, isRoute?: boolean } | null | undefined} prev
  * @param {object} clip
  */
 function timelineClipTransportStale(prev, clip) {
 	if (!prev || !clip) return true
 	if (prev.clipId !== clip.id) return true
+	const src = String(clip.source?.value || '')
+	if ((prev.src || '') !== src) return true
 	if ((prev.audioRoute || '1+2') !== clipAudioRoute(clip)) return true
+	if ((prev.loopAlways || false) !== !!clip.loopAlways) return true
+	if ((prev.isRoute || false) !== src.startsWith('route://')) return true
 	return false
 }
 

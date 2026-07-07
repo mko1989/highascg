@@ -20,7 +20,7 @@ const timelineSendToUrl = pathToFileURL(
 const { isPreviewBusAvailable, resolvePreviewAmcpChannel } = await import(lookStackUrl)
 const { resolveLookStackChannelForBus } = await import(lookBusUrl)
 const { coerceTimelineSendTo, defaultTimelineSendTo, previewBusAvailableForSendTo } = await import(
-	timelineSendToUrl,
+	timelineSendToUrl
 )
 
 const pgmOnlyMap = {

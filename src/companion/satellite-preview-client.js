@@ -127,6 +127,22 @@ class SatellitePreviewClient extends EventEmitter {
 	}
 
 	/**
+	 * Emulate a button press via the Satellite API.
+	 * @param {number} page
+	 * @param {number} row
+	 * @param {number} column
+	 */
+	pressButton(page, row, column) {
+		if (!this._connected) return
+		this._send(formatSatelliteLine('KEY-STATE', { LOCATION: `${page}/${row}/${column}`, PRESSED: '1' }))
+		setTimeout(() => {
+			if (this._connected) {
+				this._send(formatSatelliteLine('KEY-STATE', { LOCATION: `${page}/${row}/${column}`, PRESSED: '0' }))
+			}
+		}, 20)
+	}
+
+	/**
 	 * @param {object} config
 	 * @param {string} sessionId
 	 * @param {number} page

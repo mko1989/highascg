@@ -10,6 +10,7 @@ const {
 	multiviewPhysicalPortIndex,
 } = require('../utils/x-display-session')
 const { getModeDimensions } = require('../config/config-modes')
+const { readCefDebugPortFromCasparXml } = require('./cef-interactive-cdp')
 
 function envDisabled() {
 	const v = String(process.env.HIGHASCG_CEF_INTERACTIVE_BRIDGE || '').trim().toLowerCase()

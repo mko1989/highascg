@@ -219,6 +219,8 @@ routes.get('/api/host-live/operator-fullscreen', ({ path, ctx }) => routesHostLi
 routes.get('/api/host-live/migration', ({ path, ctx }) => routesHostLive.handleGet(path, ctx), { requireCaspar: false })
 routes.post('/api/host-live/operator-fullscreen', ({ body, ctx }) => routesHostLive.handlePost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/webpage', ({ body, ctx }) => routesHostLive.handleWebpagePost(body, ctx), { requireCaspar: true })
+routes.post('/api/host-live/ndi', ({ body, ctx }) => routesHostLive.handleNdiPost(body, ctx), { requireCaspar: true })
+routes.post('/api/host-live/decklink', ({ body, ctx }) => routesHostLive.handleDecklinkPost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/migration', ({ body, ctx }) => routesHostLive.handlePost(body, ctx), { requireCaspar: false })
 
 routes.get('/api/cef-interactive/targets', ({ path, ctx }) => routesCefInteractive.handleGet(path, ctx), { requireCaspar: false })
@@ -275,7 +277,7 @@ routes.post('/api/project/rename', ({ path, body, ctx }) => routesData.handlePro
 routes.get('/api/project/list', ({ ctx }) => routesData.handleProjectList(ctx), { requireCaspar: false })
 routes.get('/api/project', ({ ctx }) => routesData.handleProjectGet(ctx), { requireCaspar: false })
 routes.get('/api/project/file/*', ({ path }) => routesData.handleProjectFile(path), { requireCaspar: false }) // It handles wildcard itself
-routes.delete('/api/project/*', ({ path }) => routesData.handleProjectDelete(path), { requireCaspar: false })
+routes.delete('/api/project/*', ({ path, ctx }) => routesData.handleProjectDelete(ctx, path), { requireCaspar: false })
 routes.get('/api/project/*', ({ path, query, ctx }) => routesProject.handleGet(path, query, ctx), { requireCaspar: false })
 routes.post('/api/project/*', ({ path, body, ctx }) => routesProject.handlePost(path, body, ctx), { requireCaspar: false })
 

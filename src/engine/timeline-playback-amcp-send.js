@@ -6,10 +6,25 @@ const {
 	playAfSuffix,
 	timelineClipTransportStale,
 	TIMELINE_LAYER_BASE,
+	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
 const { clipTransportMeta } = require('./timeline-playback-amcp-schedule')
 
 module.exports = {
+	_logDebug(msg) {
+		if (typeof this.self?.log === 'function') {
+			this.self.log('debug', `[Timeline] ${msg}`)
+		}
+	},
+
+	_validateClipStateForResume(prev, clip, meta) {
+		if (!prev?.clipId || prev.clipId !== clip.id) return false
+		if (prev.isRoute !== String(clip.source?.value || '').startsWith('route://')) return false
+		if (prev.loopAlways !== !!clip.loopAlways) return false
+		if (prev.frame !== meta.frame) return false
+		return true
+	},
+
 	_canResumePlayback(id) {
 		if (this._airTimelineId !== id) return false
 		const cell = this._pbFor(id)
@@ -22,9 +37,15 @@ module.exports = {
 			const clip = this._clipAt(tl.layers[li], ms)
 			if (!clip) continue
 			for (const ch of channels) {
-				const key = `${ch}-${this._caspLayer(ch, li)}`
+				const caspLayer = this._caspLayer(ch, li)
+				const key = `${ch}-${caspLayer}`
 				const prev = this._prevKey.get(key)
-				if (!prev?.clipId || prev.clipId !== clip.id) return false
+				const meta = clipTransportMeta(clip, ms, tl, this.self, {
+					atEntry: false,
+					channel: ch,
+					physicalLayer: caspLayer,
+				})
+				if (!this._validateClipStateForResume(prev, clip, meta)) return false
 			}
 		}
 		return true
@@ -64,8 +85,8 @@ module.exports = {
 	 * @param {number} ms position
 	 * @param {boolean} force scrub / explicit seek — sends PLAY|LOAD|SEEK for active clips
 	 */
-	_applyAt(id, ms, force) {
-		this._syncAmcpLayers(id, ms, { force: !!force })
+	_applyAt(id, ms, force, opts) {
+		this._syncAmcpLayers(id, ms, { force: !!force, take: !!opts?.take })
 	},
 
 	/**
@@ -79,13 +100,16 @@ module.exports = {
 	/**
 	 * @param {string} id
 	 * @param {number} ms
-	 * @param {{ force?: boolean }} opts
+	 * @param {{ force?: boolean, take?: boolean }} opts — take: program take entry; lead
+	 *   opacity keyframe segments are batched as DEFER tweens and the MIXER COMMIT is left
+	 *   to the take orchestrator so clip fades fire frame-locked with the take crossfade (WO-139).
 	 */
 	_syncAmcpLayers(id, ms, opts) {
 		const tl = this.timelines.get(id)
 		const self = this.self
 		if (!tl || !self?.amcp) return
 		const force = !!opts.force
+		const take = !!opts.take
 		const channels = this._channels()
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
@@ -125,7 +149,9 @@ module.exports = {
 						this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
 						transportSent = true
 					} else if (needsPausedSeek) {
-						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(() => {})
+						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+							this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} failed: ${_err.message}`)
+						})
 						transportSent = true
 					} else if (needsPlayingScrub) {
 						this._sendClipTransport(ch, caspLayer, clip, meta, { playing: true, startTransport: true })
@@ -144,24 +170,29 @@ module.exports = {
 					if (transportSent || transportStale || !prev) {
 						this._prevKey.set(key, {
 							clipId: clip.id,
+							src: String(clip.source?.value || ''),
 							audioRoute: clipAudioRoute(clip),
+							loopAlways: !!clip.loopAlways,
+							isRoute: meta.isRoute,
 							frame: transportSent ? meta.frame : (prev?.frame ?? meta.frame),
 						})
 					} else if (playing && !force && prev?.clipId === clip.id) {
 						this._prevKey.set(key, { ...prev, frame: meta.frame })
 					}
-
 					if (
 						this._applyClipMixer(ch, caspLayer, clip, ms - clip.startTime, {
 							force,
 							playing,
 							fps: Math.max(1, tl.fps || 25),
+							scheduleLeadTween: take,
 						})
 					) {
 						mixerDirty.add(ch)
 					}
 				} else if (prev?.clipId) {
-					self.amcp.stop(ch, caspLayer).catch(() => {})
+				self.amcp.stop(ch, caspLayer).catch(_err => {
+					_logDebug(self, `STOP ${ch}-${caspLayer} failed: ${_err.message}`)
+				})
 					this._prevKey.set(key, null)
 					for (const pk of this._lastKfValues.keys()) {
 						if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
@@ -173,8 +204,12 @@ module.exports = {
 			}
 		}
 
-		for (const ch of mixerDirty) {
-			self.amcp.mixerCommit(ch).catch(() => {})
+		if (!take) {
+			for (const ch of mixerDirty) {
+				self.amcp.mixerCommit(ch).catch(_err => {
+					this._logDebug(`MIXER COMMIT ${ch} failed: ${_err.message}`)
+				})
+			}
 		}
 	},
 
@@ -195,10 +230,12 @@ module.exports = {
 			const afSuffix = playAfSuffix(clip, layout)
 			const cl = `${ch}-${caspLayer}`
 			const cmd = `PLAY ${cl} ${meta.srcQ} LOOP${afSuffix}`
-			self.amcp
-				.stop(ch, caspLayer)
-				.catch(() => {})
-				.then(() => self.amcp.raw(cmd).catch(() => {}))
+			self.amcp.stop(ch, caspLayer).catch(_err => {
+				this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
+			})
+			self.amcp.raw(cmd).catch(_err => {
+				this._logDebug(`PLAY ${cl} LOOP failed: ${_err.message}`)
+			})
 			return
 		}
 		if (!startTransport) return
@@ -207,36 +244,54 @@ module.exports = {
 		const afSuffix = playAfSuffix(clip, layout)
 		const cl = `${ch}-${caspLayer}`
 
-		const runTransport = () => {
-			if (meta.isRoute) {
-				self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${afSuffix}`).catch(() => {})
-			} else if (playing || meta.loopClip) {
-				const loopStr = meta.loopClip || meta.implicitLoop ? ' LOOP' : ''
-				self.amcp
-					.raw(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`)
-					.catch(() => {})
-			} else if (afSuffix) {
-				self.amcp
-					.raw(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`)
-					.catch(() => {})
-					.then(() => {
-						if (!playing) self.amcp.pause(ch, caspLayer).catch(() => {})
-					})
-			} else {
-				self.amcp.raw(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`).catch(() => {})
+		self.amcp.stop(ch, caspLayer).catch(_err => {
+			this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
+		})
+
+		// Prevent split-second flash: initialize opacity BEFORE PLAY if clip has opacity keyframes
+		let initialOpacity = 1
+		const opacityKfs = (clip.keyframes || [])
+			.filter((k) => k.property === 'opacity')
+			.sort((a, b) => a.time - b.time)
+		if (opacityKfs.length > 0) {
+			const firstKf = opacityKfs[0]
+			if (firstKf.time <= 2) {
+				initialOpacity = Number.isFinite(firstKf.value) ? firstKf.value : 1
 			}
 		}
+		if (initialOpacity < 1) {
+			self.amcp.raw(`MIXER ${cl} OPACITY ${initialOpacity} 0`).catch(_err => {
+				this._logDebug(`MIXER OPACITY ${cl} failed: ${_err.message}`)
+			})
+		}
 
-		self.amcp
-			.stop(ch, caspLayer)
-			.catch(() => {})
-			.then(() => runTransport())
+		if (meta.isRoute) {
+			self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${afSuffix}`).catch(_err => {
+				this._logDebug(`PLAY ${cl} (route) failed: ${_err.message}`)
+			})
+		} else if (playing || meta.loopClip) {
+			const loopStr = meta.loopClip || meta.implicitLoop ? ' LOOP' : ''
+			self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`).catch(_err => {
+				this._logDebug(`PLAY ${cl} (loop) failed: ${_err.message}`)
+			})
+		} else if (afSuffix) {
+			self.amcp.raw(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`).catch(_err => {
+				this._logDebug(`PLAY ${cl} (AF) failed: ${_err.message}`)
+			})
+			self.amcp.pause(ch, caspLayer).catch(_err => {
+				this._logDebug(`PAUSE ${ch}-${caspLayer} failed: ${_err.message}`)
+			})
+		} else {
+			self.amcp.raw(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`).catch(_err => {
+				this._logDebug(`LOAD ${cl} failed: ${_err.message}`)
+			})
+		}
 	},
 
 	_channelsFor(sendTo) {
-		const st = sendTo || {}
-		const previewOn = st.preview !== false
-		const programOn = st.program !== false
+		const st = normalizeTimelineSendTo(sendTo)
+		const previewOn = st.preview
+		const programOn = st.program
 		let map = null
 		try {
 			map = this.self?.config ? getChannelMap(this.self.config) : null
@@ -284,7 +339,9 @@ module.exports = {
 				const clip = this._clipAt(tl.layers[li], ms)
 				if (clip?.loopAlways) continue
 			}
-			self.amcp.pause(ch, caspLayer).catch(() => {})
+			self.amcp.pause(ch, caspLayer).catch(_err => {
+				this._logDebug(`PAUSE ${ch}-${caspLayer} failed: ${_err.message}`)
+			})
 		}
 	},
 
@@ -303,7 +360,9 @@ module.exports = {
 				const clip = this._clipAt(tl.layers[li], ms)
 				if (clip?.loopAlways) continue
 			}
-			self.amcp.resume(ch, caspLayer).catch(() => {})
+			self.amcp.resume(ch, caspLayer).catch(_err => {
+				this._logDebug(`RESUME ${ch}-${caspLayer} failed: ${_err.message}`)
+			})
 		}
 	},
 
@@ -313,7 +372,10 @@ module.exports = {
 		const channels = channelsOverride ?? this._channels()
 		for (let li = 0; li < tl.layers.length; li++) {
 			for (const ch of channels) {
-				self.amcp.stop(ch, this._caspLayer(ch, li)).catch(() => {})
+				const caspLayer = this._caspLayer(ch, li)
+				self.amcp.stop(ch, caspLayer).catch(_err => {
+					this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
+				})
 			}
 		}
 		this._lastKfValues.clear()

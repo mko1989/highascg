@@ -6,7 +6,8 @@ const fs = require('fs')
 const path = require('path')
 
 test('applyX11Layout source has no undefined xcmd / xrandrParts regressions', () => {
-	const src = fs.readFileSync(path.join(__dirname, '../../src/utils/os-config.js'), 'utf8')
+	// applyX11Layout moved from os-config.js to os-config-xrandr-apply.js (WO-122 split).
+	const src = fs.readFileSync(path.join(__dirname, '../../src/utils/os-config-xrandr-apply.js'), 'utf8')
 	assert.doesNotMatch(src, /\bxcmd\b/)
 	assert.doesNotMatch(src, /\bxrandrParts\b/)
 	assert.match(src, /!live && xrandrCommand/)

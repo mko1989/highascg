@@ -110,7 +110,7 @@ module.exports = {
 			const dur = msToMixerFrames(spanMs, fps)
 			const tween = mapKeyframeTween(fillTweenForSegmentEnd(clip, t1))
 			self.amcp.mixerFill(ch, layer, start.fx, start.fy, start.sx, start.sy, 0).catch(() => {})
-			self.amcp.mixerFill(ch, layer, end.fx, end.fy, end.sx, end.sy, dur, tween).catch(() => {})
+			self.amcp.mixerFill(ch, layer, end.fx, end.fy, end.sx, end.sy, dur, tween, true).catch(() => {})
 			this._lastKfSegment.set(kFillSeg, fillSegIdx)
 			this._lastKfValues.set(kFill, fillKey(end))
 			sent = true
@@ -144,7 +144,9 @@ module.exports = {
 		}
 
 		sent =
-			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps) || sent
+			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps, {
+				scheduleLeadTween: !!opts.scheduleLeadTween,
+			}) || sent
 		const volDef = clip.volume != null ? clip.volume : 1
 		const volVal = clip.muted ? 0 : this._interpProp(clip, 'volume', localMs, volDef)
 		sent =
@@ -168,7 +170,7 @@ module.exports = {
 				}
 			}
 			if (lines.length > 0) {
-				self.amcp.batchSendChunked(lines).catch(() => {})
+				for (const l of lines) self.amcp.raw(l).catch(() => {})
 				sent = true
 			}
 		}
@@ -177,7 +179,10 @@ module.exports = {
 
 	/**
 	 * Opacity/volume keyframes: one tweened MIXER per segment while playing.
-	 * @param {{ isVolume?: boolean }} extra
+	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean }} extra — scheduleLeadTween:
+	 *   take entry (WO-139): batch the current opacity segment as instant-start + DEFER tween so
+	 *   the clip fade-in fires on the take orchestrator's single MIXER COMMIT (frame-locked with
+	 *   the look crossfade) instead of an instant value that ticks animate later.
 	 */
 	_applyKeyedMixerProp(ch, layer, clip, prop, localMs, holdValue, playing, force, fps, extra = {}) {
 		const self = this.self
@@ -190,6 +195,32 @@ module.exports = {
 		const prevSeg = this._lastKfSegment.get(kSeg)
 		const inSpan = playing && times.length >= 2 && segIdx >= 0 && segIdx < times.length - 1
 
+		if (
+			extra.scheduleLeadTween &&
+			!extra.isVolume &&
+			force &&
+			times.length >= 2 &&
+			segIdx >= 0 &&
+			segIdx < times.length - 1
+		) {
+			const t0 = times[segIdx]
+			const t1 = times[segIdx + 1]
+			const startVal = this._interpProp(clip, prop, localMs, holdValue)
+			const endVal = this._interpProp(clip, prop, t1, holdValue)
+			const dur = msToMixerFrames(Math.max(1, t1 - Math.max(t0, localMs)), fps)
+			const tween = mapKeyframeTween(easingAtTime(clip, prop, t1))
+			const cl = `${ch}-${layer}`
+			self.amcp
+				.batchSendChunked(
+					[`MIXER ${cl} OPACITY ${startVal} 0`, `MIXER ${cl} OPACITY ${endVal} ${dur} ${tween} DEFER`],
+					{ skipMixerPreCommit: true },
+				)
+				.catch(() => {})
+			this._lastKfSegment.set(kSeg, segIdx)
+			this._lastKfValues.set(`${ch}-${layer}-${prop}`, endVal)
+			return true
+		}
+
 		const segChanged = inSpan && prevSeg !== segIdx
 
 		if (segChanged) {
@@ -201,10 +232,10 @@ module.exports = {
 			const tween = mapKeyframeTween(easingAtTime(clip, prop, t1))
 			if (extra.isVolume) {
 				self.amcp.mixerVolume(ch, layer, startVal, 0).catch(() => {})
-				self.amcp.mixerVolume(ch, layer, endVal, dur, tween).catch(() => {})
+				self.amcp.mixerVolume(ch, layer, endVal, dur, tween, true).catch(() => {})
 			} else {
 				self.amcp.mixerOpacity(ch, layer, startVal, 0).catch(() => {})
-				self.amcp.mixerOpacity(ch, layer, endVal, dur, tween).catch(() => {})
+				self.amcp.mixerOpacity(ch, layer, endVal, dur, tween, true).catch(() => {})
 			}
 			this._lastKfSegment.set(kSeg, segIdx)
 			this._lastKfValues.set(`${ch}-${layer}-${prop}`, endVal)

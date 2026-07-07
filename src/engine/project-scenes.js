@@ -1,13 +1,24 @@
 'use strict'
 
-const fs = require('fs')
-const path = require('path')
-
-const { REPO_ROOT } = require('../repo-paths')
 const projectStore = require('./project-store')
 const { ensureProjectMediaDir, normalizeProjectMediaRefs } = require('../media/project-media-root')
 const { pushProjectSlugToVolumes } = require('./project-volume-sync')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
+const {
+	loadFullProject,
+	loadProjectForSlug,
+	pickNewerFullProject,
+	projectSceneCount,
+	loadProjectScenes,
+	enrichProjectScenesFromLiveDeck,
+} = require('./project-scenes-load')
+const {
+	extractSceneDeckFromProjectScenes,
+	buildSceneDeckForApi,
+	resolveSceneById,
+	applyLiveSceneDeckToCtx,
+	sceneIdSet,
+} = require('./project-scenes-transform')
 
 /** Debounce disk writes from WebSocket `scene_deck_sync` (default 750ms). */
 const SCENE_DECK_SYNC_DEBOUNCE_MS = Math.max(
@@ -40,306 +51,6 @@ function scheduleDeckSyncPersist(ctx, project) {
 	if (_deckSyncPersistTimer) clearTimeout(_deckSyncPersistTimer)
 	_deckSyncPersistTimer = setTimeout(flushDeckSyncPersist, SCENE_DECK_SYNC_DEBOUNCE_MS)
 	if (_deckSyncPersistTimer.unref) _deckSyncPersistTimer.unref()
-}
-
-/**
- * Load one project slug from disk.
- * @param {string} slug
- * @param {{ mergeAutosave?: boolean }} [opts] — when true, merge `_autosave/<slug>.json` via `pickNewerFullProject`
- * @returns {object | null}
- */
-function loadProjectForSlug(slug, opts = {}) {
-	const s = String(slug || '').trim()
-	if (!s) return null
-	const fromFile = projectStore.readProjectFile(s)
-	if (!opts.mergeAutosave) return fromFile
-	const fromAutosave =
-		projectStore.readAutosaveFile(s) || projectStore.readLegacyAutosaveIfMatches(s)
-	if (fromAutosave) return pickNewerFullProject(fromFile, fromAutosave)
-	return fromFile
-}
-
-/**
- * Active project: `projects/<activeSlug>.json`, merged only with autosave for the **same** slug.
- * Other slugs on disk are left untouched when the name changes.
- * @returns {object | null}
- */
-function loadFullProject() {
-	try {
-		const persistence = require('../utils/persistence')
-		projectStore.migrateLegacySingleProject(persistence)
-		const slug = projectStore.getActiveSlug(persistence)
-		let fromFile = slug ? projectStore.readProjectFile(slug) : null
-		if (!fromFile) {
-			const project = persistence.get('web_project')
-			if (project && typeof project === 'object') {
-				console.warn(
-					'[project] loadFullProject: using deprecated web_project mirror fallback — re-save via header Save or fix projects/<slug>.json',
-				)
-				fromFile = project
-				const inferred = projectStore.projectSlugFromName(project.name)
-				if (inferred && !slug) projectStore.setActiveSlug(persistence, inferred)
-			}
-		}
-		if (!fromFile) return null
-		const activeSlug =
-			slug || projectStore.projectSlugFromName(fromFile.name) || String(fromFile.slug || '')
-		return loadProjectForSlug(activeSlug, { mergeAutosave: true }) || fromFile
-	} catch (_) {
-		return null
-	}
-}
-
-/** @param {object | null} fromPersist @param {object | null} fromAutosave */
-function projectSceneCount(project) {
-	const scenes = project?.scenes?.scenes
-	return Array.isArray(scenes) ? scenes.length : 0
-}
-
-/** Prefer non-empty looks; then newer `savedAt`. */
-function pickNewerFullProject(fromPersist, fromAutosave) {
-	if (!fromPersist) return fromAutosave || null
-	if (!fromAutosave) return fromPersist
-	const cP = projectSceneCount(fromPersist)
-	const cA = projectSceneCount(fromAutosave)
-	if (cP > 0 && cA === 0) return fromPersist
-	if (cA > 0 && cP === 0) return fromAutosave
-	const tP = Date.parse(fromPersist.savedAt || '') || 0
-	const tA = Date.parse(fromAutosave.savedAt || '') || 0
-	return tP >= tA ? fromPersist : fromAutosave
-}
-
-/**
- * `project.scenes` envelope only (looks + globalBorders + presets).
- */
-function loadProjectScenes() {
-	const project = loadFullProject()
-	if (project?.scenes && typeof project.scenes === 'object') {
-		return project.scenes
-	}
-	return null
-}
-
-/**
- * @param {object | null | undefined} envelope — `sceneState.getExportData()` shape
- */
-function extractSceneDeckFromProjectScenes(envelope) {
-	if (!envelope || typeof envelope !== 'object') return null
-	const scenes = Array.isArray(envelope.scenes) ? envelope.scenes : []
-	const looks = scenes
-		.map((s) => ({
-			id: String(s?.id != null ? s.id : ''),
-			name: String(s?.name != null ? s.name : 'Untitled look'),
-			...(s?.mainScope != null && String(s.mainScope).trim()
-				? { mainScope: String(s.mainScope) }
-				: {}),
-		}))
-		.filter((x) => x.id)
-	let previewSceneId = envelope.previewSceneId
-	if (previewSceneId == null && Array.isArray(envelope.previewSceneIdByMain)) {
-		const idx = Number(envelope.activeScreenIndex) || 0
-		previewSceneId = envelope.previewSceneIdByMain[idx] ?? null
-	}
-	return {
-		looks,
-		previewSceneId:
-			previewSceneId != null && String(previewSceneId).trim() ? String(previewSceneId).trim() : null,
-		layerPresets: Array.isArray(envelope.layerPresets) ? envelope.layerPresets : [],
-		lookPresets: Array.isArray(envelope.lookPresets) ? envelope.lookPresets : [],
-		...(scenes.length ? { sceneSnapshots: scenes } : {}),
-	}
-}
-
-/**
- * Apply live scene_deck_sync payload to in-memory ctx (before disk persist completes).
- *
- * @param {object} ctx
- * @param {{ looks?: object[], sceneSnapshots?: object[], previewSceneId?: string | null, layerPresets?: object[], lookPresets?: object[] }} data
- */
-function applyLiveSceneDeckToCtx(ctx, data) {
-	if (!ctx || !data || typeof data !== 'object') return
-	const sceneSnapshots = Array.isArray(data.sceneSnapshots)
-		? data.sceneSnapshots.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
-		: []
-	const looksRaw = Array.isArray(data.looks) ? data.looks : []
-	const looksFromSnaps = sceneSnapshots.map((s) => ({
-		id: String(s.id).trim(),
-		name: String(s.name != null ? s.name : 'Untitled look'),
-		...(s.mainScope != null && String(s.mainScope).trim()
-			? { mainScope: String(s.mainScope) }
-			: {}),
-	}))
-	const looksById = new Map()
-	for (const raw of looksRaw) {
-		if (!raw || raw.id == null) continue
-		const id = String(raw.id).trim()
-		if (!id) continue
-		looksById.set(id, raw)
-	}
-	for (const meta of looksFromSnaps) {
-		looksById.set(meta.id, { ...looksById.get(meta.id), ...meta })
-	}
-	const prvRaw = data.previewSceneId
-	const previewSceneId =
-		prvRaw != null && String(prvRaw).trim()
-			? String(prvRaw).trim()
-			: ctx.sceneDeck?.previewSceneId != null && String(ctx.sceneDeck.previewSceneId).trim()
-				? String(ctx.sceneDeck.previewSceneId).trim()
-				: null
-	ctx.sceneDeck = {
-		looks: [...looksById.values()],
-		sceneSnapshots,
-		previewSceneId,
-		layerPresets: Array.isArray(data.layerPresets)
-			? data.layerPresets
-			: ctx.sceneDeck?.layerPresets || [],
-		lookPresets: Array.isArray(data.lookPresets) ? data.lookPresets : ctx.sceneDeck?.lookPresets || [],
-	}
-}
-
-function sceneHasTakeableLayers(scene) {
-	return !!(scene && Array.isArray(scene.layers) && scene.layers.some((l) => l?.source?.value))
-}
-
-/** Fill missing layer payloads from saved project when deck sync only has id/name metadata. */
-function mergeSceneWithProjectLayers(scene, projectScene) {
-	if (!projectScene) return scene
-	if (sceneHasTakeableLayers(scene)) return scene
-	if (!sceneHasTakeableLayers(projectScene)) return scene || projectScene
-	return {
-		...projectScene,
-		...scene,
-		layers: projectScene.layers,
-		name: scene.name ?? projectScene.name,
-		mainScope: scene.mainScope ?? projectScene.mainScope,
-	}
-}
-
-function enrichDeckScenesWithProject(deckScenes, projectEnvelope) {
-	const projList = Array.isArray(projectEnvelope?.scenes) ? projectEnvelope.scenes : []
-	const byId = new Map(projList.map((s) => [String(s.id).trim(), s]))
-	return (deckScenes || []).map((s) => {
-		const id = String(s?.id ?? '').trim()
-		return mergeSceneWithProjectLayers(s, byId.get(id))
-	})
-}
-
-/**
- * Scene deck for Companion / GET /api/state.
- * Live WS-synced deck (ctx.sceneDeck) wins over on-disk project for look names.
- * @param {object} ctx
- */
-function buildSceneDeckForApi(ctx) {
-	const projectEnv = loadProjectScenes()
-	const fromProject = extractSceneDeckFromProjectScenes(projectEnv)
-	const rawDeck =
-		ctx?.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks)
-			? ctx.sceneDeck
-			: null
-	const livePreview =
-		rawDeck?.previewSceneId != null && String(rawDeck.previewSceneId).trim()
-			? String(rawDeck.previewSceneId).trim()
-			: null
-
-	if (rawDeck && Array.isArray(rawDeck.sceneSnapshots) && rawDeck.sceneSnapshots.length) {
-		const enrichedSnaps = enrichDeckScenesWithProject(rawDeck.sceneSnapshots, projectEnv)
-		const live = extractSceneDeckFromProjectScenes({
-			scenes: enrichedSnaps,
-			previewSceneId: livePreview ?? rawDeck.previewSceneId,
-			layerPresets: rawDeck.layerPresets,
-			lookPresets: rawDeck.lookPresets,
-		})
-		if (live) {
-			return {
-				...live,
-				previewSceneId: livePreview || live.previewSceneId || null,
-			}
-		}
-	}
-
-	if (rawDeck && Array.isArray(rawDeck.looks) && rawDeck.looks.length) {
-		if (fromProject) {
-			const nameById = new Map(
-				rawDeck.looks.map((l) => [String(l?.id ?? '').trim(), l]).filter(([id]) => id),
-			)
-			const scenes = enrichDeckScenesWithProject(
-				(fromProject.sceneSnapshots || []).map((s) => {
-					const meta = nameById.get(String(s?.id ?? '').trim())
-					return meta
-						? {
-								...s,
-								name: meta.name ?? s.name,
-								mainScope: meta.mainScope ?? s.mainScope,
-							}
-						: s
-				}),
-				projectEnv,
-			)
-			const live = extractSceneDeckFromProjectScenes({
-				scenes,
-				previewSceneId: livePreview ?? fromProject.previewSceneId,
-				layerPresets: rawDeck.layerPresets ?? fromProject.layerPresets,
-				lookPresets: rawDeck.lookPresets ?? fromProject.lookPresets,
-			})
-			if (live) {
-				return {
-					...live,
-					previewSceneId: livePreview || live.previewSceneId || null,
-				}
-			}
-		}
-		const live = extractSceneDeckFromProjectScenes({
-			scenes: rawDeck.looks.map((l) => ({
-				id: l.id,
-				name: l.name,
-				mainScope: l.mainScope,
-			})),
-			previewSceneId: livePreview,
-			layerPresets: rawDeck.layerPresets,
-			lookPresets: rawDeck.lookPresets,
-		})
-		if (live) {
-			return {
-				...live,
-				previewSceneId: livePreview || live.previewSceneId || null,
-			}
-		}
-	}
-
-	if (!fromProject) {
-		return {
-			looks: [],
-			previewSceneId: livePreview,
-			layerPresets: [],
-			lookPresets: [],
-		}
-	}
-	return {
-		...fromProject,
-		previewSceneId: livePreview || fromProject.previewSceneId || null,
-	}
-}
-
-/**
- * @param {string} sceneId
- * @returns {object | null}
- */
-function resolveSceneById(sceneId) {
-	if (sceneId == null || !String(sceneId).trim()) return null
-	const id = String(sceneId).trim()
-	const envelope = loadProjectScenes()
-	const scenes = Array.isArray(envelope?.scenes) ? envelope.scenes : []
-	return scenes.find((s) => s && String(s.id) === id) || null
-}
-
-/** @param {object | null | undefined} project */
-function sceneIdSet(project) {
-	const scenes = project?.scenes?.scenes
-	if (!Array.isArray(scenes)) return new Set()
-	const ids = scenes
-		.map((s) => (s?.id != null ? String(s.id).trim() : ''))
-		.filter(Boolean)
-	return new Set(ids)
 }
 
 /**
@@ -412,30 +123,6 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 		}
 	}
 	return { ok: true }
-}
-
-/**
- * Prefer live WS-synced deck scenes over a possibly stale autosave export (WO-106).
- * @param {object} project
- * @param {object} ctx
- * @returns {object}
- */
-function enrichProjectScenesFromLiveDeck(project, ctx) {
-	if (!project || typeof project !== 'object' || !ctx?.sceneDeck) return project
-	const deck = ctx.sceneDeck
-	const snaps = Array.isArray(deck.sceneSnapshots) ? deck.sceneSnapshots : null
-	if (!snaps?.length) return project
-	const envelope =
-		project.scenes && typeof project.scenes === 'object'
-			? { ...project.scenes }
-			: { scenes: [], layerPresets: [], lookPresets: [] }
-	envelope.scenes = snaps
-	if (deck.previewSceneId != null && String(deck.previewSceneId).trim()) {
-		envelope.previewSceneId = String(deck.previewSceneId).trim()
-	}
-	if (Array.isArray(deck.layerPresets)) envelope.layerPresets = deck.layerPresets
-	if (Array.isArray(deck.lookPresets)) envelope.lookPresets = deck.lookPresets
-	return { ...project, scenes: envelope }
 }
 
 /**

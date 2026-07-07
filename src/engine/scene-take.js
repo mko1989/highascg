@@ -11,6 +11,8 @@ const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = requir
 const { audioFilterParam } = require('../caspar/amcp-utils')
 const { shouldApplyStraightAlphaKeyer } = require('./scene-take-lbg-helpers')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
+const { fadePhysicalLayersIn, fadePhysicalLayersOut } = require('./timeline-take')
+const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
 
 function clipPath(layer) {
 	const v = layer.source && layer.source.value
@@ -41,6 +43,23 @@ function extFromPath(filename) {
 	const base = filename.split(/[/\\]/).pop() || ''
 	const i = base.lastIndexOf('.')
 	return i < 0 ? '' : base.slice(i + 1).toLowerCase()
+}
+
+/**
+ * Detect if incoming scene has timeline layers and return their physical layer indices.
+ * @param {object} incomingScene
+ * @returns {number[]} physical layer numbers for timeline (200+)
+ */
+function collectTimelinePhysicalLayers(incomingScene) {
+	const timelineLayers = (incomingScene?.layers || []).filter(
+		(l) => l && l.source && l.source.type === 'timeline' && l.source.value
+	)
+	if (timelineLayers.length === 0) return []
+	// Timeline always uses fixed layers starting at TIMELINE_LAYER_BASE
+	return Array.from(
+		{ length: timelineLayers.length },
+		(_, i) => TIMELINE_LAYER_BASE + i
+	)
 }
 
 /**
@@ -147,16 +166,6 @@ async function runSceneTake(amcp, opts) {
 	const shouldRunBankCrossfade =
 		outNums.length > 0 && (!isFirstTake || playbackOnActive.size > 0)
 
-	// Stop timelines that are exiting (present in current look but not in incoming)
-	if (self.timelineEngine) {
-		const pbNow = self.timelineEngine.getPlayback()
-		if (pbNow?.timelineId) {
-			const exitingTimeline = diff.exit.find((l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId)
-			if (exitingTimeline) {
-				self.timelineEngine.stop(pbNow.timelineId)
-			}
-		}
-	}
 
 	const layerBatches = []
 	for (const layer of incomingSorted) {
@@ -166,7 +175,10 @@ async function runSceneTake(amcp, opts) {
 				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
 				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx }, tlId)
 				self.timelineEngine.setLoop(tlId, !!layer.loop)
-				self.timelineEngine.play(tlId, 0)
+				// Respect current timeline position (or start at 0 if not playing)
+				const pb = self.timelineEngine.getPlayback?.(tlId)
+				const startPos = pb?.position ?? 0
+				self.timelineEngine.play(tlId, startPos)
 			}
 			continue
 		}
@@ -246,6 +258,11 @@ async function runSceneTake(amcp, opts) {
 		require('../media/live-thumbnail-cache').scheduleLiveThumbnailRefresh(ctx, channel, fadeDur > 0 ? Math.ceil((fadeDur / framerate) * 1000) + 600 : 600)
 	} catch (_) {}
 
+	// Detect timeline layers for potential fade transition
+	const timelinePhysicalLayers = collectTimelinePhysicalLayers(incoming)
+	const hasTimelineIncoming = timelinePhysicalLayers.length > 0
+	const shouldApplyTimelineFade = hasTimelineIncoming && !forceCut && fadeDur > 0
+
 	if (shouldRunBankCrossfade) {
 		const crossfadeLines = []
 		for (const ln of outNums) {
@@ -260,6 +277,13 @@ async function runSceneTake(amcp, opts) {
 			await amcp.batchSendChunked(crossfadeLines)
 		}
 		await amcp.mixerCommit(channel)
+
+		// Apply timeline fade-in if timeline is entering and not a hard cut
+		if (shouldApplyTimelineFade && timelinePhysicalLayers.length) {
+			const durationFrames = fadeDur
+			// Fade in timeline layers while look crossfade completes
+			await fadePhysicalLayersIn(amcp, channel, timelinePhysicalLayers, durationFrames, fadeTw)
+		}
 
 		if (fadeDur > 0) {
 			const fadeMs = (fadeDur / framerate) * 1000

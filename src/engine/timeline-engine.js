@@ -139,10 +139,9 @@ class TimelineEngine extends EventEmitter {
 	}
 
 	_clipAt(layer, ms) {
-		for (const c of layer.clips || []) {
-			if (ms >= c.startTime && ms < c.startTime + c.duration) return c
-		}
-		return null
+		const matches = (layer.clips || []).filter((c) => ms >= c.startTime && ms < c.startTime + c.duration)
+		if (!matches.length) return null
+		return matches.sort((a, b) => b.startTime - a.startTime)[0]
 	}
 
 	_emitChange() {

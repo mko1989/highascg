@@ -4,13 +4,8 @@
 
 'use strict'
 
-const fs = require('fs')
-const path = require('path')
-
 const { TEMPLATE_MAP, mergePipOverlayParamsWithDefaults } = require('./pip-overlay-utils')
 const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
-
-const REPO_ROOT = path.resolve(__dirname, '..', '..')
 
 /** Per-screen border from project (`scenes.globalBorders[screenIndex]`). */
 function readGlobalBorderSlot(screenIdx) {
@@ -108,7 +103,6 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	}
 	// Many Caspar/CEF builds reject CG UPDATE until after PLAY; some also need an initial UPDATE after PLAY
 	// (same sequence as startup-led-test-pattern and led test card routes).
-	const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))
 	lines.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${escaped}"`,
 		`CG ${cl} PLAY 0`,
@@ -123,13 +117,12 @@ function buildGlobalBorderAmcpLines(channel, layer, overlay, appCtx, opts) {
 	return lines
 }
 
-function buildGlobalBorderUpdateLines(channel, layer, overlay, opts) {
+function buildGlobalBorderUpdateLines(channel, layer, overlay, _opts) {
 	if (!overlay?.type) return []
 	const ov = _forceInside(overlay)
 	const cl = `${channel}-${layer}`
 	const data = buildGlobalBorderCgJson(ov)
 	const escaped = data.replace(/"/g, '\\"')
-	const updateDur = Math.max(0, Math.floor(Number(opts?.updateDuration) || 0))
 	// After ADD+PLAY warmed the Flash layer (`buildGlobalBorderAmcpLines`), params should move via UPDATE only —
 	// repeating PLAY each drag step spams Caspar logs and stalls CEF.
 	return [`CG ${cl} UPDATE 0 "${escaped}"`]
