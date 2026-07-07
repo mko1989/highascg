@@ -265,3 +265,12 @@ If knocking these down in order of impact:
 - **WO-79 is two documents**, not one deprecated bucket.
 - **File browser WO:** Phase A (dual-pane browser) shipped; only **Phase B cloud Share** deprecated.
 - **Leader autosave WO:** Still **in progress** — not deprecated.
+
+#### 2026-07-07 (stabilization addendum)
+
+- **Incident:** operator UI completely blocked — `ReferenceError: can't access lexical declaration before initialization` in the scenes bundle. Root cause: the WO-122 split left `getPlayback` referenced above its destructuring in `client/components/timeline-editor.js` (intra-module TDZ, minified as `C`). Three more split casualties: missing `syncSendToWithChannelMap` transport export, missing `escapeHtml` import in `sources-panel-helpers.js`, and a **server parse error** (duplicate `enrichProjectScenesFromLiveDeck` in `src/engine/project-scenes.js`). All Jul 5–7 work had been uncommitted and unverified (WO-122 §5 gates never run).
+- **Response (WO-138…142):** full-tree WIP snapshot (`wip/2026-07-07-pre-stabilize`, tag `wip-snapshot-2026-07-07`); all fixes applied; chunk hygiene (`shared` chunk leaf-only, device-view import cycle dissolved via `lib/device-view-randr-norm.js`); all gates green (repo-integrity, eslint 0 errors, test:ci, build). WO-139 shipped frame-locked look→timeline take. WO-140 finished the last WO-122 splits and corrected its record. WO-142 dependency audit analyzed (Zoom purge pending, tailscale snap duplicate flagged).
+- **History:** Jul 5–7 delta partitioned onto `main` as 6 coherent commits (`0268652`…`376de39`): server refactor / chunk fix / client refactor / host-live feature / timeline-take feature / docs. `config/*.json` runtime churn deliberately left uncommitted (live box rewrites them; consider gitignoring runtime-rewritten configs — open question). `docs/wiki-site` regenerates with embedded timestamps and churns similarly.
+- **Stash:** `stash@{0}` (2026-06-24) archived to `work/archive/stash0-local-fixes-pre-pull.patch` and dropped — both hunks superseded by `72a5246`/`ea9851f`.
+- **Backlog:** WO-143 (script reorg), WO-144 (preview defects), WO-145 (vcam stream spike), WO-146 (state monitor), WO-147 (hot-backup robustness), WO-148 (branding hardening) written and queued.
+- **Mirror:** push to backup box pending at time of writing (last successful sync 2026-06-27, rsync code 23 — vanished replication temp file; re-run with `DEPLOY_RSYNC_EXCLUDE`).

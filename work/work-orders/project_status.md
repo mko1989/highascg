@@ -38,6 +38,18 @@
 | 95 | [95_WO_EXFAT_NETWORK_CONFIG_FILE.md](./95_WO_EXFAT_NETWORK_CONFIG_FILE.md) | In progress | exFAT `network/network.conf` — operator DHCP/static IP at boot (T95.1–T95.3 shipped) |
 | 110 | [110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md](./110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md) | In progress | Looks canvas thumb fixes (T110.1/3/5–7 shipped); WO-94/95 stick network pending |
 | 121 | [121_WO_USB_WEBCAM_V4L2_INPUT.md](./121_WO_USB_WEBCAM_V4L2_INPUT.md) | In progress | USB/UVC webcam input — Phase A shipped (bridge + API + Settings tab); Device View / Live tab pending |
+| 122 | [122_WO_SPLIT_REMAINING_PRODUCTION_FILES_OVER_500.md](./122_WO_SPLIT_REMAINING_PRODUCTION_FILES_OVER_500.md) | Done (re-scoped) | File-split campaign — completed via WO-140; templates/shell installers re-scoped out, scene-state.js deferred |
+| 138 | [138_WO_STABILIZE_TREE_TDZ_CHUNK_CYCLE_AND_GATES.md](./138_WO_STABILIZE_TREE_TDZ_CHUNK_CYCLE_AND_GATES.md) | Done | 2026-07-07 stabilization — UI-blocking TDZ fixed, split regressions repaired, chunk hygiene, all gates green |
+| 139 | [139_WO_TIMELINE_TAKE_SMOOTHNESS.md](./139_WO_TIMELINE_TAKE_SMOOTHNESS.md) | Code complete | Frame-locked look→timeline take (preset, single-commit crossfade); operator PGM QA pending |
+| 140 | [140_WO_122_COMPLETION_AND_RESCOPE.md](./140_WO_122_COMPLETION_AND_RESCOPE.md) | Done | Final WO-122 splits (gpu modeline, launcher renderer) + record correction |
+| 141 | [141_WO_COMMIT_PARTITION_STASH_MIRROR_STATUS.md](./141_WO_COMMIT_PARTITION_STASH_MIRROR_STATUS.md) | In progress | Jul 5-7 work partitioned onto main (6 commits); stash resolved; mirror push pending |
+| 142 | [142_WO_SYSTEM_DEPENDENCY_AUDIT.md](./142_WO_SYSTEM_DEPENDENCY_AUDIT.md) | Analysis done | Dependency audit — Zoom purge + tailscale snap dup flagged; gaps G3/G4 → WO-143 |
+| 143 | [143_WO_SCRIPT_REORGANIZATION_IN_PLACE.md](./143_WO_SCRIPT_REORGANIZATION_IN_PLACE.md) | Planned | Script map (scripts/README.md), deprecations, eggs-wrapper consolidation, CI path guard |
+| 144 | [144_WO_COMPOSE_PREVIEW_DEFECTS.md](./144_WO_COMPOSE_PREVIEW_DEFECTS.md) | Planned | Preview ch3/ch5 ADD 400s + consumer recycle churn (visible PGM hitch) |
+| 145 | [145_WO_VCAM_STREAM_MODE_SPIKE.md](./145_WO_VCAM_STREAM_MODE_SPIKE.md) | Planned | Vcam real-motion spike: Caspar STREAM udp → ffmpeg → /dev/video10 (jpeg fallback kept) |
+| 146 | [146_WO_STATE_MONITOR_STRENGTHENING.md](./146_WO_STATE_MONITOR_STRENGTHENING.md) | Planned | Caspar health ping default-on, reconcile-diff visibility, WO-84 decision note |
+| 147 | [147_WO_HOT_BACKUP_ROBUSTNESS.md](./147_WO_HOT_BACKUP_ROBUSTNESS.md) | Planned | Single-box hardening (reconnect, parity gate, playhead correction) + two-box QA runbook |
+| 148 | [148_WO_BOOT_BRANDING_HARDENING.md](./148_WO_BOOT_BRANDING_HARDENING.md) | Planned | Branding-safe produce path enforced + Calamares slideshow branding |
 
 ## WO-33 — Device view (split)
 
