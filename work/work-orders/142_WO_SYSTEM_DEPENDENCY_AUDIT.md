@@ -1,6 +1,6 @@
 # WO-142 — System dependency audit (user-paste workflow)
 
-**Status:** Planned
+**Status:** Analysis done (2026-07-07) — awaiting owner actions: Zoom purge (G1), tailscale snap removal (G2); suite gaps G3/G4 handed to WO-143
 **Priority:** Medium
 **Date:** 2026-07-07
 **Depends on:** none — can run anytime, in parallel with everything.
@@ -43,3 +43,6 @@ Some commands need sudo → the agent prepares `work/SYSTEM_DEPENDENCY_AUDIT_202
 ## 4. Work log
 
 - 2026-07-07 — WO created.
+- 2026-07-07 — T142.1 done (template with paste slots); owner ran all 11 commands same day (T142.2).
+- 2026-07-07 — T142.3 analysis complete in `work/SYSTEM_DEPENDENCY_AUDIT_2026-07.md`: verdict table grouped by concern; every package traced to its setup step except gaps G1–G6. Notable findings: **zoom is the largest package on the box (942 MB)** — apt purge command provided (T142.4, owner to run); **tailscale installed twice** (apt daemon active + orphan snap); 3 platform snaps likely orphaned; nginx installer not in the numbered setup flow (G3 → WO-143); gh/tmux/mc/magic-wormhole/v4l2loopback-utils unprovisioned (G4 → WO-143); v4l2loopback module verified to ship inside the pinned `linux-modules` package (no dkms gap); `apt-daily-upgrade.timer` failed state confirmed intentional/benign.
+- 2026-07-07 — T142.5: G3+G4 handed to WO-143 (setup-suite additions); G5/G6 owner decisions documented in the audit file.
