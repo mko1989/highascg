@@ -20,9 +20,13 @@ Out of scope for this WO:
 - Smoke/test-only files under `tools/smoke/`.
 - Third-party, build, cache, and generated artifacts.
 
+**Re-scoped out (2026-07-07, WO-140 — owner decision):**
+- `template/lower-thirds/lt-engine.js` and `template/led_grid_test.js` — standalone CasparCG CEF templates: no bundler, different loading model (self-contained files loaded directly by the CasparCG HTML producer). Splitting them would change how the template is delivered/loaded for no runtime benefit.
+- `scripts/exfat/install-exfat-systemd-units.sh` and `scripts/lib/install-helpers.sh` — shell installers, barely over the limit; granted a ≤550-line ceiling instead of splitting into more source-able fragments.
+
 ---
 
-## 2. Remaining files to split (as of 2026-07-07)
+## 2. Remaining files to split (updated 2026-07-07 by WO-140; checker line counts)
 
 ### 2.1 Server (`src/`)
 
@@ -30,21 +34,20 @@ None remaining over 500 LOC.
 
 ### 2.2 Client (`client/`)
 
-| Lines | File |
-|------:|------|
-| 643 | `client/components/device-view-inspector-gpu-video-modeline.js` |
-| 610 | `client/tools/electron-launcher/renderer.js` |
-| 576 | `client/lib/device-view-host-channels.js` |
-| 537 | `client/lib/scene-state.js` |
+| Lines | File | Status |
+|------:|------|--------|
+| 538 | `client/lib/scene-state.js` | Deferred (see note below) |
+
+Resolved since the original scan:
+- `client/components/device-view-inspector-gpu-video-modeline.js` 644 → 457 (split by WO-140, 2026-07-07).
+- `client/tools/electron-launcher/renderer.js` 611 → 38 (split by WO-140, 2026-07-07).
+- `client/lib/device-view-host-channels.js` — stale entry (listed at 576); it was already split (now 492) before this table was corrected. Removed by WO-140 (2026-07-07).
+
+> **Deferral note (2026-07-07, WO-140):** `client/lib/scene-state.js` (538) is core operator state being touched by the concurrent WO-139 take-smoothness work; splitting it in the same window multiplies regression risk. Splitting is deferred to a follow-up batch after WO-139 lands.
 
 ### 2.3 Scripts / template
 
-| Lines | File |
-|------:|------|
-| 578 | `template/lower-thirds/lt-engine.js` |
-| 522 | `template/led_grid_test.js` |
-| 520 | `scripts/exfat/install-exfat-systemd-units.sh` |
-| 518 | `scripts/lib/install-helpers.sh` |
+Re-scoped out on 2026-07-07 by WO-140 — see §1 exclusions (standalone CEF templates; shell installers granted a ≤550 ceiling). No remaining in-scope entries.
 
 ---
 
@@ -75,7 +78,7 @@ Planned splits:
 
 Acceptance:
 - [x] Each file <= 500 LOC.
-- [x] Router behavior unchanged from caller perspective.
+- [x] Router behavior unchanged from caller perspective — originally checked from `wc -l` + editor diagnostics only (§5 pending at the time of checking); the §5 gates were subsequently run green by WO-138 on 2026-07-07 (see §5).
 
 ### Batch B — Server core/runtime internals
 
@@ -92,7 +95,7 @@ Planned splits:
 
 Acceptance:
 - [x] Each file <= 500 LOC.
-- [ ] Existing tests and runtime flows remain green.
+- [x] Existing tests and runtime flows remain green — verified by the WO-138 gate run on 2026-07-07 (see §5).
 
 Progress:
 - [x] `src/replication/replication-service.js` 546 -> 255
@@ -115,7 +118,7 @@ Planned splits:
 
 Acceptance:
 - [x] Each file <= 500 LOC.
-- [ ] Hardware/config output parity verified.
+- [ ] Hardware/config output parity verified — §5 gates ran green via WO-138 (2026-07-07), but no dedicated hardware parity check has been run on real DeckLink/GPU hardware; left open.
 
 Progress:
 - [x] `src/config/build-caspar-generator-config.js` 589 -> 494
@@ -137,7 +140,7 @@ Planned splits:
 - View rendering, actions/events, and selectors/state utilities.
 
 Acceptance:
-- [ ] Each file <= 500 LOC.
+- [ ] Each file <= 500 LOC — `client/lib/scene-state.js` (538) deferred to a follow-up batch per the §2.2 deferral note (2026-07-07, WO-140); all other Batch D targets are ≤ 500.
 - [ ] No UI regressions in scene take/edit/timeline workflows.
 
 Progress:
@@ -159,12 +162,14 @@ Planned splits:
 - Form schema/defaults, validation, API adapter, and renderer components.
 
 Acceptance:
-- [ ] Each file <= 500 LOC.
-- [ ] Device view save/apply parity maintained.
+- [x] Each file <= 500 LOC (2026-07-07, WO-140 — checker output in §6 work log).
+- [ ] Device view save/apply parity maintained — §5 pending for the WO-140 modeline split of 2026-07-07 (earlier Batch E splits covered by the WO-138 gate run, see §5).
 
 Progress:
 - [x] `client/components/device-view-inspector-decklink.js` 571 -> 68
 - [x] `client/components/device-view-destinations-inspector-form.js` 535 -> 309
+- [x] `client/components/device-view-inspector-gpu-video-modeline.js` 644 -> 457 (WO-140, 2026-07-07)
+- [x] `client/lib/device-view-host-channels.js` — already split (492); stale 576 entry removed from §2.2 (WO-140, 2026-07-07)
 
 ### Batch F — Client modal/mixer/inspector + launcher
 
@@ -178,8 +183,8 @@ Targets:
 - `client/tools/electron-launcher/renderer.js`
 
 Acceptance:
-- [ ] Each file <= 500 LOC.
-- [ ] Operator workflows remain unchanged.
+- [x] Each file <= 500 LOC (2026-07-07, WO-140 — checker output in §6 work log).
+- [ ] Operator workflows remain unchanged — §5 pending for the WO-140 launcher renderer split of 2026-07-07 (earlier Batch F splits covered by the WO-138 gate run, see §5).
 
 Progress:
 - [x] `client/components/live-input-modal.js` 577 -> 363
@@ -188,30 +193,27 @@ Progress:
 - [x] `client/components/audio-mixer-view-console.js` 539 -> 124
 - [x] `client/components/inspector-lower-third.js` 549 -> 342
 - [x] `client/components/logs-modal.js` 570 -> 419
+- [x] `client/tools/electron-launcher/renderer.js` 611 -> 38 (WO-140, 2026-07-07 — thin aggregator wiring the previously committed but unused `renderer-*.js` modules)
 
 ### Batch G — Scripts/template
 
-Targets:
+**Re-scoped out on 2026-07-07 by WO-140** — see §1 exclusions (standalone CEF templates keep their single-file loading model; the two shell installers are granted a ≤550-line ceiling instead of splitting). Batch G is closed without splits.
+
+Original targets (for the record):
 - `scripts/lib/install-helpers.sh`
 - `scripts/exfat/install-exfat-systemd-units.sh`
 - `template/led_grid_test.js`
-
-Planned splits:
-- Shell libraries split into source-able files under `scripts/lib/`.
-- Template logic split into pure helpers + runtime binding.
-
-Acceptance:
-- [ ] Each file <= 500 LOC.
-- [ ] Install and template runtime behavior unchanged.
 
 ---
 
 ## 5. Verification checklist
 
-- [ ] `node tools/ci/check-max-file-lines.js` has no violations for in-scope files.
-- [ ] `npm run lint`
-- [ ] `npm run test:ci`
-- [ ] Focused smokes for touched areas (scene/timeline/device-view/replication as applicable).
+> **Note (2026-07-07):** the batch acceptance boxes above were originally checked from `wc -l` + editor diagnostics only, before any of these gates had run. WO-138 (2026-07-07) then ran the full gates green — repo integrity OK, `npx eslint . --quiet` exit 0, `npm run test:ci` exit 0, client build OK — see the WO-138 work log ([138_WO_STABILIZE_TREE_TDZ_CHUNK_CYCLE_AND_GATES.md](./138_WO_STABILIZE_TREE_TDZ_CHUNK_CYCLE_AND_GATES.md)) for the fallout fixed en route. The WO-140 splits of 2026-07-07 (modeline, launcher renderer) landed after that gate run and were verified with targeted checks only (checker + eslint on touched files); they ride the next full gate pass.
+
+- [x] `node tools/ci/check-max-file-lines.js` has no violations for in-scope files (2026-07-07, WO-140 — output pasted in §6 work log; remaining checker hits are out of scope per §1: map/wiki, smokes, CSS/HTML, re-scoped templates and shell installers, plus the deferred `client/lib/scene-state.js` per §2.2).
+- [x] `npm run lint` — run green by WO-138, 2026-07-07 (eslint exit 0, 0 errors).
+- [x] `npm run test:ci` — run green by WO-138, 2026-07-07 (exit 0).
+- [ ] Focused smokes for touched areas (scene/timeline/device-view/replication as applicable) — partially covered by WO-138 (4/6 new smokes green; the 2 failing ones encode WO-139 target behavior); no device-view-specific smoke exists for the WO-140 modeline split.
 
 ---
 
@@ -384,3 +386,33 @@ Acceptance:
 - Validation:
 	- `get_errors` reports no diagnostics in touched lower-third inspector modules.
 	- `wc -l` confirms `client/components/inspector-lower-third.js` is now <= 500 LOC.
+
+### 2026-07-07 — WO-140: final splits, re-scope, record corrected
+
+- Split the two remaining in-scope client files (WO-140):
+	- `client/components/device-view-inspector-gpu-video-modeline.js` 644 -> 457 — extracted `device-view-inspector-gpu-video-modeline-os-settings.js` (103, settings/patch helpers) and `device-view-inspector-gpu-video-modeline-preview.js` (173, timing preview UI + mode-selection readers); public export `populateGpuVideoModelineSection` unchanged (single importer `device-view-inspector-gpu.js` untouched).
+	- `client/tools/electron-launcher/renderer.js` 611 -> 38 — rewrote as a thin CommonJS aggregator wiring the previously committed but unused `renderer-{port,nav,stick,sim,optional-modules,guides}.js` modules (launcher runs with `nodeIntegration: true`, classic `<script>` + `require()` works; `index.html` unchanged).
+- Corrected §2 tables (stale `device-view-host-channels.js` 576 entry removed — already split to 492), added the §1 re-scope exclusions and the `scene-state.js` deferral note, and reworded batch acceptance boxes that had asserted parity before §5 ran.
+- Validation — `node tools/ci/check-max-file-lines.js` after the splits (2026-07-07):
+
+```
+Files over 500 lines: 15
+  1061	client/components/map-explorer.js
+  801	client/styles/map-explorer.css
+  763	tools/smoke/smoke-config-generator-routing.js
+  703	client/styles/08c-modals-misc.css
+  676	tools/smoke/smoke-mapping-gpu-os-layout.js
+  614	client/styles/01a-base-theme-header-connection.css
+  591	tools/map/ast-scanner.js
+  579	template/lower-thirds/lt-engine.js
+  563	client/tools/electron-launcher/index.html
+  546	client/styles/06c-inspector-effects-pip.css
+  538	client/lib/scene-state.js
+  526	client/styles/02c-timeline-multiview-sources-sidebar.css
+  523	template/led_grid_test.js
+  521	scripts/exfat/install-exfat-systemd-units.sh
+  519	scripts/lib/install-helpers.sh
+```
+
+	Every remaining hit is out of scope per §1 (map/wiki, smokes, CSS/HTML, re-scoped templates and shell installers) or explicitly deferred (`client/lib/scene-state.js`, §2.2). Zero in-scope violations.
+- `npx eslint` on all touched/created JS files: 0 errors; `node --check` (module mode for client files) passes on all.
