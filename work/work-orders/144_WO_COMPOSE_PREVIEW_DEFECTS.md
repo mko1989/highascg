@@ -49,3 +49,9 @@ Key files: `src/preview/compose-preview-consumer.js`, `compose-preview-ffmpeg-jp
   - Verification (A144.1): `node --test tools/smoke/smoke-compose-preview-defects.test.js` → 6/6 pass; full compose-preview smoke set (timeline, consumer, channels, activity, client-channels, companion-thumb, ffmpeg-args, look-air + new defects) → **43/43 pass**. `node --check` + `npx eslint --quiet` clean on all touched files.
   - Pre-existing, unrelated failure noted: `smoke-compose-preview-dirty.test.js` "GET png — serves written file with ETag" fails because `resolveMediaFileOnDisk` (src/media/local-media.js, untouched here, mtime Jun 21) stem-matches `ch5.png` when asked for `ch5.jpg` and reports it as jpeg. Not caused by WO-144.
 - OPEN: A144.2 (day-of-logs grep counts after restart) and A144.3 (operator no-hitch check + blocklist UI eyeball) — exact steps written into the acceptance criteria above.
+- 2026-07-08 09:5x — **Early live evidence (service restarted 09:16 with the new code):**
+  `log/caspar_2026-07-08.log` so far: `ADD x-701` 400 errors = **0** (old code produced them
+  continuously from startup), `REMOVE x-701` = 3 (startup reconcile only; baseline 426/day),
+  legacy 98/700 REMOVEs = 0, total 400s = 1. `/api/compose-preview/stats` serves the new
+  `blocklistedChannels` / per-channel `blocklisted` fields. A144.2 stays open until a full
+  operating day confirms; A144.3 (no-hitch on config save + ch3/ch5 badge) is the operator check.
