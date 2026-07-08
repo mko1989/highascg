@@ -10,7 +10,7 @@
 
 ## 1. Bugs (owner-reported)
 
-- [ ] B150.1 **Wrong look gets on preview after transition.** After a take/transition completes, PRV shows a different look than expected. Investigate the PRV re-arm path after take (`src/engine/scene-take.js`, `scene-transition.js`, `live-scene-state` PRV bookkeeping, client `scenes-preview-*`). Define expected: PRV keeps the look that was armed before the take (or the configured next-look behavior) — confirm intent with owner before fixing.
+- [x] B150.1 **Wrong look gets on preview after transition.** *(2026-07-08 fixed — owner confirmed classic flip-flop is intended; two server-side defects in the exchange; see work log.)* After a take/transition completes, PRV shows a different look than expected. Investigate the PRV re-arm path after take (`src/engine/scene-take.js`, `scene-transition.js`, `live-scene-state` PRV bookkeeping, client `scenes-preview-*`). Define expected: PRV keeps the look that was armed before the take (or the configured next-look behavior) — confirm intent with owner before fixing.
 - [x] B150.2 **Looks editor uses wrong resolution basis:** screen is 3072×1728 but editor treats it as 1080p; self-corrects after leaving/re-entering the look editor. Smells like stale/late-arriving screen-resolution state on first entry (`getResolutionForScreen` in `client/components/scenes-editor-logic.js`, settings/screen_destinations load order). Fix = resolve resolution before first layout pass or re-layout when it arrives. *(2026-07-08 — fixed client-side; see work log.)*
 - [x] B150.3 **PGM-only channels: cannot arm a look on PRV to save a preset from PRV.** Allow choosing a look as PRV (UI arm state only — no Caspar preview route needed on PGM-only) so "save preset from PRV" works. Files: `scene-take-pgm-only.js`, scenes deck client logic, preset save path. *(2026-07-08 — fixed as client-arm-state only; engine untouched.)*
 - [x] B150.4 **Look presets cannot be removed or replaced (overwrite).** Add delete + overwrite-with-confirm to the preset UI + API/persistence (`client/lib/scene-state*` look presets, project persistence). *(2026-07-08 — remove now confirms; overwrite already confirmed; reload persistence bug fixed — see work log.)*
@@ -54,3 +54,28 @@ possible follow-up if operators still perceive an offset.
 Verification: node --check + eslint 0 on the three files; preset smoke 14/14; client build green.
 Operator QA (A150.2): arm looks on two screens → Take (and preset recall with 2-screen preset):
 both PGM outputs must start their transition together.
+
+#### 2026-07-08 — B150.1 fixed (orchestrator; owner confirmed classic flip-flop is the intent)
+
+Rig context (live API): programChannels [1,3], previewChannels [2, none] — main 1 is a real
+PGM/PRV pair, main 2 is PGM-only. The flip-flop exchange runs for main 1. Two defects in
+`src/api/routes-scene-take.js`:
+
+1. **PRV kept the incoming look for the entire transition.** The exchange was sequenced AFTER
+   `await runSceneTakeLbg(PGM)` — which includes the full fade + teardown wait — so the preview
+   showed the just-taken look for seconds before flipping. Fix: the exchange now starts
+   concurrently with the PGM take (different Caspar channel, independent AMCP); PRV flips to the
+   previous look as the transition begins.
+2. **Empty previous → PRV stuck on the just-aired look.** When there was no previous PGM look
+   (first take, or the Caspar reconcile legitimately cleared the persisted live look after a
+   Caspar restart), the exchange silently skipped and the STAGED incoming look stayed on PRV —
+   PRV showed exactly what was on air. Fix: with no previous look, the staged PRV is cleared
+   (Caspar look-stack layers + liveSceneState + broadcast) — classic flip-flop with an empty
+   "previous" means an empty preview.
+
+Verification: eslint 0, pgm-only smoke 7/7, curated test:ci green. `smoke-scene-take.js`
+standalone failure ("404 LOADBG FAILED") pre-exists this change (verified via stash) — it needs
+test media present on the box; environmental, not in the curated gate.
+Operator QA: with a look on PGM (main 1), take a different look → PRV should show the OLD look
+as soon as the transition starts; first take after a Caspar restart → PRV goes empty, not
+mirror-of-PGM. Takes effect on next service restart.

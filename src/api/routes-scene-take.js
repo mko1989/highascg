@@ -210,7 +210,24 @@ async function handleSceneTake(body, ctx) {
 					!Array.isArray(previousPgmScene.layers) ||
 					!previousPgmScene.layers.some(layerHasContent)
 				) {
-					return null
+					// No previous PGM look to flip onto PRV (first take / state cleared by the
+					// Caspar reconcile). Without this, the STAGED incoming look stays on PRV —
+					// i.e. PRV shows the exact look that is now on air (WO-150 B150.1). Classic
+					// flip-flop with an empty "previous" means an EMPTY preview.
+					if (!stageOnPreview) return null
+					previewExchangeStarted = true
+					previewExchangePromise = (async () => {
+						try {
+							await clearSceneProgramLookStackLayers(ctx.amcp, bus1, ctx)
+							liveSceneState.clearChannel?.(bus1)
+							if (typeof ctx.log === 'function') {
+								ctx.log('info', `[scene-take] pgm->prv exchange: no previous look — cleared staged PRV ch=${bus1}`)
+							}
+						} catch (e) {
+							if (typeof ctx.log === 'function') ctx.log('warn', `[scene-take] prv clear failed: ${e?.message || e}`)
+						}
+					})()
+					return previewExchangePromise
 				}
 				previewExchangeStarted = true
 				previewExchangePromise = (async () => {
@@ -238,7 +255,7 @@ async function handleSceneTake(body, ctx) {
 			}
 
 			const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
-			await runSceneTakeLbg(ctx.amcp, {
+			const pgmTakePromise = runSceneTakeLbg(ctx.amcp, {
 				...takeOpts,
 				channel,
 				currentScene: previousPgmScene,
@@ -247,11 +264,16 @@ async function handleSceneTake(body, ctx) {
 				self: ctx,
 				skipLayerVisualEquality: true,
 			})
+			// Flip-flop the preview WHILE the program transition runs (different Caspar
+			// channel, independent AMCP). Sequenced after the awaited PGM take, PRV kept
+			// showing the staged incoming look for the entire fade + teardown — the
+			// operator-visible "wrong look on preview after transition" (WO-150 B150.1).
+			startPreviewExchange()
+			await pgmTakePromise
 			if (inc && typeof inc === 'object' && inc.id) {
 				liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 			}
 
-			startPreviewExchange()
 			if (previewExchangePromise) await previewExchangePromise
 			liveSceneState.broadcastSceneLive(ctx)
 			return
