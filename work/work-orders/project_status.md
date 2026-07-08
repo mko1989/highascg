@@ -49,7 +49,7 @@
 | 145 | [145_WO_VCAM_STREAM_MODE_SPIKE.md](./145_WO_VCAM_STREAM_MODE_SPIKE.md) | Planned | Vcam real-motion spike: Caspar STREAM udp → ffmpeg → /dev/video10 (jpeg fallback kept) |
 | 146 | [146_WO_STATE_MONITOR_STRENGTHENING.md](./146_WO_STATE_MONITOR_STRENGTHENING.md) | Implemented (restart pending) | Caspar health ping default-on, reconcile-diff visibility, WO-84 decision note |
 | 147 | [147_WO_HOT_BACKUP_ROBUSTNESS.md](./147_WO_HOT_BACKUP_ROBUSTNESS.md) | Code complete (2-box QA via runbook) | Single-box hardening (reconnect, parity gate, playhead correction) + two-box QA runbook |
-| 148 | [148_WO_BOOT_BRANDING_HARDENING.md](./148_WO_BOOT_BRANDING_HARDENING.md) | Planned | Branding-safe produce path enforced + Calamares slideshow branding |
+| 148 | [148_WO_BOOT_BRANDING_HARDENING.md](./148_WO_BOOT_BRANDING_HARDENING.md) | Implemented (owner ISO build + QEMU check pending) | Branding-safe produce path enforced + Calamares slideshow branding |
 | 149 | [149_WO_OPERATOR_GUI_ON_LIVE_OUTPUT_DESIGN.md](./149_WO_OPERATOR_GUI_ON_LIVE_OUTPUT_DESIGN.md) | Draft (design) | GUI on live Caspar output — 4 routes analyzed; rec: stream-into-GUI → tiled → CEF spike |
 | 150 | [150_WO_LOOKS_PRESETS_OPERATOR_BUGS.md](./150_WO_LOOKS_PRESETS_OPERATOR_BUGS.md) | Planned | Owner bug sweep: PRV-after-transition, editor resolution, PGM-only PRV arm, preset delete/overwrite/recall, simultaneous 2-screen recall |
 | 151 | [151_WO_MULTIVIEW_TIMERS_AND_SIZING.md](./151_WO_MULTIVIEW_TIMERS_AND_SIZING.md) | Planned | MV timer correctness + window sizing after timer apply |
