@@ -10,6 +10,7 @@ import {
 } from '../lib/timeline-track-heights.js'
 import { fmtTimecode } from './timeline-canvas-utils.js'
 import { drawTimelineClip } from './timeline-canvas-clip.js'
+import { hitTestKeyframeIndex } from './timeline-canvas-snap.js'
 import { loadCompanionFlagThumb, setCompanionFlagThumbInvalidate, getCachedCompanionFlagThumb } from '../lib/companion-button-preview-url.js'
 
 export const RULER_H = 30
@@ -68,6 +69,7 @@ export function drawTimelineCanvas(deps) {
 		getWaveformUrl,
 		getSourceDurationMs,
 		isAudioOnlySource,
+		selectedKeyframe,
 	} = deps
 
 	if (schedDraw) setCompanionFlagThumbInvalidate(schedDraw)
@@ -79,7 +81,7 @@ export function drawTimelineCanvas(deps) {
 		drawBackground(ctx, canvas)
 		drawRuler(ctx, canvas, tl, pb, xAt, pxPerMs, scrollX)
 		if (tl) drawFlags(ctx, canvas, tl, xAt, getFlagSelection, schedDraw)
-		if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource)
+		if (tl) drawTracks(ctx, canvas, tl, scrollY, xAt, pxPerMs, drag, schedDraw, thumbCache, waveformCache, getClipSelection, getThumbnailUrl, getWaveformUrl, getSourceDurationMs, isAudioOnlySource, selectedKeyframe)
 		if (tl) drawFlagTrails(ctx, canvas, tl, xAt, getFlagSelection)
 		drawPlayhead(ctx, canvas, pb, xAt, RULER_H)
 		drawHeaders(ctx, canvas, tl, scrollY, layerAt)
@@ -272,6 +274,7 @@ function drawTracks(
 	getWaveformUrl,
 	getSourceDurationMs,
 	isAudioOnlySource,
+	selectedKeyframe,
 ) {
 	ensureLayerHeights(tl)
 	for (let li = 0; li < tl.layers.length; li++) {
@@ -303,6 +306,7 @@ function drawTracks(
 				drag,
 				pxPerMs,
 				selection: getClipSelection?.(),
+				selectedKeyframe,
 				activeTimelineId: tl.id,
 			})
 		}
@@ -374,18 +378,14 @@ export function hitFlag(tl, cx, cy, xAt) {
 	return null
 }
 
-/** Returns keyframe index if (cx, cy) hits a keyframe diamond, else null. */
+/**
+ * Returns keyframe index if (cx, cy) hits a keyframe diamond, else null.
+ * Value-aware: opacity/volume markers sit at value height, matching the drawing
+ * in timeline-canvas-clip.js (shared geometry in timeline-canvas-snap.js).
+ */
 export function hitKeyframe(clip, trackY, trackH, cx, cy, canvas, xAt, _pxPerMs) {
-	if (!clip.keyframes?.length) return null
 	const { y, h } = clipRowRect(canvas, trackY, trackH)
-	if (h < 8) return null
-	const ky = y + h - 7
-	if (cy < ky - 8 || cy > ky + 8) return null
-	for (let i = 0; i < clip.keyframes.length; i++) {
-		const kx = xAt(clip.startTime + clip.keyframes[i].time)
-		if (Math.abs(cx - kx) <= 8) return i
-	}
-	return null
+	return hitTestKeyframeIndex(clip, y, h, cx, cy, xAt)
 }
 
 export function applyLayerDividerMouseMove(drag, clientY, tl, onLayerHeightsChange, schedDraw) {

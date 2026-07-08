@@ -76,6 +76,8 @@ export function initTimelineCanvas(container, opts) {
 		scrollX: 0,
 		scrollY: 0,
 		drag: null,
+		/** Last keyframe grabbed on the canvas: { clipId, layerIdx, property, time } | null. */
+		selectedKeyframe: null,
 		lastSeekMs: 0,
 		wheelZoomAccum: 0,
 		wheelZoomLastSign: 0,
@@ -149,6 +151,7 @@ export function initTimelineCanvas(container, opts) {
 			scrollY: api.scrollY,
 			pxPerMs: api.pxPerMs,
 			drag: api.drag,
+			selectedKeyframe: api.selectedKeyframe,
 			schedDraw: api.schedDraw,
 			thumbCache,
 			waveformCache,

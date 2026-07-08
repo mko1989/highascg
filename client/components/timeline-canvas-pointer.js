@@ -18,9 +18,11 @@ import {
 } from './timeline-canvas-render.js'
 import {
 	collectTimelineSnapCandidates,
+	collectKeyframeSnapCandidates,
 	resolveSnappedStart,
 	resolveSnappedEdge,
 } from './timeline-canvas-snap.js'
+import { clampKeyframeDragTime } from '../lib/timeline-state-keyframes.js'
 
 const SNAP_THRESHOLD_PX = 8
 
@@ -113,23 +115,29 @@ export function attachTimelinePointerEvents(canvas, api) {
 			const trackY = trackTopForLayer(tl, li, api.scrollY, RULER_H)
 			const kfIdx = hitKeyframe(clip, trackY, layerHeightAt(tl, li), cx, cy, canvas, xAt, api.pxPerMs)
 			if (kfIdx != null && onSelectKeyframe) {
+				const kf = clip.keyframes[kfIdx]
 				onSelectClip({ layerIdx: li, clipId: clip.id, timelineId: tl.id, clip })
 				onSelectKeyframe({
 					timelineId: tl.id,
 					layerIdx: li,
 					clipId: clip.id,
 					keyframeIdx: kfIdx,
-					keyframe: clip.keyframes[kfIdx],
+					keyframe: kf,
 				})
+				// Selection feedback for the canvas (drag state carries the kf by identity —
+				// updateKeyframeTime mutates in place, so `kf` stays valid across re-sorts).
+				api.selectedKeyframe = { clipId: clip.id, layerIdx: li, property: kf.property, time: kf.time }
 				api.drag = {
 					type: 'keyframe-drag',
 					layerIdx: li,
 					clipId: clip.id,
 					keyframeIdx: kfIdx,
-					origTime: clip.keyframes[kfIdx].time,
+					kf,
+					origTime: kf.time,
 					origMs: ms,
 				}
 			} else {
+				api.selectedKeyframe = null
 				const edge = edgeZone(clip, ms, api.pxPerMs)
 				onSelectClip({ layerIdx: li, clipId: clip.id, timelineId: tl.id, clip })
 				if (edge) {
@@ -155,6 +163,7 @@ export function attachTimelinePointerEvents(canvas, api) {
 			}
 		} else {
 			canvas.dataset.lastClicked = 'track'
+			api.selectedKeyframe = null
 			onSelectClip(null)
 			if (li >= 0 && li < tl.layers.length) {
 				onLayerClick?.(tl.id, li, tl.layers[li])
@@ -183,7 +192,9 @@ export function attachTimelinePointerEvents(canvas, api) {
 					const li = layerAt(cy, tl)
 					const clip = li < tl.layers.length ? hitClip(tl, li, ms) : null
 					if (clip) {
-						canvas.style.cursor = edgeZone(clip, ms, api.pxPerMs) ? 'ew-resize' : 'grab'
+						const trackY = trackTopForLayer(tl, li, api.scrollY, RULER_H)
+						const kfIdx = hitKeyframe(clip, trackY, layerHeightAt(tl, li), cx, cy, canvas, xAt, api.pxPerMs)
+						canvas.style.cursor = kfIdx != null ? 'pointer' : edgeZone(clip, ms, api.pxPerMs) ? 'ew-resize' : 'grab'
 					} else {
 						canvas.style.cursor = 'default'
 					}
@@ -268,9 +279,18 @@ export function attachTimelinePointerEvents(canvas, api) {
 			}
 		} else if (drag.type === 'keyframe-drag' && onMoveKeyframe && tl) {
 			const clip = tl.layers[drag.layerIdx]?.clips?.find((c) => c.id === drag.clipId)
-			if (clip) {
-				const newTime = Math.max(0, Math.min(ms - clip.startTime, clip.duration))
-				onMoveKeyframe(tl.id, drag.layerIdx, drag.clipId, drag.keyframeIdx, newTime)
+			// Re-derive the index every move: re-sorting on time change shifts indexes
+			// (also across other properties' keyframes), but object identity is stable.
+			const idx = clip?.keyframes ? clip.keyframes.indexOf(drag.kf) : -1
+			if (clip && idx >= 0) {
+				const thresholdMs = SNAP_THRESHOLD_PX / api.pxPerMs
+				const { candidates, nowPointer } = collectKeyframeSnapCandidates(tl, getPlayback, {
+					excludeKf: drag.kf,
+				})
+				const snappedAbs = resolveSnappedEdge(ms, candidates, thresholdMs, nowPointer)
+				const newTime = clampKeyframeDragTime(clip.keyframes, idx, snappedAbs - clip.startTime, clip.duration)
+				onMoveKeyframe(tl.id, drag.layerIdx, drag.clipId, idx, newTime)
+				if (api.selectedKeyframe) api.selectedKeyframe.time = drag.kf.time
 			}
 		}
 		schedDraw()
@@ -292,7 +312,10 @@ export function attachTimelinePointerEvents(canvas, api) {
 			onLayerHeightsChange(tl0.id, [...tl0.layerHeights], true)
 		}
 		if (wasLayerDrag && tl0 && onLayerDragEnd) onLayerDragEnd(tl0.id)
-		if (wasKeyframeDrag && tl0 && onKeyframeDragEnd) onKeyframeDragEnd(tl0.id)
+		// Commit keyframe drags only when the time actually changed (parity with clip drag).
+		if (wasKeyframeDrag && tl0 && onKeyframeDragEnd) {
+			if (drag.kf && drag.kf.time !== drag.origTime) onKeyframeDragEnd(tl0.id)
+		}
 		if (wasClipDrag && tl0 && onClipDragEnd) {
 			const li = drag.layerIdx
 			const clip = tl0.layers?.[li]?.clips?.find((c) => c.id === drag.clipId)

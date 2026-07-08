@@ -5,6 +5,7 @@
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { enqueueWaveformFetch } from '../lib/waveform-fetch-queue.js'
 import { roundRect } from './timeline-canvas-utils.js'
+import { keyframeMarkerOffsetY } from './timeline-canvas-snap.js'
 
 const CLIP_PALETTE = ['#1f6b36', '#0c5d8c', '#5a1e87', '#8c1a44', '#7a3100', '#005c54']
 
@@ -316,8 +317,7 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 
 	const KF_COLORS = { opacity: '#ffd700', volume: '#4ec9b0', fill_x: '#569cd6', fill_y: '#569cd6', scale_x: '#c586c0', scale_y: '#c586c0' }
 	if (clip.keyframes?.length) {
-		const pad = 7
-		const innerH = Math.max(0, h - pad * 2)
+		const selKf = env.selectedKeyframe
 		const byProp = {}
 		for (const kf of clip.keyframes) {
 			if (!byProp[kf.property]) byProp[kf.property] = []
@@ -327,7 +327,7 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 		for (const [prop, kfs] of Object.entries(byProp)) {
 			kfs.sort((a, b) => a.time - b.time)
 			const isNormalized = prop === 'opacity' || prop === 'volume'
-			
+
 			if (isNormalized && kfs.length > 1) {
 				ctx.save()
 				ctx.beginPath()
@@ -339,8 +339,7 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 				for (const kf of kfs) {
 					const kx = xAt(clip.startTime + kf.time)
 					if (kx < HEADER_W || kx > canvas.width) continue
-					const val = Math.max(0, Math.min(1, kf.value || 0))
-					const ky = y + h - pad - val * innerH
+					const ky = y + keyframeMarkerOffsetY(kf, h)
 					if (first) { ctx.moveTo(kx, ky); first = false }
 					else { ctx.lineTo(kx, ky) }
 				}
@@ -351,16 +350,26 @@ export function drawTimelineClip(ctx, clip, layerIdx, trackY, _fps, env) {
 			for (const kf of kfs) {
 				const kx = xAt(clip.startTime + kf.time)
 				if (kx < HEADER_W || kx > canvas.width) continue
-				let ky = y + h - pad
-				if (isNormalized) {
-					const val = Math.max(0, Math.min(1, kf.value || 0))
-					ky = y + h - pad - val * innerH
-				}
+				const ky = y + keyframeMarkerOffsetY(kf, h)
+				const isDraggedKf = drag?.type === 'keyframe-drag' && drag.clipId === clip.id && drag.kf === kf
+				const isSelKf =
+					isDraggedKf ||
+					(selKf &&
+						selKf.clipId === clip.id &&
+						selKf.property === kf.property &&
+						Math.abs(selKf.time - kf.time) < 0.5)
+				const r = isSelKf ? 6 : 4
+				const rv = isSelKf ? 7 : 5
 				ctx.fillStyle = KF_COLORS[prop] || '#ffd700'
 				ctx.beginPath()
-				ctx.moveTo(kx, ky - 5); ctx.lineTo(kx + 4, ky)
-				ctx.lineTo(kx, ky + 5); ctx.lineTo(kx - 4, ky)
+				ctx.moveTo(kx, ky - rv); ctx.lineTo(kx + r, ky)
+				ctx.lineTo(kx, ky + rv); ctx.lineTo(kx - r, ky)
 				ctx.closePath(); ctx.fill()
+				if (isSelKf) {
+					ctx.strokeStyle = isDraggedKf ? '#ffffff' : '#58a6ff'
+					ctx.lineWidth = 1.5
+					ctx.stroke()
+				}
 			}
 		}
 	}
