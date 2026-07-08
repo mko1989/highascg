@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Eggs PREPARE — check-only. Does NOT install packages, units, excludes, or run eggs produce.
+# Eggs PREPARE — check-only by default. Does NOT install packages, units, excludes, or run eggs produce.
 #
 # Verifies the host was configured by scripts/setup/ + prepare-eggs-clone-with-exfat.sh.
 # Never touches /usr, /bin, liveroot while bind-mounted, or /home/eggs.
 #
+# Usage:
 #   cd ~/highascg
-#   sudo bash work/run-eggs-prepare-safe.sh
+#   sudo bash work/run-eggs-prepare-safe.sh              # prepare checks only
+#   sudo bash work/run-eggs-prepare-safe.sh --produce    # prepare + full produce
 #
 # Install missing pieces (one-shot):
 #   sudo bash work/bring-up-eggs-produce-host.sh   # Calamares + full verify
@@ -17,6 +19,19 @@
 set -euo pipefail
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+PRODUCE=false
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--produce) PRODUCE=true ;;
+		*)
+			echo "Unknown option: $1" >&2
+			echo "Usage: sudo $0 [--produce]" >&2
+			exit 1
+			;;
+	esac
+	shift
+done
 
 [[ "$(id -u)" -eq 0 ]] || {
 	echo "Run as root: sudo $0" >&2
@@ -51,8 +66,19 @@ bash "${LIVE_USB}/verify-eggs-safety.sh"
 echo
 echo "OK: eggs PREPARE checks passed — host ready for produce."
 echo
-echo "Next:"
-echo "  cp ~/highascg/config/casparcg.config ~/highascg/config/casparcg.config.bak.\$(date +%s)"
-echo "  sudo HIGHASCG_NVIDIA_DRIVER=595 bash work/run-eggs-produce-from-host.sh"
-echo
-echo "Never rm /home/eggs. After interrupted produce: sudo reboot first."
+
+if $PRODUCE; then
+	echo "==> Pre-produce backup reminder: casparcg.config was backed up manually before this run."
+	echo "==> Starting full produce (prepare is re-run inside build-highascg-egg.sh)..."
+	echo
+	exec bash "${REPO}/work/run-eggs-produce-from-host.sh"
+else
+	echo "Next:"
+	echo "  cp ~/highascg/config/casparcg.config ~/highascg/config/casparcg.config.bak.\$(date +%s)"
+	echo "  sudo HIGHASCG_NVIDIA_DRIVER=595 bash work/run-eggs-produce-from-host.sh"
+	echo
+	echo "Or run with --produce to continue:"
+	echo "  sudo HIGHASCG_NVIDIA_DRIVER=595 bash $0 --produce"
+	echo
+	echo "Never rm /home/eggs. After interrupted produce: sudo reboot first."
+fi

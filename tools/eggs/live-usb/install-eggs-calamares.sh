@@ -33,7 +33,7 @@ REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
-FIX_SRC="${REPO_ROOT}/tools/runtime/fix-calamares-branding.sh"
+FIX_SRC="${HERE}/fix-calamares-branding.sh"
 FIX_DST=/usr/local/lib/highascg/fix-calamares-branding.sh
 
 if ! command -v eggs >/dev/null 2>&1; then

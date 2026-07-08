@@ -42,7 +42,7 @@ echo "==> Sudo OK — starting prepare + produce at \$(date -Is)"
 echo "==> Log: ${LOG}"
 echo "==> NEVER rm /home/eggs — interrupt => reboot before retry"
 
-sudo HIGHASCG_NVIDIA_DRIVER="${DRIVER}" bash work/run-eggs-prepare-and-produce-safe.sh 2>&1 | tee -a "${LOG}"
+sudo HIGHASCG_NVIDIA_DRIVER="${DRIVER}" bash work/run-eggs-prepare-safe.sh --produce 2>&1 | tee -a "${LOG}"
 
 echo
 echo "==> FINISHED \$(date -Is)"

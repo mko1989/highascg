@@ -111,9 +111,9 @@ EOF
 	echo "==> wrote ${MOD}/bootloader.conf (full paths to grub-install)"
 fi
 
-L10N_SRC="${REPO_ROOT}/tools/runtime/calamares-l10n-helper.sh"
-NOMODESET_SRC="${REPO_ROOT}/tools/runtime/calamares-nomodeset-helper.sh"
-LOGS_SRC="${REPO_ROOT}/tools/runtime/calamares-logs-helper.sh"
+L10N_SRC="${HERE}/calamares-l10n-helper.sh"
+NOMODESET_SRC="${HERE}/calamares-nomodeset-helper.sh"
+LOGS_SRC="${HERE}/calamares-logs-helper.sh"
 if [[ -f "$L10N_SRC" ]]; then
 	install -m 0755 "$L10N_SRC" "${LIB}/calamares-l10n-helper.sh"
 	echo "==> installed ${LIB}/calamares-l10n-helper.sh (offline-safe)"

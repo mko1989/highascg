@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WO-54: Syncthing folder for playout media only (separate from dev repo sync in 12-syncthing-highascg.sh).
+# WO-54: Syncthing folder for playout media only (separate from dev repo sync in 12b-syncthing-highascg.sh).
 set -euo pipefail
 
 USER_CASPAR="${1:-casparcg}"
@@ -12,7 +12,7 @@ if [[ "$(id -un)" != root ]]; then
 fi
 
 if ! command -v syncthing >/dev/null 2>&1; then
-	echo "Syncthing not installed — run scripts/setup/12-syncthing-highascg.sh first" >&2
+	echo "Syncthing not installed — run scripts/setup/12b-syncthing-highascg.sh first" >&2
 	exit 1
 fi
 

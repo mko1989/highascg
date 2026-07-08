@@ -19,6 +19,7 @@
 		"verify:structure": "node tools/eggs/verify-w02-structure.js",
 		"config:write-defaults": "node tools/ci/write-repo-default-config.js",
 		"verify:repo-integrity": "node tools/ci/check-require-integrity.js",
+		"verify:script-paths": "node tools/ci/check-script-paths.js",
 		"lint": "npx eslint .",
 		"format:check": "npx prettier --check tools/ci eslint.config.js .prettierrc.json",
 		"format:write:ci": "npx prettier --write tools/ci eslint.config.js .prettierrc.json",
