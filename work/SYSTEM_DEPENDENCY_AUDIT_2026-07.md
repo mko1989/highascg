@@ -26,14 +26,14 @@ Raw capture is at the bottom; the owner ran all 11 commands in one shot — outp
 | Dev/ops tools | build-essential, gcc, make, dkms, git, curl, wget, unzip, bzip2, rsync, jq, nano, evtest, thunar | setup (05/14/lib) | keep |
 | Dev/ops tools **not provisioned** | **gh, tmux, mc, magic-wormhole** | manual | keep on this box; gap G4 — add to setup or document machine-local |
 | Operator browser | firefox-esr | setup `lib/install-operator-firefox.sh` | keep |
-| **Test-only** | **zoom — 942 MB, the single largest package on the box** | manual | **REMOVE** (below) |
+| **Test-only** | **zoom — 942 MB, the single largest package on the box** | manual | **KEEP on build host** (owner decision 2026-07-08) — used for vcam testing; **excluded from shipped ISOs** via the eggs squashfs fragment + guarded by `verify-iso-squashfs-excludes.sh` |
 
 ### Snaps
 
 | Snap | Verdict |
 |---|---|
 | snapd, bare, core24 | keep (snap plumbing) |
-| **tailscale (snap, rev 154)** | **duplicate** — apt tailscale is also installed and `tailscaled.service` (apt) is the enabled daemon. After confirming `tailscale status` works via the apt daemon: `sudo snap remove tailscale` (G2) |
+| **tailscale (snap, rev 154)** | duplicate of the apt install — **owner decision 2026-07-08: keep both** on the build host; the snap dirs were already excluded from ISOs via the eggs fragment |
 | gnome-46-2404, gtk-common-themes, mesa-2404 | platform snaps with **no app snap left that needs them** (tailscale is CLI-only) — likely orphans from an earlier snap app. Candidates: `sudo snap remove gnome-46-2404 gtk-common-themes mesa-2404` after `snap connections` shows nothing attached (owner call) |
 
 ### Services notes

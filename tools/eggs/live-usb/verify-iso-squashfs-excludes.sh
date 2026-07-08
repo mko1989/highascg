@@ -71,6 +71,12 @@ else
 	ok "no root /swapfile or /swap.img in squashfs"
 fi
 
+if squash_has_tree 'opt/zoom'; then
+	bad "/opt/zoom is in squashfs — Zoom is a build-host test tool and MUST NOT ship on the ISO (WO-142 G1; check exclude fragment merge)"
+else
+	ok "no /opt/zoom in squashfs"
+fi
+
 if squash_has_tree 'opt/nvidia-pool'; then
 	bad "/opt/nvidia-pool is in squashfs — ISO ~1.5 GiB larger than needed; purge pool and rebuild"
 else
