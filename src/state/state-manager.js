@@ -53,6 +53,8 @@ class StateManager extends EventEmitter {
 			osc: null,
 			/** @type {Record<string, { nbChannels: number, levels: unknown[] }>} — mixer levels by channel id string */
 			audio: {},
+			/** @type {object | null} — latest playback matrix reconciliation diff (seeded/corrected/dropped counts + timestamp) */
+			reconcileDiff: null,
 		}
 		this._changes = []
 		this._pendingVarChanges = new Set()
@@ -301,6 +303,16 @@ class StateManager extends EventEmitter {
 	}
 
 	/**
+	 * Update playback matrix reconciliation diff (seeded/corrected/dropped counts).
+	 * @param {object} diff - { seeded: number, corrected: number, dropped: number, at: number }
+	 */
+	setReconcileDiff(diff) {
+		if (!diff || typeof diff !== 'object') return
+		this._state.reconcileDiff = { ...diff }
+		this._emit('reconcileDiff', this._state.reconcileDiff)
+	}
+
+	/**
 	 * Merge CINF strings into media list and attach parsed fields (durationMs, resolution, fps, type).
 	 * @param {Record<string, string>} mediaDetails - filename -> raw CINF response text
 	 */
@@ -403,6 +415,7 @@ class StateManager extends EventEmitter {
 			variables: { ...this.variables },
 			osc: this._state.osc ? JSON.parse(JSON.stringify(this._state.osc)) : null,
 			audio: JSON.parse(JSON.stringify(this._state.audio)),
+			reconcileDiff: this._state.reconcileDiff ? { ...this._state.reconcileDiff } : null,
 		}
 	}
 

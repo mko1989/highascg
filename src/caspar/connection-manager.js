@@ -39,8 +39,8 @@ class ConnectionManager extends EventEmitter {
 		this._host = options.host ?? '127.0.0.1'
 		this._port = options.port ?? 5250
 		this._log = options.log || ((level, msg) => level === 'error' && console.error(msg))
-		/** 0 = disable periodic VERSION (default; version still set once on connect + query cycle) */
-		this._healthIntervalMs = options.healthIntervalMs ?? 0
+		/** Periodic VERSION liveness probe (ms); default 5000 = 5 sec; 0 = opt-out (disabled) */
+		this._healthIntervalMs = options.healthIntervalMs ?? 5000
 		/**
 		 * Delay before the first `VERSION` after TCP connect (ms). Caspar often will not answer
 		 * `VERSION` for ~1s while the AMCP session settles after disconnect/reconnect (e.g. systemd restart).

@@ -7,8 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Not started
-**Prerequisites:** Backup of `src/api/router.js` exists.
+**Status:** Deferred
+**Prerequisites:** Backup of `src/api/router.js` exists. (Unified router refactor deferred pending concrete need; current dispatch working.)
 
 ## 1. Objective
 
@@ -157,5 +157,14 @@ Ensure the underlying handler files (like `routesData.handleProjectFile`) are ad
 - Start on Phase A by implementing the `RouteRegistry` class in `src/api/route-registry.js`.
 - Proceed methodically in Phase B to map each route. Be careful with function signatures since each `routesX.js` handles arguments slightly differently.
 
+### 2026-07-07 — Owner Decision: Router Refactor Deferred
+**Owner Decision:**
+The current dispatch system (module-registry + config-routing + amcp-*) is proven working and stable. The unified router refactor is valuable but lacks a concrete trigger need. Deferring this work until one of the following arises:
+- A module integration becomes unsafe under the current dispatch logic.
+- A new routing pattern emerges that cannot fit cleanly into the current `if/else` structure.
+- Team capacity and priority align for an architectural improvement without a live incident driver.
+
+**Status: DEFERRED** — No further work scheduled until trigger condition met.
+
 ---
-*Work Order created: 2026-06-29 | Parent: None (Independent Architecture Task)*
+*Work Order created: 2026-06-29 | Deferred: 2026-07-07*

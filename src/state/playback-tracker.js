@@ -198,16 +198,20 @@ function getMatrixForState(ctx) {
  * Reconcile tracked cells against Caspar INFO XML, and seed layers the tracker missed
  * (e.g. content playing since before a service restart). Marks each reconciled channel
  * as tracked so teardown targeting can trust the matrix for it.
- * @param {{ _playbackMatrix?: object, gatheredInfo?: { channelXml?: Record<string, string> }, state?: import('events').EventEmitter }} ctx
+ * @param {{ _playbackMatrix?: object, _reconcileDiff?: object, gatheredInfo?: { channelXml?: Record<string, string> }, state?: import('events').EventEmitter }} ctx
+ * @returns {{ seeded: number, corrected: number, dropped: number, at: number } | null}
  */
 async function reconcilePlaybackMatrixFromGatheredXml(ctx) {
-	if (osc.isOscPlaybackActive(ctx)) return
+	if (osc.isOscPlaybackActive(ctx)) return null
 	const { parseLayerFgClipsFromChannelXml, pathsMatch } = require('./live-scene-reconcile')
-	if (!ctx) return
+	if (!ctx) return null
 	if (!ctx._playbackMatrix) ctx._playbackMatrix = {}
 	const matrix = ctx._playbackMatrix
 	const channelXml = ctx.gatheredInfo?.channelXml || {}
 	let changed = false
+	let seeded = 0
+	let corrected = 0
+	let dropped = 0
 
 	for (const chKey of Object.keys(channelXml)) {
 		const ch = parseInt(chKey, 10)
@@ -232,15 +236,18 @@ async function reconcilePlaybackMatrixFromGatheredXml(ctx) {
 			if (!actual) {
 				if (cell?.playing && !cell.isRoute) {
 					recordStop(ctx, ch, ln, { silent: true })
+					dropped++
 					changed = true
 				}
 				continue
 			}
 			if (!cell) {
 				recordPlay(ctx, ch, ln, actual, { silent: true })
+				seeded++
 				changed = true
 			} else if (!cell.isRoute && !pathsMatch(cell.clip, actual)) {
 				recordPlay(ctx, ch, ln, actual, { loop: !!cell.loop, silent: true })
+				corrected++
 				changed = true
 			}
 		}
@@ -254,12 +261,18 @@ async function reconcilePlaybackMatrixFromGatheredXml(ctx) {
 			const lnKey = String(cell.layer)
 			if (fgByLayer[lnKey] === undefined) {
 				recordStop(ctx, cell.channel, cell.layer, { silent: true })
+				dropped++
 				changed = true
 			}
 		}
 	}
 
+	const diff = { seeded, corrected, dropped, at: Date.now() }
+	if (!ctx._reconcileDiff) ctx._reconcileDiff = {}
+	Object.assign(ctx._reconcileDiff, diff)
+
 	if (changed) emitMatrix(ctx)
+	return (seeded || corrected || dropped) ? diff : null
 }
 
 const AMCP_PLAY_LINE_RE = /^(PLAY|LOAD|LOADBG)\s+(\d+)-(\d+)(?:\s+(.+))?$/i

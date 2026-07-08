@@ -370,7 +370,15 @@ async function runPeriodicChannelInfoSync(self) {
 	}
 
 	try {
-		await playbackTracker.reconcilePlaybackMatrixFromGatheredXml(self)
+		const reconcileDiff = await playbackTracker.reconcilePlaybackMatrixFromGatheredXml(self)
+		if (reconcileDiff) {
+			if (self.state && typeof self.state.setReconcileDiff === 'function') {
+				self.state.setReconcileDiff(reconcileDiff)
+			}
+			if (typeof self._wsBroadcast === 'function') {
+				self._wsBroadcast('playback.reconcile', { seeded: reconcileDiff.seeded, corrected: reconcileDiff.corrected, dropped: reconcileDiff.dropped, at: reconcileDiff.at })
+			}
+		}
 	} catch (e) {
 		if (typeof self.log === 'function') self.log('debug', 'Periodic playback matrix reconcile: ' + (e?.message || e))
 	}
