@@ -142,30 +142,34 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		previewRuntime,
 	})
 
-	const globalTakeFromPreview = async () => {
+	// All armed screens take TOGETHER (WO-150 B150.6) — one batched dispatch instead of
+	// awaiting each screen's full transition before starting the next.
+	const collectArmedPreviewEntries = () => {
 		const armed = sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
-		let any = false
+		const entries = []
 		for (const mIdx of armed) {
 			const sid = sceneState.getPreviewSceneIdForMain(mIdx)
-			if (sid) {
-				any = true
-				await takeSceneToProgram(sid, false, { targetMains: [mIdx] })
-			}
+			if (sid) entries.push({ sceneId: sid, mainIdx: mIdx })
 		}
-		if (!any) showScenesToast('No look on preview. Click a look’s thumbnail (canvas) first.', 'error')
+		return entries
+	}
+
+	const globalTakeFromPreview = async () => {
+		const entries = collectArmedPreviewEntries()
+		if (!entries.length) {
+			showScenesToast('No look on preview. Click a look’s thumbnail (canvas) first.', 'error')
+			return
+		}
+		await takeSceneToProgram.batch(entries, false, {})
 	}
 
 	const globalCutFromPreview = async () => {
-		const armed = sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
-		let any = false
-		for (const mIdx of armed) {
-			const sid = sceneState.getPreviewSceneIdForMain(mIdx)
-			if (sid) {
-				any = true
-				await takeSceneToProgram(sid, true, { targetMains: [mIdx] })
-			}
+		const entries = collectArmedPreviewEntries()
+		if (!entries.length) {
+			showScenesToast('No look on preview. Click a look’s thumbnail first.', 'error')
+			return
 		}
-		if (!any) showScenesToast('No look on preview. Click a look’s thumbnail first.', 'error')
+		await takeSceneToProgram.batch(entries, true, {})
 	}
 
 	const takeSceneToProgram = createTakeSceneToProgram({

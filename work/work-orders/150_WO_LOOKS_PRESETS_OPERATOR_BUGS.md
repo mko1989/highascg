@@ -15,7 +15,7 @@
 - [x] B150.3 **PGM-only channels: cannot arm a look on PRV to save a preset from PRV.** Allow choosing a look as PRV (UI arm state only — no Caspar preview route needed on PGM-only) so "save preset from PRV" works. Files: `scene-take-pgm-only.js`, scenes deck client logic, preset save path. *(2026-07-08 — fixed as client-arm-state only; engine untouched.)*
 - [x] B150.4 **Look presets cannot be removed or replaced (overwrite).** Add delete + overwrite-with-confirm to the preset UI + API/persistence (`client/lib/scene-state*` look presets, project persistence). *(2026-07-08 — remove now confirms; overwrite already confirmed; reload persistence bug fixed — see work log.)*
 - [x] B150.5 **Cannot load a look preset to PGM with auto transition.** Add "recall to PGM with transition" (uses the default/global transition like a normal take) as an option next to the existing recall behavior. *(2026-07-08 — "Auto" recall button; reuses POST /api/scene/take, no engine change.)*
-- [ ] B150.6 **Two-screen preset recall transitions sequentially — must be simultaneous.** The per-screen takes run awaited one after another; batch both channels' transition starts (same pattern as WO-139: build both channels' DEFER batches first, then commit both channels back-to-back, or interleave commits before any wait). Files: preset recall path → `scene-take.js` / take orchestration across `targetIdxs`.
+- [x] B150.6 **Two-screen preset recall transitions sequentially — must be simultaneous.** *(2026-07-08 fixed — batched concurrent dispatch; see work log.)* The per-screen takes run awaited one after another; batch both channels' transition starts (same pattern as WO-139: build both channels' DEFER batches first, then commit both channels back-to-back, or interleave commits before any wait). Files: preset recall path → `scene-take.js` / take orchestration across `targetIdxs`.
 
 ## 2. Approach notes
 
@@ -32,3 +32,25 @@
 ## 4. Work log
 
 - 2026-07-07 — WO created from `work/todos07.07.26`.
+
+#### 2026-07-08 — B150.6 fixed (orchestrator)
+
+Root cause: `runLookRecall` (and `globalTake/CutFromPreview`) awaited `takeSceneToProgram` per
+screen; each server take includes the full fade wait, so screen 2's transition started only after
+screen 1's completed. The naive `Promise.all` fix was impossible — `takeSceneToProgram`'s
+`takeBusy` guard silently DROPS concurrent calls (screen 2 would never fire).
+
+Fix in `scenes-editor-support.js`: new batch core `takeScenesToProgram(entries, forceCut, opts)`
+(exposed as `takeSceneToProgram.batch`) — one busy window for the whole batch, all payloads built
+first, every `POST /api/scene/take` dispatched CONCURRENTLY (one per channel; server takes on
+different channels are independent), responses merged afterwards (Promise.allSettled — one failed
+screen no longer aborts the rest). The singular `takeSceneToProgram` now delegates to the batch
+(behavior identical for single-screen takes). Callers updated: preset recall PGM path, global
+Take/Cut from preview (both had the same sequential bug), PRV recall now Promise.all.
+Residual offset between screens = network jitter (~ms), not a full transition duration. True
+frame-lock across channels would need server-side cross-channel DEFER batching — noted as a
+possible follow-up if operators still perceive an offset.
+
+Verification: node --check + eslint 0 on the three files; preset smoke 14/14; client build green.
+Operator QA (A150.2): arm looks on two screens → Take (and preset recall with 2-screen preset):
+both PGM outputs must start their transition together.

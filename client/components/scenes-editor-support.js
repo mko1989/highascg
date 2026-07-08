@@ -130,16 +130,20 @@ export function createTakeSceneToProgram(deps) {
 	let takeBusy = false
 
 	/**
-	 * @param {string} sceneId
+	 * Take SEVERAL looks to their programs SIMULTANEOUSLY (WO-150 B150.6): all payloads are
+	 * built first, every POST /api/scene/take is dispatched concurrently (one per channel),
+	 * and responses are merged afterwards — so a two-screen preset recall / global take starts
+	 * both channels' transitions together instead of waiting out screen 1's fade.
+	 * One busy window guards the whole batch (double-click protection preserved).
+	 *
+	 * @param {Array<{ sceneId: string, mainIdx: number }>} entries
 	 * @param {boolean} forceCut
-	 * @param {{ targetMains?: number[], transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
-	 *   `targetMains`: when set (e.g. from a deck column), take only those mains — not armed pills alone.
-	 *   `transitionOverride`: B150.5 — replace the look's own default transition for this take (e.g. deck global default on preset recall).
+	 * @param {{ transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
 	 */
-	return async function takeSceneToProgram(sceneId, forceCut, takeOpts = {}) {
+	async function takeScenesToProgram(entries, forceCut, takeOpts = {}) {
 		if (takeBusy) return
-		const scene = sceneState.getScene(sceneId)
-		if (!scene) return
+		const list = (entries || []).filter((e) => e && e.sceneId != null && Number.isFinite(Number(e.mainIdx)))
+		if (!list.length) return
 		const transitionOverride =
 			takeOpts?.transitionOverride && typeof takeOpts.transitionOverride === 'object'
 				? { ...takeOpts.transitionOverride }
@@ -147,37 +151,30 @@ export function createTakeSceneToProgram(deps) {
 
 		takeBusy = true
 		// The take response snapshot echoes the (possibly overridden) transition and
-		// applySceneFromTakePayload copies it into the deck look — keep the look's own.
-		const origDefaultTransition =
-			transitionOverride && scene.defaultTransition ? { ...scene.defaultTransition } : null
+		// applySceneFromTakePayload copies it into the deck look — keep each look's own.
+		const origTransitionByScene = new Map()
 		try {
 			await deps.stopActiveTimelineOnServer?.()
 			deps.flushSceneDeckSync?.()
 			const cm = deps.getChannelMap() || {}
-			const programChannels = (Array.isArray(cm.programChannels) && cm.programChannels.length > 0) ? cm.programChannels : [deps.getProgramChannel()]
-			const targetMains = (() => {
-				if (Array.isArray(takeOpts?.targetMains) && takeOpts.targetMains.length > 0) {
-					const picked = takeOpts.targetMains
-						.map((x) => parseInt(String(x), 10))
-						.filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < programChannels.length)
-					if (picked.length > 0) return picked
-					// Explicit column/deck take — do not fall back to another main (would hit wrong PGM / HTTP 500 if routing differs).
-					return []
-				}
-				const fallback = sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
-				const valid = fallback.filter(idx => idx >= 0 && idx < programChannels.length)
-				return valid.length > 0 ? valid : [0]
-			})()
-			const scenePayloadForState = buildIncomingScenePayload(scene)
-			const prevLive = deps.stateStore.getState()?.scene?.live || {}
-			const mergedLive = { ...prevLive }
-			const touched = []
+			const programChannels =
+				Array.isArray(cm.programChannels) && cm.programChannels.length > 0
+					? cm.programChannels
+					: [deps.getProgramChannel()]
 			const variableStore = deps.getVariableStore?.() ?? null
 			const oscClient = deps.getOscClient?.() ?? null
-			for (const mainIdx of targetMains) {
+
+			const jobs = []
+			for (const entry of list) {
+				const mainIdx = Number(entry.mainIdx)
+				if (mainIdx < 0 || mainIdx >= programChannels.length) continue
 				const programCh = programChannels[mainIdx]
 				if (!Number.isFinite(Number(programCh)) || Number(programCh) <= 0) continue
-				touched.push({ mainIdx, channel: Number(programCh) })
+				const scene = sceneState.getScene(entry.sceneId)
+				if (!scene) continue
+				if (transitionOverride && scene.defaultTransition && !origTransitionByScene.has(scene.id)) {
+					origTransitionByScene.set(scene.id, { ...scene.defaultTransition })
+				}
 				const fps = cm.programResolutions?.[mainIdx]?.fps ?? 50
 				const pgmOnly = !isPreviewBusAvailable(cm, mainIdx)
 				const incomingSceneForTake = buildIncomingScenePayload(scene, {
@@ -197,30 +194,43 @@ export function createTakeSceneToProgram(deps) {
 						? normalizeTransitionForPgmOnly(transitionOverride)
 						: { ...transitionOverride }
 				}
-				const takeRes = await deps.api.post('/api/scene/take', {
-					channel: Number(programCh),
+				jobs.push({
+					scene,
 					sceneId: scene.id,
-					framerate: fps,
-					forceCut,
-					useServerLive: true,
-					incomingScene: {
-						...incomingSceneForTake,
-						globalBorder: sceneState.getGlobalBorderForScreen(mainIdx),
-					},
-				})
-				const incomingScene = buildIncomingScenePayload(scene, {
-					timeline: null,
-					positionMs: 0,
-					programChannel: Number(programCh),
 					mainIdx,
-					fps,
-					stateStore: deps.stateStore,
-					variableStore,
-					oscClient,
-					transitionTake: !forceCut && !pgmOnly,
-					pgmOnly,
+					channel: Number(programCh),
+					incomingSceneForTake,
+					// Dispatch NOW — all channels' takes run server-side concurrently.
+					promise: deps.api.post('/api/scene/take', {
+						channel: Number(programCh),
+						sceneId: scene.id,
+						framerate: fps,
+						forceCut,
+						useServerLive: true,
+						incomingScene: {
+							...incomingSceneForTake,
+							globalBorder: sceneState.getGlobalBorderForScreen(mainIdx),
+						},
+					}),
 				})
-				sceneState.setLiveSceneId(sceneId, mainIdx, { silent: true })
+			}
+
+			const results = await Promise.allSettled(jobs.map((j) => j.promise))
+
+			const prevLive = deps.stateStore.getState()?.scene?.live || {}
+			const mergedLive = { ...prevLive }
+			const touched = []
+			const failed = []
+			for (let i = 0; i < jobs.length; i++) {
+				const job = jobs[i]
+				const res = results[i]
+				if (res.status !== 'fulfilled') {
+					failed.push({ job, error: res.reason })
+					continue
+				}
+				const takeRes = res.value
+				touched.push({ mainIdx: job.mainIdx, channel: job.channel })
+				sceneState.setLiveSceneId(job.sceneId, job.mainIdx, { silent: true })
 				if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {
 					for (const [k, v] of Object.entries(takeRes.sceneLive)) {
 						if (v && typeof v === 'object' && v.sceneId != null && v.scene) {
@@ -228,35 +238,34 @@ export function createTakeSceneToProgram(deps) {
 						}
 					}
 				} else {
-					mergedLive[String(programCh)] = { sceneId: scene.id, scene: incomingScene }
+					mergedLive[String(job.channel)] = { sceneId: job.sceneId, scene: job.incomingSceneForTake }
 				}
-				const liveSnap = takeRes?.sceneLive?.[String(programCh)]
-				if (liveSnap?.scene && liveSnap.sceneId === scene.id) {
-					sceneState.applySceneFromTakePayload(sceneId, liveSnap.scene, { silent: true })
+				const liveSnap = takeRes?.sceneLive?.[String(job.channel)]
+				if (liveSnap?.scene && liveSnap.sceneId === job.sceneId) {
+					sceneState.applySceneFromTakePayload(job.sceneId, liveSnap.scene, { silent: true })
 				} else {
-					sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState, { silent: true })
+					sceneState.applySceneFromTakePayload(job.sceneId, buildIncomingScenePayload(job.scene), { silent: true })
 				}
 			}
-			if (origDefaultTransition) {
+			for (const [sceneId, t] of origTransitionByScene) {
 				const s = sceneState.getScene(sceneId)
-				if (s) s.defaultTransition = { ...origDefaultTransition }
+				if (s) s.defaultTransition = { ...t }
 			}
 			deps.stateStore.applyChange('scene.live', mergedLive)
 			sceneState.applyServerLiveChannels(mergedLive, cm)
-			deps.primePreviewSnapshotFromScene(sceneId)
-			if (touched.length === 0) {
-				deps.showToast(
-					Array.isArray(takeOpts?.targetMains) && takeOpts.targetMains.length > 0
-						? 'That screen is not in the current channel map (or routing list is stale). Reload the page or fix Settings → outputs.'
-						: 'No program output mapped for this screen. Check Settings → channel routing.',
-					'error',
-				)
-			} else {
+			for (const sceneId of new Set(jobs.map((j) => j.sceneId))) {
+				deps.primePreviewSnapshotFromScene(sceneId)
+			}
+			if (touched.length === 0 && failed.length === 0) {
+				deps.showToast('No program output mapped for those screens. Check Settings → channel routing.', 'error')
+			} else if (touched.length > 0) {
 				const mode = forceCut ? 'Cut' : 'Take'
-				const routeText = touched
-					.map((x) => `M${x.mainIdx + 1} ch${x.channel}`)
-					.join(', ')
-				deps.showToast(`${mode}: “${scene.name || 'Look'}” → ${routeText}`, 'info')
+				const names = [...new Set(jobs.map((j) => j.scene.name || 'Look'))].join('”, “')
+				const routeText = touched.map((x) => `M${x.mainIdx + 1} ch${x.channel}`).join(', ')
+				deps.showToast(`${mode}: “${names}” → ${routeText}`, 'info')
+			}
+			for (const f of failed) {
+				deps.showToast(f.error?.message || String(f.error), 'error')
 			}
 		} catch (e) {
 			deps.showToast(e?.message || String(e), 'error')
@@ -264,6 +273,55 @@ export function createTakeSceneToProgram(deps) {
 			takeBusy = false
 		}
 	}
+
+	/**
+	 * @param {string} sceneId
+	 * @param {boolean} forceCut
+	 * @param {{ targetMains?: number[], transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
+	 *   `targetMains`: when set (e.g. from a deck column), take only those mains — not armed pills alone.
+	 *   `transitionOverride`: B150.5 — replace the look's own default transition for this take (e.g. deck global default on preset recall).
+	 */
+	async function takeSceneToProgram(sceneId, forceCut, takeOpts = {}) {
+		if (takeBusy) return
+		const scene = sceneState.getScene(sceneId)
+		if (!scene) return
+		const cm = deps.getChannelMap() || {}
+		const programChannels =
+			Array.isArray(cm.programChannels) && cm.programChannels.length > 0
+				? cm.programChannels
+				: [deps.getProgramChannel()]
+		const targetMains = (() => {
+			if (Array.isArray(takeOpts?.targetMains) && takeOpts.targetMains.length > 0) {
+				const picked = takeOpts.targetMains
+					.map((x) => parseInt(String(x), 10))
+					.filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < programChannels.length)
+				if (picked.length > 0) return picked
+				// Explicit column/deck take — do not fall back to another main (would hit wrong PGM / HTTP 500 if routing differs).
+				return []
+			}
+			const fallback = sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
+			const valid = fallback.filter((idx) => idx >= 0 && idx < programChannels.length)
+			return valid.length > 0 ? valid : [0]
+		})()
+		if (targetMains.length === 0) {
+			deps.showToast(
+				Array.isArray(takeOpts?.targetMains) && takeOpts.targetMains.length > 0
+					? 'That screen is not in the current channel map (or routing list is stale). Reload the page or fix Settings → outputs.'
+					: 'No program output mapped for this screen. Check Settings → channel routing.',
+				'error',
+			)
+			return
+		}
+		await takeScenesToProgram(
+			targetMains.map((mainIdx) => ({ sceneId, mainIdx })),
+			forceCut,
+			{ transitionOverride: takeOpts?.transitionOverride },
+		)
+	}
+
+	/** Batch variant exposed for multi-screen preset recall / global take (WO-150 B150.6). */
+	takeSceneToProgram.batch = takeScenesToProgram
+	return takeSceneToProgram
 }
 
 /**

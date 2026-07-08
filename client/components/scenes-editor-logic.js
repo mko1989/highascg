@@ -98,16 +98,25 @@ export async function runLookRecall(sceneId, lookPreset, target, deps) {
 		showScenesToast(`Recall PRV: “${name}”`, 'info')
 	}
 
+	if (target === 'prv') {
+		await Promise.all(items.map((it) => sendSceneToPreviewCard(it.sceneId, { targetMains: [it.mainIdx] })))
+		return
+	}
+	// All screens take TOGETHER (WO-150 B150.6): one batched dispatch — sequential awaited
+	// takes made screen 2 wait out screen 1's full transition. Each item still targets its
+	// own main (multi-main presets carry a different look per screen).
+	if (typeof takeSceneToProgram.batch === 'function') {
+		await takeSceneToProgram.batch(
+			items.map((it) => ({ sceneId: it.sceneId, mainIdx: it.mainIdx })),
+			forceCut,
+			transitionOverride ? { transitionOverride } : {},
+		)
+		return
+	}
 	for (const it of items) {
-		if (target === 'prv') {
-			await sendSceneToPreviewCard(it.sceneId, { targetMains: [it.mainIdx] })
-		} else {
-			// Target each item's own main — with multi-main presets the armed-pill
-			// fallback would take every item's look on every armed screen.
-			await takeSceneToProgram(it.sceneId, forceCut, {
-				targetMains: [it.mainIdx],
-				...(transitionOverride ? { transitionOverride } : {}),
-			})
-		}
+		await takeSceneToProgram(it.sceneId, forceCut, {
+			targetMains: [it.mainIdx],
+			...(transitionOverride ? { transitionOverride } : {}),
+		})
 	}
 }
