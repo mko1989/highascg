@@ -146,6 +146,7 @@ else
 	HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST="${HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST:-0}" \
 		bash "${HERE}/verify-iso-boot-branding.sh" || {
 		echo "ERROR: ISO boot branding check failed — do not flash this ISO." >&2
+		echo "       The FAIL lines above name the missing asset (splash.png, font.pf2, plymouth theme, show.qml, …)." >&2
 		exit 1
 	}
 fi

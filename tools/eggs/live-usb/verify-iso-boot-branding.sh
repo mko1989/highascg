@@ -266,6 +266,30 @@ elif [[ -n "$INITRD" ]]; then
 	fi
 fi
 
+# WO-148: Calamares installer slideshow inside the squashfs must be HighAsCG, not penguins.
+SQUASHFS="$MNT/live/filesystem.squashfs"
+SHOW_QML_PATH="etc/calamares/branding/highascg-eggs-theme/show.qml"
+if [[ "${HIGHASCG_ISO_BOOT_BRANDING_VERIFY_FAST:-0}" == "1" ]]; then
+	ok "fast verify — skipped Calamares slideshow check (squashfs)"
+elif [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" != "1" ]]; then
+	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skipped Calamares slideshow check"
+elif [[ ! -f "$SQUASHFS" ]]; then
+	bad "missing live/filesystem.squashfs on ISO"
+elif ! command -v unsquashfs >/dev/null 2>&1; then
+	warn "unsquashfs not available — cannot check Calamares slideshow (apt install squashfs-tools)"
+else
+	show_qml="$(unsquashfs -cat "$SQUASHFS" "$SHOW_QML_PATH" 2>/dev/null || true)"
+	if [[ -z "$show_qml" ]]; then
+		bad "squashfs missing ${SHOW_QML_PATH} (Calamares slideshow) — run install-eggs-calamares.sh on host, then full produce"
+	elif grep -q 'penguins-eggs' <<<"$show_qml"; then
+		bad "Calamares slideshow in squashfs is stock penguins-eggs (show.qml) — run install-eggs-calamares.sh, then full produce"
+	elif grep -q 'HighAsCG' <<<"$show_qml"; then
+		ok "Calamares slideshow in squashfs is HighAsCG-branded (show.qml)"
+	else
+		bad "Calamares show.qml in squashfs has no HighAsCG branding"
+	fi
+fi
+
 if ((fail)); then
 	echo >&2
 	echo "Rebuild after fixing the build host:" >&2

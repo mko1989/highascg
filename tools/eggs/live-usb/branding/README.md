@@ -188,4 +188,14 @@ Then re-run **`install-eggs-live-grub-theme.sh`** and **`eggs produce`**.
 
 ## Calamares installer slideshow
 
-The graphical **installer** still uses eggs **Calamares** branding under `theme/calamares/branding/` (penguin artwork). Replacing that is a separate task; say if you want a HighAsCG slideshow there too.
+**Branded since WO-148.** `highascg-eggs-theme/theme/calamares/` is now a **real repo directory** (it used to be a symlink to `/usr/lib/penguins-eggs/addons/eggs/theme/calamares` — that is how the penguin slideshow reached the ISO). It contains:
+
+| File | Role |
+|------|------|
+| `branding/show.qml` | HighAsCG slideshow — dark `#0c1220` background, wordmark, GRUB-palette colours (`#5eb3ff` accent, `#b8c4d8` text) |
+| `branding/highascg-mascot.png` | Slide artwork (copy of `branding/splash.png`) — **owner can replace** with richer art later, keep the name |
+| `branding/highascg-eggs-theme-logo.png`, `eggs-logo.png`, `welcome.png` | Product logo/icon names eggs 26.6.2 / Calamares look for |
+| `branding/branding.desc` | Stub — eggs generates the real one at `eggs calamares` time |
+| `modules/*.yaml` | Installer module configs (refreshed from eggs defaults by `install-eggs-live-grub-theme.sh`) |
+
+Wiring: `install-eggs-live-grub-theme.sh` removes any legacy symlink and refuses a non-HighAsCG `show.qml`; `install-eggs-calamares.sh` syncs `branding/` (minus `branding.desc`) into `/etc/calamares/branding/highascg-eggs-theme/` on every run and deletes stale penguin slide PNGs; `verify-calamares-installed.sh` (pre-produce) and `verify-iso-boot-branding.sh` (post-produce, reads `show.qml` out of the ISO squashfs) both FAIL on a penguins slideshow.

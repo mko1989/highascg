@@ -46,6 +46,18 @@ fi
 	exit 1
 }
 
+# WO-148: refuse the legacy symlink to stock eggs artwork (penguins slideshow).
+if [[ -L "${THEME_ABS}/theme/calamares" ]]; then
+	echo "ERROR: ${THEME_ABS}/theme/calamares is a symlink to stock eggs artwork — the ISO" >&2
+	echo "       installer would show the penguins-eggs slideshow." >&2
+	echo "       Fix: sudo bash ${HERE}/install-eggs-live-grub-theme.sh (removes the symlink)" >&2
+	exit 1
+fi
+if ! grep -q 'HighAsCG' "${THEME_ABS}/theme/calamares/branding/show.qml" 2>/dev/null; then
+	echo "ERROR: ${THEME_ABS}/theme/calamares/branding/show.qml missing or not HighAsCG-branded" >&2
+	exit 1
+fi
+
 [[ -f "$FIX_SRC" ]] || {
 	echo "ERROR: missing ${FIX_SRC}" >&2
 	exit 1
@@ -87,6 +99,24 @@ fi
 if [[ ! -d /etc/calamares ]]; then
 	echo "ERROR: /etc/calamares missing after eggs calamares --install" >&2
 	exit 1
+fi
+
+# WO-148: always sync the HighAsCG slideshow into the live Calamares branding dir,
+# even when the eggs calamares re-apply above was skipped (already-installed path).
+# branding.desc is excluded — eggs generates the real one and we must not clobber it.
+BRAND_DIR="/etc/calamares/branding/highascg-eggs-theme"
+if [[ -d "$BRAND_DIR" ]]; then
+	echo "==> Sync HighAsCG Calamares slideshow → ${BRAND_DIR}"
+	find "${THEME_ABS}/theme/calamares/branding" -maxdepth 1 -type f \
+		! -name branding.desc -exec install -m 0644 -o root -g root -t "$BRAND_DIR" {} +
+	# drop the stale penguins-eggs slide PNGs (1-reproductive-system.png … 7-created-by.png)
+	rm -f "${BRAND_DIR}"/[1-7]-*.png
+	if ! grep -q 'HighAsCG' "${BRAND_DIR}/show.qml" 2>/dev/null; then
+		echo "ERROR: ${BRAND_DIR}/show.qml missing or not HighAsCG-branded after sync" >&2
+		exit 1
+	fi
+else
+	echo "WARN: ${BRAND_DIR} missing — eggs calamares did not create branding dir" >&2
 fi
 
 echo "==> Calamares branding logo (eggs 26.6.2 name mismatch — bake before squashfs clone)"

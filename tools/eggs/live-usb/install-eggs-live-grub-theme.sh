@@ -66,10 +66,29 @@ fi
 
 install -m 0644 -o root -g root "${HERE}/isolinux.theme.cfg" "${LIVE}/isolinux.theme.cfg"
 
-for d in calamares applications artwork; do
+for d in applications artwork; do
 	[[ -d "${EGGS_THEME}/${d}" ]] || continue
 	ln -sfn "${EGGS_THEME}/${d}" "${THEME_ABS}/theme/${d}"
 done
+
+# WO-148: theme/calamares must be the REAL repo directory (HighAsCG slideshow).
+# Never symlink it to ${EGGS_THEME}/calamares — that is exactly how the stock
+# penguins-eggs slideshow used to reach the ISO installer.
+CAL_DIR="${THEME_ABS}/theme/calamares"
+if [[ -L "$CAL_DIR" ]]; then
+	echo "==> Removing legacy theme/calamares symlink → stock eggs artwork (penguins slideshow)"
+	rm -f "$CAL_DIR"
+fi
+if [[ ! -f "${CAL_DIR}/branding/show.qml" ]] || ! grep -q 'HighAsCG' "${CAL_DIR}/branding/show.qml"; then
+	echo "ERROR: missing HighAsCG Calamares slideshow at ${CAL_DIR}/branding/show.qml" >&2
+	echo "       (repo checkout incomplete? theme/calamares must be a real directory, not a symlink)" >&2
+	exit 1
+fi
+# Keep installer module configs in sync with the eggs defaults (real files, not symlinks)
+if [[ -d "${EGGS_THEME}/calamares/modules" ]]; then
+	mkdir -p "${CAL_DIR}/modules"
+	cp -Lf "${EGGS_THEME}/calamares/modules/"*.yaml "${CAL_DIR}/modules/" 2>/dev/null || true
+fi
 
 if grep -q '^theme:' "$EGGS_YAML"; then
 	sed -i "s|^theme:.*|theme: ${THEME_ABS}|" "$EGGS_YAML"

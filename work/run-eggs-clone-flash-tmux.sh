@@ -162,8 +162,12 @@ echo "Pipeline:"
 echo "  1. prepare-eggs-clone-with-exfat.sh (WO-47 + merge eggs exclude.list)"
 echo "  2. eggs produce --nointeractive --clone --max --excludes static"
 echo "  3. inject-iso-boot-branding.sh"
-echo "  4. dd ISO → ${USB}"
-echo "  5. exFAT HIGHASCGEXF on ${USB}3 (finish-operator-stick.sh)"
+echo "  4. verify-iso-boot-branding.sh (WO-148 — build FAILS if branding is missing)"
+echo "  5. dd ISO → ${USB}"
+echo "  6. exFAT HIGHASCGEXF on ${USB}3 (finish-operator-stick.sh)"
+echo
+echo "NOTE: this launcher detaches — its own exit code does NOT reflect the build."
+echo "      Watch the tmux pane or 'tail -f ${LOG}'; the inner runner exits non-zero on failure."
 echo
 
 if "$ATTACH"; then

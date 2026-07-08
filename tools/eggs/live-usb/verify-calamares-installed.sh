@@ -61,6 +61,17 @@ else
 	fail "missing ${BRAND}/branding.desc — run install-eggs-calamares.sh"
 fi
 
+# WO-148: installer slideshow must be HighAsCG, not stock penguins-eggs
+if [[ ! -f "${BRAND}/show.qml" ]]; then
+	fail "missing ${BRAND}/show.qml (installer slideshow) — run install-eggs-calamares.sh"
+elif grep -q 'penguins-eggs' "${BRAND}/show.qml"; then
+	fail "${BRAND}/show.qml is the stock penguins-eggs slideshow — run install-eggs-calamares.sh (WO-148)"
+elif grep -q 'HighAsCG' "${BRAND}/show.qml"; then
+	ok "installer slideshow is HighAsCG-branded (show.qml)"
+else
+	fail "${BRAND}/show.qml has no HighAsCG branding — run install-eggs-calamares.sh"
+fi
+
 if [[ -f /usr/share/polkit-1/actions/com.github.calamares.calamares.policy ]]; then
 	ok "polkit policy (com.github.calamares.calamares.policy)"
 elif [[ -f /usr/share/polkit-1/actions/io.calamares.calamares.policy ]]; then
@@ -105,19 +116,19 @@ if [[ -x /usr/libexec/calamares/calamares-l10n-helper.sh ]]; then
 	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null; then
 		ok "Calamares l10n helper patched (offline-safe)"
 	else
-		bad "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fail "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
 	fi
 else
-	bad "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
+	fail "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
 fi
 if [[ -x /usr/libexec/calamares/calamares-logs-helper.sh ]]; then
 	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-logs-helper.sh 2>/dev/null; then
 		ok "Calamares logs helper patched (avoids end-of-install exit 1)"
 	else
-		bad "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fail "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
 	fi
 else
-	bad "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
+	fail "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
 fi
 
 if [[ "$FAIL" -gt 0 ]]; then
