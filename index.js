@@ -222,6 +222,7 @@ function main() {
 		
 		appCtx._composePreviewLifecycle = createComposePreviewLifecycle({ appCtx })
 		appCtx._v4l2BridgeLifecycle = createV4l2BridgeLifecycle({ appCtx })
+		appCtx._loopRestartWatchdog = require('./src/engine/loop-restart-watchdog').startLoopRestartWatchdog(appCtx)
 		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
 			appCtx.artnetReceiver.init()

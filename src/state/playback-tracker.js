@@ -310,7 +310,15 @@ function recordAmcpLines(ctx, lines) {
 				} catch {
 					clip = rest.split(/\s+/)[0].replace(/^"|"$/g, '')
 				}
-				recordPlay(ctx, ch, ln, clip, { loop: /\bLOOP\b/i.test(rest), silent: true })
+				const isLoop = /\bLOOP\b/i.test(rest)
+				recordPlay(ctx, ch, ln, clip, { loop: isLoop, silent: true })
+				// Full original PLAY line (incl. AF audio filter) for looping foreground plays —
+				// the loop-restart watchdog re-issues it verbatim near the wrap to get a FRESH
+				// producer instead of Caspar's internal seek-to-0 (WO-154: long HAP loops decayed
+				// to ~50% speed after the second/third producer-internal wrap).
+				if (isLoop && m[1].toUpperCase() === 'PLAY' && ctx._playbackMatrix?.[`${ch}-${ln}`]) {
+					ctx._playbackMatrix[`${ch}-${ln}`].playLine = line
+				}
 			} else if (!ctx._playbackMatrix?.[`${ch}-${ln}`]) {
 				// Bare PLAY resumes a loaded bg — layer becomes occupied even if the clip is unknown.
 				recordPlay(ctx, ch, ln, '', { silent: true })

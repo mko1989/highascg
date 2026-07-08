@@ -54,6 +54,8 @@
 | 150 | [150_WO_LOOKS_PRESETS_OPERATOR_BUGS.md](./150_WO_LOOKS_PRESETS_OPERATOR_BUGS.md) | Planned | Owner bug sweep: PRV-after-transition, editor resolution, PGM-only PRV arm, preset delete/overwrite/recall, simultaneous 2-screen recall |
 | 151 | [151_WO_MULTIVIEW_TIMERS_AND_SIZING.md](./151_WO_MULTIVIEW_TIMERS_AND_SIZING.md) | Planned | MV timer correctness + window sizing after timer apply |
 | 152 | [152_WO_TIMELINE_POLISH_FROM_LOOK_AND_KEYFRAME_DND.md](./152_WO_TIMELINE_POLISH_FROM_LOOK_AND_KEYFRAME_DND.md) | Planned | Timeline-from-look transition (completes WO-139) + keyframe drag-and-drop |
+| 153 | [153_WO_FLAKY_WS_RECONNECT_SMOKE.md](./153_WO_FLAKY_WS_RECONNECT_SMOKE.md) | Open (diagnosed) | smoke-ws-restart-reconnect hangs under node --test; behavior verified healthy |
+| 154 | [154_WO_LONG_LOOP_HALF_SPEED.md](./154_WO_LONG_LOOP_HALF_SPEED.md) | Workaround implemented (opt-in) | Long HAP loop decays to 50% after wrap; app-managed fresh-producer restart behind playback.appManagedLoop |
 
 ## WO-33 — Device view (split)
 
