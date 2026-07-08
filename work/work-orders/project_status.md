@@ -46,7 +46,7 @@
 | 142 | [142_WO_SYSTEM_DEPENDENCY_AUDIT.md](./142_WO_SYSTEM_DEPENDENCY_AUDIT.md) | Analysis done | Dependency audit — Zoom purge + tailscale snap dup flagged; gaps G3/G4 → WO-143 |
 | 143 | [143_WO_SCRIPT_REORGANIZATION_IN_PLACE.md](./143_WO_SCRIPT_REORGANIZATION_IN_PLACE.md) | Done | Script map (scripts/README.md), deprecations, eggs-wrapper consolidation, CI path guard |
 | 144 | [144_WO_COMPOSE_PREVIEW_DEFECTS.md](./144_WO_COMPOSE_PREVIEW_DEFECTS.md) | Implemented (restart pending) | Preview ch3/ch5 ADD 400s + consumer recycle churn (visible PGM hitch) |
-| 145 | [145_WO_VCAM_STREAM_MODE_SPIKE.md](./145_WO_VCAM_STREAM_MODE_SPIKE.md) | Planned | Vcam real-motion spike: Caspar STREAM udp → ffmpeg → /dev/video10 (jpeg fallback kept) |
+| 145 | [145_WO_VCAM_STREAM_MODE_SPIKE.md](./145_WO_VCAM_STREAM_MODE_SPIKE.md) | Implemented (stream mode opt-in; Zoom validation pending) | Vcam real-motion spike: Caspar STREAM udp → ffmpeg → /dev/video10 (jpeg fallback kept) |
 | 146 | [146_WO_STATE_MONITOR_STRENGTHENING.md](./146_WO_STATE_MONITOR_STRENGTHENING.md) | Implemented (restart pending) | Caspar health ping default-on, reconcile-diff visibility, WO-84 decision note |
 | 147 | [147_WO_HOT_BACKUP_ROBUSTNESS.md](./147_WO_HOT_BACKUP_ROBUSTNESS.md) | Code complete (2-box QA via runbook) | Single-box hardening (reconnect, parity gate, playhead correction) + two-box QA runbook |
 | 148 | [148_WO_BOOT_BRANDING_HARDENING.md](./148_WO_BOOT_BRANDING_HARDENING.md) | Implemented (owner ISO build + QEMU check pending) | Branding-safe produce path enforced + Calamares slideshow branding |
