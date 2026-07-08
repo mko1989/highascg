@@ -111,10 +111,11 @@ async function buildReplicationStatus(ctx) {
 	const playheadSync = (() => {
 		try {
 			const { getPlayheadSyncStatus } = require('./playhead-sync')
+			const st = getPlayheadSyncStatus(runtime, ctx)
 			return {
 				enabled: amcpFanout.active,
-				measureOnly: true,
-				...getPlayheadSyncStatus(runtime),
+				measureOnly: !st.correction?.enabled,
+				...st,
 			}
 		} catch {
 			return { enabled: false, driftMs: 0, measureOnly: true }
@@ -175,7 +176,13 @@ async function buildReplicationStatus(ctx) {
 				},
 				peerLiveWs:
 					role === 'follower'
-						? { connected: !!runtime?.peerWsConnected, direction: 'outbound' }
+						? {
+								connected: !!runtime?.peerWsConnected,
+								direction: 'outbound',
+								reconnectAttempts: runtime?.peerWsReconnectAttempts ?? 0,
+								reconnects: runtime?.peerWsReconnects ?? 0,
+								lastBackoffMs: runtime?.peerWsLastBackoffMs ?? 0,
+							}
 						: {
 								connected: (runtime?.peerWsClients?.size ?? 0) > 0,
 								clientCount: runtime?.peerWsClients?.size ?? 0,
@@ -285,14 +292,20 @@ async function buildReplicationStatus(ctx) {
 		channelParity,
 		connection,
 		casparParity: runtime?.lastCasparParity || null,
+		parityGate: runtime?.lastParityGate || null,
 		follower,
 		amcpFanout: {
 			active: amcpFanout.active,
 			receiveBox: amcpFanout.receiveBox,
+			role,
 			connected: !!runtime?.peerCasparConnection?.isConnected,
 			endpoint: runtime?.peerCasparConnection?.endpoint || repl.peerCaspar || null,
 			commandsSent: runtime?.peerCasparConnection?.commandsSent ?? 0,
 			correctionsSent: runtime?.peerCasparConnection?.correctionsSent ?? 0,
+			lastFanoutAt: runtime?.peerCasparConnection?.lastSendAt || 0,
+			lastFanoutAgeMs: runtime?.peerCasparConnection?.lastSendAt
+				? Date.now() - runtime.peerCasparConnection.lastSendAt
+				: null,
 			queueDepth: runtime?.peerCasparConnection?.queueDepth ?? 0,
 			maxQueueDepth: runtime?.peerCasparConnection?.maxQueueDepth ?? 0,
 			droppedBackpressure: runtime?.peerCasparConnection?._droppedBackpressure ?? 0,

@@ -1,6 +1,6 @@
 # WO-147 — Hot-backup robustness (single-box hardening + two-box QA runbook)
 
-**Status:** Planned
+**Status:** Code complete (2026-07-07) — 21/21 replication smokes green; two-box QA deferred to runbook
 **Priority:** High
 **Date:** 2026-07-07
 **Depends on:** WO-141. Parallelizable with WO-144/145/146.
@@ -38,3 +38,13 @@ Known architecture: role-based leader/follower (no election; manual `promote.js`
 ## 4. Work log
 
 - 2026-07-07 — WO created. Owner: two-box hardware E2E deferred (no second box); robustness prioritized.
+- 2026-07-07 — Implementation (agent, interrupted before logging; verified + recorded by orchestrator):
+  - **T147.1** new `src/replication/reconnect-backoff.js` — bounded exponential backoff + jitter (deterministic under injected `random` for tests); wired into `peer-client.js` / `peer-ws-client.js` with clean re-handshake after drop.
+  - **T147.2** new `tools/smoke/smoke-replication-chaos-ws.test.js` — local mock WS server killed/restarted mid-traffic ×10; asserts clean recovery, bounded attempts, no stuck state.
+  - **T147.3** new `src/replication/parity-gate.js` — combined Caspar `INFO CONFIG` parity + channel-plan parity ("connected but stale follower" detector); `POST /api/replication/validate-parity` added in `routes-replication-post.js`; result cached and mirrored into `GET /api/replication/status` as `parityGate`. Smoke: `smoke-replication-parity-gate.test.js`.
+  - **T147.4** new `src/replication/playhead-correction.js` — opt-in (`replication.playheadCorrection.enabled=false` default), drift > 12 frames sustained 5 s → rate-limited (≥10 s apart) CALL SEEK on the FOLLOWER only; threshold/rate-limit unit-tested with mock clock (`smoke-replication-playhead-correction.test.js`); wired via `playhead-sync.js`.
+  - **T147.5** fan-out active/role/last-fanout-timestamp exposed in the replication status payload (`replication-service-status.js`). Client badge NOT wired (status payload path to the inspector not present) — payload-only per the fallback; UI wiring is a small follow-up.
+  - **T147.7** `HOT_BACKUP_TWO_BOX_QA_RUNBOOK.md` written (pairing → replication → parity → fan-out drift < 500 ms → playhead correction → failover drill → teardown).
+  - Verification (orchestrator): `node --test` chaos + parity + playhead-correction + handshake smokes → **21/21 pass**; `npx eslint src/replication/ src/api/routes-replication-post.js --quiet` → 0.
+  - **T147.6** WO-54/64 checkbox hygiene: dated reconciliation notes added to both WOs (see below) rather than silent box-flipping.
+  - Takes effect on next service restart. Two-box acceptance rides the runbook.

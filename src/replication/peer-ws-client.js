@@ -2,9 +2,27 @@
 
 const WebSocket = require('ws')
 const { getReplicationConfig } = require('../config/replication-config')
+const { computeBackoffMs } = require('./reconnect-backoff')
+
+const BACKOFF_BASE_MS = Math.max(
+	25,
+	parseInt(process.env.HIGHASCG_REPL_WS_BACKOFF_BASE_MS || '1000', 10) || 1000,
+)
+const BACKOFF_MAX_MS = Math.max(
+	BACKOFF_BASE_MS,
+	parseInt(process.env.HIGHASCG_REPL_WS_BACKOFF_MAX_MS || '30000', 10) || 30000,
+)
 
 /**
  * Follower maintains outbound WS to leader for live-state stream.
+ *
+ * Reconnect policy (WO-147 T147.1 / WO-65 T65.C2): bounded exponential backoff with
+ * jitter (base 1 s → cap 30 s), attempt counter reset on a clean open. After a drop the
+ * client re-handshakes from scratch (fresh URL + token from config); duplicate replay of
+ * the leader snapshot is prevented by the seq guard in `handlePeerWsMessage` — the
+ * mirror-apply dedup map is intentionally NOT cleared on reconnect (it is cleared only
+ * when the peer instance changes, see peer-client.js).
+ *
  * @param {object} ctx
  * @param {import('./replication-service').ReplicationRuntime} runtime
  */
@@ -13,8 +31,15 @@ function startPeerWsClient(ctx, runtime) {
 	let ws = null
 	/** @type {ReturnType<typeof setTimeout>|null} */
 	let reconnectTimer = null
+	let reconnectAttempts = 0
+	let stopped = false
+
+	runtime.peerWsReconnectAttempts = 0
+	runtime.peerWsReconnects = runtime.peerWsReconnects || 0
+	runtime.peerWsLastBackoffMs = 0
 
 	function stop() {
+		stopped = true
 		runtime.peerWsConnected = false
 		if (reconnectTimer) {
 			clearTimeout(reconnectTimer)
@@ -31,16 +56,24 @@ function startPeerWsClient(ctx, runtime) {
 	}
 
 	function scheduleReconnect() {
-		if (reconnectTimer) return
+		if (stopped || reconnectTimer) return
+		reconnectAttempts += 1
+		runtime.peerWsReconnectAttempts = reconnectAttempts
+		const delayMs = computeBackoffMs(reconnectAttempts, {
+			baseMs: BACKOFF_BASE_MS,
+			maxMs: BACKOFF_MAX_MS,
+		})
+		runtime.peerWsLastBackoffMs = delayMs
 		reconnectTimer = setTimeout(() => {
 			reconnectTimer = null
 			connect()
-		}, 3000)
+		}, delayMs)
 		if (reconnectTimer.unref) reconnectTimer.unref()
 	}
 
 	function connect() {
 		stop()
+		stopped = false
 		const repl = getReplicationConfig(ctx.config)
 		if (!repl.enabled || !repl.peer.host || runtime.roleState.getRole() !== 'follower') return
 
@@ -55,12 +88,10 @@ function startPeerWsClient(ctx, runtime) {
 
 		ws.on('open', () => {
 			runtime.peerWsConnected = true
-			try {
-				const { resetMirrorApplyDedup } = require('./mirror-apply')
-				resetMirrorApplyDedup()
-			} catch {
-				/* ignore */
-			}
+			if (reconnectAttempts > 0) runtime.peerWsReconnects = (runtime.peerWsReconnects || 0) + 1
+			reconnectAttempts = 0
+			runtime.peerWsReconnectAttempts = 0
+			runtime.peerWsLastBackoffMs = 0
 			if (typeof ctx.log === 'function') ctx.log('info', '[replication] peer live-state ws connected')
 			const { notifyReplicationStatusChanged } = require('./replication-ui-notify')
 			notifyReplicationStatusChanged(ctx, 'peer-ws-connected')
@@ -97,4 +128,4 @@ function startPeerWsClient(ctx, runtime) {
 	return { stop, connect, start: connect }
 }
 
-module.exports = { startPeerWsClient }
+module.exports = { startPeerWsClient, BACKOFF_BASE_MS, BACKOFF_MAX_MS }

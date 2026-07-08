@@ -282,3 +282,11 @@ See **§9 Operator workflow (normative)** for full spec. Summary:
 ### 2026-06-27 — WO-64 AMCP fan-out mirror spec (extends Phase 3)
 
 Field testing showed WO-54 **live-state re-take mirror** is insufficient: missed transitions, ~3 s lag, **8–9 s drift** on 60 s clips. See **[64_WO_HOT_BACKUP_AMCP_FANOUT.md](./64_WO_HOT_BACKUP_AMCP_FANOUT.md)** — primary air sync becomes **leader → follower Caspar AMCP fan-out**; project/media sync follows **confirmed look** play. Phase 3 (`mirror-apply`) retained as legacy `mirrorTransport: live-state` only.
+
+#### 2026-07-07 — status reconciliation (WO-147)
+
+Per the 2026-07-03 triage, several boxes above remained unticked despite shipped work logs.
+Shipped and verified by code + smokes as of today: AMCP fan-out core (WO-64 A–C), role machine,
+project/media replication, SSH trust (WO-78 A–D), reconnect backoff + parity gate + opt-in playhead
+correction (WO-147). Two-box hardware acceptance is intentionally NOT ticked — it now lives in
+`HOT_BACKUP_TWO_BOX_QA_RUNBOOK.md` and gets executed when a second box is available.

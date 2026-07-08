@@ -303,3 +303,10 @@ Update WO-54 §6 open items: add pointer to WO-64 as Phase 3 v2.
 - Implemented `amcp-fanout.js`, `peer-caspar-connection.js`, hooks in `amcp-client.js` / `amcp-batch.js`, connect pairing with `mirrorTransport: amcp-fanout`.
 - **User validation:** takes/transitions **in sync** — major success.
 - **Remaining gap:** continuous clip playhead drifts (~10 s / min); fan-out duplicates commands not clocks → **[WO-65](./65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md)**.
+
+#### 2026-07-07 — status reconciliation (WO-147)
+
+Phases A–C shipped (2026-06-27, confirmed). Phase D (fan-out confirmation UX): status payload now
+carries fan-out active/role/last-fanout-timestamp (WO-147 T147.5); Device View badge is a small
+follow-up. Phases E–G (smoke + hardware E2E: 60 s drift < 500 ms, failover) are scripted in
+`HOT_BACKUP_TWO_BOX_QA_RUNBOOK.md` §4/§6 — unticked until run on real hardware.

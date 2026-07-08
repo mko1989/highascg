@@ -92,6 +92,19 @@ async function handlePost(path, body, ctx, req) {
 		}
 	}
 
+	if (path === '/api/replication/validate-parity') {
+		// WO-147 T147.3 — combined parity gate: running Caspar INFO CONFIG parity +
+		// channel-plan parity. Result is cached on the runtime and mirrored into
+		// GET /api/replication/status as `parityGate`.
+		const rt = getReplicationRuntime(ctx)
+		if (!rt) {
+			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'replication service not started' }) }
+		}
+		const { validateReplicationParity } = require('../replication/parity-gate')
+		const gate = await validateReplicationParity(ctx, { runtime: rt })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(gate) }
+	}
+
 	if (path === '/api/replication/validate-caspar-parity') {
 		const rt = getReplicationRuntime(ctx)
 		if (!rt) {

@@ -4,9 +4,14 @@ const http = require('http')
 const os = require('os')
 const { getReplicationConfig } = require('../config/replication-config')
 const { updateClockOffsetFromPing } = require('./sync-clock')
+const { computeBackoffMs } = require('./reconnect-backoff')
 
 const PING_MS = Math.max(500, parseInt(process.env.HIGHASCG_REPL_PING_MS || '2000', 10) || 2000)
 const FAILOVER_MS = Math.max(1000, parseInt(process.env.HIGHASCG_REPL_FAILOVER_MS || '5000', 10) || 5000)
+const PING_BACKOFF_MAX_MS = Math.max(
+	PING_MS,
+	parseInt(process.env.HIGHASCG_REPL_PING_BACKOFF_MAX_MS || '30000', 10) || 30000,
+)
 const REQUEST_TIMEOUT_MS = Math.max(1000, parseInt(process.env.HIGHASCG_REPL_HTTP_TIMEOUT_MS || '4000', 10) || 4000)
 const SYNC_REQUEST_TIMEOUT_MS = Math.max(
 	REQUEST_TIMEOUT_MS,
@@ -100,10 +105,14 @@ function startPeerClient(ctx, runtime) {
 	/** @type {ReturnType<typeof setInterval>|null} */
 	let timer = null
 	let peerFailStreak = 0
+	// After the peer is confirmed lost (failover already handled), stretch pings with
+	// bounded exponential backoff + jitter instead of hammering a dead box (WO-147 T147.1).
+	let pingBackoffUntil = 0
 
 	async function tick() {
 		const repl = getReplicationConfig(ctx.config)
 		if (!repl.enabled || !repl.peer.host) return
+		if (pingBackoffUntil && Date.now() < pingBackoffUntil) return
 
 		const wasReachable = runtime.peerReachable
 		const res = await peerPing(repl.peer)
@@ -141,6 +150,14 @@ function startPeerClient(ctx, runtime) {
 					if (typeof ctx.log === 'function') {
 						ctx.log('info', '[replication] peer restarted — refreshing replication state')
 					}
+					// New peer instance = fresh seq domain: reset the applied-seq guard and the
+					// mirror dedup map here (NOT on every WS reconnect — see peer-ws-client.js).
+					runtime.lastAppliedSeq = 0
+					try {
+						require('./mirror-apply').resetMirrorApplyDedup()
+					} catch {
+						/* optional */
+					}
 					if (localRole === 'follower') {
 						const { reconcileFromLeader } = require('./replication-reconcile')
 						void reconcileFromLeader(ctx, runtime).catch((e) => {
@@ -154,6 +171,8 @@ function startPeerClient(ctx, runtime) {
 			}
 
 			peerFailStreak = 0
+			pingBackoffUntil = 0
+			runtime.peerPingBackoffMs = 0
 			runtime.lastPeerPingAt = now
 			runtime.lastPeerPing = res.json
 			runtime.peerReachable = true
@@ -238,6 +257,16 @@ function startPeerClient(ctx, runtime) {
 					peerFailStreak = 0
 				}
 			}
+			// Failover detection above always runs at PING_MS cadence; only once the fail
+			// streak has passed the failover window do we back off further ping attempts.
+			if (peerFailStreak > failTicksNeeded) {
+				const backoffMs = computeBackoffMs(peerFailStreak - failTicksNeeded, {
+					baseMs: PING_MS,
+					maxMs: PING_BACKOFF_MAX_MS,
+				})
+				pingBackoffUntil = now + backoffMs
+				runtime.peerPingBackoffMs = backoffMs
+			}
 		}
 	}
 
@@ -269,6 +298,7 @@ module.exports = {
 	peerPing,
 	PING_MS,
 	FAILOVER_MS,
+	PING_BACKOFF_MAX_MS,
 	REQUEST_TIMEOUT_MS,
 	SYNC_REQUEST_TIMEOUT_MS,
 }

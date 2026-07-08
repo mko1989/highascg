@@ -162,7 +162,7 @@ function stopReplicationService(ctx) {
 	} catch {
 		/* optional */
 	}
-	const rt = ctx?._replication || _runtime
+	const rt = getReplicationRuntime(ctx)
 	if (rt?.peerClient) rt.peerClient.stop()
 	if (rt?.peerWsClient) rt.peerWsClient.stop()
 	if (rt?.peerCasparConnection) {
@@ -185,28 +185,38 @@ function stopReplicationService(ctx) {
 
 /**
  * Handle inbound peer WS message on follower.
+ * Returns a reason string for smoke tests; callers may ignore it.
  * @param {object} ctx
  * @param {object} msg
+ * @returns {Promise<string>}
  */
 async function handlePeerWsMessage(ctx, msg) {
 	const runtime = getReplicationRuntime(ctx)
-	if (!runtime || msg?.type !== 'live_state' || !msg.data) return
+	if (!runtime || msg?.type !== 'live_state' || !msg.data) return 'ignored'
 
 	const repl = getReplicationConfig(ctx.config)
-	if (runtime.roleState.getRole() !== 'follower') return
+	if (runtime.roleState.getRole() !== 'follower') return 'not_follower'
 
 	runtime.lastLiveIntent = msg.data
 	if (msg.data.seq) runtime.lastPeerLiveSeq = msg.data.seq
 
+	// No duplicate command replay after a WS reconnect (WO-147 T147.1): the leader
+	// re-broadcasts its snapshot on registration; skip anything already applied.
+	// lastAppliedSeq is reset by peer-client.js when the peer instance changes.
+	const seq = Number(msg.data.seq || 0)
+	if (seq > 0 && (runtime.lastAppliedSeq || 0) >= seq) return 'stale_seq'
+
 	const { shouldSkipSemanticLiveMirror } = require('./amcp-fanout')
-	if (shouldSkipSemanticLiveMirror(ctx.config)) return
+	if (shouldSkipSemanticLiveMirror(ctx.config)) return 'amcp_fanout_skip'
 
 	if (repl.followerMode === 'mirror') {
 		const result = await scheduleLiveIntentApply(ctx, msg.data, repl, runtime)
 		if (result?.channelsApplied > 0 || result?.alreadyMirrored) {
 			runtime.lastAppliedSeq = msg.data.seq || runtime.lastAppliedSeq
 		}
+		return 'mirror_scheduled'
 	}
+	return 'armed_stored'
 }
 
 /**
