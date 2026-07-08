@@ -488,6 +488,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			takeSceneToProgram,
 			showScenesToast,
 			forceCut: !!d.forceCut,
+			useGlobalTransition: !!d.useGlobalTransition,
 		})
 	})
 	attachScenesEditorKeyboard({ globalTakeFromPreview })

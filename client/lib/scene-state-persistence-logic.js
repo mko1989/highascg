@@ -149,16 +149,33 @@ export function applyPersistedData(state, data) {
 	if (Array.isArray(data.lookPresets)) {
 		const sk = (v) => (v === 'prv' || v === 'pgm' || v === 'editing' ? v : 'editing')
 		state.lookPresets = data.lookPresets
-			.filter((p) => p && typeof p.id === 'string' && typeof p.name === 'string' && typeof p.sceneId === 'string' && state.getScene(p.sceneId))
+			.filter((p) => {
+				if (!p || typeof p.id !== 'string' || typeof p.name !== 'string') return false
+				if (typeof p.sceneId === 'string' && state.getScene(p.sceneId)) return true
+				// B150.4: multi-main presets stay valid when any item's look still exists.
+				return Array.isArray(p.items) && p.items.some((it) => it && state.getScene(it.sceneId))
+			})
 			.map((p) => {
 				const entry = {
 					id: p.id,
 					name: p.name,
 					createdAt: typeof p.createdAt === 'number' ? p.createdAt : 0,
-					sceneId: p.sceneId,
+					sceneId: typeof p.sceneId === 'string' ? p.sceneId : '',
 					sourceKind: sk(p.sourceKind),
 					targetMain: typeof p.targetMain === 'number' && p.targetMain >= 0 ? p.targetMain : 0,
 				}
+				// B150.4: keep per-main items — dropping them made overwrites of
+				// multi-main presets silently revert to a single look after reload.
+				if (Array.isArray(p.items) && p.items.length > 0) {
+					entry.items = p.items
+						.filter((it) => it && typeof it.sceneId === 'string')
+						.map((it) => ({
+							mainIdx: typeof it.mainIdx === 'number' && it.mainIdx >= 0 ? Math.floor(it.mainIdx) : 0,
+							sceneId: String(it.sceneId),
+							sourceKind: sk(it.sourceKind),
+						}))
+				}
+				if (p.tandem != null && typeof p.tandem === 'object') entry.tandem = p.tandem
 				return entry
 			})
 	} else {

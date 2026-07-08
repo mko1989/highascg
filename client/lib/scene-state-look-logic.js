@@ -57,6 +57,7 @@ export function importLookPresetsFromServer(list) {
 						sourceKind: sk(it.sourceKind),
 					}))
 			}
+			if (p.tandem != null && typeof p.tandem === 'object') o.tandem = p.tandem
 			return o
 		})
 	return next.length > 0 ? next : null

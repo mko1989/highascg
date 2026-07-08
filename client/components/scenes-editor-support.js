@@ -2,6 +2,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { buildIncomingScenePayload } from './scenes-shared.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
+import { normalizeTransitionForPgmOnly } from '../lib/transition-presets.js'
 
 /** Thumbnail width for the compose preview canvas (local ffmpeg path yields higher quality). */
 export const SCENE_THUMB_MAX_W = 960
@@ -131,14 +132,24 @@ export function createTakeSceneToProgram(deps) {
 	/**
 	 * @param {string} sceneId
 	 * @param {boolean} forceCut
-	 * @param {{ targetMains?: number[] }} [takeOpts] When set (e.g. from a deck column), take only those mains — not armed pills alone.
+	 * @param {{ targetMains?: number[], transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
+	 *   `targetMains`: when set (e.g. from a deck column), take only those mains — not armed pills alone.
+	 *   `transitionOverride`: B150.5 — replace the look's own default transition for this take (e.g. deck global default on preset recall).
 	 */
 	return async function takeSceneToProgram(sceneId, forceCut, takeOpts = {}) {
 		if (takeBusy) return
 		const scene = sceneState.getScene(sceneId)
 		if (!scene) return
+		const transitionOverride =
+			takeOpts?.transitionOverride && typeof takeOpts.transitionOverride === 'object'
+				? { ...takeOpts.transitionOverride }
+				: null
 
 		takeBusy = true
+		// The take response snapshot echoes the (possibly overridden) transition and
+		// applySceneFromTakePayload copies it into the deck look — keep the look's own.
+		const origDefaultTransition =
+			transitionOverride && scene.defaultTransition ? { ...scene.defaultTransition } : null
 		try {
 			await deps.stopActiveTimelineOnServer?.()
 			deps.flushSceneDeckSync?.()
@@ -181,6 +192,11 @@ export function createTakeSceneToProgram(deps) {
 					transitionTake: !forceCut && !pgmOnly,
 					pgmOnly,
 				})
+				if (transitionOverride) {
+					incomingSceneForTake.defaultTransition = pgmOnly
+						? normalizeTransitionForPgmOnly(transitionOverride)
+						: { ...transitionOverride }
+				}
 				const takeRes = await deps.api.post('/api/scene/take', {
 					channel: Number(programCh),
 					sceneId: scene.id,
@@ -220,6 +236,10 @@ export function createTakeSceneToProgram(deps) {
 				} else {
 					sceneState.applySceneFromTakePayload(sceneId, scenePayloadForState, { silent: true })
 				}
+			}
+			if (origDefaultTransition) {
+				const s = sceneState.getScene(sceneId)
+				if (s) s.defaultTransition = { ...origDefaultTransition }
 			}
 			deps.stateStore.applyChange('scene.live', mergedLive)
 			sceneState.applyServerLiveChannels(mergedLive, cm)

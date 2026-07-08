@@ -157,7 +157,10 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				sceneState,
 			)
 			const onPgm = pgmLookId === sc.id
-			const onPreview = !onPgm && prvLookId === sc.id
+			// B150.3: PGM-only mains have no PRV channel in scene.live — the armed
+			// look lives only in client state (setPreviewSceneId), so read it there.
+			const armedPrvId = !isPreviewBusAvailable(cm, col) ? sceneState.getPreviewSceneIdForMain(col) : null
+			const onPreview = !onPgm && (prvLookId === sc.id || armedPrvId === sc.id)
 			const isGlobal = sc.mainScope === 'all'
 			const cgOnly = isCgOnlyLook(sc)
 			// Scoped looks: live/preview styling only on the main they belong to (already filtered by getScenesForMain).
@@ -261,7 +264,10 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				ensureMainForColumn(col)
 				const cm = getChannelMap()
 				if (!isPreviewBusAvailable(cm, col)) {
-					showToast('PGM-only — use Take', 'info')
+					// B150.3: PGM-only — arm as PRV in client state only (no Caspar
+					// preview routing). Enables "save preset from PRV" and global Take.
+					sceneState.setPreviewSceneId(sc.id, col)
+					showToast('Armed as PRV (UI only — PGM-only output). Take airs it.', 'info')
 					return
 				}
 				await sendSceneToPreviewCard(sc.id, { targetMains: [col] })
@@ -270,12 +276,6 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 
 			card.addEventListener('click', (e) => {
 				if (e.target.closest('[data-action]')) return
-				ensureMainForColumn(col)
-				const cm = getChannelMap()
-				if (!isPreviewBusAvailable(cm, col)) {
-					showToast('PGM-only — use Take', 'info')
-					return
-				}
 				void sendPrv(e)
 			})
 
@@ -351,13 +351,19 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 		})
 		grid.appendChild(addTile)
 
-		if (typeof clearPreviewBusForMain === 'function' && isPreviewBusAvailable(cm, col)) {
+		if (typeof clearPreviewBusForMain === 'function') {
+			const prvAvailable = isPreviewBusAvailable(cm, col)
 			colEl.addEventListener('click', (e) => {
 				if (e.defaultPrevented) return
 				if (!isScenesDeckColBlankClick(e.target, colEl)) return
 				const sceneLive = getSceneLive() || {}
 				const sceneExists = (id) => !!sceneState.getScene(id)
-				if (!hasPreviewLookForMain(col, sceneLive, cm, sceneExists, sceneState)) return
+				// PGM-only (B150.3): armed PRV is client-state only — clear that
+				// (clearPreviewBusForMain skips AMCP when PGM/PRV share a channel).
+				const hasArmed = prvAvailable
+					? hasPreviewLookForMain(col, sceneLive, cm, sceneExists, sceneState)
+					: !!sceneState.getPreviewSceneIdForMain(col)
+				if (!hasArmed) return
 				e.preventDefault()
 				ensureMainForColumn(col)
 				void clearPreviewBusForMain(col, { full: true })

@@ -292,7 +292,8 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 		row2.className = 'look-preset-card__actions'
 		row2.innerHTML = `
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-prv>Preview</button>
-			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-take>Take</button>
+			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-take title="Take to PGM with each look's own transition">Take</button>
+			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-auto title="Take to PGM with the deck's default transition (like a normal take)">Auto</button>
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-cut>Cut</button>
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-ovw>Overwrite</button>
 			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--danger" data-lp-rm>Remove</button>
@@ -312,6 +313,13 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 				document.dispatchEvent(
 					new CustomEvent(LOOK_PRESET_RECALL_PGM, {
 						detail: { sceneId: p.sceneId, lookPreset: p, forceCut: false },
+					}),
+				)
+			})
+			row2.querySelector('[data-lp-r-auto]')?.addEventListener('click', () => {
+				document.dispatchEvent(
+					new CustomEvent(LOOK_PRESET_RECALL_PGM, {
+						detail: { sceneId: p.sceneId, lookPreset: p, forceCut: false, useGlobalTransition: true },
 					}),
 				)
 			})
@@ -335,6 +343,7 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 			})
 		}
 		row2.querySelector('[data-lp-rm]')?.addEventListener('click', () => {
+			if (!window.confirm(`Remove look preset "${p.name}"? (The look itself stays on the deck.)`)) return
 			if (sceneState.removeLookPreset(p.id)) {
 				showScenesToast('Look preset removed.', 'info')
 				onSceneRefresh?.()

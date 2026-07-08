@@ -8,16 +8,22 @@ export function getResolutionForScreen(screenIdx, sceneState, stateStore) {
 	const s = Math.max(0, screenIdx)
 	const st = stateStore.getState()
 	const cm = st?.channelMap || {}
-	
-	// 1. Try live channel resolution from INFO CONFIG
+
+	// B150.2: before Caspar INFO CONFIG is gathered, the server fills
+	// `channelMap.programResolutions` with 1920×1080 *placeholders*
+	// (src/config/channel-map-from-ctx.js `pickRes` default). Only
+	// `channelResolutionsByChannel` is INFO-derived, so use it to tell a real
+	// live resolution from the placeholder — otherwise a 3072×1728 screen lays
+	// out as 1080p on the editor's first pass.
+
+	// 1. Live channel resolution from INFO CONFIG (trusted only when INFO-backed)
 	const res = cm.programResolutions?.[s]
-	if (res && res.w > 0 && res.h > 0) return { w: res.w, h: res.h }
+	const programCh = cm.programChannels?.[s]
+	const infoRes = programCh != null ? cm.channelResolutionsByChannel?.[programCh] : null
+	if (infoRes && infoRes.w > 0 && infoRes.h > 0 && res && res.w > 0 && res.h > 0) return { w: res.w, h: res.h }
 
-	// 2. Try persisted canvas resolutions in sceneState (updated via WS)
-	const cv = sceneState.getCanvasForScreen(s)
-	if (cv && cv.width > 0 && cv.height > 0) return { w: cv.width, h: cv.height }
-
-	// 3. Try persisted screen destinations from live state for a faster update
+	// 2. Persisted screen destinations (settings) — present in the very first
+	// state snapshot, before Caspar is even connected.
 	const sd = st?.screenDestinations || {}
 	const dests = Array.isArray(sd.destinations) ? sd.destinations : []
 	const routable = dests.filter(d => d && String(d.mode || 'pgm_prv') !== 'multiview' && String(d.mode || 'pgm_prv') !== 'stream')
@@ -31,6 +37,13 @@ export function getResolutionForScreen(screenIdx, sceneState, stateStore) {
 		if (picked.videoMode && std[picked.videoMode]) return { w: std[picked.videoMode][0], h: std[picked.videoMode][1] }
 	}
 
+	// 3. Last channelMap value cached in sceneState this session (may still be
+	// the pre-INFO placeholder — hence after destinations).
+	const cv = sceneState.getCanvasForScreen(s)
+	if (cv && cv.width > 0 && cv.height > 0) return { w: cv.width, h: cv.height }
+
+	// 4. Raw programResolutions (placeholder or non-INFO server value), then default.
+	if (res && res.w > 0 && res.h > 0) return { w: res.w, h: res.h }
 	return { w: 1920, h: 1080 }
 }
 
@@ -62,11 +75,14 @@ export function lookRecallItemsFromPreset(fallbackSceneId, lookPreset) {
 /**
  * @param {object} deps
  * @param {(id: string, opts?: { targetMains?: number[] }) => void | Promise<void>} deps.sendSceneToPreviewCard
- * @param {(id: string, forceCut: boolean) => Promise<void>} deps.takeSceneToProgram
+ * @param {(id: string, forceCut: boolean, takeOpts?: { targetMains?: number[], transitionOverride?: object }) => Promise<void>} deps.takeSceneToProgram
  * @param {boolean} [deps.forceCut]
+ * @param {boolean} [deps.useGlobalTransition] — B150.5: take with the deck's default/global transition instead of each look's own.
  */
 export async function runLookRecall(sceneId, lookPreset, target, deps) {
-	const { sendSceneToPreviewCard, takeSceneToProgram, forceCut = false, showScenesToast } = deps
+	const { sendSceneToPreviewCard, takeSceneToProgram, forceCut = false, useGlobalTransition = false, showScenesToast } = deps
+	const transitionOverride =
+		target === 'pgm' && useGlobalTransition && !forceCut ? sceneState.getResolvedGlobalDefaultTransition() : null
 	const items = lookRecallItemsFromPreset(sceneId, lookPreset)
 	if (!items.length) return
 	
@@ -86,7 +102,12 @@ export async function runLookRecall(sceneId, lookPreset, target, deps) {
 		if (target === 'prv') {
 			await sendSceneToPreviewCard(it.sceneId, { targetMains: [it.mainIdx] })
 		} else {
-			await takeSceneToProgram(it.sceneId, forceCut)
+			// Target each item's own main — with multi-main presets the armed-pill
+			// fallback would take every item's look on every armed screen.
+			await takeSceneToProgram(it.sceneId, forceCut, {
+				targetMains: [it.mainIdx],
+				...(transitionOverride ? { transitionOverride } : {}),
+			})
 		}
 	}
 }
