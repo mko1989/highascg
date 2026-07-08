@@ -37,7 +37,7 @@ function findScriptReferences() {
 				`grep -rh "tools/runtime\\|scripts/\\|work/" src/ --include="*.js" --include="*.sh" 2>/dev/null`,
 				{ cwd: REPO_ROOT, encoding: 'utf8' }
 			);
-			const scripts = output.match(/(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
+			const scripts = output.split(REPO_ROOT + '/').join('').match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
 			scripts.forEach(s => {
 				if (!refs.has(s)) refs.set(s, []);
 				refs.get(s).push('src/');
@@ -51,8 +51,8 @@ function findScriptReferences() {
 	const runsh = path.join(REPO_ROOT, 'run.sh');
 	if (fs.existsSync(runsh)) {
 		try {
-			const content = fs.readFileSync(runsh, 'utf8');
-			const scripts = content.match(/(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
+			const content = fs.readFileSync(runsh, 'utf8').split(REPO_ROOT + '/').join('');
+			const scripts = content.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
 			scripts.forEach(s => {
 				if (!refs.has(s)) refs.set(s, []);
 				refs.get(s).push('run.sh');
@@ -64,8 +64,8 @@ function findScriptReferences() {
 	const pkgjson = path.join(REPO_ROOT, 'package.json');
 	if (fs.existsSync(pkgjson)) {
 		try {
-			const content = fs.readFileSync(pkgjson, 'utf8');
-			const scripts = content.match(/(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
+			const content = fs.readFileSync(pkgjson, 'utf8').split(REPO_ROOT + '/').join('');
+			const scripts = content.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
 			scripts.forEach(s => {
 				if (!refs.has(s)) refs.set(s, []);
 				refs.get(s).push('package.json');
@@ -81,7 +81,7 @@ function findScriptReferences() {
 				`grep -rh "ExecStart\\|ExecStop" scripts/systemd/ 2>/dev/null`,
 				{ cwd: REPO_ROOT, encoding: 'utf8' }
 			);
-			const scripts = output.match(/(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
+			const scripts = output.split(REPO_ROOT + '/').join('').match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
 			scripts.forEach(s => {
 				if (!refs.has(s)) refs.set(s, []);
 				refs.get(s).push('scripts/systemd/');
@@ -97,7 +97,7 @@ function findScriptReferences() {
 				`grep -rh "ExecStart\\|ExecStop" scripts/exfat/ 2>/dev/null`,
 				{ cwd: REPO_ROOT, encoding: 'utf8' }
 			);
-			const scripts = output.match(/(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
+			const scripts = output.split(REPO_ROOT + '/').join('').match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || [];
 			scripts.forEach(s => {
 				if (!refs.has(s)) refs.set(s, []);
 				refs.get(s).push('scripts/exfat/');
