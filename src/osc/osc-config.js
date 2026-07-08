@@ -29,6 +29,12 @@ function normalizeOscConfig(cfg) {
 		peakHoldMs: num(o.peakHoldMs, 2000),
 		emitIntervalMs: Math.max(10, num(o.emitIntervalMs, 50)),
 		staleTimeoutMs: num(o.staleTimeoutMs, 5000),
+		/**
+		 * Drop stage layers with no OSC for this long (Caspar stops emitting for removed layers —
+		 * without pruning the multiview overlay keeps showing the dead layer's frozen clip/elapsed, WO-151).
+		 * `0` disables pruning.
+		 */
+		layerStaleTimeoutMs: num(o.layerStaleTimeoutMs, 10000),
 		/** When true, `change` / WS may send `{ delta: true, channels: { "1": … } }` (merge by channel id). */
 		wsDeltaBroadcast: !!wsDelta,
 	}

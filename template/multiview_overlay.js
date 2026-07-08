@@ -1,6 +1,8 @@
 		// Setup live states
 		let ws = null;
-		let oscState = { channels: {} };
+		let oscState = { channels: {}, updatedAt: 0 };
+		let lastWsMessageAt = 0;
+		let resyncRequestedAt = 0;
 		let channelMap = { programChannels: [], programResolutions: [] };
 		let sceneLive = {};
 		let programLayerBankByChannel = {};
@@ -26,10 +28,12 @@
 			
 			ws.onmessage = (ev) => {
 				try {
+					lastWsMessageAt = Date.now();
 					const msg = JSON.parse(ev.data);
 					if (msg.type === 'state') {
 						if (msg.data?.osc?.channels) {
 							oscState.channels = msg.data.osc.channels;
+							if (msg.data.osc.updatedAt) oscState.updatedAt = msg.data.osc.updatedAt;
 						}
 						if (msg.data?.channelMap) {
 							channelMap = msg.data.channelMap;
@@ -47,6 +51,7 @@
 							} else {
 								oscState.channels = msg.data.channels;
 							}
+							if (msg.data.updatedAt) oscState.updatedAt = msg.data.updatedAt;
 						}
 					} else if (msg.type === 'change') {
 						if (msg.data?.path === 'scene.live') {
@@ -81,6 +86,19 @@
 		}
 
 		connect();
+
+		// WS liveness watchdog — server pushes `osc` every ~50 ms while Caspar runs; long silence
+		// means a stalled/half-open socket (frozen timers, WO-151 B151.2). Resync at 12 s, reconnect at 30 s.
+		setInterval(() => {
+			if (!ws || ws.readyState !== WebSocket.OPEN || !lastWsMessageAt) return;
+			const silentMs = Date.now() - lastWsMessageAt;
+			if (silentMs > 30000) {
+				try { ws.close(); } catch (e) { /* onclose reconnects */ }
+			} else if (silentMs > 12000 && Date.now() - resyncRequestedAt > 12000) {
+				resyncRequestedAt = Date.now();
+				try { ws.send(JSON.stringify({ type: 'osc_resync' })); } catch (e) { /* watchdog will close */ }
+			}
+		}, 5000);
 
 		// Helper formatters
 		function formatMmSs(sec) {
@@ -122,7 +140,7 @@
 				const ly = layers[key];
 				const f = ly?.file;
 				if (f && (f.name || f.path)) {
-					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly)) continue;
+					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly, oscState.updatedAt)) continue;
 					if (n > bestN) {
 						bestN = n;
 						bestState = ly;
@@ -273,7 +291,8 @@
 								const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
 								const pLayer = bank === 'b' ? num + 100 : num;
 								const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
-								const layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
+								let layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
+								if (layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt)) layerOsc = null;
 								let lFile = layerOsc?.file || {};
 
 								let isLayerRoute = false;
@@ -286,7 +305,7 @@
 										isLayerRoute = true;
 										layerRouteLabel = `Route (${getScreenLabelForChannel(targetCh)})`;
 										const targetOsc = oscState.channels[String(targetCh)]?.layers?.[num] || oscState.channels[String(targetCh)]?.layers?.[String(num)];
-										if (targetOsc?.file) {
+										if (targetOsc?.file && !window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(targetOsc, oscState.updatedAt)) {
 											lFile = targetOsc.file;
 										}
 									}

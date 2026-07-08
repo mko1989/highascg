@@ -190,45 +190,75 @@ export function resolveSourceAspectRatio(cell, cm = {}) {
 	return 16 / 9
 }
 
+/**
+ * Solve aspect-locked cell dims so video + chrome exactly fill the cell.
+ * All chrome constants (border 3 px, title 28 px, dock 120–260 px) are defined in **1920×1080 MV
+ * stage pixels** — the space the server reserves chrome in (`chromeReserveForCellLayout`,
+ * `src/engine/multiview-layout-helper.js`). Editor cells live in canvas pixels, so we convert to
+ * stage space, solve there, and convert back; solving directly in canvas pixels reserved the wrong
+ * dock space whenever the canvas is not 1920×1080 and the applied video ended up letterboxed
+ * (WO-151 B151.1 — the error is largest with the timers dock).
+ * @param {number} w cell width in editor-canvas px
+ * @param {number} h cell height in editor-canvas px
+ */
 export function solveCellDimensions(w, h, ratio, lockType, ovType, showTimersUnderLabels) {
-	const borderSize = 3
+	const canvasW = multiviewState.canvasWidth || 1920
+	const canvasH = multiviewState.canvasHeight || 1080
+	const sw = (w / canvasW) * 1920
+	const sh = (h / canvasH) * 1080
+	const solved = solveCellDimensionsStagePx(sw, sh, ratio, lockType, ovType, showTimersUnderLabels)
+	return {
+		w: Math.round((solved.w / 1920) * canvasW),
+		h: Math.round((solved.h / 1080) * canvasH),
+	}
+}
+
+/**
+ * Chrome (label / timer-dock) height for a cell with inner height `cellInnerH` (stage px).
+ * Must mirror server `chromeReserveForCellLayout` (`src/engine/multiview-layout-helper.js`), which
+ * computes from the **full cell** inner height — not from the video height.
+ */
+function stageLabelSizeForCellInnerH(cellInnerH, ovType, showTimersUnderLabels) {
+	if (ovType === 'timers') return 0
 	const isScreen = ovType === 'pgm' || ovType === 'prv'
+	let labelSize
+	if (showTimersUnderLabels && isScreen) {
+		const dockPx = Math.min(260, Math.max(120, Math.floor(cellInnerH * 0.22)))
+		labelSize = MV_TIMER_TITLE_PX + dockPx
+		const maxChrome = Math.floor(cellInnerH * 0.48)
+		labelSize = Math.min(labelSize, maxChrome)
+	} else {
+		labelSize = Math.round(Math.min(36, Math.max(24, cellInnerH * 0.1)))
+		labelSize = Math.min(labelSize, Math.max(22, cellInnerH - 20))
+	}
+	return Math.max(0, Math.min(labelSize, Math.max(0, cellInnerH - 8)))
+}
+
+/** Same solver in MV stage pixels (1920×1080). Mirrors server-side `chromeReserveForCellLayout`. */
+export function solveCellDimensionsStagePx(w, h, ratio, lockType, ovType, showTimersUnderLabels) {
+	const borderSize = 3
 
 	if (lockType === 'width') {
 		const innerW = Math.max(0, w - borderSize * 2)
-		const innerH = innerW / ratio
-		let labelSize = 0
-		if (ovType !== 'timers') {
-			if (showTimersUnderLabels && isScreen) {
-				const dockPx = Math.min(260, Math.max(120, Math.floor(innerH * 0.22)))
-				labelSize = MV_TIMER_TITLE_PX + dockPx
-				const maxChrome = Math.floor(innerH * 0.48)
-				labelSize = Math.min(labelSize, maxChrome)
-			} else {
-				labelSize = Math.round(Math.min(36, Math.max(24, innerH * 0.1)))
-				labelSize = Math.min(labelSize, Math.max(22, innerH - 20))
+		const videoH = innerW / ratio
+		// Server chrome depends on the full cell height we are solving for — iterate to its fixed
+		// point (labelSize is a monotone step function of cellInnerH, converges in a few steps).
+		let solvedH = videoH + borderSize * 2
+		for (let i = 0; i < 8; i++) {
+			const labelSize = stageLabelSizeForCellInnerH(Math.max(0, solvedH - borderSize * 2), ovType, showTimersUnderLabels)
+			const next = videoH + borderSize * 2 + labelSize
+			if (Math.abs(next - solvedH) < 0.5) {
+				solvedH = next
+				break
 			}
-			labelSize = Math.max(0, Math.min(labelSize, Math.max(0, innerH - 8)))
+			solvedH = next
 		}
-		const solvedH = Math.round(innerH + borderSize * 2 + labelSize)
 		return { w, h: solvedH }
 	} else {
 		const tempInnerH = Math.max(0, h - borderSize * 2)
-		let labelSize = 0
-		if (ovType !== 'timers') {
-			if (showTimersUnderLabels && isScreen) {
-				const dockPx = Math.min(260, Math.max(120, Math.floor(tempInnerH * 0.22)))
-				labelSize = MV_TIMER_TITLE_PX + dockPx
-				const maxChrome = Math.floor(tempInnerH * 0.48)
-				labelSize = Math.min(labelSize, maxChrome)
-			} else {
-				labelSize = Math.round(Math.min(36, Math.max(24, tempInnerH * 0.1)))
-				labelSize = Math.min(labelSize, Math.max(22, tempInnerH - 20))
-			}
-			labelSize = Math.max(0, Math.min(labelSize, Math.max(0, tempInnerH - 8)))
-		}
+		const labelSize = stageLabelSizeForCellInnerH(tempInnerH, ovType, showTimersUnderLabels)
 		const innerH = Math.max(1, tempInnerH - labelSize)
-		const solvedW = Math.round(innerH * ratio + borderSize * 2)
+		const solvedW = innerH * ratio + borderSize * 2
 		return { w: solvedW, h }
 	}
 }

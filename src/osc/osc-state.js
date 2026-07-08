@@ -294,6 +294,32 @@ class OscState extends EventEmitter {
 	}
 
 	/**
+	 * Drop stage layers Caspar no longer emits OSC for (removed via CLEAR / stage teardown — there is
+	 * no final "empty" message). Without pruning, the multiview overlay's "highest layer with a file"
+	 * pick keeps showing the dead layer's frozen clip + elapsed forever (WO-151 B151.2).
+	 * @param {number} [now]
+	 * @returns {boolean} true when at least one layer was pruned
+	 */
+	_pruneStaleLayers(now = Date.now()) {
+		const staleMs = this._config.layerStaleTimeoutMs
+		if (!Number.isFinite(staleMs) || staleMs <= 0) return false
+		let any = false
+		for (const chKey of Object.keys(this._channels)) {
+			const layers = this._channels[chKey]?.layers
+			if (!layers) continue
+			for (const layerId of Object.keys(layers)) {
+				const lastAt = layers[layerId]?._lastOscAt || 0
+				if (lastAt && now - lastAt <= staleMs) continue
+				delete layers[layerId]
+				const ch = parseInt(chKey, 10)
+				if (Number.isFinite(ch)) this._dirtyChannels.add(ch)
+				any = true
+			}
+		}
+		return any
+	}
+
+	/**
 	 * @param {'foreground' | 'background'} [fileTarget] - where `file/*` OSC goes (Caspar 2.3+ nests under foreground/background)
 	 */
 	_routeLayer(ch, layerId, tail, vals, fileTarget = 'foreground') {
@@ -410,6 +436,7 @@ class OscState extends EventEmitter {
 	_flushEmit() {
 		this._lastEmit = Date.now()
 		this._decayStaleAudio(this._lastEmit)
+		this._pruneStaleLayers(this._lastEmit)
 		if (!this._config.wsDeltaBroadcast) {
 			this._dirtyChannels.clear()
 		}
@@ -442,6 +469,7 @@ class OscState extends EventEmitter {
 	getSnapshot() {
 		const now = Date.now()
 		this._decayStaleAudio(now)
+		this._pruneStaleLayers(now)
 		return {
 			channels: JSON.parse(JSON.stringify(this._channels)),
 			updatedAt: now,

@@ -218,10 +218,28 @@ export class MultiviewState {
 		}
 	}
 
+	/**
+	 * Change the pixel basis cells are stored in. Cell rects are **rescaled** so the normalized
+	 * layout (`toApiLayout`) — i.e. what is applied to CasparCG — is unchanged. Without this, a
+	 * channel-map resolution sync silently changed the normalization basis and the next apply
+	 * (e.g. toggling "Timers under labels") resized every cell on the multiview (WO-151 B151.1).
+	 */
 	setCanvasSize(w, h) {
 		const nw = Math.max(1, Math.floor(Number(w)) || 0)
 		const nh = Math.max(1, Math.floor(Number(h)) || 0)
 		if (nw === this.canvasWidth && nh === this.canvasHeight) return
+		const ow = this.canvasWidth
+		const oh = this.canvasHeight
+		if (ow > 0 && oh > 0 && Array.isArray(this.cells) && this.cells.length > 0) {
+			const sx = nw / ow
+			const sy = nh / oh
+			for (const c of this.cells) {
+				c.x = c.x * sx
+				c.y = c.y * sy
+				c.w = c.w * sx
+				c.h = c.h * sy
+			}
+		}
 		this.canvasWidth = nw
 		this.canvasHeight = nh
 		this._save(false)
