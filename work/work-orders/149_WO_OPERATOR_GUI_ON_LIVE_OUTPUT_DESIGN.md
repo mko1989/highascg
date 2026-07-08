@@ -117,3 +117,6 @@ additive layers over the existing Node + browser stack.
 ## 10. Work log
 
 - 2026-07-07 — Idea captured from owner; four routes analyzed with limitations; recommendation B → A → spike C, skip D. No implementation yet.
+- 2026-07-07 — Owner notes from `work/todos07.07.26` folded in:
+  - "Extend the CEF control to display the webui in CEF on the Caspar operator output and relay control to the webui" — this is exactly **Route C**; owner adds the key refinement: the webui gets **alpha holes** through which lower layers (live channel routes) show, requiring a **scaling contract** between webui CSS pixels and the Caspar channel routes' fill geometry (route MIXER FILL rects must track the webui's hole rects — an explicit coordinate-mapping module would be needed).
+  - "If CEF is a bottleneck, can we display a regular browser fullscreen with transparency?" — that is **Route D** (§6): technically yes on X11 but ONLY with a compositor (picom) running; bare openbox has none, and a compositor sits in the GPU present path of the playout outputs. Verdict unchanged: not recommended. If Route C's CEF perf disappoints, the fallback is Route B (stream-into-GUI) or Route A (tiling), not D.

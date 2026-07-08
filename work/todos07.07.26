@@ -1,0 +1,26 @@
+wrong look gets on preview after transition.
+
+multiview window after applying timers wrong window size calculations
+
+the timeline playout needs polish.
+when played from inside a look it imeditly disappears and appears instead of the next transition.
+
+i need to be able to grab a keyframe and drag and drop it.
+
+
+timers on mv doesnt work correctly.
+
+wrong calcualtions in the looks editor (screen:3072x1728, treats it as 1080p),
+corrected it self after leaving and coming back into the look editor.
+
+even on pgm only channels i need to be able to choose a look as prv to be able to save a preset from prv.
+cant remove or replace look presets(overwrite).
+cant choose to load look presets to pgm with auto transition.
+when recalling look presets with two screens the second screen does the transition after the first one is done. it should happen at the same time.
+
+loose idea
+if we extend the cef control we could display the webui in cef on casparcg operator output and relay the control to the webui.
+the question is how well would that work. but this would give the best preview of live channels option (as they would be displayed under the webui, the webui would have alpha holes for them. there would need to be good scaling interaction between the webui and caspar channel routes scaling.)
+if cef is a bottle can we display a regular browser full screen with transparency?
+
+
