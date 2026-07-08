@@ -96,6 +96,8 @@ sudo modprobe snd-aloop enable=1 index=20 id=HighAsCG_VCam pcm=2
   "channel": 1,
   "device": "/dev/video10",
   "basenamePrefix": "highascg_vcam",
+  "mode": "jpeg",
+  "streamPort": 5555,
   "width": 1920,
   "height": 1080,
   "fps": 50,
@@ -176,6 +178,20 @@ Also: `GET /api/state` → `virtualCameraStatus`.
 - **T137.C1/C2:** `docs/wiki/integration/virtual-camera-output.md`, API table + `HIGHASCG_PASSWORDLESS_SUDO.md`.
 - Fixed missing `normalizeVirtualCameraConfig` import in `v4l2-bridge.js`.
 - **Instructions for next agent:** Run `sudo bash scripts/setup/12-passwordless-sudo.sh` on playout box; verify Start loads modules without manual modprobe; optional T137.C3 close-out on WO-109; multi-output pool still WO-109 scope.
+
+### 2026-07-08 — Agent (Claude, WO-145 spike + stream mode)
+- **Mode decision (WO-145):** video path now supports `virtualCamera.mode: "jpeg" | "stream"` (default **jpeg** — no behavior change unless opted in). Stream mode = Caspar `ADD <ch>-710 STREAM udp://127.0.0.1:<streamPort>?localport=<+10000>` sending **mjpeg over NUT** → Node-managed ffmpeg relay decodes udp → `/dev/video10`. Caspar never touches the device node, so the REMOVE-on-device failure that forced the JPEG flipbook disappears. Audio path (snd-aloop, consumer 711) and lifecycle unchanged in both modes.
+- **Live benchmark (2026-07-08, ch 2, 28-core host, top(1) %single-core, casparcg idle ≈ 230–236 %):**
+
+  | Path | casparcg CPU (Δ idle) | relay ffmpeg CPU | achieved fps (100-frame capture off /dev/video10) | ADD → first frame | notes |
+  |---|---|---|---|---|---|
+  | jpeg relay (current default; reasoned from code) | comparable mjpeg encode + disk `-update 1` | ~1 core (image2 loop) | nominal 50, but stale/repeated frames (overwrite race) | up to ~8 s (waits for first JPEG) | choppy motion — WO-145 motivation |
+  | **mjpeg stream (NUT/udp) — chosen** | 421–426 % (≈ +190 %) | 93–120 % | **50 steady** | **~1.0 s** | intra-only, fastest attach |
+  | h264 stream (mpegts, ultrafast+zerolatency) | 410–417 % (≈ +180 %) | 42–50 % | 50–51 | ~5.8 s | probe/GOP attach delay; cheapest relay CPU; documented alternative |
+
+- Consumer-arg gotchas (details in WO-145 §5): stream **must** carry stereo-aac audio (default mp2 dies on Caspar's 16-ch layout), mjpeg needs `-format nut` (not mpegts), only `-name:stream` option forms are forwarded, and `?localport=` avoids colliding with the relay's listener.
+- New smoke: `tools/smoke/smoke-vcam-stream-mode.test.js` (mock AMCP: FILE vs STREAM lines, relay-arg branch, invalid mode rejected). Existing `smoke-virtual-camera.test.js` still green.
+- **Instructions for next agent:** operator validation in Zoom/getUserMedia with `mode: "stream"` is still open (WO-145 A145.4). If udp loss ever appears, lower `jpegQuality` or consider the h264 variant. Device View inspector does not yet expose the mode toggle — optional follow-up.
 
 ---
 

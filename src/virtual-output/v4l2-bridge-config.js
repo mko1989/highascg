@@ -1,6 +1,12 @@
 'use strict'
 
-const { clampV4l2BridgeFps, clampJpegQuality, normalizeResolutionScale } = require('./v4l2-bridge-args')
+const {
+	clampV4l2BridgeFps,
+	clampJpegQuality,
+	normalizeResolutionScale,
+	normalizeV4l2BridgeMode,
+	clampV4l2BridgeStreamPort,
+} = require('./v4l2-bridge-args')
 
 /** @type {Readonly<object>} */
 const VIRTUAL_CAMERA_DEFAULTS = Object.freeze({
@@ -9,6 +15,10 @@ const VIRTUAL_CAMERA_DEFAULTS = Object.freeze({
 	channel: 1,
 	device: '/dev/video10',
 	basenamePrefix: 'highascg_vcam',
+	/** 'jpeg' = Caspar FILE → overwriting JPEG → relay (WO-137). 'stream' = Caspar STREAM → udp → relay (WO-145). */
+	mode: 'jpeg',
+	/** Loopback UDP port for mode 'stream' (Caspar sends from streamPort+10000 via ?localport=). */
+	streamPort: 5555,
 	width: 1920,
 	height: 1080,
 	fps: 50,
@@ -33,6 +43,8 @@ function normalizeVirtualCameraConfig(raw) {
 	vc.channel = Math.max(1, parseInt(String(vc.channel ?? 1), 10) || 1)
 	vc.device = String(vc.device || VIRTUAL_CAMERA_DEFAULTS.device).trim() || VIRTUAL_CAMERA_DEFAULTS.device
 	vc.basenamePrefix = String(vc.basenamePrefix || VIRTUAL_CAMERA_DEFAULTS.basenamePrefix).trim() || VIRTUAL_CAMERA_DEFAULTS.basenamePrefix
+	vc.mode = normalizeV4l2BridgeMode(vc.mode)
+	vc.streamPort = clampV4l2BridgeStreamPort(vc.streamPort)
 	vc.width = Math.max(320, parseInt(String(vc.width ?? 1920), 10) || 1920)
 	vc.height = Math.max(240, parseInt(String(vc.height ?? 1080), 10) || 1080)
 	vc.fps = clampV4l2BridgeFps(vc.fps, 50)
@@ -60,6 +72,8 @@ function patchVirtualCameraConfig(config, patch) {
 	if (p.channel != null) next.channel = Math.max(1, parseInt(String(p.channel), 10) || 1)
 	if (p.device != null) next.device = String(p.device).trim()
 	if (p.basenamePrefix != null) next.basenamePrefix = String(p.basenamePrefix).trim()
+	if (p.mode != null) next.mode = String(p.mode).trim()
+	if (p.streamPort != null) next.streamPort = parseInt(String(p.streamPort), 10)
 	if (p.fps != null) next.fps = p.fps
 	if (p.width != null) next.width = parseInt(String(p.width), 10)
 	if (p.height != null) next.height = parseInt(String(p.height), 10)

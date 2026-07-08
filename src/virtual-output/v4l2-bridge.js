@@ -3,7 +3,7 @@
 const consumer = require('./v4l2-bridge-consumer')
 const audio = require('./v4l2-bridge-audio')
 const relay = require('./v4l2-bridge-relay')
-const { buildV4l2BridgeCasparAddParams } = require('./v4l2-bridge-args')
+const { resolveV4l2BridgeMode } = require('./v4l2-bridge-args')
 const { resolveV4l2BridgeJpgPath, waitForV4l2BridgeJpgReady } = require('./v4l2-bridge-cache')
 const { ensureVcamKernelModules } = require('./v4l2-kernel-modules')
 const { normalizeVirtualCameraConfig } = require('./v4l2-bridge-config')
@@ -70,7 +70,8 @@ function wireRelayExitHandler(ctx, channel) {
 }
 
 /**
- * Compose-preview order: stub → Caspar FILE writer → relay reads overwriting JPG → v4l2.
+ * jpeg mode (compose-preview order): stub → Caspar FILE writer → relay reads overwriting JPG → v4l2.
+ * stream mode (WO-145): relay listens on UDP first → Caspar STREAM consumer sends → relay → v4l2.
  * @param {object} ctx
  */
 async function startV4l2BridgeInternal(ctx) {
@@ -97,23 +98,44 @@ async function startV4l2BridgeInternal(ctx) {
 			return { ok: false, reason: 'kernel_modules', lastError: modules.lastError, stats: getV4l2BridgeStats(ctx.config) }
 		}
 
-		await consumer.attachV4l2BridgeConsumer(ctx, ch)
-		if (!consumer.getV4l2BridgeConsumerStats(ctx.config).attached) {
-			return { ok: false, reason: 'caspar_video_consumer_failed', stats: getV4l2BridgeStats(ctx.config) }
-		}
-
-		await audio.attachV4l2BridgeAudioConsumer(ctx, ch)
-
-		const jpgPath = resolveV4l2BridgeJpgPath(ctx.config, ch)
-		if (jpgPath) {
-			const ready = await waitForV4l2BridgeJpgReady(jpgPath, 8000)
-			if (!ready) {
-				ctx?.log?.('warn', `[v4l2-bridge] ch${ch} JPEG buffer not ready — relay may fail until Caspar writes`)
+		const mode = resolveV4l2BridgeMode(ctx.config)
+		if (mode === 'stream') {
+			// Relay must be listening on the UDP port before the Caspar STREAM consumer starts sending.
+			relay.startV4l2BridgeRelay(ctx, ch, { onExit: wireRelayExitHandler(ctx, ch) })
+			await new Promise((r) => setTimeout(r, 300))
+			if (!relay.isV4l2BridgeRelayRunning(ch)) {
+				return { ok: false, reason: 'relay_failed', stats: getV4l2BridgeStats(ctx.config) }
 			}
-		}
 
-		relay.startV4l2BridgeRelay(ctx, ch, { onExit: wireRelayExitHandler(ctx, ch) })
-		await new Promise((r) => setTimeout(r, 400))
+			await consumer.attachV4l2BridgeConsumer(ctx, ch)
+			if (!consumer.getV4l2BridgeConsumerStats(ctx.config).attached) {
+				_intentionalStop = true
+				relay.stopV4l2BridgeRelay(ch)
+				_intentionalStop = false
+				return { ok: false, reason: 'caspar_video_consumer_failed', stats: getV4l2BridgeStats(ctx.config) }
+			}
+
+			await audio.attachV4l2BridgeAudioConsumer(ctx, ch)
+			await new Promise((r) => setTimeout(r, 400))
+		} else {
+			await consumer.attachV4l2BridgeConsumer(ctx, ch)
+			if (!consumer.getV4l2BridgeConsumerStats(ctx.config).attached) {
+				return { ok: false, reason: 'caspar_video_consumer_failed', stats: getV4l2BridgeStats(ctx.config) }
+			}
+
+			await audio.attachV4l2BridgeAudioConsumer(ctx, ch)
+
+			const jpgPath = resolveV4l2BridgeJpgPath(ctx.config, ch)
+			if (jpgPath) {
+				const ready = await waitForV4l2BridgeJpgReady(jpgPath, 8000)
+				if (!ready) {
+					ctx?.log?.('warn', `[v4l2-bridge] ch${ch} JPEG buffer not ready — relay may fail until Caspar writes`)
+				}
+			}
+
+			relay.startV4l2BridgeRelay(ctx, ch, { onExit: wireRelayExitHandler(ctx, ch) })
+			await new Promise((r) => setTimeout(r, 400))
+		}
 
 		if (!relay.isV4l2BridgeRelayRunning(ch)) {
 			ctx?.log?.('warn', `[v4l2-bridge] relay ch${ch} failed — removing Caspar consumers`)
@@ -125,10 +147,10 @@ async function startV4l2BridgeInternal(ctx) {
 		}
 
 		_running = true
-		const { amcpPath } = buildV4l2BridgeCasparAddParams(ctx.config, ch)
+		const relayStats = relay.getV4l2BridgeRelayStats(ctx.config)
 		ctx?.log?.(
 			'info',
-			`[v4l2-bridge] active ch${ch} ${amcpPath} → relay → ${relay.getV4l2BridgeRelayStats(ctx.config).device}`,
+			`[v4l2-bridge] active ch${ch} (${mode}) ${consumer.getV4l2BridgeConsumerStats(ctx.config).amcpPath} → relay → ${relayStats.device}`,
 		)
 		return { ok: true, reason: 'started', stats: getV4l2BridgeStats(ctx.config) }
 	} finally {

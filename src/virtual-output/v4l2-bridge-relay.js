@@ -1,10 +1,14 @@
 'use strict'
 
 const { spawn } = require('child_process')
-const { resolveV4l2BridgeFps } = require('./v4l2-bridge-args')
+const {
+	resolveV4l2BridgeFps,
+	resolveV4l2BridgeMode,
+	resolveV4l2BridgeStreamPort,
+} = require('./v4l2-bridge-args')
 const { resolveV4l2BridgeJpgPath } = require('./v4l2-bridge-cache')
 
-/** @type {Map<number, { proc: import('child_process').ChildProcess|null, device: string, jpgPath: string, startedAt: number, lastError?: string }>} */
+/** @type {Map<number, { proc: import('child_process').ChildProcess|null, device: string, mode: string, source: string, jpgPath: string|null, startedAt: number, lastError?: string }>} */
 const _relays = new Map()
 
 /**
@@ -25,43 +29,25 @@ function resolveV4l2Device(config) {
 }
 
 /**
- * Read the overwriting JPEG buffer and feed v4l2 (video only — same as compose preview).
- * @param {object} ctx
+ * ffmpeg args for the relay feeding v4l2. Video source branches on virtualCamera.mode:
+ * - 'jpeg' — loop the Caspar-overwritten JPEG buffer (compose-preview pattern, WO-137).
+ * - 'stream' — read Caspar's mjpeg-over-NUT UDP stream; exits after 5 s without packets so the
+ *   lifecycle exit handler detaches the Caspar consumers (WO-145). Audio stays on snd-aloop (-an).
+ * @param {object} config
  * @param {number} channel
- * @param {{ onExit?: () => void }} [opts]
+ * @returns {{ mode: string, device: string, source: string, jpgPath: string|null, args: string[] } | null}
  */
-function startV4l2BridgeRelay(ctx, channel, opts = {}) {
-	const ch = parseInt(String(channel), 10)
-	if (!Number.isFinite(ch) || ch < 1) return
-	stopV4l2BridgeRelay(ch)
-
-	const cfg = ctx?.config || {}
+function buildV4l2BridgeRelayArgs(config, channel) {
+	const cfg = config || {}
 	const vc = cfg.virtualCamera || {}
-	const jpgPath = resolveV4l2BridgeJpgPath(cfg, ch)
-	if (!jpgPath) {
-		ctx?.log?.('warn', `[v4l2-bridge] relay ch${ch}: JPEG path not resolved`)
-		return
-	}
-
+	const ch = parseInt(String(channel), 10)
+	const mode = resolveV4l2BridgeMode(cfg)
 	const device = resolveV4l2Device(cfg)
 	const fps = resolveV4l2BridgeFps(cfg)
 	const width = Math.max(320, parseInt(String(vc.width ?? 1920), 10) || 1920)
 	const height = Math.max(240, parseInt(String(vc.height ?? 1080), 10) || 1080)
 
-	const args = [
-		'-hide_banner',
-		'-loglevel',
-		'warning',
-		'-nostdin',
-		'-f',
-		'image2',
-		'-stream_loop',
-		'-1',
-		'-re',
-		'-framerate',
-		String(fps),
-		'-i',
-		jpgPath,
+	const outputArgs = [
 		'-vf',
 		`format=yuv420p,scale=${width}:${height}`,
 		'-pix_fmt',
@@ -73,12 +59,50 @@ function startV4l2BridgeRelay(ctx, channel, opts = {}) {
 		`${width}x${height}`,
 		device,
 	]
+	const common = ['-hide_banner', '-loglevel', 'warning', '-nostdin']
 
-	const proc = spawn(ffmpegBinary(cfg), args, { stdio: ['ignore', 'ignore', 'pipe'] })
+	if (mode === 'stream') {
+		const port = resolveV4l2BridgeStreamPort(cfg)
+		const source = `udp://127.0.0.1:${port}?timeout=5000000`
+		return { mode, device, source, jpgPath: null, args: [...common, '-i', source, ...outputArgs] }
+	}
+
+	const jpgPath = resolveV4l2BridgeJpgPath(cfg, ch)
+	if (!jpgPath) return null
+	return {
+		mode,
+		device,
+		source: jpgPath,
+		jpgPath,
+		args: [...common, '-f', 'image2', '-stream_loop', '-1', '-re', '-framerate', String(fps), '-i', jpgPath, ...outputArgs],
+	}
+}
+
+/**
+ * Feed v4l2 from the mode-dependent video source (video only — audio rides snd-aloop).
+ * @param {object} ctx
+ * @param {number} channel
+ * @param {{ onExit?: () => void }} [opts]
+ */
+function startV4l2BridgeRelay(ctx, channel, opts = {}) {
+	const ch = parseInt(String(channel), 10)
+	if (!Number.isFinite(ch) || ch < 1) return
+	stopV4l2BridgeRelay(ch)
+
+	const cfg = ctx?.config || {}
+	const plan = buildV4l2BridgeRelayArgs(cfg, ch)
+	if (!plan) {
+		ctx?.log?.('warn', `[v4l2-bridge] relay ch${ch}: JPEG path not resolved`)
+		return
+	}
+
+	const proc = spawn(ffmpegBinary(cfg), plan.args, { stdio: ['ignore', 'ignore', 'pipe'] })
 	const entry = {
 		proc,
-		device,
-		jpgPath,
+		device: plan.device,
+		mode: plan.mode,
+		source: plan.source,
+		jpgPath: plan.jpgPath,
 		startedAt: Date.now(),
 		lastError: undefined,
 		onExit: opts.onExit,
@@ -110,7 +134,7 @@ function startV4l2BridgeRelay(ctx, channel, opts = {}) {
 		}
 	})
 
-	ctx?.log?.('info', `[v4l2-bridge] relay ch${ch} ${jpgPath} @ ${fps}fps → ${device} (${width}x${height})`)
+	ctx?.log?.('info', `[v4l2-bridge] relay ch${ch} (${plan.mode}) ${plan.source} → ${plan.device}`)
 }
 
 /**
@@ -152,10 +176,12 @@ function getV4l2BridgeRelayStats(config) {
 	const vc = config?.virtualCamera || {}
 	const ch = Math.max(1, parseInt(String(vc.channel ?? 1), 10) || 1)
 	const st = _relays.get(ch)
-	const jpgPath = resolveV4l2BridgeJpgPath(config, ch)
+	const plan = buildV4l2BridgeRelayArgs(config, ch)
 	return st
 		? {
 				running: isV4l2BridgeRelayRunning(ch),
+				mode: st.mode,
+				source: st.source,
 				jpgPath: st.jpgPath,
 				device: st.device,
 				lastError: st.lastError || null,
@@ -164,7 +190,9 @@ function getV4l2BridgeRelayStats(config) {
 			}
 		: {
 				running: false,
-				jpgPath,
+				mode: plan?.mode ?? resolveV4l2BridgeMode(config),
+				source: plan?.source ?? null,
+				jpgPath: plan?.jpgPath ?? null,
 				device: resolveV4l2Device(config),
 				lastError: null,
 				startedAt: null,
@@ -173,6 +201,7 @@ function getV4l2BridgeRelayStats(config) {
 }
 
 module.exports = {
+	buildV4l2BridgeRelayArgs,
 	startV4l2BridgeRelay,
 	stopV4l2BridgeRelay,
 	stopAllV4l2BridgeRelays,
