@@ -29,11 +29,13 @@ async function buildTakeJobs(opts) {
 		channel,
 		incoming,
 		self,
+		amcp,
 		phys,
 		inactiveBank,
 		activeBank,
 		shouldRunBankCrossfade,
 		forceCut,
+		isMergeTransition = false,
 		globalT,
 		framerate,
 		skipLayerVisualEquality = false,
@@ -41,15 +43,24 @@ async function buildTakeJobs(opts) {
 
 	const takeJobs = []
 	const extraExitCandidates = []
+	/** Timeline physical layers preset to 0 by startSceneTimelineLayer — the caller MUST fade them in (WO-152 B152.1). */
+	const timelineFadeInPhys = []
 
 	for (const layer of incomingSorted) {
 		if (layer.source && layer.source.type === 'timeline') {
 			const tlId = layer.source.value
 			if (tlId && self.timelineEngine) {
 				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
-				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx }, tlId)
-				self.timelineEngine.setLoop(tlId, !!layer.loop)
-				self.timelineEngine.play(tlId, 0)
+				// Merge transitions keep the plain-play path (no preset) — their fade batches never run.
+				const fadeDur =
+					forceCut || isMergeTransition || !(globalT?.duration > 0) ? 0 : globalT.duration
+				const { startSceneTimelineLayer } = require('./timeline-take')
+				const fadeIn = await startSceneTimelineLayer(self, amcp, channel, layer, {
+					fadeDur,
+					screenIdx,
+					startAtCurrentPosition: false,
+				})
+				timelineFadeInPhys.push(...fadeIn)
 			}
 			continue
 		}
@@ -311,7 +322,7 @@ async function buildTakeJobs(opts) {
 		})
 	}
 
-	return { takeJobs, extraExitCandidates }
+	return { takeJobs, extraExitCandidates, timelineFadeInPhys }
 }
 
 module.exports = { buildTakeJobs }

@@ -217,9 +217,56 @@ async function runTimelineDirectTake(ctx, eng, tlId, body) {
 	return { ok: true, transition: globalT, forceCut }
 }
 
+/**
+ * Start a timeline layer from a scene take without the full-bright pop (WO-152 B152.1).
+ *
+ * With a fade (fadeDur > 0): preset the timeline's physical layers to opacity 0 BEFORE
+ * PLAY (same flash-race fix as runTimelineDirectTake, WO-139), start playback, and return
+ * the physical layer numbers the CALLER must fade in inside its own frame-locked
+ * crossfade batch. Layers whose active clip animates opacity via keyframes are excluded —
+ * the clip's own fade owns MIXER OPACITY there.
+ * With a cut (fadeDur <= 0): plain play(), nothing to fade (pop is expected on CUT).
+ *
+ * @param {{ timelineEngine?: object }} self
+ * @param {import('../caspar/amcp-client').AmcpClient} amcp
+ * @param {number} channel program channel
+ * @param {{ source?: { value?: string }, loop?: boolean }} layer scene layer (source.type 'timeline')
+ * @param {{ fadeDur: number, screenIdx: number|null, startAtCurrentPosition?: boolean }} opts
+ * @returns {Promise<number[]>} physical layers to fade in (empty on the cut path)
+ */
+async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
+	const eng = self?.timelineEngine
+	const tlId = layer?.source?.value
+	if (!eng || !tlId) return []
+	eng.setSendTo({ preview: true, program: true, screenIdx: opts.screenIdx }, tlId)
+	eng.setLoop(tlId, !!layer.loop)
+	const pb = opts.startAtCurrentPosition ? eng.getPlayback?.(tlId) : null
+	const startPos = pb?.position ?? 0
+	if (!(opts.fadeDur > 0)) {
+		eng.play(tlId, startPos)
+		return []
+	}
+	const tl = eng.get(tlId)
+	const physLayers = collectTimelinePhysicalLayers(tl)
+	if (physLayers.length && amcp) {
+		await amcp
+			.batchSendChunked(
+				physLayers.map((L) => `MIXER ${channel}-${L} OPACITY 0 0`),
+				{ skipMixerPreCommit: true },
+			)
+			.catch(() => {})
+	}
+	eng.play(tlId, startPos)
+	const kfLayers = collectClipOpacityFadeLayers(eng, tl, startPos)
+	return physLayers.filter((L) => !kfLayers.has(L))
+}
+
 module.exports = {
 	runTimelineDirectTake,
 	fadePhysicalLayersOut,
 	fadePhysicalLayersIn,
 	transitionIsCut,
+	collectTimelinePhysicalLayers,
+	collectClipOpacityFadeLayers,
+	startSceneTimelineLayer,
 }

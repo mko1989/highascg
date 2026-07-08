@@ -130,17 +130,19 @@ async function runSceneTakeLbg(amcp, opts) {
 		`[scene-take-lbg] merge=${isMergeTransition} shouldRunBankCrossfade=${shouldRunBankCrossfade} fadeDur=${fadeDur} currentMapSize=${currentMap.size}`,
 	)
 
-	const { takeJobs, extraExitCandidates } = await buildTakeJobs({
+	const { takeJobs, extraExitCandidates, timelineFadeInPhys } = await buildTakeJobs({
 		incomingSorted,
 		currentMap,
 		channel,
 		incoming,
 		self,
+		amcp,
 		phys,
 		inactiveBank,
 		activeBank,
 		shouldRunBankCrossfade,
 		forceCut,
+		isMergeTransition,
 		globalT,
 		framerate,
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
@@ -200,8 +202,20 @@ async function runSceneTakeLbg(amcp, opts) {
 		}
 	}
 
-	if ((exitMedia.length > 0 || timelineFadeLines.length > 0) && fadeDur > 0 && !shouldRunBankCrossfade && !isMergeTransition) {
+	if (
+		(exitMedia.length > 0 || timelineFadeLines.length > 0 || (timelineFadeInPhys?.length || 0) > 0) &&
+		fadeDur > 0 &&
+		!shouldRunBankCrossfade &&
+		!isMergeTransition
+	) {
 		const fadeLines = [...timelineFadeLines]
+		// Incoming timeline layers were preset to 0 before PLAY (WO-152 B152.1) — fade them
+		// in with the same batch/commit so they enter with the transition, not as a pop.
+		for (const L of timelineFadeInPhys || []) {
+			let p = `1 ${fadeDur}`
+			if (fadeTw) p += ` ${require('../caspar/amcp-utils').param(fadeTw)}`
+			fadeLines.push(`MIXER ${channel}-${L} OPACITY ${p}`)
+		}
 		for (const layer of exitMedia) {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
 			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
@@ -299,6 +313,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		sameGbTemplateType,
 		incomingGbLayer,
 		gbWillFadeIn,
+		timelineFadeInPhys: shouldRunBankCrossfade ? timelineFadeInPhys : [],
 		takeJobs,
 		mergeMixerExtras,
 		currentSceneLayers,

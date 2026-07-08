@@ -114,6 +114,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		fadeWatcher,
 		notifyProgramTransitionStarted,
 		incoming,
+		timelineFadeInPhys = [],
 	} = ctx
 
 	// Stale layers on the off-air bank are cleared immediately so they cannot resurface on the next swap.
@@ -257,6 +258,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					buildGlobalBorderOpacityFadeLine(channel, currentGbLayer, 0, fadeDur, fadeTw ? param(fadeTw) : undefined)
 				)
 			}
+			// Incoming timeline layers were preset to opacity 0 before PLAY (WO-152 B152.1) —
+			// fade them in inside the same crossfade batch so they enter with the looks.
+			for (const L of timelineFadeInPhys) {
+				let tlTail = `1 ${fadeDur}`
+				if (fadeTw) tlTail += ` ${param(fadeTw)}`
+				crossfadeLines.push(`MIXER ${channel}-${L} OPACITY ${tlTail}`)
+			}
 		}
 		const needsIncomingFadePreroll =
 			(shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)) ||
@@ -265,7 +273,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		await new Promise((r) => setTimeout(r, prebufferMs))
 
 		try {
-			if (crossfadeLines.length > 0) {
+			if (crossfadeLines.length > 0 && takeJobs.length === 0) {
+				// Timeline-only / exit-only crossfade: sendStaggeredTakePlays drops suffix
+				// lines when there are no source PLAY lines to ride on — send directly.
+				await amcp.batchSendChunked(crossfadeLines, { skipMixerPreCommit: true })
+				await amcp.mixerCommit(channel)
+				fadeClockRef.start = Date.now()
+				notifyProgramTransitionStarted()
+			} else if (crossfadeLines.length > 0) {
 				const crossfadeFadeCtx = { fadeDur, fadeTw }
 				const suffixAfterSources = crossfadeSuffixLinesForStaggeredRoutes(crossfadeLines, takeJobs)
 				await sendStaggeredTakePlays(

@@ -166,14 +166,20 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	}
 
 	const takeJobs = []
+	/** Timeline physical layers preset to 0 by startSceneTimelineLayer — faded in via flatMixer (WO-152 B152.1). */
+	const timelineFadeInPhys = []
 	for (const layer of incomingSorted) {
 		if (layer.source?.type === 'timeline') {
 			const tlId = layer.source.value
 			if (tlId && self.timelineEngine) {
 				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
-				self.timelineEngine.setSendTo({ preview: true, program: true, screenIdx }, tlId)
-				self.timelineEngine.setLoop(tlId, !!layer.loop)
-				self.timelineEngine.play(tlId, 0)
+				const { startSceneTimelineLayer } = require('./timeline-take')
+				const fadeIn = await startSceneTimelineLayer(self, amcp, channel, layer, {
+					fadeDur: forceCut ? 0 : fadeDur,
+					screenIdx,
+					startAtCurrentPosition: false,
+				})
+				timelineFadeInPhys.push(...fadeIn)
 			}
 			continue
 		}
@@ -247,14 +253,35 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			let tail = `0 ${fadeDur}`
 			if (fadeTw) tail += ` ${param(fadeTw)}`
 			for (let li = 0; li < tl.layers.length; li++) {
-				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
+				const pOut = TIMELINE_LAYER_BASE + li
+				// A layer can be both exiting (old timeline) and entering (new timeline) —
+				// the incoming fade-in owns it then; don't schedule a competing fade-out.
+				if (timelineFadeInPhys.includes(pOut)) continue
+				const cl = `${channel}-${pOut}`
 				flatMixer.push(`MIXER ${cl} OPACITY ${tail} DEFER`)
 			}
 		}
 	}
 
+	// Incoming timeline layers were preset to opacity 0 before PLAY (WO-152 B152.1) —
+	// fade them in with the same deferred batch (fired by the take's leading COMMIT).
+	if (timelineFadeInPhys.length > 0 && fadeDur > 0 && !forceCut) {
+		const { param } = require('../caspar/amcp-utils')
+		let tail = `1 ${fadeDur}`
+		if (fadeTw) tail += ` ${param(fadeTw)}`
+		for (const L of timelineFadeInPhys) {
+			flatMixer.push(`MIXER ${channel}-${L} OPACITY ${tail} DEFER`)
+		}
+	}
+
 	if (flatMixer.length > 0) {
 		await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
+	}
+
+	// Timeline-only look (no takeJobs): nothing below will COMMIT the channel, so the
+	// deferred fade lines above (in + out) must be fired explicitly here.
+	if (takeJobs.length === 0 && (timelineFadeInPhys.length > 0 || activeTimelineIdToFadeOut)) {
+		await amcp.mixerCommit(channel).catch(() => {})
 	}
 
 	if (isAnimate && fadeDur > 0 && takeJobs.length > 0) {
