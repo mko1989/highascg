@@ -103,6 +103,7 @@ export function showSettingsModal(initialTab) {
 	}
 
 	modal.querySelector('#decklink-refresh-btn')?.addEventListener('click', () => void MountHw.refreshDecklinkPanel(modal))
+	modal.querySelector('#system-hw-refresh-btn')?.addEventListener('click', () => void MountHw.refreshSystemHardwarePanel(modal))
 
 	modal.querySelector('.settings-tabs')?.addEventListener('click', e => {
 		const btn = e.target.closest('.settings-tab'); if (btn && modal.contains(btn)) activateSettingsTab(btn.dataset.tab)

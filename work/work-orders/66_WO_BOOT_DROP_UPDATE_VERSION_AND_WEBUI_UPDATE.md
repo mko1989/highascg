@@ -365,6 +365,11 @@ On validation failure: leave drop in place, log errors, exit **1** from apply (b
 
 ## 9. Work Log
 
+### 2026-07-14 — T1.1 completed via WO-188
+
+- Removed `dist-web/` exclude from `config/server-update-rsync-excludes.txt` (WO-66 T1.1 deferred to WO-188).
+- Server drops now include `dist-web/` in stick and installed-system updates; web UI refreshes with drop-update.
+
 ### 2026-06-28 — T2.2 package.json bump at release (agent)
 
 - `release_lib_bump_package_json` / `release_lib_restore_package_json` in `release-lib.sh`.

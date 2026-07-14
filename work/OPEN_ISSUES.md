@@ -43,4 +43,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | TIMER-PANEL | Collapsible timer control panel (selector, HH/MM/SS, center default) | [WO-186](./work-orders/186_WO_TIMER_CONTROL_PANEL.md) | 🟡 Implemented |
 | TEMPLATE-THUMBS | Template layers show rendered "shown-state" snapshots in the looks editor | [WO-187](./work-orders/187_WO_TEMPLATE_THUMBNAILS_IN_LOOKS_EDITOR.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-181–187; pgm-only take hotfix + all server-side changes need the next service restart)
+| UPDATE-GAPS | dist-web now included in drops; DeckLink install API/UI + tar.gz; vendor seeding verified (GitHub webui update flow was already fully shipped) | [WO-188](./work-orders/188_WO_UPDATE_SYSTEM_GAPS_DISTWEB_DECKLINK.md) | 🟡 Implemented |
+| HW-DISPLAY | Settings → System tab hardware summary (/api/system/hardware aggregator) | [WO-189](./work-orders/189_WO_SETTINGS_SYSTEM_HARDWARE_DISPLAY.md) | 🟡 Implemented |
+
+Last updated: 2026-07-14 (WO-181–189; pgm-only take hotfix + all server-side changes need the next service restart)

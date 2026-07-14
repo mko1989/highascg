@@ -517,4 +517,15 @@ echo "  /etc/systemd/system/${decklink_install_svc}"
 echo "  ${DECKLINK_INSTALL_SH_DST}"
 echo "  ${DECKLINK_INSTALL_LIB_DST}"
 echo "  /etc/systemd/system/${arrive_svc}"
+# WO-188: sudoers entry for DeckLink install (via Web UI password-gated POST)
+SUDOERS_DECKLINK=/etc/sudoers.d/highascg-decklink-install
+TMP_SUDOERS="$(mktemp)"
+trap 'rm -f "$TMP_SUDOERS"' EXIT
+cat >"$TMP_SUDOERS" <<SUDOERSEOF
+# HighAsCG DeckLink install (WO-188) — passwordless sudo for highascg-webui-server-update user
+${USER_CASPAR} ALL=(root) NOPASSWD: ${DECKLINK_INSTALL_SH_DST}
+SUDOERSEOF
+visudo -cf "$TMP_SUDOERS" >/dev/null 2>&1 && install -m 0440 -o root -g root "$TMP_SUDOERS" "$SUDOERS_DECKLINK"
+echo "installed ${SUDOERS_DECKLINK}"
+
 echo "Re-run: sudo bash ${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh ${USER_CASPAR}"

@@ -143,5 +143,6 @@ async function handleGpuLayoutGet() {
 }
 
 module.exports = {
-	handleGpuLayoutGet
+	handleGpuLayoutGet,
+	getPhysicalPortsFromXrandrInventory,
 }

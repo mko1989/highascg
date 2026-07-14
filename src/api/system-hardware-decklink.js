@@ -1,9 +1,11 @@
 /**
  * DeckLink enumeration GET — ffmpeg probe + Caspar log merge (WO-39).
+ * Includes vendorAvailable flag for install UI gating (WO-188).
  */
 
 'use strict'
 
+const fs = require('fs')
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { probeDecklinkHardware, probeDecklinkFromCasparLog } = require('../utils/decklink-enum')
 const { resolveBmdUpdater } = require('./system-hardware-gui')
@@ -22,6 +24,34 @@ function isBetterDecklinkLabel(candidate, existing) {
 	if (cDeck && !eDeck) return true
 	if (!cDeck && eDeck) return false
 	return c.length < e.length
+}
+
+/**
+ * Check if DeckLink vendor files (pre-extracted debs or tar.gz) are available.
+ * @returns {boolean}
+ */
+function checkDecklinkVendorAvailable() {
+	const vendorDirs = [
+		'/home/casparcg/exfat/decklink',
+		'/home/casparcg/bridge/decklink',
+	]
+	for (const dir of vendorDirs) {
+		try {
+			if (!fs.existsSync(dir)) continue
+			const files = fs.readdirSync(dir)
+			// Check for pre-extracted debs
+			if (files.some(f => /^desktopvideo(_|-gui_)[^/]*\.deb$/.test(f))) {
+				return true
+			}
+			// Check for tar.gz archives
+			if (files.some(f => /^Blackmagic_Desktop_Video_Linux_.*\.tar\.gz$/.test(f))) {
+				return true
+			}
+		} catch {
+			continue
+		}
+	}
+	return false
 }
 
 /**
@@ -65,6 +95,7 @@ async function decklinkGet() {
 	const primary = ff || { source: 'ffmpeg_decklink', connectors: [], warning: 'ffmpeg probe failed or timed out' }
 	const devices = mergeDecklinks(primary, clog)
 	const driverHealth = primary.driverHealth || null
+	const vendorAvailable = checkDecklinkVendorAvailable()
 
 	return {
 		status: 200,
@@ -72,6 +103,7 @@ async function decklinkGet() {
 		body: jsonBody({
 			devices,
 			driverHealth,
+			vendorAvailable,
 			sourcesTried: {
 				primary: primary.source,
 				ffmpeg: primary.sources?.ffmpeg || (primary.source === 'ffmpeg_decklink' ? primary.source : null),

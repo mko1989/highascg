@@ -1,7 +1,6 @@
 # rsync excludes: exfat/drop-update/ → ~/highascg (server-only drop)
 # Never overwrite or remove ISO/install artifacts (see apply script: merge-only, no --delete on dest).
 client/
-dist-web/
 audio_testing/
 for_client/
 From_client/

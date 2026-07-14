@@ -81,7 +81,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 	exit 0
 fi
 
-if decklink_install_vendor_pair "$DECKLINK_VENDOR_MAIN_DEB" "$DECKLINK_VENDOR_GUI_DEB"; then
+if decklink_install_vendor_pair "$DECKLINK_VENDOR_MAIN_DEB" "$DECKLINK_VENDOR_GUI_DEB" "${DECKLINK_EXTRACT_TMPDIR:-}"; then
 	log "ok: installed Desktop Video ${DECKLINK_VENDOR_VERSION}"
 	exit 0
 fi

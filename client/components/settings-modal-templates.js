@@ -198,8 +198,10 @@ export function getMainModalHtml() {
 						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-top:0.35rem">
 							<button type="button" class="btn btn--secondary" id="system-hw-open-firefox">Open browser</button>
 							<button type="button" class="btn btn--secondary" id="system-hw-open-file-manager">Open file manager</button>
+							<button type="button" class="btn btn--secondary" id="system-hw-refresh-btn">Refresh hardware</button>
 						</div>
 						<p class="settings-note" id="system-hw-operator-status" style="margin-top:0.35rem"></p>
+						<div id="system-hw-summary-container" style="margin-top:1rem"></div>
 					</div>
 					<div class="settings-pane" id="settings-pane-decklink">
 						<h3 class="settings-category">Blackmagic DeckLink</h3>

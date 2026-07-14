@@ -55,6 +55,28 @@ decklink_vendor_search_dirs() {
 	done
 }
 
+# Extract DeckLink .debs from Blackmagic_Desktop_Video_Linux_*.tar.gz to a temp directory.
+# Returns path to temp dir in DECKLINK_EXTRACT_TMPDIR; caller is responsible for cleanup.
+decklink_extract_tar_gz_debs() {
+	local tar_gz="${1:-}"
+	local temp_dir
+	[[ -f "$tar_gz" ]] || return 1
+	temp_dir="$(mktemp -d)" || return 1
+	DECKLINK_EXTRACT_TMPDIR="$temp_dir"
+	# List deb/x86_64/*.deb entries; if found, extract them to temp dir
+	if tar -tzf "$tar_gz" 2>/dev/null | grep -q '^deb/x86_64/.*\.deb$'; then
+		tar -xzf "$tar_gz" -C "$temp_dir" deb/x86_64/*.deb 2>/dev/null || {
+			rm -rf "$temp_dir"
+			DECKLINK_EXTRACT_TMPDIR=""
+			return 1
+		}
+		return 0
+	fi
+	rm -rf "$temp_dir"
+	DECKLINK_EXTRACT_TMPDIR=""
+	return 1
+}
+
 # Sets DECKLINK_VENDOR_MAIN_DEB, DECKLINK_VENDOR_GUI_DEB, DECKLINK_VENDOR_VERSION, DECKLINK_VENDOR_DIR.
 # Returns 0 when a matching pair is found.
 decklink_find_newest_vendor_pair() {
@@ -87,6 +109,39 @@ decklink_find_newest_vendor_pair() {
 		done
 	done < <(decklink_vendor_search_dirs)
 
+	# No pre-extracted debs found; check for tar.gz and extract
+	if [[ -z "$best_main" ]]; then
+		local tar_gz search_dir
+		while IFS= read -r search_dir; do
+			[[ -n "$search_dir" ]] || continue
+			for tar_gz in "$search_dir"/Blackmagic_Desktop_Video_Linux_*.tar.gz; do
+				[[ -f "$tar_gz" ]] || continue
+				if decklink_extract_tar_gz_debs "$tar_gz"; then
+					# Look for debs in extracted temp dir (deb/x86_64/ structure)
+					for f in "${DECKLINK_EXTRACT_TMPDIR}"/deb/x86_64/desktopvideo_*.deb; do
+						[[ -f "$f" ]] || continue
+						base="$(basename "$f")"
+						[[ "$base" == desktopvideo-gui_* ]] && continue
+						ver="$(decklink_deb_version_from_basename "$base")"
+						[[ -n "$ver" ]] || continue
+						gui_deb="${DECKLINK_EXTRACT_TMPDIR}/deb/x86_64/desktopvideo-gui_${ver}_amd64.deb"
+						if [[ ! -f "$gui_deb" ]]; then
+							gui_deb=""
+						fi
+						if [[ -z "$best_ver" ]] || [[ "$(printf '%s\n' "$ver" "$best_ver" | sort -V | tail -1)" == "$ver" ]]; then
+							best_ver="$ver"
+							best_main="$f"
+							best_gui="$gui_deb"
+							best_dir="${DECKLINK_EXTRACT_TMPDIR}/deb/x86_64"
+						fi
+					done
+					# Keep the temp dir for later cleanup after install
+					break 2
+				fi
+			done
+		done < <(decklink_vendor_search_dirs)
+	fi
+
 	[[ -n "$best_main" && -n "$best_ver" ]] || return 1
 	DECKLINK_VENDOR_MAIN_DEB="$best_main"
 	DECKLINK_VENDOR_GUI_DEB="${best_gui:-}"
@@ -113,6 +168,7 @@ decklink_needs_install_from_vendor() {
 decklink_install_vendor_pair() {
 	local main_deb="${1:-}"
 	local gui_deb="${2:-}"
+	local extract_dir="${3:-}"
 	[[ -f "$main_deb" ]] || return 1
 	decklink_ensure_dkms_prereqs || return 1
 	if [[ -n "$gui_deb" && -f "$gui_deb" ]]; then
@@ -129,6 +185,8 @@ decklink_install_vendor_pair() {
 	decklink_rebuild_blackmagic_dkms || true
 	modprobe blackmagic_io 2>/dev/null || true
 	modprobe blackmagic 2>/dev/null || true
+	# Clean up temporary extraction directory if provided
+	[[ -z "$extract_dir" || ! -d "$extract_dir" ]] || rm -rf "$extract_dir"
 	return 0
 }
 
