@@ -670,3 +670,209 @@ input[type="range"].audio-mixer__fader-horizontal {
 .timer-control-panel--collapsed {
 	border-top: 1px solid var(--border);
 }
+
+/* Timer list container */
+.timer-control-panel__list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+/* Timer row (compact dark row) */
+.timer-control-panel__timer-row {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 4px 6px;
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid rgba(255, 255, 255, 0.04);
+	border-radius: 4px;
+	margin-bottom: 2px;
+}
+
+/* Timer display (monospace, prominent) */
+.timer-control-panel__timer-display {
+	font-family: 'Courier New', monospace;
+	font-size: 1.1em;
+	font-weight: 600;
+	text-align: right;
+	min-width: 70px;
+	color: var(--text);
+}
+
+/* Screen chip (small inline pill) */
+.timer-control-panel__screen-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 3px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+/* Chip toggle button (small icon button) */
+.timer-control-panel__chip-toggle {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	width: 18px;
+	height: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	font-size: 0.9em;
+	transition: color 0.15s ease;
+}
+
+.timer-control-panel__chip-toggle:hover {
+	color: var(--text);
+}
+
+/* Chip unassign button (small × button) */
+.timer-control-panel__chip-unassign {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0.6;
+	color: var(--text-muted);
+	font-size: 0.9em;
+	transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.timer-control-panel__chip-unassign:hover {
+	opacity: 1;
+	color: var(--text);
+}
+
+/* Screen select dropdown (compact) */
+.timer-control-panel__screen-select {
+	padding: 2px 4px;
+	background: var(--bg-input, var(--bg-2, #161b22));
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 2px;
+	color: var(--text-muted);
+	font-size: 0.85em;
+	cursor: pointer;
+	outline: none;
+	transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.timer-control-panel__screen-select:hover {
+	color: var(--text);
+	border-color: rgba(255, 255, 255, 0.15);
+}
+
+.timer-control-panel__screen-select:focus {
+	border-color: var(--accent);
+}
+
+/* New timer button (full-width small) */
+.timer-control-panel__new-timer-btn {
+	width: 100%;
+	padding: 4px 8px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 0.75rem;
+	font-weight: 600;
+	transition: background-color 0.2s, border-color 0.2s;
+}
+
+.timer-control-panel__new-timer-btn:hover:not(:disabled) {
+	background: var(--accent);
+	color: var(--bg);
+	border-color: var(--accent);
+}
+
+.timer-control-panel__new-timer-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Settings editor section */
+.timer-control-panel__settings {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 6px;
+	background: rgba(0, 0, 0, 0.15);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 3px;
+	margin-top: 4px;
+}
+
+.timer-control-panel__settings-label {
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	letter-spacing: 0.05em;
+	margin-bottom: 2px;
+}
+
+.timer-control-panel__settings-row {
+	display: flex;
+	gap: 6px;
+	align-items: flex-end;
+}
+
+.timer-control-panel__settings-input,
+.timer-control-panel__settings-select {
+	padding: 2px 4px;
+	background: var(--bg-input, var(--bg-2, #161b22));
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 2px;
+	color: var(--text);
+	font-size: 0.75rem;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+.timer-control-panel__settings-input:hover,
+.timer-control-panel__settings-select:hover {
+	border-color: rgba(255, 255, 255, 0.15);
+}
+
+.timer-control-panel__settings-input:focus,
+.timer-control-panel__settings-select:focus {
+	border-color: var(--accent);
+}
+
+.timer-control-panel__settings-btn {
+	padding: 2px 6px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: 2px;
+	color: var(--text-muted);
+	font-size: 0.65rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.12s ease;
+	white-space: nowrap;
+}
+
+.timer-control-panel__settings-btn:hover:not(:disabled) {
+	background: var(--accent);
+	color: var(--bg);
+	border-color: var(--accent);
+}
+
+.timer-control-panel__settings-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}

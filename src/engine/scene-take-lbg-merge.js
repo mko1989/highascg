@@ -21,16 +21,23 @@ function resolveGlobalBorderPhysicalLayer(gb) {
 /**
  * Merge transition: outgoing-only logical layers (still on PGM, not replaced by a takeJob on this beat)
  * fade to opacity 0 on the **same** Caspar layer index as the look (no bank B / +100).
- * @param {{ channel: number, exitMedia: object[], takeJobs: object[], fadeDur: number, fadeTw?: string, currentSceneLayers: object, fadeWatcher: object|null }} p
+ * WO-217 T217.1: Guard with incoming physical layers to prevent fading layers that the same take is playing.
+ * @param {{ channel: number, exitMedia: object[], takeJobs: object[], fadeDur: number, fadeTw?: string, currentSceneLayers: object, fadeWatcher: object|null, activeBank?: string, phys?: function }} p
  * @returns {string[]}
  */
 function buildMergeOutgoingOpacityDeferLines(p) {
-	const { channel, exitMedia, takeJobs, fadeDur, fadeTw, currentSceneLayers, fadeWatcher } = p
+	const { channel, exitMedia, takeJobs, fadeDur, fadeTw, currentSceneLayers, fadeWatcher, activeBank, phys } = p
 	const lines = []
 	const takeJobNums = new Set(takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite))
+	// WO-217 T217.1: Also exclude incoming physical layers (guard with incoming phys to avoid blanking).
+	const incomingPhys = new Set(takeJobs.map((j) => Number(j.pLayer)).filter(Number.isFinite))
 	for (const layer of exitMedia) {
 		const ln = Number(layer.layerNumber)
 		if (!Number.isFinite(ln) || takeJobNums.has(ln)) continue
+		// WO-217 T217.1: Unconditional guard on physical layers — do not fade what the take is playing.
+		// For merge transitions, outgoing-only layers are on activeBank, so compute physical layer for that bank.
+		const pL = phys && activeBank ? phys(ln, activeBank) : ln
+		if (incomingPhys.has(pL)) continue
 		if (fadeWatcher) {
 			fadeWatcher.cancel(channel, ln)
 			fadeWatcher.cancel(channel, ln + PGM_BANK_B_OFFSET)
@@ -82,6 +89,8 @@ function buildMergeMixerExtrasForTake(p) {
 		gbWillFadeOut,
 		incomingGbLayer,
 		currentGbLayer,
+		activeBank,
+		phys,
 	} = p
 	if (!isMergeTransition || fadeDur <= 0 || forceCut) return []
 	return [
@@ -93,6 +102,8 @@ function buildMergeMixerExtrasForTake(p) {
 			fadeTw,
 			currentSceneLayers,
 			fadeWatcher,
+			activeBank,
+			phys,
 		}),
 		...(gbWillFadeIn
 			? [

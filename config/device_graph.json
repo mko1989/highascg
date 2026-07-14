@@ -216,5 +216,6 @@
       "sourceId": "dst_in_dst_pgm_1",
       "sinkId": "audio_1"
     }
-  ]
+  ],
+  "layout": {}
 }

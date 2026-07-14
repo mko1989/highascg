@@ -8,6 +8,8 @@
 
 const test = require('node:test')
 const assert = require('node:assert')
+const fs = require('fs')
+const path = require('path')
 
 // Mock persistence to make tests isolated
 const persistence = {
@@ -126,7 +128,7 @@ test('slot reuse after unassign', () => {
 	assert.strictEqual(r3.layer, 980, 'Reused slot should be 980')
 })
 
-test('assignTimerToScreen idempotency', () => {
+test('assignTimerToScreen idempotency with config update', () => {
 	resetScreenTimersModule()
 
 	// Assign timer to screen 0, channel 1
@@ -139,8 +141,10 @@ test('assignTimerToScreen idempotency', () => {
 	})
 	assert.strictEqual(r1.layer, 980)
 	assert(r1.lines.length > 0, 'First assign should return lines')
+	assert(r1.lines.some(l => l.startsWith('CG')), 'First assign should have CG line')
 
-	// Assign same timer to same screen again — should be idempotent
+	// Assign same timer to same screen again with config update
+	// Should be idempotent in layer assignment but emit CG UPDATE for config change
 	const r2 = screenTimers.assignTimerToScreen({
 		timerId: 'timer1',
 		name: 'Timer 1 (updated)',
@@ -149,7 +153,8 @@ test('assignTimerToScreen idempotency', () => {
 		channel: 1,
 	})
 	assert.strictEqual(r2.layer, 980, 'Layer should remain 980')
-	assert.strictEqual(r2.lines.length, 0, 'Idempotent assign should return no new lines')
+	assert(r2.lines.length > 0, 'Re-assign with config change should return CG UPDATE line')
+	assert(r2.lines.some(l => l.includes('UPDATE')), 'Should emit CG UPDATE when config changes')
 })
 
 test('setTimerVisible - visibility toggle line format', () => {
@@ -429,4 +434,182 @@ test('linesForLookVisibility returns empty array for null/undefined/non-object m
 	// Test with empty object
 	const linesEmpty = screenTimers.linesForLookVisibility(1, {})
 	assert.strictEqual(linesEmpty.length, 0, 'Should return empty array for empty object (no timers mentioned)')
+})
+
+test('BAND GUARD: setTimerVisible skips entries with layer outside 980-989', () => {
+	resetScreenTimersModule()
+
+	// Assign a timer normally (gets layer 980)
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Manually corrupt the registry entry to have layer 10 (violates band)
+	screenTimers.loadRegistry()
+	const registry = screenTimers.loadRegistry()
+	// Access internal structure via listScreenTimers
+	let list = screenTimers.listScreenTimers()
+	const timerRecord = list.find(r => r.timerId === 'timer1')
+	assert(timerRecord && timerRecord.screens['0'], 'Timer should be in registry')
+
+	// Manually mutate the persistence to simulate corrupted data
+	const stored = persistence.get('screenTimers')
+	stored.timer1.screens['0'].layer = 10
+	persistence.set('screenTimers', stored)
+
+	// Reload module to pick up corrupted data
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	screenTimers = require('../../src/engine/screen-timers')
+
+	// Now try to call setTimerVisible — should return no lines due to band violation
+	const result = screenTimers.setTimerVisible({
+		timerId: 'timer1',
+		screenIdx: 0,
+		visible: false,
+	})
+	assert.strictEqual(result.lines.length, 0, 'Should return no lines for layer outside 980-989')
+})
+
+test('BAND GUARD: linesForReAdd skips entries with layer outside 980-989', () => {
+	resetScreenTimersModule()
+
+	// Assign a timer
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Corrupt the registry entry
+	const stored = persistence.get('screenTimers')
+	stored.timer1.screens['0'].layer = 500 // Invalid layer
+	persistence.set('screenTimers', stored)
+
+	// Reload module
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	screenTimers = require('../../src/engine/screen-timers')
+
+	// Now try linesForReAdd — should return no lines for corrupted entry
+	const lines = screenTimers.linesForReAdd()
+	assert.strictEqual(lines.length, 0, 'Should return no lines for corrupted layer')
+})
+
+test('BAND GUARD: linesForLookVisibility skips entries with layer outside 980-989', () => {
+	resetScreenTimersModule()
+
+	// Assign a timer
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Corrupt the registry entry
+	const stored = persistence.get('screenTimers')
+	stored.timer1.screens['0'].layer = 999 // Invalid layer
+	persistence.set('screenTimers', stored)
+
+	// Reload module
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	screenTimers = require('../../src/engine/screen-timers')
+
+	// Call linesForLookVisibility with visibility map
+	const lines = screenTimers.linesForLookVisibility(1, { timer1: true })
+	assert.strictEqual(lines.length, 0, 'Should return no lines for corrupted layer')
+})
+
+test('BAND GUARD: unassignTimer skips entries with layer outside 980-989', () => {
+	resetScreenTimersModule()
+
+	// Assign a timer
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Corrupt the registry entry
+	const stored = persistence.get('screenTimers')
+	stored.timer1.screens['0'].layer = 979 // Just below valid band
+	persistence.set('screenTimers', stored)
+
+	// Reload module
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	screenTimers = require('../../src/engine/screen-timers')
+
+	// Try to unassign — should return no lines
+	const result = screenTimers.unassignTimer({
+		timerId: 'timer1',
+		screenIdx: 0,
+	})
+	assert.strictEqual(result.lines.length, 0, 'Should return no lines for layer outside 980-989')
+})
+
+test('config merge on re-assign to same screen', () => {
+	resetScreenTimersModule()
+
+	// Assign timer to screen 0
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: { durationSec: 60, mode: 'duration' },
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Verify initial config in registry
+	let list = screenTimers.listScreenTimers()
+	let timerRecord = list.find(r => r.timerId === 'timer1')
+	assert.strictEqual(timerRecord.config.durationSec, 60)
+	assert.strictEqual(timerRecord.config.mode, 'duration')
+
+	// Re-assign same timer to same screen with new config
+	const r2 = screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1 (updated)',
+		config: { mode: 'clock', targetTime: '18:00:00' },
+		screenIdx: 0,
+		channel: 1,
+	})
+	assert.strictEqual(r2.layer, 980, 'Layer should remain the same')
+	assert(r2.lines.length > 0, 'Re-assign should emit CG UPDATE line')
+
+	// Verify config was merged in registry
+	list = screenTimers.listScreenTimers()
+	timerRecord = list.find(r => r.timerId === 'timer1')
+	assert.strictEqual(timerRecord.config.durationSec, 60, 'durationSec should be preserved from original')
+	assert.strictEqual(timerRecord.config.mode, 'clock', 'mode should be updated')
+	assert.strictEqual(timerRecord.config.targetTime, '18:00:00', 'targetTime should be updated')
+})
+
+test('CSS: new timer panel classes exist in stylesheet', () => {
+	const cssPath = path.join(__dirname, '../../client/styles/07b-audio-mixer-modal-shell.css')
+	const cssContent = fs.readFileSync(cssPath, 'utf-8')
+
+	// Check for presence of new CSS classes
+	const requiredClasses = [
+		'timer-control-panel__timer-row',
+		'timer-control-panel__timer-display',
+		'timer-control-panel__screen-chip',
+		'timer-control-panel__chip-toggle',
+		'timer-control-panel__chip-unassign',
+		'timer-control-panel__screen-select',
+		'timer-control-panel__new-timer-btn',
+		'timer-control-panel__list',
+		'timer-control-panel__settings',
+	]
+
+	for (const className of requiredClasses) {
+		assert(cssContent.includes(className), `CSS should contain class: ${className}`)
+	}
 })

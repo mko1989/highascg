@@ -54,6 +54,9 @@ const FILES = [
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',
 	'tools/smoke/smoke-wo213-preview-invalidate.test.js',
 	'tools/smoke/smoke-wo214-timeline-mixer-rows.test.js',
+	'tools/smoke/smoke-wo217-self-blank-guard.test.js',
+	'tools/smoke/smoke-wo218-bank-drift.test.js',
+	'tools/smoke/smoke-wo220-shadow-geometry.test.js',
 	'test/companion-control-status.test.js',
 ]
 

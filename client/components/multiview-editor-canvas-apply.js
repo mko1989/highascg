@@ -57,6 +57,12 @@ export async function applyMultiviewLayout(getChannelMap, opts = {}) {
 		if (!silent) alert(`Multiview ${n} channel not found.`)
 		return
 	}
+	// Empty layout = nothing to apply (editor not yet loaded / cells cleared). The server
+	// engine 502s on it ('layout array required') — skip instead of spamming failures.
+	if (!Array.isArray(layout) || layout.length === 0) {
+		if (!silent) alert('Multiview layout is empty — nothing to apply.')
+		return
+	}
 
 	try {
 		await api.post('/api/multiview/apply', {

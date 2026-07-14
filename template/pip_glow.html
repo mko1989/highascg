@@ -27,6 +27,8 @@
 		pointer-events: none;
 		box-sizing: border-box;
 		overflow: visible;
+		/* WO-220 H1: invisible background forces CEF to composite this element + its box-shadow (glow effect) */
+		background: rgba(0, 0, 0, 0.002);
 	}
 	.pip-frame.side-outside {
 		box-shadow: 0 0 var(--i) var(--w) var(--c);

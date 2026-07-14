@@ -24,6 +24,19 @@ const CG_SUBLAYER = 0
 /** Caspar CG template path. */
 const COUNTDOWN_CG_NAME = 'countdown/countdown'
 
+/** Band guard: timers must use layers 980-989 only */
+const TIMER_LAYER_MIN = 980
+const TIMER_LAYER_MAX = 989
+
+/**
+ * Validate that a layer is within the timer band.
+ * @param {number} layer
+ * @returns {boolean}
+ */
+function isTimerLayer(layer) {
+	return Number.isFinite(layer) && layer >= TIMER_LAYER_MIN && layer <= TIMER_LAYER_MAX
+}
+
 /**
  * Resolve program channel from screenIdx using routing.
  * @param {number} screenIdx — 0-based screen index
@@ -119,6 +132,13 @@ function handleAssign(body, ctx) {
 			screenIdx,
 			channel,
 		})
+
+		// Band guard: validate layer before sending
+		if (!isTimerLayer(layer)) {
+			const msg = `[screen-timers] BAND VIOLATION: assign produced layer ${layer} outside 980-989`
+			if (typeof ctx.log === 'function') ctx.log('warn', msg)
+			return { ok: false, error: msg }
+		}
 
 		// Send AMCP lines
 		if (lines.length > 0) {

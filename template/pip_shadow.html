@@ -27,6 +27,8 @@
 		box-sizing: border-box;
 		overflow: visible;
 		opacity: var(--o, 1);
+		/* WO-220 H1: invisible background forces CEF to composite this element + its box-shadow */
+		background: rgba(0, 0, 0, 0.002);
 	}
 	.pip-frame.side-outside {
 		box-shadow: var(--ox) var(--oy) var(--b) var(--s) var(--c);

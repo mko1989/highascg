@@ -46,6 +46,8 @@ async function buildTakeJobs(opts) {
 	const extraExitCandidates = []
 	/** Timeline physical layers preset to 0 by startSceneTimelineLayer — the caller MUST fade them in (WO-152 B152.1). */
 	const timelineFadeInPhys = []
+	/** WO-218: Layers skipped as visually-equal that may need SWAP when bank flips. */
+	const skippedVisuallyEqualLayers = []
 
 	for (const layer of incomingSorted) {
 		if (layer.source && layer.source.type === 'timeline') {
@@ -117,6 +119,16 @@ async function buildTakeJobs(opts) {
 			? { _: 'skipLayerVisualEquality' }
 			: require('./scene-transition').layerVisuallyEqual(cur, layer, true)
 		if (Object.keys(diffs).length === 0) {
+			// WO-218: Track visually-equal layers that are being skipped
+			// They may need SWAP/re-stage if the bank flips during this take
+			if (hasOutgoingOnAir && cur) {
+				const physicalLayerNow = phys(Number(layer.layerNumber), activeBank)
+				skippedVisuallyEqualLayers.push({
+					layerNumber: layer.layerNumber,
+					physicalLayerNow, // current active bank physical layer
+					incomingLayer: layer,
+				})
+			}
 			continue
 		}
 		if (pendingManualPlaylistAdvance) {
@@ -230,8 +242,9 @@ async function buildTakeJobs(opts) {
 		mixerLines.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} ${fillTail}`)
 		mixerLines.push(...sceneLayerRotationMixerLines(cl, rot))
 		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
-		if (!incomingStartsHidden && layer.opacity != null && layer.opacity !== 1) {
-			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity} 0`)
+		// WO-217 T217.2: Defensive opacity reset — always emit OPACITY (not just when != 1) so stale 0s from prior bugs cannot hide fresh content.
+		if (!incomingStartsHidden) {
+			mixerLines.push(`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0`)
 		}
 		// Important: pre-hide for crossfade must be immediate (non-DEFER) before PLAY.
 		// If we DEFER this together with "OPACITY 1 <dur>", Caspar may only honor the
@@ -336,7 +349,7 @@ async function buildTakeJobs(opts) {
 		})
 	}
 
-	return { takeJobs, extraExitCandidates, timelineFadeInPhys }
+	return { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers }
 }
 
 module.exports = { buildTakeJobs }

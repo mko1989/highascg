@@ -23,6 +23,19 @@ const COUNTDOWN_CG_NAME = 'countdown/countdown'
 /** CG sub-layer index (scene take always uses sublayer 0; screen timers use it too for consistency). */
 const CG_SUBLAYER = 0
 
+/** Band guard: timers must use layers 980-989 only */
+const TIMER_LAYER_MIN = 980
+const TIMER_LAYER_MAX = 989
+
+/**
+ * Validate that a layer is within the timer band.
+ * @param {number} layer
+ * @returns {boolean}
+ */
+function isTimerLayer(layer) {
+	return Number.isFinite(layer) && layer >= TIMER_LAYER_MIN && layer <= TIMER_LAYER_MAX
+}
+
 /**
  * Module-level registry: { timerId → { timerId, name, config, lastCmd, cmdAt, screens } }
  * Each screen entry: { [screenIdx] → { channel, layer, visible } }
@@ -84,7 +97,7 @@ function _findLowestFreeSlot(channel) {
 
 /**
  * Assign a timer to a screen at the lowest available slot.
- * If already assigned to the same screen, returns existing layer (idempotent).
+ * If already assigned to the same screen, updates config and emits CG UPDATE.
  *
  * @param {{timerId: string, name?: string, config?: object, screenIdx: number, channel: number}} opts
  * @returns {{ layer: number, lines: string[] }}
@@ -104,10 +117,24 @@ function assignTimerToScreen(opts) {
 	if (record && record.screens && record.screens[String(screenIdx)]) {
 		const existing = record.screens[String(screenIdx)]
 		if (existing.channel === channel) {
-			// Idempotent — already assigned to this screen
+			// Re-assign to same screen: merge config and emit CG UPDATE
+			if (name !== undefined) record.name = name
+			if (config !== undefined) {
+				record.config = { ...record.config, ...config }
+			}
+
+			const lines = []
+			const cgPayload = {
+				...record.config,
+			}
+			// CG UPDATE with new config JSON payload
+			lines.push(`CG ${channel}-${existing.layer} UPDATE "${CG_SUBLAYER}" "{""${JSON.stringify(cgPayload).replace(/"/g, '""')}"}"`)
+
+			_persistRegistry()
+
 			return {
 				layer: existing.layer,
-				lines: [], // No new commands needed
+				lines,
 			}
 		}
 	}
@@ -162,6 +189,7 @@ function assignTimerToScreen(opts) {
 /**
  * Unassign a timer from a screen.
  * If no screens remain, the entire record is deleted.
+ * Band-guarded: skips entry if layer outside 980-989 range.
  *
  * @param {{timerId: string, screenIdx: number}} opts
  * @returns {{ lines: string[] }}
@@ -181,6 +209,13 @@ function unassignTimer(opts) {
 
 	const screenEntry = record.screens[String(screenIdx)]
 	const { channel, layer } = screenEntry
+
+	// Band guard: validate layer is within timer band
+	if (!isTimerLayer(layer)) {
+		console.warn(`[screen-timers] BAND VIOLATION: unassignTimer layer ${layer} outside 980-989 for timer ${timerId} screen ${screenIdx}`)
+		return { lines: [] }
+	}
+
 	const lines = [`CG ${channel}-${layer} CLEAR`]
 
 	// Remove this screen from the record
@@ -199,6 +234,7 @@ function unassignTimer(opts) {
 
 /**
  * Set visibility (opacity 0 or 1) for a timer on a screen.
+ * Band-guarded: skips entry if layer outside 980-989 range.
  *
  * @param {{timerId: string, screenIdx: number, visible: boolean}} opts
  * @returns {{ lines: string[] }}
@@ -219,6 +255,12 @@ function setTimerVisible(opts) {
 
 	const screenEntry = record.screens[String(screenIdx)]
 	const { channel, layer } = screenEntry
+
+	// Band guard: validate layer is within timer band
+	if (!isTimerLayer(layer)) {
+		console.warn(`[screen-timers] BAND VIOLATION: setTimerVisible layer ${layer} outside 980-989 for timer ${timerId} screen ${screenIdx}`)
+		return { lines: [] }
+	}
 
 	// Update visibility in registry
 	screenEntry.visible = visible
@@ -282,6 +324,7 @@ function listScreenTimers() {
 /**
  * Generate CG ADD and MIXER OPACITY lines to restore registered timers on startup/reconnect.
  * Optionally filter by channel.
+ * Band-guarded: skips entries if layer outside 980-989 range.
  *
  * @param {number} [channel] — optional channel filter
  * @returns {string[]}
@@ -296,6 +339,12 @@ function linesForReAdd(channel) {
 
 		for (const screenEntry of Object.values(record.screens)) {
 			if (!screenEntry || !Number.isFinite(screenEntry.channel) || !Number.isFinite(screenEntry.layer)) continue
+
+			// Band guard: validate layer is within timer band
+			if (!isTimerLayer(screenEntry.layer)) {
+				console.warn(`[screen-timers] BAND VIOLATION: linesForReAdd layer ${screenEntry.layer} outside 980-989 for timer ${record.timerId}`)
+				continue
+			}
 
 			// Filter by channel if specified
 			if (channel !== undefined && screenEntry.channel !== channel) continue
@@ -317,6 +366,7 @@ function linesForReAdd(channel) {
  * Apply timersVisibility map for a look take: for each assigned timer on the given channel
  * whose timerId is a key in timersVisibility, emit MIXER OPACITY lines and update registry.
  * Timers NOT mentioned in the map are left untouched.
+ * Band-guarded: skips entries if layer outside 980-989 range.
  *
  * @param {number} channel
  * @param {object|null|undefined} timersVisibility — map of { [timerId]: boolean }
@@ -340,6 +390,12 @@ function linesForLookVisibility(channel, timersVisibility) {
 
 		for (const screenEntry of Object.values(record.screens)) {
 			if (!screenEntry || !Number.isFinite(screenEntry.channel) || !Number.isFinite(screenEntry.layer)) continue
+
+			// Band guard: validate layer is within timer band
+			if (!isTimerLayer(screenEntry.layer)) {
+				console.warn(`[screen-timers] BAND VIOLATION: linesForLookVisibility layer ${screenEntry.layer} outside 980-989 for timer ${record.timerId}`)
+				continue
+			}
 
 			// Only emit for the specified channel
 			if (screenEntry.channel !== channel) continue

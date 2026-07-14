@@ -41,6 +41,7 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
+  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"
@@ -126,6 +127,23 @@
       "fps": "50",
       "thumbnailChannel": 5,
       "thumbnailLayer": 4
+    },
+    {
+      "type": "ndi",
+      "routeType": "ndi_host",
+      "value": "route://7-1",
+      "label": "marcins-macbook-pro-5.local Scan Converter",
+      "hostChannel": 7,
+      "hostLayer": 1,
+      "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter",
+      "ndiName": "ndi://marcins-macbook-pro-5.local/\"Scan Converter\"",
+      "interactiveCapable": false,
+      "hostRole": "ndi_host",
+      "useDirect": false,
+      "thumbnailChannel": 7,
+      "thumbnailLayer": 1,
+      "resolution": "1920×1080",
+      "fps": "50"
     }
   ],
   "configVersion": 1,

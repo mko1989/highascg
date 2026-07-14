@@ -236,6 +236,10 @@ export class SceneState {
 
 	_emit(key, data) { const fns = this._listeners.get(key); if (fns) fns.forEach((fn) => fn(data)) }
 
+	/** Public emit for external modules (compose handlers call sceneState.emit('change') —
+	 * without this alias the edit-on-PGM padlock flow crashed with "e.emit is not a function"). */
+	emit(key, data) { this._emit(key, data) }
+
 	switchScreen(screenIdx) {
 		if (screenIdx === this.activeScreenIndex && this.armedScreenIndices.length === 1 && this.armedScreenIndices[0] === screenIdx) return
 		this.activeScreenIndex = screenIdx

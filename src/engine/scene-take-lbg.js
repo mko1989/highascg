@@ -139,7 +139,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		`[scene-take-lbg] merge=${isMergeTransition} shouldRunBankCrossfade=${shouldRunBankCrossfade} fadeDur=${fadeDur} currentMapSize=${currentMap.size}`,
 	)
 
-	const { takeJobs, extraExitCandidates, timelineFadeInPhys } = await buildTakeJobs({
+	const { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers } = await buildTakeJobs({
 		incomingSorted,
 		currentMap,
 		channel,
@@ -299,6 +299,8 @@ async function runSceneTakeLbg(amcp, opts) {
 		gbWillFadeOut,
 		incomingGbLayer,
 		currentGbLayer,
+		activeBank,
+		phys,
 	})
 
 	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
@@ -388,11 +390,56 @@ async function runSceneTakeLbg(amcp, opts) {
 		self.timelineEngine.stop(activeTimelineIdToFadeOut)
 	}
 
+	// WO-218 T218.2: When the bank flips, move visually-equal skipped layers to the target bank
+	// to avoid split-brain (producer on old bank, mixer state on new bank).
+	// This MUST run BEFORE the pointer flip and BEFORE clearStaleInactiveBankLookLayers.
+	const shouldFlipBank = !isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0) && !banklessTake
+	if (shouldFlipBank && skippedVisuallyEqualLayers.length > 0) {
+		const swapLines = []
+		for (const skipped of skippedVisuallyEqualLayers) {
+			const fromPhys = skipped.physicalLayerNow // old bank, currently active
+			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (inactive), target
+			if (fromPhys !== toPhys) {
+				// SWAP <ch>-<from> <ch>-<to> TRANSFORMS (TRANSFORMS preserves mixer state across the swap)
+				const swapCmd = `SWAP ${channel}-${fromPhys} ${channel}-${toPhys} TRANSFORMS`
+				swapLines.push(swapCmd)
+			}
+		}
+		if (swapLines.length > 0) {
+			try {
+				await amcp.batchSend(swapLines)
+			} catch (e) {
+				self.log?.('warn', `[scene-take-lbg] WO-218 SWAP for skipped layers failed: ${e?.message || e}`)
+			}
+		}
+	}
+
 	// WO-209 T209.1: skip pointer flip when banklessTake (pointer must stay 'a' for logical layers).
-	if (!isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0) && !banklessTake) {
+	if (shouldFlipBank) {
 		self.programLayerBankByChannel[chKey] = inactiveBank
 	}
 	persistProgramLayerBanks(self)
+
+	// WO-218 T218.3: Clean up mixer state on the bank layers we just swapped FROM,
+	// so no stale CROP/FILL remains on the vacated layer for the next take.
+	if (shouldFlipBank && skippedVisuallyEqualLayers.length > 0) {
+		const clearLines = []
+		for (const skipped of skippedVisuallyEqualLayers) {
+			const fromPhys = skipped.physicalLayerNow // old bank (now inactive after flip)
+			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (now active after flip)
+			if (fromPhys !== toPhys) {
+				// Clear mixer state on the old bank layer (now inactive)
+				clearLines.push(`MIXER ${channel}-${fromPhys} CLEAR`)
+			}
+		}
+		if (clearLines.length > 0) {
+			try {
+				await amcp.batchSendChunked(clearLines, { skipMixerPreCommit: true })
+			} catch (e) {
+				self.log?.('warn', `[scene-take-lbg] WO-218 MIXER CLEAR for vacated layers failed: ${e?.message || e}`)
+			}
+		}
+	}
 
 	if (isMergeTransition && incoming) {
 		try {
