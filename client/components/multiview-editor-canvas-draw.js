@@ -12,12 +12,12 @@ const LABEL_BAR_BG = { pgm: '#c92a2a', prv: '#0d9488', decklink: '#2563eb', ndi:
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {HTMLCanvasElement} canvas
- * @param {{ offsetX: number, offsetY: number, scale: number, selectedId: string | null, dropHoverId: string | null, channelMap?: any }} view
+ * @param {{ offsetX: number, offsetY: number, scale: number, selectedId: string | null, dropHoverId: string | null, channelMap?: any, timerScale?: number }} view
  */
 export function drawMultiviewEditor(ctx, canvas, view) {
 	if (!ctx || !canvas) return
 
-	const { offsetX, offsetY, scale, selectedId, dropHoverId, channelMap = {} } = view
+	const { offsetX, offsetY, scale, selectedId, dropHoverId, channelMap = {}, timerScale = 100 } = view
 	const mw = multiviewState.canvasWidth
 	const mh = multiviewState.canvasHeight
 	const bx = offsetX
@@ -114,7 +114,8 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 		const shortLabel = displayLabel.length > 36 ? displayLabel.slice(0, 33) + '…' : displayLabel
 
 		if (timersUnder && isScreen) {
-			const titleH = Math.min(34, Math.max(22, Math.floor(rect.lh * 0.36)))
+			const scaleAdj = timerScale / 100
+			const titleH = Math.min(34 * scaleAdj, Math.max(22 * scaleAdj, Math.floor(rect.lh * 0.36 * scaleAdj)))
 			const dockH = rect.lh - titleH
 			const dockW = Math.min(rect.lw - 8, Math.max(200, rect.lw * 0.5))
 			const dockX = rect.lx + (rect.lw - dockW) / 2
@@ -131,7 +132,7 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 			ctx.strokeRect(dockX + 0.5, rect.ly + titleH + 0.5, dockW - 1, dockH - 1)
 
 			ctx.fillStyle = '#fff'
-			ctx.font = `600 ${Math.min(12, Math.max(10, titleH * 0.38))}px ${UI_FONT_FAMILY}`
+			ctx.font = `600 ${Math.min(12 * scaleAdj, Math.max(10 * scaleAdj, titleH * 0.38))}px ${UI_FONT_FAMILY}`
 			ctx.textAlign = 'center'
 			ctx.textBaseline = 'middle'
 			ctx.fillText(shortLabel, rect.lx + rect.lw / 2, rect.ly + titleH / 2)

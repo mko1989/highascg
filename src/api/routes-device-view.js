@@ -51,7 +51,7 @@ function augmentGraphWithSources(graph, live) {
  * @param {object} ctx
  * @param {Record<string, string>} query
  */
-async function handleGet(path, ctx, query) {
+async function handleGet(path, ctx, query, req) {
 	ctx.augmentGraphWithSources = augmentGraphWithSources
 	if (path !== '/api/device-view' && path !== '/api/device-view/gpu-map-debug' && path !== '/api/device-view/snapshot') return null
 	try {
@@ -111,7 +111,7 @@ async function handleGet(path, ctx, query) {
 	const etag = `"${crypto.createHash('md5').update(payloadJson).digest('hex')}"`
 
 	// Check If-None-Match header
-	const ifNoneMatch = query?.['if-none-match'] || query?.ifNoneMatch
+	const ifNoneMatch = req?.headers?.['if-none-match'] || query?.ifNoneMatch
 	if (ifNoneMatch && String(ifNoneMatch).trim() === etag) {
 		return {
 			status: 304,

@@ -9,6 +9,8 @@
 		
 		let cellsConfig = [];
 		let showTimersUnderLabels = false;
+		let timerScale = 100;
+		let highlightTopTimer = true;
 
 		// WS connection
 		function connect() {
@@ -264,12 +266,25 @@
 				// Sort descending by layer number
 				layerRows.sort((a, b) => b.num - a.num);
 
+				// Find the top (highest layer number) row with runtime
+				let topRuntimeNum = -1;
+				if (highlightTopTimer) {
+					for (const row of layerRows) {
+						if (row.hasRuntime) {
+							topRuntimeNum = row.num;
+							break;
+						}
+					}
+				}
+
 				if (layerRows.length > 0) {
 					const layerItems = layerRows.map((row) => {
+						const isTopRuntime = highlightTopTimer && row.num === topRuntimeNum;
+						const rowClass = isTopRuntime ? ' label-layer-row--highlight' : '';
 						if (row.hasRuntime) {
 							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
 							return `
-								<div class="label-layer-row">
+								<div class="label-layer-row${rowClass}">
 									<span class="label-layer-num">${row.label}</span>
 									<span class="label-layer-time">${formatMmSs(row.elapsed)} / ${formatMmSs(row.duration)} ${Number.isFinite(rem) ? `(-${formatMmSs(rem)})` : ''}</span>
 									<div class="label-layer-progress-bar-bg">
@@ -279,7 +294,7 @@
 							`;
 						} else {
 							return `
-								<div class="label-layer-row">
+								<div class="label-layer-row${rowClass}">
 									<span class="label-layer-num">${row.label}</span>
 								</div>
 							`;
@@ -329,8 +344,11 @@
 			const cells = data?.cells || [];
 			cellsConfig = cells;
 			showTimersUnderLabels = !!data?.showTimersUnderLabels;
+			timerScale = Math.max(50, Math.min(300, Number(data?.timerScale) || 100));
+			highlightTopTimer = data?.highlightTopTimer !== false;
 
 			const c = document.getElementById('container');
+			c.style.setProperty('--timer-scale', timerScale / 100);
 			c.innerHTML = '';
 			
 			cells.forEach((cell) => {

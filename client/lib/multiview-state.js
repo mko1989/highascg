@@ -121,6 +121,8 @@ export class MultiviewState {
 		this.showOverlay = true
 		this.bgColor = '#000000'
 		this.showTimersUnderLabels = false
+		this.timerScale = 100
+		this.highlightTopTimer = true
 		this.audioActiveCellId = null
 		this._listeners = new Map()
 		this._load()
@@ -148,6 +150,8 @@ export class MultiviewState {
 					this.showOverlay = data.showOverlay !== false
 					this.bgColor = data.bgColor || '#000000'
 					this.showTimersUnderLabels = !!data.showTimersUnderLabels
+					this.timerScale = Math.max(50, Math.min(300, Number(data.timerScale) || 100))
+					this.highlightTopTimer = data.highlightTopTimer !== false
 					this.audioActiveCellId = data.audioActiveCellId || null
 					if (JSON.stringify(this.cells) !== JSON.stringify(prev)) {
 						// Route migration only — do not re-push the full multiview to Caspar on refresh
@@ -278,6 +282,16 @@ export class MultiviewState {
 		this._save()
 	}
 
+	setTimerScale(v) {
+		this.timerScale = Math.max(50, Math.min(300, Number(v) || 100))
+		this._save()
+	}
+
+	setHighlightTopTimer(v) {
+		this.highlightTopTimer = !!v
+		this._save()
+	}
+
 	/** Set multiview background color (layer 10). */
 	setBgColor(color) {
 		this.bgColor = typeof color === 'string' && color.trim() ? color.trim() : '#000000'
@@ -299,6 +313,8 @@ export class MultiviewState {
 			showOverlay: this.showOverlay,
 			bgColor: this.bgColor,
 			showTimersUnderLabels: this.showTimersUnderLabels,
+			timerScale: this.timerScale,
+			highlightTopTimer: this.highlightTopTimer,
 		}
 	}
 
@@ -311,6 +327,8 @@ export class MultiviewState {
 		this.showOverlay = data.showOverlay !== false
 		this.bgColor = data.bgColor || '#000000'
 		this.showTimersUnderLabels = !!data.showTimersUnderLabels
+		this.timerScale = Math.max(50, Math.min(300, Number(data.timerScale) || 100))
+		this.highlightTopTimer = data.highlightTopTimer !== false
 		// Do not re-apply the whole layout to Caspar on every WebUI refresh / project hydrate
 		this._persistLayout(false, !opts.silent)
 	}
@@ -327,6 +345,8 @@ export class MultiviewState {
 					showOverlay: this.showOverlay,
 					bgColor: this.bgColor,
 					showTimersUnderLabels: this.showTimersUnderLabels,
+					timerScale: this.timerScale,
+					highlightTopTimer: this.highlightTopTimer,
 					audioActiveCellId: this.audioActiveCellId,
 				}),
 			)
@@ -360,7 +380,7 @@ export class MultiviewState {
 	 * index, persisted localStorage layout for the others. Null when nothing is stored.
 	 * WO-156 T156.5: lets "Refresh output" re-apply every configured multiviewer.
 	 * @param {number} n — 1-based multiviewer index
-	 * @returns {{ n: number, layout: object[], showOverlay: boolean, bgColor: string, showTimersUnderLabels: boolean } | null}
+	 * @returns {{ n: number, layout: object[], showOverlay: boolean, bgColor: string, showTimersUnderLabels: boolean, timerScale: number, highlightTopTimer: boolean } | null}
 	 */
 	getApplyBodyForIndex(n) {
 		const idx = Math.max(1, parseInt(n, 10) || 1)
@@ -372,6 +392,8 @@ export class MultiviewState {
 				showOverlay: this.showOverlay,
 				bgColor: this.bgColor,
 				showTimersUnderLabels: this.showTimersUnderLabels,
+				timerScale: this.timerScale,
+				highlightTopTimer: this.highlightTopTimer,
 			}
 		}
 		const key = idx === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${idx}`
@@ -386,6 +408,8 @@ export class MultiviewState {
 				showOverlay: data.showOverlay !== false,
 				bgColor: data.bgColor || '#000000',
 				showTimersUnderLabels: !!data.showTimersUnderLabels,
+				timerScale: Math.max(50, Math.min(300, Number(data.timerScale) || 100)),
+				highlightTopTimer: data.highlightTopTimer !== false,
 			}
 		} catch {
 			return null
@@ -401,6 +425,8 @@ export class MultiviewState {
 			showOverlay: this.showOverlay,
 			bgColor: this.bgColor,
 			showTimersUnderLabels: this.showTimersUnderLabels,
+			timerScale: this.timerScale,
+			highlightTopTimer: this.highlightTopTimer,
 			audioActiveCellId: this.audioActiveCellId,
 		}
 	}
@@ -414,6 +440,8 @@ export class MultiviewState {
 		this.showOverlay = snapshot.showOverlay !== false
 		this.bgColor = snapshot.bgColor || this.bgColor
 		this.showTimersUnderLabels = !!snapshot.showTimersUnderLabels
+		this.timerScale = Math.max(50, Math.min(300, Number(snapshot.timerScale) || 100))
+		this.highlightTopTimer = snapshot.highlightTopTimer !== false
 		this.audioActiveCellId = snapshot.audioActiveCellId ?? null
 		this._save()
 	}

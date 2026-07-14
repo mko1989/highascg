@@ -48,6 +48,8 @@
 		let programLayerBankByChannel = {};
 		let cellsConfig = [];
 		let showTimersUnderLabels = false;
+		let timerScale = 1; // WO-203: timerScale/100 from CG payload
+		let highlightTopTimer = true; // WO-203 §5
 
 		function mergeChannel(a, b) {
 			if (!b) return a;
@@ -349,30 +351,40 @@
 					ctx.font = '500 9px Rewir, system-ui, sans-serif';
 					const layerRows = collectLayerLines(cell, resolvedChNum, cell.screenIdx, cell.channelNum, isPgm);
 					const maxY = ly + chromeH - 4;
+					// WO-203: scale row typography/bars; §5 highlight the top running-media row
+					const rowFont = Math.round(9 * timerScale);
+					const timeFont = Math.round(8 * timerScale);
+					const barH = Math.max(2, Math.round(3 * timerScale));
+					const rowStep = Math.round(11 * timerScale);
+					const topRuntimeNum = highlightTopTimer
+						? (layerRows.find((r) => r.hasRuntime && Number(r.duration) > 0)?.num ?? null)
+						: null;
 					for (const row of layerRows) {
 						if (ty + 3 > maxY) break;
-						ctx.fillStyle = '#fff';
-						ctx.font = '600 9px Rewir, system-ui, sans-serif';
+						const isTop = topRuntimeNum != null && row.num === topRuntimeNum;
+						ctx.fillStyle = isTop ? '#ffc078' : '#fff';
+						ctx.font = `${isTop ? 700 : 600} ${rowFont}px Rewir, system-ui, sans-serif`;
 						ctx.textBaseline = 'middle';
 						ctx.textAlign = 'left';
 						ctx.fillText(row.label, dockX + pad, ty + 8);
 						if (row.hasRuntime && Number(row.duration) > 0) {
 							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
 							const timeText = `${formatMmSs(row.elapsed)}/${formatMmSs(row.duration)} (-${formatMmSs(rem)})`;
-							ctx.font = '500 8px Rewir, system-ui, sans-serif';
+							ctx.font = `500 ${timeFont}px Rewir, system-ui, sans-serif`;
 							ctx.textAlign = 'right';
 							ctx.fillText(timeText, dockX + dockW - pad, ty + 8);
-							ty += 11;
+							ty += rowStep;
 							if (ty + 2 <= maxY) {
+								const thisBarH = isTop ? barH + 1 : barH;
 								ctx.fillStyle = 'rgba(255,255,255,0.25)';
-								ctx.fillRect(dockX + pad, ty, dockW - pad * 2, 3);
+								ctx.fillRect(dockX + pad, ty, dockW - pad * 2, thisBarH);
 								const pct = Number(row.duration) > 0 ? Math.min(100, Math.max(0, (row.elapsed / row.duration) * 100)) : 0;
-								ctx.fillStyle = c.prog;
-								ctx.fillRect(dockX + pad, ty, ((dockW - pad * 2) * pct) / 100, 3);
-								ty += 5;
+								ctx.fillStyle = isTop ? '#ffc078' : c.prog;
+								ctx.fillRect(dockX + pad, ty, ((dockW - pad * 2) * pct) / 100, thisBarH);
+								ty += thisBarH + 2;
 							}
 						} else {
-							ty += 11;
+							ty += rowStep;
 						}
 					}
 					ctx.textBaseline = 'alphabetic';
@@ -407,6 +419,11 @@
 			}
 			cellsConfig = data?.cells || [];
 			showTimersUnderLabels = !!data?.showTimersUnderLabels;
+			{
+				const tsRaw = Number(data?.timerScale);
+				timerScale = Number.isFinite(tsRaw) ? Math.min(300, Math.max(50, tsRaw)) / 100 : 1; // WO-203
+				highlightTopTimer = data?.highlightTopTimer !== false; // WO-203 §5 default true
+			}
 			redraw();
 		}
 		window['update'] = update;

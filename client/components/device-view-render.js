@@ -288,21 +288,35 @@ export function registerDeviceViewRender(ctx) {
 				return
 			}
 
-			// First open or forced refresh: show skeleton, then fetch and render
-			if (!lastPayload) {
-				// Show a lightweight skeleton loading state
-				if (refs.layout && !state.lastPayload) {
-					refs.layout.innerHTML = '<div style="padding: 16px; text-align: center; color: #999;">Loading devices…</div>'
+			// First open: non-destructive loading overlay (WO-202 hotfix — an innerHTML
+			// replacement here detached the shell's pre-built mount nodes, so the later
+			// renderFromState wrote into orphaned elements and the pane never updated).
+			let skelEl = null
+			if (!lastPayload && refs.layout && !state.lastPayload) {
+				skelEl = document.createElement('div')
+				skelEl.style.cssText = 'padding:16px;text-align:center;color:#999;'
+				skelEl.textContent = 'Loading devices…'
+				refs.layout.appendChild(skelEl)
+			}
+			const removeSkel = () => {
+				if (skelEl) {
+					skelEl.remove()
+					skelEl = null
 				}
 			}
 
 			const currentRequestId = ++lastRequestId
 			const cachedStream = getStreamingChannelStatus()
-			const [payload, settings, stream] = await Promise.all([
-				Actions.loadDeviceView({ freshGpu }),
-				Actions.loadSettings(),
-				cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
-			])
+			let payload, settings, stream
+			try {
+				;[payload, settings, stream] = await Promise.all([
+					Actions.loadDeviceView({ freshGpu }),
+					Actions.loadSettings(),
+					cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
+				])
+			} finally {
+				removeSkel()
+			}
 
 			// Only update if this is still the latest request
 			if (currentRequestId === lastRequestId) {

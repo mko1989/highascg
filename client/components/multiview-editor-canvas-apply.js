@@ -65,6 +65,8 @@ export async function applyMultiviewLayout(getChannelMap, opts = {}) {
 			showOverlay: multiviewState.showOverlay,
 			bgColor: multiviewState.bgColor,
 			showTimersUnderLabels: multiviewState.showTimersUnderLabels,
+			timerScale: multiviewState.timerScale,
+			highlightTopTimer: multiviewState.highlightTopTimer,
 		})
 	} catch (e) {
 		const msg = String(e?.message ?? e ?? '')
@@ -76,6 +78,8 @@ export async function applyMultiviewLayout(getChannelMap, opts = {}) {
 					showOverlay: multiviewState.showOverlay,
 					bgColor: multiviewState.bgColor,
 					showTimersUnderLabels: multiviewState.showTimersUnderLabels,
+					timerScale: multiviewState.timerScale,
+					highlightTopTimer: multiviewState.highlightTopTimer,
 				})
 				return
 			} catch (fallbackErr) {

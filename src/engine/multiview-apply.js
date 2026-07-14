@@ -93,7 +93,7 @@ function resolveMultiviewChannel(body, map) {
 
 /**
  * Apply multiview layout via AMCP.
- * @param {object} body - { n, layout, showOverlay, bgColor, showTimersUnderLabels }
+ * @param {object} body - { n, layout, showOverlay, bgColor, showTimersUnderLabels, timerScale, highlightTopTimer }
  * @param {object} ctx
  * @param {{ infoXml?: string|null }} [opts] - pre-fetched INFO XML for surgical layer CLEAR
  * @returns {Promise<{ ok: true, channel: number, debug?: object }>}
@@ -140,6 +140,8 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 	const showOverlay = !!b.showOverlay
 	const bgColor = typeof b.bgColor === 'string' && b.bgColor.trim() ? b.bgColor.trim() : '#000000'
 	const showTimersUnderLabels = !!b.showTimersUnderLabels
+	const timerScale = Math.max(50, Math.min(300, Number(b.timerScale) || 100))
+	const highlightTopTimer = b.highlightTopTimer !== false
 	const inputsCh = map.inputsCh
 	const decklinkInputChannels = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
 	const previewChannels = Array.isArray(map.previewChannels)
@@ -445,7 +447,7 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 				}
 			}
 		}
-		const overlayData = JSON.stringify({ cells, showTimersUnderLabels, ...keyed })
+		const overlayData = JSON.stringify({ cells, showTimersUnderLabels, timerScale, highlightTopTimer, ...keyed })
 		await loadOverlayTemplate(ctx, ch, OVERLAY_LAYER, overlayData)
 	} else {
 		try {

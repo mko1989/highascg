@@ -209,7 +209,7 @@ routes.post('/api/settings', ({ path, body, ctx }) => routesSettings.handlePost(
 routes.post('/api/settings/apply-os', ({ path, body, ctx }) => routesSettings.handleOsPost(path, body, ctx).catch(e => ({ status: 502, headers: JSON_HEADERS, body: jsonBody({ error: String(e) }) })), { requireCaspar: false })
 
 // Device view
-routes.get('/api/device-view', ({ path, ctx, query }) => routesDeviceView.handleGet(path, ctx, query), { requireCaspar: false })
+routes.get('/api/device-view', ({ path, ctx, query, req }) => routesDeviceView.handleGet(path, ctx, query, req), { requireCaspar: false })
 routes.get('/api/device-view/gpu-map-debug', ({ path, ctx, query }) => routesDeviceView.handleGet(path, ctx, query), { requireCaspar: false })
 routes.get('/api/device-view/snapshot', ({ path, ctx, query }) => routesDeviceView.handleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/device-view', ({ body, ctx }) => routesDeviceView.handlePost(body, ctx), { requireCaspar: false })

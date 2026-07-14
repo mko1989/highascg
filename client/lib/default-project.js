@@ -62,6 +62,8 @@ export function applyDefaultUntitledProjectLocally(opts = {}) {
 			showOverlay: true,
 			bgColor: '#000000',
 			showTimersUnderLabels: false,
+			timerScale: 100,
+			highlightTopTimer: true,
 		},
 		{ silent },
 	)
