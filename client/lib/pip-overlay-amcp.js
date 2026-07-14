@@ -329,6 +329,7 @@ export function buildPipOverlayAmcpLinesAll(
 		const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, i, nextContentLayer)
 		const cgKey = Number.isFinite(ch) && Number.isFinite(oLayer) ? `${ch}-${oLayer}` : ''
 		const cgReady = !!(cgKey && pipCgReadyKeys?.has(cgKey))
+		// WO-213: UPDATE path sends full CG payload (colors/width/radius/etc + geometry) so config freshness is guaranteed.
 		if (
 			cur &&
 			old &&

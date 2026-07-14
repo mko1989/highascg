@@ -25,6 +25,40 @@ import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js
 import { showAppToast } from './app-toast.js'
 import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
 
+/** WO-213: Track previous sceneId per channel to detect PRV rewrites. */
+let prevLiveSceneIdByChannel = {}
+
+/**
+ * WO-213: When any PRV channel's live sceneId changes, the server has rewritten that PRV channel.
+ * Dispatch an event to invalidate the client's preview snapshot cache so subsequent edits take the ADD path.
+ * @param {Object.<string, { sceneId?: string }>} liveMap
+ * @param {Object} channelMap
+ */
+export function maybeInvalidatePreviewOnLiveChange(liveMap, channelMap) {
+	if (!liveMap || !channelMap) return
+	const previewChannels = channelMap.previewChannels || []
+	let shouldInvalidate = false
+
+	for (const [channelStr, entry] of Object.entries(liveMap)) {
+		const chNum = Number(channelStr)
+		const isPreviewChannel = previewChannels.includes(chNum)
+		const prevSceneId = prevLiveSceneIdByChannel[channelStr]
+		const curSceneId = entry?.sceneId
+
+		if (isPreviewChannel && prevSceneId !== curSceneId) {
+			shouldInvalidate = true
+		}
+		// Always update tracking, whether preview or not
+		if (curSceneId !== undefined) {
+			prevLiveSceneIdByChannel[channelStr] = curSceneId
+		}
+	}
+
+	if (shouldInvalidate && typeof window !== 'undefined') {
+		window.dispatchEvent(new CustomEvent('scenes-preview-invalidate'))
+	}
+}
+
 /**
  * @param {unknown} data
  * @param {{ sceneState: object, programOutputState: object, appLogic: object }} ctx
@@ -38,7 +72,10 @@ function applyWsStateSideEffects(data, { sceneState, programOutputState, appLogi
 	appLogic.syncMultiviewCanvas(data.channelMap)
 	appLogic.scheduleMultiviewRefresh()
 	appLogic.emitCasparConnectedIfNeeded(data)
-	if (data.scene?.live) sceneState.applyServerLiveChannels(data.scene.live, data.channelMap)
+	if (data.scene?.live) {
+		maybeInvalidatePreviewOnLiveChange(data.scene.live, data.channelMap)
+		sceneState.applyServerLiveChannels(data.scene.live, data.channelMap)
+	}
 	if (Array.isArray(data.scene?.globalBorders)) {
 		applyRemoteGlobalBordersArray(sceneState, data.scene.globalBorders, { source: 'project' })
 	}
@@ -77,7 +114,10 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		if (!data || data.path == null) return
 		stateStore.applyChange(data.path, data.value)
 		ingestStreamingChannelChange(data.path, data.value)
-		if (data.path === 'scene.live' && data.value) sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
+		if (data.path === 'scene.live' && data.value) {
+			maybeInvalidatePreviewOnLiveChange(data.value, stateStore.getState()?.channelMap)
+			sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
+		}
 		if (data.path === 'scene.globalBorders' && Array.isArray(data.value)) {
 			ingestArtnetGlobalBordersArray(sceneState, data.value)
 		}

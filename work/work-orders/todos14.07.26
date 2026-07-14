@@ -106,11 +106,35 @@ the timers can span the whole width of the window. when a filename is too long t
 timers on the mv of the prv channel does not work. and also the prv channel does not display the look exactly how it ends up being on the pgm, which is correct. but the prv shows something different.
 the live prv editing is still bugged as hell. it doesnt actually move the layers on the prv output observed on the multiview screen (casparcg consumer).
 
-****NEWNEWNEW***
+
 
 the multiviewer is bugged. changes made on it doesnt refresh, unless i reset the multiview and rebuild it.
 the font on the timers is a bit too big in the output, make it adjustable too.
 it also shows my pgm1 and prv1 as 1920x1080 channels when in reality they are 3072x1728.
 
 the incorrect cropping is now on the pgm channel. the prv still doesnt auto update when editing a look.
+
+
+
+
+the timers in the multiview layout are not reflected as occupying full width.
+when there is a playlist on a layer with autoplay the timers label on mv should show L## filename current -> next filename
+
+i changed a single media into a playlist and it doesnt play other items, only loops the first one.
+
+
+concerning casparcg logs
+
+
+
+****NEWNEWNEW***
+
+when messing with a layer that has a border effect on it on the prv the border sometimes render incorectly on the prv, (using a stale setting?)
+
+
+****NEWNEWNEW***
+
+playing timeline with multiple audio ch on multiple layers none of it appears in the audio mixer, so i could choose which channels to send to pgm 2 for instance.
+
+scaling on the multiviewer is wrong probably due to it taking the timers into acount. it makes the borders appear incorectly on the multiviewer. this is very weird because it looks correct on the output.
 

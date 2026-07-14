@@ -117,8 +117,9 @@ export function drawMultiviewEditor(ctx, canvas, view) {
 			const scaleAdj = timerScale / 100
 			const titleH = Math.min(34 * scaleAdj, Math.max(22 * scaleAdj, Math.floor(rect.lh * 0.36 * scaleAdj)))
 			const dockH = rect.lh - titleH
-			const dockW = Math.min(rect.lw - 8, Math.max(200, rect.lw * 0.5))
-			const dockX = rect.lx + (rect.lw - dockW) / 2
+			// WO-204 parity: full-width dock matching output template (pad=8)
+			const dockW = Math.max(80, rect.lw - 16)
+			const dockX = rect.lx + 8
 
 			ctx.fillStyle = labelBg
 			ctx.fillRect(rect.lx - OVERLAY_BORDER, rect.ly, rect.lw + OVERLAY_BORDER * 2, titleH)

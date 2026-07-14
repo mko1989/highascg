@@ -21,7 +21,7 @@
   },
   "local_template_path": "",
   "composePreview": {
-    "mode": "ffmpeg_jpeg",
+    "mode": "canvas",
     "fps": 25,
     "resolutionScale": "half",
     "jpegQuality": 20,

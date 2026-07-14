@@ -118,6 +118,9 @@ function handlePlaylistOscUpdate(self, snapshot) {
 						const chOsc = snapshot.channels && snapshot.channels[chKey]
 						const layerOsc = chOsc && chOsc.layers && chOsc.layers[pLayer]
 						const playingFile = layerOsc && layerOsc.file && (layerOsc.file.name || layerOsc.file.path)
+						/* OSC layer time lives on the file object (osc-state.js: f.elapsed / f.duration) */
+						const elapsed = layerOsc?.file?.elapsed ?? undefined
+						const duration = layerOsc?.file?.duration ?? undefined
 
 						if (playingFile) {
 							const pKey = `${scene.id}-${layer.layerNumber}`
@@ -155,6 +158,67 @@ function handlePlaylistOscUpdate(self, snapshot) {
 
 										if (nextIdx >= 0) {
 											queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx)
+										}
+									}
+								}
+							}
+
+							// T211.5: Stall watchdog for imperfect media (video stream ends before container duration).
+							// Track elapsed time progress; if near-end and frozen >2s, force-promote next item.
+							if (layer.playlist.length > 1 && typeof elapsed === 'number' && typeof duration === 'number' && duration > 0) {
+								self.playlistElapsedTracking = self.playlistElapsedTracking || {}
+								self.playlistWatchdogFiredFor = self.playlistWatchdogFiredFor || {}
+
+								const trackKey = pKey
+								const prevState = self.playlistElapsedTracking[trackKey] || {}
+								const now = Date.now()
+								const lastElapsedAt = prevState.lastElapsedAt ?? now
+								const lastElapsed = prevState.lastElapsed ?? elapsed
+								const msSinceProgress = now - lastElapsedAt
+
+								// Re-arm watchdog when file changes
+								if (prevState.lastFile !== playingFile) {
+									self.playlistWatchdogFiredFor[trackKey] = false
+									self.playlistElapsedTracking[trackKey] = {
+										lastElapsed: elapsed,
+										lastElapsedAt: now,
+										lastFile: playingFile,
+									}
+								} else {
+									// Same file: check for stall
+									if (Math.abs(elapsed - lastElapsed) > 0.01) {
+										// File is progressing
+										self.playlistElapsedTracking[trackKey] = {
+											lastElapsed: elapsed,
+											lastElapsedAt: now,
+											lastFile: playingFile,
+										}
+									} else {
+										// Elapsed unchanged: check if we should fire watchdog
+										const alreadyFired = !!self.playlistWatchdogFiredFor[trackKey]
+										const shouldFire = shouldForceAdvance({
+											elapsed,
+											duration,
+											lastElapsed,
+											msSinceProgress,
+											alreadyFired,
+										})
+
+										if (shouldFire) {
+											self.playlistWatchdogFiredFor[trackKey] = true
+											if (typeof self.log === 'function') {
+												self.log('info', `[Playlist] stall watchdog force-advanced ch=${channel} layer=${layer.layerNumber} file=${playingFile}`)
+											}
+											// Force-promote: bare PLAY promotes the AUTO-preloaded bg to fg
+											void (async () => {
+												try {
+													await self.amcp.play(channel, pLayer)
+												} catch (err) {
+													if (typeof self.log === 'function') {
+														self.log('warn', `[Playlist] stall watchdog PLAY failed on ${channel}-${pLayer}: ${err?.message || err}`)
+													}
+												}
+											})()
 										}
 									}
 								}
@@ -285,4 +349,21 @@ function sameFileName(a, b) {
 	return clean(a) === clean(b)
 }
 
-module.exports = { setupLayerPlaylists }
+/**
+ * Decide whether to force-advance due to stall watchdog (BUG 2 / T211.5).
+ * Exported for unit testing.
+ *
+ * @param {{elapsed: number, duration: number, lastElapsed: number, msSinceProgress: number, alreadyFired: boolean}} state
+ * @returns {boolean}
+ */
+function shouldForceAdvance(state) {
+	const { elapsed, duration, lastElapsed, msSinceProgress, alreadyFired } = state
+	if (!duration || duration <= 0) return false
+	if (alreadyFired) return false
+	if (msSinceProgress < 2000) return false
+	// Near-end stall: elapsed frozen within 0.5s of duration
+	const nearEnd = elapsed >= duration - 0.5
+	return nearEnd
+}
+
+module.exports = { setupLayerPlaylists, shouldForceAdvance }

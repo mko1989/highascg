@@ -74,8 +74,8 @@ function getActiveTimelineForChannel(stateStore, channel) {
 	if (!isProgram) return null
 	const screenIdx = sendTo.screenIdx ?? 0
 	const cm = stateStore.getState()?.channelMap || {}
-	const programCh = cm.programCh?.(screenIdx + 1)
-	if (programCh !== channel) return null
+	const programCh = Number(cm.programChannels?.[screenIdx])
+	if (programCh !== Number(channel)) return null
 	return timelineState.getTimeline(pb.timelineId)
 }
 

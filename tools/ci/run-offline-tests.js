@@ -50,6 +50,10 @@ const FILES = [
 	'tools/smoke/smoke-wo196-countdown-lifecycle.test.js',
 	'tools/smoke/smoke-wo207-cg-orphan-sweep.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
+	'tools/smoke/smoke-wo211-playlist-loop.test.js',
+	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',
+	'tools/smoke/smoke-wo213-preview-invalidate.test.js',
+	'tools/smoke/smoke-wo214-timeline-mixer-rows.test.js',
 	'test/companion-control-status.test.js',
 ]
 
@@ -64,7 +68,14 @@ if (dupCheck.status !== 0) process.exit(dupCheck.status === null ? 1 : dupCheck.
 const result = spawnSync(process.execPath, ['--test', ...FILES], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',
-	env: { ...process.env, NODE_TEST_TIMEOUT: process.env.NODE_TEST_TIMEOUT || '60000' },
+	env: {
+		...process.env,
+		NODE_TEST_TIMEOUT: process.env.NODE_TEST_TIMEOUT || '60000',
+		/* The WS reconnect smoke spawns a FULL highascg server — never do that from the
+		 * curated gate on a production box (it piles up orphaned servers and can touch the
+		 * live Caspar). Run it explicitly without this env when integration coverage is wanted. */
+		HIGHASCG_SKIP_SERVER_INTEGRATION: process.env.HIGHASCG_SKIP_SERVER_INTEGRATION || '1',
+	},
 })
 
 process.exit(result.status === null ? 1 : result.status)

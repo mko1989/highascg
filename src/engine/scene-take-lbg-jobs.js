@@ -168,6 +168,10 @@ async function buildTakeJobs(opts) {
 				isLoop = true
 			}
 		}
+		// Multi-item list: never use per-item LOOP token; list looping is handled by advance machinery via playlistLoop.
+		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 1) {
+			isLoop = false
+		}
 		const loadOpts = { loop: isLoop }
 		if (af) loadOpts.audioFilter = af
 		const seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {

@@ -84,6 +84,11 @@ export function createScenesPreviewRuntime(opts) {
 		}, DECK_THUMB_REDRAW_DEBOUNCE_MS)
 	}
 
+	// WO-213: Invalidate preview snapshot cache when server rewrites a PRV channel (pgm→prv exchange).
+	if (typeof window !== 'undefined') {
+		window.addEventListener('scenes-preview-invalidate', () => clearLastPreviewLayers())
+	}
+
 	async function drainPreviewPushQueue() {
 		if (previewPushBusy) {
 			previewPushPending = true

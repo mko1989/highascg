@@ -158,6 +158,36 @@
 			return last.replace(/\.[^.]*$/, ''); // Remove extension
 		}
 
+		// WO-212: Build playlist-aware row label (current -> next) when autoplay enabled
+		// keep in parity with template/multiview_master.html
+		function buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename) {
+			if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length <= 1 || layer.playlistAdvance === 'manual') {
+				const basename = getSourceBasename(layer.source?.value);
+				return basename ? `L${num} ${basename}` : `L${num}`;
+			}
+			// Playlist with autoplay: compute current -> next
+			const testName = String(oscPlayingName || getSourceBasename(layer.playlist[0]?.value) || '').toLowerCase();
+			let idxOfCurrent = 0;
+			for (let i = 0; i < layer.playlist.length; i++) {
+				const itemBase = getSourceBasename(layer.playlist[i]?.value);
+				if (itemBase && testName && itemBase.toLowerCase() === testName) {
+					idxOfCurrent = i;
+					break;
+				}
+			}
+			// If no match found, fallback to first item
+			const current = getSourceBasename(layer.playlist[idxOfCurrent]?.value);
+			const isLastItem = idxOfCurrent === layer.playlist.length - 1;
+			const hasNext = !(isLastItem && layer.playlistLoop === false);
+			let label = `L${num} ${current}`;
+			if (hasNext) {
+				const nextIdx = (idxOfCurrent + 1) % layer.playlist.length;
+				const next = getSourceBasename(layer.playlist[nextIdx]?.value);
+				label += ` -> ${next}`;
+			}
+			return label;
+		}
+
 		// Periodic Ticking Timer Renderer
 		function tick() {
 			cellsConfig.forEach((cell) => {
@@ -248,9 +278,9 @@
 							// Strict runtime guard: digits+bar only when Number.isFinite(duration) && duration > 0 && !stale (WO-195.3)
 							const hasRuntime = Number.isFinite(duration) && duration > 0 && !isStale;
 
-							// Generate label (WO-195.2)
-							const basename = getSourceBasename(sourceValue);
-							const layerLabel = basename ? `L${num} ${basename}` : `L${num}`;
+							// WO-212: Playlist-aware label, OSC playing file available here
+							const oscPlayingName = lFile.name || lFile.path ? getSourceBasename(lFile.name || lFile.path) : null;
+							const layerLabel = buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename);
 
 							layerRows.push({
 								num,
