@@ -202,6 +202,28 @@ export function getMainModalHtml() {
 						</div>
 						<p class="settings-note" id="system-hw-operator-status" style="margin-top:0.35rem"></p>
 						<div id="system-hw-summary-container" style="margin-top:1rem"></div>
+						<!-- WO-193: System time section -->
+						<div class="settings-group" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.1)">
+							<h4 style="margin:0 0 0.5rem 0">System time</h4>
+							<div style="margin-bottom:0.5rem">
+								<label style="display:block;margin-bottom:0.25rem;font-size:0.9rem">Current time: <code id="system-time-clock">Loading…</code></label>
+							</div>
+							<div class="settings-group checkbox" style="margin-bottom:0.5rem">
+								<label><input type="checkbox" id="system-time-ntp-toggle" /> NTP enabled</label>
+							</div>
+							<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;align-items:flex-end">
+								<div style="flex:0 1 auto">
+									<label for="system-time-date-input" style="display:block;font-size:0.85rem;margin-bottom:0.2rem">Date (YYYY-MM-DD)</label>
+									<input type="date" id="system-time-date-input" style="width:12rem" />
+								</div>
+								<div style="flex:0 1 auto">
+									<label for="system-time-time-input" style="display:block;font-size:0.85rem;margin-bottom:0.2rem">Time (HH:MM:SS)</label>
+									<input type="time" id="system-time-time-input" style="width:8rem" />
+								</div>
+								<button type="button" class="btn btn--secondary" id="system-time-set-btn">Set time</button>
+							</div>
+							<p class="settings-note" id="system-time-result" style="margin:0.25rem 0 0 0;min-height:1.2rem"></p>
+						</div>
 					</div>
 					<div class="settings-pane" id="settings-pane-decklink">
 						<h3 class="settings-category">Blackmagic DeckLink</h3>

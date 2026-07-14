@@ -1,15 +1,26 @@
 /**
- * Timer control panel — collapsible bottom-right controller (WO-186).
+ * Timer control panel — collapsible bottom-right controller (WO-186, WO-192).
  *
  * Fixed/docked bottom-right next to the program audio mixer. Provides:
  * - Collapsible header (persists collapsed state in localStorage)
  * - Dropdown to select which countdown timer to control
- * - Live time display (ticks locally from last-known config)
+ * - Live time display that MIRRORS countdown state (ticks 4×/s locally)
  * - Start/Pause/Reset buttons
- * - HH:MM:SS input boxes for duration/target time
+ * - HH:MM:SS input boxes for duration/target time (populated from timer config, persist on refresh)
+ * - Preset buttons for quick duration setting (5m, 10m, 15m, 20m, 25m, 30m, 45m, 60m)
  *
  * GET /api/countdown/list refreshed on scene changes or 5s poll when expanded.
  * Timer list is fetched from the API and cached locally. Hidden entirely when no timers.
+ *
+ * WO-192 notes:
+ * - Per-timer state tracks {config, lastCmd, cmdAt, remainingWhenPaused} to mirror the countdown.
+ * - Live display ticks every 250ms (4×/s).
+ * - Duration mode: remainingTime = durationSec - (now - startedAt), frozen while paused.
+ * - Clock mode: remainingTime = targetTime - now.
+ * - Negative values display as -MM:SS (overflow format).
+ * - HMS boxes are populated from the selected timer's countdownConfig on selection/refresh,
+ *   but skip repopulating while any input has focus to avoid mid-edit interruption.
+ * - External control (inspector/companion) may drift the mirror until the next panel command.
  */
 
 import { api } from '../lib/api-client.js'
@@ -19,37 +30,68 @@ import { escapeAttr } from '../lib/dom-escape.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
 const POLL_INTERVAL_MS = 5000
+const TICK_INTERVAL_MS = 250 // 4×/s
+
+// Preset durations (in seconds)
+const PRESETS = [
+	{ label: '5m', seconds: 5 * 60 },
+	{ label: '10m', seconds: 10 * 60 },
+	{ label: '15m', seconds: 15 * 60 },
+	{ label: '20m', seconds: 20 * 60 },
+	{ label: '25m', seconds: 25 * 60 },
+	{ label: '30m', seconds: 30 * 60 },
+	{ label: '45m', seconds: 45 * 60 },
+	{ label: '60m', seconds: 60 * 60 },
+]
 
 /**
- * Compute remaining/elapsed time for display.
- * Mirrors countdown-engine.js logic: uses absolute epoch milliseconds to avoid drift.
- * @param {object} config - countdown config object
+ * Compute remaining time for the selected timer based on panel state mirror.
+ * This implements a local approximation of the countdown template's state.
+ *
+ * @param {object} timerState - { config, lastCmd, cmdAt, remainingWhenPaused }
  * @returns {number} seconds remaining (may be negative)
  */
-function computeDisplayTime(config) {
-	if (!config || typeof config !== 'object') return 0
+function computeDisplayTime(timerState) {
+	if (!timerState || !timerState.config) return 0
+	const { config, lastCmd, cmdAt, remainingWhenPaused } = timerState
 	const mode = config.mode || 'duration'
 	const now = Date.now()
 
-	// Duration and clock modes store an end time in ms
-	if (mode === 'duration' || mode === 'clock') {
-		if (!Number.isFinite(config.endEpochMs)) return config.durationSec || 0
-		const remaining = (config.endEpochMs - now) / 1000
-		return remaining
+	// Duration mode: compute elapsed time since start
+	if (mode === 'duration') {
+		// If paused, show the frozen remaining time
+		if (lastCmd === 'pause' && Number.isFinite(remainingWhenPaused)) {
+			return remainingWhenPaused
+		}
+		// If reset or never started, show configured duration
+		if (lastCmd === 'reset' || !lastCmd) {
+			return config.durationSec || 0
+		}
+		// If running, compute elapsed from start time
+		if (lastCmd === 'start' && Number.isFinite(cmdAt)) {
+			const elapsedSec = (now - cmdAt) / 1000
+			const remaining = (config.durationSec || 0) - elapsedSec
+			return remaining
+		}
+		return config.durationSec || 0
 	}
 
-	// Countup mode stores a start time in ms
-	if (mode === 'countup') {
-		if (!Number.isFinite(config.startEpochMs)) return 0
-		const elapsed = (now - config.startEpochMs) / 1000
-		return elapsed
+	// Clock mode: compute time until target
+	if (mode === 'clock') {
+		// Parse targetTime as HH:MM:SS on today's local date
+		const targetStr = config.targetTime || '00:00:00'
+		const [h, m, s] = targetStr.split(':').map((x) => parseInt(x, 10) || 0)
+		const today = new Date()
+		const target = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, s)
+		const remaining = (target - now) / 1000
+		return remaining
 	}
 
 	return 0
 }
 
 /**
- * Format seconds as HH:MM:SS for display.
+ * Format seconds as HH:MM:SS for display, supporting negative values.
  */
 function formatDisplayTime(seconds) {
 	const sign = seconds < 0 ? '-' : ''
@@ -59,6 +101,17 @@ function formatDisplayTime(seconds) {
 	const s = abs % 60
 	const pad = (n) => String(n).padStart(2, '0')
 	return sign + pad(h) + ':' + pad(m) + ':' + pad(s)
+}
+
+/**
+ * Check if any of the HMS input elements currently has focus.
+ * @param {HTMLElement} hmsContainer
+ * @returns {boolean}
+ */
+function isHmsFocused(hmsContainer) {
+	if (!hmsContainer) return false
+	const activeEl = document.activeElement
+	return hmsContainer.contains(activeEl)
 }
 
 /**
@@ -79,7 +132,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			<div class="timer-control-panel__selector">
 				<select class="timer-control-panel__select" id="timer-selector" title="Select a timer"></select>
 			</div>
-			<div class="timer-control-panel__display" id="timer-display">00:00:00</div>
+			<div class="timer-control-panel__display" id="timer-display" title="Live countdown mirror (approximation; external control may drift until next panel command)">00:00:00</div>
 			<div class="timer-control-panel__buttons">
 				<button type="button" class="timer-control-panel__btn" data-action="start" title="Start/Resume">▶</button>
 				<button type="button" class="timer-control-panel__btn" data-action="pause" title="Pause">⏸</button>
@@ -87,6 +140,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			</div>
 			<div class="timer-control-panel__hms-label">Duration/Target</div>
 			<div class="timer-control-panel__hms" id="timer-hms"></div>
+			<div class="timer-control-panel__presets" id="timer-presets"></div>
 		</div>
 	`
 	mountEl.appendChild(root)
@@ -97,6 +151,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 	const select = root.querySelector('#timer-selector')
 	const displayEl = root.querySelector('#timer-display')
 	const hmsContainer = root.querySelector('#timer-hms')
+	const presetsContainer = root.querySelector('#timer-presets')
 	const buttons = root.querySelectorAll('[data-action]')
 
 	let isCollapsed = true
@@ -105,6 +160,43 @@ export function initTimerControlPanel(stateStore, mountEl) {
 	let tickTimer = null
 	let pollTimer = null
 	let hmsInput = null
+
+	// Per-timer state: { config, lastCmd, cmdAt, remainingWhenPaused }
+	const timerStateMap = new Map()
+
+	/**
+	 * Get the state key for a timer (channel:layer).
+	 */
+	function getStateKey(timer) {
+		if (!timer) return null
+		return `${timer.channel}:${timer.layerNumber}`
+	}
+
+	/**
+	 * Get or initialize timer state.
+	 */
+	function getTimerState(timer) {
+		if (!timer) return null
+		const key = getStateKey(timer)
+		if (!timerStateMap.has(key)) {
+			timerStateMap.set(key, {
+				config: timer.config || null,
+				lastCmd: null,
+				cmdAt: null,
+				remainingWhenPaused: null,
+			})
+		}
+		return timerStateMap.get(key)
+	}
+
+	/**
+	 * Update timer state (on command or config change).
+	 */
+	function updateTimerState(timer, update) {
+		if (!timer) return
+		const state = getTimerState(timer)
+		Object.assign(state, update)
+	}
 
 	// Load collapsed state from localStorage
 	try {
@@ -147,10 +239,29 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			const res = await api.get('/api/countdown/list')
 			if (res?.items && Array.isArray(res.items)) {
 				timerList = res.items
+				// Update timer states with fresh config from list
+				for (const timer of timerList) {
+					const key = getStateKey(timer)
+					const existing = timerStateMap.get(key)
+					if (existing) {
+						existing.config = timer.config || null
+					} else {
+						getTimerState(timer)
+					}
+				}
 				updateSelectOptions()
 				root.style.display = timerList.length > 0 ? '' : 'none'
 				if (timerList.length === 0) {
 					selectedTimer = null
+				}
+				// Refresh HMS display if a timer is selected and not focused
+				if (selectedTimer && !isHmsFocused(hmsContainer)) {
+					const timer = timerList.find(
+						(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
+					)
+					if (timer) {
+						updateHmsInput(timer)
+					}
 				}
 			}
 		} catch (err) {
@@ -192,6 +303,8 @@ export function initTimerControlPanel(stateStore, mountEl) {
 		if (!select.value) {
 			selectedTimer = null
 			updateDisplay()
+			updateHmsInput(null)
+			updatePresets(null)
 			return
 		}
 
@@ -201,8 +314,11 @@ export function initTimerControlPanel(stateStore, mountEl) {
 				(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
 			)
 			if (timer) {
+				// Ensure timer state exists
+				getTimerState(timer)
 				updateDisplay(timer)
 				updateHmsInput(timer)
+				updatePresets(timer)
 			}
 		} catch {
 			selectedTimer = null
@@ -217,7 +333,8 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			return
 		}
 
-		const remaining = computeDisplayTime(timer.config)
+		const timerState = getTimerState(timer)
+		const remaining = computeDisplayTime(timerState)
 		displayEl.textContent = formatDisplayTime(remaining)
 	}
 
@@ -230,29 +347,29 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			return
 		}
 
-		const mode = timer.config?.mode || 'duration'
+		const timerState = getTimerState(timer)
+		const mode = timerState.config?.mode || 'duration'
 		let value = 0
 
 		if (mode === 'duration') {
-			value = timer.config?.durationSec || 300
+			value = timerState.config?.durationSec || 300
 		} else if (mode === 'clock') {
-			// For clock mode, we'd show the target time, but that's a string
-			// For now, just show durationSec as a fallback
-			value = timer.config?.durationSec || 300
+			// For clock mode, show durationSec as fallback
+			value = timerState.config?.durationSec || 300
 		}
 
 		hmsContainer.innerHTML = ''
 		hmsInput = createHmsInput({
 			value,
 			onChange: (seconds) => {
-				onHmsChange(seconds, mode)
+				onHmsChange(seconds, timer, mode)
 			},
 		})
 		hmsContainer.appendChild(hmsInput.wrap)
 	}
 
-	async function onHmsChange(seconds, mode) {
-		if (!selectedTimer) return
+	async function onHmsChange(seconds, timer, mode) {
+		if (!selectedTimer || !timer) return
 
 		try {
 			const payload = {
@@ -268,14 +385,83 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			}
 
 			await api.post('/api/countdown/set', payload)
+
+			// Update local state so the change sticks
+			const timerState = getTimerState(timer)
+			if (timerState.config) {
+				timerState.config.durationSec = seconds
+			}
 		} catch (err) {
 			console.warn('[timer-panel] HMS update failed:', err?.message || err)
+		}
+	}
+
+	function updatePresets(timer) {
+		presetsContainer.innerHTML = ''
+
+		if (!timer || !selectedTimer) {
+			return
+		}
+
+		const presetRow = document.createElement('div')
+		presetRow.className = 'timer-control-panel__preset-row'
+		presetRow.style.display = 'flex'
+		presetRow.style.flexWrap = 'wrap'
+		presetRow.style.gap = '4px'
+		presetRow.style.marginTop = '8px'
+
+		for (const preset of PRESETS) {
+			const btn = document.createElement('button')
+			btn.type = 'button'
+			btn.className = 'timer-control-panel__preset-btn'
+			btn.textContent = preset.label
+			btn.title = `Set to ${preset.label}`
+			btn.addEventListener('click', async () => {
+				await onPresetClick(preset.seconds, timer)
+			})
+			presetRow.appendChild(btn)
+		}
+
+		presetsContainer.appendChild(presetRow)
+	}
+
+	async function onPresetClick(seconds, timer) {
+		if (!selectedTimer || !timer) return
+
+		try {
+			// Update HMS boxes
+			if (hmsInput && hmsInput.setValue) {
+				hmsInput.setValue(seconds)
+			}
+
+			// Send the set command
+			const payload = {
+				channel: selectedTimer.channel,
+				layer: selectedTimer.layerNumber,
+				templateHostLayer: 0,
+				durationSec: seconds,
+			}
+
+			await api.post('/api/countdown/set', payload)
+
+			// Update local state
+			const timerState = getTimerState(timer)
+			if (timerState.config) {
+				timerState.config.durationSec = seconds
+			}
+		} catch (err) {
+			console.warn('[timer-panel] preset click failed:', err?.message || err)
 		}
 	}
 
 	buttons.forEach((btn) => {
 		btn.addEventListener('click', async () => {
 			if (!selectedTimer) return
+
+			const timer = timerList.find(
+				(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
+			)
+			if (!timer) return
 
 			const action = btn.getAttribute('data-action')
 			const prevDisabled = Array.from(buttons).map((b) => b.disabled)
@@ -290,6 +476,26 @@ export function initTimerControlPanel(stateStore, mountEl) {
 					layer: selectedTimer.layerNumber,
 					templateHostLayer: 0,
 				})
+
+				// Update timer state based on action
+				const now = Date.now()
+				const timerState = getTimerState(timer)
+
+				if (action === 'start') {
+					timerState.lastCmd = 'start'
+					timerState.cmdAt = now
+					timerState.remainingWhenPaused = null
+				} else if (action === 'pause') {
+					timerState.lastCmd = 'pause'
+					// Compute and freeze the remaining time
+					const remaining = computeDisplayTime(timerState)
+					timerState.remainingWhenPaused = remaining
+					timerState.cmdAt = null
+				} else if (action === 'reset') {
+					timerState.lastCmd = 'reset'
+					timerState.cmdAt = null
+					timerState.remainingWhenPaused = null
+				}
 			} catch (err) {
 				console.warn(`[timer-panel] ${action} failed:`, err?.message || err)
 			} finally {
@@ -307,7 +513,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 				(t) => selectedTimer && t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
 			)
 			if (timer) updateDisplay(timer)
-		}, 100)
+		}, TICK_INTERVAL_MS)
 	}
 
 	function stopTick() {

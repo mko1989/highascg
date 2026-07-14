@@ -51,6 +51,7 @@ BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-boot.sh"
 BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-bridge-boot.sh"
 DECKLINK_INSTALL_SH_SRC="${REPO_ROOT}/scripts/runtime/decklink-install-from-exfat.sh"
 DECKLINK_INSTALL_LIB_SRC="${REPO_ROOT}/scripts/lib/decklink-install-lib.sh"
+SYSTEM_TIME_SH_SRC="${REPO_ROOT}/scripts/runtime/highascg-set-system-time.sh"
 NETWORK_APPLY_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-network-apply.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
 SEED_BRIDGE_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-bridge-operator-layout.sh"
@@ -65,6 +66,7 @@ BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
 BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
 DECKLINK_INSTALL_SH_DST=/usr/local/lib/highascg/decklink-install-from-exfat.sh
 DECKLINK_INSTALL_LIB_DST=/usr/local/lib/highascg/decklink-install-lib.sh
+SYSTEM_TIME_SH_DST=/usr/local/lib/highascg/highascg-set-system-time.sh
 NETWORK_APPLY_SH_DST=/usr/local/lib/highascg/highascg-exfat-network-apply.sh
 decklink_install_svc="highascg-decklink-install.service"
 network_apply_svc="highascg-exfat-network-apply.service"
@@ -88,6 +90,7 @@ install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/
 [[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
 [[ -f "$DECKLINK_INSTALL_LIB_SRC" ]] && install -m 0644 -o root -g root "$DECKLINK_INSTALL_LIB_SRC" "$DECKLINK_INSTALL_LIB_DST"
 [[ -f "$DECKLINK_INSTALL_SH_SRC" ]] && install -m 0755 -o root -g root "$DECKLINK_INSTALL_SH_SRC" "$DECKLINK_INSTALL_SH_DST"
+[[ -f "$SYSTEM_TIME_SH_SRC" ]] && install -m 0755 -o root -g root "$SYSTEM_TIME_SH_SRC" "$SYSTEM_TIME_SH_DST"
 [[ -f "$NETWORK_APPLY_SH_SRC" ]] && install -m 0755 -o root -g root "$NETWORK_APPLY_SH_SRC" "$NETWORK_APPLY_SH_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
 	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
@@ -516,6 +519,7 @@ echo "  ${NETWORK_APPLY_SH_DST}"
 echo "  /etc/systemd/system/${decklink_install_svc}"
 echo "  ${DECKLINK_INSTALL_SH_DST}"
 echo "  ${DECKLINK_INSTALL_LIB_DST}"
+echo "  ${SYSTEM_TIME_SH_DST}"
 echo "  /etc/systemd/system/${arrive_svc}"
 # WO-188: sudoers entry for DeckLink install (via Web UI password-gated POST)
 SUDOERS_DECKLINK=/etc/sudoers.d/highascg-decklink-install
@@ -527,5 +531,16 @@ ${USER_CASPAR} ALL=(root) NOPASSWD: ${DECKLINK_INSTALL_SH_DST}
 SUDOERSEOF
 visudo -cf "$TMP_SUDOERS" >/dev/null 2>&1 && install -m 0440 -o root -g root "$TMP_SUDOERS" "$SUDOERS_DECKLINK"
 echo "installed ${SUDOERS_DECKLINK}"
+
+# WO-193: sudoers entry for system time setting (via Web UI password-gated POST)
+SUDOERS_SYSTEM_TIME=/etc/sudoers.d/highascg-system-time
+TMP_SUDOERS_TIME="$(mktemp)"
+trap 'rm -f "$TMP_SUDOERS_TIME"' EXIT
+cat >"$TMP_SUDOERS_TIME" <<SUDOERSTIMEEOF
+# HighAsCG system time setting (WO-193) — passwordless sudo for system time control
+${USER_CASPAR} ALL=(root) NOPASSWD: ${SYSTEM_TIME_SH_DST}
+SUDOERSTIMEEOF
+visudo -cf "$TMP_SUDOERS_TIME" >/dev/null 2>&1 && install -m 0440 -o root -g root "$TMP_SUDOERS_TIME" "$SUDOERS_SYSTEM_TIME"
+echo "installed ${SUDOERS_SYSTEM_TIME}"
 
 echo "Re-run: sudo bash ${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh ${USER_CASPAR}"

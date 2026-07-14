@@ -79,7 +79,11 @@ export function showSettingsModal(initialTab) {
 		}
 		if (tabName === 'media-usb') void MountHw.refreshExfatSyncPanel(modal)
 		if (tabName === 'system-updates') void SystemUpdates.refreshSystemUpdatesPanel(modal)
-		if (tabName === 'system-hardware') void MountHw.refreshSystemHardwarePanel(modal)
+		if (tabName === 'system-hardware') {
+			void MountHw.refreshSystemHardwarePanel(modal)
+			void MountHw.refreshSystemTimePanel(modal)
+			MountHw.wireSystemTimeListeners(modal)
+		}
 		if (tabName === 'decklink') void MountHw.refreshDecklinkPanel(modal)
 		if (tabName === 'live-audio' && pane && !liveAudioMounted) {
 			liveAudioMounted = true

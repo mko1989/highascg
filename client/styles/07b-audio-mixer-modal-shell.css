@@ -629,6 +629,44 @@ input[type="range"].audio-mixer__fader-horizontal {
 	gap: 8px;
 }
 
+.timer-control-panel__preset-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 8px;
+}
+
+.timer-control-panel__preset-btn {
+	padding: 4px 8px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 3px;
+	color: var(--text-muted);
+	font-size: 0.65rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.12s ease;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.timer-control-panel__preset-btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.12);
+	border-color: var(--accent);
+	color: var(--text);
+}
+
+.timer-control-panel__preset-btn:active:not(:disabled) {
+	background: rgba(88, 166, 255, 0.18);
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+.timer-control-panel__preset-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
 .timer-control-panel--collapsed {
 	border-top: 1px solid var(--border);
 }

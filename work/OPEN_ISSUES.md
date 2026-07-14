@@ -46,4 +46,14 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | UPDATE-GAPS | dist-web now included in drops; DeckLink install API/UI + tar.gz; vendor seeding verified (GitHub webui update flow was already fully shipped) | [WO-188](./work-orders/188_WO_UPDATE_SYSTEM_GAPS_DISTWEB_DECKLINK.md) | 🟡 Implemented |
 | HW-DISPLAY | Settings → System tab hardware summary (/api/system/hardware aggregator) | [WO-189](./work-orders/189_WO_SETTINGS_SYSTEM_HARDWARE_DISPLAY.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-181–189; pgm-only take hotfix + all server-side changes need the next service restart)
+| GLOBAL-PLAY-MAIN | Global play in editor targets the edited look's main | [WO-185](./work-orders/185_WO_GLOBAL_PLAY_WRONG_MAIN_IN_EDITOR.md) | 🟡 Implemented |
+| TIMER-PANEL | Collapsible timer control panel, HH/MM/SS, center default | [WO-186](./work-orders/186_WO_TIMER_CONTROL_PANEL.md) | 🟡 Implemented |
+| TEMPLATE-THUMBS | Rendered template snapshots in the looks editor | [WO-187](./work-orders/187_WO_TEMPLATE_THUMBNAILS_IN_LOOKS_EDITOR.md) | 🟡 Implemented |
+| MV-CROP | Multiview shows layer without top crop (main correct) — apply lock + debug endpoint shipped; **owner repro capture needed** (procedure in WO §5) | [WO-190](./work-orders/190_WO_MULTIVIEW_TOP_CROP_MISMATCH.md) | 🔴 Awaiting repro evidence |
+| MV-TIMERS | Per-layer L-rows with timers/progress on the multiview overlay | [WO-191](./work-orders/191_WO_MULTIVIEW_PER_LAYER_TIMERS.md) | 🟡 Implemented |
+
+| TIMER-PANEL-FIX | Timer panel live ticking display, duration persistence, preset buttons | [WO-192](./work-orders/192_WO_TIMER_PANEL_LIVE_DISPLAY_PERSIST_PRESETS.md) | 🟡 Implemented |
+| SYSTEM-TIME | System time view/NTP/manual set in Settings → System (sudoers via next installer run) | [WO-193](./work-orders/193_WO_SYSTEM_TIME_SETTING.md) | 🟡 Implemented |
+| HOSTNAME-USB | Hostname-from-MAC failed on USB boots (read-only /var/log aborted wrapper) — fail-open logging; box self-corrects to highascg7579 next boot | [WO-194](./work-orders/194_WO_HOSTNAME_FROM_MAC_USB_BOOT_FIX.md) | 🟡 Implemented |
+
+Last updated: 2026-07-14 (WO-181–194; server-side changes live on next service restart; local commits await `git push origin main` by owner)

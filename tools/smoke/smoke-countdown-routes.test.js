@@ -11,7 +11,7 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 
 const { resolveTemplateCgHostLayer } = require('../../src/engine/cg-routing')
-const { handlePost } = require('../../src/api/routes-countdown')
+const { handleGet, handlePost } = require('../../src/api/routes-countdown')
 
 /**
  * @param {{ failAmcp?: boolean }} [opts]
@@ -154,5 +154,79 @@ describe('countdown routes (WO-169)', () => {
 		assert.equal(call1.jsonPayload.cmd, 'start')
 		assert.equal(call2.jsonPayload.cmd, 'pause')
 		// No request has caused the other to change state
+	})
+})
+
+describe('countdown list (WO-192)', () => {
+	it('GET /api/countdown/list includes countdownConfig for each timer entry', () => {
+		const mockSceneState = require('../../src/state/live-scene-state')
+		// Stub getAll to return a scene with a countdown timer layer
+		const originalGetAll = mockSceneState.getAll
+		mockSceneState.getAll = () => ({
+			'1': {
+				sceneId: 'scene-1',
+				scene: {
+					layers: [
+						{
+							layerNumber: 10,
+							source: {
+								value: 'countdown/countdown',
+								label: 'My Timer',
+								countdownConfig: {
+									mode: 'duration',
+									durationSec: 300,
+									endEpochMs: Date.now() + 300000,
+								},
+							},
+						},
+					],
+				},
+			},
+		})
+
+		const result = handleGet('/api/countdown/list', {})
+		mockSceneState.getAll = originalGetAll
+
+		assert.equal(result.status, 200)
+		const body = JSON.parse(result.body)
+		assert.ok(Array.isArray(body.items), 'response has items array')
+		assert.equal(body.items.length, 1, 'should have one timer')
+		const item = body.items[0]
+		assert.equal(item.channel, 1, 'channel should be 1')
+		assert.equal(item.layerNumber, 10, 'layerNumber should be 10')
+		assert.equal(item.label, 'My Timer', 'label should be included')
+		assert.ok(item.config, 'config should be included')
+		assert.equal(item.config.mode, 'duration', 'config.mode should be duration')
+		assert.equal(item.config.durationSec, 300, 'config.durationSec should be 300')
+	})
+
+	it('GET /api/countdown/list returns null config when countdownConfig is missing', () => {
+		const mockSceneState = require('../../src/state/live-scene-state')
+		const originalGetAll = mockSceneState.getAll
+		mockSceneState.getAll = () => ({
+			'1': {
+				sceneId: 'scene-1',
+				scene: {
+					layers: [
+						{
+							layerNumber: 10,
+							source: {
+								value: 'countdown/countdown',
+								label: 'No Config Timer',
+								// countdownConfig intentionally missing
+							},
+						},
+					],
+				},
+			},
+		})
+
+		const result = handleGet('/api/countdown/list', {})
+		mockSceneState.getAll = originalGetAll
+
+		assert.equal(result.status, 200)
+		const body = JSON.parse(result.body)
+		assert.equal(body.items.length, 1, 'should have one timer')
+		assert.equal(body.items[0].config, null, 'config should be null when missing')
 	})
 })

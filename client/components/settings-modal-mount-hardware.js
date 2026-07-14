@@ -501,3 +501,160 @@ export function wireMediaUsbMountListeners(modal) {
 		}
 	})
 }
+
+/**
+ * Refresh system time display with current clock and NTP state.
+ * Starts a local clock ticker to show live time updates.
+ */
+export async function refreshSystemTimePanel(modal) {
+	const clockLine = modal.querySelector('#system-time-clock')
+	const ntpCheckbox = modal.querySelector('#system-time-ntp-toggle')
+	const dateInput = modal.querySelector('#system-time-date-input')
+	const timeInput = modal.querySelector('#system-time-time-input')
+
+	if (!clockLine) return
+
+	clockLine.textContent = 'Loading…'
+
+	try {
+		const r = await api.get('/api/system/time')
+		if (!r?.ok) {
+			clockLine.textContent = `Error: ${r?.error || 'Unknown error'}`
+			return
+		}
+
+		// Parse the time string: "Tue 2026-07-14 10:27:20 UTC"
+		const timeStr = r.now || ''
+		const parts = timeStr.split(' ')
+		const dateStr = parts[1] || ''
+		const timeStr2 = parts[2] || ''
+
+		// Update form fields with current values
+		if (dateInput && dateStr) dateInput.value = dateStr
+		if (timeInput && timeStr2) timeInput.value = timeStr2
+
+		// Update NTP checkbox
+		if (ntpCheckbox) ntpCheckbox.checked = r.ntp === true
+
+		// Parse to get a base timestamp for local clock
+		const baseTime = new Date(`${dateStr}T${timeStr2}Z`)
+		const baseMs = baseTime.getTime()
+		const startMs = Date.now()
+
+		// Create a live clock display with local offset
+		const updateClock = () => {
+			const elapsed = Date.now() - startMs
+			const currentTime = new Date(baseMs + elapsed)
+			const datepart = currentTime.toISOString().split('T')[0]
+			const timepart = currentTime.toISOString().split('T')[1].slice(0, 8)
+			const tzStr = r.timezone || 'UTC'
+			const syncStr = r.synchronized ? 'sync' : 'unsynced'
+			clockLine.textContent = `${datepart} ${timepart} ${tzStr} (${syncStr})`
+		}
+
+		updateClock()
+		const tickInterval = setInterval(updateClock, 200)
+
+		// Store interval ID on element for cleanup if needed
+		clockLine._tickInterval = tickInterval
+	} catch (e) {
+		clockLine.textContent = e?.message || String(e)
+	}
+}
+
+/**
+ * Wire up system time control listeners (NTP toggle, Set button).
+ */
+export function wireSystemTimeListeners(modal) {
+	const setBtn = modal.querySelector('#system-time-set-btn')
+	const ntpCheckbox = modal.querySelector('#system-time-ntp-toggle')
+	const dateInput = modal.querySelector('#system-time-date-input')
+	const timeInput = modal.querySelector('#system-time-time-input')
+	const resultLine = modal.querySelector('#system-time-result')
+
+	if (!setBtn) return
+
+	// Disable Set button when NTP is on
+	if (ntpCheckbox) {
+		const updateSetBtnState = () => {
+			setBtn.disabled = ntpCheckbox.checked
+			setBtn.title = ntpCheckbox.checked ? 'Disable NTP to set manual time' : 'Set system time'
+		}
+		updateSetBtnState()
+		ntpCheckbox.addEventListener('change', async () => {
+			const password = prompt('Enter nuclear password to confirm NTP toggle:')
+			if (password === null) {
+				ntpCheckbox.checked = !ntpCheckbox.checked
+				return
+			}
+
+			try {
+				const res = await api.post('/api/system/time', {
+					password,
+					ntp: ntpCheckbox.checked,
+				})
+				if (res?.ok) {
+					if (resultLine) resultLine.textContent = `NTP: ${res.ntp ? 'enabled' : 'disabled'}`
+				} else {
+					const errMsg = res?.error || 'Unknown error'
+					if (resultLine) resultLine.textContent = `Error: ${errMsg}`
+					ntpCheckbox.checked = !ntpCheckbox.checked
+				}
+			} catch (e) {
+				const msg = e?.message || String(e)
+				if (resultLine) resultLine.textContent = `Error: ${msg}`
+				ntpCheckbox.checked = !ntpCheckbox.checked
+			} finally {
+				// Refresh after toggle
+				await refreshSystemTimePanel(modal)
+			}
+		})
+	}
+
+	// Set button listener
+	setBtn.addEventListener('click', async () => {
+		if (!dateInput || !timeInput) {
+			if (resultLine) resultLine.textContent = 'Error: Date/time inputs not found'
+			return
+		}
+
+		const date = dateInput.value?.trim()
+		const time = timeInput.value?.trim()
+
+		if (!date || !time) {
+			if (resultLine) resultLine.textContent = 'Error: Date and time are required'
+			return
+		}
+
+		const confirmed = confirm(
+			'Warning: changing system time while recording or streaming can disturb timestamps. Continue?',
+		)
+		if (!confirmed) return
+
+		const password = prompt('Enter nuclear password to confirm time setting:')
+		if (password === null) return
+
+		setBtn.disabled = true
+		if (resultLine) resultLine.textContent = 'Setting time…'
+
+		try {
+			const res = await api.post('/api/system/time', {
+				password,
+				set: `${date} ${time}`,
+			})
+			if (res?.ok) {
+				if (resultLine) resultLine.textContent = `Time set: ${res.now || date}`
+			} else {
+				const errMsg = res?.error || 'Unknown error'
+				if (resultLine) resultLine.textContent = `Error: ${errMsg}`
+			}
+		} catch (e) {
+			const msg = e?.message || String(e)
+			if (resultLine) resultLine.textContent = `Error: ${msg}`
+		} finally {
+			setBtn.disabled = false
+			// Refresh the panel after setting time
+			await refreshSystemTimePanel(modal)
+		}
+	})
+}

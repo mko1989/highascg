@@ -25,16 +25,18 @@ do a full github comit and push.
 
 in the system tab of the settings modal do a display of the hardware that is on the system.
 
-****NEW***
+
 
 weird issue the cropped layer with a border displays correctly on the main output but on multiview it displays without the top crop.
 
 the timers on the multiview need to show the timers and progress bar for every layer, but only those that actually have a video/audio file that has some running time to show. the rest should be just displayed. 
 all should have just the short version of layer label ex:L10 at the top should be the highest layer and then descending to bottom.
 
-****NEWNEW***
+
 the timer display in the small corner control does not display the time. after playing other set time the setting defaults back to 5min. under the time set add a couple of presets for 5min 10min 15min 20min 25m 30m 45m 60m (should be very small buttons).
 
 we need to add a system setting in the settings modal for setting the system time.
 
 check the workflow for auto creation of the hostname based on the mac address. on usb boot it needs to happen each time it boots.
+
+****NEW***
