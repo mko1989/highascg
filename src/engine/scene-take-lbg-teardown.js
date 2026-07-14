@@ -13,7 +13,13 @@ const {
 	nextPipContentLayerInScene,
 	pipOverlaysFromLayer,
 } = require('./pip-overlay')
-const { isSceneTemplateLayer, buildSceneTemplateCgClearLines, resolveTemplateCgHostLayer } = require('./scene-template-cg')
+const {
+	isSceneTemplateLayer,
+	buildSceneTemplateCgClearLines,
+	resolveTemplateCgHostLayer,
+	getTrackedTemplateHosts,
+	untrackTemplateHosts,
+} = require('./scene-template-cg')
 /**
  * @param {object} ctx
  * @param {object} ctx.amcp
@@ -121,6 +127,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 
 	// WO-196 T196.1: emit CG CLEAR for exiting template layers not in the incoming look.
 	// This prevents timers and other template CG from staying on air after a look transition.
+	const hostsToUntrack = new Set()
 	for (const layer of exitMedia) {
 		if (!isSceneTemplateLayer(layer, layer.source?.value, self)) continue
 		const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, layer.source?.value)
@@ -129,7 +136,29 @@ async function runSceneTakeLbgTeardown(ctx) {
 		const clearLines = buildSceneTemplateCgClearLines(channel, layer.layerNumber, layer.source?.value)
 		if (clearLines.length > 0) {
 			teardownLines.push(...clearLines)
+			hostsToUntrack.add(hostLayer)
 		}
+	}
+
+	// WO-207 T207.2: clear tracked hosts not re-declared by the incoming look (belt and braces with WO-196).
+	// This handles orphans when the same layer number exists in both scenes with different template types.
+	const trackedHosts = getTrackedTemplateHosts(channel)
+	if (trackedHosts.size > 0) {
+		for (const host of trackedHosts) {
+			// Skip hosts that are declared in the incoming look
+			if (incomingTemplateHostLayers.has(host)) continue
+			// This tracked host is not in the incoming look — clear it and mark for untracking.
+			const clearLines = buildSceneTemplateCgClearLines(channel, host, '')
+			if (clearLines.length > 0) {
+				teardownLines.push(...clearLines)
+				hostsToUntrack.add(host)
+			}
+		}
+	}
+
+	// Untrack all hosts we just cleared
+	if (hostsToUntrack.size > 0) {
+		untrackTemplateHosts(channel, hostsToUntrack)
 	}
 
 	if (currentGbEnabled && !incomingGbEnabled) {

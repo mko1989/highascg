@@ -183,6 +183,7 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 				<button type="button" class="timer-control-panel__btn" data-action="start" title="Start/Resume">▶</button>
 				<button type="button" class="timer-control-panel__btn" data-action="pause" title="Pause">⏸</button>
 				<button type="button" class="timer-control-panel__btn" data-action="reset" title="Reset">⟲</button>
+					<button type="button" class="timer-control-panel__btn" data-action="off" title="Take off air (WO-207)">⊘</button>
 			</div>
 			<div class="timer-control-panel__hms-label">Duration/Target</div>
 			<div class="timer-control-panel__hms" id="timer-hms"></div>
@@ -385,17 +386,31 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 
 	/**
 	 * WO-196 T196.3: disable Start button for off-air timers with a tooltip.
+	 * WO-207 T207.4: disable Off button for off-air timers.
 	 * @param {object|null} timer
 	 */
 	function updateButtonState(timer) {
 		const startBtn = root.querySelector('[data-action="start"]')
-		if (!startBtn) return
+		const offBtn = root.querySelector('[data-action="off"]')
+		if (!startBtn && !offBtn) return
 		if (!timer || timer.onAir) {
-			startBtn.disabled = false
-			startBtn.title = 'Start/Resume'
+			if (startBtn) {
+				startBtn.disabled = false
+				startBtn.title = 'Start/Resume'
+			}
+			if (offBtn) {
+				offBtn.disabled = false
+				offBtn.title = 'Take off air'
+			}
 		} else {
-			startBtn.disabled = true
-			startBtn.title = 'Take a look containing this timer first'
+			if (startBtn) {
+				startBtn.disabled = true
+				startBtn.title = 'Take a look containing this timer first'
+			}
+			if (offBtn) {
+				offBtn.disabled = true
+				offBtn.title = 'Timer not on air'
+			}
 		}
 	}
 
@@ -619,6 +634,14 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 					timerState.lastCmd = 'reset'
 					timerState.cmdAt = null
 					timerState.remainingWhenPaused = null
+				} else if (action === 'off') {
+					timerState.lastCmd = 'off'
+					timerState.cmdAt = null
+					timerState.remainingWhenPaused = null
+					// WO-207 T207.4: refresh list after off (timer will disappear from on-air)
+					setTimeout(() => {
+						refreshTimerList()
+					}, 200)
 				}
 			} catch (err) {
 				console.warn(`[timer-panel] ${action} failed:`, err?.message || err)

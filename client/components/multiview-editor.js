@@ -11,6 +11,35 @@ import { parseRouteValue } from './scenes-shared.js'
 import { attachMathInput } from '../lib/math-input.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
 
+/**
+ * Create a debounced function that delays execution until the specified delay has elapsed
+ * without any new calls. Pure function — no side effects.
+ * @param {Function} fn - Function to debounce
+ * @param {number} delayMs - Debounce delay in milliseconds
+ * @returns {{ call: Function, flush: Function, cancel: Function }} Object with call/flush/cancel methods
+ */
+function createDebounce(fn, delayMs) {
+	let timerId = null
+	return {
+		call: () => {
+			if (timerId) clearTimeout(timerId)
+			timerId = setTimeout(() => {
+				timerId = null
+				fn()
+			}, delayMs)
+		},
+		flush: () => {
+			if (timerId) clearTimeout(timerId)
+			timerId = null
+			fn()
+		},
+		cancel: () => {
+			if (timerId) clearTimeout(timerId)
+			timerId = null
+		}
+	}
+}
+
 function snapValue(val, candidates, threshold) {
 	let bestDiff = threshold
 	let bestCandidate = val
@@ -25,11 +54,13 @@ function snapValue(val, candidates, threshold) {
 }
 
 export function initMultiviewEditor(root, stateStore) {
-	let canvas, ctx, scale = 1, offsetX = 0, offsetY = 0, selectedId = null, dragMode = null, dragStart = { x: 0, y: 0, cell: null }, dropHoverId = null, wrap = null, disabledOverlay = null, applyTimer = null
+	let canvas, ctx, scale = 1, offsetX = 0, offsetY = 0, selectedId = null, dragMode = null, dragStart = { x: 0, y: 0, cell: null }, dropHoverId = null, wrap = null, disabledOverlay = null
 	const getCM = () => stateStore.getState()?.channelMap || {}
 	const isEnabled = () => getCM().multiviewEnabled !== false && getCM().multiviewCh != null
-	const scheduleApply = () => { if (!isEnabled()) return; if (applyTimer) clearTimeout(applyTimer); applyTimer = setTimeout(() => { applyTimer = null; applyMultiviewLayout(getCM, { silent: true }) }, 400) }
-	const flushApply = () => { if (!isEnabled()) return; if (applyTimer) clearTimeout(applyTimer); applyTimer = null; applyMultiviewLayout(getCM, { silent: true }) }
+	const applyDebounce = createDebounce(() => applyMultiviewLayout(getCM, { silent: true }), 800)
+	const scheduleApply = () => { if (!isEnabled()) return; applyDebounce.call() }
+	const flushApply = () => { if (!isEnabled()) return; applyDebounce.flush() }
+	const applyIfAutoEnabled = () => { if (multiviewState.autoApply) flushApply() }
 	const syncOverlay = () => { if (!isEnabled()) { if (!disabledOverlay && wrap) { disabledOverlay = Object.assign(document.createElement('div'), { className: 'mv-disabled-overlay', innerHTML: '<div class="mv-disabled-overlay__content"><h3>No Multiview Channel</h3><p>Add a Multiview destination in Device View to enable.</p></div>' }); wrap.appendChild(disabledOverlay) } if (disabledOverlay) disabledOverlay.style.display = 'flex' } else if (disabledOverlay) disabledOverlay.style.display = 'none' }
 	const draw = () => drawMultiviewEditor(ctx, canvas, { offsetX, offsetY, scale, selectedId, dropHoverId, channelMap: getCM(), timerScale: multiviewState.timerScale })
 	const getMvChannels = () => { const cm = getCM(); return Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : []) }
@@ -59,6 +90,7 @@ export function initMultiviewEditor(root, stateStore) {
 		<select id="mv-index-select" class="mv-select" style="margin-right:8px"></select>
 		<button id="mv-reset" class="mv-btn">Reset</button>
 		<button id="mv-refresh" class="mv-btn" title="Re-apply all multiview layouts to CasparCG (use if the multiview is stuck, e.g. after a CasparCG restart)">Refresh output</button>
+		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-auto-apply" ${multiviewState.autoApply ? 'checked' : ''}> Auto-apply</label>
 		<label class="mv-chk"><input type="checkbox" id="mv-overlay" ${multiviewState.showOverlay ? 'checked' : ''}> Borders</label>
 		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-timers-under-labels" ${multiviewState.showTimersUnderLabels ? 'checked' : ''}> Timers under labels</label>
 		<label class="mv-chk" style="margin-left:12px">Timer size % <input type="number" id="mv-timer-scale" value="${multiviewState.timerScale}" min="50" max="300" style="width:50px;padding:2px 4px"></label>
@@ -117,6 +149,7 @@ export function initMultiviewEditor(root, stateStore) {
 	const idxSel = root.querySelector('#mv-index-select')
 	idxSel.onchange = (e) => {
 		multiviewState.switchTo(e.target.value)
+		root.querySelector('#mv-auto-apply').checked = multiviewState.autoApply
 		root.querySelector('#mv-overlay').checked = multiviewState.showOverlay
 		root.querySelector('#mv-timers-under-labels').checked = multiviewState.showTimersUnderLabels
 		root.querySelector('#mv-bg-color').value = multiviewState.bgColor
@@ -128,6 +161,7 @@ export function initMultiviewEditor(root, stateStore) {
 	}
 	updateToolbar()
 
+	root.querySelector('#mv-auto-apply').onchange = e => multiviewState.setAutoApply(e.target.checked)
 	root.querySelector('#mv-overlay').onchange = e => multiviewState.setShowOverlay(e.target.checked)
 	root.querySelector('#mv-timers-under-labels').onchange = e => { multiviewState.setShowTimersUnderLabels(e.target.checked); flushApply() }
 	root.querySelector('#mv-bg-color').oninput = e => multiviewState.setBgColor(e.target.value)
@@ -245,7 +279,7 @@ export function initMultiviewEditor(root, stateStore) {
 			} return }
 		const c = getCellAt(cx, cy, getCM()); if (!c) { canvas.style.cursor = ''; return }; const h = getResizeHandle(c, cx, cy, scale, getCM()); canvas.style.cursor = h ? cursorForResizeHandle(h) : 'move'
 	}
-	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; flushApply() }
+	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; applyIfAutoEnabled() }
 	canvas.onmouseleave = () => { dragMode = null; canvas.style.cursor = '' }
 	canvas.oncontextmenu = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (!c) return; if (c.source) multiviewState.setCellSource(c.id, null); else multiviewState.removeCell(c.id) }
 	canvas.onclick = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (c) multiviewState.setAudioActiveCell(c.id) }
@@ -273,10 +307,10 @@ export function initMultiviewEditor(root, stateStore) {
 				}
 			}
 		c = multiviewState.addCell({ type: data.routeType || data.type, label: data.label || data.value, x: Math.max(0, Math.min(mw - cw, x - cw / 2)), y: Math.max(0, Math.min(mh - ch, y - ch / 2)), w: cw, h: ch, source: { value: data.value, type: data.type || 'media', label: data.label || data.value }, aspectLocked: true }); selectedId = c.id }
-		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); flushApply()
+		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); applyIfAutoEnabled()
 	}
 	multiviewState.on('change', () => { draw() })
-	multiviewState.on('apply-request', () => { if (!isEnabled()) return; scheduleApply() })
+	multiviewState.on('apply-request', () => { if (!isEnabled()) return; if (multiviewState.autoApply) scheduleApply() })
 	multiviewState.on('audio-change', () => { draw(); applyMultiviewAudioFocus() })
 
 	const onKeyDown = (e) => {
@@ -291,7 +325,7 @@ export function initMultiviewEditor(root, stateStore) {
 			multiviewState.removeCell(selectedId)
 			selectedId = null
 			draw()
-			flushApply()
+			applyIfAutoEnabled()
 		}
 	}
 	document.addEventListener('keydown', onKeyDown)

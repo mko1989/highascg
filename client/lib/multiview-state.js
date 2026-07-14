@@ -123,6 +123,7 @@ export class MultiviewState {
 		this.showTimersUnderLabels = false
 		this.timerScale = 100
 		this.highlightTopTimer = true
+		this.autoApply = true
 		this.audioActiveCellId = null
 		this._listeners = new Map()
 		this._load()
@@ -152,6 +153,7 @@ export class MultiviewState {
 					this.showTimersUnderLabels = !!data.showTimersUnderLabels
 					this.timerScale = Math.max(50, Math.min(300, Number(data.timerScale) || 100))
 					this.highlightTopTimer = data.highlightTopTimer !== false
+					this.autoApply = data.autoApply !== false
 					this.audioActiveCellId = data.audioActiveCellId || null
 					if (JSON.stringify(this.cells) !== JSON.stringify(prev)) {
 						// Route migration only — do not re-push the full multiview to Caspar on refresh
@@ -292,6 +294,11 @@ export class MultiviewState {
 		this._save()
 	}
 
+	setAutoApply(v) {
+		this.autoApply = !!v
+		this._save(false)
+	}
+
 	/** Set multiview background color (layer 10). */
 	setBgColor(color) {
 		this.bgColor = typeof color === 'string' && color.trim() ? color.trim() : '#000000'
@@ -315,6 +322,7 @@ export class MultiviewState {
 			showTimersUnderLabels: this.showTimersUnderLabels,
 			timerScale: this.timerScale,
 			highlightTopTimer: this.highlightTopTimer,
+			autoApply: this.autoApply,
 		}
 	}
 
@@ -329,6 +337,7 @@ export class MultiviewState {
 		this.showTimersUnderLabels = !!data.showTimersUnderLabels
 		this.timerScale = Math.max(50, Math.min(300, Number(data.timerScale) || 100))
 		this.highlightTopTimer = data.highlightTopTimer !== false
+		this.autoApply = data.autoApply !== false
 		// Do not re-apply the whole layout to Caspar on every WebUI refresh / project hydrate
 		this._persistLayout(false, !opts.silent)
 	}
@@ -347,6 +356,7 @@ export class MultiviewState {
 					showTimersUnderLabels: this.showTimersUnderLabels,
 					timerScale: this.timerScale,
 					highlightTopTimer: this.highlightTopTimer,
+					autoApply: this.autoApply,
 					audioActiveCellId: this.audioActiveCellId,
 				}),
 			)
@@ -427,6 +437,7 @@ export class MultiviewState {
 			showTimersUnderLabels: this.showTimersUnderLabels,
 			timerScale: this.timerScale,
 			highlightTopTimer: this.highlightTopTimer,
+			autoApply: this.autoApply,
 			audioActiveCellId: this.audioActiveCellId,
 		}
 	}
@@ -442,6 +453,7 @@ export class MultiviewState {
 		this.showTimersUnderLabels = !!snapshot.showTimersUnderLabels
 		this.timerScale = Math.max(50, Math.min(300, Number(snapshot.timerScale) || 100))
 		this.highlightTopTimer = snapshot.highlightTopTimer !== false
+		this.autoApply = snapshot.autoApply !== false
 		this.audioActiveCellId = snapshot.audioActiveCellId ?? null
 		this._save()
 	}

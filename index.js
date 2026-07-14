@@ -247,6 +247,26 @@ function main() {
 				void reconcileAfterInfoGather(appCtx).catch((e) => {
 					appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
 				})
+				// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts
+				void (async () => {
+					try {
+						const { sweepTemplateCgOrphansOnCasparConnected } = require('./src/engine/template-cg-orphan-sweep')
+						const liveSceneState = require('./src/state/live-scene-state')
+						const map = getChannelMap(config || {})
+						const programChannels = []
+						for (let i = 0; i < map.screenCount; i++) {
+							programChannels.push(map.programCh(i + 1))
+						}
+						await sweepTemplateCgOrphansOnCasparConnected({
+							amcp: appCtx.amcp,
+							liveState: liveSceneState.getAll(),
+							channels: programChannels,
+							log: (level, msg) => appCtx.log(level, msg),
+						})
+					} catch (e) {
+						appCtx.log('debug', `[template-cg-orphan-sweep] startup: ${e?.message || e}`)
+					}
+				})()
 			},
 		})
 		if (!config.streaming.enabled) void enqueueStreaming(async () => await stopStreamingSubsystem())

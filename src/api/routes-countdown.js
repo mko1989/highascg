@@ -8,6 +8,7 @@
  *   POST /api/countdown/reset   — { cmd: 'reset' } CG UPDATE
  *   POST /api/countdown/set     — full config CG UPDATE (no `cmd` — does not touch run state)
  *   POST /api/countdown/update  — alias of `set`
+ *   POST /api/countdown/off     — { cmd: 'off' } CG CLEAR (WO-207 T207.4)
  *   GET  /api/countdown/list    — enumerate countdown template layers across live/current looks
  *
  * STATELESS by design — the anti-pattern to avoid is routes-lower-thirds.js's per-channel
@@ -92,6 +93,21 @@ async function emitCgUpdate(ctx, routing, payloadObj) {
 	if (!ctx?.amcp) return { ok: false, error: 'AMCP not connected' }
 	try {
 		await ctx.amcp.cg.cgUpdate(routing.channel, routing.hostLayer, routing.templateHostLayer, JSON.stringify(payloadObj))
+		return { ok: true }
+	} catch (e) {
+		return { ok: false, error: e?.message || String(e) }
+	}
+}
+
+/**
+ * WO-207 T207.4: Clear a countdown template CG from air via CG CLEAR command.
+ * @param {object} ctx
+ * @param {{ channel: number, hostLayer: number }} routing
+ */
+async function emitCgClear(ctx, routing) {
+	if (!ctx?.amcp) return { ok: false, error: 'AMCP not connected' }
+	try {
+		await ctx.amcp.cg.cgClear(routing.channel, routing.hostLayer)
 		return { ok: true }
 	} catch (e) {
 		return { ok: false, error: e?.message || String(e) }
@@ -202,7 +218,7 @@ function handleGet(p, ctx, query = {}) {
  * @param {object} ctx
  */
 async function handlePost(p, body, ctx) {
-	const m = p.match(/^\/api\/countdown\/(start|pause|reset|set|update)$/)
+	const m = p.match(/^\/api\/countdown\/(start|pause|reset|set|update|off)$/)
 	if (!m) return null
 
 	const b = parseBody(body)
@@ -212,30 +228,40 @@ async function handlePost(p, body, ctx) {
 	}
 
 	const cmd = m[1]
-	let payload
-	if (cmd === 'set' || cmd === 'update') {
-		payload = {}
-		for (const [k, v] of Object.entries(b)) {
-			if (!ROUTING_KEYS.has(k)) payload[k] = v
-		}
-	} else {
-		payload = { cmd }
-	}
+	let res
 
-	const res = await emitCgUpdate(ctx, routing, payload)
+	// WO-207 T207.4: off command clears the CG via CG CLEAR instead of CG UPDATE
+	if (cmd === 'off') {
+		res = await emitCgClear(ctx, routing)
+	} else {
+		let payload
+		if (cmd === 'set' || cmd === 'update') {
+			payload = {}
+			for (const [k, v] of Object.entries(b)) {
+				if (!ROUTING_KEYS.has(k)) payload[k] = v
+			}
+		} else {
+			payload = { cmd }
+		}
+		res = await emitCgUpdate(ctx, routing, payload)
+	}
 
 	// WO-205 T205.1: Record command or config change in the registry for panel mirroring.
 	const registryKey = `${routing.channel}:${routing.logicalLayer}`
 	const now = Date.now()
 	let registryEntry = commandRegistry.get(registryKey) || {}
 
-	if (cmd === 'start' || cmd === 'pause' || cmd === 'reset') {
+	if (cmd === 'start' || cmd === 'pause' || cmd === 'reset' || cmd === 'off') {
 		// Record the command + timestamp
 		registryEntry.lastCmd = cmd
 		registryEntry.cmdAt = now
 		// For pause, we'll let the panel compute remainingAtPause from the prior start entry
 	} else if (cmd === 'set' || cmd === 'update') {
 		// Record config fields + timestamp
+		const payload = {}
+		for (const [k, v] of Object.entries(b)) {
+			if (!ROUTING_KEYS.has(k)) payload[k] = v
+		}
 		if (payload.durationSec != null) registryEntry.durationSec = payload.durationSec
 		if (payload.targetTime != null) registryEntry.targetTime = payload.targetTime
 		if (payload.mode != null) registryEntry.mode = payload.mode

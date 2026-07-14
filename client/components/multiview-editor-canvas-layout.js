@@ -63,20 +63,19 @@ export function getResolutionSuffix(cell, cm = {}) {
 	const previewChannels = cm.previewChannels || []
 	const ovType = getCellOverlayType(cell, programChannels, previewChannels, cm)
 
-	let resolvedCh = null
+	let idx = null
 	let isPgm = false
-	let isPrv = false
 
 	if (ovType === 'pgm') {
 		isPgm = true
-		resolvedCh = inferPgmScreen(cell, programChannels)
+		// Prefer screenIdx if available, otherwise infer from label/source/id
+		idx = typeof cell.screenIdx === 'number' ? cell.screenIdx : (inferPgmScreen(cell, programChannels) - 1)
 	} else if (ovType === 'prv') {
-		isPrv = true
-		resolvedCh = inferPrvScreen(cell, previewChannels)
+		// Prefer screenIdx if available, otherwise infer from label/source/id
+		idx = typeof cell.screenIdx === 'number' ? cell.screenIdx : (inferPrvScreen(cell, previewChannels) - 1)
 	}
 
-	if (resolvedCh) {
-		const idx = resolvedCh - 1
+	if (idx != null && idx >= 0) {
 		const res = isPgm ? cm.programResolutions?.[idx] : (cm.previewResolutions?.[idx] || cm.programResolutions?.[idx])
 		if (res && res.w > 0 && res.h > 0) {
 			return ` (${res.w}x${res.h} ${res.fps}p)`
@@ -92,11 +91,11 @@ export function resolveCellSourceResolution(cell, cm = {}) {
 	const ovType = getCellOverlayType(cell, programChannels, previewChannels, cm)
 
 	if (ovType === 'pgm') {
-		const idx = inferPgmScreen(cell, programChannels) - 1
+		const idx = typeof cell.screenIdx === 'number' ? cell.screenIdx : (inferPgmScreen(cell, programChannels) - 1)
 		const res = cm.programResolutions?.[idx]
 		if (res?.w > 0 && res?.h > 0) return res
 	} else if (ovType === 'prv') {
-		const idx = inferPrvScreen(cell, previewChannels) - 1
+		const idx = typeof cell.screenIdx === 'number' ? cell.screenIdx : (inferPrvScreen(cell, previewChannels) - 1)
 		const res = cm.previewResolutions?.[idx] || cm.programResolutions?.[idx]
 		if (res?.w > 0 && res?.h > 0) return res
 	}

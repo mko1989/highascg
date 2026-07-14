@@ -181,6 +181,20 @@ export function applyPersistedData(state, data) {
 	} else {
 		state.lookPresets = []
 	}
+
+	if (Array.isArray(data.timers)) {
+		state.timers = data.timers
+			.filter((t) => t && typeof t.id === 'string' && typeof t.name === 'string' && t.config && typeof t.config === 'object')
+			.map((t) => ({
+				id: t.id,
+				name: t.name,
+				config: t.config,
+				canonicalLayerByScreen: t.canonicalLayerByScreen && typeof t.canonicalLayerByScreen === 'object' ? t.canonicalLayerByScreen : {},
+			}))
+	} else {
+		state.timers = []
+	}
+
 	state.globalBorders = normalizeGlobalBordersArray(data.globalBorders)
 	return true
 }
@@ -199,6 +213,7 @@ export function getPersistPayload(state) {
 		mainEditorVisibilityMigrated: state.mainEditorVisibilityMigrated === true,
 		layerPresets: state.layerPresets,
 		lookPresets: state.lookPresets,
+		timers: state.timers,
 		globalBorders: state.globalBorders,
 	})
 }

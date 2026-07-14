@@ -11,6 +11,14 @@ const { isTemplateClip } = require('../state/playback-tracker-media')
 const { resolveTemplateCgHostLayer, channelMapFromCtx } = require('./cg-routing')
 
 /**
+ * WO-207: Track per-channel Sets of added template CG host layers.
+ * When `buildSceneTemplateCgAmcpLines` emits ADD lines, record the host.
+ * On reconnect/startup sweep, clear untracked hosts (orphans) and remove from tracking.
+ * @type {Map<number, Set<number>>}
+ */
+const _trackedTemplateHostsByChannel = new Map()
+
+/**
  * @param {object} layer
  * @param {string} clipId
  * @param {object} [ctx]
@@ -104,6 +112,8 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec) {
 		typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
 	const playOnLoad = spec?.playOnLoad !== false ? 1 : 0
 	const tpl = cgName.includes('/') ? `"${cgName}"` : cgName
+	// WO-207 T207.2: record this host as added (tracked removal on teardown or on take without the template)
+	recordTemplateHostAdded(channel, hostLayer)
 	return [
 		`CG ${cl} CLEAR`,
 		`CG ${cl} ADD 0 ${tpl} ${playOnLoad} ${param(dataStr)}`,
@@ -199,6 +209,67 @@ function buildSceneTemplateCgUpdateOnlyLines(channel, logicalOrHostLayer, spec) 
 	return [`CG ${cl} UPDATE 0 ${param(dataStr)}`]
 }
 
+/**
+ * WO-207 T207.2: Record a template CG host layer as added on this channel.
+ * Called after buildSceneTemplateCgAmcpLines emit via sendPipOverlayLinesSerial.
+ * @param {number} channel
+ * @param {number} hostLayer
+ */
+function recordTemplateHostAdded(channel, hostLayer) {
+	const n = Number(channel)
+	const h = Number(hostLayer)
+	if (!Number.isFinite(n) || n < 1 || !Number.isFinite(h) || h < 1) return
+	if (!_trackedTemplateHostsByChannel.has(n)) {
+		_trackedTemplateHostsByChannel.set(n, new Set())
+	}
+	_trackedTemplateHostsByChannel.get(n).add(h)
+}
+
+/**
+ * WO-207: Get the Set of tracked template host layers for a channel.
+ * @param {number} channel
+ * @returns {Set<number>}
+ */
+function getTrackedTemplateHosts(channel) {
+	const n = Number(channel)
+	if (!Number.isFinite(n) || n < 1) return new Set()
+	return _trackedTemplateHostsByChannel.get(n) || new Set()
+}
+
+/**
+ * WO-207 T207.2: Clear tracked hosts for a channel (call after teardown clears them from Caspar).
+ * @param {number} channel
+ * @param {Set<number>} [hostsToUntrack] — if provided, only untrack these hosts; else clear all
+ */
+function untrackTemplateHosts(channel, hostsToUntrack) {
+	const n = Number(channel)
+	if (!Number.isFinite(n) || n < 1) return
+	if (!hostsToUntrack || hostsToUntrack.size === 0) {
+		_trackedTemplateHostsByChannel.delete(n)
+		return
+	}
+	const tracked = _trackedTemplateHostsByChannel.get(n)
+	if (!tracked) return
+	for (const h of hostsToUntrack) {
+		tracked.delete(h)
+	}
+	if (tracked.size === 0) {
+		_trackedTemplateHostsByChannel.delete(n)
+	}
+}
+
+/**
+ * WO-207 T207.3: Get all tracked template hosts across all channels (for startup/reconnect sweep).
+ * @returns {Map<number, Set<number>>} — copy of tracked hosts by channel
+ */
+function getAllTrackedTemplateHosts() {
+	const result = new Map()
+	for (const [ch, hosts] of _trackedTemplateHostsByChannel.entries()) {
+		result.set(ch, new Set(hosts))
+	}
+	return result
+}
+
 module.exports = {
 	isSceneTemplateLayer,
 	resolveCgTemplateName,
@@ -210,4 +281,9 @@ module.exports = {
 	isSameTemplateSpec,
 	buildSceneTemplateCgUpdateOnlyLines,
 	resolveTemplateCgHostLayer,
+	// WO-207 T207.2: tracked host lifecycle
+	recordTemplateHostAdded,
+	getTrackedTemplateHosts,
+	untrackTemplateHosts,
+	getAllTrackedTemplateHosts,
 }

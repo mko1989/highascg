@@ -371,6 +371,7 @@ routes.post('/api/data/*', ({ path, body, ctx }) => routesData.handlePost(path, 
 // Media Caspar required POST operations (like PLAY, CLEAR)
 routes.post('/api/media/*', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: true })
 
+routes.get('/api/multiview/debug', ({ ctx }) => routesMultiview.handleMultiviewDebug(ctx), { requireCaspar: false })
 routes.post('/api/multiview/*', ({ path, body, ctx }) => routesMultiview.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/scene/live/preview/clear', ({ body, ctx }) =>
 	routesScene.handlePost('/api/scene/live/preview/clear', body, ctx), { requireCaspar: false })

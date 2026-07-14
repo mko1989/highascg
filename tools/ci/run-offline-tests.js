@@ -46,6 +46,9 @@ const FILES = [
 	'tools/smoke/smoke-lower-third-roster.test.js',
 	'tools/smoke/smoke-live-scene-state.test.js',
 	'tools/smoke/smoke-wiki.test.js',
+	'tools/smoke/smoke-countdown-routes.test.js',
+	'tools/smoke/smoke-wo196-countdown-lifecycle.test.js',
+	'tools/smoke/smoke-wo207-cg-orphan-sweep.test.js',
 	'test/companion-control-status.test.js',
 ]
 

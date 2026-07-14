@@ -12,7 +12,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { escapeAttr } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
-import { createHmsInput, hmsToSeconds, secondsToHms } from '../lib/duration-hms-input.js'
+import { createHmsInput } from '../lib/duration-hms-input.js'
 
 /** Debounced CG UPDATE from inspector edits (ms) — matches lower-third's cadence. */
 export const COUNTDOWN_CG_UPDATE_DEBOUNCE_MS = 450
@@ -81,14 +81,56 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 	let cgUpdateTimer = null
 	let cgUpdateInFlight = false
 	let cgUpdateQueued = false
+	let propagateTimer = null
+	let propagateInFlight = false
 
 	const cfg = resolveLayerCountdownConfig(layer)
+
+	// WO-208 T208.2: auto-create timer instance on first use (if not already bound)
+	let timerId = src?.countdownTimerId
+	const scene = sceneState.getScene(sceneId)
+	const mIdx = resolveMainIndexForScene(scene, sceneState)
+	if (!timerId) {
+		const timer = sceneState.createTimer(layer, mIdx)
+		timerId = timer.id
+		// Update the layer to bind it to the new timer (set countdownTimerId + copy name to label)
+		sceneState.patchLayer(sceneId, layerIndex, {
+			source: { ...src, countdownTimerId: timerId, label: timer.name },
+		})
+	}
 
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-countdown-group'
 	// WO-196 T196.4: add help text documenting timer identity and continuity.
 	const helpText = 'Timer identity = screen + layer number. Reuse the same layer number across looks to carry one timer through them; use another layer number for an independent timer.'
 	grp.innerHTML = `<div class="inspector-group__title" title="${escapeAttr(helpText)}">Countdown / Timer</div>`
+
+	// WO-208 T208.2: add timer name + rename affordance
+	const timerNameField = document.createElement('div')
+	timerNameField.className = 'inspector-field'
+	const timer = sceneState.getTimer(timerId)
+	const timerNameInput = document.createElement('input')
+	timerNameInput.type = 'text'
+	timerNameInput.className = 'inspector-field__input'
+	timerNameInput.placeholder = 'Timer name'
+	timerNameInput.value = timer?.name || `Timer ${timerId.slice(0, 4)}`
+	timerNameField.appendChild(timerNameInput)
+	grp.appendChild(timerNameField)
+	timerNameInput.addEventListener('change', (e) => {
+		const newName = e.target.value.trim()
+		if (newName && sceneState.renameTimer(timerId, newName)) {
+			// Update all bound layers' label
+			const bound = sceneState.findBoundLayers(timerId)
+			bound.forEach(({ sceneId: bSceneId, layerIndex: bIdx }) => {
+				const bLayer = sceneState.getScene(bSceneId)?.layers?.[bIdx]
+				if (bLayer?.source) {
+					sceneState.patchLayer(bSceneId, bIdx, {
+						source: { ...bLayer.source, label: newName },
+					})
+				}
+			})
+		}
+	})
 
 	/* ── mode ─────────────────────────────────────────────── */
 	const modeField = document.createElement('div')
@@ -110,7 +152,7 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 	durationField.className = 'inspector-field'
 	durationField.innerHTML = '<label class="inspector-field__label">Duration (HH:MM:SS)</label>'
 	grp.appendChild(durationField)
-	const { wrap: durationHmsWrap, setValue: setDurationHms } = createHmsInput({
+	const { wrap: durationHmsWrap } = createHmsInput({
 		value: cfg.durationSec ?? 300,
 		onChange: (seconds) => onFieldChange({ durationSec: seconds }),
 	})
@@ -362,6 +404,7 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 	 * facing `source.countdownConfig` AND a flat `layer.cgData` (the key extractTemplateCgData
 	 * actually reads — src/engine/scene-template-cg.js:71 — so scene take's CG ADD/UPDATE carries
 	 * the configured countdown, not `{}`).
+	 * WO-208: also propagate config changes to timer instance and all bound layers.
 	 */
 	function persistLocalConfig(partial) {
 		Object.assign(cfg, partial)
@@ -372,7 +415,45 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 			source: { ...currentSrc, countdownConfig: nextConfig },
 			cgData: { ...nextConfig },
 		})
+		// WO-208 T208.2: update timer instance config and propagate to all bound layers
+		const timer = sceneState.getTimer(timerId)
+		if (timer) {
+			timer.config = { ...nextConfig }
+			sceneState._save()
+			queueConfigPropagation()
+		}
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+	}
+
+	function queueConfigPropagation() {
+		if (propagateTimer) clearTimeout(propagateTimer)
+		propagateTimer = setTimeout(() => {
+			propagateTimer = null
+			propagateConfigToBoundLayers()
+		}, COUNTDOWN_CG_UPDATE_DEBOUNCE_MS)
+	}
+
+	async function propagateConfigToBoundLayers() {
+		if (propagateInFlight) return
+		propagateInFlight = true
+		try {
+			const bound = sceneState.findBoundLayers(timerId)
+			const nextConfig = getCurrentConfig()
+			for (const { sceneId: bSceneId, layerIndex: bIdx } of bound) {
+				if (bSceneId === sceneId && bIdx === layerIndex) continue // Skip self
+				const bLayer = sceneState.getScene(bSceneId)?.layers?.[bIdx]
+				if (bLayer?.source) {
+					sceneState.patchLayer(bSceneId, bIdx, {
+						source: { ...bLayer.source, countdownConfig: nextConfig },
+						cgData: { ...nextConfig },
+					})
+				}
+			}
+		} catch (err) {
+			console.warn('[countdown] propagation failed:', err?.message || err)
+		} finally {
+			propagateInFlight = false
+		}
 	}
 
 	function onFieldChange(partial) {

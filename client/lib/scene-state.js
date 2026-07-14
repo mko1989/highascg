@@ -47,6 +47,14 @@ import {
 	sceneStateImportLayerPresetsFromServer,
 	sceneStateImportLookPresetsFromServer,
 } from './scene-state-preset-actions.js'
+import {
+	createTimerFromLayer,
+	getTimer,
+	renameTimer,
+	ensureCanonicalLayer,
+	listTimers,
+	findBoundLayers,
+} from './scene-state-timers.js'
 export {
 	defaultTransition,
 	previewChannelLayerForSceneLayer,
@@ -71,6 +79,7 @@ export class SceneState {
 		this._layerStyleClipboard = null
 		this.layerPresets = []
 		this.lookPresets = []
+		this.timers = []
 		this.globalBorders = [null, null, null, null]
 		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
 		this.mainEditorVisibleScreenCount = 1
@@ -325,6 +334,39 @@ export class SceneState {
 		return sceneStateImportLookPresetsFromServer(this, list)
 	}
 
+	// ── Timer instances (WO-208) ──────────────────────────────────────
+
+	createTimer(layer, mainIdx) {
+		const timer = createTimerFromLayer(layer, mainIdx)
+		this.timers.push(timer)
+		this._save()
+		return timer
+	}
+
+	getTimer(id) {
+		return getTimer(this, id)
+	}
+
+	renameTimer(id, newName) {
+		if (renameTimer(this, id, newName)) {
+			this._save()
+			return true
+		}
+		return false
+	}
+
+	ensureCanonicalLayer(timerId, mainIdx, preferredNum, scene) {
+		return ensureCanonicalLayer(this, timerId, mainIdx, preferredNum, scene)
+	}
+
+	listTimers() {
+		return listTimers(this)
+	}
+
+	findBoundLayers(timerId) {
+		return findBoundLayers(this, timerId)
+	}
+
 	removeScene(id) {
 		const i = this.scenes.findIndex((s) => s.id === id)
 		if (i < 0) return
@@ -526,7 +568,7 @@ export class SceneState {
 			scenes: this.scenes, liveSceneIdByMain: this.liveSceneIdByMain, previewSceneIdByMain: this.previewSceneIdByMain,
 			liveSceneId: this.liveSceneId, previewSceneId: this.previewSceneId, activeScreenIndex: this.activeScreenIndex,
 			globalDefaultTransition: this.globalDefaultTransition, mainEditorVisible: this.mainEditorVisible,
-			layerPresets: this.layerPresets, lookPresets: this.lookPresets,
+			layerPresets: this.layerPresets, lookPresets: this.lookPresets, timers: this.timers,
 			globalBorders: this.globalBorders,
 		}))
 	}

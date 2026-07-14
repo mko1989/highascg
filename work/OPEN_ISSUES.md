@@ -57,5 +57,10 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | MV-DEADLOCK+FPS | Apply chain un-poisoned; compose consumer honors composePreview.fps (-r) | [WO-201](./work-orders/201_WO_MV_APPLY_DEADLOCK_AND_COMPOSE_FPS.md) | 🟡 Implemented |
 | DEVICES-TAB-PERF | Progressive render + caches + ETag/304 (skeleton regression hotfixed; 304 header fix) | [WO-202](./work-orders/202_WO_DEVICES_TAB_RENDER_PERFORMANCE.md) | 🟡 Implemented |
 | MV-TIMER-SIZE | Timer size % (50-300) + top-running-layer highlight, both templates | [WO-203](./work-orders/203_WO_MULTIVIEW_TIMER_SIZE_SETTING.md) | 🟡 Implemented |
+| MV-TIMER-POLISH2 | Full-width timer rows, doubled base sizes, ellipsis labels (both templates) | [WO-204](./work-orders/204_WO_MV_TIMER_POLISH_ROUND2.md) | 🟡 Implemented |
+| TIMER-PANEL-MIRROR | Panel mirrors the actual on-air timer via server command registry; duration persists via scene patch | [WO-205](./work-orders/205_WO_TIMER_PANEL_TRUE_MIRROR_AND_PERSIST.md) | 🟡 Implemented |
+| MV-EDITOR-REFRESH | Auto-apply on edit (debounced 800 ms, toggleable); real channel resolutions shown | [WO-206](./work-orders/206_WO_MV_EDITOR_REFRESH_AND_RESOLUTION_DISPLAY.md) | 🟡 Implemented |
+| CG-ORPHANS | Tracked CG adds + startup/reconnect sweep (hosts 700-789) + panel "Take off air" button (`/api/countdown/off`) | [WO-207](./work-orders/207_WO_TEMPLATE_CG_ORPHAN_LIFECYCLE.md) | 🟡 Implemented |
+| SUBTIMERS | Using a timer creates a named reusable subtimer under the countdown template; canonical layer per screen keeps WO-196 continuity | [WO-208](./work-orders/208_WO_SUBTIMERS_IN_TEMPLATES.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-155–203; **RESTART the highascg service + reload browsers**; local commits await `git push origin main` by owner)
+Last updated: 2026-07-14 (WO-155–208; service restart at 12:40 activated WO-155–205 server code — **another restart is needed for WO-206/207 server hooks, `/api/multiview/debug`, and the system-time/hardware/decklink route registrations**; reload browsers after the dist-web rebuild; WO-193 password prompts now conditional on `passwordRequired`; local commits await `git push origin main` by owner)

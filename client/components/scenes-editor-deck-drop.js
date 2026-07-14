@@ -1,9 +1,11 @@
 /**
  * Scenes editor — drop media onto deck to create a new look.
+ * WO-208: Handle timer instances (countdownTimerId in payload).
  */
 
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { showScenesToast } from './scenes-editor-support.js'
+import { nextLayerNumber } from '../lib/scene-state-helpers.js'
 
 /**
  * @param {object} ctx
@@ -57,6 +59,53 @@ export function createDeckMediaDropHandler(ctx) {
 		dispatchLayerSelect(null)
 
 		for (const data of payloads) {
+			// WO-208 T208.4: Handle timer instances with canonical layer allocation
+			if (data.countdownTimerId) {
+				const timer = sceneState.getTimer(data.countdownTimerId)
+				if (!timer) continue
+
+				let scene = sceneState.getScene(id)
+				// Allocate/get canonical layer number for this timer on this screen
+				const preferredNum = timer.canonicalLayerByScreen?.[String(mainCol)] || nextLayerNumber(scene)
+				const { layerNumber, fallback } = sceneState.ensureCanonicalLayer(
+					data.countdownTimerId,
+					mainCol,
+					preferredNum,
+					scene,
+				)
+
+				if (fallback) {
+					showScenesToast(
+						`⏱ Timer placed on L${layerNumber} — continuity with other looks requires L${preferredNum}`,
+						'info',
+					)
+				}
+
+				// Add a layer and set it to the canonical number
+				const idx = sceneState.addLayer(id)
+				const l = sceneState.getScene(id)?.layers?.[idx]
+				if (l) {
+					l.layerNumber = layerNumber
+					sceneState._save()
+				}
+
+				// Refresh scene reference and set up timer binding
+				scene = sceneState.getScene(id)
+				if (idx >= 0 && scene?.layers?.[idx]) {
+					const src = {
+						type: 'template',
+						value: data.value,
+						label: timer.name,
+						countdownTimerId: data.countdownTimerId,
+						countdownConfig: { ...timer.config },
+					}
+					sceneState.setLayerSource(id, idx, src)
+					sceneState.patchLayer(id, idx, { cgData: { ...timer.config } })
+				}
+				continue
+			}
+
+			// Standard drop handling for non-timer templates/media
 			const idx = sceneState.addLayer(id)
 			const src = {
 				...data,
@@ -89,9 +138,9 @@ export function createDeckMediaDropHandler(ctx) {
 			}
 		}
 
-		const scene = sceneState.getScene(id)
-		const lastIdx = (scene?.layers?.length ?? 1) - 1
-		const lastLayer = scene?.layers?.[lastIdx]
+		const finalScene = sceneState.getScene(id)
+		const lastIdx = (finalScene?.layers?.length ?? 1) - 1
+		const lastLayer = finalScene?.layers?.[lastIdx]
 		if (lastLayer) {
 			dispatchLayerSelect({ sceneId: id, layerIndex: lastIdx, layer: lastLayer })
 		}
