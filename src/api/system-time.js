@@ -41,6 +41,11 @@ function parseTimedatectlOutput(output) {
 /**
  * GET /api/system/time — read current time, timezone, NTP status (unprivileged).
  */
+function isTimePasswordRequired(ctx) {
+	const cfgUi = ctx?.config?.ui && typeof ctx.config.ui === 'object' ? ctx.config.ui : {}
+	return cfgUi.nuclearRequirePassword === true || cfgUi.nuclearRequirePassword === 'true'
+}
+
 async function handleSystemTimeGet(_ctx) {
 	try {
 		const output = execFileSync('timedatectl', ['show'], {
@@ -60,6 +65,7 @@ async function handleSystemTimeGet(_ctx) {
 				timezone: parsed.timezone,
 				ntp: parsed.ntp,
 				synchronized: parsed.synchronized,
+				passwordRequired: isTimePasswordRequired(_ctx),
 			}),
 		}
 	} catch (e) {
@@ -170,6 +176,7 @@ async function handleSystemTimePost(body, ctx) {
 				timezone: parsed.timezone,
 				ntp: parsed.ntp,
 				synchronized: parsed.synchronized,
+				passwordRequired: isTimePasswordRequired(_ctx),
 			}),
 		}
 	} catch (e) {

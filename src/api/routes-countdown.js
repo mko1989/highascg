@@ -23,6 +23,12 @@
  * goes through scene take. Countdown layers only ever reach air via scene take (they are look
  * layers), so these routes default `templateHostLayer` to 0 to address the SAME CG producer
  * scene take created; a request that supplies its own `templateHostLayer` is still honored.
+ *
+ * WO-205: Advisory command registry (server-side)
+ * `commandRegistry` keeps a module-level Map keyed `${channel}:${layer}` → {lastCmd, cmdAt, durationSec, targetTime, mode, configAt}.
+ * Updated by every POST; advisory only (lost on restart — acceptable; template still owns truth).
+ * Included per-item in GET /api/countdown/list as `runtime`. Panel ticks from this registry
+ * regardless of which UI issued commands (≤5 s lag for externally-started timers).
  */
 
 'use strict'
@@ -30,7 +36,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { resolveCgRequestChannel, resolveTemplateCgHostLayer } = require('../engine/cg-routing')
 const liveSceneState = require('../state/live-scene-state')
-const { loadFullProject } = require('../engine/project-scenes-load')
+const projectScenesLoad = require('../engine/project-scenes-load')
 
 /** Caspar CG template path — see template/countdown/countdown.html. */
 const COUNTDOWN_CG_NAME = 'countdown/countdown'
@@ -42,6 +48,15 @@ const SCENE_TAKE_CG_SUBLAYER = 0
 const ROUTING_KEYS = new Set([
 	'channel', 'layer', 'layerNumber', 'mainIdx', 'mainScreenIndex', 'screenIndex', 'templateHostLayer',
 ])
+
+/**
+ * WO-205 T205.1: Advisory command registry (in-memory, lost on restart).
+ * Keyed `${channel}:${layer}` → { lastCmd, cmdAt, durationSec, targetTime, mode, configAt }
+ * Every POST handler records cmd + cmdAt for start/pause/reset; config fields for set/update.
+ * Panel ticks from this registry to mirror any initiator (inspector, companion, panel, take).
+ * @type {Map<string, { lastCmd?: string, cmdAt?: number, durationSec?: number, targetTime?: string, mode?: string, configAt?: number }>}
+ */
+const commandRegistry = new Map()
 
 /**
  * @param {string} value
@@ -98,7 +113,13 @@ function handleGet(p, ctx, query = {}) {
 	const itemMap = new Map()
 
 	// Load all project scenes
-	const project = loadFullProject()
+	// Called via the module object so tests can stub it (destructured binding defeats stubs).
+	let project = null
+	try {
+		project = projectScenesLoad.loadFullProject()
+	} catch {
+		project = null
+	}
 	const allScenes = (project?.scenes?.scenes || [])
 
 	// First pass: add all countdown layers from all project scenes
@@ -143,10 +164,12 @@ function handleGet(p, ctx, query = {}) {
 			const key = `${logicalLayer}`
 			const existing = itemMap.get(key)
 			if (existing) {
-				// Update with live state info
+				// Update with live state info (live label/config are fresher than the saved project)
 				existing.channel = ch
 				existing.sceneId = entry.sceneId
 				existing.onAir = true
+				if (src.label) existing.label = src.label
+				if (src.countdownConfig) existing.config = src.countdownConfig
 			} else {
 				// New item from live state
 				itemMap.set(key, {
@@ -162,7 +185,12 @@ function handleGet(p, ctx, query = {}) {
 		}
 	}
 
-	const items = Array.from(itemMap.values())
+	// WO-205 T205.1: Augment items with runtime from the command registry (advisory).
+	const items = Array.from(itemMap.values()).map(item => {
+		const registryKey = `${item.channel}:${item.layerNumber}`
+		const runtime = commandRegistry.get(registryKey) || null
+		return { ...item, runtime }
+	})
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ items }) }
 }
 
@@ -195,6 +223,27 @@ async function handlePost(p, body, ctx) {
 	}
 
 	const res = await emitCgUpdate(ctx, routing, payload)
+
+	// WO-205 T205.1: Record command or config change in the registry for panel mirroring.
+	const registryKey = `${routing.channel}:${routing.logicalLayer}`
+	const now = Date.now()
+	let registryEntry = commandRegistry.get(registryKey) || {}
+
+	if (cmd === 'start' || cmd === 'pause' || cmd === 'reset') {
+		// Record the command + timestamp
+		registryEntry.lastCmd = cmd
+		registryEntry.cmdAt = now
+		// For pause, we'll let the panel compute remainingAtPause from the prior start entry
+	} else if (cmd === 'set' || cmd === 'update') {
+		// Record config fields + timestamp
+		if (payload.durationSec != null) registryEntry.durationSec = payload.durationSec
+		if (payload.targetTime != null) registryEntry.targetTime = payload.targetTime
+		if (payload.mode != null) registryEntry.mode = payload.mode
+		registryEntry.configAt = now
+	}
+
+	commandRegistry.set(registryKey, registryEntry)
+
 	return {
 		status: res.ok ? 200 : 502,
 		headers: JSON_HEADERS,
@@ -207,4 +256,4 @@ async function handlePost(p, body, ctx) {
 	}
 }
 
-module.exports = { handleGet, handlePost }
+module.exports = { handleGet, handlePost, commandRegistry }

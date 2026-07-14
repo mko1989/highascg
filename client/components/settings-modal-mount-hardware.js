@@ -5,6 +5,8 @@ import { api } from '../lib/api-client.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 
+let systemTimePasswordRequired = false // WO-193 fix: prompt only when the nuclear gate is active
+
 function exfatPairStatus(row) {
 	if (row.pairError) return row.pairError
 	if (!row.exfatExists && !row.projectExists) return 'both sides missing'
@@ -518,6 +520,7 @@ export async function refreshSystemTimePanel(modal) {
 
 	try {
 		const r = await api.get('/api/system/time')
+		systemTimePasswordRequired = r?.passwordRequired === true
 		if (!r?.ok) {
 			clockLine.textContent = `Error: ${r?.error || 'Unknown error'}`
 			return
@@ -582,7 +585,12 @@ export function wireSystemTimeListeners(modal) {
 		}
 		updateSetBtnState()
 		ntpCheckbox.addEventListener('change', async () => {
-			const password = prompt('Enter nuclear password to confirm NTP toggle:')
+			let password = ''
+			if (systemTimePasswordRequired) {
+				const enteredNtp = prompt('Enter nuclear password to confirm NTP toggle:')
+				if (enteredNtp === null) return
+				password = enteredNtp
+			}
 			if (password === null) {
 				ntpCheckbox.checked = !ntpCheckbox.checked
 				return
@@ -631,8 +639,12 @@ export function wireSystemTimeListeners(modal) {
 		)
 		if (!confirmed) return
 
-		const password = prompt('Enter nuclear password to confirm time setting:')
-		if (password === null) return
+		let password = ''
+		if (systemTimePasswordRequired) {
+			const entered = prompt('Enter nuclear password to confirm time setting:')
+			if (entered === null) return
+			password = entered
+		}
 
 		setBtn.disabled = true
 		if (resultLine) resultLine.textContent = 'Setting time…'

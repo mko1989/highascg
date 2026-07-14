@@ -1,5 +1,5 @@
 /**
- * Timer control panel — collapsible bottom-right controller (WO-186, WO-192).
+ * Timer control panel — collapsible bottom-right controller (WO-186, WO-192, WO-205).
  *
  * Fixed/docked bottom-right next to the program audio mixer. Provides:
  * - Collapsible header (persists collapsed state in localStorage)
@@ -20,7 +20,11 @@
  * - Negative values display as -MM:SS (overflow format).
  * - HMS boxes are populated from the selected timer's countdownConfig on selection/refresh,
  *   but skip repopulating while any input has focus to avoid mid-edit interruption.
- * - External control (inspector/companion) may drift the mirror until the next panel command.
+ *
+ * WO-205 additions:
+ * - Ticks from server-side advisory registry (runtime) via GET /api/countdown/list, regardless of which UI started the timer.
+ * - External control (inspector/companion/look take) shows within ≤5 s (list refresh lag); fallback to local state until runtime merges.
+ * - Panel set/preset commands ALSO patch the scene layer's countdownConfig (persistence) via sceneState.patchLayer.
  */
 
 import { api } from '../lib/api-client.js'
@@ -45,17 +49,52 @@ const PRESETS = [
 ]
 
 /**
- * Compute remaining time for the selected timer based on panel state mirror.
- * This implements a local approximation of the countdown template's state.
- *
+ * Compute remaining time for the selected timer.
+ * WO-205: Primarily derives from item.runtime (server-side registry), fallback to local state, then static config.
  * @param {object} timerState - { config, lastCmd, cmdAt, remainingWhenPaused }
+ * @param {object} [item] - list item with optional runtime from server registry
  * @returns {number} seconds remaining (may be negative)
  */
-function computeDisplayTime(timerState) {
+function computeDisplayTime(timerState, item) {
 	if (!timerState || !timerState.config) return 0
-	const { config, lastCmd, cmdAt, remainingWhenPaused } = timerState
+	const { config } = timerState
 	const mode = config.mode || 'duration'
 	const now = Date.now()
+
+	// WO-205: If item has server-side runtime (from registry), use it for true mirroring.
+	if (item?.runtime) {
+		const { lastCmd: runtimeCmd, cmdAt: runtimeCmdAt, durationSec: runtimeDurationSec, targetTime: runtimeTargetTime } = item.runtime
+
+		if (mode === 'duration') {
+			if (runtimeCmd === 'pause') {
+				// Pause: show the remaining time at the moment of pause.
+				// The registry doesn't store this directly, so compute from prior start.
+				// For now, fall back to local state or use serverCmdAt to infer.
+				if (Number.isFinite(timerState.remainingWhenPaused)) {
+					return timerState.remainingWhenPaused
+				}
+			}
+			if (runtimeCmd === 'start' && Number.isFinite(runtimeCmdAt)) {
+				const elapsedSec = (now - runtimeCmdAt) / 1000
+				const remaining = (runtimeDurationSec || config.durationSec || 0) - elapsedSec
+				return remaining
+			}
+			if (runtimeCmd === 'reset' || !runtimeCmd) {
+				return runtimeDurationSec || config.durationSec || 0
+			}
+		} else if (mode === 'clock') {
+			// Clock mode: use runtimeTargetTime if available
+			const targetStr = runtimeTargetTime || config.targetTime || '00:00:00'
+			const [h, m, s] = targetStr.split(':').map((x) => parseInt(x, 10) || 0)
+			const today = new Date()
+			const target = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, s)
+			const remaining = (target - now) / 1000
+			return remaining
+		}
+	}
+
+	// Fallback to local timer state (when runtime is not yet merged from registry).
+	const { lastCmd, cmdAt, remainingWhenPaused } = timerState
 
 	// Duration mode: compute elapsed time since start
 	if (mode === 'duration') {
@@ -117,14 +156,19 @@ function isHmsFocused(hmsContainer) {
 /**
  * @param {import('../lib/state-store.js').StateStore} stateStore
  * @param {HTMLElement} mountEl
+ * @param {object} [opts]
+ * @param {object} [opts.sceneState] - scene state for WO-205 persistence patching
  */
-export function initTimerControlPanel(stateStore, mountEl) {
+export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 	if (!mountEl) return
+	const { sceneState: providedSceneState } = opts
 
 	const root = document.createElement('div')
 	root.className = 'timer-control-panel timer-control-panel--collapsed'
 	// WO-196 T196.4: add help text documenting timer identity and continuity.
 	const helpText = 'Timer identity = screen + layer number. Reuse the same layer number across looks to carry one timer through them; use another layer number for an independent timer.'
+	// WO-205 T205.2: add lag note to display tooltip.
+	const displayTooltip = 'Live countdown mirror. WO-205: ticks from server registry; external control shows within ≤5 s (list refresh lag)'
 	root.innerHTML = `
 		<button type="button" class="timer-control-panel__toggle" aria-expanded="false" title="${escapeAttr(helpText)}">
 			<span class="timer-control-panel__chevron" aria-hidden="true">▶</span>
@@ -134,7 +178,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			<div class="timer-control-panel__selector">
 				<select class="timer-control-panel__select" id="timer-selector" title="Select a timer"></select>
 			</div>
-			<div class="timer-control-panel__display" id="timer-display" title="Live countdown mirror (approximation; external control may drift until next panel command)">00:00:00</div>
+			<div class="timer-control-panel__display" id="timer-display" title="${escapeAttr(displayTooltip)}">00:00:00</div>
 			<div class="timer-control-panel__buttons">
 				<button type="button" class="timer-control-panel__btn" data-action="start" title="Start/Resume">▶</button>
 				<button type="button" class="timer-control-panel__btn" data-action="pause" title="Pause">⏸</button>
@@ -241,14 +285,21 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			const res = await api.get('/api/countdown/list')
 			if (res?.items && Array.isArray(res.items)) {
 				timerList = res.items
-				// Update timer states with fresh config from list
+				// WO-205: Merge server-side runtime (registry) into local timer state for true mirroring.
 				for (const timer of timerList) {
 					const key = getStateKey(timer)
 					const existing = timerStateMap.get(key)
 					if (existing) {
 						existing.config = timer.config || null
+						// Merge runtime from registry: update lastCmd, cmdAt, durationSec, targetTime
+						if (timer.runtime) {
+							existing.runtime = timer.runtime
+						}
 					} else {
 						getTimerState(timer)
+						if (timer.runtime) {
+							timerStateMap.get(key).runtime = timer.runtime
+						}
 					}
 				}
 				updateSelectOptions()
@@ -357,7 +408,8 @@ export function initTimerControlPanel(stateStore, mountEl) {
 		}
 
 		const timerState = getTimerState(timer)
-		const remaining = computeDisplayTime(timerState)
+		// WO-205 T205.2: Pass item to computeDisplayTime so it can use server-side runtime.
+		const remaining = computeDisplayTime(timerState, timer)
 		displayEl.textContent = formatDisplayTime(remaining)
 	}
 
@@ -391,6 +443,48 @@ export function initTimerControlPanel(stateStore, mountEl) {
 		hmsContainer.appendChild(hmsInput.wrap)
 	}
 
+	/**
+	 * WO-205 T205.3: Resolve scene and layer index for persistence patching.
+	 * @param {object} timer
+	 * @returns {{ sceneId: string, layerIndex: number } | null}
+	 */
+	function resolveSceneAndLayerIndex(timer) {
+		if (!timer?.sceneId || providedSceneState == null) return null
+		const scene = providedSceneState.getScene(timer.sceneId)
+		if (!scene?.layers) return null
+		const layerIndex = scene.layers.findIndex(l => parseInt(l.layerNumber, 10) === parseInt(timer.layerNumber, 10))
+		if (layerIndex < 0) return null
+		return { sceneId: timer.sceneId, layerIndex }
+	}
+
+	/**
+	 * WO-205 T205.3: Patch scene layer's countdownConfig for persistence.
+	 * @param {object} timer
+	 * @param {object} configUpdate - partial config to merge
+	 */
+	async function patchSceneCountdownConfig(timer, configUpdate) {
+		if (!timer || providedSceneState == null) return
+		const sceneInfo = resolveSceneAndLayerIndex(timer)
+		if (!sceneInfo) return
+
+		try {
+			const scene = providedSceneState.getScene(sceneInfo.sceneId)
+			const layer = scene?.layers?.[sceneInfo.layerIndex]
+			if (!layer) return
+
+			const currentSource = layer.source || {}
+			const currentConfig = currentSource.countdownConfig || {}
+			const nextConfig = { ...currentConfig, ...configUpdate }
+
+			providedSceneState.patchLayer(sceneInfo.sceneId, sceneInfo.layerIndex, {
+				source: { ...currentSource, countdownConfig: nextConfig },
+				cgData: { ...nextConfig },
+			})
+		} catch (err) {
+			console.warn('[timer-panel] scene patch failed:', err?.message || err)
+		}
+	}
+
 	async function onHmsChange(seconds, timer, mode) {
 		if (!selectedTimer || !timer) return
 
@@ -408,6 +502,10 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			}
 
 			await api.post('/api/countdown/set', payload)
+
+			// WO-205 T205.3: Also patch scene layer for persistence.
+			const configUpdate = mode === 'duration' ? { durationSec: seconds } : { durationSec: seconds }
+			await patchSceneCountdownConfig(timer, configUpdate)
 
 			// Update local state so the change sticks
 			const timerState = getTimerState(timer)
@@ -466,6 +564,9 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			}
 
 			await api.post('/api/countdown/set', payload)
+
+			// WO-205 T205.3: Also patch scene layer for persistence.
+			await patchSceneCountdownConfig(timer, { durationSec: seconds })
 
 			// Update local state
 			const timerState = getTimerState(timer)

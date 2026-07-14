@@ -89,10 +89,19 @@ the compact timer doesnt display the timer, the display is stuck at 00. the set 
 
 playing look on screen 2 does nothing on the actual output and mv.....
 
-****NEWNEWNEW***
+
 
 now there is a loading devices... and it never loads!!!!!
 
 also need a new feature to be able to adjust the size of the multiview timers
 
 also an ability to highlight the top layer with active running media (with timers)
+
+
+****NEWNEWNEW***
+
+the highligth is not a great color on black bg. the 200% size should be 100%, as 200% is actualy readable.
+the timers can span the whole width of the window. when a filename is too long to display it should be truncated.
+
+timers on the mv of the prv channel does not work. and also the prv channel does not display the look exactly how it ends up being on the pgm, which is correct. but the prv shows something different.
+the live prv editing is still bugged as hell. it doesnt actually move the layers on the prv output observed on the multiview screen (casparcg consumer).

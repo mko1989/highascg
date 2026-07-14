@@ -87,7 +87,7 @@
 		}
 
 		.label-timer-dock {
-			width: max(200px, 50%);
+			width: calc(100% - 16px);
 			max-width: 100%;
 			align-self: center;
 			flex: 1 1 auto;
@@ -238,27 +238,35 @@
 		}
 		.label-layer-row {
 			display: flex;
-			flex-direction: column;
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
 			width: 100%;
-			font-size: calc(9px * var(--timer-scale, 1));
+			font-size: calc(18px * var(--timer-scale, 1));
 			margin-bottom: 2px;
-			gap: 1px;
+			gap: 6px;
 			flex-shrink: 0;
 		}
 		.label-layer-num {
+			flex: 1;
+			min-width: 0;
 			font-weight: 600;
 			color: #fff;
+			overflow: hidden;
+			text-overflow: ellipsis;
 			white-space: nowrap;
 		}
 		.label-layer-time {
+			flex: none;
 			font-weight: 500;
 			color: #fff;
-			font-size: calc(8px * var(--timer-scale, 1));
+			font-size: calc(16px * var(--timer-scale, 1));
 			white-space: nowrap;
 		}
 		.label-layer-progress-bar-bg {
+			flex-basis: 100%;
 			width: 100%;
-			height: calc(3px * var(--timer-scale, 1));
+			height: calc(6px * var(--timer-scale, 1));
 			background: rgba(255,255,255,0.25);
 			border-radius: 1px;
 			overflow: hidden;
@@ -275,13 +283,22 @@
 			background: #a7f3d0;
 		}
 
-		/* Highlight the top running timer row (WO-203.6) */
+		/* Highlight the top running timer row (WO-203.6, WO-204.1) */
+		.label-layer-row--highlight {
+			background: rgba(230, 57, 70, 0.28);
+			border-radius: 2px;
+			padding: 0 3px;
+		}
 		.label-layer-row--highlight .label-layer-num {
-			color: #ffc078;
+			color: #fff;
+			font-weight: 700;
+		}
+		.label-layer-row--highlight .label-layer-time {
+			color: #fff;
 			font-weight: 700;
 		}
 		.label-layer-row--highlight .label-layer-progress-bar-bg {
-			height: calc(4px * var(--timer-scale, 1));
+			height: calc(8px * var(--timer-scale, 1));
 		}
 		.label-layer-row--highlight .label-layer-progress-bar-fill {
 			background: #ffc078;

@@ -166,3 +166,4 @@ This ensures one-release hygiene: orphaned bank-B layers from the leak clear on 
 
 ---
 
+- 2026-07-14 (owner re-report, pre-restart) — "PRV MV timers don't work / PRV shows a different look than what lands on PGM / live PRV editing doesn't move layers on the PRV output": all three are this WO's symptom set on the STILL-RUNNING pre-fix service (PRV content pushed to bank-B physicals 110/111 + orphans; overlay PRV mapping fix in WO-195 also inactive). The fixes are in the tree; they activate on the service restart + a multiview Refresh output (template redeploy). Re-test then before reopening.

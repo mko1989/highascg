@@ -339,34 +339,67 @@
 				ctx.fillRect(lx, ly, lw, titleBarH);
 				drawCenteredTitle(getDynamicCellLabel(cell), lx, ly, lw, titleBarH);
 
-				const dockW = Math.min(lw - 8, Math.max(200, lw * 0.5));
-				const dockX = lx + (lw - dockW) / 2;
+				const pad = 8;
+				const dockW = Math.max(80, lw - 2 * pad);
+				const dockX = lx + pad;
 				const dockY = ly + titleBarH;
 				const dockH = chromeH - titleBarH;
 				if (dockH > 12) {
-					const pad = 8;
 					let ty = dockY + 14;
 					ctx.textBaseline = 'middle';
 					ctx.fillStyle = '#f1f5f9';
 					ctx.font = '500 9px Rewir, system-ui, sans-serif';
 					const layerRows = collectLayerLines(cell, resolvedChNum, cell.screenIdx, cell.channelNum, isPgm);
 					const maxY = ly + chromeH - 4;
-					// WO-203: scale row typography/bars; §5 highlight the top running-media row
-					const rowFont = Math.round(9 * timerScale);
-					const timeFont = Math.round(8 * timerScale);
-					const barH = Math.max(2, Math.round(3 * timerScale));
-					const rowStep = Math.round(11 * timerScale);
+					// WO-203/204: scale row typography/bars; §5 highlight the top running-media row
+					const rowFont = Math.round(18 * timerScale);
+					const timeFont = Math.round(16 * timerScale);
+					const barH = Math.max(2, Math.round(6 * timerScale));
+					const rowStep = Math.round(22 * timerScale);
 					const topRuntimeNum = highlightTopTimer
 						? (layerRows.find((r) => r.hasRuntime && Number(r.duration) > 0)?.num ?? null)
 						: null;
 					for (const row of layerRows) {
 						if (ty + 3 > maxY) break;
 						const isTop = topRuntimeNum != null && row.num === topRuntimeNum;
-						ctx.fillStyle = isTop ? '#ffc078' : '#fff';
+
+						// WO-204.1: Draw highlight chip background for top row
+						if (isTop) {
+							ctx.globalAlpha = 0.28;
+							ctx.fillStyle = '#e63946';
+							ctx.fillRect(dockX + pad - 3, ty, dockW - pad * 2 + 6, rowFont + 4);
+							ctx.globalAlpha = 1;
+						}
+
+						ctx.fillStyle = '#fff';
 						ctx.font = `${isTop ? 700 : 600} ${rowFont}px Rewir, system-ui, sans-serif`;
 						ctx.textBaseline = 'middle';
 						ctx.textAlign = 'left';
-						ctx.fillText(row.label, dockX + pad, ty + 8);
+
+						// WO-204.4: Measure time text and truncate label
+						let labelText = row.label;
+						if (row.hasRuntime && Number(row.duration) > 0) {
+							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
+							const timeText = `${formatMmSs(row.elapsed)}/${formatMmSs(row.duration)} (-${formatMmSs(rem)})`;
+							ctx.font = `500 ${timeFont}px Rewir, system-ui, sans-serif`;
+							const timeW = ctx.measureText(timeText).width;
+							const maxLabelW = dockW - pad * 2 - timeW - 6;
+
+							// Truncate label if needed
+							ctx.font = `${isTop ? 700 : 600} ${rowFont}px Rewir, system-ui, sans-serif`;
+							while (labelText.length > 3 && ctx.measureText(labelText).width > maxLabelW) {
+								labelText = labelText.slice(0, -2) + '…';
+							}
+						} else {
+							// No time text, label can use most of the width
+							const maxLabelW = dockW - pad * 2 - 6;
+							while (labelText.length > 3 && ctx.measureText(labelText).width > maxLabelW) {
+								labelText = labelText.slice(0, -2) + '…';
+							}
+						}
+
+						ctx.fillText(labelText, dockX + pad, ty + 8);
+
 						if (row.hasRuntime && Number(row.duration) > 0) {
 							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
 							const timeText = `${formatMmSs(row.elapsed)}/${formatMmSs(row.duration)} (-${formatMmSs(rem)})`;

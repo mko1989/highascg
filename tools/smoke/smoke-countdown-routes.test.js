@@ -11,7 +11,7 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 
 const { resolveTemplateCgHostLayer } = require('../../src/engine/cg-routing')
-const { handleGet, handlePost } = require('../../src/api/routes-countdown')
+const { handleGet, handlePost, commandRegistry } = require('../../src/api/routes-countdown')
 
 /**
  * @param {{ failAmcp?: boolean }} [opts]
@@ -282,5 +282,115 @@ describe('countdown list (WO-192)', () => {
 		assert.ok(liveTimer, 'live timer should be in the list')
 		assert.ok('onAir' in liveTimer, 'onAir flag should be present')
 		assert.equal(liveTimer.onAir, true, 'on-air timer should have onAir=true')
+	})
+})
+
+describe('countdown registry (WO-205)', () => {
+	it('T205.1: registry records start/pause/reset commands with timestamps', async () => {
+		const { ctx, cgUpdateCalls } = makeMockCtx()
+		commandRegistry.clear()
+
+		// Start: should record in registry
+		await handlePost('/api/countdown/start', { channel: 1, layer: 10 }, ctx)
+		let entry = commandRegistry.get('1:10')
+		assert.ok(entry, 'registry should have entry for 1:10')
+		assert.equal(entry.lastCmd, 'start', 'lastCmd should be start')
+		assert.ok(Number.isFinite(entry.cmdAt) && entry.cmdAt > 0, 'cmdAt should be a timestamp')
+
+		const startTime = entry.cmdAt
+
+		cgUpdateCalls.length = 0
+
+		// Pause: should record in registry
+		await handlePost('/api/countdown/pause', { channel: 1, layer: 10 }, ctx)
+		entry = commandRegistry.get('1:10')
+		assert.equal(entry.lastCmd, 'pause', 'lastCmd should be pause')
+		assert.ok(entry.cmdAt >= startTime, 'cmdAt should be updated')
+
+		cgUpdateCalls.length = 0
+
+		// Reset: should record in registry
+		await handlePost('/api/countdown/reset', { channel: 1, layer: 10 }, ctx)
+		entry = commandRegistry.get('1:10')
+		assert.equal(entry.lastCmd, 'reset', 'lastCmd should be reset')
+		assert.ok(entry.cmdAt, 'cmdAt should be set for reset')
+	})
+
+	it('T205.1: registry records set/update config with durationSec, targetTime, mode', async () => {
+		const { ctx, cgUpdateCalls } = makeMockCtx()
+		commandRegistry.clear()
+
+		const body = {
+			channel: 1,
+			layer: 10,
+			mode: 'duration',
+			durationSec: 120,
+			targetTime: '18:30:00',
+		}
+
+		await handlePost('/api/countdown/set', body, ctx)
+		const entry = commandRegistry.get('1:10')
+		assert.ok(entry, 'registry should have entry for 1:10')
+		assert.equal(entry.durationSec, 120, 'durationSec should be recorded')
+		assert.equal(entry.targetTime, '18:30:00', 'targetTime should be recorded')
+		assert.equal(entry.mode, 'duration', 'mode should be recorded')
+		assert.ok(Number.isFinite(entry.configAt), 'configAt should be set')
+	})
+
+	it('T205.1: registry per-key isolation — different layers independent', async () => {
+		const { ctx, cgUpdateCalls } = makeMockCtx()
+		commandRegistry.clear()
+
+		// Layer 10
+		await handlePost('/api/countdown/start', { channel: 1, layer: 10 }, ctx)
+		const entry10 = commandRegistry.get('1:10')
+
+		cgUpdateCalls.length = 0
+
+		// Small delay to ensure timestamps might differ (or not - it's ok if they don't)
+		await new Promise(r => setTimeout(r, 1))
+
+		// Layer 11 (different layer, same channel)
+		await handlePost('/api/countdown/pause', { channel: 1, layer: 11 }, ctx)
+		const entry11 = commandRegistry.get('1:11')
+
+		// They should be independent
+		assert.equal(entry10.lastCmd, 'start', 'layer 10 should still be start')
+		assert.equal(entry11.lastCmd, 'pause', 'layer 11 should be pause')
+		assert.ok(entry10.cmdAt > 0 && entry11.cmdAt > 0, 'both should have timestamps')
+	})
+
+	it('T205.2: registry persists across multiple calls to same layer', async () => {
+		const { ctx, cgUpdateCalls } = makeMockCtx()
+		commandRegistry.clear()
+
+		// First: start
+		await handlePost('/api/countdown/start', { channel: 2, layer: 15 }, ctx)
+		let entry = commandRegistry.get('2:15')
+		assert.equal(entry.lastCmd, 'start', 'should record start')
+
+		cgUpdateCalls.length = 0
+
+		// Then: set config (should preserve lastCmd)
+		await handlePost('/api/countdown/set', { channel: 2, layer: 15, durationSec: 240 }, ctx)
+		entry = commandRegistry.get('2:15')
+		assert.equal(entry.lastCmd, 'start', 'lastCmd should still be start (not replaced by set)')
+		assert.equal(entry.durationSec, 240, 'durationSec should be updated')
+
+		cgUpdateCalls.length = 0
+
+		// Then: pause (lastCmd should update, but durationSec should persist)
+		await handlePost('/api/countdown/pause', { channel: 2, layer: 15 }, ctx)
+		entry = commandRegistry.get('2:15')
+		assert.equal(entry.lastCmd, 'pause', 'lastCmd should be pause')
+		assert.equal(entry.durationSec, 240, 'durationSec should still be 240')
+	})
+
+	it('WO-205 smoke: registry exported and accessible for testing', () => {
+		// Verify commandRegistry is exported and is a Map
+		assert.ok(commandRegistry instanceof Map, 'commandRegistry should be a Map')
+		// Verify we can clear it (for test isolation)
+		commandRegistry.clear()
+		assert.equal(commandRegistry.size, 0, 'clear should empty the registry')
 	})
 })

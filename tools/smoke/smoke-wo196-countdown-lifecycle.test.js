@@ -98,7 +98,7 @@ test('WO-196 T196.3: routes-countdown.js list includes all project scenes + onAi
 	assert.ok(source.includes('loadFullProject'), 'loadFullProject used')
 
 	// Verify list logic enumerates all project scenes
-	assert.ok(source.includes('const project = loadFullProject()'), 'loads full project')
+	assert.ok(source.includes('projectScenesLoad.loadFullProject()'), 'loads full project (via module object so tests can stub — WO-205 fix)')
 	assert.ok(source.includes('allScenes'), 'iterates all scenes')
 
 	// Verify onAir flag is set
