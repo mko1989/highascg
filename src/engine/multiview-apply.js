@@ -116,13 +116,11 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 
 	// T190.1: Per-channel serialization — queue this apply after any in-flight one for the same channel.
 	const currentChain = mvApplyChains.get(ch) || Promise.resolve()
-	const newChain = currentChain
-		.then(() => _doApplyMultiviewLayout(b, ctx, ch, map, opts))
-		.catch((e) => {
-			// Propagate error but maintain chain
-			throw e
-		})
-	mvApplyChains.set(ch, newChain)
+	// T201.1: Store a settled continuation — when _doApplyMultiviewLayout rejects, wrap it in a
+	// catch() that swallows the error so the next apply can queue. But return the original result
+	// (including rejection) to the caller.
+	const newChain = currentChain.then(() => _doApplyMultiviewLayout(b, ctx, ch, map, opts))
+	mvApplyChains.set(ch, newChain.catch(() => {}))
 
 	return newChain
 }

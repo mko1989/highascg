@@ -154,3 +154,83 @@ test('applyMultiviewLayout: single apply returns debug record', async () => {
 		Module.prototype.require = originalRequire
 	}
 })
+
+test('applyMultiviewLayout: failed apply does not poison chain for next apply (T201.1)', async () => {
+	// WO-201 T201.1: When the first apply rejects, the second apply should still execute successfully.
+	// Before the fix, the rejected promise would be stored and subsequent applies would hang on `.then()`.
+	const Module = require('module')
+	const originalRequire = Module.prototype.require
+	const mockGetChannelMap = () => ({
+		inputsCh: 1,
+		previewChannels: [2],
+		programChannels: [3, 4],
+		screenCount: 2,
+		programCh: (n) => 2 + n,
+		multiviewChannels: [99],
+	})
+
+	Module.prototype.require = function (id) {
+		const result = originalRequire.apply(this, arguments)
+		if (id === '../config/routing') {
+			return { ...result, getChannelMap: mockGetChannelMap }
+		}
+		return result
+	}
+
+	try {
+		delete require.cache[require.resolve('../../src/engine/multiview-apply.js')]
+		const { applyMultiviewLayout } = require('../../src/engine/multiview-apply')
+
+		let commitCallCount = 0
+		const mockAmcp = {
+			play: async () => {
+				await new Promise((r) => setImmediate(r))
+			},
+			mixerFill: async () => {
+				await new Promise((r) => setImmediate(r))
+			},
+			mixerCommit: async () => {
+				commitCallCount++
+				// Second call (main code, not clearCasparChannel) throws to fail the first apply
+				if (commitCallCount === 2) {
+					throw new Error('MIXER COMMIT failed')
+				}
+			},
+			cgAdd: async () => {
+				throw new Error('CG not available')
+			},
+			raw: async () => {},
+			cgClear: async () => {},
+			info: async () => ({ text: '<?xml version="1.0"?><channel></channel>' }),
+		}
+
+		const ctx = {
+			amcp: mockAmcp,
+			config: { caspar: {} },
+			switcherOutputBusByChannel: {},
+			log: () => {},
+		}
+
+		const layout1 = [{ id: 'cell1', x: 0, y: 0, w: 1, h: 1 }]
+		const layout2 = [{ id: 'cell2', x: 0, y: 0, w: 1, h: 1 }]
+
+		// First apply fails in the main mixerCommit (call #2)
+		const p1 = applyMultiviewLayout({ n: 1, layout: layout1, showOverlay: false }, ctx)
+		let p1Error = null
+		try {
+			await p1
+		} catch (e) {
+			p1Error = e
+		}
+		assert.ok(p1Error, 'first apply rejected as expected')
+
+		// Second apply should execute successfully (before fix, it would hang or get the poisoned rejection)
+		const result2 = await applyMultiviewLayout({ n: 1, layout: layout2, showOverlay: false }, ctx)
+		assert.ok(result2.ok === true, 'second apply succeeded after first rejected')
+		assert.ok(commitCallCount > 2, 'second apply called mixerCommit')
+
+		console.log('✓ Chain recovers from rejection: second apply succeeds after first rejected')
+	} finally {
+		Module.prototype.require = originalRequire
+	}
+})

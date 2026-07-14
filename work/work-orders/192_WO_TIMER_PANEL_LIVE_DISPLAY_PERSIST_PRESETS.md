@@ -97,3 +97,4 @@
 - [ ] Click 30m preset → verify HMS updates to 00:30:00, display updates
 - [ ] Press Start with external control via inspector/companion API
 - [ ] Verify panel display updates to match (may lag slightly until next panel command)
+- 2026-07-14 (owner re-report, pre-restart) — "display stuck at 00 / set resets to 5min while the actual timer works": expected on the RUNNING service — the panel's live display + persistence depend on the server-side list carrying `countdownConfig` (this WO + WO-196's onAir list), which is code-on-disk but not active until the highascg service restarts. Re-test after restart before reopening.

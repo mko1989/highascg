@@ -52,7 +52,7 @@ export function attachDeviceViewEvents(ctx) {
 			},
 			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
 		})
-	refreshBtn.onclick = () => ctx.load()
+	refreshBtn.onclick = () => ctx.load({ forceRefresh: true })
 	resetBtn.onclick = () => ctx.resetCabling()
 	applyCasparBtn.onclick = () =>
 		Actions.applyCasparConfig()

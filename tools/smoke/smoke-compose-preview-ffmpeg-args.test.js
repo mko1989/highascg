@@ -54,6 +54,19 @@ describe('compose-preview-ffmpeg-args', () => {
 		assert.doesNotMatch(args, /format=yuv420p/)
 	})
 
+	it('buildComposeFfmpegConsumerArgs includes -r to limit image2 output fps (T201.4)', () => {
+		const args = buildComposeFfmpegConsumerArgs({ fps: 25, resolutionScale: 'half', jpegQuality: 10 })
+		assert.match(args, /-r 25/, 'includes -r with configured fps')
+		assert.match(args, /fps=25/, 'filter chain also uses fps')
+	})
+
+	it('buildComposeFfmpegConsumerArgs -r respects fps clamping', () => {
+		const argsLow = buildComposeFfmpegConsumerArgs({ fps: 0, resolutionScale: 'half', jpegQuality: 10 })
+		assert.match(argsLow, /-r 1/, 'clamps low fps to 1')
+		const argsHigh = buildComposeFfmpegConsumerArgs({ fps: 99, resolutionScale: 'half', jpegQuality: 10 })
+		assert.match(argsHigh, /-r 30/, 'clamps high fps to 30')
+	})
+
 	it('buildComposePreviewFfmpegConsumerXml embeds path when static config enabled', () => {
 		const config = {
 			composePreview: {

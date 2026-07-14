@@ -15,6 +15,11 @@ import { populateDestinationTypeSelect, mergeSettingsIntoDeviceViewPayload } fro
 import { renderLiveSourcesBand, openAddLiveSourceModal } from './device-view-live-sources-render.js'
 import * as Actions from './device-view-actions.js'
 
+// Module-level cache for progressive render (T202.1-T202.2)
+let lastPayload = null
+let lastPayloadAt = 0
+let lastRequestId = 0
+
 export function registerDeviceViewRender(ctx) {
 	const { refs, state, gHost } = ctx
 	const {
@@ -215,6 +220,12 @@ export function registerDeviceViewRender(ctx) {
 	ctx.load = async (opts = {}) => {
 		try {
 			getAppWs()?.send?.({ type: 'device_view_subscribe' })
+
+			const forceRefresh = opts.forceRefresh === true
+			const now = Date.now()
+			const isCached = lastPayload && (now - lastPayloadAt) < 5000
+			const shouldUseCache = !forceRefresh && isCached && lastPayload
+
 			let freshGpu = opts.freshGpu === true
 			try {
 				if (!freshGpu && sessionStorage.getItem(FACTORY_RESET_GPU_LAYOUT_KEY)) {
@@ -223,31 +234,96 @@ export function registerDeviceViewRender(ctx) {
 			} catch {
 				/* ignore */
 			}
+
 			await settingsState.load().catch(() => {})
 			if (!freshGpu) {
 				await migrateLegacyGpuLayoutPrefsToServer(Actions.saveGpuPhysicalTopology)
 			}
+
+			// T202.1: Progressive render - render from cache immediately if available
+			if (shouldUseCache) {
+				// Fresh cache hit: render and skip fetch entirely
+				state.lastPayload = lastPayload
+				ctx.renderFromState({ restoreInspector: opts.restoreInspector !== false })
+				return
+			}
+
+			// T202.2: If we have a stale payload, render it immediately then fetch background
+			if (!forceRefresh && lastPayload && (now - lastPayloadAt) >= 5000) {
+				// Stale cache: render immediately, then fetch in background
+				state.lastPayload = lastPayload
+				ctx.renderFromState({ restoreInspector: opts.restoreInspector !== false })
+
+				// Fetch in background with request ID to guard against out-of-order responses
+				const currentRequestId = ++lastRequestId
+				const fetchAndUpdate = async () => {
+					try {
+						const cachedStream = getStreamingChannelStatus()
+						const [payload, settings, stream] = await Promise.all([
+							Actions.loadDeviceView({ freshGpu }),
+							Actions.loadSettings(),
+							cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
+						])
+
+						// Only update if this is still the latest request
+						if (currentRequestId === lastRequestId) {
+							lastPayload = mergeSettingsIntoDeviceViewPayload(
+								{ ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null },
+								settings,
+							)
+							lastPayloadAt = Date.now()
+							state.lastPayload = lastPayload
+							state.currentSettings = settings
+							state.streamingStatus = stream
+							ctx.renderFromState({ restoreInspector: false })
+							setStatus(statusEl, `Updated ${state.lastPayload?.live?.host?.collectedAt || ''}`, true)
+						}
+					} catch (e) {
+						if (currentRequestId === lastRequestId) {
+							setStatus(statusEl, e.message, false)
+						}
+					}
+				}
+				void fetchAndUpdate()
+				return
+			}
+
+			// First open or forced refresh: show skeleton, then fetch and render
+			if (!lastPayload) {
+				// Show a lightweight skeleton loading state
+				if (refs.layout && !state.lastPayload) {
+					refs.layout.innerHTML = '<div style="padding: 16px; text-align: center; color: #999;">Loading devices…</div>'
+				}
+			}
+
+			const currentRequestId = ++lastRequestId
 			const cachedStream = getStreamingChannelStatus()
 			const [payload, settings, stream] = await Promise.all([
 				Actions.loadDeviceView({ freshGpu }),
 				Actions.loadSettings(),
 				cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
 			])
-			if (freshGpu) {
-				try {
-					sessionStorage.removeItem(FACTORY_RESET_GPU_LAYOUT_KEY)
-				} catch {
-					/* ignore */
+
+			// Only update if this is still the latest request
+			if (currentRequestId === lastRequestId) {
+				if (freshGpu) {
+					try {
+						sessionStorage.removeItem(FACTORY_RESET_GPU_LAYOUT_KEY)
+					} catch {
+						/* ignore */
+					}
 				}
+				lastPayload = mergeSettingsIntoDeviceViewPayload(
+					{ ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null },
+					settings,
+				)
+				lastPayloadAt = Date.now()
+				state.lastPayload = lastPayload
+				state.currentSettings = settings
+				state.streamingStatus = stream
+				ctx.renderFromState({ restoreInspector: opts.restoreInspector !== false })
+				setStatus(statusEl, `Updated ${state.lastPayload?.live?.host?.collectedAt || ''}`, true)
 			}
-			state.lastPayload = mergeSettingsIntoDeviceViewPayload(
-				{ ...payload, gpuPhysicalTopology: settings?.gpuPhysicalTopology || null },
-				settings,
-			)
-			state.currentSettings = settings
-			state.streamingStatus = stream
-			ctx.renderFromState({ restoreInspector: opts.restoreInspector !== false })
-			setStatus(statusEl, `Updated ${state.lastPayload?.live?.host?.collectedAt || ''}`, true)
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}

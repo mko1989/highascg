@@ -84,6 +84,9 @@ function buildComposeFfmpegFilterChain(opts = {}) {
 
 /**
  * Caspar ADD FILE → image2 (direct JPG on disk).
+ * T201.4: Include `-r <fps>` to limit output frame rate of the image2 muxer.
+ * The filter chain fps and output `-r` work together: filter fps=N processes frames at N,
+ * then `-r` rate-limits the image2 muxer output (which has -update 1).
  * @param {object} [composePreview]
  * @returns {string}
  */
@@ -93,7 +96,8 @@ function buildComposeFfmpegConsumerArgs(composePreview = {}) {
 		resolutionScale: composePreview.resolutionScale,
 	})
 	const q = clampJpegQuality(composePreview.jpegQuality, 10)
-	return `-filter:v ${filter} -codec:v mjpeg -q:v:v ${q} -format image2 -update 1`
+	const fps = clampComposePreviewFps(composePreview.fps, 2)
+	return `-filter:v ${filter} -codec:v mjpeg -q:v:v ${q} -r ${fps} -format image2 -update 1`
 }
 
 /**

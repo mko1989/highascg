@@ -156,3 +156,64 @@ describe('WO-171 — computeMathCommit (attachMathInput commit-decision logic)',
 		assert.equal(r.text, '1664')
 	})
 })
+
+describe('WO-200 — evaluateMath (recursive descent parser, CSP-safe)', () => {
+	it('evaluates complex expressions with operator precedence', () => {
+		// Multiplication and division bind tighter than addition/subtraction
+		assert.equal(evaluateMath('2+3*4'), 14)
+		assert.equal(evaluateMath('(2+3)*4'), 20)
+		assert.equal(evaluateMath('10-2*3'), 4)
+	})
+
+	it('evaluates unary operators correctly', () => {
+		assert.equal(evaluateMath('-5+3'), -2)
+		assert.equal(evaluateMath('2*-3'), -6)
+		assert.equal(evaluateMath('+5'), 5)
+		assert.equal(evaluateMath('-(2+3)'), -5)
+	})
+
+	it('handles division by zero as non-finite result → NaN', () => {
+		assert.ok(Number.isNaN(evaluateMath('1/0')))
+		assert.ok(Number.isNaN(evaluateMath('-1/0')))
+		assert.ok(Number.isNaN(evaluateMath('0/0')))
+	})
+
+	it('rejects exponentiation (** operator contains invalid char)', () => {
+		// The whitelist [\d\s+\-*/.()]+$ does not include * twice in a row,
+		// so 2**3 fails the regex check before parsing
+		assert.ok(Number.isNaN(evaluateMath('2**3')))
+	})
+
+	it('rejects scientific notation (e is not in the whitelist)', () => {
+		// The original whitelist only allows [\d\s+\-*/.()] — no 'e'.
+		// This behavior is preserved for CSP compliance.
+		assert.ok(Number.isNaN(evaluateMath('1e3')))
+		assert.ok(Number.isNaN(evaluateMath('1.5e2')))
+		assert.ok(Number.isNaN(evaluateMath('2E3')))
+	})
+
+	it('evaluates deeply nested parentheses', () => {
+		assert.equal(evaluateMath('((((5))))'), 5)
+		assert.equal(evaluateMath('((1+2)*(3+4))'), 21)
+		assert.equal(evaluateMath('(((1920-256)/2))'), 832)
+	})
+
+	it('handles trailing operators as incomplete expressions', () => {
+		// An operator at the end with no right operand is incomplete
+		assert.ok(Number.isNaN(evaluateMath('1920*')))
+		assert.ok(Number.isNaN(evaluateMath('100+')))
+		assert.ok(Number.isNaN(evaluateMath('(1920-')))
+	})
+
+	it('handles mismatched parentheses', () => {
+		assert.ok(Number.isNaN(evaluateMath('((1920')))
+		assert.ok(Number.isNaN(evaluateMath('1920))')))
+		assert.ok(Number.isNaN(evaluateMath('(1+2)))')))
+	})
+
+	it('preserves decimal precision through operations', () => {
+		assert.equal(evaluateMath('0.1+0.2'), 0.30000000000000004) // IEEE 754 artifact
+		assert.equal(evaluateMath('2.5*4'), 10)
+		assert.equal(evaluateMath('10/3'), 10 / 3)
+	})
+})

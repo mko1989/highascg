@@ -1,6 +1,7 @@
 /**
  * Safe math evaluation for number inputs. Supports expressions like 1920/2, 100+50, (960-10)*2.
  * Only allows digits, operators + - * /, parentheses, and decimal point.
+ * CSP-safe, no eval (WO-200).
  */
 export function evaluateMath(str) {
 	if (str == null || typeof str !== 'string') return NaN
@@ -9,10 +10,123 @@ export function evaluateMath(str) {
 	// Only allow safe characters
 	if (!/^[\d\s+\-*/.()]+$/.test(s)) return NaN
 	try {
-		const n = new Function(`"use strict"; return (${s})`)()
-		return typeof n === 'number' && isFinite(n) ? n : NaN
+		const parser = new Parser(s)
+		const result = parser.parseExpr()
+		// Ensure all tokens were consumed (no dangling operators or parens)
+		if (parser.peek()) {
+			throw new Error('Unexpected token after expression')
+		}
+		return typeof result === 'number' && isFinite(result) ? result : NaN
 	} catch {
 		return NaN
+	}
+}
+
+/**
+ * Recursive descent parser for safe math expressions.
+ * Grammar:
+ *   expr := term (('+'|'-') term)*
+ *   term := factor (('*'|'/') factor)*
+ *   factor := NUMBER | '(' expr ')' | ('-'|'+') factor
+ */
+class Parser {
+	constructor(str) {
+		this.tokens = this.tokenize(str)
+		this.pos = 0
+	}
+
+	tokenize(str) {
+		const tokens = []
+		let i = 0
+		while (i < str.length) {
+			const ch = str[i]
+			// Skip whitespace
+			if (/\s/.test(ch)) {
+				i++
+				continue
+			}
+			// Parse number (including decimals)
+			if (/\d/.test(ch) || (ch === '.' && i + 1 < str.length && /\d/.test(str[i + 1]))) {
+				let num = ''
+				while (i < str.length && (/\d/.test(str[i]) || str[i] === '.')) {
+					num += str[i]
+					i++
+				}
+				tokens.push({ type: 'NUMBER', value: parseFloat(num) })
+				continue
+			}
+			// Parse operators and delimiters
+			if ('+-*/()'.includes(ch)) {
+				tokens.push({ type: ch, value: ch })
+				i++
+				continue
+			}
+			// Invalid character (should have been caught by regex, but be safe)
+			throw new Error('Invalid character: ' + ch)
+		}
+		return tokens
+	}
+
+	peek() {
+		return this.tokens[this.pos]
+	}
+
+	consume() {
+		return this.tokens[this.pos++]
+	}
+
+	parseExpr() {
+		let result = this.parseTerm()
+		while (this.peek() && (this.peek().type === '+' || this.peek().type === '-')) {
+			const op = this.consume()
+			const right = this.parseTerm()
+			if (op.type === '+') {
+				result = result + right
+			} else {
+				result = result - right
+			}
+		}
+		return result
+	}
+
+	parseTerm() {
+		let result = this.parseFactor()
+		while (this.peek() && (this.peek().type === '*' || this.peek().type === '/')) {
+			const op = this.consume()
+			const right = this.parseFactor()
+			if (op.type === '*') {
+				result = result * right
+			} else {
+				result = result / right
+			}
+		}
+		return result
+	}
+
+	parseFactor() {
+		const tok = this.peek()
+		if (!tok) {
+			throw new Error('Unexpected end of input')
+		}
+
+		if (tok.type === 'NUMBER') {
+			this.consume()
+			return tok.value
+		} else if (tok.type === '(') {
+			this.consume()
+			const result = this.parseExpr()
+			if (!this.peek() || this.peek().type !== ')') {
+				throw new Error('Missing closing parenthesis')
+			}
+			this.consume()
+			return result
+		} else if (tok.type === '+' || tok.type === '-') {
+			const op = this.consume()
+			const value = this.parseFactor()
+			return op.type === '+' ? value : -value
+		} else {
+			throw new Error('Unexpected token: ' + tok.type)
+		}
 	}
 }
 

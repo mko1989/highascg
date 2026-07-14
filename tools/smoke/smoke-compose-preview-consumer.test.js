@@ -28,6 +28,21 @@ describe('compose-preview-consumer', () => {
 		assert.match(params, /-q:v:v 8/)
 	})
 
+	it('buildComposeFileAddParams includes -r argument from fps setting (T201.4)', () => {
+		const params = buildComposeFileAddParams(
+			{
+				composePreview: {
+					fps: 25,
+					resolutionScale: 'half',
+					jpegQuality: 10,
+					basenamePrefix: 'highascg_preview',
+				},
+			},
+			2,
+		)
+		assert.match(params, /-r 25/, 'includes -r with fps')
+	})
+
 	it('uses fixed consumer index 701 for direct FILE', () => {
 		assert.equal(COMPOSE_FILE_CONSUMER_INDEX, 701)
 	})

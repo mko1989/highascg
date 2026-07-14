@@ -3,6 +3,7 @@
  */
 'use strict'
 
+const crypto = require('crypto')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { normalizeDeviceGraph, validateDeviceGraph, mergeHardwareSync, suggestConnectorsAndDevicesFromLive } = require('../config/device-graph')
 const { normalizeScreenDestinations } = require('../config/screen-destinations')
@@ -91,21 +92,37 @@ async function handleGet(path, ctx, query) {
 	}
 	const graph = normalizeDeviceGraph(ctx.config?.deviceGraph)
 	augmentGraphWithSources(graph, live)
+	const payload = {
+		ok: true,
+		graph,
+		live,
+		suggested: suggestConnectorsAndDevicesFromLive(live, ctx.config || {}),
+		screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
+		extraLiveSources: enrichExtraLiveSources(
+			Array.isArray(ctx.config?.extraLiveSources) ? ctx.config.extraLiveSources : [],
+			ctx,
+		),
+		audioOutputs: Array.isArray(ctx.config?.audioOutputs) ? ctx.config.audioOutputs : [],
+		mappingTemplates: Array.isArray(ctx.config?.mappingTemplates) ? ctx.config.mappingTemplates : [],
+	}
+
+	// T202.3: Generate ETag from payload JSON hash
+	const payloadJson = JSON.stringify(payload)
+	const etag = `"${crypto.createHash('md5').update(payloadJson).digest('hex')}"`
+
+	// Check If-None-Match header
+	const ifNoneMatch = query?.['if-none-match'] || query?.ifNoneMatch
+	if (ifNoneMatch && String(ifNoneMatch).trim() === etag) {
+		return {
+			status: 304,
+			headers: { 'ETag': etag, 'Cache-Control': 'private, max-age=3' }
+		}
+	}
+
 	return {
-		status: 200, headers: JSON_HEADERS,
-		body: jsonBody({
-			ok: true,
-			graph,
-			live,
-			suggested: suggestConnectorsAndDevicesFromLive(live, ctx.config || {}),
-			screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
-			extraLiveSources: enrichExtraLiveSources(
-				Array.isArray(ctx.config?.extraLiveSources) ? ctx.config.extraLiveSources : [],
-				ctx,
-			),
-			audioOutputs: Array.isArray(ctx.config?.audioOutputs) ? ctx.config.audioOutputs : [],
-			mappingTemplates: Array.isArray(ctx.config?.mappingTemplates) ? ctx.config.mappingTemplates : [],
-		})
+		status: 200,
+		headers: { ...JSON_HEADERS, 'ETag': etag, 'Cache-Control': 'private, max-age=3' },
+		body: payloadJson
 	}
 }
 

@@ -63,4 +63,8 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | COMPOSE-404-LATENCY | 404-after-etag truncation race closed (generation guards + cleared WS event + client retry); WO-155 settle-nudge reverted (latency fix) | [WO-198](./work-orders/198_WO_COMPOSE_PREVIEW_404_RACE_AND_LATENCY.md) | 🟡 Implemented |
 | PRV-BANK-LEAK | PRV received bank-B layers (110/111, PIP 624) — PRV pinned to bank 'a'/logical everywhere + orphan sweep 110-199 | [WO-199](./work-orders/199_WO_PRV_BANK_MAPPING_LEAK.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-181–199; server-side changes live on next service restart; local commits await `git push origin main` by owner)
+| CSP-MATH | Math evaluator was eval-blocked by CSP (48 violations, silent feature failure) → CSP-safe parser | [WO-200](./work-orders/200_WO_CSP_SAFE_MATH_EVALUATOR.md) | 🟡 Implemented |
+| MV-DEADLOCK+FPS | Multiview apply chain poisoned by one failure (WO-190 bug) → settled continuation; compose consumer missing `-r` → honors composePreview.fps | [WO-201](./work-orders/201_WO_MV_APPLY_DEADLOCK_AND_COMPOSE_FPS.md) | 🟡 Implemented |
+| DEVICES-TAB-PERF | Progressive render + 5s client cache + ETag/304 + overlay position map | [WO-202](./work-orders/202_WO_DEVICES_TAB_RENDER_PERFORMANCE.md) | 🟡 Implemented |
+
+Last updated: 2026-07-14 (WO-181–202; **RESTART the highascg service + reload browsers** — owner's re-reports of timer-00 and screen-2 takes are the un-restarted WO-181/192 fixes; local commits await `git push origin main` by owner)

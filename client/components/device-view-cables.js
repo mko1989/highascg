@@ -94,6 +94,45 @@ export function connectorCenter(surfaceEl, connId) {
 	}
 }
 
+/**
+ * T202.4: Build a Map of connector-id → center position for all connectors in a render pass.
+ * This avoids repeated querySelectorAll calls per edge and improves overlay render performance.
+ * @param {Element} surface
+ * @param {Array} edges
+ * @param {Array} keyFillEdges
+ * @param {string} cableSourceId
+ * @returns {Map<string, {x: number, y: number}>}
+ */
+function buildConnectorPositionMap(_surface, edges, keyFillEdges, cableSourceId) {
+	const map = new Map()
+
+	if (!_surface) return map
+
+	// Collect all unique connector IDs from edges + ghost cable (if any)
+	const connectorIds = new Set()
+	for (const e of edges) {
+		if (e?.sourceId) connectorIds.add(e.sourceId)
+		if (e?.sinkId) connectorIds.add(e.sinkId)
+	}
+	for (const e of keyFillEdges) {
+		if (e?.sourceId) connectorIds.add(e.sourceId)
+		if (e?.sinkId) connectorIds.add(e.sinkId)
+	}
+	if (cableSourceId) {
+		connectorIds.add(cableSourceId)
+	}
+
+	// Query all connectors at once per ID and cache the result
+	for (const connId of connectorIds) {
+		const pos = connectorCenter(_surface, connId)
+		if (pos) {
+			map.set(connId, pos)
+		}
+	}
+
+	return map
+}
+
 const CABLE_COLORS = [
 	'#FF3333', '#FF6633', '#FF9933', '#FFCC33', '#FFFF33',
 	'#CCFF33', '#99FF33', '#66FF33', '#33FF33', '#33FF66',
@@ -302,11 +341,11 @@ function buildCable(x1, y1, x2, y2, loops, seed) {
 	return pts
 }
 
-/** 
+/**
  * Context mapper for Simple View cables.
  * Counts cables per port to calculate radial fanning angles.
  */
-function buildSmoothSimpleMap(edges, surface) {
+function buildSmoothSimpleMap(edges, _surface) {
 	const portEdges = new Map()
 	
 	for (const e of edges) {
@@ -405,13 +444,16 @@ export function renderCableOverlay(ctx) {
 	const edges = lastPayload?.graph?.edges || []
 	const keyFillEdges = collectDecklinkKeyFillVirtualEdges(lastPayload)
 	const numLoops = parseInt(messiness) || 0
-	
+
 	const simpleWiringMap = simpleWiring ? buildSmoothSimpleMap(edges, surface) : null
+
+	// T202.4: Build connector position map once per render pass
+	const connectorPositionMap = buildConnectorPositionMap(surface, edges, keyFillEdges, cableSourceId)
 
 	const drawCable = (e, { decklinkKeyFill = false } = {}) => {
 		if (!e || !e.sourceId || !e.sinkId) return
-		const a = connectorCenter(surface, e.sourceId)
-		const b = connectorCenter(surface, e.sinkId)
+		const a = connectorPositionMap.get(e.sourceId)
+		const b = connectorPositionMap.get(e.sinkId)
 		if (!a || !b) return
 
 		const keyFillLink = decklinkKeyFill ? buildDecklinkKeyFillSideLink(a.x, a.y, b.x, b.y, w, h) : null
@@ -455,7 +497,7 @@ export function renderCableOverlay(ctx) {
 	for (const e of edges) drawCable(e)
 	for (const e of keyFillEdges) drawCable(e, { decklinkKeyFill: true })
 	if (cableSourceId && cablePointer && Number.isFinite(cablePointer.x) && Number.isFinite(cablePointer.y)) {
-		const a = connectorCenter(surface, cableSourceId)
+		const a = connectorPositionMap.get(cableSourceId)
 		if (a) {
 			const b = { x: cablePointer.x, y: cablePointer.y }
 			// Ghost cable while dragging: lightweight path only (no physics sim per pointermove).

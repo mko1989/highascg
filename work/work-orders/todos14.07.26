@@ -77,3 +77,17 @@ Image corrupt or truncated. 3.jpg
 ​****NEWNEWNEW***
 
 the devices tab takes a while to render. something is holding it up or its not optimized correctly.
+
+the webui doesnt stoped working due to trying to change something on the multiview, after changes that didnt do anything i reset the layout but the caspar output still shows the old mv. the compose preview is now like 2-3fps and i have it set to 25fps and  
+
+Content-Security-Policy: The page’s settings blocked a JavaScript eval (script-src) from being executed because it violates the following directive: “script-src 'self' 'unsafe-inline'” (Missing 'unsafe-eval') 48 device-view-CJr4CM-R.js:11:25340
+Content-Security-Policy: The page’s settings blocked a JavaScript eval (script-src) from being executed because it violates the following directive: “script-src 'self' 'unsafe-inline'” (Missing 'unsafe-eval') 6 device-view-CJr4CM-R.js:11:25340
+
+​
+
+the compact timer doesnt display the timer, the display is stuck at 00. the set timer resets to 5min, even though the actual timer works as expected so in my case restes to set before 20 min.
+
+playing look on screen 2 does nothing on the actual output and mv.....
+
+****NEWNEWNEW***
+
