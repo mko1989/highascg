@@ -30,12 +30,15 @@ export function allMatrixLayersOnPreviewChannel(stateStore, previewCh) {
 /**
  * Common look-stack slots for a full sweep (WO-160: consecutive 10–99) plus the legacy
  * decade slots 100–900 that pre-migration looks may still occupy (one-release hygiene).
+ * Also covers 110–199 consecutively (WO-199: cleanup for orphaned bank-B layers that may
+ * leak when PRV inherits PGM bank pointer).
  * PIP overlay slots are cleared per content layer by the caller's pip remove lines.
  */
 export function defaultLookLayersForSweep() {
 	const out = new Set()
 	for (let L = 10; L <= 99; L += 1) out.add(L)
 	for (let L = 100; L <= 900; L += 10) out.add(L)
+	for (let L = 110; L <= 199; L += 1) out.add(L)
 	return out
 }
 

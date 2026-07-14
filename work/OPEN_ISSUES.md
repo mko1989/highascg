@@ -59,4 +59,8 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | MV-OVERLAY-REFINE | Overlay: pip rows hidden, L##+filename labels, no top block, PRV bank-map fix, instant stale-row removal | [WO-195](./work-orders/195_WO_MULTIVIEW_OVERLAY_REFINEMENTS.md) | 🟡 Implemented (reload via multiview Refresh) |
 | COUNTDOWN-LIFECYCLE | Timer cleared on look exit; continuity across same-timer transitions (UPDATE-only takes); panel lists all project timers w/ on-air marks | [WO-196](./work-orders/196_WO_COUNTDOWN_LIFECYCLE_TEARDOWN_CONTINUITY_PANEL.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-181–196; server-side changes live on next service restart; local commits await `git push origin main` by owner)
+| LOGS-TABS | Connection-eye modal: Logs/Shortcuts as full tabs (bottom bar removed) | [WO-197](./work-orders/197_WO_LOGS_MODAL_TABS.md) | 🟡 Implemented |
+| COMPOSE-404-LATENCY | 404-after-etag truncation race closed (generation guards + cleared WS event + client retry); WO-155 settle-nudge reverted (latency fix) | [WO-198](./work-orders/198_WO_COMPOSE_PREVIEW_404_RACE_AND_LATENCY.md) | 🟡 Implemented |
+| PRV-BANK-LEAK | PRV received bank-B layers (110/111, PIP 624) — PRV pinned to bank 'a'/logical everywhere + orphan sweep 110-199 | [WO-199](./work-orders/199_WO_PRV_BANK_MAPPING_LEAK.md) | 🟡 Implemented |
+
+Last updated: 2026-07-14 (WO-181–199; server-side changes live on next service restart; local commits await `git push origin main` by owner)

@@ -166,6 +166,9 @@ async function handleSceneTake(body, ctx) {
 				ctx.log('info', `[scene-take] preview-only path prv=${bus1}`)
 			}
 			const prvCurrent = liveSceneState.getChannel(bus1)?.scene || null
+			/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
+			if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {}
+			ctx.programLayerBankByChannel[String(bus1)] = 'a'
 			await runSceneTakeLbg(ctx.amcp, {
 				...takeOpts,
 				channel: bus1,
@@ -214,6 +217,9 @@ async function handleSceneTake(body, ctx) {
 			const stageOnPreview = b.stageOnPreview !== false
 			if (stageOnPreview) {
 				const prvCurrent = liveSceneState.getChannel(bus1)?.scene || null
+				/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
+				if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {}
+				ctx.programLayerBankByChannel[String(bus1)] = 'a'
 				await runSceneTakeLbg(ctx.amcp, {
 					...takeOpts,
 					channel: bus1,
@@ -263,6 +269,9 @@ async function handleSceneTake(body, ctx) {
 				previewExchangePromise = (async () => {
 					try {
 						await clearSceneProgramLookStackLayers(ctx.amcp, bus1, ctx)
+						/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
+						if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {}
+						ctx.programLayerBankByChannel[String(bus1)] = 'a'
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,

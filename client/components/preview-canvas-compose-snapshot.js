@@ -49,6 +49,13 @@ function notifyComposePreviewListeners(channel) {
  * @param {number} channel
  * @param {string} etag
  */
+/**
+ * Tracks whether we've already scheduled a retry for this channel, to avoid
+ * retry loops (WO-198 T198.3 — single-flight guard).
+ * @type {Set<number>}
+ */
+const _scheduledRetries = new Set()
+
 async function loadComposePreviewImage(channel, etag) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
 	let entry = _cache.get(ch)
@@ -67,11 +74,22 @@ async function loadComposePreviewImage(channel, etag) {
 				entry.img = img
 				entry.etag = etag
 				entry.loading = false
+				_scheduledRetries.delete(ch)
 				notifyComposePreviewListeners(ch)
 				resolve()
 			}
 			img.onerror = () => {
 				entry.loading = false
+				// WO-198 T198.3: drop the cached etag and schedule one delayed retry
+				// via the meta path (single-flight; no loop).
+				entry.etag = null
+				if (!_scheduledRetries.has(ch)) {
+					_scheduledRetries.add(ch)
+					setTimeout(() => {
+						_scheduledRetries.delete(ch)
+						void pollChannelMeta(ch)
+					}, 1000)
+				}
 				reject(new Error('compose preview load failed'))
 			}
 			img.src = url
@@ -99,12 +117,25 @@ function stopPollIfIdle() {
 
 /**
  * Push path — server broadcasts on JPG mtime change (much lower latency than meta polling).
- * @param {{ channel?: number, etag?: string }} data
+ * Also handles cleared flag (WO-198 T198.2) to drop cached etag immediately.
+ * @param {{ channel?: number, etag?: string, cleared?: boolean, blocklisted?: boolean }} data
  */
 export function ingestComposePreviewWs(data) {
 	if (!isSnapshotComposePreview()) return
 	const ch = parseInt(String(data?.channel ?? ''), 10)
 	if (!Number.isFinite(ch) || ch < 1) return
+	// Cleared flag (WO-198 T198.2): file was truncated, drop cached etag and show placeholder.
+	if (data?.cleared === true) {
+		let entry = _cache.get(ch)
+		if (!entry) {
+			entry = { img: new Image(), etag: null, loading: false }
+			_cache.set(ch, entry)
+		}
+		entry.etag = null
+		_metaUnavailable.delete(ch)
+		notifyComposePreviewListeners(ch)
+		return
+	}
 	// Blocklist push (WO-144) shares the `compose.preview` event; no etag payload.
 	if (data?.blocklisted !== undefined) {
 		if (data.blocklisted) {

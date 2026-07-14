@@ -77,23 +77,6 @@ function touchedAmcpBatchChannels(lines) {
 	return out
 }
 
-/**
- * `/api/amcp/batch` is the scenes-editor look-stack PRV push transport and, unlike /api/play|
- * /api/stop|/api/clear, never nudged compose-preview activity (B155.3 finding c / T155.4b) — the
- * ffmpeg_jpeg poller would broadcast a stale-looking frame straight through a MIXER…DEFER/COMMIT
- * edit. Best-effort like the other `notify*AfterAmcp` helpers here.
- * @param {string[]} lines
- */
-function notifyComposePreviewActivityAfterBatch(lines) {
-	try {
-		const activity = require('../preview/compose-preview-activity')
-		for (const ch of touchedAmcpBatchChannels(lines)) {
-			activity.onAmcpBatchMutation(ch)
-		}
-	} catch (_) {
-		/* WO-57 optional */
-	}
-}
 
 function applyAmcpLineNormalizations(lines, ctx) {
 	const cfg = ctx?.config || {}
@@ -148,7 +131,6 @@ async function handlePost(path, body, ctx) {
 			const last = await amcp.batchSendChunked(lines)
 			playbackTracker.recordAmcpLines(ctx, lines)
 			notifyCefInteractiveAfterAmcp(lines, ctx)
-			notifyComposePreviewActivityAfterBatch(lines)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
 		case '/api/amcp/raw-batch': {

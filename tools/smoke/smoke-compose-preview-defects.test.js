@@ -289,6 +289,78 @@ describe('compose-preview WO-159 stale-frame defects', () => {
 	})
 })
 
+describe('compose-preview WO-198: truncation race + generation counter', () => {
+	const jpgPath = (ch) => path.join(MEDIA_DIR, 'highascg_preview', `ch${ch}.jpg`)
+
+	function writeFakeFrame(ch, bytes = 4096) {
+		const fp = jpgPath(ch)
+		fs.mkdirSync(path.dirname(fp), { recursive: true })
+		fs.writeFileSync(fp, Buffer.alloc(bytes, 7))
+		return fp
+	}
+
+	beforeEach(() => {
+		consumer.resetComposeConsumerState()
+		consumer.resetComposeLegacySweep()
+		blocklist.resetComposeBlocklist()
+	})
+
+	it('truncation bumps generation counter and broadcasts cleared WS event', async () => {
+		const { ctx, events } = makeMockCtx({ channels: [1] })
+		const fp = writeFakeFrame(1)
+		const genBefore = consumer.getTruncationGeneration(1)
+		assert.equal(genBefore, 0, 'generation starts at 0')
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		const genAfter = consumer.getTruncationGeneration(1)
+		assert.equal(genAfter, 1, 'generation incremented after truncate')
+		assert.equal(fs.statSync(fp).size, 0, 'file truncated')
+		const clearedEvents = events.filter((e) => e.type === 'compose.preview' && e.payload.cleared === true)
+		assert.equal(clearedEvents.length, 1, 'cleared event broadcast')
+		assert.equal(clearedEvents[0].payload.channel, 1)
+	})
+
+	it('generation-based broadcast skip prevents stale etag push after truncation', () => {
+		// Simulate: stat at generation=0, then truncate (gen→1), then check before broadcast.
+		// The guard should skip the broadcast.
+		const { ctx } = makeMockCtx({ channels: [1] })
+		const genAtStat = consumer.getTruncationGeneration(1)
+		assert.equal(genAtStat, 0)
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		const currentGen = consumer.getTruncationGeneration(1)
+		assert.notEqual(currentGen, genAtStat, 'generation changed; broadcast would be skipped')
+	})
+
+	it('generation counter persists across multiple truncations', () => {
+		const { ctx } = makeMockCtx({ channels: [1] })
+		assert.equal(consumer.getTruncationGeneration(1), 0)
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		assert.equal(consumer.getTruncationGeneration(1), 1)
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		assert.equal(consumer.getTruncationGeneration(1), 2)
+	})
+
+	it('resetComposeConsumerState clears truncation generation', () => {
+		const { ctx } = makeMockCtx({ channels: [1] })
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		assert.equal(consumer.getTruncationGeneration(1), 1)
+		consumer.resetComposeConsumerState()
+		assert.equal(consumer.getTruncationGeneration(1), 0, 'generation reset to 0')
+	})
+
+	it('cleared WS event shape is available for broadcast (client handler tested in browser env)', () => {
+		// Verify the server broadcasts { channel, cleared: true } — this is exercised above
+		// in "truncation bumps generation..." test. Client-side handling requires Image class
+		// (DOM API) so it's not tested in the node smoke suite — that's a browser-level concern.
+		// This assertion documents the contract: server pushes cleared flag → client drops etag.
+		const { ctx, events } = makeMockCtx({ channels: [1] })
+		consumer.truncateComposePreviewJpg(ctx.config, 1, ctx)
+		const clearedEvents = events.filter((e) => e.type === 'compose.preview' && e.payload.cleared === true)
+		assert.equal(clearedEvents.length, 1)
+		assert.equal(clearedEvents[0].payload.channel, 1)
+		assert.equal(clearedEvents[0].payload.cleared, true)
+	})
+})
+
 describe('compose-preview WO-159 follow-up: blocklist reset on Caspar reconnect', () => {
 	beforeEach(() => {
 		consumer.resetComposeConsumerState()

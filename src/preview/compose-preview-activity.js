@@ -218,18 +218,6 @@ function onProgramMutation(ctx, channel, opts = {}) {
 	scheduleSettle(channel, transitionMsFromOpts(opts, ctx?.config))
 }
 
-/**
- * `POST /api/amcp/batch` (the scenes-editor look-stack PRV push transport — MIXER…DEFER + COMMIT
- * for fill/rotation/opacity edits, or PLAY for content changes) doesn't carry the transition/
- * duration metadata that `/api/play`, `/api/mixer`, or a scene take supply, so it never went
- * through {@link onProgramMutation} (B155.3 finding c / T155.4b). Settle for the same short
- * CUT-style window used for still/no-transition mutations so the ffmpeg_jpeg poller doesn't
- * broadcast a frame mid MIXER…DEFER/COMMIT.
- * @param {number|string} channel
- */
-function onAmcpBatchMutation(channel) {
-	scheduleSettle(channel, STILL_SETTLE_MS)
-}
 
 function onPlaybackPlay() {}
 
@@ -380,7 +368,6 @@ module.exports = {
 	fileHasActiveRemaining,
 	scheduleSettle,
 	onProgramMutation,
-	onAmcpBatchMutation,
 	onPlaybackPlay,
 	onPlaybackPaused,
 	onPlaybackStop,

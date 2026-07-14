@@ -145,3 +145,14 @@ manual QA steps for A155.3 (canvas mode half):
      without needing to exit the editor.
   4. Exit the editor back to the deck — thumbnail should already match, not "pop" to a different
      image.
+
+#### 2026-07-14 — T155.4(b) partially reverted by WO-198 (T198.1)
+
+The `/api/amcp/batch` → `onAmcpBatchMutation` coupling (T155.4(b) fix) was well-intentioned but
+caused a latency regression: every editor drag tick issues a batch, and each call scheduled a
+150 ms settle window (STILL_SETTLE_MS). Continuous editing = perpetually restarted settle window =
+frames withheld until the operator stops. Live investigation on 2026-07-14 found the nudge was
+unnecessary: the FILE consumer is live-writing continuously, and the 40 ms mtime poll broadcasts
+changes by itself — the settle gate exists to hide mid-TAKE transition frames (live choreography
+via OSC), not editor tweaks. Reverted in WO-198 T198.1: removed the call and the now-unused wrapper
+function. Deck-thumb redraw (T155.4(a)) stays — it's correct and has no downside.

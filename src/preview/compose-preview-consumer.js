@@ -37,6 +37,14 @@ const _channels = new Map()
 const _legacySweptChannels = new Set()
 
 /**
+ * Per-channel truncation generation (WO-198 T198.2): incremented each time the file is
+ * truncated, so the ffmpeg-jpeg poller can detect and skip broadcasting a frame whose
+ * stat was from before the truncation.
+ * @type {Map<number, number>}
+ */
+const _truncationGeneration = new Map()
+
+/**
  * Per-channel consumer signature = the exact ADD FILE params. Attach/detach is
  * diff-based against this (WO-144 T144.2) so an unchanged channel — especially the
  * on-air PGM channel — is never recycled (REMOVE/ADD causes a visible output hitch).
@@ -69,16 +77,32 @@ async function ensureComposePreviewJpgStub(config, channel) {
  * Truncate `chN.jpg` to 0 bytes so the serve gates (`size <= 32` in
  * compose-preview-cache) return 404 instead of painting a stale frame (WO-159 T159.1).
  * Called on blocklist and on detach without replacement.
+ * Bumps the truncation generation counter and broadcasts a cleared WS event
+ * (WO-198 T198.2) so clients drop their cached etag immediately.
  * @param {object} config
  * @param {number} channel
+ * @param {object} [ctx] — optional, used for WS broadcast
  */
-function truncateComposePreviewJpg(config, channel) {
+function truncateComposePreviewJpg(config, channel, ctx) {
 	const outPath = cache.resolvePreviewJpgOutputPath(config, channel)
 	if (!outPath) return
 	try {
 		if (fs.existsSync(outPath)) fs.truncateSync(outPath, 0)
 	} catch {
 		/* ok */
+	}
+	// Bump generation counter to invalidate any in-flight broadcasts from before the truncation.
+	const ch = parseInt(String(channel), 10)
+	if (Number.isFinite(ch) && ch > 0) {
+		const gen = (_truncationGeneration.get(ch) || 0) + 1
+		_truncationGeneration.set(ch, gen)
+		// Push WS event with cleared flag so clients drop their cached etag.
+		if (typeof ctx?._wsBroadcast === 'function') {
+			ctx._wsBroadcast('compose.preview', {
+				channel: ch,
+				cleared: true,
+			})
+		}
 	}
 }
 
@@ -182,7 +206,7 @@ async function attachComposeFileConsumer(ctx, channel) {
 		if (blocklist.isPermanentAddRejection(msg)) {
 			blocklist.blocklistComposeChannel(ch, { reason: msg, signature: params })
 			// Stale on-disk frame would otherwise be served forever (WO-159 T159.1).
-			truncateComposePreviewJpg(cfg, ch)
+			truncateComposePreviewJpg(cfg, ch, ctx)
 			blocklist.broadcastComposeBlocklistChange(ctx, ch, true, msg)
 			ctx.log?.(
 				'warn',
@@ -215,7 +239,7 @@ async function syncComposeFileConsumers(ctx) {
 		if (desiredSet.has(ch)) continue
 		await removeComposeConsumers(ctx, ch)
 		// Detach without replacement — clear the last frame so it cannot go stale (WO-159 T159.1).
-		truncateComposePreviewJpg(cfg, ch)
+		truncateComposePreviewJpg(cfg, ch, ctx)
 		_channels.delete(ch)
 		_everAttachedChannels.delete(ch)
 		out.detached++
@@ -258,7 +282,7 @@ async function detachAllComposeFileConsumers(ctx) {
 		for (const ch of channels) {
 			await removeComposeConsumers(ctx, ch)
 			// No replacement follows — leave a 0-byte stub, not a stale frame (WO-159 T159.1).
-			truncateComposePreviewJpg(ctx?.config || {}, ch)
+			truncateComposePreviewJpg(ctx?.config || {}, ch, ctx)
 		}
 	}
 	_channels.clear()
@@ -332,6 +356,17 @@ function getComposeConsumerStats(config) {
 function resetComposeConsumerState() {
 	_channels.clear()
 	_everAttachedChannels.clear()
+	_truncationGeneration.clear()
+}
+
+/**
+ * Get the truncation generation for a channel (WO-198 T198.2).
+ * @param {number} channel
+ * @returns {number}
+ */
+function getTruncationGeneration(channel) {
+	const ch = parseInt(String(channel), 10)
+	return Number.isFinite(ch) && ch > 0 ? (_truncationGeneration.get(ch) || 0) : 0
 }
 
 /** Test-only: re-arm the once-per-process legacy sweep. */
@@ -359,6 +394,7 @@ module.exports = {
 	isComposeConsumerAttached,
 	allComposeConsumersAttached,
 	truncateComposePreviewJpg,
+	getTruncationGeneration,
 	composeConsumersSettled,
 	detachAllComposeFileConsumers,
 	refreshComposePreviewConsumers,

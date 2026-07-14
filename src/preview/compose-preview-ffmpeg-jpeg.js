@@ -18,6 +18,8 @@ let _watchPollMs = 40
 const _lastMtime = new Map()
 /** Deferred broadcast while channel is settling (WO-110). @type {Map<number, number>} */
 const _deferredMtime = new Map()
+/** Truncation generation counter when stat-ing (WO-198 T198.2) — skip broadcast if changed. @type {Map<number, number>} */
+const _statGenerationAt = new Map()
 /** Serializes start/stop so async stop cannot kill receivers after a overlapping start. */
 let _lifecycleChain = Promise.resolve()
 /**
@@ -172,6 +174,7 @@ function pruneMtimeState(channels) {
 	const keep = new Set(channels)
 	for (const ch of [..._lastMtime.keys()]) if (!keep.has(ch)) _lastMtime.delete(ch)
 	for (const ch of [..._deferredMtime.keys()]) if (!keep.has(ch)) _deferredMtime.delete(ch)
+	for (const ch of [..._statGenerationAt.keys()]) if (!keep.has(ch)) _statGenerationAt.delete(ch)
 }
 
 /**
@@ -229,7 +232,23 @@ async function pollMtimeAndBroadcast(ctx) {
 				continue
 			}
 
-			broadcastComposePreviewFrame(ctx, cfg, ch, resolved, { ...st, mtimeMs })
+			// WO-198 T198.2: record the truncation generation at stat time; skip broadcast
+			// if it changed before we get here (indicates the file was truncated).
+			const genAtStat = consumer.getTruncationGeneration(ch)
+			_statGenerationAt.set(ch, genAtStat)
+
+			// Guard 1: check if generation changed since stat (WO-198 T198.2).
+			if (consumer.getTruncationGeneration(ch) !== genAtStat) {
+				continue
+			}
+
+			// Guard 2: re-stat and skip if size changed to <=32 (simpler fallback).
+			const reSt = await require('fs').promises.stat(resolved.path)
+			if (reSt.size <= 32) {
+				continue
+			}
+
+			broadcastComposePreviewFrame(ctx, cfg, ch, resolved, { ...reSt, mtimeMs })
 		} catch {
 			/* file not ready */
 		}

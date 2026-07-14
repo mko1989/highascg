@@ -24,6 +24,9 @@ import {
 } from '../lib/logs-modal-shared.js'
 import shortcutsMd from '../../shortcuts.md?raw'
 
+/** @type {string} Module-level storage for last active tab (per session) */
+let lastActiveTab = 'logs'
+
 function parseMarkdownBasic(md) {
 	let html = md
 		.replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -184,7 +187,9 @@ export function showLogsModal() {
 		btn.addEventListener('click', () => {
 			modal.querySelectorAll('.logs-modal__tab').forEach(b => b.classList.remove('logs-modal__tab--active'))
 			btn.classList.add('logs-modal__tab--active')
-			if (btn.dataset.tab === 'logs') {
+			const tabName = btn.dataset.tab
+			lastActiveTab = tabName
+			if (tabName === 'logs') {
 				tabLogs.hidden = false
 				tabShortcuts.hidden = true
 				if (highOn && !paused) scrollToBottom(preHigh)
@@ -476,4 +481,18 @@ export function showLogsModal() {
 	void loadInitialHighas()
 	void loadCasparLog()
 	schedulePoll()
+
+	// Activate the last-active tab
+	const savedTabBtn = modal.querySelector(`[data-tab="${lastActiveTab}"]`)
+	if (savedTabBtn) {
+		modal.querySelectorAll('.logs-modal__tab').forEach(b => b.classList.remove('logs-modal__tab--active'))
+		savedTabBtn.classList.add('logs-modal__tab--active')
+		if (lastActiveTab === 'logs') {
+			tabLogs.hidden = false
+			tabShortcuts.hidden = true
+		} else {
+			tabLogs.hidden = true
+			tabShortcuts.hidden = false
+		}
+	}
 }

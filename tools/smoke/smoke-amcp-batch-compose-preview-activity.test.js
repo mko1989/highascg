@@ -1,10 +1,11 @@
 'use strict'
 
 /**
- * WO-155 T155.4b — `POST /api/amcp/batch` is the transport the scenes-editor look-stack PRV push
- * uses (MIXER…DEFER + COMMIT for fill/rotation/opacity edits, or PLAY for content changes), but —
- * unlike /api/play, /api/stop, /api/clear — it never nudged compose-preview activity for the
- * touched channel (B155.3 finding c). Offline router + simulated AMCP — no live Caspar required.
+ * WO-198 — `POST /api/amcp/batch` (the scenes-editor look-stack PRV push transport)
+ * does NOT trigger compose-preview settle anymore (WO-155 T155.4b coupling REVERTED).
+ * Root cause: the settle deferral caused continuous 150 ms broadcast restarts per drag tick.
+ * The FILE consumer + 40 ms mtime poll already deliver editor freshness without the nudge.
+ * Offline router + simulated AMCP — no live Caspar required.
  */
 
 const test = require('node:test')
@@ -64,42 +65,54 @@ function makeAppCtx(amcp) {
 	}
 }
 
-test('POST /api/amcp/batch schedules a compose-preview settle for a MIXER-only touched channel', async () => {
+test('POST /api/amcp/batch does NOT schedule a compose-preview settle (coupling reverted in WO-198)', async () => {
 	activity.reset()
 	const amcp = makeOfflineAmcp()
 	const ctx = makeAppCtx(amcp)
-	assert.equal(activity.isComposePreviewSettled(31), true)
-	// Real callers (`postAmcpPreviewPipeline`) never put channel-level `MIXER <ch> COMMIT` in the
-	// batch itself — that goes via /api/raw separately — so this mirrors an actual MIXER-only push.
+	assert.equal(activity.isComposePreviewSettled(31), true, 'channel starts settled')
+	// Real callers (`postAmcpPreviewPipeline`) send MIXER-only batches for fill/rotation/opacity edits.
 	const lines = ['MIXER 31-10 FILL 0 0 1 1 DEFER', 'MIXER 31-10 OPACITY 800 DEFER']
 	const res = await routeRequest('POST', '/api/amcp/batch', JSON.stringify({ commands: lines }), ctx, null)
 	assert.equal(res.status, 200)
 	assert.equal(
 		activity.isComposePreviewSettled(31),
-		false,
-		'touched channel should be settling immediately after a MIXER-only batch',
+		true,
+		'touched channel must stay settled — /api/amcp/batch no longer calls onAmcpBatchMutation (WO-198 reverts T155.4b)',
 	)
 })
 
-test('POST /api/amcp/batch does not mark an unrelated channel', async () => {
-	activity.reset()
-	const amcp = makeOfflineAmcp()
-	const ctx = makeAppCtx(amcp)
-	const lines = ['MIXER 32-10 OPACITY 800 DEFER']
-	const res = await routeRequest('POST', '/api/amcp/batch', JSON.stringify({ commands: lines }), ctx, null)
-	assert.equal(res.status, 200)
-	assert.equal(activity.isComposePreviewSettled(32), false)
-	assert.equal(activity.isComposePreviewSettled(99), true, 'untouched channel must stay settled')
-})
-
-test('POST /api/amcp/batch extracts channels from PLAY/STOP/CLEAR lines too', async () => {
+test('POST /api/amcp/batch with PLAY/STOP/CLEAR does not affect settle either', async () => {
 	activity.reset()
 	const amcp = makeOfflineAmcp()
 	const ctx = makeAppCtx(amcp)
 	const lines = ['PLAY 33-10 AMB', 'STOP 34-20', 'CLEAR 35']
 	const res = await routeRequest('POST', '/api/amcp/batch', JSON.stringify({ commands: lines }), ctx, null)
 	assert.equal(res.status, 200)
+	// None of these should have been settled by the batch handler.
 	for (const ch of [33, 34, 35]) {
-		assert.equal(activity.isComposePreviewSettled(ch), false, `channel ${ch} should be settling`)
+		assert.equal(
+			activity.isComposePreviewSettled(ch),
+			true,
+			`channel ${ch} must stay settled — batch handler does not trigger settle (WO-198)`,
+		)
 	}
+})
+
+test('Other paths still settle channels correctly (e.g., /api/play)', async () => {
+	activity.reset()
+	const amcp = makeOfflineAmcp()
+	const ctx = makeAppCtx(amcp)
+	const res = await routeRequest(
+		'POST',
+		'/api/play',
+		JSON.stringify({ channel: 40, layer: 10, clip: 'test.mov' }),
+		ctx,
+		null,
+	)
+	assert.equal(res.status, 200)
+	assert.equal(
+		activity.isComposePreviewSettled(40),
+		false,
+		'/api/play still settles via onProgramMutation (unchanged)',
+	)
 })
