@@ -6,7 +6,8 @@
  * Blink: left closed → right closed → open (sequential).
  * For ~5s after AMCP connects, the green character uses random open / left / right frames at random
  * intervals (separate from the 30s blink), then normal blinking resumes.
- * Hover: panel with CPU load, GPU (nvidia-smi on server), media volume usage.
+ * Hover: panel with CPU load, GPU (nvidia-smi on server), media volume usage, and (WO-165)
+ * per-process CPU%/RSS for CasparCG + HighAsCG when the server reports them.
  */
 import { apiGet } from '../lib/api-client.js'
 
@@ -74,6 +75,29 @@ function buildTooltipText(data) {
 		)
 	} else {
 		lines.push('Media volume: —')
+	}
+
+	const procs = data?.processes
+	const cores = data?.cpu?.cores
+	const casparProc = procs?.caspar
+	if (casparProc) {
+		let cpuText = '—'
+		if (typeof casparProc.cpuPctOfMachine === 'number') {
+			cpuText = `${casparProc.cpuPctOfMachine.toFixed(1)}% of machine${cores ? ` (${cores} cores)` : ''}`
+		} else if (typeof casparProc.cpuPct === 'number') {
+			cpuText = `${casparProc.cpuPct.toFixed(1)}%`
+		}
+		lines.push(`CasparCG: ${cpuText} · ${formatBytes(casparProc.rssBytes)} RSS`)
+	}
+	const highascgProc = procs?.highascg
+	if (highascgProc) {
+		let cpuText = '—'
+		if (typeof highascgProc.cpuPctOfMachine === 'number') {
+			cpuText = `${highascgProc.cpuPctOfMachine.toFixed(1)}% of machine${cores ? ` (${cores} cores)` : ''}`
+		} else if (typeof highascgProc.cpuPct === 'number') {
+			cpuText = `${highascgProc.cpuPct.toFixed(1)}%`
+		}
+		lines.push(`HighAsCG: ${cpuText} · ${formatBytes(highascgProc.rssBytes)} RSS`)
 	}
 
 	lines.push('—')

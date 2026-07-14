@@ -73,12 +73,12 @@ test('CG payload includes ring bands for outside overlays', () => {
 test('outside border AMCP sends expanded FILL and side outside in CG JSON', () => {
 	const overlay = { type: 'border', params: { width: 20, side: 'outside', color: '#f00' } }
 	const lines = buildPipOverlayAmcpLines(overlay, 2, 10, fill, { config: {} }, 0, 20, 0, [overlay])
-	const update = lines.find((l) => l.includes('CG 2-11 UPDATE'))
+	const update = lines.find((l) => l.includes('CG 2-260 UPDATE'))
 	assert.ok(update)
 	const json = JSON.parse(update.match(/"(\{.*\})"/)[1].replace(/\\"/g, '"'))
 	assert.equal(json.side, 'outside')
 	assert.ok(json.inner.w < 1 && json.inner.l > 0)
-	const fillLine = lines.find((l) => /^MIXER 2-11 FILL /.test(l))
+	const fillLine = lines.find((l) => /^MIXER 2-260 FILL /.test(l))
 	assert.ok(fillLine)
 	const parts = fillLine.split(/\s+/)
 	const mixSx = Number(parts[5])
@@ -97,8 +97,8 @@ test('multi-overlay stack uses per-template layers, not pip_router', () => {
 	assert.ok(joined.includes('pip_glow'))
 	assert.ok(joined.includes('pip_border'))
 	assert.equal(joined.includes('pip_router'), false)
-	assert.ok(joined.includes('CG 2-11 ADD'))
-	assert.ok(joined.includes('CG 2-12 ADD'))
+	assert.ok(joined.includes('CG 2-260 ADD'))
+	assert.ok(joined.includes('CG 2-261 ADD'))
 })
 
 test('innerRectInOverlayNorm inverts expandFillOutward for outside placement', () => {
@@ -126,10 +126,10 @@ test('outside overlay stack always re-ADDs with immediate expanded FILL', () => 
 	const prevLayer = { pipOverlays: [overlay] }
 	const lines = buildPipOverlayAmcpLinesAll([overlay], 2, 10, fill, { config: {} }, 20, prevLayer, 0)
 	const joined = lines.join('\n')
-	assert.ok(joined.includes('CG 2-11 CLEAR'))
-	assert.ok(joined.includes('CG 2-11 ADD'))
-	assert.ok(!/^CG 2-11 UPDATE/m.test(joined) || joined.includes('CG 2-11 ADD'))
-	const fillLine = lines.find((l) => /^MIXER 2-11 FILL /.test(l))
+	assert.ok(joined.includes('CG 2-260 CLEAR'))
+	assert.ok(joined.includes('CG 2-260 ADD'))
+	assert.ok(!/^CG 2-260 UPDATE/m.test(joined) || joined.includes('CG 2-260 ADD'))
+	const fillLine = lines.find((l) => /^MIXER 2-260 FILL /.test(l))
 	assert.ok(fillLine)
 	assert.doesNotMatch(fillLine, /DEFER/)
 	assert.ok(Number(fillLine.split(/\s+/)[5]) > fill.scaleX)

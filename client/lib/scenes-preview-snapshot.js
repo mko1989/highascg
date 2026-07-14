@@ -1,6 +1,27 @@
 import { getPipOverlaysFromLayer } from './pip-overlay-registry.js'
 import { shouldApplyStraightAlphaKeyer } from './media-ext.js'
 
+/**
+ * Content keys whose change forces a full re-PLAY (vs MIXER-only update).
+ * Single projection used on BOTH sides of every content comparison so the
+ * stored snapshot and the current meta can never drift apart key-wise.
+ * `!!` on booleans also normalizes old stored snapshots (pre-`browserAsCg`,
+ * where the key is undefined) so they don't force one spurious re-PLAY.
+ */
+export function previewContentCompareKey(entry) {
+	return {
+		value: entry.value,
+		loop: !!entry.loop,
+		straightAlpha: !!entry.straightAlpha,
+		contentFit: entry.contentFit,
+		audioRoute: entry.audioRoute,
+		volume: entry.volume,
+		muted: !!entry.muted,
+		pipOverlays: entry.pipOverlays,
+		browserAsCg: !!entry.browserAsCg,
+	}
+}
+
 /** @param {string} sceneId @param {object} scene */
 export function buildPreviewContentSnapshot(sceneId, scene, computedFills = new Map()) {
 	const contentByLayer = new Map()
@@ -9,14 +30,7 @@ export function buildPreviewContentSnapshot(sceneId, scene, computedFills = new 
 		const ln = Number(l.layerNumber)
 		const f = computedFills.get(ln)
 		contentByLayer.set(ln, {
-			value: String(l.source.value),
-			loop: !!l.loop,
-			straightAlpha: !!l.straightAlpha,
-			contentFit: l.contentFit || 'native',
-			audioRoute: l.audioRoute || '1+2',
-			volume: l.volume != null ? l.volume : 1,
-			muted: !!l.muted,
-			pipOverlays: getPipOverlaysFromLayer(l),
+			...layerContentMetaForSnapshot(l),
 			effects: l.effects || [],
 			fill: f ? { x: f.x, y: f.y, scaleX: f.scaleX, scaleY: f.scaleY } : null,
 			rotation: l.rotation ?? 0,
@@ -29,7 +43,7 @@ export function buildPreviewContentSnapshot(sceneId, scene, computedFills = new 
 
 export function layerContentMetaForSnapshot(layer) {
 	if (!layer?.source?.value) return null
-	return {
+	return previewContentCompareKey({
 		value: String(layer.source.value),
 		loop: !!layer.loop,
 		straightAlpha: !!layer.straightAlpha,
@@ -39,7 +53,7 @@ export function layerContentMetaForSnapshot(layer) {
 		muted: !!layer.muted,
 		pipOverlays: getPipOverlaysFromLayer(layer),
 		browserAsCg: !!layer.source.browserAsCg,
-	}
+	})
 }
 
 /** Same clips on the same layers — only geometry / opacity / rotation may have changed. */
@@ -55,17 +69,7 @@ export function isGeometryOnlyPreview(lastPreviewContentSnapshot, scene) {
 	for (const [num, meta] of cur) {
 		const p = prev.get(num)
 		if (!p) return false
-		const pContent = {
-			value: p.value,
-			loop: p.loop,
-			straightAlpha: p.straightAlpha,
-			contentFit: p.contentFit,
-			audioRoute: p.audioRoute,
-			volume: p.volume,
-			muted: p.muted,
-			pipOverlays: p.pipOverlays,
-		}
-		if (JSON.stringify(pContent) !== JSON.stringify(meta)) {
+		if (JSON.stringify(previewContentCompareKey(p)) !== JSON.stringify(previewContentCompareKey(meta))) {
 			return false
 		}
 	}

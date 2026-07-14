@@ -5,6 +5,7 @@
  * - **Production:** `os` + one `statfs` + optional `nvidia-smi` (cached a few seconds).
  * - **Caspar `GL INFO`:** only when `HIGHASCG_HOST_STATS_GL_INFO=1` (or `host_stats.gl_info_via_amcp`) — hits AMCP and spams Caspar logs.
  * - **Folder size (`du`):** off by default; opt-in via `host_stats.scan_folder` or `HIGHASCG_HOST_STATS_DU=1` — can be IO-heavy.
+ * - **Per-process (`processes`):** CasparCG + this HighAsCG process CPU%/RSS from `/proc` (WO-165) — see `../system/proc-stats.js`.
  */
 
 'use strict'
@@ -18,6 +19,7 @@ const execFileAsync = promisify(execFile)
 
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { getMediaIngestBasePath } = require('../media/local-media')
+const { getCasparPidCached, getProcessUsage } = require('../system/proc-stats')
 
 /**
  * @returns {{ uid: number, gid: number, username: string | null, homedir?: string }}
@@ -100,6 +102,20 @@ async function diskForPath(mediaPath) {
 	} catch {
 		return null
 	}
+}
+
+/**
+ * Per-process CPU%/RSS for CasparCG (via systemd MainPID / /proc scan, see
+ * `../system/proc-stats.js`) and this HighAsCG process (`process.pid`). Null-safe: either side is
+ * `null` if the pid can't be resolved/read (e.g. caspar isn't running).
+ * @returns {Promise<{ caspar: {pid:number,cpuPct:number|null,rssBytes:number|null}|null, highascg: {pid:number,cpuPct:number|null,rssBytes:number|null}|null }>}
+ */
+async function gatherProcessStats() {
+	const highascgPromise = getProcessUsage(process.pid).catch(() => null)
+	const casparPid = await getCasparPidCached().catch(() => null)
+	const casparPromise = casparPid != null ? getProcessUsage(casparPid).catch(() => null) : Promise.resolve(null)
+	const [highascg, caspar] = await Promise.all([highascgPromise, casparPromise])
+	return { caspar: caspar || null, highascg: highascg || null }
 }
 
 function normalizeAmcpData(data) {
@@ -198,6 +214,7 @@ async function handleGet(ctx) {
 				media: { path: null, disk: null, folderUsedBytes: null },
 				gpu: { text: null, utilizationPct: null, source: null },
 				caspar: { glInfo: null },
+				processes: null,
 			}),
 		}
 	}
@@ -216,12 +233,21 @@ async function handleGet(ctx) {
 
 	const wantGl = wantGlInfoViaAmcp(ctx) && ctx.amcp
 
-	const [disk, folderUsedBytes, gpu, glInfo] = await Promise.all([
+	const [disk, folderUsedBytes, gpu, glInfo, processes] = await Promise.all([
 		diskForPath(mediaPath),
 		gatherMediaDirSizeCached(mediaPath, wantDu),
 		getGpuCached(),
 		wantGl ? getGlInfoCached(ctx) : Promise.resolve(null),
+		gatherProcessStats(),
 	])
+
+	// Add normalized CPU% (machine share) to each process
+	if (processes?.caspar && typeof processes.caspar.cpuPct === 'number' && cores > 0) {
+		processes.caspar.cpuPctOfMachine = Math.round((processes.caspar.cpuPct / cores) * 10) / 10
+	}
+	if (processes?.highascg && typeof processes.highascg.cpuPct === 'number' && cores > 0) {
+		processes.highascg.cpuPctOfMachine = Math.round((processes.highascg.cpuPct / cores) * 10) / 10
+	}
 
 	return {
 		status: 200,
@@ -254,6 +280,7 @@ async function handleGet(ctx) {
 			caspar: {
 				glInfo,
 			},
+			processes,
 		}),
 	}
 }

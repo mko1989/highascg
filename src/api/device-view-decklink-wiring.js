@@ -115,6 +115,25 @@ function applyDecklinkOutputOnDestinationEdge(ctx, graph, sourceId, sinkId) {
 let deviceViewCasparSyncTimer = null
 
 /**
+ * WO-172 T172.1: best-effort label for a sync failure/warning — which stream_out/record_out
+ * edges (if any) were involved, so error logs are actionable instead of a bare exception message.
+ * @param {object} ctx
+ * @returns {string}
+ */
+function summarizeStreamRecordEdgesForLog(ctx) {
+	try {
+		const { collectDestinationOutputEdges } = require('../config/device-graph-output-mapping')
+		const edges = collectDestinationOutputEdges(ctx?.config || {}).filter(
+			(e) => e.sink?.kind === 'stream_out' || e.sink?.kind === 'record_out',
+		)
+		if (!edges.length) return 'no stream/record edges in graph'
+		return edges.map((e) => `${e.sink.kind}:${e.sink.id || '?'}<-dst:${e.destinationId}`).join(', ')
+	} catch {
+		return 'edge summary unavailable'
+	}
+}
+
+/**
  * Debounced Caspar regen after Device View output wiring (all roles).
  * @param {object} ctx
  * @param {number} [delayMs]
@@ -124,7 +143,12 @@ function scheduleDeviceViewCasparSync(ctx, delayMs = 1500) {
 	deviceViewCasparSyncTimer = setTimeout(() => {
 		deviceViewCasparSyncTimer = null
 		void syncDeviceViewToCaspar(ctx).catch((e) => {
-			if (typeof ctx.log === 'function') ctx.log('warn', '[device-view] caspar sync: ' + (e?.message || e))
+			// WO-172 T172.1: was a silent 'warn' — this is the exact failure mode that let
+			// stream/record source-channel sync silently die in production (missing export,
+			// TypeError swallowed here). Sync failures are error-level now, with the edge involved.
+			if (typeof ctx.log === 'function') {
+				ctx.log('error', `[device-view] caspar sync failed (${summarizeStreamRecordEdgesForLog(ctx)}): ${e?.message || e}`)
+			}
 		})
 	}, delayMs)
 }
@@ -134,7 +158,18 @@ function scheduleDeviceViewCasparSync(ctx, delayMs = 1500) {
  */
 async function syncDeviceViewToCaspar(ctx) {
 	const { applyDestinationOutputEdgesToCasparConfig } = require('./device-view-apply')
-	applyDestinationOutputEdgesToCasparConfig(ctx, { actions: [], warnings: [] })
+	const mappingRes = applyDestinationOutputEdgesToCasparConfig(ctx, { actions: [], warnings: [] })
+	if (mappingRes && Array.isArray(mappingRes.warnings) && mappingRes.warnings.length && typeof ctx.log === 'function') {
+		for (const w of mappingRes.warnings) {
+			ctx.log('warn', `[device-view] caspar sync: ${w.message || w.code || 'mapping warning'} (target=${w.target || ''}, destinationId=${w.destinationId || ''})`)
+		}
+	}
+	// WO-172 T172.1/T172.3: only DeckLink/screen output mapping (casparServer keys) requires the
+	// full config write + Caspar restart. Stream/record/vcam source-channel sync (videoSource,
+	// recordOutputs[].source, virtualCamera.channel) already persisted above is config-write-only —
+	// the next Start/PLAY reads fresh config, no restart needed (A172.1; matches the WO-81
+	// stream_out/record_out/v4l2_out restart-exempt policy in client/lib/caspar-restart-dirty-policy.js).
+	if (!mappingRes || !mappingRes.casparServerChanged) return
 	try {
 		const { isFollowerRole, syncFollowerDeviceViewToCaspar } = require('../replication/follower-machine-profile')
 		if (isFollowerRole(ctx)) {

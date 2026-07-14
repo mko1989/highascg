@@ -6,9 +6,11 @@ const {
 	playAfSuffix,
 	timelineClipTransportStale,
 	TIMELINE_LAYER_BASE,
+	timelineCasparLayer,
 	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
 const { clipTransportMeta } = require('./timeline-playback-amcp-schedule')
+const { opacitySegmentAtLocalMs, buildDeferredSegmentMixerLines } = require('./timeline-keyframe-mixer')
 
 module.exports = {
 	_logDebug(msg) {
@@ -52,7 +54,7 @@ module.exports = {
 	},
 
 	_caspLayer(_ch, li) {
-		return TIMELINE_LAYER_BASE + li
+		return timelineCasparLayer(li, this.self?.log)
 	},
 
 	/** True when an explicit seek would change Caspar transport frame on any active layer. */
@@ -103,6 +105,7 @@ module.exports = {
 	 * @param {{ force?: boolean, take?: boolean }} opts — take: program take entry; lead
 	 *   opacity keyframe segments are batched as DEFER tweens and the MIXER COMMIT is left
 	 *   to the take orchestrator so clip fades fire frame-locked with the take crossfade (WO-139).
+	 *   T173.4: per-tick keyframe segment changes are collected into per-channel batches.
 	 */
 	_syncAmcpLayers(id, ms, opts) {
 		const tl = this.timelines.get(id)
@@ -113,6 +116,7 @@ module.exports = {
 		const channels = this._channels()
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
+		const channelLines = new Map() // T173.4: collect MIXER lines per channel
 
 		for (let li = 0; li < tl.layers.length; li++) {
 			const layer = tl.layers[li]
@@ -139,31 +143,51 @@ module.exports = {
 					const needsPausedSeek = needsScrubSeek && !playing
 					const needsPlayingScrub = needsScrubSeek && playing
 					let transportSent = false
+					let hasDeferredLines = false // T173.2: track deferred tween
 
 					if (meta.loopAlways) {
 						if (needsFullTransport || (force && !playing && !prev)) {
-							this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
+							const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
 							transportSent = true
+							if (result?.hasDeferredLines) {
+								mixerDirty.add(ch)
+								hasDeferredLines = true // T173.2
+							}
 						}
 					} else if (needsFullTransport) {
-						this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
+						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
 						transportSent = true
+						if (result?.hasDeferredLines) {
+							mixerDirty.add(ch)
+							hasDeferredLines = true // T173.2
+						}
 					} else if (needsPausedSeek) {
 						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
 							this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} failed: ${_err.message}`)
 						})
 						transportSent = true
 					} else if (needsPlayingScrub) {
-						this._sendClipTransport(ch, caspLayer, clip, meta, { playing: true, startTransport: true })
+						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing: true, startTransport: true })
 						transportSent = true
+						if (result?.hasDeferredLines) {
+							mixerDirty.add(ch)
+							hasDeferredLines = true // T173.2
+						}
 					}
 
 					if (transportSent && (force || transportStale)) {
+						// T173.2: protect opacity value and segment if we just applied a tween in _sendClipTransport
+						const opacityKeyToPreserve = hasDeferredLines ? `${ch}-${caspLayer}-opacity` : null
+						const opacitySegToPreserve = hasDeferredLines ? `${ch}-${caspLayer}-opacity-seg` : null
 						for (const pk of this._lastKfValues.keys()) {
-							if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
+							if (pk.startsWith(`${ch}-${caspLayer}-`) && pk !== opacityKeyToPreserve) {
+								this._lastKfValues.delete(pk)
+							}
 						}
 						for (const pk of this._lastKfSegment.keys()) {
-							if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfSegment.delete(pk)
+							if (pk.startsWith(`${ch}-${caspLayer}-`) && pk !== opacitySegToPreserve) {
+								this._lastKfSegment.delete(pk)
+							}
 						}
 					}
 
@@ -179,20 +203,29 @@ module.exports = {
 					} else if (playing && !force && prev?.clipId === clip.id) {
 						this._prevKey.set(key, { ...prev, frame: meta.frame })
 					}
+
+					// T173.4: collect lines per channel instead of sending immediately
+					const lines = channelLines.get(ch) || []
+					if (!channelLines.has(ch)) channelLines.set(ch, lines)
+
 					if (
 						this._applyClipMixer(ch, caspLayer, clip, ms - clip.startTime, {
 							force,
 							playing,
 							fps: Math.max(1, tl.fps || 25),
 							scheduleLeadTween: take,
+							collectLines: lines,
 						})
 					) {
 						mixerDirty.add(ch)
 					}
 				} else if (prev?.clipId) {
-				self.amcp.stop(ch, caspLayer).catch(_err => {
-					_logDebug(self, `STOP ${ch}-${caspLayer} failed: ${_err.message}`)
-				})
+					// T173.4: collect STOP line into per-channel array
+					const lines = channelLines.get(ch) || []
+					if (!channelLines.has(ch)) channelLines.set(ch, lines)
+					lines.push(`STOP ${ch}-${caspLayer}`)
+					mixerDirty.add(ch)
+
 					this._prevKey.set(key, null)
 					for (const pk of this._lastKfValues.keys()) {
 						if (pk.startsWith(`${ch}-${caspLayer}-`)) this._lastKfValues.delete(pk)
@@ -204,8 +237,15 @@ module.exports = {
 			}
 		}
 
+		// T173.4: send collected lines per channel as batch, then MIXER COMMIT
 		if (!take) {
 			for (const ch of mixerDirty) {
+				const lines = channelLines.get(ch)
+				if (lines && lines.length > 0) {
+					self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
+						this._logDebug(`batch MIXER ${ch} failed: ${_err.message}`)
+					})
+				}
 				self.amcp.mixerCommit(ch).catch(_err => {
 					this._logDebug(`MIXER COMMIT ${ch} failed: ${_err.message}`)
 				})
@@ -216,16 +256,18 @@ module.exports = {
 	/**
 	 * PLAY / LOADBG for one layer — only when clip starts or user scrubs (startTransport).
 	 * STOP first so Caspar reapplies AF when route/clip changes. LOAD ignores AF on some builds — use LOADBG.
+	 * T173: batched via batchSendChunked + optional opacity tween at clip start (T173.2).
 	 * @param {boolean} opts.playing timeline transport playing
 	 * @param {boolean} opts.startTransport new clip, play(), or seek/scrub
+	 * @returns {{ hasDeferredLines: boolean }} indicates if DEFER tween lines were added (T173.2)
 	 */
 	_sendClipTransport(ch, caspLayer, clip, meta, opts) {
 		const self = this.self
-		if (!self?.amcp) return
+		if (!self?.amcp) return { hasDeferredLines: false }
 		const { playing, startTransport } = opts
 
 		if (meta.loopAlways) {
-			if (!startTransport) return
+			if (!startTransport) return { hasDeferredLines: false }
 			const layout = this._programLayoutForPlayback()
 			const afSuffix = playAfSuffix(clip, layout)
 			const cl = `${ch}-${caspLayer}`
@@ -236,56 +278,81 @@ module.exports = {
 			self.amcp.raw(cmd).catch(_err => {
 				this._logDebug(`PLAY ${cl} LOOP failed: ${_err.message}`)
 			})
-			return
+			return { hasDeferredLines: false }
 		}
-		if (!startTransport) return
+		if (!startTransport) return { hasDeferredLines: false }
 
 		const layout = this._programLayoutForPlayback()
 		const afSuffix = playAfSuffix(clip, layout)
 		const cl = `${ch}-${caspLayer}`
 
-		self.amcp.stop(ch, caspLayer).catch(_err => {
-			this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
-		})
+		// T173.1: collect transport + mixer init lines into one batch
+		const lines = []
 
-		// Prevent split-second flash: initialize opacity BEFORE PLAY if clip has opacity keyframes
-		let initialOpacity = 1
-		const opacityKfs = (clip.keyframes || [])
-			.filter((k) => k.property === 'opacity')
-			.sort((a, b) => a.time - b.time)
-		if (opacityKfs.length > 0) {
-			const firstKf = opacityKfs[0]
-			if (firstKf.time <= 2) {
-				initialOpacity = Number.isFinite(firstKf.value) ? firstKf.value : 1
+		// STOP first so Caspar reapplies AF when route/clip changes
+		lines.push('STOP ' + cl)
+
+		// T173.2: check if there's an opacity segment tween at clip-local 0
+		// Determine if we'll use a tween or just init opacity
+		const fps = 25 // default; could be taken from timeline context if needed
+		const opacitySeg = opacitySegmentAtLocalMs(clip, 0, fps, this._interpProp.bind(this), 1)
+		const hasOpacityTween = opacitySeg && opacitySeg.startVal !== opacitySeg.endVal
+
+		// Add opacity init if NO tween (else the tween start value will set it)
+		if (!hasOpacityTween) {
+			let initialOpacity = 1
+			const opacityKfs = (clip.keyframes || [])
+				.filter((k) => k.property === 'opacity')
+				.sort((a, b) => a.time - b.time)
+			if (opacityKfs.length > 0) {
+				const firstKf = opacityKfs[0]
+				if (firstKf.time <= 2) {
+					initialOpacity = Number.isFinite(firstKf.value) ? firstKf.value : 1
+				}
+			}
+			if (initialOpacity < 1) {
+				lines.push(`MIXER ${cl} OPACITY ${initialOpacity} 0`)
 			}
 		}
-		if (initialOpacity < 1) {
-			self.amcp.raw(`MIXER ${cl} OPACITY ${initialOpacity} 0`).catch(_err => {
-				this._logDebug(`MIXER OPACITY ${cl} failed: ${_err.message}`)
-			})
-		}
 
+		// Add transport line (PLAY/LOAD/etc)
 		if (meta.isRoute) {
-			self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${afSuffix}`).catch(_err => {
-				this._logDebug(`PLAY ${cl} (route) failed: ${_err.message}`)
-			})
+			lines.push(`PLAY ${cl} ${meta.srcQ}${afSuffix}`)
 		} else if (playing || meta.loopClip) {
 			const loopStr = meta.loopClip || meta.implicitLoop ? ' LOOP' : ''
-			self.amcp.raw(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`).catch(_err => {
-				this._logDebug(`PLAY ${cl} (loop) failed: ${_err.message}`)
-			})
+			lines.push(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`)
 		} else if (afSuffix) {
-			self.amcp.raw(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`).catch(_err => {
-				this._logDebug(`PLAY ${cl} (AF) failed: ${_err.message}`)
-			})
-			self.amcp.pause(ch, caspLayer).catch(_err => {
-				this._logDebug(`PAUSE ${ch}-${caspLayer} failed: ${_err.message}`)
-			})
+			lines.push(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`)
 		} else {
-			self.amcp.raw(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`).catch(_err => {
-				this._logDebug(`LOAD ${cl} failed: ${_err.message}`)
-			})
+			lines.push(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`)
 		}
+
+		// T173.2: append opacity segment tween if one starts at clip-local 0
+		let hasDeferredLines = false
+		if (hasOpacityTween) {
+			const segLines = buildDeferredSegmentMixerLines(ch, caspLayer, 'OPACITY', opacitySeg.startVal, opacitySeg.endVal, opacitySeg.dur, opacitySeg.tween)
+			lines.push(...segLines)
+			// Mark segment as pre-applied so per-tick scheduler skips it.
+			// Set _lastKfValues to start value so instant mixer check doesn't incorrectly trigger
+			// in _applyClipMixer called right after (force=true at clip start).
+			const kSeg = `${ch}-${caspLayer}-opacity-seg`
+			const kVal = `${ch}-${caspLayer}-opacity`
+			this._lastKfSegment.set(kSeg, opacitySeg.segIdx)
+			this._lastKfValues.set(kVal, opacitySeg.startVal)
+			hasDeferredLines = true
+		}
+
+		// If we need PAUSE after PLAY, add it to the batch
+		if (afSuffix && !meta.isRoute && !(playing || meta.loopClip)) {
+			lines.push(`PAUSE ${cl}`)
+		}
+
+		// Send all lines as one batch
+		self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
+			this._logDebug(`batch transport ${cl} failed: ${_err.message}`)
+		})
+
+		return { hasDeferredLines }
 	},
 
 	_channelsFor(sendTo) {

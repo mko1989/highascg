@@ -6,9 +6,10 @@ import { getContentResolution } from '../lib/mixer-fill.js'
 import { appendSceneLayerFillGroup } from './inspector-fill.js'
 import { appendSceneLayerMixerGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
-import { renderPipOverlayGroup } from './inspector-pip-overlay.js'
+import { renderPipOverlayGroup, scheduleLivePipOverlayPush } from './inspector-pip-overlay.js'
 import { appendSceneLayerHtmlTemplateGroup } from './inspector-html-template.js'
 import { appendLowerThirdGroup } from './inspector-lower-third.js'
+import { appendCountdownGroup } from './inspector-countdown.js'
 import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { getResolutionForScreen } from './inspector-channel-resolution.js'
@@ -199,8 +200,15 @@ export function renderSceneLayerInspector(deps, sel) {
 
 	appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateStore })
 
+	appendCountdownGroup(root, { sceneId, layerIndex, layer, stateStore })
+
+	/* Crop is edited in pixels of the layer's content resolution (fallback: channel) — WO-158 T158.4. */
+	const effectContentRes =
+		(layer.source ? getContentResolution(layer.source, stateStore, sceneState.activeScreenIndex) : null) || res
+
 	renderEffectsGroup(root, {
 		effects: layer.effects || [],
+		contentResolution: effectContentRes,
 		liveApplyContext: {
 			kind: 'scene_layer',
 			sceneState,
@@ -209,8 +217,19 @@ export function renderSceneLayerInspector(deps, sel) {
 			layerIndex,
 		},
 		onUpdate: (newEffects) => {
+			const prevCrop = (layer.effects || []).find((f) => f?.type === 'crop')
 			sceneState.patchLayer(sceneId, layerIndex, { effects: newEffects })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+			// WO-158 T158.5: PIP borders hug the visible (cropped) content — when the crop
+			// changes on an on-air layer with overlays, re-push them with the new content rect.
+			const nextCrop = (newEffects || []).find((f) => f?.type === 'crop')
+			if (JSON.stringify(prevCrop?.params ?? null) !== JSON.stringify(nextCrop?.params ?? null)) {
+				const freshLayer = sceneState.getScene(sceneId)?.layers?.[layerIndex]
+				const pips = getPipOverlaysFromLayer(freshLayer)
+				if (pips.length > 0) {
+					scheduleLivePipOverlayPush({ sceneState, stateStore, sceneId, layerIndex }, pips)
+				}
+			}
 			rerenderSceneLayer(sel)
 		},
 	})

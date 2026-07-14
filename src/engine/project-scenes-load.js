@@ -1,6 +1,36 @@
 'use strict'
 
 const projectStore = require('./project-store')
+const { renumberLookLayersConsecutive } = require('./look-layer-ranges')
+
+/** Looks already logged as migrated this process (loadProjectScenes re-reads disk per call). */
+const _migratedLookLogKeys = new Set()
+
+/**
+ * WO-160 one-way migration on load: every look whose layerNumbers are not already
+ * consecutive-from-10 (legacy 10/20/30 decades, >99 overflow) is renumbered by
+ * current ascending layerNumber order. Logged once per look per process; persisted
+ * back naturally on the next project save / deck sync.
+ * @param {object | null} envelope — `project.scenes` envelope ({ scenes: [...] })
+ * @returns {object | null} the same envelope (scenes mutated in place)
+ */
+function migrateEnvelopeLookLayerNumbers(envelope) {
+	const scenes = Array.isArray(envelope?.scenes) ? envelope.scenes : null
+	if (!scenes) return envelope
+	for (const s of scenes) {
+		if (!s || !Array.isArray(s.layers)) continue
+		if (renumberLookLayersConsecutive(s.layers)) {
+			const key = String(s.id || s.name || 'unknown')
+			if (!_migratedLookLogKeys.has(key)) {
+				_migratedLookLogKeys.add(key)
+				console.warn(
+					`[project] WO-160 migration: look ${key}${s.name ? ` (${s.name})` : ''} renumbered to consecutive layer numbers from 10 (one-way, on load)`,
+				)
+			}
+		}
+	}
+	return envelope
+}
 
 /**
  * Load one project slug from disk.
@@ -75,7 +105,7 @@ function pickNewerFullProject(fromPersist, fromAutosave) {
 function loadProjectScenes() {
 	const project = loadFullProject()
 	if (project?.scenes && typeof project.scenes === 'object') {
-		return project.scenes
+		return migrateEnvelopeLookLayerNumbers(project.scenes)
 	}
 	return null
 }
@@ -110,5 +140,6 @@ module.exports = {
 	pickNewerFullProject,
 	projectSceneCount,
 	loadProjectScenes,
+	migrateEnvelopeLookLayerNumbers,
 	enrichProjectScenesFromLiveDeck,
 }

@@ -10,8 +10,16 @@ function artnetScreenIndex(dmx = {}) {
 function slotListenEnabled(slot) {
 	if (!slot || typeof slot !== 'object') return false
 	const raw = slot.artnetListenEnabled ?? slot.params?.artnetListenEnabled
+	if (raw === undefined || raw === null) return false
 	if (raw === false || raw === 0 || raw === 'false' || raw === '0') return false
 	return true
+}
+
+function slotLightingProtocol(slot) {
+	if (!slot || typeof slot !== 'object') return 'artnet'
+	const raw = slot.lightingProtocol ?? slot.params?.lightingProtocol
+	if (raw === 'sacn') return 'sacn'
+	return 'artnet'
 }
 
 function normalizeChannelMap(slot, channelCount = PATCH_CHANNEL_COUNT) {
@@ -117,6 +125,7 @@ function resolveProgramChannel(appCtx, screenIdx) {
 module.exports = {
 	artnetScreenIndex,
 	slotListenEnabled,
+	slotLightingProtocol,
 	normalizeChannelMap,
 	runtimeParamsFromSlot,
 	resolveArtnetPatch,

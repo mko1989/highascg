@@ -1,6 +1,7 @@
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { classifyMediaItem } from '../lib/media-ext.js'
+import { createThumbnailErrorHandler } from '../lib/thumbnail-error-handler.js'
 import { escapeHtml, getExtension, formatDuration, formatFps, makeDraggable, attachMediaModifierClick } from './sources-panel-helpers.js'
 
 function folderSegmentKey(segment) {
@@ -189,9 +190,11 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 			el.dataset.sourceValue = id
 
 			let thumbHtml = ''
+			let thumbKind = kind // Store for later error handler (WO-184)
 			if (kind === 'video' || kind === 'still') {
 				const thumbUrl = getThumbnailUrl(id, 80, 2)
-				thumbHtml = `<div class="source-item__thumbnail"><img src="${thumbUrl}" loading="lazy" onerror="this.parentElement.innerHTML='<i>${kind === 'video' ? '🎬' : '🖼️'}</i>'"/></div>`
+				// WO-184: Use placeholder; error handler will be attached after DOM creation
+				thumbHtml = `<div class="source-item__thumbnail"><img src="${thumbUrl}" loading="lazy"/></div>`
 			} else if (kind === 'audio') {
 				thumbHtml = `<div class="source-item__thumbnail"><i>🎵</i></div>`
 			} else {
@@ -255,6 +258,13 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 
 			const thumbEl = el.querySelector('.source-item__thumbnail')
 			if (thumbEl) {
+				// WO-184: Attach error handler for thumbnail images (with retry logic)
+				const thumbImg = thumbEl.querySelector('img')
+				if (thumbImg) {
+					const fallback = thumbKind === 'video' ? '🎬' : thumbKind === 'still' ? '🖼️' : '📄'
+					thumbImg.addEventListener('error', createThumbnailErrorHandler(`<i>${fallback}</i>`), { once: false })
+				}
+
 				thumbEl.onclick = (e) => {
 					if (e.ctrlKey || e.metaKey) return
 					e.stopPropagation()

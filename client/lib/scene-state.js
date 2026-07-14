@@ -7,9 +7,12 @@ import {
 	defaultLayerConfig,
 	migrateScene,
 	newId,
+	nextLayerNumber,
+	LOOK_FULL_MESSAGE,
 	LOOK_LAYER_FIRST,
 	LOOK_LAYER_STEP,
 } from './scene-state-helpers.js'
+import { showAppToast } from './app-toast.js'
 
 import * as Persistence from './scene-state-persistence-logic.js'
 import * as LayerLogic from './scene-state-layer-logic.js'
@@ -411,17 +414,24 @@ export class SceneState {
 		this._emit('change')
 	}
 
+	/** WO-160: lowest free number ≥ 10, or -1 when the look is full (see scene-state-helpers.js). */
 	nextLayerNumber(scene) {
-		const used = new Set((scene.layers || []).map(l => Number(l.layerNumber)).filter(n => Number.isFinite(n) && n >= LOOK_LAYER_FIRST && n % LOOK_LAYER_STEP === 0))
-		let c = LOOK_LAYER_FIRST
-		while (used.has(c)) c += LOOK_LAYER_STEP
-		return c
+		return nextLayerNumber(scene)
 	}
 
 	addLayer(sceneId) {
 		const s = this.getScene(sceneId)
 		if (!s) return -1
-		const layer = defaultLayerConfig(this.nextLayerNumber(s))
+		const n = this.nextLayerNumber(s)
+		if (n < 0) {
+			try {
+				showAppToast(LOOK_FULL_MESSAGE, 'warn')
+			} catch {
+				/* non-DOM context (tests) */
+			}
+			return -1
+		}
+		const layer = defaultLayerConfig(n)
 		applySceneLayerDefaults(layer)
 		s.layers.push(layer)
 		this._save()

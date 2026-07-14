@@ -28,6 +28,7 @@ Excluded from the snapshot; applied from **`exfat/drop-update/`** when the stick
 - **`index.js`**, **`src/`**, **`scripts/`**, **`package.json`**, **`package-lock.json`**
 - **`tools/`** (entire tree) — playout receives **`tools/runtime/`** only inside the server tarball (`exfat-sync-cli.js`, staged Caspar helpers)
 - **`client/`**, **`dist-web/`**, **`work/`**, **`deprecated/`**, **`node_modules/`**, dev trees
+- **`.private/`** — device identity/auth material (Syncthing device ID, Tailscale status, replication pairing); **`projects/_trash/`** — deleted-project tombstones; **`config/*.bak*`** / `casparcg copy.config` — config backups (WO-168; see `tools/eggs/live-usb/EGGS_EXCLUDE_LIST.md` for the full exclude/reset/verify matrix)
 
 **First boot / hotfix:** **`highascg-exfat-server-update.service`** rsyncs **`drop-update/`** → **`~/highascg/`** when **`drop-update/package.json`** exists (stops **`highascg.service`**, optional **`npm ci`**). **Live USB:** drop **stays** in **`drop-update/`** (retain — `~/highascg/` is reset each boot). **Persistent install:** drop may move to **`drop-update/applied/<UTC>/`**. Legacy **`update/server/`** is still accepted once.
 

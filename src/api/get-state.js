@@ -13,6 +13,7 @@ const { enrichMediaListWithCinfAndProbe } = require('../utils/media-snapshot-cin
 const { buildSceneDeckForApi, loadProjectScenes } = require('../engine/project-scenes')
 const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 const { getHostOperatorFullscreenSnapshot } = require('./host-operator-fullscreen')
+const { getComposeBlocklistStats } = require('../preview/compose-preview-blocklist')
 const {
 	migrateExtraLiveSourcesList,
 	collectHostLiveConfigWarnings,
@@ -121,6 +122,8 @@ function getState(ctx, opts = {}) {
 		playback: {
 			matrix: playbackTracker.getMatrixForState(ctx),
 		},
+		/** Blocklisted compose-preview channels — bootstraps the client badge on WS connect/reconnect (WO-159 T159.2). */
+		composePreview: { blocklist: getComposeBlocklistStats() },
 		localMediaEnabled: !!(cfg.local_media_path || '').trim(),
 		configComparison: ctx._configComparison || null,
 		ui: cfg.ui || {},

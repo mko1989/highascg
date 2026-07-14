@@ -74,6 +74,16 @@ if [[ -f "${PLAYOUT}/media/casparcg.config.ftd" && ! -f "${PLAYOUT}/config/caspa
 	ok "migrated config → config/casparcg.config"
 fi
 
+# WO-162: the media scanner opens ./casparcg.config relative to its
+# WorkingDirectory (the repo ROOT — distinct from the server's
+# config/casparcg.config handled above); nothing else ever recreates it, so
+# seed the root file from the scanner template when absent.
+if [[ -f "${REPO_ROOT}/scripts/setup/templates/scanner.config" && ! -f "${PLAYOUT}/casparcg.config" ]]; then
+	cp -a "${REPO_ROOT}/scripts/setup/templates/scanner.config" "${PLAYOUT}/casparcg.config"
+	chown "${USER_CASPAR}:${USER_CASPAR}" "${PLAYOUT}/casparcg.config"
+	ok "seeded scanner config → ${PLAYOUT}/casparcg.config"
+fi
+
 cp /usr/lib/x86_64-linux-gnu/libndi.so.6* "${PLAYOUT}/lib/" 2>/dev/null || true
 chown "${USER_CASPAR}:${USER_CASPAR}" "${PLAYOUT}/lib"/libndi.so.6* 2>/dev/null || true
 chown -R "${USER_CASPAR}:${USER_CASPAR}" "${PLAYOUT}/lib" 2>/dev/null || true

@@ -1,6 +1,6 @@
 {
-  "host": "192.168.0.12",
-  "port": 8000,
+  "host": "127.0.0.1",
+  "port": 8001,
   "satelliteEnabled": true,
   "satelliteHost": "",
   "satellitePort": 16622,

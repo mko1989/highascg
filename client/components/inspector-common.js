@@ -9,7 +9,7 @@ import { parseNumberInput } from '../lib/math-input.js'
  * Supports basic math on commit (e.g. 1920/2, 100+50).
  */
 export function createDragInput(opts) {
-	const { label, value, min = -Infinity, max = Infinity, step = 0.01, decimals = 2, onChange, placeholder = '' } = opts
+	const { label, value, min = -Infinity, max = Infinity, step = 0.01, decimals = 2, onChange, placeholder = '', slider } = opts
 	const wrap = document.createElement('div')
 	wrap.className = 'inspector-field'
 	const lab = document.createElement('label')
@@ -45,11 +45,18 @@ export function createDragInput(opts) {
 	function formatVal(v) {
 		return decimals >= 0 ? Number(v).toFixed(decimals) : String(v)
 	}
+	let sliderEl = null
+	function syncSlider(val) {
+		if (sliderEl && Number.isFinite(val)) {
+			sliderEl.value = val
+		}
+	}
 	function commitNumber(n, triggerChange = true) {
 		const clamped = Math.max(min, Math.min(max, n))
 		inp.value = formatVal(clamped)
 		if (clamped !== lastCommitted) {
 			lastCommitted = clamped
+			syncSlider(clamped)
 			if (triggerChange) onChange?.(clamped)
 		}
 	}
@@ -102,6 +109,30 @@ export function createDragInput(opts) {
 		const cur = parseValOrLast()
 		commitNumber(cur + dir * step * mult)
 	}, { passive: false })
+
+	// Mini slider: only render when slider is enabled and both bounds are finite
+	if (slider && Number.isFinite(min) && Number.isFinite(max)) {
+		sliderEl = document.createElement('input')
+		sliderEl.type = 'range'
+		sliderEl.className = 'inspector-mini-slider'
+		sliderEl.min = min
+		sliderEl.max = max
+		sliderEl.step = step
+		sliderEl.value = value != null && Number.isFinite(value) ? value : Math.max(min, Math.min(max, lastCommitted))
+		wrap.appendChild(sliderEl)
+
+		// Slider input → update text field + fire onChange (respect drag semantics)
+		sliderEl.addEventListener('input', (e) => {
+			const n = Number(e.target.value)
+			if (!Number.isNaN(n)) {
+				inp.value = formatVal(n)
+				if (n !== lastCommitted) {
+					lastCommitted = n
+					onChange?.(n)
+				}
+			}
+		})
+	}
 
 	return {
 		wrap,

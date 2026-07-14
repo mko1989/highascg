@@ -6,11 +6,14 @@
 import { pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api } from '../lib/api-client.js'
-import { getThumbnailUrl, getLiveThumbnailUrl, getLiveThumbnailChannelForSource } from '../lib/thumbnail-url.js'
-import { isMediaOrFileSource, parseDraggableSourcesPayload, parseRouteChannelLayer } from './scenes-shared.js'
+import { getThumbnailUrl, getLiveThumbnailUrl, getLiveThumbnailChannelForSource, resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
+import { isMediaOrFileSource, parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
 import { showScenesToast } from './scenes-editor-support.js'
+import { cropFromLayer, normalizeCrop } from '../lib/layer-crop.js'
+import { createComposeDragHandlers } from './scenes-compose-handlers.js'
+import { getTemplateThumbUrl, isTemplateSourceType } from '../lib/template-thumb.js'
 export { createComposeDragHandlers } from './scenes-compose-handlers.js'
 
 /** @param {object | null | undefined} source @param {string} [text] */
@@ -91,15 +94,29 @@ export function renderComposeScene(scene, opts) {
 		getPreviewChannelForLiveThumb,
 	} = opts
 
-	/** Block `route://ch-L` on the same channel-layer the look stack uses for that layer (Caspar recursion). */
+	/*
+	 * WO-158 T158.3: `startCropResize` is not threaded through scenes-editor.js's opts wiring
+	 * (that file lists startDrag/startRotate/startScale/startEdgeResize explicitly and is out of
+	 * scope for this change) — build a local handler set from the sceneState/schedulePreviewPush
+	 * already in opts instead. Cheap (pure closures, no side effects) and keeps the other four
+	 * handlers exactly as wired by the parent.
+	 */
+	const { startCropResize } = createComposeDragHandlers(sceneState, schedulePreviewPush)
+
+	/**
+	 * Block `route://ch-L` on the same channel-layer the look stack uses for that layer (Caspar
+	 * recursion) and whole-channel `route://ch` routes to this screen's own PGM/PRV channel —
+	 * a whole-channel self-route wedges the channel in CasparCG (WO-156).
+	 */
 	function routeLayerDropAllowed(data, targetLayerNumber) {
-		const parsed = parseRouteChannelLayer(data?.value)
-		if (!parsed) return true
 		const cm = stateStore?.getState?.()?.channelMap || {}
-		const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
-		if (ch == null) return true
-		if (parsed.channel === ch && parsed.layer === Number(targetLayerNumber)) {
-			showScenesToast('A layer cannot play a route to itself (same channel and layer).', 'warn')
+		const msg = routeDropRejectionMessage(data?.value, {
+			editChannel: resolveLookStackChannelForBus(cm, sceneState, scene, 'edit'),
+			pgmChannel: resolveLookStackChannelForBus(cm, sceneState, scene, 'pgm'),
+			targetLayerNumber,
+		})
+		if (msg) {
+			showScenesToast(msg, 'warn')
 			return false
 		}
 		return true
@@ -218,6 +235,12 @@ export function renderComposeScene(scene, opts) {
 		const inner = document.createElement('div')
 		inner.className = 'scenes-layer__inner'
 
+		/* WO-158 T158.2: source content lives in its own clip wrapper so the crop rect can be
+		 * clipped without also clipping the handle buttons (which are positioned outside the
+		 * box via negative offsets and must stay visible). */
+		const content = document.createElement('div')
+		content.className = 'scenes-layer__content'
+
 		if (layer.source?.isPlaceholder) {
 			const ph = document.createElement('div')
 			ph.className = 'scenes-layer__placeholder scenes-layer__placeholder--pattern'
@@ -227,7 +250,7 @@ export function renderComposeScene(scene, opts) {
 				ph.style.backgroundColor = layer.source.value
 			}
 			ph.textContent = layer.source.label || layer.source.value
-			inner.appendChild(ph)
+			content.appendChild(ph)
 		} else if (isMediaOrFileSource(layer.source)) {
 			const img = document.createElement('img')
 			img.className = 'scenes-layer__thumb'
@@ -237,7 +260,44 @@ export function renderComposeScene(scene, opts) {
 			img.addEventListener('error', () => {
 				img.replaceWith(makeLayerSourcePlaceholder(layer.source, 'No preview'))
 			})
-			inner.appendChild(img)
+			content.appendChild(img)
+		} else if (isTemplateSourceType(layer.source)) {
+			/* WO-187: Template/CG/HTML thumbnails — render via server Puppeteer or fall back to static posters.
+			 * Show placeholder initially, swap img src when async resolution completes. */
+			const placeholder = makeLayerSourcePlaceholder(layer.source, 'Template...')
+			content.appendChild(placeholder)
+
+			const cachedUrl = getTemplateThumbUrl(layer, {
+				onResolved: (url) => {
+					// Guard: element may have been detached before callback fires
+					if (!placeholder.isConnected) return
+					if (!url) return
+
+					const img = document.createElement('img')
+					img.className = 'scenes-layer__thumb'
+					img.alt = ''
+					img.src = url
+					img.draggable = false
+					img.addEventListener('error', () => {
+						img.replaceWith(makeLayerSourcePlaceholder(layer.source, 'No preview'))
+					})
+					placeholder.replaceWith(img)
+				},
+			})
+
+			// If already cached synchronously, use it immediately
+			if (cachedUrl) {
+				placeholder.remove()
+				const img = document.createElement('img')
+				img.className = 'scenes-layer__thumb'
+				img.alt = ''
+				img.src = cachedUrl
+				img.draggable = false
+				img.addEventListener('error', () => {
+					img.replaceWith(makeLayerSourcePlaceholder(layer.source, 'No preview'))
+				})
+				content.appendChild(img)
+			}
 		} else if (typeof getThumbUrlForLayerSource === 'function') {
 			const liveUrl = getThumbUrlForLayerSource(layer.source)
 			if (liveUrl) {
@@ -287,20 +347,29 @@ export function renderComposeScene(scene, opts) {
 					}
 				})
 				wrap.appendChild(btn)
-				inner.appendChild(wrap)
+				content.appendChild(wrap)
 			} else {
-				inner.appendChild(makeLayerSourcePlaceholder(layer.source))
+				content.appendChild(makeLayerSourcePlaceholder(layer.source))
 			}
 		} else {
 			const ph = makeLayerSourcePlaceholder(layer.source, 'Drop source')
-			inner.appendChild(ph)
+			content.appendChild(ph)
 		}
+
+		/* WO-158 T158.2: clip the thumbnail to the crop rect (fractions of this layer's own fill
+		 * rect, same convention as cropAdjustedRect). Identity/no crop → no style set at all. */
+		const cropVisible = cropFromLayer(layer)
+		if (cropVisible) {
+			content.style.clipPath = `inset(${cropVisible.top * 100}% ${(1 - cropVisible.right) * 100}% ${(1 - cropVisible.bottom) * 100}% ${cropVisible.left * 100}%)`
+		}
+		inner.appendChild(content)
 
 		const handles = document.createElement('div')
 		handles.className = 'scenes-layer__handles'
 		handles.innerHTML = `
 				<button type="button" class="scenes-layer__handle scenes-layer__handle--rotate" title="Drag to rotate"></button>
 				<button type="button" class="scenes-layer__handle scenes-layer__handle--scale" title="Drag to scale"></button>
+				<button type="button" class="scenes-layer__handle scenes-layer__handle--crop" title="Toggle crop handles" aria-pressed="false"></button>
 			`
 		inner.appendChild(handles)
 
@@ -318,8 +387,36 @@ export function renderComposeScene(scene, opts) {
 			<span class="scenes-layer__edge scenes-layer__edge--sw" data-edge="sw" title="Resize"></span>
 		`
 
+		/*
+		 * WO-158 T158.3: 8 bracket-style crop drag zones, positioned on the cropped-content
+		 * outline (a sub-rect of this layer's own box, expressed in % like the edge zones
+		 * above). Auto-visible when the layer already has a crop effect (any params, so a
+		 * freshly-toggled identity crop stays visible after the render that follows the first
+		 * drag); otherwise hidden until the operator clicks the crop toggle button.
+		 */
+		const cropEffectEntry = Array.isArray(layer.effects) ? layer.effects.find((fx) => fx?.type === 'crop') : null
+		const cropForHandles = cropEffectEntry ? normalizeCrop(cropEffectEntry.params) : { left: 0, top: 0, right: 1, bottom: 1 }
+		const cropHandles = document.createElement('div')
+		cropHandles.className = 'scenes-layer__crop-handles' + (cropEffectEntry ? ' scenes-layer__crop-handles--active' : '')
+		cropHandles.setAttribute('aria-hidden', 'true')
+		cropHandles.style.left = `${cropForHandles.left * 100}%`
+		cropHandles.style.top = `${cropForHandles.top * 100}%`
+		cropHandles.style.right = `${(1 - cropForHandles.right) * 100}%`
+		cropHandles.style.bottom = `${(1 - cropForHandles.bottom) * 100}%`
+		cropHandles.innerHTML = `
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--n" data-crop-edge="n" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--s" data-crop-edge="s" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--e" data-crop-edge="e" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--w" data-crop-edge="w" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--ne" data-crop-edge="ne" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--nw" data-crop-edge="nw" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--se" data-crop-edge="se" title="Drag to crop"></span>
+			<span class="scenes-layer__crop-handle scenes-layer__crop-handle--sw" data-crop-edge="sw" title="Drag to crop"></span>
+		`
+
 		el.appendChild(inner)
 		el.appendChild(edges)
+		el.appendChild(cropHandles)
 
 		edges.querySelectorAll('.scenes-layer__edge').forEach((zone) => {
 			zone.addEventListener('pointerdown', (e) => {
@@ -332,9 +429,21 @@ export function renderComposeScene(scene, opts) {
 			})
 		})
 
+		cropHandles.querySelectorAll('.scenes-layer__crop-handle').forEach((zone) => {
+			zone.addEventListener('pointerdown', (e) => {
+				const ced = zone.getAttribute('data-crop-edge')
+				if (!ced) return
+				e.stopPropagation()
+				e.preventDefault()
+				dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+				startCropResize(ced, e, realIdx, scene, aspect, el, cropHandles, content)
+			})
+		})
+
 		el.addEventListener('pointerdown', (e) => {
 			if (e.target.closest('.scenes-layer__handle')) return
 			if (e.target.closest('.scenes-layer__edge')) return
+			if (e.target.closest('.scenes-layer__crop-handle')) return
 			e.preventDefault()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
 			startDrag(e, realIdx, scene, aspect, el)
@@ -345,6 +454,14 @@ export function renderComposeScene(scene, opts) {
 			e.stopPropagation()
 			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
 			startRotate(e, realIdx, scene, aspect, el)
+		})
+		const cropToggleBtn = handles.querySelector('.scenes-layer__handle--crop')
+		cropToggleBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
+		cropToggleBtn.addEventListener('click', (e) => {
+			e.stopPropagation()
+			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+			const nowActive = cropHandles.classList.toggle('scenes-layer__crop-handles--active')
+			cropToggleBtn.setAttribute('aria-pressed', String(nowActive))
 		})
 		const scaleBtn = handles.querySelector('.scenes-layer__handle--scale')
 		scaleBtn.addEventListener('pointerdown', (e) => {

@@ -23,6 +23,10 @@ if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
 		node "${HERE}/write-iso-default-config.js"
 	GRP="$(id -gn "$USER_CASPAR")"
 	chown -R "${USER_CASPAR}:${GRP}" "${HIGHASCG_ROOT}/config"
+	# WO-162: writer also lays down the factory MEDIA-SCANNER config at the
+	# repo root as casparcg.config (the scanner binary reads ./casparcg.config
+	# from its cwd — distinct from the server's config/casparcg.config)
+	chown "${USER_CASPAR}:${GRP}" "${HIGHASCG_ROOT}/casparcg.config" 2>/dev/null || true
 else
 	node "${HERE}/write-iso-default-config.js"
 fi

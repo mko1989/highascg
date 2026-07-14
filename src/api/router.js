@@ -54,6 +54,7 @@ const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
+const routesCountdown = require('./routes-countdown')
 const routesCgThumb = require('./routes-cg-thumb')
 const routesReplication = require('./routes-replication')
 const routesCompanion = require('./routes-companion')
@@ -322,6 +323,12 @@ routes.get('/api/lower-thirds/*', ({ path, ctx, query }) => routesLowerThirds.ha
 routes.get('/api/lower-thirds', ({ path, ctx, query }) => routesLowerThirds.handleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/lower-thirds/*', ({ path, body, ctx, req }) => routesLowerThirds.handlePost(path, body, ctx, req), { requireCaspar: false })
 routes.post('/api/lower-thirds', ({ path, body, ctx, req }) => routesLowerThirds.handlePost(path, body, ctx, req), { requireCaspar: false })
+
+// Countdown / timer template (WO-169) — stateless CG UPDATE addressing, no per-channel singleton.
+routes.get('/api/countdown/*', ({ path, ctx, query }) => routesCountdown.handleGet(path, ctx, query), { requireCaspar: false })
+routes.get('/api/countdown', ({ path, ctx, query }) => routesCountdown.handleGet(path, ctx, query), { requireCaspar: false })
+routes.post('/api/countdown/*', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/countdown', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
 
 
 // --- CASPAR REQUIRED ROUTES (requireCaspar: true) ---

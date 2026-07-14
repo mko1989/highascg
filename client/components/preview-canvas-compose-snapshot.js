@@ -12,6 +12,19 @@ const _metaUnavailable = new Set()
 /** @type {Map<number, string>} — server-blocklisted channels (ADD rejected, WO-144): ch → reason */
 const _blocklisted = new Map()
 
+/**
+ * Last full server-provided blocklist (WS `state` bootstrap + `compose.preview` pushes).
+ * Survives {@link resetComposePreviewClientCache} so routing/project changes don't
+ * silently regress the badge to a black cell (WO-159 T159.2).
+ * @type {Map<number, string>}
+ */
+const _blocklistSeed = new Map()
+
+/** Re-apply the last server-provided blocklist after a cache wipe (WO-159 T159.2). */
+function applyBlocklistSeed() {
+	for (const [ch, reason] of _blocklistSeed) _blocklisted.set(ch, reason)
+}
+
 /** @type {Map<number, { img: HTMLImageElement, etag: string | null, loading: boolean }>} */
 const _cache = new Map()
 
@@ -94,8 +107,14 @@ export function ingestComposePreviewWs(data) {
 	if (!Number.isFinite(ch) || ch < 1) return
 	// Blocklist push (WO-144) shares the `compose.preview` event; no etag payload.
 	if (data?.blocklisted !== undefined) {
-		if (data.blocklisted) _blocklisted.set(ch, String(data.reason || 'ADD rejected'))
-		else _blocklisted.delete(ch)
+		if (data.blocklisted) {
+			const reason = String(data.reason || 'ADD rejected')
+			_blocklisted.set(ch, reason)
+			_blocklistSeed.set(ch, reason)
+		} else {
+			_blocklisted.delete(ch)
+			_blocklistSeed.delete(ch)
+		}
 		notifyComposePreviewListeners(ch)
 		return
 	}
@@ -103,6 +122,7 @@ export function ingestComposePreviewWs(data) {
 	if (!etag) return
 	_metaUnavailable.delete(ch)
 	_blocklisted.delete(ch)
+	_blocklistSeed.delete(ch)
 	trackComposePreviewChannel(ch)
 	void loadComposePreviewImage(ch, etag)
 }
@@ -113,6 +133,34 @@ export function ingestComposePreviewWs(data) {
  */
 export function isComposePreviewChannelBlocklisted(channel) {
 	return _blocklisted.has(parseInt(String(channel), 10))
+}
+
+/**
+ * Replace the client blocklist with the server's full list — WS `state` bootstrap on
+ * connect/reconnect carries `composePreview.blocklist` (WO-159 T159.2). Accepts the
+ * `getComposeBlocklistStats()` shape or a bare channel array.
+ * @param {{ channels?: number[], byChannel?: Record<string, { reason?: string }> } | number[] | null | undefined} blocklist
+ */
+export function syncComposePreviewBlocklist(blocklist) {
+	const channels = Array.isArray(blocklist)
+		? blocklist
+		: Array.isArray(blocklist?.channels)
+			? blocklist.channels
+			: null
+	if (!channels) return
+	const byChannel = (blocklist && !Array.isArray(blocklist) && blocklist.byChannel) || {}
+	const touched = new Set([..._blocklisted.keys()])
+	_blocklistSeed.clear()
+	_blocklisted.clear()
+	for (const c of channels) {
+		const ch = parseInt(String(c), 10)
+		if (!Number.isFinite(ch) || ch < 1) continue
+		const reason = String(byChannel[ch]?.reason || byChannel[String(ch)]?.reason || 'ADD rejected')
+		_blocklistSeed.set(ch, reason)
+		_blocklisted.set(ch, reason)
+		touched.add(ch)
+	}
+	for (const ch of touched) notifyComposePreviewListeners(ch)
 }
 
 /**
@@ -182,6 +230,9 @@ export function resetComposePreviewClientCache(keepChannels) {
 		_metaUnavailable.clear()
 		_blocklisted.clear()
 	}
+	// Server blocklist survives client cache resets (WO-159 T159.2) — the WO-144 badge
+	// must not regress to a black cell after routing / project changes.
+	applyBlocklistSeed()
 	_trackedChannelSig = ''
 	stopPollIfIdle()
 }
@@ -256,11 +307,13 @@ export function drawComposeSnapshotCell(ctx, cellW, cellH, channel, opts = {}) {
 		const dy = (cellH - dh) / 2
 		ctx.drawImage(entry.img, dx, dy, dw, dh)
 	} else {
+		// Starting up, not dead (WO-159 T159.4) — blocklisted channels take the badge above.
 		ctx.fillStyle = '#555'
 		ctx.font = '12px system-ui,sans-serif'
 		ctx.textAlign = 'center'
 		ctx.textBaseline = 'middle'
-		ctx.fillText(`PGM ch ${ch}…`, cellW / 2, cellH / 2)
+		const label = _metaUnavailable.has(ch) ? `no frame yet — ch ${ch}` : `PGM ch ${ch}…`
+		ctx.fillText(label, cellW / 2, cellH / 2)
 	}
 	if (opts.onLoaded && entry?.etag) opts.onLoaded()
 }

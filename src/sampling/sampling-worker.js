@@ -1,6 +1,7 @@
 'use strict'
 
 const { parentPort } = require('worker_threads')
+const { transformFixtureCoords, averageRegion } = require('./fixture-transform')
 
 /**
  * Pre-computed gamma table for 8-bit values.
@@ -64,67 +65,100 @@ parentPort.on('message', (msg) => {
 		const results = []
 
 		for (const fixture of fixtures) {
-			const { sample, grid, colorOrder, gamma, brightness, rotation } = fixture
-			
+			const { sample, grid, colorOrder, gamma, brightness, rotation, mirrorH, mirrorV, sampleMode } = fixture
+
 			if (gamma) updateGammaTable(gamma)
-			
+
 			const sx = (sample.x || 0) * scale
 			const sy = (sample.y || 0) * scale
 			const sw = (sample.w || width / scale) * scale
 			const sh = (sample.h || height / scale) * scale
-			const angle = (rotation || 0) * (Math.PI / 180)
 
 			const cols = grid.cols || 1
 			const rows = grid.rows || 1
-			
+
 			const cw = sw / cols
 			const ch = sh / rows
-			
+
 			const fixtureDmx = []
-			
-			const cosA = Math.cos(angle)
-			const sinA = Math.sin(angle)
+
 			const centerX = sx + sw / 2
 			const centerY = sy + sh / 2
+			const mode = sampleMode || 'center'
 
 			for (let r = 0; r < rows; r++) {
 				for (let c = 0; c < cols; c++) {
-					// Local coords (centered at fixture center)
-					const lx = (c + 0.5) * cw - sw / 2
-					const ly = (r + 0.5) * ch - sh / 2
-					
-					// Rotated coords
-					const rx = lx * cosA - ly * sinA
-					const ry = lx * sinA + ly * cosA
-					
-					// Global scaled coords
-					const gx = Math.round(centerX + rx)
-					const gy = Math.round(centerY + ry)
-					
 					let avgR = 0, avgG = 0, avgB = 0
-					
-					if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
-						const idx = (gy * width + gx) * 3
-						avgR = frame[idx]
-						avgG = frame[idx+1]
-						avgB = frame[idx+2]
+
+					if (mode === 'average') {
+						// Region average: sample all pixels in the cell
+						// Compute corners of the cell in local coords
+						const lx0 = c * cw - sw / 2
+						const ly0 = r * ch - sh / 2
+						const lx1 = (c + 1) * cw - sw / 2
+						const ly1 = (r + 1) * ch - sh / 2
+
+						// Transform all four corners and find bounding box
+						const corners = [
+							transformFixtureCoords(lx0, ly0, !!mirrorH, !!mirrorV, rotation || 0),
+							transformFixtureCoords(lx1, ly0, !!mirrorH, !!mirrorV, rotation || 0),
+							transformFixtureCoords(lx0, ly1, !!mirrorH, !!mirrorV, rotation || 0),
+							transformFixtureCoords(lx1, ly1, !!mirrorH, !!mirrorV, rotation || 0),
+						]
+
+						let minRx = Infinity, maxRx = -Infinity, minRy = Infinity, maxRy = -Infinity
+						for (const c of corners) {
+							minRx = Math.min(minRx, c.rx)
+							maxRx = Math.max(maxRx, c.rx)
+							minRy = Math.min(minRy, c.ry)
+							maxRy = Math.max(maxRy, c.ry)
+						}
+
+						// Global frame coords
+						const gx0 = centerX + minRx
+						const gx1 = centerX + maxRx
+						const gy0 = centerY + minRy
+						const gy1 = centerY + maxRy
+
+						const region = averageRegion(frame, width, height, gx0, gx1, gy0, gy1)
+						avgR = region.r
+						avgG = region.g
+						avgB = region.b
+					} else {
+						// Center mode: sample single pixel at cell center
+						const lx = (c + 0.5) * cw - sw / 2
+						const ly = (r + 0.5) * ch - sh / 2
+
+						// Apply mirror and rotation transform
+						const { rx, ry } = transformFixtureCoords(lx, ly, !!mirrorH, !!mirrorV, rotation || 0)
+
+						// Global scaled coords
+						const gx = Math.round(centerX + rx)
+						const gy = Math.round(centerY + ry)
+
+						if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
+							const idx = (gy * width + gx) * 3
+							avgR = frame[idx]
+							avgG = frame[idx + 1]
+							avgB = frame[idx + 2]
+						}
 					}
-					
+
 					// Apply brightness
 					avgR *= (brightness || 1.0)
 					avgG *= (brightness || 1.0)
 					avgB *= (brightness || 1.0)
-					
+
 					// Apply gamma
 					avgR = gammaTable[Math.min(255, Math.max(0, Math.round(avgR)))]
 					avgG = gammaTable[Math.min(255, Math.max(0, Math.round(avgG)))]
 					avgB = gammaTable[Math.min(255, Math.max(0, Math.round(avgB)))]
-					
+
 					const colors = extractColors(avgR, avgG, avgB, colorOrder)
 					fixtureDmx.push(...colors)
 				}
 			}
-			
+
 			results.push({
 				id: fixture.id, // Include ID for UI sync
 				universe: fixture.universe,

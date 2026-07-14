@@ -141,7 +141,8 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 			edgeId: String(winner.edge?.id || ''),
 		})
 	}
-	const changed = JSON.stringify(nextCaspar) !== JSON.stringify(ctx.config?.casparServer || {})
+	const casparServerChanged = JSON.stringify(nextCaspar) !== JSON.stringify(ctx.config?.casparServer || {})
+	const changed = casparServerChanged
 	const streamChanged = streamRecordRes.changed || JSON.stringify(nextStreaming) !== JSON.stringify((ctx.config && ctx.config.streamingChannel) || {})
 	const recordChanged = streamRecordRes.changed || JSON.stringify(nextRecordOutputs) !== JSON.stringify(Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs : [])
 	const vcamChanged = vcamRes.changed || JSON.stringify(nextVirtualCamera) !== JSON.stringify(ctx.config?.virtualCamera || {})
@@ -162,7 +163,19 @@ function applyDestinationOutputEdgesToCasparConfig(ctx, plan) {
 		if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), virtualCamera: nextVirtualCamera })
 		ctx.config.virtualCamera = nextVirtualCamera
 	}
-	return { changed: changed || streamChanged || recordChanged || vcamChanged, warnings }
+	return {
+		changed: changed || streamChanged || recordChanged || vcamChanged,
+		warnings,
+		// WO-172 T172.1/T172.3: exposed so callers (syncDeviceViewToCaspar) can skip the heavy
+		// write+restart for stream/record/vcam-only syncs — only casparServer (DeckLink/screen
+		// output mapping) changes require regenerating and restarting Caspar. Source-channel sync
+		// (videoSource / recordOutputs[].source / virtualCamera.channel) is a config-write-only
+		// operation; the next Start/PLAY reads the fresh config (A172.1).
+		casparServerChanged,
+		streamChanged,
+		recordChanged,
+		vcamChanged,
+	}
 }
 
 function buildApplyDryRunPlan(ctx) {
@@ -276,4 +289,4 @@ async function executeApplyPlan(ctx, opts = {}) {
 	return { ok: casparResult.ok && !errors.length, plan, caspar: casparResult, executed, skipped, errors }
 }
 
-module.exports = { buildApplyDryRunPlan, executeApplyPlan }
+module.exports = { buildApplyDryRunPlan, executeApplyPlan, applyDestinationOutputEdgesToCasparConfig }

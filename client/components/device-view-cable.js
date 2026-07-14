@@ -22,7 +22,7 @@ import {
 	mergeSettingsPatches,
 	resolveCableSourceResolution,
 } from '../lib/device-view-gpu-source-inherit.js'
-import { cableSinkAffectsCasparRestart } from '../lib/caspar-restart-dirty-policy.js'
+import { cableSinkAffectsCasparRestart, isStreamingDedicatedOutputChannel } from '../lib/caspar-restart-dirty-policy.js'
 import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
 import * as Actions from './device-view-actions.js'
 
@@ -250,7 +250,10 @@ export function registerDeviceViewCable(ctx) {
 			}
 			state.cableSourceId = null
 			state.cablePointer = null
-			if (cableSinkAffectsCasparRestart(sinkConn)) {
+			// WO-172 T172.3: stream_out/record_out cabling only needs the restart flag in
+			// dedicated-output-channel mode (setupAllRouting must re-run to move the PLAY route://
+			// binding); attach mode and record are config-write-only (A172.2 decision matrix).
+			if (cableSinkAffectsCasparRestart(sinkConn, { dedicatedStreamingChannel: isStreamingDedicatedOutputChannel(state.currentSettings) })) {
 				ctx.setCasparRestartDirty(true)
 			}
 			ctx.load()
@@ -349,7 +352,10 @@ export function registerDeviceViewCable(ctx) {
 			const cur = Array.isArray(state.currentSettings?.streamOutputs) ? state.currentSettings.streamOutputs : []
 			await Actions.saveSettingsPatch({ streamOutputs: cur.filter((s) => String(s?.id) !== cid) })
 			await pruneConnectorFromGraph(cid)
-			ctx.setCasparRestartDirty(true)
+			// WO-172 T172.3: fixes the WO-81 regression — this used to unconditionally dirty the
+			// restart flag. Only dedicated-output-channel mode needs it (same rule as cabling above);
+			// attach mode's next Start already resolves from fresh config.
+			if (isStreamingDedicatedOutputChannel(state.currentSettings)) ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Stream output removed', true)
 			await ctx.load()
 		} catch (e) {
@@ -364,7 +370,9 @@ export function registerDeviceViewCable(ctx) {
 			const cur = Array.isArray(state.currentSettings?.recordOutputs) ? state.currentSettings.recordOutputs : []
 			await Actions.saveSettingsPatch({ recordOutputs: cur.filter((s) => String(s?.id) !== cid) })
 			await pruneConnectorFromGraph(cid)
-			ctx.setCasparRestartDirty(true)
+			// WO-172 T172.3: fixes the WO-81 regression — record has no "dedicated channel" concept
+			// (resolveRecordSourceChannel always resolves live from fresh config at record-start), so
+			// removing a record output connector never needs the restart flag.
 			setStatus(statusEl, 'Record output removed', true)
 			await ctx.load()
 		} catch (e) {

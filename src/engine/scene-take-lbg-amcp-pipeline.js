@@ -18,6 +18,7 @@ const {
 } = require('./pip-overlay')
 const { buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
+const { cropAdjustedFillForLayer } = require('./layer-crop')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
 const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
 const { layerHasContent } = require('./scene-transition')
@@ -183,11 +184,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		for (const job of takeJobs) {
 			if (job.pipOverlays.length > 0) {
 				try {
+					// WO-158 T158.5: overlay placement hugs the visible (cropped) content;
+					// the video layer's MIXER FILL stays uncropped (Caspar applies CROP itself).
 					const lines = buildPipOverlayAmcpLinesAll(
 						job.pipOverlays,
 						channel,
 						job.pLayer,
-						job.f,
+						cropAdjustedFillForLayer(job.f, job.layer),
 						self,
 						nextPipContentLayerInTake(takeJobs, job.pLayer),
 						currentMap.get(job.layer.layerNumber) || null,

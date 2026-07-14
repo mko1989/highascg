@@ -1,4 +1,8 @@
+/* WO-165: operator wants the main UI fully visible (undimmed, unblurred) behind the settings
+   modal. Panel itself (.modal-content.settings-modal) keeps var(--bg-panel), an opaque
+   background — see 07b-audio-mixer-modal-shell.css:441-451 — so content stays readable. */
 #settings-modal.modal-overlay {
+	background: transparent;
 	backdrop-filter: none;
 }
 

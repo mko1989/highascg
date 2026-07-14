@@ -122,10 +122,21 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 			mediaWithProbe = null
 		}
 	}
+	const fetchTemplates = async () => {
+		try {
+			const templates = await api.get('/api/templates')
+			if (Array.isArray(templates) && stateStore) {
+				stateStore.applyChange('templates', templates)
+			}
+		} catch {
+			// ignore template fetch errors
+		}
+	}
 	const loadMedia = () => void fetchMedia()
 	const rescanMediaFromCaspar = async () => {
 		await api.post('/api/media/refresh', { ensureHqThumbs: true }).catch(() => {})
 		await fetchMedia()
+		await fetchTemplates()
 		await refreshProjectMediaParity()
 	}
 	const refreshMedia = rescanMediaFromCaspar

@@ -255,6 +255,8 @@ function startHttpServer(options) {
 				reqPathForRouting.startsWith('/api/') ||
 				reqPathForRouting === '/api' ||
 				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPathForRouting)
+
+
 			if (isApi) {
 				// Pass path including ?query so router can parse query params consistently.
 				const qIdx = rawPath.indexOf('?')

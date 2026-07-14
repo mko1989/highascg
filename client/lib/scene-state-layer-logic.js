@@ -9,6 +9,10 @@ import {
 } from './scene-state-helpers.js'
 import { getPipOverlaysFromLayer } from './pip-overlay-registry.js'
 
+// WeakMap to track layer local edit timestamps (WO-177: prevent mixer_update echo stomps).
+// Using WeakMap avoids serialization risk — timestamps don't leak into saved JSON.
+const layerLocalEditTimes = new WeakMap()
+
 export function getLayerStyleDataFromLayer(l) {
 	return {
 		fill: l.fill ? { ...l.fill } : undefined,
@@ -132,4 +136,18 @@ export function patchLayer(L, patch) {
 		if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour
 		else L.startBehaviour = startBehaviour
 	}
+	// WO-177: record local edit timestamp to prevent mixer_update echo from stomping recent changes
+	layerLocalEditTimes.set(L, Date.now())
+}
+
+/**
+ * Check if a layer was edited locally within the guard window (WO-177).
+ * Used to prevent mixer_update WS echoes from stomping recent local edits.
+ * @param {object} layer - the layer to check
+ * @param {number} guardMs - guard window in ms (default 1500)
+ * @returns {boolean} true if edited within the last guardMs
+ */
+export function isLayerRecentlyEdited(layer, guardMs = 1500) {
+	const editAt = layerLocalEditTimes.get(layer) || 0
+	return Date.now() - editAt < guardMs
 }

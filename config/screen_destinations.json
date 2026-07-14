@@ -2,8 +2,8 @@
   "version": 1,
   "destinations": [
     {
-      "id": "dst_mr6mopxd_1",
-      "label": "PGM/PRV 1",
+      "id": "dst_pgm_1",
+      "label": "PGM 1",
       "mainScreenIndex": 0,
       "mode": "pgm_prv",
       "audioLayout": "stereo",
@@ -25,10 +25,10 @@
       }
     },
     {
-      "id": "dst_mr6mp0g6_1",
-      "label": "Multiview 1",
-      "mainScreenIndex": 0,
-      "mode": "multiview",
+      "id": "dst_mrizwm0m_1",
+      "label": "PGM 2",
+      "mainScreenIndex": 1,
+      "mode": "pgm_only",
       "audioLayout": "stereo",
       "videoMode": "1080p5000",
       "width": 1920,
@@ -48,10 +48,10 @@
       }
     },
     {
-      "id": "dst_mr6mp27s_1",
-      "label": "PGM 2",
-      "mainScreenIndex": 1,
-      "mode": "pgm_only",
+      "id": "dst_mrizwonx_1",
+      "label": "Multiview 1",
+      "mainScreenIndex": 0,
+      "mode": "multiview",
       "audioLayout": "stereo",
       "videoMode": "1080p5000",
       "width": 1920,

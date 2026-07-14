@@ -54,6 +54,9 @@ async function handleMultiviewApply(body, ctx) {
 		const storeKey = n === 1 ? 'multiviewLayout' : `multiviewLayout_${n}`
 		if (!ctx._multiviewLayouts) ctx._multiviewLayouts = {}
 		ctx._multiviewLayouts[n] = b
+		// WO-156: keep the legacy singular in sync so boot/reconnect re-apply never uses a
+		// stale layout (the plural map is the source of truth; singular kept for old readers).
+		if (n === 1) ctx._multiviewLayout = b
 		persistence.set(storeKey, b)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
 	} catch (e) {

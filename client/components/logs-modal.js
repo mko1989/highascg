@@ -22,6 +22,41 @@ import {
 	downloadSupportBundleFromApi,
 	setLogsToggleStyles,
 } from '../lib/logs-modal-shared.js'
+import shortcutsMd from '../../shortcuts.md?raw'
+
+function parseMarkdownBasic(md) {
+	let html = md
+		.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+		.replace(/^### (.*$)/gim, '<h3>$1</h3>')
+		.replace(/^## (.*$)/gim, '<h2>$1</h2>')
+		.replace(/^# (.*$)/gim, '<h1>$1</h1>')
+		.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+		.replace(/`(.*?)`/gim, '<code>$1</code>')
+		.replace(/\*(.*?)\*/gim, '<em>$1</em>')
+	
+	let inList = false;
+	const lines = html.split('\n');
+	for(let i=0; i<lines.length; i++) {
+		if(lines[i].match(/^- /)) {
+			if(!inList) {
+				lines[i] = '<ul>\n' + lines[i].replace(/^- (.*)$/, '<li>$1</li>');
+				inList = true;
+			} else {
+				lines[i] = lines[i].replace(/^- (.*)$/, '<li>$1</li>');
+			}
+		} else {
+			if(inList) {
+				lines[i-1] += '\n</ul>';
+				inList = false;
+			}
+			if (lines[i].trim() && !lines[i].match(/^<h/) && !lines[i].match(/^<ul>/) && !lines[i].match(/^<\/ul>/)) {
+				lines[i] = '<p>' + lines[i] + '</p>';
+			}
+		}
+	}
+	if (inList) lines[lines.length-1] += '\n</ul>';
+	return lines.join('\n');
+}
 
 const POLL_MS = 2000
 
@@ -62,10 +97,14 @@ export function showLogsModal() {
 	modal.innerHTML = `
 		<div class="modal-content logs-modal" role="dialog" aria-labelledby="logs-modal-title">
 			<div class="modal-header">
-				<h2 id="logs-modal-title">Server logs</h2>
+				<h2 id="logs-modal-title" style="display:none;">Server logs</h2>
+				<div class="logs-modal__tabs">
+					<button type="button" class="logs-modal__tab logs-modal__tab--active" data-tab="logs">System Logs</button>
+					<button type="button" class="logs-modal__tab" data-tab="shortcuts">Shortcuts</button>
+				</div>
 				<button type="button" class="modal-close" id="logs-modal-close" aria-label="Close">&times;</button>
 			</div>
-			<div class="modal-body logs-modal__body">
+			<div class="modal-body logs-modal__body" id="logs-tab-logs">
 				<p class="settings-note logs-modal__hint">Enable one or both sources. <strong>HighAsCG</strong> = this Node process (AMCP commands + internal events, streamed live). <strong>CasparCG</strong> = log file on the Caspar host (default <code id="logs-caspar-path-hint">/home/casparcg/highascg/log/caspar_YYYY-MM-DD.log</code>). Override with <code>CASPAR_LOG_PATH</code>.</p>
 				<div class="logs-modal__toolbar">
 					<button type="button" class="btn btn--secondary logs-modal__toggle logs-modal__toggle--on" id="logs-toggle-highascg" aria-pressed="true">HighAsCG</button>
@@ -119,6 +158,9 @@ export function showLogsModal() {
 					</div>
 				</div>
 			</div>
+			<div class="modal-body logs-modal__body logs-modal__shortcuts" id="logs-tab-shortcuts" hidden>
+				${parseMarkdownBasic(shortcutsMd)}
+			</div>
 		</div>
 	`
 	document.body.appendChild(modal)
@@ -135,6 +177,24 @@ export function showLogsModal() {
 	const amcpInput = modal.querySelector('#logs-amcp-cmd')
 	const categoryDrop = modal.querySelector('#logs-category-drop')
 	const filtersEl = modal.querySelector('#logs-filters')
+	const tabLogs = modal.querySelector('#logs-tab-logs')
+	const tabShortcuts = modal.querySelector('#logs-tab-shortcuts')
+
+	modal.querySelectorAll('.logs-modal__tab').forEach(btn => {
+		btn.addEventListener('click', () => {
+			modal.querySelectorAll('.logs-modal__tab').forEach(b => b.classList.remove('logs-modal__tab--active'))
+			btn.classList.add('logs-modal__tab--active')
+			if (btn.dataset.tab === 'logs') {
+				tabLogs.hidden = false
+				tabShortcuts.hidden = true
+				if (highOn && !paused) scrollToBottom(preHigh)
+				if (casparOn && !paused) scrollToBottom(preCaspar)
+			} else {
+				tabLogs.hidden = true
+				tabShortcuts.hidden = false
+			}
+		})
+	})
 
 	function casparAmcpTargetLabel() {
 		const c = settingsState.getSettings()?.caspar || {}

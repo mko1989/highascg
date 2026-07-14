@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "audio_1",
+    "label": "Audio 1",
+    "enabled": true,
+    "type": "portaudio",
+    "deviceName": "hw:2,0",
+    "channelLayout": "8ch",
+    "hostApi": "auto",
+    "bufferFrames": 128,
+    "latencyMs": 40,
+    "fifoMs": 50
+  }
+]

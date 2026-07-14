@@ -1,6 +1,7 @@
 import { sceneState } from '../lib/scene-state.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {
 	const grp = document.createElement('div')
@@ -213,6 +214,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 					sceneState.patchLayer(sceneId, layerIndex, { playlist: list })
 					document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 				})
+				attachMathInput(durInp, { decimals: 0 })
 			}
 
 			// Handle delete
@@ -303,6 +305,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			sceneState.patchLayer(sceneId, layerIndex, { playlistTransition: { ...pt, duration: Math.max(0, parseInt(transDur.value, 10) || 0) } })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 		})
+		attachMathInput(transDur, { decimals: 0 })
 
 		listContainer.appendChild(settingsBlock)
 		grp.appendChild(listContainer)

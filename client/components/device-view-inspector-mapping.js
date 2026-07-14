@@ -4,6 +4,7 @@
 import * as MappingNode from '../lib/mapping-node-service.js'
 import { resolveCableSourceResolution } from '../lib/device-view-gpu-source-inherit.js'
 import { STANDARD_VIDEO_MODES } from './device-view-destinations-inspector.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 function findMappingNode(graph, deviceId) {
 	return (graph?.devices || []).find((d) => d.id === deviceId && d.role === 'pixel_mapping') || null
@@ -177,6 +178,9 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 		const cH = Object.assign(document.createElement('input'), { type: 'number', placeholder: 'H', className: 'device-view__inspector-input', value: outRes.height })
 		const cF = Object.assign(document.createElement('input'), { type: 'number', placeholder: 'FPS', step: '0.01', className: 'device-view__inspector-input', value: outRes.fps })
 		customBox.append(cW, cH, cF)
+		attachMathInput(cW, { min: 1, decimals: 0 })
+		attachMathInput(cH, { min: 1, decimals: 0 })
+		attachMathInput(cF, { min: 1, decimals: 2 })
 		customBox.style.display = isCustomMode ? 'grid' : 'none'
 
 		const saveCustom = async () => {
@@ -221,6 +225,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 			inp.className = 'device-view__inspector-input'
 			inp.value = value
 			inp.onchange = (e) => onchange(e.target.value)
+			attachMathInput(inp, { decimals: 0 })
 			f.appendChild(inp)
 			return { f, inp }
 		}

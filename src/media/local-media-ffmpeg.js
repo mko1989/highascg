@@ -240,9 +240,17 @@ function readThumbnailCacheFile(cacheDir, key) {
 function writeThumbnailCacheFile(cacheDir, key, data) {
 	try {
 		fs.mkdirSync(cacheDir, { recursive: true })
-		fs.writeFileSync(path.join(cacheDir, `${key}.png`), data)
-	} catch {
+		const targetPath = path.join(cacheDir, `${key}.png`)
+		// WO-184: Use atomic write (tmp+rename) to avoid partial files
+		const tmpPath = `${targetPath}.tmp`
+		fs.writeFileSync(tmpPath, data)
+		fs.renameSync(tmpPath, targetPath)
+	} catch (e) {
 		/* non-fatal: cache write failure is OK */
+		// Clean up tmp file if it exists
+		try {
+			fs.unlinkSync(`${path.join(cacheDir, `${key}.png`)}.tmp`)
+		} catch {}
 	}
 }
 
@@ -330,6 +338,45 @@ async function tryLocalThumbnailPng(config, filename, maxW = 960, seekSec = 2) {
 }
 
 /**
+ * WO-184: Clean up zero-byte and corrupted thumbnail files that may have been
+ * left over from interrupted writes. Called on startup.
+ * @param {object} [config]
+ * @param {(msg: string) => void} [log] - optional logger
+ * @returns {Promise<{deleted: number, errors: number}>}
+ */
+async function cleanupZeroByteThumbnails(config, log) {
+	const cacheDir = getThumbnailCacheDir(config)
+	const result = { deleted: 0, errors: 0 }
+
+	try {
+		if (!fs.existsSync(cacheDir)) return result
+
+		const files = fs.readdirSync(cacheDir)
+		for (const file of files) {
+			if (!file.endsWith('.png')) continue
+			const filePath = path.join(cacheDir, file)
+			try {
+				const stat = fs.statSync(filePath)
+				// Delete zero-byte files
+				if (stat.size === 0) {
+					fs.unlinkSync(filePath)
+					result.deleted++
+					if (log) log(`[WO-184] Deleted zero-byte thumbnail: ${file}`)
+				}
+			} catch (e) {
+				result.errors++
+				if (log) log(`[WO-184] Error checking thumbnail ${file}: ${e?.message || e}`)
+			}
+		}
+	} catch (e) {
+		result.errors++
+		if (log) log(`[WO-184] Error reading thumbnail cache dir: ${e?.message || e}`)
+	}
+
+	return result
+}
+
+/**
  * Best-effort thumbnail prewarm from media IDs (typically CLS output).
  * Generates only missing cache entries and limits work per invocation.
  * @param {object} [config]
@@ -395,4 +442,5 @@ module.exports = {
 	extractThumbnailPng,
 	tryLocalThumbnailPng,
 	ensureLocalThumbnailCacheForMediaIds,
+	cleanupZeroByteThumbnails,
 }

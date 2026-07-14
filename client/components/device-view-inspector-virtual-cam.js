@@ -10,6 +10,7 @@ import {
 	stopVirtualCamera,
 	subscribeVirtualCameraStatus,
 } from '../lib/virtual-camera-state.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 function savedVirtualCamera(currentSettings, conn) {
 	const vc = currentSettings?.virtualCamera
@@ -68,6 +69,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 		placeholder: 'channel',
 		value: String(saved.channel ?? caspar.channel ?? 1),
 	})
+	attachMathInput(chIn, { decimals: 0 })
 	const devIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'text',
@@ -82,6 +84,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 		step: '1',
 		value: String(saved.fps ?? caspar.fps ?? 50),
 	})
+	attachMathInput(fpsIn, { decimals: 0 })
 	const resIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'text',

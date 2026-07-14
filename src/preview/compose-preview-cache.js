@@ -133,6 +133,36 @@ function etagFromStat(st) {
 	return `W/"${Math.floor(st.mtimeMs)}-${st.size}"`
 }
 
+/** Staleness gate: generous multiple of the mtime poll interval, floored at 60 s. */
+const STALE_POLL_MULTIPLIER = 10
+const STALE_MIN_AGE_MS = 60_000
+
+/**
+ * Defense-in-depth against serving a frozen frame forever (WO-159 T159.1): only when
+ * the channel is expected to be live-writing — ffmpeg_jpeg mode with the FILE consumer
+ * attached (the image2 consumer rewrites chN.jpg continuously at >= 1 fps). Detached /
+ * blocklisted channels are exempt so a legitimately-paused preview never 404s here
+ * (the settle-gate in compose-preview-activity only defers WS broadcasts, not writes).
+ * @param {object} config
+ * @param {number} channel
+ * @param {import('fs').Stats} st
+ * @param {number} [nowMs]
+ * @returns {boolean}
+ */
+function isComposePreviewFrameStale(config, channel, st, nowMs = Date.now()) {
+	try {
+		const { isFfmpegJpegComposePreview } = require('./compose-preview-mode')
+		if (!isFfmpegJpegComposePreview(config)) return false
+		const { isComposeConsumerAttached } = require('./compose-preview-consumer')
+		if (!isComposeConsumerAttached(channel)) return false
+		const { resolveMtimePollMs } = require('./compose-preview-ffmpeg-jpeg')
+		const maxAgeMs = Math.max(STALE_POLL_MULTIPLIER * resolveMtimePollMs(config), STALE_MIN_AGE_MS)
+		return nowMs - st.mtimeMs > maxAgeMs
+	} catch {
+		return false
+	}
+}
+
 /**
  * @param {object} ctx
  * @param {number} channel
@@ -156,6 +186,13 @@ async function handleComposePreviewMetaGet(ctx, channel) {
 				status: 404,
 				headers: JSON_HEADERS,
 				body: jsonBody({ error: 'Compose preview file empty', channel: ch }),
+			}
+		}
+		if (resolved.format === 'jpeg' && isComposePreviewFrameStale(cfg, ch, st)) {
+			return {
+				status: 404,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: 'Compose preview frame stale', channel: ch }),
 			}
 		}
 		return {
@@ -304,6 +341,7 @@ module.exports = {
 	ensurePreviewDir,
 	sha256File,
 	etagFromStat,
+	isComposePreviewFrameStale,
 	handleComposePreviewMetaGet,
 	handleComposePreviewImageGet,
 	handleComposePreviewPngGet,

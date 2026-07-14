@@ -112,5 +112,13 @@ export function createDeckThumbPainter(ctx) {
 		mainHost.querySelectorAll('.scenes-card__thumb-canvas').forEach(paintDeckThumb)
 	}
 
+	// Canvas-mode PRV deck cells go stale after MIXER-only look edits (no new source thumbnail URL
+	// to invalidate the composite) — `scenes-preview-runtime.js` fires this (debounced) after every
+	// completed preview push (T155.4a). `repaintDeckThumbs` already no-ops while the editor is open
+	// (deck cards aren't mounted then); the deck picks up the current geometry on its next render.
+	if (typeof window !== 'undefined') {
+		window.addEventListener('scenes-deck-thumb-redraw', repaintDeckThumbs)
+	}
+
 	return { paintDeckThumb, repaintDeckThumbs }
 }

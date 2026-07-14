@@ -154,9 +154,24 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 		const audio = channels[String(ch)]?.audio
 		const lastAt = audio?._lastUpdateAt || 0
 		const oscStale = !lastAt || now - lastAt > staleMs
-		const healthy = await isLiveAlsaProducerHealthy(ctx, ch, slot.layer)
 
-		if (!opts.force && !oscStale && healthy) continue
+		// WO-164: gate the AMCP INFO probe on the cheap, local OSC meter-freshness
+		// signal instead of firing it every watchdog tick. Fresh OSC meters (and
+		// no forced repair) are treated as proof the producer is alive — skip
+		// this slot with zero AMCP traffic. Only probe when meters are
+		// stale/absent, or when a repair is explicitly forced (startup / config
+		// change), and repair unconditionally in that case exactly as before —
+		// the probe here is for AMCP-log visibility into genuine stale events,
+		// not a gate on the repair decision (playLiveAlsaClipWithRecovery below
+		// already re-probes as its own post-repair confirmation).
+		if (!opts.force && !oscStale) continue
+
+		if (oscStale && typeof ctx.log === 'function') {
+			ctx.log('info', `[live-audio-health] meters stale on slot ${slot.slot} → probing ch${ch}-${slot.layer}`)
+		}
+		if (oscStale) {
+			await isLiveAlsaProducerHealthy(ctx, ch, slot.layer)
+		}
 
 		const res = await playLiveAlsaClipWithRecovery(ctx, slot, { log: true })
 		if (res.ok) repaired.push({ slot: slot.slot, channel: ch, clip: res.clip, attempt: res.attempt })

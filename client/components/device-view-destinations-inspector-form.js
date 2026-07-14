@@ -2,6 +2,7 @@ import { buildInspectorTable } from './device-view-ui-utils.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 import { renderHostChannelDestinationInspector } from './device-view-destinations-inspector-host-channel.js'
+import { attachMathInput } from '../lib/math-input.js'
 import {
 	STANDARD_VIDEO_MODES,
 	CASPAR_VIDEO_MODE_SPECS,
@@ -140,6 +141,7 @@ export function renderDestinationInspector(args) {
 	mainIn.value = String(Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0))
 	mainIn.title = 'Main index (zero-based)'
 	mainIn.addEventListener('change', () => patchDestination(d.id, { mainScreenIndex: Math.max(0, parseInt(String(mainIn.value || 0), 10) || 0) }))
+	attachMathInput(mainIn, { decimals: 0 })
 
 	const modeSel = document.createElement('select')
 	modeSel.className = 'device-view__destinations-type'
@@ -196,6 +198,7 @@ export function renderDestinationInspector(args) {
 	widthIn.placeholder = 'Width'
 	widthIn.value = String(Math.max(64, parseInt(String(d?.width ?? 1920), 10) || 1920))
 	widthIn.disabled = vmSel.value !== 'custom'
+	attachMathInput(widthIn, { decimals: 0 })
 
 	const heightIn = document.createElement('input')
 	heightIn.type = 'number'
@@ -205,6 +208,7 @@ export function renderDestinationInspector(args) {
 	heightIn.placeholder = 'Height'
 	heightIn.value = String(Math.max(64, parseInt(String(d?.height ?? 1080), 10) || 1080))
 	heightIn.disabled = vmSel.value !== 'custom'
+	attachMathInput(heightIn, { decimals: 0 })
 
 	const fpsIn = document.createElement('input')
 	fpsIn.type = 'number'
@@ -214,6 +218,7 @@ export function renderDestinationInspector(args) {
 	fpsIn.placeholder = 'Frame rate'
 	fpsIn.value = String(Math.max(1, parseFloat(String(d?.fps ?? 50)) || 50))
 	fpsIn.disabled = vmSel.value !== 'custom'
+	attachMathInput(fpsIn, { decimals: 2 })
 
 	const applyStandardVideoMode = (modeId) => {
 		const spec = CASPAR_VIDEO_MODE_SPECS[modeId]

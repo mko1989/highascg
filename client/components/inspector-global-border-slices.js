@@ -1,4 +1,5 @@
 import { getResolutionForScreen } from './inspector-channel-resolution.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} root
@@ -85,6 +86,7 @@ export function appendGlobalBorderSlicesSection(root, stateStore, gbNow, patchGl
 					patchGlobalBorder({ slices: next })
 				}
 			})
+			attachMathInput(i, { decimals: 0 })
 			w.appendChild(l)
 			w.appendChild(i)
 			return w

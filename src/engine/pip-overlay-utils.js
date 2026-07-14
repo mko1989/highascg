@@ -7,9 +7,14 @@
 
 'use strict'
 
-const PIP_OVERLAY_LAYER_OFFSET = 100
-const PIP_OVERLAY_MAX_STACK = 8
-const PIP_OVERLAY_ALIGN_GAP = 1
+const {
+	LOOK_LAYER_MIN,
+	LOOK_LAYER_MAX,
+	PGM_BANK_B_OFFSET,
+	PIP_OVERLAY_BAND_BASE,
+	PIP_OVERLAY_MAX_STACK,
+	assertPhysicalLayerBelowCeiling,
+} = require('./look-layer-ranges')
 
 const TEMPLATE_MAP = {
 	border: 'pip_border',
@@ -19,34 +24,49 @@ const TEMPLATE_MAP = {
 	router: 'pip_router',
 }
 
-function overlayLayerSlot(contentLayer, stackIndex = 0) {
-	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const base = Number(contentLayer)
-	const n = Number.isFinite(base) ? base : 0
-	return PIP_OVERLAY_LAYER_OFFSET + n * PIP_OVERLAY_MAX_STACK + i
+/** Compact indices 0–89 (bank A 10–99) and 90–179 (bank B 110–199) — 180 content layers total. */
+const PIP_OVERLAY_CONTENT_INDEX_MAX = 2 * (LOOK_LAYER_MAX - LOOK_LAYER_MIN + 1) - 1
+
+/**
+ * Compact index of a look content physical layer for PIP slot math (WO-160):
+ * bank A 10–99 → 0–89, bank B 110–199 → 90–179. Out-of-band input is clamped
+ * (deterministic, stays inside the reserved band).
+ * @param {number} contentPhysicalLayer
+ */
+function pipOverlayContentIndex(contentPhysicalLayer) {
+	const p = Number(contentPhysicalLayer)
+	if (!Number.isFinite(p)) return 0
+	const idx =
+		p <= LOOK_LAYER_MAX
+			? p - LOOK_LAYER_MIN
+			: LOOK_LAYER_MAX - LOOK_LAYER_MIN + 1 + (p - (PGM_BANK_B_OFFSET + LOOK_LAYER_MIN))
+	return Math.max(0, Math.min(PIP_OVERLAY_CONTENT_INDEX_MAX, Math.round(idx)))
 }
 
-function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer) {
+/**
+ * PIP overlay Caspar layer — pure function of content physical layer + stack index (WO-160).
+ * `260 + compactIndex * 4 + stackIndex` → 260–979, serving BOTH banks simultaneously
+ * (bank crossfades overlap), clear of timelines (210–259) and the global border (996/998).
+ * Replaces the legacy `content+1…+8` in-between slots (impossible with consecutive
+ * numbering) and the `100 + content*8 + i` fallback (landed inside bank B's range).
+ * @param {number} contentLayer — content physical layer (10–99 bank A, 110–199 bank B)
+ * @param {number} [stackIndex] — 0…PIP_OVERLAY_MAX_STACK-1
+ */
+function overlayLayerSlot(contentLayer, stackIndex = 0) {
 	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const p = Number(contentPhysicalLayer)
-	if (!Number.isFinite(p) || p < 0) {
-		return PIP_OVERLAY_LAYER_OFFSET + i
-	}
-	let nx = nextContentLayer
-	if (nx == null) {
-		nx = p >= 10 && p % 10 === 0 ? p + 10 : p + 1
-	} else if (typeof nx === 'string' && nx.trim() === '') {
-		nx = 10000
-	} else {
-		nx = Number(nx)
-	}
-	if (!Number.isFinite(nx) || nx <= p) {
-		nx = 10000
-	}
-	if (p + PIP_OVERLAY_ALIGN_GAP + i < nx) {
-		return p + PIP_OVERLAY_ALIGN_GAP + i
-	}
-	return PIP_OVERLAY_LAYER_OFFSET + p * PIP_OVERLAY_MAX_STACK + i
+	const slot = PIP_OVERLAY_BAND_BASE + pipOverlayContentIndex(contentLayer) * PIP_OVERLAY_MAX_STACK + i
+	return assertPhysicalLayerBelowCeiling(slot, 'pip-overlay slot')
+}
+
+/**
+ * Same as {@link overlayLayerSlot}. `nextContentLayer` is accepted for call-site
+ * compatibility but ignored — slots no longer depend on neighbouring content layers.
+ * @param {number} contentPhysicalLayer
+ * @param {number} [stackIndex]
+ * @param {number} [_nextContentLayer] — deprecated (WO-160), unused
+ */
+function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, _nextContentLayer) {
+	return overlayLayerSlot(contentPhysicalLayer, stackIndex)
 }
 
 function overlayLayer(contentLayer) {
@@ -348,9 +368,6 @@ function computePipOverlayPlacement(
 	const cf = normalizeContentFill(contentFill)
 	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
-	const p = Number(contentPhysicalLayer)
-	const idx = stackIndex | 0
-	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
 
 	if (!isOutsideSide(overlay)) {
 		return { inner: { l: 0, t: 0, w: 1, h: 1 }, mixFill: cf, oLayer }
@@ -408,10 +425,10 @@ function computePipRouterPlacement(overlays, contentFill, chW, chH, contentPhysi
 }
 
 module.exports = {
-	PIP_OVERLAY_LAYER_OFFSET,
+	PIP_OVERLAY_BAND_BASE,
 	PIP_OVERLAY_MAX_STACK,
-	PIP_OVERLAY_ALIGN_GAP,
 	TEMPLATE_MAP,
+	pipOverlayContentIndex,
 	mergePipOverlayParamsWithDefaults,
 	overlayLayerSlot,
 	resolvePipOverlayCasparLayer,

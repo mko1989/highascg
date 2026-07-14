@@ -18,6 +18,7 @@ const {
 	recordSessionKey,
 	allocateRecordConsumerIndex,
 	resolveRecordSourceChannel,
+	resolveSourceProgramAudioLayout,
 } = require('./routes-streaming-channel-shared')
 const { pushRecordLog, broadcastRecordStopped } = require('./routes-streaming-channel-log')
 
@@ -74,6 +75,11 @@ async function handlePostRecord(body, ctx) {
 		const recLabel = safeFileStem(outCfg?.name || outCfg?.label || outputId || 'record')
 		const fileName = `${recLabel}_${localDateTimeStampForFilename()}.mp4`
 		const absPath = joinCasparMediaFile(dir, fileName)
+		// WO-172 T172.5: layout-aware downmix — resolve the cabled source's program-bus audio layout
+		// (screenDestinations[].audioLayout) so non-stereo buses (e.g. this rig's discrete-8ch) get an
+		// explicit pan= downmix instead of a blind stereo remix.
+		const recordSource = String(outCfg?.source || 'program_1')
+		const programLayout = resolveSourceProgramAudioLayout(ctx.config || {}, recordSource)
 		const args = recordFfmpegArgs({
 			crf,
 			videoCodec: b.videoCodec || outCfg?.videoCodec,
@@ -81,10 +87,21 @@ async function handlePostRecord(body, ctx) {
 			encoderPreset: b.encoderPreset || outCfg?.encoderPreset,
 			audioCodec: b.audioCodec || outCfg?.audioCodec,
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
+			programLayout,
 		})
 		const paramsAfterPath = `${param(fileName)} ${args}`
 		const addCmd = `ADD ${ch}-${consumerIndex} FILE ${paramsAfterPath}`
-		pushRecordLog(ctx, 'info', `Record start requested on ch${ch}`, { path: absPath, outputId: sessionKey, crf, consumerIndex })
+		// WO-172 T172.7: full ADD line + resolved source channel + layout, at error level visibility
+		// (info) so an ffprobe-style audio complaint can be cross-checked against exactly what was sent.
+		pushRecordLog(ctx, 'info', `Record start requested on ch${ch} (source=${recordSource}, layout=${programLayout})`, {
+			path: absPath,
+			outputId: sessionKey,
+			crf,
+			consumerIndex,
+			source: recordSource,
+			programLayout,
+			command: addCmd,
+		})
 		try {
 			const res = await ctx.amcp.basic.add(ch, 'FILE', paramsAfterPath, consumerIndex)
 			sessions[sessionKey] = {

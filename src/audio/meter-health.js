@@ -6,6 +6,15 @@ const { ensureMeterNullConsumer, isMeterNullConsumerEnabled } = require('./meter
 const { ensureLiveAudioInputsHealthy, isLiveAlsaProducerHealthy } = require('./live-audio-health')
 
 const DEFAULT_STALE_MS = 8000
+// WO-164: 15 s watchdog tick, probe-on-suspicion design. Added after the owner
+// was confused by an unconditional `INFO <ch>-<layer>` AMCP command going out
+// every 15 s ("there is a INFO 6-10 amcp command going out every 15s WTF???").
+// The watchdog itself is correct/wanted (it restarts a dead ALSA capture via
+// CLEAR/PLAY), but it used to probe AMCP on every tick regardless of health.
+// It now only sends the AMCP INFO probe when the OSC meter freshness check
+// (DEFAULT_STALE_MS, see live-audio-health.js) says meters are stale/absent,
+// or as part of the post-repair confirmation — so a healthy steady state
+// produces zero periodic AMCP traffic. See work/work-orders/164_WO_LIVE_AUDIO_WATCHDOG_QUIET_INFO_PROBE.md.
 const WATCH_INTERVAL_MS = 15000
 
 /** @type {WeakMap<object, ReturnType<typeof setInterval>>} */

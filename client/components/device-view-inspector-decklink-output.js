@@ -4,6 +4,7 @@
 import * as Actions from './device-view-actions.js'
 import { setStatus } from './device-view-ui-utils.js'
 import { DECKLINK_REAR_ORDER_KEY, readSavedDecklinkOrder, orderDecklinkConnectors } from '../lib/device-view-decklink-order.js'
+import { attachMathInput } from '../lib/math-input.js'
 import {
 	collectDecklinkDeviceIndices,
 	resolveDecklinkKeyFillState,
@@ -160,6 +161,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 		className: 'device-view__destinations-type',
 		value: String(cur.bufferDepth),
 	})
+	attachMathInput(depthIn, { decimals: 0 })
 	depthField.wrap.append(depthIn)
 	grid.append(depthField.wrap)
 

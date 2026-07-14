@@ -1,5 +1,5 @@
 {
-  "programLayout": "stereo",
+  "programLayout": "8ch",
   "programOutput": "default",
   "programAlsaDevice": "",
   "programFfmpegPath": "",

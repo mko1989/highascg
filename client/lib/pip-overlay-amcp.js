@@ -6,9 +6,7 @@
  */
 
 import {
-	PIP_OVERLAY_ALIGN_GAP,
 	PIP_OVERLAY_MAX_STACK,
-	overlayLayerSlot,
 	resolvePipOverlayCasparLayer,
 	PIP_OVERLAY_MAP,
 } from './pip-overlay-registry.js'
@@ -249,16 +247,6 @@ function buildPipOverlayAmcpLines(
 	const data = buildPipOverlayCgPayload(overlay, placement)
 	/** @type {string[]} */
 	const out = []
-	const p = Number(contentPhysicalLayer)
-	const idx = stackIndex | 0
-	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
-	if (aligned) {
-		const leg = overlayLayerSlot(p, idx)
-		if (Number.isFinite(leg) && leg !== oLayer) {
-			const lcl = `${channel}-${leg}`
-			out.push(`CG ${lcl} CLEAR`, `MIXER ${lcl} CLEAR`)
-		}
-	}
 	out.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${data.replace(/"/g, '\\"')}"`,
 		`CG ${cl} PLAY 0`,
@@ -407,7 +395,7 @@ export function buildPipOverlayRemoveLines(channel, contentPhysicalLayer, nextCo
 
 /**
  * CLEAR only PIP/CG slots that actually change between previous and next overlay stacks.
- * Avoids blind sweeps of all {@link PIP_OVERLAY_MAX_STACK} slots (e.g. L11–L18 on L10) on every preview push.
+ * Avoids blind sweeps of all {@link PIP_OVERLAY_MAX_STACK} slots (e.g. L260–L263 on L10) on every preview push.
  *
  * @param {number|undefined} nextContentLayer
  * @param {{ type: string, params?: object }[]|null|undefined} previousOverlays
@@ -450,8 +438,7 @@ export function buildPipOverlayRemoveStaleSlots(
 
 /**
  * AMCP lines to clear PIP CG/MIXER for content layers in [minL, maxL].
- * Reuses the same slot resolution as live remove (aligned + legacy); dedupes repeated clears across L.
- * `next=10000` = treat as unbounded so aligned slots p…p+7 and legacy 100+8p… are all cleared.
+ * Reuses the same slot resolution as live remove (WO-160 band 260–979); dedupes repeated clears across L.
  *
  * @param {number} channel
  * @param {number} minL

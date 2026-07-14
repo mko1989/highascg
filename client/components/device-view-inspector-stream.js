@@ -10,6 +10,7 @@ import {
 	subscribeStreamingChannelStatus,
 } from '../lib/streaming-channel-state.js'
 import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 function savedStreamOutput(currentSettings, conn) {
 	const rows = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : []
@@ -49,6 +50,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		placeholder: 'video kbps',
 		value: String(saved.videoBitrateKbps ?? caspar.videoBitrateKbps ?? 4500),
 	})
+	attachMathInput(vBitrateIn, { decimals: 0 })
 	const presetSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	presetSel.innerHTML = '<option value="ultrafast">ultrafast</option><option value="veryfast">veryfast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option>'
 	presetSel.value = String(saved.encoderPreset || caspar.encoderPreset || 'veryfast').toLowerCase()
@@ -63,6 +65,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		placeholder: 'audio kbps',
 		value: String(saved.audioBitrateKbps ?? caspar.audioBitrateKbps ?? 128),
 	})
+	attachMathInput(aBitrateIn, { decimals: 0 })
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save stream settings' })
 	const startBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Start stream' })
 	const stopBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Stop stream' })

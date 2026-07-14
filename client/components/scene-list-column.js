@@ -73,7 +73,9 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			ftbBtn.disabled = true
 			void (async () => {
 				try {
-					await api.post('/api/ftb', { screenIdx: col })
+					const fps = cm?.programResolutions?.[col]?.fps ?? 50
+					const durationFrames = Math.round(0.5 * fps)
+					await api.post('/api/ftb', { screenIdx: col, durationFrames, framerate: fps })
 					sceneState.setLiveSceneId(null, col)
 					sceneState.setPreviewSceneId(null, col)
 					showToast(`FTB: ${mainLabel(col)}`, 'info')

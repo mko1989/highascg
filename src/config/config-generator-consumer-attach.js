@@ -423,6 +423,24 @@ function buildHostLiveChannel(config, entry) {
 }
 
 /**
+ * WO-172 T172.6: resolve the `<channel-layout>` for the dedicated streaming/encode bus from the
+ * cabled source's program-bus layout (`screen_N_audio_layout`, already derived onto `config` by
+ * `applyDestinationAudioLayoutsToScreens` before this generator stage runs — see
+ * `src/config/build-caspar-generator-config.js:281-288`). Multiview / unresolved source: 'stereo'
+ * (multiview has no per-layout audio; `buildMultiviewChannel` likewise emits no `<channel-layout>`).
+ * @param {Record<string, unknown>} config
+ * @param {Record<string, unknown>} sc - `config.streamingChannel`
+ * @returns {string}
+ */
+function resolveStreamingChannelAudioLayout(config, sc) {
+	const rawVideo = String(sc.videoSource || 'program_1').toLowerCase()
+	const m = rawVideo.match(/^(?:program|preview)[_-]?(\d+)$/)
+	if (!m) return 'stereo'
+	const n = parseInt(m[1], 10) || 1
+	return String(config[`screen_${n}_audio_layout`] || 'stereo').toLowerCase() || 'stereo'
+}
+
+/**
  * @param {Record<string, unknown>} config
  * @param {number|null|undefined} casparChannelNum
  */
@@ -439,9 +457,12 @@ function buildStreamingChannel(config, casparChannelNum) {
 			keyDevice: parseDecklinkDeviceIndex(sc.decklinkKeyDevice),
 		})
 	}
+	// WO-172 T172.6: dormant bug — sibling buildHostLiveChannel emits <channel-layout>, this didn't,
+	// a Caspar-side pre-downmix hazard for non-stereo program buses attached to the dedicated bus.
+	const layoutXml = channelLayoutElementXml(resolveStreamingChannelAudioLayout(config, sc))
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	return `${channelXmlComment(`Caspar channel ${ch}: Dedicated streaming / encode bus (HighAsCG attaches FFmpeg/SRT here)`)}        <channel>
-            <video-mode>${modeId}</video-mode>
+            <video-mode>${modeId}</video-mode>${layoutXml}
             <consumers>${profXml}
             </consumers>
             <mixer>

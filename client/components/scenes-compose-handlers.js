@@ -2,6 +2,44 @@
 
 import { fillToPixelRect } from '../lib/fill-math.js'
 import { applyDragDeltaToFill } from '../lib/coordinate-origin.js'
+import { normalizeCrop, isIdentityCrop } from '../lib/layer-crop.js'
+
+function clamp01(v) {
+	return Math.max(0, Math.min(1, v))
+}
+
+/**
+ * Pure delta→crop-params math (WO-158 T158.3), split out from `startCropResize` so it can be
+ * unit-tested without DOM/pointer-event mocks. `dxFrac`/`dyFrac` are the pointer delta expressed
+ * as a fraction of the layer's own on-screen fill-rect size (not the full canvas) — the crop
+ * handles live on the cropped-content outline, a sub-rect of the layer's box.
+ * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
+ * @param {{ left: number, top: number, right: number, bottom: number }} startCrop - normalized (0-1) crop at drag start
+ * @param {number} dxFrac
+ * @param {number} dyFrac
+ * @param {number} [minFrac] - minimum crop window width/height (fraction), mirrors `minS` in startEdgeResize
+ * @returns {{ left: number, top: number, right: number, bottom: number }}
+ */
+export function cropDeltaToParams(edge, startCrop, dxFrac, dyFrac, minFrac = 0.02) {
+	const start = normalizeCrop(startCrop)
+	let { left, top, right, bottom } = start
+
+	if (edge.includes('e')) right = clamp01(right + dxFrac)
+	if (edge.includes('w')) left = clamp01(left + dxFrac)
+	if (edge.includes('s')) bottom = clamp01(bottom + dyFrac)
+	if (edge.includes('n')) top = clamp01(top + dyFrac)
+
+	if ((edge.includes('e') || edge.includes('w')) && right - left < minFrac) {
+		if (edge.includes('e')) right = Math.min(1, left + minFrac)
+		if (edge.includes('w')) left = Math.max(0, right - minFrac)
+	}
+	if ((edge.includes('n') || edge.includes('s')) && bottom - top < minFrac) {
+		if (edge.includes('s')) bottom = Math.min(1, top + minFrac)
+		if (edge.includes('n')) top = Math.max(0, bottom - minFrac)
+	}
+
+	return normalizeCrop({ left, top, right, bottom })
+}
 
 function snapValue(val, candidates, threshold) {
 	let bestDiff = threshold
@@ -282,5 +320,68 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		document.addEventListener('pointerup', onUp)
 	}
 
-	return { startDrag, startRotate, startScale, startEdgeResize }
+	/**
+	 * WO-158 T158.3: 8 crop drag zones, modeled on `startEdgeResize` but writing normalized crop
+	 * fractions (relative to the layer's own fill rect) into the layer's `crop` effect instead of
+	 * `fill`, through the same `sceneState.patchLayer(..., { effects })` path the inspector uses
+	 * (`inspector-scene-layer.js`) so live-apply / preview-push fire exactly as for inspector edits.
+	 * Creates the crop effect entry (identity params) if the layer doesn't have one yet.
+	 * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
+	 * @param {HTMLElement} cropHandlesEl - the `.scenes-layer__crop-handles` container (repositioned live)
+	 * @param {HTMLElement} contentEl - the `.scenes-layer__content` wrapper (clip-path updated live)
+	 */
+	function startCropResize(edge, e, layerIndex, scene, aspectEl, el, cropHandlesEl, contentEl) {
+		const rect = aspectEl.getBoundingClientRect()
+		const layer = scene.layers[layerIndex]
+		const fill = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+		const existingCropFx = Array.isArray(layer.effects) ? layer.effects.find((fx) => fx?.type === 'crop') : null
+		const startCrop = normalizeCrop(existingCropFx?.params)
+		const sx0 = e.clientX
+		const sy0 = e.clientY
+		sceneState.isInteracting = true
+
+		function onMove(ev) {
+			const currentRect = !aspectEl.isConnected ? document.querySelector('.scenes-compose')?.getBoundingClientRect() || rect : aspectEl.getBoundingClientRect()
+			// Delta is a fraction of THIS layer's own on-screen box (canvas rect × its fill scale),
+			// not the full canvas — the crop handles live on the cropped-content outline, a sub-rect
+			// of the layer's own box.
+			const rw = Math.max(10, currentRect.width) * Math.max(1e-6, fill.scaleX || 1)
+			const rh = Math.max(10, currentRect.height) * Math.max(1e-6, fill.scaleY || 1)
+			const dx = (ev.clientX - sx0) / rw
+			const dy = (ev.clientY - sy0) / rh
+			const nextCrop = cropDeltaToParams(edge, startCrop, dx, dy)
+
+			// Direct DOM update for instant feedback (mirrors the other handlers)
+			cropHandlesEl.style.left = `${nextCrop.left * 100}%`
+			cropHandlesEl.style.top = `${nextCrop.top * 100}%`
+			cropHandlesEl.style.right = `${(1 - nextCrop.right) * 100}%`
+			cropHandlesEl.style.bottom = `${(1 - nextCrop.bottom) * 100}%`
+			if (isIdentityCrop(nextCrop)) {
+				contentEl.style.clipPath = ''
+			} else {
+				contentEl.style.clipPath = `inset(${nextCrop.top * 100}% ${(1 - nextCrop.right) * 100}% ${(1 - nextCrop.bottom) * 100}% ${nextCrop.left * 100}%)`
+			}
+
+			const nextEffects = Array.isArray(layer.effects) ? layer.effects.slice() : []
+			const idx = nextEffects.findIndex((fx) => fx?.type === 'crop')
+			const fxEntry = { type: 'crop', params: nextCrop }
+			if (idx >= 0) nextEffects[idx] = fxEntry
+			else nextEffects.push(fxEntry)
+
+			sceneState.patchLayer(scene.id, layerIndex, { effects: nextEffects })
+			schedulePreviewPush()
+		}
+		function onUp() {
+			document.removeEventListener('pointermove', onMove)
+			document.removeEventListener('pointerup', onUp)
+			setTimeout(() => {
+				sceneState.isInteracting = false
+				if (typeof sceneState._emit === 'function') sceneState._emit('change')
+			}, 10)
+		}
+		document.addEventListener('pointermove', onMove)
+		document.addEventListener('pointerup', onUp)
+	}
+
+	return { startDrag, startRotate, startScale, startEdgeResize, startCropResize }
 }

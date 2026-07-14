@@ -25,6 +25,24 @@ warn() {
 
 echo "==> verify squashfs excludes: $SQ"
 
+# WO-168 T168.5: directory-name constants shared with write-iso-default-config.js
+# live in src/config/factory-defaults-manifest.js. Shell can't require() JS, so
+# pull them via a tiny `node -e` print step instead of hardcoding a second copy
+# that could drift; falls back to the (currently identical) literal if node or
+# the manifest is unavailable.
+HERE_VERIFY="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+MANIFEST_JS="${HERE_VERIFY}/../../../src/config/factory-defaults-manifest.js"
+manifest_const() {
+	local key="$1" fallback="$2" v=""
+	if command -v node >/dev/null 2>&1 && [[ -f "$MANIFEST_JS" ]]; then
+		v="$(node -e "try{const m=require(process.argv[1]);process.stdout.write(String(m[process.argv[2]]||''))}catch(e){}" \
+			"$MANIFEST_JS" "$key" 2>/dev/null || true)"
+	fi
+	[[ -n "$v" ]] && echo "$v" || echo "$fallback"
+}
+PROJECTS_TRASH_DIR="$(manifest_const PROJECTS_TRASH_DIR '_trash')"
+PRIVATE_IDENTITY_DIR="$(manifest_const PRIVATE_IDENTITY_DIR '.private')"
+
 # pipefail + `grep -q` on a large `unsquashfs -l` stream: early match closes the pipe,
 # unsquashfs exits SIGPIPE, and the pipeline status becomes failure (false negative).
 squash_grep_list() {
@@ -81,6 +99,28 @@ if squash_has_tree 'opt/nvidia-pool'; then
 	bad "/opt/nvidia-pool is in squashfs — ISO ~1.5 GiB larger than needed; purge pool and rebuild"
 else
 	ok "no /opt/nvidia-pool in squashfs"
+fi
+
+# WO-168 T168.1 — device identity/auth material (Syncthing device ID, Tailscale
+# status, replication pairing manifest). MUST NOT ship on any produced ISO/clone.
+if squash_has_tree "home/casparcg/highascg/${PRIVATE_IDENTITY_DIR}"; then
+	bad "home/casparcg/highascg/${PRIVATE_IDENTITY_DIR} is in squashfs — device identity/auth material leaked (WO-168 T168.1); check exclude fragment merge, then rotate Syncthing/Tailscale identities on any box cloned from a prior ISO"
+else
+	ok "no home/casparcg/highascg/${PRIVATE_IDENTITY_DIR} in squashfs"
+fi
+
+# WO-168 T168.4/T168.6 — deleted-project tombstones; reset also purges these.
+if squash_has_tree "home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR}"; then
+	bad "home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR} is in squashfs — deleted-project tombstones leaked (WO-168 T168.4); check exclude fragment merge and factory reset"
+else
+	ok "no home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR} in squashfs"
+fi
+
+# WO-168 T168.4/T168.6 — config/*.bak* and "casparcg copy.config"-style duplicates.
+if squash_grep_list '^squashfs-root/home/casparcg/highascg/config/[^/]*(\.bak(\.[0-9]+)?|copy\.config)$' 'home/casparcg/highascg/config'; then
+	bad "config/*.bak* or *copy*.config is in squashfs — build-host config backups leaked (WO-168 T168.4); check exclude fragment merge and factory reset"
+else
+	ok "no config/*.bak* or *copy*.config in squashfs"
 fi
 
 for needle in \

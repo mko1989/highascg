@@ -3,6 +3,7 @@
  */
 
 import { escapeHtml } from '../lib/dom-escape.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 const LS = {
 	cols: 'highascg_led_test_cols',
@@ -324,6 +325,7 @@ export function showLedTestModal(onApplied, stateStore) {
 
 	for (const el of [cols, rows, pw, ph, charCountInp]) {
 		el.addEventListener('change', () => persistAndApply())
+		attachMathInput(el, { decimals: 0 })
 	}
 	label.addEventListener('input', persistAndApplyDebounced)
 	label.addEventListener('change', () => persistAndApply())

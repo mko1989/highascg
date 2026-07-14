@@ -26,6 +26,7 @@ import {
 	createModeSelectionReaders,
 	createModelineTimingPreview,
 } from './device-view-inspector-gpu-video-modeline-preview.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const { saveRef, osSaveRef, conn, lastPayload, cs, currentSettings, screenN, osScreenN } = ctx
@@ -150,6 +151,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 			),
 		),
 	})
+	attachMathInput(customWidthIn, { decimals: 0 })
 	const customHeightIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'number',
@@ -170,6 +172,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 			),
 		),
 	})
+	attachMathInput(customHeightIn, { decimals: 0 })
 	const customFpsIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'number',
@@ -185,6 +188,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 			),
 		),
 	})
+	attachMathInput(customFpsIn, { decimals: 2 })
 	const syncCustomInputsState = () => {
 		const isCustom = modeSel.value === 'custom'
 		customWidthIn.disabled = !isCustom
@@ -244,6 +248,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		placeholder: 'Width',
 		value: String(osCustomInit.w),
 	})
+	attachMathInput(osCustomWidthIn, { decimals: 0 })
 	const osCustomHeightIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'number',
@@ -252,6 +257,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		placeholder: 'Height',
 		value: String(osCustomInit.h),
 	})
+	attachMathInput(osCustomHeightIn, { decimals: 0 })
 	const osCustomFpsIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'number',
@@ -260,6 +266,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		placeholder: 'Hz',
 		value: String(osCustomInit.r),
 	})
+	attachMathInput(osCustomFpsIn, { decimals: 2 })
 	osCustomFields.append(osCustomWidthIn, osCustomHeightIn, osCustomFpsIn)
 	osCustomRow.append(osCustomLbl, osCustomFields)
 

@@ -35,6 +35,116 @@ function lookLogicalLayerSet(scene) {
 }
 
 /**
+ * Direct self-route guard (WO-156). Playing a route that targets its own destination channel
+ * (`route://N` onto channel N, or `route://N-L` back onto channel N) creates a self-feedback
+ * route producer that wedges the channel in CasparCG — recovery needs `CLEAR <ch>` or a
+ * server restart. Cross-channel cycles (A routes B while B routes A) are NOT blocked here —
+ * owner decision 2026-07-13: warn-only (see findCrossChannelRouteCycles), may tighten later.
+ *
+ * @param {string} clip — candidate source value (non-route values never violate)
+ * @param {number} destChannel — Caspar channel the clip would PLAY on
+ * @param {{ allowSameChannelLayers?: Set<number> }} [opts] — logical layer numbers of the look
+ *   being taken; same-channel LAYER routes referencing them are intra-look routes (a supported
+ *   feature — remapped by {@link remapIntraLookRoutesForTakeChannel}) and are not violations.
+ * @returns {{ channel: number, layer: number|null, clip: string, reason: string } | null}
+ */
+function findSelfRouteViolation(clip, destChannel, opts = {}) {
+	const ch = parseInt(destChannel, 10)
+	if (!Number.isFinite(ch) || ch < 1) return null
+	const parsed = parseRouteClip(clip)
+	if (!parsed || parsed.channel !== ch) return null
+	if (
+		parsed.layer != null &&
+		opts.allowSameChannelLayers instanceof Set &&
+		opts.allowSameChannelLayers.has(parsed.layer)
+	) {
+		return null
+	}
+	const reason =
+		parsed.layer == null
+			? `route://${parsed.channel} routes channel ${ch} into itself`
+			: `route://${parsed.channel}-${parsed.layer} routes a layer of channel ${ch} back onto channel ${ch}`
+	return { channel: parsed.channel, layer: parsed.layer, clip: String(clip).trim(), reason }
+}
+
+/**
+ * First self-route violation in a scene destined for `destChannel`.
+ * Intra-look layer routes (route to one of the scene's own logical layers) are exempt.
+ * @param {object} scene
+ * @param {number} destChannel
+ * @returns {{ layerNumber: number|null, violation: { channel: number, layer: number|null, clip: string, reason: string } } | null}
+ */
+function findSceneSelfRouteViolation(scene, destChannel) {
+	if (!scene || !Array.isArray(scene.layers)) return null
+	const allowSameChannelLayers = lookLogicalLayerSet(scene)
+	for (const layer of scene.layers) {
+		const v = layer?.source?.value
+		if (!v || !isRouteClip(v)) continue
+		const violation = findSelfRouteViolation(v, destChannel, { allowSameChannelLayers })
+		if (violation) return { layerNumber: layer?.layerNumber ?? null, violation }
+	}
+	return null
+}
+
+/**
+ * Throws a 400-flavored error when the scene contains a direct self-route for `destChannel`.
+ * Called from {@link runSceneTakeLbg} so every take path (API take, preview stage, project
+ * sync-push, replication mirror) passes through the same guard.
+ * @param {object} scene
+ * @param {number} destChannel
+ */
+function assertSceneHasNoSelfRoutes(scene, destChannel) {
+	const found = findSceneSelfRouteViolation(scene, destChannel)
+	if (!found) return
+	const err = new Error(
+		`Self-route blocked on channel ${destChannel}: layer ${found.layerNumber ?? '?'} plays ${found.violation.clip} — ${found.violation.reason}. This would wedge the channel in CasparCG (fix: pick a source from another channel).`,
+	)
+	// @ts-ignore — surfaced as HTTP status by the take route
+	err.statusCode = 400
+	// @ts-ignore
+	err.code = 'SELF_ROUTE_BLOCKED'
+	throw err
+}
+
+/**
+ * Best-effort multi-hop cycle detection (warn-only, WO-156): scene routes to channel X while
+ * X's live scene routes back to `destChannel`. Never blocks — some setups intentionally
+ * cross-route buses; the operator warning is for diagnosing feedback/starvation.
+ * @param {object} scene
+ * @param {number} destChannel
+ * @param {(channel: number) => object|null} getSceneForChannel — e.g. live-scene-state lookup
+ * @returns {number[]} channels forming a 2-hop cycle with destChannel
+ */
+function findCrossChannelRouteCycles(scene, destChannel, getSceneForChannel) {
+	/** @type {number[]} */
+	const out = []
+	const dest = parseInt(destChannel, 10)
+	if (!scene || !Array.isArray(scene.layers) || typeof getSceneForChannel !== 'function' || !Number.isFinite(dest)) {
+		return out
+	}
+	const seen = new Set()
+	for (const layer of scene.layers) {
+		const parsed = parseRouteClip(layer?.source?.value)
+		if (!parsed || parsed.channel === dest || seen.has(parsed.channel)) continue
+		seen.add(parsed.channel)
+		let other = null
+		try {
+			other = getSceneForChannel(parsed.channel)
+		} catch {
+			other = null
+		}
+		for (const ol of other?.layers || []) {
+			const op = parseRouteClip(ol?.source?.value)
+			if (op && op.channel === dest) {
+				out.push(parsed.channel)
+				break
+			}
+		}
+	}
+	return out
+}
+
+/**
  * Looks store intra-composition routes against the program bus (e.g. route://1-10).
  * Logical layer N in the route string maps to physical N (bank a) or N+100 (bank b).
  * When staging on another channel or inactive bank, rewrite to route://<takeChannel>-<physical>.
@@ -267,6 +377,10 @@ function crossfadeSuffixLinesForStaggeredRoutes(crossfadeLines, takeJobs) {
 module.exports = {
 	parseRouteClip,
 	isRouteClip,
+	findSelfRouteViolation,
+	findSceneSelfRouteViolation,
+	assertSceneHasNoSelfRoutes,
+	findCrossChannelRouteCycles,
 	remapIntraLookRoutesForTakeChannel,
 	partitionTakeJobsPlayOrder,
 	orderRouteJobsByDependency,

@@ -24,6 +24,12 @@ export class DmxState {
 		settingsState.subscribe((s) => {
 			const d = s.dmx && typeof s.dmx === 'object' ? s.dmx : {}
 			this.fixtures = Array.isArray(d.fixtures) ? d.fixtures : []
+			// Migration: set sampleMode to 'center' for existing fixtures without it (backward compat)
+			for (const fixture of this.fixtures) {
+				if (fixture && typeof fixture === 'object' && fixture.sampleMode === undefined) {
+					fixture.sampleMode = 'center'
+				}
+			}
 			this.enabled = !!d.enabled
 			this.debugLogDmx = !!d.debugLogDmx
 			this.fps = typeof d.fps === 'number' && d.fps > 0 ? d.fps : 25
@@ -71,6 +77,9 @@ export class DmxState {
 				h: Math.round(opts.h || 200)
 			},
 			rotation: opts.rotation || 0,
+			mirrorH: opts.mirrorH || false,
+			mirrorV: opts.mirrorV || false,
+			sampleMode: opts.sampleMode || 'average',
 			sourceChannel: opts.sourceChannel || 1,
 			grid: {
 				cols: opts.cols || 1,
@@ -101,10 +110,13 @@ export class DmxState {
 	updateFixture(id, updates) {
 		const fixture = this.getFixture(id)
 		if (!fixture) return
-		
+
 		if (updates.sample) Object.assign(fixture.sample, updates.sample)
 		if (updates.grid) Object.assign(fixture.grid, updates.grid)
 		if (updates.rotation !== undefined) fixture.rotation = updates.rotation
+		if (updates.mirrorH !== undefined) fixture.mirrorH = updates.mirrorH
+		if (updates.mirrorV !== undefined) fixture.mirrorV = updates.mirrorV
+		if (updates.sampleMode !== undefined) fixture.sampleMode = updates.sampleMode
 		if (updates.sourceChannel !== undefined) fixture.sourceChannel = updates.sourceChannel
 		if (updates.colorOrder !== undefined) fixture.colorOrder = updates.colorOrder
 		if (updates.universe !== undefined) fixture.universe = updates.universe
@@ -113,7 +125,7 @@ export class DmxState {
 		if (updates.destination !== undefined) fixture.destination = updates.destination
 		if (updates.gamma !== undefined) fixture.gamma = updates.gamma
 		if (updates.brightness !== undefined) fixture.brightness = updates.brightness
-		
+
 		this._save()
 	}
 

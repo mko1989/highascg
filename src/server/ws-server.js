@@ -347,6 +347,9 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					ws.send(safeStringify({ type: 'osc_resync_ok', id: msg.id }))
 				} else if (msg.type === 'multiview_sync' && msg.data) {
 					ctx._multiviewLayout = msg.data
+					// WO-156: also update the plural map (source of truth for reconnect re-apply).
+					if (!ctx._multiviewLayouts) ctx._multiviewLayouts = {}
+					ctx._multiviewLayouts[Math.max(1, parseInt(msg.data?.n || 1, 10) || 1)] = msg.data
 					const persistence = ctx.persistence || require('../utils/persistence')
 					persistence.set('multiviewLayout', msg.data)
 					if (typeof ctx.log === 'function') ctx.log('debug', 'Multiview layout synced from web UI')

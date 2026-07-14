@@ -2,7 +2,11 @@
 #
 # Location: /etc/penguins-eggs.d/exclude.list
 #
-# penguins-eggs master template + HighAsCG WO-47 fragment (single block).
+# Pure upstream penguins-eggs template — no HighAsCG-specific entries (WO-168
+# T168.2). HighAsCG excludes live only in penguins-eggs-exclude-highascg-*.list
+# and penguins-eggs-exclude-decklink.list; merge-penguins-eggs-exclude-highascg.sh
+# appends the right fragment to this file at prepare-time (single source of
+# truth — see EGGS_EXCLUDE_LIST.md).
 #
 ######################################################################################################
 
@@ -101,103 +105,3 @@ var/log/*.log.?
 var/log/*/*
 var/spool/postfix/*
 var/tmp/*
-
-# --- HighAsCG tools/eggs/live-usb: see EGGS_EXCLUDE_LIST.md ---
-swap.img
-swapfile
-
-# Single-driver ISO — no multi-branch deb pool (WO single-nvidia-driver-per-iso)
-opt/nvidia-pool
-opt/nvidia-pool/*
-# WO-47 server-tree excludes (index.js, src/, node_modules/, dist-web/, …) live in
-# penguins-eggs-exclude-highascg-fragment.list — merged only when HIGHASCG_ISO_EMBED_SERVER=0.
-# Embed-server ISOs merge penguins-eggs-exclude-highascg-embed-server.list instead.
-home/casparcg/highascg/media/*
-home/casparcg/highascg/_media
-home/casparcg/highascg/log
-home/casparcg/highascg/log/*
-home/casparcg/highascg/cef-cache
-home/casparcg/highascg/cef-cache/*
-home/casparcg/highascg/data
-home/casparcg/highascg/data/*
-home/casparcg/highascg/refs
-home/casparcg/highascg/dist
-home/casparcg/highascg/.github
-home/casparcg/highascg/.github/*
-# Build-host sync copies (not needed on live system)
-home/casparcg/bridge
-home/casparcg/bridge/*
-home/casparcg/exfat
-home/casparcg/exfat/*
-home/casparcg/0x200014
-home/casparcg/0x200014/*
-home/casparcg/.cache
-home/casparcg/.cache/*
-home/casparcg/Downloads
-home/casparcg/Downloads/*
-home/casparcg/.copilot
-home/casparcg/.copilot/*
-home/casparcg/.cursor-server
-home/casparcg/.cursor-server/*
-home/casparcg/.cursor
-home/casparcg/.cursor/*
-home/casparcg/.antigravity-ide-server
-home/casparcg/.antigravity-ide-server/*
-home/casparcg/.gemini
-home/casparcg/.gemini/*
-home/casparcg/.vscode-server
-home/casparcg/.vscode-server/*
-home/casparcg/.local
-home/casparcg/.local/*
-home/casparcg/.ssh
-home/casparcg/.ssh/*
-home/casparcg/.npm
-home/casparcg/.npm/*
-home/casparcg/.nvm
-home/casparcg/.nvm/*
-home/casparcg/.config/Code
-home/casparcg/.config/Code/*
-home/casparcg/.config/Cursor
-home/casparcg/.config/Cursor/*
-home/casparcg/.config/cursor
-home/casparcg/.config/cursor/*
-var/lib/tailscale
-var/lib/tailscale/*
-var/snap/tailscale
-var/snap/tailscale/*
-snap/tailscale
-snap/tailscale/*
-root/snap/tailscale
-root/snap/tailscale/*
-
-# --- DeckLink / Blackmagic Desktop Video (WO-92 — operator-supplied, not in redistributable ISO) ---
-usr/lib/blackmagic
-usr/lib/blackmagic/*
-usr/lib/libDeckLinkAPI.so
-usr/lib/libDeckLinkPreviewAPI.so
-lib/udev/rules.d/55-blackmagic.rules
-etc/udev/rules.d/55-blackmagic.rules
-etc/init.d/DesktopVideoHelper
-etc/init/DesktopVideoHelper.conf
-etc/xdg/autostart/DesktopVideoUpdaterAutoStart.desktop
-usr/bin/BlackmagicDesktopVideoSetup
-usr/bin/BlackmagicFirmwareUpdater
-usr/bin/DesktopVideoUpdateTool
-usr/bin/DesktopVideoUpdater
-usr/lib/systemd/system/DesktopVideoHelper.service
-usr/share/applications/BlackmagicDesktopVideoSetup.desktop
-usr/share/applications/DesktopVideoUpdater.desktop
-usr/share/doc/desktopvideo
-usr/share/doc/desktopvideo/*
-usr/share/doc/desktopvideo-gui
-usr/share/doc/desktopvideo-gui/*
-var/lib/dkms/blackmagic
-var/lib/dkms/blackmagic/*
-var/lib/dkms/blackmagic-io
-var/lib/dkms/blackmagic-io/*
-var/lib/dpkg/info/desktopvideo.*
-var/lib/dpkg/info/desktopvideo-gui.*
-lib/modules/*/updates/dkms/blackmagic.ko*
-lib/modules/*/updates/dkms/blackmagic-io.ko*
-lib/modules/*/updates/dkms/snd_blackmagic-io.ko*
-usr/src/blackmagic-*

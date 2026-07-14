@@ -5,7 +5,7 @@
 import { createEffectInstance } from '../lib/effect-registry.js'
 import { api } from '../lib/api-client.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
-import { parseRouteChannelLayer } from './scenes-shared.js'
+import { routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 
 /**
@@ -168,13 +168,17 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 						value: data.value,
 						label: data.label || data.value,
 					}
-					const parsed = parseRouteChannelLayer(src.value)
-					if (parsed) {
+					{
+						// WO-156: reject self-routes (same channel+layer, or whole-channel route to
+						// this screen's own PGM/PRV channel — that wedges the channel in Caspar).
 						const cm = stateStore?.getState?.()?.channelMap || {}
-						const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
-						const targetLn = scene.layers[realIdx]?.layerNumber
-						if (ch != null && parsed.channel === ch && parsed.layer === Number(targetLn)) {
-							showToast('A layer cannot play a route to itself (same channel and layer).', 'warn')
+						const rejectMsg = routeDropRejectionMessage(src.value, {
+							editChannel: resolveLookStackChannelForBus(cm, sceneState, scene, 'edit'),
+							pgmChannel: resolveLookStackChannelForBus(cm, sceneState, scene, 'pgm'),
+							targetLayerNumber: scene.layers[realIdx]?.layerNumber,
+						})
+						if (rejectMsg) {
+							showToast(rejectMsg, 'warn')
 							return
 						}
 					}

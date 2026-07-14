@@ -8,6 +8,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
 const { layerHasContent } = require('../engine/scene-transition')
+const { LOOK_LAYER_MIN, LOOK_LAYER_MAX } = require('../engine/look-layer-ranges')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
@@ -88,6 +89,23 @@ async function handleSceneTake(body, ctx) {
 			}),
 		}
 	}
+	// WO-160 T160.3: logical look layers live in 10–99 (bank A physical = logical, bank B = +100).
+	// A stale client (old unbounded +10 numbering) must never write into the audio (1–9/101–109),
+	// bank B (110–199), timeline (210+) or PIP overlay (260+) bands.
+	const outOfRangeLayer = b.incomingScene.layers.find((l) => {
+		if (!layerHasContent(l)) return false
+		const n = Number(l.layerNumber)
+		return !Number.isInteger(n) || n < LOOK_LAYER_MIN || n > LOOK_LAYER_MAX
+	})
+	if (outOfRangeLayer) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				error: `incomingScene layer number ${outOfRangeLayer.layerNumber} is outside the look layer range ${LOOK_LAYER_MIN}-${LOOK_LAYER_MAX} — reload the operator UI so the project migrates to consecutive layer numbering (WO-160)`,
+			}),
+		}
+	}
 
 	const useClientCurrentScene = b.useServerLive === false && Object.prototype.hasOwnProperty.call(b, 'currentScene')
 	const requestedCurrentScene = useClientCurrentScene ? b.currentScene : null
@@ -106,6 +124,18 @@ async function handleSceneTake(body, ctx) {
 		const currentScene = useClientCurrentScene
 			? requestedCurrentScene
 			: (liveSceneState.getChannel(channel)?.scene || null)
+		// WO-156: multi-hop route cycles (this look routes ch X while X routes back here) are
+		// allowed but logged — direct self-routes are rejected in runSceneTakeLbg.
+		if (typeof ctx.log === 'function') {
+			const { findCrossChannelRouteCycles } = require('../engine/scene-route-deps')
+			const cycles = findCrossChannelRouteCycles(inc, channel, (ch) => liveSceneState.getChannel(ch)?.scene || null)
+			for (const via of cycles) {
+				ctx.log(
+					'warn',
+					`[scene-take] cross-channel route cycle: ch${channel} routes ch${via} while ch${via} routes ch${channel} (allowed — watch for feedback/starvation)`,
+				)
+			}
+		}
 		let mainIdx = Array.isArray(routeMap.programChannels) ? routeMap.programChannels.indexOf(channel) : -1
 		if (mainIdx < 0 && routeMap.programCh && Number.isFinite(routeMap.screenCount)) {
 			for (let i = 0; i < routeMap.screenCount; i++) {
@@ -285,7 +315,7 @@ async function handleSceneTake(body, ctx) {
 		if (pgmOnly && typeof ctx.log === 'function') {
 			ctx.log(
 				'info',
-				`[scene-take] pgm-only stack ch=${channel} (no A/B banks; CUT / +Animate only)${sharedPreviewBus ? ' shared-preview-bus' : ''}`,
+				`[scene-take] pgm-only channel — LBG bank pipeline with unconditional orphan sweep (WO-160b) ch=${channel}${sharedPreviewBus ? ' shared-preview-bus' : ''}`,
 			)
 		}
 		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
@@ -302,21 +332,31 @@ async function handleSceneTake(body, ctx) {
 	const takePromise = prev.then(() => runTake())
 	ctx._sceneTakeChainByChannel[chKey] = takePromise.catch(() => {})
 
+	let takeTimeoutTimer = null
 	try {
 		await Promise.race([
 			takePromise,
-			new Promise((_, reject) => setTimeout(() => reject(new Error('Scene take timed out')), TAKE_TIMEOUT_MS)),
+			new Promise((_, reject) => {
+				takeTimeoutTimer = setTimeout(() => reject(new Error('Scene take timed out')), TAKE_TIMEOUT_MS)
+			}),
 		])
 	} catch (e) {
 		const log = ctx.log
 		if (typeof log === 'function') log('error', 'Scene take failed: ' + (e?.message || e))
 		const msg = e?.message || String(e)
 		const timedOut = /timed out/i.test(msg)
+		// WO-156: validation failures (e.g. self-route guard) carry statusCode 400 — surface as
+		// client errors so the UI toasts the message instead of a generic server error.
+		const clientErrorStatus =
+			Number.isInteger(e?.statusCode) && e.statusCode >= 400 && e.statusCode < 500 ? e.statusCode : null
 		return {
-			status: timedOut ? 504 : 500,
+			status: timedOut ? 504 : (clientErrorStatus ?? 500),
 			headers: JSON_HEADERS,
 			body: jsonBody({ error: msg || 'Scene take failed' }),
 		}
+	} finally {
+		// Do not leak a 2-minute timer per take (kept the event loop alive; WO-156 cleanup).
+		if (takeTimeoutTimer) clearTimeout(takeTimeoutTimer)
 	}
 
 	const matrix = playbackTracker.getMatrixForState(ctx)

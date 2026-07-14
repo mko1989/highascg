@@ -60,6 +60,15 @@ function createComposePreviewLifecycle({ appCtx }) {
 
 	function onCasparConnected() {
 		if (isFfmpegJpegComposePreview(appCtx.config)) {
+			try {
+				// WO-159 T159.3 follow-up: a "channel doesn't exist" 400 is only valid for the
+				// Caspar instance that produced it — clear the blocklist before the consumer
+				// re-sync below so a fresh instance gets re-probed instead of staying blocked
+				// forever on a stale signature match.
+				require('../preview/compose-preview-blocklist').resetComposeBlocklistOnReconnect(appCtx)
+			} catch (e) {
+				appCtx.log?.('warn', `[compose-preview] blocklist reset on reconnect failed: ${e?.message || e}`)
+			}
 			restartComposePreviewNow()
 		}
 	}

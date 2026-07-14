@@ -22,6 +22,7 @@ const { startLiveInputMeterHealthWatch, repairLiveInputMetersIfStale } = require
 const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
 const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
 const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
+const { findSelfRouteViolation } = require('../engine/scene-route-deps')
 
 async function setupInputsChannel(self) {
 	const channelMap = routingMap.getChannelMap(self.config)
@@ -302,17 +303,25 @@ async function setupAllRouting(self) {
 			const outCh = map.programChannels?.[i]
 			const bus1 = map.switcherBus1Channels?.[i] ?? map.previewChannels?.[i]
 			if (outCh == null || bus1 == null) continue
+			// WO-156: never PLAY a bus route onto its own channel (self-feedback wedges the channel).
+			const busRoute = routingMap.getRouteString(bus1)
+			const selfRoute = findSelfRouteViolation(busRoute, outCh)
+			if (selfRoute) {
+				self.log('warn', `Switcher bus routing skipped for output ch ${outCh}: ${selfRoute.reason}`)
+				continue
+			}
 			try {
-				await self.amcp.play(outCh, 1, routingMap.getRouteString(bus1))
+				await self.amcp.play(outCh, 1, busRoute)
 				self.switcherOutputBusByChannel[String(outCh)] = bus1
 			} catch (_) {}
 		}
 	}
-	if (map.multiviewEnabled && self._multiviewLayout?.layout?.length > 0) {
-		try {
-			const { applyMultiviewLayout } = require('../engine/multiview-apply')
-			await applyMultiviewLayout(self._multiviewLayout, self)
-		} catch {}
+	if (map.multiviewEnabled) {
+		// WO-156: re-apply ALL persisted multiviewers (multiviewLayout, multiviewLayout_<n>,
+		// HTTP-applied layouts in ctx._multiviewLayouts) with logged retries — runs on boot and
+		// on every Caspar reconnect (status → fetchInfo → onAfterInfoConfigReady → here).
+		const { reapplyAllMultiviewLayouts } = require('../engine/multiview-reapply')
+		await reapplyAllMultiviewLayouts(self)
 	}
 	const { setupHostLiveSources } = require('./host-live-sources-setup')
 	await setupHostLiveSources(self)

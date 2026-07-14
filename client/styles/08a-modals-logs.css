@@ -3,6 +3,15 @@
 	overflow-y: auto;
 }
 
+/* WO-165: operator wants the main UI fully visible (undimmed, unblurred) behind the logs modal.
+   Panel itself (.modal-content.logs-modal) keeps var(--bg-panel), an opaque background — see
+   07b-audio-mixer-modal-shell.css:441-451 — so content stays readable. Close is button-only
+   (#logs-modal-close), never click-outside, so a transparent backdrop is safe. */
+#logs-modal.modal-overlay {
+	background: transparent;
+	backdrop-filter: none;
+}
+
 /* Server logs (connection eye) */
 .logs-modal {
 	max-width: min(96vw, 1100px);
@@ -262,3 +271,42 @@
 .logs-modal__amcp-input:disabled {
 	opacity: 0.6;
 }
+
+.logs-modal__tabs {
+	display: flex;
+	gap: 1.5rem;
+	border-bottom: 1px solid var(--border, #333);
+	margin-bottom: 0;
+	flex: 1;
+}
+.logs-modal__tab {
+	background: none;
+	border: none;
+	padding: 0.5rem 0.2rem;
+	color: var(--text-muted);
+	font-weight: 600;
+	font-size: 0.9rem;
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+}
+.logs-modal__tab:hover {
+	color: var(--text, #ddd);
+}
+.logs-modal__tab--active {
+	color: var(--text, #ddd);
+	border-bottom-color: var(--accent, #58a6ff);
+}
+.logs-modal__shortcuts {
+	font-size: 0.85rem;
+	line-height: 1.6;
+	color: #ddd;
+}
+.logs-modal__shortcuts h1 { display: none; }
+.logs-modal__shortcuts h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; color: #fff; border-bottom: 1px solid #333; padding-bottom: 0.2rem; }
+.logs-modal__shortcuts h2:first-child { margin-top: 0; }
+.logs-modal__shortcuts h3 { font-size: 0.95rem; margin: 1.2rem 0 0.4rem; color: var(--text-muted); }
+.logs-modal__shortcuts p { margin-bottom: 0.8rem; }
+.logs-modal__shortcuts ul { margin: 0 0 1rem 1.5rem; padding: 0; list-style-type: disc; }
+.logs-modal__shortcuts li { margin-bottom: 0.4rem; }
+.logs-modal__shortcuts code { background: rgba(255,255,255,0.1); padding: 0.15rem 0.35rem; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.logs-modal__shortcuts strong { color: var(--accent, #58a6ff); font-weight: 600; }

@@ -11,7 +11,7 @@ const {
 	clearSceneProgramLookStackLayers,
 	collectOccupiedLookLayersOnChannel,
 } = require('./scene-exit-layers')
-const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+const { timelineCasparLayer } = require('./timeline-playback-helpers')
 
 function transitionIsCut(globalT) {
 	return globalT.duration <= 0 || String(globalT.type || '').toUpperCase() === 'CUT'
@@ -75,7 +75,7 @@ async function fadePhysicalLayersIn(amcp, channel, layerNums, durationFrames, tw
  */
 function collectTimelinePhysicalLayers(tl) {
 	if (!tl?.layers?.length) return []
-	return tl.layers.map((_, i) => TIMELINE_LAYER_BASE + i)
+	return tl.layers.map((_, i) => timelineCasparLayer(i))
 }
 
 /**
@@ -97,7 +97,7 @@ function collectClipOpacityFadeLayers(eng, tl, pos) {
 			.map((k) => k.time)
 			.sort((a, b) => a - b)
 		if (times.length >= 2 && pos - clip.startTime < times[times.length - 1]) {
-			set.add(TIMELINE_LAYER_BASE + i)
+			set.add(timelineCasparLayer(i))
 		}
 	}
 	return set

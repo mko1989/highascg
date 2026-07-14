@@ -3,6 +3,7 @@
 const assert = require('assert')
 const { transitionIsCut } = require('../../src/engine/timeline-take')
 const { normalizeTransition } = require('../../src/engine/scene-transition')
+const { TIMELINE_LAYER_BASE } = require('../../src/engine/timeline-playback-helpers')
 
 {
 	const t = normalizeTransition({ type: 'MIX', duration: 25, tween: 'linear' }, false)
@@ -68,8 +69,13 @@ const { normalizeTransition } = require('../../src/engine/scene-transition')
 		assert.strictEqual(eng.getPlayback(tl.id).playing, true)
 		const opacityLines = batchLines.filter((l) => l.includes(' OPACITY '))
 		assert.ok(opacityLines.length >= 2, 'playForTake schedules clip fade-in on program route')
-		assert.match(opacityLines[0], /1-200 OPACITY 0 0/)
-		assert.ok(transportCalls.some((c) => c.includes('PLAY 1-200')), 'playForTake starts transport on PGM')
+		assert.match(opacityLines[0], new RegExp(`1-${TIMELINE_LAYER_BASE} OPACITY 0 0`))
+		// T173: transport is now batched via batchSendChunked, so check batchLines
+		const playLine = batchLines.some((c) => c.includes(`PLAY 1-${TIMELINE_LAYER_BASE}`))
+		assert.ok(
+			playLine || transportCalls.some((c) => c.includes(`PLAY 1-${TIMELINE_LAYER_BASE}`)),
+			'playForTake starts transport on PGM',
+		)
 		console.log('smoke-timeline-take: OK')
 	})().catch((err) => {
 		console.error(err)

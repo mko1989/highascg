@@ -195,7 +195,9 @@ async function handleApplyBundle(body, ctx) {
 		if (filePath) {
 			try {
 				await fs.promises.mkdir(path.dirname(filePath), { recursive: true }).catch(() => {})
-				await fs.promises.writeFile(filePath, payload.casparcgConfig, 'utf8')
+				// WO-161 T161.1: atomic (tmp + rename) so bundle apply can't leave a torn casparcg.config.
+				const { atomicWriteFile } = require('../utils/atomic-file-write')
+				await atomicWriteFile(filePath, payload.casparcgConfig, 'utf8')
 			} catch (e) {
 				console.warn('[Sync] Failed to write caspar config:', e.message)
 			}

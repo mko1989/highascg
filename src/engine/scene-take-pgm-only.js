@@ -1,4 +1,10 @@
 /**
+ * LEGACY since WO-160b: pgm-only takes now run through the LBG bank pipeline instead of this engine.
+ * This file is kept for backwards compatibility — verify via grep that no callers remain at runtime.
+ * runSceneTakePgmOnly is no longer invoked; normalizeTransitionForPgmOnly, physicalLayer, pgmOnlyMixerAnimTail
+ * may have other consumers — check before deletion.
+ *
+ * --- Original docstring ---
  * PGM-only program take — single stack (no A/B banks), CUT or +Animate only.
  * Outgoing layers are cleared in teardown after the transition window, not before LOADBG.
  */
@@ -26,6 +32,7 @@ const {
 	chLayerAmcp,
 } = require('./scene-take-lbg-helpers')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
+const { cropAdjustedFillForLayer } = require('./layer-crop')
 const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
@@ -345,11 +352,13 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		try {
 			const prev = currentMap.get(job.layer.layerNumber)
 			const nextP = nextPipContentLayerInScene(incomingSorted, job.layer.layerNumber)
+			// WO-158 T158.5: overlay placement hugs the visible (cropped) content;
+			// the video layer's MIXER FILL above stays uncropped (Caspar applies CROP itself).
 			const lines = buildPipOverlayAmcpLinesAll(
 				job.pipOverlays,
 				channel,
 				job.pLayer,
-				job.f,
+				cropAdjustedFillForLayer(job.f, job.layer),
 				self,
 				nextP,
 				prev || null,

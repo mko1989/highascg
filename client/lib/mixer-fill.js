@@ -6,6 +6,7 @@
 import { fillToPixelRect } from './fill-math.js'
 import { api } from './api-client.js'
 import { inputChannelResolution, isAnyInputChannel } from './input-channels.js'
+import { cropAdjustedFillForLayer } from './layer-crop.js'
 
 /**
  * Layer fills are authored in program compose pixels; PRV may differ (letterbox / pillarbox).
@@ -266,6 +267,33 @@ export async function resolveLayerFillForAmcp(
 	const ls = { x: mapped.x, y: mapped.y, w: mapped.w, h: mapped.h, stretch: stretchMode }
 	const out = calcMixerFill(ls, { w: outW, h: outH }, contentRes)
 	return { x: out.x, y: out.y, scaleX: out.xScale, scaleY: out.yScale }
+}
+
+/**
+ * Visible content rect for PIP overlay placement ONLY (WO-158 T158.5): the resolved
+ * MIXER FILL intersected with the layer's crop effect, so borders/shadows/glow hug the
+ * cropped content. The video layer's own MIXER FILL must stay UNcropped — Caspar
+ * applies CROP separately on the same layer — so never feed this to MIXER FILL.
+ * Identity/no crop returns exactly what resolveLayerFillForAmcp returns.
+ * Same signature as resolveLayerFillForAmcp.
+ */
+export async function resolveLayerContentRectForOverlay(
+	layer,
+	stateStore,
+	screenIdx,
+	targetOutputCanvas,
+	fetchMediaList,
+	authoringCanvas = null
+) {
+	const fill = await resolveLayerFillForAmcp(
+		layer,
+		stateStore,
+		screenIdx,
+		targetOutputCanvas,
+		fetchMediaList,
+		authoringCanvas,
+	)
+	return cropAdjustedFillForLayer(fill, layer)
 }
 
 /** @param {{ type?: string, value?: string }} source */

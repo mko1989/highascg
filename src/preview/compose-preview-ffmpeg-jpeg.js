@@ -208,6 +208,9 @@ async function pollMtimeAndBroadcast(ctx) {
 		if (!resolved) continue
 		try {
 			const st = await require('fs').promises.stat(resolved.path)
+			// 0-byte stub / truncated-on-blocklist file (WO-159 T159.1) — never push it as a
+			// frame: the client's etag path would clear its blocklist badge and fetch a 404.
+			if (st.size <= 32) continue
 			const prev = _lastMtime.get(ch) || 0
 			const deferred = _deferredMtime.get(ch) || 0
 			const hasNewFrame = st.mtimeMs > prev
@@ -260,4 +263,5 @@ module.exports = {
 	startFfmpegJpegComposePreview,
 	stopFfmpegJpegComposePreview,
 	getFfmpegJpegComposePreviewStats,
+	resolveMtimePollMs,
 }

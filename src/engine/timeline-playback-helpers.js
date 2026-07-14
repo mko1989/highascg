@@ -105,8 +105,42 @@ function parseResolutionAspect(s) {
 /**
  * Caspar layers for timeline (per stack index). Must sit **above** look bank B (110–199) so fills/CG from looks
  * do not cover timeline output; keep separate from bank A (1–99) and black CG (9).
+ * WO-160: base moved 200 → 210 and capped at 50 layers (210–259) — the PIP overlay band starts at 260.
+ * Constants live in look-layer-ranges.js (single source of truth for all bands).
  */
-const TIMELINE_LAYER_BASE = 200
+const {
+	TIMELINE_LAYER_BASE,
+	TIMELINE_LAYER_MAX_COUNT,
+	assertPhysicalLayerBelowCeiling,
+} = require('./look-layer-ranges')
+
+let _timelineLayerClampWarned = false
+
+/**
+ * Physical Caspar layer for a timeline layer index, clamped to the timeline band.
+ * A timeline with more than {@link TIMELINE_LAYER_MAX_COUNT} layers would spill into the
+ * PIP overlay band (260+) — extra layers are clamped onto the last slot and warned once.
+ * @param {number} layerIndex — 0-based timeline layer index
+ * @param {(level: string, msg: string) => void} [log]
+ */
+function timelineCasparLayer(layerIndex, log) {
+	const li = Math.max(0, Number(layerIndex) | 0)
+	if (li >= TIMELINE_LAYER_MAX_COUNT) {
+		if (!_timelineLayerClampWarned) {
+			_timelineLayerClampWarned = true
+			const msg = `[timeline] layer index ${li} exceeds max ${TIMELINE_LAYER_MAX_COUNT - 1} — clamped to layer ${
+				TIMELINE_LAYER_BASE + TIMELINE_LAYER_MAX_COUNT - 1
+			} (timeline band ${TIMELINE_LAYER_BASE}-${TIMELINE_LAYER_BASE + TIMELINE_LAYER_MAX_COUNT - 1}, WO-160)`
+			if (typeof log === 'function') log('warn', msg)
+			else console.warn(msg)
+		}
+		return assertPhysicalLayerBelowCeiling(
+			TIMELINE_LAYER_BASE + TIMELINE_LAYER_MAX_COUNT - 1,
+			'timeline layer',
+		)
+	}
+	return assertPhysicalLayerBelowCeiling(TIMELINE_LAYER_BASE + li, 'timeline layer')
+}
 
 const TICK_MS = 40
 /** WS `timeline.tick` throttle — client extrapolates between ticks; ~150–180ms reduces jitter over high-latency links. */
@@ -141,6 +175,8 @@ module.exports = {
 	timelineClipTransportStale,
 	parseResolutionAspect,
 	TIMELINE_LAYER_BASE,
+	TIMELINE_LAYER_MAX_COUNT,
+	timelineCasparLayer,
 	TICK_MS,
 	TIMELINE_TICK_BROADCAST_MS,
 	TIMELINE_AMCP_DRIFT_MS,

@@ -8,7 +8,7 @@
 
 import { createDragInput } from './inspector-common.js'
 import { api } from '../lib/api-client.js'
-import { resolveLayerFillForAmcp } from '../lib/mixer-fill.js'
+import { resolveLayerContentRectForOverlay } from '../lib/mixer-fill.js'
 import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import {
 	PIP_OVERLAYS,
@@ -86,8 +86,9 @@ async function pushLivePipOverlaysToProgram(ctx, pipOverlays) {
 		framerate: progRes.fps ?? 50,
 	}
 	const authoringCanvas = sceneState.getCanvasForScreen(mainIdx)
-	// Match video-layer MIXER FILL (content-fit) — required for outside borders (expanded CG canvas).
-	const fill = await resolveLayerFillForAmcp(
+	// Match video-layer MIXER FILL (content-fit) but crop-adjusted (WO-158 T158.5): the
+	// overlay placement hugs the visible content; the video layer's own FILL stays uncropped.
+	const fill = await resolveLayerContentRectForOverlay(
 		layer,
 		stateStore,
 		mainIdx,
@@ -229,6 +230,7 @@ export function renderParamEditor(container, schema, currentValue, onChange) {
 		step: schema.step ?? 0.01,
 		decimals: schema.decimals ?? 2,
 		onChange: (val) => onChange(val),
+		slider: schema.slider,
 	})
 	container.appendChild(di.wrap)
 }

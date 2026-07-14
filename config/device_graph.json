@@ -23,12 +23,12 @@
         "type": "rtmp",
         "name": "Str1",
         "quality": "medium",
-        "rtmpServerUrl": "",
-        "streamKey": "",
+        "rtmpServerUrl": "rtmp://x.rtmp.youtube.com/live2",
+        "streamKey": "aek2-2g0j-jvr0-qca4-9j89",
         "srtUrl": "",
         "udpUrl": "",
         "videoCodec": "h264",
-        "videoBitrateKbps": 4500,
+        "videoBitrateKbps": 6500,
         "encoderPreset": "veryfast",
         "audioCodec": "aac",
         "audioBitrateKbps": 128
@@ -54,19 +54,20 @@
       "externalRef": "record_1"
     },
     {
+      "id": "dst_in_dst_pgm_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM 1",
+      "externalRef": "dst_pgm_1"
+    },
+    {
       "id": "dlsdi_1",
       "deviceId": "caspar_host",
       "kind": "decklink_io",
       "index": 0,
       "label": "DeckLink 1",
       "caspar": {
-        "ioDirection": "out",
-        "bus": "pgm",
-        "mainIndex": 0,
-        "outputBinding": {
-          "type": "screen",
-          "index": 1
-        }
+        "ioDirection": "unassigned"
       },
       "externalRef": "1"
     },
@@ -77,7 +78,9 @@
       "index": 1,
       "label": "DeckLink 2",
       "caspar": {
-        "ioDirection": "unassigned"
+        "ioDirection": "unassigned",
+        "bus": "pgm",
+        "mainIndex": 1
       },
       "externalRef": "2"
     },
@@ -88,7 +91,13 @@
       "index": 2,
       "label": "DeckLink 3",
       "caspar": {
-        "ioDirection": "unassigned"
+        "ioDirection": "out",
+        "outputBinding": {
+          "type": "screen",
+          "index": 2
+        },
+        "bus": "pgm",
+        "mainIndex": 1
       },
       "externalRef": "3"
     },
@@ -104,6 +113,13 @@
       "externalRef": "4"
     },
     {
+      "id": "dst_in_dst_mrizwonx_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "Multiview 1",
+      "externalRef": "dst_mrizwonx_1"
+    },
+    {
       "id": "caspar_mv_out",
       "deviceId": "caspar_host",
       "kind": "caspar_mv_out",
@@ -111,37 +127,18 @@
       "externalRef": "4"
     },
     {
-      "id": "dst_in_dst_mr6mopxd_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM/PRV 1",
-      "externalRef": "dst_mr6mopxd_1"
-    },
-    {
-      "id": "dst_in_dst_mr6mp0g6_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "Multiview 1",
-      "externalRef": "dst_mr6mp0g6_1"
-    },
-    {
-      "id": "dst_in_dst_mr6mp27s_1",
+      "id": "dst_in_dst_mrizwm0m_1",
       "deviceId": "destinations",
       "kind": "destination_in",
       "label": "PGM 2",
-      "externalRef": "dst_mr6mp27s_1"
+      "externalRef": "dst_mrizwm0m_1"
     },
     {
-      "id": "dst_in_host_decklink_input_4",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "DeckLink 4",
-      "caspar": {
-        "hostRole": "decklink_input",
-        "hostChannel": 5,
-        "slot": 4
-      },
-      "externalRef": "host_decklink_input_4"
+      "id": "audio_1",
+      "deviceId": "caspar_host",
+      "kind": "audio_out",
+      "label": "Audio 1",
+      "externalRef": "hw:2,0"
     },
     {
       "id": "gpu_p0",
@@ -152,7 +149,7 @@
         "bus": "pgm",
         "mainIndex": 0
       },
-      "externalRef": "DP-0/DP-1"
+      "externalRef": "DP-0"
     },
     {
       "id": "gpu_p1",
@@ -161,9 +158,9 @@
       "label": "P1",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 1
+        "mainIndex": 0
       },
-      "externalRef": "DP-3"
+      "externalRef": "DP-2/DP-3"
     },
     {
       "id": "gpu_p2",
@@ -172,9 +169,9 @@
       "label": "P2",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 0
+        "mainIndex": 1
       },
-      "externalRef": "DP-4"
+      "externalRef": "DP-5"
     },
     {
       "id": "gpu_p3",
@@ -190,29 +187,34 @@
   ],
   "edges": [
     {
-      "id": "e_dst_in_dst_mr6mp0g6_1_gpu_p1",
-      "sourceId": "dst_in_dst_mr6mp0g6_1",
-      "sinkId": "gpu_p1"
+      "id": "e_dst_in_dst_pgm_1_gpu_p0",
+      "sourceId": "dst_in_dst_pgm_1",
+      "sinkId": "gpu_p0"
     },
     {
-      "id": "e_dst_in_dst_mr6mopxd_1_gpu_p2",
-      "sourceId": "dst_in_dst_mr6mopxd_1",
+      "id": "e_dst_in_dst_mrizwonx_1_gpu_p2",
+      "sourceId": "dst_in_dst_mrizwonx_1",
       "sinkId": "gpu_p2"
     },
     {
-      "id": "e_dst_in_dst_mr6mopxd_1_dlsdi_1",
-      "sourceId": "dst_in_dst_mr6mopxd_1",
-      "sinkId": "dlsdi_1"
+      "id": "e_dst_in_dst_mrizwm0m_1_dlsdi_3",
+      "sourceId": "dst_in_dst_mrizwm0m_1",
+      "sinkId": "dlsdi_3"
     },
     {
-      "id": "e_dst_in_dst_mr6mp27s_1_rec_1",
-      "sourceId": "dst_in_dst_mr6mp27s_1",
+      "id": "e_dst_in_dst_mrizwm0m_1_rec_1",
+      "sourceId": "dst_in_dst_mrizwm0m_1",
       "sinkId": "rec_1"
     },
     {
-      "id": "e_dst_in_dst_mr6mp27s_1_str_1",
-      "sourceId": "dst_in_dst_mr6mp27s_1",
+      "id": "e_dst_in_dst_mrizwm0m_1_str_1",
+      "sourceId": "dst_in_dst_mrizwm0m_1",
       "sinkId": "str_1"
+    },
+    {
+      "id": "e_dst_in_dst_pgm_1_audio_1",
+      "sourceId": "dst_in_dst_pgm_1",
+      "sinkId": "audio_1"
     }
   ]
 }

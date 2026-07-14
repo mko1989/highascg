@@ -9,8 +9,32 @@ const persistence = require('../utils/persistence')
 const { getChannelMap } = require('../config/routing')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { runSerialized } = require('../utils/async-serial-queue')
+const { renumberLookLayersConsecutive } = require('../engine/look-layer-ranges')
 
 const KEY = 'liveScenesByProgramChannel'
+
+/** Channels already logged as WO-160-migrated this process. */
+const _liveMigrateLoggedChannels = new Set()
+
+/**
+ * WO-160 one-way migration on read: persisted live looks with legacy layer numbering
+ * (10/20/30 decades or >99 overflow) renumber to consecutive-from-10 so takes/reconcile
+ * never fight the new client numbering. If Caspar still carries content on the old
+ * physical layers, reconcile clears the live JSON and the orphan sweep cleans them.
+ */
+function _migrateLiveScenes(all) {
+	for (const ch of Object.keys(all)) {
+		const scene = all[ch]?.scene
+		if (!scene || !Array.isArray(scene.layers)) continue
+		if (renumberLookLayersConsecutive(scene.layers) && !_liveMigrateLoggedChannels.has(ch)) {
+			_liveMigrateLoggedChannels.add(ch)
+			console.warn(
+				`[live-scene] WO-160 migration: ch${ch} persisted live look renumbered to consecutive layer numbers from 10 (one-way, on read)`,
+			)
+		}
+	}
+	return all
+}
 
 /** @type {((ctx: object) => void)|null} */
 let _onSceneLiveBroadcast = null
@@ -34,7 +58,7 @@ function onProgramChange(fn) {
 
 function _all() {
 	const raw = persistence.get(KEY)
-	return raw && typeof raw === 'object' ? raw : {}
+	return raw && typeof raw === 'object' ? _migrateLiveScenes(raw) : {}
 }
 
 /**

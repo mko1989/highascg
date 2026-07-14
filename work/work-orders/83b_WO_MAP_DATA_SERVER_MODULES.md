@@ -225,37 +225,37 @@ Also scan: `src/module-registry.js` and `src/repo-paths.js` as top-level `src/` 
 
 ### Phase A: Module-level scan (Layer 2)
 
-- [ ] **T1** Add `src/` directory walker to `generate-map-data.js`: list all subdirectories of `src/`, create one `kind: "module"` node per directory.
-- [ ] **T2** Embed curated descriptions from §2 lookup table. Fall back to `"Source module: <dirname>"` for unknown dirs.
-- [ ] **T3** For each module directory, list all `.js` files and create `kind: "file"` children with `meta.path`, `meta.lines`, `meta.bytes`.
-- [ ] **T4** Inject the module tree under `app:highascg-server.children` in the map-data envelope.
-- [ ] **T5** Scan `index.js`, `src/module-registry.js`, `src/repo-paths.js` as direct children of `app:highascg-server`.
+- [x] **T1** Add `src/` directory walker to `generate-map-data.js`: list all subdirectories of `src/`, create one `kind: "module"` node per directory.
+- [x] **T2** Embed curated descriptions from §2 lookup table. Fall back to `"Source module: <dirname>"` for unknown dirs.
+- [x] **T3** For each module directory, list all `.js` files and create `kind: "file"` children with `meta.path`, `meta.lines`, `meta.bytes`.
+- [x] **T4** Inject the module tree under `app:highascg-server.children` in the map-data envelope.
+- [x] **T5** Scan `index.js`, `src/module-registry.js`, `src/repo-paths.js` as direct children of `app:highascg-server`.
 
 ### Phase B: AST extraction (Layer 4–5)
 
-- [ ] **T6** Install `acorn` as devDependency (`npm install --save-dev acorn`).
-- [ ] **T7** Implement `parseFile(filePath)` function: read file, parse with acorn, return AST.
-- [ ] **T8** Implement `extractExports(ast, filePath)` — walk AST per §3.3 rules, return array of `{name, kind, line, endLine, params, async, jsdoc}`.
-- [ ] **T9** Implement `extractImports(ast, filePath)` — find all `require()` calls and `import` declarations, return array of `{target, line}`.
-- [ ] **T10** Implement `extractRoutes(ast, filePath)` — find `router.get/post/put/delete/patch` calls per §3.4, return route nodes.
-- [ ] **T11** Implement `extractWsEvents(ast, filePath)` — find broadcast/emit patterns per §3.5, return event nodes.
-- [ ] **T12** Implement `extractFileDescription(source)` — grab first `//` comment or `@fileoverview` JSDoc as the file description.
-- [ ] **T13** Wire all extractors into the file scan: each file node gets `children` from exports + routes + ws-events, and `meta.imports` from the import extractor.
-- [ ] **T14** Handle parse errors gracefully: if acorn fails on a file (syntax error, non-JS), log a warning and emit the file node with `meta.parseError: true` and no children.
+- [x] **T6** Install `acorn` as devDependency (`npm install --save-dev acorn`).
+- [x] **T7** Implement `parseFile(filePath)` function: read file, parse with acorn, return AST.
+- [x] **T8** Implement `extractExports(ast, filePath)` — walk AST per §3.3 rules, return array of `{name, kind, line, endLine, params, async, jsdoc}`.
+- [x] **T9** Implement `extractImports(ast, filePath)` — find all `require()` calls and `import` declarations, return array of `{target, line}`.
+- [x] **T10** Implement `extractRoutes(ast, filePath)` — find `router.get/post/put/delete/patch` calls per §3.4, return route nodes.
+- [x] **T11** Implement `extractWsEvents(ast, filePath)` — find broadcast/emit patterns per §3.5, return event nodes.
+- [x] **T12** Implement `extractFileDescription(source)` — grab first `//` comment or `@fileoverview` JSDoc as the file description.
+- [x] **T13** Wire all extractors into the file scan: each file node gets `children` from exports + routes + ws-events, and `meta.imports` from the import extractor.
+- [x] **T14** Handle parse errors gracefully: if acorn fails on a file (syntax error, non-JS), log a warning and emit the file node with `meta.parseError: true` and no children.
 
 ### Phase C: Import graph (cross-references)
 
-- [ ] **T15** Implement `resolveImport(target, fromFile, repoRoot)` — resolve `./` relative paths, classify as `internal`/`external`/`builtin`.
-- [ ] **T16** After all files are parsed, run the second pass: build `importedBy` reverse map.
-- [ ] **T17** Attach `meta.importedBy` to each file node (list of internal files that import it).
-- [ ] **T18** Attach `meta.importCount` and `meta.importedByCount` summary numbers.
+- [x] **T15** Implement `resolveImport(target, fromFile, repoRoot)` — resolve `./` relative paths, classify as `internal`/`external`/`builtin`.
+- [x] **T16** After all files are parsed, run the second pass: build `importedBy` reverse map.
+- [x] **T17** Attach `meta.importedBy` to each file node (list of internal files that import it).
+- [x] **T18** Attach `meta.importCount` and `meta.importedByCount` summary numbers.
 
 ### Phase D: Validation & output
 
-- [ ] **T19** Update `stats` in the envelope: recount total nodes, max depth, per-layer counts.
-- [ ] **T20** Run on the actual codebase and verify: ≥500 file nodes, ≥2000 function nodes, ≥100 route nodes.
-- [ ] **T21** Performance: the full scan must complete in < 10 seconds on the playout host.
-- [ ] **T22** Log summary to stdout: modules scanned, files parsed, exports found, routes found, parse errors.
+- [x] **T19** Update `stats` in the envelope: recount total nodes, max depth, per-layer counts.
+- [x] **T20** Run on the actual codebase and verify: ≥500 file nodes, ≥2000 function nodes, ≥100 route nodes.
+- [x] **T21** Performance: the full scan must complete in < 10 seconds on the playout host.
+- [x] **T22** Log summary to stdout: modules scanned, files parsed, exports found, routes found, parse errors.
 
 ---
 

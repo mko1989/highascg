@@ -3,6 +3,7 @@
  */
 
 import { PLACEHOLDER_TEMPLATES } from '../lib/placeholder-state.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 export function showPlaceholderModal(options = {}) {
 	const existing = document.getElementById('placeholder-modal')
@@ -70,6 +71,7 @@ export function showPlaceholderModal(options = {}) {
 	}
 	templateSel.addEventListener('change', updateDesc)
 	updateDesc()
+	attachMathInput(modal.querySelector('#ph-duration'), { decimals: 0 })
 
 	function close() {
 		document.removeEventListener('keydown', onKey)

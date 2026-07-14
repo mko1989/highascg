@@ -1,51 +1,54 @@
 /**
  * PIP Overlay registry — catalog of HTML-template-based overlay effects for PIP layers.
- * CG runs on {@link resolvePipOverlayCasparLayer} (aligned with video or legacy high band).
+ * CG runs on {@link resolvePipOverlayCasparLayer} in the reserved 260–979 band (WO-160).
  *
  * @see 25_WO_PIP_OVERLAY_EFFECTS.md
  */
 
-export const PIP_OVERLAY_LAYER_OFFSET = 100
+/** PIP overlay band base — must match server `src/engine/look-layer-ranges.js`. */
+export const PIP_OVERLAY_BAND_BASE = 260
 
-/** Max stacked HTML overlays above one PIP (border + shadow + …). */
-export const PIP_OVERLAY_MAX_STACK = 8
+/** Max stacked HTML overlays above one PIP (border + shadow + …). WO-160: 8 → 4. */
+export const PIP_OVERLAY_MAX_STACK = 4
 
-/** @see src/engine/pip-overlay.js — first PIP/CG layer = content + this (main clip stays on 10, 20, …). */
-export const PIP_OVERLAY_ALIGN_GAP = 1
+/** Look layer band bounds — must match server `src/engine/look-layer-ranges.js`. */
+const LOOK_LAYER_MIN = 10
+const LOOK_LAYER_MAX = 99
+const BANK_B_OFFSET = 100
+const CONTENT_INDEX_MAX = 2 * (LOOK_LAYER_MAX - LOOK_LAYER_MIN + 1) - 1
 
-/** @deprecated legacy high-band slot — use resolvePipOverlayCasparLayer */
-export function overlayLayerSlot(contentLayer, stackIndex = 0) {
-	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const base = Number(contentLayer)
-	const n = Number.isFinite(base) ? base : 0
-	return PIP_OVERLAY_LAYER_OFFSET + n * PIP_OVERLAY_MAX_STACK + i
+/**
+ * Compact index of a look content physical layer (WO-160): bank A 10–99 → 0–89,
+ * bank B 110–199 → 90–179. Out-of-band input is clamped.
+ * Must match `pipOverlayContentIndex` in src/engine/pip-overlay-utils.js.
+ */
+function pipOverlayContentIndex(contentPhysicalLayer) {
+	const p = Number(contentPhysicalLayer)
+	if (!Number.isFinite(p)) return 0
+	const idx =
+		p <= LOOK_LAYER_MAX
+			? p - LOOK_LAYER_MIN
+			: LOOK_LAYER_MAX - LOOK_LAYER_MIN + 1 + (p - (BANK_B_OFFSET + LOOK_LAYER_MIN))
+	return Math.max(0, Math.min(CONTENT_INDEX_MAX, Math.round(idx)))
 }
 
 /**
- * Must match {@link ../../src/engine/pip-overlay.js resolvePipOverlayCasparLayer}.
- * @param {number|undefined} nextContentLayer - Min other look layer &gt; this PIP
+ * PIP overlay Caspar layer — pure function of content physical layer + stack index
+ * (`260 + compactIndex * 4 + stackIndex` → 260–979, both banks).
+ * Must match {@link ../../src/engine/pip-overlay-utils.js overlayLayerSlot}.
  */
-export function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer) {
+export function overlayLayerSlot(contentLayer, stackIndex = 0) {
 	const i = Math.max(0, Math.min(PIP_OVERLAY_MAX_STACK - 1, stackIndex | 0))
-	const p = Number(contentPhysicalLayer)
-	if (!Number.isFinite(p) || p < 0) {
-		return PIP_OVERLAY_LAYER_OFFSET + i
-	}
-	let nx = nextContentLayer
-	if (nx == null) {
-		nx = p >= 10 && p % 10 === 0 ? p + 10 : p + 1
-	} else if (typeof nx === 'string' && nx.trim() === '') {
-		nx = 10000
-	} else {
-		nx = Number(nx)
-	}
-	if (!Number.isFinite(nx) || nx <= p) {
-		nx = 10000
-	}
-	if (p + PIP_OVERLAY_ALIGN_GAP + i < nx) {
-		return p + PIP_OVERLAY_ALIGN_GAP + i
-	}
-	return PIP_OVERLAY_LAYER_OFFSET + p * PIP_OVERLAY_MAX_STACK + i
+	return PIP_OVERLAY_BAND_BASE + pipOverlayContentIndex(contentLayer) * PIP_OVERLAY_MAX_STACK + i
+}
+
+/**
+ * Same as {@link overlayLayerSlot}. `nextContentLayer` is accepted for call-site
+ * compatibility but ignored (WO-160) — slots no longer depend on neighbouring layers.
+ * @param {number|undefined} _nextContentLayer — deprecated, unused
+ */
+export function resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, _nextContentLayer) {
+	return overlayLayerSlot(contentPhysicalLayer, stackIndex)
 }
 
 export function overlayLayer(contentLayer) {
@@ -107,10 +110,10 @@ export const PIP_OVERLAYS = [
 		},
 		schema: [
 			{ key: 'side', label: 'Side', type: 'select', options: ['inside', 'outside'], default: 'outside' },
-			{ key: 'width', label: 'Width', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 4 },
+			{ key: 'width', label: 'Width', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 4, slider: true },
 			{ key: 'color', label: 'Color', type: 'color', default: '#e63946' },
-			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0 },
-			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1 },
+			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0, slider: true },
+			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1, slider: true },
 		],
 	},
 	{
@@ -130,13 +133,13 @@ export const PIP_OVERLAYS = [
 		},
 		schema: [
 			{ key: 'side', label: 'Side', type: 'select', options: ['inside', 'outside'], default: 'outside' },
-			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1 },
-			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 100, step: 1, decimals: 0, default: 20 },
-			{ key: 'offsetX', label: 'Offset X', type: 'float', min: -50, max: 50, step: 1, decimals: 0, default: 5 },
-			{ key: 'offsetY', label: 'Offset Y', type: 'float', min: -50, max: 50, step: 1, decimals: 0, default: 5 },
+			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1, slider: true },
+			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 100, step: 1, decimals: 0, default: 20, slider: true },
+			{ key: 'offsetX', label: 'Offset X', type: 'float', min: -50, max: 50, step: 1, decimals: 0, default: 5, slider: true },
+			{ key: 'offsetY', label: 'Offset Y', type: 'float', min: -50, max: 50, step: 1, decimals: 0, default: 5, slider: true },
 			{ key: 'color', label: 'Color', type: 'color', default: 'rgba(0,0,0,0.6)' },
-			{ key: 'spread', label: 'Spread', type: 'float', min: -20, max: 20, step: 1, decimals: 0, default: 0 },
-			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0 },
+			{ key: 'spread', label: 'Spread', type: 'float', min: -20, max: 20, step: 1, decimals: 0, default: 0, slider: true },
+			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0, slider: true },
 		],
 	},
 	{
@@ -160,7 +163,7 @@ export const PIP_OVERLAYS = [
 		},
 		schema: [
 			{ key: 'side', label: 'Side', type: 'select', options: ['inside', 'outside'], default: 'outside' },
-			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1 },
+			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1, slider: true },
 			{
 				key: 'direction',
 				label: 'Flow (clockwise vs counter-clockwise around PIP)',
@@ -177,10 +180,11 @@ export const PIP_OVERLAYS = [
 				step: 1,
 				decimals: 0,
 				default: 1,
+				slider: true,
 			},
-			{ key: 'thickness', label: 'Thickness', type: 'float', min: 1, max: 20, step: 1, decimals: 0, default: 3 },
+			{ key: 'thickness', label: 'Thickness', type: 'float', min: 1, max: 20, step: 1, decimals: 0, default: 3, slider: true },
 			{ key: 'color', label: 'Color', type: 'color', default: '#e63946' },
-			{ key: 'speed', label: 'Loop (sec)', type: 'float', min: 0.1, max: 10, step: 0.1, decimals: 1, default: 2 },
+			{ key: 'speed', label: 'Loop (sec)', type: 'float', min: 0.1, max: 10, step: 0.1, decimals: 1, default: 2, slider: true },
 			{
 				key: 'length',
 				label: 'Strip length % of edge',
@@ -190,10 +194,11 @@ export const PIP_OVERLAYS = [
 				step: 1,
 				decimals: 0,
 				default: 28,
+				slider: true,
 			},
 			{ key: 'glow', label: 'Glow Trail', type: 'bool', default: true },
 			{ key: 'glowColor', label: 'Glow Color', type: 'color', default: '#ff6b6b' },
-			{ key: 'glowWidth', label: 'Glow Width', type: 'float', min: 1, max: 50, step: 1, decimals: 0, default: 5 },
+			{ key: 'glowWidth', label: 'Glow Width', type: 'float', min: 1, max: 50, step: 1, decimals: 0, default: 5, slider: true },
 			{ key: 'roundedTips', label: 'Rounded Tips', type: 'bool', default: false },
 		],
 	},
@@ -215,10 +220,10 @@ export const PIP_OVERLAYS = [
 		},
 		schema: [
 			{ key: 'side', label: 'Side', type: 'select', options: ['inside', 'outside'], default: 'outside' },
-			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1 },
+			{ key: 'opacity', label: 'Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 1, slider: true },
 			{ key: 'color', label: 'Color', type: 'color', default: '#e63946' },
-			{ key: 'intensity', label: 'Intensity (Blur)', type: 'float', min: 1, max: 50, step: 1, decimals: 0, default: 15 },
-			{ key: 'width', label: 'Width (Spread)', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0 },
+			{ key: 'intensity', label: 'Intensity (Blur)', type: 'float', min: 1, max: 50, step: 1, decimals: 0, default: 15, slider: true },
+			{ key: 'width', label: 'Width (Spread)', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0, slider: true },
 			{ key: 'pulse', label: 'Pulse', type: 'bool', default: true },
 			{
 				key: 'pulseSpeed',
@@ -229,9 +234,10 @@ export const PIP_OVERLAYS = [
 				step: 0.1,
 				decimals: 1,
 				default: 2,
+				slider: true,
 			},
-			{ key: 'minOpacity', label: 'Min Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 0.4 },
-			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0 },
+			{ key: 'minOpacity', label: 'Min Opacity', type: 'float', min: 0, max: 1, step: 0.05, decimals: 2, default: 0.4, slider: true },
+			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0, slider: true },
 		],
 	},
 	{
@@ -241,7 +247,7 @@ export const PIP_OVERLAYS = [
 		template: 'pip_router',
 		defaults: { radius: 0, effects: [] },
 		schema: [
-			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0 },
+			{ key: 'radius', label: 'Corner Radius', type: 'float', min: 0, max: 50, step: 1, decimals: 0, default: 0, slider: true },
 		],
 	},
 ]

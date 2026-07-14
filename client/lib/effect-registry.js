@@ -37,6 +37,11 @@ export const CHROMA_KEY_TYPES = ['None', 'Green', 'Blue']
  * @property {string[]} [options] - Select options
  * @property {*} [default] - Default value
  * @property {boolean} [primary] - When false, param is shown under Advanced in inspector (default true)
+ * @property {'px'} [displayAs] - Edit surface only: show/edit as pixels of the layer's content
+ *   resolution (fallback: channel resolution). Persisted values STAY 0–1 fractions —
+ *   the inspector converts px↔fraction at the presentation layer (WO-158 T158.4).
+ * @property {'w'|'h'} [pxAxis] - Which content dimension the px conversion uses
+ * @property {string} [pxHint] - Tooltip explaining the pixel semantics
  */
 
 /**
@@ -71,7 +76,7 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'brightness',
 		defaults: { value: 1 },
 		schema: [
-			{ key: 'value', label: 'Brightness', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1 },
+			{ key: 'value', label: 'Brightness', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, slider: true },
 		],
 	},
 	{
@@ -82,7 +87,7 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'contrast',
 		defaults: { value: 1 },
 		schema: [
-			{ key: 'value', label: 'Contrast', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1 },
+			{ key: 'value', label: 'Contrast', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, slider: true },
 		],
 	},
 	{
@@ -93,7 +98,7 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'saturation',
 		defaults: { value: 1 },
 		schema: [
-			{ key: 'value', label: 'Saturation', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1 },
+			{ key: 'value', label: 'Saturation', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, slider: true },
 		],
 	},
 	{
@@ -104,11 +109,11 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'levels',
 		defaults: { minIn: 0, maxIn: 1, gamma: 1, minOut: 0, maxOut: 1 },
 		schema: [
-			{ key: 'minIn', label: 'Min In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: true },
-			{ key: 'maxIn', label: 'Max In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: true },
-			{ key: 'gamma', label: 'Gamma', type: 'float', min: 0, max: 4, step: 0.01, decimals: 2, default: 1, primary: true },
-			{ key: 'minOut', label: 'Min Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: false },
-			{ key: 'maxOut', label: 'Max Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: false },
+			{ key: 'minIn', label: 'Min In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: true, slider: true },
+			{ key: 'maxIn', label: 'Max In', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: true, slider: true },
+			{ key: 'gamma', label: 'Gamma', type: 'float', min: 0, max: 4, step: 0.01, decimals: 2, default: 1, primary: true, slider: true },
+			{ key: 'minOut', label: 'Min Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0, primary: false, slider: true },
+			{ key: 'maxOut', label: 'Max Out', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 1, primary: false, slider: true },
 		],
 	},
 	{
@@ -120,10 +125,10 @@ export const MIXER_EFFECTS = [
 		defaults: { key: 'None', threshold: 0.34, softness: 0.44, spill: 1, blur: 0 },
 		schema: [
 			{ key: 'key', label: 'Key', type: 'select', options: CHROMA_KEY_TYPES, default: 'None', primary: true },
-			{ key: 'threshold', label: 'Threshold', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.34, primary: true },
-			{ key: 'softness', label: 'Softness', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.44, primary: true },
-			{ key: 'spill', label: 'Spill', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, primary: false },
-			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 0, primary: false },
+			{ key: 'threshold', label: 'Threshold', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.34, primary: true, slider: true },
+			{ key: 'softness', label: 'Softness', type: 'float', min: 0, max: 1, step: 0.01, decimals: 2, default: 0.44, primary: true, slider: true },
+			{ key: 'spill', label: 'Spill', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 1, primary: false, slider: true },
+			{ key: 'blur', label: 'Blur', type: 'float', min: 0, max: 2, step: 0.01, decimals: 2, default: 0, primary: false, slider: true },
 		],
 	},
 	{
@@ -133,11 +138,17 @@ export const MIXER_EFFECTS = [
 		category: 'geometry',
 		amcpCommand: 'crop',
 		defaults: { left: 0, top: 0, right: 1, bottom: 1 },
+		/**
+		 * Stored/sent as 0–1 fractions of the layer's image (CasparCG MIXER CROP semantics;
+		 * right/bottom are measured from the top-left origin, 1 = full width/height).
+		 * `displayAs: 'px'` makes the inspector edit these as pixel positions of the layer's
+		 * content resolution — presentation only, persisted values stay fractions (WO-158).
+		 */
 		schema: [
-			{ key: 'left', label: 'Left', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'top', label: 'Top', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'right', label: 'Right', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1 },
-			{ key: 'bottom', label: 'Bottom', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1 },
+			{ key: 'left', label: 'Left', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0, displayAs: 'px', pxAxis: 'w', pxHint: 'Left crop edge — pixels from the left edge of the layer content', slider: true },
+			{ key: 'top', label: 'Top', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0, displayAs: 'px', pxAxis: 'h', pxHint: 'Top crop edge — pixels from the top edge of the layer content', slider: true },
+			{ key: 'right', label: 'Right', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1, displayAs: 'px', pxAxis: 'w', pxHint: 'Right crop edge — pixel position measured from the LEFT edge (full width = uncropped)', slider: true },
+			{ key: 'bottom', label: 'Bottom', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1, displayAs: 'px', pxAxis: 'h', pxHint: 'Bottom crop edge — pixel position measured from the TOP edge (full height = uncropped)', slider: true },
 		],
 	},
 	{
@@ -148,10 +159,10 @@ export const MIXER_EFFECTS = [
 		amcpCommand: 'clip',
 		defaults: { left: 0, width: 1, top: 0, height: 1 },
 		schema: [
-			{ key: 'left', label: 'Left', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'width', label: 'Width', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1 },
-			{ key: 'top', label: 'Top', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0 },
-			{ key: 'height', label: 'Height', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1 },
+			{ key: 'left', label: 'Left', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0, slider: true },
+			{ key: 'width', label: 'Width', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1, slider: true },
+			{ key: 'top', label: 'Top', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 0, slider: true },
+			{ key: 'height', label: 'Height', type: 'float', min: 0, max: 1, step: 0.01, decimals: 3, default: 1, slider: true },
 		],
 	},
 	{

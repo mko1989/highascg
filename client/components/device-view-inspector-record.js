@@ -9,6 +9,7 @@ import {
 	refreshStreamingChannelStatus,
 	subscribeStreamingChannelStatus,
 } from '../lib/streaming-channel-state.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 function savedRecordOutput(currentSettings, conn) {
 	const rows = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : []
@@ -43,6 +44,7 @@ export function renderRecordOutControls(h, conn, { currentSettings, streamingSta
 	const wrapCtl = Object.assign(document.createElement('div'), { className: 'device-view__inspector-links' })
 	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'record output name', value: String(saved.name || caspar.name || conn?.label || '') })
 	const crfIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '18', max: '51', value: String(saved.crf ?? caspar.crf ?? 26) })
+	attachMathInput(crfIn, { decimals: 0 })
 	const vCodecSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	vCodecSel.innerHTML = '<option value="h264">h264</option><option value="hevc">hevc</option>'
 	vCodecSel.value = String(saved.videoCodec || caspar.videoCodec || 'h264').toLowerCase()
@@ -54,6 +56,7 @@ export function renderRecordOutControls(h, conn, { currentSettings, streamingSta
 		placeholder: 'video kbps (0=CRF mode)',
 		value: String(saved.videoBitrateKbps ?? caspar.videoBitrateKbps ?? 4500),
 	})
+	attachMathInput(vBitrateIn, { decimals: 0 })
 	const presetSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	presetSel.innerHTML = '<option value="ultrafast">ultrafast</option><option value="veryfast">veryfast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option>'
 	presetSel.value = String(saved.encoderPreset || caspar.encoderPreset || 'veryfast').toLowerCase()
@@ -68,6 +71,7 @@ export function renderRecordOutControls(h, conn, { currentSettings, streamingSta
 		placeholder: 'audio kbps',
 		value: String(saved.audioBitrateKbps ?? caspar.audioBitrateKbps ?? 128),
 	})
+	attachMathInput(aBitrateIn, { decimals: 0 })
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save record settings' })
 	const startBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Start record' })
 	const stopBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Stop record' })

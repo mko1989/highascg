@@ -2,7 +2,8 @@
  * Scenes editor — drop media onto deck to create a new look.
  */
 
-import { parseDraggableSourcesPayload } from './scenes-shared.js'
+import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
+import { showScenesToast } from './scenes-editor-support.js'
 
 /**
  * @param {object} ctx
@@ -10,6 +11,7 @@ import { parseDraggableSourcesPayload } from './scenes-shared.js'
 export function createDeckMediaDropHandler(ctx) {
 	const {
 		sceneState,
+		getChannelMap,
 		getScreenCount,
 		ingestDeckDroppedFiles,
 		dispatchLayerSelect,
@@ -28,6 +30,21 @@ export function createDeckMediaDropHandler(ctx) {
 		} else {
 			payloads = parseDraggableSourcesPayload(dt)
 		}
+		if (!payloads.length) return
+
+		// WO-156: drop route sources that would route this screen's own PGM/PRV channel into
+		// itself (whole-channel self-route wedges the channel in CasparCG).
+		const cm = typeof getChannelMap === 'function' ? getChannelMap() : {}
+		const pgmCh = cm?.programChannels?.[mainCol] ?? null
+		const prvCh = cm?.previewChannels?.[mainCol] ?? null
+		payloads = payloads.filter((data) => {
+			const msg = routeDropRejectionMessage(data?.value, { editChannel: prvCh, pgmChannel: pgmCh })
+			if (msg) {
+				showScenesToast(msg, 'warn')
+				return false
+			}
+			return true
+		})
 		if (!payloads.length) return
 
 		if (mainCol !== sceneState.activeScreenIndex) sceneState.switchScreen(mainCol)

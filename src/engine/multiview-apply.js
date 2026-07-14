@@ -194,10 +194,22 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		ctx.log('debug', 'Multiview BG setup: ' + (e?.message || e))
 	}
 
+	const { findSelfRouteViolation } = require('./scene-route-deps')
 	let layer = MV_CELL_LAYER_START
 	const failed = []
 	for (const cell of layout) {
 		const route = routeForCell(cell, map, inputsCh, previewChannels)
+		// WO-156: a cell routing the multiview channel into itself starves/wedges the channel —
+		// skip the cell (with a warning) instead of failing the whole apply.
+		const selfRoute = findSelfRouteViolation(route, ch)
+		if (selfRoute) {
+			ctx.log(
+				'warn',
+				`Multiview: skipped cell "${cell.label || cell.id || `L${layer}`}" — ${selfRoute.reason} (self-route would wedge the multiview channel)`,
+			)
+			layer++
+			continue
+		}
 		const ovType = overlayType(cell, programChannels, previewChannels, inputsCh, decklinkInputChannels)
 
 		let vx = cell.x

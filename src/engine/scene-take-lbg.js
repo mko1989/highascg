@@ -30,16 +30,16 @@ const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
-const { remapIntraLookRoutesForTakeChannel } = require('./scene-route-deps')
+const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
 
 /**
  * @param {object} amcp
  * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, skipLayerVisualEquality?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
-	if (opts.pgmOnly) {
-		return require('./scene-take-pgm-only').runSceneTakePgmOnly(amcp, opts)
-	}
+	// WO-156: every take path (API take, preview stage, sync-push, replication) funnels through
+	// here — reject direct self-routes (route://N onto channel N) before any AMCP is sent.
+	assertSceneHasNoSelfRoutes(opts?.incomingScene, parseInt(opts?.channel, 10))
 	const {
 		diffScenes,
 		layerHasContent,
@@ -154,7 +154,10 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	// PGM-only / empty live JSON: bank A/B may leave the other slot on-air (e.g. L110 then L10).
 	// Clear stale physical layers before LOADBG when we are not doing a bank opacity crossfade.
-	if (!shouldRunBankCrossfade && takeJobs.length > 0) {
+	// WO-160b: pgm-only channels run the orphan sweep BEFORE every take regardless of shouldRunBankCrossfade
+	// because their live JSON is less reliable (no staged PRV exchange).
+	const shouldClearOrphans = (!shouldRunBankCrossfade && takeJobs.length > 0) || (opts.pgmOnly && takeJobs.length > 0)
+	if (shouldClearOrphans) {
 		const incomingPhys = takeJobs.map((j) => j.pLayer)
 		const stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
 		if (stalePhys.length > 0) {

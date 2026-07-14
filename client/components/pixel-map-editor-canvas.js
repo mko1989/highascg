@@ -110,7 +110,11 @@ export function createPixelMapCanvasController(canvas, wrap) {
 			ctx.fillStyle = '#fff'
 			ctx.font = `bold 10px ${UI_FONT_FAMILY}`
 			ctx.textAlign = 'center'
-			ctx.fillText(m.label || m.id, 0, (-h / 2) * scale - 12)
+			let label = m.label || m.id
+			if (m.mirrorH || m.mirrorV) {
+				label += ` [${m.mirrorH ? 'H' : ''}${m.mirrorH && m.mirrorV ? '/' : ''}${m.mirrorV ? 'V' : ''}]`
+			}
+			ctx.fillText(label, 0, (-h / 2) * scale - 12)
 			if (isSelected) {
 				ctx.beginPath()
 				ctx.strokeStyle = '#58a6ff'

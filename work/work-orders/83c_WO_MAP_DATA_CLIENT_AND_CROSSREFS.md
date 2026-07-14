@@ -212,47 +212,47 @@ For `client/styles/`:
 
 ### Phase A: Client component scan (Layer 3)
 
-- [ ] **T1** Add `client/components/` walker: list all `.js` files (exclude sync-conflicts).
-- [ ] **T2** Implement prefix-based grouping algorithm from §2.2 (longest prefix first, modals suffix group, ungrouped fallback).
-- [ ] **T3** Create `kind: "group"` intermediate nodes with curated descriptions from the lookup tables.
-- [ ] **T4** For each component file: create `kind: "file"` node with `meta.path`, `meta.lines`, `meta.bytes`.
-- [ ] **T5** Inject component tree under `app:highascg-client.children`.
+- [x] **T1** Add `client/components/` walker: list all `.js` files (exclude sync-conflicts).
+- [x] **T2** Implement prefix-based grouping algorithm from §2.2 (longest prefix first, modals suffix group, ungrouped fallback).
+- [x] **T3** Create `kind: "group"` intermediate nodes with curated descriptions from the lookup tables.
+- [x] **T4** For each component file: create `kind: "file"` node with `meta.path`, `meta.lines`, `meta.bytes`.
+- [x] **T5** Inject component tree under `app:highascg-client.children`.
 
 ### Phase B: Client lib scan
 
-- [ ] **T6** Add `client/lib/` walker: list all `.js` and `.json` files (exclude sync-conflicts).
-- [ ] **T7** Implement prefix-based grouping for lib files from §2.3.
-- [ ] **T8** Create `kind: "group"` nodes for lib groups.
-- [ ] **T9** For each lib file: create `kind: "file"` node with metadata.
-- [ ] **T10** Inject lib tree as a separate child group under `app:highascg-client`.
+- [x] **T6** Add `client/lib/` walker: list all `.js` and `.json` files (exclude sync-conflicts).
+- [x] **T7** Implement prefix-based grouping for lib files from §2.3.
+- [x] **T8** Create `kind: "group"` nodes for lib groups.
+- [x] **T9** For each lib file: create `kind: "file"` node with metadata.
+- [x] **T10** Inject lib tree as a separate child group under `app:highascg-client`.
 
 ### Phase C: AST extraction for client files (Layer 4–5)
 
-- [ ] **T11** Reuse `parseFile()`, `extractExports()`, `extractImports()` from 83b for client `.js` files.
-- [ ] **T12** Handle client-specific import patterns: ES module `import ... from '...'` (client uses Vite/ESM).
-- [ ] **T13** For client files: extract exported functions/classes as `kind: "function"` children.
-- [ ] **T14** Build client-side import graph: `client/components/` ↔ `client/lib/` ↔ `client/app.js`.
-- [ ] **T15** Build cross-tree import graph: identify any `client/` files that reference `src/` shared code (if any).
+- [x] **T11** Reuse `parseFile()`, `extractExports()`, `extractImports()` from 83b for client `.js` files.
+- [x] **T12** Handle client-specific import patterns: ES module `import ... from '...'` (client uses Vite/ESM).
+- [x] **T13** For client files: extract exported functions/classes as `kind: "function"` children.
+- [x] **T14** Build client-side import graph: `client/components/` ↔ `client/lib/` ↔ `client/app.js`.
+- [x] **T15** Build cross-tree import graph: identify any `client/` files that reference `src/` shared code (if any).
 
 ### Phase D: Additional client files
 
-- [ ] **T16** Scan `client/app.js` as a direct child of `app:highascg-client` (SPA entry point).
-- [ ] **T17** Add `client/index.html` and `client/setup.html` as metadata-only file nodes.
-- [ ] **T18** Scan `client/styles/` — list CSS files with line/byte counts, group by prefix, no AST.
+- [x] **T16** Scan `client/app.js` as a direct child of `app:highascg-client` (SPA entry point).
+- [x] **T17** Add `client/index.html` and `client/setup.html` as metadata-only file nodes.
+- [x] **T18** Scan `client/styles/` — list CSS files with line/byte counts, group by prefix, no AST.
 
 ### Phase E: Work-order cross-references
 
-- [ ] **T19** Implement `crossReferenceWorkOrders()` per §3 — scan all `work/work-orders/*.md` files.
-- [ ] **T20** Attach `meta.relatedWOs` to every matching node (server + client).
-- [ ] **T21** Log summary: "N nodes linked to M work orders".
+- [x] **T19** Implement `crossReferenceWorkOrders()` per §3 — scan all `work/work-orders/*.md` files.
+- [x] **T20** Attach `meta.relatedWOs` to every matching node (server + client).
+- [x] **T21** Log summary: "N nodes linked to M work orders".
 
 ### Phase F: Final validation
 
-- [ ] **T22** Update `stats` in envelope: recount all nodes, verify per-layer counts.
-- [ ] **T23** Verify: ≥147 component file nodes, ≥164 lib file nodes, ≥20 component groups, ≥15 lib groups.
-- [ ] **T24** Verify: `app:highascg-client` has depth ≥3 (client → group → file → function).
-- [ ] **T25** Verify: ≥100 nodes have `meta.relatedWOs` (cross-reference coverage).
-- [ ] **T26** Full generation time still < 15 seconds with all three phases (83a + 83b + 83c).
+- [x] **T22** Update `stats` in envelope: recount all nodes, verify per-layer counts.
+- [x] **T23** Verify: ≥147 component file nodes, ≥164 lib file nodes, ≥20 component groups, ≥15 lib groups.
+- [x] **T24** Verify: `app:highascg-client` has depth ≥3 (client → group → file → function).
+- [x] **T25** Verify: ≥100 nodes have `meta.relatedWOs` (cross-reference coverage).
+- [x] **T26** Full generation time still < 15 seconds with all three phases (83a + 83b + 83c).
 
 ---
 

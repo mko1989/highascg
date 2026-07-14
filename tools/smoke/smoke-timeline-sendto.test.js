@@ -21,7 +21,13 @@ function makeEngine() {
 			mixerOpacity: () => Promise.resolve(),
 			mixerVolume: () => Promise.resolve(),
 			mixerCommit: () => Promise.resolve(),
-			batchSendChunked: () => Promise.resolve(),
+			batchSendChunked: (lines) => {
+				// Record batch calls for transport detection (T173 batched sends)
+				for (const line of lines || []) {
+					amcpCalls.push({ type: 'raw', cmd: line })
+				}
+				return Promise.resolve()
+			},
 		},
 	}
 	return { eng: new TimelineEngine(self), amcpCalls }

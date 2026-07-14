@@ -67,8 +67,10 @@ module.exports = {
 	/**
 	 * One MIXER command per keyframe segment during playback (duration = end−start in frames).
 	 * Scrub/force/pause: instant mixer (duration 0) at interpolated value.
-	 * @param {{ force?: boolean, playing?: boolean, fps?: number }} opts
-	 * @returns {boolean} True if any mixer command was sent (caller should COMMIT that channel on Caspar 2.5+).
+	 * T173.4: collect MIXER lines into array instead of sending immediately when collectLines provided.
+	 * @param {{ force?: boolean, playing?: boolean, fps?: number, scheduleLeadTween?: boolean, collectLines?: Array }} opts
+	 *   collectLines: array to collect MIXER lines; if provided, lines are appended instead of sent via amcp.
+	 * @returns {boolean} True if any mixer command was collected/sent (caller should COMMIT that channel on Caspar 2.5+).
 	 */
 	_applyClipMixer(ch, layer, clip, localMs, opts = {}) {
 		const self = this.self
@@ -76,6 +78,7 @@ module.exports = {
 		const force = !!opts.force
 		const playing = !!opts.playing && !force
 		const fps = Math.max(1, opts.fps || 25)
+		const collectLines = opts.collectLines
 		const { w, h } = this._programResolutionForPlayback()
 		const base = this._clipFillBaseNormalized(clip, w, h)
 
@@ -109,8 +112,19 @@ module.exports = {
 			const spanMs = Math.max(1, t1 - t0)
 			const dur = msToMixerFrames(spanMs, fps)
 			const tween = mapKeyframeTween(fillTweenForSegmentEnd(clip, t1))
-			self.amcp.mixerFill(ch, layer, start.fx, start.fy, start.sx, start.sy, 0).catch(() => {})
-			self.amcp.mixerFill(ch, layer, end.fx, end.fy, end.sx, end.sy, dur, tween, true).catch(() => {})
+			const cl = `${ch}-${layer}`
+
+			if (collectLines) {
+				// T173.4: collect FILL segment lines with DEFER for tween
+				collectLines.push(`MIXER ${cl} FILL ${start.fx} ${start.fy} ${start.sx} ${start.sy} 0`)
+				let p = `${end.fx} ${end.fy} ${end.sx} ${end.sy} ${dur}`
+				if (tween) p += ` ${tween}`
+				collectLines.push(`MIXER ${cl} FILL ${p} DEFER`)
+			} else {
+				// Legacy path (when collectLines not provided, e.g., scheduleLeadTween or phase 1 only)
+				self.amcp.mixerFill(ch, layer, start.fx, start.fy, start.sx, start.sy, 0).catch(() => {})
+				self.amcp.mixerFill(ch, layer, end.fx, end.fy, end.sx, end.sy, dur, tween, true).catch(() => {})
+			}
 			this._lastKfSegment.set(kFillSeg, fillSegIdx)
 			this._lastKfValues.set(kFill, fillKey(end))
 			sent = true
@@ -136,6 +150,8 @@ module.exports = {
 			this._lastKfValues.set(kFill, curStr)
 			if (playing && inAnimatedSpan) this._lastKfSegment.set(kFillSeg, fillSegIdx)
 			else if (!playing) this._lastKfSegment.delete(kFillSeg)
+			const cl = `${ch}-${layer}`
+			// T173.4: instant (non-segment) FILL values still sent immediately, not collected
 			self.amcp.mixerFill(ch, layer, cur.fx, cur.fy, cur.sx, cur.sy, 0).catch(() => {})
 			sent = true
 			if (typeof self.log === 'function') {
@@ -146,12 +162,14 @@ module.exports = {
 		sent =
 			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps, {
 				scheduleLeadTween: !!opts.scheduleLeadTween,
+				collectLines: collectLines,
 			}) || sent
 		const volDef = clip.volume != null ? clip.volume : 1
 		const volVal = clip.muted ? 0 : this._interpProp(clip, 'volume', localMs, volDef)
 		sent =
 			this._applyKeyedMixerProp(ch, layer, clip, 'volume', localMs, volVal, playing, force, fps, {
 				isVolume: true,
+				collectLines: collectLines,
 			}) || sent
 
 		const kFx = `${ch}-${layer}-fx`
@@ -170,6 +188,7 @@ module.exports = {
 				}
 			}
 			if (lines.length > 0) {
+				// T173.4: effects are not segment changes, sent immediately
 				for (const l of lines) self.amcp.raw(l).catch(() => {})
 				sent = true
 			}
@@ -179,13 +198,17 @@ module.exports = {
 
 	/**
 	 * Opacity/volume keyframes: one tweened MIXER per segment while playing.
-	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean }} extra — scheduleLeadTween:
+	 * T173.4: collect MIXER lines into array instead of sending immediately.
+	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean, collectLines?: Array }} extra — scheduleLeadTween:
 	 *   take entry (WO-139): batch the current opacity segment as instant-start + DEFER tween so
 	 *   the clip fade-in fires on the take orchestrator's single MIXER COMMIT (frame-locked with
 	 *   the look crossfade) instead of an instant value that ticks animate later.
+	 *   collectLines: array to collect MIXER lines (T173.4); if provided, lines are appended instead of sent.
+	 * @returns {boolean} True if any lines were collected/sent (caller should mark channel dirty).
 	 */
 	_applyKeyedMixerProp(ch, layer, clip, prop, localMs, holdValue, playing, force, fps, extra = {}) {
 		const self = this.self
+		const collectLines = extra.collectLines
 		const kfs = (clip.keyframes || [])
 			.filter((k) => k.property === prop)
 			.sort((a, b) => a.time - b.time)
@@ -230,12 +253,24 @@ module.exports = {
 			const endVal = this._interpProp(clip, prop, t1, holdValue)
 			const dur = msToMixerFrames(Math.max(1, t1 - t0), fps)
 			const tween = mapKeyframeTween(easingAtTime(clip, prop, t1))
-			if (extra.isVolume) {
-				self.amcp.mixerVolume(ch, layer, startVal, 0).catch(() => {})
-				self.amcp.mixerVolume(ch, layer, endVal, dur, tween, true).catch(() => {})
+			const cl = `${ch}-${layer}`
+			const keyword = extra.isVolume ? 'VOLUME' : 'OPACITY'
+
+			if (collectLines) {
+				// T173.4: collect segment lines with DEFER for tween
+				collectLines.push(`MIXER ${cl} ${keyword} ${startVal} 0`)
+				let p = `${endVal} ${dur}`
+				if (tween) p += ` ${tween}`
+				collectLines.push(`MIXER ${cl} ${keyword} ${p} DEFER`)
 			} else {
-				self.amcp.mixerOpacity(ch, layer, startVal, 0).catch(() => {})
-				self.amcp.mixerOpacity(ch, layer, endVal, dur, tween, true).catch(() => {})
+				// Legacy path (for scheduleLeadTween which uses its own batching)
+				if (extra.isVolume) {
+					self.amcp.mixerVolume(ch, layer, startVal, 0).catch(() => {})
+					self.amcp.mixerVolume(ch, layer, endVal, dur, tween, true).catch(() => {})
+				} else {
+					self.amcp.mixerOpacity(ch, layer, startVal, 0).catch(() => {})
+					self.amcp.mixerOpacity(ch, layer, endVal, dur, tween, true).catch(() => {})
+				}
 			}
 			this._lastKfSegment.set(kSeg, segIdx)
 			this._lastKfValues.set(`${ch}-${layer}-${prop}`, endVal)
@@ -258,6 +293,9 @@ module.exports = {
 			this._lastKfValues.set(kVal, val)
 			if (playing && inSpan) this._lastKfSegment.set(kSeg, segIdx)
 			else if (!playing) this._lastKfSegment.delete(kSeg)
+			const cl = `${ch}-${layer}`
+			const keyword = extra.isVolume ? 'VOLUME' : 'OPACITY'
+			// T173.4: instant (non-segment) values still sent immediately, not collected
 			if (extra.isVolume) {
 				self.amcp.mixerVolume(ch, layer, val, 0).catch(() => {})
 			} else {

@@ -68,9 +68,26 @@ export function renderConsoleInputGroups(
 				})
 				.join('')
 			const labelTitle = r.labelTitle || r.label
+
+			// Screens/PGM channel row
+			const pgmButtonsHtml = programChannels
+				.map((pc) => {
+					const ch = Number(pc)
+					const isHost = ch === r.ch
+					const active = isHost
+					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${!isHost ? 'disabled' : ''} title="${isHost ? 'Host channel' : 'Cross-screen audio fan-out: planned (WO-157)'}">${ch}</button>`
+				})
+				.join('')
+			const screensRowHtml = r.sceneId ? `
+				<div class="audio-mixer-view__matrix">
+					<div class="audio-mixer-view__matrix-title">Screens</div>
+					<div class="audio-mixer-view__matrix-buttons">${pgmButtonsHtml}</div>
+				</div>
+			` : ''
+
 			const matrixHtml = r.sceneId ? `
 				<div class="audio-mixer-view__matrix">
-					<div class="audio-mixer-view__matrix-title">Routing</div>
+					<div class="audio-mixer-view__matrix-title">Stereo pair</div>
 					<div class="audio-mixer-view__matrix-buttons">${matrixButtonsHtml}</div>
 				</div>
 			` : ''
@@ -90,6 +107,7 @@ export function renderConsoleInputGroups(
 					<button type="button" class="audio-mixer-view__solo-btn${isSolo ? ' audio-mixer-view__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo layer (Ctrl+Click for multi)">SOLO</button>
 					<button type="button" class="audio-mixer-view__mute-btn${isMuted ? ' audio-mixer-view__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute layer">MUTE</button>
 				</div>
+				${screensRowHtml}
 				${matrixHtml}
 			`
 			if (r?.liveAudioSlot != null) {
@@ -121,11 +139,14 @@ export function renderConsoleInputGroups(
 			fader.addEventListener('input', () => {
 				const x = faderPercentToLinearGain(fader.value)
 				valEl.textContent = formatVolumeDb(x)
-				const liveScenes = stateStore.getState()?.scene?.live || {}
-				const liveSceneData = liveScenes[r.ch] || liveScenes[String(r.ch)]
-				if (liveSceneData?.scene?.layers) {
-					const layer = liveSceneData.scene.layers.find((l) => l.layerNumber === r.layer)
-					if (layer) layer.volume = x
+				// For timeline clips, don't try to update scene data (they're not in scene.live)
+				if (!r.isTimelineClip) {
+					const liveScenes = stateStore.getState()?.scene?.live || {}
+					const liveSceneData = liveScenes[r.ch] || liveScenes[String(r.ch)]
+					if (liveSceneData?.scene?.layers) {
+						const layer = liveSceneData.scene.layers.find((l) => l.layerNumber === r.layer)
+						if (layer) layer.volume = x
+					}
 				}
 				if (!r.sceneId) {
 					audioMixerState.setMasterVolume(r.key, x)
@@ -186,11 +207,14 @@ export function renderConsoleInputGroups(
 					audioMixerState.setMuted(r.key, nextMuted)
 				}
 
-				const liveScenes = stateStore.getState()?.scene?.live || {}
-				const liveSceneData = liveScenes[r.ch] || liveScenes[String(r.ch)]
-				if (liveSceneData?.scene?.layers) {
-					const layer = liveSceneData.scene.layers.find((l) => l.layerNumber === r.layer)
-					if (layer) layer.muted = nextMuted
+				// For timeline clips, don't try to update scene data (they're not in scene.live)
+				if (!r.isTimelineClip) {
+					const liveScenes = stateStore.getState()?.scene?.live || {}
+					const liveSceneData = liveScenes[r.ch] || liveScenes[String(r.ch)]
+					if (liveSceneData?.scene?.layers) {
+						const layer = liveSceneData.scene.layers.find((l) => l.layerNumber === r.layer)
+						if (layer) layer.muted = nextMuted
+					}
 				}
 				syncMuteUI(r.key, nextMuted)
 				const meta = meterLayerMeta.get(r.key)

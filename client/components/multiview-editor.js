@@ -5,6 +5,9 @@ import { multiviewState } from '../lib/multiview-state.js'
 import { initLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
+import { api } from '../lib/api-client.js'
+import { showAppToast } from '../lib/app-toast.js'
+import { parseRouteValue } from './scenes-shared.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
 
 function snapValue(val, candidates, threshold) {
@@ -28,6 +31,17 @@ export function initMultiviewEditor(root, stateStore) {
 	const flushApply = () => { if (!isEnabled()) return; if (applyTimer) clearTimeout(applyTimer); applyTimer = null; applyMultiviewLayout(getCM, { silent: true }) }
 	const syncOverlay = () => { if (!isEnabled()) { if (!disabledOverlay && wrap) { disabledOverlay = Object.assign(document.createElement('div'), { className: 'mv-disabled-overlay', innerHTML: '<div class="mv-disabled-overlay__content"><h3>No Multiview Channel</h3><p>Add a Multiview destination in Device View to enable.</p></div>' }); wrap.appendChild(disabledOverlay) } if (disabledOverlay) disabledOverlay.style.display = 'flex' } else if (disabledOverlay) disabledOverlay.style.display = 'none' }
 	const draw = () => drawMultiviewEditor(ctx, canvas, { offsetX, offsetY, scale, selectedId, dropHoverId, channelMap: getCM() })
+	const getMvChannels = () => { const cm = getCM(); return Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : []) }
+	/** WO-156: routing the multiview's own channel into one of its cells wedges the channel in Caspar. */
+	const mvSelfRouteMessage = (value) => {
+		const parsed = parseRouteValue(value)
+		if (!parsed) return null
+		const mvCh = getMvChannels()[(multiviewState.currentIndex || 1) - 1]
+		if (mvCh != null && parsed.channel === Number(mvCh)) {
+			return `Cannot show route://${parsed.channel} on this multiview — channel ${mvCh} is the multiview's own output and routing it into itself would freeze it.`
+		}
+		return null
+	}
 
 	const updateToolbar = () => {
 		const cm = getCM()
@@ -43,6 +57,7 @@ export function initMultiviewEditor(root, stateStore) {
 	root.innerHTML = `<div class="mv-toolbar">
 		<select id="mv-index-select" class="mv-select" style="margin-right:8px"></select>
 		<button id="mv-reset" class="mv-btn">Reset</button>
+		<button id="mv-refresh" class="mv-btn" title="Re-apply all multiview layouts to CasparCG (use if the multiview is stuck, e.g. after a CasparCG restart)">Refresh output</button>
 		<label class="mv-chk"><input type="checkbox" id="mv-overlay" ${multiviewState.showOverlay ? 'checked' : ''}> Borders</label>
 		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-timers-under-labels" ${multiviewState.showTimersUnderLabels ? 'checked' : ''}> Timers under labels</label>
 		<span class="mv-toolbar__sep"></span>
@@ -63,7 +78,39 @@ export function initMultiviewEditor(root, stateStore) {
 	const upPres = () => { const s = multiviewState.getPresetSlots(); for (let i = 0; i < 4; i++) root.querySelector(`.mv-preset[data-slot="${i}"]`)?.classList.toggle('mv-preset--stored', s[i] != null) }
 	for (const b of root.querySelectorAll('.mv-preset')) b.onclick = (e) => { const s = parseInt(b.dataset.slot); if (e.shiftKey) multiviewState.clearPresetSlot(s); else if (multiviewState.getPresetSlots()[s] == null) multiviewState.savePresetSlot(s, multiviewState.snapshotForPreset()); else multiviewState.applyPresetSnapshot(multiviewState.getPresetSlots()[s]); upPres() }
 	upPres(); root.querySelector('#mv-reset').onclick = () => { multiviewState.clearLayout(); selectedId = null; draw() }
-	
+
+	// WO-156 T156.5: one-click re-apply of every configured multiviewer via the existing
+	// POST /api/multiview/apply (recovers a stuck multiview after a CasparCG restart).
+	const refreshBtn = root.querySelector('#mv-refresh')
+	refreshBtn.onclick = async () => {
+		const mvChs = getMvChannels()
+		if (mvChs.length === 0) {
+			showAppToast('No multiview channel configured.', 'warn')
+			return
+		}
+		refreshBtn.disabled = true
+		let okCount = 0
+		let failCount = 0
+		try {
+			for (let n = 1; n <= mvChs.length; n++) {
+				const body = multiviewState.getApplyBodyForIndex(n)
+				if (!body) continue
+				try {
+					await api.post('/api/multiview/apply', body)
+					okCount++
+				} catch (err) {
+					failCount++
+					console.error(`Multiview refresh failed for multiviewer ${n}:`, err)
+				}
+			}
+			if (okCount === 0 && failCount === 0) showAppToast('No multiview layout to apply yet.', 'info')
+			else if (failCount > 0) showAppToast(`Multiview refresh: ${okCount} applied, ${failCount} failed — see logs.`, 'error')
+			else showAppToast(`Multiview output refreshed (${okCount} layout${okCount === 1 ? '' : 's'}).`, 'success')
+		} finally {
+			refreshBtn.disabled = false
+		}
+	}
+
 	const idxSel = root.querySelector('#mv-index-select')
 	idxSel.onchange = (e) => {
 		multiviewState.switchTo(e.target.value)
@@ -190,6 +237,7 @@ export function initMultiviewEditor(root, stateStore) {
 	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
 	canvas.ondragleave = () => { dropHoverId = null; draw() }
 	canvas.ondrop = e => { e.preventDefault(); dropHoverId = null; const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); let c = getCellAt(x, y, getCM()), data; try { data = JSON.parse(e.dataTransfer.getData('application/json')) } catch { const v = e.dataTransfer.getData('text/plain'); if (v) data = { type: 'media', value: v, label: v } }; if (!data?.value) { draw(); return }
+		const selfRouteMsg = mvSelfRouteMessage(data.value); if (selfRouteMsg) { showAppToast(selfRouteMsg, 'warn'); draw(); return }
 		if (!c) { const mw = multiviewState.canvasWidth, mh = multiviewState.canvasHeight; if (x < 0 || x > mw || y < 0 || y > mh) { draw(); return }
 			const routeType = data.routeType || data.type || 'media'
 			let cw = Math.round(mw / 4)

@@ -13,6 +13,7 @@ import {
 import { listInputChannels } from '../lib/input-channels.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { escapeHtml } from '../lib/dom-escape.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} container
@@ -140,6 +141,9 @@ export async function mountV4l2InputsSettingsPanel(container) {
 		}
 		wrap.innerHTML = html
 		for (let i = 1; i <= V4L2_MAX_SLOTS; i++) {
+			attachMathInput(wrap.querySelector(`#v4l2-slot-${i}-width`), { decimals: 0 })
+			attachMathInput(wrap.querySelector(`#v4l2-slot-${i}-height`), { decimals: 0 })
+			attachMathInput(wrap.querySelector(`#v4l2-slot-${i}-fps`), { decimals: 0 })
 			const sel = wrap.querySelector(`#v4l2-slot-${i}-audio-select`)
 			const manual = wrap.querySelector(`#v4l2-slot-${i}-audio`)
 			sel?.addEventListener('change', () => {
@@ -239,6 +243,8 @@ export async function mountV4l2InputsSettingsPanel(container) {
 
 		renderSlotRows(ui)
 		renderStatus()
+
+		attachMathInput(mainEl.querySelector('#v4l2-slot-count'), { decimals: 0 })
 
 		const statusLine = mainEl.querySelector('#v4l2-action-status')
 		const setActionStatus = (msg, ok = true) => {

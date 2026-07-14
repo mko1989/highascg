@@ -45,6 +45,24 @@ function pickSubsystemReloadSnapshot(config) {
 		osc: normalizeOscConfig(config),
 		dmx: config.dmx,
 		streaming: s,
+		// WO-172 T172.3: `streamingChannel`/`recordOutputs` intentionally included — `deviceGraph` is
+		// intentionally NOT. Verified index.js:257-299's `configManager.on('change', ...)` handler:
+		// a signature change here calls `casparConn.start()`/`.stop()` (AMCP reconnect, which reruns
+		// `setupAllRouting` — see src/config/routing-setup.js:328-340 — the only place the dedicated
+		// streaming-channel `PLAY <streamingCh> route://<src>` gets re-issued). `deviceGraph` changes on
+		// every single cable/decklink edit; recycling the AMCP connection that often is too heavy and
+		// was excluded. `streamingChannel`/`recordOutputs` only change when a stream_out/record_out
+		// cable edit actually resolves a new source (via the now-fixed device-view-apply.js sync), or
+		// via a direct settings save — comparatively rare — so picking up the reconnect there is an
+		// acceptable, much lighter alternative to a full "Apply Caspar config" restart, and is what lets
+		// dedicated-output-channel mode's routing self-heal without the user needing to hit Apply.
+		// Attach-mode source changes don't strictly need this (next Start/ADD resolves the channel from
+		// fresh config directly), so this is a no-op-but-harmless AMCP recycle for that mode.
+		streamingChannel:
+			config.streamingChannel && typeof config.streamingChannel === 'object'
+				? stripLeadingUnderscoreKeys(config.streamingChannel)
+				: {},
+		recordOutputs: Array.isArray(config.recordOutputs) ? config.recordOutputs : [],
 		amcp_batch: config.amcp_batch,
 		amcp_max_batch_commands: config.amcp_max_batch_commands,
 		amcp_mixer_commit_before_amcp_batch: config.amcp_mixer_commit_before_amcp_batch,

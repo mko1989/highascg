@@ -57,7 +57,7 @@ class ArtnetReceiver {
 		this._targetScreenIndex = 0
 		this._targetConfigured = false
 		this._channelMap = Array(PATCH_CHANNEL_COUNT).fill(true)
-		this._artnetListenEnabled = true
+		this._artnetListenEnabled = false
 		this._projectScenesCache = null
 		/** screenIndex values we already logged “no global border” for (avoid periodic reconfigure spam). */
 		this._warnedNoGlobalBorder = new Set()

@@ -61,13 +61,31 @@ export function renderInspectorProgramInputLayers(
 						`<option value="${escapeAttr(rt.value)}"${rt.value === r.audioRoute ? ' selected' : ''}>${escapeHtml(rt.label)}</option>`,
 				)
 				.join('')
-			const routeHtml = r.sceneId ? `<select class="audio-mixer__route-sel" data-ch="${r.ch}" data-layer="${r.layer}" data-scene="${escapeAttr(r.sceneId)}" aria-label="Audio Route" title="Audio routing destination">${options}</select>` : ''
+
+			// Screens/PGM channel row for panel view
+			const pgmButtonsHtmlPanel = programChannels
+				.map((pc) => {
+					const ch = Number(pc)
+					const isHost = ch === r.ch
+					const active = isHost
+					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${!isHost ? 'disabled' : ''} title="${isHost ? 'Host channel' : 'Cross-screen audio fan-out: planned (WO-157)'}">${ch}</button>`
+				})
+				.join('')
+			const screensRowHtmlPanel = r.sceneId ? `
+				<div class="audio-mixer-view__matrix" style="margin-bottom: 8px;">
+					<div class="audio-mixer-view__matrix-title">Screens</div>
+					<div class="audio-mixer-view__matrix-buttons">${pgmButtonsHtmlPanel}</div>
+				</div>
+			` : ''
+
+			const routeHtml = r.sceneId ? `<select class="audio-mixer__route-sel" data-ch="${r.ch}" data-layer="${r.layer}" data-scene="${escapeAttr(r.sceneId)}" aria-label="Stereo pair" title="Audio stereo pair routing destination">${options}</select>` : ''
 			const isSolo = audioMixerState.isSoloed(r.key)
 			const soloHtml = `<button type="button" class="audio-mixer__solo-btn${isSolo ? ' audio-mixer__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this layer to monitor">S</button>`
 			const isMuted = !!r.muted
 			const muteHtml = `<button type="button" class="audio-mixer__mute-btn${isMuted ? ' audio-mixer__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute this layer">M</button>`
 			const labelTitle = r.labelTitle || r.label
 			row.innerHTML = `
+				${screensRowHtmlPanel}
 				<div class="audio-mixer__layer-info">
 					<div class="audio-mixer__layer-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}</div>
 					<div class="audio-mixer__layer-actions">

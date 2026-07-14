@@ -5,6 +5,7 @@ import { settingsState } from '../lib/settings-state.js'
 import { sceneState } from '../lib/scene-state.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
+import { clearTemplateThumbCache } from '../lib/template-thumb.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
 import { drawComposePrvPgmCellEdgeBar, drawDualComposeCellPreview, drawOutputCanvasBounds } from './preview-canvas-draw-base.js'
 import {
@@ -28,6 +29,7 @@ import * as Logic from './scenes-editor-logic.js'
 import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
+import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 import { createBuildLayerRouteLiveSourceItem } from './scenes-editor-layer-route.js'
@@ -92,10 +94,14 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 			const scene = sceneState.getScene(id)
 			if (scene) {
 				const mainIdx = resolveMainIndexForScene(scene, sceneState)
-				try {
-					await syncPreviewLiveToServer(id, mainIdx, { sceneState, stateStore })
-				} catch (e) {
-					console.warn('Exit edit: preview live sync failed:', e?.message || e)
+				const cm = getChannelMap()
+				// Skip preview live sync for PGM-only mains (no separate preview bus)
+				if (isPreviewBusAvailable(cm, mainIdx)) {
+					try {
+						await syncPreviewLiveToServer(id, mainIdx, { sceneState, stateStore })
+					} catch (e) {
+						console.warn('Exit edit: preview live sync failed:', e?.message || e)
+					}
 				}
 			}
 			try {
@@ -155,18 +161,48 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 
 	const globalTakeFromPreview = async () => {
+		// WO-185 T185.1: If editing a scene with a specific mainScope, take the edited scene to its main
+		if (sceneState.editingSceneId) {
+			const scene = sceneState.getScene(sceneState.editingSceneId)
+			if (scene) {
+				const scope = String(scene.mainScope || 'all')
+				// Only override if scope is NOT 'all' - 'all' scope uses armed-preview logic
+				if (scope !== 'all') {
+					const mainIdx = resolveMainIndexForScene(scene, sceneState)
+					await takeSceneToProgram(sceneState.editingSceneId, false, { targetMains: [mainIdx] })
+					return
+				}
+			}
+		}
+
+		// Otherwise use armed-preview logic
 		const entries = collectArmedPreviewEntries()
 		if (!entries.length) {
-			showScenesToast('No look on preview. Click a look’s thumbnail (canvas) first.', 'error')
+			showScenesToast('No look on preview. Click a look thumbnail (canvas) first.', 'error')
 			return
 		}
 		await takeSceneToProgram.batch(entries, false, {})
 	}
 
 	const globalCutFromPreview = async () => {
+		// WO-185 T185.1: If editing a scene with a specific mainScope, cut the edited scene to its main
+		if (sceneState.editingSceneId) {
+			const scene = sceneState.getScene(sceneState.editingSceneId)
+			if (scene) {
+				const scope = String(scene.mainScope || 'all')
+				// Only override if scope is NOT 'all' - 'all' scope uses armed-preview logic
+				if (scope !== 'all') {
+					const mainIdx = resolveMainIndexForScene(scene, sceneState)
+					await takeSceneToProgram(sceneState.editingSceneId, true, { targetMains: [mainIdx] })
+					return
+				}
+			}
+		}
+
+		// Otherwise use armed-preview logic
 		const entries = collectArmedPreviewEntries()
 		if (!entries.length) {
-			showScenesToast('No look on preview. Click a look’s thumbnail first.', 'error')
+			showScenesToast('No look on preview. Click a look thumbnail first.', 'error')
 			return
 		}
 		await takeSceneToProgram.batch(entries, true, {})
@@ -390,6 +426,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 
 	onDeckMediaDrop = createDeckMediaDropHandler({
 		sceneState,
+		getChannelMap,
 		getScreenCount,
 		ingestDeckDroppedFiles,
 		dispatchLayerSelect,
@@ -444,7 +481,12 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		scheduleRender() 
 	})
 	sceneState.on('editingChange', scheduleRender); sceneState.on('screenChange', () => { previewPanel.scheduleDraw(); scheduleRender() })
-	document.addEventListener('scenes-refresh-preview', () => { previewRuntime.scheduleFlushPreviewFromInspector(); previewPanel.scheduleDraw() })
+	document.addEventListener('scenes-refresh-preview', () => {
+		/* WO-187 T187.4: Invalidate template thumb cache on cgData/countdownConfig changes */
+		clearTemplateThumbCache()
+		previewRuntime.scheduleFlushPreviewFromInspector()
+		previewPanel.scheduleDraw()
+	})
 	document.addEventListener('scenes-tab-activated', async () => {
 		const cm = getChannelMap()
 		const screenCount = Math.max(1, cm.screenCount ?? sceneState._canvasResolutions?.length ?? 1)

@@ -27,7 +27,13 @@ function makeEngine() {
 			mixerOpacity: noop,
 			mixerVolume: noop,
 			mixerCommit: noop,
-			batchSendChunked: noop,
+			batchSendChunked: (lines) => {
+				// Record batch calls for transport detection (T173 batched sends)
+				for (const line of lines || []) {
+					amcpCalls.push({ type: 'raw', cmd: line })
+				}
+				return noop()
+			},
 		},
 	}
 	const eng = new TimelineEngine(self)
@@ -174,7 +180,13 @@ function callSeeks(calls) {
 			mixerOpacity: () => Promise.resolve(),
 			mixerVolume: () => Promise.resolve(),
 			mixerCommit: () => Promise.resolve(),
-			batchSendChunked: () => Promise.resolve(),
+			batchSendChunked: (lines) => {
+				// Record batch calls for transport detection (T173 batched sends)
+				for (const line of lines || []) {
+					amcpCalls.push({ type: 'raw', cmd: line })
+				}
+				return Promise.resolve()
+			},
 		},
 	}
 	const eng = new TimelineEngine(self)

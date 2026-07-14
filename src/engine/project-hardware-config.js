@@ -122,6 +122,10 @@ function applyHardwareConfigToCtx(ctx, hc) {
 		if (hc.multiviewLayout !== undefined) {
 			persistence.set('multiviewLayout', hc.multiviewLayout)
 			ctx._multiviewLayout = hc.multiviewLayout
+			// WO-156: plural map is the reconnect re-apply source of truth.
+			if (!ctx._multiviewLayouts) ctx._multiviewLayouts = {}
+			if (hc.multiviewLayout) ctx._multiviewLayouts[1] = hc.multiviewLayout
+			else delete ctx._multiviewLayouts[1]
 			try {
 				const { applyMultiviewLayout } = require('./multiview-apply')
 				void applyMultiviewLayout(hc.multiviewLayout, ctx).catch(() => {})

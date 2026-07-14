@@ -140,6 +140,8 @@ function createAppContext(deps) {
 		mediaDetails: {},
 		liveDeck,
 		_multiviewLayout: deps.multiviewLayout,
+		/** WO-156: plural map (n → apply body) is the multiview source of truth; singular kept for old readers. */
+		_multiviewLayouts: deps.multiviewLayout ? { 1: deps.multiviewLayout } : {},
 		persistence: deps.persistence,
 		amcp: null,
 		timelineEngine: null,

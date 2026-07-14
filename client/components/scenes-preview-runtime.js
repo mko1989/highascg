@@ -8,7 +8,7 @@ import { buildPipOverlayRemoveLines } from '../lib/pip-overlay-amcp.js'
 import { chLayerAmcp, buildIncomingScenePayload } from './scenes-shared.js'
 import {
 	allMatrixLayersOnPreviewChannel,
-	defaultLookDecadeLayersForSweep,
+	defaultLookLayersForSweep,
 	getOccupiedPreviewLookLayersFromState,
 	isPreviewBusAvailable,
 	PREVIEW_SCENE_LAYER_MIN,
@@ -21,6 +21,9 @@ import { createScenesPreviewGlobalBorder } from '../lib/scenes-preview-global-bo
 import { clearPreviewLiveOnServer } from '../lib/scene-live-sync.js'
 
 const PREVIEW_PUSH_DEBOUNCE_MS = 16
+
+/** Debounce for the deck PRV thumbnail redraw signal — coalesces rapid inspector drags into one repaint (T155.4a). */
+const DECK_THUMB_REDRAW_DEBOUNCE_MS = 120
 
 /** @param {{ sceneState: object, stateStore: object, getChannelMap: () => object, getPreviewChannel: () => number|null, getPreviewOutputResolution: () => { w: number, h: number, fps?: number }, flushSceneDeckSync?: () => void }} opts */
 export function createScenesPreviewRuntime(opts) {
@@ -60,6 +63,26 @@ export function createScenesPreviewRuntime(opts) {
 	let previewDebounce = null
 
 	let previewFlushRaf = null
+
+	/** @type {ReturnType<typeof setTimeout> | null} */
+	let deckThumbRedrawTimer = null
+
+	/**
+	 * Canvas-mode deck PRV cells are a client-side composite of source thumbnails over `sceneState`
+	 * (`scenes-editor-deck-thumb.js`); a MIXER-only push (fill/rotation/opacity, no PLAY) changes no
+	 * source thumbnail URL, so nothing would otherwise tell that composite to repaint (B155.3/T155.4a).
+	 * Debounced — reuses the repo's existing `window` CustomEvent redraw-signal pattern (see
+	 * `timeline-redraw-request`, `dmx-redraw`) rather than a new event bus; the deck thumb painter
+	 * listens for `scenes-deck-thumb-redraw` and calls its own `repaintDeckThumbs()`.
+	 */
+	function scheduleDeckThumbRedraw() {
+		if (typeof window === 'undefined') return
+		if (deckThumbRedrawTimer != null) clearTimeout(deckThumbRedrawTimer)
+		deckThumbRedrawTimer = setTimeout(() => {
+			deckThumbRedrawTimer = null
+			window.dispatchEvent(new CustomEvent('scenes-deck-thumb-redraw'))
+		}, DECK_THUMB_REDRAW_DEBOUNCE_MS)
+	}
 
 	async function drainPreviewPushQueue() {
 		if (previewPushBusy) {
@@ -215,6 +238,7 @@ export function createScenesPreviewRuntime(opts) {
 			lastPreviewLayers = out.lastPreviewLayers
 			lastPreviewContentSnapshot = out.lastPreviewContentSnapshot
 			lastPreviewChannel = out.lastPreviewChannel
+			scheduleDeckThumbRedraw()
 		}
 	}
 
@@ -260,6 +284,10 @@ export function createScenesPreviewRuntime(opts) {
 
 		sceneState.setPreviewSceneId(null, mIdx)
 
+		// Skip clear for PGM-only mains (no separate preview bus)
+		const cm = getChannelMap()
+		if (!isPreviewBusAvailable(cm, mIdx)) return
+
 		const pgmCh = physicalPgmChannelForMain(mIdx)
 		const prvCh = physicalPrvChannelForMain(mIdx)
 		const separatePrv = !!(prvCh && pgmCh && prvCh !== pgmCh)
@@ -285,7 +313,7 @@ export function createScenesPreviewRuntime(opts) {
 			if (opts.full) {
 				for (const n of allMatrixLayersOnPreviewChannel(stateStore, previewCh)) occupied.add(n)
 				for (let ti = 0; ti < TIMELINE_LAYER_CLEAR_COUNT; ti++) occupied.add(TIMELINE_LAYER_BASE + ti)
-				for (const n of defaultLookDecadeLayersForSweep()) occupied.add(n)
+				for (const n of defaultLookLayersForSweep()) occupied.add(n)
 			}
 
 			for (const ln of [...occupied].sort((a, b) => a - b)) {

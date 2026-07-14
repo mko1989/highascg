@@ -5,6 +5,7 @@
 
 'use strict'
 
+const fs = require('fs')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { parseCinfMedia } = require('../media/cinf-parse')
 const {
@@ -33,6 +34,26 @@ function cinfResponseToStr(data) {
 }
 
 const failedThumbs = new Map() // filename -> timestamp
+
+/**
+ * Check if a thumbnail file is safe to serve (not zero-byte, not mid-write).
+ * Files with mtime < 500ms old may still be written to by another process.
+ * @param {string} filePath
+ * @returns {boolean} true if safe to serve
+ */
+function isThumbFileSafeToServe(filePath) {
+	try {
+		const stat = fs.statSync(filePath)
+		// Reject zero-byte files (empty/stub)
+		if (stat.size === 0) return false
+		// Reject files modified < 500ms ago (likely still being written)
+		const ageMs = Date.now() - stat.mtimeMs
+		if (ageMs < 500) return false
+		return true
+	} catch {
+		return false
+	}
+}
 
 async function handleThumbnail(path, query, ctx) {
 	const liveM = path.match(/^\/api\/thumbnail\/live\/(\d+)$/)
@@ -81,9 +102,41 @@ async function handleThumbnail(path, query, ctx) {
 	const hasHqFlag = query.hq != null
 	const preferHqLocal = !hasHqFlag || String(query.hq ?? '').toLowerCase() === '1' || String(query.hq ?? '').toLowerCase() === 'true'
 	const allowHqFallback = String(query.fallback ?? '').toLowerCase() === '1' || String(query.fallback ?? '').toLowerCase() === 'true'
-	const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
-	if (localBuf && localBuf.length) {
-		return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
+
+	// WO-184: Guard against serving zero-byte or in-flight thumbnail files
+	const { getThumbnailCacheDir, thumbnailCacheKey } = require('../media/local-media-ffmpeg')
+	const { resolveMediaFileOnDisk } = require('../media/local-media')
+	const mediaPath = resolveMediaFileOnDisk(ctx.config || {}, filename)
+	if (mediaPath && fs.existsSync(mediaPath)) {
+		try {
+			const stat = fs.statSync(mediaPath)
+			const cacheDir = getThumbnailCacheDir(ctx.config || {})
+			const key = thumbnailCacheKey(mediaPath, stat, maxW, seekSec)
+			const cachedPath = require('path').join(cacheDir, `${key}.png`)
+			// If cached file exists but is not safe to serve, skip local cache and try Caspar
+			if (fs.existsSync(cachedPath) && !isThumbFileSafeToServe(cachedPath)) {
+				if (typeof ctx.log === 'function') {
+					ctx.log('debug', `[WO-184] Skipping unsafe thumb file: ${cachedPath} (size/mtime check)`)
+				}
+				// Don't use localBuf from cache; fall through to Caspar
+			} else {
+				const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
+				if (localBuf && localBuf.length) {
+					return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
+				}
+			}
+		} catch (e) {
+			// Cache key generation failed; fall through to normal flow
+			const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
+			if (localBuf && localBuf.length) {
+				return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
+			}
+		}
+	} else {
+		const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
+		if (localBuf && localBuf.length) {
+			return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
+		}
 	}
 	if (preferHqLocal && !allowHqFallback) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Local HQ thumbnail not found' }) }

@@ -416,3 +416,46 @@ export function parseRouteChannelLayer(value) {
 	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layer) || layer < 1) return null
 	return { channel, layer }
 }
+
+/**
+ * Parse any route value: `route://N` (whole channel, layer = null) or `route://N-L`.
+ * @param {unknown} value
+ * @returns {{ channel: number, layer: number | null } | null}
+ */
+export function parseRouteValue(value) {
+	const m = String(value || '').trim().match(/^route:\/\/(\d+)(?:-(\d+))?$/i)
+	if (!m) return null
+	const channel = parseInt(m[1], 10)
+	if (!Number.isFinite(channel) || channel < 1) return null
+	const layer = m[2] != null ? parseInt(m[2], 10) : null
+	return { channel, layer: Number.isFinite(layer) && layer >= 1 ? layer : null }
+}
+
+/**
+ * WO-156: rejection message for assigning a route source to a look, or null when allowed.
+ * Blocks:
+ *  - whole-channel routes to the look's own PGM or PRV/edit channel (`route://3` onto ch 3
+ *    wedges the channel in CasparCG — the on-air incident behind WO-156);
+ *  - same-channel routes to the exact target layer (Caspar recursion; pre-existing rule).
+ * Same-channel routes to a *different* layer stay allowed — that is intra-look routing.
+ * @param {unknown} value — dropped source value
+ * @param {{ editChannel?: number | null, pgmChannel?: number | null, targetLayerNumber?: number | null }} target
+ * @returns {string | null} toast message when the drop must be rejected
+ */
+export function routeDropRejectionMessage(value, { editChannel = null, pgmChannel = null, targetLayerNumber = null } = {}) {
+	const parsed = parseRouteValue(value)
+	if (!parsed) return null
+	if (parsed.layer == null) {
+		if (pgmChannel != null && parsed.channel === Number(pgmChannel)) {
+			return `Cannot use route://${parsed.channel} here — it routes this screen's program channel (${parsed.channel}) into itself and freezes the channel.`
+		}
+		if (editChannel != null && parsed.channel === Number(editChannel)) {
+			return `Cannot use route://${parsed.channel} here — it routes this screen's preview channel (${parsed.channel}) into itself and freezes the channel.`
+		}
+		return null
+	}
+	if (editChannel != null && targetLayerNumber != null && parsed.channel === Number(editChannel) && parsed.layer === Number(targetLayerNumber)) {
+		return 'A layer cannot play a route to itself (same channel and layer).'
+	}
+	return null
+}

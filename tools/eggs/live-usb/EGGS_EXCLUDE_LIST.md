@@ -2,10 +2,16 @@
 
 Single file to replace **`/etc/penguins-eggs.d/exclude.list`** on the eggs build host.
 
+**WO-168 T168.2:** [`exclude.list`](exclude.list) is now **pure upstream** (penguins-eggs/refractasnapshot master template) — it contains **no** HighAsCG-specific entries. HighAsCG excludes live only in the fragment files below; `merge-penguins-eggs-exclude-highascg.sh` appends the right one to `/etc/penguins-eggs.d/exclude.list` at prepare-time. Previously `exclude.list` also carried a baked-in, hand-duplicated HighAsCG block (lines ~105–204) that drifted from the fragments — removed.
+
 | File | Purpose |
 |------|---------|
-| **[`exclude.list`](exclude.list)** | Ready to install (eggs master + one HighAsCG block) |
-| [`penguins-eggs-exclude-highascg-fragment.list`](penguins-eggs-exclude-highascg-fragment.list) | HighAsCG-only lines (for merge script) |
+| **[`exclude.list`](exclude.list)** | Ready to install — pure upstream template (no HighAsCG lines) |
+| [`penguins-eggs-exclude-highascg-embed-server.list`](penguins-eggs-exclude-highascg-embed-server.list) | HighAsCG lines, default embed-server ISO (`HIGHASCG_ISO_EMBED_SERVER=1`) — merge script appends this |
+| [`penguins-eggs-exclude-highascg-fragment.list`](penguins-eggs-exclude-highascg-fragment.list) | HighAsCG lines, WO-47 exFAT-only mode (`HIGHASCG_ISO_EMBED_SERVER=0`) |
+| [`penguins-eggs-exclude-decklink.list`](penguins-eggs-exclude-decklink.list) | DeckLink/Blackmagic lines (WO-92), always merged |
+
+> **WO-168 T168.1 — owner action needed.** Before this fix, `home/casparcg/highascg/.private/` (Syncthing device ID, Tailscale status, replication pairing manifest) had **zero** exclude/reset/verify coverage and shipped in every produced ISO/clone. **Any ISO already produced from this box before 2026-07-13 contains this box's device identity/auth material.** Consider rotating Syncthing/Tailscale identities on boxes cloned from those ISOs, and re-producing the ISO after this fix before distributing further.
 
 ## Safety: will prepare / produce erase `/usr`, `/bin`, …?
 
@@ -72,9 +78,26 @@ grep antigravity /etc/penguins-eggs.d/exclude.list
 | Tailscale state (`var/snap`, `snap/`, `root/snap/`, `var/lib`) | Not cloned (avoid stealing builder node) |
 | Blackmagic Desktop Video (`usr/lib/blackmagic`, DKMS modules, …) | **Not cloned** — build host may keep `desktopvideo`; operator installs from exFAT `decklink/` (WO-92) |
 
-**Stays on ISO:** Factory **`config/*.json`** (from `defaults.js` at build time), **`config/casparcg.config`** (from `casparcg.config.iso`), `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc. **Not** the build host’s operator JSON or **`.env`**. **Not** DeckLink/BMD when `HIGHASCG_ISO_FORBID_DECKLINK=1` (default).
+**Stays on ISO:** Factory **`config/*.json`** (from `defaults.js` at build time), **`config/casparcg.config`** (from `casparcg.config.iso`), `lib/`, empty `media/` / `template/` stubs, drivers, systemd, etc. **Not** the build host’s operator JSON or **`.env`**. **Not** DeckLink/BMD when `HIGHASCG_ISO_FORBID_DECKLINK=1` (default). **Not** `home/casparcg/highascg/.private/` (device identity/secrets), `projects/_trash/` (deleted-project tombstones), or `config/*.bak*` / `casparcg copy.config` (config backups) — see below (WO-168).
 
 See [`docs/WO47_ISO_VS_EXFAT.md`](../../../docs/WO47_ISO_VS_EXFAT.md).
+
+## Device identity, trash, and config backups (WO-168)
+
+Three categories of build-host cruft got dedicated coverage across all three layers — exclude (belt), factory reset (suspenders), and post-build verify (proof):
+
+| What | Exclude (both HighAsCG fragments) | Factory reset (`write-iso-default-config.js`) | Verify (`verify-iso-squashfs-excludes.sh`) |
+|------|------------------------------------|--------------------------------------------------|----------------------------------------------|
+| `home/casparcg/highascg/.private/` — Syncthing device ID, Tailscale status, replication pairing (device identity/auth) | Yes | N/A (never operator config; excludes are the only guard — reset does not touch `.private/`) | Yes — asserts absent from squashfs |
+| `projects/_trash/` — tombstoned deleted projects | Yes | `resetProjectsDir()` recursively purges it (and any other non-`.json`, non-`_autosave` entry under `projects/`) | Yes — asserts absent |
+| `config/*.bak*`, `casparcg copy.config` — config backups/duplicates | Yes | Config wipe loop also removes anything matching `isConfigBackupEntry()` (`src/config/factory-defaults-manifest.js`), regardless of `.json` extension | Yes — asserts absent |
+| `_media/` — LevelDB media-scanner cache | Already covered before WO-168 (`home/casparcg/highascg/_media` in both fragments) | Not reset (scanner rebuilds it from `media/` on first run) | Not asserted (pre-existing, unchanged) |
+| `.applied-at`, `.applied-stamp` at repo root | Yes (WO-168 T168.4) | Cleared — see `STALE_ROOT_STAMP_FILES` in `factory-defaults-manifest.js` | Not asserted (low severity; excluded + reset is sufficient) |
+| `BUILD_STAMP`, `.highascg-build-stamp` at repo root | **No** — do not exclude/reset | **No** — do not touch | N/A |
+
+`BUILD_STAMP` / `.highascg-build-stamp` are real runtime data (`src/system/build-stamp.js` `readBuildStampFromDir(REPO_ROOT)`, consumed by `src/system/server-update.js` for version reporting) and must ship/persist. `.applied-at` / `.applied-stamp` at the **repo root** are build-host leftovers with no runtime reader — the only reader (`readAppliedStamp()` in `src/system/server-update.js`) always looks under the exFAT/bridge `drop-update/` mount, never `HIGHASCG_ROOT`.
+
+The preserve-JSON set, starter-project identifiers, and the constants above are centralized in [`src/config/factory-defaults-manifest.js`](../../../src/config/factory-defaults-manifest.js) — the reset script imports it directly; this shell verify script can't `require()` JS, so it pulls the same directory-name constants via a `node -e` print step at verify time (see `manifest_const()` near the top of `verify-iso-squashfs-excludes.sh`).
 
 ## Alternative: merge without replacing whole file
 

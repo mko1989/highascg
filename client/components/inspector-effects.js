@@ -23,8 +23,11 @@ import { scheduleLiveEffectApply } from '../lib/effect-apply-live.js'
  * @param {import('../lib/effect-registry.js').EffectParamSchema} schema
  * @param {*} currentValue
  * @param {(value: *) => void} onChange
+ * @param {{ w: number, h: number } | null} [contentResolution] - Layer content resolution
+ *   (fallback: channel resolution) for `displayAs: 'px'` params (WO-158 T158.4). The px
+ *   conversion is presentation-only: stored params stay 0–1 fractions.
  */
-function renderParamEditor(container, schema, currentValue, onChange) {
+function renderParamEditor(container, schema, currentValue, onChange, contentResolution = null) {
 	if (schema.type === 'select') {
 		const wrap = document.createElement('div')
 		wrap.className = 'inspector-field'
@@ -67,6 +70,33 @@ function renderParamEditor(container, schema, currentValue, onChange) {
 
 	// float or int — use drag input
 	const v = currentValue != null ? Number(currentValue) : (schema.default ?? 0)
+
+	// Pixel edit surface for fraction params (crop): value/min/max shown in px of the
+	// content resolution; onChange converts back so persisted values stay 0–1 fractions.
+	const pxDim =
+		schema.displayAs === 'px' && contentResolution
+			? schema.pxAxis === 'h'
+				? contentResolution.h
+				: contentResolution.w
+			: 0
+	if (pxDim > 0) {
+		const fracMin = schema.min ?? 0
+		const fracMax = schema.max ?? 1
+		const di = createDragInput({
+			label: `${schema.label} (px)`,
+			value: Math.round(v * pxDim),
+			min: fracMin * pxDim,
+			max: fracMax * pxDim,
+			step: 1,
+			decimals: 0,
+			onChange: (val) => onChange(Math.min(fracMax, Math.max(fracMin, val / pxDim))),
+			slider: true,
+		})
+		if (schema.pxHint) di.wrap.title = schema.pxHint
+		container.appendChild(di.wrap)
+		return
+	}
+
 	const di = createDragInput({
 		label: schema.label,
 		value: v,
@@ -75,6 +105,7 @@ function renderParamEditor(container, schema, currentValue, onChange) {
 		step: schema.step ?? 0.01,
 		decimals: schema.decimals ?? 2,
 		onChange: (val) => onChange(val),
+		slider: schema.slider,
 	})
 	container.appendChild(di.wrap)
 }
@@ -86,13 +117,19 @@ function renderParamEditor(container, schema, currentValue, onChange) {
  * @param {import('../lib/effect-registry.js').EffectParamSchema[]} schemaFields
  * @param {(params: object) => void} onParamsChange
  */
-function renderEffectParamBlock(container, def, effect, schemaFields, onParamsChange) {
+function renderEffectParamBlock(container, def, effect, schemaFields, onParamsChange, contentResolution = null) {
 	for (const schema of schemaFields) {
 		const curVal = effect.params?.[schema.key] ?? schema.default
-		renderParamEditor(container, schema, curVal, (newVal) => {
-			const updated = { ...effect.params, [schema.key]: newVal }
-			onParamsChange(updated)
-		})
+		renderParamEditor(
+			container,
+			schema,
+			curVal,
+			(newVal) => {
+				const updated = { ...effect.params, [schema.key]: newVal }
+				onParamsChange(updated)
+			},
+			contentResolution,
+		)
 	}
 }
 
@@ -103,8 +140,9 @@ function renderEffectParamBlock(container, def, effect, schemaFields, onParamsCh
  * @param {(params: object) => void} onChange - Called with updated params
  * @param {() => void} onRemove - Called when user clicks remove
  * @param {import('../lib/effect-apply-live.js').SceneLayerLiveContext | import('../lib/effect-apply-live.js').TimelineClipLiveContext | null} [liveApplyContext]
+ * @param {{ w: number, h: number } | null} [contentResolution] - For `displayAs: 'px'` params (WO-158)
  */
-export function renderEffectEditor(container, effect, onChange, onRemove, liveApplyContext = null) {
+export function renderEffectEditor(container, effect, onChange, onRemove, liveApplyContext = null, contentResolution = null) {
 	const def = EFFECT_MAP.get(effect.type)
 	if (!def) return
 
@@ -144,7 +182,7 @@ export function renderEffectEditor(container, effect, onChange, onRemove, liveAp
 	paramsBlock.className = 'inspector-effect-card__params'
 
 	if (primaryFields.length > 0) {
-		renderEffectParamBlock(paramsBlock, def, effect, primaryFields, notifyChange)
+		renderEffectParamBlock(paramsBlock, def, effect, primaryFields, notifyChange, contentResolution)
 	}
 
 	if (advancedFields.length > 0) {
@@ -157,7 +195,7 @@ export function renderEffectEditor(container, effect, onChange, onRemove, liveAp
 		details.appendChild(summary)
 		const advancedBlock = document.createElement('div')
 		advancedBlock.className = 'inspector-effect-card__advanced-params'
-		renderEffectParamBlock(advancedBlock, def, effect, advancedFields, notifyChange)
+		renderEffectParamBlock(advancedBlock, def, effect, advancedFields, notifyChange, contentResolution)
 		details.appendChild(advancedBlock)
 		paramsBlock.appendChild(details)
 	}
@@ -173,8 +211,11 @@ export function renderEffectEditor(container, effect, onChange, onRemove, liveAp
  * @param {Array<{ type: string, params: object }>} opts.effects - Current effects array
  * @param {(effects: Array) => void} opts.onUpdate - Called with the updated effects array
  * @param {import('../lib/effect-apply-live.js').SceneLayerLiveContext | import('../lib/effect-apply-live.js').TimelineClipLiveContext | null} [opts.liveApplyContext]
+ * @param {{ w: number, h: number } | null} [opts.contentResolution] - Layer/clip content
+ *   resolution (fallback: channel resolution); enables px editing for `displayAs: 'px'`
+ *   params such as crop (WO-158 T158.4). Omit → fraction editing as before.
  */
-export function renderEffectsGroup(root, { effects, onUpdate, liveApplyContext = null }) {
+export function renderEffectsGroup(root, { effects, onUpdate, liveApplyContext = null, contentResolution = null }) {
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-effects-group'
 	grp.innerHTML = '<div class="inspector-group__title">Mixer Effects</div>'
@@ -268,6 +309,7 @@ export function renderEffectsGroup(root, { effects, onUpdate, liveApplyContext =
 				onUpdate(updated)
 			},
 			liveApplyContext,
+			contentResolution,
 		)
 	}
 

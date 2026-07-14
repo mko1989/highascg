@@ -3,6 +3,7 @@ import { PIP_OVERLAY_MAP } from '../lib/pip-overlay-registry.js'
 import { renderParamEditor } from './inspector-pip-overlay.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { requestGlobalBorderPush } from './inspector-global-border-events.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} root
@@ -65,6 +66,7 @@ export function appendGlobalBorderEffectSections(
 		const val = parseInt(fadeInp.value, 10)
 		patchGlobalBorder({ fadeDuration: isNaN(val) ? 25 : val })
 	})
+	attachMathInput(fadeInp, { decimals: 0 })
 	fadeLab.appendChild(fadeInp)
 	fadeWrap.appendChild(fadeLab)
 	borderGrp.appendChild(fadeWrap)

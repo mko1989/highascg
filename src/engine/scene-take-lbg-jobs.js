@@ -1,8 +1,9 @@
 'use strict'
 
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
-const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
+const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel, routeSourceChannelsToAudioFilter } = require('./audio-route')
 const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
+const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
@@ -148,7 +149,16 @@ async function buildTakeJobs(opts) {
 			: phys(Number(layer.layerNumber), inactiveBank)
 		const f = await getResolvedFillForSceneLayer(self, layer, channel, incoming)
 		const cl = chLayerAmcp(channel, pLayer)
-		const af = audioRouteToAudioFilter(layer.audioRoute || '1+2', resolveConfigProgramLayoutForChannel(self.config, channel))
+		let af
+		if (String(clip || '').startsWith('route://')) {
+			// Whole-channel routes (route://N) and layer routes (route://N-L) both carry the source channel.
+			const routeMatch = String(clip).match(/^route:\/\/(\d+)(?:-\d+)?(?:\s|$)/)
+			const sourceChannel = routeMatch ? Number(routeMatch[1]) : null
+			const sourceLayout = sourceChannel != null ? resolveConfigProgramLayoutForChannel(self.config, sourceChannel) : null
+			af = sourceLayout ? routeSourceChannelsToAudioFilter(layer.routeSourceAudio, sourceLayout) : null
+		} else {
+			af = audioRouteToAudioFilter(layer.audioRoute || '1+2', resolveConfigProgramLayoutForChannel(self.config, channel))
+		}
 
 		let isLoop = !!layer.loop
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length === 1) {

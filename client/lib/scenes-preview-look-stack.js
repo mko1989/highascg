@@ -2,11 +2,11 @@
  * Look-stack layer constants + helpers shared by PRV preview push and clear paths.
  */
 
-/** Must match server `TIMELINE_LAYER_BASE` — timeline clips use Caspar layers 200+. */
-export const TIMELINE_LAYER_BASE = 200
+/** Must match server `TIMELINE_LAYER_BASE` (src/engine/look-layer-ranges.js) — timeline clips use Caspar layers 210–259 (WO-160). */
+export const TIMELINE_LAYER_BASE = 210
 export const TIMELINE_LAYER_CLEAR_COUNT = 32
 
-/** Scene content on PRV uses the same layer numbers as PGM (L9 = black CG; main clips on 10, 20, 30…; PIP/CG in the band above each). */
+/** Scene content on PRV uses the same layer numbers as PGM (L9 = black CG; main clips on 10, 11, 12…; PIP/CG in the 260+ band). */
 export const PREVIEW_SCENE_LAYER_MIN = 10
 
 /** @param {object} [stateStore] @param {number} previewCh @returns {Set<number>} */
@@ -27,10 +27,15 @@ export function allMatrixLayersOnPreviewChannel(stateStore, previewCh) {
 	return out
 }
 
-/** Common look-stack decade slots (PIP HTML may use base+1… — matrix sweep catches orphans). */
-export function defaultLookDecadeLayersForSweep() {
+/**
+ * Common look-stack slots for a full sweep (WO-160: consecutive 10–99) plus the legacy
+ * decade slots 100–900 that pre-migration looks may still occupy (one-release hygiene).
+ * PIP overlay slots are cleared per content layer by the caller's pip remove lines.
+ */
+export function defaultLookLayersForSweep() {
 	const out = new Set()
-	for (let L = 10; L <= 900; L += 10) out.add(L)
+	for (let L = 10; L <= 99; L += 1) out.add(L)
+	for (let L = 100; L <= 900; L += 10) out.add(L)
 	return out
 }
 

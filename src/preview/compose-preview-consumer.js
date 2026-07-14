@@ -65,6 +65,23 @@ async function ensureComposePreviewJpgStub(config, channel) {
 	}
 }
 
+/**
+ * Truncate `chN.jpg` to 0 bytes so the serve gates (`size <= 32` in
+ * compose-preview-cache) return 404 instead of painting a stale frame (WO-159 T159.1).
+ * Called on blocklist and on detach without replacement.
+ * @param {object} config
+ * @param {number} channel
+ */
+function truncateComposePreviewJpg(config, channel) {
+	const outPath = cache.resolvePreviewJpgOutputPath(config, channel)
+	if (!outPath) return
+	try {
+		if (fs.existsSync(outPath)) fs.truncateSync(outPath, 0)
+	} catch {
+		/* ok */
+	}
+}
+
 /** @type {Set<number>} */
 const _everAttachedChannels = new Set()
 
@@ -164,6 +181,8 @@ async function attachComposeFileConsumer(ctx, channel) {
 		_channels.set(ch, { attached: false, lastError: msg })
 		if (blocklist.isPermanentAddRejection(msg)) {
 			blocklist.blocklistComposeChannel(ch, { reason: msg, signature: params })
+			// Stale on-disk frame would otherwise be served forever (WO-159 T159.1).
+			truncateComposePreviewJpg(cfg, ch)
 			blocklist.broadcastComposeBlocklistChange(ctx, ch, true, msg)
 			ctx.log?.(
 				'warn',
@@ -195,6 +214,8 @@ async function syncComposeFileConsumers(ctx) {
 	for (const ch of known) {
 		if (desiredSet.has(ch)) continue
 		await removeComposeConsumers(ctx, ch)
+		// Detach without replacement — clear the last frame so it cannot go stale (WO-159 T159.1).
+		truncateComposePreviewJpg(cfg, ch)
 		_channels.delete(ch)
 		_everAttachedChannels.delete(ch)
 		out.detached++
@@ -236,6 +257,8 @@ async function detachAllComposeFileConsumers(ctx) {
 	if (ctx?.amcp?.isConnected) {
 		for (const ch of channels) {
 			await removeComposeConsumers(ctx, ch)
+			// No replacement follows — leave a 0-byte stub, not a stale frame (WO-159 T159.1).
+			truncateComposePreviewJpg(ctx?.config || {}, ch)
 		}
 	}
 	_channels.clear()
@@ -258,6 +281,16 @@ function composeConsumersSettled(config) {
 		if (st?.attached && st.signature === sig) return true
 		return blocklist.isComposeChannelBlocklisted(ch, sig)
 	})
+}
+
+/**
+ * True when the channel's FILE consumer is currently attached (live-writing chN.jpg).
+ * Used by the meta staleness gate (WO-159 T159.1).
+ * @param {number} channel
+ * @returns {boolean}
+ */
+function isComposeConsumerAttached(channel) {
+	return !!_channels.get(parseInt(String(channel), 10))?.attached
 }
 
 /**
@@ -323,7 +356,9 @@ module.exports = {
 	attachComposeFileConsumer,
 	attachAllComposeFileConsumers,
 	syncComposeFileConsumers,
+	isComposeConsumerAttached,
 	allComposeConsumersAttached,
+	truncateComposePreviewJpg,
 	composeConsumersSettled,
 	detachAllComposeFileConsumers,
 	refreshComposePreviewConsumers,

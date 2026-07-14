@@ -1,6 +1,7 @@
 /**
  * Live input modal DOM shell.
  */
+import { attachMathInput } from '../lib/math-input.js'
 
 export function createLiveInputModalShell(defaultCh = 5) {
 	const modal = document.createElement('div')
@@ -77,6 +78,7 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	chInput.max = '999'
 	chInput.value = String(defaultCh)
 	chInput.style.width = '5rem'
+	attachMathInput(chInput, { decimals: 0 })
 	chCol.appendChild(chLabel)
 	chCol.appendChild(chInput)
 	const layerCol = document.createElement('div')
@@ -89,6 +91,7 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	layerInput.max = '999'
 	layerInput.value = '1'
 	layerInput.style.width = '5rem'
+	attachMathInput(layerInput, { decimals: 0 })
 	layerCol.appendChild(layerLabel)
 	layerCol.appendChild(layerInput)
 	chRow.appendChild(chCol)
@@ -332,6 +335,7 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	v4l2Fps.max = '120'
 	v4l2Fps.value = '0'
 	v4l2Fps.style.width = '5rem'
+	attachMathInput(v4l2Fps, { decimals: 0 })
 	v4l2FpsCol.appendChild(v4l2FpsLabel)
 	v4l2FpsCol.appendChild(v4l2Fps)
 	v4l2FormatRow.appendChild(v4l2FormatCol)

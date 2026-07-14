@@ -1,0 +1,27 @@
+i edited a look for pgm 2 hit the global play button (still inside this looks editor) and it took this look to pgm1.
+
+for the timer template. 
+the thing is we need to change where the controls for the timer appear. having them inside the layers inspector only is not flexible enough.
+when a timer is used it should create timer #1 and add a small collapsible timer display and controll in the right bottom next to the compact audio mixer. there should also be a drop down at the top of it to select which timer to control/display.
+also inputing duration in seconds is not good. should be 3 seperate boxes for hh mm ss 
+timers default should be center.
+
+
+i need a way to somehow show the templates in the looks editor. i had an idea to just grab a sort of thumbnail/snapshot from the template (when there are animations for lower thirds then from fully "shown") to display in the editor as a layer.
+
+
+
+****NEW***
+
+i need you to check the auto systems for drop-update and decklink install.
+my idea is for a usb stick boot. while system is booting a service checks if exfat usb exists, checks the content of drop-update if there is something there copies it over into the highascg workdir. (make sure the copy overwrites only existing files, and does not somehow delete others) so highascg can run with the latest version without rebuilding the stick.
+for decklink simliar but when the debs are in the decklink folder the service needs to install it. so passwordless sudo for this is needed.
+
+for installed system similar case, but it should check first if the update or decklink is not already installed.
+
+i also need a way for installed systems to easily from the web gui check for updates (realease on github) download it and install (once the download is complete prompt the user that highascg needs to restart press yes/no to restart)
+
+do a full github comit and push.
+
+in the system tab of the settings modal do a display of the hardware that is on the system.
+

@@ -28,6 +28,22 @@ function assertFilePathString(filePath, label = 'filePath') {
 	}
 }
 
+/**
+ * WO-161 T161.6 — config schema version stamped into the modular config
+ * (top-level scalar → persisted in general.json). Absent = 0 (pre-versioning).
+ * Loads with version < CONFIG_VERSION run the legacy one-shot migrations
+ * (ui nuclear password hash, mediaMount strip, WO-88 host live sources) once,
+ * then stamp CONFIG_VERSION in memory so the next successful save persists it
+ * and later loads skip them. Bump this when adding a new one-shot migration.
+ */
+const CONFIG_VERSION = 1
+
+/** @param {unknown} v @returns {number} */
+function normalizeConfigVersion(v) {
+	const n = parseInt(String(v ?? ''), 10)
+	return Number.isFinite(n) && n > 0 ? n : 0
+}
+
 const MODULAR_KEYS = [
 	'caspar',
 	'server',
@@ -78,23 +94,33 @@ class ConfigManager extends EventEmitter {
 			return Number.isFinite(n) ? n : fallback
 		}
 
+		/** T161.6: version of the config as found on disk (0 = pre-versioning). */
+		let loadedVersion = 0
 		try {
 			if (fs.existsSync(this.configPath)) {
 				const stats = fs.statSync(this.configPath)
 				if (stats.isDirectory()) {
-					this.config = finalizeScreenDestinationsConfig(
-						this._stripLegacyMediaMount(this._loadModular(this.configPath)),
-					)
+					let loaded = this._loadModular(this.configPath)
+					loadedVersion = normalizeConfigVersion(loaded.configVersion)
+					if (loadedVersion < CONFIG_VERSION) loaded = this._stripLegacyMediaMount(loaded)
+					this.config = finalizeScreenDestinationsConfig(loaded)
 					applyStreamRecordMappingsFromGraph(this.config)
 					this.logger.info(`[Config] Loaded modular config from directory: ${this.configPath}`)
 				} else {
 					const raw = fs.readFileSync(this.configPath, 'utf8')
 					const parsed = JSON.parse(raw)
-					this.config = finalizeScreenDestinationsConfig(
-						this._stripLegacyMediaMount(this._merge(defaults, parsed)),
-					)
+					let loaded = this._merge(defaults, parsed)
+					loadedVersion = normalizeConfigVersion(loaded.configVersion)
+					if (loadedVersion < CONFIG_VERSION) loaded = this._stripLegacyMediaMount(loaded)
+					this.config = finalizeScreenDestinationsConfig(loaded)
 					applyStreamRecordMappingsFromGraph(this.config)
 					this.logger.info(`[Config] Loaded monolithic config from ${this.configPath}`)
+				}
+				if (loadedVersion > CONFIG_VERSION) {
+					this.logger.warn(
+						`[Config] *** CONFIG IS NEWER THAN THIS BUILD *** configVersion=${loadedVersion} on disk, this code supports ${CONFIG_VERSION}. ` +
+							'Loading anyway — settings written by a newer HighAsCG may be misread or dropped on save. Update the software or restore a matching config.',
+					)
 				}
 			} else {
 				this.logger.info(`[Config] No config found at ${this.configPath}. Creating from defaults + environment.`)
@@ -114,16 +140,28 @@ class ConfigManager extends EventEmitter {
 					},
 				}
 				this.config = finalizeScreenDestinationsConfig(this._merge(defaults, bootstrap))
+				// Fresh config: born at the current schema version, nothing to migrate.
+				loadedVersion = CONFIG_VERSION
+				this.config.configVersion = CONFIG_VERSION
 				this.save(this.config)
 			}
-			const { migrateUiNuclearPassword } = require('../utils/nuclear-password')
-			if (this.config.ui && typeof this.config.ui === 'object') {
-				const mig = migrateUiNuclearPassword(this.config.ui)
-				if (mig.changed) {
-					this.config.ui = mig.ui
-					this.save(this.config, { emitChange: false })
-					this.logger.info('[Config] Migrated ui.nuclearPassword to scrypt hash')
+			// T161.6: one-shot migrations only for pre-versioning (v0) configs; they
+			// still self-detect, this gate just lets them be retired. Load succeeded
+			// by this point, so stamp the current version in memory first — any
+			// migration save below (or the next regular save) persists it, and
+			// subsequent loads skip this block.
+			if (loadedVersion < CONFIG_VERSION) {
+				this.config.configVersion = CONFIG_VERSION
+				const { migrateUiNuclearPassword } = require('../utils/nuclear-password')
+				if (this.config.ui && typeof this.config.ui === 'object') {
+					const mig = migrateUiNuclearPassword(this.config.ui)
+					if (mig.changed) {
+						this.config.ui = mig.ui
+						this.save(this.config, { emitChange: false })
+						this.logger.info('[Config] Migrated ui.nuclearPassword to scrypt hash')
+					}
 				}
+				this._migrateHostLiveSourcesOnce()
 			}
 			this.isLoaded = true
 			this.emit('load', this.config)
@@ -137,12 +175,33 @@ class ConfigManager extends EventEmitter {
 
 	/**
 	 * Atomic save to disk. Supports both monolithic file and modular directory.
+	 *
+	 * WO-161 T161.5 — write serialization: the disk work runs synchronously
+	 * (writeFileSync + renameSync) before save() returns, so two save() calls
+	 * can never interleave their writes; `_saveChain` additionally records
+	 * strict FIFO completion order so async flows can chain behind in-flight
+	 * saves. (The async caspar XML writer keeps its own mutex in
+	 * routes-caspar-config.js.) Return value/semantics unchanged.
+	 *
 	 * @param {object} newConfig
 	 * @param {{ emitChange?: boolean }} [opts] — `emitChange: false` skips subsystem recycle (e.g. during full apply).
+	 * @returns {boolean}
 	 */
 	save(newConfig, opts = {}) {
+		const result = this._saveNow(newConfig, opts)
+		ConfigManager._saveChain = ConfigManager._saveChain.then(() => result)
+		return result
+	}
+
+	/**
+	 * @param {object} newConfig
+	 * @param {{ emitChange?: boolean }} [opts]
+	 * @private
+	 */
+	_saveNow(newConfig, opts = {}) {
+		let isDir = false
 		try {
-			const isDir = fs.existsSync(this.configPath) && fs.statSync(this.configPath).isDirectory()
+			isDir = fs.existsSync(this.configPath) && fs.statSync(this.configPath).isDirectory()
 
 			if (isDir) {
 				this._saveModular(this.configPath, newConfig)
@@ -279,6 +338,30 @@ class ConfigManager extends EventEmitter {
 		return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
 	}
 
+	/**
+	 * WO-88 host live sources migration, run once at load for v0 configs
+	 * (T161.6). Previously only ran lazily on settings save / host-live routes;
+	 * running it here guarantees it executed before the configVersion stamp
+	 * retires the automatic call sites.
+	 * @private
+	 */
+	_migrateHostLiveSourcesOnce() {
+		try {
+			const { migrateHostLiveSourcesConfig } = require('./host-live-sources-migrate')
+			const mig = migrateHostLiveSourcesConfig(this.config, { config: this.config })
+			if (!mig.changed) return
+			this.config.extraLiveSources = mig.extraLiveSources
+			if (mig.casparServerPatch && Object.keys(mig.casparServerPatch).length) {
+				this.config.casparServer = { ...(this.config.casparServer || {}), ...mig.casparServerPatch }
+			}
+			this.save(this.config, { emitChange: false })
+			this.logger.info('[Config] Migrated host live sources (WO-88) during load')
+			for (const w of mig.warnings || []) this.logger.warn(`[Config] Host live migration: ${w}`)
+		} catch (e) {
+			this.logger.warn(`[Config] Host live sources migration skipped: ${e?.message || e}`)
+		}
+	}
+
 	/** WO-38 mediaMount removed — warn once and drop legacy keys from effective config. */
 	_stripLegacyMediaMount(cfg) {
 		const legacy = cfg && cfg.mediaMount
@@ -363,4 +446,10 @@ class ConfigManager extends EventEmitter {
 	}
 }
 
-module.exports = { ConfigManager }
+/**
+ * T161.5 — module-level promise chain advanced by every save(); strict FIFO.
+ * @type {Promise<unknown>}
+ */
+ConfigManager._saveChain = Promise.resolve()
+
+module.exports = { ConfigManager, CONFIG_VERSION }

@@ -16,12 +16,13 @@ import { createDragInput } from './inspector-common.js'
  * @param {HTMLElement} root
  * @param {object} opts
  * @param {() => { audioRoute?: string, muted?: boolean, volume?: number }} opts.getAudio
- * @param {(patch: { audioRoute?: string, muted?: boolean, volume?: number }) => void} opts.onPatch
+ * @param {(patch: { audioRoute?: string, muted?: boolean, volume?: number, routeSourceAudio?: string }) => void} opts.onPatch
  * @param {boolean} [opts.showStoredRoute]
  * @param {number|null|undefined} [opts.mainIndex] 0-based main; null = all screens (widest bus)
  * @param {object|null|undefined} [opts.channelMap] defaults to settings.channelMap
+ * @param {() => { source?: { type?: string, value?: string }, routeSourceAudio?: string } | null} [opts.getLayer]
  */
-export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredRoute = false, mainIndex, channelMap }) {
+export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredRoute = false, mainIndex, channelMap, getLayer }) {
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group'
 	grp.innerHTML = '<div class="inspector-group__title">Audio</div>'
@@ -39,30 +40,66 @@ export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredR
 				)
 	const routes = audioOutputRoutesForLayout(masterLayout)
 	let a = getAudio()
-	let canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
-	if (canonical !== (a.audioRoute || '1+2')) {
-		queueMicrotask(() => onPatch({ audioRoute: canonical }))
-	}
+	const layer = getLayer?.()
+	const isRouteSource = layer && String(layer.source?.value || '').startsWith('route://')
 
-	const routeWrap = document.createElement('div')
-	routeWrap.className = 'inspector-field'
-	const routeLab = document.createElement('label')
-	routeLab.className = 'inspector-field__label'
-	routeLab.textContent = 'Audio output (pair)'
-	const routeSel = document.createElement('select')
-	routeSel.className = 'inspector-field__select'
-	routeSel.setAttribute('data-inspector-field', 'audio-route')
-	routes.forEach((r) => {
-		const opt = document.createElement('option')
-		opt.value = r.value
-		opt.textContent = r.label
-		routeSel.appendChild(opt)
-	})
-	routeSel.value = canonical
-	routeSel.addEventListener('change', () => onPatch({ audioRoute: routeSel.value }))
-	routeLab.appendChild(routeSel)
-	routeWrap.appendChild(routeLab)
-	grp.appendChild(routeWrap)
+	if (isRouteSource) {
+		// Route source: render source audio channels selector
+		const srcWrap = document.createElement('div')
+		srcWrap.className = 'inspector-field'
+		const srcLab = document.createElement('label')
+		srcLab.className = 'inspector-field__label'
+		srcLab.textContent = 'Source audio channels'
+		const srcSel = document.createElement('select')
+		srcSel.className = 'inspector-field__select'
+		srcSel.setAttribute('data-inspector-field', 'route-source-audio')
+		const sourceOptions = [
+			{ value: 'all', label: 'All' },
+			{ value: '1+2', label: '1+2' },
+			{ value: '3+4', label: '3+4' },
+			{ value: '5+6', label: '5+6' },
+			{ value: '7+8', label: '7+8' },
+		]
+		sourceOptions.forEach((opt) => {
+			const option = document.createElement('option')
+			option.value = opt.value
+			option.textContent = opt.label
+			srcSel.appendChild(option)
+		})
+		srcSel.value = layer.routeSourceAudio || 'all'
+		srcSel.addEventListener('change', () => {
+			onPatch({ routeSourceAudio: srcSel.value })
+		})
+		srcLab.appendChild(srcSel)
+		srcWrap.appendChild(srcLab)
+		grp.appendChild(srcWrap)
+	} else {
+		// Media source: render output pair selector
+		let canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
+		if (canonical !== (a.audioRoute || '1+2')) {
+			queueMicrotask(() => onPatch({ audioRoute: canonical }))
+		}
+
+		const routeWrap = document.createElement('div')
+		routeWrap.className = 'inspector-field'
+		const routeLab = document.createElement('label')
+		routeLab.className = 'inspector-field__label'
+		routeLab.textContent = 'Audio output (pair)'
+		const routeSel = document.createElement('select')
+		routeSel.className = 'inspector-field__select'
+		routeSel.setAttribute('data-inspector-field', 'audio-route')
+		routes.forEach((r) => {
+			const opt = document.createElement('option')
+			opt.value = r.value
+			opt.textContent = r.label
+			routeSel.appendChild(opt)
+		})
+		routeSel.value = canonical
+		routeSel.addEventListener('change', () => onPatch({ audioRoute: routeSel.value }))
+		routeLab.appendChild(routeSel)
+		routeWrap.appendChild(routeLab)
+		grp.appendChild(routeWrap)
+	}
 
 	if (showStoredRoute) {
 		const stored = routes.find((r) => r.value === canonical)?.label || canonical
@@ -238,6 +275,7 @@ export function appendSceneLayerMixerGroup(root, { sceneId, layerIndex, layer })
 			sceneState.patchLayer(sceneId, layerIndex, p)
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 		},
+		getLayer: () => sceneState.getScene(sceneId)?.layers?.[layerIndex],
 		mainIndex: sceneState.activeScreenIndex ?? 0,
 		channelMap: settingsState.getSettings()?.channelMap ?? null,
 	})

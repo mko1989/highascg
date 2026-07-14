@@ -9,6 +9,7 @@
  */
 
 import { PREVIS_STATE_EVENTS } from '../lib/previs-state.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {{ state: ReturnType<typeof import('../lib/previs-state.js').createPrevisState> }} opts
@@ -75,6 +76,7 @@ export function createPrevisSettingsPanel(opts) {
 	vcW.step = '1'
 	vcW.className = 'previs-pgm-3d-settings__num'
 	vcW.title = 'Logical canvas width for UV math (Show Creator virtual canvas)'
+	attachMathInput(vcW, { decimals: 0 })
 	const vcSep = document.createElement('span')
 	vcSep.className = 'previs-pgm-3d-settings__vc-sep'
 	vcSep.textContent = '×'
@@ -85,6 +87,7 @@ export function createPrevisSettingsPanel(opts) {
 	vcH.step = '1'
 	vcH.className = 'previs-pgm-3d-settings__num'
 	vcH.title = 'Logical canvas height for UV math'
+	attachMathInput(vcH, { decimals: 0 })
 	vcRow.append(vcW, vcSep, vcH)
 
 	const aaRow = labeled('Antialiasing')

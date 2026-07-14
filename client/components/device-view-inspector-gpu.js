@@ -8,6 +8,7 @@ import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
 import { edidMonitorLabel } from '../lib/device-view-gpu-port-utils.js'
 import { appendGpuLayoutEditorIfEditMode } from './device-view-inspector-gpu-layout-editor.js'
 import { populateGpuVideoModelineSection } from './device-view-inspector-gpu-video-modeline.js'
+import { attachMathInput } from '../lib/math-input.js'
 import {
 	SCREEN_CONSUMER_DEFAULTS,
 	screenConsumerFlagsFromCasparServer,
@@ -180,9 +181,11 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	arIn.addEventListener('change', runSave)
 	const posXIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'X', value: String(posXVal) })
 	posXIn.style.width = '50%'
+	attachMathInput(posXIn, { decimals: 0 })
 	posXIn.addEventListener('change', runSave)
 	const posYIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'Y', value: String(posYVal) })
 	posYIn.style.width = '50%'
+	attachMathInput(posYIn, { decimals: 0 })
 	posYIn.addEventListener('change', runSave)
 
 	const gpuUi = populateGpuVideoModelineSection(wrapCtl, {

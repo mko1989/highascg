@@ -55,9 +55,32 @@ function audioRouteToAudioFilter(route, programLayout) {
 	return `pan=${busChannels}c|c${out[0]}=c0|c${out[1]}=c1`
 }
 
+/**
+ * Map route source channel pair selection to Caspar FFmpeg audio filter string.
+ * For a multi-channel source (e.g. 8ch program routed into a layer), select which
+ * source channels to play and route them to stereo output (c0=source-ch-N, c1=source-ch-M).
+ * @param {string} [pairId] - channel pair like '1+2', '3+4', '5+6', '7+8' (1-based); 'all' or falsy = no filter
+ * @param {string} [sourceLayout] - source channel layout like 'stereo' | '4ch' | '8ch' | '16ch'
+ * @returns {string | null} inner AF string for AMCP, or null for 'all' / identity
+ */
+function routeSourceChannelsToAudioFilter(pairId, sourceLayout) {
+	const pair = pairId && String(pairId).trim()
+	if (!pair || pair === 'all') return null
+	const sourceChannels = channelCountFromLayout(normalizeProgramLayout(sourceLayout))
+	if (sourceChannels < 2) return null
+	const match = String(pair).match(/^(\d+)\+(\d+)$/)
+	if (!match) return null
+	const ch0 = Number(match[1]) - 1
+	const ch1 = Number(match[2]) - 1
+	if (ch0 < 0 || ch1 < 0 || ch0 >= sourceChannels || ch1 >= sourceChannels) return null
+	if (ch0 === ch1) return null
+	return `pan=stereo|c0=c${ch0}|c1=c${ch1}`
+}
+
 module.exports = {
 	ROUTE_OUTPUT_CHANNELS,
 	resolveConfigProgramLayout,
 	resolveConfigProgramLayoutForChannel,
 	audioRouteToAudioFilter,
+	routeSourceChannelsToAudioFilter,
 }

@@ -8,6 +8,7 @@ const {
 	STREAMING_RTMP_CONSUMER_INDEX,
 	isRemoveNotFoundError,
 	resolveStreamOutputConfig,
+	resolveSourceProgramAudioLayout,
 } = require('./routes-streaming-channel-shared')
 const { pushRtmpLog } = require('./routes-streaming-channel-log')
 
@@ -72,12 +73,18 @@ async function handlePostRtmp(body, ctx) {
 		const serverUrl = String(b.rtmpServerUrl || '').trim()
 		const streamKey = String(b.streamKey || '').trim()
 		const quality = String(b.quality || outCfg?.quality || 'medium').toLowerCase()
+		// WO-172 T172.5: layout-aware downmix — resolve the cabled source's program-bus audio layout
+		// (screenDestinations[].audioLayout) so non-stereo buses (e.g. this rig's discrete-8ch) get an
+		// explicit pan= downmix instead of a blind stereo remix.
+		const videoSource = String((ctx.config?.streamingChannel && ctx.config.streamingChannel.videoSource) || 'program_1')
+		const programLayout = resolveSourceProgramAudioLayout(ctx.config || {}, videoSource)
 		const built = buildStreamingRtmpAddParams(serverUrl, streamKey, quality, {
 			videoCodec: b.videoCodec || outCfg?.videoCodec,
 			videoBitrateKbps: b.videoBitrateKbps ?? outCfg?.videoBitrateKbps,
 			encoderPreset: b.encoderPreset || outCfg?.encoderPreset,
 			audioCodec: b.audioCodec || outCfg?.audioCodec,
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
+			programLayout,
 		})
 		if (!built) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'rtmpServerUrl and streamKey required' }) }
@@ -85,7 +92,16 @@ async function handlePostRtmp(body, ctx) {
 		const params = `${param(built.url)} ${built.args}`.trim()
 		const addWithIdxCmd = `ADD ${ch}-${STREAMING_RTMP_CONSUMER_INDEX} STREAM ${params}`
 		const addNoIdxCmd = `ADD ${ch} STREAM ${params}`
-		pushRtmpLog(ctx, 'info', `RTMP start requested on ch${ch}`, { url: built.url, quality })
+		// WO-172 T172.7: full ADD line + resolved source channel + layout, at error level visibility
+		// (info) so an ffprobe-style audio complaint can be cross-checked against exactly what was sent.
+		pushRtmpLog(ctx, 'info', `RTMP start requested on ch${ch} (source=${videoSource}, layout=${programLayout})`, {
+			url: built.url,
+			quality,
+			channel: ch,
+			source: videoSource,
+			programLayout,
+			command: addWithIdxCmd,
+		})
 		try {
 			let res
 			let usedIndex = STREAMING_RTMP_CONSUMER_INDEX

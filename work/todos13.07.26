@@ -1,0 +1,86 @@
+annoying behaviour:
+when changing any parameter in the looks editor the clip restarts each time.
+
+i acidentaly played route:3 on channel 3 and it somehow blocked the screen 2 (ch3) so i couldnt play the route1 which i intended and then it made multiview screen display the pgm1 with a 1fps even though the actual output on the pgm1 was fine.
+had to restart caspar for a fix to this.
+
+audio mixer. there is route ch1 and 2 under an input ch strip. first there should be routing to screens/caspar channels. under it routing to different stero pairs.
+live audio input has the correct screen routing.
+
+there should be a multiview "refresh"/apply after caspar restart.
+
+when eidting a look it should be sent to prv if available.
+in gui i have some stale thubnail to represent prv ch.
+
+when cropping in looks editor (crop in effects) there should appear special crop points in the editor so the crop can be done visually.
+also cropping needs real pixel values and not 0-1 range.
+the cropping is also not visible in the editor in gui at all.
+
+pip borders need to be "aware" of the cropping so they appear on the actual content and not what it originally was.
+
+in the gui the screen 2(caspar ch3) is displaying black frame on the pgm in compose prv and the current look.
+this can be linked to the prv issue and is porbably rooted in the compose preview jpeg file workflow.
+
+
+***NEW***
+
+there is a INFO 6-10 amcp command going out every 15s WTF???!!!!
+
+the refresh button especially when browsing templates should send TLS amcp command.
+
+streaming even though connected in device view to ch3 pgm2 starts stream of ch1. 
+changes in streaming flag the apply and restart as needed (ornage) even though any setting change and even connetion to a channel needs restart for streaming and record outputs.
+
+audio is buggy in stream and record. 
+
+
+need a timer/count down timer template it can be based on my existing timer module /home/casparcg/highascg/work/references/show_creator/companion-module-highpass-countdown
+with additional countdown to time option. 
+all settings and options should be available in the ispector when countdown template used on a layer. the bg of the timer should of course be transparent so it can be overlayed.
+make sure its "allowed" to use multiple countdowns accross the project.
+make sure all the countdown options are exposed to companion module.
+/home/casparcg/companion-module-dev/companion-module-highpass-highascg
+review the companion module and make sure it hits all the current api endpoints as it hasnt been reciewed in a while.
+
+stupid fucking gemini added the project map to the main service. that is meant only to be deployed as a github page related to the project.
+
+
+i need a clean up of eggs exclude list. 
+in the process i need to have default projects and configs and include only those in the eggs produce build.
+
+
+can we add to the connection/status eyes hover casparcg (and highascg optional) process usage?
+opening settings modal and the logs modal makes the app in the bg dim and for logs blured. none of that, the main ui needs to be visble fully in bg.
+
+
+there is no way to change live audio input to a different device, this should be available without restarting casparcg. just stops the play of old hw on the host channel and starts the new one.
+
+
+****NEWNEW***
+
+most of the number inputs in the gui should allow for basic math to be done inside that input box. (ex: crop, crop left 256px and right 1920-256)
+
+
+****NEWNEWNEW***
+i want you to review the the timeline playout from highascg webui to casparcg screen consumer. 
+id like the timeline playout -> amcp comunication to be used similar to schedule, where each point of intrest inside the timeline (ex: clips start/end, flag) is bundled into the batch commit workflow, if there are situations for instace where a clips starts with 0 oppacity and has the fadein set it should recive in the start clip batch opacity to 100 over 25 frames (or whatever the actual duration is the 100& keyframe).
+
+i need to have an option to choose which audio channels to play on second screen. in my current setup i have screen 1 with 8ch of audio and play route of ch1 on screen 2 (caspar ch3) the full 8ch gets downmixed to stero. id like to be able to choose to only get ch1&2 for instance.
+
+there is an unblock button which clears a channel. this should be part of fade to black not a seperate button. ftb should fade everything out in 0,5s (counted from the set project framerate). wait for the fade to finish and fire full channel clear. no need for a prompt that it clears.... ftb has that implied.
+
+
+there is still issues with the current look in the looks editor to display correctly on the prv channel.
+
+
+color changes of borders (only observed) doesn't "stick", get defaulted asap. 
+
+add super small sliders (horizontal) under number input boxes where it applies. ex: parameters of borders, crop values, size, position etc.
+
+the artnet listener in a global border shouldn't be on by default.
+also add a choice to use sacn both for input in case of global border and output in case of pixel mapping.
+while at it i want you to research what casparcg can do with artnet as i know it has some settings for it (might be for input only tho).
+also review the current implementation of pixel mapping in regards to lighting output (artnet/sacn), im not sure it was based on best approach to achive the goal.
+id like to be able to choose a region that will be scaled down to how many pixels the fixture is set to (avaraged). 
+can we add a gdtf import/export to work with actual fixtures?
+id also like the mapping area to be able to be rotaed and mirrored (h or v or both) ex: ligths to mimic what happens on edges of the screen, but inverted so the effect looks correctly.

@@ -13,6 +13,7 @@ import { listInputChannels } from '../lib/input-channels.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { mountAlsaMixerPanel } from './settings-alsa-mixer-panel.js'
 import { escapeHtml } from '../lib/dom-escape.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} container
@@ -238,6 +239,10 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 
 		renderSlotRows(ui)
 		renderStatus()
+
+		attachMathInput(mainEl.querySelector('#live-audio-pgm-screen'), { decimals: 0 })
+		attachMathInput(mainEl.querySelector('#live-audio-pgm-layer'), { decimals: 0 })
+		attachMathInput(mainEl.querySelector('#live-audio-preview-screen'), { decimals: 0 })
 
 		const statusLine = mainEl.querySelector('#live-audio-action-status')
 		const setActionStatus = (msg, ok = true) => {

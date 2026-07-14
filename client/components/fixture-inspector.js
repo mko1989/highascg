@@ -4,6 +4,7 @@
 
 import { dmxState } from '../lib/dmx-state.js'
 import { escapeAttr } from '../lib/dom-escape.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} root
@@ -47,6 +48,23 @@ export function renderFixtureInspector(root, onDraw) {
 		<div class="inspector-field"><label class="inspector-field__label">Grid cols</label><input type="number" class="inspector-field__input" id="fx-cols" value="${f.grid.cols}"></div>
 		<div class="inspector-field"><label class="inspector-field__label">Grid rows</label><input type="number" class="inspector-field__input" id="fx-rows" value="${f.grid.rows}"></div>
 		<div class="inspector-field"><label class="inspector-field__label">Brightness</label><input type="number" class="inspector-field__input" step="0.1" id="fx-bright" value="${f.brightness}"></div>
+		<div class="inspector-field"><label class="inspector-field__label">Rotation (°)</label><input type="number" class="inspector-field__input" id="fx-rot" value="${f.rotation || 0}" step="1"></div>
+		<div class="inspector-field" style="display: flex; gap: 8px; align-items: center;">
+			<label style="display: flex; align-items: center; gap: 4px; flex: 1;">
+				<input type="checkbox" id="fx-mirror-h" ${f.mirrorH ? 'checked' : ''} style="cursor: pointer;">
+				<span>Mirror H</span>
+			</label>
+			<label style="display: flex; align-items: center; gap: 4px; flex: 1;">
+				<input type="checkbox" id="fx-mirror-v" ${f.mirrorV ? 'checked' : ''} style="cursor: pointer;">
+				<span>Mirror V</span>
+			</label>
+		</div>
+		<div class="inspector-field"><label class="inspector-field__label">Sample mode</label>
+			<select class="inspector-field__select" id="fx-sample-mode">
+				<option value="center"${f.sampleMode === 'center' ? ' selected' : ''}>Single pixel (center)</option>
+				<option value="average"${f.sampleMode === 'average' ? ' selected' : ''}>Region average</option>
+			</select>
+		</div>
 		<div class="inspector-field" style="margin-top:0.75rem">
 			<button type="button" class="inspector-btn-sm" id="fx-delete" style="background:rgba(218,54,51,0.2);color:#f85149">Delete fixture</button>
 		</div>
@@ -88,6 +106,18 @@ export function renderFixtureInspector(root, onDraw) {
 	wrap.querySelector('#fx-cols').addEventListener('change', (e) => update('grid.cols', parseInt(e.target.value, 10)))
 	wrap.querySelector('#fx-rows').addEventListener('change', (e) => update('grid.rows', parseInt(e.target.value, 10)))
 	wrap.querySelector('#fx-bright').addEventListener('change', (e) => update('brightness', parseFloat(e.target.value)))
+	wrap.querySelector('#fx-rot').addEventListener('change', (e) => update('rotation', parseInt(e.target.value, 10)))
+	wrap.querySelector('#fx-mirror-h').addEventListener('change', (e) => update('mirrorH', e.target.checked))
+	wrap.querySelector('#fx-mirror-v').addEventListener('change', (e) => update('mirrorV', e.target.checked))
+	wrap.querySelector('#fx-sample-mode').addEventListener('change', (e) => update('sampleMode', e.target.value))
+
+	attachMathInput(wrap.querySelector('#fx-uni'), { decimals: 0 })
+	attachMathInput(wrap.querySelector('#fx-ch'), { decimals: 0 })
+	attachMathInput(wrap.querySelector('#fx-src'), { decimals: 0 })
+	attachMathInput(wrap.querySelector('#fx-cols'), { decimals: 0 })
+	attachMathInput(wrap.querySelector('#fx-rows'), { decimals: 0 })
+	attachMathInput(wrap.querySelector('#fx-bright'), { decimals: 1 })
+	attachMathInput(wrap.querySelector('#fx-rot'), { decimals: 0 })
 
 	wrap.querySelector('#fx-delete').addEventListener('click', () => {
 		if (!confirm('Delete this fixture?')) return

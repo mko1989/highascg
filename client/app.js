@@ -17,6 +17,7 @@ import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
+import { initTimerControlPanel } from './components/timer-control-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
 import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
 import { programOutputState } from './lib/program-output-state.js'
@@ -380,6 +381,7 @@ async function init() {
 	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore); initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
 	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore); initInspectorPanel(document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
 	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
+	initTimerControlPanel(stateStore, document.getElementById('panel-inspector-timer-mount'))
 
 	settingsState.subscribe(s => {
 		applyBrowserMonitorFromSettings(s); const isOffline = !!s.offline_mode

@@ -508,47 +508,47 @@ handleArrowNavigation(direction) {
 
 ### Phase A: Search overlay
 
-- [ ] **T1** Add search `<dialog>` HTML to `map.html`.
-- [ ] **T2** Implement `SearchIndex` class — build flat index from tree, multi-term fuzzy search with scoring.
-- [ ] **T3** Implement search overlay open/close: Ctrl+K / Cmd+K trigger, Escape close, backdrop click close.
-- [ ] **T4** Implement debounced search-as-you-type (100ms debounce) with result rendering.
-- [ ] **T5** Implement keyboard navigation in results: ↑/↓ to move highlight, Enter to select.
-- [ ] **T6** Implement match highlighting in result labels (`<mark>` tags).
-- [ ] **T7** Implement result selection: close overlay, navigate to node path, expand breadcrumb.
-- [ ] **T8** Style the search overlay per §2.5 CSS spec.
+- [x] **T1** Add search `<dialog>` HTML to `map.html`.
+- [x] **T2** Implement `SearchIndex` class — build flat index from tree, multi-term fuzzy search with scoring.
+- [x] **T3** Implement search overlay open/close: Ctrl+K / Cmd+K trigger, Escape close, backdrop click close.
+- [x] **T4** Implement debounced search-as-you-type (100ms debounce) with result rendering.
+- [x] **T5** Implement keyboard navigation in results: ↑/↓ to move highlight, Enter to select.
+- [x] **T6** Implement match highlighting in result labels (`<mark>` tags).
+- [x] **T7** Implement result selection: close overlay, navigate to node path, expand breadcrumb.
+- [x] **T8** Style the search overlay per §2.5 CSS spec.
 
 ### Phase B: Pan & zoom
 
-- [ ] **T9** Implement `PanZoom` class per §3.1 — scroll-to-zoom, drag-to-pan, pinch-to-zoom.
-- [ ] **T10** Add floating zoom controls (+ / ⟳ / − / level indicator) per §3.2.
-- [ ] **T11** Wire zoom controls: button click → scale change, display current zoom %.
-- [ ] **T12** Reset zoom on drill-down / drill-up (each new level starts at 100%).
-- [ ] **T13** Ensure card click still works at non-100% zoom (transform coordinate mapping).
-- [ ] **T14** Style zoom controls with glassmorphism.
+- [x] **T9** Implement `PanZoom` class per §3.1 — scroll-to-zoom, drag-to-pan, pinch-to-zoom.
+- [x] **T10** Add floating zoom controls (+ / ⟳ / − / level indicator) per §3.2.
+- [x] **T11** Wire zoom controls: button click → scale change, display current zoom %.
+- [x] **T12** Reset zoom on drill-down / drill-up (each new level starts at 100%).
+- [x] **T13** Ensure card click still works at non-100% zoom (transform coordinate mapping).
+- [x] **T14** Style zoom controls with glassmorphism.
 
 ### Phase C: Minimap
 
-- [ ] **T15** Implement `Minimap` class per §4 — canvas rendering, kind-colored dots, viewport rectangle.
-- [ ] **T16** Add minimap container to `map.html`.
-- [ ] **T17** Update minimap on pan/zoom and on level change.
-- [ ] **T18** Click-on-minimap → jump viewport to that position.
-- [ ] **T19** Show/hide minimap: visible only when zoomed or when grid overflows viewport.
+- [x] **T15** Implement `Minimap` class per §4 — canvas rendering, kind-colored dots, viewport rectangle.
+- [x] **T16** Add minimap container to `map.html`.
+- [x] **T17** Update minimap on pan/zoom and on level change.
+- [x] **T18** Click-on-minimap → jump viewport to that position.
+- [x] **T19** Show/hide minimap: visible only when zoomed or when grid overflows viewport.
 
 ### Phase D: Keyboard navigation
 
-- [ ] **T20** Implement arrow key grid navigation per §5.2 (right/left/down/up with column-aware row jumps).
-- [ ] **T21** Implement Enter = drill in, Space = show sidebar, Escape = go up.
-- [ ] **T22** Implement Home/End for first/last card focus.
-- [ ] **T23** Implement +/−/0 for zoom control from keyboard.
-- [ ] **T24** Add ARIA attributes: `role="tree"`, `role="treeitem"`, `aria-expanded`, `aria-level`.
+- [x] **T20** Implement arrow key grid navigation per §5.2 (right/left/down/up with column-aware row jumps).
+- [x] **T21** Implement Enter = drill in, Space = show sidebar, Escape = go up.
+- [x] **T22** Implement Home/End for first/last card focus.
+- [x] **T23** Implement +/−/0 for zoom control from keyboard.
+- [x] **T24** Add ARIA attributes: `role="tree"`, `role="treeitem"`, `aria-expanded`, `aria-level`.
 
 ### Phase E: Integration & testing
 
-- [ ] **T25** Wire SearchIndex build into MapExplorer `init()`.
-- [ ] **T26** Wire PanZoom into the viewport element.
-- [ ] **T27** Verify: Ctrl+K opens search, typing "scene-take" finds the file node, Enter navigates to it with full breadcrumb.
-- [ ] **T28** Verify: scroll-to-zoom works, drag-to-pan works, pinch-to-zoom works on tablet.
-- [ ] **T29** Verify: arrow keys navigate cards, Enter drills in, Escape goes back.
+- [x] **T25** Wire SearchIndex build into MapExplorer `init()`.
+- [x] **T26** Wire PanZoom into the viewport element.
+- [x] **T27** Verify: Ctrl+K opens search, typing "scene-take" finds the file node, Enter navigates to it with full breadcrumb.
+- [x] **T28** Verify: scroll-to-zoom works, drag-to-pan works, pinch-to-zoom works on tablet.
+- [x] **T29** Verify: arrow keys navigate cards, Enter drills in, Escape goes back.
 
 ---
 

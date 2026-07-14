@@ -9,7 +9,7 @@ const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
 const playbackTracker = require('../state/playback-tracker')
 const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
-const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+const { TIMELINE_LAYER_BASE, TIMELINE_LAYER_MAX_COUNT } = require('./timeline-playback-helpers')
 const { clearCasparChannel } = require('./caspar-channel-clear')
 
 function mapTween(tw) {
@@ -64,7 +64,8 @@ function collectLayersToFadeOnChannel(self, ch) {
 		const pb = eng.getPlayback()
 		if (pb?.timelineId && timelineSendToIncludesChannel(self, pb.sendTo, ch)) {
 			const tl = eng.timelines.get(pb.timelineId)
-			const n = tl?.layers?.length ?? 0
+			// Cap at the timeline band (WO-160: 210–259) — extra layers clamp onto the last slot.
+			const n = Math.min(tl?.layers?.length ?? 0, TIMELINE_LAYER_MAX_COUNT)
 			for (let li = 0; li < n; li++) layers.add(TIMELINE_LAYER_BASE + li)
 		}
 	}

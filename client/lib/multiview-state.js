@@ -89,6 +89,29 @@ function defaultLayout(channelMap, cw = DEFAULT_WIDTH, ch = DEFAULT_HEIGHT) {
 	return cells
 }
 
+/**
+ * Normalize editor cells (pixel space) to the 0–1 layout shape `/api/multiview/apply` expects.
+ * @param {object[]} cells
+ * @param {number} canvasWidth
+ * @param {number} canvasHeight
+ */
+function cellsToApiLayout(cells, canvasWidth, canvasHeight) {
+	const cw = canvasWidth || 1
+	const ch = canvasHeight || 1
+	const fixFloat = (v) => Math.round(v * 1000000) / 1000000
+	return (cells || []).map((c) => ({
+		id: c.id,
+		type: c.type,
+		label: c.source ? (c.source.label || c.source.value) : c.label,
+		x: fixFloat(c.x / cw),
+		y: fixFloat(c.y / ch),
+		w: fixFloat(c.w / cw),
+		h: fixFloat(c.h / ch),
+		source: c.source?.value || null,
+		aspectLocked: c.aspectLocked !== false,
+	}))
+}
+
 export class MultiviewState {
 	constructor() {
 		this.currentIndex = 1
@@ -329,20 +352,44 @@ export class MultiviewState {
 	 * Clamps to valid range to avoid floating-point garbage (e.g. -2.6e-17) that can break CasparCG MIXER FILL.
 	 */
 	toApiLayout() {
-		const cw = this.canvasWidth || 1
-		const ch = this.canvasHeight || 1
-		const fixFloat = (v) => Math.round(v * 1000000) / 1000000
-		return this.cells.map((c) => ({
-			id: c.id,
-			type: c.type,
-			label: c.source ? (c.source.label || c.source.value) : c.label,
-			x: fixFloat(c.x / cw),
-			y: fixFloat(c.y / ch),
-			w: fixFloat(c.w / cw),
-			h: fixFloat(c.h / ch),
-			source: c.source?.value || null,
-			aspectLocked: c.aspectLocked !== false,
-		}))
+		return cellsToApiLayout(this.cells, this.canvasWidth, this.canvasHeight)
+	}
+
+	/**
+	 * Full `/api/multiview/apply` body for multiviewer `n` — live state for the currently edited
+	 * index, persisted localStorage layout for the others. Null when nothing is stored.
+	 * WO-156 T156.5: lets "Refresh output" re-apply every configured multiviewer.
+	 * @param {number} n — 1-based multiviewer index
+	 * @returns {{ n: number, layout: object[], showOverlay: boolean, bgColor: string, showTimersUnderLabels: boolean } | null}
+	 */
+	getApplyBodyForIndex(n) {
+		const idx = Math.max(1, parseInt(n, 10) || 1)
+		if (idx === this.currentIndex) {
+			if (!Array.isArray(this.cells) || this.cells.length === 0) return null
+			return {
+				n: idx,
+				layout: this.toApiLayout(),
+				showOverlay: this.showOverlay,
+				bgColor: this.bgColor,
+				showTimersUnderLabels: this.showTimersUnderLabels,
+			}
+		}
+		const key = idx === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${idx}`
+		try {
+			const raw = localStorage.getItem(key)
+			if (!raw) return null
+			const data = JSON.parse(raw)
+			if (!Array.isArray(data.cells) || data.cells.length === 0) return null
+			return {
+				n: idx,
+				layout: cellsToApiLayout(data.cells, data.canvasWidth ?? DEFAULT_WIDTH, data.canvasHeight ?? DEFAULT_HEIGHT),
+				showOverlay: data.showOverlay !== false,
+				bgColor: data.bgColor || '#000000',
+				showTimersUnderLabels: !!data.showTimersUnderLabels,
+			}
+		} catch {
+			return null
+		}
 	}
 
 	/** Deep snapshot for preset slots 1–4. */

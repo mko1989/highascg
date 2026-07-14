@@ -71,6 +71,23 @@ home/casparcg/highascg/.github/*
 home/casparcg/highascg/CT-SS-master
 home/casparcg/highascg/CT-SS-master/*
 
+# Device identity/secrets — MUST NOT ship on any produced ISO/clone (WO-168 T168.1)
+home/casparcg/highascg/.private
+home/casparcg/highascg/.private/*
+
+# Trash tombstones + config backups (WO-168 T168.4) — factory reset also purges these
+home/casparcg/highascg/projects/_trash
+home/casparcg/highascg/projects/_trash/*
+home/casparcg/highascg/config/*.bak*
+home/casparcg/highascg/config/casparcg copy.config
+
+# Build-host drop-update leftovers at repo root — the real .applied-stamp /
+# .applied-at live under exfat|bridge drop-update/, not here (WO-168 T168.4;
+# see src/system/server-update.js readAppliedStamp()). BUILD_STAMP and
+# .highascg-build-stamp are NOT excluded — runtime reads them from repo root.
+home/casparcg/highascg/.applied-at
+home/casparcg/highascg/.applied-stamp
+
 # exFAT mountpoint (empty in ISO)
 home/casparcg/exfat
 home/casparcg/exfat/*

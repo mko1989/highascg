@@ -131,6 +131,13 @@
 	border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* WO-158 T158.2: isolates the source content from the handle buttons so clip-path (crop) never
+   clips the rotate/scale/crop-toggle buttons, which are positioned outside this box. */
+.scenes-layer__content {
+	width: 100%;
+	height: 100%;
+}
+
 .scenes-layer__thumb {
 	width: 100%;
 	height: 100%;
@@ -360,5 +367,121 @@
 	bottom: -8px;
 	right: -8px;
 	cursor: nwse-resize;
+}
+
+/* WO-158 T158.3: crop-mode toggle (mirrors the scale handle position on the opposite corner).
+   Square + amber to read as a distinct affordance from the round blue rotate/scale handles. */
+.scenes-layer__handle--crop {
+	bottom: -8px;
+	left: -8px;
+	border-radius: 3px;
+	border-color: var(--warn);
+	cursor: crosshair;
+}
+
+.scenes-layer__handle--crop[aria-pressed='true'] {
+	background: var(--warn);
+}
+
+/*
+ * WO-158 T158.3: visual crop handles — bracket-style corner marks + short edge ticks, positioned
+ * on the cropped-content outline (a sub-rect of the layer box, set inline via left/top/right/bottom
+ * %). Amber (--warn) throughout so operators can tell "crop" apart from the blue scale/rotate
+ * handles and the plain edge-resize zones at a glance. Hidden unless the layer already has a crop
+ * effect or the operator opened crop mode via the toggle button.
+ */
+.scenes-layer__crop-handles {
+	position: absolute;
+	pointer-events: none;
+	z-index: 4;
+	display: none;
+}
+
+.scenes-layer__crop-handles--active {
+	display: block;
+}
+
+.scenes-layer__crop-handle {
+	position: absolute;
+	pointer-events: auto;
+	background: transparent;
+}
+
+.scenes-layer__crop-handle--n,
+.scenes-layer__crop-handle--s {
+	left: 50%;
+	width: 28px;
+	height: 10px;
+	transform: translateX(-50%);
+	cursor: ns-resize;
+}
+
+.scenes-layer__crop-handle--n {
+	top: -5px;
+	border-top: 3px solid var(--warn);
+}
+
+.scenes-layer__crop-handle--s {
+	bottom: -5px;
+	border-bottom: 3px solid var(--warn);
+}
+
+.scenes-layer__crop-handle--e,
+.scenes-layer__crop-handle--w {
+	top: 50%;
+	width: 10px;
+	height: 28px;
+	transform: translateY(-50%);
+	cursor: ew-resize;
+}
+
+.scenes-layer__crop-handle--e {
+	right: -5px;
+	border-right: 3px solid var(--warn);
+}
+
+.scenes-layer__crop-handle--w {
+	left: -5px;
+	border-left: 3px solid var(--warn);
+}
+
+.scenes-layer__crop-handle--ne,
+.scenes-layer__crop-handle--nw,
+.scenes-layer__crop-handle--se,
+.scenes-layer__crop-handle--sw {
+	width: 18px;
+	height: 18px;
+}
+
+.scenes-layer__crop-handle--ne {
+	top: -6px;
+	right: -6px;
+	border-top: 3px solid var(--warn);
+	border-right: 3px solid var(--warn);
+	cursor: nesw-resize;
+}
+
+.scenes-layer__crop-handle--nw {
+	top: -6px;
+	left: -6px;
+	border-top: 3px solid var(--warn);
+	border-left: 3px solid var(--warn);
+	cursor: nwse-resize;
+}
+
+.scenes-layer__crop-handle--se {
+	bottom: -6px;
+	right: -6px;
+	border-bottom: 3px solid var(--warn);
+	border-right: 3px solid var(--warn);
+	cursor: nwse-resize;
+}
+
+.scenes-layer__crop-handle--sw {
+	bottom: -6px;
+	left: -6px;
+	border-bottom: 3px solid var(--warn);
+	border-left: 3px solid var(--warn);
+	cursor: nesw-resize;
 }
 

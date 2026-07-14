@@ -15,16 +15,12 @@ const utils = require('./pip-overlay-utils')
 const globalBorder = require('./global-border')
 
 const {
-	PIP_OVERLAY_ALIGN_GAP,
 	PIP_OVERLAY_MAX_STACK,
 	TEMPLATE_MAP,
 	resolvePipOverlayCasparLayer,
 	pipOverlaysFromLayer,
 	mergeOverlayParams,
-	normalizeContentFill,
-	outsetPxForPipOverlay,
 	buildPipOverlayCgPayload,
-	overlayLayerSlot,
 	shouldStripPipSlotBeforeAdd,
 	computePipOverlayPlacement,
 	computePipRouterPlacement,
@@ -88,17 +84,6 @@ function buildPipOverlayAmcpLines(
 	const cl = `${channel}-${oLayer}`
 	const data = buildPipOverlayCgPayload(overlay, placement)
 	const out = []
-	const p = Number(contentPhysicalLayer)
-	const idx = stackIndex | 0
-	const aligned = Number.isFinite(p) && oLayer === p + PIP_OVERLAY_ALIGN_GAP + idx
-
-	if (aligned) {
-		const leg = overlayLayerSlot(p, idx)
-		if (Number.isFinite(leg) && leg !== oLayer) {
-			const lcl = `${channel}-${leg}`
-			out.push(deferMixerAmcpLine(`MIXER ${lcl} CLEAR`))
-		}
-	}
 	out.push(
 		`CG ${cl} ADD 0 "${template}" 1 "${data.replace(/"/g, '\\"')}"`,
 		`CG ${cl} PLAY 0`,

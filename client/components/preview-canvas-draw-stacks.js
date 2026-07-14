@@ -1,9 +1,11 @@
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { fillToPixelRect } from '../lib/fill-math.js'
+import { cropFromLayer, cropAdjustedRect } from '../lib/layer-crop.js'
 import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
 import { sceneState } from '../lib/scene-state.js'
 import { getResolutionForScreen } from './scenes-editor-logic.js'
+import { getCachedTemplateThumbUrl, getCachedTemplateThumbImage, isTemplateSourceType } from '../lib/template-thumb.js'
 import {
 	COMPOSE_DUAL_PREVIEW_BG,
 	drawComposePrvPgmCellEdgeBar,
@@ -94,6 +96,16 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		const py = pr.y
 		const pw = Math.max(1, pr.w)
 		const ph = Math.max(1, pr.h)
+		/**
+		 * MIXER CROP crops the layer's source in place — the fill rect is unchanged, the
+		 * cropped-away band just turns transparent. So the visible region = fill rect
+		 * intersected with its own (left..right, top..bottom) crop fractions, and the
+		 * image keeps the full-rect mapping while we clip to the crop window (equivalent
+		 * to cropping the image source rect). @see client/lib/layer-crop.js (WO-158).
+		 */
+		const crop = cropFromLayer(layer)
+		const visRaw = crop ? cropAdjustedRect({ x: px, y: py, w: pw, h: ph }, crop) : { x: px, y: py, w: pw, h: ph }
+		const vis = { x: visRaw.x, y: visRaw.y, w: Math.max(1, visRaw.w), h: Math.max(1, visRaw.h) }
 		const realIdx = scene.layers.indexOf(layer)
 		const color = PREVIEW_LAYER_COLORS[realIdx % PREVIEW_LAYER_COLORS.length]
 		const op = layer.opacity != null ? layer.opacity : 1
@@ -114,10 +126,10 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 				if (!composeDualStreamPreview) {
 					ctx.strokeStyle = isSel ? '#58a6ff' : color
 					ctx.lineWidth = isSel ? lw * 2 : lw
-					ctx.strokeRect(px + lw / 2, py + lw / 2, pw - lw, ph - lw)
+					ctx.strokeRect(vis.x + lw / 2, vis.y + lw / 2, vis.w - lw, vis.h - lw)
 					ctx.fillStyle = color
 					ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
-					ctx.fillText(`L${layer.layerNumber}`, px + 6, py + Math.max(14, Math.round(H / 70)))
+					ctx.fillText(`L${layer.layerNumber}`, vis.x + 6, vis.y + Math.max(14, Math.round(H / 70)))
 				}
 				ctx.restore()
 				return
@@ -129,7 +141,8 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 				if (ready && !failed && isThumbnailImageDrawable(img)) {
 					ctx.save()
 					ctx.beginPath()
-					ctx.rect(px, py, pw, ph)
+					/* Clip to the crop window; image below keeps the uncropped fill-rect mapping. */
+					ctx.rect(vis.x, vis.y, vis.w, vis.h)
 					ctx.clip()
 					const cf = layer.contentFit || 'native'
 					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false
@@ -143,27 +156,51 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					}
 					ctx.restore()
 				} else if (failed) {
-					drawPreviewStatusText(ctx, px, py, pw, ph, 'No preview')
+					drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, 'No preview')
 				} else {
-					drawPreviewStatusText(ctx, px, py, pw, ph, 'Loading…')
+					drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, 'Loading…')
+				}
+			} else if (isTemplateSourceType(src)) {
+				/* WO-187: Template/CG/HTML thumbnails from cached render (T187.3 canvas path).
+				 * Synchronous lookup only — canvas draw must not await. */
+				const thumbImg = getCachedTemplateThumbImage(layer)
+				if (thumbImg && isThumbnailImageDrawable(thumbImg)) {
+					ctx.save()
+					ctx.beginPath()
+					ctx.rect(vis.x, vis.y, vis.w, vis.h)
+					ctx.clip()
+					const cf = layer.contentFit || 'native'
+					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false
+					if (forceStretch) {
+						ctx.drawImage(thumbImg, px, py, pw, ph)
+					} else if (cf === 'horizontal' || cf === 'vertical') {
+						drawImageCover(ctx, thumbImg, px, py, pw, ph)
+					} else {
+						drawImageContainInRect(ctx, thumbImg, px, py, pw, ph)
+					}
+					ctx.restore()
+				} else {
+					/* No cached image — show placeholder (will be filled when thumb resolves) */
+					drawPlaceholderFill(ctx, vis.x, vis.y, vis.w, vis.h, src || { template: 'cg' })
 				}
 			} else if (src?.isPlaceholder || src?.type === 'placeholder' || src?.template || layer.template) {
-				drawPlaceholderFill(ctx, px, py, pw, ph, src || { template: layer.template })
+				drawPlaceholderFill(ctx, vis.x, vis.y, vis.w, vis.h, src || { template: layer.template })
 			} else if (src?.value) {
-				drawPreviewStatusText(ctx, px, py, pw, ph, sourceFallbackLabel(src))
+				drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, sourceFallbackLabel(src))
 			} else {
 				ctx.fillStyle = 'rgba(22, 27, 34, 0.45)'
-				ctx.fillRect(px, py, pw, ph)
+				ctx.fillRect(vis.x, vis.y, vis.w, vis.h)
 			}
 
 			if (!deckThumbnailMode) {
+				/* Layer outline hugs the visible (cropped) content — same rect the PIP border uses. */
 				ctx.strokeStyle = isSel ? '#58a6ff' : color
 				ctx.lineWidth = isSel ? lw * 2 : lw
-				ctx.strokeRect(px + lw / 2, py + lw / 2, pw - lw, ph - lw)
+				ctx.strokeRect(vis.x + lw / 2, vis.y + lw / 2, vis.w - lw, vis.h - lw)
 
 				ctx.fillStyle = color
 				ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
-				ctx.fillText(`L${layer.layerNumber}`, px + 6, py + Math.max(14, Math.round(H / 70)))
+				ctx.fillText(`L${layer.layerNumber}`, vis.x + 6, vis.y + Math.max(14, Math.round(H / 70)))
 			}
 			ctx.restore()
 		}
@@ -408,6 +445,10 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		const y = r.y
 		const w = Math.max(1, r.w)
 		const h = Math.max(1, r.h)
+		/* MIXER CROP window into the clip rect — see drawSceneComposeStack / layer-crop.js (WO-158). */
+		const crop = cropFromLayer(clip)
+		const visRaw = crop ? cropAdjustedRect({ x, y, w, h }, crop) : { x, y, w, h }
+		const vis = { x: visRaw.x, y: visRaw.y, w: Math.max(1, visRaw.w), h: Math.max(1, visRaw.h) }
 		const color = PREVIEW_LAYER_COLORS[li % PREVIEW_LAYER_COLORS.length]
 
 		const drawFn = () => {
@@ -417,10 +458,10 @@ export function drawTimelineStack(ctx, W, H, opts) {
 				if (!composeDualStreamPreview) {
 					ctx.strokeStyle = color
 					ctx.lineWidth = lw
-					ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
+					ctx.strokeRect(vis.x + lw / 2, vis.y + lw / 2, vis.w - lw, vis.h - lw)
 					ctx.fillStyle = color
 					ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
-					ctx.fillText(`L${li + 1}`, x + 6, y + Math.max(14, Math.round(H / 70)))
+					ctx.fillText(`L${li + 1}`, vis.x + 6, vis.y + Math.max(14, Math.round(H / 70)))
 				}
 				ctx.restore()
 				return
@@ -431,10 +472,10 @@ export function drawTimelineStack(ctx, W, H, opts) {
 			if (audioOnly) {
 				drawAudioOnlyPreviewFill(
 					ctx,
-					x,
-					y,
-					w,
-					h,
+					vis.x,
+					vis.y,
+					vis.w,
+					vis.h,
 					(clip.source.label || clip.source.value || 'Audio').slice(0, 28),
 				)
 			} else if (url) {
@@ -442,7 +483,8 @@ export function drawTimelineStack(ctx, W, H, opts) {
 				if (ready && !failed && isThumbnailImageDrawable(img)) {
 					ctx.save()
 					ctx.beginPath()
-					ctx.rect(x, y, w, h)
+					/* Clip to the crop window; image below keeps the uncropped clip-rect mapping. */
+					ctx.rect(vis.x, vis.y, vis.w, vis.h)
 					ctx.clip()
 					const cf = clip.contentFit || 'native'
 					if (cf === 'stretch') {
@@ -454,23 +496,23 @@ export function drawTimelineStack(ctx, W, H, opts) {
 					}
 					ctx.restore()
 				} else if (failed) {
-					drawPreviewStatusText(ctx, x, y, w, h, 'No preview')
+					drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, 'No preview')
 				} else {
-					drawPreviewStatusText(ctx, x, y, w, h, 'Loading…')
+					drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, 'Loading…')
 				}
 			} else if (clip.source?.isPlaceholder) {
-				drawPlaceholderFill(ctx, x, y, w, h, clip.source)
+				drawPlaceholderFill(ctx, vis.x, vis.y, vis.w, vis.h, clip.source)
 			} else {
-				drawPreviewStatusText(ctx, x, y, w, h, sourceFallbackLabel(clip.source))
+				drawPreviewStatusText(ctx, vis.x, vis.y, vis.w, vis.h, sourceFallbackLabel(clip.source))
 			}
 
 			ctx.strokeStyle = color
 			ctx.lineWidth = lw
-			ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw)
+			ctx.strokeRect(vis.x + lw / 2, vis.y + lw / 2, vis.w - lw, vis.h - lw)
 
 			ctx.fillStyle = color
 			ctx.font = `bold ${Math.max(11, Math.round(W / 100))}px ${UI_FONT_FAMILY}`
-			ctx.fillText(`L${li + 1}`, x + 6, y + Math.max(14, Math.round(H / 70)))
+			ctx.fillText(`L${li + 1}`, vis.x + 6, vis.y + Math.max(14, Math.round(H / 70)))
 			ctx.restore()
 		}
 

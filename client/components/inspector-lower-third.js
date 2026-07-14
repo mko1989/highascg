@@ -19,6 +19,7 @@ import {
 import { escapeAttr } from '../lib/dom-escape.js'
 import { fetchLowerThirdTemplates } from './inspector-lower-third-templates.js'
 import { appendLowerThirdRoster } from './inspector-lower-third-roster.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 
 /**
@@ -135,6 +136,10 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 		const n = parseFloat(String(e.target.value))
 		onFieldChange({ displayDurationSec: Number.isFinite(n) ? Math.max(0, n) : 10 })
 	})
+	attachMathInput(metricsRow.querySelector('#lt-title-size'), { decimals: 0 })
+	attachMathInput(metricsRow.querySelector('#lt-subtitle-size'), { decimals: 0 })
+	attachMathInput(metricsRow.querySelector('#lt-render-scale'), { decimals: 0 })
+	attachMathInput(metricsRow.querySelector('#lt-display-sec'), { decimals: 1 })
 
 	const colorRow = document.createElement('div')
 	colorRow.className = 'inspector-lt-colors'

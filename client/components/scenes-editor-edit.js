@@ -2,9 +2,9 @@
  * Edit view rendering for Scenes Editor.
  */
 import { defaultTransition as defaultTransitionDef } from '../lib/scene-state.js'
-import { mountLookTransitionControls, parseDraggableSourcesPayload, parseRouteChannelLayer } from './scenes-shared.js'
+import { mountLookTransitionControls, parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { appendLayerPresetBar, appendSceneLayerStripRows } from './scene-layer-row.js'
-import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
+import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 
@@ -53,10 +53,14 @@ export function renderEdit(ctx) {
 	mainHost.appendChild(bar)
 
 	bar.querySelector('#scenes-take-live').addEventListener('click', () => {
-		void takeSceneToProgram(scene.id, false)
+		// WO-185 T185.2: Pass targetMains to take the edited scene to its configured main
+		const mainIdx = resolveMainIndexForScene(scene, sceneState)
+		void takeSceneToProgram(scene.id, false, { targetMains: [mainIdx] })
 	})
 	bar.querySelector('#scenes-take-cut').addEventListener('click', () => {
-		void takeSceneToProgram(scene.id, true)
+		// WO-185 T185.2: Pass targetMains to take the edited scene to its configured main
+		const mainIdx = resolveMainIndexForScene(scene, sceneState)
+		void takeSceneToProgram(scene.id, true, { targetMains: [mainIdx] })
 	})
 	bar.querySelector('#scenes-back').addEventListener('click', () => {
 		void (async () => {
@@ -106,17 +110,19 @@ export function renderEdit(ctx) {
 				for (const data of items) {
 					if (!data?.value || !sceneState.editingSceneId) continue
 					
-					const parsed = parseRouteChannelLayer(data.value)
 					const cm = stateStore?.getState?.()?.channelMap || {}
-					const ch = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
-					
+					const editCh = resolveLookStackChannelForBus(cm, sceneState, scene, 'edit')
+					const pgmCh = resolveLookStackChannelForBus(cm, sceneState, scene, 'pgm')
+
 					const idx = sceneState.addLayer(scene.id)
 					if (idx < 0) continue
-					
+
 					const added = sceneState.getScene(scene.id)?.layers?.[idx]
 					const targetLn = added?.layerNumber
-					
-					if (parsed && ch != null && parsed.channel === ch && targetLn != null && parsed.layer === targetLn) {
+
+					// WO-156: reject self-routes (same channel+layer, or whole-channel route to
+					// this screen's own PGM/PRV channel — that wedges the channel in Caspar).
+					if (routeDropRejectionMessage(data.value, { editChannel: editCh, pgmChannel: pgmCh, targetLayerNumber: targetLn })) {
 						sceneState.removeLayer(scene.id, idx)
 						continue
 					}

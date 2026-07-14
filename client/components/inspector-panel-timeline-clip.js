@@ -358,8 +358,16 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		stateStore,
 	})
 
+	/* Crop is edited in pixels of the clip's content resolution (fallback: program canvas) — WO-158 T158.4. */
+	const effectContentRes =
+		(clip.source ? getContentResolution(clip.source, stateStore, programScreenIdx) : null) || {
+			w: canvas.width,
+			h: canvas.height,
+		}
+
 	renderEffectsGroup(root, {
 		effects: clip.effects || [],
+		contentResolution: effectContentRes,
 		liveApplyContext: {
 			kind: 'timeline_clip',
 			stateStore: deps.stateStore,

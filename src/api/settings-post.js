@@ -334,15 +334,20 @@ async function handlePost(path, body, ctx) {
 		delete newConfig.mediaMount
 		delete newConfig.streaming._effectiveBasePort; delete newConfig.streaming._casparHost
 		for (const k of SYSTEM_DISPLAY_KEYS) { if (settings[k] !== undefined) { if (cfg[k] !== undefined) newConfig[k] = cfg[k]; else delete newConfig[k] } }
-		const { migrateHostLiveSourcesConfig } = require('../config/host-live-sources-migrate')
-		const hostLiveMig = migrateHostLiveSourcesConfig(newConfig, ctx)
-		if (hostLiveMig.changed) {
-			newConfig.extraLiveSources = hostLiveMig.extraLiveSources
-			if (hostLiveMig.casparServerPatch && Object.keys(hostLiveMig.casparServerPatch).length) {
-				newConfig.casparServer = { ...newConfig.casparServer, ...hostLiveMig.casparServerPatch }
+		// T161.6: legacy WO-88 host-live migration is retired for versioned configs
+		// (it ran once at load / before the configVersion stamp). Explicit
+		// /api/host-live migration endpoints remain available regardless.
+		if (!(parseInt(String(newConfig.configVersion ?? ''), 10) >= 1)) {
+			const { migrateHostLiveSourcesConfig } = require('../config/host-live-sources-migrate')
+			const hostLiveMig = migrateHostLiveSourcesConfig(newConfig, ctx)
+			if (hostLiveMig.changed) {
+				newConfig.extraLiveSources = hostLiveMig.extraLiveSources
+				if (hostLiveMig.casparServerPatch && Object.keys(hostLiveMig.casparServerPatch).length) {
+					newConfig.casparServer = { ...newConfig.casparServer, ...hostLiveMig.casparServerPatch }
+				}
 			}
+			if (hostLiveMig.warnings.length) warnings.push(...hostLiveMig.warnings)
 		}
-		if (hostLiveMig.warnings.length) warnings.push(...hostLiveMig.warnings)
 		ctx.configManager.save(newConfig)
 		const { syncOperatorPointerConfine } = require('../system/pointer-confine')
 		syncOperatorPointerConfine(newConfig, { log: (level, msg) => ctx.log?.(level, msg) })

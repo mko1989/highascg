@@ -8,6 +8,7 @@ import {
 	PORTAUDIO_LAYOUT_OPTIONS,
 	portAudioLayoutOptionsForDevice,
 } from '../lib/audio-channel-layouts.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 function selectedDeviceMaxChannels(deviceSel, lastPayload) {
 	const val = String(deviceSel?.value || '').trim()
@@ -139,9 +140,12 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	hostApiSel.innerHTML = '<option value="auto">Auto Host API</option><option value="ASIO">ASIO</option><option value="ALSA">ALSA</option><option value="CoreAudio">CoreAudio</option><option value="WASAPI">WASAPI</option>'
 	hostApiSel.value = String(existing?.hostApi || 'auto')
 
-	const bufferIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'Buffer frames (e.g. 128)', value: String(existing?.bufferFrames ?? 128) })
-	const latencyIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'Latency ms (e.g. 40)', value: String(existing?.latencyMs ?? 40) })
-	const fifoIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', placeholder: 'FIFO ms (e.g. 50)', value: String(existing?.fifoMs ?? 50) })
+	const bufferIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'Buffer frames (e.g. 128)', value: String(existing?.bufferFrames ?? 128) })
+	attachMathInput(bufferIn, { decimals: 0 })
+	const latencyIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'Latency ms (e.g. 40)', value: String(existing?.latencyMs ?? 40) })
+	attachMathInput(latencyIn, { decimals: 0 })
+	const fifoIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'FIFO ms (e.g. 50)', value: String(existing?.fifoMs ?? 50) })
+	attachMathInput(fifoIn, { decimals: 0 })
 
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save audio settings' })
 	saveBtn.onclick = async () => {

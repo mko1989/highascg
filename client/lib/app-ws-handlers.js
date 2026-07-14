@@ -16,12 +16,14 @@ import {
 } from './streaming-channel-state.js'
 import {
 	ingestComposePreviewWs,
+	syncComposePreviewBlocklist,
 	syncComposePreviewClientChannels,
 	syncComposePreviewFromChannelMap,
 } from '../components/preview-canvas-compose-snapshot.js'
 import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-url.js'
 import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
+import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
 
 /**
  * @param {unknown} data
@@ -57,6 +59,10 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		applyWsStateSideEffects(data, { sceneState, programOutputState, appLogic })
 		if (data?.channelMap) {
 			syncComposePreviewFromChannelMap(data.channelMap)
+		}
+		if (data?.composePreview?.blocklist) {
+			// Bootstrap the WO-144 badge on connect/reconnect (WO-159 T159.2).
+			syncComposePreviewBlocklist(data.composePreview.blocklist)
 		}
 		if (data?.catalogDeferred) {
 			void loadDeferredCatalogOverWs(ws, stateStore, (full) =>
@@ -135,22 +141,31 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		const sc = sceneState.getScene(lookId)
 		const L = sc?.layers?.[layerIdx]
 		if (L) {
+			// WO-177: whitelist-based approach. Apply ONLY keys the mixer_update emitter legitimately sends
+			// (from src/api/routes-mixer-inspector.js:213). Prevents echo from stomping structural fields
+			// (pipOverlays, effects, source, globalBorder, transition, audioRoute, etc).
+			const mixerUpdateWhitelist = ['opacity', 'x', 'y', 'scaleX', 'scaleY']
 			const fillProps = ['x', 'y', 'scaleX', 'scaleY']
+
+			// Guard against stomping recent local edits (WO-177 T177.2).
+			const recentEdit = isLayerRecentlyEdited(L)
+
+			// Apply fill props to L.fill
 			const hasFill = Object.keys(updatedValues).some(k => fillProps.includes(k))
-			
-			if (hasFill) {
+			if (hasFill && !recentEdit) {
 				if (!L.fill) L.fill = {}
 				for (const k of fillProps) {
 					if (updatedValues[k] !== undefined) L.fill[k] = updatedValues[k]
 				}
 			}
-			
-			for (const [k, v] of Object.entries(updatedValues)) {
-				if (!fillProps.includes(k)) {
-					L[k] = v
+
+			// Apply whitelisted non-fill keys (currently just opacity)
+			for (const k of mixerUpdateWhitelist) {
+				if (!fillProps.includes(k) && updatedValues[k] !== undefined && !recentEdit) {
+					L[k] = updatedValues[k]
 				}
 			}
-			
+
 			sceneState._emit('softChange')
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 		}

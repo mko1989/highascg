@@ -11,6 +11,7 @@ const { buildConfigXml, normalizeAudioRouting } = require('../config/config-gene
 const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-generator-config')
 const { getStandardModeChoices } = require('../config/config-modes')
 const { applyFullServerConfig } = require('../utils/full-config-apply')
+const { atomicWriteFile } = require('../utils/atomic-file-write')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -67,10 +68,31 @@ function resolveCasparConfigWritePath(ctx) {
  * @returns {Promise<{ ok: boolean, status?: number, path?: string, error?: string, detail?: string, hint?: string }>}
  */
 /**
+ * WO-161 T161.5 — promise-chain mutex: concurrent writeCasparConfigToDisk calls
+ * (UI apply vs follower regen vs host-live repair) run strictly in order, so
+ * two writers can never race on the same tmp file / target XML.
+ * @type {Promise<unknown>}
+ */
+let casparXmlWriteChain = Promise.resolve()
+
+/**
  * @param {object} ctx
  * @param {{ xml?: string }} [opts] - one-shot XML from editor Apply (not persisted in settings)
  */
-async function writeCasparConfigToDisk(ctx, opts = {}) {
+function writeCasparConfigToDisk(ctx, opts = {}) {
+	const run = casparXmlWriteChain.then(() => writeCasparConfigToDiskUnserialized(ctx, opts))
+	casparXmlWriteChain = run.then(
+		() => undefined,
+		() => undefined,
+	)
+	return run
+}
+
+/**
+ * @param {object} ctx
+ * @param {{ xml?: string }} [opts]
+ */
+async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 	if (ctx.config?.offline_mode) {
 		apiLog(ctx, 'warn', '[Caspar config] Write rejected: offline_mode is enabled')
 		return {
@@ -105,7 +127,8 @@ async function writeCasparConfigToDisk(ctx, opts = {}) {
 	const dir = path.dirname(filePath)
 	try {
 		await fs.mkdir(dir, { recursive: true })
-		await fs.writeFile(filePath, xml, 'utf8')
+		// WO-161 T161.1: tmp + rename so a crash mid-write never leaves a torn casparcg.config.
+		await atomicWriteFile(filePath, xml, 'utf8')
 		apiLog(ctx, 'info', `[Caspar config] Saved ${filePath} (${xml.length} bytes)`)
 	} catch (e) {
 		const code = e && e.code

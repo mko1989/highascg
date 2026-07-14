@@ -143,6 +143,16 @@ async function applyHostOperatorFullscreen(ctx, payload) {
 	}
 
 	const { channel, layer } = target
+	// WO-156: routing the operator display channel into itself wedges it in CasparCG.
+	const { findSelfRouteViolation } = require('../engine/scene-route-deps')
+	const selfRoute = findSelfRouteViolation(route, channel)
+	if (selfRoute) {
+		return {
+			ok: false,
+			status: 400,
+			error: `Operator fullscreen blocked: ${selfRoute.reason} (self-route would wedge channel ${channel})`,
+		}
+	}
 	const cmds = [`PLAY ${channel}-${layer} ${route}`, `MIXER ${channel}-${layer} FILL 0 0 1 1`, `MIXER ${channel} COMMIT`]
 	for (const cmd of cmds) {
 		await ctx.amcp.raw(cmd)

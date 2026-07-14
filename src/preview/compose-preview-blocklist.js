@@ -98,6 +98,36 @@ function resetComposeBlocklist() {
 }
 
 /**
+ * Clear the entire blocklist on Caspar (re)connect (WO-159 T159.3 follow-up).
+ *
+ * A "channel doesn't exist" 400 is only valid for the lifetime of the Caspar instance
+ * that produced it. WO-159's live-box investigation found the ADD FILE 400s on ch2/3/5/6
+ * were a Caspar-restart race — the app probed channels before they existed in the
+ * just-started instance — but the WO-144 blocklist is keyed on (channel, ADD-params
+ * signature) and never re-probes on its own, so a transient startup race became
+ * permanent for the rest of the process lifetime. Since every reconnect is potentially
+ * a *different* Caspar instance (restart, config reload, crash recovery), the blocklist
+ * must not survive across the connection edge — callers should invoke this before the
+ * compose-preview consumer re-sync so the fresh instance gets a fresh probe.
+ * @param {object} [ctx] — passed through to the WS broadcast + logger; safe to omit.
+ * @returns {number[]} channels that were cleared (empty when nothing was blocklisted)
+ */
+function resetComposeBlocklistOnReconnect(ctx) {
+	const channels = getComposeBlocklistedChannels()
+	if (channels.length) {
+		resetComposeBlocklist()
+		for (const ch of channels) broadcastComposeBlocklistChange(ctx, ch, false)
+	}
+	ctx?.log?.(
+		'info',
+		channels.length
+			? `[compose-preview] blocklist cleared on Caspar reconnect (ch ${channels.join(',')} will be reprobed)`
+			: '[compose-preview] Caspar reconnected — blocklist already empty, nothing to reprobe',
+	)
+	return channels
+}
+
+/**
  * Push blocklist change to the webUI (same `compose.preview` WS event the frame
  * push uses — payload is disambiguated by the `blocklisted` field).
  * @param {object} ctx
@@ -124,5 +154,6 @@ module.exports = {
 	getComposeBlocklistedChannels,
 	getComposeBlocklistStats,
 	resetComposeBlocklist,
+	resetComposeBlocklistOnReconnect,
 	broadcastComposeBlocklistChange,
 }

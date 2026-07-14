@@ -5,6 +5,7 @@ import {
 } from '../lib/global-border-artnet-map.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { scheduleGlobalBorderConfigSave } from './inspector-global-border-events.js'
+import { attachMathInput } from '../lib/math-input.js'
 
 /**
  * @param {HTMLElement} root
@@ -17,7 +18,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 
 	const patchGrp = document.createElement('div')
 	patchGrp.className = 'inspector-group'
-	patchGrp.innerHTML = '<div class="inspector-group__title">Art-Net</div>'
+	patchGrp.innerHTML = '<div class="inspector-group__title">Lighting input (Art-Net/sACN)</div>'
 
 	const patchBlock = document.createElement('div')
 	patchBlock.className = 'inspector-effect-card__params'
@@ -31,7 +32,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 	listenLab.style.gap = '8px'
 	const listenChk = document.createElement('input')
 	listenChk.type = 'checkbox'
-	listenChk.checked = gb.artnetListenEnabled !== false
+	listenChk.checked = gb.artnetListenEnabled === true
 	listenChk.addEventListener('change', () => {
 		patchGlobalBorder({ artnetListenEnabled: listenChk.checked })
 		scheduleGlobalBorderConfigSave()
@@ -43,6 +44,31 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 	listenLab.appendChild(listenTxt)
 	listenWrap.appendChild(listenLab)
 	patchBlock.appendChild(listenWrap)
+
+	const protocolWrap = document.createElement('div')
+	protocolWrap.className = 'inspector-field'
+	const protocolLab = document.createElement('label')
+	protocolLab.className = 'inspector-field__label'
+	protocolLab.textContent = 'Protocol'
+	const protocolSel = document.createElement('select')
+	protocolSel.className = 'inspector-field__select'
+	const artnetOpt = document.createElement('option')
+	artnetOpt.value = 'artnet'
+	artnetOpt.textContent = 'Art-Net'
+	artnetOpt.selected = (gb.lightingProtocol !== 'sacn')
+	const sacnOpt = document.createElement('option')
+	sacnOpt.value = 'sacn'
+	sacnOpt.textContent = 'sACN (E1.31)'
+	sacnOpt.selected = (gb.lightingProtocol === 'sacn')
+	protocolSel.appendChild(artnetOpt)
+	protocolSel.appendChild(sacnOpt)
+	protocolSel.addEventListener('change', () => {
+		patchGlobalBorder({ lightingProtocol: protocolSel.value })
+		scheduleGlobalBorderConfigSave()
+	})
+	protocolLab.appendChild(protocolSel)
+	protocolWrap.appendChild(protocolLab)
+	patchBlock.appendChild(protocolWrap)
 
 	let patchStartCh = Number(gb.artnetPatch?.startChannel) || 1
 
@@ -69,6 +95,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 		scheduleGlobalBorderConfigSave()
 		rebuildMappingTable()
 	})
+	attachMathInput(scInp, { decimals: 0 })
 	scLab.appendChild(scInp)
 	scWrap.appendChild(scLab)
 	patchBlock.appendChild(scWrap)
@@ -94,6 +121,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 		})
 		scheduleGlobalBorderConfigSave()
 	})
+	attachMathInput(uniInp, { decimals: 0 })
 	uniLab.appendChild(uniInp)
 	uniWrap.appendChild(uniLab)
 	patchBlock.appendChild(uniWrap)

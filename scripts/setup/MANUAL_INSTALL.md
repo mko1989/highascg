@@ -388,7 +388,7 @@ sudo bash work/run-eggs-prepare-safe.sh    # check-only
 Produce ISO (after prepare passes):
 
 ```bash
-cp ~/highascg/config/casparcg.config ~/highascg/config/casparcg.config.bak.$(date +%s)
+bash ~/highascg/scripts/backup-caspar-config.sh   # → config/backups/casparcg.config.bak.<epoch>, rotates to newest 10
 sudo HIGHASCG_NVIDIA_DRIVER=595 bash work/run-eggs-produce-from-host.sh
 ```
 

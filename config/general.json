@@ -21,7 +21,7 @@
   },
   "local_template_path": "",
   "composePreview": {
-    "mode": "canvas",
+    "mode": "ffmpeg_jpeg",
     "fps": 25,
     "resolutionScale": "half",
     "jpegQuality": 10,
@@ -41,7 +41,6 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
-  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"
@@ -93,24 +92,6 @@
       "dns": []
     }
   },
-  "extraLiveSources": [
-    {
-      "type": "route",
-      "routeType": "decklink",
-      "value": "route://5-4",
-      "label": "DeckLink 4",
-      "decklinkSlot": 4,
-      "inputsChannel": 5,
-      "inputsLayer": 4,
-      "decklinkDevice": 4,
-      "connectorId": "dlsdi_4",
-      "resolution": "1920×1080",
-      "fps": "50",
-      "thumbnailChannel": 5,
-      "thumbnailLayer": 4
-    }
-  ],
-  "gpuPhysicalTopologyOperatorSaved": false,
   "screen_count": 2,
   "streaming": {
     "enabled": false,
@@ -130,6 +111,24 @@
     "drmDevice": "/dev/dri/card0",
     "autoRelocateBasePort": true
   },
+  "extraLiveSources": [
+    {
+      "type": "route",
+      "routeType": "decklink",
+      "value": "route://5-4",
+      "label": "DeckLink 4",
+      "decklinkSlot": 4,
+      "inputsChannel": 5,
+      "inputsLayer": 4,
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_4",
+      "resolution": "1920×1080",
+      "fps": "50",
+      "thumbnailChannel": 5,
+      "thumbnailLayer": 4
+    }
+  ],
+  "configVersion": 1,
   "periodic_sync_interval_sec": null,
   "periodic_sync_interval_sec_osc": null,
   "screen_1_system_id": "",

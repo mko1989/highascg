@@ -8,6 +8,7 @@ import { audioRouteToAudioFilter } from './audio-routes.js'
 import { resolveProgramLayoutForProgramChannel } from './program-audio-layouts.js'
 import { settingsState } from './settings-state.js'
 import { resolveLayerFillForAmcp } from './mixer-fill.js'
+import { cropAdjustedFillForLayer } from './layer-crop.js'
 import { shouldApplyStraightAlphaKeyer } from './media-ext.js'
 import { buildPipOverlayAmcpLinesAll, buildPipOverlayRemoveLines, buildPipOverlayRemoveStaleSlots } from './pip-overlay-amcp.js'
 import { getPipOverlaysFromLayer, resolvePipOverlayCasparLayer, PIP_OVERLAY_MAX_STACK } from './pip-overlay-registry.js'
@@ -19,9 +20,10 @@ import {
 	TIMELINE_LAYER_CLEAR_COUNT,
 	getOccupiedPreviewLookLayersFromState,
 	resolvePreviewAmcpChannel,
+	isPreviewBusAvailable,
 } from './scenes-preview-look-stack.js'
 import { linearGainToCasparDb } from './audio-volume-scale.js'
-import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot } from './scenes-preview-snapshot.js'
+import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot, previewContentCompareKey } from './scenes-preview-snapshot.js'
 import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
 import { syncPreviewLiveToServer } from './scene-live-sync.js'
 
@@ -245,19 +247,9 @@ export async function pushSceneToPreviewImpl(opts) {
 				}
 
 				const curMeta = layerContentMetaForSnapshot(layer)
-				const prevContent = prevMeta
-					? {
-							value: prevMeta.value,
-							loop: prevMeta.loop,
-							straightAlpha: prevMeta.straightAlpha,
-							contentFit: prevMeta.contentFit,
-							audioRoute: prevMeta.audioRoute,
-							volume: prevMeta.volume,
-							muted: prevMeta.muted,
-							pipOverlays: prevMeta.pipOverlays,
-						}
-					: null
-				const contentUnchanged = prevContent && curMeta && JSON.stringify(prevContent) === JSON.stringify(curMeta)
+				const prevContent = prevMeta ? previewContentCompareKey(prevMeta) : null
+				const contentUnchanged =
+					prevContent && curMeta && JSON.stringify(prevContent) === JSON.stringify(previewContentCompareKey(curMeta))
 
 				if (geometryOnly || contentUnchanged) {
 					queue.push(...mixerPart)
@@ -300,7 +292,9 @@ export async function pushSceneToPreviewImpl(opts) {
 								pipOverlays,
 								previewCh,
 								ln,
-								f,
+								/* WO-158 T158.5 (part B): border/overlay geometry hugs the visible (cropped) content —
+								 * the video layer's own MIXER FILL (`f`, used above) stays uncropped. */
+								cropAdjustedFillForLayer(f, layer),
 								{ w: prvRes.w, h: prvRes.h },
 								nextP,
 								prevPip,
@@ -319,7 +313,9 @@ export async function pushSceneToPreviewImpl(opts) {
 								pipOverlays,
 								previewCh,
 								ln,
-								f,
+								/* WO-158 T158.5 (part B): border/overlay geometry hugs the visible (cropped) content —
+								 * the video layer's own MIXER FILL (`f`, used above) stays uncropped. */
+								cropAdjustedFillForLayer(f, layer),
 								{ w: prvRes.w, h: prvRes.h },
 								nextP,
 								prevPip,
@@ -393,10 +389,13 @@ export async function pushSceneToPreviewImpl(opts) {
 		const nextLastPreviewChannel = Number(lastPreviewCh)
 
 		for (const mIdx of pendingPreviewMainIds) {
-			try {
-				await syncPreviewLiveToServer(sceneId, mIdx, { sceneState, stateStore })
-			} catch (e) {
-				console.warn('Preview live sync failed:', e?.message || e)
+			// Skip preview live sync for PGM-only mains (no separate preview bus)
+			if (isPreviewBusAvailable(cm, mIdx)) {
+				try {
+					await syncPreviewLiveToServer(sceneId, mIdx, { sceneState, stateStore })
+				} catch (e) {
+					console.warn('Preview live sync failed:', e?.message || e)
+				}
 			}
 		}
 

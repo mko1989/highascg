@@ -25,6 +25,7 @@
 | **Network** netplan + systemd-networkd files | Keep or restore from backup |
 | **`config/casparcg.config`** | Overwritten with ISO factory default (`reset-iso-operator-config.sh`) — **back up first** |
 | **`config/*` + `projects/*` + `.highascg-state.json`** | Factory reset to **New project 1** (empty looks/timelines, one PGM-only screen) — **back up operator projects first** |
+| **`casparcg.config`** (repo ROOT — the MEDIA-SCANNER's config, NOT the server's `config/casparcg.config`) | Overwritten with the factory template (WO-162: `write-iso-default-config.js` now always writes a fresh one from `scripts/setup/templates/scanner.config`; the scanner binary reads `./casparcg.config` from its cwd, so ISOs ship a valid media-scanner config) |
 | **`~/exfat/configs/*`** | Cleared for ISO snapshot |
 | **`/etc/fstab` swap lines** | Stripped during build, **restored** at end (`strip-host-swap restore`) |
 | **Initramfs** for pinned kernel | Rebuilt for Plymouth branding |
