@@ -422,6 +422,21 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		setupLayerPlaylists(self, channel, incoming, takeJobs.map((j) => ({ layer: j.layer, pLayer: j.pLayer, clip: j.clip })))
 	}
 
+	// WO-210 T210.5: apply timersVisibility map from the look (if present).
+	// For each assigned timer on this channel whose timerId is in the map, emit MIXER OPACITY.
+	try {
+		const timersVisibilityMap = incoming?.timersVisibility || opts?.incomingScene?.timersVisibility
+		if (timersVisibilityMap && typeof timersVisibilityMap === 'object') {
+			const { linesForLookVisibility } = require('./screen-timers')
+			const visibilityLines = linesForLookVisibility(channel, timersVisibilityMap)
+			if (visibilityLines.length > 0) {
+				await amcp.batchSendChunked(visibilityLines, { skipMixerPreCommit: true })
+			}
+		}
+	} catch (e) {
+		self.log?.('warn', `[scene-take-pgm-only] timersVisibility apply failed: ${e?.message || e}`)
+	}
+
 	return {
 		ok: true,
 		takeMode: 'pgm-only',

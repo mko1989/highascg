@@ -87,6 +87,7 @@ export class SceneState {
 		this.isInteracting = false
 		this.editOnPgm = false
 		this._listeners = new Map()
+		this._timersSnapshotFn = null // WO-210 T210.8: function to snapshot timers visibility
 		this._load()
 		this._applyFpsAwareGlobalDefaultTransition(false)
 	}
@@ -196,6 +197,22 @@ export class SceneState {
 		// Save immediately (e.g. on click, delete, scope change)
 		if (this._persistTimer) clearTimeout(this._persistTimer)
 		this._persistTimer = null
+
+		// WO-210 T210.8: capture the timers-visibility snapshot ONLY on the look currently
+		// being edited — every other look keeps its previously saved state (stamping all
+		// scenes would make every look carry the same map and takes could never flip it).
+		if (this._timersSnapshotFn && this.editingSceneId) {
+			try {
+				const scene = this.scenes.find((s) => s && s.id === this.editingSceneId)
+				if (scene) {
+					const snapshot = this._timersSnapshotFn(scene)
+					if (snapshot) scene.timersVisibility = snapshot
+				}
+			} catch (err) {
+				console.warn('[scene-state] timers snapshot failed:', err?.message || err)
+			}
+		}
+
 		try {
 			localStorage.setItem(Persistence.STORAGE_KEY, Persistence.getPersistPayload(this))
 		} catch {}
@@ -454,6 +471,11 @@ export class SceneState {
 	setEditOnPgm(val) {
 		this.editOnPgm = !!val
 		this._emit('change')
+	}
+
+	/** WO-210 T210.8: Register function to snapshot timer visibility state when saving looks. */
+	setTimersSnapshotFn(fn) {
+		this._timersSnapshotFn = typeof fn === 'function' ? fn : null
 	}
 
 	/** WO-160: lowest free number ≥ 10, or -1 when the look is full (see scene-state-helpers.js). */

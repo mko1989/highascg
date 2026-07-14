@@ -1,30 +1,25 @@
 /**
- * Timer control panel — collapsible bottom-right controller (WO-186, WO-192, WO-205).
+ * Timer control panel — collapsible bottom-right controller (WO-186, WO-192, WO-205, WO-210).
  *
  * Fixed/docked bottom-right next to the program audio mixer. Provides:
  * - Collapsible header (persists collapsed state in localStorage)
- * - Dropdown to select which countdown timer to control
- * - Live time display that MIRRORS countdown state (ticks 4×/s locally)
- * - Start/Pause/Reset buttons
- * - HH:MM:SS input boxes for duration/target time (populated from timer config, persist on refresh)
- * - Preset buttons for quick duration setting (5m, 10m, 15m, 20m, 25m, 30m, 45m, 60m)
+ * - List of all screen timers from /api/timers/list (polled ~1s while open)
+ * - Per-timer row: name, remaining-time display (computed client-side from lastCmd/cmdAt/config),
+ *   start/pause/reset buttons, and per-screen chips with visible toggles
+ * - "Add to screen" dropdown per timer (assign to screen slot)
+ * - Unassign button (×) per chip with confirmation
+ * - "New timer" button (creates timer instance with default config, assigns to screen)
+ * - Live time display that MIRRORS timer state (ticks 4×/s locally)
  *
- * GET /api/countdown/list refreshed on scene changes or 5s poll when expanded.
- * Timer list is fetched from the API and cached locally. Hidden entirely when no timers.
- *
- * WO-192 notes:
- * - Per-timer state tracks {config, lastCmd, cmdAt, remainingWhenPaused} to mirror the countdown.
- * - Live display ticks every 250ms (4×/s).
- * - Duration mode: remainingTime = durationSec - (now - startedAt), frozen while paused.
- * - Clock mode: remainingTime = targetTime - now.
- * - Negative values display as -MM:SS (overflow format).
- * - HMS boxes are populated from the selected timer's countdownConfig on selection/refresh,
- *   but skip repopulating while any input has focus to avoid mid-edit interruption.
- *
- * WO-205 additions:
- * - Ticks from server-side advisory registry (runtime) via GET /api/countdown/list, regardless of which UI started the timer.
- * - External control (inspector/companion/look take) shows within ≤5 s (list refresh lag); fallback to local state until runtime merges.
- * - Panel set/preset commands ALSO patch the scene layer's countdownConfig (persistence) via sceneState.patchLayer.
+ * WO-210 T210.6:
+ * - Source of truth: GET /api/timers/list (poll ~1s while open)
+ * - Per-timer display computed from {lastCmd, cmdAt, config} using computeDisplayTime
+ * - Transport buttons: POST /api/timers/cmd {timerId, cmd: start|pause|reset}
+ * - Per-screen chips with visible toggle: POST /api/timers/visible {timerId, screenIdx, visible}
+ * - "Add to screen" control: POST /api/timers/assign {timerId, name?, config?, screenIdx}
+ * - Unassign chip affordance (×) with confirm(): POST /api/timers/unassign {timerId, screenIdx}
+ * - "New timer" creates instance (via crypto.randomUUID() or similar) with default config
+ * - getScreenTimersSnapshot() exported for T210.8 (look-save integration)
  */
 
 import { api } from '../lib/api-client.js'
@@ -33,91 +28,61 @@ import { createHmsInput, secondsToHms, hmsToSeconds } from '../lib/duration-hms-
 import { escapeAttr } from '../lib/dom-escape.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
-const POLL_INTERVAL_MS = 5000
+const POLL_INTERVAL_MS = 1000 // ~1s (was 5s for old countdown polling)
 const TICK_INTERVAL_MS = 250 // 4×/s
 
-// Preset durations (in seconds)
-const PRESETS = [
-	{ label: '5m', seconds: 5 * 60 },
-	{ label: '10m', seconds: 10 * 60 },
-	{ label: '15m', seconds: 15 * 60 },
-	{ label: '20m', seconds: 20 * 60 },
-	{ label: '25m', seconds: 25 * 60 },
-	{ label: '30m', seconds: 30 * 60 },
-	{ label: '45m', seconds: 45 * 60 },
-	{ label: '60m', seconds: 60 * 60 },
-]
+/**
+ * Default timer config (mirrors scene-state-timers.js DEFAULT_TIMER_CONFIG).
+ */
+const DEFAULT_TIMER_CONFIG = {
+	mode: 'duration',
+	durationSec: 300,
+	targetTime: '18:00:00',
+	format: 'auto',
+	amberThresholdSec: 60,
+	redThresholdSec: 15,
+	position: 'center',
+	hideTimer: false,
+	timerFontSize: 15,
+	auxFontSize: 5,
+	timerColor: '#ffffff',
+	amberColor: '#ffb300',
+	redColor: '#ff3b30',
+	auxColor: '#ffffff',
+	auxTop: '',
+	auxMiddle: '',
+	auxBottom: '',
+}
 
 /**
- * Compute remaining time for the selected timer.
- * WO-205: Primarily derives from item.runtime (server-side registry), fallback to local state, then static config.
- * @param {object} timerState - { config, lastCmd, cmdAt, remainingWhenPaused }
- * @param {object} [item] - list item with optional runtime from server registry
+ * Compute remaining time for a timer.
+ * Uses server-side runtime (lastCmd, cmdAt) from /api/timers/list, with fallback to config.
+ * @param {object} timerRecord - { config, lastCmd, cmdAt, durationSec }
  * @returns {number} seconds remaining (may be negative)
  */
-function computeDisplayTime(timerState, item) {
-	if (!timerState || !timerState.config) return 0
-	const { config } = timerState
+function computeDisplayTime(timerRecord) {
+	if (!timerRecord) return 0
+	const { config = {}, lastCmd, cmdAt, durationSec } = timerRecord
 	const mode = config.mode || 'duration'
 	const now = Date.now()
 
-	// WO-205: If item has server-side runtime (from registry), use it for true mirroring.
-	if (item?.runtime) {
-		const { lastCmd: runtimeCmd, cmdAt: runtimeCmdAt, durationSec: runtimeDurationSec, targetTime: runtimeTargetTime } = item.runtime
-
-		if (mode === 'duration') {
-			if (runtimeCmd === 'pause') {
-				// Pause: show the remaining time at the moment of pause.
-				// The registry doesn't store this directly, so compute from prior start.
-				// For now, fall back to local state or use serverCmdAt to infer.
-				if (Number.isFinite(timerState.remainingWhenPaused)) {
-					return timerState.remainingWhenPaused
-				}
-			}
-			if (runtimeCmd === 'start' && Number.isFinite(runtimeCmdAt)) {
-				const elapsedSec = (now - runtimeCmdAt) / 1000
-				const remaining = (runtimeDurationSec || config.durationSec || 0) - elapsedSec
-				return remaining
-			}
-			if (runtimeCmd === 'reset' || !runtimeCmd) {
-				return runtimeDurationSec || config.durationSec || 0
-			}
-		} else if (mode === 'clock') {
-			// Clock mode: use runtimeTargetTime if available
-			const targetStr = runtimeTargetTime || config.targetTime || '00:00:00'
-			const [h, m, s] = targetStr.split(':').map((x) => parseInt(x, 10) || 0)
-			const today = new Date()
-			const target = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, s)
-			const remaining = (target - now) / 1000
-			return remaining
-		}
-	}
-
-	// Fallback to local timer state (when runtime is not yet merged from registry).
-	const { lastCmd, cmdAt, remainingWhenPaused } = timerState
-
-	// Duration mode: compute elapsed time since start
 	if (mode === 'duration') {
-		// If paused, show the frozen remaining time
-		if (lastCmd === 'pause' && Number.isFinite(remainingWhenPaused)) {
-			return remainingWhenPaused
+		if (lastCmd === 'pause') {
+			// Paused: show remaining from last computation (server may provide this)
+			// For now, fall back to config
+			return durationSec || config.durationSec || 0
 		}
-		// If reset or never started, show configured duration
-		if (lastCmd === 'reset' || !lastCmd) {
-			return config.durationSec || 0
-		}
-		// If running, compute elapsed from start time
 		if (lastCmd === 'start' && Number.isFinite(cmdAt)) {
 			const elapsedSec = (now - cmdAt) / 1000
-			const remaining = (config.durationSec || 0) - elapsedSec
+			const remaining = (durationSec || config.durationSec || 0) - elapsedSec
 			return remaining
 		}
-		return config.durationSec || 0
+		// Reset or never started
+		return durationSec || config.durationSec || 0
 	}
 
-	// Clock mode: compute time until target
+	// Clock mode: time until target
 	if (mode === 'clock') {
-		// Parse targetTime as HH:MM:SS on today's local date
 		const targetStr = config.targetTime || '00:00:00'
 		const [h, m, s] = targetStr.split(':').map((x) => parseInt(x, 10) || 0)
 		const today = new Date()
@@ -143,51 +108,64 @@ function formatDisplayTime(seconds) {
 }
 
 /**
- * Check if any of the HMS input elements currently has focus.
- * @param {HTMLElement} hmsContainer
- * @returns {boolean}
+ * Module-level reference to the last fetched timers list and their visibility state.
+ * Used by T210.8 (getScreenTimersSnapshot) for look-save integration.
  */
-function isHmsFocused(hmsContainer) {
-	if (!hmsContainer) return false
-	const activeEl = document.activeElement
-	return hmsContainer.contains(activeEl)
+let lastTimersList = []
+let screenTimersSnapshot = {}
+
+/**
+ * Get a snapshot of current timer visibility for a look.
+ * T210.8: Called when saving a look to snapshot timersVisibility state.
+ * Returns the FLAT `{ [timerId]: boolean }` shape that the server's
+ * `linesForLookVisibility` (src/engine/screen-timers.js) consumes at take time —
+ * a timer counts as visible for the look when it is visible on ANY target screen.
+ * @param {object} [scene] — the look being saved (used by the app.js wrapper to derive screens)
+ * @param {Array<number>} [screenIndices] — explicit target screen indices
+ * @returns {object | null} { [timerId]: boolean } or null if no timers fetched/assigned
+ */
+export function getScreenTimersSnapshot(scene, screenIndices) {
+	if (lastTimersList.length === 0) return null
+
+	const targets =
+		Array.isArray(screenIndices) && screenIndices.length > 0 ? new Set(screenIndices.map(Number)) : null
+
+	const snapshot = {}
+	for (const timer of lastTimersList) {
+		if (!timer.timerId || !timer.screens) continue
+		for (const [screenIdxStr, screenEntry] of Object.entries(timer.screens)) {
+			const screenIdx = parseInt(screenIdxStr, 10)
+			if (targets && !targets.has(screenIdx)) continue
+			if (!(timer.timerId in snapshot)) snapshot[timer.timerId] = false
+			if (screenEntry.visible) snapshot[timer.timerId] = true
+		}
+	}
+
+	return Object.keys(snapshot).length > 0 ? snapshot : null
 }
 
 /**
  * @param {import('../lib/state-store.js').StateStore} stateStore
  * @param {HTMLElement} mountEl
  * @param {object} [opts]
- * @param {object} [opts.sceneState] - scene state for WO-205 persistence patching
+ * @param {object} [opts.getChannelMap] - function to get channel map for screen count
  */
 export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 	if (!mountEl) return
-	const { sceneState: providedSceneState } = opts
+	const { getChannelMap } = opts
 
 	const root = document.createElement('div')
 	root.className = 'timer-control-panel timer-control-panel--collapsed'
-	// WO-196 T196.4: add help text documenting timer identity and continuity.
-	const helpText = 'Timer identity = screen + layer number. Reuse the same layer number across looks to carry one timer through them; use another layer number for an independent timer.'
-	// WO-205 T205.2: add lag note to display tooltip.
-	const displayTooltip = 'Live countdown mirror. WO-205: ticks from server registry; external control shows within ≤5 s (list refresh lag)'
+	const helpText = 'Screen timers (WO-210): panel-owned, never destroyed, assigned to screens via visible toggle'
+	const displayTooltip = 'Live timer display. Ticks from server; start/pause/reset commands fan out to all assigned screens'
 	root.innerHTML = `
 		<button type="button" class="timer-control-panel__toggle" aria-expanded="false" title="${escapeAttr(helpText)}">
 			<span class="timer-control-panel__chevron" aria-hidden="true">▶</span>
-			<span class="timer-control-panel__label">Timer</span>
+			<span class="timer-control-panel__label">Timers</span>
 		</button>
 		<div class="timer-control-panel__content" hidden>
-			<div class="timer-control-panel__selector">
-				<select class="timer-control-panel__select" id="timer-selector" title="Select a timer"></select>
-			</div>
-			<div class="timer-control-panel__display" id="timer-display" title="${escapeAttr(displayTooltip)}">00:00:00</div>
-			<div class="timer-control-panel__buttons">
-				<button type="button" class="timer-control-panel__btn" data-action="start" title="Start/Resume">▶</button>
-				<button type="button" class="timer-control-panel__btn" data-action="pause" title="Pause">⏸</button>
-				<button type="button" class="timer-control-panel__btn" data-action="reset" title="Reset">⟲</button>
-					<button type="button" class="timer-control-panel__btn" data-action="off" title="Take off air (WO-207)">⊘</button>
-			</div>
-			<div class="timer-control-panel__hms-label">Duration/Target</div>
-			<div class="timer-control-panel__hms" id="timer-hms"></div>
-			<div class="timer-control-panel__presets" id="timer-presets"></div>
+			<div class="timer-control-panel__list" id="timer-list"></div>
+			<button type="button" class="timer-control-panel__new-timer-btn" id="new-timer-btn" title="Create and assign a new timer">+ New Timer</button>
 		</div>
 	`
 	mountEl.appendChild(root)
@@ -195,55 +173,12 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 	const toggle = root.querySelector('.timer-control-panel__toggle')
 	const chevron = root.querySelector('.timer-control-panel__chevron')
 	const content = root.querySelector('.timer-control-panel__content')
-	const select = root.querySelector('#timer-selector')
-	const displayEl = root.querySelector('#timer-display')
-	const hmsContainer = root.querySelector('#timer-hms')
-	const presetsContainer = root.querySelector('#timer-presets')
-	const buttons = root.querySelectorAll('[data-action]')
+	const listContainer = root.querySelector('#timer-list')
+	const newTimerBtn = root.querySelector('#new-timer-btn')
 
 	let isCollapsed = true
-	let timerList = []
-	let selectedTimer = null
 	let tickTimer = null
 	let pollTimer = null
-	let hmsInput = null
-
-	// Per-timer state: { config, lastCmd, cmdAt, remainingWhenPaused }
-	const timerStateMap = new Map()
-
-	/**
-	 * Get the state key for a timer (channel:layer).
-	 */
-	function getStateKey(timer) {
-		if (!timer) return null
-		return `${timer.channel}:${timer.layerNumber}`
-	}
-
-	/**
-	 * Get or initialize timer state.
-	 */
-	function getTimerState(timer) {
-		if (!timer) return null
-		const key = getStateKey(timer)
-		if (!timerStateMap.has(key)) {
-			timerStateMap.set(key, {
-				config: timer.config || null,
-				lastCmd: null,
-				cmdAt: null,
-				remainingWhenPaused: null,
-			})
-		}
-		return timerStateMap.get(key)
-	}
-
-	/**
-	 * Update timer state (on command or config change).
-	 */
-	function updateTimerState(timer, update) {
-		if (!timer) return
-		const state = getTimerState(timer)
-		Object.assign(state, update)
-	}
 
 	// Load collapsed state from localStorage
 	try {
@@ -283,383 +218,272 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 
 	async function refreshTimerList() {
 		try {
-			const res = await api.get('/api/countdown/list')
-			if (res?.items && Array.isArray(res.items)) {
-				timerList = res.items
-				// WO-205: Merge server-side runtime (registry) into local timer state for true mirroring.
-				for (const timer of timerList) {
-					const key = getStateKey(timer)
-					const existing = timerStateMap.get(key)
-					if (existing) {
-						existing.config = timer.config || null
-						// Merge runtime from registry: update lastCmd, cmdAt, durationSec, targetTime
-						if (timer.runtime) {
-							existing.runtime = timer.runtime
-						}
-					} else {
-						getTimerState(timer)
-						if (timer.runtime) {
-							timerStateMap.get(key).runtime = timer.runtime
+			const res = await api.get('/api/timers/list')
+			if (res?.ok && Array.isArray(res.timers)) {
+				lastTimersList = res.timers
+				screenTimersSnapshot = {}
+				// Build visibility snapshot for T210.8
+				for (const timer of lastTimersList) {
+					if (timer.timerId && timer.screens) {
+						for (const [screenIdxStr, entry] of Object.entries(timer.screens)) {
+							if (!screenTimersSnapshot[timer.timerId]) screenTimersSnapshot[timer.timerId] = {}
+							screenTimersSnapshot[timer.timerId][parseInt(screenIdxStr, 10)] = entry.visible ? 1 : 0
 						}
 					}
 				}
-				updateSelectOptions()
-				root.style.display = timerList.length > 0 ? '' : 'none'
-				if (timerList.length === 0) {
-					selectedTimer = null
-				}
-				// Refresh HMS display if a timer is selected and not focused
-				if (selectedTimer && !isHmsFocused(hmsContainer)) {
-					const timer = timerList.find(
-						(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
-					)
-					if (timer) {
-						updateHmsInput(timer)
-					}
-				}
+				updateTimerRows()
+				root.style.display = lastTimersList.length > 0 ? '' : 'none'
 			}
 		} catch (err) {
 			console.warn('[timer-panel] refresh failed:', err?.message || err)
 		}
 	}
 
-	function updateSelectOptions() {
-		const prevSelected = select.value
-		select.innerHTML = ''
-
-		if (timerList.length === 0) {
-			const opt = document.createElement('option')
-			opt.value = ''
-			opt.textContent = '(no timers)'
-			select.appendChild(opt)
+	function updateTimerRows() {
+		listContainer.innerHTML = ''
+		if (lastTimersList.length === 0) {
+			listContainer.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);font-size:0.9em;">(no timers assigned)</p>'
 			return
 		}
 
-		timerList.forEach((item, idx) => {
-			const opt = document.createElement('option')
-			const label = item.label || `Timer #${idx + 1}`
-			// WO-196 T196.3: mark on-air timers in the dropdown label
-			const suffix = item.onAir ? ' (on air)' : ''
-			opt.value = JSON.stringify({ channel: item.channel, layerNumber: item.layerNumber })
-			opt.textContent = `● ${label} — L${item.layerNumber}${suffix}`
-			opt.setAttribute('data-on-air', item.onAir ? 'true' : 'false')
-			select.appendChild(opt)
-		})
+		for (const timer of lastTimersList) {
+			const timerEl = document.createElement('div')
+			timerEl.className = 'timer-control-panel__timer-row'
+			timerEl.dataset.timerId = timer.timerId
+			timerEl.style.cssText = 'border:1px solid var(--color-border);border-radius:4px;padding:8px;margin-bottom:8px;background:var(--color-bg-secondary)'
 
-		// Restore previous selection if it still exists
-		if (prevSelected && Array.from(select.options).some((o) => o.value === prevSelected)) {
-			select.value = prevSelected
-		} else if (timerList.length > 0) {
-			select.value = timerList[0] ? JSON.stringify({ channel: timerList[0].channel, layerNumber: timerList[0].layerNumber }) : ''
-		}
+			const headerEl = document.createElement('div')
+			headerEl.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px'
 
-		onSelectChange()
-	}
+			// Timer name
+			const nameEl = document.createElement('div')
+			nameEl.style.cssText = 'font-weight:500;flex:1;min-width:100px'
+			nameEl.textContent = timer.name || `Timer ${timer.timerId.slice(0, 8)}`
+			headerEl.appendChild(nameEl)
 
-	function onSelectChange() {
-		if (!select.value) {
-			selectedTimer = null
-			updateDisplay()
-			updateHmsInput(null)
-			updatePresets(null)
-			updateButtonState(null)
-			return
-		}
+			// Remaining time display
+			const remaining = computeDisplayTime(timer)
+			const displayEl = document.createElement('div')
+			displayEl.className = 'timer-control-panel__timer-display'
+			displayEl.style.cssText = 'font-family:monospace;font-size:1.1em;font-weight:600;min-width:70px;text-align:right'
+			displayEl.textContent = formatDisplayTime(remaining)
+			displayEl.dataset.timerId = timer.timerId
+			headerEl.appendChild(displayEl)
 
-		try {
-			selectedTimer = JSON.parse(select.value)
-			const timer = timerList.find(
-				(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
-			)
-			if (timer) {
-				// Ensure timer state exists
-				getTimerState(timer)
-				updateDisplay(timer)
-				updateHmsInput(timer)
-				updatePresets(timer)
-				updateButtonState(timer)
-			}
-		} catch {
-			selectedTimer = null
-		}
-	}
+			timerEl.appendChild(headerEl)
 
-	/**
-	 * WO-196 T196.3: disable Start button for off-air timers with a tooltip.
-	 * WO-207 T207.4: disable Off button for off-air timers.
-	 * @param {object|null} timer
-	 */
-	function updateButtonState(timer) {
-		const startBtn = root.querySelector('[data-action="start"]')
-		const offBtn = root.querySelector('[data-action="off"]')
-		if (!startBtn && !offBtn) return
-		if (!timer || timer.onAir) {
-			if (startBtn) {
-				startBtn.disabled = false
-				startBtn.title = 'Start/Resume'
-			}
-			if (offBtn) {
-				offBtn.disabled = false
-				offBtn.title = 'Take off air'
-			}
-		} else {
-			if (startBtn) {
-				startBtn.disabled = true
-				startBtn.title = 'Take a look containing this timer first'
-			}
-			if (offBtn) {
-				offBtn.disabled = true
-				offBtn.title = 'Timer not on air'
-			}
-		}
-	}
+			// Control buttons (start/pause/reset)
+			const controlsEl = document.createElement('div')
+			controlsEl.style.cssText = 'display:flex;gap:4px;margin-bottom:6px'
 
-	select.addEventListener('change', onSelectChange)
-
-	function updateDisplay(timer) {
-		if (!timer || !selectedTimer) {
-			displayEl.textContent = '00:00:00'
-			return
-		}
-
-		const timerState = getTimerState(timer)
-		// WO-205 T205.2: Pass item to computeDisplayTime so it can use server-side runtime.
-		const remaining = computeDisplayTime(timerState, timer)
-		displayEl.textContent = formatDisplayTime(remaining)
-	}
-
-	function updateHmsInput(timer) {
-		if (!timer || !selectedTimer) {
-			if (hmsInput) {
-				hmsContainer.innerHTML = ''
-				hmsInput = null
-			}
-			return
-		}
-
-		const timerState = getTimerState(timer)
-		const mode = timerState.config?.mode || 'duration'
-		let value = 0
-
-		if (mode === 'duration') {
-			value = timerState.config?.durationSec || 300
-		} else if (mode === 'clock') {
-			// For clock mode, show durationSec as fallback
-			value = timerState.config?.durationSec || 300
-		}
-
-		hmsContainer.innerHTML = ''
-		hmsInput = createHmsInput({
-			value,
-			onChange: (seconds) => {
-				onHmsChange(seconds, timer, mode)
-			},
-		})
-		hmsContainer.appendChild(hmsInput.wrap)
-	}
-
-	/**
-	 * WO-205 T205.3: Resolve scene and layer index for persistence patching.
-	 * @param {object} timer
-	 * @returns {{ sceneId: string, layerIndex: number } | null}
-	 */
-	function resolveSceneAndLayerIndex(timer) {
-		if (!timer?.sceneId || providedSceneState == null) return null
-		const scene = providedSceneState.getScene(timer.sceneId)
-		if (!scene?.layers) return null
-		const layerIndex = scene.layers.findIndex(l => parseInt(l.layerNumber, 10) === parseInt(timer.layerNumber, 10))
-		if (layerIndex < 0) return null
-		return { sceneId: timer.sceneId, layerIndex }
-	}
-
-	/**
-	 * WO-205 T205.3: Patch scene layer's countdownConfig for persistence.
-	 * @param {object} timer
-	 * @param {object} configUpdate - partial config to merge
-	 */
-	async function patchSceneCountdownConfig(timer, configUpdate) {
-		if (!timer || providedSceneState == null) return
-		const sceneInfo = resolveSceneAndLayerIndex(timer)
-		if (!sceneInfo) return
-
-		try {
-			const scene = providedSceneState.getScene(sceneInfo.sceneId)
-			const layer = scene?.layers?.[sceneInfo.layerIndex]
-			if (!layer) return
-
-			const currentSource = layer.source || {}
-			const currentConfig = currentSource.countdownConfig || {}
-			const nextConfig = { ...currentConfig, ...configUpdate }
-
-			providedSceneState.patchLayer(sceneInfo.sceneId, sceneInfo.layerIndex, {
-				source: { ...currentSource, countdownConfig: nextConfig },
-				cgData: { ...nextConfig },
-			})
-		} catch (err) {
-			console.warn('[timer-panel] scene patch failed:', err?.message || err)
-		}
-	}
-
-	async function onHmsChange(seconds, timer, mode) {
-		if (!selectedTimer || !timer) return
-
-		try {
-			const payload = {
-				channel: selectedTimer.channel,
-				layer: selectedTimer.layerNumber,
-				templateHostLayer: 0,
+			for (const action of ['start', 'pause', 'reset']) {
+				const btn = document.createElement('button')
+				btn.type = 'button'
+				btn.className = 'timer-control-panel__btn'
+				btn.style.cssText = 'padding:4px 8px;font-size:0.85em;flex:1'
+				btn.dataset.action = action
+				btn.dataset.timerId = timer.timerId
+				const icons = { start: '▶', pause: '⏸', reset: '⟲' }
+				const titles = { start: 'Start', pause: 'Pause', reset: 'Reset' }
+				btn.textContent = icons[action]
+				btn.title = titles[action]
+				btn.addEventListener('click', () => onTimerAction(timer.timerId, action))
+				controlsEl.appendChild(btn)
 			}
 
-			if (mode === 'duration') {
-				payload.durationSec = seconds
-			} else if (mode === 'clock') {
-				payload.durationSec = seconds
-			}
+			timerEl.appendChild(controlsEl)
 
-			await api.post('/api/countdown/set', payload)
+			// Per-screen chips
+			if (timer.screens && Object.keys(timer.screens).length > 0) {
+				const chipsEl = document.createElement('div')
+				chipsEl.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px'
 
-			// WO-205 T205.3: Also patch scene layer for persistence.
-			const configUpdate = mode === 'duration' ? { durationSec: seconds } : { durationSec: seconds }
-			await patchSceneCountdownConfig(timer, configUpdate)
+				for (const [screenIdxStr, screenEntry] of Object.entries(timer.screens)) {
+					const screenIdx = parseInt(screenIdxStr, 10)
+					const chipEl = document.createElement('div')
+					chipEl.className = 'timer-control-panel__screen-chip'
+					chipEl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:var(--color-bg-tertiary);border-radius:3px;font-size:0.85em'
 
-			// Update local state so the change sticks
-			const timerState = getTimerState(timer)
-			if (timerState.config) {
-				timerState.config.durationSec = seconds
-			}
-		} catch (err) {
-			console.warn('[timer-panel] HMS update failed:', err?.message || err)
-		}
-	}
+					const labelEl = document.createElement('span')
+					labelEl.textContent = `S${screenIdx + 1}`
+					chipEl.appendChild(labelEl)
 
-	function updatePresets(timer) {
-		presetsContainer.innerHTML = ''
+					// Visible toggle
+					const toggleEl = document.createElement('button')
+					toggleEl.type = 'button'
+					toggleEl.className = 'timer-control-panel__chip-toggle'
+					toggleEl.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center'
+					toggleEl.title = screenEntry.visible ? 'Hide' : 'Show'
+					toggleEl.textContent = screenEntry.visible ? '👁' : '⊘'
+					toggleEl.dataset.timerId = timer.timerId
+					toggleEl.dataset.screenIdx = screenIdx
+					toggleEl.addEventListener('click', () => onToggleVisible(timer.timerId, screenIdx, !screenEntry.visible))
+					chipEl.appendChild(toggleEl)
 
-		if (!timer || !selectedTimer) {
-			return
-		}
+					// Unassign button
+					const unassignEl = document.createElement('button')
+					unassignEl.type = 'button'
+					unassignEl.className = 'timer-control-panel__chip-unassign'
+					unassignEl.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;width:16px;height:16px;display:flex;align-items:center;justify-content:center;opacity:0.6;font-size:0.9em'
+					unassignEl.title = 'Remove from screen'
+					unassignEl.textContent = '×'
+					unassignEl.dataset.timerId = timer.timerId
+					unassignEl.dataset.screenIdx = screenIdx
+					unassignEl.addEventListener('click', () => onUnassign(timer.timerId, screenIdx))
+					chipEl.appendChild(unassignEl)
 
-		const presetRow = document.createElement('div')
-		presetRow.className = 'timer-control-panel__preset-row'
-		presetRow.style.display = 'flex'
-		presetRow.style.flexWrap = 'wrap'
-		presetRow.style.gap = '4px'
-		presetRow.style.marginTop = '8px'
-
-		for (const preset of PRESETS) {
-			const btn = document.createElement('button')
-			btn.type = 'button'
-			btn.className = 'timer-control-panel__preset-btn'
-			btn.textContent = preset.label
-			btn.title = `Set to ${preset.label}`
-			btn.addEventListener('click', async () => {
-				await onPresetClick(preset.seconds, timer)
-			})
-			presetRow.appendChild(btn)
-		}
-
-		presetsContainer.appendChild(presetRow)
-	}
-
-	async function onPresetClick(seconds, timer) {
-		if (!selectedTimer || !timer) return
-
-		try {
-			// Update HMS boxes
-			if (hmsInput && hmsInput.setValue) {
-				hmsInput.setValue(seconds)
-			}
-
-			// Send the set command
-			const payload = {
-				channel: selectedTimer.channel,
-				layer: selectedTimer.layerNumber,
-				templateHostLayer: 0,
-				durationSec: seconds,
-			}
-
-			await api.post('/api/countdown/set', payload)
-
-			// WO-205 T205.3: Also patch scene layer for persistence.
-			await patchSceneCountdownConfig(timer, { durationSec: seconds })
-
-			// Update local state
-			const timerState = getTimerState(timer)
-			if (timerState.config) {
-				timerState.config.durationSec = seconds
-			}
-		} catch (err) {
-			console.warn('[timer-panel] preset click failed:', err?.message || err)
-		}
-	}
-
-	buttons.forEach((btn) => {
-		btn.addEventListener('click', async () => {
-			if (!selectedTimer) return
-
-			const timer = timerList.find(
-				(t) => t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
-			)
-			if (!timer) return
-
-			const action = btn.getAttribute('data-action')
-			const prevDisabled = Array.from(buttons).map((b) => b.disabled)
-
-			buttons.forEach((b) => {
-				b.disabled = true
-			})
-
-			try {
-				await api.post(`/api/countdown/${action}`, {
-					channel: selectedTimer.channel,
-					layer: selectedTimer.layerNumber,
-					templateHostLayer: 0,
-				})
-
-				// Update timer state based on action
-				const now = Date.now()
-				const timerState = getTimerState(timer)
-
-				if (action === 'start') {
-					timerState.lastCmd = 'start'
-					timerState.cmdAt = now
-					timerState.remainingWhenPaused = null
-				} else if (action === 'pause') {
-					timerState.lastCmd = 'pause'
-					// Compute and freeze the remaining time
-					const remaining = computeDisplayTime(timerState)
-					timerState.remainingWhenPaused = remaining
-					timerState.cmdAt = null
-				} else if (action === 'reset') {
-					timerState.lastCmd = 'reset'
-					timerState.cmdAt = null
-					timerState.remainingWhenPaused = null
-				} else if (action === 'off') {
-					timerState.lastCmd = 'off'
-					timerState.cmdAt = null
-					timerState.remainingWhenPaused = null
-					// WO-207 T207.4: refresh list after off (timer will disappear from on-air)
-					setTimeout(() => {
-						refreshTimerList()
-					}, 200)
+					chipsEl.appendChild(chipEl)
 				}
-			} catch (err) {
-				console.warn(`[timer-panel] ${action} failed:`, err?.message || err)
-			} finally {
-				buttons.forEach((b, i) => {
-					b.disabled = prevDisabled[i]
-				})
+
+				timerEl.appendChild(chipsEl)
 			}
-		})
+
+			// "Add to screen" dropdown
+			const addEl = document.createElement('div')
+			addEl.style.cssText = 'display:flex;gap:4px;font-size:0.85em'
+
+			const addLabelEl = document.createElement('span')
+			addLabelEl.textContent = 'Add to screen:'
+			addLabelEl.style.cssText = 'display:flex;align-items:center'
+			addEl.appendChild(addLabelEl)
+
+			const selectEl = document.createElement('select')
+			selectEl.className = 'timer-control-panel__screen-select'
+			selectEl.style.cssText = 'padding:2px 4px;border-radius:2px'
+			selectEl.dataset.timerId = timer.timerId
+			selectEl.addEventListener('change', (e) => {
+				const screenIdx = parseInt(e.target.value, 10)
+				if (Number.isFinite(screenIdx)) {
+					onAssignToScreen(timer.timerId, screenIdx)
+					e.target.value = ''
+				}
+			})
+
+			const defaultOpt = document.createElement('option')
+			defaultOpt.value = ''
+			defaultOpt.textContent = 'Select screen...'
+			selectEl.appendChild(defaultOpt)
+
+			// Build screen list from channelMap
+			const getScreens = typeof getChannelMap === 'function' ? getChannelMap() : {}
+			const screenCount = getScreens.programChannels ? getScreens.programChannels.length : 4
+			const assignedScreens = new Set(Object.keys(timer.screens || {}).map(s => parseInt(s, 10)))
+
+			for (let i = 0; i < screenCount; i++) {
+				if (assignedScreens.has(i)) continue // Skip already assigned
+				const opt = document.createElement('option')
+				opt.value = String(i)
+				opt.textContent = `S${i + 1}`
+				selectEl.appendChild(opt)
+			}
+
+			addEl.appendChild(selectEl)
+			timerEl.appendChild(addEl)
+
+			listContainer.appendChild(timerEl)
+		}
+	}
+
+	async function onTimerAction(timerId, action) {
+		try {
+			await api.post('/api/timers/cmd', { timerId, cmd: action })
+		} catch (err) {
+			console.warn(`[timer-panel] cmd ${action} failed:`, err?.message || err)
+		}
+	}
+
+	async function onToggleVisible(timerId, screenIdx, visible) {
+		try {
+			await api.post('/api/timers/visible', { timerId, screenIdx, visible })
+			// Refresh to update UI
+			setTimeout(() => refreshTimerList(), 100)
+		} catch (err) {
+			console.warn('[timer-panel] visible toggle failed:', err?.message || err)
+		}
+	}
+
+	async function onUnassign(timerId, screenIdx) {
+		if (!confirm(`Remove timer from Screen ${screenIdx + 1}?`)) return
+		try {
+			await api.post('/api/timers/unassign', { timerId, screenIdx })
+			// Refresh to update UI
+			setTimeout(() => refreshTimerList(), 100)
+		} catch (err) {
+			console.warn('[timer-panel] unassign failed:', err?.message || err)
+		}
+	}
+
+	async function onAssignToScreen(timerId, screenIdx) {
+		try {
+			await api.post('/api/timers/assign', { timerId, screenIdx })
+			// Refresh to update UI
+			setTimeout(() => refreshTimerList(), 100)
+		} catch (err) {
+			console.warn('[timer-panel] assign failed:', err?.message || err)
+		}
+	}
+
+	newTimerBtn.addEventListener('click', async () => {
+		const name = prompt('Timer name (default: Timer N):', '')?.trim() || `Timer ${lastTimersList.length + 1}`
+
+		// Show HMS input for duration
+		const defaultDuration = 300 // 5 minutes
+		const h = Math.floor(defaultDuration / 3600)
+		const m = Math.floor((defaultDuration % 3600) / 60)
+		const s = defaultDuration % 60
+		const durationStr = prompt('Duration (HH:MM:SS)', `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)?.trim()
+
+		let durationSec = defaultDuration
+		if (durationStr) {
+			const parts = durationStr.split(':').map(x => parseInt(x, 10) || 0)
+			durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0)
+		}
+
+		// Generate timer ID
+		const timerId = typeof crypto !== 'undefined' && crypto.randomUUID
+			? crypto.randomUUID()
+			: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+
+		const config = {
+			...DEFAULT_TIMER_CONFIG,
+			durationSec,
+		}
+
+		// Get first available screen (or prompt user)
+		const getScreens = typeof getChannelMap === 'function' ? getChannelMap() : {}
+		const screenCount = getScreens.programChannels ? getScreens.programChannels.length : 1
+		const screenIdx = 0 // Assign to first screen by default
+
+		try {
+			await api.post('/api/timers/assign', {
+				timerId,
+				name,
+				config,
+				screenIdx,
+			})
+			// Refresh to show new timer
+			setTimeout(() => refreshTimerList(), 100)
+		} catch (err) {
+			console.warn('[timer-panel] new timer failed:', err?.message || err)
+		}
 	})
 
 	function startTick() {
 		if (tickTimer) return
 		tickTimer = setInterval(() => {
-			const timer = timerList.find(
-				(t) => selectedTimer && t.channel === selectedTimer.channel && t.layerNumber === selectedTimer.layerNumber,
-			)
-			if (timer) updateDisplay(timer)
+			// Update all timer display elements
+			const displays = listContainer.querySelectorAll('[data-timer-id]')
+			for (const el of displays) {
+				const timerId = el.dataset.timerId
+				const timer = lastTimersList.find(t => t.timerId === timerId)
+				if (timer) {
+					const remaining = computeDisplayTime(timer)
+					const displayEl = el.querySelector('.timer-control-panel__timer-display')
+					if (displayEl) {
+						displayEl.textContent = formatDisplayTime(remaining)
+					}
+				}
+			}
 		}, TICK_INTERVAL_MS)
 	}
 
@@ -684,20 +508,11 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 		}
 	}
 
-	// Listen for scene changes to refresh timer list
-	const onSceneChange = () => {
-		if (!isCollapsed) refreshTimerList()
-	}
-	sceneState.on('change', onSceneChange)
-	sceneState.on('softChange', onSceneChange)
-
 	// Cleanup on unmount
 	const obs = new MutationObserver(() => {
 		if (!root.isConnected) {
 			stopTick()
 			stopPoll()
-			sceneState.off('change', onSceneChange)
-			sceneState.off('softChange', onSceneChange)
 			obs.disconnect()
 		}
 	})

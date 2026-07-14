@@ -17,7 +17,7 @@ import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
-import { initTimerControlPanel } from './components/timer-control-panel.js'
+import { initTimerControlPanel, getScreenTimersSnapshot } from './components/timer-control-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
 import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
 import { programOutputState } from './lib/program-output-state.js'
@@ -382,6 +382,20 @@ async function init() {
 	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore); initInspectorPanel(document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
 	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
 	initTimerControlPanel(stateStore, document.getElementById('panel-inspector-timer-mount'), { sceneState })
+	// WO-210 T210.8: Register timers snapshot function for look-save integration.
+	// Derive the look's target screens from mainScope so the flat {timerId: boolean}
+	// snapshot only reflects timers on screens this look actually drives.
+	sceneState.setTimersSnapshotFn((scene) => {
+		const cm = stateStore.getState()?.channelMap || {}
+		const count = Number(cm.screenCount) || 1
+		const scope = String(scene?.mainScope || 'all')
+		const n = parseInt(scope, 10)
+		const idxs =
+			scope !== 'all' && Number.isFinite(n) && n >= 0 && n < count
+				? [n]
+				: Array.from({ length: count }, (_, i) => i)
+		return getScreenTimersSnapshot(scene, idxs)
+	})
 
 	settingsState.subscribe(s => {
 		applyBrowserMonitorFromSettings(s); const isOffline = !!s.offline_mode

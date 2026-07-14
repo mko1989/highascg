@@ -34,7 +34,7 @@ const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = requi
 
 /**
  * @param {object} amcp
- * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, skipLayerVisualEquality?: boolean }} opts
+ * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, skipLayerVisualEquality?: boolean, banklessTake?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
 	// WO-156: every take path (API take, preview stage, sync-push, replication) funnels through
@@ -63,9 +63,18 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	const chKey = String(channel)
 	if (!self.programLayerBankByChannel) self.programLayerBankByChannel = {}
-	const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
-	const inactiveBank = activeBank === 'a' ? 'b' : 'a'
-	const routeRemapBank = isMergeTransitionEarly ? activeBank : inactiveBank
+	let activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel[chKey])
+	let inactiveBank = activeBank === 'a' ? 'b' : 'a'
+	let routeRemapBank = isMergeTransitionEarly ? activeBank : inactiveBank
+
+	// WO-209 T209.1: bankless take mode — stage incoming on same bank (logical layers).
+	// PRV channels are bank-less by design; setting both to 'a' forces content at logical 10-99.
+	const banklessTake = !!opts.banklessTake
+	if (banklessTake) {
+		activeBank = 'a'
+		inactiveBank = 'a'
+		routeRemapBank = 'a'
+	}
 	const incoming = remapIntraLookRoutesForTakeChannel(incomingRaw, channel, routeRemapBank)
 	const layersWithContent = incoming.layers.filter(layerHasContent)
 	if (layersWithContent.length === 0) {
@@ -379,7 +388,8 @@ async function runSceneTakeLbg(amcp, opts) {
 		self.timelineEngine.stop(activeTimelineIdToFadeOut)
 	}
 
-	if (!isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0)) {
+	// WO-209 T209.1: skip pointer flip when banklessTake (pointer must stay 'a' for logical layers).
+	if (!isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0) && !banklessTake) {
 		self.programLayerBankByChannel[chKey] = inactiveBank
 	}
 	persistProgramLayerBanks(self)
@@ -389,6 +399,37 @@ async function runSceneTakeLbg(amcp, opts) {
 			const { clearStaleInactiveBankLookLayers } = require('./scene-exit-layers')
 			await clearStaleInactiveBankLookLayers(amcp, channel, inactiveBank, incoming, self)
 		} catch (_) {}
+	}
+
+	// WO-209 T209.3: when banklessTake, sweep opposite bank for orphaned look layers (not in incoming).
+	// This cleans up stale bank-B physical layers (110-199) that aren't targeted by this take.
+	if (banklessTake && !isMergeTransition && takeJobs.length > 0) {
+		try {
+			const incomingPhys = takeJobs.map((j) => j.pLayer)
+			const stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
+			// Filter to bank-B layers only (110-199)
+			const staleBankB = stalePhys.filter((layer) => layer >= PGM_BANK_B_OFFSET && layer <= 199)
+			if (staleBankB.length > 0) {
+				await clearPhysicalLookLayers(amcp, channel, staleBankB, self)
+			}
+		} catch (e) {
+			self.log?.('warn', `[scene-take-lbg] bankless-take opposite-bank sweep failed: ${e?.message || e}`)
+		}
+	}
+
+	// WO-210 T210.5: apply timersVisibility map from the look (if present).
+	// For each assigned timer on this channel whose timerId is in the map, emit MIXER OPACITY.
+	try {
+		const timersVisibilityMap = incoming?.timersVisibility || opts?.incomingScene?.timersVisibility
+		if (timersVisibilityMap && typeof timersVisibilityMap === 'object') {
+			const { linesForLookVisibility } = require('./screen-timers')
+			const visibilityLines = linesForLookVisibility(channel, timersVisibilityMap)
+			if (visibilityLines.length > 0) {
+				await amcp.batchSendChunked(visibilityLines, { skipMixerPreCommit: true })
+			}
+		}
+	} catch (e) {
+		self.log?.('warn', `[scene-take-lbg] timersVisibility apply failed: ${e?.message || e}`)
 	}
 
 	// Setup playlist automation for list-mode layers in this look

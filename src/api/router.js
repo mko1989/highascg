@@ -55,6 +55,7 @@ const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
 const routesCountdown = require('./routes-countdown')
+const routesScreenTimers = require('./routes-screen-timers')
 const routesCgThumb = require('./routes-cg-thumb')
 const routesReplication = require('./routes-replication')
 const routesCompanion = require('./routes-companion')
@@ -334,6 +335,12 @@ routes.get('/api/countdown', ({ path, ctx, query }) => routesCountdown.handleGet
 routes.post('/api/countdown/*', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/countdown', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
 
+// Screen timers (WO-210) — panel-owned timer assignments, persistent across restarts
+routes.get('/api/timers/list', ({ path, ctx }) => routesScreenTimers.handleGet(path, ctx), { requireCaspar: false })
+routes.post('/api/timers/assign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
+routes.post('/api/timers/unassign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
+routes.post('/api/timers/visible', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
+routes.post('/api/timers/cmd', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 
 // --- CASPAR REQUIRED ROUTES (requireCaspar: true) ---
 

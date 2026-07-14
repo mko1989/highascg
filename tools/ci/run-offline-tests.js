@@ -49,6 +49,7 @@ const FILES = [
 	'tools/smoke/smoke-countdown-routes.test.js',
 	'tools/smoke/smoke-wo196-countdown-lifecycle.test.js',
 	'tools/smoke/smoke-wo207-cg-orphan-sweep.test.js',
+	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'test/companion-control-status.test.js',
 ]
 

@@ -244,10 +244,22 @@ function main() {
 				void setupAllRouting(appCtx).catch((e) => {
 					appCtx.log('warn', 'Routing setup: ' + (e?.message || e))
 				})
+				// WO-209 T209.4: normalize preview channel pointers to 'a' (bank-less mode).
+				// A stale 'b' pointer from previous session must not survive into the playlist path.
+				try {
+					const map = getChannelMap(config || {})
+					const previews = (map.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
+					if (appCtx.liveDeck && previews.length > 0) {
+						appCtx.liveDeck.normalizePreviewChannelBanksToA(previews)
+					}
+				} catch (e) {
+					appCtx.log('debug', `[WO-209] preview channel normalization: ${e?.message || e}`)
+				}
 				void reconcileAfterInfoGather(appCtx).catch((e) => {
 					appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
 				})
-				// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts
+				// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts (band 700-789)
+				// WO-210 T210.4: restore screen timers (band 980-989)
 				void (async () => {
 					try {
 						const { sweepTemplateCgOrphansOnCasparConnected } = require('./src/engine/template-cg-orphan-sweep')
@@ -265,6 +277,19 @@ function main() {
 						})
 					} catch (e) {
 						appCtx.log('debug', `[template-cg-orphan-sweep] startup: ${e?.message || e}`)
+					}
+
+					// WO-210 T210.4: restore registered screen timers on startup/reconnect
+					try {
+						const screenTimers = require('./src/engine/screen-timers')
+						screenTimers.loadRegistry()
+						const reAddLines = screenTimers.linesForReAdd()
+						if (reAddLines.length > 0 && appCtx.amcp && typeof appCtx.amcp.batchSendChunked === 'function') {
+							await appCtx.amcp.batchSendChunked(reAddLines, { skipMixerPreCommit: true })
+							appCtx.log('info', `[screen-timers] restored ${reAddLines.length / 2} timer(s) from registry`)
+						}
+					} catch (e) {
+						appCtx.log('debug', `[screen-timers] startup restore: ${e?.message || e}`)
 					}
 				})()
 			},

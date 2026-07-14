@@ -67,6 +67,19 @@ class LiveDeckState {
 	}
 
 	/**
+	 * WO-209 T209.4: normalize preview channel pointers to 'a' (bank-less mode).
+	 * A stale 'b' pointer from a previous session must not survive into the playlist path.
+	 * @param {string[]} previewChannels — preview channel numbers from routing config
+	 */
+	normalizePreviewChannelBanksToA(previewChannels) {
+		if (!Array.isArray(previewChannels)) return
+		for (const ch of previewChannels) {
+			const chKey = String(ch)
+			this._programLayerBankByChannel[chKey] = 'a'
+		}
+	}
+
+	/**
 	 * @param {object} deck
 	 */
 	setSceneDeck(deck) {
@@ -138,4 +151,9 @@ module.exports = {
 	normalizeSceneDeck,
 	PERSIST_BANKS_KEY,
 	PERSIST_DECK_KEY,
+	normalizePreviewChannelBanksToA: (liveDeck, previewChannels) => {
+		if (liveDeck?.normalizePreviewChannelBanksToA) {
+			liveDeck.normalizePreviewChannelBanksToA(previewChannels)
+		}
+	},
 }

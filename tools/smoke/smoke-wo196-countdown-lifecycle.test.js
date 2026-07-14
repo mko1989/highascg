@@ -135,14 +135,14 @@ test('WO-196 T196.3: handleGet returns items with onAir flag', async () => {
 	}
 })
 
-test('WO-196 T196.4: timer-control-panel.js has help text on header', () => {
+test('WO-196 T196.4 (superseded by WO-210): timer-control-panel.js has help text on header', () => {
 	const fs = require('fs')
 	const path = require('path')
 	const source = fs.readFileSync(path.join(__dirname, '../../client/components/timer-control-panel.js'), 'utf8')
 
-	// Verify help text is added to panel header
-	assert.ok(source.includes('Timer identity = screen + layer number'), 'help text present in panel')
-	assert.ok(source.includes('Reuse the same layer number across looks'), 'continuity guidance in panel')
+	// WO-210: panel is screen-timer-owned now; identity guidance moved to the WO-210 help text
+	assert.ok(source.includes('helpText'), 'help text present in panel')
+	assert.ok(source.includes('Screen timers'), 'WO-210 screen-timer guidance in panel')
 })
 
 test('WO-196 T196.4: inspector-countdown.js has help text on title', () => {
@@ -155,24 +155,14 @@ test('WO-196 T196.4: inspector-countdown.js has help text on title', () => {
 	assert.ok(source.includes('Reuse the same layer number across looks'), 'continuity guidance in inspector')
 })
 
-test('WO-196 T196.3: timer-control-panel marks on-air timers in dropdown', () => {
+test('WO-196 T196.3 (superseded by WO-210): timer-control-panel is registry-driven', () => {
 	const fs = require('fs')
 	const path = require('path')
 	const source = fs.readFileSync(path.join(__dirname, '../../client/components/timer-control-panel.js'), 'utf8')
 
-	// Verify on-air marking in dropdown label
-	assert.ok(source.includes('item.onAir'), 'checks onAir flag')
-	assert.ok(source.includes(' (on air)'), 'marks on-air timers in label')
-	assert.ok(source.includes('data-on-air'), 'sets data attribute for on-air state')
-})
-
-test('WO-196 T196.3: timer-control-panel disables Start for off-air timers', () => {
-	const fs = require('fs')
-	const path = require('path')
-	const source = fs.readFileSync(path.join(__dirname, '../../client/components/timer-control-panel.js'), 'utf8')
-
-	// Verify updateButtonState function exists
-	assert.ok(source.includes('updateButtonState'), 'button state update function')
-	assert.ok(source.includes('startBtn.disabled = true'), 'Start button can be disabled')
-	assert.ok(source.includes('Take a look containing this timer first'), 'off-air tooltip present')
+	// WO-210 replaced the dropdown/on-air UI: the panel lists screen timers from the
+	// server registry and controls them via /api/timers/* — no off-air dead ends exist.
+	assert.ok(source.includes('/api/timers/list'), 'panel reads the screen-timer registry')
+	assert.ok(source.includes('/api/timers/cmd'), 'transport commands go through the registry API')
+	assert.ok(source.includes('/api/timers/visible'), 'visibility toggles never clear the CG')
 })

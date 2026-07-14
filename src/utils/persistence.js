@@ -32,6 +32,7 @@ const IMMEDIATE_KEYS = new Set([
 	'web_project',
 	'web_project_active_slug',
 	'programLayerBankByChannel',
+	'screenTimers',
 ])
 
 /** @type {ReturnType<typeof setTimeout> | null} */

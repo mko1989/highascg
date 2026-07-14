@@ -15,10 +15,8 @@ export function renderTemplatesBrowser(container, templates, filter) {
 			)
 		: templates || []
 
-	const timers = sceneState.listTimers()
 	const renderKey = JSON.stringify({
 		ids: filtered.map(t => t.id || t.label),
-		timerIds: timers.map(t => t.id),
 		filter
 	})
 	if (container._lastRenderKey === renderKey) return
@@ -60,46 +58,5 @@ export function renderTemplatesBrowser(container, templates, filter) {
 
 		makeDraggable(el, 'template', id, label)
 		container.appendChild(el)
-
-		// WO-208 T208.3: Render timer instances as child rows under countdown template
-		if (isCountdownTemplate && timers.length > 0) {
-			const timerContainer = document.createElement('div')
-			timerContainer.className = 'source-items-children'
-			timerContainer.style.paddingLeft = '20px'
-			timerContainer.style.marginTop = '4px'
-			timerContainer.style.borderLeft = '2px solid rgba(255,255,255,0.2)'
-			timerContainer.style.marginLeft = '10px'
-
-			for (const timer of timers) {
-				const timerEl = document.createElement('div')
-				timerEl.className = 'source-item source-item--timer'
-				timerEl.dataset.sourceValue = id
-				timerEl.dataset.countdownTimerId = timer.id
-
-				// Summary: show config duration or target time
-				let summary = ''
-				if (timer.config?.mode === 'duration') {
-					const sec = timer.config.durationSec || 0
-					const h = Math.floor(sec / 3600)
-					const m = Math.floor((sec % 3600) / 60)
-					const s = sec % 60
-					summary = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
-				} else if (timer.config?.mode === 'clock') {
-					summary = timer.config.targetTime || '→time'
-				} else {
-					summary = 'countup'
-				}
-
-				timerEl.innerHTML = `
-					<span class="source-item__kind-pill" title="Countdown timer instance" style="font-size:0.9em">⏱</span>
-					<span class="source-item__label" title="${escapeHtml(timer.name)}">${escapeHtml(truncate(timer.name, 32))} — ${escapeHtml(summary)}</span>
-				`
-
-				makeDraggable(timerEl, 'template', id, label, { countdownTimerId: timer.id })
-				timerContainer.appendChild(timerEl)
-			}
-
-			container.appendChild(timerContainer)
-		}
 	}
 }

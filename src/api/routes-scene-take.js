@@ -177,6 +177,7 @@ async function handleSceneTake(body, ctx) {
 				forceCut: !!b.forceCut,
 				self: ctx,
 				skipLayerVisualEquality: true,
+				banklessTake: true,
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
 				liveSceneState.setChannel(bus1, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
@@ -228,6 +229,7 @@ async function handleSceneTake(body, ctx) {
 					forceCut: true,
 					self: ctx,
 					skipLayerVisualEquality: true,
+					banklessTake: true,
 				})
 				if (inc && typeof inc === 'object' && inc.id) {
 					liveSceneState.setChannel(bus1, {
@@ -280,6 +282,7 @@ async function handleSceneTake(body, ctx) {
 							forceCut: true,
 							self: ctx,
 							skipLayerVisualEquality: true,
+							banklessTake: true,
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
