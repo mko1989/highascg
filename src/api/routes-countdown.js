@@ -30,6 +30,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { resolveCgRequestChannel, resolveTemplateCgHostLayer } = require('../engine/cg-routing')
 const liveSceneState = require('../state/live-scene-state')
+const { loadFullProject } = require('../engine/project-scenes-load')
 
 /** Caspar CG template path — see template/countdown/countdown.html. */
 const COUNTDOWN_CG_NAME = 'countdown/countdown'
@@ -92,27 +93,76 @@ async function emitCgUpdate(ctx, routing, payloadObj) {
 function handleGet(p, ctx, query = {}) {
 	if (p !== '/api/countdown/list') return null
 
-	const all = liveSceneState.getAll()
-	const items = []
-	for (const chKey of Object.keys(all)) {
-		const entry = all[chKey]
+	// WO-196 T196.3: enumerate all project countdown layers + mark on-air from live state.
+	// Items keyed by {channel, layerNumber} to avoid duplicates.
+	const itemMap = new Map()
+
+	// Load all project scenes
+	const project = loadFullProject()
+	const allScenes = (project?.scenes?.scenes || [])
+
+	// First pass: add all countdown layers from all project scenes
+	for (const scene of allScenes) {
+		if (!Array.isArray(scene?.layers)) continue
+		for (const layer of scene.layers) {
+			const src = layer?.source
+			if (!isCountdownSourceValue(src?.value)) continue
+			const logicalLayer = parseInt(layer.layerNumber, 10)
+			if (!Number.isFinite(logicalLayer)) continue
+
+			// Use a composite key to track unique timer identities (assume single channel for now)
+			// In multi-channel setups, this would need channel awareness from the scene.
+			const key = `${logicalLayer}`
+			if (!itemMap.has(key)) {
+				itemMap.set(key, {
+					channel: 1, // Default channel (will be overridden by live state if available)
+					layerNumber: logicalLayer,
+					hostLayer: resolveTemplateCgHostLayer(logicalLayer, COUNTDOWN_CG_NAME),
+					sceneId: scene.id || null,
+					label: src.label || null,
+					config: src.countdownConfig || null,
+					onAir: false,
+				})
+			}
+		}
+	}
+
+	// Second pass: mark on-air items from live state and override with live channel info
+	const liveAll = liveSceneState.getAll()
+	for (const chKey of Object.keys(liveAll)) {
+		const entry = liveAll[chKey]
 		const layers = entry?.scene?.layers
 		if (!Array.isArray(layers)) continue
+		const ch = parseInt(chKey, 10)
 		for (const layer of layers) {
 			const src = layer?.source
 			if (!isCountdownSourceValue(src?.value)) continue
 			const logicalLayer = parseInt(layer.layerNumber, 10)
 			if (!Number.isFinite(logicalLayer)) continue
-			items.push({
-				channel: parseInt(chKey, 10),
-				layerNumber: logicalLayer,
-				hostLayer: resolveTemplateCgHostLayer(logicalLayer, COUNTDOWN_CG_NAME),
-				sceneId: entry.sceneId,
-				label: src.label || null,
-				config: src.countdownConfig || null,
-			})
+
+			const key = `${logicalLayer}`
+			const existing = itemMap.get(key)
+			if (existing) {
+				// Update with live state info
+				existing.channel = ch
+				existing.sceneId = entry.sceneId
+				existing.onAir = true
+			} else {
+				// New item from live state
+				itemMap.set(key, {
+					channel: ch,
+					layerNumber: logicalLayer,
+					hostLayer: resolveTemplateCgHostLayer(logicalLayer, COUNTDOWN_CG_NAME),
+					sceneId: entry.sceneId,
+					label: src.label || null,
+					config: src.countdownConfig || null,
+					onAir: true,
+				})
+			}
 		}
 	}
+
+	const items = Array.from(itemMap.values())
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ items }) }
 }
 

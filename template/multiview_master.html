@@ -144,57 +144,6 @@
 			return `Ch ${chNum}`;
 		}
 
-		function getTopLayerForPlayback(chNum, seen = new Set()) {
-			if (seen.has(chNum)) return null;
-			seen.add(chNum);
-			const ch = oscState.channels[String(chNum)] || oscState.channels[chNum];
-			const layers = ch?.layers;
-			if (!layers) return null;
-			let bestN = -1;
-			let bestState = null;
-			for (const key of Object.keys(layers)) {
-				const n = parseInt(key, 10);
-				if (!Number.isFinite(n)) continue;
-				const ly = layers[key];
-				const f = ly?.file;
-				if (f && (f.name || f.path)) {
-					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly, oscState.updatedAt)) continue;
-					if (n > bestN) {
-						bestN = n;
-						bestState = ly;
-					}
-				}
-			}
-			if (bestState) {
-				const f = bestState.file || {};
-				const name = String(f.name || f.path || '');
-				if (name.toLowerCase().startsWith('route://')) {
-					const match = name.match(/route:\/\/(\d+)/i);
-					if (match) {
-						const targetCh = parseInt(match[1], 10);
-						if (targetCh !== chNum) {
-							const targetState = getTopLayerForPlayback(targetCh, seen);
-							if (targetState) {
-								return {
-									...targetState,
-									file: { ...targetState.file, name: targetState.file?.name || '', path: targetState.file?.path || '' },
-									isRoute: true,
-									routeTarget: targetCh,
-									routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`,
-								};
-							}
-							return {
-								file: { name: `Route (${getScreenLabelForChannel(targetCh)})` },
-								isRoute: true,
-								routeTarget: targetCh,
-								routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`,
-							};
-						}
-					}
-				}
-			}
-			return bestState;
-		}
 
 		function getActiveScenes() {
 			const list = [];
@@ -281,15 +230,34 @@
 			ctx.closePath();
 		}
 
-		function collectLayerLines(cell, resolvedChNum, screenIdx, chNum) {
+		// Check if a source path matches the pip template family (WO-195.1)
+		function isPipTemplateSource(sourceValue) {
+			if (!sourceValue) return false;
+			const src = String(sourceValue).toLowerCase();
+			// Match pip_border/pip-border, pip_shadow/pip-shadow, etc.
+			return /\b(pip_border|pip-border|pip_shadow|pip-shadow|pip_edge_strip|pip-edge-strip|pip_glow|pip-glow|pip_router|pip-router)\b/i.test(src);
+		}
+
+		// Extract basename without extension from a source path
+		function getSourceBasename(sourceValue) {
+			if (!sourceValue) return '';
+			const src = String(sourceValue);
+			const parts = src.split(/[/\\]/);
+			const last = parts[parts.length - 1] || '';
+			return last.replace(/\.[^.]*$/, ''); // Remove extension
+		}
+
+		function collectLayerLines(cell, resolvedChNum, screenIdx, chNum, isPgm) {
 			const rows = [];
-			if (cell.type !== 'pgm') return rows;
 			const activeScenes = getActiveScenes();
 			for (const scene of activeScenes) {
 				if (!Array.isArray(scene.layers)) continue;
 				for (const layer of scene.layers) {
 					const num = Number(layer.layerNumber);
-					if (layer.source?.value && layer.source.value.includes('playback_timers.html')) continue;
+					const sourceValue = layer.source?.value;
+					if (sourceValue && sourceValue.includes('playback_timers.html')) continue;
+					// Skip pip decoration templates (WO-195.1)
+					if (isPipTemplateSource(sourceValue)) continue;
 					let lookScreenIdx = 0;
 					if (/^[0-3]$/.test(String(scene.mainScope))) lookScreenIdx = parseInt(scene.mainScope, 10);
 					else if (channelMap.programChannels) {
@@ -302,36 +270,27 @@
 						}
 					}
 					if (lookScreenIdx !== screenIdx) continue;
+					// PGM: bank-mapped physical; PRV has no banks — logical = physical (WO-195.4)
 					const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
-					const pLayer = bank === 'b' ? num + 100 : num;
+					const pLayer = isPgm && bank === 'b' ? num + 100 : num;
 					const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
 					let layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
 					const isStale = layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt);
 					if (isStale) layerOsc = null;
 					let lFile = layerOsc?.file || {};
-					let isLayerRoute = false;
-					let layerRouteLabel = '';
-					const lName = String(lFile.name || lFile.path || '');
-					if (lName.toLowerCase().startsWith('route://')) {
-						const match = lName.match(/route:\/\/(\d+)/i);
-						if (match) {
-							const targetCh = parseInt(match[1], 10);
-							isLayerRoute = true;
-							layerRouteLabel = `Route (${getScreenLabelForChannel(targetCh)})`;
-							const targetOsc =
-								oscState.channels[String(targetCh)]?.layers?.[num] ||
-								oscState.channels[String(targetCh)]?.layers?.[String(num)];
-							if (targetOsc?.file && !window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(targetOsc, oscState.updatedAt)) lFile = targetOsc.file;
-						}
-					}
 					const elapsed = lFile.elapsed ?? 0;
 					const duration = lFile.duration ?? 0;
-					const hasRuntime = Number(duration) > 0 && !isStale;
+					// Strict runtime guard: digits+bar only when Number.isFinite(duration) && duration > 0 && !stale (WO-195.3)
+					const hasRuntime = Number.isFinite(duration) && duration > 0 && !isStale;
+					// Generate label (WO-195.2)
+					const basename = getSourceBasename(sourceValue);
+					const layerLabel = basename ? `L${num} ${basename}` : `L${num}`;
 					rows.push({
 						num,
 						hasRuntime,
 						elapsed,
-						duration
+						duration,
+						label: layerLabel
 					});
 				}
 			}
@@ -372,18 +331,7 @@
 				}
 
 				const resolvedChNum = resolvePlaybackCh(cell);
-				const lyState = getTopLayerForPlayback(resolvedChNum);
-				const file = lyState?.file || {};
-				const elapsed = file.elapsed ?? 0;
-				const dur = file.duration ?? 0;
-				const rem = Number.isFinite(dur) && dur > 0 ? Math.max(0, dur - elapsed) : null;
-				const pct = dur > 0 ? Math.min(100, Math.max(0, (elapsed / dur) * 100)) : 0;
-				let fileName = file.name || (file.path ? file.path.split(/[/\\]/).pop() : '');
-				if (lyState?.isRoute) {
-					const subName = file.name && !file.name.toLowerCase().startsWith('route://') ? file.name : '';
-					fileName = lyState.routeLabel + (subName ? ` - ${subName}` : '');
-				}
-				const clip = fileName || 'No active clip';
+				const isPgm = cell.type === 'pgm';
 
 				ctx.fillStyle = c.solid;
 				ctx.fillRect(lx, ly, lw, titleBarH);
@@ -397,30 +345,9 @@
 					const pad = 8;
 					let ty = dockY + 14;
 					ctx.textBaseline = 'middle';
-					ctx.fillStyle = '#fff';
-					ctx.font = '600 10px Rewir, system-ui, sans-serif';
-					ctx.shadowColor = 'rgba(0,0,0,0.9)';
-					ctx.shadowBlur = 4;
-					const timeStr = `${formatMmSs(elapsed)} / ${formatMmSs(dur)}${Number.isFinite(rem) ? `  -${formatMmSs(rem)}` : ''}`;
-					const rowY = ty;
-					let clipDraw = String(clip);
-					const maxClip = dockW - pad * 2 - ctx.measureText(timeStr).width - 10;
-					while (clipDraw.length > 3 && ctx.measureText(clipDraw).width > maxClip) clipDraw = clipDraw.slice(0, -2) + '…';
-					ctx.textAlign = 'left';
-					ctx.fillText(clipDraw, dockX + pad, rowY);
-					ctx.textAlign = 'right';
-					ctx.fillText(timeStr, dockX + dockW - pad, rowY);
-					ctx.textAlign = 'left';
-					ctx.shadowBlur = 0;
-					ty += 18;
-					ctx.fillStyle = 'rgba(255,255,255,0.25)';
-					ctx.fillRect(dockX + pad, ty, dockW - pad * 2, 4);
-					ctx.fillStyle = c.prog;
-					ctx.fillRect(dockX + pad, ty, ((dockW - pad * 2) * pct) / 100, 4);
-					ty += 12;
 					ctx.fillStyle = '#f1f5f9';
 					ctx.font = '500 9px Rewir, system-ui, sans-serif';
-					const layerRows = collectLayerLines(cell, resolvedChNum, cell.screenIdx, cell.channelNum);
+					const layerRows = collectLayerLines(cell, resolvedChNum, cell.screenIdx, cell.channelNum, isPgm);
 					const maxY = ly + chromeH - 4;
 					for (const row of layerRows) {
 						if (ty + 3 > maxY) break;
@@ -428,8 +355,7 @@
 						ctx.font = '600 9px Rewir, system-ui, sans-serif';
 						ctx.textBaseline = 'middle';
 						ctx.textAlign = 'left';
-						const labelText = `L${row.num}`;
-						ctx.fillText(labelText, dockX + pad, ty + 8);
+						ctx.fillText(row.label, dockX + pad, ty + 8);
 						if (row.hasRuntime && Number(row.duration) > 0) {
 							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
 							const timeText = `${formatMmSs(row.elapsed)}/${formatMmSs(row.duration)} (-${formatMmSs(rem)})`;

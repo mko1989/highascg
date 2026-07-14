@@ -40,3 +40,38 @@ we need to add a system setting in the settings modal for setting the system tim
 check the workflow for auto creation of the hostname based on the mac address. on usb boot it needs to happen each time it boots.
 
 ****NEW***
+still the top layer of my test look is pip-edge-strip.html which just shows with 00 and empty progess bar on the multiview. 
+actually the pip borders should be linked with their layers.
+no need to make the top layer bigger in the timers. the labels should be L## file name.
+the prv channel timers doesn't work correctly.
+the timers show stale leftover layers sometime.
+
+i had a timer template in two looks on pgm 2 and after transitioning to a look without the timer stays on the screen and it shouldnt.
+whats the workflow to create multiple timers? id like to be able to use the same timer on different looks, and be able to use a completly different one on other looks.
+the  compact timer disppeared. it also didnt show the current timer.
+
+****NEWNEW***
+
+the modal that opens when connection eyes are clicked.
+the logs and shortcuts should be tabs, minmal. and changing them should change the view of the modal. now the shortcus display in a super small bar at the bottom of the logs....
+
+doing changes in the look editor does not move the prv channel of caspar...
+the crop and border issue is now preset only on prv1 ch2.
+the prv screen needs to be treated as such. meaning the changes made in the web ui need to be reflected on the prv screen asap. 
+
+i also noticed that the jpeg hack preview in the ui now has higher latency than i noticed at the begging.
+still something wrong with this
+Image corrupt or truncated. 1.jpg
+Image corrupt or truncated. 2.jpg
+Image corrupt or truncated. 1.jpg
+Image corrupt or truncated. 2.jpg
+Image corrupt or truncated. 2.jpg
+Image corrupt or truncated. 3.jpg
+Image corrupt or truncated. 1.jpg
+GET
+http://192.168.0.35/api/compose-preview/3.jpg?v=W/"1784026611284-23003"
+[HTTP/1.1 404 Not Found 9ms]
+
+Image corrupt or truncated. 3.jpg
+
+​

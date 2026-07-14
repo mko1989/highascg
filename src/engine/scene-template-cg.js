@@ -168,6 +168,37 @@ function buildSceneTemplateCgSpec(layer, tlsId, ctx) {
 	}
 }
 
+/**
+ * WO-196 T196.2: compare two template specs to detect continuity.
+ * Same cgName (template type) on the same host layer means the timer identity is preserved.
+ * @param {{ cgName?: string } | null} incoming
+ * @param {{ cgName?: string } | null} current
+ * @returns {boolean}
+ */
+function isSameTemplateSpec(incoming, current) {
+	if (!incoming || !current) return false
+	const inCg = String(incoming.cgName || '').trim().toLowerCase()
+	const curCg = String(current.cgName || '').trim().toLowerCase()
+	return inCg === curCg && inCg.length > 0
+}
+
+/**
+ * WO-196 T196.2: emit only a CG UPDATE line (no CLEAR/ADD) to preserve running timer state.
+ * This is used when the incoming take has the same template on the same host layer as the current scene.
+ * @param {number} channel
+ * @param {number} logicalOrHostLayer
+ * @param {{ cgName: string, data?: string }} spec
+ * @returns {string[]}
+ */
+function buildSceneTemplateCgUpdateOnlyLines(channel, logicalOrHostLayer, spec) {
+	const cgName = String(spec?.cgName || '').trim()
+	if (!cgName) return []
+	const hostLayer = resolveTemplateCgHostLayer(logicalOrHostLayer, cgName)
+	const cl = `${channel}-${hostLayer}`
+	const dataStr = typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
+	return [`CG ${cl} UPDATE 0 ${param(dataStr)}`]
+}
+
 module.exports = {
 	isSceneTemplateLayer,
 	resolveCgTemplateName,
@@ -176,5 +207,7 @@ module.exports = {
 	buildSceneTemplateCgClearLines,
 	buildClearTemplateCgOnOtherProgramChannelsLines,
 	buildSceneTemplateCgSpec,
+	isSameTemplateSpec,
+	buildSceneTemplateCgUpdateOnlyLines,
 	resolveTemplateCgHostLayer,
 }

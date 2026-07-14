@@ -125,65 +125,6 @@
 			return `Ch ${chNum}`;
 		}
 
-		function getTopLayerForPlayback(chNum, seen = new Set()) {
-			if (seen.has(chNum)) return null;
-			seen.add(chNum);
-
-			const ch = oscState.channels[String(chNum)] || oscState.channels[chNum];
-			const layers = ch?.layers;
-			if (!layers) return null;
-			let bestN = -1;
-			let bestState = null;
-			for (const key of Object.keys(layers)) {
-				const n = parseInt(key, 10);
-				if (!Number.isFinite(n)) continue;
-				const ly = layers[key];
-				const f = ly?.file;
-				if (f && (f.name || f.path)) {
-					if (window.mvPlaybackOsc?.shouldIgnoreOscPlaybackLayer?.(n, ly, oscState.updatedAt)) continue;
-					if (n > bestN) {
-						bestN = n;
-						bestState = ly;
-					}
-				}
-			}
-
-			if (bestState) {
-				const f = bestState.file || {};
-				const name = String(f.name || f.path || '');
-				if (name.toLowerCase().startsWith('route://')) {
-					const match = name.match(/route:\/\/(\d+)/i);
-					if (match) {
-						const targetCh = parseInt(match[1], 10);
-						if (targetCh !== chNum) {
-							const targetState = getTopLayerForPlayback(targetCh, seen);
-							if (targetState) {
-								return {
-									...targetState,
-									file: {
-										...targetState.file,
-										name: targetState.file?.name || '',
-										path: targetState.file?.path || '',
-									},
-									isRoute: true,
-									routeTarget: targetCh,
-									routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`
-								};
-							} else {
-								return {
-									file: { name: `Route (${getScreenLabelForChannel(targetCh)})` },
-									isRoute: true,
-									routeTarget: targetCh,
-									routeLabel: `Route (${getScreenLabelForChannel(targetCh)})`
-								};
-							}
-						}
-					}
-				}
-			}
-
-			return bestState;
-		}
 
 		function getActiveScenes() {
 			const list = [];
@@ -196,6 +137,23 @@
 				});
 			}
 			return list;
+		}
+
+		// Check if a source path matches the pip template family (WO-195.1)
+		function isPipTemplateSource(sourceValue) {
+			if (!sourceValue) return false;
+			const src = String(sourceValue).toLowerCase();
+			// Match pip_border/pip-border, pip_shadow/pip-shadow, etc.
+			return /\b(pip_border|pip-border|pip_shadow|pip-shadow|pip_edge_strip|pip-edge-strip|pip_glow|pip-glow|pip_router|pip-router)\b/i.test(src);
+		}
+
+		// Extract basename without extension from a source path
+		function getSourceBasename(sourceValue) {
+			if (!sourceValue) return '';
+			const src = String(sourceValue);
+			const parts = src.split(/[/\\]/);
+			const last = parts[parts.length - 1] || '';
+			return last.replace(/\.[^.]*$/, ''); // Remove extension
 		}
 
 		// Periodic Ticking Timer Renderer
@@ -232,126 +190,102 @@
 					resolvedChNum = activeCh || chNum;
 				}
 
-				// Fetch top playback layer
-				const lyState = getTopLayerForPlayback(resolvedChNum);
-				const file = lyState?.file || {};
-				const elapsed = file.elapsed ?? 0;
-				const dur = file.duration ?? 0;
-				const rem = Number.isFinite(dur) && dur > 0 ? Math.max(0, dur - elapsed) : null;
-				const pct = dur > 0 ? Math.min(100, Math.max(0, (elapsed / dur) * 100)) : 0;
-				
-				let fileName = file.name || (file.path ? file.path.split(/[/\\]/).pop() : '');
-				if (lyState?.isRoute) {
-					const subName = file.name && !file.name.toLowerCase().startsWith('route://') ? file.name : '';
-					fileName = lyState.routeLabel + (subName ? ` - ${subName}` : '');
-				}
+				let innerBlocks = '';
 
-				// Timers + bars live in transparent stack; channel title only on solid bar at bottom
-				const clip = fileName || 'No active clip'
-				let innerBlocks = `
-					<div class="label-timer-row">
-						<span class="label-clip-name" title="${escAttr(clip)}">${escHtml(clip)}</span>
-						<span class="label-time-elapsed">${formatMmSs(elapsed)} / ${formatMmSs(dur)}</span>
-						<span class="label-time-remaining">${Number.isFinite(rem) ? `-${formatMmSs(rem)}` : ''}</span>
-					</div>
-					<div class="label-progress-bar-bg">
-						<div class="label-progress-bar-fill" style="width: ${pct}%"></div>
-					</div>
-				`;
+				// Layer timers stack (PGM and PRV) (WO-195)
+				const activeScenes = getActiveScenes();
+				const layerRows = [];
 
-				// Layer timers opt-in stack (PGM only)
-				if (isPgm) {
-					const activeScenes = getActiveScenes();
-					const layerRows = [];
+				activeScenes.forEach((scene) => {
+					if (Array.isArray(scene.layers)) {
+						scene.layers.forEach((layer) => {
+							const num = Number(layer.layerNumber);
+							const sourceValue = layer.source?.value;
 
-					activeScenes.forEach((scene) => {
-						if (Array.isArray(scene.layers)) {
-							scene.layers.forEach((layer) => {
-								const num = Number(layer.layerNumber);
-								const isTimersTemplate = layer.source?.value && layer.source.value.includes('playback_timers.html');
-								if (isTimersTemplate) return;
+							// Skip playback_timers template
+							if (sourceValue && sourceValue.includes('playback_timers.html')) return;
 
-								// Ensure look is routed to this screen
-								let lookScreenIdx = 0;
-								if (/^[0-3]$/.test(String(scene.mainScope))) {
-									lookScreenIdx = parseInt(scene.mainScope, 10);
-								} else if (channelMap.programChannels) {
-									for (let i = 0; i < channelMap.programChannels.length; i++) {
-										const entry = sceneLive[String(channelMap.programChannels[i])] || sceneLive[channelMap.programChannels[i]];
-										if (entry?.sceneId === scene.id) {
-											lookScreenIdx = i;
-											break;
-										}
+							// Skip pip decoration templates (WO-195.1)
+							if (isPipTemplateSource(sourceValue)) return;
+
+							// Ensure look is routed to this screen
+							let lookScreenIdx = 0;
+							if (/^[0-3]$/.test(String(scene.mainScope))) {
+								lookScreenIdx = parseInt(scene.mainScope, 10);
+							} else if (channelMap.programChannels) {
+								for (let i = 0; i < channelMap.programChannels.length; i++) {
+									const entry = sceneLive[String(channelMap.programChannels[i])] || sceneLive[channelMap.programChannels[i]];
+									if (entry?.sceneId === scene.id) {
+										lookScreenIdx = i;
+										break;
 									}
 								}
+							}
 
-								if (lookScreenIdx !== screenIdx) return;
+							if (lookScreenIdx !== screenIdx) return;
 
-								// Fetch Look Layer OSC playback values
+							// Fetch Look Layer OSC playback values
+							let pLayer;
+							if (isPgm) {
+								// PGM: apply bank offset
 								const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
-								const pLayer = bank === 'b' ? num + 100 : num;
-								const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
-								let layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
-								const isStale = layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt);
-								if (isStale) layerOsc = null;
-								let lFile = layerOsc?.file || {};
+								pLayer = bank === 'b' ? num + 100 : num;
+							} else {
+								// PRV: physical = logical (no bank offset) (WO-195.4)
+								pLayer = num;
+							}
 
-								let isLayerRoute = false;
-								let layerRouteLabel = '';
-								const lName = String(lFile.name || lFile.path || '');
-								if (lName.toLowerCase().startsWith('route://')) {
-									const match = lName.match(/route:\/\/(\d+)/i);
-									if (match) {
-										const targetCh = parseInt(match[1], 10);
-										isLayerRoute = true;
-										layerRouteLabel = `Route (${getScreenLabelForChannel(targetCh)})`;
-										const targetOsc = oscState.channels[String(targetCh)]?.layers?.[num] || oscState.channels[String(targetCh)]?.layers?.[String(num)];
-										if (targetOsc?.file && !window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(targetOsc, oscState.updatedAt)) {
-											lFile = targetOsc.file;
-										}
-									}
-								}
+							const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
+							let layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
+							const isStale = layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt);
+							if (isStale) layerOsc = null;
+							let lFile = layerOsc?.file || {};
 
-								const elapsed = lFile.elapsed ?? 0;
-								const duration = lFile.duration ?? 0;
-								const hasRuntime = Number(duration) > 0 && !isStale;
+							const elapsed = lFile.elapsed ?? 0;
+							const duration = lFile.duration ?? 0;
+							// Strict runtime guard: digits+bar only when Number.isFinite(duration) && duration > 0 && !stale (WO-195.3)
+							const hasRuntime = Number.isFinite(duration) && duration > 0 && !isStale;
 
-								layerRows.push({
-									num,
-									hasRuntime,
-									elapsed,
-									duration
-								});
+							// Generate label (WO-195.2)
+							const basename = getSourceBasename(sourceValue);
+							const layerLabel = basename ? `L${num} ${basename}` : `L${num}`;
+
+							layerRows.push({
+								num,
+								hasRuntime,
+								elapsed,
+								duration,
+								label: layerLabel
 							});
+						});
+					}
+				});
+
+				// Sort descending by layer number
+				layerRows.sort((a, b) => b.num - a.num);
+
+				if (layerRows.length > 0) {
+					const layerItems = layerRows.map((row) => {
+						if (row.hasRuntime) {
+							const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
+							return `
+								<div class="label-layer-row">
+									<span class="label-layer-num">${row.label}</span>
+									<span class="label-layer-time">${formatMmSs(row.elapsed)} / ${formatMmSs(row.duration)} ${Number.isFinite(rem) ? `(-${formatMmSs(rem)})` : ''}</span>
+									<div class="label-layer-progress-bar-bg">
+										<div class="label-layer-progress-bar-fill" style="width: ${row.duration > 0 ? Math.min(100, Math.max(0, (row.elapsed / row.duration) * 100)) : 0}%"></div>
+									</div>
+								</div>
+							`;
+						} else {
+							return `
+								<div class="label-layer-row">
+									<span class="label-layer-num">${row.label}</span>
+								</div>
+							`;
 						}
 					});
-
-					// Sort descending by layer number
-					layerRows.sort((a, b) => b.num - a.num);
-
-					if (layerRows.length > 0) {
-						const layerItems = layerRows.map((row) => {
-							if (row.hasRuntime) {
-								const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
-								return `
-									<div class="label-layer-row">
-										<span class="label-layer-num">L${row.num}</span>
-										<span class="label-layer-time">${formatMmSs(row.elapsed)} / ${formatMmSs(row.duration)} ${Number.isFinite(rem) ? `(-${formatMmSs(rem)})` : ''}</span>
-										<div class="label-layer-progress-bar-bg">
-											<div class="label-layer-progress-bar-fill" style="width: ${row.duration > 0 ? Math.min(100, Math.max(0, (row.elapsed / row.duration) * 100)) : 0}%"></div>
-										</div>
-									</div>
-								`;
-							} else {
-								return `
-									<div class="label-layer-row">
-										<span class="label-layer-num">L${row.num}</span>
-									</div>
-								`;
-							}
-						});
-						innerBlocks += `<div class="label-layers-list">${layerItems.join('')}</div>`;
-					}
+					innerBlocks = `<div class="label-layers-list">${layerItems.join('')}</div>`;
 				}
 
 				labelDiv.innerHTML = `

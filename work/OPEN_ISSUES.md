@@ -56,4 +56,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | SYSTEM-TIME | System time view/NTP/manual set in Settings → System (sudoers via next installer run) | [WO-193](./work-orders/193_WO_SYSTEM_TIME_SETTING.md) | 🟡 Implemented |
 | HOSTNAME-USB | Hostname-from-MAC failed on USB boots (read-only /var/log aborted wrapper) — fail-open logging; box self-corrects to highascg7579 next boot | [WO-194](./work-orders/194_WO_HOSTNAME_FROM_MAC_USB_BOOT_FIX.md) | 🟡 Implemented |
 
-Last updated: 2026-07-14 (WO-181–194; server-side changes live on next service restart; local commits await `git push origin main` by owner)
+| MV-OVERLAY-REFINE | Overlay: pip rows hidden, L##+filename labels, no top block, PRV bank-map fix, instant stale-row removal | [WO-195](./work-orders/195_WO_MULTIVIEW_OVERLAY_REFINEMENTS.md) | 🟡 Implemented (reload via multiview Refresh) |
+| COUNTDOWN-LIFECYCLE | Timer cleared on look exit; continuity across same-timer transitions (UPDATE-only takes); panel lists all project timers w/ on-air marks | [WO-196](./work-orders/196_WO_COUNTDOWN_LIFECYCLE_TEARDOWN_CONTINUITY_PANEL.md) | 🟡 Implemented |
+
+Last updated: 2026-07-14 (WO-181–196; server-side changes live on next service restart; local commits await `git push origin main` by owner)

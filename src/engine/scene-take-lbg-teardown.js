@@ -13,6 +13,7 @@ const {
 	nextPipContentLayerInScene,
 	pipOverlaysFromLayer,
 } = require('./pip-overlay')
+const { isSceneTemplateLayer, buildSceneTemplateCgClearLines, resolveTemplateCgHostLayer } = require('./scene-template-cg')
 /**
  * @param {object} ctx
  * @param {object} ctx.amcp
@@ -31,6 +32,7 @@ const {
  * @param {'a'|'b'} ctx.activeBank
  * @param {'a'|'b'} ctx.inactiveBank
  * @param {(sceneLn: number, bank: 'a'|'b') => number} ctx.phys
+ * @param {Set<number>} [ctx.incomingTemplateHostLayers]
  */
 async function runSceneTakeLbgTeardown(ctx) {
 	const {
@@ -50,6 +52,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 		activeBank,
 		inactiveBank,
 		phys,
+		incomingTemplateHostLayers = new Set(),
 	} = ctx
 
 	if (exitMedia.length === 0 && !needsBorderOnlyTeardown && !ctx.activeTimelineIdToFadeOut) return
@@ -113,6 +116,19 @@ async function runSceneTakeLbgTeardown(ctx) {
 			try {
 				playbackTracker.recordStop(self, channel, pOut)
 			} catch (_) {}
+		}
+	}
+
+	// WO-196 T196.1: emit CG CLEAR for exiting template layers not in the incoming look.
+	// This prevents timers and other template CG from staying on air after a look transition.
+	for (const layer of exitMedia) {
+		if (!isSceneTemplateLayer(layer, layer.source?.value, self)) continue
+		const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, layer.source?.value)
+		if (incomingTemplateHostLayers.has(hostLayer)) continue
+		// This layer is exiting and will not be replaced by the incoming look.
+		const clearLines = buildSceneTemplateCgClearLines(channel, layer.layerNumber, layer.source?.value)
+		if (clearLines.length > 0) {
+			teardownLines.push(...clearLines)
 		}
 	}
 

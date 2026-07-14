@@ -86,7 +86,9 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-countdown-group'
-	grp.innerHTML = '<div class="inspector-group__title">Countdown / Timer</div>'
+	// WO-196 T196.4: add help text documenting timer identity and continuity.
+	const helpText = 'Timer identity = screen + layer number. Reuse the same layer number across looks to carry one timer through them; use another layer number for an independent timer.'
+	grp.innerHTML = `<div class="inspector-group__title" title="${escapeAttr(helpText)}">Countdown / Timer</div>`
 
 	/* ── mode ─────────────────────────────────────────────── */
 	const modeField = document.createElement('div')

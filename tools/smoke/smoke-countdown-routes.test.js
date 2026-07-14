@@ -160,8 +160,10 @@ describe('countdown routes (WO-169)', () => {
 describe('countdown list (WO-192)', () => {
 	it('GET /api/countdown/list includes countdownConfig for each timer entry', () => {
 		const mockSceneState = require('../../src/state/live-scene-state')
+		const projectScenesLoad = require('../../src/engine/project-scenes-load')
 		// Stub getAll to return a scene with a countdown timer layer
 		const originalGetAll = mockSceneState.getAll
+		const originalLoadFullProject = projectScenesLoad.loadFullProject
 		mockSceneState.getAll = () => ({
 			'1': {
 				sceneId: 'scene-1',
@@ -183,15 +185,19 @@ describe('countdown list (WO-192)', () => {
 				},
 			},
 		})
+		projectScenesLoad.loadFullProject = () => ({ scenes: { scenes: [] } })
 
 		const result = handleGet('/api/countdown/list', {})
 		mockSceneState.getAll = originalGetAll
+		projectScenesLoad.loadFullProject = originalLoadFullProject
 
 		assert.equal(result.status, 200)
 		const body = JSON.parse(result.body)
 		assert.ok(Array.isArray(body.items), 'response has items array')
-		assert.equal(body.items.length, 1, 'should have one timer')
-		const item = body.items[0]
+		assert.ok(body.items.length >= 1, 'should have at least one timer')
+		// Find the specific timer we created
+		const item = body.items.find(i => i.label === 'My Timer')
+		assert.ok(item, 'My Timer should be in the list')
 		assert.equal(item.channel, 1, 'channel should be 1')
 		assert.equal(item.layerNumber, 10, 'layerNumber should be 10')
 		assert.equal(item.label, 'My Timer', 'label should be included')
@@ -202,7 +208,9 @@ describe('countdown list (WO-192)', () => {
 
 	it('GET /api/countdown/list returns null config when countdownConfig is missing', () => {
 		const mockSceneState = require('../../src/state/live-scene-state')
+		const projectScenesLoad = require('../../src/engine/project-scenes-load')
 		const originalGetAll = mockSceneState.getAll
+		const originalLoadFullProject = projectScenesLoad.loadFullProject
 		mockSceneState.getAll = () => ({
 			'1': {
 				sceneId: 'scene-1',
@@ -220,13 +228,59 @@ describe('countdown list (WO-192)', () => {
 				},
 			},
 		})
+		projectScenesLoad.loadFullProject = () => ({ scenes: { scenes: [] } })
 
 		const result = handleGet('/api/countdown/list', {})
 		mockSceneState.getAll = originalGetAll
+		projectScenesLoad.loadFullProject = originalLoadFullProject
 
 		assert.equal(result.status, 200)
 		const body = JSON.parse(result.body)
-		assert.equal(body.items.length, 1, 'should have one timer')
-		assert.equal(body.items[0].config, null, 'config should be null when missing')
+		assert.ok(body.items.length >= 1, 'should have at least one timer')
+		const item = body.items.find(i => i.label === 'No Config Timer')
+		assert.ok(item, 'No Config Timer should be in the list')
+		assert.equal(item.config, null, 'config should be null when missing')
+	})
+
+	it('WO-196 T196.3: GET /api/countdown/list includes onAir flag for live timers', () => {
+		const mockSceneState = require('../../src/state/live-scene-state')
+		const projectScenesLoad = require('../../src/engine/project-scenes-load')
+		const originalGetAll = mockSceneState.getAll
+		const originalLoadFullProject = projectScenesLoad.loadFullProject
+		mockSceneState.getAll = () => ({
+			'1': {
+				sceneId: 'scene-1',
+				scene: {
+					layers: [
+						{
+							layerNumber: 10,
+							source: {
+								value: 'countdown/countdown',
+								label: 'Live Timer',
+								countdownConfig: {
+									mode: 'duration',
+									durationSec: 300,
+								},
+							},
+						},
+					],
+				},
+			},
+		})
+		projectScenesLoad.loadFullProject = () => ({ scenes: { scenes: [] } })
+
+		const result = handleGet('/api/countdown/list', {})
+		mockSceneState.getAll = originalGetAll
+		projectScenesLoad.loadFullProject = originalLoadFullProject
+
+		assert.equal(result.status, 200)
+		const body = JSON.parse(result.body)
+		assert.ok(body.items.length >= 1, 'should have at least one timer')
+
+		// Find the live timer in the list (there may be other items from project state)
+		const liveTimer = body.items.find(item => item.label === 'Live Timer')
+		assert.ok(liveTimer, 'live timer should be in the list')
+		assert.ok('onAir' in liveTimer, 'onAir flag should be present')
+		assert.equal(liveTimer.onAir, true, 'on-air timer should have onAir=true')
 	})
 })

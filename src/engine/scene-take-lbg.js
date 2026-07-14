@@ -337,6 +337,20 @@ async function runSceneTakeLbg(amcp, opts) {
 	})
 	fadeClockStart = fadeClockRef.start
 
+	// WO-196 T196.1: build set of incoming template host layers to avoid clearing them on exit.
+	// This enables continuity: if a template layer carries the same identity on the next look,
+	// we keep it on air without a CG CLEAR.
+	const { buildSceneTemplateCgSpec, resolveTemplateCgHostLayer } = require('./scene-template-cg')
+	const incomingTemplateHostLayers = new Set()
+	for (const layer of incoming.layers) {
+		if (!layerHasContent(layer)) continue
+		const spec = buildSceneTemplateCgSpec(layer, layer.source?.value, self)
+		if (spec) {
+			const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, spec.cgName)
+			incomingTemplateHostLayers.add(hostLayer)
+		}
+	}
+
 	// Border-only teardown path: when the new look removes the border and there's no exit
 	// media to anchor the wait, still respect the crossfade clock before clearing the CG.
 	const needsBorderOnlyTeardown = currentGbEnabled && !incomingGbEnabled && exitMedia.length === 0
@@ -358,6 +372,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		inactiveBank,
 		phys,
 		activeTimelineIdToFadeOut,
+		incomingTemplateHostLayers,
 	})
 
 	if (activeTimelineIdToFadeOut) {

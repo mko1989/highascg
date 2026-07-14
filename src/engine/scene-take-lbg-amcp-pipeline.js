@@ -16,7 +16,13 @@ const {
 	buildGlobalBorderUpdateLines,
 	buildGlobalBorderOpacityFadeLine,
 } = require('./pip-overlay')
-const { buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
+const {
+	buildSceneTemplateCgAmcpLines,
+	buildClearTemplateCgOnOtherProgramChannelsLines,
+	buildSceneTemplateCgSpec,
+	isSameTemplateSpec,
+	buildSceneTemplateCgUpdateOnlyLines,
+} = require('./scene-template-cg')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { cropAdjustedFillForLayer } = require('./layer-crop')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
@@ -338,6 +344,15 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			}
 			for (const job of takeJobs) {
 				if (!job.templateCg) continue
+
+				// WO-196 T196.2: detect continuity — same template on same host layer preserves timer state.
+				// Check if the current scene already has this template on the same layer.
+				const currentLayer = currentMap.get(job.layer.layerNumber)
+				const currentSpec = currentLayer
+					? buildSceneTemplateCgSpec(currentLayer, currentLayer.source?.value, self)
+					: null
+				const isContinuous = isSameTemplateSpec(job.templateCg, currentSpec)
+
 				const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
 					channel,
 					job.layer.layerNumber,
@@ -345,14 +360,29 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					self,
 				)
 				if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
-				const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
-				if (lines.length > 0) {
+
+				let lines = []
+				if (isContinuous) {
+					// Same timer on same layer: emit UPDATE only to preserve running state.
+					lines = buildSceneTemplateCgUpdateOnlyLines(channel, job.layer.layerNumber, job.templateCg)
+					if (typeof self.log === 'function') {
+						self.log(
+							'info',
+							`[scene-take-lbg] template CG layer ${job.layer.layerNumber} → ${job.templateCg.cgName} (continuity UPDATE)`,
+						)
+					}
+				} else {
+					// Different template or no current layer: full CLEAR+ADD+PLAY+UPDATE.
+					lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
 					if (typeof self.log === 'function') {
 						self.log(
 							'info',
 							`[scene-take-lbg] template CG layer ${job.layer.layerNumber} → ${job.templateCg.cgName}`,
 						)
 					}
+				}
+
+				if (lines.length > 0) {
 					await sendPipOverlayLinesSerial(amcp, lines)
 				}
 			}

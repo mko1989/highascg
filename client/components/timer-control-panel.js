@@ -123,8 +123,10 @@ export function initTimerControlPanel(stateStore, mountEl) {
 
 	const root = document.createElement('div')
 	root.className = 'timer-control-panel timer-control-panel--collapsed'
+	// WO-196 T196.4: add help text documenting timer identity and continuity.
+	const helpText = 'Timer identity = screen + layer number. Reuse the same layer number across looks to carry one timer through them; use another layer number for an independent timer.'
 	root.innerHTML = `
-		<button type="button" class="timer-control-panel__toggle" aria-expanded="false" title="Timer controls">
+		<button type="button" class="timer-control-panel__toggle" aria-expanded="false" title="${escapeAttr(helpText)}">
 			<span class="timer-control-panel__chevron" aria-hidden="true">▶</span>
 			<span class="timer-control-panel__label">Timer</span>
 		</button>
@@ -284,8 +286,11 @@ export function initTimerControlPanel(stateStore, mountEl) {
 		timerList.forEach((item, idx) => {
 			const opt = document.createElement('option')
 			const label = item.label || `Timer #${idx + 1}`
+			// WO-196 T196.3: mark on-air timers in the dropdown label
+			const suffix = item.onAir ? ' (on air)' : ''
 			opt.value = JSON.stringify({ channel: item.channel, layerNumber: item.layerNumber })
-			opt.textContent = `${label}`
+			opt.textContent = `● ${label} — L${item.layerNumber}${suffix}`
+			opt.setAttribute('data-on-air', item.onAir ? 'true' : 'false')
 			select.appendChild(opt)
 		})
 
@@ -305,6 +310,7 @@ export function initTimerControlPanel(stateStore, mountEl) {
 			updateDisplay()
 			updateHmsInput(null)
 			updatePresets(null)
+			updateButtonState(null)
 			return
 		}
 
@@ -319,9 +325,26 @@ export function initTimerControlPanel(stateStore, mountEl) {
 				updateDisplay(timer)
 				updateHmsInput(timer)
 				updatePresets(timer)
+				updateButtonState(timer)
 			}
 		} catch {
 			selectedTimer = null
+		}
+	}
+
+	/**
+	 * WO-196 T196.3: disable Start button for off-air timers with a tooltip.
+	 * @param {object|null} timer
+	 */
+	function updateButtonState(timer) {
+		const startBtn = root.querySelector('[data-action="start"]')
+		if (!startBtn) return
+		if (!timer || timer.onAir) {
+			startBtn.disabled = false
+			startBtn.title = 'Start/Resume'
+		} else {
+			startBtn.disabled = true
+			startBtn.title = 'Take a look containing this timer first'
 		}
 	}
 
