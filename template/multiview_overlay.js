@@ -262,8 +262,8 @@
 				// Layer timers opt-in stack (PGM only)
 				if (isPgm) {
 					const activeScenes = getActiveScenes();
-					const layerItems = [];
-					
+					const layerRows = [];
+
 					activeScenes.forEach((scene) => {
 						if (Array.isArray(scene.layers)) {
 							scene.layers.forEach((layer) => {
@@ -292,7 +292,8 @@
 								const pLayer = bank === 'b' ? num + 100 : num;
 								const chOsc = oscState.channels[String(resolvedChNum)] || oscState.channels[resolvedChNum];
 								let layerOsc = chOsc?.layers?.[pLayer] || chOsc?.layers?.[String(pLayer)];
-								if (layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt)) layerOsc = null;
+								const isStale = layerOsc && window.mvPlaybackOsc?.isStaleOscPlaybackLayer?.(layerOsc, oscState.updatedAt);
+								if (isStale) layerOsc = null;
 								let lFile = layerOsc?.file || {};
 
 								let isLayerRoute = false;
@@ -311,28 +312,44 @@
 									}
 								}
 
-								let lFileName = lFile.name || (lFile.path ? lFile.path.split(/[/\\]/).pop() : '');
-								if (isLayerRoute) {
-									const subName = lFile.name && !lFile.name.toLowerCase().startsWith('route://') ? lFile.name : '';
-									lFileName = layerRouteLabel + (subName ? ` - ${subName}` : '');
-								}
+								const elapsed = lFile.elapsed ?? 0;
+								const duration = lFile.duration ?? 0;
+								const hasRuntime = Number(duration) > 0 && !isStale;
 
-								if (lFileName) {
-									const lElapsed = lFile.elapsed ?? 0;
-									const lDur = lFile.duration ?? 0;
-									const lRem = Number.isFinite(lDur) && lDur > 0 ? Math.max(0, lDur - lElapsed) : null;
-									
-									layerItems.push(`
-										<div class="label-layer-item">
-											L${num} [${escHtml(layer.label || `Layer ${num}`)}]: ${escHtml(lFileName)} - ${formatMmSs(lElapsed)}/${formatMmSs(lDur)} ${Number.isFinite(lRem) ? `(-${formatMmSs(lRem)})` : ''}
-										</div>
-									`);
-								}
+								layerRows.push({
+									num,
+									hasRuntime,
+									elapsed,
+									duration
+								});
 							});
 						}
 					});
 
-					if (layerItems.length > 0) {
+					// Sort descending by layer number
+					layerRows.sort((a, b) => b.num - a.num);
+
+					if (layerRows.length > 0) {
+						const layerItems = layerRows.map((row) => {
+							if (row.hasRuntime) {
+								const rem = Number.isFinite(row.duration) && row.duration > 0 ? Math.max(0, row.duration - row.elapsed) : 0;
+								return `
+									<div class="label-layer-row">
+										<span class="label-layer-num">L${row.num}</span>
+										<span class="label-layer-time">${formatMmSs(row.elapsed)} / ${formatMmSs(row.duration)} ${Number.isFinite(rem) ? `(-${formatMmSs(rem)})` : ''}</span>
+										<div class="label-layer-progress-bar-bg">
+											<div class="label-layer-progress-bar-fill" style="width: ${row.duration > 0 ? Math.min(100, Math.max(0, (row.elapsed / row.duration) * 100)) : 0}%"></div>
+										</div>
+									</div>
+								`;
+							} else {
+								return `
+									<div class="label-layer-row">
+										<span class="label-layer-num">L${row.num}</span>
+									</div>
+								`;
+							}
+						});
 						innerBlocks += `<div class="label-layers-list">${layerItems.join('')}</div>`;
 					}
 				}

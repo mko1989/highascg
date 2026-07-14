@@ -30,6 +30,12 @@ const MV_BG_LAYER = 10
 const MV_CELL_LAYER_START = 11
 const OVERLAY_LAYER = 60
 
+/** T190.1: Per-MV-channel in-flight serialization — Map of promise chains keyed by MV channel. */
+const mvApplyChains = new Map()
+
+/** T190.2: Last-applied per-cell debug record {mvChannel, layer, route, fill, appliedAt}. */
+let lastAppliedDebug = null
+
 /**
  * Copy multiview HTML/CSS/JS and font assets to Caspar media path.
  * @param {object} ctx
@@ -90,7 +96,7 @@ function resolveMultiviewChannel(body, map) {
  * @param {object} body - { n, layout, showOverlay, bgColor, showTimersUnderLabels }
  * @param {object} ctx
  * @param {{ infoXml?: string|null }} [opts] - pre-fetched INFO XML for surgical layer CLEAR
- * @returns {Promise<{ ok: true, channel: number }>}
+ * @returns {Promise<{ ok: true, channel: number, debug?: object }>}
  */
 async function applyMultiviewLayout(body, ctx, opts = {}) {
 	const b = body && typeof body === 'object' ? body : {}
@@ -108,6 +114,31 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		throw new Error(`Multiviewer ${Math.max(1, parseInt(b.n || 1, 10) || 1)} not enabled`)
 	}
 
+	// T190.1: Per-channel serialization — queue this apply after any in-flight one for the same channel.
+	const currentChain = mvApplyChains.get(ch) || Promise.resolve()
+	const newChain = currentChain
+		.then(() => _doApplyMultiviewLayout(b, ctx, ch, map, opts))
+		.catch((e) => {
+			// Propagate error but maintain chain
+			throw e
+		})
+	mvApplyChains.set(ch, newChain)
+
+	return newChain
+}
+
+/**
+ * Internal: execute the multiview apply logic (called serially per channel).
+ * @param {object} b - parsed body
+ * @param {object} ctx
+ * @param {number} ch - resolved multiview channel
+ * @param {object} map - channel map
+ * @param {{ infoXml?: string|null }} opts
+ * @returns {Promise<{ ok: true, channel: number, debug?: object }>}
+ */
+async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
+	const layout = b.layout
+
 	const showOverlay = !!b.showOverlay
 	const bgColor = typeof b.bgColor === 'string' && b.bgColor.trim() ? b.bgColor.trim() : '#000000'
 	const showTimersUnderLabels = !!b.showTimersUnderLabels
@@ -118,6 +149,13 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		: []
 	const programChannels = map.programChannels || Array.from({ length: map.screenCount || 4 }, (_, i) => map.programCh(i + 1))
 	const infoXml = opts.infoXml ?? null
+
+	// T190.2: Initialize debug record for this apply
+	const debugRecord = {
+		mvChannel: ch,
+		cells: [],
+		appliedAt: Date.now(),
+	}
 
 	deployMultiviewTemplates(ctx)
 
@@ -283,6 +321,15 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		} catch (e) {
 			failed.push({ layer, route: 'MIXER', err: e?.message || e })
 		}
+
+		// T190.2: Record applied cell info for debug endpoint
+		const cellDebug = {
+			layer,
+			route,
+			fill: { vx, vy, vw, vh },
+		}
+		debugRecord.cells.push(cellDebug)
+
 		layer++
 	}
 	try {
@@ -411,7 +458,10 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
 		} catch {}
 	}
 
-	return { ok: true, channel: ch }
+	// T190.2: Store last-applied debug record
+	lastAppliedDebug = debugRecord
+
+	return { ok: true, channel: ch, debug: debugRecord }
 }
 
 /**
@@ -431,6 +481,14 @@ async function fetchMultiviewInfoXml(body, ctx) {
 	return { channel: ch, infoXml }
 }
 
+/**
+ * T190.2: Get last-applied debug record.
+ * @returns {object|null}
+ */
+function getLastAppliedDebug() {
+	return lastAppliedDebug
+}
+
 module.exports = {
 	MAX_MV_LAYERS,
 	MV_BG_LAYER,
@@ -440,4 +498,5 @@ module.exports = {
 	resolveMultiviewChannel,
 	applyMultiviewLayout,
 	fetchMultiviewInfoXml,
+	getLastAppliedDebug,
 }

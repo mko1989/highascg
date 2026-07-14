@@ -12,7 +12,9 @@ const {
 	applyMultiviewLayout,
 	fetchMultiviewInfoXml,
 	resolveMultiviewChannel,
+	getLastAppliedDebug,
 } = require('../engine/multiview-apply')
+const liveSceneState = require('../state/live-scene-state')
 
 const MULTIVIEW_APPLY_TIMEOUT_MS = 25_000
 
@@ -50,7 +52,7 @@ async function handleMultiviewApply(body, ctx) {
 	})
 
 	try {
-		await Promise.race([applyMultiviewLayout(b, ctx, { infoXml }), timeoutPromise])
+		const result = await Promise.race([applyMultiviewLayout(b, ctx, { infoXml }), timeoutPromise])
 		const storeKey = n === 1 ? 'multiviewLayout' : `multiviewLayout_${n}`
 		if (!ctx._multiviewLayouts) ctx._multiviewLayouts = {}
 		ctx._multiviewLayouts[n] = b
@@ -58,7 +60,12 @@ async function handleMultiviewApply(body, ctx) {
 		// stale layout (the plural map is the source of truth; singular kept for old readers).
 		if (n === 1) ctx._multiviewLayout = b
 		persistence.set(storeKey, b)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+		// T190.2: Include debug info in response
+		const responseBody = { ok: true }
+		if (result?.debug) {
+			responseBody.debug = result.debug
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(responseBody) }
 	} catch (e) {
 		if (e?.message === 'Multiview apply timed out') {
 			ctx.log('warn', 'Multiview apply timed out')
@@ -76,10 +83,87 @@ async function handleMultiviewApply(body, ctx) {
 	}
 }
 
+/**
+ * T190.2: Handle GET /api/multiview/debug — return last-applied debug record + live scene state + playback matrix.
+ */
+async function handleMultiviewDebug(ctx) {
+	const debug = getLastAppliedDebug()
+	if (!debug) {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ debug: null }) }
+	}
+
+	// Extract distinct routed source channels from the debug record
+	const sourceChannels = new Set()
+	if (debug.cells && Array.isArray(debug.cells)) {
+		for (const cell of debug.cells) {
+			const route = cell.route
+			if (typeof route === 'string') {
+				const m = route.match(/^route:\/\/(\d+)/)
+				if (m) {
+					const ch = parseInt(m[1], 10)
+					if (Number.isFinite(ch)) sourceChannels.add(ch)
+				}
+			}
+		}
+	}
+
+	// Build response with live scene state info for each source channel
+	const payload = { ...debug }
+	payload.sourceChannels = {}
+
+	for (const chNum of sourceChannels) {
+		const chStr = String(chNum)
+		const liveScene = liveSceneState.getChannel(chNum)
+		const layers = liveScene?.scene?.layers || []
+
+		// Extract crop effect params from each layer
+		const layersDebug = layers.map((layer) => {
+			const layerDebug = {
+				num: layer.num,
+				type: layer.type,
+			}
+			// Extract crop effect if present
+			if (layer.effects && Array.isArray(layer.effects)) {
+				const cropEffect = layer.effects.find((e) => e.type === 'crop')
+				if (cropEffect) {
+					layerDebug.crop = cropEffect
+				}
+			}
+			return layerDebug
+		})
+
+		// Get playback-matrix entries for this channel (prefix match)
+		const playbackMatrix = ctx._playbackMatrix || {}
+		const matrixEntries = {}
+		for (const key of Object.keys(playbackMatrix)) {
+			if (key.startsWith(`${chNum}-`)) {
+				matrixEntries[key] = playbackMatrix[key]
+			}
+		}
+
+		// Get programLayerBankByChannel for this channel
+		const bankByChannel = ctx.programLayerBankByChannel || {}
+		const activeBank = bankByChannel[chStr] || null
+
+		payload.sourceChannels[chStr] = {
+			layers: layersDebug,
+			playbackMatrix: matrixEntries,
+			programLayerBank: activeBank,
+		}
+	}
+
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ debug: payload }) }
+}
+
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/multiview/apply') return null
 	if (!ctx.amcp) return null
 	return handleMultiviewApply(body, ctx)
 }
 
-module.exports = { handlePost, handleMultiviewApply }
+async function handleGet(path, ctx) {
+	if (path !== '/api/multiview/debug') return null
+	return handleMultiviewDebug(ctx)
+}
+
+module.exports = { handlePost, handleGet, handleMultiviewApply, handleMultiviewDebug }
