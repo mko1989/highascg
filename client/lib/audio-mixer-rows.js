@@ -72,8 +72,16 @@ function getActiveTimelineForChannel(stateStore, channel) {
 	if (!sendTo) return null
 	const isProgram = sendTo.program === true
 	if (!isProgram) return null
-	const screenIdx = sendTo.screenIdx ?? 0
 	const cm = stateStore.getState()?.channelMap || {}
+	// FIX-4 (2026-07-15 review, WO-214 finding 3): screenIdx null/'all' is the server's
+	// ALL-SCREENS sentinel (see normalizeTimelineSendTo in timeline-playback-helpers.js) — it
+	// must match every program channel, not collapse to screen 0 via `?? 0`.
+	if (sendTo.screenIdx == null || sendTo.screenIdx === 'all') {
+		const programChannels = Array.isArray(cm.programChannels) ? cm.programChannels : []
+		if (!programChannels.map(Number).includes(Number(channel))) return null
+		return timelineState.getTimeline(pb.timelineId)
+	}
+	const screenIdx = sendTo.screenIdx
 	const programCh = Number(cm.programChannels?.[screenIdx])
 	if (programCh !== Number(channel)) return null
 	return timelineState.getTimeline(pb.timelineId)

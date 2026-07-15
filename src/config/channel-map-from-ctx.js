@@ -85,6 +85,8 @@ function buildChannelMap(ctx) {
 
 	return {
 		screenCount: map.screenCount,
+		/** Custom screen labels persisted in config; when set, propagated to all render sites. */
+		screenLabels: Array.isArray(map.screenLabels) ? map.screenLabels : [],
 		/** Custom PGM/PRV channel rows (Settings → Caspar); used for main tabs labels when non-empty. */
 		virtualMainChannels: map.virtualMainChannels || [],
 		decklinkCount,

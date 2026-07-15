@@ -4,57 +4,22 @@
  */
 import {
 	defaultTransition,
-	defaultLayerConfig,
 	migrateScene,
 	newId,
-	nextLayerNumber,
-	LOOK_FULL_MESSAGE,
-	LOOK_LAYER_FIRST,
-	LOOK_LAYER_STEP,
 } from './scene-state-helpers.js'
-import { showAppToast } from './app-toast.js'
 
 import * as Persistence from './scene-state-persistence-logic.js'
-import * as LayerLogic from './scene-state-layer-logic.js'
 import * as LookLogic from './scene-state-look-logic.js'
-import {
-	sceneStateGetGlobalBorderForScreen,
-	sceneStateSetGlobalBorderForScreen,
-	sceneStateNoteGlobalBorderPushedToPgm,
-	sceneStateGetGlobalBorderPresetSlotCount,
-	sceneStateSaveGlobalBorderPresetSlot,
-	sceneStateDeleteGlobalBorderPresetSlot,
-	sceneStateGetGlobalBorderPreset,
-	sceneStateSetGlobalBorder,
-} from './scene-state-global-border.js'
 import { syncMainSlotsFromSceneLive } from './scene-live-main-sync.js'
-import { applySceneLayerDefaults } from './editor-defaults.js'
 import {
 	isAutoTransitionDuration,
 	resolveTransitionDuration,
 	transitionDurationForFps,
 } from './transition-duration.js'
-import {
-	sceneStateCopyLayerStyle,
-	sceneStateSaveLayerPresetFromLayer,
-	sceneStatePasteLayerStyle,
-	sceneStateApplyLayerPresetToLayer,
-	sceneStateRemoveLayerPreset,
-	sceneStateSaveLookPreset,
-	sceneStateOverwriteLookPreset,
-	sceneStateRemoveLookPreset,
-	sceneStatePatchLookPreset,
-	sceneStateImportLayerPresetsFromServer,
-	sceneStateImportLookPresetsFromServer,
-} from './scene-state-preset-actions.js'
-import {
-	createTimerFromLayer,
-	getTimer,
-	renameTimer,
-	ensureCanonicalLayer,
-	listTimers,
-	findBoundLayers,
-} from './scene-state-timers.js'
+import { mixinSceneStateLayerOps } from './scene-state-layer-ops.js'
+import { mixinSceneStateGlobalBorderOps } from './scene-state-global-border-ops.js'
+import { mixinSceneStatePresetOps } from './scene-state-preset-ops.js'
+import { mixinSceneStateTimerOps } from './scene-state-timer-ops.js'
 export {
 	defaultTransition,
 	previewChannelLayerForSceneLayer,
@@ -306,88 +271,6 @@ export class SceneState {
 		this._emit('previewScene')
 	}
 
-	copyLayerStyle(sceneId, layerIndex) {
-		return sceneStateCopyLayerStyle(this, sceneId, layerIndex)
-	}
-
-	hasLayerStyleClipboard() { return this._layerStyleClipboard != null }
-	getLayerPresets() { return this.layerPresets }
-
-	saveLayerPresetFromLayer(sceneId, layerIndex, name) {
-		return sceneStateSaveLayerPresetFromLayer(this, sceneId, layerIndex, name)
-	}
-
-	pasteLayerStyle(sceneId, layerIndex) {
-		return sceneStatePasteLayerStyle(this, sceneId, layerIndex)
-	}
-
-	applyLayerPresetToLayer(sceneId, layerIndex, presetId) {
-		return sceneStateApplyLayerPresetToLayer(this, sceneId, layerIndex, presetId)
-	}
-
-	removeLayerPreset(presetId) {
-		return sceneStateRemoveLayerPreset(this, presetId)
-	}
-
-	getLookPresets() { return this.lookPresets }
-
-	saveLookPreset(name, sourceKind) {
-		return sceneStateSaveLookPreset(this, name, sourceKind)
-	}
-
-	overwriteLookPreset(presetId) {
-		return sceneStateOverwriteLookPreset(this, presetId)
-	}
-
-	removeLookPreset(presetId) {
-		return sceneStateRemoveLookPreset(this, presetId)
-	}
-
-	patchLookPreset(lookPresetId, patch) {
-		return sceneStatePatchLookPreset(this, lookPresetId, patch)
-	}
-
-	importLayerPresetsFromServer(list) {
-		return sceneStateImportLayerPresetsFromServer(this, list)
-	}
-
-	importLookPresetsFromServer(list) {
-		return sceneStateImportLookPresetsFromServer(this, list)
-	}
-
-	// ── Timer instances (WO-208) ──────────────────────────────────────
-
-	createTimer(layer, mainIdx) {
-		const timer = createTimerFromLayer(layer, mainIdx)
-		this.timers.push(timer)
-		this._save()
-		return timer
-	}
-
-	getTimer(id) {
-		return getTimer(this, id)
-	}
-
-	renameTimer(id, newName) {
-		if (renameTimer(this, id, newName)) {
-			this._save()
-			return true
-		}
-		return false
-	}
-
-	ensureCanonicalLayer(timerId, mainIdx, preferredNum, scene) {
-		return ensureCanonicalLayer(this, timerId, mainIdx, preferredNum, scene)
-	}
-
-	listTimers() {
-		return listTimers(this)
-	}
-
-	findBoundLayers(timerId) {
-		return findBoundLayers(this, timerId)
-	}
-
 	removeScene(id) {
 		const i = this.scenes.findIndex((s) => s.id === id)
 		if (i < 0) return
@@ -482,100 +365,6 @@ export class SceneState {
 		this._timersSnapshotFn = typeof fn === 'function' ? fn : null
 	}
 
-	/** WO-160: lowest free number ≥ 10, or -1 when the look is full (see scene-state-helpers.js). */
-	nextLayerNumber(scene) {
-		return nextLayerNumber(scene)
-	}
-
-	addLayer(sceneId) {
-		const s = this.getScene(sceneId)
-		if (!s) return -1
-		const n = this.nextLayerNumber(s)
-		if (n < 0) {
-			try {
-				showAppToast(LOOK_FULL_MESSAGE, 'warn')
-			} catch {
-				/* non-DOM context (tests) */
-			}
-			return -1
-		}
-		const layer = defaultLayerConfig(n)
-		applySceneLayerDefaults(layer)
-		s.layers.push(layer)
-		this._save()
-		return s.layers.length - 1
-	}
-
-	removeLayer(sceneId, layerIndex) {
-		const s = this.getScene(sceneId)
-		if (s && layerIndex >= 0 && layerIndex < s.layers.length) { s.layers.splice(layerIndex, 1); this._save() }
-	}
-
-	reorderLayers(sceneId, fromVisualIndex, toVisualIndex) {
-		const s = this.getScene(sceneId)
-		if (!s?.layers?.length) return
-		const next = LayerLogic.reorderLayers(s.layers, fromVisualIndex, toVisualIndex, LOOK_LAYER_FIRST, LOOK_LAYER_STEP)
-		if (next) { s.layers = next; this._save() }
-	}
-
-	setLayerNumber(sceneId, layerIndex, layerNumber) {
-		const s = this.getScene(sceneId)
-		if (!s?.layers?.length) return { ok: false, reason: 'Look not found' }
-		const result = LayerLogic.setLayerNumberOnLayer(s.layers, layerIndex, layerNumber)
-		if (result.ok && result.changed) this._save()
-		return result
-	}
-
-	setLayerSource(sceneId, layerIndex, source) {
-		const s = this.getScene(sceneId); const L = s?.layers?.[layerIndex]
-		if (!L) return
-		L.source = source
-		if (source?.value && /\.(jpe?g|png|gif|bmp|webp|tiff?)$/i.test(String(source.value))) L.loop = false
-		this._save()
-	}
-
-	patchLayer(sceneId, layerIndex, patch) {
-		const L = this.getScene(sceneId)?.layers?.[layerIndex]
-		if (L) { LayerLogic.patchLayer(L, patch); this._softSave() }
-	}
-
-	setDefaultTransition(sceneId, t) {
-		const s = this.getScene(sceneId)
-		if (s) { s.defaultTransition = { ...defaultTransition(), ...s.defaultTransition, ...t }; this._softSave() }
-	}
-
-	getGlobalBorderForScreen(screenIdx) {
-		return sceneStateGetGlobalBorderForScreen(this, screenIdx)
-	}
-
-	setGlobalBorderForScreen(screenIdx, border) {
-		sceneStateSetGlobalBorderForScreen(this, screenIdx, border)
-	}
-
-	noteGlobalBorderPushedToPgm(screenIdx, slice) {
-		sceneStateNoteGlobalBorderPushedToPgm(this, screenIdx, slice)
-	}
-
-	getGlobalBorderPresetSlotCount(screenIdx) {
-		return sceneStateGetGlobalBorderPresetSlotCount(this, screenIdx)
-	}
-
-	saveGlobalBorderPresetSlot(screenIdx, slotNum, name) {
-		sceneStateSaveGlobalBorderPresetSlot(this, screenIdx, slotNum, name)
-	}
-
-	deleteGlobalBorderPresetSlot(screenIdx, slotNum) {
-		sceneStateDeleteGlobalBorderPresetSlot(this, screenIdx, slotNum)
-	}
-
-	getGlobalBorderPreset(screenIdx, slotNum) {
-		return sceneStateGetGlobalBorderPreset(this, screenIdx, slotNum)
-	}
-
-	setGlobalBorder(sceneId, border) {
-		sceneStateSetGlobalBorder(this, sceneId, border)
-	}
-
 	setGlobalDefaultTransition(t) {
 		this.globalDefaultTransition = { ...defaultTransition(), ...this.globalDefaultTransition, ...t }
 		this._softSave()
@@ -611,5 +400,10 @@ export class SceneState {
 		this._emit('imported')
 	}
 }
+
+mixinSceneStateLayerOps(SceneState)
+mixinSceneStateGlobalBorderOps(SceneState)
+mixinSceneStatePresetOps(SceneState)
+mixinSceneStateTimerOps(SceneState)
 
 export const sceneState = new SceneState()

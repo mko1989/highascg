@@ -109,9 +109,14 @@ function appendAlsaBufferSizeToClip(uri, cfg) {
 /**
  * Global / per-screen PortAudio ALSA hw identities (e.g. "0,0") that may block exclusive capture.
  * @param {object} cfg
+ * @param {string} [xmlOverride] - FIX-6 (2026-07-15 review, infra finding 2): pre-supplied
+ *   CasparCG config XML text. When provided, this is parsed INSTEAD OF reading the live
+ *   `configPath` file from disk, so callers (tests) can supply a fixture without depending on
+ *   the box's real, mutable `config/casparcg.config`. Omitted — the only way any production
+ *   call site invokes this function — preserves the exact prior behavior: read from `configPath`.
  * @returns {string[]}
  */
-function listPortAudioHwIdentities(cfg) {
+function listPortAudioHwIdentities(cfg, xmlOverride) {
 	const cs = cfg?.casparServer && typeof cfg.casparServer === 'object' ? cfg.casparServer : cfg
 	/** @type {Set<string>} */
 	const out = new Set()
@@ -140,19 +145,29 @@ function listPortAudioHwIdentities(cfg) {
 	addRaw(readCasparSetting(cfg, 'multiview_portaudio_device_name'))
 	addRaw(readCasparSetting(cfg, 'monitor_portaudio_device'))
 
-	const configPath = String(readCasparSetting(cfg, 'configPath') || cfg?.configPath || '').trim()
-	if (configPath) {
+	const addFromPortAudioXml = (xml) => {
+		const block = xml.match(/<portaudio>([\s\S]*?)<\/portaudio>/i)
+		if (block) {
+			const inner = block[1]
+			const dm = inner.match(/<device>([^<]+)<\/device>/i)
+			const dnm = inner.match(/<device-name>([^<]+)<\/device-name>/i)
+			if (dm?.[1]?.trim()) addRaw(dm[1].trim())
+			if (dnm?.[1]?.trim()) addRaw(dnm[1].trim())
+		}
+	}
+
+	if (typeof xmlOverride === 'string') {
+		// Caller supplied the XML directly — never touch the live file.
 		try {
-			const xml = fs.readFileSync(configPath, 'utf8')
-			const block = xml.match(/<portaudio>([\s\S]*?)<\/portaudio>/i)
-			if (block) {
-				const inner = block[1]
-				const dm = inner.match(/<device>([^<]+)<\/device>/i)
-				const dnm = inner.match(/<device-name>([^<]+)<\/device-name>/i)
-				if (dm?.[1]?.trim()) addRaw(dm[1].trim())
-				if (dnm?.[1]?.trim()) addRaw(dnm[1].trim())
-			}
+			addFromPortAudioXml(xmlOverride)
 		} catch (_) {}
+	} else {
+		const configPath = String(readCasparSetting(cfg, 'configPath') || cfg?.configPath || '').trim()
+		if (configPath) {
+			try {
+				addFromPortAudioXml(fs.readFileSync(configPath, 'utf8'))
+			} catch (_) {}
+		}
 	}
 
 	return [...out]

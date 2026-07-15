@@ -176,7 +176,7 @@ async function handleSystemTimePost(body, ctx) {
 				timezone: parsed.timezone,
 				ntp: parsed.ntp,
 				synchronized: parsed.synchronized,
-				passwordRequired: isTimePasswordRequired(_ctx),
+				passwordRequired: isTimePasswordRequired(ctx),
 			}),
 		}
 	} catch (e) {

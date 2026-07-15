@@ -249,8 +249,26 @@ async function handleCmd(body, ctx) {
 			return { ok: false, error: `Invalid cmd: ${cmd}` }
 		}
 
-		// Record the command in the registry
-		screenTimers.recordTimerCmd(timerId, cmd)
+		if (cmd === 'pause') {
+			// FIX-5 (2026-07-15 review, timers finding 3): compute the true frozen remaining
+			// time server-side, BEFORE recording the pause, so both the client mirror display
+			// and a later 'start' resume reflect the actual elapsed-adjusted value instead of
+			// snapping back to the full configured duration.
+			const before = screenTimers.listScreenTimers().find((r) => r.timerId === timerId)
+			const durationSec = Number(before?.config?.durationSec) || 0
+			let remainingSec = durationSec
+			if (before) {
+				const basis = Number.isFinite(before.remainingSec) ? before.remainingSec : durationSec
+				remainingSec =
+					before.lastCmd === 'start' && Number.isFinite(before.cmdAt)
+						? basis - (Date.now() - before.cmdAt) / 1000
+						: basis
+			}
+			screenTimers.recordTimerPause(timerId, remainingSec)
+		} else {
+			// Record the command in the registry
+			screenTimers.recordTimerCmd(timerId, cmd)
+		}
 
 		// Get the timer record to find all assigned screens
 		const timers = screenTimers.listScreenTimers()
@@ -259,8 +277,13 @@ async function handleCmd(body, ctx) {
 			return { ok: false, error: `Timer ${timerId} not assigned to any screens` }
 		}
 
-		// Prepare CG UPDATE payload
-		const payload = JSON.stringify({ cmd })
+		// Prepare CG UPDATE payload — a 'start' resumes from the server-frozen remainingSec
+		// (set by a prior pause) if present; countdown-engine.js's `doStart()` (FIX-5) honors it
+		// and otherwise falls back to its own local paused state, so this is backward compatible
+		// with any template instance that predates this field.
+		const payload = JSON.stringify(
+			cmd === 'start' && Number.isFinite(record.remainingSec) ? { cmd, remainingSec: record.remainingSec } : { cmd },
+		)
 
 		// Send updates to all assigned screens
 		let healed = false
@@ -268,6 +291,13 @@ async function handleCmd(body, ctx) {
 
 		for (const [screenIdxStr, screenEntry] of Object.entries(record.screens)) {
 			const { channel, layer } = screenEntry
+
+			// WO-219 band guard (review 2026-07-15: this path was missed) — timer commands may
+			// NEVER target layers outside the timer band, even from a corrupted registry record.
+			if (!isTimerLayer(layer)) {
+				failedScreens.push({ screenIdx: screenIdxStr, error: `BAND VIOLATION: layer ${layer}` })
+				continue
+			}
 
 			try {
 				// First attempt: CG UPDATE

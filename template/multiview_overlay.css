@@ -65,7 +65,7 @@
 			min-height: 0;
 		}
 
-		/* Opt-in PGM/PRV: full-width title bar + timer dock below (narrow: max(200px, 50% cell width), centered) */
+		/* Opt-in PGM/PRV: full-width title bar + timer dock below (WO-204: full-width dock, calc(100% - 16px), centered) */
 		.cell .label.has-timers {
 			padding: 0;
 			white-space: normal;

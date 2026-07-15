@@ -54,6 +54,17 @@ export function maybeInvalidatePreviewOnLiveChange(liveMap, channelMap) {
 		}
 	}
 
+	// FIX-2 (2026-07-15 review, WO-213 finding 2): the live map is always sent in full, so a
+	// tracked channel key that's absent from this payload means the server deleted that
+	// channel's live entry (e.g. an explicit preview clear). Reset its tracked sceneId to a
+	// sentinel that can never equal a real sceneId, so a later clear-then-restage with the
+	// SAME sceneId still compares as changed instead of skipping invalidation.
+	for (const channelStr of Object.keys(prevLiveSceneIdByChannel)) {
+		if (!Object.prototype.hasOwnProperty.call(liveMap, channelStr)) {
+			prevLiveSceneIdByChannel[channelStr] = null
+		}
+	}
+
 	if (shouldInvalidate && typeof window !== 'undefined') {
 		window.dispatchEvent(new CustomEvent('scenes-preview-invalidate'))
 	}

@@ -265,6 +265,25 @@ export function showSettingsModal(initialTab) {
 			void mountVariablesPanel(varPane)
 			if (initialTab) activateSettingsTab(initialTab)
 			autosaveSuspended = false
+
+			// Setup screen label change handlers (WO-222)
+			const screenLabelMount = modal.querySelector('#settings-screen-labels-mount')
+			if (screenLabelMount) {
+				screenLabelMount.addEventListener('input', (e) => {
+					const input = e.target.closest('input.screen-label-input')
+					if (!input) return
+					const screenIdx = parseInt(input.dataset.screenIdx, 10)
+					const label = input.value.trim()
+					void (async () => {
+						try {
+							await api.post('/api/screens/label', { screenIdx, label })
+							input.setAttribute('data-was-set', label ? 'true' : 'false')
+						} catch (err) {
+							console.error(`Failed to save screen label ${screenIdx}:`, err)
+						}
+					})()
+				})
+			}
 		} catch (e) { console.error('Load failed:', e) }
 	})()
 }

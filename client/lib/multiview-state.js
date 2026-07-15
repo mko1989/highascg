@@ -5,6 +5,7 @@
  */
 
 import { decklinkInputForSlot, migrateLegacyInputRoute } from './input-channels.js'
+import { screenLabel } from './screen-label.js'
 
 const STORAGE_KEY_BASE = 'casparcg_multiview_layout'
 /** Four quick-save slots (localStorage); first click saves, later clicks recall (see multiview-editor). */
@@ -57,12 +58,14 @@ function defaultLayout(channelMap, cw = DEFAULT_WIDTH, ch = DEFAULT_HEIGHT) {
 		// id convention: first screen uses legacy 'pgm'/'prv', rest use 'pgm_1','prv_1' etc.
 		const pgmId = s === 0 ? 'pgm' : `pgm_${s}`
 		const prvId = s === 0 ? 'prv' : `prv_${s}`
-		const screenLabel = activeScreens > 1 ? ` S${s + 1}` : ''
+		const label = screenLabel(channelMap, s)
+		const pgmLabel = activeScreens > 1 ? `PGM ${label}` : 'PGM'
+		const prvLabel = activeScreens > 1 ? `PRV ${label}` : 'PRV'
 		if (programChannels[s] != null) {
-			cells.push({ id: pgmId, type: 'pgm', label: `PGM${screenLabel}`, screenIdx: s, x: 0, y, w: cellW, h })
+			cells.push({ id: pgmId, type: 'pgm', label: pgmLabel, screenIdx: s, x: 0, y, w: cellW, h })
 		}
 		if (previewChannels[s] != null) {
-			cells.push({ id: prvId, type: 'prv', label: `PRV${screenLabel}`, screenIdx: s, x: cellW, y, w: cellW, h })
+			cells.push({ id: prvId, type: 'prv', label: prvLabel, screenIdx: s, x: cellW, y, w: cellW, h })
 		}
 	}
 
@@ -125,8 +128,25 @@ export class MultiviewState {
 		this.highlightTopTimer = true
 		this.autoApply = true
 		this.audioActiveCellId = null
+		/** FIX-1 (2026-07-15 review, WO-206 finding 1): true while a cell drag (move/resize) is in progress. */
+		this.dragInProgress = false
 		this._listeners = new Map()
 		this._load()
+	}
+
+	/**
+	 * FIX-1: gate for the 'apply-request' listener — while a drag is in progress, mid-drag
+	 * `setCell()` calls must not schedule an auto-apply with unfinished geometry. The editor's
+	 * drag-end handler (mouseup/mouseleave) calls this with `false`, which fires exactly one
+	 * final 'apply-request' for the now-settled rect.
+	 * @param {boolean} v
+	 */
+	setDragInProgress(v) {
+		const was = this.dragInProgress
+		this.dragInProgress = !!v
+		if (was && !this.dragInProgress) {
+			this._emit('apply-request')
+		}
 	}
 
 	switchTo(index) {

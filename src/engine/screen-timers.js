@@ -16,9 +16,10 @@
 'use strict'
 
 const persistence = require('../utils/persistence')
+const { param } = require('../caspar/amcp-utils')
 
 /** Caspar CG template path — see template/countdown/countdown.html. */
-const COUNTDOWN_CG_NAME = 'countdown/countdown'
+const COUNTDOWN_CG_NAME = '"countdown/countdown"' // slash-containing template names must be quoted in AMCP (cf. scene-template-cg.js tpl)
 
 /** CG sub-layer index (scene take always uses sublayer 0; screen timers use it too for consistency). */
 const CG_SUBLAYER = 0
@@ -128,7 +129,7 @@ function assignTimerToScreen(opts) {
 				...record.config,
 			}
 			// CG UPDATE with new config JSON payload
-			lines.push(`CG ${channel}-${existing.layer} UPDATE "${CG_SUBLAYER}" "{""${JSON.stringify(cgPayload).replace(/"/g, '""')}"}"`)
+			lines.push(`CG ${channel}-${existing.layer} UPDATE ${CG_SUBLAYER} ${param(JSON.stringify(cgPayload))}`)
 
 			_persistRegistry()
 
@@ -176,7 +177,7 @@ function assignTimerToScreen(opts) {
 	const cgPayload = {
 		...record.config,
 	}
-	lines.push(`CG ${channel}-${layer} ADD ${COUNTDOWN_CG_NAME} "${CG_SUBLAYER}" "{""${JSON.stringify(cgPayload).replace(/"/g, '""')}"}"`)
+	lines.push(`CG ${channel}-${layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(cgPayload))}`)
 
 	// MIXER OPACITY 1 (visible on add)
 	lines.push(`MIXER ${channel}-${layer} OPACITY 1`)
@@ -294,6 +295,7 @@ function recordTimerCmd(timerId, cmd) {
 			config: {},
 			lastCmd: null,
 			cmdAt: null,
+			remainingSec: null,
 			screens: {},
 		}
 		_registry.set(timerId, record)
@@ -301,6 +303,47 @@ function recordTimerCmd(timerId, cmd) {
 
 	record.lastCmd = cmd
 	record.cmdAt = Date.now()
+	// FIX-5 (2026-07-15 review, timers finding 3): 'reset' clears any frozen-pause remaining
+	// value so the next 'start' begins fresh from the configured duration instead of resuming
+	// a stale freeze. 'start'/other cmds intentionally leave remainingSec untouched — it stays
+	// as the resume basis for computeDisplayTime / the CG resume payload until the next pause.
+	if (cmd === 'reset') record.remainingSec = null
+
+	_persistRegistry()
+}
+
+/**
+ * Record a pause with the server-computed, elapsed-adjusted remaining seconds (FIX-5,
+ * 2026-07-15 review, timers finding 3 — "pause shows configured duration instead of frozen
+ * remaining"). Unlike `recordTimerCmd`, this also persists `remainingSec` so the client's
+ * mirror display and a later 'start' resume use the true frozen value instead of snapping back
+ * to the full configured duration.
+ *
+ * @param {string} timerId
+ * @param {number} remainingSec — server-computed remaining seconds at the moment of pause
+ */
+function recordTimerPause(timerId, remainingSec) {
+	if (!timerId) throw new Error('timerId required')
+
+	loadRegistry()
+
+	let record = _registry.get(timerId)
+	if (!record) {
+		record = {
+			timerId,
+			name: '',
+			config: {},
+			lastCmd: null,
+			cmdAt: null,
+			remainingSec: null,
+			screens: {},
+		}
+		_registry.set(timerId, record)
+	}
+
+	record.lastCmd = 'pause'
+	record.cmdAt = Date.now()
+	record.remainingSec = Number.isFinite(remainingSec) ? Math.max(0, remainingSec) : null
 
 	_persistRegistry()
 }
@@ -351,7 +394,7 @@ function linesForReAdd(channel) {
 
 			// CG ADD line with JSON config payload
 			const cgPayload = { ...record.config }
-			lines.push(`CG ${screenEntry.channel}-${screenEntry.layer} ADD ${COUNTDOWN_CG_NAME} "${CG_SUBLAYER}" "{""${JSON.stringify(cgPayload).replace(/"/g, '""')}"}"`)
+			lines.push(`CG ${screenEntry.channel}-${screenEntry.layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(cgPayload))}`)
 
 			// MIXER OPACITY based on visible flag
 			const opacity = screenEntry.visible ? 1 : 0
@@ -423,6 +466,7 @@ module.exports = {
 	unassignTimer,
 	setTimerVisible,
 	recordTimerCmd,
+	recordTimerPause,
 	listScreenTimers,
 	linesForReAdd,
 	linesForLookVisibility,

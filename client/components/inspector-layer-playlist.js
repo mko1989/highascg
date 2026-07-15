@@ -2,6 +2,9 @@ import { sceneState } from '../lib/scene-state.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
+import { api } from '../lib/api-client.js'
+import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
+import { showScenesToast } from './scenes-editor-support.js'
 
 export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {
 	const grp = document.createElement('div')
@@ -245,7 +248,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 		settingsBlock.style.paddingTop = '8px'
 		settingsBlock.innerHTML = `
 			<div class="inspector-group__title" style="font-size: 0.65rem; margin-bottom: 8px;">Playlist Settings</div>
-			
+
 			<div class="inspector-row" style="margin-bottom: 8px;">
 				<div class="inspector-field" style="flex: 1;">
 					<label class="inspector-field__label" style="cursor: default;">Advance Mode</label>
@@ -260,6 +263,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 						Loop List
 					</label>
 				</div>
+				${layer.playlistAdvance === 'manual' ? `<button type="button" class="inspector-btn inspector-btn-sm" id="playlist-next-btn" style="margin-top: 18px;">Next ▶</button>` : ''}
 			</div>
 
 			<div class="inspector-row">
@@ -284,7 +288,34 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 		advSel.addEventListener('change', () => {
 			sceneState.patchLayer(sceneId, layerIndex, { playlistAdvance: advSel.value })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+			rerenderSceneLayer(sel)  // Rerender to show/hide the Next button
 		})
+
+		// Attach Next button handler (WO-224 T224.4)
+		const nextBtn = settingsBlock.querySelector('#playlist-next-btn')
+		if (nextBtn) {
+			nextBtn.addEventListener('click', async () => {
+				const cm = stateStore?.getState?.()?.channelMap || {}
+				const scene = sceneState.getScene(sceneId)
+				const mIdx = resolveMainIndexForScene(scene, sceneState)
+				const targetCh =
+					resolveLookStackChannelForBus(cm, sceneState, scene, 'edit', mIdx) ??
+					Number(cm.programChannels?.[mIdx] ?? cm.playbackChannels?.[mIdx])
+				const channel = Number.isFinite(targetCh) && targetCh > 0 ? targetCh : Number(cm.programChannels?.[0] ?? 1)
+
+				nextBtn.disabled = true
+				try {
+					await api.post('/api/playlist/next', {
+						channel,
+						layerNumber: layer.layerNumber,
+					})
+				} catch (err) {
+					showScenesToast(`Playlist next failed: ${err?.message || err}`, 'error')
+				} finally {
+					nextBtn.disabled = false
+				}
+			})
+		}
 
 		const loopCb = settingsBlock.querySelector('#playlist-loop')
 		loopCb.addEventListener('change', () => {

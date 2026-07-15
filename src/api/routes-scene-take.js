@@ -174,7 +174,11 @@ async function handleSceneTake(body, ctx) {
 				channel: bus1,
 				currentScene: prvCurrent,
 				incomingScene: inc,
-				forceCut: !!b.forceCut,
+				/* FIX-3 (2026-07-15 review, WO-209 finding 2): PRV staging is always a cut (no
+				 * previous PRV content needs a crossfade), and WO-209's banklessTake requires
+				 * forceCut:true — match the other two preview call sites below instead of
+				 * trusting the caller-supplied flag. */
+				forceCut: true,
 				self: ctx,
 				skipLayerVisualEquality: true,
 				banklessTake: true,

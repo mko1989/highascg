@@ -185,7 +185,16 @@ const CountdownEngine = (function () {
 		}
 	}
 
-	function doStart() {
+	/**
+	 * @param {number} [resumeRemainingSec] — FIX-5 (2026-07-15 review, timers finding 3):
+	 *   server-authoritative resume value from screen-timers.js's `recordTimerPause` /
+	 *   routes-screen-timers.js `handleCmd`. Takes precedence over the template's own local
+	 *   `paused` snapshot — needed because a self-heal re-ADD (producer lost + recreated) or a
+	 *   reconnect restore loses the local `remainingSec`/`state` variables entirely, which would
+	 *   otherwise incorrectly resume from the full configured duration. Omitted (undefined) is
+	 *   fully backward compatible with the pre-FIX-5 local-only resume path.
+	 */
+	function doStart(resumeRemainingSec) {
 		if (state === 'running') {
 			render();
 			return;
@@ -197,7 +206,9 @@ const CountdownEngine = (function () {
 			// hits zero at the target time regardless of when start was pressed (A169.2).
 			endEpochMs = parseTargetTimeToNextEpoch(config.targetTime);
 		} else {
-			const seed = state === 'paused' ? remainingSec : (Number(config.durationSec) || 0);
+			const seed = Number.isFinite(resumeRemainingSec)
+				? Math.max(0, resumeRemainingSec)
+				: (state === 'paused' ? remainingSec : (Number(config.durationSec) || 0));
 			remainingSec = seed;
 			endEpochMs = Date.now() + seed * 1000;
 		}
@@ -229,14 +240,18 @@ const CountdownEngine = (function () {
 	}
 
 	/**
-	 * @param {object} raw — config fields plus optional `cmd`
+	 * @param {object} raw — config fields plus optional `cmd` and (FIX-5) `remainingSec`
 	 */
 	function applyConfig(raw) {
 		if (!raw || typeof raw !== 'object') return;
 		const cmd = raw.cmd;
+		// FIX-5 (2026-07-15 review, timers finding 3): `remainingSec` is a transient resume
+		// instruction for `cmd: 'start'`, not a persistent config field — keep it out of `rest`
+		// so it doesn't get merged into `config` and leak into unrelated future updates.
+		const resumeRemainingSec = raw.remainingSec;
 		const rest = {};
 		Object.keys(raw).forEach((k) => {
-			if (k !== 'cmd') rest[k] = raw[k];
+			if (k !== 'cmd' && k !== 'remainingSec') rest[k] = raw[k];
 		});
 		const prevMode = config.mode;
 		Object.assign(config, rest);
@@ -247,7 +262,7 @@ const CountdownEngine = (function () {
 			return;
 		}
 		applyPositionClass();
-		if (cmd === 'start') doStart();
+		if (cmd === 'start') doStart(resumeRemainingSec);
 		else if (cmd === 'pause') doPause();
 		else if (cmd === 'reset') doReset();
 		else render();

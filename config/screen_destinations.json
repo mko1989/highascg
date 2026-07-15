@@ -3,7 +3,7 @@
   "destinations": [
     {
       "id": "dst_pgm_1",
-      "label": "PGM 1",
+      "label": "Dioda",
       "mainScreenIndex": 0,
       "mode": "pgm_prv",
       "audioLayout": "stereo",

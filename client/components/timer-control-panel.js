@@ -24,88 +24,14 @@
 
 import { api } from '../lib/api-client.js'
 import { sceneState } from '../lib/scene-state.js'
-import { createHmsInput, secondsToHms, hmsToSeconds } from '../lib/duration-hms-input.js'
 import { escapeAttr } from '../lib/dom-escape.js'
+import { screenLabel } from '../lib/screen-label.js'
+import { DEFAULT_TIMER_CONFIG, computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
+import { buildTimerSettings } from './timer-control-panel-settings-form.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
 const POLL_INTERVAL_MS = 1000 // ~1s (was 5s for old countdown polling)
 const TICK_INTERVAL_MS = 250 // 4×/s
-
-/**
- * Default timer config (mirrors scene-state-timers.js DEFAULT_TIMER_CONFIG).
- */
-const DEFAULT_TIMER_CONFIG = {
-	mode: 'duration',
-	durationSec: 300,
-	targetTime: '18:00:00',
-	format: 'auto',
-	amberThresholdSec: 60,
-	redThresholdSec: 15,
-	position: 'center',
-	hideTimer: false,
-	timerFontSize: 15,
-	auxFontSize: 5,
-	timerColor: '#ffffff',
-	amberColor: '#ffb300',
-	redColor: '#ff3b30',
-	auxColor: '#ffffff',
-	auxTop: '',
-	auxMiddle: '',
-	auxBottom: '',
-}
-
-/**
- * Compute remaining time for a timer.
- * Uses server-side runtime (lastCmd, cmdAt) from /api/timers/list, with fallback to config.
- * @param {object} timerRecord - { config, lastCmd, cmdAt, durationSec }
- * @returns {number} seconds remaining (may be negative)
- */
-function computeDisplayTime(timerRecord) {
-	if (!timerRecord) return 0
-	const { config = {}, lastCmd, cmdAt, durationSec } = timerRecord
-	const mode = config.mode || 'duration'
-	const now = Date.now()
-
-	if (mode === 'duration') {
-		if (lastCmd === 'pause') {
-			// Paused: show remaining from last computation (server may provide this)
-			// For now, fall back to config
-			return durationSec || config.durationSec || 0
-		}
-		if (lastCmd === 'start' && Number.isFinite(cmdAt)) {
-			const elapsedSec = (now - cmdAt) / 1000
-			const remaining = (durationSec || config.durationSec || 0) - elapsedSec
-			return remaining
-		}
-		// Reset or never started
-		return durationSec || config.durationSec || 0
-	}
-
-	// Clock mode: time until target
-	if (mode === 'clock') {
-		const targetStr = config.targetTime || '00:00:00'
-		const [h, m, s] = targetStr.split(':').map((x) => parseInt(x, 10) || 0)
-		const today = new Date()
-		const target = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, s)
-		const remaining = (target - now) / 1000
-		return remaining
-	}
-
-	return 0
-}
-
-/**
- * Format seconds as HH:MM:SS for display, supporting negative values.
- */
-function formatDisplayTime(seconds) {
-	const sign = seconds < 0 ? '-' : ''
-	const abs = Math.abs(Math.trunc(seconds))
-	const h = Math.floor(abs / 3600)
-	const m = Math.floor((abs % 3600) / 60)
-	const s = abs % 60
-	const pad = (n) => String(n).padStart(2, '0')
-	return sign + pad(h) + ':' + pad(m) + ':' + pad(s)
-}
 
 /**
  * Module-level reference to the last fetched timers list and their visibility state.
@@ -314,7 +240,8 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 					chipEl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:var(--color-bg-tertiary);border-radius:3px;font-size:0.85em'
 
 					const labelEl = document.createElement('span')
-					labelEl.textContent = `S${screenIdx + 1}`
+					const cm = typeof getChannelMap === 'function' ? getChannelMap() : {}
+					labelEl.textContent = screenLabel(cm, screenIdx)
 					chipEl.appendChild(labelEl)
 
 					// Visible toggle
@@ -382,7 +309,7 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 				if (assignedScreens.has(i)) continue // Skip already assigned
 				const opt = document.createElement('option')
 				opt.value = String(i)
-				opt.textContent = `S${i + 1}`
+				opt.textContent = screenLabel(getScreens, i)
 				selectEl.appendChild(opt)
 			}
 
@@ -393,7 +320,7 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 			const settingsEl = document.createElement('div')
 			settingsEl.className = 'timer-control-panel__settings'
 			settingsEl.style.display = 'none'
-			buildTimerSettings(settingsEl, timer)
+			buildTimerSettings(settingsEl, timer, { refreshTimerList })
 			timerEl.appendChild(settingsEl)
 
 			// Toggle settings visibility
@@ -406,147 +333,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 		}
 	}
 
-	/**
-	 * Build settings section for a timer.
-	 */
-	function buildTimerSettings(containerEl, timer) {
-		const config = timer.config || {}
-		const assignedScreenIdxStr = timer.screens ? Object.keys(timer.screens)[0] : null
-
-		// Duration label and HMS boxes
-		const durationLabel = document.createElement('div')
-		durationLabel.className = 'timer-control-panel__settings-label'
-		durationLabel.textContent = 'Duration'
-		containerEl.appendChild(durationLabel)
-
-		const durationSec = config.durationSec || DEFAULT_TIMER_CONFIG.durationSec
-		const hmsControl = createHmsInput({ value: durationSec })
-		hmsControl.wrap.style.marginBottom = '4px'
-		containerEl.appendChild(hmsControl.wrap)
-
-		// Mode select
-		const modeLabel = document.createElement('div')
-		modeLabel.className = 'timer-control-panel__settings-label'
-		modeLabel.style.marginTop = '4px'
-		modeLabel.textContent = 'Mode'
-		containerEl.appendChild(modeLabel)
-
-		const modeSelect = document.createElement('select')
-		modeSelect.className = 'timer-control-panel__settings-select'
-		modeSelect.style.cssText = 'width:100%;padding:2px 4px'
-		const modeOpt1 = document.createElement('option')
-		modeOpt1.value = 'duration'
-		modeOpt1.textContent = 'Duration'
-		const modeOpt2 = document.createElement('option')
-		modeOpt2.value = 'clock'
-		modeOpt2.textContent = 'Clock'
-		modeSelect.appendChild(modeOpt1)
-		modeSelect.appendChild(modeOpt2)
-		modeSelect.value = config.mode || 'duration'
-		containerEl.appendChild(modeSelect)
-
-		// Target time input (shown only when mode=clock)
-		const targetTimeLabel = document.createElement('div')
-		targetTimeLabel.className = 'timer-control-panel__settings-label'
-		targetTimeLabel.style.marginTop = '4px'
-		targetTimeLabel.textContent = 'Target Time (HH:MM:SS)'
-		targetTimeLabel.style.display = config.mode === 'clock' ? 'block' : 'none'
-		containerEl.appendChild(targetTimeLabel)
-
-		const targetTimeInput = document.createElement('input')
-		targetTimeInput.type = 'text'
-		targetTimeInput.className = 'timer-control-panel__settings-input'
-		targetTimeInput.style.cssText = 'width:100%;padding:2px 4px'
-		targetTimeInput.placeholder = 'HH:MM:SS'
-		targetTimeInput.value = config.targetTime || DEFAULT_TIMER_CONFIG.targetTime
-		targetTimeInput.style.display = config.mode === 'clock' ? 'block' : 'none'
-		targetTimeInput.style.marginBottom = '4px'
-		containerEl.appendChild(targetTimeInput)
-
-		// Position select
-		const positionLabel = document.createElement('div')
-		positionLabel.className = 'timer-control-panel__settings-label'
-		positionLabel.style.marginTop = '4px'
-		positionLabel.textContent = 'Position'
-		containerEl.appendChild(positionLabel)
-
-		const positionSelect = document.createElement('select')
-		positionSelect.className = 'timer-control-panel__settings-select'
-		positionSelect.style.cssText = 'width:100%;padding:2px 4px'
-		const positions = ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right']
-		for (const pos of positions) {
-			const opt = document.createElement('option')
-			opt.value = pos
-			opt.textContent = pos
-			positionSelect.appendChild(opt)
-		}
-		positionSelect.value = config.position || 'center'
-		containerEl.appendChild(positionSelect)
-
-		// Mode change handler to show/hide targetTime
-		modeSelect.addEventListener('change', () => {
-			const isClock = modeSelect.value === 'clock'
-			targetTimeLabel.style.display = isClock ? 'block' : 'none'
-			targetTimeInput.style.display = isClock ? 'block' : 'none'
-		})
-
-		// Save/Cancel buttons
-		const buttonsRow = document.createElement('div')
-		buttonsRow.style.cssText = 'display:flex;gap:4px;margin-top:6px'
-
-		const saveBtn = document.createElement('button')
-		saveBtn.type = 'button'
-		saveBtn.className = 'timer-control-panel__settings-btn'
-		saveBtn.textContent = 'Save'
-		saveBtn.addEventListener('click', async () => {
-			if (!assignedScreenIdxStr) {
-				console.warn('[timer-panel] Cannot save settings: timer not assigned to any screen')
-				return
-			}
-
-			const screenIdx = parseInt(assignedScreenIdxStr, 10)
-			const newDurationSec = hmsControl.wrap.querySelector('[id="hms-hours"]')
-				? hmsToSeconds(
-					parseInt(hmsControl.wrap.querySelector('[id="hms-hours"]').value, 10) || 0,
-					parseInt(hmsControl.wrap.querySelector('[id="hms-minutes"]').value, 10) || 0,
-					parseInt(hmsControl.wrap.querySelector('[id="hms-seconds"]').value, 10) || 0
-				)
-				: durationSec
-
-			const newConfig = {
-				...config,
-				durationSec: newDurationSec,
-				mode: modeSelect.value,
-				targetTime: targetTimeInput.value,
-				position: positionSelect.value,
-			}
-
-			try {
-				await api.post('/api/timers/assign', {
-					timerId: timer.timerId,
-					screenIdx,
-					config: newConfig,
-				})
-				// Refresh to update UI
-				setTimeout(() => refreshTimerList(), 100)
-			} catch (err) {
-				console.warn('[timer-panel] settings save failed:', err?.message || err)
-			}
-		})
-		buttonsRow.appendChild(saveBtn)
-
-		const cancelBtn = document.createElement('button')
-		cancelBtn.type = 'button'
-		cancelBtn.className = 'timer-control-panel__settings-btn'
-		cancelBtn.textContent = 'Cancel'
-		cancelBtn.addEventListener('click', () => {
-			// Hide settings section
-			containerEl.parentElement.style.display = 'none'
-		})
-		buttonsRow.appendChild(cancelBtn)
-
-		containerEl.appendChild(buttonsRow)
-	}
 
 	async function onTimerAction(timerId, action) {
 		try {

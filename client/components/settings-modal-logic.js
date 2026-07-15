@@ -8,6 +8,7 @@ import {
 	collectOpenalAudioRoutingFromModal,
 } from './settings-modal-caspar-collect.js'
 import { syncNuclearPasswordVisibility } from '../lib/settings-nuclear-shared.js'
+import { api } from '../lib/api-client.js'
 
 /** Push Defaults tab values into settingsState so new layers/clips use them before autosave completes. */
 export function syncEditorDefaultsFromModal(modal) {
@@ -144,9 +145,90 @@ export function buildSettingsPayload(modal) {
 	return settings
 }
 
+/**
+ * Mount the screen labels inputs section in the modal.
+ * @param {HTMLElement} mountEl - The element to mount into (#settings-screen-labels-mount)
+ * @param {object} cfg - Settings config (with channelMap)
+ */
+export function mountScreenLabelsSection(mountEl, cfg) {
+	if (!mountEl) return
+
+	const cm = cfg?.channelMap || {}
+	const screenCount = cm.screenCount || 1
+	const labels = Array.isArray(cm.screenLabels) ? cm.screenLabels : []
+
+	const container = document.createElement('div')
+	container.style.display = 'flex'
+	container.style.flexDirection = 'column'
+	container.style.gap = '0.5rem'
+
+	for (let i = 0; i < screenCount; i++) {
+		const group = document.createElement('div')
+		group.className = 'settings-group'
+
+		const label = document.createElement('label')
+		label.htmlFor = `set-screen-label-${i}`
+		label.textContent = `Screen ${i + 1}`
+
+		const input = document.createElement('input')
+		input.type = 'text'
+		input.id = `set-screen-label-${i}`
+		input.className = 'screen-label-input'
+		input.placeholder = `S${i + 1}`
+		input.value = labels[i] || ''
+		input.dataset.screenIdx = String(i)
+
+		group.appendChild(label)
+		group.appendChild(input)
+		container.appendChild(group)
+	}
+
+	mountEl.innerHTML = ''
+	mountEl.appendChild(container)
+}
+
+/**
+ * Collect screen label changes and save them via POST /api/screens/label
+ * @param {HTMLElement} modal
+ */
+export async function saveChangedScreenLabels(modal) {
+	const mount = modal.querySelector('#settings-screen-labels-mount')
+	if (!mount) return
+
+	const inputs = mount.querySelectorAll('input.screen-label-input')
+	const changes = []
+
+	inputs.forEach((input) => {
+		const idx = parseInt(input.dataset.screenIdx, 10)
+		const newLabel = input.value.trim()
+		const oldLabel = input.placeholder.replace('S', '')
+
+		// Only save if changed from placeholder or has a value
+		if (newLabel && newLabel !== oldLabel) {
+			changes.push({ screenIdx: idx, label: newLabel })
+		} else if (!newLabel && input.hasAttribute('data-was-set')) {
+			// Clear label if it was previously set
+			changes.push({ screenIdx: idx, label: '' })
+			input.removeAttribute('data-was-set')
+		}
+	})
+
+	for (const change of changes) {
+		try {
+			await api.post('/api/screens/label', {
+				screenIdx: change.screenIdx,
+				label: change.label,
+			})
+		} catch (e) {
+			console.error(`Failed to save screen label ${change.screenIdx}:`, e)
+		}
+	}
+}
+
 export function hydrateSettings(modal, cfg) {
 	const fps = sceneState.getCanvasForScreen(0).framerate
 	hydrateEditorDefaultsModal(modal, cfg.editorDefaults, fps)
+	mountScreenLabelsSection(modal.querySelector('#settings-screen-labels-mount'), cfg)
 	const casparHostEl = modal.querySelector('#set-caspar-host'); if (casparHostEl) casparHostEl.value = cfg.caspar.host
 	const casparPortEl = modal.querySelector('#set-caspar-port'); if (casparPortEl) casparPortEl.value = cfg.caspar.port
 	const osc = cfg.osc || {}

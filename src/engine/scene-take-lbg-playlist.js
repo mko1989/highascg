@@ -294,7 +294,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
 
 	const loadOpts = {
-		loop: false
+		loop: layer.playlistAdvance === 'manual' ? true : false
 	}
 	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
 		loadOpts.transition = transition.type
@@ -366,4 +366,4 @@ function shouldForceAdvance(state) {
 	return nearEnd
 }
 
-module.exports = { setupLayerPlaylists, shouldForceAdvance }
+module.exports = { setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }

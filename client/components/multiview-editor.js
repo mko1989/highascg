@@ -177,7 +177,7 @@ export function initMultiviewEditor(root, stateStore) {
 
 	root.querySelector('#mv-highlight-top-timer').onchange = e => { multiviewState.setHighlightTopTimer(e.target.checked); flushApply() }
 	canvas.onmousedown = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM())
-		if (c) { selectedId = c.id; const h = getResizeHandle(c, x, y, scale, getCM()); if (h) { dragMode = 'resize-' + h; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = cursorForResizeHandle(h) } else { dragMode = 'move'; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = 'grabbing' } window.dispatchEvent(new CustomEvent('multiview-select', { detail: { cellId: selectedId } })) }
+		if (c) { selectedId = c.id; const h = getResizeHandle(c, x, y, scale, getCM()); if (h) { dragMode = 'resize-' + h; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = cursorForResizeHandle(h) } else { dragMode = 'move'; dragStart = { mouseX: x, mouseY: y, cell: { ...c } }; canvas.style.cursor = 'grabbing' } multiviewState.setDragInProgress(true); window.dispatchEvent(new CustomEvent('multiview-select', { detail: { cellId: selectedId } })) }
 		else { selectedId = null; canvas.style.cursor = ''; window.dispatchEvent(new CustomEvent('multiview-select', { detail: {} })) }
 	}
 	canvas.onmousemove = e => { const r = canvas.getBoundingClientRect(); const { x: cx, y: cy } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale)
@@ -279,8 +279,8 @@ export function initMultiviewEditor(root, stateStore) {
 			} return }
 		const c = getCellAt(cx, cy, getCM()); if (!c) { canvas.style.cursor = ''; return }; const h = getResizeHandle(c, cx, cy, scale, getCM()); canvas.style.cursor = h ? cursorForResizeHandle(h) : 'move'
 	}
-	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; applyIfAutoEnabled() }
-	canvas.onmouseleave = () => { dragMode = null; canvas.style.cursor = '' }
+	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; multiviewState.setDragInProgress(false); applyIfAutoEnabled() }
+	canvas.onmouseleave = () => { dragMode = null; canvas.style.cursor = ''; multiviewState.setDragInProgress(false) }
 	canvas.oncontextmenu = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (!c) return; if (c.source) multiviewState.setCellSource(c.id, null); else multiviewState.removeCell(c.id) }
 	canvas.onclick = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (c) multiviewState.setAudioActiveCell(c.id) }
 	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
@@ -310,7 +310,7 @@ export function initMultiviewEditor(root, stateStore) {
 		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); applyIfAutoEnabled()
 	}
 	multiviewState.on('change', () => { draw() })
-	multiviewState.on('apply-request', () => { if (!isEnabled()) return; if (multiviewState.autoApply) scheduleApply() })
+	multiviewState.on('apply-request', () => { if (!isEnabled()) return; if (multiviewState.dragInProgress) return; if (multiviewState.autoApply) scheduleApply() })
 	multiviewState.on('audio-change', () => { draw(); applyMultiviewAudioFocus() })
 
 	const onKeyDown = (e) => {

@@ -7,6 +7,7 @@ import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 import { appendSceneDeckColumn } from './scene-list-column.js'
+import { screenLabel } from '../lib/screen-label.js'
 
 /**
  * @param {object} ctx
@@ -76,7 +77,7 @@ export function renderSceneDeck(ctx) {
 	function mainLabel(i) {
 		const v = virtuals[i]
 		if (v && v.name) return String(v.name)
-		return `Screen ${i + 1}`
+		return screenLabel(cm, i)
 	}
 
 	const deckWrap = document.createElement('div')

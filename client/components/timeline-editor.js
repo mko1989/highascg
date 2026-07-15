@@ -30,6 +30,7 @@ import { createTimelineTransport } from './timeline-transport.js'
 import { streamState } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 import { getDefaultTransitionFromEditor } from '../lib/editor-defaults.js'
+import { screenLabel } from '../lib/screen-label.js'
 import {
 	createNotifyTimelineSeekFailed,
 	createTimelineCanvasHandlers,
@@ -286,7 +287,7 @@ export function initTimelineEditor(root, stateStore) {
 			const cm = stateStore.getState()?.channelMap || {}
 			const pgmCh = cm.programChannels?.[s] ?? null
 			const prvCh = cm.previewChannels?.[s] ?? null
-			const labelBase = cm.virtualMainChannels?.[s]?.name || `Screen ${s + 1}`
+			const labelBase = cm.virtualMainChannels?.[s]?.name || screenLabel(cm, s)
 			const defs = [{
 				id: `pgm_${s + 1}`,
 				role: 'pgm',

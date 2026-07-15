@@ -158,11 +158,49 @@
 			return last.replace(/\.[^.]*$/, ''); // Remove extension
 		}
 
+		// WO-223: Map route:// sources to friendly channel/screen labels
+		// keep in parity with template/multiview_master.html
+		function friendlyRouteLabel(sourceValue, channelMap) {
+			if (!sourceValue) return '';
+			const src = String(sourceValue);
+			// Check if this is a route:// source
+			if (!src.startsWith('route://')) return '';
+
+			// Parse route://N or route://N-L
+			const routePart = src.substring(8); // Remove 'route://'
+			const parts = routePart.split('-');
+			const channelNum = parseInt(parts[0], 10);
+			const layerNum = parts.length > 1 ? parseInt(parts[1], 10) : null;
+
+			if (!Number.isFinite(channelNum)) return '';
+
+			// Check if channelNum is in programChannels
+			if (channelMap && Array.isArray(channelMap.programChannels)) {
+				const idx = channelMap.programChannels.indexOf(channelNum);
+				if (idx !== -1) {
+					const screenLabel = channelMap.screenLabels?.[idx] || `PGM${idx + 1}`;
+					return screenLabel;
+				}
+			}
+
+			// Check if channelNum is in previewChannels
+			if (channelMap && Array.isArray(channelMap.previewChannels)) {
+				const idx = channelMap.previewChannels.indexOf(channelNum);
+				if (idx !== -1) {
+					return `PRV${idx + 1}`;
+				}
+			}
+
+			// Fallback: return 'Route ch N'
+			return `Route ch ${channelNum}`;
+		}
+
 		// WO-212: Build playlist-aware row label (current -> next) when autoplay enabled
 		// keep in parity with template/multiview_master.html
-		function buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename) {
+		function buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename, friendlyRouteLabel, channelMap) {
 			if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length <= 1 || layer.playlistAdvance === 'manual') {
-				const basename = getSourceBasename(layer.source?.value);
+				const sourceValue = layer.source?.value;
+				let basename = friendlyRouteLabel(sourceValue, channelMap) || getSourceBasename(sourceValue);
 				return basename ? `L${num} ${basename}` : `L${num}`;
 			}
 			// Playlist with autoplay: compute current -> next
@@ -176,13 +214,15 @@
 				}
 			}
 			// If no match found, fallback to first item
-			const current = getSourceBasename(layer.playlist[idxOfCurrent]?.value);
+			const currentValue = layer.playlist[idxOfCurrent]?.value;
+			const current = friendlyRouteLabel(currentValue, channelMap) || getSourceBasename(currentValue);
 			const isLastItem = idxOfCurrent === layer.playlist.length - 1;
 			const hasNext = !(isLastItem && layer.playlistLoop === false);
 			let label = `L${num} ${current}`;
 			if (hasNext) {
 				const nextIdx = (idxOfCurrent + 1) % layer.playlist.length;
-				const next = getSourceBasename(layer.playlist[nextIdx]?.value);
+				const nextValue = layer.playlist[nextIdx]?.value;
+				const next = friendlyRouteLabel(nextValue, channelMap) || getSourceBasename(nextValue);
 				label += ` -> ${next}`;
 			}
 			return label;
@@ -280,7 +320,7 @@
 
 							// WO-212: Playlist-aware label, OSC playing file available here
 							const oscPlayingName = lFile.name || lFile.path ? getSourceBasename(lFile.name || lFile.path) : null;
-							const layerLabel = buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename);
+							const layerLabel = buildPlaylistRowLabel(num, layer, oscPlayingName, getSourceBasename, friendlyRouteLabel, channelMap);
 
 							layerRows.push({
 								num,

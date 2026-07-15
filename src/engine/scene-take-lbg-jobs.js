@@ -184,6 +184,10 @@ async function buildTakeJobs(opts) {
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 1) {
 			isLoop = false
 		}
+		// WO-224 T224.6: Manual-advance playlists loop each item until operator advances
+		if (layer.sourceMode === 'list' && layer.playlistAdvance === 'manual') {
+			isLoop = true
+		}
 		const loadOpts = { loop: isLoop }
 		if (af) loadOpts.audioFilter = af
 		const seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {

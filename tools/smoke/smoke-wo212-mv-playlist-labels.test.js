@@ -25,7 +25,8 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 		assert.match(content, /playlistAdvance/, 'Master template should check playlistAdvance');
 		assert.match(content, /\s->\s/, 'Master template should have arrow label (-> )');
 		assert.match(content, /buildPlaylistRowLabel/, 'Master template should have buildPlaylistRowLabel function');
-		assert.match(content, /function buildPlaylistRowLabel\(num, layer, oscPlayingName, getSourceBasename\)/, 'Master template should have buildPlaylistRowLabel function with correct signature');
+		// Updated signature includes friendlyRouteLabel and channelMap (WO-223)
+		assert.match(content, /function buildPlaylistRowLabel\(num, layer, oscPlayingName, getSourceBasename, friendlyRouteLabel, channelMap\)/, 'Master template should have buildPlaylistRowLabel function with updated signature');
 	});
 
 	await t.test('T212.2b: Overlay template contains playlist-aware label branch', async () => {
@@ -36,7 +37,8 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 		assert.match(content, /playlistAdvance/, 'Overlay template should check playlistAdvance');
 		assert.match(content, /\s->\s/, 'Overlay template should have arrow label (-> )');
 		assert.match(content, /buildPlaylistRowLabel/, 'Overlay template should have buildPlaylistRowLabel function');
-		assert.match(content, /function buildPlaylistRowLabel\(num, layer, oscPlayingName, getSourceBasename\)/, 'Overlay template should have buildPlaylistRowLabel function with correct signature');
+		// Updated signature includes friendlyRouteLabel and channelMap (WO-223)
+		assert.match(content, /function buildPlaylistRowLabel\(num, layer, oscPlayingName, getSourceBasename, friendlyRouteLabel, channelMap\)/, 'Overlay template should have buildPlaylistRowLabel function with updated signature');
 	});
 
 	await t.test('T212.3: buildPlaylistRowLabel function logic', async () => {
@@ -54,7 +56,7 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 		// Create a test executor function
 		const funcCode = funcMatch[0];
 
-		// Create getSourceBasename for the test
+		// Create getSourceBasename and friendlyRouteLabel for the test
 		const getSourceBasename = (sourceValue) => {
 			if (!sourceValue) return '';
 			const src = String(sourceValue);
@@ -63,20 +65,42 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 			return last.replace(/\.[^.]*$/, '');
 		};
 
+		const friendlyRouteLabel = (sourceValue, channelMap) => {
+			if (!sourceValue) return '';
+			const src = String(sourceValue);
+			if (!src.startsWith('route://')) return '';
+			const routePart = src.substring(8);
+			const parts = routePart.split('-');
+			const channelNum = parseInt(parts[0], 10);
+			if (!Number.isFinite(channelNum)) return '';
+			if (channelMap && Array.isArray(channelMap.programChannels)) {
+				const idx = channelMap.programChannels.indexOf(channelNum);
+				if (idx !== -1) {
+					const screenLabel = channelMap.screenLabels?.[idx] || `PGM${idx + 1}`;
+					return screenLabel;
+				}
+			}
+			if (channelMap && Array.isArray(channelMap.previewChannels)) {
+				const idx = channelMap.previewChannels.indexOf(channelNum);
+				if (idx !== -1) return `PRV${idx + 1}`;
+			}
+			return `Route ch ${channelNum}`;
+		};
+
 		// Use Function constructor to create and test the function
-		const testFunc = new Function('getSourceBasename', `
+		const testFunc = new Function('getSourceBasename', 'friendlyRouteLabel', `
 ${funcCode}
 return buildPlaylistRowLabel;
 		`);
 
-		const buildPlaylistRowLabel = testFunc(getSourceBasename);
+		const buildPlaylistRowLabel = testFunc(getSourceBasename, friendlyRouteLabel);
 
 		// Test 1: Non-playlist layer
 		const nonPlaylistLayer = {
 			sourceMode: 'normal',
 			source: { value: 'some_template.html' }
 		};
-		const result1 = buildPlaylistRowLabel(5, nonPlaylistLayer, null, getSourceBasename);
+		const result1 = buildPlaylistRowLabel(5, nonPlaylistLayer, null, getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result1, 'L5 some_template', 'Non-playlist layer should return standard label');
 
 		// Test 2: Playlist with middle item
@@ -91,11 +115,11 @@ return buildPlaylistRowLabel;
 			playlistAdvance: 'auto',
 			playlistLoop: true
 		};
-		const result2 = buildPlaylistRowLabel(10, playlistLayer, 'file2', getSourceBasename);
+		const result2 = buildPlaylistRowLabel(10, playlistLayer, 'file2', getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result2, 'L10 file2 -> file3', 'Middle item should show arrow to next');
 
 		// Test 3: Last item with loop
-		const result3 = buildPlaylistRowLabel(10, playlistLayer, 'file3', getSourceBasename);
+		const result3 = buildPlaylistRowLabel(10, playlistLayer, 'file3', getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result3, 'L10 file3 -> file1', 'Last item with loop should wrap to first');
 
 		// Test 4: Last item without loop
@@ -110,11 +134,11 @@ return buildPlaylistRowLabel;
 			playlistAdvance: 'auto',
 			playlistLoop: false
 		};
-		const result4 = buildPlaylistRowLabel(10, noLoopLayer, 'file3', getSourceBasename);
+		const result4 = buildPlaylistRowLabel(10, noLoopLayer, 'file3', getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result4, 'L10 file3', 'Last item without loop should not show arrow');
 
 		// Test 5: OSC name not in playlist, fallback to first
-		const result5 = buildPlaylistRowLabel(10, playlistLayer, 'unknown', getSourceBasename);
+		const result5 = buildPlaylistRowLabel(10, playlistLayer, 'unknown', getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result5, 'L10 file1 -> file2', 'Unknown OSC name should fallback to first item');
 
 		// Test 6: Manual advance mode (should not use playlist label)
@@ -128,7 +152,7 @@ return buildPlaylistRowLabel;
 			playlistAdvance: 'manual',
 			playlistLoop: true
 		};
-		const result6 = buildPlaylistRowLabel(10, manualAdvanceLayer, 'file1', getSourceBasename);
+		const result6 = buildPlaylistRowLabel(10, manualAdvanceLayer, 'file1', getSourceBasename, friendlyRouteLabel, {});
 		assert.equal(result6, 'L10 file1', 'Manual advance mode should use standard label');
 	});
 });

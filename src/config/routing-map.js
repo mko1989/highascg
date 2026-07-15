@@ -365,6 +365,8 @@ function getChannelMap(config, activeBuses = null) {
 
 	const result = {
 		screenCount,
+		/** Custom screen labels persisted in config. */
+		screenLabels: Array.isArray(config?.screenLabels) ? config.screenLabels.slice(0, screenCount) : [],
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
 		multiviewEnabled: multiviewChannels.length > 0,
 		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,

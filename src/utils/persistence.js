@@ -10,7 +10,14 @@ const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 
-const STATE_FILE = path.join(REPO_ROOT, '.highascg-state.json')
+/* Test isolation (review 2026-07-15): node:test children set NODE_TEST_CONTEXT — redirect them
+ * to a scratch file so smokes can NEVER clobber the live production state (a review-session smoke
+ * partially overwrote programLayerBankByChannel on this box). HIGHASCG_STATE_FILE overrides both. */
+const STATE_FILE = process.env.HIGHASCG_STATE_FILE
+	? path.resolve(process.env.HIGHASCG_STATE_FILE)
+	: process.env.NODE_TEST_CONTEXT
+		? path.join(require('os').tmpdir(), `highascg-state-test-${process.pid}.json`)
+		: path.join(REPO_ROOT, '.highascg-state.json')
 const STATE_FILE_TMP = STATE_FILE + '.tmp'
 let _cache = null
 

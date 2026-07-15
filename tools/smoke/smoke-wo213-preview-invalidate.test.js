@@ -133,4 +133,53 @@ describe('WO-213 preview invalidate on live change', () => {
 			globalThis.window = originalWindow
 		}
 	})
+
+	it('FIX-2 (2026-07-15 review, WO-213 finding 2): clear-then-restage-with-same-sceneId still invalidates', async () => {
+		const eventDispatcher = {
+			dispatchedEvents: [],
+			addEventListener(name, handler) {
+				this.handlers ??= {}
+				this.handlers[name] = handler
+			},
+			dispatchEvent(ev) {
+				this.dispatchedEvents.push(ev.type)
+			},
+		}
+
+		const originalWindow = globalThis.window
+		try {
+			globalThis.window = eventDispatcher
+
+			// Dynamic import resolves to the same cached module instance as the earlier test in
+			// this file, so `prevLiveSceneIdByChannel` tracking state carries over — use a
+			// channel number not touched by earlier tests to stay isolated.
+			const { maybeInvalidatePreviewOnLiveChange } = await import(
+				`file://${path.join(repoRoot, 'client/lib/app-ws-handlers.js')}`
+			)
+
+			const channelMap = { previewChannels: [7] } // PRV channel is 7
+
+			// 1. PRV channel 7 goes live with sceneA.
+			maybeInvalidatePreviewOnLiveChange({ '7': { sceneId: 'sceneA' } }, channelMap)
+
+			// 2. Operator clears PRV preview — server omits channel 7's key entirely from the
+			//    next live payload (not just a null sceneId).
+			eventDispatcher.dispatchedEvents = []
+			maybeInvalidatePreviewOnLiveChange({}, channelMap)
+
+			// 3. Same scene (sceneA) gets re-staged on channel 7 — a genuine CLEAR + re-ADD on
+			//    the server, exactly the class of event WO-213 exists to catch. Before the fix,
+			//    the stale tracked value ('sceneA') matched the reappearing curSceneId
+			//    ('sceneA') and invalidation was skipped.
+			eventDispatcher.dispatchedEvents = []
+			maybeInvalidatePreviewOnLiveChange({ '7': { sceneId: 'sceneA' } }, channelMap)
+			assert.equal(
+				eventDispatcher.dispatchedEvents[eventDispatcher.dispatchedEvents.length - 1],
+				'scenes-preview-invalidate',
+				'Must dispatch scenes-preview-invalidate on clear-then-restage with the same sceneId'
+			)
+		} finally {
+			globalThis.window = originalWindow
+		}
+	})
 })

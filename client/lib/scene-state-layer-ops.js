@@ -65,6 +65,14 @@ export function mixinSceneStateLayerOps(SceneStateClass) {
 			}
 		},
 
+		setLayerNumber(sceneId, layerIndex, layerNumber) {
+			const s = this.getScene(sceneId)
+			if (!s?.layers?.length) return { ok: false, reason: 'Look not found' }
+			const result = LayerLogic.setLayerNumberOnLayer(s.layers, layerIndex, layerNumber)
+			if (result.ok && result.changed) this._save()
+			return result
+		},
+
 		setLayerSource(sceneId, layerIndex, source) {
 			const s = this.getScene(sceneId)
 			const L = s?.layers?.[layerIndex]

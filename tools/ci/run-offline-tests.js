@@ -57,6 +57,8 @@ const FILES = [
 	'tools/smoke/smoke-wo217-self-blank-guard.test.js',
 	'tools/smoke/smoke-wo218-bank-drift.test.js',
 	'tools/smoke/smoke-wo220-shadow-geometry.test.js',
+	'tools/smoke/smoke-wo222-screen-labels.test.js',
+	'tools/smoke/smoke-wo223-route-labels.test.js',
 	'test/companion-control-status.test.js',
 ]
 

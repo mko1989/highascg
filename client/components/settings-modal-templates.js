@@ -115,6 +115,9 @@ export function getMainModalHtml() {
 								<p class="settings-note">Pushes <code>compose_preview_ch{N}_image</code> data-URI variables at compose preview rate (same fps). In Companion, set a button image to <code>$(highascg_compose_preview_ch1_image)</code>.</p>
 							</div>
 						</div>
+						<h3 class="settings-category">Screen labels (WO-222)</h3>
+						<p class="settings-note">Custom label for each screen output. Used in looks editor selector, multiview, and panels. Leave empty to use default (S1, S2, etc.).</p>
+						<div id="settings-screen-labels-mount"></div>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>

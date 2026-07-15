@@ -9,6 +9,7 @@ import { api } from '../lib/api-client.js'
 import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
 import { parseNumberInput } from '../lib/math-input.js'
 import { resolveTransitionDuration, transitionDurationForFps } from '../lib/transition-duration.js'
+import { screenLabel } from '../lib/screen-label.js'
 
 /**
  * @param {object} deps
@@ -172,7 +173,7 @@ export function createTimelineTransport(deps) {
 		const cm = state?.channelMap || {}
 		const screenCount = cm.screenCount || 1
 		const screenOpts = Array.from({ length: screenCount }, (_, i) => {
-			const label = cm.virtualMainChannels?.[i]?.name || `Screen ${i + 1}`
+			const label = cm.virtualMainChannels?.[i]?.name || screenLabel(cm, i)
 			return `<option value="${i}" ${view.sendTo.screenIdx === i ? 'selected' : ''}>${label}</option>`
 		}).join('')
 		const allSelected = view.sendTo.screenIdx === null

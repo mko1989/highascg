@@ -228,6 +228,7 @@ function coreDefaults() {
 			version: 1,
 			edidNotes: '',
 		},
+		screenLabels: [],
 		gpuPhysicalTopology: resolveDefaultTopologyForGpu(null),
 		deviceGraph: {
 			version: 1,

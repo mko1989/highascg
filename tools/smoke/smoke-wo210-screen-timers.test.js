@@ -304,6 +304,59 @@ test('recordTimerCmd records command and timestamp', () => {
 	assert(list[0].cmdAt >= before && list[0].cmdAt <= after, 'cmdAt should be within reasonable time range')
 })
 
+test('FIX-5 (2026-07-15 review, timers finding 3): recordTimerPause round-trip', () => {
+	resetScreenTimersModule()
+
+	// Create a timer record by assigning it
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: { durationSec: 300 },
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Pause with a server-computed frozen remaining value
+	screenTimers.recordTimerPause('timer1', 123.4)
+
+	let list = screenTimers.listScreenTimers()
+	let record = list.find((r) => r.timerId === 'timer1')
+	assert.strictEqual(record.lastCmd, 'pause', 'lastCmd should be "pause"')
+	assert.strictEqual(record.remainingSec, 123.4, 'remainingSec should round-trip through listScreenTimers')
+	assert(Number.isFinite(record.cmdAt), 'cmdAt should be set')
+
+	// Persists to disk (mocked persistence) — reload the module and confirm it survives
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	const screenTimers2 = require('../../src/engine/screen-timers')
+	const list2 = screenTimers2.listScreenTimers()
+	const record2 = list2.find((r) => r.timerId === 'timer1')
+	assert.strictEqual(record2.remainingSec, 123.4, 'remainingSec should persist across module reload')
+
+	// A negative/non-finite value clamps to null (never a stale negative freeze)
+	screenTimers2.recordTimerPause('timer1', -5)
+	let list3 = screenTimers2.listScreenTimers()
+	assert.strictEqual(list3.find((r) => r.timerId === 'timer1').remainingSec, 0, 'negative remaining clamps to 0')
+
+	screenTimers2.recordTimerPause('timer1', NaN)
+	let list4 = screenTimers2.listScreenTimers()
+	assert.strictEqual(list4.find((r) => r.timerId === 'timer1').remainingSec, null, 'non-finite remaining stores as null')
+
+	// 'reset' clears remainingSec so the next start begins fresh from the configured duration.
+	screenTimers2.recordTimerPause('timer1', 55)
+	screenTimers2.recordTimerCmd('timer1', 'reset')
+	let list5 = screenTimers2.listScreenTimers()
+	assert.strictEqual(list5.find((r) => r.timerId === 'timer1').remainingSec, null, 'reset clears remainingSec')
+	assert.strictEqual(list5.find((r) => r.timerId === 'timer1').lastCmd, 'reset', 'lastCmd should be "reset"')
+
+	// 'start' leaves a previously frozen remainingSec untouched (it's the resume basis).
+	screenTimers2.recordTimerPause('timer1', 77)
+	screenTimers2.recordTimerCmd('timer1', 'start')
+	let list6 = screenTimers2.listScreenTimers()
+	const record6 = list6.find((r) => r.timerId === 'timer1')
+	assert.strictEqual(record6.remainingSec, 77, 'start should not clear the resume-basis remainingSec')
+	assert.strictEqual(record6.lastCmd, 'start', 'lastCmd should be "start"')
+})
+
 test('listScreenTimers returns deep copies', () => {
 	resetScreenTimersModule()
 
