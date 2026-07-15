@@ -3,6 +3,7 @@
 const { getModeDimensions, getExtraAudioModeDimensions } = require('./config-modes')
 const { screenModeString } = require('./config-generator-mode-helpers')
 const { readCasparSetting } = require('./routing-map')
+const { destinationsFromConfig } = require('./screen-destinations')
 
 /**
  * @param {Record<string, unknown>} config
@@ -16,11 +17,21 @@ function buildChannelPlan(config, routeMap) {
 	const liveAudioCount = typeof routeMap.liveAudioCount === 'number' ? routeMap.liveAudioCount : 0
 	const extraAudioCount = Array.isArray(routeMap.audioOnlyChannels) ? routeMap.audioOnlyChannels.length : 0
 
+	// WO-242: pixelmap screens are still "mains" (screenCount/programCh indexing) but render via a
+	// native <artnet> consumer instead of the generic PGM screen-consumer chain — flag them here so
+	// config-generator-channels.js can special-case their <channel> body.
+	const pixelmapByMain = new Map()
+	for (const dest of destinationsFromConfig(config)) {
+		if (dest && dest.mode === 'pixelmap') {
+			pixelmapByMain.set(Math.max(0, parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0), dest)
+		}
+	}
 	const screens = []
 	for (let n = 1; n <= screenCount; n++) {
 		const mode = screenModeString(config, n)
 		const dims = getModeDimensions(mode, config, n)
-		screens.push({ n, dims })
+		const pixelmap = pixelmapByMain.get(n - 1) || null
+		screens.push({ n, dims, pixelmap })
 	}
 	const extraAudio = []
 	for (let i = 1; i <= extraAudioCount; i++) {

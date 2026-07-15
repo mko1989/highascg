@@ -68,6 +68,14 @@ function coreDefaults() {
 			nuclearRequirePassword: false,
 			nuclearPassword: '',
 			nuclearPasswordHash: '',
+			/**
+			 * WO-242: JS pixel-mapping (Pixel Map tab editor + fixture DMX Art-Net/sACN output engine,
+			 * src/sampling/dmx-*) is deprecated in favor of native `pixelmap` screen destinations.
+			 * Default off/absent hides the legacy editor's UI entry points; the code itself is untouched
+			 * and this flag restores it (sACN output + restart-free remapping only exist on the legacy
+			 * path — native is Art-Net + config+restart only, see docs/ARTNET_PIXEL_MAPPING.md).
+			 */
+			legacyJsPixelmap: false,
 		},
 		composePreview: {
 			mode: 'ffmpeg_jpeg',

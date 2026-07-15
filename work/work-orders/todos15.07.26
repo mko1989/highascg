@@ -42,3 +42,10 @@ sdjust to doesnt count the crop values in.
 still something is broken in the osc variables parser
 
 i cant choose a template in the web browser source. also the point of having a seperate channel for browser is to keep it open in that channel and route it where needed. one of it is showing full screen on operator screen with mouse keyboard routed via pupeteer. 
+
+
+****NEW_IDEA****
+
+i want to prepare and develop this workflow.
+on the operator monitor we get firefox fullscreen with transparent background (picom needed) all the spaces where normaly preview appears in gui should become transparent boxes with caspar special gui screen consumer under the browser.
+another way would be interactive cef but straight not thru pupeteer.

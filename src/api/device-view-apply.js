@@ -193,7 +193,15 @@ function buildApplyDryRunPlan(ctx) {
 		const mainIdx = Math.max(0, parseInt(d.mainScreenIndex, 10) || 0)
 		const modeRaw = String(d.mode || 'pgm_prv')
 		const mode =
-			modeRaw === 'pgm_only' ? 'pgm_only' : modeRaw === 'multiview' ? 'multiview' : modeRaw === 'stream' ? 'stream' : 'pgm_prv'
+			modeRaw === 'pgm_only'
+				? 'pgm_only'
+				: modeRaw === 'multiview'
+					? 'multiview'
+					: modeRaw === 'stream'
+						? 'stream'
+						: modeRaw === 'pixelmap'
+							? 'pixelmap'
+							: 'pgm_prv'
 		if (mode === 'stream') {
 			const dActions = [
 				{
@@ -237,7 +245,7 @@ function buildApplyDryRunPlan(ctx) {
 				fps: d.fps || 50,
 				channelIntent: {
 					pgmCh: mode === 'multiview' ? map.multiviewCh : map.programChannels[mainIdx],
-					prvCh: mode === 'pgm_only' || mode === 'multiview' ? null : map.previewChannels[mainIdx],
+					prvCh: mode === 'pgm_only' || mode === 'multiview' || mode === 'pixelmap' ? null : map.previewChannels[mainIdx],
 					mode,
 				},
 			},
@@ -250,7 +258,7 @@ function buildApplyDryRunPlan(ctx) {
 			mode,
 			bus,
 			pgmCh: mode === 'multiview' ? map.multiviewCh : map.programChannels[mainIdx],
-			prvCh: mode === 'pgm_only' || mode === 'multiview' ? null : map.previewChannels[mainIdx],
+			prvCh: mode === 'pgm_only' || mode === 'multiview' || mode === 'pixelmap' ? null : map.previewChannels[mainIdx],
 			cableEdgeId: null,
 			blockers: [],
 			warnings: [],

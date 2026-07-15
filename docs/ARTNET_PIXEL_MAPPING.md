@@ -1,15 +1,48 @@
-# Art-Net & pixel mapping — capability landscape (WO-241)
+# Art-Net & pixel mapping — capability landscape (WO-241, updated WO-242)
 
 **Status:** Canonical reference (2026-07) | **Binary:** `bin/casparcg` highascg-build-v1, deployed 2026-07-15 — see [CASPARCG_BUILD_PROVENANCE.md](CASPARCG_BUILD_PROVENANCE.md)
-**Walkthroughs:** [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines) · [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md) (live JS pipeline)
+**Walkthroughs:** [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines, primary flow) · [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md) (live JS pipeline, [DEPRECATED — legacyJsPixelmap flag])
 
 This rig has **three independent engines** that turn live video into DMX-over-network (Art-Net / sACN). They coexist; pick per production. Everything below is read from the code actually deployed — source cites are `file:line` into the built Caspar tree (`/home/casparcg/caspar-build/src-tree/`) and this repo.
 
 ---
 
+## Pixel-map screen (native) — primary flow (WO-242)
+
+**Recommended default as of WO-242.** Device View can now create a dedicated `pixelmap` screen
+destination end-to-end: a Caspar channel (custom raster-exact video-mode) plus a generated native
+`<artnet>` consumer, wired up automatically — no hand-editing `config/casparcg.config` and no risk of
+the block being wiped by the next regen (that gap, flagged in WO-241 below, is closed).
+
+1. **Device View → rear panel → destination type "Pixel Map".** Set label, fixture columns/rows,
+   controller IP, start universe, start DMX address, fixture type (RGB/RGBW), DMX refresh rate, and
+   (optionally) a custom raster width/height/fps — same panel as any other screen destination
+   (`client/components/device-view-destinations-inspector-form.js`).
+2. **Apply Caspar config (restart)** — same WO-236 restart-dirty affordance as every other
+   config-affecting Device View change; any pixel-map field edit turns the button orange.
+3. The generator emits the channel + `<artnet>` consumer block automatically on every regen —
+   see [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) for the exact schema and a
+   worked 8×4-wall example, and `src/config/config-generator-consumer-attach.js` (`buildPixelmapChannel`)
+   for the implementation.
+4. **Looks integration for free:** the pixel-map channel registers as a **PGM-only** screen (WO-160b
+   path — same mechanism as any "PGM only" destination), so it appears in decks/screen selectors,
+   respects custom screen labels (WO-222), and takes onto it run the pgm-only path automatically. No
+   preview bus is allocated for it.
+5. **What you lose vs. the legacy JS pipeline:** Art-Net only (no sACN), and every fixture-array
+   change needs a config regen + Caspar restart (no live remapping mid-show). If you need either of
+   those, re-enable the legacy engine below via `settings.ui.legacyJsPixelmap` instead.
+
+---
+
 ## The three engines
 
-### 1. HighAsCG JS sampling pipeline — [LIVE-EDITABLE]
+### 1. HighAsCG JS sampling pipeline — [LIVE-EDITABLE] · [DEPRECATED — legacyJsPixelmap flag]
+
+**WO-242:** this engine's UI (Pixel Map editor overlay, "+ Add mapping node" in Device View) is now
+hidden by default — the code is untouched and still fully functional, but new fixtures/mappings can't
+be created from the UI unless `settings.ui.legacyJsPixelmap` is set to `true` (default `false`/absent).
+Prefer the native "Pixel-map screen" flow above unless you specifically need sACN output or
+restart-free live remapping (see the walkthrough for the honest trade-off).
 
 The WO-179 pipeline inside the Node server. Caspar streams a downscaled copy of a program channel back to Node (`ADD <ch> STREAM` MPEG-TS + local ffmpeg, or a FILE consumer on dedicated slot 97 — `src/sampling/dmx-sampling-ingress.js:17`), a worker thread samples per-fixture regions, and `src/sampling/dmx-output.js` transmits **Art-Net (npm dmxnet) or sACN (npm sacn) per fixture**. Fixtures are edited in the UI and applied **without touching Caspar's config or restarting anything** (`index.js:316` re-runs `SamplingManager.updateConfig()` on every settings save).
 
@@ -72,6 +105,12 @@ Concrete production ideas, each pointing at the right engine.
 
 - **[PLANNED] WO-228 hybrid sws sampling** — replace the JS worker's stride-capped averaging with a Caspar-side ffmpeg `scale=cols:rows:flags=area` consumer feeding the existing live-editable output path (drafted in `work/work-orders/225_WO_ARTNET_INVESTIGATION.md`). Not implemented; today the UDP ingress already downscales with `flags=area` (`dmx-sampling-ingress.js:152`) but the per-cell average is still JS-side.
 - **[PLANNED] WO-180 GDTF fixture import/export** — industry fixture exchange (`.gdtf`) into/out of the pixel-map fixture model. Research-stage only (`work/work-orders/180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md`).
-- The **config generator emits no `<artnet>`/`<pixel>` blocks** (nothing in `src/config/` references them; only the JS listener defaults in `src/config/defaults-core.js:125-130`). Native-consumer blocks are manual config edits and are **lost on the next Device View regen** — re-add after every "Apply Caspar config". Generator support was drafted as WO-230 (retarget note in WO-233).
+- **[DONE — WO-242]** The config generator now emits `<artnet>` consumer blocks automatically for
+  `pixelmap` screen destinations (`src/config/config-generator-consumer-attach.js`
+  `buildPixelmapChannel`) — those survive every regen. This does **not** cover the manual
+  single-fixture `<artnet>` edit from the LED-wall walkthrough's step 4, nor the `<pixel>` consumer:
+  both are still hand-edited config and are **lost on the next Device View regen** — re-add after
+  every "Apply Caspar config" if you use either outside a `pixelmap` destination. Generator support
+  for `<pixel>` remains undrafted follow-up work.
 - JS Art-Net output is clamped to universes 0–15 (`dmx-output.js:30`); use sACN or the native consumers above that.
 - All three engines are 8-bit (`artnet_consumer.cpp:745`, `pixel_consumer.cpp:140`).

@@ -233,4 +233,10 @@ module.exports = {
 	getStandardModeChoices,
 	getLowestStandardVideoModeId,
 	resolveLiveAudioInputChannelMode,
+	// WO-242: pre-existing latent bug fix — project-fps.js requires this but it was never exported,
+	// so inferProjectFpsFromConfig() threw "readScreenConfigValue is not a function" for any config
+	// missing machineProfile.defaultProjectFps (e.g. handleAddDestination on a fresh install). Found
+	// while adding the T242.7 CRUD smoke test; fixing since it's on the pixelmap "create destination"
+	// path this WO relies on.
+	readScreenConfigValue,
 }

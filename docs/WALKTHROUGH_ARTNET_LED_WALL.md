@@ -6,13 +6,23 @@
 
 Scenario: an **8×4-panel LED wall** behind the stage, each panel driven as one RGB pixel-block, wall controller at `192.168.1.50`, Art-Net universe 0.
 
+**WO-242 update:** for exactly this scenario — one fixture group sampling the *whole* channel raster,
+row-major grid, RGB/RGBW — Device View can now generate this whole config for you: create a
+`pixelmap` screen destination (rear panel → destination type "Pixel Map") with the same
+columns/rows/IP/universe/address/color-order/refresh-rate values, then **Apply Caspar config
+(restart)**. See docs/ARTNET_PIXEL_MAPPING.md's "Pixel-map screen (native) — primary flow" section.
+The manual walk below is still the right tool for anything the generated single-fixture-group model
+doesn't cover — multiple `<fixture>` groups per channel, partial/off-center sample regions, rotation,
+or mirror-x/y — and it's how `buildPixelmapChannel` (`src/config/config-generator-consumer-attach.js`)
+itself was derived, so the schema table in step 2 is still the source of truth either way.
+
 ---
 
 ## 1. Dedicate a Caspar channel to wall content
 
 Give the wall its own channel so wall looks/loops don't fight PGM. The consumer samples whatever the channel renders — media, HTML templates, a routed copy of PGM. A small video mode is fine (the consumer rescales per fixture region anyway); 8-bit only — the consumer refuses to attach to deep-color channels ("Artnet consumer only supports 8-bit color depth.", `artnet_consumer.cpp:745-746`).
 
-On this rig channels come from the Device View generator (`config/casparcg.config` is generated). The `<artnet>` block is **not** emitted by the generator (no artnet-consumer support anywhere in `src/config/`), so it is added by hand — see step 4.
+On this rig channels come from the Device View generator (`config/casparcg.config` is generated). As of WO-242 the generator *can* emit a single-fixture-group `<artnet>` block automatically for a `pixelmap` screen destination (see the update note above) — this manual walk instead hand-edits an `<artnet>` block onto an arbitrary existing channel (step 4), which is still how you'd add a second/partial fixture group, rotation, or mirroring the generated model doesn't expose.
 
 ## 2. The real `<artnet>` consumer schema
 

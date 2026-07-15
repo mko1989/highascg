@@ -44,7 +44,17 @@ export function renderDestinationInspector(args) {
 
 	const rows = [
 		{ label: 'Label', value: String(d?.label || d?.id || 'Destination') },
-		{ label: 'Mode', value: mode === 'pgm_only' ? 'PGM only' : (mode === 'multiview' ? 'Multiview' : 'PGM/PRV') },
+		{
+			label: 'Mode',
+			value:
+				mode === 'pgm_only'
+					? 'PGM only'
+					: mode === 'multiview'
+						? 'Multiview'
+						: mode === 'pixelmap'
+							? 'Pixel Map (native Art-Net)'
+							: 'PGM/PRV',
+		},
 		{ label: 'Main index', value: String(d?.mainScreenIndex ?? 0) },
 		...(mode !== 'multiview' && mode !== 'stream'
 			? [{
@@ -58,7 +68,7 @@ export function renderDestinationInspector(args) {
 		{ label: 'FPS', value: String(Math.max(1, parseFloat(String(d?.fps ?? 50)) || 50)) },
 		{ label: 'PGM channel', value: intent?.pgmChannel != null ? String(intent.pgmChannel) : '-' },
 	]
-	if (mode !== 'pgm_only' && mode !== 'multiview') {
+	if (mode !== 'pgm_only' && mode !== 'multiview' && mode !== 'pixelmap') {
 		rows.push({
 			label: 'PRV channel',
 			value: intent == null ? '-' : String(intent.previewChannelIntended ?? intent.previewChannelGenerated ?? '-'),
@@ -149,13 +159,15 @@ export function renderDestinationInspector(args) {
 		{ value: 'pgm_prv', label: 'PGM/PRV' },
 		{ value: 'pgm_only', label: 'PGM only' },
 		{ value: 'multiview', label: 'Multiview' },
+		{ value: 'pixelmap', label: 'Pixel Map (native Art-Net)' },
 	]) {
 		const option = document.createElement('option')
 		option.value = opt.value
 		option.textContent = opt.label
 		modeSel.appendChild(option)
 	}
-	modeSel.value = mode === 'pgm_only' ? 'pgm_only' : (mode === 'multiview' ? 'multiview' : 'pgm_prv')
+	modeSel.value =
+		mode === 'pgm_only' ? 'pgm_only' : (mode === 'multiview' ? 'multiview' : (mode === 'pixelmap' ? 'pixelmap' : 'pgm_prv'))
 	modeSel.addEventListener('change', () => patchDestination(d.id, { mode: modeSel.value }))
 
 	const audioOutputsFieldId = `dest_audio_outputs_${String(d?.id || 'dest').replace(/[^a-zA-Z0-9_-]/g, '_')}`
@@ -290,6 +302,121 @@ export function renderDestinationInspector(args) {
 	rm.textContent = 'Remove destination'
 	rm.addEventListener('click', () => removeDestination(d.id))
 
+	// WO-242: fixture-array fields for the native <artnet> consumer — schema mirrors
+	// docs/WALKTHROUGH_ARTNET_LED_WALL.md exactly (rows/cols -> fixture-count "cols x rows",
+	// start-universe/start-address/color-order/refresh-rate map 1:1 onto <fixture>/<refresh-rate>).
+	let pixelmapFields = []
+	if (mode === 'pixelmap') {
+		const art = d?.artnet && typeof d.artnet === 'object' ? d.artnet : {}
+		const field = (labelText, input) => {
+			const wrap = Object.assign(document.createElement('div'), {
+				style: 'display:flex; flex-direction:column; gap:4px; width:100%',
+			})
+			const lab = Object.assign(document.createElement('label'), {
+				className: 'device-view__inspector-label',
+				textContent: labelText,
+				style: 'font-size:10px;opacity:.7',
+			})
+			wrap.append(lab, input)
+			return wrap
+		}
+		const patchArtnet = (patch) => patchDestination(d.id, { artnet: patch })
+
+		const ipIn = document.createElement('input')
+		ipIn.type = 'text'
+		ipIn.className = 'device-view__destinations-type'
+		ipIn.placeholder = '192.168.1.50'
+		ipIn.value = String(art.ip || '')
+		ipIn.title = 'Art-Net controller / node IP (fixture/host — required, valid IPv4)'
+		ipIn.addEventListener('change', () => patchArtnet({ ip: String(ipIn.value || '').trim() }))
+
+		const colsIn = document.createElement('input')
+		colsIn.type = 'number'
+		colsIn.min = '1'
+		colsIn.step = '1'
+		colsIn.className = 'device-view__destinations-type'
+		colsIn.title = 'Fixture columns (horizontal panel count)'
+		colsIn.value = String(Math.max(1, parseInt(String(art.cols ?? 1), 10) || 1))
+		colsIn.addEventListener('change', () => patchArtnet({ cols: Math.max(1, parseInt(String(colsIn.value || 1), 10) || 1) }))
+		attachMathInput(colsIn, { decimals: 0 })
+
+		const rowsIn = document.createElement('input')
+		rowsIn.type = 'number'
+		rowsIn.min = '1'
+		rowsIn.step = '1'
+		rowsIn.className = 'device-view__destinations-type'
+		rowsIn.title = 'Fixture rows (vertical panel count)'
+		rowsIn.value = String(Math.max(1, parseInt(String(art.rows ?? 1), 10) || 1))
+		rowsIn.addEventListener('change', () => patchArtnet({ rows: Math.max(1, parseInt(String(rowsIn.value || 1), 10) || 1) }))
+		attachMathInput(rowsIn, { decimals: 0 })
+
+		const colorOrderSel = document.createElement('select')
+		colorOrderSel.className = 'device-view__destinations-type'
+		colorOrderSel.title = 'Fixture type (fixture/type)'
+		for (const opt of [{ value: 'RGB', label: 'RGB (3ch)' }, { value: 'RGBW', label: 'RGBW (4ch)' }]) {
+			const option = document.createElement('option')
+			option.value = opt.value
+			option.textContent = opt.label
+			colorOrderSel.appendChild(option)
+		}
+		colorOrderSel.value = String(art.colorOrder || 'RGB').toUpperCase() === 'RGBW' ? 'RGBW' : 'RGB'
+		colorOrderSel.addEventListener('change', () => patchArtnet({ colorOrder: colorOrderSel.value }))
+
+		const startUniverseIn = document.createElement('input')
+		startUniverseIn.type = 'number'
+		startUniverseIn.min = '0'
+		startUniverseIn.max = '32767'
+		startUniverseIn.step = '1'
+		startUniverseIn.className = 'device-view__destinations-type'
+		startUniverseIn.title = 'Start Art-Net universe (fixture/universe, 0-32767). Additional universes auto-spill upward.'
+		startUniverseIn.value = String(Math.min(32767, Math.max(0, parseInt(String(art.startUniverse ?? 0), 10) || 0)))
+		startUniverseIn.addEventListener('change', () =>
+			patchArtnet({ startUniverse: Math.min(32767, Math.max(0, parseInt(String(startUniverseIn.value || 0), 10) || 0)) }),
+		)
+		attachMathInput(startUniverseIn, { decimals: 0 })
+
+		const startAddressIn = document.createElement('input')
+		startAddressIn.type = 'number'
+		startAddressIn.min = '1'
+		startAddressIn.max = '512'
+		startAddressIn.step = '1'
+		startAddressIn.className = 'device-view__destinations-type'
+		startAddressIn.title = 'Start DMX channel of the first fixture (fixture/start-address, 1-512)'
+		startAddressIn.value = String(Math.min(512, Math.max(1, parseInt(String(art.startAddress ?? 1), 10) || 1)))
+		startAddressIn.addEventListener('change', () =>
+			patchArtnet({ startAddress: Math.min(512, Math.max(1, parseInt(String(startAddressIn.value || 1), 10) || 1)) }),
+		)
+		attachMathInput(startAddressIn, { decimals: 0 })
+
+		const refreshRateIn = document.createElement('input')
+		refreshRateIn.type = 'number'
+		refreshRateIn.min = '1'
+		refreshRateIn.step = '1'
+		refreshRateIn.className = 'device-view__destinations-type'
+		refreshRateIn.title = 'DMX sends/sec, decoupled from the channel video rate (refresh-rate, default 10)'
+		refreshRateIn.value = String(Math.max(1, parseInt(String(art.refreshRateHz ?? 10), 10) || 10))
+		refreshRateIn.addEventListener('change', () =>
+			patchArtnet({ refreshRateHz: Math.max(1, parseInt(String(refreshRateIn.value || 10), 10) || 10) }),
+		)
+		attachMathInput(refreshRateIn, { decimals: 0 })
+
+		pixelmapFields = [
+			field('Controller IP', ipIn),
+			field('Fixture columns', colsIn),
+			field('Fixture rows', rowsIn),
+			field('Fixture type', colorOrderSel),
+			field('Start universe', startUniverseIn),
+			field('Start DMX address', startAddressIn),
+			field('DMX refresh rate (Hz)', refreshRateIn),
+		]
+
+		const note = document.createElement('p')
+		note.className = 'device-view__note'
+		note.textContent =
+			'This channel samples its own full raster into one native <artnet> fixture group (whole-frame area averaging). Universes beyond the first auto-spill per the deployed consumer’s addressing rule. Regenerate + restart Caspar to apply.'
+		pixelmapFields.push(note)
+	}
+
 	edits.append(nameIn, mainIn, modeSel)
 	if (mode !== 'multiview' && mode !== 'stream') {
 		const audioOutputsWrap = Object.assign(document.createElement('div'), {
@@ -304,7 +431,9 @@ export function renderDestinationInspector(args) {
 		audioOutputsWrap.append(audioLab, audioLayoutSel)
 		edits.append(audioOutputsWrap)
 	}
-	edits.append(vmSel, widthIn, heightIn, fpsIn, rm)
+	edits.append(vmSel, widthIn, heightIn, fpsIn)
+	if (pixelmapFields.length) edits.append(...pixelmapFields)
+	edits.append(rm)
 	host.append(
 		Object.assign(document.createElement('p'), { className: 'device-view__status', textContent: 'Selected destination' }),
 		table,

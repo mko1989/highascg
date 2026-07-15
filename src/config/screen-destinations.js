@@ -4,6 +4,60 @@ const defaults = require('./defaults')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeProgramLayout } = require('./audio-channel-layouts')
 
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+
+/**
+ * `parseInt(...) || def` silently discards a legitimate `0` (falsy) and substitutes `def` instead
+ * of clamping it — wrong whenever `def !== min` (e.g. refresh-rate default 10, min 1; port default
+ * 6454, min 1). This clamps the *parsed* value, only substituting `def` when parsing truly failed.
+ * @param {unknown} raw
+ * @param {number} def
+ * @param {number} min
+ * @param {number} max
+ */
+function clampedInt(raw, def, min, max) {
+	const n = parseInt(String(raw ?? def), 10)
+	const v = Number.isFinite(n) ? n : def
+	return Math.min(max, Math.max(min, v))
+}
+
+function isValidIpv4(s) {
+	const m = IPV4_RE.exec(String(s || '').trim())
+	if (!m) return false
+	return m.slice(1, 5).every((oct) => {
+		const n = parseInt(oct, 10)
+		return Number.isFinite(n) && n >= 0 && n <= 255
+	})
+}
+
+/**
+ * WO-242: `pixelmap` destination fixture-array params, mapped 1:1 onto the real native `<artnet>`
+ * consumer schema documented (with `artnet_consumer.cpp` cites) in
+ * docs/WALKTHROUGH_ARTNET_LED_WALL.md — only schema elements listed there are used.
+ * `rows` x `cols` become one `<fixture-count>cols x rows</fixture-count>` group covering the
+ * whole channel raster (row-major grid, per the walkthrough's 8x4-wall example).
+ * @param {Record<string, unknown>} raw
+ */
+function normalizeArtnetFixtureArray(raw) {
+	const a = raw && typeof raw === 'object' ? raw : {}
+	const ip = isValidIpv4(a.ip) ? String(a.ip).trim() : ''
+	// artnet_consumer.cpp:595-600 — fixture/port, 1-65535 (Art-Net standard 6454).
+	const port = clampedInt(a.port, 6454, 1, 65535)
+	// artnet_consumer.cpp:602-607 — fixture/universe, 0-32767.
+	const startUniverse = clampedInt(a.startUniverse, 0, 0, 32767)
+	// artnet_consumer.cpp:577-583 — fixture/start-address, 1-based DMX, 1-512.
+	const startAddress = clampedInt(a.startAddress, 1, 1, 512)
+	// artnet_consumer.cpp:633-645 — fixture/type: DIMMER | RGB | RGBW (case-insensitive). WO-242's
+	// model exposes RGB/RGBW only (no per-pixel dimmer walls in this flow).
+	const colorOrder = String(a.colorOrder || 'RGB').trim().toUpperCase() === 'RGBW' ? 'RGBW' : 'RGB'
+	// artnet_consumer.cpp:609-631 — fixture/fixture-count "WxH" grid; rows/cols map to H/W (walkthrough step 3).
+	const rows = clampedInt(a.rows, 1, 1, 4096)
+	const cols = clampedInt(a.cols, 1, 1, 4096)
+	// artnet_consumer.cpp:748-751,:67 — refresh-rate, int >= 1 DMX sends/sec, default 10.
+	const refreshRateHz = clampedInt(a.refreshRateHz, 10, 1, 1000)
+	return { ip, port, startUniverse, startAddress, colorOrder, rows, cols, refreshRateHz }
+}
+
 function normalizeDestination(d) {
 	if (!d || typeof d !== 'object') return null
 	const id = String(d.id || '').trim()
@@ -22,11 +76,17 @@ function normalizeDestination(d) {
 					? 'stream'
 					: modeRaw === 'host_channel'
 						? 'host_channel'
-						: 'pgm_prv'
+						: modeRaw === 'pixelmap'
+							? 'pixelmap'
+							: 'pgm_prv'
 	const width = Math.max(64, parseInt(String(d.width ?? 1920), 10) || 1920)
 	const height = Math.max(64, parseInt(String(d.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(d.fps ?? 50)) || 50)
-	const videoMode = String(d.videoMode || '1080p5000').trim() || '1080p5000'
+	// WO-242: pixelmap screens are raster-exact by default (custom WxH), not a standard mode,
+	// since the fixture grid is normally sized to the wall, not a stock broadcast resolution.
+	const videoMode = String(
+		d.videoMode != null && d.videoMode !== '' ? d.videoMode : mode === 'pixelmap' ? 'custom' : '1080p5000',
+	).trim() || (mode === 'pixelmap' ? 'custom' : '1080p5000')
 	const std = videoMode !== 'custom' ? STANDARD_VIDEO_MODES[videoMode] : null
 	const hostRole = String(d.hostRole || '').trim()
 	const casparChannel = parseInt(String(d.casparChannel ?? ''), 10)
@@ -63,6 +123,9 @@ function normalizeDestination(d) {
 		if (Number.isFinite(casparChannel) && casparChannel >= 1) base.casparChannel = casparChannel
 		if (Number.isFinite(inputSlot) && inputSlot >= 1) base.inputSlot = inputSlot
 		if (d.sourceId) base.sourceId = String(d.sourceId)
+	}
+	if (mode === 'pixelmap') {
+		base.artnet = normalizeArtnetFixtureArray(d.artnet)
 	}
 	return base
 }
@@ -144,4 +207,5 @@ module.exports = {
 	destinationsFromConfig,
 	routingDestinationsFromConfig,
 	destinationAudioLayoutsByMain,
+	clampedInt,
 }

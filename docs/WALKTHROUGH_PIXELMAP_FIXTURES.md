@@ -1,8 +1,18 @@
 # Walkthrough — live-editable pixel-map fixtures (HighAsCG JS pipeline)
 
-**Badge:** [LIVE-EDITABLE] — everything here re-applies on save with **no Caspar restart** and no config regen.
+**Badge:** [DEPRECATED — legacyJsPixelmap flag] · [LIVE-EDITABLE] — everything here re-applies on save with **no Caspar restart** and no config regen.
 **Engine:** WO-179 sampling pipeline (`src/sampling/`, `src/artnet/`, `client/lib/dmx-state.js`). Cites are `file:line` in this repo.
 **Landscape / engine choice:** [ARTNET_PIXEL_MAPPING.md](ARTNET_PIXEL_MAPPING.md)
+
+**WO-242:** this whole engine is deprecated in favor of native `pixelmap` screen destinations
+(dedicated Caspar channel + native `<artnet>` consumer — see
+[WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) and the "Pixel-map screen (native)
+— primary flow" section of [ARTNET_PIXEL_MAPPING.md](ARTNET_PIXEL_MAPPING.md)). The code below still
+works exactly as documented, but its UI entry points (Pixel Map editor overlay, "+ Add mapping node")
+are now hidden unless `settings.ui.legacyJsPixelmap` is set to `true`. Only this engine gives you
+**sACN output** and **restart-free live remapping** — the native path is Art-Net only and requires a
+config regen + Caspar restart per change. Re-enable the flag if you specifically need those two
+properties; otherwise use the native flow.
 
 Use this engine when the mapping changes during the show: pixel tape you re-aim after a set change, house-light sACN washes, anything you want to nudge from FOH mid-act.
 

@@ -92,7 +92,10 @@ function resolvePreviewEnabledByMain(config, screenCount) {
 			continue
 		}
 		const picked = perMain.find(d => String(d.mode || 'pgm_prv') === 'pgm_prv') || perMain[0]
-		out[idx] = String(picked.mode || 'pgm_prv') !== 'pgm_only'
+		// WO-242: pixelmap screens are PGM-only (native <artnet> consumer channel), same as pgm_only —
+		// no PRV bus is allocated (routing-map.js previewChannels[idx] stays null for them).
+		const pickedMode = String(picked.mode || 'pgm_prv')
+		out[idx] = pickedMode !== 'pgm_only' && pickedMode !== 'pixelmap'
 	}
 	return out
 }

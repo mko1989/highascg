@@ -87,9 +87,12 @@ function handleAddDestination(j, ctx) {
 				? 'multiview'
 				: reqType === 'stream'
 					? 'stream'
-					: 'pgm_prv'
+					: reqType === 'pixelmap'
+						? 'pixelmap'
+						: 'pgm_prv'
 	const mvCount = top.destinations.filter(d => d.mode === 'multiview').length
 	const streamCount = top.destinations.filter(d => d.mode === 'stream').length
+	const pixelmapCount = top.destinations.filter(d => d.mode === 'pixelmap').length
 	const defaultLabel =
 		mode === 'multiview'
 			? `Multiview ${mvCount + 1}`
@@ -97,11 +100,15 @@ function handleAddDestination(j, ctx) {
 				? `Stream ${streamCount + 1}`
 				: mode === 'pgm_only'
 					? `PGM ${nextMain + 1}`
-					: `PGM/PRV ${nextMain + 1}`
+					: mode === 'pixelmap'
+						? `Pixel Map ${pixelmapCount + 1}`
+						: `PGM/PRV ${nextMain + 1}`
 	const projectFps = resolveProjectFps(ctx.config)
 	const defaultMode = defaultVideoModeForProjectFps(projectFps)
 	const std = STANDARD_VIDEO_MODES[defaultMode] || STANDARD_VIDEO_MODES['1080p5000']
-	const reqVideoMode = String(j.addDestination.videoMode || defaultMode).trim() || defaultMode
+	// WO-242: pixelmap screens default to a raster-exact custom mode (see normalizeDestination)
+	// unless the operator explicitly requests a standard videoMode.
+	const reqVideoMode = String(j.addDestination.videoMode || (mode === 'pixelmap' ? 'custom' : defaultMode)).trim() || defaultMode
 	const reqStd = STANDARD_VIDEO_MODES[reqVideoMode] || std
 	top.destinations.push({
 		id,
@@ -116,6 +123,7 @@ function handleAddDestination(j, ctx) {
 		fps: Math.max(1, j.addDestination.fps || reqStd.fps),
 		inheritsProjectFps: j.addDestination.inheritsProjectFps !== false,
 		stream: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' },
+		...(mode === 'pixelmap' ? { artnet: j.addDestination.artnet && typeof j.addDestination.artnet === 'object' ? j.addDestination.artnet : {} } : {}),
 	})
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
@@ -128,7 +136,10 @@ function handleUpdateDestination(j, ctx) {
 	const top = normalizeScreenDestinations(ctx.config?.screenDestinations)
 	const idx = top.destinations.findIndex(d => d.id === id); if (idx < 0) return { error: 'Not found', id }
 	const d0 = top.destinations[idx]; const p = j.updateDestination
-	const nextMode = p.mode === 'pgm_only' || p.mode === 'pgm_prv' || p.mode === 'multiview' || p.mode === 'stream' ? p.mode : d0.mode
+	const nextMode =
+		p.mode === 'pgm_only' || p.mode === 'pgm_prv' || p.mode === 'multiview' || p.mode === 'stream' || p.mode === 'pixelmap'
+			? p.mode
+			: d0.mode
 	
 	let nextWidth = p.width || d0.width
 	let nextHeight = p.height || d0.height
@@ -167,6 +178,11 @@ function handleUpdateDestination(j, ctx) {
 					quality: p.stream.quality != null ? String(p.stream.quality) : String(d0.stream?.quality || 'medium'),
 				}
 				: (d0.stream || { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' }),
+		// WO-242: merge partial artnet fixture-array patches (rows/cols/ip/universe/…) onto the
+		// existing object so per-field edits from the inspector don't clobber sibling fields.
+		...(nextMode === 'pixelmap' || d0.mode === 'pixelmap'
+			? { artnet: { ...(d0.artnet || {}), ...(p.artnet && typeof p.artnet === 'object' ? p.artnet : {}) } }
+			: {}),
 	}
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next

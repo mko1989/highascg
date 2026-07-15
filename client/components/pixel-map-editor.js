@@ -5,6 +5,8 @@ import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { api } from '../lib/api-client.js'
 import { mappingState } from '../lib/mapping-state.js'
 import { createPixelMapCanvasController } from './pixel-map-editor-canvas.js'
+import { settingsState } from '../lib/settings-state.js'
+import { showScenesToast } from './scenes-editor-support.js'
 
 export function initPixelMapEditor(root, stateStore) {
 	let wrap = null
@@ -114,6 +116,15 @@ export function initPixelMapEditor(root, stateStore) {
 
 	window.addEventListener('highascg-pixel-mapping-open', async (ev) => {
 		if (!ev.detail?.nodeId) return
+		// WO-242: JS pixel-mapping (this editor) is [DEPRECATED] in favor of native Pixel Map screen
+		// destinations. Code stays intact — gated behind settings.ui.legacyJsPixelmap (default off).
+		if (settingsState.getSettings?.()?.ui?.legacyJsPixelmap !== true) {
+			showScenesToast(
+				'JS pixel-mapping is deprecated. Use a native "Pixel Map" screen destination instead, or enable settings.ui.legacyJsPixelmap to restore this editor.',
+				'warn',
+			)
+			return
+		}
 		const target = document.getElementById('tab-device-view')
 		hostContainer = target || root || document.body
 		if (editor.parentElement !== hostContainer) hostContainer.appendChild(editor)

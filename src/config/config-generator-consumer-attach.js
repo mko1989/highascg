@@ -32,6 +32,8 @@ const {
 	channelVideoModeForDecklinkConsumer,
 	pickDecklinkParentVideoMode,
 } = require('./decklink-output-resolve')
+const { computeArtnetUniverseSpill } = require('./artnet-pixelmap-universe')
+const { clampedInt } = require('./screen-destinations')
 
 /**
  * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + primary SDI
@@ -378,6 +380,72 @@ function buildExtraAudioChannel(config, i, dims, casparChannelNum) {
 }
 
 /**
+ * WO-242: dedicated Caspar channel for a native `pixelmap` screen destination — a custom video-mode
+ * raster feeding one native `<artnet>` consumer fixture group. XML shape is strictly the schema
+ * documented (with `artnet_consumer.cpp` line cites) in docs/WALKTHROUGH_ARTNET_LED_WALL.md — the
+ * whole channel raster is sampled by one `<fixture>` (center box == full frame, matching the
+ * walkthrough's 8x4-wall example), `fixture-count` = `<cols>x<rows>` (row-major grid).
+ * PGM-only: no `<screen>`/DeckLink/NDI/RTMP consumers — this channel exists to drive the wall.
+ * @param {Record<string, unknown>} config
+ * @param {ReturnType<import('./screen-destinations').normalizeDestination>} dest
+ * @param {any} dims - `{ width, height, fps, modeId, isCustom }` from `getModeDimensions`
+ * @param {number|null|undefined} casparChannelNum
+ */
+function buildPixelmapChannel(config, dest, dims, casparChannelNum) {
+	const art = dest && typeof dest.artnet === 'object' && dest.artnet ? dest.artnet : {}
+	const ip = escapeXml(String(art.ip || ''))
+	const port = clampedInt(art.port, 6454, 1, 65535)
+	const startUniverse = clampedInt(art.startUniverse, 0, 0, 32767)
+	const startAddress = clampedInt(art.startAddress, 1, 1, 512)
+	const colorOrder = String(art.colorOrder || 'RGB').toUpperCase() === 'RGBW' ? 'RGBW' : 'RGB'
+	const rows = clampedInt(art.rows, 1, 1, 4096)
+	const cols = clampedInt(art.cols, 1, 1, 4096)
+	const refreshRateHz = clampedInt(art.refreshRateHz, 10, 1, 1000)
+	const channelsPerFixture = colorOrder === 'RGBW' ? 4 : 3
+	const width = Math.max(64, parseInt(String(dims?.width ?? 1920), 10) || 1920)
+	const height = Math.max(64, parseInt(String(dims?.height ?? 1080), 10) || 1080)
+
+	const spill = computeArtnetUniverseSpill({ rows, cols, channelsPerFixture, startAddress, startUniverse })
+
+	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
+	const label = escapeXml(String(dest?.label || 'Pixel Map'))
+	const universeNote =
+		spill.universesUsed > 1
+			? `universes ${spill.startUniverse}-${spill.endUniverse} (${spill.universesUsed} universes, auto-spill)`
+			: `universe ${spill.startUniverse}`
+	const fixturesXml = `
+                    <fixtures>
+                        <fixture>
+                            <type>${colorOrder}</type>
+                            <start-address>${startAddress}</start-address>
+                            <fixture-count>${cols}x${rows}</fixture-count>
+                            <fixture-channels>${channelsPerFixture}</fixture-channels>
+                            <host>${ip}</host>
+                            <port>${port}</port>
+                            <universe>${startUniverse}</universe>
+                            <x>${Math.round(width / 2)}</x>
+                            <y>${Math.round(height / 2)}</y>
+                            <width>${width}</width>
+                            <height>${height}</height>
+                            <brightness>1.0</brightness>
+                        </fixture>
+                    </fixtures>`
+	return `${channelXmlComment(
+		`Caspar channel ${ch}: Pixel-map screen "${label}" — native <artnet> wall ${cols}x${rows} ${colorOrder} @ ${art.ip || '(no host set)'}, ${universeNote}`,
+	)}        <channel>
+            <video-mode>${dims.modeId}</video-mode>
+            <consumers>
+                <artnet>
+                    <refresh-rate>${refreshRateHz}</refresh-rate>${fixturesXml}
+                </artnet>
+            </consumers>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
+        </channel>`
+}
+
+/**
  * WO-53: one dedicated channel per live input. The producer (DeckLink/ALSA) is PLAYed here over AMCP,
  * so the channel-level OSC meter is isolated to that single input. DeckLink uses a full-quality mode
  * (`inputs_channel_mode`); audio-only ALSA uses the cheap lowest standard mode. No config consumers.
@@ -483,6 +551,7 @@ module.exports = {
 	buildMultiviewChannel,
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
+	buildPixelmapChannel,
 	buildInputChannel,
 	buildHostLiveChannel,
 	buildStreamingChannel,

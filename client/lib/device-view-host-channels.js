@@ -398,6 +398,8 @@ const SCREEN_DEST_TYPE_OPTIONS = [
 	{ value: 'pgm_prv', label: 'PGM/PRV' },
 	{ value: 'pgm_only', label: 'PGM only' },
 	{ value: 'multiview', label: 'Multiview' },
+	// WO-242: dedicated channel + native <artnet> consumer for an LED/pixel-map fixture array.
+	{ value: 'pixelmap', label: 'Pixel Map' },
 ]
 
 /** @param {HTMLSelectElement} selectEl @param {object | null | undefined} [_payload] */

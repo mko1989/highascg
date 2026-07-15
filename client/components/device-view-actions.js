@@ -69,7 +69,13 @@ export async function removeDestination(id) {
 
 export async function addDestination(typeOrOptions) {
 	const o = typeOrOptions && typeof typeOrOptions === 'object' ? typeOrOptions : { type: typeOrOptions }
-	const t = o.type === 'pgm_only' ? 'pgm_only' : (o.type === 'multiview' ? 'multiview' : (o.type === 'host_channel' ? 'host_channel' : 'pgm_prv'))
+	const t = o.type === 'pgm_only'
+		? 'pgm_only'
+		: (o.type === 'multiview'
+			? 'multiview'
+			: (o.type === 'host_channel'
+				? 'host_channel'
+				: (o.type === 'pixelmap' ? 'pixelmap' : 'pgm_prv')))
 	const mainScreenIndex = Number.isFinite(Number(o.mainScreenIndex)) ? Number(o.mainScreenIndex) : undefined
 	const addDestination = { type: t }
 	if (mainScreenIndex != null) addDestination.mainScreenIndex = Math.max(0, mainScreenIndex)

@@ -87,7 +87,7 @@ export function renderDestinations(ctx) {
 		const keyPgm = `${main}:pgm`
 		for (const el of chipByKey.get(keyPgm) || []) el.classList.add('device-view__channel-chip--active')
 		for (const el of destinationByKey.get(keyPgm) || []) el.classList.add('device-view__destination--active')
-		if (intent.mode !== 'pgm_only') {
+		if (intent.mode !== 'pgm_only' && intent.mode !== 'pixelmap') {
 			const keyPrv = `${main}:prv`
 			for (const el of chipByKey.get(keyPrv) || []) el.classList.add('device-view__channel-chip--active')
 			for (const el of destinationByKey.get(keyPrv) || []) el.classList.add('device-view__destination--active')
@@ -271,7 +271,7 @@ export function renderDestinations(ctx) {
 		const mainFromIntent = Number.isFinite(intent?.mainScreenIndex) ? intent.mainScreenIndex : main
 		if (mode !== 'multiview' && mode !== 'stream' && mode !== 'host_channel') {
 			addDestinationKey(`${mainFromIntent}:pgm`, b)
-			if (mode !== 'pgm_only') addDestinationKey(`${mainFromIntent}:prv`, b)
+			if (mode !== 'pgm_only' && mode !== 'pixelmap') addDestinationKey(`${mainFromIntent}:prv`, b)
 		} else if (mode === 'multiview') {
 			const mvIdx = intent?.mainScreenIndex ?? destinationsList.filter(x => x.mode === 'multiview').indexOf(d)
 			addDestinationKey(`mv:${mvIdx}`, b)

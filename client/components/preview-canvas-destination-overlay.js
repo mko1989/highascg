@@ -41,7 +41,7 @@ export function createDestinationLayoutOverlay(ctx) {
 				w,
 				h,
 				label: String(d.label || id),
-				sub: d.mode === 'pgm_only'
+				sub: d.mode === 'pgm_only' || d.mode === 'pixelmap'
 					? `Screen ${main + 1} · PGM ch ${pgm ?? '?'}`
 					: `Screen ${main + 1} · PGM ch ${pgm ?? '?'} · PRV ch ${prv ?? pgm ?? '?'}`,
 				pgmCh: pgm,
@@ -134,7 +134,7 @@ export function createDestinationLayoutOverlay(ctx) {
 			frame.style.borderRadius = '4px'
 			frame.style.overflow = 'hidden'
 			el.appendChild(frame)
-			if (b.mode === 'pgm_only') {
+			if (b.mode === 'pgm_only' || b.mode === 'pixelmap') {
 				const single = document.createElement('div')
 				single.style.position = 'absolute'
 				single.style.inset = '0'

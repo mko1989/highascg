@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-07-15T13:26:21.696Z",
+  "generatedAt": "2026-07-15T16:10:59.306Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -632,6 +632,14 @@
       "order": 81
     },
     {
+      "id": "ARTNET_PIXEL_MAPPING",
+      "title": "Art-Net & pixel mapping — capability landscape (WO-241, updated WO-242)",
+      "file": "ARTNET_PIXEL_MAPPING.md",
+      "category": "Reference",
+      "description": "**Status:** Canonical reference (2026-07) | **Binary:** `bin/casparcg` highascg-build-v1, deployed 2026-07-15 — see [CASPARCG_BUILD_PROVENANCE.md](CASPARCG_BUIL",
+      "order": 900
+    },
+    {
       "id": "CASPARCG_BUILD_PROVENANCE",
       "title": "CasparCG highascg-build-v1 — provenance manifest",
       "file": "CASPARCG_BUILD_PROVENANCE.md",
@@ -661,6 +669,22 @@
       "file": "wiki/integration/virtual-camera-output.md",
       "category": "Reference",
       "description": "Feed Caspar program output to **Zoom**, **OBS**, or other apps as a **V4L2 webcam** plus an optional **ALSA virtual mic**. HighAsCG uses the same safe JPEG buff",
+      "order": 900
+    },
+    {
+      "id": "WALKTHROUGH_ARTNET_LED_WALL",
+      "title": "Walkthrough — LED wall on the native Art-Net consumer",
+      "file": "WALKTHROUGH_ARTNET_LED_WALL.md",
+      "category": "Reference",
+      "description": "**Badge:** [CONFIG+CASPAR-RESTART] — every step in this doc that changes fixtures requires a Caspar restart.",
+      "order": 900
+    },
+    {
+      "id": "WALKTHROUGH_PIXELMAP_FIXTURES",
+      "title": "Walkthrough — live-editable pixel-map fixtures (HighAsCG JS pipeline)",
+      "file": "WALKTHROUGH_PIXELMAP_FIXTURES.md",
+      "category": "Reference",
+      "description": "**Badge:** [DEPRECATED — legacyJsPixelmap flag] · [LIVE-EDITABLE] — everything here re-applies on save with **no Caspar restart** and no config regen.",
       "order": 900
     }
   ]

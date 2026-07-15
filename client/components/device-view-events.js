@@ -102,12 +102,18 @@ export function attachDeviceViewEvents(ctx) {
 		const type = rawType
 		const newMainIdx = type === 'multiview' ? 0 : highest + 1
 		const newScreenN = type === 'multiview' ? 0 : newMainIdx + 1
+		// WO-242: pixelmap screens default to a raster-exact custom video-mode server-side
+		// (screen-destinations.js normalizeDestination) — don't force a standard project mode here.
 		void Actions.addDestination({
 			type,
 			mainScreenIndex: newMainIdx,
-			videoMode: defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(state.currentSettings)),
+			...(type === 'pixelmap'
+				? {}
+				: { videoMode: defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(state.currentSettings)) }),
 		}).then(async () => {
-			if (newScreenN >= 1 && state.currentSettings) {
+			// Pixel-map screens drive a wall over Art-Net, not a GPU/monitor output — skip the
+			// screen-consumer seeding used for physical PGM/PGM-only screens.
+			if (newScreenN >= 1 && type !== 'pixelmap' && state.currentSettings) {
 				const cs =
 					state.currentSettings.casparServer && typeof state.currentSettings.casparServer === 'object'
 						? state.currentSettings.casparServer

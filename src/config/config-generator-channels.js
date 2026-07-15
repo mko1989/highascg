@@ -9,6 +9,7 @@ const {
 	buildMultiviewChannel,
 	buildInputsHostChannel,
 	buildExtraAudioChannel,
+	buildPixelmapChannel,
 	buildInputChannel,
 	buildHostLiveChannel,
 	buildStreamingChannel,
@@ -84,6 +85,14 @@ function buildChannelsSection(config, routeMap) {
 	}
 
 	for (const s of plan.screens) {
+		// WO-242: pixelmap screens skip the generic PGM/PRV screen-consumer build entirely — one
+		// PGM-only channel carrying a native <artnet> consumer, no PRV pair, no GPU screen consumer.
+		if (s.pixelmap) {
+			const pgmChNum = routeMap.programCh(s.n)
+			setChannelXml(pgmChNum, buildPixelmapChannel(config, s.pixelmap, s.dims, pgmChNum))
+			if (s.dims.isCustom) pushCustomMode(customVideoModes, customModeIds, s.dims)
+			continue
+		}
 		const info = layout.screens[s.n]
 		const pair = buildScreenPairChannels(config, routeMap, {
 			n: s.n,

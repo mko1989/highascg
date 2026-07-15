@@ -31,7 +31,8 @@ function destinationToVideoSource(destination) {
 	const mode = String(destination?.mode || 'pgm_prv')
 	const mainIndex = Math.max(0, parseInt(String(destination?.mainScreenIndex ?? 0), 10) || 0)
 	if (mode === 'multiview') return 'multiview'
-	if (mode === 'pgm_only' || mode === 'pgm_prv') return `program_${mainIndex + 1}`
+	// WO-242: pixelmap is a PGM-only program bus too (dedicated channel), same source-id shape as pgm_only.
+	if (mode === 'pgm_only' || mode === 'pgm_prv' || mode === 'pixelmap') return `program_${mainIndex + 1}`
 	return 'program_1'
 }
 

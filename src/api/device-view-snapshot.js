@@ -182,11 +182,12 @@ function buildDestinationCasparIntent(ctx) {
 			continue
 		}
 		const mainIdx = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
-		const mode = modeRaw === 'pgm_only' ? 'pgm_only' : (modeRaw === 'multiview' ? 'multiview' : (modeRaw === 'stream' ? 'stream' : 'pgm_prv'))
+		const mode = modeRaw === 'pgm_only' ? 'pgm_only' : (modeRaw === 'multiview' ? 'multiview' : (modeRaw === 'stream' ? 'stream' : (modeRaw === 'pixelmap' ? 'pixelmap' : 'pgm_prv')))
 		const pgmCh = mode === 'multiview' ? (map.multiviewCh ?? null) : (map.programChannels?.[mainIdx] ?? null)
 		const prvGen = (mode === 'multiview' || mode === 'stream') ? null : (map.previewChannels?.[mainIdx] ?? null)
-		if (mode === 'pgm_only') pgmOnlyCount++; if (prvGen != null) generatedPreviewCount++
-		items.push({ id: String(d.id || ''), label: String(d.label || d.id || ''), mainScreenIndex: mainIdx, mode, pgmChannel: pgmCh, previewChannelIntended: mode === 'pgm_only' ? null : prvGen, previewChannelGenerated: prvGen, previewChannelGeneratedEnabled: (map.previewEnabledByMain || [])[mainIdx] !== false, videoMode: String(d.videoMode || ''), width: d.width || null, height: d.height || null, fps: d.fps || null })
+		// WO-242: pixelmap is PGM-only too (native <artnet> consumer channel, no PRV bus).
+		if (mode === 'pgm_only' || mode === 'pixelmap') pgmOnlyCount++; if (prvGen != null) generatedPreviewCount++
+		items.push({ id: String(d.id || ''), label: String(d.label || d.id || ''), mainScreenIndex: mainIdx, mode, pgmChannel: pgmCh, previewChannelIntended: (mode === 'pgm_only' || mode === 'pixelmap') ? null : prvGen, previewChannelGenerated: prvGen, previewChannelGeneratedEnabled: (map.previewEnabledByMain || [])[mainIdx] !== false, videoMode: String(d.videoMode || ''), width: d.width || null, height: d.height || null, fps: d.fps || null })
 	}
 	return { items, pgmOnlyCount, generatedPreviewCount }
 }

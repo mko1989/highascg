@@ -3,6 +3,17 @@
  */
 import * as MappingNode from '../lib/mapping-node-service.js'
 import { appendCableAffordance } from './device-view-cable-affordance.js'
+import { settingsState } from '../lib/settings-state.js'
+
+/**
+ * WO-242: the JS pixel-mapping pipeline (this band's "+ Add mapping node" entry point, cabled
+ * fixture DMX output) is deprecated in favor of native `pixelmap` screen destinations. Hidden
+ * behind `settings.ui.legacyJsPixelmap` (default off) — existing nodes/code are untouched, this
+ * only stops *new* ones being created from the UI. See docs/ARTNET_PIXEL_MAPPING.md.
+ */
+function legacyJsPixelmapEnabled() {
+	return settingsState.getSettings?.()?.ui?.legacyJsPixelmap === true
+}
 
 function addPortNodeDot(portEl, connectorId, onPortStartCable, key, data, dotSide = 'right') {
 	if (!portEl || !connectorId) return
@@ -27,16 +38,33 @@ export function renderMappingsBand(ctx) {
 		onAddMappingNode,
 		mappingPersist,
 	} = ctx
+	const legacyOn = legacyJsPixelmapEnabled()
+	const nodes = (lastPayload?.graph?.devices || []).filter((d) => d.role === 'pixel_mapping')
+
 	const band = document.createElement('div')
 	band.className = 'device-view__band device-view__band--mappings'
 	band.innerHTML =
-		'<div class="device-view__destinations-head"><h3 style="margin:0">Pixel Mappings</h3><button type="button" class="header-btn" data-add-mapping title="Add mapping node">+</button></div><div class="device-view__ports" data-mapping-nodes></div>'
+		`<div class="device-view__destinations-head"><h3 style="margin:0">Pixel Mappings</h3>${
+			legacyOn ? '<button type="button" class="header-btn" data-add-mapping title="Add mapping node">+</button>' : ''
+		}</div><div class="device-view__ports" data-mapping-nodes></div>`
 
 	const ports = band.querySelector('[data-mapping-nodes]')
 	const addBtn = band.querySelector('[data-add-mapping]')
 	if (addBtn) addBtn.addEventListener('click', () => { if (typeof onAddMappingNode === 'function') onAddMappingNode() })
 
-	const nodes = (lastPayload?.graph?.devices || []).filter((d) => d.role === 'pixel_mapping')
+	// WO-242: JS pixel-mapping is [DEPRECATED] — hide the "+" entry point when the legacy flag is
+	// off. Existing mapping nodes (if any survive from before the flag was flipped) still render so
+	// nothing already cabled silently disappears; only *new* ones are blocked from the UI.
+	if (!legacyOn && !nodes.length) {
+		ports.appendChild(
+			Object.assign(document.createElement('p'), {
+				className: 'device-view__note',
+				textContent:
+					'JS pixel-mapping is deprecated — use a native Pixel Map screen destination instead (rear-panel destination type “Pixel Map”). Enable settings.ui.legacyJsPixelmap to restore this legacy editor.',
+			}),
+		)
+		return band
+	}
 	if (!nodes.length) {
 		ports.appendChild(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'No mapping nodes. Click + to add.' }))
 		return band
