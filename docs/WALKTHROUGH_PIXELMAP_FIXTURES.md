@@ -8,8 +8,7 @@
 (dedicated Caspar channel + native `<artnet>` consumer — see
 [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) and the "Pixel-map screen (native)
 — primary flow" section of [ARTNET_PIXEL_MAPPING.md](ARTNET_PIXEL_MAPPING.md)). The code below still
-works exactly as documented, but its UI entry points (Pixel Map editor overlay, "+ Add mapping node")
-are now hidden unless `settings.ui.legacyJsPixelmap` is set to `true`. Only this engine gives you
+works exactly as documented, but its fixture-creation UI is now hidden unless `settings.ui.legacyJsPixelmap` is set to `true`. (Note: the Device View "mapping nodes" band — "+ Add mapping node" button — is a separate canvas-splitting feature and remains fully active; see the Pixel Map tab inspector and ARTNET_PIXEL_MAPPING.md for clarity.) Only this engine gives you
 **sACN output** and **restart-free live remapping** — the native path is Art-Net only and requires a
 config regen + Caspar restart per change. Re-enable the flag if you specifically need those two
 properties; otherwise use the native flow.

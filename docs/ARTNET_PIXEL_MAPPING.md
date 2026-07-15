@@ -38,9 +38,8 @@ the block being wiped by the next regen (that gap, flagged in WO-241 below, is c
 
 ### 1. HighAsCG JS sampling pipeline — [LIVE-EDITABLE] · [DEPRECATED — legacyJsPixelmap flag]
 
-**WO-242:** this engine's UI (Pixel Map editor overlay, "+ Add mapping node" in Device View) is now
-hidden by default — the code is untouched and still fully functional, but new fixtures/mappings can't
-be created from the UI unless `settings.ui.legacyJsPixelmap` is set to `true` (default `false`/absent).
+**WO-242:** this engine's fixture inspector (in the "Pixel Map" tab) is now hidden by default — the code is untouched and still fully functional, but new fixtures can't be created from the UI unless `settings.ui.legacyJsPixelmap` is set to `true` (default `false`/absent).
+(Note: mapping nodes — the "+ Add mapping node" button in Device View — are NOT part of this pipeline; they are the canvas-splitting output feature and remain fully active.)
 Prefer the native "Pixel-map screen" flow above unless you specifically need sACN output or
 restart-free live remapping (see the walkthrough for the honest trade-off).
 

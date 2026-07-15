@@ -368,8 +368,8 @@ describe('WO-242 T242.5/T242.6: UI wiring + legacy-flag deprecation gate (source
 
 	it('legacyJsPixelmap settings flag exists, defaults off, and gates the JS pixel-map UI entry points', () => {
 		assert.match(read('src/config/defaults-core.js'), /legacyJsPixelmap:\s*false/)
-		assert.match(read('client/components/pixel-map-editor.js'), /legacyJsPixelmap/)
-		assert.match(read('client/components/device-view-mappings-render.js'), /legacyJsPixelmap/)
+		// Note: WO-253 removed the gates from pixel-map-editor.js and device-view-mappings-render.js.
+		// The flag remains defined but unused; see WO-253 T253.1.
 	})
 
 	it('docs badge the JS pipeline deprecated and document the native pixelmap screen flow', () => {
@@ -377,5 +377,54 @@ describe('WO-242 T242.5/T242.6: UI wiring + legacy-flag deprecation gate (source
 		assert.match(docs, /DEPRECATED/i)
 		assert.match(docs, /legacyJsPixelmap/)
 		assert.match(docs, /Pixel-map screen \(native\)/i)
+	})
+})
+
+describe('WO-253 T253.1/T253.2/T253.4: Un-deprecate mapping nodes + rename + docs scope', () => {
+	const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
+
+	it('T253.1 + T253.4: pixel-map-editor.js contains NO legacyJsPixelmap gate', () => {
+		const editor = read('client/components/pixel-map-editor.js')
+		assert.doesNotMatch(editor, /legacyJsPixelmap/, 'legacyJsPixelmap gate removed from pixel-map-editor.js')
+		assert.doesNotMatch(editor, /showScenesToast.*deprecated/, 'deprecation toast removed')
+	})
+
+	it('T253.1 + T253.4: device-view-mappings-render.js renders the + button unconditionally', () => {
+		const mappings = read('client/components/device-view-mappings-render.js')
+		assert.doesNotMatch(mappings, /settingsState/, 'settingsState import removed')
+		assert.doesNotMatch(mappings, /legacyJsPixelmapEnabled/, 'legacyJsPixelmapEnabled function removed')
+		assert.doesNotMatch(mappings, /!legacyOn && !nodes\.length/, 'deprecation note conditional removed')
+		assert.match(mappings, /data-add-mapping/, 'add button present')
+		assert.match(mappings, /Mapping nodes/, 'heading text correct')
+	})
+
+	it('T253.2: device-view band heading says "Mapping nodes" (not "Pixel Mappings")', () => {
+		const mappings = read('client/components/device-view-mappings-render.js')
+		assert.match(mappings, /Mapping nodes/, 'heading renamed to "Mapping nodes"')
+		assert.doesNotMatch(mappings, /Pixel Mappings/, 'old "Pixel Mappings" heading removed')
+	})
+
+	it('T253.2: device-view-inspector-mapping.js section title says "Mapping Node" (not "Pixel Mapping Node")', () => {
+		const inspector = read('client/components/device-view-inspector-mapping.js')
+		assert.match(inspector, /section\('Mapping Node'\)/, 'section title renamed')
+		assert.doesNotMatch(inspector, /section\('Pixel Mapping Node'\)/, 'old title removed')
+	})
+
+	it('T253.1 + T253.2: device-view-inspector-mapping.js editor button has no deprecation title', () => {
+		const inspector = read('client/components/device-view-inspector-mapping.js')
+		assert.doesNotMatch(inspector, /editorBtn\.title = /, 'deprecated title attribute removed')
+		assert.match(inspector, /editorBtn\.textContent = 'Show Mapping Preview'/, 'button text preserved')
+	})
+
+	it('T253.3: docs corrected: mapping nodes are canvas-splitting, not the deprecated JS pipeline', () => {
+		const docs = read('docs/ARTNET_PIXEL_MAPPING.md')
+		assert.match(docs, /mapping nodes.*canvas-splitting.*remain.*active/, 'docs clarify mapping nodes are active')
+		assert.doesNotMatch(docs, /Pixel Map editor overlay, ".*Add mapping node/, 'old incorrect description removed')
+	})
+
+	it('T253.3: walkthroughs clarify mapping nodes are not the JS engine', () => {
+		const fixtures = read('docs/WALKTHROUGH_PIXELMAP_FIXTURES.md')
+		assert.match(fixtures, /mapping nodes.*separate canvas-splitting/, 'walkthrough clarifies the distinction')
+		assert.doesNotMatch(fixtures, /UI entry points.*Pixel Map editor overlay.*Add mapping node/, 'old incorrect JS UI list corrected')
 	})
 })

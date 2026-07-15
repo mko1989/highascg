@@ -32,8 +32,8 @@ Grep-level: pixel-map-editor.js contains NO legacyJsPixelmap gate; mappings-rend
 ## Constraints (standard)
 No git ops beyond reading history, no service ops, no AMCP, no HTTP, no vite build, curated gate ONLY. node --check + eslint --quiet; exact counts; honest checkboxes.
 
-- [ ] T253.1 gating reverted (3 files)
-- [ ] T253.2 display rename
-- [ ] T253.3 docs re-scoped
-- [ ] T253.4 smoke
+- [x] T253.1 gating reverted (3 files)
+- [x] T253.2 display rename
+- [x] T253.3 docs re-scoped
+- [x] T253.4 smoke
 - [ ] A253.1 (owner) mapping node editor opens again; native Pixel Map destination unaffected

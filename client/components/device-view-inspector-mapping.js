@@ -35,7 +35,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 		host.appendChild(h)
 	}
 
-	section('Pixel Mapping Node')
+	section('Mapping Node')
 
 	const row = (label, input) => {
 		const wrap = document.createElement('div')
@@ -294,7 +294,6 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 	editorBtn.className = 'mv-btn'
 	editorBtn.style.cssText = 'width:100%;margin-bottom:8px;padding:8px;display:flex;align-items:center;justify-content:center;gap:6px'
 	editorBtn.textContent = 'Show Mapping Preview'
-	editorBtn.title = 'JS pixel-mapping is deprecated — prefer a native Pixel Map screen destination (WO-242). settings.ui.legacyJsPixelmap re-enables this editor.'
 	editorBtn.onclick = () => {
 		window.dispatchEvent(new CustomEvent('highascg-open-pixel-mapping', { detail: { nodeId: node.id } }))
 	}
