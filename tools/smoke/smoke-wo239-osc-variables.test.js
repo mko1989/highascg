@@ -72,6 +72,13 @@ function attachStateShim(ctx) {
 describe('WO-239 T239.1/T239.3 — osc-variables per-layer derivation, old + new OSC format', () => {
 	it('new lineage: nested foreground/producer + file/time populates clip/time/remaining/progress', () => {
 		const os = makeOscState()
+		// First tick: the `producer` leaf's signature transitions from unset -> 'ffmpeg', which
+		// clears file timing (new-producer guard in osc-state.js `_routeLayer`). Second tick (steady
+		// state, signature unchanged) mirrors the real bundle cadence — same pattern as
+		// smoke-wo235-osc-compat.test.js's "new lineage" case.
+		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/name', args: ['BRIDGE/355317'] })
+		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [3.96, 5.04] })
+		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/producer', args: ['ffmpeg'] })
 		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/name', args: ['BRIDGE/355317'] })
 		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [4.06, 5.04] })
 		os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/producer', args: ['ffmpeg'] })
@@ -103,6 +110,11 @@ describe('WO-239 T239.1/T239.3 — osc-variables per-layer derivation, old + new
 			'variables cleared, not frozen at the last value',
 		() => {
 			const os = makeOscState({ layerStaleTimeoutMs: 5 })
+			// Two ticks: first sets the producer signature (which clears file timing on transition),
+			// second is steady state with real timing — mirrors the live bundle cadence.
+			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/name', args: ['BRIDGE/355317'] })
+			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [3.96, 5.04] })
+			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/producer', args: ['ffmpeg'] })
 			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/name', args: ['BRIDGE/355317'] })
 			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [4.06, 5.04] })
 			os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/producer', args: ['ffmpeg'] })
