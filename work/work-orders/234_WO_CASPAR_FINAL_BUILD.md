@@ -232,3 +232,11 @@ Backoff logic itself (1s→2s→4s→8s→16s, 25 attempts/level, capped 30s, tr
 ## 2026-07-15 — OWNER OVERRIDE on #1751
 "Its a media server. i can see multiple uses for pixel consumer." → #1751 verdict SKIP is OVERRIDDEN to MERGE (generic full-frame pixel raster output has standalone value beyond the fixture-mapping use case: raw grid walls, external processors, analysis taps). Revised apply order: base → Enhanced 18 → #1763 → #1761 → #1691 → #1727 → **#1751** → #1762 (mixer core last). Conflict note from review: #1751 is a self-contained new consumer module — no overlap with improved-artnet files expected; verify at cherry-pick.
 Owner also requires: **full provenance documentation** — see work/CASPAR_BUILD_MANIFEST.md (which feature comes from which PR/repo, kept current through the build).
+
+## 2026-07-15 — BUILT ON THIS BOX (owner: dev machine, full power)
+- Deps installed by owner; configure: cmake 3.28.3/ninja, Release, USE_SYSTEM_CEF=OFF, CEF pre-seeded from the kit tarball (hash-verified). PortAudio found.
+- One compile fix required: Enhanced's oal/portaudio consumers used C++17 `[=]` this-captures — error under base's gnu++20 -Werror. Patched to `[=, this]` (6 lambdas), branch commit b96e58d.
+- Build: 108/108 targets, linked shell/casparcg (9.3MB), sha stamped 2.6.0 Dev (Revision: 253c16c).
+- Verified: artnet_consumer/pixel_consumer/portaudio/oal/reconnect symbols present; BLUR/SHARPEN/GRAIN shader code present; ldd with the production LD_LIBRARY_PATH resolves /home/casparcg/highascg/lib/libcef.so — which is BYTE-IDENTICAL (sha256 fa0993fa...) to the pinned v.142 tarball's libcef.so, so the existing lib/ tree needs NO changes.
+- STAGED: bin/casparcg.new (old binary untouched). Bundle regenerated UNSHALLOWED + self-tested (clone from bundle OK) — the earlier bundle was shallow/incomplete.
+- REMAINING (owner): maintenance-window swap per DEPLOY.md — mv bin/casparcg bin/casparcg.prev && mv bin/casparcg.new bin/casparcg && restart Caspar; soak: playout + PortAudio audio + artnet consumer + a MIXER BLUR smoke; rollback = swap back.
