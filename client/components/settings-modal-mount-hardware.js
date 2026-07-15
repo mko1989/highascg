@@ -306,12 +306,21 @@ export function wireSystemTimeListeners(modal) {
 		}
 
 		const date = dateInput.value?.trim()
-		const time = timeInput.value?.trim()
+		let time = timeInput.value?.trim()
 
 		if (!date || !time) {
 			if (resultLine) resultLine.textContent = 'Error: Date and time are required'
 			return
 		}
+
+		/* 24h text field (the native type="time" input capped hours at 12 in 12h locales).
+		 * Accept H:MM, HH:MM or HH:MM:SS; normalize to HH:MM:SS. */
+		const tm = time.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/)
+		if (!tm) {
+			if (resultLine) resultLine.textContent = 'Error: time must be HH:MM[:SS] (24h, 00-23 hours)'
+			return
+		}
+		time = `${tm[1].padStart(2, '0')}:${tm[2]}:${tm[3] ?? '00'}`
 
 		const confirmed = confirm(
 			'Warning: changing system time while recording or streaming can disturb timestamps. Continue?',

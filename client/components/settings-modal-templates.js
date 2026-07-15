@@ -220,8 +220,8 @@ export function getMainModalHtml() {
 									<input type="date" id="system-time-date-input" style="width:12rem" />
 								</div>
 								<div style="flex:0 1 auto">
-									<label for="system-time-time-input" style="display:block;font-size:0.85rem;margin-bottom:0.2rem">Time (HH:MM:SS)</label>
-									<input type="time" id="system-time-time-input" style="width:8rem" />
+									<label for="system-time-time-input" style="display:block;font-size:0.85rem;margin-bottom:0.2rem">Time (HH:MM:SS, 24h)</label>
+									<input type="text" id="system-time-time-input" style="width:8rem" placeholder="14:30:00" inputmode="numeric" spellcheck="false" />
 								</div>
 								<button type="button" class="btn btn--secondary" id="system-time-set-btn">Set time</button>
 							</div>
