@@ -1,6 +1,7 @@
 'use strict'
 
 const EventEmitter = require('events')
+const { isSaneTimingValue, computeRemainingAndProgress } = require('./osc-state-timing')
 
 /**
  * WO-235 T235.1: permanent, default-off raw OSC trace. Enable with `HIGHASCG_OSC_TRACE=1`
@@ -448,15 +449,10 @@ class OscState extends EventEmitter {
 			// WO-235: guard against rare extreme-magnitude float garbage observed live (e.g.
 			// elapsed ~1e-32 / duration ~1e+23 for a producer mid-teardown/init) — a single
 			// insane sample must not corrupt or flicker the UI timer; keep the previous value.
-			const SANE_MAX_SECONDS = 30 * 24 * 3600 // 30 days
-			// Reject both ends of the observed garbage (subnormal-magnitude AND astronomically
-			// large) — legit frame-granular seconds are never nonzero-but-smaller than ~1ms.
-			const isSane = (n) =>
-				Number.isFinite(n) && n > -1e-3 && (n === 0 || Math.abs(n) >= 1e-3) && Math.abs(n) <= SANE_MAX_SECONDS
 			const elapsedRaw = Number(vals[0])
 			const durationRaw = vals.length >= 2 ? Number(vals[1]) : NaN
-			const elapsed = isSane(elapsedRaw) ? elapsedRaw : Number.isFinite(f.elapsed) ? f.elapsed : null
-			if (isSane(durationRaw)) f.duration = durationRaw
+			const elapsed = isSaneTimingValue(elapsedRaw) ? elapsedRaw : Number.isFinite(f.elapsed) ? f.elapsed : null
+			if (isSaneTimingValue(durationRaw)) f.duration = durationRaw
 			f.elapsed = elapsed
 			// WO-250 T250.3: some builds report `file/time` duration as 0/absent (e.g. mid-init)
 			// even though `file/frame` (frameElapsed/frameTotal, routed below) and `file/fps` are
@@ -464,21 +460,20 @@ class OscState extends EventEmitter {
 			// don't go dark just because `file/time`'s own duration field is empty. Pattern mirrors
 			// src/state/playback-tracker-osc.js:131-138 (elapsedSec/progress -> total). Only fires
 			// when the REAL duration is 0/absent (rollback-safe: a real duration always wins,
-			// untouched); reuses the WO-235 `isSane` clamp so a garbage frameTotal/fps pair can't
+			// untouched); reuses the WO-235 `isSaneTimingValue` clamp so a garbage frameTotal/fps pair can't
 			// corrupt the UI either. Guards fps 0 (division by zero) explicitly.
 			if (!(Number.isFinite(f.duration) && f.duration > 0)) {
 				const frameTotal = Number(f.frameTotal)
 				const fps = Number(f.fps)
 				if (Number.isFinite(frameTotal) && frameTotal > 0 && Number.isFinite(fps) && fps > 0) {
 					const derivedDuration = frameTotal / fps
-					if (isSane(derivedDuration)) f.duration = derivedDuration
+					if (isSaneTimingValue(derivedDuration)) f.duration = derivedDuration
 				}
 			}
 			const duration = Number.isFinite(f.duration) ? f.duration : NaN
-			f.remaining =
-				Number.isFinite(duration) && Number.isFinite(elapsed) ? Math.max(0, duration - elapsed) : null
-			f.progress =
-				Number.isFinite(duration) && duration > 0 && Number.isFinite(elapsed) ? Math.min(1, Math.max(0, elapsed / duration)) : null
+			const { remaining, progress } = computeRemainingAndProgress(elapsed, duration)
+			f.remaining = remaining
+			f.progress = progress
 		} else if (sub === 'frame' && vals.length >= 2) {
 			f.frameElapsed = parseInt(String(vals[0]), 10)
 			f.frameTotal = parseInt(String(vals[1]), 10)
@@ -563,6 +558,50 @@ class OscState extends EventEmitter {
 			channels: JSON.parse(JSON.stringify(this._channels)),
 			updatedAt: now,
 		}
+	}
+
+	/**
+	 * WO-252: Apply AMCP INFO supplemental timing data to fill gaps when the binary omits OSC `file/time`.
+	 * Only writes duration/elapsed when OSC-sourced values are absent (OSC stays authoritative when present —
+	 * rollback-safe). Reuses the WO-235 sanity clamp and recomputes remaining/progress.
+	 * @param {number} ch
+	 * @param {number} layerNum
+	 * @param {{ durationSec?: number, timeSec?: number }} supplement
+	 */
+	applyInfoTimingSupplement(ch, layerNum, supplement) {
+		if (!supplement || typeof supplement !== 'object') return
+		const layer = this._ensureLayer(ch, layerNum)
+		const f = layer.file || (layer.file = {})
+		const now = Date.now()
+		layer._lastOscAt = now
+
+		// Only fill duration if OSC did not provide one.
+		const durationRaw = supplement.durationSec
+		if (!(Number.isFinite(f.duration) && f.duration > 0) && Number.isFinite(durationRaw) && durationRaw > 0) {
+			if (isSaneTimingValue(durationRaw)) {
+				f.duration = durationRaw
+			}
+		}
+
+		// Only fill elapsed if it is entirely absent; OSC elapsed is fresher than a 2s INFO poll.
+		if (!Number.isFinite(f.elapsed)) {
+			const elapsedRaw = supplement.timeSec
+			if (Number.isFinite(elapsedRaw) && elapsedRaw >= 0) {
+				if (isSaneTimingValue(elapsedRaw)) {
+					f.elapsed = elapsedRaw
+				}
+			}
+		}
+
+		// Recompute remaining/progress the same way the file/time branch does.
+		const duration = Number.isFinite(f.duration) ? f.duration : NaN
+		const elapsed = Number.isFinite(f.elapsed) ? f.elapsed : null
+		const { remaining, progress } = computeRemainingAndProgress(elapsed, duration)
+		f.remaining = remaining
+		f.progress = progress
+
+		this._dirtyChannels.add(ch)
+		this._scheduleEmit()
 	}
 
 	clear() {

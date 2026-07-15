@@ -123,13 +123,13 @@ function clearPeriodicSyncTimer(self) {
 }
 
 /**
- * While OSC drives layers, Caspar may omit `file/time` for some clips — poll AMCP INFO on each
+ * While OSC drives layers, the new CasparCG 2.6-dev binary may omit `file/time` for some clips — poll AMCP INFO on each
  * **program** channel (e.g. `INFO 1`) so `state.channels[].layers` stays fresh for the PGM header
  * timer / playback merge. This is **separate** from `periodic_sync_interval_sec` (CLS/TLS/INFO CONFIG).
  *
- * Interval: `osc_info_supplement_ms` in config, else env `HIGHASCG_OSC_INFO_MS`, else **off (0)**.
- * Set **`2000`** or higher (≥ **500**) only if you need AMCP `INFO` for codecs that omit `file/time` on OSC.
- * **`0`** = no periodic `INFO` (OSC-only; default when unset).
+ * Interval: `osc_info_supplement_ms` in config, else env `HIGHASCG_OSC_INFO_MS`, else **default 2000ms**.
+ * Set explicitly to **`0`** to disable (OSC-only). Set to ≥ **500** for active binary that omits durations on OSC.
+ * The new binary needs this for clip durations to appear in multiview/timer bars (WO-252).
  */
 function clearOscPlaybackInfoSupplement() {
 	if (oscPlaybackInfoTimer) {
@@ -149,9 +149,11 @@ function resolveOscInfoSupplementMs(self) {
 		return Number.isFinite(ms) ? ms : 0
 	}
 	const e = process.env.HIGHASCG_OSC_INFO_MS
-	if (e === undefined || e === '') return 0
-	const ms = parseInt(String(e), 10)
-	return Number.isFinite(ms) ? ms : 0
+	if (e !== undefined && e !== '') {
+		const ms = parseInt(String(e), 10)
+		return Number.isFinite(ms) ? ms : 0
+	}
+	return 2000 // Default: 2000ms when unset and no env override
 }
 
 /**

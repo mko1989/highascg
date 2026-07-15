@@ -366,6 +366,18 @@ function updateChannelVariablesFromXml(ctx, ch, xmlStr) {
 					timeSec: layer.timeSec,
 					remainingSec: layer.remainingSec,
 				}
+				// WO-252: Inject INFO timing supplement into oscState for layers missing OSC duration.
+				// The real layer number comes from the parsedLayers array index (layerIdx).
+				if (ctx.oscState?.applyInfoTimingSupplement && Number.isFinite(layerIdx)) {
+					const durationSec = layer.durationSec ? parseFloat(layer.durationSec) : undefined
+					const timeSec = layer.timeSec ? parseFloat(layer.timeSec) : undefined
+					if (Number.isFinite(durationSec) || Number.isFinite(timeSec)) {
+						ctx.oscState.applyInfoTimingSupplement(parseInt(ch, 10), layerIdx, {
+							durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+							timeSec: Number.isFinite(timeSec) ? timeSec : undefined,
+						})
+					}
+				}
 			}
 			if (!ctx.variables) ctx.variables = {}
 			Object.keys(layerData).forEach((layerIdx) => {

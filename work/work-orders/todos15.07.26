@@ -49,3 +49,23 @@ i cant choose a template in the web browser source. also the point of having a s
 i want to prepare and develop this workflow.
 on the operator monitor we get firefox fullscreen with transparent background (picom needed) all the spaces where normaly preview appears in gui should become transparent boxes with caspar special gui screen consumer under the browser.
 another way would be interactive cef but straight not thru pupeteer.
+
+
+the timers in the web ui seem to fight between screens or layers resulting in giberish.
+on multiview the progress bars are gone.
+
+the pip borders doesnt calcualte the cropped part.
+
+there is no way to change which clip/layer should go to pgm 2 when route pgm1 is played with 8ch. i dont wnat a downmix, i want to be able which pair gets routed.
+the audio mixer reports it like its like that but on the stream of the pgm2 i hear ch 3 & 4
+
+
+the playlist doesnt loop again, when loop is set.
+
+
+you did thisJS pixel-mapping is deprecated — use a native Pixel Map screen destination instead (rear-panel destination type “Pixel Map”). Enable settings.ui.legacyJsPixelmap to restore this legacy editor.
+Rear panel
+GPU
+
+
+yet this pixel mapping is a different thing. lets call it mapping node for simplicity. it splits a large canvas into multiple outputs to use as screen consumer spanning multiple monitors or decklink outputs split with subregions.

@@ -23,7 +23,7 @@ function coreDefaults() {
 		host_stats: {
 			scan_folder: false,
 		},
-		osc_info_supplement_ms: null,
+		osc_info_supplement_ms: 2000,
 		hq_thumbnail_prewarm_on_start: true,
 		hq_thumbnail_prewarm_on_media_refresh: true,
 		casparServer: casparServerDefaults(),
