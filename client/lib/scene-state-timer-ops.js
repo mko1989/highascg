@@ -19,7 +19,11 @@ export function mixinSceneStateTimerOps(SceneStateClass) {
 		createTimer(layer, mainIdx) {
 			const timer = createTimerFromLayer(layer, mainIdx)
 			this.timers.push(timer)
-			this._save()
+			/* Debounced persist ONLY — _save() emits 'change' synchronously, which re-renders the
+			 * countdown inspector BEFORE the caller can patch countdownTimerId onto the layer, so the
+			 * re-render auto-creates again → infinite recursion ("too much recursion" app freeze,
+			 * owner-reported 2026-07-15). The caller's patchLayer emits the change for everyone. */
+			this._persist()
 			return timer
 		},
 

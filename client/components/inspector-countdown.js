@@ -14,6 +14,9 @@ import { escapeAttr } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
 import { createHmsInput } from '../lib/duration-hms-input.js'
 
+/** Layers with an auto-create currently in progress (recursion-freeze guard, 2026-07-15). */
+const autoCreateInFlight = new Set()
+
 /** Debounced CG UPDATE from inspector edits (ms) — matches lower-third's cadence. */
 export const COUNTDOWN_CG_UPDATE_DEBOUNCE_MS = 450
 
@@ -91,12 +94,21 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 	const scene = sceneState.getScene(sceneId)
 	const mIdx = resolveMainIndexForScene(scene, sceneState)
 	if (!timerId) {
-		const timer = sceneState.createTimer(layer, mIdx)
-		timerId = timer.id
-		// Update the layer to bind it to the new timer (set countdownTimerId + copy name to label)
-		sceneState.patchLayer(sceneId, layerIndex, {
-			source: { ...src, countdownTimerId: timerId, label: timer.name },
-		})
+		/* Re-entrancy guard: any synchronous 'change' emitted between create and the binding
+		 * patch re-renders this inspector and would auto-create AGAIN (recursion freeze). */
+		const inflightKey = `${sceneId}:${layerIndex}`
+		if (autoCreateInFlight.has(inflightKey)) return null
+		autoCreateInFlight.add(inflightKey)
+		try {
+			const timer = sceneState.createTimer(layer, mIdx)
+			timerId = timer.id
+			// Update the layer to bind it to the new timer (set countdownTimerId + copy name to label)
+			sceneState.patchLayer(sceneId, layerIndex, {
+				source: { ...src, countdownTimerId: timerId, label: timer.name },
+			})
+		} finally {
+			autoCreateInFlight.delete(inflightKey)
+		}
 	}
 
 	const grp = document.createElement('div')

@@ -183,6 +183,19 @@
         "mainIndex": 0
       },
       "externalRef": "DP-6/DP-7"
+    },
+    {
+      "id": "dst_in_host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "marcins-macbook-pro-5.local Scan Converter",
+      "caspar": {
+        "hostRole": "ndi_host",
+        "hostChannel": 7,
+        "hostLayer": 1,
+        "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter"
+      },
+      "externalRef": "host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter"
     }
   ],
   "edges": [
@@ -216,6 +229,5 @@
       "sourceId": "dst_in_dst_pgm_1",
       "sinkId": "audio_1"
     }
-  ],
-  "layout": {}
+  ]
 }
