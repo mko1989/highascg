@@ -14,6 +14,7 @@ const { readDecklinkKeyFillSettings } = require('../config/decklink-key-fill')
 const { listDecklinkOutputStatuses } = require('../config/decklink-output-resolve')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
+const { resolveOperatorMonitorPort } = require('../utils/operator-monitor-resolve')
 const { listPortAudioDevices } = require('../audio/audio-devices')
 const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
 const { resolveDecklinkInputSlots } = require('../config/decklink-input-slots')
@@ -341,10 +342,10 @@ async function buildLiveSnapshot(ctx) {
 			collectedAt: new Date().toISOString(),
 		},
 		gpu: {
-			displays: decoratedDisplays.map(d => ({ 
-				name: d.name, 
-				resolution: d.resolution, 
-				refreshHz: d.refreshHz, 
+			displays: decoratedDisplays.map(d => ({
+				name: d.name,
+				resolution: d.resolution,
+				refreshHz: d.refreshHz,
 			modes: (d.modes || []).slice(0, 64),
 				casparScreenIndex: d.casparScreenIndex,
 				casparMode: d.casparMode,
@@ -354,6 +355,7 @@ async function buildLiveSnapshot(ctx) {
 			})),
 			connectors: sanitizedGpuConnectors,
 			physicalMap: gpuPhysicalMap,
+			operatorMonitor: resolveOperatorMonitorPort(ctx.config || {}),
 		},
 		decklink: buildDecklinkSummary(ctx, decklinkHw),
 		audio: {

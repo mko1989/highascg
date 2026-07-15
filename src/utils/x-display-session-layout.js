@@ -7,6 +7,7 @@ const {
 const {
 	resolvePhysicalPortIndexForDestination,
 } = require('../config/screen-consumer-port-resolve')
+const { resolveOperatorMonitorPort } = require('./operator-monitor-resolve')
 
 /**
  * @typedef {{ x: number, y: number, width: number, height: number, sysId: string|null, kind: 'multiview'|'screen', index: number, interactive: boolean }} OperatorDisplayRect
@@ -199,7 +200,7 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
  * @returns {boolean}
  */
 function isOperatorPointerConfineDesired(config) {
-	if (operatorMonitorPortIndex(config) != null) return true
+	if (resolveOperatorMonitorPort(config).port != null) return true
 	if (config?.operatorTools?.pointerConfineMultiview === true) return true
 	return false
 }
@@ -213,7 +214,7 @@ function isOperatorPointerConfineDesired(config) {
  */
 function resolveOperatorMonitorRect(config, layout) {
 	const plan = layout || calculateLayoutPositions(config)
-	const operatorPort = operatorMonitorPortIndex(config)
+	const operatorPort = resolveOperatorMonitorPort(config).port
 	if (operatorPort) {
 		return resolveLayoutRectForOperatorPort(config, plan, operatorPort)
 	}
