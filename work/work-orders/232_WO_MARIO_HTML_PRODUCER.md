@@ -70,3 +70,34 @@ Full curated offline gate (`node tools/ci/run-offline-tests.js`) re-run after th
 ### File count / sizes
 `template/mario/`: 50 files, 1.2MB total (LICENSE, index.html, css/game.css, 24 js/*.js + 3 js/levels/*.js, 6 sprites/*.png, 14 sounds/*.wav + 2 sounds/*.ogg [silent placeholders, see above]).
 New/modified repo files: `tools/smoke/smoke-wo232-mario-static.test.js` (new), `tools/smoke/smoke-wo232-mario-transparent.live.test.js` (new), `tools/ci/run-offline-tests.js` (added one line to `FILES`).
+
+## Follow-up T232.6 (owner: "controls doesnt work")
+Root cause: input forwards only to the current CEF focus target (src/system/cef-focus-registry.js — set via the live-webpage host / operator-fullscreen flow), and a raw template drop never arms it. Interim workflow documented (webpage-host source at http://127.0.0.1:4200/template/mario/index.html + its focus control).
+- [x] T232.6 Operator-facing "Arm input" toggle: implemented as an inspector group for browser/template sources matching /mario|cef_input_test/i. Operator clicks the toggle in the layer inspector to arm/release input forwarding without the full live-webpage workflow.
+
+### T232.6 Implementation notes
+
+**Server-side (routes-cef-arm-input.js):**
+- POST `/api/cef/arm-input {channel, layer, needle}` — validates parameters, calls `setCefFocusTarget({sourceId: 'layer:${channel}-${layer}', hostChannel, hostLayer, needle, zoneId:'layer'})`, notifies listeners, broadcasts 'cefFocusTarget' change.
+- POST `/api/cef/release-input` — calls `clearCefFocusTarget()`, notifies listeners, broadcasts null.
+- Both routes registered in `src/api/router.js` with `requireCaspar: false` for offline operator use.
+
+**Client-side (inspector-interactive-input.js + inspector-scene-layer.js):**
+- New component `appendInteractiveInputGroup()` checks source value via `isInteractiveSource()` regex (/mario|cef_input_test/i).
+- Single "Arm Input" / "Release Input" toggle button.
+- Posts to endpoints with `channel` and `layer` from the scene context, `needle` from source match.
+- Integrated into `inspector-scene-layer.js` after countdown group (line 205).
+
+**Smoke tests (smoke-wo232-arm-input.test.js):**
+- 11/11 tests passing: route registration checks, arm/release handler behavior, parameter validation, inspector component existence and integration.
+- Added to curated offline gate (tools/ci/run-offline-tests.js).
+
+**Files changed:**
+- **New:** `src/api/routes-cef-arm-input.js` (~100 lines, handler logic)
+- **New:** `client/components/inspector-interactive-input.js` (~115 lines, UI component)
+- **New:** `tools/smoke/smoke-wo232-arm-input.test.js` (~270 lines, test coverage)
+- **Modified:** `src/api/router.js` (import + 2 route registrations)
+- **Modified:** `client/components/inspector-scene-layer.js` (import + 1 function call)
+- **Modified:** `tools/ci/run-offline-tests.js` (1 test file added to FILES array)
+
+Full gate pass: 244 passed / 0 failed / 2 pre-existing skips (unrelated). `npx eslint --quiet` 0 errors. `node --check` all touched files.

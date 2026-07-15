@@ -50,6 +50,7 @@ const routesModules = require('./routes-modules')
 const routesDeviceView = require('./routes-device-view')
 const routesHostLive = require('./routes-host-live')
 const routesCefInteractive = require('./routes-cef-interactive')
+const routesCefArmInput = require('./routes-cef-arm-input')
 const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
 const routesNdi = require('./routes-ndi')
@@ -237,6 +238,10 @@ routes.delete('/api/cef-interactive/focus', ({ path, ctx }) => routesCefInteract
 routes.post('/api/cef-interactive/mouse', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/cef-interactive/keyboard', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/cef-interactive/eval', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
+
+// WO-232 T232.6: Operator-facing arm/release input for interactive templates
+routes.post('/api/cef/arm-input', ({ path, body, ctx }) => routesCefArmInput.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/cef/release-input', ({ path, body, ctx }) => routesCefArmInput.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/device-snapshot/build', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/device-snapshot/schema', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })

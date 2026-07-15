@@ -14,92 +14,11 @@ first of all it looks like casparcg has native artnet consumer.
 second of all there is something baked in that can do pixel averaging (sws_scale)
 third there is a improved artnet consumer, that we could build into the extended version of caspar we are using.
 https://github.com/firecraftgaming/caspar-server/tree/improved-artnet
-
-@firecraftgaming what are your thoughts on the following:
-
-    I am basically trying to map channel output to an RGBW LED matrix. There are a number of controllers that will accept ArtNet data and map it to LED strips.
-
-    Single universe limitation is a bummer. It only allows 128 RGBW LEDs. My idea was for it be the starting universe and allow the number of channels to extend beyond 512.
-
-    I was thinking of making the <fixture-count> parameter accept values like 128x128 instead of specifying individual rows.
-
-    Using <x> and <y> to specify the center of the region is a royal PITA, if you ask me. I'd like to either repurpose them to be the top-left corner (breaking change) or maybe add <top> and <left> tags for that.
-
-    How important is the <rotation> parameter and can't that be handled by the mixer (ie, rotate the image)? The reason I am asking is that instead of doing home-grown color averaging, we can use sws_scale() function to re-scale the region of the image to the exact fixture matrix and then just grab one pixel for each fixture. The only problem is that sws_scale() doesn't do rotation.
-
-    I'd like to be able to specify flux values for the LEDs so that RGB colors can be properly translated to the corresponding R, G, B and W values.
-
-firecraftgaming commented on May 20
-@firecraftgaming
-firecraftgaming
-on May 20
-Contributor
-
-@dimitry-ishenko
-
-I think thats a pretty cool idea.
-
-I did not know about the sws_scale() method, so thank you, I think it could hugely help here. Didnt think of that either, but yeah, rotation can absolutely be handled in the mixer, would make this all easier as well. The reason for x, y to be center was for rotation, so I want them top-left now also, I am just thinking about how to do that without breaking changes, but I am liking your suggestion with <top> and <left> as alternatives.
-
-I havent looked at multi universe before, as my view on it was that you could simple create more consumers for that (before I realised you could max have one consumer, which was fixed by having a sub list in the consumer), but I see your vision, and agree that multi-universe per fixture group would be good.
-
-With the flux / rgbw translation, do you have a specific format or way of exposing that. What would you think would fit the best?
-dimitry-ishenko commented on May 22
-@dimitry-ishenko
-dimitry-ishenko
-on May 22
-ContributorAuthor
-
-@firecraftgaming I thought this over and realized the goals we are trying to achieve are somewhat different. Your approach is oriented towards fixtures with different channel numbers, covering different regions, etc. My goal is essentially to output channel content onto a pixel matrix.
-
-I ended up making a super stripped down version and called it pixel consumer. It has minimal processing and relies on the channel and mixer to do most of the heavy lifting. You can find it in #1751.
-
-To use it, you define a custom channel resolution that matches dimensions of the pixel matrix and refresh rate. When you play an image or a video the channel will automatically re-scale the contents to fill the matrix. And you can use MIXER commands to display a sub-region and/or rotate it.
-
-I am planning to add coefficients to account for different flux values for each color, and maybe "zig-zag" and "reverse" options to accommodate different wiring patterns (although most pixel controllers can do that already).
-
-If you want, take a look and maybe we can figure out how to integrate them. I have a stiff deadline to get this thing into production, so I will have to focus on that.
-
-@Julusian I'd be interested in hearing your opinion whether you think we should keep them separate to try to merge them into one.
-dimitry-ishenko commented on May 22
-@dimitry-ishenko
-dimitry-ishenko
-on May 22
-ContributorAuthor
-
-My other thought was that if we keep it as a separate pixel consumer, we can also add other protocols to it in the future (eg, sACN) that are popular in the pixel matrix community.
-firecraftgaming commented on May 22
-@firecraftgaming
-firecraftgaming
-on May 22
-Contributor
-
-@dimitry-ishenko
-
-I see your vision, and I think that could very well be accomodated for in the artnet consumer. Although I see your stiff deadline, and if you feel like the pixel consumer is better to get it up and running that is probably a good idea.
-
-I have made a new branch that I think should accomodate the needs you have described, however it is currently fully untested, which is why I haven't created a PR for it yet.
-
-If you want to test it, it lives on this branch https://github.com/firecraftgaming/caspar-server/tree/improved-artnet
-Julusian commented on May 22
-@Julusian
-Julusian
-on May 22
-Member
-
-    Hmm, that seems to be a general limitation... @Julusian is there no way to add more than one instance of the same type of consumer to the same channel?
-
-Consumers are 'deduplicated' based on the port number they assign themselves. which is pretty baked into the protocol in a way, as it allows for things like REMOVE 1 DECKLINK 3 to remove the correct thing.
-
-I'm not sure how best to handle that for this artnet one, but it will need to assign itself a different number to allow multiple on a channel.
-
-    My other thought was that if we keep it as a separate pixel consumer,
-
-I dont think that is a problem with the current artnet name, we can either alias the name in the future, or leave it a little confusing but perhaps more descriptive in intention.
-
-    I'd be interested in hearing your opinion whether you think we should keep them separate to try to merge them into one.
-
-I think it would be good to try and combine them so that we have a clearer set of functionality (and less confusion about which to use). I havent read the above enough to get an idea on how viable that is, so do push back if it seems problematic
+current caspar used is the enhanced version from here
+https://github.com/gmeisel01/CasparCG_Enhanced
+i had to build it from source due to custom cef build.
+while we plan on building caspar again do a reserch on github for pull requests that would be beneficial to live events work.
+ill search too and paste found here:
 
 
 
@@ -110,3 +29,5 @@ https://codepen.io/yananas/pen/xrjaGX
 https://github.com/reruns/mario
 python for windows but transparent background
 https://github.com/axonyxquantum/desktop_mario
+
+

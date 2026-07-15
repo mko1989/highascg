@@ -129,7 +129,7 @@
   "multiview_aspect_ratio": "",
   "multiview_enable_mipmaps": false,
   "multiview_key_only": false,
-  "multiview_interactive": false,
+  "multiview_interactive": true,
   "multiview_sbs_key": false,
   "multiview_colour_space": "RGB",
   "multiview_force_linear_filter": false,
@@ -244,5 +244,14 @@
   "screen_2_custom_height": 1080,
   "screen_2_custom_fps": 50,
   "decklink_input_3_direction": "unassigned",
-  "decklink_input_4_direction": "in"
+  "decklink_input_4_direction": "in",
+  "screen_3_high_bitdepth": false,
+  "screen_3_name": "",
+  "screen_3_x": 0,
+  "screen_3_y": 0,
+  "screen_1_operator_monitor": false,
+  "screen_2_operator_monitor": false,
+  "screen_3_operator_monitor": true,
+  "screen_4_operator_monitor": false,
+  "screen_3_nvidia_sync_to_display": false
 }
