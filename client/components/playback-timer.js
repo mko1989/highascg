@@ -310,15 +310,67 @@ export function enrichFileTimingForDisplay(f, fpsFallback = 50) {
 	return resolvePlaybackTimingFromFile(f, fpsFallback).file
 }
 
-export function pickTopLayerStateForPlayback(channelState) {
+/**
+ * Timer band (per-layer countdown overlay, `osc-variables.js`) and the multiview border/chrome
+ * layer never carry a real clip's `file` hints, but if a future producer ever puts *something*
+ * playback-shaped there, they must not be eligible for "top layer" — cheap insurance (WO-250 T250.1).
+ */
+const TIMER_BAND_MIN = 980
+const TIMER_BAND_MAX = 989
+const BORDER_LAYER = 998
+
+function isExcludedPlaybackLayerNum(n) {
+	if (n >= TIMER_BAND_MIN && n <= TIMER_BAND_MAX) return true
+	if (n === BORDER_LAYER) return true
+	return false
+}
+
+/** Bank A: physical layers 10-99. Bank B: 110-199 (`src/osc/osc-state.js` layer keys are per-channel, offset by bank). */
+function bankLayerRange(bank) {
+	return bank === 'b' ? [110, 199] : [10, 99]
+}
+
+/**
+ * Layer whose OSC stopped flowing recently enough that the server hasn't pruned it yet
+ * (`_pruneStaleLayers`, default 10s, `src/osc/osc-config.js:37`) but which is stale relative to
+ * `nowTs` — e.g. the losing bank's frozen layer right after a take. Copied client-side from
+ * `template/multiview-playback-osc.js:24-29` (`isStaleOscPlaybackLayer`) — templates aren't
+ * bundled with the client, so this is a deliberate duplicate, not a divergent implementation;
+ * keep both in sync if the staleness window changes.
+ * @param {object|null|undefined} layerOsc
+ * @param {number|null|undefined} nowTs
+ * @param {number} [staleMs]
+ */
+const STALE_OSC_LAYER_MS = 12000
+function isStaleOscPlaybackLayer(layerOsc, nowTs, staleMs = STALE_OSC_LAYER_MS) {
+	const last = Number(layerOsc?._lastOscAt || 0)
+	const now = Number(nowTs || 0)
+	if (!last || !now) return false
+	return now - last > (Number(staleMs) > 0 ? Number(staleMs) : STALE_OSC_LAYER_MS)
+}
+
+/**
+ * @param {object} [channelState] - `oscClient.channels[ch]`
+ * @param {{ bank?: 'a' | 'b' | null, nowTs?: number }} [opts] - active program-layer bank for this
+ *   channel (`programLayerBankByChannel`, same source the switcher-bus remap reads — see
+ *   `mountPgmTopLayerPlaybackTimer.refresh` below) and the clock to test layer staleness against.
+ *   PRV/bankless channels (no bank entry) and any value other than `'b'` restrict to 10-99.
+ *   Omitting `nowTs` disables the staleness check (no snapshot clock to compare against).
+ */
+export function pickTopLayerStateForPlayback(channelState, opts) {
 	const layers = channelState?.layers
 	if (!layers) return { layerNum: null, layerState: null }
+	const { bank, nowTs } = opts || {}
+	const [lo, hi] = bankLayerRange(bank)
 	let bestN = -1
 	let bestState = null
 	for (const key of Object.keys(layers)) {
 		const n = parseInt(key, 10)
 		if (!Number.isFinite(n)) continue
+		if (isExcludedPlaybackLayerNum(n)) continue
+		if (n < lo || n > hi) continue
 		const ly = layers[key]
+		if (isStaleOscPlaybackLayer(ly, nowTs)) continue
 		const f = ly?.file
 		if (fileHasPlaybackHints(f) && n > bestN) {
 			bestN = n
@@ -390,6 +442,7 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 
 	function refresh() {
 		let chNum = getChannel()
+		let bank = null
 		try {
 			const st = typeof getState === 'function' ? getState() : null
 			const cm = st?.channelMap
@@ -397,16 +450,27 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 				const screenIdx = cm.playbackChannels ? cm.playbackChannels.indexOf(chNum) : -1
 				if (screenIdx >= 0) {
 					const parentCh = cm.programChannels[screenIdx] || 1
-					const bank = st?.scene?.programLayerBankByChannel?.[String(parentCh)] || 'a'
+					bank = st?.scene?.programLayerBankByChannel?.[String(parentCh)] || 'a'
 					const activeCh = bank === 'b' ? cm.switcherBusChannels?.[screenIdx] : cm.switcherBus1Channels?.[screenIdx]
 					if (activeCh) chNum = activeCh
 				}
+			}
+			// T250.1 (WO-250): outside switcher_bus (or no screen match) `chNum` IS the program/logical
+			// channel already, so its own bank entry applies directly — same source
+			// (`state.scene.programLayerBankByChannel`) the remap above reads, just keyed by the
+			// channel we actually have. PRV/bankless channels have no entry → bank stays null →
+			// pickTopLayerStateForPlayback defaults that to the 10-99 range.
+			if (bank == null) {
+				bank = st?.scene?.programLayerBankByChannel?.[String(chNum)] || null
 			}
 		} catch (e) {
 			console.warn('[playback-timer] active ch resolution failed:', e)
 		}
 		const ch = oscClient.channels[String(chNum)] || oscClient.channels[chNum]
-		const { layerNum, layerState } = pickTopLayerStateForPlayback(ch)
+		// T250.1 (WO-250): restrict "topmost layer" to the ACTIVE bank's layer range and skip
+		// stale (about-to-be-pruned) layers — otherwise the losing bank's frozen layer briefly
+		// outranks the live bank's layer right after a take ("gibberish" jump/latch).
+		const { layerNum, layerState } = pickTopLayerStateForPlayback(ch, { bank, nowTs: Date.now() })
 		const rawFile = layerState?.file || {}
 		lastMeta = {
 			layerState: layerState || { file: {} },

@@ -458,6 +458,22 @@ class OscState extends EventEmitter {
 			const elapsed = isSane(elapsedRaw) ? elapsedRaw : Number.isFinite(f.elapsed) ? f.elapsed : null
 			if (isSane(durationRaw)) f.duration = durationRaw
 			f.elapsed = elapsed
+			// WO-250 T250.3: some builds report `file/time` duration as 0/absent (e.g. mid-init)
+			// even though `file/frame` (frameElapsed/frameTotal, routed below) and `file/fps` are
+			// already known on this layer — derive duration from them so the UI/multiview digits+bar
+			// don't go dark just because `file/time`'s own duration field is empty. Pattern mirrors
+			// src/state/playback-tracker-osc.js:131-138 (elapsedSec/progress -> total). Only fires
+			// when the REAL duration is 0/absent (rollback-safe: a real duration always wins,
+			// untouched); reuses the WO-235 `isSane` clamp so a garbage frameTotal/fps pair can't
+			// corrupt the UI either. Guards fps 0 (division by zero) explicitly.
+			if (!(Number.isFinite(f.duration) && f.duration > 0)) {
+				const frameTotal = Number(f.frameTotal)
+				const fps = Number(f.fps)
+				if (Number.isFinite(frameTotal) && frameTotal > 0 && Number.isFinite(fps) && fps > 0) {
+					const derivedDuration = frameTotal / fps
+					if (isSane(derivedDuration)) f.duration = derivedDuration
+				}
+			}
 			const duration = Number.isFinite(f.duration) ? f.duration : NaN
 			f.remaining =
 				Number.isFinite(duration) && Number.isFinite(elapsed) ? Math.max(0, duration - elapsed) : null
