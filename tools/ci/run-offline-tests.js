@@ -59,6 +59,8 @@ const FILES = [
 	'tools/smoke/smoke-wo220-shadow-geometry.test.js',
 	'tools/smoke/smoke-wo222-screen-labels.test.js',
 	'tools/smoke/smoke-wo223-route-labels.test.js',
+	'tools/smoke/smoke-wo226-timer-overlay.test.js',
+	'tools/smoke/smoke-wo227-mixer-dense.test.js',
 	'test/companion-control-status.test.js',
 ]
 

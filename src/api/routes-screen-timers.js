@@ -195,19 +195,32 @@ function handleUnassign(body, ctx) {
 
 /**
  * POST /api/timers/visible
- * @param {{timerId: string, screenIdx: number, visible: boolean}} body
+ *
+ * WO-226 T226.1: optional `fadeFrames` (int 0-500, default 0) — when > 0 the emitted MIXER
+ * line carries a fade duration + tween instead of an instant cut. Validated here so a bad
+ * value never reaches the (still band-guarded) engine.
+ *
+ * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number}} body
  * @param {object} ctx
  * @returns {object}
  */
 function handleVisible(body, ctx) {
 	try {
-		const { timerId, screenIdx, visible } = body
+		const { timerId, screenIdx, visible, fadeFrames } = body
 
 		if (!timerId) return { ok: false, error: 'timerId required' }
 		if (!Number.isFinite(screenIdx)) return { ok: false, error: 'screenIdx required' }
 		if (typeof visible !== 'boolean') return { ok: false, error: 'visible must be boolean' }
 
-		const { lines } = screenTimers.setTimerVisible({ timerId, screenIdx, visible })
+		let frames = 0
+		if (fadeFrames !== undefined && fadeFrames !== null) {
+			if (!Number.isFinite(fadeFrames) || !Number.isInteger(fadeFrames) || fadeFrames < 0 || fadeFrames > 500) {
+				return { ok: false, error: 'fadeFrames must be an integer 0-500' }
+			}
+			frames = fadeFrames
+		}
+
+		const { lines } = screenTimers.setTimerVisible({ timerId, screenIdx, visible, fadeFrames: frames })
 
 		// Send AMCP lines
 		if (lines.length > 0) {
@@ -223,7 +236,7 @@ function handleVisible(body, ctx) {
 			}
 		}
 
-		return { ok: true, timerId, screenIdx, visible }
+		return { ok: true, timerId, screenIdx, visible, fadeFrames: frames }
 	} catch (e) {
 		return { ok: false, error: e?.message || String(e) }
 	}

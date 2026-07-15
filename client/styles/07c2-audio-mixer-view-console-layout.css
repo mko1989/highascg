@@ -86,3 +86,15 @@
 	min-height: 0;
 	align-items: flex-start;
 }
+
+/* Dense layout for groups with >4 strips: reduce strip width and enable scrolling */
+.mixer-group--dense .audio-mixer-view__group-strips {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding-bottom: 6px;
+}
+
+.mixer-group--dense .audio-mixer-view__strip {
+	width: 80px;
+	min-width: 80px;
+}

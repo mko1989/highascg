@@ -141,6 +141,19 @@
       "externalRef": "hw:2,0"
     },
     {
+      "id": "dst_in_host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "marcins-macbook-pro-5.local Scan Converter",
+      "caspar": {
+        "hostRole": "ndi_host",
+        "hostChannel": 7,
+        "hostLayer": 1,
+        "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter"
+      },
+      "externalRef": "host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter"
+    },
+    {
       "id": "gpu_p0",
       "deviceId": "caspar_host",
       "kind": "gpu_out",
@@ -183,19 +196,6 @@
         "mainIndex": 0
       },
       "externalRef": "DP-6/DP-7"
-    },
-    {
-      "id": "dst_in_host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "marcins-macbook-pro-5.local Scan Converter",
-      "caspar": {
-        "hostRole": "ndi_host",
-        "hostChannel": 7,
-        "hostLayer": 1,
-        "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter"
-      },
-      "externalRef": "host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter"
     }
   ],
   "edges": [

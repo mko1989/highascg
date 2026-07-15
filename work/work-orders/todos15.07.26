@@ -100,3 +100,13 @@ I dont think that is a problem with the current artnet name, we can either alias
     I'd be interested in hearing your opinion whether you think we should keep them separate to try to merge them into one.
 
 I think it would be good to try and combine them so that we have a clearer set of functionality (and less confusion about which to use). I havent read the above enough to get an idea on how viable that is, so do push back if it seems problematic
+
+
+
+***mario-game***
+id like to be able to add a mario game via an html producer but with transparent background instead of the sky. controlled via pupeteer the same as before.
+https://github.com/tylerreichle/mario_js
+https://codepen.io/yananas/pen/xrjaGX
+https://github.com/reruns/mario
+python for windows but transparent background
+https://github.com/axonyxquantum/desktop_mario

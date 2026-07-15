@@ -68,6 +68,25 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	targetTimeInput.style.marginBottom = '4px'
 	containerEl.appendChild(targetTimeInput)
 
+	// Size (timerFontSize, vw units — template/countdown/countdown-engine.js DEFAULT_CONFIG.timerFontSize)
+	// WO-226 T226.4: exposed here (not just Position) so the inspector modal and the corner
+	// panel share one settings form instead of duplicating fields.
+	const sizeLabel = document.createElement('div')
+	sizeLabel.className = 'timer-control-panel__settings-label'
+	sizeLabel.style.marginTop = '4px'
+	sizeLabel.textContent = 'Size (vw)'
+	containerEl.appendChild(sizeLabel)
+
+	const sizeInput = document.createElement('input')
+	sizeInput.type = 'number'
+	sizeInput.min = '1'
+	sizeInput.max = '100'
+	sizeInput.step = '1'
+	sizeInput.className = 'timer-control-panel__settings-input'
+	sizeInput.style.cssText = 'width:100%;padding:2px 4px'
+	sizeInput.value = String(config.timerFontSize || DEFAULT_TIMER_CONFIG.timerFontSize)
+	containerEl.appendChild(sizeInput)
+
 	// Position select
 	const positionLabel = document.createElement('div')
 	positionLabel.className = 'timer-control-panel__settings-label'
@@ -124,6 +143,7 @@ export function buildTimerSettings(containerEl, timer, deps) {
 			mode: modeSelect.value,
 			targetTime: targetTimeInput.value,
 			position: positionSelect.value,
+			timerFontSize: Math.max(1, Math.min(100, parseInt(sizeInput.value, 10) || DEFAULT_TIMER_CONFIG.timerFontSize)),
 		}
 
 		try {

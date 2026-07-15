@@ -6,6 +6,73 @@ import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
+import { showTimerInspectorModal } from './timer-inspector-modal.js'
+
+/**
+ * WO-226 T226.3: per-screen timer icon next to the FTB button. A module-level cache (shared
+ * across every column) avoids one /api/timers/list fetch per column per render — the deck
+ * tears down and rebuilds all columns on most sceneState changes, so per-column fetches would
+ * multiply fast. The cache is populated once lazily and refreshed on the lightweight
+ * 'screen-timers-changed' event that the drop-assign path (scenes-editor-deck-drop.js), the
+ * timer inspector modal, and the compact transport (audio-mixer-panel.js) all dispatch after a
+ * successful POST.
+ */
+let _timersCache = []
+let _timersCacheLoaded = false
+let _timersFetchPromise = null
+let _timersListenerBound = false
+
+function _timerStateForScreen(screenIdx) {
+	for (const t of _timersCache) {
+		const entry = t?.screens?.[String(screenIdx)]
+		if (entry) return { timerId: t.timerId, visible: !!entry.visible }
+	}
+	return null
+}
+
+function _applyTimerButtonState(btn, screenIdx) {
+	const state = _timerStateForScreen(screenIdx)
+	if (!state) {
+		btn.hidden = true
+		return
+	}
+	btn.hidden = false
+	btn.dataset.timerId = state.timerId
+	btn.classList.toggle('scenes-btn--timer-on', state.visible)
+	btn.title = state.visible ? 'Timer on air — click for settings' : 'Timer assigned (hidden) — click for settings'
+}
+
+function _refreshAllTimerButtons() {
+	document.querySelectorAll('.scenes-deck-col__timer-btn').forEach((btn) => {
+		const idx = parseInt(btn.dataset.screenIdx, 10)
+		if (Number.isFinite(idx)) _applyTimerButtonState(btn, idx)
+	})
+}
+
+function _fetchTimersCache() {
+	if (_timersFetchPromise) return _timersFetchPromise
+	_timersFetchPromise = api
+		.get('/api/timers/list')
+		.then((res) => {
+			if (res?.ok && Array.isArray(res.timers)) _timersCache = res.timers
+			_timersCacheLoaded = true
+		})
+		.catch(() => {
+			/* leave cache as-is; a later event will retry */
+		})
+		.finally(() => {
+			_timersFetchPromise = null
+		})
+	return _timersFetchPromise
+}
+
+function _ensureTimersListener() {
+	if (_timersListenerBound) return
+	_timersListenerBound = true
+	window.addEventListener('screen-timers-changed', () => {
+		_fetchTimersCache().then(_refreshAllTimerButtons)
+	})
+}
 
 function isScenesDeckColBlankClick(target, colRoot) {
 	const t = /** @type {HTMLElement | null} */ (target)
@@ -87,7 +154,30 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			})()
 		})
 		headLeft.appendChild(ftbBtn)
+
+		// WO-226 T226.3: per-screen timer icon — shown only when a timer is assigned to this
+		// screen (state comes from the shared module-level cache). Click opens the inspector.
+		const timerBtn = document.createElement('button')
+		timerBtn.type = 'button'
+		timerBtn.className = 'scenes-btn scenes-btn--timer scenes-deck-col__timer-btn'
+		timerBtn.textContent = '⏱'
+		timerBtn.dataset.screenIdx = String(col)
+		timerBtn.hidden = true
+		timerBtn.setAttribute('aria-label', `Timer settings for ${mainLabel(col)}`)
+		timerBtn.addEventListener('click', (e) => {
+			e.stopPropagation()
+			const state = _timerStateForScreen(col)
+			if (!state) return
+			showTimerInspectorModal({ timerId: state.timerId, screenIdx: col, screenLabel: mainLabel(col) })
+		})
+		headLeft.appendChild(timerBtn)
 		head.appendChild(headLeft)
+
+		_ensureTimersListener()
+		_applyTimerButtonState(timerBtn, col)
+		if (!_timersCacheLoaded) {
+			_fetchTimersCache().then(_refreshAllTimerButtons)
+		}
 
 		const borderBtn = document.createElement('div')
 		borderBtn.className = 'scenes-global-border-item'

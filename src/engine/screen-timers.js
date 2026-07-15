@@ -237,11 +237,15 @@ function unassignTimer(opts) {
  * Set visibility (opacity 0 or 1) for a timer on a screen.
  * Band-guarded: skips entry if layer outside 980-989 range.
  *
- * @param {{timerId: string, screenIdx: number, visible: boolean}} opts
+ * WO-226 T226.1: optional `fadeFrames` (int 0-500, default 0). When > 0, the OPACITY line
+ * carries a fade duration + tween (`MIXER <ch>-<layer> OPACITY <0|1> <fadeFrames> linear`)
+ * instead of the instant-cut form, so the timer inspector's Fade In / Fade Out buttons animate.
+ *
+ * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number}} opts
  * @returns {{ lines: string[] }}
  */
 function setTimerVisible(opts) {
-	const { timerId, screenIdx, visible } = opts || {}
+	const { timerId, screenIdx, visible, fadeFrames } = opts || {}
 	if (!timerId) throw new Error('timerId required')
 	if (!Number.isFinite(screenIdx)) throw new Error('screenIdx required')
 	if (typeof visible !== 'boolean') throw new Error('visible must be boolean')
@@ -267,7 +271,11 @@ function setTimerVisible(opts) {
 	screenEntry.visible = visible
 
 	const opacity = visible ? 1 : 0
-	const lines = [`MIXER ${channel}-${layer} OPACITY ${opacity}`]
+	const frames =
+		Number.isFinite(fadeFrames) && fadeFrames > 0 ? Math.round(Math.min(500, Math.max(0, fadeFrames))) : 0
+	const lines = [
+		frames > 0 ? `MIXER ${channel}-${layer} OPACITY ${opacity} ${frames} linear` : `MIXER ${channel}-${layer} OPACITY ${opacity}`,
+	]
 
 	_persistRegistry()
 

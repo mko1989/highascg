@@ -44,6 +44,34 @@
 	min-width: 0;
 }
 
+/* WO-226 T226.5: compact timer transport, active screen only. Feeds WO-221 Phase C split-out.
+ * Name reuses .audio-mixer__layer-label (below) for its ellipsis/truncation styling. */
+.audio-mixer__timers-compact {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 6px 16px;
+	border-top: 1px solid var(--border);
+	background: var(--bg-elevated);
+}
+.audio-mixer__timer-compact-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.audio-mixer__timer-compact-btn {
+	background: none;
+	border: 1px solid var(--border);
+	border-radius: 3px;
+	color: var(--text);
+	cursor: pointer;
+	padding: 1px 5px;
+}
+.audio-mixer__timer-compact-btn:hover {
+	background: var(--accent);
+	color: var(--bg);
+}
+
 .audio-mixer--inspector .audio-mixer__panel {
 	margin-top: 0;
 	width: 100%;

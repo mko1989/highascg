@@ -1,11 +1,40 @@
 /**
  * Scenes editor — drop media onto deck to create a new look.
  * (WO-208 timer-drop handling removed by WO-210: timers are panel-owned, not look inputs.)
+ *
+ * WO-226 T226.2: dropping a countdown template (or a payload carrying a timerId — e.g. a future
+ * draggable timer-instance row) onto a screen's looks column must NOT create a look. It routes to
+ * POST /api/timers/assign for that screen instead, and the per-screen timer icon (scene-list-column.js)
+ * picks up the change via the 'screen-timers-changed' event dispatched below.
  */
 
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { nextLayerNumber } from '../lib/scene-state-helpers.js'
+import { api } from '../lib/api-client.js'
+import { screenLabel } from '../lib/screen-label.js'
+import { DEFAULT_TIMER_CONFIG } from './timer-control-panel-display.js'
+
+/**
+ * Whether a dragged payload should be routed to the screen-timer assign API instead of
+ * becoming a look layer: an explicit `timerId` on the payload, or a `template` source whose
+ * value references the countdown template.
+ * @param {object} data
+ * @returns {boolean}
+ */
+function isTimerDropPayload(data) {
+	if (!data) return false
+	if (data.timerId) return true
+	const ty = String(data.type || '').toLowerCase()
+	if (ty !== 'template') return false
+	return String(data.value || '').toLowerCase().includes('countdown')
+}
+
+function newTimerId() {
+	return typeof crypto !== 'undefined' && crypto.randomUUID
+		? crypto.randomUUID()
+		: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
 
 /**
  * @param {object} ctx
@@ -31,6 +60,31 @@ export function createDeckMediaDropHandler(ctx) {
 			payloads = (await ingestDeckDroppedFiles(dt.files)) || []
 		} else {
 			payloads = parseDraggableSourcesPayload(dt)
+		}
+		if (!payloads.length) return
+
+		// WO-226 T226.2: countdown-template / timer-instance drops assign a screen timer
+		// instead of creating a look. Peel them off before any look-creation logic runs.
+		const timerPayloads = payloads.filter(isTimerDropPayload)
+		payloads = payloads.filter((data) => !isTimerDropPayload(data))
+		if (timerPayloads.length) {
+			const cmForTimers = typeof getChannelMap === 'function' ? getChannelMap() : {}
+			const label = screenLabel(cmForTimers, mainCol)
+			for (const data of timerPayloads) {
+				const timerId = data.timerId || newTimerId()
+				try {
+					await api.post('/api/timers/assign', {
+						timerId,
+						name: data.label || data.name || 'Timer',
+						config: { ...DEFAULT_TIMER_CONFIG },
+						screenIdx: mainCol,
+					})
+					showScenesToast(`⏱ Timer assigned to ${label}`, 'info')
+					window.dispatchEvent(new CustomEvent('screen-timers-changed'))
+				} catch (err) {
+					showScenesToast(`Timer assign failed: ${err?.message || err}`, 'error')
+				}
+			}
 		}
 		if (!payloads.length) return
 

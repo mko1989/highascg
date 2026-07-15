@@ -188,6 +188,60 @@ test('setTimerVisible - visibility toggle line format', () => {
 	assert(onResult.lines[0].startsWith('MIXER 1-980 OPACITY 1'), 'Line format should match MIXER pattern')
 })
 
+test('WO-226 T226.1: setTimerVisible fadeFrames produces MIXER OPACITY <v> <frames> linear', () => {
+	resetScreenTimersModule()
+
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// fadeFrames > 0 → fade form
+	const fadeOut = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: false, fadeFrames: 25 })
+	assert.strictEqual(fadeOut.lines.length, 1)
+	assert.strictEqual(fadeOut.lines[0], 'MIXER 1-980 OPACITY 0 25 linear', 'fade-out line should carry frames + linear tween')
+
+	const fadeIn = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: true, fadeFrames: 25 })
+	assert.strictEqual(fadeIn.lines[0], 'MIXER 1-980 OPACITY 1 25 linear', 'fade-in line should carry frames + linear tween')
+
+	// fadeFrames omitted or 0 → unchanged instant-cut form (back-compat)
+	const omitted = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: false })
+	assert.strictEqual(omitted.lines[0], 'MIXER 1-980 OPACITY 0', 'default (no fadeFrames) should stay instant-cut form')
+
+	const zero = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: true, fadeFrames: 0 })
+	assert.strictEqual(zero.lines[0], 'MIXER 1-980 OPACITY 1', 'fadeFrames:0 should stay instant-cut form')
+
+	// out-of-range fadeFrames clamps into 0-500 rather than producing an unbounded fade
+	const clamped = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: false, fadeFrames: 9999 })
+	assert.strictEqual(clamped.lines[0], 'MIXER 1-980 OPACITY 0 500 linear', 'fadeFrames should clamp to 500 max')
+})
+
+test('WO-226 T226.1: BAND GUARD still applies to setTimerVisible with fadeFrames', () => {
+	resetScreenTimersModule()
+
+	screenTimers.assignTimerToScreen({
+		timerId: 'timer1',
+		name: 'Timer 1',
+		config: {},
+		screenIdx: 0,
+		channel: 1,
+	})
+
+	// Corrupt the registry entry to violate the band
+	const stored = persistence.get('screenTimers')
+	stored.timer1.screens['0'].layer = 5
+	persistence.set('screenTimers', stored)
+
+	delete require.cache[require.resolve('../../src/engine/screen-timers')]
+	screenTimers = require('../../src/engine/screen-timers')
+
+	const result = screenTimers.setTimerVisible({ timerId: 'timer1', screenIdx: 0, visible: true, fadeFrames: 25 })
+	assert.strictEqual(result.lines.length, 0, 'Band guard should suppress lines even when fadeFrames is set')
+})
+
 test('linesForReAdd - returns CG ADD and MIXER lines for all records', () => {
 	resetScreenTimersModule()
 

@@ -47,6 +47,10 @@ export function renderConsoleInputGroups(
 
 		const groupCard = document.createElement('div')
 		groupCard.className = 'audio-mixer-view__group'
+		// Add dense class when >4 strips to allow narrower strips with horizontal scroll
+		if (list.length > 4) {
+			groupCard.classList.add('mixer-group--dense')
+		}
 		groupCard.innerHTML = `
 			<div class="audio-mixer-view__group-header">${escapeHtml(g.title)}</div>
 			<div class="audio-mixer-view__group-strips"></div>

@@ -164,6 +164,30 @@
 	cursor: wait;
 }
 
+/* WO-226 T226.3: per-screen timer icon, same pill family as .scenes-btn--ftb. Dim by default
+   (assigned but hidden); accent when the timer is on air. */
+.scenes-btn--timer {
+	padding: 1px 6px;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	background: var(--bg-elevated, #21262d);
+	border-color: var(--border);
+	color: var(--text-muted);
+	opacity: 0.65;
+	flex-shrink: 0;
+}
+
+.scenes-btn--timer:hover:not(:disabled) {
+	opacity: 1;
+}
+
+.scenes-btn--timer-on {
+	background: rgba(88, 166, 255, 0.18);
+	border-color: var(--accent);
+	color: var(--accent);
+	opacity: 1;
+}
+
 .scenes-deck__empty--tight {
 	padding: 1rem 0.5rem;
 }
