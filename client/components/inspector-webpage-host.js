@@ -1,5 +1,6 @@
 /**
  * Live webpage host inspector — URL input + reload (same host channel).
+ * Includes optional Template checkbox to pick from local template catalog.
  * Used from the right Inspector panel and Device View host-channel destination.
  */
 
@@ -40,17 +41,35 @@ function applyWebpageHostApiResult(r) {
 
 /**
  * @param {HTMLElement} container
- * @param {{ source: object, onApplied?: (r: object) => void }} opts
+ * @param {{ source: object, stateStore?: object, onApplied?: (r: object) => void }} opts
  */
-export function mountWebpageHostPageControls(container, { source, onApplied }) {
+export function mountWebpageHostPageControls(container, { source, stateStore, onApplied }) {
 	if (!source) return
+
+	// Detect if current value is a template URL
+	const currentValue = source.playArg || source.templateOrUrl || ''
+	const isTemplateUrl = currentValue.startsWith('http://127.0.0.1:4200/template/')
+	const extractedTemplateName = isTemplateUrl
+		? currentValue.replace('http://127.0.0.1:4200/template/', '').replace(/\.html$/, '')
+		: ''
 
 	const section = document.createElement('div')
 	section.className = 'inspector-section inspector-webpage-host-controls'
+
+	// Build HTML with template checkbox and conditional elements
 	section.innerHTML = `
 		<div class="inspector-section__title">Page</div>
-		<div class="inspector-field" style="margin-bottom:8px">
-			<input type="text" class="inspector-math-input inspector-webpage-host__url" style="width:100%;box-sizing:border-box" spellcheck="false" placeholder="https://example.com/" value="${escapeHtml(source.playArg || source.templateOrUrl || '')}" />
+		<div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.5rem">
+			<input type="checkbox" class="inspector-webpage-host__use-template" id="inspector-webpage-host-use-template" ${isTemplateUrl ? 'checked' : ''} />
+			<label for="inspector-webpage-host-use-template" style="font-weight:normal;cursor:pointer">Template</label>
+		</div>
+		<div class="inspector-field" style="margin-bottom:8px;display:${isTemplateUrl ? 'none' : 'block'}">
+			<input type="text" class="inspector-math-input inspector-webpage-host__url" style="width:100%;box-sizing:border-box" spellcheck="false" placeholder="https://example.com/" value="${escapeHtml(currentValue)}" />
+		</div>
+		<div class="inspector-field" style="margin-bottom:8px;display:${isTemplateUrl ? 'block' : 'none'}">
+			<select class="inspector-webpage-host__template" style="width:100%;box-sizing:border-box">
+				<option value="">— Select a template —</option>
+			</select>
 		</div>
 		<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 			<button type="button" class="btn btn--secondary inspector-webpage-host__reload">Reload</button>
@@ -61,14 +80,53 @@ export function mountWebpageHostPageControls(container, { source, onApplied }) {
 	`
 
 	const urlInput = section.querySelector('.inspector-webpage-host__url')
+	const useTemplateCheckbox = section.querySelector('.inspector-webpage-host__use-template')
+	const templateSelect = section.querySelector('.inspector-webpage-host__template')
 	const reloadBtn = section.querySelector('.inspector-webpage-host__reload')
 
+	// Populate template select if stateStore is provided
+	if (stateStore && templateSelect) {
+		const templates = stateStore.getState?.()?.templates || []
+		for (const t of templates) {
+			const id = t.id || t.label || ''
+			if (!id) continue
+			const label = t.label || String(id)
+			const opt = document.createElement('option')
+			opt.value = id
+			opt.textContent = label
+			if (id === extractedTemplateName) opt.selected = true
+			templateSelect.appendChild(opt)
+		}
+	}
+
+	// Sync checkbox and input/select visibility
+	const syncUI = () => {
+		const useTemplate = useTemplateCheckbox?.checked
+		if (urlInput) urlInput.parentElement.style.display = useTemplate ? 'none' : 'block'
+		if (templateSelect) templateSelect.parentElement.style.display = useTemplate ? 'block' : 'none'
+	}
+
+	useTemplateCheckbox?.addEventListener('change', syncUI)
+
 	const runReload = async () => {
-		const templateOrUrl = urlInput.value.trim()
-		if (!templateOrUrl) {
-			showAppToast('Enter a page URL or template name', 'warn')
-			urlInput.focus()
-			return
+		let templateOrUrl
+		if (useTemplateCheckbox?.checked) {
+			const templateName = (templateSelect?.value || '').trim()
+			if (!templateName) {
+				showAppToast('Select a template', 'warn')
+				templateSelect?.focus()
+				return
+			}
+			// Construct template URL; handle .html suffix deduplication
+			const withoutHtml = templateName.endsWith('.html') ? templateName.slice(0, -5) : templateName
+			templateOrUrl = `http://127.0.0.1:4200/template/${withoutHtml}.html`
+		} else {
+			templateOrUrl = urlInput.value.trim()
+			if (!templateOrUrl) {
+				showAppToast('Enter a page URL or select a template', 'warn')
+				urlInput.focus()
+				return
+			}
 		}
 		const saved = String(source.playArg || source.templateOrUrl || '').trim()
 		reloadBtn.disabled = true
@@ -98,6 +156,12 @@ export function mountWebpageHostPageControls(container, { source, onApplied }) {
 
 	reloadBtn.addEventListener('click', () => void runReload())
 	urlInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			void runReload()
+		}
+	})
+	templateSelect?.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter') {
 			e.preventDefault()
 			void runReload()
@@ -144,6 +208,7 @@ export function renderWebpageHostInspector(root, stateStore, selection) {
 
 	mountWebpageHostPageControls(root, {
 		source,
+		stateStore,
 		onApplied: () => {
 			const next = resolveWebpageHostSource(stateStore.getState()?.extraLiveSources || [], selection)
 			if (!next) return

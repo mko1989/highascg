@@ -193,6 +193,19 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	browserWrap.className = 'settings-group'
 	browserWrap.id = 'live-input-browser-wrap'
 	browserWrap.style.display = 'none'
+
+	// Template checkbox row
+	const templateCheckRow = document.createElement('div')
+	templateCheckRow.style.display = 'flex'
+	templateCheckRow.style.alignItems = 'center'
+	templateCheckRow.style.gap = '0.35rem'
+	templateCheckRow.style.marginBottom = '0.5rem'
+	const browserUseTemplate = document.createElement('input')
+	browserUseTemplate.type = 'checkbox'
+	browserUseTemplate.id = 'live-input-browser-use-template'
+	templateCheckRow.appendChild(browserUseTemplate)
+	templateCheckRow.appendChild(document.createTextNode('Template'))
+
 	const browserLabel = document.createElement('label')
 	browserLabel.textContent = 'URL'
 	const browserUrl = document.createElement('input')
@@ -200,6 +213,21 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	browserUrl.id = 'live-input-browser-url'
 	browserUrl.placeholder = 'https://...'
 	browserUrl.style.width = '100%'
+
+	// Template select (hidden by default)
+	const templateSelectLabel = document.createElement('label')
+	templateSelectLabel.textContent = 'Template'
+	templateSelectLabel.style.display = 'none'
+	templateSelectLabel.id = 'live-input-template-label'
+	const browserTemplate = document.createElement('select')
+	browserTemplate.id = 'live-input-browser-template'
+	browserTemplate.style.width = '100%'
+	browserTemplate.style.display = 'none'
+	const placeholderOpt = document.createElement('option')
+	placeholderOpt.value = ''
+	placeholderOpt.textContent = '— Select a template —'
+	browserTemplate.appendChild(placeholderOpt)
+
 	const browserCgLabel = document.createElement('label')
 	browserCgLabel.style.marginTop = '0.5rem'
 	browserCgLabel.style.display = 'flex'
@@ -212,8 +240,12 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	browserAsCg.id = 'live-input-browser-as-cg'
 	browserCgLabel.appendChild(browserAsCg)
 	browserCgLabel.appendChild(document.createTextNode('Add as CG template (plays highascg_browser_url + passes URL via CG UPDATE)'))
+
+	browserWrap.appendChild(templateCheckRow)
 	browserWrap.appendChild(browserLabel)
 	browserWrap.appendChild(browserUrl)
+	browserWrap.appendChild(templateSelectLabel)
+	browserWrap.appendChild(browserTemplate)
 	browserWrap.appendChild(browserCgLabel)
 	body.appendChild(browserWrap)
 
@@ -416,6 +448,9 @@ export function createLiveInputModalShell(defaultCh = 5) {
 			decklinkPortStatus,
 			decklinkLayerInput,
 			browserAsCg,
+			browserUseTemplate,
+			browserTemplate,
+			templateSelectLabel,
 			audioRefreshBtn,
 			audioDiscoverStatus,
 			audioSelect,

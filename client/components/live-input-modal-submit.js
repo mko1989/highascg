@@ -111,10 +111,23 @@ export function attachLiveInputModalSubmit({ elements, getKind, stateStore, sele
 		}
 
 		if (k === 'browser') {
-			const url = (elements.browserUrl?.value || '').trim()
-			if (!url) {
-				setStatus('Enter a URL', true)
-				return
+			const useTemplate = !!elements.browserUseTemplate?.checked
+			let url
+			if (useTemplate) {
+				const templateName = (elements.browserTemplate?.value || '').trim()
+				if (!templateName) {
+					setStatus('Select a template', true)
+					return
+				}
+				// Construct template URL; handle .html suffix deduplication
+				const withoutHtml = templateName.endsWith('.html') ? templateName.slice(0, -5) : templateName
+				url = `http://127.0.0.1:4200/template/${withoutHtml}.html`
+			} else {
+				url = (elements.browserUrl?.value || '').trim()
+				if (!url) {
+					setStatus('Enter a URL or select a template', true)
+					return
+				}
 			}
 			const asCg = !!elements.browserAsCg?.checked
 			const item = {

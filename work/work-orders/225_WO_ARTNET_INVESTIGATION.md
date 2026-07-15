@@ -147,3 +147,8 @@ Three options were evaluated:
 ---
 
 **Numbering note:** work-orders through 227 exist at time of writing (`226_WO_TIMER_SCREEN_OVERLAY_UX.md`, `227_WO_COMPACT_MIXER_8CH_OVERFLOW.md`); this investigation's drafts start at 228 to avoid collision.
+
+## 2026-07-15 — CORRECTION (owner appended sources after the investigation ran)
+- Improved artnet consumer SOURCE: https://github.com/firecraftgaming/caspar-server/tree/improved-artnet
+- The shipped extended build's SOURCE: https://github.com/gmeisel01/CasparCG_Enhanced — owner built it from source previously ("custom cef build"), so "rebuild unrealistic" is WITHDRAWN; a rebuild is planned.
+- New task: research CasparCG/server PRs beneficial to live events (owner seeds: #1762, #1751, #1727; more to come). → WO-233.

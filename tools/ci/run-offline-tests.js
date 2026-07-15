@@ -63,6 +63,7 @@ const FILES = [
 	'tools/smoke/smoke-wo227-mixer-dense.test.js',
 	'tools/smoke/smoke-wo232-mario-static.test.js',
 	'tools/smoke/smoke-wo232-arm-input.test.js',
+	'tools/smoke/smoke-wo232-template-tick.test.js',
 	'test/companion-control-status.test.js',
 ]
 

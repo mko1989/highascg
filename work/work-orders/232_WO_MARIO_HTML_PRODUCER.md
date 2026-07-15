@@ -101,3 +101,34 @@ Root cause: input forwards only to the current CEF focus target (src/system/cef-
 - **Modified:** `tools/ci/run-offline-tests.js` (1 test file added to FILES array)
 
 Full gate pass: 244 passed / 0 failed / 2 pre-existing skips (unrelated). `npx eslint --quiet` 0 errors. `node --check` all touched files.
+
+## T232.7 — template tick for webpage sources
+
+Owner usability request: "when adding a web-browser source, only offering a URL box; want a Template tick to pick a local template instead of typing a URL."
+
+**Implementation:** Added a "Template" checkbox in BOTH places where the URL input appears:
+1. **Live-input modal (creation form)** — `client/components/live-input-modal-shell.js` + `live-input-modal-submit.js`
+2. **Webpage-host inspector (edit form)** — `client/components/inspector-webpage-host.js`
+
+When the Template checkbox is ticked:
+- URL input is hidden; a `<select>` dropdown is shown with template names from `stateStore.getState()?.templates || []` (same catalog as sources-panel-templates.js reads).
+- Template names appear as options: `countdown/countdown`, `mario/index`, etc. (the `id` field from the template object).
+- On selection, the effective URL becomes `http://127.0.0.1:4200/template/<name>.html` (server serves `/template/` → `/templates/` via `src/server/http-server.js` lines 79–97).
+- Names already ending in `.html` are NOT doubled (e.g., `mario/index.html` → URL stays `http://127.0.0.1:4200/template/mario/index.html`, not `/template/mario/index.html.html`).
+- The stored value (playArg / templateOrUrl) is always the full URL, so downstream CEF needle matching and WO-232 arm-input see a normal URL.
+- When the template URL prefix is detected on load (`http://127.0.0.1:4200/template/`), the UI initializes with the Template checkbox ON and the matching template preset in the select.
+
+**Files modified:**
+- **`client/components/live-input-modal-shell.js`** — added Template checkbox + select elements to browserWrap, returned in elements dict
+- **`client/components/live-input-modal-submit.js`** — handle template checkbox state when submit button is clicked; build the URL from selected template
+- **`client/components/inspector-webpage-host.js`** — added Template checkbox + select to the Page section; bind to sync with URL input; detect and initialize from existing template URLs
+
+**Smoke tests:**
+- New file `tools/smoke/smoke-wo232-template-tick.test.js` with source-grep assertions and unit-level checks:
+  - Template checkbox + select present in both modal shell and inspector
+  - Template URL prefix construction (`http://127.0.0.1:4200/template/`) from template names
+  - `.html` suffix deduplication (names ending in .html don't get doubled)
+  - When template URL prefix is detected on load, checkbox initializes to ON
+- Added to `tools/ci/run-offline-tests.js` FILES list.
+
+Full offline gate after implementation: **271 passed / 0 failed / 2 pre-existing skips** (unrelated). `npx eslint --quiet` 0 errors. `node --check` all touched files.

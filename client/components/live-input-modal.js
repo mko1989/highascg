@@ -179,6 +179,29 @@ export function showLiveInputModal(stateStore, options = {}) {
 		}
 	}
 
+	function syncTemplateUI() {
+		const useTemplate = elements.browserUseTemplate?.checked
+		if (elements.browserUrl) elements.browserUrl.style.display = useTemplate ? 'none' : 'block'
+		if (elements.browserTemplate) elements.browserTemplate.style.display = useTemplate ? 'block' : 'none'
+		if (elements.templateSelectLabel) elements.templateSelectLabel.style.display = useTemplate ? 'block' : 'none'
+		if (useTemplate) {
+			// Populate template select if not already done
+			const sel = elements.browserTemplate
+			if (sel && sel.children.length <= 1) {
+				const templates = stateStore.getState()?.templates || []
+				for (const t of templates) {
+					const id = t.id || t.label || ''
+					if (!id) continue
+					const label = t.label || String(id)
+					const opt = document.createElement('option')
+					opt.value = id
+					opt.textContent = label
+					sel.appendChild(opt)
+				}
+			}
+		}
+	}
+
 	function syncKind() {
 		const k = kindSel?.value || 'decklink'
 		if (dlWrap) dlWrap.style.display = k === 'decklink' ? 'block' : 'none'
@@ -194,6 +217,7 @@ export function showLiveInputModal(stateStore, options = {}) {
 		if (k === 'decklink') void refreshDecklinkPorts()
 		if (k === 'live_audio') syncLiveAudioSlotHint()
 		if (k === 'usb_video') syncV4l2SlotHint()
+		if (k === 'browser') syncTemplateUI()
 	}
 
 	function syncLiveAudioSlotHint() {
@@ -286,6 +310,7 @@ export function showLiveInputModal(stateStore, options = {}) {
 	})
 	elements.decklinkSlotSel?.addEventListener('change', syncDecklinkFromPort)
 	elements.browserAsCg?.addEventListener('change', syncHint)
+	elements.browserUseTemplate?.addEventListener('change', syncTemplateUI)
 	elements.audioRefreshBtn?.addEventListener('click', () => void refreshAudioDevices())
 	elements.audioSelect?.addEventListener('change', syncLiveAudioSlotHint)
 	elements.audioManual?.addEventListener('input', syncLiveAudioSlotHint)
