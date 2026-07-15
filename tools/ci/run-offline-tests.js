@@ -68,8 +68,11 @@ const FILES = [
 	'tools/smoke/smoke-wo239-osc-variables.test.js',
 	'tools/smoke/smoke-wo242-pixelmap-screens.test.js',
 	'tools/smoke/smoke-wo244-stream-secret-preserve.test.js',
+	'tools/smoke/smoke-wo249-audio-pair-select.test.js',
 	'tools/smoke/smoke-wo246-operator-monitor-auto.test.js',
 	'tools/smoke/smoke-wo247-raw-cdp.test.js',
+	'tools/smoke/smoke-wo250-timer-bank-mv-bars.test.js',
+	'tools/smoke/smoke-wo251-playlist-osc-wiring.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 ]

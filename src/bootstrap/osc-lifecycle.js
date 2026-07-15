@@ -1,5 +1,9 @@
 'use strict'
 
+const { handlePlaylistOscUpdate } = require('../engine/scene-take-lbg-playlist')
+
+let lastPlaylistTickAt = 0
+
 function createOscLifecycle({
 	appCtx,
 	config,
@@ -58,6 +62,20 @@ function createOscLifecycle({
 			pushOscToState()
 			if (typeof appCtx._wsBroadcast === 'function') {
 				appCtx._wsBroadcast('osc', snapshot)
+			}
+			// WO-251: playlist auto-advance/wrap is OSC-driven (file-name change detection +
+			// stall watchdog in scene-take-lbg-playlist.js). The handler existed since WO-211
+			// but was NEVER subscribed anywhere — playlists therefore played the initial item
+			// plus one native LOADBG-AUTO handoff and then stopped ("doesn't loop"). Throttled:
+			// advance detection needs ~4 Hz, not every OSC tick.
+			const now = Date.now()
+			if (now - lastPlaylistTickAt >= 250) {
+				lastPlaylistTickAt = now
+				try {
+					handlePlaylistOscUpdate(appCtx, snapshot)
+				} catch (e) {
+					appCtx.log?.('warn', `[Playlist] OSC advance handler failed: ${e?.message || e}`)
+				}
 			}
 		})
 	}
