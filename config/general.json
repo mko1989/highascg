@@ -145,6 +145,24 @@
       "thumbnailLayer": 1,
       "resolution": "1920×1080",
       "fps": "50"
+    },
+    {
+      "type": "browser",
+      "routeType": "webpage_host",
+      "value": "route://8-1",
+      "label": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
+      "hostChannel": 8,
+      "hostLayer": 1,
+      "sourceId": "webpage_127_0_0_1",
+      "templateOrUrl": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
+      "cefNeedle": "127.0.0.1",
+      "playArg": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
+      "interactiveCapable": true,
+      "hostRole": "webpage_host",
+      "thumbnailChannel": 8,
+      "thumbnailLayer": 1,
+      "resolution": "1920×1080",
+      "fps": "50"
     }
   ],
   "configVersion": 1,
