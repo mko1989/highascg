@@ -186,6 +186,15 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 	audioRow.append(audioCheck, Object.assign(document.createElement('span'), { textContent: 'Embedded audio on SDI' }))
 	grid.append(audioRow)
 
+	const lowLatencyRow = Object.assign(document.createElement('label'), {
+		className: 'device-view__field',
+		style: 'grid-column:1 / -1;display:flex;align-items:center;gap:6px;margin-top:4px',
+	})
+	const lowLatencyCheck = Object.assign(document.createElement('input'), { type: 'checkbox' })
+	lowLatencyCheck.checked = cur.lowLatency === true
+	lowLatencyRow.append(lowLatencyCheck, Object.assign(document.createElement('span'), { textContent: 'Low-latency mode' }))
+	grid.append(lowLatencyRow)
+
 	box.append(grid)
 	h.append(box)
 
@@ -206,6 +215,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 			decklinkLatency: String(latencySel.value || 'normal'),
 			decklinkBufferDepth: Math.min(3, Math.max(1, parseInt(String(depthIn.value || '3'), 10) || 3)),
 			decklinkColorSpace: String(colorSel.value || 'bt709'),
+			decklinkLowLatency: lowLatencyCheck.checked,
 		}
 		if (conn?.caspar?.outputBinding) casparPatch.outputBinding = conn.caspar.outputBinding
 		if (conn?.caspar?.decklinkKeyFill != null) casparPatch.decklinkKeyFill = conn.caspar.decklinkKeyFill
@@ -223,7 +233,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 		}
 	}
 
-	for (const el of [modeSel, layoutSel, latencySel, colorSel, depthIn, audioCheck]) {
+	for (const el of [modeSel, layoutSel, latencySel, colorSel, depthIn, audioCheck, lowLatencyCheck]) {
 		el.addEventListener('change', () => void persist())
 	}
 }

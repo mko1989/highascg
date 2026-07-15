@@ -38,12 +38,13 @@ const {
  * (first tile on `<decklink>`) + synced `<ports>` for additional tiles.
  * Caspar cannot use the channel custom mode (e.g. 5120×1024) for DeckLink format — parent video-mode is required.
  * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
- * @param {{ videoMode?: string, keyer?: string }} [opts]
+ * @param {{ videoMode?: string, keyer?: string, lowLatency?: boolean }} [opts]
  */
 function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 	if (!Array.isArray(tiles) || tiles.length === 0) return ''
 	const globalVideoMode = escapeXml(String(opts.videoMode || tiles[0]?.videoMode || '1080p5000'))
 	const pixelFormatXml = decklinkPixelFormatXml(String(opts.videoMode || tiles[0]?.videoMode || ''))
+	const lowLatencyXml = opts.lowLatency ? '\n                     <latency>low</latency>' : ''
 	const keyerXml = `\n                     <keyer>${escapeXml(
 		resolveDecklinkConsumerKeyer({
 			fillDevice: tiles[0]?.device,
@@ -65,7 +66,7 @@ function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 					.join('')}\n                </ports>`
 			: ''
 	return `\n                <decklink>
-                     <video-mode>${globalVideoMode}</video-mode>${pixelFormatXml}${keyerXml}${primaryXml}${portsXml}
+                     <video-mode>${globalVideoMode}</video-mode>${pixelFormatXml}${lowLatencyXml}${keyerXml}${primaryXml}${portsXml}
                  </decklink>`
 }
 
@@ -115,11 +116,13 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	let profConsumersXml = ''
 	if (tiles.length > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
+		const consumerSettings = readDecklinkConsumerSettings(config, `screen_${n}_`)
 		profConsumersXml += buildDecklinkTiledConsumersXml(tiles, {
 			videoMode: pickDecklinkParentVideoMode(tiles),
 			keyer: keyFill.keyer,
 			keyDevice: keyFill.keyDevice,
 			keyFillEnabled: keyFill.keyFillEnabled,
+			lowLatency: consumerSettings.lowLatency,
 		})
 	} else if (decklinkDevice > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
@@ -132,6 +135,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 				keyer: keyFill.keyer,
 				videoMode: decklinkVideoMode,
 				consumerSettings,
+				lowLatency: consumerSettings.lowLatency,
 			})
 		}
 	}
@@ -291,6 +295,7 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 						keyer: mvKeyFill.keyer,
 						videoMode: inheritedMode,
 						consumerSettings,
+						lowLatency: consumerSettings.lowLatency,
 					})
 				})()
 			: ''
@@ -455,6 +460,7 @@ function buildStreamingChannel(config, casparChannelNum) {
 		profXml = buildDecklinkKeyFillConsumersXml({
 			fillDevice: deckN,
 			keyDevice: parseDecklinkDeviceIndex(sc.decklinkKeyDevice),
+			lowLatency: sc.decklinkLowLatency === true || sc.decklinkLowLatency === 'true',
 		})
 	}
 	// WO-172 T172.6: dormant bug — sibling buildHostLiveChannel emits <channel-layout>, this didn't,

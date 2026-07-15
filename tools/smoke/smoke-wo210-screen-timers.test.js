@@ -700,7 +700,9 @@ test('config merge on re-assign to same screen', () => {
 })
 
 test('CSS: new timer panel classes exist in stylesheet', () => {
-	const cssPath = path.join(__dirname, '../../client/styles/07b-audio-mixer-modal-shell.css')
+	// WO-221 T221.C: timer-control-panel__* rules moved from 07b-audio-mixer-modal-shell.css
+	// to 07b2-timer-control-panel.css (behavior-preserving mechanical split).
+	const cssPath = path.join(__dirname, '../../client/styles/07b2-timer-control-panel.css')
 	const cssContent = fs.readFileSync(cssPath, 'utf-8')
 
 	// Check for presence of new CSS classes

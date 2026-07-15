@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-07-15T10:55:17.864Z",
+  "generatedAt": "2026-07-15T12:36:15.942Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -630,6 +630,14 @@
       "category": "Reference",
       "description": "> **Production (WO-52):** API and UI both run on the **playout machine** at **`http://<host>:4200/`** (`dist-web/` + `/api/*`). The diagram below is the **logic",
       "order": 81
+    },
+    {
+      "id": "CASPARCG_BUILD_PROVENANCE",
+      "title": "CasparCG highascg-build-v1 — provenance manifest",
+      "file": "CASPARCG_BUILD_PROVENANCE.md",
+      "category": "Reference",
+      "description": "Every component of the final binary, mapped to its source. Keep current through assembly/build.",
+      "order": 900
     },
     {
       "id": "STICK_QUICK_START",

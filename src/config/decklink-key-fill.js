@@ -179,7 +179,18 @@ function readDecklinkConsumerSettings(cs, prefix) {
 		latency: normalizeDecklinkLatency(cs?.[`${prefix}decklink_latency`]),
 		bufferDepth: normalizeDecklinkBufferDepth(cs?.[`${prefix}decklink_buffer_depth`]),
 		colorSpace: normalizeDecklinkColorSpace(cs?.[`${prefix}decklink_color_space`]),
+		lowLatency: parseDecklinkLowLatency(cs?.[`${prefix}decklink_low_latency`]),
 	}
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+function parseDecklinkLowLatency(raw) {
+	if (raw === true || raw === 'true') return true
+	if (raw === false || raw === 'false') return false
+	return false
 }
 
 /**
@@ -193,6 +204,7 @@ function readDecklinkConsumerSettingsFromConnectorCaspar(caspar) {
 		latency: normalizeDecklinkLatency(caspar.decklinkLatency),
 		bufferDepth: normalizeDecklinkBufferDepth(caspar.decklinkBufferDepth),
 		colorSpace: normalizeDecklinkColorSpace(caspar.decklinkColorSpace),
+		lowLatency: parseDecklinkLowLatency(caspar.decklinkLowLatency),
 	}
 }
 
@@ -208,6 +220,7 @@ function applyDecklinkConsumerSettingsFromConnector(merged, prefix, connector) {
 	merged[`${prefix}decklink_latency`] = s.latency
 	merged[`${prefix}decklink_buffer_depth`] = s.bufferDepth
 	merged[`${prefix}decklink_color_space`] = s.colorSpace
+	merged[`${prefix}decklink_low_latency`] = s.lowLatency
 	const outputMode = String(connector?.caspar?.decklinkOutputVideoMode || '').trim()
 	if (outputMode) merged[`${prefix}decklink_output_video_mode`] = outputMode
 }
@@ -262,7 +275,7 @@ function buildDecklinkSubregionXml(subregion) {
 
 /**
  * CasparCG DeckLink consumers for fill-only or fill+key on separate SDI outputs.
- * @param {{ fillDevice: number, keyDevice?: number, keyer?: string, videoMode?: string, consumerSettings?: object, passthroughSubregion?: object }} opts
+ * @param {{ fillDevice: number, keyDevice?: number, keyer?: string, videoMode?: string, consumerSettings?: object, passthroughSubregion?: object, lowLatency?: boolean }} opts
  * @returns {string}
  */
 function buildDecklinkKeyFillConsumersXml(opts) {
@@ -274,11 +287,12 @@ function buildDecklinkKeyFillConsumersXml(opts) {
 	const pixelFormatXml = decklinkPixelFormatXml(videoModeRaw)
 	const consumerXml = buildDecklinkConsumerOptionsXml(opts?.consumerSettings || {})
 	const subregionXml = buildDecklinkSubregionXml(opts?.passthroughSubregion)
+	const lowLatencyXml = opts?.lowLatency ? '\n                    <latency>low</latency>' : ''
 	const keyer = escapeXml(resolveDecklinkConsumerKeyer(opts))
 	if (keyDevice > 0 && keyDevice !== fillDevice) {
 		return `
              <decklink>
-               <device>${fillDevice}</device>${videoModeXml}${pixelFormatXml}${consumerXml}${subregionXml}
+               <device>${fillDevice}</device>${videoModeXml}${pixelFormatXml}${lowLatencyXml}${consumerXml}${subregionXml}
                  <key-device>${keyDevice}</key-device>
              <keyer>${keyer}</keyer>
 	     </decklink>
@@ -289,7 +303,7 @@ function buildDecklinkKeyFillConsumersXml(opts) {
 	}
 	// Fill-only: explicit default — omitting <keyer> makes Caspar use external and fail init on many devices.
 	return `\n                <decklink>
-                    <device>${fillDevice}</device>${videoModeXml}${pixelFormatXml}
+                    <device>${fillDevice}</device>${videoModeXml}${pixelFormatXml}${lowLatencyXml}
                     <keyer>${keyer}</keyer>${consumerXml}${subregionXml}
                 </decklink>`
 }
@@ -307,6 +321,7 @@ module.exports = {
 	DECKLINK_LATENCY_VALUES,
 	DECKLINK_COLOR_SPACE_VALUES,
 	parseDecklinkEmbeddedAudio,
+	parseDecklinkLowLatency,
 	normalizeDecklinkLatency,
 	normalizeDecklinkColorSpace,
 	normalizeDecklinkBufferDepth,

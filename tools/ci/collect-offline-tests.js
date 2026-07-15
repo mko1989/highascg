@@ -29,6 +29,17 @@ const EXCLUDE_NAME = [
 	/^smoke-project-fps-network/i,
 	/^smoke-preview-amcp-channel/i,
 	/^smoke-xrandr-canvas-check/i,
+	// WO-235 incident (2026-07-15): these connect a real ConnectionManager to
+	// `HIGHASCG_CASPAR_PORT || CASPAR_PORT || 5250` with no self-hosted mock AMCP server and no
+	// `.live.` naming safeguard. Running the "full" gate on a box with a real CasparCG on :5250
+	// sent live BEGIN/CLEAR/PLAY/COMMIT traffic to the production channel and wiped on-air layers
+	// (channel 1 layers 10-15 CLEARed). Excluded until they gate on an explicit opt-in env var
+	// (matching the `.live.test.js` convention) instead of silently succeeding against whatever
+	// is listening on the default port.
+	/^smoke-amcp-batch-library\.test\./i,
+	/^smoke-amcp-legacy-transport\.test\./i,
+	/^smoke-amcp-migration-air-paths\.test\./i,
+	/^smoke-amcp-send-after\.test\./i,
 ]
 
 function isOfflineTestFile(name) {

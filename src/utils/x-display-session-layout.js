@@ -24,12 +24,37 @@ function screenConsumerEnabled(config, n) {
 	return v !== false && v !== 'false' && v !== 0 && v !== '0'
 }
 
+/**
+ * WO-235 T235.4: `casparServer.multiview_enabled` / `multiview_screen_consumer` are legacy
+ * booleans that only get refreshed when the Caspar XML config is (re)generated
+ * (config/build-caspar-generator-layout-sync.js:34,63 / device-graph-destination-wiring.js:179)
+ * — they go stale once a multiview output is added/edited via screenDestinations (Device Graph)
+ * without a regenerate, even though the multiview channel is genuinely wired up and its screen
+ * consumer is running (confirmed live: `INFO <multiview channel>` shows a real
+ * `<consumer>screen</consumer>` entry). routing-map.js already ignores these legacy flags and
+ * derives `multiviewEnabled`/`multiviewCh` straight from `screenDestinations` (mode: "multiview"
+ * destinations are real consumer/output entries, not just an internal compositing channel) —
+ * mirror that here as a fallback so the operator-fullscreen / interactive-zone detection
+ * (host-operator-fullscreen.js resolveOperatorRouteTarget) doesn't 400 "No interactive operator
+ * display configured" just because the legacy flags never got resynced. Only ever widens
+ * detection (never narrows an existing true legacy result).
+ * @param {object} config
+ * @returns {boolean}
+ */
 function multiviewScreenConsumerEnabled(config) {
 	const cs = config?.casparServer || config
 	const mvOn = cs.multiview_enabled !== false && cs.multiview_enabled !== 'false'
-	if (!mvOn) return false
-	const { multiviewGeneratedConfigIncludesScreen } = require('../config/multiview-helpers')
-	return multiviewGeneratedConfigIncludesScreen(cs)
+	if (mvOn) {
+		const { multiviewGeneratedConfigIncludesScreen } = require('../config/multiview-helpers')
+		if (multiviewGeneratedConfigIncludesScreen(cs)) return true
+	}
+	try {
+		const { getChannelMap } = require('../config/routing')
+		const map = getChannelMap(config)
+		return !!(map && map.multiviewEnabled && map.multiviewCh != null)
+	} catch (_) {
+		return false
+	}
 }
 
 function screenInteractiveEnabled(config, n) {

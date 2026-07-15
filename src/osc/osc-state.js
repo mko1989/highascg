@@ -2,6 +2,17 @@
 
 const EventEmitter = require('events')
 
+/**
+ * WO-235 T235.1: permanent, default-off raw OSC trace. Enable with `HIGHASCG_OSC_TRACE=1`
+ * to log address + args for the first N packets after process start — used to diff old vs.
+ * new CasparCG binary OSC output live without a code change. Cannot be toggled without a
+ * process restart (env var is read once at module load), which is expected: this is for
+ * future incident capture, not a live switch.
+ */
+const OSC_TRACE_ENABLED = process.env.HIGHASCG_OSC_TRACE === '1'
+const OSC_TRACE_MAX_PACKETS = 200
+let oscTraceCount = 0
+
 /** Clear timing fields so the UI does not show the previous clip’s elapsed when Caspar omits updates (some codecs). */
 function clearOscFileTiming(f) {
 	if (!f || typeof f !== 'object') return
@@ -150,6 +161,14 @@ class OscState extends EventEmitter {
 			address = '/channel/' + address.slice('/ch/'.length)
 		}
 		const vals = this._argValues(packet.args || [])
+		if (OSC_TRACE_ENABLED && oscTraceCount < OSC_TRACE_MAX_PACKETS) {
+			oscTraceCount++
+			try {
+				this._log('info', `[OSC_TRACE ${oscTraceCount}/${OSC_TRACE_MAX_PACKETS}] ${address} ${JSON.stringify(vals)}`)
+			} catch (_) {
+				this._log('info', `[OSC_TRACE ${oscTraceCount}/${OSC_TRACE_MAX_PACKETS}] ${address} <unserializable args>`)
+			}
+		}
 		const m = address.match(/^\/channel\/(\d+)\/(.+)$/)
 		if (!m) return
 		const ch = parseInt(m[1], 10)
@@ -361,6 +380,31 @@ class OscState extends EventEmitter {
 						: layer.file || (layer.file = {})
 				clearOscFileTiming(f)
 			}
+			// WO-235 T235.2/T235.3: Caspar 2.6-dev (r253c16c) core/producer/layer.cpp:132-141 never
+			// emits an explicit `.../type` leaf — it only sets `state_["foreground"]["producer"]` /
+			// `state_["background"]["producer"]` to the producer's name (e.g. "ffmpeg", "empty",
+			// "route", "html", "transition", "color"). The old lineage's explicit `.../type` message
+			// (handled above) is still honored when present, so both binaries work without a config
+			// switch. Without this, `layer.type`/`backgroundType` stay `null` forever → every
+			// consumer that gates on `String(layer.type||'') === 'empty'` (playback-tracker-osc
+			// buildMatrixFromOsc/getOccupiedLayerNumbersFromOsc, osc-variables per-layer timer
+			// variables, scene-play-seek, compose-preview-activity) treats every layer as empty:
+			// /api/state playback.matrix stays {} and per-layer timers in the main UI + multiview
+			// never populate/clear correctly ("freaking out").
+			const producerName = vals[0] != null ? String(vals[0]) : null
+			if (producerName != null) {
+				if (fileTarget === 'background') {
+					layer.backgroundType = producerName
+					if (producerName === 'empty') layer.backgroundFile = {}
+				} else {
+					layer.type = producerName
+					if (producerName === 'empty') {
+						layer.file = {}
+						layer.backgroundFile = {}
+						layer.template = { path: null, width: 0, height: 0, fps: 0 }
+					}
+				}
+			}
 		} else if (tail.startsWith('file/')) this._routeLayerFile(layer, tail.slice('file/'.length), vals, fileTarget)
 		else if (tail.startsWith('host/')) this._routeLayerHost(layer, tail.slice('host/'.length), vals)
 	}
@@ -382,10 +426,24 @@ class OscState extends EventEmitter {
 			f._lastOscFilePath = pv
 			f.path = pv
 		} else if (sub === 'time' && vals.length >= 1) {
-			const elapsed = Number(vals[0])
-			const duration = vals.length >= 2 ? Number(vals[1]) : NaN
+			// `.../file/time` carries [elapsed_sec, duration_sec] on both lineages: old and new
+			// (2.6-dev av_producer.cpp:990 `state_["file/time"] = {time()/format_desc_.fps,
+			// file_duration().value_or(0)/format_desc_.fps}`) compute seconds by dividing CHANNEL
+			// frame counters by the CHANNEL fps, so no unit/scale change vs. the old lineage.
+			// WO-235: guard against rare extreme-magnitude float garbage observed live (e.g.
+			// elapsed ~1e-32 / duration ~1e+23 for a producer mid-teardown/init) — a single
+			// insane sample must not corrupt or flicker the UI timer; keep the previous value.
+			const SANE_MAX_SECONDS = 30 * 24 * 3600 // 30 days
+			// Reject both ends of the observed garbage (subnormal-magnitude AND astronomically
+			// large) — legit frame-granular seconds are never nonzero-but-smaller than ~1ms.
+			const isSane = (n) =>
+				Number.isFinite(n) && n > -1e-3 && (n === 0 || Math.abs(n) >= 1e-3) && Math.abs(n) <= SANE_MAX_SECONDS
+			const elapsedRaw = Number(vals[0])
+			const durationRaw = vals.length >= 2 ? Number(vals[1]) : NaN
+			const elapsed = isSane(elapsedRaw) ? elapsedRaw : Number.isFinite(f.elapsed) ? f.elapsed : null
+			if (isSane(durationRaw)) f.duration = durationRaw
 			f.elapsed = elapsed
-			if (Number.isFinite(duration)) f.duration = duration
+			const duration = Number.isFinite(f.duration) ? f.duration : NaN
 			f.remaining =
 				Number.isFinite(duration) && Number.isFinite(elapsed) ? Math.max(0, duration - elapsed) : null
 			f.progress =

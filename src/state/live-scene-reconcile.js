@@ -56,12 +56,33 @@ async function parseLayerFgClipsFromChannelXml(xmlStr) {
 			const fg = layers[key][0].foreground && layers[key][0].foreground[0]
 			let fgClip = ''
 			if (fg && fg.producer && fg.producer[0]) {
+				// Old lineage: some builds emitted `<producer name="Clip">ffmpeg</producer>` (name
+				// as an XML attribute). Caspar 2.6-dev's `<producer>` is a plain string (producer
+				// *type*, e.g. "ffmpeg"/"html"/"empty" — core/producer/layer.cpp:133
+				// `state_["foreground"]["producer"] = foreground_->name()`), so `p.$`/`p.name` are
+				// both undefined here and this branch is a harmless no-op on the new binary; the
+				// `fg.file` block below is what actually resolves the clip identity there.
 				const p = fg.producer[0]
 				fgClip = p.$ && p.$.name ? p.$.name : p.name && p.name[0] ? p.name[0] : ''
 			}
 			if (fg && fg.file && fg.file[0]) {
 				const f = fg.file[0]
-				fgClip = f.$ && f.$.name ? f.$.name : f.clip && f.clip[1] ? String(f.clip[1]) : fgClip
+				if (f.$ && f.$.name) {
+					// Old lineage: `<file name="Clip">` attribute.
+					fgClip = f.$.name
+				} else if (f.name && f.name[0]) {
+					// WO-235: Caspar 2.6-dev `<file><name>Clip</name>...</file>` — canonical clip id
+					// (av_producer.cpp:764 `state_["file/name"] = u8(name_)`). Must be checked before
+					// the `<clip>` fallback below: the new binary repurposes `<clip>` as a numeric
+					// [start_sec, duration_sec] pair (av_producer.cpp:989), not a name.
+					fgClip = String(f.name[0])
+				} else if (Array.isArray(f.clip) && f.clip.length) {
+					// Old lineage: `<file><clip>ClipName</clip></file>` — single string clip name.
+					// Guard against the new [start_sec, duration_sec] numeric-pair shape so we never
+					// mistake a duration ("5.04") for a clip name and wrongly clear a persisted look.
+					const looksLikeNumericPair = f.clip.length >= 2 && f.clip.every((v) => Number.isFinite(Number(v)))
+					if (!looksLikeNumericPair) fgClip = String(f.clip[0])
+				}
 			}
 			out[layerIdx] = fgClip || ''
 		}
