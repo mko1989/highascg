@@ -118,6 +118,58 @@ export function getMainModalHtml() {
 						<h3 class="settings-category">Screen labels (WO-222)</h3>
 						<p class="settings-note">Custom label for each screen output. Used in looks editor selector, multiview, and panels. Leave empty to use default (S1, S2, etc.).</p>
 						<div id="settings-screen-labels-mount"></div>
+						<h3 class="settings-category">Streaming channel RTMP (WO-244)</h3>
+						<div class="settings-group"><label>Enabled</label>
+							<input type="checkbox" id="set-streaming-ch-enabled" />
+						</div>
+						<div class="settings-group"><label>Dedicated output channel</label>
+							<input type="checkbox" id="set-streaming-ch-dedicated-output" />
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-mode">Video mode</label>
+							<select id="set-streaming-ch-mode">
+								<option value="720p2500">720p 25 fps (2500)</option>
+								<option value="720p5000">720p 50 fps (5000)</option>
+								<option value="1080p2500">1080p 25 fps (2500)</option>
+								<option value="1080p5000">1080p 50 fps (5000)</option>
+								<option value="2160p2500">2160p 25 fps (2500)</option>
+								<option value="2160p5000">2160p 50 fps (5000)</option>
+							</select>
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-source">Video source</label>
+							<select id="set-streaming-ch-source">
+								<option value="program_1">Program 1</option>
+								<option value="program_2">Program 2</option>
+								<option value="preview">Preview</option>
+							</select>
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-audio">Audio source</label>
+							<select id="set-streaming-ch-audio">
+								<option value="follow_video">Follow video</option>
+								<option value="muxed">Muxed (all channels)</option>
+								<option value="main_l">Main — L</option>
+								<option value="main_r">Main — R</option>
+								<option value="main_m">Main — Mono</option>
+							</select>
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-layer">Content layer</label>
+							<input type="number" id="set-streaming-ch-layer" min="1" value="10" />
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-decklink">Decklink device (0-based)</label>
+							<input type="number" id="set-streaming-ch-decklink" min="0" value="0" />
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-override">Override Caspar channel</label>
+							<input type="text" id="set-streaming-ch-override" placeholder="leave empty for 'dedicated'" />
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-rtmp-url">RTMP server URL</label>
+							<input type="text" id="set-streaming-ch-rtmp-url" placeholder="rtmp://live-api-s.facebook.com/rtmp/" />
+						</div>
+						<div class="settings-group"><label for="set-streaming-ch-stream-key">Stream key</label>
+							<input type="password" id="set-streaming-ch-stream-key" placeholder="stream key" />
+						</div>
+						<div class="settings-group checkbox">
+							<label><input type="checkbox" id="set-streaming-ch-clear-creds" /> Clear credentials on save</label>
+							<p class="settings-note">Check this to clear both RTMP server and stream key. Requires confirmation on save.</p>
+						</div>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>

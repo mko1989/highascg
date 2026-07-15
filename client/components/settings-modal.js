@@ -231,12 +231,20 @@ export function showSettingsModal(initialTab) {
 	let autosaveTimer = null
 
 	async function persistSettings() {
+		const clearCredsCheckbox = modal.querySelector('#set-streaming-ch-clear-creds')
+		if (clearCredsCheckbox?.checked) {
+			if (!window.confirm('Clear stored RTMP server and stream key? This action cannot be undone.')) {
+				clearCredsCheckbox.checked = false
+				return
+			}
+		}
 		const settings = Logic.buildSettingsPayload(modal)
 		if (settings.composePreview) settingsState.settings.composePreview = { ...settings.composePreview }
 		settingsState.notify()
 		try {
 			const res = await api.post('/api/settings', settings)
 			if (res.ok) {
+				if (clearCredsCheckbox?.checked) clearCredsCheckbox.checked = false
 				await settingsState.load()
 				document.dispatchEvent(new CustomEvent('highascg-settings-applied', { detail: res }))
 				if (saveStatusEl) {

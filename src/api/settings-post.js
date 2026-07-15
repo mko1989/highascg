@@ -205,6 +205,14 @@ async function handlePost(path, body, ctx) {
 			if (Number.isFinite(a) && a >= 1) casparChannel = a
 		}
 		const rq = String(s.rtmpQuality || s.quality || 'medium').toLowerCase()
+		const clearCreds = s.clearCredentials === true || s.clearCredentials === 'true'
+		const current = ctx.configManager?.get()?.streamingChannel || {}
+		let rtmpServerUrl = String(s.rtmpServerUrl ?? '').trim()
+		let streamKey = String(s.streamKey ?? '').trim()
+		if (!clearCreds) {
+			if (!rtmpServerUrl && current.rtmpServerUrl) rtmpServerUrl = current.rtmpServerUrl
+			if (!streamKey && current.streamKey) streamKey = current.streamKey
+		}
 		cfg.streamingChannel = {
 			enabled: s.enabled === true || s.enabled === 'true',
 			videoMode: String(s.videoMode || '1080p5000').trim(),
@@ -214,8 +222,8 @@ async function handlePost(path, body, ctx) {
 			decklinkDevice: Math.max(0, parseInt(s.decklinkDevice ?? 0, 10) || 0),
 			casparChannel,
 			dedicatedOutputChannel: s.dedicatedOutputChannel === true || s.dedicatedOutputChannel === 'true',
-			rtmpServerUrl: String(s.rtmpServerUrl ?? '').trim(),
-			streamKey: String(s.streamKey ?? '').trim(),
+			rtmpServerUrl,
+			streamKey,
 			rtmpQuality: ['low', 'medium', 'high'].includes(rq) ? rq : 'medium',
 		}
 	}

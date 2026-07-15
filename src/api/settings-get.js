@@ -56,7 +56,14 @@ async function handleGet(path, ctx) {
 			usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) },
 			operatorTools: { ...defaults.operatorTools, ...(cfg.operatorTools || {}) },
 			projectScopedMedia: { ...defaults.projectScopedMedia, ...(cfg.projectScopedMedia || {}) },
-			streamingChannel: { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) },
+			streamingChannel: (() => {
+				const sc = { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }
+				return {
+					...sc,
+					streamKey: '',
+					hasStreamKey: !!sc.streamKey,
+				}
+			})(),
 			local_media_path: cfg.local_media_path ?? '',
 			hostLiveMigrationWarnings: (() => {
 				const { collectHostLiveConfigWarnings, migrateExtraLiveSourcesList } = require('../config/host-live-sources-migrate')

@@ -129,6 +129,7 @@ export function buildSettingsPayload(modal) {
 				const n = parseInt(ovr, 10)
 				if (Number.isFinite(n) && n >= 1) casparChannel = n
 			}
+			const clearCreds = modal.querySelector('#set-streaming-ch-clear-creds')?.checked || false
 			return {
 				enabled: modal.querySelector('#set-streaming-ch-enabled')?.checked ?? !!prevSch.enabled,
 				dedicatedOutputChannel: modal.querySelector('#set-streaming-ch-dedicated-output')?.checked ?? !!prevSch.dedicatedOutputChannel,
@@ -138,6 +139,9 @@ export function buildSettingsPayload(modal) {
 				audioSource: modal.querySelector('#set-streaming-ch-audio')?.value ?? prevSch.audioSource ?? 'follow_video',
 				contentLayer: parseInt(String(modal.querySelector('#set-streaming-ch-layer')?.value ?? prevSch.contentLayer ?? '10'), 10) || 10,
 				decklinkDevice: parseInt(String(modal.querySelector('#set-streaming-ch-decklink')?.value ?? prevSch.decklinkDevice ?? '0'), 10) || 0,
+				rtmpServerUrl: modal.querySelector('#set-streaming-ch-rtmp-url')?.value?.trim?.() ?? prevSch.rtmpServerUrl ?? '',
+				streamKey: modal.querySelector('#set-streaming-ch-stream-key')?.value?.trim?.() ?? prevSch.streamKey ?? '',
+				clearCredentials: clearCreds,
 			}
 		})(),
 	}
@@ -275,6 +279,11 @@ export function hydrateSettings(modal, cfg) {
 	const schAudio = modal.querySelector('#set-streaming-ch-audio'); if (schAudio) { const as = String(sch.audioSource || 'follow_video'); if ([...schAudio.options].some(o => o.value === as)) schAudio.value = as }
 	const schLay = modal.querySelector('#set-streaming-ch-layer'); if (schLay) schLay.value = String(sch.contentLayer ?? 10)
 	const schDl = modal.querySelector('#set-streaming-ch-decklink'); if (schDl) schDl.value = String(sch.decklinkDevice ?? 0)
+	const schUrl = modal.querySelector('#set-streaming-ch-rtmp-url'); if (schUrl) schUrl.value = sch.rtmpServerUrl || ''
+	const schKey = modal.querySelector('#set-streaming-ch-stream-key'); if (schKey) {
+		schKey.value = ''
+		if (sch.hasStreamKey) schKey.placeholder = 'saved — leave blank to keep'
+	}
 	const ui = cfg.ui || {}
 	const nr = modal.querySelector('#set-nuclear-require-pass'); if (nr) nr.checked = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
 	const np = modal.querySelector('#set-nuclear-password')
