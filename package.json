@@ -103,7 +103,6 @@
 		"jpeg-js": "^0.4.4",
 		"osc": "^2.4.5",
 		"pngjs": "^7.0.0",
-		"puppeteer": "^25.3.0",
 		"sacn": "^4.6.2",
 		"unzipper": "^0.12.5",
 		"wetransfert": "^2.4.0",

@@ -242,10 +242,8 @@ async function forwardToCefTarget(opts) {
 		const expression = String(opts.expression || '').trim()
 		if (!expression) return { ok: false, status: 400, error: 'expression required' }
 		const page = await resolveCefPageForNeedle(target.needle, log, target.playArg)
-		const value = await page.evaluate((expr) => {
-			// eslint-disable-next-line no-eval
-			return eval(expr)
-		}, expression)
+		// WO-247: Runtime.evaluate takes the raw expression string directly — no eval-wrapper needed.
+		const value = await page.evaluate(expression)
 		return { ok: true, sourceId: target.sourceId, value }
 	}
 

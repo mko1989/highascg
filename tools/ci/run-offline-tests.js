@@ -69,6 +69,7 @@ const FILES = [
 	'tools/smoke/smoke-wo242-pixelmap-screens.test.js',
 	'tools/smoke/smoke-wo244-stream-secret-preserve.test.js',
 	'tools/smoke/smoke-wo246-operator-monitor-auto.test.js',
+	'tools/smoke/smoke-wo247-raw-cdp.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 ]
