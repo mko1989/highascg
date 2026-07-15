@@ -269,7 +269,10 @@ export function renderDestinations(ctx) {
 		}
 		
 		const mainFromIntent = Number.isFinite(intent?.mainScreenIndex) ? intent.mainScreenIndex : main
-		if (mode !== 'multiview' && mode !== 'stream' && mode !== 'host_channel') {
+		// WO-243: operator_gui, like multiview/stream, is not a takeable PGM/PRV screen — it never
+		// occupies a mainScreenIndex programChannels slot (routing-map.js), so it must not register a
+		// pgm/prv highlight key here either.
+		if (mode !== 'multiview' && mode !== 'stream' && mode !== 'host_channel' && mode !== 'operator_gui') {
 			addDestinationKey(`${mainFromIntent}:pgm`, b)
 			if (mode !== 'pgm_only' && mode !== 'pixelmap') addDestinationKey(`${mainFromIntent}:prv`, b)
 		} else if (mode === 'multiview') {

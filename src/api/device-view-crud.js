@@ -89,7 +89,13 @@ function handleAddDestination(j, ctx) {
 					? 'stream'
 					: reqType === 'pixelmap'
 						? 'pixelmap'
-						: 'pgm_prv'
+						: reqType === 'operator_gui'
+							? 'operator_gui'
+							: 'pgm_prv'
+	// WO-243: at most one operator_gui destination — there is only one operator monitor / CEF web-UI.
+	if (mode === 'operator_gui' && top.destinations.some((d) => d.mode === 'operator_gui')) {
+		return { error: 'At most one Operator GUI destination is allowed' }
+	}
 	const mvCount = top.destinations.filter(d => d.mode === 'multiview').length
 	const streamCount = top.destinations.filter(d => d.mode === 'stream').length
 	const pixelmapCount = top.destinations.filter(d => d.mode === 'pixelmap').length
@@ -102,13 +108,16 @@ function handleAddDestination(j, ctx) {
 					? `PGM ${nextMain + 1}`
 					: mode === 'pixelmap'
 						? `Pixel Map ${pixelmapCount + 1}`
-						: `PGM/PRV ${nextMain + 1}`
+						: mode === 'operator_gui'
+							? 'Operator GUI'
+							: `PGM/PRV ${nextMain + 1}`
 	const projectFps = resolveProjectFps(ctx.config)
 	const defaultMode = defaultVideoModeForProjectFps(projectFps)
 	const std = STANDARD_VIDEO_MODES[defaultMode] || STANDARD_VIDEO_MODES['1080p5000']
-	// WO-242: pixelmap screens default to a raster-exact custom mode (see normalizeDestination)
-	// unless the operator explicitly requests a standard videoMode.
-	const reqVideoMode = String(j.addDestination.videoMode || (mode === 'pixelmap' ? 'custom' : defaultMode)).trim() || defaultMode
+	// WO-242/WO-243: pixelmap and operator_gui screens default to a raster-exact custom mode (see
+	// normalizeDestination) unless the operator explicitly requests a standard videoMode.
+	const isCustomByDefault = mode === 'pixelmap' || mode === 'operator_gui'
+	const reqVideoMode = String(j.addDestination.videoMode || (isCustomByDefault ? 'custom' : defaultMode)).trim() || defaultMode
 	const reqStd = STANDARD_VIDEO_MODES[reqVideoMode] || std
 	top.destinations.push({
 		id,
@@ -124,6 +133,7 @@ function handleAddDestination(j, ctx) {
 		inheritsProjectFps: j.addDestination.inheritsProjectFps !== false,
 		stream: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' },
 		...(mode === 'pixelmap' ? { artnet: j.addDestination.artnet && typeof j.addDestination.artnet === 'object' ? j.addDestination.artnet : {} } : {}),
+		...(mode === 'operator_gui' ? { guiUrl: j.addDestination.guiUrl, physicalPort: j.addDestination.physicalPort } : {}),
 	})
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
@@ -137,10 +147,15 @@ function handleUpdateDestination(j, ctx) {
 	const idx = top.destinations.findIndex(d => d.id === id); if (idx < 0) return { error: 'Not found', id }
 	const d0 = top.destinations[idx]; const p = j.updateDestination
 	const nextMode =
-		p.mode === 'pgm_only' || p.mode === 'pgm_prv' || p.mode === 'multiview' || p.mode === 'stream' || p.mode === 'pixelmap'
+		p.mode === 'pgm_only' || p.mode === 'pgm_prv' || p.mode === 'multiview' || p.mode === 'stream' || p.mode === 'pixelmap' || p.mode === 'operator_gui'
 			? p.mode
 			: d0.mode
-	
+	// WO-243: at most one operator_gui destination — block switching another destination's mode
+	// to operator_gui when one already exists (the add-time guard alone can be bypassed via PATCH).
+	if (nextMode === 'operator_gui' && d0.mode !== 'operator_gui' && top.destinations.some((d, i) => i !== idx && d.mode === 'operator_gui')) {
+		return { error: 'At most one Operator GUI destination is allowed' }
+	}
+
 	let nextWidth = p.width || d0.width
 	let nextHeight = p.height || d0.height
 	let nextFps = p.fps || d0.fps
@@ -182,6 +197,13 @@ function handleUpdateDestination(j, ctx) {
 		// existing object so per-field edits from the inspector don't clobber sibling fields.
 		...(nextMode === 'pixelmap' || d0.mode === 'pixelmap'
 			? { artnet: { ...(d0.artnet || {}), ...(p.artnet && typeof p.artnet === 'object' ? p.artnet : {}) } }
+			: {}),
+		// WO-243: guiUrl/physicalPort single-field edits should not clobber each other.
+		...(nextMode === 'operator_gui' || d0.mode === 'operator_gui'
+			? {
+				guiUrl: p.guiUrl != null ? String(p.guiUrl) : d0.guiUrl,
+				physicalPort: p.physicalPort != null ? p.physicalPort : d0.physicalPort,
+			}
 			: {}),
 	}
 	const next = normalizeScreenDestinations(top)

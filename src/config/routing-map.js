@@ -61,7 +61,9 @@ function resolveMainScreenCount(config) {
 	}
 	const routableDests = routedDests.filter((d) => {
 		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream'
+		// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
+		// mainScreenIndex/programChannels slot.
+		return mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui'
 	})
 	// When destinations exist, drive screen count from topology only — stale casparServer.screen_count must not spawn extra PGM/PRV pairs.
 	if (routableDests.length > 0) {
@@ -79,7 +81,7 @@ function resolvePreviewEnabledByMain(config, screenCount) {
 	const graphMainUsage = inferGraphMainUsage(config)
 	const withMode = dests.filter(d => {
 		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream'
+		return mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui'
 	})
 	if (!withMode.length) {
 		return Array.from({ length: screenCount }, (_, idx) => !graphMainUsage.pgmOnlyMainIndices.has(idx))
@@ -240,6 +242,16 @@ function getChannelMap(config, activeBuses = null) {
 		mvDests.forEach(() => multiviewChannels.push(nextCh++))
 	}
 	const multiviewCh = multiviewChannels[0] || null
+
+	// WO-243: operator_gui is a dedicated utility channel (CEF web-UI over routed preview holes),
+	// allocated the same way as multiview — never a programChannels[] slot. At most one is expected
+	// (validated in device-view-crud.js), but this mirrors multiview's array shape defensively.
+	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
+	const operatorGuiChannels = []
+	if (ogDests.length > 0) {
+		ogDests.forEach(() => operatorGuiChannels.push(nextCh++))
+	}
+	const operatorGuiCh = operatorGuiChannels[0] || null
 	const decklinkInputsHost = String(readCasparSetting(config, 'decklink_inputs_host') ?? 'multiview_if_match').toLowerCase()
 
 	// WO-53: each live input gets its own Caspar channel so its audio meter is isolated (channel-level
@@ -335,6 +347,7 @@ function getChannelMap(config, activeBuses = null) {
 		},
 		programChannels,
 		multiviewCh,
+		operatorGuiCh,
 	}
 	let streamingAttachToChannel = null
 	let streamingCh = null
@@ -372,6 +385,10 @@ function getChannelMap(config, activeBuses = null) {
 		screenLabels: Array.isArray(config?.screenLabels) ? config.screenLabels.slice(0, screenCount) : [],
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
 		multiviewEnabled: multiviewChannels.length > 0,
+		/** WO-243: true only when an operator_gui destination is allocated a Caspar channel. */
+		operatorGuiEnabled: operatorGuiChannels.length > 0,
+		operatorGuiCh,
+		operatorGuiChannels,
 		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,
 		inputsOnMvr,
 		decklinkInputsHost,

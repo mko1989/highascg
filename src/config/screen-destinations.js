@@ -78,15 +78,19 @@ function normalizeDestination(d) {
 						? 'host_channel'
 						: modeRaw === 'pixelmap'
 							? 'pixelmap'
-							: 'pgm_prv'
+							: modeRaw === 'operator_gui'
+								? 'operator_gui'
+								: 'pgm_prv'
 	const width = Math.max(64, parseInt(String(d.width ?? 1920), 10) || 1920)
 	const height = Math.max(64, parseInt(String(d.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(d.fps ?? 50)) || 50)
-	// WO-242: pixelmap screens are raster-exact by default (custom WxH), not a standard mode,
-	// since the fixture grid is normally sized to the wall, not a stock broadcast resolution.
+	// WO-242/WO-243: pixelmap and operator_gui channels are raster-exact by default (custom WxH),
+	// not a standard broadcast mode — pixelmap sizes to the fixture wall, operator_gui sizes to the
+	// operator monitor's real resolution.
+	const isCustomByDefaultMode = mode === 'pixelmap' || mode === 'operator_gui'
 	const videoMode = String(
-		d.videoMode != null && d.videoMode !== '' ? d.videoMode : mode === 'pixelmap' ? 'custom' : '1080p5000',
-	).trim() || (mode === 'pixelmap' ? 'custom' : '1080p5000')
+		d.videoMode != null && d.videoMode !== '' ? d.videoMode : isCustomByDefaultMode ? 'custom' : '1080p5000',
+	).trim() || (isCustomByDefaultMode ? 'custom' : '1080p5000')
 	const std = videoMode !== 'custom' ? STANDARD_VIDEO_MODES[videoMode] : null
 	const hostRole = String(d.hostRole || '').trim()
 	const casparChannel = parseInt(String(d.casparChannel ?? ''), 10)
@@ -126,6 +130,15 @@ function normalizeDestination(d) {
 	}
 	if (mode === 'pixelmap') {
 		base.artnet = normalizeArtnetFixtureArray(d.artnet)
+	}
+	if (mode === 'operator_gui') {
+		// WO-243: CEF web-UI layer URL (?cefOperator=1 self-identifies the client bundle, see
+		// client/lib/cef-operator-mode.js) + optional explicit physical GPU port (1-4). When
+		// physicalPort is unset, the runtime orchestrator/generator fall back to
+		// resolveOperatorMonitorPort() (src/utils/operator-monitor-resolve.js).
+		base.guiUrl = String(d.guiUrl || '').trim() || 'http://127.0.0.1:4200/?cefOperator=1'
+		const pp = parseInt(String(d.physicalPort ?? ''), 10)
+		if (Number.isFinite(pp) && pp >= 1 && pp <= 4) base.physicalPort = pp
 	}
 	return base
 }

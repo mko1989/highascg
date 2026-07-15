@@ -15,6 +15,7 @@ const {
 	buildStreamingChannel,
 	buildMonitorChannelXml,
 } = require('./config-generator-consumer-attach')
+const { buildOperatorGuiChannel } = require('./config-generator-operator-gui')
 const { parseOptionalPixel } = require('./config-generator-utils')
 
 /**
@@ -133,6 +134,18 @@ function buildChannelsSection(config, routeMap) {
 			}
 			if (mvPlan.dims.isCustom) pushCustomMode(customVideoModes, customModeIds, mvPlan.dims)
 		})
+	}
+
+	// WO-243: operator_gui utility channel(s) — after screens/multiview (mirrors multiview's
+	// placement: doesn't advance cumulativeX/nextDevice since its device/position come from
+	// resolveOperatorMonitorPort()/physicalPort, not the sequential virtual-display strip).
+	if (plan.operatorGuiEnabled) {
+		const ogs = Array.isArray(plan.operatorGuis) ? plan.operatorGuis : []
+		for (const ogPlan of ogs) {
+			const xml = buildOperatorGuiChannel(config, ogPlan.dest, ogPlan.dims, { cumulativeX, nextDevice, layout }, ogPlan.ch)
+			setChannelXml(ogPlan.ch, xml)
+			if (ogPlan.dims.isCustom) pushCustomMode(customVideoModes, customModeIds, ogPlan.dims)
+		}
 	}
 
 	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).

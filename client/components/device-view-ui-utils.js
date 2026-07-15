@@ -12,7 +12,11 @@ export function destinationRectLabel(d) {
 	const mode =
 		modeRaw === 'pgm_only'
 			? 'PGM'
-			: (modeRaw === 'multiview' ? 'MVR' : (modeRaw === 'stream' ? 'STREAM' : (modeRaw === 'pixelmap' ? 'PXM' : 'PGM/PRV')))
+			: (modeRaw === 'multiview'
+				? 'MVR'
+				: (modeRaw === 'stream'
+					? 'STREAM'
+					: (modeRaw === 'pixelmap' ? 'PXM' : (modeRaw === 'operator_gui' ? 'OPG' : 'PGM/PRV'))))
 	const w = Math.max(64, parseInt(String(d?.width ?? 1920), 10) || 1920)
 	const h = Math.max(64, parseInt(String(d?.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(d?.fps ?? 50)) || 50)

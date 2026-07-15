@@ -100,20 +100,25 @@ export function attachDeviceViewEvents(ctx) {
 			: []
 		const highest = Math.max(-1, ...list.map((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)))
 		const type = rawType
-		const newMainIdx = type === 'multiview' ? 0 : highest + 1
-		const newScreenN = type === 'multiview' ? 0 : newMainIdx + 1
-		// WO-242: pixelmap screens default to a raster-exact custom video-mode server-side
-		// (screen-destinations.js normalizeDestination) — don't force a standard project mode here.
+		// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
+		// mainScreenIndex slot.
+		const newMainIdx = (type === 'multiview' || type === 'operator_gui') ? 0 : highest + 1
+		const newScreenN = (type === 'multiview' || type === 'operator_gui') ? 0 : newMainIdx + 1
+		// WO-242/WO-243: pixelmap and operator_gui screens default to a raster-exact custom video-mode
+		// server-side (screen-destinations.js normalizeDestination) — don't force a standard project
+		// mode here.
 		void Actions.addDestination({
 			type,
 			mainScreenIndex: newMainIdx,
-			...(type === 'pixelmap'
+			...(type === 'pixelmap' || type === 'operator_gui'
 				? {}
 				: { videoMode: defaultVideoModeForProjectFps(resolveProjectFpsFromSettings(state.currentSettings)) }),
 		}).then(async () => {
-			// Pixel-map screens drive a wall over Art-Net, not a GPU/monitor output — skip the
-			// screen-consumer seeding used for physical PGM/PGM-only screens.
-			if (newScreenN >= 1 && type !== 'pixelmap' && state.currentSettings) {
+			// Pixel-map screens drive a wall over Art-Net, and operator_gui drives its own resolved
+			// monitor — neither wants the sequential-screen-numbered GPU/monitor consumer seeding used
+			// for physical PGM/PGM-only screens (newScreenN is already 0 for operator_gui above, but
+			// keep the explicit type check here for the same honesty pixelmap's guard has).
+			if (newScreenN >= 1 && type !== 'pixelmap' && type !== 'operator_gui' && state.currentSettings) {
 				const cs =
 					state.currentSettings.casparServer && typeof state.currentSettings.casparServer === 'object'
 						? state.currentSettings.casparServer

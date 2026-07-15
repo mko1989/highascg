@@ -2,6 +2,7 @@ import { buildInspectorTable } from './device-view-ui-utils.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 import { renderHostChannelDestinationInspector } from './device-view-destinations-inspector-host-channel.js'
+import { buildOperatorGuiFields } from './device-view-destinations-inspector-operator-gui-fields.js'
 import { attachMathInput } from '../lib/math-input.js'
 import {
 	STANDARD_VIDEO_MODES,
@@ -53,10 +54,12 @@ export function renderDestinationInspector(args) {
 						? 'Multiview'
 						: mode === 'pixelmap'
 							? 'Pixel Map (native Art-Net)'
-							: 'PGM/PRV',
+							: mode === 'operator_gui'
+								? 'Operator GUI (CEF web-UI)'
+								: 'PGM/PRV',
 		},
 		{ label: 'Main index', value: String(d?.mainScreenIndex ?? 0) },
-		...(mode !== 'multiview' && mode !== 'stream'
+		...(mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui'
 			? [{
 				label: 'Audio outputs',
 				value: PROGRAM_LAYOUT_OPTIONS.find((o) => o.value === String(d?.audioLayout || 'stereo'))?.label
@@ -68,7 +71,7 @@ export function renderDestinationInspector(args) {
 		{ label: 'FPS', value: String(Math.max(1, parseFloat(String(d?.fps ?? 50)) || 50)) },
 		{ label: 'PGM channel', value: intent?.pgmChannel != null ? String(intent.pgmChannel) : '-' },
 	]
-	if (mode !== 'pgm_only' && mode !== 'multiview' && mode !== 'pixelmap') {
+	if (mode !== 'pgm_only' && mode !== 'multiview' && mode !== 'pixelmap' && mode !== 'operator_gui') {
 		rows.push({
 			label: 'PRV channel',
 			value: intent == null ? '-' : String(intent.previewChannelIntended ?? intent.previewChannelGenerated ?? '-'),
@@ -160,6 +163,7 @@ export function renderDestinationInspector(args) {
 		{ value: 'pgm_only', label: 'PGM only' },
 		{ value: 'multiview', label: 'Multiview' },
 		{ value: 'pixelmap', label: 'Pixel Map (native Art-Net)' },
+		{ value: 'operator_gui', label: 'Operator GUI (CEF web-UI)' },
 	]) {
 		const option = document.createElement('option')
 		option.value = opt.value
@@ -167,7 +171,11 @@ export function renderDestinationInspector(args) {
 		modeSel.appendChild(option)
 	}
 	modeSel.value =
-		mode === 'pgm_only' ? 'pgm_only' : (mode === 'multiview' ? 'multiview' : (mode === 'pixelmap' ? 'pixelmap' : 'pgm_prv'))
+		mode === 'pgm_only'
+			? 'pgm_only'
+			: (mode === 'multiview'
+				? 'multiview'
+				: (mode === 'pixelmap' ? 'pixelmap' : (mode === 'operator_gui' ? 'operator_gui' : 'pgm_prv')))
 	modeSel.addEventListener('change', () => patchDestination(d.id, { mode: modeSel.value }))
 
 	const audioOutputsFieldId = `dest_audio_outputs_${String(d?.id || 'dest').replace(/[^a-zA-Z0-9_-]/g, '_')}`
@@ -417,8 +425,12 @@ export function renderDestinationInspector(args) {
 		pixelmapFields.push(note)
 	}
 
+	// WO-243: guiUrl/physicalPort fields for the operator_gui destination — extracted to keep this
+	// file under the repo's ~500-line target (device-view-destinations-inspector-operator-gui-fields.js).
+	const operatorGuiFields = mode === 'operator_gui' ? buildOperatorGuiFields({ d, patchDestination }) : []
+
 	edits.append(nameIn, mainIn, modeSel)
-	if (mode !== 'multiview' && mode !== 'stream') {
+	if (mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui') {
 		const audioOutputsWrap = Object.assign(document.createElement('div'), {
 			style: 'display:flex; flex-direction:column; gap:4px; width:100%',
 		})
@@ -433,6 +445,7 @@ export function renderDestinationInspector(args) {
 	}
 	edits.append(vmSel, widthIn, heightIn, fpsIn)
 	if (pixelmapFields.length) edits.append(...pixelmapFields)
+	if (operatorGuiFields.length) edits.append(...operatorGuiFields)
 	edits.append(rm)
 	host.append(
 		Object.assign(document.createElement('p'), { className: 'device-view__status', textContent: 'Selected destination' }),

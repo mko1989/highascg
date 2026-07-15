@@ -1,9 +1,27 @@
 'use strict'
 
-const { getModeDimensions, getExtraAudioModeDimensions } = require('./config-modes')
+const { getModeDimensions, getExtraAudioModeDimensions, STANDARD_VIDEO_MODES } = require('./config-modes')
 const { screenModeString } = require('./config-generator-mode-helpers')
 const { readCasparSetting } = require('./routing-map')
 const { destinationsFromConfig } = require('./screen-destinations')
+
+/**
+ * WO-243: dims for an `operator_gui` utility channel, sourced from the destination's own
+ * width/height/fps/videoMode fields — NOT from `screen_${n}_custom_*` config keys (unlike
+ * {@link getModeDimensions}'s `'custom'` branch), since operator_gui does not occupy a
+ * mainScreenIndex/screen-numbered slot for those keys to apply to.
+ * @param {ReturnType<import('./screen-destinations').normalizeDestination>} dest
+ * @returns {{ width: number, height: number, fps: number, modeId: string, isCustom: boolean }}
+ */
+function operatorGuiModeDimensions(dest) {
+	const videoMode = String(dest?.videoMode || 'custom')
+	const std = STANDARD_VIDEO_MODES[videoMode]
+	if (std) return { ...std, modeId: videoMode, isCustom: false }
+	const width = Math.max(64, parseInt(String(dest?.width ?? 1920), 10) || 1920)
+	const height = Math.max(64, parseInt(String(dest?.height ?? 1080), 10) || 1080)
+	const fps = Math.max(1, parseFloat(String(dest?.fps ?? 50)) || 50)
+	return { width, height, fps, modeId: `${width}x${height}`, isCustom: true }
+}
 
 /**
  * @param {Record<string, unknown>} config
@@ -49,6 +67,19 @@ function buildChannelPlan(config, routeMap) {
 	/** Emit multiview `<channel>` blocks only when routing allocated multiview slot(s). */
 	const multiviewEnabled = multiviewChannels.length > 0
 
+	// WO-243: operator_gui utility channel(s) — mirrors the multiview plan-entry shape exactly
+	// (top-level `{ ch, dims, dest }` array, NOT nested inside `screens[]` like pixelmap, since
+	// operator_gui does not occupy a mainScreenIndex slot — see routing-map.js's ogDests block).
+	const operatorGuiChannels = Array.isArray(routeMap.operatorGuiChannels) ? routeMap.operatorGuiChannels : (routeMap.operatorGuiCh != null ? [routeMap.operatorGuiCh] : [])
+	const ogDests = destinationsFromConfig(config).filter((d) => d && d.mode === 'operator_gui')
+	const operatorGuis = []
+	for (let i = 0; i < operatorGuiChannels.length; i++) {
+		const dest = ogDests[i] || null
+		if (!dest) continue
+		operatorGuis.push({ ch: operatorGuiChannels[i], dims: operatorGuiModeDimensions(dest), dest })
+	}
+	const operatorGuiEnabled = operatorGuis.length > 0
+
 	// WO-53: one Caspar channel per live input (DeckLink = full mode, ALSA = cheap mode).
 	const inputChannels = Array.isArray(routeMap.inputChannels) ? routeMap.inputChannels : []
 
@@ -57,6 +88,8 @@ function buildChannelPlan(config, routeMap) {
 		extraAudio,
 		multiviewEnabled,
 		multiviews,
+		operatorGuiEnabled,
+		operatorGuis,
 		inputChannels,
 		decklinkCount,
 		liveAudioCount,
@@ -67,4 +100,4 @@ function buildChannelPlan(config, routeMap) {
 	}
 }
 
-module.exports = { buildChannelPlan }
+module.exports = { buildChannelPlan, operatorGuiModeDimensions }

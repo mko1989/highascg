@@ -52,8 +52,12 @@ import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
+import { applyCefOperatorHtmlClass } from './lib/cef-operator-mode.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
+// WO-243 T243.3: hard-gated on ?cefOperator in the query string — no-op (removes the class, which
+// is already absent) for every normal browser session.
+applyCefOperatorHtmlClass()
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()

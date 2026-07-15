@@ -75,7 +75,9 @@ export async function addDestination(typeOrOptions) {
 			? 'multiview'
 			: (o.type === 'host_channel'
 				? 'host_channel'
-				: (o.type === 'pixelmap' ? 'pixelmap' : 'pgm_prv')))
+				: (o.type === 'pixelmap'
+					? 'pixelmap'
+					: (o.type === 'operator_gui' ? 'operator_gui' : 'pgm_prv'))))
 	const mainScreenIndex = Number.isFinite(Number(o.mainScreenIndex)) ? Number(o.mainScreenIndex) : undefined
 	const addDestination = { type: t }
 	if (mainScreenIndex != null) addDestination.mainScreenIndex = Math.max(0, mainScreenIndex)

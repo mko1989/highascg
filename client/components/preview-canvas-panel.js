@@ -7,11 +7,12 @@ import { settingsState } from '../lib/settings-state.js'
 import { api } from '../lib/api-client.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
+import { isCefOperatorModeActive } from '../lib/cef-operator-mode.js'
 
 const G = 6; const BORDER_FADE = 400
 
 export function initPreviewPanel(host, options) {
-	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false } = options
+	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null } = options
 	const kC = `${storageKeyPrefix}_collapsed`; const kH = `${storageKeyPrefix}_height`; const kL = `${storageKeyPrefix}_compose_prv_pgm_layout`; const kS = `${storageKeyPrefix}_compose_prv_pgm_split`; const kW = `${storageKeyPrefix}_compose_cell_weights`
 
 	let layout = (localStorage.getItem(kL) === 'tb' || localStorage.getItem(kL) === 'lr') ? localStorage.getItem(kL) : 'lr'
@@ -354,17 +355,15 @@ export function initPreviewPanel(host, options) {
 		if (collapsed) return; const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
+		// WO-243 T243.3: skip canvas draw work when cefOperator mode renders transparent holes instead — inert/false otherwise.
+		const cefOperatorActive = isCefOperatorModeActive()
 		if (!composePrvPgmLayoutToggle) {
 			canv.width = Math.round(w * dpr)
 			canv.height = Math.round(h * dpr)
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 			canv.style.width = `${Math.floor(w * Math.min(cw / w, ch / h))}px`
 			canv.style.height = `${Math.floor(h * Math.min(cw / w, ch / h))}px`
-			try {
-				draw(ctx, w, h, isLive, {})
-			} catch (err) {
-				console.warn('[preview] compose draw failed:', err?.message || err)
-			}
+			if (!cefOperatorActive) { try { draw(ctx, w, h, isLive, {}) } catch (err) { console.warn('[preview] compose draw failed:', err?.message || err) } }
 			renderDestinationLayoutOverlay()
 			return
 		}
@@ -414,6 +413,7 @@ export function initPreviewPanel(host, options) {
 			if (layout === 'tb') cPairEl.style.flexDirection = 'column'
 			else cPairEl.style.flexDirection = 'row'
 		}
+		const cellRectsForCef = cefOperatorActive && typeof onComposeCellRects === 'function' ? [] : null
 		for (const item of composeCells) {
 			const cellRect = item.cellEl.getBoundingClientRect()
 			const pairRect = cPairEl.getBoundingClientRect()
@@ -422,20 +422,25 @@ export function initPreviewPanel(host, options) {
 			item.canvas.width = Math.max(1, Math.round(wCell * dpr))
 			item.canvas.height = Math.max(1, Math.round(hCell * dpr))
 			if (item.ctx) item.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-			try {
-				draw(item.ctx, w, h, false, {
-					layout,
-					composeCell: item.role,
-					composePrvPgmLayoutToggle: true,
-					composeDualStreamPreview: true,
-					composeCellViewport: { w: wCell, h: hCell },
-					composeScreenIdx: item.mainIndex,
-					composeCellZoom: item.zoom || 1.0,
-				})
-			} catch (err) {
-				console.warn('[preview] compose cell draw failed:', err?.message || err)
+			if (!cefOperatorActive) {
+				try {
+					draw(item.ctx, w, h, false, {
+						layout,
+						composeCell: item.role,
+						composePrvPgmLayoutToggle: true,
+						composeDualStreamPreview: true,
+						composeCellViewport: { w: wCell, h: hCell },
+						composeScreenIdx: item.mainIndex,
+						composeCellZoom: item.zoom || 1.0,
+					})
+				} catch (err) {
+					console.warn('[preview] compose cell draw failed:', err?.message || err)
+				}
 			}
+			// WO-243 T243.3: reuse this getBoundingClientRect() for the operator-GUI route-hole rect report.
+			if (cellRectsForCef) cellRectsForCef.push({ id: item.id, role: item.role, mainIndex: item.mainIndex, rect: cellRect })
 		}
+		if (cellRectsForCef) onComposeCellRects(cellRectsForCef)
 		renderDestinationLayoutOverlay()
 	}
 
@@ -457,7 +462,7 @@ export function initPreviewPanel(host, options) {
 		scheduleDraw()
 	}
 
-	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); updateLive() }
+	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); if (c && typeof onComposeCellRects === 'function') onComposeCellRects([]); updateLive() }
 	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = async () => { try { grabBtnEl.classList.add('busy'); await api.post('/api/amcp/print', { channel: options.getProgramChannel?.() || 1 }); grabBtnEl.classList.remove('busy'); grabBtnEl.classList.add('ok'); setTimeout(() => grabBtnEl.classList.remove('ok'), 1000) } catch { grabBtnEl.classList.add('err'); setTimeout(() => grabBtnEl.classList.remove('err'), 2000) } }
 	if (composePrvPgmLayoutToggle) {
 		cLayoutBtn.hidden = false; const syncB = () => { cLayoutBtn.textContent = layout === 'tb' ? 'Stack' : 'Side'; cPairEl.classList.remove('preview-panel__compose-pair--lr', 'preview-panel__compose-pair--tb'); cPairEl.classList.add(layout === 'tb' ? 'preview-panel__compose-pair--tb' : 'preview-panel__compose-pair--lr') }
@@ -476,7 +481,9 @@ export function initPreviewPanel(host, options) {
 	}
 	if (!hideInnerResize) ResizeH.initPanelResizing(resizeH, body, { collapsed: () => collapsed, onHeightChange: scheduleDraw, maxPanelBodyPx: () => Math.min(1200, window.innerHeight * 0.9) })
 	if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(scheduleDraw); ro.observe(wrap) }
-	window.addEventListener('resize', scheduleDraw); 
+	window.addEventListener('resize', scheduleDraw);
+	// WO-243 T243.3: cefOperator needs rects fresh across scroll too (viewport-relative) — gated, no extra listener otherwise.
+	if (isCefOperatorModeActive()) window.addEventListener('scroll', scheduleDraw, true)
 	const unsubS = streamState.subscribe(updateLive); 
 	const unsubSe = settingsState.subscribe(updateLive)
 	const unsubCm = stateStore?.on('channelMap', () => {
@@ -488,5 +495,5 @@ export function initPreviewPanel(host, options) {
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }
