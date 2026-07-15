@@ -11,14 +11,31 @@ function _isOscVariableKey(k) {
 
 /**
  * Remove OSC-derived keys so stale layers/channels disappear after snapshot shrink.
- * @param {{ variables?: Record<string, string> }} ctx
+ * @param {{ variables?: Record<string, string>, _oscVarsSeenLayers?: Record<string, Set<number>> }} ctx
  */
 function clearOscVariables(ctx) {
 	const v = ctx.variables
-	if (!v || typeof v !== 'object') return
-	for (const k of Object.keys(v)) {
-		if (_isOscVariableKey(k)) delete v[k]
+	if (v && typeof v === 'object') {
+		for (const k of Object.keys(v)) {
+			if (_isOscVariableKey(k)) delete v[k]
+		}
 	}
+	// WO-239: reset per-layer tracking too, so a restart doesn't inherit a stale "seen" set
+	// (see applyOscSnapshotToVariables — that set drives clearing of pruned-layer variables).
+	ctx._oscVarsSeenLayers = {}
+}
+
+/**
+ * Clear the 4 per-layer variables (used both for the explicit `type === 'empty'` case and for
+ * layers that vanished from the snapshot entirely — see WO-239 root-cause note below).
+ * @param {object} state
+ * @param {string} base
+ */
+function _clearLayerVariables(state, base) {
+	state.setVariable(`${base}clip`, '')
+	state.setVariable(`${base}time`, '')
+	state.setVariable(`${base}remaining`, '')
+	state.setVariable(`${base}progress`, '')
 }
 
 /**
@@ -42,6 +59,19 @@ function _fmt(n, digits = 2) {
 function applyOscSnapshotToVariables(ctx, snapshot) {
 	if (!snapshot || !snapshot.channels || typeof snapshot.channels !== 'object') return
 	const state = ctx.state
+	// WO-239 root cause: osc-state.js `_pruneStaleLayers` (layerStaleTimeoutMs, default 10s) deletes
+	// a layer from `channels[ch].layers` once Caspar stops emitting OSC for it (CLEAR / stage
+	// teardown — there is no final "empty" producer message, see that function's own comment). This
+	// function used to only ever walk `Object.keys(layers)` of the *current* snapshot, so a pruned
+	// layer's `osc_chN_lL_clip/time/remaining/progress` variables were simply left at their last
+	// value forever (frozen stale clip name/timer in companion/UI). Before WO-235, `layer.type`
+	// never resolved (stayed null forever), so the `type === 'empty'` gate below cleared every
+	// layer's variables on *every* tick, masking this gap entirely — WO-235 fixing the type
+	// derivation is what makes real content populate variables correctly, which is exactly what
+	// exposes this pre-existing hole as visibly "frozen" once a clip stops. Fix: track which layer
+	// keys we saw last time per channel and explicitly clear any that disappeared.
+	if (!ctx._oscVarsSeenLayers || typeof ctx._oscVarsSeenLayers !== 'object') ctx._oscVarsSeenLayers = {}
+	const seenLayers = ctx._oscVarsSeenLayers
 
 	for (const ck of Object.keys(snapshot.channels)) {
 		const ch = snapshot.channels[ck]
@@ -82,19 +112,17 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 		}
 
 		const layers = ch.layers || {}
+		const currentLayerNums = new Set()
 		for (const lk of Object.keys(layers)) {
 			const layer = layers[lk]
 			if (!layer || typeof layer !== 'object') continue
 			const ln = parseInt(lk, 10)
 			if (!Number.isFinite(ln)) continue
-			
+			currentLayerNums.add(ln)
+
 			const base = `${prefix}_l${ln}_`
 			if (String(layer.type || '') === 'empty') {
-				// Clear if empty
-				state.setVariable(`${base}clip`, '')
-				state.setVariable(`${base}time`, '')
-				state.setVariable(`${base}remaining`, '')
-				state.setVariable(`${base}progress`, '')
+				_clearLayerVariables(state, base)
 				continue
 			}
 
@@ -116,6 +144,19 @@ function applyOscSnapshotToVariables(ctx, snapshot) {
 			}
 			state.setVariable(`${base}progress`, progress)
 		}
+
+		// WO-239 fix: clear variables for any layer we saw on a previous emit for this channel but
+		// that is no longer in the snapshot (pruned by osc-state.js `_pruneStaleLayers` — CLEAR /
+		// stage teardown with no final "empty" message). Without this, those 4 variables freeze at
+		// their last value forever instead of going blank.
+		const prevLayers = seenLayers[chNum]
+		if (prevLayers) {
+			for (const prevLn of prevLayers) {
+				if (currentLayerNums.has(prevLn)) continue
+				_clearLayerVariables(state, `${prefix}_l${prevLn}_`)
+			}
+		}
+		seenLayers[chNum] = currentLayerNums
 	}
 }
 

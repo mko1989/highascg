@@ -369,6 +369,21 @@ class OscState extends EventEmitter {
 		} else if (tail === 'paused') {
 			const v = vals[0]
 			layer.paused = v === true || v === 1 || v === 'true'
+		} else if (tail === 'loop') {
+			// WO-239 T239.2: Caspar 2.6-dev av_producer.cpp:766/991 `state_["loop"] = loop;` is a
+			// TOP-LEVEL key on the producer's own state map, not nested under "file/" — confirmed both
+			// by core/monitor/monitor.h's state_proxy merge semantics (a plain key with no "/" stays
+			// flat) and by a live `INFO 1` capture showing `<loop>true</loop>` as a *sibling* of
+			// `<file>` inside `<foreground>`, not a child of it (see
+			// tools/smoke/smoke-wo235-osc-compat.test.js NEW_INFO_XML). So the wire address is
+			// `.../foreground/loop`, not `.../foreground/file/loop`. This was previously unhandled
+			// (silently dropped) on the new binary — the old-format `.../file/loop` leaf (handled in
+			// _routeLayerFile below) is still honored for the old lineage, so both work without a
+			// config switch. Not currently consumed by osc-variables.js, but fixed here for
+			// correctness/robustness of the layer.file.loop field other consumers may read.
+			const v = vals[0]
+			const f = fileTarget === 'background' ? layer.backgroundFile || (layer.backgroundFile = {}) : layer.file || (layer.file = {})
+			f.loop = v === true || v === 1 || v === 'true'
 		} else if (tail === 'producer') {
 			const sig = producerSignatureFromVals(vals)
 			const sigKey = fileTarget === 'background' ? '_lastBgProducerSig' : '_lastProducerSig'

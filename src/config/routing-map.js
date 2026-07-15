@@ -305,11 +305,11 @@ function getChannelMap(config, activeBuses = null) {
 	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? v4l2InputChannels[0] ?? legacyHostCh ?? null
 
 	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
-	
+
 	/** @deprecated Always empty — pixel-map DeckLink routing is merged onto the program channel in generated Caspar XML. */
 	const mappingChannels = []
 
-	const monitorChannelEnabled = cs.monitor_channel_enabled === true || cs.monitor_channel_enabled === 'true'
+	const monitorChannelEnabled = readCasparSetting(config, 'monitor_channel_enabled') === true || readCasparSetting(config, 'monitor_channel_enabled') === 'true'
 	const monitorCh = monitorChannelEnabled ? nextCh++ : null
 
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}

@@ -65,7 +65,9 @@ const FILES = [
 	'tools/smoke/smoke-wo232-arm-input.test.js',
 	'tools/smoke/smoke-wo232-template-tick.test.js',
 	'tools/smoke/smoke-wo235-osc-compat.test.js',
+	'tools/smoke/smoke-wo239-osc-variables.test.js',
 	'test/companion-control-status.test.js',
+	'test/wo-238-adjust-fill-ignores-crop.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

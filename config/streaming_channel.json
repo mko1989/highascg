@@ -5,9 +5,10 @@
   "audioSource": "follow_video",
   "casparChannel": null,
   "dedicatedOutputChannel": false,
-  "rtmpServerUrl": "",
-  "streamKey": "",
+  "rtmpServerUrl": "rtmp://x.rtmp.youtube.com/live2",
+  "streamKey": "aek2-2g0j-jvr0-qca4-9j89",
   "rtmpQuality": "medium",
   "contentLayer": 10,
-  "decklinkDevice": 0
+  "decklinkDevice": 0,
+  "quality": "medium"
 }

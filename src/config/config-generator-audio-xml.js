@@ -433,7 +433,7 @@ function buildMonitorChannelXml(config, casparChannelNum) {
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const head = channelXmlComment(`Caspar channel ${ch}: Monitor / headphone mix (PortAudio consumer)`)
 	return `${head}        <channel>
-            <video-mode>1080p5000</video-mode>
+            <video-mode>576p2500</video-mode>
             <consumers>
                 <portaudio>${inner}
                 </portaudio>

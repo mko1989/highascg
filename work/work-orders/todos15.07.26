@@ -38,3 +38,7 @@ Audio only channel was supposed to be the ceapest video channel possible and it 
 
 sdjust to doesnt count the crop values in.
 
+
+still something is broken in the osc variables parser
+
+i cant choose a template in the web browser source. also the point of having a seperate channel for browser is to keep it open in that channel and route it where needed. one of it is showing full screen on operator screen with mouse keyboard routed via pupeteer. 
