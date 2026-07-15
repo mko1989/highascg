@@ -2,6 +2,9 @@
  * HighAsCG UI — composed from ./styles/*.css (target ≤500 lines per file).
  */
 @import url('./styles/01a-base-theme-header-connection.css');
+@import url('./styles/01a1-base-theme-tokens.css');
+@import url('./styles/01a2-header-bar.css');
+@import url('./styles/01a3-connection-chrome.css');
 @import url('./styles/01b-layout-panels-workspace.css');
 @import url('./styles/02a-workspace-tabs-scenes-preview-host.css');
 @import url('./styles/02b-preview-panel-output-compose.css');
@@ -21,6 +24,8 @@
 @import url('./styles/06a3-scenes-deck-multi.css');
 @import url('./styles/06b-scenes-edit-transitions-layerstrip.css');
 @import url('./styles/06c-inspector-effects-pip.css');
+@import url('./styles/06c2-inspector-layer-style-presets.css');
+@import url('./styles/06c3-inspector-lt-roster.css');
 @import url('./styles/07a-scenes-compose-canvas.css');
 @import url('./styles/07b-audio-mixer-modal-shell.css');
 @import url('./styles/07b1-modal-shell-base.css');
@@ -29,6 +34,8 @@
 @import url('./styles/08a-modals-logs.css');
 @import url('./styles/08b-modals-settings.css');
 @import url('./styles/08c-modals-misc.css');
+@import url('./styles/08c2-modals-header-audio-usb-import.css');
+@import url('./styles/08c3-modals-hardware-reconcile-banners.css');
 @import url('./styles/companion-button-picker.css');
 @import url('./styles/09-device-view.css');
 @import url('./styles/09e-device-view-matrix.css');

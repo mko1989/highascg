@@ -41,7 +41,6 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
-  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"

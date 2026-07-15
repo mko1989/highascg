@@ -163,7 +163,9 @@ test('CSS: WO-226 classes exist in their stylesheets', () => {
 	assert(scenesCss.includes('.scenes-btn--timer'), 'icon base class')
 	assert(scenesCss.includes('.scenes-btn--timer-on'), 'icon on-air class')
 
-	const modalsCss = read('client/styles/08c-modals-misc.css')
+	// WO-221 T221.C: .timer-inspector-modal* rules moved from 08c-modals-misc.css to
+	// 08c3-modals-hardware-reconcile-banners.css (behavior-preserving mechanical split).
+	const modalsCss = read('client/styles/08c3-modals-hardware-reconcile-banners.css')
 	assert(modalsCss.includes('.timer-inspector-modal'), 'inspector modal layout class')
 	assert(modalsCss.includes('.timer-inspector-modal__fade-row'), 'fade button row class')
 

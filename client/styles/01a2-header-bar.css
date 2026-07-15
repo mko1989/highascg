@@ -1,3 +1,8 @@
+/**
+ * Header bar (title, connection/replication/stream indicators, project name, PGM timer chip).
+ * Split from 01a (WO-221 T221.C).
+ */
+
 /* Header */
 .header {
 	display: flex;
@@ -187,6 +192,24 @@
 	user-select: none;
 }
 
+.header-bar__map-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-muted);
+	text-decoration: none;
+	transition: background 150ms, color 150ms;
+}
+
+.header-bar__map-link:hover {
+	background: rgba(139, 92, 246, 0.15);
+	color: var(--text-primary);
+}
+
 .header-led-test__label {
 	font-size: 0.8rem;
 	color: var(--text-muted);
@@ -333,92 +356,74 @@
 	overflow: hidden;
 }
 
-/* Header — monitor audio (headphones + dropdown); keep below connection-eye + stats tooltip */
-.header-audio {
-	position: relative;
-	z-index: 1;
-	display: flex;
-	align-items: center;
-	margin: 0;
+/* PGM clip time (OSC, topmost layer) — left of connection eye */
+.header-pgm-timer-wrap {
+	flex: 1 1 0;
+	min-width: 0;
+	max-width: min(100%, 18rem);
+	overflow: hidden;
+	text-align: right;
 }
 
-.header-audio__toggle {
+.header-pgm-timer-chips {
 	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	min-width: 32px;
-	padding: 4px 8px;
-	margin-right: 0;
+	gap: 4px;
+	margin-bottom: 2px;
 }
 
-.header-audio__toggle .header-audio__icon {
-	display: block;
-}
-
-.header-audio__toggle--active {
-	color: var(--success, #3fb950);
-}
-
-.header-audio__toggle--muted {
-	opacity: 0.45;
-}
-
-.header-audio__dropdown {
-	position: absolute;
-	top: calc(100% + 4px);
-	right: 0;
-	z-index: 200;
-	min-width: 11rem;
-	padding: 6px 0;
-	background: var(--bg-elevated);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.header-audio__channels {
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-}
-
-.header-audio__channel {
-	display: block;
-	width: 100%;
-	margin: 0;
-	padding: 6px 12px;
-	text-align: left;
-	font-size: 0.82rem;
-	color: var(--text);
+.header-pgm-timer-chip {
+	border: 1px solid var(--border, #3a3a3a);
 	background: transparent;
-	border: none;
-	border-radius: 0;
-	cursor: pointer;
-	font-family: inherit;
-}
-
-.header-audio__channel:hover {
-	background: var(--bg-dark);
-}
-
-.header-audio__channel--on {
-	color: var(--accent);
-	font-weight: 600;
-}
-
-.header-audio__mute {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	margin: 0;
-	padding: 8px 12px 4px;
-	border-top: 1px solid var(--border);
-	font-size: 0.8rem;
-	color: var(--text-muted);
+	color: var(--text-muted, #9ca3af);
+	font-size: 10px;
+	line-height: 1;
+	padding: 2px 5px;
+	border-radius: 999px;
 	cursor: pointer;
 }
 
-.header-audio__mute input {
-	margin: 0;
-	cursor: pointer;
+.header-pgm-timer-chip--active {
+	color: var(--text, #fff);
+	border-color: var(--accent, #58a6ff);
+	background: color-mix(in srgb, var(--accent, #58a6ff) 20%, transparent);
 }
+
+/* Beats injected .playback-timer { min-width: 8em } from playback-timer.js */
+.header__status .playback-timer.header-pgm-timer {
+	font-size: 11px;
+	line-height: 1.25;
+	min-width: 0;
+	width: 100%;
+	max-width: 100%;
+}
+
+.header__status .header-pgm-timer .playback-timer__row {
+	min-width: 0;
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Headphones + menu stay visible when the timer competes for width */
+.header-right .header-audio {
+	flex-shrink: 0;
+}
+
+.header__status .connection-eye-wrap {
+	flex-shrink: 0;
+	position: relative;
+	z-index: 20;
+}
+
+.header__status .connection-eye {
+	flex-shrink: 0;
+	min-width: 72px;
+	min-height: 28px;
+}
+
+.header__status .connection-eye__img {
+	width: 72px;
+	height: 28px;
+}
+
