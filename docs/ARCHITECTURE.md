@@ -1,7 +1,7 @@
 # HighAsCG architecture — unified playout stack
 
 **Status:** Canonical reference (2026)  
-**Related:** [`../client/README.md`](../client/README.md), [`../from_client/AGENT_SERVER_CLIENT_MERGE.md`](../from_client/AGENT_SERVER_CLIENT_MERGE.md), [`PLAN_SERVER_CLIENT_SPLIT.md`](PLAN_SERVER_CLIENT_SPLIT.md) (historical WO-51), [`work/BACKEND_AND_CLIENT_SPLIT.md`](../work/BACKEND_AND_CLIENT_SPLIT.md), [`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md)
+**Related:** [`../client/README.md`](../client/README.md), [`../from_client/AGENT_SERVER_CLIENT_MERGE.md`](../from_client/AGENT_SERVER_CLIENT_MERGE.md), [`PLAN_SERVER_CLIENT_SPLIT.md`](PLAN_SERVER_CLIENT_SPLIT.md) (historical WO-51), [`work/BACKEND_AND_CLIENT_SPLIT.md`](../work/BACKEND_AND_CLIENT_SPLIT.md), [`WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`CASPARCG_BUILD_PROVENANCE.md`](CASPARCG_BUILD_PROVENANCE.md) (**which PR/repo every piece of our custom CasparCG binary comes from**)
 
 ---
 
