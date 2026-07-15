@@ -1,0 +1,39 @@
+html, body, ul, li {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+canvas {
+  display: block;
+  width: 762;
+  margin: 0 auto;
+  /* WO-232: dropped the upstream opaque canvas-element fallback fill color (blue) that used to
+     sit behind the 2d context. Removed so nothing but the (now transparent) canvas pixels show. */
+}
+
+p {
+  text-align: center;
+}
+
+/* WO-232: html/body forced transparent (with !important so nothing upstream can re-opaque them)
+   so the CasparCG [html] producer composites the game over video instead of a solid page color. */
+html, body {
+  background: transparent !important;
+}
+
+body {
+  overflow: hidden;
+  height: 100%;
+}
+
+html {
+  overflow: hidden;
+  height: 100%;
+}
+
+.info {
+  position: absolute;
+  top: 0;
+  left: 0;
+}

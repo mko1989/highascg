@@ -61,6 +61,7 @@ const FILES = [
 	'tools/smoke/smoke-wo223-route-labels.test.js',
 	'tools/smoke/smoke-wo226-timer-overlay.test.js',
 	'tools/smoke/smoke-wo227-mixer-dense.test.js',
+	'tools/smoke/smoke-wo232-mario-static.test.js',
 	'test/companion-control-status.test.js',
 ]
 
