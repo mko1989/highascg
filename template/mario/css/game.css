@@ -6,8 +6,15 @@ html, body, ul, li {
 
 canvas {
   display: block;
-  width: 762;
-  margin: 0 auto;
+  /* WO-232 (owner fix): fill the full producer width and anchor to the BOTTOM — height scales
+     aspect-true (762:720), so the empty sky above the viewport top is clipped by overflow:hidden
+     while the ground hugs the bottom edge. pixelated keeps the sprite art crisp when upscaled. */
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: auto;
+  image-rendering: pixelated;
   /* WO-232: dropped the upstream opaque canvas-element fallback fill color (blue) that used to
      sit behind the 2d context. Removed so nothing but the (now transparent) canvas pixels show. */
 }
