@@ -80,6 +80,8 @@ async function resolveCasparMediaDir(ctx) {
  * @param {string} [opts.programLayout] - WO-172 T172.5: 'stereo' | '4ch' | '8ch' | '16ch'
  *   (`screen_N_audio_layout` id) of the cabled source's program bus. Defaults to 'stereo'
  *   (today's behavior, byte-identical for stereo sources).
+ * @param {string} [opts.audioSourcePair] - WO-249 T249.2: 'all' | '1+2' | '3+4' | '5+6' | '7+8' for pair selection.
+ * @param {(msg: string, context?: object) => void} [opts.logWarn] - optional warn logger.
  */
 function recordFfmpegArgs(opts = {}) {
 	const crf = Number.isFinite(Number(opts.crf)) ? Math.min(51, Math.max(18, Math.round(Number(opts.crf)))) : 26
@@ -101,7 +103,8 @@ function recordFfmpegArgs(opts = {}) {
 	// syntax documented (src/streaming/streaming-channel-ffmpeg.js) as causing `400
 	// COMMAND_UNKNOWN_DATA` on some Caspar builds. Now the same chained two-pass form RTMP uses.
 	// T172.5: layout-aware — stereo (default) is byte-identical to the prior chained form.
-	const { filterA, ac } = buildAudioDownmixFilterChain(opts.programLayout)
+	// WO-249 T249.2: pass audioSourcePair for pair selection on multichannel buses.
+	const { filterA, ac } = buildAudioDownmixFilterChain(opts.programLayout, opts.audioSourcePair, opts.logWarn)
 	const filterArgsStr = filterA.map((f) => `-filter:a ${f}`).join(' ')
 	const acArg = ac != null ? ` -ac ${ac}` : ''
 	const abrRaw = parseInt(String(opts.audioBitrateKbps ?? ''), 10)

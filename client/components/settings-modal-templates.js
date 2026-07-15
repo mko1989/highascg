@@ -151,6 +151,15 @@ export function getMainModalHtml() {
 								<option value="main_m">Main — Mono</option>
 							</select>
 						</div>
+						<div class="settings-group"><label for="set-streaming-ch-audio-pair">Source audio pair</label>
+							<select id="set-streaming-ch-audio-pair">
+								<option value="all">All channels</option>
+								<option value="1+2">1+2</option>
+								<option value="3+4">3+4</option>
+								<option value="5+6">5+6</option>
+								<option value="7+8">7+8</option>
+							</select>
+						</div>
 						<div class="settings-group"><label for="set-streaming-ch-layer">Content layer</label>
 							<input type="number" id="set-streaming-ch-layer" min="1" value="10" />
 						</div>

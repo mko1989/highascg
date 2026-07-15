@@ -202,6 +202,7 @@ function coreDefaults() {
 			videoMode: '1080p5000',
 			videoSource: 'program_1',
 			audioSource: 'follow_video',
+			audioSourcePair: 'all',
 			casparChannel: null,
 			dedicatedOutputChannel: false,
 			rtmpServerUrl: '',

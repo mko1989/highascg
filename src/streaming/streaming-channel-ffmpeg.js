@@ -15,16 +15,46 @@ const { joinRtmpServerUrlAndStreamKey } = require('../config/rtmp-url')
  * mirrors `ROUTE_OUTPUT_CHANNELS['1+2']` in `client/lib/audio-routes.js`) instead of a blind
  * `channel_layouts=stereo` remix, which on FFmpeg's default downmixer blends/attenuates the wrong
  * channels for a linear-pair bus (this is the "audio is buggy" complaint for non-stereo program buses).
+ *
+ * WO-249 T249.2: extend with `audioSourcePair` to select a specific stereo pair from a multichannel
+ * program bus. When 'all' (default), uses the first pair (c0/c1); specific pairs ('3+4', etc.) are
+ * mapped to their channel indices ('3+4' → [2,3] → c0=c2|c1=c3). If the selected pair exceeds the
+ * resolved layout's channel count, logs a warn and falls back to first pair.
+ *
  * @param {string} [programLayout] - 'stereo' | '4ch' | '8ch' | '16ch' (i.e. `screen_N_audio_layout` id)
+ * @param {string} [audioSourcePair] - 'all' | '1+2' | '3+4' | '5+6' | '7+8' (default: 'all')
+ * @param {(msg: string, context?: object) => void} [logWarn] - optional warn logger
  * @returns {{ filterA: string[], ac: number | null }}
  */
-function buildAudioDownmixFilterChain(programLayout) {
+function buildAudioDownmixFilterChain(programLayout, audioSourcePair, logWarn) {
 	const layout = String(programLayout || 'stereo').toLowerCase()
 	const channels = layout === '16ch' ? 16 : layout === '8ch' ? 8 : layout === '4ch' ? 4 : 2
 	if (channels <= 2) {
 		return { filterA: ['aresample=48000', 'aformat=channel_layouts=stereo'], ac: null }
 	}
-	return { filterA: ['aresample=48000', 'pan=stereo|c0=c0|c1=c1'], ac: 2 }
+	const pair = String(audioSourcePair || 'all').trim().toLowerCase()
+	if (!pair || pair === 'all') {
+		return { filterA: ['aresample=48000', 'pan=stereo|c0=c0|c1=c1'], ac: 2 }
+	}
+	const match = String(pair).match(/^(\d+)\+(\d+)$/)
+	if (!match) {
+		return { filterA: ['aresample=48000', 'pan=stereo|c0=c0|c1=c1'], ac: 2 }
+	}
+	const ch0 = Number(match[1]) - 1
+	const ch1 = Number(match[2]) - 1
+	if (ch0 < 0 || ch1 < 0 || ch0 >= channels || ch1 >= channels) {
+		if (logWarn) {
+			logWarn(`audioSourcePair ${pair} exceeds resolved layout channel count ${channels}; falling back to 1+2`, {
+				pair,
+				channels,
+			})
+		}
+		return { filterA: ['aresample=48000', 'pan=stereo|c0=c0|c1=c1'], ac: 2 }
+	}
+	if (ch0 === ch1) {
+		return { filterA: ['aresample=48000', 'pan=stereo|c0=c0|c1=c1'], ac: 2 }
+	}
+	return { filterA: [`aresample=48000`, `pan=stereo|c0=c${ch0}|c1=c${ch1}`], ac: 2 }
 }
 
 /**
@@ -61,7 +91,8 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
 	const abr = Number.isFinite(abrRaw) ? Math.max(32, abrRaw) : 128
 	// WO-172 T172.5: layout-aware downmix — stereo program buses (the default when `programLayout`
 	// is unset) produce the exact same filter chain as before this WO.
-	const { filterA, ac } = buildAudioDownmixFilterChain(opts.programLayout)
+	// WO-249 T249.2: pass audioSourcePair for pair selection on multichannel buses.
+	const { filterA, ac } = buildAudioDownmixFilterChain(opts.programLayout, opts.audioSourcePair, opts.logWarn)
 	const filterArgsStr = filterA.map((f) => `-filter:a ${f}`).join(' ')
 	const acArg = ac != null ? ` -ac ${ac}` : ''
 	let audioPart = `${filterArgsStr}${acArg} -codec:a aac -b:a ${abr}k`

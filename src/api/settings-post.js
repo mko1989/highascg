@@ -218,6 +218,7 @@ async function handlePost(path, body, ctx) {
 			videoMode: String(s.videoMode || '1080p5000').trim(),
 			videoSource: String(s.videoSource || 'program_1').trim(),
 			audioSource: String(s.audioSource || 'follow_video').trim(),
+			audioSourcePair: String(s.audioSourcePair || 'all').trim() || 'all',
 			contentLayer: Math.max(1, parseInt(s.contentLayer ?? 10, 10) || 10),
 			decklinkDevice: Math.max(0, parseInt(s.decklinkDevice ?? 0, 10) || 0),
 			casparChannel,

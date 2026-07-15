@@ -161,6 +161,7 @@ export function collectProgramAudioRows(stateStore, { masterLabel, labelMax = 22
 						muted: !!layer.muted,
 						isMaster: false,
 						audioRoute: layer.audioRoute || '1+2',
+						...(layer.routeSourceAudio && layer.routeSourceAudio !== 'all' ? { sourceAudioPair: layer.routeSourceAudio } : {}),
 						sceneId: liveSceneData.sceneId,
 						...(Number.isFinite(liveSlot)
 							? { liveAudioSlot: liveSlot, hostChannel: hostEntry?.channel ?? null }

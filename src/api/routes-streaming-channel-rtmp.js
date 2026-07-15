@@ -78,6 +78,7 @@ async function handlePostRtmp(body, ctx) {
 		// explicit pan= downmix instead of a blind stereo remix.
 		const videoSource = String((ctx.config?.streamingChannel && ctx.config.streamingChannel.videoSource) || 'program_1')
 		const programLayout = resolveSourceProgramAudioLayout(ctx.config || {}, videoSource)
+		const audioSourcePair = String((ctx.config?.streamingChannel && ctx.config.streamingChannel.audioSourcePair) || 'all').trim()
 		const built = buildStreamingRtmpAddParams(serverUrl, streamKey, quality, {
 			videoCodec: b.videoCodec || outCfg?.videoCodec,
 			videoBitrateKbps: b.videoBitrateKbps ?? outCfg?.videoBitrateKbps,
@@ -85,6 +86,8 @@ async function handlePostRtmp(body, ctx) {
 			audioCodec: b.audioCodec || outCfg?.audioCodec,
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
 			programLayout,
+			audioSourcePair,
+			logWarn: (msg, ctx) => pushRtmpLog(ctx, 'warn', msg, ctx),
 		})
 		if (!built) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'rtmpServerUrl and streamKey required' }) }

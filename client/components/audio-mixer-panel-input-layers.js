@@ -84,10 +84,11 @@ export function renderInspectorProgramInputLayers(
 			const isMuted = !!r.muted
 			const muteHtml = `<button type="button" class="audio-mixer__mute-btn${isMuted ? ' audio-mixer__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute this layer">M</button>`
 			const labelTitle = r.labelTitle || r.label
+			const sourceAudioLabel = r.sourceAudioPair ? ` (src ${r.sourceAudioPair})` : ''
 			row.innerHTML = `
 				${screensRowHtmlPanel}
 				<div class="audio-mixer__layer-info">
-					<div class="audio-mixer__layer-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}</div>
+					<div class="audio-mixer__layer-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}${escapeHtml(sourceAudioLabel)}</div>
 					<div class="audio-mixer__layer-actions">
 						${soloHtml}
 						${muteHtml}

@@ -137,6 +137,7 @@ export function buildSettingsPayload(modal) {
 				videoMode: modal.querySelector('#set-streaming-ch-mode')?.value ?? prevSch.videoMode ?? '1080p5000',
 				videoSource: modal.querySelector('#set-streaming-ch-source')?.value ?? prevSch.videoSource ?? 'program_1',
 				audioSource: modal.querySelector('#set-streaming-ch-audio')?.value ?? prevSch.audioSource ?? 'follow_video',
+				audioSourcePair: modal.querySelector('#set-streaming-ch-audio-pair')?.value ?? prevSch.audioSourcePair ?? 'all',
 				contentLayer: parseInt(String(modal.querySelector('#set-streaming-ch-layer')?.value ?? prevSch.contentLayer ?? '10'), 10) || 10,
 				decklinkDevice: parseInt(String(modal.querySelector('#set-streaming-ch-decklink')?.value ?? prevSch.decklinkDevice ?? '0'), 10) || 0,
 				rtmpServerUrl: modal.querySelector('#set-streaming-ch-rtmp-url')?.value?.trim?.() ?? prevSch.rtmpServerUrl ?? '',

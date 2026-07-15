@@ -64,7 +64,7 @@ export const settingsState = {
 			companionThumbIntervalMs: 1000,
 		},
 		/** Dedicated Caspar channel for RTMP/record (WO-27); tab visible when enabled */
-		streamingChannel: { enabled: false, videoSource: 'program_1', audioSource: 'follow_video', dedicatedOutputChannel: false },
+		streamingChannel: { enabled: false, videoSource: 'program_1', audioSource: 'follow_video', audioSourcePair: 'all', dedicatedOutputChannel: false },
 		audioRouting: {
 			programLayout: 'stereo',
 			programOutput: 'default',
