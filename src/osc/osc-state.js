@@ -452,7 +452,13 @@ class OscState extends EventEmitter {
 			const elapsedRaw = Number(vals[0])
 			const durationRaw = vals.length >= 2 ? Number(vals[1]) : NaN
 			const elapsed = isSaneTimingValue(elapsedRaw) ? elapsedRaw : Number.isFinite(f.elapsed) ? f.elapsed : null
-			if (isSaneTimingValue(durationRaw)) f.duration = durationRaw
+			// Only a POSITIVE duration is real. The 2.6-dev binary sends duration=0 for looping /
+			// live producers whose file_duration() is absent — and 0 passes isSaneTimingValue, so
+			// the old `f.duration = durationRaw` overwrote a real duration (e.g. the WO-252 INFO
+			// supplement's 15.04s) back to 0 on EVERY 50ms tick. That left the loop-modulo below with
+			// nothing to modulo → the raw monotonic elapsed (462289s ≈ "7 thousand seconds") showed.
+			// Leave f.duration untouched when the binary reports 0 so the INFO-injected value survives.
+			if (durationRaw > 0 && isSaneTimingValue(durationRaw)) f.duration = durationRaw
 			f.elapsed = elapsed
 			// WO-250 T250.3: some builds report `file/time` duration as 0/absent (e.g. mid-init)
 			// even though `file/frame` (frameElapsed/frameTotal, routed below) and `file/fps` are
@@ -476,6 +482,14 @@ class OscState extends EventEmitter {
 			// in-iteration position (elapsed % duration), or timers jump between the two values.
 			const { remaining, progress, iterationElapsed } = computeRemainingAndProgress(elapsed, duration, { loop: f.loop === true })
 			if (f.loop === true && Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed
+			// No duration to modulo against AND a monotonic elapsed far beyond any real clip
+			// (live/route producers whose elapsed is a since-start clock, never reset per play) —
+			// showing 462289s ("128 hours") is worse than nothing. Null it so the UI shows a blank
+			// timer rather than a garbage running total. 12h cap: no playout clip is that long.
+			const MONOTONIC_ELAPSED_CAP_SEC = 12 * 3600
+			if (!(Number.isFinite(duration) && duration > 0) && Number.isFinite(f.elapsed) && f.elapsed > MONOTONIC_ELAPSED_CAP_SEC) {
+				f.elapsed = null
+			}
 			f.remaining = remaining
 			f.progress = progress
 		} else if (sub === 'frame' && vals.length >= 2) {

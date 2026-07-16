@@ -148,7 +148,10 @@ describe('WO-250 T250.3 — osc-state duration fallback from frameTotal/fps', ()
 
 		const layer = os.getSnapshot().channels[1].layers[12]
 		assert.equal(layer.file.elapsed, 1.0)
-		assert.equal(layer.file.duration, 0, 'fps 0 must not derive a duration; stays at the sane literal 0 from file/time')
+		// 2026-07-16: a file/time duration of 0 is now treated as ABSENT, not stored as literal 0 —
+		// storing 0 clobbered the INFO-supplied duration every tick (the "7 thousand seconds" bug).
+		// fps 0 still must not DERIVE a duration; the result is simply no positive duration.
+		assert.ok(!(layer.file.duration > 0), 'fps 0 must not derive a duration; a 0 file/time duration stays absent')
 	})
 })
 

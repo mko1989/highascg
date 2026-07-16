@@ -261,3 +261,34 @@ t2('loop-modulo: looping within first iteration is untouched', () => {
 	assert2.equal(r.iterationElapsed, 5)
 	assert2.equal(r.remaining, 25)
 })
+
+// 2026-07-16 live bug: looping producers send file/time duration=0 (file_duration absent), which
+// clobbered the INFO-supplement's real duration every 50ms tick, so the loop-modulo had nothing to
+// wrap against and the raw monotonic elapsed (462289s) showed as "7 thousand seconds".
+it('OSC duration=0 does NOT clobber an INFO-supplied duration; loop-modulo then wraps the monotonic elapsed', () => {
+	const os = makeOscState()
+	// INFO supplement injects a real duration first (WO-252).
+	os.applyInfoTimingSupplement(1, 10, { durationSec: 15.04 })
+	// Looping producer: file/time carries a huge monotonic elapsed + duration 0.
+	os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/loop', args: [1] })
+	os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [461266.03, 0] })
+	const f = os.getSnapshot().channels['1'].layers['10'].file
+	assert.equal(f.duration, 15.04, 'INFO duration survives the duration=0 OSC tick')
+	assert.ok(f.elapsed >= 0 && f.elapsed < 15.04, `elapsed wrapped into the loop (got ${f.elapsed})`)
+})
+
+it('monotonic elapsed with NO duration is nulled (no 128-hour timer)', () => {
+	const os = makeOscState()
+	os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [462289.0, 0] })
+	const f = os.getSnapshot().channels['1'].layers['10'].file
+	assert.equal(f.duration ?? null, null, 'no duration')
+	assert.equal(f.elapsed, null, 'absurd monotonic elapsed nulled rather than shown')
+})
+
+it('a real positive duration is unaffected', () => {
+	const os = makeOscState()
+	os.handleOscMessage({ address: '/channel/1/stage/layer/10/foreground/file/time', args: [4.16, 5.04] })
+	const f = os.getSnapshot().channels['1'].layers['10'].file
+	assert.equal(f.duration, 5.04)
+	assert.ok(Math.abs(f.elapsed - 4.16) < 0.001)
+})
