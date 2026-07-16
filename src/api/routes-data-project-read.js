@@ -4,6 +4,7 @@ const { JSON_HEADERS, jsonBody } = require('./response')
 const persistence = require('../utils/persistence')
 const { loadFullProject, loadProjectForSlug } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
+const { maskProjectStreamCredentials } = require('../engine/project-stream-credentials')
 const { getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')
 const { retireSlugWithReplication } = require('./routes-data-project-slug')
 
@@ -54,7 +55,8 @@ async function handleProjectGet(ctx) {
 	if (!project) {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({}) }
 	}
-	return { status: 200, headers: JSON_HEADERS, body: jsonBody(project) }
+	// WO-261: never emit raw stream keys to clients.
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody(maskProjectStreamCredentials(project)) }
 }
 
 /** GET /api/project/file/:slug and …/download — read JSON without activating slug. */
@@ -70,7 +72,9 @@ async function handleProjectFile(path) {
 	if (!project) {
 		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Project file not found' }) }
 	}
-	const body = jsonBody(project)
+	// WO-261: browser-bound project JSON (view + download) carries masked keys only; the canonical
+	// key transport is USB/replication (server-side), never the browser.
+	const body = jsonBody(maskProjectStreamCredentials(project))
 	if (m[2]) {
 		return {
 			status: 200,

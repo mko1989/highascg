@@ -226,8 +226,11 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 				type: String(so.type || 'rtmp').toLowerCase(),
 				name,
 				quality: String(so.quality || 'medium'),
+				// WO-261: connectors are client-bound — never expose the raw key. Config creds are
+				// blanked once migrated to the project; the inspector reads URL/status from settings.
 				rtmpServerUrl: String(so.rtmpServerUrl || ''),
-				streamKey: String(so.streamKey || ''),
+				streamKey: '',
+				hasStreamKey: !!String(so.streamKey || ''),
 				srtUrl: String(so.srtUrl || ''),
 				udpUrl: String(so.udpUrl || ''),
 				videoCodec: String(so.videoCodec || 'h264').toLowerCase(),

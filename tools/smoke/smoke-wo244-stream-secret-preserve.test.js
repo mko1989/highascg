@@ -72,7 +72,8 @@ async function testPreserveOnEmpty() {
 }
 
 /**
- * Test 2: settings-post replaces with new non-empty value
+ * Test 2: WO-261 supersedes WO-244 — settings-post NO LONGER accepts credential writes into config.
+ * Incoming url/key are ignored; existing config values are preserved untouched (migration fallback).
  */
 async function testReplaceWithNewValue() {
 	const { handlePost } = require('../../src/api/settings-post')
@@ -124,20 +125,21 @@ async function testReplaceWithNewValue() {
 	assert.strictEqual(result.status, 200, 'POST should return 200')
 	assert.strictEqual(
 		mockConfig.streamingChannel.streamKey,
-		'new_secret_key',
-		'streamKey should be updated with new value'
+		'old_key',
+		'WO-261: incoming streamKey is ignored; existing config value preserved as migration fallback'
 	)
 	assert.strictEqual(
 		mockConfig.streamingChannel.rtmpServerUrl,
-		'rtmp://new.example.com/app',
-		'rtmpServerUrl should be updated with new value'
+		'rtmp://old.example.com/app',
+		'WO-261: incoming rtmpServerUrl is ignored; existing config value preserved'
 	)
 
-	console.log('✓ Replace with new value test passed')
+	console.log('✓ WO-261 config-write-ignored test passed')
 }
 
 /**
- * Test 3: settings-post clears when clearCredentials: true
+ * Test 3: WO-261 — config credentials are no longer client-clearable via settings-post. The legacy
+ * clearCredentials flag is ignored; config values are preserved (migration/project owns clearing now).
  */
 async function testClearCredentials() {
 	const { handlePost } = require('../../src/api/settings-post')
@@ -190,16 +192,16 @@ async function testClearCredentials() {
 	assert.strictEqual(result.status, 200, 'POST should return 200')
 	assert.strictEqual(
 		mockConfig.streamingChannel.streamKey,
-		'',
-		'streamKey should be cleared when clearCredentials: true'
+		'existing_secret_key_12345',
+		'WO-261: clearCredentials no longer clears config; existing value preserved'
 	)
 	assert.strictEqual(
 		mockConfig.streamingChannel.rtmpServerUrl,
-		'',
-		'rtmpServerUrl should be cleared when clearCredentials: true'
+		'rtmp://live.example.com/app',
+		'WO-261: clearCredentials no longer clears config rtmpServerUrl'
 	)
 
-	console.log('✓ Clear credentials test passed')
+	console.log('✓ WO-261 clearCredentials-ignored test passed')
 }
 
 /**

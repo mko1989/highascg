@@ -205,14 +205,13 @@ async function handlePost(path, body, ctx) {
 			if (Number.isFinite(a) && a >= 1) casparChannel = a
 		}
 		const rq = String(s.rtmpQuality || s.quality || 'medium').toLowerCase()
-		const clearCreds = s.clearCredentials === true || s.clearCredentials === 'true'
+		// WO-261: config no longer accepts stream credentials from clients. Existing config values are
+		// carried forward untouched (never taken from the incoming payload) as MIGRATION FALLBACK only —
+		// the one-shot migration on the next project save moves them into the project and blanks them.
+		// Credentials now live in the active project via /api/project/streaming-credentials.
 		const current = ctx.configManager?.get()?.streamingChannel || {}
-		let rtmpServerUrl = String(s.rtmpServerUrl ?? '').trim()
-		let streamKey = String(s.streamKey ?? '').trim()
-		if (!clearCreds) {
-			if (!rtmpServerUrl && current.rtmpServerUrl) rtmpServerUrl = current.rtmpServerUrl
-			if (!streamKey && current.streamKey) streamKey = current.streamKey
-		}
+		const rtmpServerUrl = String(current.rtmpServerUrl ?? '').trim()
+		const streamKey = String(current.streamKey ?? '').trim()
 		cfg.streamingChannel = {
 			enabled: s.enabled === true || s.enabled === 'true',
 			videoMode: String(s.videoMode || '1080p5000').trim(),
@@ -229,11 +228,20 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	if (Array.isArray(settings.streamOutputs)) {
+		// WO-261: per-output rtmpServerUrl/streamKey are project-scoped credentials — never taken from
+		// the incoming payload. Existing config values (matched by id) are carried forward untouched as
+		// migration fallback only. Non-credential fields still round-trip through config as before.
+		const curStreamOutputs = Array.isArray(ctx.configManager?.get()?.streamOutputs)
+			? ctx.configManager.get().streamOutputs
+			: Array.isArray(cfg.streamOutputs)
+				? cfg.streamOutputs
+				: []
 		cfg.streamOutputs = settings.streamOutputs
 			.map((x, i) => {
 				if (!x || typeof x !== 'object') return null
 				const idx = i + 1
 				const id = String(x.id || `str_${idx}`).trim() || `str_${idx}`
+				const curOut = curStreamOutputs.find((o) => String(o?.id || '') === id) || {}
 				const typeRaw = String(x.type || 'rtmp').trim().toLowerCase()
 				const type = ['rtmp', 'ndi', 'srt', 'udp'].includes(typeRaw) ? typeRaw : 'rtmp'
 				const name = String(x.name || x.label || `Str${idx}`).trim() || `Str${idx}`
@@ -250,8 +258,8 @@ async function handlePost(path, body, ctx) {
 					type,
 					name,
 					quality: String(x.quality || 'medium').trim() || 'medium',
-					rtmpServerUrl: String(x.rtmpServerUrl || '').trim(),
-					streamKey: String(x.streamKey || '').trim(),
+					rtmpServerUrl: String(curOut.rtmpServerUrl || '').trim(),
+					streamKey: String(curOut.streamKey || '').trim(),
 					srtUrl: String(x.srtUrl || '').trim(),
 					udpUrl: String(x.udpUrl || '').trim(),
 					videoCodec,

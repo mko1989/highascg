@@ -199,7 +199,6 @@ export async function getStreamingChannelStatus() {
 
 export async function startStreamingChannelRtmp({
 	rtmpServerUrl,
-	streamKey,
 	quality,
 	outputId,
 	videoCodec,
@@ -208,10 +207,10 @@ export async function startStreamingChannelRtmp({
 	audioCodec,
 	audioBitrateKbps,
 }) {
+	// WO-261: the stream key is resolved SERVER-side from the active project — never sent by the client.
 	return await api.post('/api/streaming-channel/rtmp', {
 		action: 'start',
 		rtmpServerUrl,
-		streamKey,
 		quality,
 		outputId,
 		videoCodec,
@@ -224,6 +223,19 @@ export async function startStreamingChannelRtmp({
 
 export async function stopStreamingChannelRtmp() {
 	return await api.post('/api/streaming-channel/rtmp', { action: 'stop' })
+}
+
+/**
+ * WO-261: save RTMP url/key into the ACTIVE project (and only there). Empty streamKey keeps the
+ * stored key; clearKey blanks it. The server never returns the raw key.
+ */
+export async function saveProjectStreamCredentials({ outputId, rtmpServerUrl, streamKey, clearKey }) {
+	return await api.post('/api/project/streaming-credentials', {
+		outputId,
+		rtmpServerUrl,
+		streamKey,
+		clearKey: clearKey === true,
+	})
 }
 
 export async function getPgmRecordStatus() {

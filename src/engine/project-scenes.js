@@ -1,6 +1,10 @@
 'use strict'
 
 const projectStore = require('./project-store')
+const {
+	preserveProjectCredentials,
+	migrateConfigCredentialsIntoProject,
+} = require('./project-stream-credentials')
 const { ensureProjectMediaDir, normalizeProjectMediaRefs } = require('../media/project-media-root')
 const { pushProjectSlugToVolumes } = require('./project-volume-sync')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
@@ -126,11 +130,42 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 }
 
 /**
+ * WO-261 one-shot migration: move any config-held stream creds into `project` and blank + persist
+ * the config copies. Idempotent — once config is blanked nothing moves again. Guarded so callers
+ * without a configManager (unit tests, failure-path tests) are a no-op.
+ * @param {object} ctx
+ * @param {object} project — mutated in place to gain migrated credentials
+ */
+function applyStreamCredentialMigration(ctx, project) {
+	if (!ctx?.config || !ctx.configManager || typeof ctx.configManager.save !== 'function') return
+	const log = typeof ctx.log === 'function' ? (m) => ctx.log('info', m) : undefined
+	const res = migrateConfigCredentialsIntoProject(ctx.config, project, log)
+	if (!res.changed) return
+	try {
+		const cur = ctx.configManager.get()
+		const next = { ...cur }
+		if (res.streamingChannel) next.streamingChannel = res.streamingChannel
+		if (res.streamOutputs) next.streamOutputs = res.streamOutputs
+		if (res.deviceGraph) next.deviceGraph = res.deviceGraph
+		ctx.configManager.save(next)
+		if (res.streamingChannel) ctx.config.streamingChannel = res.streamingChannel
+		if (res.streamOutputs) ctx.config.streamOutputs = res.streamOutputs
+		if (res.deviceGraph) ctx.config.deviceGraph = res.deviceGraph
+	} catch (e) {
+		if (typeof ctx.log === 'function') ctx.log('warn', '[stream-creds] config blank failed: ' + (e?.message || e))
+	}
+}
+
+/**
  * Persist project + optional autosave file; update in-memory deck mirror (no WS broadcast).
  * Main file write must succeed before mirror/autosave updates (WO-106).
+ * WO-261: stream credentials are project-scoped. Client saves never carry real keys, so on the
+ * normal path we re-apply the on-disk authoritative creds (`preserveProjectCredentials`). The
+ * dedicated credentials API passes `authoritativeCredentials: true` to write the creds it just set.
+ * Either way the one-shot config→project migration runs and blanks any config copies.
  * @param {object} ctx
  * @param {object} project
- * @param {{ writeAutosave?: boolean, pushVolumes?: boolean }} [opts]
+ * @param {{ writeAutosave?: boolean, pushVolumes?: boolean, authoritativeCredentials?: boolean }} [opts]
  * @returns {{ ok: true, slug: string }}
  */
 function persistProject(ctx, project, opts = {}) {
@@ -140,6 +175,10 @@ function persistProject(ctx, project, opts = {}) {
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const slug = projectStore.projectSlugFromName(project.name)
 	projectStore.migrateLegacySingleProject(persistence)
+	if (opts.authoritativeCredentials !== true) {
+		project = preserveProjectCredentials(project, projectStore.readProjectFile(slug))
+	}
+	applyStreamCredentialMigration(ctx, project)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
 	projectStore.writeProjectFile(slug, stamped)

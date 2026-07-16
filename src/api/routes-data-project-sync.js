@@ -1,5 +1,7 @@
 'use strict'
 
+const { maskProjectStreamCredentials } = require('../engine/project-stream-credentials')
+
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null
 /** @type {{ ctx: object, project: object } | null} */
@@ -21,7 +23,7 @@ function flushProjectSyncBroadcast() {
 	const { ctx, project } = pending
 	if (typeof ctx._wsBroadcast !== 'function') return
 	try {
-		ctx._wsBroadcast('project_sync', project)
+		ctx._wsBroadcast('project_sync', maskProjectStreamCredentials(project))
 	} catch (e) {
 		if (typeof ctx.log === 'function') {
 			ctx.log('warn', '[project] WebSocket broadcast failed: ' + (e?.message || e))
@@ -33,7 +35,7 @@ function scheduleProjectSyncBroadcast(ctx, project) {
 	if (typeof ctx?._wsBroadcast !== 'function') return
 	if (PROJECT_SYNC_DEBOUNCE_MS <= 0) {
 		try {
-			ctx._wsBroadcast('project_sync', project)
+			ctx._wsBroadcast('project_sync', maskProjectStreamCredentials(project))
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('warn', '[project] WebSocket broadcast failed: ' + (e?.message || e))

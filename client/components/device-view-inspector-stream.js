@@ -20,6 +20,10 @@ function savedStreamOutput(currentSettings, conn) {
 export function renderStreamOutControls(h, conn, { currentSettings, streamingStatus, statusEl, load, setCasparRestartDirty, onRemoveStreamOutput }) {
 	const saved = savedStreamOutput(currentSettings, conn)
 	const caspar = conn?.caspar && typeof conn.caspar === 'object' ? conn.caspar : {}
+	// WO-261: stream credentials live in the active project. The client never receives the raw key —
+	// only a masked url + hasStreamKey. Prefill the URL, leave the key blank ("leave blank to keep").
+	const projCred = (currentSettings?.streamCredentials && currentSettings.streamCredentials[String(conn?.id || '')]) || {}
+	const savedHasKey = projCred.hasStreamKey === true || saved.hasStreamKey === true
 
 	h.append(
 		Object.assign(document.createElement('p'), {
@@ -34,8 +38,11 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 	streamType.innerHTML = '<option value="ndi">NDI</option><option value="rtmp">RTMP</option><option value="srt">SRT</option><option value="udp">UDP</option>'
 	streamType.value = String(saved.type || caspar.type || 'rtmp').toLowerCase()
 	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'name / label', value: String(saved.name || caspar.name || conn?.label || '') })
-	const urlIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'rtmp://server/app or srt://host:port', value: String(saved.rtmpServerUrl || saved.srtUrl || caspar.rtmpServerUrl || caspar.srtUrl || '') })
-	const keyIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'stream key', value: String(saved.streamKey || caspar.streamKey || '') })
+	const urlIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'rtmp://server/app or srt://host:port', value: String(projCred.rtmpServerUrl || saved.rtmpServerUrl || saved.srtUrl || caspar.rtmpServerUrl || caspar.srtUrl || '') })
+	const keyIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: savedHasKey ? 'saved in project — leave blank to keep' : 'stream key (saved in project)', value: '' })
+	const clearKeyChk = Object.assign(document.createElement('input'), { type: 'checkbox', title: 'Clear the saved stream key' })
+	const clearKeyLabel = Object.assign(document.createElement('label'), { className: 'device-view__note', style: 'display:inline-flex;align-items:center;gap:4px' })
+	clearKeyLabel.append(clearKeyChk, document.createTextNode('clear saved key'))
 	const qSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	qSel.innerHTML = '<option value="low">low</option><option value="medium">medium</option><option value="high">high</option>'
 	qSel.value = String(saved.quality || caspar.quality || 'medium')
@@ -97,6 +104,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		const t = String(streamType.value || 'rtmp')
 		urlIn.style.display = t === 'ndi' ? 'none' : ''
 		keyIn.style.display = t === 'rtmp' ? '' : 'none'
+		clearKeyLabel.style.display = t === 'rtmp' ? '' : 'none'
 		ndiAttribution.style.display = t === 'ndi' ? '' : 'none'
 	}
 	updateTypeVisibility()
@@ -108,6 +116,9 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		const t = String(streamType.value || 'rtmp').toLowerCase()
 		const name = String(nameIn.value || conn?.label || conn.id).trim() || String(conn?.label || conn.id)
 		const next = [...cur]
+		// WO-261: non-credential fields still round-trip through config. rtmpServerUrl/streamKey are
+		// project-scoped credentials — the server ignores them here and they are written via the project
+		// credentials API below.
 		next[idx] = {
 			...next[idx],
 			id: String(conn.id),
@@ -115,8 +126,6 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			name,
 			label: t === 'ndi' ? name : String(next[idx]?.label || name),
 			quality: String(qSel.value || 'medium'),
-			rtmpServerUrl: t === 'rtmp' ? String(urlIn.value || '').trim() : String(next[idx]?.rtmpServerUrl || ''),
-			streamKey: t === 'rtmp' ? String(keyIn.value || '').trim() : '',
 			srtUrl: t === 'srt' ? String(urlIn.value || '').trim() : '',
 			videoCodec: String(vCodecSel.value || 'h264').toLowerCase(),
 			videoBitrateKbps: Math.max(200, parseInt(String(vBitrateIn.value || '4500'), 10) || 4500),
@@ -125,6 +134,16 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			audioBitrateKbps: Math.max(32, parseInt(String(aBitrateIn.value || '128'), 10) || 128),
 		}
 		await Actions.saveSettingsPatch({ streamOutputs: next })
+		if (t === 'rtmp') {
+			// Credentials into the ACTIVE project (and only there). Empty key keeps the stored one.
+			await Actions.saveProjectStreamCredentials({
+				outputId: String(conn.id),
+				rtmpServerUrl: String(urlIn.value || '').trim(),
+				streamKey: String(keyIn.value || '').trim(),
+				clearKey: clearKeyChk.checked === true,
+			})
+			clearKeyChk.checked = false
+		}
 		await load()
 	}
 	startBtn.onclick = async () => {
@@ -136,8 +155,9 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			}
 			const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : []
 			const saved = cur.find((x) => String(x?.id || '') === String(conn.id || '')) || {}
-			const rtmpServerUrl = String(urlIn.value || saved?.rtmpServerUrl || conn?.caspar?.rtmpServerUrl || '').trim()
-			const streamKey = String(keyIn.value || saved?.streamKey || conn?.caspar?.streamKey || '').trim()
+			// WO-261: the stream key is resolved SERVER-side from the active project — never sent from the
+			// client. Only a freshly typed (unsaved) URL is forwarded so the box still works before Save.
+			const rtmpServerUrl = String(urlIn.value || projCred.rtmpServerUrl || saved?.rtmpServerUrl || '').trim()
 			const quality = String(qSel.value || saved?.quality || conn?.caspar?.quality || 'medium')
 			const videoCodec = String(vCodecSel.value || saved?.videoCodec || conn?.caspar?.videoCodec || 'h264').toLowerCase()
 			const videoBitrateKbps = Math.max(200, parseInt(String(vBitrateIn.value || saved?.videoBitrateKbps || conn?.caspar?.videoBitrateKbps || '4500'), 10) || 4500)
@@ -159,7 +179,6 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			const res = await Actions.startStreamingChannelRtmp({
 				outputId: String(conn.id),
 				rtmpServerUrl,
-				streamKey,
 				quality,
 				videoCodec,
 				videoBitrateKbps,
@@ -203,7 +222,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			setStatus(statusEl, e?.message || String(e), false)
 		}
 	}
-	wrapCtl.append(streamType, nameIn, urlIn, keyIn, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, saveBtn, startBtn, stopBtn, removeBtn)
+	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
 	h.append(ndiAttribution)
 	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Stream log' }))

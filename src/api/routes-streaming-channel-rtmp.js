@@ -11,6 +11,9 @@ const {
 	resolveSourceProgramAudioLayout,
 } = require('./routes-streaming-channel-shared')
 const { pushRtmpLog } = require('./routes-streaming-channel-log')
+const { redactStreamUrl } = require('../streaming/streaming-channel-status')
+const projectStore = require('../engine/project-store')
+const { resolveStreamCredential } = require('../engine/project-stream-credentials')
 
 function parseStreamStatusPollMs() {
 	const n = parseInt(String(process.env.HIGHASCG_STREAM_STATUS_POLL_MS || ''), 10)
@@ -70,8 +73,17 @@ async function handlePostRtmp(body, ctx) {
 		if (ctx.streamingChannelRtmp.active) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'RTMP already running — stop first' }) }
 		}
-		const serverUrl = String(b.rtmpServerUrl || '').trim()
-		const streamKey = String(b.streamKey || '').trim()
+		// WO-261: credentials are resolved SERVER-side from the ACTIVE project (config is fallback-only).
+		// The client no longer sends streamKey; a freshly typed (unsaved) rtmpServerUrl in the body is
+		// accepted only as a last resort so the URL box still works before Save.
+		const persistence = ctx.persistence || require('../utils/persistence')
+		let activeProject = null
+		try {
+			activeProject = projectStore.loadProjectBySlug(persistence)
+		} catch (_) {}
+		const resolved = resolveStreamCredential(ctx.config || {}, activeProject, outputId || 'streamingChannel')
+		const serverUrl = resolved.rtmpServerUrl || String(b.rtmpServerUrl || '').trim()
+		const streamKey = resolved.streamKey
 		const quality = String(b.quality || outCfg?.quality || 'medium').toLowerCase()
 		// WO-172 T172.5: layout-aware downmix — resolve the cabled source's program-bus audio layout
 		// (screenDestinations[].audioLayout) so non-stereo buses (e.g. this rig's discrete-8ch) get an
@@ -128,7 +140,7 @@ async function handlePostRtmp(body, ctx) {
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, active: true, url: built.url, amcp: res }),
+				body: jsonBody({ ok: true, active: true, url: redactStreamUrl(built.url), amcp: res }),
 			}
 		} catch (e) {
 			const msg = e?.message || String(e)

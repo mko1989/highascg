@@ -285,6 +285,7 @@ routes.post('/api/project/autosave', ({ path, body, ctx }) => routesData.handleP
 routes.post('/api/project/apply-hardware', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/new', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
 routes.post('/api/project/rename', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })
+routes.post('/api/project/streaming-credentials', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false }) // WO-261 project-scoped stream creds
 
 routes.get('/api/project/list', ({ ctx }) => routesData.handleProjectList(ctx), { requireCaspar: false })
 routes.get('/api/project', ({ ctx }) => routesData.handleProjectGet(ctx), { requireCaspar: false })

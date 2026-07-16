@@ -112,20 +112,13 @@ function applyStreamRecordMappingsFromGraph(config) {
 		}
 		const sink = winner.sink || {}
 		const q = String(sink?.caspar?.quality || '').trim()
-		const url = String(sink?.caspar?.rtmpServerUrl || '').trim()
-		const key = String(sink?.caspar?.streamKey || '').trim()
 		if (q && sc.quality !== q) {
 			sc.quality = q
 			changed = true
 		}
-		if (url && sc.rtmpServerUrl !== url) {
-			sc.rtmpServerUrl = url
-			changed = true
-		}
-		if (key && sc.streamKey !== key) {
-			sc.streamKey = key
-			changed = true
-		}
+		// WO-261: stream credentials (rtmpServerUrl/streamKey) are project-scoped and live in the
+		// active project ONLY. They are deliberately NOT copied from the device graph into config here —
+		// doing so would resurrect a key in config after the one-shot migration blanked it.
 	}
 
 	if (groupedRecords.size) {

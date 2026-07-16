@@ -92,9 +92,11 @@ async function handleGet(path, ctx, query, req) {
 	}
 	const graph = normalizeDeviceGraph(ctx.config?.deviceGraph)
 	augmentGraphWithSources(graph, live)
+	const { maskDeviceGraphConnectorKeys } = require('../engine/project-stream-credentials')
 	const payload = {
 		ok: true,
-		graph,
+		graph: maskDeviceGraphConnectorKeys(graph), // WO-261: never emit raw per-connector stream keys
+
 		live,
 		suggested: suggestConnectorsAndDevicesFromLive(live, ctx.config || {}),
 		screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),

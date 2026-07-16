@@ -10,6 +10,12 @@ const {
 } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
 const {
+	withProjectCredential,
+	projectHasStreamKey,
+	readProjectCredential,
+	maskProjectStreamCredentials,
+} = require('../engine/project-stream-credentials')
+const {
 	injectHardwareConfigToProject,
 	applyHardwareConfigFromProject,
 	applyHardwareConfigToCtx,
@@ -103,6 +109,45 @@ async function handleProject(path, body, ctx) {
 			}),
 		}
 	}
+	if (path === '/api/project/streaming-credentials') {
+		// WO-261 T261.3: the ONLY write path for stream credentials — they land in the active project
+		// and only there. Empty streamKey keeps the stored key (empty-keeps); clearKey blanks it.
+		projectStore.migrateLegacySingleProject(persistence)
+		const slug = projectStore.getActiveSlug(persistence)
+		const existing = slug ? projectStore.readProjectFile(slug) : null
+		if (!existing || typeof existing !== 'object') {
+			return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'No active project to store credentials' }) }
+		}
+		const key = String(b.outputId || '').trim() || 'streamingChannel'
+		const next = withProjectCredential(existing, key, {
+			rtmpServerUrl: b.rtmpServerUrl,
+			streamKey: b.streamKey,
+			clearKey: b.clearKey === true || b.clearKey === 'true',
+		})
+		try {
+			await persistProject(ctx, next, { writeAutosave: true, authoritativeCredentials: true })
+		} catch (e) {
+			if (typeof ctx.log === 'function') ctx.log('error', '[project] credentials persist failed: ' + (e?.message || e))
+			return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'Credential save failed', detail: e?.message || String(e) }) }
+		}
+		if (typeof ctx.onProjectSavedForReplication === 'function') {
+			try {
+				ctx.onProjectSavedForReplication(next)
+			} catch (e) {
+				if (typeof ctx.log === 'function') ctx.log('warn', '[replication] credential push: ' + (e?.message || e))
+			}
+		}
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({
+				ok: true,
+				outputId: key,
+				rtmpServerUrl: readProjectCredential(next, key).rtmpServerUrl,
+				hasStreamKey: projectHasStreamKey(next, key),
+			}),
+		}
+	}
 	if (path === '/api/project/load') {
 		const reqSlug =
 			b.slug != null
@@ -153,7 +198,7 @@ async function handleProject(path, body, ctx) {
 			status: 200,
 			headers: JSON_HEADERS,
 			body: jsonBody({
-				...project,
+				...maskProjectStreamCredentials(project),
 				...(recoveredFromAutosave ? { _recoveredFromAutosave: true } : {}),
 			}),
 		}
@@ -202,7 +247,7 @@ async function handleProject(path, body, ctx) {
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, slug, activeSlug: slug, project }),
+				body: jsonBody({ ok: true, slug, activeSlug: slug, project: maskProjectStreamCredentials(project) }),
 			}
 		} catch (e) {
 			return {

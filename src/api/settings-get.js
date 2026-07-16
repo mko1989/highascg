@@ -18,10 +18,19 @@ const { normalizeNetworkSettings } = require('../config/network-settings')
 const { resolveProjectFps } = require('../config/project-fps')
 const { redactObject } = require('../support/redact-settings')
 const { getExpectedApiToken } = require('../server/auth')
+const projectStore = require('../engine/project-store')
+const { buildStreamCredentialStatus, maskDeviceGraphConnectorKeys } = require('../engine/project-stream-credentials')
 
 async function handleGet(path, ctx) {
 	if (path !== '/api/settings') return null
 	const cfg = ctx.config
+	// WO-261: report project-held stream credentials as { rtmpServerUrl, hasStreamKey } (never the raw
+	// key) so the inspector's URL prefill + "saved in project" placeholder keep working.
+	let activeProject = null
+	try {
+		activeProject = projectStore.loadProjectBySlug(ctx.persistence || require('../utils/persistence'))
+	} catch (_) {}
+	const streamCredentials = buildStreamCredentialStatus(cfg, activeProject)
 	const cs = { ...defaults.casparServer, ...cfg.casparServer }
 	normalizeCasparServerConfigPath(cs)
 	const payload = {
@@ -48,7 +57,7 @@ async function handleGet(path, ctx) {
 			casparServer: cs,
 			screen_count: resolveMainScreenCount(cfg),
 			companion: { ...defaults.companion, ...(cfg.companion || {}) },
-			screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: normalizeDeviceGraph(cfg.deviceGraph),
+			screenDestinations: normalizeScreenDestinations(cfg.screenDestinations), deviceGraph: maskDeviceGraphConnectorKeys(normalizeDeviceGraph(cfg.deviceGraph)),
 			gpuPhysicalTopology: Array.isArray(cfg.gpuPhysicalTopology) && cfg.gpuPhysicalTopology.length ? cfg.gpuPhysicalTopology : defaults.gpuPhysicalTopology,
 			screen_1_system_id: cfg.screen_1_system_id ?? '', screen_2_system_id: cfg.screen_2_system_id ?? '', screen_3_system_id: cfg.screen_3_system_id ?? '', screen_4_system_id: cfg.screen_4_system_id ?? '', screen_1_os_mode: cfg.screen_1_os_mode ?? '', screen_2_os_mode: cfg.screen_2_os_mode ?? '', screen_3_os_mode: cfg.screen_3_os_mode ?? '', screen_4_os_mode: cfg.screen_4_os_mode ?? '', screen_1_os_backend: cfg.screen_1_os_backend ?? 'xrandr', screen_2_os_backend: cfg.screen_2_os_backend ?? 'xrandr', screen_3_os_backend: cfg.screen_3_os_backend ?? 'xrandr', screen_4_os_backend: cfg.screen_4_os_backend ?? 'xrandr', screen_1_os_rate: cfg.screen_1_os_rate ?? '', screen_2_os_rate: cfg.screen_2_os_rate ?? '', screen_3_os_rate: cfg.screen_3_os_rate ?? '', screen_4_os_rate: cfg.screen_4_os_rate ?? '',
 			screen_1_force_os_resolution: !!(cfg.screen_1_force_os_resolution ?? cs.screen_1_force_os_resolution), screen_2_force_os_resolution: !!(cfg.screen_2_force_os_resolution ?? cs.screen_2_force_os_resolution), screen_3_force_os_resolution: !!(cfg.screen_3_force_os_resolution ?? cs.screen_3_force_os_resolution), screen_4_force_os_resolution: !!(cfg.screen_4_force_os_resolution ?? cs.screen_4_force_os_resolution),
@@ -73,7 +82,8 @@ async function handleGet(path, ctx) {
 				})
 				return [...collectHostLiveConfigWarnings(cfg), ...mig.warnings]
 			})(),
-			streamOutputs: Array.isArray(cfg.streamOutputs) && cfg.streamOutputs.length ? cfg.streamOutputs : [{
+			streamCredentials,
+			streamOutputs: (Array.isArray(cfg.streamOutputs) && cfg.streamOutputs.length ? cfg.streamOutputs : [{
 				id: 'str_1',
 				label: 'Str1',
 				enabled: true,
@@ -89,7 +99,13 @@ async function handleGet(path, ctx) {
 				encoderPreset: 'veryfast',
 				audioCodec: 'aac',
 				audioBitrateKbps: 128,
-			}],
+			}]).map((o) => {
+				// WO-261: never emit the raw per-output key; expose the resolved (project-first) URL and a
+				// hasStreamKey boolean for the inspector placeholder.
+				const id = String(o?.id || '')
+				const st = streamCredentials[id] || {}
+				return { ...o, rtmpServerUrl: st.rtmpServerUrl || String(o?.rtmpServerUrl || ''), streamKey: '', hasStreamKey: !!st.hasStreamKey }
+			}),
 			recordOutputs: Array.isArray(cfg.recordOutputs) && cfg.recordOutputs.length ? cfg.recordOutputs : [{
 				id: 'rec_1',
 				label: 'Rec1',
