@@ -44,10 +44,10 @@ Read the whole file first; preserve its public API and output bytes' semantics (
 - Curated gate ONLY; `node --check` + `./node_modules/.bin/eslint --quiet` on touched files.
 - Keep files under 500 lines; match style; honest checkboxes.
 
-- [ ] T248.1 headless CDP helper + binary resolver
-- [ ] T248.2 cg-look-thumb-render.js migrated
-- [ ] T248.3 generate-lt-thumbnails.js migrated
-- [ ] T248.4 DOM smokes migrated (standalone runs pasted)
-- [ ] T248.5 npm uninstall puppeteer + repo grep clean
-- [ ] T248.6 binary-resolve smoke in gate
+- [x] T248.1 headless CDP helper + binary resolver
+- [x] T248.2 cg-look-thumb-render.js migrated
+- [x] T248.3 generate-lt-thumbnails.js migrated
+- [x] T248.4 DOM smokes migrated (standalone runs pasted)
+- [x] T248.5 npm uninstall puppeteer + repo grep clean
+- [x] T248.6 binary-resolve smoke in gate
 - [ ] A248.1 (owner/orchestrator) live: LT thumbnails regenerate correctly; look thumbs render with transparency

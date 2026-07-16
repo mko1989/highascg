@@ -3,6 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const { resolveCgTemplateName, extractTemplateCgData } = require('../engine/scene-template-cg')
+const { launchHeadlessChrome, openPage } = require('./headless-chrome-cdp')
 
 const LT_DIR = path.join(__dirname, '..', '..', 'template', 'lower-thirds')
 const STUDIO_LT_DIR = path.join(__dirname, '..', '..', 'template', 'studio')
@@ -103,22 +104,22 @@ function resolveCgDataJson(req) {
 	return extractTemplateCgData(fakeLayer, cgName)
 }
 
-/** @type {import('puppeteer').Browser | null} */
-let browserPromise = null
+/** @type {Promise<{ browserWs: string, httpPort: number, kill: () => void }>|null} */
+let chromePromise = null
 
-async function getBrowser() {
-	if (!browserPromise) {
-		const puppeteer = require('puppeteer')
-		browserPromise = puppeteer.launch({
-			args: ['--no-sandbox', '--disable-setuid-sandbox'],
-		})
+/**
+ * @returns {Promise<{ browserWs: string, httpPort: number, kill: () => void }>}
+ */
+async function getChrome() {
+	if (!chromePromise) {
+		chromePromise = launchHeadlessChrome()
 	}
-	return browserPromise
+	return chromePromise
 }
 
 /**
  * Wait until CG play-in animation has finished (avoids thin mid-animation strips).
- * @param {import('puppeteer').Page} page
+ * @param {object} page headless-chrome-cdp page wrapper
  * @param {number} speed
  */
 async function waitForCgThumbSettle(page, speed) {
@@ -138,7 +139,7 @@ async function waitForCgThumbSettle(page, speed) {
 
 /**
  * Mark the best visible template element and return whether it is viewport-sized.
- * @param {import('puppeteer').Page} page
+ * @param {object} page headless-chrome-cdp page wrapper
  * @returns {Promise<'element'|'clip'|'viewport'>}
  */
 async function markCgThumbCaptureTarget(page) {
@@ -225,17 +226,15 @@ async function markCgThumbCaptureTarget(page) {
 }
 
 /**
- * @param {import('puppeteer').Page} page
+ * @param {object} page headless-chrome-cdp page wrapper
  * @returns {Promise<Buffer>}
  */
 async function captureCgThumbPng(page) {
 	const mode = await markCgThumbCaptureTarget(page)
 	if (mode === 'element') {
-		const handle = await page.$('[data-cg-thumb-target="element"]')
-		if (handle) {
-			const png = await handle.screenshot({ type: 'png', omitBackground: true })
-			await handle.dispose().catch(() => {})
-			return Buffer.from(png)
+		const clip = await page.elementClip('[data-cg-thumb-target="element"]')
+		if (clip && clip.width > 0 && clip.height > 0) {
+			return page.screenshot({ omitBackground: true, clip })
 		}
 	}
 
@@ -245,8 +244,7 @@ async function captureCgThumbPng(page) {
 			try {
 				const clip = JSON.parse(clipRaw)
 				if (clip.width > 0 && clip.height > 0) {
-					const png = await page.screenshot({ type: 'png', omitBackground: true, clip })
-					return Buffer.from(png)
+					return page.screenshot({ omitBackground: true, clip })
 				}
 			} catch {
 				/* fall through */
@@ -254,8 +252,7 @@ async function captureCgThumbPng(page) {
 		}
 	}
 
-	const png = await page.screenshot({ type: 'png', omitBackground: true, fullPage: false })
-	return Buffer.from(png)
+	return page.screenshot({ omitBackground: true })
 }
 
 /**
@@ -275,11 +272,10 @@ async function renderCgLookThumbPng(req) {
 		cgPayload = {}
 	}
 
-	const browser = await getBrowser()
-	const page = await browser.newPage()
+	const chrome = await getChrome()
+	const page = await openPage(chrome.httpPort, { width: VIEWPORT_W, height: VIEWPORT_H, deviceScaleFactor: 1 })
 	try {
-		await page.setViewport({ width: VIEWPORT_W, height: VIEWPORT_H, deviceScaleFactor: 1 })
-		await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle0', timeout: 30000 })
+		await page.navigate(`file://${htmlPath}`, { timeoutMs: 30000 })
 
 		await page.evaluate((payload) => {
 			if (typeof window.update === 'function') {

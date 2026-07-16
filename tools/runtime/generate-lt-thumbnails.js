@@ -1,6 +1,8 @@
-const puppeteer = require('puppeteer');
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
+const { launchHeadlessChrome, openPage } = require('../../src/media/headless-chrome-cdp');
 
 const LT_DIR = path.join(__dirname, '..', '..', 'template', 'lower-thirds');
 const THUMB_DIR = path.join(LT_DIR, 'thumbnails');
@@ -23,40 +25,42 @@ const templates = [
 
 async function generateThumbnails() {
     console.log('Generating lower-third thumbnails...');
-    const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
+    const chrome = await launchHeadlessChrome();
+    try {
+        const page = await openPage(chrome.httpPort, { width: 1920, height: 1080 });
 
-    for (const template of templates) {
-        console.log(`Processing ${template}...`);
-        const fileUrl = `file://${path.join(LT_DIR, template + '.html')}`;
-        
-        await page.goto(fileUrl, { waitUntil: 'networkidle0' });
+        for (const template of templates) {
+            console.log(`Processing ${template}...`);
+            const fileUrl = `file://${path.join(LT_DIR, template + '.html')}`;
 
-        // Evaluate code in the context of the page to load data and play
-        await page.evaluate(() => {
-            window.update({
-                data: { title: "Alex Rivera", subtitle: "Lead Designer" },
-                style: {
-                    primaryColor: "#00bcd4",
-                    textColor: "#ffffff",
-                    speed: 100 // Super fast animation
-                }
+            await page.navigate(fileUrl, { timeoutMs: 30000 });
+
+            // Evaluate code in the context of the page to load data and play
+            await page.evaluate(() => {
+                window.update({
+                    data: { title: "Alex Rivera", subtitle: "Lead Designer" },
+                    style: {
+                        primaryColor: "#00bcd4",
+                        textColor: "#ffffff",
+                        speed: 100 // Super fast animation
+                    }
+                });
+                window.play();
             });
-            window.play();
-        });
 
-        // Wait a short moment for the super-fast animation to finish
-        await new Promise(r => setTimeout(r, 200));
+            // Wait a short moment for the super-fast animation to finish
+            await new Promise(r => setTimeout(r, 200));
 
-        const savePath = path.join(THUMB_DIR, `${template}.png`);
-        await page.screenshot({ path: savePath });
-        console.log(`Saved ${savePath}`);
+            const savePath = path.join(THUMB_DIR, `${template}.png`);
+            const png = await page.screenshot({});
+            fs.writeFileSync(savePath, png);
+            console.log(`Saved ${savePath}`);
+        }
+
+        await page.close().catch(() => {});
+    } finally {
+        chrome.kill();
     }
-
-    await browser.close();
     console.log('Thumbnail generation complete.');
 }
 

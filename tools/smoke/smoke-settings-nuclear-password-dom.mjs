@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 /**
- * DOM smoke: settings modal nuclear tab password input (Puppeteer + harness HTML).
+ * DOM smoke: settings modal nuclear tab password input (headless Chrome via
+ * raw CDP + harness HTML). WO-248 — migrated off puppeteer onto
+ * `src/media/headless-chrome-cdp.js` (cached Chrome-for-Testing binary or
+ * HIGHASCG_CHROME_BIN / chromium on PATH).
  */
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import puppeteer from 'puppeteer'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { launchHeadlessChrome, openPage } = require('../../src/media/headless-chrome-cdp.js')
 
 const ROOT = path.join(fileURLToPath(new URL('.', import.meta.url)), '../..')
 const HARNESS = path.join(ROOT, 'tools/smoke/fixtures/settings-nuclear-test.html')
@@ -66,15 +72,12 @@ async function main() {
 	assert.ok(fs.existsSync(HARNESS), 'harness HTML missing')
 
 	const { server, url } = await startStaticServer()
-	const browser = await puppeteer.launch({
-		headless: true,
-		args: ['--no-sandbox', '--disable-setuid-sandbox'],
-	})
+	const chrome = await launchHeadlessChrome()
 
 	try {
-		const page = await browser.newPage()
-		await page.goto(url, { waitUntil: 'load', timeout: 30_000 })
-		await page.waitForFunction(() => window.__settingsNuclearReady === true, { timeout: 15_000 })
+		const page = await openPage(chrome.httpPort)
+		await page.navigate(url, { timeoutMs: 30_000 })
+		await page.waitForFunction(() => window.__settingsNuclearReady === true, { timeoutMs: 15_000 })
 
 		let nuclear = await fieldState(page, 'set-nuclear-password')
 		assert.notEqual(nuclear.missing, true)
@@ -86,7 +89,7 @@ async function main() {
 		nuclear = await fieldState(page, 'set-nuclear-password')
 		assert.notEqual(nuclear.groupDisplay, 'none', 'nuclear password visible when protection on')
 
-		await page.type('#set-nuclear-password', 'nuclear-secret', { delay: 0 })
+		await page.type('#set-nuclear-password', 'nuclear-secret')
 		const values = await page.evaluate(() => ({
 			password: document.getElementById('set-nuclear-password')?.value || '',
 			viaHelper: typeof window.__getNuclearPassword === 'function' ? window.__getNuclearPassword() : '',
@@ -101,8 +104,9 @@ async function main() {
 		assert.equal(nuclear.groupDisplay, 'none', 'nuclear password hidden again when protection off')
 
 		console.log('smoke-settings-nuclear-password-dom: OK')
+		await page.close().catch(() => {})
 	} finally {
-		await browser.close()
+		chrome.kill()
 		server.close()
 	}
 }

@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 /**
- * DOM smoke: logs modal pane toggles (Puppeteer + harness HTML).
- * Requires: npm install (puppeteer devDependency).
+ * DOM smoke: logs modal pane toggles (headless Chrome via raw CDP + harness
+ * HTML). WO-248 — migrated off puppeteer onto `src/media/headless-chrome-cdp.js`
+ * (cached Chrome-for-Testing binary or HIGHASCG_CHROME_BIN / chromium on PATH).
  */
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import puppeteer from 'puppeteer'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { launchHeadlessChrome, openPage } = require('../../src/media/headless-chrome-cdp.js')
 
 const ROOT = path.join(fileURLToPath(new URL('.', import.meta.url)), '../..')
 const HARNESS = path.join(ROOT, 'tools/smoke/fixtures/logs-modal-test.html')
@@ -28,12 +32,21 @@ function startStaticServer() {
 	return new Promise((resolve, reject) => {
 		const server = http.createServer((req, res) => {
 			try {
-				const raw = decodeURIComponent(String(req.url || '/').split('?')[0])
+				const reqUrl = new URL(String(req.url || '/'), 'http://127.0.0.1')
+				const raw = decodeURIComponent(reqUrl.pathname)
 				const rel = raw === '/test' || raw === '/' ? 'tools/smoke/fixtures/logs-modal-test.html' : raw.replace(/^\//, '')
 				const filePath = path.normalize(path.join(ROOT, rel))
 				if (!filePath.startsWith(ROOT) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
 					res.writeHead(404)
 					res.end('Not found')
+					return
+				}
+				if (reqUrl.searchParams.has('raw')) {
+					// Emulate Vite's `?raw` import (real client modules use it, e.g.
+					// logs-modal.js imports shortcuts.md?raw): expose the file text as an
+					// ES-module default export so a plain browser can load the graph.
+					res.writeHead(200, { 'Content-Type': 'application/javascript' })
+					res.end(`export default ${JSON.stringify(fs.readFileSync(filePath, 'utf8'))}`)
 					return
 				}
 				res.writeHead(200, { 'Content-Type': mimeFor(filePath) })
@@ -53,7 +66,7 @@ function startStaticServer() {
 }
 
 /**
- * @param {import('puppeteer').Page} page
+ * @param {object} page headless-chrome-cdp page wrapper
  * @param {string} id
  */
 async function paneDisplay(page, id) {
@@ -71,16 +84,13 @@ async function main() {
 	assert.ok(fs.existsSync(HARNESS), 'harness HTML missing')
 
 	const { server, url } = await startStaticServer()
-	const browser = await puppeteer.launch({
-		headless: true,
-		args: ['--no-sandbox', '--disable-setuid-sandbox'],
-	})
+	const chrome = await launchHeadlessChrome()
 
 	try {
-		const page = await browser.newPage()
-		await page.goto(url, { waitUntil: 'load', timeout: 30_000 })
-		await page.waitForFunction(() => window.__logsModalReady === true, { timeout: 10_000 })
-		await page.waitForSelector('#logs-modal', { timeout: 5000 })
+		const page = await openPage(chrome.httpPort)
+		await page.navigate(url, { timeoutMs: 30_000 })
+		await page.waitForFunction(() => window.__logsModalReady === true, { timeoutMs: 10_000 })
+		await page.waitForSelector('#logs-modal', { timeoutMs: 5000 })
 
 		let caspar = await paneDisplay(page, 'logs-pane-caspar')
 		let high = await paneDisplay(page, 'logs-pane-highascg')
@@ -117,8 +127,9 @@ async function main() {
 		assert.equal(filtersHidden, false, 'filters visible when HighAsCG on')
 
 		console.log('smoke-logs-modal-toggles: OK')
+		await page.close().catch(() => {})
 	} finally {
-		await browser.close()
+		chrome.kill()
 		server.close()
 	}
 }
