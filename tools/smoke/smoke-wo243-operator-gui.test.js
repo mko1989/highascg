@@ -440,3 +440,25 @@ describe('WO-243 T243.3: client cef-operator-mode pure logic (no jsdom required)
 		assert.match(src, /function cellRectsToLayoutCells/, 'the real module still exports this exact function name')
 	})
 })
+
+// WO-243 follow-up (owner: "gui still displays on the first screen"): an operator_gui-bound GPU
+// jack must claim the multiview-style head, never a screen_<mainScreenIndex+1> assignment — the
+// screen-branch classification hijacked screen_1's head (program output lost its monitor) and the
+// generator emitted x=0,y=0 (window on the program screen). Grep-level wiring guards.
+describe('WO-243 follow-up: operator_gui never claims a program-screen layout slot', () => {
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+	it('os-layout-calculator-assign classifies operator_gui as a multiview-style head', () => {
+		const src = read('src/utils/os-layout-calculator-assign.js')
+		assert.match(src, /dMode === 'multiview' \|\| dMode === 'operator_gui'/, 'edge classifier maps operator_gui to the multiview head')
+		assert.match(src, /dMode !== 'stream' && dMode !== 'multiview' && dMode !== 'operator_gui'/, 'legacy mainIndex fallback excludes operator_gui')
+	})
+	it('resolveLayoutRectForOperatorPort resolves operator_gui-bound ports to the multiview rect', () => {
+		const src = read('src/utils/x-display-session-layout.js')
+		assert.match(src, /mode === 'multiview' \|\| mode === 'operator_gui'/, 'wiring loop treats operator_gui like multiview')
+		assert.match(src, /buildGpuPhysicalMap\(/, 'gpu-map xrandr fallback strategy present')
+	})
+	it('generator pins <device> to the X-screen convention, not the GPU port number', () => {
+		const src = read('src/config/config-generator-operator-gui.js')
+		assert.match(src, /const device = 1/, 'device is the X-screen index (1), position is x/y-driven')
+	})
+})

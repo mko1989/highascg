@@ -164,7 +164,9 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
 		if (portIdx !== portN) continue
 		const mode = String(dest?.mode || '').toLowerCase()
-		if (mode === 'multiview') {
+		// operator_gui-bound jacks claim the multiview-style head (os-layout-calculator-assign.js)
+		// — resolve them to the multiview rect, never to screen_<mainScreenIndex+1>.
+		if (mode === 'multiview' || mode === 'operator_gui') {
 			const mv = plan?.multiview?.[1]
 			if (!mv || mv.width <= 0 || mv.height <= 0) continue
 			return {
@@ -191,6 +193,35 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 			index: n,
 			interactive: screenInteractiveEnabled(config, n),
 		}
+	}
+	// WO-243 follow-up: neither the screen_N_system_id keys (empty on boxes configured purely via
+	// Device View) nor the destination wiring (multiview jacks are often not gpu_out-cabled in the
+	// graph) resolved — ask the GPU physical map which xrandr output is live on this port and match
+	// its name against the layout entries' sysIds. This is what actually places the window on the
+	// operator/multiview monitor instead of falling back to 0,0 (= program screen 1).
+	try {
+		const { getDisplayDetails, getGpuConnectorInventory } = require('./hardware-info')
+		const { buildGpuPhysicalMap } = require('./gpu-physical-map')
+		const map = buildGpuPhysicalMap({
+			config: config || {},
+			displays: getDisplayDetails() || [],
+			connectors: getGpuConnectorInventory() || [],
+		})
+		for (const entry of map?.ports || []) {
+			const slot = Number(entry?.slotOrder)
+			if (!Number.isFinite(slot) || slot + 1 !== portN) continue
+			const xr = String(entry?.runtime?.xrandrName || '').trim()
+			if (!xr) break
+			const hit = findLayoutRectBySysId(plan, xr)
+			if (!hit) break
+			const interactive =
+				hit.kind === 'multiview'
+					? multiviewInteractiveEnabled(config)
+					: screenInteractiveEnabled(config, hit.index)
+			return { x: hit.x, y: hit.y, width: hit.width, height: hit.height, sysId: xr, kind: hit.kind, index: hit.index, interactive }
+		}
+	} catch (_) {
+		/* detection unavailable (headless/tests) — keep the null fallback */
 	}
 	return null
 }

@@ -98,7 +98,12 @@ function collectGpuLayoutAssignments(config) {
 		}
 		if (boundDest) {
 			const dMode = String(boundDest.mode || 'pgm_prv').toLowerCase()
-			if (dMode === 'multiview') {
+			// WO-243 follow-up: an operator_gui-bound jack is the operator-area monitor — it claims
+			// the multiview-style head so the OS layout keeps placing that output (mode/position)
+			// exactly as when the multiview owned the jack. Classifying it as a screen (the old
+			// default branch) made it hijack screen_<mainScreenIndex+1>'s assignment: screen_1
+			// landed on the operator monitor and the real program output lost its head.
+			if (dMode === 'multiview' || dMode === 'operator_gui') {
 				edgeDerivedMode = 'multiview'
 			} else if (dMode !== 'stream') {
 				edgeDerivedMode = 'screen'
@@ -118,7 +123,7 @@ function collectGpuLayoutAssignments(config) {
 
 		if (!binding && mainIndex == null && boundDest) {
 			const dMode = String(boundDest.mode || 'pgm_prv').toLowerCase()
-			if (dMode !== 'stream' && dMode !== 'multiview') {
+			if (dMode !== 'stream' && dMode !== 'multiview' && dMode !== 'operator_gui') {
 				mainIndex = boundDest.mainScreenIndex
 				binding = { type: 'screen', index: (parseInt(String(mainIndex ?? 0), 10) || 0) + 1 }
 				inferredFromEdge = true

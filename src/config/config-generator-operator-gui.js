@@ -55,7 +55,10 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 	}
 	const posX = rect && Number.isFinite(rect.x) ? rect.x : ctx.cumulativeX
 	const posY = rect && Number.isFinite(rect.y) ? rect.y : 0
-	const device = resolvedPort != null ? resolvedPort : ctx.nextDevice
+	// <device> is the X-screen index (1 on a single spanned desktop — what every other screen/
+	// multiview consumer here emits), NOT our GPU port number. Positioning is x/y-driven; a
+	// device value beyond the real X screen count makes Caspar fall back to 0,0 on screen 1.
+	const device = 1
 
 	const screenInner = [
 		`<device>${device}</device>`,
