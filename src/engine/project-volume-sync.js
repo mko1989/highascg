@@ -6,7 +6,14 @@ const { execFileSync } = require('child_process')
 const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
 const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
-const projectStore = require('./project-store')
+// Lazy: project-store requires this module back — a top-level require creates a require cycle
+// (project-store's exports are incomplete when read from here at load time; Node floods
+// "Accessing non-existent property ... inside circular dependency" per project file scanned).
+let _projectStore = null
+function projectStoreLazy() {
+	if (!_projectStore) _projectStore = require('./project-store')
+	return _projectStore
+}
 
 const PROJECTS_SUBDIR = 'projects'
 const AUTOSAVE_SUBDIR = '_autosave'
@@ -131,7 +138,7 @@ function scanProjectsDir(projectsDir, source) {
 	for (const ent of names) {
 		if (!ent.endsWith('.json')) continue
 		if (ent.startsWith('.')) continue
-		const parsed = projectStore.parseProjectListFilename(ent)
+		const parsed = projectStoreLazy().parseProjectListFilename(ent)
 		if (!parsed) continue
 		const { slug, baseSlug, isSyncConflict, isCorrupt } = parsed
 		if (!slug || slug === AUTOSAVE_SUBDIR) continue
@@ -160,7 +167,7 @@ function scanProjectsDir(projectsDir, source) {
 		try {
 			project = JSON.parse(fs.readFileSync(p, 'utf8'))
 		} catch (e) {
-			projectStore.quarantineCorruptFile(p)
+			projectStoreLazy().quarantineCorruptFile(p)
 			out.push({
 				slug: baseSlug || slug,
 				name: baseSlug || slug,

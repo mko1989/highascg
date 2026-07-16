@@ -157,27 +157,51 @@ function resolveOscInfoSupplementMs(self) {
 }
 
 /**
+ * Self-throttling (2026-07-16 incident): a slow/booting Caspar (e.g. the operator-GUI CEF layer
+ * loading the full SPA) answered INFO after minutes; a fixed-interval poll kept stacking INFOs
+ * onto the AMCP queue, wedging every operator command behind the backlog. One in-flight INFO
+ * cycle max, and a timeout response triggers a 30s backoff.
+ */
+let _infoSupplementInFlight = false
+let _infoSupplementBackoffUntil = 0
+const INFO_SUPPLEMENT_BACKOFF_MS = 30000
+
+/**
  * @param {object} self
  */
 async function runOscPlaybackInfoSupplementOnce(self) {
 	if (!canRunPeriodicSync(self)) return
 	if (!playbackTracker.isOscPlaybackActive(self)) return
+	if (_infoSupplementInFlight) return
+	if (Date.now() < _infoSupplementBackoffUntil) return
 	const channels = pickInfoChannelsThisTick(self, getProgramChannelsForOscInfo(self))
 	if (channels.length === 0) return
-	for (const ch of channels) {
-		try {
-			const res = await self.amcp.info(ch)
-			const xmlStr = infoResponseToXml(res)
-			if (!xmlStr) continue
-			self.gatheredInfo = self.gatheredInfo || {}
-			self.gatheredInfo.channelXml = self.gatheredInfo.channelXml || {}
-			self.gatheredInfo.channelXml[String(ch)] = xmlStr
-			self.state.updateFromInfo(ch, xmlStr)
-			if (typeof self.updateChannelVariablesFromXml === 'function') self.updateChannelVariablesFromXml(ch, xmlStr)
-			else updateChannelVariablesFromXml(self, ch, xmlStr)
-		} catch {
-			/* ignore */
+	_infoSupplementInFlight = true
+	try {
+		for (const ch of channels) {
+			try {
+				const res = await self.amcp.info(ch)
+				const xmlStr = infoResponseToXml(res)
+				if (!xmlStr) continue
+				self.gatheredInfo = self.gatheredInfo || {}
+				self.gatheredInfo.channelXml = self.gatheredInfo.channelXml || {}
+				self.gatheredInfo.channelXml[String(ch)] = xmlStr
+				self.state.updateFromInfo(ch, xmlStr)
+				if (typeof self.updateChannelVariablesFromXml === 'function') self.updateChannelVariablesFromXml(ch, xmlStr)
+				else updateChannelVariablesFromXml(self, ch, xmlStr)
+			} catch (e) {
+				if (/timeout/i.test(String(e?.message || e))) {
+					_infoSupplementBackoffUntil = Date.now() + INFO_SUPPLEMENT_BACKOFF_MS
+					if (typeof self.log === 'function') {
+						self.log('warn', `[OSC INFO supplement] AMCP timeout on INFO ${ch} — backing off ${INFO_SUPPLEMENT_BACKOFF_MS / 1000}s`)
+					}
+					break
+				}
+				/* other errors: ignore, keep cycling */
+			}
 		}
+	} finally {
+		_infoSupplementInFlight = false
 	}
 	scheduleOscChannelsFullBroadcast(self)
 }

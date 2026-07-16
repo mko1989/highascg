@@ -119,7 +119,9 @@ async function warmCefInteractivePage(log) {
 function scheduleCefWarm(log, delayMs = 0) {
 	const timer = setTimeout(() => {
 		if (S.warmInFlight) {
-			void warmInFlight.finally(() => warmCefInteractivePage(log))
+			// Bare `warmInFlight` was a ReferenceError — latent until WO-243's auto-arm made the
+			// bridge start (and this timer fire) on every boot: uncaughtException -> crash-loop.
+			void S.warmInFlight.finally(() => warmCefInteractivePage(log))
 			return
 		}
 		S.warmInFlight = warmCefInteractivePage(log).finally(() => {
