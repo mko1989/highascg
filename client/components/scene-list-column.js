@@ -280,14 +280,19 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			duplicateBtn.dataset.action = 'duplicate'
 			duplicateBtn.title = 'Duplicate look'
 			duplicateBtn.setAttribute('aria-label', 'Duplicate look')
-			duplicateBtn.textContent = '⧉'
+			// Inline SVG, not a glyph: '⧉' (U+29C9) has no coverage in the bundled Rewir font or the
+			// Linux fallback sans — it rendered only under Chromium and vanished on Firefox (2026-07-16).
+			duplicateBtn.innerHTML =
+				'<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="9" height="9" rx="1"/><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"/></svg>'
 			const deleteBtn = document.createElement('button')
 			deleteBtn.type = 'button'
 			deleteBtn.className = 'scenes-card__icon-btn scenes-card__icon-btn--danger'
 			deleteBtn.dataset.action = 'delete'
 			deleteBtn.title = 'Delete look'
 			deleteBtn.setAttribute('aria-label', 'Delete look')
-			deleteBtn.textContent = '🗑'
+			// Inline SVG for the same reason as duplicateBtn: '🗑' needs a color-emoji font (absent here).
+			deleteBtn.innerHTML =
+				'<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5h11M6.5 4.5v-2h3v2M4 4.5l.8 9a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-9M6.5 7.5v4M9.5 7.5v4"/></svg>'
 			headerActions.appendChild(duplicateBtn)
 			headerActions.appendChild(deleteBtn)
 			header.appendChild(nameInput)

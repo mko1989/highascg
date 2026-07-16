@@ -55,6 +55,7 @@ function extractChannelInfoFromParsed(result) {
 					let nbFrames = 0
 					let currentFrame = 0
 					let fileElapsedSec = NaN
+					let fileDurationSec = NaN
 					if (fg) {
 						const p = _first(fg.producer)
 						if (p) {
@@ -98,21 +99,28 @@ function extractChannelInfoFromParsed(result) {
 									? timeVals[1]
 									: NaN
 
-							const fpsNum = parseInt(framerate, 10) || 1
-							if (Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0) {
-								currentFrame = Math.round(fileElapsedSec * fpsNum)
-							}
-							if (Number.isFinite(durSec) && durSec > 0) {
-								nbFrames = Math.round(durSec * fpsNum)
-							} else {
-								const clipRaw = file.clip
-								const clipSecond = Array.isArray(clipRaw)
-									? clipRaw[1]
-									: clipRaw && typeof clipRaw === 'object'
-										? clipRaw._
-										: undefined
-								if (clipSecond != null && String(clipSecond).length && nbFrames <= 0) {
-									nbFrames = Math.floor(parseFloat(String(clipSecond)) * fpsNum)
+							if (Number.isFinite(durSec) && durSec > 0) fileDurationSec = durSec
+							// Frames<->seconds conversion ONLY with a real fps. `|| 1` here turned
+							// producer frame counts into "seconds" downstream (owner's 7686-for-05:07
+							// jumping timer, 2026-07-16) — with fps unknown, keep the producer's real
+							// frame values and let the emit below fall back to the direct seconds.
+							const fpsNum = parseInt(framerate, 10)
+							if (fpsNum > 0) {
+								if (Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0) {
+									currentFrame = Math.round(fileElapsedSec * fpsNum)
+								}
+								if (Number.isFinite(durSec) && durSec > 0) {
+									nbFrames = Math.round(durSec * fpsNum)
+								} else {
+									const clipRaw = file.clip
+									const clipSecond = Array.isArray(clipRaw)
+										? clipRaw[1]
+										: clipRaw && typeof clipRaw === 'object'
+											? clipRaw._
+											: undefined
+									if (clipSecond != null && String(clipSecond).length && nbFrames <= 0) {
+										nbFrames = Math.floor(parseFloat(String(clipSecond)) * fpsNum)
+									}
 								}
 							}
 						}
@@ -124,16 +132,28 @@ function extractChannelInfoFromParsed(result) {
 							bgClip = bAttr.name || _str(bp.name)
 						}
 					}
-					const fpsNum = parseInt(framerate, 10) || 1
-					const durationSec =
-						nbFrames > 0 ? (nbFrames / fpsNum).toFixed(2) : Number.isFinite(fileElapsedSec) ? String(fileElapsedSec) : ''
+					// *Sec fields must ONLY ever carry seconds: direct file/time seconds win; frame
+					// counts convert only through a VALID fps (the old `|| 1` divisor injected raw
+					// frame counts as durations — the alternating 05:07/7686 timer).
+					const fpsNum = parseInt(framerate, 10)
+					const fpsValid = fpsNum > 0
+					const durationSec = Number.isFinite(fileDurationSec) && fileDurationSec > 0
+						? fileDurationSec.toFixed(2)
+						: fpsValid && nbFrames > 0
+							? (nbFrames / fpsNum).toFixed(2)
+							: ''
 					const timeSec =
 						Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0
 							? fileElapsedSec.toFixed(2)
-							: nbFrames > 0 && currentFrame >= 0
+							: fpsValid && nbFrames > 0 && currentFrame >= 0
 								? (currentFrame / fpsNum).toFixed(2)
 								: ''
-					const remainingSec = nbFrames > 0 && currentFrame >= 0 ? ((nbFrames - currentFrame) / fpsNum).toFixed(2) : ''
+					const remainingSec =
+						Number.isFinite(fileDurationSec) && fileDurationSec > 0 && Number.isFinite(fileElapsedSec) && fileElapsedSec >= 0
+							? Math.max(0, fileDurationSec - fileElapsedSec).toFixed(2)
+							: fpsValid && nbFrames > 0 && currentFrame >= 0
+								? ((nbFrames - currentFrame) / fpsNum).toFixed(2)
+								: ''
 					layers[layerIdx] = { fgClip, fgState, bgClip, durationSec, timeSec, remainingSec }
 				})
 			}
@@ -149,7 +169,10 @@ function extractChannelInfoFromParsed(result) {
 			const p = _first(fg.producer)
 			if (p) {
 				const fr = _str(p.fps)
-				const fpsNum = parseInt(fr, 10) || 1
+				// Frames-only source: without a valid producer fps there is NO way to express these
+				// as seconds — emit '' rather than frames/1 (the 7686-as-seconds bug).
+				const fpsNum = parseInt(fr, 10)
+				const fpsValid = fpsNum > 0
 				const nb = parseInt(_str(p['nb-frames']), 10) || 0
 				const cur = parseInt(_str(p.frame), 10) || 0
 				const pAttrs = p.$ || {}
@@ -161,9 +184,9 @@ function extractChannelInfoFromParsed(result) {
 					fgClip,
 					fgState,
 					bgClip: '',
-					durationSec: nb > 0 ? (nb / fpsNum).toFixed(2) : '',
-					timeSec: nb > 0 && cur >= 0 ? (cur / fpsNum).toFixed(2) : '',
-					remainingSec: nb > 0 && cur >= 0 ? ((nb - cur) / fpsNum).toFixed(2) : '',
+					durationSec: fpsValid && nb > 0 ? (nb / fpsNum).toFixed(2) : '',
+					timeSec: fpsValid && nb > 0 && cur >= 0 ? (cur / fpsNum).toFixed(2) : '',
+					remainingSec: fpsValid && nb > 0 && cur >= 0 ? ((nb - cur) / fpsNum).toFixed(2) : '',
 					/** Strip before persisting / WS; used only for Companion variables on this INFO shape */
 					fgFps: fr,
 				}
