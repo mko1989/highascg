@@ -28,7 +28,7 @@ import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
-import { reportComposeCellRects } from '../lib/cef-operator-mode.js'
+import { reportComposeCellRects } from '../lib/operator-gui-mode.js'
 import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 import { createBuildLayerRouteLiveSourceItem } from './scenes-editor-layer-route.js'
@@ -254,9 +254,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		title: 'Compose preview', storageKeyPrefix: 'casparcg_preview_scenes', getOutputResolution: getResolution, stateStore, streamName: 'prv_1', composePrvPgmLayoutToggle: true, fillParentHeight: true, hideInnerResize: true, getProgramChannel,
 		getDualStreamNames: getComposeStreamNames,
 		showDestinationVisualOverlay: false,
-		// WO-243 T243.3: no-op unless cefOperator mode is active (reportComposeCellRects hard-gates
-		// itself) — this is the main operator output preview, so its compose cells are what the
-		// operator-GUI channel's route holes (10-49) mirror.
+		// WO-243/255: no-op unless operator-GUI mode is active (reportComposeCellRects hard-gates
+		// itself) — this is the main operator output preview, so its compose cells are the
+		// 'compose' surface merged into the operator-GUI channel's route holes (10-49).
 		onComposeCellRects: (cellRects) => reportComposeCellRects(cellRects),
 		onCollapsedChange: c => { previewHost.classList.toggle('preview-host--collapsed', !!c); previewHost.style.flex = c ? '0 0 auto' : `0 0 ${splitPx.current}px` },
 		draw: (ctx, W, H, isLive, meta = {}) => {

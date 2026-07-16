@@ -6,37 +6,28 @@ const { resolveOperatorMonitorPort } = require('../utils/operator-monitor-resolv
 const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session-layout')
 
 /**
- * WO-243: dedicated Caspar channel for the `operator_gui` destination — a `<screen>` consumer
- * (borderless, windowed, matching the existing PGM/multiview screen-consumer conventions) on the
- * chosen monitor. The CEF web-UI layer (100) and routed preview holes (10-49) are PLAYed here at
- * runtime over AMCP (src/system/operator-gui-channel.js) — this generator only builds the raster +
- * the physical monitor output, exactly like `buildMultiviewChannel` (config-generator-consumer-attach.js)'s
- * screen consumer but without any DeckLink/profile switch (operator GUI is screen-only, always).
- * Device/position resolution: explicit `dest.physicalPort` wins; otherwise
- * `resolveOperatorMonitorPort()` (WO-246); the resolved port's layout rect (screen or multiview
- * sysId) positions the window. No resolvable port falls back to the running `cumulativeX`/`0`
- * (same fallback multiview/PGM screens use when no OS-layout rect is available).
+ * WO-255 T255.1/T255.2: pure port-resolution chain shared by the generator (here) and the runtime
+ * shape-overlay monitor-rect resolver (src/system/operator-gui-channel.js's
+ * `resolveOperatorGuiMonitorRect`) — factored out of `buildOperatorGuiChannel` so both sides agree
+ * on which physical GPU port the operator_gui destination lands on. Explicit `dest.physicalPort`
+ * wins; otherwise `resolveOperatorMonitorPort()` (WO-246); no operator_monitor flag resolvable
+ * falls back to the multiview jack (the operator-area monitor by convention — never a program
+ * screen, which would land the window over live PGM output).
  * @param {Record<string, unknown>} config
  * @param {ReturnType<import('./screen-destinations').normalizeDestination>} dest
- * @param {any} dims - `{ width, height, fps, modeId, isCustom }` from `operatorGuiModeDimensions`
- * @param {{ cumulativeX: number, nextDevice: number, layout?: object }} ctx
- * @param {number|null|undefined} casparChannelNum
+ * @returns {number|null} 1-based physical GPU port, or null when nothing resolves
  */
-function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
+function resolveOperatorGuiPort(config, dest) {
 	const explicitPort = Number.isFinite(Number(dest?.physicalPort)) && Number(dest.physicalPort) >= 1 && Number(dest.physicalPort) <= 4
 		? Number(dest.physicalPort)
 		: null
-	let resolvedPort = explicitPort
-	if (resolvedPort == null) {
-		try {
-			resolvedPort = resolveOperatorMonitorPort(config).port
-		} catch (_) {
-			resolvedPort = null
-		}
+	if (explicitPort != null) return explicitPort
+	let resolvedPort = null
+	try {
+		resolvedPort = resolveOperatorMonitorPort(config).port
+	} catch (_) {
+		resolvedPort = null
 	}
-	// No operator_monitor flag resolvable (e.g. multiple displays, no flag set): the multiview
-	// jack is the operator-area monitor by convention — land the GUI consumer there rather than
-	// on the first program screen (nextDevice), which would open a window over live PGM output.
 	if (resolvedPort == null) {
 		try {
 			const { multiviewPhysicalPortIndex } = require('../utils/x-display-session-layout')
@@ -45,6 +36,30 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 			resolvedPort = null
 		}
 	}
+	return resolvedPort
+}
+
+/**
+ * WO-243/255: dedicated Caspar channel for the `operator_gui` destination — a `<screen>` consumer
+ * (borderless, windowed, matching the existing PGM/multiview screen-consumer conventions,
+ * ALWAYS-ON-TOP so it stacks above the fullscreen Firefox GUI beneath it — WO-255) on the chosen
+ * monitor. Routed preview holes (10-49) are PLAYed here at runtime over AMCP
+ * (src/system/operator-gui-channel.js) and shaped by the python-xlib helper
+ * (tools/runtime/operator-shape-overlay.py) so only those holes are visible — this generator only
+ * builds the raster + the physical monitor output, exactly like `buildMultiviewChannel`
+ * (config-generator-consumer-attach.js)'s screen consumer but without any DeckLink/profile switch
+ * (operator GUI is screen-only, always). Device/position resolution: see
+ * {@link resolveOperatorGuiPort}; the resolved port's layout rect (screen or multiview sysId)
+ * positions the window. No resolvable port falls back to the running `cumulativeX`/`0` (same
+ * fallback multiview/PGM screens use when no OS-layout rect is available).
+ * @param {Record<string, unknown>} config
+ * @param {ReturnType<import('./screen-destinations').normalizeDestination>} dest
+ * @param {any} dims - `{ width, height, fps, modeId, isCustom }` from `operatorGuiModeDimensions`
+ * @param {{ cumulativeX: number, nextDevice: number, layout?: object }} ctx
+ * @param {number|null|undefined} casparChannelNum
+ */
+function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
+	const resolvedPort = resolveOperatorGuiPort(config, dest)
 	let rect = null
 	if (resolvedPort != null) {
 		try {
@@ -67,14 +82,17 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 		`<stretch>none</stretch>`,
 		`<windowed>true</windowed>`,
 		`<vsync>true</vsync>`,
-		`<always-on-top>false</always-on-top>`,
+		// WO-255: must stack ABOVE the fullscreen Firefox GUI window sharing this monitor — the
+		// python-xlib shape helper (tools/runtime/operator-shape-overlay.py) then punches the
+		// non-video regions transparent-and-click-through via X SHAPE.
+		`<always-on-top>true</always-on-top>`,
 		`<borderless>true</borderless>`,
 	].join('\n                    ')
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const label = escapeXml(String(dest?.label || 'Operator GUI'))
 	return `${channelXmlComment(
-		`Caspar channel ${ch}: Operator GUI channel "${label}" — CEF web-UI (layer 100, PLAYed at runtime) over routed preview holes (layers 10-49); screen consumer on ${rect ? `port ${resolvedPort}` : 'default position (no monitor resolved yet)'}`,
+		`Caspar channel ${ch}: Operator GUI channel "${label}" — routed preview holes (layers 10-49), shaped via X SHAPE above fullscreen Firefox (WO-255); screen consumer on ${rect ? `port ${resolvedPort}` : 'default position (no monitor resolved yet)'}`,
 	)}        <channel>
             <video-mode>${dims.modeId}</video-mode>
             <consumers>
@@ -88,4 +106,4 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
         </channel>`
 }
 
-module.exports = { buildOperatorGuiChannel }
+module.exports = { buildOperatorGuiChannel, resolveOperatorGuiPort }

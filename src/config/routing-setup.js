@@ -324,12 +324,13 @@ async function setupAllRouting(self) {
 		await reapplyAllMultiviewLayouts(self)
 	}
 	if (map.operatorGuiEnabled) {
-		// WO-243 T243.2: re-PLAY the CEF web-UI layer (100) on boot/reconnect — mirrors the CG orphan
-		// sweep's re-ADD-after-restart pattern (template-cg-orphan-sweep.js). Route holes (10-49) are
-		// re-applied by the client's cef-operator-mode.js the next time it reports cell rects.
-		const { ensureOperatorGuiCefLayer } = require('../system/operator-gui-channel')
+		// WO-255: re-feed the shape helper + nudge the client to re-report cell rects on
+		// boot/reconnect (the CEF layer this used to re-PLAY is retired — see operator-gui-channel.js).
+		// Route holes (10-49) are re-applied by the client's operator-gui-mode.js the next time it
+		// reports cell rects.
+		const { ensureOperatorGuiChannel } = require('../system/operator-gui-channel')
 		try {
-			await ensureOperatorGuiCefLayer(self)
+			await ensureOperatorGuiChannel(self)
 		} catch (e) {
 			self.log('warn', `Operator GUI channel: ${e?.message || e}`)
 		}

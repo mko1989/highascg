@@ -52,12 +52,14 @@ import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
-import { applyCefOperatorHtmlClass } from './lib/cef-operator-mode.js'
+import { applyOperatorGuiHtmlClass, initOperatorGuiRectReporting } from './lib/operator-gui-mode.js'
+import { initOperatorGuiInteractionSuppress } from './lib/operator-gui-interaction-suppress.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
-// WO-243 T243.3: hard-gated on ?cefOperator in the query string — no-op (removes the class, which
-// is already absent) for every normal browser session.
-applyCefOperatorHtmlClass()
+// WO-243/255: hard-gated on ?operatorGui / legacy ?cefOperator in the query string — no-op
+// (removes the class, which is already absent) for every normal browser session.
+applyOperatorGuiHtmlClass()
+initOperatorGuiInteractionSuppress()
 
 export const stateStore = new StateStore()
 export const ws = new WsClient()
@@ -188,6 +190,10 @@ async function init() {
 	setAppRuntime({ ws, osc: _oscClient, stateStore, appLogic, getVariableStore: () => getVariableStore(ws) })
 
 	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
+	// WO-254 T254.2 (kept under the WO-255 rename): re-POST cached merged cell rects on WS
+	// reconnect / server nudge / 60s heartbeat. Hard-gated inside — no-op for every normal
+	// (non-operator-GUI) session.
+	initOperatorGuiRectReporting(ws)
 
 	let autosaveTimeout = null
 	let autosaveInFlight = null

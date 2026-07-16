@@ -7,7 +7,7 @@ import { settingsState } from '../lib/settings-state.js'
 import { api } from '../lib/api-client.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
-import { isCefOperatorModeActive } from '../lib/cef-operator-mode.js'
+import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 
 const G = 6; const BORDER_FADE = 400
 
@@ -355,15 +355,16 @@ export function initPreviewPanel(host, options) {
 		if (collapsed) return; const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
-		// WO-243 T243.3: skip canvas draw work when cefOperator mode renders transparent holes instead — inert/false otherwise.
-		const cefOperatorActive = isCefOperatorModeActive()
+		// WO-243/255: skip canvas draw work when operator-GUI mode shows the shaped video overlay
+		// instead — inert/false otherwise.
+		const operatorGuiActive = isOperatorGuiModeActive()
 		if (!composePrvPgmLayoutToggle) {
 			canv.width = Math.round(w * dpr)
 			canv.height = Math.round(h * dpr)
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 			canv.style.width = `${Math.floor(w * Math.min(cw / w, ch / h))}px`
 			canv.style.height = `${Math.floor(h * Math.min(cw / w, ch / h))}px`
-			if (!cefOperatorActive) { try { draw(ctx, w, h, isLive, {}) } catch (err) { console.warn('[preview] compose draw failed:', err?.message || err) } }
+			if (!operatorGuiActive) { try { draw(ctx, w, h, isLive, {}) } catch (err) { console.warn('[preview] compose draw failed:', err?.message || err) } }
 			renderDestinationLayoutOverlay()
 			return
 		}
@@ -413,7 +414,7 @@ export function initPreviewPanel(host, options) {
 			if (layout === 'tb') cPairEl.style.flexDirection = 'column'
 			else cPairEl.style.flexDirection = 'row'
 		}
-		const cellRectsForCef = cefOperatorActive && typeof onComposeCellRects === 'function' ? [] : null
+		const cellRectsForOperatorGui = operatorGuiActive && typeof onComposeCellRects === 'function' ? [] : null
 		for (const item of composeCells) {
 			const cellRect = item.cellEl.getBoundingClientRect()
 			const pairRect = cPairEl.getBoundingClientRect()
@@ -422,7 +423,7 @@ export function initPreviewPanel(host, options) {
 			item.canvas.width = Math.max(1, Math.round(wCell * dpr))
 			item.canvas.height = Math.max(1, Math.round(hCell * dpr))
 			if (item.ctx) item.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-			if (!cefOperatorActive) {
+			if (!operatorGuiActive) {
 				try {
 					draw(item.ctx, w, h, false, {
 						layout,
@@ -438,9 +439,9 @@ export function initPreviewPanel(host, options) {
 				}
 			}
 			// WO-243 T243.3: reuse this getBoundingClientRect() for the operator-GUI route-hole rect report.
-			if (cellRectsForCef) cellRectsForCef.push({ id: item.id, role: item.role, mainIndex: item.mainIndex, rect: cellRect })
+			if (cellRectsForOperatorGui) cellRectsForOperatorGui.push({ id: item.id, role: item.role, mainIndex: item.mainIndex, rect: cellRect })
 		}
-		if (cellRectsForCef) onComposeCellRects(cellRectsForCef)
+		if (cellRectsForOperatorGui) onComposeCellRects(cellRectsForOperatorGui)
 		renderDestinationLayoutOverlay()
 	}
 
@@ -482,8 +483,8 @@ export function initPreviewPanel(host, options) {
 	if (!hideInnerResize) ResizeH.initPanelResizing(resizeH, body, { collapsed: () => collapsed, onHeightChange: scheduleDraw, maxPanelBodyPx: () => Math.min(1200, window.innerHeight * 0.9) })
 	if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(scheduleDraw); ro.observe(wrap) }
 	window.addEventListener('resize', scheduleDraw);
-	// WO-243 T243.3: cefOperator needs rects fresh across scroll too (viewport-relative) — gated, no extra listener otherwise.
-	if (isCefOperatorModeActive()) window.addEventListener('scroll', scheduleDraw, true)
+	// WO-243/255: operator-GUI mode needs rects fresh across scroll too (viewport-relative) — gated, no extra listener otherwise.
+	if (isOperatorGuiModeActive()) window.addEventListener('scroll', scheduleDraw, true)
 	const unsubS = streamState.subscribe(updateLive); 
 	const unsubSe = settingsState.subscribe(updateLive)
 	const unsubCm = stateStore?.on('channelMap', () => {

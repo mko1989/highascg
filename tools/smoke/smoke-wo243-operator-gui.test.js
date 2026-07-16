@@ -1,12 +1,18 @@
 'use strict'
 
 /**
- * WO-243 smoke tests — Operator GUI channel: CEF web-UI layer over routed preview channels.
+ * WO-243/255 smoke tests — Operator GUI channel: destination model, routing, generator, layout
+ * endpoint, CRUD, and client-gate/UI source checks.
  *
  * Covers: T243.1 (destination model + CRUD single-instance validation + device-view UI source
  * checks), T243.2 (routing exclusion, generator channel emission, layout-endpoint pure logic +
- * router registration grep), T243.3 (client cefOperator hard-gate, pure rect-conversion logic,
- * source checks that preview-canvas-panel.js/app.js wire the gate).
+ * router registration grep), T243.3/T255.3 (client operator-GUI-mode hard-gate, three-surface
+ * reporting + interaction suppression source checks), WO-243 follow-up regression guards.
+ *
+ * WO-255 split (line-count target): aspect-fit pure functions (T254.1), the CEF-layer/auto-arm
+ * retirement guards, the shape helper (T255.1), the Firefox launcher + routes (T255.2), and the
+ * client rect-reporting pure-logic tests (T255.3) all live in
+ * tools/smoke/smoke-wo255-shaped-overlay.test.js instead.
  */
 
 const { describe, it } = require('node:test')
@@ -40,18 +46,18 @@ function baseAppConfig() {
 	return app
 }
 
-describe('WO-243 T243.1: operator_gui destination model (screen-destinations.js)', () => {
+describe('WO-243/255 T243.1: operator_gui destination model (screen-destinations.js)', () => {
 	it('normalizeDestination fills operator_gui defaults (guiUrl, custom videoMode)', () => {
 		const d = normalizeDestination({ id: 'og1', label: 'Operator GUI', mode: 'operator_gui' })
 		assert.equal(d.mode, 'operator_gui')
 		assert.equal(d.videoMode, 'custom', 'operator_gui defaults to a raster-exact custom mode')
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1')
+		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1', 'WO-255: default guiUrl switched from ?cefOperator to ?operatorGui')
 		assert.equal(d.physicalPort, undefined, 'no physicalPort by default -> falls back to resolveOperatorMonitorPort() at runtime')
 	})
 
 	it('accepts an explicit guiUrl and a valid physicalPort (1-4)', () => {
-		const d = normalizeDestination({ id: 'og2', mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?cefOperator=1&x=2', physicalPort: 3 })
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1&x=2')
+		const d = normalizeDestination({ id: 'og2', mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?operatorGui=1&x=2', physicalPort: 3 })
+		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1&x=2')
 		assert.equal(d.physicalPort, 3)
 	})
 
@@ -133,7 +139,7 @@ describe('WO-243 T243.2: config generator emits the operator_gui channel', () =>
 			version: 1,
 			destinations: [
 				{ id: 'scr1', label: 'Main', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
-				{ id: 'og1', label: 'Operator GUI', mainScreenIndex: 5, mode: 'operator_gui', videoMode: 'custom', width: 1280, height: 720, fps: 30, guiUrl: 'http://127.0.0.1:4200/?cefOperator=1' },
+				{ id: 'og1', label: 'Operator GUI', mainScreenIndex: 5, mode: 'operator_gui', videoMode: 'custom', width: 1280, height: 720, fps: 30, guiUrl: 'http://127.0.0.1:4200/?operatorGui=1' },
 			],
 		}
 		const flat = buildCasparGeneratorFlatConfig(app)
@@ -149,6 +155,7 @@ describe('WO-243 T243.2: config generator emits the operator_gui channel', () =>
 		assert.match(block, /<screen>/, 'operator_gui channel drives a physical monitor via a screen consumer')
 		assert.match(block, /<windowed>true<\/windowed>/)
 		assert.match(block, /<borderless>true<\/borderless>/)
+		assert.match(block, /<always-on-top>true<\/always-on-top>/, 'WO-255: must stack above fullscreen Firefox')
 		assert.match(block, /<width>1280<\/width><height>720<\/height>/)
 		assert.doesNotMatch(block, /<artnet>/)
 		assert.doesNotMatch(block, /<decklink>/)
@@ -310,7 +317,7 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		assert.equal(res.ok, true)
 		const d = res.screenDestinations.destinations.find((x) => x.id === res.addedId)
 		assert.equal(d.mode, 'operator_gui')
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1')
+		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1')
 	})
 
 	it('handleAddDestination rejects a second operator_gui destination', () => {
@@ -351,7 +358,7 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 	})
 })
 
-describe('WO-243 T243.1/T243.2/T243.3: UI + client-gate source checks', () => {
+describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks', () => {
 	const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
 
 	it('destination type select + inspector form know about operator_gui', () => {
@@ -360,7 +367,7 @@ describe('WO-243 T243.1/T243.2/T243.3: UI + client-gate source checks', () => {
 		assert.match(form, /'operator_gui'/)
 		assert.match(form, /buildOperatorGuiFields/)
 		const fields = read('client/components/device-view-destinations-inspector-operator-gui-fields.js')
-		assert.match(fields, /CEF web-UI URL/)
+		assert.match(fields, /Web-UI URL/)
 	})
 
 	it('addDestination() client action normalizes the operator_gui type', () => {
@@ -371,73 +378,44 @@ describe('WO-243 T243.1/T243.2/T243.3: UI + client-gate source checks', () => {
 		assert.match(read('src/api/device-view-crud.js'), /At most one Operator GUI destination is allowed/)
 	})
 
-	it('cef-operator-mode.js hard-gates on the ?cefOperator query param', () => {
-		const src = read('client/lib/cef-operator-mode.js')
-		assert.match(src, /has\('cefOperator'\)/)
+	it('operator-gui-mode.js (renamed from cef-operator-mode.js, WO-255) hard-gates on ?operatorGui / legacy ?cefOperator', () => {
+		assert.ok(!fs.existsSync(path.join(__dirname, '../../client/lib/cef-operator-mode.js')), 'old file removed')
+		const src = read('client/lib/operator-gui-mode.js')
+		assert.match(src, /has\('operatorGui'\)/)
+		assert.match(src, /has\('cefOperator'\)/, 'legacy query param still accepted')
 	})
 
-	it('preview-canvas-panel.js wires the cefOperator gate (draw skip) without unconditional behavior change', () => {
+	it('preview-canvas-panel.js wires the operator-GUI gate (draw skip) without unconditional behavior change', () => {
 		const src = read('client/components/preview-canvas-panel.js')
-		assert.match(src, /isCefOperatorModeActive/)
-		assert.match(src, /cefOperatorActive/)
+		assert.match(src, /isOperatorGuiModeActive/)
+		assert.match(src, /operatorGuiActive/)
 	})
 
-	it('app.js applies the cef-operator html class at bootstrap', () => {
-		assert.match(read('client/app.js'), /applyCefOperatorHtmlClass/)
+	it('app.js applies the operator-gui html class + interaction-suppress detector at bootstrap', () => {
+		const src = read('client/app.js')
+		assert.match(src, /applyOperatorGuiHtmlClass/)
+		assert.match(src, /initOperatorGuiInteractionSuppress/)
 	})
 
-	it('scenes-editor.js reports compose cell rects (gated inside reportComposeCellRects)', () => {
+	it('WO-255 T255.3: three surfaces report into operator-gui-mode.js (compose/timeline/mv-edit)', () => {
 		assert.match(read('client/components/scenes-editor.js'), /reportComposeCellRects/)
-	})
-})
-
-describe('WO-243 T243.3: client cef-operator-mode pure logic (no jsdom required)', () => {
-	it('isCefOperatorModeActive is false without the query param, true with it (any value, including empty)', () => {
-		// Import lazily via a tiny CJS-compatible shim is unnecessary here — cellRectsToLayoutCells
-		// and isCefOperatorModeActive have no DOM dependency beyond URLSearchParams, which Node provides.
-		const modPath = path.join(__dirname, '../../client/lib/cef-operator-mode.js')
-		const src = fs.readFileSync(modPath, 'utf8')
-		// Source-level check (module is ESM; curated gate runs plain node:test/CJS) — the exported
-		// function must use URLSearchParams(...).has('cefOperator'), not a truthy-value comparison.
-		assert.match(src, /new URLSearchParams\(s \|\| ''\)\.has\('cefOperator'\)/)
+		assert.match(read('client/components/timeline-editor-preview.js'), /reportTimelineCellRects/)
+		assert.match(read('client/components/multiview-editor.js'), /reportMultiviewEditRect/)
 	})
 
-	it('cellRectsToLayoutCells conversion math (re-implemented here to pin the contract without ESM import)', () => {
-		// Mirrors client/lib/cef-operator-mode.js's cellRectsToLayoutCells exactly — kept in lockstep
-		// so this test fails loudly if the two ever diverge (source-grepped below).
-		function clamp01(n) {
-			const v = Number(n)
-			if (!Number.isFinite(v)) return 0
-			return Math.min(1, Math.max(0, v))
-		}
-		function cellRectsToLayoutCells(cellRects, viewport) {
-			const vw = Math.max(1, Number(viewport?.width) || 1)
-			const vh = Math.max(1, Number(viewport?.height) || 1)
-			const out = []
-			for (const c of Array.isArray(cellRects) ? cellRects : []) {
-				const r = c?.rect
-				if (!r || !(Number(r.width) > 0) || !(Number(r.height) > 0)) continue
-				out.push({
-					id: c.id,
-					role: c.role === 'prv' ? 'prv' : 'pgm',
-					mainIndex: Math.max(0, parseInt(String(c.mainIndex ?? 0), 10) || 0),
-					rect: { x: clamp01(Number(r.left) / vw), y: clamp01(Number(r.top) / vh), w: clamp01(Number(r.width) / vw), h: clamp01(Number(r.height) / vh) },
-				})
-			}
-			return out
-		}
-		const cells = cellRectsToLayoutCells(
-			[
-				{ id: 'pgm_1', role: 'pgm', mainIndex: 0, rect: { left: 960, top: 0, width: 960, height: 1080 } },
-				{ id: 'prv_1', role: 'prv', mainIndex: 0, rect: { left: 0, top: 0, width: 0, height: 1080 } },
-			],
-			{ width: 1920, height: 1080 },
-		)
-		assert.equal(cells.length, 1, 'zero-width cell is dropped')
-		assert.deepEqual(cells[0].rect, { x: 0.5, y: 0, w: 0.5, h: 1 })
+	it('WO-255 T255.3: interaction suppression detector wired at bootstrap and hooks modal-overlay + preview surfaces', () => {
+		const src = read('client/lib/operator-gui-interaction-suppress.js')
+		assert.match(src, /modal-overlay/)
+		assert.match(src, /pointerdown/)
+		assert.match(src, /setInteractionSuppressed/)
+	})
 
-		const src = fs.readFileSync(path.join(__dirname, '../../client/lib/cef-operator-mode.js'), 'utf8')
-		assert.match(src, /function cellRectsToLayoutCells/, 'the real module still exports this exact function name')
+	it('WO-255 T255.3: 10-operator-gui-mode.css replaces the WO-243 transparent-holes CSS with a dark backing', () => {
+		assert.ok(!fs.existsSync(path.join(__dirname, '../../client/styles/10-cef-operator-mode.css')), 'old CSS file removed')
+		const css = read('client/styles/10-operator-gui-mode.css')
+		assert.match(css, /#0a0a0a/)
+		assert.match(css, /html\.operator-gui/)
+		assert.match(read('client/styles.css'), /10-operator-gui-mode\.css/)
 	})
 })
 
@@ -463,24 +441,3 @@ describe('WO-243 follow-up: operator_gui never claims a program-screen layout sl
 	})
 })
 
-// WO-243 follow-up (owner: "no mouse control of the ui"): the X11 input bridge only starts when a
-// CEF focus target is armed, and nothing armed the GUI page (the arm toggle lives on look layers;
-// you cannot click an arm button through a mouseless GUI). The GUI is now the DEFAULT input sink.
-describe('WO-243 follow-up: operator GUI input auto-arm', () => {
-	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
-	it('ensureOperatorGuiCefLayer auto-arms focus after PLAYing the CEF layer', () => {
-		const src = read('src/system/operator-gui-channel.js')
-		assert.match(src, /function ensureOperatorGuiFocus/, 'auto-arm helper exists')
-		assert.match(src, /ensureOperatorGuiFocus\(ctx\)/, 'ensureOperatorGuiCefLayer calls it')
-		assert.match(src, /current\.sourceId !== 'operator_gui'\) return current/, 'never steals a manual arm')
-	})
-	it('release-input falls back to the operator GUI instead of leaving the box mouseless', () => {
-		const src = read('src/api/routes-cef-arm-input.js')
-		assert.match(src, /ensureOperatorGuiFocus\(ctx\)/, 'release path re-arms the GUI when configured')
-	})
-	it('auto-arm is a no-op without an operator_gui destination', () => {
-		const { ensureOperatorGuiFocus } = require(path.join(__dirname, '../../src/system/operator-gui-channel.js'))
-		const out = ensureOperatorGuiFocus({ config: { screenDestinations: { destinations: [] } } })
-		assert.equal(out, null)
-	})
-})

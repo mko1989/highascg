@@ -10,6 +10,7 @@ import { showAppToast } from '../lib/app-toast.js'
 import { parseRouteValue } from './scenes-shared.js'
 import { attachMathInput } from '../lib/math-input.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
+import { reportMultiviewEditRect, isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 
 /**
  * Create a debounced function that delays execution until the specified delay has elapsed
@@ -108,8 +109,14 @@ export function initMultiviewEditor(root, stateStore) {
 	wrap = root.querySelector('.mv-canvas-wrap'); canvas = wrap.querySelector('canvas'); ctx = canvas.getContext('2d'); const vCont = root.querySelector('#mv-video')
 	const refit = () => { const r = fitInContainer(canvas, wrap); scale = r.scale; offsetX = r.offsetX; offsetY = r.offsetY }
 	let liveView = null; const updateLive = () => { if (shouldShowLiveVideo() && isEnabled()) { if (!liveView) liveView = initLiveView(vCont, 'multiview') } else if (liveView) { liveView.destroy(); liveView = null } draw() }
+	// WO-255 T255.3: surface 3/3 for the operator-GUI video overlay — a single whole-dock rect
+	// (the MV editor composites all cells onto one shared canvas, no per-cell DOM rects). No-op
+	// unless operator-GUI mode is active. A zero-sized wrap (display:none / detached) withdraws.
+	const reportMvRect = () => { if (isOperatorGuiModeActive()) reportMultiviewEditRect(wrap.getBoundingClientRect()) }
 	streamState.subscribe(() => { syncOverlay(); updateLive() }); settingsState.subscribe(() => { syncOverlay(); updateLive() }); syncOverlay(); updateLive(); refit()
-	new ResizeObserver(() => { refit(); draw() }).observe(wrap)
+	new ResizeObserver(() => { refit(); draw(); reportMvRect() }).observe(wrap)
+	if (isOperatorGuiModeActive()) window.addEventListener('scroll', reportMvRect, true)
+	reportMvRect()
 	const upPres = () => { const s = multiviewState.getPresetSlots(); for (let i = 0; i < 4; i++) root.querySelector(`.mv-preset[data-slot="${i}"]`)?.classList.toggle('mv-preset--stored', s[i] != null) }
 	for (const b of root.querySelectorAll('.mv-preset')) b.onclick = (e) => { const s = parseInt(b.dataset.slot); if (e.shiftKey) multiviewState.clearPresetSlot(s); else if (multiviewState.getPresetSlots()[s] == null) multiviewState.savePresetSlot(s, multiviewState.snapshotForPreset()); else multiviewState.applyPresetSnapshot(multiviewState.getPresetSlots()[s]); upPres() }
 	upPres(); root.querySelector('#mv-reset').onclick = () => { multiviewState.clearLayout(); selectedId = null; draw() }

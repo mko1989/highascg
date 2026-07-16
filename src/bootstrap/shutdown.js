@@ -77,6 +77,10 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 				stopCefInteractiveBridge()
 			} catch (_) {}
 			try {
+				const { stopOperatorShapeOverlay } = require('../system/operator-shape-overlay')
+				stopOperatorShapeOverlay()
+			} catch (_) {}
+			try {
 				const { stopPointerConfine } = require('../system/pointer-confine')
 				stopPointerConfine()
 			} catch (_) {}

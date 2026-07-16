@@ -90,31 +90,20 @@ async function handlePost(path, body, ctx) {
 
 	if (path === '/api/cef/release-input') {
 		clearCefFocusTarget()
-		// WO-243 follow-up: the operator GUI (when configured) is the DEFAULT input sink — releasing
-		// a manual arm (mario / live-webpage) falls back to it instead of leaving the box mouseless.
-		let fallback = null
-		try {
-			const { ensureOperatorGuiFocus } = require('../system/operator-gui-channel')
-			fallback = ensureOperatorGuiFocus(ctx)
-		} catch (_) {
-			fallback = null
-		}
-		if (!fallback) {
-			notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
-		}
+		// WO-255: the operator_gui release-fallback auto-arm is retired along with the CEF layer it
+		// targeted (operator_gui is a fullscreen Firefox process now, not a CDP-focusable CEF page —
+		// see src/system/operator-gui-channel.js). Plain clear restored; `syncCefInteractiveBridge`
+		// self-heal below still applies (mario / other interactive templates still need it).
+		notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
 
 		if (typeof ctx._wsBroadcast === 'function') {
-			ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: fallback })
+			ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: null })
 		}
 
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({
-				ok: true,
-				message: fallback ? 'Released input focus (operator GUI re-armed)' : 'Released input focus',
-				cefFocusTarget: fallback,
-			}),
+			body: jsonBody({ ok: true, message: 'Released input focus', cefFocusTarget: null }),
 		}
 	}
 

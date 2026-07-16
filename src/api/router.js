@@ -247,6 +247,8 @@ routes.post('/api/cef/release-input', ({ path, body, ctx }) => routesCefArmInput
 // WO-243 T243.2: Operator GUI channel — routed preview-hole layout apply/clear.
 routes.post('/api/operator-gui/layout', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 routes.delete('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleDelete(path, ctx), { requireCaspar: false })
+routes.post('/api/operator-gui/launch', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/operator-gui/raise', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/device-snapshot/build', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/device-snapshot/schema', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })

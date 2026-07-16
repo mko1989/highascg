@@ -1,0 +1,27 @@
+/**
+ * WO-255 T255.3 — operator-GUI mode: plain dark backing on the reported preview surfaces
+ * (replaces the WO-243 transparent-holes CSS this file used to be, client/styles/10-cef-operator-mode.css).
+ *
+ * Only active when <html class="operator-gui"> is present (client/lib/operator-gui-mode.js gates
+ * this on the `?operatorGui`/legacy `?cefOperator` query params). Every selector below is scoped
+ * under `html.operator-gui` so a normal browser session sees zero style change.
+ *
+ * WO-255's architecture inverts WO-243's: the Caspar video window now sits ABOVE this page
+ * (shaped via X SHAPE, empty input region) rather than being punched through FROM BEHIND a
+ * transparent page — so unlike the old CSS, nothing here needs to make ancestor chains
+ * transparent (the rest of the GUI outside the reported cells is untouched, normal, opaque). Only
+ * the reported cells themselves get a plain dark backing, so a frame where the shape helper's
+ * rects haven't caught up with a DOM resize yet shows dark instead of a flash of stale UI/white
+ * underneath. The preview canvases are still hidden (JS also skips drawing into them — see
+ * preview-canvas-panel.js's `operatorGuiActive` gate — this is belt-and-suspenders / instant paint).
+ */
+
+html.operator-gui .preview-panel__compose-cell,
+html.operator-gui .mv-canvas-wrap {
+	background: #0a0a0a !important;
+	background-image: none !important;
+}
+
+html.operator-gui .preview-panel__canvas {
+	display: none !important;
+}

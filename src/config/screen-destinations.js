@@ -132,11 +132,12 @@ function normalizeDestination(d) {
 		base.artnet = normalizeArtnetFixtureArray(d.artnet)
 	}
 	if (mode === 'operator_gui') {
-		// WO-243: CEF web-UI layer URL (?cefOperator=1 self-identifies the client bundle, see
-		// client/lib/cef-operator-mode.js) + optional explicit physical GPU port (1-4). When
-		// physicalPort is unset, the runtime orchestrator/generator fall back to
-		// resolveOperatorMonitorPort() (src/utils/operator-monitor-resolve.js).
-		base.guiUrl = String(d.guiUrl || '').trim() || 'http://127.0.0.1:4200/?cefOperator=1'
+		// WO-255: fullscreen Firefox web-UI URL (?operatorGui=1 self-identifies the client bundle,
+		// see client/lib/operator-gui-mode.js — the legacy ?cefOperator param is still accepted for
+		// back-compat) + optional explicit physical GPU port (1-4). When physicalPort is unset, the
+		// runtime orchestrator/generator fall back to resolveOperatorMonitorPort()
+		// (src/utils/operator-monitor-resolve.js).
+		base.guiUrl = String(d.guiUrl || '').trim() || 'http://127.0.0.1:4200/?operatorGui=1'
 		const pp = parseInt(String(d.physicalPort ?? ''), 10)
 		if (Number.isFinite(pp) && pp >= 1 && pp <= 4) base.physicalPort = pp
 	}

@@ -11,9 +11,6 @@ const {
 } = require('../utils/x-display-session')
 const { getModeDimensions } = require('../config/config-modes')
 const { readCefDebugPortFromCasparXml } = require('./cef-interactive-cdp')
-const { resolveOperatorGuiChannel } = require('./operator-gui-channel')
-const { resolveOperatorMonitorPort } = require('../utils/operator-monitor-resolve')
-const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session-layout')
 
 function envDisabled() {
 	const v = String(process.env.HIGHASCG_CEF_INTERACTIVE_BRIDGE || '').trim().toLowerCase()
@@ -75,29 +72,9 @@ function listInteractiveZones(config) {
 			layer,
 		})
 	}
-	// WO-243 T243.2: operator_gui zone, gated on the destination existing — the GUI page itself
-	// (the CEF layer) becomes the focusable CDP target via arm-input; this zone is what lets the
-	// raw-CDP X11 bridge map operator-monitor pointer coords onto that target.
-	const ogResolved = resolveOperatorGuiChannel(config)
-	if (ogResolved) {
-		const dest = ogResolved.dest
-		const explicitPort = Number.isFinite(Number(dest?.physicalPort)) && Number(dest.physicalPort) >= 1 && Number(dest.physicalPort) <= 4
-			? Number(dest.physicalPort)
-			: null
-		const ogPort = explicitPort != null ? explicitPort : resolveOperatorMonitorPort(config).port
-		const ogRect = ogPort != null ? resolveLayoutRectForOperatorPort(config, layout, ogPort) : null
-		if (ogRect && ogRect.width > 0 && ogRect.height > 0) {
-			zones.push({
-				id: 'operator_gui',
-				x: ogRect.x,
-				y: ogRect.y,
-				width: ogRect.width,
-				height: ogRect.height,
-				channel: ogResolved.ch,
-				layer,
-			})
-		}
-	}
+	// WO-255: the operator_gui zone is RETIRED — the GUI is a fullscreen Firefox process now (100%
+	// native X11 input, no CDP focus target, no raw-CDP X11 bridge involvement). See
+	// src/system/operator-gui-channel.js / operator-gui-launcher.js.
 	const mvPort = multiviewPhysicalPortIndex(config)
 	for (let n = 1; n <= 8; n++) {
 		const sc = layout?.screens?.[n]

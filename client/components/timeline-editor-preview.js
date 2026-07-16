@@ -21,6 +21,7 @@ import { drawComposePrvPgmCellEdgeBar } from './preview-canvas-draw-base.js'
 import { streamState } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
+import { reportTimelineCellRects } from '../lib/operator-gui-mode.js'
 
 /**
  * @param {object} opts
@@ -88,6 +89,9 @@ export function initTimelineEditorPreview(opts) {
 		},
 		showDestinationVisualOverlay: false,
 		composePrvPgmLayoutToggle: true,
+		// WO-255 T255.3: surface 2/3 for the operator-GUI video overlay — no-op unless operator-GUI
+		// mode is active (reportTimelineCellRects hard-gates itself).
+		onComposeCellRects: (cellRects) => reportTimelineCellRects(cellRects),
 		draw(ctx, W, H, isLive, meta = {}) {
 			if (isSnapshotComposePreview() && meta.composeCell) {
 				const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'

@@ -1,27 +1,37 @@
 /**
- * WO-243 T243.2 — Operator GUI channel runtime orchestrator.
+ * WO-243/255 — Operator GUI channel runtime orchestrator.
  *
  * Owns the AMCP side of the operator_gui destination:
- *  - `ensureOperatorGuiCefLayer()` — (re-)PLAYs the CEF web-UI layer (100) on Caspar connect/startup,
- *    mirroring the CG orphan sweep's re-ADD-after-restart pattern (template-cg-orphan-sweep.js).
+ *  - `ensureOperatorGuiChannel()` — no-op-at-boot placeholder (route layers need nothing at boot
+ *    unlike the retired CEF layer) that re-feeds the shape helper and nudges the client to
+ *    re-report its cell rects on Caspar connect/reconnect — mirrors the CG orphan sweep's
+ *    re-ADD-after-restart pattern (template-cg-orphan-sweep.js) in spirit, just with nothing to
+ *    re-PLAY.
  *  - `applyOperatorGuiLayout()` / `clearOperatorGuiLayout()` — route layers 10-49, one `route://`
- *    per compose preview cell + a `MIXER FILL` positioned by viewport-fraction rect. Line-building
- *    mirrors src/engine/multiview-apply.js's conventions: PLAY only when the route changed, MIXER
- *    FILL every apply, STOP+MIXER CLEAR hygiene for layers beyond the current cell count, one
- *    MIXER COMMIT at the end, and per-channel serialization via a promise chain.
+ *    per compose/timeline/mv-edit preview cell + a `MIXER FILL` positioned by an aspect-fit rect
+ *    (WO-254). Line-building mirrors src/engine/multiview-apply.js's conventions: PLAY only when
+ *    the route changed, MIXER FILL every apply, STOP+MIXER CLEAR hygiene for layers beyond the
+ *    current cell count, one MIXER COMMIT at the end, and per-channel serialization via a promise
+ *    chain. Each apply also feeds the python-xlib shape helper (operator-shape-overlay.js) so the
+ *    Caspar screen consumer window is shaped to exactly these rects, above Firefox.
  *
- * Route layers are visual only (out of scope: PRV interactivity through the GUI holes — WO-243's
- * own scope note).
+ * WO-255: the CEF web-UI layer (100) and its auto-arm input focus are RETIRED — the operator GUI
+ * is now a fullscreen Firefox process (src/system/operator-gui-launcher.js), not a Caspar layer.
+ * Route layers remain visual only (out of scope: PRV interactivity through the shaped holes).
  */
 'use strict'
 
 const { getChannelMap } = require('../config/routing')
 const { destinationsFromConfig } = require('../config/screen-destinations')
+const { getModeDimensions } = require('../config/config-modes')
+const { screenModeString } = require('../config/config-generator-mode-helpers')
+const { operatorGuiModeDimensions } = require('../config/config-generator-channel-plan')
+const { resolveOperatorGuiPort } = require('../config/config-generator-operator-gui')
+const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session-layout')
 
 const ROUTE_LAYER_START = 10
 const ROUTE_LAYER_MAX = 49
-const CEF_LAYER = 100
-const DEFAULT_GUI_URL = 'http://127.0.0.1:4200/?cefOperator=1'
+const DEFAULT_GUI_URL = 'http://127.0.0.1:4200/?operatorGui=1'
 const APPLY_DEBOUNCE_MS = 150
 
 /**
@@ -53,12 +63,15 @@ function clampFraction(v) {
 }
 
 /**
- * Resolve the route:// source channel for one compose preview cell.
+ * Resolve the route:// source channel for one preview cell (compose PGM/PRV, or WO-255's
+ * 'multiview' role for the mv-edit dock surface — routes the whole multiview channel into the
+ * reported rect rather than indexing by mainIndex).
  * @param {{ role?: string, mainIndex?: number }} cell
  * @param {ReturnType<typeof getChannelMap>} map
  * @returns {number|null}
  */
 function resolveCellSourceChannel(cell, map) {
+	if (cell?.role === 'multiview') return map.multiviewCh ?? null
 	const role = cell?.role === 'prv' ? 'prv' : 'pgm'
 	const idx = Math.max(0, parseInt(String(cell?.mainIndex ?? 0), 10) || 0)
 	if (role === 'pgm') return Array.isArray(map.programChannels) ? (map.programChannels[idx] ?? null) : null
@@ -66,13 +79,162 @@ function resolveCellSourceChannel(cell, map) {
 }
 
 /**
+ * WO-255 T255.1: resolve the operator monitor's ROOT/absolute-pixel rect for the shape helper —
+ * same port-resolution chain the generator uses (`resolveOperatorGuiPort`, incl. the gpu-map
+ * fallback inside `resolveLayoutRectForOperatorPort`), so the shape helper's monitor rect always
+ * matches where the generator actually placed the screen consumer window.
+ * @param {object} config
+ * @param {object} [layout] - pre-computed `calculateLayoutPositions()` result; recomputed if omitted
+ * @returns {{x: number, y: number, w: number, h: number}|null}
+ */
+function resolveOperatorGuiMonitorRect(config, layout) {
+	const dest = operatorGuiDestination(config)
+	if (!dest) return null
+	const port = resolveOperatorGuiPort(config, dest)
+	if (port == null) return null
+	try {
+		const rect = resolveLayoutRectForOperatorPort(config, layout || null, port)
+		if (rect && rect.width > 0 && rect.height > 0) return { x: rect.x, y: rect.y, w: rect.width, h: rect.height }
+	} catch (_) {
+		/* hardware detection unavailable (headless/tests) — treat as unresolved */
+	}
+	return null
+}
+
+/**
+ * WO-255 T255.1: pure conversion — a 0-1 viewport-fraction rect (of the GUI channel's raster) to
+ * monitor-relative INTEGER pixels, for the shape helper's stdin protocol. Deliberately scales by
+ * the MONITOR rect's own width/height, not the GUI channel raster's dims: the shape helper matches
+ * its target window by monitor-rect geometry (operator-shape-overlay.py), so monitor-relative is
+ * the coordinate space its rects must already be in — the channel raster and the monitor rect can
+ * differ in size (e.g. a custom operator_gui video-mode vs. the physical monitor's native res).
+ * @param {{x: number, y: number, w: number, h: number}} fracRect
+ * @param {{w: number, h: number}} monitorRect
+ * @returns {[number, number, number, number]}
+ */
+function fractionRectToMonitorPx(fracRect, monitorRect) {
+	return [
+		Math.round((Number(fracRect?.x) || 0) * monitorRect.w),
+		Math.round((Number(fracRect?.y) || 0) * monitorRect.h),
+		Math.round((Number(fracRect?.w) || 0) * monitorRect.w),
+		Math.round((Number(fracRect?.h) || 0) * monitorRect.h),
+	]
+}
+
+/**
+ * WO-254 T254.1 — resolve the GUI channel's own raster dims (the coordinate space cell rects are
+ * fractions OF). Returns null when there's no operator_gui destination or its dims don't resolve
+ * to a positive size — callers must treat null as "keep today's stretch-fill behavior".
+ * @param {object} config
+ * @returns {{width: number, height: number}|null}
+ */
+function resolveOperatorGuiChannelDims(config) {
+	const dest = operatorGuiDestination(config)
+	if (!dest) return null
+	const dims = operatorGuiModeDimensions(dest)
+	return dims && dims.width > 0 && dims.height > 0 ? { width: dims.width, height: dims.height } : null
+}
+
+/**
+ * WO-254 T254.1 — resolve a compose-cell's SOURCE channel raster dims (PGM/PRV share the same
+ * physical screen's mode, keyed by mainIndex+1 — mirrors {@link resolveCellSourceChannel}'s
+ * indexing and `config-compare.js`'s "Screen N preview" role reuse of `screen_N_mode`). Unlike
+ * `hostChannelVideoSize` (cef-interactive-forward.js:72-83, which only resolves PGM/multiview
+ * channels via reverse channel-number lookup), this resolves directly by screen index so PRV
+ * cells get correct dims too.
+ * @param {{ mainIndex?: number }} cell
+ * @param {object} config
+ * @returns {{width: number, height: number}|null}
+ */
+function resolveCellSourceDims(cell, config) {
+	const idx = Math.max(0, parseInt(String(cell?.mainIndex ?? 0), 10) || 0)
+	const dims = getModeDimensions(screenModeString(config, idx + 1), config, idx + 1)
+	return dims && dims.width > 0 && dims.height > 0 ? { width: dims.width, height: dims.height } : null
+}
+
+/**
+ * Pure pixel-space "contain" fit: the largest rect inside `cellPx` that preserves `srcW`/`srcH`'s
+ * aspect ratio, centered. Source wider (relative) than the cell -> bars top/bottom (letterbox);
+ * source narrower (relative) than the cell -> bars left/right (pillarbox). Degenerate guard:
+ * zero/negative cell or source dims pass `cellPx` through unchanged (no NaN/Infinity).
+ * @param {{x?: number, y?: number, w: number, h: number}} cellPx
+ * @param {number} srcW
+ * @param {number} srcH
+ * @returns {{x: number, y: number, w: number, h: number}}
+ */
+function fitAspectRectPx(cellPx, srcW, srcH) {
+	const cx = Number(cellPx?.x) || 0
+	const cy = Number(cellPx?.y) || 0
+	const cw = Number(cellPx?.w) || 0
+	const ch = Number(cellPx?.h) || 0
+	const sw = Number(srcW) || 0
+	const sh = Number(srcH) || 0
+	if (!(cw > 0) || !(ch > 0) || !(sw > 0) || !(sh > 0)) {
+		return { x: cx, y: cy, w: cw, h: ch }
+	}
+	const cellAR = cw / ch
+	const srcAR = sw / sh
+	let w
+	let h
+	if (srcAR > cellAR) {
+		// Source relatively wider than the cell -> width-constrained, bars top/bottom.
+		w = cw
+		h = w / srcAR
+	} else {
+		// Source relatively narrower than (or equal to) the cell -> height-constrained, bars left/right.
+		h = ch
+		w = h * srcAR
+	}
+	return { x: cx + (cw - w) / 2, y: cy + (ch - h) / 2, w, h }
+}
+
+/**
+ * WO-254 T254.1 — cell rects are VIEWPORT-FRACTION rects (0-1) of the GUI channel's raster, not
+ * of the source's. Aspect math must therefore convert to absolute pixels of the GUI raster
+ * first (fraction × guiDims), fit in pixel space, then normalize back to fractions — doing the
+ * fit directly in fraction space would silently conflate the GUI raster's own aspect with the
+ * source's whenever the GUI raster isn't square. Pure function, no I/O.
+ * @param {{x: number, y: number, w: number, h: number}} cellFrac - clamped 0-1 viewport-fraction cell rect
+ * @param {{width: number, height: number}} guiDims - GUI channel raster dims
+ * @param {{width: number, height: number}} srcDims - source channel raster dims
+ * @returns {{x: number, y: number, w: number, h: number}} fitted 0-1 fraction rect
+ */
+function computeAspectFitCellRect(cellFrac, guiDims, srcDims) {
+	const guiW = Number(guiDims?.width) || 0
+	const guiH = Number(guiDims?.height) || 0
+	if (!(guiW > 0) || !(guiH > 0)) return cellFrac
+	const cellPx = {
+		x: (Number(cellFrac?.x) || 0) * guiW,
+		y: (Number(cellFrac?.y) || 0) * guiH,
+		w: (Number(cellFrac?.w) || 0) * guiW,
+		h: (Number(cellFrac?.h) || 0) * guiH,
+	}
+	const fittedPx = fitAspectRectPx(cellPx, srcDims?.width, srcDims?.height)
+	return {
+		x: clampFraction(fittedPx.x / guiW),
+		y: clampFraction(fittedPx.y / guiH),
+		w: clampFraction(fittedPx.w / guiW),
+		h: clampFraction(fittedPx.h / guiH),
+	}
+}
+
+/**
  * Pure function: cells -> per-layer route/rect plan. No I/O — fully unit-testable. Cells whose
  * channel resolves to null are skipped (per T243.2: "skip cells whose channel is null").
+ *
+ * WO-254 T254.1: when `config` is supplied and both the GUI channel's and the cell's source
+ * channel's raster dims resolve, the emitted rect is the largest aspect-preserving fit INSIDE
+ * the reported cell rect (letterbox/pillarbox, centered) instead of the raw cell rect — CasparCG
+ * `MIXER FILL` stretches to whatever rect it's given, so without this a 16:9 source stretches to
+ * fill non-16:9 holes. `config` is optional and defaults to today's stretch-fill behavior (kept
+ * for the existing WO-243 call sites/tests that don't pass it).
  * @param {Array<{id?: string, role?: string, mainIndex?: number, rect?: {x:number,y:number,w:number,h:number}}>} cells
  * @param {ReturnType<typeof getChannelMap>} map
+ * @param {object} [config] - app config; enables aspect-fit when its operator_gui dims resolve
  * @returns {Array<{layer: number, route: string, srcCh: number, x: number, y: number, w: number, h: number}>}
  */
-function computeOperatorGuiCellPlan(cells, map) {
+function computeOperatorGuiCellPlan(cells, map, config) {
+	const guiDims = config ? resolveOperatorGuiChannelDims(config) : null
 	const out = []
 	let layer = ROUTE_LAYER_START
 	for (const cell of Array.isArray(cells) ? cells : []) {
@@ -80,14 +242,24 @@ function computeOperatorGuiCellPlan(cells, map) {
 		const srcCh = resolveCellSourceChannel(cell, map)
 		if (srcCh == null) continue
 		const rect = cell?.rect || {}
-		out.push({
-			layer,
-			route: `route://${srcCh}`,
-			srcCh,
+		let fitted = {
 			x: clampFraction(rect.x),
 			y: clampFraction(rect.y),
 			w: clampFraction(rect.w),
 			h: clampFraction(rect.h),
+		}
+		if (guiDims) {
+			const srcDims = resolveCellSourceDims(cell, config)
+			if (srcDims) fitted = computeAspectFitCellRect(fitted, guiDims, srcDims)
+		}
+		out.push({
+			layer,
+			route: `route://${srcCh}`,
+			srcCh,
+			x: fitted.x,
+			y: fitted.y,
+			w: fitted.w,
+			h: fitted.h,
 		})
 		layer++
 	}
@@ -106,13 +278,29 @@ const debounceTimers = new Map()
 
 /**
  * Actually run one apply against `ctx.amcp` — no debounce, assumes already serialized by the caller.
+ * Also feeds the shape helper (WO-255 T255.1) with the same fitted rects, converted to
+ * monitor-relative pixels — best-effort: no resolvable monitor rect (headless/tests/no destination
+ * yet) just skips the shape feed, the route-layer apply itself is unaffected.
  * @param {{ amcp: object, config: object, log?: Function }} ctx
  * @param {number} ch
  * @param {Array} cells
  */
 async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
 	const map = getChannelMap(ctx.config)
-	const plan = computeOperatorGuiCellPlan(cells, map)
+	const plan = computeOperatorGuiCellPlan(cells, map, ctx.config)
+	try {
+		const monitorRect = resolveOperatorGuiMonitorRect(ctx.config)
+		if (monitorRect) {
+			const { updateShapeRects } = require('./operator-shape-overlay')
+			updateShapeRects(
+				monitorRect,
+				plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect)),
+				{ log: ctx.log, channel: ch },
+			)
+		}
+	} catch (e) {
+		ctx.log?.('warn', `operator-gui: shape overlay feed failed: ${e?.message || e}`)
+	}
 	const priorRoutes = lastAppliedRouteByChannel.get(ch) || new Map()
 	const nextRoutes = new Map()
 	for (const entry of plan) {
@@ -202,70 +390,37 @@ function clearOperatorGuiLayout(ctx) {
 }
 
 /**
- * On Caspar connect/startup: (re-)PLAY the CEF web-UI layer if an operator_gui destination exists —
- * mirrors the CG orphan sweep's re-ADD-after-restart pattern (src/engine/template-cg-orphan-sweep.js).
- * Convention: `PLAY <ch>-100 [HTML] "<guiUrl>"` — amcp-basic.js's `play()` auto-quotes `[HTML] `-
- * prefixed clips via `param()` (src/caspar/amcp-command-plan.js), so the raw URL is passed here.
- * @param {{ amcp: object, config: object, log?: Function }} ctx
+ * WO-255: on Caspar connect/startup, when an operator_gui destination exists — re-feeds the shape
+ * helper with its last-known rects (a Caspar restart spawns a brand-new, unshaped screen-consumer
+ * window id) and nudges the client (over the app's own WS, once it reconnects) to re-POST its
+ * last-known compose/timeline/mv-edit cell rects. Route layers themselves need no re-PLAY at boot
+ * (unlike the retired CEF layer — WO-243's `ensureOperatorGuiCefLayer` used to (re-)PLAY it here);
+ * they're re-applied the moment the client's next POST lands.
+ *
+ * A Caspar/highascg restart clears the server's route layers (10-49) but doesn't change the
+ * client's DOM layout, so without the WS nudge nothing re-triggers the client's
+ * ResizeObserver-driven report and the holes stay black until a window resize — see
+ * client/lib/operator-gui-mode.js's `initOperatorGuiRectReporting` (WO-254 T254.2, kept as-is
+ * under the WO-255 rename).
+ * @param {{ amcp: object, config: object, log?: Function, _wsBroadcast?: (type: string, data: object) => void }} ctx
  * @returns {Promise<object>}
  */
-async function ensureOperatorGuiCefLayer(ctx) {
+async function ensureOperatorGuiChannel(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return { skipped: true }
 	const { ch, guiUrl } = resolved
 	try {
-		await ctx.amcp.play(ch, CEF_LAYER, `[HTML] ${guiUrl}`)
-		await ctx.amcp.mixerFill(ch, CEF_LAYER, 0, 0, 1, 1)
-		await ctx.amcp.mixerCommit(ch)
+		const { reapplyOperatorShapeOverlay } = require('./operator-shape-overlay')
+		reapplyOperatorShapeOverlay({ log: ctx.log })
 	} catch (e) {
-		ctx.log?.('warn', `operator-gui: failed to (re-)play CEF layer: ${e?.message || e}`)
+		ctx.log?.('warn', `operator-gui: shape overlay re-feed failed: ${e?.message || e}`)
 	}
-	ensureOperatorGuiFocus(ctx)
-	return { ch, guiUrl }
-}
-
-/**
- * Auto-arm the GUI page as the DEFAULT CEF input sink. Without a focus target the X11 capture
- * bridge never starts, and there is no clickable arm affordance for the GUI itself (chicken-and-
- * egg: you cannot click "arm" through a mouseless GUI). Never steals focus from a manually armed
- * target (mario / live-webpage) — those override; releasing them falls back here
- * (routes-cef-arm-input.js).
- * @param {{ config: object, log?: Function }} ctx
- * @returns {object|null} the focus target set (or already active), null when not applicable
- */
-function ensureOperatorGuiFocus(ctx) {
-	const resolved = resolveOperatorGuiChannel(ctx?.config)
-	if (!resolved) return null
-	const { getCefFocusTarget, setCefFocusTarget } = require('./cef-focus-registry')
-	const current = getCefFocusTarget()
-	if (current && current.sourceId !== 'operator_gui') return current
-	const target = {
-		sourceId: 'operator_gui',
-		hostChannel: resolved.ch,
-		hostLayer: CEF_LAYER,
-		// urlMatchesNeedle token-matches the page URL; 'cefOperator' (case-sensitive) uniquely
-		// matches the GUI page. Deliberately NO playArg: cefMatchTokens derives host tokens from
-		// it ('127.0.0.1:4200') which match EVERY page served from the app — live-debugged 2026-07-16:
-		// the needle resolved the mario template page instead of the GUI.
-		needle: 'cefOperator',
-		zoneId: 'operator_gui',
-	}
-	if (current && current.hostChannel === target.hostChannel && current.needle === target.needle) return current
-	setCefFocusTarget(target)
 	try {
-		const { notifyCefFocusChanged, syncCefInteractiveBridge } = require('./cef-interactive-bridge')
-		const log = typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined
-		notifyCefFocusChanged(log)
-		// Self-heal: notifyCefFocusChanged only re-syncs an ALREADY-RUNNING bridge (bails on
-		// !S.activeKey). A transient gate (e.g. casparcg.config mid-rewrite during an apply makes
-		// the debug-port read 0) stops the bridge and nothing restarts it — arming must (re)start
-		// it or the operator monitor has no input capture. Idempotent when already running.
-		void syncCefInteractiveBridge(ctx.config, { log, amcp: ctx.amcp })
+		ctx._wsBroadcast?.('change', { path: 'operatorGuiRectsWanted', value: Date.now() })
 	} catch (e) {
-		ctx.log?.('warn', `operator-gui: focus notify failed: ${e?.message || e}`)
+		ctx.log?.('warn', `operator-gui: rects-wanted broadcast failed: ${e?.message || e}`)
 	}
-	ctx.log?.('info', `operator-gui: input focus auto-armed (ch ${resolved.ch}, layer ${CEF_LAYER})`)
-	return target
+	return { ch, guiUrl }
 }
 
 /** Test-only: reset module-level apply/debounce state between smoke test cases. */
@@ -281,15 +436,19 @@ module.exports = {
 	DEFAULT_GUI_URL,
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
-	CEF_LAYER,
 	APPLY_DEBOUNCE_MS,
 	operatorGuiDestination,
-	ensureOperatorGuiFocus,
 	resolveOperatorGuiChannel,
+	resolveOperatorGuiMonitorRect,
+	fractionRectToMonitorPx,
 	resolveCellSourceChannel,
+	resolveOperatorGuiChannelDims,
+	resolveCellSourceDims,
+	fitAspectRectPx,
+	computeAspectFitCellRect,
 	computeOperatorGuiCellPlan,
 	applyOperatorGuiLayout,
 	clearOperatorGuiLayout,
-	ensureOperatorGuiCefLayer,
+	ensureOperatorGuiChannel,
 	resetOperatorGuiStateForTests,
 }

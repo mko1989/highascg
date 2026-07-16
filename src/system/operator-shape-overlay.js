@@ -1,0 +1,133 @@
+/**
+ * operator-shape-overlay.js — WO-255 T255.1: spawn/manage the python-xlib shape helper
+ * (tools/runtime/operator-shape-overlay.py) that shapes the Caspar operator_gui screen-consumer
+ * window so only the reported preview rects are visible, with an empty input shape so clicks pass
+ * through to the fullscreen Firefox GUI beneath it.
+ *
+ * Mirrors cef-interactive-bridge-lifecycle.js's spawn/stderr-log/exit-log pattern: spawn once with
+ * `displaySessionEnv()`, pipe stdio, log stdout/stderr lines through `ctx.log`, null the process
+ * ref on exit so the NEXT `updateShapeRects()` call transparently respawns (no retry storm — it's
+ * lazy, driven by demand).
+ *
+ * Test/CI safety: never spawns when `NODE_TEST_CONTEXT` is set (the same env var
+ * src/utils/persistence.js already relies on to detect a `node --test` child) — the curated gate
+ * calls `applyOperatorGuiLayout()` directly against a fake `ctx.amcp`, and that must never shell
+ * out to a real `python3` process. This is belt-and-suspenders on top of the natural gate (no
+ * resolvable monitor rect in a config-only test fixture -> callers never even reach here).
+ */
+'use strict'
+
+const path = require('path')
+const { spawn } = require('child_process')
+const { REPO_ROOT } = require('../repo-paths')
+const { swallow } = require('../utils/swallow')
+const { displaySessionEnv } = require('../utils/x-display-session')
+
+const SHAPE_SCRIPT = path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py')
+
+/** @type {import('child_process').ChildProcess | null} */
+let proc = null
+/** Last-known {monitor, rects} sent — re-sent verbatim by {@link reapplyOperatorShapeOverlay} on
+ * Caspar reconnect (a fresh consumer window has no custom shape yet) and after a lazy respawn. */
+let lastMonitor = null
+let lastRects = null
+let lastChannel = null
+let lastLog = null
+
+function isTestContext() {
+	return !!process.env.NODE_TEST_CONTEXT
+}
+
+function ensureSpawned(log) {
+	if (proc) return proc
+	if (isTestContext()) return null
+	const fs = require('fs')
+	if (!fs.existsSync(SHAPE_SCRIPT)) {
+		log?.('warn', `[Shape overlay] missing ${SHAPE_SCRIPT}`)
+		return null
+	}
+	const env = displaySessionEnv()
+	const child = spawn('python3', ['-u', SHAPE_SCRIPT], { env, stdio: ['pipe', 'pipe', 'pipe'] })
+	child.stdout.on('data', (chunk) => {
+		const t = String(chunk).trim()
+		if (t) log?.('info', `[Shape overlay] ${t}`)
+	})
+	child.stderr.on('data', (chunk) => {
+		const t = String(chunk).trim()
+		if (t) log?.('warn', `[Shape overlay] ${t}`)
+	})
+	child.on('exit', (code, sig) => {
+		log?.('warn', `[Shape overlay] exited code=${code} sig=${sig}`)
+		if (proc === child) proc = null
+	})
+	proc = child
+	log?.('info', '[Shape overlay] started')
+	return proc
+}
+
+/**
+ * Send `{ monitor, rects, channel }` as one JSON line to the helper's stdin, spawning (or
+ * respawning after an unexpected exit) it first. Caches the payload so
+ * {@link reapplyOperatorShapeOverlay} can re-send it without a fresh layout apply.
+ * `channel` (the operator_gui Caspar channel) lets the helper match the consumer window by its
+ * exact title `Screen consumer [<ch>|...]` — live-verified 2026-07-16 — instead of geometry+class
+ * alone (Firefox deliberately shares the same monitor rect).
+ * @param {{x: number, y: number, w: number, h: number}} monitorRect - ROOT/absolute pixels
+ * @param {Array<[number, number, number, number]>} rectsPx - monitor-relative pixel rects; empty -> hide
+ * @param {{ log?: Function, channel?: number|null }} [opts]
+ */
+function updateShapeRects(monitorRect, rectsPx, opts = {}) {
+	const log = typeof opts.log === 'function' ? opts.log : lastLog
+	lastLog = log || lastLog
+	if (!monitorRect || !(monitorRect.w > 0) || !(monitorRect.h > 0)) return
+	lastMonitor = monitorRect
+	lastRects = Array.isArray(rectsPx) ? rectsPx : []
+	if (Number.isFinite(Number(opts.channel))) lastChannel = Number(opts.channel)
+	const p = ensureSpawned(log)
+	if (!p || !p.stdin || p.stdin.destroyed) return
+	try {
+		p.stdin.write(
+			JSON.stringify({
+				monitor: { x: monitorRect.x, y: monitorRect.y, w: monitorRect.w, h: monitorRect.h },
+				rects: lastRects,
+				channel: lastChannel,
+			}) + '\n',
+		)
+	} catch (e) {
+		swallow(e, { tag: 'operator-shape-overlay' })
+	}
+}
+
+/**
+ * WO-255 T255.2: "re-feed the shape helper ... on Caspar reconnect" — a Caspar restart spawns a
+ * brand-new screen-consumer window id with no custom shape, and the helper's own 2s poll will find
+ * it, but re-sending the last-known payload here is a cheap way to also (re)spawn the helper itself
+ * if it wasn't running yet (e.g. first boot, before any client ever POSTed cell rects). No-op when
+ * nothing has ever been applied.
+ * @param {{ log?: Function }} [opts]
+ */
+function reapplyOperatorShapeOverlay(opts = {}) {
+	if (lastMonitor == null) return
+	updateShapeRects(lastMonitor, lastRects || [], opts)
+}
+
+/** Stop the helper (SIGTERM — the python side cleans up its own shape state on stdin EOF/SIGTERM,
+ * see operator-shape-overlay.py's `finally` block). Hooked from src/bootstrap/shutdown.js. */
+function stopOperatorShapeOverlay() {
+	if (proc) {
+		try {
+			proc.kill('SIGTERM')
+		} catch (err) {
+			swallow(err, { tag: 'operator-shape-overlay' })
+		}
+		proc = null
+	}
+	lastMonitor = null
+	lastRects = null
+}
+
+module.exports = {
+	updateShapeRects,
+	reapplyOperatorShapeOverlay,
+	stopOperatorShapeOverlay,
+}
