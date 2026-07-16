@@ -69,6 +69,11 @@ POLL_INTERVAL_SEC = 2.0
 # windows: the WO-258 browser sources (also firefox, on the operator monitor during "Interact"),
 # or any browser the operator opens. X11 exposes no URL property, so the page title stands in for it.
 OPERATOR_TITLE_MARKER = "HIGHASCG-OPERATOR-GUI"
+
+# Interned lazily in main() once the display is open; window_title() falls back to legacy WM_NAME
+# when these are still None (get_full_property tolerates a bad atom via the surrounding try/except).
+_ATOM_NET_WM_NAME = None
+_ATOM_UTF8_STRING = None
 STDIN_SELECT_TIMEOUT_SEC = 0.5
 
 
@@ -100,6 +105,17 @@ def remove_pid_file() -> None:
 
 
 def window_title(win) -> str:
+    # Firefox sets its page title in _NET_WM_NAME (EWMH, UTF-8) and leaves the legacy WM_NAME empty
+    # (live-verified 2026-07-16: WM_NAME=b'' but _NET_WM_NAME='HIGHASCG-OPERATOR-GUI — Mozilla
+    # Firefox'). Reading only get_wm_name() saw '' and the title-marker match always failed → no
+    # holes. Prefer _NET_WM_NAME, fall back to the legacy name.
+    try:
+        prop = win.get_full_property(_ATOM_NET_WM_NAME, _ATOM_UTF8_STRING)
+        if prop and prop.value:
+            val = prop.value
+            return val.decode("utf-8", "replace") if isinstance(val, (bytes, bytearray)) else str(val)
+    except Exception:
+        pass
     try:
         name = win.get_wm_name()
         return name if isinstance(name, str) else ""
@@ -281,6 +297,13 @@ def main() -> int:
         return 1
 
     root = d.screen().root
+
+    global _ATOM_NET_WM_NAME, _ATOM_UTF8_STRING
+    try:
+        _ATOM_NET_WM_NAME = d.intern_atom("_NET_WM_NAME")
+        _ATOM_UTF8_STRING = d.intern_atom("UTF8_STRING")
+    except Exception as e:
+        log(f"warning: could not intern _NET_WM_NAME atoms ({e}); title match falls back to WM_NAME")
 
     state_monitor = None
     state_rects = []
