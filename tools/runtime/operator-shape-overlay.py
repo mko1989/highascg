@@ -78,6 +78,7 @@ _ATOM_UTF8_STRING = None
 _ATOM_NET_WM_STATE = None
 _ATOM_NET_WM_STATE_ABOVE = None
 _ATOM_NET_WM_STATE_BELOW = None
+_ATOM_NET_ACTIVE_WINDOW = None
 _DISPLAY = None
 _ROOT = None
 STDIN_SELECT_TIMEOUT_SEC = 0.5
@@ -237,11 +238,13 @@ def set_net_wm_state(win, state_atom, add=True):
 
 
 def find_caspar_consumer(root, monitor, channel):
-    """Find the operator_gui Caspar screen-consumer CLIENT window (WM_CLASS 'casparcg', title
-    'Screen consumer [<channel>|...]') so it can be forced BELOW Firefox. The operator_gui channel is
-    unique, so match by the channel signature in title/class ANYWHERE in the tree — NOT by exact
-    monitor geometry (Openbox may frame/place the consumer at a different origin than the monitor
-    rect, unlike Firefox which we position exactly). `monitor` is unused; kept for call symmetry."""
+    """Find the operator_gui Caspar screen consumer (WM_CLASS 'casparcg', title
+    'Screen consumer [<channel>|...]'). Returns (toplevel, client) — the toplevel (WM frame, a
+    direct root child) is what the X server stacks, the client is what Openbox reads EWMH state
+    from; both are needed. The operator_gui channel is unique, so match by the channel signature
+    in title/class ANYWHERE in the tree — NOT by exact monitor geometry (Openbox may frame/place
+    the consumer at a different origin than the monitor rect, unlike Firefox which we position
+    exactly). `monitor` is unused; kept for call symmetry."""
     def walk(win, depth):
         title = window_title(win)
         inst, cls = window_class(win)
@@ -265,7 +268,7 @@ def find_caspar_consumer(root, monitor, channel):
         for top in root.query_tree().children:
             hit = walk(top, 0)
             if hit is not None:
-                return hit
+                return (top, hit)
     except Exception:
         return None
     return None
@@ -276,19 +279,93 @@ def lock_window_above(win):
     set_net_wm_state(win, _ATOM_NET_WM_STATE_ABOVE, add=True)
 
 
-def enforce_caspar_below(root, monitor, channel):
-    """Pin the operator_gui Caspar consumer BELOW (and strip ABOVE, in case the consumer was
-    started from a stale config with always-on-top). Returns the window id pinned, or None.
-    Idempotent — safe to re-send every poll tick, which is what keeps the lock standing across a
-    Caspar restart (the fresh consumer window carries no EWMH state)."""
-    if channel is None or _ATOM_NET_WM_STATE_BELOW is None:
+def set_input_empty(pair):
+    """Make a (toplevel, client) pair INPUT-DEAD: SET each window's input shape to the empty
+    region. X SHAPE semantics make this the ONLY way to keep clicks off the Caspar consumer: a
+    window's effective input region is the INTERSECTION of its input and bounding regions, so
+    Firefox's input=full does NOT cover its bounding holes — a click inside a hole falls through
+    to the window below no matter what (live-proven 2026-07-16: synthetic click in a hole raised
+    Caspar over the FULLSCREEN+ABOVE Firefox, with BELOW still set on it — Openbox executes the
+    focused client's restack). Input-dead, the consumer can never be clicked, focused, or
+    click-raised; hole clicks land on the desktop, which is inert."""
+    try:
+        for win in pair:
+            win.shape_rectangles(shape.SO.Set, shape.SK.Input, 0, 0, 0, [])
+        return True
+    except Exception as e:
+        log(f"set_input_empty failed: {e}")
+        return False
+
+
+def restore_input(pair):
+    """Reset both windows' input shape to default (full window) — exit cleanup, so a dead helper
+    never leaves the consumer permanently unclickable outside operator mode."""
+    try:
+        for win in pair:
+            win.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, X.NONE)
+        return True
+    except Exception as e:
+        log(f"restore_input failed: {e}")
+        return False
+
+
+def activate_window(win):
+    """EWMH _NET_ACTIVE_WINDOW (source=2, pager) — asks Openbox to focus AND raise `win` per its
+    layer policy. Used by the stacking watchdog to put Firefox back on top after anything manages
+    to hoist the consumer above it."""
+    if _ATOM_NET_ACTIVE_WINDOW is None or _ROOT is None or _DISPLAY is None:
+        return
+    try:
+        data = [2, 0, 0, 0, 0]  # source=pager, timestamp=0, currently-active=0
+        ev = event.ClientMessage(window=win, client_type=_ATOM_NET_ACTIVE_WINDOW, data=(32, data))
+        _ROOT.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+        _DISPLAY.flush()
+    except Exception as e:
+        log(f"activate_window failed: {e}")
+
+
+def stacking_inverted(root, caspar_top_id, firefox_top_id):
+    """True when the caspar toplevel is stacked ABOVE the firefox toplevel (root children are
+    bottom->top). Unknown ids -> False (nothing to fix)."""
+    try:
+        order = [w.id for w in root.query_tree().children]
+        ci = order.index(caspar_top_id)
+        fi = order.index(firefox_top_id)
+        return ci > fi
+    except Exception:
+        return False
+
+
+def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
+    """Keep the operator_gui Caspar consumer under Firefox, permanently:
+      - EWMH: strip ABOVE (stale always-on-top config), add BELOW;
+      - SHAPE: input region EMPTY on frame+client (see set_input_empty — clicks in the bounding
+        holes otherwise reach the consumer and Openbox raises it);
+      - watchdog: if the consumer toplevel is nonetheless stacked above Firefox's, re-activate
+        Firefox (_NET_ACTIVE_WINDOW re-raises it per layer policy and returns focus to the GUI).
+    Re-run every poll tick — a restarted Caspar spawns a fresh window with none of this state.
+    Returns the (toplevel, client) pair found, or None."""
+    if channel is None:
         return None
-    caspar = find_caspar_consumer(root, monitor, channel)
-    if caspar is None:
+    pair = find_caspar_consumer(root, monitor, channel)
+    if pair is None:
         return None
-    set_net_wm_state(caspar, _ATOM_NET_WM_STATE_ABOVE, add=False)
-    set_net_wm_state(caspar, _ATOM_NET_WM_STATE_BELOW, add=True)
-    return caspar.id
+    top, client = pair
+    is_new = client.id != prev_caspar_id
+    if _ATOM_NET_WM_STATE_BELOW is not None:
+        set_net_wm_state(client, _ATOM_NET_WM_STATE_ABOVE, add=False)
+        set_net_wm_state(client, _ATOM_NET_WM_STATE_BELOW, add=True)
+    set_input_empty(pair)
+    if is_new:
+        log(f"caspar consumer window {client.id} (ch {channel}): pinned BELOW + input-dead")
+    if firefox_pair is not None and stacking_inverted(root, top.id, firefox_pair[0].id):
+        log("stacking inverted (caspar above firefox) — re-activating firefox")
+        activate_window(firefox_pair[1])
+        try:
+            firefox_pair[0].configure(stack_mode=X.Above)
+        except Exception:
+            pass
+    return pair
 
 
 def apply_holes(pair, monitor, rects, channel=None):
@@ -296,12 +373,14 @@ def apply_holes(pair, monitor, rects, channel=None):
     Firefox's BOUNDING shape (visual): SET bounding to the full window rect, then SUBTRACT each
     preview rect so the Caspar consumer below shows through.
 
-    Crucially the INPUT shape is SET to the FULL window (not the holed bounding). Bounding and input
-    are independent SHAPE regions: Firefox is DRAWN with holes but RECEIVES clicks everywhere — a
-    'show-through but still clickable' layer. Otherwise a click in a hole fell through to the Caspar
-    window, and the WM raised it over Firefox, burying the GUI (owner, 2026-07-16). With input full,
-    clicks over the video hit the (inert) GUI area and Caspar is never raised. Tradeoff: you cannot
-    click the video itself — fine, previews are display-only, chrome/drag handles sit below.
+    The INPUT shape is SET to the full window only as NORMALIZATION (an earlier design left holed
+    input shapes behind). It does NOT make the holes clickable: X SHAPE intersects a window's
+    input region with its bounding region, so where bounding has holes the window cannot receive
+    input at all — 'drawn with holes but clicked everywhere' is impossible on one window
+    (live-proven 2026-07-16). Clicks inside holes inevitably go to whatever is below; keeping them
+    off the Caspar consumer is set_input_empty()'s job (the consumer is made input-dead, so hole
+    clicks land on the inert desktop). Tradeoff stands: the video itself is not clickable —
+    fine, previews are display-only, chrome/drag handles sit below.
 
     Empty `rects` -> restore unshaped (bounding + input reset) so a modal can render whole over
     preview areas. Applied to BOTH the WM frame (toplevel) and the firefox client inside it.
@@ -386,7 +465,7 @@ def main() -> int:
     root = d.screen().root
 
     global _ATOM_NET_WM_NAME, _ATOM_UTF8_STRING
-    global _ATOM_NET_WM_STATE, _ATOM_NET_WM_STATE_ABOVE, _ATOM_NET_WM_STATE_BELOW, _DISPLAY, _ROOT
+    global _ATOM_NET_WM_STATE, _ATOM_NET_WM_STATE_ABOVE, _ATOM_NET_WM_STATE_BELOW, _ATOM_NET_ACTIVE_WINDOW, _DISPLAY, _ROOT
     _DISPLAY = d
     _ROOT = root
     try:
@@ -398,6 +477,7 @@ def main() -> int:
         _ATOM_NET_WM_STATE = d.intern_atom("_NET_WM_STATE")
         _ATOM_NET_WM_STATE_ABOVE = d.intern_atom("_NET_WM_STATE_ABOVE")
         _ATOM_NET_WM_STATE_BELOW = d.intern_atom("_NET_WM_STATE_BELOW")
+        _ATOM_NET_ACTIVE_WINDOW = d.intern_atom("_NET_ACTIVE_WINDOW")
     except Exception as e:
         log(f"warning: could not intern _NET_WM_STATE atoms ({e}); persistent always-on-top disabled")
 
@@ -406,7 +486,7 @@ def main() -> int:
     state_channel = None
     state_title_marker = OPERATOR_TITLE_MARKER
     win = None
-    caspar_id = None
+    caspar_pair = None
     last_poll = 0.0
 
     # WO-262: read stdin with os.read (raw fd) + our own newline buffer, NOT a buffered
@@ -434,13 +514,13 @@ def main() -> int:
                 elif win is not None:
                     log("firefox window no longer present (restart?) — will re-search")
                     win = None
-                # Re-assert the Caspar-below lock every poll tick (idempotent): a restarted
-                # consumer window arrives with no EWMH state and must be re-pinned within 2s.
-                pinned = enforce_caspar_below(root, state_monitor, state_channel)
-                if pinned != caspar_id:
-                    caspar_id = pinned
-                    if pinned is not None:
-                        log(f"caspar consumer window {pinned} pinned BELOW (ch {state_channel})")
+                # Re-assert the Caspar-under lock every poll tick (idempotent): a restarted
+                # consumer window arrives with no EWMH state and a live input region, and must be
+                # re-neutralized within 2s. Also runs the stacking watchdog (firefox back on top).
+                caspar_pair = enforce_caspar_under(
+                    root, state_monitor, state_channel, win,
+                    caspar_pair[1].id if caspar_pair else None,
+                )
 
             r, _, _ = select.select([stdin_fd], [], [], STDIN_SELECT_TIMEOUT_SEC)
             if stdin_fd not in r:
@@ -493,6 +573,9 @@ def main() -> int:
     finally:
         if win is not None:
             clear_shape(win)
+        if caspar_pair is not None:
+            restore_input(caspar_pair)
+        if win is not None or caspar_pair is not None:
             try:
                 d.sync()
             except Exception:
