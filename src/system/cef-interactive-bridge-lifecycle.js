@@ -100,7 +100,9 @@ async function startCefInteractiveBridge(config, opts = {}) {
 		// Multiview screen consumer is 1:1 with layout pixels (often 2160p); casparServer.multiview_mode can lag.
 		const width = z.id === 'multiview' ? z.width : size.width
 		const height = z.id === 'multiview' ? z.height : size.height
-		zoneTargets.set(z.id, {
+		// S.-prefix required: bare `zoneTargets` was a ReferenceError (unhandledRejection on every
+		// Caspar connect, killing the bridge start — same latent-bug class as `warmInFlight`).
+		S.zoneTargets.set(z.id, {
 			channel: z.channel,
 			layer: z.layer,
 			width,
