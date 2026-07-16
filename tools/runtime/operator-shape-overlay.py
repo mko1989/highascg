@@ -276,6 +276,21 @@ def lock_window_above(win):
     set_net_wm_state(win, _ATOM_NET_WM_STATE_ABOVE, add=True)
 
 
+def enforce_caspar_below(root, monitor, channel):
+    """Pin the operator_gui Caspar consumer BELOW (and strip ABOVE, in case the consumer was
+    started from a stale config with always-on-top). Returns the window id pinned, or None.
+    Idempotent — safe to re-send every poll tick, which is what keeps the lock standing across a
+    Caspar restart (the fresh consumer window carries no EWMH state)."""
+    if channel is None or _ATOM_NET_WM_STATE_BELOW is None:
+        return None
+    caspar = find_caspar_consumer(root, monitor, channel)
+    if caspar is None:
+        return None
+    set_net_wm_state(caspar, _ATOM_NET_WM_STATE_ABOVE, add=False)
+    set_net_wm_state(caspar, _ATOM_NET_WM_STATE_BELOW, add=True)
+    return caspar.id
+
+
 def apply_holes(pair, monitor, rects, channel=None):
     """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
     Firefox's BOUNDING shape (visual): SET bounding to the full window rect, then SUBTRACT each
@@ -306,9 +321,11 @@ def apply_holes(pair, monitor, rects, channel=None):
             win.shape_rectangles(shape.SO.Set, shape.SK.Input, 0, 0, 0, [full])
         # Keep Firefox on top — with holes punched, that is exactly what shows the video through.
         # Persistent (_NET_WM_STATE_ABOVE) so a click routed through a hole to the Caspar window
-        # below cannot let the WM raise it over Firefox and hide the GUI.
+        # below cannot let the WM raise it over Firefox and hide the GUI. EWMH state MUST go to
+        # the CLIENT window Openbox manages — a message for the frame is silently dropped (the
+        # 2026-07-16 'ABOVE did not stick' bug).
         toplevel.configure(stack_mode=X.Above)
-        lock_window_above(toplevel)
+        lock_window_above(client)
         return True
     except Exception as e:
         log(f"apply_holes failed: {e}")
@@ -389,6 +406,7 @@ def main() -> int:
     state_channel = None
     state_title_marker = OPERATOR_TITLE_MARKER
     win = None
+    caspar_id = None
     last_poll = 0.0
 
     # WO-262: read stdin with os.read (raw fd) + our own newline buffer, NOT a buffered
@@ -416,6 +434,13 @@ def main() -> int:
                 elif win is not None:
                     log("firefox window no longer present (restart?) — will re-search")
                     win = None
+                # Re-assert the Caspar-below lock every poll tick (idempotent): a restarted
+                # consumer window arrives with no EWMH state and must be re-pinned within 2s.
+                pinned = enforce_caspar_below(root, state_monitor, state_channel)
+                if pinned != caspar_id:
+                    caspar_id = pinned
+                    if pinned is not None:
+                        log(f"caspar consumer window {pinned} pinned BELOW (ch {state_channel})")
 
             r, _, _ = select.select([stdin_fd], [], [], STDIN_SELECT_TIMEOUT_SEC)
             if stdin_fd not in r:
