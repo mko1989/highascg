@@ -471,7 +471,11 @@ class OscState extends EventEmitter {
 				}
 			}
 			const duration = Number.isFinite(f.duration) ? f.duration : NaN
-			const { remaining, progress } = computeRemainingAndProgress(elapsed, duration)
+			// Looping producers report a monotonic elapsed accumulating across iterations on the
+			// 2.6-dev binary — remaining/progress (and the elapsed the UI timers read) must use the
+			// in-iteration position (elapsed % duration), or timers jump between the two values.
+			const { remaining, progress, iterationElapsed } = computeRemainingAndProgress(elapsed, duration, { loop: f.loop === true })
+			if (f.loop === true && Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed
 			f.remaining = remaining
 			f.progress = progress
 		} else if (sub === 'frame' && vals.length >= 2) {
@@ -596,7 +600,8 @@ class OscState extends EventEmitter {
 		// Recompute remaining/progress the same way the file/time branch does.
 		const duration = Number.isFinite(f.duration) ? f.duration : NaN
 		const elapsed = Number.isFinite(f.elapsed) ? f.elapsed : null
-		const { remaining, progress } = computeRemainingAndProgress(elapsed, duration)
+		const { remaining, progress, iterationElapsed } = computeRemainingAndProgress(elapsed, duration, { loop: f.loop === true })
+		if (f.loop === true && Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed
 		f.remaining = remaining
 		f.progress = progress
 

@@ -21,18 +21,28 @@ function isSaneTimingValue(n) {
 /**
  * Compute remaining/progress from elapsed and duration, following the same logic
  * as the file/time OSC branch in osc-state.js.
+ *
+ * Looping producers on the 2.6-dev binary report elapsed as a MONOTONIC clock that keeps
+ * counting across loop iterations (observed live: elapsed=462802s on a looping bumper) —
+ * once a real duration exists (WO-252), raw elapsed makes remaining/progress garbage and the
+ * UI timer jump between the in-iteration and accumulated values. For looping files the
+ * in-iteration position is elapsed modulo duration.
  * @param {number | null} elapsed
  * @param {number | null} duration
- * @returns {{ remaining: number | null, progress: number | null }}
+ * @param {{ loop?: boolean }} [opts]
+ * @returns {{ remaining: number | null, progress: number | null, iterationElapsed: number | null }}
  */
-function computeRemainingAndProgress(elapsed, duration) {
-	const remaining =
-		Number.isFinite(duration) && Number.isFinite(elapsed) ? Math.max(0, duration - elapsed) : null
+function computeRemainingAndProgress(elapsed, duration, opts = {}) {
+	let e = Number.isFinite(elapsed) ? elapsed : null
+	if (opts.loop === true && Number.isFinite(duration) && duration > 0 && Number.isFinite(e) && e > duration) {
+		e = e % duration
+	}
+	const remaining = Number.isFinite(duration) && Number.isFinite(e) ? Math.max(0, duration - e) : null
 	const progress =
-		Number.isFinite(duration) && duration > 0 && Number.isFinite(elapsed)
-			? Math.min(1, Math.max(0, elapsed / duration))
+		Number.isFinite(duration) && duration > 0 && Number.isFinite(e)
+			? Math.min(1, Math.max(0, e / duration))
 			: null
-	return { remaining, progress }
+	return { remaining, progress, iterationElapsed: e }
 }
 
 module.exports = {

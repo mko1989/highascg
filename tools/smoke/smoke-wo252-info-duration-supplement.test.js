@@ -236,3 +236,28 @@ describe('WO-252 T252.3 — resolveOscInfoSupplementMs defaults', () => {
 		}
 	})
 })
+
+// 2026-07-16 follow-up: looping producers on the 2.6-dev binary report a MONOTONIC elapsed that
+// accumulates across loop iterations — remaining/progress (and stored elapsed) must use the
+// in-iteration position (elapsed % duration) or the UI timer jumps (owner: "05 to 7686").
+const { computeRemainingAndProgress } = require('../../src/osc/osc-state-timing')
+const { test: t2 } = require('node:test')
+t2('loop-modulo: accumulated elapsed wraps to in-iteration position', () => {
+	const assert2 = require('node:assert/strict')
+	const r = computeRemainingAndProgress(7686, 30, { loop: true })
+	assert2.equal(r.iterationElapsed, 7686 % 30)
+	assert2.ok(r.remaining >= 0 && r.remaining <= 30)
+	assert2.ok(r.progress >= 0 && r.progress <= 1)
+})
+t2('loop-modulo: non-looping elapsed is untouched even when > duration (stall case)', () => {
+	const assert2 = require('node:assert/strict')
+	const r = computeRemainingAndProgress(35, 30, { loop: false })
+	assert2.equal(r.iterationElapsed, 35)
+	assert2.equal(r.remaining, 0)
+})
+t2('loop-modulo: looping within first iteration is untouched', () => {
+	const assert2 = require('node:assert/strict')
+	const r = computeRemainingAndProgress(5, 30, { loop: true })
+	assert2.equal(r.iterationElapsed, 5)
+	assert2.equal(r.remaining, 25)
+})
