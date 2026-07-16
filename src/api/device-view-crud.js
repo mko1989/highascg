@@ -202,7 +202,9 @@ function handleUpdateDestination(j, ctx) {
 		...(nextMode === 'operator_gui' || d0.mode === 'operator_gui'
 			? {
 				guiUrl: p.guiUrl != null ? String(p.guiUrl) : d0.guiUrl,
-				physicalPort: p.physicalPort != null ? p.physicalPort : d0.physicalPort,
+				// physicalPort: explicit null = "clear back to Auto"; key absent = keep current.
+				physicalPort:
+					'physicalPort' in p ? (p.physicalPort == null ? undefined : p.physicalPort) : d0.physicalPort,
 			}
 			: {}),
 	}

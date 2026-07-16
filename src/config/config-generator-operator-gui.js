@@ -34,6 +34,17 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 			resolvedPort = null
 		}
 	}
+	// No operator_monitor flag resolvable (e.g. multiple displays, no flag set): the multiview
+	// jack is the operator-area monitor by convention — land the GUI consumer there rather than
+	// on the first program screen (nextDevice), which would open a window over live PGM output.
+	if (resolvedPort == null) {
+		try {
+			const { multiviewPhysicalPortIndex } = require('../utils/x-display-session-layout')
+			resolvedPort = multiviewPhysicalPortIndex(config)
+		} catch (_) {
+			resolvedPort = null
+		}
+	}
 	let rect = null
 	if (resolvedPort != null) {
 		try {

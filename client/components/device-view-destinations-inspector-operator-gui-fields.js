@@ -1,5 +1,3 @@
-import { attachMathInput } from '../lib/math-input.js'
-
 /**
  * WO-243: guiUrl/physicalPort fields for the `operator_gui` destination inspector — split out of
  * device-view-destinations-inspector-form.js to keep that file under the repo's ~500-line target
@@ -29,21 +27,26 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 	guiUrlIn.title = 'CEF web-UI URL (top layer 100) — must include ?cefOperator to render transparent preview holes'
 	guiUrlIn.addEventListener('change', () => patchDestination(d.id, { guiUrl: String(guiUrlIn.value || '').trim() }))
 
-	const physicalPortIn = document.createElement('input')
-	physicalPortIn.type = 'number'
-	physicalPortIn.min = '1'
-	physicalPortIn.max = '4'
-	physicalPortIn.step = '1'
+	// A select with an explicit Auto entry: a bare number input read as "required" and gave no
+	// way back to auto once a port was typed (the PATCH also swallowed null — fixed server-side).
+	const physicalPortIn = document.createElement('select')
 	physicalPortIn.className = 'device-view__destinations-type'
-	physicalPortIn.placeholder = '(auto)'
+	const autoOpt = Object.assign(document.createElement('option'), {
+		value: '',
+		textContent: 'Auto (operator monitor, else multiview jack)',
+	})
+	physicalPortIn.appendChild(autoOpt)
+	for (let n = 1; n <= 4; n++) {
+		physicalPortIn.appendChild(Object.assign(document.createElement('option'), { value: String(n), textContent: `Port ${n}` }))
+	}
 	physicalPortIn.value = d?.physicalPort != null ? String(d.physicalPort) : ''
-	physicalPortIn.title = 'Explicit physical GPU port (1-4) for the operator monitor. Blank = auto-resolve (resolveOperatorMonitorPort).'
+	physicalPortIn.title =
+		'Physical GPU port for the operator-GUI window. Auto = the screen_N_operator_monitor flag (single connected display wins), falling back to the multiview jack — never a program screen.'
 	physicalPortIn.addEventListener('change', () => {
 		const raw = String(physicalPortIn.value || '').trim()
 		const n = parseInt(raw, 10)
 		patchDestination(d.id, { physicalPort: raw === '' ? null : (Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : null) })
 	})
-	attachMathInput(physicalPortIn, { decimals: 0 })
 
 	const note = document.createElement('p')
 	note.className = 'device-view__note'
