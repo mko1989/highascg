@@ -150,6 +150,22 @@ export function syncPlaybackTimingClock(clock, file, opts = {}) {
 		return f
 	}
 
+	// Absorb per-tick OSC jitter: the source `elapsed` carries ~50ms of latency/frame-quantization
+	// noise, and re-anchoring to it on EVERY tick snapped the smooth clock backward/forward each
+	// time — the visible progress-bar jump. While already extrapolating, if the new sample is within
+	// tolerance of where the smooth clock already is, keep the clock (don't re-seed). A real
+	// discontinuity — seek, loop wrap, speed change accumulating past tolerance — exceeds it and
+	// falls through to the normal re-anchor below. Clip changes are already handled (clipKey reset).
+	const SNAP_TOL_SEC = 0.5
+	if (clock.playing && clock.anchorElapsed != null && duration != null) {
+		const extrapolated = clock.anchorElapsed + Math.max(0, (now - clock.anchorMs) / 1000)
+		if (Math.abs(elapsed - extrapolated) <= SNAP_TOL_SEC) {
+			clock.lastSourceElapsed = elapsed
+			clock.lastFrameElapsed = frameElapsed
+			return f
+		}
+	}
+
 	const prevEl = clock.lastSourceElapsed
 	const prevFr = clock.lastFrameElapsed
 	const jumpedBack = prevEl != null && elapsed < prevEl - 0.35

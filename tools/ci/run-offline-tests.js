@@ -73,6 +73,7 @@ const FILES = [
 	'tools/smoke/smoke-wo246-operator-monitor-auto.test.js',
 	'tools/smoke/smoke-wo247-raw-cdp.test.js',
 	'tools/smoke/smoke-wo248-chrome-binary-resolve.test.js',
+	'tools/smoke/smoke-timer-clock-jitter.test.js',
 	'tools/smoke/smoke-wo250-timer-bank-mv-bars.test.js',
 	'tools/smoke/smoke-wo251-playlist-osc-wiring.test.js',
 	'tools/smoke/smoke-wo252-info-duration-supplement.test.js',
