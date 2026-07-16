@@ -239,15 +239,18 @@ def lock_window_above(win):
 
 def apply_holes(pair, monitor, rects):
     """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
-    Firefox's bounding shape: SET the bounding region to the full window rect, then SUBTRACT each
-    preview rect so the Caspar consumer below shows through. The INPUT shape is left untouched (it
-    defaults to the bounding shape) so Firefox keeps click input everywhere it is still visible; a
-    click inside a hole falls through to the inert Caspar window (accepted WO-262 tradeoff).
+    Firefox's BOUNDING shape (visual): SET bounding to the full window rect, then SUBTRACT each
+    preview rect so the Caspar consumer below shows through.
 
-    Empty `rects` -> restore unshaped (holes filled) so a modal can render whole over preview areas.
+    Crucially the INPUT shape is SET to the FULL window (not the holed bounding). Bounding and input
+    are independent SHAPE regions: Firefox is DRAWN with holes but RECEIVES clicks everywhere — a
+    'show-through but still clickable' layer. Otherwise a click in a hole fell through to the Caspar
+    window, and the WM raised it over Firefox, burying the GUI (owner, 2026-07-16). With input full,
+    clicks over the video hit the (inert) GUI area and Caspar is never raised. Tradeoff: you cannot
+    click the video itself — fine, previews are display-only, chrome/drag handles sit below.
 
-    Shapes are applied to BOTH the WM frame (toplevel — what the server composites/routes input by)
-    and the firefox client inside it, so no WM re-mirroring can leave one of them un-holed.
+    Empty `rects` -> restore unshaped (bounding + input reset) so a modal can render whole over
+    preview areas. Applied to BOTH the WM frame (toplevel) and the firefox client inside it.
     """
     toplevel, client = pair
     full = (0, 0, int(monitor["w"]), int(monitor["h"]))
@@ -255,10 +258,13 @@ def apply_holes(pair, monitor, rects):
         for win in (toplevel, client):
             if not rects:
                 win.shape_mask(shape.SO.Set, shape.SK.Bounding, 0, 0, X.NONE)
+                win.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, X.NONE)
                 continue
             win.shape_rectangles(shape.SO.Set, shape.SK.Bounding, 0, 0, 0, [full])
             for r in rects:
                 win.shape_rectangles(shape.SO.Subtract, shape.SK.Bounding, 0, 0, 0, [tuple(r)])
+            # INPUT = FULL window: catch clicks over the holes so they never reach Caspar below.
+            win.shape_rectangles(shape.SO.Set, shape.SK.Input, 0, 0, 0, [full])
         # Keep Firefox on top — with holes punched, that is exactly what shows the video through.
         # Persistent (_NET_WM_STATE_ABOVE) so a click routed through a hole to the Caspar window
         # below cannot let the WM raise it over Firefox and hide the GUI.
