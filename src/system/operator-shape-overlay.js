@@ -29,6 +29,11 @@ const { displaySessionEnv } = require('../utils/x-display-session')
 
 const SHAPE_SCRIPT = path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py')
 
+// URL-tied guard sent to the helper: it only shapes a Firefox whose window title carries this
+// marker (the operator page forces it via client/lib/operator-gui-mode.js's OPERATOR_GUI_TITLE_MARKER).
+// Stops the helper holing WO-258 browser-source firefoxes / any other browser. Keep all three in sync.
+const OPERATOR_TITLE_MARKER = 'HIGHASCG-OPERATOR-GUI'
+
 /** @type {import('child_process').ChildProcess | null} */
 let proc = null
 /** Last-known {monitor, rects} sent — re-sent verbatim by {@link reapplyOperatorShapeOverlay} on
@@ -94,6 +99,7 @@ function updateShapeRects(monitorRect, rectsPx, opts = {}) {
 				monitor: { x: monitorRect.x, y: monitorRect.y, w: monitorRect.w, h: monitorRect.h },
 				rects: lastRects,
 				channel: lastChannel,
+				titleMarker: OPERATOR_TITLE_MARKER,
 			}) + '\n',
 		)
 	} catch (e) {

@@ -63,6 +63,12 @@ LOG_PATH = os.path.expanduser("~/.highascg/log/operator-shape-overlay.log")
 PID_PATH = os.path.expanduser("~/.highascg/run/operator-shape-overlay.pid")
 
 POLL_INTERVAL_SEC = 2.0
+
+# URL-tied guard: only a Firefox whose window title contains this marker (set by the operator page
+# in client/lib/operator-gui-mode.js — kept in sync there) is shaped. Prevents holing OTHER firefox
+# windows: the WO-258 browser sources (also firefox, on the operator monitor during "Interact"),
+# or any browser the operator opens. X11 exposes no URL property, so the page title stands in for it.
+OPERATOR_TITLE_MARKER = "HIGHASCG-OPERATOR-GUI"
 STDIN_SELECT_TIMEOUT_SEC = 0.5
 
 
@@ -111,11 +117,17 @@ def window_class(win):
         return "", ""
 
 
-def is_operator_firefox(win) -> bool:
-    """WO-262: match the operator kiosk Firefox by WM_CLASS. This is the exact INVERSE of the
-    retired is_caspar_screen_consumer, which excluded these same tokens as a negative signal."""
+def is_operator_firefox(win, title_marker=OPERATOR_TITLE_MARKER) -> bool:
+    """WO-262: firefox by WM_CLASS. WO-263 follow-up: AND the window title must carry `title_marker`
+    (the operator page forces it) — WM_CLASS alone would also match the WO-258 browser-source
+    firefoxes and any other firefox, which must NEVER be shaped. An empty/None marker disables the
+    title requirement (back-compat)."""
     inst, cls = window_class(win)
-    return "navigator" in inst or "navigator" in cls or "firefox" in inst or "firefox" in cls
+    if not ("navigator" in inst or "navigator" in cls or "firefox" in inst or "firefox" in cls):
+        return False
+    if title_marker:
+        return title_marker in window_title(win)
+    return True
 
 
 def absolute_geometry(win, root):
@@ -133,7 +145,7 @@ def absolute_geometry(win, root):
         return None
 
 
-def find_firefox_window(root, monitor):
+def find_firefox_window(root, monitor, title_marker=OPERATOR_TITLE_MARKER):
     """Return (toplevel, client) for the operator kiosk Firefox on `monitor`, or None.
 
     Geometry is checked on the TOP-LEVEL ancestor (what the X server stacks/composites); the
@@ -148,7 +160,7 @@ def find_firefox_window(root, monitor):
         return None
 
     def signature_in(win, depth):
-        if is_operator_firefox(win):
+        if is_operator_firefox(win, title_marker):
             return win
         if depth >= 3:
             return None
@@ -244,7 +256,9 @@ def parse_line(line: str):
         rects.append((int(r[0]), int(r[1]), int(r[2]), int(r[3])))
     channel = obj.get("channel")
     channel = int(channel) if channel is not None else None
-    return monitor, rects, channel
+    title_marker = obj.get("titleMarker")
+    title_marker = str(title_marker) if title_marker else OPERATOR_TITLE_MARKER
+    return monitor, rects, channel, title_marker
 
 
 def main() -> int:
@@ -271,6 +285,7 @@ def main() -> int:
     state_monitor = None
     state_rects = []
     state_channel = None
+    state_title_marker = OPERATOR_TITLE_MARKER
     win = None
     last_poll = 0.0
 
@@ -289,7 +304,7 @@ def main() -> int:
             now = time.time()
             if state_monitor and (now - last_poll) >= POLL_INTERVAL_SEC:
                 last_poll = now
-                found = find_firefox_window(root, state_monitor)
+                found = find_firefox_window(root, state_monitor, state_title_marker)
                 if found is not None:
                     is_new = win is None or found[0].id != win[0].id
                     win = found
@@ -324,20 +339,21 @@ def main() -> int:
                 # window match/shape, so a repeat of this class is diagnosable straight from the log.
                 log(f"stdin line received: {line[:200]}")
                 try:
-                    monitor, rects, channel = parse_line(line)
+                    monitor, rects, channel, title_marker = parse_line(line)
                 except Exception as e:
                     log(f"bad stdin line ({e}): {line[:200]}")
                     continue
                 state_monitor = monitor
                 state_rects = rects
                 state_channel = channel
+                state_title_marker = title_marker
                 got_update = True
 
             if not got_update:
                 continue
 
             if win is None:
-                win = find_firefox_window(root, state_monitor)
+                win = find_firefox_window(root, state_monitor, state_title_marker)
             if win is not None:
                 if not apply_holes(win, state_monitor, state_rects):
                     win = None  # stale handle — force re-search next iteration

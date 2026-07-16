@@ -49,6 +49,37 @@ export function isOperatorGuiModeActive(search) {
 }
 
 /**
+ * URL-tied window marker (WO-263 follow-up): the shape helper punches holes ONLY into a Firefox
+ * whose window title contains this exact token, so OTHER Firefox instances — the WO-258 browser
+ * sources (also firefox, and on the operator monitor during "Interact"), or any browser the
+ * operator opens — are never shaped. It stands in for the URL, which X11 does not expose as a
+ * window property. Kept in sync with tools/runtime/operator-shape-overlay.py's OPERATOR_TITLE_MARKER.
+ */
+export const OPERATOR_GUI_TITLE_MARKER = 'HIGHASCG-OPERATOR-GUI'
+
+let _titleMarkerObserver = null
+
+/**
+ * Force the document title to carry {@link OPERATOR_GUI_TITLE_MARKER} while in operator mode and
+ * keep re-asserting it if a view changes `document.title` (a `<title>` MutationObserver) — the
+ * shape helper's URL check depends on it never dropping. No-op outside operator mode.
+ * @param {Document} [doc]
+ */
+export function applyOperatorGuiTitleMarker(doc) {
+	const d = doc || (typeof document !== 'undefined' ? document : null)
+	if (!d || !isOperatorGuiModeActive()) return
+	const ensure = () => {
+		if (!d.title || !d.title.includes(OPERATOR_GUI_TITLE_MARKER)) d.title = OPERATOR_GUI_TITLE_MARKER
+	}
+	ensure()
+	const titleEl = d.querySelector('title')
+	if (titleEl && typeof MutationObserver !== 'undefined' && !_titleMarkerObserver) {
+		_titleMarkerObserver = new MutationObserver(ensure)
+		_titleMarkerObserver.observe(titleEl, { childList: true, characterData: true, subtree: true })
+	}
+}
+
+/**
  * Adds/removes the `operator-gui` class on `<html>` to match the current mode. Idempotent — safe
  * to call repeatedly (e.g. on every render). No-op when `document` is unavailable.
  * @param {Document} [doc]
@@ -58,6 +89,7 @@ export function applyOperatorGuiHtmlClass(doc) {
 	const d = doc || (typeof document !== 'undefined' ? document : null)
 	const active = isOperatorGuiModeActive()
 	if (d && d.documentElement) d.documentElement.classList.toggle('operator-gui', active)
+	if (active) applyOperatorGuiTitleMarker(d)
 	return active
 }
 

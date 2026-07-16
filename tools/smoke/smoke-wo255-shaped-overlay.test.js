@@ -203,6 +203,18 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 		assert.match(src, /shape_rectangles/, 'uses the SHAPE extension rectangles call')
 		assert.doesNotMatch(src, /def is_caspar_screen_consumer/, 'the retired Caspar-target matcher is gone')
 	})
+	it('WO-263 URL guard: the title marker is required in the match and kept in sync across all three sites', () => {
+		const MARKER = 'HIGHASCG-OPERATOR-GUI'
+		const py = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
+		const js = fs.readFileSync(path.join(REPO_ROOT, 'src/system/operator-shape-overlay.js'), 'utf8')
+		const client = fs.readFileSync(path.join(REPO_ROOT, 'client/lib/operator-gui-mode.js'), 'utf8')
+		assert.ok(py.includes(MARKER), 'helper carries the marker constant')
+		assert.ok(js.includes(MARKER), 'server carries the marker constant')
+		assert.ok(client.includes(MARKER), 'client sets the marker (operator page title)')
+		assert.match(py, /title_marker in window_title\(win\)/, 'helper REQUIRES the marker in the window title (URL guard) — WM_CLASS alone would hole browser-source firefoxes')
+		assert.match(js, /titleMarker:\s*OPERATOR_TITLE_MARKER/, 'server sends titleMarker in the shape payload')
+		assert.match(client, /applyOperatorGuiTitleMarker/, 'client forces + re-asserts the title marker in operator mode')
+	})
 	it('fractionRectToMonitorPx: scales by the MONITOR rect (not the GUI channel raster) and rounds to integers', () => {
 		const out = fractionRectToMonitorPx({ x: 0.25, y: 0.5, w: 0.5, h: 0.25 }, { w: 1920, h: 1080 })
 		assert.deepEqual(out, [480, 540, 960, 270])
