@@ -118,7 +118,7 @@ export function getMainModalHtml() {
 						<h3 class="settings-category">Screen labels (WO-222)</h3>
 						<p class="settings-note">Custom label for each screen output. Used in looks editor selector, multiview, and panels. Leave empty to use default (S1, S2, etc.).</p>
 						<div id="settings-screen-labels-mount"></div>
-						<h3 class="settings-category">Streaming channel RTMP (WO-244)</h3>
+						<h3 class="settings-category">Streaming channel</h3>
 						<div class="settings-group"><label>Enabled</label>
 							<input type="checkbox" id="set-streaming-ch-enabled" />
 						</div>
@@ -169,16 +169,7 @@ export function getMainModalHtml() {
 						<div class="settings-group"><label for="set-streaming-ch-override">Override Caspar channel</label>
 							<input type="text" id="set-streaming-ch-override" placeholder="leave empty for 'dedicated'" />
 						</div>
-						<div class="settings-group"><label for="set-streaming-ch-rtmp-url">RTMP server URL</label>
-							<input type="text" id="set-streaming-ch-rtmp-url" placeholder="rtmp://live-api-s.facebook.com/rtmp/" />
-						</div>
-						<div class="settings-group"><label for="set-streaming-ch-stream-key">Stream key</label>
-							<input type="password" id="set-streaming-ch-stream-key" placeholder="stream key" />
-						</div>
-						<div class="settings-group checkbox">
-							<label><input type="checkbox" id="set-streaming-ch-clear-creds" /> Clear credentials on save</label>
-							<p class="settings-note">Check this to clear both RTMP server and stream key. Requires confirmation on save.</p>
-						</div>
+						<p class="settings-note">RTMP server URL and stream key are configured per streaming node in the Device View (stream output inspector).</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>

@@ -1,11 +1,17 @@
 import { getApiBase } from './api-client.js'
 import { resolveMainIndexForScene } from './look-stack-amcp-channel.js'
 import { settingsState } from './settings-state.js'
+import { isOperatorGuiModeActive } from './operator-gui-mode.js'
 
 /**
- * @returns {'canvas' | 'ffmpeg_jpeg'}
+ * Operator-GUI pages force 'native': the shaped Caspar overlay IS the preview there, so neither
+ * canvas thumbnails nor the ffmpeg JPEG poll should run (owner 2026-07-16: "start with the
+ * compose preview setting set to native so it doesnt interfere"). This is a per-page override —
+ * the shared server setting is untouched, so normal browsers keep their configured mode.
+ * @returns {'canvas' | 'ffmpeg_jpeg' | 'native'}
  */
 export function resolveComposePreviewMode() {
+	if (isOperatorGuiModeActive()) return 'native'
 	const mode = settingsState.getSettings()?.composePreview?.mode
 	if (mode === 'ffmpeg_jpeg' || mode === 'canvas') return mode
 	return 'canvas'
