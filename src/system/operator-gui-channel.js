@@ -220,7 +220,44 @@ async function ensureOperatorGuiCefLayer(ctx) {
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: failed to (re-)play CEF layer: ${e?.message || e}`)
 	}
+	ensureOperatorGuiFocus(ctx)
 	return { ch, guiUrl }
+}
+
+/**
+ * Auto-arm the GUI page as the DEFAULT CEF input sink. Without a focus target the X11 capture
+ * bridge never starts, and there is no clickable arm affordance for the GUI itself (chicken-and-
+ * egg: you cannot click "arm" through a mouseless GUI). Never steals focus from a manually armed
+ * target (mario / live-webpage) — those override; releasing them falls back here
+ * (routes-cef-arm-input.js).
+ * @param {{ config: object, log?: Function }} ctx
+ * @returns {object|null} the focus target set (or already active), null when not applicable
+ */
+function ensureOperatorGuiFocus(ctx) {
+	const resolved = resolveOperatorGuiChannel(ctx?.config)
+	if (!resolved) return null
+	const { getCefFocusTarget, setCefFocusTarget } = require('./cef-focus-registry')
+	const current = getCefFocusTarget()
+	if (current && current.sourceId !== 'operator_gui') return current
+	const target = {
+		sourceId: 'operator_gui',
+		hostChannel: resolved.ch,
+		hostLayer: CEF_LAYER,
+		// urlMatchesNeedle token-matches the page URL; 'cefOperator' survives host/port changes.
+		needle: 'cefOperator',
+		playArg: resolved.guiUrl,
+		zoneId: 'operator_gui',
+	}
+	if (current && current.hostChannel === target.hostChannel && current.needle === target.needle) return current
+	setCefFocusTarget(target)
+	try {
+		const { notifyCefFocusChanged } = require('./cef-interactive-bridge')
+		notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
+	} catch (e) {
+		ctx.log?.('warn', `operator-gui: focus notify failed: ${e?.message || e}`)
+	}
+	ctx.log?.('info', `operator-gui: input focus auto-armed (ch ${resolved.ch}, layer ${CEF_LAYER})`)
+	return target
 }
 
 /** Test-only: reset module-level apply/debounce state between smoke test cases. */
@@ -239,6 +276,7 @@ module.exports = {
 	CEF_LAYER,
 	APPLY_DEBOUNCE_MS,
 	operatorGuiDestination,
+	ensureOperatorGuiFocus,
 	resolveOperatorGuiChannel,
 	resolveCellSourceChannel,
 	computeOperatorGuiCellPlan,

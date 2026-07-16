@@ -79,10 +79,21 @@ async function handlePost(path, body, ctx) {
 
 	if (path === '/api/cef/release-input') {
 		clearCefFocusTarget()
-		notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
+		// WO-243 follow-up: the operator GUI (when configured) is the DEFAULT input sink — releasing
+		// a manual arm (mario / live-webpage) falls back to it instead of leaving the box mouseless.
+		let fallback = null
+		try {
+			const { ensureOperatorGuiFocus } = require('../system/operator-gui-channel')
+			fallback = ensureOperatorGuiFocus(ctx)
+		} catch (_) {
+			fallback = null
+		}
+		if (!fallback) {
+			notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
+		}
 
 		if (typeof ctx._wsBroadcast === 'function') {
-			ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: null })
+			ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: fallback })
 		}
 
 		return {
@@ -90,8 +101,8 @@ async function handlePost(path, body, ctx) {
 			headers: JSON_HEADERS,
 			body: jsonBody({
 				ok: true,
-				message: 'Released input focus',
-				cefFocusTarget: null,
+				message: fallback ? 'Released input focus (operator GUI re-armed)' : 'Released input focus',
+				cefFocusTarget: fallback,
 			}),
 		}
 	}

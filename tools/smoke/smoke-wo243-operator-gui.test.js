@@ -462,3 +462,25 @@ describe('WO-243 follow-up: operator_gui never claims a program-screen layout sl
 		assert.match(src, /const device = 1/, 'device is the X-screen index (1), position is x/y-driven')
 	})
 })
+
+// WO-243 follow-up (owner: "no mouse control of the ui"): the X11 input bridge only starts when a
+// CEF focus target is armed, and nothing armed the GUI page (the arm toggle lives on look layers;
+// you cannot click an arm button through a mouseless GUI). The GUI is now the DEFAULT input sink.
+describe('WO-243 follow-up: operator GUI input auto-arm', () => {
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+	it('ensureOperatorGuiCefLayer auto-arms focus after PLAYing the CEF layer', () => {
+		const src = read('src/system/operator-gui-channel.js')
+		assert.match(src, /function ensureOperatorGuiFocus/, 'auto-arm helper exists')
+		assert.match(src, /ensureOperatorGuiFocus\(ctx\)/, 'ensureOperatorGuiCefLayer calls it')
+		assert.match(src, /current\.sourceId !== 'operator_gui'\) return current/, 'never steals a manual arm')
+	})
+	it('release-input falls back to the operator GUI instead of leaving the box mouseless', () => {
+		const src = read('src/api/routes-cef-arm-input.js')
+		assert.match(src, /ensureOperatorGuiFocus\(ctx\)/, 'release path re-arms the GUI when configured')
+	})
+	it('auto-arm is a no-op without an operator_gui destination', () => {
+		const { ensureOperatorGuiFocus } = require(path.join(__dirname, '../../src/system/operator-gui-channel.js'))
+		const out = ensureOperatorGuiFocus({ config: { screenDestinations: { destinations: [] } } })
+		assert.equal(out, null)
+	})
+})
