@@ -49,8 +49,6 @@ const routesArtnet = require('./routes-artnet')
 const routesModules = require('./routes-modules')
 const routesDeviceView = require('./routes-device-view')
 const routesHostLive = require('./routes-host-live')
-const routesCefInteractive = require('./routes-cef-interactive')
-const routesCefArmInput = require('./routes-cef-arm-input')
 const routesOperatorGui = require('./routes-operator-gui')
 const routesDeviceSnapshot = require('./routes-device-snapshot')
 const routesPlugins = require('./routes-plugins')
@@ -232,17 +230,6 @@ routes.post('/api/host-live/webpage', ({ body, ctx }) => routesHostLive.handleWe
 routes.post('/api/host-live/ndi', ({ body, ctx }) => routesHostLive.handleNdiPost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/decklink', ({ body, ctx }) => routesHostLive.handleDecklinkPost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/migration', ({ body, ctx }) => routesHostLive.handlePost(body, ctx), { requireCaspar: false })
-
-routes.get('/api/cef-interactive/targets', ({ path, ctx }) => routesCefInteractive.handleGet(path, ctx), { requireCaspar: false })
-routes.post('/api/cef-interactive/focus', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: false })
-routes.delete('/api/cef-interactive/focus', ({ path, ctx }) => routesCefInteractive.handleDelete(path, ctx), { requireCaspar: false })
-routes.post('/api/cef-interactive/mouse', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
-routes.post('/api/cef-interactive/keyboard', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
-routes.post('/api/cef-interactive/eval', ({ path, body, ctx }) => routesCefInteractive.handlePost(path, body, ctx), { requireCaspar: true })
-
-// WO-232 T232.6: Operator-facing arm/release input for interactive templates
-routes.post('/api/cef/arm-input', ({ path, body, ctx }) => routesCefArmInput.handlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/cef/release-input', ({ path, body, ctx }) => routesCefArmInput.handlePost(path, body, ctx), { requireCaspar: false })
 
 // WO-243 T243.2: Operator GUI channel — routed preview-hole layout apply/clear.
 routes.post('/api/operator-gui/layout', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })

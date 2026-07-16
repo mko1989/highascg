@@ -10,7 +10,6 @@ import { renderPipOverlayGroup, scheduleLivePipOverlayPush } from './inspector-p
 import { appendSceneLayerHtmlTemplateGroup } from './inspector-html-template.js'
 import { appendLowerThirdGroup } from './inspector-lower-third.js'
 import { appendCountdownGroup } from './inspector-countdown.js'
-import { appendInteractiveInputGroup } from './inspector-interactive-input.js'
 import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { getResolutionForScreen } from './inspector-channel-resolution.js'
@@ -202,8 +201,6 @@ export function renderSceneLayerInspector(deps, sel) {
 	appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateStore })
 
 	appendCountdownGroup(root, { sceneId, layerIndex, layer, stateStore })
-
-	appendInteractiveInputGroup(root, { sceneId, layerIndex, layer, stateStore })
 
 	/* Crop is edited in pixels of the layer's content resolution (fallback: channel) — WO-158 T158.4. */
 	const effectContentRes =

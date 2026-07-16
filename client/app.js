@@ -379,9 +379,8 @@ async function init() {
 	window.__highascgApplyExtraLiveSources = (list) => {
 		if (Array.isArray(list)) stateStore.applyChange('extraLiveSources', list)
 	}
-	window.__highascgApplyHostOperatorFullscreen = (hostState, cefFocusTarget) => {
+	window.__highascgApplyHostOperatorFullscreen = (hostState) => {
 		stateStore.applyChange('hostOperatorFullscreen', hostState)
-		stateStore.applyChange('cefFocusTarget', cefFocusTarget ?? null)
 	}
 	initScenesEditor(document.querySelector('#tab-scenes'), stateStore, {
 		getOscClient: () => _oscClient,

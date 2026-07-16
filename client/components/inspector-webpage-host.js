@@ -33,8 +33,8 @@ function applyWebpageHostApiResult(r) {
 	if (Array.isArray(r?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
 		window.__highascgApplyExtraLiveSources(r.extraLiveSources)
 	}
-	if (typeof window.__highascgApplyHostOperatorFullscreen === 'function' && r?.cefFocusTarget) {
-		window.__highascgApplyHostOperatorFullscreen(r.hostOperatorFullscreen ?? null, r.cefFocusTarget)
+	if (typeof window.__highascgApplyHostOperatorFullscreen === 'function' && r?.hostOperatorFullscreen) {
+		window.__highascgApplyHostOperatorFullscreen(r.hostOperatorFullscreen)
 	}
 	window.dispatchEvent(new CustomEvent('webpage-host-changed', { detail: { source: r?.source || null } }))
 }

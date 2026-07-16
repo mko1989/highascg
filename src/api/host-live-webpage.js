@@ -3,9 +3,6 @@
 const { isWebpageHostCandidate, resolveWebpagePlayTarget } = require('../config/host-live-sources')
 const { playHostLiveSourceNow } = require('../config/host-live-sources-setup')
 const { findWebpageHostSource, buildOperatorFullscreenState } = require('../api/host-operator-fullscreen')
-const { setCefFocusTarget } = require('../system/cef-focus-registry')
-const { notifyCefFocusChanged, notifyCefInteractiveAmcpLines } = require('../system/cef-interactive-bridge')
-const { clearStableCefPages } = require('../system/cef-interactive-cdp')
 const { enrichExtraLiveSource } = require('../config/extra-live-source-enrich')
 
 /**
@@ -53,25 +50,23 @@ function patchWebpageHostUrl(existing, urlOrTemplate, label) {
 }
 
 /**
+ * Keeps the operator-fullscreen state's label/route metadata current when the
+ * underlying webpage URL changes while it's routed to the operator display.
  * @param {object} ctx
  * @param {object} updated
  */
-function syncCefFocusAfterWebpageChange(ctx, updated) {
+function syncOperatorFullscreenAfterWebpageChange(ctx, updated) {
 	const fs = ctx._hostOperatorFullscreen
 	if (!fs?.active || String(fs.sourceId || '') !== String(updated.sourceId || '')) return
 	const target = {
 		channel: fs.operatorChannel,
 		layer: fs.operatorLayer,
-		zoneId: fs.zoneId || ctx._cefFocusTarget?.zoneId || 'multiview',
+		zoneId: fs.zoneId || 'multiview',
 	}
 	const state = buildOperatorFullscreenState(updated, target)
 	ctx._hostOperatorFullscreen = state
-	ctx._cefFocusTarget = state.cefFocusTarget
-	setCefFocusTarget(state.cefFocusTarget)
-	notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
 	if (typeof ctx._wsBroadcast === 'function') {
 		ctx._wsBroadcast('change', { path: 'hostOperatorFullscreen', value: state })
-		ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: state.cefFocusTarget })
 	}
 }
 
@@ -81,15 +76,7 @@ function syncCefFocusAfterWebpageChange(ctx, updated) {
  */
 async function playWebpageHostNow(ctx, item) {
 	if (!ctx?.amcp) return { ok: false, error: 'AMCP not connected' }
-	clearStableCefPages()
-	const playResult = await playHostLiveSourceNow(ctx, item)
-	try {
-		const { amcpCommandsForHostLiveSource } = require('../config/host-live-sources')
-		notifyCefInteractiveAmcpLines(amcpCommandsForHostLiveSource(item), ctx.config || {}, (level, msg) =>
-			ctx.log?.(level, msg),
-		)
-	} catch (_) {}
-	return playResult
+	return playHostLiveSourceNow(ctx, item)
 }
 
 /**
@@ -135,7 +122,7 @@ async function updateWebpageHostSource(ctx, payload) {
 	} catch (e) {
 		playResult = { ok: false, error: e?.message || String(e) }
 	}
-	syncCefFocusAfterWebpageChange(ctx, updated)
+	syncOperatorFullscreenAfterWebpageChange(ctx, updated)
 	if (typeof ctx._wsBroadcast === 'function') {
 		ctx._wsBroadcast('change', { path: 'extraLiveSources', value: list })
 	}
@@ -146,7 +133,6 @@ async function updateWebpageHostSource(ctx, payload) {
 		extraLiveSources: list.map((x) => enrichExtraLiveSource(x, ctx)),
 		hostLivePlay: playResult,
 		hostOperatorFullscreen: ctx._hostOperatorFullscreen ?? null,
-		cefFocusTarget: ctx._cefFocusTarget ?? null,
 		message: `Webpage updated on ch ${updated.hostChannel} (route unchanged)`,
 	}
 }
@@ -165,14 +151,13 @@ async function reloadWebpageHostSource(ctx, payload) {
 	} catch (e) {
 		playResult = { ok: false, error: e?.message || String(e) }
 	}
-	syncCefFocusAfterWebpageChange(ctx, source)
+	syncOperatorFullscreenAfterWebpageChange(ctx, source)
 	return {
 		ok: true,
 		action: 'reload',
 		source: enrichExtraLiveSource(source, ctx),
 		hostLivePlay: playResult,
 		hostOperatorFullscreen: ctx._hostOperatorFullscreen ?? null,
-		cefFocusTarget: ctx._cefFocusTarget ?? null,
 		message: `Reloaded webpage on ch ${source.hostChannel}`,
 	}
 }

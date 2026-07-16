@@ -1,41 +1,35 @@
-# CEF interactive bridge (operator X11 → CDP)
+# CEF interactive bridge (removed, WO-257)
 
-Operator mouse/keyboard on the multiview (or interactive screen consumer) is forwarded to embedded CEF HTML via Chrome DevTools Protocol. Host-channel webpages ([WO-88](../../work/work-orders/88_WO_HOST_CHANNEL_LIVE_SOURCES.md)) keep the CEF tab alive; [WO-89](../../work/work-orders/89_WO_CEF_OPERATOR_CONTROL.md) routes input to the host channel tab.
+**Status:** Removed. This page is kept as a pointer for anyone following old links or work
+orders — the feature it describes no longer exists.
 
-## Enable
+The CEF interactive bridge forwarded operator mouse/keyboard on the multiview (or an interactive
+screen consumer) to embedded CEF HTML via the Chrome DevTools Protocol
+([WO-89](../../work/work-orders/89_WO_CEF_OPERATOR_CONTROL.md), arm/release toggle added in
+[WO-232](../../work/work-orders/232_WO_MARIO_HTML_PRODUCER.md)). It was removed outright in
+[WO-257](../../work/work-orders/257_WO_REMOVE_CEF_INTERACTIVE.md) after repeated production
+incidents (a `warmInFlight` crash-loop, `zoneTargets` connect-rejection, needle-matching
+poisoning) made the shared-process synthetic-input approach too fragile to keep — see
+INCIDENT-2026-07-16. WO-255 had already replaced the operator GUI's own CEF layer with a
+fullscreen Firefox process using native X11 input, which made the interactive bridge's remaining
+justification just embedded-webpage/template input (e.g. `template/mario` — see WO-232).
 
-1. `operatorTools.cefInteractiveBridge: true` in `config/general.json`
-2. `<remote-debugging-port>9222</remote-debugging-port>` in `casparcg.config` (non-zero)
-3. Interactive multiview or screen consumer enabled in layout settings
-4. Webpage host source playing on a dedicated channel (`PLAY ch-N [HTML] … LOOP`)
+## What's gone
 
-## Environment variables
+- `src/system/cef-interactive-bridge*.js`, `cef-interactive-cdp.js`, `cef-interactive-forward.js`,
+  `cef-focus-registry.js`, `cef-interactive-trace.js`
+- `tools/runtime/cef-interactive-x11.py`
+- `POST /api/cef/arm-input`, `POST /api/cef/release-input`, all `/api/cef-interactive/*` routes
+- The "Interactive input" arm/release toggle in the scene layer inspector
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `HIGHASCG_CEF_INTERACTIVE_BRIDGE` | on | Set `0` / `false` to disable the bridge |
-| `HIGHASCG_CEF_INTERACTIVE_LAYER` | `999` (or `operatorTools.cefInteractiveLayer`) | Operator consumer layer for legacy L999 path |
-| `HIGHASCG_CEF_FORCE_LEGACY_INFO` | off | Force AMCP INFO needle resolve on operator layer (dev/load-test) |
-| `HIGHASCG_CEF_BRIDGE_TRACE` | `1` (on) | Bridge + X11 stderr trace; `0` to silence; `all` includes mousemove |
+## What's still here
 
-Trace output appears in HighAsCG logs as `[CEF bridge] …` and in the X11 helper stderr as `x11: …`.
-
-## Keyboard behaviour
-
-- **Modifiers:** X11 events include a `modifiers` array (`Control`, `Alt`, `Shift`, `Meta`). CDP forwarding tracks held modifiers for combos (e.g. Ctrl+C, Shift+click flows that need shift held).
-- **HTTP API:** `POST /api/cef-interactive/keyboard` accepts optional `modifiers: ["Control"]` (aliases `Ctrl`, `Cmd`).
-- **Autorepeat:** The X11 poller uses `XQueryKeymap` snapshots (~60 Hz). It emits keydown/keyup on **state transitions** only. OS key autorepeat does **not** produce repeated keydown events unless the keymap flickers — by design so Thunar and other apps are not flooded. For held-key repeat inside CEF, use the HTTP API or type text via `keyboard.type`.
-
-## HTTP API
-
-See [system-settings-hardware API](../wiki/api/system-settings-hardware.md#host-live-sources--cef-interactive).
-
-## Related files
-
-| File | Role |
-|------|------|
-| `src/system/cef-interactive-bridge.js` | X11 zone poll → CDP |
-| `src/system/cef-interactive-forward.js` | Shared `forwardToCefTarget()` for HTTP |
-| `src/system/cef-focus-registry.js` | `cefFocusTarget` from operator fullscreen |
-| `tools/runtime/cef-interactive-x11.py` | Passive pointer/keymap capture |
-| `tools/runtime/cef-interactive-load-test.sh` | Legacy L999 dev test |
+- `src/system/cef-cdp-client.js` — the generic raw CDP client WO-247 introduced to replace
+  puppeteer-core. It doesn't depend on anything removed above and is what WO-248 migrates the
+  headless-Chrome thumbnail renderers onto.
+- Webpage-host content routing (`POST /api/host-live/webpage`, `/api/host-live/operator-fullscreen`
+  — see [system-settings-hardware API](../wiki/api/system-settings-hardware.md#host-live-sources--operator-fullscreen)):
+  playing a URL on a host channel and (optionally) routing it fullscreen to the operator display
+  still works. It just no longer arms keyboard/mouse forwarding into the page.
+- `template/mario` and any other "interactive" template still play as templates — they just don't
+  receive clicks or key presses anymore.

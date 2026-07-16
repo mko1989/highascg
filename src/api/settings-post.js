@@ -360,8 +360,6 @@ async function handlePost(path, body, ctx) {
 		ctx.configManager.save(newConfig)
 		const { syncOperatorPointerConfine } = require('../system/pointer-confine')
 		syncOperatorPointerConfine(newConfig, { log: (level, msg) => ctx.log?.(level, msg) })
-		const { syncCefInteractiveBridge } = require('../system/cef-interactive-bridge')
-		void syncCefInteractiveBridge(newConfig, { log: (level, msg) => ctx.log?.(level, msg), amcp: ctx.amcp })
 	}
 
 	let oscRestarted = false; if (settings.osc && typeof ctx.restartOscSubsystem === 'function') { ctx.restartOscSubsystem(); oscRestarted = true }

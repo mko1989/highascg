@@ -51,14 +51,6 @@ const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = requir
 const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
 const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
 
-function notifyCefInteractiveAfterAmcp(lines, ctx) {
-	try {
-		const { notifyCefInteractiveAmcpLines } = require('../system/cef-interactive-bridge')
-		const log = typeof ctx?.log === 'function' ? (level, msg) => ctx.log(level, msg) : () => {}
-		notifyCefInteractiveAmcpLines(Array.isArray(lines) ? lines : [lines], ctx?.config || {}, log)
-	} catch (_) {}
-}
-
 /** PLAY/LOAD/LOADBG/STOP/CLEAR/MIXER/CG all start `<VERB> <channel>[-<layer>] ...` (mirrors the shape playback-tracker's recordAmcpLines regexes match). */
 const AMCP_BATCH_CHANNEL_RE = /^[A-Za-z_]+\s+(\d+)(?:-\d+)?\b/
 
@@ -130,7 +122,6 @@ async function handlePost(path, body, ctx) {
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
 			playbackTracker.recordAmcpLines(ctx, lines)
-			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
 		case '/api/amcp/raw-batch': {
@@ -161,7 +152,6 @@ async function handlePost(path, body, ctx) {
 				await amcp.raw(line)
 			}
 			playbackTracker.recordAmcpLines(ctx, lines)
-			notifyCefInteractiveAfterAmcp(lines, ctx)
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -341,7 +331,6 @@ async function handlePost(path, body, ctx) {
 			}
 			const r = await amcp.raw(line)
 			playbackTracker.recordAmcpLines(ctx, [line])
-			notifyCefInteractiveAfterAmcp([line], ctx)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		default:

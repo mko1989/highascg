@@ -2,19 +2,69 @@
 
 const { getChannelMap } = require('../config/routing')
 const { isWebpageHostCandidate } = require('../config/host-live-sources')
-const { listInteractiveZones, resolveInteractiveLayer, notifyCefFocusChanged } = require('../system/cef-interactive-bridge')
-const { setCefFocusTarget, clearCefFocusTarget } = require('../system/cef-focus-registry')
+const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+const {
+	multiviewScreenConsumerEnabled,
+	multiviewInteractiveEnabled,
+	screenConsumerEnabled,
+	screenInteractiveEnabled,
+	multiviewPhysicalPortIndex,
+} = require('../utils/x-display-session')
+
+/**
+ * WO-257: relocated from the (removed) CEF interactive-bridge zone resolver
+ * (src/system/cef-interactive-bridge-zones.js). The `interactive` config flags
+ * (multiviewInteractiveEnabled/screenInteractiveEnabled) still gate which outputs are
+ * eligible operator-fullscreen targets and the default reserved layer is still 999 —
+ * only the CEF input-forwarding half of that concept is gone; this is routing-only now.
+ * @param {object} config
+ */
+function resolveOperatorFullscreenLayer(config) {
+	const fromEnv = parseInt(String(process.env.HIGHASCG_CEF_INTERACTIVE_LAYER || ''), 10)
+	if (Number.isFinite(fromEnv) && fromEnv >= 0) return fromEnv
+	const ot = config?.operatorTools
+	const fromCfg = parseInt(String(ot?.cefInteractiveLayer ?? ''), 10)
+	if (Number.isFinite(fromCfg) && fromCfg >= 0) return fromCfg
+	return 999
+}
+
+/**
+ * @param {object} config
+ * @returns {Array<{ id: string, channel: number, layer: number }>}
+ */
+function listOperatorFullscreenZones(config) {
+	const layout = calculateLayoutPositions(config)
+	const map = getChannelMap(config)
+	const layer = resolveOperatorFullscreenLayer(config)
+	/** @type {Array<{ id: string, channel: number, layer: number }>} */
+	const zones = []
+	const mv = layout?.multiview?.[1]
+	if (multiviewScreenConsumerEnabled(config) && multiviewInteractiveEnabled(config) && mv?.width > 0 && map.multiviewCh != null) {
+		zones.push({ id: 'multiview', channel: map.multiviewCh, layer })
+	}
+	const mvPort = multiviewPhysicalPortIndex(config)
+	for (let n = 1; n <= 8; n++) {
+		const sc = layout?.screens?.[n]
+		if (!sc || sc.width <= 0 || sc.height <= 0) continue
+		if (!screenConsumerEnabled(config, n) || !screenInteractiveEnabled(config, n)) continue
+		if (mvPort && n === mvPort) continue
+		const ch = map.programCh?.(n)
+		if (ch == null) continue
+		zones.push({ id: `screen-${n}`, channel: ch, layer })
+	}
+	return zones
+}
 
 /**
  * @param {object} config
  */
 function resolveOperatorRouteTarget(config) {
-	const zones = listInteractiveZones(config || {})
+	const zones = listOperatorFullscreenZones(config || {})
 	const mv = zones.find((z) => z.id === 'multiview')
 	if (mv) {
 		return {
 			channel: mv.channel,
-			layer: resolveInteractiveLayer(config),
+			layer: resolveOperatorFullscreenLayer(config),
 			zoneId: mv.id,
 		}
 	}
@@ -50,17 +100,9 @@ function findWebpageHostSource(config, query) {
 function buildOperatorFullscreenState(source, target) {
 	const hostChannel = parseInt(String(source.hostChannel), 10)
 	const hostLayer = parseInt(String(source.hostLayer ?? 1), 10) || 1
-	const cefFocusTarget = {
-		sourceId: String(source.sourceId || ''),
-		hostChannel,
-		hostLayer,
-		needle: String(source.cefNeedle || source.playArg || source.templateOrUrl || '').trim(),
-		playArg: String(source.playArg || source.templateOrUrl || '').trim(),
-		zoneId: target.zoneId,
-	}
 	return {
 		active: true,
-		sourceId: cefFocusTarget.sourceId,
+		sourceId: String(source.sourceId || ''),
 		hostChannel,
 		hostLayer,
 		route: String(source.value || `route://${hostChannel}-${hostLayer}`),
@@ -68,7 +110,6 @@ function buildOperatorFullscreenState(source, target) {
 		operatorLayer: target.layer,
 		zoneId: target.zoneId,
 		label: String(source.label || source.sourceId || 'Webpage'),
-		cefFocusTarget,
 		updatedAt: Date.now(),
 	}
 }
@@ -76,7 +117,6 @@ function buildOperatorFullscreenState(source, target) {
 function broadcastOperatorFullscreen(ctx) {
 	if (typeof ctx._wsBroadcast !== 'function') return
 	ctx._wsBroadcast('change', { path: 'hostOperatorFullscreen', value: ctx._hostOperatorFullscreen })
-	ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: ctx._cefFocusTarget })
 }
 
 /**
@@ -87,7 +127,7 @@ async function clearHostOperatorFullscreen(ctx, opts = {}) {
 	const prev = ctx._hostOperatorFullscreen
 	const target =
 		prev?.operatorChannel != null
-			? { channel: prev.operatorChannel, layer: prev.operatorLayer ?? resolveInteractiveLayer(ctx.config) }
+			? { channel: prev.operatorChannel, layer: prev.operatorLayer ?? resolveOperatorFullscreenLayer(ctx.config) }
 			: resolveOperatorRouteTarget(ctx.config)
 
 	if (target && ctx.amcp) {
@@ -101,9 +141,6 @@ async function clearHostOperatorFullscreen(ctx, opts = {}) {
 
 	const hostChannel = prev?.hostChannel
 	ctx._hostOperatorFullscreen = null
-	ctx._cefFocusTarget = null
-	clearCefFocusTarget()
-	notifyCefFocusChanged(ctx.log)
 	broadcastOperatorFullscreen(ctx)
 
 	return {
@@ -112,7 +149,6 @@ async function clearHostOperatorFullscreen(ctx, opts = {}) {
 		hostChannel: hostChannel ?? null,
 		message: hostChannel != null ? `Webpage still running on ch ${hostChannel}` : 'Operator route cleared',
 		hostOperatorFullscreen: null,
-		cefFocusTarget: null,
 	}
 }
 
@@ -160,9 +196,6 @@ async function applyHostOperatorFullscreen(ctx, payload) {
 
 	const state = buildOperatorFullscreenState(source, target)
 	ctx._hostOperatorFullscreen = state
-	ctx._cefFocusTarget = state.cefFocusTarget
-	setCefFocusTarget(state.cefFocusTarget)
-	notifyCefFocusChanged(ctx.log)
 	broadcastOperatorFullscreen(ctx)
 
 	if (typeof ctx.log === 'function') {
@@ -199,7 +232,6 @@ async function handleHostOperatorFullscreen(ctx, payload) {
 function getHostOperatorFullscreenSnapshot(ctx) {
 	return {
 		hostOperatorFullscreen: ctx._hostOperatorFullscreen ?? null,
-		cefFocusTarget: ctx._cefFocusTarget ?? null,
 	}
 }
 

@@ -48,7 +48,6 @@ const assert = require('node:assert/strict')
 const { OscState } = require('../../src/osc/osc-state')
 const { buildMatrixFromOsc, getOccupiedLayerNumbersFromOsc } = require('../../src/state/playback-tracker-osc')
 const { parseLayerFgClipsFromChannelXml } = require('../../src/state/live-scene-reconcile')
-const { htmlNeedleFromInfoXml } = require('../../src/system/cef-interactive-cdp')
 const { multiviewScreenConsumerEnabled } = require('../../src/utils/x-display-session-layout')
 
 function makeOscState(overrides) {
@@ -240,16 +239,6 @@ describe('WO-235 T235.4 — INFO XML consumers, old + new schema', () => {
 	it('live-scene-reconcile: still resolves the clip name from the old attribute/singular-clip schema', async () => {
 		const out = await parseLayerFgClipsFromChannelXml(OLD_INFO_XML)
 		assert.equal(out['10'], 'BRIDGE/355317')
-	})
-
-	it('cef-interactive-cdp: htmlNeedleFromInfoXml resolves the html producer + path on both schemas', () => {
-		const newResult = htmlNeedleFromInfoXml(NEW_INFO_XML, 264)
-		assert.equal(newResult.hasHtml, true)
-		assert.equal(newResult.needle, 'pip_edge_strip')
-
-		const oldResult = htmlNeedleFromInfoXml(OLD_INFO_XML, 264)
-		assert.equal(oldResult.hasHtml, true)
-		assert.equal(oldResult.needle, 'pip_edge_strip')
 	})
 })
 

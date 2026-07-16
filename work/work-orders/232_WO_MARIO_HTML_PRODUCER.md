@@ -1,6 +1,19 @@
 # WO-232 — Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF interactive bridge)
 
 **Status:** Planned | **Date:** 2026-07-15
+
+**STATUS ADDENDUM (2026-07-16, WO-257):** The CEF interactive bridge this WO's input path (T232.3)
+depended on has been **removed entirely** — repeated production incidents (`warmInFlight`
+crash-loop, `zoneTargets` connect-rejection, needle-matching poisoning) made it too fragile to
+keep. `template/mario` (and `template/cef_input_test.html`) **still play** as normal `[HTML]`
+producers with a transparent background — the T232.1/T232.2 vendoring + transparency-patch work
+below is entirely unaffected — but they no longer receive keyboard/mouse input: T232.3's
+"Interactive input" arm/release path (`POST /api/cef/arm-input`, `src/api/routes-cef-arm-input.js`,
+`smoke-wo232-arm-input.test.js`, the inspector arm/release toggle) is deleted, and
+`cef-interactive-cdp.js`/`cef-interactive-bridge-events.js` cited under T232.3 below no longer
+exist. See [work/work-orders/257_WO_REMOVE_CEF_INTERACTIVE.md](257_WO_REMOVE_CEF_INTERACTIVE.md)
+and [docs/reference/cef-interactive-bridge.md](../../docs/reference/cef-interactive-bridge.md).
+
 **Source:** owner todos15.07.26 ***mario-game***: "id like to be able to add a mario game via an html producer but with transparent background instead of the sky. controlled via pupeteer the same as before." Candidate sources given: github.com/tylerreichle/mario_js, codepen.io/yananas/pen/xrjaGX, github.com/reruns/mario (JS), github.com/axonyxquantum/desktop_mario (python — NOT usable in an html producer; ignore).
 
 ## Design

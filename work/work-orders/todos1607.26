@@ -1,6 +1,27 @@
-the gui progress bar still shows weird values making it jump back and forth.
+the gui progress bar still shows weird values making it jump back and forth. (still the same)
 it changes from 05 to 7686 for instance all the time
 
-im missing some of the icons ine the web ui
+im missing some of the icons ine the web ui (in looks list, remove and copy are missing)
 
-caspar stopped respondnig to the laptopt webui and the operator ui didnt apear after restart.
+
+first issue is see with the compose preview with live casparcg is that it fits the layer to the size of the window this screen gets (pgm1 for instance) instead of keeping its aspect ratio and filling as much as it can while keeping the ratio.
+now the live caspar does not appear in the operator gui, after a restart.
+
+
+fuck yeah! shaper and firefox. 
+we need to also create a brach of the webui that will be tailored to act as the operator gui. meaning blending (caspar + webui) in looks editor, compose preview, timeline preview, and multiview layout editor.
+lets keep the operator gui node as a way to choose which monitor it should go to and with launch/bring to front button in the inspector.
+
+add a camera icon minmal transparent bg next to screen labels in compose prv that will print the screen to png to project folder. remove the main prt pgm button.
+in the looks list the top bar with screen label ftb, global border needs to be pined so it cant be scrolled away. also add a per screen play button in the middle of that bar that does a screen transition from prv (or for pgm only selected as prv) to pgm.
+
+due to change in the nature of the ui on operator gui. i want to change how the compose preview is used. i want the compose preview full window to be a canvas for windows like on the mulviviewer that can be sized and positioned freely. they should have the same border label and single layer progress bar (highest with running timer).
+default positioning of the windows should be similar to current.
+
+
+the transition is bugging. it seems like its sending amcp sequential makeing part of transition to happen before others. 
+transition needs to be packed in to two begin comit. first set up. loadbg, mixers, cgs, with the transition time. second play and mixer comits.
+
+ lets use cef only for displaying templates.
+ lets also change the web browser source to a different approach. adding a webbrowser source adds a Display:1 virtual where that browser lives. the interaction is then system only, just need to make that browser available to the oparator screen.
+ the display needsto be captured and relayed to casparcg. we will use similar approach for zoom (future).

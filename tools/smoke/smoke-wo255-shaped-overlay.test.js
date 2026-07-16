@@ -109,16 +109,9 @@ describe('WO-255: CEF layer + auto-arm-focus retirement', () => {
 		assert.match(src, /ensureOperatorGuiChannel/)
 		assert.doesNotMatch(src, /ensureOperatorGuiCefLayer/)
 	})
-	it('routes-cef-arm-input.js: release-input is a plain clear, no operator_gui fallback; ARM path keeps the syncCefInteractiveBridge self-heal', () => {
-		const src = read('src/api/routes-cef-arm-input.js')
-		assert.doesNotMatch(src, /ensureOperatorGuiFocus/, 'release-fallback removed')
-		assert.match(src, /syncCefInteractiveBridge/, 'ARM path self-heal kept (mario still needs it)')
-	})
-	it('cef-interactive-bridge-zones.js: no operator_gui zone', () => {
-		const src = read('src/system/cef-interactive-bridge-zones.js')
-		assert.doesNotMatch(src, /id:\s*'operator_gui'/, 'operator_gui zone entry removed')
-		assert.doesNotMatch(src, /resolveOperatorGuiChannel/, 'no longer imports the operator-gui resolver')
-	})
+	// WO-257: routes-cef-arm-input.js and cef-interactive-bridge-zones.js (the "operator_gui
+	// fallback" / "operator_gui zone" this used to guard against) are deleted outright along with
+	// the rest of the CEF interactive bridge — nothing left to assert against.
 	it('DEFAULT_GUI_URL switched to ?operatorGui=1', () => {
 		const { DEFAULT_GUI_URL } = require(path.join(__dirname, '../../src/system/operator-gui-channel.js'))
 		assert.equal(DEFAULT_GUI_URL, 'http://127.0.0.1:4200/?operatorGui=1')

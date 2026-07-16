@@ -397,7 +397,7 @@ export function renderLiveTab(listEl, {
 						value: s.value,
 					})
 					if (typeof window.__highascgApplyHostOperatorFullscreen === 'function') {
-						window.__highascgApplyHostOperatorFullscreen(r.hostOperatorFullscreen ?? null, r.cefFocusTarget ?? null)
+						window.__highascgApplyHostOperatorFullscreen(r.hostOperatorFullscreen ?? null)
 					}
 					if (r?.message) showAppToast(r.message, 'info')
 				} catch (err) {

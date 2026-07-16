@@ -154,9 +154,9 @@ unzip -l support.zip
 
 Same bundle as the **Support bundle** button in the connection-eye logs modal, or **Settings → Diagnostics**. Use after a failure or before contacting support.
 
-## Host live sources & CEF interactive
+## Host live sources & operator fullscreen
 
-**Caspar:** optional for focus/targets; required for mouse/keyboard/eval.
+**Caspar:** required.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -164,24 +164,12 @@ Same bundle as the **Support bundle** button in the connection-eye logs modal, o
 | POST | `/api/host-live/operator-fullscreen` | Toggle fullscreen route (`{ sourceId, action }`) |
 | GET | `/api/host-live/migration` | Preview legacy NDI/browser migration |
 | POST | `/api/host-live/migration` | Apply migration (`{ migrateHostLiveSources: true }`) |
-| GET | `/api/cef-interactive/targets` | Focusable webpage hosts + CDP attach status |
-| POST | `/api/cef-interactive/focus` | Bind CDP focus (`{ sourceId, zoneId? }`) |
-| DELETE | `/api/cef-interactive/focus` | Clear CDP focus (host channel keeps playing) |
-| POST | `/api/cef-interactive/mouse` | `{ sourceId?, type, x, y, button?, coordsNormalized? }` |
-| POST | `/api/cef-interactive/keyboard` | `{ sourceId?, type, keysym?, text?, key?, modifiers? }` |
-| POST | `/api/cef-interactive/eval` | `{ sourceId?, expression }` — evaluate JS in CEF page |
 
-```bash
-curl -s http://127.0.0.1:4200/api/cef-interactive/targets | jq .
-curl -s -X POST http://127.0.0.1:4200/api/cef-interactive/focus \
-  -H 'Content-Type: application/json' \
-  -d '{"sourceId":"webpage_slido"}'
-curl -s -X POST http://127.0.0.1:4200/api/cef-interactive/mouse \
-  -H 'Content-Type: application/json' \
-  -d '{"type":"mousedown","x":0.5,"y":0.5,"coordsNormalized":true}'
-```
-
-Requires `operatorTools.cefInteractiveBridge: true` and `remote-debugging-port` in `casparcg.config`. Operator fullscreen (WO-88) sets `cefFocusTarget` automatically; the focus API is for automation and Web UI without X11.
+WO-257 removed the CEF interactive bridge (`/api/cef-interactive/*`, `/api/cef/arm-input`,
+`/api/cef/release-input`) and its keyboard/mouse/eval forwarding into embedded CEF HTML. Operator
+fullscreen still routes a webpage host source onto the operator display (multiview or an
+interactive-enabled screen consumer) — it just doesn't forward input into it anymore. Templates
+that expected input (e.g. `template/mario`) still play; they no longer receive clicks/keys.
 
 ## Tailscale
 

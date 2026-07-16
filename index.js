@@ -332,15 +332,6 @@ function main() {
 			} catch (e) {
 				appCtx.log('warn', `[Pointer confine] Config sync failed: ${e?.message || e}`)
 			}
-			try {
-				const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
-				void syncCefInteractiveBridge(config, {
-					log: (level, msg) => appCtx.log(level, msg),
-					amcp: appCtx.amcp,
-				})
-			} catch (e) {
-				appCtx.log('warn', `[CEF bridge] Config sync failed: ${e?.message || e}`)
-			}
 		})
 
 		let casparConn = null; if (!cli.noCaspar) {
@@ -409,15 +400,6 @@ function main() {
 		} catch (e) {
 			appCtx.log('warn', `[Pointer confine] Boot sync failed: ${e?.message || e}`)
 		}
-		try {
-			const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
-			void syncCefInteractiveBridge(config, {
-				log: (level, msg) => appCtx.log(level, msg),
-				amcp: appCtx.amcp,
-			})
-		} catch (e) {
-			appCtx.log('warn', `[CEF bridge] Boot sync failed: ${e?.message || e}`)
-		}
 		setTimeout(() => {
 			const { maybeAutoLoginOnBoot } = require('./src/network/tailscale-service')
 			void maybeAutoLoginOnBoot({ log: (level, msg) => appCtx.log(level, msg) }).catch((e) => {
@@ -450,15 +432,6 @@ function main() {
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
 					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparConnected()
-					try {
-						const { syncCefInteractiveBridge } = require('./src/system/cef-interactive-bridge')
-						void syncCefInteractiveBridge(config, {
-							log: (level, msg) => appCtx.log(level, msg),
-							amcp: appCtx.amcp,
-						})
-					} catch (e) {
-						appCtx.log('warn', `[CEF bridge] Caspar connect sync failed: ${e?.message || e}`)
-					}
 				} else if (payload.connected === false) {
 					wasConnected = false
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparDisconnected()
