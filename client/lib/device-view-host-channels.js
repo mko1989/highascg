@@ -400,7 +400,7 @@ const SCREEN_DEST_TYPE_OPTIONS = [
 	{ value: 'multiview', label: 'Multiview' },
 	// WO-242: dedicated channel + native <artnet> consumer for an LED/pixel-map fixture array.
 	{ value: 'pixelmap', label: 'Pixel Map' },
-	// WO-243: dedicated channel — CEF web-UI over routed preview holes, on the operator monitor.
+	// WO-255: dedicated channel — routed preview rects shaped above fullscreen Firefox, on the operator monitor.
 	{ value: 'operator_gui', label: 'Operator GUI' },
 ]
 

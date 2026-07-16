@@ -55,7 +55,7 @@ export function renderDestinationInspector(args) {
 						: mode === 'pixelmap'
 							? 'Pixel Map (native Art-Net)'
 							: mode === 'operator_gui'
-								? 'Operator GUI (CEF web-UI)'
+								? 'Operator GUI (Firefox + shaped overlay)'
 								: 'PGM/PRV',
 		},
 		{ label: 'Main index', value: String(d?.mainScreenIndex ?? 0) },
@@ -163,7 +163,7 @@ export function renderDestinationInspector(args) {
 		{ value: 'pgm_only', label: 'PGM only' },
 		{ value: 'multiview', label: 'Multiview' },
 		{ value: 'pixelmap', label: 'Pixel Map (native Art-Net)' },
-		{ value: 'operator_gui', label: 'Operator GUI (CEF web-UI)' },
+		{ value: 'operator_gui', label: 'Operator GUI (Firefox + shaped overlay)' },
 	]) {
 		const option = document.createElement('option')
 		option.value = opt.value
