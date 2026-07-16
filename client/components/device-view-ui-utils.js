@@ -56,6 +56,8 @@ export function roleLabel(item) {
 			return 'Webpage host'
 		case 'ndi_host':
 			return 'NDI host'
+		case 'browser_display':
+			return 'Browser display'
 		default:
 			return String(item.role || 'channel')
 	}

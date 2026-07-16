@@ -47,7 +47,8 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	const typeOptions = [
 		['decklink', 'Decklink'],
 		['ndi', 'NDI'],
-		['browser', 'Web Browser'],
+		['browser_display', 'Web Browser (system)'],
+		['browser', 'Web Browser (CG template)'],
 		['live_audio', 'Live Audio'],
 		['usb_video', 'USB Video (V4L2)'],
 	]
@@ -188,6 +189,90 @@ export function createLiveInputModalShell(defaultCh = 5) {
 	ndiWrap.appendChild(ndiManual)
 	ndiWrap.appendChild(ndiAttrHost)
 	body.appendChild(ndiWrap)
+
+	const browserDisplayWrap = document.createElement('div')
+	browserDisplayWrap.className = 'settings-group'
+	browserDisplayWrap.id = 'live-input-browser-display-wrap'
+	browserDisplayWrap.style.display = 'none'
+
+	const bdUrlLabel = document.createElement('label')
+	bdUrlLabel.textContent = 'URL'
+	const bdUrl = document.createElement('input')
+	bdUrl.type = 'text'
+	bdUrl.id = 'live-input-browser-display-url'
+	bdUrl.placeholder = 'https://example.com/'
+	bdUrl.style.width = '100%'
+	bdUrl.style.marginBottom = '0.5rem'
+
+	const bdDimsRow = document.createElement('div')
+	bdDimsRow.style.display = 'flex'
+	bdDimsRow.style.flexWrap = 'wrap'
+	bdDimsRow.style.gap = '0.75rem'
+	bdDimsRow.style.marginBottom = '0.5rem'
+
+	const bdWidthCol = document.createElement('div')
+	bdWidthCol.style.flex = '1'
+	bdWidthCol.style.minWidth = '120px'
+	const bdWidthLabel = document.createElement('label')
+	bdWidthLabel.textContent = 'Width (px)'
+	const bdWidth = document.createElement('input')
+	bdWidth.type = 'number'
+	bdWidth.id = 'live-input-browser-display-width'
+	bdWidth.min = '160'
+	bdWidth.max = '3840'
+	bdWidth.value = '1152'
+	bdWidth.style.width = '100%'
+	attachMathInput(bdWidth, { decimals: 0 })
+	bdWidthCol.appendChild(bdWidthLabel)
+	bdWidthCol.appendChild(bdWidth)
+
+	const bdHeightCol = document.createElement('div')
+	bdHeightCol.style.flex = '1'
+	bdHeightCol.style.minWidth = '120px'
+	const bdHeightLabel = document.createElement('label')
+	bdHeightLabel.textContent = 'Height (px)'
+	const bdHeight = document.createElement('input')
+	bdHeight.type = 'number'
+	bdHeight.id = 'live-input-browser-display-height'
+	bdHeight.min = '120'
+	bdHeight.max = '2160'
+	bdHeight.value = '648'
+	bdHeight.style.width = '100%'
+	attachMathInput(bdHeight, { decimals: 0 })
+	bdHeightCol.appendChild(bdHeightLabel)
+	bdHeightCol.appendChild(bdHeight)
+
+	const bdFpsCol = document.createElement('div')
+	bdFpsCol.style.flex = '0 0 auto'
+	bdFpsCol.style.minWidth = '80px'
+	const bdFpsLabel = document.createElement('label')
+	bdFpsLabel.textContent = 'FPS'
+	const bdFps = document.createElement('input')
+	bdFps.type = 'number'
+	bdFps.id = 'live-input-browser-display-fps'
+	bdFps.min = '1'
+	bdFps.max = '60'
+	bdFps.value = '25'
+	bdFps.style.width = '100%'
+	attachMathInput(bdFps, { decimals: 0 })
+	bdFpsCol.appendChild(bdFpsLabel)
+	bdFpsCol.appendChild(bdFps)
+
+	bdDimsRow.appendChild(bdWidthCol)
+	bdDimsRow.appendChild(bdHeightCol)
+	bdDimsRow.appendChild(bdFpsCol)
+
+	const bdHint = document.createElement('p')
+	bdHint.className = 'settings-note'
+	bdHint.id = 'live-input-browser-display-hint'
+	bdHint.style.margin = '0.5rem 0 0'
+	bdHint.textContent = 'Browser runs off-screen; max size = free desktop area (1920x648 on this box). Create, then use the Inspector to toggle operator screen.'
+
+	browserDisplayWrap.appendChild(bdUrlLabel)
+	browserDisplayWrap.appendChild(bdUrl)
+	browserDisplayWrap.appendChild(bdDimsRow)
+	browserDisplayWrap.appendChild(bdHint)
+	body.appendChild(browserDisplayWrap)
 
 	const browserWrap = document.createElement('div')
 	browserWrap.className = 'settings-group'
@@ -434,6 +519,7 @@ export function createLiveInputModalShell(defaultCh = 5) {
 			kindSel,
 			dlWrap,
 			ndiWrap,
+			browserDisplayWrap,
 			browserWrap,
 			liveAudioWrap,
 			v4l2Wrap,
@@ -471,6 +557,10 @@ export function createLiveInputModalShell(defaultCh = 5) {
 			ndiSelect,
 			ndiManual,
 			ndiAttrHost,
+			browserDisplayUrl: bdUrl,
+			browserDisplayWidth: bdWidth,
+			browserDisplayHeight: bdHeight,
+			browserDisplayFps: bdFps,
 			browserUrl,
 			chInput,
 			layerInput,

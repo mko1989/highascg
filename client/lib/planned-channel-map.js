@@ -38,7 +38,7 @@ export function casparHostChannelsPendingApply(planned, live) {
 	for (const k of arrayKeys) {
 		if (JSON.stringify(planned[k] ?? []) !== JSON.stringify(live[k] ?? [])) return true
 	}
-	const hostKinds = new Set(['webpage_host', 'ndi_host'])
+	const hostKinds = new Set(['webpage_host', 'ndi_host', 'browser_display'])
 	const pickHost = (cm) =>
 		(Array.isArray(cm?.inputChannels) ? cm.inputChannels : [])
 			.filter((e) => hostKinds.has(String(e?.kind || '')))
@@ -118,7 +118,7 @@ export function reconcileExtraLiveSourceChannel(source, cm) {
 		entry = liveAudioInputForSlot(cm, Number(source.liveAudioSlot))
 	} else if (routeType === 'v4l2' && source.v4l2Slot != null) {
 		entry = v4l2InputForSlot(cm, Number(source.v4l2Slot))
-	} else if (routeType === 'webpage_host' || routeType === 'ndi_host') {
+	} else if (routeType === 'webpage_host' || routeType === 'ndi_host' || routeType === 'browser_display') {
 		const sid = String(source.sourceId || source.hostSourceId || '').trim()
 		entry = (Array.isArray(cm.inputChannels) ? cm.inputChannels : []).find(
 			(e) => String(e?.kind || '') === routeType && (!sid || String(e?.sourceId || '') === sid),

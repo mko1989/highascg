@@ -22,6 +22,7 @@ export const HOST_CHANNEL_DEST_ROLES = new Set([
 	'v4l2_input',
 	'webpage_host',
 	'ndi_host',
+	'browser_display',
 ])
 
 /**
@@ -56,6 +57,10 @@ export function hostChannelDestinationId(role, ch, slot) {
 		const sid = String(slot ?? ch ?? '').trim()
 		return sid ? `host_ndi_${sid}` : `host_ndi_ch_${ch}`
 	}
+	if (r === 'browser_display') {
+		const sid = String(slot ?? ch ?? '').trim()
+		return sid ? `host_browser_${sid}` : `host_browser_ch_${ch}`
+	}
 	return `host_${r}_${ch}`
 }
 
@@ -85,6 +90,10 @@ export function defaultHostChannelLabel(row) {
 		const name = row?.label || row?.sourceId || 'NDI'
 		return ch != null ? `NDI: ${name} (ch ${ch})` : `NDI: ${name}`
 	}
+	if (role === 'browser_display') {
+		const name = row?.label || row?.sourceId || 'Browser'
+		return ch != null ? `Browser: ${name} (ch ${ch})` : `Browser: ${name}`
+	}
 	const base = roleLabel({ role, mainIndex: 0 })
 	return ch != null ? `${base} (ch ${ch})` : base
 }
@@ -104,7 +113,7 @@ export function normalizeHostChannelDestination(item) {
 		String(item.id || '').trim() ||
 		(role === 'decklink_input' || role === 'live_audio_input'
 			? hostChannelDestinationId(role, ch, Number.isFinite(slot) ? slot : undefined)
-			: role === 'webpage_host' || role === 'ndi_host'
+			: role === 'webpage_host' || role === 'ndi_host' || role === 'browser_display'
 				? hostChannelDestinationId(role, ch, item.sourceId || item.id)
 				: hostChannelDestinationId(role, ch))
 	return {
@@ -324,11 +333,11 @@ export function listHostLiveSourceDestinations(payload) {
 	const cm = channelMapForHostChannels(payload)
 	if (!cm || typeof cm !== 'object') return []
 	const hostEntries = (Array.isArray(cm.inputChannels) ? cm.inputChannels : []).filter(
-		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host',
+		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host' || e?.kind === 'browser_display',
 	)
 	const out = []
 	for (const entry of hostEntries) {
-		const role = entry.kind === 'webpage_host' ? 'webpage_host' : 'ndi_host'
+		const role = entry.kind === 'webpage_host' ? 'webpage_host' : entry.kind === 'ndi_host' ? 'ndi_host' : 'browser_display'
 		const dest = normalizeHostChannelDestination({
 			hostRole: role,
 			casparChannel: entry.channel,
@@ -452,8 +461,8 @@ export function hostDestinationIdForExtraLiveSource(x) {
 	if (routeType === 'v4l2' && x.v4l2Slot != null) {
 		return hostChannelDestinationId('v4l2_input', Number.isFinite(ch) ? ch : 1, x.v4l2Slot)
 	}
-	if (routeType === 'webpage_host' || routeType === 'ndi_host') {
-		const role = routeType === 'webpage_host' ? 'webpage_host' : 'ndi_host'
+	if (routeType === 'webpage_host' || routeType === 'ndi_host' || routeType === 'browser_display') {
+		const role = routeType === 'webpage_host' ? 'webpage_host' : routeType === 'ndi_host' ? 'ndi_host' : 'browser_display'
 		const sid = String(x?.sourceId || x?.hostSourceId || '').trim()
 		return hostChannelDestinationId(role, Number.isFinite(ch) ? ch : 1, sid || undefined)
 	}

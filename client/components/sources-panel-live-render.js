@@ -89,6 +89,9 @@ export function renderLiveTab(listEl, {
 	if (sources.some((s) => s.routeType === 'ndi_host')) {
 		hintParts.push('NDI hosts: click a tile to inspect and remove in the Inspector panel.')
 	}
+	if (sources.some((s) => s.routeType === 'browser_display')) {
+		hintParts.push('Browser sources: click a tile to edit URL/dimensions and toggle operator screen in the Inspector.')
+	}
 	if (hintParts.length) listEl.innerHTML = `<p class="sources-live-hint">${hintParts.join(' ')}</p>`
 	sources.forEach(s => {
 		const el = document.createElement('div')
@@ -97,8 +100,11 @@ export function renderLiveTab(listEl, {
 		if (s.routeType === 'v4l2' && s.devicePath) {
 			metaItems.unshift(String(s.devicePath))
 		}
-		if (s.routeType === 'webpage_host' || s.routeType === 'ndi_host') {
+		if (s.routeType === 'webpage_host' || s.routeType === 'ndi_host' || s.routeType === 'browser_display') {
 			if (s.hostChannel != null) metaItems.push(`host ch ${s.hostChannel}`)
+			if (s.routeType === 'browser_display' && s.width != null && s.height != null) {
+				metaItems.push(`${s.width}x${s.height}`)
+			}
 			metaItems.push(s.value || '')
 		}
 		if (s.type === 'ndi' && s.routeType !== 'ndi_host' && s.useDirect) {
@@ -262,6 +268,18 @@ export function renderLiveTab(listEl, {
 				if (e.target.closest('button, input, a')) return
 				window.dispatchEvent(
 					new CustomEvent('webpage-host-select', {
+						detail: { sourceId: s.sourceId, value: s.value, hostChannel: s.hostChannel },
+					}),
+				)
+			})
+		}
+
+		if (s.routeType === 'browser_display' && s.interactiveCapable !== false) {
+			el.style.cursor = 'pointer'
+			el.addEventListener('click', (e) => {
+				if (e.target.closest('button, input, a')) return
+				window.dispatchEvent(
+					new CustomEvent('browser-display-select', {
 						detail: { sourceId: s.sourceId, value: s.value, hostChannel: s.hostChannel },
 					}),
 				)
@@ -462,7 +480,38 @@ export function renderLiveTab(listEl, {
 			}
 			btnGroup.append(removeBtn)
 			el.appendChild(btnGroup)
-		} else if ((s.type === 'ndi' && s.routeType !== 'ndi_host') || s.type === 'browser' || s.routeType === 'layer') {
+		} else if (s.routeType === 'browser_display') {
+			el.style.cursor = 'pointer'
+			el.addEventListener('click', (e) => {
+				if (e.target.closest('button, input, a')) return
+				window.dispatchEvent(
+					new CustomEvent('browser-display-select', {
+						detail: { sourceId: s.sourceId, value: s.value, hostChannel: s.hostChannel },
+					}),
+				)
+			})
+			const btnGroup = document.createElement('div')
+			btnGroup.className = 'source-item__live-actions'
+			const removeBtn = Object.assign(document.createElement('button'), {
+				type: 'button',
+				className: 'source-item__live-btn source-item__live-btn--remove',
+				title: 'Remove from Live tab',
+				textContent: 'Remove',
+			})
+			removeBtn.onclick = async (e) => {
+				e.stopPropagation()
+				if (!confirm(`Remove browser source "${s.label}"?`)) return
+				removeBtn.disabled = true
+				try {
+					await removeExtraLiveHostSource(s)
+					window.dispatchEvent(new CustomEvent('browser-display-select', { detail: null }))
+				} finally {
+					removeBtn.disabled = false
+				}
+			}
+			btnGroup.append(removeBtn)
+			el.appendChild(btnGroup)
+		} else if ((s.type === 'ndi' && s.routeType !== 'ndi_host') || (s.type === 'browser' && s.routeType !== 'browser_display') || s.routeType === 'layer') {
 			const btnGroup = document.createElement('div'); btnGroup.className = 'source-item__live-actions'
 			const removeBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'source-item__live-btn source-item__live-btn--remove', title: `Remove from Live tab`, textContent: 'Remove' })
 			removeBtn.onclick = async (e) => {

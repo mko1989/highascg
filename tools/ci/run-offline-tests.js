@@ -77,6 +77,7 @@ const FILES = [
 	'tools/smoke/smoke-wo252-info-duration-supplement.test.js',
 	'tools/smoke/smoke-wo256-operator-compose-tiles.test.js',
 	'tools/smoke/smoke-wo259-two-phase-batch.test.js',
+	'tools/smoke/smoke-wo260-browser-display-ui.test.js',
 	'tools/smoke/smoke-wo258-browser-source.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',

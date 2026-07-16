@@ -110,6 +110,48 @@ export function attachLiveInputModalSubmit({ elements, getKind, stateStore, sele
 			return
 		}
 
+		if (k === 'browser_display') {
+			const url = (elements.browserDisplayUrl?.value || '').trim()
+			if (!url) {
+				setStatus('Enter a URL', true)
+				return
+			}
+			const width = Math.max(160, parseInt(String(elements.browserDisplayWidth?.value || '1152'), 10) || 1152)
+			const height = Math.max(120, parseInt(String(elements.browserDisplayHeight?.value || '648'), 10) || 648)
+			const fps = Math.max(1, Math.min(60, parseInt(String(elements.browserDisplayFps?.value || '25'), 10) || 25))
+
+			const item = {
+				mode: 'browser_display',
+				url,
+				width,
+				height,
+				fps,
+				label: url,
+			}
+
+			try {
+				const r = await api.post('/api/device-view', { addExtraLiveSource: item })
+				if (Array.isArray(r?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
+					window.__highascgApplyExtraLiveSources(r.extraLiveSources)
+				}
+				if (r.casparRestartRecommended || r.pendingApply) markCasparRestartDirty()
+				const hostMsg = r?.hostLivePlay?.ok
+					? ' Host producer started.'
+					: r?.hostLivePlay?.error
+						? ` Host PLAY: ${r.hostLivePlay.error}`
+						: ''
+				const applyMsg =
+					r?.pendingApply || r?.casparRestartRecommended
+						? ' Apply Caspar config and restart in Device View to start capture.'
+						: ''
+				setStatus(`Added to Live Sources.${hostMsg}${applyMsg}`, false)
+				finishAdded()
+			} catch (e) {
+				setStatus(e?.message || String(e), true)
+			}
+			return
+		}
+
 		if (k === 'browser') {
 			const useTemplate = !!elements.browserUseTemplate?.checked
 			let url

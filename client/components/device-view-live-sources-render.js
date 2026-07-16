@@ -56,7 +56,9 @@ function detailForExtra(x, lastPayload) {
 		return [ch, dev].filter(Boolean).join(' · ') || 'DeckLink'
 	}
 	if (type === 'ndi' || routeType === 'ndi_host') return 'NDI'
-	if (type === 'browser' || routeType === 'webpage_host') return 'Webpage'
+	if (type === 'browser' && routeType !== 'browser_display') return 'Webpage'
+	if (routeType === 'browser_display') return 'Browser (system)'
+	if (routeType === 'webpage_host') return 'Webpage'
 	if (routeType === 'live_audio') return 'Live audio'
 	if (routeType === 'v4l2') return 'USB video'
 	if (type === 'route' && x?.value) return String(x.value)

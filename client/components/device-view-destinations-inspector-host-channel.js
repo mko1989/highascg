@@ -1,6 +1,7 @@
 import { buildInspectorTable, roleLabel } from './device-view-ui-utils.js'
 import { mountWebpageHostPageControls } from './inspector-webpage-host.js'
 import { mountNdiHostSourceControls } from './inspector-ndi-host.js'
+import { mountBrowserDisplayControls, mountBrowserDisplayInteractToggle } from './inspector-browser-display.js'
 import { mountDecklinkHostSourceControls } from './inspector-decklink-host.js'
 import {
 	findExtraLiveSourceForHostDestination,
@@ -71,6 +72,24 @@ export function renderHostChannelDestinationInspector({
 			},
 		})
 	}
+	if (role === 'browser_display' && liveSource) {
+		mountBrowserDisplayControls(host, {
+			source: liveSource,
+			onApplied: (r) => {
+				if (Array.isArray(r?.extraLiveSources)) {
+					lastPayload.extraLiveSources = r.extraLiveSources
+				}
+			},
+		})
+		mountBrowserDisplayInteractToggle(host, {
+			source: liveSource,
+			onApplied: (r) => {
+				if (Array.isArray(r?.extraLiveSources)) {
+					lastPayload.extraLiveSources = r.extraLiveSources
+				}
+			},
+		})
+	}
 	if (role === 'decklink_input' && liveSource) {
 		const slot = decklinkSlotFromHostDestination(d) || liveSource.decklinkSlot
 		if (slot) {
@@ -92,9 +111,11 @@ export function renderHostChannelDestinationInspector({
 	note.textContent =
 		role === 'webpage_host'
 			? 'Persistent webpage host — Caspar plays HTML with LOOP on this channel. Drag route:// onto PGM or multiview for on-air; clearing the route does not destroy page state. Cable to Record or Stream to capture this bus.'
-			: role === 'ndi_host' || role === 'decklink_input'
-				? ''
-				: role === 'live_audio_input'
+			: role === 'browser_display'
+				? 'Browser source — real Firefox window running off-screen, captured via x11grab and relayed as MPEG-TS. Use the Inspector to edit URL/dimensions and toggle between background and operator monitor. Drag route:// onto PGM or multiview for on-air.'
+				: role === 'ndi_host' || role === 'decklink_input'
+					? ''
+					: role === 'live_audio_input'
 					? 'Dedicated live-audio input host channel. Cable to Record or Stream to capture that ALSA/USB input bus.'
 					: role === 'v4l2_input'
 						? 'Dedicated USB / V4L2 video host channel. FFmpeg bridge feeds MPEG-TS into Caspar; cable to Record or Stream to capture that input directly.'
@@ -177,6 +198,29 @@ export function renderHostChannelDestinationInspector({
 			rmBtn.disabled = true
 			try {
 				await removeExtraLiveHostSource(liveSource)
+				if (typeof onHostInputRemoved === 'function') {
+					await onHostInputRemoved(d, { ok: true })
+				} else {
+					await removeDestination(d.id)
+				}
+			} catch (e) {
+				window.alert(e?.message || String(e))
+				rmBtn.disabled = false
+			}
+		})
+		host.append(rmBtn)
+	} else if (role === 'browser_display' && liveSource) {
+		const rmBtn = document.createElement('button')
+		rmBtn.type = 'button'
+		rmBtn.className = 'header-btn'
+		rmBtn.style.marginTop = '10px'
+		rmBtn.textContent = 'Remove browser source'
+		rmBtn.addEventListener('click', async () => {
+			const label = String(liveSource.label || liveSource.url || 'Browser source')
+			if (!confirm(`Remove "${label}" from Live sources?`)) return
+			rmBtn.disabled = true
+			try {
+				await removeExtraLiveHostSource(liveSource, lastPayload?.hostOperatorFullscreen)
 				if (typeof onHostInputRemoved === 'function') {
 					await onHostInputRemoved(d, { ok: true })
 				} else {

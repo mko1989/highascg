@@ -53,6 +53,7 @@ export function showLiveInputModal(stateStore, options = {}) {
 	const kindSel = elements.kindSel
 	const dlWrap = elements.dlWrap
 	const ndiWrap = elements.ndiWrap
+	const browserDisplayWrap = elements.browserDisplayWrap
 	const browserWrap = elements.browserWrap
 	const liveAudioWrap = elements.liveAudioWrap
 	const v4l2Wrap = elements.v4l2Wrap
@@ -170,6 +171,10 @@ export function showLiveInputModal(stateStore, options = {}) {
 			hintEl.textContent = ''
 			hintEl.innerHTML =
 				'USB / V4L2 video gets a <strong>dedicated Caspar host channel</strong>. FFmpeg captures from the device and Caspar plays MPEG-TS via UDP; drag <code>route://</code> from Sources → Live onto PGM or multiview. Apply Caspar config when adding a new slot.'
+		} else if (k === 'browser_display') {
+			hintEl.textContent = ''
+			hintEl.innerHTML =
+				'Browser runs on a <strong>dedicated host channel</strong> (real Firefox + x11grab capture, not CEF). Drag <code>route://</code> from Sources → Live onto PGM or multiview for on-air. Use the Inspector to toggle between background and operator monitor, and to change URL/dimensions. Apply Caspar config after adding.'
 		} else {
 			const cg = elements.browserAsCg?.checked
 			hintEl.textContent = ''
@@ -206,6 +211,7 @@ export function showLiveInputModal(stateStore, options = {}) {
 		const k = kindSel?.value || 'decklink'
 		if (dlWrap) dlWrap.style.display = k === 'decklink' ? 'block' : 'none'
 		if (ndiWrap) ndiWrap.style.display = k === 'ndi' ? 'block' : 'none'
+		if (browserDisplayWrap) browserDisplayWrap.style.display = k === 'browser_display' ? 'block' : 'none'
 		if (browserWrap) browserWrap.style.display = k === 'browser' ? 'block' : 'none'
 		if (liveAudioWrap) liveAudioWrap.style.display = k === 'live_audio' ? 'block' : 'none'
 		if (v4l2Wrap) v4l2Wrap.style.display = k === 'usb_video' ? 'block' : 'none'
