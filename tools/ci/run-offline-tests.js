@@ -74,6 +74,7 @@ const FILES = [
 	'tools/smoke/smoke-wo247-raw-cdp.test.js',
 	'tools/smoke/smoke-wo248-chrome-binary-resolve.test.js',
 	'tools/smoke/smoke-timer-clock-jitter.test.js',
+	'tools/smoke/smoke-osc-float-endian.test.js',
 	'tools/smoke/smoke-wo261-project-stream-credentials.test.js',
 	'tools/smoke/smoke-wo250-timer-bank-mv-bars.test.js',
 	'tools/smoke/smoke-wo251-playlist-osc-wiring.test.js',
