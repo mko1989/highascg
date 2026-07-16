@@ -2,6 +2,7 @@
 
 const osc = require('osc')
 const { OscState } = require('./osc-state')
+const { createFloatEndianNormalizer } = require('./osc-float-endian')
 
 /**
  * UDP OSC receiver → {@link OscState}.
@@ -33,12 +34,13 @@ class OscListener {
 		}
 	}
 
-	/** @returns {{ received: number, lastAt: number | null, sampleAddresses: string[] }} */
+	/** @returns {{ received: number, lastAt: number | null, sampleAddresses: string[], floatByteOrder: string }} */
 	getStats() {
 		return {
 			received: this._stats.received,
 			lastAt: this._stats.lastAt,
 			sampleAddresses: [...this._stats.sampleAddresses],
+			floatByteOrder: this._endian ? this._endian.getMode() : 'auto',
 		}
 	}
 
@@ -49,6 +51,14 @@ class OscListener {
 			localPort: this._config.listenPort,
 		})
 		this._port = udpPort
+
+		// Fix the 2.6-dev binary's little-endian OSC floats BEFORE osc.js parses them: the port's
+		// "raw" event fires synchronously on the exact byte array readPacket then decodes (see
+		// node_modules/osc/src/osc-transports.js decodeOSC), so an in-place swap here corrects
+		// every downstream 'message'/'bundle' value. See src/osc/osc-float-endian.js.
+		const endian = createFloatEndianNormalizer(this._config.floatByteOrder || 'auto', this._log)
+		this._endian = endian
+		udpPort.on('raw', (data) => endian.normalize(data))
 
 		udpPort.on('message', (packet) => {
 			try {
