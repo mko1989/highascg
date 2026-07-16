@@ -409,6 +409,13 @@ async function ensureOperatorGuiChannel(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return { skipped: true }
 	const { ch, guiUrl } = resolved
+	// WO-255 migration hygiene: the retired CEF web-UI layer (100) may still be PLAYing from a
+	// pre-pivot server run — a Caspar restart clears it, but don't rely on one. Harmless when empty.
+	try {
+		await ctx.amcp.stop(ch, 100)
+	} catch (_) {
+		/* layer empty / caspar variant without content — nothing to stop */
+	}
 	try {
 		const { reapplyOperatorShapeOverlay } = require('./operator-shape-overlay')
 		reapplyOperatorShapeOverlay({ log: ctx.log })
