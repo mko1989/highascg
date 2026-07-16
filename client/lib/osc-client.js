@@ -70,6 +70,15 @@ export class OscClient {
 
 	_ingest(d) {
 		if (!d || typeof d !== 'object') return
+		// cefOperator mode runs this SPA inside Caspar's own CEF: full-snapshot OSC ticks (~20/s)
+		// are a constant JSON/merge tax inside the playout process (2026-07-16: a booting GUI
+		// starved AMCP). Full snapshots replace state wholesale, so dropping intermediates loses
+		// nothing; coalesce to ~4 Hz there. Deltas are never dropped (they compound).
+		if (!d.delta && typeof location !== 'undefined' && new URLSearchParams(location.search).has('cefOperator')) {
+			const now = Date.now()
+			if (this._lastCefIngestAt && now - this._lastCefIngestAt < 250) return
+			this._lastCefIngestAt = now
+		}
 		if (d.delta && d.channels) {
 			for (const k of Object.keys(d.channels)) this._ch[k] = mergeChannel(this._ch[k], d.channels[k])
 		} else if (d.channels) this._ch = { ...d.channels }
