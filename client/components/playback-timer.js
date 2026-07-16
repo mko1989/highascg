@@ -212,19 +212,21 @@ export function mergeOscFileWithInfoLayer(rawFile, infoLayer, fpsFallback) {
 		return enrichFileTimingForDisplay({ ...enriched, ...hints }, fpsFallback)
 	}
 	const merged = { ...enriched }
-	const hEl = hints.elapsed
-	const oEl = merged.elapsed
-	if (Number.isFinite(hEl) && (!Number.isFinite(oEl) || hEl > oEl + 0.02)) {
-		merged.elapsed = hEl
+	// INFO is a 2s poll — a GAP-FILLER only, never an override of fresh OSC. The old
+	// `hEl > oEl + 0.02` override let a stale INFO timeSec leapfrog live OSC elapsed every
+	// poll window, re-anchoring the extrapolation clock on each flip (the "bogus running
+	// time every half a second" alternation, 2026-07-16). Mirrors the server's own guard
+	// (osc-state.js applyInfoTimingSupplement: "OSC elapsed is fresher than a 2s INFO poll").
+	if (!Number.isFinite(merged.elapsed) && Number.isFinite(hints.elapsed)) {
+		merged.elapsed = hints.elapsed
 	}
-	if (Number.isFinite(hints.duration) && hints.duration > 0) {
-		if (!Number.isFinite(merged.duration) || hints.duration > merged.duration + 0.2) {
-			merged.duration = hints.duration
-		}
+	if (!(Number.isFinite(merged.duration) && merged.duration > 0) && Number.isFinite(hints.duration) && hints.duration > 0) {
+		merged.duration = hints.duration
 	}
-	if (Number.isFinite(hints.remaining)) merged.remaining = hints.remaining
-	else if (Number.isFinite(merged.duration) && Number.isFinite(merged.elapsed)) {
+	if (Number.isFinite(merged.duration) && Number.isFinite(merged.elapsed)) {
 		merged.remaining = Math.max(0, merged.duration - merged.elapsed)
+	} else if (!Number.isFinite(merged.remaining) && Number.isFinite(hints.remaining)) {
+		merged.remaining = hints.remaining
 	}
 	if (Number.isFinite(merged.duration) && merged.duration > 0 && Number.isFinite(merged.elapsed)) {
 		merged.progress = Math.min(1, Math.max(0, merged.elapsed / merged.duration))
