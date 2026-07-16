@@ -243,16 +243,24 @@ function ensureOperatorGuiFocus(ctx) {
 		sourceId: 'operator_gui',
 		hostChannel: resolved.ch,
 		hostLayer: CEF_LAYER,
-		// urlMatchesNeedle token-matches the page URL; 'cefOperator' survives host/port changes.
+		// urlMatchesNeedle token-matches the page URL; 'cefOperator' (case-sensitive) uniquely
+		// matches the GUI page. Deliberately NO playArg: cefMatchTokens derives host tokens from
+		// it ('127.0.0.1:4200') which match EVERY page served from the app — live-debugged 2026-07-16:
+		// the needle resolved the mario template page instead of the GUI.
 		needle: 'cefOperator',
-		playArg: resolved.guiUrl,
 		zoneId: 'operator_gui',
 	}
 	if (current && current.hostChannel === target.hostChannel && current.needle === target.needle) return current
 	setCefFocusTarget(target)
 	try {
-		const { notifyCefFocusChanged } = require('./cef-interactive-bridge')
-		notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
+		const { notifyCefFocusChanged, syncCefInteractiveBridge } = require('./cef-interactive-bridge')
+		const log = typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined
+		notifyCefFocusChanged(log)
+		// Self-heal: notifyCefFocusChanged only re-syncs an ALREADY-RUNNING bridge (bails on
+		// !S.activeKey). A transient gate (e.g. casparcg.config mid-rewrite during an apply makes
+		// the debug-port read 0) stops the bridge and nothing restarts it — arming must (re)start
+		// it or the operator monitor has no input capture. Idempotent when already running.
+		void syncCefInteractiveBridge(ctx.config, { log, amcp: ctx.amcp })
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: focus notify failed: ${e?.message || e}`)
 	}

@@ -61,6 +61,17 @@ async function handlePost(path, body, ctx) {
 
 		setCefFocusTarget(target)
 		notifyCefFocusChanged(typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined)
+		// Self-heal (2026-07-16): arming must (re)start the X11 capture bridge — notify alone only
+		// syncs an already-running one. Idempotent when running.
+		try {
+			const { syncCefInteractiveBridge } = require('../system/cef-interactive-bridge')
+			void syncCefInteractiveBridge(ctx.config, {
+				log: typeof ctx.log === 'function' ? (level, msg) => ctx.log(level, msg) : undefined,
+				amcp: ctx.amcp,
+			})
+		} catch (_) {
+			/* bridge module unavailable — key/mouse forwarding will need a manual bridge sync */
+		}
 
 		if (typeof ctx._wsBroadcast === 'function') {
 			ctx._wsBroadcast('change', { path: 'cefFocusTarget', value: target })
