@@ -68,6 +68,7 @@ const FILES = [
 	'tools/smoke/smoke-wo242-pixelmap-screens.test.js',
 	'tools/smoke/smoke-wo243-operator-gui.test.js',
 	'tools/smoke/smoke-wo255-shaped-overlay.test.js',
+	'tools/smoke/smoke-shape-overlay-input-dead.test.js',
 	'tools/smoke/smoke-wo244-stream-secret-preserve.test.js',
 	'tools/smoke/smoke-wo249-audio-pair-select.test.js',
 	'tools/smoke/smoke-wo246-operator-monitor-auto.test.js',
