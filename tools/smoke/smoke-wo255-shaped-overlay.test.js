@@ -195,13 +195,13 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 		// Throws (assert-worthy failure) on a non-zero exit; stdio inherited-suppressed via pipe.
 		execFileSync('python3', ['-m', 'py_compile', script], { stdio: 'pipe' })
 	})
-	it('operator-shape-overlay.py: window-match strategy documented + implemented (geometry + title/class, Firefox excluded)', () => {
+	it('operator-shape-overlay.py: WO-262 window-match strategy — targets FIREFOX by WM_CLASS (inverted from Caspar), geometry on the monitor rect', () => {
 		const src = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
-		assert.match(src, /Screen consumer/, 'matches on the CasparCG screen-consumer window title default')
-		assert.match(src, /casparcg/i, 'matches on WM_CLASS mentioning casparcg as a secondary signal')
-		assert.match(src, /navigator/i, 'explicitly excludes Firefox (WM_CLASS "Navigator") from candidates')
-		assert.match(src, /shape_rectangles/, 'uses the SHAPE extension rectangles call (mirrors the proven PoC)')
-		assert.match(src, /SK\.Input/, 'sets an empty INPUT shape so clicks pass through')
+		assert.match(src, /def is_operator_firefox/, 'matches the operator kiosk Firefox (WO-262 inversion)')
+		assert.match(src, /navigator/i, 'matches on WM_CLASS "Navigator"/firefox (now a POSITIVE signal)')
+		assert.match(src, /def find_firefox_window/, 'window finder targets Firefox, not the Caspar consumer')
+		assert.match(src, /shape_rectangles/, 'uses the SHAPE extension rectangles call')
+		assert.doesNotMatch(src, /def is_caspar_screen_consumer/, 'the retired Caspar-target matcher is gone')
 	})
 	it('fractionRectToMonitorPx: scales by the MONITOR rect (not the GUI channel raster) and rounds to integers', () => {
 		const out = fractionRectToMonitorPx({ x: 0.25, y: 0.5, w: 0.5, h: 0.25 }, { w: 1920, h: 1080 })
@@ -226,6 +226,83 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 		const map = { programChannels: [1, 3], previewChannels: [2, null], multiviewCh: 9 }
 		assert.equal(resolveCellSourceChannel({ role: 'multiview', mainIndex: 7 }, map), 9)
 		assert.equal(resolveCellSourceChannel({ role: 'multiview' }, { ...map, multiviewCh: null }), null)
+	})
+})
+
+// WO-262: the helper spawned but the operator monitor stayed dark. Root cause (reproduced on
+// Xvfb :78): the stdin loop paired select()-on-fd with a BUFFERED sys.stdin.readline(). When two
+// payloads landed in the OS pipe close together (empty boot payload + the real rects), readline()
+// pulled BOTH lines into Python's userspace buffer and returned only the first; the next select()
+// saw an empty fd and stranded the second (real-rects) line — the window stayed shaped per the
+// first (empty => invisible) payload, and the stdin path logged nothing. Fix: os.read(fd) into our
+// own newline buffer, drain EVERY complete line each wakeup, + a heartbeat log per line.
+describe('WO-262: shape helper stdin drain + heartbeat (fixes lost 2nd-payload-after-spawn)', () => {
+	const pySrc = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
+
+	it('py: py_compile still passes with the os.read drain in place', () => {
+		execFileSync('python3', ['-m', 'py_compile', path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py')], { stdio: 'pipe' })
+	})
+	it('py: reads stdin via os.read(fd) into a newline buffer, NOT the buggy select()+buffered-readline pair', () => {
+		assert.match(pySrc, /os\.read\(stdin_fd/, 'drains the raw fd (select and the buffer can never disagree)')
+		assert.match(pySrc, /stdin_buf\s*\+=\s*chunk/, 'accumulates partial reads across wakeups')
+		assert.match(pySrc, /stdin_buf\.split\(b"\\n"\)/, 'splits the buffer into complete lines')
+		assert.doesNotMatch(pySrc, /=\s*sys\.stdin\.readline\(\)/, 'the buffered readline() that stranded queued lines is gone')
+	})
+	it('py: T262.3 heartbeat — logs every stdin line as it is read, before any window match', () => {
+		assert.match(pySrc, /log\(f"stdin line received: \{line\[:200\]\}"\)/, 'per-line heartbeat log line present')
+	})
+	it('py: WO-262 shaping punches HOLES in Firefox (SO.Set full then SO.Subtract each rect), does not set an empty input shape, restores unshaped on empty rects', () => {
+		assert.match(pySrc, /def apply_holes/, 'shaping fn punches holes (renamed from apply_shape)')
+		assert.match(pySrc, /shape\.SO\.Subtract/, 'subtracts each preview rect from the bounding shape (the holes)')
+		assert.match(pySrc, /shape\.SO\.Set, shape\.SK\.Bounding, 0, 0, 0, \[full\]/, 'sets the full window rect first, then subtracts')
+		assert.doesNotMatch(pySrc, /SK\.Input/, 'WO-262: no longer sets an empty input shape — Firefox keeps input outside the holes')
+		assert.match(pySrc, /if not rects:[\s\S]*?shape_mask\(shape\.SO\.Set, shape\.SK\.Bounding, 0, 0, X\.NONE\)/, 'empty rects -> restore unshaped (holes filled) for modals')
+	})
+	it('pure-logic: hole complement — SO.Set(full) then SO.Subtract(rect) yields a region that EXCLUDES the rect interior but keeps everything else', () => {
+		// Mirrors apply_holes: the effective bounding region is the full monitor MINUS each preview
+		// rect. A point is part of Firefox (drawn + clickable) iff it is in `full` and NOT in any hole.
+		const full = { x: 0, y: 0, w: 1920, h: 1080 }
+		const holes = [[100, 100, 400, 300]]
+		function inRect(px, py, [x, y, w, h]) {
+			return px >= x && px < x + w && py >= y && py < y + h
+		}
+		function firefoxCovers(px, py) {
+			if (!inRect(px, py, [full.x, full.y, full.w, full.h])) return false
+			for (const hole of holes) if (inRect(px, py, hole)) return false
+			return true
+		}
+		assert.equal(firefoxCovers(300, 250), false, 'inside the hole -> NOT Firefox (Caspar video shows through, click falls through)')
+		assert.equal(firefoxCovers(0, 0), true, 'corner outside the hole -> Firefox still there (visible + clickable)')
+		assert.equal(firefoxCovers(1000, 900), true, 'chrome outside the hole (tile handles) stays interactive')
+		// Empty rects -> no holes -> Firefox fully covers the monitor (modal renders whole).
+		const holes2 = []
+		assert.equal(holes2.length === 0, true)
+	})
+	it('pure-logic: the newline-buffer drain processes BOTH back-to-back lines (latest wins) and carries a partial line', () => {
+		// Mirrors the helper's os.read-buffer draining exactly (kept in lockstep with the .py above,
+		// grep-guarded there). Feeds the two-writes-in-one-pipe-chunk case that the old code lost.
+		function drain(prevBuf, chunk) {
+			const buf = prevBuf + chunk
+			const parts = buf.split('\n')
+			const rest = parts.pop() // trailing partial ('' when chunk ended on a newline)
+			const lines = parts.map((s) => s.trim()).filter((s) => s.length > 0)
+			return { lines, rest }
+		}
+		// Empty boot payload + real rects arrive together in one read — the exact WO-262 sequence.
+		const line1 = JSON.stringify({ monitor: { x: 0, y: 0, w: 1920, h: 1080 }, rects: [], channel: 1 })
+		const line2 = JSON.stringify({ monitor: { x: 0, y: 0, w: 1920, h: 1080 }, rects: [[100, 100, 400, 300]], channel: 1 })
+		const { lines, rest } = drain('', line1 + '\n' + line2 + '\n')
+		assert.equal(lines.length, 2, 'both payloads are drained from one read (old select+readline lost the 2nd)')
+		const latest = JSON.parse(lines[lines.length - 1])
+		assert.deepEqual(latest.rects, [[100, 100, 400, 300]], 'the real-rects payload (last) is what state ends on — window becomes visible, not empty-shaped')
+		assert.equal(rest, '', 'no partial remainder when the chunk ends on a newline')
+
+		// A payload split across two reads is reassembled, not dropped.
+		const a = drain('', line2.slice(0, 20))
+		assert.equal(a.lines.length, 0, 'no complete line yet from a partial chunk')
+		const b = drain(a.rest, line2.slice(20) + '\n')
+		assert.equal(b.lines.length, 1, 'the split payload is reassembled on the next read')
+		assert.deepEqual(JSON.parse(b.lines[0]).rects, [[100, 100, 400, 300]])
 	})
 })
 

@@ -1,51 +1,50 @@
 #!/usr/bin/env python3
 """
-operator-shape-overlay.py — WO-255 T255.1: shape the Caspar operator_gui screen-consumer window
-so only the reported preview rects (compose/timeline/mv-edit) are visible, with an EMPTY input
-shape so every click passes through to the fullscreen Firefox GUI beneath it.
+operator-shape-overlay.py — WO-255 T255.1 / WO-262 pivot: shape the operator_gui FIREFOX kiosk
+window so the reported preview rects (compose/timeline/mv-edit) are punched out as HOLES, letting
+the Caspar screen-consumer window BELOW show video through them. Firefox keeps normal click input
+everywhere it is still visible (outside the holes); a click inside a hole falls through to the
+(inert, display-only) Caspar window — the accepted WO-262 tradeoff.
+
+WO-262 INVERSION (why this now targets Firefox, not the Caspar consumer): the original design
+shaped the always-on-top Caspar consumer to show only the preview rects and set an EMPTY input
+shape so clicks passed through to Firefox below. Live-proven failure: the interactive Firefox
+window ALWAYS wins stacking on click (it gets focus + raises above the always-on-top Caspar
+window), so the video vanished the instant the operator clicked anything. Video-window-on-top is
+fundamentally wrong. So we INVERT: leave Caspar as a plain window UNDER Firefox and instead punch
+holes in Firefox so the video shows through — Firefox staying on top is now exactly what we want.
+(Server follow-up, tracked separately: config-generator-operator-gui.js should set
+<always-on-top>false for the operator_gui consumer and let it sit below Firefox.)
 
 Long-running (mirrors tools/runtime/confine-pointer-barriers.py's conventions: log file under
-~/.highascg/log/, pid file under ~/.highascg/run/, DISPLAY defaults to :0). Unlike that script,
-this one is fed over stdin (mirrors tools/runtime/cef-interactive-x11.py's stdin-JSON idea, but
-here the protocol is IN-only — this script never needs to write events back).
+~/.highascg/log/, pid file under ~/.highascg/run/, DISPLAY defaults to :0). Fed over stdin
+(protocol is IN-only — this script never writes events back).
 
 Protocol: one JSON object per line on stdin:
-    {"monitor": {"x":, "y":, "w":, "h":}, "rects": [[x,y,w,h], ...]}
+    {"monitor": {"x":, "y":, "w":, "h":}, "rects": [[x,y,w,h], ...], "channel": <int|null>}
 `monitor` is the operator monitor's rect in ROOT (absolute) pixels. `rects` are RECT-in-monitor
 pixels — because the match strategy below only accepts a window whose absolute origin equals
 `monitor.x,monitor.y`, monitor-relative and window-relative are the same numbers; no extra
-translation happens here. Empty `rects` -> hide the window entirely (empty bounding shape).
+translation happens here. Empty `rects` -> RESTORE Firefox to unshaped (fill the holes) — this is
+how interaction-suppression lets a modal render whole over the preview areas. `channel` is carried
+for protocol compatibility with the JS feeder but is not used to match Firefox (Firefox has no
+Caspar channel; the WM_CLASS signature is unambiguous).
 
-Window match strategy (see WO-255 for the research trail — no live xprop was run against this
-box's :0 display per the LIVE-box constraint; this is grounded directly in the CasparCG source
-tree already checked out on this box, /home/casparcg/caspar-build/src-tree):
-  - src/modules/screen/consumer/screen_consumer.cpp creates an `sf::Window` (SFML) whose title is
-    `print()` = `config_.name + " " + "[" + channel_index + "|" + format_name + "]"`, and
-    `config_.name` defaults to `L"Screen consumer"` (our generator, config-generator-operator-gui.js,
-    never sets a `<name>` for the operator_gui channel, so the default stands) — so the title always
-    starts with "Screen consumer ".
-  - The systemd unit (casparcg-server.service) launches the binary as
-    `/home/casparcg/highascg/bin/casparcg`; SFML's X11 backend sets WM_CLASS (both the instance and
-    class hints) from the running binary's name by convention, i.e. "casparcg" — this half of the
-    match could not be confirmed with a live xprop query (no DISPLAY in the dev/build sandbox this
-    script was authored in, and the constraint forbids running this script against the live :0
-    display), so it is used only as a secondary signal, never required alone.
-  - Geometry ALONE is not suffient: Firefox (kiosk, fullscreen) is deliberately placed at the exact
-    same monitor rect as the operator_gui screen consumer (that is the whole point of the shaped
-    overlay), so a window matching the monitor rect could just as easily be the Firefox window.
-    Firefox's own WM_CLASS is "Navigator" on this box (see GUI_WINDOW_CLASS.firefox in
-    src/utils/x-display-session-runtime.js, an existing, working convention for the same Firefox
-    ESR install) and is explicitly excluded below as a negative signal.
-  - Final rule: candidate top-level windows are filtered to those whose ABSOLUTE geometry equals
-    `monitor` exactly, and among those, the one whose title starts with "Screen consumer" OR whose
-    WM_CLASS mentions "casparcg" (case-insensitive) AND whose WM_CLASS does NOT mention "navigator"
-    or "firefox" wins. If more than one still matches (shouldn't happen), the first is used and a
-    warning is logged.
+Window match strategy:
+  - The operator GUI is a single fullscreen firefox-esr --kiosk instance placed at the exact
+    operator monitor rect. Its WM_CLASS is "Navigator" (instance) / "Navigator" or "firefox"
+    (class) on this box — see GUI_WINDOW_CLASS.firefox in src/utils/x-display-session-runtime.js,
+    an existing, working convention for the same Firefox ESR install. This is the INVERSE of the
+    retired Caspar matcher, which used the same "navigator"/"firefox" tokens as a NEGATIVE signal.
+  - A WM is running, so Firefox sits at depth <= 3 inside an unnamed WM frame; geometry is checked
+    on the TOP-LEVEL ancestor (the window the X server stacks/composites), and the firefox
+    signature is matched recursively inside it (same recursive matcher shape as WO-255, signature
+    flipped). Caspar's consumer also sits at the monitor rect but has no firefox-class descendant,
+    so it is never matched.
 
-Applies on every stdin line and on a 2s poll (catches a Caspar restart that spawns a NEW window
-id at the same geometry — the previous window's custom shape does not carry over to the new one).
-Clean exit (restore default/unshaped window state, so a dead helper never leaves Firefox
-permanently unclickable) on stdin EOF or SIGTERM.
+Applies on every stdin line and on a 2s poll (catches a Firefox restart that spawns a NEW window
+id at the same geometry — the previous window's holes do not carry over). Clean exit restores
+Firefox to unshaped (holes filled) so a dead helper never leaves permanent dead regions.
 
 Usage: operator-shape-overlay.py   (no CLI args — everything comes over stdin)
 """
@@ -112,16 +111,11 @@ def window_class(win):
         return "", ""
 
 
-def is_caspar_screen_consumer(win) -> bool:
-    title = window_title(win)
+def is_operator_firefox(win) -> bool:
+    """WO-262: match the operator kiosk Firefox by WM_CLASS. This is the exact INVERSE of the
+    retired is_caspar_screen_consumer, which excluded these same tokens as a negative signal."""
     inst, cls = window_class(win)
-    if "navigator" in inst or "navigator" in cls or "firefox" in inst or "firefox" in cls:
-        return False
-    if title.startswith("Screen consumer"):
-        return True
-    if "casparcg" in inst or "casparcg" in cls:
-        return True
-    return False
+    return "navigator" in inst or "navigator" in cls or "firefox" in inst or "firefox" in cls
 
 
 def absolute_geometry(win, root):
@@ -129,8 +123,8 @@ def absolute_geometry(win, root):
 
     Only called on DIRECT children of root, whose get_geometry() x/y are already root-relative.
     (win.translate_coords(root, 0, 0) is the INVERSE mapping — live-verified 2026-07-16: it
-    returned (-3072,0) for the operator-monitor windows at (3072,0), so the original
-    translate-based version never matched the monitor rect and the helper found no window.)
+    returned (-3072,0) for the operator-monitor windows at (3072,0), so a translate-based version
+    never matched the monitor rect and the helper found no window.)
     """
     try:
         geom = win.get_geometry()
@@ -139,15 +133,13 @@ def absolute_geometry(win, root):
         return None
 
 
-def find_consumer_window(root, monitor, channel=None):
-    """Return (toplevel, client) for the CasparCG screen consumer on `monitor`, or None.
+def find_firefox_window(root, monitor):
+    """Return (toplevel, client) for the operator kiosk Firefox on `monitor`, or None.
 
-    Live-verified on this box (2026-07-16): a WM IS running (_NET_SUPPORTING_WM_CHECK present), so
-    the caspar client window (title 'Screen consumer [<ch>|<WxH>]', WM_CLASS 'casparcg') sits at
-    depth 2 inside an UNNAMED WM frame — a top-level-only enumeration finds zero candidates. The
-    signature is matched recursively (depth <= 3); geometry is checked on the TOP-LEVEL ancestor
-    (the window the X server actually stacks/composites). When `channel` is given the title must
-    contain '[<channel>|' — an exact, geometry-independent match (Firefox shares the monitor rect).
+    Geometry is checked on the TOP-LEVEL ancestor (what the X server stacks/composites); the
+    firefox WM_CLASS signature is matched recursively (depth <= 3) because a WM reparents Firefox
+    inside an unnamed frame. Caspar's consumer shares the monitor rect but has no firefox-class
+    descendant, so it is never returned.
     """
     try:
         toplevels = root.query_tree().children
@@ -156,10 +148,7 @@ def find_consumer_window(root, monitor, channel=None):
         return None
 
     def signature_in(win, depth):
-        if is_caspar_screen_consumer(win):
-            title = window_title(win)
-            if channel is not None and f"[{channel}|" not in title:
-                return None
+        if is_operator_firefox(win):
             return win
         if depth >= 3:
             return None
@@ -194,38 +183,47 @@ def find_consumer_window(root, monitor, channel=None):
     if not candidates:
         return None
     if len(candidates) > 1:
-        log(f"WARNING: {len(candidates)} windows matched monitor rect + caspar signature; using the first")
+        log(f"WARNING: {len(candidates)} firefox windows matched monitor rect; using the first")
     return candidates[0]
 
 
-def apply_shape(pair, rects):
-    """pair: (toplevel, client). rects: (x,y,w,h) tuples, window-relative (== monitor-relative).
+def apply_holes(pair, monitor, rects):
+    """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
+    Firefox's bounding shape: SET the bounding region to the full window rect, then SUBTRACT each
+    preview rect so the Caspar consumer below shows through. The INPUT shape is left untouched (it
+    defaults to the bounding shape) so Firefox keeps click input everywhere it is still visible; a
+    click inside a hole falls through to the inert Caspar window (accepted WO-262 tradeoff).
 
-    Shapes are applied to BOTH the WM frame (toplevel — what the server composites and routes
-    input by) and the caspar client inside it: some WMs mirror a client's bounding shape onto the
-    frame but none mirror the INPUT shape, so shaping only the client would leave the frame
-    catching every click instead of passing them through to Firefox below.
+    Empty `rects` -> restore unshaped (holes filled) so a modal can render whole over preview areas.
+
+    Shapes are applied to BOTH the WM frame (toplevel — what the server composites/routes input by)
+    and the firefox client inside it, so no WM re-mirroring can leave one of them un-holed.
     """
     toplevel, client = pair
+    full = (0, 0, int(monitor["w"]), int(monitor["h"]))
     try:
         for win in (toplevel, client):
-            win.shape_rectangles(shape.SO.Set, shape.SK.Bounding, 0, 0, 0, list(rects))
-            win.shape_rectangles(shape.SO.Set, shape.SK.Input, 0, 0, 0, [])
+            if not rects:
+                win.shape_mask(shape.SO.Set, shape.SK.Bounding, 0, 0, X.NONE)
+                continue
+            win.shape_rectangles(shape.SO.Set, shape.SK.Bounding, 0, 0, 0, [full])
+            for r in rects:
+                win.shape_rectangles(shape.SO.Subtract, shape.SK.Bounding, 0, 0, 0, [tuple(r)])
+        # Keep Firefox on top — with holes punched, that is exactly what shows the video through.
         toplevel.configure(stack_mode=X.Above)
         return True
     except Exception as e:
-        log(f"apply_shape failed: {e}")
+        log(f"apply_holes failed: {e}")
         return False
 
 
 def clear_shape(pair):
-    """Restore both windows' default (unshaped, fully clickable) state — used on clean exit so a
-    dead helper never leaves Firefox permanently unclickable under a stuck invisible/passthrough
-    Caspar window."""
+    """Restore both windows' default (unshaped, no holes) bounding state — used on clean exit so a
+    dead helper never leaves Firefox with permanent holes (dead regions the operator can't click).
+    Only the bounding shape is reset; the input shape was never explicitly set."""
     try:
         for win in pair:
             win.shape_mask(shape.SO.Set, shape.SK.Bounding, 0, 0, X.NONE)
-            win.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, X.NONE)
         return True
     except Exception as e:
         log(f"clear_shape failed: {e}")
@@ -276,51 +274,75 @@ def main() -> int:
     win = None
     last_poll = 0.0
 
+    # WO-262: read stdin with os.read (raw fd) + our own newline buffer, NOT a buffered
+    # sys.stdin.readline(). select() reports readiness on the fd, but a buffered readline() pulls a
+    # whole OS-pipe chunk (possibly SEVERAL newline-terminated payloads) into Python's userspace
+    # buffer and hands back only the first line; the next select() then sees an EMPTY fd and strands
+    # the remaining line(s) until more bytes happen to arrive. That lost the 2nd payload after spawn
+    # (e.g. an empty boot payload written just before the real rects) -> the window stayed shaped
+    # per the first payload with nothing in the log. Reproduced on Xvfb :78.
+    stdin_fd = sys.stdin.fileno()
+    stdin_buf = b""
+
     try:
         while True:
             now = time.time()
             if state_monitor and (now - last_poll) >= POLL_INTERVAL_SEC:
                 last_poll = now
-                found = find_consumer_window(root, state_monitor, state_channel)
+                found = find_firefox_window(root, state_monitor)
                 if found is not None:
                     is_new = win is None or found[0].id != win[0].id
                     win = found
                     if is_new:
-                        log(f"consumer window (re)found: toplevel={win[0].id} client={win[1].id} — (re)applying shape")
-                        apply_shape(win, state_rects)
+                        log(f"firefox window (re)found: toplevel={win[0].id} client={win[1].id} — (re)applying holes")
+                        apply_holes(win, state_monitor, state_rects)
                 elif win is not None:
-                    log("consumer window no longer present (Caspar restart?) — will re-search")
+                    log("firefox window no longer present (restart?) — will re-search")
                     win = None
 
-            r, _, _ = select.select([sys.stdin], [], [], STDIN_SELECT_TIMEOUT_SEC)
-            if sys.stdin not in r:
-                continue
-
-            line = sys.stdin.readline()
-            if line == "":
-                log("stdin EOF — exiting")
-                break
-            line = line.strip()
-            if not line:
+            r, _, _ = select.select([stdin_fd], [], [], STDIN_SELECT_TIMEOUT_SEC)
+            if stdin_fd not in r:
                 continue
 
             try:
-                monitor, rects, channel = parse_line(line)
-            except Exception as e:
-                log(f"bad stdin line ({e}): {line[:200]}")
+                chunk = os.read(stdin_fd, 65536)
+            except (BlockingIOError, InterruptedError):
+                continue
+            if chunk == b"":
+                log("stdin EOF — exiting")
+                break
+            stdin_buf += chunk
+            parts = stdin_buf.split(b"\n")
+            stdin_buf = parts.pop()  # trailing partial line (b"" when chunk ended on a newline)
+
+            got_update = False
+            for raw in parts:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line:
+                    continue
+                # WO-262 T262.3 heartbeat: log EVERY stdin line the moment it is read, before any
+                # window match/shape, so a repeat of this class is diagnosable straight from the log.
+                log(f"stdin line received: {line[:200]}")
+                try:
+                    monitor, rects, channel = parse_line(line)
+                except Exception as e:
+                    log(f"bad stdin line ({e}): {line[:200]}")
+                    continue
+                state_monitor = monitor
+                state_rects = rects
+                state_channel = channel
+                got_update = True
+
+            if not got_update:
                 continue
 
-            state_monitor = monitor
-            state_rects = rects
-            state_channel = channel
-
             if win is None:
-                win = find_consumer_window(root, state_monitor, state_channel)
+                win = find_firefox_window(root, state_monitor)
             if win is not None:
-                if not apply_shape(win, state_rects):
+                if not apply_holes(win, state_monitor, state_rects):
                     win = None  # stale handle — force re-search next iteration
             else:
-                log("no consumer window matching monitor rect yet (will retry on next update/poll)")
+                log("no firefox window matching monitor rect yet (will retry on next update/poll)")
 
             d.sync()
     except KeyboardInterrupt:

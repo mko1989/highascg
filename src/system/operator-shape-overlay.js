@@ -1,8 +1,12 @@
 /**
- * operator-shape-overlay.js — WO-255 T255.1: spawn/manage the python-xlib shape helper
- * (tools/runtime/operator-shape-overlay.py) that shapes the Caspar operator_gui screen-consumer
- * window so only the reported preview rects are visible, with an empty input shape so clicks pass
- * through to the fullscreen Firefox GUI beneath it.
+ * operator-shape-overlay.js — WO-255 T255.1 / WO-262 pivot: spawn/manage the python-xlib shape
+ * helper (tools/runtime/operator-shape-overlay.py) that punches the reported preview rects as
+ * HOLES in the operator_gui FIREFOX kiosk window, so the Caspar screen-consumer BELOW shows video
+ * through them. (Inverted in WO-262 from the original "shape the always-on-top Caspar consumer"
+ * design, which broke the moment the operator clicked: Firefox took focus and raised above the
+ * video. Firefox is the window that must stay on top, so we hole IT instead.) This JS side only
+ * spawns the helper and feeds it `{monitor, rects, channel}` over stdin — the targeting/shaping
+ * all live in the python helper.
  *
  * Mirrors cef-interactive-bridge-lifecycle.js's spawn/stderr-log/exit-log pattern: spawn once with
  * `displaySessionEnv()`, pipe stdio, log stdout/stderr lines through `ctx.log`, null the process
@@ -69,11 +73,10 @@ function ensureSpawned(log) {
  * Send `{ monitor, rects, channel }` as one JSON line to the helper's stdin, spawning (or
  * respawning after an unexpected exit) it first. Caches the payload so
  * {@link reapplyOperatorShapeOverlay} can re-send it without a fresh layout apply.
- * `channel` (the operator_gui Caspar channel) lets the helper match the consumer window by its
- * exact title `Screen consumer [<ch>|...]` — live-verified 2026-07-16 — instead of geometry+class
- * alone (Firefox deliberately shares the same monitor rect).
+ * `channel` is carried for protocol compatibility but is no longer used to match the target window
+ * (WO-262: the helper now matches the FIREFOX kiosk by WM_CLASS, not the Caspar consumer by title).
  * @param {{x: number, y: number, w: number, h: number}} monitorRect - ROOT/absolute pixels
- * @param {Array<[number, number, number, number]>} rectsPx - monitor-relative pixel rects; empty -> hide
+ * @param {Array<[number, number, number, number]>} rectsPx - monitor-relative pixel rects; empty -> restore Firefox unshaped (fill holes)
  * @param {{ log?: Function, channel?: number|null }} [opts]
  */
 function updateShapeRects(monitorRect, rectsPx, opts = {}) {

@@ -82,17 +82,19 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 		`<stretch>none</stretch>`,
 		`<windowed>true</windowed>`,
 		`<vsync>true</vsync>`,
-		// WO-255: must stack ABOVE the fullscreen Firefox GUI window sharing this monitor — the
-		// python-xlib shape helper (tools/runtime/operator-shape-overlay.py) then punches the
-		// non-video regions transparent-and-click-through via X SHAPE.
-		`<always-on-top>true</always-on-top>`,
+		// WO-263 (inverts WO-255): this consumer stacks BELOW the fullscreen Firefox GUI, which
+		// stays on top and takes all clicks. The shape helper punches HOLES in FIREFOX at the
+		// preview rects so this window shows through. always-on-top MUST be false — video-on-top
+		// lost the picture the instant the operator clicked the GUI (WM raises the focused Firefox
+		// above an always-on-top video window). See tools/runtime/operator-shape-overlay.py.
+		`<always-on-top>false</always-on-top>`,
 		`<borderless>true</borderless>`,
 	].join('\n                    ')
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const label = escapeXml(String(dest?.label || 'Operator GUI'))
 	return `${channelXmlComment(
-		`Caspar channel ${ch}: Operator GUI channel "${label}" — routed preview holes (layers 10-49), shaped via X SHAPE above fullscreen Firefox (WO-255); screen consumer on ${rect ? `port ${resolvedPort}` : 'default position (no monitor resolved yet)'}`,
+		`Caspar channel ${ch}: Operator GUI channel "${label}" — routed preview layers (10-49) shown through HOLES punched in the fullscreen Firefox GUI above it (WO-263); consumer stacks below Firefox on ${rect ? `port ${resolvedPort}` : 'default position (no monitor resolved yet)'}`,
 	)}        <channel>
             <video-mode>${dims.modeId}</video-mode>
             <consumers>

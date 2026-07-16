@@ -1,0 +1,36 @@
+# WO-262 — Operator GUI: shape helper spawns but never shapes (consumer opaque under Firefox, no holes, no video)
+
+**Status:** OPEN — LIVE broken (operator GUI shows no video; Caspar consumer sits opaque under Firefox)
+**Priority:** URGENT
+**Owner check:** A262.1
+
+## Verified facts (orchestrator, live, 2026-07-16 ~15:55Z — DO NOT re-doubt these, build on them)
+1. **Client works.** Headless Chrome loading `http://127.0.0.1:4200/?operatorGui=1` → `html.operator-gui`, 4 tile elements mounted (`.preview-panel__operator-tiles-mount` present), and a REAL `POST /api/operator-gui/layout` fires with body `{"cells":[{"id":"pgm_1","role":"pgm","mainIndex":0,"rect":{...}}]}`. So rect reporting is NOT the bug. (The route does not log, which is why the journal shows "0 POSTs" — misleading.)
+2. **monitorRect resolves.** `resolveOperatorGuiMonitorRect(liveConfig)` → `{x:3072,y:0,w:1920,h:1080}` (correct operator monitor). `fractionRectToMonitorPx` is monitor-relative + aspect-fit (correct).
+3. **always-on-top is in the generated config** (`grep always-on-top>true config/casparcg.config` = 1).
+4. **The consumer window exists and is findable.** Earlier probe: `Screen consumer [5|1920x1080]` at depth 2 under a WM frame at (3072,0); the WO-255 recursive+channel-title matcher finds it (verified returning `(toplevel, client)` live).
+5. **The helper spawns but never processes stdin.** `~/.highascg/log/operator-shape-overlay.log`: a helper (pid 1889624) started 15:53:38 (triggered by a layout POST → `updateShapeRects` → `ensureSpawned`) and logged ONLY "starting" — no "consumer window (re)found", no "no consumer window matching monitor rect yet". If it had received ANY stdin line it would log one of those. So: **the payload write after spawn is not reaching the python stdin reader.**
+
+## The bug is between `updateShapeRects` spawning the helper and the python reading its first line
+`src/system/operator-shape-overlay.js` `updateShapeRects`: `ensureSpawned(log)` then `p.stdin.write(JSON.stringify({monitor,rects,channel})+'\n')`. `tools/runtime/operator-shape-overlay.py` main loop: `select([stdin],...,0.5)` → `stdin.readline()`. Candidate causes to investigate IN ORDER:
+- **First-write race / lost write**: is the write happening but not flushed/delivered on the very first payload after spawn? (Node pipe should buffer — but verify: is `p.stdin` the spawned child's, is it writable at that instant, does the write need a newline the python split expects, is `-u` enough or does python need `sys.stdin` line-buffered read via `select`?) Add a spawn→ready handshake or re-send the cached payload shortly after spawn.
+- **`reapplyOperatorShapeOverlay` on caspar-connect spawns with an EMPTY/null payload first** (lastMonitor null at boot), so the helper starts idle; then the real POST's `updateShapeRects` finds `proc` already set (`ensureSpawned` returns existing) and writes — verify THAT write path (existing-proc branch) actually writes and isn't short-circuited.
+- **Empty rects**: if `computeOperatorGuiCellPlan` returns [] (source channel unresolved for the reported cells), `updateShapeRects` writes `rects:[]` → helper sets an EMPTY bounding shape = window INVISIBLE. But the owner sees the window OPAQUE (unshaped), which means no stdin was processed at all — so this is likely NOT it, but confirm the plan is non-empty for a `{role:'pgm',mainIndex:0}` cell against the live channel map (programChannels[0] must resolve).
+
+## Tasks
+- [x] T262.1 Reproduce the stdin-not-delivered path in a unit/integration harness (spawn the real python helper against a throwaway Xvfb :78 with a known window, write a payload, assert it shapes) OR instrument to prove where the first payload is lost.
+- [x] T262.2 Fix so the FIRST payload after spawn reliably reaches the helper and it shapes+restacks the window. Likely: after `ensureSpawned` spawns a NEW child, schedule a re-send of the cached payload (e.g. on the child's first stdout/`spawn` event, or a short timer) — mirror how other stdin-fed helpers here handle spawn readiness. Keep it idempotent.
+- [x] T262.3 Add a helper-side heartbeat log line on each stdin line received (even pre-window-match) so this class is diagnosable from the log next time.
+- [x] T262.4 Smoke (curated gate): pure-logic for the spawn/re-send scheduling; py_compile.
+- [ ] A262.1 (owner) after restart: operator monitor shows PGM/PRV video through shaped holes, clicks pass through.
+
+## Resolution (2026-07-16)
+**Proven root cause (NOT a lost write).** The first-write-after-spawn IS reliably delivered (reproduced on Xvfb :78: a single payload shapes the window every time). The REAL bug was in the python stdin loop: `select([sys.stdin],...)` on the fd paired with a BUFFERED `sys.stdin.readline()`. When two payloads landed in the OS pipe close together (e.g. an empty boot payload + the real rects), readline() pulled BOTH lines into Python's userspace buffer and returned only the first; the next `select()` saw an EMPTY fd and stranded the second (real-rects) line until more bytes arrived. The window stayed shaped per the first (empty) payload and the stdin apply path logged nothing — which is exactly why the live log's "only starting" was mis-read as "no stdin received" (verified fact #5's inference was invalid: the stdin success path was simply silent). Reproduced BEFORE fix: two back-to-back writes -> shape stuck at empty (`0,0,0,0`); AFTER fix -> the real rects win.
+**Fix (T262.2):** `operator-shape-overlay.py` now reads stdin via `os.read(fd)` into its own newline buffer and DRAINS every complete line each wakeup (latest state wins) — select and the buffer can never disagree. Plus the T262.3 heartbeat (`stdin line received: ...` per line).
+
+## ARCHITECTURE PIVOT (owner decision, this WO) — shape FIREFOX, not the Caspar consumer
+Live-proven: raising the always-on-top Caspar consumer showed video, but it vanished the instant the operator clicked (Firefox took focus + raised above it). Video-window-on-top is fundamentally wrong. INVERTED the helper: it now finds the FIREFOX kiosk (WM_CLASS `Navigator`/firefox on the monitor rect — the exact inverse of the old negative filter) and punches the preview rects as HOLES in Firefox's bounding shape (`SO.Set` full rect then `SO.Subtract` each rect), so the plain Caspar consumer BELOW shows through. Input shape is left untouched (defaults to bounding) so Firefox keeps clicks outside the holes; clicks inside a hole fall through to the inert Caspar window (accepted tradeoff). Empty rects -> restore Firefox unshaped (fills holes for modals). Verified on Xvfb :78 with a firefox-classed stand-in: `HOLES_VERIFIED` (hole center uncovered, outside covered); empty-rects -> `bounding_shaped=0` restored.
+**REQUIRED SERVER FOLLOW-UP (not done here — flagged for the owner):** `config-generator-operator-gui.js` should set `<always-on-top>false` for the operator_gui consumer so it stacks BELOW Firefox.
+
+## Constraints
+LIVE box: no git, no service ops, no AMCP, no HTTP/WS to :4200/:5250, no vite build, curated gate ONLY. You MAY spawn a throwaway Xvfb + the helper on :78 for T262.1 (kill everything, pgrep-clean). node --check + eslint + py_compile; honest checkboxes. Do NOT touch scene-take-*/amcp-batch.js, project-store.js, streaming-*, cg-look-thumb-render.js (other WOs).

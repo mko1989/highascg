@@ -155,7 +155,7 @@ describe('WO-243 T243.2: config generator emits the operator_gui channel', () =>
 		assert.match(block, /<screen>/, 'operator_gui channel drives a physical monitor via a screen consumer')
 		assert.match(block, /<windowed>true<\/windowed>/)
 		assert.match(block, /<borderless>true<\/borderless>/)
-		assert.match(block, /<always-on-top>true<\/always-on-top>/, 'WO-255: must stack above fullscreen Firefox')
+		assert.match(block, /<always-on-top>false<\/always-on-top>/, 'WO-263: consumer stacks BELOW Firefox (holes are punched in Firefox, not this window)')
 		assert.match(block, /<width>1280<\/width><height>720<\/height>/)
 		assert.doesNotMatch(block, /<artnet>/)
 		assert.doesNotMatch(block, /<decklink>/)
