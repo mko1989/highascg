@@ -71,6 +71,22 @@ function isMixerCommitBeforeAmcpBatchEnabled(connection) {
 }
 
 /**
+ * WO-259: take-scoped two-phase BEGIN…COMMIT batching for the live take pipeline (default **true** —
+ * owner-requested behavior). Explicit `config.take_two_phase_batch === false` restores the pre-WO-259
+ * per-command sequential/staggered AMCP line sequence with zero further code changes (instant rollback).
+ * Independent of the global {@link isAmcpBatchEnabled} flag — see {@link AmcpBatch#batchSend}'s
+ * `forceBatch` option, which lets take-scoped callers force a BEGIN…COMMIT batch without flipping
+ * `config.amcp_batch` (which still gates every other AMCP caller in the app).
+ * @param {{ config?: { take_two_phase_batch?: unknown } } | null | undefined} connection
+ * @returns {boolean}
+ */
+function isTakeTwoPhaseBatchEnabled(connection) {
+	const v = connection?.config?.take_two_phase_batch
+	if (v === false || v === 'false' || v === 0) return false
+	return true
+}
+
+/**
  * Infer video channel number from the first MIXER/CG/PLAY/… line (`channel-layer` form).
  * @param {string[]} lines
  * @returns {number | null}
@@ -272,7 +288,9 @@ class AmcpBatch {
 
 	/**
 	 * @param {string[]} commandLines - raw AMCP lines (no BEGIN/COMMIT)
-	 * @param {{ skipMixerPreCommit?: boolean }} [options] - when true, do not send `MIXER <ch> COMMIT` before this batch (see file header)
+	 * @param {{ skipMixerPreCommit?: boolean, forceBatch?: boolean }} [options] - `skipMixerPreCommit`: when true, do not send `MIXER <ch> COMMIT` before this batch (see file header).
+	 *   `forceBatch` (WO-259): force a BEGIN…COMMIT batch for this call regardless of the global `config.amcp_batch`
+	 *   flag — take-scoped opt-in, does not affect any other caller. Still subject to the same 2+ line / size-cap rules.
 	 * @returns {Promise<object>}
 	 */
 	batchSend(commandLines, options) {
@@ -297,7 +315,8 @@ class AmcpBatch {
 		// {@link isBatchCommitAckLine}). A single AMCP line has one `202 <CMD> OK` reply and no separate
 		// batch COMMIT ack on some paths — wrapping it in BEGIN…COMMIT then waiting for `202 COMMIT OK`
 		// never completes. Send one-command chunks with normal `_send` (same as non-batch mode).
-		const useBatch = clean.length >= 2 && isAmcpBatchEnabled(connection)
+		const forceBatch = options?.forceBatch === true
+		const useBatch = clean.length >= 2 && (isAmcpBatchEnabled(connection) || forceBatch)
 		if (!useBatch) {
 			return sequentialRaw(clean, client)
 		}
@@ -345,6 +364,7 @@ module.exports = {
 	validateBatchLine,
 	isAmcpBatchEnabled,
 	isMixerCommitBeforeAmcpBatchEnabled,
+	isTakeTwoPhaseBatchEnabled,
 	inferProgramChannelFromAmcpLines,
 	resolveMaxBatchCommands,
 	MAX_BATCH_COMMANDS,

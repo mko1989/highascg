@@ -286,7 +286,11 @@ function orderRouteJobsByDependency(routeJobs, allJobs) {
  * @param {number} channel
  * @param {object[]} takeJobs
  * @param {(job: object) => string[]} linesForJob
- * @param {{ leadingCommit?: boolean, commitAfterSources?: boolean, commitAfterRoutes?: boolean, suffixAfterSources?: string[] }} [opts]
+ * @param {{ leadingCommit?: boolean, commitAfterSources?: boolean, commitAfterRoutes?: boolean, suffixAfterSources?: string[], twoPhaseBatch?: boolean }} [opts]
+ *   `twoPhaseBatch` (WO-259): send the non-route source PLAY + suffix lines as one BEGIN…COMMIT batch instead
+ *   of one-command-at-a-time; the leading/trailing `MIXER <ch> COMMIT` still go outside the batch (Caspar
+ *   forbids `MIXER n COMMIT` inside BEGIN…COMMIT). Route PLAYs are NEVER folded into the batch — they keep
+ *   this same staggered sequential path below regardless of the flag (route:// producers need real round trips).
  */
 async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts = {}) {
 	const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
@@ -297,19 +301,29 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 	const commitAfterSources = opts.commitAfterSources === true
 	const commitAfterRoutes = opts.commitAfterRoutes === true
 	const suffixAfterSources = Array.isArray(opts.suffixAfterSources) ? opts.suffixAfterSources : []
+	const twoPhaseBatch = opts.twoPhaseBatch === true
 
 	const { sources, routes } = partitionTakeJobsPlayOrder(takeJobs, ch)
 	const sourceLines = sources.flatMap((job) => linesForJob(job) || [])
 	const orderedRoutes = orderRouteJobsByDependency(routes, takeJobs)
 
 	if (sourceLines.length > 0) {
-		/** @type {string[]} */
-		const block = []
-		if (leadingCommit) block.push(commitLine)
-		block.push(...sourceLines)
-		if (suffixAfterSources.length) block.push(...suffixAfterSources)
-		if (commitAfterSources) block.push(commitLine)
-		await sendAmcpLinesSequential(block, amcp)
+		if (twoPhaseBatch) {
+			// Phase B: one BEGIN…COMMIT for all non-route PLAYs + crossfade suffix; leading/trailing
+			// `MIXER <ch> COMMIT` sent outside the batch, same position as the sequential path below.
+			if (leadingCommit) await amcp.mixerCommit(ch)
+			const block = [...sourceLines, ...suffixAfterSources]
+			await amcp.batchSendChunked(block, { skipMixerPreCommit: true, forceBatch: true })
+			if (commitAfterSources) await amcp.mixerCommit(ch)
+		} else {
+			/** @type {string[]} */
+			const block = []
+			if (leadingCommit) block.push(commitLine)
+			block.push(...sourceLines)
+			if (suffixAfterSources.length) block.push(...suffixAfterSources)
+			if (commitAfterSources) block.push(commitLine)
+			await sendAmcpLinesSequential(block, amcp)
+		}
 	}
 
 	if (orderedRoutes.length === 0) {

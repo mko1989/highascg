@@ -6,7 +6,8 @@
 
 const playbackTracker = require('../state/playback-tracker')
 const { isSceneTemplateLayer } = require('./scene-template-cg')
-const { param } = require('../caspar/amcp-utils')
+const { param, chLayer } = require('../caspar/amcp-utils')
+const { isTakeTwoPhaseBatchEnabled } = require('../caspar/amcp-batch')
 const {
 	buildPipOverlayAmcpLinesAll,
 	buildPipOverlayRemoveLinesForTakeJobSet,
@@ -41,7 +42,7 @@ const {
  * @param {number} channel
  * @param {object[]} takeJobs
  * @param {*} self
- * @param {{ trailingCommit?: boolean }} [opts]
+ * @param {{ trailingCommit?: boolean, twoPhaseBatch?: boolean }} [opts]
  */
 async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 	await sendStaggeredTakePlays(
@@ -57,6 +58,7 @@ async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 			leadingCommit: true,
 			commitAfterSources: true,
 			commitAfterRoutes: opts.trailingCommit !== false,
+			twoPhaseBatch: opts.twoPhaseBatch === true,
 		},
 	)
 }
@@ -131,11 +133,15 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		} catch (_) {}
 	}
 
+	// WO-259: take-scoped two-phase BEGIN…COMMIT batching (default true). `false` restores the exact
+	// pre-WO-259 sequential/staggered AMCP line sequence below, byte-for-byte, with zero other changes.
+	const twoPhaseBatch = isTakeTwoPhaseBatchEnabled(amcp._context)
+
 	// Global border (layer 998) lifecycle — must ride the same channel COMMIT/crossfade
 	// as the bank swap so it doesn't pop on/off when looks transition. See WO-09.
+	let borderLines = []
 	if (incomingGbEnabled) {
 		try {
-			let borderLines = []
 			if (sameGbTemplateType) {
 				// Same template → CG UPDATE so params (color/width/etc.) change without re-adding the CG instance.
 				borderLines = buildGlobalBorderUpdateLines(channel, incomingGbLayer, incomingGb)
@@ -145,75 +151,147 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					initialOpacity: gbWillFadeIn ? 0 : 1,
 				})
 			}
-			if (borderLines.length > 0) {
-				if (typeof self.log === 'function') self.log('info', `[scene-take-lbg] Sending border lines: ${JSON.stringify(borderLines)}`)
-				await sendPipOverlayLinesSerial(amcp, borderLines)
-			}
 		} catch (e) {
 			self.log?.('warn', `Global border failed: ${e?.message || e}`)
+			borderLines = []
+		}
+	}
+
+	// Phase A only exists when there is a take/merge batch to fold border lines into (WO-259 fix design).
+	// Border-only changes (no takeJobs/mergeMixerExtras) keep the immediate legacy send below.
+	const hasPhaseA = twoPhaseBatch && (takeJobs.length > 0 || mergeMixerExtras.length > 0)
+
+	if (!hasPhaseA && borderLines.length > 0) {
+		try {
+			if (typeof self.log === 'function') self.log('info', `[scene-take-lbg] Sending border lines: ${JSON.stringify(borderLines)}`)
+			await sendPipOverlayLinesSerial(amcp, borderLines)
+		} catch (e) {
+			self.log?.('warn', `Global border send failed: ${e?.message || e}`)
 		}
 	}
 
 	if (takeJobs.length > 0 || mergeMixerExtras.length > 0) {
-		for (const job of takeJobs) {
-			if (!job.isMerge) {
-				await amcp.mixerClear(channel, job.pLayer).catch(() => {})
-			}
-			if (job.loadPlan) {
-				logPlannedCommand(self, 'load', job.layer.layerNumber, job.loadPlan)
-				await amcp.loadbg(job.loadPlan.channel, job.loadPlan.layer, job.loadPlan.clip, job.loadPlan.opts)
-			}
-		}
-
-		const prePlayOpacityLines = takeJobs
-			.flatMap((j) => [j.prePlayOpacityZeroLine, j.prePlayOpacityFullLine])
-			.filter(Boolean)
-		if (prePlayOpacityLines.length > 0) {
-			await amcp.batchSendChunked(prePlayOpacityLines, { skipMixerPreCommit: true })
-		}
-		const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
-		if (flatMixer.length > 0) {
-			await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
-		}
-
-		let pipRemoveLines = []
-		try {
-			pipRemoveLines = buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentSceneLayers)
-		} catch (_) {}
-		if (pipRemoveLines.length > 0) {
-			try {
-				await sendPipOverlayLinesSerial(amcp, pipRemoveLines)
-			} catch (_) {}
-		}
-
-		const pipAddLines = []
-		for (const job of takeJobs) {
-			if (job.pipOverlays.length > 0) {
-				try {
-					// WO-158 T158.5: overlay placement hugs the visible (cropped) content;
-					// the video layer's MIXER FILL stays uncropped (Caspar applies CROP itself).
-					const lines = buildPipOverlayAmcpLinesAll(
-						job.pipOverlays,
-						channel,
-						job.pLayer,
-						cropAdjustedFillForLayer(job.f, job.layer),
-						self,
-						nextPipContentLayerInTake(takeJobs, job.pLayer),
-						currentMap.get(job.layer.layerNumber) || null,
-						job.layer?.rotation ?? 0,
-					)
-					if (lines.length > 0) pipAddLines.push(...lines)
-				} catch (e) {
-					self.log?.('warn', `PIP overlay layer ${job.pLayer}: ${e?.message || e}`)
+		if (hasPhaseA) {
+			// WO-259 T259.1 — Phase A: one BEGIN…COMMIT batch (chunked at the AMCP cap) carrying
+			// border/PIP CG lines + per-layer MIXER CLEAR + LOADBG (transition params intact via the
+			// same plan the legacy path serializes) + pre-PLAY opacity + deferred MIXER setup (incl.
+			// immediate FILL/ANCHOR). The leading `MIXER <ch> COMMIT` stays OUTSIDE this batch and at
+			// its existing position (right before the PLAY phase, inside sendStaggeredTakePlays) —
+			// Caspar forbids `MIXER n COMMIT` inside BEGIN…COMMIT (amcp-batch.js validateBatchLine).
+			const phaseALines = [...borderLines]
+			for (const job of takeJobs) {
+				if (!job.isMerge) {
+					phaseALines.push(`MIXER ${chLayer(channel, job.pLayer)} CLEAR`)
+				}
+				if (job.loadPlan) {
+					logPlannedCommand(self, 'load', job.layer.layerNumber, job.loadPlan)
+					phaseALines.push(serializeClipCommandPlan(job.loadPlan))
 				}
 			}
-		}
-		if (pipAddLines.length > 0) {
-			try {
-				await sendPipOverlayLinesSerial(amcp, pipAddLines)
-			} catch (_) {}
-		}
 
+			const prePlayOpacityLines = takeJobs
+				.flatMap((j) => [j.prePlayOpacityZeroLine, j.prePlayOpacityFullLine])
+				.filter(Boolean)
+			phaseALines.push(...prePlayOpacityLines)
+
+			const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
+			phaseALines.push(...flatMixer)
+
+			let pipRemoveLines = []
+			try {
+				pipRemoveLines = buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentSceneLayers)
+			} catch (_) {}
+			phaseALines.push(...pipRemoveLines)
+
+			const pipAddLines = []
+			for (const job of takeJobs) {
+				if (job.pipOverlays.length > 0) {
+					try {
+						// WO-158 T158.5: overlay placement hugs the visible (cropped) content;
+						// the video layer's MIXER FILL stays uncropped (Caspar applies CROP itself).
+						const lines = buildPipOverlayAmcpLinesAll(
+							job.pipOverlays,
+							channel,
+							job.pLayer,
+							cropAdjustedFillForLayer(job.f, job.layer),
+							self,
+							nextPipContentLayerInTake(takeJobs, job.pLayer),
+							currentMap.get(job.layer.layerNumber) || null,
+							job.layer?.rotation ?? 0,
+						)
+						if (lines.length > 0) pipAddLines.push(...lines)
+					} catch (e) {
+						self.log?.('warn', `PIP overlay layer ${job.pLayer}: ${e?.message || e}`)
+					}
+				}
+			}
+			phaseALines.push(...pipAddLines)
+
+			if (phaseALines.length > 0) {
+				await amcp.batchSendChunked(phaseALines, { skipMixerPreCommit: true, forceBatch: true })
+			}
+		} else {
+			// Legacy sequential path (take_two_phase_batch: false, or no borderLines/takeJobs to fold) —
+			// byte-identical to pre-WO-259 behavior.
+			for (const job of takeJobs) {
+				if (!job.isMerge) {
+					await amcp.mixerClear(channel, job.pLayer).catch(() => {})
+				}
+				if (job.loadPlan) {
+					logPlannedCommand(self, 'load', job.layer.layerNumber, job.loadPlan)
+					await amcp.loadbg(job.loadPlan.channel, job.loadPlan.layer, job.loadPlan.clip, job.loadPlan.opts)
+				}
+			}
+
+			const prePlayOpacityLines = takeJobs
+				.flatMap((j) => [j.prePlayOpacityZeroLine, j.prePlayOpacityFullLine])
+				.filter(Boolean)
+			if (prePlayOpacityLines.length > 0) {
+				await amcp.batchSendChunked(prePlayOpacityLines, { skipMixerPreCommit: true })
+			}
+			const flatMixer = [...takeJobs.flatMap((j) => j.mixerLines), ...mergeMixerExtras]
+			if (flatMixer.length > 0) {
+				await amcp.batchSendChunked(flatMixer, { skipMixerPreCommit: true })
+			}
+
+			let pipRemoveLines = []
+			try {
+				pipRemoveLines = buildPipOverlayRemoveLinesForTakeJobSet(channel, takeJobs, currentSceneLayers)
+			} catch (_) {}
+			if (pipRemoveLines.length > 0) {
+				try {
+					await sendPipOverlayLinesSerial(amcp, pipRemoveLines)
+				} catch (_) {}
+			}
+
+			const pipAddLines = []
+			for (const job of takeJobs) {
+				if (job.pipOverlays.length > 0) {
+					try {
+						// WO-158 T158.5: overlay placement hugs the visible (cropped) content;
+						// the video layer's MIXER FILL stays uncropped (Caspar applies CROP itself).
+						const lines = buildPipOverlayAmcpLinesAll(
+							job.pipOverlays,
+							channel,
+							job.pLayer,
+							cropAdjustedFillForLayer(job.f, job.layer),
+							self,
+							nextPipContentLayerInTake(takeJobs, job.pLayer),
+							currentMap.get(job.layer.layerNumber) || null,
+							job.layer?.rotation ?? 0,
+						)
+						if (lines.length > 0) pipAddLines.push(...lines)
+					} catch (e) {
+						self.log?.('warn', `PIP overlay layer ${job.pLayer}: ${e?.message || e}`)
+					}
+				}
+			}
+			if (pipAddLines.length > 0) {
+				try {
+					await sendPipOverlayLinesSerial(amcp, pipAddLines)
+				} catch (_) {}
+			}
+		}
 
 		let crossfadeLines = []
 		if (shouldRunBankCrossfade) {
@@ -302,6 +380,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						commitAfterSources: true,
 						commitAfterRoutes: true,
 						suffixAfterSources,
+						twoPhaseBatch,
 					},
 				)
 				fadeClockRef.start = Date.now()
@@ -320,12 +399,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						leadingCommit: true,
 						commitAfterSources: true,
 						commitAfterRoutes: true,
+						twoPhaseBatch,
 					},
 				)
 				fadeClockRef.start = Date.now()
 				notifyProgramTransitionStarted()
 			} else {
-				await sendPhasedTakePlays(amcp, channel, takeJobs, self)
+				await sendPhasedTakePlays(amcp, channel, takeJobs, self, { twoPhaseBatch })
 			}
 		} catch (_) {}
 

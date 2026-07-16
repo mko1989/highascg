@@ -11,7 +11,12 @@
  * 4) Bank crossfade path (non-merge): direction-aware opacity — fade incoming in when it is on top (bank B),
  *    or fade outgoing out when incoming is underneath (bank A); only one side tweens (no 50% dip).
  * 5) Teardown after transition window; merge teardown clears both logical layer N and N+100 to drop legacy bank B.
- * LOADBG/PLAY stay `_send` (not inside BEGIN…COMMIT) so Caspar can resolve each layer reliably.
+ * WO-259: `take_two_phase_batch` (config, default true) folds per-layer MIXER CLEAR/LOADBG/pre-PLAY
+ * opacity/deferred MIXER/border+PIP CG into one BEGIN…COMMIT (Phase A), and non-route PLAYs + crossfade
+ * OPACITY into a second BEGIN…COMMIT (Phase B) — see scene-take-lbg-amcp-pipeline.js and
+ * scene-route-deps.js#sendStaggeredTakePlays. `MIXER <ch> COMMIT` always stays outside both batches, and
+ * route:// PLAYs are never folded in (they still need real round trips to resolve). Explicit `false`
+ * restores the historical one-command-at-a-time sequence this comment used to mandate unconditionally.
  */
 
 'use strict'

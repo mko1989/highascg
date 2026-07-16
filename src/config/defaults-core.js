@@ -15,6 +15,9 @@ function coreDefaults() {
 		amcp_batch: false,
 		amcp_max_batch_commands: 64,
 		amcp_mixer_commit_before_amcp_batch: true,
+		/** WO-259: two-phase BEGIN…COMMIT batching for the live take pipeline. `false` = pre-WO-259
+		 * byte-identical sequential AMCP line sequence (instant no-code-change rollback). */
+		take_two_phase_batch: true,
 		offline_mode: false,
 		screen_1_force_os_resolution: false,
 		screen_2_force_os_resolution: false,

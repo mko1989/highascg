@@ -37,8 +37,17 @@ New config flag `take_two_phase_batch` (default **true** — owner asked for thi
 ## Constraints (LIVE-CRITICAL — strictest standard)
 No git, no service ops, NO AMCP to the live server under any circumstances, no HTTP/WS to :4200/:5250, no vite build, curated gate ONLY. node --check + eslint --quiet on touched files; exact gate counts. The take pipeline has caused live outages before (WO-217): keep diffs minimal, show the before/after emission sequence for a 3-layer crossfade take in your report, and if ANY finding contradicts this WO's design, STOP and report instead of improvising. A259.1 (owner) validates on PRV/non-air first per the historical reliability note.
 
-- [ ] T259.1 two-phase batches behind take_two_phase_batch (default true, false = byte-identical legacy)
-- [ ] T259.2 PGM-only path
-- [ ] T259.3 wire-shape smokes (flag on AND off)
-- [ ] T259.4 comment/docs update
+- [x] T259.1 two-phase batches behind take_two_phase_batch (default true, false = byte-identical legacy)
+- [ ] T259.2 PGM-only path — **SKIPPED, see contradiction note below**
+- [x] T259.3 wire-shape smokes (flag on AND off) — `tools/smoke/smoke-wo259-two-phase-batch.test.js`, added to curated gate
+- [x] T259.4 comment/docs update — scene-take-lbg.js:14 (docblock) updated
 - [ ] A259.1 (owner) PRV-first validation, then a live multi-layer crossfade take: all layers transition together
+
+### Implementation deviation — T259.2 STOPPED (contradiction found)
+
+Per this WO's own escape clause, T259.2 was **not implemented**. Two file:line-verified findings contradict the WO's premise that `scene-take-pgm-only.js` is a live code path sharing the LBG jobs model:
+
+1. **Dead code since WO-160b.** `scene-take-pgm-only.js:1-6` carries its own header: "LEGACY since WO-160b: pgm-only takes now run through the LBG bank pipeline instead of this engine... `runSceneTakePgmOnly` is no longer invoked." Confirmed by grep: the only callers of `runSceneTakePgmOnly` are `tools/smoke/smoke-scene-take-pgm-only.test.js` and `tools/smoke/smoke-wo160b-pgm-only-lbg.test.js` (which exists specifically to assert the delegation was *removed*). Production pgm-only takes route through `runSceneTakeLbg` with `opts.pgmOnly: true` — see `src/api/routes-scene-take.js:330-338` and `src/engine/scene-take-lbg.js:168` (`shouldClearOrphans` gate). T259.1's changes to `scene-take-lbg-amcp-pipeline.js` + `scene-route-deps.js` already cover the PGM-only take path end-to-end (both flow through the same `sendStaggeredTakePlays`).
+2. **"Shares the jobs model" is false.** `scene-take-pgm-only.js`'s `runSceneTakePgmOnly` builds its own inline job objects (`{layer, pLayer, clip, f, loadOpts, templateCg, pipOverlays}`, built via `buildPgmOnlyMixerLines`) — it does not use `buildTakeJobs` from `scene-take-lbg-jobs.js` and its job shape has no `mixerLines`/`prePlayOpacityZeroLine`/`prePlayOpacityFullLine` fields, so the Phase-A composition built for T259.1 does not transfer without a rewrite (not a wire-shape rename).
+
+Given the file is unreachable at runtime, applying two-phase batching there carries no live risk either way but also no live benefit, and hand-adapting the (different) job shape would be improvising past a stated contradiction on LIVE-CRITICAL code. Left untouched; owner/next WO should decide whether to delete `scene-take-pgm-only.js` (no callers besides its own smokes) or resurrect it.
