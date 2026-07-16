@@ -68,16 +68,32 @@
 	box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.6);
 }
 
-.operator-tile__header {
+/* The reported video rect — chrome (footer/border) never overlaps this box; all chrome is BELOW. */
+.operator-tile__body {
+	position: absolute;
+	background: #050505;
+}
+
+/* Footer sits BELOW the video: a colored screen-label row (drag handle) over the playback timer
+ * (clip file name + progress bar). Nothing is drawn above the video body. */
+.operator-tile__footer {
 	position: absolute;
 	left: 0;
-	top: 0;
+	bottom: 0;
 	width: 100%;
 	box-sizing: border-box;
 	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 2px 6px;
+	flex-direction: column;
+	justify-content: flex-start;
+	padding: 0;
+	overflow: hidden;
+	background: rgba(0, 0, 0, 0.72);
+	cursor: grab;
+}
+.operator-tile__footer:active { cursor: grabbing; }
+.operator-tile__label {
+	box-sizing: border-box;
+	padding: 1px 6px;
 	font-size: 10px;
 	font-weight: 600;
 	letter-spacing: 0.3px;
@@ -85,29 +101,10 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	cursor: grab;
 	background: #c92a2a;
 }
-.operator-tile[data-role='prv'] .operator-tile__header { background: #0d9488; }
-.operator-tile__header:active { cursor: grabbing; }
-
-/* The reported video rect — chrome (header/footer/border) never overlaps this box. */
-.operator-tile__body {
-	position: absolute;
-	background: #050505;
-}
-
-.operator-tile__footer {
-	position: absolute;
-	left: 0;
-	bottom: 0;
-	width: 100%;
-	box-sizing: border-box;
-	padding: 1px 6px;
-	overflow: hidden;
-	background: rgba(0, 0, 0, 0.55);
-}
-.operator-tile__footer .playback-timer { min-width: 0; font-size: 9px; }
+.operator-tile[data-role='prv'] .operator-tile__label { background: #0d9488; }
+.operator-tile__footer .playback-timer { min-width: 0; font-size: 9px; padding: 0 6px; }
 .operator-tile__footer .playback-timer__row { font-size: 9px; }
 
 .operator-tile__resize {

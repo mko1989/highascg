@@ -7,13 +7,14 @@
  * `isOperatorGuiModeActive()` is true (see its `operatorTilesActive` gate) — this module itself
  * has no gate of its own, callers own that.
  *
- * Each tile = header strip (drag handle + `${ROLE} ${screen} / ${label}`, screen-label.js WO-222)
- * + body (the reported video rect — literally empty, the shaped Caspar window renders ABOVE this
- * page, see client/lib/operator-gui-mode.js's header doc) + footer strip (single running-layer
- * progress bar, `mountPgmTopLayerPlaybackTimer` from playback-timer.js — WO-250's bank-aware
- * `pickTopLayerStateForPlayback`, imported/reused there, never copied here).
+ * Each tile = body (the reported video rect — literally empty; the Caspar consumer shows through a
+ * HOLE punched in Firefox at this rect, WO-263) + a footer strip BELOW the body (owner: chrome must
+ * never overlay the video) holding a screen-label row (drag handle, `${ROLE} ${screen} / ${label}`,
+ * screen-label.js WO-222) above the playback timer (clip file name + single running-layer progress
+ * bar, `mountPgmTopLayerPlaybackTimer` from playback-timer.js — WO-250's bank-aware
+ * `pickTopLayerStateForPlayback`, imported/reused there, never copied here). headerH is 0.
  *
- * Chrome (border/header/footer) is laid out by explicit pixel math (`tileBodyRectFromOuter`), not
+ * Chrome (border/footer) is laid out by explicit pixel math (`tileBodyRectFromOuter`), not
  * flexbox — the border-box CSS in client/styles/10b-operator-compose-tiles.css already keeps the
  * border off the body by construction, but sizing the body from the same pure function this file
  * unit-tests keeps "what runs" and "what's tested" identical.
@@ -24,7 +25,7 @@ import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 /** Body minimum (video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
 /** Header/footer/border pixel sizes — kept in lockstep with client/styles/10b-operator-compose-tiles.css. */
-export const TILE_CHROME = { headerH: 20, footerH: 24, borderW: 2 }
+export const TILE_CHROME = { headerH: 0, footerH: 34, borderW: 2 }
 const GRID = 8
 
 /** @returns {{ width: number, height: number }} smallest OUTER (tile) size whose body still meets {@link MIN_BODY}. */
@@ -175,7 +176,7 @@ export function initOperatorComposeTiles(container, options) {
 
 	const getCm = () => stateStore?.getState?.()?.channelMap || {}
 
-	/** @type {Map<string, { def: object, frac: { x: number, y: number, w: number, h: number }, el: HTMLElement, bodyEl: HTMLElement, headerEl: HTMLElement, footerEl: HTMLElement, timer: { destroy: () => void, refresh: () => void } | null }>} */
+	/** @type {Map<string, { def: object, frac: { x: number, y: number, w: number, h: number }, el: HTMLElement, bodyEl: HTMLElement, footerEl: HTMLElement, labelEl: HTMLElement, timer: { destroy: () => void, refresh: () => void } | null }>} */
 	const tiles = new Map()
 	let defsKey = ''
 	let storageKey = layoutStorageKey(storageKeyPrefix, 1)
@@ -209,7 +210,6 @@ export function initOperatorComposeTiles(container, options) {
 		t.bodyEl.style.top = `${body.top}px`
 		t.bodyEl.style.width = `${body.width}px`
 		t.bodyEl.style.height = `${body.height}px`
-		t.headerEl.style.height = `${TILE_CHROME.headerH}px`
 		t.footerEl.style.height = `${TILE_CHROME.footerH}px`
 	}
 
@@ -239,25 +239,28 @@ export function initOperatorComposeTiles(container, options) {
 		el.dataset.role = def.role
 		el.dataset.tileId = def.id
 
-		const headerEl = document.createElement('div')
-		headerEl.className = 'operator-tile__header'
-		headerEl.textContent = `${def.role.toUpperCase()} ${def.mainIndex + 1} / ${screenLabel(getCm(), def.mainIndex)}`
-
 		const bodyEl = document.createElement('div')
 		bodyEl.className = 'operator-tile__body'
 
+		// All chrome sits BELOW the video body (owner: label + progress bar must not overlay any
+		// actual content). The footer holds a screen-label row (also the drag handle) above the
+		// playback timer (which itself shows the clip file name + progress bar).
 		const footerEl = document.createElement('div')
 		footerEl.className = 'operator-tile__footer'
+		const labelEl = document.createElement('div')
+		labelEl.className = 'operator-tile__label'
+		labelEl.textContent = `${def.role.toUpperCase()} ${def.mainIndex + 1} / ${screenLabel(getCm(), def.mainIndex)}`
+		footerEl.appendChild(labelEl)
 
 		const resizeEl = document.createElement('div')
 		resizeEl.className = 'operator-tile__resize'
 
-		el.append(headerEl, bodyEl, footerEl, resizeEl)
+		el.append(bodyEl, footerEl, resizeEl)
 		root.appendChild(el)
 
-		const t = { def, frac, el, bodyEl, headerEl, footerEl, timer: null }
+		const t = { def, frac, el, bodyEl, footerEl, labelEl, timer: null }
 
-		headerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
+		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
 
 		const osc = typeof getOscClient === 'function' ? getOscClient() : null
@@ -277,7 +280,7 @@ export function initOperatorComposeTiles(container, options) {
 	}
 
 	function relabel(t) {
-		t.headerEl.textContent = `${t.def.role.toUpperCase()} ${t.def.mainIndex + 1} / ${screenLabel(getCm(), t.def.mainIndex)}`
+		t.labelEl.textContent = `${t.def.role.toUpperCase()} ${t.def.mainIndex + 1} / ${screenLabel(getCm(), t.def.mainIndex)}`
 	}
 
 	function startDrag(e, t, mode) {
@@ -312,6 +315,10 @@ export function initOperatorComposeTiles(container, options) {
 		const clamped = clampTileRect(nextPx, cw, ch, minOuter.width, minOuter.height)
 		t.frac = { x: clamped.x / cw, y: clamped.y / ch, w: clamped.w / cw, h: clamped.h / ch }
 		layoutTileDom(t)
+		// WO-263: report the new body rect LIVE during the drag so the Firefox hole tracks the box
+		// in real time (the video follows the resize). The old model suppressed here because the
+		// video sat ABOVE the DOM and couldn't show the drag; holes-in-Firefox can.
+		scheduleReport()
 	}
 
 	function onDragEnd() {
@@ -321,8 +328,7 @@ export function initOperatorComposeTiles(container, options) {
 		if (drag) drag.t.el.classList.remove('operator-tile--dragging')
 		drag = null
 		persist()
-		// WO-256: rects report only on release — matches the suppression contract (video hidden
-		// mid-drag, tile outline is the only feedback; the new body rect reports once settled).
+		// Final settle report (the live drag reports were throttled/rAF; guarantee the last rect).
 		reportRectsNow()
 	}
 

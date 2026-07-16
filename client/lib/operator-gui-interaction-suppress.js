@@ -24,7 +24,13 @@
 
 import { setInteractionSuppressed } from './operator-gui-mode.js'
 
-const PREVIEW_SURFACE_SELECTOR = '.preview-panel__compose-cell, .preview-panel__canvas, .mv-canvas-wrap, .operator-compose-tiles'
+// WO-263 inversion: `.operator-compose-tiles` is deliberately NOT here. Under the old video-on-top
+// model a tile drag had to suppress (fill the holes) because the video couldn't show the drag. Now
+// the holes are punched in FIREFOX, so a tile drag/resize reports its rects LIVE and the hole tracks
+// the box in real time (operator-compose-tiles.js onDragMove → scheduleReport) — suppressing would
+// blank the very video the operator is trying to position. Only genuine occluders (modals/dropdowns)
+// and the OTHER preview surfaces still suppress.
+const PREVIEW_SURFACE_SELECTOR = '.preview-panel__compose-cell, .preview-panel__canvas, .mv-canvas-wrap'
 
 let _modalObserver = null
 let _pointerDown = false

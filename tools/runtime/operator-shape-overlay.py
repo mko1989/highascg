@@ -58,6 +58,7 @@ import time
 
 from Xlib import X, display
 from Xlib.ext import shape
+from Xlib.protocol import event
 
 LOG_PATH = os.path.expanduser("~/.highascg/log/operator-shape-overlay.log")
 PID_PATH = os.path.expanduser("~/.highascg/run/operator-shape-overlay.pid")
@@ -74,6 +75,10 @@ OPERATOR_TITLE_MARKER = "HIGHASCG-OPERATOR-GUI"
 # when these are still None (get_full_property tolerates a bad atom via the surrounding try/except).
 _ATOM_NET_WM_NAME = None
 _ATOM_UTF8_STRING = None
+_ATOM_NET_WM_STATE = None
+_ATOM_NET_WM_STATE_ABOVE = None
+_DISPLAY = None
+_ROOT = None
 STDIN_SELECT_TIMEOUT_SEC = 0.5
 
 
@@ -215,6 +220,23 @@ def find_firefox_window(root, monitor, title_marker=OPERATOR_TITLE_MARKER):
     return candidates[0]
 
 
+def lock_window_above(win):
+    """Persistently keep `win` (the Firefox toplevel) above other windows via EWMH
+    _NET_WM_STATE_ABOVE. A one-shot stack raise is not enough: clicking a hole routes the click to
+    the Caspar window below, and the WM then raises THAT window over Firefox — hiding the GUI. This
+    tells the WM to keep Firefox on top for good, so a click through a hole can never bury it."""
+    if _ATOM_NET_WM_STATE is None or _ATOM_NET_WM_STATE_ABOVE is None or _ROOT is None or _DISPLAY is None:
+        return
+    try:
+        # _NET_WM_STATE: action=1 (ADD), prop1=_NET_WM_STATE_ABOVE, prop2=0, source=1 (application)
+        data = [1, _ATOM_NET_WM_STATE_ABOVE, 0, 1, 0]
+        ev = event.ClientMessage(window=win, client_type=_ATOM_NET_WM_STATE, data=(32, data))
+        _ROOT.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+        _DISPLAY.flush()
+    except Exception as e:
+        log(f"lock_window_above failed: {e}")
+
+
 def apply_holes(pair, monitor, rects):
     """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
     Firefox's bounding shape: SET the bounding region to the full window rect, then SUBTRACT each
@@ -238,7 +260,10 @@ def apply_holes(pair, monitor, rects):
             for r in rects:
                 win.shape_rectangles(shape.SO.Subtract, shape.SK.Bounding, 0, 0, 0, [tuple(r)])
         # Keep Firefox on top — with holes punched, that is exactly what shows the video through.
+        # Persistent (_NET_WM_STATE_ABOVE) so a click routed through a hole to the Caspar window
+        # below cannot let the WM raise it over Firefox and hide the GUI.
         toplevel.configure(stack_mode=X.Above)
+        lock_window_above(toplevel)
         return True
     except Exception as e:
         log(f"apply_holes failed: {e}")
@@ -299,11 +324,19 @@ def main() -> int:
     root = d.screen().root
 
     global _ATOM_NET_WM_NAME, _ATOM_UTF8_STRING
+    global _ATOM_NET_WM_STATE, _ATOM_NET_WM_STATE_ABOVE, _DISPLAY, _ROOT
+    _DISPLAY = d
+    _ROOT = root
     try:
         _ATOM_NET_WM_NAME = d.intern_atom("_NET_WM_NAME")
         _ATOM_UTF8_STRING = d.intern_atom("UTF8_STRING")
     except Exception as e:
         log(f"warning: could not intern _NET_WM_NAME atoms ({e}); title match falls back to WM_NAME")
+    try:
+        _ATOM_NET_WM_STATE = d.intern_atom("_NET_WM_STATE")
+        _ATOM_NET_WM_STATE_ABOVE = d.intern_atom("_NET_WM_STATE_ABOVE")
+    except Exception as e:
+        log(f"warning: could not intern _NET_WM_STATE atoms ({e}); persistent always-on-top disabled")
 
     state_monitor = None
     state_rects = []

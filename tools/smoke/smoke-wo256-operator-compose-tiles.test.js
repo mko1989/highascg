@@ -249,9 +249,11 @@ describe('WO-256 T256.4: rect reporting reuses the existing merged-report path u
 		assert.equal(typeof pickTopLayerStateForPlayback, 'function')
 	})
 
-	it('operator-gui-interaction-suppress.js: preview-surface selector extended to catch tile drags/resizes', () => {
-		const src = read('client/lib/operator-gui-interaction-suppress.js')
-		assert.match(src, /PREVIEW_SURFACE_SELECTOR\s*=\s*'[^']*\.operator-compose-tiles[^']*'/)
+	it('WO-263: tile drags do NOT suppress (holes track the box live) — tile surface excluded from the suppressor; onDragMove reports live', () => {
+		const suppress = read('client/lib/operator-gui-interaction-suppress.js')
+		assert.doesNotMatch(suppress, /PREVIEW_SURFACE_SELECTOR\s*=\s*'[^']*\.operator-compose-tiles[^']*'/, 'tile surface must NOT suppress — it reports live instead')
+		const tiles = read('client/components/operator-compose-tiles.js')
+		assert.match(tiles, /onDragMove[\s\S]*?scheduleReport\(\)/, 'onDragMove reports live so the Firefox hole follows the resize')
 	})
 
 	it('screen-label.js (WO-222) is reused for the header label, not re-implemented', () => {
@@ -269,7 +271,8 @@ describe('WO-256: CSS wired, tile chrome/body classes present, styles.css import
 		const css = read('client/styles/10b-operator-compose-tiles.css')
 		assert.match(css, /\.operator-tile\s*\{[^}]*box-sizing:\s*border-box/)
 		assert.match(css, /\.operator-tile__body/)
-		assert.match(css, /\.operator-tile__header/)
+		// WO-263: chrome moved BELOW the video — the screen-label row lives in the footer now.
+		assert.match(css, /\.operator-tile__label/)
 		assert.match(css, /\.operator-tile__footer/)
 	})
 })
