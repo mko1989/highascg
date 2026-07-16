@@ -77,6 +77,7 @@ _ATOM_NET_WM_NAME = None
 _ATOM_UTF8_STRING = None
 _ATOM_NET_WM_STATE = None
 _ATOM_NET_WM_STATE_ABOVE = None
+_ATOM_NET_WM_STATE_BELOW = None
 _DISPLAY = None
 _ROOT = None
 STDIN_SELECT_TIMEOUT_SEC = 0.5
@@ -220,24 +221,62 @@ def find_firefox_window(root, monitor, title_marker=OPERATOR_TITLE_MARKER):
     return candidates[0]
 
 
-def lock_window_above(win):
-    """Persistently keep `win` (the Firefox toplevel) above other windows via EWMH
-    _NET_WM_STATE_ABOVE. A one-shot stack raise is not enough: clicking a hole routes the click to
-    the Caspar window below, and the WM then raises THAT window over Firefox — hiding the GUI. This
-    tells the WM to keep Firefox on top for good, so a click through a hole can never bury it."""
-    if _ATOM_NET_WM_STATE is None or _ATOM_NET_WM_STATE_ABOVE is None or _ROOT is None or _DISPLAY is None:
+def set_net_wm_state(win, state_atom, add=True):
+    """EWMH _NET_WM_STATE client message to root (WM is Openbox; ABOVE/BELOW both in _NET_SUPPORTED).
+    MUST target the CLIENT window Openbox manages, NOT the WM frame — a message for the frame is
+    silently ignored (the 2026-07-16 'ABOVE did not stick' bug: it was sent for the frame)."""
+    if _ATOM_NET_WM_STATE is None or state_atom is None or _ROOT is None or _DISPLAY is None:
         return
     try:
-        # _NET_WM_STATE: action=1 (ADD), prop1=_NET_WM_STATE_ABOVE, prop2=0, source=1 (application)
-        data = [1, _ATOM_NET_WM_STATE_ABOVE, 0, 1, 0]
+        data = [1 if add else 0, state_atom, 0, 1, 0]  # action(ADD/REMOVE), prop1, prop2=0, source=app
         ev = event.ClientMessage(window=win, client_type=_ATOM_NET_WM_STATE, data=(32, data))
         _ROOT.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
         _DISPLAY.flush()
     except Exception as e:
-        log(f"lock_window_above failed: {e}")
+        log(f"set_net_wm_state failed: {e}")
 
 
-def apply_holes(pair, monitor, rects):
+def find_caspar_consumer(root, monitor, channel):
+    """Find the operator_gui Caspar screen-consumer CLIENT window (WM_CLASS 'casparcg', title
+    'Screen consumer [<channel>|...]') so it can be forced BELOW Firefox. The operator_gui channel is
+    unique, so match by the channel signature in title/class ANYWHERE in the tree — NOT by exact
+    monitor geometry (Openbox may frame/place the consumer at a different origin than the monitor
+    rect, unlike Firefox which we position exactly). `monitor` is unused; kept for call symmetry."""
+    def walk(win, depth):
+        title = window_title(win)
+        inst, cls = window_class(win)
+        firefoxy = "navigator" in inst or "navigator" in cls or "firefox" in inst or "firefox" in cls
+        is_caspar = (not firefoxy) and ("casparcg" in inst or "casparcg" in cls or title.startswith("Screen consumer"))
+        sig = f"[{channel}|" if channel is not None else None
+        if is_caspar and (sig is None or sig in title or sig in cls):
+            return win
+        if depth >= 4:
+            return None
+        try:
+            for k in win.query_tree().children:
+                hit = walk(k, depth + 1)
+                if hit is not None:
+                    return hit
+        except Exception:
+            return None
+        return None
+
+    try:
+        for top in root.query_tree().children:
+            hit = walk(top, 0)
+            if hit is not None:
+                return hit
+    except Exception:
+        return None
+    return None
+
+
+def lock_window_above(win):
+    """Keep the Firefox CLIENT window above others (EWMH _NET_WM_STATE_ABOVE)."""
+    set_net_wm_state(win, _ATOM_NET_WM_STATE_ABOVE, add=True)
+
+
+def apply_holes(pair, monitor, rects, channel=None):
     """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
     Firefox's BOUNDING shape (visual): SET bounding to the full window rect, then SUBTRACT each
     preview rect so the Caspar consumer below shows through.
@@ -330,7 +369,7 @@ def main() -> int:
     root = d.screen().root
 
     global _ATOM_NET_WM_NAME, _ATOM_UTF8_STRING
-    global _ATOM_NET_WM_STATE, _ATOM_NET_WM_STATE_ABOVE, _DISPLAY, _ROOT
+    global _ATOM_NET_WM_STATE, _ATOM_NET_WM_STATE_ABOVE, _ATOM_NET_WM_STATE_BELOW, _DISPLAY, _ROOT
     _DISPLAY = d
     _ROOT = root
     try:
@@ -341,6 +380,7 @@ def main() -> int:
     try:
         _ATOM_NET_WM_STATE = d.intern_atom("_NET_WM_STATE")
         _ATOM_NET_WM_STATE_ABOVE = d.intern_atom("_NET_WM_STATE_ABOVE")
+        _ATOM_NET_WM_STATE_BELOW = d.intern_atom("_NET_WM_STATE_BELOW")
     except Exception as e:
         log(f"warning: could not intern _NET_WM_STATE atoms ({e}); persistent always-on-top disabled")
 
@@ -372,7 +412,7 @@ def main() -> int:
                     win = found
                     if is_new:
                         log(f"firefox window (re)found: toplevel={win[0].id} client={win[1].id} — (re)applying holes")
-                        apply_holes(win, state_monitor, state_rects)
+                        apply_holes(win, state_monitor, state_rects, state_channel)
                 elif win is not None:
                     log("firefox window no longer present (restart?) — will re-search")
                     win = None
@@ -417,7 +457,7 @@ def main() -> int:
             if win is None:
                 win = find_firefox_window(root, state_monitor, state_title_marker)
             if win is not None:
-                if not apply_holes(win, state_monitor, state_rects):
+                if not apply_holes(win, state_monitor, state_rects, state_channel):
                     win = None  # stale handle — force re-search next iteration
             else:
                 log("no firefox window matching monitor rect yet (will retry on next update/poll)")
