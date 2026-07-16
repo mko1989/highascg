@@ -481,7 +481,7 @@ class OscState extends EventEmitter {
 			// 2.6-dev binary — remaining/progress (and the elapsed the UI timers read) must use the
 			// in-iteration position (elapsed % duration), or timers jump between the two values.
 			const { remaining, progress, iterationElapsed } = computeRemainingAndProgress(elapsed, duration, { loop: f.loop === true })
-			if (f.loop === true && Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed
+			if (Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed /* corrected: modulo/clamp per computeRemainingAndProgress (magnitude, not loop flag) */
 			// No duration to modulo against AND a monotonic elapsed far beyond any real clip
 			// (live/route producers whose elapsed is a since-start clock, never reset per play) —
 			// showing 462289s ("128 hours") is worse than nothing. Null it so the UI shows a blank
@@ -615,7 +615,7 @@ class OscState extends EventEmitter {
 		const duration = Number.isFinite(f.duration) ? f.duration : NaN
 		const elapsed = Number.isFinite(f.elapsed) ? f.elapsed : null
 		const { remaining, progress, iterationElapsed } = computeRemainingAndProgress(elapsed, duration, { loop: f.loop === true })
-		if (f.loop === true && Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed
+		if (Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed /* corrected: modulo/clamp per computeRemainingAndProgress (magnitude, not loop flag) */
 		f.remaining = remaining
 		f.progress = progress
 

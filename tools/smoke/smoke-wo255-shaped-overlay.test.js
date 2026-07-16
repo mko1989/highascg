@@ -263,11 +263,13 @@ describe('WO-262: shape helper stdin drain + heartbeat (fixes lost 2nd-payload-a
 	it('py: T262.3 heartbeat — logs every stdin line as it is read, before any window match', () => {
 		assert.match(pySrc, /log\(f"stdin line received: \{line\[:200\]\}"\)/, 'per-line heartbeat log line present')
 	})
-	it('py: WO-262 shaping punches HOLES in Firefox (SO.Set full then SO.Subtract each rect), does not set an empty input shape, restores unshaped on empty rects', () => {
+	it('py: shaping punches HOLES in the bounding shape but sets INPUT to the FULL window (show-through but clickable); restores unshaped on empty rects', () => {
 		assert.match(pySrc, /def apply_holes/, 'shaping fn punches holes (renamed from apply_shape)')
 		assert.match(pySrc, /shape\.SO\.Subtract/, 'subtracts each preview rect from the bounding shape (the holes)')
 		assert.match(pySrc, /shape\.SO\.Set, shape\.SK\.Bounding, 0, 0, 0, \[full\]/, 'sets the full window rect first, then subtracts')
-		assert.doesNotMatch(pySrc, /SK\.Input/, 'WO-262: no longer sets an empty input shape — Firefox keeps input outside the holes')
+		// 2026-07-16: input shape is now SET to the full window so clicks over holes hit Firefox and
+		// never reach (and raise) the Caspar consumer below — the "clickable show-through layer".
+		assert.match(pySrc, /shape\.SO\.Set, shape\.SK\.Input, 0, 0, 0, \[full\]/, 'input = full window (catch clicks over the holes)')
 		assert.match(pySrc, /if not rects:[\s\S]*?shape_mask\(shape\.SO\.Set, shape\.SK\.Bounding, 0, 0, X\.NONE\)/, 'empty rects -> restore unshaped (holes filled) for modals')
 	})
 	it('pure-logic: hole complement — SO.Set(full) then SO.Subtract(rect) yields a region that EXCLUDES the rect interior but keeps everything else', () => {

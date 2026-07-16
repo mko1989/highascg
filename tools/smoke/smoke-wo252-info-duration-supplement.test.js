@@ -249,10 +249,10 @@ t2('loop-modulo: accumulated elapsed wraps to in-iteration position', () => {
 	assert2.ok(r.remaining >= 0 && r.remaining <= 30)
 	assert2.ok(r.progress >= 0 && r.progress <= 1)
 })
-t2('loop-modulo: non-looping elapsed is untouched even when > duration (stall case)', () => {
+t2('non-looping elapsed a hair past duration (<2×) pins to 100% (2026-07-16 magnitude correction)', () => {
 	const assert2 = require('node:assert/strict')
 	const r = computeRemainingAndProgress(35, 30, { loop: false })
-	assert2.equal(r.iterationElapsed, 35)
+	assert2.equal(r.iterationElapsed, 30, 'clamped to duration — a non-loop clip past its end shows 100%, not an overrun number')
 	assert2.equal(r.remaining, 0)
 })
 t2('loop-modulo: looping within first iteration is untouched', () => {
@@ -291,4 +291,22 @@ it('a real positive duration is unaffected', () => {
 	const f = os.getSnapshot().channels['1'].layers['10'].file
 	assert.equal(f.duration, 5.04)
 	assert.ok(Math.abs(f.elapsed - 4.16) < 0.001)
+})
+
+// 2026-07-16 live: a NON-looping clip (loop flag FALSE) with a monotonic elapsed far past its
+// duration (462034s on a 5.04s clip) slipped past the loop-only modulo. Correction is by MAGNITUDE
+// now: elapsed > 2×duration wraps regardless of the (unreliable) loop flag; a normal clip ending a
+// hair past duration pins to 100% instead of snapping to ~0.
+it('monotonic elapsed with loop=FALSE still wraps (magnitude, not loop flag)', () => {
+	const { computeRemainingAndProgress } = require('../../src/osc/osc-state-timing')
+	const assert3 = require('node:assert/strict')
+	const r = computeRemainingAndProgress(462034, 5.04, { loop: false })
+	assert3.ok(r.iterationElapsed >= 0 && r.iterationElapsed < 5.04, `wrapped into range, got ${r.iterationElapsed}`)
+})
+it('a normal clip ending just past duration pins to 100%, not wrapped to ~0', () => {
+	const { computeRemainingAndProgress } = require('../../src/osc/osc-state-timing')
+	const assert3 = require('node:assert/strict')
+	const r = computeRemainingAndProgress(5.05, 5.04, { loop: false })
+	assert3.equal(r.iterationElapsed, 5.04)
+	assert3.equal(r.progress, 1)
 })
