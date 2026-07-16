@@ -13,16 +13,18 @@
  * "Pointer-drag on a preview surface" is detected the same way: a capture-phase `pointerdown` whose
  * target is inside a known preview-surface container (`.preview-panel__compose-cell` — the compose/
  * timeline surfaces share this class via `preview-canvas-panel.js`'s `initPreviewPanel` — or
- * `.mv-canvas-wrap` for the multiview editor) starts suppression; the next `pointerup`/`pointercancel`
- * anywhere (drags routinely end outside the starting element) ends it. This intentionally covers
- * ANY pointer interaction on those surfaces (not just the "known" drag handlers), which is the safe
- * direction to err in — a suppressed frame during a plain click is imperceptible, an unsuppressed
- * frame during an actual drag hides the drag chrome (the bug this exists to prevent).
+ * `.mv-canvas-wrap` for the multiview editor, or `.operator-compose-tiles` for the WO-256 operator-
+ * GUI free-tile canvas's own header-drag/corner-resize handles) starts suppression; the next
+ * `pointerup`/`pointercancel` anywhere (drags routinely end outside the starting element) ends it.
+ * This intentionally covers ANY pointer interaction on those surfaces (not just the "known" drag
+ * handlers), which is the safe direction to err in — a suppressed frame during a plain click is
+ * imperceptible, an unsuppressed frame during an actual drag hides the drag chrome (the bug this
+ * exists to prevent).
  */
 
 import { setInteractionSuppressed } from './operator-gui-mode.js'
 
-const PREVIEW_SURFACE_SELECTOR = '.preview-panel__compose-cell, .preview-panel__canvas, .mv-canvas-wrap'
+const PREVIEW_SURFACE_SELECTOR = '.preview-panel__compose-cell, .preview-panel__canvas, .mv-canvas-wrap, .operator-compose-tiles'
 
 let _modalObserver = null
 let _pointerDown = false

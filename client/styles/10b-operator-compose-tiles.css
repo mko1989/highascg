@@ -1,0 +1,124 @@
+/**
+ * WO-256 — operator-GUI compose canvas: free-tile, multiviewer-style movable/resizable windows
+ * (client/components/operator-compose-tiles.js). These classes are only ever created by that
+ * module, which only ever mounts under operator-GUI mode (isOperatorGuiModeActive()) — so unlike
+ * 10-operator-gui-mode.css this file needs no `html.operator-gui` gate: a normal browser session
+ * never has this markup in the DOM at all, hence zero visual/behavior change.
+ *
+ * Visual parity with template/multiview_overlay.css's label-row/progress-bar LOOK (border color
+ * per role, dark label strip, thin fill bar) — the LOOK is copied here, not the file itself (the
+ * MV template CSS renders inside a CasparCG HTML producer, a different runtime entirely).
+ */
+
+.preview-panel__operator-tiles-mount {
+	position: relative;
+	flex: 1 1 auto;
+	align-self: stretch;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.operator-compose-tiles {
+	position: absolute;
+	inset: 0;
+	background: #0a0a0a;
+	overflow: hidden;
+	user-select: none;
+}
+
+.operator-compose-tiles__reset-btn {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 20;
+	padding: 3px 8px;
+	font-size: 10px;
+	font-weight: 600;
+	color: rgba(230, 237, 243, 0.9);
+	background: rgba(0, 0, 0, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 4px;
+	cursor: pointer;
+}
+.operator-compose-tiles__reset-btn:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+/*
+ * Frame is an OUTLINE, not a `border` — an outline takes no layout space and does not become the
+ * containing block for absolutely-positioned children the way a real `border` would (that would
+ * silently double-count client/components/operator-compose-tiles.js's own `TILE_CHROME.borderW`
+ * inset on top of the browser's automatic containing-block exclusion). `outline-offset: -2px`
+ * draws it flush with the edge, visually identical to a 2px inset border.
+ */
+.operator-tile {
+	position: absolute;
+	box-sizing: border-box;
+	outline: 2px solid #457b9d;
+	outline-offset: -2px;
+	border-radius: 3px;
+	background: transparent;
+}
+.operator-tile[data-role='pgm'] { outline-color: #e63946; }
+.operator-tile[data-role='prv'] { outline-color: #2a9d8f; }
+.operator-tile--dragging {
+	opacity: 0.85;
+	box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.6);
+}
+
+.operator-tile__header {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px 6px;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.3px;
+	color: #fff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: grab;
+	background: #c92a2a;
+}
+.operator-tile[data-role='prv'] .operator-tile__header { background: #0d9488; }
+.operator-tile__header:active { cursor: grabbing; }
+
+/* The reported video rect — chrome (header/footer/border) never overlaps this box. */
+.operator-tile__body {
+	position: absolute;
+	background: #050505;
+}
+
+.operator-tile__footer {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 1px 6px;
+	overflow: hidden;
+	background: rgba(0, 0, 0, 0.55);
+}
+.operator-tile__footer .playback-timer { min-width: 0; font-size: 9px; }
+.operator-tile__footer .playback-timer__row { font-size: 9px; }
+
+.operator-tile__resize {
+	position: absolute;
+	right: -3px;
+	bottom: -3px;
+	width: 14px;
+	height: 14px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.25);
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	cursor: nwse-resize;
+	z-index: 5;
+}

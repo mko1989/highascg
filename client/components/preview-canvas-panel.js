@@ -8,12 +8,17 @@ import { api } from '../lib/api-client.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
+import { initOperatorComposeTiles } from './operator-compose-tiles.js'
 
 const G = 6; const BORDER_FADE = 400
 
 export function initPreviewPanel(host, options) {
-	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null } = options
+	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null, getOscClient = null } = options
 	const kC = `${storageKeyPrefix}_collapsed`; const kH = `${storageKeyPrefix}_height`; const kL = `${storageKeyPrefix}_compose_prv_pgm_layout`; const kS = `${storageKeyPrefix}_compose_prv_pgm_split`; const kW = `${storageKeyPrefix}_compose_cell_weights`
+	// WO-256: operator-GUI mode replaces the compose canvas-pair with a free-tile canvas
+	// (client/components/operator-compose-tiles.js) — hard-gated, zero effect otherwise.
+	const operatorTilesActive = composePrvPgmLayoutToggle && isOperatorGuiModeActive()
 
 	let layout = (localStorage.getItem(kL) === 'tb' || localStorage.getItem(kL) === 'lr') ? localStorage.getItem(kL) : 'lr'
 	let prvPct = parseFloat(localStorage.getItem(kS) || '0.5'); if (isNaN(prvPct) || prvPct < 0.05 || prvPct > 0.95) prvPct = 0.5
@@ -34,7 +39,13 @@ export function initPreviewPanel(host, options) {
 	const bodyEl = document.createElement('div'); bodyEl.className = bodyCls; if (!fillParentHeight) bodyEl.style.height = `${bodyH}px`
 	const resizeEl = document.createElement('div'); resizeEl.className = 'preview-panel__resize'
 	const canvasOuterEl = document.createElement('div'); canvasOuterEl.className = 'preview-panel__canvas-outer'
-	if (composePrvPgmLayoutToggle) {
+	let tilesMountEl = null
+	if (operatorTilesActive) {
+		// WO-256: free-tile canvas mount — no webrtc containers/canvas-pair DOM at all, the shaped
+		// Caspar video renders ABOVE this page; the tile bodies are just reported rects.
+		tilesMountEl = document.createElement('div'); tilesMountEl.className = 'preview-panel__operator-tiles-mount'
+		canvasOuterEl.appendChild(tilesMountEl)
+	} else if (composePrvPgmLayoutToggle) {
 		const wrapEl = document.createElement('div'); wrapEl.className = 'preview-panel__canvas-wrap'
 		const pairEl = document.createElement('div'); pairEl.className = `preview-panel__compose-pair ${cCls}`
 		const prvCell = document.createElement('div'); prvCell.className = 'preview-panel__compose-cell preview-panel__compose-cell--prv'
@@ -235,112 +246,7 @@ export function initPreviewPanel(host, options) {
 				})
 			}
 			cPairEl.appendChild(cell)
-			const badge = document.createElement('div')
-			badge.style.position = 'absolute'
-			if (d.role === 'pgm') {
-				badge.style.right = '4px'
-			} else {
-				badge.style.left = '4px'
-			}
-			badge.style.top = '4px'
-			badge.style.padding = '1px 5px'
-			badge.style.borderRadius = '999px'
-			badge.style.fontSize = '10px'
-			badge.style.lineHeight = '1.2'
-			badge.style.color = 'rgba(230,237,243,0.95)'
-			badge.style.background = 'rgba(0,0,0,0.55)'
-			badge.style.border = '1px solid rgba(255,255,255,0.22)'
-			badge.style.pointerEvents = 'auto'
-			badge.style.zIndex = '10'
-			
-			if (d.role === 'pgm') {
-				badge.style.cursor = 'pointer'
-				badge.title = 'Edit live on PGM'
-				badge.onclick = (e) => {
-					console.log('PGM badge clicked, mainIndex:', d.mainIndex)
-					e.stopPropagation()
-					document.dispatchEvent(new CustomEvent('scenes-edit-live-on-pgm', { detail: { mainIndex: d.mainIndex } }))
-				}
-				const lockSpan = document.createElement('span')
-				lockSpan.textContent = '🔓 '
-				badge.appendChild(lockSpan)
-				
-				const textSpan = document.createElement('span')
-				textSpan.textContent = d.label
-				badge.appendChild(textSpan)
-			} else {
-				const textSpan = document.createElement('span')
-				textSpan.textContent = d.label
-				badge.appendChild(textSpan)
-			}
-			
-			cell.style.position = 'relative'
-			cell.appendChild(badge)
-
-			const zoomContainer = document.createElement('div')
-			zoomContainer.className = 'preview-panel__zoom-wrap'
-			zoomContainer.style.cssText = 'position:absolute;right:4px;bottom:4px;display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:999px;font-size:9px;color:rgba(230,237,243,0.85);background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);z-index:10;pointer-events:auto;'
-			
-			const zoomLabel = document.createElement('span')
-			zoomLabel.textContent = '1.0x'
-			
-			const zoomMinus = document.createElement('button')
-			zoomMinus.type = 'button'
-			zoomMinus.textContent = '-'
-			zoomMinus.style.cssText = 'background:transparent;border:none;color:inherit;font-size:11px;font-weight:bold;cursor:pointer;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;user-select:none;line-height:1;'
-			
-			const zoomPlus = document.createElement('button')
-			zoomPlus.type = 'button'
-			zoomPlus.textContent = '+'
-			zoomPlus.style.cssText = 'background:transparent;border:none;color:inherit;font-size:11px;font-weight:bold;cursor:pointer;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;user-select:none;line-height:1;'
-			
-			const zoomSlider = document.createElement('input')
-			zoomSlider.type = 'range'
-			zoomSlider.min = '0.5'
-			zoomSlider.max = '3'
-			zoomSlider.step = '0.05'
-			zoomSlider.value = '1'
-			zoomSlider.setAttribute('value', '1')
-			zoomSlider.defaultValue = '1'
-			zoomSlider.style.cssText = 'width:50px;height:4px;margin:0;cursor:pointer;opacity:0.8;accent-color:#58a6ff;'
-			
-			const cellObj = {
-				id: d.id,
-				role: d.role,
-				mainIndex: d.mainIndex,
-				label: d.label,
-				cellEl: cell,
-				canvas: c,
-				ctx: c.getContext('2d'),
-				zoom: 1.0,
-			}
-			
-			const updateZoom = (val) => {
-				const clamped = Math.max(0.5, Math.min(3.0, val))
-				cellObj.zoom = clamped
-				zoomSlider.value = String(clamped)
-				zoomLabel.textContent = `${clamped.toFixed(1)}x`
-				scheduleDraw()
-			}
-			
-			zoomSlider.addEventListener('input', () => {
-				updateZoom(parseFloat(zoomSlider.value) || 1.0)
-			})
-			
-			zoomMinus.addEventListener('click', (e) => {
-				e.stopPropagation()
-				updateZoom(cellObj.zoom - 0.1)
-			})
-			
-			zoomPlus.addEventListener('click', (e) => {
-				e.stopPropagation()
-				updateZoom(cellObj.zoom + 0.1)
-			})
-			
-			zoomContainer.append(zoomMinus, zoomSlider, zoomPlus, zoomLabel)
-			cell.appendChild(zoomContainer)
-
-			composeCells.push(cellObj)
+			composeCells.push(createComposeCellObj({ cell, canvas: c, def: d, scheduleDraw }))
 		})
 	}
 
@@ -352,7 +258,11 @@ export function initPreviewPanel(host, options) {
 		showDestinationVisualOverlay,
 	})
 	const paint = () => {
-		if (collapsed) return; const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
+		if (collapsed) return
+		// WO-256: operator-GUI free-tile canvas owns its own layout/resize/report loop entirely
+		// (client/components/operator-compose-tiles.js) — nothing to paint here.
+		if (operatorTilesActive) return
+		const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
 		// WO-243/255: skip canvas draw work when operator-GUI mode shows the shaped video overlay
@@ -446,6 +356,9 @@ export function initPreviewPanel(host, options) {
 	}
 
 	const updateLive = () => {
+		// WO-256: tiles never mount webrtc video (prvVC/pgmVC don't exist) — the shaped Caspar
+		// overlay is the video, above this page.
+		if (operatorTilesActive) return
 		const currentSingle = typeof getStreamName === 'function' ? getStreamName() : streamName
 		const dualNames = typeof getDualStreamNames === 'function' ? getDualStreamNames() : { prv: 'prv_1', pgm: 'pgm_1' }
 		const should = !!(((composePrvPgmLayoutToggle ? dualNames?.pgm || dualNames?.prv : currentSingle)) && shouldShowLiveVideo() && !collapsed && !composePrvPgmLayoutToggle)
@@ -465,7 +378,9 @@ export function initPreviewPanel(host, options) {
 
 	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); if (c && typeof onComposeCellRects === 'function') onComposeCellRects([]); updateLive() }
 	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = async () => { try { grabBtnEl.classList.add('busy'); await api.post('/api/amcp/print', { channel: options.getProgramChannel?.() || 1 }); grabBtnEl.classList.remove('busy'); grabBtnEl.classList.add('ok'); setTimeout(() => grabBtnEl.classList.remove('ok'), 1000) } catch { grabBtnEl.classList.add('err'); setTimeout(() => grabBtnEl.classList.remove('err'), 2000) } }
-	if (composePrvPgmLayoutToggle) {
+	if (composePrvPgmLayoutToggle && !operatorTilesActive) {
+		// WO-256: the Stack/Side toggle only affects the legacy canvas-pair's flex direction — the
+		// free-tile canvas has no such single-axis layout, so the control would otherwise be dead.
 		cLayoutBtn.hidden = false; const syncB = () => { cLayoutBtn.textContent = layout === 'tb' ? 'Stack' : 'Side'; cPairEl.classList.remove('preview-panel__compose-pair--lr', 'preview-panel__compose-pair--tb'); cPairEl.classList.add(layout === 'tb' ? 'preview-panel__compose-pair--tb' : 'preview-panel__compose-pair--lr') }
 		syncB(); cLayoutBtn.onclick = () => { layout = layout === 'tb' ? 'lr' : 'tb'; localStorage.setItem(kL, layout); syncB(); scheduleDraw() }
 		// initGutterResizing is bound dynamically to rebuilt gutters in rebuildComposeCellsIfNeeded
@@ -481,20 +396,25 @@ export function initPreviewPanel(host, options) {
 		})
 	}
 	if (!hideInnerResize) ResizeH.initPanelResizing(resizeH, body, { collapsed: () => collapsed, onHeightChange: scheduleDraw, maxPanelBodyPx: () => Math.min(1200, window.innerHeight * 0.9) })
-	if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(scheduleDraw); ro.observe(wrap) }
+	if (wrap && typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(scheduleDraw); ro.observe(wrap) }
 	window.addEventListener('resize', scheduleDraw);
 	// WO-243/255: operator-GUI mode needs rects fresh across scroll too (viewport-relative) — gated, no extra listener otherwise.
 	if (isOperatorGuiModeActive()) window.addEventListener('scroll', scheduleDraw, true)
-	const unsubS = streamState.subscribe(updateLive); 
+	const unsubS = streamState.subscribe(updateLive);
 	const unsubSe = settingsState.subscribe(updateLive)
+	// WO-256: the free-tile canvas owns its own defs-changed/redraw handling; the legacy
+	// canvas-pair path (rebuildComposeCellsIfNeeded/scheduleDraw) is skipped entirely for it.
+	const tilesHandle = operatorTilesActive
+		? initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
+		: null
 	const unsubCm = stateStore?.on('channelMap', () => {
-		rebuildComposeCellsIfNeeded()
-		scheduleDraw()
+		if (tilesHandle) tilesHandle.refreshDefs()
+		else { rebuildComposeCellsIfNeeded(); scheduleDraw() }
 	})
-	body.hidden = collapsed; 
-	updateLive(); 
+	body.hidden = collapsed;
+	updateLive();
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }

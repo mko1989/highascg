@@ -254,6 +254,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		title: 'Compose preview', storageKeyPrefix: 'casparcg_preview_scenes', getOutputResolution: getResolution, stateStore, streamName: 'prv_1', composePrvPgmLayoutToggle: true, fillParentHeight: true, hideInnerResize: true, getProgramChannel,
 		getDualStreamNames: getComposeStreamNames,
 		showDestinationVisualOverlay: false,
+		// WO-256: threaded through to the operator-GUI free-tile canvas's per-tile progress bars
+		// (mountPgmTopLayerPlaybackTimer) — unused/no-op on the normal (non-operator-tiles) path.
+		getOscClient,
 		// WO-243/255: no-op unless operator-GUI mode is active (reportComposeCellRects hard-gates
 		// itself) — this is the main operator output preview, so its compose cells are the
 		// 'compose' surface merged into the operator-GUI channel's route holes (10-49).
