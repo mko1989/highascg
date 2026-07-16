@@ -125,11 +125,16 @@ def is_caspar_screen_consumer(win) -> bool:
 
 
 def absolute_geometry(win, root):
-    """Returns (x, y, width, height) in ROOT coordinates, or None if unavailable."""
+    """Returns (x, y, width, height) in ROOT coordinates, or None if unavailable.
+
+    Only called on DIRECT children of root, whose get_geometry() x/y are already root-relative.
+    (win.translate_coords(root, 0, 0) is the INVERSE mapping — live-verified 2026-07-16: it
+    returned (-3072,0) for the operator-monitor windows at (3072,0), so the original
+    translate-based version never matched the monitor rect and the helper found no window.)
+    """
     try:
         geom = win.get_geometry()
-        coords = win.translate_coords(root, 0, 0)
-        return coords.x, coords.y, geom.width, geom.height
+        return geom.x, geom.y, geom.width, geom.height
     except Exception:
         return None
 
