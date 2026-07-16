@@ -4,7 +4,9 @@ const {
 	listHostLiveChannelEntries,
 	amcpCommandsForHostLiveSource,
 	isHostLiveSource,
+	isBrowserDisplayCandidate,
 } = require('./host-live-sources')
+const { ensureBrowserDisplaySourceReady } = require('./host-live-sources-browser-runtime')
 
 /**
  * @param {object} self — app context (amcp, config, log)
@@ -24,6 +26,18 @@ async function setupHostLiveSources(self) {
 	const played = []
 	const failed = []
 	for (const entry of entries) {
+		if (isBrowserDisplayCandidate(entry.item)) {
+			const ready = await ensureBrowserDisplaySourceReady(self, entry.item)
+			if (!ready.ok) {
+				failed.push({
+					sourceId: entry.sourceId,
+					channel: entry.channel,
+					cmd: '(browser-source pipeline)',
+					message: ready.reason || 'browser_source_not_ready',
+				})
+				continue
+			}
+		}
 		const cmds = amcpCommandsForHostLiveSource(entry.item)
 		for (const cmd of cmds) {
 			try {
@@ -83,6 +97,10 @@ async function setupHostLiveSources(self) {
  */
 async function playHostLiveSourceNow(ctx, item) {
 	if (!ctx?.amcp || !isHostLiveSource(item)) return { ok: false, reason: 'not_host_source' }
+	if (isBrowserDisplayCandidate(item)) {
+		const ready = await ensureBrowserDisplaySourceReady(ctx, item)
+		if (!ready.ok) return { ok: false, reason: ready.reason || 'browser_source_not_ready' }
+	}
 	const cmds = amcpCommandsForHostLiveSource(item)
 	for (const cmd of cmds) {
 		await ctx.amcp.raw(cmd)

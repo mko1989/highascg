@@ -3,6 +3,7 @@
 const { getChannelMap, getRouteString } = require('./routing-map')
 const { getModeDimensions } = require('./config-modes')
 const { normalizeNdiSourceName, ndiDisplayLabel, buildNdiHostPlayCommands } = require('./ndi-playback')
+const { browserCapturePlayClip } = require('../capture/browser-capture-args')
 
 /** Default layer for webpage / NDI host producers (WO-88). */
 const HOST_LAYER = 1
@@ -27,6 +28,10 @@ function slugSourceId(raw) {
 function isWebpageHostCandidate(item) {
 	if (!item || typeof item !== 'object') return false
 	if (item.routeType === 'webpage_host') return true
+	// WO-258: 'browser_display' items also carry type:'browser' (real Firefox + x11grab, not CEF) —
+	// exclude them explicitly so the two candidate checks stay mutually exclusive regardless of
+	// call-site ordering (see isBrowserDisplayCandidate below).
+	if (item.routeType === 'browser_display' || item.mode === 'browser_display') return false
 	if (item.type !== 'browser') return false
 	if (item.browserAsCg === true) return false
 	if (item.routeType === 'layer') return false
@@ -44,11 +49,25 @@ function isNdiHostCandidate(item) {
 }
 
 /**
+ * WO-258: a real Firefox on an off-screen `:0` region, captured via x11grab and relayed into Caspar
+ * as a udp:// clip (see src/capture/browser-capture-args.js) — distinct from `webpage_host`, which
+ * still plays CEF's `[HTML]` producer (WO-258 scopes CEF to templates only; existing webpage_host
+ * items with raw http(s) URLs are left as-is rather than force-migrated, see WO-258 report).
+ * @param {object} item
+ * @returns {boolean}
+ */
+function isBrowserDisplayCandidate(item) {
+	if (!item || typeof item !== 'object') return false
+	if (item.routeType === 'browser_display') return true
+	return item.mode === 'browser_display'
+}
+
+/**
  * @param {object} item
  * @returns {boolean}
  */
 function isHostLiveSource(item) {
-	return isWebpageHostCandidate(item) || isNdiHostCandidate(item)
+	return isWebpageHostCandidate(item) || isNdiHostCandidate(item) || isBrowserDisplayCandidate(item)
 }
 
 /**
@@ -203,11 +222,62 @@ function normalizeNdiHostSource(item, ctx) {
 }
 
 /**
+ * WO-258 T258.3: normalize a `browser_display` extraLiveSources entry — url/width/height/fps drive
+ * the real Firefox session + x11grab capture (see src/system/browser-source-session.js,
+ * src/capture/browser-capture-*.js); `hostChannel`/`hostLayer`/`value` follow the same host-channel
+ * allocation convention as webpage_host/ndi_host.
+ * @param {object} item
+ * @param {object} ctx
+ */
+function normalizeBrowserDisplaySource(item, ctx) {
+	const config = ctx?.config || {}
+	const url = String(item.url || item.value || '').trim()
+	if (!/^https?:\/\//i.test(url)) throw new Error('Browser source requires an http(s) URL')
+
+	let hostChannel = parseInt(String(item.hostChannel ?? ''), 10)
+	if (!Number.isFinite(hostChannel) || hostChannel < 1) {
+		hostChannel = suggestNextHostChannel(config)
+	}
+	const hostLayer = parseInt(String(item.hostLayer ?? HOST_LAYER), 10) || HOST_LAYER
+	const width = Math.max(160, parseInt(String(item.width ?? 1920), 10) || 1920)
+	const height = Math.max(120, parseInt(String(item.height ?? 1080), 10) || 1080)
+	const fps = Math.max(1, Math.min(60, parseInt(String(item.fps ?? 25), 10) || 25))
+	let sourceId = String(item.sourceId || '').trim()
+	if (!sourceId) {
+		let host = 'browser'
+		try {
+			host = new URL(url).hostname || 'browser'
+		} catch (_) {
+			/* fall back to default */
+		}
+		sourceId = `browser_${slugSourceId(host)}`
+	}
+
+	return {
+		type: 'browser',
+		routeType: 'browser_display',
+		mode: 'browser_display',
+		value: getRouteString(hostChannel, hostLayer),
+		label: String(item.label || url).trim() || sourceId,
+		hostChannel,
+		hostLayer,
+		sourceId,
+		url,
+		width,
+		height,
+		fps,
+		interactiveCapable: true,
+		hostRole: 'browser_display',
+	}
+}
+
+/**
  * @param {object} item
  * @param {object} ctx
  */
 function normalizeToHostLiveSource(item, ctx) {
 	if (!item || typeof item !== 'object') return item
+	if (isBrowserDisplayCandidate(item)) return normalizeBrowserDisplaySource(item, ctx)
 	if (isWebpageHostCandidate(item)) return normalizeWebpageHostSource(item, ctx)
 	if (isNdiHostCandidate(item)) return normalizeNdiHostSource(item, ctx)
 	return item
@@ -225,13 +295,16 @@ function listHostLiveChannelEntries(config) {
 		const hostChannel = parseInt(String(item.hostChannel ?? ''), 10)
 		if (!Number.isFinite(hostChannel) || hostChannel < 1) continue
 		const hostLayer = parseInt(String(item.hostLayer ?? HOST_LAYER), 10) || HOST_LAYER
-		const kind = isWebpageHostCandidate(item) ? 'webpage_host' : 'ndi_host'
+		const kind = isBrowserDisplayCandidate(item) ? 'browser_display' : isWebpageHostCandidate(item) ? 'webpage_host' : 'ndi_host'
 		out.push({
 			kind,
 			sourceId: item.sourceId,
 			channel: hostChannel,
 			layer: hostLayer,
-			mode: kind === 'ndi_host' ? DEFAULT_HOST_MODE : mode,
+			// browser_display's udp/mpegts producer resamples like NDI does — DEFAULT_HOST_MODE for both,
+			// same conservative choice as ndi_host (arbitrary browser width/height/fps isn't guaranteed
+			// to be a valid Caspar channel video-mode string).
+			mode: kind === 'ndi_host' || kind === 'browser_display' ? DEFAULT_HOST_MODE : mode,
 			route: getRouteString(hostChannel, hostLayer),
 			label: item.label || item.sourceId || kind,
 			item,
@@ -263,6 +336,14 @@ function amcpCommandsForHostLiveSource(item) {
 	const layer = parseInt(String(item.hostLayer ?? HOST_LAYER), 10) || HOST_LAYER
 	if (!Number.isFinite(ch) || ch < 1) return []
 
+	if (isBrowserDisplayCandidate(item)) {
+		// The capture bridge (src/capture/browser-capture-bridge.js) must already be relaying to this
+		// port before this PLAY lands — see ensureBrowserDisplaySourceReady in
+		// src/config/host-live-sources-browser-runtime.js, which host-live-sources-setup.js calls
+		// first for browser_display entries.
+		const clip = browserCapturePlayClip(ch)
+		return [`PLAY ${ch}-${layer} ${clip}`, `MIXER ${ch}-${layer} FILL 0 0 1 1`, `MIXER ${ch} COMMIT`]
+	}
 	if (isWebpageHostCandidate(item)) {
 		const playArg = item.playArg || item.templateOrUrl || item.cefNeedle
 		if (!playArg) return []
@@ -310,6 +391,10 @@ function hostChannelDestinationId(role, ch, slotOrSourceId) {
 		const sid = String(slotOrSourceId ?? ch ?? '').trim()
 		return sid ? `host_ndi_${sid}` : `host_ndi_ch_${ch}`
 	}
+	if (r === 'browser_display') {
+		const sid = String(slotOrSourceId ?? ch ?? '').trim()
+		return sid ? `host_browser_${sid}` : `host_browser_ch_${ch}`
+	}
 	return `host_${r}_${ch}`
 }
 
@@ -319,11 +404,13 @@ module.exports = {
 	isHostLiveSource,
 	isWebpageHostCandidate,
 	isNdiHostCandidate,
+	isBrowserDisplayCandidate,
 	listHostLiveChannelEntries,
 	mergeHostLiveChannelsIntoRouting,
 	normalizeToHostLiveSource,
 	normalizeWebpageHostSource,
 	normalizeNdiHostSource,
+	normalizeBrowserDisplaySource,
 	suggestNextHostChannel,
 	amcpCommandsForHostLiveSource,
 	slugSourceId,

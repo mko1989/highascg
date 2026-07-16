@@ -217,7 +217,9 @@ function buildGeneratedChannelOrder(ctx) {
 						? 'webpage_host'
 						: entry.kind === 'ndi_host'
 							? 'ndi_host'
-							: 'decklink_input'
+							: entry.kind === 'browser_display'
+								? 'browser_display'
+								: 'decklink_input'
 		const row = { ch: entry.channel, role, slot: entry.slot }
 		if (entry.sourceId) row.sourceId = entry.sourceId
 		if (entry.label) row.label = entry.label

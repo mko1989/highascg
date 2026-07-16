@@ -7,6 +7,7 @@ const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 const { handleWebpageHostLive } = require('./host-live-webpage')
 const { handleNdiHostLive } = require('./host-live-ndi')
 const { handleDecklinkHostLive } = require('./host-live-decklink')
+const { handleBrowserDisplayHostLive, handleBrowserDisplayInteract } = require('./host-live-browser')
 
 /**
  * @param {string} path
@@ -137,4 +138,39 @@ async function handleDecklinkPost(body, ctx) {
 	}
 }
 
-module.exports = { handleGet, handlePost, handleWebpagePost, handleNdiPost, handleDecklinkPost }
+/**
+ * @param {string} body
+ * @param {object} ctx
+ */
+async function handleBrowserPost(body, ctx) {
+	const j = parseBody(body) || {}
+	const res = await handleBrowserDisplayHostLive(ctx, j)
+	if (res.status) {
+		return { status: res.status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: res.error }) }
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody(res) }
+}
+
+/**
+ * WO-258 T258.4 — "Interact on operator screen" <-> "Return to background".
+ * @param {string} body
+ * @param {object} ctx
+ */
+async function handleBrowserInteractPost(body, ctx) {
+	const j = parseBody(body) || {}
+	const res = await handleBrowserDisplayInteract(ctx, j)
+	if (res.status) {
+		return { status: res.status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: res.error }) }
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody(res) }
+}
+
+module.exports = {
+	handleGet,
+	handlePost,
+	handleWebpagePost,
+	handleNdiPost,
+	handleDecklinkPost,
+	handleBrowserPost,
+	handleBrowserInteractPost,
+}

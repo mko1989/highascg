@@ -150,7 +150,7 @@ function buildChannelsSection(config, routeMap) {
 
 	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).
 	for (const entry of plan.inputChannels) {
-		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host') {
+		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host' || entry.kind === 'browser_display') {
 			setChannelXml(entry.channel, buildHostLiveChannel(config, entry))
 		} else {
 			setChannelXml(entry.channel, buildInputChannel(config, entry))

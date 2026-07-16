@@ -132,14 +132,20 @@ function enrichExtraLiveSource(item, ctx) {
 		}
 		out.thumbnailChannel = parsed.channel
 		out.thumbnailLayer = parsed.layer
-	} else if (routeType === 'webpage_host' || routeType === 'ndi_host') {
+	} else if (routeType === 'webpage_host' || routeType === 'ndi_host' || routeType === 'browser_display') {
 		const hostCh = parseInt(String(out.hostChannel ?? parsed.channel), 10)
 		const hostLayer = parseInt(String(out.hostLayer ?? parsed.layer ?? 1), 10) || 1
 		if (Number.isFinite(hostCh) && hostCh >= 1) {
 			out.thumbnailChannel = hostCh
 			out.thumbnailLayer = hostLayer
 		}
-		if (!out.resolution) out.resolution = formatResolution(chRes.w, chRes.h)
+		if (routeType === 'browser_display' && out.width > 0 && out.height > 0) {
+			// The item already carries its own declared capture width/height/fps (normalizeBrowserDisplaySource) —
+			// more precise than the host CHANNEL's resolution for a udp/mpegts producer.
+			out.resolution = formatResolution(out.width, out.height)
+		} else if (!out.resolution) {
+			out.resolution = formatResolution(chRes.w, chRes.h)
+		}
 	} else if (routeType === 'decklink' || out.decklinkSlot != null) {
 		const cm = buildChannelMap(ctx)
 		const slot = Number(out.decklinkSlot) || parsed.layer || 1

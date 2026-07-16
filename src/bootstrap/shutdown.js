@@ -34,6 +34,12 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 				const { stopAllV4l2InputBridges } = require('../capture/v4l2-input-bridge')
 				stopAllV4l2InputBridges()
 			} catch (_) {}
+			try {
+				const { stopAllBrowserCaptureBridges } = require('../capture/browser-capture-bridge')
+				stopAllBrowserCaptureBridges()
+				const { stopAllBrowserSources } = require('../system/browser-source-session')
+				stopAllBrowserSources()
+			} catch (_) {}
 			clearPeriodicSyncTimer(appCtx)
 			if (appCtx._systemVarsInterval) clearInterval(appCtx._systemVarsInterval)
 			if (appCtx._startupInventoryInterval) clearInterval(appCtx._startupInventoryInterval)

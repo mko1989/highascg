@@ -184,7 +184,9 @@ async function handlePost(body, ctx) {
 	} else if (j.addExtraLiveSource) {
 		const list = Array.isArray(ctx.config.extraLiveSources) ? [...ctx.config.extraLiveSources] : []
 		const item = j.addExtraLiveSource
-		if (item && (item.value || item.ndiName || item.templateOrUrl)) {
+		// WO-258: browser_display entries are keyed by `url` (real Firefox + x11grab), not `value`/
+		// `templateOrUrl` (CEF) or `ndiName`.
+		if (item && (item.value || item.ndiName || item.templateOrUrl || (item.mode === 'browser_display' && item.url))) {
 			try {
 				const { normalizeToHostLiveSource } = require('../config/host-live-sources')
 				const normalized = normalizeToHostLiveSource(item, ctx)

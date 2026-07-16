@@ -34,10 +34,10 @@ Recommend one; the capture relay below is identical for both.
 ## Constraints (standard)
 LIVE box: no git, no service ops, no AMCP, no HTTP/WS to :4200/:5250, no npm/apt, no vite build, curated gate ONLY. You MAY run short-lived Xvfb/x11grab probes for T258.0 on a HIGH display number (:77) that touch nothing live — kill everything you spawn, no orphans. node --check + eslint --quiet; exact gate counts; <500 lines/file; honest checkboxes.
 
-- [ ] T258.0 strategy investigation + recommendation (with probe evidence)
-- [ ] T258.1 browser session manager
-- [ ] T258.2 capture relay (reusing v4l2-bridge path)
-- [ ] T258.3 source type/config + host-channel play
-- [ ] T258.4 operator interaction flow (conscious grab-vs-move design)
-- [ ] T258.5 smokes in gate
-- [ ] A258.1 (owner) add browser source → appears on host channel via capture; Interact button brings it to the operator screen and back
+- [x] T258.0 strategy investigation + recommendation (with probe evidence) — recommend off-screen region of `:0`; probes on Xvfb `:77` (x11grab basic capture, xterm windowmove/windowsize, off-CRTC-region grab, `xrandr --fb` hard-cap) + read-only live `:0` xrandr introspection (no probe touched `:0`). See implementation report.
+- [x] T258.1 browser session manager — `src/system/browser-source-session.js`
+- [x] T258.2 capture relay — reuses `src/capture/v4l2-input-bridge.js`'s ffmpeg→udp://127.0.0.1:PORT→Caspar-PLAY precedent (the INPUT-direction bridge; `src/virtual-output/v4l2-bridge*.js` is the opposite direction and was NOT reused — see report), in `src/capture/browser-capture-args.js` + `src/capture/browser-capture-bridge.js`
+- [x] T258.3 source type/config + host-channel play — `browser_display` routeType wired through `src/config/host-live-sources.js`, `host-live-sources-browser-runtime.js`, `host-live-sources-setup.js`, `extra-live-source-enrich.js`, `src/api/host-live-browser.js`, `routes-device-view.js` (create), `router.js`
+- [x] T258.4 operator interaction flow (conscious grab-vs-move design) — chose "grab-follows-window": `restartBrowserCaptureBridge` respawns x11grab at the operator-monitor rect while interacting, and back at the dead zone on return; `/api/host-live/browser/interact`
+- [x] T258.5 smokes in gate — `tools/smoke/smoke-wo258-browser-source.test.js` (26 tests, pure logic only), added to `tools/ci/run-offline-tests.js`
+- [ ] A258.1 (owner) add browser source → appears on host channel via capture; Interact button brings it to the operator screen and back — NOT verified live (constraints forbid AMCP/HTTP/service ops on this box); this is the owner's live acceptance step
