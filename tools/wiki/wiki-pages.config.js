@@ -44,6 +44,7 @@ module.exports = [
 	{ match: /^companion-websocket-catalog-bootstrap\.md$/, category: 'Integration', order: 61 },
 	{ match: /^companion-module-ui-selection\.md$/, category: 'Integration', order: 62 },
 	{ match: /^caspar_config_explained\.md$/, category: 'Integration', order: 63 },
+	{ match: /^wiki\/guides\/shader-fx\.md$/, category: 'Audio', order: 69, title: 'Shader FX (audio-reactive shader templates)' },
 	{ match: /^guides\/audio\//, category: 'Audio', order: 70 },
 	{ match: /^reference\/audio\//, category: 'Audio', order: 71 },
 	{ match: /^reference\//, category: 'Reference', order: 80 },

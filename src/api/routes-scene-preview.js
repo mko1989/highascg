@@ -4,7 +4,13 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
-const { stripEphemeralTakeFields, resolvePreviewChannel, getRouteMap } = require('./routes-scene-shared')
+const {
+	stripEphemeralTakeFields,
+	resolvePreviewChannel,
+	getRouteMap,
+	chainSceneTakeWork,
+	takeChainKeyForPreviewChannel,
+} = require('./routes-scene-shared')
 
 /**
  * POST /api/scene/live/preview — register PRV look on server live map (no AMCP).
@@ -94,7 +100,10 @@ async function handlePreviewLiveClear(body, ctx) {
 	let clearedAmcp = false
 	if (ctx.amcp) {
 		try {
-			await clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx)
+			/* Join the /api/scene/take per-channel chain: a clear interleaving into a mid-flight
+			 * staging take strips layers the take just staged ("sometimes not all layers" race). */
+			const chainKey = takeChainKeyForPreviewChannel(routeMap, previewCh, mainIdx)
+			await chainSceneTakeWork(ctx, chainKey, () => clearSceneProgramLookStackLayers(ctx.amcp, previewCh, ctx))
 			clearedAmcp = true
 		} catch (e) {
 			if (typeof ctx.log === 'function') {

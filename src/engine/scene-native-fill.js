@@ -227,6 +227,11 @@ function cinfResponseToStr(data) {
 	return String(data)
 }
 
+/** Successful CINF resolutions are reused for this long — the preview mixer-nudge resolves fills
+ * every ~100ms during a drag and must not pay an AMCP CINF round-trip per tick. File resolutions
+ * do not change while a clip plays; re-ingest with a different size refreshes within the TTL. */
+const CINF_RESOLUTION_CACHE_TTL_MS = 30000
+
 /**
  * @param {object} self
  * @param {string} clipValue
@@ -238,13 +243,25 @@ async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	if (isTemplateClip(clipValue, self)) return null
 	try {
 		const cinfId = resolveCasparCinfMediaId(clipValue, self)
+		if (self && typeof self === 'object') {
+			const cached = self._cinfResolutionCache?.[cinfId]
+			if (cached && Date.now() - cached.at < CINF_RESOLUTION_CACHE_TTL_MS) {
+				return { w: cached.w, h: cached.h }
+			}
+		}
 		const res = await self.amcp.query.cinf(cinfId, { ctx: self })
 		const str = cinfResponseToStr(res?.data)
 		if (!str.trim()) return null
 		const parsed = parseCinfMedia(str)
 		if (parsed.resolution) {
 			const r = parseResolutionString(parsed.resolution)
-			if (r?.w > 0 && r?.h > 0) return r
+			if (r?.w > 0 && r?.h > 0) {
+				if (self && typeof self === 'object') {
+					self._cinfResolutionCache = self._cinfResolutionCache || {}
+					self._cinfResolutionCache[cinfId] = { w: r.w, h: r.h, at: Date.now() }
+				}
+				return r
+			}
 		}
 	} catch (_) {}
 	return null

@@ -255,9 +255,24 @@ function main() {
 				} catch (e) {
 					appCtx.log('debug', `[WO-209] preview channel normalization: ${e?.message || e}`)
 				}
-				void reconcileAfterInfoGather(appCtx).catch((e) => {
-					appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
-				})
+				// Restart fix (todos19.07.26): after the reconcile settles, re-stage the persisted
+				// preview look on each PRV bus (a surviving Caspar otherwise keeps showing the
+				// previous run's staged content) and warm the look-deck thumbnail cache so deck
+				// thumbs render without a first look play. Sequenced, fire-and-forget — mirrors
+				// the Multiview re-apply pattern above (runs on boot AND every Caspar reconnect).
+				void reconcileAfterInfoGather(appCtx)
+					.catch((e) => {
+						appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
+					})
+					.then(async () => {
+						const Setup = require('./src/config/routing-setup')
+						await Setup.restagePersistedPreviewLooks(appCtx).catch((e) => {
+							appCtx.log('warn', 'Preview re-stage: ' + (e?.message || e))
+						})
+						await Setup.warmLookDeckThumbnails(appCtx).catch((e) => {
+							appCtx.log('warn', 'Look thumb warm: ' + (e?.message || e))
+						})
+					})
 				// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts (band 700-789)
 				// WO-210 T210.4: restore screen timers (band 980-989)
 				void (async () => {

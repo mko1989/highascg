@@ -28,6 +28,26 @@ import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from '.
 import { syncPreviewLiveToServer } from './scene-live-sync.js'
 
 /**
+ * GET /api/media is expensive server-side (recursive media-dir scan + bounded ffprobe batch).
+ * The old code fired it EAGERLY on every preview push — during a compose drag that meant one
+ * catalog rebuild per push and dominated the perceived edit→PRV latency. Cache it across
+ * pushes; it is only awaited at all when a layer's content resolution is not already in state.
+ */
+const MEDIA_LIST_CACHE_TTL_MS = 10000
+let mediaListCacheAt = 0
+/** @type {Promise<object[]> | null} */
+let mediaListCachePromise = null
+
+function getMediaListCached() {
+	const now = Date.now()
+	if (!mediaListCachePromise || now - mediaListCacheAt >= MEDIA_LIST_CACHE_TTL_MS) {
+		mediaListCacheAt = now
+		mediaListCachePromise = api.get('/api/media').catch(() => [])
+	}
+	return mediaListCachePromise
+}
+
+/**
  * @param {object} opts
  * @param {string} opts.sceneId
  * @param {number[]|undefined} opts.restrictMains
@@ -88,10 +108,8 @@ export async function pushSceneToPreviewImpl(opts) {
 	try {
 		const commandsByChannel = new Map()
 		const sideBorderPipelines = []
-		const mediaListPromise = api.get('/api/media').catch(() => [])
-		async function getMediaListOnce() {
-			return mediaListPromise
-		}
+		/* Lazy + TTL-cached — never refetch the media catalog per drag-frame push. */
+		const getMediaListOnce = () => getMediaListCached()
 
 		let lastComputedFills = new Map()
 		let lastPreviewCh = null

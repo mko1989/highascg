@@ -44,7 +44,7 @@
       "label": "Rec1",
       "caspar": {
         "name": "Rec1",
-        "source": "program_2",
+        "source": "program_1",
         "crf": 26,
         "videoCodec": "h264",
         "videoBitrateKbps": 4500,
@@ -55,11 +55,18 @@
       "externalRef": "record_1"
     },
     {
-      "id": "dst_in_dst_pgm_1",
+      "id": "audio_1",
+      "deviceId": "caspar_host",
+      "kind": "audio_out",
+      "label": "Audio 1",
+      "externalRef": "hw:2,0"
+    },
+    {
+      "id": "dst_in_dst_mrs7vx1i_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "Dioda",
-      "externalRef": "dst_pgm_1"
+      "label": "PGM/PRV 1",
+      "externalRef": "dst_mrs7vx1i_1"
     },
     {
       "id": "dlsdi_1",
@@ -94,11 +101,10 @@
       "caspar": {
         "ioDirection": "out",
         "outputBinding": {
-          "type": "screen",
-          "index": 2
+          "type": "multiview"
         },
-        "bus": "pgm",
-        "mainIndex": 1
+        "bus": "multiview",
+        "mainIndex": 0
       },
       "externalRef": "3"
     },
@@ -114,89 +120,38 @@
       "externalRef": "4"
     },
     {
-      "id": "dst_in_dst_mrizwonx_1",
+      "id": "dst_in_dst_mrs7zdk8_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "Multiview 1",
-      "externalRef": "dst_mrizwonx_1"
+      "label": "Operator GUI",
+      "externalRef": "dst_mrs7zdk8_1"
     },
     {
-      "id": "caspar_mv_out",
-      "deviceId": "caspar_host",
-      "kind": "caspar_mv_out",
-      "label": "Multiview channel (virtual)",
-      "externalRef": "4"
-    },
-    {
-      "id": "dst_in_dst_mrizwm0m_1",
+      "id": "dst_in_dst_mrs803yn_1",
       "deviceId": "destinations",
       "kind": "destination_in",
       "label": "PGM 2",
-      "externalRef": "dst_mrizwm0m_1"
-    },
-    {
-      "id": "audio_1",
-      "deviceId": "caspar_host",
-      "kind": "audio_out",
-      "label": "Audio 1",
-      "externalRef": "hw:2,0"
-    },
-    {
-      "id": "dst_in_host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "marcins-macbook-pro-5.local Scan Converter",
-      "caspar": {
-        "hostRole": "ndi_host",
-        "hostChannel": 7,
-        "hostLayer": 1,
-        "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter"
-      },
-      "externalRef": "host_ndi_ndi_marcins_macbook_pro_5_local_scan_converter"
+      "externalRef": "dst_mrs803yn_1"
     },
     {
       "id": "dst_in_host_webpage_webpage_127_0_0_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
+      "label": "http://127.0.0.1:4200/template/SHADERS/SH-KSJB.html",
       "caspar": {
         "hostRole": "webpage_host",
-        "hostChannel": 8,
+        "hostChannel": 4,
         "hostLayer": 1,
         "sourceId": "webpage_127_0_0_1"
       },
       "externalRef": "host_webpage_webpage_127_0_0_1"
     },
     {
-      "id": "dst_in_dst_mrmet518_1",
+      "id": "dst_in_dst_mrsa11vf_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "Operator GUI",
-      "externalRef": "dst_mrmet518_1"
-    },
-    {
-      "id": "dst_in_host_decklink_input_4",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "DeckLink 4",
-      "caspar": {
-        "hostRole": "decklink_input",
-        "hostChannel": 6,
-        "slot": 4
-      },
-      "externalRef": "host_decklink_input_4"
-    },
-    {
-      "id": "dst_in_host_live_audio_input_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "Live audio 1",
-      "caspar": {
-        "hostRole": "live_audio_input",
-        "hostChannel": 7,
-        "slot": 1
-      },
-      "externalRef": "host_live_audio_input_1"
+      "label": "Multiview 1",
+      "externalRef": "dst_mrsa11vf_1"
     },
     {
       "id": "gpu_p0",
@@ -245,35 +200,34 @@
   ],
   "edges": [
     {
-      "id": "e_dst_in_dst_pgm_1_gpu_p0",
-      "sourceId": "dst_in_dst_pgm_1",
+      "id": "e_dst_in_dst_mrs7vx1i_1_gpu_p0",
+      "sourceId": "dst_in_dst_mrs7vx1i_1",
       "sinkId": "gpu_p0"
     },
     {
-      "id": "e_dst_in_dst_mrizwm0m_1_dlsdi_3",
-      "sourceId": "dst_in_dst_mrizwm0m_1",
+      "id": "e_dst_in_dst_mrs7zdk8_1_gpu_p2",
+      "sourceId": "dst_in_dst_mrs7zdk8_1",
+      "sinkId": "gpu_p2"
+    },
+    {
+      "id": "e_dst_in_dst_mrsa11vf_1_dlsdi_3",
+      "sourceId": "dst_in_dst_mrsa11vf_1",
       "sinkId": "dlsdi_3"
     },
     {
-      "id": "e_dst_in_dst_mrizwm0m_1_rec_1",
-      "sourceId": "dst_in_dst_mrizwm0m_1",
-      "sinkId": "rec_1"
-    },
-    {
-      "id": "e_dst_in_dst_mrizwm0m_1_str_1",
-      "sourceId": "dst_in_dst_mrizwm0m_1",
-      "sinkId": "str_1"
-    },
-    {
-      "id": "e_dst_in_dst_pgm_1_audio_1",
-      "sourceId": "dst_in_dst_pgm_1",
+      "id": "e_dst_in_dst_mrs7vx1i_1_audio_1",
+      "sourceId": "dst_in_dst_mrs7vx1i_1",
       "sinkId": "audio_1"
     },
     {
-      "id": "e_dst_in_dst_mrmet518_1_gpu_p2",
-      "sourceId": "dst_in_dst_mrmet518_1",
-      "sinkId": "gpu_p2"
+      "id": "e_dst_in_dst_mrs803yn_1_rec_1",
+      "sourceId": "dst_in_dst_mrs803yn_1",
+      "sinkId": "rec_1"
+    },
+    {
+      "id": "e_dst_in_dst_mrs803yn_1_str_1",
+      "sourceId": "dst_in_dst_mrs803yn_1",
+      "sinkId": "str_1"
     }
-  ],
-  "layout": {}
+  ]
 }

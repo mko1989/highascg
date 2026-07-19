@@ -15,12 +15,26 @@ import {
 	TIMELINE_LAYER_BASE,
 	TIMELINE_LAYER_CLEAR_COUNT,
 } from '../lib/scenes-preview-look-stack.js'
-import { buildPreviewContentSnapshot } from '../lib/scenes-preview-snapshot.js'
+import { buildPreviewContentSnapshot, isGeometryOnlyPreview } from '../lib/scenes-preview-snapshot.js'
 import { pushSceneToPreviewImpl } from '../lib/scenes-preview-push-scene.js'
 import { createScenesPreviewGlobalBorder } from '../lib/scenes-preview-global-border.js'
 import { clearPreviewLiveOnServer } from '../lib/scene-live-sync.js'
 
 const PREVIEW_PUSH_DEBOUNCE_MS = 16
+
+/**
+ * Hard ceiling before a continuously-rescheduled full push must fire: pointermove streams arrive
+ * faster than the 16ms debounce, so a pure debounce starved the push for the whole drag (updates
+ * only appeared when the pointer paused — the looks-editor "preview lags seconds" report).
+ */
+const PREVIEW_PUSH_MAX_WAIT_MS = 200
+
+/**
+ * Throttle for the low-latency geometry/opacity/crop nudge (POST /api/preview/mixer-nudge).
+ * Cosmetic acceleration only — the full preview push / take pipeline stays authoritative and
+ * converges to the same values (the server computes MIXER lines from the same fill fractions).
+ */
+const PREVIEW_NUDGE_THROTTLE_MS = 90
 
 /** Debounce for the deck PRV thumbnail redraw signal — coalesces rapid inspector drags into one repaint (T155.4a). */
 const DECK_THUMB_REDRAW_DEBOUNCE_MS = 120
@@ -124,11 +138,30 @@ export function createScenesPreviewRuntime(opts) {
 		}
 	}
 
+	/** First-schedule timestamp of the current debounce window (max-wait accounting). */
+	let previewDebounceFirstAt = null
+
+	/** Editor pushes target `editingSceneId`; a queued deck-stage request (forcePrvBus) must survive. */
+	function dropEditorPushRequest() {
+		if (previewPushRequest?.forcePrvBus !== true) previewPushRequest = null
+	}
+
 	function schedulePreviewPush() {
+		scheduleMixerNudge()
+		const now = Date.now()
+		if (previewDebounceFirstAt == null) previewDebounceFirstAt = now
 		if (previewDebounce != null) clearTimeout(previewDebounce)
+		if (now - previewDebounceFirstAt >= PREVIEW_PUSH_MAX_WAIT_MS) {
+			previewDebounce = null
+			previewDebounceFirstAt = null
+			dropEditorPushRequest()
+			void drainPreviewPushQueue()
+			return
+		}
 		previewDebounce = setTimeout(() => {
 			previewDebounce = null
-			previewPushRequest = null
+			previewDebounceFirstAt = null
+			dropEditorPushRequest()
 			void drainPreviewPushQueue()
 		}, PREVIEW_PUSH_DEBOUNCE_MS)
 	}
@@ -136,7 +169,8 @@ export function createScenesPreviewRuntime(opts) {
 	function flushPreviewPush() {
 		if (previewDebounce != null) clearTimeout(previewDebounce)
 		previewDebounce = null
-		previewPushRequest = null
+		previewDebounceFirstAt = null
+		dropEditorPushRequest()
 		void drainPreviewPushQueue()
 	}
 
@@ -254,13 +288,17 @@ export function createScenesPreviewRuntime(opts) {
 	async function sendSceneToPreviewCard(sceneId, opts = {}) {
 		if (previewDebounce != null) clearTimeout(previewDebounce)
 		previewDebounce = null
+		previewDebounceFirstAt = null
 		const forcePrvBus = opts.forcePrvBus !== false
-		if (forcePrvBus) {
-			await pushSceneToPreviewViaServer(sceneId, opts.targetMains, true)
-			return
-		}
+		/* Determinism (todos19.07.26): a deck recall/stage must never interleave with an in-flight
+		 * editor push on the same PRV channel — the old direct `pushSceneToPreviewViaServer` call
+		 * ran concurrently with the drain queue, so a stale editor push's STOP/CLEAR sweep and
+		 * per-layer MIXER FILLs could land AFTER the take staged the new look (missing layers /
+		 * layers wearing the previous look's transforms). Route it through the same single-flight
+		 * queue: it runs strictly after, and supersedes, any queued editor push. */
 		previewPushRequest = { sceneId, targetMains: opts.targetMains, forcePrvBus }
 		await drainPreviewPushQueue()
+		if (previewPushBusy || previewPushPending) await waitForPreviewPushComplete()
 	}
 
 	/** @type {number | null} */
@@ -271,6 +309,133 @@ export function createScenesPreviewRuntime(opts) {
 		lastPreviewContentSnapshot = null
 		lastPreviewChannel = null
 		lastGlobalBorderPushMeta.clear()
+		lastNudgeSentByLayer.clear()
+		lastNudgeSceneId = null
+	}
+
+	// --- Low-latency mixer nudge (POST /api/preview/mixer-nudge) -------------------------------
+	// While the looks editor drags geometry/opacity/crop, send ONLY the changed layers' fill
+	// fractions to the server every ~90ms; the server maps look layer → staged PRV layer and
+	// computes the MIXER lines with the SAME fill math the take pipeline uses. Cosmetic
+	// acceleration only: content changes and convergence stay with the full push above.
+
+	/** @type {ReturnType<typeof setTimeout> | null} */
+	let nudgeTimer = null
+	let nudgeInFlight = false
+	let nudgeQueued = false
+	let lastNudgeAt = 0
+	/** @type {Map<string, string>} `${mIdx}:${layerNumber}` → JSON of last-nudged geometry */
+	const lastNudgeSentByLayer = new Map()
+	/** @type {string | null} */
+	let lastNudgeSceneId = null
+
+	function nudgeCropParams(l) {
+		if (!Array.isArray(l.effects)) return null
+		const fx = l.effects.find((e) => e?.type === 'crop')
+		return fx?.params ?? null
+	}
+
+	function nudgeGeometryKeyForLayer(l) {
+		return JSON.stringify({
+			fill: l.fill ?? null,
+			rotation: l.rotation ?? 0,
+			opacity: l.opacity ?? 1,
+			crop: nudgeCropParams(l),
+		})
+	}
+
+	/** Minimal layer subset — the server resolves fill fractions → MIXER numbers itself. */
+	function nudgeLayerPayload(l) {
+		const crop = nudgeCropParams(l)
+		return {
+			layerNumber: l.layerNumber,
+			fill: l.fill ?? null,
+			rotation: l.rotation ?? 0,
+			opacity: l.opacity ?? 1,
+			contentFit: l.contentFit,
+			fillNativeAspect: l.fillNativeAspect,
+			source: l.source ? { type: l.source.type, value: l.source.value } : null,
+			effects: crop ? [{ type: 'crop', params: crop }] : [],
+		}
+	}
+
+	function nudgeTargetMainIdxs(scene, cm) {
+		const scope = String(scene.mainScope || 'all')
+		if (scope === 'all') return Array.from({ length: cm.screenCount || 1 }, (_, i) => i)
+		const n = parseInt(scope, 10)
+		if (Number.isFinite(n) && n >= 0 && n < (cm.screenCount || 1)) return [n]
+		return sceneState.armedScreenIndices?.length ? sceneState.armedScreenIndices : [sceneState.activeScreenIndex]
+	}
+
+	function scheduleMixerNudge() {
+		if (nudgeTimer != null) return
+		const wait = Math.max(0, PREVIEW_NUDGE_THROTTLE_MS - (Date.now() - lastNudgeAt))
+		nudgeTimer = setTimeout(() => {
+			nudgeTimer = null
+			void sendMixerNudge()
+		}, wait)
+	}
+
+	async function sendMixerNudge() {
+		if (nudgeInFlight) {
+			nudgeQueued = true
+			return
+		}
+		nudgeInFlight = true
+		lastNudgeAt = Date.now()
+		try {
+			const id = sceneState.editingSceneId
+			const scene = id ? sceneState.getScene(id) : null
+			if (!id || !scene) return
+			/* Only nudge the look our last full push/stage put on PRV, and only while the edit is
+			 * geometry/opacity/crop-only — content changes (clip/loop/audio/PIP) need the full
+			 * push's PLAY pipeline and must never be short-cut. */
+			if (!lastPreviewContentSnapshot || lastPreviewContentSnapshot.sceneId !== id) return
+			if (!isGeometryOnlyPreview(lastPreviewContentSnapshot, scene)) return
+			if (lastNudgeSceneId !== id) {
+				lastNudgeSentByLayer.clear()
+				lastNudgeSceneId = id
+			}
+			const cm = getChannelMap()
+			for (const mIdx of nudgeTargetMainIdxs(scene, cm)) {
+				if (!isPreviewBusAvailable(cm, mIdx)) continue
+				const changed = []
+				for (const l of scene.layers || []) {
+					if (!l?.source?.value) continue
+					const ln = Number(l.layerNumber)
+					if (!Number.isFinite(ln)) continue
+					const key = `${mIdx}:${ln}`
+					const geom = nudgeGeometryKeyForLayer(l)
+					if (lastNudgeSentByLayer.get(key) === geom) continue
+					changed.push({ layer: l, key, geom })
+				}
+				if (changed.length === 0) continue
+				const cv = sceneState.getCanvasForScreen(mIdx)
+				try {
+					const res = await api.post('/api/preview/mixer-nudge', {
+						mainIndex: mIdx,
+						sceneId: id,
+						composeCanvas: cv ? { w: cv.width, h: cv.height } : null,
+						layers: changed.map((c) => nudgeLayerPayload(c.layer)),
+					})
+					if (res?.ok) {
+						for (const c of changed) lastNudgeSentByLayer.set(c.key, c.geom)
+					} else {
+						/* Not staged (yet/anymore) on this PRV — never repaint a foreign look; the
+						 * authoritative push restages and the next nudge retries after that. */
+						for (const c of changed) lastNudgeSentByLayer.delete(c.key)
+					}
+				} catch {
+					/* cosmetic path — the authoritative push converges */
+				}
+			}
+		} finally {
+			nudgeInFlight = false
+			if (nudgeQueued) {
+				nudgeQueued = false
+				scheduleMixerNudge()
+			}
+		}
 	}
 
 	/**
@@ -284,6 +449,7 @@ export function createScenesPreviewRuntime(opts) {
 			clearTimeout(previewDebounce)
 			previewDebounce = null
 		}
+		previewDebounceFirstAt = null
 		previewPushRequest = null
 		await waitForPreviewPushComplete()
 

@@ -355,6 +355,68 @@ describe('WO-256: CSS wired, tile chrome/body classes present, styles.css import
 	})
 })
 
+describe('2026-07-19 fix: a pure POSITION change (looks list <-> looks editor shifts the canvas vertically, same size) re-reports the rects', () => {
+	const {
+		POSITION_WATCH_SLACK,
+		POSITION_WATCH_THRESHOLDS,
+		positionWatchRootMargin,
+		watchElementPosition,
+	} = require('../../client/lib/element-position-watch.js')
+
+	it('positionWatchRootMargin hugs the rect: negative insets from every viewport edge, inflated by the slack', () => {
+		const rect = { left: 100, top: 200, right: 500, bottom: 400 }
+		const viewport = { width: 1920, height: 1080 }
+		// top=200-2=198, right=1920-500-2=1418, bottom=1080-400-2=678, left=100-2=98 -> negated
+		assert.equal(positionWatchRootMargin(rect, viewport), '-198px -1418px -678px -98px')
+	})
+
+	it('floors so sub-pixel positions only ever GROW the box (containment at rest is never lost)', () => {
+		const rect = { left: 100.6, top: 200.4, right: 500.7, bottom: 400.2 }
+		const viewport = { width: 1920, height: 1080 }
+		// left: floor(100.6)-2=98 (box edge at 98 <= 100.6), right inset: floor(1920-500.7)-2=1417 (box edge at 503 >= 500.7)
+		assert.equal(positionWatchRootMargin(rect, viewport), '-198px -1417px -677px -98px')
+	})
+
+	it('a rect edge outside the viewport yields a positive (expanding) component — valid rootMargin, no crash', () => {
+		const rect = { left: -50, top: 10, right: 2000, bottom: 500 }
+		const m = positionWatchRootMargin(rect, { width: 1920, height: 1080 })
+		const [top, right] = m.split(' ')
+		assert.equal(top, '-8px')
+		assert.equal(right, '82px', 'right edge past the viewport -> expansion, not clamped/NaN')
+	})
+
+	it('threshold ladder spans 0..1 so partial-visibility elements still cross a threshold on movement', () => {
+		assert.equal(POSITION_WATCH_THRESHOLDS[0], 0)
+		assert.equal(POSITION_WATCH_THRESHOLDS[POSITION_WATCH_THRESHOLDS.length - 1], 1)
+		assert.ok(POSITION_WATCH_THRESHOLDS.length >= 100)
+		assert.ok(POSITION_WATCH_SLACK >= 1, 'some slack: sub-pixel drift must not thrash')
+	})
+
+	it('watchElementPosition degrades to a no-op without IntersectionObserver/window (node) — never throws', () => {
+		const w = watchElementPosition({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }) }, () => {})
+		assert.doesNotThrow(() => { w.update(); w.destroy() })
+	})
+
+	it('operator-compose-tiles.js wires the watcher: root position watched, re-hugged after every report, torn down on destroy', () => {
+		const src = read('client/components/operator-compose-tiles.js')
+		assert.match(src, /import \{ watchElementPosition \} from '\.\.\/lib\/element-position-watch\.js'/)
+		assert.match(src, /const posWatch = watchElementPosition\(root, \(\) => scheduleReport\(\)\)/)
+		assert.match(src, /onCellRects\(cellRects\)\s*\n[\s\S]{0,200}posWatch\.update\(\)/, 're-hug happens after each rect report')
+		assert.match(src, /posWatch\.destroy\(\)/)
+	})
+
+	it('workspace tab switches re-layout + re-report deterministically (and the listener is removed on destroy)', () => {
+		const src = read('client/components/operator-compose-tiles.js')
+		assert.match(src, /window\.addEventListener\('highascg-workspace-tab-activated', onTabActivated\)/)
+		assert.match(src, /window\.removeEventListener\('highascg-workspace-tab-activated', onTabActivated\)/)
+	})
+
+	it('no idle polling snuck in: the tiles module has no setInterval and no free-running rAF loop', () => {
+		const src = read('client/components/operator-compose-tiles.js')
+		assert.doesNotMatch(src, /setInterval/, 'position watching must be observer-driven, not polled')
+	})
+})
+
 describe('WO-256: server needs no changes — operator-gui-channel.js already accepts arbitrary role/mainIndex/rect cells', () => {
 	it('resolveCellSourceChannel branches only on role + mainIndex, not on rect position/size/count (grep-level, source unchanged by this WO)', () => {
 		const src = read('src/system/operator-gui-channel.js')

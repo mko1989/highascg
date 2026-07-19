@@ -48,6 +48,12 @@ Or double-click `docs/wiki-site/index.html`. All page content is embedded in `as
 | [**api/network-tailscale.md**](api/network-tailscale.md) | **Tailscale** — status, login, operator-monitor UI |
 | [api/ingest-usb-plugins.md](api/ingest-usb-plugins.md) | Ingest, USB import, plugins, optional modules |
 
+## Operator guides
+
+| Page | Contents |
+|------|----------|
+| [**guides/shader-fx.md**](guides/shader-fx.md) | **Shader FX** — audio-reactive Shadertoy-style shader templates: create, put on air, edit, limits |
+
 ## Integration
 
 | Page | Contents |

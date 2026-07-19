@@ -18,6 +18,7 @@ const routesData = require('./routes-data')
 const routesConfig = require('./routes-config')
 const routesMultiview = require('./routes-multiview')
 const routesScene = require('./routes-scene')
+const routesPreviewNudge = require('./routes-preview-nudge')
 const routesMisc = require('./routes-misc')
 const routesTimeline = require('./routes-timeline')
 const routesStreaming = require('./routes-streaming')
@@ -403,6 +404,8 @@ routes.post('/api/multiview/*', ({ path, body, ctx }) => routesMultiview.handleP
 routes.post('/api/scene/live/preview/clear', ({ body, ctx }) =>
 	routesScene.handlePost('/api/scene/live/preview/clear', body, ctx), { requireCaspar: false })
 routes.post('/api/scene/*', ({ path, body, ctx }) => routesScene.handlePost(path, body, ctx), { requireCaspar: true })
+// Low-latency looks-editor geometry nudge for the look staged on PRV (cosmetic; take path stays authoritative).
+routes.post('/api/preview/mixer-nudge', ({ body, ctx }) => routesPreviewNudge.handlePreviewMixerNudge(body, ctx), { requireCaspar: true })
 routes.post('/api/misc/*', ({ path, body, ctx }) => routesMisc.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Timeline catchall post

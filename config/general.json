@@ -11,7 +11,7 @@
   "host_stats": {
     "scan_folder": false
   },
-  "osc_info_supplement_ms": null,
+  "osc_info_supplement_ms": 2000,
   "hq_thumbnail_prewarm_on_start": true,
   "hq_thumbnail_prewarm_on_media_refresh": true,
   "operatorTools": {
@@ -26,14 +26,14 @@
     "mode": "canvas",
     "fps": 25,
     "resolutionScale": "half",
-    "jpegQuality": 20,
+    "jpegQuality": 10,
     "basenamePrefix": "highascg_preview",
     "maxWidth": 480,
     "channels": "compose_visible",
     "embedConsumersInCasparConfig": true,
     "attachViaAmcp": true,
     "pauseConsumerWhenIdle": false,
-    "companionThumbEnabled": false,
+    "companionThumbEnabled": true,
     "companionThumbSize": 144,
     "companionThumbIntervalMs": 1000
   },
@@ -43,7 +43,6 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
-  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"
@@ -96,6 +95,42 @@
       "dns": []
     }
   },
+  "extraLiveSources": [
+    {
+      "type": "browser",
+      "routeType": "webpage_host",
+      "value": "route://4-1",
+      "label": "http://127.0.0.1:4200/template/SHADERS/SH-KSJB.html",
+      "hostChannel": 4,
+      "hostLayer": 1,
+      "sourceId": "webpage_127_0_0_1",
+      "templateOrUrl": "http://127.0.0.1:4200/template/SHADERS/SH-KSJB.html",
+      "cefNeedle": "127.0.0.1",
+      "playArg": "http://127.0.0.1:4200/template/SHADERS/SH-KSJB.html",
+      "interactiveCapable": true,
+      "hostRole": "webpage_host",
+      "thumbnailChannel": 4,
+      "thumbnailLayer": 1,
+      "resolution": "1920×1080",
+      "fps": "50"
+    },
+    {
+      "type": "route",
+      "routeType": "decklink",
+      "value": "route://6-4",
+      "label": "DeckLink 4",
+      "decklinkSlot": 4,
+      "inputsChannel": 6,
+      "inputsLayer": 4,
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_4",
+      "resolution": "1920×1080",
+      "fps": "50",
+      "thumbnailChannel": 6,
+      "thumbnailLayer": 4
+    }
+  ],
+  "gpuPhysicalTopologyOperatorSaved": false,
   "screen_count": 2,
   "streaming": {
     "enabled": false,
@@ -115,79 +150,27 @@
     "drmDevice": "/dev/dri/card0",
     "autoRelocateBasePort": true
   },
-  "extraLiveSources": [
-    {
-      "type": "route",
-      "routeType": "decklink",
-      "value": "route://6-4",
-      "label": "DeckLink 4",
-      "decklinkSlot": 4,
-      "inputsChannel": 6,
-      "inputsLayer": 4,
-      "decklinkDevice": 4,
-      "connectorId": "dlsdi_4",
-      "resolution": "1920×1080",
-      "fps": "50",
-      "thumbnailChannel": 6,
-      "thumbnailLayer": 4
-    },
-    {
-      "type": "ndi",
-      "routeType": "ndi_host",
-      "value": "route://7-1",
-      "label": "marcins-macbook-pro-5.local Scan Converter",
-      "hostChannel": 7,
-      "hostLayer": 1,
-      "sourceId": "ndi_marcins_macbook_pro_5_local_scan_converter",
-      "ndiName": "ndi://marcins-macbook-pro-5.local/\"Scan Converter\"",
-      "interactiveCapable": false,
-      "hostRole": "ndi_host",
-      "useDirect": false,
-      "thumbnailChannel": 7,
-      "thumbnailLayer": 1,
-      "resolution": "1920×1080",
-      "fps": "50"
-    },
-    {
-      "type": "browser",
-      "routeType": "webpage_host",
-      "value": "route://8-1",
-      "label": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
-      "hostChannel": 8,
-      "hostLayer": 1,
-      "sourceId": "webpage_127_0_0_1",
-      "templateOrUrl": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
-      "cefNeedle": "127.0.0.1",
-      "playArg": "http://127.0.0.1:4200/template/MARIO/INDEX.html",
-      "interactiveCapable": true,
-      "hostRole": "webpage_host",
-      "thumbnailChannel": 8,
-      "thumbnailLayer": 1,
-      "resolution": "1920×1080",
-      "fps": "50"
-    },
-    {
-      "type": "route",
-      "routeType": "layer",
-      "value": "route://1-11",
-      "label": "Route: Ch1 L11 PGM · Look 7 (copy)",
-      "lookId": "3e2a218a-7a9a-4828-8494-b7846eb1afda",
-      "lookName": "Look 7 (copy)",
-      "resolution": "839×472",
-      "fps": "50",
-      "thumbnailChannel": 1,
-      "fill": {
-        "x": 0.10901900114456001,
-        "y": 0.1077321197877593,
-        "scaleX": 0.43719230937206727,
-        "scaleY": 0.4371923093720672
-      },
-      "thumbnailLayer": 11
-    }
-  ],
-  "configVersion": 1,
   "periodic_sync_interval_sec": null,
   "periodic_sync_interval_sec_osc": null,
+  "virtualCamera": {
+    "enabled": false,
+    "label": "Virtual cam",
+    "channel": 1,
+    "device": "/dev/video10",
+    "basenamePrefix": "highascg_vcam",
+    "mode": "jpeg",
+    "streamPort": 5555,
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "resolutionScale": "full",
+    "jpegQuality": 10,
+    "audioEnabled": true,
+    "alsaLoopbackCardId": "HighAsCG_VCam",
+    "alsaLoopbackIndex": 20,
+    "alsaLoopbackPcm": 2,
+    "showInDeviceView": false
+  },
   "screen_1_system_id": "",
   "screen_2_system_id": "",
   "screen_3_system_id": "",

@@ -46,6 +46,13 @@ let lastLog = null
  * lives, so draw-loop re-reports can't flood the helper log. */
 let _lastWrittenPayload = null
 
+/** todos19.07.26 release: startup timing probes — LOG-ONLY. Companion phases to the kiosk-spawn
+ * probes in operator-gui-launcher.js and the first-rect-report probe in routes-operator-gui.js:
+ * helper spawn -> ready (first stdout — the python side is up and talking) -> first rects written. */
+let helperSpawnAt = null
+let helperFirstOutputSeen = false
+let firstRectsWritten = false
+
 /** @returns {boolean} helper process currently alive */
 function isRunning() {
 	return !!(proc && proc.stdin && !proc.stdin.destroyed)
@@ -65,8 +72,14 @@ function ensureSpawned(log) {
 	}
 	const env = displaySessionEnv()
 	const child = spawn('python3', ['-u', SHAPE_SCRIPT], { env, stdio: ['pipe', 'pipe', 'pipe'] })
+	helperSpawnAt = Date.now()
+	helperFirstOutputSeen = false
 	child.stdout.on('data', (chunk) => {
 		const t = String(chunk).trim()
+		if (!helperFirstOutputSeen) {
+			helperFirstOutputSeen = true
+			log?.('info', `[Shape overlay] timing: ready (first output) t=${Date.now()} +${helperSpawnAt == null ? '?' : Date.now() - helperSpawnAt}ms`)
+		}
 		if (t) log?.('info', `[Shape overlay] ${t}`)
 	})
 	child.stderr.on('data', (chunk) => {
@@ -115,6 +128,10 @@ function updateShapeRects(monitorRect, rectsPx, opts = {}) {
 	try {
 		p.stdin.write(payload + '\n')
 		_lastWrittenPayload = payload
+		if (!firstRectsWritten && lastRects.length) {
+			firstRectsWritten = true
+			log?.('info', `[Shape overlay] timing: first rects written t=${Date.now()} rects=${lastRects.length}`)
+		}
 	} catch (e) {
 		_lastWrittenPayload = null
 		swallow(e, { tag: 'operator-shape-overlay' })

@@ -28,6 +28,7 @@
  *    relationship live during drags/resizes too (WO-263).
  */
 import { screenLabel } from '../lib/screen-label.js'
+import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 
 /** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
@@ -235,6 +236,14 @@ export function initOperatorComposeTiles(container, options) {
 	root.appendChild(resetBtn)
 	container.appendChild(root)
 
+	// 2026-07-19 bug: switching looks list <-> looks editor shifts the whole canvas vertically at
+	// the SAME size (the rundown slot above the preview host toggles), so ResizeObserver/scroll
+	// never fire and the reported rects — the punched holes + route video — stayed at the old Y
+	// while the DOM tile borders moved. Watch the root's viewport POSITION too (idle-free
+	// IntersectionObserver hug-box, see element-position-watch.js) and re-report on any move.
+	// `scheduleReport` is a hoisted function declaration, safe to hand over here.
+	const posWatch = watchElementPosition(root, () => scheduleReport())
+
 	const getCm = () => stateStore?.getState?.()?.channelMap || {}
 
 	/** @type {Map<string, { def: object, frac: { x: number, y: number, w: number, h: number }, el: HTMLElement, bodyEl: HTMLElement, footerEl: HTMLElement, labelEl: HTMLElement, timer: { destroy: () => void, refresh: () => void } | null }>} */
@@ -289,6 +298,8 @@ export function initOperatorComposeTiles(container, options) {
 			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
 		}
 		onCellRects(cellRects)
+		// Re-hug the freshest canvas position so the next pure MOVE (no resize/scroll) re-reports.
+		posWatch.update()
 	}
 
 	function scheduleReport() {
@@ -432,8 +443,12 @@ export function initOperatorComposeTiles(container, options) {
 	ro?.observe(root)
 	const onWinResize = () => layoutAll()
 	const onWinScroll = () => scheduleReport()
+	// Workspace tab switches reflow the whole page — re-layout + re-report deterministically
+	// (belt-and-suspenders next to posWatch; also covers environments without IntersectionObserver).
+	const onTabActivated = () => layoutAll()
 	window.addEventListener('resize', onWinResize)
 	window.addEventListener('scroll', onWinScroll, true)
+	window.addEventListener('highascg-workspace-tab-activated', onTabActivated)
 	const unsubCm = stateStore?.on?.('channelMap', () => rebuild())
 
 	rebuild()
@@ -442,8 +457,10 @@ export function initOperatorComposeTiles(container, options) {
 		refreshDefs: rebuild,
 		destroy() {
 			ro?.disconnect()
+			posWatch.destroy()
 			window.removeEventListener('resize', onWinResize)
 			window.removeEventListener('scroll', onWinScroll, true)
+			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			unsubCm?.()
 			if (rafReport != null) cancelAnimationFrame(rafReport)
 			for (const t of tiles.values()) t.timer?.destroy?.()

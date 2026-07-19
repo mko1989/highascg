@@ -12,6 +12,7 @@ import { resolveMvCellSourceChannel } from '../lib/input-channels.js'
 import { attachMathInput } from '../lib/math-input.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
 import { reportMultiviewEditRect, reportMultiviewEditCellRects, isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { holeRectFromOuter } from '../lib/hole-rect.js'
 
 /**
  * Create a debounced function that delays execution until the specified delay has elapsed
@@ -68,9 +69,8 @@ export function initMultiviewEditor(root, stateStore) {
 	//  - FULL OUTPUT (toggle): the old single whole-dock hole showing the real composited
 	//    multiview channel (incl. its own labels/timers/bg) — click-dead, view-only.
 	let mvOperatorFullOutput = false
-	/** Viewport-px insets keeping editor chrome outside the per-cell holes. */
-	const MV_BLEND_INSET_TOP = 20
-	const MV_BLEND_INSET = 6
+	/** Viewport-px insets keeping editor chrome outside the per-cell holes ({@link holeRectFromOuter}). */
+	const MV_BLEND_INSETS = { top: 20, right: 6, bottom: 6, left: 6 }
 	const getCM = () => stateStore.getState()?.channelMap || {}
 	const isEnabled = () => getCM().multiviewEnabled !== false && getCM().multiviewCh != null
 	const applyDebounce = createDebounce(() => applyMultiviewLayout(getCM, { silent: true }), 800)
@@ -146,12 +146,11 @@ export function initMultiviewEditor(root, stateStore) {
 		const cells = []
 		for (const c of multiviewState.getCells()) {
 			// Same client-px mapping as the mouse handlers (toCanvas is its inverse).
-			const left = canvasRect.left + offsetX + c.x * scale + MV_BLEND_INSET
-			const top = canvasRect.top + offsetY + c.y * scale + MV_BLEND_INSET_TOP
-			const width = c.w * scale - MV_BLEND_INSET * 2
-			const height = c.h * scale - MV_BLEND_INSET_TOP - MV_BLEND_INSET
-			if (width < 24 || height < 24) continue
-			const rect = { left, top, width, height }
+			const rect = holeRectFromOuter(
+				{ left: canvasRect.left + offsetX + c.x * scale, top: canvasRect.top + offsetY + c.y * scale, width: c.w * scale, height: c.h * scale },
+				MV_BLEND_INSETS
+			)
+			if (rect.width < 24 || rect.height < 24) continue
 			if (c.type === 'pgm' || c.type === 'prv') {
 				const idx = Number(c.screenIdx)
 				if (Number.isFinite(idx)) {

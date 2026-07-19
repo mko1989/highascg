@@ -14,6 +14,7 @@ import {
 import * as Ingest from './sources-panel-ingest-logic.js'
 import { showUsbImportModal } from './usb-import-modal.js'
 import { showPlaceholderModal } from './placeholder-modal.js'
+import { showShaderFxModal } from './shader-fx-modal.js'
 
 /**
  * @param {object} ctx
@@ -224,6 +225,16 @@ export function bindSourcesPanelIngestUi(ctx) {
 				if (getCurrentTab() === 'placeholders') render()
 			},
 		})
+	}
+	// WO-266: Shader FX manager entry — appended here (last, after the media items) rather
+	// than in the shell markup so the wiring and the menu item live together.
+	dropMenu.insertAdjacentHTML(
+		'beforeend',
+		'<button class="ingest-menu-item" id="ingest-menu-shaderfx" title="Create / edit audio-reactive shader templates">New shader…</button>',
+	)
+	dropMenu.querySelector('#ingest-menu-shaderfx').onclick = () => {
+		dropMenu.style.display = 'none'
+		showShaderFxModal()
 	}
 	urlBtn.onclick = async () => {
 		const u = urlIn.value.trim()

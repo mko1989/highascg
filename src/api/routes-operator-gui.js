@@ -19,6 +19,12 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { applyOperatorGuiLayout, clearOperatorGuiLayout } = require('../system/operator-gui-channel')
 const { launchOperatorGuiBrowser, raiseOperatorGuiBrowser } = require('../system/operator-gui-launcher')
 
+/** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Final phase of the operator-
+ * GUI startup timeline (kiosk spawn probes: operator-gui-launcher.js; shape helper probes:
+ * operator-shape-overlay.js). Logged once per server run, before the amcp gate so a report that
+ * arrives while Caspar is still connecting is timed too. */
+let firstLayoutReportSeen = false
+
 /**
  * @param {string} path
  * @param {string|object} body
@@ -28,6 +34,10 @@ async function handlePost(path, body, ctx) {
 	if (path === '/api/operator-gui/layout') {
 		const j = parseBody(body) || {}
 		const cells = Array.isArray(j.cells) ? j.cells : []
+		if (!firstLayoutReportSeen && cells.length && typeof ctx.log === 'function') {
+			firstLayoutReportSeen = true
+			ctx.log('info', `[Operator GUI] timing: first rect report t=${Date.now()} cells=${cells.length}`)
+		}
 		if (!ctx.amcp) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 		}

@@ -123,14 +123,17 @@ describe('WO-266 T266.2/T266.3: player runtime + vendored lib (source asserts)',
 		assert.ok(player.indexOf('toy.addTexture') < player.indexOf('toy.setImage'), 'addTexture must precede setImage (patch requirement)')
 	})
 
-	it('client wiring: Shader FX under templates (+) menu + edit branch + WO-265 studio-tab fallback', () => {
+	it('client wiring: New shader… in the main ingest (+) menu + edit branch + WO-265 studio-tab fallback', () => {
+		// todos19.07.26 feedback: no extra (+) on the templates tab — the manager entry
+		// lives in the media ingest plus menu instead.
+		const ingest = src('client/components/sources-panel-ingest-ui.js')
+		assert.match(ingest, /import \{ showShaderFxModal \} from '\.\/shader-fx-modal\.js'/)
+		assert.match(ingest, /class="ingest-menu-item" id="ingest-menu-shaderfx"[^>]*>New shader…</)
+		assert.match(ingest, /showShaderFxModal\(\)/)
 		const tpl = src('client/components/sources-panel-templates.js')
-		// todos19.07.26: the manager hides behind a (+) mirroring the media ingest plus —
-		// no always-visible "Shader FX…" toolbar button anymore.
-		assert.match(tpl, /class="ingest-plus-btn" id="sources-templates-plus-btn"/)
-		assert.match(tpl, /class="ingest-menu-item" id="sources-shaderfx-new"[^>]*>New shader…</)
+		assert.ok(!tpl.includes('ingest-plus-btn'), 'templates tab must not render its own (+) button')
 		assert.ok(!tpl.includes('sources-shaderfx-btn'), 'old always-visible Shader FX… button must be gone')
-		assert.match(tpl, /showShaderFxModal\(\)/)
+		assert.ok(!tpl.includes('sources-shaderfx-new'), 'templates-tab New shader… menu item must be gone')
 		assert.match(tpl, /shaders\\\/\(sh-\[a-z0-9-\]\+\)\$/)
 		assert.match(tpl, /highascgActivateWorkspaceTab\('cg-studio'\)/)
 		const modal = src('client/components/shader-fx-modal.js')

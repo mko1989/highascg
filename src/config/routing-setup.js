@@ -453,6 +453,124 @@ async function setupAllRouting(self) {
 	startLiveInputMeterHealthWatch(self)
 }
 
+/**
+ * Boot/reconnect re-stage of the persisted preview look onto each PRV bus (restart fix,
+ * todos19.07.26): a highascg restart leaves a surviving Caspar showing the PREVIOUS run's
+ * staged PRV content, and the operator GUI preview hole shows that stale channel until a
+ * first look action. Mirrors the "Multiview re-apply" pattern — runs after the INFO gather
+ * + live-scene reconcile settle (index.js chains it off reconcileAfterInfoGather), and
+ * stages via the EXISTING preview-only take path (routes-scene-take handleSceneTake with
+ * target:'preview' — same '[scene-take] preview-only path' as an operator preview click).
+ *
+ * Look selection per main (first candidate that still resolves to a project look with
+ * content wins — never force-stages garbage after a reconcile clear or look deletion):
+ *   1. project envelope `previewSceneIdByMain[i]` (persisted deck selection per main)
+ *   2. envelope `previewSceneId` (scalar legacy field, active main only)
+ *   3. `liveSceneState.getChannel(prvCh).sceneId` (what was actually staged on PRV last
+ *      run — reconcile only clears program channels, so this survives restarts)
+ * @param {object} self - app context
+ */
+async function restagePersistedPreviewLooks(self) {
+	if (!self?.amcp || self.amcp.isConnected === false) return
+	const map = routingMap.getChannelMap(self.config)
+	const liveSceneState = require('../state/live-scene-state')
+	const { resolveSceneById } = require('../engine/project-scenes')
+	let envelope
+	try {
+		envelope = require('../engine/project-scenes-load').loadProjectScenes()
+	} catch (e) {
+		self.log('debug', `Preview re-stage: project load failed (${e?.message || e}) — skipped`)
+		return
+	}
+	const byMain = Array.isArray(envelope?.previewSceneIdByMain) ? envelope.previewSceneIdByMain : []
+	const activeIdx = Number(envelope?.activeScreenIndex) || 0
+	for (let i = 0; i < (map.screenCount || 0); i++) {
+		const pgmCh = map.programChannels?.[i] ?? map.programCh?.(i + 1)
+		const prvCh = map.switcherBus1Channels?.[i] ?? map.previewChannels?.[i]
+		if (pgmCh == null || prvCh == null || Number(prvCh) <= 0 || Number(prvCh) === Number(pgmCh)) continue
+		const candidates = [
+			byMain[i],
+			i === activeIdx ? envelope?.previewSceneId : null,
+			liveSceneState.getChannel(prvCh)?.sceneId,
+		]
+		let lookId = null
+		let look = null
+		for (const c of candidates) {
+			const id = c != null ? String(c).trim() : ''
+			if (!id) continue
+			const s = resolveSceneById(id)
+			if (s && Array.isArray(s.layers) && s.layers.some((l) => l?.source?.value)) {
+				lookId = id
+				look = s
+				break
+			}
+		}
+		if (!lookId) {
+			self.log('debug', `Preview re-stage: no valid persisted look for prv ${prvCh} — skipped`)
+			continue
+		}
+		try {
+			const { handleSceneTake } = require('../api/routes-scene-take')
+			const res = await handleSceneTake({ channel: pgmCh, target: 'preview', sceneId: lookId, forceCut: true }, self)
+			if (res?.status === 200) {
+				self.log('info', `Preview re-stage: look ${look?.name || lookId} staged on prv ${prvCh}`)
+			} else {
+				let errMsg = `status ${res?.status}`
+				try {
+					errMsg = JSON.parse(res?.body || '{}').error || errMsg
+				} catch {
+					/* keep status */
+				}
+				self.log('warn', `Preview re-stage: look ${look?.name || lookId} on prv ${prvCh} failed: ${errMsg}`)
+			}
+		} catch (e) {
+			self.log('warn', `Preview re-stage: look ${look?.name || lookId} on prv ${prvCh} failed: ${e?.message || e}`)
+		}
+	}
+}
+
+/**
+ * Boot warm of the look-deck thumbnail cache (restart fix, todos19.07.26): deck cards are a
+ * client canvas composite of `GET /api/thumbnail/<mediaId>?hq=1&w=960&t=0` PNGs
+ * (scenes-editor-deck-thumb.js → routes-media handleThumbnail → local ffmpeg extraction
+ * cached under data/thumbnails). The deck paints ONCE at render — a cold cache means slow /
+ * 404'd extractions (WO-184 in-flight guard + 10 s failedThumbs cooldown) and the only
+ * repaint trigger is the `scenes-deck-thumb-redraw` event, which fires AFTER a completed
+ * preview push — so thumbs stayed blank until the first look play. Pre-generating the exact
+ * cache keys the deck requests (maxW 960; the deck's t=0 resolves server-side to seekSec 2 —
+ * `parseFloat('0') || 2` in routes-media) makes the first paint an instant cache hit.
+ * @param {object} self - app context
+ */
+async function warmLookDeckThumbnails(self) {
+	let envelope
+	try {
+		envelope = require('../engine/project-scenes-load').loadProjectScenes()
+	} catch {
+		return
+	}
+	const scenes = Array.isArray(envelope?.scenes) ? envelope.scenes : []
+	const ids = []
+	for (const s of scenes) {
+		for (const l of Array.isArray(s?.layers) ? s.layers : []) {
+			const src = l?.source
+			if (!src || src.isPlaceholder || !src.value) continue
+			const t = String(src.type || '').toLowerCase()
+			if (t === 'media' || t === 'file') ids.push(String(src.value))
+		}
+	}
+	if (!ids.length) return
+	const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
+	const stats = await ensureLocalThumbnailCacheForMediaIds(self.config || {}, ids, {
+		maxItems: ids.length,
+		maxW: 960,
+		seekSec: 2,
+	})
+	self.log(
+		'info',
+		`Look thumb warm: ${stats.generated} generated, ${stats.cached} already cached (${stats.attempted} look media file(s))`,
+	)
+}
+
 async function setupMappingChannels(_self) {
 	// Pixel-map → DeckLink is expressed in generated Caspar XML as one program channel (custom width)
 	// plus a single decklink consumer with subregions and synced ports — no extra mapping channels or AMCP mirrors.
@@ -491,4 +609,6 @@ module.exports = {
 	setupMultiview,
 	setupAllRouting,
 	setupMappingChannels,
+	restagePersistedPreviewLooks,
+	warmLookDeckThumbnails,
 }

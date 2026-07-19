@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-07-19T18:51:30.100Z",
+  "generatedAt": "2026-07-19T22:56:18.097Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -366,6 +366,14 @@
       "category": "Integration",
       "description": "<?xml version=\"1.0\" encoding=\"utf-8\"?> <-- The opening XML declaration -->",
       "order": 63
+    },
+    {
+      "id": "wiki--guides--shader-fx",
+      "title": "Shader FX — audio-reactive shader templates",
+      "file": "wiki/guides/shader-fx.md",
+      "category": "Audio",
+      "description": "Paste a **Shadertoy-style GLSL shader**, save it, and play it like any other template. Saved shaders export as self-contained Caspar HTML templates in **`templa",
+      "order": 69
     },
     {
       "id": "guides--audio--audio_features_walkthrough",

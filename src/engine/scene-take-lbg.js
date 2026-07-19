@@ -12,11 +12,12 @@
  *    or fade outgoing out when incoming is underneath (bank A); only one side tweens (no 50% dip).
  * 5) Teardown after transition window; merge teardown clears both logical layer N and N+100 to drop legacy bank B.
  * WO-259: `take_two_phase_batch` (config, default true) folds per-layer MIXER CLEAR/LOADBG/pre-PLAY
- * opacity/deferred MIXER/border+PIP CG into one BEGIN…COMMIT (Phase A), and non-route PLAYs + crossfade
+ * opacity/deferred MIXER/border+PIP CG into one BEGIN…COMMIT (Phase A), and PLAYs + crossfade
  * OPACITY into a second BEGIN…COMMIT (Phase B) — see scene-take-lbg-amcp-pipeline.js and
- * scene-route-deps.js#sendStaggeredTakePlays. `MIXER <ch> COMMIT` always stays outside both batches, and
- * route:// PLAYs are never folded in (they still need real round trips to resolve). Explicit `false`
- * restores the historical one-command-at-a-time sequence this comment used to mandate unconditionally.
+ * scene-route-deps.js#sendStaggeredTakePlays. `MIXER <ch> COMMIT` always stays outside both batches.
+ * Same-channel route:// PLAYs ride Phase B too, dependency-ordered after their source PLAYs, so a look
+ * mixing media + routes lands on one frame (todos19.07.26 fix — batches execute in order, apply
+ * atomically). Explicit `false` restores the historical one-command-at-a-time staggered sequence.
  */
 
 'use strict'

@@ -44,6 +44,22 @@ const AUTO_LAUNCH_VERIFY_MS = 3000
 let firefoxProc = null
 let firefoxPid = null
 
+/**
+ * todos19.07.26 release: launch timing probes — LOG-ONLY, no behavior change. Each phase line
+ * carries wall-clock epoch ms (`t=`) plus ms since the kiosk spawn (`+Nms`) so startup races
+ * (X not ready, slow window map, shape helper vs first rect report) are diagnosable from the
+ * journal alone. NOTE: the operator-GUI Firefox is a plain native kiosk — there is NO CDP in this
+ * path (CDP timing belongs to the WO-258 browser-source/CEF sessions); the later phases of this
+ * timeline are the shape helper probes in operator-shape-overlay.js and the first-rect-report
+ * probe in src/api/routes-operator-gui.js.
+ */
+let launchSpawnAt = null
+function probeLaunchPhase(log, phase, extra = '') {
+	const now = Date.now()
+	const dt = launchSpawnAt == null ? '?' : String(now - launchSpawnAt)
+	log?.('info', `[Operator GUI] timing: ${phase} t=${now} +${dt}ms${extra ? ` ${extra}` : ''}`)
+}
+
 function isRunning() {
 	if (!firefoxPid) return false
 	try {
@@ -104,6 +120,7 @@ async function positionFirefoxWindow(env, monitorRect, log, timeout = FIRST_SEAR
 		return false
 	}
 	const wid = ids[ids.length - 1]
+	probeLaunchPhase(log, 'kiosk window found', `wid=${wid} candidates=${ids.length}`)
 	if (monitorRect && monitorRect.w > 0 && monitorRect.h > 0) {
 		try {
 			await execFileAsync('xdotool', ['windowmove', wid, String(monitorRect.x), String(monitorRect.y)], {
@@ -123,6 +140,7 @@ async function positionFirefoxWindow(env, monitorRect, log, timeout = FIRST_SEAR
 	} catch (_) {
 		/* best-effort */
 	}
+	probeLaunchPhase(log, 'kiosk window positioned')
 	return true
 }
 
@@ -182,6 +200,8 @@ async function launchOperatorGuiBrowser(ctx) {
 	})
 	firefoxProc = child
 	firefoxPid = child.pid
+	launchSpawnAt = Date.now()
+	probeLaunchPhase(ctx.log, 'kiosk spawned', `pid=${child.pid} bin=${bin}`)
 	child.stdout.on('data', (chunk) => {
 		const t = String(chunk).trim()
 		if (t) ctx.log?.('info', `[Operator GUI firefox] ${t}`)

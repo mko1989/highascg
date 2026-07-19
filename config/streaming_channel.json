@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "videoMode": "1080p5000",
+  "videoMode": "",
   "videoSource": "program_2",
   "audioSource": "follow_video",
   "audioSourcePair": "all",
@@ -10,6 +10,5 @@
   "streamKey": "",
   "rtmpQuality": "medium",
   "contentLayer": 10,
-  "decklinkDevice": 0,
-  "quality": "medium"
+  "decklinkDevice": 0
 }

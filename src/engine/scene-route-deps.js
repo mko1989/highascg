@@ -287,10 +287,14 @@ function orderRouteJobsByDependency(routeJobs, allJobs) {
  * @param {object[]} takeJobs
  * @param {(job: object) => string[]} linesForJob
  * @param {{ leadingCommit?: boolean, commitAfterSources?: boolean, commitAfterRoutes?: boolean, suffixAfterSources?: string[], twoPhaseBatch?: boolean }} [opts]
- *   `twoPhaseBatch` (WO-259): send the non-route source PLAY + suffix lines as one BEGIN…COMMIT batch instead
- *   of one-command-at-a-time; the leading/trailing `MIXER <ch> COMMIT` still go outside the batch (Caspar
- *   forbids `MIXER n COMMIT` inside BEGIN…COMMIT). Route PLAYs are NEVER folded into the batch — they keep
- *   this same staggered sequential path below regardless of the flag (route:// producers need real round trips).
+ *   `twoPhaseBatch` (WO-259): send the source PLAY + suffix lines as one BEGIN…COMMIT batch instead of
+ *   one-command-at-a-time; the leading/trailing `MIXER <ch> COMMIT` still go outside the batch (Caspar
+ *   forbids `MIXER n COMMIT` inside BEGIN…COMMIT). Same-channel route:// PLAYs are folded into the SAME
+ *   batch, after their source PLAYs (dependency-ordered): a BEGIN…COMMIT executes its commands in order —
+ *   so each route producer finds its source layer already playing — but applies atomically, so source and
+ *   route layers hit air on the same frame. The pre-fix staggered path (source batch → sleep → sequential
+ *   route PLAYs) made route layers of a look pop in one-by-one (todos19.07.26); it remains only for
+ *   `take_two_phase_batch: false` rollback parity.
  */
 async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts = {}) {
 	const { sendAmcpLinesSequential } = require('../caspar/amcp-batch')
@@ -307,23 +311,40 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 	const sourceLines = sources.flatMap((job) => linesForJob(job) || [])
 	const orderedRoutes = orderRouteJobsByDependency(routes, takeJobs)
 
-	if (sourceLines.length > 0) {
-		if (twoPhaseBatch) {
-			// Phase B: one BEGIN…COMMIT for all non-route PLAYs + crossfade suffix; leading/trailing
-			// `MIXER <ch> COMMIT` sent outside the batch, same position as the sequential path below.
-			if (leadingCommit) await amcp.mixerCommit(ch)
-			const block = [...sourceLines, ...suffixAfterSources]
-			await amcp.batchSendChunked(block, { skipMixerPreCommit: true, forceBatch: true })
-			if (commitAfterSources) await amcp.mixerCommit(ch)
-		} else {
-			/** @type {string[]} */
-			const block = []
-			if (leadingCommit) block.push(commitLine)
-			block.push(...sourceLines)
-			if (suffixAfterSources.length) block.push(...suffixAfterSources)
-			if (commitAfterSources) block.push(commitLine)
-			await sendAmcpLinesSequential(block, amcp)
+	if (twoPhaseBatch) {
+		// Phase B: ONE BEGIN…COMMIT carrying source PLAYs + crossfade suffix + same-channel route PLAYs
+		// (dependency-ordered after their sources). Commands inside a batch execute in order, so each
+		// route:// producer is created after its source layer's PLAY ran, but the batch applies
+		// atomically — every layer of the look (media AND routes) lands on the same output frame.
+		// Leading/trailing `MIXER <ch> COMMIT` stay outside (forbidden inside BEGIN…COMMIT).
+		const routeLines = orderedRoutes.flatMap((job) => linesForJob(job) || [])
+		const block = [
+			...sourceLines,
+			...(sourceLines.length > 0 ? suffixAfterSources : []),
+			...routeLines,
+		]
+		if (block.length === 0) {
+			if (orderedRoutes.length === 0 && (leadingCommit || commitAfterRoutes)) {
+				await amcp.mixerCommit(ch)
+			}
+			return
 		}
+		if (leadingCommit && sourceLines.length > 0) await amcp.mixerCommit(ch)
+		await amcp.batchSendChunked(block, { skipMixerPreCommit: true, forceBatch: true })
+		if (commitAfterSources || (routeLines.length > 0 && commitAfterRoutes)) {
+			await amcp.mixerCommit(ch)
+		}
+		return
+	}
+
+	if (sourceLines.length > 0) {
+		/** @type {string[]} */
+		const block = []
+		if (leadingCommit) block.push(commitLine)
+		block.push(...sourceLines)
+		if (suffixAfterSources.length) block.push(...suffixAfterSources)
+		if (commitAfterSources) block.push(commitLine)
+		await sendAmcpLinesSequential(block, amcp)
 	}
 
 	if (orderedRoutes.length === 0) {

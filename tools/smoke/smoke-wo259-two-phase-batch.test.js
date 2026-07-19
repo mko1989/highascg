@@ -8,8 +8,9 @@ const assert = require('node:assert/strict')
  *
  * T259.3 wire-shape coverage:
  * - flag ON: Phase A (one BEGIN…COMMIT: MIXER CLEAR + LOADBG + pre-PLAY opacity + deferred MIXER) →
- *   `MIXER <ch> COMMIT` outside the batch → Phase B (one BEGIN…COMMIT: non-route PLAYs + crossfade
- *   OPACITY) → trailing `MIXER <ch> COMMIT` outside the batch → route PLAYs after, sequential.
+ *   `MIXER <ch> COMMIT` outside the batch → Phase B (one BEGIN…COMMIT: PLAYs + crossfade OPACITY,
+ *   with same-channel route:// PLAYs folded in after their source PLAYs — todos19.07.26 fix, so
+ *   media + route layers of a look land on one frame) → trailing `MIXER <ch> COMMIT` outside.
  * - flag OFF: byte-identical to the pre-WO-259 sequential/staggered line sequence (no batch events at all).
  * - `MIXER n COMMIT` never appears inside any batch payload.
  * - AmcpBatch.batchSendChunked really chunks at the configured cap even when forced.
@@ -289,11 +290,12 @@ test('WO-259 T259.3: flag ON and flag OFF emit the same underlying command multi
 	assert.deepEqual(normalize(onAmcp.events), normalize(offAmcp.events), 'same content, channel-normalized, regardless of batching')
 })
 
-test('WO-259 T259.3: route:// PLAY stays staggered sequential AFTER Phase B, never inside the batch', async () => {
+test('todos19.07.26: route:// PLAY rides INSIDE the Phase B batch, after its source PLAY (one-frame look)', async () => {
 	const { runSceneTakeLbg } = require('../../src/engine/scene-take-lbg')
 	const channel = 11
 	const mockAmcp = makeMockAmcp(true)
 	const self = makeSelf(channel)
+	// Look: 3 media layers + layer 13 playing route://11-10 (a route consuming this look's layer 10).
 	const { currentScene, incomingScene } = threeLayerScenes(channel)
 
 	const result = await runSceneTakeLbg(mockAmcp, { self, channel, currentScene, incomingScene, forceCut: false })
@@ -301,13 +303,20 @@ test('WO-259 T259.3: route:// PLAY stays staggered sequential AFTER Phase B, nev
 
 	const events = mockAmcp.events
 	const batchEvents = events.filter((e) => e.t === 'batch')
-	assert.equal(batchEvents.length, 2, 'still exactly Phase A + Phase B batches (route excluded from both)')
+	assert.equal(batchEvents.length, 2, 'still exactly Phase A + Phase B batches (route folded into Phase B, not a third batch)')
 
 	const phaseB = batchEvents[1]
-	assert.ok(!phaseB.lines.some((l) => /route/i.test(l)), `route PLAY must never be inside Phase B batch: ${JSON.stringify(phaseB.lines)}`)
+	// Incoming bank is B: media layers 10/11/12 → phys 110/111/112, route layer 13 → phys 113.
+	const playLines = phaseB.lines.filter((l) => /^PLAY 11-\d+/.test(l))
+	assert.equal(playLines.length, 4, `Phase B must carry ALL 4 PLAYs (3 media + 1 route) so the look lands on one frame; got: ${JSON.stringify(phaseB.lines)}`)
+	const iSourcePlay = phaseB.lines.findIndex((l) => /^PLAY 11-110\b/.test(l))
+	const iRoutePlay = phaseB.lines.findIndex((l) => /^PLAY 11-113\b/.test(l))
+	assert.ok(iSourcePlay !== -1, `Phase B contains the route's source-layer PLAY (11-110): ${JSON.stringify(phaseB.lines)}`)
+	assert.ok(iRoutePlay !== -1, `Phase B contains the route-layer PLAY (11-113): ${JSON.stringify(phaseB.lines)}`)
+	assert.ok(iSourcePlay < iRoutePlay, 'route PLAY executes after its source PLAY within the batch (dependency order)')
 
-	// The route PLAY must appear as a sequential `send` event, positioned after the Phase B batch.
+	// No sequential route PLAY dribbles out after Phase B anymore (that was the layer-by-layer pop-in bug).
 	const iPhaseB = events.indexOf(phaseB)
-	const routeSendIdx = events.findIndex((e, i) => i > iPhaseB && e.t === 'send' && /^PLAY 11-\d+/.test(e.line || ''))
-	assert.ok(routeSendIdx !== -1, `expected a sequential PLAY for the route layer after Phase B; events: ${JSON.stringify(events)}`)
+	const straggler = events.findIndex((e, i) => i > iPhaseB && e.t === 'send' && /^PLAY 11-\d+/.test(e.line || ''))
+	assert.equal(straggler, -1, `no staggered sequential PLAY after Phase B; events: ${JSON.stringify(events)}`)
 })
