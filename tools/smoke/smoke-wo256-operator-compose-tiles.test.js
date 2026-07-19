@@ -21,8 +21,11 @@ const path = require('node:path')
 const {
 	MIN_BODY,
 	TILE_CHROME,
+	DEFAULT_TILE_ASPECT,
 	minOuterSize,
 	tileBodyRectFromOuter,
+	tileHoleRectFromOuter,
+	resolveTileAspect,
 	snapToGrid,
 	clampTileRect,
 	computeDefaultTileLayout,
@@ -118,6 +121,77 @@ describe('WO-256 T256.1/T256.4: body-rect-excludes-chrome invariant', () => {
 		const body = tileBodyRectFromOuter({ left: 0, top: 0, width: min.width, height: min.height })
 		assert.ok(body.width >= MIN_BODY.width - 1e-9, 'min outer width yields at least the min body width')
 		assert.ok(body.height >= MIN_BODY.height - 1e-9, 'min outer height yields at least the min body height')
+	})
+})
+
+describe('todos19.07.26: hole is aspect-locked, border sits just outside it (never over the video)', () => {
+	it('tileHoleRectFromOuter keeps the given source aspect exactly (wide tile -> pillarbox)', () => {
+		const outer = { left: 0, top: 0, width: 1000, height: 300 } // content 996 x (300-4-34)=262, very wide
+		const hole = tileHoleRectFromOuter(outer, 16 / 9)
+		assert.ok(Math.abs(hole.width / hole.height - 16 / 9) < 1e-9, 'hole w/h is exactly the source aspect')
+		const content = tileBodyRectFromOuter(outer)
+		assert.ok(Math.abs(hole.height - content.height) < 1e-9, 'height-constrained: bars left/right')
+		assert.ok(Math.abs((hole.left - content.left) - (content.left + content.width - (hole.left + hole.width))) < 1e-6, 'pillarbox is centered')
+	})
+
+	it('tall tile -> letterbox (bars top/bottom), still exact aspect and centered', () => {
+		const outer = { left: 10, top: 20, width: 300, height: 800 }
+		const hole = tileHoleRectFromOuter(outer, 16 / 9)
+		const content = tileBodyRectFromOuter(outer)
+		assert.ok(Math.abs(hole.width / hole.height - 16 / 9) < 1e-9)
+		assert.ok(Math.abs(hole.width - content.width) < 1e-9, 'width-constrained: bars top/bottom')
+		assert.ok(Math.abs((hole.top - content.top) - (content.top + content.height - (hole.top + hole.height))) < 1e-6, 'letterbox is centered')
+	})
+
+	it('border-just-outside invariant: hole stays >= borderW inside the tile box on all four sides, above the footer', () => {
+		for (const outer of [
+			{ left: 40, top: 60, width: 300, height: 220 },
+			{ left: 0, top: 0, width: 1000, height: 300 },
+			{ left: 5, top: 5, width: 300, height: 900 },
+		]) {
+			for (const ar of [16 / 9, 4 / 3, 32 / 9]) {
+				const hole = tileHoleRectFromOuter(outer, ar)
+				assert.ok(hole.left >= outer.left + TILE_CHROME.borderW - 1e-9, 'left ring reserved for the outline')
+				assert.ok(hole.top >= outer.top + TILE_CHROME.borderW - 1e-9, 'top ring reserved for the outline')
+				assert.ok(hole.left + hole.width <= outer.left + outer.width - TILE_CHROME.borderW + 1e-9, 'right ring reserved')
+				assert.ok(
+					hole.top + hole.height <= outer.top + outer.height - TILE_CHROME.borderW - TILE_CHROME.footerH + 1e-9,
+					'hole never reaches into the footer strip',
+				)
+			}
+		}
+	})
+
+	it('invalid/degenerate aspect falls back to DEFAULT_TILE_ASPECT (16:9); tiny outer never yields negative sizes', () => {
+		const hole = tileHoleRectFromOuter({ left: 0, top: 0, width: 500, height: 400 }, NaN)
+		assert.ok(Math.abs(hole.width / hole.height - DEFAULT_TILE_ASPECT) < 1e-9)
+		assert.equal(DEFAULT_TILE_ASPECT, 16 / 9)
+		const tiny = tileHoleRectFromOuter({ left: 0, top: 0, width: 1, height: 1 }, 16 / 9)
+		assert.ok(tiny.width >= 0 && tiny.height >= 0)
+	})
+
+	it('resolveTileAspect: INFO-derived channelResolutionsByChannel for the resolved source channel wins', () => {
+		const cm = {
+			programChannels: [1], previewChannels: [3],
+			channelResolutionsByChannel: { 1: { w: 3072, h: 1728 }, 3: { w: 1024, h: 768 } },
+			programResolutions: [{ w: 1920, h: 1080 }],
+		}
+		assert.equal(resolveTileAspect({ role: 'pgm', mainIndex: 0 }, cm), 3072 / 1728)
+		assert.equal(resolveTileAspect({ role: 'prv', mainIndex: 0 }, cm), 1024 / 768, 'PRV resolves its own channel')
+	})
+
+	it('resolveTileAspect: falls back to programResolutions[mainIndex], then 16:9; never NaN/throws', () => {
+		const cm = { programChannels: [1], programResolutions: [{ w: 1280, h: 1024 }] }
+		assert.equal(resolveTileAspect({ role: 'pgm', mainIndex: 0 }, cm), 1280 / 1024)
+		assert.equal(resolveTileAspect({ role: 'pgm', mainIndex: 5 }, cm), DEFAULT_TILE_ASPECT)
+		assert.equal(resolveTileAspect({ role: 'pgm', mainIndex: 0 }, null), DEFAULT_TILE_ASPECT)
+		assert.equal(resolveTileAspect(null, {}), DEFAULT_TILE_ASPECT)
+	})
+
+	it('layoutTileDom positions the BODY from tileHoleRectFromOuter + resolveTileAspect (the reported bodyEl IS the hole)', () => {
+		const src = read('client/components/operator-compose-tiles.js')
+		assert.match(src, /const hole = tileHoleRectFromOuter\(\s*\{ left: 0, top: 0, width: outer\.width, height: outer\.height \},\s*resolveTileAspect\(t\.def, getCm\(\)\),?\s*\)/)
+		assert.match(src, /t\.bodyEl\.style\.left = `\$\{hole\.left\}px`/)
 	})
 })
 
@@ -267,10 +341,14 @@ describe('WO-256: CSS wired, tile chrome/body classes present, styles.css import
 	it('client/styles.css imports the new 10b-operator-compose-tiles.css partial', () => {
 		assert.match(read('client/styles.css'), /10b-operator-compose-tiles\.css/)
 	})
-	it('CSS defines the tile chrome classes with the border-box invariant that keeps border off the body', () => {
+	it('todos19.07.26: the frame is an outline ON THE BODY (hole) — inner edge = hole edge, zero border pixels over the video', () => {
 		const css = read('client/styles/10b-operator-compose-tiles.css')
-		assert.match(css, /\.operator-tile\s*\{[^}]*box-sizing:\s*border-box/)
-		assert.match(css, /\.operator-tile__body/)
+		assert.match(css, /\.operator-tile__body\s*\{[^}]*outline:\s*2px solid/, 'body carries the frame outline')
+		assert.match(css, /\.operator-tile__body\s*\{[^}]*outline-offset:\s*0/, 'offset 0: outline hugs the hole edge from OUTSIDE')
+		assert.doesNotMatch(css, /\.operator-tile\s*\{[^}]*outline/, 'tile box itself is frameless — no border on the free-form box')
+		assert.doesNotMatch(css, /\.operator-tile__body\s*\{[^}]*border:/, 'a real border would eat into the hole box')
+		assert.match(css, /\.operator-tile\[data-role='pgm'\] \.operator-tile__body \{ outline-color/, 'role colors target the body outline')
+		assert.match(css, /\.operator-tile\[data-role='prv'\] \.operator-tile__body \{ outline-color/)
 		// WO-263: chrome moved BELOW the video — the screen-label row lives in the footer now.
 		assert.match(css, /\.operator-tile__label/)
 		assert.match(css, /\.operator-tile__footer/)

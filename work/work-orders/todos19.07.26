@@ -8,11 +8,40 @@ the add shader needs to be hidden under a plus buttom in the templates tab simil
 make sure logins to zoom, tailscale, syncthing, nomachine and others are eggs excluded. zoom and nomachine should be excluded fully.
 
 
-after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look.
+after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look. (still and the first look play try fails after long timeout holding the whole app from functioning)
 
 
-when dropping new media to exxisting layer to exchange it it should keep the size and positioning of the existing layer and not impose defaults.
+when dropping new media to exxisting layer to exchange it it should keep the size and positioning of the existing layer and not impose defaults. (still)
 
 in looks editor grabing a layer not by the "special" dot by another corner makes the layer (only in looks editor) loose the aspect ratio lock.
 also id like to loose the dots for size and rotation. it should be done by grabbing a layer border anywhere.
 
+in the operator gui in the compose preview the overlayed borders should be always just outside the window from caspar below and always keep the aspect ratio of the screen its overlaying.
+
+etched 11.3 MB in 2s (5213 kB/s)                                     
+Reading package lists... Done
+N: Ignoring file 'penguins-eggs-repos.list.disabled-by-highascg-apt' in directory '/etc/apt/sources.list.d/' as it has an invalid filename extension
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+linux-headers-6.8.0-117-generic is already the newest version (6.8.0-117.117).
+You might want to run 'apt --fix-broken install' to correct these.
+The following packages have unmet dependencies:
+ nvidia-kernel-common-595 : Depends: nvidia-firmware-595-595.71.05 but it is not going to be installed
+N: Ignoring file 'penguins-eggs-repos.list.disabled-by-highascg-apt' in directory '/etc/apt/sources.list.d/' as it has an invalid filename extension
+E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).
+casparcg@highascg-nvidia-595:~/highascg$ 
+
+this needs to be done:
+Known-and-accepted leftovers, none release-blocking: the deferred altitude refactors (WO-269 triple dedupe, mv hole-inset geometry, launcher timing probes, lt-engine helper sharing), the exFAT/audio/GPU nice-to-haves in the eggs backlog, and the size WARN on embed-mode squashfs (by design).
+
+the preview channel of pgm1 in my case is not working as it should consistently, sometimes it recalls all layers of the look, sometimes not, seems like racing. it sometimes recalls a layer with other layers position scaling. the prv especially and editing on prv needs to be as close to realtime as possible, but it also NEEDS to be precises and exact in whats its showing.
+
+in the new gui operator we need the buttons for pgm editing (opens the look on pgm in looks editor with edits happening straight on pgm).
+and the capture button.
+
+i also have an issue with playing a look with 1 layer with media that has a route created from it and 3 layers playing that route. they appear on screen sequentialy instead of all togheter.
+a look with similar setup but all layers are media clips transitions correctly.
+
+i want you to write a very simple guide to the shadertoy effects, im not even sure what should be done there. 
+i need to also know how the audio for audio reactivity works, there is just an enable tick for it.

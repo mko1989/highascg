@@ -41,6 +41,102 @@ export function cropDeltaToParams(edge, startCrop, dxFrac, dyFrac, minFrac = 0.0
 	return normalizeCrop({ left, top, right, bottom })
 }
 
+/**
+ * Pure delta→fill math for border/corner resize (todos19.07.26), split out of `startEdgeResize`
+ * so aspect-lock behaviour is unit-testable without DOM/pointer mocks (same pattern as
+ * `cropDeltaToParams` above). `dx`/`dy` are the pointer delta as a fraction of the compose
+ * canvas ("fill space"); the canvas aspect is fixed, so preserving the scaleX:scaleY ratio
+ * preserves the on-screen aspect ratio.
+ *
+ * Behaviour with `lockAspect` (layer default):
+ * - corner drags resize both axes; the axis the pointer changed more (relative to start) drives,
+ *   the other is derived from the start ratio. The opposite corner stays anchored.
+ * - edge drags resize the dragged axis (opposite edge anchored); the perpendicular axis is
+ *   derived proportionally and grows/shrinks around its own centre.
+ * - snapping (WO-158 border awareness) applies to the dragged edge(s) BEFORE the ratio is
+ *   derived, so the dragged edge still lands on canvas/neighbour borders; the derived axis
+ *   follows the ratio exactly.
+ * With `lockAspect: false` (layer unlocked in the inspector, or Shift held) each axis resizes
+ * freely — the pre-todos19 behaviour.
+ *
+ * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
+ * @param {{ x: number, y: number, scaleX: number, scaleY: number }} startFill
+ * @param {number} dx
+ * @param {number} dy
+ * @param {{ lockAspect?: boolean, minS?: number, snapX?: (v: number) => number, snapY?: (v: number) => number }} [opts]
+ * @returns {{ x: number, y: number, scaleX: number, scaleY: number }}
+ */
+export function edgeResizeDeltaToFill(edge, startFill, dx, dy, opts = {}) {
+	const { lockAspect = true, minS = 0.02, snapX = (v) => v, snapY = (v) => v } = opts
+	const start = {
+		x: startFill?.x || 0,
+		y: startFill?.y || 0,
+		scaleX: startFill?.scaleX || 1,
+		scaleY: startFill?.scaleY || 1,
+	}
+	const right0 = start.x + start.scaleX
+	const bottom0 = start.y + start.scaleY
+	const hasE = edge.includes('e')
+	const hasW = edge.includes('w')
+	const hasS = edge.includes('s')
+	const hasN = edge.includes('n')
+
+	let x = start.x
+	let y = start.y
+	let sx = start.scaleX
+	let sy = start.scaleY
+
+	if (hasE) sx = snapX(right0 + dx) - x
+	if (hasW) {
+		const left = snapX(start.x + dx)
+		x = left
+		sx = right0 - left
+	}
+	if (hasS) sy = snapY(bottom0 + dy) - y
+	if (hasN) {
+		const top = snapY(start.y + dy)
+		y = top
+		sy = bottom0 - top
+	}
+
+	if (lockAspect) {
+		const ratio = start.scaleY > 1e-6 ? start.scaleX / start.scaleY : 1
+		// Both final sizes must stay >= minS while keeping sx = ratio * sy (also swallows
+		// negative sizes from dragging past the opposite edge).
+		const sxFloor = Math.max(minS, minS * ratio)
+		const horizontal = hasE || hasW
+		const vertical = hasN || hasS
+		let driveX = horizontal
+		if (horizontal && vertical) {
+			const relX = Math.abs(sx / Math.max(1e-6, start.scaleX) - 1)
+			const relY = Math.abs(sy / Math.max(1e-6, start.scaleY) - 1)
+			driveX = relX >= relY
+		}
+		if (driveX) {
+			sx = Math.max(sx, sxFloor)
+			sy = sx / Math.max(1e-6, ratio)
+		} else {
+			sy = Math.max(sy, sxFloor / Math.max(1e-6, ratio))
+			sx = sy * ratio
+		}
+		// Re-anchor: a dragged edge keeps its opposite edge fixed; the derived axis of a
+		// non-corner drag is centred on where it started.
+		x = hasW ? right0 - sx : hasE ? start.x : start.x + (start.scaleX - sx) / 2
+		y = hasN ? bottom0 - sy : hasS ? start.y : start.y + (start.scaleY - sy) / 2
+	} else {
+		if (sx < minS) {
+			if (hasW) x = right0 - minS
+			sx = minS
+		}
+		if (sy < minS) {
+			if (hasN) y = bottom0 - minS
+			sy = minS
+		}
+	}
+
+	return { ...startFill, x, y, scaleX: sx, scaleY: sy }
+}
+
 function snapValue(val, candidates, threshold) {
 	let bestDiff = threshold
 	let bestCandidate = val
@@ -134,6 +230,10 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		document.addEventListener('pointerup', onUp)
 	}
 
+	/* todos19.07.26: startRotate/startScale are no longer wired to any compose-canvas DOM (the
+	 * rotate/scale dots were removed; border grab bands call startEdgeResize instead, rotation is
+	 * inspector-only). Kept exported because scenes-editor.js still destructures and passes them
+	 * through renderComposeScene's opts — renderComposeScene simply ignores them now. */
 	function startRotate(e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
@@ -223,12 +323,17 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 	}
 
 	/**
+	 * Border/corner resize (todos19.07.26: the only resize affordance — the scale dot is gone).
+	 * Honours the layer's aspect lock (`aspectLocked`, default ON) from EVERY edge/corner;
+	 * holding Shift during the drag resizes freely, as does unlocking aspect in the inspector.
+	 * Delta→fill math lives in the pure `edgeResizeDeltaToFill` above.
 	 * @param {'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'} edge
 	 */
 	function startEdgeResize(edge, e, layerIndex, scene, aspectEl, el) {
 		const rect = aspectEl.getBoundingClientRect()
 		const layer = scene.layers[layerIndex]
 		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
+		const aspectLocked = layer.aspectLocked !== false
 		const sx0 = e.clientX
 		const sy0 = e.clientY
 		const minS = 0.02
@@ -256,55 +361,21 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 			const snapThresholdX = 10 / rw
 			const snapThresholdY = 10 / rh
 
-			let x = startFill.x
-			let y = startFill.y
-			let sx = startFill.scaleX
-			let sy = startFill.scaleY
-
-			if (edge.includes('e')) {
-				const rawRight = startFill.x + startFill.scaleX + dx
-				const snappedRight = snapValue(rawRight, xCandidates, snapThresholdX)
-				sx = snappedRight - x
-			}
-			if (edge.includes('w')) {
-				const rawLeft = startFill.x + dx
-				const snappedLeft = snapValue(rawLeft, xCandidates, snapThresholdX)
-				x = snappedLeft
-				sx = (startFill.x + startFill.scaleX) - snappedLeft
-			}
-			if (edge.includes('s')) {
-				const rawBottom = startFill.y + startFill.scaleY + dy
-				const snappedBottom = snapValue(rawBottom, yCandidates, snapThresholdY)
-				sy = snappedBottom - y
-			}
-			if (edge.includes('n')) {
-				const rawTop = startFill.y + dy
-				const snappedTop = snapValue(rawTop, yCandidates, snapThresholdY)
-				y = snappedTop
-				sy = (startFill.y + startFill.scaleY) - snappedTop
-			}
-
-			if (sx < minS) {
-				if (edge.includes('w')) {
-					x = startFill.x + startFill.scaleX - minS
-				}
-				sx = minS
-			}
-			if (sy < minS) {
-				if (edge.includes('n')) {
-					y = startFill.y + startFill.scaleY - minS
-				}
-				sy = minS
-			}
+			const next = edgeResizeDeltaToFill(edge, startFill, dx, dy, {
+				lockAspect: aspectLocked && !ev.shiftKey,
+				minS,
+				snapX: (v) => snapValue(v, xCandidates, snapThresholdX),
+				snapY: (v) => snapValue(v, yCandidates, snapThresholdY),
+			})
 
 			// Direct DOM update
-			el.style.left = `${x * 100}%`
-			el.style.top = `${y * 100}%`
-			el.style.width = `${sx * 100}%`
-			el.style.height = `${sy * 100}%`
+			el.style.left = `${next.x * 100}%`
+			el.style.top = `${next.y * 100}%`
+			el.style.width = `${next.scaleX * 100}%`
+			el.style.height = `${next.scaleY * 100}%`
 
 			sceneState.patchLayer(scene.id, layerIndex, {
-				fill: { ...startFill, x, y, scaleX: sx, scaleY: sy },
+				fill: next,
 			})
 			schedulePreviewPush()
 		}

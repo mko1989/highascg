@@ -127,6 +127,24 @@ function attachEnqueueQueue(ctx) {
 			const fullCommand = (command + (params != null && params !== '' ? ' ' + params : '')).trim().toUpperCase()
 			const key =
 				responseKey !== undefined ? String(responseKey).toUpperCase() : fullCommand.split(/\s+/)[0]
+			// 2026-07-19 post-restart wedge: this used to write straight to the socket while
+			// sharing `response_callback` with the queued AmcpClient. Wire order then diverged
+			// from the per-key callback FIFO order and a queued single (INFO poll) starved for
+			// its full response timeout — blocking the global _amcpSendQueue and with it every
+			// AMCP action (first look-take included). Route through the same send queue instead;
+			// _send also bounds each query with the standard response timeout, so a lost
+			// response can no longer stall the query chain (runCommandQueue) forever.
+			if (ctx.amcp && typeof ctx.amcp._send === 'function') {
+				ctx.amcp._send(fullCommand, key).then(
+					(res) => {
+						if (typeof callback === 'function') callback(res && res.data !== undefined ? res.data : '')
+					},
+					(err) => {
+						if (typeof callback === 'function') callback(err instanceof Error ? err : new Error(String(err)))
+					},
+				)
+				return
+			}
 			if (ctx.response_callback[key] === undefined) ctx.response_callback[key] = []
 			ctx.response_callback[key].push(callback)
 			ctx._pendingResponseKey = key

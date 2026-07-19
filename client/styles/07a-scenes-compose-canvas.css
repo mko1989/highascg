@@ -266,7 +266,13 @@
 	z-index: 3;
 }
 
-/* Edge hit zones: resize cursors (corners last in DOM win over sides at corners) */
+/* Border grab bands (todos19.07.26: the ONLY resize affordance — the rotate/scale dots are
+ * gone). Invisible zones straddling the layer border: edges reach 7px outside + 7px inside,
+ * corners 8px + 8px (corners come last in the DOM so they win where they overlap the sides).
+ * Sized in screen px, so the band is constant regardless of layer scale or canvas zoom.
+ * Per-edge/corner resize cursors advertise the drag direction; inside the band a drag resizes
+ * from that edge/corner (aspect-locked by default, Shift = free), anywhere deeper inside the
+ * layer a drag MOVES it. */
 .scenes-layer__edges {
 	position: absolute;
 	inset: 0;
@@ -283,7 +289,7 @@
 .scenes-layer__edge--n {
 	left: 12px;
 	right: 12px;
-	top: -6px;
+	top: -7px;
 	height: 14px;
 	cursor: ns-resize;
 }
@@ -291,7 +297,7 @@
 .scenes-layer__edge--s {
 	left: 12px;
 	right: 12px;
-	bottom: -6px;
+	bottom: -7px;
 	height: 14px;
 	cursor: ns-resize;
 }
@@ -299,7 +305,7 @@
 .scenes-layer__edge--e {
 	top: 12px;
 	bottom: 12px;
-	right: -6px;
+	right: -7px;
 	width: 14px;
 	cursor: ew-resize;
 }
@@ -307,43 +313,45 @@
 .scenes-layer__edge--w {
 	top: 12px;
 	bottom: 12px;
-	left: -6px;
+	left: -7px;
 	width: 14px;
 	cursor: ew-resize;
 }
 
 .scenes-layer__edge--ne {
-	top: -6px;
-	right: -6px;
+	top: -8px;
+	right: -8px;
 	width: 16px;
 	height: 16px;
 	cursor: nesw-resize;
 }
 
 .scenes-layer__edge--nw {
-	top: -6px;
-	left: -6px;
+	top: -8px;
+	left: -8px;
 	width: 16px;
 	height: 16px;
 	cursor: nwse-resize;
 }
 
 .scenes-layer__edge--se {
-	bottom: -6px;
-	right: -6px;
+	bottom: -8px;
+	right: -8px;
 	width: 16px;
 	height: 16px;
 	cursor: nwse-resize;
 }
 
 .scenes-layer__edge--sw {
-	bottom: -6px;
-	left: -6px;
+	bottom: -8px;
+	left: -8px;
 	width: 16px;
 	height: 16px;
 	cursor: nesw-resize;
 }
 
+/* todos19.07.26: rotate/scale dots removed — the only remaining handle button is the WO-158
+ * crop toggle. Resize = border grab bands above; rotation = inspector ("Rotation °"). */
 .scenes-layer__handle {
 	position: absolute;
 	pointer-events: auto;
@@ -356,21 +364,8 @@
 	cursor: pointer;
 }
 
-.scenes-layer__handle--rotate {
-	top: -18px;
-	left: 50%;
-	transform: translateX(-50%);
-	cursor: alias;
-}
-
-.scenes-layer__handle--scale {
-	bottom: -8px;
-	right: -8px;
-	cursor: nwse-resize;
-}
-
-/* WO-158 T158.3: crop-mode toggle (mirrors the scale handle position on the opposite corner).
-   Square + amber to read as a distinct affordance from the round blue rotate/scale handles. */
+/* WO-158 T158.3: crop-mode toggle. Square + amber to read as a distinct affordance from the
+   blue border grab bands and the amber crop drag handles. */
 .scenes-layer__handle--crop {
 	bottom: -8px;
 	left: -8px;

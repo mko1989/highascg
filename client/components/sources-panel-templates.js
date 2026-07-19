@@ -25,11 +25,34 @@ export function renderTemplatesBrowser(container, templates, filter) {
 
 	container.innerHTML = ''
 	// WO-266: Shader FX library manager — saved shaders export into template/shaders/ and show
-	// up in this list (via Caspar TLS) like any other template.
+	// up in this list (via Caspar TLS) like any other template. The manager hides behind a (+)
+	// mirroring the media tab's ingest plus (todos19.07.26); here the menu drops down, not up.
 	const toolbar = document.createElement('div')
 	toolbar.className = 'sources-templates-toolbar'
-	toolbar.innerHTML = '<button type="button" class="btn btn--secondary" id="sources-shaderfx-btn" title="Create / edit audio-reactive shader templates">Shader FX…</button>'
-	toolbar.querySelector('#sources-shaderfx-btn').addEventListener('click', () => showShaderFxModal())
+	toolbar.innerHTML =
+		'<div class="ingest-plus-wrap">' +
+			'<button type="button" class="ingest-plus-btn" id="sources-templates-plus-btn" title="Add template">+</button>' +
+			'<div class="ingest-dropup-menu ingest-dropup-menu--down" style="display:none">' +
+				'<button class="ingest-menu-item" id="sources-shaderfx-new" title="Create / edit audio-reactive shader templates">New shader…</button>' +
+			'</div>' +
+		'</div>'
+	const plusBtn = toolbar.querySelector('#sources-templates-plus-btn')
+	const dropMenu = toolbar.querySelector('.ingest-dropup-menu')
+	plusBtn.addEventListener('click', (e) => {
+		e.stopPropagation()
+		dropMenu.style.display = dropMenu.style.display !== 'flex' ? 'flex' : 'none'
+	})
+	toolbar.querySelector('#sources-shaderfx-new').addEventListener('click', () => {
+		dropMenu.style.display = 'none'
+		showShaderFxModal()
+	})
+	// Close on outside click — addEventListener (never document.onclick: the media
+	// ingest UI owns that slot) with the previous render's listener removed first.
+	if (container._templatesPlusDocClose) document.removeEventListener('click', container._templatesPlusDocClose)
+	container._templatesPlusDocClose = (e) => {
+		if (!plusBtn.contains(e.target)) dropMenu.style.display = 'none'
+	}
+	document.addEventListener('click', container._templatesPlusDocClose)
 	container.appendChild(toolbar)
 	if (filtered.length === 0) {
 		container.appendChild(Object.assign(document.createElement('p'), { className: 'sources-empty', textContent: 'No templates (run Refresh — Caspar TLS)' }))

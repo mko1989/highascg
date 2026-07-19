@@ -14,18 +14,30 @@
  * bar, `mountPgmTopLayerPlaybackTimer` from playback-timer.js — WO-250's bank-aware
  * `pickTopLayerStateForPlayback`, imported/reused there, never copied here). headerH is 0.
  *
- * Chrome (border/footer) is laid out by explicit pixel math (`tileBodyRectFromOuter`), not
- * flexbox — the border-box CSS in client/styles/10b-operator-compose-tiles.css already keeps the
- * border off the body by construction, but sizing the body from the same pure function this file
- * unit-tests keeps "what runs" and "what's tested" identical.
+ * Chrome (border/footer) is laid out by explicit pixel math (`tileBodyRectFromOuter` ->
+ * `tileHoleRectFromOuter`), not flexbox. Geometry rules (todos19.07.26):
+ *  - The HOLE (body) keeps the SOURCE channel's aspect ratio ({@link resolveTileAspect}: INFO-
+ *    derived `channelMap.channelResolutionsByChannel` per resolved channel, else
+ *    `programResolutions[mainIndex]`, else 16:9) — the largest aspect-fit rect centered inside the
+ *    tile's content area, letterboxing the tile frame as needed so the punched rect never distorts.
+ *  - The border is an `outline` on the body element itself (10b-operator-compose-tiles.css): an
+ *    outline draws OUTSIDE the element box, so its inner edge is exactly the hole edge and no
+ *    border pixel ever covers the video. `TILE_CHROME.borderW` reserves that ring inside the tile.
+ *  - The rect reported to operator-gui-mode is the body/hole rect (bodyEl's own
+ *    getBoundingClientRect), so the X SHAPE hole and the visible border keep the just-outside
+ *    relationship live during drags/resizes too (WO-263).
  */
 import { screenLabel } from '../lib/screen-label.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 
-/** Body minimum (video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
+/** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
-/** Header/footer/border pixel sizes — kept in lockstep with client/styles/10b-operator-compose-tiles.css. */
+/** Header/footer/border pixel sizes — kept in lockstep with client/styles/10b-operator-compose-tiles.css.
+ * `borderW` is the ring reserved INSIDE the tile for the body outline, which itself draws just
+ * OUTSIDE the hole (inner outline edge = hole edge — no border pixel over the video). */
 export const TILE_CHROME = { headerH: 0, footerH: 34, borderW: 2 }
+/** Fallback hole aspect when the channel map has no resolution for a tile's source channel. */
+export const DEFAULT_TILE_ASPECT = 16 / 9
 const GRID = 8
 
 /** @returns {{ width: number, height: number }} smallest OUTER (tile) size whose body still meets {@link MIN_BODY}. */
@@ -51,6 +63,55 @@ export function tileBodyRectFromOuter(outer, chrome = TILE_CHROME) {
 		width: Math.max(0, outer.width - borderW * 2),
 		height: Math.max(0, outer.height - borderW * 2 - headerH - footerH),
 	}
+}
+
+/**
+ * The punched-hole (video) rect: the largest `aspect`-preserving rect centered inside the tile's
+ * content area ({@link tileBodyRectFromOuter}). The frame letterboxes/pillarboxes around it — the
+ * hole never distorts the source mapping, and it stays >= `chrome.borderW` inside the tile on
+ * every side so the body outline (drawn just outside the hole) never leaves the tile box.
+ * @param {{ left: number, top: number, width: number, height: number }} outer - tile OUTER px rect
+ * @param {number} aspect - source width/height ratio; invalid values fall back to {@link DEFAULT_TILE_ASPECT}
+ * @param {{ headerH: number, footerH: number, borderW: number }} [chrome]
+ */
+export function tileHoleRectFromOuter(outer, aspect, chrome = TILE_CHROME) {
+	const content = tileBodyRectFromOuter(outer, chrome)
+	if (!(content.width > 0) || !(content.height > 0)) return content
+	const ar = Number.isFinite(Number(aspect)) && Number(aspect) > 0 ? Number(aspect) : DEFAULT_TILE_ASPECT
+	let width = content.width
+	let height = width / ar
+	if (height > content.height) {
+		// Content relatively wider than the source -> pillarbox (bars left/right).
+		height = content.height
+		width = height * ar
+	}
+	return {
+		left: content.left + (content.width - width) / 2,
+		top: content.top + (content.height - height) / 2,
+		width,
+		height,
+	}
+}
+
+/**
+ * Source aspect ratio (w/h) for a tile: the resolved source channel's INFO-derived resolution
+ * (`channelMap.channelResolutionsByChannel`) wins; `programResolutions[mainIndex]` is the
+ * pre-INFO fallback (PGM/PRV share the physical screen's mode); default {@link DEFAULT_TILE_ASPECT}.
+ * Pure — mirrors the server's own contain-fit source dims (operator-gui-channel.js
+ * `resolveCellSourceDims`) so the server's aspect-fit inside the reported hole is a no-op.
+ * @param {{ role?: string, mainIndex?: number }} def
+ * @param {object} cm - `stateStore.getState().channelMap`
+ * @returns {number}
+ */
+export function resolveTileAspect(def, cm) {
+	const map = cm || {}
+	const ch = resolveTileChannel(def || {}, map)
+	const byCh = map.channelResolutionsByChannel || {}
+	const res = ch != null ? byCh[ch] ?? byCh[String(ch)] : null
+	if (res && Number(res.w) > 0 && Number(res.h) > 0) return Number(res.w) / Number(res.h)
+	const pr = map.programResolutions?.[def?.mainIndex ?? -1]
+	if (pr && Number(pr.w) > 0 && Number(pr.h) > 0) return Number(pr.w) / Number(pr.h)
+	return DEFAULT_TILE_ASPECT
 }
 
 /** @param {number} value @param {number} [grid] */
@@ -205,11 +266,16 @@ export function initOperatorComposeTiles(container, options) {
 		t.el.style.top = `${outer.top}px`
 		t.el.style.width = `${outer.width}px`
 		t.el.style.height = `${outer.height}px`
-		const body = tileBodyRectFromOuter({ left: 0, top: 0, width: outer.width, height: outer.height })
-		t.bodyEl.style.left = `${body.left}px`
-		t.bodyEl.style.top = `${body.top}px`
-		t.bodyEl.style.width = `${body.width}px`
-		t.bodyEl.style.height = `${body.height}px`
+		// The body IS the punched hole: aspect-locked to the source channel (todos19.07.26), so the
+		// visible outline (drawn just outside bodyEl) hugs the video with no overlap and no distortion.
+		const hole = tileHoleRectFromOuter(
+			{ left: 0, top: 0, width: outer.width, height: outer.height },
+			resolveTileAspect(t.def, getCm()),
+		)
+		t.bodyEl.style.left = `${hole.left}px`
+		t.bodyEl.style.top = `${hole.top}px`
+		t.bodyEl.style.width = `${hole.width}px`
+		t.bodyEl.style.height = `${hole.height}px`
 		t.footerEl.style.height = `${TILE_CHROME.footerH}px`
 	}
 
@@ -217,6 +283,8 @@ export function initOperatorComposeTiles(container, options) {
 		if (typeof onCellRects !== 'function') return
 		const cellRects = []
 		for (const t of tiles.values()) {
+			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
+			// so the X SHAPE hole and the visible border keep the just-outside relationship (WO-263).
 			const rect = t.bodyEl.getBoundingClientRect()
 			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
 		}
@@ -337,7 +405,10 @@ export function initOperatorComposeTiles(container, options) {
 		const key = JSON.stringify(defs.map((d) => ({ id: d.id, role: d.role, mainIndex: d.mainIndex })))
 		const screenCount = new Set(defs.map((d) => d.mainIndex)).size || 1
 		storageKey = layoutStorageKey(storageKeyPrefix, screenCount)
-		if (key === defsKey) { for (const t of tiles.values()) relabel(t); return }
+		// Same defs: labels AND hole aspects may still have changed (INFO-derived
+		// channelResolutionsByChannel arrives after the first channelMap snapshot) — re-layout so
+		// the holes snap to the real source aspect and the new rects get reported.
+		if (key === defsKey) { for (const t of tiles.values()) relabel(t); layoutAll(); return }
 		defsKey = key
 		for (const t of tiles.values()) { t.timer?.destroy?.(); t.el.remove() }
 		tiles.clear()

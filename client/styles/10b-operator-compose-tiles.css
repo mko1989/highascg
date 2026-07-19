@@ -47,32 +47,36 @@
 }
 
 /*
- * Frame is an OUTLINE, not a `border` — an outline takes no layout space and does not become the
- * containing block for absolutely-positioned children the way a real `border` would (that would
- * silently double-count client/components/operator-compose-tiles.js's own `TILE_CHROME.borderW`
- * inset on top of the browser's automatic containing-block exclusion). `outline-offset: -2px`
- * draws it flush with the edge, visually identical to a 2px inset border.
+ * The tile box itself is frameless (todos19.07.26) — the visible border lives on the BODY (the
+ * punched hole) instead, see .operator-tile__body below, so it always hugs the aspect-locked hole
+ * rather than the free-form tile box.
  */
 .operator-tile {
 	position: absolute;
 	box-sizing: border-box;
-	outline: 2px solid #457b9d;
-	outline-offset: -2px;
-	border-radius: 3px;
 	background: transparent;
 }
-.operator-tile[data-role='pgm'] { outline-color: #e63946; }
-.operator-tile[data-role='prv'] { outline-color: #2a9d8f; }
 .operator-tile--dragging {
 	opacity: 0.85;
 	box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.6);
 }
 
-/* The reported video rect — chrome (footer/border) never overlaps this box; all chrome is BELOW. */
+/*
+ * The reported video rect (the punched HOLE, aspect-locked to the source channel by
+ * operator-compose-tiles.js's tileHoleRectFromOuter). The frame is an OUTLINE with the default
+ * offset 0: an outline takes no layout space and draws JUST OUTSIDE the element box, so its inner
+ * edge is exactly the hole edge — not a single border pixel covers the video, and a real `border`
+ * would instead eat into the box / shift abs-positioned children. TILE_CHROME.borderW (2px) in
+ * operator-compose-tiles.js reserves the ring the outline occupies inside the tile box.
+ */
 .operator-tile__body {
 	position: absolute;
 	background: #050505;
+	outline: 2px solid #457b9d;
+	outline-offset: 0;
 }
+.operator-tile[data-role='pgm'] .operator-tile__body { outline-color: #e63946; }
+.operator-tile[data-role='prv'] .operator-tile__body { outline-color: #2a9d8f; }
 
 /* Footer sits BELOW the video: a colored screen-label row (drag handle) over the playback timer
  * (clip file name + progress bar). Nothing is drawn above the video body. */

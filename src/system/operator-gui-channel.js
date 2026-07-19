@@ -322,9 +322,11 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
 	const priorRoutes = lastAppliedRouteByChannel.get(ch) || new Map()
 	const nextRoutes = new Map()
 	for (const entry of plan) {
-		if (priorRoutes.get(entry.layer) !== entry.route) {
+		let routeLive = priorRoutes.get(entry.layer) === entry.route
+		if (!routeLive) {
 			try {
 				await ctx.amcp.play(ch, entry.layer, entry.route)
+				routeLive = true
 			} catch (e) {
 				ctx.log?.('warn', `operator-gui: PLAY ${ch}-${entry.layer} ${entry.route} failed: ${e?.message || e}`)
 			}
@@ -334,7 +336,10 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
 		} catch (e) {
 			ctx.log?.('warn', `operator-gui: MIXER ${ch}-${entry.layer} FILL failed: ${e?.message || e}`)
 		}
-		nextRoutes.set(entry.layer, entry.route)
+		// Only record routes whose PLAY actually landed — compose-cell routes rarely change,
+		// so caching a failed PLAY as applied would make every later apply skip it and leave
+		// the hole on the previous run's stale content until a manual route change.
+		if (routeLive) nextRoutes.set(entry.layer, entry.route)
 	}
 	const newMax = plan.length ? plan[plan.length - 1].layer : ROUTE_LAYER_START - 1
 	const prevMax = lastMaxLayerByChannel.has(ch) ? lastMaxLayerByChannel.get(ch) : newMax
@@ -357,6 +362,14 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
 	}
 	lastAppliedRouteByChannel.set(ch, nextRoutes)
 	lastMaxLayerByChannel.set(ch, newMax)
+	// Persist the applied cell set (mirrors routes-multiview.js persisting `multiviewLayout`)
+	// so `ensureOperatorGuiChannel` can re-apply the saved layout at boot/reconnect.
+	try {
+		const persistence = ctx.persistence || require('../utils/persistence')
+		persistence.set('operatorGuiLayout', { cells: Array.isArray(cells) ? cells : [], savedAt: Date.now() })
+	} catch (_) {
+		/* persistence optional (tests/headless) */
+	}
 	return { ch, plan }
 }
 
@@ -410,10 +423,9 @@ function clearOperatorGuiLayout(ctx) {
 /**
  * WO-255: on Caspar connect/startup, when an operator_gui destination exists — re-feeds the shape
  * helper with its last-known rects (a Caspar restart spawns a brand-new, unshaped screen-consumer
- * window id) and nudges the client (over the app's own WS, once it reconnects) to re-POST its
- * last-known compose/timeline/mv-edit cell rects. Route layers themselves need no re-PLAY at boot
- * (unlike the retired CEF layer — WO-243's `ensureOperatorGuiCefLayer` used to (re-)PLAY it here);
- * they're re-applied the moment the client's next POST lands.
+ * window id), re-applies the last persisted cell layout (mirrors multiview re-apply — see below),
+ * and nudges the client (over the app's own WS, once it reconnects) to re-POST its last-known
+ * compose/timeline/mv-edit cell rects, which overrides the persisted re-apply with live rects.
  *
  * A Caspar/highascg restart clears the server's route layers (10-49) but doesn't change the
  * client's DOM layout, so without the WS nudge nothing re-triggers the client's
@@ -439,6 +451,25 @@ async function ensureOperatorGuiChannel(ctx) {
 		reapplyOperatorShapeOverlay({ log: ctx.log })
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: shape overlay re-feed failed: ${e?.message || e}`)
+	}
+	// Mirror multiview re-apply (WO-156): re-apply the last persisted cell layout NOW —
+	// Caspar survives a highascg restart with the previous run's route layers/rects still
+	// live on the GUI channel, and the client's re-POST only lands once the kiosk page is
+	// back up. Without this the compose-preview holes show the stale pre-restart layout
+	// until the first client report (or first look-take) after the restart.
+	try {
+		const persistence = ctx.persistence || require('../utils/persistence')
+		const saved = persistence.get('operatorGuiLayout')
+		if (saved && Array.isArray(saved.cells)) {
+			// Not awaited: a client POST inside the apply debounce window supersedes this call's
+			// promise (its timer is cleared, so it never settles) — and boot must not block on it.
+			applyOperatorGuiLayout(ctx, saved.cells).then(
+				() => ctx.log?.('info', `Operator GUI re-apply: ${saved.cells.length} cell(s) applied (ch ${ch})`),
+				(e) => ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`),
+			)
+		}
+	} catch (e) {
+		ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`)
 	}
 	try {
 		ctx._wsBroadcast?.('change', { path: 'operatorGuiRectsWanted', value: Date.now() })

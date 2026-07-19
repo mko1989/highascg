@@ -1,5 +1,9 @@
 /**
- * Compose frame: layer stack DOM, drag/rotate/scale, media drop.
+ * Compose frame: layer stack DOM, move-drag + border resize, media drop.
+ * todos19.07.26: the rotate/scale corner dots are gone — resizing is done by grabbing the
+ * layer border anywhere (the invisible `.scenes-layer__edge` grab bands, ~7px either side of
+ * the border, constant in screen px). Rotation is inspector-only (`inspector-mixer.js`,
+ * "Rotation °").
  */
 
 
@@ -11,6 +15,7 @@ import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scene
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { cropFromLayer, normalizeCrop } from '../lib/layer-crop.js'
+import { isLayerSourceExchange } from '../lib/scene-state-layer-logic.js'
 import { createComposeDragHandlers } from './scenes-compose-handlers.js'
 import { buildComposeLayerContent } from './scenes-compose-layer-thumb.js'
 export { createComposeDragHandlers } from './scenes-compose-handlers.js'
@@ -74,8 +79,6 @@ export function renderComposeScene(scene, opts) {
 		applyNativeFillForSource,
 		SCENE_THUMB_MAX_W,
 		startDrag,
-		startRotate,
-		startScale,
 		startEdgeResize,
 		onSourceDropped,
 		getThumbUrlForLayerSource,
@@ -236,11 +239,12 @@ export function renderComposeScene(scene, opts) {
 		}
 		inner.appendChild(content)
 
+		/* todos19.07.26: rotate/scale dots removed — resize happens by grabbing the border
+		 * (edge zones below); rotation lives in the inspector ("Rotation °", inspector-mixer.js).
+		 * Only the WO-158 crop toggle remains in the handle bar. */
 		const handles = document.createElement('div')
 		handles.className = 'scenes-layer__handles'
 		handles.innerHTML = `
-				<button type="button" class="scenes-layer__handle scenes-layer__handle--rotate" title="Drag to rotate"></button>
-				<button type="button" class="scenes-layer__handle scenes-layer__handle--scale" title="Drag to scale"></button>
 				<button type="button" class="scenes-layer__handle scenes-layer__handle--crop" title="Toggle crop handles" aria-pressed="false"></button>
 			`
 		inner.appendChild(handles)
@@ -321,12 +325,6 @@ export function renderComposeScene(scene, opts) {
 			startDrag(e, realIdx, scene, aspect, el)
 		})
 
-		const rotBtn = handles.querySelector('.scenes-layer__handle--rotate')
-		rotBtn.addEventListener('pointerdown', (e) => {
-			e.stopPropagation()
-			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			startRotate(e, realIdx, scene, aspect, el)
-		})
 		const cropToggleBtn = handles.querySelector('.scenes-layer__handle--crop')
 		cropToggleBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
 		cropToggleBtn.addEventListener('click', (e) => {
@@ -335,13 +333,6 @@ export function renderComposeScene(scene, opts) {
 			const nowActive = cropHandles.classList.toggle('scenes-layer__crop-handles--active')
 			cropToggleBtn.setAttribute('aria-pressed', String(nowActive))
 		})
-		const scaleBtn = handles.querySelector('.scenes-layer__handle--scale')
-		scaleBtn.addEventListener('pointerdown', (e) => {
-			e.stopPropagation()
-			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			startScale(e, realIdx, scene, aspect, el)
-		})
-
 		el.addEventListener('dragover', (e) => {
 			e.preventDefault()
 			e.stopPropagation()
@@ -359,13 +350,16 @@ export function renderComposeScene(scene, opts) {
 					const first = items[0]
 					if (first?.value) {
 						if (!routeLayerDropAllowed(first, layer.layerNumber)) return
+						// todos19.07.26: exchanging an existing layer's content keeps its transform
+						// (fill/rotation/crop/…) — only an empty layer gets the content-fit rect.
+						const isExchange = isLayerSourceExchange(layer)
 						sceneState.setLayerSource(scene.id, realIdx, {
 							...first,
 							type: first.type || 'media',
 							value: first.value,
 							label: first.label || first.value,
 						})
-						await applyNativeFillForSource(realIdx, sourcePayloadForFill(first))
+						if (!isExchange) await applyNativeFillForSource(realIdx, sourcePayloadForFill(first))
 					}
 					for (let i = 1; i < items.length; i++) {
 						if (items[i]?.value) await addLayerFromMedia(items[i])
@@ -381,13 +375,19 @@ export function renderComposeScene(scene, opts) {
 			} else if (items.length === 1) {
 				const data = items[0]
 				if (!routeLayerDropAllowed(data, layer.layerNumber)) return
+				// todos19.07.26: exchanging an existing layer's content keeps its transform
+				// (fill/rotation/crop/…) — only an empty layer gets the content-fit rect.
+				const isExchange = isLayerSourceExchange(layer)
 				sceneState.setLayerSource(scene.id, realIdx, {
 					...data,
 					type: data.type || 'media',
 					value: data.value,
 					label: data.label || data.value,
 				})
-				void applyNativeFillForSource(realIdx, sourcePayloadForFill(data)).then(() => {
+				void (isExchange
+					? Promise.resolve()
+					: applyNativeFillForSource(realIdx, sourcePayloadForFill(data))
+				).then(() => {
 					const updated = sceneState.getScene(scene.id)
 					const layer = updated?.layers?.[realIdx]
 					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })

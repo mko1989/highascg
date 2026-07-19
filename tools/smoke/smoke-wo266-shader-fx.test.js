@@ -123,8 +123,13 @@ describe('WO-266 T266.2/T266.3: player runtime + vendored lib (source asserts)',
 		assert.ok(player.indexOf('toy.addTexture') < player.indexOf('toy.setImage'), 'addTexture must precede setImage (patch requirement)')
 	})
 
-	it('client wiring: Shader FX button + edit branch + WO-265 studio-tab fallback', () => {
+	it('client wiring: Shader FX under templates (+) menu + edit branch + WO-265 studio-tab fallback', () => {
 		const tpl = src('client/components/sources-panel-templates.js')
+		// todos19.07.26: the manager hides behind a (+) mirroring the media ingest plus —
+		// no always-visible "Shader FX…" toolbar button anymore.
+		assert.match(tpl, /class="ingest-plus-btn" id="sources-templates-plus-btn"/)
+		assert.match(tpl, /class="ingest-menu-item" id="sources-shaderfx-new"[^>]*>New shader…</)
+		assert.ok(!tpl.includes('sources-shaderfx-btn'), 'old always-visible Shader FX… button must be gone')
 		assert.match(tpl, /showShaderFxModal\(\)/)
 		assert.match(tpl, /shaders\\\/\(sh-\[a-z0-9-\]\+\)\$/)
 		assert.match(tpl, /highascgActivateWorkspaceTab\('cg-studio'\)/)

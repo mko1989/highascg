@@ -7,6 +7,7 @@ import { api } from '../lib/api-client.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
+import { isLayerSourceExchange } from '../lib/scene-state-layer-logic.js'
 
 /**
  * @param {object} opts
@@ -193,16 +194,22 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 					if (src.type === 'ndi' && String(src.value || '').trim().toLowerCase().startsWith('route://')) {
 						delete src.useDirect
 					}
+					// todos19.07.26: exchanging an existing layer's content keeps its transform
+					// (fill/rotation/crop/…) — only an empty layer gets the content-fit rect.
+					const isExchange = isLayerSourceExchange(scene.layers[realIdx])
 					sceneState.setLayerSource(scene.id, realIdx, src)
 					if (src.type === 'live_audio') {
 						sceneState.patchLayer(scene.id, realIdx, { opacity: 0 })
 					}
-					void applyNativeFillForSource(realIdx, {
-						type: data.type || 'media',
-						value: data.value,
-						label: data.label,
-						resolution: data.resolution,
-					}).then(() => {
+					void (isExchange
+						? Promise.resolve()
+						: applyNativeFillForSource(realIdx, {
+							type: data.type || 'media',
+							value: data.value,
+							label: data.label,
+							resolution: data.resolution,
+						})
+					).then(() => {
 						const updated = sceneState.getScene(scene.id)
 						const layer = updated?.layers?.[realIdx]
 						if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })

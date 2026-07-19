@@ -60,6 +60,23 @@ export function applyLayerStyleData(L, c) {
 	}
 }
 
+/**
+ * Whether dropping a source onto this layer is a content EXCHANGE (the layer already shows
+ * something) rather than the first fill-in of an empty layer.
+ *
+ * todos19.07.26: exchanging a layer's content must keep the operator's visual transform —
+ * fill rect (position/size), rotation, crop and other effects, opacity, aspect lock, audio
+ * routing. Only an empty layer gets the native/content-fit rect computed for the dropped
+ * media (applyNativeFillForSource); on an exchange that refit must be skipped. Content-owned
+ * behaviour (e.g. `loop` off for still images) is handled by setLayerSource and still applies.
+ *
+ * @param {{ source?: { value?: string } | null } | null | undefined} layer
+ * @returns {boolean} true → preserve the existing transform (skip refit); false → empty layer, apply fit
+ */
+export function isLayerSourceExchange(layer) {
+	return Boolean(layer?.source?.value)
+}
+
 export function uniqueLayerPresetName(presets, baseName) {
 	const base = String(baseName || '').trim() || 'Layer preset'
 	const taken = new Set(presets.map((p) => String(p.name || '').trim().toLowerCase()))

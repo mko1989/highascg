@@ -157,3 +157,31 @@ usr/share/doc/zoom/*
 usr/share/mime/packages/zoom.xml
 usr/share/pixmaps/Zoom.png
 usr/share/pixmaps/application-x-zoom.png
+
+# Remote-access / meeting / sync IDENTITY & LOGIN data — never ship (todos19.07.26).
+# NoMachine excluded FULLY (binaries + config + user state), same policy as Zoom (WO-142).
+usr/NX
+usr/NX/*
+etc/NX
+etc/NX/*
+home/casparcg/.nx
+home/casparcg/.nx/*
+# Zoom user identity (opt/zoom binaries excluded separately)
+home/casparcg/.zoom
+home/casparcg/.zoom/*
+home/casparcg/.config/zoomus.conf
+# Syncthing device identity + sync state (binary may ship; logins must not)
+home/casparcg/.config/syncthing
+home/casparcg/.config/syncthing/*
+home/casparcg/.local/state/syncthing
+home/casparcg/.local/state/syncthing/*
+# Browser + assistant identity stores
+home/casparcg/.mozilla
+home/casparcg/.mozilla/*
+home/casparcg/.claude
+home/casparcg/.claude/*
+home/casparcg/.claude.json
+home/casparcg/highascg/.operator-firefox-profile
+home/casparcg/highascg/.operator-firefox-profile/*
+home/casparcg/snap
+home/casparcg/snap/*
