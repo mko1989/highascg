@@ -61,13 +61,80 @@ async function setupInputsChannel(self) {
 
 	const failed = []; let playOk = 0
 	for (const { channel, layer, device } of inputDevice) {
-		try { await self.amcp.raw(`PLAY ${channel}-${layer} DECKLINK ${device}`); playOk++ }
-		catch (e) {
-			const msg = e?.message || String(e); if (/already playing|404|PLAY FAILED/i.test(msg)) playOk++
-			else failed.push({ channel, layer, device, message: msg })
-		}
+		const res = await tryPlayDecklinkInput(self, { channel, layer, device })
+		if (res.ok) playOk++
+		else failed.push(res.entry)
 	}
-	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: channelMap.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed }
+	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: channelMap.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed, retrying: failed.length > 0 }
+	if (failed.length) {
+		for (const f of failed) self.log('warn', `DeckLink input setup: ${f.message} (channel ${f.channel}-${f.layer}) — retrying every ${Math.round(DECKLINK_INPUT_RETRY_MS / 1000)}s`)
+	}
+	scheduleDecklinkInputRetries(self)
+}
+
+/**
+ * PLAY one DeckLink input and classify the outcome. Caspar reports a producer that cannot
+ * open the card input (camera powered off, nothing cabled, connector-profile conflict) as
+ * `404 PLAY FAILED` — the old code pattern-matched that as SUCCESS, so a dead input was
+ * counted healthy, never surfaced to the GUI, and never retried (the 2026-07-19 case).
+ * @param {object} self
+ * @param {{ channel: number, layer: number, device: number }} target
+ */
+async function tryPlayDecklinkInput(self, { channel, layer, device }) {
+	try {
+		await self.amcp.raw(`PLAY ${channel}-${layer} DECKLINK ${device}`)
+		return { ok: true }
+	} catch (e) {
+		const raw = e?.message || String(e)
+		const message = /404|PLAY FAILED/i.test(raw)
+			? `DeckLink ${device} input could not be enabled — source powered off / not cabled, or connector-profile conflict`
+			: raw
+		return { ok: false, entry: { channel, layer, device, message, raw } }
+	}
+}
+
+const DECKLINK_INPUT_RETRY_MS = 20000
+
+/**
+ * Re-attempt failed DeckLink input PLAYs every {@link DECKLINK_INPUT_RETRY_MS} until they
+ * come up (e.g. the operator turns the camera on) — one PLAY per failed device per tick,
+ * no storm. Re-arms itself only while failures remain; setupInputsChannel re-runs clear
+ * and replace the pending timer so reconnect/config-apply never double-schedules.
+ * @param {object} self
+ */
+function scheduleDecklinkInputRetries(self) {
+	if (self._decklinkInputRetryTimer) {
+		clearTimeout(self._decklinkInputRetryTimer)
+		self._decklinkInputRetryTimer = null
+	}
+	const status = self._decklinkInputsStatus
+	if (!status?.enabled || !Array.isArray(status.failed) || status.failed.length === 0) return
+	self._decklinkInputRetryTimer = setTimeout(async () => {
+		self._decklinkInputRetryTimer = null
+		const cur = self._decklinkInputsStatus
+		if (!cur?.enabled || !Array.isArray(cur.failed) || cur.failed.length === 0) return
+		if (!self.amcp || self.amcp.isConnected === false) { scheduleDecklinkInputRetries(self); return }
+		const stillFailed = []
+		let recovered = 0
+		for (const entry of cur.failed) {
+			const res = await tryPlayDecklinkInput(self, entry)
+			if (res.ok) {
+				recovered++
+				self.log('info', `DeckLink ${entry.device} input recovered (channel ${entry.channel}-${entry.layer})`)
+			} else {
+				stillFailed.push(res.entry)
+			}
+		}
+		self._decklinkInputsStatus = {
+			...cur,
+			updatedAt: Date.now(),
+			playSucceeded: (cur.playSucceeded || 0) + recovered,
+			failed: stillFailed,
+			retrying: stillFailed.length > 0,
+		}
+		scheduleDecklinkInputRetries(self)
+	}, DECKLINK_INPUT_RETRY_MS)
+	if (typeof self._decklinkInputRetryTimer.unref === 'function') self._decklinkInputRetryTimer.unref()
 }
 
 async function setupLiveAudioInputs(self) {

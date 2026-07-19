@@ -12,3 +12,7 @@ after highascg restart the operator gui starts with a stale compose preview layo
 
 
 when dropping new media to exxisting layer to exchange it it should keep the size and positioning of the existing layer and not impose defaults.
+
+in looks editor grabing a layer not by the "special" dot by another corner makes the layer (only in looks editor) loose the aspect ratio lock.
+also id like to loose the dots for size and rotation. it should be done by grabbing a layer border anywhere.
+

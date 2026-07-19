@@ -94,6 +94,7 @@ const FILES = [
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',
 	'tools/smoke/smoke-amcp-batch-drain-timeout.test.js',
+	'tools/smoke/smoke-decklink-input-retry.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 ]

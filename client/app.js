@@ -55,6 +55,7 @@ import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
 import { applyOperatorGuiHtmlClass, initOperatorGuiRectReporting } from './lib/operator-gui-mode.js'
 import { initOperatorGuiInteractionSuppress } from './lib/operator-gui-interaction-suppress.js'
+import { initDecklinkInputToasts } from './lib/decklink-input-toast.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
 // WO-243/255: hard-gated on ?operatorGui / legacy ?cefOperator in the query string — no-op
@@ -63,6 +64,7 @@ applyOperatorGuiHtmlClass()
 initOperatorGuiInteractionSuppress()
 
 export const stateStore = new StateStore()
+initDecklinkInputToasts(stateStore)
 export const ws = new WsClient()
 window.placeholderState = placeholderState
 settingsState.subscribe(() => applyEditorDefaultsToRuntime(sceneState))
