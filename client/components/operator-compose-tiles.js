@@ -28,6 +28,7 @@
  *    relationship live during drags/resizes too (WO-263).
  */
 import { screenLabel } from '../lib/screen-label.js'
+import { holeRectFromOuter, chromeInsets } from '../lib/hole-rect.js'
 import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 
@@ -57,13 +58,7 @@ export function minOuterSize(chrome = TILE_CHROME) {
  * @param {{ headerH: number, footerH: number, borderW: number }} [chrome]
  */
 export function tileBodyRectFromOuter(outer, chrome = TILE_CHROME) {
-	const { headerH, footerH, borderW } = chrome
-	return {
-		left: outer.left + borderW,
-		top: outer.top + borderW + headerH,
-		width: Math.max(0, outer.width - borderW * 2),
-		height: Math.max(0, outer.height - borderW * 2 - headerH - footerH),
-	}
+	return holeRectFromOuter(outer, chromeInsets(chrome))
 }
 
 /**

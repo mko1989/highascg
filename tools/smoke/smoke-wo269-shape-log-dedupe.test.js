@@ -25,6 +25,10 @@ describe('WO-269 T269.1: client sendLayout dedupe', () => {
 		assert.match(lib, /if \(!force && json === _lastSentJson\) return/)
 	})
 
+	it('cache is set on successful send (POST/DELETE)', () => {
+		assert.match(lib, /_lastSentJson = json\s*\n\s*\} catch/)
+	})
+
 	it('recovery resend (reconnect/nudge/heartbeat) forces', () => {
 		assert.match(lib, /void sendLayout\(effectiveCells\(\), \{ force: true \}\)/)
 	})
@@ -38,9 +42,20 @@ describe('WO-269 T269.1: client sendLayout dedupe', () => {
 describe('WO-269 T269.2: feeder stdin dedupe', () => {
 	const feeder = src('src/system/operator-shape-overlay.js')
 
+	it('alreadyRunning is computed BEFORE ensureSpawned (fresh spawn always gets payload)', () => {
+		const alreadyRunningIdx = feeder.indexOf('const alreadyRunning = isRunning()')
+		const ensureSpawnedIdx = feeder.indexOf('const p = ensureSpawned(log)')
+		assert.ok(alreadyRunningIdx > 0 && ensureSpawnedIdx > alreadyRunningIdx,
+			'alreadyRunning must be checked before spawn to allow fresh process to receive payload')
+	})
+
 	it('skips identical payloads only while the helper is already alive', () => {
 		assert.match(feeder, /const alreadyRunning = isRunning\(\)/)
 		assert.match(feeder, /if \(!opts\.force && alreadyRunning && payload === _lastWrittenPayload\) return/)
+	})
+
+	it('cache is set on successful write (after p.stdin.write)', () => {
+		assert.match(feeder, /p\.stdin\.write\(payload \+ '\\n'\)\s*\n\s*_lastWrittenPayload = payload/)
 	})
 
 	it('reapply (Caspar reconnect) forces a rewrite', () => {
@@ -62,9 +77,35 @@ describe('WO-269 T269.3: helper repeat compression', () => {
 		assert.match(helper, /REPEAT_SUMMARY_SEC = 60\.0/)
 	})
 
+	it('emits repeat summary when line changes (before new-line log)', () => {
+		const code = helper
+		// Find the pattern: repeat summary on change, THEN new line log, THEN parse
+		const repeatPattern = code.indexOf('log(f"stdin line repeated')
+		const changeBlock = code.indexOf('else:', repeatPattern)
+		const newLineLogAfterChange = code.indexOf('log(f"stdin line received:', changeBlock)
+		assert.ok(changeBlock > 0 && newLineLogAfterChange > changeBlock,
+			'repeat summary and last_stdin_line reset must occur before new-line log on payload change')
+	})
+
+	it('tracks last_stdin_line to detect repeats', () => {
+		assert.match(helper, /last_stdin_line = line/)
+	})
+
 	it('keeps the WO-262 log-before-parse guarantee for NEW payloads', () => {
 		const idx = helper.indexOf('log(f"stdin line received:')
 		const parseIdx = helper.indexOf('monitor, rects, channel, title_marker = parse_line(line)')
 		assert.ok(idx > 0 && parseIdx > idx, 'new-line log must still precede parse_line')
+	})
+
+	it('does NOT compress timing probes from the feeder (one-shot, not stdin repeats)', () => {
+		// Timing probes like "timing: ready" and "timing: first rects written" come from feeder's
+		// stdout handler, not from stdin, so the repeat compression (which only looks at stdin lines)
+		// never touches them. This is correct by design — they're logged when first received.
+		// Verify feeder doesn't apply repeat compression to its own timing probes:
+		const feeder = src('src/system/operator-shape-overlay.js')
+		// Timing probes are logged directly from child.stdout.on('data') via log?.('info', ...)
+		// They're NOT affected by stdin repeat compression (which is python-side only)
+		assert.match(feeder, /if \(!helperFirstOutputSeen\) {[\s\S]*?helperFirstOutputSeen = true/)
+		assert.match(feeder, /if \(!firstRectsWritten && lastRects\.length\) {[\s\S]*?firstRectsWritten = true/)
 	})
 })
