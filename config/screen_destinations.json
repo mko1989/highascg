@@ -69,6 +69,32 @@
         "key": "",
         "quality": "medium"
       }
+    },
+    {
+      "id": "dst_mrmet518_1",
+      "label": "Operator GUI",
+      "mainScreenIndex": 0,
+      "mode": "operator_gui",
+      "audioLayout": "stereo",
+      "videoMode": "custom",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": true,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      },
+      "guiUrl": "http://127.0.0.1:4200/?cefOperator=1",
+      "physicalPort": 3,
+      "autoLaunch": true
     }
   ],
   "edidNotes": ""

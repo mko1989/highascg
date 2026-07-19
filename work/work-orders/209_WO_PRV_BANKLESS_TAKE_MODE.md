@@ -1,6 +1,6 @@
 # WO-209 — PRV exchange still stages on bank-B layers: WO-199's pin was backwards; PRV needs a bankless take mode
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Critical (PRV editing is effectively dead: edits target empty logical layers while content plays on bank-B physical layers)
 **Date:** 2026-07-14
 **Source:** owner (post-13:24 restart): "still nothing happens on the prv channel when editing a look with a prv channel... i dont see any amcp traffic when editing a look for ch2 other than the initial auto play on transition out."

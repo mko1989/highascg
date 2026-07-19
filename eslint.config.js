@@ -114,4 +114,24 @@ module.exports = [
 			...ESLINT_10_RECOMMENDED_OVERRIDES,
 		},
 	},
+	{
+		// CG Studio's served UI: plain browser scripts under src/ (same code also synced into
+		// client/tools/electron-launcher/cg-studio/). Without this block they inherit the node
+		// globals from the server block above and every `document` use warns no-undef.
+		files: ['src/cg-studio/public/**/*.js'],
+		languageOptions: {
+			ecmaVersion: 2022,
+			sourceType: 'script',
+			globals: {
+				...globals.browser,
+				...globals.es2021,
+				StudioPlacement: 'readonly',
+			},
+		},
+		rules: {
+			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+			'no-empty': ['warn', { allowEmptyCatch: false }],
+			...ESLINT_10_RECOMMENDED_OVERRIDES,
+		},
+	},
 ]

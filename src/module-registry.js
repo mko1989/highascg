@@ -225,6 +225,31 @@ async function handleApi(method, path, body, ctx, req, query) {
 	return null
 }
 
+/**
+ * Merge every loaded module's `staticMounts` (URL prefix -> on-disk dir, WO-265) into one map,
+ * suitable for spreading into the `vendorDirs` option of `serveWebApp`. First registration of a
+ * prefix wins; duplicates are logged and skipped so one module can't silently shadow another.
+ * @param {(level:'warn'|'info',msg:string)=>void} [log]
+ * @returns {Record<string, string>}
+ */
+function collectStaticMounts(log) {
+	/** @type {Record<string, string>} */
+	const out = {}
+	for (const m of _modules) {
+		if (!m.staticMounts || typeof m.staticMounts !== 'object') continue
+		for (const [prefix, dir] of Object.entries(m.staticMounts)) {
+			if (typeof prefix !== 'string' || !prefix.startsWith('/') || !prefix.endsWith('/')) continue
+			if (typeof dir !== 'string' || !dir) continue
+			if (out[prefix]) {
+				if (log) log('warn', `[modules] staticMounts prefix "${prefix}" from "${m.name}" already taken — skipped`)
+				continue
+			}
+			out[prefix] = dir
+		}
+	}
+	return out
+}
+
 /** @returns {{ modules: string[], bundles: string[], styles: string[], wsNamespaces: string[] }} */
 function describe() {
 	const modules = []
@@ -254,5 +279,6 @@ module.exports = {
 	bootAll,
 	shutdownAll,
 	handleApi,
+	collectStaticMounts,
 	describe,
 }

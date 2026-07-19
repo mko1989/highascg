@@ -1,6 +1,6 @@
 # WO-184 — Console spam "Image corrupt or truncated. 1.jpg / 2 1.jpg / 3.jpg" (media thumbnails)
 
-**Status:** Planned (investigate-then-fix)
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (console noise; suggests partial thumbnail reads)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner). Names look like MEDIA clip thumbnails (clips named "1", "2 1", "3"), not compose chN.jpg files.

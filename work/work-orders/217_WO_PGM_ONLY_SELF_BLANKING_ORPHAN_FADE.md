@@ -1,6 +1,6 @@
 # WO-217 — PGM-only merge take fades out the layer it just played into (screen blanks, sticky opacity 0)
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Critical (live outage 2026-07-14 ~15:50 — screen 2 blank across takes AND a Caspar restart; manually recovered 16:0x via `MIXER 3-10 OPACITY 1`)
 **Date:** 2026-07-14
 **Source:** owner: "the pgm only screen stopped working... i even restarted caspar and it stays blank..."

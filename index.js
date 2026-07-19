@@ -434,6 +434,9 @@ function main() {
 					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparConnected()
 				} else if (payload.connected === false) {
 					wasConnected = false
+					// WO-268: quarantine (not clear) tracked template hosts — the reconnect INFO gather
+					// restores the ones whose host layer still runs a producer (routing-setup.js).
+					;(require('./src/engine/scene-template-cg')).quarantineAllTrackedTemplateHosts()
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparDisconnected()
 					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparDisconnected()
 					;(require('./src/utils/periodic-sync')).clearPeriodicSyncTimer(appCtx)

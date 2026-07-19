@@ -10,6 +10,7 @@ import { fmtSmpte, parseTcInput } from './timeline-canvas.js'
 import { parseNumberInput } from '../lib/math-input.js'
 import { resolveTransitionDuration, transitionDurationForFps } from '../lib/transition-duration.js'
 import { screenLabel } from '../lib/screen-label.js'
+import { uiIcon } from './ui-icons.js'
 
 /**
  * @param {object} deps
@@ -27,6 +28,9 @@ import { screenLabel } from '../lib/screen-label.js'
  * @param {(v: object|null) => void} [deps.setSelectedFlagDetail]
  * @param {(nextId: string) => void | Promise<void>} [deps.onTimelineSwitch]
  */
+/** Shared uiIcon() SVGs sized via .tl-btn__icon; the loop button reuses the 'reset' arrow. */
+const tlIcon = (name) => uiIcon(name, 'tl-btn__icon')
+
 export function createTimelineTransport(deps) {
 	const {
 		transportEl,
@@ -193,13 +197,13 @@ export function createTimelineTransport(deps) {
 					<button class="tl-btn" id="tl-new-tl" title="New timeline">+</button>
 				</div>
 				<div class="tl-tb-group tl-tb-transport">
-					<button class="tl-btn" id="tl-to-start" title="To start">⏮</button>
+					<button class="tl-btn" id="tl-to-start" title="To start">${tlIcon('toStart')}</button>
 					<button class="tl-btn tl-btn-play ${playback.playing ? 'active' : ''}" id="tl-play">
-						${playback.playing ? '⏸' : '▶'}
+						${playback.playing ? tlIcon('pause') : tlIcon('play')}
 					</button>
-					<button class="tl-btn" id="tl-stop" title="Stop">⏹</button>
-					<button class="tl-btn" id="tl-to-end" title="To end">⏭</button>
-					<button class="tl-btn ${playback.loop ? 'active' : ''}" id="tl-loop" title="Loop">⟳</button>
+					<button class="tl-btn" id="tl-stop" title="Stop">${tlIcon('stop')}</button>
+					<button class="tl-btn" id="tl-to-end" title="To end">${tlIcon('toEnd')}</button>
+					<button class="tl-btn ${playback.loop ? 'active' : ''}" id="tl-loop" title="Loop">${tlIcon('reset')}</button>
 				</div>
 				<div class="tl-tb-group tl-timecode-group">
 					<input type="text" class="tl-timecode tl-timecode-input" id="tl-tc-cur" value="${fmtSmpte(playback.position, fps)}" title="Current time (Enter to focus). ++500 / --500 for jump" />

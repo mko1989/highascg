@@ -23,8 +23,9 @@
         "type": "rtmp",
         "name": "Str1",
         "quality": "medium",
-        "rtmpServerUrl": "rtmp://x.rtmp.youtube.com/live2",
-        "streamKey": "aek2-2g0j-jvr0-qca4-9j89",
+        "rtmpServerUrl": "",
+        "streamKey": "",
+        "hasStreamKey": false,
         "srtUrl": "",
         "udpUrl": "",
         "videoCodec": "h264",
@@ -57,7 +58,7 @@
       "id": "dst_in_dst_pgm_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "PGM 1",
+      "label": "Dioda",
       "externalRef": "dst_pgm_1"
     },
     {
@@ -167,6 +168,37 @@
       "externalRef": "host_webpage_webpage_127_0_0_1"
     },
     {
+      "id": "dst_in_dst_mrmet518_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "Operator GUI",
+      "externalRef": "dst_mrmet518_1"
+    },
+    {
+      "id": "dst_in_host_decklink_input_4",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "DeckLink 4",
+      "caspar": {
+        "hostRole": "decklink_input",
+        "hostChannel": 6,
+        "slot": 4
+      },
+      "externalRef": "host_decklink_input_4"
+    },
+    {
+      "id": "dst_in_host_live_audio_input_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "Live audio 1",
+      "caspar": {
+        "hostRole": "live_audio_input",
+        "hostChannel": 7,
+        "slot": 1
+      },
+      "externalRef": "host_live_audio_input_1"
+    },
+    {
       "id": "gpu_p0",
       "deviceId": "caspar_host",
       "kind": "gpu_out",
@@ -218,11 +250,6 @@
       "sinkId": "gpu_p0"
     },
     {
-      "id": "e_dst_in_dst_mrizwonx_1_gpu_p2",
-      "sourceId": "dst_in_dst_mrizwonx_1",
-      "sinkId": "gpu_p2"
-    },
-    {
       "id": "e_dst_in_dst_mrizwm0m_1_dlsdi_3",
       "sourceId": "dst_in_dst_mrizwm0m_1",
       "sinkId": "dlsdi_3"
@@ -241,6 +268,11 @@
       "id": "e_dst_in_dst_pgm_1_audio_1",
       "sourceId": "dst_in_dst_pgm_1",
       "sinkId": "audio_1"
+    },
+    {
+      "id": "e_dst_in_dst_mrmet518_1_gpu_p2",
+      "sourceId": "dst_in_dst_mrmet518_1",
+      "sinkId": "gpu_p2"
     }
   ],
   "layout": {}

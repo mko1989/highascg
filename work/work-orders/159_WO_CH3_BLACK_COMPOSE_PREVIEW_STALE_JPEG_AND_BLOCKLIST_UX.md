@@ -1,6 +1,6 @@
 # WO-159 — Screen 2 (ch3) black compose preview: stale JPEG served + blocklist state never reaches the client
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (operator flying blind on screen 2 previews)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)

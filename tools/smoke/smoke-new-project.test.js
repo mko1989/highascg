@@ -36,12 +36,13 @@ function makeCtx(mediaRoot) {
 	}
 }
 
-test('buildStarterHardwareConfig yields one PGM destination', () => {
+test('buildStarterHardwareConfig yields one operator-GUI destination (WO-264)', () => {
 	const { hardwareConfig } = buildStarterHardwareConfig(fakePersistence)
 	const dests = hardwareConfig.screenDestinations?.destinations || []
 	assert.equal(dests.length, 1)
-	assert.equal(dests[0].id, 'dst_pgm_1')
-	assert.equal(dests[0].mode, 'pgm_only')
+	assert.equal(dests[0].id, 'dst_operator_gui')
+	assert.equal(dests[0].mode, 'operator_gui')
+	assert.equal(dests[0].autoLaunch, true)
 	assert.equal(hardwareConfig.casparServer?.screen_count, 1)
 })
 

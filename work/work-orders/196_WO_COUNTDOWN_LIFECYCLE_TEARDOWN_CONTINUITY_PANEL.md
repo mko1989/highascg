@@ -1,6 +1,6 @@
 # WO-196 — Countdown lifecycle: clear CG on look exit, keep state across same-timer transitions, panel lists all project timers
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (timer stays on air after transitioning away — on-air wrongness)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, latest NEW block).

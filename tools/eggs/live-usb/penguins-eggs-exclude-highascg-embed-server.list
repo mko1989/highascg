@@ -136,6 +136,17 @@ home/casparcg/.config/Cursor/*
 home/casparcg/.config/cursor
 home/casparcg/.config/cursor/*
 
+# Zoom — dev/test tool on the build host only; MUST NOT ship on the ISO (WO-142 G1)
+opt/zoom
+opt/zoom/*
+usr/bin/zoom
+usr/share/applications/Zoom.desktop
+usr/share/doc/zoom
+usr/share/doc/zoom/*
+usr/share/mime/packages/zoom.xml
+usr/share/pixmaps/Zoom.png
+usr/share/pixmaps/application-x-zoom.png
+
 # Tailscale node identity (deb + snap — all common layouts)
 var/lib/tailscale
 var/lib/tailscale/*

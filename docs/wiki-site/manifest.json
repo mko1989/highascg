@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-07-15T16:10:59.306Z",
+  "generatedAt": "2026-07-19T18:02:26.039Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -489,10 +489,10 @@
     },
     {
       "id": "reference--cef-interactive-bridge",
-      "title": "CEF interactive bridge (operator X11 → CDP)",
+      "title": "CEF interactive bridge (removed, WO-257)",
       "file": "reference/cef-interactive-bridge.md",
       "category": "Reference",
-      "description": "Operator mouse/keyboard on the multiview (or interactive screen consumer) is forwarded to embedded CEF HTML via Chrome DevTools Protocol. Host-channel webpages ",
+      "description": "**Status:** Removed. This page is kept as a pointer for anyone following old links or work",
       "order": 80
     },
     {

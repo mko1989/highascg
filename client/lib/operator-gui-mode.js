@@ -114,9 +114,10 @@ export function cellRectsToLayoutCells(cellRects, viewport) {
 	for (const c of Array.isArray(cellRects) ? cellRects : []) {
 		const r = c?.rect
 		if (!r || !(Number(r.width) > 0) || !(Number(r.height) > 0)) continue
-		out.push({
+		const cell = {
 			id: c.id,
-			role: c.role === 'prv' ? 'prv' : c.role === 'multiview' ? 'multiview' : 'pgm',
+			role:
+				c.role === 'prv' ? 'prv' : c.role === 'multiview' ? 'multiview' : c.role === 'mvcell' ? 'mvcell' : 'pgm',
 			mainIndex: Math.max(0, parseInt(String(c.mainIndex ?? 0), 10) || 0),
 			rect: {
 				x: clamp01(Number(r.left) / vw),
@@ -124,7 +125,15 @@ export function cellRectsToLayoutCells(cellRects, viewport) {
 				w: clamp01(Number(r.width) / vw),
 				h: clamp01(Number(r.height) / vh),
 			},
-		})
+		}
+		// 'mvcell' (WO-263 follow-up, mv-editor blend): explicit source channel — the mv layout
+		// editor's cells route arbitrary channels, not mainIndex-addressable PGM/PRV pairs.
+		if (cell.role === 'mvcell') {
+			const srcCh = Number(c.srcCh)
+			if (!Number.isFinite(srcCh) || srcCh <= 0) continue
+			cell.srcCh = Math.floor(srcCh)
+		}
+		out.push(cell)
 	}
 	return out
 }
@@ -145,6 +154,7 @@ let _bySurface = new Map()
 let _debounceTimer = null
 let _restoreTimer = null
 let _suppressed = false
+let _tabBlocked = false
 let _heartbeatTimer = null
 
 function mergedCells() {
@@ -153,11 +163,17 @@ function mergedCells() {
 	return out
 }
 
+/** The set that should actually be on the wire right now — empty while a popup suppression OR
+ * the foreground-tab latch (WO-265) is active, else the merged surface cells. */
+function effectiveCells() {
+	return _suppressed || _tabBlocked ? [] : mergedCells()
+}
+
 function scheduleReport() {
 	if (_debounceTimer) clearTimeout(_debounceTimer)
 	_debounceTimer = setTimeout(() => {
 		_debounceTimer = null
-		void sendLayout(_suppressed ? [] : mergedCells())
+		void sendLayout(effectiveCells())
 	}, REPORT_DEBOUNCE_MS)
 }
 
@@ -217,14 +233,43 @@ export function reportMultiviewEditRect(rect, viewport) {
 	reportSurfaceCells('mvedit', cells)
 }
 
-async function sendLayout(cells) {
+/**
+ * Surface 3/3 alternative (2026-07-17, mv-editor blend): PER-CELL holes for the multiview layout
+ * editor — one rect per cell body, each routing that cell's OWN source channel (`role: 'mvcell'`
+ * + `srcCh`, or `role: 'pgm'/'prv'` + `mainIndex` for the default screen cells). Insets are the
+ * caller's job: the editor keeps its canvas-drawn chrome (borders/label strip/handles) OUTSIDE
+ * these rects so it stays clickable — hole regions can never receive pointer events (X SHAPE
+ * intersects input with bounding). Mutually exclusive with {@link reportMultiviewEditRect}
+ * (same 'mvedit' surface). Empty array withdraws the surface.
+ * @param {Array<{id?: string, role?: string, srcCh?: number, mainIndex?: number, rect: {left: number, top: number, width: number, height: number}}>} cellRects
+ * @param {{width: number, height: number}} [viewport]
+ */
+export function reportMultiviewEditCellRects(cellRects, viewport) {
+	if (!isOperatorGuiModeActive()) return
+	const cells = cellRectsToLayoutCells(cellRects, defaultViewport(viewport)).map((c) => ({
+		...c,
+		surface: 'mvedit',
+	}))
+	reportSurfaceCells('mvedit', cells)
+}
+
+/** WO-269: serialized payload of the last successful send — identical payloads are skipped
+ * (preview draw loops re-report unchanged rects every tick, which flooded the server + shape
+ * helper at the debounce rate). Recovery paths pass `force` (reconnect/nudge/heartbeat). */
+let _lastSentJson = null
+
+async function sendLayout(cells, { force = false } = {}) {
+	const json = JSON.stringify(cells)
+	if (!force && json === _lastSentJson) return
 	try {
 		if (!cells.length) {
 			await api.delete(LAYOUT_ENDPOINT)
 		} else {
 			await api.post(LAYOUT_ENDPOINT, { cells })
 		}
+		_lastSentJson = json
 	} catch (e) {
+		_lastSentJson = null
 		console.warn('[operator-gui-mode] layout report failed:', e?.message || e)
 	}
 }
@@ -258,8 +303,57 @@ export function setInteractionSuppressed(suppressed) {
 	_restoreTimer = setTimeout(() => {
 		_restoreTimer = null
 		_suppressed = false
-		void sendLayout(mergedCells())
+		void sendLayout(effectiveCells())
 	}, RESTORE_DEBOUNCE_MS)
+}
+
+/**
+ * WO-265 T265.4 — hold video holes closed while a workspace tab that must own the whole window
+ * (CG Studio) is in the foreground. A separate latch from {@link setInteractionSuppressed} on
+ * purpose: a modal opening+closing over the CG Studio tab must not restore the holes. Block fires
+ * immediately (cancels any pending debounced report); unblock re-sends whatever the surfaces hold
+ * — surfaces belonging to background views have already withdrawn themselves, and popup
+ * suppression still wins while active.
+ * @param {boolean} blocked
+ */
+export function setForegroundTabBlocksVideo(blocked) {
+	if (!isOperatorGuiModeActive()) return
+	const next = !!blocked
+	if (next === _tabBlocked) return
+	_tabBlocked = next
+	if (_debounceTimer) {
+		clearTimeout(_debounceTimer)
+		_debounceTimer = null
+	}
+	void sendLayout(effectiveCells())
+}
+
+const _videoBlockingTabs = new Set()
+let _tabActivationListenerInstalled = false
+
+/**
+ * Declarative alternative to per-component 'highascg-workspace-tab-activated' listeners driving
+ * {@link setForegroundTabBlocksVideo}: with two full-window tabs each wiring their own listener,
+ * both fire on every switch and race on the single latch (listener order decides whether the
+ * holes reopen under the foreground blocker). One central listener computes the latch from the
+ * registered set instead — a full-window tab registers its name once and never touches the latch.
+ * @param {string} tabName
+ */
+export function registerVideoBlockingTab(tabName) {
+	const name = String(tabName || '').trim()
+	if (!name) return
+	_videoBlockingTabs.add(name)
+	if (_tabActivationListenerInstalled || typeof window === 'undefined') return
+	_tabActivationListenerInstalled = true
+	window.addEventListener('highascg-workspace-tab-activated', (ev) => {
+		const tab = String(/** @type {CustomEvent} */ (ev).detail?.tab || '')
+		setForegroundTabBlocksVideo(_videoBlockingTabs.has(tab))
+	})
+}
+
+/** @returns {boolean} current foreground-tab latch — exposed for tests/diagnostics only. */
+export function isForegroundTabBlockingVideo() {
+	return _tabBlocked
 }
 
 /** @returns {boolean} current suppression state — exposed for tests/diagnostics only. */
@@ -275,7 +369,7 @@ function resendMergedNow() {
 		clearTimeout(_debounceTimer)
 		_debounceTimer = null
 	}
-	void sendLayout(_suppressed ? [] : mergedCells())
+	void sendLayout(effectiveCells(), { force: true })
 }
 
 /**
@@ -323,6 +417,8 @@ export function resetOperatorGuiModeStateForTests() {
 	_restoreTimer = null
 	_bySurface = new Map()
 	_suppressed = false
+	_tabBlocked = false
+	_lastSentJson = null
 	if (_heartbeatTimer) clearInterval(_heartbeatTimer)
 	_heartbeatTimer = null
 }

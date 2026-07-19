@@ -241,11 +241,15 @@ function unassignTimer(opts) {
  * carries a fade duration + tween (`MIXER <ch>-<layer> OPACITY <0|1> <fadeFrames> linear`)
  * instead of the instant-cut form, so the timer inspector's Fade In / Fade Out buttons animate.
  *
- * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number}} opts
+ * Optional `opacity` (0-1, default keep stored / 1): the on-air opacity used when visible —
+ * stored per screen entry so re-adds and look-visibility restores keep it (inspector's layer
+ * opacity slider).
+ *
+ * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number, opacity?: number}} opts
  * @returns {{ lines: string[] }}
  */
 function setTimerVisible(opts) {
-	const { timerId, screenIdx, visible, fadeFrames } = opts || {}
+	const { timerId, screenIdx, visible, fadeFrames, opacity: opacityIn } = opts || {}
 	if (!timerId) throw new Error('timerId required')
 	if (!Number.isFinite(screenIdx)) throw new Error('screenIdx required')
 	if (typeof visible !== 'boolean') throw new Error('visible must be boolean')
@@ -267,10 +271,13 @@ function setTimerVisible(opts) {
 		return { lines: [] }
 	}
 
-	// Update visibility in registry
+	// Update visibility (and, when given, the stored on-air opacity) in registry
 	screenEntry.visible = visible
+	if (Number.isFinite(opacityIn)) {
+		screenEntry.opacity = Math.min(1, Math.max(0, opacityIn))
+	}
 
-	const opacity = visible ? 1 : 0
+	const opacity = visible ? (Number.isFinite(screenEntry.opacity) ? screenEntry.opacity : 1) : 0
 	const frames =
 		Number.isFinite(fadeFrames) && fadeFrames > 0 ? Math.round(Math.min(500, Math.max(0, fadeFrames))) : 0
 	const lines = [
@@ -404,8 +411,8 @@ function linesForReAdd(channel) {
 			const cgPayload = { ...record.config }
 			lines.push(`CG ${screenEntry.channel}-${screenEntry.layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(cgPayload))}`)
 
-			// MIXER OPACITY based on visible flag
-			const opacity = screenEntry.visible ? 1 : 0
+			// MIXER OPACITY based on visible flag (honoring the stored on-air opacity)
+			const opacity = screenEntry.visible ? (Number.isFinite(screenEntry.opacity) ? screenEntry.opacity : 1) : 0
 			lines.push(`MIXER ${screenEntry.channel}-${screenEntry.layer} OPACITY ${opacity}`)
 		}
 	}
@@ -457,7 +464,7 @@ function linesForLookVisibility(channel, timersVisibility) {
 			// Update visibility in registry
 			screenEntry.visible = visible
 
-			const opacity = visible ? 1 : 0
+			const opacity = visible ? (Number.isFinite(screenEntry.opacity) ? screenEntry.opacity : 1) : 0
 			lines.push(`MIXER ${channel}-${screenEntry.layer} OPACITY ${opacity}`)
 		}
 	}

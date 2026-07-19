@@ -153,6 +153,61 @@ async function testWO244PreserveWithAudioSourcePair() {
 	console.log('✓ WO-244 preserve-on-empty with audioSourcePair test passed')
 }
 
+/**
+ * Test 5: T249.4 — streaming bus layout follows the wider of video/audio source screens
+ */
+async function testStreamingBusLayoutWidening() {
+	const { resolveStreamingChannelAudioLayout } = require('../../src/config/config-generator-consumer-attach')
+
+	const config = {
+		screen_1_audio_layout: 'stereo',
+		screen_2_audio_layout: '8ch',
+	}
+
+	// Video source stereo + audio source 8ch → wider audio-source layout wins
+	const widened = resolveStreamingChannelAudioLayout(config, { videoSource: 'program_1', audioSource: 'program_2' })
+	assert.strictEqual(widened, '8ch', 'video stereo + audio 8ch: bus layout widens to 8ch')
+
+	// audioSource follow_video → unchanged video-source layout (both widths)
+	const followStereo = resolveStreamingChannelAudioLayout(config, { videoSource: 'program_1', audioSource: 'follow_video' })
+	assert.strictEqual(followStereo, 'stereo', 'follow_video: stereo video source stays stereo')
+	const followWide = resolveStreamingChannelAudioLayout(config, { videoSource: 'program_2', audioSource: 'follow_video' })
+	assert.strictEqual(followWide, '8ch', 'follow_video: 8ch video source stays 8ch')
+
+	// Audio source narrower than video source → keep the wider video-source layout
+	const keptWider = resolveStreamingChannelAudioLayout(config, { videoSource: 'program_2', audioSource: 'program_1' })
+	assert.strictEqual(keptWider, '8ch', 'audio stereo + video 8ch: keeps wider video layout')
+
+	console.log('✓ Streaming bus layout widening test passed')
+}
+
+/**
+ * Test 6: streaming bus videoMode inherits from the cabled source screen (videoMode '' = inherit;
+ * sc.videoSource is graph-synced, so the encode bus follows the cable — WO-270 follow-up).
+ */
+async function testStreamingBusVideoModeInheritance() {
+	const { buildStreamingChannel } = require('../../src/config/config-generator-consumer-attach')
+
+	const config = {
+		screen_1_mode: '1080p5000',
+		screen_2_mode: '720p5000',
+	}
+
+	// videoMode '' + cabled program_2 → inherits screen_2_mode
+	config.streamingChannel = { videoMode: '', videoSource: 'program_2' }
+	assert.ok(/<video-mode>720p50/.test(buildStreamingChannel(config, 9)), 'empty videoMode inherits the cabled screen mode')
+
+	// explicit videoMode stays the escape hatch and wins over the cable
+	config.streamingChannel = { videoMode: '1080i5000', videoSource: 'program_2' }
+	assert.ok(/<video-mode>1080i50/.test(buildStreamingChannel(config, 9)), 'explicit videoMode overrides inheritance')
+
+	// non-screen source (multiview) → screen_1_mode fallback as before
+	config.streamingChannel = { videoMode: '', videoSource: 'multiview' }
+	assert.ok(/<video-mode>1080p50/.test(buildStreamingChannel(config, 9)), 'non-screen source falls back to screen_1_mode')
+
+	console.log('✓ Streaming bus videoMode inheritance test passed')
+}
+
 // Run all tests
 async function run() {
 	try {
@@ -160,6 +215,8 @@ async function run() {
 		await testSettingsRoundTrip()
 		await testMixerRowsSourceAudioPair()
 		await testWO244PreserveWithAudioSourcePair()
+		await testStreamingBusLayoutWidening()
+		await testStreamingBusVideoModeInheritance()
 		console.log('\n✓ All WO-249 smoke tests passed')
 	} catch (e) {
 		console.error('Test failed:', e)

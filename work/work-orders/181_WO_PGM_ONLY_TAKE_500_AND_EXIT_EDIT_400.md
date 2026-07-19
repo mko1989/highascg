@@ -1,6 +1,6 @@
 # WO-181 — PGM-only take HTTP 500 (buildClipCommandPlan) + exit-edit preview-sync HTTP 400
 
-**Status:** In progress (500 hotfixed by orchestrator; 400 + regression smoke open)
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** HIGH (takes on screen 2 were broken)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner).

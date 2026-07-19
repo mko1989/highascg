@@ -1,6 +1,6 @@
 # WO-191 — Multiview overlay: per-layer rows with timers + progress bars (runtime layers only), short L-labels, descending order
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (operator visibility on the multiview)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner): every layer shown as a row; timers + progress bar ONLY for layers with a video/audio file that has running time; the rest label-only; short labels ("L10"); highest layer at top, descending.

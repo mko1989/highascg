@@ -399,7 +399,14 @@ describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks
 
 	it('WO-255 T255.3: three surfaces report into operator-gui-mode.js (compose/timeline/mv-edit)', () => {
 		assert.match(read('client/components/scenes-editor.js'), /reportComposeCellRects/)
-		assert.match(read('client/components/timeline-editor-preview.js'), /reportTimelineCellRects/)
+		// The timeline wiring MUST live in the LIVE editor (timeline-editor.js). It originally
+		// landed only in the orphaned, never-imported timeline-editor-preview.js (deleted), which
+		// left the timeline surface silent — no rects, no holes, no video in operator-GUI mode.
+		assert.match(read('client/components/timeline-editor.js'), /reportTimelineCellRects/)
+		assert.ok(
+			!fs.existsSync(path.join(__dirname, '../../client/components/timeline-editor-preview.js')),
+			'orphaned timeline-editor-preview.js stays deleted (dead copy that masked the WO-255 wiring regression)',
+		)
 		assert.match(read('client/components/multiview-editor.js'), /reportMultiviewEditRect/)
 	})
 

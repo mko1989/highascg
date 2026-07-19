@@ -1,6 +1,6 @@
 # WO-218 — Bank drift: visually-equal layers skip re-staging while the bank flips → producer and mixer state (CROP) end up on different banks
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (answers WO-190's crop mismatch with hard evidence; also the "PRV cell on MV wrong after recall" family)
 **Date:** 2026-07-14
 **Source:** owner: "the route of pgm ch1 on multiview shows without the top cropping of the layer. even though it shows correctly on the actual pgm screen consumer. why?" + "the preview on the multiviewer doesnt show exactly what it should when a look is recalled to prv."

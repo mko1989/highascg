@@ -219,8 +219,10 @@ const LTEngine = (function () {
                 // Reset inline margins to prevent accumulation
                 container.style.marginLeft = '';
                 container.style.marginRight = '';
+                container.style.marginTop = '';
+                container.style.marginBottom = '';
                 container.style.margin = '';
-                
+
                 const pos = (style.position || 'left').toLowerCase();
                 if (pos === 'center') {
                     container.style.marginLeft = 'auto';
@@ -235,7 +237,11 @@ const LTEngine = (function () {
                     const mx = style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77;
                     const my = style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43;
                     if (Number.isFinite(mx) && Number.isFinite(my)) {
-                        container.style.margin = my + 'px ' + mx + 'px';
+                        // WO-267: individual margins — the old `margin` shorthand stomped the
+                        // auto margins that anchor position center/right.
+                        container.style.marginBottom = my + 'px';
+                        if (pos === 'right') container.style.marginRight = mx + 'px';
+                        else if (pos !== 'center') container.style.marginLeft = mx + 'px';
                     }
                 }
                 if (style.opacity != null && style.opacity !== '') {
@@ -354,6 +360,59 @@ const LTEngine = (function () {
             state = 2;
             clearDisplayTimer();
         }).catch(handleError);
+    }
+
+    /* ── WO-267 studio-only helpers (never exported outside ?studio=1) ── */
+
+    /** Replay the intro at normal speed. `play()` no-ops at state 2 (by design for CG), so the
+     * studio Play button uses this: animateIn's opening .set() calls make it self-resetting. */
+    function studioReplay() {
+        try {
+            ensurePlayableDefaults();
+        } catch (error) {
+            handleError(error);
+            return Promise.resolve();
+        }
+        syncStyleFromActiveData();
+        applyData();
+        applyStyles();
+        return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
+            state = 2;
+            clearDisplayTimer();
+        }).catch(handleError);
+    }
+
+    /** Current graphic placement for the studio drag overlay. */
+    function studioGetPlacement() {
+        const container = cfg.containerSel ? document.querySelector(cfg.containerSel) : null;
+        if (!container) return null;
+        return {
+            rect: container.getBoundingClientRect(),
+            position: (style.position || 'left').toLowerCase(),
+            marginX: style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77,
+            marginY: style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43,
+        };
+    }
+
+    /** Live-apply a placement from the studio drag overlay (merged into style). */
+    function studioSetPlacement(p) {
+        if (!p || typeof p !== 'object') return;
+        if (p.position) style.position = String(p.position);
+        if (p.marginX != null) style.marginX = Number(p.marginX);
+        if (p.marginY != null) style.marginY = Number(p.marginY);
+        applyStyles();
+    }
+
+    /** Computed font sizes for the studio wheel-resize. */
+    function studioGetFontSizes() {
+        const out = { titleFontSize: null, subtitleFontSize: null };
+        try {
+            const t = document.querySelector(cfg.titleSel || 'h1');
+            if (t) out.titleFontSize = parseFloat(window.getComputedStyle(t).fontSize);
+            const s = document.querySelector(cfg.subtitleSel || 'p');
+            if (s) out.subtitleFontSize = parseFloat(window.getComputedStyle(s).fontSize);
+        } catch (_) { /* fall through with nulls */ }
+        return out;
     }
 
     /* ── CasparCG interface ──────────────────────────────────── */
@@ -564,6 +623,10 @@ const LTEngine = (function () {
         }
         if (isStudioMode()) {
             window['studioHoldIn'] = studioHoldIn;
+            window['studioReplay'] = studioReplay;
+            window['studioGetPlacement'] = studioGetPlacement;
+            window['studioSetPlacement'] = studioSetPlacement;
+            window['studioGetFontSizes'] = studioGetFontSizes;
         }
     }
 

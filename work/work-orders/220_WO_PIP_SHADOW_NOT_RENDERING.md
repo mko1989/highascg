@@ -1,6 +1,6 @@
 # WO-220 — Drop Shadow PIP overlay doesn't render (delivery pipeline verified good; fault is in-template or z-interplay)
 
-**Status:** Planned
+**Status:** Implemented (fix applied; render not yet visually confirmed)
 **Priority:** Medium
 **Date:** 2026-07-14
 **Source:** owner: "drop shadow border effect doesnt work"

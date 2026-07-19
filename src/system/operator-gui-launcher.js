@@ -34,6 +34,11 @@ const FIREFOX_BINARIES = ['/usr/bin/firefox-esr', '/usr/bin/firefox']
 const XDOTOOL_FIREFOX_CLASSES = ['Navigator', 'firefox']
 const FIRST_SEARCH_TIMEOUT_MS = 8000
 const SEARCH_TIMEOUT_MS = 5000
+const AUTO_LAUNCH_RETRIES = 5
+const AUTO_LAUNCH_RETRY_MS = 10_000
+// After a boot-time spawn, firefox that came up before X was ready exits within a couple of
+// seconds — wait this long before trusting the pid as a successful launch.
+const AUTO_LAUNCH_VERIFY_MS = 3000
 
 /** @type {import('child_process').ChildProcess | null} */
 let firefoxProc = null
@@ -198,4 +203,89 @@ async function launchOperatorGuiBrowser(ctx) {
 	return { ok: true, action: 'launched', pid: firefoxPid }
 }
 
-module.exports = { launchOperatorGuiBrowser, raiseOperatorGuiBrowser, PROFILE_DIR }
+/** @param {object} config @returns {object|null} the `operator_gui`-mode screen destination, if any */
+function findOperatorGuiDestination(config) {
+	const dests = config?.screenDestinations?.destinations
+	if (!Array.isArray(dests)) return null
+	return dests.find((d) => d && d.mode === 'operator_gui') || null
+}
+
+/**
+ * WO-264 T264.1: pure boot-time auto-launch decision. Launch only when an operator_gui destination
+ * is defined, its `autoLaunch` field (default true) isn't off, and a monitor resolves — an explicit
+ * `physicalPort` on the destination counts (the generator honors it before the resolver, see
+ * config-generator-operator-gui.js resolveOperatorGuiPort), otherwise resolveOperatorMonitorPort
+ * decides. Mode 'none' (multiple displays, no screen_N_operator_monitor flag) deliberately does
+ * NOT launch: guessing a monitor on a live multi-output box risks covering a program screen.
+ * @param {object} config
+ * @param {{ resolveMonitorPort?: (config: object) => { port: number|null, mode: string } }} [opts] injectable for offline tests
+ * @returns {{ launch: boolean, reason: string }}
+ */
+function shouldAutoLaunchOperatorGui(config, opts = {}) {
+	const dest = findOperatorGuiDestination(config)
+	if (!dest) return { launch: false, reason: 'no_operator_gui_destination' }
+	if (dest.autoLaunch === false) return { launch: false, reason: 'auto_launch_disabled' }
+	if (Number.isFinite(dest.physicalPort)) return { launch: true, reason: 'explicit_port' }
+	const resolveMonitorPort =
+		opts.resolveMonitorPort || require('../utils/operator-monitor-resolve').resolveOperatorMonitorPort
+	const resolved = resolveMonitorPort(config) || {}
+	if (resolved.mode === 'none') return { launch: false, reason: 'no_monitor_resolved' }
+	return { launch: true, reason: String(resolved.mode || 'resolved') }
+}
+
+/** @type {Promise<void>|null} in-flight auto-launch retry loop (at most one) */
+let autoLaunchChain = null
+
+/**
+ * WO-264 T264.2: fire-and-forget boot/reconnect auto-launch. Never throws and never blocks the
+ * caller (routing-setup awaits nothing here) — the retry loop covers the `:0` X session coming up
+ * after highascg at boot. On reconnects the isRunning() guard makes this a no-op, matching the
+ * manual Launch button's raise-instead-of-respawn semantics.
+ * @param {{ config: object, log?: Function }} ctx
+ */
+function maybeAutoLaunchOperatorGui(ctx) {
+	try {
+		if (process.env.NODE_TEST_CONTEXT) return
+		if (isRunning() || autoLaunchChain) return
+		const verdict = shouldAutoLaunchOperatorGui(ctx.config)
+		if (!verdict.launch) {
+			ctx?.log?.('info', `[Operator GUI] auto-start skipped: ${verdict.reason}`)
+			return
+		}
+		autoLaunchChain = (async () => {
+			for (let attempt = 1; attempt <= AUTO_LAUNCH_RETRIES; attempt++) {
+				try {
+					if (isRunning()) return
+					const res = await launchOperatorGuiBrowser(ctx)
+					if (res?.ok && res.action !== 'launched') return
+					if (res?.ok) {
+						await new Promise((r) => setTimeout(r, AUTO_LAUNCH_VERIFY_MS))
+						if (isRunning()) {
+							ctx?.log?.('info', `[Operator GUI] auto-started (attempt ${attempt}, ${verdict.reason})`)
+							return
+						}
+						ctx?.log?.('info', `[Operator GUI] auto-start attempt ${attempt}/${AUTO_LAUNCH_RETRIES}: firefox exited right after spawn (display not ready?)`)
+					} else {
+						ctx?.log?.('info', `[Operator GUI] auto-start attempt ${attempt}/${AUTO_LAUNCH_RETRIES} failed: ${res?.reason || 'unknown'}`)
+					}
+				} catch (e) {
+					ctx?.log?.('info', `[Operator GUI] auto-start attempt ${attempt}/${AUTO_LAUNCH_RETRIES} threw: ${e?.message || e}`)
+				}
+				if (attempt < AUTO_LAUNCH_RETRIES) await new Promise((r) => setTimeout(r, AUTO_LAUNCH_RETRY_MS))
+			}
+			ctx?.log?.('warn', `[Operator GUI] auto-start gave up after ${AUTO_LAUNCH_RETRIES} attempts — use the inspector Launch button`)
+		})().finally(() => {
+			autoLaunchChain = null
+		})
+	} catch (e) {
+		ctx?.log?.('warn', `[Operator GUI] auto-start: ${e?.message || e}`)
+	}
+}
+
+module.exports = {
+	launchOperatorGuiBrowser,
+	raiseOperatorGuiBrowser,
+	shouldAutoLaunchOperatorGui,
+	maybeAutoLaunchOperatorGui,
+	PROFILE_DIR,
+}

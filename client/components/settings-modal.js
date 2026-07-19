@@ -231,20 +231,12 @@ export function showSettingsModal(initialTab) {
 	let autosaveTimer = null
 
 	async function persistSettings() {
-		const clearCredsCheckbox = modal.querySelector('#set-streaming-ch-clear-creds')
-		if (clearCredsCheckbox?.checked) {
-			if (!window.confirm('Clear stored RTMP server and stream key? This action cannot be undone.')) {
-				clearCredsCheckbox.checked = false
-				return
-			}
-		}
 		const settings = Logic.buildSettingsPayload(modal)
 		if (settings.composePreview) settingsState.settings.composePreview = { ...settings.composePreview }
 		settingsState.notify()
 		try {
 			const res = await api.post('/api/settings', settings)
 			if (res.ok) {
-				if (clearCredsCheckbox?.checked) clearCredsCheckbox.checked = false
 				await settingsState.load()
 				document.dispatchEvent(new CustomEvent('highascg-settings-applied', { detail: res }))
 				if (saveStatusEl) {
@@ -273,25 +265,7 @@ export function showSettingsModal(initialTab) {
 			void mountVariablesPanel(varPane)
 			if (initialTab) activateSettingsTab(initialTab)
 			autosaveSuspended = false
-
-			// Setup screen label change handlers (WO-222)
-			const screenLabelMount = modal.querySelector('#settings-screen-labels-mount')
-			if (screenLabelMount) {
-				screenLabelMount.addEventListener('input', (e) => {
-					const input = e.target.closest('input.screen-label-input')
-					if (!input) return
-					const screenIdx = parseInt(input.dataset.screenIdx, 10)
-					const label = input.value.trim()
-					void (async () => {
-						try {
-							await api.post('/api/screens/label', { screenIdx, label })
-							input.setAttribute('data-was-set', label ? 'true' : 'false')
-						} catch (err) {
-							console.error(`Failed to save screen label ${screenIdx}:`, err)
-						}
-					})()
-				})
-			}
+			// Screen labels + streaming channel moved to the Devices tab (owner request 2026-07-18).
 		} catch (e) { console.error('Load failed:', e) }
 	})()
 }

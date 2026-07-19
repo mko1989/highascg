@@ -72,6 +72,21 @@ function clampFraction(v) {
  */
 function resolveCellSourceChannel(cell, map) {
 	if (cell?.role === 'multiview') return map.multiviewCh ?? null
+	// 'mvcell' (2026-07-17, mv-editor blend): the multiview layout editor's per-cell holes carry
+	// an explicit source channel (route:// cells can point at any channel, not a mainIndex).
+	if (cell?.role === 'mvcell') {
+		const srcCh = Number(cell.srcCh)
+		if (!Number.isFinite(srcCh) || srcCh <= 0) return null
+		const ch = Math.floor(srcCh)
+		// WO-156: never route a multiview output into an mv-editor hole — the client filters
+		// this too, but the map is authoritative here and a stale client reporting
+		// srcCh == multiview channel would wedge the multiview exactly as WO-156 documented.
+		const mvChs = Array.isArray(map.multiviewChannels) && map.multiviewChannels.length
+			? map.multiviewChannels
+			: (map.multiviewCh != null ? [map.multiviewCh] : [])
+		if (mvChs.includes(ch)) return null
+		return ch
+	}
 	const role = cell?.role === 'prv' ? 'prv' : 'pgm'
 	const idx = Math.max(0, parseInt(String(cell?.mainIndex ?? 0), 10) || 0)
 	if (role === 'pgm') return Array.isArray(map.programChannels) ? (map.programChannels[idx] ?? null) : null
@@ -248,7 +263,10 @@ function computeOperatorGuiCellPlan(cells, map, config) {
 			w: clampFraction(rect.w),
 			h: clampFraction(rect.h),
 		}
-		if (guiDims) {
+		// 'mvcell' skips aspect-fit: the mv editor's cell box IS the target shape (the real
+		// multiview output MIXER-FILL-stretches its cells the same way), and mainIndex-keyed
+		// resolveCellSourceDims would resolve the wrong screen's mode for an arbitrary channel.
+		if (guiDims && cell?.role !== 'mvcell') {
 			const srcDims = resolveCellSourceDims(cell, config)
 			if (srcDims) fitted = computeAspectFitCellRect(fitted, guiDims, srcDims)
 		}

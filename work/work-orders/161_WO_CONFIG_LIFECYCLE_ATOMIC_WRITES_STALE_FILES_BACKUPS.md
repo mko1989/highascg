@@ -1,6 +1,6 @@
 # WO-161 — Config lifecycle hardening: atomic XML writes, stale root config, backup rotation, custom-build XML audit
 
-**Status:** Planned
+**Status:** Partially implemented (hazard fixes landed; deletions owner-gated)
 **Priority:** Medium-High (truncated casparcg.config on crash = Caspar won't start; stale-file edits silently do nothing)
 **Date:** 2026-07-13
 **Source:** owner review request 2026-07-13 ("review how the configs are created and managed and if they are not full of deprecated values")

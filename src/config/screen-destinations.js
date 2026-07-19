@@ -140,6 +140,8 @@ function normalizeDestination(d) {
 		base.guiUrl = String(d.guiUrl || '').trim() || 'http://127.0.0.1:4200/?operatorGui=1'
 		const pp = parseInt(String(d.physicalPort ?? ''), 10)
 		if (Number.isFinite(pp) && pp >= 1 && pp <= 4) base.physicalPort = pp
+		// WO-264: auto-launch the Firefox GUI at boot (default true; only an explicit false disables).
+		base.autoLaunch = d.autoLaunch !== false
 	}
 	return base
 }

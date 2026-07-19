@@ -77,7 +77,8 @@ CI runs `node tools/ci/npm-audit-ci.js`, which fails on **high** or **critical**
 
 | Package | Notes |
 |---------|--------|
-| `ws` | Direct + transitive (via `osc`, `puppeteer`) pinned to **8.21.0+** via `package.json` `overrides`. |
+| `ws` | Direct + transitive (via `osc`) pinned to **8.21.0+** via `package.json` `overrides`. |
+| `puppeteer` | **Removed** (WO-247/WO-248). CEF control and headless-Chrome thumbnail rendering now use the in-repo raw CDP client (`src/system/cef-cdp-client.js`, `src/media/headless-chrome-cdp.js`) over `ws`. The Chrome binary is resolved from `HIGHASCG_CHROME_BIN`, the cached Chrome-for-Testing under `~/.cache/puppeteer/chrome/`, or a system `chromium`/`google-chrome`. |
 | `exceljs` | Optional — lower-third roster `.xlsx` import only. Parses with a **2 MB** size cap and **15 s** timeout; row objects use null prototypes and unsafe keys (`__proto__`, etc.) are stripped. |
 | Legacy `.xls` | Not supported — operators should save as `.xlsx` or CSV. |
 

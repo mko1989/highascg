@@ -1,6 +1,6 @@
 # WO-226 — Timer as a per-screen overlay: icon next to screen label/FTB, full inspector (size/position/fade), compact controls next to audio; drop ≠ look
 
-**Status:** Planned | **Date:** 2026-07-15
+**Status:** Implemented (owner/hardware acceptance pending) | **Date:** 2026-07-15
 **Source:** owner: "the timer was supposed to be added as a screen overlay, that is either on or not. when dropped into screens looks list it shouldnt create a look but a timer icon next to screen label and ftb, which opens its inspector with all settings as well as size and position and button to fade in fade out. there also needs to appear the compact timer controls next to audio."
 **Builds on:** WO-210/219 server model (band 980-989, /api/timers/*, opacity lifecycle) — server largely READY; this is UX relocation + two server extensions.
 

@@ -342,3 +342,76 @@
 	cursor: pointer;
 	border: none;
 }
+
+/* ── Screen-timer inspector (components/inspector-screen-timer.js) ─────────────────────────── */
+.inspector-screen-timer {
+	padding: 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.inspector-screen-timer__title {
+	margin: 0;
+	font-size: 0.95rem;
+}
+.inspector-screen-timer__section {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.inspector-screen-timer__head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+.inspector-screen-timer__name {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.inspector-screen-timer__time {
+	margin-left: auto;
+	font-variant-numeric: tabular-nums;
+	font-size: 1rem;
+}
+.inspector-screen-timer__time--amber {
+	color: #ffb300;
+}
+.inspector-screen-timer__time--red {
+	color: #ff3b30;
+}
+.inspector-screen-timer__transport {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+.inspector-screen-timer__opacity {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.inspector-screen-timer__opacity input[type='range'] {
+	flex: 1;
+}
+.inspector-screen-timer__opacity-val {
+	font-variant-numeric: tabular-nums;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	min-width: 4ch;
+	text-align: right;
+}
+.inspector-screen-timer__remove {
+	color: #ff6b60;
+	border-color: rgba(255, 107, 96, 0.4);
+}
+.inspector-screen-timer__remove:hover {
+	background: rgba(255, 59, 48, 0.15);
+}
+.inspector-screen-timer__empty {
+	color: var(--text-muted);
+	margin: 0;
+}

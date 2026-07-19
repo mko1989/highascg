@@ -91,6 +91,10 @@ ${customVideoModes.join('\n')}
 		cefDebugPort > 0
 			? `\n        <remote-debugging-port>${cefDebugPort}</remote-debugging-port>`
 			: ''
+	// WO-268: CEF GPU is an owner opt-in (default false, historic default — GPU CEF can contend
+	// with the GL consumers). Without it this CEF build has NO WebGL, so Shader FX templates
+	// (WO-266) on the CG path need it true. Applied on config regen + caspar restart.
+	const cefEnableGpu = ot.cefEnableGpu === true || ot.cefEnableGpu === 'true'
 
 	return `<configuration>
     <paths>
@@ -111,7 +115,7 @@ ${oscXml}
     <ndi><auto-load>${ndiAutoLoad}</auto-load></ndi>
     <decklink/>
     <html>
-        <enable-gpu>false</enable-gpu>${cefDebugPortXml}
+        <enable-gpu>${cefEnableGpu ? 'true' : 'false'}</enable-gpu>${cefDebugPortXml}
     </html>
 </configuration>`
 }

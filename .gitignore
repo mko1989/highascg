@@ -123,3 +123,5 @@ config/*copy.config
 work/logs/
 work/multi-logs/
 timelines/
+.operator-firefox-profile/
+config/*.tmp

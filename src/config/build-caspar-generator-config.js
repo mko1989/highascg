@@ -470,6 +470,12 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 			: {}),
 	}
 	merged.screenDestinations = normalizeScreenDestinations(appConfig?.screenDestinations)
+	// WO-268: the generator reads operatorTools (cefInteractiveBridge, cefRemoteDebuggingPort,
+	// and now cefEnableGpu) but the flat config never carried it — those flags silently used
+	// their fallbacks on the production path. Pass it through.
+	merged.operatorTools = {
+		...((appConfig && typeof appConfig.operatorTools === 'object' && appConfig.operatorTools) || {}),
+	}
 	merged.extraLiveSources = Array.isArray(appConfig?.extraLiveSources) ? appConfig.extraLiveSources : []
 	
 	// Attach layout-related bits for buildChannelsSection -> calculateLayoutPositions

@@ -62,3 +62,11 @@ optgroup {
 	flex-direction: column;
 	height: 100vh;
 }
+
+/* Shared inline-SVG icon default (components/ui-icons.js) — 1em square, baseline-friendly. */
+.ui-icon {
+	width: 1em;
+	height: 1em;
+	display: inline-block;
+	vertical-align: -0.125em;
+}

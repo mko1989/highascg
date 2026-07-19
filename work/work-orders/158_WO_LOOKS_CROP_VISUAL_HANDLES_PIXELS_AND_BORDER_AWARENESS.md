@@ -1,6 +1,6 @@
 # WO-158 — Looks editor crop: visual handles, pixel values, editor visibility, crop-aware PIP borders
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (operator cannot crop visually; borders wrong on air with cropped content)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)

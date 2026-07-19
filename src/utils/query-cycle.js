@@ -367,7 +367,9 @@ function updateChannelVariablesFromXml(ctx, ch, xmlStr) {
 					remainingSec: layer.remainingSec,
 				}
 				// WO-252: Inject INFO timing supplement into oscState for layers missing OSC duration.
-				// The real layer number comes from the parsedLayers array index (layerIdx).
+				// layerIdx IS the real Caspar layer number: extractChannelInfoFromParsed assigns
+				// layers[N] from the parsed `layer_<N>` XML key, so the array is sparse and indexed
+				// by physical layer (bank-B 110-199 included) — verified in the 2026-07-17 audit.
 				if (ctx.oscState?.applyInfoTimingSupplement && Number.isFinite(layerIdx)) {
 					const durationSec = layer.durationSec ? parseFloat(layer.durationSec) : undefined
 					const timeSec = layer.timeSec ? parseFloat(layer.timeSec) : undefined

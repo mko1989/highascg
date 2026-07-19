@@ -34,6 +34,7 @@ const {
 } = require('./decklink-output-resolve')
 const { computeArtnetUniverseSpill } = require('./artnet-pixelmap-universe')
 const { clampedInt } = require('./screen-destinations')
+const { channelCountFromLayout } = require('./audio-channel-layouts')
 
 /**
  * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + primary SDI
@@ -503,16 +504,29 @@ function buildHostLiveChannel(config, entry) {
  * `applyDestinationAudioLayoutsToScreens` before this generator stage runs — see
  * `src/config/build-caspar-generator-config.js:281-288`). Multiview / unresolved source: 'stereo'
  * (multiview has no per-layout audio; `buildMultiviewChannel` likewise emits no `<channel-layout>`).
+ * WO-249 T249.4: when `sc.audioSource` names a screen (`program_N`/`preview_N`, not `follow_video` —
+ * same semantics as `resolveStreamingChannelRouteForRole(config, 'audio')` in `routing-map.js`), the
+ * bus carries THAT screen's audio, so its layout is resolved too and the WIDER of the two wins — a
+ * narrower bus would make Caspar's count-based interleaved audio copy scramble pairs (see WO file).
+ * Restart-dirty affordance: this only shapes generated config; no live behavior change until the
+ * config is regenerated and Caspar is restarted.
  * @param {Record<string, unknown>} config
  * @param {Record<string, unknown>} sc - `config.streamingChannel`
  * @returns {string}
  */
 function resolveStreamingChannelAudioLayout(config, sc) {
-	const rawVideo = String(sc.videoSource || 'program_1').toLowerCase()
-	const m = rawVideo.match(/^(?:program|preview)[_-]?(\d+)$/)
-	if (!m) return 'stereo'
-	const n = parseInt(m[1], 10) || 1
-	return String(config[`screen_${n}_audio_layout`] || 'stereo').toLowerCase() || 'stereo'
+	/** @param {string} rawSource @returns {string|null} screen layout id, or null when not a screen source */
+	const screenLayoutFor = (rawSource) => {
+		const m = String(rawSource || '').trim().toLowerCase().match(/^(?:program|preview)[_-]?(\d+)$/)
+		if (!m) return null
+		const n = parseInt(m[1], 10) || 1
+		return String(config[`screen_${n}_audio_layout`] || 'stereo').toLowerCase() || 'stereo'
+	}
+	const videoLayout = screenLayoutFor(String(sc.videoSource || 'program_1')) ?? 'stereo'
+	const rawAudio = String(sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : sc.audioSource).trim().toLowerCase()
+	const audioLayout = rawAudio === 'follow_video' || rawAudio === 'follow' ? null : screenLayoutFor(rawAudio)
+	if (audioLayout == null) return videoLayout
+	return channelCountFromLayout(audioLayout) > channelCountFromLayout(videoLayout) ? audioLayout : videoLayout
 }
 
 /**
@@ -521,7 +535,12 @@ function resolveStreamingChannelAudioLayout(config, sc) {
  */
 function buildStreamingChannel(config, casparChannelNum) {
 	const sc = config.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
-	const rawMode = String(sc.videoMode || config.screen_1_mode || '1080p5000').trim() || '1080p5000'
+	// videoMode '' = inherit from the cabled source: sc.videoSource is graph-synced
+	// (applyStreamRecordMappingsFromGraph), so the encode bus follows that screen's mode.
+	// An explicit sc.videoMode remains the config-file escape hatch.
+	const srcScreen = String(sc.videoSource || '').trim().toLowerCase().match(/^(?:program|preview)[_-]?(\d+)$/)
+	const inheritedMode = srcScreen ? String(config[`screen_${parseInt(srcScreen[1], 10) || 1}_mode`] || '').trim() : ''
+	const rawMode = String(sc.videoMode || '').trim() || inheritedMode || String(config.screen_1_mode || '').trim() || '1080p5000'
 	const modeId = effectiveStandardVideoModeId(rawMode)
 	const deckN = parseInt(String(sc.decklinkDevice || '0'), 10) || 0
 	const mvStd = !!STANDARD_VIDEO_MODES[rawMode]
@@ -558,4 +577,5 @@ module.exports = {
 	buildHostLiveChannel,
 	buildStreamingChannel,
 	buildMonitorChannelXml,
+	resolveStreamingChannelAudioLayout,
 }

@@ -1,0 +1,20 @@
+work on the countdown timers correct implemetation.
+the countdown timer should be added per screen with an icon appearing in the screen's bar for the timers inspector.
+the timer should be controled displayed and turned on and off from the compact timer menu.
+
+
+in the operator gui in the timeline editor no prvs appears in the compose prv.
+in the multiview editor i cant move nor add any windows.
+
+
+in the timeline editor a couple of icons changed |< for instance.
+
+in the multiview editor i need to also see the casparcg screen thru the layout editor.
+
+
+the countdown options shouldn't be in a new modal but in inspector, with size, position, opacity and other layer specifc settings.
+does it allow multiple countdowns per screen?
+
+
+when operator gui is defined and coonected in the device view config it should auto start the ui browser when highascg starts.
+the gui should also appear on a completly fresh system. meaning the default should be one screen with the gui.

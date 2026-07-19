@@ -32,6 +32,11 @@ function buildVendorDirs(logger) {
 			out['/vendor/html-to-image/'] = htmlToImageRoot
 		}
 	} catch {}
+	// WO-265: loaded modules may contribute their own URL-prefix -> dir mounts (e.g. cg-studio UI).
+	const moduleMounts = moduleRegistry.collectStaticMounts((level, msg) => logger?.[level]?.(msg))
+	for (const [prefix, dir] of Object.entries(moduleMounts)) {
+		if (!out[prefix]) out[prefix] = dir
+	}
 	return out
 }
 

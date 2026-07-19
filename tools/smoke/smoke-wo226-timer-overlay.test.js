@@ -131,22 +131,44 @@ test('T226.3: scene-list-column renders a per-screen timer icon next to FTB, lis
 	assert(src.includes('scenes-deck-col__timer-btn'), 'icon should be queryable for cache refresh')
 	assert(src.includes("addEventListener('screen-timers-changed'"), 'should listen for the lightweight refresh event')
 	assert(src.includes('/api/timers/list'), 'should source assignment/visibility state from the list endpoint')
-	assert(src.includes('showTimerInspectorModal'), 'click should open the T226.4 inspector')
+	// 2026-07-17: click selects the screen's timers in the INSPECTOR (screen-timer-select) —
+	// the T226.4 modal is retired.
+	assert(src.includes('screen-timer-select'), 'click should select the screen timers in the inspector')
 	assert(src.includes('scenes-btn--timer-on'), 'on-air state should get a distinct (accent) class')
+	assert(src.includes('scenes-btn--timer-unassigned'), 'no-timer state keeps the icon visible but dimmed')
 })
 
-test('T226.4: timer inspector modal reuses buildTimerSettings and wires Fade In/Out to fadeFrames', () => {
-	const src = read('client/components/timer-inspector-modal.js')
+test('T226.4 (2026-07-17 rework): timer settings render in the Inspector, not a modal', () => {
+	assert(
+		!fs.existsSync(path.join(__dirname, '../../client/components/timer-inspector-modal.js')),
+		'timer-inspector-modal.js stays deleted (settings moved into the Inspector panel)',
+	)
+	const src = read('client/components/inspector-screen-timer.js')
 	assert(src.includes("import { buildTimerSettings } from './timer-control-panel-settings-form.js'"), 'must reuse, not duplicate, the settings form')
-	assert(src.includes("modal-overlay"), 'should use the existing lightweight modal shell')
-	assert(src.includes("data-fade=\"in\"") || src.includes("data-fade='in'"), 'should have a Fade In control')
-	assert(src.includes("data-fade=\"out\"") || src.includes("data-fade='out'"), 'should have a Fade Out control')
-	assert(src.includes('/api/timers/visible'), 'fade buttons should post to the visible endpoint')
+	assert(src.includes('/api/timers/visible'), 'fade/show/hide should post to the visible endpoint')
 	assert(src.includes('fadeFrames'), 'fade buttons should pass fadeFrames')
+	assert(src.includes('opacity'), 'should expose the per-layer opacity slider')
+	assert(src.includes('createTimerForScreen'), '"+ Add timer" should assign via the shared helper (screen-timer-create.js)')
+	assert(
+		read('client/lib/screen-timer-create.js').includes('/api/timers/assign'),
+		'the shared create helper owns the POST /api/timers/assign flow',
+	)
+	assert(src.includes('/api/timers/unassign'), 'remove button should unassign')
+
+	const panelSrc = read('client/components/inspector-panel.js')
+	assert(panelSrc.includes("addEventListener('screen-timer-select'"), 'inspector panel should handle the selection event')
+	assert(panelSrc.includes('renderScreenTimerInspector'), 'inspector panel should render the screen-timer view')
 
 	const formSrc = read('client/components/timer-control-panel-settings-form.js')
 	assert(formSrc.includes('timerFontSize'), 'settings form should expose the Size (timerFontSize) field')
 	assert(formSrc.includes("config.position || 'center'"), 'settings form already carries the Position field (reused as-is)')
+})
+
+test('2026-07-17: /api/timers/visible accepts fractional opacity, engine persists it per screen entry', () => {
+	const routeSrc = read('src/api/routes-screen-timers.js')
+	assert(routeSrc.includes('opacity must be a number 0-1'), 'route should validate opacity range')
+	const engineSrc = read('src/engine/screen-timers.js')
+	assert(engineSrc.includes('screenEntry.opacity'), 'engine should store per-screen opacity')
 })
 
 test('T226.5: audio-mixer-panel mounts a compact per-active-screen timer transport cluster', () => {
@@ -163,11 +185,10 @@ test('CSS: WO-226 classes exist in their stylesheets', () => {
 	assert(scenesCss.includes('.scenes-btn--timer'), 'icon base class')
 	assert(scenesCss.includes('.scenes-btn--timer-on'), 'icon on-air class')
 
-	// WO-221 T221.C: .timer-inspector-modal* rules moved from 08c-modals-misc.css to
-	// 08c3-modals-hardware-reconcile-banners.css (behavior-preserving mechanical split).
-	const modalsCss = read('client/styles/08c3-modals-hardware-reconcile-banners.css')
-	assert(modalsCss.includes('.timer-inspector-modal'), 'inspector modal layout class')
-	assert(modalsCss.includes('.timer-inspector-modal__fade-row'), 'fade button row class')
+	// 2026-07-17: the modal is retired — the timer settings view lives in the Inspector panel.
+	const inspectorCss = read('client/styles/05d-inspector-fields.css')
+	assert(inspectorCss.includes('.inspector-screen-timer'), 'screen-timer inspector layout class')
+	assert(inspectorCss.includes('.inspector-screen-timer__opacity'), 'opacity slider row class')
 
 	const audioCss = read('client/styles/07b-audio-mixer-modal-shell.css')
 	assert(audioCss.includes('.audio-mixer__timers-compact'), 'compact transport cluster class')

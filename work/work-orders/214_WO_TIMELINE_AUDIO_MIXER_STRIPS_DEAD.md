@@ -1,6 +1,6 @@
 # WO-214 — Timeline audio never appears in the audio mixer (dead channel lookup)
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (operator cannot route timeline audio channels to outputs)
 **Date:** 2026-07-14
 **Source:** owner: "playing timeline with multiple audio ch on multiple layers none of it appears in the audio mixer, so i could choose which channels to send to pgm 2 for instance."

@@ -23,6 +23,9 @@ const {
 	buildSceneTemplateCgSpec,
 	isSameTemplateSpec,
 	buildSceneTemplateCgUpdateOnlyLines,
+	getTrackedTemplateHosts,
+	recordTemplateHostAdded,
+	resolveTemplateCgHostLayer,
 } = require('./scene-template-cg')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { cropAdjustedFillForLayer } = require('./layer-crop')
@@ -431,7 +434,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				const currentSpec = currentLayer
 					? buildSceneTemplateCgSpec(currentLayer, currentLayer.source?.value, self)
 					: null
-				const isContinuous = isSameTemplateSpec(job.templateCg, currentSpec)
+				// WO-268: continuity also requires that THIS session actually ADDed the template on
+				// that host layer (WO-207 tracked hosts, cleared on Caspar reconnect) — the client
+				// scene map alone can claim continuity across a Caspar restart, and the resulting
+				// UPDATE-only take 403s against the empty layer.
+				const continuityHostLayer = resolveTemplateCgHostLayer(job.layer.layerNumber, job.templateCg.cgName)
+				const isContinuous =
+					isSameTemplateSpec(job.templateCg, currentSpec) &&
+					getTrackedTemplateHosts(channel).has(continuityHostLayer)
 
 				const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
 					channel,
@@ -464,6 +474,10 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 
 				if (lines.length > 0) {
 					await sendPipOverlayLinesSerial(amcp, lines)
+					// WO-268 (completing WO-207's intent — this call was documented but never
+					// wired): remember that this session ADDed the template host, so continuity
+					// UPDATEs and teardown can trust the record.
+					if (!isContinuous) recordTemplateHostAdded(channel, continuityHostLayer)
 				}
 			}
 			if (takeJobs.some((j) => j.browserCgUrl || j.templateCg)) {

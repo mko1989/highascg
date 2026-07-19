@@ -30,6 +30,19 @@ const PLUGIN_CATALOG = [
 			return isTruthy(envFlag) || config?.features?.autofollow === true
 		},
 	},
+	{
+		id: 'cg-studio',
+		name: 'CG Studio',
+		moduleName: 'cg-studio',
+		// WO-265: on by default (owner wants the studio tab on every box); no heavy deps —
+		// the module only mounts static files + template-scan routes. Opt OUT via
+		// `features.cgStudio: false` or a plugin-store entry.
+		legacyEnabled: (config) => {
+			const envFlag = process.env.HIGHASCG_CG_STUDIO
+			if (envFlag !== undefined) return isTruthy(envFlag)
+			return config?.features?.cgStudio !== false
+		},
+	},
 ]
 
 function isTruthy(v) {

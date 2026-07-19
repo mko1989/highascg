@@ -1,6 +1,6 @@
 # WO-182 — Connection-eye process CPU shows 1400%: normalize multi-core percentages
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Low (cosmetic/clarity)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner): "casparcg shows 1400% cpu usage and highascg 83% ????"

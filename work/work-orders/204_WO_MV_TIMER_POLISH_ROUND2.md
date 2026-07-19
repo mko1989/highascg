@@ -1,6 +1,6 @@
 # WO-204 — Multiview timer polish round 2: readable highlight on black, ×2 base size, full-width rows, filename truncation
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (readability on the MV monitor)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, latest NEWNEWNEW): "the highlight is not a great color on black bg. the 200% size should be 100% (200% is actually readable). the timers can span the whole width of the window; truncate filenames that are too long."

@@ -1,6 +1,6 @@
 # WO-249 — 8ch → stereo pair selection for PGM2/streaming + stop the mixer reporting lie
 
-**Status:** OPEN
+**Status:** Implemented (owner acceptance A249.1 pending)
 **Priority:** HIGH (owner: hears ch 3&4 on the PGM2 stream while the mixer claims otherwise; no way to pick the pair)
 **Owner check:** A249.1
 
@@ -35,9 +35,14 @@ Dropdown "Source audio pair" (same option list/labels as `inspector-mixer.js:56-
 ## Constraints (standard)
 No git, no service ops, no AMCP, no HTTP to :4200/:5250, no vite build, curated gate ONLY. node --check + eslint --quiet on touched files; exact gate counts; <500 lines/file; honest checkboxes.
 
-- [ ] T249.1 mixer truth
-- [ ] T249.2 model+server pair plumbing (rtmp AND record paths)
-- [ ] T249.3 UI dropdown
-- [ ] T249.4 wider-bus layout resolve
-- [ ] T249.5 smoke in gate
+- [x] T249.1 mixer truth
+- [x] T249.2 model+server pair plumbing (rtmp AND record paths)
+- [x] T249.3 UI dropdown
+- [x] T249.4 wider-bus layout resolve
+- [x] T249.5 smoke in gate
 - [ ] A249.1 (owner) 8ch clip on PGM1, route on stream: pick 1+2/3+4/5+6/7+8 and confirm on the stream; mixer row shows the source pair
+
+## Work log
+
+**2026-07-17 — audit + T249.4 implemented.** Audit verified T249.1/T249.2/T249.3/T249.5 already in-tree: mixer rows expose `sourceAudioPair` (`client/lib/audio-mixer-rows.js:164`, shown as `(src N+M)` in `client/components/audio-mixer-panel-input-layers.js:87`); `audioSourcePair` plumbed through defaults (`src/config/defaults-core.js:208`), settings-post rebuild (`src/api/settings-post.js:220`), `buildAudioDownmixFilterChain` with the exceeds-layout warn+fallback (`src/streaming/streaming-channel-ffmpeg.js:29-58`), threaded on both rtmp (`src/api/routes-streaming-channel-rtmp.js:93-101`) and record (`src/api/routes-streaming-channel-shared.js:106-107`) paths; UI dropdown "Source audio pair" landed in the settings modal (`client/components/settings-modal-templates.js:154-162`, saved at `settings-modal-logic.js:140`) rather than the inspector file the task named; smoke `tools/smoke/smoke-wo249-audio-pair-select.test.js` is in the curated gate (`tools/ci/run-offline-tests.js:74`).
+T249.4 implemented: `resolveStreamingChannelAudioLayout` (`src/config/config-generator-consumer-attach.js:517-530`) now resolves the audio-source screen's `screen_N_audio_layout` too whenever `streamingChannel.audioSource` names a `program_N`/`preview_N` (same semantics as `resolveStreamingChannelRouteForRole(config, 'audio')`), and emits the WIDER of the video-source and audio-source layouts (compared via `channelCountFromLayout`); `follow_video`/unresolved audio sources keep the previous video-only behavior byte-for-byte. Restart-dirty: only generated config changes; no live effect until regen + Caspar restart. Smoke extended with widening cases (video stereo + audio 8ch → 8ch; follow_video unchanged; narrower audio source keeps wider video layout). Gate: exit 0 — node:test 543 tests / 75 suites, 541 pass, 0 fail, 2 skipped (CI-gated spawn tests), all smoke scripts passed incl. the 5 WO-249 tests.

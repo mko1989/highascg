@@ -8,9 +8,10 @@ import { settingsState } from '../lib/settings-state.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { parseRouteValue } from './scenes-shared.js'
+import { resolveMvCellSourceChannel } from '../lib/input-channels.js'
 import { attachMathInput } from '../lib/math-input.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
-import { reportMultiviewEditRect, isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { reportMultiviewEditRect, reportMultiviewEditCellRects, isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 
 /**
  * Create a debounced function that delays execution until the specified delay has elapsed
@@ -56,6 +57,20 @@ function snapValue(val, candidates, threshold) {
 
 export function initMultiviewEditor(root, stateStore) {
 	let canvas, ctx, scale = 1, offsetX = 0, offsetY = 0, selectedId = null, dragMode = null, dragStart = { x: 0, y: 0, cell: null }, dropHoverId = null, wrap = null, disabledOverlay = null
+	// Operator-GUI mode only. Hole regions in the Firefox window shape can never receive pointer
+	// events — X intersects the input shape with the bounding shape (see tools/runtime shape
+	// helper / commit 8cf5fc4). Two blend modes for the editor dock:
+	//  - BLEND (default): one inset hole PER CELL, each routing that cell's own source channel —
+	//    live video shows inside every window while the canvas-drawn chrome around the holes
+	//    (borders / label strip / resize handles) stays solid and clickable. Any pointer-drag on
+	//    the canvas suppresses all holes live (operator-gui-interaction-suppress.js), so
+	//    moving/resizing works everywhere mid-drag.
+	//  - FULL OUTPUT (toggle): the old single whole-dock hole showing the real composited
+	//    multiview channel (incl. its own labels/timers/bg) — click-dead, view-only.
+	let mvOperatorFullOutput = false
+	/** Viewport-px insets keeping editor chrome outside the per-cell holes. */
+	const MV_BLEND_INSET_TOP = 20
+	const MV_BLEND_INSET = 6
 	const getCM = () => stateStore.getState()?.channelMap || {}
 	const isEnabled = () => getCM().multiviewEnabled !== false && getCM().multiviewCh != null
 	const applyDebounce = createDebounce(() => applyMultiviewLayout(getCM, { silent: true }), 800)
@@ -91,6 +106,7 @@ export function initMultiviewEditor(root, stateStore) {
 		<select id="mv-index-select" class="mv-select" style="margin-right:8px"></select>
 		<button id="mv-reset" class="mv-btn">Reset</button>
 		<button id="mv-refresh" class="mv-btn" title="Re-apply all multiview layouts to CasparCG (use if the multiview is stuck, e.g. after a CasparCG restart)">Refresh output</button>
+		<button id="mv-live-toggle" class="mv-btn" style="display:none" title="Show the real composited multiview output (incl. its labels/timers) in this dock. View-only while on — toggle back to keep editing over the per-window live video.">Full output</button>
 		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-auto-apply" ${multiviewState.autoApply ? 'checked' : ''}> Auto-apply</label>
 		<label class="mv-chk"><input type="checkbox" id="mv-overlay" ${multiviewState.showOverlay ? 'checked' : ''}> Borders</label>
 		<label class="mv-chk" style="margin-left:12px"><input type="checkbox" id="mv-timers-under-labels" ${multiviewState.showTimersUnderLabels ? 'checked' : ''}> Timers under labels</label>
@@ -109,10 +125,54 @@ export function initMultiviewEditor(root, stateStore) {
 	wrap = root.querySelector('.mv-canvas-wrap'); canvas = wrap.querySelector('canvas'); ctx = canvas.getContext('2d'); const vCont = root.querySelector('#mv-video')
 	const refit = () => { const r = fitInContainer(canvas, wrap); scale = r.scale; offsetX = r.offsetX; offsetY = r.offsetY }
 	let liveView = null; const updateLive = () => { if (shouldShowLiveVideo() && isEnabled()) { if (!liveView) liveView = initLiveView(vCont, 'multiview') } else if (liveView) { liveView.destroy(); liveView = null } draw() }
-	// WO-255 T255.3: surface 3/3 for the operator-GUI video overlay — a single whole-dock rect
-	// (the MV editor composites all cells onto one shared canvas, no per-cell DOM rects). No-op
-	// unless operator-GUI mode is active. A zero-sized wrap (display:none / detached) withdraws.
-	const reportMvRect = () => { if (isOperatorGuiModeActive()) reportMultiviewEditRect(wrap.getBoundingClientRect()) }
+	// WO-255 T255.3 surface 3/3, reworked 2026-07-17 (see mvOperatorFullOutput above): default is
+	// per-cell inset holes routing each cell's own source; the toggle switches to the old single
+	// whole-dock rect. No-op unless operator-GUI mode is active. A zero-sized/hidden wrap (tab
+	// not visible) withdraws the surface.
+	const reportMvRect = () => {
+		if (!isOperatorGuiModeActive()) return
+		if (mvOperatorFullOutput) {
+			reportMultiviewEditRect(wrap.getBoundingClientRect())
+			return
+		}
+		const r = wrap.getBoundingClientRect()
+		if (!(r.width > 0) || !(r.height > 0)) {
+			reportMultiviewEditCellRects([])
+			return
+		}
+		const canvasRect = canvas.getBoundingClientRect()
+		const cm = getCM()
+		const mvChs = getMvChannels()
+		const cells = []
+		for (const c of multiviewState.getCells()) {
+			// Same client-px mapping as the mouse handlers (toCanvas is its inverse).
+			const left = canvasRect.left + offsetX + c.x * scale + MV_BLEND_INSET
+			const top = canvasRect.top + offsetY + c.y * scale + MV_BLEND_INSET_TOP
+			const width = c.w * scale - MV_BLEND_INSET * 2
+			const height = c.h * scale - MV_BLEND_INSET_TOP - MV_BLEND_INSET
+			if (width < 24 || height < 24) continue
+			const rect = { left, top, width, height }
+			if (c.type === 'pgm' || c.type === 'prv') {
+				const idx = Number(c.screenIdx)
+				if (Number.isFinite(idx)) {
+					cells.push({ id: `mv-${c.id}`, role: c.type, mainIndex: idx, rect })
+					continue
+				}
+				// No screenIdx (sources-panel drops only carry route://<ch>) — fall through and
+				// resolve the channel from the route value like any other routed cell.
+			}
+			const parsed = parseRouteValue(c.source?.value)
+			if (!parsed) continue // media/html cells have no live channel to route — canvas box only
+			// WO-271: heal stale persisted route channels (channel-map shifts); an unresolvable
+			// stale route gets NO hole (the canvas box stays) instead of routing a wrong channel.
+			const srcCh = resolveMvCellSourceChannel(c, parsed, cm)
+			if (srcCh == null) continue
+			// Never route the multiview's own output into a hole (WO-156: self-route wedges it).
+			if (mvChs.some((mc) => Number(mc) === srcCh)) continue
+			cells.push({ id: `mv-${c.id}`, role: 'mvcell', srcCh, rect })
+		}
+		reportMultiviewEditCellRects(cells)
+	}
 	streamState.subscribe(() => { syncOverlay(); updateLive() }); settingsState.subscribe(() => { syncOverlay(); updateLive() }); syncOverlay(); updateLive(); refit()
 	new ResizeObserver(() => { refit(); draw(); reportMvRect() }).observe(wrap)
 	if (isOperatorGuiModeActive()) window.addEventListener('scroll', reportMvRect, true)
@@ -150,6 +210,25 @@ export function initMultiviewEditor(root, stateStore) {
 			else showAppToast(`Multiview output refreshed (${okCount} layout${okCount === 1 ? '' : 's'}).`, 'success')
 		} finally {
 			refreshBtn.disabled = false
+		}
+	}
+
+	// Operator-GUI mode: per-cell blend (default, editable) ⇄ full-output toggle (see
+	// mvOperatorFullOutput). Hidden elsewhere — normal browser sessions get their live view via
+	// #mv-video/WebRTC and stay interactive.
+	const liveToggleBtn = root.querySelector('#mv-live-toggle')
+	if (isOperatorGuiModeActive()) {
+		liveToggleBtn.style.display = 'inline-block'
+		const syncLiveToggle = () => {
+			liveToggleBtn.textContent = mvOperatorFullOutput ? 'Edit layout' : 'Full output'
+			liveToggleBtn.classList.toggle('mv-btn--live-on', mvOperatorFullOutput)
+		}
+		syncLiveToggle()
+		liveToggleBtn.onclick = () => {
+			mvOperatorFullOutput = !mvOperatorFullOutput
+			syncLiveToggle()
+			reportMvRect()
+			draw()
 		}
 	}
 
@@ -286,8 +365,8 @@ export function initMultiviewEditor(root, stateStore) {
 			} return }
 		const c = getCellAt(cx, cy, getCM()); if (!c) { canvas.style.cursor = ''; return }; const h = getResizeHandle(c, cx, cy, scale, getCM()); canvas.style.cursor = h ? cursorForResizeHandle(h) : 'move'
 	}
-	canvas.onmouseup = () => { dragMode = null; dragStart = { cell: null }; multiviewState.setDragInProgress(false); applyIfAutoEnabled() }
-	canvas.onmouseleave = () => { dragMode = null; canvas.style.cursor = ''; multiviewState.setDragInProgress(false) }
+	canvas.onmouseup = () => { const wasDrag = dragMode != null; dragMode = null; dragStart = { cell: null }; multiviewState.setDragInProgress(false); if (wasDrag) reportMvRect(); applyIfAutoEnabled() }
+	canvas.onmouseleave = () => { const wasDrag = dragMode != null; dragMode = null; canvas.style.cursor = ''; multiviewState.setDragInProgress(false); if (wasDrag) reportMvRect() }
 	canvas.oncontextmenu = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (!c) return; if (c.source) multiviewState.setCellSource(c.id, null); else multiviewState.removeCell(c.id) }
 	canvas.onclick = e => { const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); if (c) multiviewState.setAudioActiveCell(c.id) }
 	canvas.ondragover = e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const { x, y } = toCanvas(e.clientX - r.left, e.clientY - r.top, offsetX, offsetY, scale); const c = getCellAt(x, y, getCM()); const nid = c ? c.id : (x >= 0 && x <= multiviewState.canvasWidth && y >= 0 && y <= multiviewState.canvasHeight ? '__canvas__' : null); if (nid !== dropHoverId) { dropHoverId = nid; draw() } }
@@ -316,7 +395,12 @@ export function initMultiviewEditor(root, stateStore) {
 		c = multiviewState.addCell({ type: data.routeType || data.type, label: data.label || data.value, x: Math.max(0, Math.min(mw - cw, x - cw / 2)), y: Math.max(0, Math.min(mh - ch, y - ch / 2)), w: cw, h: ch, source: { value: data.value, type: data.type || 'media', label: data.label || data.value }, aspectLocked: true }); selectedId = c.id }
 		else multiviewState.setCellSource(c.id, { value: data.value, type: data.type || 'media', label: data.label || data.value }); draw(); applyIfAutoEnabled()
 	}
-	multiviewState.on('change', () => { draw() })
+	// Cell adds/removes/layout loads must re-report the per-cell blend holes (debounced in
+	// operator-gui-mode.js; no-op outside operator-GUI mode). During a move/resize drag the
+	// 'change' events fire at pointermove rate but interaction suppression blanks the holes for
+	// the whole drag anyway — skip the expensive re-report (getBoundingClientRect + per-cell
+	// route resolution) and send one report from the mouseup/mouseleave drag-end paths instead.
+	multiviewState.on('change', () => { draw(); if (!multiviewState.dragInProgress) reportMvRect() })
 	multiviewState.on('apply-request', () => { if (!isEnabled()) return; if (multiviewState.dragInProgress) return; if (multiviewState.autoApply) scheduleApply() })
 	multiviewState.on('audio-change', () => { draw(); applyMultiviewAudioFocus() })
 
@@ -345,6 +429,16 @@ export function initMultiviewEditor(root, stateStore) {
 		'log_line',
 		'dmx:colors',
 	])
+	// Everything reportMvRect's hole resolution reads from the channel map: inputChannels /
+	// programChannels / previewChannels (resolveMvCellSourceChannel) plus multiviewChannels /
+	// multiviewCh (self-route filter). Re-report only when this changes — reportMvRect is
+	// expensive (getBoundingClientRect + per-cell loops) and already fires per-drag via the
+	// multiviewState 'change' listener, so it must not run on every '*' state event.
+	const mvHoleSignature = () => {
+		const cm = getCM()
+		return JSON.stringify([cm.inputChannels, cm.programChannels, cm.previewChannels, cm.multiviewChannels, cm.multiviewCh])
+	}
+	let lastMvHoleSig = mvHoleSignature()
 	let stateRedrawTimer = null
 	const scheduleStateRedraw = () => {
 		if (stateRedrawTimer) return
@@ -354,6 +448,11 @@ export function initMultiviewEditor(root, stateStore) {
 			updateToolbar()
 			refit()
 			draw()
+			const sig = mvHoleSignature()
+			if (sig !== lastMvHoleSig) {
+				lastMvHoleSig = sig
+				reportMvRect()
+			}
 		})
 	}
 	const unsubState = stateStore.on('*', (path) => {

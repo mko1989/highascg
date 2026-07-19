@@ -1,7 +1,10 @@
 'use strict'
 
 /**
- * Factory starter show + modular config (PGM-only default).
+ * Factory starter show + modular config (WO-264: one operator-GUI screen by default — a fresh box
+ * boots straight into the GUI on its single display; PGM outputs are added in device view during
+ * setup). Also the "New project" routing reset (src/engine/new-project.js), which intentionally
+ * returns to this factory shape.
  * Lives under src/ so playout runtime works without tools/eggs/ on ISO or drop-update.
  * Eggs build scripts re-export via tools/eggs/live-usb/starter-project.js.
  */
@@ -17,16 +20,17 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 	config.screenDestinations = normalizeScreenDestinations({
 		version: 1,
 		destinations: [
+			// WO-264 T264.3: fresh default = one screen with the operator GUI. No physicalPort —
+			// WO-246's resolveOperatorMonitorPort auto-selects the lone connected display; guiUrl
+			// and autoLaunch:true come from normalizeScreenDestinations' operator_gui defaults.
 			{
-				id: 'dst_pgm_1',
-				label: 'PGM 1',
+				id: 'dst_operator_gui',
+				label: 'Operator GUI',
 				mainScreenIndex: 0,
-				mode: 'pgm_only',
-				videoMode: '1080p5000',
+				mode: 'operator_gui',
 				width: 1920,
 				height: 1080,
 				fps: 50,
-				caspar: { bus: 'pgm' },
 				edidLabel: '',
 			},
 		],

@@ -72,6 +72,30 @@
 	color: var(--bg);
 }
 
+/* Live countdown readout — tabular numerals so the ticking digits don't wobble the row. */
+.audio-mixer__timer-compact-time {
+	font-variant-numeric: tabular-nums;
+	font-size: 0.8rem;
+	color: var(--text);
+	margin-left: auto;
+	padding-right: 4px;
+}
+.audio-mixer__timer-compact-time--amber {
+	color: #ffb300;
+}
+.audio-mixer__timer-compact-time--red {
+	color: #ff3b30;
+}
+
+/* Per-screen add affordance shown when the active screen has no timer yet. */
+.audio-mixer__timer-compact-add {
+	align-self: flex-start;
+	opacity: 0.7;
+}
+.audio-mixer__timer-compact-add:hover {
+	opacity: 1;
+}
+
 .audio-mixer--inspector .audio-mixer__panel {
 	margin-top: 0;
 	width: 100%;

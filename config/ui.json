@@ -3,5 +3,6 @@
   "rundownPlaybackTimer": true,
   "nuclearRequirePassword": false,
   "nuclearPassword": "",
-  "nuclearPasswordHash": ""
+  "nuclearPasswordHash": "",
+  "legacyJsPixelmap": false
 }

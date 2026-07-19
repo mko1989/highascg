@@ -1,6 +1,6 @@
 # WO-198 — Compose preview: 404-after-etag race, editor-induced latency (settle over-deferral), client recovery
 
-**Status:** Planned
+**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** High (preview latency + dead cells on the operator UI)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): higher jpeg-preview latency than before; `Image corrupt or truncated 1/2/3.jpg` spam; `GET /api/compose-preview/3.jpg?v=<etag> → 404`.
@@ -16,11 +16,11 @@
 
 ## 2. Tasks (haiku-sized)
 
-- [ ] T198.1 **Revert the settle coupling for editor batches:** remove the `onAmcpBatchMutation` call from `routes-amcp.js:87-91` (and the wrapper in `compose-preview-activity.js` if now unused — keep `scheduleSettle`/`onSceneTake` used by takes). Keep WO-155's deck-thumb redraw event (that part is good). Note the partial revert in WO-155's log with the latency math.
-- [ ] T198.2 **Close the truncation race:** in `truncateComposePreviewJpg` (consumer), after truncating ALSO (a) bump an internal generation/invalidate the last-broadcast mtime for that channel so the next poll can't treat the old broadcast as current, and (b) push the existing `compose.preview` WS event with an `unavailable`/cleared flag (mirror the blocklist push shape) so clients drop their cached etag immediately. Broadcast path: skip broadcasting any etag whose stat happens after a newer truncation (compare against the generation).
-- [ ] T198.3 **Client recovery:** in `loadComposePreviewImage`/onerror — drop the cached etag for that channel and schedule ONE delayed retry (~1 s) via the meta path; any incoming WS frame push MUST clear `_metaUnavailable` for its channel (verify; fix if missing). No tight loops (keep the existing single-flight guard).
-- [ ] T198.4 **Smokes:** extend `smoke-compose-preview-defects.test.js`: truncation after broadcast → next poll does not re-broadcast the dead etag + WS cleared-flag fired; batch mutations no longer defer broadcasts (activity untouched by /api/amcp/batch); client-side pure logic (etag drop on error) if extractable. Re-run the full compose-preview smoke family green.
-- [ ] T198.5 Verify + WO bookkeeping (checkboxes, dated log; WO-155 log note; manual QA: edit continuously in the looks editor → compose cells keep updating ~live; no 404 spam in console; blocklisted cell shows badge not errors).
+- [x] T198.1 **Revert the settle coupling for editor batches:** remove the `onAmcpBatchMutation` call from `routes-amcp.js:87-91` (and the wrapper in `compose-preview-activity.js` if now unused — keep `scheduleSettle`/`onSceneTake` used by takes). Keep WO-155's deck-thumb redraw event (that part is good). Note the partial revert in WO-155's log with the latency math.
+- [x] T198.2 **Close the truncation race:** in `truncateComposePreviewJpg` (consumer), after truncating ALSO (a) bump an internal generation/invalidate the last-broadcast mtime for that channel so the next poll can't treat the old broadcast as current, and (b) push the existing `compose.preview` WS event with an `unavailable`/cleared flag (mirror the blocklist push shape) so clients drop their cached etag immediately. Broadcast path: skip broadcasting any etag whose stat happens after a newer truncation (compare against the generation).
+- [x] T198.3 **Client recovery:** in `loadComposePreviewImage`/onerror — drop the cached etag for that channel and schedule ONE delayed retry (~1 s) via the meta path; any incoming WS frame push MUST clear `_metaUnavailable` for its channel (verify; fix if missing). No tight loops (keep the existing single-flight guard).
+- [x] T198.4 **Smokes:** extend `smoke-compose-preview-defects.test.js`: truncation after broadcast → next poll does not re-broadcast the dead etag + WS cleared-flag fired; batch mutations no longer defer broadcasts (activity untouched by /api/amcp/batch); client-side pure logic (etag drop on error) if extractable. Re-run the full compose-preview smoke family green.
+- [x] T198.5 Verify + WO bookkeeping (checkboxes, dated log; WO-155 log note; manual QA: edit continuously in the looks editor → compose cells keep updating ~live; no 404 spam in console; blocklisted cell shows badge not errors).
 
 ## 3. Acceptance criteria
 
@@ -72,3 +72,4 @@ Test results:
   - `smoke-preview-snapshot-restart.test.js` 7/7 pass (no regressions)
 
 Ready for operator QA (A198.1-A198.3).
+- **Audit 2026-07-17:** Implementation verified in-tree. Compose-preview modules live in src/preview/ (not src/api/); client snapshot file is client/components/preview-canvas-compose-snapshot.js (not client/lib/). Batch-settle coupling removed, truncation generation counter + cleared WS event added, client retry logic implemented, all smoke tests green.

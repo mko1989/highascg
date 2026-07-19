@@ -120,8 +120,12 @@ button.primary {
 
 .preview-pane {
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	justify-content: center;
+	/* WO-267 round 2 (owner: "canvas still displays too low"): top-align the stage under the
+	   toolbar instead of floating it vertically centered — in a tall pane the centered canvas
+	   sat mid-page with a large dead zone above it. */
+	justify-content: flex-start;
 	padding: 1rem;
 	background: #111418;
 	overflow: hidden;
@@ -129,11 +133,27 @@ button.primary {
 
 .preview-frame-wrap {
 	width: 100%;
-	max-width: 960px;
+	max-width: 1600px;
 	aspect-ratio: 16 / 9;
+	/* WO-267: never let the frame outgrow (and get clipped by) the pane — the scaled stage
+	   centers itself inside whatever box remains (see scalePreview/fitStage). */
+	max-height: 100%;
 	border: 1px solid var(--border);
 	background: #000;
 	position: relative;
+	overflow: hidden;
+}
+
+/* WO-267: drag/resize surface above the (pointer-swallowing) preview iframe */
+#canvas-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+}
+
+.canvas-hint {
+	margin-top: 0.5rem;
+	margin-bottom: 0;
 }
 
 #preview {

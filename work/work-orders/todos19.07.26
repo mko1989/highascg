@@ -1,0 +1,14 @@
+bug hunt and general project stability and performane review.
+
+preparation for clean eggs produce and basicly for realese.
+
+the cg studio and shadertoy needs ui polish. some things are not done easily in the workflow.
+the add shader needs to be hidden under a plus buttom in the templates tab similar to the plus button in media files
+
+make sure logins to zoom, tailscale, syncthing, nomachine and others are eggs excluded. zoom and nomachine should be excluded fully.
+
+
+after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look.
+
+
+when dropping new media to exxisting layer to exchange it it should keep the size and positioning of the existing layer and not impose defaults.

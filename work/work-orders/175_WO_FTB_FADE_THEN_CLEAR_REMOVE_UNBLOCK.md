@@ -1,6 +1,6 @@
 # WO-175 — FTB = fade 0.5 s (project framerate) then full clear; remove the separate Unblock button
 
-**Status:** Planned
+**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** Medium (operator UX; supersedes the WO-156 T156.3 affordance)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "the unblock button… should be part of fade to black. ftb should fade everything out in 0.5s (counted from the set project framerate), wait for the fade to finish and fire full channel clear. no need for a prompt… ftb has that implied."
@@ -19,10 +19,10 @@
 
 ## 2. Tasks (haiku-sized)
 
-- [ ] T175.1 FTB button handler (`scene-list-column.js:70-86`): compute `fps = cm?.programResolutions?.[col]?.fps ?? 50`, `durationFrames = Math.round(0.5 * fps)`, post `{ screenIdx: col, durationFrames, framerate: fps }`. No prompt (FTB already implies it).
-- [ ] T175.2 Delete the Unblock button block (`scene-list-column.js:91-125` incl. its append) — read the current file first, line numbers may have drifted; remove ONLY the unblock block, keep everything else (the file was edited today by WO-156).
-- [ ] T175.3 Update WO-156's log with one line: "T156.3 affordance superseded by WO-175 (FTB fade-then-clear absorbs Unblock)".
-- [ ] T175.4 Verify: node --check + eslint on scene-list-column.js; grep client/ for remaining "unblock" references (should be none); manual QA note: FTB on a playing screen → 0.5 s fade → channel fully cleared; a wedged self-route channel is also recoverable via FTB now.
+- [x] T175.1 FTB button handler (`scene-list-column.js:70-86`): compute `fps = cm?.programResolutions?.[col]?.fps ?? 50`, `durationFrames = Math.round(0.5 * fps)`, post `{ screenIdx: col, durationFrames, framerate: fps }`. No prompt (FTB already implies it).
+- [x] T175.2 Delete the Unblock button block (`scene-list-column.js:91-125` incl. its append) — read the current file first, line numbers may have drifted; remove ONLY the unblock block, keep everything else (the file was edited today by WO-156).
+- [x] T175.3 Update WO-156's log with one line: "T156.3 affordance superseded by WO-175 (FTB fade-then-clear absorbs Unblock)".
+- [x] T175.4 Verify: node --check + eslint on scene-list-column.js; grep client/ for remaining "unblock" references (should be none); manual QA note: FTB on a playing screen → 0.5 s fade → channel fully cleared; a wedged self-route channel is also recoverable via FTB now.
 
 ## 3. Acceptance criteria
 
@@ -36,3 +36,4 @@
 - 2026-07-13 — **T175.2 implemented.** Deleted the entire Unblock button block (`scene-list-column.js:89-125` incl. comment, button creation, event listener, and appendChild). The FTB button now provides the same recovery path: fade-then-clear.
 - 2026-07-13 — **T175.3 implemented.** Updated `work/work-orders/156_WO_ROUTE_SELF_LOOP_GUARD_AND_MULTIVIEW_RESTART_REAPPLY.md` work log with: "- 2026-07-13 — T156.3 Unblock affordance superseded by WO-175: FTB now fades 0.5 s at project fps then fires the same full channel clear."
 - 2026-07-13 — **Verification green.** `node --check` + `eslint --quiet` clean; `grep -ri "unblock" client/` returns no matches (affordance and class removed cleanly).
+- **Audit 2026-07-17:** Implementation verified in-tree: FTB button computes project fps and 0.5s duration, posts computed values; Unblock button fully removed from scene-list-column.js; WO-156 cross-reference updated.

@@ -59,6 +59,18 @@
 .tl-btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
 .tl-btn-play { font-size: 15px; min-width: 28px; }
 
+/* Inline SVG transport icons (font-independent — the box has no emoji/symbol font). */
+.tl-btn__icon {
+	width: 13px;
+	height: 13px;
+	display: block;
+	margin: 2px auto;
+}
+.tl-btn-play .tl-btn__icon {
+	width: 15px;
+	height: 15px;
+}
+
 .tl-timecode {
 	font-family: var(--font-ui);
 	font-size: 14px;

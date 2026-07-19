@@ -1,0 +1,124 @@
+as we moved the main gui to be displayed on the server system, we can also add the cg studio to it.
+id like the cg studio to open in a new tab seperate from the main gui. but how can i easily change tabs while in fullscreen mode? will it also "cut out" parts of the page in cg studio?
+
+on a simliar note id like to implement additional shader tool that will let users add shaders and display them (web browser source) on the caspar output with audio reactivity.
+there was a project that could load shaders straight from shadertoy but i cant find it now.
+
+audio analayzer js:
+https://github.com/hvianna/audioMotion-analyzer
+
+
+the cg studio canvas is showing up way lower than it should be.
+the cg studio needs to be able to edit the tmeplates by drag and dropping on the canvas to resize reposition.
+the play button doesnt play the animation.
+
+something wrong with playing the saved shader[2026-07-18 12:41:42.151] [info]    Received message from 127.0.0.1: CG 1-700 UPDATE 0 {}\r\n
+2026-07-18 13:11:26.884] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-18 13:11:27.006] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-18 13:11:27.006] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.183] [info]    Received message from 127.0.0.1: CG 1-700 CLEAR\r\n
+[2026-07-18 13:11:27.183] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.189] [info]    Received message from 127.0.0.1: CG 3-700 CLEAR\r\n
+[2026-07-18 13:11:27.189] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.195] [info]    Received message from 127.0.0.1: CG 2-700 CLEAR\r\n
+[2026-07-18 13:11:27.195] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.201] [info]    Received message from 127.0.0.1: CG 2-700 ADD 0 "shaders/sh-test" 1 {}\r\n
+[2026-07-18 13:11:27.201] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.202] [info]    Received message from 127.0.0.1: CG 2-700 PLAY 0\r\n
+[2026-07-18 13:11:27.202] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.202] [info]    Received message from 127.0.0.1: CG 2-700 UPDATE 0 {}\r\n
+[2026-07-18 13:11:27.203] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.203] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-18 13:11:27.203] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.236] [error]   html[file:///home/casparcg/highascg/template/shaders/sh-test.html] 3072 1728 50.000000 Log: Shader FX: WebGL2 unavailable — on the Caspar CG path this needs <html><enable-gpu>true</enable-gpu> (config operatorTools.cefEnableGpu, WO-268), or play this page as a browser_display source instead.
+[2026-07-18 13:11:27.254] [info]    Received message from 127.0.0.1: CLEAR 2\r\n
+[2026-07-18 13:11:27.254] [info]    Sent message to 127.0.0.1:202 CLEAR OK\r\n
+[2026-07-18 13:11:27.255] [info]    Received message from 127.0.0.1: CG 1-111 CLEAR\r\n
+[2026-07-18 13:11:27.256] [info]    ffmpeg[/home/casparcg/highascg/media/bridge/355317.mp4|253/252] Destroyed.
+[2026-07-18 13:11:27.256] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.257] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-18 13:11:27.257] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.264] [info]    Received message from 127.0.0.1: STOP 1-111\r\n
+[2026-07-18 13:11:27.264] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: BEGIN\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: MIXER 2-10 CLEAR\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: MIXER 2-10 FILL 0 0 1 1 0\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: MIXER 2-10 ANCHOR 0 0 0\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: MIXER 2-10 ROTATION 0 0 DEFER\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: MIXER 2-10 OPACITY 1 0 DEFER\r\n
+[2026-07-18 13:11:27.265] [info]    Received message from 127.0.0.1: COMMIT\r\n
+[2026-07-18 13:11:27.265] [warning] Executing batch: BATCH(5 commands)
+[2026-07-18 13:11:27.265] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.265] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.265] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.265] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.265] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.267] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-18 13:11:27.309] [info]    Received message from 127.0.0.1: MIXER 1-111 CLEAR\r\n
+[2026-07-18 13:11:27.309] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.309] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-07-18 13:11:27.309] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.309] [info]    Received message from 127.0.0.1: BEGIN\r\n
+[2026-07-18 13:11:27.309] [info]    Received message from 127.0.0.1: MIXER 1-110 CLEAR\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: MIXER 1-110 OPACITY 0 0\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: MIXER 1-110 OPACITY 0 0 DEFER\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: MIXER 1-110 FILL 0 0 1 1 0\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: MIXER 1-110 ANCHOR 0 0 0\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: MIXER 1-110 ROTATION 0 0 DEFER\r\n
+[2026-07-18 13:11:27.310] [info]    Received message from 127.0.0.1: COMMIT\r\n
+[2026-07-18 13:11:27.310] [warning] Executing batch: BATCH(6 commands)
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.310] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.311] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-18 13:11:27.465] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-18 13:11:27.466] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.650] [info]    Received message from 127.0.0.1: CG 1-700 CLEAR\r\n
+[2026-07-18 13:11:27.650] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.770] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-07-18 13:11:27.771] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.956] [info]    Received message from 127.0.0.1: CG 3-700 CLEAR\r\n
+[2026-07-18 13:11:27.956] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.962] [info]    Received message from 127.0.0.1: CG 3-700 CLEAR\r\n
+[2026-07-18 13:11:27.963] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.964] [info]    Received message from 127.0.0.1: CG 2-700 CLEAR\r\n
+[2026-07-18 13:11:27.965] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.965] [info]    Received message from 127.0.0.1: CG 1-700 UPDATE 0 {}\r\n
+[2026-07-18 13:11:27.965] [info]    Sent message to 127.0.0.1:403 CG UPDATE FAILED\r\n
+[2026-07-18 13:11:27.966] [info]    Received message from 127.0.0.1: CG 2-700 ADD 0 "shaders/sh-test" 1 {}\r\n
+[2026-07-18 13:11:27.968] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.968] [info]    Received message from 127.0.0.1: CG 2-700 PLAY 0\r\n
+[2026-07-18 13:11:27.968] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.968] [info]    Received message from 127.0.0.1: CG 2-700 UPDATE 0 {}\r\n
+[2026-07-18 13:11:27.968] [info]    Sent message to 127.0.0.1:202 CG OK\r\n
+[2026-07-18 13:11:27.968] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-18 13:11:27.968] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:27.996] [error]   html[file:///home/casparcg/highascg/template/shaders/sh-test.html] 3072 1728 50.000000 Log: Shader FX: WebGL2 unavailable — on the Caspar CG path this needs <html><enable-gpu>true</enable-gpu> (config operatorTools.cefEnableGpu, WO-268), or play this page as a browser_display source instead.
+[2026-07-18 13:11:28.278] [info]    Received message from 127.0.0.1: STOP 1-10\r\n
+[2026-07-18 13:11:28.278] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-18 13:11:28.284] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-07-18 13:11:28.284] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:28.284] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-07-18 13:11:28.285] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:35.737] [info]    Received message from 127.0.0.1: STOP 5-10\r\n
+[2026-07-18 13:11:35.737] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-18 13:11:35.739] [info]    Received message from 127.0.0.1: MIXER 5-10 CLEAR\r\n
+[2026-07-18 13:11:35.740] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:35.740] [info]    Received message from 127.0.0.1: STOP 5-11\r\n
+[2026-07-18 13:11:35.740] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-18 13:11:35.741] [info]    Received message from 127.0.0.1: MIXER 5-11 CLEAR\r\n
+[2026-07-18 13:11:35.741] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:35.741] [info]    Received message from 127.0.0.1: STOP 5-12\r\n
+[2026-07-18 13:11:35.741] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-18 13:11:35.742] [info]    Received message from 127.0.0.1: MIXER 5-12 CLEAR\r\n
+[2026-07-18 13:11:35.742] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-18 13:11:35.742] [info]    Received message from 127.0.0.1: MIXER 5 COMMIT\r\n
+[2026-07-18 13:11:35.742] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+
+
+cg studio
+the canvas still displays too low.
+the play button should be a play in and stop should be play out.

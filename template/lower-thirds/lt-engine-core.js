@@ -45,6 +45,58 @@ const LTEngine = (function () {
         }).catch(handleError);
     }
 
+    /* ── WO-267 studio-only helpers (never exported outside ?studio=1) ── */
+
+    /** Replay the intro at normal speed — `play()` no-ops at state 2 (by design for CG). */
+    function studioReplay() {
+        try {
+            ensurePlayableDefaults();
+        } catch (error) {
+            handleError(error);
+            return Promise.resolve();
+        }
+        syncStyleFromActiveData();
+        S.applyData();
+        S.applyStyles();
+        return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
+            state = 2;
+            clearDisplayTimer();
+        }).catch(handleError);
+    }
+
+    /** Current graphic placement for the studio drag overlay. */
+    function studioGetPlacement() {
+        const container = cfg.containerSel ? document.querySelector(cfg.containerSel) : null;
+        if (!container) return null;
+        return {
+            rect: container.getBoundingClientRect(),
+            position: (style.position || 'left').toLowerCase(),
+            marginX: style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77,
+            marginY: style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43,
+        };
+    }
+
+    /** Live-apply a placement from the studio drag overlay (merged into style). */
+    function studioSetPlacement(p) {
+        if (!p || typeof p !== 'object') return;
+        if (p.position) style.position = String(p.position);
+        if (p.marginX != null) style.marginX = Number(p.marginX);
+        if (p.marginY != null) style.marginY = Number(p.marginY);
+        S.applyStyles();
+    }
+
+    /** Computed font sizes for the studio wheel-resize. */
+    function studioGetFontSizes() {
+        const out = { titleFontSize: null, subtitleFontSize: null };
+        try {
+            const t = document.querySelector(cfg.titleSel || 'h1');
+            if (t) out.titleFontSize = parseFloat(window.getComputedStyle(t).fontSize);
+            const s = document.querySelector(cfg.subtitleSel || 'p');
+            if (s) out.subtitleFontSize = parseFloat(window.getComputedStyle(s).fontSize);
+        } catch (_) { /* fall through with nulls */ }
+        return out;
+    }
+
     /* ── CasparCG interface ──────────────────────────────────── */
 
     const DEFAULT_DATA = { title: 'Name', subtitle: 'Title' };
@@ -236,7 +288,16 @@ const LTEngine = (function () {
 
     function init(variantConfig) {
         cfg = variantConfig;
-        S.setContext({ cfg, data, style, activeStep, handleError });
+        // WO-267: live getters, NOT a snapshot — update()/play() REBIND data/style/activeStep
+        // after init, and a `{ cfg, data, ... }` snapshot left LTEngineStyles working on the
+        // stale originals (styles/data silently applied to nothing).
+        S.setContext({
+            get cfg() { return cfg; },
+            get data() { return data; },
+            get style() { return style; },
+            get activeStep() { return activeStep; },
+            handleError,
+        });
         window['update'] = raw => update(raw);
         window['play'] = play;
         window['next'] = next;
@@ -252,6 +313,10 @@ const LTEngine = (function () {
         }
         if (isStudioMode()) {
             window['studioHoldIn'] = studioHoldIn;
+            window['studioReplay'] = studioReplay;
+            window['studioGetPlacement'] = studioGetPlacement;
+            window['studioSetPlacement'] = studioSetPlacement;
+            window['studioGetFontSizes'] = studioGetFontSizes;
         }
     }
 

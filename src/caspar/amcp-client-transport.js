@@ -106,6 +106,21 @@ module.exports = {
 						if (idx !== -1) arr.splice(idx, 1)
 					}
 					if (self._pendingResponseKey === key) self._pendingResponseKey = undefined
+					// Sends are serialized, so a batch drain still installed while a SINGLE timed out
+					// is stale — and a stale drain swallows every response line, turning one missed
+					// ack into a permanent every-command-times-out wedge. Clear it here too.
+					if (self._amcpBatchDrain) {
+						const stale = self._amcpBatchDrain
+						self._amcpBatchDrain = null
+						if (typeof self.log === 'function') {
+							self.log('warn', 'AMCP: cleared stale batch drain during single-command timeout')
+						}
+						try {
+							if (typeof stale.rejectBatch === 'function') stale.rejectBatch(new Error('stale batch drain (single-command timeout)'))
+						} catch (_) {
+							/* non-fatal */
+						}
+					}
 					try {
 						if (typeof self._resetAmcpProtocol === 'function') self._resetAmcpProtocol()
 					} catch (_) {

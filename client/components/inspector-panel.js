@@ -19,6 +19,7 @@ import { renderLiveAudioInputInspector } from './inspector-live-audio-input.js'
 import { renderWebpageHostInspector } from './inspector-webpage-host.js'
 import { renderNdiHostInspector } from './inspector-ndi-host.js'
 import { renderV4l2InputInspector } from './inspector-v4l2-input.js'
+import { renderScreenTimerInspector } from './inspector-screen-timer.js'
 import { renderPreservingFocus } from './device-view-ui-utils.js'
 import { attachInspectorLiveSourceSelectionEvents } from './inspector-panel-live-source-events.js'
 
@@ -115,6 +116,8 @@ export function initInspectorPanel(root, stateStore) {
 				return `multiview:${data.cellId}`
 			case 'globalBorder':
 				return `globalBorder:${data.screenIndex}`
+			case 'screenTimer':
+				return `screenTimer:${data.screenIndex}`
 			case 'liveAudioInput':
 				return `liveAudioInput:${data.slot}`
 			case 'webpageHost':
@@ -154,6 +157,11 @@ export function initInspectorPanel(root, stateStore) {
 		}
 		if (data.type === 'multiview' && data.cellId) {
 			renderMultiviewInspector(multiviewDeps, data.cellId)
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
+		if (data.type === 'screenTimer' && data.screenIndex != null) {
+			renderScreenTimerInspector(root, { screenIdx: data.screenIndex, screenLabel: data.screenLabel })
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
@@ -327,6 +335,15 @@ export function initInspectorPanel(root, stateStore) {
 		const d = e.detail
 		if (d && d.screenIndex != null) {
 			update({ type: 'globalBorder', screenIndex: d.screenIndex })
+		}
+	})
+
+	// Per-screen countdown timers (⏱ icon in the looks deck screen bar) — inspector view, not a
+	// modal (2026-07-17 UX direction).
+	window.addEventListener('screen-timer-select', (e) => {
+		const d = e.detail
+		if (d && d.screenIndex != null) {
+			update({ type: 'screenTimer', screenIndex: d.screenIndex, screenLabel: d.screenLabel })
 		}
 	})
 

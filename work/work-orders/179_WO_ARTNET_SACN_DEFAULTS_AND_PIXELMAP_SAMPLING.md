@@ -1,6 +1,6 @@
 # WO-179 — Lighting I/O: Art-Net listener off by default, sACN input option, region-averaged sampling, mirror H/V
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner). GDTF import/export split to WO-180.

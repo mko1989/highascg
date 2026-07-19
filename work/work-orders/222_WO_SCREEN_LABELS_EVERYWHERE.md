@@ -1,6 +1,6 @@
 # WO-222 — Canonical screen labels: rename once, propagates everywhere (looks selector, multiview, panels)
 
-**Status:** Planned | **Date:** 2026-07-15
+**Status:** Implemented (owner/hardware acceptance pending) | **Date:** 2026-07-15
 **Source:** owner: "changing the label of a screen should change its labelling across the board. also the screen selector in looks and multiview label."
 
 ## 1. Findings

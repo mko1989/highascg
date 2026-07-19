@@ -90,7 +90,16 @@ async function handlePostRtmp(body, ctx) {
 		// explicit pan= downmix instead of a blind stereo remix.
 		const videoSource = String((ctx.config?.streamingChannel && ctx.config.streamingChannel.videoSource) || 'program_1')
 		const programLayout = resolveSourceProgramAudioLayout(ctx.config || {}, videoSource)
-		const audioSourcePair = String((ctx.config?.streamingChannel && ctx.config.streamingChannel.audioSourcePair) || 'all').trim()
+		// WO-249 pair selection is per stream output (Devices-tab inspector / streamOutputs entry),
+		// inheriting the streamingChannel value only as legacy fallback for configs that predate it.
+		const VALID_PAIRS = new Set(['all', '1+2', '3+4', '5+6', '7+8'])
+		const rawPair = String(
+			b.audioSourcePair
+			|| outCfg?.audioSourcePair
+			|| (ctx.config?.streamingChannel && ctx.config.streamingChannel.audioSourcePair)
+			|| 'all',
+		).trim()
+		const audioSourcePair = VALID_PAIRS.has(rawPair) ? rawPair : 'all'
 		const built = buildStreamingRtmpAddParams(serverUrl, streamKey, quality, {
 			videoCodec: b.videoCodec || outCfg?.videoCodec,
 			videoBitrateKbps: b.videoBitrateKbps ?? outCfg?.videoBitrateKbps,

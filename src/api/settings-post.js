@@ -184,9 +184,18 @@ async function handlePost(path, body, ctx) {
 	}
 	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
 	if (settings.operatorTools) {
+		// WO-268: preserve already-saved keys and only apply the keys present in the patch —
+		// this used to rebuild from defaults + pointerConfineMultiview only, silently wiping
+		// every other operatorTools customization on ANY settings save.
 		cfg.operatorTools = {
 			...defaults.operatorTools,
-			pointerConfineMultiview: settings.operatorTools.pointerConfineMultiview === true,
+			...(cfg.operatorTools || {}),
+		}
+		if (settings.operatorTools.pointerConfineMultiview !== undefined) {
+			cfg.operatorTools.pointerConfineMultiview = settings.operatorTools.pointerConfineMultiview === true
+		}
+		if (settings.operatorTools.cefEnableGpu !== undefined) {
+			cfg.operatorTools.cefEnableGpu = settings.operatorTools.cefEnableGpu === true
 		}
 	}
 	if (settings.projectScopedMedia) {
@@ -214,7 +223,7 @@ async function handlePost(path, body, ctx) {
 		const streamKey = String(current.streamKey ?? '').trim()
 		cfg.streamingChannel = {
 			enabled: s.enabled === true || s.enabled === 'true',
-			videoMode: String(s.videoMode || '1080p5000').trim(),
+			videoMode: String(s.videoMode || '').trim(),
 			videoSource: String(s.videoSource || 'program_1').trim(),
 			audioSource: String(s.audioSource || 'follow_video').trim(),
 			audioSourcePair: String(s.audioSourcePair || 'all').trim() || 'all',

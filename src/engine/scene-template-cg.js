@@ -19,6 +19,16 @@ const { resolveTemplateCgHostLayer, channelMapFromCtx } = require('./cg-routing'
 const _trackedTemplateHostsByChannel = new Map()
 
 /**
+ * Hosts quarantined at Caspar disconnect. They no longer vouch for continuity
+ * (getTrackedTemplateHosts reads only the tracked map) but are kept so the reconnect INFO
+ * gather can restore the ones whose host layer still runs a producer — a TCP-only blip
+ * leaves casparcg-server (and its loaded templates) running, and the old blanket clear
+ * made the next take of the same look CLEAR+ADD+PLAY, visibly restarting the on-air intro.
+ * @type {Map<number, Set<number>>}
+ */
+const _quarantinedTemplateHostsByChannel = new Map()
+
+/**
  * @param {object} layer
  * @param {string} clipId
  * @param {object} [ctx]
@@ -223,6 +233,8 @@ function recordTemplateHostAdded(channel, hostLayer) {
 		_trackedTemplateHostsByChannel.set(n, new Set())
 	}
 	_trackedTemplateHostsByChannel.get(n).add(h)
+	// A fresh ADD supersedes any pending quarantine verdict for this host.
+	_quarantinedTemplateHostsByChannel.get(n)?.delete(h)
 }
 
 /**
@@ -237,6 +249,77 @@ function getTrackedTemplateHosts(channel) {
 }
 
 /**
+ * WO-268: forget every tracked (and quarantined) host — records must not vouch for continuity
+ * (a WO-196 UPDATE-only take against an empty layer 403s).
+ */
+function clearAllTrackedTemplateHosts() {
+	_trackedTemplateHostsByChannel.clear()
+	_quarantinedTemplateHostsByChannel.clear()
+}
+
+/**
+ * WO-268: move every tracked host into quarantine. Called on Caspar disconnect — until the
+ * reconnect INFO gather proves a host layer still runs a producer, its record must not vouch
+ * for continuity (Caspar may have restarted with empty layers; takes in the window do the
+ * safe full CLEAR+ADD+PLAY).
+ */
+function quarantineAllTrackedTemplateHosts() {
+	for (const [ch, hosts] of _trackedTemplateHostsByChannel.entries()) {
+		if (!_quarantinedTemplateHostsByChannel.has(ch)) {
+			_quarantinedTemplateHostsByChannel.set(ch, new Set())
+		}
+		const q = _quarantinedTemplateHostsByChannel.get(ch)
+		for (const h of hosts) q.add(h)
+	}
+	_trackedTemplateHostsByChannel.clear()
+}
+
+/**
+ * WO-268: resolve quarantined hosts against the per-channel INFO XML gathered on (re)connect
+ * (query-cycle.js `gatheredInfo.channelXml`). A host whose layer still has a non-empty
+ * foreground producer is restored to tracked (Caspar kept running through a TCP-only blip);
+ * everything else is dropped — a genuinely restarted Caspar has empty layers and a wrong keep
+ * (UPDATE against an empty layer = nothing on air) is worse than a wrong clear. With no XML
+ * yet — the INFO CONFIG path can run setupAllRouting before the connect gather finishes —
+ * the quarantine is left in place: unresolved hosts already do not vouch, and the
+ * finishConnectionGather pass resolves them once the XML exists.
+ * @param {{ gatheredInfo?: { channelXml?: Record<string, string> }, log?: Function }} [ctx]
+ */
+async function reconcileQuarantinedTemplateHosts(ctx) {
+	if (_quarantinedTemplateHostsByChannel.size === 0) return
+	const channelXml = ctx?.gatheredInfo?.channelXml || {}
+	const hasXml = Object.keys(channelXml).some((k) => String(channelXml[k] || '').trim())
+	if (!hasXml) return
+	const { parseLayerFgProducerTypesFromChannelXml } = require('../state/live-scene-reconcile')
+	let restored = 0
+	let dropped = 0
+	for (const [ch, hosts] of [..._quarantinedTemplateHostsByChannel.entries()]) {
+		_quarantinedTemplateHostsByChannel.delete(ch)
+		let types = null
+		const xml = channelXml[String(ch)]
+		if (xml && String(xml).trim()) {
+			try {
+				types = await parseLayerFgProducerTypesFromChannelXml(xml)
+			} catch {
+				types = null
+			}
+		}
+		for (const h of hosts) {
+			const t = types ? String(types[String(h)] || '') : ''
+			if (t && t !== 'empty') {
+				recordTemplateHostAdded(ch, h)
+				restored++
+			} else {
+				dropped++
+			}
+		}
+	}
+	if (typeof ctx?.log === 'function' && (restored || dropped)) {
+		ctx.log('info', `[template-cg] reconnect tracked-host reconcile: restored ${restored}, dropped ${dropped}`)
+	}
+}
+
+/**
  * WO-207 T207.2: Clear tracked hosts for a channel (call after teardown clears them from Caspar).
  * @param {number} channel
  * @param {Set<number>} [hostsToUntrack] — if provided, only untrack these hosts; else clear all
@@ -246,15 +329,20 @@ function untrackTemplateHosts(channel, hostsToUntrack) {
 	if (!Number.isFinite(n) || n < 1) return
 	if (!hostsToUntrack || hostsToUntrack.size === 0) {
 		_trackedTemplateHostsByChannel.delete(n)
+		_quarantinedTemplateHostsByChannel.delete(n)
 		return
 	}
 	const tracked = _trackedTemplateHostsByChannel.get(n)
-	if (!tracked) return
+	const quarantined = _quarantinedTemplateHostsByChannel.get(n)
 	for (const h of hostsToUntrack) {
-		tracked.delete(h)
+		tracked?.delete(h)
+		quarantined?.delete(h)
 	}
-	if (tracked.size === 0) {
+	if (tracked && tracked.size === 0) {
 		_trackedTemplateHostsByChannel.delete(n)
+	}
+	if (quarantined && quarantined.size === 0) {
+		_quarantinedTemplateHostsByChannel.delete(n)
 	}
 }
 
@@ -285,5 +373,8 @@ module.exports = {
 	recordTemplateHostAdded,
 	getTrackedTemplateHosts,
 	untrackTemplateHosts,
+	clearAllTrackedTemplateHosts,
+	quarantineAllTrackedTemplateHosts,
+	reconcileQuarantinedTemplateHosts,
 	getAllTrackedTemplateHosts,
 }

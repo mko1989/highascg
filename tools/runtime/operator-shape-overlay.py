@@ -498,6 +498,13 @@ def main() -> int:
     # per the first payload with nothing in the log. Reproduced on Xvfb :78.
     stdin_fd = sys.stdin.fileno()
     stdin_buf = b""
+    # WO-269: compress repeated identical stdin lines in the log. WO-262's log-before-parse
+    # guarantee is kept for every NEW payload; unchanged repeats are counted and summarized (on
+    # change, and at most once per REPEAT_SUMMARY_SEC while the repeats continue).
+    REPEAT_SUMMARY_SEC = 60.0
+    last_stdin_line = None
+    stdin_repeat_count = 0
+    last_repeat_summary_ts = 0.0
 
     try:
         while True:
@@ -542,9 +549,22 @@ def main() -> int:
                 line = raw.decode("utf-8", "replace").strip()
                 if not line:
                     continue
-                # WO-262 T262.3 heartbeat: log EVERY stdin line the moment it is read, before any
-                # window match/shape, so a repeat of this class is diagnosable straight from the log.
-                log(f"stdin line received: {line[:200]}")
+                # WO-262 T262.3 heartbeat: log every stdin line the moment it is read, before any
+                # window match/shape, so a repeat of this class is diagnosable straight from the
+                # log. WO-269: identical repeats are counted, not re-logged (see summary below).
+                if line == last_stdin_line:
+                    stdin_repeat_count += 1
+                    if (now - last_repeat_summary_ts) >= REPEAT_SUMMARY_SEC:
+                        log(f"stdin line repeated x{stdin_repeat_count} (unchanged, suppressed)")
+                        stdin_repeat_count = 0
+                        last_repeat_summary_ts = now
+                else:
+                    if stdin_repeat_count:
+                        log(f"stdin line repeated x{stdin_repeat_count} (unchanged, suppressed)")
+                        stdin_repeat_count = 0
+                    last_repeat_summary_ts = now
+                    last_stdin_line = line
+                    log(f"stdin line received: {line[:200]}")
                 try:
                     monitor, rects, channel, title_marker = parse_line(line)
                 except Exception as e:

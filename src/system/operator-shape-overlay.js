@@ -42,6 +42,14 @@ let lastMonitor = null
 let lastRects = null
 let lastChannel = null
 let lastLog = null
+/** WO-269: last stdin line actually written — identical re-applies are skipped while the helper
+ * lives, so draw-loop re-reports can't flood the helper log. */
+let _lastWrittenPayload = null
+
+/** @returns {boolean} helper process currently alive */
+function isRunning() {
+	return !!(proc && proc.stdin && !proc.stdin.destroyed)
+}
 
 function isTestContext() {
 	return !!process.env.NODE_TEST_CONTEXT
@@ -82,7 +90,7 @@ function ensureSpawned(log) {
  * (WO-262: the helper now matches the FIREFOX kiosk by WM_CLASS, not the Caspar consumer by title).
  * @param {{x: number, y: number, w: number, h: number}} monitorRect - ROOT/absolute pixels
  * @param {Array<[number, number, number, number]>} rectsPx - monitor-relative pixel rects; empty -> restore Firefox unshaped (fill holes)
- * @param {{ log?: Function, channel?: number|null }} [opts]
+ * @param {{ log?: Function, channel?: number|null, force?: boolean }} [opts] - force bypasses the WO-269 identical-payload skip
  */
 function updateShapeRects(monitorRect, rectsPx, opts = {}) {
 	const log = typeof opts.log === 'function' ? opts.log : lastLog
@@ -91,18 +99,24 @@ function updateShapeRects(monitorRect, rectsPx, opts = {}) {
 	lastMonitor = monitorRect
 	lastRects = Array.isArray(rectsPx) ? rectsPx : []
 	if (Number.isFinite(Number(opts.channel))) lastChannel = Number(opts.channel)
+	const alreadyRunning = isRunning()
 	const p = ensureSpawned(log)
 	if (!p || !p.stdin || p.stdin.destroyed) return
+	const payload = JSON.stringify({
+		monitor: { x: monitorRect.x, y: monitorRect.y, w: monitorRect.w, h: monitorRect.h },
+		rects: lastRects,
+		channel: lastChannel,
+		titleMarker: OPERATOR_TITLE_MARKER,
+	})
+	// WO-269: preview draw loops re-apply identical layouts continuously — skip the write (and
+	// the helper's per-line log) when nothing changed AND the helper was already alive (a fresh
+	// spawn must always receive the current payload). `opts.force` (reapply path) bypasses.
+	if (!opts.force && alreadyRunning && payload === _lastWrittenPayload) return
 	try {
-		p.stdin.write(
-			JSON.stringify({
-				monitor: { x: monitorRect.x, y: monitorRect.y, w: monitorRect.w, h: monitorRect.h },
-				rects: lastRects,
-				channel: lastChannel,
-				titleMarker: OPERATOR_TITLE_MARKER,
-			}) + '\n',
-		)
+		p.stdin.write(payload + '\n')
+		_lastWrittenPayload = payload
 	} catch (e) {
+		_lastWrittenPayload = null
 		swallow(e, { tag: 'operator-shape-overlay' })
 	}
 }
@@ -117,7 +131,9 @@ function updateShapeRects(monitorRect, rectsPx, opts = {}) {
  */
 function reapplyOperatorShapeOverlay(opts = {}) {
 	if (lastMonitor == null) return
-	updateShapeRects(lastMonitor, lastRects || [], opts)
+	// force: a reconnect means a new consumer window — the helper must re-shape even if the
+	// payload is byte-identical to the last one (WO-269 dedupe would otherwise skip it).
+	updateShapeRects(lastMonitor, lastRects || [], { ...opts, force: true })
 }
 
 /** Stop the helper (SIGTERM — the python side cleans up its own shape state on stdin EOF/SIGTERM,
@@ -133,6 +149,7 @@ function stopOperatorShapeOverlay() {
 	}
 	lastMonitor = null
 	lastRects = null
+	_lastWrittenPayload = null
 }
 
 module.exports = {

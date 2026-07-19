@@ -1,6 +1,6 @@
 # WO-246 — Auto-select operator monitor: single connected display wins, multiple wait for the flag
 
-**Status:** OPEN
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** MEDIUM (UX + self-healing; the 2026-07-15 config clobber flipped `screen_3_operator_monitor` off and silently broke operator-display features)
 **Owner check:** A246.1
 

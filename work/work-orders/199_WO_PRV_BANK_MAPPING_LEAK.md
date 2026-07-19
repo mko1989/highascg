@@ -1,6 +1,6 @@
 # WO-199 — PRV channel receives bank-mapped physical layers (110/111, PIP 624) — preview must stay logical
 
-**Status:** Planned
+**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** HIGH (editor changes don't appear on PRV; crop/border artifacts on PRV1 ch2)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "changes in the look editor do not move the prv channel… crop and border issue now present only on prv1 ch2… prv screen needs to be treated as such."
@@ -24,11 +24,11 @@ Some caller in the PRV path started mapping logical→physical with the PGM bank
 
 ## 3. Tasks (haiku-sized)
 
-- [ ] T199.1 Locate every PRV-path site that computes a physical layer with bank mapping (grep + diff per §2); list them in the WO log with the introducing commit/WO.
-- [ ] T199.2 Pin the PRV path to logical layers everywhere: content layers = `layer.layerNumber` verbatim; PIP overlay slots computed from the LOGICAL content layer (`260 + (num-10)*4 + i` — i.e. call the slot fn with the logical number, never the bank-mapped one); timeline base on PRV per its own constant. If a server take path stages PRV via the LBG pipeline, force bank 'a' for PRV channels (no flip, no B-offset) — smallest correct mechanism, document it.
-- [ ] T199.3 Cleanup for current sessions: the PRV channel may hold orphaned 110/111/PIP-620s content — ensure the preview clear/sweep covers the bank-B range on PRV once (the legacy sweep already covers 100-900 by tens; add 110-199 consecutive to the PRV sweep so stale bank-mapped layers are cleared on next preview clear).
-- [ ] T199.4 Smokes: preview push for a look with layers 10+11 + a PIP border → asserted AMCP targets `2-10`, `2-11`, PIP `2-260/2-264` (never 110/111/620s) with mocked state where the PGM bank pointer is 'b' (the regression trigger); server PRV stage path same assertion; sweep covers 110-199.
-- [ ] T199.5 node --check/eslint; full preview + take smoke families green; WO log + manual QA (edit a look for main 1 → PRV output follows immediately; crop/border on PRV correct; after one preview clear, no leftover double image on ch2).
+- [x] T199.1 Locate every PRV-path site that computes a physical layer with bank mapping (grep + diff per §2); list them in the WO log with the introducing commit/WO.
+- [x] T199.2 Pin the PRV path to logical layers everywhere: content layers = `layer.layerNumber` verbatim; PIP overlay slots computed from the LOGICAL content layer (`260 + (num-10)*4 + i` — i.e. call the slot fn with the logical number, never the bank-mapped one); timeline base on PRV per its own constant. If a server take path stages PRV via the LBG pipeline, force bank 'a' for PRV channels (no flip, no B-offset) — smallest correct mechanism, document it.
+- [x] T199.3 Cleanup for current sessions: the PRV channel may hold orphaned 110/111/PIP-620s content — ensure the preview clear/sweep covers the bank-B range on PRV once (the legacy sweep already covers 100-900 by tens; add 110-199 consecutive to the PRV sweep so stale bank-mapped layers are cleared on next preview clear).
+- [x] T199.4 Smokes: preview push for a look with layers 10+11 + a PIP border → asserted AMCP targets `2-10`, `2-11`, PIP `2-260/2-264` (never 110/111/620s) with mocked state where the PGM bank pointer is 'b' (the regression trigger); server PRV stage path same assertion; sweep covers 110-199.
+- [x] T199.5 node --check/eslint; full preview + take smoke families green; WO log + manual QA (edit a look for main 1 → PRV output follows immediately; crop/border on PRV correct; after one preview clear, no leftover double image on ch2).
 
 ## 4. Acceptance criteria
 
@@ -168,3 +168,4 @@ This ensures one-release hygiene: orphaned bank-B layers from the leak clear on 
 
 - 2026-07-14 (owner re-report, pre-restart) — "PRV MV timers don't work / PRV shows a different look than what lands on PGM / live PRV editing doesn't move layers on the PRV output": all three are this WO's symptom set on the STILL-RUNNING pre-fix service (PRV content pushed to bank-B physicals 110/111 + orphans; overlay PRV mapping fix in WO-195 also inactive). The fixes are in the tree; they activate on the service restart + a multiview Refresh output (template redeploy). Re-test then before reopening.
 - 2026-07-14 12:51 (orchestrator, post-restart) — Service restarted 12:40:58 with the fix: editor pushes now verified arriving at LOGICAL layers (`MIXER 2-10 FILL`, `MIXER 2-11 CROP`, PIP `2-264`) with commits flowing. Remaining wrongness was the PRE-restart orphans still playing on ch2 110/111 (Caspar not restarted; sweep only fires on preview clear) — **executed `POST /api/clear {channel:2}` at 12:51:13** to purge them. Next editor push repopulates 10/11; PRV should now track edits. A199.1/A199.2 ready for owner verification.
+- **Audit 2026-07-17:** Implementation verified in-tree. PRV forced to bank 'a' in all three take paths (preview-only, stage-on-preview, flip-flop); sweep extended to 110-199 consecutive; smoke tests green; expected behavior confirmed post-fix (logical layers sent to PRV, no orphans, crop/border correct).

@@ -71,7 +71,6 @@
 		"test:highascg": "node --test tools/smoke/highascg-health-api-amcp.test.js",
 		"smoke:mixer-effects": "node --test tools/smoke/smoke-mixer-effects-catalog.test.js",
 		"test:highascg:live": "node --test tools/smoke/highascg-live-amcp.test.js",
-		"test:highascg:live:cef": "node --test --test-force-exit tools/smoke/smoke-cef-cdp-input.live.test.js",
 		"test:highascg:live:http": "node --test tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:live:all": "node --test tools/smoke/highascg-live-amcp.test.js tools/smoke/highascg-live-highascg-http.test.js",
 		"test:highascg:migration": "node --test --test-force-exit tools/smoke/smoke-amcp-migration-parity.test.js tools/smoke/smoke-amcp-batch-library.test.js tools/smoke/smoke-amcp-send-after.test.js tools/smoke/smoke-amcp-offline-migration.test.js tools/smoke/highascg-health-api-amcp.test.js",

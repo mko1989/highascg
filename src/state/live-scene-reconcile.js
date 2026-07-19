@@ -98,6 +98,36 @@ async function parseLayerFgClipsFromChannelXml(xmlStr) {
 	return out
 }
 
+/**
+ * Layer index string -> foreground producer *type* ('' when the layer has no foreground
+ * producer). Caspar 2.6-dev emits the type as element text ("ffmpeg"/"html"/"empty" —
+ * core/producer/layer.cpp:133); old lineage put the clip in a `name` attribute, so any
+ * producer node with attributes still counts as loaded ('unknown').
+ * @returns {Record<string, string>}
+ */
+async function parseLayerFgProducerTypesFromChannelXml(xmlStr) {
+	const out = {}
+	if (!xmlStr || typeof xmlStr !== 'string') return out
+	const result = await parseXml(xmlStr)
+	const stage = result.channel && result.channel.stage && result.channel.stage[0]
+	const layers = stage && stage.layer && stage.layer[0]
+	if (!layers || typeof layers !== 'object') return out
+	for (const key of Object.keys(layers)) {
+		if (!key.startsWith('layer_') || !Array.isArray(layers[key]) || !layers[key][0]) continue
+		const layerIdx = key.replace('layer_', '')
+		const fg = layers[key][0].foreground && layers[key][0].foreground[0]
+		const p = fg && fg.producer && fg.producer[0]
+		let type = ''
+		if (typeof p === 'string') type = p.trim().toLowerCase()
+		else if (p && typeof p === 'object') {
+			if (typeof p._ === 'string' && p._.trim()) type = p._.trim().toLowerCase()
+			else if (p.$ && p.$.name) type = 'unknown'
+		}
+		out[layerIdx] = type
+	}
+	return out
+}
+
 function shouldSkipSceneReconcile(scene) {
 	if (isTimelineOnlyScene(scene)) return true
 	for (const l of scene?.layers || []) {
@@ -199,6 +229,7 @@ module.exports = {
 	pathsMatch,
 	normPath,
 	parseLayerFgClipsFromChannelXml,
+	parseLayerFgProducerTypesFromChannelXml,
 	reconcileLiveSceneFromGatheredXml,
 	reconcileAfterInfoGather,
 }

@@ -27,6 +27,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { escapeAttr } from '../lib/dom-escape.js'
 import { screenLabel } from '../lib/screen-label.js'
 import { DEFAULT_TIMER_CONFIG, computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
+import { createTimerForScreen } from '../lib/screen-timer-create.js'
 import { buildTimerSettings } from './timer-control-panel-settings-form.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
@@ -389,11 +390,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 			durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0)
 		}
 
-		// Generate timer ID
-		const timerId = typeof crypto !== 'undefined' && crypto.randomUUID
-			? crypto.randomUUID()
-			: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-
 		const config = {
 			...DEFAULT_TIMER_CONFIG,
 			durationSec,
@@ -405,12 +401,9 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 		const screenIdx = 0 // Assign to first screen by default
 
 		try {
-			await api.post('/api/timers/assign', {
-				timerId,
-				name,
-				config,
-				screenIdx,
-			})
+			// notify:false — this panel refreshes via its own list reload below, not the
+			// 'screen-timers-changed' event (matches the pre-helper behavior).
+			await createTimerForScreen({ name, config, screenIdx, notify: false })
 			// Refresh to show new timer
 			setTimeout(() => refreshTimerList(), 100)
 		} catch (err) {

@@ -73,6 +73,15 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		value: String(saved.audioBitrateKbps ?? caspar.audioBitrateKbps ?? 128),
 	})
 	attachMathInput(aBitrateIn, { decimals: 0 })
+	// WO-249 source-pair pick, per stream output (was in the deleted settings-modal streaming
+	// section). 'all' = follow the cabled source bus unchanged; a pair selects it via ffmpeg pan=.
+	const pairSel = Object.assign(document.createElement('select'), {
+		className: 'device-view__destinations-type',
+		title: 'Source audio pair (8ch program bus)',
+	})
+	pairSel.innerHTML = '<option value="all">audio pair: all</option><option value="1+2">audio pair: 1+2</option><option value="3+4">audio pair: 3+4</option><option value="5+6">audio pair: 5+6</option><option value="7+8">audio pair: 7+8</option>'
+	pairSel.value = String(saved.audioSourcePair || caspar.audioSourcePair || 'all')
+	if (!pairSel.value) pairSel.value = 'all'
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save stream settings' })
 	const startBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Start stream' })
 	const stopBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Stop stream' })
@@ -132,6 +141,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			encoderPreset: String(presetSel.value || 'veryfast').toLowerCase(),
 			audioCodec: String(aCodecSel.value || 'aac').toLowerCase(),
 			audioBitrateKbps: Math.max(32, parseInt(String(aBitrateIn.value || '128'), 10) || 128),
+			audioSourcePair: String(pairSel.value || 'all'),
 		}
 		await Actions.saveSettingsPatch({ streamOutputs: next })
 		if (t === 'rtmp') {
@@ -164,6 +174,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			const encoderPreset = String(presetSel.value || saved?.encoderPreset || conn?.caspar?.encoderPreset || 'veryfast').toLowerCase()
 			const audioCodec = String(aCodecSel.value || saved?.audioCodec || conn?.caspar?.audioCodec || 'aac').toLowerCase()
 			const audioBitrateKbps = Math.max(32, parseInt(String(aBitrateIn.value || saved?.audioBitrateKbps || conn?.caspar?.audioBitrateKbps || '128'), 10) || 128)
+			const audioSourcePair = String(pairSel.value || saved?.audioSourcePair || conn?.caspar?.audioSourcePair || 'all')
 			if (!rtmpServerUrl) {
 				setStatus(statusEl, 'RTMP server URL is empty. Fill it in stream inspector first.', false)
 				return
@@ -185,6 +196,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 				encoderPreset,
 				audioCodec,
 				audioBitrateKbps,
+				audioSourcePair,
 			})
 			applyStreamingChannelActionResponse(res, { action: 'start_stream', outputId: String(conn.id) })
 			setStatus(statusEl, 'Streaming started', true)
@@ -222,7 +234,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			setStatus(statusEl, e?.message || String(e), false)
 		}
 	}
-	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, saveBtn, startBtn, stopBtn, removeBtn)
+	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
 	h.append(ndiAttribution)
 	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Stream log' }))

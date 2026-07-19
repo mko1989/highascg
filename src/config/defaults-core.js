@@ -200,9 +200,12 @@ function coreDefaults() {
 				},
 			],
 		},
+		// videoSource/quality/audioSourcePair sync from Devices-tab cabling (device-graph-output-mapping);
+		// videoMode '' inherits the cabled screen's mode. casparChannel/dedicatedOutputChannel/
+		// contentLayer/decklinkDevice are config-file escape hatches with cable-derived fallbacks.
 		streamingChannel: {
 			enabled: false,
-			videoMode: '1080p5000',
+			videoMode: '',
 			videoSource: 'program_1',
 			audioSource: 'follow_video',
 			audioSourcePair: 'all',

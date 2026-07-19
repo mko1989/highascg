@@ -1,5 +1,9 @@
 'use strict'
 
+// WO-265: same UI runs standalone on :4300 (API at /api) and mounted on the playout
+// server under /cg-studio/ (API namespaced at /api/cg-studio).
+const API_BASE = location.pathname.startsWith('/cg-studio/') ? '/api/cg-studio' : '/api'
+
 let templates = []
 let current = null
 let payload = { data: {}, style: {} }
@@ -19,11 +23,17 @@ const FIELD_GROUPS = [
 	{ key: 'animation', legend: 'Animation & timing' },
 ]
 
+/** Current stage fit ({scale, ox, oy}) — shared with the drag overlay (WO-267). */
+let previewView = { scale: 1, ox: 0, oy: 0 }
+
 function scalePreview() {
 	const wrap = preview.parentElement
 	if (!wrap) return
-	const scale = Math.min(wrap.clientWidth / 1920, wrap.clientHeight / 1080)
-	preview.style.transform = `scale(${scale})`
+	// WO-267: fit AND center — top-left-anchored scaling misplaces the stage whenever the wrap
+	// isn't exactly 16:9 (workspace-tab panes, collapsed side panels).
+	previewView = StudioPlacement.fitStage({ width: wrap.clientWidth, height: wrap.clientHeight })
+	preview.style.transform = `translate(${previewView.ox}px, ${previewView.oy}px) scale(${previewView.scale})`
+	invalidatePlacementCache()
 }
 
 function buildUpdateJson() {
@@ -47,6 +57,7 @@ function applyToPreview() {
 	} catch (e) {
 		console.warn('preview update failed', e)
 	}
+	invalidatePlacementCache()
 }
 
 function showPreviewInState() {
@@ -68,6 +79,7 @@ function invokePreview(fn) {
 	} catch (e) {
 		console.warn('preview ' + fn + ' failed', e)
 	}
+	invalidatePlacementCache()
 }
 
 function setPayloadValue(section, key, value) {
@@ -109,6 +121,8 @@ function createFieldControl(field, section) {
 		const valSpan = document.createElement('span')
 		valSpan.className = 'range-value'
 		valSpan.textContent = input.value
+		input.dataset.fieldSection = section
+		input.dataset.fieldKey = field.key
 		input.addEventListener('input', () => {
 			valSpan.textContent = input.value
 			setPayloadValue(section, field.key, parseFloat(input.value))
@@ -136,6 +150,8 @@ function createFieldControl(field, section) {
 		input.value = currentVal ?? ''
 	}
 
+	input.dataset.fieldSection = section
+	input.dataset.fieldKey = field.key
 	input.addEventListener('input', () => {
 		let val = input.value
 		if (field.type === 'number') val = val === '' ? '' : parseFloat(val)
@@ -177,7 +193,7 @@ async function selectTemplate(tpl) {
 		b.classList.toggle('active', b.dataset.id === tpl.id && b.dataset.category === tpl.category)
 	})
 
-	const res = await fetch('/api/templates/' + encodeURIComponent(tpl.id) + '?category=' + encodeURIComponent(tpl.category))
+	const res = await fetch(API_BASE + '/templates/' + encodeURIComponent(tpl.id) + '?category=' + encodeURIComponent(tpl.category))
 	const detail = await res.json()
 	payload = {
 		data: { ...detail.defaults.data },
@@ -186,6 +202,7 @@ async function selectTemplate(tpl) {
 	renderInspector(detail)
 
 	preview.onload = () => {
+		invalidatePlacementCache()
 		setTimeout(showPreviewInState, 50)
 	}
 	preview.src = tpl.previewUrl
@@ -222,14 +239,21 @@ function escapeHtml(s) {
 }
 
 async function loadTemplates() {
-	const res = await fetch('/api/templates')
+	const res = await fetch(API_BASE + '/templates')
 	const data = await res.json()
 	templates = data.templates || []
 	renderGallery()
 	if (templates.length) await selectTemplate(templates[0])
 }
 
-document.getElementById('btn-play').addEventListener('click', () => invokePreview('play'))
+// WO-267: after the on-load "Preview hold" the engine sits at state 2 where play() no-ops by
+// design (CG semantics) — studioReplay re-runs the intro; plain play stays the fallback.
+document.getElementById('btn-play').addEventListener('click', () => {
+	const win = preview.contentWindow
+	if (win && typeof win.studioReplay === 'function') win.studioReplay()
+	else invokePreview('play')
+	invalidatePlacementCache()
+})
 document.getElementById('btn-stop').addEventListener('click', () => invokePreview('stop'))
 document.getElementById('btn-reset').addEventListener('click', () => showPreviewInState())
 
@@ -250,7 +274,7 @@ document.getElementById('export-form').addEventListener('submit', async (e) => {
 	statusEl.textContent = 'Exporting…'
 	statusEl.className = 'status'
 	try {
-		const res = await fetch('/api/export', {
+		const res = await fetch(API_BASE + '/export', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -273,5 +297,154 @@ document.getElementById('export-form').addEventListener('submit', async (e) => {
 	}
 })
 
+/* ── WO-267: canvas drag-to-position + wheel-to-resize ─────────────────────── */
+
+/** Write a value into the matching inspector input (tagged data-field-*) without re-rendering. */
+function setInspectorValue(section, key, value) {
+	const input = inspectorForm.querySelector(`[data-field-section="${section}"][data-field-key="${key}"]`)
+	if (input) input.value = String(value)
+}
+
+/**
+ * Placement cache: studioGetPlacement is a cross-frame querySelector + getBoundingClientRect
+ * (forced layout inside the template iframe), far too heavy to run on every pointermove.
+ * Every mutation path in this file invalidates the cache; the short TTL covers async moves
+ * we can't observe (GSAP play/stop/replay animations finishing inside the template).
+ */
+const PLACEMENT_CACHE_TTL_MS = 200
+let placementCache = null // { win, at, placement }
+
+function invalidatePlacementCache() {
+	placementCache = null
+}
+
+function getPlacementCached() {
+	const w = preview.contentWindow
+	if (!w || typeof w.studioGetPlacement !== 'function') return null
+	if (!placementCache || placementCache.win !== w || Date.now() - placementCache.at > PLACEMENT_CACHE_TTL_MS) {
+		placementCache = { win: w, at: Date.now(), placement: w.studioGetPlacement() }
+	}
+	return placementCache.placement
+}
+
+function initCanvasOverlay() {
+	const wrap = preview.parentElement
+	if (!wrap) return
+	const overlay = document.createElement('div')
+	overlay.id = 'canvas-overlay'
+	wrap.appendChild(overlay)
+
+	const hint = document.createElement('p')
+	hint.className = 'hint canvas-hint'
+	hint.textContent = 'Drag the graphic to reposition · scroll over it to resize text'
+	wrap.parentElement.appendChild(hint)
+
+	let drag = null // { grabX, grabY, width, height }
+	let rafPending = false
+
+	const win = () => preview.contentWindow
+	const stagePoint = (e) => {
+		const r = overlay.getBoundingClientRect()
+		return StudioPlacement.stageFromOverlay({ x: e.clientX - r.left, y: e.clientY - r.top }, previewView)
+	}
+	const insideRect = (pt, rect) =>
+		pt.x >= rect.left && pt.x <= rect.left + rect.width && pt.y >= rect.top && pt.y <= rect.top + rect.height
+
+	function commitPlacement(p) {
+		payload.style.position = p.position
+		payload.style.marginX = p.marginX
+		payload.style.marginY = p.marginY
+		setInspectorValue('style', 'position', p.position)
+		setInspectorValue('style', 'marginX', p.marginX)
+		setInspectorValue('style', 'marginY', p.marginY)
+	}
+
+	overlay.addEventListener('pointerdown', (e) => {
+		const w = win()
+		if (!w || typeof w.studioGetPlacement !== 'function') return
+		const placement = w.studioGetPlacement()
+		if (!placement || !placement.rect || !(placement.rect.width > 0)) return
+		const pt = stagePoint(e)
+		if (!insideRect(pt, placement.rect)) return
+		drag = {
+			grabX: pt.x - placement.rect.left,
+			grabY: pt.y - placement.rect.top,
+			width: placement.rect.width,
+			height: placement.rect.height,
+		}
+		overlay.setPointerCapture(e.pointerId)
+		e.preventDefault()
+	})
+
+	overlay.addEventListener('pointermove', (e) => {
+		const w = win()
+		if (!w) return
+		if (rafPending) return
+		rafPending = true
+		requestAnimationFrame(() => {
+			rafPending = false
+			if (!drag) {
+				// hover affordance only — cached placement, no cross-frame layout read per move
+				const placement = getPlacementCached()
+				overlay.style.cursor = placement && placement.rect && insideRect(stagePoint(e), placement.rect) ? 'move' : 'default'
+				return
+			}
+			const pt = stagePoint(e)
+			const p = StudioPlacement.placementFromDrag({
+				left: pt.x - drag.grabX,
+				top: pt.y - drag.grabY,
+				width: drag.width,
+				height: drag.height,
+			})
+			if (typeof w.studioSetPlacement === 'function') {
+				w.studioSetPlacement(p)
+				invalidatePlacementCache()
+			}
+		})
+	})
+
+	const endDrag = (e) => {
+		if (!drag) return
+		drag = null
+		const w = win()
+		if (w && typeof w.studioGetPlacement === 'function') {
+			const placement = w.studioGetPlacement()
+			if (placement) commitPlacement({ position: placement.position, marginX: placement.marginX, marginY: placement.marginY })
+		}
+		try { overlay.releasePointerCapture(e.pointerId) } catch { /* already released */ }
+	}
+	overlay.addEventListener('pointerup', endDrag)
+	overlay.addEventListener('pointercancel', endDrag)
+
+	overlay.addEventListener(
+		'wheel',
+		(e) => {
+			const w = win()
+			if (!w || typeof w.studioGetFontSizes !== 'function' || typeof w.studioGetPlacement !== 'function') return
+			const placement = w.studioGetPlacement()
+			if (!placement || !placement.rect || !insideRect(stagePoint(e), placement.rect)) return
+			e.preventDefault()
+			const factor = e.deltaY < 0 ? 1.05 : 1 / 1.05
+			const sizes = w.studioGetFontSizes()
+			if (sizes.titleFontSize) {
+				const v = Math.round(Math.min(120, Math.max(12, sizes.titleFontSize * factor)))
+				payload.style.titleFontSize = v
+				setInspectorValue('style', 'titleFontSize', v)
+			}
+			if (sizes.subtitleFontSize) {
+				const v = Math.round(Math.min(80, Math.max(10, sizes.subtitleFontSize * factor)))
+				payload.style.subtitleFontSize = v
+				setInspectorValue('style', 'subtitleFontSize', v)
+			}
+			applyToPreview()
+		},
+		{ passive: false },
+	)
+
+	// Workspace-pane resizes don't always fire this iframe's window resize — observe the wrap.
+	if (typeof ResizeObserver !== 'undefined') new ResizeObserver(scalePreview).observe(wrap)
+}
+
 window.addEventListener('resize', scalePreview)
+initCanvasOverlay()
 loadTemplates().then(scalePreview)

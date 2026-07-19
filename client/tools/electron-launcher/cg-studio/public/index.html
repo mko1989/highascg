@@ -4,14 +4,14 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>CG Studio</title>
-	<link rel="stylesheet" href="/studio.css">
+	<link rel="stylesheet" href="studio.css">
 </head>
 <body>
 	<header class="topbar">
 		<h1>CG Studio</h1>
 		<div class="toolbar">
-			<button type="button" id="btn-play" title="Animate in">Play</button>
-			<button type="button" id="btn-stop" title="Animate out">Stop</button>
+			<button type="button" id="btn-play" title="Run the intro animation">Play in</button>
+			<button type="button" id="btn-stop" title="Run the outro animation">Play out</button>
 			<button type="button" id="btn-reset" title="Show transitioned-in preview state">Preview hold</button>
 			<button type="button" id="btn-export" class="primary">Export template…</button>
 		</div>
@@ -56,6 +56,7 @@
 		</form>
 	</dialog>
 
-	<script src="/app.js"></script>
+	<script src="placement-math.js"></script>
+	<script src="app.js"></script>
 </body>
 </html>

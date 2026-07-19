@@ -10,6 +10,10 @@ import { renderInspectorMasterBuses } from './audio-mixer-panel-masters.js'
 import { renderInspectorLiveInputs } from './audio-mixer-panel-live-inputs.js'
 import { renderInspectorProgramInputLayers } from './audio-mixer-panel-input-layers.js'
 import { api } from '../lib/api-client.js'
+import { computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
+import { createTimerForScreen, dispatchTimersChanged } from '../lib/screen-timer-create.js'
+import { screenLabel } from '../lib/screen-label.js'
+import { uiIcon } from './ui-icons.js'
 
 export { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
 
@@ -45,14 +49,46 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 	// collapse state above).
 	const timersCompactEl = root.querySelector('#audio-mixer-timers-compact')
 
-	function dispatchTimersChanged() {
-		window.dispatchEvent(new CustomEvent('screen-timers-changed'))
+	/** Latest fetched records for the active screen — the display ticker below recomputes the
+	 *  remaining time from these between fetches (computeDisplayTime is lastCmd/cmdAt-based, so
+	 *  no per-second server traffic is needed). Each record carries its time element and the
+	 *  last applied text/classes so the 250ms tick only touches the DOM on actual changes. */
+	let compactRecords = []
+
+	function tickCompactDisplays() {
+		if (compactRecords.length === 0) return
+		for (const rec of compactRecords) {
+			const remaining = computeDisplayTime(rec.timer)
+			const text = formatDisplayTime(remaining)
+			const red = remaining <= rec.red
+			const amber = !red && remaining <= rec.amber
+			if (text === rec.lastText && red === rec.lastRed && amber === rec.lastAmber) continue
+			rec.lastText = text
+			rec.lastRed = red
+			rec.lastAmber = amber
+			rec.timeEl.textContent = text
+			rec.timeEl.classList.toggle('audio-mixer__timer-compact-time--red', red)
+			rec.timeEl.classList.toggle('audio-mixer__timer-compact-time--amber', amber)
+		}
 	}
+
+	async function addCompactTimer(screenIdx) {
+		const cm = stateStore?.getState?.()?.channelMap || {}
+		await createTimerForScreen({
+			name: `Timer ${screenLabel(cm, screenIdx)}`,
+			screenIdx,
+		})
+	}
+
+	// Non-null while the compact strip is showing the empty-state add button; keyed by screen
+	// so consecutive empty renders skip the innerHTML/closure rebuild.
+	let emptyRenderKey = null
 
 	async function renderCompactTimers() {
 		const screenIdx = sceneState.activeScreenIndex
 		if (!Number.isFinite(screenIdx)) {
 			timersCompactEl.hidden = true
+			compactRecords = []
 			return
 		}
 		let timers = []
@@ -67,13 +103,40 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			.filter((t) => t?.screens?.[String(screenIdx)])
 			.map((t) => ({ timer: t, entry: t.screens[String(screenIdx)] }))
 
-		timersCompactEl.innerHTML = ''
-		if (forScreen.length === 0) {
-			timersCompactEl.hidden = true
-			return
-		}
 		timersCompactEl.hidden = false
 
+		if (forScreen.length === 0) {
+			compactRecords = []
+			// No timer on the active screen — offer the per-screen add right here so the compact
+			// menu is a complete control surface (add → control → display → on/off). The 3s poll
+			// lands here repeatedly, so skip the rebuild when the button is already in the DOM
+			// (the click closure captures screenIdx — a screen switch must rebuild).
+			const key = `empty:${screenIdx}`
+			if (emptyRenderKey === key) return
+			emptyRenderKey = key
+			timersCompactEl.innerHTML = ''
+			const addBtn = document.createElement('button')
+			addBtn.type = 'button'
+			addBtn.className = 'audio-mixer__timer-compact-btn audio-mixer__timer-compact-add'
+			addBtn.innerHTML = `${uiIcon('timer')} ${uiIcon('plus')}`
+			addBtn.title = 'Add countdown timer to the active screen'
+			addBtn.addEventListener('click', async () => {
+				addBtn.disabled = true
+				try {
+					await addCompactTimer(screenIdx)
+				} catch (err) {
+					console.warn('[audio-mixer-panel] add timer failed:', err?.message || err)
+				} finally {
+					addBtn.disabled = false
+				}
+			})
+			timersCompactEl.appendChild(addBtn)
+			return
+		}
+
+		emptyRenderKey = null
+		timersCompactEl.innerHTML = ''
+		const records = []
 		for (const { timer, entry } of forScreen) {
 			const row = document.createElement('div')
 			row.className = 'audio-mixer__timer-compact-row'
@@ -83,13 +146,31 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			nameEl.textContent = timer.name || `Timer ${String(timer.timerId).slice(0, 8)}`
 			row.appendChild(nameEl)
 
+			const timeEl = document.createElement('span')
+			timeEl.className = 'audio-mixer__timer-compact-time'
+			timeEl.dataset.timerTime = timer.timerId
+			timeEl.textContent = formatDisplayTime(computeDisplayTime(timer))
+			row.appendChild(timeEl)
+
+			const cfg = timer.config || {}
+			records.push({
+				timer,
+				timeEl,
+				amber: Number(cfg.amberThresholdSec) || 0,
+				red: Number(cfg.redThresholdSec) || 0,
+				lastText: timeEl.textContent,
+				// Classes start absent on a fresh row; the next tick applies them if due.
+				lastRed: false,
+				lastAmber: false,
+			})
+
 			for (const action of ['start', 'pause', 'reset']) {
-				const icons = { start: '▶', pause: '⏸', reset: '⟲' }
+				const icons = { start: 'play', pause: 'pause', reset: 'reset' }
 				const btn = document.createElement('button')
 				btn.type = 'button'
 				btn.className = 'audio-mixer__timer-compact-btn'
 				btn.title = action[0].toUpperCase() + action.slice(1)
-				btn.textContent = icons[action]
+				btn.innerHTML = uiIcon(icons[action])
 				btn.addEventListener('click', async () => {
 					try {
 						await api.post('/api/timers/cmd', { timerId: timer.timerId, cmd: action })
@@ -105,7 +186,7 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			eyeBtn.type = 'button'
 			eyeBtn.className = 'audio-mixer__timer-compact-btn'
 			eyeBtn.title = entry.visible ? 'Hide' : 'Show'
-			eyeBtn.textContent = entry.visible ? '👁' : '⊘'
+			eyeBtn.innerHTML = uiIcon(entry.visible ? 'eye' : 'eyeOff')
 			eyeBtn.addEventListener('click', async () => {
 				try {
 					await api.post('/api/timers/visible', { timerId: timer.timerId, screenIdx, visible: !entry.visible })
@@ -119,6 +200,7 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 
 			timersCompactEl.appendChild(row)
 		}
+		compactRecords = records
 	}
 
 	void renderCompactTimers()
@@ -126,6 +208,9 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 	sceneState.on('softChange', () => void renderCompactTimers())
 	window.addEventListener('screen-timers-changed', () => void renderCompactTimers())
 	setInterval(() => void renderCompactTimers(), TIMERS_COMPACT_POLL_MS)
+	// Live countdown readout — purely client-side math off the last-fetched records (see
+	// tickCompactDisplays), so 4×/s costs nothing on the wire.
+	setInterval(tickCompactDisplays, 250)
 
 	const toggle = root.querySelector('.audio-mixer__section-toggle')
 	const panel = root.querySelector('.audio-mixer__panel')

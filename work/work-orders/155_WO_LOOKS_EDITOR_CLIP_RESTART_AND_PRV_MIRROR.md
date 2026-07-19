@@ -1,6 +1,6 @@
 # WO-155 — Looks editor: clip restarts on every param change; edit→PRV mirror; stale PRV thumbnail
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (every edit restarts playback — worst operator annoyance in the list)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)

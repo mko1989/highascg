@@ -1,6 +1,6 @@
 # WO-223 — MV timer rows show "L10 1" for routes; should show the source's friendly label (PGM1 / PRV1 / DeckLink #)
 
-**Status:** Planned | **Date:** 2026-07-15
+**Status:** Implemented (owner/hardware acceptance pending) | **Date:** 2026-07-15
 **Source:** owner: "when playing a route on a screen in the mulviviewer i get only L10 1 so the route number. it should be the label, either pgm1 or decklink#."
 
 ## 1. Diagnosis

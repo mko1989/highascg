@@ -59,6 +59,7 @@ const routesPlaylist = require('./routes-playlist')
 const routesScreenTimers = require('./routes-screen-timers')
 const routesScreens = require('./routes-screens')
 const routesCgThumb = require('./routes-cg-thumb')
+const routesShaders = require('./routes-shaders')
 const routesReplication = require('./routes-replication')
 const routesCompanion = require('./routes-companion')
 const routesPrivateSync = require('./routes-private-sync')
@@ -365,6 +366,12 @@ routes.get('/api/pip-overlay', ({ path, ctx }) => routesPipOverlay.handleGet(pat
 
 // State + Caspar INFO routes (registry `/*` does not match bare `/api/foo`)
 const casparStateGet = ({ path, ctx, query }) => routesState.handleGet(path, ctx, query)
+// Shader FX library (WO-266) — pure fs CRUD, no Caspar dependency
+routes.get('/api/shaders', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
+routes.get('/api/shaders/*', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
+routes.post('/api/shaders', ({ path, body, ctx }) => routesShaders.handlePost(path, body, ctx), { requireCaspar: false })
+routes.delete('/api/shaders/*', ({ path }) => routesShaders.handleDelete(path), { requireCaspar: false })
+
 routes.get('/api/state', casparStateGet, { requireCaspar: true })
 routes.get('/api/state/*', casparStateGet, { requireCaspar: true })
 routes.get('/api/templates', casparStateGet, { requireCaspar: true })

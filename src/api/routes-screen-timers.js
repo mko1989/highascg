@@ -200,13 +200,16 @@ function handleUnassign(body, ctx) {
  * line carries a fade duration + tween instead of an instant cut. Validated here so a bad
  * value never reaches the (still band-guarded) engine.
  *
- * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number}} body
+ * Optional `opacity` (0-1): on-air opacity used while visible, persisted per screen entry
+ * (inspector layer-opacity slider).
+ *
+ * @param {{timerId: string, screenIdx: number, visible: boolean, fadeFrames?: number, opacity?: number}} body
  * @param {object} ctx
  * @returns {object}
  */
 function handleVisible(body, ctx) {
 	try {
-		const { timerId, screenIdx, visible, fadeFrames } = body
+		const { timerId, screenIdx, visible, fadeFrames, opacity } = body
 
 		if (!timerId) return { ok: false, error: 'timerId required' }
 		if (!Number.isFinite(screenIdx)) return { ok: false, error: 'screenIdx required' }
@@ -220,7 +223,15 @@ function handleVisible(body, ctx) {
 			frames = fadeFrames
 		}
 
-		const { lines } = screenTimers.setTimerVisible({ timerId, screenIdx, visible, fadeFrames: frames })
+		let opacityVal
+		if (opacity !== undefined && opacity !== null) {
+			if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+				return { ok: false, error: 'opacity must be a number 0-1' }
+			}
+			opacityVal = opacity
+		}
+
+		const { lines } = screenTimers.setTimerVisible({ timerId, screenIdx, visible, fadeFrames: frames, opacity: opacityVal })
 
 		// Send AMCP lines
 		if (lines.length > 0) {

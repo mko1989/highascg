@@ -189,6 +189,49 @@ export function migrateLegacyInputRoute(cm, routeValue) {
 }
 
 /**
+ * WO-271 — resolve a multiview cell's live source channel against the CURRENT channel map,
+ * healing stale persisted route strings (channel-map shifts leave copied `route://N-L` values
+ * pointing at the wrong channel — live case: DeckLink `route://5-4` after the operator_gui
+ * channel took index 5). Mirrors src/config/live-source-route-heal.js.
+ * @param {{ id?: string, type?: string, label?: string }} cell
+ * @param {{ channel: number, layer: number|null }} parsed - parseRouteValue(cell.source.value)
+ * @param {object | null | undefined} cm - state.channelMap
+ * @returns {number|null} current channel, or null when the route is stale AND unresolvable
+ */
+export function resolveMvCellSourceChannel(cell, parsed, cm) {
+	if (!parsed || !Number.isFinite(Number(parsed.channel))) return null
+	const ch = Number(parsed.channel)
+	const inputs = Array.isArray(cm?.inputChannels) ? cm.inputChannels : []
+	// Identity first: after a channel-map shift a stale number can COLLIDE with a different
+	// now-valid channel, so a resolvable identity (decklink slot / label) always wins.
+	if (String(cell?.type || '') === 'decklink') {
+		let slot = null
+		const idM = cell.id?.match(/decklink_(\d+)/)
+		if (idM) slot = parseInt(idM[1], 10) + 1
+		if (slot == null) {
+			const lblM = String(cell.label || '').match(/decklink\s*(\d+)/i)
+			if (lblM) slot = parseInt(lblM[1], 10)
+		}
+		if (slot == null && parsed.layer != null) slot = parsed.layer
+		const entry = inputs.find((e) => e.kind === 'decklink' && e.slot === slot)
+		if (entry?.channel != null) return Number(entry.channel)
+	}
+	const label = String(cell?.label || '').trim().toLowerCase()
+	if (label) {
+		const byLabel = inputs.find((e) => String(e.label || '').trim().toLowerCase() === label)
+		if (byLabel?.channel != null) return Number(byLabel.channel)
+	}
+	// No identity resolved — trust the number only if the current map still knows it.
+	const known = new Set([
+		...(cm?.programChannels || []).filter((c) => c != null).map(Number),
+		...(cm?.previewChannels || []).filter((c) => c != null).map(Number),
+		...inputs.filter((e) => e?.channel != null).map((e) => Number(e.channel)),
+	])
+	if (known.has(ch)) return ch
+	return null
+}
+
+/**
  * DeckLink slot from connector (index is 0-based slot, externalRef is device index).
  * @param {{ index?: number, externalRef?: string | number }} conn
  */

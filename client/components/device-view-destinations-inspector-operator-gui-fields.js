@@ -51,6 +51,19 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 		patchDestination(d.id, { physicalPort: raw === '' ? null : (Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : null) })
 	})
 
+	// WO-264 T264.4: boot-time auto-start toggle (default on; server launches when a monitor resolves).
+	const autoLaunchWrap = Object.assign(document.createElement('label'), {
+		className: 'device-view__inspector-label',
+		style: 'display:flex; align-items:center; gap:6px; font-size:10px;opacity:.7',
+	})
+	const autoLaunchIn = document.createElement('input')
+	autoLaunchIn.type = 'checkbox'
+	autoLaunchIn.checked = d?.autoLaunch !== false
+	autoLaunchIn.title =
+		'Launch the operator GUI browser automatically when HighAsCG starts (skipped when no operator monitor resolves — multiple displays need a screen_N_operator_monitor flag or an explicit port).'
+	autoLaunchIn.addEventListener('change', () => patchDestination(d.id, { autoLaunch: autoLaunchIn.checked }))
+	autoLaunchWrap.append(autoLaunchIn, document.createTextNode('Auto-start at boot'))
+
 	const note = document.createElement('p')
 	note.className = 'device-view__note'
 	note.textContent =
@@ -85,5 +98,5 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 	})
 	launchWrap.append(launchBtn, statusLine)
 
-	return [field('Web-UI URL', guiUrlIn), field('Physical GPU port (optional)', physicalPortIn), note, launchWrap]
+	return [field('Web-UI URL', guiUrlIn), field('Physical GPU port (optional)', physicalPortIn), autoLaunchWrap, note, launchWrap]
 }

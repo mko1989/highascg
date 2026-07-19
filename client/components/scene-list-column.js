@@ -6,7 +6,7 @@ import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
-import { showTimerInspectorModal } from './timer-inspector-modal.js'
+import { uiIcon } from './ui-icons.js'
 
 /**
  * WO-226 T226.3: per-screen timer icon next to the FTB button. A module-level cache (shared
@@ -23,23 +23,34 @@ let _timersFetchPromise = null
 let _timersListenerBound = false
 
 function _timerStateForScreen(screenIdx) {
+	// Multi-timer aware (up to 10 per screen, layer band 980-989): the icon is "on" when ANY
+	// timer on this screen is on air.
+	let found = null
 	for (const t of _timersCache) {
 		const entry = t?.screens?.[String(screenIdx)]
-		if (entry) return { timerId: t.timerId, visible: !!entry.visible }
+		if (!entry) continue
+		if (!found) found = { count: 0, visible: false }
+		found.count++
+		if (entry.visible) found.visible = true
 	}
-	return null
+	return found
 }
 
 function _applyTimerButtonState(btn, screenIdx) {
 	const state = _timerStateForScreen(screenIdx)
+	btn.hidden = false
 	if (!state) {
-		btn.hidden = true
+		// Always visible: with no timer assigned the icon is dimmed — clicking selects this
+		// screen's timers in the Inspector, where "+ Add timer" lives.
+		btn.classList.remove('scenes-btn--timer-on')
+		btn.classList.add('scenes-btn--timer-unassigned')
+		btn.title = 'Timers for this screen (none yet) — click to add in Inspector'
 		return
 	}
-	btn.hidden = false
-	btn.dataset.timerId = state.timerId
+	btn.classList.remove('scenes-btn--timer-unassigned')
 	btn.classList.toggle('scenes-btn--timer-on', state.visible)
-	btn.title = state.visible ? 'Timer on air — click for settings' : 'Timer assigned (hidden) — click for settings'
+	const n = state.count > 1 ? `${state.count} timers` : 'Timer'
+	btn.title = state.visible ? `${n} on air — click for settings` : `${n} assigned (hidden) — click for settings`
 }
 
 function _refreshAllTimerButtons() {
@@ -160,15 +171,17 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 		const timerBtn = document.createElement('button')
 		timerBtn.type = 'button'
 		timerBtn.className = 'scenes-btn scenes-btn--timer scenes-deck-col__timer-btn'
-		timerBtn.textContent = '⏱'
+		timerBtn.innerHTML = uiIcon('timer')
 		timerBtn.dataset.screenIdx = String(col)
 		timerBtn.hidden = true
 		timerBtn.setAttribute('aria-label', `Timer settings for ${mainLabel(col)}`)
 		timerBtn.addEventListener('click', (e) => {
 			e.stopPropagation()
-			const state = _timerStateForScreen(col)
-			if (!state) return
-			showTimerInspectorModal({ timerId: state.timerId, screenIdx: col, screenLabel: mainLabel(col) })
+			// Select this screen's timers in the Inspector (add/control/settings all live there —
+			// not a modal, 2026-07-17 UX direction).
+			window.dispatchEvent(
+				new CustomEvent('screen-timer-select', { detail: { screenIndex: col, screenLabel: mainLabel(col) } }),
+			)
 		})
 		headLeft.appendChild(timerBtn)
 		head.appendChild(headLeft)

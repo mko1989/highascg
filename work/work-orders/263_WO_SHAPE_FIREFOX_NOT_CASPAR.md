@@ -1,6 +1,6 @@
 # WO-263 — Invert the operator overlay: punch holes in Firefox, Caspar consumer sits below
 
-**Status:** IN PROGRESS (helper: agent ade58e4d; generator+smoke: orchestrator, held uncommitted pending the helper)
+**Status:** Implemented (helper inversion—Firefox hole-punching in operator-shape-overlay.py, and <always-on-top>false generator flip—both present in working tree; owner acceptance pending)
 **Priority:** URGENT (operator GUI shows no usable video)
 **Owner check:** A263.1
 
@@ -25,7 +25,7 @@ WO-255 put the Caspar consumer ON TOP with an empty input region so clicks pass 
 ## Landing
 All parts commit TOGETHER when the helper lands — committing the generator flip alone would drop the consumer below an unshaped Firefox (worse). Then: owner regen config → caspar restart → hard-reload operator Firefox.
 
-- [ ] T263.1 helper → Firefox holes (agent)
+- [x] T263.1 helper → Firefox holes (agent)
 - [x] T263.2 generator always-on-top false (held)
 - [x] T263.3 smoke assertion flipped (held)
 - [ ] T263.4 confirm no other server change

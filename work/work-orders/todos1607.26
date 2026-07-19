@@ -25,3 +25,38 @@ transition needs to be packed in to two begin comit. first set up. loadbg, mixer
  lets use cef only for displaying templates.
  lets also change the web browser source to a different approach. adding a webbrowser source adds a Display:1 virtual where that browser lives. the interaction is then system only, just need to make that browser available to the oparator screen.
  the display needsto be captured and relayed to casparcg. we will use similar approach for zoom (future).
+
+
+
+ WWWWOOOOOWWWWW
+ [2026-07-16 13:34:00.233] (HACG) [info] [Playlist] Layer 11 advanced to item 3: BRIDGE/252166
+[2026-07-16 13:34:00.233] (HACG) [info] [Playlist] Preloading next item 0 (bridge/291780.mp4) on 1-111 with AUTO
+[2026-07-16 13:34:00.235] (HACG) [info] [Playlist] Layer 11 advanced to item 1: BRIDGE/355317
+[2026-07-16 13:34:00.235] (HACG) [info] [Playlist] Preloading next item 2 (bridge/plymouth-corner-preview.mp4) on 2-11 with AUTO
+[2026-07-16 13:34:00.333] (HACG) [info] [Playlist] Layer 11 advanced to item 3: BRIDGE/252166
+[2026-07-16 13:34:00.333] (HACG) [info] [Playlist] Preloading next item 0 (bridge/291780.mp4) on 1-111 with AUTO
+[2026-07-16 13:34:00.334] (HACG) [info] [Playlist] Layer 11 advanced to item 1: BRIDGE/355317
+[2026-07-16 13:34:00.334] (HACG) [info] [Playlist] Preloading next item 2 (bridge/plymouth-corner-preview.mp4) on 2-11 with AUTO
+[2026-07-16 13:34:00.382] (HACG) [info] [Playlist] Layer 11 advanced to item 3: BRIDGE/252166
+[2026-07-16 13:34:00.383] (HACG) [info] [Playlist] Preloading next item 0 (bridge/291780.mp4) on 1-111 with AUTO
+[2026-07-16 13:34:00.432] (HACG) [info] [Playlist] Layer 11 advanced to item 3: BRIDGE/252166
+[2026-07-16 13:34:00.432] (HACG) [info] [Playlist] Preloading next item 0 (bridge/291780.mp4) on 1-111 with AUTO
+[2026-07-16 13:34:00.434] (HACG) [info] [Playlist] Layer 11 advanced to item 1: BRIDGE/355317
+
+this can't happen!
+
+
+border effect doesnt appear on the pgm now. forgot about cg in the transition.
+
+
+in looks editor add to layers corner button for loop toggle and fit screen.
+
+the window in the compose preview needs to be grabable in all places not just label.
+
+in compose preview the progres bar and file name need to appear under the window, so it doesnt overlay any actual content.
+
+
+still jumpy timers 
+still can click thru firefox and bring caspar up. in the operator gui case the casparcg screen consumer needs to always be under firefox, and it needs to be locked like that.
+
+the variables for playing clips in settings variables are frozen. the only ones that move are audio ones.

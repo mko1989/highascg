@@ -194,6 +194,14 @@ function runBeginCommitBatch(client, lines, options) {
 	let drainRef = null
 	/** @type {((reason?: Error) => void) | null} */
 	let rejectP = null
+	/** @type {ReturnType<typeof setTimeout> | null} */
+	let drainTimeout = null
+	const clearDrainTimeout = () => {
+		if (drainTimeout) {
+			clearTimeout(drainTimeout)
+			drainTimeout = null
+		}
+	}
 	const p = new Promise((resolve, reject) => {
 		rejectP = reject
 		const drain = {
@@ -202,6 +210,7 @@ function runBeginCommitBatch(client, lines, options) {
 			onLine(line) {
 				this.lines.push(line)
 				if (isBatchCommitAckLine(line)) {
+					clearDrainTimeout()
 					if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
 					if (typeof connection.log === 'function') {
 						connection.log(
@@ -219,6 +228,7 @@ function runBeginCommitBatch(client, lines, options) {
 			},
 			/** @param {Error} err */
 			rejectBatch(err) {
+				clearDrainTimeout()
 				if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
 				rejectP(err instanceof Error ? err : new Error(String(err)))
 			},
@@ -250,6 +260,26 @@ function runBeginCommitBatch(client, lines, options) {
 			if (typeof connection.log === 'function') {
 				connection.log('debug', `AMCP → BEGIN…COMMIT (${lines.length} cmd${lines.length === 1 ? '' : 's'})`)
 			}
+			// A drain with no timeout is a wedge: if the `2xx COMMIT` ack never arrives (command
+			// error inside the transaction, ack format drift), the stale drain swallows EVERY
+			// subsequent response line and each queued single burns its full timeout — the
+			// 2026-07-19 "GUI actions fire minutes late" incident. Bound it like single sends.
+			const { resolveSendTimeoutMs } = require('./amcp-client-static')
+			const batchTimeoutMs = resolveSendTimeoutMs('COMMIT')
+			drainTimeout = setTimeout(() => {
+				drainTimeout = null
+				if (connection._amcpBatchDrain !== drainRef) return
+				connection._amcpBatchDrain = null
+				const got = drainRef ? drainRef.lines.length : 0
+				if (typeof connection.log === 'function') {
+					connection.log(
+						'warn',
+						`AMCP batch COMMIT ack timeout (${batchTimeoutMs}ms): ${lines.length} cmds sent, ${got} response line(s) drained — clearing stale batch drain`,
+					)
+				}
+				connection._amcpSendQueue = Promise.resolve()
+				if (rejectP) rejectP(new Error(`AMCP batch COMMIT ack timeout (${lines.length} cmds)`))
+			}, batchTimeoutMs)
 			connection.socket.send(payload)
 			try {
 				const { fanoutBatchPayload } = require('../replication/amcp-fanout')
@@ -370,4 +400,7 @@ module.exports = {
 	MAX_BATCH_COMMANDS,
 	/** @public One AMCP line at a time (no BEGIN…COMMIT chunking). Used for PIP overlay CG+MIXER blocks — see {@link sendPipOverlayLinesSerial}. */
 	sendAmcpLinesSequential: sequentialRaw,
+	/** @internal exported for the batch-drain-timeout smoke test only */
+	runBeginCommitBatch,
+	isBatchCommitAckLine,
 }

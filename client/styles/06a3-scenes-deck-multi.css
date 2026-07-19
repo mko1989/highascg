@@ -188,6 +188,16 @@
 	opacity: 1;
 }
 
+/* No timer assigned yet — the icon doubles as the per-screen "add timer" affordance. */
+.scenes-btn--timer-unassigned {
+	opacity: 0.3;
+	border-style: dashed;
+}
+
+.scenes-btn--timer-unassigned:hover:not(:disabled) {
+	opacity: 0.85;
+}
+
 .scenes-deck__empty--tight {
 	padding: 1rem 0.5rem;
 }

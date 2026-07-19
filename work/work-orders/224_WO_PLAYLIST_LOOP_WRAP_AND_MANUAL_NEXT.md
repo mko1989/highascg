@@ -1,6 +1,6 @@
 # WO-224 — Playlist: list-loop doesn't wrap; manual-advance mode has no Next trigger
 
-**Status:** Planned | **Date:** 2026-07-15
+**Status:** Implemented (owner/hardware acceptance pending) | **Date:** 2026-07-15
 **Source:** owner: "playlist on a layer in a look doesnt loop even when set to loop." + "there is a manual next setting for playlist, with no actual way to trigger next item."
 
 ## 1. Findings

@@ -270,6 +270,32 @@ function syncAllTemplatesToDestination(self, destDir, label) {
 
 async function setupAllRouting(self) {
 	const { PIP_OVERLAY_TEMPLATE_FILES } = require('../engine/pip-overlay'); const map = routingMap.getChannelMap(self.config)
+	// WO-268: runs on boot AND every Caspar reconnect. Tracked template hosts are quarantined at
+	// disconnect (index.js status handler) so they stop vouching for WO-196 continuity; here the
+	// per-channel INFO XML from the connect gather decides their fate — restore hosts whose layer
+	// still runs a producer (TCP-only blip, Caspar kept the template loaded), drop the rest (a
+	// genuinely restarted Caspar has empty layers; UPDATE-only takes 403 against them). The old
+	// blanket clear restarted on-air template intros after mere connection blips.
+	await require('../engine/scene-template-cg').reconcileQuarantinedTemplateHosts(self)
+	// WO-271: re-point stale route:// channel references (config live sources + persisted
+	// multiview layouts) at the CURRENT channel map before anything replays them — a channel-map
+	// shift (e.g. the operator_gui channel insertion) otherwise leaves them routing the wrong
+	// channel (live case: mv cells routed the operator channel into its own holes → black).
+	try {
+		const heal = require('./live-source-route-heal')
+		const { changed } = heal.healExtraLiveSourceChannels(self.config, (l, m) => self.log(l, m))
+		if (changed && self.configManager) {
+			try {
+				self.configManager.save({ ...self.configManager.get(), extraLiveSources: self.config.extraLiveSources })
+			} catch (e) {
+				self.log('warn', `[route-heal] config persist failed: ${e?.message || e}`)
+			}
+		}
+		const { healedKeys } = heal.healPersistedMultiviewLayouts(self)
+		if (healedKeys.length) self.log('info', `[route-heal] multiview layouts healed: ${healedKeys.join(', ')}`)
+	} catch (e) {
+		self.log('warn', `[route-heal] skipped: ${e?.message || e}`)
+	}
 	const tBase = (self.config?.local_template_path || '').trim(); const mBase = (self.config?.local_media_path || '').trim()
 	if (tBase) syncAllTemplatesToDestination(self, tBase, 'local_template_path')
 	else if (mBase) { syncAllTemplatesToDestination(self, mBase, 'local_media_path'); self.log('info', 'Templates synced to local_media_path') }
@@ -334,6 +360,10 @@ async function setupAllRouting(self) {
 		} catch (e) {
 			self.log('warn', `Operator GUI channel: ${e?.message || e}`)
 		}
+		// WO-264: auto-start the operator GUI browser at boot when defined + monitor resolvable.
+		// Fire-and-forget (internal retry loop covers X coming up late); never throws.
+		const { maybeAutoLaunchOperatorGui } = require('../system/operator-gui-launcher')
+		maybeAutoLaunchOperatorGui(self)
 	}
 	const { setupHostLiveSources } = require('./host-live-sources-setup')
 	await setupHostLiveSources(self)

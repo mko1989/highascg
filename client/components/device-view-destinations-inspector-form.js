@@ -1,4 +1,5 @@
 import { buildInspectorTable } from './device-view-ui-utils.js'
+import { api } from '../lib/api-client.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 import { renderHostChannelDestinationInspector } from './device-view-destinations-inspector-host-channel.js'
@@ -155,6 +156,23 @@ export function renderDestinationInspector(args) {
 	mainIn.title = 'Main index (zero-based)'
 	mainIn.addEventListener('change', () => patchDestination(d.id, { mainScreenIndex: Math.max(0, parseInt(String(mainIn.value || 0), 10) || 0) }))
 	attachMathInput(mainIn, { decimals: 0 })
+
+	// WO-222 label editing moved here from the settings modal (owner request 2026-07-18): the
+	// screen label (S1/S2 default, shown in looks selector / multiview / panels) is per SCREEN
+	// (mainScreenIndex), distinct from the destination's own label above.
+	const screenIdxForLabel = Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)
+	const screenLabels = Array.isArray(currentSettings?.channelMap?.screenLabels) ? currentSettings.channelMap.screenLabels : []
+	const screenLabelIn = document.createElement('input')
+	screenLabelIn.type = 'text'
+	screenLabelIn.className = 'device-view__destinations-type'
+	screenLabelIn.value = String(screenLabels[screenIdxForLabel] || '')
+	screenLabelIn.placeholder = `Screen label (S${screenIdxForLabel + 1})`
+	screenLabelIn.title = 'Custom label for this screen output — used in looks selector, multiview and panels; empty = default'
+	screenLabelIn.addEventListener('change', () => {
+		void api
+			.post('/api/screens/label', { screenIdx: screenIdxForLabel, label: String(screenLabelIn.value || '').trim() })
+			.catch((e) => console.warn('screen label save failed:', e?.message || e))
+	})
 
 	const modeSel = document.createElement('select')
 	modeSel.className = 'device-view__destinations-type'
@@ -430,6 +448,7 @@ export function renderDestinationInspector(args) {
 	const operatorGuiFields = mode === 'operator_gui' ? buildOperatorGuiFields({ d, patchDestination }) : []
 
 	edits.append(nameIn, mainIn, modeSel)
+	if (mode === 'pgm_prv' || mode === 'pgm_only') edits.append(screenLabelIn)
 	if (mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui') {
 		const audioOutputsWrap = Object.assign(document.createElement('div'), {
 			style: 'display:flex; flex-direction:column; gap:4px; width:100%',

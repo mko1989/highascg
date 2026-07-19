@@ -1,6 +1,6 @@
 # WO-234 — Assemble + build the final (for now) CasparCG for highascg
 
-**Status:** In progress | **Date:** 2026-07-15
+**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending) | **Date:** 2026-07-15
 **Owner directives:** Enhanced's audio (PortAudio) work is CRUCIAL — all Enhanced differentiators go in. Re-review the seed PRs code-level (#1762 mixer effects, #1751 Pixel consumer — fair second look, owner sees pixel mapping as a good fit, #1727 stream reconnect). Then build the final version.
 
 ## Merge plan (from WO-233, owner-amended)
@@ -16,7 +16,7 @@ Its a media server. i can see multiple uses for pixel consumer.
 - [x] T234.1 Deep code-level PR review (sonnet): read the actual diffs of #1762(-series), #1751, #1727 (+sanity on #1763/#1691/#1761); verdict per PR: MERGE / SKIP with code-level rationale, conflict forecast vs the base+MUST tree, and any needed follow-up patches. Append verdicts here.
 - [x] T234.2 Assemble branch `highascg-build-v1` in a scratchpad clone: base + Enhanced commits re-applied + approved PRs cherry-picked; resolve conflicts; record every commit hash + resolution in the work log; push NOTHING (bundle the tree as a tar + git bundle under /home/casparcg/Downloads/caspar-build-kit/).
 - [x] T234.3 Build kit: `build.sh` with two variants — (a) docker (Enhanced's documented recipe, CPU-limited flags) and (b) bare-metal deps list (exact apt packages from the repo's docs/CI) + cmake/ninja bootstrap; includes CEF 142 prebuilt fetch per the tree's mechanism; output: casparcg binary + verification steps (strings check for artnet+portaudio symbols, --version).
-- [ ] T234.4 BUILD: blocked on owner choice — (a) install docker or cmake+deps on this box (root) → orchestrator builds niced/CPU-limited; or (b) owner runs the kit on the original 'serwer' build machine. Deploy plan after: place binary as bin/casparcg.new, owner swaps + restarts Caspar in a maintenance window (NEVER auto-swap on the live box).
+- [x] T234.4 BUILD: blocked on owner choice — (a) install docker or cmake+deps on this box (root) → orchestrator builds niced/CPU-limited; or (b) owner runs the kit on the original 'serwer' build machine. Deploy plan after: place binary as bin/casparcg.new, owner swaps + restarts Caspar in a maintenance window (NEVER auto-swap on the live box).
 - [ ] A234.1 Owner: new binary passes soak (playout + audio via PortAudio + artnet consumer smoke) before replacing bin/casparcg.
 
 ---
@@ -240,3 +240,4 @@ Owner also requires: **full provenance documentation** — see work/CASPAR_BUILD
 - Verified: artnet_consumer/pixel_consumer/portaudio/oal/reconnect symbols present; BLUR/SHARPEN/GRAIN shader code present; ldd with the production LD_LIBRARY_PATH resolves /home/casparcg/highascg/lib/libcef.so — which is BYTE-IDENTICAL (sha256 fa0993fa...) to the pinned v.142 tarball's libcef.so, so the existing lib/ tree needs NO changes.
 - STAGED: bin/casparcg.new (old binary untouched). Bundle regenerated UNSHALLOWED + self-tested (clone from bundle OK) — the earlier bundle was shallow/incomplete.
 - REMAINING (owner): maintenance-window swap per DEPLOY.md — mv bin/casparcg bin/casparcg.prev && mv bin/casparcg.new bin/casparcg && restart Caspar; soak: playout + PortAudio audio + artnet consumer + a MIXER BLUR smoke; rollback = swap back.
+- **Audit 2026-07-17:** Binary built AND deployed — live bin/casparcg is 2.6.0 253c16c Dev, 9.3MB; casparcg.prev retained; deployment ready pending owner soak test (A234.1 owner-gated, not audit-verified).

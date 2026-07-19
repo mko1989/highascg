@@ -1,6 +1,6 @@
 # WO-165 — Status eyes hover: per-process usage; remove settings/logs modal backdrop dim+blur
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Low (operator quality-of-life)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): status-eye hover should show casparcg (and optionally highascg) process usage; settings/logs modals must not dim or blur the main UI behind them.

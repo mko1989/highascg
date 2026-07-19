@@ -34,6 +34,7 @@ import { getVariableStore } from './lib/variable-state.js'
 import { projectState } from './lib/project-state.js'
 import { timelineState } from './lib/timeline-state.js'
 import { initOptionalModules } from './lib/optional-modules.js'
+import { initCgStudioTab } from './components/cg-studio-tab.js'
 import { initDeviceView, onDeviceViewTabActivated } from './components/device-view.js'
 import { initAudioMixerView } from './components/audio-mixer-view.js'
 import { placeholderState } from './lib/placeholder-state.js'
@@ -184,7 +185,7 @@ async function init() {
 	})
 	initTabs(); initWorkspaceLayout()
 	initReplicationUiState(ws)
-	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState })
+	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState }).then(() => initCgStudioTab())
 	_oscClient = new OscClient({ wsClient: ws })
 	window.highascg_osc_client = _oscClient
 	setAppRuntime({ ws, osc: _oscClient, stateStore, appLogic, getVariableStore: () => getVariableStore(ws) })
@@ -289,7 +290,8 @@ async function init() {
 	timelineState.on('change', scheduleAutosave)
 	multiviewState.on('change', scheduleAutosave)
 
-	document.addEventListener('highascg-workspace-tab-activated', () => void flushAutosaveIfPending())
+	// activateTab dispatches on window — a document listener would never fire
+	window.addEventListener('highascg-workspace-tab-activated', () => void flushAutosaveIfPending())
 	document.addEventListener('visibilitychange', () => {
 		if (document.visibilityState === 'hidden') void flushAutosaveIfPending()
 	})
@@ -387,7 +389,9 @@ async function init() {
 		getVariableStore: () => getVariableStore(ws),
 		flushSceneDeckSync: () => SceneDeck.flushSceneDeckSync(ws, sceneState),
 	})
-	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore); initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
+	initTimelineEditor(document.querySelector('#tab-timeline'), stateStore, {
+		getOscClient: () => _oscClient,
+	}); initMultiviewEditor(document.querySelector('#tab-multiview'), stateStore)
 	initPixelMapEditor(document.querySelector('#tab-pixelmap'), stateStore); initInspectorPanel(document.getElementById('panel-inspector-scroll') || document.getElementById('panel-inspector-body') || document.querySelector('#panel-inspector .panel__body'), stateStore)
 	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
 	initTimerControlPanel(stateStore, document.getElementById('panel-inspector-timer-mount'), { getChannelMap: () => stateStore.getState()?.channelMap || {} })

@@ -1,6 +1,6 @@
 # WO-185 — Global play inside the look editor takes to the wrong PGM (uses active screen, not the edited look's main)
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** High (wrong screen on air)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner): "edited a look for pgm 2, hit the global play button (still inside this look's editor) and it took this look to pgm1."

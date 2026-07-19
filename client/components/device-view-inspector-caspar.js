@@ -84,6 +84,36 @@ export function renderCasparSettingsInspector(host, { currentSettings, lastPaylo
 	projectSec.append(saveFpsBtn)
 	shell.append(projectSec)
 
+	// WO-268: CEF GPU opt-in (owner request 2026-07-18) — required for WebGL/Shader FX templates
+	// on the CG path; historically off because GPU CEF can contend with the GL consumers.
+	const cefSec = document.createElement('div')
+	cefSec.className = 'device-view__inspector-section'
+	cefSec.innerHTML = '<p class="device-view__note"><strong>Templates (CEF)</strong></p>'
+	const gpuLab = document.createElement('label')
+	gpuLab.className = 'device-view__cablemode'
+	const gpuChk = document.createElement('input')
+	gpuChk.type = 'checkbox'
+	gpuChk.checked = s.operatorTools?.cefEnableGpu === true
+	gpuLab.append(gpuChk, document.createTextNode(' Enable GPU in CEF templates (WebGL / Shader FX)'))
+	const gpuHint = document.createElement('p')
+	gpuHint.className = 'device-view__note small'
+	gpuHint.textContent = 'Needed for shader templates on the CG path. Takes effect on Caspar config apply + restart. Turn off if other channels stutter or tear.'
+	gpuChk.addEventListener('change', async () => {
+		gpuChk.disabled = true
+		try {
+			await Actions.saveSettingsPatch({ operatorTools: { cefEnableGpu: gpuChk.checked } })
+			setCasparRestartDirty(true)
+			setStatus(statusEl, `CEF GPU ${gpuChk.checked ? 'enabled' : 'disabled'} — apply Caspar config + restart to take effect`, true)
+		} catch (e) {
+			gpuChk.checked = !gpuChk.checked
+			setStatus(statusEl, e?.message || String(e), false)
+		} finally {
+			gpuChk.disabled = false
+		}
+	})
+	cefSec.append(gpuLab, gpuHint)
+	shell.append(cefSec)
+
 	const netSec = document.createElement('div')
 	netSec.className = 'device-view__inspector-section'
 	netSec.innerHTML = '<p class="device-view__note"><strong>Network</strong></p>'

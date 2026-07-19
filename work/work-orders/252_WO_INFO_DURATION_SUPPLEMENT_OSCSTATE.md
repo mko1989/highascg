@@ -1,6 +1,6 @@
 # WO-252 — Feed clip duration from the AMCP INFO supplement into oscState (new binary omits it on OSC)
 
-**Status:** OPEN
+**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** HIGH (feeds MV progress bars/digits, playlist stall watchdog, timer remaining/progress)
 **Owner check:** A252.1
 
@@ -34,8 +34,12 @@ Default `osc_info_supplement_ms` to 2000 when unset (explicit 0 still disables; 
 ## Constraints (standard)
 No git, no service ops, no AMCP, no HTTP to :4200/:5250, no vite build, curated gate ONLY, never the full suite. node --check + eslint --quiet on touched files; exact gate counts; <500 lines/file (osc-state.js is at ~560 — if your additions push it further, extract the new supplement + shared helpers into a small `src/osc/osc-state-timing.js` instead); honest checkboxes.
 
-- [ ] T252.1 oscState supplement API
-- [ ] T252.2 INFO parse → oscState injection (with the real-layer-number investigation reported)
-- [ ] T252.3 default 2000ms
-- [ ] T252.4 smoke in gate
+## Work log
+
+- **Audit 2026-07-17:** Implementation verified in-tree. oscState supplement API added with duration/remaining/progress recomputation; INFO parse path injects into oscState; supplement defaulted to 2000ms; smoke tests green. Array-index-as-layer-number concern was investigated and is NOT a bug — src/state/info-channel-parse.js assigns layers[N] from the parsed `layer_<N>` XML key, so the array is sparse and indexed by the REAL Caspar layer number (bank-B layers 110–199 included).
+
+- [x] T252.1 oscState supplement API
+- [x] T252.2 INFO parse → oscState injection (with the real-layer-number investigation reported)
+- [x] T252.3 default 2000ms
+- [x] T252.4 smoke in gate
 - [ ] A252.1 (owner) after restart: MV shows digits+bars again; playlist watchdog logs on stalled media; timer shows remaining

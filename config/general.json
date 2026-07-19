@@ -2,6 +2,7 @@
   "amcp_batch": false,
   "amcp_max_batch_commands": 64,
   "amcp_mixer_commit_before_amcp_batch": true,
+  "take_two_phase_batch": true,
   "offline_mode": false,
   "screen_1_force_os_resolution": false,
   "screen_2_force_os_resolution": false,
@@ -17,7 +18,8 @@
     "pointerConfineMultiview": false,
     "cefInteractiveBridge": true,
     "cefInteractiveLayer": 999,
-    "cefRemoteDebuggingPort": 9222
+    "cefRemoteDebuggingPort": 9222,
+    "cefEnableGpu": true
   },
   "local_template_path": "",
   "composePreview": {
@@ -117,16 +119,16 @@
     {
       "type": "route",
       "routeType": "decklink",
-      "value": "route://5-4",
+      "value": "route://6-4",
       "label": "DeckLink 4",
       "decklinkSlot": 4,
-      "inputsChannel": 5,
+      "inputsChannel": 6,
       "inputsLayer": 4,
       "decklinkDevice": 4,
       "connectorId": "dlsdi_4",
       "resolution": "1920×1080",
       "fps": "50",
-      "thumbnailChannel": 5,
+      "thumbnailChannel": 6,
       "thumbnailLayer": 4
     },
     {
@@ -163,6 +165,24 @@
       "thumbnailLayer": 1,
       "resolution": "1920×1080",
       "fps": "50"
+    },
+    {
+      "type": "route",
+      "routeType": "layer",
+      "value": "route://1-11",
+      "label": "Route: Ch1 L11 PGM · Look 7 (copy)",
+      "lookId": "3e2a218a-7a9a-4828-8494-b7846eb1afda",
+      "lookName": "Look 7 (copy)",
+      "resolution": "839×472",
+      "fps": "50",
+      "thumbnailChannel": 1,
+      "fill": {
+        "x": 0.10901900114456001,
+        "y": 0.1077321197877593,
+        "scaleX": 0.43719230937206727,
+        "scaleY": 0.4371923093720672
+      },
+      "thumbnailLayer": 11
     }
   ],
   "configVersion": 1,

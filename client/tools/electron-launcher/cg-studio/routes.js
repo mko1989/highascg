@@ -161,5 +161,6 @@ async function handleStudioRequest(req) {
 module.exports = {
 	resolveStudioPort,
 	buildStudioUrl,
+	handleStudioApi,
 	handleStudioRequest,
 }

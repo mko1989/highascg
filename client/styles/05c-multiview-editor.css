@@ -62,6 +62,13 @@
 	background: var(--border);
 }
 
+/* Operator-GUI Edit ⇄ Live toggle — accented while the live video hole is up (canvas locked). */
+.mv-btn--live-on {
+	background: rgba(88, 166, 255, 0.18);
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
 .mv-chk {
 	display: flex;
 	align-items: center;

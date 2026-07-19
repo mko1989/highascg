@@ -1,6 +1,6 @@
 # WO-195 — Multiview overlay refinements: hide PIP-decoration rows, L## + filename labels, drop the big top-clip block, fix PRV cells, kill stale rows
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (overlay currently misleads: decoration rows, wrong PRV, stale rows)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, latest NEW block).

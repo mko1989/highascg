@@ -1,6 +1,6 @@
 # WO-157 — Audio mixer: screen/channel routing level above stereo-pair routing on input strips
 
-**Status:** Planned
+**Status:** Partially implemented (UI landed; audio fan-out deferred)
 **Priority:** Medium (operator workflow consistency; no on-air breakage)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)

@@ -1,6 +1,6 @@
 # WO-216 — Companion module: stored Wake-on-LAN target (mac/hostname/ip) + fire action
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium
 **Date:** 2026-07-14
 **Source:** owner: "adding it to companion module to store and be ready to fire of wake on lan to stored mac, hostname, ip."

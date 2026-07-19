@@ -51,25 +51,6 @@ const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = requir
 const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
 const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
 
-/** PLAY/LOAD/LOADBG/STOP/CLEAR/MIXER/CG all start `<VERB> <channel>[-<layer>] ...` (mirrors the shape playback-tracker's recordAmcpLines regexes match). */
-const AMCP_BATCH_CHANNEL_RE = /^[A-Za-z_]+\s+(\d+)(?:-\d+)?\b/
-
-/**
- * @param {string[]} lines
- * @returns {Set<number>}
- */
-function touchedAmcpBatchChannels(lines) {
-	const out = new Set()
-	for (const raw of lines) {
-		const m = AMCP_BATCH_CHANNEL_RE.exec(String(raw || '').trim())
-		if (!m) continue
-		const ch = parseInt(m[1], 10)
-		if (Number.isFinite(ch) && ch > 0) out.add(ch)
-	}
-	return out
-}
-
-
 function applyAmcpLineNormalizations(lines, ctx) {
 	const cfg = ctx?.config || {}
 	return normalizeClipPlayAmcpLines(normalizeDecklinkPlayAmcpLines(lines, cfg), ctx)

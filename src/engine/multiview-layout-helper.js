@@ -27,6 +27,17 @@ function normalizePrvRouteSource(src, previewChannels) {
  * Determine the route string for a given cell.
  */
 function routeForCell(cell, map, inputsCh, previewChannels) {
+	// WO-271: a persisted cell.source route string can carry a channel number from an OLD map
+	// (channel insertions shift hosts — live case: "route://5-4" for a DeckLink that moved to
+	// ch6 when the operator_gui channel took 5). Re-resolve by identity BEFORE the verbatim
+	// replay — the decklink remap further down was unreachable behind this early return.
+	try {
+		const { healMultiviewCellSource } = require('../config/live-source-route-heal')
+		const healed = healMultiviewCellSource(cell, map)
+		if (healed) return healed
+	} catch {
+		/* heal module unavailable — fall through to verbatim behavior */
+	}
 	if (cell.source) return normalizePrvRouteSource(cell.source, previewChannels)
 	// Support pgm / pgm_0 (screen 1) ... pgm_N (screen N+1)
 	const pgmM = cell.id?.match(/^pgm(?:_(\d+))?$/)

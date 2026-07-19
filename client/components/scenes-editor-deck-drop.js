@@ -11,9 +11,8 @@
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { nextLayerNumber } from '../lib/scene-state-helpers.js'
-import { api } from '../lib/api-client.js'
 import { screenLabel } from '../lib/screen-label.js'
-import { DEFAULT_TIMER_CONFIG } from './timer-control-panel-display.js'
+import { createTimerForScreen, newTimerId } from '../lib/screen-timer-create.js'
 
 /**
  * Whether a dragged payload should be routed to the screen-timer assign API instead of
@@ -28,12 +27,6 @@ function isTimerDropPayload(data) {
 	const ty = String(data.type || '').toLowerCase()
 	if (ty !== 'template') return false
 	return String(data.value || '').toLowerCase().includes('countdown')
-}
-
-function newTimerId() {
-	return typeof crypto !== 'undefined' && crypto.randomUUID
-		? crypto.randomUUID()
-		: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
 
 /**
@@ -71,16 +64,14 @@ export function createDeckMediaDropHandler(ctx) {
 			const cmForTimers = typeof getChannelMap === 'function' ? getChannelMap() : {}
 			const label = screenLabel(cmForTimers, mainCol)
 			for (const data of timerPayloads) {
-				const timerId = data.timerId || newTimerId()
 				try {
-					await api.post('/api/timers/assign', {
-						timerId,
+					// createTimerForScreen dispatches 'screen-timers-changed' on success.
+					await createTimerForScreen({
+						timerId: data.timerId || newTimerId(),
 						name: data.label || data.name || 'Timer',
-						config: { ...DEFAULT_TIMER_CONFIG },
 						screenIdx: mainCol,
 					})
 					showScenesToast(`⏱ Timer assigned to ${label}`, 'info')
-					window.dispatchEvent(new CustomEvent('screen-timers-changed'))
 				} catch (err) {
 					showScenesToast(`Timer assign failed: ${err?.message || err}`, 'error')
 				}

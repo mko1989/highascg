@@ -165,12 +165,17 @@ window.LTEngineStyles = (function () {
         if (subtitle) subtitle.textContent = secondaryText || '';
     }
 
+    // WO-267: this whole function was corrupted by a past mechanical style->context rename that
+    // also rewrote DOM property chains (container margins), the custom-font element id, and the
+    // createElement tag — every call threw a TypeError, so lt-engine-core templates never got
+    // styles applied. Repaired here; margins now use individual properties (the shorthand
+    // stomped the auto margins anchoring center/right).
     function applyStyles() {
         if (C().style.customFont) {
-            let styleEl = document.getElementById('lt-custom-font-C().style');
+            let styleEl = document.getElementById('lt-custom-font-style');
             if (!styleEl) {
-                styleEl = document.createElement('C().style');
-                styleEl.id = 'lt-custom-font-C().style';
+                styleEl = document.createElement('style');
+                styleEl.id = 'lt-custom-font-style';
                 document.head.appendChild(styleEl);
             }
             // Add a timestamp or encode URI to handle paths
@@ -179,12 +184,12 @@ window.LTEngineStyles = (function () {
                 src: url('../fonts/${C().style.customFont}');
             }`;
             // Apply it to the body or container
-            document.body.C().style.fontFamily = "'LTCustomFont', 'Arial', sans-serif";
+            document.body.style.fontFamily = "'LTCustomFont', 'Arial', sans-serif";
         } else {
             // Revert to original if removed
-            const styleEl = document.getElementById('lt-custom-font-C().style');
+            const styleEl = document.getElementById('lt-custom-font-style');
             if (styleEl) styleEl.innerHTML = '';
-            document.body.C().style.fontFamily = "'Arial', 'Helvetica Neue', sans-serif";
+            document.body.style.fontFamily = "'Arial', 'Helvetica Neue', sans-serif";
         }
 
         // Apply global animation speed if gsap is available
@@ -197,30 +202,34 @@ window.LTEngineStyles = (function () {
             const container = document.querySelector(C().cfg.containerSel);
             if (container) {
                 // Reset inline margins to prevent accumulation
-                container.C().style.marginLeft = '';
-                container.C().style.marginRight = '';
-                container.C().style.margin = '';
-                
+                container.style.marginLeft = '';
+                container.style.marginRight = '';
+                container.style.marginTop = '';
+                container.style.marginBottom = '';
+                container.style.margin = '';
+
                 const pos = (C().style.position || 'left').toLowerCase();
                 if (pos === 'center') {
-                    container.C().style.marginLeft = 'auto';
-                    container.C().style.marginRight = 'auto';
+                    container.style.marginLeft = 'auto';
+                    container.style.marginRight = 'auto';
                 } else if (pos === 'right') {
-                    container.C().style.marginLeft = 'auto';
+                    container.style.marginLeft = 'auto';
                 } else {
                     // Default to left
-                    container.C().style.marginRight = 'auto';
+                    container.style.marginRight = 'auto';
                 }
                 if (C().style.marginX != null || C().style.marginY != null) {
                     const mx = C().style.marginX != null && C().style.marginX !== '' ? Number(C().style.marginX) : 77;
                     const my = C().style.marginY != null && C().style.marginY !== '' ? Number(C().style.marginY) : 43;
                     if (Number.isFinite(mx) && Number.isFinite(my)) {
-                        container.C().style.margin = my + 'px ' + mx + 'px';
+                        container.style.marginBottom = my + 'px';
+                        if (pos === 'right') container.style.marginRight = mx + 'px';
+                        else if (pos !== 'center') container.style.marginLeft = mx + 'px';
                     }
                 }
                 if (C().style.opacity != null && C().style.opacity !== '') {
                     const op = Number(C().style.opacity);
-                    if (Number.isFinite(op)) container.C().style.opacity = String(Math.max(0, Math.min(1, op)));
+                    if (Number.isFinite(op)) container.style.opacity = String(Math.max(0, Math.min(1, op)));
                 }
             }
         }
@@ -261,7 +270,7 @@ window.LTEngineStyles = (function () {
             return;
         }
         if (!el) {
-            el = document.createElement('C().style');
+            el = document.createElement('style');
             el.id = 'lt-studio-typography';
             document.head.appendChild(el);
         }
@@ -271,7 +280,7 @@ window.LTEngineStyles = (function () {
     function applyBlurOverride() {
         if (C().style.blurAmount == null || C().style.blurAmount === '' || !C().cfg.containerSel) return;
         const panel = document.querySelector(C().cfg.containerSel + ' .glass-panel');
-        if (panel) panel.C().style.backdropFilter = 'blur(' + Number(C().style.blurAmount) + 'px)';
+        if (panel) panel.style.backdropFilter = 'blur(' + Number(C().style.blurAmount) + 'px)';
     }
 
     function parseCasparXML(xml) {

@@ -25,8 +25,11 @@ justification just embedded-webpage/template input (e.g. `template/mario` — se
 ## What's still here
 
 - `src/system/cef-cdp-client.js` — the generic raw CDP client WO-247 introduced to replace
-  puppeteer-core. It doesn't depend on anything removed above and is what WO-248 migrates the
-  headless-Chrome thumbnail renderers onto.
+  puppeteer-core. It doesn't depend on anything removed above. WO-248 completed the puppeteer
+  removal: the headless-Chrome thumbnail renderers (`src/media/cg-look-thumb-render.js`,
+  `tools/runtime/generate-lt-thumbnails.js`) now run on this client via
+  `src/media/headless-chrome-cdp.js`, and the `puppeteer` npm dependency is fully purged from
+  `package.json`/`node_modules`.
 - Webpage-host content routing (`POST /api/host-live/webpage`, `/api/host-live/operator-fullscreen`
   — see [system-settings-hardware API](../wiki/api/system-settings-hardware.md#host-live-sources--operator-fullscreen)):
   playing a URL on a host channel and (optionally) routing it fullscreen to the operator display

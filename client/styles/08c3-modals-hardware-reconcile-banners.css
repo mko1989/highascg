@@ -207,27 +207,5 @@
 	opacity: 1;
 }
 
-/* Timer inspector modal (WO-226 T226.4) — settings form reuses .timer-control-panel__settings-*
-   classes (07b-audio-mixer-modal-shell.css); only the modal-specific layout lives here. */
-.timer-inspector-modal {
-	width: min(90vw, 26rem);
-	max-width: min(90vw, 26rem);
-}
-.timer-inspector-modal__body {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	padding: 16px 20px;
-}
-.timer-inspector-modal__settings-wrap {
-	display: flex;
-}
-.timer-inspector-modal__fade-row {
-	display: flex;
-	gap: 8px;
-	border-top: 1px solid var(--border);
-	padding-top: 12px;
-}
-.timer-inspector-modal__fade-row .timer-control-panel__btn {
-	flex: 1;
-}
+/* (WO-226 T226.4 timer-inspector MODAL retired 2026-07-17 — timer settings now render in the
+   Inspector panel: 05d-inspector-fields.css .inspector-screen-timer, components/inspector-screen-timer.js.) */

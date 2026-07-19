@@ -1,6 +1,6 @@
 # WO-203 — Adjustable size for the multiview timers
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Low-Medium (readability on the MV monitor)
 **Date:** 2026-07-14
 **Source:** owner request 2026-07-14: "need a new feature to be able to adjust the size of the multiview timers."

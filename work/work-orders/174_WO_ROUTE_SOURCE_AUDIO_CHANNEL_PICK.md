@@ -1,6 +1,6 @@
 # WO-174 — Route sources: choose which source audio channels play (e.g. only ch1+2 of an 8ch program)
 
-**Status:** Planned
+**Status:** Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (owner's screen-2 use case downmixes all 8ch today)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): screen 1 has 8ch audio; route of ch1 on screen 2 downmixes all 8ch to stereo; want to pick e.g. ch1&2 only.
