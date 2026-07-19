@@ -1,0 +1,17 @@
+# HighAsCG: NVIDIA persistence mode at boot (perf audit 2026-07-03 item 4).
+# `nvidia-smi -pm 1` is runtime-only — without this unit it resets to Disabled on
+# every reboot (and on every live-USB boot). Install:
+#   sudo cp scripts/setup/highascg-nvidia-persistence.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now highascg-nvidia-persistence.service
+[Unit]
+Description=HighAsCG: NVIDIA persistence mode for playout
+After=multi-user.target
+ConditionPathExists=/usr/bin/nvidia-smi
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nvidia-smi -pm 1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
