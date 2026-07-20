@@ -260,7 +260,8 @@ test('multiview off: per-DeckLink channels then streaming channel after screen p
 	const xml = buildConfigXml(flat)
 	const channelBlocks = [...xml.matchAll(/<channel>[\s\S]*?<\/channel>/g)].map((m) => m[0])
 	assert.equal(channelBlocks.length, 5, 'OUTPUT/PGM + PRV + 2 DeckLink channels + streaming')
-	assert.match(channelBlocks[2], /<consumers\s*\/>/, 'DeckLink channel has no consumers')
+	/* Empty consumers may serialize self-closing or expanded — both mean "no consumers". */
+	assert.match(channelBlocks[2], /<consumers\s*\/>|<consumers>\s*<\/consumers>/, 'DeckLink channel has no consumers')
 	assert.match(channelBlocks[2], /<audio-osc>true<\/audio-osc>/, 'DeckLink channel exposes audio OSC')
 	assert.match(channelBlocks[4], /<video-mode>720p5000<\/video-mode>/, 'streaming channel is last with its mode')
 })
@@ -759,4 +760,56 @@ test('multiview screen consumer omitted when Device View has no GPU cable to mul
 	const mvBlock = xml.match(/Multiview output #1[\s\S]*?<channel>([\s\S]*?)<\/channel>/)
 	assert.ok(mvBlock, 'multiview channel block')
 	assert.doesNotMatch(mvBlock[1], /<screen>/)
+})
+
+test('WO-288: standard mode aliases (e.g. 1080p50) emit no custom video-mode block', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: '1080p50',
+		multiview_enabled: false,
+	}
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p50', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_mode, '1080p5000', 'mode alias 1080p50 normalized to canonical 1080p5000')
+	const xml = buildConfigXml(flat)
+	assert.match(xml, /<video-mode>1080p5000<\/video-mode>/, 'channel uses canonical mode')
+	assert.doesNotMatch(xml, /<video-modes>[\s\S]*?<id>1920x1080<\/id>/, 'no custom video-mode block for standard mode alias')
+})
+
+test('WO-288: non-standard screen destination resolution still emits custom video-mode block', () => {
+	const app = clone(defaults)
+	addMockGraph(app)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		multiview_enabled: false,
+	}
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'd1', label: 'Main1', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: 'custom', width: 5120, height: 768, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	const flat = buildCasparGeneratorFlatConfig(app)
+	assert.equal(flat.screen_1_mode, 'custom')
+	assert.equal(flat.screen_1_custom_width, 5120)
+	assert.equal(flat.screen_1_custom_height, 768)
+	const xml = buildConfigXml(flat)
+	assert.match(xml, /<id>5120x768<\/id>/, 'custom destination resolution emits custom video-mode block')
 })

@@ -4,7 +4,7 @@ const defaults = require('./defaults')
 const { mergeAudioRoutingIntoConfig } = require('./config-generator')
 const { normalizeRtmpConfig } = require('./rtmp-output')
 const { resolveMainScreenCount } = require('./routing')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
+const { STANDARD_VIDEO_MODES, normalizeVideoModeId } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')
 const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-mapping')
@@ -64,8 +64,10 @@ function applyDestinationOverridesToScreens(merged, appConfig) {
 		const height = Math.max(64, parseInt(String(picked.height ?? 0), 10) || 0)
 		const fps = Math.max(1, parseFloat(String(picked.fps ?? 50)) || 50)
 		const n = idx + 1
-		if (modeRaw && STANDARD_VIDEO_MODES[modeRaw]) {
-			merged[`screen_${n}_mode`] = modeRaw
+		// Normalize mode aliases (e.g. '1080p50' → '1080p5000') and check if standard
+		const normalized = modeRaw ? normalizeVideoModeId(modeRaw) : ''
+		if (normalized && STANDARD_VIDEO_MODES[normalized]) {
+			merged[`screen_${n}_mode`] = normalized
 			continue
 		}
 		const customFromMode = parseCustomVideoModeString(modeRaw)

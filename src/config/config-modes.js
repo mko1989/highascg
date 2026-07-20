@@ -48,6 +48,52 @@ const STANDARD_VIDEO_MODES = {
 }
 
 /**
+ * Shorthand/legacy aliases for standard Caspar video mode IDs.
+ * Maps canonical-named modes (e.g. '1080p50') to their full Caspar time-scale
+ * equivalents (e.g. '1080p5000').
+ * @type {Record<string, string>}
+ */
+const STANDARD_VIDEO_MODE_ALIASES = {
+	'1080p50': '1080p5000',
+	'720p50': '720p5000',
+	'1080p60': '1080p6000',
+	'720p60': '720p6000',
+	'1080p59.94': '1080p5994',
+	'720p59.94': '720p5994',
+	'1080p25': '1080p2500',
+	'720p25': '720p2500',
+	'1080p24': '1080p2400',
+	'720p24': '720p2400',
+	'1080p23.98': '1080p2398',
+	'720p23.98': '720p2398',
+	'1080p30': '1080p3000',
+	'720p30': '720p3000',
+	'1080p29.97': '1080p2997',
+	'720p29.97': '720p2997',
+	'2160p50': '2160p5000',
+	'2160p60': '2160p6000',
+	'2160p59.94': '2160p5994',
+	'2160p25': '2160p2500',
+	'2160p24': '2160p2400',
+	'2160p23.98': '2160p2398',
+	'2160p30': '2160p3000',
+	'2160p29.97': '2160p2997',
+}
+
+/**
+ * Normalize shorthand/legacy video mode IDs to canonical STANDARD_VIDEO_MODES keys.
+ * @param {string} raw
+ * @returns {string}
+ */
+function normalizeVideoModeId(raw) {
+	const id = String(raw || '').trim()
+	if (!id) return ''
+	if (id === 'custom') return 'custom'
+	const aliased = STANDARD_VIDEO_MODE_ALIASES[id] || id
+	return aliased
+}
+
+/**
  * Pixel size for a Caspar `video-mode` id from INFO CONFIG (standard preset or WxH custom id).
  * @param {string} vm
  * @returns {{ width: number, height: number }}
@@ -99,16 +145,18 @@ function getModeDimensions(modeId, config, screenIdx) {
 		const fps = parseFloat(String(readScreenConfigValue(config, screenIdx, 'custom_fps') || '50')) || 50
 		return { width: w, height: h, fps, modeId: `${w}x${h}`, isCustom: true }
 	}
-	const std = STANDARD_VIDEO_MODES[modeId]
-	if (std) return { ...std, modeId, isCustom: false }
-	const px = String(modeId || '').match(/^(\d+)x(\d+)p?([\d.]+)?$/i)
+	// Normalize aliases like '1080p50' to '1080p5000'
+	const normalized = normalizeVideoModeId(modeId)
+	const std = STANDARD_VIDEO_MODES[normalized]
+	if (std) return { ...std, modeId: normalized, isCustom: false }
+	const px = String(normalized || '').match(/^(\d+)x(\d+)p?([\d.]+)?$/i)
 	if (px) {
 		const w = parseInt(px[1], 10) || 1920
 		const h = parseInt(px[2], 10) || 1080
 		const fps = px[3] ? parseFloat(px[3]) : 50
 		return { width: w, height: h, fps: Number.isFinite(fps) && fps > 0 ? fps : 50, modeId: `${w}x${h}`, isCustom: true }
 	}
-	return { width: 1920, height: 1080, fps: 50, modeId: modeId || '1080p5000', isCustom: false }
+	return { width: 1920, height: 1080, fps: 50, modeId: normalized || '1080p5000', isCustom: false }
 }
 
 /** @see companion docs/casparcg-multichannel-audio.md */
@@ -227,6 +275,7 @@ module.exports = {
 	calculateCadence,
 	getModeDimensions,
 	pixelSizeForVideoMode,
+	normalizeVideoModeId,
 	AUDIO_LAYOUT_CHOICES,
 	layoutChannelCount,
 	getExtraAudioModeDimensions,
