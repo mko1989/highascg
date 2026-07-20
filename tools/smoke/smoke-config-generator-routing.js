@@ -637,7 +637,11 @@ test('uncabled second main stays stereo when first main has 8ch PortAudio', () =
 })
 
 test('screen consumer x/y sync from graph layout without screen_N_system_id', () => {
-	const graph = clone(require('../../config/device_graph.json'))
+	/* Fixtures, NOT config/ — this test used to require the LIVE device graph and screen
+	 * destinations, so it failed the gate whenever the box was re-cabled or reconfigured
+	 * (observed 2026-07-20: live config yielded screen_1_x undefined where the committed one
+	 * yields 0). A gate test must not depend on mutable runtime state. */
+	const graph = clone(require('./fixtures/device_graph.sample.json'))
 	graph.edges = [
 		...(Array.isArray(graph.edges) ? graph.edges : []),
 		{ id: 'e_mv_gpu', sourceId: 'dst_in_dst_mqtchens_1', sinkId: 'gpu_p2' },
@@ -659,7 +663,7 @@ test('screen consumer x/y sync from graph layout without screen_N_system_id', ()
 			preview_screen_consumer: false,
 			streamingChannel: { enabled: false },
 		},
-		screenDestinations: require('../../config/screen_destinations.json'),
+		screenDestinations: require('./fixtures/screen_destinations.sample.json'),
 		deviceGraph: graph,
 	}
 	const flat = buildCasparGeneratorFlatConfig(app)
