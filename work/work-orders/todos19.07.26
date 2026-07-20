@@ -13,8 +13,12 @@ the add shader needs to be hidden under a plus buttom in the templates tab simil
 
 
 after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look. (still and the first look play try fails after long timeout holding the whole app from functioning)
-   -> PARTLY DONE, LAYOUT STILL BROKEN - being fixed now. I fixed PRV CONTENT (re-stage + thumb warm) and wrongly called the whole item done. Sorry.
-   -> PROVEN CAUSE of the layout half, from your last restart: server restored your saved layout ("re-apply: 3 cell(s)", rects for 3 tiles at 12:44:29.368), then 0.7s later the freshly-booted kiosk reported "first rect report cells=1" and overwrote it with its own default single tile. Not stale - clobbered. It "comes back when you trigger a look" because the look re-renders the tiles once state has arrived.
+   -> NOW FIXED (both halves) - verified live on your box after a restart at 12:58: first rect report is cells=3 and the final holes are your saved 3-tile layout, where before it was cells=1 clobbering it.
+   -> Cause 1: the kiosk rendered and reported BEFORE server state arrived, so it only knew about 1 tile and sent that, overwriting the layout the server had just restored.
+   -> Cause 2 (why it never recovered on its own): the state store only ever emits '*', but the compose panel listened for 'channelMap' - so the real state never triggered a re-render. That is why it only came back when you triggered a look.
+   -> Cause 3: on websocket connect the client also sent an EMPTY layout, which DELETED the restored one.
+   -> PLEASE RE-TEST after reloading the kiosk. Also still worth telling me if the first look play still times out - I have no evidence of it since the AMCP fix but I am not claiming it.
+   -> Known cosmetic leftover: for ~2s during boot the holes close once (one empty payload) before the layout lands.
 
 
 
