@@ -30,14 +30,14 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO | Item | Size | Status |
 |----|------|------|--------|
 | WO-273 | scripts/ + tools/ cleanup: move deprecated out, leave a clear runtime set, a fresh-install set, and a dev/eggs set | L | TODO |
-| WO-274 | Config generator keeps stale PGM/PRV channels that are unused and invisible in the GUI | M | TODO |
-| WO-275 | Config generator ignores a changed destination (DeckLink out 3: pgm2 → multiview still shows pgm2 after restarts) | M | TODO |
-| WO-276 | Screen-destination custom resolution: height reverts to 1080, inspector disagrees with the node | M | TODO |
+| WO-274 | Config generator keeps stale PGM/PRV channels that are unused and invisible in the GUI | M | **DONE** — graph cable from multiview/stream/operator_gui inflated screen count via Math.max; isMainBusDestinationMode() filter |
+| WO-275 | Config generator ignores a changed destination (DeckLink out 3: pgm2 → multiview still shows pgm2 after restarts) | M | **DONE** — additive DeckLink projection left screen_2_decklink_device=3 AND multiview_decklink_device=3 (both in live config); now released on claim |
+| WO-276 | Screen-destination custom resolution: height reverts to 1080, inspector disagrees with the node | M | **DONE** — NOT linked to stale channels: 5s client payload cache answered the post-save reload; now forceRefresh |
 | WO-277 | Loading a project doesn't actually load anything | M | TODO |
 | WO-278 | Cable render performance; allow re-grabbing a cable end and reconnecting it elsewhere | M | TODO |
 | WO-279 | Operator-GUI Firefox opens on the wrong monitor (mouse lock is correct); review the xrandr/window-placement workflow | M | TODO |
 | WO-280 | Caspar JPEG compose preview: background tab causes lag; thumbnail creation for an ever-changing JPEG needs error handling/backpressure | M | **DONE** (93fa79e) — push-driven at 25Hz x clients x channels, each push a full re-read; now single-flight + etag memo server-side, visibility-aware polling and capped backoff client-side |
-| WO-281 | Audit `work/work-orders/logs.19.07.26` — many errors/false calls during normal operation; check whether enabling AMCP batch caused regressions | M | TODO |
+| WO-281 | Audit `work/work-orders/logs.19.07.26` — many errors/false calls during normal operation; check whether enabling AMCP batch caused regressions | M | **DONE** — all errors trace to one powered-off DeckLink 4; amcp_batch was never enabled. Report: 281_WO_CASPAR_LOG_AUDIT.md |
 | WO-282 | Browser source: route a real audio source in; give it a virtual display shown in kiosk and relayed to Caspar; options for operator mouse/keyboard control | L (research) | TODO |
 | WO-283 | Operator GUI blocks any window on top (DeckLink setup, NVIDIA settings, file browser, operator web browser) | M | TODO |
 | WO-284 | Audio mixer: VU meters per input; know which input produces sound. Allow routing a layer's audio to another screen (UI currently blocks it) | L | TODO |
