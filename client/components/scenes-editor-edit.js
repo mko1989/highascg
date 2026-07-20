@@ -50,6 +50,16 @@ export function renderEdit(ctx) {
 		<button type="button" class="scenes-btn scenes-btn--sm" id="scenes-take-cut" title="Hard cut" aria-label="Hard cut">CUT</button>
 		<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-layer">＋</button>
 	`
+	// WO-272 edit-on-PGM: unmissable red LIVE indication — every edit in this session hits AIR
+	// (geometry via the PGM mixer nudge, content changes via a forceCut server take).
+	if (sceneState.editOnPgm === true) {
+		bar.classList.add('scenes-edit-bar--live-pgm')
+		const liveBadge = document.createElement('span')
+		liveBadge.className = 'scenes-edit-live-badge'
+		liveBadge.textContent = '● LIVE — EDITING PGM'
+		liveBadge.title = 'Edits apply straight to the on-air PGM channel'
+		bar.insertBefore(liveBadge, bar.querySelector('#scenes-name'))
+	}
 	mainHost.appendChild(bar)
 
 	bar.querySelector('#scenes-take-live').addEventListener('click', () => {

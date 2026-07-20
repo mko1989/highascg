@@ -246,6 +246,70 @@ export function createScenesPreviewRuntime(opts) {
 	}
 
 	/**
+	 * WO-272 edit-on-PGM content push: the client full-push AMCP is bank-less and must NEVER touch a
+	 * bank-mapped PGM channel, so CONTENT changes (clip/loop/audio/PIP — anything failing
+	 * {@link isGeometryOnlyPreview}) go through the server take pipeline instead: a forceCut
+	 * /api/scene/take at the PGM channel with `stageOnPreview: false` + `previewExchange: false`
+	 * (leave PRV completely alone — the operator may have something staged there). Geometry/opacity/
+	 * crop edits never reach here on the live path: {@link sendMixerNudge} targets PGM directly.
+	 * Only mains where this look is CURRENTLY live take the cut — an edit must never put the look
+	 * on an air channel it is not already on.
+	 * @param {string} sceneId
+	 * @param {number[]|undefined} restrictMains
+	 */
+	async function pushEditsToPgmLive(sceneId, restrictMains) {
+		const scene = sceneState.getScene(sceneId)
+		if (!scene) return
+		if (lastPreviewContentSnapshot?.sceneId === sceneId && isGeometryOnlyPreview(lastPreviewContentSnapshot, scene)) {
+			return /* geometry-only — the PGM nudge owns it */
+		}
+		const cm = getChannelMap()
+		let targets = nudgeTargetMainIdxs(scene, cm).filter((mIdx) => sceneState.getLiveSceneIdForMain?.(mIdx) === sceneId)
+		if (Array.isArray(restrictMains) && restrictMains.length > 0) {
+			const allow = new Set(restrictMains.map((x) => Number(x)))
+			targets = targets.filter((i) => allow.has(i))
+		}
+		if (targets.length === 0) return
+		flushSceneDeckSync?.()
+		let failed = false
+		for (const mIdx of targets) {
+			const programCh = Number(cm.programChannels?.[mIdx] ?? cm.playbackChannels?.[mIdx])
+			if (!Number.isFinite(programCh) || programCh <= 0) continue
+			const fps = cm.programResolutions?.[mIdx]?.fps ?? 50
+			const incomingScene = buildIncomingScenePayload(scene, {
+				timeline: null,
+				positionMs: 0,
+				programChannel: programCh,
+				mainIdx: mIdx,
+				fps,
+				stateStore,
+				transitionTake: false,
+				pgmOnly: !isPreviewBusAvailable(cm, mIdx),
+			})
+			try {
+				await api.post('/api/scene/take', {
+					channel: programCh,
+					sceneId,
+					forceCut: true,
+					useServerLive: true,
+					stageOnPreview: false,
+					previewExchange: false,
+					framerate: fps,
+					incomingScene: {
+						...incomingScene,
+						globalBorder: sceneState.getGlobalBorderForScreen(mIdx),
+					},
+				})
+			} catch (e) {
+				failed = true
+				console.warn('Edit-on-PGM content push failed:', e?.message || e)
+			}
+		}
+		/* Only converge the snapshot when every target took — a stale snapshot retries on the next push. */
+		if (!failed) primePreviewSnapshotFromScene(sceneId)
+	}
+
+	/**
 	 * @param {string} sceneId
 	 * @param {number[]|undefined} restrictMains - If set, only push AMCP / set preview state for these main indices (deck column, look recall, etc.).
 	 * @param {boolean} [forcePrvBus] - When true (deck / recall), always use the mapped preview channel, not PGM from edit-on-PGM compose mode.
@@ -253,6 +317,12 @@ export function createScenesPreviewRuntime(opts) {
 	async function pushSceneToPreview(sceneId, restrictMains, forcePrvBus = false) {
 		if (forcePrvBus) {
 			await pushSceneToPreviewViaServer(sceneId, restrictMains, true)
+			return
+		}
+		/* WO-272 edit-on-PGM: editor pushes go to AIR, not PRV — geometry rides the PGM nudge,
+		 * content changes cut through the (bank-aware) server take pipeline. */
+		if (sceneState.editOnPgm === true && sceneState.editingSceneId === sceneId) {
+			await pushEditsToPgmLive(sceneId, restrictMains)
 			return
 		}
 		const out = await pushSceneToPreviewImpl({
@@ -311,6 +381,7 @@ export function createScenesPreviewRuntime(opts) {
 		lastGlobalBorderPushMeta.clear()
 		lastNudgeSentByLayer.clear()
 		lastNudgeSceneId = null
+		lastNudgeTargetPgm = false
 	}
 
 	// --- Low-latency mixer nudge (POST /api/preview/mixer-nudge) -------------------------------
@@ -328,6 +399,8 @@ export function createScenesPreviewRuntime(opts) {
 	const lastNudgeSentByLayer = new Map()
 	/** @type {string | null} */
 	let lastNudgeSceneId = null
+	/** WO-272: whether the last nudge targeted PGM (edit-on-PGM) — a mode flip resets the dedup map. */
+	let lastNudgeTargetPgm = false
 
 	function nudgeCropParams(l) {
 		if (!Array.isArray(l.effects)) return null
@@ -392,13 +465,20 @@ export function createScenesPreviewRuntime(opts) {
 			 * push's PLAY pipeline and must never be short-cut. */
 			if (!lastPreviewContentSnapshot || lastPreviewContentSnapshot.sceneId !== id) return
 			if (!isGeometryOnlyPreview(lastPreviewContentSnapshot, scene)) return
-			if (lastNudgeSceneId !== id) {
+			/* WO-272 edit-on-PGM: same nudge machinery, pointed at the on-air PGM channel (the
+			 * server maps logical→physical layers bank-aware and staleness-guards against what is
+			 * actually live there). Only mains where this look IS live are nudged. */
+			const pgmMode = sceneState.editOnPgm === true
+			if (lastNudgeSceneId !== id || lastNudgeTargetPgm !== pgmMode) {
 				lastNudgeSentByLayer.clear()
 				lastNudgeSceneId = id
+				lastNudgeTargetPgm = pgmMode
 			}
 			const cm = getChannelMap()
 			for (const mIdx of nudgeTargetMainIdxs(scene, cm)) {
-				if (!isPreviewBusAvailable(cm, mIdx)) continue
+				if (pgmMode) {
+					if (sceneState.getLiveSceneIdForMain?.(mIdx) !== id) continue
+				} else if (!isPreviewBusAvailable(cm, mIdx)) continue
 				const changed = []
 				for (const l of scene.layers || []) {
 					if (!l?.source?.value) continue
@@ -415,6 +495,7 @@ export function createScenesPreviewRuntime(opts) {
 					const res = await api.post('/api/preview/mixer-nudge', {
 						mainIndex: mIdx,
 						sceneId: id,
+						...(pgmMode ? { target: 'pgm' } : {}),
 						composeCanvas: cv ? { w: cv.width, h: cv.height } : null,
 						layers: changed.map((c) => nudgeLayerPayload(c.layer)),
 					})

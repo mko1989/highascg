@@ -89,6 +89,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	async function exitLookEditor() {
 		commitPendingLookNameEdits(mainHost, sceneState)
 		const id = sceneState.editingSceneId
+		// WO-272: read before setEditingScene(null) resets it — an edit-on-PGM session never staged
+		// anything on PRV, so registering the look as PRV-live on exit would be a lie.
+		const wasEditOnPgm = sceneState.editOnPgm === true
 		await previewRuntime.waitForPreviewPushComplete()
 		if (id) {
 			const scene = sceneState.getScene(id)
@@ -96,7 +99,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 				const mainIdx = resolveMainIndexForScene(scene, sceneState)
 				const cm = getChannelMap()
 				// Skip preview live sync for PGM-only mains (no separate preview bus)
-				if (isPreviewBusAvailable(cm, mainIdx)) {
+				if (!wasEditOnPgm && isPreviewBusAvailable(cm, mainIdx)) {
 					try {
 						await syncPreviewLiveToServer(id, mainIdx, { sceneState, stateStore })
 					} catch (e) {
@@ -460,6 +463,10 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		if (sceneId) {
 			sceneState.setEditOnPgm(true)
 			sceneState.setEditingScene(sceneId)
+			// WO-272: prime the content snapshot from the look being edited so the first geometry
+			// drag rides the PGM nudge instead of tripping the content-change cut-take path
+			// (pushEditsToPgmLive in scenes-preview-runtime.js — a cut restarts clips on AIR).
+			previewRuntime.primePreviewSnapshotFromScene(sceneId)
 			if (typeof window.highascgActivateWorkspaceTab === 'function') {
 				window.highascgActivateWorkspaceTab('scenes')
 			}

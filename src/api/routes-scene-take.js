@@ -220,6 +220,11 @@ async function handleSceneTake(body, ctx) {
 			}
 			const previousPgmScene = currentScene
 			const stageOnPreview = b.stageOnPreview !== false
+			/* WO-272: edit-on-PGM content pushes re-take the SAME look that is already on air —
+			 * flipping the "previous" (older edit of the same look) onto PRV would clobber whatever
+			 * the operator has staged there. `previewExchange: false` skips the pgm→prv flip-flop;
+			 * default (absent) keeps the normal take behavior unchanged. */
+			const previewExchange = b.previewExchange !== false
 			if (stageOnPreview) {
 				const prvCurrent = liveSceneState.getChannel(bus1)?.scene || null
 				/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
@@ -314,7 +319,7 @@ async function handleSceneTake(body, ctx) {
 			// channel, independent AMCP). Sequenced after the awaited PGM take, PRV kept
 			// showing the staged incoming look for the entire fade + teardown — the
 			// operator-visible "wrong look on preview after transition" (WO-150 B150.1).
-			startPreviewExchange()
+			if (previewExchange) startPreviewExchange()
 			await pgmTakePromise
 			if (inc && typeof inc === 'object' && inc.id) {
 				liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))

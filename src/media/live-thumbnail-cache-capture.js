@@ -259,4 +259,6 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 module.exports = {
 	captureLiveThumbnailToCache,
 	scheduleLiveThumbnailRefresh,
+	/* WO-272: reused by routes-pgm-capture.js (operator capture button). */
+	parsePrintFilenameFromAmcpData,
 }

@@ -19,6 +19,7 @@ const routesConfig = require('./routes-config')
 const routesMultiview = require('./routes-multiview')
 const routesScene = require('./routes-scene')
 const routesPreviewNudge = require('./routes-preview-nudge')
+const routesPgmCapture = require('./routes-pgm-capture')
 const routesMisc = require('./routes-misc')
 const routesTimeline = require('./routes-timeline')
 const routesStreaming = require('./routes-streaming')
@@ -405,7 +406,10 @@ routes.post('/api/scene/live/preview/clear', ({ body, ctx }) =>
 	routesScene.handlePost('/api/scene/live/preview/clear', body, ctx), { requireCaspar: false })
 routes.post('/api/scene/*', ({ path, body, ctx }) => routesScene.handlePost(path, body, ctx), { requireCaspar: true })
 // Low-latency looks-editor geometry nudge for the look staged on PRV (cosmetic; take path stays authoritative).
+// WO-272: `target: 'pgm'` points the same machinery at the on-air PGM channel (bank-aware) for edit-on-PGM mode.
 routes.post('/api/preview/mixer-nudge', ({ body, ctx }) => routesPreviewNudge.handlePreviewMixerNudge(body, ctx), { requireCaspar: true })
+// WO-272: operator capture button — Caspar PRINT of the resolved PGM channel (PNG lands in the Caspar media folder).
+routes.post('/api/pgm/capture', ({ body, ctx }) => routesPgmCapture.handlePgmCapture(body, ctx), { requireCaspar: true })
 routes.post('/api/misc/*', ({ path, body, ctx }) => routesMisc.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Timeline catchall post

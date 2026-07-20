@@ -14,6 +14,13 @@
  * Staleness guard: if the requested sceneId is not the look currently staged on the PRV channel
  * (server live map), nothing is emitted and `{ ok: false, staged: false }` is returned — a nudge
  * must never repaint an old/foreign staged look.
+ *
+ * WO-272 (todos19.07.26): `target: 'pgm'` points the same machinery at the PGM channel for the
+ * operator-GUI "edit live on PGM" mode. Unlike PRV, PGM is bank-mapped (WO-160/199: bank A
+ * physical = logical, bank B = logical + 100) — the ACTIVE bank is re-read INSIDE the per-channel
+ * take chain so a queued take that flips the bank can never race the nudge onto the wrong bank.
+ * The staleness guard compares against what is LIVE on the PGM channel (same live map — takes key
+ * it by the program channel), so a PGM nudge can never repaint a look that just left air.
  */
 
 'use strict'
@@ -26,7 +33,8 @@ const {
 	sceneLayerRotationMixerLines,
 } = require('../engine/scene-layer-rotation-amcp')
 const { buildEffectAmcpLines } = require('../engine/scene-take-lbg-helpers')
-const { LOOK_LAYER_MIN, LOOK_LAYER_MAX } = require('../engine/look-layer-ranges')
+const { LOOK_LAYER_MIN, LOOK_LAYER_MAX, PGM_BANK_B_OFFSET } = require('../engine/look-layer-ranges')
+const { normalizeProgramLayerBank } = require('../engine/program-layer-bank')
 const {
 	resolvePreviewChannel,
 	getRouteMap,
@@ -44,10 +52,12 @@ const NUDGE_MAX_LAYERS = 12
  * @param {number} previewCh
  * @param {{ layerNumber: number|string, rotation?: number, opacity?: number, effects?: { type?: string, params?: object }[] }} layer
  * @param {{ x: number, y: number, scaleX: number, scaleY: number }} f
+ * @param {number|null} [physicalLayer] - WO-272: bank-mapped physical layer for PGM targets
+ *   (logical + 100 on bank B); null/omitted = logical layer IS physical (bank-less PRV).
  * @returns {string[]}
  */
-function buildNudgeLinesForLayer(previewCh, layer, f) {
-	const ln = parseInt(layer.layerNumber, 10)
+function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null) {
+	const ln = physicalLayer != null ? parseInt(physicalLayer, 10) : parseInt(layer.layerNumber, 10)
 	const cl = `${parseInt(previewCh, 10)}-${ln}`
 	const rot = Number(layer.rotation) || 0
 	/* Same center-pivot shift as scene-take-lbg-jobs / the client full push. */
@@ -92,6 +102,37 @@ function resolveNudgePreviewChannel(ctx, b) {
 }
 
 /**
+ * WO-272: resolve the PGM channel for a `target: 'pgm'` nudge (mainIndex preferred; an explicit
+ * channel is accepted only when it IS a program channel). Program channels are where takes land
+ * and live-scene-state is keyed — playbackChannels is the switcher-bus fallback.
+ * Exported for the offline smoke test.
+ * @param {object} ctx
+ * @param {{ mainIndex?: unknown, channel?: unknown }} b
+ * @returns {number | null}
+ */
+function resolveNudgePgmChannel(ctx, b) {
+	const routeMap = getRouteMap(ctx)
+	const mainIdx = b.mainIndex != null ? parseInt(b.mainIndex, 10) : -1
+	if (Number.isInteger(mainIdx) && mainIdx >= 0) {
+		const ch = Number(routeMap.programChannels?.[mainIdx] ?? routeMap.playbackChannels?.[mainIdx])
+		if (Number.isFinite(ch) && ch > 0) return ch
+	}
+	if (b.channel != null) {
+		const ch = parseInt(b.channel, 10)
+		const programs = [...(routeMap.programChannels || []), ...(routeMap.playbackChannels || [])]
+			.map((p) => Number(p))
+			.filter((n) => Number.isFinite(n) && n > 0)
+		if (programs.includes(ch)) return ch
+	}
+	return null
+}
+
+/** WO-272: `target: 'pgm'` routes the nudge at the on-air PGM channel (bank-aware). */
+function isPgmNudgeTarget(b) {
+	return String(b?.target || '').toLowerCase() === 'pgm'
+}
+
+/**
  * @param {string} body
  * @param {object} ctx — app context
  */
@@ -101,12 +142,17 @@ async function handlePreviewMixerNudge(body, ctx) {
 	}
 	const b = parseBody(body)
 
-	const previewCh = resolveNudgePreviewChannel(ctx, b)
-	if (!previewCh) {
+	const pgmTarget = isPgmNudgeTarget(b)
+	const targetCh = pgmTarget ? resolveNudgePgmChannel(ctx, b) : resolveNudgePreviewChannel(ctx, b)
+	if (!targetCh) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'Preview channel not found for mainIndex/channel (PGM-only destination?)' }),
+			body: jsonBody({
+				error: pgmTarget
+					? 'Program channel not found for mainIndex/channel'
+					: 'Preview channel not found for mainIndex/channel (PGM-only destination?)',
+			}),
 		}
 	}
 
@@ -116,13 +162,13 @@ async function handlePreviewMixerNudge(body, ctx) {
 	}
 
 	const sceneId = b.sceneId != null ? String(b.sceneId).trim() : ''
-	const staged = liveSceneState.getChannel(previewCh)
+	const staged = liveSceneState.getChannel(targetCh)
 	if (!sceneId || !staged?.sceneId || String(staged.sceneId) !== sceneId) {
 		/* Not an error: the client falls back to the full (re)staging push. */
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: false, staged: false, previewChannel: previewCh, stagedSceneId: staged?.sceneId ?? null }),
+			body: jsonBody({ ok: false, staged: false, previewChannel: targetCh, stagedSceneId: staged?.sceneId ?? null }),
 		}
 	}
 
@@ -130,46 +176,59 @@ async function handlePreviewMixerNudge(body, ctx) {
 	const incomingScene =
 		cc && Number(cc.w) > 0 && Number(cc.h) > 0 ? { composeCanvas: { w: Number(cc.w), h: Number(cc.h) } } : null
 
-	const lines = []
+	/* Fill math is bank-independent — resolve outside the chain; layer→physical mapping happens
+	 * inside it (WO-272: the active PGM bank may flip while we wait behind a queued take). */
+	const resolved = []
 	for (const layer of layers) {
 		if (!layer || typeof layer !== 'object') continue
 		const ln = parseInt(layer.layerNumber, 10)
-		/* WO-160 band guard: nudges may only touch the look layer range on PRV. */
+		/* WO-160 band guard: nudges may only touch the LOGICAL look layer range. */
 		if (!Number.isInteger(ln) || ln < LOOK_LAYER_MIN || ln > LOOK_LAYER_MAX) continue
-		const f = await getResolvedFillForSceneLayer(ctx, layer, previewCh, incomingScene)
-		lines.push(...buildNudgeLinesForLayer(previewCh, layer, f))
+		const f = await getResolvedFillForSceneLayer(ctx, layer, targetCh, incomingScene)
+		resolved.push({ layer, f })
 	}
 
-	if (lines.length === 0) {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, previewChannel: previewCh, lines: 0 }) }
+	if (resolved.length === 0) {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, previewChannel: targetCh, lines: 0 }) }
 	}
 
 	/* Join the /api/scene/take per-channel chain so a nudge can never interleave into a
-	 * mid-flight staging take on the same PRV (determinism before speed — todos19.07.26).
+	 * mid-flight staging take on the same channel (determinism before speed — todos19.07.26).
+	 * PGM targets chain on the PGM channel itself — the exact key /api/scene/take uses.
 	 * DEFER lines + one channel COMMIT: atomic apply, no pre-flush COMMIT between chunks. */
 	const mainIdx = b.mainIndex != null ? parseInt(b.mainIndex, 10) : -1
-	const chainKey = takeChainKeyForPreviewChannel(getRouteMap(ctx), previewCh, mainIdx)
+	const chainKey = pgmTarget ? targetCh : takeChainKeyForPreviewChannel(getRouteMap(ctx), targetCh, mainIdx)
 	let emitted = false
+	let lineCount = 0
 	await chainSceneTakeWork(ctx, chainKey, async () => {
 		/* Re-check inside the chain: a take queued ahead of us may have restaged a different look. */
-		const stagedNow = liveSceneState.getChannel(previewCh)
+		const stagedNow = liveSceneState.getChannel(targetCh)
 		if (!stagedNow?.sceneId || String(stagedNow.sceneId) !== sceneId) return
+		/* WO-272: read the ACTIVE bank here, after any queued take has settled — bank B is +100. */
+		const bank = pgmTarget ? normalizeProgramLayerBank(ctx.programLayerBankByChannel?.[String(targetCh)]) : 'a'
+		const lines = []
+		for (const { layer, f } of resolved) {
+			const ln = parseInt(layer.layerNumber, 10)
+			const physLn = bank === 'b' ? ln + PGM_BANK_B_OFFSET : ln
+			lines.push(...buildNudgeLinesForLayer(targetCh, layer, f, physLn))
+		}
 		await ctx.amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
-		await ctx.amcp.raw(`MIXER ${previewCh} COMMIT`)
+		await ctx.amcp.raw(`MIXER ${targetCh} COMMIT`)
 		emitted = true
+		lineCount = lines.length
 	})
 
 	if (!emitted) {
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: false, staged: false, previewChannel: previewCh }),
+			body: jsonBody({ ok: false, staged: false, previewChannel: targetCh }),
 		}
 	}
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, previewChannel: previewCh, lines: lines.length }),
+		body: jsonBody({ ok: true, previewChannel: targetCh, target: pgmTarget ? 'pgm' : 'prv', lines: lineCount }),
 	}
 }
 
@@ -177,5 +236,7 @@ module.exports = {
 	handlePreviewMixerNudge,
 	buildNudgeLinesForLayer,
 	resolveNudgePreviewChannel,
+	resolveNudgePgmChannel,
+	isPgmNudgeTarget,
 	NUDGE_MAX_LAYERS,
 }

@@ -95,8 +95,18 @@
 	cursor: grab;
 }
 .operator-tile__footer:active { cursor: grabbing; }
+/* WO-272: the colored strip is now a ROW — label text (drag area) + PGM action buttons on the
+ * right. The role background moved from the label onto the row so the strip stays full-width. */
+.operator-tile__labelrow {
+	display: flex;
+	align-items: center;
+	background: #c92a2a;
+}
+.operator-tile[data-role='prv'] .operator-tile__labelrow { background: #0d9488; }
 .operator-tile__label {
 	box-sizing: border-box;
+	flex: 1 1 auto;
+	min-width: 0;
 	padding: 1px 6px;
 	font-size: 10px;
 	font-weight: 600;
@@ -105,9 +115,32 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	background: #c92a2a;
 }
-.operator-tile[data-role='prv'] .operator-tile__label { background: #0d9488; }
+
+/* WO-272 — PGM tile chrome buttons (EDIT PGM / CAPTURE). Real chrome only: they live in the
+ * footer label row, never over the video hole (hole rects are click-dead by design). */
+.operator-tile__actions {
+	display: flex;
+	align-items: stretch;
+	flex: 0 0 auto;
+	gap: 3px;
+	padding: 0 3px 0 4px;
+}
+.operator-tile__btn {
+	padding: 0 5px;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.3px;
+	line-height: 12px;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.35);
+	border-radius: 3px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.operator-tile__btn:hover { background: rgba(0, 0, 0, 0.55); }
+.operator-tile__btn:disabled { opacity: 0.5; cursor: default; }
 .operator-tile__footer .playback-timer { min-width: 0; font-size: 9px; padding: 0 6px; }
 .operator-tile__footer .playback-timer__row { font-size: 9px; }
 
