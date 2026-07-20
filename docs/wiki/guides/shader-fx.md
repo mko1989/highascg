@@ -41,9 +41,26 @@ Standard Shadertoy entry point `mainImage(out vec4 fragColor, in vec2 fragCoord)
 
 | Path | Audio quality |
 |------|---------------|
-| browser_display source | **Real FFT** via getUserMedia — picks an ALSA monitor/loopback input automatically; `?audioDev=<substring>` overrides |
+| browser_display source | **Real FFT** via getUserMedia — but only if a capture device actually exists, see the warning below; `?audioDev=<substring>` selects one |
 | Caspar CG / CEF template | **Coarse** — level from the playout OSC meters, synthesized into a plausible spectrum; `?ch=<caspar channel>` picks the meter source (default 1) |
 | No audio available | Shader still renders; audio texture stays silent |
+
+> **Audio-reactive shaders need a capture device that does not exist by default.** A stock HighAsCG
+> box runs raw ALSA with no sound server (no PulseAudio, no PipeWire) — so there is no "monitor" or
+> "loopback" device to pick up what Caspar is playing. `arecord -l` on such a box lists only the
+> physical motherboard analog inputs. Consequences:
+>
+> - The player's automatic pick looks for a device whose label matches `monitor|loopback`. With no
+>   such device it silently falls through to the default input, which is usually a mic jack with
+>   nothing plugged in — the shader renders, the audio texture stays near silent.
+> - To react to **program audio** you must first create a loopback: the `snd-aloop` kernel module
+>   ships with the installed kernel (no extra package), and Caspar then needs a second audio
+>   consumer pointed at its playback side. That is a Caspar restart and a boot-time module load.
+> - To react to a **live input**, patch a real source into a motherboard line-in and select it with
+>   `?audioDev=`.
+>
+> See `work/work-orders/282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md` for the measured state
+> of the box and the staged plan.
 
 **Not supported** (v1): Shadertoy texture/video/cubemap/keyboard/webcam channel assets (channels are buffers + audio only), sound shaders, VR, mouse interaction. CG `UPDATE` accepts `{ "paused": true|false }` only — everything else is baked in at export.
 
@@ -61,7 +78,7 @@ Standard Shadertoy entry point `mainImage(out vec4 fragColor, in vec2 fragCoord)
 |---------|--------|
 | Layer black on air | CEF GPU disabled — enable + Apply Caspar config + restart, or play via browser_display |
 | Shader missing from Templates | **Refresh** the Templates tab (Caspar TLS) |
-| No audio reaction | A channel must be wired to **audio** *and* **audio reactive** ticked; CG path gives coarse levels only — use browser_display for real FFT |
+| No audio reaction | First check a capture device exists at all (`arecord -l`) — see the audio warning above; then that a channel is wired to **audio** with **audio reactive** ticked. CG path gives coarse levels only |
 | Save fails | Missing name, empty Image pass, or a pass over 256 KB — the status line shows the reason |
 | Preview blank in the modal | Shader compile error — check the browser console for the GLSL error |
 
