@@ -99,7 +99,12 @@
 	position: relative;
 	width: 100%;
 	max-height: min(62vh, 520px);
-	background: #0d1117;
+	background:
+		linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06)),
+		linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06)),
+		#0d1117;
+	background-size: 16px 16px;
+	background-position: 0 0, 8px 8px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	overflow: hidden;
