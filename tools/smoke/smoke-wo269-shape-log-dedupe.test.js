@@ -93,7 +93,10 @@ describe('WO-269 T269.3: helper repeat compression', () => {
 
 	it('keeps the WO-262 log-before-parse guarantee for NEW payloads', () => {
 		const idx = helper.indexOf('log(f"stdin line received:')
-		const parseIdx = helper.indexOf('monitor, rects, channel, title_marker = parse_line(line)')
+		// Match the CALL, not the destructuring arity — the payload gains fields over time (WO-283
+		// added `helperOpen`). What this test guards is the ORDER: log the raw line first, parse
+		// second, so a payload that crashes the parser is still visible in the helper log.
+		const parseIdx = helper.indexOf('= parse_line(line)')
 		assert.ok(idx > 0 && parseIdx > idx, 'new-line log must still precede parse_line')
 	})
 

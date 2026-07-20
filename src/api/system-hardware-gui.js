@@ -267,6 +267,16 @@ function spawnGuiDetached(action, opts = {}) {
 		detached: true,
 		stdio: 'ignore',
 	})
+	// WO-283: hand the child to the caller BEFORE unref() so the operator-helper watchdog can
+	// attach its 'exit' listener. unref() only drops the event-loop reference — 'exit' still fires
+	// while the server lives — but the child ref is otherwise unreachable from here.
+	if (typeof opts.onSpawn === 'function') {
+		try {
+			opts.onSpawn(proc)
+		} catch (e) {
+			opts.log?.('warn', `[GUI launch] onSpawn hook threw: ${e?.message || e}`)
+		}
+	}
 	proc.unref()
 	if (opts.config) {
 		const { scheduleGuiWindowPosition } = require('../utils/x-display-session')
@@ -319,6 +329,76 @@ async function handlePointerConfinePost(body, ctx) {
 	}
 	stopPointerConfine()
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, active: isPointerConfineActive() }) }
+}
+
+/**
+ * WO-283 — POST /api/system/operator-helper-window. Open a foreign window (DeckLink setup,
+ * nvidia-settings, file manager, browser) ON TOP of the shaped operator kiosk, on operator
+ * request, and guarantee the kiosk comes back when it closes or dies.
+ *
+ * This is `/api/system/gui-launch` plus stacking: the same `spawnGuiDetached` launcher, the same
+ * nuclear-password gate, the same action vocabulary. The difference lives in
+ * src/system/operator-helper-window.js — it suspends the shape overlay's kiosk top-assert, puts
+ * the helper in Openbox's ABOVE layer so the raise can actually win, and runs a watchdog that
+ * restores the kiosk on ANY helper exit (clean close, crash, or kill -9).
+ *
+ * `mode: 'close'` does not kill the helper — the operator closes their own window. It only forces
+ * the restore, so a helper that somehow outlives its window can never strand the GUI.
+ *
+ * @param {string} body
+ * @param {*} ctx
+ */
+async function handleOperatorHelperWindowPost(body, ctx) {
+	const pw = checkNuclearPassword(body, ctx)
+	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
+
+	const b = parseBody(body)
+	const mode = String(b?.mode ?? 'open').trim() || 'open'
+	const log = (level, msg) => {
+		if (typeof ctx.log === 'function') ctx.log(level, msg)
+	}
+	const {
+		openOperatorHelperWindow,
+		closeOperatorHelperWindow,
+		getOperatorHelperState,
+		HELPER_ACTIONS,
+	} = require('../system/operator-helper-window')
+
+	if (mode === 'close') {
+		const r = await closeOperatorHelperWindow(ctx.config || {}, { log })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ...r, ...getOperatorHelperState() }) }
+	}
+	if (mode !== 'open') {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown mode: ${mode}` }) }
+	}
+
+	const action = String(b?.action ?? '').trim()
+	if (!HELPER_ACTIONS.includes(action)) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: `Unknown action: ${action} (expected one of ${HELPER_ACTIONS.join(', ')})` }),
+		}
+	}
+	const r = await openOperatorHelperWindow(action, ctx.config || {}, { log, url: b?.url })
+	return {
+		status: r.ok ? 200 : 409,
+		headers: JSON_HEADERS,
+		body: jsonBody(r.ok ? { ...r, ...getOperatorHelperState() } : { error: r.reason, ...getOperatorHelperState() }),
+	}
+}
+
+/**
+ * WO-283 — GET /api/system/operator-helper-window. Lets the operator button render "Close helper"
+ * while one is up, and lets a stuck state be seen without reading the journal.
+ */
+function handleOperatorHelperWindowGet() {
+	const { getOperatorHelperState, HELPER_ACTIONS } = require('../system/operator-helper-window')
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ok: true, ...getOperatorHelperState(), actions: HELPER_ACTIONS }),
+	}
 }
 
 /**
@@ -393,5 +473,7 @@ module.exports = {
 	spawnGuiDetached,
 	spawnOperatorFirefox,
 	handleGuiLaunchPost,
+	handleOperatorHelperWindowPost,
+	handleOperatorHelperWindowGet,
 	handlePointerConfinePost,
 }

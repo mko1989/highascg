@@ -40,6 +40,104 @@ async function parkPointerOnOperatorDisplay(config, opts = {}) {
 }
 
 /**
+ * WO-283. Find the currently mapped X window ids for a GUI action, without touching them.
+ *
+ * Two things this does that `raiseOperatorGuiWindows`'s inline search does not, both required for
+ * the operator-helper path:
+ *
+ *  - SEARCHES BOTH `--class` (res_class) AND `--classname` (res_name). GUI_WINDOW_CLASS.firefox is
+ *    `'Navigator'`, which is Firefox-ESR's res_NAME on this box — `xdotool search --class Navigator`
+ *    matches NOTHING here (verified live), while `--class firefox-esr-esr140` matches. Same
+ *    res_name/res_class confusion WO-279 hit in operator-gui-launcher.js.
+ *  - EXCLUDES THE KIOSK BY TITLE. The operator helper Firefox is the same binary as the kiosk, so
+ *    it has the identical WM_CLASS and no class-based filter can separate them. Without
+ *    `excludeTitle` the 'firefox' action would match the kiosk itself: the watchdog would see a
+ *    window forever (never restoring), and the promote would slap `_NET_WM_STATE_ABOVE` on the
+ *    kiosk. The kiosk is identified by the OPERATOR_TITLE_MARKER its page forces into the window
+ *    title — the same marker the shape helper matches on.
+ *
+ * @param {string} action
+ * @param {{ excludeTitle?: string }} [opts]
+ * @returns {Promise<string[]>}
+ */
+async function findGuiWindowIds(action, opts = {}) {
+	const winClassRaw = GUI_WINDOW_CLASS[action]
+	const winClasses = Array.isArray(winClassRaw) ? winClassRaw : winClassRaw ? [winClassRaw] : []
+	if (!winClasses.length || !(await commandExists('xdotool'))) return []
+	const env = displaySessionEnv()
+	/** @type {Set<string>} */
+	const found = new Set()
+	for (const winClass of winClasses) {
+		for (const flag of ['--class', '--classname']) {
+			try {
+				const { stdout } = await execFileAsync('xdotool', ['search', '--onlyvisible', flag, winClass], {
+					env,
+					timeout: 3000,
+				})
+				for (const id of String(stdout || '').trim().split(/\s+/).filter(Boolean)) found.add(id)
+			} catch {
+				/* no window matched this flag/pattern pair */
+			}
+		}
+	}
+	if (!found.size || !opts.excludeTitle) return [...found]
+
+	/** @type {string[]} */
+	const kept = []
+	for (const wid of found) {
+		let name = ''
+		try {
+			const { stdout } = await execFileAsync('xdotool', ['getwindowname', wid], { env, timeout: 3000 })
+			name = String(stdout || '')
+		} catch {
+			/* unnamed window — cannot be the marker-carrying kiosk, keep it */
+		}
+		if (!name.includes(opts.excludeTitle)) kept.push(wid)
+	}
+	return kept
+}
+
+/**
+ * WO-283. Put a helper window OVER the operator kiosk and give it focus.
+ *
+ * Why this is not just `windowraise`: the kiosk client permanently carries `_NET_WM_STATE_ABOVE`
+ * (set by tools/runtime/operator-shape-overlay.py's `lock_window_above`; verified live with
+ * `xprop -id <kiosk> _NET_WM_STATE`), and Openbox clamps every restack request to the window's own
+ * layer. A NORMAL-layer helper therefore CANNOT be raised over it — the raise silently does
+ * nothing. So we promote the helper into the same ABOVE layer first, then raise, then focus.
+ * `windowactivate` last is load-bearing too: the kiosk's FULLSCREEN state lifts it into Openbox's
+ * fullscreen layer only while it is FOCUSED, so handing focus to the helper drops the kiosk back
+ * to ABOVE where the helper can actually sit on top.
+ *
+ * Separate from {@link raiseOperatorGuiWindows} on purpose: that one is the pre-existing
+ * gui-launch path and keeps its exact behaviour, so nothing is promoted unless the operator asked.
+ *
+ * @param {string} action
+ * @param {object} config
+ * @param {{ log?: Function, excludeTitle?: string }} [opts]
+ * @returns {Promise<boolean>}
+ */
+async function promoteGuiWindowsAboveKiosk(action, config, opts = {}) {
+	const log = typeof opts.log === 'function' ? opts.log : () => {}
+	const ids = await findGuiWindowIds(action, { excludeTitle: opts.excludeTitle })
+	if (!ids.length) return false
+	const env = displaySessionEnv()
+	const rect = resolveOperatorDisplayRect(config)
+	const x = rect ? rect.x + Math.max(0, Math.floor(rect.width * 0.05)) : 0
+	const y = rect ? rect.y + Math.max(0, Math.floor(rect.height * 0.05)) : 0
+	for (const wid of ids) {
+		await execFileAsync('xdotool', ['windowstate', '--add', 'ABOVE', wid], { env, timeout: 3000 }).catch(() => {})
+		await execFileAsync('xdotool', ['windowraise', wid], { env, timeout: 3000 }).catch(() => {})
+		if (rect) {
+			await execFileAsync('xdotool', ['windowmove', wid, String(x), String(y)], { env, timeout: 3000 }).catch(() => {})
+		}
+		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: 3000 }).catch(() => {})
+	}
+	log('info', `[X-Display] Promoted ${action} ABOVE the kiosk (${ids.length} window(s))`)
+	return true
+}
+
+/**
  * @param {string} action
  * @param {object} config
  * @param {{ log?: Function }} [opts]
@@ -334,6 +432,8 @@ module.exports = {
 	applyOperatorDisplaySession,
 	parkPointerOnOperatorDisplay,
 	raiseOperatorGuiWindows,
+	findGuiWindowIds,
+	promoteGuiWindowsAboveKiosk,
 	positionGuiWindowForAction,
 	scheduleGuiWindowPosition,
 	displaySessionEnv,

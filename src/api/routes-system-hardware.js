@@ -35,6 +35,10 @@ async function hardwareHandleGet(p, ctx) {
 	if (p === '/api/system/xrandr-layout') return handleXrandrLayoutGet(ctx)
 	if (p === '/api/system/network') return handleNetworkGet(ctx)
 	if (p === '/api/system/operator-display') return operatorDisplayGet(ctx)
+	if (p === '/api/system/operator-helper-window') {
+		const { handleOperatorHelperWindowGet } = require('./system-hardware-gui')
+		return handleOperatorHelperWindowGet()
+	}
 	return null
 }
 
@@ -49,6 +53,10 @@ async function hardwareHandlePost(p, body, ctx) {
 	if (p === '/api/system/pointer-confine') {
 		const { handlePointerConfinePost } = require('./system-hardware-gui')
 		return handlePointerConfinePost(body, ctx)
+	}
+	if (p === '/api/system/operator-helper-window') {
+		const { handleOperatorHelperWindowPost } = require('./system-hardware-gui')
+		return handleOperatorHelperWindowPost(body, ctx)
 	}
 	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset(body, ctx)
 	if (p === '/api/system/time') return handleSystemTimePost(body, ctx)

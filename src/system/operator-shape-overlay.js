@@ -46,6 +46,15 @@ let lastLog = null
  * lives, so draw-loop re-reports can't flood the helper log. */
 let _lastWrittenPayload = null
 
+/** WO-283: true while the operator has a foreign window (DeckLink setup, nvidia-settings, file
+ * manager, browser) deliberately open OVER the kiosk. Sent to the python helper as `helperOpen`,
+ * where it suppresses ONE line — `toplevel.configure(stack_mode=X.Above)` in `apply_holes()` — so
+ * a rects payload arriving while the helper is up cannot re-raise the kiosk over it. The holes,
+ * the kiosk's own `_NET_WM_STATE_ABOVE`, the Caspar consumer's input-dead lock and the pointer
+ * confinement are all left untouched: the shaped-video contract is fully intact, and this flag is
+ * false in every state except "the operator asked for it". */
+let helperOpen = false
+
 /** todos19.07.26 release: startup timing probes — LOG-ONLY. Companion phases to the kiosk-spawn
  * probes in operator-gui-launcher.js and the first-rect-report probe in routes-operator-gui.js:
  * helper spawn -> ready (first stdout — the python side is up and talking) -> first rects written. */
@@ -120,6 +129,7 @@ function updateShapeRects(monitorRect, rectsPx, opts = {}) {
 		rects: lastRects,
 		channel: lastChannel,
 		titleMarker: OPERATOR_TITLE_MARKER,
+		helperOpen,
 	})
 	// WO-269: preview draw loops re-apply identical layouts continuously — skip the write (and
 	// the helper's per-line log) when nothing changed AND the helper was already alive (a fresh
@@ -153,6 +163,23 @@ function reapplyOperatorShapeOverlay(opts = {}) {
 	updateShapeRects(lastMonitor, lastRects || [], { ...opts, force: true })
 }
 
+/**
+ * WO-283: suspend/resume the kiosk top-assert while an operator helper window is open. Forced
+ * through (not WO-269-deduped) because the payload rects are usually unchanged — the whole point
+ * of the write is the flag flip. A no-op if nothing has ever been applied (no kiosk to demote).
+ * @param {boolean} open
+ * @param {{ log?: Function }} [opts]
+ */
+function setOperatorShapeHelperOpen(open, opts = {}) {
+	const next = open === true
+	if (next === helperOpen) return
+	helperOpen = next
+	const log = typeof opts.log === 'function' ? opts.log : lastLog
+	log?.('info', `[Shape overlay] helperOpen=${helperOpen} — kiosk top-assert ${helperOpen ? 'suspended' : 'resumed'}`)
+	if (lastMonitor == null) return
+	updateShapeRects(lastMonitor, lastRects || [], { ...opts, force: true })
+}
+
 /** Stop the helper (SIGTERM — the python side cleans up its own shape state on stdin EOF/SIGTERM,
  * see operator-shape-overlay.py's `finally` block). Hooked from src/bootstrap/shutdown.js. */
 function stopOperatorShapeOverlay() {
@@ -167,10 +194,12 @@ function stopOperatorShapeOverlay() {
 	lastMonitor = null
 	lastRects = null
 	_lastWrittenPayload = null
+	helperOpen = false
 }
 
 module.exports = {
 	updateShapeRects,
 	reapplyOperatorShapeOverlay,
+	setOperatorShapeHelperOpen,
 	stopOperatorShapeOverlay,
 }

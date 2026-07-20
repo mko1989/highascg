@@ -92,6 +92,7 @@ const FILES = [
 	'tools/smoke/smoke-operator-gui-launch-timing.test.js',
 	'tools/smoke/smoke-wo279-operator-gui-monitor-placement.test.js',
 	'tools/smoke/smoke-wo290-operator-monitor-picker.test.js',
+	'tools/smoke/smoke-wo283-operator-helper-window.test.js',
 	'tools/smoke/smoke-wo278-cable-regrab.test.js',
 	'tools/smoke/smoke-preview-mixer-nudge.test.js',
 	'tools/smoke/smoke-lt-engine-registry-sync.test.js',

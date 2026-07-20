@@ -21,7 +21,8 @@ Long-running (mirrors tools/runtime/confine-pointer-barriers.py's conventions: l
 (protocol is IN-only — this script never writes events back).
 
 Protocol: one JSON object per line on stdin:
-    {"monitor": {"x":, "y":, "w":, "h":}, "rects": [[x,y,w,h], ...], "channel": <int|null>}
+    {"monitor": {"x":, "y":, "w":, "h":}, "rects": [[x,y,w,h], ...], "channel": <int|null>,
+     "titleMarker": <str>, "helperOpen": <bool>}
 `monitor` is the operator monitor's rect in ROOT (absolute) pixels. `rects` are RECT-in-monitor
 pixels — because the match strategy below only accepts a window whose absolute origin equals
 `monitor.x,monitor.y`, monitor-relative and window-relative are the same numbers; no extra
@@ -368,7 +369,7 @@ def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
     return pair
 
 
-def apply_holes(pair, monitor, rects, channel=None):
+def apply_holes(pair, monitor, rects, channel=None, helper_open=False):
     """pair: (toplevel, client). Punch `rects` (window-relative == monitor-relative px) as HOLES in
     Firefox's BOUNDING shape (visual): SET bounding to the full window rect, then SUBTRACT each
     preview rect so the Caspar consumer below shows through.
@@ -403,8 +404,18 @@ def apply_holes(pair, monitor, rects, channel=None):
         # below cannot let the WM raise it over Firefox and hide the GUI. EWMH state MUST go to
         # the CLIENT window Openbox manages — a message for the frame is silently dropped (the
         # 2026-07-16 'ABOVE did not stick' bug).
-        toplevel.configure(stack_mode=X.Above)
-        lock_window_above(client)
+        # WO-283: while the operator has a foreign window (DeckLink setup, nvidia-settings, file
+        # manager, browser) open OVER the kiosk, skip the top-assert — re-raising here would bury
+        # the very window they asked for. Everything else above still runs: the HOLES are applied
+        # unchanged, and the kiosk keeps whatever _NET_WM_STATE_ABOVE it already has (we never
+        # strip it), so the shaped-video contract is untouched and the kiosk is still in the ABOVE
+        # layer. The helper is put in that same layer by the server side
+        # (`xdotool windowstate --add ABOVE`, src/utils/x-display-session-runtime.js), which is what
+        # lets an ordinary raise finally win against it. Restored the moment the helper closes or
+        # dies (src/system/operator-helper-window.js's watchdog).
+        if not helper_open:
+            toplevel.configure(stack_mode=X.Above)
+            lock_window_above(client)
         return True
     except Exception as e:
         log(f"apply_holes failed: {e}")
@@ -440,7 +451,10 @@ def parse_line(line: str):
     channel = int(channel) if channel is not None else None
     title_marker = obj.get("titleMarker")
     title_marker = str(title_marker) if title_marker else OPERATOR_TITLE_MARKER
-    return monitor, rects, channel, title_marker
+    # WO-283: the operator deliberately opened a foreign window over the kiosk. Absent/false in
+    # every other state, so old feeders (and the boot payload) behave exactly as before.
+    helper_open = obj.get("helperOpen") is True
+    return monitor, rects, channel, title_marker, helper_open
 
 
 def main() -> int:
@@ -485,6 +499,7 @@ def main() -> int:
     state_rects = []
     state_channel = None
     state_title_marker = OPERATOR_TITLE_MARKER
+    state_helper_open = False
     win = None
     caspar_pair = None
     last_poll = 0.0
@@ -517,7 +532,7 @@ def main() -> int:
                     win = found
                     if is_new:
                         log(f"firefox window (re)found: toplevel={win[0].id} client={win[1].id} — (re)applying holes")
-                        apply_holes(win, state_monitor, state_rects, state_channel)
+                        apply_holes(win, state_monitor, state_rects, state_channel, state_helper_open)
                 elif win is not None:
                     log("firefox window no longer present (restart?) — will re-search")
                     win = None
@@ -566,7 +581,7 @@ def main() -> int:
                     last_stdin_line = line
                     log(f"stdin line received: {line[:200]}")
                 try:
-                    monitor, rects, channel, title_marker = parse_line(line)
+                    monitor, rects, channel, title_marker, helper_open = parse_line(line)
                 except Exception as e:
                     log(f"bad stdin line ({e}): {line[:200]}")
                     continue
@@ -574,6 +589,9 @@ def main() -> int:
                 state_rects = rects
                 state_channel = channel
                 state_title_marker = title_marker
+                if helper_open != state_helper_open:
+                    log(f"helperOpen={helper_open} — kiosk top-assert {'suspended' if helper_open else 'resumed'}")
+                state_helper_open = helper_open
                 got_update = True
 
             if not got_update:
@@ -582,7 +600,7 @@ def main() -> int:
             if win is None:
                 win = find_firefox_window(root, state_monitor, state_title_marker)
             if win is not None:
-                if not apply_holes(win, state_monitor, state_rects, state_channel):
+                if not apply_holes(win, state_monitor, state_rects, state_channel, state_helper_open):
                     win = None  # stale handle — force re-search next iteration
             else:
                 log("no firefox window matching monitor rect yet (will retry on next update/poll)")
