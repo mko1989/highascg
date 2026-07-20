@@ -57,6 +57,7 @@ ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl stop snap.tailscale.tailscale
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/tailscale logout, /snap/bin/tailscale logout
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-tailscale-up.sh
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-vcam-modules-up.sh
+${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-apply-hardware-hostname.sh
 EOF
 
 # eggs calamares --install runs as root on the build host only (install-eggs-calamares.sh).
@@ -66,7 +67,7 @@ visudo -cf "$TMP" >/dev/null
 install -m 0440 -o root -g root "$TMP" "$DEST"
 
 echo "OK: $DEST"
-echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home"
+echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home, hardware-hostname"
 echo
 echo "Verify as ${USER_CASPAR}:"
 echo "  sudo -u ${USER_CASPAR} sudo -n /usr/local/bin/caspar-systemd-control.sh status"

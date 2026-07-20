@@ -210,9 +210,20 @@ function applySystemHostname(hostname, log) {
 	const current = os.hostname()
 	if (current === target) return { ok: true, applied: false, hostname: current }
 
+	/* Third attempt is the one that works unprivileged: `sudo -n hostnamectl` is NOT in the
+	 * allowlist and never will be — scripts/setup/12-passwordless-sudo.sh grants exact command
+	 * paths only (WO-97: no NOPASSWD wildcards), and set-hostname needs a per-box argument. The
+	 * installed helper derives the same MAC-based highascg#### name itself and runs as root, so
+	 * granting that one path costs no extra surface. It re-enters this function AS ROOT, where the
+	 * first attempt succeeds — no recursion back into sudo. */
 	const attempts = [
 		() => execFileSync('hostnamectl', ['set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
 		() => execFileSync('sudo', ['-n', 'hostnamectl', 'set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
+		() =>
+			execFileSync('sudo', ['-n', '/usr/local/lib/highascg/highascg-apply-hardware-hostname.sh'], {
+				encoding: 'utf8',
+				timeout: 20000,
+			}),
 	]
 
 	for (const run of attempts) {

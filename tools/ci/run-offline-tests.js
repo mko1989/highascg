@@ -128,6 +128,7 @@ const FILES = [
 	'tools/smoke/smoke-live-input-stop-start.test.js',
 	'tools/smoke/smoke-alsa-plug-fallback.test.js',
 	'tools/smoke/smoke-command-lookup.test.js',
+	'tools/smoke/smoke-hostname-sudoers.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)
