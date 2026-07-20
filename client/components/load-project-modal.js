@@ -287,8 +287,10 @@ export function showLoadProjectModal(opts = {}) {
 		}
 		const result = await importProjectWithHardwareReconcile(project, importDeps(entry))
 		if (result === 'cancelled') return
+		let activation = null
 		if (entry && !entry.legacy) {
-			await api.post('/api/project/load', { slug: entry.id, applyHardware: true })
+			const applied = await api.post('/api/project/load', { slug: entry.id, applyHardware: true })
+			activation = applied?._activation || null
 			document.dispatchEvent(new CustomEvent('highascg-settings-applied'))
 			showToast?.(
 				'Device View loaded from project — verify cabling and Apply Caspar config when ready.',
@@ -303,6 +305,15 @@ export function showLoadProjectModal(opts = {}) {
 			showToast?.('Recovered newer autosaved work for this project', 'info')
 		}
 		showToast?.('Project loaded', 'success')
+		// WO-277: everything else hot-swaps, but a changed Caspar channel layout cannot — say so
+		// instead of leaving the operator with a project that half-applied.
+		if (activation?.restartRequired) {
+			showToast?.(
+				activation.restartReason ||
+					'This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.',
+				'error',
+			)
+		}
 		close()
 	}
 

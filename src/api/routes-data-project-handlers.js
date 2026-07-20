@@ -17,7 +17,6 @@ const {
 } = require('../engine/project-stream-credentials')
 const {
 	injectHardwareConfigToProject,
-	applyHardwareConfigFromProject,
 	applyHardwareConfigToCtx,
 	hardwareConfigHasOperatorData,
 } = require('../engine/project-hardware-config')
@@ -180,19 +179,14 @@ async function handleProject(path, body, ctx) {
 			projectStore.projectSlugFromName(project.name)
 		projectStore.setActiveSlug(persistence, activeSlug)
 		ensureProjectMediaDir(ctx.config, activeSlug)
-		if (b.applyHardware === true) {
-			applyHardwareConfigFromProject(ctx, project)
-		}
-		try {
-			const { ensureLiveAudioRouting } = require('../config/routing-setup')
-			void ensureLiveAudioRouting(ctx).catch((e) => {
-				if (typeof ctx.log === 'function') {
-					ctx.log('warn', `[project] Live audio routing: ${e?.message || e}`)
-				}
-			})
-		} catch {
-			/* optional */
-		}
+		// WO-277: adopt the project into the RUNNING system (deck mirror, live-scene prune, artnet,
+		// broadcasts, PRV re-stage + thumb warm). Without this the load only moved the slug pointer
+		// and everything downstream kept serving the previous project until a service restart.
+		const { activateLoadedProject } = require('../engine/project-activate')
+		const activation = await activateLoadedProject(ctx, project, {
+			applyHardware: b.applyHardware === true,
+			broadcastProject: b.broadcastProject === true,
+		})
 
 		return {
 			status: 200,
@@ -200,6 +194,13 @@ async function handleProject(path, body, ctx) {
 			body: jsonBody({
 				...maskProjectStreamCredentials(project),
 				...(recoveredFromAutosave ? { _recoveredFromAutosave: true } : {}),
+				_activation: {
+					slug: activation.slug,
+					lookCount: activation.lookCount,
+					clearedLiveChannels: activation.clearedLiveChannels,
+					restartRequired: activation.restartRequired,
+					restartReason: activation.restartReason,
+				},
 			}),
 		}
 	}
