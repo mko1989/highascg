@@ -124,6 +124,7 @@ const FILES = [
 	'tools/smoke/smoke-eggs-exclude-lists.test.js',
 	'tools/smoke/smoke-wo284-audio-mixer-inputs-vu-routing.test.js',
 	'tools/smoke/smoke-live-input-stop-start.test.js',
+	'tools/smoke/smoke-alsa-plug-fallback.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

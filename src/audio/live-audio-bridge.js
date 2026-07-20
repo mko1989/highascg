@@ -67,6 +67,29 @@ function resolveFfmpegAlsaInputDevice(cfg, slot) {
 }
 
 /**
+ * `dsnoop:`/`hw:` hand the device format straight through, so a card that does not offer the
+ * format ffmpeg asks for fails outright with "cannot set sample format" — observed on a Yamaha DM3,
+ * which is S32_LE only. `plughw:` runs ALSA's plug converter, which negotiates format/rate. We keep
+ * dsnoop first (it is the only form that lets several readers share one capture device) and fall
+ * back to plughw only after a format failure, so sharing is preserved on cards that support it.
+ * @param {string} device
+ * @returns {string|null} plug-converting equivalent, or null when there is no sensible one
+ */
+function plugFallbackDevice(device) {
+	const d = String(device || '')
+	let m = d.match(/^dsnoop:(.+)$/i)
+	if (m) return `plughw:${m[1]}`
+	m = d.match(/^hw:(.+)$/i)
+	if (m) return `plughw:${m[1]}`
+	return null
+}
+
+/** ALSA format-negotiation failure — the case plugFallbackDevice() exists to recover from. */
+function isAlsaFormatError(text) {
+	return /cannot set sample format|sample format .*invalid|snd_pcm_hw_params/i.test(String(text || ''))
+}
+
+/**
  * @param {object} cfg
  * @param {number} slot
  * @param {string} device
@@ -139,12 +162,12 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
  * @param {object} ctx
  * @param {number} slot
  */
-function startLiveAudioBridge(ctx, slot) {
+function startLiveAudioBridge(ctx, slot, opts = {}) {
 	const n = parseInt(String(slot), 10)
 	if (!Number.isFinite(n) || n < 1 || n > 8) return false
 	stopLiveAudioBridge(n)
 	const cfg = ctx?.config || {}
-	const device = resolveFfmpegAlsaInputDevice(cfg, n)
+	const device = opts.deviceOverride || resolveFfmpegAlsaInputDevice(cfg, n)
 	if (!device) {
 		_bridges.set(n, {
 			proc: null,
@@ -158,12 +181,13 @@ function startLiveAudioBridge(ctx, slot) {
 	const port = liveAudioBridgeUdpPort(n)
 	const args = buildLiveAudioBridgeFfmpegArgs(cfg, n, device)
 	const proc = spawn(ffmpegBinary(cfg), args, { stdio: ['ignore', 'ignore', 'pipe'] })
-	const entry = { proc, port, device, startedAt: Date.now(), lastError: undefined }
+	const entry = { proc, port, device, startedAt: Date.now(), lastError: undefined, plugRetried: !!opts.plugRetried }
 	_bridges.set(n, entry)
 	proc.stderr?.on('data', (buf) => {
 		const s = buf.toString().trim()
 		if (!s) return
 		if (/error|invalid|failed|busy/i.test(s)) entry.lastError = s.slice(0, 240)
+		if (isAlsaFormatError(s)) entry.formatError = true
 		ctx?.log?.('debug', `[live-audio-bridge] slot ${n}: ${s.slice(0, 180)}`)
 	})
 	proc.on('close', (code, signal) => {
@@ -172,6 +196,19 @@ function startLiveAudioBridge(ctx, slot) {
 		cur.proc = null
 		if (code !== 0 && code != null) {
 			cur.lastError = `ffmpeg exited ${code}${signal ? ` (${signal})` : ''}`
+			/* One retry through the plug converter when the card rejected the format (see
+			 * plugFallbackDevice). Guarded by cur.plugRetried so a genuinely broken device
+			 * cannot produce a respawn loop. */
+			const fallback = cur.formatError && !cur.plugRetried ? plugFallbackDevice(cur.device) : null
+			if (fallback) {
+				cur.plugRetried = true
+				ctx?.log?.(
+					'warn',
+					`[live-audio-bridge] slot ${n}: ${cur.device} rejected the capture format — retrying via ${fallback}`,
+				)
+				startLiveAudioBridge(ctx, n, { deviceOverride: fallback, plugRetried: true })
+				return
+			}
 			ctx?.log?.('warn', `[live-audio-bridge] slot ${n} stopped: ${cur.lastError}`)
 		}
 	})
@@ -246,6 +283,8 @@ module.exports = {
 	liveAudioBridgeUdpPort,
 	liveAudioBridgePlayClip,
 	resolveFfmpegAlsaInputDevice,
+	plugFallbackDevice,
+	isAlsaFormatError,
 	buildLiveAudioBridgeFfmpegArgs,
 	startLiveAudioBridge,
 	stopLiveAudioBridge,
