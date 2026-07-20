@@ -98,7 +98,11 @@ when i resize the compose preview panel the preview windows inside get resized t
    -> DONE. Tiles were stored as fractions of the canvas, so resizing rescaled them. Now pixel-stable.
 
 the produced eggs iso was 5.9gb it should be closer to 3.9gb something big does not get excluded. is puppeteer still in?
-   -> TODO next. Will check puppeteer/chromium, node_modules, media, cef-cache, kernel headers against the 5.9GB.
+   -> DONE (measured the actual shipped tree, not guessed). Puppeteer was NOT it - it is already gone from the project; its 1.3G cache lives in .cache which was already excluded.
+   -> The real leak: ~/caspar-build 3.3GB (the CasparCG build tree) + 407M apt cache + 79M crash dumps + 183M boost headers. Now excluded -> should land ~4.1GB.
+   -> The apt cache leaked because of a real bug: the exclude had TWO patterns on ONE line, and mksquashfs reads one per line, so it matched nothing. Test added so that cannot recur.
+   -> STILL ~1.6GB available: var/lib/snapd holds dead snap revisions + bases for the REMOVED firefox snap. Fix is on the build host BEFORE produce (snap remove --purge + refresh.retain=2), not an exclude - excluding leaves broken mount units at boot. Would take the ISO to ~3.0GB.
+   -> SEPARATE PROBLEM FOUND: no Chrome binary ships on the ISO (chromium/chrome not installed, .cache excluded), so template thumbnail rendering will fail on a booted ISO. Pre-existing, needs a decision.
 
 write a new md file in work folder giving me a breakdown of options for porting the webui into a native ubuntu gui app. electron is a no go for me.
 name the file NATIVE_GUI_PROPOSITIONS
