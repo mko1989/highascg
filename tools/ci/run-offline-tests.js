@@ -74,6 +74,7 @@ const FILES = [
 	'tools/smoke/smoke-wo239-osc-variables.test.js',
 	'tools/smoke/smoke-wo242-pixelmap-screens.test.js',
 	'tools/smoke/smoke-wo243-operator-gui.test.js',
+	'tools/smoke/smoke-operator-gui-reconnect-reassert.test.js',
 	'tools/smoke/smoke-wo255-shaped-overlay.test.js',
 	'tools/smoke/smoke-shape-overlay-input-dead.test.js',
 	'tools/smoke/smoke-wo244-stream-secret-preserve.test.js',

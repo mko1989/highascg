@@ -16,7 +16,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { applyOperatorGuiLayout, clearOperatorGuiLayout } = require('../system/operator-gui-channel')
+const { applyOperatorGuiLayout, clearOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
 const { launchOperatorGuiBrowser, raiseOperatorGuiBrowser } = require('../system/operator-gui-launcher')
 
 /** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Final phase of the operator-
@@ -38,6 +38,10 @@ async function handlePost(path, body, ctx) {
 			firstLayoutReportSeen = true
 			ctx.log('info', `[Operator GUI] timing: first rect report t=${Date.now()} cells=${cells.length}`)
 		}
+		// 2026-07-20: record the client's intent BEFORE the amcp gate — a report that lands while
+		// Caspar is mid-reload still tells us what the operator has on screen, and that is exactly
+		// the window in which `ensureOperatorGuiChannel` decides whether to re-assert the holes.
+		noteClientLayoutReport(ctx, cells)
 		if (!ctx.amcp) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 		}
@@ -61,6 +65,9 @@ async function handlePost(path, body, ctx) {
  */
 async function handleDelete(path, ctx) {
 	if (path !== '/api/operator-gui/layout') return null
+	// A DELETE is the client withdrawing every surface — the authoritative "nothing is on screen"
+	// signal that vetoes the reconnect re-apply (src/system/operator-gui-channel.js).
+	noteClientLayoutReport(ctx, [])
 	if (!ctx.amcp) {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 	}

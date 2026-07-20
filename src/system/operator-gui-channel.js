@@ -312,6 +312,70 @@ let bootShrinkGuard = null
 const BOOT_GUARD_MS = 10000
 
 /**
+ * 2026-07-20 bug (todos19.07.26): "when caspar is reloaded it comes back trying to display the
+ * compose preview even though im on devices tab. only going to looks and back clears the windows."
+ *
+ * Root cause is HERE, not in the client: {@link ensureOperatorGuiChannel} re-applies the PERSISTED
+ * cell layout on every Caspar connect/reconnect, unconditionally. When the operator sits on a tab
+ * with no preview surface (Devices) the client has already withdrawn its rects (DELETE
+ * /api/operator-gui/layout on unmount) and does NOT answer the reconnect nudge — `resendMergedNow`
+ * deliberately returns early while the surface map is empty (client/lib/operator-gui-mode.js:377),
+ * because at boot an empty send would wipe the layout the server just restored. So nothing ever
+ * contradicts the server and the holes light up over a tab that shows no preview. Only a
+ * mount/unmount cycle (Looks and back) issues a fresh withdrawal, which is exactly what the owner
+ * observed as the workaround.
+ *
+ * Fix: remember the last CLIENT-ORIGINATED intent per channel for this server run. A client that
+ * has explicitly withdrawn is authoritative — skip the persisted re-apply and leave the holes shut
+ * until the operator returns to a tab that reports rects. Deliberately untouched:
+ *  - no client report yet this run (fresh boot, kiosk still starting) -> re-apply exactly as before
+ *    (the verified "Operator GUI re-apply: 3 cell(s) applied (ch 5)" path);
+ *  - last client report non-empty (operator IS on Looks) -> re-apply as before, so a Caspar restart
+ *    repaints the holes without waiting on the client's own re-POST.
+ * The persistence RECORD is never read-modified here, so a genuine arrangement still survives a
+ * restart and is restored the moment the operator returns to Looks.
+ * @type {Map<number, {cells: number, at: number}>}
+ */
+const lastClientIntentByChannel = new Map()
+
+/**
+ * Record a CLIENT-originated layout report — a POST with cells, or a DELETE (withdrawal, recorded
+ * as 0 cells). Called from the API boundary ONLY (src/api/routes-operator-gui.js): the server's own
+ * persisted re-apply goes straight to {@link applyOperatorGuiLayout} and must never look like a
+ * client intent, or the first reconnect would license every later one. No-op when there is no
+ * operator_gui destination.
+ * @param {{ config: object }} ctx
+ * @param {Array} cells - empty/absent means "this client is showing no preview surface"
+ */
+function noteClientLayoutReport(ctx, cells) {
+	const resolved = resolveOperatorGuiChannel(ctx?.config)
+	if (!resolved) return
+	lastClientIntentByChannel.set(resolved.ch, { cells: Array.isArray(cells) ? cells.length : 0, at: Date.now() })
+}
+
+/**
+ * Pure decision (no I/O): should a connect/reconnect re-apply the persisted layout? See
+ * {@link lastClientIntentByChannel} for why a withdrawn client vetoes it.
+ *
+ * An EMPTY persisted set still "re-applies": applying [] only clears stale route layers, it can
+ * never light a hole up, so the veto is irrelevant there and the pre-existing boot-hygiene clear
+ * is preserved.
+ * @param {number} ch
+ * @param {Array} savedCells
+ * @returns {{ reapply: boolean, reason: string }}
+ */
+function shouldReapplyPersistedLayout(ch, savedCells) {
+	const n = Array.isArray(savedCells) ? savedCells.length : 0
+	if (n === 0) return { reapply: true, reason: 'empty persisted layout (clears stale layers only)' }
+	const intent = lastClientIntentByChannel.get(ch)
+	if (intent && intent.cells === 0) {
+		return { reapply: false, reason: 'client withdrew its rects — no preview surface is on screen' }
+	}
+	if (intent) return { reapply: true, reason: `client is reporting ${intent.cells} cell(s)` }
+	return { reapply: true, reason: 'no client report yet this run' }
+}
+
+/**
  * @param {number} ch
  * @param {Array} cells - incoming reported cells
  * @param {Function} [log]
@@ -512,14 +576,25 @@ async function ensureOperatorGuiChannel(ctx) {
 		const persistence = ctx.persistence || require('../utils/persistence')
 		const saved = persistence.get('operatorGuiLayout')
 		if (saved && Array.isArray(saved.cells)) {
-			// Arm the one-shot shrink guard for the boot window (see {@link shouldIgnoreBootShrink}).
-			bootShrinkGuard = saved.cells.length > 1 ? { ch, until: Date.now() + BOOT_GUARD_MS, cells: saved.cells.length } : null
-			// Not awaited: a client POST inside the apply debounce window supersedes this call's
-			// promise (its timer is cleared, so it never settles) — and boot must not block on it.
-			applyOperatorGuiLayout(ctx, saved.cells).then(
-				() => ctx.log?.('info', `Operator GUI re-apply: ${saved.cells.length} cell(s) applied (ch ${ch})`),
-				(e) => ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`),
-			)
+			// 2026-07-20: never re-assert holes over a tab that shows no preview — see
+			// {@link lastClientIntentByChannel}. The saved record itself is left intact, so
+			// returning to Looks restores it via the client's own report.
+			const decision = shouldReapplyPersistedLayout(ch, saved.cells)
+			if (!decision.reapply) {
+				ctx.log?.(
+					'info',
+					`Operator GUI re-apply skipped (ch ${ch}): ${decision.reason} — ${saved.cells.length} cell(s) stay saved`,
+				)
+			} else {
+				// Arm the one-shot shrink guard for the boot window (see {@link shouldIgnoreBootShrink}).
+				bootShrinkGuard = saved.cells.length > 1 ? { ch, until: Date.now() + BOOT_GUARD_MS, cells: saved.cells.length } : null
+				// Not awaited: a client POST inside the apply debounce window supersedes this call's
+				// promise (its timer is cleared, so it never settles) — and boot must not block on it.
+				applyOperatorGuiLayout(ctx, saved.cells).then(
+					() => ctx.log?.('info', `Operator GUI re-apply: ${saved.cells.length} cell(s) applied (ch ${ch})`),
+					(e) => ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`),
+				)
+			}
 		}
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`)
@@ -540,6 +615,7 @@ function resetOperatorGuiStateForTests() {
 	for (const t of debounceTimers.values()) clearTimeout(t)
 	debounceTimers.clear()
 	bootShrinkGuard = null
+	lastClientIntentByChannel.clear()
 }
 
 module.exports = {
@@ -561,5 +637,7 @@ module.exports = {
 	applyOperatorGuiLayout,
 	clearOperatorGuiLayout,
 	ensureOperatorGuiChannel,
+	noteClientLayoutReport,
+	shouldReapplyPersistedLayout,
 	resetOperatorGuiStateForTests,
 }
