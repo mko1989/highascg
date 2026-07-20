@@ -1,35 +1,27 @@
 {
-  "modules": [
-    {
-      "id": "cg-studio",
-      "label": "CG Overlay Studio",
-      "description": "Lower-thirds template editor on this machine (:4300). Exports to the linked HighAsCG template/ tree.",
-      "launcherOpensWindow": true,
-      "defaultEnabled": false
-    },
-    {
-      "id": "previs",
-      "label": "Previs",
-      "description": "Preview 3D / previsualization tools in the PGM cell.",
-      "bundle": "/assets/modules/previs/entry.js",
-      "defaultEnabled": false,
-      "launcherHidden": true
-    },
-    {
-      "id": "tracking",
-      "label": "Tracking",
-      "description": "Person tracking module (server + inspector integration).",
-      "bundle": "/assets/modules/tracking/entry.js",
-      "defaultEnabled": false,
-      "launcherHidden": true
-    },
-    {
-      "id": "autofollow",
-      "label": "Autofollow",
-      "description": "Camera autofollow module.",
-      "bundle": "/assets/modules/autofollow/entry.js",
-      "defaultEnabled": false,
-      "launcherHidden": true
-    }
-  ]
+	"modules": [
+		{
+			"id": "cg-studio",
+			"label": "CG Overlay Studio",
+			"description": "Lower-thirds template editor on this machine (:4300). Exports to the linked HighAsCG template/ tree.",
+			"launcherOpensWindow": true,
+			"defaultEnabled": false
+		},
+		{
+			"id": "tracking",
+			"label": "Tracking",
+			"description": "Person tracking module (server + inspector integration).",
+			"bundle": "/assets/modules/tracking/entry.js",
+			"defaultEnabled": false,
+			"launcherHidden": true
+		},
+		{
+			"id": "autofollow",
+			"label": "Autofollow",
+			"description": "Camera autofollow module.",
+			"bundle": "/assets/modules/autofollow/entry.js",
+			"defaultEnabled": false,
+			"launcherHidden": true
+		}
+	]
 }

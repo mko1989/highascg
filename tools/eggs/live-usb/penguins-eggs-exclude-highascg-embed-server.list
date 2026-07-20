@@ -233,3 +233,11 @@ home/casparcg/.claude/*
 home/casparcg/.claude.json
 home/casparcg/highascg/.operator-firefox-profile
 home/casparcg/highascg/.operator-firefox-profile/*
+
+# Previs — future module, deliberately NOT in this release (owner, todos19.07.26).
+# Source stays in git; it must not ship. Needs `three` (not installed) and is no longer
+# offered in the optional-module registry.
+home/casparcg/highascg/src/previs
+home/casparcg/highascg/src/previs/*
+home/casparcg/highascg/client/assets/modules/previs
+home/casparcg/highascg/client/assets/modules/previs/*
