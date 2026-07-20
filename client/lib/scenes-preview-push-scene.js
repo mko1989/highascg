@@ -26,6 +26,12 @@ import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot, previewContentCompareKey } from './scenes-preview-snapshot.js'
 import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
 import { syncPreviewLiveToServer } from './scene-live-sync.js'
+import {
+	lookLogicalLayerNumbers,
+	orderPreviewLayerBlocks,
+	parseRouteClipValue,
+	remapIntraLookRouteForChannel,
+} from './scene-route-preview-remap.js'
 
 /**
  * GET /api/media is expensive server-side (recursive media-dir scan + bounded ffprobe batch).
@@ -201,21 +207,39 @@ export async function pushSceneToPreviewImpl(opts) {
 			const computedFills = new Map()
 			const sortedLayers = [...(scene.layers || [])].sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 
+			/* todos19.07.26: a look-local route is authored against the PGM bus (`route://<pgmCh>-<L>`)
+			 * and every SERVER take path rewrites it to the channel being taken. This client-built
+			 * preview push does not go through that pipeline, so it must do the same remap itself —
+			 * otherwise the PRV route producer taps the program bus and the route shows the program
+			 * feed (or nothing, since PGM keeps look content on bank-mapped physical layers). */
+			const lookLogicalLayers = lookLogicalLayerNumbers(scene.layers)
+			/** @type {{ layerNumber: number, routeTargetLayer: number|null, lines: string[] }[]} */
+			const layerBlocks = []
+
 			for (const layer of sortedLayers) {
 				const ln = layer.layerNumber
 				const cl = chLayerAmcp(previewCh, ln)
 				if (!layer.source?.value) continue
+				/** AMCP for THIS layer, ordered against its route dependency before it joins `queue`. */
+				const layerLines = []
 
 				const f = await resolveLayerFillForAmcp(layer, stateStore, mIdx, previewCanvas, getMediaListOnce, authoringCanvas)
 				computedFills.set(Number(ln), f)
 
 				const clipRaw = layer.source.value
+				/* Intra-look layer route → this PRV channel (bank-less, so physical == logical).
+				 * Non-route values, whole-channel routes and routes pointing outside this look are
+				 * returned unchanged — see client/lib/scene-route-preview-remap.js. */
+				const clipRouted = remapIntraLookRouteForChannel(clipRaw, previewCh, lookLogicalLayers)
+				const routeParsed = parseRouteClipValue(clipRaw)
+				const routeTargetLayer =
+					routeParsed?.layer != null && lookLogicalLayers.has(routeParsed.layer) ? routeParsed.layer : null
 				const browserCg =
 					layer.source.type === 'browser' &&
 					layer.source.browserAsCg === true &&
 					/^https?:\/\//i.test(String(clipRaw || '').trim())
 				const browserCgUrl = browserCg ? String(clipRaw).trim() : null
-				const clip = browserCgUrl ? '[HTML] black' : clipRaw
+				const clip = browserCgUrl ? '[HTML] black' : clipRouted
 				const wantLoop = !!layer.loop
 				let playCmd = `PLAY ${cl}`
 				if (clip) playCmd += ' ' + amcpParam(clip)
@@ -270,7 +294,7 @@ export async function pushSceneToPreviewImpl(opts) {
 					prevContent && curMeta && JSON.stringify(prevContent) === JSON.stringify(previewContentCompareKey(curMeta))
 
 				if (geometryOnly || contentUnchanged) {
-					queue.push(...mixerPart)
+					layerLines.push(...mixerPart)
 				} else {
 					const cgTail = []
 					if (browserCgUrl) {
@@ -282,7 +306,7 @@ export async function pushSceneToPreviewImpl(opts) {
 							`CG ${cl} UPDATE 0 ${amcpParam(json)}`,
 						)
 					}
-					queue.push(
+					layerLines.push(
 						playCmd,
 						...sceneLayerRotationMixerLines(cl, rot, { deferRotation: true }),
 						`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 1 DEFER`,
@@ -297,7 +321,7 @@ export async function pushSceneToPreviewImpl(opts) {
 				const effects = layer.effects || []
 				for (const fx of effects) {
 					const lines = effectToAmcpLines(fx.type, fx.params, cl)
-					if (lines) queue.push(...lines)
+					if (lines) layerLines.push(...lines)
 				}
 
 				const nextP = nextPipLayerInPreview(ln)
@@ -305,7 +329,7 @@ export async function pushSceneToPreviewImpl(opts) {
 				const prevPip = prevMeta?.pipOverlays
 				if (geometryOnly || contentUnchanged) {
 					if (pipOverlays.length > 0) {
-						queue.push(
+						layerLines.push(
 							...buildPipOverlayAmcpLinesAll(
 								pipOverlays,
 								previewCh,
@@ -321,12 +345,12 @@ export async function pushSceneToPreviewImpl(opts) {
 							),
 						)
 					} else if ((prevPip?.length ?? 0) > 0) {
-						queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, [], pipCgReadyKeys))
+						layerLines.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, [], pipCgReadyKeys))
 					}
 				} else {
-					queue.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, pipOverlays, pipCgReadyKeys))
+					layerLines.push(...buildPipOverlayRemoveStaleSlots(previewCh, ln, nextP, prevPip, pipOverlays, pipCgReadyKeys))
 					if (pipOverlays.length > 0) {
-						queue.push(
+						layerLines.push(
 							...buildPipOverlayAmcpLinesAll(
 								pipOverlays,
 								previewCh,
@@ -343,7 +367,14 @@ export async function pushSceneToPreviewImpl(opts) {
 						)
 					}
 				}
+
+				layerBlocks.push({ layerNumber: Number(ln), routeTargetLayer, lines: layerLines })
 			}
+
+			/* An intra-look route producer must be created AFTER its source layer is playing. The ↗
+			 * button takes the lowest free layer number, so a route can easily sort BELOW the layer it
+			 * reads — mirrors partitionTakeJobsPlayOrder()/orderRouteJobsByDependency() on the server. */
+			for (const block of orderPreviewLayerBlocks(layerBlocks)) queue.push(...block.lines)
 
 			const globalBorder = sceneState.getGlobalBorderForScreen(mIdx)
 			const borderEnabled = !!(globalBorder && globalBorder.enabled)

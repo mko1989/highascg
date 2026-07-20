@@ -277,15 +277,22 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 					return
 				}
 				const idx = added.layerIndex
-				try {
-					await applyNativeFillForSource(idx, {
-						type: 'route',
-						value: built.item.value,
-						label: built.item.label,
-						resolution: built.item.resolution,
-					})
-				} catch {
-					/* fill is best-effort — the layer already exists */
+				/* todos19.07.26 (owner): "creating a route should apply same position and size from
+				 * source." addRouteLayerToLook copies the source layer's rect/rotation; the native-fill
+				 * fallback below would immediately overwrite it with a full-canvas rect (a route's
+				 * content resolution IS the whole source channel), so only run it when nothing was
+				 * copied — e.g. a source layer with no fill of its own. */
+				if (!added.copiedGeometry) {
+					try {
+						await applyNativeFillForSource(idx, {
+							type: 'route',
+							value: built.item.value,
+							label: built.item.label,
+							resolution: built.item.resolution,
+						})
+					} catch {
+						/* fill is best-effort — the layer already exists */
+					}
 				}
 				const updatedScene = sceneState.getScene(scene.id)
 				const addedLayer = updatedScene?.layers?.[idx]
