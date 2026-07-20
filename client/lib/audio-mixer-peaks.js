@@ -1,4 +1,5 @@
 import { isLayerStripOnAir } from './audio-mixer-meter-eligibility.js'
+import { inputHasAudioData } from './audio-input-meter-map.js'
 
 /** @param {import('./state-store.js').StateStore} stateStore */
 function isSoleLiveSceneMediaLayer(stateStore, chNum, layerNum) {
@@ -76,6 +77,20 @@ export function peakDbfsFromVarStrings(obj, chNum) {
  * @param {import('./state-store.js').StateStore} stateStore
  */
 export function readBusPeakDbfs(chNum, vars, oscClient, stateStore) {
+	return readBusPeakDbfsOrNull(chNum, vars, oscClient, stateStore) ?? -99
+}
+
+/**
+ * Same read as {@link readBusPeakDbfs}, but returns `null` instead of the -99 sentinel when no
+ * source has ever reported a level for this channel. WO-284 needs that difference: -99 means
+ * "quiet", null means "nothing has been heard from this channel at all".
+ * @param {number} chNum
+ * @param {import('./variable-state.js').VariableStore | null} vars
+ * @param {import('./osc-client.js').OscClient | null} oscClient
+ * @param {import('./state-store.js').StateStore} stateStore
+ * @returns {number | null}
+ */
+export function readBusPeakDbfsOrNull(chNum, vars, oscClient, stateStore) {
 	const key = String(chNum)
 	const chState = oscClient?.channels?.[key] ?? oscClient?.channels?.[chNum]
 	const pOsc = peakDbfsFromLevels(chState?.audio?.levels)
@@ -84,7 +99,31 @@ export function readBusPeakDbfs(chNum, vars, oscClient, stateStore) {
 	if (Number.isFinite(pSt)) return pSt
 	const pVs = vars ? peakDbfsFromVarStrings(vars.variables, chNum) : NaN
 	if (Number.isFinite(pVs)) return pVs
-	return -99
+	return null
+}
+
+/**
+ * WO-284 — one metering sample for a dedicated input channel strip, carrying the
+ * silence-vs-no-data distinction the meter styles on.
+ * @param {number} hostCh
+ * @param {import('./osc-client.js').OscClient | null} oscClient
+ * @param {import('./state-store.js').StateStore} stateStore
+ * @param {{ muted?: boolean, inputLayer?: number | null } | undefined} layerMeta
+ * @param {import('./variable-state.js').VariableStore | null} vars
+ * @returns {{ dbfs: number | null, hasData: boolean, muted: boolean }}
+ */
+export function readInputChannelMeterSample(hostCh, oscClient, stateStore, layerMeta, vars) {
+	const chNum = parseInt(String(hostCh), 10)
+	if (!Number.isFinite(chNum) || chNum < 1) return { dbfs: null, hasData: false, muted: false }
+	const key = String(chNum)
+	const channelState = oscClient?.channels?.[key] ?? oscClient?.channels?.[chNum] ?? null
+	const dbfs = readBusPeakDbfsOrNull(chNum, vars, oscClient, stateStore)
+	const hasData = inputHasAudioData({
+		channelState,
+		inputLayer: layerMeta?.inputLayer ?? null,
+		dbfs,
+	})
+	return { dbfs, hasData, muted: !!layerMeta?.muted }
 }
 
 /**

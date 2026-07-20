@@ -7,6 +7,13 @@ import { liveAudioInputForSlot } from './input-channels.js'
 const LS_KEY = 'highascg_live_audio_play_targets'
 const LS_MULTI_KEY = 'highascg_live_audio_play_targets_multi'
 
+/** Accepts a bare slot number (legacy live_audio) or an already-qualified `kind:slot` key. */
+function multiKey(slot) {
+	const raw = String(slot ?? '').trim()
+	if (raw.includes(':')) return raw
+	return String(Math.max(1, parseInt(raw, 10) || 1))
+}
+
 /** Previous default was 9 + slot (L10 for slot 1) — remap on read so saved targets don't collide with video. */
 function migrateLegacyLayer(slot, layer) {
 	const n = Math.max(1, parseInt(String(slot), 10) || 1)
@@ -82,15 +89,28 @@ export function clearPlayTarget(slot) {
 }
 
 /**
+ * WO-293: the multi-target store is now shared by every audio-capable input kind, not just ALSA
+ * live audio. `live_audio` keeps the historical bare-slot key so saved routes survive; other
+ * kinds (DeckLink, NDI) get a `kind:slot` key so slot numbers cannot collide across kinds.
+ * @param {string | null | undefined} kind
+ * @param {number} slot
+ */
+export function inputTargetKey(kind, slot) {
+	const n = String(Math.max(1, parseInt(String(slot), 10) || 1))
+	const k = String(kind || 'live_audio').trim() || 'live_audio'
+	return k === 'live_audio' ? n : `${k}:${n}`
+}
+
+/**
  * Multi-destination routing: one live audio slot can be routed to multiple Caspar channel/layers.
  * Stored as: { [slotNumber]: Array<{ channel:number, layer:number }> }
  *
  * This is purely client routing state; actual Caspar playback is started/stopped by the UI.
- * @param {number} slot - 1-based
+ * @param {number | string} slot - 1-based (or a kind-qualified key from inputTargetKey)
  * @returns {{ channel: number, layer: number }[]}
  */
 export function getMultiPlayTargets(slot) {
-	const key = String(Math.max(1, parseInt(String(slot), 10) || 1))
+	const key = multiKey(slot)
 	try {
 		const raw = localStorage.getItem(LS_MULTI_KEY)
 		const j = raw ? JSON.parse(raw) : {}
@@ -115,7 +135,7 @@ export function getMultiPlayTargets(slot) {
  * @param {{ channel: number, layer: number }[]} targets
  */
 export function setMultiPlayTargets(slot, targets) {
-	const key = String(Math.max(1, parseInt(String(slot), 10) || 1))
+	const key = multiKey(slot)
 	const cleaned = Array.isArray(targets) ? targets : []
 	const uniq = []
 	const seen = new Set()
@@ -144,7 +164,7 @@ export function setMultiPlayTargets(slot, targets) {
  * @param {number} slot - 1-based
  */
 export function clearMultiPlayTargets(slot) {
-	const key = String(Math.max(1, parseInt(String(slot), 10) || 1))
+	const key = multiKey(slot)
 	try {
 		const raw = localStorage.getItem(LS_MULTI_KEY)
 		const j = raw ? JSON.parse(raw) : {}

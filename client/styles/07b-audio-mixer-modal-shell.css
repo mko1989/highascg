@@ -475,3 +475,58 @@ input[type="range"].audio-mixer__fader-horizontal {
 	cursor: not-allowed;
 }
 
+
+/* WO-284 — input VU meter states.
+ * A silent input and an input with NO DATA must not look the same:
+ *  - no-data : the track is hatched grey and a "no signal" badge shows (dead/unplugged input)
+ *  - silent  : normal empty track plus a dim green presence tick at the floor
+ *  - signal  : normal metering
+ * The meter loop stamps data-meter-state on the fill AND its track, only when it changes. */
+.audio-mixer__meter-horizontal[data-meter-state='no-data'],
+.audio-mixer-view__meter-vertical[data-meter-state='no-data'] {
+	background: repeating-linear-gradient(
+		135deg,
+		var(--bg-dark, #0d1117),
+		var(--bg-dark, #0d1117) 3px,
+		#30363d 3px,
+		#30363d 6px
+	);
+	opacity: 0.75;
+}
+
+.audio-mixer__meter-horizontal[data-meter-state='silent']::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: #166534;
+}
+
+.audio-mixer-view__meter-vertical[data-meter-state='silent']::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 2px;
+	background: #166534;
+}
+
+.audio-mixer__input-nosignal {
+	font-size: 9px;
+	line-height: 1;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--accent-red, #ef4444);
+	border: 1px solid currentColor;
+	border-radius: 3px;
+	padding: 2px 4px;
+	white-space: nowrap;
+	align-self: center;
+}
+
+.audio-mixer__input-nosignal[hidden] {
+	display: none;
+}

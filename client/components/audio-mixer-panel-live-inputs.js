@@ -11,11 +11,12 @@ import { syncFaderUI, syncMuteUI } from './audio-mixer-panel-sync.js'
 import { meterMetaForInputRow } from '../lib/audio-mixer-rows.js'
 import { settingsState } from '../lib/settings-state.js'
 import { readLiveAudioCasparSettings } from '../lib/live-audio-inputs.js'
-import { getMultiPlayTargets, setMultiPlayTargets } from '../lib/live-audio-play-targets.js'
+import { getMultiPlayTargets, inputTargetKey, setMultiPlayTargets } from '../lib/live-audio-play-targets.js'
 import {
 	disableLiveAudioPgmRoute,
-	enableLiveAudioPgmRoute,
-	pgmDestLayerForSlot,
+	enableInputPgmRoute,
+	inputRouteForRow,
+	pgmDestLayerForInput,
 } from '../lib/live-audio-routing.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
@@ -40,10 +41,14 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 
 	for (const r of liveInputMeters) {
 		const slot = r?.slot
-		const device = liveUi?.slots?.[slot - 1] || ''
-		const destLayer = pgmDestLayerForSlot(slot, liveUi)
 		const cm = stateStore.getState()?.channelMap || {}
-		const enabledTargets = getMultiPlayTargets(slot)
+		// WO-293: an ALSA slot is routable once a capture device is picked in settings; a
+		// DeckLink/NDI input is routable once the channel map has allocated its route.
+		const routable =
+			r?.inputKind === 'live_audio' ? !!(liveUi?.slots?.[slot - 1] || '') : !!inputRouteForRow(cm, r)
+		const destLayer = pgmDestLayerForInput(r?.inputKind, slot, liveUi)
+		const targetKey = inputTargetKey(r?.inputKind, slot)
+		const enabledTargets = getMultiPlayTargets(targetKey)
 		const enabledChannels = new Set(enabledTargets.map((t) => Number(t.channel)))
 
 		const isMuted = !!r.muted
@@ -60,11 +65,13 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				<div class="audio-mixer__meter-horizontal" aria-hidden="true">
 					<div class="audio-mixer__meter-fill"></div>
 				</div>
+				<span class="audio-mixer__input-nosignal" data-input-nosignal hidden>no signal</span>
 				<input type="range" class="audio-mixer__fader-horizontal" min="0" max="100" value="${linearGainToFaderPercent(r.v)}" data-ch="${r.ch}" data-layer="${r.layer}" data-key="${escapeAttr(r.key)}" aria-label="Volume" />
 				<span class="audio-mixer__fader-val">${formatVolumeDb(r.v)}</span>
 			</div>
 			<div class="audio-mixer__live-route-buttons" data-slot="${slot}"></div>
 		`
+		row.dataset.inputKind = String(r?.inputKind || '')
 		row.title = 'Click to inspect / remove'
 		row.addEventListener('click', (e) => {
 			const t = /** @type {HTMLElement} */ (e.target)
@@ -83,35 +90,43 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				btn.className = `audio-mixer__live-route-btn${active ? ' audio-mixer__live-route-btn--active' : ''}`
 				btn.dataset.channel = String(ch)
 				btn.textContent = `Ch${ch}`
-				btn.disabled = !device
+				btn.disabled = !routable
 				btn.onclick = async (e) => {
 					e.stopPropagation()
-					if (!device) {
-						showScenesToast(`No capture device selected for live input slot ${slot}.`, 'error')
+					if (!routable) {
+						showScenesToast(
+							r?.inputKind === 'live_audio'
+								? `No capture device selected for live input slot ${slot}.`
+								: `Input "${r?.label || slot}" has no dedicated channel route yet.`,
+							'error',
+						)
 						return
 					}
+					// Single-flight per button: a dead input must not become a retry storm.
 					const busy = btn.dataset.busy === '1'
 					if (busy) return
 					btn.dataset.busy = '1'
 					btn.disabled = true
-					const curTargets = getMultiPlayTargets(slot)
+					const curTargets = getMultiPlayTargets(targetKey)
 					const curEnabled = curTargets.some((t) => Number(t.channel) === ch && Number(t.layer) === destLayer)
 					try {
 						if (!curEnabled) {
-							setMultiPlayTargets(slot, [...curTargets, { channel: ch, layer: destLayer }])
-							await enableLiveAudioPgmRoute(slot, ch, cm, liveUi)
+							// Apply first, persist only on success — a failed route must not leave a
+							// target recorded that nothing on air matches.
+							await enableInputPgmRoute(r, ch, cm, liveUi)
+							setMultiPlayTargets(targetKey, [...curTargets, { channel: ch, layer: destLayer }])
 							btn.classList.add('audio-mixer__live-route-btn--active')
 						} else {
 							await disableLiveAudioPgmRoute(ch, destLayer)
 							const next = curTargets.filter((t) => !(Number(t.channel) === ch && Number(t.layer) === destLayer))
-							setMultiPlayTargets(slot, next)
+							setMultiPlayTargets(targetKey, next)
 							btn.classList.remove('audio-mixer__live-route-btn--active')
 						}
 					} catch (err) {
 						showScenesToast(err?.message || String(err), 'error')
 					} finally {
 						btn.dataset.busy = '0'
-						btn.disabled = !device
+						btn.disabled = !routable
 					}
 				}
 				btnWrap.appendChild(btn)

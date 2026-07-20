@@ -14,6 +14,12 @@ import {
 } from '../lib/audio-volume-scale.js'
 import { bindFaderResetGestures, UNITY_LINEAR_GAIN } from '../lib/audio-mixer-fader-bind.js'
 import { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
+import {
+	crossScreenReasonText,
+	parseCrossScreenTargets,
+	validateCrossScreenAudioTarget,
+} from '../lib/audio-cross-screen-routing.js'
+import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
 
 /**
  * @param {HTMLElement} inputsEl
@@ -62,13 +68,29 @@ export function renderInspectorProgramInputLayers(
 				)
 				.join('')
 
-			// Screens/PGM channel row for panel view
+			// Screens/PGM channel row for panel view (WO-284: cross-screen routing is live —
+			// non-host buttons used to be hard-disabled as an unimplemented-feature placeholder).
+			const crossTargets = parseCrossScreenTargets(r.audioScreens)
 			const pgmButtonsHtmlPanel = programChannels
 				.map((pc) => {
 					const ch = Number(pc)
 					const isHost = ch === r.ch
-					const active = isHost
-					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${!isHost ? 'disabled' : ''} title="${isHost ? 'Host channel' : 'Cross-screen audio fan-out: planned (WO-157)'}">${ch}</button>`
+					const active = isHost || crossTargets.includes(ch)
+					const check = isHost
+						? { ok: false, reason: 'host-channel' }
+						: validateCrossScreenAudioTarget({
+								sourceChannel: r.ch,
+								sourceLayer: r.layer,
+								targetChannel: ch,
+								programChannels,
+								channelMap,
+							})
+					const title = isHost
+						? 'Host channel'
+						: check.ok
+							? `Route this layer's audio to PGM channel ${ch}`
+							: crossScreenReasonText(check.reason)
+					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${check.ok ? `data-cross-screen="${ch}"` : 'disabled'} title="${escapeAttr(title)}">${ch}</button>`
 				})
 				.join('')
 			const screensRowHtmlPanel = r.sceneId ? `
@@ -115,6 +137,8 @@ export function renderInspectorProgramInputLayers(
 
 			meterFills.set(r.key, row.querySelector('.audio-mixer__meter-fill'))
 			meterLayerMeta.set(r.key, meterMetaForInputRow(r))
+
+			bindCrossScreenButtons(row, r, { programChannels, channelMap })
 
 			const soloBtn = row.querySelector('.audio-mixer__solo-btn')
 			if (soloBtn) {

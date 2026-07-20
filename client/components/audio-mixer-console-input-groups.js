@@ -14,6 +14,8 @@ import {
 } from '../lib/audio-volume-scale.js'
 import { bindFaderResetGestures, UNITY_LINEAR_GAIN } from '../lib/audio-mixer-fader-bind.js'
 import { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
+import { crossScreenReasonText, parseCrossScreenTargets, validateCrossScreenAudioTarget } from '../lib/audio-cross-screen-routing.js'
+import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
 
 /**
  * @param {HTMLElement} inputsListEl
@@ -73,13 +75,29 @@ export function renderConsoleInputGroups(
 				.join('')
 			const labelTitle = r.labelTitle || r.label
 
-			// Screens/PGM channel row
+			// Screens/PGM channel row (WO-284: cross-screen routing is live — non-host buttons
+			// used to be hard-disabled as an unimplemented-feature placeholder).
+			const crossTargets = parseCrossScreenTargets(r.audioScreens)
 			const pgmButtonsHtml = programChannels
 				.map((pc) => {
 					const ch = Number(pc)
 					const isHost = ch === r.ch
-					const active = isHost
-					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${!isHost ? 'disabled' : ''} title="${isHost ? 'Host channel' : 'Cross-screen audio fan-out: planned (WO-157)'}">${ch}</button>`
+					const active = isHost || crossTargets.includes(ch)
+					const check = isHost
+						? { ok: false, reason: 'host-channel' }
+						: validateCrossScreenAudioTarget({
+								sourceChannel: r.ch,
+								sourceLayer: r.layer,
+								targetChannel: ch,
+								programChannels,
+								channelMap,
+							})
+					const title = isHost
+						? 'Host channel'
+						: check.ok
+							? `Route this layer's audio to PGM channel ${ch}`
+							: crossScreenReasonText(check.reason)
+					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${check.ok ? `data-cross-screen="${ch}"` : 'disabled'} title="${escapeAttr(title)}">${ch}</button>`
 				})
 				.join('')
 			const screensRowHtml = r.sceneId ? `
@@ -126,6 +144,8 @@ export function renderConsoleInputGroups(
 
 			meterFills.set(r.key, strip.querySelector('.audio-mixer-view__meter-fill'))
 			meterLayerMeta.set(r.key, meterMetaForInputRow(r))
+
+			bindCrossScreenButtons(strip, r, { programChannels, channelMap })
 
 			const fader = strip.querySelector('.audio-mixer-view__fader')
 			const valEl = strip.querySelector('.audio-mixer-view__fader-val')
@@ -237,7 +257,9 @@ export function renderConsoleInputGroups(
 			})
 
 			if (r.sceneId) {
-				strip.querySelectorAll('.audio-mixer-view__matrix-btn').forEach((btn) => {
+				// Scoped to [data-route]: the Screens matrix reuses the same button class, and an
+				// unscoped selector would patch audioRoute=undefined on a cross-screen click.
+				strip.querySelectorAll('.audio-mixer-view__matrix-btn[data-route]').forEach((btn) => {
 					btn.addEventListener('click', () => {
 						const routeVal = btn.dataset.route
 						const scene = sceneState.getScene(r.sceneId)

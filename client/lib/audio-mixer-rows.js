@@ -4,7 +4,7 @@ import { sceneState } from './scene-state.js'
 import { shortenMediaName } from './audio-mixer-ui.js'
 import { settingsState } from './settings-state.js'
 import { enumerateLiveAudioMixerSlots, readLiveAudioCasparSettings } from './live-audio-inputs.js'
-import { listInputChannels, LIVE_AUDIO_INPUT_LAYER, liveAudioInputForSlot } from './input-channels.js'
+import { listAudioInputChannels, LIVE_AUDIO_INPUT_LAYER, liveAudioInputForSlot } from './input-channels.js'
 import { timelineState } from './timeline-state.js'
 
 /** Layers that expose a per-strip fader in the program mixer. */
@@ -36,6 +36,9 @@ export function meterMetaForInputRow(row) {
 		hostChannel,
 		expectAudio: true,
 		sourceType,
+		// WO-284: the capture producer's layer on a dedicated input channel — the meter uses it
+		// to tell "input present but quiet" from "no producer at all" (dead/unplugged input).
+		inputLayer: row?.isLiveInput ? (row?.layer ?? null) : null,
 	}
 }
 
@@ -161,7 +164,9 @@ export function collectProgramAudioRows(stateStore, { masterLabel, labelMax = 22
 						muted: !!layer.muted,
 						isMaster: false,
 						audioRoute: layer.audioRoute || '1+2',
-						...(layer.routeSourceAudio && layer.routeSourceAudio !== 'all' ? { sourceAudioPair: layer.routeSourceAudio } : {}),
+						// WO-284: program channels this layer's audio is additionally routed to.
+					audioScreens: Array.isArray(layer.audioScreens) ? layer.audioScreens.slice() : [],
+					...(layer.routeSourceAudio && layer.routeSourceAudio !== 'all' ? { sourceAudioPair: layer.routeSourceAudio } : {}),
 						sceneId: liveSceneData.sceneId,
 						...(Number.isFinite(liveSlot)
 							? { liveAudioSlot: liveSlot, hostChannel: hostEntry?.channel ?? null }
@@ -206,29 +211,42 @@ export function collectProgramAudioRows(stateStore, { masterLabel, labelMax = 22
 	}
 }
 
+/** @param {{ kind?: string, slot?: number }} entry */
+function defaultInputLabel(entry) {
+	const kind = String(entry?.kind || '')
+	if (kind === 'decklink') return `DeckLink ${entry?.slot ?? '?'}`
+	if (kind === 'live_audio') return `Live audio ${entry?.slot ?? '?'}`
+	return `Input ${entry?.slot ?? '?'}`
+}
+
 /**
  * Isolated VU meter rows for dedicated live input channels (WO-53).
+ *
+ * WO-293 root cause: this used to hard-filter `kind === 'live_audio'`, so DeckLink inputs —
+ * which are real audio sources with embedded SDI/HDMI audio on their own dedicated Caspar
+ * channel — never produced a mixer strip at all. Enumeration now goes through
+ * `listAudioInputChannels`, which owns the "does this input kind carry audio" decision.
+ *
  * @param {object | null | undefined} channelMap
  */
 export function collectLiveInputMeterRows(channelMap) {
-	return listInputChannels(channelMap)
-		.filter((entry) => entry.kind === 'live_audio')
-		.map((entry) => {
-			const key = `input:${entry.channel}`
-			const layer = entry.layer ?? LIVE_AUDIO_INPUT_LAYER
-			return {
-				key,
-				ch: entry.channel,
-				layer,
-				label: entry.label || `Live audio ${entry.slot}`,
-				labelTitle: `Ch ${entry.channel} · L${layer} — ${entry.route || ''}`,
-				v: audioMixerState.getMasterVolume(key),
-				muted: audioMixerState.getMuted(key),
-				isMaster: false,
-				isLiveInput: true,
-				inputKind: entry.kind,
-				slot: entry.slot,
-				hostChannel: entry.channel,
-			}
-		})
+	return listAudioInputChannels(channelMap).map((entry) => {
+		const key = `input:${entry.channel}`
+		const layer = entry.layer ?? (entry.kind === 'live_audio' ? LIVE_AUDIO_INPUT_LAYER : 1)
+		return {
+			key,
+			ch: entry.channel,
+			layer,
+			label: entry.label || defaultInputLabel(entry),
+			labelTitle: `Ch ${entry.channel} · L${layer} — ${entry.route || ''}`,
+			v: audioMixerState.getMasterVolume(key),
+			muted: audioMixerState.getMuted(key),
+			isMaster: false,
+			isLiveInput: true,
+			inputKind: entry.kind,
+			slot: entry.slot,
+			route: entry.route || null,
+			hostChannel: entry.channel,
+		}
+	})
 }

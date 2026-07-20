@@ -113,6 +113,30 @@ export function listInputChannels(cm) {
 }
 
 /**
+ * WO-293 — input kinds whose dedicated Caspar channel actually carries audio, and therefore
+ * deserve a mixer strip + VU meter.
+ *
+ * `decklink` (embedded SDI/HDMI audio) and `live_audio` (ALSA capture) are audio sources.
+ * `ndi_host` carries an audio track too. `v4l2` (USB webcam producer) and the screen-scrape
+ * kinds (`browser_display`, `webpage_host`) are video-only in this pipeline, so they are
+ * deliberately excluded — a fader that can never move is worse than no fader.
+ */
+export const AUDIO_INPUT_KINDS = Object.freeze(['decklink', 'live_audio', 'ndi_host'])
+
+/** @param {string | null | undefined} kind */
+export function inputKindHasAudio(kind) {
+	return AUDIO_INPUT_KINDS.includes(String(kind || '').trim())
+}
+
+/**
+ * Audio-capable input channels, in channel-map order.
+ * @param {object | null | undefined} cm
+ */
+export function listAudioInputChannels(cm) {
+	return listInputChannels(cm).filter((e) => inputKindHasAudio(e?.kind))
+}
+
+/**
  * @param {object | null | undefined} cm
  * @param {number} channel
  */
