@@ -185,7 +185,16 @@ class AmcpProtocol {
 					if (optionalRemoveMiss) {
 						this.log('debug', 'AMCP optional remove (absent): ' + line)
 					} else {
-						this.log('error', 'Got error ' + RETCODE2TYPE[code] + ': ' + line)
+						// Caspar reports *any* producer that fails to construct as 404 MEDIAFILE_NOT_FOUND,
+						// including DECKLINK/route producers where nothing is missing from disk (camera
+						// powered off, nothing cabled, connector-profile conflict). Logging that bare as
+						// "MEDIAFILE_NOT_FOUND" sends operators hunting for a missing file that exists.
+						// See routing-setup.tryPlayDecklinkInput, which classifies the same 404.
+						const producerHint =
+							code === RETCODE.MEDIAFILE_NOT_FOUND && statusUpper.includes('PLAY')
+								? ' — note: 404 on PLAY also covers a producer that could not open (e.g. DeckLink input powered off / not cabled), not only a missing media file'
+								: ''
+						this.log('error', 'Got error ' + RETCODE2TYPE[code] + ': ' + line + producerHint)
 					}
 				}
 				const cbKey =
