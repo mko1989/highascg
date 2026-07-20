@@ -33,7 +33,7 @@ id like the clean up to be moving deprecated into deprecated folder, and leaving
 
 idea for opt in operator gui start on a fresh, not configured yet system (or after a factory reset)
 it should start a small service that tracks mouse, user hovers the mouse to the screen he wants to be his gui, clicks left mouse and this gets chosen as the operator gui, the service sleeps.
-   -> DONE. Opt-in picker, CLI only, never fires on boot. Verified it refuses on THIS box (already configured).
+   -> DONE. Opt-in picker, CLI only, never fires on boot. Verified on THIS box: --dry-run prints SKIP (already configured). Not wired to boot - your call.
 
 
 loading a project doesnt realy load anything.
@@ -65,10 +65,10 @@ see @/home/casparcg/highascg/work/work-orders/logs.19.07.26 for caspar logs duri
 
 i have a feeling that playing shaders in cef won't let me use it as intended. mostly audio might be hard. what we need to work thru is directing a proper audio source to the browser.
 the browser source apart from getting a casparcg host channel should also get a virtual display to be displayedin kiosk mode and that relayed to casparcg as a source played on the host channel. what are the options for having control (mouse keyboard) over that window from the operator position? 
-   -> RESEARCH RUNNING. Options doc being written (audio in / virtual display / operator control + security).
+   -> RESEARCH DONE (282_WO...md). KEY: this box has NO sound server at all, so there is no loopback to capture -> shader audio cannot work until snd-aloop is loaded. Xvfb rejected (no GPU = no shaders). Input-forwarding rejected (would let any API caller drive the whole desktop).
 
 the operator gui prevents opening any windows on top, like decklink setup, nvidia, file browser, web browser for operator.
-   -> RUNNING. Implementing managed launch + raise above kiosk (keeps video holes working).
+   -> DONE. Header button 'Open window' (browser/files/decklink/nvidia). A plain raise could not work - kiosk sits in a higher WM layer; helper is promoted into it. Video holes keep working. NEEDS YOUR TESTING.
 
 the audio mixer does not show "vu" meters on the inputs, highascg should be aware which input produces sound.
 it should be possible to route audio playing on a layer in a channel to another screen, now the ui blocks it.
