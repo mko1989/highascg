@@ -14,7 +14,9 @@ const {
 } = require('../streaming/caspar-ffmpeg-setup')
 
 /** Dedicated Caspar consumer slot — avoids clobbering `ADD 1 STREAM` (preview) on the same channel. */
-const DMX_FILE_CONSUMER_INDEX = 97
+/* 721, not 97: 97 is STREAMING_RTMP_CONSUMER_INDEX — same displacement hazard as the meter
+ * consumer above (see src/audio/meter-null-consumer.js). */
+const DMX_FILE_CONSUMER_INDEX = 721
 /** Caspar MPEG-TS duplicate stream port offset (per channel: base + 50 + ch). */
 const DMX_UDP_PORT_OFFSET = 50
 

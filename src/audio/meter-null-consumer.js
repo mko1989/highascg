@@ -18,7 +18,11 @@ const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { parseChannelVideoModesFromInfoConfigXml } = require('../config/server-info-config')
 
 /** Dedicated slot — below DMX (97), above typical route layers. */
-const METER_NULL_CONSUMER_INDEX = 96
+/* 720, not 96: 96 is STREAMING_RECORD_CONSUMER_INDEX. This consumer is added to EVERY channel
+ * on connect, so it would silently displace a running RECORD — Caspar replaces whatever occupies
+ * the index. The high range (7xx) is where the other long-lived internal consumers live
+ * (compose-preview 701, v4l2 bridge 710/711), well clear of the streaming pair. */
+const METER_NULL_CONSUMER_INDEX = 720
 /** 52000 + channel → unique discard port per input channel. */
 const METER_UDP_PORT_BASE = 52000
 
