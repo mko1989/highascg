@@ -161,6 +161,29 @@ export function computeDefaultTileLayout(defs) {
 	return out
 }
 
+/**
+ * Has the real channel state arrived yet? (2026-07-19 bug: "after highascg restart the operator gui
+ * starts with a stale compose preview layout".)
+ *
+ * The kiosk client renders this canvas BEFORE the WS `state` message lands, so
+ * `stateStore.getState().channelMap` is still `{}` — preview-canvas-panel.js's `getComposeCellDefs`
+ * then reads `Math.max(1, cm.screenCount || 1)` and produces ONE provisional `pgm_1` def, whose
+ * layout {@link resolveTileLayout} legitimately defaults to a single full-canvas tile (the saved
+ * multi-screen map is stored under a different {@link layoutStorageKey}, keyed by screen count, and
+ * would not cover `pgm_1` anyway). Reporting that provisional rect CLOBBERS the multi-cell layout
+ * the server just re-applied from `operatorGuiLayout` persistence. So: report nothing until this
+ * returns true. `screenCount` is always present on a server-built channelMap
+ * (src/config/channel-map-from-ctx.js), so its absence is an unambiguous "not booted yet".
+ * @param {object|null|undefined} cm - `stateStore.getState().channelMap`
+ * @returns {boolean}
+ */
+export function hasResolvedChannelState(cm) {
+	const map = cm || {}
+	const n = Number(map.screenCount)
+	if (Number.isFinite(n) && n >= 1) return true
+	return Array.isArray(map.programChannels) && map.programChannels.length > 0
+}
+
 /** localStorage key for a screen-count-keyed tile layout, following preview-canvas-panel.js's `storageKeyPrefix` convention. */
 export function layoutStorageKey(storageKeyPrefix, screenCount) {
 	return `${storageKeyPrefix || 'casparcg_preview'}_operator_tiles_${Math.max(1, parseInt(screenCount, 10) || 1)}`
@@ -307,6 +330,12 @@ export function initOperatorComposeTiles(container, options) {
 	let rafReport = null
 	let drag = null
 	let lastCanvasSize = { w: 0, h: 0 }
+	/** See {@link hasResolvedChannelState}: false until the WS `state`/`channelMap` payload has
+	 * landed. While false the tiles still BUILD and lay out (so the operator sees a frame) but
+	 * NOTHING is reported — a provisional single-tile rect would overwrite the server's persisted
+	 * multi-cell layout ~0.7s after a highascg restart. Latches true the moment real state arrives;
+	 * every later report (drag, resize, position watch) is completely unaffected. */
+	let stateReady = false
 
 	function currentDefs() {
 		return Array.isArray(getComposeCellDefs?.()) ? getComposeCellDefs() : []
@@ -350,6 +379,10 @@ export function initOperatorComposeTiles(container, options) {
 
 	function reportRectsNow() {
 		if (typeof onCellRects !== 'function') return
+		// Provisional (pre-state) render: never report. Prefer not-reporting over
+		// reporting-then-correcting — the server's re-applied layout is the better truth until the
+		// real channelMap lands and `rebuild()` re-derives the tiles from it.
+		if (!stateReady) return
 		const cellRects = []
 		for (const t of tiles.values()) {
 			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
@@ -497,6 +530,10 @@ export function initOperatorComposeTiles(container, options) {
 	}
 
 	function rebuild() {
+		// Latch readiness here (not only in the channelMap listener) so EVERY rebuild path —
+		// refreshDefs() from preview-canvas-panel, the channelMap subscription, the one-shot
+		// full-state subscription below — flips the gate as soon as real state is visible.
+		if (!stateReady && hasResolvedChannelState(getCm())) stateReady = true
 		const defs = currentDefs()
 		const key = JSON.stringify(defs.map((d) => ({ id: d.id, role: d.role, mainIndex: d.mainIndex })))
 		const screenCount = new Set(defs.map((d) => d.mainIndex)).size || 1
@@ -543,8 +580,23 @@ export function initOperatorComposeTiles(container, options) {
 	window.addEventListener('scroll', onWinScroll, true)
 	window.addEventListener('highascg-workspace-tab-activated', onTabActivated)
 	const unsubCm = stateStore?.on?.('channelMap', () => rebuild())
+	// The WS full-`state` message goes through StateStore.setState(), which emits ONLY '*' — it
+	// never emits 'channelMap' (client/lib/state-store.js) — so the subscription above alone can
+	// leave this canvas parked on its provisional defs until some later incremental change (in
+	// practice: the first look take). Watch '*' too, but only until real state has landed, then
+	// unsubscribe so the hot per-change path stays untouched.
+	let unsubAnyState = null
+	const onAnyState = () => {
+		if (stateReady) return
+		rebuild()
+		if (stateReady) {
+			unsubAnyState?.()
+			unsubAnyState = null
+		}
+	}
 
 	rebuild()
+	if (!stateReady) unsubAnyState = stateStore?.on?.('*', onAnyState) || null
 
 	return {
 		refreshDefs: rebuild,
@@ -555,10 +607,13 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('scroll', onWinScroll, true)
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			unsubCm?.()
+			unsubAnyState?.()
 			if (rafReport != null) cancelAnimationFrame(rafReport)
 			for (const t of tiles.values()) t.timer?.destroy?.()
 			tiles.clear()
-			if (typeof onCellRects === 'function') onCellRects([])
+			// Withdraw only if this canvas ever reported: tearing down while still provisional must
+			// not send an empty set either (that DELETEs the server's restored layout).
+			if (stateReady && typeof onCellRects === 'function') onCellRects([])
 			root.remove()
 		},
 	}

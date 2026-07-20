@@ -295,6 +295,46 @@ const applyChains = new Map()
 const debounceTimers = new Map()
 
 /**
+ * Boot-window shrink guard (2026-07-19 bug: "after highascg restart the operator gui starts with a
+ * stale compose preview layout"). The freshly-booted kiosk client renders its compose tiles BEFORE
+ * the WS state arrives and used to report a single provisional tile, clobbering the multi-cell
+ * layout `ensureOperatorGuiChannel` had just re-applied from persistence. The client no longer does
+ * that (client/components/operator-compose-tiles.js `stateReady`), but this is the cheap belt-and-
+ * braces: for {@link BOOT_GUARD_MS} after a re-apply, ONE report that would strictly REDUCE the
+ * restored cell count is ignored.
+ *
+ * Deliberately one-shot per boot and count-based only, so it can never block a real operator
+ * change: moving/resizing a tile reports the SAME cell count (never fewer), and a genuine
+ * screen-count reduction re-reports on the client's very next render, which sails through.
+ * @type {{ ch: number, until: number, cells: number }|null}
+ */
+let bootShrinkGuard = null
+const BOOT_GUARD_MS = 10000
+
+/**
+ * @param {number} ch
+ * @param {Array} cells - incoming reported cells
+ * @param {Function} [log]
+ * @returns {boolean} true when this report should be ignored
+ */
+function shouldIgnoreBootShrink(ch, cells, log) {
+	const g = bootShrinkGuard
+	if (!g || g.ch !== ch) return false
+	if (Date.now() > g.until) {
+		bootShrinkGuard = null
+		return false
+	}
+	const n = Array.isArray(cells) ? cells.length : 0
+	if (n === 0 || n >= g.cells) return false
+	bootShrinkGuard = null // one-shot: the next report wins whatever it says
+	log?.(
+		'warn',
+		`operator-gui: ignoring boot-window report of ${n} cell(s) that would shrink the restored ${g.cells}-cell layout (one-shot guard)`,
+	)
+	return true
+}
+
+/**
  * Actually run one apply against `ctx.amcp` — no debounce, assumes already serialized by the caller.
  * Also feeds the shape helper (WO-255 T255.1) with the same fitted rects, converted to
  * monitor-relative pixels — best-effort: no resolvable monitor rect (headless/tests/no destination
@@ -385,6 +425,9 @@ function applyOperatorGuiLayout(ctx, cells) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return Promise.resolve({ skipped: true, reason: 'no operator_gui destination' })
 	const ch = resolved.ch
+	if (shouldIgnoreBootShrink(ch, cells, ctx.log)) {
+		return Promise.resolve({ skipped: true, reason: 'boot-window shrink ignored' })
+	}
 	return new Promise((resolve, reject) => {
 		const existing = debounceTimers.get(ch)
 		if (existing) clearTimeout(existing)
@@ -461,6 +504,8 @@ async function ensureOperatorGuiChannel(ctx) {
 		const persistence = ctx.persistence || require('../utils/persistence')
 		const saved = persistence.get('operatorGuiLayout')
 		if (saved && Array.isArray(saved.cells)) {
+			// Arm the one-shot shrink guard for the boot window (see {@link shouldIgnoreBootShrink}).
+			bootShrinkGuard = saved.cells.length > 1 ? { ch, until: Date.now() + BOOT_GUARD_MS, cells: saved.cells.length } : null
 			// Not awaited: a client POST inside the apply debounce window supersedes this call's
 			// promise (its timer is cleared, so it never settles) — and boot must not block on it.
 			applyOperatorGuiLayout(ctx, saved.cells).then(
@@ -486,6 +531,7 @@ function resetOperatorGuiStateForTests() {
 	applyChains.clear()
 	for (const t of debounceTimers.values()) clearTimeout(t)
 	debounceTimers.clear()
+	bootShrinkGuard = null
 }
 
 module.exports = {
@@ -493,6 +539,7 @@ module.exports = {
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
 	APPLY_DEBOUNCE_MS,
+	BOOT_GUARD_MS,
 	operatorGuiDestination,
 	resolveOperatorGuiChannel,
 	resolveOperatorGuiMonitorRect,

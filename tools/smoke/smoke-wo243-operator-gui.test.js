@@ -448,3 +448,101 @@ describe('WO-243 follow-up: operator_gui never claims a program-screen layout sl
 	})
 })
 
+
+/**
+ * 2026-07-19 bug — server-side belt-and-braces for "after highascg restart the operator gui starts
+ * with a stale compose preview layout". `ensureOperatorGuiChannel` re-applies the persisted
+ * multi-cell layout at boot; the freshly-booted kiosk client used to report a single provisional
+ * tile ~0.7s later and clobber it. The client no longer reports pre-state
+ * (client/components/operator-compose-tiles.js `stateReady`); this guard makes the server refuse
+ * ONE boot-window report that would strictly shrink the restored layout.
+ */
+describe('2026-07-19: server ignores a single boot-window report that would shrink the restored layout', () => {
+	const { applyOperatorGuiLayout, ensureOperatorGuiChannel, BOOT_GUARD_MS } = require('../../src/system/operator-gui-channel')
+
+	function bootCtx() {
+		const app = clone(defaults)
+		app.screenDestinations = {
+			version: 1,
+			destinations: [
+				{ id: 'scr1', mainScreenIndex: 0, mode: 'pgm_prv' },
+				{ id: 'og1', mainScreenIndex: 5, mode: 'operator_gui' },
+			],
+		}
+		const saved = {
+			cells: [
+				{ id: 'pgm_1', role: 'pgm', mainIndex: 0, rect: { x: 0, y: 0, w: 0.3, h: 0.3 } },
+				{ id: 'pgm_2', role: 'pgm', mainIndex: 0, rect: { x: 0.35, y: 0, w: 0.3, h: 0.3 } },
+				{ id: 'pgm_3', role: 'pgm', mainIndex: 0, rect: { x: 0.7, y: 0, w: 0.3, h: 0.3 } },
+			],
+		}
+		const store = new Map([['operatorGuiLayout', saved]])
+		const amcp = {
+			play: async () => {}, mixerFill: async () => {}, stop: async () => {},
+			mixerClear: async () => {}, mixerCommit: async () => {},
+		}
+		return {
+			ctx: {
+				config: app,
+				amcp,
+				log: () => {},
+				persistence: { get: (k) => store.get(k), set: (k, v) => store.set(k, v) },
+			},
+			saved,
+		}
+	}
+
+	const oneCell = [{ id: 'pgm_1', role: 'pgm', mainIndex: 0, rect: { x: 0, y: 0, w: 1, h: 1 } }]
+
+	it('the guard window is bounded and non-trivial', () => {
+		assert.equal(typeof BOOT_GUARD_MS, 'number')
+		assert.ok(BOOT_GUARD_MS > 0 && BOOT_GUARD_MS <= 30000, 'a short boot window, not a permanent latch')
+	})
+
+	it('a 1-cell report right after a 3-cell re-apply is ignored ONCE, and the very next one is honoured', async () => {
+		resetOperatorGuiStateForTests()
+		const { ctx } = bootCtx()
+		await ensureOperatorGuiChannel(ctx)
+
+		const first = await applyOperatorGuiLayout(ctx, oneCell)
+		assert.equal(first.skipped, true, 'provisional 1-cell boot report does not shrink the restored 3-cell layout')
+		assert.equal(first.reason, 'boot-window shrink ignored')
+
+		// One-shot: a real screen-count reduction re-reports on the client's next render and lands.
+		const second = await applyOperatorGuiLayout(ctx, oneCell)
+		assert.notEqual(second.skipped, true, 'the guard never latches — the second report applies')
+		assert.equal(second.plan.length, 1)
+	})
+
+	it('an operator tile move (same cell count) is NEVER blocked, even inside the boot window', async () => {
+		resetOperatorGuiStateForTests()
+		const { ctx, saved } = bootCtx()
+		await ensureOperatorGuiChannel(ctx)
+
+		const moved = saved.cells.map((c, i) => ({ ...c, rect: { ...c.rect, y: 0.4 + i * 0.01 } }))
+		const res = await applyOperatorGuiLayout(ctx, moved)
+		assert.notEqual(res.skipped, true, 'a genuine 3-cell move applies immediately')
+		assert.equal(res.plan.length, 3)
+	})
+
+	it('a GROWING report inside the boot window is never blocked either', async () => {
+		resetOperatorGuiStateForTests()
+		const { ctx, saved } = bootCtx()
+		await ensureOperatorGuiChannel(ctx)
+
+		const grown = [...saved.cells, { id: 'pgm_4', role: 'pgm', mainIndex: 0, rect: { x: 0, y: 0.5, w: 0.3, h: 0.3 } }]
+		const res = await applyOperatorGuiLayout(ctx, grown)
+		assert.notEqual(res.skipped, true)
+		assert.equal(res.plan.length, 4)
+	})
+
+	it('with no persisted layout to protect, nothing is ever guarded', async () => {
+		resetOperatorGuiStateForTests()
+		const { ctx } = bootCtx()
+		ctx.persistence.set('operatorGuiLayout', { cells: [] })
+		await ensureOperatorGuiChannel(ctx)
+
+		const res = await applyOperatorGuiLayout(ctx, oneCell)
+		assert.notEqual(res.skipped, true, 'no restored layout -> no guard')
+	})
+})

@@ -365,6 +365,14 @@ export function isInteractionSuppressed() {
  * mode is inactive (cheap, safe to call unconditionally). */
 function resendMergedNow() {
 	if (!isOperatorGuiModeActive()) return
+	// 2026-07-19: a recovery trigger must never ASSERT AN EMPTY SET. At boot the WS 'connect'
+	// handler fires long before any surface has reported, so a forced send here would POST/DELETE
+	// an empty layout and wipe the layout the server just re-applied from `operatorGuiLayout`
+	// persistence. Genuine withdrawals never come through this path — they go through
+	// reportSurfaceCells / setInteractionSuppressed / setForegroundTabBlocksVideo, which all send
+	// immediately on their own. (Suppression with live surfaces still re-asserts empty: _bySurface
+	// is non-empty then, only `effectiveCells()` is empty.)
+	if (!_bySurface.size) return
 	if (_debounceTimer) {
 		clearTimeout(_debounceTimer)
 		_debounceTimer = null
