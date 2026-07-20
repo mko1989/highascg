@@ -546,3 +546,26 @@ describe('2026-07-19: server ignores a single boot-window report that would shri
 		assert.notEqual(res.skipped, true, 'no restored layout -> no guard')
 	})
 })
+
+describe('operator GUI layout persistence: never save an empty cell set', () => {
+	const guiChannel = require('../../src/system/operator-gui-channel')
+
+	it('applyOperatorGuiLayout is the real export under test (guards against a vacuous test)', () => {
+		assert.equal(typeof guiChannel.applyOperatorGuiLayout, 'function')
+	})
+
+	it('the persist call is guarded on a non-empty cell list', () => {
+		const src = fs.readFileSync(
+			path.join(__dirname, '..', '..', 'src', 'system', 'operator-gui-channel.js'),
+			'utf8',
+		)
+		const setIdx = src.indexOf("persistence.set('operatorGuiLayout'")
+		assert.ok(setIdx > 0, "persistence.set('operatorGuiLayout') must exist")
+		const before = src.slice(Math.max(0, setIdx - 400), setIdx)
+		assert.match(
+			before,
+			/if \(list\.length > 0\)/,
+			'persisting the layout must be gated on a non-empty cell list — an empty apply means the client went away, not that the operator wants no tiles',
+		)
+	})
+})

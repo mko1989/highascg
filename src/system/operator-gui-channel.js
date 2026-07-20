@@ -404,9 +404,17 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
 	lastMaxLayerByChannel.set(ch, newMax)
 	// Persist the applied cell set (mirrors routes-multiview.js persisting `multiviewLayout`)
 	// so `ensureOperatorGuiChannel` can re-apply the saved layout at boot/reconnect.
+	/* Never persist an EMPTY cell set. An empty apply means "no client is currently reporting"
+	 * — the kiosk unloading, being killed, or reconnecting — not "the operator wants no tiles".
+	 * Persisting it destroyed the saved arrangement on every kiosk close (observed: a restart
+	 * later logged "re-apply: 0 cell(s)" and .highascg-state.json held cells: []). The live holes
+	 * still clear, because that is driven by the applied routes above, not by this record. */
 	try {
-		const persistence = ctx.persistence || require('../utils/persistence')
-		persistence.set('operatorGuiLayout', { cells: Array.isArray(cells) ? cells : [], savedAt: Date.now() })
+		const list = Array.isArray(cells) ? cells : []
+		if (list.length > 0) {
+			const persistence = ctx.persistence || require('../utils/persistence')
+			persistence.set('operatorGuiLayout', { cells: list, savedAt: Date.now() })
+		}
 	} catch (_) {
 		/* persistence optional (tests/headless) */
 	}
