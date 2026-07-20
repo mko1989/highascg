@@ -120,3 +120,19 @@ describe('WO-289: Looks editor checkerboard canvas', () => {
 			'operator-tiles mount must not have checkerboard pattern')
 	})
 })
+
+describe('WO-287b: modal overlays carry no scrim tint at all', () => {
+	it('.modal-overlay has no rgba tint — the UI behind a dialog stays fully readable', () => {
+		const css = fs.readFileSync(
+			path.join(__dirname, '..', '..', 'client', 'styles', '07b1-modal-shell-base.css'),
+			'utf8',
+		)
+		const block = css.slice(css.indexOf('.modal-overlay'), css.indexOf('.modal-overlay') + 600)
+		assert.doesNotMatch(
+			block,
+			/background:\s*rgba\(/,
+			'.modal-overlay must not paint a translucent scrim (owner: "should be nothing, 100% alpha bg")',
+		)
+		assert.match(block, /background:\s*none/, '.modal-overlay should declare background: none')
+	})
+})

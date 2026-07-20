@@ -9,7 +9,11 @@
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background: rgba(0, 0, 0, 0.7);
+	/* No scrim at all (owner, todos19.07.26: "no blur but tint. should be nothing, 100% alpha bg").
+	 * The rest of the UI must stay fully readable behind a dialog on a live playout box — the modal
+	 * panel itself carries the contrast. `background: none` also keeps this element click-catching,
+	 * so click-outside-to-close still works. */
+	background: none;
 	display: flex;
 	align-items: center;
 	justify-content: center;
