@@ -73,3 +73,9 @@ when i resize the compose preview panel the preview windows inside get resized t
 
 the produced eggs iso was 5.9gb it should be closer to 3.9gb something big does not get excluded. is puppeteer still in?
 
+write a new md file in work folder giving me a breakdown of options for porting the webui into a native ubuntu gui app. electron is a no go for me.
+name the file NATIVE_GUI_PROPOSITIONS
+
+when alt tabbing in ubuntu i get a white border around the chosen window, can this be disabled?
+
+in the compose preview when there is no "running" source on the screen it should show the highest layers content in the "progress bar" section of the under the preview window, just without timers.

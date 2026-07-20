@@ -205,6 +205,7 @@ export function renderCableOverlay(ctx) {
 		cablePointer,
 		messiness,
 		simpleWiring,
+		regrabEdgeId,
 	} = ctx
 
 	const group = cableOverlay.querySelector('[data-cable-lines]')
@@ -223,7 +224,12 @@ export function renderCableOverlay(ctx) {
 	cableOverlay.setAttribute('width', String(w))
 	cableOverlay.setAttribute('height', String(h))
 
-	const edges = lastPayload?.graph?.edges || []
+	const allEdges = lastPayload?.graph?.edges || []
+	// WO-278: while one end of a cable is held, that cable is drawn as the ghost (anchor →
+	// pointer) instead of as itself. It is only hidden from the overlay — the edge is still in
+	// the graph, so cancelling the gesture restores it with no server round trip.
+	const heldEdgeId = String(regrabEdgeId || '').trim()
+	const edges = heldEdgeId ? allEdges.filter((e) => String(e?.id || '') !== heldEdgeId) : allEdges
 	const keyFillEdges = collectDecklinkKeyFillVirtualEdges(lastPayload)
 	const numLoops = parseInt(messiness) || 0
 

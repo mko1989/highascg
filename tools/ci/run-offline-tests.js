@@ -91,6 +91,7 @@ const FILES = [
 	'tools/smoke/smoke-hole-rect.test.js',
 	'tools/smoke/smoke-operator-gui-launch-timing.test.js',
 	'tools/smoke/smoke-wo279-operator-gui-monitor-placement.test.js',
+	'tools/smoke/smoke-wo278-cable-regrab.test.js',
 	'tools/smoke/smoke-preview-mixer-nudge.test.js',
 	'tools/smoke/smoke-lt-engine-registry-sync.test.js',
 	'tools/smoke/smoke-wo259-two-phase-batch.test.js',
@@ -116,6 +117,7 @@ const FILES = [
 	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
 	'tools/smoke/smoke-decklink-input-look-thumb.test.js',
 	'tools/smoke/smoke-eggs-exclude-lists.test.js',
+	'tools/smoke/smoke-wo284-audio-mixer-inputs-vu-routing.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

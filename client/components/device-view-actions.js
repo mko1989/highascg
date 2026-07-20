@@ -12,6 +12,20 @@ export async function loadDeviceView(opts = {}) {
 	return await api.get(`/api/device-view${q}`)
 }
 
+/**
+ * WO-278 (A): warm the server's live-hardware snapshot cache off the critical path.
+ * `/api/device-view/snapshot` runs the same buildLiveSnapshot() every cable mutation needs but
+ * returns only the live block (~27 KB vs ~37 KB) and skips graph normalize/suggest/ETag work.
+ * Fire-and-forget: a failed warm just means the next real request pays the cold price.
+ */
+export async function prewarmDeviceViewSnapshot() {
+	try {
+		return await api.get('/api/device-view/snapshot')
+	} catch {
+		return null
+	}
+}
+
 export async function applyDeviceSnapshot(snapshot, opts = {}) {
 	return await api.post('/api/device-snapshot/apply', {
 		snapshot,

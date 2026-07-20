@@ -40,7 +40,7 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-281 | Audit `work/work-orders/logs.19.07.26` — many errors/false calls during normal operation; check whether enabling AMCP batch caused regressions | M | **DONE** — all errors trace to one powered-off DeckLink 4; amcp_batch was never enabled. Report: 281_WO_CASPAR_LOG_AUDIT.md |
 | WO-282 | Browser source: route a real audio source in; give it a virtual display shown in kiosk and relayed to Caspar; options for operator mouse/keyboard control | L (research) | TODO |
 | WO-283 | Operator GUI blocks any window on top (DeckLink setup, NVIDIA settings, file browser, operator web browser) | M | TODO |
-| WO-284 | Audio mixer: VU meters per input; know which input produces sound. Allow routing a layer's audio to another screen (UI currently blocks it) | L | TODO |
+| WO-284 | Audio mixer: VU meters per input; know which input produces sound. Allow routing a layer's audio to another screen (UI currently blocks it) | L | **DONE** — VU meters from existing OSC levels (silent vs no-data distinguished); cross-screen block was an unimplemented-feature placeholder, now validated routing |
 | WO-285 | CG studio should reuse the existing inspector; box size options missing (only weight) | M | **DONE** — studio inspector now emits the main inspector DOM vocabulary (literal reuse impossible: ESM vs plain script, proven); boxWidth/boxHeight/boxScale added to registry + both engines |
 | WO-286 | Inverted two-finger scroll for laptop touchpads | S | **DONE** (74a7c14) — shared wheel-delta helper + Settings > Defaults preference, default off |
 | WO-287 | No modal may blur the background — none | S | **DONE** (0a5a80a) — blur removed from modal shell + ingest drag overlay; regression test |
@@ -48,7 +48,7 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-289 | Looks editor canvas background should be a low-opacity alpha checkerboard, visibly distinct from the surrounding div | S | **DONE** (0a5a80a) — 6% alpha checkerboard on the looks-editor canvas only |
 | WO-291 | DeckLink input does not use its captured frame as the looks thumbnail (added by owner 2026-07-20) | M | **DONE** — deckIdleMode returned null for every non-media source; now excepts DeckLink INPUT channels, TTL-gated capture + backoff, no-signal placeholder |
 | WO-292 | Resizing the compose preview panel resizes the preview windows inside; should only happen when space demands it (added by owner 2026-07-20) | M | TODO |
-| WO-293 | DeckLink input audio mixer does not show up (added by owner 2026-07-20) | M | TODO |
+| WO-293 | DeckLink input audio mixer does not show up (added by owner 2026-07-20) | M | **DONE** — collectLiveInputMeterRows filtered kind===live_audio at enumeration, so DeckLink strips were never created |
 | WO-290 | Opt-in operator-GUI monitor picker on a fresh/factory-reset system: hover + left click selects the GUI screen, then the service sleeps | M | TODO |
 
 ## Execution notes

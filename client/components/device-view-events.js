@@ -70,10 +70,11 @@ export function attachDeviceViewEvents(ctx) {
 		})
 	window.onresize = () => renderCableOverlay(ctx.getCOCtx())
 	clearCableBtn.onclick = () => {
-		state.cableSourceId = null
-		state.cablePointer = null
+		const wasRegrab = !!state.cableRegrab
+		ctx.clearCableGesture()
 		ctx.updateUI()
-		setStatus(statusEl, 'Cable mode cancelled', true)
+		// WO-278: a held cable end was never unpatched on the server, so cancelling just redraws it.
+		setStatus(statusEl, wasRegrab ? 'Cable re-grab cancelled — connection left as it was.' : 'Cable mode cancelled', true)
 	}
 	destAdd.onclick = () => {
 		const rawType = destType.value
@@ -147,6 +148,16 @@ export function attachDeviceViewEvents(ctx) {
 		}
 	})
 	document.addEventListener('keydown', (ev) => {
+		// WO-278: Escape restores a held cable end (and cancels a plain armed cable). Nothing was
+		// persisted during the gesture, so this is a pure client-side redraw.
+		if (ev.key === 'Escape' && (state.cableSourceId || state.cableRegrab)) {
+			const wasRegrab = !!state.cableRegrab
+			ev.preventDefault()
+			ctx.clearCableGesture()
+			ctx.updateUI()
+			setStatus(statusEl, wasRegrab ? 'Cable re-grab cancelled — connection left as it was.' : 'Cable mode cancelled', true)
+			return
+		}
 		const isZ = ev.key?.toLowerCase() === 'z'
 		const isUndo = isZ && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey
 		if (isUndo) {
@@ -176,10 +187,13 @@ export function attachDeviceViewEvents(ctx) {
 				}
 				return
 			}
-			state.cableSourceId = null
-			state.cablePointer = null
+			// Empty space. This is the app's existing cancel gesture, NOT its delete affordance
+			// (that is select-the-cable + Delete, or the edge inspector's remove button), so a
+			// held cable end is restored here rather than disconnected — WO-278.
+			const wasRegrab = !!state.cableRegrab
+			ctx.clearCableGesture()
 			ctx.updateUI()
-			setStatus(statusEl, 'Cable mode cancelled', true)
+			setStatus(statusEl, wasRegrab ? 'Cable re-grab cancelled — connection left as it was.' : 'Cable mode cancelled', true)
 		},
 		true,
 	)

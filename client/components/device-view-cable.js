@@ -7,7 +7,19 @@ import {
 import { setStatus } from './device-view-ui-utils.js'
 import { renderCableOverlay } from './device-view-cables.js'
 import { describeCableRejection, cableReasonFromError } from '../lib/device-view-cable-messages.js'
-import { isUnknownCableConnectorError, resolveCableEdgeIds, findGpuSinkCableConflict } from '../lib/device-view-cable-resolve.js'
+import {
+	isUnknownCableConnectorError,
+	resolveCableEdgeIds,
+	findGpuSinkCableConflict,
+	canonicalCableConnectorId,
+} from '../lib/device-view-cable-resolve.js'
+import {
+	pickRegrabCandidate,
+	planCableRegrab,
+	planRegrabRollback,
+	describeRegrabRestore,
+} from '../lib/device-view-cable-regrab.js'
+import { createSnapshotPrewarmer } from '../lib/device-view-snapshot-prewarm.js'
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
 import { resolveGpuPhysicalScreenIndex, resolveGpuScreenNumber } from './device-view-inspector-gpu-resolve.js'
 import {
@@ -43,7 +55,22 @@ export function registerDeviceViewCable(ctx) {
 		cablePointer: state.cablePointer,
 		messiness: messinessSlider.value,
 		simpleWiring: simpleWiringCk.checked,
+		regrabEdgeId: state.cableRegrab?.edgeId || null,
 	})
+
+	// WO-278 (A): the dominant cost of applying a cable is the server's cold live-hardware
+	// snapshot (measured 274 ms median / 1770 ms worst, vs 43 ms warm). Arming a cable is a
+	// reliable warning that a mutation is ~1 s away, so warm the cache during the gesture.
+	// The timer exists only between arm and commit/cancel — no idle polling.
+	const snapshotPrewarm = createSnapshotPrewarmer({ warm: () => Actions.prewarmDeviceViewSnapshot() })
+
+	/** Leave cable/re-grab mode. Client-side only: no intermediate state was ever persisted. */
+	ctx.clearCableGesture = () => {
+		state.cableSourceId = null
+		state.cablePointer = null
+		state.cableRegrab = null
+		snapshotPrewarm.stop()
+	}
 
 	ctx.pushUndo = () => {
 		if (!state.lastPayload?.graph || !state.currentSettings?.screenDestinations) return
@@ -111,12 +138,38 @@ export function registerDeviceViewCable(ctx) {
 		renderCableOverlay(ctx.getCOCtx())
 	}
 
+	/**
+	 * WO-278 (B): click a cable to select it, then click either of its ends to lift that end
+	 * off its port. The far end stays anchored and the whole existing arm/complete machinery
+	 * (ghost cable, valid/invalid target highlighting, click-elsewhere-to-cancel) is reused by
+	 * pointing `cableSourceId` at the anchor.
+	 * @returns {boolean} true if a re-grab was started
+	 */
+	ctx.tryBeginCableRegrab = (connectorId) => {
+		if (state.cableSourceId || state.cableRegrab) return false
+		const grab = pickRegrabCandidate(state.lastPayload?.graph?.edges, connectorId, {
+			selectedEdgeId: state.selectedEdgeId,
+		})
+		if (!grab) return false
+		state.cableRegrab = grab
+		state.cableSourceId = grab.anchorId
+		state.cablePointer = null
+		state.suppressDocCableClickUntil = Date.now() + 100
+		snapshotPrewarm.start()
+		ctx.updateUI()
+		setStatus(statusEl, 'Cable end grabbed: click another connector to move it, or click empty space to restore.', true)
+		return true
+	}
+
 	ctx.beginOrCompleteCable = (k, c, d) => {
 		if (!c) return
 		if (state.cableSourceId && state.cableSourceId !== c) {
 			void ctx.tryAddCable(c)
 			return
 		}
+		// Re-grab takes priority over starting a new cable, but only when the operator has
+		// already picked out which cable they mean by selecting it.
+		if (ctx.tryBeginCableRegrab(c)) return
 		const conn = connectorById(state.lastPayload, c)
 		const role = connectorRole(conn)
 		if (role !== 'destination_out' && role !== 'caspar_out' && role !== 'pixel_mapping_out') {
@@ -126,16 +179,90 @@ export function registerDeviceViewCable(ctx) {
 		ctx.selectKey(k, { ...d, connectorId: c })
 		state.cableSourceId = c
 		state.suppressDocCableClickUntil = Date.now() + 100
+		// WO-278 (A): warm the server snapshot while the operator picks a target.
+		snapshotPrewarm.start()
 		ctx.updateUI()
 		setStatus(statusEl, 'Cable armed: click another connector dot to connect', true)
 	}
 
+	/**
+	 * WO-278 (B): commit a held cable end onto `targetId`.
+	 *
+	 * Validation runs BEFORE anything is written. Anything short of a valid new target is a
+	 * restore, which costs nothing because the original edge was never removed. If the server
+	 * rejects the new edge after the old one is gone, the original is put back — a re-grab can
+	 * never end in a silent disconnect.
+	 */
+	ctx.commitCableRegrab = async (targetId) => {
+		const grab = state.cableRegrab
+		const plan = planCableRegrab({
+			grab,
+			targetId,
+			orderEdge: (a, b) => orderEdgeForDeviceView(a, b, (cid) => connectorById(state.lastPayload, cid)),
+			findSinkConflict: (sinkId) => findGpuSinkCableConflict(state.lastPayload, sinkId),
+			canonicalize: (cid) => canonicalCableConnectorId(state.lastPayload, cid),
+		})
+
+		if (plan.action !== 'retarget') {
+			ctx.clearCableGesture()
+			// Nothing was persisted, so "restore" is just redrawing the edge we had hidden.
+			ctx.updateUI()
+			if (plan.action === 'restore') setStatus(statusEl, describeRegrabRestore(plan), plan.reason === 'unchanged')
+			return
+		}
+
+		const rollback = planRegrabRollback(grab)
+		ctx.clearCableGesture()
+		try {
+			ctx.pushUndo()
+			// Remove first: moving a SOURCE end re-uses the same sink, and one-cable-per-sink
+			// would reject the new edge while the old one still holds it.
+			const removed = await Actions.removeEdge(plan.removeEdgeId)
+			if (removed?.graph) state.lastPayload.graph = removed.graph
+			let res
+			try {
+				res = await Actions.addCable(plan.sourceId, plan.sinkId)
+				if (res?.error) throw new Error(describeCableRejection(res.error))
+			} catch (addErr) {
+				if (rollback) {
+					try {
+						const back = await Actions.addCable(rollback.sourceId, rollback.sinkId)
+						if (back?.graph) state.lastPayload.graph = back.graph
+					} catch {
+						/* surfaced below; the forced reload shows the operator the real graph */
+					}
+				}
+				throw addErr
+			}
+			if (res?.graph) state.lastPayload.graph = res.graph
+			if (state.selectedEdgeId === plan.removeEdgeId) state.selectedEdgeId = null
+			const sinkConn = connectorById(state.lastPayload, plan.sinkId)
+			if (
+				cableSinkAffectsCasparRestart(sinkConn, {
+					dedicatedStreamingChannel: isStreamingDedicatedOutputChannel(state.currentSettings),
+				})
+			) {
+				ctx.setCasparRestartDirty(true)
+			}
+			setStatus(statusEl, `Cable moved to ${friendlyConnectorLabel(state.lastPayload, plan.sinkId)}`, true)
+			// WO-276: a read issued right after a write must never be answered from the 5 s cache.
+			await ctx.load({ forceRefresh: true })
+		} catch (e) {
+			setStatus(statusEl, `Cable move failed — original connection restored: ${cableReasonFromError(e)}`, false)
+			ctx.updateUI()
+			await ctx.load({ forceRefresh: true })
+		}
+	}
+
 	ctx.tryAddCable = async (id) => {
+		if (state.cableRegrab) {
+			await ctx.commitCableRegrab(id)
+			return
+		}
 		const o = orderEdgeForDeviceView(state.cableSourceId, id, (cid) => connectorById(state.lastPayload, cid))
 		if (!o) {
 			setStatus(statusEl, 'These connectors cannot be cabled together (wrong roles or direction).', false)
-			state.cableSourceId = null
-			state.cablePointer = null
+			ctx.clearCableGesture()
 			ctx.updateUI()
 			return
 		}
@@ -157,8 +284,7 @@ export function registerDeviceViewCable(ctx) {
 				`${sinkLabel} already has a cable from ${srcLabel}. Remove that cable first.${bracketNote}`,
 				false,
 			)
-			state.cableSourceId = null
-			state.cablePointer = null
+			ctx.clearCableGesture()
 			ctx.focusConnectorById(id)
 			ctx.updateUI()
 			return
@@ -211,8 +337,7 @@ export function registerDeviceViewCable(ctx) {
 					`${describeCableRejection(res.error)} (${resolved.sourceId} → ${resolved.sinkId})`,
 					false,
 				)
-				state.cableSourceId = null
-				state.cablePointer = null
+				ctx.clearCableGesture()
 				ctx.focusConnectorById(id)
 				ctx.updateUI()
 				return
@@ -248,19 +373,21 @@ export function registerDeviceViewCable(ctx) {
 					await Actions.updateConnector(resolved.sinkId, connectorPatch)
 				}
 			}
-			state.cableSourceId = null
-			state.cablePointer = null
+			ctx.clearCableGesture()
 			// WO-172 T172.3: stream_out/record_out cabling only needs the restart flag in
 			// dedicated-output-channel mode (setupAllRouting must re-run to move the PLAY route://
 			// binding); attach mode and record are config-write-only (A172.2 decision matrix).
 			if (cableSinkAffectsCasparRestart(sinkConn, { dedicatedStreamingChannel: isStreamingDedicatedOutputChannel(state.currentSettings) })) {
 				ctx.setCasparRestartDirty(true)
 			}
-			ctx.load()
+			// WO-276/WO-278: a plain ctx.load() here is answered from the 5 s payload cache and
+			// re-assigns state.lastPayload to the module-level object captured BEFORE this write,
+			// throwing away the graph the POST just returned — the new cable would vanish until
+			// some later fetch. A mutation must always force the refresh.
+			ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, cableReasonFromError(e), false)
-			state.cableSourceId = null
-			state.cablePointer = null
+			ctx.clearCableGesture()
 			ctx.focusConnectorById(id)
 			ctx.updateUI()
 		}
@@ -272,7 +399,7 @@ export function registerDeviceViewCable(ctx) {
 			const res = await Actions.removeEdge(id)
 			if (res?.graph) state.lastPayload.graph = res.graph
 			if (state.selectedEdgeId === id) state.selectedEdgeId = null
-			ctx.load()
+			ctx.load({ forceRefresh: true }) // WO-276: never read a mutation back from the cache
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}
@@ -286,7 +413,7 @@ export function registerDeviceViewCable(ctx) {
 			if (res?.graph) state.lastPayload.graph = res.graph
 			state.selectedEdgeId = null
 			ctx.setCasparRestartDirty(true)
-			ctx.load()
+			ctx.load({ forceRefresh: true }) // WO-276: never read a mutation back from the cache
 			setStatus(statusEl, 'All cabling removed', true)
 		} catch (e) {
 			setStatus(statusEl, e.message, false)

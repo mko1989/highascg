@@ -35,6 +35,9 @@ export function initDeviceView(root) {
 		hoveredEdgeId: null,
 		casparRestartDirty: false,
 		cablePointer: null,
+		// WO-278: set while an existing cable is held by one end. Purely client-side — the
+		// original edge stays in the server graph until a valid target is committed.
+		cableRegrab: null,
 		suppressDocCableClickUntil: 0,
 		currentSettings: null,
 		streamingStatus: null,
