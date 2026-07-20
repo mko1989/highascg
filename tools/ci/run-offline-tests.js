@@ -115,6 +115,7 @@ const FILES = [
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
 	'tools/smoke/smoke-decklink-input-look-thumb.test.js',
+	'tools/smoke/smoke-eggs-exclude-lists.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

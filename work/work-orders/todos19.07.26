@@ -67,6 +67,7 @@ in the generated caspar config there is no need to write the additional mode for
 the canvas (background) in the looks editor is not visibly different than the rest of the div. the bg in looks (empty) should be "alpha checkerboard" with low opacity.
 
 decklink input is not using its captured frame as looks thumbnail.
+decklink's input audio mixer doesnt show up.
 
 when i resize the compose preview panel the preview windows inside get resized too, shouldnt happen unless there is too little space for them.
 

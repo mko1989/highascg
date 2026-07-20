@@ -21,6 +21,11 @@ home/casparcg/highascg/client
 home/casparcg/highascg/client/*
 home/casparcg/highascg/deprecated
 home/casparcg/highascg/deprecated/*
+
+# Deprecated + development scripts (WO-273 finding 5: archive_common_server_tar_members excludes on exFAT update)
+home/casparcg/highascg/scripts/deprecated
+home/casparcg/highascg/scripts/deprecated/*
+
 home/casparcg/highascg/work
 home/casparcg/highascg/work/*
 home/casparcg/highascg/examples
@@ -45,14 +50,23 @@ home/casparcg/highascg/lib/libcef_dll
 home/casparcg/highascg/lib/libcef_dll/*
 
 # tools/ except runtime/ + startup/ (exfat-sync, Caspar helpers, post-boot QA on stick)
+# Excludes: build-host only dev buckets (eggs, smoke, release, ci, map, wiki, replication, dev)
 home/casparcg/highascg/tools/eggs
 home/casparcg/highascg/tools/eggs/*
 home/casparcg/highascg/tools/smoke
 home/casparcg/highascg/tools/smoke/*
 home/casparcg/highascg/tools/release
 home/casparcg/highascg/tools/release/*
-home/casparcg/highascg/tools/restore
-home/casparcg/highascg/tools/restore/*
+home/casparcg/highascg/tools/ci
+home/casparcg/highascg/tools/ci/*
+home/casparcg/highascg/tools/map
+home/casparcg/highascg/tools/map/*
+home/casparcg/highascg/tools/wiki
+home/casparcg/highascg/tools/wiki/*
+home/casparcg/highascg/tools/replication
+home/casparcg/highascg/tools/replication/*
+home/casparcg/highascg/tools/dev
+home/casparcg/highascg/tools/dev/*
 
 # Runtime under ~/highascg (stubs stay on ISO)
 home/casparcg/highascg/media/*
