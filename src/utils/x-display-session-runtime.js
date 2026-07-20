@@ -16,6 +16,7 @@ const {
 	isOperatorPointerConfineDesired,
 	resolveOperatorMonitorRect,
 	resolveOperatorDisplayRect,
+	resolveHelperWindowRect,
 	nvidiaSyncToDisplayPortIndex,
 	readCasparSetting,
 } = require('./x-display-session-layout')
@@ -174,9 +175,14 @@ async function promoteGuiWindowsAboveKiosk(action, config, opts = {}) {
 	const ids = await findGuiWindowIds(action, { excludeTitle: opts.excludeTitle })
 	if (!ids.length) return false
 	const env = displaySessionEnv()
-	const rect = resolveOperatorDisplayRect(config)
-	const x = rect ? rect.x + Math.max(0, Math.floor(rect.width * 0.05)) : 0
-	const y = rect ? rect.y + Math.max(0, Math.floor(rect.height * 0.05)) : 0
+	// PLACEMENT IS THE THING THAT KEEPS PGM CLEAR — not the stacking. Since PGM screen consumers also
+	// default to always-on-top, helper and PGM share the ABOVE layer and raise order alone can no
+	// longer protect program output. `resolveHelperWindowRect` pins the helper INSIDE the operator
+	// monitor (the shared `resolveOperatorMonitorRect` SSOT) and refuses to place at all when that
+	// monitor is unknown. It deliberately replaces `resolveOperatorDisplayRect` here: that helper's
+	// documented fallback is the FIRST PGM SCREEN CONSUMER HEAD, i.e. it moved helpers onto air.
+	const placement = resolveHelperWindowRect(config)
+	const rect = placement.rect
 	// ABOVE-promotion goes through the python/EWMH helper, NOT `xdotool windowstate`: that
 	// subcommand only exists in xdotool >= 3.20211022 and this box ships 3.20160805.1, where it
 	// errors with "Unknown command: windowstate". The old `.catch(() => {})` hid that, so the one
@@ -202,9 +208,28 @@ async function promoteGuiWindowsAboveKiosk(action, config, opts = {}) {
 		if (ok) promoted += 1
 		await execFileAsync('xdotool', ['windowraise', wid], { env, timeout: 3000 }).catch(() => {})
 		if (rect) {
-			await execFileAsync('xdotool', ['windowmove', wid, String(x), String(y)], { env, timeout: 3000 }).catch(() => {})
+			// Move AND size. Moving alone left a window wider than the operator head hanging over the
+			// neighbouring output — on this box that neighbour is the program head.
+			await execFileAsync('xdotool', ['windowmove', wid, String(rect.x), String(rect.y)], { env, timeout: 3000 }).catch(
+				() => {},
+			)
+			await execFileAsync('xdotool', ['windowsize', wid, String(rect.width), String(rect.height)], {
+				env,
+				timeout: 3000,
+			}).catch(() => {})
 		}
 		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: 3000 }).catch(() => {})
+	}
+	if (rect) {
+		log('info', `[X-Display] Helper ${action} confined to the operator monitor @ ${rect.x},${rect.y} ${rect.width}x${rect.height}`)
+	} else {
+		// Loud, because this is the state in which a helper CAN end up over program output: we do not
+		// know where the operator monitor is, so we leave the window wherever the app opened it rather
+		// than guess (guessing is what put a browser on PGM in the first place).
+		log(
+			'warn',
+			`[X-Display] Helper ${action} NOT repositioned (${placement.reason}) — cannot guarantee it stays off the ${placement.programRects.length} program consumer head(s); set Device View → GPU port → Operator monitor`,
+		)
 	}
 	log(
 		promoted === ids.length ? 'info' : 'warn',

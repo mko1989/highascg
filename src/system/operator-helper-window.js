@@ -27,6 +27,21 @@
  *      confinement are ALL left exactly as they are — nothing about the shaped-video contract is
  *      touched, and nothing changes until the operator presses the button.
  *
+ * WHY THE HELPER MUST NOT RELY ON STACKING TO STAY OFF PGM (regression found 2026-07-20). The same
+ * day WO-283 landed, PGM screen consumers began defaulting to always-on-top, which puts them in the
+ * SAME EWMH ABOVE layer the promote above uses. Once both windows are in one layer, raise order
+ * decides — and the helper is deliberately raised and focused, so it wins over program output. The
+ * protection is therefore GEOMETRIC, not stacking-based: `resolveHelperWindowRect()`
+ * (src/utils/x-display-session-layout.js) sizes and positions the helper INSIDE the operator monitor
+ * rect — the same `resolveOperatorMonitorRect` SSOT the kiosk launcher and pointer confinement use —
+ * so it physically cannot overlap a program head. It also refuses to place when no operator monitor
+ * is configured, instead of the old behaviour of falling back to `resolveOperatorDisplayRect()`,
+ * whose documented last resort is the FIRST PGM SCREEN CONSUMER HEAD. Measured on this box: operator
+ * GUI DP-5 1920x1080+3072+0, program DP-0 3072x1728+0+0 — different outputs, so the confinement is
+ * total. Stacking is otherwise untouched, so operator-shape-overlay.py's separate pin of the
+ * operator_gui consumer (BELOW the kiosk + input-dead) is not fought: that consumer is on the
+ * operator head and is not program output.
+ *
  * RESTORE-ON-CRASH. Requirement 2 of the WO: a helper that segfaults or is `kill -9`ed must not
  * strand the GUI with a suspended top-assert. Restore is therefore driven by a WATCHDOG POLL
  * (see decideRestoreOnExit) rather than only by a clean-close handler:
