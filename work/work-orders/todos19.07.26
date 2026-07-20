@@ -106,7 +106,10 @@ the produced eggs iso was 5.9gb it should be closer to 3.9gb something big does 
 
 write a new md file in work folder giving me a breakdown of options for porting the webui into a native ubuntu gui app. electron is a no go for me.
 name the file NATIVE_GUI_PROPOSITIONS
-   -> TODO next. Will write work/NATIVE_GUI_PROPOSITIONS.md (no Electron).
+   -> DONE: work/NATIVE_GUI_PROPOSITIONS.md. Honest answer: DON'T port. Every native option is 40-80 person-weeks = 9-15 month release slip for zero new operator features.
+   -> Why: your client/server split is already clean (163 API paths + 21 WS messages is the whole contract), which is the prize people port to get. Also the ISO argument fails - Firefox cannot be removed because your browser SOURCES are Firefox. And performance cannot improve: video never enters the browser.
+   -> The one real argument for native: a native window could shape ITSELF and delete ~600-900 lines of the hole-punching hack. Worth ~1 engineer-month, not 40-80.
+   -> Cheap follow-up found: previs (4,324 lines) may be dead code - three.js loads from /vendor/three/ which does not exist. Worth confirming.
 
 when alt tabbing in ubuntu i get a white border around the chosen window, can this be disabled?
    -> TODO next. Openbox/GNOME alt-tab outline - will find the setting.
