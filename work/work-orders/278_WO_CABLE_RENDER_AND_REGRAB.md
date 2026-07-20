@@ -43,3 +43,67 @@ the standard patch-bay interaction. Requirements:
 - No idle CPU cost added: no per-frame layout reads while nothing is being dragged.
 - Offline smoke test for the pure parts (endpoint hit-testing, validation on re-target,
   restore-on-invalid decision logic). `npm run test:ci` → 0 fail; no new eslint warnings vs HEAD.
+
+---
+
+# Results (executed 2026-07-20)
+
+## A — measured before optimising, and the guess in this WO was wrong
+
+The WO speculated the cost was "re-render every cable + getBoundingClientRect per endpoint".
+That shape is real but is **~4 orders of magnitude below the actual cost**, benchmarked against a
+stub DOM at this box's real graph size (6 edges / 16 connectors, read from the live API):
+
+| edges | render | rect reads | querySelectorAll |
+|-------|--------|-----------|------------------|
+| 6 | 0.048 ms | 25 | 24 |
+| 24 | 0.186 ms | 97 | 96 |
+| 96 | 0.560 ms | 385 | 384 |
+
+Optimising the renderer would have been the wrong layer. It was left alone.
+
+**The server round trip dominates.** Device-view requests needing a live-hardware snapshot are
+gated by the xrandr cache (`XRANDR_CACHE_TTL_MS = 3000`, `src/utils/hardware-info.js`). 10 trials
+against the live box:
+
+| | median | min | max |
+|---|--------|-----|-----|
+| cold (>=3 s idle — i.e. a real operator click) | **274 ms** | 40 ms | **1770 ms** |
+| pre-warmed (warm at arm, 600 ms reaction gap) | **43 ms** | 39 ms | 54 ms |
+
+Applying one cable fires several snapshot-building requests back to back, so only the first pays
+the cold price — and that first one is exactly the operator's click. Downstream config
+regeneration was not a factor.
+
+**Fix:** `client/lib/device-view-snapshot-prewarm.js` warms the snapshot when a cable is armed and
+re-warms every 2500 ms (under the TTL) until commit/cancel. Zero idle cost by construction — the
+interval exists only between `start()` and `stop()`; no observers, no polling.
+
+Estimated destination→GPU apply: **~375 ms → ~144 ms** typical, **~1.87 s → ~0.15 s** worst case.
+
+**Latent bug found while measuring (WO-276 class):** `tryAddCable`, `removeEdge` and
+`resetCabling` ended in a bare `ctx.load()`. On a cache hit that reassigns `state.lastPayload` to
+the object captured *before* the write, discarding the graph the POST just returned — the new
+cable would vanish until a later fetch. All three now use `ctx.load({ forceRefresh: true })`.
+
+## B — re-grab rules as implemented
+
+Gesture: **select a cable → click either end to lift it → click a new port to commit.**
+
+- Re-grab only starts if the cable is *already selected*. Deliberately strict: clicking a cabled
+  output still means "start another cable from here", because an output legitimately fans out to
+  several sinks and hijacking that click would re-cable live output on a gesture nobody asked for.
+- **Nothing intermediate is persisted.** The original edge stays in the server graph for the whole
+  gesture and is merely hidden from the overlay, so "restore" is a client-side redraw, no round trip.
+- Validation (`orderEdgeForDeviceView` + `findGpuSinkCableConflict`) runs against the new target
+  before commit, with UI ids canonicalised first.
+- **Restores, never silently disconnects**, on: empty space, same port, its own far end, role or
+  direction rejection, occupied sink, and any target that would reverse the cable.
+- No destructive gesture was invented — delete remains select+Delete / the inspector button, and
+  empty-space click already meant cancel. Escape also restores.
+- Commit is remove-then-add (moving a *source* end reuses the same sink, which one-cable-per-sink
+  would otherwise reject); if the add fails after the remove, the original edge is re-added.
+
+## Known gap
+The DOM wiring was never exercised in a real browser (no client build inside the agent run), so the
+12 offline tests cover the pure logic only. **Worth a click-through after a client build.**
