@@ -76,6 +76,19 @@ Everything you already confirmed has been stripped out. What is left is: **thing
 
 ## 2. Only you can do these
 
+- [ ] **Install the hostname sudoers rule** (needs root once). Your box currently cannot set its own
+      hostname — `sudo hostnamectl` is refused, so the MAC-derived `highascg####` name never
+      applies. Fix is in the repo; install with:
+      ```bash
+      sudo bash scripts/setup/12-passwordless-sudo.sh
+      ```
+      That regenerates `/etc/sudoers.d/highascg` (a generated file) with the new grant. Then restart
+      highascg and check: `hostname` should become `highascg####`, and the journal should no longer
+      show `hostnamectl ... a password is required`.
+      *Note the grant is for the existing root-owned helper, NOT a `hostnamectl *` wildcard — this
+      repo forbids NOPASSWD wildcards, and the helper derives the same name itself. Syntax was
+      validated with `visudo -cf` before proposing it.*
+
 - [ ] **Snap cleanup (~1.5GB off the ISO).** One at a time. The earlier error was that `--purge` is
       a flag, not the target — it needs a snap name after it:
       ```bash
