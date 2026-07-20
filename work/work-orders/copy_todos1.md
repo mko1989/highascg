@@ -29,7 +29,7 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 
 | WO | Item | Size | Status |
 |----|------|------|--------|
-| WO-273 | scripts/ + tools/ cleanup: move deprecated out, leave a clear runtime set, a fresh-install set, and a dev/eggs set | L | TODO |
+| WO-273 | scripts/ + tools/ cleanup: move deprecated out, leave a clear runtime set, a fresh-install set, and a dev/eggs set | L | **DONE** — inventory of all 747 files; runtime is only 46 (~6%); legacy/unused/lib-splits consolidated into deprecated/; eggs contradictions fixed separately |
 | WO-274 | Config generator keeps stale PGM/PRV channels that are unused and invisible in the GUI | M | **DONE** — graph cable from multiview/stream/operator_gui inflated screen count via Math.max; isMainBusDestinationMode() filter |
 | WO-275 | Config generator ignores a changed destination (DeckLink out 3: pgm2 → multiview still shows pgm2 after restarts) | M | **DONE** — additive DeckLink projection left screen_2_decklink_device=3 AND multiview_decklink_device=3 (both in live config); now released on claim |
 | WO-276 | Screen-destination custom resolution: height reverts to 1080, inspector disagrees with the node | M | **DONE** — NOT linked to stale channels: 5s client payload cache answered the post-save reload; now forceRefresh |
@@ -48,6 +48,7 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-289 | Looks editor canvas background should be a low-opacity alpha checkerboard, visibly distinct from the surrounding div | S | **DONE** (0a5a80a) — 6% alpha checkerboard on the looks-editor canvas only |
 | WO-291 | DeckLink input does not use its captured frame as the looks thumbnail (added by owner 2026-07-20) | M | **DONE** — deckIdleMode returned null for every non-media source; now excepts DeckLink INPUT channels, TTL-gated capture + backoff, no-signal placeholder |
 | WO-292 | Resizing the compose preview panel resizes the preview windows inside; should only happen when space demands it (added by owner 2026-07-20) | M | TODO |
+| WO-293 | DeckLink input audio mixer does not show up (added by owner 2026-07-20) | M | TODO |
 | WO-290 | Opt-in operator-GUI monitor picker on a fresh/factory-reset system: hover + left click selects the GUI screen, then the service sleeps | M | TODO |
 
 ## Execution notes
