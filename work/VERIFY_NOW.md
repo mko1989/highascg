@@ -63,10 +63,13 @@ nothing can be shown over the gui. i need to be able as a user use web browser, 
       `<lock-clear-phrase>secret</lock-clear-phrase>`. Every box installed from your ISO is a
       network-reachable remote desktop **plus unauthenticated playout control**. Options: bind to
       localhost, firewall the ports, or ship with the services disabled.
+      the services should be available on lan and tailscale. 
+
 
 - [ ] **No Chrome binary on the ISO.** Chromium is not installed and the fallback path points into
       `~/.cache`, which is excluded — so template thumbnail rendering will fail on a freshly
       installed box. Either install a chromium package into the image or accept the loss.
+we have cef for casparcg and firefox for everything else. no need for chrome, its excluded specificaly.
 
 - [ ] **`config/casparcg.config` PortAudio is `hw:2,0`, a card that does not exist** (you have cards
       0 and 1 only). Channel 1's audio consumer is aimed at nothing — this is what produces the
@@ -78,9 +81,15 @@ nothing can be shown over the gui. i need to be able as a user use web browser, 
       refresh.retain=2` — NOT an exclude line, because excluding the images leaves broken mount
       units at boot. Would take the ISO to ~3.0GB.
 
+asparcg@highascg-nvidia-595:~/highascg$ sudo snap remove --purge
+[sudo] password for casparcg: 
+error: the required argument `<snap> (at least 1 argument)` was not provided
+
 - [ ] **`scripts/` ships whole in the release tarball and exFAT drop-update.** Consolidating into
       `deprecated/` did not shrink the payload. One-line exclude available; it changes the live
       update path, so it is your call.
+
+eggs exclude deprecated scripts.
 
 - [ ] **wo47 recovery fallback has drifted** from its twin: `wo47-highascg-exfat-boot.sh` is missing
       the network-apply queue block, so a host recovered via the fallback boots without
@@ -96,8 +105,8 @@ nothing can be shown over the gui. i need to be able as a user use web browser, 
 
 ## 3. Sudo tasks still outstanding
 
-- [ ] `sudo apt --fix-broken install` — the nvidia-595 firmware dependency error you pasted.
-- [ ] `sudo cp scripts/setup/highascg-nvidia-persistence.service /etc/systemd/system/ && sudo
+- [x] `sudo apt --fix-broken install` — the nvidia-595 firmware dependency error you pasted.
+- [x] `sudo cp scripts/setup/highascg-nvidia-persistence.service /etc/systemd/system/ && sudo
       systemctl daemon-reload && sudo systemctl enable --now highascg-nvidia-persistence.service`
 - [ ] Re-run the eggs produce once you are happy, and tell me the new ISO size.
 
@@ -210,3 +219,40 @@ no symbols) and short option names are suffix-merged into other strings by the l
 option table do appear standalone and adjacent (`raise`, `panels`, `finalactions` at consecutive
 offsets), which is consistent. If `<bar>no</bar>` turns out not to take, the fallback is
 `<dialog>none</dialog>` plus `<bar>no</bar>` together, which disables the cycling UI wholesale.
+
+
+---
+
+## Fixed since you last read this (2026-07-20, later)
+
+- **Caspar restarted when you cabled a screen dest to a DeckLink output.** It was DELIBERATE: that
+  is the only graph edit that writes Caspar config keys, and a 1.5s debounced sync then ran a full
+  apply+restart. WO-172 even had a test asserting the restart. A graph edit now never restarts
+  Caspar — it marks an apply as pending and lights the Apply button instead. **Deployed.**
+- **Cable re-grab.** Unreachable by design accident: a cable's visible end is the connector marker,
+  whose click handler cleared the very selection the gesture requires. Fixed, but the real click
+  path is still UNVERIFIED (no browser test harness here) — please click-through after a reload.
+- **Live audio input could not be started again.** There was no start control anywhere and no
+  per-input start path on the server; only the whole-rig apply (which glitches inputs still on air)
+  or a Caspar restart could revive capture. Start buttons added to the inspector and every mixer
+  strip, rendered regardless of signal state.
+- **Modal tint.** Fully removed — the overlay now paints nothing, not just "no blur".
+- **Your Yamaha DM3 capture was failing** (spotted in the journal, not reported by you): slot 1
+  captured `dsnoop:2,0` and ffmpeg died on every respawn with "cannot set sample format" because
+  the DM3 is S32_LE only and `dsnoop:` does no conversion. The bridge now falls back to `plughw:`
+  on a format failure and remembers the working device. Verified live: capture is up and stable.
+- `hw:2,0` in casparcg.config is CORRECT — the DM3 is card 2 now that the mixer is on. Not a bug.
+
+### Snap cleanup — your command needed arguments
+```bash
+sudo snap set system refresh.retain=2
+sudo snap remove --purge gnome-46-2404      # 607M — base for the Firefox snap you removed
+sudo snap remove --purge gtk-common-themes  # 92M
+sudo snap remove --purge mesa-2404          # 797M across both revisions; only gnome-46 needed it
+```
+Verified nothing else uses these (`snap connections` shows no consumers).
+
+### Still worth your call
+Services staying on LAN + Tailscale is noted and unchanged. But `config/casparcg.config` still ships
+`<lock-clear-phrase>secret</lock-clear-phrase>` — anyone who can reach port 5250 can drive playout.
+Changing that phrase costs nothing and is independent of the LAN decision.
