@@ -5,6 +5,24 @@ const path = require('path')
 const crypto = require('crypto')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
 const { getMediaIngestBasePath, resolveMediaFileOnDisk } = require('../media/local-media')
+const { createSingleFlight, createBackoffGate } = require('./compose-preview-backpressure')
+
+/**
+ * WO-280: one stat/read per channel per frame no matter how many clients are asking.
+ * Concurrent GETs of the same channel join the in-flight read instead of each issuing
+ * their own `readFile` of the whole JPEG.
+ */
+const _previewSingleFlight = createSingleFlight()
+/** WO-280: capped exponential backoff per channel; logs once per health transition. */
+const _previewBackoff = createBackoffGate()
+/**
+ * WO-280: last successfully read frame per channel, keyed by etag. Bounded to one
+ * buffer per channel (and hard-capped below) so it can never grow with client count.
+ * @type {Map<number, { etag: string, buf: Buffer, format: 'jpeg' | 'png' }>}
+ */
+const _frameMemo = new Map()
+/** Hard ceiling on memo entries — a client asking for bogus channels cannot grow it. */
+const FRAME_MEMO_MAX = 32
 
 /**
  * @param {object} config
@@ -180,7 +198,8 @@ async function handleComposePreviewMetaGet(ctx, channel) {
 		}
 	}
 	try {
-		const st = await fs.promises.stat(resolved.path)
+		// WO-280: concurrent meta polls from N clients collapse into one stat().
+		const st = await _previewSingleFlight.run(`meta:${ch}`, () => fs.promises.stat(resolved.path))
 		if (st.size <= 32) {
 			return {
 				status: 404,
@@ -217,6 +236,75 @@ async function handleComposePreviewMetaGet(ctx, channel) {
 }
 
 /**
+ * Read one compose preview frame from disk. Always called through
+ * {@link _previewSingleFlight}, so at most one execution per channel is in progress and
+ * every concurrent caller shares its result. Re-reads are skipped when the memoized
+ * frame's etag still matches the current stat.
+ *
+ * @param {object} config
+ * @param {number} ch
+ * @returns {Promise<{ etag: string, buf: Buffer, format: 'jpeg' | 'png' }>}
+ * @throws {Error} when the file is missing / empty — the caller records the failure
+ */
+async function readComposePreviewFrame(config, ch) {
+	const resolved = resolvePreviewImagePath(config, ch)
+	if (!resolved) throw new Error('No compose preview captured yet')
+	const st = await fs.promises.stat(resolved.path)
+	if (st.size <= 32) throw new Error('Compose preview file empty')
+	const etag = etagFromStat(st)
+	const memo = _frameMemo.get(ch)
+	if (memo && memo.etag === etag && memo.format === resolved.format) return memo
+	const buf = await fs.promises.readFile(resolved.path)
+	// Bounded: one entry per channel, hard-capped so a client requesting arbitrary
+	// channel numbers can never grow this map without limit.
+	if (_frameMemo.size >= FRAME_MEMO_MAX && !_frameMemo.has(ch)) _frameMemo.clear()
+	const entry = { etag, buf, format: resolved.format }
+	_frameMemo.set(ch, entry)
+	return entry
+}
+
+/**
+ * One log line per health transition — never per frame (WO-280 req. 3).
+ * @param {object} ctx
+ * @param {number} ch
+ * @param {{ changed: boolean, failures?: number, delayMs?: number }} res
+ * @param {string} [reason]
+ */
+function logComposePreviewHealth(ctx, ch, res, reason) {
+	if (!res?.changed || typeof ctx?.log !== 'function') return
+	if (res.delayMs != null) {
+		ctx.log(
+			'warn',
+			`[compose-preview] ch${ch} frame read failing — backing off (${reason || 'unknown'}); retry in ${res.delayMs}ms`,
+		)
+	} else {
+		ctx.log('info', `[compose-preview] ch${ch} frame read recovered after ${res.failures} failure(s)`)
+	}
+}
+
+/**
+ * @param {number} ch
+ * @param {string} etag
+ * @param {Buffer} buf
+ * @param {'jpeg' | 'png'} format
+ * @param {string} inm
+ */
+function composePreviewImageResponse(ch, etag, buf, format, inm) {
+	if (inm && inm === etag) {
+		return { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache' } }
+	}
+	return {
+		status: 200,
+		headers: {
+			'Content-Type': format === 'jpeg' ? 'image/jpeg' : 'image/png',
+			'Cache-Control': 'no-cache',
+			ETag: etag,
+		},
+		body: buf,
+	}
+}
+
+/**
  * @param {object} ctx
  * @param {number} channel
  * @param {Record<string, string>} [query]
@@ -224,46 +312,56 @@ async function handleComposePreviewMetaGet(ctx, channel) {
 async function handleComposePreviewImageGet(ctx, channel, query = {}) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
 	const cfg = ctx.config || {}
-	const resolved = resolvePreviewImagePath(cfg, ch)
-	if (!resolved) {
+	const now = Date.now()
+	const inm = String(query['if-none-match'] || query.ifNoneMatch || '').trim()
+
+	// WO-280: a channel that is currently failing is answered straight from the backoff
+	// window instead of re-stat/re-reading the disk on every request from every client.
+	// The memoized frame is dropped on failure, so this never serves a frozen frame
+	// (WO-159 T159.1) — it just stops the 404 path from doing I/O at push rate.
+	if (!_previewBackoff.canAttempt(ch, now)) {
 		return {
 			status: 404,
 			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'No compose preview captured yet', channel: ch }),
+			body: jsonBody({ error: 'No compose preview captured yet', channel: ch, backoffMs: _previewBackoff.delayMs(ch) }),
 		}
 	}
-	let st
+
+	let frame
 	try {
-		st = await fs.promises.stat(resolved.path)
-	} catch {
+		frame = await _previewSingleFlight.run(`img:${ch}`, () => readComposePreviewFrame(cfg, ch))
+	} catch (e) {
+		const res = _previewBackoff.recordFailure(ch, now)
+		logComposePreviewHealth(ctx, ch, res, e?.message)
+		_frameMemo.delete(ch)
 		return {
 			status: 404,
 			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'No compose preview captured yet', channel: ch }),
+			body: jsonBody({ error: e?.message || 'No compose preview captured yet', channel: ch }),
 		}
 	}
-	if (st.size <= 32) {
-		return {
-			status: 404,
-			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'Compose preview file empty', channel: ch }),
-		}
-	}
-	const etag = etagFromStat(st)
-	const inm = query['if-none-match'] || query.ifNoneMatch
-	if (inm && String(inm).trim() === etag) {
-		return { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache' } }
-	}
-	const buf = await fs.promises.readFile(resolved.path)
-	const contentType = resolved.format === 'jpeg' ? 'image/jpeg' : 'image/png'
+	logComposePreviewHealth(ctx, ch, _previewBackoff.recordSuccess(ch))
+	return composePreviewImageResponse(ch, frame.etag, frame.buf, frame.format, inm)
+}
+
+/**
+ * Test / lifecycle hook — drops the memoized frames, the in-flight joins and the
+ * per-channel backoff state.
+ */
+function resetComposePreviewServeState() {
+	_frameMemo.clear()
+	_previewSingleFlight.clear()
+	_previewBackoff.clear()
+}
+
+/**
+ * Introspection for `/api/compose-preview/stats` and the offline smoke test.
+ */
+function getComposePreviewServeStats() {
 	return {
-		status: 200,
-		headers: {
-			'Content-Type': contentType,
-			'Cache-Control': 'no-cache',
-			ETag: etag,
-		},
-		body: buf,
+		memoChannels: _frameMemo.size,
+		inFlight: _previewSingleFlight.size(),
+		backingOff: _previewBackoff.size(),
 	}
 }
 
@@ -346,4 +444,7 @@ module.exports = {
 	handleComposePreviewImageGet,
 	handleComposePreviewPngGet,
 	handleComposePreviewCompanionGet,
+	readComposePreviewFrame,
+	resetComposePreviewServeState,
+	getComposePreviewServeStats,
 }

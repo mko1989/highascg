@@ -5,6 +5,18 @@ import {
 	resolveComposeChannelForCell,
 	resolveComposePreviewChannelsFromChannelMap,
 } from '../lib/compose-preview-url.js'
+import {
+	computeBackoffDelayMs,
+	resolvePollIntervalMs,
+	shouldAcceptFramePush,
+} from '../lib/compose-preview-backpressure.js'
+
+/**
+ * @returns {string} current page visibility ('visible' when there is no document)
+ */
+function visibility() {
+	return typeof document !== 'undefined' ? document.visibilityState : 'visible'
+}
 
 /** @type {Set<number>} — channels whose meta returned 404 (no JPEG yet); skip poll spam */
 const _metaUnavailable = new Set()
@@ -32,8 +44,23 @@ const _cache = new Map()
 let _trackedChannelSig = ''
 
 let _pollTimer = null
+/** Interval the running `_pollTimer` was created with — retuned on visibility change. */
+let _pollIntervalMs = 0
 /** @type {Set<(channel: number) => void>} */
 const _listeners = new Set()
+
+/**
+ * WO-280 backpressure state. All three maps are keyed by channel, so they stay bounded
+ * by the tracked channel count and are cleared alongside `_cache`.
+ */
+/** Consecutive failed frame loads per channel. @type {Map<number, number>} */
+const _failures = new Map()
+/** Timestamp until which a channel must not be re-requested. @type {Map<number, number>} */
+const _backoffUntil = new Map()
+/** At most one pending retry timer per channel. @type {Map<number, ReturnType<typeof setTimeout>>} */
+const _retryTimers = new Map()
+/** Last WS push we actually turned into a fetch — throttles hidden tabs. @type {Map<number, number>} */
+const _lastPushAt = new Map()
 
 function notifyComposePreviewListeners(channel) {
 	for (const fn of _listeners) {
@@ -50,11 +77,61 @@ function notifyComposePreviewListeners(channel) {
  * @param {string} etag
  */
 /**
- * Tracks whether we've already scheduled a retry for this channel, to avoid
- * retry loops (WO-198 T198.3 — single-flight guard).
- * @type {Set<number>}
+ * WO-280: is this channel inside its backoff window?
+ * @param {number} ch
+ * @param {number} [nowMs]
  */
-const _scheduledRetries = new Set()
+function isBackingOff(ch, nowMs = Date.now()) {
+	const until = _backoffUntil.get(ch) || 0
+	return until > nowMs
+}
+
+/**
+ * WO-280: record a failed frame load and arm exactly one retry.
+ *
+ * Replaces the old fixed 1 s retry (WO-198 T198.3), which did not actually throttle
+ * anything: the error path reset `entry.etag = null`, so the very next `compose.preview`
+ * push — 40 ms later at 25 fps — re-entered this function. A channel serving 404s
+ * therefore produced a full-rate request storm plus a console line per frame from every
+ * open tab. The backoff window is now consulted by both the push and the poll path.
+ * @param {number} ch
+ */
+function noteComposePreviewFailure(ch) {
+	const failures = (_failures.get(ch) || 0) + 1
+	_failures.set(ch, failures)
+	const delayMs = computeBackoffDelayMs(failures)
+	_backoffUntil.set(ch, Date.now() + delayMs)
+	// One line on the healthy → degraded edge only, never per frame.
+	if (failures === 1) {
+		console.warn(`[compose-preview] ch${ch} frame load failed — backing off (retry in ${delayMs}ms)`)
+	}
+	if (_retryTimers.has(ch)) return
+	_retryTimers.set(
+		ch,
+		setTimeout(() => {
+			_retryTimers.delete(ch)
+			// Timer jitter can fire a hair early — open the window explicitly so the
+			// scheduled retry is never swallowed by its own backoff check.
+			_backoffUntil.delete(ch)
+			void pollChannelMeta(ch)
+		}, delayMs),
+	)
+}
+
+/**
+ * @param {number} ch
+ */
+function noteComposePreviewSuccess(ch) {
+	if (!_failures.has(ch)) return
+	console.info(`[compose-preview] ch${ch} frame load recovered after ${_failures.get(ch)} failure(s)`)
+	_failures.delete(ch)
+	_backoffUntil.delete(ch)
+	const t = _retryTimers.get(ch)
+	if (t) {
+		clearTimeout(t)
+		_retryTimers.delete(ch)
+	}
+}
 
 async function loadComposePreviewImage(channel, etag) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
@@ -63,8 +140,10 @@ async function loadComposePreviewImage(channel, etag) {
 		entry = { img: new Image(), etag: null, loading: false }
 		_cache.set(ch, entry)
 	}
+	// Never more than one outstanding request per channel (WO-280 req. 2).
 	if (entry.loading) return
 	if (etag && etag === entry.etag) return
+	if (isBackingOff(ch)) return
 	entry.loading = true
 	try {
 		const url = getComposePreviewUrl(ch, etag)
@@ -74,22 +153,14 @@ async function loadComposePreviewImage(channel, etag) {
 				entry.img = img
 				entry.etag = etag
 				entry.loading = false
-				_scheduledRetries.delete(ch)
+				noteComposePreviewSuccess(ch)
 				notifyComposePreviewListeners(ch)
 				resolve()
 			}
 			img.onerror = () => {
 				entry.loading = false
-				// WO-198 T198.3: drop the cached etag and schedule one delayed retry
-				// via the meta path (single-flight; no loop).
 				entry.etag = null
-				if (!_scheduledRetries.has(ch)) {
-					_scheduledRetries.add(ch)
-					setTimeout(() => {
-						_scheduledRetries.delete(ch)
-						void pollChannelMeta(ch)
-					}, 1000)
-				}
+				noteComposePreviewFailure(ch)
 				reject(new Error('compose preview load failed'))
 			}
 			img.src = url
@@ -99,12 +170,19 @@ async function loadComposePreviewImage(channel, etag) {
 	}
 }
 
+/**
+ * Fallback meta poll when WS is quiet; the primary path is the `compose.preview` push.
+ * Hidden tabs drop from 1 Hz to a 30 s heartbeat (WO-280 req. 2) — a backgrounded
+ * laptop tab was previously polling and fetching at the full visible rate.
+ */
 function ensurePoll() {
-	if (_pollTimer) return
-	// Fallback when WS is quiet; primary path is `compose.preview` push from server.
+	const wantMs = resolvePollIntervalMs(visibility())
+	if (_pollTimer && _pollIntervalMs === wantMs) return
+	if (_pollTimer) clearInterval(_pollTimer)
+	_pollIntervalMs = wantMs
 	_pollTimer = setInterval(() => {
 		void pollAllTracked()
-	}, 1000)
+	}, wantMs)
 }
 
 function stopPollIfIdle() {
@@ -112,7 +190,18 @@ function stopPollIfIdle() {
 	if (_pollTimer) {
 		clearInterval(_pollTimer)
 		_pollTimer = null
+		_pollIntervalMs = 0
 	}
+}
+
+// Retune the poll cadence when the tab is hidden/restored, and catch up immediately on
+// return so the operator never looks at a 30 s stale frame.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+	document.addEventListener('visibilitychange', () => {
+		if (!_pollTimer) return
+		ensurePoll()
+		if (visibility() !== 'hidden') void pollAllTracked()
+	})
 }
 
 /**
@@ -155,6 +244,12 @@ export function ingestComposePreviewWs(data) {
 	_blocklisted.delete(ch)
 	_blocklistSeed.delete(ch)
 	trackComposePreviewChannel(ch)
+	// WO-280: the server pushes at the JPEG mtime rate (25/s by default). Browsers throttle
+	// timers in hidden tabs but not WS delivery or image loads, so without this gate a
+	// backgrounded tab kept pulling a full frame per push — the reported operator GUI lag.
+	const now = Date.now()
+	if (!shouldAcceptFramePush(visibility(), _lastPushAt.get(ch) || 0, now)) return
+	_lastPushAt.set(ch, now)
 	void loadComposePreviewImage(ch, etag)
 }
 
@@ -206,6 +301,7 @@ async function pollChannelMeta(channel) {
 		_cache.set(ch, entry)
 	}
 	if (entry.loading) return
+	if (isBackingOff(ch)) return
 	try {
 		const res = await fetch(getComposePreviewMetaUrl(ch), { cache: 'no-store' })
 		if (!res.ok) {
@@ -245,6 +341,17 @@ export function subscribeComposePreviewRefresh(fn) {
  * @param {number[]} [keepChannels] — when set, only drop channels not in this list
  */
 export function resetComposePreviewClientCache(keepChannels) {
+	// WO-280: drop backpressure bookkeeping for every channel we are about to forget —
+	// a pending retry timer for an untracked channel would otherwise outlive its cache
+	// entry and keep firing after routing / project changes.
+	const dropBackpressure = (ch) => {
+		const t = _retryTimers.get(ch)
+		if (t) clearTimeout(t)
+		_retryTimers.delete(ch)
+		_failures.delete(ch)
+		_backoffUntil.delete(ch)
+		_lastPushAt.delete(ch)
+	}
 	if (Array.isArray(keepChannels) && keepChannels.length) {
 		const keep = new Set(
 			keepChannels.map((c) => Math.max(1, parseInt(String(c), 10) || 0)).filter((c) => c > 0),
@@ -254,9 +361,12 @@ export function resetComposePreviewClientCache(keepChannels) {
 				_cache.delete(ch)
 				_metaUnavailable.delete(ch)
 				_blocklisted.delete(ch)
+				dropBackpressure(ch)
 			}
 		}
 	} else {
+		for (const ch of [..._cache.keys()]) dropBackpressure(ch)
+		for (const ch of [..._retryTimers.keys()]) dropBackpressure(ch)
 		_cache.clear()
 		_metaUnavailable.clear()
 		_blocklisted.clear()

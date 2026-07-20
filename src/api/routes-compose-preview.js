@@ -6,6 +6,7 @@ const {
 	handleComposePreviewImageGet,
 	handleComposePreviewPngGet,
 	handleComposePreviewCompanionGet,
+	getComposePreviewServeStats,
 } = require('../preview/compose-preview-cache')
 const ffmpegJpeg = require('../preview/compose-preview-ffmpeg-jpeg')
 const { getComposeBlocklistStats } = require('../preview/compose-preview-blocklist')
@@ -44,6 +45,8 @@ async function handleGet(path, query, ctx) {
 				...ffmpegJpeg.getFfmpegJpegComposePreviewStats(ctx.config),
 				channels: resolveMonitoredChannels(ctx.config),
 				blocklist: getComposeBlocklistStats(),
+				// WO-280 backpressure counters — must stay flat regardless of client count.
+				serve: getComposePreviewServeStats(),
 			}),
 		}
 	}

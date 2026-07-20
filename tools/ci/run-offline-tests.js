@@ -29,6 +29,7 @@ const FILES = [
 	'tools/smoke/smoke-timeline-pause-resume.test.js',
 	'tools/smoke/smoke-device-graph-multiview-suggest.test.js',
 	'tools/smoke/smoke-config-classify.js',
+	'tools/smoke/smoke-config-generator-routing.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
 	'tools/smoke/smoke-api-auth.test.js',
 	'tools/smoke/smoke-settings-nuclear-password.test.js',
@@ -100,6 +101,7 @@ const FILES = [
 	'tools/smoke/smoke-wo268-shader-cef-continuity.test.js',
 	'tools/smoke/smoke-wo269-shape-log-dedupe.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',
+	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',
 	'tools/smoke/smoke-wo272-pgm-edit-capture.test.js',
 	'tools/smoke/smoke-wo287-wo289-styles.test.js',
@@ -107,6 +109,7 @@ const FILES = [
 	'tools/smoke/smoke-decklink-input-retry.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
+	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)
