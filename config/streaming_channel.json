@@ -10,5 +10,6 @@
   "streamKey": "",
   "rtmpQuality": "medium",
   "contentLayer": 10,
-  "decklinkDevice": 0
+  "decklinkDevice": 0,
+  "quality": "medium"
 }
