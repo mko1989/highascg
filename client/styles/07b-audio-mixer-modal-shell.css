@@ -291,7 +291,20 @@ input[type="range"].audio-mixer__fader-vertical {
 	gap: 4px;
 }
 
-.audio-mixer__solo-btn, .audio-mixer__mute-btn {
+/* Start / restart an input's capture — always available on a live-input strip, including one
+   that is showing "no signal" (that is exactly when the operator needs it). */
+.audio-mixer__start-btn {
+	background: rgba(34, 197, 94, 0.16);
+	border-color: rgba(74, 222, 128, 0.45);
+	color: #86efac;
+}
+
+.audio-mixer__start-btn:hover {
+	background: rgba(34, 197, 94, 0.3);
+	color: #dcfce7;
+}
+
+.audio-mixer__solo-btn, .audio-mixer__mute-btn, .audio-mixer__start-btn {
 	width: 18px;
 	height: 18px;
 	padding: 0;

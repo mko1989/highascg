@@ -599,6 +599,7 @@ async function ensureV4l2InputRouting(ctx) {
 
 module.exports = {
 	setupInputsChannel,
+	tryPlayDecklinkInput,
 	setupLiveAudioInputs,
 	setupV4l2Inputs,
 	setupLiveAudioPgmRoutes,

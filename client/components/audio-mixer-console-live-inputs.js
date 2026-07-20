@@ -17,7 +17,10 @@ import {
 	enableInputPgmRoute,
 	inputRouteForRow,
 	pgmDestLayerForInput,
+	playRouteOnChannel,
 } from '../lib/live-audio-routing.js'
+import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
+import { api } from '../lib/api-client.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -68,6 +71,10 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 			: ''
 
 		const isMuted = !!r.muted
+		// A stopped input reads as "no signal" — the strip must still carry its own way back.
+		const startHtml = shouldShowStartControl(r)
+			? `<button type="button" class="audio-mixer-view__start-btn" data-input-start title="Start / restart this input's capture">START</button>`
+			: ''
 		const strip = document.createElement('div')
 		strip.className = 'audio-mixer-view__strip audio-mixer-view__strip--live-input'
 		const labelTitle = r.labelTitle || r.label
@@ -85,6 +92,7 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 			</div>
 			<span class="audio-mixer-view__fader-val">${formatVolumeDb(r.v)}</span>
 			<div class="audio-mixer-view__strip-actions">
+				${startHtml}
 				<button type="button" class="audio-mixer-view__mute-btn${isMuted ? ' audio-mixer-view__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute live input">MUTE</button>
 			</div>
 			<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;align-self:stretch;margin-top:6px">
@@ -131,6 +139,29 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 					btn.disabled = false
 				}
 			})
+		})
+
+		strip.querySelector('[data-input-start]')?.addEventListener('click', async (e) => {
+			e.stopPropagation()
+			const startBtn = /** @type {HTMLButtonElement} */ (strip.querySelector('[data-input-start]'))
+			if (!startBtn || startBtn.dataset.busy === '1') return
+			startBtn.dataset.busy = '1'
+			startBtn.disabled = true
+			try {
+				await runInputStart(r, {
+					post: (p, b) => api.post(p, b),
+					targets: getMultiPlayTargets(targetKey),
+					playRoute: playRouteOnChannel,
+					route: inputRouteForRow(cm, r),
+					audioOnly: liveUi?.pgmAudioOnly !== false,
+				})
+				showScenesToast(`${r.label} capture started.`, 'success')
+			} catch (err) {
+				showScenesToast(err?.message || String(err), 'error')
+			} finally {
+				startBtn.dataset.busy = '0'
+				startBtn.disabled = false
+			}
 		})
 
 		stripsEl.appendChild(strip)

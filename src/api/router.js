@@ -207,6 +207,7 @@ routes.post('/api/audio/monitor-source', ({ path, body, ctx }) => routesAudio.ha
 routes.post('/api/audio/solo', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/audio/live-inputs/apply', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/audio/live-inputs/config', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/audio/inputs/start', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
 
 // Variables
 routes.get('/api/variables', ({ path, ctx, query }) => routesState.handleGet(path, ctx, query), { requireCaspar: false })

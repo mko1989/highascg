@@ -17,7 +17,10 @@ import {
 	enableInputPgmRoute,
 	inputRouteForRow,
 	pgmDestLayerForInput,
+	playRouteOnChannel,
 } from '../lib/live-audio-routing.js'
+import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
+import { api } from '../lib/api-client.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -53,13 +56,18 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 
 		const isMuted = !!r.muted
 		const muteHtml = `<button type="button" class="audio-mixer__mute-btn${isMuted ? ' audio-mixer__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute live input">M</button>`
+		// A stopped input reads as "no signal" — it must still carry its own way back. Offered for
+		// every startable kind regardless of metering state (see shouldShowStartControl).
+		const startHtml = shouldShowStartControl(r)
+			? `<button type="button" class="audio-mixer__start-btn" data-input-start title="Start / restart this input's capture">▶</button>`
+			: ''
 		const row = document.createElement('div')
 		row.className = 'audio-mixer__bus-layer audio-mixer__bus-layer--live-input'
 		const labelTitle = r.labelTitle || r.label
 		row.innerHTML = `
 			<div class="audio-mixer__layer-info">
 				<div class="audio-mixer__layer-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}</div>
-				<div class="audio-mixer__layer-actions">${muteHtml}</div>
+				<div class="audio-mixer__layer-actions">${startHtml}${muteHtml}</div>
 			</div>
 			<div class="audio-mixer__layer-fader-row">
 				<div class="audio-mixer__meter-horizontal" aria-hidden="true">
@@ -136,6 +144,31 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 		inputsEl.appendChild(row)
 		meterFills.set(r.key, row.querySelector('.audio-mixer__meter-fill'))
 		meterLayerMeta.set(r.key, meterMetaForInputRow(r))
+
+		const startBtn = row.querySelector('[data-input-start]')
+		if (startBtn) {
+			startBtn.onclick = async (e) => {
+				e.stopPropagation()
+				if (startBtn.dataset.busy === '1') return
+				startBtn.dataset.busy = '1'
+				startBtn.disabled = true
+				try {
+					await runInputStart(r, {
+						post: (p, b) => api.post(p, b),
+						targets: getMultiPlayTargets(targetKey),
+						playRoute: playRouteOnChannel,
+						route: inputRouteForRow(cm, r),
+						audioOnly: liveUi?.pgmAudioOnly !== false,
+					})
+					showScenesToast(`${r.label} capture started.`, 'success')
+				} catch (err) {
+					showScenesToast(err?.message || String(err), 'error')
+				} finally {
+					startBtn.dataset.busy = '0'
+					startBtn.disabled = false
+				}
+			}
+		}
 
 		const muteBtn = row.querySelector('.audio-mixer__mute-btn')
 		if (muteBtn) {

@@ -200,7 +200,8 @@ input[type="range"].audio-mixer-view__fader {
 }
 
 .audio-mixer-view__solo-btn,
-.audio-mixer-view__mute-btn {
+.audio-mixer-view__mute-btn,
+.audio-mixer-view__start-btn {
 	flex: 1;
 	height: 20px;
 	padding: 0;
@@ -226,6 +227,17 @@ input[type="range"].audio-mixer-view__fader {
 .audio-mixer-view__mute-btn:hover {
 	border-color: var(--error);
 	color: var(--text);
+}
+
+/* Restart this input's capture — offered even while the strip reads "no signal". */
+.audio-mixer-view__start-btn {
+	border-color: rgba(74, 222, 128, 0.45);
+	color: #86efac;
+}
+
+.audio-mixer-view__start-btn:hover {
+	border-color: #4ade80;
+	color: #dcfce7;
 }
 
 /* SOLO Backlit State (DAW-style Yellow) */

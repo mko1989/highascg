@@ -21,6 +21,7 @@ const {
 } = require('../config/audio-preview')
 const { listConfiguredLiveAudioSlots, normalizeAlsaCaptureUri } = require('../config/live-audio-input')
 const { getChannelMap } = require('../config/routing')
+const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -301,6 +302,25 @@ async function handlePost(path, body, ctx) {
 				headers: JSON_HEADERS,
 				body: jsonBody({ ok: true, status: ctx._liveAudioInputsStatus ?? null }),
 			}
+		} catch (e) {
+			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
+		}
+	}
+
+	// Start (or restart) ONE input's capture producer — the counterpart of the inspector/Sources
+	// Stop button. Deliberately per-input: /live-inputs/apply re-PLAYs every configured slot and
+	// would glitch inputs that are still on air.
+	if (path === '/api/audio/inputs/start') {
+		const b = parseBody(body) || {}
+		try {
+			const res = await startInputCapture(ctx, b)
+			const { status, ...payload } = res
+			if (!res.ok) {
+				apiLog(ctx, 'warn', `[input-start] ${b?.kind || 'live_audio'} slot ${b?.slot}: ${res.reason}`)
+				return { status: status || 502, headers: JSON_HEADERS, body: jsonBody({ ...payload, error: res.reason }) }
+			}
+			apiLog(ctx, 'info', `[input-start] ${res.kind} slot ${res.slot} capture started on ${res.channel}-${res.layer}`)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(payload) }
 		} catch (e) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
 		}
