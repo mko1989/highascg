@@ -58,3 +58,16 @@ describe('the working-device memo survives the internal stop', () => {
 		)
 	})
 })
+
+describe('the memo is re-armed, not consumed once', () => {
+	it('start() re-sets the memo whenever it runs on a non-configured device', () => {
+		const fs = require('fs')
+		const path = require('path')
+		const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'audio', 'live-audio-bridge.js'), 'utf8')
+		assert.match(
+			src,
+			/if \(device !== configured\) _workingDeviceBySlot\.set\(n, device\)/,
+			'without re-arming, the memo is cleared by the stop inside start() and every later start re-probes the broken device',
+		)
+	})
+})

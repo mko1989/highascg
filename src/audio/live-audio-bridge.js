@@ -192,6 +192,10 @@ function startLiveAudioBridge(ctx, slot, opts = {}) {
 	const proc = spawn(ffmpegBinary(cfg), args, { stdio: ['ignore', 'ignore', 'pipe'] })
 	const entry = { proc, port, device, startedAt: Date.now(), lastError: undefined, plugRetried: !!opts.plugRetried }
 	_bridges.set(n, entry)
+	/* Re-arm the memo whenever we are running on something other than the configured device: the
+	 * stop above cleared it, and without this the remembered value is consumed once and every
+	 * later start re-probes the device we already know is broken. */
+	if (device !== configured) _workingDeviceBySlot.set(n, device)
 	proc.stderr?.on('data', (buf) => {
 		const s = buf.toString().trim()
 		if (!s) return
