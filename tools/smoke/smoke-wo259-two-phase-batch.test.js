@@ -85,6 +85,45 @@ test('WO-259: batchSendChunked really splits >64 lines into multiple chunks even
 	assert.ok(seenChunks.every((c) => c.forceBatch), 'forceBatch propagated to every chunk')
 })
 
+test('WO-281 4.1: batchSendChunked aggregates inner failures across ALL chunks, not just the last', async () => {
+	const connection = { config: { amcp_batch: false, amcp_max_batch_commands: 2 }, log: () => {} }
+	const client = { _context: connection }
+	const batch = new AmcpBatch(client)
+
+	// Only `batchSendChunked` returns the last chunk's result, so a failure in chunk 1 used to be
+	// unreachable to the caller even once the drain started extracting it.
+	let call = 0
+	batch.batchSend = async () => {
+		call += 1
+		return call === 1
+			? { ok: true, okAll: false, batched: true, failures: [{ code: 404, line: '404 PLAY FAILED', command: 'PLAY 1-10' }], benignFailures: [] }
+			: { ok: true, okAll: true, batched: true, failures: [], benignFailures: [] }
+	}
+
+	const result = await batch.batchSendChunked(
+		['PLAY 1-10', 'PLAY 1-11', 'PLAY 1-12', 'PLAY 1-13'],
+		{ forceBatch: true, skipMixerPreCommit: true },
+	)
+	assert.equal(call, 2, 'two chunks at cap 2')
+	assert.equal(result.ok, true, 'transport-level ok unchanged (take keeps going)')
+	assert.equal(result.okAll, false, 'a failure in an earlier chunk still lands in the returned verdict')
+	assert.equal(result.failures.length, 1)
+	assert.equal(result.failures[0].line, '404 PLAY FAILED')
+})
+
+test('WO-281 4.1: a fully successful chunked batch reports okAll with no failures', async () => {
+	const connection = { config: { amcp_batch: false, amcp_max_batch_commands: 2 }, log: () => {} }
+	const client = { _context: connection }
+	const batch = new AmcpBatch(client)
+	batch.batchSend = async () => ({ ok: true, okAll: true, batched: true, failures: [], benignFailures: [] })
+
+	const result = await batch.batchSendChunked(['PLAY 1-10', 'PLAY 1-11', 'PLAY 1-12'], { forceBatch: true })
+	assert.equal(result.ok, true)
+	assert.equal(result.okAll, true)
+	assert.deepEqual(result.failures, [])
+	assert.deepEqual(result.benignFailures, [])
+})
+
 test('WO-259: validateBatchLine rejects MIXER n COMMIT even with forceBatch set (never inside a batch)', async () => {
 	const connection = { config: { amcp_batch: false }, log: () => {} }
 	const client = { _context: connection }

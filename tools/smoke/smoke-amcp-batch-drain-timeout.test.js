@@ -16,7 +16,12 @@ const assert = require('node:assert')
 
 process.env.HIGHASCG_AMCP_SEND_TIMEOUT_MS = '120'
 
-const { runBeginCommitBatch, isBatchCommitAckLine } = require('../../src/caspar/amcp-batch')
+const {
+	runBeginCommitBatch,
+	isBatchCommitAckLine,
+	parseBatchStatusLine,
+	extractBatchFailures,
+} = require('../../src/caspar/amcp-batch')
 const transport = require('../../src/caspar/amcp-client-transport')
 
 function makeConnection() {
@@ -52,6 +57,88 @@ test('COMMIT ack resolves the batch and clears the drain', async () => {
 	const res = await p
 	assert.strictEqual(res.ok, true)
 	assert.strictEqual(connection._amcpBatchDrain, null, 'drain cleared on ack')
+	// WO-281 4.1: an all-2xx batch reports a clean per-command verdict and an empty failure list.
+	assert.strictEqual(res.okAll, true, 'no inner failures -> okAll true')
+	assert.deepStrictEqual(res.failures, [], 'no inner failures -> empty failures array')
+	assert.deepStrictEqual(res.benignFailures, [])
+	assert.ok(Array.isArray(res.rawLines) && res.rawLines.length === 3, 'rawLines still carries every drained line')
+	assert.ok(
+		!connection.logs.some((l) => l.startsWith('error:')),
+		`clean batch logs no error; got ${JSON.stringify(connection.logs)}`,
+	)
+})
+
+/**
+ * WO-281 4.1 — a command that fails INSIDE BEGIN...COMMIT used to vanish: amcp-protocol hands the
+ * line to the drain and returns before its error-classification switch, and the drain only tested
+ * for the COMMIT ack. The take reported success with a layer missing. These tests pin the fix.
+ */
+test('WO-281: an inner 404 is reported in failures and logged once at error', async () => {
+	const connection = makeConnection()
+	const client = { _context: connection }
+	const cmds = ['PLAY 1-10 AMB', 'PLAY 1-11 DECKLINK 4', 'MIXER 1-10 OPACITY 1']
+	const p = runBeginCommitBatch(client, cmds, { skipMixerPreCommit: true })
+	await new Promise((r) => setImmediate(r))
+	connection._amcpBatchDrain.onLine('202 PLAY OK')
+	connection._amcpBatchDrain.onLine('404 PLAY FAILED')
+	connection._amcpBatchDrain.onLine('202 MIXER OK')
+	connection._amcpBatchDrain.onLine('202 COMMIT OK')
+	const res = await p
+
+	// `ok` stays transport-level so a partially-applied take still finishes its remaining phases.
+	assert.strictEqual(res.ok, true, 'batch still committed -> transport-level ok stays true')
+	assert.strictEqual(res.okAll, false, 'per-command verdict is false when any inner command failed')
+	assert.strictEqual(res.failures.length, 1, `exactly one failure; got ${JSON.stringify(res.failures)}`)
+	assert.strictEqual(res.failures[0].code, 404)
+	assert.strictEqual(res.failures[0].line, '404 PLAY FAILED')
+	assert.strictEqual(res.failures[0].command, 'PLAY 1-11 DECKLINK 4', 'failure attributed to the offending command')
+
+	const errorLogs = connection.logs.filter((l) => l.startsWith('error:'))
+	assert.strictEqual(errorLogs.length, 1, `one error log per failure, no spam; got ${JSON.stringify(errorLogs)}`)
+	assert.ok(errorLogs[0].includes('404 PLAY FAILED'), 'log carries the Caspar status line')
+	assert.ok(errorLogs[0].includes('PLAY 1-11 DECKLINK 4'), 'log carries the offending command')
+	assert.strictEqual(connection._amcpBatchDrain, null, 'drain still cleared on ack')
+})
+
+test('WO-281: optional REMOVE misses stay benign - one aggregated warn, never an error', async () => {
+	const connection = makeConnection()
+	const client = { _context: connection }
+	const p = runBeginCommitBatch(client, ['REMOVE 1-701', 'REMOVE 2-701'], { skipMixerPreCommit: true })
+	await new Promise((r) => setImmediate(r))
+	connection._amcpBatchDrain.onLine('404 REMOVE FAILED')
+	connection._amcpBatchDrain.onLine('404 REMOVE FAILED')
+	connection._amcpBatchDrain.onLine('202 COMMIT OK')
+	const res = await p
+
+	assert.strictEqual(res.okAll, true, 'benign teardown misses do not make the batch fail')
+	assert.deepStrictEqual(res.failures, [])
+	assert.strictEqual(res.benignFailures.length, 2)
+	assert.strictEqual(connection.logs.filter((l) => l.startsWith('error:')).length, 0, 'never error')
+	const warns = connection.logs.filter((l) => l.startsWith('warn:') && l.includes('REMOVE'))
+	assert.strictEqual(warns.length, 1, `aggregated into ONE warn, not one per miss; got ${JSON.stringify(warns)}`)
+})
+
+test('WO-281: parseBatchStatusLine mirrors isBatchCommitAckLine prefix handling', () => {
+	assert.deepStrictEqual(parseBatchStatusLine('202 PLAY OK'), { code: 202, command: 'PLAY' })
+	assert.deepStrictEqual(parseBatchStatusLine('404 PLAY FAILED'), { code: 404, command: 'PLAY' })
+	assert.deepStrictEqual(parseBatchStatusLine('RES uid 502 MIXER FAILED'), { code: 502, command: 'MIXER' })
+	assert.strictEqual(parseBatchStatusLine(''), null)
+	assert.strictEqual(parseBatchStatusLine('ffmpeg latency report'), null)
+})
+
+test('WO-281: extractBatchFailures ignores the terminal COMMIT ack and every 2xx reply', () => {
+	const { failures, benign } = extractBatchFailures(
+		['202 PLAY OK', '202 MIXER OK', '202 COMMIT OK'],
+		['PLAY 1-10 AMB', 'MIXER 1-10 OPACITY 1'],
+	)
+	assert.deepStrictEqual(failures, [])
+	assert.deepStrictEqual(benign, [])
+
+	// Mis-attribution guard: when the reply verb does not match the positional candidate, `command`
+	// is left null rather than blaming the wrong line.
+	const mismatched = extractBatchFailures(['404 STOP FAILED'], ['PLAY 1-10 AMB'])
+	assert.strictEqual(mismatched.failures.length, 1)
+	assert.strictEqual(mismatched.failures[0].command, null)
 })
 
 test('missing COMMIT ack times out, rejects, and clears the stale drain', async () => {

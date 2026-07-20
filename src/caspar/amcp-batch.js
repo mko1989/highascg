@@ -19,6 +19,17 @@
  * **Look takes** (`scene-take-lbg`) send many `MIXER … DEFER` lines then one channel `COMMIT`. Chunked batches
  * must not inject a pre-flush `MIXER <ch> COMMIT` between chunks — that would apply a subset of DEFER lines early.
  * Use {@link AmcpBatch#batchSendChunked} with `{ skipMixerPreCommit: true }` for those sequences.
+ *
+ * **Inner failures** (WO-281 4.1) - `amcp-protocol.handleLine` hands every line to the batch drain and
+ * returns *before* its error-classification switch, so a `404`/`5xx` on one command inside BEGIN...COMMIT
+ * used to produce no log, no rejection and no GUI signal (a look silently recalling all-but-one layer).
+ * {@link extractBatchFailures} now reads the drained lines, and every batch result carries
+ * `failures: [{ code, line, command }]`, `benignFailures` (optional-REMOVE misses) and `okAll`.
+ *
+ * `ok` deliberately stays **transport-level** - true whenever the batch framed and the `2xx COMMIT` ack
+ * arrived - because callers treat a false/rejected result as "fall back or abort", and a partially-applied
+ * take must still finish its remaining phases and trailing `MIXER <ch> COMMIT`. Read `okAll`/`failures`
+ * for the per-command verdict.
  */
 
 /** @deprecated Use {@link resolveMaxBatchCommands} — kept for static imports that need a default cap. */
@@ -138,7 +149,7 @@ function validateBatchLine(line) {
 /**
  * @param {string[]} lines
  * @param {import('./amcp-client').AmcpClient} client
- * @returns {Promise<{ ok: boolean, batched: boolean, responses: object[] }>}
+ * @returns {Promise<{ ok: boolean, okAll: boolean, batched: boolean, responses: object[], failures: BatchFailure[] }>}
  */
 function sequentialRaw(lines, client) {
 	return lines
@@ -146,14 +157,12 @@ function sequentialRaw(lines, client) {
 			const key = line.trim().split(/\s+/)[0].toUpperCase()
 			return acc.then((responses) => client._send(line, key).then((r) => [...responses, r]))
 		}, Promise.resolve(/** @type {object[]} */ ([])))
-		.then((responses) => ({ ok: true, batched: false, responses }))
+		// Sequential sends are already classified + logged per line by amcp-protocol's error switch
+		// (a failing `_send` rejects), so `failures` is structurally empty here — present only so
+		// callers can read the same field regardless of which transport ran.
+		.then((responses) => ({ ok: true, okAll: true, batched: false, responses, failures: [] }))
 }
 
-/**
- * @param {import('./amcp-client').AmcpClient} client
- * @param {string[]} lines
- * @returns {Promise<{ ok: boolean, batched: boolean, rawLines: string[], innerCount: number }>}
- */
 /**
  * True when this line is the **AMCP batch** closing ack (second status token is `COMMIT`).
  * Examples: `202 COMMIT OK`, `RES uid 202 COMMIT OK`.
@@ -166,6 +175,79 @@ function isBatchCommitAckLine(line) {
 	if (!s) return false
 	// After optional REQ id tokens: `<code> COMMIT` must be the AMCP status word (not `202 MIXER …`).
 	return /^(\S+\s+)*2\d{2}\s+COMMIT(\s|$)/i.test(s)
+}
+
+/**
+ * @typedef {{ code: number, line: string, command: string | null }} BatchFailure
+ */
+
+/**
+ * Parse one AMCP status line into `{ code, command }`, tolerating the same optional leading
+ * `REQ`/`RES <id>` tokens {@link isBatchCommitAckLine} skips (lazy prefix, first 3-digit token wins).
+ * `202 PLAY OK` → `{ code: 202, command: 'PLAY' }`; `RES uid 404 PLAY FAILED` → `{ code: 404, … }`.
+ * @param {string} line
+ * @returns {{ code: number, command: string } | null}
+ */
+function parseBatchStatusLine(line) {
+	const s = String(line).trim()
+	if (!s) return null
+	const m = s.match(/^(?:\S+\s+)*?([1-5]\d{2})(?:\s+(\S+))?(?:\s|$)/)
+	if (!m) return null
+	const code = parseInt(m[1], 10)
+	if (!Number.isFinite(code)) return null
+	return { code, command: (m[2] || '').toUpperCase() }
+}
+
+/**
+ * `404 REMOVE FAILED` for a consumer that is not attached — best-effort teardown, caller swallows it.
+ * Classified benign by amcp-protocol.js (`optionalRemoveMiss`) on the single-command path; mirrored
+ * here so batched teardown blocks do not spam `error`. See WO-281 §1 pattern #7.
+ * @param {number} code
+ * @param {string} command
+ */
+function isOptionalRemoveMiss(code, command) {
+	return code === 404 && command === 'REMOVE'
+}
+
+/**
+ * WO-281 §4.1 — extract per-command failures from the lines drained inside a BEGIN…COMMIT batch.
+ *
+ * `amcp-protocol.handleLine` returns early while a drain is installed, so the error-classification
+ * switch never sees these lines: without this, a `404`/`5xx` on a layer inside a take batch produced
+ * no log, no rejection and no GUI signal. The drained `rawLines` (previously collected and never
+ * read by anyone) are exactly the evidence, so they feed this extraction.
+ *
+ * Inner replies arrive in submission order, one status line per command, so the nth status line is
+ * matched back to `commandLines[n]` — but only when the reply's command token agrees with the
+ * candidate's verb, otherwise `command` is left null rather than mis-attributed.
+ * @param {string[]} rawLines - lines drained between BEGIN and the terminal `2xx COMMIT` ack
+ * @param {string[]} commandLines - the inner commands sent, in order (no BEGIN/COMMIT)
+ * @returns {{ failures: BatchFailure[], benign: BatchFailure[] }}
+ */
+function extractBatchFailures(rawLines, commandLines) {
+	/** @type {BatchFailure[]} */
+	const failures = []
+	/** @type {BatchFailure[]} */
+	const benign = []
+	let statusIndex = 0
+	for (const raw of rawLines || []) {
+		if (isBatchCommitAckLine(raw)) continue
+		const parsed = parseBatchStatusLine(raw)
+		if (!parsed) continue
+		const idx = statusIndex++
+		if (parsed.code < 400) continue
+		const candidate = commandLines && commandLines[idx] ? String(commandLines[idx]).trim() : ''
+		const verb = candidate ? candidate.split(/\s+/)[0].toUpperCase() : ''
+		/** @type {BatchFailure} */
+		const entry = {
+			code: parsed.code,
+			line: String(raw).trim(),
+			command: verb && verb === parsed.command ? candidate : null,
+		}
+		if (isOptionalRemoveMiss(parsed.code, parsed.command)) benign.push(entry)
+		else failures.push(entry)
+	}
+	return { failures, benign }
 }
 
 /**
@@ -184,7 +266,7 @@ function runBeginCommitBatch(client, lines, options) {
 					`[replication] skip local PGM AMCP batch ch=${ch} (${lines.length} cmds, leader fan-out drives air)`,
 				)
 			}
-			return Promise.resolve({ ok: true, batched: true, skipped: true, responses: [] })
+			return Promise.resolve({ ok: true, okAll: true, batched: true, skipped: true, responses: [], failures: [] })
 		}
 	} catch {
 		/* replication optional */
@@ -212,17 +294,43 @@ function runBeginCommitBatch(client, lines, options) {
 				if (isBatchCommitAckLine(line)) {
 					clearDrainTimeout()
 					if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
+					const rawLines = this.lines.slice()
+					const { failures, benign } = extractBatchFailures(rawLines, lines)
 					if (typeof connection.log === 'function') {
+						// One line per failure, carrying the offending command and Caspar's own status line.
+						// Before WO-281 §4.1 these were invisible: the drain short-circuits amcp-protocol's
+						// error-classification switch, so a failed layer inside a take batch left no trace.
+						for (const f of failures) {
+							connection.log(
+								'error',
+								`AMCP batch: command failed inside BEGIN…COMMIT — ${f.command ? `cmd="${f.command}" ` : ''}reply="${f.line}"`,
+							)
+						}
+						if (benign.length > 0) {
+							// Aggregated on purpose: optional-REMOVE teardown misses are expected, and one line
+							// per absent consumer per batch would be pure noise (WO-281 §1 pattern #7).
+							connection.log(
+								'warn',
+								`AMCP batch: ${benign.length} optional REMOVE miss(es) inside BEGIN…COMMIT (consumer absent — benign)`,
+							)
+						}
 						connection.log(
 							'debug',
-							`AMCP ← BEGIN…COMMIT OK (${lines.length} cmd${lines.length === 1 ? '' : 's'})`,
+							failures.length > 0
+								? `AMCP ← BEGIN…COMMIT committed with ${failures.length} failed command(s) (${lines.length} cmd${lines.length === 1 ? '' : 's'})`
+								: `AMCP ← BEGIN…COMMIT OK (${lines.length} cmd${lines.length === 1 ? '' : 's'})`,
 						)
 					}
 					resolve({
+						// `ok` stays transport-level ("the batch framed and committed") — see the module header
+						// for why it is not flipped on inner failures. `okAll` is the per-command verdict.
 						ok: true,
+						okAll: failures.length === 0,
 						batched: true,
-						rawLines: this.lines.slice(),
+						rawLines,
 						innerCount: lines.length,
+						failures,
+						benignFailures: benign,
 					})
 				}
 			},
@@ -373,19 +481,33 @@ class AmcpBatch {
 			if (t) clean.push(t)
 		}
 		if (clean.length === 0) {
-			return Promise.resolve({ ok: true, batched: false, responses: [] })
+			return Promise.resolve({ ok: true, okAll: true, batched: false, responses: [], failures: [] })
 		}
 		const maxCmd = resolveMaxBatchCommands(this._client._context)
 		/** @type {object | null} */
 		let last = null
+		// WO-281 4.1: only the LAST chunk's result is returned, so failures from earlier chunks would
+		// be dropped on the floor. Accumulate across every chunk instead.
+		/** @type {BatchFailure[]} */
+		const failures = []
+		/** @type {BatchFailure[]} */
+		const benignFailures = []
 		let chain = Promise.resolve()
 		for (let i = 0; i < clean.length; i += maxCmd) {
 			const chunk = clean.slice(i, i + maxCmd)
 			chain = chain.then(async () => {
 				last = await this.batchSend(chunk, options)
+				const r = /** @type {{ failures?: BatchFailure[], benignFailures?: BatchFailure[] }} */ (last || {})
+				if (Array.isArray(r.failures)) failures.push(...r.failures)
+				if (Array.isArray(r.benignFailures)) benignFailures.push(...r.benignFailures)
 			})
 		}
-		return chain.then(() => last || { ok: true, batched: false, responses: [] })
+		return chain.then(() => ({
+			...(last || { ok: true, batched: false, responses: [] }),
+			okAll: failures.length === 0,
+			failures,
+			benignFailures,
+		}))
 	}
 }
 
@@ -403,4 +525,7 @@ module.exports = {
 	/** @internal exported for the batch-drain-timeout smoke test only */
 	runBeginCommitBatch,
 	isBatchCommitAckLine,
+	/** @internal exported for the WO-281 4.1 batch-failure tests */
+	parseBatchStatusLine,
+	extractBatchFailures,
 }
