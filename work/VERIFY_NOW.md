@@ -14,25 +14,25 @@ what would hurt most if wrong. Server is running the new code; the kiosk needs a
 
 ## 1. Verify — the things I fixed that you reported (highest value)
 
-- [ ] **Compose preview layout after restart** (the one I wrongly marked done).
+- [x] **Compose preview layout after restart** (the one I wrongly marked done).
       Restart highascg, watch the operator GUI come up. Your saved tile layout must be there
       *without* triggering a look. Journal proof to compare against:
       `journalctl -u highascg -f -o cat | grep -E "re-apply|first rect report"` —
       you want `first rect report ... cells=3`, not `cells=1`.
       Known cosmetic leftover: the holes close once for ~2s during boot before the layout lands.
 
-- [ ] **First look play after a restart.** You reported it fails after a long timeout and freezes
+- [x] **First look play after a restart.** You reported it fails after a long timeout and freezes
       the app. I fixed an AMCP wedge and have seen no recurrence, but I am NOT claiming it fixed.
       Take a look right after a restart and tell me.
 
-- [ ] **PRV precision + realtime.** Play several looks on preview. Watch for: a layer missing, or a
+- [x] **PRV precision + realtime.** Play several looks on preview. Watch for: a layer missing, or a
       layer wearing another layer's position/scale. Then drag geometry in the looks editor — edits
       should appear on PRV almost immediately.
 
-- [ ] **Route looks land on one frame.** Play the look with 1 media layer + 3 route layers. All four
+- [x] **Route looks land on one frame.** Play the look with 1 media layer + 3 route layers. All four
       must appear together, not one by one.
-
-- [ ] **EDIT PGM + CAPTURE** buttons on each PGM tile footer. EDIT PGM opens the on-air look with a
+small edit here. the route shouldnt go to live sources browser but be added as a new layer in that look only.
+- [x] **EDIT PGM + CAPTURE** buttons on each PGM tile footer. EDIT PGM opens the on-air look with a
       red "LIVE — EDITING PGM" badge and edits hit air. CAPTURE writes a PNG in the Caspar media
       folder and toasts.
 
@@ -40,7 +40,7 @@ what would hurt most if wrong. Server is running the new code; the kiosk needs a
       NVIDIA settings must appear **over** the kiosk and be clickable, the video holes must keep
       showing Caspar output while it is open, and closing it must restore the GUI.
       Also test the crash path: `kill -9` the helper — the GUI must restore within ~1s.
-
+nothing can be shown over the gui. i need to be able as a user use web browser, file browser, setups decklink and nvidia etc.
 - [ ] **Cable re-grab** (never exercised in a real browser): select a cable, click one end, drop it
       on a different port. Invalid drops must restore, not disconnect. Also check connections now
       apply faster (~375ms → ~144ms typical).

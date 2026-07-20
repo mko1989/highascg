@@ -3,8 +3,7 @@
  */
 
 import { createEffectInstance } from '../lib/effect-registry.js'
-import { api } from '../lib/api-client.js'
-import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
+import { addRouteLayerToLook } from './scenes-editor-layer-route.js'
 import { routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { isLayerSourceExchange } from '../lib/scene-state-layer-logic.js'
@@ -20,7 +19,7 @@ import { isLayerSourceExchange } from '../lib/scene-state-layer-logic.js'
  * @param {{ getState?: () => { channelMap?: object } }} [opts.stateStore]
  * @param {(s: string) => string} opts.escapeHtml
  * @param {(layerIndex: number, data: object) => Promise<void>} opts.applyNativeFillForSource
- * @param {(scene: import('../lib/scene-state.js').Scene, layerNumber: number, opts?: { forceBus?: 'edit' | 'pgm' | 'prv' }) => { item: object } | { error: string }} [opts.buildLayerRouteLiveSourceItem]
+ * @param {(scene: import('../lib/scene-state.js').Scene, layerNumber: number, opts?: { forceBus?: 'edit' | 'pgm' | 'prv' }) => { item: object } | { error: string }} [opts.buildLayerRouteDescriptor]
  */
 export function appendSceneLayerStripRows(layerStrip, opts) {
 	const {
@@ -34,7 +33,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 		stateStore,
 		escapeHtml,
 		applyNativeFillForSource,
-		buildLayerRouteLiveSourceItem,
+		buildLayerRouteDescriptor,
 	} = opts
 
 	/** HTML5 DnD: visual index being dragged (bottom→top); avoids MIME type quirks in dragover. */
@@ -50,7 +49,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 			const src = l.source
 			const label = src ? (src.label || src.value || '').slice(0, 28) : 'Empty'
 			const canPaste = sceneState.hasLayerStyleClipboard()
-			const canAddLayerRoute = typeof buildLayerRouteLiveSourceItem === 'function'
+			const canAddLayerRoute = typeof buildLayerRouteDescriptor === 'function'
 			row.innerHTML = `
 				<span class="scenes-layer-row__drag" draggable="true" title="Drag to change stack order (Z)" aria-grabbed="false" aria-label="Drag to reorder layer">⋮⋮</span>
 				<div class="scenes-layer-row__col">
@@ -62,7 +61,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-copy-style="${realIdx}" title="Copy position, scale, opacity, keyer, transition" aria-label="Copy layer settings">→📋</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋→</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-save-preset="${realIdx}" title="Save as layer style preset" aria-label="Save as layer style preset">💾</button>
-						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-add-layer-route="${realIdx}" title="Add this layer as a Live route (↗ default = PGM; Shift+↗ = edit bus; Ctrl+↗ = PRV)" aria-label="Add layer route to Live sources" ${canAddLayerRoute ? '' : 'disabled'}>↗</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-add-layer-route="${realIdx}" title="Add a route to this layer as a new layer in this look (↗ default = PGM; Shift+↗ = edit bus; Ctrl+↗ = PRV)" aria-label="Add route to this layer as a new layer in this look" ${canAddLayerRoute ? '' : 'disabled'}>↗</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">🗑</button>
 					</div>
 				</div>
@@ -257,27 +256,46 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 					showToast('Could not save preset (empty name).', 'warn')
 				}
 			})
+			// todos20.07.26 (owner): the route must NOT go to the Live sources browser — it becomes a
+			// new layer in THIS look only. No /api/device-view addExtraLiveSource, so nothing is
+			// published globally and no Caspar restart is implied (a routeType:'layer' entry was
+			// never a host live source — see scenes-editor-layer-route.js).
 			row.querySelector('[data-add-layer-route]')?.addEventListener('click', async (e) => {
 				e.stopPropagation()
-				if (typeof buildLayerRouteLiveSourceItem !== 'function') return
+				if (typeof buildLayerRouteDescriptor !== 'function') return
 				let forceBus = 'pgm'
 				if (e.shiftKey) forceBus = 'edit'
 				else if (e.ctrlKey || e.metaKey) forceBus = 'prv'
-				const built = buildLayerRouteLiveSourceItem(scene, l.layerNumber, { forceBus })
+				const built = buildLayerRouteDescriptor(scene, l.layerNumber, { forceBus })
 				if ('error' in built && built.error) {
 					showToast(built.error, 'warn')
 					return
 				}
-				try {
-					const addRes = await api.post('/api/device-view', { addExtraLiveSource: built.item })
-					if (Array.isArray(addRes?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {
-						window.__highascgApplyExtraLiveSources(addRes.extraLiveSources)
-					}
-					markCasparRestartDirty()
-					showToast('Added to Live sources.', 'info')
-				} catch (err) {
-					showToast(err?.message || String(err), 'error')
+				const added = addRouteLayerToLook({ sceneState, scene, item: built.item })
+				if (!added.ok) {
+					if (added.reason) showToast(added.reason, 'warn')
+					return
 				}
+				const idx = added.layerIndex
+				try {
+					await applyNativeFillForSource(idx, {
+						type: 'route',
+						value: built.item.value,
+						label: built.item.label,
+						resolution: built.item.resolution,
+					})
+				} catch {
+					/* fill is best-effort — the layer already exists */
+				}
+				const updatedScene = sceneState.getScene(scene.id)
+				const addedLayer = updatedScene?.layers?.[idx]
+				if (addedLayer) {
+					selectedLayerIndexRef.current = idx
+					dispatchLayerSelect({ sceneId: scene.id, layerIndex: idx, layer: addedLayer })
+				}
+				schedulePreviewPush()
+				render()
+				showToast(`Route layer added to this look (${built.item.value}).`, 'info')
 			})
 			row.querySelector('[data-remove]').addEventListener('click', (e) => {
 				e.stopPropagation()

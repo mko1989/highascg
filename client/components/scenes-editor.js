@@ -31,7 +31,7 @@ import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { reportComposeCellRects } from '../lib/operator-gui-mode.js'
 import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
-import { createBuildLayerRouteLiveSourceItem } from './scenes-editor-layer-route.js'
+import { createBuildLayerRouteDescriptor } from './scenes-editor-layer-route.js'
 import { createDeckMediaDropHandler } from './scenes-editor-deck-drop.js'
 import { createDeckThumbPainter } from './scenes-editor-deck-thumb.js'
 import { createPreviewActions } from './scenes-editor-preview-actions.js'
@@ -45,7 +45,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	const getPlaybackChannel = () => getChannelMap().playbackChannels?.[sceneState.activeScreenIndex] ?? getProgramChannel()
 	const getPreviewChannel = () => getChannelMap().previewChannels?.[sceneState.activeScreenIndex] ?? null
 
-	const buildLayerRouteLiveSourceItem = createBuildLayerRouteLiveSourceItem({ sceneState, getChannelMap })
+	const buildLayerRouteDescriptor = createBuildLayerRouteDescriptor({ sceneState, getChannelMap })
 	const getThumbForSource = (source, channelForLive) =>
 		resolveSourceThumbnailUrl(source, { maxWidth: SCENE_THUMB_MAX_W, seekSec: 0, channelForLive })
 	const getComposeStreamNames = () => {
@@ -340,7 +340,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		const prevScrollTop = preserveDeckScroll ? mainHost.scrollTop : 0
 		const prevScrollLeft = preserveDeckScroll ? mainHost.scrollLeft : 0
 		tabsHost.innerHTML = ''
-		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, onExitEdit: exitLookEditor, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteLiveSourceItem, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getEditBusChannelForComposeScene()), getPreviewChannelForLiveThumb: getEditBusChannelForComposeScene }), selectedLayerIndexRef, showScenesToast })
+		if (sceneState.editingSceneId) renderEdit({ mainHost, sceneState, stateStore, takeSceneToProgram, getProgramChannel, getScreenCount, getChannelMap, clearLastPreviewLayers: previewRuntime.clearLastPreviewLayers, onExitEdit: exitLookEditor, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, buildLayerRouteDescriptor, renderCompose: s => renderComposeScene(s, { sceneState, stateStore, getResolution, selectedLayerIndex, dispatchLayerSelect, schedulePreviewPush: previewRuntime.schedulePreviewPush, applyNativeFillForSource, SCENE_THUMB_MAX_W: SCENE_THUMB_MAX_W, startDrag, startRotate, startScale, startEdgeResize, onSourceDropped: captureOnDemandForDroppedSource, getThumbUrlForLayerSource: (src) => getThumbForSource(src, getEditBusChannelForComposeScene()), getPreviewChannelForLiveThumb: getEditBusChannelForComposeScene }), selectedLayerIndexRef, showScenesToast })
 		else renderSceneDeck({ mainHost, sceneState, getScreenCount, getChannelMap, getSceneLive: () => stateStore.getState()?.scene?.live || {}, outputAspect: getResolution().w / getResolution().h, paintDeckThumb, takeSceneToProgram, showToast: showScenesToast, dispatchLayerSelect, previewPanel, sendSceneToPreviewCard: sendSceneToPreviewWithTimelineClear, clearPreviewBusForMain: previewRuntime.clearPreviewBusForMain, selectedLayerIndexRef,
 		onDeckMediaDropAccept: dataTransferOffersDeckMedia,
 		onDeckMediaDrop,

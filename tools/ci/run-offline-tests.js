@@ -98,6 +98,7 @@ const FILES = [
 	'tools/smoke/smoke-preview-mixer-nudge.test.js',
 	'tools/smoke/smoke-lt-engine-registry-sync.test.js',
 	'tools/smoke/smoke-wo259-two-phase-batch.test.js',
+	'tools/smoke/smoke-wo300-layer-route-look-local.test.js',
 	'tools/smoke/smoke-scene-route-deps.js',
 	'tools/smoke/smoke-wo260-browser-display-ui.test.js',
 	'tools/smoke/smoke-wo258-browser-source.test.js',
