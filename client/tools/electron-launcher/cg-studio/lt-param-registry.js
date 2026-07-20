@@ -16,6 +16,11 @@ const DEFAULT_STYLE = {
 	marginX: 77,
 	marginY: 43,
 	opacity: 1,
+	// WO-285: box sizing is opt-in — empty means "template default geometry", which is what the
+	// engine renders today. Never default these to a number or every existing look shifts.
+	boxWidth: '',
+	boxHeight: '',
+	boxScale: '',
 	titleFontSize: '',
 	subtitleFontSize: '',
 	titleFontWeight: '700',
@@ -58,6 +63,37 @@ const LAYOUT_FIELDS = [
 	{ key: 'marginX', label: 'Side margin (px)', type: 'number', min: 0, max: 400, step: 1 },
 	{ key: 'marginY', label: 'Bottom margin (px)', type: 'number', min: 0, max: 400, step: 1 },
 	{ key: 'opacity', label: 'Graphic opacity', type: 'range', min: 0, max: 1, step: 0.05 },
+	// WO-285: the missing counterpart to "title weight" — actual box dimensions.
+	{
+		key: 'boxWidth',
+		label: 'Box width (px)',
+		type: 'number',
+		min: 40,
+		max: 1920,
+		step: 1,
+		placeholder: 'auto',
+		hint: 'Empty = template default width',
+	},
+	{
+		key: 'boxHeight',
+		label: 'Box height (px)',
+		type: 'number',
+		min: 20,
+		max: 1080,
+		step: 1,
+		placeholder: 'auto',
+		hint: 'Empty = template default height',
+	},
+	{
+		key: 'boxScale',
+		label: 'Box scale',
+		type: 'number',
+		min: 0.1,
+		max: 4,
+		step: 0.05,
+		placeholder: '1',
+		hint: 'Scales the whole graphic from its anchored corner; empty = 1',
+	},
 ]
 
 const ANIMATION_FIELDS = [

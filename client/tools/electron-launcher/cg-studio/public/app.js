@@ -87,18 +87,34 @@ function setPayloadValue(section, key, value) {
 	else payload.style[key] = value
 }
 
+/**
+ * WO-285: build one field in the *same DOM vocabulary the main client inspector uses*
+ * (`.inspector-field` > `label.inspector-field__label` > `span.inspector-field__key` + a
+ * `.inspector-field__input` / `.inspector-field__select` control), so the studio inspector reads
+ * and styles identically to the device/scene inspectors. The client's components themselves are
+ * ESM (`client/components/inspector-common.js` imports `../lib/math-input.js`) and are bundled into
+ * dist-web; CG studio is a separate static app served straight out of src/cg-studio/public with
+ * plain `<script src>` tags and no module graph, so the markup contract is what's shareable here,
+ * not the module. The field list itself IS shared — it all comes from lt-param-registry.js.
+ */
 function createFieldControl(field, section) {
 	const wrap = document.createElement('div')
 	wrap.className = 'inspector-field'
 
 	const label = document.createElement('label')
-	label.textContent = field.label
+	label.className = 'inspector-field__label'
+	const key = document.createElement('span')
+	key.className = 'inspector-field__key'
+	key.textContent = field.label
+	label.appendChild(key)
 
 	let input
+	let valSpan = null
 	const currentVal = section === 'data' ? payload.data[field.key] : payload.style[field.key]
 
 	if (field.type === 'select') {
 		input = document.createElement('select')
+		input.className = 'inspector-field__select'
 		for (const opt of field.options || []) {
 			const o = document.createElement('option')
 			o.value = opt
@@ -109,38 +125,24 @@ function createFieldControl(field, section) {
 	} else if (field.type === 'color') {
 		input = document.createElement('input')
 		input.type = 'color'
+		input.className = 'inspector-field__input inspector-field__input--color'
 		const hex = String(currentVal || '#ffffff')
 		input.value = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#ffffff'
 	} else if (field.type === 'range') {
 		input = document.createElement('input')
 		input.type = 'range'
+		input.className = 'inspector-field__input inspector-mini-slider'
 		input.min = String(field.min ?? 0)
 		input.max = String(field.max ?? 1)
 		input.step = String(field.step ?? 0.05)
 		input.value = String(currentVal ?? field.max ?? 1)
-		const valSpan = document.createElement('span')
+		valSpan = document.createElement('span')
 		valSpan.className = 'range-value'
 		valSpan.textContent = input.value
-		input.dataset.fieldSection = section
-		input.dataset.fieldKey = field.key
-		input.addEventListener('input', () => {
-			valSpan.textContent = input.value
-			setPayloadValue(section, field.key, parseFloat(input.value))
-			applyToPreview()
-		})
-		label.appendChild(input)
-		label.appendChild(valSpan)
-		wrap.appendChild(label)
-		if (field.hint) {
-			const hint = document.createElement('span')
-			hint.className = 'field-hint'
-			hint.textContent = field.hint
-			wrap.appendChild(hint)
-		}
-		return wrap
 	} else {
 		input = document.createElement('input')
 		input.type = field.type === 'number' ? 'number' : 'text'
+		input.className = 'inspector-field__input'
 		if (field.type === 'number') {
 			if (field.min != null) input.min = String(field.min)
 			if (field.max != null) input.max = String(field.max)
@@ -150,16 +152,20 @@ function createFieldControl(field, section) {
 		input.value = currentVal ?? ''
 	}
 
+	input.setAttribute('aria-label', field.label)
 	input.dataset.fieldSection = section
 	input.dataset.fieldKey = field.key
 	input.addEventListener('input', () => {
 		let val = input.value
-		if (field.type === 'number') val = val === '' ? '' : parseFloat(val)
+		if (field.type === 'range') val = parseFloat(input.value)
+		else if (field.type === 'number') val = val === '' ? '' : parseFloat(val)
+		if (valSpan) valSpan.textContent = input.value
 		setPayloadValue(section, field.key, val)
 		applyToPreview()
 	})
 
 	label.appendChild(input)
+	if (valSpan) label.appendChild(valSpan)
 	wrap.appendChild(label)
 	if (field.hint) {
 		const hint = document.createElement('span')
@@ -177,12 +183,17 @@ function renderInspector(detail) {
 	for (const group of FIELD_GROUPS) {
 		const list = fields[group.key]
 		if (!Array.isArray(list) || list.length === 0) continue
-		const fs = document.createElement('fieldset')
-		fs.innerHTML = '<legend>' + group.legend + '</legend>'
+		// `.inspector-group` + `.inspector-group__title` — the client inspector's grouping element.
+		const grp = document.createElement('div')
+		grp.className = 'inspector-group'
+		const title = document.createElement('div')
+		title.className = 'inspector-group__title'
+		title.textContent = group.legend
+		grp.appendChild(title)
 		for (const field of list) {
-			fs.appendChild(createFieldControl(field, group.key === 'data' ? 'data' : 'style'))
+			grp.appendChild(createFieldControl(field, group.key === 'data' ? 'data' : 'style'))
 		}
-		inspectorForm.appendChild(fs)
+		inspectorForm.appendChild(grp)
 	}
 }
 

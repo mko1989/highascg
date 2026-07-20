@@ -9,6 +9,7 @@ window.LTEngineStyles = (function () {
     const STYLE_KEYS = new Set([
         'primaryColor', 'textColor', 'panelColor', 'gradientMid', 'gradientEnd',
         'position', 'marginX', 'marginY', 'opacity',
+        'boxWidth', 'boxHeight', 'boxScale',
         'titleFontSize', 'subtitleFontSize', 'titleFontWeight', 'letterSpacing', 'textTransform',
         'blurAmount', 'displayDurationSec', 'speed', 'customFont',
     ]);
@@ -235,6 +236,7 @@ window.LTEngineStyles = (function () {
         }
 
         applyTypographyOverrides();
+        applyBoxSizeOverride();
         applyBlurOverride();
 
         if (typeof C().cfg.applyStyles === 'function') {
@@ -275,6 +277,75 @@ window.LTEngineStyles = (function () {
             document.head.appendChild(el);
         }
         el.textContent = rules.join('\n');
+    }
+
+    /**
+     * WO-285: the resizable "box" is the inner graphic panel every lower-third variant wraps its
+     * content in (`.graphic`), falling back to the positioned container for variants that don't.
+     * A variant may name it explicitly via cfg.boxSel.
+     */
+    function boxElement() {
+        if (!C().cfg.containerSel) return null;
+        if (C().cfg.boxSel) return document.querySelector(C().cfg.boxSel);
+        return document.querySelector(C().cfg.containerSel + ' .graphic')
+            || document.querySelector(C().cfg.containerSel);
+    }
+
+    function numericOverride(raw, min) {
+        if (raw == null || raw === '') return null;
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < min) return null;
+        return n;
+    }
+
+    /**
+     * WO-285: opt-in box sizing (width/height/scale). Every write is guarded by a dataset marker
+     * so that with the keys unset — the default — this function performs no DOM writes at all and
+     * on-air geometry is bit-for-bit what the template's own CSS produces.
+     */
+    function applyBoxSizeOverride() {
+        const box = boxElement();
+        if (box) {
+            const w = numericOverride(C().style.boxWidth, 1);
+            const h = numericOverride(C().style.boxHeight, 1);
+            if (w != null || h != null) {
+                if (w != null) {
+                    // the template .graphic panels carry min-/max-width clamps that would silently
+                    // swallow an explicit width — released only while an override is active.
+                    box.style.width = w + 'px';
+                    box.style.minWidth = '0';
+                    box.style.maxWidth = 'none';
+                }
+                if (h != null) {
+                    box.style.height = h + 'px';
+                    box.style.maxHeight = 'none';
+                }
+                box.dataset.ltBoxSized = '1';
+            } else if (box.dataset.ltBoxSized) {
+                box.style.width = '';
+                box.style.minWidth = '';
+                box.style.maxWidth = '';
+                box.style.height = '';
+                box.style.maxHeight = '';
+                delete box.dataset.ltBoxSized;
+            }
+        }
+
+        const container = C().cfg.containerSel ? document.querySelector(C().cfg.containerSel) : null;
+        if (!container) return;
+        const scale = numericOverride(C().style.boxScale, 0.01);
+        if (scale != null && scale !== 1) {
+            // Scale about the anchored corner so the marginX/marginY the operator set stays put.
+            const pos = (C().style.position || 'left').toLowerCase();
+            const originX = pos === 'right' ? 'right' : pos === 'center' ? 'center' : 'left';
+            container.style.transformOrigin = originX + ' bottom';
+            container.style.transform = 'scale(' + scale + ')';
+            container.dataset.ltBoxScaled = '1';
+        } else if (container.dataset.ltBoxScaled) {
+            container.style.transform = '';
+            container.style.transformOrigin = '';
+            delete container.dataset.ltBoxScaled;
+        }
     }
 
     function applyBlurOverride() {
@@ -339,6 +410,7 @@ window.LTEngineStyles = (function () {
         applyData,
         applyStyles,
         applyTypographyOverrides,
+        applyBoxSizeOverride,
         applyBlurOverride,
         parseCasparXML,
     };
