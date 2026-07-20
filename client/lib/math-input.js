@@ -3,6 +3,8 @@
  * Only allows digits, operators + - * /, parentheses, and decimal point.
  * CSP-safe, no eval (WO-200).
  */
+import { getWheelDelta } from './wheel-delta.js'
+
 export function evaluateMath(str) {
 	if (str == null || typeof str !== 'string') return NaN
 	const s = String(str).trim()
@@ -248,7 +250,8 @@ export function createMathInput(opts) {
 
 	inp.addEventListener('wheel', (e) => {
 		e.preventDefault()
-		const dir = e.deltaY < 0 ? 1 : -1
+		const { dy } = getWheelDelta(e)
+		const dir = dy < 0 ? 1 : -1
 		const mult = e.shiftKey ? 10 : 1
 		const cur = parseVal()
 		const n = Math.max(min, Math.min(max, cur + dir * step * mult))

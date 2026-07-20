@@ -85,6 +85,7 @@ export function buildSettingsPayload(modal) {
 			rundownPlaybackTimer: true,
 			nuclearRequirePassword: !!(modal.querySelector('#set-nuclear-require-pass') || {}).checked,
 			nuclearPassword: (modal.querySelector('#set-nuclear-password') || {}).value ?? '',
+			invertTouchpadScroll: !!(modal.querySelector('#set-invert-touchpad-scroll') || {}).checked,
 		},
 		companion: {
 			host: modal.querySelector('#set-companion-host').value || '127.0.0.1',
@@ -172,6 +173,7 @@ export function hydrateSettings(modal, cfg) {
 		np.value = raw === '[REDACTED]' ? '' : raw
 	}
 	syncNuclearPasswordVisibility(modal)
+	const its = modal.querySelector('#set-invert-touchpad-scroll'); if (its) its.checked = ui.invertTouchpadScroll === true
 	const cp = cfg.composePreview || {}
 	const cpMode = modal.querySelector('#set-compose-preview-mode')
 	if (cpMode) {

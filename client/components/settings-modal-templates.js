@@ -116,6 +116,11 @@ export function getMainModalHtml() {
 							</div>
 						</div>
 						<p class="settings-note">Screen labels and the streaming channel are configured in the <strong>Devices</strong> tab (destination inspector / stream output inspector).</p>
+						<h3 class="settings-category">Input — mouse and touchpad</h3>
+						<div class="settings-group checkbox">
+							<label><input type="checkbox" id="set-invert-touchpad-scroll" /> Invert touchpad scroll</label>
+						</div>
+						<p class="settings-note">When on, two-finger touchpad scrolling reverses direction in zoom/pan controls (timeline, device graph, compose canvas, pixel map). Native list scrolling and mouse wheels are unaffected. Most useful when scrolling feels backwards on a laptop.</p>
 					</div>
 					<div class="settings-pane" id="settings-pane-companion">
 						<h3 class="settings-category">Bitfocus Companion</h3>

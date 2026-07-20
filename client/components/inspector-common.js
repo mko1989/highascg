@@ -3,6 +3,7 @@
  */
 
 import { parseNumberInput } from '../lib/math-input.js'
+import { getWheelDelta } from '../lib/wheel-delta.js'
 
 /**
  * Create a numeric input with drag-to-adjust (Millumin/After Effects style).
@@ -104,7 +105,8 @@ export function createDragInput(opts) {
 
 	inp.addEventListener('wheel', (e) => {
 		e.preventDefault()
-		const dir = e.deltaY < 0 ? 1 : -1
+		const { dy } = getWheelDelta(e)
+		const dir = dy < 0 ? 1 : -1
 		const mult = e.shiftKey ? 10 : 1
 		const cur = parseValOrLast()
 		commitNumber(cur + dir * step * mult)

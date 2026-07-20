@@ -1,6 +1,7 @@
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { shouldShowLiveVideo } from '../lib/stream-state.js'
 import { mappingState } from '../lib/mapping-state.js'
+import { getWheelDelta } from '../lib/wheel-delta.js'
 
 export const HANDLE_SIZE = 8
 export const ROTATE_HANDLE_DIST = 30
@@ -203,7 +204,8 @@ export function createPixelMapCanvasController(canvas, wrap) {
 			const mx = e.clientX - rect.left
 			const my = e.clientY - rect.top
 			const before = toCanvas(mx, my)
-			const factor = -e.deltaY > 0 ? 1.1 : 0.9
+			const { dy } = getWheelDelta(e)
+			const factor = -dy > 0 ? 1.1 : 0.9
 			scale = Math.max(0.05, Math.min(20, scale * factor))
 			offsetX = mx - before.x * scale
 			offsetY = my - before.y * scale

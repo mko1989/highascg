@@ -51,7 +51,7 @@ export const settingsState = {
 			listenAddress: '0.0.0.0',
 			peakHoldMs: 2000,
 		},
-		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '' },
+		ui: { oscFooterVu: true, rundownPlaybackTimer: true, nuclearRequirePassword: false, nuclearPassword: '', invertTouchpadScroll: false },
 		composePreview: {
 			mode: 'ffmpeg_jpeg',
 			fps: 25,

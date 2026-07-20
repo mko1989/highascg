@@ -2,6 +2,8 @@
  * Timeline canvas wheel pan/zoom and drag-drop.
  */
 
+import { getWheelDelta } from '../lib/wheel-delta.js'
+
 export const MIN_PX_MS = 0.0001
 export const MAX_PX_MS = 5.0
 export const ZOOM_FACTOR = 1.18
@@ -28,8 +30,7 @@ export function attachTimelineWheelAndDrop(canvas, api) {
 		const rect = canvas.getBoundingClientRect()
 		const cx = e.clientX - rect.left
 		const tl = getTimeline()
-		const dx = e.deltaX
-		const dy = e.deltaY
+		const { dx, dy } = getWheelDelta(e)
 
 		if (e.altKey && Math.abs(dy) >= Math.abs(dx)) {
 			api.wheelZoomAccum = 0
