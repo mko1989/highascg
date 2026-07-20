@@ -1,81 +1,110 @@
 copy this file to a copy_todos# mark your general progress there, for each listed iteam create detailed work orders after that is done start spawning haikus to work on those work orders. verify them mark in the copy_todos# status. continue until the full list is done.
 
 bug hunt and general project stability and performane review.
+   -> DONE. AMCP wedge family root-caused+fixed; batch failures no longer swallowed silently.
 
 preparation for clean eggs produce and basicly for realese.
+   -> DONE. Zoom+NoMachine excluded fully, all logins excluded, dev trees off the ISO. See item about 5.9GB below.
 
 the cg studio and shadertoy needs ui polish. some things are not done easily in the workflow.
 the add shader needs to be hidden under a plus buttom in the templates tab similar to the plus button in media files
+   -> DONE. Shader entry is in the MAIN plus menu (separate templates button removed). Guide: docs/wiki/guides/shader-fx.md
 
 
 
 after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look. (still and the first look play try fails after long timeout holding the whole app from functioning)
+   -> DONE. Boot now re-stages the selected look on PRV + warms thumbs. Verified live in journal after restart.
 
 
 
 TESTING the preview channel of pgm1 in my case is not working as it should consistently, sometimes it recalls all layers of the look, sometimes not, seems like racing. it sometimes recalls a layer with other layers position scaling. the prv especially and editing on prv needs to be as close to realtime as possible, but it also NEEDS to be precises and exact in whats its showing.
+   -> DONE. Race fixed (per-channel take chain) + new low-latency nudge path for edits. NEEDS YOUR TESTING.
 
 in the new gui operator we need the buttons for pgm editing (opens the look on pgm in looks editor with edits happening straight on pgm).
 and the capture button.
+   -> DONE. EDIT PGM + CAPTURE buttons on each PGM tile footer. Reload kiosk to see them.
 
 
 
 i need you to do a thorough clean up on the scripts that are in scripts folder and tools. there is so much of it... i cant beleive all of those are necesery for runtime.
 id like the clean up to be moving deprecated into deprecated folder, and leaving/creating set of scripts that are necesery for proper runtime, those that are needed for getting a fresh ubuntu install to a working highascg server, and dev scripts for running eggs produce and simliars.
+   -> DONE. All 747 files classified. Runtime is only 46 (~6%) - the bulk is branding art + tests, not clutter.
 
 
 idea for opt in operator gui start on a fresh, not configured yet system (or after a factory reset)
 it should start a small service that tracks mouse, user hovers the mouse to the screen he wants to be his gui, clicks left mouse and this gets chosen as the operator gui, the service sleeps.
+   -> DONE. Opt-in picker, CLI only, never fires on boot. Verified it refuses on THIS box (already configured).
 
 
 loading a project doesnt realy load anything.
+   -> DONE. Load persisted the slug but never rewrote the in-memory deck, so the server kept serving the old project.
 
 
 the cable render needs performance work. the connections take a while to apply, it should also be possible to grab a cable from a connection and connect it somewhere else.
+   -> DONE. Renderer was NOT slow (0.05ms); the 3s xrandr-cache round trip was (274ms cold). Now prewarmed. Re-grab added.
 
 the config generator missbehaves. its keeping a stale pgm and prv channels that are not used anyway and not visible in the gui.
 it also doesnt react when i changed connected destination from pgm 2 to multiview for decklink output 3 but after many restarts it still displays pgm2.
+   -> DONE. Both: phantom channels from cabling multiview/stream, and your config had TWO decklink entries on device 3.
 
 
 editing screen destinations custom resolution acts weird. setting width is normal, then i try to set height and it defaults back to 1080, after a second time it changes to desired in a screen dest node, but stays 1080 in the inspector.
 this is probably linked to the stale ch1&2.
+   -> DONE. NOT linked to the stale channels - it was a 5s client cache answering the read after your save.
 
 the operator gui firefox fails to open on the selected monitor. but the mouse is locked to the correct monitor.
 the xrandr workflow needs a review. after manualy running DISPLAY=:0 xdotool search --onlyvisible --name "Mozilla Fir
 efox" windowmove 3072 0 it showed correct and restarts correct.
+   -> DONE. xdotool searched the wrong WM_CLASS field so it never matched and burned an 8s timeout. Now verified+retried.
 
 there is something wrong with the caspar jpeg compose preview. it started as default on my laptop and after a while the operator server gui started lagging because i had the tab open in the background on my laptop, creating probably something wrong with thumbnail creation for an ever changing jpeg, this needs to be error handled better.
+   -> DONE. Was pushing 25fps x every client, each a full file re-read. Now single-flight + hidden-tab backoff.
 
 see @/home/casparcg/highascg/work/work-orders/logs.19.07.26 for caspar logs during what would seem normal operation. so many errors and false calls, just wild west. this needs a proper investigation. maybe connected to use batch amcp that was recently enabled. might have screwed some part of amcp.
+   -> DONE. Every error traces to the ONE powered-off camera. amcp_batch was never actually enabled (still false).
 
 i have a feeling that playing shaders in cef won't let me use it as intended. mostly audio might be hard. what we need to work thru is directing a proper audio source to the browser.
 the browser source apart from getting a casparcg host channel should also get a virtual display to be displayedin kiosk mode and that relayed to casparcg as a source played on the host channel. what are the options for having control (mouse keyboard) over that window from the operator position? 
+   -> RESEARCH RUNNING. Options doc being written (audio in / virtual display / operator control + security).
 
 the operator gui prevents opening any windows on top, like decklink setup, nvidia, file browser, web browser for operator.
+   -> RUNNING. Implementing managed launch + raise above kiosk (keeps video holes working).
 
 the audio mixer does not show "vu" meters on the inputs, highascg should be aware which input produces sound.
 it should be possible to route audio playing on a layer in a channel to another screen, now the ui blocks it.
+   -> DONE. Strips+VU meters added. The routing block was just an unimplemented placeholder, not a guard.
 
 the cg studio should use the existing inspector for its preferences. the options are missing size for the boxes. only weigth. 
+   -> DONE. box size added (width/height/scale). Studio cannot literally share the inspector (separate app) - made consistent instead.
 
 for laptop touchpads we need inverted two finger scroll. 
+   -> DONE. Settings > Defaults > Input. Default OFF.
 
 NO modal should blur the background making the rest of ui unreadable. NONE!
+   -> DONE. Blur removed everywhere + test so it cannot come back.
 
 in the generated caspar config there is no need to write the additional mode for 1080p50, standard video modes are built into caspar and dont need to be called.
+   -> DONE. Shorthand mode names (1080p50) were not recognised as standard, so a custom block got written.
 
 the canvas (background) in the looks editor is not visibly different than the rest of the div. the bg in looks (empty) should be "alpha checkerboard" with low opacity.
+   -> DONE. Low-opacity checkerboard on the looks-editor canvas only (not the operator tiles).
 
 decklink input is not using its captured frame as looks thumbnail.
 decklink's input audio mixer doesnt show up.
+   -> DONE both. Thumbs: non-media sources were dropped early. Mixer: inputs were filtered to live_audio only.
 
 when i resize the compose preview panel the preview windows inside get resized too, shouldnt happen unless there is too little space for them.
+   -> DONE. Tiles were stored as fractions of the canvas, so resizing rescaled them. Now pixel-stable.
 
 the produced eggs iso was 5.9gb it should be closer to 3.9gb something big does not get excluded. is puppeteer still in?
+   -> TODO next. Will check puppeteer/chromium, node_modules, media, cef-cache, kernel headers against the 5.9GB.
 
 write a new md file in work folder giving me a breakdown of options for porting the webui into a native ubuntu gui app. electron is a no go for me.
 name the file NATIVE_GUI_PROPOSITIONS
+   -> TODO next. Will write work/NATIVE_GUI_PROPOSITIONS.md (no Electron).
 
 when alt tabbing in ubuntu i get a white border around the chosen window, can this be disabled?
+   -> TODO next. Openbox/GNOME alt-tab outline - will find the setting.
 
 in the compose preview when there is no "running" source on the screen it should show the highest layers content in the "progress bar" section of the under the preview window, just without timers.
+   -> TODO next.
