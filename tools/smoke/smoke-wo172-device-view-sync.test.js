@@ -165,7 +165,13 @@ describe('WO-172 T172.1/T172.3: syncDeviceViewToCaspar restart gating', () => {
 		}
 	})
 
-	it('does attempt the write+restart when a decklink/screen output edge is present', async () => {
+	// WO-303 SUPERSEDES the original form of this test. It used to assert `restartCalls === 1`
+	// here — i.e. that a decklink/screen output edge auto-restarted Caspar. That is the exact
+	// production incident reported later: cabling a screen destination to a DeckLink output
+	// bounced live playout ~1.5 s after the click, with the operator never pressing "Apply &
+	// restart". The restart is now opt-in; the assertion is inverted deliberately, and the
+	// opt-in half is covered below so the explicit operator path stays proven.
+	it('does NOT restart on the graph-edit path even when a decklink/screen output edge is present (WO-303)', async () => {
 		const config = streamPlusDecklinkConfig()
 		const routesCasparConfig = require('../../src/api/routes-caspar-config')
 		let restartCalls = 0
@@ -176,8 +182,31 @@ describe('WO-172 T172.1/T172.3: syncDeviceViewToCaspar restart gating', () => {
 		}
 		try {
 			const ctx = { config, configManager: mockConfigManager(config), log: () => {} }
-			await syncDeviceViewToCaspar(ctx)
+			const res = await syncDeviceViewToCaspar(ctx)
+			assert.equal(restartCalls, 0)
+			assert.equal(res.casparServerChanged, true)
+			assert.equal(res.restartDeferred, true)
+			// The mapping itself is still persisted — only the bounce is deferred.
+			assert.equal(ctx.config.casparServer.screen_1_decklink_device, 2)
+		} finally {
+			routesCasparConfig.applyCasparConfigToDiskAndRestart = orig
+		}
+	})
+
+	it('does restart when the caller explicitly opts in (the Apply & restart path)', async () => {
+		const config = streamPlusDecklinkConfig()
+		const routesCasparConfig = require('../../src/api/routes-caspar-config')
+		let restartCalls = 0
+		const orig = routesCasparConfig.applyCasparConfigToDiskAndRestart
+		routesCasparConfig.applyCasparConfigToDiskAndRestart = async () => {
+			restartCalls++
+			return { status: 200, headers: {}, body: '{"ok":true}' }
+		}
+		try {
+			const ctx = { config, configManager: mockConfigManager(config), log: () => {} }
+			const res = await syncDeviceViewToCaspar(ctx, { allowRestart: true })
 			assert.equal(restartCalls, 1)
+			assert.equal(res.restarted, true)
 		} finally {
 			routesCasparConfig.applyCasparConfigToDiskAndRestart = orig
 		}

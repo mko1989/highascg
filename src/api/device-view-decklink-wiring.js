@@ -135,6 +135,11 @@ function summarizeStreamRecordEdgesForLog(ctx) {
 
 /**
  * Debounced Caspar regen after Device View output wiring (all roles).
+ *
+ * NOTE the absence of `{ allowRestart: true }`: this is the graph-mutation path (add/remove a
+ * cable, retarget a DeckLink port). It persists config and nothing more — see
+ * {@link syncDeviceViewToCaspar}.
+ *
  * @param {object} ctx
  * @param {number} [delayMs]
  */
@@ -154,9 +159,25 @@ function scheduleDeviceViewCasparSync(ctx, delayMs = 1500) {
 }
 
 /**
+ * Persist Device View output wiring into config; restart Caspar ONLY when explicitly asked.
+ *
+ * WO-303: this used to end in an unconditional `applyCasparConfigToDiskAndRestart(ctx)` whenever
+ * the wiring touched a `casparServer` key. Cabling a screen destination to a DeckLink output is
+ * exactly such a change (`applyDecklinkOutputOnDestinationEdge` writes
+ * `screen_N_decklink_device` / `screen_N_decklink_replace_screen`), so a single cable click
+ * bounced live playout ~1.5 s later with the operator never touching "Apply & restart".
+ *
+ * A graph edit is now config-write-only. The generated casparcg.config is regenerated and Caspar
+ * is bounced by the explicit operator paths only (the Apply & restart button →
+ * `executeApplyPlan`, or `/api/caspar-config` apply). `ctx.casparApplyPending` records that the
+ * on-disk Caspar config is behind the graph, which is what the orange Apply button reflects.
+ *
  * @param {object} ctx
+ * @param {{ allowRestart?: boolean }} [opts] - `allowRestart: true` is the operator explicitly
+ *   asking for a restart. Never pass it from a graph-mutation handler.
+ * @returns {Promise<{ casparServerChanged: boolean, restarted: boolean, restartDeferred: boolean }>}
  */
-async function syncDeviceViewToCaspar(ctx) {
+async function syncDeviceViewToCaspar(ctx, opts = {}) {
 	const { applyDestinationOutputEdgesToCasparConfig } = require('./device-view-apply')
 	const mappingRes = applyDestinationOutputEdgesToCasparConfig(ctx, { actions: [], warnings: [] })
 	if (mappingRes && Array.isArray(mappingRes.warnings) && mappingRes.warnings.length && typeof ctx.log === 'function') {
@@ -169,18 +190,41 @@ async function syncDeviceViewToCaspar(ctx) {
 	// recordOutputs[].source, virtualCamera.channel) already persisted above is config-write-only —
 	// the next Start/PLAY reads fresh config, no restart needed (A172.1; matches the WO-81
 	// stream_out/record_out/v4l2_out restart-exempt policy in client/lib/caspar-restart-dirty-policy.js).
-	if (!mappingRes || !mappingRes.casparServerChanged) return
+	if (!mappingRes || !mappingRes.casparServerChanged) {
+		return { casparServerChanged: false, restarted: false, restartDeferred: false }
+	}
+
+	// WO-303: the casparServer keys are already persisted by the mapping step above. Everything
+	// below this point restarts Caspar, and Caspar is on air — so it only runs when the operator
+	// asked for it. A cable click marks the config pending and stops here.
+	if (opts.allowRestart !== true) {
+		ctx.casparApplyPending = true
+		if (typeof ctx.log === 'function') {
+			ctx.log(
+				'info',
+				'[device-view] output wiring changed casparServer — config saved, Caspar restart deferred to the operator (Apply & restart)',
+			)
+		}
+		try {
+			if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('caspar-apply-pending', { pending: true })
+		} catch {
+			/* optional */
+		}
+		return { casparServerChanged: true, restarted: false, restartDeferred: true }
+	}
+
 	try {
 		const { isFollowerRole, syncFollowerDeviceViewToCaspar } = require('../replication/follower-machine-profile')
 		if (isFollowerRole(ctx)) {
 			await syncFollowerDeviceViewToCaspar(ctx)
-			return
+			return { casparServerChanged: true, restarted: true, restartDeferred: false }
 		}
 	} catch {
 		/* optional */
 	}
 	const { applyCasparConfigToDiskAndRestart } = require('./routes-caspar-config')
 	await applyCasparConfigToDiskAndRestart(ctx)
+	return { casparServerChanged: true, restarted: true, restartDeferred: false }
 }
 
 module.exports = {

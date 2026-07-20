@@ -241,7 +241,10 @@ function handleAddEdge(j, ctx, liveSnapshot) {
 	saveConfig(ctx, { deviceGraph: nextGraph, ...(ctx.config.casparServer ? { casparServer: ctx.config.casparServer } : {}) })
 	scheduleDeviceViewCasparSyncIfNeeded(ctx)
 	if (typeof ctx.augmentGraphWithSources === 'function') ctx.augmentGraphWithSources(res.graph, liveSnapshot)
-	return { ok: true, graph: res.graph }
+	// WO-303: `wired.changed` means this cable rewrote casparServer output keys (a destination
+	// cabled to a DeckLink port). That used to auto-restart Caspar 1.5 s later; it now only marks
+	// the generated Caspar config stale so the operator's Apply & restart button turns orange.
+	return { ok: true, graph: res.graph, casparRestartNeeded: !!wired.changed, pendingApply: !!wired.changed }
 }
 
 function handleRemoveEdge(j, ctx) {

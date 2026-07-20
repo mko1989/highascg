@@ -82,6 +82,17 @@ export function registerDeviceViewSelection(ctx) {
 			ctx.updateUI()
 			return
 		}
+		// WO-303 (A): a cable's visible end is the connector *marker* (the 36px icon / port body),
+		// not the small `.device-view__connector-dot` child that owns the cable gesture. Clicking
+		// that marker lands here — and the `state.selectedEdgeId = null` below used to fire first,
+		// destroying the very "cable is already selected" precondition `tryBeginCableRegrab`
+		// requires. The gesture from WO-278 ("select a cable, click one of its ends to lift it")
+		// was therefore unreachable for every operator who did not hit the dot exactly.
+		//
+		// Offer the re-grab before clearing. `tryBeginCableRegrab` is itself strict: it returns
+		// false unless a currently-SELECTED edge actually terminates at this connector, so a plain
+		// connector click still selects the connector exactly as before.
+		if (typeof ctx.tryBeginCableRegrab === 'function' && ctx.tryBeginCableRegrab(requestedConnectorId)) return
 		state.selectedKey = key
 		state.selectedConnectorId = requestedConnectorId
 		state.selectedEdgeId = null

@@ -147,7 +147,13 @@ export function registerDeviceViewCable(ctx) {
 	 */
 	ctx.tryBeginCableRegrab = (connectorId) => {
 		if (state.cableSourceId || state.cableRegrab) return false
-		const grab = pickRegrabCandidate(state.lastPayload?.graph?.edges, connectorId, {
+		if (!state.selectedEdgeId) return false
+		// WO-303 (A): edges store canonical graph ids (`gpu_p0`), but a click can hand us a UI id
+		// for the same socket (`gpu_p0__DP_1`, `DP-1`). `planCableRegrab` canonicalises its drop
+		// target, but the hit-test that decides whether a re-grab starts at all did not — so on a
+		// bracket-split GPU jack the endpoint under the cursor never matched its own cable.
+		const hitId = canonicalCableConnectorId(state.lastPayload, connectorId) || connectorId
+		const grab = pickRegrabCandidate(state.lastPayload?.graph?.edges, hitId, {
 			selectedEdgeId: state.selectedEdgeId,
 		})
 		if (!grab) return false
