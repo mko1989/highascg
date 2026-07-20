@@ -118,9 +118,15 @@ name the file NATIVE_GUI_PROPOSITIONS
 
 
 when alt tabbing in ubuntu i get a white border around the chosen window, can this be disabled?
-   -> TODO next. Openbox/GNOME alt-tab outline - will find the setting.
+   -> DONE (investigated, nothing changed on your box). It is OPENBOX's own focus-cycle indicator - not a compositor (none runs) and NOT the theme: none of openbox's 58 colour keys covers it, it is compiled in.
+   -> Fix: copy /etc/xdg/openbox/rc.xml to ~/.config/openbox/rc.xml (you have no user copy) and add <bar>no</bar> inside the NextWindow AND PreviousWindow actions, then `openbox --reconfigure`. Full detail + fallback in work/VERIFY_NOW.md.
 
 in the compose preview when there is no "running" source on the screen it should show the highest layers content in the "progress bar" section of the under the preview window, just without timers.
-   -> TODO next.
+   -> DONE. Idle tiles now show the top layer's content label (clip/template/producer name) with the bar hidden; a channel with nothing on any layer stays blank rather than showing a stale label. Reload the kiosk to see it.
 
 based on the todos create a list for me what to check and verify now.
+   -> DONE: work/VERIFY_NOW.md - what to test, what only you can decide, and the sudo tasks.
+
+
+prepare a new document in which you try to find a way to display low latency and low rescources casparcg channel in the webbrowser ui on localhost only.
+   -> IN PROGRESS. Researching now -> will land as work/LOCALHOST_CHANNEL_VIEW.md
