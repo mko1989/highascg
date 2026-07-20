@@ -116,35 +116,42 @@ async function handlePostRtmp(body, ctx) {
 		const params = `${param(built.url)} ${built.args}`.trim()
 		const addWithIdxCmd = `ADD ${ch}-${STREAMING_RTMP_CONSUMER_INDEX} STREAM ${params}`
 		const addNoIdxCmd = `ADD ${ch} STREAM ${params}`
+		/** @param {string} cmd @returns {string} same line with the stream key masked */
+		const maskCmd = (cmd) => String(cmd).split(built.url).join(redactStreamUrl(built.url))
 		// WO-172 T172.7: full ADD line + resolved source channel + layout, at error level visibility
 		// (info) so an ffprobe-style audio complaint can be cross-checked against exactly what was sent.
+		/* The command carries the destination URL, and therefore the STREAM KEY. `url` was already
+		 * redacted here while `command` shipped the key verbatim into the journal and Caspar's log
+		 * — observed 2026-07-20 with a live YouTube key. Redact the URL inside the command too;
+		 * the ADD line stays readable for the WO-172 cross-check it exists for. */
+		const redactedCmd = maskCmd(addWithIdxCmd)
 		pushRtmpLog(ctx, 'info', `RTMP start requested on ch${ch} (source=${videoSource}, layout=${programLayout})`, {
-			url: built.url,
+			url: redactStreamUrl(built.url),
 			quality,
 			channel: ch,
 			source: videoSource,
 			programLayout,
-			command: addWithIdxCmd,
+			command: redactedCmd,
 		})
 		try {
 			let res
 			let usedIndex = STREAMING_RTMP_CONSUMER_INDEX
 			try {
 				res = await ctx.amcp.raw(addWithIdxCmd)
-				pushRtmpLog(ctx, 'debug', 'AMCP ADD STREAM with consumer index accepted', { command: addWithIdxCmd })
+				pushRtmpLog(ctx, 'debug', 'AMCP ADD STREAM with consumer index accepted', { command: maskCmd(addWithIdxCmd) })
 			} catch (e1) {
 				const msg1 = e1?.message || String(e1)
 				pushRtmpLog(ctx, 'warn', 'AMCP ADD with consumer index failed, trying fallback syntax', {
-					command: addWithIdxCmd,
+					command: maskCmd(addWithIdxCmd),
 					error: msg1,
 				})
 				res = await ctx.amcp.raw(addNoIdxCmd)
 				usedIndex = null
-				pushRtmpLog(ctx, 'debug', 'AMCP ADD STREAM without consumer index accepted', { command: addNoIdxCmd })
+				pushRtmpLog(ctx, 'debug', 'AMCP ADD STREAM without consumer index accepted', { command: maskCmd(addNoIdxCmd) })
 			}
 			ctx.streamingChannelRtmp = { active: true, url: built.url, consumerIndex: usedIndex, lastError: null, outputId: outputId || null }
 			ctx.log?.('info', `[Streaming channel] RTMP started ch${ch}`)
-			pushRtmpLog(ctx, 'info', `RTMP started on ch${ch}`, { url: built.url, consumerIndex: usedIndex })
+			pushRtmpLog(ctx, 'info', `RTMP started on ch${ch}`, { url: redactStreamUrl(built.url), consumerIndex: usedIndex })
 			startStreamingStatusPoll(ctx)
 			return {
 				status: 200,
@@ -155,7 +162,7 @@ async function handlePostRtmp(body, ctx) {
 			const msg = e?.message || String(e)
 			ctx.streamingChannelRtmp = { ...ctx.streamingChannelRtmp, active: false, lastError: msg }
 			ctx.log?.('warn', `[Streaming channel] RTMP start failed: ${msg}`)
-			pushRtmpLog(ctx, 'error', `RTMP start failed on ch${ch}`, { error: msg, command: addNoIdxCmd })
+			pushRtmpLog(ctx, 'error', `RTMP start failed on ch${ch}`, { error: msg, command: maskCmd(addNoIdxCmd) })
 			stopStreamingStatusPoll(ctx)
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 		}
