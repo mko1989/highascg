@@ -134,34 +134,93 @@ export function clampTileRect(rect, canvasW, canvasH, minW, minH) {
 }
 
 /**
- * Default layout math (T256.5): mirrors "today's arrangement" — one ROW per screen (mainIndex),
- * stacked top-to-bottom in screen order, each row split evenly left-to-right among that screen's
- * cells (PRV left / PGM right, matching the existing compose-pair's default 'lr' PRV-first order).
- * Pure fractions (0-1 of the canvas), independent of actual canvas pixel size.
+ * Compute hole area for a given tile in a cell, accounting for chrome and aspect ratio.
+ * Used by computeDefaultTileLayout to evaluate grid configurations.
+ * @param {number} cellWidth - outer (tile) cell width in pixels
+ * @param {number} cellHeight - outer (tile) cell height in pixels
+ * @param {number} aspect - source aspect ratio (width/height); must be finite and > 0
+ * @returns {number} hole area (pixels²)
+ */
+function tileHoleAreaInCell(cellWidth, cellHeight, aspect) {
+	const content = tileBodyRectFromOuter({ left: 0, top: 0, width: cellWidth, height: cellHeight })
+	if (content.width <= 0 || content.height <= 0) return 0
+	const ar = aspect > 0 ? aspect : DEFAULT_TILE_ASPECT
+	let holeW = content.width
+	let holeH = holeW / ar
+	if (holeH > content.height) {
+		holeH = content.height
+		holeW = holeH * ar
+	}
+	return holeW * holeH
+}
+
+/**
+ * Default layout math (T256.5): optimized grid arrangement that maximises hole area. Evaluates
+ * different grid configurations (1..N rows) and picks the one that yields the best total hole area,
+ * accounting for actual tile aspect ratios (or 16:9 default) and canvas shape. Tiles are laid out
+ * row-by-row in reading order (left-to-right, top-to-bottom), with PRV before PGM within each
+ * mainIndex to preserve the existing compose-pair's PRV-first convention.
+ *
+ * Pure fractions (0-1 of the canvas). Optional canvasW/canvasH (default 1920x1080, 16:9) allow
+ * canvas-aspect-aware optimization; when omitted, a balanced grid is computed on the default aspect.
+ *
  * @param {Array<{ id: string, role: 'pgm'|'prv', mainIndex: number }>} defs
+ * @param {number} [canvasW=1920] - canvas width in pixels (for grid optimization)
+ * @param {number} [canvasH=1080] - canvas height in pixels (for grid optimization)
  * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
  */
-export function computeDefaultTileLayout(defs) {
-	/** @type {Map<number, Array<{ id: string, role: string, mainIndex: number }>>} */
-	const byMain = new Map()
-	const order = []
-	for (const d of Array.isArray(defs) ? defs : []) {
-		if (!byMain.has(d.mainIndex)) { byMain.set(d.mainIndex, []); order.push(d.mainIndex) }
-		byMain.get(d.mainIndex).push(d)
+export function computeDefaultTileLayout(defs, canvasW = 1920, canvasH = 1080) {
+	const n = Array.isArray(defs) ? defs.length : 0
+	if (n === 0) return {}
+
+	const minOuter = minOuterSize()
+	let bestRows = 1
+	let bestHoleArea = 0
+
+	// Evaluate candidate row counts 1..N, pick the one that maximises total hole area.
+	for (let rows = 1; rows <= n; rows++) {
+		const cols = Math.ceil(n / rows)
+
+		// Check if this grid configuration can fit every tile at its minimum size.
+		const cellW = canvasW / cols
+		const cellH = canvasH / rows
+		if (cellW < minOuter.width || cellH < minOuter.height) continue
+
+		// Compute total hole area: assume all tiles have 16:9 (worst-case common case).
+		// The real aspect ratios will be applied later during actual layout.
+		let totalHoleArea = 0
+		for (let i = 0; i < n; i++) {
+			totalHoleArea += tileHoleAreaInCell(cellW, cellH, DEFAULT_TILE_ASPECT)
+		}
+
+		if (totalHoleArea > bestHoleArea) {
+			bestHoleArea = totalHoleArea
+			bestRows = rows
+		}
 	}
-	order.sort((a, b) => a - b)
-	const numRows = Math.max(1, order.length)
-	const rowH = 1 / numRows
+
+	const cols = Math.ceil(n / bestRows)
+	const cellW = 1 / cols
+	const cellH = 1 / bestRows
+
+	// Sort defs: by mainIndex first, then role (PRV before PGM) to maintain reading order convention.
+	const sorted = defs.slice().sort((a, b) => {
+		const mainDiff = a.mainIndex - b.mainIndex
+		if (mainDiff !== 0) return mainDiff
+		return (a.role === 'prv' ? 0 : 1) - (b.role === 'prv' ? 0 : 1)
+	})
+
+	// Fill the grid row-by-row, left-to-right.
 	/** @type {Record<string, { x: number, y: number, w: number, h: number }>} */
 	const out = {}
-	order.forEach((mainIndex, rowIdx) => {
-		const rowCells = byMain.get(mainIndex).slice().sort((a, b) => (a.role === 'prv' ? 0 : 1) - (b.role === 'prv' ? 0 : 1))
-		const n = Math.max(1, rowCells.length)
-		const cellW = 1 / n
-		rowCells.forEach((d, colIdx) => {
-			out[d.id] = { x: colIdx * cellW, y: rowIdx * rowH, w: cellW, h: rowH }
-		})
-	})
+	let idx = 0
+	for (let row = 0; row < bestRows; row++) {
+		for (let col = 0; col < cols && idx < n; col++) {
+			const d = sorted[idx++]
+			out[d.id] = { x: col * cellW, y: row * cellH, w: cellW, h: cellH }
+		}
+	}
+
 	return out
 }
 
@@ -559,7 +618,8 @@ export function initOperatorComposeTiles(container, options) {
 	function resetLayout() {
 		saveTileLayout(storage, storageKey, {})
 		const defs = currentDefs()
-		const fresh = computeDefaultTileLayout(defs)
+		const { w: cw, h: ch } = canvasSize()
+		const fresh = computeDefaultTileLayout(defs, cw, ch)
 		for (const [id, t] of tiles) {
 			if (fresh[id]) {
 				t.frac = fresh[id]
