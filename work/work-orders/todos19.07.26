@@ -130,3 +130,139 @@ based on the todos create a list for me what to check and verify now.
 
 prepare a new document in which you try to find a way to display low latency and low rescources casparcg channel in the webbrowser ui on localhost only.
    -> IN PROGRESS. Researching now -> will land as work/LOCALHOST_CHANNEL_VIEW.md
+
+- [x] **Route looks land on one frame.** Play the look with 1 media layer + 3 route layers. All four
+      must appear together, not one by one.
+small edit here. the route shouldnt go to live sources browser but be added as a new layer in that look only.
+
+- [ ] **Open window ▾** button in the header (operator GUI mode): DeckLink setup / file browser /
+      NVIDIA settings must appear **over** the kiosk and be clickable, the video holes must keep
+      showing Caspar output while it is open, and closing it must restore the GUI.
+      Also test the crash path: `kill -9` the helper — the GUI must restore within ~1s.
+nothing can be shown over the gui. i need to be able as a user use web browser, file browser, setups decklink and nvidia etc.
+
+- [ ] **Cable re-grab** (never exercised in a real browser): select a cable, click one end, drop it
+      on a different port. Invalid drops must restore, not disconnect. Also check connections now
+      apply faster (~375ms → ~144ms typical).
+
+cant regrab. connecting a screen dest to a decklink output made the casparcg restart without clicking the apply restart button.
+
+there is no way to restart a live audio input. i stopped it, it shows no signal in the audio mixer but cant start it again.
+
+modal backgrounds no longer blur
+no blur but tint. should be nothing, 100% alpha bg.
+
+## 2. Decide — I deliberately did not do these
+
+- [ ] **SECURITY, decide before the ISO cut.** `ss -ltn` shows NoMachine on `0.0.0.0:4000` and
+      CasparCG AMCP on `0.0.0.0:5250`, and `config/casparcg.config` ships
+      `<lock-clear-phrase>secret</lock-clear-phrase>`. Every box installed from your ISO is a
+      network-reachable remote desktop **plus unauthenticated playout control**. Options: bind to
+      localhost, firewall the ports, or ship with the services disabled.
+      the services should be available on lan and tailscale. 
+      
+      - [ ] **No Chrome binary on the ISO.** Chromium is not installed and the fallback path points into
+      `~/.cache`, which is excluded — so template thumbnail rendering will fail on a freshly
+      installed box. Either install a chromium package into the image or accept the loss.
+we have cef for casparcg and firefox for everything else. no need for chrome, its excluded specificaly.
+
+- [ ] **`config/casparcg.config` PortAudio is `hw:2,0`, a card that does not exist** (you have cards
+      0 and 1 only). Channel 1's audio consumer is aimed at nothing — this is what produces the
+      repeated `ALSA lib ... snd_func_card_id returned error` lines in your journal.
+
+the mixer was turned off. it is on now.
+
+- [ ] **Another ~1.6GB of ISO** is in `var/lib/snapd`, ~1.1GB of it provably dead (duplicate
+      revisions, plus GNOME/theme bases for the Firefox snap you removed). The fix is on the build
+      host **before** produce — `snap remove --purge` the orphans and `snap set system
+      refresh.retain=2` — NOT an exclude line, because excluding the images leaves broken mount
+      units at boot. Would take the ISO to ~3.0GB.
+
+asparcg@highascg-nvidia-595:~/highascg$ sudo snap remove --purge
+[sudo] password for casparcg: 
+error: the required argument `<snap> (at least 1 argument)` was not provided
+
+
+- [ ] **`scripts/` ships whole in the release tarball and exFAT drop-update.** Consolidating into
+      `deprecated/` did not shrink the payload. One-line exclude available; it changes the live
+      update path, so it is your call.
+
+eggs exclude deprecated scripts.
+
+- [ ] **Previs may be dead code** (4,324 lines): it loads three.js from `/vendor/three/`, which does
+      not exist in this checkout. Confirm and it can be deleted outright.
+
+this nneds to be parked for future and be excluded from relaeas.
+
+
+Investigated read-only on this box (2026-07-19). Nothing was changed — no openbox config was
+edited and `openbox --reconfigure` was NOT run (live playout session).
+
+dev box, dont worry.
+
+the reset layout in compose preview needs to do a better job on calculating best sizes for the windows it has.
+
+the routes doesnt show up on preview, highascg knows which route it should show on prv channel and what on pgm.
+also creating a route should apply same position and size from source.
+
+The one thing I'd still push on: your services staying on LAN and Tailscale is fine and unchanged, but lock-clear-phrase is still secret. Anyone who can reach port 5250 can drive playout. Changing it costs nothing and is independent of the LAN decision.
+yes but it does not need security layer on localnetwork. 
+
+pgm screen consumers should be always on top by default. changing manualy doesnt change the casparcg config.
+
+casparcg@highascg-nvidia-595:~/highascg$ sudo snap set system refresh.retain=2
+sudo snap remove --purge gnome-46-2404
+sudo snap remove --purge gtk-common-themes
+sudo snap remove --purge mesa-2404
+[sudo] password for casparcg: 
+gnome-46-2404 removed
+gtk-common-themes removed
+mesa-2404 removed
+
+
+
+
+something fails.
+2026-07-20 14:37:57.768] [info]    Received message from 127.0.0.1: PLAY 6-4 DECKLINK 4\r\n
+[2026-07-20 14:37:57.782] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-20 14:37:57.784] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-20 14:37:57.784] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-20 14:37:57.784] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-20 14:37:57.784] [error]   [caspar::tag_stacktrace_info*] =  0# 0x000057183784C36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    1# 0x0000571837AE7F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    2# 0x0000571837AE90F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    3# 0x0000571837AE92C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    4# 0x000057183786C32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    5# 0x00007A99E8EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]    6# 0x0000571837ADEC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    7# 0x00005718378F8960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    8# 0x00007A99E92ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-20 14:37:57.784] [error]    9# 0x00007A99E8E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]   10# 0x00007A99E8F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]   
+[2026-07-20 14:37:57.784] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-20 14:37:57.784] [error]   
+[2026-07-20 14:37:57.784] [error]    0# 0x0000571837837B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    1# 0x00005718377F643F in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    2# 0x00005718379092C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    3# 0x0000571837909519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    4# 0x00005718379BAD10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    5# 0x00005718379BB53F in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    6# 0x00005718379C7364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    7# 0x00005718379F77DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    8# 0x000057183799A614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]    9# 0x0000571837A211FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   10# 0x0000571837A21D48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   11# 0x0000571837A22AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   12# 0x0000571837A22D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   13# 0x000057183786C32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   14# 0x00007A99E8EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]   15# 0x0000571837A1EDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   16# 0x00005718378F8960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-20 14:37:57.784] [error]   17# 0x00007A99E92ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-20 14:37:57.784] [error]   18# 0x00007A99E8E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]   19# 0x00007A99E8F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-20 14:37:57.784] [error]   
+[2026-07-20 14:37:57.785] [error]    File not fou
+
+also live audio usb input, the vu meters show the audio is incoming, its routed to ch3 pgm2 and the vu meters there show it too, but the audio is not audiable on the stream from that channel.

@@ -38,8 +38,8 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-279 | Operator-GUI Firefox opens on the wrong monitor (mouse lock is correct); review the xrandr/window-placement workflow | M | **DONE** — xdotool --class matched res_class not res_name so the search never matched and burned an 8s timeout; placement also never verified. Same monitor source as pointer-confine + verify/retry |
 | WO-280 | Caspar JPEG compose preview: background tab causes lag; thumbnail creation for an ever-changing JPEG needs error handling/backpressure | M | **DONE** (93fa79e) — push-driven at 25Hz x clients x channels, each push a full re-read; now single-flight + etag memo server-side, visibility-aware polling and capped backoff client-side |
 | WO-281 | Audit `work/work-orders/logs.19.07.26` — many errors/false calls during normal operation; check whether enabling AMCP batch caused regressions | M | **DONE** — all errors trace to one powered-off DeckLink 4; amcp_batch was never enabled. Report: 281_WO_CASPAR_LOG_AUDIT.md |
-| WO-282 | Browser source: route a real audio source in; give it a virtual display shown in kiosk and relayed to Caspar; options for operator mouse/keyboard control | L (research) | TODO |
-| WO-283 | Operator GUI blocks any window on top (DeckLink setup, NVIDIA settings, file browser, operator web browser) | M | TODO |
+| WO-282 | Browser source: route a real audio source in; give it a virtual display shown in kiosk and relayed to Caspar; options for operator mouse/keyboard control | L (research) | **DONE (research)** — 282_WO...md. KEY: this box has NO sound server, so no loopback exists; shader audio needs snd-aloop first. Xvfb rejected (no GPU). Input forwarding rejected (XTEST cannot be scoped to a window). |
+| WO-283 | Operator GUI blocks any window on top (DeckLink setup, NVIDIA settings, file browser, operator web browser) | M | **DONE** — shipped, then owner found it did not work; two structural bugs (commandExists probed /usr/bin/command which is a shell builtin; xdotool too old for `windowstate`). Fixed + deployed. |
 | WO-284 | Audio mixer: VU meters per input; know which input produces sound. Allow routing a layer's audio to another screen (UI currently blocks it) | L | **DONE** — VU meters from existing OSC levels (silent vs no-data distinguished); cross-screen block was an unimplemented-feature placeholder, now validated routing |
 | WO-285 | CG studio should reuse the existing inspector; box size options missing (only weight) | M | **DONE** — studio inspector now emits the main inspector DOM vocabulary (literal reuse impossible: ESM vs plain script, proven); boxWidth/boxHeight/boxScale added to registry + both engines |
 | WO-286 | Inverted two-finger scroll for laptop touchpads | S | **DONE** (74a7c14) — shared wheel-delta helper + Settings > Defaults preference, default off |
@@ -47,9 +47,9 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-288 | Generated Caspar config should not emit a custom 1080p50 mode (built in) | S | **DONE** (487f2f3) — mode-alias normalization; also registered 23 previously-ungated config-generator tests |
 | WO-289 | Looks editor canvas background should be a low-opacity alpha checkerboard, visibly distinct from the surrounding div | S | **DONE** (0a5a80a) — 6% alpha checkerboard on the looks-editor canvas only |
 | WO-291 | DeckLink input does not use its captured frame as the looks thumbnail (added by owner 2026-07-20) | M | **DONE** — deckIdleMode returned null for every non-media source; now excepts DeckLink INPUT channels, TTL-gated capture + backoff, no-signal placeholder |
-| WO-292 | Resizing the compose preview panel resizes the preview windows inside; should only happen when space demands it (added by owner 2026-07-20) | M | TODO |
+| WO-292 | Resizing the compose preview panel resizes the preview windows inside; should only happen when space demands it (added by owner 2026-07-20) | M | **DONE** — tiles were stored as canvas fractions so resizing rescaled them; now pixel-stable. Reset layout also now maximises video area (+143% for 3 tiles). |
 | WO-293 | DeckLink input audio mixer does not show up (added by owner 2026-07-20) | M | **DONE** — collectLiveInputMeterRows filtered kind===live_audio at enumeration, so DeckLink strips were never created |
-| WO-290 | Opt-in operator-GUI monitor picker on a fresh/factory-reset system: hover + left click selects the GUI screen, then the service sleeps | M | TODO |
+| WO-290 | Opt-in operator-GUI monitor picker on a fresh/factory-reset system: hover + left click selects the GUI screen, then the service sleeps | M | **DONE** — opt-in picker, CLI only, no boot call site. Verified on this box: --dry-run prints SKIP (already configured). |
 
 ## Execution notes
 
@@ -58,3 +58,22 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 - Every subagent prompt carries the hard rule: never run `git stash`/`checkout`/`reset`/`rm` on
   files it did not create (a subagent destroyed an uncommitted test this way on 2026-07-19).
 - Investigation-first items (WO-281, WO-282) produce a written finding before any code changes.
+
+## Batch 3 — owner test round (2026-07-20 afternoon)
+
+Reported after testing, all fixed and deployed:
+
+| Item | Status |
+|------|--------|
+| "nothing can be shown over the gui" | **DONE** — WO-283 was structurally incapable of working; see above |
+| "cant regrab" | **DONE** — clicking a cable end cleared the selection the gesture requires. Real click path still unverified (no browser harness) |
+| Cabling a screen dest to a DeckLink output restarted CasparCG | **DONE** — it was deliberate (WO-172 asserted it). A graph edit now only marks apply pending |
+| Live audio input could not be restarted | **DONE** — there was no start control anywhere, and no per-input start path on the server |
+| Modal "no blur but tint" | **DONE** — scrim removed entirely |
+| Routes do not show on preview | **DONE** — the editor's live preview bypassed the take pipeline and pointed the route at the program channel |
+| A route should inherit source position/size | **DONE** — copies fill, rotation, aspect-lock; deliberately not crop (would crop twice) or mix state |
+| Reset layout sizing | **DONE** — grid chosen to maximise hole area |
+| PGM consumers always-on-top; manual change did not persist | **DONE** — and the operator-GUI destination was clobbering ALL 16 PGM consumer fields on every generate |
+| Alt-tab white border | **DONE** — openbox focus-cycle indicator; `<bar>no</bar>` in a new ~/.config/openbox/rc.xml |
+| Yamaha DM3 capture failing (found, not reported) | **DONE** — dsnoop does no format conversion and the DM3 is S32_LE only; falls back to plughw |
+| /usr/bin/command probe in 3 more modules | **DONE** — extracted src/utils/which.js; regression test proven non-vacuous |
