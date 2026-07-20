@@ -1,258 +1,115 @@
-# Verify now — checklist for the owner (2026-07-20)
+# Verify now — outstanding only (rewritten 2026-07-20 14:50)
 
-Everything below is either **you need to look at it** or **you need to decide it**. Ordered by
-what would hurt most if wrong. Server is running the new code; the kiosk needs a reload.
-
----
-
-## 0. Do this first (one minute)
-
-- [ ] **Reload the kiosk Firefox.** The server restarted, but the browser is still running the old
-      bundle. Most of the UI fixes below are invisible until you reload.
+Everything you already confirmed has been stripped out. What is left is: **things to test**,
+**things only you can do**, and **decisions already closed** (listed so they stop coming up).
 
 ---
 
-## 1. Verify — the things I fixed that you reported (highest value)
+## 0. Do this first
 
-- [x] **Compose preview layout after restart** (the one I wrongly marked done).
-      Restart highascg, watch the operator GUI come up. Your saved tile layout must be there
-      *without* triggering a look. Journal proof to compare against:
-      `journalctl -u highascg -f -o cat | grep -E "re-apply|first rect report"` —
-      you want `first rect report ... cells=3`, not `cells=1`.
-      Known cosmetic leftover: the holes close once for ~2s during boot before the layout lands.
-
-- [x] **First look play after a restart.** You reported it fails after a long timeout and freezes
-      the app. I fixed an AMCP wedge and have seen no recurrence, but I am NOT claiming it fixed.
-      Take a look right after a restart and tell me.
-
-- [x] **PRV precision + realtime.** Play several looks on preview. Watch for: a layer missing, or a
-      layer wearing another layer's position/scale. Then drag geometry in the looks editor — edits
-      should appear on PRV almost immediately.
-
-- [x] **Route looks land on one frame.** Play the look with 1 media layer + 3 route layers. All four
-      must appear together, not one by one.
-small edit here. the route shouldnt go to live sources browser but be added as a new layer in that look only.
-- [x] **EDIT PGM + CAPTURE** buttons on each PGM tile footer. EDIT PGM opens the on-air look with a
-      red "LIVE — EDITING PGM" badge and edits hit air. CAPTURE writes a PNG in the Caspar media
-      folder and toasts.
-
-- [ ] **Open window ▾** button in the header (operator GUI mode): DeckLink setup / file browser /
-      NVIDIA settings must appear **over** the kiosk and be clickable, the video holes must keep
-      showing Caspar output while it is open, and closing it must restore the GUI.
-      Also test the crash path: `kill -9` the helper — the GUI must restore within ~1s.
-nothing can be shown over the gui. i need to be able as a user use web browser, file browser, setups decklink and nvidia etc.
-- [ ] **Cable re-grab** (never exercised in a real browser): select a cable, click one end, drop it
-      on a different port. Invalid drops must restore, not disconnect. Also check connections now
-      apply faster (~375ms → ~144ms typical).
-
-- [ ] **DeckLink**: input strips now appear in the audio mixer with VU meters; a DeckLink layer's
-      looks thumbnail uses the captured frame. **Power the camera on** to check both properly, and
-      watch for a false "no signal" badge on a live input (see note in the mixer commit).
-
-- [ ] Smaller ones: modal backgrounds no longer blur; looks-editor canvas shows a checkerboard;
-      compose panel resize keeps tile sizes; project load actually loads; screen-destination custom
-      height sticks; DeckLink 3 destination change takes effect; touchpad scroll inversion in
-      Settings > Defaults > Input.
+- [ ] **Reload the kiosk Firefox.** Every client fix below is built into `dist-web/`, but the
+      running browser still has the old bundle. A service restart does not reload it.
 
 ---
 
-## 2. Decide — I deliberately did not do these
+## 1. Test these — every one is something you reported as broken
 
-- [ ] **SECURITY, decide before the ISO cut.** `ss -ltn` shows NoMachine on `0.0.0.0:4000` and
-      CasparCG AMCP on `0.0.0.0:5250`, and `config/casparcg.config` ships
-      `<lock-clear-phrase>secret</lock-clear-phrase>`. Every box installed from your ISO is a
-      network-reachable remote desktop **plus unauthenticated playout control**. Options: bind to
-      localhost, firewall the ports, or ship with the services disabled.
-      the services should be available on lan and tailscale. 
+- [ ] **Open window ▾** (header, operator-GUI mode) — browser / file browser / DeckLink setup /
+      NVIDIA settings must appear **over** the kiosk and be clickable, with the video holes still
+      showing Caspar. Closing it must restore the GUI. Also `kill -9` the helper: the GUI must come
+      back within ~1s.
+      *Why it failed: the probe for xdotool ran `/usr/bin/command`, which does not exist (it is a
+      shell builtin), so an installed xdotool was reported missing and the window lookup was blind;
+      and the raise used an xdotool subcommand your version does not have, failing silently.*
 
+- [ ] **Cable re-grab** — select a cable, click one end, drop it on another port. An invalid drop
+      must restore, never disconnect.
+      **This is the least-proven fix I have shipped.** There is no browser test harness in this
+      repo, so hit-target size and z-order at real geometry are unverified by me.
+      *Why it failed: clicking a cable's visible end cleared the very selection the gesture needs.*
 
-- [ ] **No Chrome binary on the ISO.** Chromium is not installed and the fallback path points into
-      `~/.cache`, which is excluded — so template thumbnail rendering will fail on a freshly
-      installed box. Either install a chromium package into the image or accept the loss.
-we have cef for casparcg and firefox for everything else. no need for chrome, its excluded specificaly.
+- [ ] **Cabling must NOT restart CasparCG** — connect a screen destination to a DeckLink output.
+      Output must keep running and the **Apply** button should light up instead.
+      *This was deliberate, with a test asserting the restart. A graph edit now only marks apply
+      pending; you decide when output is interrupted.*
 
-- [ ] **`config/casparcg.config` PortAudio is `hw:2,0`, a card that does not exist** (you have cards
-      0 and 1 only). Channel 1's audio consumer is aimed at nothing — this is what produces the
-      repeated `ALSA lib ... snd_func_card_id returned error` lines in your journal.
+- [ ] **Live audio input Start** — stop an input, then start it again from the mixer strip (▶) or
+      the inspector. *There was no start control anywhere before; only a whole-rig apply (which
+      glitches inputs still on air) or a Caspar restart could revive capture.*
 
-- [ ] **Another ~1.6GB of ISO** is in `var/lib/snapd`, ~1.1GB of it provably dead (duplicate
-      revisions, plus GNOME/theme bases for the Firefox snap you removed). The fix is on the build
-      host **before** produce — `snap remove --purge` the orphans and `snap set system
-      refresh.retain=2` — NOT an exclude line, because excluding the images leaves broken mount
-      units at boot. Would take the ISO to ~3.0GB.
+- [ ] **Routes on preview** — a look with a route layer must show it on PRV, not just PGM. And
+      creating a route from a layer (↗) should land with the **same position and size** as its
+      source. *The editor's live preview bypassed the take pipeline and told PRV to play a route
+      pointing at the program channel.*
 
-asparcg@highascg-nvidia-595:~/highascg$ sudo snap remove --purge
-[sudo] password for casparcg: 
-error: the required argument `<snap> (at least 1 argument)` was not provided
+- [ ] **Compose preview layout survives a restart** — restart highascg; your saved tile arrangement
+      must be there without triggering a look.
+      Check: `journalctl -u highascg -f -o cat | grep -E "re-apply|first rect report"` → want
+      `cells=3`, not `cells=1`.
+      *Two bugs: the kiosk reported a provisional 1-tile layout over the restored one, and a client
+      disconnect persisted an EMPTY layout, wiping your saved arrangement.*
 
-- [ ] **`scripts/` ships whole in the release tarball and exFAT drop-update.** Consolidating into
-      `deprecated/` did not shrink the payload. One-line exclude available; it changes the live
-      update path, so it is your call.
+- [ ] **Reset layout** in the compose preview — should pack tiles much better now (measured on a
+      1920x1080 canvas: +15% video area for 2 tiles, +143% for 3, +23% for 5).
 
-eggs exclude deprecated scripts.
+- [ ] **PGM always-on-top** — the PGM screen consumer should stay above other windows, and the
+      setting must survive a config generate.
+      *A worse bug sat underneath: the operator-GUI destination was overwriting the PGM consumer's
+      settings on every generate — not only always-on-top but all 16 fields, including x, y, name,
+      stretch and colour space.*
 
-- [ ] **wo47 recovery fallback has drifted** from its twin: `wo47-highascg-exfat-boot.sh` is missing
-      the network-apply queue block, so a host recovered via the fallback boots without
-      network-apply. Only matters when something has already gone wrong.
+- [ ] **Modal backgrounds** — fully transparent: no blur and no tint.
 
-- [ ] **Monitor picker is not wired to boot.** It works and refuses to run on a configured box
-      (verified here), but nothing calls it automatically. One line to enable — your call.
+- [ ] **Alt-tab white border** — should be gone. I created `~/.config/openbox/rc.xml` with
+      `<bar>no</bar>` and ran `openbox --reconfigure`; the system file is untouched, so deleting the
+      user copy reverts it. If the outline persists, add `<dialog>none</dialog>` in the same block.
 
-- [ ] **Previs may be dead code** (4,324 lines): it loads three.js from `/vendor/three/`, which does
-      not exist in this checkout. Confirm and it can be deleted outright.
+- [ ] **DeckLink camera — power it on.** Then check the mixer strip shows real VU, the looks
+      thumbnail uses the captured frame, and there is **no false "no signal" badge** on a live
+      input. That last case is the one I could not test without a live camera.
+
+- [ ] **Yamaha DM3 capture** — should be running; worth a listen. *It was failing on every respawn:
+      the DM3 is S32_LE only and the configured `dsnoop:` device does no format conversion. It now
+      falls back to `plughw:` and remembers what worked. Verified live in the journal.*
 
 ---
 
-## 3. Sudo tasks still outstanding
+## 2. Only you can do these
 
-- [x] `sudo apt --fix-broken install` — the nvidia-595 firmware dependency error you pasted.
-- [x] `sudo cp scripts/setup/highascg-nvidia-persistence.service /etc/systemd/system/ && sudo
-      systemctl daemon-reload && sudo systemctl enable --now highascg-nvidia-persistence.service`
-- [ ] Re-run the eggs produce once you are happy, and tell me the new ISO size.
+- [ ] **Snap cleanup (~1.5GB off the ISO).** One at a time. The earlier error was that `--purge` is
+      a flag, not the target — it needs a snap name after it:
+      ```bash
+      sudo snap set system refresh.retain=2
+      sudo snap remove --purge gnome-46-2404      # 607M — base for the Firefox snap you removed
+      sudo snap remove --purge gtk-common-themes  # 92M
+      sudo snap remove --purge mesa-2404          # 797M across both revisions
+      ```
+      Verified nothing else uses these. Keep `tailscale` and `core24`.
+
+- [ ] **Re-run the eggs produce**, then tell me the new ISO size. Expect ~4.1GB from the excludes
+      already committed, or ~3.0GB once the snaps above are gone (it was 5.9GB).
 
 ---
 
-## 4. Where the details live
+## 3. Closed — recorded so they stop coming up
 
-- `work/work-orders/copy_todos1.md` — per-item status with commit refs.
-- `work/work-orders/todos19.07.26` — your original list, now with a short status note under each.
-- `work/work-orders/281_WO_CASPAR_LOG_AUDIT.md` — why your Caspar log looked like the wild west
-  (short answer: one powered-off camera; `amcp_batch` was never actually enabled).
+Services stay reachable on **LAN + Tailscale**; no security layer wanted on the local network.
+**No Chrome needed** (CEF for Caspar, Firefox for everything else). **Previs parked** and excluded
+from the release, source kept in git. **Deprecated scripts excluded** from eggs. **`hw:2,0` is
+correct** — the DM3 is card 2 now the mixer is on, so it was never a bug. Openbox edits are fine on
+this box ("dev box, dont worry"). `apt --fix-broken` and the NVIDIA persistence unit are done and
+verified (persistence is Enabled and the unit is enabled at boot).
+
+---
+
+## 4. Where the detail lives
+
+- `work/work-orders/copy_todos1.md` — per-item status with commit refs
+- `work/work-orders/todos19.07.26` — your original list, with a short status note under each item
+- `work/work-orders/281_WO_CASPAR_LOG_AUDIT.md` — why the Caspar log looked like the wild west
+  (one powered-off camera; `amcp_batch` was never actually enabled)
 - `work/work-orders/282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md` — why shader audio cannot
-  work on this box today.
-- `work/NATIVE_GUI_PROPOSITIONS.md` — the native GUI answer (recommendation: don't port).
-
----
-
-## Alt-tab white border
-
-Investigated read-only on this box (2026-07-19). Nothing was changed — no openbox config was
-edited and `openbox --reconfigure` was NOT run (live playout session).
-
-### What draws it
-
-Openbox's own **focus-cycle indicator**, not a compositor and not the GTK theme.
-
-Evidence:
-
-- WM is `openbox 3.6.1-12build5` (`dpkg -l openbox`), running as
-  `/usr/bin/openbox --startup /usr/lib/x86_64-linux-gnu/openbox-autostart OPENBOX`.
-- **No compositor is running** — `pgrep -a 'picom|compton|xcompmgr|mutter|kwin|xfwm|marco'`
-  returns nothing. So nothing else is in a position to draw an overlay outline.
-- Alt-Tab is bound to openbox's own cycler: `/etc/xdg/openbox/rc.xml:254-262`
-  `<keybind key="A-Tab"><action name="NextWindow">…` (A-S-Tab -> `PreviousWindow` at :263).
-- The openbox binary contains the indicator routines:
-  `focus_cycle_indicator_startup` / `focus_cycle_update_indicator` /
-  `focus_cycle_draw_indicator` / `focus_cycle_indicator_shutdown`
-  (`strings /usr/bin/openbox`). That indicator is four override-redirect windows forming a
-  line-art rectangle around the *candidate* window while the cycle popup is up — which matches
-  "white border around the chosen window, only while alt-tabbing".
-
-**There is no config file on this box that owns it.** `~/.config/openbox/` contains only
-`autostart` — there is **no user `rc.xml`**, so `/etc/xdg/openbox/rc.xml` is the effective config.
-
-### Why it is white, and why the theme cannot fix it
-
-This is **rc.xml-level, not theme-level.**
-
-- Active theme is `Clearlooks` (`/etc/xdg/openbox/rc.xml:51-52` `<theme><name>Clearlooks</name>`),
-  themerc at `/usr/share/themes/Clearlooks/openbox-3/themerc`.
-- `libobrender.so.32` exposes **58 colour theme keys**; enumerating them
-  (`strings /usr/lib/x86_64-linux-gnu/libobrender.so.32 | grep -E '^(window|menu|border|osd)\.'`)
-  shows **no key for the focus-cycle indicator**. The only client-ish keys are
-  `window.active.client.color` / `window.inactive.client.color`, and those colour the frame's
-  client-area border, which is drawn all the time — not only during alt-tab.
-- So the indicator colour is compiled into openbox (white line art), which is why editing
-  `osd.*`, `window.active.border.color` or `*.border.color` in the themerc will not touch it.
-  Confirmed the Clearlooks themerc does not set `client.color` at all.
-
-Nothing under `osd.*` is the outline either — those keys style the alt-tab *popup panel*
-(the window list), which is a separate thing from the rectangle on the target window.
-
-### The change that disables it
-
-Add `<bar>no</bar>` to the cycling actions. `bar` is the openbox option that gates
-`focus_cycle_draw_indicator` (the outline); `dialog` gates the icon/list popup — keep `dialog`
-alone if the popup itself is still wanted.
-
-Do it in a **user** rc.xml rather than editing the system file:
-
-```sh
-mkdir -p ~/.config/openbox
-cp /etc/xdg/openbox/rc.xml ~/.config/openbox/rc.xml
-```
-
-then in `~/.config/openbox/rc.xml`, for both `A-Tab` (`NextWindow`) and `A-S-Tab`
-(`PreviousWindow`) — and `C-A-Tab` if that one is used too:
-
-```xml
-<keybind key="A-Tab">
-  <action name="NextWindow">
-    <bar>no</bar>
-    <finalactions>
-      <action name="Focus"/>
-      <action name="Raise"/>
-      <action name="Unshade"/>
-    </finalactions>
-  </action>
-</keybind>
-```
-
-### Reconfigure or restart?
-
-`openbox --reconfigure` is enough for an rc.xml that **already exists** — keybindings and their
-action options are re-read on reconfigure; no session restart, no X restart.
-
-Caveat for the recipe above: it *creates* `~/.config/openbox/rc.xml` where there was none. A
-reconfigure re-resolves the XDG config path, so it should be picked up, but if the outline is
-still there after `openbox --reconfigure`, a session restart is the guaranteed pickup. Either way
-this is a live-playout box, so schedule it — do not run it mid-show.
-
-### Confidence note
-
-The chain WM -> openbox cycler -> `focus_cycle_draw_indicator` is directly evidenced above.
-That `<bar>no</bar>` is the switch for it is from openbox 3.6's action option set, which could
-not be re-confirmed from the shipped binary alone: the packaged openbox is stripped (`nm` finds
-no symbols) and short option names are suffix-merged into other strings by the linker
-(`bar` inside `skip_taskbar`, `dialog` inside `placing dialog`, `linear` inside
-`NotifyNonlinear`), so they have no standalone entries. The sibling options from the *same*
-option table do appear standalone and adjacent (`raise`, `panels`, `finalactions` at consecutive
-offsets), which is consistent. If `<bar>no</bar>` turns out not to take, the fallback is
-`<dialog>none</dialog>` plus `<bar>no</bar>` together, which disables the cycling UI wholesale.
-
-
----
-
-## Fixed since you last read this (2026-07-20, later)
-
-- **Caspar restarted when you cabled a screen dest to a DeckLink output.** It was DELIBERATE: that
-  is the only graph edit that writes Caspar config keys, and a 1.5s debounced sync then ran a full
-  apply+restart. WO-172 even had a test asserting the restart. A graph edit now never restarts
-  Caspar — it marks an apply as pending and lights the Apply button instead. **Deployed.**
-- **Cable re-grab.** Unreachable by design accident: a cable's visible end is the connector marker,
-  whose click handler cleared the very selection the gesture requires. Fixed, but the real click
-  path is still UNVERIFIED (no browser test harness here) — please click-through after a reload.
-- **Live audio input could not be started again.** There was no start control anywhere and no
-  per-input start path on the server; only the whole-rig apply (which glitches inputs still on air)
-  or a Caspar restart could revive capture. Start buttons added to the inspector and every mixer
-  strip, rendered regardless of signal state.
-- **Modal tint.** Fully removed — the overlay now paints nothing, not just "no blur".
-- **Your Yamaha DM3 capture was failing** (spotted in the journal, not reported by you): slot 1
-  captured `dsnoop:2,0` and ffmpeg died on every respawn with "cannot set sample format" because
-  the DM3 is S32_LE only and `dsnoop:` does no conversion. The bridge now falls back to `plughw:`
-  on a format failure and remembers the working device. Verified live: capture is up and stable.
-- `hw:2,0` in casparcg.config is CORRECT — the DM3 is card 2 now that the mixer is on. Not a bug.
-
-### Snap cleanup — your command needed arguments
-```bash
-sudo snap set system refresh.retain=2
-sudo snap remove --purge gnome-46-2404      # 607M — base for the Firefox snap you removed
-sudo snap remove --purge gtk-common-themes  # 92M
-sudo snap remove --purge mesa-2404          # 797M across both revisions; only gnome-46 needed it
-```
-Verified nothing else uses these (`snap connections` shows no consumers).
-
-### Still worth your call
-Services staying on LAN + Tailscale is noted and unchanged. But `config/casparcg.config` still ships
-`<lock-clear-phrase>secret</lock-clear-phrase>` — anyone who can reach port 5250 can drive playout.
-Changing that phrase costs nothing and is independent of the LAN decision.
+  work on this box today (no sound server at all, so no loopback device exists)
+- `work/LOCALHOST_CHANNEL_VIEW.md` — low-latency Caspar channel in the browser (keep the holes for
+  the operator, add an NVENC stream for the laptop view)
+- `work/NATIVE_GUI_PROPOSITIONS.md` — native Ubuntu GUI options (recommendation: do not port)
