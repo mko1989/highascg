@@ -10,7 +10,8 @@ function casparScreenDefaults(n, ndiName) {
 		/** NVIDIA: keep true; driver Sync to VBlank must be off — docs/reference/screen-consumer-vsync-nvidia.md */
 		[`${p}vsync`]: true,
 		[`${p}borderless`]: true,
-		[`${p}always_on_top`]: false,
+		/** PGM screen consumers stack above desktop chrome by default (owner default, todos19.07.26). */
+		[`${p}always_on_top`]: true,
 		[`${p}decklink_device`]: 0,
 		[`${p}decklink_key_device`]: 0,
 		[`${p}decklink_keyer`]: 'default',

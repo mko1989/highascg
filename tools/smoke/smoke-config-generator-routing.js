@@ -813,3 +813,99 @@ test('WO-288: non-standard screen destination resolution still emits custom vide
 	const xml = buildConfigXml(flat)
 	assert.match(xml, /<id>5120x768<\/id>/, 'custom destination resolution emits custom video-mode block')
 })
+
+/**
+ * PGM always-on-top (owner todos19.07.26): PGM screen consumers stack on top by default, and an
+ * explicit operator choice must survive the generator in both directions.
+ * Caspar element is `<always-on-top>` (binary property path `screen/always_on_top`).
+ */
+function pgmAlwaysOnTopFixture(alwaysOnTop) {
+	const app = clone(defaults)
+	app.screen_count = 1
+	app.casparServer = {
+		...app.casparServer,
+		screen_count: 1,
+		screen_1_mode: '1080p5000',
+		multiview_enabled: false,
+		streamingChannel: { enabled: false },
+	}
+	if (alwaysOnTop !== undefined) app.casparServer.screen_1_always_on_top = alwaysOnTop
+	app.streamingChannel = { ...app.streamingChannel, enabled: false }
+	app.rtmp = { ...app.rtmp, enabled: false }
+	addMockGraph(app)
+	return app
+}
+
+/** @param {string} xml @returns {string} the PGM `<screen>` inner block */
+function pgmScreenBlock(xml) {
+	const m = xml.match(/Screen 1 program output \(PGM\)[\s\S]*?<screen>([\s\S]*?)<\/screen>/)
+	assert.ok(m, 'PGM screen consumer block present')
+	return m[1]
+}
+
+test('PGM screen consumer is always-on-top by default (key unset)', () => {
+	const flat = buildCasparGeneratorFlatConfig(pgmAlwaysOnTopFixture(undefined))
+	assert.equal(flat.screen_1_always_on_top, true, 'flat config default is on')
+	assert.match(
+		pgmScreenBlock(buildConfigXml(flat)),
+		/<always-on-top>true<\/always-on-top>/,
+		'PGM defaults to always-on-top with no explicit setting',
+	)
+})
+
+test('PGM always-on-top round-trips through the generator (set -> generate -> present)', () => {
+	for (const want of [true, false]) {
+		const flat = buildCasparGeneratorFlatConfig(pgmAlwaysOnTopFixture(want))
+		assert.equal(flat.screen_1_always_on_top, want, `flat config keeps explicit ${want}`)
+		const block = pgmScreenBlock(buildConfigXml(flat))
+		assert.match(
+			block,
+			new RegExp(`<always-on-top>${want}</always-on-top>`),
+			`explicit always_on_top=${want} survives to the generated XML`,
+		)
+	}
+})
+
+test('PGM always-on-top default does not leak to multiview or the operator-GUI consumer', () => {
+	// Multiview reads multiview_* only (never PGM screen_1) — an explicit false must stay false.
+	const app = pgmAlwaysOnTopFixture(true)
+	app.casparServer = {
+		...app.casparServer,
+		multiview_enabled: true,
+		multiview_output_mode: 'screen_only',
+		multiview_mode: '1080p5000',
+		multiview_always_on_top: false,
+	}
+	app.screenDestinations = {
+		version: 1,
+		destinations: [
+			{ id: 'mv', label: 'MV', mainScreenIndex: 0, mode: 'multiview', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+		],
+		edidNotes: '',
+	}
+	app.deviceGraph = {
+		connectors: [
+			{ id: 'dst_in_mv', kind: 'destination_in', externalRef: 'mv' },
+			{ id: 'gpu_p0', kind: 'gpu_out' },
+		],
+		edges: [{ sourceId: 'dst_in_mv', sinkId: 'gpu_p0' }],
+	}
+	const xml = buildConfigXml(buildCasparGeneratorFlatConfig(app))
+	const mv = xml.match(/Multiview output #1[\s\S]*?<screen>([\s\S]*?)<\/screen>/)
+	assert.ok(mv, 'multiview screen consumer block')
+	assert.match(
+		mv[1],
+		/<always-on-top>false<\/always-on-top>/,
+		'multiview keeps its own always_on_top — PGM default must not bleed across',
+	)
+	// The operator-GUI consumer is hardcoded false (WO-263: it must stack BELOW the Firefox kiosk).
+	const src = require('node:fs').readFileSync(
+		require('node:path').join(__dirname, '../../src/config/config-generator-operator-gui.js'),
+		'utf8',
+	)
+	assert.match(
+		src,
+		/<always-on-top>false<\/always-on-top>/,
+		'WO-263: operator-GUI consumer stays below Firefox regardless of the PGM default',
+	)
+})

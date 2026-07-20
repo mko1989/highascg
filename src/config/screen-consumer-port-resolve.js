@@ -114,6 +114,12 @@ function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
 		const dest = ctx.destinations[destIndex]
 		const mode = String(dest?.mode || 'pgm_prv').toLowerCase()
 		if (mode === 'stream') continue
+		// The operator-GUI destination drives its own consumer (config-generator-operator-gui.js) and
+		// carries a meaningless mainScreenIndex (always 0). Letting it fall through to the generic
+		// branch below copied its rear-port flags — always_on_top=false per WO-263, plus x/y/name/
+		// stretch/colour_space — straight over the PGM screen_1_* keys on every generate, silently
+		// discarding the operator's PGM choices (owner: "changing manualy doesnt change the config").
+		if (mode === 'operator_gui') continue
 
 		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
 		if (!portIdx) continue
