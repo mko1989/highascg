@@ -300,12 +300,13 @@ export function initOperatorComposeTiles(container, options) {
 
 	const getCm = () => stateStore?.getState?.()?.channelMap || {}
 
-	/** @type {Map<string, { def: object, frac: { x: number, y: number, w: number, h: number }, el: HTMLElement, bodyEl: HTMLElement, footerEl: HTMLElement, labelEl: HTMLElement, timer: { destroy: () => void, refresh: () => void } | null }>} */
+	/** @type {Map<string, { def: object, frac: { x: number, y: number, w: number, h: number }, px: { x: number, y: number, w: number, h: number } | null, pxDesired: { x: number, y: number, w: number, h: number } | null, el: HTMLElement, bodyEl: HTMLElement, footerEl: HTMLElement, labelEl: HTMLElement, timer: { destroy: () => void, refresh: () => void } | null }>} */
 	const tiles = new Map()
 	let defsKey = ''
 	let storageKey = layoutStorageKey(storageKeyPrefix, 1)
 	let rafReport = null
 	let drag = null
+	let lastCanvasSize = { w: 0, h: 0 }
 
 	function currentDefs() {
 		return Array.isArray(getComposeCellDefs?.()) ? getComposeCellDefs() : []
@@ -324,7 +325,12 @@ export function initOperatorComposeTiles(container, options) {
 
 	function layoutTileDom(t) {
 		const { w: cw, h: ch } = canvasSize()
-		const outer = { left: t.frac.x * cw, top: t.frac.y * ch, width: t.frac.w * cw, height: t.frac.h * ch }
+		// On first layout, initialize px and pxDesired from frac. Subsequent layouts preserve px (clamped to canvas bounds).
+		if (!t.px) {
+			t.px = { x: t.frac.x * cw, y: t.frac.y * ch, w: t.frac.w * cw, h: t.frac.h * ch }
+			t.pxDesired = { ...t.px }
+		}
+		const outer = { left: t.px.x, top: t.px.y, width: t.px.w, height: t.px.h }
 		t.el.style.left = `${outer.left}px`
 		t.el.style.top = `${outer.top}px`
 		t.el.style.width = `${outer.width}px`
@@ -366,6 +372,23 @@ export function initOperatorComposeTiles(container, options) {
 		scheduleReport()
 	}
 
+	function onCanvasResize() {
+		const newSize = canvasSize()
+		// Canvas size changed: preserve px sizes (clamped to new bounds), update fractions
+		if ((newSize.w !== lastCanvasSize.w || newSize.h !== lastCanvasSize.h) && lastCanvasSize.w > 0) {
+			const minOuter = minOuterSize()
+			for (const t of tiles.values()) {
+				if (!t.px) continue // Not yet laid out
+				// Try to restore pxDesired (the size the user set), then clamp if needed to fit new canvas
+				t.px = clampTileRect(t.pxDesired, newSize.w, newSize.h, minOuter.width, minOuter.height)
+				// Update fractions to match new px in new canvas size
+				t.frac = { x: t.px.x / newSize.w, y: t.px.y / newSize.h, w: t.px.w / newSize.w, h: t.px.h / newSize.h }
+			}
+		}
+		lastCanvasSize = newSize
+		layoutAll()
+	}
+
 	function buildTile(def, frac) {
 		const el = document.createElement('div')
 		el.className = 'operator-tile'
@@ -397,7 +420,7 @@ export function initOperatorComposeTiles(container, options) {
 		el.append(bodyEl, footerEl, resizeEl)
 		root.appendChild(el)
 
-		const t = { def, frac, el, bodyEl, footerEl, labelEl, timer: null }
+		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, timer: null }
 
 		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
@@ -452,6 +475,8 @@ export function initOperatorComposeTiles(container, options) {
 			nextPx = { x: startPx.x, y: startPx.y, w: snapToGrid(startPx.w + dx), h: snapToGrid(startPx.h + dy) }
 		}
 		const clamped = clampTileRect(nextPx, cw, ch, minOuter.width, minOuter.height)
+		t.px = clamped
+		t.pxDesired = { ...clamped }
 		t.frac = { x: clamped.x / cw, y: clamped.y / ch, w: clamped.w / cw, h: clamped.h / ch }
 		layoutTileDom(t)
 		// WO-263: report the new body rect LIVE during the drag so the Firefox hole tracks the box
@@ -483,6 +508,7 @@ export function initOperatorComposeTiles(container, options) {
 		defsKey = key
 		for (const t of tiles.values()) { t.timer?.destroy?.(); t.el.remove() }
 		tiles.clear()
+		lastCanvasSize = { w: 0, h: 0 }
 		const stored = loadTileLayout(storage, storageKey)
 		const resolved = resolveTileLayout(defs, stored)
 		for (const d of defs) tiles.set(d.id, buildTile(d, resolved[d.id]))
@@ -493,13 +519,20 @@ export function initOperatorComposeTiles(container, options) {
 		saveTileLayout(storage, storageKey, {})
 		const defs = currentDefs()
 		const fresh = computeDefaultTileLayout(defs)
-		for (const [id, t] of tiles) if (fresh[id]) t.frac = fresh[id]
+		for (const [id, t] of tiles) {
+			if (fresh[id]) {
+				t.frac = fresh[id]
+				// Reset px and pxDesired so they're re-derived on next layoutTileDom
+				t.px = null
+				t.pxDesired = null
+			}
+		}
 		persist()
 		layoutAll()
 	}
 	resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetLayout() })
 
-	const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(layoutAll) : null
+	const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onCanvasResize) : null
 	ro?.observe(root)
 	const onWinResize = () => layoutAll()
 	const onWinScroll = () => scheduleReport()
