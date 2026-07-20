@@ -110,6 +110,43 @@ home/casparcg/exfat/*
 home/casparcg/companion-module-dev
 home/casparcg/companion-module-dev/*
 
+# CasparCG build tree — build host only (WO-274). MEASURED 3328M in the shipped
+# squashfs of the 2026-07-19 5.9GB ISO: the single largest unexcluded item.
+# The runtime ships as ~/highascg/bin + ~/highascg/lib; nothing under src/,
+# tools/runtime/, tools/startup/ or scripts/ references caspar-build.
+home/casparcg/caspar-build
+home/casparcg/caspar-build/*
+
+# Boost headers — CasparCG *compile-time* only (183M measured in shipped tree).
+# Kernel headers for DKMS live in usr/src (already excluded above); usr/include
+# is C/C++ dev headers and is not read by anything at playout runtime.
+usr/include/boost
+usr/include/boost/*
+
+# Operator browser profiles — identity + cache, regenerated on first launch.
+# tools/runtime/highascg-launch-operator-firefox.sh does `mkdir -p "$PROFILE"`,
+# so an absent profile dir is the normal cold-start path (247M measured).
+home/casparcg/.highascg/firefox-operator
+home/casparcg/.highascg/firefox-operator/*
+home/casparcg/.highascg/cloud-browser-profile
+home/casparcg/.highascg/cloud-browser-profile/*
+
+# Crash dumps (79M measured — includes Zoom/Calamares/DKMS .crash files).
+var/crash
+var/crash/*
+
+# apt/pkg caches (407M of .deb measured in the shipped tree). The upstream eggs
+# template DOES intend to drop these, but its line reads
+#   "var/cache/* var/lib/aide/*"
+# — two patterns on ONE line, which mksquashfs -ef treats as a single literal
+# pattern that matches nothing. Re-stated here one-per-line so it actually fires.
+var/cache/*
+var/lib/aide/*
+
+# Copilot identity (parity with the WO-47 fragment list)
+home/casparcg/.copilot
+home/casparcg/.copilot/*
+
 # Build-host working files (not needed on playout)
 home/casparcg/highascg-backup-box.tgz
 home/casparcg/highascg-wiki-map
