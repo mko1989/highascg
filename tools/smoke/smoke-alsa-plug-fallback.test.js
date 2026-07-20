@@ -43,3 +43,18 @@ describe('ALSA plug fallback for format-rejecting cards', () => {
 		assert.match(src, /plugRetried: true/, 'the retry must mark the entry so it happens at most once')
 	})
 })
+
+describe('the working-device memo survives the internal stop', () => {
+	it('reads the memo BEFORE stopLiveAudioBridge clears it', () => {
+		const fs = require('fs')
+		const path = require('path')
+		const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'audio', 'live-audio-bridge.js'), 'utf8')
+		const readIdx = src.indexOf('const remembered = _workingDeviceBySlot.get(n)')
+		const stopIdx = src.indexOf('stopLiveAudioBridge(n)', readIdx > 0 ? readIdx : 0)
+		assert.ok(readIdx > 0, 'start() must snapshot the remembered device')
+		assert.ok(
+			readIdx < stopIdx,
+			'the memo must be read before stopLiveAudioBridge(n), which clears it — otherwise every start re-probes the failing device',
+		)
+	})
+})

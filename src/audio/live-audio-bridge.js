@@ -15,6 +15,11 @@ const BRIDGE_WARMUP_MS = 700
 /** @type {Map<number, { proc: import('child_process').ChildProcess|null, port: number, device: string, startedAt: number, lastError?: string }>} */
 const _bridges = new Map()
 
+/* Slot -> device string that actually opened. Once a card has rejected the configured form we go
+ * straight to the working one on every later start, instead of re-spawning a doomed ffmpeg first.
+ * Cleared by stopLiveAudioBridge so a re-cabled or swapped device is re-probed from scratch. */
+const _workingDeviceBySlot = new Map()
+
 /**
  * @param {object} cfg
  * @returns {boolean}
@@ -165,9 +170,13 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
 function startLiveAudioBridge(ctx, slot, opts = {}) {
 	const n = parseInt(String(slot), 10)
 	if (!Number.isFinite(n) || n < 1 || n > 8) return false
+	/* Read the remembered device BEFORE stopping — stopLiveAudioBridge clears the memo (so an
+	 * explicit stop re-probes a possibly swapped card), and start() calls it on the way in. */
+	const remembered = _workingDeviceBySlot.get(n)
 	stopLiveAudioBridge(n)
 	const cfg = ctx?.config || {}
-	const device = opts.deviceOverride || resolveFfmpegAlsaInputDevice(cfg, n)
+	const configured = resolveFfmpegAlsaInputDevice(cfg, n)
+	const device = opts.deviceOverride || remembered || configured
 	if (!device) {
 		_bridges.set(n, {
 			proc: null,
@@ -187,7 +196,10 @@ function startLiveAudioBridge(ctx, slot, opts = {}) {
 		const s = buf.toString().trim()
 		if (!s) return
 		if (/error|invalid|failed|busy/i.test(s)) entry.lastError = s.slice(0, 240)
-		if (isAlsaFormatError(s)) entry.formatError = true
+		if (isAlsaFormatError(s)) {
+			entry.formatError = true
+			_workingDeviceBySlot.delete(n)
+		}
 		ctx?.log?.('debug', `[live-audio-bridge] slot ${n}: ${s.slice(0, 180)}`)
 	})
 	proc.on('close', (code, signal) => {
@@ -206,6 +218,7 @@ function startLiveAudioBridge(ctx, slot, opts = {}) {
 					'warn',
 					`[live-audio-bridge] slot ${n}: ${cur.device} rejected the capture format — retrying via ${fallback}`,
 				)
+				_workingDeviceBySlot.set(n, fallback)
 				startLiveAudioBridge(ctx, n, { deviceOverride: fallback, plugRetried: true })
 				return
 			}
@@ -231,6 +244,7 @@ function stopLiveAudioBridge(slot) {
 		} catch (_) {}
 	}
 	_bridges.delete(n)
+	_workingDeviceBySlot.delete(n)
 }
 
 function stopAllLiveAudioBridges() {
