@@ -266,3 +266,16 @@ something fails.
 [2026-07-20 14:37:57.785] [error]    File not fou
 
 also live audio usb input, the vu meters show the audio is incoming, its routed to ch3 pgm2 and the vu meters there show it too, but the audio is not audiable on the stream from that channel.
+
+
+when caspar is reloaded it comes back trying to display the compose preview even though im on devices tab. only going to looks and back clears the windows.
+
+the browser window for instance appears over the gui and caspar, but also over the caspars screen consumer that should be always on top as its a pgm screen.
+
+   -> [pasted caspar stacktrace] NOT A CRASH. Caspar logs a full exception + stack for a failed producer, then recovers and answers 404. Line 168508 of log/caspar_2026-07-20.log shows the cause: `PLAY 6-4 DECKLINK 4` -> "DeckLink 8K Pro [4|1080p5000] Could not enable video input" = the powered-off camera. The trailing "File not found." is Caspar mislabelling it. Same single cause as the whole log audit. Caspar did NOT die: its restart at 14:57 was your own Apply (POST /api/caspar-config/apply), and systemd reports NRestarts=0.
+
+   -> [usb audio audible in meters but not on the stream] IN PROGRESS. Investigating why a routed input reaches the VU meters on ch3/pgm2 but not the stream consumer's audio.
+
+   -> [compose preview returns after caspar reload while on devices tab] IN PROGRESS. Your clue "only going to looks and back clears it" is the key one - the withdraw only happens on a mount/unmount cycle, which a Caspar reload does not trigger.
+
+   -> [browser window covers the pgm screen consumer] IN PROGRESS. The helper is promoted into the same X layer as the always-on-top PGM consumer, so it stacks above it. Needs the helper to stay clear of program output.
