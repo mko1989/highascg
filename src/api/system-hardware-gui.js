@@ -4,6 +4,8 @@
 
 'use strict'
 
+const { lookupCommandPath } = require('../utils/which')
+
 const fs = require('fs')
 const path = require('path')
 const { execFileSync, spawn } = require('child_process')
@@ -61,10 +63,7 @@ function resolveFirefox() {
 	for (const name of ['firefox-esr', 'firefox']) {
 		try {
 			const p =
-				execFileSync('/usr/bin/command', ['-v', name], {
-					encoding: 'utf8',
-					timeout: 2000,
-				}).trim() || null
+				lookupCommandPath(name)
 			if (p && !p.startsWith('/snap/')) return p
 		} catch {
 			/* ignore */
@@ -87,10 +86,7 @@ function resolveFileManager() {
 	for (const name of ['thunar', 'pcmanfm', 'nautilus', 'dolphin']) {
 		try {
 			const p =
-				execFileSync('/usr/bin/command', ['-v', name], {
-					encoding: 'utf8',
-					timeout: 2000,
-				}).trim() || null
+				lookupCommandPath(name)
 			if (p) return { bin: p, name }
 		} catch {
 			/* ignore */
@@ -112,10 +108,7 @@ function resolveNvidiaSettings() {
 	}
 	try {
 		const p =
-			execFileSync('/usr/bin/command', ['-v', 'nvidia-settings'], {
-				encoding: 'utf8',
-				timeout: 2000,
-			}).trim() || null
+			lookupCommandPath('nvidia-settings')
 		return p || null
 	} catch {
 		return null
@@ -129,10 +122,7 @@ function resolveDesktopvideoSetup() {
 	for (const name of ['desktopvideo_setup', 'BlackmagicDesktopVideoSetup']) {
 		try {
 			const p =
-				execFileSync('/usr/bin/command', ['-v', name], {
-					encoding: 'utf8',
-					timeout: 2000,
-				}).trim() || null
+				lookupCommandPath(name)
 			if (p) return p
 		} catch {
 			/* ignore */

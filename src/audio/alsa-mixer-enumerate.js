@@ -3,9 +3,10 @@
  */
 'use strict'
 
+const { lookupCommandPath } = require('../utils/which')
+
 const fs = require('fs')
 const os = require('os')
-const { execFileSync } = require('child_process')
 
 const AMIXER_BINS = ['amixer', '/usr/bin/amixer', '/usr/local/bin/amixer']
 const ALSAMIXER_BINS = ['alsamixer', '/usr/bin/alsamixer', '/usr/local/bin/alsamixer']
@@ -23,10 +24,7 @@ function resolveAmixer() {
 	}
 	try {
 		return (
-			execFileSync('/usr/bin/command', ['-v', 'amixer'], {
-				encoding: 'utf8',
-				timeout: 2000,
-			}).trim() || null
+			lookupCommandPath('amixer')
 		)
 	} catch {
 		return null
@@ -42,13 +40,7 @@ function resolveAlsamixer() {
 		}
 	}
 	try {
-		return (
-			execFileSync('/usr/bin/command', ['-v', 'alsamixer'], {
-				encoding: 'utf8',
-				timeout: 2000,
-				env: { ...process.env, PATH: process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
-			}).trim() || null
-		)
+		return lookupCommandPath('alsamixer')
 	} catch {
 		return null
 	}

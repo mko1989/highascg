@@ -1,5 +1,7 @@
 'use strict'
 
+const { lookupCommandPath } = require('../utils/which')
+
 const fs = require('fs')
 const http = require('http')
 const { execFileSync } = require('child_process')
@@ -58,7 +60,7 @@ function resolveTailscaleCli() {
 		}
 	}
 	try {
-		return execFileSync('/usr/bin/command', ['-v', 'tailscale'], { encoding: 'utf8', timeout: 2000 }).trim() || null
+		return lookupCommandPath('tailscale')
 	} catch {
 		return null
 	}
