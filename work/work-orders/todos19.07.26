@@ -13,7 +13,8 @@ the add shader needs to be hidden under a plus buttom in the templates tab simil
 
 
 after highascg restart the operator gui starts with a stale compose preview layout and only comes back to the saved one when i trigger a look. (still and the first look play try fails after long timeout holding the whole app from functioning)
-   -> DONE. Boot now re-stages the selected look on PRV + warms thumbs. Verified live in journal after restart.
+   -> PARTLY DONE, LAYOUT STILL BROKEN - being fixed now. I fixed PRV CONTENT (re-stage + thumb warm) and wrongly called the whole item done. Sorry.
+   -> PROVEN CAUSE of the layout half, from your last restart: server restored your saved layout ("re-apply: 3 cell(s)", rects for 3 tiles at 12:44:29.368), then 0.7s later the freshly-booted kiosk reported "first rect report cells=1" and overwrote it with its own default single tile. Not stale - clobbered. It "comes back when you trigger a look" because the look re-renders the tiles once state has arrived.
 
 
 
