@@ -12,7 +12,11 @@
  * never overlay the video) holding a screen-label row (drag handle, `${ROLE} ${screen} / ${label}`,
  * screen-label.js WO-222) above the playback timer (clip file name + single running-layer progress
  * bar, `mountPgmTopLayerPlaybackTimer` from playback-timer.js — WO-250's bank-aware
- * `pickTopLayerStateForPlayback`, imported/reused there, never copied here). headerH is 0.
+ * `pickTopLayerStateForPlayback`, imported/reused there, never copied here). When NO source is
+ * running, that same strip shows the topmost layer's content label with the timer/progress bar
+ * hidden (WO-297, `pickTopLayerContentForIdle` — same scan, no second top-layer implementation);
+ * a channel with nothing on any layer shows nothing. The footer height is unchanged either way —
+ * TILE_CHROME.footerH is what the hole geometry is derived from. headerH is 0.
  *
  * Chrome (border/footer) is laid out by explicit pixel math (`tileBodyRectFromOuter` ->
  * `tileHoleRectFromOuter`), not flexbox. Geometry rules (todos19.07.26):

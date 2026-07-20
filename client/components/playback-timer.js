@@ -360,6 +360,20 @@ function isStaleOscPlaybackLayer(layerOsc, nowTs, staleMs = STALE_OSC_LAYER_MS) 
  *   Omitting `nowTs` disables the staleness check (no snapshot clock to compare against).
  */
 export function pickTopLayerStateForPlayback(channelState, opts) {
+	return pickTopLayerStateBy(channelState, opts, (ly) => fileHasPlaybackHints(ly?.file))
+}
+
+/**
+ * The single bank/exclusion/staleness scan behind BOTH top-layer picks. Only the "does this layer
+ * count" predicate differs — {@link pickTopLayerStateForPlayback} wants a layer with real timing,
+ * {@link pickTopLayerContentForIdle} (WO-297) wants a layer with *any* content. Keeping one scan
+ * means the idle label can never disagree with the timer about which layer is on top.
+ * @param {object} [channelState]
+ * @param {{ bank?: 'a' | 'b' | null, nowTs?: number }} [opts]
+ * @param {(layerState: object) => boolean} predicate
+ * @returns {{ layerNum: number | null, layerState: object | null }}
+ */
+function pickTopLayerStateBy(channelState, opts, predicate) {
 	const layers = channelState?.layers
 	if (!layers) return { layerNum: null, layerState: null }
 	const { bank, nowTs } = opts || {}
@@ -373,13 +387,48 @@ export function pickTopLayerStateForPlayback(channelState, opts) {
 		if (n < lo || n > hi) continue
 		const ly = layers[key]
 		if (isStaleOscPlaybackLayer(ly, nowTs)) continue
-		const f = ly?.file
-		if (fileHasPlaybackHints(f) && n > bestN) {
+		if (n > bestN && predicate(ly)) {
 			bestN = n
 			bestState = ly
 		}
 	}
 	return bestN >= 0 ? { layerNum: bestN, layerState: bestState } : { layerNum: null, layerState: null }
+}
+
+/**
+ * WO-297 (todos19.07.26): what a layer is SHOWING, with no timing attached — used to fill the
+ * compose-tile footer when nothing is running. `type === 'empty'` (Caspar's own producer name for a
+ * cleared layer, `src/osc/osc-state.js:417`) and a layer with no name/path/template resolve to ''
+ * so an idle tile shows nothing rather than a stale label.
+ * @param {object} [layerState] - one `oscClient.channels[ch].layers[n]` entry
+ * @returns {string} display label, or '' when the layer carries no content
+ */
+export function idleLayerContentLabel(layerState) {
+	if (!layerState || typeof layerState !== 'object') return ''
+	const type = layerState.type != null ? String(layerState.type).trim() : ''
+	if (type === 'empty') return ''
+	const fileLabel = playbackFileLabel(layerState.file)
+	if (fileLabel) return fileLabel
+	const tplPath = layerState.template?.path
+	if (tplPath != null && String(tplPath).trim()) {
+		const seg = String(tplPath).replace(/\\/g, '/').split('/').filter(Boolean).pop()
+		if (seg) return truncatePlaybackLabel(seg)
+	}
+	// A producer with no file/template still identifies itself ('route', 'decklink', 'html', ...).
+	return type ? truncatePlaybackLabel(type) : ''
+}
+
+/**
+ * Topmost layer with ANY content, for the "no running source" footer line. Same bank range,
+ * exclusions and staleness rules as {@link pickTopLayerStateForPlayback} — see
+ * {@link pickTopLayerStateBy}.
+ * @param {object} [channelState] - `oscClient.channels[ch]`
+ * @param {{ bank?: 'a' | 'b' | null, nowTs?: number }} [opts]
+ * @returns {{ layerNum: number | null, layerState: object | null, label: string }}
+ */
+export function pickTopLayerContentForIdle(channelState, opts) {
+	const picked = pickTopLayerStateBy(channelState, opts, (ly) => idleLayerContentLabel(ly) !== '')
+	return { ...picked, label: picked.layerState ? idleLayerContentLabel(picked.layerState) : '' }
 }
 
 /**
@@ -407,10 +456,43 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 	const fill = container.querySelector('.playback-timer__fill')
 	const bar = container.querySelector('.playback-timer__bar')
 	const clock = createPlaybackTimingClock()
-	let lastMeta = { layerState: { file: {} }, layerNum: null, resolvedChNum: 1, rawFile: {} }
+	let lastMeta = { layerState: { file: {} }, layerNum: null, resolvedChNum: 1, rawFile: {}, idle: null }
+	// WO-297 change guard: the idle footer line is static, but `repaint` runs off a rAF tick loop.
+	// `paintedIdleKey` is the last idle string committed to the DOM (null = not currently idle), so a
+	// steady idle tile costs one string compare per frame and ZERO DOM writes — the same
+	// stored-record + guard discipline the timer path already uses.
+	let paintedIdleKey = null
+
+	/** @param {{ label: string, layerNum: number | null } | null} idle */
+	function paintIdle(idle) {
+		const label = idle?.label || ''
+		const key = `${idle?.layerNum ?? ''} ${label}`
+		if (paintedIdleKey === key) return
+		paintedIdleKey = key
+		// Timing chrome OFF (no timer/progress when nothing runs) — display:none only, so the footer
+		// keeps the height operator-compose-tiles.js reserves via TILE_CHROME.footerH.
+		bar.style.display = 'none'
+		fill.style.width = '0%'
+		row.textContent = label
+		row.style.color = COLORS.muted.text
+		const headerExtra = container.classList.contains('header-pgm-timer') ? ' header-pgm-timer' : ''
+		container.className = 'playback-timer playback-timer--idle' + headerExtra
+		container.title = label
+			? `${label} — on the top layer, not running`
+			: 'Nothing on any layer of this channel'
+	}
 
 	function repaint(now = performance.now()) {
-		const { layerState, layerNum, resolvedChNum, rawFile } = lastMeta
+		const { layerState, layerNum, resolvedChNum, rawFile, idle } = lastMeta
+		if (layerNum == null) {
+			paintIdle(idle)
+			return
+		}
+		if (paintedIdleKey !== null) {
+			// Leaving idle: restore the progress bar the idle paint hid, and re-arm the guard.
+			paintedIdleKey = null
+			bar.style.display = ''
+		}
 		let infoLayer = null
 		try {
 			const st = typeof getState === 'function' ? getState() : null
@@ -472,13 +554,19 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 		// T250.1 (WO-250): restrict "topmost layer" to the ACTIVE bank's layer range and skip
 		// stale (about-to-be-pruned) layers — otherwise the losing bank's frozen layer briefly
 		// outranks the live bank's layer right after a take ("gibberish" jump/latch).
-		const { layerNum, layerState } = pickTopLayerStateForPlayback(ch, { bank, nowTs: Date.now() })
+		const nowTs = Date.now()
+		const { layerNum, layerState } = pickTopLayerStateForPlayback(ch, { bank, nowTs })
 		const rawFile = layerState?.file || {}
+		// WO-297: no RUNNING source -> fall back to the topmost layer that has ANY content, so the
+		// footer still says what is on screen (label only, no timer). Computed HERE (once per OSC
+		// ingest, and only when there is nothing to time), never in the per-frame `repaint`.
+		const idle = layerNum == null ? pickTopLayerContentForIdle(ch, { bank, nowTs }) : null
 		lastMeta = {
 			layerState: layerState || { file: {} },
 			layerNum,
 			resolvedChNum: chNum,
 			rawFile,
+			idle,
 		}
 		repaint()
 	}

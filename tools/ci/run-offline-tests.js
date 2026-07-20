@@ -88,6 +88,7 @@ const FILES = [
 	'tools/smoke/smoke-wo251-playlist-osc-wiring.test.js',
 	'tools/smoke/smoke-wo252-info-duration-supplement.test.js',
 	'tools/smoke/smoke-wo256-operator-compose-tiles.test.js',
+	'tools/smoke/smoke-wo297-idle-top-layer-footer.test.js',
 	'tools/smoke/smoke-hole-rect.test.js',
 	'tools/smoke/smoke-operator-gui-launch-timing.test.js',
 	'tools/smoke/smoke-wo279-operator-gui-monitor-placement.test.js',
