@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# DEPRECATED (WO-273) — DEAD FORK, DO NOT RESURRECT.
+#
+# Lived at scripts/highascg-exfat-server-update.sh (added 2026-07-04). It was never
+# installed or invoked by anything: scripts/exfat/install-exfat-systemd-units.sh copies
+# scripts/exfat/highascg-exfat-server-update.sh → /usr/local/lib/highascg/, which is what
+# highascg-exfat-server-update.service actually runs.
+#
+# Despite the later date this file is a REGRESSION against scripts/exfat/: it drops the
+# --excludes list, --archive-copy, the mkdir -p /run/highascg, and the apply-failure
+# recovery path that restarts the previous tree. Use scripts/exfat/ — never this.
+#
 # Apply a server-only drop from exFAT: /home/casparcg/exfat/drop-update/
 # Delegates to highascg-apply-server-drop.sh (merge-only — never deletes bin/, lib/, …).
 #

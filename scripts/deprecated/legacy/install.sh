@@ -6,7 +6,8 @@ set -e
 # Do not save GitHub’s HTML page as install.sh (use raw.githubusercontent.com or git clone).
 
 INSTALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export SCRIPT_DIR="$(cd "$INSTALL_SCRIPT_DIR/../.." && pwd)"
+# scripts/deprecated/legacy/ → repo root is three levels up (WO-273 consolidation).
+export SCRIPT_DIR="$(cd "$INSTALL_SCRIPT_DIR/../../.." && pwd)"
 
 _installer="$INSTALL_SCRIPT_DIR/install.sh"
 if [[ ! -r "$_installer" ]]; then

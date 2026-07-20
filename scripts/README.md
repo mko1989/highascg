@@ -266,13 +266,52 @@ These are installed by `fix-calamares-shellprocess.sh` into the live-USB squashf
 
 | Path | Reason | Status |
 |------|--------|--------|
-| `scripts/legacy/` | Old install phases (1–5) | Superseded by `scripts/setup/01-16` ordered flow |
-| `scripts/unused/` | Dead scripts (no references) | Keep for audit trail; do not run |
-| `scripts/deprecated/` | Old versions | Archive; kept for diff reference |
+| `scripts/deprecated/` | **The single archive** — everything retired lives here (WO-273) | Archive; kept for diff reference. Never referenced by runtime. |
+| `scripts/deprecated/legacy/` | Old install phases (1–5), was `scripts/legacy/` | Superseded by `scripts/setup/01-16` ordered flow |
+| `scripts/deprecated/unused/` | Dead scripts (no references), was `scripts/unused/` | Keep for audit trail; do not run |
+| `scripts/deprecated/lib/` | Abandoned 2026-07-04 split of `lib/install-helpers.sh` | All 23 functions still live in the monolith; nothing sourced these |
 | `scripts/fix/` | Duplicate sources of root `fix-*.sh` | Keep newest; deprecate pair |
 | `tools/eggs/live-usb/legacy-persistence/` | Old persistence schemes | Not used in current ISO |
 | `tools/eggs/unused/` | Unused eggs modules | Audit trail only |
 | `work/deprecated/` | Retired wrappers + stray helpers | Moved items only; do not reference |
+
+---
+
+## Where do I put a new script? (WO-273)
+
+Answer these in order; the first "yes" is your directory.
+
+1. **Does the running server, a systemd unit, or the operator GUI invoke it during playout?**
+   → `tools/runtime/`. It ships in the release tarball and the exFAT drop-update, so it must
+   work with no build host present. Add the call site to the runtime table above in the same
+   commit — a runtime script with no named caller is indistinguishable from dead code.
+   *(Naming trap, unchanged: `scripts/runtime/` holds INSTALLERS for runtime scripts, not
+   runtime scripts.)*
+
+2. **Does it install/configure a systemd unit or a runtime helper onto a host?**
+   → `scripts/setup/` (numbered if part of the fresh-Ubuntu sequence), `scripts/boot/`,
+   `scripts/exfat/`, or `scripts/replication/`. Run once per machine, never during playout.
+
+3. **Does it only ever run on the build host** (eggs produce, release packaging, wiki,
+   mirrors, QA)? → `tools/eggs/`, `tools/release/`, `tools/wiki/`, `tools/ci/`, `tools/map/`,
+   `tools/smoke/`, `tools/startup/`. These may be excluded from the ISO.
+
+4. **Is it superseded or dead?** → `scripts/deprecated/` (or `tools/eggs/unused/`). **Move,
+   never delete** — `git mv` so history follows. `scripts/legacy/` and `scripts/unused/` were
+   folded into `scripts/deprecated/{legacy,unused}/` by WO-273; do not recreate them. One
+   archive, one meaning.
+
+**Before you move anything:** name the caller first. `grep -rn <basename>` across `src/`,
+`client/`, `scripts/`, `tools/`, `package.json`, `scripts/systemd/*.service`,
+`/etc/systemd/system/`, `~/.config/openbox/autostart`, and the eggs exclude lists. Note that
+basename grep alone is **not sufficient** — `tools/runtime/patch-wo47-exfat-boot-scripts.sh`
+builds its fallback path as `"${HERE}/wo47-${name}"`, so `wo47-highascg-exfat-boot.sh` looks
+unreferenced but is live. Grep for constructed paths (`${VAR}/...${VAR}`) too.
+
+**When evidence is ambiguous, classify as runtime.** A wrong "deprecated" call breaks a live
+playout box; a wrong "runtime" call only leaves clutter.
+
+After any move run `npm run verify:script-paths` and `npm run test:ci`.
 
 ---
 

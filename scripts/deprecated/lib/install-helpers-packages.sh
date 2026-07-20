@@ -1,3 +1,10 @@
+#!/usr/bin/env bash
+# DEPRECATED (WO-273) — abandoned split, never wired up.
+#
+# Added 2026-07-04 as part of a split of scripts/lib/install-helpers.sh. No script ever
+# sourced it, and every function it defines is STILL defined in the 518-line monolith at
+# scripts/lib/install-helpers.sh. Editing this file changes nothing. Edit the monolith.
+#
 # DeckLink tarball: try URL first (wget/curl), then HIGHASCG_DECKLINK_TAR, then /tmp/decklink.tar.gz
 # Writes to $1 (e.g. /tmp/decklink.tar.gz). Returns 0 if valid .tar.gz content.
 fetch_decklink_tarball() {

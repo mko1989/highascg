@@ -18,7 +18,9 @@ Files here remain for reference and one-off recovery; do not use on new Blackwel
 | `nvidia/restore-nvidia-595-closed-userspace.sh` | `setup/03-nvidia-open-595.sh` |
 | `nvidia/fix-nvidia-dkms-prebuilt-conflict.sh` | not needed with open `nvidia-open` |
 | `restore-production-host.sh` | `setup/` steps 01–11 |
-| `../legacy/install.sh` phases 1–5 | `setup/` steps 01–11 |
+| `legacy/install.sh` phases 1–5 | `setup/` steps 01–11 |
+| `lib/install-helpers-{github,packages,runtime}.sh` | `../lib/install-helpers.sh` (monolith still defines all 23 functions) |
+| `highascg-exfat-server-update.sh` | `../exfat/highascg-exfat-server-update.sh` (the one `install-exfat-systemd-units.sh` actually installs) |
 
 ## Active infrastructure (moved out of deprecated)
 

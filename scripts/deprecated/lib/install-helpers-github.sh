@@ -1,3 +1,10 @@
+#!/usr/bin/env bash
+# DEPRECATED (WO-273) — abandoned split, never wired up.
+#
+# Added 2026-07-04 as part of a split of scripts/lib/install-helpers.sh. No script ever
+# sourced it, and every function it defines is STILL defined in the 518-line monolith at
+# scripts/lib/install-helpers.sh. Editing this file changes nothing. Edit the monolith.
+#
 get_latest_github_tag() {
     curl --silent "https://api.github.com/repos/$1/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/'
 }

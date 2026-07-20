@@ -1,3 +1,10 @@
+#!/usr/bin/env bash
+# DEPRECATED (WO-273) — abandoned split, never wired up.
+#
+# Added 2026-07-04 as part of a split of scripts/lib/install-helpers.sh. No script ever
+# sourced it, and every function it defines is STILL defined in the 518-line monolith at
+# scripts/lib/install-helpers.sh. Editing this file changes nothing. Edit the monolith.
+#
 # Compare version strings: returns 0 if $1 >= $2
 version_gte() {
     [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
