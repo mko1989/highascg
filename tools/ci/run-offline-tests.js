@@ -30,6 +30,7 @@ const FILES = [
 	'tools/smoke/smoke-device-graph-multiview-suggest.test.js',
 	'tools/smoke/smoke-config-classify.js',
 	'tools/smoke/smoke-config-generator-routing.js',
+	'tools/smoke/smoke-wo274-config-generator-stale.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
 	'tools/smoke/smoke-api-auth.test.js',
 	'tools/smoke/smoke-settings-nuclear-password.test.js',

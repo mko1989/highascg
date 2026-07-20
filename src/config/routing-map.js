@@ -13,6 +13,20 @@ function readCasparSetting(cfg, key) {
 	return undefined
 }
 
+/**
+ * Does this destination `mode` occupy a `mainScreenIndex` PGM/PRV bus slot?
+ *
+ * `multiview`, `stream` and `operator_gui` are dedicated utility channels allocated on their own
+ * (see {@link getChannelMap}'s multiview/operatorGui blocks) — they carry a `mainScreenIndex` only
+ * as a monitor-placement hint, never as a claim on a PGM/PRV pair.
+ * @param {unknown} mode
+ * @returns {boolean}
+ */
+function isMainBusDestinationMode(mode) {
+	const m = String(mode || 'pgm_prv')
+	return m !== 'multiview' && m !== 'stream' && m !== 'operator_gui'
+}
+
 function inferGraphMainUsage(config) {
 	const out = {
 		maxMainCount: 0,
@@ -40,6 +54,13 @@ function inferGraphMainUsage(config) {
 		const topDests = routingDestinationsFromConfig(config) ?? []
 		const match = topDests.find((d) => String(d?.id || '') === ref)
 		if (!match) continue
+		// WO-274: resolveMainScreenCount deliberately filters multiview/stream/operator_gui out of
+		// `routableDests`, then re-admits whatever this function counted via
+		// `Math.max(..., graphMainUsage.maxMainCount)`. Without the same filter here, merely *cabling*
+		// a multiview/stream/operator_gui destination (e.g. multiview → DeckLink) inflated the screen
+		// count and generated a phantom PGM+PRV channel pair for a screen index that has no PGM/PRV
+		// destination behind it — channels that are never routed to and never shown in the GUI.
+		if (!isMainBusDestinationMode(match.mode)) continue
 		const idx = Math.max(0, parseInt(String(match.mainScreenIndex ?? 0), 10) || 0)
 		out.maxMainCount = Math.max(out.maxMainCount, idx + 1)
 	}
@@ -59,12 +80,9 @@ function resolveMainScreenCount(config) {
 	if (routedDests.length === 0) {
 		return Math.max(1, graphMainUsage.maxMainCount)
 	}
-	const routableDests = routedDests.filter((d) => {
-		const mode = String(d?.mode || 'pgm_prv')
-		// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
-		// mainScreenIndex/programChannels slot.
-		return mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui'
-	})
+	// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
+	// mainScreenIndex/programChannels slot. Same predicate is applied in inferGraphMainUsage (WO-274).
+	const routableDests = routedDests.filter((d) => isMainBusDestinationMode(d?.mode))
 	// When destinations exist, drive screen count from topology only — stale casparServer.screen_count must not spawn extra PGM/PRV pairs.
 	if (routableDests.length > 0) {
 		const fromDest = Math.max(
@@ -79,10 +97,7 @@ function resolveMainScreenCount(config) {
 function resolvePreviewEnabledByMain(config, screenCount) {
 	const dests = routingDestinationsFromConfig(config) ?? []
 	const graphMainUsage = inferGraphMainUsage(config)
-	const withMode = dests.filter(d => {
-		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui'
-	})
+	const withMode = dests.filter((d) => isMainBusDestinationMode(d?.mode))
 	if (!withMode.length) {
 		return Array.from({ length: screenCount }, (_, idx) => !graphMainUsage.pgmOnlyMainIndices.has(idx))
 	}
@@ -462,6 +477,7 @@ module.exports = {
 	getRouteString,
 	resolveMainScreenCount,
 	resolvePreviewEnabledByMain,
+	isMainBusDestinationMode,
 	resolveStreamOutputCasparChannel,
 	resolveDecklinkInputDeviceIndex,
 	readCasparSetting,

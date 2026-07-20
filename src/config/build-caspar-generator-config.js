@@ -4,6 +4,7 @@ const defaults = require('./defaults')
 const { mergeAudioRoutingIntoConfig } = require('./config-generator')
 const { normalizeRtmpConfig } = require('./rtmp-output')
 const { resolveMainScreenCount } = require('./routing')
+const { isMainBusDestinationMode } = require('./routing-map')
 const { STANDARD_VIDEO_MODES, normalizeVideoModeId } = require('./config-modes')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('./screen-destinations')
 const { applyPixelMappingProgramScreens } = require('./pixel-mapping-config')
@@ -42,10 +43,10 @@ function applyDestinationOverridesToScreens(merged, appConfig) {
 	const rawList = destinationsFromConfig(appConfig || {})
 	const list = getDestinationList(appConfig)
 	if (!list.length) return
-	const routable = list.filter((d) => {
-		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream'
-	})
+	// WO-274: must match routing-map's main-bus predicate exactly. This filter previously omitted
+	// `operator_gui`, so an operator GUI destination parked on a high mainScreenIndex pushed
+	// `merged.screen_count` past the real PGM/PRV count that resolveMainScreenCount had just computed.
+	const routable = list.filter((d) => isMainBusDestinationMode(d?.mode))
 	if (!routable.length) return
 	const mainIdxs = routable.map((d) => Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0))
 	const dstCount = Math.max(...mainIdxs, 0) + 1
@@ -138,9 +139,47 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		return ''
 	}
 
+	/**
+	 * WO-275: this projection is additive — `merged` is seeded from the persisted `casparServer`
+	 * blob, so a `screen_N_decklink_device` written by an *earlier* binding survives forever once
+	 * the operator re-cables that physical DeckLink to a different destination. The graph is the
+	 * source of truth, so before claiming `devNum` for a target, drop every other target still
+	 * pointing at the same device. Without this, rebinding DeckLink 3 from "PGM 2" to "Multiview"
+	 * left `screen_2_decklink_device: 3` in place and the generator emitted TWO `<decklink>`
+	 * consumers on device 3 (one under the PGM 2 channel, one under multiview) — Caspar opens the
+	 * screen one first, so the output kept showing PGM 2 across restarts.
+	 * @param {number} devNum
+	 * @param {'multiview' | number} keep - target that legitimately owns `devNum`
+	 */
+	function releaseDecklinkDeviceFromOtherTargets(devNum, keep) {
+		if (!Number.isFinite(devNum) || devNum <= 0) return
+		// Scan the full 1..16 screen key space, not just `merged.screen_count` — a stale binding on a
+		// screen index that no longer exists still has to be cleared out of the flat config.
+		for (let n = 1; n <= 16; n++) {
+			if (keep === n) continue
+			const cur = parseInt(String(merged[`screen_${n}_decklink_device`] || '0'), 10) || 0
+			if (cur !== devNum) continue
+			// Tiled (LED-wall) screens own the device through `screen_N_decklink_tiles`, not this key —
+			// assignDecklinkToScreen refuses to touch them, so releasing them here would be inconsistent.
+			const tiles = merged[`screen_${n}_decklink_tiles`]
+			if (Array.isArray(tiles) && tiles.length > 0) continue
+			merged[`screen_${n}_decklink_device`] = 0
+			merged[`screen_${n}_decklink_key_device`] = 0
+			merged[`screen_${n}_decklink_replace_screen`] = false
+		}
+		if (keep !== 'multiview') {
+			const mv = parseInt(String(merged.multiview_decklink_device || '0'), 10) || 0
+			if (mv === devNum) {
+				merged.multiview_decklink_device = 0
+				merged.multiview_decklink_key_device = 0
+			}
+		}
+	}
+
 	function assignDecklinkToScreen(n, devNum, connector) {
 		const existingTiles = merged[`screen_${n}_decklink_tiles`]
 		if (Array.isArray(existingTiles) && existingTiles.length > 0) return
+		releaseDecklinkDeviceFromOtherTargets(devNum, n)
 		merged[`screen_${n}_decklink_device`] = devNum
 		if (merged[`screen_${n}_decklink_replace_screen`] === undefined) {
 			merged[`screen_${n}_decklink_replace_screen`] = true
@@ -163,6 +202,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
 				assignDecklinkToScreen(n, devNum, c)
 			} else if (binding?.type === 'multiview') {
+				releaseDecklinkDeviceFromOtherTargets(devNum, 'multiview')
 				merged.multiview_decklink_device = devNum
 				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 				applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)
@@ -187,6 +227,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			}
 			if (!dest) return
 			if (String(dest.mode || '') === 'multiview') {
+				releaseDecklinkDeviceFromOtherTargets(devNum, 'multiview')
 				merged.multiview_decklink_device = devNum
 				applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 				applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)
@@ -201,6 +242,7 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			const n = idx + 1
 			if (n > 0) assignDecklinkToScreen(n, devNum, c)
 		} else if (sourceId === 'caspar_mv_out') {
+			releaseDecklinkDeviceFromOtherTargets(devNum, 'multiview')
 			merged.multiview_decklink_device = devNum
 			applyDecklinkKeyFillFromConnector(merged, 'multiview_', c)
 			applyDecklinkConsumerSettingsFromConnector(merged, 'multiview_', c)

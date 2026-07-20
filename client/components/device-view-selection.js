@@ -179,10 +179,16 @@ export function registerDeviceViewSelection(ctx) {
 				intent,
 				mappedOutputEdges,
 				connectorById: connectorByIdMap,
+				// WO-276: `ctx.load()` short-circuits to the module-level payload cache for 5 s
+				// (device-view-render.js), so a second destination edit committed within that window
+				// re-rendered the inspector from the *pre-edit* payload and silently reverted the field
+				// that was just saved (classically: set width, then set height → height snaps back to
+				// 1080). The PATCH itself always succeeded; only the read-back was stale. A mutation
+				// must never be answered from a cache written before it.
 				patchDestination: (did, patch) =>
 					Actions.patchDestination(did, patch).then(() => {
 						ctx.setCasparRestartDirty(true)
-						return ctx.load()
+						return ctx.load({ forceRefresh: true })
 					}),
 				removeDestination: (did) =>
 					Actions.removeDestination(did).then(() => {
