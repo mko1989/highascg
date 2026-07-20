@@ -4,14 +4,20 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const path = require('path')
+const os = require('os')
 const { execFileSync } = require('child_process')
 const { markdownToHtml } = require('../wiki/md-to-html')
 const { resolveWikiLink } = require('../wiki/resolve-link')
 
 const REPO_ROOT = path.join(__dirname, '..', '..')
 const DOCS_ROOT = path.join(REPO_ROOT, 'docs')
+/* Build into a throwaway dir: building into docs/wiki-site/ rewrote its generatedAt stamp on every
+ * gate run, so `npm run test:ci` left the working tree dirty and every commit carried the churn.
+ * The committed site is still what ships — `node tools/wiki/build-wiki.js` (no env) regenerates it. */
 const SITE_DIR = path.join(DOCS_ROOT, 'wiki-site')
-const BUNDLE_PATH = path.join(SITE_DIR, 'assets', 'wiki-bundle.js')
+const BUILD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'highascg-wiki-'))
+const BUILD_ENV = { ...process.env, HIGHASCG_WIKI_OUT_DIR: BUILD_DIR }
+const BUNDLE_PATH = path.join(BUILD_DIR, 'assets', 'wiki-bundle.js')
 
 describe('wiki build', () => {
 	it('markdown converter handles headings and code', () => {
@@ -22,7 +28,7 @@ describe('wiki build', () => {
 	})
 
 	it('build-wiki.js produces bundle with pages', () => {
-		execFileSync('node', ['tools/wiki/build-wiki.js'], { cwd: REPO_ROOT, stdio: 'pipe' })
+		execFileSync('node', ['tools/wiki/build-wiki.js'], { cwd: REPO_ROOT, stdio: 'pipe', env: BUILD_ENV })
 		assert.ok(fs.existsSync(BUNDLE_PATH), 'wiki-bundle.js missing after build')
 		const src = fs.readFileSync(BUNDLE_PATH, 'utf8')
 		assert.match(src, /window\.WIKI_BUNDLE=/)
@@ -59,7 +65,7 @@ describe('wiki build', () => {
 	})
 
 	it('built wiki README links target hash routes', () => {
-		execFileSync('node', ['tools/wiki/build-wiki.js'], { cwd: REPO_ROOT, stdio: 'pipe' })
+		execFileSync('node', ['tools/wiki/build-wiki.js'], { cwd: REPO_ROOT, stdio: 'pipe', env: BUILD_ENV })
 		const src = fs.readFileSync(BUNDLE_PATH, 'utf8')
 		const bundle = JSON.parse(src.replace(/^[\s\S]*?window\.WIKI_BUNDLE=/, '').replace(/;\s*$/, ''))
 		const html = bundle.content['wiki--README']

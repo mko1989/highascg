@@ -16,7 +16,12 @@ const { resolveWikiLink } = require('./resolve-link')
 
 const REPO_ROOT = path.join(__dirname, '..', '..')
 const DOCS_ROOT = path.join(REPO_ROOT, 'docs')
-const SITE_DIR = path.join(DOCS_ROOT, 'wiki-site')
+/* HIGHASCG_WIKI_OUT_DIR lets a caller build somewhere other than the committed site — the smoke
+ * test uses it so a gate run does not rewrite docs/wiki-site (its generatedAt stamp dirtied the
+ * working tree on every `npm run test:ci`). Unset = normal build into docs/wiki-site/. */
+const SITE_DIR = process.env.HIGHASCG_WIKI_OUT_DIR
+	? path.resolve(process.env.HIGHASCG_WIKI_OUT_DIR)
+	: path.join(DOCS_ROOT, 'wiki-site')
 const MANIFEST_PATH = path.join(SITE_DIR, 'manifest.json')
 const BUNDLE_PATH = path.join(SITE_DIR, 'assets', 'wiki-bundle.js')
 
