@@ -33,9 +33,9 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-274 | Config generator keeps stale PGM/PRV channels that are unused and invisible in the GUI | M | **DONE** — graph cable from multiview/stream/operator_gui inflated screen count via Math.max; isMainBusDestinationMode() filter |
 | WO-275 | Config generator ignores a changed destination (DeckLink out 3: pgm2 → multiview still shows pgm2 after restarts) | M | **DONE** — additive DeckLink projection left screen_2_decklink_device=3 AND multiview_decklink_device=3 (both in live config); now released on claim |
 | WO-276 | Screen-destination custom resolution: height reverts to 1080, inspector disagrees with the node | M | **DONE** — NOT linked to stale channels: 5s client payload cache answered the post-save reload; now forceRefresh |
-| WO-277 | Loading a project doesn't actually load anything | M | TODO |
+| WO-277 | Loading a project doesn't actually load anything | M | **DONE** — /api/project/load persisted the slug but never rewrote ctx.sceneDeck (which the API prefers over disk); new project-activate.js adopts deck, prunes live entries, re-stages preview, surfaces restart-required |
 | WO-278 | Cable render performance; allow re-grabbing a cable end and reconnecting it elsewhere | M | TODO |
-| WO-279 | Operator-GUI Firefox opens on the wrong monitor (mouse lock is correct); review the xrandr/window-placement workflow | M | TODO |
+| WO-279 | Operator-GUI Firefox opens on the wrong monitor (mouse lock is correct); review the xrandr/window-placement workflow | M | **DONE** — xdotool --class matched res_class not res_name so the search never matched and burned an 8s timeout; placement also never verified. Same monitor source as pointer-confine + verify/retry |
 | WO-280 | Caspar JPEG compose preview: background tab causes lag; thumbnail creation for an ever-changing JPEG needs error handling/backpressure | M | **DONE** (93fa79e) — push-driven at 25Hz x clients x channels, each push a full re-read; now single-flight + etag memo server-side, visibility-aware polling and capped backoff client-side |
 | WO-281 | Audit `work/work-orders/logs.19.07.26` — many errors/false calls during normal operation; check whether enabling AMCP batch caused regressions | M | **DONE** — all errors trace to one powered-off DeckLink 4; amcp_batch was never enabled. Report: 281_WO_CASPAR_LOG_AUDIT.md |
 | WO-282 | Browser source: route a real audio source in; give it a virtual display shown in kiosk and relayed to Caspar; options for operator mouse/keyboard control | L (research) | TODO |
@@ -46,6 +46,7 @@ Gate baseline at time of writing: `npm run test:ci` → 707 tests, 705 pass, 0 f
 | WO-287 | No modal may blur the background — none | S | **DONE** (0a5a80a) — blur removed from modal shell + ingest drag overlay; regression test |
 | WO-288 | Generated Caspar config should not emit a custom 1080p50 mode (built in) | S | **DONE** (487f2f3) — mode-alias normalization; also registered 23 previously-ungated config-generator tests |
 | WO-289 | Looks editor canvas background should be a low-opacity alpha checkerboard, visibly distinct from the surrounding div | S | **DONE** (0a5a80a) — 6% alpha checkerboard on the looks-editor canvas only |
+| WO-291 | DeckLink input does not use its captured frame as the looks thumbnail (added by owner 2026-07-20) | M | TODO |
 | WO-290 | Opt-in operator-GUI monitor picker on a fresh/factory-reset system: hover + left click selects the GUI screen, then the service sleeps | M | TODO |
 
 ## Execution notes
