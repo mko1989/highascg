@@ -58,7 +58,40 @@ elif ! pgrep -u "$USER_NAME" -f "firefox.*${PROFILE}" >/dev/null 2>&1; then
 	clear_stale_profile_locks "$PROFILE"
 fi
 
+# PROFILE IN USE. Firefox does NOT open a window when a second instance is pointed at a profile
+# another live process already holds — it opens a modal titled "Close Firefox" and waits. That is
+# what the operator hit on 2026-07-20: the button launched, no window ever appeared, and the open
+# timed out with a stray modal left on screen.
+#
+# The caller now REUSES an already-mapped helper window instead of launching at all, so reaching
+# here means the holding instance has no usable window (hung, or windowless). In that case a second
+# fixed profile is useless too — take a distinct sibling profile and --new-instance so a real
+# window is guaranteed to appear. -no-remote/--new-instance also stops this launch from being
+# swallowed by the kiosk's remote-control socket.
+NEW_INSTANCE=()
+if pgrep -u "$USER_NAME" -f "firefox.*${PROFILE}" >/dev/null 2>&1; then
+	# Bounded set of alternates, reused in place — never an unbounded pile of new profile dirs.
+	ALT=""
+	for slot in 1 2 3 4 5; do
+		cand="${PROFILE}-alt${slot}"
+		if ! pgrep -u "$USER_NAME" -f "firefox.*${cand}" >/dev/null 2>&1; then
+			ALT="$cand"
+			break
+		fi
+	done
+	if [[ -z "$ALT" ]]; then
+		echo "all alternate profiles busy — refusing to open a modal-only Firefox" >&2
+		exit 1
+	fi
+	echo "profile in use by a live process — using alternate profile ${ALT}" >>"$LOG"
+	PROFILE="$ALT"
+	mkdir -p "$PROFILE"
+	clear_stale_profile_locks "$PROFILE"
+	chmod 700 "$PROFILE" 2>/dev/null || true
+	NEW_INSTANCE=(--new-instance)
+fi
+
 {
-	echo "=== $(date -Is) launch $BIN profile=$PROFILE DISPLAY=$DISPLAY ==="
-	exec "$BIN" -profile "$PROFILE" -url "${1:-about:blank}"
+	echo "=== $(date -Is) launch $BIN profile=$PROFILE DISPLAY=$DISPLAY new_instance=${#NEW_INSTANCE[@]} ==="
+	exec "$BIN" "${NEW_INSTANCE[@]+"${NEW_INSTANCE[@]}"}" -profile "$PROFILE" -url "${1:-about:blank}"
 } >>"$LOG" 2>&1

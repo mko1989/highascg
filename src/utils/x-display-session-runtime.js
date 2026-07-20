@@ -57,8 +57,9 @@ async function parkPointerOnOperatorDisplay(config, opts = {}) {
  *    title — the same marker the shape helper matches on.
  *
  * @param {string} action
- * @param {{ excludeTitle?: string }} [opts]
- * @returns {Promise<string[]>}
+ * @param {{ excludeTitle?: string, withNames?: boolean }} [opts]
+ * @returns {Promise<string[] | { id: string, name: string }[]>} ids, or `{id,name}` with `withNames`
+ *   (the caller needs titles to tell a real helper window from a "Close Firefox" profile-lock modal)
  */
 async function findGuiWindowIds(action, opts = {}) {
 	const winClassRaw = GUI_WINDOW_CLASS[action]
@@ -80,21 +81,72 @@ async function findGuiWindowIds(action, opts = {}) {
 			}
 		}
 	}
-	if (!found.size || !opts.excludeTitle) return [...found]
+	if (!found.size) return []
 
-	/** @type {string[]} */
+	// The kiosk process owns MORE than the marker-titled window. Live on this box the kiosk PID also
+	// owns a 1x1 off-screen window at -99,-99 titled just "Firefox" — no marker in its title, so a
+	// title-only filter lets it through. If that window is ever accepted as "the helper", the
+	// watchdog sees a helper window forever and NEVER restores the kiosk. So exclude the whole kiosk
+	// PID, and drop windows too small to be a thing the operator could use.
+	const kioskPid = opts.excludeTitle ? await findWindowPidByTitle(opts.excludeTitle, env) : null
+
+	/** @type {{ id: string, name: string }[]} */
 	const kept = []
 	for (const wid of found) {
 		let name = ''
 		try {
 			const { stdout } = await execFileAsync('xdotool', ['getwindowname', wid], { env, timeout: 3000 })
-			name = String(stdout || '')
+			name = String(stdout || '').trim()
 		} catch {
 			/* unnamed window — cannot be the marker-carrying kiosk, keep it */
 		}
-		if (!name.includes(opts.excludeTitle)) kept.push(wid)
+		if (opts.excludeTitle && name.includes(opts.excludeTitle)) continue
+		if (kioskPid && (await getWindowPid(wid, env)) === kioskPid) continue
+		if (!(await isUsableWindowSize(wid, env))) continue
+		kept.push({ id: wid, name })
 	}
-	return kept
+	return opts.withNames ? kept : kept.map((w) => w.id)
+}
+
+/** @returns {Promise<string|null>} the _NET_WM_PID of the first window whose title contains `title` */
+async function findWindowPidByTitle(title, env) {
+	try {
+		const { stdout } = await execFileAsync('xdotool', ['search', '--name', title], { env, timeout: 3000 })
+		for (const id of String(stdout || '').trim().split(/\s+/).filter(Boolean)) {
+			const pid = await getWindowPid(id, env)
+			if (pid) return pid
+		}
+	} catch {
+		/* no kiosk window found — nothing to exclude by PID */
+	}
+	return null
+}
+
+/** @returns {Promise<string|null>} */
+async function getWindowPid(wid, env) {
+	try {
+		const { stdout } = await execFileAsync('xdotool', ['getwindowpid', wid], { env, timeout: 3000 })
+		return String(stdout || '').trim() || null
+	} catch {
+		return null
+	}
+}
+
+/** A window the operator can actually see and use — not a 1x1 IPC/marker window. @readonly */
+const MIN_USABLE_WINDOW_W = 80
+const MIN_USABLE_WINDOW_H = 40
+
+/** @returns {Promise<boolean>} */
+async function isUsableWindowSize(wid, env) {
+	try {
+		const { stdout } = await execFileAsync('xdotool', ['getwindowgeometry', '--shell', wid], { env, timeout: 3000 })
+		const w = Number(/^WIDTH=(\d+)$/m.exec(String(stdout))?.[1])
+		const h = Number(/^HEIGHT=(\d+)$/m.exec(String(stdout))?.[1])
+		if (!Number.isFinite(w) || !Number.isFinite(h)) return true
+		return w >= MIN_USABLE_WINDOW_W && h >= MIN_USABLE_WINDOW_H
+	} catch {
+		return true // cannot measure — do not throw away a possibly good window
+	}
 }
 
 /**
@@ -125,16 +177,56 @@ async function promoteGuiWindowsAboveKiosk(action, config, opts = {}) {
 	const rect = resolveOperatorDisplayRect(config)
 	const x = rect ? rect.x + Math.max(0, Math.floor(rect.width * 0.05)) : 0
 	const y = rect ? rect.y + Math.max(0, Math.floor(rect.height * 0.05)) : 0
+	// ABOVE-promotion goes through the python/EWMH helper, NOT `xdotool windowstate`: that
+	// subcommand only exists in xdotool >= 3.20211022 and this box ships 3.20160805.1, where it
+	// errors with "Unknown command: windowstate". The old `.catch(() => {})` hid that, so the one
+	// step that makes WO-283 work was a silent no-op and the helper stayed stuck under the kiosk.
+	const promoter = resolveWindowAbovePromoter()
+	let promoted = 0
 	for (const wid of ids) {
-		await execFileAsync('xdotool', ['windowstate', '--add', 'ABOVE', wid], { env, timeout: 3000 }).catch(() => {})
+		let ok = false
+		if (promoter) {
+			try {
+				await execFileAsync('python3', [promoter, wid], { env, timeout: 5000 })
+				ok = true
+			} catch (e) {
+				log('warn', `[X-Display] ABOVE promote helper failed for ${wid}: ${e?.message || e}`)
+			}
+		}
+		if (!ok) {
+			// Only useful on a newer xdotool; harmless (and still logged) where the verb is missing.
+			await execFileAsync('xdotool', ['windowstate', '--add', 'ABOVE', wid], { env, timeout: 3000 }).catch((e) =>
+				log('warn', `[X-Display] xdotool windowstate fallback failed for ${wid}: ${e?.message || e}`),
+			)
+		}
+		if (ok) promoted += 1
 		await execFileAsync('xdotool', ['windowraise', wid], { env, timeout: 3000 }).catch(() => {})
 		if (rect) {
 			await execFileAsync('xdotool', ['windowmove', wid, String(x), String(y)], { env, timeout: 3000 }).catch(() => {})
 		}
 		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: 3000 }).catch(() => {})
 	}
-	log('info', `[X-Display] Promoted ${action} ABOVE the kiosk (${ids.length} window(s))`)
+	log(
+		promoted === ids.length ? 'info' : 'warn',
+		`[X-Display] Promoted ${action} ABOVE the kiosk (${promoted}/${ids.length} window(s) got the ABOVE layer)`,
+	)
 	return true
+}
+
+/** @returns {string|null} tools/runtime/highascg-window-above.py, or its installed copy */
+function resolveWindowAbovePromoter() {
+	for (const p of [
+		path.join(REPO_ROOT, 'tools/runtime/highascg-window-above.py'),
+		'/usr/local/lib/highascg/highascg-window-above.py',
+		'/usr/local/bin/highascg-window-above.py',
+	]) {
+		try {
+			if (fs.existsSync(p) && fs.statSync(p).isFile()) return p
+		} catch {
+			/* ignore */
+		}
+	}
+	return null
 }
 
 /**
@@ -188,7 +280,12 @@ const GUI_WINDOW_CLASS = {
 	desktopvideo_setup: 'DesktopVideo',
 	desktop_video_updater: 'DesktopVideo',
 	alsamixer: 'Alsamixer',
-	firefox: 'Navigator',
+	// 'Navigator' is Firefox-ESR's res_NAME for a real browser window on this box. 'Firefox' is the
+	// res_name its DIALOGS use — including the "Close Firefox" profile-lock modal, which we WANT the
+	// lookup to see so it can be raised for the operator to dismiss instead of hiding under the
+	// kiosk. Safe only because findGuiWindowIds now excludes the kiosk PID and 1x1 windows: the
+	// kiosk's own stray 1x1 "Firefox" window also carries res_name 'Firefox'.
+	firefox: ['Navigator', 'Firefox'],
 	'file-manager': ['Thunar', 'Pcmanfm', 'Nautilus', 'Dolphin'],
 	calamares: 'calamares',
 }
@@ -200,13 +297,59 @@ function displaySessionEnv() {
 	}
 }
 
-async function commandExists(bin) {
-	try {
-		await execFileAsync('/usr/bin/command', ['-v', bin], { timeout: 2000, env: displaySessionEnv() })
-		return true
-	} catch {
-		return false
+/** Default PATH used when the service env somehow has none. @readonly */
+const FALLBACK_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+/**
+ * Resolve an executable the way `command -v` would, IN-PROCESS.
+ *
+ * THIS IS THE WO-283 ROOT-CAUSE FIX. The previous implementation shelled out to
+ * `execFile('/usr/bin/command', ['-v', bin])` — but `command` is a POSIX SHELL BUILTIN, not a
+ * binary, and on this box it does not exist as a file:
+ *
+ *   $ ls -l /usr/bin/command
+ *   ls: cannot access '/usr/bin/command': No such file or directory
+ *   $ type command
+ *   command is a shell builtin
+ *
+ * execFile therefore threw ENOENT for EVERY probe, so `commandExists()` answered `false` for every
+ * binary on the box — including `xdotool`, which is installed. `findGuiWindowIds()` gates on
+ * `commandExists('xdotool')` and so returned `[]` on every watchdog tick, no matter what was on
+ * screen. That is why the operator's "Open window" press always ended in `helper_never_appeared`:
+ * the helper window was there, the lookup was structurally blind to it. Verified live 2026-07-20 —
+ * before this fix `findGuiWindowIds('firefox', …)` returned `[]` while `xdotool search
+ * --onlyvisible --classname Navigator` returned the running helper window 33554477.
+ *
+ * Doing the lookup with `fs` removes the dependency on any external binary existing, which is
+ * exactly the class of bug that caused this.
+ *
+ * @param {string} bin
+ * @returns {string|null} absolute path, or null when not found/not executable
+ */
+function lookupCommandPath(bin) {
+	const name = String(bin || '').trim()
+	if (!name) return null
+	const candidates = name.includes('/')
+		? [name]
+		: String(process.env.PATH || FALLBACK_PATH)
+				.split(':')
+				.filter(Boolean)
+				.map((dir) => path.join(dir, name))
+	for (const p of candidates) {
+		try {
+			if (!fs.statSync(p).isFile()) continue
+			fs.accessSync(p, fs.constants.X_OK)
+			return p
+		} catch {
+			/* not here, or not executable — keep looking */
+		}
 	}
+	return null
+}
+
+/** @param {string} bin @returns {Promise<boolean>} */
+async function commandExists(bin) {
+	return lookupCommandPath(bin) !== null
 }
 
 /**
@@ -433,6 +576,8 @@ module.exports = {
 	parkPointerOnOperatorDisplay,
 	raiseOperatorGuiWindows,
 	findGuiWindowIds,
+	lookupCommandPath,
+	resolveWindowAbovePromoter,
 	promoteGuiWindowsAboveKiosk,
 	positionGuiWindowForAction,
 	scheduleGuiWindowPosition,

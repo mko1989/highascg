@@ -53,6 +53,7 @@ install_operator_firefox_launchers() {
 		highascg-operator-snap-home.sh \
 		highascg-launch-operator-firefox.sh \
 		highascg-clean-firefox-snap-leftovers.sh \
+		highascg-window-above.py \
 		highascg-tailscale-up.sh; do
 		if [[ -f "${runtime}/${_name}" ]]; then
 			install -m 0755 -o root -g root "${runtime}/${_name}" "/usr/local/lib/highascg/${_name}"

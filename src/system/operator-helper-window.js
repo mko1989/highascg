@@ -73,10 +73,28 @@ const STATE = /** @type {const} */ ({
 	RESTORING: 'restoring',
 })
 
-/** Watchdog cadence. 8 ticks * 750ms = 6s for a helper to map its first window before we treat it
- * as dead — nvidia-settings and the DeckLink setup GUI are slow starters on this box. @readonly */
+/** Watchdog cadence.
+ *
+ * 40 ticks * 750ms = 30s for a helper to map its first window. This was 8 ticks (6s) and 6s IS NOT
+ * ENOUGH: a cold Firefox start on a fresh profile, nvidia-settings enumerating GPUs, and the
+ * Blackmagic DeckLink setup GUI all routinely take longer than that on this box, and the operator
+ * saw the kiosk snap back before the app had drawn anything. The long budget costs nothing in the
+ * cases that matter, because "hasn't appeared YET" is the only path that waits it out — a helper
+ * that actually DIED is caught by the childExited branch of decideRestoreOnExit and restores in
+ * about a second, so `kill -9` / segfault recovery stays as responsive as it was. @readonly */
 const WATCHDOG_INTERVAL_MS = 750
-const WATCHDOG_APPEAR_TICKS = 8
+const WATCHDOG_APPEAR_TICKS = 40
+
+/** Grace before "the child exited and nothing is mapped yet" counts as a crash. Launchers that fork
+ * and exit immediately (thunar, and any `sh -c … &` wrapper) legitimately look identical to a crash
+ * for the first moment. 4 ticks = 3s: still a fast crash-restore, but no longer a race the forking
+ * launchers lose. @readonly */
+const WATCHDOG_EARLY_EXIT_GRACE_TICKS = 4
+
+/** Titles Firefox uses when a SECOND instance is pointed at an in-use profile. It puts up a modal
+ * ("Close Firefox") instead of a browser window — the exact failure the operator hit on 2026-07-20.
+ * Matching these lets the watchdog say `profile_locked` instead of timing out mutely. @readonly */
+const PROFILE_LOCK_TITLE_RE = /close firefox|already running|profile (?:is )?(?:in use|missing)|restart firefox/i
 
 /* ------------------------------------------------------------------------------------------- *
  * PURE LOGIC (offline-tested: tools/smoke/smoke-wo283-operator-helper-window.test.js)
@@ -132,12 +150,20 @@ function nextHelperState(state, event) {
  * the window lives on) and too lax (a `kill -9`ed app whose exit event we missed). The mapped X
  * window is the ground truth; the child exit only decides how fast we trust its absence.
  *
+ * Every terminal reason is a distinct code, so the journal answers "why did it give up?" without
+ * anyone having to reconstruct the X state after the fact (which is exactly what the 2026-07-20
+ * failure cost).
+ *
  * @param {{ state: string, childExited: boolean, windowPresent: boolean, everSawWindow: boolean,
- *           restoreDone: boolean, ticks: number, maxAppearTicks?: number }} s
+ *           restoreDone: boolean, ticks: number, maxAppearTicks?: number,
+ *           earlyExitGraceTicks?: number, profileLocked?: boolean }} s
  * @returns {{ restore: boolean, reason: string }}
  */
 function decideRestoreOnExit(s) {
 	const maxAppearTicks = Number.isFinite(s.maxAppearTicks) ? Number(s.maxAppearTicks) : WATCHDOG_APPEAR_TICKS
+	const graceTicks = Number.isFinite(s.earlyExitGraceTicks)
+		? Number(s.earlyExitGraceTicks)
+		: WATCHDOG_EARLY_EXIT_GRACE_TICKS
 	if (s.restoreDone) return { restore: false, reason: 'already_restored' }
 	if (s.state !== STATE.OPENING && s.state !== STATE.OPEN) return { restore: false, reason: 'not_open' }
 	// A live window outranks a dead child: the launcher/forking app is allowed to have exited.
@@ -145,11 +171,38 @@ function decideRestoreOnExit(s) {
 	if (s.everSawWindow) {
 		return { restore: true, reason: s.childExited ? 'helper_closed' : 'helper_window_gone' }
 	}
-	// Never mapped anything. A dead child means it crashed on startup — restore now, do not make
-	// the operator wait out the appear window for a helper that is already gone.
-	if (s.childExited) return { restore: true, reason: 'helper_died_before_mapping' }
-	if (s.ticks >= maxAppearTicks) return { restore: true, reason: 'helper_never_appeared' }
+	// Never mapped anything. A dead child usually means it crashed on startup — but a launcher that
+	// forks and exits looks identical for the first instant, so give it a short grace before
+	// declaring a crash. Genuine crashes still restore in ~3s, far inside the appear budget.
+	if (s.childExited) {
+		if (s.ticks < graceTicks) return { restore: false, reason: 'waiting_after_child_exit' }
+		return { restore: true, reason: 'helper_died_before_mapping' }
+	}
+	if (s.ticks >= maxAppearTicks) {
+		// Distinguish "slow/broken app" from "we asked Firefox to reuse a locked profile and it put
+		// up a modal instead of a window" — completely different fixes, so completely different code.
+		return { restore: true, reason: s.profileLocked ? 'helper_profile_locked' : 'helper_never_appeared' }
+	}
 	return { restore: false, reason: 'waiting_for_window' }
+}
+
+/**
+ * PURE. Split the helper windows we found into ones the operator can actually work in, and
+ * profile-lock/error modals that merely LOOK like a window appeared.
+ *
+ * @param {Array<string|{ id: string, name?: string }>} windows
+ * @returns {{ usable: {id: string, name: string}[], blocked: {id: string, name: string}[] }}
+ */
+function classifyHelperWindows(windows) {
+	const usable = []
+	const blocked = []
+	for (const w of Array.isArray(windows) ? windows : []) {
+		const entry = typeof w === 'string' ? { id: w, name: '' } : { id: String(w?.id ?? ''), name: String(w?.name ?? '') }
+		if (!entry.id) continue
+		if (entry.name && PROFILE_LOCK_TITLE_RE.test(entry.name)) blocked.push(entry)
+		else usable.push(entry)
+	}
+	return { usable, blocked }
 }
 
 /* ------------------------------------------------------------------------------------------- *
@@ -164,6 +217,8 @@ const session = {
 	childExited: false,
 	everSawWindow: false,
 	restoreDone: false,
+	/** Saw a "Close Firefox"/profile-in-use modal instead of a real window. */
+	profileLocked: false,
 	ticks: 0,
 	/** @type {NodeJS.Timeout|null} */
 	timer: null,
@@ -198,6 +253,7 @@ function resetSession() {
 	session.childExited = false
 	session.everSawWindow = false
 	session.restoreDone = false
+	session.profileLocked = false
 	session.ticks = 0
 }
 
@@ -256,7 +312,14 @@ async function restoreNow(reason, ctx) {
 	session.restoreDone = true
 	session.state = t.state
 	clearWatchdog()
-	say(ctx.log, 'info', `restoring after ${reason} (helper=${session.action})`)
+	// WHY we gave up, in one greppable line — reason code, how long we actually waited, whether a
+	// window was ever seen, whether the child died, and whether a profile-lock modal was involved.
+	const waitedMs = session.startedAt ? Date.now() - session.startedAt : 0
+	say(
+		ctx.log,
+		'info',
+		`restoring after ${reason} (helper=${session.action} waited=${waitedMs}ms ticks=${session.ticks}/${WATCHDOG_APPEAR_TICKS} everSawWindow=${session.everSawWindow} childExited=${session.childExited} profileLocked=${session.profileLocked})`,
+	)
 	await runActions(t.actions, { action: session.action || '', config: ctx.config, log: ctx.log, deps: ctx.deps })
 	const done = nextHelperState(session.state, 'restore_done')
 	say(ctx.log, 'info', `restored — state=${done.state}`)
@@ -264,17 +327,20 @@ async function restoreNow(reason, ctx) {
 }
 
 /**
- * Is a window for `action` still mapped? Ground truth for the watchdog.
+ * Which windows for `action` are mapped right now? Ground truth for both the watchdog and the
+ * reuse check. Normalises the two shapes findGuiWindowIds can return (bare ids, or `{id,name}` when
+ * asked `withNames`) so an injected test double may return either.
+ *
  * @param {string} action @param {object} [deps]
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ usable: {id:string,name:string}[], blocked: {id:string,name:string}[] }>}
  */
-async function helperWindowPresent(action, deps = {}) {
+async function findHelperWindows(action, deps = {}) {
 	try {
 		const find = deps.findGuiWindowIds || require('../utils/x-display-session').findGuiWindowIds
-		const ids = await find(action, { excludeTitle: OPERATOR_TITLE_MARKER })
-		return Array.isArray(ids) && ids.length > 0
+		const found = await find(action, { excludeTitle: OPERATOR_TITLE_MARKER, withNames: true })
+		return classifyHelperWindows(found)
 	} catch {
-		return false
+		return { usable: [], blocked: [] }
 	}
 }
 
@@ -304,10 +370,37 @@ async function openOperatorHelperWindow(action, config, opts = {}) {
 	session.everSawWindow = false
 	session.restoreDone = false
 	session.ticks = 0
+	session.profileLocked = false
 	say(log, 'info', `open requested: ${action}`)
 
 	// suspend_kiosk_top runs BEFORE the spawn so the helper never maps under a re-raising kiosk.
 	await runActions(t.actions.filter((a) => a !== 'spawn_helper'), { action, config, log, deps })
+
+	// REUSE BEFORE LAUNCH. If a helper of this kind is already up, promote THAT window instead of
+	// starting a second process. This is the case the operator actually hit: a Firefox was already
+	// running on the single fixed operator profile, so launching another produced a "Close Firefox"
+	// modal and no browser window at all, and the open timed out. Reuse also matches what the
+	// operator means by the button — "put the browser in front of me" — regardless of how it got
+	// there. Nothing is spawned, so there is no child to watch; the watchdog falls straight through
+	// to window-presence tracking and restores normally when the operator closes the window.
+	const existing = await findHelperWindows(action, deps)
+	if (existing.usable.length) {
+		session.everSawWindow = true
+		const reuse = nextHelperState(session.state, 'window_raised')
+		if (reuse.ok) {
+			session.state = reuse.state
+			say(log, 'info', `reusing ${existing.usable.length} existing ${action} window(s) — no second process launched`)
+			await runActions(reuse.actions, { action, config, log, deps })
+			startWatchdog({ config, log, deps })
+			return { ok: true, action, reused: true, state: session.state }
+		}
+	}
+	if (existing.blocked.length) {
+		// e.g. a leftover "Close Firefox" modal from an earlier failed attempt. Say so loudly — this
+		// is the state that previously produced a silent 6s timeout and no explanation.
+		say(log, 'warn', `${action}: profile-lock/error dialog already on screen (${existing.blocked.map((w) => w.name).join(', ')}) — it will be raised for dismissal`)
+		session.profileLocked = true
+	}
 
 	try {
 		const spawnGui = deps.spawnGuiDetached || require('../api/system-hardware-gui').spawnGuiDetached
@@ -350,7 +443,11 @@ async function openOperatorHelperWindow(action, config, opts = {}) {
 async function watchdogTick(ctx) {
 	if (session.state !== STATE.OPENING && session.state !== STATE.OPEN) return
 	session.ticks += 1
-	const present = await helperWindowPresent(session.action || '', ctx.deps || {})
+	const windows = await findHelperWindows(session.action || '', ctx.deps || {})
+	// A profile-lock modal counts as "something is on screen" — the operator must be able to see and
+	// dismiss it — but it is remembered separately so the give-up reason can name it.
+	if (windows.blocked.length) session.profileLocked = true
+	const present = windows.usable.length > 0 || windows.blocked.length > 0
 	if (present && !session.everSawWindow) {
 		session.everSawWindow = true
 		const t = nextHelperState(session.state, 'window_raised')
@@ -367,6 +464,7 @@ async function watchdogTick(ctx) {
 		everSawWindow: session.everSawWindow,
 		restoreDone: session.restoreDone,
 		ticks: session.ticks,
+		profileLocked: session.profileLocked,
 	})
 	if (d.restore) await restoreNow(d.reason, ctx)
 }
@@ -396,9 +494,12 @@ module.exports = {
 	// pure
 	nextHelperState,
 	decideRestoreOnExit,
+	classifyHelperWindows,
 	STATE,
 	HELPER_ACTIONS,
 	WATCHDOG_APPEAR_TICKS,
+	WATCHDOG_INTERVAL_MS,
+	WATCHDOG_EARLY_EXIT_GRACE_TICKS,
 	// runtime
 	openOperatorHelperWindow,
 	closeOperatorHelperWindow,
