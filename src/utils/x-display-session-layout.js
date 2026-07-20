@@ -435,6 +435,9 @@ module.exports = {
 	describeOperatorDisplay,
 	pointerOverInteractiveConsumer,
 	pointerInConfineAllowance,
+	// WO-290: the operator-monitor picker hit-tests the click against the connected outputs with
+	// the SAME half-open rect test the confinement uses — no second opinion about "which screen".
+	pointerInRect,
 	screenConsumerEnabled,
 	screenInteractiveEnabled,
 	multiviewScreenConsumerEnabled,
