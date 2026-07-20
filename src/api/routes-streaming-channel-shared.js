@@ -3,7 +3,8 @@
 const path = require('path')
 const { getChannelMap } = require('../config/routing')
 const { buildAudioDownmixFilterChain } = require('../streaming/streaming-channel-ffmpeg')
-const { destinationAudioLayoutsByMain } = require('../config/screen-destinations')
+const { destinationAudioLayoutsByMain, destinationsFromConfig } = require('../config/screen-destinations')
+const { normalizeProgramLayout, maxProgramLayout } = require('../config/audio-channel-layouts')
 
 const STREAMING_RTMP_CONSUMER_INDEX = 97
 const STREAMING_RECORD_CONSUMER_INDEX = 96
@@ -172,6 +173,59 @@ function allocateRecordConsumerIndex(sessions, ch) {
  * @param {string} [source] - e.g. 'program_1', 'preview_2', 'multiview'
  * @returns {string} 'stereo' | '4ch' | '8ch' | '16ch'
  */
+/**
+ * WO-297: widen a main screen's program-bus layout by any PortAudio output CABLED to that screen's
+ * destination, exactly as the Caspar XML generator does — `applyAudioOutputOverridesToScreens`
+ * (`src/config/build-caspar-generator-config.js:400-405`) runs AFTER
+ * `applyDestinationAudioLayoutsToScreens` and does `screen_N_audio_layout =
+ * maxProgramLayout(current, audioOutputs[].channelLayout)`.
+ *
+ * Without this, `resolveSourceProgramAudioLayout` sees only `screenDestinations[].audioLayout` and
+ * under-reports the bus width whenever an operator cables a multichannel audio device to a screen
+ * whose destination still says `stereo` — the live case on this rig, where `PGM/PRV 1` has
+ * `audioLayout: "stereo"` but the 8ch `hw:2,0` PortAudio output is cabled to it, so the generated
+ * channel is `<channel-layout>discrete-8ch</channel-layout>` while the stream/record downmix was
+ * built for a 2-channel bus. `buildAudioDownmixFilterChain` then takes its `channels <= 2` early
+ * return (`src/streaming/streaming-channel-ffmpeg.js:32-34`) and emits a bare
+ * `aformat=channel_layouts=stereo` with no `pan=` — a blind remix of a DISCRETE (unnamed c0..c7)
+ * layout, i.e. the exact hazard WO-172 T172.5 exists to prevent. OSC meters read the channel mixer
+ * and keep showing signal, so the fault is silent until someone listens to the stream.
+ *
+ * Stream/record path only — this never touches generated config, so it cannot mark apply pending.
+ * @param {Record<string, unknown>} config
+ * @param {number} mainIdx - 0-based main screen index
+ * @returns {string|null} layout id contributed by cabling, or null when nothing is cabled
+ */
+function cabledAudioOutputLayoutForMain(config, mainIdx) {
+	const outputs = Array.isArray(config?.audioOutputs) ? config.audioOutputs : []
+	const edges = Array.isArray(config?.deviceGraph?.edges) ? config.deviceGraph.edges : []
+	if (!outputs.length || !edges.length) return null
+	const destinations = destinationsFromConfig(config || {})
+	if (!destinations.length) return null
+	let layout = null
+	for (const out of outputs) {
+		if (!out || typeof out !== 'object') continue
+		if (out.enabled === false || out.enabled === 'false') continue
+		// `system-audio` carries no explicit width in the generator either — only PortAudio widens.
+		if (String(out.type || 'portaudio').toLowerCase() === 'system-audio') continue
+		if (!String(out.deviceName || '').trim()) continue
+		const id = String(out.id || '').trim()
+		if (!id) continue
+		const edge = edges.find((e) => String(e?.sinkId) === id)
+		if (!edge) continue
+		const srcId = String(edge.sourceId || '')
+		if (!srcId.startsWith('dst_in_')) continue
+		const dest = destinations.find((d) => String(d?.id) === srcId.slice('dst_in_'.length))
+		if (!dest) continue
+		if (String(dest.mode || '') === 'multiview') continue
+		const idx = Number.isFinite(Number(dest.mainScreenIndex)) ? Number(dest.mainScreenIndex) : 0
+		if (idx !== mainIdx) continue
+		const outLayout = normalizeProgramLayout(String(out.channelLayout || 'stereo'))
+		layout = layout == null ? outLayout : maxProgramLayout(layout, outLayout)
+	}
+	return layout
+}
+
 function resolveSourceProgramAudioLayout(config, source) {
 	const src = String(source || 'program_1').toLowerCase()
 	if (src === 'multiview') return 'stereo'
@@ -179,7 +233,10 @@ function resolveSourceProgramAudioLayout(config, source) {
 	if (!m) return 'stereo'
 	const mainIdx = Math.max(0, (parseInt(m[1], 10) || 1) - 1)
 	const byMain = destinationAudioLayoutsByMain(config || {})
-	return String(byMain[mainIdx] || 'stereo')
+	const fromDest = normalizeProgramLayout(String(byMain[mainIdx] || 'stereo'))
+	// WO-297: agree with the generated `<channel-layout>`, which the audio-output cabling widens.
+	const fromCabling = cabledAudioOutputLayoutForMain(config || {}, mainIdx)
+	return fromCabling == null ? fromDest : maxProgramLayout(fromDest, fromCabling)
 }
 
 function resolveRecordSourceChannel(ctx, outputId) {
@@ -221,4 +278,5 @@ module.exports = {
 	allocateRecordConsumerIndex,
 	resolveRecordSourceChannel,
 	resolveSourceProgramAudioLayout,
+	cabledAudioOutputLayoutForMain,
 }
