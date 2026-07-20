@@ -16,6 +16,7 @@ const {
 	isLiveThumbnailMetaStale,
 } = require('./live-thumbnail-cache-store')
 const { captureLiveThumbnailToCache } = require('./live-thumbnail-cache-capture')
+const { ensureInputLiveThumbnail } = require('./live-thumbnail-input-capture')
 
 /**
  * GET /api/thumbnail/live/:channel — PNG bytes or triggers lazy capture once.
@@ -37,6 +38,27 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 		stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : null
 	} catch {
 		stat = null
+	}
+
+	// Dedicated capture inputs (DeckLink / V4L2) have no media file behind them, so a look card's
+	// only possible thumbnail is a PRINT of the input channel. Refresh it lazily here — TTL-gated
+	// and backoff-gated, so a powered-off camera degrades to the 404 placeholder below instead of
+	// retrying per render. PGM/PRV buses are excluded and keep their cache-or-404 behaviour.
+	if (!force) {
+		const meta0 = readMeta(cfg, ch)
+		const ttl0 = resolveLiveThumbnailTtlMs(cfg)
+		const hasCache = !!stat && stat.size > 32
+		const r = await ensureInputLiveThumbnail(ctx, ch, {
+			hasCache,
+			stale: !hasCache || isLiveThumbnailMetaStale(meta0, ttl0),
+		})
+		if (r.captured) {
+			try {
+				stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : stat
+			} catch {
+				/* fall through to whatever we already had */
+			}
+		}
 	}
 
 	const etag =
@@ -64,7 +86,7 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 	if (!lazy && (!stat || stat.size <= 32)) {
 		return {
 			status: 404,
-			headers: JSON_HEADERS,
+			headers: { ...JSON_HEADERS, 'X-Live-Thumb-No-Signal': '1', 'Cache-Control': 'no-store' },
 			body: jsonBody({
 				error: 'No cached live thumbnail',
 				hint: 'POST /api/thumbnail/live/capture with { "channel": N } or use the ↻ button in Sources → Live',

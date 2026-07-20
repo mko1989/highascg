@@ -1,4 +1,26 @@
 import { getApiBase } from './api-client.js'
+import { isDecklinkInputChannel } from './input-channels.js'
+
+/**
+ * Client mirror of the server `live_thumbnail_ttl_ms` default
+ * (`src/config/defaults-core.js` / `config/general.json`). The deck reuses one URL for the
+ * whole window so a repaint storm costs zero extra requests.
+ */
+export const LIVE_THUMBNAIL_TTL_MS = 30000
+
+/**
+ * Cache-bust token quantised to the live-thumbnail TTL: constant inside a window, so the
+ * browser (and the canvas thumb cache) reuse one image per channel per TTL instead of
+ * refetching on every render.
+ * @param {number} [ttlMs]
+ * @param {number} [nowMs]
+ * @returns {number}
+ */
+export function liveThumbnailCacheBustWindow(ttlMs = LIVE_THUMBNAIL_TTL_MS, nowMs = Date.now()) {
+	const ttl = Math.max(1000, Number(ttlMs) || LIVE_THUMBNAIL_TTL_MS)
+	const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now()
+	return Math.floor(now / ttl)
+}
 
 /**
  * @param {unknown} x
@@ -70,10 +92,33 @@ export function isMediaOrFileSourceValue(source) {
 }
 
 /**
+ * True when a layer source is a **dedicated DeckLink input** channel rather than a program bus.
+ *
+ * A DeckLink input layer is stored as `{ type: 'route', value: 'route://<ch>-<slot>' }`, usually
+ * with `routeType: 'decklink'`. Older looks were saved without `routeType`, so the channel map is
+ * the authoritative check — `route://1` (PGM) must never match, which is what keeps WO-63 intact.
+ *
+ * @param {object | null | undefined} source
+ * @param {object | null | undefined} channelMap — `state.channelMap`
+ * @param {number | null} [fallbackChannel]
+ * @returns {boolean}
+ */
+export function isDecklinkInputSource(source, channelMap, fallbackChannel = null) {
+	if (!source?.value) return false
+	if (source.isPlaceholder || source.type === 'placeholder') return false
+	const t = String(source.type || '').toLowerCase()
+	if (t !== 'route' && t !== 'live') return false
+	if (String(source.routeType || '').toLowerCase() === 'decklink') return true
+	const ch = getLiveThumbnailChannelForSource(source, fallbackChannel)
+	if (ch == null || ch <= 0) return false
+	return isDecklinkInputChannel(channelMap, ch)
+}
+
+/**
  * Resolve a deck/compose thumbnail URL for a layer or clip source.
  * Returns null when no static thumbnail applies (timeline, templates, direct NDI, etc.).
  * @param {object | null | undefined} source
- * @param {{ maxWidth?: number, seekSec?: number, channelForLive?: number | null, cacheBust?: number | string, deckIdleMode?: boolean }} [opts]
+ * @param {{ maxWidth?: number, seekSec?: number, channelForLive?: number | null, cacheBust?: number | string, deckIdleMode?: boolean, channelMap?: object | null }} [opts]
  * @returns {string | null}
  */
 export function resolveSourceThumbnailUrl(source, opts = {}) {
@@ -87,7 +132,12 @@ export function resolveSourceThumbnailUrl(source, opts = {}) {
 	}
 
 	// Idle look deck cards: media thumbs only — never full-bus PRINT stills (WO-63).
-	if (opts.deckIdleMode) return null
+	// Exception (2026-07-19): a DeckLink INPUT layer has no media file, and its dedicated input
+	// channel is not a program bus — the captured frame IS the layer's content, so it is exactly
+	// what the deck card should show. Everything else still bails out here.
+	if (opts.deckIdleMode && !isDecklinkInputSource(source, opts.channelMap, opts.channelForLive)) {
+		return null
+	}
 
 	const t = String(source.type || '').toLowerCase()
 	if (t === 'timeline' || t === 'template' || t === 'cg' || t === 'html') return null
