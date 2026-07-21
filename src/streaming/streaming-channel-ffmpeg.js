@@ -131,15 +131,24 @@ function buildSrtOutputUrl(srtUrl, opts = {}) {
 	if (sid) params.push(`streamid=${encodeURIComponent(sid)}`)
 	const mode = String(opts.mode || '').trim().toLowerCase()
 	if (mode === 'listener' || mode === 'caller') params.push(`mode=${mode}`)
+	// WO-307: libsrt rejects a passphrase outside 10-79 chars outright — better to omit it and let
+	// the connection fail on an obviously-wrong length than hand Caspar a passphrase it will bounce
+	// with a cryptic AMCP error. Silent length-guard here, not upstream, because this is the single
+	// choke point every SRT URL (Start button AND any future caller) passes through.
+	const pass = String(opts.passphrase || '').trim()
+	if (pass.length >= 10 && pass.length <= 79) {
+		params.push(`passphrase=${encodeURIComponent(pass)}`, 'pbkeylen=16')
+	}
 	if (!params.length) return base
 	return base + (base.includes('?') ? '&' : '?') + params.join('&')
 }
 
 /**
  * SRT variant of {@link buildStreamingRtmpAddParams}: same encoder pipeline, but MPEG-TS container
- * (SRT carries TS, not FLV) and no stream-key credential — SRT's secret would be a passphrase,
- * which is deliberately NOT wired yet: it needs the WO-261 project-credentials treatment, not a
- * plaintext settings field.
+ * (SRT carries TS, not FLV). `opts.passphrase` — WO-307 — must be resolved server-side from the
+ * project credentials (project-stream-credentials.js), the same rule the RTMP stream key already
+ * follows: never accept a passphrase from the client body except a freshly-typed, unsaved value as
+ * a last resort before the operator hits Save.
  * @param {string} srtUrl
  * @param {'low'|'medium'|'high'} quality
  * @param {object} [opts] encoder opts plus { latencyMs, streamId, mode }

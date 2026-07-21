@@ -115,6 +115,12 @@ function isPassthroughAmcpClip(id) {
 	if (/^iec61883:/i.test(s)) return true
 	if (/^rtsp:/i.test(s)) return true
 	if (/^rtmp:/i.test(s)) return true
+	// WO-307: found while verifying the SRT feature end-to-end — a PLAY/LOAD/LOADBG of an srt://
+	// clip through anything that calls normalizeClipPlayAmcpLine (e.g. the /api/raw admin endpoint)
+	// fell through to resolveClipForAmcpLoad, which treats it as a media FILENAME: it got uppercased
+	// and its query string mangled beyond recognition. Every other network scheme here (rtmp, udp,
+	// rtsp, route) was already listed; srt was simply missed when it was added this session.
+	if (/^srt:/i.test(s)) return true
 	if (/^\[HTML\]/i.test(s)) return true
 	if (/^https?:\/\//i.test(s)) return true
 	if (/^ndi:\/\//i.test(s)) return true

@@ -41,3 +41,7 @@ person) can pick it up cold.
 Priority suggestion for the release: 312 and 311 are correctness holes an
 operator will hit; 310 and 309 are hygiene; 306/307/308 are features on your
 word; 313 is a nicety; 314 is hardware-gated.
+
+
+tell me how big of a work it would be to port to the node gui https://github.com/nodegui/nodegui
+could this give as more native preview from casparcg?

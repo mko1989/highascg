@@ -111,6 +111,8 @@ async function handleProject(path, body, ctx) {
 	if (path === '/api/project/streaming-credentials') {
 		// WO-261 T261.3: the ONLY write path for stream credentials — they land in the active project
 		// and only there. Empty streamKey keeps the stored key (empty-keeps); clearKey blanks it.
+		// WO-307: same rule extended to srtPassphrase/clearPassphrase — another secret, same path,
+		// never written to config.
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.getActiveSlug(persistence)
 		const existing = slug ? projectStore.readProjectFile(slug) : null
@@ -122,6 +124,10 @@ async function handleProject(path, body, ctx) {
 			rtmpServerUrl: b.rtmpServerUrl,
 			streamKey: b.streamKey,
 			clearKey: b.clearKey === true || b.clearKey === 'true',
+			// WO-307: same empty-keeps / explicit-clear pattern as streamKey, independent of it —
+			// clearing one must not touch the other.
+			srtPassphrase: b.srtPassphrase,
+			clearPassphrase: b.clearPassphrase === true || b.clearPassphrase === 'true',
 		})
 		try {
 			await persistProject(ctx, next, { writeAutosave: true, authoritativeCredentials: true })

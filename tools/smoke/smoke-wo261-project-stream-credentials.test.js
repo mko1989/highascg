@@ -18,6 +18,7 @@ const creds = require('../../src/engine/project-stream-credentials')
 
 const SECRET = 'SUPER_SECRET_KEY_XYZ'
 const SC_SECRET = 'SC_SECRET_KEY_123'
+const SRT_SECRET = 'SRT_PASSPHRASE_ABCDEFGH' // WO-307
 
 test('withProjectCredential stores per-output creds; empty-keeps semantics', () => {
 	let p = { name: 'Show' }
@@ -30,6 +31,24 @@ test('withProjectCredential stores per-output creds; empty-keeps semantics', () 
 	// explicit clear blanks it
 	p = creds.withProjectCredential(p, 'str_1', { clearKey: true })
 	assert.equal(creds.readProjectCredential(p, 'str_1').streamKey, '')
+})
+
+// WO-307
+test('withProjectCredential: srtPassphrase has the same empty-keeps/clear semantics, independent of streamKey', () => {
+	let p = { name: 'Show' }
+	p = creds.withProjectCredential(p, 'str_2', { srtPassphrase: SRT_SECRET })
+	assert.equal(creds.readProjectCredential(p, 'str_2').srtPassphrase, SRT_SECRET)
+	assert.equal(creds.projectHasSrtPassphrase(p, 'str_2'), true)
+	// empty passphrase keeps the stored one
+	p = creds.withProjectCredential(p, 'str_2', { srtPassphrase: '' })
+	assert.equal(creds.readProjectCredential(p, 'str_2').srtPassphrase, SRT_SECRET)
+	// setting streamKey on the SAME key must not disturb the passphrase
+	p = creds.withProjectCredential(p, 'str_2', { streamKey: 'unrelated' })
+	assert.equal(creds.readProjectCredential(p, 'str_2').srtPassphrase, SRT_SECRET, 'streamKey write must not clear srtPassphrase')
+	// explicit clearPassphrase blanks ONLY the passphrase
+	p = creds.withProjectCredential(p, 'str_2', { clearPassphrase: true })
+	assert.equal(creds.readProjectCredential(p, 'str_2').srtPassphrase, '')
+	assert.equal(creds.readProjectCredential(p, 'str_2').streamKey, 'unrelated', 'clearPassphrase must not clear streamKey')
 })
 
 test('preserveProjectCredentials re-applies on-disk creds over a client save', () => {
@@ -54,6 +73,16 @@ test('maskProjectStreamCredentials removes raw key, keeps url + hasStreamKey', (
 	assert.equal(p.streaming.credentials.str_1.streamKey, SECRET)
 })
 
+// WO-307
+test('maskProjectStreamCredentials also strips srtPassphrase, keeps hasSrtPassphrase', () => {
+	const p = { streaming: { credentials: { str_2: { srtPassphrase: SRT_SECRET } } } }
+	const masked = creds.maskProjectStreamCredentials(p)
+	assert.equal(masked.streaming.credentials.str_2.srtPassphrase, '')
+	assert.equal(masked.streaming.credentials.str_2.hasSrtPassphrase, true)
+	assert.ok(!JSON.stringify(masked).includes(SRT_SECRET), 'no raw passphrase in masked JSON')
+	assert.equal(p.streaming.credentials.str_2.srtPassphrase, SRT_SECRET, 'input not mutated')
+})
+
 test('resolveStreamCredential prefers project over config', () => {
 	const config = { streamOutputs: [{ id: 'str_1', rtmpServerUrl: 'rtmp://cfg/app', streamKey: 'CFG_KEY' }] }
 	const project = { streaming: { credentials: { str_1: { rtmpServerUrl: 'rtmp://proj/app', streamKey: SECRET } } } }
@@ -65,6 +94,18 @@ test('resolveStreamCredential prefers project over config', () => {
 	const r2 = creds.resolveStreamCredential(config, {}, 'str_1')
 	assert.equal(r2.streamKey, 'CFG_KEY')
 	assert.equal(r2.source, 'config')
+})
+
+// WO-307
+test('resolveStreamCredential: srtPassphrase is PROJECT-ONLY, no config fallback ever', () => {
+	const project = { streaming: { credentials: { str_2: { srtPassphrase: SRT_SECRET } } } }
+	const r = creds.resolveStreamCredential({}, project, 'str_2')
+	assert.equal(r.srtPassphrase, SRT_SECRET)
+	// even if something were to put a passphrase-shaped field in config, it must be ignored —
+	// readConfigCredential has no srtPassphrase key at all, by construction.
+	const configWithBogusField = { streamOutputs: [{ id: 'str_2', srtPassphrase: 'SHOULD_NEVER_BE_READ' }] }
+	const r2 = creds.resolveStreamCredential(configWithBogusField, {}, 'str_2')
+	assert.equal(r2.srtPassphrase, '', 'no project value and config is not a valid source → empty, never the config field')
 })
 
 test('migration moves config creds into project and blanks config, once', () => {
@@ -153,6 +194,16 @@ test('client start-stream action no longer sends streamKey (server-resolved)', (
 	const src = fs.readFileSync(path.join(__dirname, '../../client/components/device-view-actions.js'), 'utf8')
 	const start = src.slice(src.indexOf('export async function startStreamingChannelRtmp'), src.indexOf('export async function stopStreamingChannelRtmp'))
 	assert.ok(!/\bstreamKey\b/.test(start), 'startStreamingChannelRtmp must not reference streamKey')
+	// WO-307 — same rule for the SRT passphrase: the client must never send one on Start.
+	assert.ok(!/passphrase/i.test(start), 'startStreamingChannelRtmp must not reference an SRT passphrase either')
+})
+
+// WO-307
+test('the SRT start route resolves the passphrase from resolveStreamCredential, not the client body', () => {
+	const src = fs.readFileSync(path.join(__dirname, '../../src/api/routes-streaming-channel-rtmp.js'), 'utf8')
+	const srtBranch = src.slice(src.indexOf("outType === 'srt'"), src.indexOf(': buildStreamingRtmpAddParams('))
+	assert.match(srtBranch, /passphrase:\s*resolved\.srtPassphrase/, 'passphrase must come from the resolved (project-first) credential')
+	assert.ok(!/passphrase:\s*b\./.test(srtBranch), 'the client request body must never supply a passphrase')
 })
 
 test('client-bound payload builders route project emissions through the mask', () => {

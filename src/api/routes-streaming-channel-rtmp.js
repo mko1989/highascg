@@ -121,6 +121,9 @@ async function handlePostRtmp(body, ctx) {
 						latencyMs: b.srtLatencyMs ?? outCfg?.srtLatencyMs,
 						streamId: b.srtStreamId ?? outCfg?.srtStreamId,
 						mode: b.srtMode ?? outCfg?.srtMode,
+						// WO-307: resolved server-side ONLY, same rule as `streamKey` above — the
+						// client never sends a passphrase on Start, saved or otherwise.
+						passphrase: resolved.srtPassphrase,
 					})
 				: buildStreamingRtmpAddParams(serverUrl, streamKey, quality, encoderOpts)
 		if (!built) {

@@ -100,6 +100,25 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 	})
 	srtModeSel.innerHTML = '<option value="caller">srt: caller</option><option value="listener">srt: listener</option>'
 	srtModeSel.value = String(saved.srtMode || caspar.srtMode || 'caller').toLowerCase() === 'listener' ? 'listener' : 'caller'
+	// WO-307: SRT passphrase, same project-credentials treatment as the RTMP stream key (WO-261) —
+	// never received or held in the raw. `hasSrtPassphrase` flows through settings-get's
+	// streamCredentials (buildStreamCredentialStatus); `saved.srtPassphrase`/`caspar.srtPassphrase`
+	// are read here only for prefill in case an OLDER build ever wrote one to config — the server
+	// never emits a raw value there, so this is normally always empty.
+	const savedHasPassphrase = projCred.hasSrtPassphrase === true || saved.hasSrtPassphrase === true
+	const srtPassphraseIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'password',
+		placeholder: savedHasPassphrase ? 'saved in project — leave blank to keep' : 'SRT passphrase (10-79 chars, saved in project)',
+		title: 'SRT passphrase — encrypts the stream. Stored in the project only, same as the RTMP key.',
+		value: '',
+	})
+	const clearPassphraseChk = Object.assign(document.createElement('input'), { type: 'checkbox', title: 'Clear the saved SRT passphrase' })
+	const clearPassphraseLabel = Object.assign(document.createElement('label'), {
+		className: 'device-view__note',
+		style: 'display:inline-flex;align-items:center;gap:4px',
+	})
+	clearPassphraseLabel.append(clearPassphraseChk, document.createTextNode('clear saved passphrase'))
 	// NDI is not a stream you start (owner spec): it is emitted as an always-on <ndi> consumer in
 	// the generated Caspar config, like an SDI out. Only the name is configurable.
 	const ndiNote = Object.assign(document.createElement('p'), {
@@ -160,7 +179,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		for (const el of [qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel]) {
 			el.style.display = isNdi ? 'none' : ''
 		}
-		for (const el of [srtLatencyIn, srtStreamIdIn, srtModeSel]) {
+		for (const el of [srtLatencyIn, srtStreamIdIn, srtModeSel, srtPassphraseIn, clearPassphraseLabel]) {
 			el.style.display = isSrt ? '' : 'none'
 		}
 		// No Start/Stop for NDI — the consumer lives in the config and is on while Caspar runs.
@@ -213,6 +232,18 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 				clearKey: clearKeyChk.checked === true,
 			})
 			clearKeyChk.checked = false
+		}
+		if (t === 'srt') {
+			// WO-307: the passphrase is a secret — same project-only path as the RTMP key above.
+			// srtUrl/latency/streamid/mode are NOT secret and already went through the settings
+			// patch a few lines up.
+			await Actions.saveProjectStreamCredentials({
+				outputId: String(conn.id),
+				srtPassphrase: String(srtPassphraseIn.value || '').trim(),
+				clearPassphrase: clearPassphraseChk.checked === true,
+			})
+			clearPassphraseChk.checked = false
+			srtPassphraseIn.value = ''
 		}
 		await load()
 	}
@@ -312,7 +343,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			setStatus(statusEl, e?.message || String(e), false)
 		}
 	}
-	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, srtLatencyIn, srtStreamIdIn, srtModeSel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel, saveBtn, startBtn, stopBtn, removeBtn)
+	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, srtLatencyIn, srtStreamIdIn, srtModeSel, srtPassphraseIn, clearPassphraseLabel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
 	h.append(ndiNote)
 	h.append(ndiAttribution)

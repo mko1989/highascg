@@ -4,6 +4,16 @@ const { amcpVerboseTrace } = require('./amcp-utils')
 const { QUIET_CMDS, resolveSendTimeoutMs } = require('./amcp-client-static')
 const { recordAmcpHistory } = require('./amcp-client-history')
 const { swallow } = require('../utils/swallow')
+/* WO-307: this is the ACTUAL wire-send path for every AMCP command, including `ADD ch-N STREAM
+ * <rtmp-or-srt-url> ...` for RTMP/SRT streaming — so it is also where the stream key / SRT
+ * passphrase lives in the command string. routes-streaming-channel-rtmp.js already redacts its
+ * OWN log lines, but this file logs the raw command independently at nine further sites (debug
+ * trace, on-disk history, timeout warn, timeout Error message — each duplicated across the plain
+ * and typed send paths, plus one in the replication skip-log branch). Every one of those must go
+ * through `redactAmcpCommandForLog` for LOGGING ONLY — the actual bytes handed to
+ * `socket.send`/`sendRaw`/`fanoutSingleCommand` stay on the untouched `trimmed`, since Caspar and
+ * a replication follower both need the real secret to work. */
+const { redactAmcpCommandForLog } = require('../streaming/stream-secret-redact')
 
 module.exports = {
 	/**
@@ -49,7 +59,7 @@ module.exports = {
 						if (typeof self.log === 'function') {
 							self.log(
 								'debug',
-								`[replication] skip local PGM AMCP (leader fan-out drives air): ${trimmed}`,
+								`[replication] skip local PGM AMCP (leader fan-out drives air): ${redactAmcpCommandForLog(trimmed)}`,
 							)
 						}
 						if (!settled) {
@@ -66,9 +76,9 @@ module.exports = {
 				}
 				self._pendingResponseKey = key
 				if (typeof self.log === 'function' && (amcpVerboseTrace() || !QUIET_CMDS.has(key))) {
-					self.log('debug', `AMCP → ${trimmed}`)
+					self.log('debug', `AMCP → ${redactAmcpCommandForLog(trimmed)}`)
 				}
-				recordAmcpHistory(self, trimmed)
+				recordAmcpHistory(self, redactAmcpCommandForLog(trimmed))
 
 				if (typeof self.socket.send === 'function') {
 					self.socket.send(trimmed)
@@ -132,9 +142,9 @@ module.exports = {
 						const hint = isVersion
 							? ' — Caspar did not reply in time; AMCP is often blocked by a producer/GPU/thumbnail. Check casparcg-server log, restart Caspar if stuck. Optional env: HIGHASCG_AMCP_SEND_TIMEOUT_MS, HIGHASCG_AMCP_HEALTH_MS=0 (disable periodic VERSION).'
 							: ''
-						self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${trimmed}${hint}`)
+						self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${redactAmcpCommandForLog(trimmed)}${hint}`)
 					}
-					rejectP(new Error(`AMCP response timeout: ${trimmed}`))
+					rejectP(new Error(`AMCP response timeout: ${redactAmcpCommandForLog(trimmed)}`))
 				}, timeoutMs)
 
 				return p
@@ -209,9 +219,9 @@ module.exports = {
 			typeof self.socket.ccg[methodName] === 'function'
 		) {
 			if (typeof self.log === 'function' && (amcpVerboseTrace() || !QUIET_CMDS.has(key))) {
-				self.log('debug', `AMCP → ${trimmed}`)
+				self.log('debug', `AMCP → ${redactAmcpCommandForLog(trimmed)}`)
 			}
-			recordAmcpHistory(self, trimmed)
+			recordAmcpHistory(self, redactAmcpCommandForLog(trimmed))
 
 			return new Promise((resolve, reject) => {
 				let settled = false
@@ -220,8 +230,8 @@ module.exports = {
 					settled = true
 					timeoutHandle = null
 					const hint = key === 'VERSION' ? ' — Caspar did not reply in time...' : ''
-					if (typeof self.log === 'function') self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${trimmed}${hint}`)
-					reject(new Error(`AMCP response timeout: ${trimmed}`))
+					if (typeof self.log === 'function') self.log('warn', `AMCP response timeout (${timeoutMs}ms): ${redactAmcpCommandForLog(trimmed)}${hint}`)
+					reject(new Error(`AMCP response timeout: ${redactAmcpCommandForLog(trimmed)}`))
 				}, timeoutMs)
 
 				self.socket.ccg[methodName](params).then(res => {

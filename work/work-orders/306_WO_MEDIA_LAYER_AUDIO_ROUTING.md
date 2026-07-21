@@ -1,6 +1,7 @@
 # WO-306 — Media-layer audio routing: unroute from own channel, route to another channel
 
-**Status: AWAITING OWNER GO** (owner sentence exists; scope decision requested in todos21.07.26)
+**Status: NOT WANTED — closed 2026-07-21.** Owner: "the current way is how caspar works and is
+fine." Do not build. Kept below for context only.
 
 ## Owner ask (verbatim)
 "even media inputs should be able to be unrouted from the channel its playing on, as well as

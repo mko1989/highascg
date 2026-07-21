@@ -1,39 +1,9 @@
 'use strict'
 
 const { getChannelMap, resolveStreamingChannelRoute, resolveStreamingChannelRouteForRole } = require('../config/routing')
-
-/**
- * Mask RTMP stream key in URL path (last segment). Server keeps full URL internally for AMCP REMOVE.
- * @param {unknown} url
- */
-function redactStreamUrl(url) {
-	const s = String(url || '').trim()
-	if (!s) return s
-	try {
-		const u = new URL(s.replace(/^rtmps?:\/\//i, 'https://').replace(/^rtmp:\/\//i, 'http://'))
-		const parts = u.pathname.split('/').filter(Boolean)
-		if (parts.length >= 2) {
-			parts[parts.length - 1] = '****'
-			const scheme = /^rtmps:/i.test(s) ? 'rtmps' : 'rtmp'
-			return `${scheme}://${u.host}/${parts.join('/')}`
-		}
-	} catch {
-		/* fall through */
-	}
-	const slash = s.lastIndexOf('/')
-	if (slash > 'rtmp://'.length) return `${s.slice(0, slash + 1)}****`
-	return s
-}
-
-/**
- * Redact stream keys inside quoted AMCP STREAM params.
- * @param {unknown} command
- */
-function redactAmcpStreamCommand(command) {
-	const s = String(command || '')
-	if (!s) return s
-	return s.replace(/(STREAM\s+"[^"]*\/)([^"/?#]+)(")/gi, '$1****$3')
-}
+// WO-307: redaction logic lives in a zero-dependency leaf module so the AMCP transport layer
+// (amcp-client-transport.js) can require it directly without pulling in ../config/routing.
+const { redactStreamUrl, redactAmcpStreamCommand } = require('./stream-secret-redact')
 
 /**
  * @param {unknown} extra

@@ -34,7 +34,7 @@ function s(v) {
 
 /**
  * @param {object|null|undefined} project
- * @returns {Record<string, { rtmpServerUrl: string, streamKey: string }>}
+ * @returns {Record<string, { rtmpServerUrl: string, streamKey: string, srtPassphrase: string }>}
  */
 function getCredentialsMap(project) {
 	const creds = project && typeof project === 'object' ? project.streaming?.credentials : null
@@ -44,11 +44,24 @@ function getCredentialsMap(project) {
 /**
  * @param {object|null|undefined} project
  * @param {string} key
- * @returns {{ rtmpServerUrl: string, streamKey: string }}
+ * @returns {{ rtmpServerUrl: string, streamKey: string, srtPassphrase: string }}
  */
 function readProjectCredential(project, key) {
 	const entry = getCredentialsMap(project)[s(key)] || {}
-	return { rtmpServerUrl: s(entry.rtmpServerUrl), streamKey: s(entry.streamKey) }
+	return {
+		rtmpServerUrl: s(entry.rtmpServerUrl),
+		streamKey: s(entry.streamKey),
+		srtPassphrase: s(entry.srtPassphrase),
+	}
+}
+
+/**
+ * @param {object|null|undefined} project
+ * @param {string} key
+ * @returns {boolean}
+ */
+function projectHasSrtPassphrase(project, key) {
+	return !!readProjectCredential(project, key).srtPassphrase
 }
 
 /**
@@ -60,18 +73,20 @@ function projectHasStreamKey(project, key) {
 	return !!readProjectCredential(project, key).streamKey
 }
 
-/** True when the project holds any non-empty url/key for `key`. */
+/** True when the project holds any non-empty url/key/passphrase for `key`. */
 function projectHasCredential(project, key) {
 	const c = readProjectCredential(project, key)
-	return !!(c.streamKey || c.rtmpServerUrl)
+	return !!(c.streamKey || c.rtmpServerUrl || c.srtPassphrase)
 }
 
 /**
  * Return a shallow project clone with `streaming.credentials[key]` updated using empty-keeps
- * semantics: an empty/omitted streamKey KEEPS the stored key; `clearKey` explicitly blanks it.
+ * semantics: an empty/omitted streamKey/srtPassphrase KEEPS the stored value; `clearKey`/
+ * `clearPassphrase` explicitly blank them (independently — clearing one does not touch the other).
  * @param {object} project
  * @param {string} key
- * @param {{ rtmpServerUrl?: string, streamKey?: string, clearKey?: boolean }} patch
+ * @param {{ rtmpServerUrl?: string, streamKey?: string, clearKey?: boolean,
+ *   srtPassphrase?: string, clearPassphrase?: boolean }} patch
  * @returns {object}
  */
 function withProjectCredential(project, key, patch = {}) {
@@ -85,9 +100,15 @@ function withProjectCredential(project, key, patch = {}) {
 		const incoming = s(patch.streamKey)
 		nextKey = incoming || prev.streamKey
 	}
+	let nextPassphrase
+	if (patch.clearPassphrase === true) nextPassphrase = ''
+	else {
+		const incoming = s(patch.srtPassphrase)
+		nextPassphrase = incoming || prev.srtPassphrase
+	}
 	const streaming = base.streaming && typeof base.streaming === 'object' ? base.streaming : {}
 	const credentials = { ...getCredentialsMap(base) }
-	credentials[k] = { rtmpServerUrl: nextUrl, streamKey: nextKey }
+	credentials[k] = { rtmpServerUrl: nextUrl, streamKey: nextKey, srtPassphrase: nextPassphrase }
 	return { ...base, streaming: { ...streaming, credentials } }
 }
 
@@ -112,7 +133,7 @@ function preserveProjectCredentials(incoming, onDisk) {
 	}
 	const credentials = {}
 	for (const [k, v] of Object.entries(stored)) {
-		credentials[k] = { rtmpServerUrl: s(v?.rtmpServerUrl), streamKey: s(v?.streamKey) }
+		credentials[k] = { rtmpServerUrl: s(v?.rtmpServerUrl), streamKey: s(v?.streamKey), srtPassphrase: s(v?.srtPassphrase) }
 	}
 	return { ...incoming, streaming: { ...(streaming || {}), credentials } }
 }
@@ -129,7 +150,13 @@ function maskProjectStreamCredentials(project) {
 	if (!Object.keys(creds).length) return project
 	const masked = {}
 	for (const [k, v] of Object.entries(creds)) {
-		masked[k] = { rtmpServerUrl: s(v?.rtmpServerUrl), streamKey: '', hasStreamKey: !!s(v?.streamKey) }
+		masked[k] = {
+			rtmpServerUrl: s(v?.rtmpServerUrl),
+			streamKey: '',
+			hasStreamKey: !!s(v?.streamKey),
+			srtPassphrase: '',
+			hasSrtPassphrase: !!s(v?.srtPassphrase),
+		}
 	}
 	return { ...project, streaming: { ...project.streaming, credentials: masked } }
 }
@@ -164,6 +191,9 @@ function configStreamOutputIds(config) {
 /**
  * Config fallback slot for a credential key. streamingChannel → config.streamingChannel; any other
  * key → the matching config.streamOutputs[] entry.
+ *
+ * `srtPassphrase` has NO config fallback and never will — WO-307 deliberately never writes it
+ * anywhere but the project (see the module header); config is simply not a valid source for it.
  * @param {object|null|undefined} config
  * @param {string} key
  * @returns {{ rtmpServerUrl: string, streamKey: string }}
@@ -180,11 +210,12 @@ function readConfigCredential(config, key) {
 }
 
 /**
- * Stream-time resolution: project first (per field), config fallback-only.
+ * Stream-time resolution: project first (per field), config fallback-only for
+ * rtmpServerUrl/streamKey. srtPassphrase is PROJECT-ONLY (see readConfigCredential).
  * @param {object|null|undefined} config
  * @param {object|null|undefined} project
  * @param {string} key
- * @returns {{ rtmpServerUrl: string, streamKey: string, source: string }}
+ * @returns {{ rtmpServerUrl: string, streamKey: string, srtPassphrase: string, source: string }}
  */
 function resolveStreamCredential(config, project, key) {
 	const k = s(key) || STREAMING_CHANNEL_KEY
@@ -192,16 +223,17 @@ function resolveStreamCredential(config, project, key) {
 	const cfg = readConfigCredential(config, k)
 	const rtmpServerUrl = proj.rtmpServerUrl || cfg.rtmpServerUrl
 	const streamKey = proj.streamKey || cfg.streamKey
-	const source = proj.streamKey || proj.rtmpServerUrl ? 'project' : 'config'
-	return { rtmpServerUrl, streamKey, source }
+	const srtPassphrase = proj.srtPassphrase
+	const source = proj.streamKey || proj.rtmpServerUrl || proj.srtPassphrase ? 'project' : 'config'
+	return { rtmpServerUrl, streamKey, srtPassphrase, source }
 }
 
 /**
- * Client-safe credential status for settings-get: per-key { rtmpServerUrl, hasStreamKey }. Never
- * carries the raw key.
+ * Client-safe credential status for settings-get: per-key { rtmpServerUrl, hasStreamKey,
+ * hasSrtPassphrase }. Never carries the raw key or passphrase.
  * @param {object|null|undefined} config
  * @param {object|null|undefined} project
- * @returns {Record<string, { rtmpServerUrl: string, hasStreamKey: boolean }>}
+ * @returns {Record<string, { rtmpServerUrl: string, hasStreamKey: boolean, hasSrtPassphrase: boolean }>}
  */
 function buildStreamCredentialStatus(config, project) {
 	const out = {}
@@ -209,7 +241,7 @@ function buildStreamCredentialStatus(config, project) {
 	for (const k of Object.keys(getCredentialsMap(project))) keys.add(k)
 	for (const k of keys) {
 		const r = resolveStreamCredential(config, project, k)
-		out[k] = { rtmpServerUrl: r.rtmpServerUrl, hasStreamKey: !!r.streamKey }
+		out[k] = { rtmpServerUrl: r.rtmpServerUrl, hasStreamKey: !!r.streamKey, hasSrtPassphrase: !!r.srtPassphrase }
 	}
 	return out
 }
@@ -301,6 +333,7 @@ module.exports = {
 	getCredentialsMap,
 	readProjectCredential,
 	projectHasStreamKey,
+	projectHasSrtPassphrase,
 	projectHasCredential,
 	withProjectCredential,
 	preserveProjectCredentials,

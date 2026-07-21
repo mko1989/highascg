@@ -251,12 +251,22 @@ export async function stopStreamingChannelRtmp() {
  * WO-261: save RTMP url/key into the ACTIVE project (and only there). Empty streamKey keeps the
  * stored key; clearKey blanks it. The server never returns the raw key.
  */
-export async function saveProjectStreamCredentials({ outputId, rtmpServerUrl, streamKey, clearKey }) {
+export async function saveProjectStreamCredentials({
+	outputId,
+	rtmpServerUrl,
+	streamKey,
+	clearKey,
+	srtPassphrase,
+	clearPassphrase,
+}) {
 	return await api.post('/api/project/streaming-credentials', {
 		outputId,
 		rtmpServerUrl,
 		streamKey,
 		clearKey: clearKey === true,
+		// WO-307: same empty-keeps/explicit-clear pattern as streamKey, independent of it.
+		srtPassphrase,
+		clearPassphrase: clearPassphrase === true,
 	})
 }
 
