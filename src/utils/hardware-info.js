@@ -2,6 +2,17 @@
 
 const { execSync } = require('child_process')
 
+/**
+ * Both xrandr probes are execSync on the `GET /api/device-view` path, so they block the entire
+ * single-threaded server -- AMCP, every WS client, every other route -- for their full duration,
+ * not just the Devices view. They were the only sync probes in the codebase with no timeout at all
+ * (nvidia-smi below uses 2000, decklink-enum 1500-2000, audio-devices 5000-8000), which meant a
+ * wedged or unreachable X server would hang the whole process indefinitely with no recovery.
+ * Measured healthy cost on the operator box: xrandr --query ~75-90ms, --verbose ~72ms. 3s is a
+ * generous ceiling for a far slower machine while still bounding the pathological case.
+ */
+const XRANDR_TIMEOUT_MS = 3000
+
 function drmShort(name) {
 	return String(name || '').replace(/^card\d+-/i, '')
 }
@@ -67,6 +78,7 @@ function getDisplaysXrandrVerboseRaw() {
 		return execSync('xrandr --verbose', {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+			timeout: XRANDR_TIMEOUT_MS,
 		}).toString()
 	} catch (e) {
 		console.error(`[Hardware-Info] getDisplaysXrandrVerboseRaw failed:`, e.message)
@@ -187,6 +199,7 @@ function getDisplaysXrandrDetailedUncached() {
 		const stdout = execSync('xrandr --query', {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+			timeout: XRANDR_TIMEOUT_MS,
 		}).toString()
 		if (String(stdout || '').trim()) {
 			return parseXrandrQueryRaw(stdout)
