@@ -369,7 +369,10 @@ async function handleProject(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
 		project = enrichProjectScenesFromLiveDeck(project, ctx)
-		injectHardwareConfigToProject(ctx, project)
+		/* Autosave is a background write and must never destroy the stored hardware slice. After a
+		 * factory reset the live config is empty, and an autosave from a still-open browser used to
+		 * stamp that emptiness over a good project (and even recreate one the reset had trashed). */
+		injectHardwareConfigToProject(ctx, project, { preserveWhenEmpty: true })
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)

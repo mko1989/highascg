@@ -260,7 +260,7 @@ export function registerDeviceViewRender(ctx) {
 					try {
 						const cachedStream = getStreamingChannelStatus()
 						const [payload, settings, stream] = await Promise.all([
-							Actions.loadDeviceView({ freshGpu }),
+							Actions.loadDeviceView({ freshGpu, bustCache: forceRefresh }),
 							Actions.loadSettings(),
 							cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
 						])

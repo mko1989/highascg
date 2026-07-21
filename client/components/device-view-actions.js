@@ -8,7 +8,15 @@ import { resolveTopologyForDeviceView } from '../lib/device-view-gpu-port-list.j
 
 export async function loadDeviceView(opts = {}) {
 	const freshGpu = opts?.freshGpu === true || opts?.freshGpu === '1'
-	const q = freshGpu ? '?freshGpu=1' : ''
+	const params = []
+	if (freshGpu) params.push('freshGpu=1')
+	/* GET /api/device-view answers with `Cache-Control: private, max-age=3`, so for 3s the BROWSER
+	 * serves it without contacting the server. Bypassing our own 5s payload cache with forceRefresh
+	 * therefore was not enough — a reload right after a mutation could still be handed a pre-change
+	 * response by the HTTP cache. api.get takes no fetch options, so bust it in the URL. Only on
+	 * explicit fresh reads: ordinary loads should keep the benefit of that 3s window. */
+	if (opts?.bustCache === true) params.push(`_ts=${Date.now()}`)
+	const q = params.length ? `?${params.join('&')}` : ''
 	return await api.get(`/api/device-view${q}`)
 }
 

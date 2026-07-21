@@ -62,6 +62,7 @@ const FILES = [
 	'tools/smoke/smoke-logs-modal-tab-hidden.test.js',
 	'tools/smoke/smoke-modal-panel-class-defined.test.js',
 	'tools/smoke/smoke-device-view-reload-forces-refresh.test.js',
+	'tools/smoke/smoke-autosave-preserves-hardware.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',

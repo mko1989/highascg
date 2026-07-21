@@ -164,12 +164,64 @@ function applyHardwareConfigToCtx(ctx, hc) {
 }
 
 /**
+ * True when this hardware slice records something the OPERATOR chose, as opposed to something the
+ * machine merely detected.
+ *
+ * Deliberately NOT {@link hardwareConfigHasOperatorData}, which counts `connectors > 0` as data.
+ * Connectors are enumerated GPU/DeckLink ports — a factory-reset box still reports 7 of them, so by
+ * that measure a wiped config looks "non-empty" and would sail past this guard. Only cables (edges)
+ * and screen destinations represent a decision worth protecting from a background write.
+ * @param {object} hc
+ * @returns {boolean}
+ */
+function hardwareConfigHasOperatorIntent(hc) {
+	if (!hc || typeof hc !== 'object') return false
+	const edges = Array.isArray(hc.deviceGraph?.edges) ? hc.deviceGraph.edges.length : 0
+	const dests = Array.isArray(hc.screenDestinations?.destinations)
+		? hc.screenDestinations.destinations.length
+		: 0
+	return edges > 0 || dests > 0
+}
+
+/**
+ * Stamp the live hardware slice onto a project about to be written.
+ *
+ * `preserveWhenEmpty` exists because this OVERWRITES whatever the project already carried, and the
+ * live config is empty immediately after a factory reset. Observed data loss: a project saved with
+ * 14 connectors / 6 edges / 3 destinations was factory-reset (which correctly trashed it), and ~23s
+ * later a background autosave from the still-open browser recreated it carrying the now-empty live
+ * config — connectors 7, edges 0, destinations 0. Loading it then restored nothing, which reads as
+ * "load is broken" but is really "the file was destroyed before the load".
+ *
+ * The split is deliberate. An EXPLICIT save is the operator saying "capture what is on screen now",
+ * so it may legitimately record an empty rig. An AUTOSAVE is a background write that must never
+ * destroy data, so when the live config has nothing to say it leaves the stored slice alone.
+ * Same shape as preserveProjectCredentials in project-scenes.js.
+ *
  * @param {object} ctx
  * @param {object} project
+ * @param {{ preserveWhenEmpty?: boolean }} [opts]
  */
-function injectHardwareConfigToProject(ctx, project) {
+function injectHardwareConfigToProject(ctx, project, opts = {}) {
 	const hc = buildHardwareConfigFromCtx(ctx)
-	if (hc) project.hardwareConfig = hc
+	if (!hc) return
+
+	if (opts.preserveWhenEmpty === true && !hardwareConfigHasOperatorIntent(hc)) {
+		if (hardwareConfigHasOperatorIntent(project?.hardwareConfig)) return
+		try {
+			const projectStore = require('./project-store')
+			const slug = projectStore.projectSlugFromName(project?.name)
+			const stored = slug ? projectStore.readProjectFile(slug) : null
+			if (hardwareConfigHasOperatorIntent(stored?.hardwareConfig)) {
+				project.hardwareConfig = stored.hardwareConfig
+				return
+			}
+		} catch {
+			/* no stored copy to fall back to — writing the empty slice below is then harmless */
+		}
+	}
+
+	project.hardwareConfig = hc
 }
 
 /**
@@ -230,6 +282,7 @@ module.exports = {
 	hardwareConfigToSnapshotPayload,
 	applyHardwareConfigToCtx,
 	injectHardwareConfigToProject,
+	hardwareConfigHasOperatorIntent,
 	applyHardwareConfigFromProject,
 	hardwareConfigHasOperatorData,
 }
