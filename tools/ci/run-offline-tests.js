@@ -148,6 +148,7 @@ const FILES = [
 	'tools/smoke/smoke-wo317-helper-registry.test.js',
 	'tools/smoke/smoke-wo317-helper-window-plan.test.js',
 	'tools/smoke/smoke-wo319-gui-stream-nvenc-args.test.js',
+	'tools/smoke/smoke-wo319-gop-buffer.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
