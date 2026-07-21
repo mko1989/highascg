@@ -218,6 +218,16 @@ class AmcpMixer {
 		return this._mixer(channel, layer, `MIPMAP ${enabled ? 1 : 0}`)
 	}
 
+	/**
+	 * `volume` is a LINEAR coefficient (1 = unity, 0 = silence) — NOT decibels.
+	 *
+	 * Verified against this build (2.6.0 253c16c Dev) on 2026-07-21, WO-310: the value is stored
+	 * verbatim and unclamped. `MIXER 1-990 VOLUME 0.5` reads back `0.5`; `MIXER 1-990 VOLUME -60`
+	 * reads back `-60` — it is NOT reinterpreted as −60 dB and NOT clamped to 0. A negative
+	 * coefficient means inverted phase at |v| gain, so passing a dB figure here is an audio
+	 * hazard, not a no-op. Callers must convert first (client/lib/audio-volume-scale.js keeps
+	 * `volumeDb` for DISPLAY only).
+	 */
 	mixerVolume(channel, layer, volume, duration, tween, defer) {
 		if (volume === undefined) return this._mixer(channel, layer, 'VOLUME')
 		let p = String(volume)
