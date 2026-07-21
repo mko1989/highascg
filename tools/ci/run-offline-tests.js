@@ -145,6 +145,7 @@ const FILES = [
 	'tools/smoke/smoke-wo313-cable-resize-raf.test.js',
 	'tools/smoke/smoke-wo315-nodm-canvas-decision.test.js',
 	'tools/smoke/smoke-wo316-decklink-already-open.test.js',
+	'tools/smoke/smoke-wo317-helper-registry.test.js',
 	'tools/smoke/smoke-wo319-gui-stream-nvenc-args.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
