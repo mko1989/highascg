@@ -52,6 +52,17 @@ function resolvePickerOptIn(config, opts = {}) {
 	const env = opts.env || process.env
 	if (String(env?.HIGHASCG_OPERATOR_MONITOR_PICKER || '') === '1') return { optIn: true, via: 'env' }
 	if (config?.operatorTools?.monitorPicker === true) return { optIn: true, via: 'config' }
+	/* Owner (todos21.07.26): "for the gui monitor choice on a fresh boot. can we have a button
+	 * appear on each screen with press this to run operator gui on this screen." So the fresh-boot
+	 * call site (operator-gui-launcher, reason no_monitor_resolved) is opted in BY DEFAULT — the
+	 * original WO-290 posture of no-boot-call-site is superseded by that explicit request. Every
+	 * hard gate below this one still applies unchanged: configured boxes, pinned ports, resolvable
+	 * rects and active playout all still refuse, so the prompt can only ever appear on a box where
+	 * nobody has chosen a monitor and nothing is on air. `operatorTools.monitorPicker: false`
+	 * remains the opt-out. */
+	if (opts.freshBoot === true && config?.operatorTools?.monitorPicker !== false) {
+		return { optIn: true, via: 'fresh_boot_default' }
+	}
 	return { optIn: false, via: 'none' }
 }
 

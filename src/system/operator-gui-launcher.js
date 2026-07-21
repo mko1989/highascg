@@ -453,6 +453,66 @@ function shouldAutoLaunchOperatorGui(config, opts = {}) {
 /** @type {Promise<void>|null} in-flight auto-launch retry loop (at most one) */
 let autoLaunchChain = null
 
+/** @type {Promise<void>|null} in-flight boot monitor picker (at most one, never re-prompts) */
+let bootPickerChain = null
+
+/**
+ * True when any channel has a live look on air — the picker must never paint over program.
+ * On a genuinely fresh boot this is empty; a box that rebooted mid-show restores its live state
+ * before routing-setup runs, so that case refuses too.
+ * @returns {boolean}
+ */
+function anyLiveLookOnAir() {
+	try {
+		const st = require('../state/live-scene-state').getAll()
+		return Object.values(st || {}).some((e) => (e?.scene?.layers || []).length > 0)
+	} catch (_) {
+		return false
+	}
+}
+
+/**
+ * WO-290 boot call site (owner request, todos21.07.26): fresh multi-display boot with no operator
+ * monitor chosen → full-screen "press this to run the operator GUI on this screen" prompt on every
+ * output. Fire-and-forget; a successful click persists the flag via configManager and re-enters
+ * maybeAutoLaunchOperatorGui, which now resolves the monitor and launches.
+ * @param {{ config: object, configManager?: object, log?: Function }} ctx
+ */
+function maybeRunBootMonitorPicker(ctx) {
+	if (bootPickerChain) return
+	const log = typeof ctx?.log === 'function' ? ctx.log : () => {}
+	bootPickerChain = (async () => {
+		const { runOperatorMonitorPicker } = require('./operator-monitor-picker')
+		const res = await runOperatorMonitorPicker({
+			config: ctx.config,
+			log,
+			freshBoot: true,
+			playoutActive: anyLiveLookOnAir(),
+			persist: (next) => {
+				try {
+					if (!ctx.configManager?.save) return false
+					ctx.configManager.save(next)
+					if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
+					return true
+				} catch (e) {
+					log('error', `[Operator monitor picker] persist failed: ${e?.message || e}`)
+					return false
+				}
+			},
+		})
+		if (res?.ok) {
+			log('info', `[Operator GUI] monitor picked (${res.output}, port ${res.port}) — launching`)
+			maybeAutoLaunchOperatorGui(ctx)
+		}
+	})()
+		.catch((e) => log('warn', `[Operator monitor picker] ${e?.message || e}`))
+		.finally(() => {
+			/* deliberately NOT reset: one prompt per process. An abandoned picker (Esc/timeout) must
+			 * not re-appear on every reconnect — the operator said no; the inspector Launch button
+			 * and Device View flag remain the manual paths. */
+		})
+}
+
 /**
  * WO-264 T264.2: fire-and-forget boot/reconnect auto-launch. Never throws and never blocks the
  * caller (routing-setup awaits nothing here) — the retry loop covers the `:0` X session coming up
@@ -467,6 +527,11 @@ function maybeAutoLaunchOperatorGui(ctx) {
 		const verdict = shouldAutoLaunchOperatorGui(ctx.config)
 		if (!verdict.launch) {
 			ctx?.log?.('info', `[Operator GUI] auto-start skipped: ${verdict.reason}`)
+			// Fresh multi-display boot: nothing chose a monitor yet. Paint the WO-290 "press this to
+			// run the operator GUI on this screen" prompt on every connected output; a click persists
+			// screen_N_operator_monitor and re-enters this function, which then launches normally.
+			// Every WO-290 hard gate still applies inside (configured / pinned / on-air all refuse).
+			if (verdict.reason === 'no_monitor_resolved') maybeRunBootMonitorPicker(ctx)
 			return
 		}
 		autoLaunchChain = (async () => {
@@ -501,6 +566,8 @@ function maybeAutoLaunchOperatorGui(ctx) {
 
 module.exports = {
 	launchOperatorGuiBrowser,
+	maybeRunBootMonitorPicker,
+	anyLiveLookOnAir,
 	raiseOperatorGuiBrowser,
 	shouldAutoLaunchOperatorGui,
 	maybeAutoLaunchOperatorGui,
