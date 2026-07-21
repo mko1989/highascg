@@ -56,6 +56,7 @@ const FILES = [
 	'tools/smoke/smoke-countdown-routes.test.js',
 	'tools/smoke/smoke-wo196-countdown-lifecycle.test.js',
 	'tools/smoke/smoke-wo207-cg-orphan-sweep.test.js',
+	'tools/smoke/smoke-project-hardware-mismatch-identity.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',

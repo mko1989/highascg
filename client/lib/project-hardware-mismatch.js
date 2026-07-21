@@ -144,18 +144,38 @@ function liveOsKeyMap(ctx) {
  * @param {object|null|undefined} hardwareConfig
  * @param {object|null|undefined} liveCtx
  */
+/** Hostnames written before the MAC-derived rename (see LEGACY_HOSTNAME_RE server-side). */
+const LEGACY_SAVED_HOSTNAME_RE = /^(highascg-nvidia-|casparcg$)/i
+/** Hostnames produced by hardwareIdToHostname(). */
+const MIGRATED_HOSTNAME_RE = /^highascg\d{4}$/i
+
 export function isLikelySameMachine(hardwareConfig, liveCtx) {
-	const savedHost =
-		hardwareConfig?.fingerprint?.hostname ||
-		hardwareConfig?.hardwareFingerprint?.hostname ||
-		hardwareConfig?.host?.hostname ||
-		hardwareConfig?.hostname
-	const liveHost =
-		liveCtx?.deviceSnapBuild?.host?.hostname ||
-		liveCtx?.deviceViewSnap?.host?.hostname ||
-		liveCtx?.deviceViewSnap?.hostname
-	if (savedHost && liveHost) return String(savedHost).trim() === String(liveHost).trim()
-	return false
+	const fp = hardwareConfig?.fingerprint || hardwareConfig?.hardwareFingerprint || {}
+	const liveHost = liveCtx?.deviceSnapBuild?.host || liveCtx?.deviceViewSnap?.host || {}
+
+	/* Prefer the identifiers that survive a rename. ensureHardwareHostname() rewrites the hostname
+	 * to highascg#### on first boot after the migration, so comparing hostnames alone reported every
+	 * pre-migration project as a foreign machine and popped the reconcile modal on every startup. */
+	const savedId = fp.hardwareId != null ? String(fp.hardwareId).trim() : ''
+	const liveId = liveHost.hardwareId != null ? String(liveHost.hardwareId).trim() : ''
+	if (savedId && liveId) return savedId === liveId
+
+	const savedMac = fp.mac ? String(fp.mac).trim().toLowerCase() : ''
+	const liveMac = liveHost.mac ? String(liveHost.mac).trim().toLowerCase() : ''
+	if (savedMac && liveMac) return savedMac === liveMac
+
+	const savedHostname = String(
+		fp.hostname || hardwareConfig?.host?.hostname || hardwareConfig?.hostname || '',
+	).trim()
+	const liveHostname = String(liveHost.hostname || liveCtx?.deviceViewSnap?.hostname || '').trim()
+	if (!savedHostname || !liveHostname) return false
+	if (savedHostname === liveHostname) return true
+
+	/* Projects saved before the rename carry no hardwareId at all, so the checks above cannot help
+	 * them. The rename is ours and one-way, so a legacy name against a migrated name is treated as
+	 * this machine. Worst case (a project copied from another pre-migration box) this only suppresses
+	 * a modal on the server's OWN bootstrap/reconnect — it never applies hardware by itself. */
+	return LEGACY_SAVED_HOSTNAME_RE.test(savedHostname) && MIGRATED_HOSTNAME_RE.test(liveHostname)
 }
 
 /**

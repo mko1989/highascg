@@ -22,6 +22,24 @@ const ROUTING_EXTRA_KEYS = [
 ]
 
 /**
+ * Stable machine identifiers for the project fingerprint. Best-effort: hardware-identity pulls in
+ * network inventory, so a failure here must never block a project save.
+ * @returns {{ hardwareId?: string, mac?: string }}
+ */
+function hardwareFingerprintIds() {
+	try {
+		const { getHardwareIdentity } = require('../system/hardware-identity')
+		const id = getHardwareIdentity()
+		return {
+			...(id?.hardwareId ? { hardwareId: String(id.hardwareId) } : {}),
+			...(id?.mac ? { mac: String(id.mac).toLowerCase() } : {}),
+		}
+	} catch {
+		return {}
+	}
+}
+
+/**
  * @param {object} cfg
  * @param {object} persistence
  * @returns {object}
@@ -39,8 +57,13 @@ function buildHardwareConfigFromConfig(cfg, persistence) {
 		osDisplay,
 		casparServer: cfg.casparServer,
 		multiviewLayout: persistence?.get?.('multiviewLayout') ?? null,
+		/* hostname alone is NOT a machine identity: ensureHardwareHostname() rewrites legacy
+		 * `highascg-nvidia-*` names to the MAC-derived `highascg####`, so every project saved before
+		 * that migration looked like a DIFFERENT machine afterwards and raised the hardware-mismatch
+		 * modal on every boot. hardwareId/mac are stable across the rename. */
 		fingerprint: {
 			hostname: os.hostname(),
+			...hardwareFingerprintIds(),
 		},
 	}
 

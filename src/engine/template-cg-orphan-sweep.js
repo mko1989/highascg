@@ -55,7 +55,14 @@ async function sweepTemplateCgOrphansOnCasparConnected(opts) {
 	let clearedCount = 0
 	if (clearLines.length > 0) {
 		try {
-			await amcp.batchSendChunked(clearLines, { skipMixerPreCommit: true })
+			/* forceBatch is not optional here. The global `config.amcp_batch` flag is off, so without it
+			 * batchSendChunked degrades to one _send per line: 90 hosts x N program channels, each a
+			 * separate serialized AMCP round-trip on _amcpSendQueue. On a CPU-bound box that measured
+			 * ~450ms per command, i.e. ~90s of saturated AMCP on EVERY startup and reconnect, during
+			 * which every other caller (Device View polls, INFO, TLS) queues behind it. Chunked
+			 * BEGIN...COMMIT turns the sweep into 3 round-trips. Same opt-in the take path uses (WO-259),
+			 * and it does not flip the global flag for anyone else. */
+			await amcp.batchSendChunked(clearLines, { skipMixerPreCommit: true, forceBatch: true })
 			clearedCount = clearLines.length
 		} catch (e) {
 			if (typeof log === 'function') {

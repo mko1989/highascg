@@ -82,3 +82,21 @@ test('WO-207 T207.4: POST /api/countdown/off emits CG CLEAR and records off in t
 	assert.ok(registry instanceof Map, 'registry exported')
 	assert.equal(registry.get('3:11')?.lastCmd, 'off', 'registry records off')
 })
+
+test('sweep forces BEGIN…COMMIT batching (180 sequential sends saturate AMCP on every reconnect)', async () => {
+	/** @type {object|undefined} */
+	let seenOpts
+	const amcp = {
+		batchSendChunked: async (_lines, opts) => {
+			seenOpts = opts
+		},
+	}
+	await sweepTemplateCgOrphansOnCasparConnected({ amcp, liveState: {}, channels: [1, 2] })
+	assert.equal(
+		seenOpts?.forceBatch,
+		true,
+		'forceBatch must be set: config.amcp_batch is off, so without it batchSendChunked ' +
+			'degrades to one serialized _send per line (~180 round-trips per startup)',
+	)
+	assert.equal(seenOpts?.skipMixerPreCommit, true, 'still must not inject a mixer pre-commit')
+})
