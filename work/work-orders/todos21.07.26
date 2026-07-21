@@ -85,28 +85,33 @@ plays there, but muting it or not routing it to pgm2 has no effect on the pgm2 o
 for live inputs such as decklink or usb there needs to be seperate setting to send or not send the audio.
 for instance my standard setup would be 3 cameras from decklink, one of those has an audio input from mixer. so i want to always route audio from that camera to ch3 and not route from other cameras even when they are on pgm.
 so add to audio mixer an auto mix toggle. wheter it should be turned on when transition or not.
-for live inputs such as decklink or usb there needs to be seperate setting to send or not
-send the audio. [3 cameras, one with mixer audio -> always to ch3, others never] + auto mix
-toggle for transitions.
-  >> DONE (commit above, service restarted, dist-web rebuilt). How it maps to your setup:
-     - Each DeckLink/USB-video strip in the audio mixer now has an "audio:" select:
-         AFV    - audio follows video on takes (the default, old behaviour)
-         always - for your mixer-audio camera: it feeds whatever buses you route it to
-                  with the strip's Ch buttons, on air or not. The copy embedded in the
-                  look is silenced ON PURPOSE - the same signal twice on one bus comb-
-                  filters and sounds wrong, it does not get louder.
-         never  - for the other two cameras: video only, their audio never follows.
-     - AUTO MIX button on the "Live inputs" divider: ON = takes bring AFV inputs' audio
-       with the video; OFF = every take brings live inputs in SILENT and you mix manually
-       on the strips. Deliberately takes effect from the NEXT take - flipping it never
-       yanks audio out of what is on air mid-show.
-     - Changing a strip's audio select DOES bite immediately (it pushes the matching
-       volume through the same fanout that fixed your mute earlier today).
-     - Settings live per input slot (decklink_input_N_audio_send), so they survive
-       restarts and travel with the project hardware config.
-     Also fixed underneath: both take paths used to skip the VOLUME command when the
-     look volume was 1 - after today's mute fanout that could leave a retaken layer
-     stuck silent from a stale 0. VOLUME is now always asserted on take (same defensive
-     rule WO-217 established for OPACITY).
-     YOUR SETUP: set the mixer camera's strip to "always" + press its Ch button for the
-     bus you want; set the other two cameras to "never". NEEDS KIOSK RELOAD.
+
+
+
+for the gui monitor choice on a fresh boot. can we have a button appear on each screen with press this to run operator gui on this screen.
+
+
+
+for the gui monitor choice on a fresh boot. can we have a button appear on each screen
+with press this to run operator gui on this screen.
+  >> DONE (commit above, service restarted). The good news: WO-290 had already built the
+     entire picker - full-screen prompt on every output, click handling, flag persistence
+     - but shipped it deliberately disconnected ("no call site in the boot path"). Your
+     request is exactly that call site, so I wired it rather than building anything new.
+     How it behaves:
+     - Fresh boot, MULTIPLE displays, no operator monitor chosen -> every connected
+       screen paints a full-screen "press this to run the operator GUI on this screen"
+       prompt. Click one: the choice is saved (screen_N_operator_monitor), and the GUI
+       launches on that screen immediately.
+     - Single display -> no prompt at all, it just picks it (nothing to choose).
+     - Esc or 2 minutes of nothing -> prompt goes away and does NOT come back on
+       reconnects. One prompt per boot; the inspector Launch button stays the manual way.
+     - It can NEVER appear on a configured box or over program: monitor already chosen,
+       operator_gui destination pinned to a port, or ANY live look on air -> it refuses,
+       and logs why. On this box it correctly refuses (your monitor is configured) -
+       the journal shows the GUI auto-started normally on the flag after restart.
+     - Opt-out if you ever hate it: operatorTools.monitorPicker = false.
+     NOT LIVE-TESTED: the actual prompt needs a fresh multi-display boot - this box is
+     configured, so the gate (correctly) never lets it paint here. First boot of the
+     next ISO on the laptop with two screens is the real test; the journal will carry
+     a "[Operator monitor picker] RUN/SKIP" line either way.
