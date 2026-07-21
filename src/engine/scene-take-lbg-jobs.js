@@ -22,6 +22,7 @@ const {
 	baseTypeStripAnimateSuffix,
 } = require('./scene-transition')
 const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
 
 async function buildTakeJobs(opts) {
 	const {
@@ -219,7 +220,9 @@ async function buildTakeJobs(opts) {
 		const hasLoadTransition = !!loadOpts.transition && Number(loadOpts.duration) > 0 && String(loadOpts.transition).toUpperCase() !== 'CUT'
 
 		const keyer = shouldApplyStraightAlphaKeyer(clip, !!layer.straightAlpha) ? 1 : 0
-		const vol = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
+		// Live-input audio-send policy (afv/always/never + the mixer's auto-mix toggle) is applied
+		// HERE, on the program-channel layer — the only place layer-route audio can be gated.
+		const vol = resolveTakeVolumeForSceneLayer(self.config, layer)
 		const mixerLines = []
 		let fillTail = '0'
 		if (isMerge && globalT.duration > 0) {
@@ -262,9 +265,10 @@ async function buildTakeJobs(opts) {
 		if (keyer === 1) {
 			mixerLines.push(`MIXER ${cl} KEYER 1`)
 		}
-		if (vol !== 1) {
-			mixerLines.push(`MIXER ${cl} VOLUME ${vol}`)
-		}
+		// Always emit VOLUME (same defensive rule WO-217 T217.2 applies to OPACITY): the mixer-strip
+		// fanout (f343e5e) and the audio-send policy can leave a stale 0 on this physical layer, and
+		// `if (vol !== 1)` would then keep a retaken layer silent forever.
+		mixerLines.push(`MIXER ${cl} VOLUME ${vol}`)
 
 		if (Array.isArray(layer.effects)) {
 			for (const fx of layer.effects) {

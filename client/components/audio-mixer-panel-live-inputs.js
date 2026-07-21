@@ -37,9 +37,35 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 	if (liveInputMeters.length === 0) return
 
 	const liveUi = readLiveAudioCasparSettings(settingsState.getSettings()?.casparServer || {})
+	const csNow = settingsState.getSettings()?.casparServer || {}
 	const liveDivider = document.createElement('div')
 	liveDivider.className = 'audio-mixer__channel-divider'
 	liveDivider.textContent = 'Live inputs'
+	// Mixer-wide AUTO MIX (audio follows video). Applied at TAKE time by the server's audio-send
+	// policy (src/engine/live-input-audio-policy.js): off = takes bring live-input video in silent
+	// and the operator mixes via the strips. Deliberately not retroactive — flipping it does not
+	// touch what is on air now, the next transition applies it.
+	const autoMixOn = !(csNow.audio_auto_mix === false || csNow.audio_auto_mix === 'false')
+	const autoMixBtn = Object.assign(document.createElement('button'), {
+		type: 'button',
+		className: `audio-mixer__automix-btn header-btn${autoMixOn ? ' audio-mixer__automix-btn--active' : ''}`,
+		textContent: 'AUTO MIX',
+		title: autoMixOn
+			? 'Auto mix ON: takes/transitions bring AFV inputs’ audio with the video. Applies from the next take.'
+			: 'Auto mix OFF: takes bring live inputs in SILENT — mix manually with the strips. Applies from the next take.',
+	})
+	autoMixBtn.onclick = async (e) => {
+		e.stopPropagation()
+		try {
+			await api.post('/api/settings', { casparServer: { audio_auto_mix: !autoMixOn } })
+			await settingsState.load()
+			autoMixBtn.classList.toggle('audio-mixer__automix-btn--active', !autoMixOn)
+			showScenesToast(`Auto mix ${!autoMixOn ? 'ON' : 'OFF'} — applies from the next take.`, 'info')
+		} catch (err) {
+			showScenesToast(err?.message || String(err), 'error')
+		}
+	}
+	liveDivider.appendChild(autoMixBtn)
 	inputsEl.appendChild(liveDivider)
 
 	for (const r of liveInputMeters) {
@@ -86,6 +112,44 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 			if (t?.closest?.('button, input, select, textarea')) return
 			if (r?.inputKind === 'live_audio' && r?.slot != null) window.dispatchEvent(new CustomEvent('live-audio-input-select', { detail: { slot: r.slot } }))
 		})
+
+		// Audio-send policy per video-capable input (DeckLink / v4l2). Owner workflow: three cameras,
+		// one carries the sound mixer — that one 'always', the others 'never', so PGM takes never
+		// drag camera audio in. Server applies it at take time; flipping it here also pushes the
+		// matching volume NOW through the strip fanout so the on-air state changes immediately.
+		if (r?.inputKind === 'decklink' || r?.inputKind === 'v4l2') {
+			const policyKey = `${r.inputKind}_input_${slot}_audio_send`
+			const cur = String(csNow[policyKey] || 'afv').toLowerCase()
+			const sendSel = document.createElement('select')
+			sendSel.className = 'audio-mixer__destinations-type audio-mixer__audio-send-sel'
+			sendSel.title =
+				'Audio send: AFV = audio follows video on takes (respects AUTO MIX) · always = feeds its routed ' +
+				'buses even off-PGM (embedded copy stays silent to avoid doubling) · never = video only'
+			sendSel.innerHTML =
+				'<option value="afv">audio: AFV</option><option value="always">audio: always</option><option value="never">audio: never</option>'
+			sendSel.value = ['afv', 'always', 'never'].includes(cur) ? cur : 'afv'
+			sendSel.onclick = (e) => e.stopPropagation()
+			sendSel.onchange = async (e) => {
+				e.stopPropagation()
+				const next = String(sendSel.value || 'afv')
+				try {
+					await api.post('/api/settings', { casparServer: { [policyKey]: next } })
+					await settingsState.load()
+					// Make it bite NOW, not only on the next take: the server fans this volume out to
+					// every live look layer consuming this input's route (f343e5e).
+					const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
+					const gain = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+					const autoOn = !(settingsState.getSettings()?.casparServer?.audio_auto_mix === false)
+					const effective = next === 'afv' ? (autoOn ? gain : 0) : 0
+					await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: effective })
+					showScenesToast(`${r.label}: audio ${next}`, 'success')
+				} catch (err) {
+					showScenesToast(err?.message || String(err), 'error')
+				}
+			}
+			const actions = row.querySelector('.audio-mixer__layer-actions')
+			actions?.insertBefore(sendSel, actions.firstChild)
+		}
 
 		const btnWrap = row.querySelector('.audio-mixer__live-route-buttons')
 		if (btnWrap && Array.isArray(programChannels)) {

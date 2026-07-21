@@ -17,6 +17,7 @@ const { param } = require('../caspar/amcp-utils')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
 const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
 const {
 	buildPipOverlayAmcpLinesAll,
 	buildPipOverlayRemoveLines,
@@ -75,9 +76,10 @@ function pgmOnlyMixerAnimTail(isAnimate, fadeDur, fadeTw) {
 	return '0'
 }
 
-function buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw) {
+function buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw, config) {
 	const cl = chLayerAmcp(channel, job.pLayer)
-	const vol = job.layer.muted ? 0 : job.layer.volume != null ? job.layer.volume : 1
+	// Live-input audio-send policy (afv/always/never + auto-mix) — same gate as the LBG take path.
+	const vol = resolveTakeVolumeForSceneLayer(config, job.layer)
 	const targetOpacity = job.layer.muted ? 0 : job.layer.opacity != null ? job.layer.opacity : 1
 	const keyer = shouldApplyStraightAlphaKeyer(job.clip, !!job.layer.straightAlpha) ? 1 : 0
 	const animTail = pgmOnlyMixerAnimTail(isAnimate, fadeDur, fadeTw)
@@ -91,7 +93,9 @@ function buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw) {
 		lines.push(`MIXER ${cl} OPACITY ${targetOpacity} 0`)
 	}
 	lines.push(`MIXER ${cl} KEYER ${keyer}`)
-	if (vol !== 1) {
+	// Always emit VOLUME (WO-217-style defensive reset): the strip fanout (f343e5e) and the
+	// audio-send policy can leave a stale 0 on this layer, and skipping at vol===1 kept it silent.
+	{
 		const volTail = isAnimate && fadeDur > 0 ? animTail : ''
 		lines.push(`MIXER ${cl} VOLUME ${vol}${volTail ? ` ${volTail}` : ''}`)
 	}
@@ -249,7 +253,7 @@ async function runSceneTakePgmOnly(amcp, opts) {
 		if (!job.templateCg) {
 			await amcp.loadbg(channel, job.pLayer, job.clip, job.loadOpts)
 		}
-		flatMixer.push(...buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw))
+		flatMixer.push(...buildPgmOnlyMixerLines(job, channel, isAnimate, fadeDur, fadeTw, self.config))
 	}
 
 	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
