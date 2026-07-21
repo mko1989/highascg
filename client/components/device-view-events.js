@@ -10,6 +10,7 @@ import {
 	shouldSeedScreenConsumerDefaults,
 } from '../lib/screen-consumer-defaults.js'
 import { nextMainScreenIndex } from '../lib/screen-destination-index.js'
+import { rafThrottle } from '../lib/raf-throttle.js'
 import * as Actions from './device-view-actions.js'
 
 export function attachDeviceViewEvents(ctx) {
@@ -69,7 +70,7 @@ export function attachDeviceViewEvents(ctx) {
 				return ctx.load({ forceRefresh: true })
 			},
 		})
-	window.onresize = () => renderCableOverlay(ctx.getCOCtx())
+	window.onresize = rafThrottle(() => renderCableOverlay(ctx.getCOCtx()))
 	clearCableBtn.onclick = () => {
 		const wasRegrab = !!state.cableRegrab
 		ctx.clearCableGesture()
