@@ -333,8 +333,19 @@ WHAT THE NUMBERS DO SHOW
   swap: 0 B used of 8 G. memory: 8.2 Gi free. Memory is not the problem.
   governor: already "performance", 3.84 GHz of a 4.60 GHz max. Not a power
            management problem - nothing to fix there.
-  renderer: Mesa 25.2.8 AMD - real hardware GL, NOT llvmpipe. Good news; software
-           rendering would have been far worse.
+  renderer: Mesa 25.2.8 AMD
+    *** I CALLED THIS "GOOD NEWS". THAT WAS WRONG. ***
+    You have told me the laptop HAS an NVIDIA card. So this line does not mean
+    "hardware GL, fine" - it means Caspar is rendering on the INTEGRATED AMD GPU
+    and your discrete NVIDIA GPU is sitting idle. That also explains the two
+    other things I could not account for:
+      - gpu.text / gpu.source came back NULL, i.e. nvidia-smi produced nothing.
+        On a box with a working NVIDIA driver it returns utilisation and VRAM
+        (it does on this tower). Null means the driver is not loaded/usable.
+      - casparcg burning 5 of 12 cores. That is exactly what 2x 1080p50 with
+        "frame copied to host for rendering" costs when the dGPU is not doing it.
+    This is very likely THE root cause of the lag, not a side note. See the
+    NVIDIA section at the bottom.
   dropped/late frames: none logged. Caspar is keeping its frame clock.
 
   thermal_zone0 (acpitz): 86000 = 86 C. That is hot. acpitz is usually not the
@@ -363,3 +374,80 @@ RANKED, BY EXPECTED EFFECT
      list. Now caches the negative too.
   5. Minor: 2 zombie processes, and the media disk is only 7.98 GB total
      (7.64 GB free) - that will fill quickly once you record anything.
+
+
+================================================================================
+NVIDIA GPU NOT IN USE ON THE LAPTOP - diagnose, then fix
+================================================================================
+Caspar reported "Mesa 25.2.8 AMD" and nvidia-smi returned nothing, on a machine
+that has an NVIDIA card. So the discrete GPU is not being used at all. I cannot
+test any of this from here - the laptop is a different machine - so this is
+diagnose-first, and do NOT apply the fix until step A says the driver is alive.
+
+--- A. Is the NVIDIA driver even loaded? (run all four) ------------------------
+  nvidia-smi
+  lsmod | grep -i nvidia
+  ls -l /dev/nvidia* 2>&1
+  cat /proc/driver/nvidia/version 2>&1
+
+  If nvidia-smi says "command not found" or "couldn't communicate with the
+  NVIDIA driver", and lsmod shows nothing, the driver is NOT loaded. Then the
+  GPU-selection env vars below will do nothing and the real job is installing /
+  fixing the driver first. Stop here and tell me what these printed.
+
+--- B. What hardware is there and which driver is bound to it? -----------------
+  lspci -nnk | grep -A3 -iE "vga|3d controller"
+
+  Look at "Kernel driver in use:" under the NVIDIA entry. Want: nvidia.
+  If it says nouveau, the open driver grabbed it and the proprietary one is not
+  in play. If there is no "Kernel driver in use" line at all, nothing claimed it.
+
+--- C. Is the NVIDIA GLX vendor library present? -------------------------------
+  ls /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so* 2>&1
+  ls /usr/share/glvnd/egl_vendor.d/ 2>&1
+
+--- D. Which way is this laptop wired? -----------------------------------------
+  xrandr --listproviders
+
+  This says whether the NVIDIA GPU is a render offload provider (hybrid/Optimus,
+  panel driven by the AMD iGPU) or is driving outputs itself. It changes which
+  fix below is correct, so include the output when you report back.
+
+--- THE FIX, once A/B/C confirm the driver is working --------------------------
+Caspar is started by systemd, not by highascg, and that unit currently sets NO
+GPU-selection environment at all:
+
+  /etc/systemd/system/casparcg-server.service
+  ExecStart=/home/casparcg/highascg/run.sh
+  (has DISPLAY and XAUTHORITY, nothing about which GPU to render on)
+
+Option 1 - PRIME render offload (correct for a hybrid/Optimus laptop):
+  sudo systemctl edit casparcg-server
+  then add:
+      [Service]
+      Environment=__NV_PRIME_RENDER_OFFLOAD=1
+      Environment=__GLX_VENDOR_LIBRARY_NAME=nvidia
+  then:
+      sudo systemctl daemon-reload
+      sudo systemctl restart casparcg-server
+
+Option 2 - make NVIDIA the primary X GPU (better for sustained playout, needs a
+reboot, only if `prime-select` exists):
+      sudo prime-select nvidia && sudo reboot
+
+Option 1 renders on the NVIDIA GPU but still presents through the iGPU, which
+costs an extra copy per frame. Option 2 avoids that copy and is what you want on
+a machine whose job is playout - but it is the more invasive change, so try
+Option 1 first and measure.
+
+--- VERIFY IT WORKED ----------------------------------------------------------
+  grep -m1 "Initialized OpenGL" log/caspar_$(date +%F).log
+
+  Want NVIDIA in that line instead of "Mesa ... AMD". Then re-run the two probes
+  from the runbook above and compare:
+      curl -s localhost:4200/api/host-stats | python3 -m json.tool
+  gpu.source should become "nvidia-smi" with a real utilisation figure, and
+  processes.caspar cpuPct should drop a long way below the 521% you measured.
+
+  If the OpenGL line still says Mesa AMD after a restart, the env vars did not
+  reach the process - check `systemctl show casparcg-server -p Environment`.
