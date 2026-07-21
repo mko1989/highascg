@@ -190,9 +190,29 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 							btn.classList.add('audio-mixer__live-route-btn--active')
 						} else {
 							await disableLiveAudioPgmRoute(ch, destLayer)
-							const next = curTargets.filter((t) => !(Number(t.channel) === ch && Number(t.layer) === destLayer))
-							setMultiPlayTargets(targetKey, next)
+							setMultiPlayTargets(targetKey, curTargets.filter((t) => !(Number(t.channel) === ch && Number(t.layer) === destLayer)))
 							btn.classList.remove('audio-mixer__live-route-btn--active')
+						}
+						// The matrix is authoritative (owner: "not selected to route to ch3 yet it
+						// plays on ch3"). Mirror targets into config so the TAKE pipeline can honor
+						// them — localStorage is invisible to the server — and push the embedded-copy
+						// volume NOW: any lit Ch button means the matrix rules and the embedded copy
+						// goes silent everywhere (audio arrives via the audio-only routes, so no
+						// doubling); an empty matrix under AFV returns to follow-the-video.
+						if (r?.inputKind === 'decklink' || r?.inputKind === 'v4l2') {
+							const nowTargets = getMultiPlayTargets(targetKey)
+							const chans = [...new Set(nowTargets.map((t) => Number(t.channel)).filter((n) => n >= 1))]
+							await api.post('/api/settings', {
+								casparServer: { [`${r.inputKind}_input_${slot}_audio_targets`]: chans },
+							})
+							await settingsState.load()
+							const csNext = settingsState.getSettings()?.casparServer || {}
+							const policy = String(csNext[`${r.inputKind}_input_${slot}_audio_send`] || 'afv')
+							const autoOn = !(csNext.audio_auto_mix === false || csNext.audio_auto_mix === 'false')
+							const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
+							const gain = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+							const embedded = policy === 'afv' && autoOn && chans.length === 0 ? gain : 0
+							await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: embedded })
 						}
 					} catch (err) {
 						showScenesToast(err?.message || String(err), 'error')

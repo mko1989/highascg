@@ -78,8 +78,32 @@ function resolveLiveInputForSource(config, source) {
 }
 
 /**
+ * The mixer's routed target channels for an input — the server-side copy of the Ch buttons.
+ * Stored as `<kind>_input_<slot>_audio_targets` (array of program channel numbers) so the TAKE
+ * pipeline can honor the matrix; the client keeps its localStorage copy for route start/stop.
+ * @param {object} config
+ * @param {string} kind
+ * @param {number} slot
+ * @returns {number[]}
+ */
+function liveInputAudioTargets(config, kind, slot) {
+	const cs = config?.casparServer && typeof config.casparServer === 'object' ? config.casparServer : config || {}
+	const raw = cs[`${kind}_input_${slot}_audio_targets`]
+	if (!Array.isArray(raw)) return []
+	return raw.map((v) => parseInt(String(v), 10)).filter((n) => Number.isFinite(n) && n >= 1)
+}
+
+/**
  * The MIXER VOLUME a take must set on a scene layer, with the audio-send policy applied.
  * Non-live-input layers keep the authored volume exactly as before.
+ *
+ * Owner (todos21.07.26): "i dont want that audio to appear on ch3, in audio mixer it is not
+ * selected to route to ch3 yet it plays on ch3 when on pgm" — the route matrix must be
+ * authoritative. So under 'afv': the embedded copy follows video ONLY while the input has no
+ * routed targets at all. The moment any Ch button is lit, the matrix rules: audio arrives solely
+ * via the audio-only routes on the targeted channels and the embedded copy is silenced everywhere
+ * — which is also what makes doubling structurally impossible (one signal path at a time, never
+ * both).
  * @param {object} config
  * @param {{ muted?: boolean, volume?: number|null, source?: object }} layer
  * @returns {number}
@@ -90,11 +114,13 @@ function resolveTakeVolumeForSceneLayer(config, layer) {
 	if (!input) return authored
 	const policy = liveInputAudioSendPolicy(config, input.kind, input.slot)
 	if (policy === 'never' || policy === 'always') return 0
-	return isAutoMixEnabled(config) ? authored : 0
+	if (!isAutoMixEnabled(config)) return 0
+	return liveInputAudioTargets(config, input.kind, input.slot).length === 0 ? authored : 0
 }
 
 module.exports = {
 	VALID_POLICIES,
+	liveInputAudioTargets,
 	liveInputAudioSendPolicy,
 	isAutoMixEnabled,
 	resolveLiveInputForSource,

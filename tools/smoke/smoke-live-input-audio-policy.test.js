@@ -13,6 +13,7 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
 const {
+	liveInputAudioTargets,
 	liveInputAudioSendPolicy,
 	isAutoMixEnabled,
 	resolveLiveInputForSource,
@@ -110,4 +111,27 @@ test('the take pipeline emits VOLUME unconditionally (stale-0 defence)', () => {
 		assert.ok(!/if\s*\(\s*vol\s*!==\s*1\s*\)/.test(src), `${f}: VOLUME must not be gated on vol !== 1`)
 		assert.match(src, /resolveTakeVolumeForSceneLayer/, `${f}: uses the policy resolver`)
 	}
+})
+
+test('the route matrix is authoritative: any lit Ch button silences the embedded copy', () => {
+	/* Owner: "i dont want that audio to appear on ch3, in audio mixer it is not selected to route
+	 * to ch3 yet it plays on ch3 when on pgm." With targets stored, audio arrives ONLY via the
+	 * audio-only routes on the targeted channels — embedded suppressed everywhere, so unrouted
+	 * channels stay silent and routed ones cannot double. */
+	const c = cfg()
+	const host = decklinkHost(c, 1)
+	const layer = { volume: 1, source: { type: 'route', value: `route://${host.channel}-${host.layer}` } }
+
+	assert.equal(resolveTakeVolumeForSceneLayer(c, layer), 1, 'empty matrix under afv: follow the video')
+
+	c.casparServer.decklink_input_1_audio_targets = [3]
+	assert.equal(
+		resolveTakeVolumeForSceneLayer(c, layer),
+		0,
+		'a routed target exists → matrix rules → embedded copy silent even where the video plays',
+	)
+
+	c.casparServer.decklink_input_1_audio_targets = []
+	assert.equal(resolveTakeVolumeForSceneLayer(c, layer), 1, 'clearing the matrix restores follow-the-video')
+	assert.deepEqual(liveInputAudioTargets(c, 'decklink', 2), [], 'other slots unaffected')
 })
