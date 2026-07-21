@@ -182,3 +182,91 @@ describe('screen consumer physical port resolve', () => {
 		assert.equal(merged.screen_1_x, 0, 'nor any other PGM consumer field (x/y/name/stretch/colour_space)')
 	})
 })
+
+describe('port role is derived from what is cabled to it', () => {
+	function appWith(destinations, edges, casparOverrides = {}) {
+		const app = clone(defaults)
+		app.screen_count = 1
+		app.casparServer = { ...app.casparServer, screen_count: 1, screen_1_mode: '1080p5000', ...casparOverrides }
+		app.screenDestinations = { version: 1, destinations, edidNotes: '' }
+		app.deviceGraph = {
+			version: 1,
+			devices: [],
+			connectors: [
+				{ id: 'dst_in_gui', kind: 'destination_in', externalRef: 'gui1' },
+				{ id: 'dst_in_pgm', kind: 'destination_in', externalRef: 'pgm1' },
+				{ id: 'gpu_p0', kind: 'gpu_out', label: 'GPU 1' },
+				{ id: 'gpu_p3', kind: 'gpu_out', label: 'GPU 3' },
+			],
+			edges,
+		}
+		return app
+	}
+
+	const GUI_DEST = {
+		id: 'gui1',
+		label: 'Operator GUI',
+		mainScreenIndex: 0,
+		mode: 'operator_gui',
+		videoMode: 'custom',
+		width: 1920,
+		height: 1080,
+		fps: 50,
+	}
+	const PGM_DEST = {
+		id: 'pgm1',
+		label: 'PGM 1',
+		mainScreenIndex: 0,
+		mode: 'pgm_only',
+		videoMode: '1080p5000',
+		width: 1920,
+		height: 1080,
+		fps: 50,
+		caspar: { bus: 'pgm' },
+	}
+
+	it('cabling the operator GUI to a port sets that port not-on-top, interactive and operator_monitor', () => {
+		// gpu_p3 is physical port 4 (gpu_p{n} -> n+1).
+		const app = appWith([GUI_DEST], [{ sourceId: 'dst_in_gui', sinkId: 'gpu_p3' }])
+		const flat = buildCasparGeneratorFlatConfig(app)
+
+		assert.equal(flat.screen_4_always_on_top, false, 'GUI port must not be on top — Firefox stacks above it')
+		assert.equal(flat.screen_4_interactive, true, 'holes must pass pointer events through')
+		assert.equal(flat.screen_4_operator_monitor, true, 'this is the flag resolveOperatorMonitorPort reads')
+	})
+
+	it('does not stamp operator-GUI flags onto ports it is not cabled to', () => {
+		const app = appWith([GUI_DEST], [{ sourceId: 'dst_in_gui', sinkId: 'gpu_p3' }])
+		const flat = buildCasparGeneratorFlatConfig(app)
+		assert.notEqual(flat.screen_1_always_on_top, false, 'port 1 carries no GUI — must keep the PGM default')
+		assert.notEqual(flat.screen_1_operator_monitor, true)
+	})
+
+	it('re-cabling a former operator-GUI port to PGM restores always-on-top and clears operator_monitor', () => {
+		/* The stale values a previous operator-GUI cabling would have left behind. Without the PGM
+		 * branch these survive and the program output silently stops stacking above desktop chrome. */
+		const app = appWith([PGM_DEST], [{ sourceId: 'dst_in_pgm', sinkId: 'gpu_p0' }], {
+			screen_1_always_on_top: false,
+			screen_1_operator_monitor: true,
+		})
+		const flat = buildCasparGeneratorFlatConfig(app)
+
+		assert.equal(flat.screen_1_always_on_top, true, 'PGM port must be on top')
+		assert.equal(flat.screen_1_operator_monitor, false, 'PGM port must not still claim to be the operator monitor')
+	})
+
+	it('a GUI port and a PGM port on the same machine get opposite always-on-top', () => {
+		const app = appWith(
+			[GUI_DEST, PGM_DEST],
+			[
+				{ sourceId: 'dst_in_gui', sinkId: 'gpu_p3' },
+				{ sourceId: 'dst_in_pgm', sinkId: 'gpu_p0' },
+			],
+		)
+		const flat = buildCasparGeneratorFlatConfig(app)
+		assert.equal(flat.screen_4_always_on_top, false, 'GUI port')
+		assert.equal(flat.screen_1_always_on_top, true, 'PGM port')
+		assert.equal(flat.screen_4_operator_monitor, true)
+		assert.equal(flat.screen_1_operator_monitor, false)
+	})
+})

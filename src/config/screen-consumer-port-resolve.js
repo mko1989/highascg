@@ -27,6 +27,26 @@ const PHYSICAL_PORT_CONSUMER_FIELDS = [
 
 const WINDOW_CHROME_FIELDS = ['windowed', 'vsync', 'borderless']
 
+/** Destination modes that put live program video on a port. */
+const PGM_DESTINATION_MODES = new Set(['pgm_prv', 'pgm_only'])
+
+/**
+ * Port flags implied by cabling the operator GUI to a GPU port. These are not preferences — each one
+ * is load-bearing:
+ *  - always_on_top false: the operator-GUI consumer stacks BELOW the fullscreen Firefox GUI, which
+ *    the shape helper punches holes in (WO-263). On top, the WM raises focused Firefox above it and
+ *    the picture vanishes the moment the operator clicks.
+ *  - interactive true: the holes must pass pointer events through to the video window.
+ *  - operator_monitor true: this is the flag resolveOperatorMonitorPort() reads, which in turn feeds
+ *    resolveOperatorGuiPort() and the helper-window confinement in x-display-session-layout. Deriving
+ *    it from the cable removes the manual "tick Operator monitor on this port" step entirely.
+ */
+const OPERATOR_GUI_PORT_FLAGS = {
+	always_on_top: false,
+	interactive: true,
+	operator_monitor: true,
+}
+
 /**
  * @param {object | null | undefined} connector
  * @returns {number | null} 1-based physical port index (gpu_p0 → 1)
@@ -119,10 +139,30 @@ function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
 		// branch below copied its rear-port flags — always_on_top=false per WO-263, plus x/y/name/
 		// stretch/colour_space — straight over the PGM screen_1_* keys on every generate, silently
 		// discarding the operator's PGM choices (owner: "changing manualy doesnt change the config").
-		if (mode === 'operator_gui') continue
+		// ...but the port it is CABLED TO still has to be told what it now is. Resolve the port and
+		// stamp the operator-GUI flags on that port's own `screen_${portIdx}_*` keys, then stop —
+		// deliberately without falling through to the screen_${n} copy that WO-263 removed.
+		if (mode === 'operator_gui') {
+			const guiPort = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
+			if (guiPort) {
+				for (const [field, value] of Object.entries(OPERATOR_GUI_PORT_FLAGS)) {
+					merged[`screen_${guiPort}_${field}`] = value
+				}
+			}
+			continue
+		}
 
 		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
 		if (!portIdx) continue
+
+		// A port that used to carry the operator GUI keeps always_on_top=false and
+		// operator_monitor=true once those were written; re-cabling it to PGM must undo both, or the
+		// program output silently stops stacking above desktop chrome and the operator-monitor
+		// resolver keeps pointing at a screen that is now showing program.
+		if (PGM_DESTINATION_MODES.has(mode)) {
+			merged[`screen_${portIdx}_always_on_top`] = true
+			merged[`screen_${portIdx}_operator_monitor`] = false
+		}
 
 		if (mode === 'multiview') {
 			const mvDests = ctx.destinations.filter((d) => String(d?.mode || '').toLowerCase() === 'multiview')
@@ -149,6 +189,8 @@ function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
 module.exports = {
 	PHYSICAL_PORT_CONSUMER_FIELDS,
 	WINDOW_CHROME_FIELDS,
+	PGM_DESTINATION_MODES,
+	OPERATOR_GUI_PORT_FLAGS,
 	physicalPortIndexFromGpuConnector,
 	resolveGpuOutConnectorFromSource,
 	resolvePhysicalPortIndexForDestination,
