@@ -46,3 +46,23 @@ test('config-changed events bypass the payload cache', () => {
 		)
 	}
 })
+
+test('every reload in device-view-events.js bypasses the cache', () => {
+	/* Every ctx.load() in this file runs either from an explicit operator action (Refresh, Add
+	 * destination) or from an onApplied/settings-changed callback — i.e. always at a moment when
+	 * the server state has just moved or the operator has just asked to see current truth. None of
+	 * them may be answered from the 5s payload cache. The plain-load path that legitimately uses
+	 * the cache is tab activation, which lives in device-view.js, not here.
+	 *
+	 * The reported symptom this guards: "adding a screen destination does not always show the
+	 * destination straight away and needs a manual refresh" — addDestination().then(() => ctx.load())
+	 * re-rendered a cached snapshot taken before the destination existed. */
+	const src = code(EVENTS)
+	const bare = [...src.matchAll(/ctx\.load\(\s*\)/g)]
+	assert.deepEqual(
+		bare.map((m) => src.slice(Math.max(0, m.index - 60), m.index + 12).trim().split('\n').pop()),
+		[],
+		'these ctx.load() calls take no forceRefresh, so a snapshot fetched in the preceding 5s is ' +
+			're-rendered instead of the change that just happened',
+	)
+})

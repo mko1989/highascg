@@ -48,7 +48,7 @@ export function attachDeviceViewEvents(ctx) {
 	loadSnapBtn.onclick = () =>
 		openLoadDeviceSnapshotModal({
 			onApplied: () => {
-				void ctx.load()
+				void ctx.load({ forceRefresh: true })
 			},
 			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
 		})
@@ -65,7 +65,7 @@ export function attachDeviceViewEvents(ctx) {
 		showCasparConfigModal({
 			onApplied: () => {
 				ctx.setCasparRestartDirty(false)
-				return ctx.load()
+				return ctx.load({ forceRefresh: true })
 			},
 		})
 	window.onresize = () => renderCableOverlay(ctx.getCOCtx())
@@ -93,7 +93,7 @@ export function attachDeviceViewEvents(ctx) {
 				casparChannel: host.casparChannel,
 				inputSlot: host.inputSlot,
 				sourceId: host.sourceId,
-			}).then(() => ctx.load())
+			}).then(() => ctx.load({ forceRefresh: true }))
 			return
 		}
 		const list = Array.isArray(state.lastPayload?.screenDestinations?.destinations)
@@ -131,7 +131,12 @@ export function attachDeviceViewEvents(ctx) {
 				}
 			}
 			ctx.setCasparRestartDirty(true)
-			ctx.load()
+			/* The destination was just created server-side, so this reload MUST refetch. A plain
+			 * ctx.load() is served from the 5s payload cache, and on a hit the new destination is
+			 * simply absent from the re-render — the operator sees nothing until they hit Refresh
+			 * (which forces). That is the "does not always show up straight away" report: it only
+			 * misses when a snapshot was fetched within the preceding 5 seconds. */
+			ctx.load({ forceRefresh: true })
 		})
 	}
 	let cableOverlayRafPending = false
