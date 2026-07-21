@@ -1,124 +1,43 @@
-when operator gui is connected to gpu port that port must have enabled operator monitor.
-  >> DONE - the flag is back ON (screen_3_operator_monitor=true) and the thing that made
-     me turn it off is fixed properly (e2ab1a8).
-     What locked your mouse: that flag also switches on the pointer-confine helper, which
-     read the monitor geometry ONCE at startup and then warped your cursor back into that
-     rect every 50ms forever. The layout moved under it (DP-5 was at +3072+0 at startup,
-     later at +0+0), so it dragged the pointer into empty space 20x a second - feels like
-     a dead mouse, not a fence. Now it re-reads geometry every 2s, rebuilds barriers when
-     the monitor moves, and RELEASES if the output disappears.
-     BEING STRAIGHT: I caused the lockout. My a35c245 auto-sets operator_monitor from the
-     cable, and I did not check that the flag also implies pointer confinement. Also note
-     "operator monitor" and "confine pointer to it" are STILL one setting - if you ever
-     want the flag without the caged mouse, say so and I will split them.
+the live audio channel should be created with pal or ntsc resolution setting so its the cheapest.
 
-ndi stream should not have the normal settings rtmp stream has.
-srt stream should also have unique options different than rtmp.
-  >> DONE per your spec (587ab14), and VERIFIED against your real rig.
-     NDI - treated exactly like an SDI out now:
-       - Your existing str_2 (type ndi, cabled from PGM 2) is emitted into the generated
-         config as <ndi><name>Str2</name></ndi> on the Screen 2 PGM channel. I checked the
-         running server's generate after restart - it is there.
-       - Always on, no Start/Stop buttons, no encoder fields. The inspector shows only the
-         name + a note. Saving an NDI output lights the Apply button, because the consumer
-         only exists after regenerate + Apply Caspar config.
-       - Cable direction does not matter; disabled/uncabled outputs emit nothing. Two NDI
-         senders with the same name are collapsed to one (same-name = on-air conflict).
-     SRT - real options, and Start actually works now:
-       - FACT FIRST: I checked the binary - bin/casparcg links libsrt-gnutls.so.1.5, so
-         Caspar's own ffmpeg opens srt:// directly. The old "Caspar cannot do srt" comment
-         in the code was about builds you are not running.
-       - New per-output fields (SRT only): latency in MS (default 120, you type ms, the
-         server converts to ffmpeg's microseconds - classic footgun, handled in one place),
-         streamid, and mode caller/listener.
-       - Start for SRT goes through the same encoder pipeline as RTMP with an mpegts
-         container. RTMP args are asserted byte-identical in the gate - your on-air
-         YouTube path is untouched.
-     DELIBERATELY LEFT OUT: an SRT passphrase field. That is a secret, and after the
-     YouTube-key-in-logs incident I am not putting another credential in plaintext
-     settings. If you need encrypted SRT, say so and I will wire the passphrase through
-     the same project-credentials mechanism the RTMP key uses (WO-261).
-     TO USE: reload kiosk, then for NDI: Apply Caspar config (the button is lit after you
-     save the output). Server already restarted with the new generator.
+i connected pgm2 to rec output and pgm1 got recorded.
 
-i still get these fucking stale channels in the generated config
-  >> NOW ACTUALLY DEAD (90e58e4) - verified against your live box: the running server
-     now generates Screen 1 PGM+PRV, Screen 2 PGM-only, Operator GUI. 4 channels, no
-     phantom. You were right three times over; this had THREE separate causes and I owed
-     you the last two:
-     1. (48ca829) empty-destinations floor - fixed earlier.
-     2. Deploy miss BY ME: my second fix (35f6350) landed on disk AFTER the service had
-        started, and node caches modules in memory - so every generate you tried today
-        ran the OLD code. The file changed; the process never knew. I restarted it.
-     3. The real remaining bug, visible once you built your actual rig: the factory
-        default seeds the Operator GUI at screen-slot 0, and the Add-destination button
-        COUNTED it when picking the next slot - so your first real screen landed at
-        slot 1, your second at 2, and slot 0 stayed a permanent hole. Screen count is
-        max(slot)+1, so the generator kept filling that hole with a PGM+PRV pair that
-        nothing routes to. Fixed both sides: stored configs get their main slots
-        re-packed to 0,1,2... automatically (your existing config heals itself - no
-        action needed), and the Add button now ignores utility channels when numbering.
-     Regenerate + Apply from Device View whenever you like; the config the server hands
-     you is already clean. NEEDS KIOSK RELOAD for the Add-button half.
+why would keyboard reload(?). without rebooting the pc the keyboard unlocks the numlock between restarts of highascg or casparcg.
 
-i have a decklink input playing on a look on pgm2 its audio is routed to pgm2 because it
-plays there, but muting it or not routing it to pgm2 has no effect on the pgm2 output.
-  >> MUTE IS FIXED and live-verified (commit above + service restarted). Full mechanism,
-     read off your running Caspar, not guessed:
-     - Your look plays the DeckLink input on PGM2 as route://5-4 (host channel 5, layer 4;
-       the look layer is ch3-10). The audio arrives EMBEDDED in that video route.
-     - The mixer strip's mute sent MIXER 5-4 VOLUME 0 - the HOST channel. A layer route
-       taps the source layer BEFORE the host channel's mixer applies volume, so that
-       command mutes a mix nobody listens to. Caspar's own log showed your exact clicks.
-     - The strip's "routed to PGM2" plumbing is a separate audio-only layer (ch3-324,
-       320+slot) which was EMPTY - so unrouting cleared nothing that carried audio.
-     Fix: /api/audio/volume now fans the strip's gain out to every live look layer playing
-     that exact route. Verified on your box: mute now emits MIXER 5-4 AND MIXER 3-10.
-     Retaking a look reasserts the look's own volume - the take stays the authority.
-     ONE SEMANTIC LEFT FOR YOU TO DECIDE: the strip's per-PGM route toggles still only
-     control the strip's own audio-only routes, NOT audio embedded in a look's video
-     route. So "unroute from PGM2" still does not silence a look that plays the input
-     with audio - mute does. If you want the route toggle to also gate look-embedded
-     audio, that means the take pipeline consulting routing state on every take, and
-     retakes would re-silence - say the word and I will spec it properly.
+some drag and drops from media browser to timeline do not "land" on the timeline.
 
-for live inputs such as decklink or usb there needs to be seperate setting to send or not send the audio.
-for instance my standard setup would be 3 cameras from decklink, one of those has an audio input from mixer. so i want to always route audio from that camera to ch3 and not route from other cameras even when they are on pgm.
-so add to audio mixer an auto mix toggle. wheter it should be turned on when transition or not.
+clips on the timeline are missing almost all of their settings in the inspector.
+
+timeline operations especially during editing should be quicker on casparcg output. so they should act similar to how looks editing work.
+
+compose preview with the cut out holes in operator gui need to react faster to tab changes and edits. id also like to be able to add a live input (decklink for instance) to preview in the compose preview.
+in compose preview inside timeline editor the default sizes of the label bar is fill width instead of keep it under the prv window.
 
 
+================================================================================
+WORK ORDERS CREATED FOR EVERYTHING STILL OPEN (306-314)
+================================================================================
+Each carries today's verified context + acceptance criteria, so any session (or
+person) can pick it up cold.
 
-for the gui monitor choice on a fresh boot. can we have a button appear on each screen with press this to run operator gui on this screen.
+  306  Media-layer audio routing (unroute own ch / route to other ch)
+       - AWAITING YOUR GO: it changes the look model. Spec is written.
+  307  SRT passphrase via project credentials (encrypted SRT, no plaintext secret)
+  308  Split "operator monitor" from "confine pointer" (the welded setting that
+       caged your mouse) - built behind operatorTools.pointerConfine when you say
+  309  Async device-view probes - the REAL fix for xrandr blocking the whole
+       server (~160ms per cache miss, measured); 4ab0c2d only bounded the hang
+  310  One unit on the volume wire - kill the dB/linear double-send seen in the
+       caspar log (last-write-wins hides it today)
+  311  Autosave must not RESURRECT a factory-reset-trashed project (5d01bca
+       protected the contents; the empty-shell recreation remains)
+  312  Reassert audio-only routes after a Caspar restart - your route matrix is
+       config now, but the routes themselves die with Caspar and only the
+       browser recreates them
+  313  rAF-throttle the cable-overlay resize handler (small; flagged, unmeasured)
+  314  Laptop NVIDIA PRIME env for casparcg-server.service - BLOCKED on secure
+       boot being disabled first; conditional drop-in so the tower is unaffected
 
-
-even media inputs should be able to be unrouted from the channel its playing on, as well as routed to another channel. (channel in casparcg)
-now i wanted to test the camera that has audio but i dont want that audio to appear on ch3, in audio mixer it is not selected to route to ch3 yet it plays on ch3 when on pgm.
-
-even media inputs should be able to be unrouted from the channel its playing on, as well
-as routed to another channel. (channel in casparcg)
-now i wanted to test the camera that has audio but i dont want that audio to appear on
-ch3, in audio mixer it is not selected to route to ch3 yet it plays on ch3 when on pgm.
-  >> CAMERA CASE FIXED (commit above, service restarted, dist-web rebuilt).
-     Why it ignored your route selection: the Ch buttons saved to browser
-     localStorage ONLY - the file's own comment admits "until the server stores play
-     targets on slots". The take pipeline literally could not see your matrix, so AFV
-     dragged the camera audio wherever its video went.
-     Now the matrix is authoritative for DeckLink/USB inputs:
-       - NO Ch buttons lit (fresh input): audio follows video - nothing goes silent by
-         surprise.
-       - ANY Ch button lit: the matrix rules. Audio plays ONLY on the selected channels
-         (via the audio-only routes), and the embedded copy is silenced everywhere -
-         including the channel the video is on. That is your exact sentence: not
-         selected for ch3 = no audio on ch3, even on PGM. It also makes doubling
-         structurally impossible (one signal path at a time).
-       - Toggling a button bites immediately, not at the next take.
-     YOUR TEST NOW: reload kiosk, light the Ch button for wherever you DO want that
-     camera's audio (or none + audio:never for silence everywhere) - ch3 stays clean.
-     MEDIA LAYERS (your first sentence) - NOT DONE, and I want a decision, not a guess:
-     clips already have per-layer strips with mute/fader under each PGM section. What is
-     missing is (a) "unroute from own channel" as a routing act and (b) "route a media
-     layer's audio to a DIFFERENT caspar channel" - that means an audio-only
-     route://pgmN-layer on the other channel, per layer, with lifecycle tied to the look
-     (take/retake/clear must move it). Doable with the same machinery, but it changes
-     what a look "contains". Say it is wanted for the release and I will build it; if it
-     can wait, it goes to the backlog with this note as the spec.
+Priority suggestion for the release: 312 and 311 are correctness holes an
+operator will hit; 310 and 309 are hygiene; 306/307/308 are features on your
+word; 313 is a nicety; 314 is hardware-gated.
