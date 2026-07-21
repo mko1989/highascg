@@ -27,6 +27,10 @@ BARRIER_NEGATIVE_X = 2
 BARRIER_POSITIVE_Y = 4
 BARRIER_NEGATIVE_Y = 8
 
+"""How often to re-read the output geometry. The layout can move under a running confine (apply
+layout, hotplug, mode change) and a stale rect means the watchdog drags the pointer off-screen."""
+GEOMETRY_POLL_SEC = 2.0
+
 libX11 = ctypes.CDLL(ctypes.util.find_library("X11"), use_errno=True)
 libXfixes = ctypes.CDLL(ctypes.util.find_library("Xfixes"), use_errno=True)
 
@@ -173,11 +177,49 @@ def clamp(n, lo, hi):
     return max(lo, min(hi, n))
 
 
-def warp_watchdog(dpy, root, x, y, w, h):
-    """Pull pointer back inside monitor if barriers fail on this driver."""
-    min_x, min_y = x, y
-    max_x, max_y = x + w - 1, y + h - 1
+def destroy_barriers(dpy, barriers):
+    for edge, bid in barriers:
+        try:
+            libXfixes.XFixesDestroyPointerBarrier(dpy, bid)
+        except Exception as e:
+            log(f"destroy {edge} warning: {e}")
+
+
+def warp_watchdog(dpy, root, output_name, geom, barriers):
+    """Pull pointer back inside the monitor if barriers fail on this driver.
+
+    The geometry is RE-READ periodically. It used to be captured once at startup, and this loop
+    warps the pointer every 50ms, so when the layout moved under us the watchdog spent 20 times a
+    second dragging the pointer into coordinates where no monitor existed any more. Observed live:
+    barriers built for DP-5 at 1920x1080+3072+0, xrandr later reporting DP-5 at +0+0, and the mouse
+    unusable — it reads as a frozen cursor, not as a fence.
+
+    If the output disappears entirely we RELEASE. Clamping to a rect that is definitely wrong is
+    strictly worse than not confining at all: the operator loses the pointer with no way back.
+    """
+    w, h, x, y = geom
+    last_geom_check = time.monotonic()
     while True:
+        now = time.monotonic()
+        if now - last_geom_check >= GEOMETRY_POLL_SEC:
+            last_geom_check = now
+            try:
+                _, fresh = get_monitor_geometry(output_name)
+            except Exception as e:
+                log(f"geometry re-read failed ({e}) — keeping current rect")
+                fresh = (w, h, x, y)
+            if fresh is None:
+                log(f"output {output_name!r} is no longer connected — releasing instead of clamping to a stale rect")
+                return
+            if fresh != (w, h, x, y):
+                w, h, x, y = fresh
+                log(f"geometry changed → {w}x{h}+{x}+{y} — rebuilding barriers")
+                destroy_barriers(dpy, barriers)
+                barriers[:] = create_edge_barriers(dpy, root, x, y, w, h)
+                libX11.XSync(dpy, 0)
+
+        min_x, min_y = x, y
+        max_x, max_y = x + w - 1, y + h - 1
         pt = query_pointer(dpy, root)
         if pt:
             px, py = pt
@@ -222,15 +264,11 @@ def main():
         barriers = create_edge_barriers(dpy, root, x, y, w, h)
         libX11.XSync(dpy, 0)
         log(f"Pointer barriers active ({len(barriers)} edges) + warp watchdog")
-        warp_watchdog(dpy, root, x, y, w, h)
+        warp_watchdog(dpy, root, name, (w, h, x, y), barriers)
     except KeyboardInterrupt:
         pass
     finally:
-        for edge, bid in barriers:
-            try:
-                libXfixes.XFixesDestroyPointerBarrier(dpy, bid)
-            except Exception as e:
-                log(f"destroy {edge} warning: {e}")
+        destroy_barriers(dpy, barriers)
         libX11.XSync(dpy, 0)
         libX11.XCloseDisplay(dpy)
         remove_pid_file()
