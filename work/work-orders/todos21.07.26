@@ -18,7 +18,6 @@ loading prrrr project for instance does not load the devices settings and connec
 
 after factory reset, there is a state screen (pgm/prv) in the generated casparcg config.
 
-right here what to tests and commands to run via ssh on the test laptop to know why it lags so much.
 
 after factory reset, there is a state screen (pgm/prv) in the generated casparcg config.
   >> DONE 48ca829. Confirmed on your box in its post-reset state: destinations [], no
@@ -45,3 +44,103 @@ after factory reset, there is a state screen (pgm/prv) in the generated casparcg
      pgm: undefined in that state, and these are offline generator tests. So regenerate
      + apply on a truly blank box is untested - add a destination first, or tell me and
      I will go make the runtime side safe.
+
+
+right here what to tests and commands to run via ssh on the test laptop to know why it lags so much.
+
+
+================================================================================
+LAPTOP LAG DIAGNOSTIC - run these over ssh on the test laptop
+================================================================================
+I ran every one of these on THIS box first, so the "healthy" numbers below are
+real measurements from the working machine, not guesses. Run the same command on
+the laptop and compare. Note that glxinfo / pidstat / sensors / iostat are NOT
+installed on this image, so nothing here needs them.
+
+  ssh casparcg@<laptop>
+
+--- 1. The one-shot overview (start here) -------------------------------------
+  curl -s localhost:4200/api/host-stats | python3 -m json.tool
+
+  Look at: cpu.load1 vs cpu.cores, memory.freeBytes, gpu.text,
+           processes.caspar and processes.highascg CPU%.
+  HEALTHY HERE: load1 9.65 on 28 cores.
+  RED FLAG: load1 at or above the core count = the box is saturated. On a
+  4-core laptop, load1 > 4 is the whole story.
+
+--- 2. Is the Node event loop actually starved? --------------------------------
+This is the direct test of my theory. The laptop's caspar log showed ~450ms
+between EVERY amcp command, including trivial ones, which is what a blocked
+event loop looks like.
+
+  node -e "
+  let max=0,last=process.hrtime.bigint()
+  const t=setInterval(()=>{const n=process.hrtime.bigint();const lag=Number(n-last)/1e6-50;last=n;if(lag>max)max=lag},50)
+  setTimeout(()=>{clearInterval(t);console.log('max event-loop lag over 3s:',max.toFixed(1),'ms')},3000)"
+
+  HEALTHY HERE: 0.2 ms.
+  RED FLAG: anything over ~50ms. Hundreds of ms confirms starvation.
+  NOTE this measures a FRESH node process, i.e. how starved the MACHINE is. It
+  does not measure the highascg process itself - if this is clean but the app is
+  still slow, the problem is inside the app, not the box.
+
+--- 3. Time the AMCP round-trip directly ---------------------------------------
+  node -e "
+  const net=require('net'),s=net.connect(5250,'127.0.0.1')
+  let n=0,t0;const times=[]
+  s.on('connect',()=>{t0=Date.now();s.write('VERSION\r\n')})
+  s.on('data',()=>{times.push(Date.now()-t0);if(++n>=5){s.end();console.log('AMCP VERSION round-trips (ms):',times.join(' '));process.exit(0)}t0=Date.now();s.write('VERSION\r\n')})
+  s.on('error',e=>{console.log('AMCP connect failed:',e.message);process.exit(0)})
+  setTimeout(()=>{console.log('timeout, got',times.join(' '));process.exit(0)},5000)"
+
+  HEALTHY HERE: 1 0 0 0 2 ms.
+  RED FLAG: tens or hundreds of ms. If THIS is fast but the app is still slow,
+  Caspar is fine and the delay is on the highascg side.
+
+--- 4. Pressure stall info (no tools needed, and very telling) ------------------
+  cat /proc/pressure/cpu /proc/pressure/io /proc/pressure/memory
+
+  HEALTHY HERE: cpu some avg10=4.26, full avg10=0.00 everywhere.
+  RED FLAG: "full" above 0 on memory or io means real stalling - swapping or
+  disk-bound. cpu "some" avg10 above ~30 means tasks are constantly waiting.
+
+--- 5. Thermal throttling / CPU governor (laptops throttle, the tower does not) -
+  cpupower frequency-info | head -20
+  grep . /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp
+  grep -c . /proc/cpuinfo
+
+  Temps are millidegrees: 95000 = 95C = throttling hard.
+  If the governor is "powersave" try: sudo cpupower frequency-set -g performance
+  That alone can transform a laptop under sustained load.
+
+--- 6. Who is actually eating the CPU ------------------------------------------
+  top -b -n 2 -d 1 | head -30
+  ps -eo pid,ppid,pcpu,pmem,comm --sort=-pcpu | head -15
+
+  Expect casparcg at the top. If Xorg or firefox is above it, the problem is the
+  GUI/compositor, not playout.
+
+--- 7. Confirm which renderer Caspar got --------------------------------------
+  grep -m1 "Initialized OpenGL" log/caspar_$(date +%F).log
+
+  The laptop log said "Mesa 25.2.8 AMD" = integrated GPU, no NVIDIA. If it ever
+  says llvmpipe or softpipe you are rendering 1080p50 ON THE CPU, which would
+  explain everything on its own.
+
+--- 8. Dropped/late frames --------------------------------------------------
+  grep -ohiE "late frame|dropped|underflow|buffer.{0,12}full|too slow" log/caspar_$(date +%F).log | sort | uniq -c | sort -rn | head
+
+  Empty on this box. Anything here on the laptop means Caspar itself cannot keep
+  up with the frame clock.
+
+--- 9. Memory / swap ----------------------------------------------------------
+  free -h; swapon --show
+
+  Swapping on a playout box will produce exactly these symptoms.
+
+--- What I already suspect (from your pasted log, unverified on the hardware) ---
+The laptop is running TWO channels at 1080p5000 (50fps) with gpu_texture:false,
+"frame copied to host for rendering", vsync on, on integrated AMD graphics. That
+is a full CPU readback of a 1920x1080 frame 50 times a second, twice over.
+Before anything else, try ONE channel at 1080p2500 and see if the lag vanishes.
+Steps 2 and 3 will tell you whether it is the machine or the app.
