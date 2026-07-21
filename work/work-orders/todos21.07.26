@@ -14,19 +14,32 @@ when operator gui is connected to gpu port that port must have enabled operator 
 
 ndi stream should not have the normal settings rtmp stream has.
 srt stream should also have unique options different than rtmp.
-  >> INVESTIGATED, NOT IMPLEMENTED YET - because it is bigger than a form tidy-up and I
-     need one decision from you.
-     Today (client/components/device-view-inspector-stream.js): only the URL and stream
-     key are protocol-gated. Everything else - quality, video codec, bitrate, encoder
-     preset, audio codec/bitrate - is shown for ALL types, and those are ffmpeg encoder
-     settings that mean nothing for NDI.
-     The deeper truth: there is NO server-side NDI or SRT streaming at all. Only the RTMP
-     path exists; the Start button literally answers "Start for NDI is not wired yet".
-     NDI would go through a Caspar <ndi> consumer (not ffmpeg), and a code comment says
-     srt:// output is avoided because many Caspar builds cannot open it (UDP is used).
-     PICK ONE: (a) hide non-applicable fields per protocol - quick + safe cosmetic fix;
-     (b) also add real SRT fields (latency/passphrase/streamid) persisted for later;
-     (c) actually wire NDI + SRT start server-side - the real feature, a day-plus of work.
+  >> DONE per your spec (587ab14), and VERIFIED against your real rig.
+     NDI - treated exactly like an SDI out now:
+       - Your existing str_2 (type ndi, cabled from PGM 2) is emitted into the generated
+         config as <ndi><name>Str2</name></ndi> on the Screen 2 PGM channel. I checked the
+         running server's generate after restart - it is there.
+       - Always on, no Start/Stop buttons, no encoder fields. The inspector shows only the
+         name + a note. Saving an NDI output lights the Apply button, because the consumer
+         only exists after regenerate + Apply Caspar config.
+       - Cable direction does not matter; disabled/uncabled outputs emit nothing. Two NDI
+         senders with the same name are collapsed to one (same-name = on-air conflict).
+     SRT - real options, and Start actually works now:
+       - FACT FIRST: I checked the binary - bin/casparcg links libsrt-gnutls.so.1.5, so
+         Caspar's own ffmpeg opens srt:// directly. The old "Caspar cannot do srt" comment
+         in the code was about builds you are not running.
+       - New per-output fields (SRT only): latency in MS (default 120, you type ms, the
+         server converts to ffmpeg's microseconds - classic footgun, handled in one place),
+         streamid, and mode caller/listener.
+       - Start for SRT goes through the same encoder pipeline as RTMP with an mpegts
+         container. RTMP args are asserted byte-identical in the gate - your on-air
+         YouTube path is untouched.
+     DELIBERATELY LEFT OUT: an SRT passphrase field. That is a secret, and after the
+     YouTube-key-in-logs incident I am not putting another credential in plaintext
+     settings. If you need encrypted SRT, say so and I will wire the passphrase through
+     the same project-credentials mechanism the RTMP key uses (WO-261).
+     TO USE: reload kiosk, then for NDI: Apply Caspar config (the button is lit after you
+     save the output). Server already restarted with the new generator.
 
 i still get these fucking stale channels in the generated config
   >> NOW ACTUALLY DEAD (90e58e4) - verified against your live box: the running server
