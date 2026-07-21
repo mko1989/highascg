@@ -491,6 +491,16 @@ async function setupAllRouting(self) {
 		const { maybeAutoLaunchOperatorGui } = require('../system/operator-gui-launcher')
 		maybeAutoLaunchOperatorGui(self)
 	}
+	// WO-312: the audio route matrix is config, but the route LAYERS carrying the audio are AMCP
+	// state and die with Caspar. Replay them server-side on boot and every reconnect — previously
+	// only a client button press recreated them, so with the kiosk closed a restart left the matrix
+	// claiming "routed" while nothing played. Runs after the input channels exist above.
+	try {
+		const { reassertLiveInputAudioRoutes } = require('../engine/live-input-route-reassert')
+		await reassertLiveInputAudioRoutes(self)
+	} catch (e) {
+		self.log('warn', `[Audio reassert] skipped: ${e?.message || e}`)
+	}
 	const { setupHostLiveSources } = require('./host-live-sources-setup')
 	await setupHostLiveSources(self)
 	if (map.streamingCh != null && self.amcp) {

@@ -85,11 +85,19 @@ function foregroundProducerOnLayer(xmlStr, layer) {
 				const rawPath = fg?.file?.path != null ? String(fg.file.path).trim() : ''
 				const deviceNum = /^\d+$/.test(rawPath) ? parseInt(rawPath, 10) : NaN
 				const sig = fg?.has_signal != null ? String(fg.has_signal).trim().toLowerCase() : ''
+				// A route producer reports its SOURCE instead of a file:
+				//   foreground.route = { channel: '5', layer: '4' }   (layer absent for `route://5`)
+				const routeEl = fg?.route
+				const rc = routeEl?.channel != null ? parseInt(String(routeEl.channel), 10) : NaN
+				const rl = routeEl?.layer != null ? parseInt(String(routeEl.layer), 10) : NaN
 				resolve({
 					producer,
 					device: Number.isFinite(deviceNum) ? deviceNum : null,
 					hasSignal: sig === 'true' ? true : sig === 'false' ? false : null,
 					path: rawPath,
+					routeSource: Number.isFinite(rc)
+						? { channel: rc, layer: Number.isFinite(rl) ? rl : null }
+						: null,
 				})
 			} catch {
 				resolve(null)
@@ -109,9 +117,42 @@ function isDecklinkProducerForDevice(fg, device) {
 	return fg.producer === 'decklink' && fg.device === want
 }
 
+/**
+ * True when `layer` already runs a route producer fed from exactly `route://<channel>[-<layer>]`.
+ * A bare `route://5` reports no source layer, so a null srcLayer must match a null routeSource.layer
+ * rather than matching anything.
+ * @param {{producer: string, routeSource: {channel: number, layer: number|null}|null}|null} fg
+ * @param {number} srcChannel
+ * @param {number|null} [srcLayer]
+ */
+function isRouteProducerFrom(fg, srcChannel, srcLayer = null) {
+	const wantCh = parseInt(String(srcChannel), 10)
+	if (!fg || fg.producer !== 'route' || !fg.routeSource || !Number.isFinite(wantCh)) return false
+	if (fg.routeSource.channel !== wantCh) return false
+	const wantLayer = srcLayer == null ? null : parseInt(String(srcLayer), 10)
+	if (wantLayer == null) return fg.routeSource.layer == null
+	return fg.routeSource.layer === wantLayer
+}
+
+/**
+ * Parse a `route://<channel>[-<layer>]` clip string.
+ * @param {string} route
+ * @returns {{channel: number, layer: number|null}|null}
+ */
+function parseRouteClip(route) {
+	const m = /^route:\/\/(\d+)(?:-(\d+))?$/i.exec(String(route || '').trim())
+	if (!m) return null
+	const channel = parseInt(m[1], 10)
+	if (!Number.isFinite(channel) || channel < 1) return null
+	const layer = m[2] != null ? parseInt(m[2], 10) : NaN
+	return { channel, layer: Number.isFinite(layer) ? layer : null }
+}
+
 module.exports = {
 	infoResponseToXml,
 	listOccupiedStageLayersInRange,
 	foregroundProducerOnLayer,
 	isDecklinkProducerForDevice,
+	isRouteProducerFrom,
+	parseRouteClip,
 }
