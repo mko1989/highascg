@@ -60,3 +60,24 @@ i still get these fucking stale channels in the generated config
         action needed), and the Add button now ignores utility channels when numbering.
      Regenerate + Apply from Device View whenever you like; the config the server hands
      you is already clean. NEEDS KIOSK RELOAD for the Add-button half.
+
+i have a decklink input playing on a look on pgm2 its audio is routed to pgm2 because it
+plays there, but muting it or not routing it to pgm2 has no effect on the pgm2 output.
+  >> MUTE IS FIXED and live-verified (commit above + service restarted). Full mechanism,
+     read off your running Caspar, not guessed:
+     - Your look plays the DeckLink input on PGM2 as route://5-4 (host channel 5, layer 4;
+       the look layer is ch3-10). The audio arrives EMBEDDED in that video route.
+     - The mixer strip's mute sent MIXER 5-4 VOLUME 0 - the HOST channel. A layer route
+       taps the source layer BEFORE the host channel's mixer applies volume, so that
+       command mutes a mix nobody listens to. Caspar's own log showed your exact clicks.
+     - The strip's "routed to PGM2" plumbing is a separate audio-only layer (ch3-324,
+       320+slot) which was EMPTY - so unrouting cleared nothing that carried audio.
+     Fix: /api/audio/volume now fans the strip's gain out to every live look layer playing
+     that exact route. Verified on your box: mute now emits MIXER 5-4 AND MIXER 3-10.
+     Retaking a look reasserts the look's own volume - the take stays the authority.
+     ONE SEMANTIC LEFT FOR YOU TO DECIDE: the strip's per-PGM route toggles still only
+     control the strip's own audio-only routes, NOT audio embedded in a look's video
+     route. So "unroute from PGM2" still does not silence a look that plays the input
+     with audio - mute does. If you want the route toggle to also gate look-embedded
+     audio, that means the take pipeline consulting routing state on every take, and
+     retakes would re-silence - say the word and I will spec it properly.
