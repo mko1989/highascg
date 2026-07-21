@@ -138,7 +138,13 @@ async function startInputCapture(ctx, req) {
 	} catch (_) {
 		/* ditto */
 	}
-	const res = await tryPlayDecklinkInput(ctx, { channel: plan.channel, layer: plan.layer, device: plan.device })
+	// The STOP + CLEAR above already released the card, so skip WO-316's already-open probes:
+	// this path is a deliberate re-acquire, not the retry loop guarding against a double-open.
+	const res = await tryPlayDecklinkInput(
+		ctx,
+		{ channel: plan.channel, layer: plan.layer, device: plan.device },
+		{ assumeReleased: true },
+	)
 	if (!res.ok) {
 		return { ok: false, reason: res.entry?.message || 'play_failed', status: 502, ...planShape(plan) }
 	}

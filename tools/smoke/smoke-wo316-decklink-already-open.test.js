@@ -105,8 +105,21 @@ test('wiring: the retry path checks before playing and re-checks after a failure
 
 	assert.match(src, /isDecklinkProducerForDevice\(before, device\)/, 'must check BEFORE playing')
 	assert.match(src, /isDecklinkProducerForDevice\(after, device\)/, 'must re-check after a failed PLAY')
+	assert.match(src, /assumeReleased/, 'the deliberate re-acquire path must be able to opt out')
 	assert.match(src, /alreadyOpen/, 'status must distinguish already-open from a fresh PLAY')
 	// The transient classification must survive — a genuinely dead input still has to retry.
 	assert.match(src, /source powered off \/ not cabled/, 'transient failure message kept')
 	assert.match(src, /scheduleDecklinkInputRetries/, 'the retry loop itself is still wired')
+})
+
+test('the deliberate re-acquire path opts out, so its STOP/CLEAR/PLAY sequence stays clean', () => {
+	const fs = require('fs')
+	const path = require('path')
+	const src = fs.readFileSync(path.join(__dirname, '../../src/audio/live-input-start.js'), 'utf8')
+
+	// live-input-start STOPs and CLEARs the layer itself before re-PLAYing, so the card is
+	// provably free. Probing there costs a round-trip and inserts an INFO into a sequence that
+	// smoke-live-input-stop-start.test.js asserts exactly — it must stay opted out.
+	assert.match(src, /assumeReleased:\s*true/, 'the re-acquire path must skip the already-open probe')
+	assert.match(src, /STOP \$\{cl\}/, 'it still releases the card first')
 })

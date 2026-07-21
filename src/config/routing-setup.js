@@ -128,11 +128,19 @@ async function readForegroundProducer(self, channel, layer) {
  *
  * @param {object} self
  * @param {{ channel: number, layer: number, device: number }} target
+ * @param {{ assumeReleased?: boolean }} [opts] `assumeReleased` when the caller has just STOPped
+ *   and CLEARed the layer itself (src/audio/live-input-start.js does exactly that to release the
+ *   card before re-acquiring it). The device is provably free at that point, so the INFO probes
+ *   below would only cost a round-trip and add a command to a deliberate, asserted restart
+ *   sequence. Skip them and go straight to the PLAY.
  */
-async function tryPlayDecklinkInput(self, { channel, layer, device }) {
-	const before = await readForegroundProducer(self, channel, layer)
-	if (isDecklinkProducerForDevice(before, device)) {
-		return { ok: true, alreadyOpen: true, hasSignal: before.hasSignal }
+async function tryPlayDecklinkInput(self, { channel, layer, device }, opts = {}) {
+	const probe = opts.assumeReleased !== true
+	if (probe) {
+		const before = await readForegroundProducer(self, channel, layer)
+		if (isDecklinkProducerForDevice(before, device)) {
+			return { ok: true, alreadyOpen: true, hasSignal: before.hasSignal }
+		}
 	}
 	try {
 		await self.amcp.raw(`PLAY ${channel}-${layer} DECKLINK ${device}`)
@@ -141,7 +149,7 @@ async function tryPlayDecklinkInput(self, { channel, layer, device }) {
 		const raw = e?.message || String(e)
 		// Race guard: another path may have opened it between the pre-check and the PLAY.
 		// If the layer now holds the device we asked for, the PLAY was redundant, not failed.
-		const after = await readForegroundProducer(self, channel, layer)
+		const after = probe ? await readForegroundProducer(self, channel, layer) : null
 		if (isDecklinkProducerForDevice(after, device)) {
 			return { ok: true, alreadyOpen: true, hasSignal: after.hasSignal }
 		}
