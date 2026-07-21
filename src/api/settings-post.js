@@ -194,6 +194,12 @@ async function handlePost(path, body, ctx) {
 		if (settings.operatorTools.pointerConfineMultiview !== undefined) {
 			cfg.operatorTools.pointerConfineMultiview = settings.operatorTools.pointerConfineMultiview === true
 		}
+		if (settings.operatorTools.pointerConfine !== undefined) {
+			// WO-308: 'auto' | 'on' | 'off' only — any other value (including a stray boolean)
+			// falls back to 'auto' rather than being written verbatim into config.
+			const raw = String(settings.operatorTools.pointerConfine || '').trim().toLowerCase()
+			cfg.operatorTools.pointerConfine = ['auto', 'on', 'off'].includes(raw) ? raw : 'auto'
+		}
 		if (settings.operatorTools.cefEnableGpu !== undefined) {
 			cfg.operatorTools.cefEnableGpu = settings.operatorTools.cefEnableGpu === true
 		}

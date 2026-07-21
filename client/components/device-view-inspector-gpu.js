@@ -160,6 +160,32 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		nvidiaSyncOn,
 		'NVIDIA OpenGL/XVideo sync-to-display target (often PGM, not the operator monitor)',
 	)
+	// WO-308: "operator monitor" and "confine pointer to it" used to be ONE setting — checking this
+	// box also silently switched on the pointer barriers, which caused a real mouse lockout
+	// (2026-07-21, a35c245/e2ab1a8) when the resolved rect went stale. This is a GLOBAL setting
+	// (operatorTools.pointerConfine), not per-port, so it posts its own patch independent of
+	// runSave()'s per-port casparServer builder.
+	const pointerConfineSel = Object.assign(document.createElement('select'), {
+		className: 'device-view__destinations-type',
+		title:
+			'auto (default): confine follows the operator monitor, same as before. off: this port ' +
+			'still becomes the operator monitor for GUI placement, but the mouse is never caged to it. ' +
+			'on: confine even without a resolved monitor.',
+		style: 'font-size:10px; padding:2px 6px; opacity:0.85',
+	})
+	pointerConfineSel.innerHTML =
+		'<option value="auto">Confine: auto</option><option value="on">Confine: on</option><option value="off">Confine: off</option>'
+	const pointerConfineVal = String(currentSettings?.operatorTools?.pointerConfine || 'auto').toLowerCase()
+	pointerConfineSel.value = ['auto', 'on', 'off'].includes(pointerConfineVal) ? pointerConfineVal : 'auto'
+	pointerConfineSel.addEventListener('click', (e) => e.stopPropagation())
+	pointerConfineSel.addEventListener('change', async () => {
+		try {
+			await Actions.saveSettingsPatch({ operatorTools: { pointerConfine: pointerConfineSel.value } })
+			setStatus(statusEl, `Pointer confine: ${pointerConfineSel.value}`, true)
+		} catch (e) {
+			setStatus(statusEl, e?.message || String(e), false)
+		}
+	})
 	operatorMonitorIn.addEventListener('change', () => {
 		if (operatorMonitorIn.checked) {
 			interactiveIn.checked = true
@@ -355,7 +381,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	minimalToggleRow.append(
 		mkSmallCk(fullscreenCk), mkSmallCk(windowedCk), mkSmallCk(borderCk), mkSmallCk(vsyncCk),
 		mkSmallCk(keyOnlyCk), mkSmallCk(aotCk),
-		mkSmallCk(operatorMonitorCk), mkSmallCk(interactiveCk), mkSmallCk(nvidiaSyncCk),
+		mkSmallCk(operatorMonitorCk), pointerConfineSel, mkSmallCk(interactiveCk), mkSmallCk(nvidiaSyncCk),
 		mkSmallCk(sbsKeyCk), mkSmallCk(forceLinearCk), mkSmallCk(mipmapsCk), mkSmallCk(highBitdepthCk),
 	)
 

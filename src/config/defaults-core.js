@@ -38,6 +38,14 @@ function coreDefaults() {
 		},
 		operatorTools: {
 			pointerConfineMultiview: false,
+			// WO-308: 'auto' (default) keeps the pre-existing rule — confine follows whatever
+			// resolves an operator monitor. 'off' resolves the monitor for GUI/helper placement as
+			// always, but never starts the pointer barriers; 'on' forces them even without a
+			// resolvable monitor. Added after a35c245 auto-set screen_N_operator_monitor from
+			// cabling and silently switched confinement on with it (the 2026-07-21 mouse lockout,
+			// fixed in e2ab1a8) — "operator monitor" and "confine pointer to it" were one setting
+			// with no way to pick just one.
+			pointerConfine: 'auto',
 			cefInteractiveBridge: true,
 			cefInteractiveLayer: 999,
 			cefRemoteDebuggingPort: 9222,

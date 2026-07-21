@@ -45,3 +45,21 @@ word; 313 is a nicety; 314 is hardware-gated.
 
 tell me how big of a work it would be to port to the node gui https://github.com/nodegui/nodegui
 could this give as more native preview from casparcg?
+
+VERY IMPORTANT
+when total resolution of the planned gpu outputs desktop xrandr is bigger than current the restart needs a nodm restart too. this was already coded in but either got deleted or stopped working.
+
+/home/casparcg/highascg/work/work-orders/todos21.07.26-logs
+highascg peridically tries to play decklink input, its already playing on the host channel and it wont be able to play anywhere else thats why it fails. 
+
+---
+WO-308 (split operator monitor from pointer confine) — DONE, commit follows.
+  New setting, Device View -> GPU port inspector, next to "Operator monitor":
+    Confine: auto (default, byte-identical to before) | on | off.
+  'off' still makes the port the operator monitor for GUI/helper placement, it just never
+  cages the mouse to it. Verified live on this box: switching to 'off' stopped the running
+  barrier process immediately (journal: "SKIP - pointerConfine_off"), switching back to
+  'auto' brought it back ("RUN - operator_monitor_port_3"). Box left in its normal 'auto'
+  state afterward - nothing changed for you unless you go flip it.
+  Every decision now logs one line (RUN/SKIP + why), same style as the WO-290 monitor
+  picker. NEEDS KIOSK RELOAD for the new dropdown to appear.

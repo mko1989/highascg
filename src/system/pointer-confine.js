@@ -16,6 +16,7 @@ const { promisify } = require('util')
 const {
 	resolveOperatorMonitorRect,
 	isOperatorPointerConfineDesired,
+	evaluateOperatorPointerConfineDesire,
 	pointerInConfineAllowance,
 	parkPointerOnOperatorDisplay,
 	resolveConfineBarriersScript,
@@ -117,7 +118,15 @@ function startBarrierWatchdog(config, opts) {
 	watchOpts = opts
 	if (barrierWatchdog) return
 	barrierWatchdog = setInterval(() => {
-		if (!watchConfig || !isOperatorPointerConfineDesired(watchConfig)) {
+		if (!watchConfig) {
+			stopBarrierWatchdog()
+			return
+		}
+		const verdict = evaluateOperatorPointerConfineDesire(watchConfig)
+		if (!verdict.desired) {
+			// This branch only runs once per transition — stopBarrierWatchdog() clears the interval
+			// that is calling it, so the poll cannot fire again to log the same line twice.
+			watchOpts?.log?.('info', `[Pointer confine] stopping — ${verdict.reason}`)
 			stopBarrierWatchdog()
 			return
 		}
@@ -300,9 +309,11 @@ async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {
  * @param {{ log?: Function, layout?: object }} [opts]
  */
 async function startPointerConfine(config, opts = {}) {
-	if (!isOperatorPointerConfineDesired(config)) {
+	const verdict = evaluateOperatorPointerConfineDesire(config)
+	if (!verdict.desired) {
+		opts.log?.('info', `[Pointer confine] SKIP — ${verdict.reason}`)
 		stopPointerConfine()
-		return { ok: true, enabled: false }
+		return { ok: true, enabled: false, reason: verdict.reason }
 	}
 	const layout = opts.layout || calculateLayoutPositions(config)
 	const rect = resolveOperatorMonitorRect(config, layout)
@@ -313,10 +324,15 @@ async function startPointerConfine(config, opts = {}) {
 	const key = confineKey(rect)
 	const env = displaySessionEnv()
 	if (key && key === activeConfineKey && (await isBarrierDaemonRunning(rect.sysId, env))) {
+		// Steady-state watchdog recheck (fires every 8s while confine stays desired) — NOT a fresh
+		// decision, so it must not repeat the RUN log every tick.
 		startBarrierWatchdog(config, opts)
 		return { ok: true, rect, mode: 'unchanged' }
 	}
 
+	// Reached only on a genuine transition into confine (first start, or restart after the rect/key
+	// changed) — never on the steady-state watchdog recheck above, so this logs once per transition.
+	opts.log?.('info', `[Pointer confine] RUN — ${verdict.reason}`)
 	stopPointerConfine()
 	const log = opts.log
 	watchConfig = config
@@ -348,15 +364,19 @@ async function startPointerConfine(config, opts = {}) {
  * @param {{ log?: Function }} [opts]
  */
 function syncOperatorPointerConfine(config, opts = {}) {
-	const enabled = isOperatorPointerConfineDesired(config)
-	if (enabled) {
+	const verdict = evaluateOperatorPointerConfineDesire(config)
+	// WO-308: one line per decision, mirroring WO-290's RUN/SKIP verdict style. startPointerConfine
+	// logs its OWN skip below when desired — logging here too would just be the same reason twice
+	// for the enabled case, so this line covers the disabled case only.
+	if (verdict.desired) {
 		void startPointerConfine(config, opts).then((r) => {
 			if (!r.ok) stopPointerConfine()
 		})
-		return { ok: true, enabled: true, starting: true }
+		return { ok: true, enabled: true, starting: true, reason: verdict.reason }
 	}
+	opts.log?.('info', `[Pointer confine] SKIP — ${verdict.reason}`)
 	stopPointerConfine()
-	return { ok: true, enabled: false }
+	return { ok: true, enabled: false, reason: verdict.reason }
 }
 
 module.exports = {

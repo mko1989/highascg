@@ -70,6 +70,7 @@ const FILES = [
 	'tools/smoke/smoke-audio-volume-route-fanout.test.js',
 	'tools/smoke/smoke-live-input-audio-policy.test.js',
 	'tools/smoke/smoke-boot-monitor-picker.test.js',
+	'tools/smoke/smoke-wo308-pointer-confine-split.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',

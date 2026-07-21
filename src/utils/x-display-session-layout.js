@@ -227,13 +227,36 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 }
 
 /**
+ * WO-308 — PURE verdict + reason for whether the pointer should be confined, split out so the
+ * decision and its explanation can never drift apart (mirrors WO-290's
+ * evaluateMonitorPickerTrigger/formatTriggerLog split). `operatorTools.pointerConfine` overrides
+ * the pre-existing auto-detect rule:
+ *   'off'  — never confine, even when an operator monitor resolves (GUI/helper placement is
+ *            UNAFFECTED — only the barriers are skipped).
+ *   'on'   — always confine, even with nothing resolved (the caller still needs a rect to draw
+ *            barriers around; see startPointerConfine's own 'no_operator_monitor' failure path).
+ *   'auto' (default, or any unrecognized value) — byte-identical to the pre-WO-308 behavior.
+ * @param {object} config
+ * @returns {{ desired: boolean, reason: string }}
+ */
+function evaluateOperatorPointerConfineDesire(config) {
+	const mode = String(config?.operatorTools?.pointerConfine || 'auto').trim().toLowerCase()
+	if (mode === 'off') return { desired: false, reason: 'pointerConfine_off' }
+	if (mode === 'on') return { desired: true, reason: 'pointerConfine_on' }
+	const port = resolveOperatorMonitorPort(config).port
+	if (port != null) return { desired: true, reason: `operator_monitor_port_${port}` }
+	if (config?.operatorTools?.pointerConfineMultiview === true) {
+		return { desired: true, reason: 'pointerConfineMultiview' }
+	}
+	return { desired: false, reason: 'no_operator_monitor_and_multiview_off' }
+}
+
+/**
  * @param {object} config
  * @returns {boolean}
  */
 function isOperatorPointerConfineDesired(config) {
-	if (resolveOperatorMonitorPort(config).port != null) return true
-	if (config?.operatorTools?.pointerConfineMultiview === true) return true
-	return false
+	return evaluateOperatorPointerConfineDesire(config).desired
 }
 
 /**
@@ -543,6 +566,7 @@ module.exports = {
 	resolveHelperWindowRect,
 	HELPER_WINDOW_INSET,
 	isOperatorPointerConfineDesired,
+	evaluateOperatorPointerConfineDesire,
 	formatOperatorDisplaySummary,
 	describeOperatorDisplay,
 	pointerOverInteractiveConsumer,
