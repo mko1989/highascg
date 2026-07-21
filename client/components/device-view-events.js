@@ -197,8 +197,13 @@ export function attachDeviceViewEvents(ctx) {
 		},
 		true,
 	)
-	document.addEventListener('highascg-settings-applied', () => ctx.load())
-	window.addEventListener('highascg-device-view-reload', () => ctx.load())
+	/* Both of these fire BECAUSE the config just changed — loading a project applies its hardware
+	 * slice and then dispatches settings-applied. A plain ctx.load() consults the 5s payload cache
+	 * and, on a hit, re-renders the pre-apply snapshot without fetching at all, so the freshly
+	 * loaded Device View settings never appear. An explicit "this changed" signal must never be
+	 * answered from cache. */
+	document.addEventListener('highascg-settings-applied', () => ctx.load({ forceRefresh: true }))
+	window.addEventListener('highascg-device-view-reload', () => ctx.load({ forceRefresh: true }))
 	window.addEventListener('highascg-device-view-focus-connector', (ev) => {
 		const cid = String(ev?.detail?.connectorId || '').trim()
 		if (cid) ctx.focusConnectorById(cid)
