@@ -52,6 +52,9 @@ when total resolution of the planned gpu outputs desktop xrandr is bigger than c
 /home/casparcg/highascg/work/work-orders/todos21.07.26-logs
 highascg peridically tries to play decklink input, its already playing on the host channel and it wont be able to play anywhere else thats why it fails. 
 
+the app needs to be able to run multiple "windows" file browser and web browser togheter. when its running clicking on web browser running should bring the browser to front. can the gui browser and casparcg screen consumer "background" be glued togheter, meaning when the standard web browser is hiden it overlays the caspar window, id like it to be under the caspar window.
+
+
 ---
 WO-308 (split operator monitor from pointer confine) — DONE, commit follows.
   New setting, Device View -> GPU port inspector, next to "Operator monitor":
@@ -63,3 +66,16 @@ WO-308 (split operator monitor from pointer confine) — DONE, commit follows.
   state afterward - nothing changed for you unless you go flip it.
   Every decision now logs one line (RUN/SKIP + why), same style as the WO-290 monitor
   picker. NEEDS KIOSK RELOAD for the new dropdown to appear.
+
+---
+WO-309 (async device-view probes) — DONE, commit follows.
+  GET /api/device-view no longer blocks the whole server while it reads xrandr.
+  Verified live: a slow (366ms) device-view fetch ran while I fired 6 AMCP round-trips
+  at the same time - all 6 stayed at 0-1ms, same as with nothing else happening.
+  Scoped narrower than "convert everything": only the actual GET /api/device-view path
+  was converted. ~20 other places that read xrandr (bootstrap scripts, layout math used
+  deep inside config generation) were left exactly as they are - they were never slow
+  enough to matter and touching them risked a much bigger, riskier refactor for no
+  measured benefit. Full reasoning is in the WO-309 file if you want it.
+  Nothing to test in the UI for this one - it's a background responsiveness fix, not a
+  visible feature. No kiosk reload needed (server-side only).

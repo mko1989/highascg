@@ -1,6 +1,8 @@
 'use strict'
 
-const { execSync } = require('child_process')
+const { execSync, execFile } = require('child_process')
+const { promisify } = require('util')
+const execFileAsync = promisify(execFile)
 
 /**
  * Both xrandr probes are execSync on the `GET /api/device-view` path, so they block the entire
@@ -82,6 +84,26 @@ function getDisplaysXrandrVerboseRaw() {
 		}).toString()
 	} catch (e) {
 		console.error(`[Hardware-Info] getDisplaysXrandrVerboseRaw failed:`, e.message)
+		return ''
+	}
+}
+
+/**
+ * WO-309: non-blocking sibling of {@link getDisplaysXrandrVerboseRaw}. Same command, same env,
+ * same timeout — only the exec call itself is async (execFile, not execSync) so a devices-view
+ * request awaiting this does not freeze AMCP/WS/every other route for the ~70ms this normally
+ * takes (or up to XRANDR_TIMEOUT_MS on a wedged X server).
+ * @returns {Promise<string>}
+ */
+async function getDisplaysXrandrVerboseRawAsync() {
+	try {
+		const { stdout } = await execFileAsync('xrandr', ['--verbose'], {
+			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+			timeout: XRANDR_TIMEOUT_MS,
+		})
+		return stdout.toString()
+	} catch (e) {
+		console.error(`[Hardware-Info] getDisplaysXrandrVerboseRawAsync failed:`, e.message)
 		return ''
 	}
 }
@@ -194,6 +216,21 @@ function getDisplaysXrandrDetailed() {
 	return value
 }
 
+/** Shared by the sync and async xrandr-query paths — file read only, never blocks on a process. */
+function readBootXrandrSnapshotParsed() {
+	try {
+		const { readBootXrandrSnapshot } = require('./boot-xrandr-snapshot')
+		const boot = readBootXrandrSnapshot()
+		if (boot?.raw) {
+			const parsed = parseXrandrQueryRaw(boot.raw)
+			return { ...parsed, source: 'boot-snapshot', bootPath: boot.path }
+		}
+	} catch {
+		/* optional */
+	}
+	return null
+}
+
 function getDisplaysXrandrDetailedUncached() {
 	try {
 		const stdout = execSync('xrandr --query', {
@@ -208,18 +245,49 @@ function getDisplaysXrandrDetailedUncached() {
 		console.error(`[Hardware-Info] getDisplaysXrandrDetailed failed:`, e.message)
 	}
 
-	try {
-		const { readBootXrandrSnapshot } = require('./boot-xrandr-snapshot')
-		const boot = readBootXrandrSnapshot()
-		if (boot?.raw) {
-			const parsed = parseXrandrQueryRaw(boot.raw)
-			return { ...parsed, source: 'boot-snapshot', bootPath: boot.path }
-		}
-	} catch {
-		/* optional */
-	}
+	const boot = readBootXrandrSnapshotParsed()
+	if (boot) return boot
 
 	return null
+}
+
+/** In-flight de-dup so a burst of concurrent requests during a cold cache fires ONE exec, not N. */
+let _xrandrDetailedInFlight = null
+
+/**
+ * WO-309: non-blocking sibling of {@link getDisplaysXrandrDetailed}. Shares the SAME
+ * `_xrandrCache` — whichever path (sync or async) populates it first, the other gets a fast hit —
+ * and the same {@link invalidateXrandrCache}. Use this from any request-path caller that can
+ * await; the sync version stays for callers that genuinely cannot (bootstrap scripts, layout math
+ * called from deep inside synchronous config-generation code) and were never the measured problem
+ * (only GET /api/device-view was — see the module header).
+ * @returns {Promise<object | null>}
+ */
+async function getDisplaysXrandrDetailedAsync() {
+	if (_xrandrCache && Date.now() - _xrandrCache.at < XRANDR_CACHE_TTL_MS) {
+		return _xrandrCache.value
+	}
+	if (_xrandrDetailedInFlight) return _xrandrDetailedInFlight
+	_xrandrDetailedInFlight = (async () => {
+		let value = null
+		try {
+			const { stdout } = await execFileAsync('xrandr', ['--query'], {
+				env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
+				timeout: XRANDR_TIMEOUT_MS,
+			})
+			if (String(stdout || '').trim()) value = parseXrandrQueryRaw(stdout.toString())
+		} catch (e) {
+			console.error(`[Hardware-Info] getDisplaysXrandrDetailedAsync failed:`, e.message)
+		}
+		if (!value) value = readBootXrandrSnapshotParsed()
+		_xrandrCache = { at: Date.now(), value }
+		return value
+	})()
+	try {
+		return await _xrandrDetailedInFlight
+	} finally {
+		_xrandrDetailedInFlight = null
+	}
 }
 
 /**
@@ -256,10 +324,14 @@ function parseXrandrAllOutputs(raw) {
 /**
  * GPU connector list from live xrandr --query (connected and disconnected DP/HDMI outputs).
  */
-function getGpuConnectorInventory() {
-	const { probeGpuEdidCatalog, attachEdidToConnector } = require('./gpu-edid-probe')
-	const catalog = probeGpuEdidCatalog()
-	const xr = getDisplaysXrandrDetailed()
+/**
+ * PURE — shared by {@link getGpuConnectorInventory} and its async sibling so the two can never
+ * drift: both just fetch (xr, catalog) their own way and hand them to this one builder.
+ * @param {object | null} xr
+ * @param {object} catalog
+ */
+function buildGpuConnectorInventoryFrom(xr, catalog) {
+	const { attachEdidToConnector } = require('./gpu-edid-probe')
 	const outputs = parseXrandrAllOutputs(xr?.raw || '')
 	return outputs.map((o) =>
 		attachEdidToConnector(
@@ -280,13 +352,37 @@ function getGpuConnectorInventory() {
 	)
 }
 
-/**
- * Connected displays with resolution, position, refresh rate, and modes from xrandr.
- */
-function getDisplayDetails() {
-	const { probeGpuEdidCatalog, edidForXrandrOutput } = require('./gpu-edid-probe')
+function getGpuConnectorInventory() {
+	const { probeGpuEdidCatalog } = require('./gpu-edid-probe')
 	const catalog = probeGpuEdidCatalog()
 	const xr = getDisplaysXrandrDetailed()
+	return buildGpuConnectorInventoryFrom(xr, catalog)
+}
+
+/**
+ * WO-309: non-blocking sibling of {@link getGpuConnectorInventory}, for the GET /api/device-view
+ * request path. Fetches xrandr --query and --verbose CONCURRENTLY (independent probes), passes the
+ * verbose raw into probeGpuEdidCatalog's existing `opts.xrandrVerboseRaw` injection point so it
+ * skips its own internal blocking call, then reuses the exact same pure builder as the sync path.
+ * @returns {Promise<object[]>}
+ */
+async function getGpuConnectorInventoryAsync() {
+	const { probeGpuEdidCatalog } = require('./gpu-edid-probe')
+	const [xr, xrandrVerboseRaw] = await Promise.all([
+		getDisplaysXrandrDetailedAsync(),
+		getDisplaysXrandrVerboseRawAsync(),
+	])
+	const catalog = probeGpuEdidCatalog({ xrandrVerboseRaw })
+	return buildGpuConnectorInventoryFrom(xr, catalog)
+}
+
+/**
+ * PURE — shared by {@link getDisplayDetails} and its async sibling.
+ * @param {object | null} xr
+ * @param {object} catalog
+ */
+function buildDisplayDetailsFrom(xr, catalog) {
+	const { edidForXrandrOutput } = require('./gpu-edid-probe')
 	const displays = (xr?.displays || []).map((d) => {
 		const ed = edidForXrandrOutput(d.name, { connected: d.connected, catalog })
 		return {
@@ -324,6 +420,31 @@ function getDisplayDetails() {
 }
 
 /**
+ * Connected displays with resolution, position, refresh rate, and modes from xrandr.
+ */
+function getDisplayDetails() {
+	const { probeGpuEdidCatalog } = require('./gpu-edid-probe')
+	const catalog = probeGpuEdidCatalog()
+	const xr = getDisplaysXrandrDetailed()
+	return buildDisplayDetailsFrom(xr, catalog)
+}
+
+/**
+ * WO-309: non-blocking sibling of {@link getDisplayDetails}. Same concurrent-fetch +
+ * injection pattern as {@link getGpuConnectorInventoryAsync}.
+ * @returns {Promise<object[]>}
+ */
+async function getDisplayDetailsAsync() {
+	const { probeGpuEdidCatalog } = require('./gpu-edid-probe')
+	const [xr, xrandrVerboseRaw] = await Promise.all([
+		getDisplaysXrandrDetailedAsync(),
+		getDisplaysXrandrVerboseRawAsync(),
+	])
+	const catalog = probeGpuEdidCatalog({ xrandrVerboseRaw })
+	return buildDisplayDetailsFrom(xr, catalog)
+}
+
+/**
  * Returns names of all connected displays (xrandr output names when X is up).
  */
 function getConnectedDisplayNames() {
@@ -355,11 +476,15 @@ module.exports = {
 	getXAuthority,
 	getDisplaysXrandr,
 	getDisplaysXrandrDetailed,
+	getDisplaysXrandrDetailedAsync,
 	invalidateXrandrCache,
 	getDisplaysXrandrVerboseRaw,
+	getDisplaysXrandrVerboseRawAsync,
 	getGpuConnectorInventory,
+	getGpuConnectorInventoryAsync,
 	getConnectedDisplayNames,
 	getDisplayDetails,
+	getDisplayDetailsAsync,
 	getGpuModel,
 	compareConnectorNames,
 	drmShort,

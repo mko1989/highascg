@@ -58,6 +58,7 @@ const FILES = [
 	'tools/smoke/smoke-wo207-cg-orphan-sweep.test.js',
 	'tools/smoke/smoke-project-hardware-mismatch-identity.test.js',
 	'tools/smoke/smoke-hardware-info-xrandr-timeout.test.js',
+	'tools/smoke/smoke-wo309-async-xrandr-probes.test.js',
 	'tools/smoke/smoke-screen-consumer-port-resolve.test.js',
 	'tools/smoke/smoke-logs-modal-tab-hidden.test.js',
 	'tools/smoke/smoke-modal-panel-class-defined.test.js',

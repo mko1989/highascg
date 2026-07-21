@@ -4,7 +4,7 @@
 'use strict'
 
 const os = require('os')
-const { getDisplayDetails, getGpuConnectorInventory } = require('../utils/hardware-info')
+const { getDisplayDetailsAsync, getGpuConnectorInventoryAsync } = require('../utils/hardware-info')
 const { readSystemInventoryFile } = require('../bootstrap/system-inventory-file')
 const { casparSnapshot } = require('./device-view-caspar-snapshot')
 const { resolveMainScreenCount, getChannelMap } = require('../config/routing')
@@ -239,7 +239,7 @@ function buildGeneratedChannelOrder(ctx) {
 
 async function buildLiveSnapshot(ctx) {
 	const warnings = []; const inv = readSystemInventoryFile(); let displays = []
-	try { displays = getDisplayDetails() || [] } catch (e) { warnings.push(`gpu_enum: ${e.message}`) }
+	try { displays = (await getDisplayDetailsAsync()) || [] } catch (e) { warnings.push(`gpu_enum: ${e.message}`) }
 	let decklinkHw =
 		inv?.payload?.decklink && Array.isArray(inv.payload.decklink.connectors)
 			? {
@@ -304,7 +304,7 @@ async function buildLiveSnapshot(ctx) {
 		}
 	})
 
-	const gpuConnectors = getGpuConnectorInventory() || []
+	const gpuConnectors = (await getGpuConnectorInventoryAsync()) || []
 	const sanitizedGpuConnectors = (Array.isArray(gpuConnectors) ? gpuConnectors : [])
 		.filter((c) => !isPseudoGpuConnectorName(c?.shortName || c?.name))
 	try {

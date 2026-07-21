@@ -1,6 +1,40 @@
 # WO-309 — Device View hardware probes must stop blocking the event loop
 
-**Status: OPEN** (bounded in 4ab0c2d; the real fix deliberately deferred pre-release)
+**Status: DONE — 2026-07-21.**
+
+Delivered with a DELIBERATELY NARROWER scope than "ripple through ALL callers":
+async siblings (`getDisplaysXrandrDetailedAsync`, `getDisplaysXrandrVerboseRawAsync`,
+`getGpuConnectorInventoryAsync`, `getDisplayDetailsAsync`) share the exact same cache
+and boot-snapshot fallback as the sync versions (proven byte-identical output), and
+ONLY `device-view-snapshot.js`'s `buildLiveSnapshot` — the actual measured GET
+/api/device-view hot path — was switched to await them.
+
+Every other caller enumerated (20+ across bootstrap/, utils/, api/, capture/, support/,
+system/ — os-layout-watchdog, gpu-topology-drm-merge, system-inventory-file,
+x-display-session-layout's calculateLayoutPositions and everything built on it,
+os-config.js, operator-monitor-resolve, the WO-290 monitor picker, etc.) was
+LEFT ON THE SYNC PATH on purpose. Reasoning: most of these are called from deep
+inside synchronous config-generation/layout-math call chains where "just make it
+async" would cascade into a much larger, riskier refactor of code that was never
+part of the measured problem (only the live per-request devices-tab GET was slow
+enough to matter — WO-278/this WO's own measurements were both taken against that
+path specifically). Converting them would be scope creep with no measured benefit
+and real risk to code more sensitive than a display probe.
+
+One exception audited and deliberately NOT converted: `system-hardware-gpu-layout.js`
+(GET /api/system/gpu-layout) — the file's own header already calls it "legacy
+(deprecated WO-108)"; not the hot path, single low-traffic diagnostic endpoint.
+
+Verified LIVE on this box: a cold-cache /api/device-view GET took 366ms, and SIX
+AMCP VERSION round-trips fired concurrently during that window all stayed at 0-1ms
+— identical to the idle baseline (also 0-1ms). Directly satisfies the acceptance
+criterion below. Also proved directly: the sync call blocks a 5ms-interval timer
+completely (0 ticks over ~170ms); the async call lets it tick freely (28 ticks over
+155ms) — same input, same output, only the blocking differs.
+
+Gate: 1214 tests, 0 fail.
+
+---
 
 ## Context — measured, not guessed
 GET /api/device-view runs `xrandr --query` AND `xrandr --verbose` via execSync on the request
