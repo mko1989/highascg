@@ -26,6 +26,40 @@ function addMockGraph(app) {
 	}
 }
 
+/**
+ * Give the fixture `n` real PGM/PRV destinations.
+ *
+ * Needed because an EMPTY destinations list now generates ZERO main channels (a factory-reset box
+ * must not emit a Screen 1 PGM+PRV pair that nothing routes to). Fixtures that only set
+ * `screen_count` are using the pre-destinations style; tests whose subject is DeckLink, streaming,
+ * audio routing or always-on-top still need main channels to exist, so they declare them properly
+ * instead of leaning on a floor that no longer applies.
+ * @param {object} app
+ * @param {number} n
+ */
+function addMainDestinations(app, n) {
+	const destinations = Array.from({ length: n }, (_, i) => ({
+		id: `main${i + 1}`,
+		label: `PGM ${i + 1}`,
+		mode: 'pgm_prv',
+		mainScreenIndex: i,
+		videoMode: '1080p5000',
+		width: 1920,
+		height: 1080,
+		fps: 50,
+	}))
+	app.screenDestinations = { version: 1, edidNotes: '', destinations }
+	/* Each destination must also be CABLED to a GPU port, or it emits no screen consumer and the
+	 * `Screen N program output (PGM)` block the assertions look for never appears. */
+	app.deviceGraph = {
+		connectors: [
+			...destinations.map((d) => ({ id: `dst_in_${d.id}`, kind: 'destination_in', externalRef: d.id })),
+			...destinations.map((_, i) => ({ id: `gpu_p${i}`, kind: 'gpu_out' })),
+		],
+		edges: destinations.map((d, i) => ({ sourceId: `dst_in_${d.id}`, sinkId: `gpu_p${i}` })),
+	}
+}
+
 test('multiview auto x counts only real screen consumers', () => {
 	const app = clone(defaults)
 	app.screen_count = 2
@@ -222,6 +256,7 @@ test('WO-53: each DeckLink input gets its own dedicated channel (never bundled o
 test('WO-53: one dedicated channel per DeckLink input', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
+	addMainDestinations(app, 1)
 	app.screen_count = 1
 	app.casparServer = {
 		...app.casparServer,
@@ -245,6 +280,7 @@ test('WO-53: one dedicated channel per DeckLink input', () => {
 test('multiview off: per-DeckLink channels then streaming channel after screen pairs', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
+	addMainDestinations(app, 1)
 	app.screen_count = 1
 	app.casparServer = {
 		...app.casparServer,
@@ -320,6 +356,7 @@ test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest sta
 test('streaming without dedicatedOutputChannel encodes the videoSource bus — no extra <channel>', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
+	addMainDestinations(app, 1)
 	app.screen_count = 1
 	app.casparServer = {
 		...app.casparServer,
@@ -462,16 +499,22 @@ test('empty screen destinations ignore stale screen_count (one main bus)', () =>
 	app.streamingChannel = { ...app.streamingChannel, enabled: false }
 	app.rtmp = { ...app.rtmp, enabled: false }
 	const flat = buildCasparGeneratorFlatConfig(app)
-	assert.equal(flat.screen_count, 1, 'cleared destinations should not keep old screen_count')
+	/* Original point of this test — a stale screen_count of 4 must not spawn four PGM/PRV pairs —
+	 * still holds. What changed is the floor: it used to bottom out at ONE main bus, so a
+	 * factory-reset box emitted a Screen 1 PGM+PRV pair with no destination behind it. The owner
+	 * reads that as a leftover, and it is. No destinations now means no channels. */
+	assert.notEqual(flat.screen_count, 4, 'cleared destinations must not keep old screen_count')
 	const map = getChannelMap(app)
-	assert.equal(map.screenCount, 1)
+	assert.equal(map.screenCount, 0, 'no destinations → no main bus')
 	const xml = buildConfigXml(flat)
-	assert.equal((xml.match(/<channel>/g) || []).length, 2, 'one main: OUTPUT/PGM + PRV')
+	assert.equal((xml.match(/<channel>/g) || []).length, 0, 'a blank slate generates no channels')
+	assert.match(xml, /<channels>\s*<\/channels>/, 'channels element is present but empty')
 })
 
 test('default audio routing does not attach channel system-audio consumers', () => {
 	const app = clone(defaults)
 	addMockGraph(app)
+	addMainDestinations(app, 2)
 	app.screen_count = 2
 	app.casparServer = { ...app.casparServer, screen_count: 2, multiview_enabled: false }
 	app.streamingChannel = { ...app.streamingChannel, enabled: false }
@@ -837,6 +880,7 @@ function pgmAlwaysOnTopFixture(alwaysOnTop) {
 	app.streamingChannel = { ...app.streamingChannel, enabled: false }
 	app.rtmp = { ...app.rtmp, enabled: false }
 	addMockGraph(app)
+	addMainDestinations(app, 1)
 	return app
 }
 
@@ -857,16 +901,30 @@ test('PGM screen consumer is always-on-top by default (key unset)', () => {
 	)
 })
 
-test('PGM always-on-top round-trips through the generator (set -> generate -> present)', () => {
+test('a CABLED PGM port is always-on-top regardless of an explicit false (cable wins)', () => {
+	/* Owner rule, todos21.07.26: "any pgm port should have always on top true". Port role is derived
+	 * from the cable in screen-consumer-port-resolve.js, so on a port carrying a PGM destination the
+	 * derived value overrides a hand-set false.
+	 *
+	 * This deliberately REPLACES an older round-trip assertion that explicit false survived to the
+	 * XML. The two rules cannot both hold. The old test only kept passing because its fixture had no
+	 * destinations at all, so nothing identified the port as PGM and the rule never engaged — worth
+	 * recording, because it means the override was never actually exercised before. */
 	for (const want of [true, false]) {
 		const flat = buildCasparGeneratorFlatConfig(pgmAlwaysOnTopFixture(want))
-		assert.equal(flat.screen_1_always_on_top, want, `flat config keeps explicit ${want}`)
-		const block = pgmScreenBlock(buildConfigXml(flat))
-		assert.match(
-			block,
-			new RegExp(`<always-on-top>${want}</always-on-top>`),
-			`explicit always_on_top=${want} survives to the generated XML`,
-		)
+		assert.equal(flat.screen_1_always_on_top, true, `cabled PGM port forces true (asked for ${want})`)
+		assert.match(pgmScreenBlock(buildConfigXml(flat)), /<always-on-top>true<\/always-on-top>/)
+	}
+})
+
+test('an UNCABLED screen still round-trips an explicit always_on_top', () => {
+	/* Where no destination claims the port, nothing derives a role and the operator's setting is the
+	 * only source of truth — so it must still survive verbatim. */
+	for (const want of [true, false]) {
+		const app = pgmAlwaysOnTopFixture(want)
+		app.deviceGraph = { connectors: [], edges: [] } // same destinations, nothing cabled
+		const flat = buildCasparGeneratorFlatConfig(app)
+		assert.equal(flat.screen_1_always_on_top, want, `uncabled screen keeps explicit ${want}`)
 	}
 })
 

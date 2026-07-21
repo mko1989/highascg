@@ -78,7 +78,17 @@ function resolveMainScreenCount(config) {
 		return Math.max(1, Math.max(nA, nB, graphMainUsage.maxMainCount))
 	}
 	if (routedDests.length === 0) {
-		return Math.max(1, graphMainUsage.maxMainCount)
+		/* A blank slate generates NO channels. Every other path here keeps a floor of 1, and this one
+		 * used to as well, so a factory-reset box (destinations: [], no edges) still emitted a
+		 * Screen 1 PGM + PRV pair that nothing routed to — the owner reads that as a leftover, and
+		 * it is: there is no destination behind it.
+		 *
+		 * Scoped deliberately to "no destinations AT ALL". The `routedDests === null` path above
+		 * means the config predates the destinations key entirely, and must keep its floor or every
+		 * legacy config loses its channels. The "destinations exist but none are main" path below
+		 * also keeps its floor — an operator-GUI-only project still gets a phantom PGM+PRV pair, a
+		 * separate question I have not decided unilaterally. */
+		return graphMainUsage.maxMainCount
 	}
 	// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
 	// mainScreenIndex/programChannels slot. Same predicate is applied in inferGraphMainUsage (WO-274).
