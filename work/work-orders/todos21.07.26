@@ -12,3 +12,36 @@ adding a screen destination does not always show the destiantion straight away a
      Worth noting: I had these exact lines fixed an hour ago and reverted them because
      I could not justify the scope at the time. You just justified them.
      NEEDS KIOSK RELOAD.
+
+
+loading prrrr project for instance does not load the devices settings and connections.
+
+after factory reset, there is a state screen (pgm/prv) in the generated casparcg config.
+
+right here what to tests and commands to run via ssh on the test laptop to know why it lags so much.
+
+after factory reset, there is a state screen (pgm/prv) in the generated casparcg config.
+  >> DONE 48ca829. Confirmed on your box in its post-reset state: destinations [], no
+     edges, yet the generator still emitted Screen 1 PGM + PRV. resolveMainScreenCount
+     had Math.max(1, ...) on EVERY return path, so a main bus always existed even with
+     nothing routed to it. You chose "reset means empty", so no destinations now means
+     no channels - the config gets an empty <channels> block.
+     Scoped carefully: configs that predate the destinations key keep the old floor
+     (otherwise every legacy config loses its channels), and so does the
+     "destinations exist but none are PGM/PRV" case - so an operator-GUI-only project
+     like prrrr STILL gets a phantom PGM+PRV pair. That was option 3 in what I asked
+     you and you did not pick it, so I left it. Say if you want it too.
+     Seven gate tests broke. Six were fixtures that set screen_count without declaring
+     any destination (the old pre-destinations style) - they now declare real cabled
+     destinations so they still test what they are about.
+     The seventh was a REAL conflict you should know about: a test asserted that an
+     explicit always_on_top=false survives to the XML, which directly contradicts your
+     new "any pgm port should have always on top true" rule from earlier today. It had
+     only been passing because its fixture had no destinations, so nothing marked the
+     port as PGM and the override never ran. I replaced it with two tests stating both
+     halves: a CABLED pgm port forces true, an UNCABLED screen still keeps whatever you
+     set by hand.
+     NOT VERIFIED: how the running app behaves with zero channels. getChannelMap returns
+     pgm: undefined in that state, and these are offline generator tests. So regenerate
+     + apply on a truly blank box is untested - add a destination first, or tell me and
+     I will go make the runtime side safe.
