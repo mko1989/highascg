@@ -270,6 +270,15 @@ async function handlePost(path, body, ctx) {
 					rtmpServerUrl: String(curOut.rtmpServerUrl || '').trim(),
 					streamKey: String(curOut.streamKey || '').trim(),
 					srtUrl: String(x.srtUrl || '').trim(),
+					// SRT-specific options (owner: "srt has its own options in casparcg"). Latency is
+					// OWNER-FACING MILLISECONDS; the µs conversion ffmpeg wants happens in exactly one
+					// place (streaming-channel-ffmpeg.js buildSrtOutputUrl). No passphrase here on
+					// purpose — a secret belongs in the WO-261 project credentials, not plain settings.
+					srtLatencyMs: Math.min(8000, Math.max(20, parseInt(String(x.srtLatencyMs ?? 120), 10) || 120)),
+					srtStreamId: String(x.srtStreamId || '').trim(),
+					srtMode: ['caller', 'listener'].includes(String(x.srtMode || '').trim().toLowerCase())
+						? String(x.srtMode).trim().toLowerCase()
+						: 'caller',
 					udpUrl: String(x.udpUrl || '').trim(),
 					videoCodec,
 					videoBitrateKbps: Math.max(200, parseInt(String(x.videoBitrateKbps ?? 4500), 10) || 4500),

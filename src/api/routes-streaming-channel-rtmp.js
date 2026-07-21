@@ -2,7 +2,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getChannelMap } = require('../config/routing')
-const { buildStreamingRtmpAddParams } = require('../streaming/streaming-channel-ffmpeg')
+const { buildStreamingRtmpAddParams, buildStreamingSrtAddParams } = require('../streaming/streaming-channel-ffmpeg')
 const { param } = require('../caspar/amcp-utils')
 const {
 	STREAMING_RTMP_CONSUMER_INDEX,
@@ -100,7 +100,7 @@ async function handlePostRtmp(body, ctx) {
 			|| 'all',
 		).trim()
 		const audioSourcePair = VALID_PAIRS.has(rawPair) ? rawPair : 'all'
-		const built = buildStreamingRtmpAddParams(serverUrl, streamKey, quality, {
+		const encoderOpts = {
 			videoCodec: b.videoCodec || outCfg?.videoCodec,
 			videoBitrateKbps: b.videoBitrateKbps ?? outCfg?.videoBitrateKbps,
 			encoderPreset: b.encoderPreset || outCfg?.encoderPreset,
@@ -109,9 +109,28 @@ async function handlePostRtmp(body, ctx) {
 			programLayout,
 			audioSourcePair,
 			logWarn: (msg, ctx) => pushRtmpLog(ctx, 'warn', msg, ctx),
-		})
+		}
+		// SRT shares the whole encoder pipeline with RTMP; only the container (mpegts) and the URL
+		// differ, and there is no stream-key credential. The bundled Caspar links libsrt (ldd-verified
+		// 2026-07-21) so ADD … STREAM srt:// runs in Caspar's own ffmpeg consumer.
+		const outType = String(outCfg?.type || b.type || 'rtmp').toLowerCase()
+		const built =
+			outType === 'srt'
+				? buildStreamingSrtAddParams(String(b.srtUrl || outCfg?.srtUrl || '').trim(), quality, {
+						...encoderOpts,
+						latencyMs: b.srtLatencyMs ?? outCfg?.srtLatencyMs,
+						streamId: b.srtStreamId ?? outCfg?.srtStreamId,
+						mode: b.srtMode ?? outCfg?.srtMode,
+					})
+				: buildStreamingRtmpAddParams(serverUrl, streamKey, quality, encoderOpts)
 		if (!built) {
-			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'rtmpServerUrl and streamKey required' }) }
+			return {
+				status: 400,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error: outType === 'srt' ? 'srtUrl required (srt://host:port)' : 'rtmpServerUrl and streamKey required',
+				}),
+			}
 		}
 		const params = `${param(built.url)} ${built.args}`.trim()
 		const addWithIdxCmd = `ADD ${ch}-${STREAMING_RTMP_CONSUMER_INDEX} STREAM ${params}`

@@ -34,6 +34,53 @@ const {
 } = require('./build-caspar-generator-layout-sync')
 
 /**
+ * Owner spec (todos21.07.26): an NDI stream output "should not have a start stream but be treated
+ * as an sdi out, it gets added as a screen consumer in the config and is on always without any
+ * settings other than changing the id/label".
+ *
+ * So: for every enabled `type: 'ndi'` entry in streamOutputs that is CABLED from a main
+ * destination in the device graph (edge dst_in_<destId> ↔ <outputId>), collect its name onto that
+ * destination's screen as `screen_${n}_ndi_stream_names`. config-generator-consumer-attach.js
+ * emits one `<ndi>` consumer per name, right next to the existing per-screen
+ * `screen_${n}_ndi_enabled` block — same consumer, different source of truth. No runtime process
+ * and no Start button: the consumer lives in casparcg.config and is on for as long as Caspar runs.
+ * @param {Record<string, unknown>} merged flat generator config (mutated)
+ * @param {Record<string, unknown>} appConfig
+ */
+function applyNdiStreamOutputsToScreens(merged, appConfig) {
+	const outputs = Array.isArray(appConfig?.streamOutputs) ? appConfig.streamOutputs : []
+	const ndiOutputs = outputs.filter(
+		(o) => o && String(o.type || '').toLowerCase() === 'ndi' && o.enabled !== false,
+	)
+	if (!ndiOutputs.length) return
+	const graph = appConfig?.deviceGraph
+	const edges = Array.isArray(graph?.edges) ? graph.edges : []
+	const dests = getDestinationList(appConfig)
+
+	for (const out of ndiOutputs) {
+		const outId = String(out.id || '').trim()
+		if (!outId) continue
+		// Cables are stored dst_in_<destId> → <outputId> today, but match both directions — the
+		// graph editor has produced either depending on which end the operator grabbed first.
+		const edge = edges.find(
+			(e) =>
+				(String(e?.sinkId || '') === outId && String(e?.sourceId || '').startsWith('dst_in_')) ||
+				(String(e?.sourceId || '') === outId && String(e?.sinkId || '').startsWith('dst_in_')),
+		)
+		if (!edge) continue
+		const destInId = String(edge.sinkId || '') === outId ? String(edge.sourceId || '') : String(edge.sinkId || '')
+		const destId = destInId.slice('dst_in_'.length)
+		const dest = dests.find((d) => String(d?.id || '') === destId)
+		if (!dest || !isMainBusDestinationMode(dest.mode)) continue
+		const n = Math.max(1, (parseInt(String(dest.mainScreenIndex ?? 0), 10) || 0) + 1)
+		const key = `screen_${n}_ndi_stream_names`
+		const list = Array.isArray(merged[key]) ? merged[key] : (merged[key] = [])
+		const name = String(out.name || out.label || outId).trim() || outId
+		if (!list.includes(name)) list.push(name)
+	}
+}
+
+/**
  * Project destination panel state into Caspar generator screen settings.
  * Priority: destination `videoMode` when standard, otherwise destination `width/height/fps` as custom mode.
  * @param {Record<string, unknown>} merged
@@ -497,6 +544,7 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	applyMultiviewOutputOverridesFromCabling(merged, appConfig || {})
 	const { applyPhysicalPortConsumerFlagsToScreens } = require('./screen-consumer-port-resolve')
 	applyPhysicalPortConsumerFlagsToScreens(merged, appConfig || {})
+	applyNdiStreamOutputsToScreens(merged, appConfig || {})
 	reconcileDecklinkScreenConsumerFlags(merged)
 	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})

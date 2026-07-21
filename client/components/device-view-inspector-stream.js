@@ -73,6 +73,41 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		value: String(saved.audioBitrateKbps ?? caspar.audioBitrateKbps ?? 128),
 	})
 	attachMathInput(aBitrateIn, { decimals: 0 })
+	// SRT options (owner: "srt has its own options in casparcg"). Latency is entered in MILLISECONDS;
+	// the server converts to ffmpeg's microseconds in exactly one place (buildSrtOutputUrl). No
+	// passphrase field on purpose — that is a secret and belongs in the WO-261 project credentials,
+	// not plaintext settings; say so before adding it.
+	const srtLatencyIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'number',
+		min: '20',
+		max: '8000',
+		step: '10',
+		placeholder: 'SRT latency ms',
+		title: 'SRT latency (ms) — receive buffer / retransmission window',
+		value: String(saved.srtLatencyMs ?? caspar.srtLatencyMs ?? 120),
+	})
+	const srtStreamIdIn = Object.assign(document.createElement('input'), {
+		className: 'device-view__destinations-type',
+		type: 'text',
+		placeholder: 'SRT streamid (optional)',
+		title: 'SRT streamid — passed to the receiver for routing/auth',
+		value: String(saved.srtStreamId || caspar.srtStreamId || ''),
+	})
+	const srtModeSel = Object.assign(document.createElement('select'), {
+		className: 'device-view__destinations-type',
+		title: 'SRT mode: caller connects out (normal push), listener waits for the receiver to connect in',
+	})
+	srtModeSel.innerHTML = '<option value="caller">srt: caller</option><option value="listener">srt: listener</option>'
+	srtModeSel.value = String(saved.srtMode || caspar.srtMode || 'caller').toLowerCase() === 'listener' ? 'listener' : 'caller'
+	// NDI is not a stream you start (owner spec): it is emitted as an always-on <ndi> consumer in
+	// the generated Caspar config, like an SDI out. Only the name is configurable.
+	const ndiNote = Object.assign(document.createElement('p'), {
+		className: 'device-view__note',
+		textContent:
+			'NDI output is always on — it is written into the Caspar config as an NDI consumer on the cabled ' +
+			'destination’s channel (like an SDI out). Set the name, Save, then Apply Caspar config. No Start needed.',
+	})
 	// WO-249 source-pair pick, per stream output (was in the deleted settings-modal streaming
 	// section). 'all' = follow the cabled source bus unchanged; a pair selects it via ffmpeg pan=.
 	const pairSel = Object.assign(document.createElement('select'), {
@@ -111,10 +146,26 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 	ndiAttribution.style.display = String(streamType.value || 'rtmp') === 'ndi' ? '' : 'none'
 	const updateTypeVisibility = () => {
 		const t = String(streamType.value || 'rtmp')
-		urlIn.style.display = t === 'ndi' ? 'none' : ''
+		const isNdi = t === 'ndi'
+		const isSrt = t === 'srt'
+		urlIn.style.display = isNdi ? 'none' : ''
+		urlIn.placeholder = isSrt ? 'srt://host:port' : t === 'udp' ? 'udp://host:port' : 'rtmp://server/app'
 		keyIn.style.display = t === 'rtmp' ? '' : 'none'
 		clearKeyLabel.style.display = t === 'rtmp' ? '' : 'none'
-		ndiAttribution.style.display = t === 'ndi' ? '' : 'none'
+		ndiAttribution.style.display = isNdi ? '' : 'none'
+		ndiNote.style.display = isNdi ? '' : 'none'
+		// NDI has no encoder: Caspar's <ndi> consumer sends the raster as-is. Every ffmpeg field is
+		// meaningless there — showing them was the owner's complaint ("should not have the normal
+		// settings rtmp stream has").
+		for (const el of [qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel]) {
+			el.style.display = isNdi ? 'none' : ''
+		}
+		for (const el of [srtLatencyIn, srtStreamIdIn, srtModeSel]) {
+			el.style.display = isSrt ? '' : 'none'
+		}
+		// No Start/Stop for NDI — the consumer lives in the config and is on while Caspar runs.
+		startBtn.style.display = isNdi ? 'none' : ''
+		stopBtn.style.display = isNdi ? 'none' : ''
 	}
 	updateTypeVisibility()
 	streamType.addEventListener('change', updateTypeVisibility)
@@ -142,8 +193,17 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			audioCodec: String(aCodecSel.value || 'aac').toLowerCase(),
 			audioBitrateKbps: Math.max(32, parseInt(String(aBitrateIn.value || '128'), 10) || 128),
 			audioSourcePair: String(pairSel.value || 'all'),
+			srtLatencyMs: Math.min(8000, Math.max(20, parseInt(String(srtLatencyIn.value || '120'), 10) || 120)),
+			srtStreamId: String(srtStreamIdIn.value || '').trim(),
+			srtMode: String(srtModeSel.value || 'caller'),
 		}
 		await Actions.saveSettingsPatch({ streamOutputs: next })
+		if (t === 'ndi') {
+			// The NDI consumer is config-time: it only exists after a regenerate + Apply, so saving an
+			// NDI output must light the Apply button the same way a cabling change does.
+			setCasparRestartDirty(true)
+			setStatus(statusEl, 'NDI output saved — Apply Caspar config to put it on air.', true)
+		}
 		if (t === 'rtmp') {
 			// Credentials into the ACTIVE project (and only there). Empty key keeps the stored one.
 			await Actions.saveProjectStreamCredentials({
@@ -159,7 +219,11 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 	startBtn.onclick = async () => {
 		try {
 			const t = String(streamType.value || 'rtmp').toLowerCase()
-			if (t !== 'rtmp') {
+			if (t === 'ndi') {
+				setStatus(statusEl, 'NDI is always on via the Caspar config — Apply Caspar config instead of Start.', false)
+				return
+			}
+			if (t !== 'rtmp' && t !== 'srt') {
 				setStatus(statusEl, `Start for ${t.toUpperCase()} is not wired yet. Save settings first.`, false)
 				return
 			}
@@ -175,7 +239,12 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			const audioCodec = String(aCodecSel.value || saved?.audioCodec || conn?.caspar?.audioCodec || 'aac').toLowerCase()
 			const audioBitrateKbps = Math.max(32, parseInt(String(aBitrateIn.value || saved?.audioBitrateKbps || conn?.caspar?.audioBitrateKbps || '128'), 10) || 128)
 			const audioSourcePair = String(pairSel.value || saved?.audioSourcePair || conn?.caspar?.audioSourcePair || 'all')
-			if (!rtmpServerUrl) {
+			const srtUrl = t === 'srt' ? String(urlIn.value || saved?.srtUrl || conn?.caspar?.srtUrl || '').trim() : ''
+			if (t === 'srt' && !srtUrl) {
+				setStatus(statusEl, 'SRT URL is empty (srt://host:port). Fill it in the stream inspector first.', false)
+				return
+			}
+			if (t === 'rtmp' && !rtmpServerUrl) {
 				setStatus(statusEl, 'RTMP server URL is empty. Fill it in stream inspector first.', false)
 				return
 			}
@@ -189,7 +258,16 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			}
 			const res = await Actions.startStreamingChannelRtmp({
 				outputId: String(conn.id),
+				type: t,
 				rtmpServerUrl,
+				...(t === 'srt'
+					? {
+						srtUrl,
+						srtLatencyMs: Math.min(8000, Math.max(20, parseInt(String(srtLatencyIn.value || '120'), 10) || 120)),
+						srtStreamId: String(srtStreamIdIn.value || '').trim(),
+						srtMode: String(srtModeSel.value || 'caller'),
+					}
+					: {}),
 				quality,
 				videoCodec,
 				videoBitrateKbps,
@@ -234,8 +312,9 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 			setStatus(statusEl, e?.message || String(e), false)
 		}
 	}
-	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel, saveBtn, startBtn, stopBtn, removeBtn)
+	wrapCtl.append(streamType, nameIn, urlIn, keyIn, clearKeyLabel, srtLatencyIn, srtStreamIdIn, srtModeSel, qSel, vCodecSel, vBitrateIn, presetSel, aCodecSel, aBitrateIn, pairSel, saveBtn, startBtn, stopBtn, removeBtn)
 	h.append(wrapCtl)
+	h.append(ndiNote)
 	h.append(ndiAttribution)
 	h.append(Object.assign(document.createElement('p'), { className: 'device-view__note', textContent: 'Stream log' }))
 	h.append(logBox)

@@ -151,6 +151,21 @@ function buildScreenPairChannels(config, routeMap, ctx) {
                     <name>${ndiName}</name>
                 </ndi>`
 	}
+	// NDI STREAM OUTPUTS cabled from this screen's destination (applyNdiStreamOutputsToScreens):
+	// owner spec — treated like an SDI out, always on, config-time consumer, no Start button. One
+	// <ndi> per output; a name colliding with the per-screen block above is skipped, since two NDI
+	// senders with one name on one host is an on-air conflict, not redundancy.
+	const ndiStreamNames = Array.isArray(config[`screen_${n}_ndi_stream_names`])
+		? config[`screen_${n}_ndi_stream_names`]
+		: []
+	for (const rawName of ndiStreamNames) {
+		const name = String(rawName || '').trim()
+		if (!name) continue
+		if (ndiEnabled && name === String(config[`screen_${n}_ndi_name`] || `HighAsCG-CH${n}`)) continue
+		profConsumersXml += `\n                <ndi>
+                    <name>${escapeXml(name)}</name>
+                </ndi>`
+	}
 
 	const pgmChNum = routeMap.programCh(n)
 	const composePgmXml = buildComposePreviewFfmpegConsumerXml(config, pgmChNum)

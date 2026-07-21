@@ -66,6 +66,7 @@ const FILES = [
 	'tools/smoke/smoke-host-stats-gpu-negative-cache.test.js',
 	'tools/smoke/smoke-pointer-confine-geometry-follow.test.js',
 	'tools/smoke/smoke-main-screen-index-gap.test.js',
+	'tools/smoke/smoke-stream-output-ndi-srt.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',

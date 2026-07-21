@@ -106,8 +106,48 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
 		`-g:v ${keyint}`,
 		`-x264-params:v ${x264opts}`,
 		audioPart,
-		`-format flv`,
+		`-format ${String(opts.containerFormat || 'flv')}`,
 	].join(' ')
+}
+
+/**
+ * SRT output URL with ffmpeg/libsrt query options. The bundled Caspar binary links
+ * libsrt-gnutls.so.1.5 (verified via ldd 2026-07-21), so `ADD … STREAM srt://…` goes through
+ * Caspar's own ffmpeg consumer — no external process.
+ *
+ * ffmpeg's `latency` option is in MICROSECONDS (libsrt doc), while every SRT UI on earth speaks
+ * milliseconds — the owner-facing field is ms and converted here, in one place.
+ * @param {string} srtUrl e.g. srt://host:9000 (existing query params are preserved)
+ * @param {{ latencyMs?: number|string, streamId?: string, mode?: string }} [opts]
+ * @returns {string|null}
+ */
+function buildSrtOutputUrl(srtUrl, opts = {}) {
+	const base = String(srtUrl || '').trim()
+	if (!base || !/^srt:\/\//i.test(base)) return null
+	const params = []
+	const latMs = parseInt(String(opts.latencyMs ?? ''), 10)
+	if (Number.isFinite(latMs) && latMs > 0) params.push(`latency=${Math.min(8000, latMs) * 1000}`)
+	const sid = String(opts.streamId || '').trim()
+	if (sid) params.push(`streamid=${encodeURIComponent(sid)}`)
+	const mode = String(opts.mode || '').trim().toLowerCase()
+	if (mode === 'listener' || mode === 'caller') params.push(`mode=${mode}`)
+	if (!params.length) return base
+	return base + (base.includes('?') ? '&' : '?') + params.join('&')
+}
+
+/**
+ * SRT variant of {@link buildStreamingRtmpAddParams}: same encoder pipeline, but MPEG-TS container
+ * (SRT carries TS, not FLV) and no stream-key credential — SRT's secret would be a passphrase,
+ * which is deliberately NOT wired yet: it needs the WO-261 project-credentials treatment, not a
+ * plaintext settings field.
+ * @param {string} srtUrl
+ * @param {'low'|'medium'|'high'} quality
+ * @param {object} [opts] encoder opts plus { latencyMs, streamId, mode }
+ */
+function buildStreamingSrtAddParams(srtUrl, quality, opts = {}) {
+	const url = buildSrtOutputUrl(srtUrl, opts)
+	if (!url) return null
+	return { url, args: buildStreamingRtmpFfmpegArgs(quality, { ...opts, containerFormat: 'mpegts' }) }
 }
 
 /**
@@ -121,4 +161,10 @@ function buildStreamingRtmpAddParams(serverUrl, streamKey, quality, opts = {}) {
 	return { url, args: buildStreamingRtmpFfmpegArgs(quality, opts) }
 }
 
-module.exports = { buildStreamingRtmpFfmpegArgs, buildStreamingRtmpAddParams, buildAudioDownmixFilterChain }
+module.exports = {
+	buildStreamingRtmpFfmpegArgs,
+	buildStreamingRtmpAddParams,
+	buildSrtOutputUrl,
+	buildStreamingSrtAddParams,
+	buildAudioDownmixFilterChain,
+}
