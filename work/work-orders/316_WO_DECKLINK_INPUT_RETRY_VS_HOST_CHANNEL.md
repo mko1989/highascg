@@ -1,4 +1,55 @@
-# WO-316 — DeckLink input retry loop fails forever when the device is already open on the host channel
+# WO-316 — DeckLink input retry loop fails forever when the device is already open
+
+**Status: FIXED 2026-07-21.** See "CORRECTED ROOT CAUSE" below — the live evidence did not
+match the assumption this WO was written on, and the shipped fix is different (and smaller)
+than the one originally proposed here. The original analysis is kept for the record.
+
+## CORRECTED ROOT CAUSE (measured on the box, not inferred)
+
+The device is NOT held by a different "host channel". It is held by **the target layer itself**.
+
+`INFO 5` showed channel 5 layer 4 already running `producer=decklink`, `file.path=4`
+(= device 4), `has_signal=false`. Meanwhile `PLAY 5-4 DECKLINK 4` — the same device, the same
+channel-layer — failed every 20s with "Could not enable video input".
+
+Ruled out at the same time: the running `casparcg.config` declares NO decklink consumers at
+all, and channel 3's runtime output consumer is `<index>3</index>`, not 4. No other channel
+ran a decklink producer. Nothing but 5-4 held device 4.
+
+A card input can only be enabled once, and Caspar constructs the new producer BEFORE tearing
+down the one already on the layer — so re-PLAYing a device the target layer already holds fails
+deterministically, forever. The retry was fighting its own producer.
+
+Why it entered the retry set at all: `has_signal=false`. The card is open and the SOURCE is
+missing (nothing powered/cabled into it), which is a different operator problem from "the input
+never opened" — and one that no amount of retrying can fix.
+
+### What shipped
+- `src/caspar/channel-info-xml.js`: `foregroundProducerOnLayer()` + `isDecklinkProducerForDevice()`
+  read what is actually running on a layer. Unparseable INFO returns null = UNKNOWN, and callers
+  must fall through to attempting the PLAY — never treat null as "already open".
+- `src/config/routing-setup.js` `tryPlayDecklinkInput()`: checks BEFORE playing and, if the PLAY
+  fails, re-checks after (race guard — something else may have opened it in between). Either way,
+  a layer already holding the requested device is reported `alreadyOpen`, never `failed`, so it
+  does not enter the retry set.
+- Status carries `alreadyOpen` (with `hasSignal`) distinctly from a fresh PLAY, and logs
+  "no signal: check the source is powered and cabled" when the card is open but dark.
+- The transient classification is untouched: a genuinely un-openable input (source off, not
+  cabled, profile conflict) still retries every 20s. That was the 2026-07-19 fix and must not
+  regress.
+
+7 tests in `tools/smoke/smoke-wo316-decklink-already-open.test.js`, built on the real INFO XML
+shape captured from this build. Proven non-vacuous two ways: making the already-open check
+always-false, and deleting the pre-PLAY check.
+
+### Still open (deliberately not done)
+The `route://` idea below is NOT needed for this fault and was not implemented. If a future
+setup genuinely wants the same physical input on a second channel, route:// from the owning
+channel-layer remains the right answer — but nothing on this box needs it today.
+
+---
+
+## ORIGINAL ANALYSIS (superseded — kept for the record)
 
 **Source:** todos21.07.26 — "highascg peridically tries to play decklink input, its already
 playing on the host channel and it wont be able to play anywhere else thats why it fails."

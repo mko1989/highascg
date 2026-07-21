@@ -23,6 +23,11 @@ const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
 const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
 const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
 const { findSelfRouteViolation } = require('../engine/scene-route-deps')
+const {
+	infoResponseToXml,
+	foregroundProducerOnLayer,
+	isDecklinkProducerForDevice,
+} = require('../caspar/channel-info-xml')
 
 async function setupInputsChannel(self) {
 	const channelMap = routingMap.getChannelMap(self.config)
@@ -59,13 +64,24 @@ async function setupInputsChannel(self) {
 		usedDevices.set(device, i); inputDevice.push({ channel: entry.channel, layer: entry.layer, slot: i, device })
 	}
 
-	const failed = []; let playOk = 0
+	const failed = []; let playOk = 0; const alreadyOpen = []
 	for (const { channel, layer, device } of inputDevice) {
 		const res = await tryPlayDecklinkInput(self, { channel, layer, device })
-		if (res.ok) playOk++
-		else failed.push(res.entry)
+		if (res.ok) {
+			playOk++
+			// WO-316: distinct from a fresh PLAY. The input is open on the right device; if it also
+			// reports has_signal=false the card is fine and the SOURCE is missing — a different
+			// operator problem from "the input never opened", and one no retry can fix.
+			if (res.alreadyOpen) alreadyOpen.push({ channel, layer, device, hasSignal: res.hasSignal })
+		} else failed.push(res.entry)
 	}
-	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: channelMap.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, skippedConflicts, skippedDuplicates, failed, retrying: failed.length > 0 }
+	self._decklinkInputsStatus = { updatedAt: Date.now(), enabled: true, channels: decklinkEntries.map((e) => e.channel), inputsOnMvr: false, requestedSlots: channelMap.decklinkCount, scheduledPlays: inputDevice.length, playSucceeded: playOk, alreadyOpen, skippedConflicts, skippedDuplicates, failed, retrying: failed.length > 0 }
+	for (const a of alreadyOpen) {
+		self.log(
+			'info',
+			`DeckLink ${a.device} input already open on ${a.channel}-${a.layer} — no re-PLAY${a.hasSignal === false ? ' (no signal: check the source is powered and cabled)' : ''}`,
+		)
+	}
 	if (failed.length) {
 		for (const f of failed) self.log('warn', `DeckLink input setup: ${f.message} (channel ${f.channel}-${f.layer}) — retrying every ${Math.round(DECKLINK_INPUT_RETRY_MS / 1000)}s`)
 	}
@@ -73,19 +89,62 @@ async function setupInputsChannel(self) {
 }
 
 /**
- * PLAY one DeckLink input and classify the outcome. Caspar reports a producer that cannot
- * open the card input (camera powered off, nothing cabled, connector-profile conflict) as
- * `404 PLAY FAILED` — the old code pattern-matched that as SUCCESS, so a dead input was
- * counted healthy, never surfaced to the GUI, and never retried (the 2026-07-19 case).
+ * Read what is currently running on one channel-layer. Returns null on any failure — an
+ * unreadable INFO means UNKNOWN, and callers must fall through to attempting the PLAY rather
+ * than assuming the layer is empty.
+ * @param {object} self
+ * @param {number} channel
+ * @param {number} layer
+ */
+async function readForegroundProducer(self, channel, layer) {
+	try {
+		const res = await self.amcp.raw(`INFO ${channel}`)
+		return await foregroundProducerOnLayer(infoResponseToXml(res), layer)
+	} catch {
+		return null
+	}
+}
+
+/**
+ * PLAY one DeckLink input and classify the outcome.
+ *
+ * A card input can only be enabled by ONE producer. Caspar builds the new producer BEFORE
+ * tearing down the one already on the layer, so re-PLAYing a device that THIS layer already
+ * holds fails with `404 PLAY FAILED` every single time — forever, at the retry cadence.
+ *
+ * That is the live 2026-07-21 case, diagnosed on the box: `PLAY 5-4 DECKLINK 4` retried every
+ * 20s and always failed, while INFO showed channel 5 layer 4 ALREADY running
+ * `producer=decklink, file.path=4` (has_signal=false — nothing cabled, which is why the first
+ * attempt got classified failed and entered the retry set). Nothing else held device 4: no
+ * decklink consumer in the running config, and channel 3's output consumer is index 3.
+ *
+ * So the input was already open and working as far as Caspar was concerned — the retry was
+ * fighting its own producer. Check first; only PLAY when the layer does not already hold it.
+ *
+ * Caspar also reports a genuinely un-openable input (camera powered off, nothing cabled,
+ * connector-profile conflict) as `404 PLAY FAILED` — the pre-2026-07-19 code pattern-matched
+ * that as SUCCESS, so a dead input was counted healthy and never retried. That classification
+ * stays: those failures are transient and MUST keep retrying.
+ *
  * @param {object} self
  * @param {{ channel: number, layer: number, device: number }} target
  */
 async function tryPlayDecklinkInput(self, { channel, layer, device }) {
+	const before = await readForegroundProducer(self, channel, layer)
+	if (isDecklinkProducerForDevice(before, device)) {
+		return { ok: true, alreadyOpen: true, hasSignal: before.hasSignal }
+	}
 	try {
 		await self.amcp.raw(`PLAY ${channel}-${layer} DECKLINK ${device}`)
 		return { ok: true }
 	} catch (e) {
 		const raw = e?.message || String(e)
+		// Race guard: another path may have opened it between the pre-check and the PLAY.
+		// If the layer now holds the device we asked for, the PLAY was redundant, not failed.
+		const after = await readForegroundProducer(self, channel, layer)
+		if (isDecklinkProducerForDevice(after, device)) {
+			return { ok: true, alreadyOpen: true, hasSignal: after.hasSignal }
+		}
 		const message = /404|PLAY FAILED/i.test(raw)
 			? `DeckLink ${device} input could not be enabled — source powered off / not cabled, or connector-profile conflict`
 			: raw
