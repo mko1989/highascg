@@ -1,56 +1,14 @@
-when operator gui is connected to the gpu port, this gpu port should be set to always on top false, interactive and operator monitor true.
-similarly any pgm port should have alway on top true.
-  >> DONE a35c245. Port role is now derived from the cable
-     (src/config/screen-consumer-port-resolve.js).
-     Operator GUI on a port -> always_on_top=false, interactive=true,
-     operator_monitor=true. All three are load-bearing: on-top loses the picture the
-     moment you click Firefox (WO-263); interactive is what marks a screen as an
-     interactive operator surface for x-display-session-layout/host-operator-fullscreen;
-     operator_monitor is the flag resolveOperatorMonitorPort() reads. That last one
-     REPLACES the manual step still open on your VERIFY_NOW list ("set Device View ->
-     GPU port -> Operator monitor for DP-5") - cabling does it for you now.
-     PGM on a port -> always_on_top=true AND operator_monitor=false. The second half
-     matters: a port that used to carry the GUI kept both stale values after re-cabling
-     to PGM, so PGM silently stopped stacking on top and the operator-monitor resolver
-     kept pointing at a screen now showing program.
-     TRADEOFF: these are forced on every generate, so hand-setting them on a cabled port
-     no longer sticks - the cable wins. That is what you asked for, but it is the same
-     class of thing as the WO-263 complaint, so say if you want default-on-cable instead
-     of a hard rule. Takes effect on next generate + apply.
-
-casparcg config modal does not have a bg.
-  >> DONE 70c3f58. Its panel used class "modal-shell", which is defined in NO stylesheet
-     - so it had no background, border, radius, shadow or max-height. It was invisible
-     while the backdrop still painted rgba(0,0,0,0.7) and became unreadable the moment
-     I removed the scrim for you (f1d8fd3). Now uses .modal-content like every other
-     modal; .caspar-config-modal still sets the wider width.
-     Added a guard that walks EVERY modal in the client and fails if the panel carries
-     no class any stylesheet gives a background to. NEEDS KIOSK RELOAD.
-
-conecction eyes logs and shortcuts modal. the shortcuts are under the logs instead of being in a seperate tab.
-  >> DONE 70c3f58. The tabs were already there and the switching code was correct - it
-     hides the inactive pane with the `hidden` ATTRIBUTE. But [hidden]{display:none}
-     comes from the browser's own stylesheet, and our .logs-modal__body{display:flex}
-     outranks it, so both panes rendered at once and the tab buttons looked dead.
-     One rule added: .logs-modal__body[hidden]{display:none}. NEEDS KIOSK RELOAD.
-
-loading a project does not load the devices view settings with it.
-  >> PARTLY FIXED d2d6c19 - and I want to be straight with you that I could not
-     reproduce your exact symptom.
-     What I found and fixed: after a project load the client fires
-     'highascg-settings-applied', and Device View answered it with a plain ctx.load(),
-     which consults a 5-second payload cache and on a hit RE-RENDERS THE CACHED
-     SNAPSHOT WITHOUT FETCHING. So a reload triggered by "the config just changed"
-     could show you the pre-load state. Both those listeners now force a refresh.
-     What I checked that was FINE: the load modal does post applyHardware:true, and the
-     server-side apply covers deviceGraph + screenDestinations + settingsPatches. On
-     this box the active project's deviceGraph matches config/device_graph.json exactly,
-     so the apply path itself is demonstrably working.
-     So this may be the whole bug or only part of it. If it still happens after a kiosk
-     reload, tell me WHICH settings did not come through (cabling? screen modes? audio
-     routing?) and whether you were already sitting on the Devices tab when you loaded -
-     that will tell us which half is at fault.
-
----
-ALL FOUR NEED A KIOSK RELOAD - three of these are client-side and dist-web is rebuilt.
-Gate: 1152 tests, 0 fail. Every fix has a test proven to fail without it.
+adding a screen destination does not always show the destiantion straight away and need a manual refresh button action.
+  >> DONE 1c5d035. Same 5-second cache as the project-load item, and your report is
+     what confirmed it. After adding a destination the code called a plain ctx.load(),
+     which is served from the client payload cache - so on a hit it re-rendered a
+     snapshot taken BEFORE the destination existed and the new row was just missing.
+     The Refresh button always worked because it forces a refetch. "Not always" is
+     precisely the cache window: it only misses if a snapshot was fetched in the
+     preceding 5 seconds, which is why it felt random.
+     Fixed the reported site plus the three others in that file with the same shape
+     (host-channel add, device-snapshot applied, caspar-config applied). Guard now
+     fails if any bare ctx.load() reappears in device-view-events.js.
+     Worth noting: I had these exact lines fixed an hour ago and reverted them because
+     I could not justify the scope at the time. You just justified them.
+     NEEDS KIOSK RELOAD.
