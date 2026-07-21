@@ -8,6 +8,7 @@
 import { resolveCableSourceResolution } from '../lib/device-view-gpu-source-inherit.js'
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
 import { resolveGpuDetectedDisplay } from './device-view-inspector-gpu-resolve.js'
+import { parseEdidPreferredMode, edidPreferredModeIsSelectable } from '../lib/edid-preferred-mode.js'
 import {
 	STANDARD_VIDEO_MODES,
 	resolveGpuInspectorVideoMode,
@@ -70,6 +71,18 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const detectedDisplay = resolveGpuDetectedDisplay(conn, lastPayload)
 	const edidParsed = detectedDisplay?.monitor || detectedDisplay?.edid?.parsed || null
 
+	/**
+	 * The EDID's own preferred/native timing ("3840x2160@50Hz" — edid-parse.js's detailed-timing
+	 * descriptor at 0x36). Only meaningful when it is NOT already one of the driver's known CRTC
+	 * modes: that is exactly the case reported live — the inspector's "Native mode" summary row
+	 * read this correctly, but it could not be picked from `displayModeSelect` (that list only ever
+	 * shows modes xrandr already has), and "Custom OS resolution" defaulted to a hardcoded
+	 * 1920x1080@50 with no awareness of it, forcing a hand-retype of numbers already shown two rows
+	 * up. Used below both to prefill the Custom fields and to default the dropdown itself to
+	 * "Custom" when the native mode is the only correct choice.
+	 */
+	const edidPreferred = parseEdidPreferredMode(edidParsed?.preferredMode)
+
 	const readDim = (suffix, fallback) => {
 		const k = `screen_${screenN}_${suffix}`
 		return cs[k] ?? currentSettings?.casparServer?.[k] ?? fallback
@@ -99,9 +112,14 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		return String(m.rate) === String(savedOsRate)
 	})
 	const savedBareOs = savedOsMode.match(/^(\d+)x(\d+)$/i)
+	const edidPreferredIsSelectable = edidPreferredModeIsSelectable(edidPreferred, uniqueDetectedModes)
 	const preferCustomOs =
 		savedOsModeSource === 'custom' ||
-		(!savedOsModeSource && savedBareOs && matchSavedModeIdx < 0)
+		(!savedOsModeSource && savedBareOs && matchSavedModeIdx < 0) ||
+		// Nothing saved yet, and the monitor's own EDID-native mode is not even one of the choices
+		// xrandr currently offers — default to Custom (prefilled with that native mode below) rather
+		// than silently landing on whatever lower-resolution mode happens to be first/current.
+		(!savedOsMode && !edidPreferredIsSelectable)
 	const currentModeIdx = uniqueDetectedModes.findIndex((m) => m.current)
 	const defaultEdidIdx = matchSavedModeIdx >= 0
 		? matchSavedModeIdx
@@ -202,9 +220,17 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 	const edidOptions = uniqueDetectedModes.length
 		? uniqueDetectedModes.map((m, i) => `<option value="${i}">${m.label}</option>`).join('')
 		: ''
+	// Label makes explicit that "Custom" is how the EDID-native mode gets registered when xrandr
+	// doesn't already have it as a CRTC mode — this IS the correct choice, not a workaround; it
+	// used to read just "Custom (register RandR mode)", which read as "give up and guess numbers"
+	// even when the exact right numbers were already known and shown two rows up.
+	const customOptionLabel =
+		!edidPreferredIsSelectable && edidPreferred
+			? `Custom (register RandR mode) — EDID native ${edidPreferred.w}x${edidPreferred.h} @ ${edidPreferred.r}`
+			: 'Custom (register RandR mode)'
 	displayModeSelect.innerHTML = edidOptions
-		? `${edidOptions}<option value="custom">Custom (register RandR mode)</option>`
-		: `<option value="custom">Custom (register RandR mode)</option>`
+		? `${edidOptions}<option value="custom">${customOptionLabel}</option>`
+		: `<option value="custom">${customOptionLabel}</option>`
 	displayModeSelect.value = preferCustomOs ? 'custom' : String(defaultEdidIdx)
 
 	const osCustomRow = Object.assign(document.createElement('div'), {
@@ -237,7 +263,7 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 				}
 			}
 		}
-		return { w: 1920, h: 1080, r: 50 }
+		return edidPreferred || { w: 1920, h: 1080, r: 50 }
 	}
 	const osCustomInit = parseSavedOsCustom()
 	const osCustomWidthIn = Object.assign(document.createElement('input'), {
