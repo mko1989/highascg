@@ -154,21 +154,22 @@ function currentXrandrCanvasSize(xrDetailed) {
  * True when the planned layout extends past the live X desktop canvas — live xrandr
  * cannot grow the framebuffer; nodm restart is required.
  * @param {object} config
+ * @param {{ layout?: object, inventory?: object[], xrDetailed?: object, displays?: object[] }} [opts]
  */
-function needsNodmRestartForLayout(config) {
+function needsNodmRestartForLayout(config, opts = {}) {
 	const { calculateLayoutPositions } = require('./os-layout-calculator')
 	const { getGpuConnectorInventory } = require('./hardware-info')
-	const layout = calculateLayoutPositions(config)
-	const inventory = getGpuConnectorInventory()
+	const layout = opts.layout ?? calculateLayoutPositions(config)
+	const inventory = opts.inventory ?? getGpuConnectorInventory()
 	const planned = plannedHeadsFromLayout(layout, { inventory, config })
 	const plannedCanvas = boundingBoxFromHeads(planned)
 	if (plannedCanvas.width <= 0 || plannedCanvas.height <= 0) {
-		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_planned_heads' }
+		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_planned_heads', warn: true }
 	}
-	const xr = getDisplaysXrandrDetailed()
+	const xr = opts.xrDetailed ?? getDisplaysXrandrDetailed()
 	const currentCanvas = currentXrandrCanvasSize(xr)
 	if (!currentCanvas) {
-		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_live_canvas' }
+		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_live_canvas', warn: true }
 	}
 	const needed =
 		plannedCanvas.width > currentCanvas.width || plannedCanvas.height > currentCanvas.height

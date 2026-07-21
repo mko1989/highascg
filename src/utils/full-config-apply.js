@@ -92,13 +92,29 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	out.layout.currentCanvas = canvasCheck.currentCanvas || null
 	out.layout.canvasReason = canvasCheck.reason || null
 
+	// A degenerate canvas check returns needed:false, so the apply proceeds with NO nodm restart.
+	// That silent skip is how the 2026-07-21 regression stayed invisible — say so out loud.
+	// `no_live_canvas` is always an anomaly (X is up, yet its Screen line is unreadable).
+	// `no_planned_heads` is only an anomaly when the config actually defines GPU heads; a
+	// genuinely headless config hits it every apply and must not warn (there is already an info
+	// line for that case below).
+	if (canvasCheck.warn && canvasCheck.reason === 'no_live_canvas') {
+		log(
+			'warn',
+			`[Full apply] Live desktop canvas unreadable — cannot tell whether the planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} layout needs a nodm restart; continuing WITHOUT one`,
+		)
+	}
+
 	if (needsNodm) {
 		log(
 			'info',
 			`[Full apply] Desktop canvas expansion required (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} > current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — nodm restart will run`,
 		)
 	} else {
-		log('info', '[Full apply] Planned layout fits current desktop canvas — skipping nodm restart')
+		log(
+			'info',
+			`[Full apply] Planned layout fits current desktop canvas (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height}, current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — skipping nodm restart`,
+		)
 	}
 
 	const layoutRes = applyX11Layout(ctx.config, { live: false, persist: true })
