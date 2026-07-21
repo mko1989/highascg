@@ -92,7 +92,13 @@ test('createNewProject resets routing and persists empty Untitled project', () =
 		assert.deepEqual(project.scenes.scenes, [])
 		assert.deepEqual(project.scenes.mainEditorVisible, [true, true, true, true])
 		assert.equal(ctx.config.screenDestinations.destinations.length, 1)
-		assert.equal(ctx.config.casparServer.screen_count, 1)
+		/* The one seeded destination is the Operator GUI (factory-starter.js), which is NOT a PGM/PRV
+		 * main — so a fresh project resolves to zero main screens. The point of this assertion is
+		 * that the fixture's stale screen_count of 2 is cleared, and it still is; what changed is the
+		 * floor. Forcing 1 here used to invent a Screen 1 PGM+PRV pair with no destination behind it
+		 * (owner: "i still get the stale pgm/prv channels in the casparcg config"). */
+		assert.notEqual(ctx.config.casparServer.screen_count, 2, 'stale screen_count must be cleared')
+		assert.equal(ctx.config.casparServer.screen_count, 0, 'operator-GUI-only seed = no main bus')
 		assert.equal(ctx.config.casparServer.multiview_enabled, false)
 		assert.equal(ctx.sceneDeck.looks.length, 0)
 		assert.equal(ctx.sceneDeck.previewSceneId, null)

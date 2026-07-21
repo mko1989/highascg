@@ -100,8 +100,12 @@ function resolveMainScreenCount(config) {
 		)
 		return Math.max(1, fromDest, graphMainUsage.maxMainCount)
 	}
-	// Destinations exist but none are PGM/PRV mains (only multiview/stream): one main bus — do not inherit stale screen_count from disk.
-	return Math.max(1, graphMainUsage.maxMainCount)
+	/* Destinations exist but none are PGM/PRV mains — only multiview / stream / operator_gui. This
+	 * used to force one main bus, which invented a Screen 1 PGM+PRV pair that no destination stood
+	 * behind: owner, with a single operator_gui destination configured, "i still get the stale
+	 * pgm/prv channels in the casparcg config". Main channels now exist only when a main destination
+	 * does, same rule as the empty-destinations path above. */
+	return graphMainUsage.maxMainCount
 }
 
 function resolvePreviewEnabledByMain(config, screenCount) {
