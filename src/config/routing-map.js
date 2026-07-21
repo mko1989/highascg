@@ -22,10 +22,9 @@ function readCasparSetting(cfg, key) {
  * @param {unknown} mode
  * @returns {boolean}
  */
-function isMainBusDestinationMode(mode) {
-	const m = String(mode || 'pgm_prv')
-	return m !== 'multiview' && m !== 'stream' && m !== 'operator_gui'
-}
+// Canonical definition moved to screen-destinations.js (this module already imports from there;
+// the reverse would be a cycle). Kept in module.exports so existing importers are untouched.
+const { isMainBusDestinationMode } = require('./screen-destinations')
 
 function inferGraphMainUsage(config) {
 	const out = {

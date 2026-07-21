@@ -146,16 +146,52 @@ function normalizeDestination(d) {
 	return base
 }
 
+/**
+ * Modes that claim a PGM/PRV main slot. Canonical copy — routing-map.js re-exports this (it already
+ * imports from here; the reverse import would be a cycle). multiview/stream/operator_gui carry a
+ * mainScreenIndex only as a placement hint, never as a claim on a main bus.
+ * @param {unknown} mode
+ * @returns {boolean}
+ */
+function isMainBusDestinationMode(mode) {
+	const m = String(mode || 'pgm_prv')
+	return m !== 'multiview' && m !== 'stream' && m !== 'operator_gui'
+}
+
+/**
+ * Re-rank main-bus destinations' mainScreenIndex to a dense 0..n-1 (ascending, stable).
+ *
+ * A GAP in main indices generates phantom PGM/PRV channel pairs: screen count is max(index)+1, so a
+ * main at index 1 with nothing at 0 emits a Screen 1 pair no destination stands behind. The gap was
+ * easy to create — the factory default seeds an operator_gui at mainScreenIndex 0, and the Add
+ * button counted it when picking the next index, so the first REAL screen landed at 1 permanently
+ * (owner's box: operator_gui@0, pgm_prv@1, pgm_only@2 → phantom Screen 1). Non-main destinations
+ * keep their index untouched: for them it is a monitor-placement hint, not a slot claim.
+ * @param {Array<object>} list normalized destinations (mutated)
+ */
+function compactMainScreenIndices(list) {
+	const mains = list.filter((d) => d && isMainBusDestinationMode(d.mode))
+	const distinct = [...new Set(mains.map((d) => Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)))].sort(
+		(a, b) => a - b,
+	)
+	const rank = new Map(distinct.map((v, i) => [v, i]))
+	for (const d of mains) {
+		d.mainScreenIndex = rank.get(Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)) ?? 0
+	}
+}
+
 function normalizeScreenDestinations(raw) {
 	const base = defaults.screenDestinations && typeof defaults.screenDestinations === 'object' ? defaults.screenDestinations : {}
 	const x = raw && typeof raw === 'object' ? raw : {}
+	const destinations = Array.isArray(x.destinations)
+		? x.destinations.map(normalizeDestination).filter(Boolean)
+		: Array.isArray(base.destinations)
+			? base.destinations
+			: []
+	compactMainScreenIndices(destinations)
 	return {
 		version: 1,
-		destinations: Array.isArray(x.destinations)
-			? x.destinations.map(normalizeDestination).filter(Boolean)
-			: Array.isArray(base.destinations)
-				? base.destinations
-				: [],
+		destinations,
 		edidNotes: typeof x.edidNotes === 'string' ? x.edidNotes : (base.edidNotes != null ? String(base.edidNotes) : ''),
 	}
 }
@@ -217,6 +253,7 @@ function destinationAudioLayoutsByMain(cfg) {
 }
 
 module.exports = {
+	isMainBusDestinationMode,
 	normalizeDestination,
 	normalizeScreenDestinations,
 	finalizeScreenDestinationsConfig,

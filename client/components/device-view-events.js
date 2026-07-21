@@ -9,6 +9,7 @@ import {
 	screenConsumerSeedSettingsPatch,
 	shouldSeedScreenConsumerDefaults,
 } from '../lib/screen-consumer-defaults.js'
+import { nextMainScreenIndex } from '../lib/screen-destination-index.js'
 import * as Actions from './device-view-actions.js'
 
 export function attachDeviceViewEvents(ctx) {
@@ -99,11 +100,11 @@ export function attachDeviceViewEvents(ctx) {
 		const list = Array.isArray(state.lastPayload?.screenDestinations?.destinations)
 			? state.lastPayload.screenDestinations.destinations
 			: []
-		const highest = Math.max(-1, ...list.map((d) => Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)))
 		const type = rawType
-		// WO-243: operator_gui is a dedicated utility channel (like multiview) — it never occupies a
-		// mainScreenIndex slot.
-		const newMainIdx = (type === 'multiview' || type === 'operator_gui') ? 0 : highest + 1
+		// Counts MAIN destinations only (see screen-destination-index.js). Counting the factory
+		// operator_gui at index 0 made the first real screen land at index 1, and the generator
+		// filled the gap with a phantom Screen 1 PGM+PRV pair.
+		const newMainIdx = nextMainScreenIndex(list, type)
 		const newScreenN = (type === 'multiview' || type === 'operator_gui') ? 0 : newMainIdx + 1
 		// WO-242/WO-243: pixelmap and operator_gui screens default to a raster-exact custom video-mode
 		// server-side (screen-destinations.js normalizeDestination) — don't force a standard project
