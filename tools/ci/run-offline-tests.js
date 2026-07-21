@@ -140,6 +140,7 @@ const FILES = [
 	'tools/smoke/smoke-amcp-batch-drain-timeout.test.js',
 	'tools/smoke/smoke-decklink-input-retry.test.js',
 	'tools/smoke/smoke-wo310-volume-wire-units.test.js',
+	'tools/smoke/smoke-wo311-autosave-no-resurrect.test.js',
 	'tools/smoke/smoke-wo312-live-input-route-reassert.test.js',
 	'tools/smoke/smoke-wo313-cable-resize-raf.test.js',
 	'tools/smoke/smoke-wo315-nodm-canvas-decision.test.js',

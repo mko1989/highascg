@@ -139,6 +139,31 @@ function retireProjectSlug(slug) {
 }
 
 /**
+ * Was this slug deliberately retired (deleted / factory reset) at some point?
+ *
+ * WO-311: `retireProjectSlug` moves the files to `projects/_trash/<slug>-<timestamp>/` rather
+ * than hard-deleting, so the trash directory IS the record that a human (or a factory reset)
+ * threw this project away. That distinction matters: "no stored file" alone cannot tell a
+ * deleted project from a brand-new one that has simply never been saved, and rejecting the
+ * latter would break creating a project.
+ *
+ * @param {string} slug
+ * @returns {boolean}
+ */
+function wasProjectSlugRetired(slug) {
+	const s = String(slug || '').trim()
+	if (!s) return false
+	const trashRoot = path.join(PROJECTS_DIR, TRASH_SUBDIR)
+	try {
+		if (!fs.existsSync(trashRoot)) return false
+		const re = new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`)
+		return fs.readdirSync(trashRoot).some((name) => re.test(name))
+	} catch {
+		return false
+	}
+}
+
+/**
  * @param {string} slug
  * @returns {object | null}
  */
@@ -277,6 +302,7 @@ module.exports = {
 	ensureProjectsDir,
 	getActiveSlug,
 	setActiveSlug,
+	wasProjectSlugRetired,
 	migrateLegacySingleProject,
 	readProjectFile,
 	readAutosaveFile,

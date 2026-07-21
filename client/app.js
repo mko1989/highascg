@@ -41,6 +41,7 @@ import { placeholderState } from './lib/placeholder-state.js'
 import {
 	bootstrapFromServer,
 	canPushProjectToServer,
+	markProjectGoneOnServer,
 	resyncFromServer,
 	setOfflineBootstrapMode,
 	shouldResyncOnWsConnect,
@@ -219,12 +220,26 @@ async function init() {
 				document.dispatchEvent(new CustomEvent('project-autosaved', { detail: { time: timeStr } }))
 			} catch (e) {
 				const reason = e?.body?.reason || e?.reason || e?.message || String(e)
-				console.warn('[HighAsCG] Auto-save failed:', reason)
-				document.dispatchEvent(
-					new CustomEvent('project-autosave-failed', {
-						detail: { reason, status: e?.status },
-					}),
-				)
+				// WO-311: 410 project_gone means the server deleted this project (factory reset /
+				// delete). Retrying would recreate it — the resurrection bug. Latch autosave OFF
+				// and tell the operator once; Save As or a reload is the way out.
+				// api-client attaches `status` and `reason` to the error (never `body`).
+				if (e?.status === 410 || e?.reason === 'project_gone') {
+					markProjectGoneOnServer()
+					console.warn('[HighAsCG] Auto-save stopped: project was deleted on the server')
+					document.dispatchEvent(
+						new CustomEvent('project-gone-on-server', {
+							detail: { reason: 'project_gone', message: e?.message || '' },
+						}),
+					)
+				} else {
+					console.warn('[HighAsCG] Auto-save failed:', reason)
+					document.dispatchEvent(
+						new CustomEvent('project-autosave-failed', {
+							detail: { reason, status: e?.status },
+						}),
+					)
+				}
 			} finally {
 				autosaveInFlight = null
 				if (autosavePending) {

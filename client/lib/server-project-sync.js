@@ -10,6 +10,8 @@ import { syncComposePreviewFromChannelMap } from '../components/preview-canvas-c
 
 let synced = false
 let offlineMode = false
+/** WO-311 latch: the server says this project is gone; stop pushing until the operator acts. */
+let projectGone = false
 let resyncPromise = null
 let lastSyncedAt = 0
 
@@ -23,7 +25,27 @@ export function isServerProjectSynced() {
 }
 
 export function canPushProjectToServer() {
-	return synced && !offlineMode
+	return synced && !offlineMode && !projectGone
+}
+
+/**
+ * WO-311: the server refused an autosave because this project was deleted there (410
+ * `project_gone`). Latch outbound pushes OFF — retrying would be an attempt to resurrect a
+ * project someone deliberately trashed, which is exactly the bug. The operator must act:
+ * Save As keeps their in-memory copy under a new slug, or a reload adopts the server's truth
+ * (a fresh page re-imports this module, so the latch does not outlive the session).
+ */
+export function markProjectGoneOnServer() {
+	projectGone = true
+}
+
+export function isProjectGoneOnServer() {
+	return projectGone
+}
+
+/** Explicit operator action produced a real project again (Save As / Load). */
+export function clearProjectGoneOnServer() {
+	projectGone = false
 }
 
 export function markServerProjectSynced() {

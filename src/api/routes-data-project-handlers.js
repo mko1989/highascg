@@ -383,6 +383,30 @@ async function handleProject(path, body, ctx) {
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		/* WO-311: a factory reset at 11:47:28 correctly trashed projects/tra.json; three seconds
+		 * later a background autosave from the still-open browser RECREATED it as an empty shell.
+		 * 5d01bca stopped the autosave destroying the hardware slice, but not the resurrection
+		 * itself — any autosave whose slug had no stored file silently created one.
+		 *
+		 * The trash directory is the signal: it records that this project was deliberately thrown
+		 * away. "No stored file" ALONE is not enough, because a brand-new project that has never
+		 * been saved looks identical, and rejecting that would break creating a project. An
+		 * explicit save still works and clears the condition (it writes the file, so `existing`
+		 * becomes truthy on the next autosave). */
+		if (!existing && projectStore.wasProjectSlugRetired(slug)) {
+			if (typeof ctx.log === 'function') {
+				ctx.log('warn', `[project] autosave REFUSED for retired slug "${slug}" — not resurrecting a deleted project`)
+			}
+			return {
+				status: 410,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error: 'Project was deleted on the server — use Save As to keep your local copy',
+					reason: 'project_gone',
+					slug,
+				}),
+			}
+		}
 		const check = validateIncomingProject(project, existing)
 		if (!check.ok) {
 			if (typeof ctx.log === 'function') {

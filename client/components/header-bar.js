@@ -281,6 +281,13 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		autosaveIndicator.style.color = '#f87171'
 		autosaveIndicator.style.opacity = '1'
 	})
+	// WO-311: terminal, not a transient failure — autosave has stopped and will not retry, so
+	// this message must stay up and tell the operator what to do rather than blink past.
+	window.addEventListener('project-gone-on-server', () => {
+		autosaveIndicator.textContent = 'Project deleted on server — Save As to keep your copy'
+		autosaveIndicator.style.color = '#f87171'
+		autosaveIndicator.style.opacity = '1'
+	})
 
 	const leftWrap = document.createElement('div')
 	leftWrap.className = 'header-left'
