@@ -156,7 +156,12 @@ async function probeNvidiaSmi() {
  */
 async function getGpuCached() {
 	const now = Date.now()
-	if (_gpuCache.text && now - _gpuCache.at < GPU_TTL_MS) {
+	/* Gate on `at`, not on `text`. Keying the cache-hit off a truthy text meant a NULL result was
+	 * never cached, so on a machine with no NVIDIA GPU every single poll spawned another nvidia-smi
+	 * that failed. Caught on the AMD test laptop: host-stats reported gpu.source null while
+	 * nvidia-smi sat in the process list burning CPU. `at` starts at 0, so the first probe still
+	 * runs. */
+	if (_gpuCache.at && now - _gpuCache.at < GPU_TTL_MS) {
 		return {
 			text: _gpuCache.text,
 			utilizationPct: _gpuCache.utilizationPct ?? null,
