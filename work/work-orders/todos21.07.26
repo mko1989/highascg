@@ -91,27 +91,34 @@ so add to audio mixer an auto mix toggle. wheter it should be turned on when tra
 for the gui monitor choice on a fresh boot. can we have a button appear on each screen with press this to run operator gui on this screen.
 
 
+even media inputs should be able to be unrouted from the channel its playing on, as well as routed to another channel. (channel in casparcg)
+now i wanted to test the camera that has audio but i dont want that audio to appear on ch3, in audio mixer it is not selected to route to ch3 yet it plays on ch3 when on pgm.
 
-for the gui monitor choice on a fresh boot. can we have a button appear on each screen
-with press this to run operator gui on this screen.
-  >> DONE (commit above, service restarted). The good news: WO-290 had already built the
-     entire picker - full-screen prompt on every output, click handling, flag persistence
-     - but shipped it deliberately disconnected ("no call site in the boot path"). Your
-     request is exactly that call site, so I wired it rather than building anything new.
-     How it behaves:
-     - Fresh boot, MULTIPLE displays, no operator monitor chosen -> every connected
-       screen paints a full-screen "press this to run the operator GUI on this screen"
-       prompt. Click one: the choice is saved (screen_N_operator_monitor), and the GUI
-       launches on that screen immediately.
-     - Single display -> no prompt at all, it just picks it (nothing to choose).
-     - Esc or 2 minutes of nothing -> prompt goes away and does NOT come back on
-       reconnects. One prompt per boot; the inspector Launch button stays the manual way.
-     - It can NEVER appear on a configured box or over program: monitor already chosen,
-       operator_gui destination pinned to a port, or ANY live look on air -> it refuses,
-       and logs why. On this box it correctly refuses (your monitor is configured) -
-       the journal shows the GUI auto-started normally on the flag after restart.
-     - Opt-out if you ever hate it: operatorTools.monitorPicker = false.
-     NOT LIVE-TESTED: the actual prompt needs a fresh multi-display boot - this box is
-     configured, so the gate (correctly) never lets it paint here. First boot of the
-     next ISO on the laptop with two screens is the real test; the journal will carry
-     a "[Operator monitor picker] RUN/SKIP" line either way.
+even media inputs should be able to be unrouted from the channel its playing on, as well
+as routed to another channel. (channel in casparcg)
+now i wanted to test the camera that has audio but i dont want that audio to appear on
+ch3, in audio mixer it is not selected to route to ch3 yet it plays on ch3 when on pgm.
+  >> CAMERA CASE FIXED (commit above, service restarted, dist-web rebuilt).
+     Why it ignored your route selection: the Ch buttons saved to browser
+     localStorage ONLY - the file's own comment admits "until the server stores play
+     targets on slots". The take pipeline literally could not see your matrix, so AFV
+     dragged the camera audio wherever its video went.
+     Now the matrix is authoritative for DeckLink/USB inputs:
+       - NO Ch buttons lit (fresh input): audio follows video - nothing goes silent by
+         surprise.
+       - ANY Ch button lit: the matrix rules. Audio plays ONLY on the selected channels
+         (via the audio-only routes), and the embedded copy is silenced everywhere -
+         including the channel the video is on. That is your exact sentence: not
+         selected for ch3 = no audio on ch3, even on PGM. It also makes doubling
+         structurally impossible (one signal path at a time).
+       - Toggling a button bites immediately, not at the next take.
+     YOUR TEST NOW: reload kiosk, light the Ch button for wherever you DO want that
+     camera's audio (or none + audio:never for silence everywhere) - ch3 stays clean.
+     MEDIA LAYERS (your first sentence) - NOT DONE, and I want a decision, not a guess:
+     clips already have per-layer strips with mute/fader under each PGM section. What is
+     missing is (a) "unroute from own channel" as a routing act and (b) "route a media
+     layer's audio to a DIFFERENT caspar channel" - that means an audio-only
+     route://pgmN-layer on the other channel, per layer, with lifecycle tied to the look
+     (take/retake/clear must move it). Doable with the same machinery, but it changes
+     what a look "contains". Say it is wanted for the release and I will build it; if it
+     can wait, it goes to the backlog with this note as the spec.
