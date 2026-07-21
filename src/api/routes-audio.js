@@ -25,6 +25,55 @@ const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
+ * Apply an input-strip volume to every live look layer consuming the target via a LAYER route.
+ *
+ * A DeckLink input lives on its dedicated host channel (WO-53), and the mixer strip's volume/mute
+ * targets that host layer — e.g. MIXER 5-4 VOLUME 0. But a look puts the input on a program
+ * channel with `route://5-4`, and a layer route taps the source layer's frames BEFORE the host
+ * channel's mixer applies volume. So the mute changed a mix nobody listens to while PGM kept
+ * playing the input's audio untouched (owner, live-verified: ch3 layer 10 = route://5-4, Caspar
+ * log shows MIXER 5-4 VOLUME 0, PGM2 output unchanged).
+ *
+ * Exact `route://ch-layer` matches only. A bare channel route (`route://ch`) taps the source
+ * channel's MIX — post-mixer — so the host command already reaches it and fanning out would apply
+ * the gain twice. Values are LINEAR, same convention the take pipeline uses for look layers
+ * (scene-take-pgm-only.js `MIXER ${cl} VOLUME ${vol}`), so a later re-take simply reasserts the
+ * look's own volume — take remains the authority on look state.
+ * @param {object} amcp
+ * @param {number} channel host channel the strip targeted
+ * @param {number} layer host layer the strip targeted
+ * @param {{ volume?: unknown, duration?: unknown, tween?: unknown, defer?: unknown }} b
+ * @returns {Promise<Array<{ channel: number, layer: number }>>} consumers that were updated
+ */
+async function fanOutVolumeToRouteConsumers(amcp, channel, layer, b) {
+	/** @type {Array<{ channel: number, layer: number }>} */
+	const applied = []
+	let liveState
+	try {
+		liveState = require('../state/live-scene-state').getAll()
+	} catch {
+		return applied
+	}
+	const routeExact = `route://${channel}-${layer}`
+	for (const [chStr, entry] of Object.entries(liveState || {})) {
+		const consumerCh = parseInt(chStr, 10)
+		if (!Number.isFinite(consumerCh) || consumerCh === channel) continue
+		for (const l of entry?.scene?.layers || []) {
+			if (String(l?.source?.value || '').trim() !== routeExact) continue
+			const consumerLayer = parseInt(String(l?.layerNumber), 10)
+			if (!Number.isFinite(consumerLayer)) continue
+			try {
+				await amcp.mixer.mixerVolume(consumerCh, consumerLayer, b.volume, b.duration, b.tween, b.defer)
+				applied.push({ channel: consumerCh, layer: consumerLayer })
+			} catch {
+				/* one consumer failing must not block the others */
+			}
+		}
+	}
+	return applied
+}
+
+/**
  * @param {object} ctx
  * @param {'info'|'warn'|'error'|'debug'} level
  * @param {string} msg
@@ -128,7 +177,8 @@ async function handlePost(path, body, ctx) {
 			}
 			const layer = b.layer != null ? parseInt(String(b.layer), 10) : 0
 			const r = await amcp.mixer.mixerVolume(channel, layer, b.volume, b.duration, b.tween, b.defer)
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
+			const fanout = await fanOutVolumeToRouteConsumers(amcp, channel, layer, b)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(fanout.length ? { ...r, fanout } : r) }
 		} catch (e) {
 			const msg = e?.message || String(e)
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
