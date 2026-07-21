@@ -14,7 +14,7 @@ export async function showCasparConfigModal(opts = {}) {
 	modal.className = 'modal-overlay'
 
 	modal.innerHTML = `
-		<div class="modal-shell caspar-config-modal">
+		<div class="modal-content caspar-config-modal">
 			<div class="modal-header">
 				<div class="modal-header__title">
 					<h2>Caspar config</h2>

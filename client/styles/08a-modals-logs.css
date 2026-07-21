@@ -22,6 +22,13 @@
 	flex-direction: column;
 	min-height: 0;
 }
+/* The tab switcher hides the inactive pane with the `hidden` ATTRIBUTE, but `[hidden]{display:none}`
+ * lives in the user-agent stylesheet, so the author `display:flex` above beat it and BOTH panes
+ * rendered — the shortcuts pane sat permanently under the logs and the tab buttons looked dead.
+ * Class+attribute (0,2,0) outranks the plain class, so this restores the attribute's meaning. */
+.logs-modal__body[hidden] {
+	display: none;
+}
 .logs-modal__hint {
 	margin-bottom: 0.75rem;
 }

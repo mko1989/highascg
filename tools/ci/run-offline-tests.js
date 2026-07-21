@@ -59,6 +59,8 @@ const FILES = [
 	'tools/smoke/smoke-project-hardware-mismatch-identity.test.js',
 	'tools/smoke/smoke-hardware-info-xrandr-timeout.test.js',
 	'tools/smoke/smoke-screen-consumer-port-resolve.test.js',
+	'tools/smoke/smoke-logs-modal-tab-hidden.test.js',
+	'tools/smoke/smoke-modal-panel-class-defined.test.js',
 	'tools/smoke/smoke-wo210-screen-timers.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',
