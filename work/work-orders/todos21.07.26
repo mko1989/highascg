@@ -79,3 +79,24 @@ WO-309 (async device-view probes) — DONE, commit follows.
   measured benefit. Full reasoning is in the WO-309 file if you want it.
   Nothing to test in the UI for this one - it's a background responsiveness fix, not a
   visible feature. No kiosk reload needed (server-side only).
+
+---
+"operator gui refuses to run 2160p50" + "native res not in dropdown" — DONE, commit follows.
+  First question (why 2160p50 doesn't run): Caspar itself is 100% correct - config, and
+  its own log across 3 restarts, all confirm 3840x2160 window created fine. The real gap
+  was one level down: the operator monitor's ACTUAL xrandr output was still 1920x1080 -
+  the Caspar video-mode field and the physical GPU port's OS resolution are two SEPARATE
+  settings, and only the first one had been changed. That part needed no code fix, just
+  pointing at the right control ("Custom OS resolution" in the GPU port inspector).
+  Second question (the real bug): confirmed. The inspector's "Native mode" row correctly
+  reads 3840x2160@50 from the monitor's own EDID, but the resolution DROPDOWN only lists
+  modes xrandr already knows about - which for this port was 1920x1080 and 1280x1024,
+  nothing at 4K. "Custom (register RandR mode)" is the correct way to add a mode xrandr
+  doesn't have yet, but it defaulted to a generic 1920x1080@50 guess with zero awareness
+  of the EDID value shown two rows up - so you had to hand-retype numbers the app already
+  knew were right.
+  Fixed: opening that panel now defaults straight to Custom, ALREADY filled in with
+  3840x2160 @ 50 - matching "Native mode" exactly, nothing to type. The Custom option's
+  label also now says "EDID native 3840x2160 @ 50" so it's clear that's the correct
+  choice, not a workaround.
+  NEEDS KIOSK RELOAD. Client-only, no service restart needed.
