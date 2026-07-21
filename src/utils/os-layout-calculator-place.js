@@ -51,10 +51,18 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 		const osModeSource =
 			p.kind === 'screen' ? resolveEffectiveOsModeSource(config, p.n, { osMode: rawOsMode, casparMode: data.casparMode }) : 'edid'
 		const cm = String(data.casparMode || '').trim()
+		// A multiview/operator_gui head's `osMode` can be filled from the bound destination's
+		// videoMode (a Caspar mode id like "2160p5000", not a real xrandr token) when no OS-level
+		// override was ever set (os-layout-calculator-assign.js's `mvVideoMode` fallback). Trusting
+		// that literally as `modeForXrandr` fails the WxH match below and silently falls back to the
+		// 1920x1080 default — reported live 2026-07-21: an operator_gui destination on a 3840x2160
+		// GPU port kept computing a 1920x1080 rect for the shape-overlay hole punch. Only a genuine
+		// xrandr-recognizable token (WxH, optionally `_rate` suffixed) may be used as-is.
+		const looksLikeXrandrModeToken = /^\d+x\d+/i.test(rawOsMode || '')
 
 		let modeForXrandr = ''
 		let usedCasparOverStaleOsPixel = false
-		if (osModeSource === 'edid' && rawOsMode) {
+		if (osModeSource === 'edid' && rawOsMode && looksLikeXrandrModeToken) {
 			modeForXrandr = rawOsMode
 		} else if (forceOsRes) {
 			if (explicitPixelOsMode && rawOsMode) {

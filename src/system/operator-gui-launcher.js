@@ -34,7 +34,13 @@ const { REPO_ROOT } = require('../repo-paths')
 // pointer confinement uses — src/system/pointer-confine.js:17. WO-279 requirement 1: the kiosk
 // window and the pointer barrier must never derive "the operator monitor" independently.
 const { displaySessionEnv, resolveOperatorMonitorRect } = require('../utils/x-display-session')
-const { resolveOperatorGuiChannel, resolveOperatorGuiMonitorRect, DEFAULT_GUI_URL } = require('./operator-gui-channel')
+const {
+	resolveOperatorGuiChannel,
+	resolveOperatorGuiChannelDims,
+	resolveOperatorGuiMonitorRect,
+	DEFAULT_GUI_URL,
+} = require('./operator-gui-channel')
+const { writeOperatorGuiScalePref } = require('./operator-gui-scale')
 
 const execFileAsync = promisify(execFile)
 
@@ -386,6 +392,15 @@ async function launchOperatorGuiBrowser(ctx) {
 	} catch (e) {
 		ctx.log?.('warn', `[Operator GUI] launch: profile dir failed: ${e?.message || e}`)
 		return { ok: false, reason: 'profile_dir_failed' }
+	}
+
+	// WO-310-ish (2026-07-21 report: "the gui has no scaling for 4k") — force Firefox's DPI-scale
+	// pref to match the destination's resolution over the 1920x1080 CSS baseline, so buttons/text
+	// read at a consistent physical size whether the operator_gui destination is 1080p or 2160p.
+	const dims = resolveOperatorGuiChannelDims(ctx.config)
+	const scaleRatio = writeOperatorGuiScalePref(PROFILE_DIR, dims, ctx.log)
+	if (scaleRatio != null) {
+		ctx.log?.('info', `[Operator GUI] launch: UI scale ${scaleRatio}x for ${dims?.width || '?'}x${dims?.height || '?'}`)
 	}
 
 	const env = displaySessionEnv()

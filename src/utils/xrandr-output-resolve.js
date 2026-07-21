@@ -67,6 +67,43 @@ function resolveFromDeviceGraphAlias(raw, aliasMap) {
 }
 
 /**
+ * Physical GPU port pairing (`config.gpuPhysicalTopology`, e.g. `{physicalPortId:"gpu_p2",
+ * dpA:"DP-4", dpB:"DP-5"}`): the NVIDIA driver assigns each physical port ONE of its two possible
+ * xrandr names per boot/replug, so a name pinned to config on one boot ("DP-5") can legitimately be
+ * the SAME physical port as a later boot's "DP-4" — not a different, disconnected output.
+ * @param {string} raw e.g. "DP-5"
+ * @param {object} [config]
+ * @returns {{physicalPortId?: string, dpA?: string, dpB?: string}|null}
+ */
+function findTopologyPairForName(raw, config) {
+	const list = Array.isArray(config?.gpuPhysicalTopology) ? config.gpuPhysicalTopology : []
+	const key = String(raw || '').trim().toLowerCase()
+	if (!key) return null
+	return (
+		list.find((p) => String(p?.dpA || '').toLowerCase() === key || String(p?.dpB || '').toLowerCase() === key) || null
+	)
+}
+
+/**
+ * @param {string} raw e.g. "DP-5"
+ * @param {object} [config]
+ * @param {Array<{ name?: string, connected?: boolean }>} [displays]
+ * @returns {string} the pair's OTHER member if it is currently live, else ''
+ */
+function resolveViaPortPair(raw, config, displays) {
+	const pair = findTopologyPairForName(raw, config)
+	if (!pair) return ''
+	const key = String(raw).trim().toLowerCase()
+	const other = String(pair.dpA || '').toLowerCase() === key ? pair.dpB : pair.dpA
+	if (!other) return ''
+	const list = Array.isArray(displays) ? displays : getDisplaysXrandrDetailed()?.displays || []
+	const live = list.some(
+		(d) => d?.connected !== false && String(d?.name || '').toLowerCase() === String(other).toLowerCase(),
+	)
+	return live ? String(other) : ''
+}
+
+/**
  * @param {string} drmish
  * @param {Array<{ name?: string, connected?: boolean }>} [displays]
  */
@@ -168,6 +205,11 @@ function resolveSysIdToXrandrOutput(sysId, opts = {}) {
 			(d) => String(d?.name || '').toLowerCase() === rawKey,
 		)
 		if (live) return raw
+		// Pinned name isn't live under itself — check whether its A/B port-pair sibling is, before
+		// falling back to a fuzzy same-kind name match (this is authoritative; the heuristic below is
+		// a guess).
+		const viaPair = resolveViaPortPair(raw, opts.config, opts.displays)
+		if (viaPair) return viaPair
 	}
 
 	const inventory = Array.isArray(opts.inventory) ? opts.inventory : getGpuConnectorInventory()
@@ -200,6 +242,8 @@ module.exports = {
 	looksLikeXrandrOutputName,
 	deviceGraphXrandrAliasMap,
 	pickGpuOutLayoutSysId,
+	findTopologyPairForName,
+	resolveViaPortPair,
 	resolveSysIdToXrandrOutput,
 	resolveLayoutHeadSysId,
 	normalizePortName,
