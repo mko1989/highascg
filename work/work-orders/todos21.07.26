@@ -12,7 +12,20 @@ devices view is super slow
      Confirmed contributor: the CG orphan sweep fired 180 serialized AMCP commands on every
      start/reconnect (see the log below - CG 1-700..789 CLEAR, one every ~500ms = ~90s).
      Device View's polls queued behind all of it. Now 3 batched round-trips.
-     A separate audit of the Device View's own polling + server probe cost is in progress.
+     Audit done. Second confirmed contributor, 4ab0c2d: GET /api/device-view runs xrandr
+     --query AND xrandr --verbose via execSync, i.e. it blocks the ENTIRE server (AMCP, all
+     WS clients, every route) while they run. I measured them on this box: ~90ms + ~72ms,
+     so ~160ms of total freeze per cache miss, and the cache TTL is only 3s so you hit a
+     miss on basically every interaction. They were also the only sync probes in the repo
+     with NO timeout, so a wedged X server would have hung highascg forever - now capped
+     at 3s. Not polling: there is no tight setInterval, the view loads on tab activation
+     and after each cable edit (which forces a cache-busting reload).
+     STILL OPEN (deliberately not done before release): making those probes async so they
+     stop blocking at all. That ripples through buildLiveSnapshot and its sync callers -
+     too invasive to do unprompted right now, but it is the real fix.
+     Also flagged, unverified: window.onresize -> renderCableOverlay has no rAF throttle
+     (device-view-events.js:71) and can re-run the rope physics per resize event. Only
+     matters while dragging the window edge; low confidence, not measured.
 
 on a test laptop these are the logs after restart
   >> The ~500ms gap between EVERY command in this log is not an AMCP pacer - there is no
