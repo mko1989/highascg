@@ -67,6 +67,30 @@ async function runSceneTakeLbgTeardown(ctx) {
 	if (fadeClockStart != null && fadeDur > 0) {
 		teardownWait = Math.max(0, fadeMs - (Date.now() - fadeClockStart))
 	}
+
+	// Fade EXITING template CG out over the (remaining) crossfade window so template->media
+	// transitions MIX instead of cutting. The CG CLEAR built below (after the wait) completes the
+	// removal once the template is invisible. Template CG lives on the fixed 700+ overlay host layer,
+	// outside the bank crossfade, so it needs its own opacity ramp — the counterpart to the fade-IN in
+	// scene-template-cg.js buildSceneTemplateCgAmcpLines. Only exiting, non-replaced templates fade.
+	if (fadeDur > 0 && teardownWait > 0) {
+		const fadeOutFrames = fadeMs > 0 ? Math.max(1, Math.round(fadeDur * (teardownWait / fadeMs))) : fadeDur
+		const fadeOutLines = []
+		for (const layer of exitMedia) {
+			if (!isSceneTemplateLayer(layer, layer.source?.value, self)) continue
+			const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, layer.source?.value)
+			if (incomingTemplateHostLayers.has(hostLayer)) continue // replaced by the incoming look — not exiting
+			fadeOutLines.push(`MIXER ${channel}-${hostLayer} OPACITY 0 ${fadeOutFrames}`)
+		}
+		if (fadeOutLines.length > 0) {
+			try {
+				await sendPipOverlayLinesSerial(amcp, fadeOutLines)
+			} catch (e) {
+				self?.log?.('warn', `[scene-take-lbg] template fade-out failed: ${e?.message || e}`)
+			}
+		}
+	}
+
 	if (teardownWait > 0) {
 		await new Promise((r) => setTimeout(r, Math.ceil(teardownWait) + 5))
 	}
@@ -136,6 +160,9 @@ async function runSceneTakeLbgTeardown(ctx) {
 		const clearLines = buildSceneTemplateCgClearLines(channel, layer.layerNumber, layer.source?.value)
 		if (clearLines.length > 0) {
 			teardownLines.push(...clearLines)
+			// Reset the host opacity after the clear: the fade-out above left it at 0, so a later
+			// CUT-in template on this host would otherwise be invisible. Empty layer → harmless.
+			teardownLines.push(`MIXER ${channel}-${hostLayer} OPACITY 1 0`)
 			hostsToUntrack.add(hostLayer)
 		}
 	}
@@ -151,6 +178,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 			const clearLines = buildSceneTemplateCgClearLines(channel, host, '')
 			if (clearLines.length > 0) {
 				teardownLines.push(...clearLines)
+				teardownLines.push(`MIXER ${channel}-${host} OPACITY 1 0`) // reset opacity for future reuse of this host
 				hostsToUntrack.add(host)
 			}
 		}

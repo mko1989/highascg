@@ -168,6 +168,7 @@ const FILES = [
 	'tools/smoke/smoke-stream-key-redaction.test.js',
 	'tools/smoke/smoke-consumer-index-collisions.test.js',
 	'tools/smoke/smoke-scene-template-cg-crossfade.test.js',
+	'tools/smoke/smoke-scene-template-cg-fadeout.test.js',
 	'tools/smoke/smoke-wo319-remote-operator-view.test.js',
 ]
 
