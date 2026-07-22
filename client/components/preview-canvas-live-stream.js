@@ -22,6 +22,7 @@ import {
 	guiStreamChannel,
 	guiStreamFrame,
 	guiStreamSupported,
+	guiStreamStats,
 	subscribeGuiStreamFrames,
 } from '../lib/gui-stream-client.js'
 
@@ -123,6 +124,14 @@ function reconcile() {
 export function initOperatorLiveCanvas() {
 	if (guiStreamSupported()) void fetchStatus(true)
 	else notifyState()
+	// WO-319 diagnostic: window.__liveCanvas() reports the full client-side state (streaming, whether
+	// a decoded frame is on hand, decoder frame count, and the last decode error) so a remote client
+	// can be inspected from its console without a rebuild.
+	try {
+		globalThis.__liveCanvas = () => ({ ...operatorLiveCanvasState(), stream: guiStreamStats() })
+	} catch {
+		/* no global — ignore */
+	}
 }
 
 /**
