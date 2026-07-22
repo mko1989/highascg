@@ -37,6 +37,14 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
+import { setOperatorComposeHolesSuppressed } from '../lib/operator-gui-mode.js'
+import {
+	isOperatorLiveCanvasEnabled,
+	operatorLiveCanvasHasFrame,
+	drawOperatorLiveCanvasCrop,
+	subscribeOperatorLiveCanvasRepaint,
+	subscribeOperatorLiveCanvasState,
+} from './preview-canvas-live-stream.js'
 
 /** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
@@ -463,6 +471,50 @@ export function initOperatorComposeTiles(container, options) {
 		rafReport = requestAnimationFrame(() => { rafReport = null; reportRectsNow() })
 	}
 
+	// WO-319 — draw each tile's crop of the operator live canvas into its body canvas. The operator
+	// channel is a mosaic of routed feeds laid out to the tile rects, so each tile shows the frame
+	// region at its OWN viewport fraction — exactly what its punch-hole revealed of the screen
+	// consumer. Driven at frame rate by the live-canvas repaint, so drags/resizes track for free.
+	let liveActive = false
+	function drawLiveCrops() {
+		const on = liveActive && isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
+		const vw = window.innerWidth || 1
+		const vh = window.innerHeight || 1
+		for (const t of tiles.values()) {
+			const cv = t.liveCanvas
+			if (!cv) continue
+			if (!on) {
+				if (cv.style.display !== 'none') cv.style.display = 'none'
+				continue
+			}
+			const r = t.bodyEl.getBoundingClientRect()
+			if (r.width < 2 || r.height < 2) {
+				cv.style.display = 'none'
+				continue
+			}
+			const w = Math.round(r.width)
+			const h = Math.round(r.height)
+			if (cv.width !== w) cv.width = w
+			if (cv.height !== h) cv.height = h
+			const cx = cv.getContext('2d')
+			if (!cx) continue
+			const ok = drawOperatorLiveCanvasCrop(cx, r.left / vw, r.top / vh, r.width / vw, r.height / vh, 0, 0, w, h)
+			cv.style.display = ok ? 'block' : 'none'
+		}
+	}
+
+	// Suppress the punch-holes (server keeps the mosaic) while streaming, so the browser draws the
+	// crops; restore them when it stops. Redraw on every decoded frame and on any state flip.
+	function onLiveState(state) {
+		liveActive = !!(state && state.streaming)
+		setOperatorComposeHolesSuppressed(liveActive)
+		// Force a re-report so the shape overlay flips holes off/on immediately for the new state.
+		scheduleReport()
+		drawLiveCrops()
+	}
+	const unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
+	const unsubLiveState = subscribeOperatorLiveCanvasState(onLiveState)
+
 	function layoutAll() {
 		for (const t of tiles.values()) layoutTileDom(t)
 		scheduleReport()
@@ -493,6 +545,14 @@ export function initOperatorComposeTiles(container, options) {
 
 		const bodyEl = document.createElement('div')
 		bodyEl.className = 'operator-tile__body'
+		// WO-319: the live-canvas crop for this tile. Hidden by default; while the operator live canvas
+		// is streaming it fills the body with this tile's sub-region of the operator mosaic, replacing
+		// the punch-hole (which is withheld server-side via suppressHoles). pointer-events:none so the
+		// footer/resize chrome keeps working; the visible border/label/timer stay ON TOP as before.
+		const liveCanvasEl = document.createElement('canvas')
+		liveCanvasEl.className = 'operator-tile__live'
+		liveCanvasEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;'
+		bodyEl.appendChild(liveCanvasEl)
 
 		// All chrome sits BELOW the video body (owner: label + progress bar must not overlay any
 		// actual content). The footer holds a screen-label row (also the drag handle) above the
@@ -516,7 +576,7 @@ export function initOperatorComposeTiles(container, options) {
 		el.append(bodyEl, footerEl, resizeEl)
 		root.appendChild(el)
 
-		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, timer: null }
+		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, liveCanvas: liveCanvasEl, timer: null }
 
 		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
@@ -672,6 +732,11 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			unsubCm?.()
 			unsubAnyState?.()
+			unsubLiveFrame?.()
+			unsubLiveState?.()
+			// WO-319: restore the holes if we were suppressing them, so a torn-down tiles surface never
+			// leaves the compose region hole-less (which would hide the screen consumer with nothing on top).
+			setOperatorComposeHolesSuppressed(false)
 			if (rafReport != null) cancelAnimationFrame(rafReport)
 			for (const t of tiles.values()) t.timer?.destroy?.()
 			tiles.clear()

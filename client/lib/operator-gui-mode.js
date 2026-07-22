@@ -156,6 +156,11 @@ let _restoreTimer = null
 let _suppressed = false
 let _tabBlocked = false
 let _heartbeatTimer = null
+/** WO-319: while the operator live canvas is on, the compose mosaic must keep running (it IS the
+ * stream) but its punch-holes must NOT be cut — the browser draws the decoded crops itself, so a
+ * hole would show the screen consumer THROUGH the canvas. This flag rides on the layout POST and the
+ * server keeps the route+FILL mosaic while feeding the shape overlay an empty rect set. */
+let _composeHolesSuppressed = false
 
 function mergedCells() {
 	const out = []
@@ -259,19 +264,35 @@ export function reportMultiviewEditCellRects(cellRects, viewport) {
 let _lastSentJson = null
 
 async function sendLayout(cells, { force = false } = {}) {
-	const json = JSON.stringify(cells)
+	// Fold the hole-suppress flag into the dedupe key so toggling live preview re-sends even when
+	// the cell rects are identical (the flag is the only thing that changed).
+	const json = JSON.stringify({ cells, s: _composeHolesSuppressed })
 	if (!force && json === _lastSentJson) return
 	try {
 		if (!cells.length) {
 			await api.delete(LAYOUT_ENDPOINT)
 		} else {
-			await api.post(LAYOUT_ENDPOINT, { cells })
+			await api.post(LAYOUT_ENDPOINT, { cells, suppressHoles: _composeHolesSuppressed })
 		}
 		_lastSentJson = json
 	} catch (e) {
 		_lastSentJson = null
 		console.warn('[operator-gui-mode] layout report failed:', e?.message || e)
 	}
+}
+
+/**
+ * WO-319 — the operator live canvas turned on/off. On: the compose mosaic keeps running but its
+ * punch-holes are withheld (the browser draws the decoded crops). Off: holes resume (screen
+ * consumer shows through). Forces an immediate re-send so the flip is not lost to the dedupe.
+ * @param {boolean} suppressed
+ */
+export function setOperatorComposeHolesSuppressed(suppressed) {
+	const next = suppressed === true
+	if (next === _composeHolesSuppressed) return
+	_composeHolesSuppressed = next
+	if (!isOperatorGuiModeActive()) return
+	void sendLayout(effectiveCells(), { force: true })
 }
 
 /**

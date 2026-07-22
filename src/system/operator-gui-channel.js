@@ -407,18 +407,18 @@ function shouldIgnoreBootShrink(ch, cells, log) {
  * @param {number} ch
  * @param {Array} cells
  */
-async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
+async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	const map = getChannelMap(ctx.config)
 	const plan = computeOperatorGuiCellPlan(cells, map, ctx.config)
 	try {
 		const monitorRect = resolveOperatorGuiMonitorRect(ctx.config)
 		if (monitorRect) {
 			const { updateShapeRects } = require('./operator-shape-overlay')
-			updateShapeRects(
-				monitorRect,
-				plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect)),
-				{ log: ctx.log, channel: ch },
-			)
+			// WO-319: suppressHoles keeps the mosaic (routes + FILL, applied below) but feeds the
+			// shape overlay an EMPTY rect set, so no hole is cut — the browser draws the decoded
+			// crops itself. Without this, a hole would reveal the screen consumer THROUGH the canvas.
+			const shapeRects = opts.suppressHoles ? [] : plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect))
+			updateShapeRects(monitorRect, shapeRects, { log: ctx.log, channel: ch })
 		}
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: shape overlay feed failed: ${e?.message || e}`)
@@ -493,7 +493,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells) {
  * @param {Array} cells
  * @returns {Promise<object>}
  */
-function applyOperatorGuiLayout(ctx, cells) {
+function applyOperatorGuiLayout(ctx, cells, opts = {}) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return Promise.resolve({ skipped: true, reason: 'no operator_gui destination' })
 	const ch = resolved.ch
@@ -506,7 +506,7 @@ function applyOperatorGuiLayout(ctx, cells) {
 		const timer = setTimeout(() => {
 			debounceTimers.delete(ch)
 			const chain = applyChains.get(ch) || Promise.resolve()
-			const next = chain.then(() => _doApplyOperatorGuiLayout(ctx, ch, cells))
+			const next = chain.then(() => _doApplyOperatorGuiLayout(ctx, ch, cells, opts))
 			next.then(resolve, reject)
 			applyChains.set(ch, next.catch(() => {}))
 		}, APPLY_DEBOUNCE_MS)

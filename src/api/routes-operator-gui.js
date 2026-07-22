@@ -34,6 +34,10 @@ async function handlePost(path, body, ctx) {
 	if (path === '/api/operator-gui/layout') {
 		const j = parseBody(body) || {}
 		const cells = Array.isArray(j.cells) ? j.cells : []
+		// WO-319: when the client is showing the operator live canvas, keep the mosaic but punch no
+		// holes (the browser draws the decoded crops; a hole would reveal the screen consumer through
+		// the canvas).
+		const suppressHoles = j.suppressHoles === true
 		if (!firstLayoutReportSeen && cells.length && typeof ctx.log === 'function') {
 			firstLayoutReportSeen = true
 			ctx.log('info', `[Operator GUI] timing: first rect report t=${Date.now()} cells=${cells.length}`)
@@ -45,7 +49,7 @@ async function handlePost(path, body, ctx) {
 		if (!ctx.amcp) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 		}
-		const result = await applyOperatorGuiLayout(ctx, cells)
+		const result = await applyOperatorGuiLayout(ctx, cells, { suppressHoles })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...result }) }
 	}
 	if (path === '/api/operator-gui/launch') {

@@ -202,3 +202,35 @@ export function drawOperatorLiveCanvas(ctx, w, h) {
 		return false
 	}
 }
+
+/**
+ * Draw a CROP of the newest live frame — the source region given as FRACTIONS [0..1] of the frame,
+ * stretched to fill the dest rect. This is what the operator compose tiles use: the operator channel
+ * is a mosaic of routed feeds, and each tile shows the sub-region of that mosaic that its punch-hole
+ * used to reveal (the same viewport-fraction the screen consumer mapped). No letterbox — the source
+ * crop already matches the tile's aspect because the FILL that built the mosaic used the tile's rect.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} fx @param {number} fy @param {number} fw @param {number} fh source fractions [0..1]
+ * @param {number} dx @param {number} dy @param {number} dw @param {number} dh dest pixels
+ * @returns {boolean}
+ */
+export function drawOperatorLiveCanvasCrop(ctx, fx, fy, fw, fh, dx, dy, dw, dh) {
+	if (!_acquired) return false
+	const frame = guiStreamFrame()
+	if (!frame) return false
+	const iw = frame.displayWidth
+	const ih = frame.displayHeight
+	if (!(iw > 0) || !(ih > 0) || !(dw > 0) || !(dh > 0)) return false
+	// Clamp the source rect inside the frame — a tile dragged partly off-screen must not ask for
+	// pixels outside the decoded frame (drawImage throws on an out-of-bounds source rect).
+	const sx = Math.max(0, Math.min(fx, 1)) * iw
+	const sy = Math.max(0, Math.min(fy, 1)) * ih
+	const sw = Math.max(1, Math.min(fw, 1 - fx) * iw)
+	const sh = Math.max(1, Math.min(fh, 1 - fy) * ih)
+	try {
+		ctx.drawImage(frame, sx, sy, sw, sh, dx, dy, dw, dh)
+		return true
+	} catch {
+		return false
+	}
+}
