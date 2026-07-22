@@ -476,8 +476,19 @@ export function initOperatorComposeTiles(container, options) {
 	// region at its OWN viewport fraction — exactly what its punch-hole revealed of the screen
 	// consumer. Driven at frame rate by the live-canvas repaint, so drags/resizes track for free.
 	let liveActive = false
+	let holesSuppressedForLive = false
+	// Suppress the holes ONLY while crops are actually drawing — so a stream that never produces a
+	// frame leaves the screen-consumer view intact (holes stay), and there is no black flash on the
+	// gap between acquire and the first keyframe. Restores holes the moment drawing stops.
+	function applyHoleSuppress(want) {
+		if (want === holesSuppressedForLive) return
+		holesSuppressedForLive = want
+		setOperatorComposeHolesSuppressed(want)
+		scheduleReport() // flip the shape overlay immediately for the new state
+	}
 	function drawLiveCrops() {
 		const on = liveActive && isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
+		applyHoleSuppress(on)
 		const vw = window.innerWidth || 1
 		const vh = window.innerHeight || 1
 		for (const t of tiles.values()) {
@@ -503,13 +514,9 @@ export function initOperatorComposeTiles(container, options) {
 		}
 	}
 
-	// Suppress the punch-holes (server keeps the mosaic) while streaming, so the browser draws the
-	// crops; restore them when it stops. Redraw on every decoded frame and on any state flip.
 	function onLiveState(state) {
 		liveActive = !!(state && state.streaming)
-		setOperatorComposeHolesSuppressed(liveActive)
-		// Force a re-report so the shape overlay flips holes off/on immediately for the new state.
-		scheduleReport()
+		if (!liveActive) applyHoleSuppress(false) // stream stopped — bring the holes back now
 		drawLiveCrops()
 	}
 	const unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
