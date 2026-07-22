@@ -10,6 +10,8 @@ import { createDestinationLayoutOverlay } from './preview-canvas-destination-ove
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
 import { initOperatorComposeTiles } from './operator-compose-tiles.js'
+import { initOperatorStreamView } from './operator-stream-view.js'
+import { subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './preview-canvas-live-stream.js'
 
 const G = 6; const BORDER_FADE = 400
 
@@ -411,10 +413,30 @@ export function initPreviewPanel(host, options) {
 		if (tilesHandle) tilesHandle.refreshDefs()
 		else { rebuildComposeCellsIfNeeded(); scheduleDraw() }
 	})
+
+	// WO-319: the operator STREAM VIEW — ch4 full width, crop-from-bottom divider + per-client zoom.
+	// Shown when Live preview is on, REPLACING the normal JPEG cells (its own crop height drives the
+	// panel). NOT built on the host operator kiosk (operatorTilesActive): there the tiles+holes show
+	// the real screen consumer and drive the ch4 mosaic — hiding them would stop reporting. This view
+	// is for every OTHER client, which has no screen consumer and just needs to view the stream.
+	const streamView = operatorTilesActive ? null : initOperatorStreamView(canvasOuterEl)
+	if (streamView) streamView.root.style.display = 'none'
+	const applyStreamViewVisible = (st) => {
+		if (!streamView) return
+		const on = !!(st && st.available && st.enabled)
+		streamView.root.style.display = on ? 'block' : 'none'
+		for (const child of Array.from(canvasOuterEl.children)) {
+			if (child !== streamView.root) child.style.display = on ? 'none' : ''
+		}
+		if (on) streamView.redraw()
+	}
+	const unsubStreamState = streamView ? subscribeOperatorLiveCanvasState(applyStreamViewVisible) : null
+	if (streamView) applyStreamViewVisible(operatorLiveCanvasState())
+
 	body.hidden = collapsed;
 	updateLive();
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubStreamState?.(); streamView?.destroy(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }

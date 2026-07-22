@@ -37,14 +37,6 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
-import { setOperatorComposeHolesSuppressed, isRemoteOperatorView, subscribeSharedLayout } from '../lib/operator-gui-mode.js'
-import {
-	isOperatorLiveCanvasEnabled,
-	operatorLiveCanvasHasFrame,
-	drawOperatorLiveCanvasCrop,
-	subscribeOperatorLiveCanvasRepaint,
-	subscribeOperatorLiveCanvasState,
-} from './preview-canvas-live-stream.js'
 
 /** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
@@ -448,30 +440,18 @@ export function initOperatorComposeTiles(container, options) {
 		t.footerEl.style.height = `${TILE_CHROME.footerH}px`
 	}
 
-	// WO-319: the compose layout is shared (one ch4). A REMOTE operator client must not report its
-	// local/default layout on connect — that would overwrite the host's layout. It stays silent until
-	// it has SEEDED from the server's current shared layout (see seedFromServerLayout). The host uses
-	// its own local layout and is considered seeded immediately.
-	let serverSeeded = !isRemoteOperatorView()
-
 	function reportRectsNow() {
 		if (typeof onCellRects !== 'function') return
 		// Provisional (pre-state) render: never report. Prefer not-reporting over
 		// reporting-then-correcting — the server's re-applied layout is the better truth until the
 		// real channelMap lands and `rebuild()` re-derives the tiles from it.
 		if (!stateReady) return
-		if (!serverSeeded) return // remote client: wait for the shared layout before touching it
 		const cellRects = []
-		const vw = window.innerWidth || 1
-		const vh = window.innerHeight || 1
 		for (const t of tiles.values()) {
 			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
 			// so the X SHAPE hole and the visible border keep the just-outside relationship (WO-263).
 			const rect = t.bodyEl.getBoundingClientRect()
 			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
-			// This viewport fraction IS what the server applies as the ch4 FILL — record it as this
-			// tile's fillFrac so the local crop follows an in-progress drag before the broadcast echoes.
-			t.fillFrac = { x: rect.left / vw, y: rect.top / vh, w: rect.width / vw, h: rect.height / vh }
 		}
 		onCellRects(cellRects)
 		// Re-hug the freshest canvas position so the next pure MOVE (no resize/scroll) re-reports.
@@ -482,61 +462,6 @@ export function initOperatorComposeTiles(container, options) {
 		if (rafReport != null) return
 		rafReport = requestAnimationFrame(() => { rafReport = null; reportRectsNow() })
 	}
-
-	// WO-319 — draw each tile's crop of the operator live canvas into its body canvas. The operator
-	// channel is a mosaic of routed feeds laid out to the tile rects, so each tile shows the frame
-	// region at its OWN viewport fraction — exactly what its punch-hole revealed of the screen
-	// consumer. Driven at frame rate by the live-canvas repaint, so drags/resizes track for free.
-	let liveActive = false
-	let holesSuppressedForLive = false
-	// Suppress the holes ONLY while crops are actually drawing — so a stream that never produces a
-	// frame leaves the screen-consumer view intact (holes stay), and there is no black flash on the
-	// gap between acquire and the first keyframe. Restores holes the moment drawing stops.
-	function applyHoleSuppress(want) {
-		if (want === holesSuppressedForLive) return
-		holesSuppressedForLive = want
-		setOperatorComposeHolesSuppressed(want)
-		scheduleReport() // flip the shape overlay immediately for the new state
-	}
-	function drawLiveCrops() {
-		const on = liveActive && isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
-		applyHoleSuppress(on)
-		const vw = window.innerWidth || 1
-		const vh = window.innerHeight || 1
-		for (const t of tiles.values()) {
-			const cv = t.liveCanvas
-			if (!cv) continue
-			if (!on) {
-				if (cv.style.display !== 'none') cv.style.display = 'none'
-				continue
-			}
-			const r = t.bodyEl.getBoundingClientRect()
-			if (r.width < 2 || r.height < 2) {
-				cv.style.display = 'none'
-				continue
-			}
-			const w = Math.round(r.width)
-			const h = Math.round(r.height)
-			if (cv.width !== w) cv.width = w
-			if (cv.height !== h) cv.height = h
-			const cx = cv.getContext('2d')
-			if (!cx) continue
-			// Sample the SHARED ch4 FILL fraction (t.fillFrac), not this client's own window rect, so
-			// the video matches on every client regardless of window size. Falls back to the local rect
-			// only until the first report/seed populates fillFrac.
-			const s = t.fillFrac || { x: r.left / vw, y: r.top / vh, w: r.width / vw, h: r.height / vh }
-			const ok = drawOperatorLiveCanvasCrop(cx, s.x, s.y, s.w, s.h, 0, 0, w, h)
-			cv.style.display = ok ? 'block' : 'none'
-		}
-	}
-
-	function onLiveState(state) {
-		liveActive = !!(state && state.streaming)
-		if (!liveActive) applyHoleSuppress(false) // stream stopped — bring the holes back now
-		drawLiveCrops()
-	}
-	const unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
-	const unsubLiveState = subscribeOperatorLiveCanvasState(onLiveState)
 
 	function layoutAll() {
 		for (const t of tiles.values()) layoutTileDom(t)
@@ -568,14 +493,6 @@ export function initOperatorComposeTiles(container, options) {
 
 		const bodyEl = document.createElement('div')
 		bodyEl.className = 'operator-tile__body'
-		// WO-319: the live-canvas crop for this tile. Hidden by default; while the operator live canvas
-		// is streaming it fills the body with this tile's sub-region of the operator mosaic, replacing
-		// the punch-hole (which is withheld server-side via suppressHoles). pointer-events:none so the
-		// footer/resize chrome keeps working; the visible border/label/timer stay ON TOP as before.
-		const liveCanvasEl = document.createElement('canvas')
-		liveCanvasEl.className = 'operator-tile__live'
-		liveCanvasEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;'
-		bodyEl.appendChild(liveCanvasEl)
 
 		// All chrome sits BELOW the video body (owner: label + progress bar must not overlay any
 		// actual content). The footer holds a screen-label row (also the drag handle) above the
@@ -599,7 +516,7 @@ export function initOperatorComposeTiles(container, options) {
 		el.append(bodyEl, footerEl, resizeEl)
 		root.appendChild(el)
 
-		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, liveCanvas: liveCanvasEl, timer: null }
+		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, timer: null }
 
 		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
@@ -698,54 +615,6 @@ export function initOperatorComposeTiles(container, options) {
 		layoutAll()
 	}
 
-	// WO-319: apply a SHARED layout (server cells, role+mainIndex → fraction rect) onto the matching
-	// tiles so every client renders the same arrangement no matter who moved a window. Also records
-	// t.fillFrac — the ch4 FILL fraction this tile occupies — which the live crop samples from, so the
-	// video is identical across clients regardless of each one's window size. A tile being dragged
-	// right now is skipped (never snap out from under the operator's hand).
-	function seedFromCells(cells) {
-		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
-		if (!byKey.size) return
-		let changed = false
-		for (const t of tiles.values()) {
-			if (drag && drag.t === t) continue // do not yank the tile under the pointer
-			const rect = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
-			if (!rect) continue
-			t.fillFrac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
-			// Dedupe: only re-layout when the position actually differs (avoids feedback churn).
-			const f = t.frac || {}
-			if (Math.abs((f.x || 0) - rect.x) > 1e-4 || Math.abs((f.y || 0) - rect.y) > 1e-4 || Math.abs((f.w || 0) - rect.w) > 1e-4 || Math.abs((f.h || 0) - rect.h) > 1e-4) {
-				t.frac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
-				t.px = null
-				t.pxDesired = null
-				changed = true
-			}
-		}
-		if (changed) layoutAll()
-		drawLiveCrops()
-	}
-
-	// Seed a REMOTE client from the server's current shared layout at startup, then unlock reporting.
-	async function seedFromServerLayout() {
-		if (!isRemoteOperatorView()) return
-		try {
-			const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
-			if (res.ok) {
-				const j = await res.json()
-				seedFromCells(Array.isArray(j?.cells) ? j.cells : [])
-			}
-		} catch {
-			/* server layout unavailable — fall back to local/default (still no clobber: report waits) */
-		} finally {
-			serverSeeded = true // now this client may edit the shared layout
-			scheduleReport()
-		}
-	}
-
-	// Every client (host + remote) re-syncs to a layout broadcast so previews always match. The host
-	// receiving the echo of its own change is a dedupe no-op (and its dragging tile is skipped).
-	const unsubSharedLayout = subscribeSharedLayout((cells) => seedFromCells(cells))
-
 	function resetLayout() {
 		saveTileLayout(storage, storageKey, {})
 		const defs = currentDefs()
@@ -792,8 +661,6 @@ export function initOperatorComposeTiles(container, options) {
 
 	rebuild()
 	if (!stateReady) unsubAnyState = stateStore?.on?.('*', onAnyState) || null
-	// WO-319: a remote client seeds from the shared server layout before it is allowed to report.
-	void seedFromServerLayout()
 
 	return {
 		refreshDefs: rebuild,
@@ -805,12 +672,6 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			unsubCm?.()
 			unsubAnyState?.()
-			unsubLiveFrame?.()
-			unsubLiveState?.()
-			unsubSharedLayout?.()
-			// WO-319: restore the holes if we were suppressing them, so a torn-down tiles surface never
-			// leaves the compose region hole-less (which would hide the screen consumer with nothing on top).
-			setOperatorComposeHolesSuppressed(false)
 			if (rafReport != null) cancelAnimationFrame(rafReport)
 			for (const t of tiles.values()) t.timer?.destroy?.()
 			tiles.clear()
