@@ -487,13 +487,15 @@ export function initOperatorComposeTiles(container, options) {
 	function drawLiveCrops() {
 		if (!isClient) return
 		const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
-		const rootRect = root.getBoundingClientRect()
-		const rw = rootRect.width || 1
-		const rh = rootRect.height || 1
 		for (const t of tiles.values()) {
 			const cv = t.liveCanvas
 			if (!cv) continue
-			if (!on) { if (cv.style.display !== 'none') cv.style.display = 'none'; continue }
+			// The crop SOURCE is this window's FILL fraction of the ch4 raster (its route region in the
+			// mosaic), NOT the body's position on screen. Display and content are decoupled: the body can
+			// be dragged anywhere, but always shows the same route. Using fraction-of-root here was the
+			// bug — root is the compose area, a different aspect/letterbox than ch4, so crops were skewed.
+			const fill = t.fill
+			if (!on || !fill) { if (cv.style.display !== 'none') cv.style.display = 'none'; continue }
 			const b = t.bodyEl.getBoundingClientRect()
 			if (b.width < 2 || b.height < 2) { cv.style.display = 'none'; continue }
 			const w = Math.round(b.width)
@@ -502,7 +504,7 @@ export function initOperatorComposeTiles(container, options) {
 			if (cv.height !== h) cv.height = h
 			const cx = cv.getContext('2d')
 			if (!cx) continue
-			const ok = drawOperatorLiveCanvasCrop(cx, (b.left - rootRect.left) / rw, (b.top - rootRect.top) / rh, b.width / rw, b.height / rh, 0, 0, w, h)
+			const ok = drawOperatorLiveCanvasCrop(cx, fill.x, fill.y, fill.w, fill.h, 0, 0, w, h)
 			cv.style.display = ok ? 'block' : 'none'
 		}
 	}
@@ -518,9 +520,12 @@ export function initOperatorComposeTiles(container, options) {
 		const { borderW, footerH } = TILE_CHROME
 		let changed = false
 		for (const t of tiles.values()) {
-			if (drag && drag.t === t) continue
 			const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
 			if (!fill) continue
+			// Always record the crop source (fraction of ch4) — drawLiveCrops reads t.fill regardless of
+			// where the body sits, so a dragged/unchanged tile still shows its route.
+			t.fill = { x: fill.x, y: fill.y, w: fill.w, h: fill.h }
+			if (drag && drag.t === t) continue
 			const outer = {
 				x: (fill.x * cw - borderW) / cw,
 				y: (fill.y * ch - borderW) / ch,
@@ -759,6 +764,24 @@ export function initOperatorComposeTiles(container, options) {
 				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : []) }
 			} catch { /* keep local/default until a broadcast arrives */ }
 		})()
+		// Diagnostic (client only): one call from the laptop console pinpoints where the chain breaks —
+		// tiles not mounting (defs/state), FILL not seeded (no shared layout), or no video (decoder).
+		try {
+			window.__composeTiles = () => ({
+				isClient,
+				stateReady,
+				tileCount: tiles.size,
+				defsCount: currentDefs().length,
+				enabled: isOperatorLiveCanvasEnabled(),
+				hasFrame: operatorLiveCanvasHasFrame(),
+				tiles: [...tiles.values()].map((t) => ({
+					id: t.def.id,
+					fill: t.fill || null,
+					body: (() => { const b = t.bodyEl.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) } })(),
+					canvasShown: t.liveCanvas ? t.liveCanvas.style.display !== 'none' : false,
+				})),
+			})
+		} catch { /* no window */ }
 	}
 
 	return {

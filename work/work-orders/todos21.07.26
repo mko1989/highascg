@@ -53,7 +53,7 @@ when total resolution of the planned gpu outputs desktop xrandr is bigger than c
 highascg peridically tries to play decklink input, its already playing on the host channel and it wont be able to play anywhere else thats why it fails. 
 
 the app needs to be able to run multiple "windows" file browser and web browser togheter. when its running clicking on web browser running should bring the browser to front. can the gui browser and casparcg screen consumer "background" be glued togheter, meaning when the standard web browser is hiden it overlays the caspar window, id like it to be under the caspar window.
-
+basicly a taskbar, or just add the systems taskbar to the operator monitor.
 
 ---
 WO-308 (split operator monitor from pointer confine) — DONE, commit follows.
@@ -100,3 +100,18 @@ WO-309 (async device-view probes) — DONE, commit follows.
   label also now says "EDID native 3840x2160 @ 50" so it's clear that's the correct
   choice, not a workaround.
   NEEDS KIOSK RELOAD. Client-only, no service restart needed.
+
+
+tell me how big of a work it would be to port the webui to the node gui https://github.com/nodegui/nodegui
+could this give as more native preview from casparcg?
+
+VERY IMPORTANT
+when total resolution of the planned gpu outputs desktop xrandr is bigger than current the restart needs a nodm restart too. this was already coded in but either got deleted or stopped working.
+
+/home/casparcg/highascg/work/work-orders/todos21.07.26-logs
+highascg peridically tries to play decklink input, its already playing on the host channel and it wont be able to play anywhere else thats why it fails. 
+
+the app needs to be able to run multiple "windows" file browser and web browser togheter. when its running clicking on web browser running should bring the browser to front. can the gui browser and casparcg screen consumer "background" be glued togheter, meaning when the standard web browser is hiden it overlays the caspar window, id like it to be under the caspar window.
+basicly a taskbar, or just add the systems taskbar to the operator monitor.
+
+the punch holes in firefox doesnt work currently on the operator gui monitor (at 2160p50)

@@ -2,11 +2,36 @@
   "version": 1,
   "destinations": [
     {
-      "id": "dst_mrs7vx1i_1",
-      "label": "PGM/PRV 1",
+      "id": "dst_mrumipa8_1",
+      "label": "Operator GUI",
+      "mainScreenIndex": 0,
+      "mode": "operator_gui",
+      "audioLayout": "stereo",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": false,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      },
+      "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
+      "autoLaunch": true
+    },
+    {
+      "id": "dst_mrunnh8x_1",
+      "label": "PGM/PRV 2",
       "mainScreenIndex": 0,
       "mode": "pgm_prv",
-      "audioLayout": "stereo",
+      "audioLayout": "8ch",
       "videoMode": "custom",
       "width": 3072,
       "height": 1728,
@@ -25,59 +50,10 @@
       }
     },
     {
-      "id": "dst_mrs7zdk8_1",
-      "label": "Operator GUI",
-      "mainScreenIndex": 0,
-      "mode": "operator_gui",
-      "audioLayout": "stereo",
-      "videoMode": "custom",
-      "width": 1920,
-      "height": 1080,
-      "fps": 50,
-      "caspar": {
-        "bus": "pgm"
-      },
-      "edidLabel": "",
-      "inheritsProjectFps": true,
-      "stream": {
-        "type": "rtmp",
-        "source": "program_1",
-        "url": "",
-        "key": "",
-        "quality": "medium"
-      },
-      "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
-      "physicalPort": 3,
-      "autoLaunch": true
-    },
-    {
-      "id": "dst_mrs803yn_1",
-      "label": "PGM 2",
+      "id": "dst_mruno18x_1",
+      "label": "PGM 3",
       "mainScreenIndex": 1,
       "mode": "pgm_only",
-      "audioLayout": "stereo",
-      "videoMode": "1080p5000",
-      "width": 1920,
-      "height": 1080,
-      "fps": 50,
-      "caspar": {
-        "bus": "pgm"
-      },
-      "edidLabel": "",
-      "inheritsProjectFps": true,
-      "stream": {
-        "type": "rtmp",
-        "source": "program_1",
-        "url": "",
-        "key": "",
-        "quality": "medium"
-      }
-    },
-    {
-      "id": "dst_mrsa11vf_1",
-      "label": "Multiview 1",
-      "mainScreenIndex": 0,
-      "mode": "multiview",
       "audioLayout": "stereo",
       "videoMode": "1080p5000",
       "width": 1920,

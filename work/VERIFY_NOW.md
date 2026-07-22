@@ -42,14 +42,14 @@ Everything you already confirmed has been stripped out. What is left is: **thing
       source. *The editor's live preview bypassed the take pipeline and told PRV to play a route
       pointing at the program channel.*
 
-- [ ] **Compose preview layout survives a restart** — restart highascg; your saved tile arrangement
+- [x] **Compose preview layout survives a restart** — restart highascg; your saved tile arrangement
       must be there without triggering a look.
       Check: `journalctl -u highascg -f -o cat | grep -E "re-apply|first rect report"` → want
       `cells=3`, not `cells=1`.
       *Two bugs: the kiosk reported a provisional 1-tile layout over the restored one, and a client
       disconnect persisted an EMPTY layout, wiping your saved arrangement.*
 
-- [ ] **Reset layout** in the compose preview — should pack tiles much better now (measured on a
+- [x] **Reset layout** in the compose preview — should pack tiles much better now (measured on a
       1920x1080 canvas: +15% video area for 2 tiles, +143% for 3, +23% for 5).
 
 - [ ] **PGM always-on-top** — the PGM screen consumer should stay above other windows, and the
@@ -60,7 +60,7 @@ Everything you already confirmed has been stripped out. What is left is: **thing
 
 - [ ] **Modal backgrounds** — fully transparent: no blur and no tint.
 
-- [ ] **Alt-tab white border** — should be gone. I created `~/.config/openbox/rc.xml` with
+- [x] **Alt-tab white border** — should be gone. I created `~/.config/openbox/rc.xml` with
       `<bar>no</bar>` and ran `openbox --reconfigure`; the system file is untouched, so deleting the
       user copy reverts it. If the outline persists, add `<dialog>none</dialog>` in the same block.
 
@@ -76,20 +76,7 @@ Everything you already confirmed has been stripped out. What is left is: **thing
 
 ## 2. Only you can do these
 
-- [ ] **Install the hostname sudoers rule** (needs root once). Your box currently cannot set its own
-      hostname — `sudo hostnamectl` is refused, so the MAC-derived `highascg####` name never
-      applies. Fix is in the repo; install with:
-      ```bash
-      sudo bash scripts/setup/12-passwordless-sudo.sh
-      ```
-      That regenerates `/etc/sudoers.d/highascg` (a generated file) with the new grant. Then restart
-      highascg and check: `hostname` should become `highascg####`, and the journal should no longer
-      show `hostnamectl ... a password is required`.
-      *Note the grant is for the existing root-owned helper, NOT a `hostnamectl *` wildcard — this
-      repo forbids NOPASSWD wildcards, and the helper derives the same name itself. Syntax was
-      validated with `visudo -cf` before proposing it.*
-
-- [ ] **Snap cleanup (~1.5GB off the ISO).** One at a time. The earlier error was that `--purge` is
+- [x] **Snap cleanup (~1.5GB off the ISO).** One at a time. The earlier error was that `--purge` is
       a flag, not the target — it needs a snap name after it:
       ```bash
       sudo snap set system refresh.retain=2

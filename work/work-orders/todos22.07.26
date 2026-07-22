@@ -1,0 +1,11 @@
+the countdown timer needs precise position in pixels and in the small compact timer the eye icon should perform fade in/out.
+
+cg studio export seemed to only export the color changes and nothing else.
+it also doesnt use the built in inspector but its own. making the canvas smaller.
+
+the shaders that are dropped into a look cant play on 700 cg layers as that makes them imposible to compose (put layers on top). they need to play on the same layers as standard media.
+not sure with the lower thirds, will have to test.
+
+add the ability to add (and remove) to compose preview other live sources like decklink ndi etc.
+
+operatort gui in kiosk sticked togheter with caspar screen consumer.

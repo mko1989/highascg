@@ -45,7 +45,7 @@
       "caspar": {
         "name": "Rec1",
         "source": "program_2",
-        "crf": 26,
+        "crf": 18,
         "videoCodec": "h264",
         "videoBitrateKbps": 4500,
         "encoderPreset": "veryfast",
@@ -62,11 +62,11 @@
       "externalRef": "hw:2,0"
     },
     {
-      "id": "dst_in_dst_mrs7vx1i_1",
+      "id": "dst_in_dst_mrumipa8_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "PGM/PRV 1",
-      "externalRef": "dst_mrs7vx1i_1"
+      "label": "Operator GUI",
+      "externalRef": "dst_mrumipa8_1"
     },
     {
       "id": "dlsdi_1",
@@ -100,11 +100,12 @@
       "label": "DeckLink 3",
       "caspar": {
         "ioDirection": "out",
+        "bus": "pgm",
+        "mainIndex": 2,
         "outputBinding": {
-          "type": "multiview"
-        },
-        "bus": "multiview",
-        "mainIndex": 0
+          "type": "screen",
+          "index": 3
+        }
       },
       "externalRef": "3"
     },
@@ -120,38 +121,53 @@
       "externalRef": "4"
     },
     {
-      "id": "dst_in_dst_mrs7zdk8_1",
+      "id": "dst_in_dst_mrunnh8x_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "Operator GUI",
-      "externalRef": "dst_mrs7zdk8_1"
+      "label": "PGM/PRV 2",
+      "externalRef": "dst_mrunnh8x_1"
     },
     {
-      "id": "dst_in_dst_mrs803yn_1",
+      "id": "dst_in_dst_mruno18x_1",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "PGM 2",
-      "externalRef": "dst_mrs803yn_1"
+      "label": "PGM 3",
+      "externalRef": "dst_mruno18x_1"
     },
     {
-      "id": "dst_in_host_webpage_webpage_127_0_0_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "http://127.0.0.1:4200/template/SHADERS/SH-KSJB.html",
+      "id": "str_2",
+      "deviceId": "caspar_host",
+      "kind": "stream_out",
+      "index": 1,
+      "label": "Str2",
       "caspar": {
-        "hostRole": "webpage_host",
-        "hostChannel": 4,
-        "hostLayer": 1,
-        "sourceId": "webpage_127_0_0_1"
+        "type": "ndi",
+        "name": "Str2",
+        "quality": "medium",
+        "rtmpServerUrl": "",
+        "streamKey": "",
+        "hasStreamKey": false,
+        "srtUrl": "",
+        "udpUrl": "",
+        "videoCodec": "h264",
+        "videoBitrateKbps": 4500,
+        "encoderPreset": "veryfast",
+        "audioCodec": "aac",
+        "audioBitrateKbps": 128
       },
-      "externalRef": "host_webpage_webpage_127_0_0_1"
+      "externalRef": "stream_2"
     },
     {
-      "id": "dst_in_dst_mrsa11vf_1",
+      "id": "dst_in_host_decklink_input_4",
       "deviceId": "destinations",
       "kind": "destination_in",
-      "label": "Multiview 1",
-      "externalRef": "dst_mrsa11vf_1"
+      "label": "DeckLink 4",
+      "caspar": {
+        "hostRole": "decklink_input",
+        "hostChannel": 5,
+        "slot": 4
+      },
+      "externalRef": "host_decklink_input_4"
     },
     {
       "id": "gpu_p0",
@@ -184,7 +200,7 @@
         "bus": "pgm",
         "mainIndex": 1
       },
-      "externalRef": "DP-5"
+      "externalRef": "DP-4"
     },
     {
       "id": "gpu_p3",
@@ -200,34 +216,40 @@
   ],
   "edges": [
     {
-      "id": "e_dst_in_dst_mrs7vx1i_1_gpu_p0",
-      "sourceId": "dst_in_dst_mrs7vx1i_1",
+      "id": "e_dst_in_dst_mrunnh8x_1_gpu_p0",
+      "sourceId": "dst_in_dst_mrunnh8x_1",
       "sinkId": "gpu_p0"
     },
     {
-      "id": "e_dst_in_dst_mrs7zdk8_1_gpu_p2",
-      "sourceId": "dst_in_dst_mrs7zdk8_1",
-      "sinkId": "gpu_p2"
-    },
-    {
-      "id": "e_dst_in_dst_mrsa11vf_1_dlsdi_3",
-      "sourceId": "dst_in_dst_mrsa11vf_1",
+      "id": "e_dst_in_dst_mruno18x_1_dlsdi_3",
+      "sourceId": "dst_in_dst_mruno18x_1",
       "sinkId": "dlsdi_3"
     },
     {
-      "id": "e_dst_in_dst_mrs7vx1i_1_audio_1",
-      "sourceId": "dst_in_dst_mrs7vx1i_1",
+      "id": "e_dst_in_dst_mrunnh8x_1_audio_1",
+      "sourceId": "dst_in_dst_mrunnh8x_1",
       "sinkId": "audio_1"
     },
     {
-      "id": "e_dst_in_dst_mrs803yn_1_rec_1",
-      "sourceId": "dst_in_dst_mrs803yn_1",
+      "id": "e_dst_in_dst_mruno18x_1_str_1",
+      "sourceId": "dst_in_dst_mruno18x_1",
+      "sinkId": "str_1"
+    },
+    {
+      "id": "e_dst_in_dst_mruno18x_1_str_2",
+      "sourceId": "dst_in_dst_mruno18x_1",
+      "sinkId": "str_2"
+    },
+    {
+      "id": "e_dst_in_dst_mruno18x_1_rec_1",
+      "sourceId": "dst_in_dst_mruno18x_1",
       "sinkId": "rec_1"
     },
     {
-      "id": "e_dst_in_dst_mrs803yn_1_str_1",
-      "sourceId": "dst_in_dst_mrs803yn_1",
-      "sinkId": "str_1"
+      "id": "e_dst_in_dst_mrumipa8_1_gpu_p2",
+      "sourceId": "dst_in_dst_mrumipa8_1",
+      "sinkId": "gpu_p2"
     }
-  ]
+  ],
+  "layout": {}
 }

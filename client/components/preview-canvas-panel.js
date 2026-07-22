@@ -435,7 +435,10 @@ export function initPreviewPanel(host, options) {
 		}
 		if (tilesMountEl) tilesMountEl.style.display = on ? '' : 'none'
 		if (wrap) wrap.style.display = on ? 'none' : ''
-		setOperatorStreamViewActive(on) // let this client report/edit the shared layout while in view
+		// DISPLAY-ONLY for now: the client follows the host's shared layout and fills windows from the
+		// stream, but must NOT report — two clients reporting to the one shared layout with different
+		// coordinate bases fight (the FILL oscillates and they re-seed each other). One writer = the host.
+		setOperatorStreamViewActive(false)
 		if (on) tilesRef.h?.refreshDefs()
 		scheduleDraw()
 	}

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>balatro — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-balatro","name":"balatro","common":"","passes":{"image":{"source":"// Original by localthunk (https://www.playbalatro.com)\n\n// Configuration (modify these values to change the effect)\n#define SPIN_ROTATION -2.0\n#define SPIN_SPEED 7.0\n#define OFFSET vec2(0.0)\n#define COLOUR_1 vec4(0.871, 0.267, 0.231, 1.0)\n#define COLOUR_2 vec4(0.0, 0.42, 0.706, 1.0)\n#define COLOUR_3 vec4(0.086, 0.137, 0.145, 1.0)\n#define CONTRAST 3.5\n#define LIGTHING 0.4\n#define SPIN_AMOUNT 0.25\n#define PIXEL_FILTER 745.0\n#define SPIN_EASE 1.0\n#define PI 3.14159265359\n#define IS_ROTATE false\n\nvec4 effect(vec2 screenSize, vec2 screen_coords) {\n    float pixel_size = length(screenSize.xy) / PIXEL_FILTER;\n    vec2 uv = (floor(screen_coords.xy*(1./pixel_size))*pixel_size - 0.5*screenSize.xy)/length(screenSize.xy) - OFFSET;\n    float uv_len = length(uv);\n    \n    float speed = (SPIN_ROTATION*SPIN_EASE*0.2);\n    if(IS_ROTATE){\n       speed = iTime * speed;\n    }\n    speed += 302.2;\n    float new_pixel_angle = atan(uv.y, uv.x) + speed - SPIN_EASE*20.*(1.*SPIN_AMOUNT*uv_len + (1. - 1.*SPIN_AMOUNT));\n    vec2 mid = (screenSize.xy/length(screenSize.xy))/2.;\n    uv = (vec2((uv_len * cos(new_pixel_angle) + mid.x), (uv_len * sin(new_pixel_angle) + mid.y)) - mid);\n    \n    uv *= 30.;\n    speed = iTime*(SPIN_SPEED);\n    vec2 uv2 = vec2(uv.x+uv.y);\n    \n    for(int i=0; i < 5; i++) {\n        uv2 += sin(max(uv.x, uv.y)) + uv;\n        uv  += 0.5*vec2(cos(5.1123314 + 0.353*uv2.y + speed*0.131121),sin(uv2.x - 0.113*speed));\n        uv  -= 1.0*cos(uv.x + uv.y) - 1.0*sin(uv.x*0.711 - uv.y);\n    }\n    \n    float contrast_mod = (0.25*CONTRAST + 0.5*SPIN_AMOUNT + 1.2);\n    float paint_res = min(2., max(0.,length(uv)*(0.035)*contrast_mod));\n    float c1p = max(0.,1. - contrast_mod*abs(1.-paint_res));\n    float c2p = max(0.,1. - contrast_mod*abs(paint_res));\n    float c3p = 1. - min(1., c1p + c2p);\n    float light = (LIGTHING - 0.2)*max(c1p*5. - 4., 0.) + LIGTHING*max(c2p*5. - 4., 0.);\n    return (0.3/CONTRAST)*COLOUR_1 + (1. - 0.3/CONTRAST)*(COLOUR_1*c1p + COLOUR_2*c2p + vec4(c3p*COLOUR_3.rgb, c3p*COLOUR_1.a)) + light;\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 uv = fragCoord/iResolution.xy;\n    \n    fragColor = effect(iResolution.xy, uv * iResolution.xy);\n}","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

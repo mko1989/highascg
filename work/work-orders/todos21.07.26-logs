@@ -1,0 +1,500 @@
+4-12 FILL 0.628708064114606 0.1712962962962963 0.1898148148148148 0.18981481481481483\r\n
+[2026-07-21 15:49:26.136] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:26.136] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:26.136] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.120] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:32.121] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.145] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:32.145] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.146] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6273698170979818 0.1712977409362793 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:32.146] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.146] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:32.146] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.339] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:32.342] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.343] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:32.343] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.369] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6273698170979818 0.1712977409362793 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:32.372] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:32.375] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:32.380] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.313] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:34.313] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.327] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:34.332] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.342] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.653064219156901 0.18611255575109412 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:34.342] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.347] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:34.348] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.895] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:34.898] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.906] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:34.909] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.909] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:34.909] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:34.909] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:34.909] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.249] [info]    Received message from 127.0.0.1: STOP 4-10\r\n
+[2026-07-21 15:49:38.251] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:38.260] [info]    Received message from 127.0.0.1: MIXER 4-10 CLEAR\r\n
+[2026-07-21 15:49:38.261] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.268] [info]    Received message from 127.0.0.1: STOP 4-11\r\n
+[2026-07-21 15:49:38.272] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:38.272] [info]    Received message from 127.0.0.1: MIXER 4-11 CLEAR\r\n
+[2026-07-21 15:49:38.273] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.277] [info]    Received message from 127.0.0.1: STOP 4-12\r\n
+[2026-07-21 15:49:38.277] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:38.283] [info]    Received message from 127.0.0.1: MIXER 4-12 CLEAR\r\n
+[2026-07-21 15:49:38.283] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.284] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:38.284] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.815] [info]    Received message from 127.0.0.1: PLAY 4-10 route://2\r\n
+[2026-07-21 15:49:38.820] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:38.827] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:38.827] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.842] [info]    Received message from 127.0.0.1: PLAY 4-11 route://1\r\n
+[2026-07-21 15:49:38.842] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:38.843] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:38.843] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.844] [info]    Received message from 127.0.0.1: PLAY 4-12 route://3\r\n
+[2026-07-21 15:49:38.844] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:38.849] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:38.849] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:38.849] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:38.849] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:40.796] [info]    Received message from 127.0.0.1: PLAY 5-4 DECKLINK 4\r\n
+[2026-07-21 15:49:40.820] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-21 15:49:40.835] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-21 15:49:40.835] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-21 15:49:40.835] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-21 15:49:40.835] [error]   [caspar::tag_stacktrace_info*] =  0# 0x00005D49A164A36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    1# 0x00005D49A18E5F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    2# 0x00005D49A18E70F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    3# 0x00005D49A18E72C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    4# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    5# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]    6# 0x00005D49A18DCC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    7# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    8# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:49:40.835] [error]    9# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]   10# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]   
+[2026-07-21 15:49:40.835] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-21 15:49:40.835] [error]   
+[2026-07-21 15:49:40.835] [error]    0# 0x00005D49A1635B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    1# 0x00005D49A15F443F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    2# 0x00005D49A17072C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    3# 0x00005D49A1707519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    4# 0x00005D49A17B8D10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    5# 0x00005D49A17B953F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    6# 0x00005D49A17C5364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    7# 0x00005D49A17F57DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    8# 0x00005D49A1798614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]    9# 0x00005D49A181F1FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   10# 0x00005D49A181FD48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   11# 0x00005D49A1820AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   12# 0x00005D49A1820D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   13# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   14# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]   15# 0x00005D49A181CDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   16# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:49:40.835] [error]   17# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:49:40.835] [error]   18# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]   19# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:49:40.835] [error]   
+[2026-07-21 15:49:40.836] [error]    File not found.
+[2026-07-21 15:49:40.836] [info]    Sent message to 127.0.0.1:404 PLAY FAILED\r\n
+[2026-07-21 15:49:41.000] [info]    Received message from 127.0.0.1: STOP 4-10\r\n
+[2026-07-21 15:49:41.000] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:41.003] [info]    Received message from 127.0.0.1: MIXER 4-10 CLEAR\r\n
+[2026-07-21 15:49:41.007] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.012] [info]    Received message from 127.0.0.1: STOP 4-11\r\n
+[2026-07-21 15:49:41.012] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:41.013] [info]    Received message from 127.0.0.1: MIXER 4-11 CLEAR\r\n
+[2026-07-21 15:49:41.014] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.014] [info]    Received message from 127.0.0.1: STOP 4-12\r\n
+[2026-07-21 15:49:41.014] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:41.015] [info]    Received message from 127.0.0.1: MIXER 4-12 CLEAR\r\n
+[2026-07-21 15:49:41.015] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.015] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:41.015] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.480] [info]    Received message from 127.0.0.1: PLAY 4-10 route://2\r\n
+[2026-07-21 15:49:41.480] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:41.487] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:41.487] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.496] [info]    Received message from 127.0.0.1: PLAY 4-11 route://1\r\n
+[2026-07-21 15:49:41.496] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:41.496] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:41.497] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.497] [info]    Received message from 127.0.0.1: PLAY 4-12 route://3\r\n
+[2026-07-21 15:49:41.497] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:41.497] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:41.498] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:41.498] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:41.498] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:43.707] [info]    Received message from 127.0.0.1: STOP 4-10\r\n
+[2026-07-21 15:49:43.710] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:43.723] [info]    Received message from 127.0.0.1: MIXER 4-10 CLEAR\r\n
+[2026-07-21 15:49:43.727] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:43.744] [info]    Received message from 127.0.0.1: STOP 4-11\r\n
+[2026-07-21 15:49:43.744] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:43.755] [info]    Received message from 127.0.0.1: MIXER 4-11 CLEAR\r\n
+[2026-07-21 15:49:43.756] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:43.756] [info]    Received message from 127.0.0.1: STOP 4-12\r\n
+[2026-07-21 15:49:43.757] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:43.759] [info]    Received message from 127.0.0.1: MIXER 4-12 CLEAR\r\n
+[2026-07-21 15:49:43.763] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:43.764] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:43.769] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:44.008] [info]    Received message from 127.0.0.1: PLAY 4-10 route://2\r\n
+[2026-07-21 15:49:44.009] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:44.010] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:44.011] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:44.025] [info]    Received message from 127.0.0.1: PLAY 4-11 route://1\r\n
+[2026-07-21 15:49:44.027] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:44.030] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:44.030] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:44.031] [info]    Received message from 127.0.0.1: PLAY 4-12 route://3\r\n
+[2026-07-21 15:49:44.031] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:44.031] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:44.031] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:44.031] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:44.031] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:45.550] [info]    Received message from 127.0.0.1: STOP 4-10\r\n
+[2026-07-21 15:49:45.550] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:45.562] [info]    Received message from 127.0.0.1: MIXER 4-10 CLEAR\r\n
+[2026-07-21 15:49:45.565] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:45.572] [info]    Received message from 127.0.0.1: STOP 4-11\r\n
+[2026-07-21 15:49:45.572] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:45.572] [info]    Received message from 127.0.0.1: MIXER 4-11 CLEAR\r\n
+[2026-07-21 15:49:45.573] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:45.573] [info]    Received message from 127.0.0.1: STOP 4-12\r\n
+[2026-07-21 15:49:45.573] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:49:45.573] [info]    Received message from 127.0.0.1: MIXER 4-12 CLEAR\r\n
+[2026-07-21 15:49:45.573] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:45.577] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:45.577] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:46.030] [info]    Received message from 127.0.0.1: PLAY 4-10 route://2\r\n
+[2026-07-21 15:49:46.033] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:46.033] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:46.033] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:46.034] [info]    Received message from 127.0.0.1: PLAY 4-11 route://1\r\n
+[2026-07-21 15:49:46.034] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:46.035] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:46.035] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:46.035] [info]    Received message from 127.0.0.1: PLAY 4-12 route://3\r\n
+[2026-07-21 15:49:46.035] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:46.035] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:46.037] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:46.037] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:46.038] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: BEGIN\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: LOADBG 3-10 route://5-4 SEEK 0\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: MIXER 3-10 FILL 0 0 1 1 12 linear\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: MIXER 3-10 ANCHOR 0 0 0\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: MIXER 3-10 ROTATION 0 0 DEFER\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: MIXER 3-10 OPACITY 1 0 DEFER\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: MIXER 3-10 VOLUME 1 DEFER\r\n
+[2026-07-21 15:49:51.933] [info]    Received message from 127.0.0.1: COMMIT\r\n
+[2026-07-21 15:49:51.933] [warning] Executing batch: BATCH(6 commands)
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.934] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:51.938] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-21 15:49:52.136] [info]    Received message from 127.0.0.1: MIXER 3 COMMIT\r\n
+[2026-07-21 15:49:52.137] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:52.149] [info]    Received message from 127.0.0.1: PLAY 3-10 route://5-4 MIX 12 linear\r\n
+[2026-07-21 15:49:52.149] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:52.162] [info]    Received message from 127.0.0.1: MIXER 3 COMMIT\r\n
+[2026-07-21 15:49:52.165] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:52.187] [info]    Received message from 127.0.0.1: PRINT 5\r\n
+[2026-07-21 15:49:52.187] [info]    image[] Initialized.
+[2026-07-21 15:49:52.189] [info]    Sent message to 127.0.0.1:202 PRINT OK\r\n
+[2026-07-21 15:49:52.201] [info]    image[] Uninitialized.
+[2026-07-21 15:49:52.935] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.2087808679651331 0.11875 0.11875\r\n
+[2026-07-21 15:49:52.937] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:52.947] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.22035494203920716 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:52.947] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:52.969] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.2079644132543493 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:52.969] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:52.970] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:52.970] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: BEGIN\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 CLEAR\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: LOADBG 2-10 PROJECTS/TETST/GABONA-HEBE-V4 LOOP SEEK 0\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 FILL 0 0 1 1 0\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 ANCHOR 0 0 0\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 ROTATION 0 0 DEFER\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 OPACITY 1 0 DEFER\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: MIXER 2-10 VOLUME 1 DEFER\r\n
+[2026-07-21 15:49:55.559] [info]    Received message from 127.0.0.1: COMMIT\r\n
+[2026-07-21 15:49:55.561] [warning] Executing batch: BATCH(7 commands)
+[2026-07-21 15:49:55.570] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.571] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.572] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-21 15:49:55.708] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-21 15:49:55.714] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.791] [info]    Received message from 127.0.0.1: PLAY 2-10\r\n
+[2026-07-21 15:49:55.791] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:55.798] [warning] ffmpeg[PROJECTS/TETST/GABONA-HEBE-V4|0.0000/69.7600] Latency: 0
+[2026-07-21 15:49:55.810] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-21 15:49:55.810] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:55.845] [info]    Received message from 127.0.0.1: CLEAR 2\r\n
+[2026-07-21 15:49:55.846] [info]    Sent message to 127.0.0.1:202 CLEAR OK\r\n
+[2026-07-21 15:49:55.850] [info]    ffmpeg[/home/casparcg/highascg/media/projects/tetst/Gabona-Hebe-v4.mp4|2/3488] Destroyed.
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: BEGIN\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 CLEAR\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: LOADBG 1-10 PROJECTS/TETST/GABONA-HEBE-V4 LOOP MIX 12 linear SEEK 0\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 FILL 0 0 1 1 0\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 ANCHOR 0 0 0\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 ROTATION 0 0 DEFER\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 OPACITY 1 0 DEFER\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: MIXER 1-10 VOLUME 1 DEFER\r\n
+[2026-07-21 15:49:56.120] [info]    Received message from 127.0.0.1: COMMIT\r\n
+[2026-07-21 15:49:56.124] [warning] Executing batch: BATCH(7 commands)
+[2026-07-21 15:49:56.124] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 LOADBG OK\r\n
+[2026-07-21 15:49:56.132] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.133] [info]    Sent message to 127.0.0.1:202 COMMIT OK\r\n
+[2026-07-21 15:49:56.160] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.1943364178692853 0.11875 0.11875\r\n
+[2026-07-21 15:49:56.163] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.163] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-21 15:49:56.163] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.164] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.20591049194335936 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:56.164] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.165] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.1935199631585015 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:56.170] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.171] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:56.171] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.243] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-07-21 15:49:56.246] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.259] [info]    Received message from 127.0.0.1: PLAY 1-10\r\n
+[2026-07-21 15:49:56.259] [info]    Sent message to 127.0.0.1:202 PLAY OK\r\n
+[2026-07-21 15:49:56.260] [info]    Received message from 127.0.0.1: MIXER 1 COMMIT\r\n
+[2026-07-21 15:49:56.260] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.282] [warning] ffmpeg[PROJECTS/TETST/GABONA-HEBE-V4|0.0000/69.7600] Latency: 0
+[2026-07-21 15:49:56.986] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.21526234944661457 0.11875 0.11875\r\n
+[2026-07-21 15:49:56.989] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.996] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.22683642352068867 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:49:56.996] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:56.997] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.2144458947358308 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:49:56.997] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:49:57.020] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:49:57.021] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:00.839] [info]    Received message from 127.0.0.1: PLAY 5-4 DECKLINK 4\r\n
+[2026-07-21 15:50:00.865] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-21 15:50:00.883] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-21 15:50:00.883] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-21 15:50:00.883] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-21 15:50:00.883] [error]   [caspar::tag_stacktrace_info*] =  0# 0x00005D49A164A36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    1# 0x00005D49A18E5F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    2# 0x00005D49A18E70F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    3# 0x00005D49A18E72C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    4# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    5# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]    6# 0x00005D49A18DCC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    7# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    8# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:00.883] [error]    9# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]   10# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]   
+[2026-07-21 15:50:00.883] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-21 15:50:00.883] [error]   
+[2026-07-21 15:50:00.883] [error]    0# 0x00005D49A1635B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    1# 0x00005D49A15F443F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    2# 0x00005D49A17072C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    3# 0x00005D49A1707519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    4# 0x00005D49A17B8D10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    5# 0x00005D49A17B953F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    6# 0x00005D49A17C5364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    7# 0x00005D49A17F57DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    8# 0x00005D49A1798614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]    9# 0x00005D49A181F1FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   10# 0x00005D49A181FD48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   11# 0x00005D49A1820AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   12# 0x00005D49A1820D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   13# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   14# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]   15# 0x00005D49A181CDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   16# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:00.883] [error]   17# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:00.883] [error]   18# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]   19# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:00.883] [error]   
+[2026-07-21 15:50:00.884] [error]    File not found.
+[2026-07-21 15:50:00.884] [info]    Sent message to 127.0.0.1:404 PLAY FAILED\r\n
+[2026-07-21 15:50:03.386] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.17864583333333334 0.21526234944661457 0.11875 0.11875\r\n
+[2026-07-21 15:50:03.387] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:03.398] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.31614583333333335 0.22683642352068867 0.11041666666666666 0.11041666666666666\r\n
+[2026-07-21 15:50:03.403] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:03.436] [info]    Received message from 127.0.0.1: MIXER 4-12 FILL 0.6613975524902344 0.2144458947358308 0.1574045181274414 0.1574045181274414\r\n
+[2026-07-21 15:50:03.436] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:03.437] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:50:03.438] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:06.356] [info]    Received message from 127.0.0.1: CLEAR 2\r\n
+[2026-07-21 15:50:06.361] [info]    Sent message to 127.0.0.1:202 CLEAR OK\r\n
+[2026-07-21 15:50:06.377] [info]    Received message from 127.0.0.1: MIXER 2 COMMIT\r\n
+[2026-07-21 15:50:06.377] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:06.904] [info]    Received message from 127.0.0.1: MIXER 4-10 FILL 0.16614583333333333 0.13796296296296295 0.08333333333333333 0.08333333333333333\r\n
+[2026-07-21 15:50:06.904] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:06.911] [info]    Received message from 127.0.0.1: MIXER 4-11 FILL 0.16640625 0.13796296296296295 0.08333333333333333 0.08333333333333333\r\n
+[2026-07-21 15:50:06.913] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:06.936] [info]    Received message from 127.0.0.1: STOP 4-12\r\n
+[2026-07-21 15:50:06.938] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:50:06.943] [info]    Received message from 127.0.0.1: MIXER 4-12 CLEAR\r\n
+[2026-07-21 15:50:06.944] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:06.944] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:50:06.944] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:07.888] [info]    Received message from 127.0.0.1: STOP 4-10\r\n
+[2026-07-21 15:50:07.888] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:50:07.906] [info]    Received message from 127.0.0.1: MIXER 4-10 CLEAR\r\n
+[2026-07-21 15:50:07.908] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:07.914] [info]    Received message from 127.0.0.1: STOP 4-11\r\n
+[2026-07-21 15:50:07.915] [info]    Sent message to 127.0.0.1:202 STOP OK\r\n
+[2026-07-21 15:50:07.915] [info]    Received message from 127.0.0.1: MIXER 4-11 CLEAR\r\n
+[2026-07-21 15:50:07.916] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:07.926] [info]    Received message from 127.0.0.1: MIXER 4 COMMIT\r\n
+[2026-07-21 15:50:07.928] [info]    Sent message to 127.0.0.1:202 MIXER OK\r\n
+[2026-07-21 15:50:20.886] [info]    Received message from 127.0.0.1: PLAY 5-4 DECKLINK 4\r\n
+[2026-07-21 15:50:20.919] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-21 15:50:20.933] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-21 15:50:20.933] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-21 15:50:20.933] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-21 15:50:20.933] [error]   [caspar::tag_stacktrace_info*] =  0# 0x00005D49A164A36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    1# 0x00005D49A18E5F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    2# 0x00005D49A18E70F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    3# 0x00005D49A18E72C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    4# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    5# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]    6# 0x00005D49A18DCC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    7# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    8# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:20.933] [error]    9# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]   10# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]   
+[2026-07-21 15:50:20.933] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-21 15:50:20.933] [error]   
+[2026-07-21 15:50:20.933] [error]    0# 0x00005D49A1635B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    1# 0x00005D49A15F443F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    2# 0x00005D49A17072C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    3# 0x00005D49A1707519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    4# 0x00005D49A17B8D10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    5# 0x00005D49A17B953F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    6# 0x00005D49A17C5364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    7# 0x00005D49A17F57DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    8# 0x00005D49A1798614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]    9# 0x00005D49A181F1FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   10# 0x00005D49A181FD48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   11# 0x00005D49A1820AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   12# 0x00005D49A1820D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   13# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   14# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]   15# 0x00005D49A181CDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   16# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:20.933] [error]   17# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:20.933] [error]   18# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]   19# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:20.933] [error]   
+[2026-07-21 15:50:20.934] [error]    File not found.
+[2026-07-21 15:50:20.934] [info]    Sent message to 127.0.0.1:404 PLAY FAILED\r\n
+[2026-07-21 15:50:30.011] [info]    Received message from 127.0.0.1: PRINT 5\r\n
+[2026-07-21 15:50:30.013] [info]    image[] Initialized.
+[2026-07-21 15:50:30.013] [info]    Sent message to 127.0.0.1:202 PRINT OK\r\n
+[2026-07-21 15:50:30.018] [info]    image[] Uninitialized.
+[2026-07-21 15:50:40.936] [info]    Received message from 127.0.0.1: PLAY 5-4 DECKLINK 4\r\n
+[2026-07-21 15:50:40.968] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-21 15:50:40.975] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-21 15:50:40.975] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-21 15:50:40.975] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-21 15:50:40.975] [error]   [caspar::tag_stacktrace_info*] =  0# 0x00005D49A164A36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    1# 0x00005D49A18E5F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    2# 0x00005D49A18E70F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    3# 0x00005D49A18E72C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    4# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    5# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]    6# 0x00005D49A18DCC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    7# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    8# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:40.975] [error]    9# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]   10# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]   
+[2026-07-21 15:50:40.975] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-21 15:50:40.975] [error]   
+[2026-07-21 15:50:40.975] [error]    0# 0x00005D49A1635B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    1# 0x00005D49A15F443F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    2# 0x00005D49A17072C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    3# 0x00005D49A1707519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    4# 0x00005D49A17B8D10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    5# 0x00005D49A17B953F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    6# 0x00005D49A17C5364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    7# 0x00005D49A17F57DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    8# 0x00005D49A1798614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]    9# 0x00005D49A181F1FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   10# 0x00005D49A181FD48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   11# 0x00005D49A1820AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   12# 0x00005D49A1820D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   13# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   14# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]   15# 0x00005D49A181CDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   16# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:50:40.975] [error]   17# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:50:40.975] [error]   18# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]   19# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:50:40.975] [error]   
+[2026-07-21 15:50:40.976] [error]    File not found.
+[2026-07-21 15:50:40.976] [info]    Sent message to 127.0.0.1:404 PLAY FAILED\r\n
+[2026-07-21 15:51:00.996] [info]    Received message from 127.0.0.1: PLAY 5-4 DECKLINK 4\r\n
+[2026-07-21 15:51:01.030] [warning] Device supports video-format with conversion: 1080p50
+[2026-07-21 15:51:01.035] [error]   Exception: /home/casparcg/caspar-build/src-tree/src/modules/decklink/producer/decklink_producer.cpp(530): Throw in function caspar::decklink::decklink_producer::decklink_producer(caspar::core::video_format_desc, int, const caspar::spl::shared_ptr<caspar::core::frame_factory>&, const caspar::core::video_format_repository&, std::string, std::string, const std::wstring&, bool, bool)
+[2026-07-21 15:51:01.035] [error]   Dynamic exception type: boost::wrapexcept<caspar::caspar_exception>
+[2026-07-21 15:51:01.035] [error]   [caspar::tag_msg_info*] = DeckLink 8K Pro [4|1080p5000] Could not enable video input.
+[2026-07-21 15:51:01.035] [error]   [caspar::tag_stacktrace_info*] =  0# 0x00005D49A164A36E in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    1# 0x00005D49A18E5F8F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    2# 0x00005D49A18E70F9 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    3# 0x00005D49A18E72C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    4# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    5# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]    6# 0x00005D49A18DCC8B in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    7# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    8# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:51:01.035] [error]    9# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]   10# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]   
+[2026-07-21 15:51:01.035] [error]   [boost::errinfo_api_function_*] = EnableVideoInput
+[2026-07-21 15:51:01.035] [error]   
+[2026-07-21 15:51:01.035] [error]    0# 0x00005D49A1635B27 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    1# 0x00005D49A15F443F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    2# 0x00005D49A17072C0 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    3# 0x00005D49A1707519 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    4# 0x00005D49A17B8D10 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    5# 0x00005D49A17B953F in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    6# 0x00005D49A17C5364 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    7# 0x00005D49A17F57DD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    8# 0x00005D49A1798614 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]    9# 0x00005D49A181F1FD in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   10# 0x00005D49A181FD48 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   11# 0x00005D49A1820AAE in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   12# 0x00005D49A1820D90 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   13# 0x00005D49A166A32D in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   14# 0x0000708F26EA1ED3 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]   15# 0x00005D49A181CDAB in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   16# 0x00005D49A16F6960 in /home/casparcg/highascg/bin/casparcg
+[2026-07-21 15:51:01.035] [error]   17# 0x0000708F272ECDB4 in /lib/x86_64-linux-gnu/libstdc++.so.6
+[2026-07-21 15:51:01.035] [error]   18# 0x0000708F26E9CAA4 in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]   19# 0x0000708F26F29C6C in /lib/x86_64-linux-gnu/libc.so.6
+[2026-07-21 15:51:01.035] [error]   
+[2026-07-21 15:51:01.037] [error]    File not found.
+[2026-07-21 15:51:01.037] [info]    Sent message to 127.0.0.1:404 PLAY FAILED\r\n
+

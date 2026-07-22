@@ -5,7 +5,7 @@
     "enabled": true,
     "name": "Rec1",
     "source": "program_2",
-    "crf": 26,
+    "crf": 18,
     "videoCodec": "h264",
     "videoBitrateKbps": 4500,
     "encoderPreset": "veryfast",
