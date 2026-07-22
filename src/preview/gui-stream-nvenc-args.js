@@ -35,8 +35,10 @@ const DEFAULT_PRESET = 'p1'
 const DEFAULT_TUNE = 'ull'
 const DEFAULT_BITRATE_KBPS = 8000
 const DEFAULT_FPS = 50
-/** One keyframe per second: bounds a joining client's wait to <= 1 GOP. */
-const DEFAULT_GOP = 50
+/** Keyframe every ~0.5s: bounds a joining/recovering client's wait to <= 1 GOP. Shorter = snappier
+ * recovery from a WiFi hiccup (stale-drop resyncs to the next keyframe); the near-static operator
+ * screen makes the extra keyframes almost free on bandwidth. */
+const DEFAULT_GOP = 25
 
 const MIN_BITRATE_KBPS = 500
 const MAX_BITRATE_KBPS = 60000

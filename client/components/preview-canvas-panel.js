@@ -10,8 +10,7 @@ import { createDestinationLayoutOverlay } from './preview-canvas-destination-ove
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
 import { initOperatorComposeTiles } from './operator-compose-tiles.js'
-import { initOperatorStreamView } from './operator-stream-view.js'
-import { subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './preview-canvas-live-stream.js'
+import { drawOperatorLiveCanvasFill, isOperatorLiveCanvasEnabled, operatorLiveCanvasHasFrame, subscribeOperatorLiveCanvasRepaint, subscribeOperatorLiveCanvasState } from './preview-canvas-live-stream.js'
 
 const G = 6; const BORDER_FADE = 400
 
@@ -414,29 +413,46 @@ export function initPreviewPanel(host, options) {
 		else { rebuildComposeCellsIfNeeded(); scheduleDraw() }
 	})
 
-	// WO-319: the operator STREAM VIEW — ch4 full width, crop-from-bottom divider + per-client zoom.
-	// Shown when Live preview is on, REPLACING the normal JPEG cells (its own crop height drives the
-	// panel). NOT built on the host operator kiosk (operatorTilesActive): there the tiles+holes show
-	// the real screen consumer and drive the ch4 mosaic — hiding them would stop reporting. This view
-	// is for every OTHER client, which has no screen consumer and just needs to view the stream.
-	const streamView = operatorTilesActive ? null : initOperatorStreamView(canvasOuterEl)
-	if (streamView) streamView.root.style.display = 'none'
-	const applyStreamViewVisible = (st) => {
-		if (!streamView) return
-		const on = !!(st && st.available && st.enabled)
-		streamView.root.style.display = on ? 'block' : 'none'
-		for (const child of Array.from(canvasOuterEl.children)) {
-			if (child !== streamView.root) child.style.display = on ? 'none' : ''
+	// WO-319: STREAM BACKDROP behind the operator tiles. The tiles (border/label/progress + drag) have
+	// transparent bodies; on the host those reveal the screen consumer through X holes, but a client
+	// browser has no screen consumer — so we draw the ch4 stream on a canvas BEHIND the tiles and the
+	// bodies show it through. The tiles still report the shared layout; this is a pure backdrop.
+	// Only for the tiles path (operator mode); the mosaic is Caspar's and the host may run no client.
+	let streamBackdrop = null
+	let unsubBackdropFrame = null
+	let unsubBackdropState = null
+	if (operatorTilesActive) {
+		streamBackdrop = document.createElement('canvas')
+		streamBackdrop.className = 'preview-panel__stream-backdrop'
+		streamBackdrop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:0;pointer-events:none;'
+		if (!canvasOuterEl.style.position) canvasOuterEl.style.position = 'relative'
+		canvasOuterEl.insertBefore(streamBackdrop, canvasOuterEl.firstChild)
+		if (tilesMountEl) { tilesMountEl.style.position = 'relative'; tilesMountEl.style.zIndex = '1' }
+		const drawBackdrop = () => {
+			const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
+			streamBackdrop.style.display = on ? 'block' : 'none'
+			// While the backdrop shows, the tile bodies must be transparent so the stream shows through
+			// (their default dark fill is only there for the host, where the X hole cuts it out anyway).
+			canvasOuterEl.classList.toggle('preview-panel__canvas-outer--stream-backdrop', on)
+			if (!on) return
+			const w = Math.max(1, Math.round(canvasOuterEl.clientWidth || 1))
+			const h = Math.max(1, Math.round(canvasOuterEl.clientHeight || 1))
+			if (streamBackdrop.width !== w) streamBackdrop.width = w
+			if (streamBackdrop.height !== h) streamBackdrop.height = h
+			const cx = streamBackdrop.getContext('2d')
+			if (cx) { cx.clearRect(0, 0, w, h); drawOperatorLiveCanvasFill(cx, w, h) }
 		}
-		if (on) streamView.redraw()
+		let backdropRaf = false
+		const scheduleBackdrop = () => { if (backdropRaf) return; backdropRaf = true; requestAnimationFrame(() => { backdropRaf = false; drawBackdrop() }) }
+		unsubBackdropFrame = subscribeOperatorLiveCanvasRepaint(scheduleBackdrop)
+		unsubBackdropState = subscribeOperatorLiveCanvasState(scheduleBackdrop)
+		drawBackdrop()
 	}
-	const unsubStreamState = streamView ? subscribeOperatorLiveCanvasState(applyStreamViewVisible) : null
-	if (streamView) applyStreamViewVisible(operatorLiveCanvasState())
 
 	body.hidden = collapsed;
 	updateLive();
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubStreamState?.(); streamView?.destroy(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubBackdropFrame?.(); unsubBackdropState?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }

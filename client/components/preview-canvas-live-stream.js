@@ -220,6 +220,24 @@ export function drawOperatorLiveCanvas(ctx, w, h) {
 }
 
 /**
+ * Draw the newest live frame STRETCHED to fill a w×h rect (no letterbox) at the current transform
+ * origin. Used as the tiles backdrop: the chrome tiles are positioned as fractions of the same
+ * compose area, so a fill (not a fit) keeps the routes under their tiles regardless of aspect.
+ * @param {CanvasRenderingContext2D} ctx @param {number} w @param {number} h @returns {boolean}
+ */
+export function drawOperatorLiveCanvasFill(ctx, w, h) {
+	if (!_acquired) return false
+	const frame = guiStreamFrame()
+	if (!frame || !(w > 0) || !(h > 0)) return false
+	try {
+		ctx.drawImage(frame, 0, 0, w, h)
+		return true
+	} catch {
+		return false
+	}
+}
+
+/**
  * Draw a CROP of the newest live frame — the source region given as FRACTIONS [0..1] of the frame,
  * stretched to fill the dest rect. This is what the operator compose tiles use: the operator channel
  * is a mosaic of routed feeds, and each tile shows the sub-region of that mosaic that its punch-hole

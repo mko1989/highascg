@@ -71,6 +71,10 @@ function buildRemuxArgs(port) {
 		'-i', `udp://127.0.0.1:${port}?fifo_size=1048576&overrun_nonfatal=1`,
 		'-map', '0:v:0',
 		'-c:v', 'copy',
+		// Latency: emit every packet the instant it is remuxed — no output buffering. Without this
+		// ffmpeg can hold several frames before flushing pipe:1, adding tens of ms on top of the network.
+		'-flush_packets', '1',
+		'-max_delay', '0',
 		'-f', 'h264',
 		'pipe:1',
 	]
