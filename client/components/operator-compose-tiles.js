@@ -509,38 +509,55 @@ export function initOperatorComposeTiles(container, options) {
 		}
 	}
 
-	// WO-319 — CLIENT ONLY. Position tiles so each BODY lands on its shared FILL rect (fraction of the
-	// tiles-mount), so the crop above shows the right route and the chrome frames it. The FILL is the
-	// body/hole rect; the tile OUTER = that expanded by chrome (border all sides, footer below).
-	function seedFromCells(cells) {
+	// True once this client has a layout it saved itself (a drag/resize persisted to localStorage) —
+	// after that its window POSITIONS are the user's, never re-seeded from the shared layout.
+	function hasStoredLayout() {
+		const stored = loadTileLayout(storage, storageKey)
+		return !!stored && Object.keys(stored).length > 0
+	}
+	// Guards the one-time position seed per session (the initial GET). Broadcasts never flip it.
+	let positionsSeeded = false
+
+	// WO-319 — CLIENT ONLY. A shared-layout update carries TWO things, and they are decoupled:
+	//   1. The CROP SOURCE — each route's real region in the ch4 mosaic. ALWAYS applied, so a window
+	//      keeps showing the right route even after the host rearranges the mosaic.
+	//   2. The DISPLAY POSITION — where the framed window sits on THIS client. Seeded from the shared
+	//      layout only ONCE, and only when the user has no layout of their own yet; thereafter it is
+	//      local and must NOT be stomped by a later broadcast (that stomp — including a transient
+	//      tiny-hole report from the host mid-transition — was what "refreshed to tiny by itself").
+	// @param {{ positions?: boolean }} [opts] positions:true only for the initial seed.
+	function seedFromCells(cells, opts = {}) {
 		if (!isClient) return
 		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
 		if (!byKey.size) return
-		const { w: cw, h: ch } = canvasSize()
-		const { borderW, footerH } = TILE_CHROME
-		let changed = false
+		// (1) Crop source — always.
 		for (const t of tiles.values()) {
 			const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
-			if (!fill) continue
-			// Always record the crop source (fraction of ch4) — drawLiveCrops reads t.fill regardless of
-			// where the body sits, so a dragged/unchanged tile still shows its route.
-			t.fill = { x: fill.x, y: fill.y, w: fill.w, h: fill.h }
-			if (drag && drag.t === t) continue
-			const outer = {
-				x: (fill.x * cw - borderW) / cw,
-				y: (fill.y * ch - borderW) / ch,
-				w: (fill.w * cw + borderW * 2) / cw,
-				h: (fill.h * ch + borderW * 2 + footerH) / ch,
-			}
-			const f = t.frac || {}
-			if (Math.abs((f.x || 0) - outer.x) > 1e-4 || Math.abs((f.y || 0) - outer.y) > 1e-4 || Math.abs((f.w || 0) - outer.w) > 1e-4 || Math.abs((f.h || 0) - outer.h) > 1e-4) {
+			if (fill) t.fill = { x: fill.x, y: fill.y, w: fill.w, h: fill.h }
+		}
+		// (2) Display position — once, first run only.
+		if (opts.positions && !positionsSeeded && !hasStoredLayout()) {
+			positionsSeeded = true
+			const { w: cw, h: ch } = canvasSize()
+			const { borderW, footerH } = TILE_CHROME
+			let changed = false
+			for (const t of tiles.values()) {
+				if (drag && drag.t === t) continue
+				const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+				if (!fill) continue
+				const outer = {
+					x: (fill.x * cw - borderW) / cw,
+					y: (fill.y * ch - borderW) / ch,
+					w: (fill.w * cw + borderW * 2) / cw,
+					h: (fill.h * ch + borderW * 2 + footerH) / ch,
+				}
 				t.frac = outer
 				t.px = null
 				t.pxDesired = null
 				changed = true
 			}
+			if (changed) { layoutAll(); return }
 		}
-		if (changed) layoutAll()
 		drawLiveCrops()
 	}
 
@@ -757,11 +774,13 @@ export function initOperatorComposeTiles(container, options) {
 	let unsubShared = null
 	if (isClient) {
 		unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
+		// Broadcasts refresh crop sources only — they never move this client's windows.
 		unsubShared = subscribeSharedLayout((cells) => seedFromCells(cells))
 		void (async () => {
 			try {
 				const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
-				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : []) }
+				// Initial seed MAY place windows on their routes (first run, no local layout yet).
+				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : [], { positions: true }) }
 			} catch { /* keep local/default until a broadcast arrives */ }
 		})()
 		// Diagnostic (client only): one call from the laptop console pinpoints where the chain breaks —
@@ -770,6 +789,8 @@ export function initOperatorComposeTiles(container, options) {
 			window.__composeTiles = () => ({
 				isClient,
 				stateReady,
+				positionsSeeded,
+				hasStoredLayout: hasStoredLayout(),
 				tileCount: tiles.size,
 				defsCount: currentDefs().length,
 				enabled: isOperatorLiveCanvasEnabled(),
