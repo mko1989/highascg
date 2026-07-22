@@ -10,6 +10,11 @@ import {
 	resolvePollIntervalMs,
 	shouldAcceptFramePush,
 } from '../lib/compose-preview-backpressure.js'
+import {
+	drawLiveStreamCell,
+	noteTrackedChannels,
+	subscribeLiveStreamRepaint,
+} from './preview-canvas-live-stream.js'
 
 /**
  * @returns {string} current page visibility ('visible' when there is no document)
@@ -71,6 +76,24 @@ function notifyComposePreviewListeners(channel) {
 		}
 	}
 }
+
+// WO-319: decoded live frames arrive ~50/s; coalesce them to one repaint per animation frame so
+// the panels' own rAF scheduler (preview-canvas-panel.js) paints at display cadence, not decode
+// cadence. The subscription drives the SAME listener set as JPEG refreshes, so a cell already
+// wired for compose preview repaints for live frames with no extra plumbing at the call sites.
+let _liveRepaintPending = false
+subscribeLiveStreamRepaint((channel) => {
+	if (_liveRepaintPending) return
+	if (typeof requestAnimationFrame !== 'function') {
+		notifyComposePreviewListeners(channel)
+		return
+	}
+	_liveRepaintPending = true
+	requestAnimationFrame(() => {
+		_liveRepaintPending = false
+		notifyComposePreviewListeners(channel)
+	})
+})
 
 /**
  * @param {number} channel
@@ -376,6 +399,9 @@ export function resetComposePreviewClientCache(keepChannels) {
 	applyBlocklistSeed()
 	_trackedChannelSig = ''
 	stopPollIfIdle()
+	// WO-319: cells may have been dropped — re-evaluate whether the live stream is still needed so
+	// it releases (stops the NVENC consumer) when no visible cell shows the streamed channel.
+	noteTrackedChannels([..._cache.keys()])
 }
 
 /**
@@ -411,6 +437,9 @@ export function trackComposePreviewChannel(channel, opts = {}) {
 	const hadEntry = _cache.has(ch)
 	if (!hadEntry) {
 		_cache.set(ch, { img: new Image(), etag: null, loading: false })
+		// WO-319: the live-stream module acquires/releases the NVENC stream based on whether a
+		// tracked cell shows the streamed channel.
+		noteTrackedChannels([..._cache.keys()])
 	}
 	ensurePoll()
 	if (opts.poll !== false && !hadEntry) void pollChannelMeta(ch)
@@ -438,6 +467,8 @@ export function drawComposeSnapshotCell(ctx, cellW, cellH, channel, opts = {}) {
 		ctx.fillText(`preview unavailable on ch ${ch}`, cellW / 2, cellH / 2)
 		return
 	}
+	// WO-319: live motion when the NVENC stream carries this cell's channel; JPEG otherwise.
+	if (drawLiveStreamCell(ctx, cellW, cellH, ch)) return
 	if (entry?.img?.complete && entry.img.naturalWidth > 0) {
 		const iw = entry.img.naturalWidth
 		const ih = entry.img.naturalHeight
