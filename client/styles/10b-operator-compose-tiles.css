@@ -164,3 +164,34 @@
 /* WO-319: over the stream backdrop (client browsers), the tiles container must also be transparent
  * so the stream canvas behind it shows through — its dark fill is only for the host's holes. */
 .preview-panel__canvas-outer--stream-backdrop .operator-compose-tiles { background: transparent; }
+
+/* WO-319: client STREAM VIEW frames — simple bordered windows over the letterboxed ch4 stream,
+ * placed at the shared FILL positions. Not the WO-256 hole tiles; a frame IS the route rect. */
+.operator-stream-tiles { background: transparent; }
+.operator-stream-tile {
+	position: absolute;
+	box-sizing: border-box;
+	border: 2px solid #457b9d;
+	cursor: move;
+}
+.operator-stream-tile--pgm { border-color: #e63946; }
+.operator-stream-tile--prv { border-color: #2a9d8f; }
+.operator-stream-tile__label {
+	position: absolute;
+	left: 0; bottom: 0;
+	max-width: 100%;
+	padding: 1px 5px;
+	background: rgba(0, 0, 0, 0.62);
+	color: #fff;
+	font: 11px system-ui, sans-serif;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.operator-stream-tile__resize {
+	position: absolute;
+	right: 0; bottom: 0;
+	width: 14px; height: 14px;
+	cursor: nwse-resize;
+	background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.7) 50%);
+}
