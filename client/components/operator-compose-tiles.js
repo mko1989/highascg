@@ -37,7 +37,7 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
-import { setOperatorComposeHolesSuppressed } from '../lib/operator-gui-mode.js'
+import { setOperatorComposeHolesSuppressed, isRemoteOperatorView } from '../lib/operator-gui-mode.js'
 import {
 	isOperatorLiveCanvasEnabled,
 	operatorLiveCanvasHasFrame,
@@ -448,12 +448,19 @@ export function initOperatorComposeTiles(container, options) {
 		t.footerEl.style.height = `${TILE_CHROME.footerH}px`
 	}
 
+	// WO-319: the compose layout is shared (one ch4). A REMOTE operator client must not report its
+	// local/default layout on connect — that would overwrite the host's layout. It stays silent until
+	// it has SEEDED from the server's current shared layout (see seedFromServerLayout). The host uses
+	// its own local layout and is considered seeded immediately.
+	let serverSeeded = !isRemoteOperatorView()
+
 	function reportRectsNow() {
 		if (typeof onCellRects !== 'function') return
 		// Provisional (pre-state) render: never report. Prefer not-reporting over
 		// reporting-then-correcting — the server's re-applied layout is the better truth until the
 		// real channelMap lands and `rebuild()` re-derives the tiles from it.
 		if (!stateReady) return
+		if (!serverSeeded) return // remote client: wait for the shared layout before touching it
 		const cellRects = []
 		for (const t of tiles.values()) {
 			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
@@ -682,6 +689,35 @@ export function initOperatorComposeTiles(container, options) {
 		layoutAll()
 	}
 
+	// WO-319: seed a REMOTE client from the server's current shared layout so it shows the operator's
+	// arrangement (not a local default) and never clobbers it. Maps server cells (role+mainIndex →
+	// fraction rect) onto the matching tiles, then unlocks reporting so later edits DO propagate.
+	async function seedFromServerLayout() {
+		if (!isRemoteOperatorView()) return
+		try {
+			const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
+			if (res.ok) {
+				const j = await res.json()
+				const cells = Array.isArray(j?.cells) ? j.cells : []
+				const byKey = new Map(cells.map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r))
+				for (const t of tiles.values()) {
+					const rect = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+					if (rect && rect.w > 0 && rect.h > 0) {
+						t.frac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
+						t.px = null
+						t.pxDesired = null
+					}
+				}
+				layoutAll()
+			}
+		} catch {
+			/* server layout unavailable — fall back to local/default (still no clobber: report waits) */
+		} finally {
+			serverSeeded = true // now this client may edit the shared layout
+			scheduleReport()
+		}
+	}
+
 	function resetLayout() {
 		saveTileLayout(storage, storageKey, {})
 		const defs = currentDefs()
@@ -728,6 +764,8 @@ export function initOperatorComposeTiles(container, options) {
 
 	rebuild()
 	if (!stateReady) unsubAnyState = stateStore?.on?.('*', onAnyState) || null
+	// WO-319: a remote client seeds from the shared server layout before it is allowed to report.
+	void seedFromServerLayout()
 
 	return {
 		refreshDefs: rebuild,
