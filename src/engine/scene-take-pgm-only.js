@@ -335,7 +335,10 @@ async function runSceneTakePgmOnly(amcp, opts) {
 				self,
 			)
 			if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
-			const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
+			// Animate take → crossfade the template in on its host layer instead of cutting (matches
+			// the media Animate/MIX). fadeDur is 0 unless isAnimate, so a cut take is unchanged.
+			const cgFade = fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
+			const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg, cgFade)
 			if (lines.length > 0) {
 				self.log?.(
 					'info',

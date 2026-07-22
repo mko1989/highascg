@@ -462,8 +462,11 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						)
 					}
 				} else {
-					// Different template or no current layer: full CLEAR+ADD+PLAY+UPDATE.
-					lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg)
+					// Different template or no current layer: full CLEAR+ADD+PLAY+UPDATE. When the take is a
+					// bank crossfade, fade the template in on its host layer so it MIXES with the media
+					// instead of cutting (the CG host layer is outside the bank crossfade math).
+					const cgFade = shouldRunBankCrossfade && fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
+					lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg, cgFade)
 					if (typeof self.log === 'function') {
 						self.log(
 							'info',

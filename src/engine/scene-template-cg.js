@@ -111,9 +111,15 @@ function extractTemplateCgData(layer, cgName) {
  * @param {number} channel
  * @param {number} logicalOrHostLayer — scene layerNumber; mapped to 700+ overlay host
  * @param {{ cgName: string, data?: string, playOnLoad?: boolean }} spec
+ * @param {{ fadeDurFrames?: number, fadeTween?: string }} [opts] when fadeDurFrames > 0 the template
+ *   is CROSSFADED in on its own host layer instead of cutting. This mirrors the global-border
+ *   pattern (add hidden → tween up, same layer): template CG lands on a fixed 700+ overlay layer
+ *   that the bank crossfade never touches, so without an explicit opacity ramp here it always pops
+ *   at full opacity — a hard cut — while the media layers around it mix. The `MIXER … OPACITY 0 0`
+ *   MUST precede the CG ADD so the template plays hidden; the tween to 1 follows the PLAY.
  * @returns {string[]}
  */
-function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec) {
+function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec, opts = {}) {
 	const cgName = String(spec?.cgName || '').trim()
 	if (!cgName) return []
 	const hostLayer = resolveTemplateCgHostLayer(logicalOrHostLayer, cgName)
@@ -124,6 +130,18 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec) {
 	const tpl = cgName.includes('/') ? `"${cgName}"` : cgName
 	// WO-207 T207.2: record this host as added (tracked removal on teardown or on take without the template)
 	recordTemplateHostAdded(channel, hostLayer)
+	const fadeDur = Number(opts?.fadeDurFrames)
+	if (Number.isFinite(fadeDur) && fadeDur > 0) {
+		const tw = opts?.fadeTween ? ` ${param(opts.fadeTween)}` : ''
+		return [
+			`CG ${cl} CLEAR`,
+			`MIXER ${cl} OPACITY 0 0`,
+			`CG ${cl} ADD 0 ${tpl} ${playOnLoad} ${param(dataStr)}`,
+			`CG ${cl} PLAY 0`,
+			`CG ${cl} UPDATE 0 ${param(dataStr)}`,
+			`MIXER ${cl} OPACITY 1 ${fadeDur}${tw}`,
+		]
+	}
 	return [
 		`CG ${cl} CLEAR`,
 		`CG ${cl} ADD 0 ${tpl} ${playOnLoad} ${param(dataStr)}`,
