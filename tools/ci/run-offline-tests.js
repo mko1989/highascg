@@ -152,6 +152,7 @@ const FILES = [
 	'tools/smoke/smoke-wo319-annexb-au-splitter.test.js',
 	'tools/smoke/smoke-wo319-gui-stream-ingest-relay.test.js',
 	'tools/smoke/smoke-wo319-operator-live-canvas.test.js',
+	'tools/smoke/smoke-wo319-gui-stream-status-route.test.js',
 	'tools/smoke/smoke-wo317-helper-applier.test.js',
 	'tools/smoke/smoke-wo317-helper-coordinator.test.js',
 	'test/companion-control-status.test.js',
