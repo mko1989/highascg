@@ -1,17 +1,19 @@
 /**
- * WO-319 — live-motion overlay for the compose preview.
+ * WO-319 — the operator LIVE CANVAS: the operator-GUI composed channel (server-selected, channel 4
+ * on this box), NVENC-encoded once and decoded in-browser by WebCodecs, shown as live motion in the
+ * preview surfaces (compose preview, looks editor, multiview editor) in place of the ~1 Hz JPEG.
  *
- * When the GUI live stream (one NVENC-encoded composed channel, see src/preview/gui-stream-*)
- * carries a channel that a visible compose cell is showing, that cell draws the DECODED VIDEO
- * FRAME instead of the 1 Hz JPEG snapshot. Everything else — including every error path — falls
- * back to the JPEG, so this module can never make the preview worse than today.
+ * TOGGLE-DRIVEN, not automatic. Each connected browser starts an NVENC session server-side, so the
+ * operator turns this on explicitly (persisted per-client in localStorage); off is the JPEG path,
+ * i.e. exactly today's behaviour. The stream is channel-AGNOSTIC to the caller: it carries "the
+ * operator canvas", and any preview surface can draw it with {@link drawOperatorLiveCanvas} — it is
+ * NOT matched to a per-cell channel (the composed channel is not one of the compose cells' PGM/PRV
+ * channels; it IS the whole surface).
  *
- * CONNECTING IS NOT FREE: the first WS client starts the NVENC consumer server-side. So the
- * stream is only acquired once BOTH are true — /api/gui-stream/status says the feature is enabled
- * AND the set of channels the compose preview is actually tracking includes the streamed channel.
- * When cells change (project/routing) the acquisition follows, releasing when no visible cell
- * shows the stream. `noteTrackedChannels` is the single entry point for that decision, called by
- * preview-canvas-compose-snapshot on every tracking change.
+ * NETWORK: the relay is served by the highascg HTTP server, so every client that enables the toggle
+ * decodes the SAME stream — one NVENC encode on the box, N independent WebCodecs decoders, each
+ * served keyframe-first by the server GOP buffer. Extra viewers cost a decode on their own machine,
+ * not extra GPU on the playout box.
  */
 
 import {
@@ -23,55 +25,89 @@ import {
 	subscribeGuiStreamFrames,
 } from '../lib/gui-stream-client.js'
 
-/** Stream channel per the server, or null when disabled/unknown. */
-let _statusChannel = null
-let _statusFetchedAt = 0
-let _statusFetching = false
-/** Re-ask the server occasionally — the feature can appear after a service restart. */
+const LS_KEY = 'highascg.operatorLiveCanvas'
+/** Re-ask the server occasionally — the feature can appear/disappear across a service restart. */
 const STATUS_TTL_MS = 60000
 
+/** Server feature availability + which channel it carries (null = disabled/unknown). */
+let _available = false
+let _channel = null
+let _statusFetchedAt = 0
+let _statusFetching = false
+
+/** Operator toggle (persisted). Acquiring the stream only happens when enabled AND available. */
+let _enabled = readPersistedEnabled()
 let _acquired = false
 let _unsubFrames = null
-/** @type {Set<(channel: number) => void>} */
-const _repaint = new Set()
-/** @type {number[]} last channel set handed to noteTrackedChannels (re-evaluated after status) */
-let _lastTracked = []
 
-async function fetchStatus() {
+/** Repaint subscribers (each preview surface schedules its own redraw on a new frame). */
+const _repaint = new Set()
+/** Toggle-state subscribers (the toggle button re-renders when availability/enabled changes). */
+const _stateSubs = new Set()
+
+function readPersistedEnabled() {
+	try {
+		return globalThis.localStorage?.getItem(LS_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+function persistEnabled(on) {
+	try {
+		globalThis.localStorage?.setItem(LS_KEY, on ? '1' : '0')
+	} catch {
+		/* private mode / no storage — in-memory only */
+	}
+}
+
+function notifyState() {
+	for (const fn of _stateSubs) {
+		try {
+			fn(operatorLiveCanvasState())
+		} catch {
+			/* a bad listener must not break the toggle */
+		}
+	}
+}
+
+async function fetchStatus(force = false) {
 	if (_statusFetching) return
-	if (Date.now() - _statusFetchedAt < STATUS_TTL_MS) return
+	if (!force && Date.now() - _statusFetchedAt < STATUS_TTL_MS) return
 	_statusFetching = true
 	try {
 		const res = await fetch('/api/gui-stream/status', { cache: 'no-store' })
 		_statusFetchedAt = Date.now()
 		if (!res.ok) {
-			_statusChannel = null
+			_available = false
+			_channel = null
 			return
 		}
 		const j = await res.json()
-		_statusChannel = j?.enabled && Number.isFinite(j.channel) ? j.channel : null
+		_available = j?.enabled === true
+		_channel = Number.isFinite(j?.channel) ? j.channel : null
 	} catch {
 		_statusFetchedAt = Date.now()
-		_statusChannel = null
+		_available = false
+		_channel = null
 	} finally {
 		_statusFetching = false
-		reevaluate()
+		reconcile()
+		notifyState()
 	}
 }
 
-function reevaluate() {
-	const want = guiStreamSupported() && _statusChannel != null && _lastTracked.includes(_statusChannel)
+/** Acquire/release the stream to match (enabled AND available AND WebCodecs present). */
+function reconcile() {
+	const want = _enabled && _available && guiStreamSupported()
 	if (want && !_acquired) {
 		_acquired = true
 		acquireGuiStream()
 		_unsubFrames = subscribeGuiStreamFrames(() => {
-			const ch = guiStreamChannel()
-			if (ch == null) return
 			for (const fn of _repaint) {
 				try {
-					fn(ch)
+					fn()
 				} catch {
-					/* a bad listener must not break the frame path */
+					/* keep the frame path alive */
 				}
 			}
 		})
@@ -83,52 +119,86 @@ function reevaluate() {
 	}
 }
 
-/**
- * The compose preview's current channel set changed — decide whether the live stream should run.
- * @param {number[]} channels
- */
-export function noteTrackedChannels(channels) {
-	_lastTracked = Array.isArray(channels) ? channels : []
-	if (_lastTracked.length && guiStreamSupported()) void fetchStatus()
-	reevaluate()
+/** Call once at UI init: restore the persisted toggle and probe availability. */
+export function initOperatorLiveCanvas() {
+	if (guiStreamSupported()) void fetchStatus(true)
+	else notifyState()
 }
 
-/** @param {(channel: number) => void} fn repaint scheduler, called once per decoded frame */
-export function subscribeLiveStreamRepaint(fn) {
+/**
+ * The operator toggled live preview. Persists and acquires/releases accordingly. When turning on
+ * without a fresh availability read, this re-probes so a stale "disabled" doesn't block it.
+ * @param {boolean} on
+ */
+export function setOperatorLiveCanvasEnabled(on) {
+	_enabled = on === true
+	persistEnabled(_enabled)
+	if (_enabled && !_available) void fetchStatus(true)
+	reconcile()
+	notifyState()
+}
+
+export function isOperatorLiveCanvasEnabled() {
+	return _enabled
+}
+export function isOperatorLiveCanvasAvailable() {
+	return _available && guiStreamSupported()
+}
+export function operatorLiveCanvasChannel() {
+	return _channel
+}
+
+/** True once a decoded frame is on hand — surfaces use this to decide live-vs-JPEG per paint. */
+export function operatorLiveCanvasHasFrame() {
+	return _acquired && !!guiStreamFrame()
+}
+
+export function operatorLiveCanvasState() {
+	return {
+		enabled: _enabled,
+		available: isOperatorLiveCanvasAvailable(),
+		channel: _channel,
+		streaming: _acquired,
+		hasFrame: operatorLiveCanvasHasFrame(),
+	}
+}
+
+/** @param {() => void} fn called once per decoded frame — schedule a repaint of your surface. */
+export function subscribeOperatorLiveCanvasRepaint(fn) {
 	_repaint.add(fn)
 	return () => _repaint.delete(fn)
 }
 
+/** @param {(state: ReturnType<typeof operatorLiveCanvasState>) => void} fn toggle/availability change */
+export function subscribeOperatorLiveCanvasState(fn) {
+	_stateSubs.add(fn)
+	return () => _stateSubs.delete(fn)
+}
+
 /**
- * Draw the newest live frame into a compose cell IF the stream carries this cell's channel.
- * Same letterbox math as the JPEG path. Returns false when the JPEG fallback should draw instead.
+ * Draw the newest live frame letterboxed into a w×h rect at the current transform origin. Returns
+ * false when there is nothing to draw (caller should fall back to its JPEG/snapshot path). The
+ * stream is channel-agnostic — this draws whatever the operator canvas carries.
  * @param {CanvasRenderingContext2D} ctx
- * @param {number} cellW
- * @param {number} cellH
- * @param {number} channel
+ * @param {number} w
+ * @param {number} h
  * @returns {boolean}
  */
-export function drawLiveStreamCell(ctx, cellW, cellH, channel) {
+export function drawOperatorLiveCanvas(ctx, w, h) {
 	if (!_acquired) return false
-	if (guiStreamChannel() !== channel) return false
 	const frame = guiStreamFrame()
 	if (!frame) return false
 	const iw = frame.displayWidth
 	const ih = frame.displayHeight
-	if (!(iw > 0) || !(ih > 0)) return false
-	const scale = Math.min(cellW / iw, cellH / ih)
+	if (!(iw > 0) || !(ih > 0) || !(w > 0) || !(h > 0)) return false
+	const scale = Math.min(w / iw, h / ih)
 	const dw = iw * scale
 	const dh = ih * scale
 	try {
-		ctx.drawImage(frame, (cellW - dw) / 2, (cellH - dh) / 2, dw, dh)
+		ctx.drawImage(frame, (w - dw) / 2, (h - dh) / 2, dw, dh)
 		return true
 	} catch {
-		// A frame closed mid-draw (stream teardown race) — JPEG fallback this paint.
+		// Frame closed mid-draw (teardown race) — caller falls back this paint.
 		return false
 	}
-}
-
-/** Test/inspection hook. */
-export function liveStreamPreviewState() {
-	return { acquired: _acquired, statusChannel: _statusChannel, tracked: [..._lastTracked] }
 }

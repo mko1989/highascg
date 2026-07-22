@@ -11,9 +11,10 @@ import {
 	shouldAcceptFramePush,
 } from '../lib/compose-preview-backpressure.js'
 import {
-	drawLiveStreamCell,
-	noteTrackedChannels,
-	subscribeLiveStreamRepaint,
+	drawOperatorLiveCanvas,
+	isOperatorLiveCanvasEnabled,
+	operatorLiveCanvasHasFrame,
+	subscribeOperatorLiveCanvasRepaint,
 } from './preview-canvas-live-stream.js'
 
 /**
@@ -82,16 +83,16 @@ function notifyComposePreviewListeners(channel) {
 // cadence. The subscription drives the SAME listener set as JPEG refreshes, so a cell already
 // wired for compose preview repaints for live frames with no extra plumbing at the call sites.
 let _liveRepaintPending = false
-subscribeLiveStreamRepaint((channel) => {
+subscribeOperatorLiveCanvasRepaint(() => {
 	if (_liveRepaintPending) return
 	if (typeof requestAnimationFrame !== 'function') {
-		notifyComposePreviewListeners(channel)
+		notifyComposePreviewListeners(-1)
 		return
 	}
 	_liveRepaintPending = true
 	requestAnimationFrame(() => {
 		_liveRepaintPending = false
-		notifyComposePreviewListeners(channel)
+		notifyComposePreviewListeners(-1)
 	})
 })
 
@@ -399,9 +400,6 @@ export function resetComposePreviewClientCache(keepChannels) {
 	applyBlocklistSeed()
 	_trackedChannelSig = ''
 	stopPollIfIdle()
-	// WO-319: cells may have been dropped — re-evaluate whether the live stream is still needed so
-	// it releases (stops the NVENC consumer) when no visible cell shows the streamed channel.
-	noteTrackedChannels([..._cache.keys()])
 }
 
 /**
@@ -437,9 +435,6 @@ export function trackComposePreviewChannel(channel, opts = {}) {
 	const hadEntry = _cache.has(ch)
 	if (!hadEntry) {
 		_cache.set(ch, { img: new Image(), etag: null, loading: false })
-		// WO-319: the live-stream module acquires/releases the NVENC stream based on whether a
-		// tracked cell shows the streamed channel.
-		noteTrackedChannels([..._cache.keys()])
 	}
 	ensurePoll()
 	if (opts.poll !== false && !hadEntry) void pollChannelMeta(ch)
@@ -467,8 +462,10 @@ export function drawComposeSnapshotCell(ctx, cellW, cellH, channel, opts = {}) {
 		ctx.fillText(`preview unavailable on ch ${ch}`, cellW / 2, cellH / 2)
 		return
 	}
-	// WO-319: live motion when the NVENC stream carries this cell's channel; JPEG otherwise.
-	if (drawLiveStreamCell(ctx, cellW, cellH, ch)) return
+	// WO-319: when the operator live canvas is on and decoding, it IS the composed surface — draw
+	// the live frame in place of the JPEG snapshot. Channel-agnostic (the composed channel is not a
+	// per-cell PGM/PRV channel); the caller decides which surface hosts it. Falls back to JPEG.
+	if (isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame() && drawOperatorLiveCanvas(ctx, cellW, cellH)) return
 	if (entry?.img?.complete && entry.img.naturalWidth > 0) {
 		const iw = entry.img.naturalWidth
 		const ih = entry.img.naturalHeight
