@@ -151,6 +151,8 @@ const FILES = [
 	'tools/smoke/smoke-wo319-gop-buffer.test.js',
 	'tools/smoke/smoke-wo319-annexb-au-splitter.test.js',
 	'tools/smoke/smoke-wo319-gui-stream-ingest-relay.test.js',
+	'tools/smoke/smoke-wo317-helper-applier.test.js',
+	'tools/smoke/smoke-wo317-helper-coordinator.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
 	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
