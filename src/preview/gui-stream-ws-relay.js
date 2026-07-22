@@ -31,8 +31,11 @@ const WebSocket = require('ws')
 const { createClientCursor, framesForClient, resetClientToKeyframe } = require('./gui-stream-gop-buffer')
 
 const GUI_STREAM_WS_PATH = '/ws/gui-stream'
-/** Above this many unsent bytes on a client socket, stop feeding it and reset to keyframe. */
-const DEFAULT_HIGH_WATER_BYTES = 2 * 1024 * 1024
+/** Above this many unsent bytes on a client socket, stop feeding it and reset to keyframe. Kept
+ * SMALL on purpose: a live preview wants LOWEST LATENCY, and dropping frames to catch up is fine —
+ * delivering every frame is NOT the goal. At ~6 Mbps, 128 KB ≈ 0.17s, so a client that falls behind
+ * jumps to the newest keyframe almost immediately instead of playing out a backlog. */
+const DEFAULT_HIGH_WATER_BYTES = 128 * 1024
 const HEADER_BYTES = 8
 const FLAG_KEYFRAME = 0x01
 

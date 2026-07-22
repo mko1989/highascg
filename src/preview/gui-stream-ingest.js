@@ -64,6 +64,11 @@ function buildRemuxArgs(port) {
 	return [
 		'-hide_banner',
 		'-loglevel', 'warning',
+		// nobuffer: do not hold the demuxer's default buffer — on a low-bitrate stream that buffer
+		// takes SECONDS to fill before ffmpeg emits anything (the multi-second latency). Safe here
+		// with a real analyzeduration below: nobuffer trims steady-state latency, analyzeduration only
+		// caps the one-time startup analysis, so the stream is still detected.
+		'-fflags', 'nobuffer',
 		'-flags', 'low_delay',
 		'-probesize', '500000',
 		'-analyzeduration', '1000000',

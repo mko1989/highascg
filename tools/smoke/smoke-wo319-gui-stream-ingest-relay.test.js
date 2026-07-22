@@ -77,9 +77,11 @@ test('remux args: udp in on the right port, pure copy out — the ONE encode sta
 	assert.match(s, /-f h264 pipe:1/)
 	assert.ok(!/nvenc|libx264/.test(s), 'the remux hop must never re-encode')
 	assert.match(s, /low_delay/, 'low-latency decode posture')
-	// Regression guard (verified live 2026-07-22): -fflags nobuffer + analyzeduration 0 starves
-	// stream detection on the near-static operator-GUI feed → copy never latches → 0 AUs forever.
-	assert.ok(!/nobuffer/.test(s) && !/-analyzeduration 0(\s|$)/.test(s), 'must allow one GOP for stream detection')
+	assert.match(s, /nobuffer/, 'nobuffer trims the demuxer buffer — the low-bitrate multi-second latency')
+	assert.match(s, /-flush_packets 1/, 'flush every packet, do not wait to fill an output buffer')
+	// Regression guard (verified live 2026-07-22): nobuffer is safe ONLY with a real analyzeduration;
+	// nobuffer + analyzeduration 0 starves detection so copy never latches (0 AUs forever).
+	assert.ok(!/-analyzeduration 0(\s|$)/.test(s), 'must allow up to one GOP for stream detection')
 })
 
 test('acquire spawns the reader BEFORE adding the consumer, on the verified index', async () => {
