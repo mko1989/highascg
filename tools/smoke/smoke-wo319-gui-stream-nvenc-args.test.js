@@ -64,8 +64,8 @@ test('yuv420p is forced — browsers cannot hardware-decode 4:4:4', () => {
 	)
 })
 
-test('the default GOP bounds a joining/recovering client to <= half a second of wait', () => {
-	assert.equal(DEFAULT_GOP, 25, '~0.5s keyframe interval at 50p — snappier recovery on lossy WiFi')
+test('the default GOP caps the stale-freeze after a drop to ~a quarter second', () => {
+	assert.equal(DEFAULT_GOP, 12, '~0.24s keyframe interval at 50p — every drop resyncs at the next key')
 	assert.match(buildGuiStreamNvencArgs(), new RegExp(`-g:v ${DEFAULT_GOP}\\b`))
 	assert.match(buildGuiStreamNvencArgs({ gop: 25 }), /-g:v 25\b/)
 })

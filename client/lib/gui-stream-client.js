@@ -23,6 +23,12 @@ const RECONNECT_MIN_MS = 1000
 const RECONNECT_MAX_MS = 30000
 const HEADER_BYTES = 8
 const FLAG_KEYFRAME = 0x01
+/** Decoder backpressure ceiling. With optimizeForLatency and no B-frames the queue sits at 0–1 in
+ * steady state; a sustained climb means decode is not keeping up (busy GPU, backgrounded tab, a slow
+ * client). Past this, stop feeding deltas and force a resync at the next keyframe — LOWEST LATENCY is
+ * the priority and dropping a GOP tail is acceptable; letting decode lag accumulate frame-by-frame is
+ * not. A keyframe always resets the reference chain, so it is never dropped here. */
+const MAX_DECODE_QUEUE = 3
 
 const state = {
 	refs: 0,
@@ -34,6 +40,7 @@ const state = {
 	/** @type {VideoFrame|null} */
 	frame: null,
 	frameCount: 0,
+	dropped: 0,
 	seenKey: false,
 	reconnectMs: RECONNECT_MIN_MS,
 	reconnectTimer: null,
@@ -60,6 +67,8 @@ export function guiStreamStats() {
 		refs: state.refs,
 		connected: !!state.ws && state.ws.readyState === 1,
 		frames: state.frameCount,
+		dropped: state.dropped,
+		queue: state.decoder?.decodeQueueSize ?? 0,
 		lastError: state.lastError,
 	}
 }
@@ -117,6 +126,14 @@ function handleBinary(buf) {
 	if (buf.byteLength <= HEADER_BYTES) return
 	const seq = view.getUint32(0, true)
 	const key = (view.getUint8(4) & FLAG_KEYFRAME) !== 0
+	// Decoder backpressure: when decode falls behind, drop deltas and force a resync at the next
+	// keyframe rather than queueing more work behind a stalled decoder. Latency stays capped at ~1 GOP
+	// instead of growing without bound. Keyframes are never dropped — they are the recovery point.
+	if (!key && state.decoder.decodeQueueSize > MAX_DECODE_QUEUE) {
+		state.seenKey = false // resync at the next keyframe; the delta guard below drops until then
+		state.dropped++
+		return
+	}
 	if (!state.seenKey) {
 		if (!key) return // never feed a delta before the first key
 		state.seenKey = true

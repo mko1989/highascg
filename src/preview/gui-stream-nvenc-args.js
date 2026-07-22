@@ -35,10 +35,12 @@ const DEFAULT_PRESET = 'p1'
 const DEFAULT_TUNE = 'ull'
 const DEFAULT_BITRATE_KBPS = 8000
 const DEFAULT_FPS = 50
-/** Keyframe every ~0.5s: bounds a joining/recovering client's wait to <= 1 GOP. Shorter = snappier
- * recovery from a WiFi hiccup (stale-drop resyncs to the next keyframe); the near-static operator
- * screen makes the extra keyframes almost free on bandwidth. */
-const DEFAULT_GOP = 25
+/** Keyframe every ~0.24s at 50p: bounds a joining/recovering client's wait to <= 1 GOP. Every drop
+ * (WiFi hiccup, decoder backpressure, socket high-water) resyncs at the NEXT keyframe, so a short GOP
+ * directly caps the stale-freeze the viewer sees — the dominant perceived latency once frames start
+ * getting dropped. 12 halves the old 25 (~0.5s) window; at downscaled 1080p within an 8 Mbps budget
+ * the extra keyframes are cheap. */
+const DEFAULT_GOP = 12
 
 const MIN_BITRATE_KBPS = 500
 const MAX_BITRATE_KBPS = 60000

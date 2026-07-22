@@ -33,9 +33,10 @@ const { createClientCursor, framesForClient, resetClientToKeyframe } = require('
 const GUI_STREAM_WS_PATH = '/ws/gui-stream'
 /** Above this many unsent bytes on a client socket, stop feeding it and reset to keyframe. Kept
  * SMALL on purpose: a live preview wants LOWEST LATENCY, and dropping frames to catch up is fine —
- * delivering every frame is NOT the goal. At ~6 Mbps, 128 KB ≈ 0.17s, so a client that falls behind
- * jumps to the newest keyframe almost immediately instead of playing out a backlog. */
-const DEFAULT_HIGH_WATER_BYTES = 128 * 1024
+ * delivering every frame is NOT the goal. At ~6 Mbps, 64 KB ≈ 0.08s, so a client that falls behind
+ * jumps to the newest keyframe almost immediately instead of playing out a backlog. Must stay above a
+ * single keyframe (a downscaled-1080p IDR is well under this) so steady state is not one long reset. */
+const DEFAULT_HIGH_WATER_BYTES = 64 * 1024
 const HEADER_BYTES = 8
 const FLAG_KEYFRAME = 0x01
 

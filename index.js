@@ -394,6 +394,7 @@ function main() {
 			const { resolveOperatorGuiChannel, resolveOperatorGuiChannelDims } = require('./src/system/operator-gui-channel')
 			const { createGuiStreamIngest } = require('./src/preview/gui-stream-ingest')
 			const { attachGuiStreamRelay } = require('./src/preview/gui-stream-ws-relay')
+			const { DEFAULT_FPS, DEFAULT_GOP } = require('./src/preview/gui-stream-nvenc-args')
 			const guiCh = resolveOperatorGuiChannel(config)
 			if (guiCh) {
 				const dims = resolveOperatorGuiChannelDims(config)
@@ -408,7 +409,7 @@ function main() {
 				const ingest = createGuiStreamIngest({ amcp: lazyAmcp, channel: guiCh.ch, scale, log: glog })
 				ingest.cleanupStaleConsumer().catch(() => {})
 				appCtx._guiStreamIngest = ingest
-				appCtx._guiStreamRelay = attachGuiStreamRelay(httpServer, appCtx, { ingest, channel: guiCh.ch, log: glog })
+				appCtx._guiStreamRelay = attachGuiStreamRelay(httpServer, appCtx, { ingest, channel: guiCh.ch, fps: DEFAULT_FPS, gop: DEFAULT_GOP, log: glog })
 				appCtx._guiStreamLifecycle = { onShutdown: () => void ingest.stop() }
 				logger.info(`[GUI stream] relay at /ws/gui-stream → channel ${guiCh.ch}${scale ? ` (scale ${scale})` : ''}`)
 			} else {
