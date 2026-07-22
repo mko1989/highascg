@@ -39,6 +39,10 @@ async function hardwareHandleGet(p, ctx) {
 		const { handleOperatorHelperWindowGet } = require('./system-hardware-gui')
 		return handleOperatorHelperWindowGet()
 	}
+	if (p === '/api/system/operator-helper-taskbar') {
+		const { handleOperatorHelperTaskbarGet } = require('./system-hardware-gui')
+		return handleOperatorHelperTaskbarGet(ctx)
+	}
 	return null
 }
 
@@ -57,6 +61,10 @@ async function hardwareHandlePost(p, body, ctx) {
 	if (p === '/api/system/operator-helper-window') {
 		const { handleOperatorHelperWindowPost } = require('./system-hardware-gui')
 		return handleOperatorHelperWindowPost(body, ctx)
+	}
+	if (p === '/api/system/operator-helper-taskbar') {
+		const { handleOperatorHelperTaskbarPost } = require('./system-hardware-gui')
+		return handleOperatorHelperTaskbarPost(body, ctx)
 	}
 	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset(body, ctx)
 	if (p === '/api/system/time') return handleSystemTimePost(body, ctx)

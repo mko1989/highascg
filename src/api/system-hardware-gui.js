@@ -379,6 +379,52 @@ async function handleOperatorHelperWindowPost(body, ctx) {
 }
 
 /**
+ * WO-317 — GET /api/system/operator-helper-taskbar. Returns the multi-helper taskbar model when the
+ * feature is enabled, else `{ enabled: false }` so the client renders the WO-283 single button.
+ */
+function handleOperatorHelperTaskbarGet(ctx) {
+	const { getHelperCoordinator, isMultiHelperTaskbarEnabled } = require('../system/operator-helper-live')
+	if (!isMultiHelperTaskbarEnabled(ctx?.config)) {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, helpers: [] }) }
+	}
+	const coord = getHelperCoordinator(ctx)
+	const { HELPER_ACTIONS } = require('../system/operator-helper-window')
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ok: true, enabled: true, helpers: coord ? coord.taskbar() : [], actions: HELPER_ACTIONS }),
+	}
+}
+
+/**
+ * WO-317 — POST /api/system/operator-helper-taskbar. Body: { id, action?, password }. Runs the
+ * coordinator's decide→plan→apply pipeline (launch / raise / park). Password-gated like the WO-283
+ * helper POST. Returns 400 when the feature flag is off (the client should not have called it).
+ */
+async function handleOperatorHelperTaskbarPost(body, ctx) {
+	const pw = checkNuclearPassword(body, ctx)
+	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
+
+	const { getHelperCoordinator, isMultiHelperTaskbarEnabled } = require('../system/operator-helper-live')
+	if (!isMultiHelperTaskbarEnabled(ctx?.config)) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'multi-helper taskbar disabled' }) }
+	}
+	const coord = getHelperCoordinator(ctx)
+	if (!coord) return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'coordinator unavailable' }) }
+
+	const b = parseBody(body)
+	const id = String(b?.id ?? '').trim()
+	if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
+	const action = b?.action ? String(b.action).trim() : id
+	const r = await coord.handleAction(id, { action })
+	return {
+		status: r.ok ? 200 : 409,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ...r, helpers: coord.taskbar() }),
+	}
+}
+
+/**
  * WO-283 — GET /api/system/operator-helper-window. Lets the operator button render "Close helper"
  * while one is up, and lets a stuck state be seen without reading the journal.
  */
@@ -465,5 +511,7 @@ module.exports = {
 	handleGuiLaunchPost,
 	handleOperatorHelperWindowPost,
 	handleOperatorHelperWindowGet,
+	handleOperatorHelperTaskbarGet,
+	handleOperatorHelperTaskbarPost,
 	handlePointerConfinePost,
 }

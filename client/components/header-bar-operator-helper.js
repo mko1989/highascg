@@ -19,6 +19,8 @@ import {
 	openOperatorHelperWindow,
 	closeOperatorHelperWindow,
 	getOperatorHelperWindowState,
+	getOperatorHelperTaskbar,
+	operatorHelperTaskbarAction,
 } from '../lib/operator-gui-launch.js'
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 
@@ -95,6 +97,15 @@ export function initHeaderBarOperatorHelper(container) {
 		item.addEventListener('click', async (e) => {
 			e.preventDefault()
 			closeMenu()
+			// WO-317: with the taskbar active, launch through the per-helper action so more than one
+			// window can run at once; otherwise the WO-283 single-helper open (mutually exclusive).
+			if (_taskbarOn) {
+				const r = await operatorHelperTaskbarAction(action, action)
+				if (r.error) window.showToast?.(r.error, 'error')
+				else window.showToast?.(`${label} opening — use the taskbar to send it behind the GUI.`, 'info')
+				void refresh()
+				return
+			}
 			render('opening', action)
 			const r = await openOperatorHelperWindow(action)
 			if (r.error) {
@@ -129,12 +140,55 @@ export function initHeaderBarOperatorHelper(container) {
 		if (!wrap.contains(/** @type {Node} */ (e.target))) closeMenu()
 	})
 
+	// WO-317: taskbar strip of running helpers, shown ONLY when the server reports the multi-helper
+	// feature enabled. When off, this stays empty and the WO-283 single button above is the whole UI.
+	const taskbar = document.createElement('div')
+	taskbar.className = 'header-operator-taskbar'
+	taskbar.style.cssText = 'display: inline-flex; gap: 4px; align-items: center;'
+	let _taskbarOn = false
+
+	function renderTaskbar(helpers) {
+		taskbar.replaceChildren()
+		for (const h of helpers) {
+			if (h.state !== 'open' && h.state !== 'launching') continue
+			const chip = document.createElement('button')
+			chip.type = 'button'
+			chip.className = 'header-btn header-operator-taskbar__chip'
+			const label = labelFor(h.info?.action || h.id)
+			// A parked helper is behind the video; a raised one is on top. The chip shows which and
+			// clicking toggles it — click a parked chip to bring it forward, a raised one to send it back.
+			chip.textContent = h.state === 'launching' ? `${label}…` : h.parked ? `▸ ${label}` : `▾ ${label}`
+			chip.title = h.parked ? `Bring ${label} to front` : `Send ${label} behind the GUI`
+			chip.style.opacity = h.parked ? '0.6' : '1'
+			chip.disabled = h.state === 'launching'
+			chip.addEventListener('click', async (e) => {
+				e.preventDefault()
+				chip.disabled = true
+				const r = await operatorHelperTaskbarAction(h.id, h.info?.action || h.id)
+				if (r.error) window.showToast?.(r.error, 'error')
+				else if (Array.isArray(r.helpers)) renderTaskbar(r.helpers)
+				void refresh()
+			})
+			taskbar.appendChild(chip)
+		}
+	}
+
 	async function refresh() {
 		const s = await getOperatorHelperWindowState()
 		render(s.state, s.action)
+		// Poll the taskbar too; cheap, and it is the only signal that a helper crashed/closed.
+		const tb = await getOperatorHelperTaskbar()
+		_taskbarOn = tb.enabled
+		if (tb.enabled) {
+			// With the taskbar active, launching is per-helper (multiple can run) — the menu items
+			// route through the taskbar action instead of the single-helper open.
+			renderTaskbar(tb.helpers)
+		} else {
+			taskbar.replaceChildren()
+		}
 	}
 
-	wrap.append(openBtn, backBtn, menu)
+	wrap.append(openBtn, backBtn, menu, taskbar)
 	container.appendChild(wrap)
 
 	if (_pollTimer) clearInterval(_pollTimer)

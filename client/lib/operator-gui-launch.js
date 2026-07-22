@@ -82,6 +82,40 @@ export async function getOperatorHelperWindowState() {
 }
 
 /**
+ * WO-317 — multi-helper taskbar model. `enabled:false` means the feature flag is off and the
+ * caller should keep the WO-283 single-button behaviour. `helpers` are { id, state, parked, info }.
+ * @returns {Promise<{ enabled: boolean, helpers: Array<object>, actions?: string[] }>}
+ */
+export async function getOperatorHelperTaskbar() {
+	try {
+		const res = await api.get('/api/system/operator-helper-taskbar')
+		return { enabled: res?.enabled === true, helpers: Array.isArray(res?.helpers) ? res.helpers : [], actions: res?.actions }
+	} catch {
+		return { enabled: false, helpers: [] }
+	}
+}
+
+/**
+ * WO-317 — taskbar action: launch (if not running), or toggle raise/park (if running). The server
+ * decides which based on the helper's current state; `action` names the helper class to launch.
+ * @param {string} id helper id (its action class)
+ * @param {string} [action]
+ * @returns {Promise<{ ok?: boolean, action?: string, helpers?: Array<object>, error?: string }>}
+ */
+export async function operatorHelperTaskbarAction(id, action) {
+	try {
+		const res = await api.post('/api/system/operator-helper-taskbar', {
+			id,
+			action: action || id,
+			password: nuclearPassword(),
+		})
+		return { ok: true, action: res?.action, helpers: res?.helpers }
+	} catch (e) {
+		return { error: e?.message || String(e) }
+	}
+}
+
+/**
  * @param {boolean} enabled
  */
 export async function setOperatorPointerConfine(enabled) {
