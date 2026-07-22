@@ -125,3 +125,6 @@ work/multi-logs/
 timelines/
 .operator-firefox-profile/
 config/*.tmp
+
+# WO-319: self-signed TLS proxy cert/key — never commit
+config/certs/
