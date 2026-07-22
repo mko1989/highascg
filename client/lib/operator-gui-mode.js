@@ -74,6 +74,17 @@ export function isRemoteOperatorView(search) {
 	return false
 }
 
+// WO-319: the compose STREAM VIEW is active on this client (Live preview on) — a non-operator client
+// showing the operator tiles over the stream. While active, it may report/edit the shared compose
+// layout just like the host, so `reportingEnabled()` opens up beyond the ?operatorGui URL gate.
+let _streamViewActive = false
+export function setOperatorStreamViewActive(on) {
+	_streamViewActive = on === true
+}
+function reportingEnabled() {
+	return isOperatorGuiModeActive() || _streamViewActive
+}
+
 // WO-319: shared compose-layout sync. The server broadcasts the applied layout (operatorGuiLayout)
 // on every change; subscribers (the operator tiles) re-seed to it so all clients match no matter who
 // moved a window. Fed from the WS dispatch in app-ws-handlers.js.
@@ -240,7 +251,7 @@ function scheduleReport() {
 // concern is hole-suppression, gated host-only in sendLayout (a remote's live preview must not blank
 // the operator monitor's physical holes).
 function reportSurfaceCells(surface, cells) {
-	if (!isOperatorGuiModeActive()) return
+	if (!reportingEnabled()) return
 	if (cells.length) _bySurface.set(surface, cells)
 	else _bySurface.delete(surface)
 	scheduleReport()
@@ -253,7 +264,7 @@ function reportSurfaceCells(surface, cells) {
  * @param {{width: number, height: number}} [viewport]
  */
 export function reportComposeCellRects(cellRects, viewport) {
-	if (!isOperatorGuiModeActive()) return
+	if (!reportingEnabled()) return
 	const cells = cellRectsToLayoutCells(cellRects, defaultViewport(viewport)).map((c) => ({ ...c, surface: 'compose' }))
 	reportSurfaceCells('compose', cells)
 }

@@ -7,10 +7,10 @@ import { settingsState } from '../lib/settings-state.js'
 import { api } from '../lib/api-client.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
-import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { isOperatorGuiModeActive, setOperatorStreamViewActive } from '../lib/operator-gui-mode.js'
 import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
 import { initOperatorComposeTiles } from './operator-compose-tiles.js'
-import { drawOperatorLiveCanvasFill, isOperatorLiveCanvasEnabled, operatorLiveCanvasHasFrame, subscribeOperatorLiveCanvasRepaint, subscribeOperatorLiveCanvasState } from './preview-canvas-live-stream.js'
+import { drawOperatorLiveCanvasFill, isOperatorLiveCanvasEnabled, operatorLiveCanvasHasFrame, subscribeOperatorLiveCanvasRepaint, subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './preview-canvas-live-stream.js'
 
 const G = 6; const BORDER_FADE = 400
 
@@ -20,6 +20,7 @@ export function initPreviewPanel(host, options) {
 	// WO-256: operator-GUI mode replaces the compose canvas-pair with a free-tile canvas
 	// (client/components/operator-compose-tiles.js) — hard-gated, zero effect otherwise.
 	const operatorTilesActive = composePrvPgmLayoutToggle && isOperatorGuiModeActive()
+	let composeTilesMode = operatorTilesActive // WO-319: dynamic — Live preview flips a client into the tiles+stream view
 
 	let layout = (localStorage.getItem(kL) === 'tb' || localStorage.getItem(kL) === 'lr') ? localStorage.getItem(kL) : 'lr'
 	let prvPct = parseFloat(localStorage.getItem(kS) || '0.5'); if (isNaN(prvPct) || prvPct < 0.05 || prvPct > 0.95) prvPct = 0.5
@@ -47,6 +48,10 @@ export function initPreviewPanel(host, options) {
 		tilesMountEl = document.createElement('div'); tilesMountEl.className = 'preview-panel__operator-tiles-mount'
 		canvasOuterEl.appendChild(tilesMountEl)
 	} else if (composePrvPgmLayoutToggle) {
+		// WO-319: a tiles mount ALSO exists on non-operator clients, hidden until Live preview flips
+		// the compose view from thumbnails to the operator stream view (see setComposeTilesMode).
+		tilesMountEl = document.createElement('div'); tilesMountEl.className = 'preview-panel__operator-tiles-mount'; tilesMountEl.style.display = 'none'
+		canvasOuterEl.appendChild(tilesMountEl)
 		const wrapEl = document.createElement('div'); wrapEl.className = 'preview-panel__canvas-wrap'
 		const pairEl = document.createElement('div'); pairEl.className = `preview-panel__compose-pair ${cCls}`
 		const prvCell = document.createElement('div'); prvCell.className = 'preview-panel__compose-cell preview-panel__compose-cell--prv'
@@ -405,34 +410,33 @@ export function initPreviewPanel(host, options) {
 	const unsubSe = settingsState.subscribe(updateLive)
 	// WO-256: the free-tile canvas owns its own defs-changed/redraw handling; the legacy
 	// canvas-pair path (rebuildComposeCellsIfNeeded/scheduleDraw) is skipped entirely for it.
-	const tilesHandle = operatorTilesActive
+	// WO-319: tiles handle — built now on the host operator kiosk, lazily on the first Live-preview-on
+	// for any other client (setComposeTilesMode). Held in a ref because it is created dynamically.
+	const tilesRef = { h: operatorTilesActive
 		? initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
-		: null
+		: null }
 	const unsubCm = stateStore?.on('channelMap', () => {
-		if (tilesHandle) tilesHandle.refreshDefs()
+		if (tilesRef.h) tilesRef.h.refreshDefs()
 		else { rebuildComposeCellsIfNeeded(); scheduleDraw() }
 	})
 
-	// WO-319: STREAM BACKDROP behind the operator tiles. The tiles (border/label/progress + drag) have
-	// transparent bodies; on the host those reveal the screen consumer through X holes, but a client
-	// browser has no screen consumer — so we draw the ch4 stream on a canvas BEHIND the tiles and the
-	// bodies show it through. The tiles still report the shared layout; this is a pure backdrop.
-	// Only for the tiles path (operator mode); the mosaic is Caspar's and the host may run no client.
+	// WO-319: STREAM BACKDROP behind the tiles. Tile bodies are transparent; the host reveals the
+	// screen consumer through X holes, but a client browser has none — so draw the ch4 stream on a
+	// canvas BEHIND the tiles and the bodies show it through. Built whenever there is a tiles mount.
 	let streamBackdrop = null
 	let unsubBackdropFrame = null
 	let unsubBackdropState = null
-	if (operatorTilesActive) {
+	let scheduleBackdrop = () => {}
+	if (tilesMountEl) {
 		streamBackdrop = document.createElement('canvas')
 		streamBackdrop.className = 'preview-panel__stream-backdrop'
 		streamBackdrop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:0;pointer-events:none;'
 		if (!canvasOuterEl.style.position) canvasOuterEl.style.position = 'relative'
 		canvasOuterEl.insertBefore(streamBackdrop, canvasOuterEl.firstChild)
-		if (tilesMountEl) { tilesMountEl.style.position = 'relative'; tilesMountEl.style.zIndex = '1' }
+		tilesMountEl.style.position = 'relative'; tilesMountEl.style.zIndex = '1'
 		const drawBackdrop = () => {
-			const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
+			const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame() && (operatorTilesActive || composeTilesMode)
 			streamBackdrop.style.display = on ? 'block' : 'none'
-			// While the backdrop shows, the tile bodies must be transparent so the stream shows through
-			// (their default dark fill is only there for the host, where the X hole cuts it out anyway).
 			canvasOuterEl.classList.toggle('preview-panel__canvas-outer--stream-backdrop', on)
 			if (!on) return
 			const w = Math.max(1, Math.round(canvasOuterEl.clientWidth || 1))
@@ -443,10 +447,33 @@ export function initPreviewPanel(host, options) {
 			if (cx) { cx.clearRect(0, 0, w, h); drawOperatorLiveCanvasFill(cx, w, h) }
 		}
 		let backdropRaf = false
-		const scheduleBackdrop = () => { if (backdropRaf) return; backdropRaf = true; requestAnimationFrame(() => { backdropRaf = false; drawBackdrop() }) }
+		scheduleBackdrop = () => { if (backdropRaf) return; backdropRaf = true; requestAnimationFrame(() => { backdropRaf = false; drawBackdrop() }) }
 		unsubBackdropFrame = subscribeOperatorLiveCanvasRepaint(scheduleBackdrop)
 		unsubBackdropState = subscribeOperatorLiveCanvasState(scheduleBackdrop)
-		drawBackdrop()
+	}
+
+	// WO-319: on a NON-operator client, the Live-preview toggle flips the compose view between the
+	// thumbnail pair (off) and the operator stream view — tiles (border/label/progress + drag/resize,
+	// reporting the shared layout) over the stream backdrop (on). The host kiosk is always tiles.
+	let unsubTilesToggle = null
+	function setComposeTilesMode(on) {
+		if (operatorTilesActive) return
+		if (on === composeTilesMode) return
+		composeTilesMode = on
+		if (on && !tilesRef.h && tilesMountEl) {
+			tilesRef.h = initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
+		}
+		if (tilesMountEl) tilesMountEl.style.display = on ? '' : 'none'
+		if (wrap) wrap.style.display = on ? 'none' : ''
+		setOperatorStreamViewActive(on) // let this client report/edit the shared layout while in view
+		if (on) tilesRef.h?.refreshDefs()
+		scheduleBackdrop()
+		scheduleDraw()
+	}
+	if (!operatorTilesActive && composePrvPgmLayoutToggle) {
+		unsubTilesToggle = subscribeOperatorLiveCanvasState((st) => setComposeTilesMode(!!(st && st.available && st.enabled)))
+		const st0 = operatorLiveCanvasState()
+		if (st0 && st0.available && st0.enabled) setComposeTilesMode(true)
 	}
 
 	body.hidden = collapsed;
@@ -454,5 +481,5 @@ export function initPreviewPanel(host, options) {
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubBackdropFrame?.(); unsubBackdropState?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesHandle?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubBackdropFrame?.(); unsubBackdropState?.(); unsubTilesToggle?.(); setOperatorStreamViewActive(false); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesRef.h?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }

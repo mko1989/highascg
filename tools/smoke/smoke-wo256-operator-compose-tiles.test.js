@@ -424,10 +424,12 @@ describe('WO-256 T256.2: preview-canvas-panel.js hard-gates the tile canvas on o
 		assert.ok(hits.length >= 2, `expected >=2 early-return gates, found ${hits.length}`)
 	})
 
-	it('mounts operator-compose-tiles.js only when the gate is active, destroys it on panel teardown', () => {
+	it('mounts operator-compose-tiles.js (host now, other clients when Live preview flips the view), destroys on teardown', () => {
 		assert.match(src, /import \{ initOperatorComposeTiles \} from '\.\/operator-compose-tiles\.js'/)
+		// WO-319: the mount is dynamic — built for the host operator kiosk at init, and lazily on the
+		// first Live-preview-on for any other client (setComposeTilesMode). Held in tilesRef.
 		assert.match(src, /operatorTilesActive\s*\n?\s*\?\s*initOperatorComposeTiles\(/)
-		assert.match(src, /tilesHandle\?\.destroy\(\)/)
+		assert.match(src, /tilesRef\.h\?\.destroy\(\)/)
 	})
 
 	it('file stays under the repo max-file-lines gate (~500) despite the new branch', () => {
