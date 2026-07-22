@@ -37,6 +37,7 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
+import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 
 /** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
@@ -446,14 +447,23 @@ export function initOperatorComposeTiles(container, options) {
 		// reporting-then-correcting — the server's re-applied layout is the better truth until the
 		// real channelMap lands and `rebuild()` re-derives the tiles from it.
 		if (!stateReady) return
+		// WO-319 coordinate basis: the host operator kiosk punches monitor-relative X holes, so it
+		// reports rects in VIEWPORT space (defaultViewport = window). A client showing the stream in a
+		// windowed compose area displays ch4 filling the TILES MOUNT and must report relative to that
+		// same region, so the reported FILL fractions match where the stream draws each route.
+		const composeAreaBasis = !isOperatorGuiModeActive()
+		const rootRect = composeAreaBasis ? root.getBoundingClientRect() : null
 		const cellRects = []
 		for (const t of tiles.values()) {
 			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
 			// so the X SHAPE hole and the visible border keep the just-outside relationship (WO-263).
-			const rect = t.bodyEl.getBoundingClientRect()
+			const b = t.bodyEl.getBoundingClientRect()
+			const rect = composeAreaBasis
+				? { left: b.left - rootRect.left, top: b.top - rootRect.top, width: b.width, height: b.height }
+				: b
 			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
 		}
-		onCellRects(cellRects)
+		onCellRects(cellRects, composeAreaBasis ? { width: rootRect.width, height: rootRect.height } : undefined)
 		// Re-hug the freshest canvas position so the next pure MOVE (no resize/scroll) re-reports.
 		posWatch.update()
 	}

@@ -263,7 +263,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		// WO-243/255: no-op unless operator-GUI mode is active (reportComposeCellRects hard-gates
 		// itself) — this is the main operator output preview, so its compose cells are the
 		// 'compose' surface merged into the operator-GUI channel's route holes (10-49).
-		onComposeCellRects: (cellRects) => reportComposeCellRects(cellRects),
+		onComposeCellRects: (cellRects, viewport) => reportComposeCellRects(cellRects, viewport),
 		onCollapsedChange: c => { previewHost.classList.toggle('preview-host--collapsed', !!c); previewHost.style.flex = c ? '0 0 auto' : `0 0 ${splitPx.current}px` },
 		draw: (ctx, W, H, isLive, meta = {}) => {
 			const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'; const isDual = meta.composePrvPgmLayoutToggle

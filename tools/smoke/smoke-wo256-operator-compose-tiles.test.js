@@ -546,7 +546,7 @@ describe('2026-07-19 fix: a pure POSITION change (looks list <-> looks editor sh
 		const src = read('client/components/operator-compose-tiles.js')
 		assert.match(src, /import \{ watchElementPosition \} from '\.\.\/lib\/element-position-watch\.js'/)
 		assert.match(src, /const posWatch = watchElementPosition\(root, \(\) => scheduleReport\(\)\)/)
-		assert.match(src, /onCellRects\(cellRects\)\s*\n[\s\S]{0,200}posWatch\.update\(\)/, 're-hug happens after each rect report')
+		assert.match(src, /onCellRects\(cellRects[^)]*\)\s*\n[\s\S]{0,200}posWatch\.update\(\)/, 're-hug happens after each rect report')
 		assert.match(src, /posWatch\.destroy\(\)/)
 	})
 

@@ -430,17 +430,19 @@ export function initPreviewPanel(host, options) {
 	if (tilesMountEl) {
 		streamBackdrop = document.createElement('canvas')
 		streamBackdrop.className = 'preview-panel__stream-backdrop'
+		// Pin the backdrop to the TILES MOUNT (the compose display area), not the padded outer — the
+		// tiles report their rects relative to this same region, so the stream and the windows share
+		// one coordinate space and the routes land under their tiles.
 		streamBackdrop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:0;pointer-events:none;'
-		if (!canvasOuterEl.style.position) canvasOuterEl.style.position = 'relative'
-		canvasOuterEl.insertBefore(streamBackdrop, canvasOuterEl.firstChild)
-		tilesMountEl.style.position = 'relative'; tilesMountEl.style.zIndex = '1'
+		tilesMountEl.style.position = 'relative'
+		tilesMountEl.insertBefore(streamBackdrop, tilesMountEl.firstChild)
 		const drawBackdrop = () => {
 			const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame() && (operatorTilesActive || composeTilesMode)
 			streamBackdrop.style.display = on ? 'block' : 'none'
 			canvasOuterEl.classList.toggle('preview-panel__canvas-outer--stream-backdrop', on)
 			if (!on) return
-			const w = Math.max(1, Math.round(canvasOuterEl.clientWidth || 1))
-			const h = Math.max(1, Math.round(canvasOuterEl.clientHeight || 1))
+			const w = Math.max(1, Math.round(tilesMountEl.clientWidth || 1))
+			const h = Math.max(1, Math.round(tilesMountEl.clientHeight || 1))
 			if (streamBackdrop.width !== w) streamBackdrop.width = w
 			if (streamBackdrop.height !== h) streamBackdrop.height = h
 			const cx = streamBackdrop.getContext('2d')
