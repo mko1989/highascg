@@ -160,3 +160,7 @@
 /* WO-319: with the ch4 stream backdrop behind the tiles (client browsers, which have no screen
  * consumer), the tile body must be transparent so the stream shows through it. */
 .preview-panel__canvas-outer--stream-backdrop .operator-tile__body { background: transparent; }
+
+/* WO-319: over the stream backdrop (client browsers), the tiles container must also be transparent
+ * so the stream canvas behind it shows through — its dark fill is only for the host's holes. */
+.preview-panel__canvas-outer--stream-backdrop .operator-compose-tiles { background: transparent; }
