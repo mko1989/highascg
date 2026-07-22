@@ -520,6 +520,25 @@ function applyOperatorGuiLayout(ctx, cells, opts = {}) {
  * @param {{ amcp: object, config: object, log?: Function }} ctx
  * @returns {Promise<object>}
  */
+/**
+ * WO-319 — the current operator GUI compose layout (cells with viewport-fraction rects that ARE the
+ * ch4 mosaic FILL fractions), for a REMOTE operator view to render read-only. Returns { cells,
+ * channel } or { cells: [] } when nothing is persisted / no operator_gui destination.
+ * @param {{ config: object, persistence?: object }} ctx
+ */
+function getPersistedOperatorGuiLayout(ctx) {
+	const resolved = resolveOperatorGuiChannel(ctx.config)
+	let cells = []
+	try {
+		const persistence = ctx.persistence || require('../utils/persistence')
+		const saved = persistence.get('operatorGuiLayout')
+		if (saved && Array.isArray(saved.cells)) cells = saved.cells
+	} catch {
+		/* no persistence — empty */
+	}
+	return { cells, channel: resolved ? resolved.ch : null }
+}
+
 function clearOperatorGuiLayout(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return Promise.resolve({ skipped: true, reason: 'no operator_gui destination' })
@@ -636,6 +655,7 @@ module.exports = {
 	computeOperatorGuiCellPlan,
 	applyOperatorGuiLayout,
 	clearOperatorGuiLayout,
+	getPersistedOperatorGuiLayout,
 	ensureOperatorGuiChannel,
 	noteClientLayoutReport,
 	shouldReapplyPersistedLayout,

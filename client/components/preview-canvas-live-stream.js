@@ -162,6 +162,13 @@ export function operatorLiveCanvasHasFrame() {
 	return _acquired && !!guiStreamFrame()
 }
 
+/** Current decoded frame dimensions {width,height}, or null — for aspect-correct letterbox layout. */
+export function operatorLiveCanvasFrameSize() {
+	const f = guiStreamFrame()
+	if (!f || !(f.displayWidth > 0) || !(f.displayHeight > 0)) return null
+	return { width: f.displayWidth, height: f.displayHeight }
+}
+
 export function operatorLiveCanvasState() {
 	return {
 		enabled: _enabled,

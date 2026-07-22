@@ -16,7 +16,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { applyOperatorGuiLayout, clearOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
+const { applyOperatorGuiLayout, clearOperatorGuiLayout, getPersistedOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
 const { launchOperatorGuiBrowser, raiseOperatorGuiBrowser } = require('../system/operator-gui-launcher')
 
 /** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Final phase of the operator-
@@ -64,6 +64,18 @@ async function handlePost(path, body, ctx) {
 }
 
 /**
+ * GET /api/operator-gui/layout — the current operator compose layout, for a REMOTE operator view to
+ * render read-only (its cell rects ARE the ch4 mosaic FILL fractions). Envelope, not a bare object.
+ * @param {string} path
+ * @param {object} ctx
+ */
+function handleGet(path, ctx) {
+	if (path !== '/api/operator-gui/layout') return null
+	const { cells, channel } = getPersistedOperatorGuiLayout(ctx)
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel, cells }) }
+}
+
+/**
  * @param {string} path
  * @param {object} ctx
  */
@@ -79,4 +91,4 @@ async function handleDelete(path, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...result }) }
 }
 
-module.exports = { handlePost, handleDelete }
+module.exports = { handlePost, handleGet, handleDelete }

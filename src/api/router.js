@@ -246,6 +246,7 @@ routes.post('/api/host-live/migration', ({ body, ctx }) => routesHostLive.handle
 
 // WO-243 T243.2: Operator GUI channel — routed preview-hole layout apply/clear.
 routes.post('/api/operator-gui/layout', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
+routes.get('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleGet(path, ctx), { requireCaspar: false })
 routes.delete('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleDelete(path, ctx), { requireCaspar: false })
 routes.post('/api/operator-gui/launch', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/operator-gui/raise', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })

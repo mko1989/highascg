@@ -49,6 +49,32 @@ export function isOperatorGuiModeActive(search) {
 }
 
 /**
+ * WO-319 — a REMOTE operator view: the webui opened through the HTTPS proxy (LAN clients, needed for
+ * WebCodecs' secure context). It shows the operator multiview compose preview fed by the live stream,
+ * but is strictly READ-ONLY: it must NEVER POST a layout (that would repaint holes / move the mosaic
+ * on the physical operator monitor). Detected by an explicit `?operatorView` param OR by being served
+ * from the proxy port (the plain-HTTP app server on :4200 is the host kiosk; the TLS proxy is :4443).
+ * @param {string} [search]
+ * @returns {boolean}
+ */
+export function isRemoteOperatorView(search) {
+	try {
+		const s = search != null ? search : (typeof location !== 'undefined' ? location.search : '')
+		if (new URLSearchParams(s || '').has('operatorView')) return true
+	} catch (_) {
+		/* ignore */
+	}
+	// Served via the TLS proxy → remote. The host kiosk is http://127.0.0.1:4200; anything on the
+	// HTTPS proxy port is a remote client that must stay read-only.
+	try {
+		if (typeof location !== 'undefined' && location.protocol === 'https:' && location.port === '4443') return true
+	} catch (_) {
+		/* ignore */
+	}
+	return false
+}
+
+/**
  * URL-tied window marker (WO-263 follow-up): the shape helper punches holes ONLY into a Firefox
  * whose window title contains this exact token, so OTHER Firefox instances — the WO-258 browser
  * sources (also firefox, and on the operator monitor during "Interact"), or any browser the
@@ -186,6 +212,10 @@ function scheduleReport() {
  * @param {string} surface
  * @param {Array<object>} cells - already-tagged, post-`cellRectsToLayoutCells` cells; empty -> withdraw this surface
  */
+// WO-319: the compose layout is ONE shared thing (one ch4 channel) — every operator client, host or
+// remote, edits it and it applies everywhere, so a remote client DOES report. The only per-client
+// concern is hole-suppression, gated host-only in sendLayout (a remote's live preview must not blank
+// the operator monitor's physical holes).
 function reportSurfaceCells(surface, cells) {
 	if (!isOperatorGuiModeActive()) return
 	if (cells.length) _bySurface.set(surface, cells)
@@ -264,15 +294,19 @@ export function reportMultiviewEditCellRects(cellRects, viewport) {
 let _lastSentJson = null
 
 async function sendLayout(cells, { force = false } = {}) {
+	// WO-319: hole-suppression is HOST-only — a remote client editing the shared layout must not send
+	// suppressHoles (that would blank the operator's physical-monitor holes based on the REMOTE's live
+	// preview state). The shared cell layout still posts; only the host's own hole toggle rides along.
+	const suppress = isRemoteOperatorView() ? false : _composeHolesSuppressed
 	// Fold the hole-suppress flag into the dedupe key so toggling live preview re-sends even when
 	// the cell rects are identical (the flag is the only thing that changed).
-	const json = JSON.stringify({ cells, s: _composeHolesSuppressed })
+	const json = JSON.stringify({ cells, s: suppress })
 	if (!force && json === _lastSentJson) return
 	try {
 		if (!cells.length) {
 			await api.delete(LAYOUT_ENDPOINT)
 		} else {
-			await api.post(LAYOUT_ENDPOINT, { cells, suppressHoles: _composeHolesSuppressed })
+			await api.post(LAYOUT_ENDPOINT, { cells, suppressHoles: suppress })
 		}
 		_lastSentJson = json
 	} catch (e) {
