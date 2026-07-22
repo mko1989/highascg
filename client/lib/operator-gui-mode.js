@@ -74,6 +74,29 @@ export function isRemoteOperatorView(search) {
 	return false
 }
 
+// WO-319: shared compose-layout sync. The server broadcasts the applied layout (operatorGuiLayout)
+// on every change; subscribers (the operator tiles) re-seed to it so all clients match no matter who
+// moved a window. Fed from the WS dispatch in app-ws-handlers.js.
+const _sharedLayoutSubs = new Set()
+
+/** @param {(cells: Array<object>) => void} fn @returns {() => void} */
+export function subscribeSharedLayout(fn) {
+	_sharedLayoutSubs.add(fn)
+	return () => _sharedLayoutSubs.delete(fn)
+}
+
+/** Called by the WS handler on an 'operatorGuiLayout' broadcast. @param {Array<object>} cells */
+export function applySharedLayoutBroadcast(cells) {
+	if (!Array.isArray(cells)) return
+	for (const fn of _sharedLayoutSubs) {
+		try {
+			fn(cells)
+		} catch {
+			/* a bad subscriber must not break sync */
+		}
+	}
+}
+
 /**
  * URL-tied window marker (WO-263 follow-up): the shape helper punches holes ONLY into a Firefox
  * whose window title contains this exact token, so OTHER Firefox instances — the WO-258 browser

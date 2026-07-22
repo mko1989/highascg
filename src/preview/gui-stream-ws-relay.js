@@ -98,6 +98,14 @@ function attachGuiStreamRelay(httpServer, ctx, opts) {
 	wss.on('connection', (ws) => {
 		const entry = { ws, cursor: createClientCursor() }
 		clients.add(entry)
+		// Latency: disable Nagle. Each access unit is a small message; Nagle would hold it up to
+		// ~40ms waiting to coalesce — invisible on localhost, very visible over WiFi. Video wants
+		// every frame out the instant it is ready.
+		try {
+			ws._socket?.setNoDelay?.(true)
+		} catch {
+			/* socket already gone */
+		}
 		log('info', `[GUI stream] client connected (${clients.size} watching)`)
 		ws.send(
 			JSON.stringify({

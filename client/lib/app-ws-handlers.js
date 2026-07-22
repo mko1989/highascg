@@ -21,6 +21,7 @@ import {
 	syncComposePreviewFromChannelMap,
 } from '../components/preview-canvas-compose-snapshot.js'
 import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-url.js'
+import { applySharedLayoutBroadcast } from './operator-gui-mode.js'
 import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
 import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
@@ -158,6 +159,9 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('streaming_channel', (data) => ingestStreamingChannelWsEvent(data))
 
 	ws.on('compose.preview', (data) => ingestComposePreviewWs(data))
+
+	// WO-319: the shared operator compose layout changed (any client moved a window) — re-sync tiles.
+	ws.on('operatorGuiLayout', (data) => applySharedLayoutBroadcast(data?.cells))
 
 	ws.on('companion.buttonPreview', (data) => {
 		invalidateCompanionFlagThumbs()

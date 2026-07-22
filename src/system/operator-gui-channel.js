@@ -482,6 +482,15 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	} catch (_) {
 		/* persistence optional (tests/headless) */
 	}
+	// WO-319: broadcast the applied layout so EVERY operator client (host + remote) re-syncs its
+	// tiles to it — the compose preview matches on all clients no matter who moved a window.
+	try {
+		if (typeof ctx._wsBroadcast === 'function') {
+			ctx._wsBroadcast('operatorGuiLayout', { channel: ch, cells: Array.isArray(cells) ? cells : [] })
+		}
+	} catch (_) {
+		/* broadcast optional */
+	}
 	return { ch, plan }
 }
 

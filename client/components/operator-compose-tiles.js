@@ -37,7 +37,7 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
-import { setOperatorComposeHolesSuppressed, isRemoteOperatorView } from '../lib/operator-gui-mode.js'
+import { setOperatorComposeHolesSuppressed, isRemoteOperatorView, subscribeSharedLayout } from '../lib/operator-gui-mode.js'
 import {
 	isOperatorLiveCanvasEnabled,
 	operatorLiveCanvasHasFrame,
@@ -462,11 +462,16 @@ export function initOperatorComposeTiles(container, options) {
 		if (!stateReady) return
 		if (!serverSeeded) return // remote client: wait for the shared layout before touching it
 		const cellRects = []
+		const vw = window.innerWidth || 1
+		const vh = window.innerHeight || 1
 		for (const t of tiles.values()) {
 			// bodyEl IS the aspect-locked hole — report the INNER rect, never the outlined/frame box,
 			// so the X SHAPE hole and the visible border keep the just-outside relationship (WO-263).
 			const rect = t.bodyEl.getBoundingClientRect()
 			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
+			// This viewport fraction IS what the server applies as the ch4 FILL — record it as this
+			// tile's fillFrac so the local crop follows an in-progress drag before the broadcast echoes.
+			t.fillFrac = { x: rect.left / vw, y: rect.top / vh, w: rect.width / vw, h: rect.height / vh }
 		}
 		onCellRects(cellRects)
 		// Re-hug the freshest canvas position so the next pure MOVE (no resize/scroll) re-reports.
@@ -516,7 +521,11 @@ export function initOperatorComposeTiles(container, options) {
 			if (cv.height !== h) cv.height = h
 			const cx = cv.getContext('2d')
 			if (!cx) continue
-			const ok = drawOperatorLiveCanvasCrop(cx, r.left / vw, r.top / vh, r.width / vw, r.height / vh, 0, 0, w, h)
+			// Sample the SHARED ch4 FILL fraction (t.fillFrac), not this client's own window rect, so
+			// the video matches on every client regardless of window size. Falls back to the local rect
+			// only until the first report/seed populates fillFrac.
+			const s = t.fillFrac || { x: r.left / vw, y: r.top / vh, w: r.width / vw, h: r.height / vh }
+			const ok = drawOperatorLiveCanvasCrop(cx, s.x, s.y, s.w, s.h, 0, 0, w, h)
 			cv.style.display = ok ? 'block' : 'none'
 		}
 	}
@@ -689,26 +698,41 @@ export function initOperatorComposeTiles(container, options) {
 		layoutAll()
 	}
 
-	// WO-319: seed a REMOTE client from the server's current shared layout so it shows the operator's
-	// arrangement (not a local default) and never clobbers it. Maps server cells (role+mainIndex →
-	// fraction rect) onto the matching tiles, then unlocks reporting so later edits DO propagate.
+	// WO-319: apply a SHARED layout (server cells, role+mainIndex → fraction rect) onto the matching
+	// tiles so every client renders the same arrangement no matter who moved a window. Also records
+	// t.fillFrac — the ch4 FILL fraction this tile occupies — which the live crop samples from, so the
+	// video is identical across clients regardless of each one's window size. A tile being dragged
+	// right now is skipped (never snap out from under the operator's hand).
+	function seedFromCells(cells) {
+		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		if (!byKey.size) return
+		let changed = false
+		for (const t of tiles.values()) {
+			if (drag && drag.t === t) continue // do not yank the tile under the pointer
+			const rect = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+			if (!rect) continue
+			t.fillFrac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
+			// Dedupe: only re-layout when the position actually differs (avoids feedback churn).
+			const f = t.frac || {}
+			if (Math.abs((f.x || 0) - rect.x) > 1e-4 || Math.abs((f.y || 0) - rect.y) > 1e-4 || Math.abs((f.w || 0) - rect.w) > 1e-4 || Math.abs((f.h || 0) - rect.h) > 1e-4) {
+				t.frac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
+				t.px = null
+				t.pxDesired = null
+				changed = true
+			}
+		}
+		if (changed) layoutAll()
+		drawLiveCrops()
+	}
+
+	// Seed a REMOTE client from the server's current shared layout at startup, then unlock reporting.
 	async function seedFromServerLayout() {
 		if (!isRemoteOperatorView()) return
 		try {
 			const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
 			if (res.ok) {
 				const j = await res.json()
-				const cells = Array.isArray(j?.cells) ? j.cells : []
-				const byKey = new Map(cells.map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r))
-				for (const t of tiles.values()) {
-					const rect = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
-					if (rect && rect.w > 0 && rect.h > 0) {
-						t.frac = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
-						t.px = null
-						t.pxDesired = null
-					}
-				}
-				layoutAll()
+				seedFromCells(Array.isArray(j?.cells) ? j.cells : [])
 			}
 		} catch {
 			/* server layout unavailable — fall back to local/default (still no clobber: report waits) */
@@ -717,6 +741,10 @@ export function initOperatorComposeTiles(container, options) {
 			scheduleReport()
 		}
 	}
+
+	// Every client (host + remote) re-syncs to a layout broadcast so previews always match. The host
+	// receiving the echo of its own change is a dedupe no-op (and its dragging tile is skipped).
+	const unsubSharedLayout = subscribeSharedLayout((cells) => seedFromCells(cells))
 
 	function resetLayout() {
 		saveTileLayout(storage, storageKey, {})
@@ -779,6 +807,7 @@ export function initOperatorComposeTiles(container, options) {
 			unsubAnyState?.()
 			unsubLiveFrame?.()
 			unsubLiveState?.()
+			unsubSharedLayout?.()
 			// WO-319: restore the holes if we were suppressing them, so a torn-down tiles surface never
 			// leaves the compose region hole-less (which would hide the screen consumer with nothing on top).
 			setOperatorComposeHolesSuppressed(false)

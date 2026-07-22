@@ -95,7 +95,18 @@ const server = https.createServer(tlsOpts, (creq, cres) => {
 
 // WebSocket upgrades (operator WS + /ws/gui-stream) — forward the raw stream to the app server.
 server.on('upgrade', (creq, csocket, head) => {
+	// Latency: disable Nagle on both legs so video frames are not held ~40ms to coalesce.
+	try {
+		csocket.setNoDelay(true)
+	} catch {
+		/* ignore */
+	}
 	const psocket = net.connect(TARGET_PORT, TARGET_HOST, () => {
+		try {
+			psocket.setNoDelay(true)
+		} catch {
+			/* ignore */
+		}
 		// Reconstruct the request line + headers exactly, then splice the two sockets together.
 		let raw = `${creq.method} ${creq.url} HTTP/${creq.httpVersion}\r\n`
 		for (let i = 0; i < creq.rawHeaders.length; i += 2) {
