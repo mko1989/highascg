@@ -37,7 +37,13 @@ import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
-import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { isOperatorGuiModeActive, subscribeSharedLayout } from '../lib/operator-gui-mode.js'
+import {
+	drawOperatorLiveCanvasCrop,
+	operatorLiveCanvasHasFrame,
+	isOperatorLiveCanvasEnabled,
+	subscribeOperatorLiveCanvasRepaint,
+} from './preview-canvas-live-stream.js'
 
 /** Content-area minimum (max video rect) — chrome (border/header/footer) is additional, see {@link minOuterSize}. */
 export const MIN_BODY = { width: 160, height: 90 }
@@ -473,9 +479,70 @@ export function initOperatorComposeTiles(container, options) {
 		rafReport = requestAnimationFrame(() => { rafReport = null; reportRectsNow() })
 	}
 
+	// WO-319 — CLIENT ONLY. Fill each tile body with this window's crop of the ch4 stream. The route
+	// sits at its FILL fraction of the mosaic; the body is at that same fraction of the tiles-mount
+	// (root), so cropping ch4 at the body's fraction-of-root shows exactly this window's content. On
+	// the host this is a no-op (the real X hole reveals the screen consumer). Frame-rate driven.
+	const isClient = !isOperatorGuiModeActive()
+	function drawLiveCrops() {
+		if (!isClient) return
+		const on = isOperatorLiveCanvasEnabled() && operatorLiveCanvasHasFrame()
+		const rootRect = root.getBoundingClientRect()
+		const rw = rootRect.width || 1
+		const rh = rootRect.height || 1
+		for (const t of tiles.values()) {
+			const cv = t.liveCanvas
+			if (!cv) continue
+			if (!on) { if (cv.style.display !== 'none') cv.style.display = 'none'; continue }
+			const b = t.bodyEl.getBoundingClientRect()
+			if (b.width < 2 || b.height < 2) { cv.style.display = 'none'; continue }
+			const w = Math.round(b.width)
+			const h = Math.round(b.height)
+			if (cv.width !== w) cv.width = w
+			if (cv.height !== h) cv.height = h
+			const cx = cv.getContext('2d')
+			if (!cx) continue
+			const ok = drawOperatorLiveCanvasCrop(cx, (b.left - rootRect.left) / rw, (b.top - rootRect.top) / rh, b.width / rw, b.height / rh, 0, 0, w, h)
+			cv.style.display = ok ? 'block' : 'none'
+		}
+	}
+
+	// WO-319 — CLIENT ONLY. Position tiles so each BODY lands on its shared FILL rect (fraction of the
+	// tiles-mount), so the crop above shows the right route and the chrome frames it. The FILL is the
+	// body/hole rect; the tile OUTER = that expanded by chrome (border all sides, footer below).
+	function seedFromCells(cells) {
+		if (!isClient) return
+		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		if (!byKey.size) return
+		const { w: cw, h: ch } = canvasSize()
+		const { borderW, footerH } = TILE_CHROME
+		let changed = false
+		for (const t of tiles.values()) {
+			if (drag && drag.t === t) continue
+			const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+			if (!fill) continue
+			const outer = {
+				x: (fill.x * cw - borderW) / cw,
+				y: (fill.y * ch - borderW) / ch,
+				w: (fill.w * cw + borderW * 2) / cw,
+				h: (fill.h * ch + borderW * 2 + footerH) / ch,
+			}
+			const f = t.frac || {}
+			if (Math.abs((f.x || 0) - outer.x) > 1e-4 || Math.abs((f.y || 0) - outer.y) > 1e-4 || Math.abs((f.w || 0) - outer.w) > 1e-4 || Math.abs((f.h || 0) - outer.h) > 1e-4) {
+				t.frac = outer
+				t.px = null
+				t.pxDesired = null
+				changed = true
+			}
+		}
+		if (changed) layoutAll()
+		drawLiveCrops()
+	}
+
 	function layoutAll() {
 		for (const t of tiles.values()) layoutTileDom(t)
 		scheduleReport()
+		drawLiveCrops()
 	}
 
 	function onCanvasResize() {
@@ -503,6 +570,13 @@ export function initOperatorComposeTiles(container, options) {
 
 		const bodyEl = document.createElement('div')
 		bodyEl.className = 'operator-tile__body'
+		// WO-319: on a CLIENT (no screen consumer behind an X hole) the body is filled by a canvas that
+		// shows this window's crop of the ch4 stream. On the host this canvas stays empty/hidden — the
+		// real X hole reveals the screen consumer. See drawLiveCrops.
+		const liveCanvasEl = document.createElement('canvas')
+		liveCanvasEl.className = 'operator-tile__live'
+		liveCanvasEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;'
+		bodyEl.appendChild(liveCanvasEl)
 
 		// All chrome sits BELOW the video body (owner: label + progress bar must not overlay any
 		// actual content). The footer holds a screen-label row (also the drag handle) above the
@@ -526,7 +600,7 @@ export function initOperatorComposeTiles(container, options) {
 		el.append(bodyEl, footerEl, resizeEl)
 		root.appendChild(el)
 
-		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, timer: null }
+		const t = { def, frac, px: null, pxDesired: null, el, bodyEl, footerEl, labelEl, liveCanvas: liveCanvasEl, timer: null }
 
 		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
@@ -672,6 +746,21 @@ export function initOperatorComposeTiles(container, options) {
 	rebuild()
 	if (!stateReady) unsubAnyState = stateStore?.on?.('*', onAnyState) || null
 
+	// WO-319 client: fill bodies from the stream each frame, seed positions from the shared layout,
+	// and re-sync whenever any client edits it. No-ops on the host (isClient false).
+	let unsubLiveFrame = null
+	let unsubShared = null
+	if (isClient) {
+		unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
+		unsubShared = subscribeSharedLayout((cells) => seedFromCells(cells))
+		void (async () => {
+			try {
+				const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
+				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : []) }
+			} catch { /* keep local/default until a broadcast arrives */ }
+		})()
+	}
+
 	return {
 		refreshDefs: rebuild,
 		destroy() {
@@ -682,6 +771,8 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			unsubCm?.()
 			unsubAnyState?.()
+			unsubLiveFrame?.()
+			unsubShared?.()
 			if (rafReport != null) cancelAnimationFrame(rafReport)
 			for (const t of tiles.values()) t.timer?.destroy?.()
 			tiles.clear()

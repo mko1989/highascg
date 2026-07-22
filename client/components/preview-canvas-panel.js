@@ -10,7 +10,6 @@ import { createDestinationLayoutOverlay } from './preview-canvas-destination-ove
 import { isOperatorGuiModeActive, setOperatorStreamViewActive } from '../lib/operator-gui-mode.js'
 import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
 import { initOperatorComposeTiles } from './operator-compose-tiles.js'
-import { initOperatorStreamTiles } from './operator-stream-tiles.js'
 import { subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './preview-canvas-live-stream.js'
 
 const G = 6; const BORDER_FADE = 400
@@ -432,7 +431,7 @@ export function initPreviewPanel(host, options) {
 		composeTilesMode = on
 		if (on && !tilesRef.h && tilesMountEl) {
 			tilesMountEl.style.position = 'relative'
-			tilesRef.h = initOperatorStreamTiles(tilesMountEl, { stateStore })
+			tilesRef.h = initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
 		}
 		if (tilesMountEl) tilesMountEl.style.display = on ? '' : 'none'
 		if (wrap) wrap.style.display = on ? 'none' : ''
