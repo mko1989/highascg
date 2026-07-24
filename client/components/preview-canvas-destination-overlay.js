@@ -3,6 +3,7 @@
  */
 
 import { settingsState } from '../lib/settings-state.js'
+import { resolveDestinationDims } from '../lib/mapping-node-service.js'
 
 export function createDestinationLayoutOverlay(ctx) {
 	const { layoutOverlay, stateStore, showDestinationVisualOverlay } = ctx
@@ -25,8 +26,13 @@ export function createDestinationLayoutOverlay(ctx) {
 			if (!id) continue
 			const lay = graphLayout[id] || {}
 			const hasExplicitLayout = Number.isFinite(Number(lay.x)) && Number.isFinite(Number(lay.y))
-			const w = Math.max(120, Number(lay.w) || 120)
-			const h = Math.max(70, Number(lay.h) || 70)
+			// WO-327: the border must show the destination's REAL output aspect. A saved layout
+			// keeps its position and width, but height is re-derived from the true resolution —
+			// a stale rect saved before a res change must not draw a wrong-aspect border.
+			const dims = resolveDestinationDims(d)
+			const aspect = dims.h / Math.max(1, dims.w)
+			const w = Math.max(120, Number(lay.w) || dims.w)
+			const h = Math.max(70, Math.round(w * aspect))
 			const x = Math.max(0, Number(lay.x) || 0)
 			const y = Math.max(0, Number(lay.y) || 0)
 			const main = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
@@ -50,19 +56,23 @@ export function createDestinationLayoutOverlay(ctx) {
 			boxes.push(box)
 			if (!hasExplicitLayout) fallbackDests.push(box)
 		}
-		// If destination layout was never saved, auto-tile so all destinations are visible (not stacked at 0,0).
+		// If destination layout was never saved, auto-tile so all destinations are visible (not
+		// stacked at 0,0). WO-327: cells are sized per destination from its true resolution —
+		// the old fixed 1920x1080 grid overlapped/misplaced custom-res destinations.
 		if (fallbackDests.length) {
 			const cols = Math.max(1, Math.ceil(Math.sqrt(fallbackDests.length)))
-			const cellW = 1920
-			const cellH = 1080
-			for (let i = 0; i < fallbackDests.length; i++) {
-				const b = fallbackDests[i]
-				const col = i % cols
-				const row = Math.floor(i / cols)
-				b.x = col * cellW
-				b.y = row * cellH
-				b.w = Math.max(120, b.w)
-				b.h = Math.max(70, b.h)
+			let rowY = 0
+			for (let i = 0; i < fallbackDests.length; i += cols) {
+				const row = fallbackDests.slice(i, i + cols)
+				let colX = 0
+				let rowH = 0
+				for (const b of row) {
+					b.x = colX
+					b.y = rowY
+					colX += b.w
+					rowH = Math.max(rowH, b.h)
+				}
+				rowY += rowH
 			}
 		}
 		if (!boxes.length) {

@@ -36,6 +36,7 @@ const FILES = [
 	'tools/smoke/smoke-cg-studio.test.js',
 	'tools/smoke/smoke-wo325-headless-operator-gui.test.js',
 	'tools/smoke/smoke-wo331-live-thumb-url-stability.test.js',
+	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',
 	'tools/smoke/smoke-device-graph-multiview-suggest.test.js',
 	'tools/smoke/smoke-config-classify.js',
 	'tools/smoke/smoke-config-generator-routing.js',

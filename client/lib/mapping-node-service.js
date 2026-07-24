@@ -81,6 +81,21 @@ export function videoModeToResolution(mode) {
 }
 
 /**
+ * True pixel size of a screen destination (WO-327): explicit width/height when set
+ * (custom OS resolutions), else the videoMode's canonical dims, else 1080p. The compose
+ * preview overlay must draw borders at THIS aspect, never a hardcoded 1920x1080 cell.
+ * @param {{ width?: unknown, height?: unknown, videoMode?: unknown } | null | undefined} dest
+ * @returns {{ w: number, h: number }}
+ */
+export function resolveDestinationDims(dest) {
+	const w = parseInt(String(dest?.width), 10)
+	const h = parseInt(String(dest?.height), 10)
+	if (Number.isFinite(w) && w >= 64 && Number.isFinite(h) && h >= 64) return { w, h }
+	const res = videoModeToResolution(dest?.videoMode)
+	return { w: res.w, h: res.h }
+}
+
+/**
  * Split input canvas horizontally across N mapping outputs.
  * @param {number} inputWidth
  * @param {number} inputHeight
