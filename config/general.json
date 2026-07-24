@@ -19,11 +19,12 @@
     "pointerConfine": "auto",
     "cefInteractiveBridge": true,
     "cefInteractiveLayer": 999,
-    "cefRemoteDebuggingPort": 9222
+    "cefRemoteDebuggingPort": 9222,
+    "cefEnableGpu": true
   },
   "local_template_path": "",
   "composePreview": {
-    "mode": "ffmpeg_jpeg",
+    "mode": "canvas",
     "fps": 25,
     "resolutionScale": "half",
     "jpegQuality": 10,
@@ -43,7 +44,6 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
-  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"

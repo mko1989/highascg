@@ -4,5 +4,6 @@
   "nuclearRequirePassword": false,
   "nuclearPassword": "",
   "nuclearPasswordHash": "",
-  "legacyJsPixelmap": false
+  "legacyJsPixelmap": false,
+  "invertTouchpadScroll": false
 }

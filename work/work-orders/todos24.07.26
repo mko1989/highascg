@@ -21,6 +21,9 @@ Each WO carries a code-verified survey of what exists today + acceptance criteri
   326  Custom scaling of layers in looks — geometry (X/Y/W/H via fill) already exists
        end-to-end; WO starts with a 10-min live check of what you actually mean
        (bug in the existing path vs content-zoom-in-rect vs a scale% control).
+
+layers are aspect locked always even when i unlock it. the width height numbers can be changed in the inspector but it does not have an effect on the pgm channel.
+
   327  Compose-preview dest borders vs custom res — root cause found: the overlay's
        fallback auto-tiler hardcodes 1920x1080 cells and never reads the destination's
        stored width/height (preview-canvas-destination-overlay.js:53-67).
@@ -40,6 +43,7 @@ Each WO carries a code-verified survey of what exists today + acceptance criteri
   332  Power button — listener already does short=network-reset / hold>=3s=poweroff;
        missing: UI Shutdown button + endpoint, configurable actions/threshold,
        service health in Devices view. Scope check with you first.
+       the hold 3s to poweroff doesnt work. i need to hold it way longer to get the hard power off instead.
 
 ================================================================================
 2026-07-24 — VERIFICATION OF todos21 + todos22 CLAIMS (3 independent audits)
@@ -77,3 +81,51 @@ Tree state found today: ~43 files of real work sitting uncommitted since 4e0a998
 (WO-320B/321/325, autostart fix, timeline<->look fade coordination + timeline-clip
 inspector ReferenceError fix, WO-319 stream continuation). Committed in labeled units
 today so nothing else can be silently lost.
+
+================================================================================
+2026-07-24 (evening) — IMPLEMENTATION PASS ON WO 326-332
+================================================================================
+Deploy state: client REBUILT (dist-web current) — NEEDS KIOSK RELOAD to see the client
+fixes. Node service restarted (WO-329 live). Caspar playout untouched.
+
+✅ 326  BOTH your symptoms were real client bugs, fixed + committed:
+        - "aspect locked always": the W/H inputs paired each other from a STALE captured
+          layer object — after unlocking, the UI kept showing locked-aspect numbers the
+          model never had. Pairing now happens only in patchFillPx (fresh state, content
+          aspect) and the inputs re-sync from the model after every change.
+        - "W/H has no effect on pgm": the inspector-edit path never armed the mixer
+          nudge, and in edit-on-PGM mode geometry-only edits early-return with "the PGM
+          nudge owns it" — so inspector geometry edits reached NOTHING on air (canvas
+          drags worked; that's why it felt arbitrary). Both paths arm the nudge now.
+        NOTE: in NORMAL editing mode, PGM still only updates on take — live-on-air apply
+        remains the edit-on-PGM compose mode, by design. Say if you want that changed.
+✅ 327  Borders now use each destination's true resolution (explicit w/h → videoMode →
+        1080p); no-layout fallback tiles per-destination cells. KIOSK RELOAD.
+✅ 331  Live thumbnails stop refetching every render: TTL-window cache-bust like the deck
+        thumbs; explicit capture/upload still force-refresh. KIOSK RELOAD.
+✅ 329A Server-issued monotonic rev replaces the wall-clock 409. Verified LIVE on this
+        box: no-rev autosave accepted (grace) → rev 1; echo → rev 2; stale echo → 409
+        stale_rev. Clock skew can no longer produce bogus "payload is older" errors.
+        (Found + deleted a dead duplicate module project-scenes-persist.js on the way —
+        first pass patched it and changed nothing; live verify caught it.)
+        Part B (two clients editing simultaneously = last-write-wins) still needs your
+        Option 1 (edit lock) vs Option 2 (per-section merge) decision — see WO-329.
+🟡 332  Root cause found + fixed in repo: evtest block-buffers when piped, the listener
+        never saw ANY button events (journal has zero presses ever) — only the firmware
+        long-hold hard-off worked. Fix = stdbuf line-buffering (+ a now_ms overflow +
+        per-press journal line). NEEDS YOUR SUDO to activate:
+          sudo install -m 755 ~/highascg/tools/runtime/highascg-power-button-listen.sh \
+            /usr/local/lib/highascg/highascg-power-button-listen.sh
+          sudo systemctl restart highascg-power-button.service
+        Then: short-press → journal "press" + network reset; hold 3s → clean poweroff.
+🟡 330  Audit done: Companion runs module 1.0.1; ALL the WO-170 actions live only in the
+        packaged-but-undeployed 1.0.3. Instance pins 1.0.1 in db.sqlite, so the installer
+        was upgraded to repoint stale pins safely. NEEDS YOUR SUDO (drops the desk ~30s):
+          sudo systemctl stop companion \
+            && ~/highascg/tools/eggs/companion/install-companion-module.sh \
+            && sudo systemctl start companion
+⬜ 328  Media continuity between looks — needs the 15-min live repro with you (5 ranked
+        suspects in the WO; most likely: same media on a DIFFERENT layer number, or a
+        property-delta reload whose seek-resume falls back to frame 0).
+Also: the regression test todos22 claimed for the autostart fix now actually exists
+(smoke-wo243, 42/42). Gate: only the 2 pre-existing WO-315 box-geometry tests fail.
