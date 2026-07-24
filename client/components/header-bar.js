@@ -116,6 +116,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		try {
 			const res = await api.post('/api/project/save', { project })
 			if (res?.slug) projectState.setProjectSlug(res.slug)
+			if (res?.rev != null) projectState.setRev(res.rev)
 			markLocalProjectSaved()
 			markServerProjectSynced()
 			showHeaderToast('Saved', 'success')

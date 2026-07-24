@@ -60,8 +60,9 @@ async function handleProject(path, body, ctx) {
 				}),
 			}
 		}
+		let persisted
 		try {
-			await persistProject(ctx, project, { writeAutosave: true })
+			persisted = await persistProject(ctx, project, { writeAutosave: true })
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('error', '[project] save persist failed: ' + (e?.message || e))
@@ -88,11 +89,12 @@ async function handleProject(path, body, ctx) {
 			ctx.artnetReceiver.reconfigure()
 		}
 		if (b.broadcastProject !== false && typeof ctx._wsBroadcast === 'function') {
-			scheduleProjectSyncBroadcast(ctx, project)
+			/* WO-329: broadcast the STAMPED project so other clients pick up the new rev. */
+			scheduleProjectSyncBroadcast(ctx, persisted.project)
 		}
 		if (typeof ctx.onProjectSavedForReplication === 'function') {
 			try {
-				ctx.onProjectSavedForReplication(project)
+				ctx.onProjectSavedForReplication(persisted.project)
 			} catch (e) {
 				if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project push: ' + (e?.message || e))
 			}
@@ -105,6 +107,7 @@ async function handleProject(path, body, ctx) {
 				slug,
 				activeSlug: slug,
 				created: !existing,
+				rev: persisted.rev,
 			}),
 		}
 	}
@@ -410,11 +413,13 @@ async function handleProject(path, body, ctx) {
 		const check = validateIncomingProject(project, existing)
 		if (!check.ok) {
 			if (typeof ctx.log === 'function') {
-				const lvl = check.reason === 'stale_saved_at' ? 'debug' : 'warn'
+				const lvl = check.reason === 'stale_saved_at' || check.reason === 'stale_rev' ? 'debug' : 'warn'
 				const detail =
-					check.reason === 'stale_saved_at'
-						? `incoming=${check.details?.incomingSavedAt || project.savedAt || '?'} stored=${check.details?.storedSavedAt || existing?.savedAt || '?'}`
-						: `looks ${check.details?.incomingLookCount ?? '?'} vs stored ${check.details?.storedLookCount ?? '?'}`
+					check.reason === 'stale_rev'
+						? `incoming rev=${check.details?.incomingRev ?? '?'} stored rev=${check.details?.storedRev ?? '?'}`
+						: check.reason === 'stale_saved_at'
+							? `incoming=${check.details?.incomingSavedAt || project.savedAt || '?'} stored=${check.details?.storedSavedAt || existing?.savedAt || '?'}`
+							: `looks ${check.details?.incomingLookCount ?? '?'} vs stored ${check.details?.storedLookCount ?? '?'}`
 				ctx.log(lvl, `[project] autosave skipped (${check.reason}) ${detail}`)
 			}
 			return {
@@ -459,7 +464,7 @@ async function handleProject(path, body, ctx) {
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, slug: result.slug, activeSlug: result.slug }),
+				body: jsonBody({ ok: true, slug: result.slug, activeSlug: result.slug, rev: result.rev }),
 			}
 		} catch (e) {
 			if (typeof ctx.log === 'function') {

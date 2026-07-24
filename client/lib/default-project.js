@@ -97,7 +97,8 @@ async function postProjectSave(project, id, opts = {}) {
 	const body = { project, id }
 	if (opts.force) body.force = true
 	try {
-		await api.post('/api/project/save', body)
+		const res = await api.post('/api/project/save', body)
+		if (res?.rev != null) projectState.setRev(res.rev)
 		return
 	} catch (e) {
 		if (!isProjectSaveConflictError(e?.message)) throw e
@@ -110,7 +111,8 @@ async function postProjectSave(project, id, opts = {}) {
 			}
 		}
 		project.savedAt = new Date().toISOString()
-		await api.post('/api/project/save', { project, id, force: true })
+		const res = await api.post('/api/project/save', { project, id, force: true })
+		if (res?.rev != null) projectState.setRev(res.rev)
 	}
 }
 

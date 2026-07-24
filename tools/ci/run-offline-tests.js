@@ -38,6 +38,7 @@ const FILES = [
 	'tools/smoke/smoke-wo331-live-thumb-url-stability.test.js',
 	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',
 	'tools/smoke/smoke-wo326-inspector-fill-live-apply.test.js',
+	'tools/smoke/smoke-wo329-project-rev.test.js',
 	'tools/smoke/smoke-device-graph-multiview-suggest.test.js',
 	'tools/smoke/smoke-config-classify.js',
 	'tools/smoke/smoke-config-generator-routing.js',

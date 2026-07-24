@@ -12,8 +12,17 @@ export class ProjectState {
 	constructor(options = {}) {
 		this.projectName = ''
 		this.projectSlug = ''
+		/** WO-329: server-issued monotonic revision this client's state is based on. The server
+		 * compares revs (not wall clocks) on save/autosave; null = legacy/no-rev grace path. */
+		this.rev = null
 		this._listeners = new Map()
 		this._loadName()
+	}
+
+	/** @param {unknown} rev - server-issued rev from a save/autosave response or project payload */
+	setRev(rev) {
+		const r = Number(rev)
+		this.rev = Number.isFinite(r) && r > 0 ? Math.floor(r) : null
 	}
 
 	_loadName() {
@@ -81,6 +90,7 @@ export class ProjectState {
 			version: PROJECT_VERSION,
 			name: this.projectName || 'Untitled',
 			savedAt: new Date().toISOString(),
+			...(this.rev != null ? { rev: this.rev } : {}),
 			scenes,
 			programOutput,
 			timelines,
@@ -104,6 +114,7 @@ export class ProjectState {
 		const name = data.name
 		if (name) this.setProjectName(name)
 		if (data.slug) this.setProjectSlug(data.slug)
+		this.setRev(data.rev)
 		if (data.scenes && sceneState?.loadFromData) sceneState.loadFromData(data.scenes, { silent })
 		const po = data.programOutput || data.dashboard
 		if (po && programOutputState?.loadFromData) programOutputState.loadFromData(po, { silent })

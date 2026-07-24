@@ -215,6 +215,8 @@ async function init() {
 				project = normalizeProjectMediaRefs(project, settingsState.getSettings())
 				const res = await api.post('/api/project/autosave', { project })
 				if (res?.slug && projectState.setProjectSlug) projectState.setProjectSlug(res.slug)
+				/* WO-329: adopt the server-issued rev — the next save must echo it or be seen as stale. */
+				if (res?.rev != null) projectState.setRev(res.rev)
 				const d = new Date()
 				const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 				document.dispatchEvent(new CustomEvent('project-autosaved', { detail: { time: timeStr } }))

@@ -30,7 +30,8 @@ function flushDeckSyncPersist() {
 	const pending = _deckSyncPersistPending
 	_deckSyncPersistPending = null
 	if (!pending?.ctx || !pending?.project) return
-	void persistProject(pending.ctx, pending.project, { writeAutosave: true, pushVolumes: false }).catch((e) => {
+	/* WO-329: bumpRev:false — deck-sync merges must not outrun HTTP clients' rev echo. */
+	void persistProject(pending.ctx, pending.project, { writeAutosave: true, pushVolumes: false, bumpRev: false }).catch((e) => {
 		if (typeof pending.ctx?.log === 'function') {
 			pending.ctx.log('warn', '[project] deck sync persist: ' + (e?.message || e))
 		}
@@ -68,12 +69,28 @@ function isLikelyStaleProjectReplace(incoming, existing) {
 }
 
 /**
+ * WO-329: both sides carry a server-issued monotonic `rev` → compare THAT (clock-skew
+ * immune). A missing rev on either side (older tab across the deploy, hand-made JSON)
+ * falls back to the legacy wall-clock `savedAt` compare — accept-once grace, the next
+ * persist stamps a rev.
+ * @param {object} incoming
+ * @param {object | null} existing
+ */
+function projectRevOf(p) {
+	const r = Number(p?.rev)
+	return Number.isFinite(r) && r > 0 ? Math.floor(r) : null
+}
+
+/**
  * Reject saves that would roll back to an older project (e.g. Companion cached state).
  * @param {object} incoming
  * @param {object | null} existing
  */
 function isProjectSaveNewerOrEqual(incoming, existing) {
 	if (!existing || typeof existing !== 'object') return true
+	const rIn = projectRevOf(incoming)
+	const rEx = projectRevOf(existing)
+	if (rIn != null && rEx != null) return rIn >= rEx
 	const tIn = Date.parse(incoming?.savedAt || '') || 0
 	const tEx = Date.parse(existing.savedAt || '') || 0
 	if (!tIn || !tEx) return true
@@ -97,10 +114,13 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 		}
 	}
 	if (!isProjectSaveNewerOrEqual(incoming, existing)) {
+		const revBased = projectRevOf(incoming) != null && projectRevOf(existing) != null
 		return {
 			ok: false,
-			reason: 'stale_saved_at',
+			reason: revBased ? 'stale_rev' : 'stale_saved_at',
 			details: {
+				storedRev: projectRevOf(existing),
+				incomingRev: projectRevOf(incoming),
 				storedSavedAt: existing?.savedAt || null,
 				incomingSavedAt: incoming?.savedAt || null,
 			},
@@ -123,10 +143,16 @@ function validateIncomingProject(incoming, existing, opts = {}) {
 /**
  * Persist project + optional autosave file; update in-memory deck mirror (no WS broadcast).
  * Main file write must succeed before mirror/autosave updates (WO-106).
+ *
+ * WO-329: every bumping persist stamps `rev = max(storedRev, incomingRev) + 1` — a server-
+ * issued monotonic revision that survives restarts (it lives in the project file) and can
+ * never move backwards. `bumpRev: false` (WS deck-sync merges) carries the stored rev
+ * through unchanged: deck-sync is a server-internal merge with no HTTP response to hand a
+ * new rev back on, and bumping there would instantly strand every HTTP-saving client.
  * @param {object} ctx
  * @param {object} project
- * @param {{ writeAutosave?: boolean, pushVolumes?: boolean }} [opts]
- * @returns {{ ok: true, slug: string }}
+ * @param {{ writeAutosave?: boolean, pushVolumes?: boolean, bumpRev?: boolean }} [opts]
+ * @returns {{ ok: true, slug: string, rev: number | null, project: object }}
  */
 async function persistProject(ctx, project, opts = {}) {
 	if (!ctx || !project || typeof project !== 'object') {
@@ -137,6 +163,12 @@ async function persistProject(ctx, project, opts = {}) {
 	projectStore.migrateLegacySingleProject(persistence)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
+	const storedRev = projectRevOf(projectStore.readProjectFile(slug)) || 0
+	if (opts.bumpRev !== false) {
+		stamped.rev = Math.max(storedRev, projectRevOf(stamped) || 0) + 1
+	} else if (projectRevOf(stamped) == null && storedRev > 0) {
+		stamped.rev = storedRev
+	}
 	await projectStore.writeProjectFile(slug, stamped)
 	projectStore.setActiveSlug(persistence, slug)
 	ensureProjectMediaDir(ctx.config, slug, persistence)
@@ -171,7 +203,7 @@ async function persistProject(ctx, project, opts = {}) {
 		}
 		persistSceneDeckForCtx(ctx)
 	}
-	return { ok: true, slug }
+	return { ok: true, slug, rev: projectRevOf(stamped), project: stamped }
 }
 
 /**
@@ -224,6 +256,7 @@ function mergeDeckSyncIntoProject(ctx, data) {
 }
 
 module.exports = {
+	projectRevOf,
 	isProjectSaveNewerOrEqual,
 	isLikelyStaleProjectReplace,
 	validateIncomingProject,
