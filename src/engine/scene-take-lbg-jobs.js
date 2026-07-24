@@ -41,6 +41,7 @@ async function buildTakeJobs(opts) {
 		globalT,
 		framerate,
 		skipLayerVisualEquality = false,
+		outgoingTopIsTimeline = false,
 	} = opts
 
 	const takeJobs = []
@@ -231,8 +232,11 @@ async function buildTakeJobs(opts) {
 		}
 
 		// Bank B (+100) stacks above bank A — only pre-hide when incoming is the top layer.
+		// An outgoing timeline (band 210+) sits above BOTH look banks, so the incoming bank-B look is
+		// then genuinely BELOW the real top: stage it at full opacity (revealed as the timeline fades)
+		// rather than fading it in, which would double-ramp with the timeline fade-out into a dip.
 		const incomingIsAboveOutgoing =
-			shouldRunBankCrossfade && inactiveBank === 'b' && activeBank === 'a'
+			shouldRunBankCrossfade && inactiveBank === 'b' && activeBank === 'a' && !outgoingTopIsTimeline
 		const isEnterOnly = !hasOutgoingOnAir
 		// New layers (not in leaving look) always fade in; replace-below reveals through outgoing fade.
 		const incomingStartsHidden =

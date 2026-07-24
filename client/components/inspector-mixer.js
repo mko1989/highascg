@@ -43,6 +43,12 @@ export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredR
 	const layer = getLayer?.()
 	const isRouteSource = layer && String(layer.source?.value || '').startsWith('route://')
 
+	// Canonical output pair for a media source. Also read by the `showStoredRoute` hint below (outside
+	// the media branch), so it must be function-scoped — when it was block-scoped in the else branch,
+	// the hint threw `ReferenceError: canonical is not defined`, which aborted the whole timeline-clip
+	// inspector render (its only caller passing showStoredRoute) and left the panel near-empty.
+	let canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
+
 	if (isRouteSource) {
 		// Route source: render source audio channels selector
 		const srcWrap = document.createElement('div')
@@ -75,7 +81,6 @@ export function appendAudioInspectorGroup(root, { getAudio, onPatch, showStoredR
 		grp.appendChild(srcWrap)
 	} else {
 		// Media source: render output pair selector
-		let canonical = normalizeAudioRouteForLayout(a.audioRoute || '1+2', masterLayout)
 		if (canonical !== (a.audioRoute || '1+2')) {
 			queueMicrotask(() => onPatch({ audioRoute: canonical }))
 		}

@@ -7,10 +7,7 @@ const {
 	normalizeTransition,
 	resolveChannelFramerateForMixerTween,
 } = require('./scene-transition')
-const {
-	clearSceneProgramLookStackLayers,
-	collectOccupiedLookLayersOnChannel,
-} = require('./scene-exit-layers')
+const { clearSceneProgramLookStackLayers } = require('./scene-exit-layers')
 const { timelineCasparLayer } = require('./timeline-playback-helpers')
 
 function transitionIsCut(globalT) {
@@ -187,12 +184,11 @@ async function runTimelineDirectTake(ctx, eng, tlId, body) {
 			if (globalT.tween) p += ` ${param(globalT.tween)}`
 			lines.push(`MIXER ${programCh}-${L} OPACITY ${p} DEFER`)
 		}
-		const lookLayers = collectOccupiedLookLayersOnChannel(ctx, programCh)
-		for (const L of lookLayers) {
-			let p = `0 ${globalT.duration}`
-			if (globalT.tween) p += ` ${param(globalT.tween)}`
-			lines.push(`MIXER ${programCh}-${L} OPACITY ${p} DEFER`)
-		}
+		// Mix, not double-ramp: the timeline band (210+) sits ABOVE the look, so fading ONLY the
+		// timeline in over the look held at full opacity is a clean dissolve. Ramping the look out at
+		// the same time made both semi-transparent mid-transition — a ~50% luminance dip + double-
+		// exposure ("not a smooth mix"). The look is hard-cleared AFTER the fade (below), so holding it
+		// at full costs nothing at the end.
 		if (lines.length) await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
 		if (lines.length || clipFadeLayers.size) {
 			await amcp.mixerCommit(programCh)

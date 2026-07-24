@@ -159,8 +159,9 @@ module.exports = {
 			}
 		}
 
+		const opDef = clip.opacity != null ? clip.opacity : 1
 		sent =
-			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, 1, playing, force, fps, {
+			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, opDef, playing, force, fps, {
 				scheduleLeadTween: !!opts.scheduleLeadTween,
 				collectLines: collectLines,
 			}) || sent

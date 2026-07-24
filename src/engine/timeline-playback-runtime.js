@@ -154,6 +154,15 @@ module.exports = {
 			this._lastKfValues.clear()
 			this._lastKfSegment.clear()
 			this._airTimelineId = null
+			// A timeline leaving PGM must not stay flagged program:true. Take sets program:true and it
+			// is persisted (project autosave); if it survives the stop, re-activating the Timeline tab
+			// re-adopts that stale flag and re-routes the timeline back onto PGM — punching through
+			// whatever replaced it (e.g. a look). Reset to preview-only on leaving air; the only thing
+			// that puts a timeline back on PGM is an explicit Take. The reset rides the _emitPb below,
+			// so clients clear their sticky copy via the playback broadcast (onPlayback).
+			if (tl && tl.sendTo && tl.sendTo.program) {
+				tl.sendTo = { preview: true, program: false, screenIdx: tl.sendTo.screenIdx ?? 0 }
+			}
 		}
 		setCellPosition(cell, 0)
 		cell.playing = false

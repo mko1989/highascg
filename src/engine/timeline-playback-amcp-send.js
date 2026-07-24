@@ -295,12 +295,14 @@ module.exports = {
 		// T173.2: check if there's an opacity segment tween at clip-local 0
 		// Determine if we'll use a tween or just init opacity
 		const fps = 25 // default; could be taken from timeline context if needed
-		const opacitySeg = opacitySegmentAtLocalMs(clip, 0, fps, this._interpProp.bind(this), 1)
+		const clipOpacityBase = clip.opacity != null ? clip.opacity : 1
+		const opacitySeg = opacitySegmentAtLocalMs(clip, 0, fps, this._interpProp.bind(this), clipOpacityBase)
 		const hasOpacityTween = opacitySeg && opacitySeg.startVal !== opacitySeg.endVal
 
-		// Add opacity init if NO tween (else the tween start value will set it)
+		// Add opacity init if NO tween (else the tween start value will set it). Base is the clip's
+		// static opacity (default 1); an opacity keyframe at/near clip-local 0 still overrides it.
 		if (!hasOpacityTween) {
-			let initialOpacity = 1
+			let initialOpacity = clipOpacityBase
 			const opacityKfs = (clip.keyframes || [])
 				.filter((k) => k.property === 'opacity')
 				.sort((a, b) => a.time - b.time)

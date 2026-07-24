@@ -104,6 +104,8 @@ export function defaultClip(source, startTime, duration) {
 		audioRoute: '1+2',
 		muted: false,
 		volume: 1,
+		/** Base clip opacity (0..1); honored by timeline playback as the hold value under opacity keyframes. */
+		opacity: 1,
 		/** When true (default), changing W or H keeps media aspect when known — same as look editor. */
 		aspectLocked: true,
 		/** @type {'native' | 'fill-canvas' | 'horizontal' | 'vertical' | 'stretch'} */

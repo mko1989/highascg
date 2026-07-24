@@ -82,3 +82,42 @@ const { TIMELINE_LAYER_BASE } = require('../../src/engine/timeline-playback-help
 		process.exit(1)
 	})
 }
+
+// Bug: after Take (program:true) a timeline that STOPS (e.g. a look replaces it) must reset to
+// preview-only — otherwise re-activating the Timeline tab re-adopts the stale program flag and
+// re-routes it onto PGM, interrupting the live look. stop() of an on-air timeline clears program.
+{
+	const noop = () => Promise.resolve()
+	const self = {
+		config: { screen_count: 1 },
+		amcp: {
+			raw: noop, stop: noop, pause: noop, resume: noop, call: noop,
+			mixerFill: noop, mixerOpacity: noop, mixerVolume: noop, mixerCommit: noop,
+			batchSendChunked: noop,
+		},
+	}
+	const { TimelineEngine } = require('../../src/engine/timeline-engine')
+	const eng = new TimelineEngine(self)
+	const tl = eng.create({
+		id: 'tlb',
+		duration: 10000,
+		fps: 25,
+		sendTo: { preview: false, program: true, screenIdx: 0 },
+		layers: [{ id: 'l1', name: 'Layer 1', clips: [] }],
+	})
+	void (async () => {
+		await eng.playForTake(tl.id, 0)
+		assert.strictEqual(eng._airTimelineId, tl.id, 'on air after take')
+		assert.strictEqual(tl.sendTo.program, true, 'take put it on PGM')
+		eng.stop(tl.id)
+		assert.strictEqual(eng._airTimelineId, null, 'no longer on air')
+		assert.strictEqual(tl.sendTo.program, false, 'stop clears the program flag')
+		assert.strictEqual(tl.sendTo.preview, true, 'stop restores preview-only')
+		assert.strictEqual(tl.sendTo.screenIdx, 0, 'screenIdx preserved')
+		assert.strictEqual(eng.getPlayback(tl.id).sendTo.program, false, 'broadcast carries the cleared flag')
+		console.log('smoke-timeline-take stop-resets-sendTo: OK')
+	})().catch((err) => {
+		console.error(err)
+		process.exit(1)
+	})
+}

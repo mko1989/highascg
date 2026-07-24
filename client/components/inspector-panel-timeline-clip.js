@@ -25,14 +25,23 @@ import { appendTimelineInspectorPosition, syncTimelineToServer } from './inspect
 export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, clip) {
 	const { root, stateStore, getTimelinePlaybackPos } = deps
 	root.innerHTML = ''
-	if (!clip?.source?.value) return
 
 	const layerNum = layerIdx + 1
-	const mediaLabel = clip.source?.label || clip.source?.value || 'Clip'
+	const mediaLabel = clip?.source?.label || clip?.source?.value || 'Clip'
 	const title = document.createElement('div')
 	title.className = 'inspector-title'
 	title.textContent = `${mediaLabel} · Layer ${layerNum}`
 	root.appendChild(title)
+
+	// Title renders before this guard so a clip whose source has not resolved yet still shows a
+	// labelled panel with a hint, never a completely blank inspector.
+	if (!clip?.source?.value) {
+		const note = document.createElement('p')
+		note.className = 'inspector-field inspector-field--hint'
+		note.textContent = 'This clip has no resolved media source yet.'
+		root.appendChild(note)
+		return
+	}
 
 	function freshClip() {
 		const tl = timelineState.getTimeline(timelineId)
@@ -314,6 +323,63 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		'Applies to the whole clip (program canvas pixels). Use keyframes below only when you need motion over time.'
 	transGrp.appendChild(tfHint)
 	root.appendChild(transGrp)
+
+	// Mixer — base opacity for the clip. The timeline playback engine reads clip.opacity as the hold
+	// value under any opacity keyframes (mirrors clip.volume) — see
+	// src/engine/timeline-playback-amcp-schedule.js. Unset/1 renders exactly as before.
+	const mixGrp = document.createElement('div')
+	mixGrp.className = 'inspector-group'
+	mixGrp.innerHTML = '<div class="inspector-group__title">Mixer</div>'
+	const opPct = Math.max(0, Math.min(100, Math.round((freshClip().opacity ?? 1) * 100)))
+	const opInp = createDragInput({
+		label: 'Opacity %',
+		value: opPct,
+		min: 0,
+		max: 100,
+		step: 1,
+		decimals: 0,
+		onChange: (v) => {
+			timelineState.updateClip(timelineId, layerIdx, clipId, { opacity: Math.max(0, Math.min(1, v / 100)) })
+			void refreshTimelineClipGeometryOnServer()
+			window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+		},
+	})
+	mixGrp.appendChild(opInp.wrap)
+	const opHint = document.createElement('p')
+	opHint.className = 'inspector-field inspector-field--hint'
+	opHint.style.fontSize = '0.78rem'
+	opHint.style.color = 'var(--text-muted)'
+	opHint.textContent = 'Base opacity for the whole clip. Opacity keyframes (below) override it over time. Blend mode and chroma/keyer live in Effects.'
+	mixGrp.appendChild(opHint)
+	root.appendChild(mixGrp)
+
+	// Trim — in-point (frames into the source file). Honored by the transport: added to the seek frame
+	// in resolveTimelineClipFrame (src/engine/scene-play-seek.js). The clip's out bound is its timeline
+	// duration; a separate out-point is not yet applied server-side.
+	const trimGrp = document.createElement('div')
+	trimGrp.className = 'inspector-group'
+	trimGrp.innerHTML = '<div class="inspector-group__title">Trim</div>'
+	const inFrames = Math.max(0, Math.round(Number(freshClip().inPoint) || 0))
+	const inInp = createDragInput({
+		label: 'In-point (frames)',
+		value: inFrames,
+		min: 0,
+		max: 999999,
+		step: 1,
+		decimals: 0,
+		onChange: (v) => {
+			timelineState.updateClip(timelineId, layerIdx, clipId, { inPoint: Math.max(0, Math.round(v)) })
+			void refreshTimelineClipGeometryOnServer()
+		},
+	})
+	trimGrp.appendChild(inInp.wrap)
+	const inHint = document.createElement('p')
+	inHint.className = 'inspector-field inspector-field--hint'
+	inHint.style.fontSize = '0.78rem'
+	inHint.style.color = 'var(--text-muted)'
+	inHint.textContent = `Frames skipped from the start of the media on take/seek (at ${fps} fps).`
+	trimGrp.appendChild(inHint)
+	root.appendChild(trimGrp)
 
 	const takeGrp = document.createElement('div')
 	takeGrp.className = 'inspector-group'

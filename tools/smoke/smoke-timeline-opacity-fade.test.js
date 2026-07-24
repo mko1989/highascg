@@ -86,4 +86,40 @@ function makeEngine() {
 	assert.match(opacityLines[1], /OPACITY 1 13 linear DEFER/)
 }
 
+// Static clip.opacity is honored as the hold value (no keyframes). Before the fix the hold value was
+// hardcoded 1, so a clip's base opacity was ignored on the timeline path. Mirrors clip.volume.
+{
+	const { eng, mixerCalls } = makeEngine()
+	const clip = {
+		id: 'c1',
+		startTime: 0,
+		duration: 10000,
+		source: { value: 'test.mov' },
+		opacity: 0.5,
+		keyframes: [],
+	}
+	const tl = eng.create({
+		id: 'tlop',
+		duration: 10000,
+		fps: 25,
+		layers: [{ id: 'l1', name: 'Layer 1', clips: [clip] }],
+	})
+	eng._airTimelineId = tl.id
+	eng._applyClipMixer(1, 202, clip, 0, { force: true, playing: false, fps: 25 })
+	const op = mixerCalls.find((c) => c.duration === 0)
+	assert.ok(op, 'static clip opacity emits a MIXER OPACITY line')
+	assert.strictEqual(op.opacity, 0.5, 'hold opacity honors clip.opacity, not a hardcoded 1')
+}
+
+// Default opacity (unset) stays 1 — the change must not shift existing clips.
+{
+	const { eng, mixerCalls } = makeEngine()
+	const clip = { id: 'c2', startTime: 0, duration: 10000, source: { value: 'test.mov' }, keyframes: [] }
+	const tl = eng.create({ id: 'tlop2', duration: 10000, fps: 25, layers: [{ id: 'l1', name: 'Layer 1', clips: [clip] }] })
+	eng._airTimelineId = tl.id
+	eng._applyClipMixer(1, 203, clip, 0, { force: true, playing: false, fps: 25 })
+	const op = mixerCalls.find((c) => c.duration === 0)
+	assert.ok(op && op.opacity === 1, 'unset clip opacity holds at 1 (unchanged behavior)')
+}
+
 console.log('smoke-timeline-opacity-fade: OK')
