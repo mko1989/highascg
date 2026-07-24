@@ -19,8 +19,10 @@ fi
 
 now_ms() {
 	local s ns
-	if read -r s ns < <(date +%s%N 2>/dev/null); then
-		echo $((s * 1000 + ns / 1000000))
+	# '+%s %N' — two fields. The old '+%s%N' put all 19 digits in s, and s*1000
+	# overflowed 64-bit, so held_ms on release was garbage.
+	if read -r s ns < <(date '+%s %N' 2>/dev/null) && [[ -n "${ns:-}" ]]; then
+		echo $((s * 1000 + 10#$ns / 1000000))
 	else
 		echo $(($(date +%s) * 1000))
 	fi
@@ -134,6 +136,7 @@ on_short_press() {
 on_press() {
 	rm -f "$LONG_PRESS_MARK"
 	press_ts_ms=$(now_ms)
+	logger -t highascg-power "press (hold ${HOLD_SEC}s to power off)"
 	schedule_shutdown
 }
 
@@ -154,6 +157,16 @@ on_release() {
 	press_ts_ms=0
 }
 
+# evtest block-buffers stdout when piped (not a TTY), so without stdbuf the read loop
+# below saw NO events until ~4KB accumulated — press/hold silently did nothing and the
+# only way to power off was the firmware's own long-hold hard-off. Line-buffer it.
+EVTEST_CMD=(evtest)
+if command -v stdbuf >/dev/null 2>&1; then
+	EVTEST_CMD=(stdbuf -oL -eL evtest)
+else
+	logger -t highascg-power "WARNING: stdbuf missing — evtest output may buffer and delay button handling"
+fi
+
 while IFS= read -r line; do
 	case "$line" in
 	*"EV_KEY"*"code ${KEY_CODE}"*"value 1"*)
@@ -163,4 +176,4 @@ while IFS= read -r line; do
 		on_release
 		;;
 	esac
-done < <(evtest --grab "$DEV" 2>&1)
+done < <("${EVTEST_CMD[@]}" --grab "$DEV" 2>&1)

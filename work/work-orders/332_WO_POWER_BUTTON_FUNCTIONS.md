@@ -1,9 +1,35 @@
 # WO-332 — Power button functions
 
-**Source:** todos24.07.26 — "Power button functions."
-**Status: OPEN — scope check with owner first.** Written 2026-07-24 from a read-only
-survey. A LOT already exists; the todo most plausibly means "make the button's functions
-configurable / add the missing UI pieces", but confirm before building.
+**Source:** todos24.07.26 — "Power button functions." Owner note 2026-07-24: "the hold 3s
+to poweroff doesnt work. i need to hold it way longer to get the hard power off instead."
+
+**Status: ROOT CAUSE FOUND + FIXED IN REPO 2026-07-24 — AWAITING ROOT INSTALL (needs
+owner's sudo password).**
+
+## Root cause of the dead 3s hold (verified live on the box)
+The listener design is correct (timer fires DURING the hold, not on release), the service
+is running, the device is right, logind ignores the key — but the journal shows ZERO
+press events ever handled. `evtest --grab` block-buffers its stdout when piped (not a
+TTY), so the bash `read` loop received nothing until ~4KB accumulated: presses were
+silently swallowed, and only the FIRMWARE's own long-hold hard-off ever worked — exactly
+the owner's symptom.
+
+Fixed in `tools/runtime/highascg-power-button-listen.sh`:
+1. `stdbuf -oL -eL evtest` — line-buffered, events arrive immediately.
+2. `now_ms()` used `date +%s%N` read as ONE field → s*1000 overflowed 64-bit → garbage
+   held_ms on the release path. Now `date '+%s %N'`.
+3. One journal line per press for future diagnosability.
+
+## To activate (root; casparcg has no NOPASSWD for this)
+```
+sudo install -m 755 /home/casparcg/highascg/tools/runtime/highascg-power-button-listen.sh \
+  /usr/local/lib/highascg/highascg-power-button-listen.sh
+sudo systemctl restart highascg-power-button.service
+```
+Then verify: short-press the button → journal shows "press" + "short press — network
+reset" within a second (`journalctl -t highascg-power -f`); hold 3 s → clean poweroff.
+While testing, consider adding `systemctl restart highascg-power-button.service` (and the
+install path) to sudoers NOPASSWD so future sessions can deploy this without you.
 
 ## Verified current state (2026-07-24, source + system read)
 
