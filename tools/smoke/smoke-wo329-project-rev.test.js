@@ -15,11 +15,14 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
+// IMPORTANT: require the LIVE module. src/engine/project-scenes-persist.js was a dead
+// duplicate nothing imported — the first WO-329 pass patched it and changed nothing at
+// runtime (caught by live verify). It has been deleted; project-scenes.js is authoritative.
 const {
 	projectRevOf,
 	isProjectSaveNewerOrEqual,
 	validateIncomingProject,
-} = require('../../src/engine/project-scenes-persist')
+} = require('../../src/engine/project-scenes')
 
 const scenes = (ids) => ({ scenes: ids.map((id) => ({ id })) })
 
@@ -95,7 +98,11 @@ describe('WO-329 wiring source guards', () => {
 	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
 
 	it('deck-sync persists must NOT bump the rev (would strand HTTP clients)', () => {
-		assert.match(read('src/engine/project-scenes-persist.js'), /pushVolumes: false, bumpRev: false/)
+		assert.match(read('src/engine/project-scenes.js'), /pushVolumes: false, bumpRev: false/)
+	})
+
+	it('the dead project-scenes-persist duplicate stays deleted', () => {
+		assert.equal(fs.existsSync(path.join(__dirname, '../../src/engine/project-scenes-persist.js')), false)
 	})
 
 	it('save/autosave responses carry the new rev and the client adopts it', () => {
