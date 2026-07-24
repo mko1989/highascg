@@ -1,2 +1,7 @@
 on the test pattern screen resolution is displayed 3 times.
 
+
+FIXED 2026-07-24 (commit f3c8f61): not stacked copies - one test pattern instance showed the
+same mode in three fields (resolution line "WxH · mode", Output line "... · mode", GPU badge
+sub). Badge sub now only shows an OS mode that differs; Output line drops the duplicate mode.
+Applies automatically the next time the pattern is played.
