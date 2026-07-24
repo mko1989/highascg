@@ -42,6 +42,30 @@ describe('cg-studio', () => {
 		assert.match(out, /--primary:\s*#ff0000/)
 	})
 
+	it('WO-321: bakeDefaults persists NON-color style via window.__LT_INITIAL_STYLE__ (fixes "only exports color")', () => {
+		const src = fs.readFileSync(
+			path.join(REPO_ROOT, 'template', 'lower-thirds', 'lt-classic-box.html'),
+			'utf8',
+		)
+		// Colors alone still bake as CSS vars only — no engine seed required.
+		const colorOnly = bakeDefaults(src, { data: {}, style: { primaryColor: '#ff0000' } })
+		assert.ok(!colorOnly.includes('__LT_INITIAL_STYLE__'), 'a color-only export needs no style seed')
+		// A non-color field (typography/layout/etc) must ride the seed so it is not silently dropped.
+		const withGeom = bakeDefaults(src, {
+			data: {},
+			style: { primaryColor: '#ff0000', titleFontSize: 48, position: 'right' },
+		})
+		assert.match(withGeom, /window\.__LT_INITIAL_STYLE__\s*=/, 'non-color style is seeded')
+		assert.match(withGeom, /"titleFontSize":48/, 'seed carries the non-color field')
+		assert.match(withGeom, /"position":"right"/)
+		// Regression guard: validate must REJECT a non-color style with no seed, ACCEPT when seeded.
+		assert.throws(
+			() => validateExportedHtml('x LTEngine.init y lt-engine.js z', { titleFontSize: 48 }),
+			/dropped non-color style/,
+		)
+		validateExportedHtml(withGeom, { primaryColor: '#ff0000', titleFontSize: 48, position: 'right' })
+	})
+
 	it('exportTemplate writes valid lt-engine HTML to template/studio/', () => {
 		try {
 			if (fs.existsSync(TEST_EXPORT)) fs.unlinkSync(TEST_EXPORT)

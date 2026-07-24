@@ -679,6 +679,19 @@ const LTEngine = (function () {
 
     function init(variantConfig) {
         cfg = variantConfig;
+        // WO-321: CG-studio exports bake their full configured style into window.__LT_INITIAL_STYLE__
+        // so the exported template renders the studio look — typography/layout/box/timing, not just
+        // colors. Seed the style store before first render. GUARDED: absent on hand-written templates,
+        // so this is a complete no-op for them. Colors still come from the CSS vars baked in the export
+        // (the engine's applyStyles never touches color).
+        try {
+            var seed = (typeof window !== 'undefined') ? window.__LT_INITIAL_STYLE__ : null;
+            if (seed && typeof seed === 'object') {
+                STYLE_KEYS.forEach(function (k) {
+                    if (seed[k] != null && seed[k] !== '') style[k] = seed[k];
+                });
+            }
+        } catch (_) { /* seed is best-effort; a bad global must not break init */ }
         window['update'] = raw => update(raw);
         window['play'] = play;
         window['next'] = next;

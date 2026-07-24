@@ -189,7 +189,10 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 			eyeBtn.innerHTML = uiIcon(entry.visible ? 'eye' : 'eyeOff')
 			eyeBtn.addEventListener('click', async () => {
 				try {
-					await api.post('/api/timers/visible', { timerId: timer.timerId, screenIdx, visible: !entry.visible })
+					// WO-320: fade the compact timer in/out (~25-frame opacity ramp) instead of an instant
+					// cut — the server ramps MIXER OPACITY over fadeFrames, and a fade-in targets the timer's
+					// stored on-air opacity. 25 matches the full screen-timer inspector's fade.
+					await api.post('/api/timers/visible', { timerId: timer.timerId, screenIdx, visible: !entry.visible, fadeFrames: 25 })
 					dispatchTimersChanged()
 					void renderCompactTimers()
 				} catch (err) {

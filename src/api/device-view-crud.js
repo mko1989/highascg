@@ -205,6 +205,12 @@ function handleUpdateDestination(j, ctx) {
 				// physicalPort: explicit null = "clear back to Auto"; key absent = keep current.
 				physicalPort:
 					'physicalPort' in p ? (p.physicalPort == null ? undefined : p.physicalPort) : d0.physicalPort,
+					// The merge only carries EXPLICITLY-listed patch fields (…d0 keeps the rest), so a
+					// boolean toggle must be picked up here or its edit is dropped. autoLaunch was missing
+					// → unchecking "Auto-start at boot" never stuck ("can't uncheck autostart gui"). A
+					// present key wins (false honoured); an absent key keeps the current value.
+					autoLaunch: 'autoLaunch' in p ? p.autoLaunch !== false : d0.autoLaunch,
+					headless: 'headless' in p ? p.headless === true : d0.headless,
 			}
 			: {}),
 	}

@@ -46,6 +46,25 @@ function bakeDefaults(html, payload) {
 		}
 	}
 
+	// WO-321: colors bake as CSS vars above (the engine's applyStyles never touches color), but every
+	// OTHER style field — typography, layout, box size, opacity, timing — is applied by the engine at
+	// runtime from its style store, which an exported template previously never seeded. Bake the full
+	// style into window.__LT_INITIAL_STYLE__ so lt-engine.js seeds it at init and the export renders
+	// the studio's configured look, not just its colors. (data/text is already baked into the HTML.)
+	const seed = {}
+	for (const [k, v] of Object.entries(style)) {
+		if (v == null || v === '') continue
+		if (/color|gradient|panel/i.test(k)) continue // colors ride the CSS vars above, not the engine seed
+		seed[k] = v
+	}
+	if (Object.keys(seed).length) {
+		// Escape </ so a style value can never close the injected <script> early.
+		const json = JSON.stringify(seed).replace(/<\//g, '<\\/')
+		const seedScript = `<script>window.__LT_INITIAL_STYLE__ = ${json};</script>`
+		if (out.includes('</head>')) out = out.replace('</head>', `${seedScript}\n</head>`)
+		else out = seedScript + out
+	}
+
 	return out
 }
 
@@ -75,9 +94,19 @@ function escapeHtml(s) {
 		.replace(/"/g, '&quot;')
 }
 
-function validateExportedHtml(html) {
+function validateExportedHtml(html, style) {
 	if (!html.includes('LTEngine.init')) throw new Error('Export missing LTEngine.init')
 	if (!html.includes('lt-engine.js')) throw new Error('Export missing lt-engine.js reference')
+	// WO-321: guard against the original "only exports color changes" bug — a non-color style must be
+	// persisted via the window.__LT_INITIAL_STYLE__ seed, or the exported template silently reverts
+	// typography/layout/box/timing to the base template's defaults on air.
+	const hasNonColorStyle =
+		style &&
+		typeof style === 'object' &&
+		Object.entries(style).some(([k, v]) => v != null && v !== '' && !/color|gradient|panel/i.test(k))
+	if (hasNonColorStyle && !html.includes('window.__LT_INITIAL_STYLE__')) {
+		throw new Error('Export dropped non-color style (missing window.__LT_INITIAL_STYLE__ seed)')
+	}
 }
 
 function exportTemplate(opts) {
@@ -93,7 +122,7 @@ function exportTemplate(opts) {
 	const raw = fs.readFileSync(source.filePath, 'utf8')
 	let html = bakeDefaults(raw, { data: opts.data, style: opts.style })
 	html = fixStudioAssetPaths(html)
-	validateExportedHtml(html)
+	validateExportedHtml(html, opts.style)
 
 	const studioDir = getStudioDir()
 	fs.mkdirSync(studioDir, { recursive: true })
