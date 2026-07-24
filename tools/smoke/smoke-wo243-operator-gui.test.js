@@ -356,6 +356,34 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1&debug=1', 'patched field applied')
 		assert.equal(d.physicalPort, 2, 'sibling field preserved, not clobbered')
 	})
+
+	it('handleUpdateDestination honours autoLaunch:false on patch (todos22 "can\'t uncheck autostart gui")', () => {
+		const ctx = mockCtx({
+			screenDestinations: {
+				version: 1,
+				destinations: [{ id: 'og1', mainScreenIndex: 0, mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?operatorGui=1', autoLaunch: true }],
+			},
+		})
+		const res = handleUpdateDestination({ updateDestination: { id: 'og1', autoLaunch: false } }, ctx)
+		assert.equal(res.ok, true)
+		const d = res.screenDestinations.destinations[0]
+		assert.equal(d.autoLaunch, false, 'explicit autoLaunch:false must stick — the merge used to drop it and the box re-checked the box')
+		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1', 'untouched fields preserved')
+	})
+
+	it('handleUpdateDestination preserves autoLaunch when the patch omits it, and honours headless (WO-325)', () => {
+		const ctx = mockCtx({
+			screenDestinations: {
+				version: 1,
+				destinations: [{ id: 'og1', mainScreenIndex: 0, mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?operatorGui=1', autoLaunch: false, headless: false }],
+			},
+		})
+		const res = handleUpdateDestination({ updateDestination: { id: 'og1', headless: true } }, ctx)
+		assert.equal(res.ok, true)
+		const d = res.screenDestinations.destinations[0]
+		assert.equal(d.autoLaunch, false, 'omitted field keeps its stored value')
+		assert.equal(d.headless, true, 'explicit headless:true applied')
+	})
 })
 
 describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks', () => {
