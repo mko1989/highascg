@@ -105,6 +105,7 @@ WO-309 (async device-view probes) — DONE, commit follows.
 tell me how big of a work it would be to port the webui to the node gui https://github.com/nodegui/nodegui
 could this give as more native preview from casparcg?
 
+
 VERY IMPORTANT
 when total resolution of the planned gpu outputs desktop xrandr is bigger than current the restart needs a nodm restart too. this was already coded in but either got deleted or stopped working.
 

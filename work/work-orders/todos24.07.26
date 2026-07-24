@@ -1,0 +1,79 @@
+No custom scaling of layers in looks
+
+The borders around screen dests in compose preview don't act well with custom res.
+
+Layer media continue playback between looks.
+
+Loading saving projects.
+Projects running on two clients.
+
+Companion module.
+
+Live input seems to periodically refresh it's thumbnail.
+
+Power button functions
+
+================================================================================
+2026-07-24 — WORK ORDERS CREATED FOR EVERYTHING ABOVE (326-332)
+================================================================================
+Each WO carries a code-verified survey of what exists today + acceptance criteria.
+
+  326  Custom scaling of layers in looks — geometry (X/Y/W/H via fill) already exists
+       end-to-end; WO starts with a 10-min live check of what you actually mean
+       (bug in the existing path vs content-zoom-in-rect vs a scale% control).
+  327  Compose-preview dest borders vs custom res — root cause found: the overlay's
+       fallback auto-tiler hardcodes 1920x1080 cells and never reads the destination's
+       stored width/height (preview-canvas-destination-overlay.js:53-67).
+  328  Media continues playback between looks — continuity machinery already exists
+       (visual-equal skip, SWAP TRANSFORMS, seek-resume); WO lists the 5 ranked
+       suspects for why your case restarts, needs a live repro to pick one.
+  329  Loading/saving projects + two clients — kill the wall-clock savedAt 409 with a
+       server monotonic rev; two clients today = silent last-write-wins (whole-project
+       overwrite on every project_sync); recommend an advisory edit-lock first.
+  330  Companion module — NOT greenfield: highpass-highascg 1.0.3 already exists in
+       /home/casparcg/companion-module-dev with its own WO + QA checklist, installer in
+       tools/eggs/companion. WO = audit checklist vs source, install-verify on box,
+       desk QA with your streamdeck, close gaps, repackage.
+  331  Live-input thumbnail refresh — root cause found: sources-panel-live-render.js:131
+       busts the URL with Date.now() on EVERY render (deck thumbs correctly use the
+       30s TTL window), so every state tick refetches. Small client fix.
+  332  Power button — listener already does short=network-reset / hold>=3s=poweroff;
+       missing: UI Shutdown button + endpoint, configurable actions/threshold,
+       service health in Devices view. Scope check with you first.
+
+================================================================================
+2026-07-24 — VERIFICATION OF todos21 + todos22 CLAIMS (3 independent audits)
+================================================================================
+todos21 claims — ALL VERIFIED in source, tests present + wired into the gate:
+  WO-308 pointer-confine split      VERIFIED (UI dropdown, whitelist, RUN/SKIP logs,
+                                    off still keeps operator-monitor placement; 9/9 tests)
+  WO-309 async device-view          VERIFIED (GET path fully async; caveat: a latent
+                                    execSync fallback in gpu-edid-probe.js:91-119 is only
+                                    dodged by call ORDER warming the cache — fragile if
+                                    device-view-snapshot.js:312 is ever reordered)
+  EDID-native dropdown default      VERIFIED (moved to device-view-inspector-gpu-video-
+                                    modeline.js + edid-preferred-mode.js; note db0094b was
+                                    an unrelated commit — only 889eed2 implements it)
+  Full offline gate: 1435/1439 pass; the 2 fails are pre-existing env-dependent
+  smoke-wo315-nodm-canvas-decision tests (box-geometry-dependent), not regressions.
+
+todos22 claims — MIXED; two claimed-done items DO NOT EXIST in the tree:
+  WO-320B compact-timer eye fade    VERIFIED (real MIXER OPACITY 25-frame tween;
+                                    part A pixel position correctly still blocked)
+  WO-321 CG-studio full-style export VERIFIED (seed + hard export guard + engine no-op
+                                    guard; mirror rsync confirmed identical; canvas/
+                                    collapsible inspector correctly still open)
+  autostart-gui uncheck fix         PARTIAL (device-view-crud.js fix is real and correct;
+                                    the CLAIMED regression test in smoke-wo243 was NEVER
+                                    written — no autoLaunch/headless coverage anywhere)
+  WO-325 headless GUI + stream hint VERIFIED (config-gen drops <screen>, kiosk suppressed,
+                                    new smoke test 5/5) — but was sitting UNCOMMITTED
+  WO-322 shaders on media band      *** FALSE CLAIM — ZERO code in the tree. ***
+  WO-323 compose live-source drops  *** FALSE CLAIM — ZERO code in the tree. ***
+       Both WO files re-annotated + reopened. Likely uncommitted work wiped by a later
+       git operation (the exact failure mode the commit-immediately rule exists for).
+
+Tree state found today: ~43 files of real work sitting uncommitted since 4e0a998
+(WO-320B/321/325, autostart fix, timeline<->look fade coordination + timeline-clip
+inspector ReferenceError fix, WO-319 stream continuation). Committed in labeled units
+today so nothing else can be silently lost.
