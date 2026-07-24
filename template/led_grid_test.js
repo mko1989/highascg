@@ -115,6 +115,11 @@ function fillGpuPortBadge(data) {
 	if (xr && xr.toUpperCase() !== gpuId.toUpperCase()) {
 		sub = xr
 	}
+	/* issues24.07.26 "resolution displayed 3 times": the connectorLabel fallback ends in
+	 * "· <videoMode>", which this badge echoed while the brand-meta resolution line already
+	 * carries the same mode. The sub exists to show an OS mode that DIFFERS — identical = noise. */
+	var vmBadge = data.videoMode != null ? String(data.videoMode).trim() : ''
+	if (sub && vmBadge && sub.toUpperCase() === vmBadge.toUpperCase()) sub = ''
 	badge.innerHTML = gpuId + (sub ? '<span class="gpu-port-badge__sub">' + sub + '</span>' : '')
 }
 
@@ -146,6 +151,15 @@ function fillBrandMetaAndPatterns(data, mode) {
 	}
 	var connText = data.connectorLabel != null ? String(data.connectorLabel).trim() : ''
 	if (/^Output:\s*/i.test(connText)) connText = connText.replace(/^Output:\s*/i, '')
+	/* Same de-dup: drop a trailing "· <videoMode>" from the Output line when the resolution
+	 * line above already shows that mode — third copy of the same resolution otherwise. */
+	var vmMeta = data.videoMode != null ? String(data.videoMode).trim() : ''
+	if (connText && vmMeta && resText && resText.toUpperCase().indexOf(vmMeta.toUpperCase()) >= 0) {
+		var tail = connText.slice(-vmMeta.length)
+		if (tail.toUpperCase() === vmMeta.toUpperCase()) {
+			connText = connText.slice(0, -vmMeta.length).replace(/\s*·\s*$/, '').trim()
+		}
+	}
 	if (connText) {
 		var lc = document.createElement('span')
 		lc.className = 'brand-meta__line'
