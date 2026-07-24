@@ -220,6 +220,30 @@ function createGuiStreamIngest(opts) {
 		state.buf = createGopBuffer({ maxGopFrames: Math.max(gop * 4, 200) })
 	}
 
+	let refreshing = false
+	/**
+	 * WO-319 hardening — called by the app on the Caspar (re)connect edge (index.js), NOT on a timer.
+	 * When Caspar restarts (crash, or a config-apply restart) the NVENC consumer dies with it and the
+	 * local remux is left reading a now-silent UDP port with no error of its own. If clients are still
+	 * watching, re-establish the consumer: stop (best-effort REMOVE on the new connection, harmless if
+	 * it is already gone) then start (re-ADD + respawn the remux). No-op when nobody is watching — the
+	 * refcount starts it on the next client connect.
+	 */
+	async function onCasparConnected() {
+		if (state.refs <= 0) return
+		if (refreshing) return
+		refreshing = true
+		try {
+			log('info', '[GUI stream] Caspar (re)connected — refreshing consumer for active clients')
+			await stop()
+			if (state.refs > 0) await start()
+		} catch (e) {
+			log('warn', `[GUI stream] refresh on reconnect failed: ${e?.message || e}`)
+		} finally {
+			refreshing = false
+		}
+	}
+
 	async function acquire() {
 		state.refs++
 		if (state.lingerTimer) {
@@ -262,6 +286,7 @@ function createGuiStreamIngest(opts) {
 		acquire,
 		release,
 		stop,
+		onCasparConnected,
 		cleanupStaleConsumer,
 		get buffer() {
 			return state.buf

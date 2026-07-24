@@ -44,7 +44,10 @@ function normalizeComposePreviewSettings(composePreview = {}, defaults = {}) {
 	const prev = { ...defaults, ...composePreview }
 	return {
 		...prev,
-		mode: prev.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : 'canvas',
+		// 'stream' (WO-319 Live preview, now a Preview-source choice) persists as-is; the server treats
+		// it as canvas base (isFfmpegJpegComposePreview → false, no JPEG consumers) while the client
+		// overlays the NVENC gui-stream. Any other/legacy value (e.g. caspar_image) migrates to canvas.
+		mode: prev.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : prev.mode === 'stream' ? 'stream' : 'canvas',
 		fps: clampComposePreviewFps(prev.fps, defaults.fps ?? 25),
 		resolutionScale: normalizeResolutionScale(prev.resolutionScale),
 		jpegQuality: clampJpegQuality(prev.jpegQuality, defaults.jpegQuality ?? 10),

@@ -24,7 +24,7 @@ import { importProjectWithHardwareReconcile } from '../lib/project-import-flow.j
 import { showLoadProjectModal } from './load-project-modal.js'
 import { startNewProject } from '../lib/default-project.js'
 import { initHeaderBarOperatorHelper } from './header-bar-operator-helper.js'
-import { initHeaderBarLivePreviewToggle } from './header-bar-live-preview-toggle.js'
+import { initComposePreviewStreamDriver } from './compose-preview-stream-driver.js'
 
 import { initLedTestCard } from './header-bar-led-test.js'
 import { initStreamingBadge } from './header-bar-streaming.js'
@@ -300,8 +300,10 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	// WO-283: operator-GUI-only "Open window ▾" / "Back to GUI". Self-gating — a no-op outside
 	// operator-GUI mode, where the Settings modal's launch buttons already cover this.
 	initHeaderBarOperatorHelper(midWrap)
-	// WO-319: "Live preview" toggle — shown on any client once the NVENC stream feature is available.
-	initHeaderBarLivePreviewToggle(midWrap)
+	// WO-319 / todos22.07.26: the Live preview stream is now the 'stream' choice in the Compose
+	// preview "Preview source" dropdown (Settings), not a header button. This driver mirrors that
+	// setting onto the per-client live canvas — no visible control here.
+	initComposePreviewStreamDriver()
 
 	const rightWrap = document.createElement('div')
 	rightWrap.className = 'header-right'

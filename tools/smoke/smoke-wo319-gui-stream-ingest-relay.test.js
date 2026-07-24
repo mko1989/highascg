@@ -157,6 +157,27 @@ test('a failed ADD kills the orphan reader and surfaces the error', async () => 
 	assert.match(h.ingest.stats().lastError || '', /start failed/)
 })
 
+test('onCasparConnected re-establishes the consumer for active clients (Caspar restart)', async () => {
+	const h = makeHarness()
+	await h.ingest.acquire()
+	assert.equal(h.calls.amcp.filter((c) => c.startsWith('ADD')).length, 1)
+	assert.equal(h.calls.spawns.length, 1)
+	// Caspar restarts underneath: its consumer is gone, our remux reads a dead port. The connect edge
+	// fires onCasparConnected → REMOVE (stale) + re-ADD + respawn.
+	await h.ingest.onCasparConnected()
+	assert.equal(h.calls.amcp.filter((c) => c.startsWith('REMOVE')).length, 1, 'removed the stale consumer')
+	assert.equal(h.calls.amcp.filter((c) => c.startsWith('ADD')).length, 2, 're-added on the new connection')
+	assert.equal(h.calls.spawns.length, 2, 'respawned the remux')
+	await h.ingest.stop()
+})
+
+test('onCasparConnected is a no-op when nobody is watching', async () => {
+	const h = makeHarness()
+	await h.ingest.onCasparConnected()
+	assert.equal(h.calls.spawns.length, 0, 'no clients → nothing to refresh')
+	assert.equal(h.calls.amcp.length, 0, 'no ADD/REMOVE churn on an idle stream')
+})
+
 test('wire framing: 8-byte LE header, keyframe flag, payload verbatim', () => {
 	const data = Buffer.from([1, 2, 3, 4, 5])
 	const buf = encodeWireFrame({ seq: 0x01020304, keyframe: true, data })

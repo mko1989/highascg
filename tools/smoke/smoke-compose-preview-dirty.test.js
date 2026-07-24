@@ -87,4 +87,14 @@ describe('compose-preview API', () => {
 		assert.equal(normalizeComposePreviewSettings({ mode: 'caspar_image' }).mode, 'canvas')
 		assert.equal(normalizeComposePreviewSettings({ mode: 'ffmpeg_jpeg' }).mode, 'ffmpeg_jpeg')
 	})
+
+	it('normalizeComposePreviewSettings persists the stream mode; server treats it as canvas base (no JPEG consumers)', () => {
+		// todos22.07.26: Live preview is now the 'stream' Preview-source choice. It must survive the
+		// settings-post normalizer (else it reverts to canvas and never activates), while the server's
+		// ffmpeg-JPEG path stays OFF for it — the base is client thumbnails, the NVENC gui-stream is a
+		// separate channel.
+		const { isFfmpegJpegComposePreview } = require('../../src/preview/compose-preview-mode')
+		assert.equal(normalizeComposePreviewSettings({ mode: 'stream' }).mode, 'stream')
+		assert.equal(isFfmpegJpegComposePreview({ composePreview: { mode: 'stream' } }), false)
+	})
 })

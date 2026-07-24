@@ -8,13 +8,32 @@ import { isOperatorGuiModeActive } from './operator-gui-mode.js'
  * canvas thumbnails nor the ffmpeg JPEG poll should run (owner 2026-07-16: "start with the
  * compose preview setting set to native so it doesnt interfere"). This is a per-page override —
  * the shared server setting is untouched, so normal browsers keep their configured mode.
+ *
+ * This returns the BASE rendering mode. The 'stream' setting (WO-319 Live preview) is not a base
+ * mode — it is a hardware-encoded video that OVERLAYS the compose surfaces (driven separately via
+ * isStreamComposePreview() → the operator live canvas). Its base underneath is canvas thumbnails,
+ * so 'stream' maps to 'canvas' here and the stream blits on top once frames arrive (and falls back
+ * to plain thumbnails when the gui-stream channel / WebCodecs is unavailable on this client).
  * @returns {'canvas' | 'ffmpeg_jpeg' | 'native'}
  */
 export function resolveComposePreviewMode() {
 	if (isOperatorGuiModeActive()) return 'native'
 	const mode = settingsState.getSettings()?.composePreview?.mode
 	if (mode === 'ffmpeg_jpeg' || mode === 'canvas') return mode
+	if (mode === 'stream') return 'canvas'
 	return 'canvas'
+}
+
+/**
+ * True when the shared compose-preview setting selects the WO-319 Live preview stream, EXCEPT on
+ * operator-GUI pages (which use their own shaped 'native' overlay and must not also decode a stream).
+ * Drives the per-client operator live canvas; actual acquisition still gates on the gui-stream
+ * channel being available AND the browser supporting WebCodecs (see preview-canvas-live-stream.js).
+ * @returns {boolean}
+ */
+export function isStreamComposePreview() {
+	if (isOperatorGuiModeActive()) return false
+	return settingsState.getSettings()?.composePreview?.mode === 'stream'
 }
 
 /**
