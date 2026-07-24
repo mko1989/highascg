@@ -167,6 +167,11 @@ export function createScenesPreviewRuntime(opts) {
 	}
 
 	function flushPreviewPush() {
+		/* WO-326: inspector edits flush through HERE, not schedulePreviewPush — without arming the
+		 * nudge, an edit-on-PGM geometry-only edit hit pushEditsToPgmLive's early return ("the PGM
+		 * nudge owns it") with no nudge ever scheduled, so inspector W/H changes never reached air.
+		 * Canvas drags only worked because schedulePreviewPush arms it. */
+		scheduleMixerNudge()
 		if (previewDebounce != null) clearTimeout(previewDebounce)
 		previewDebounce = null
 		previewDebounceFirstAt = null

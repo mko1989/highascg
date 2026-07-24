@@ -178,12 +178,11 @@ export function appendSceneLayerFillGroup(root, opts) {
 		step: 1,
 		decimals: 0,
 		onChange: (v) => {
+			/* patchFillPx reads FRESH layer state (aspectLocked + content AR) and pairs H itself
+			 * when locked; the old cosmetic pairing here read a STALE captured `layer`, so after
+			 * unlocking, the inputs kept showing locked-aspect values the model never had (WO-326). */
 			patchFillPx({ w: Math.max(1, v) })
-			if (layer.aspectLocked !== false) {
-				const ar = pxRect.w > 0 && pxRect.h > 0 ? pxRect.w / pxRect.h : 16 / 9
-				const nh = Math.max(1, Math.round(v / ar))
-				hInp.setValue(nh, false)
-			}
+			syncGeometryInputsFromLayer()
 		},
 	}))
 	const hInp = (hInpRef = createDragInput({
@@ -195,11 +194,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 		decimals: 0,
 		onChange: (v) => {
 			patchFillPx({ h: Math.max(1, v) })
-			if (layer.aspectLocked !== false) {
-				const ar = pxRect.w > 0 && pxRect.h > 0 ? pxRect.w / pxRect.h : 16 / 9
-				const nw = Math.max(1, Math.round(v * ar))
-				wInp.setValue(nw, false)
-			}
+			syncGeometryInputsFromLayer()
 		},
 	}))
 	fillGrp.appendChild(xInp.wrap)
@@ -219,6 +214,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 	lockCb.addEventListener('change', () => {
 		sceneState.patchLayer(sceneId, layerIndex, { aspectLocked: lockCb.checked })
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		syncGeometryInputsFromLayer()
 	})
 	lockWrap.appendChild(lockCb)
 	lockWrap.appendChild(lockLab)
