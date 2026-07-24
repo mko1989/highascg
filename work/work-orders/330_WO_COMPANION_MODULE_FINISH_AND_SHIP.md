@@ -1,9 +1,38 @@
 # WO-330 — Companion module: finish, verify on-box, and ship
 
 **Source:** todos24.07.26 — "Companion module."
-**Status: OPEN — mostly an audit/finish job, NOT greenfield.** Written 2026-07-24.
-A HighAsCG Bitfocus Companion module ALREADY EXISTS and has its own work tracking — the
-first task is reconciling what's done vs. what the owner still misses.
+**Status: AUDITED ON-BOX 2026-07-24 — one deploy command for the owner, then desk QA.**
+A HighAsCG Bitfocus Companion module ALREADY EXISTS and has its own work tracking.
+
+## On-box audit result (2026-07-24, live)
+- Companion (headless v5, admin :8001) RUNNING; HighAsCG :4200 RUNNING; satellite :16622
+  listening; `/api/companion/control-status`: acceptsCompanionControl=true, role standalone.
+- **Installed module is v1.0.1; source/packaged is v1.0.3** — the entire WO-170 feature
+  set (RTMP start/stop, record start/stop, multiview apply, timeline take/sendTo,
+  countdown actions) plus WO-216 WoL exists ONLY in 1.0.3, i.e. NONE of it is on the desk.
+  This is almost certainly what "Companion module" on the todo means.
+- The Companion instance PINS `moduleVersionId: "1.0.1"` in `v5.0/db.sqlite` — a plain
+  file swap would kill the instance on the next Companion restart. The installer
+  (`tools/eggs/companion/install-companion-module.sh`) has been upgraded 2026-07-24 to
+  repoint ANY stale pin (not just "dev") to the installed version, and it refuses to
+  touch the db while Companion is running.
+- `/api/companion/connection-status` anomaly: satellite `connected:true` yet
+  `reason:"satellite_not_connected"` — contradictory status payload; journal shows the
+  satellite TCP session established then closed with 0 surfaces. Cosmetic/status bug,
+  investigate after 1.0.3 lands.
+- Companion journal: "Invalid preset definitions: Preview ch1/ch2 · Bottom-right" +
+  "Preset references not found: preview_ch1_quad_br, preview_ch2_quad_br" — module preset
+  bug (bad references), fix in module repo.
+- WO-170-QA-CHECKLIST.md: ALL items unchecked — nothing desk-verified yet.
+
+## OWNER ACTION (needs sudo; ~1 min, briefly drops the streamdeck):
+```
+sudo systemctl stop companion \
+  && /home/casparcg/highascg/tools/eggs/companion/install-companion-module.sh \
+  && sudo systemctl start companion
+journalctl -u companion --since '1 min ago' | grep -i highpass
+```
+Then run the WO-170 desk QA with the streamdeck and tick the checklist.
 
 ## Verified current state (2026-07-24, source read)
 
