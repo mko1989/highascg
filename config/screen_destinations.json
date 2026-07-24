@@ -2,60 +2,12 @@
   "version": 1,
   "destinations": [
     {
-      "id": "dst_mrumipa8_1",
+      "id": "dst_mrzemj1s_1",
       "label": "Operator GUI",
       "mainScreenIndex": 0,
       "mode": "operator_gui",
       "audioLayout": "stereo",
-      "videoMode": "1080p5000",
-      "width": 1920,
-      "height": 1080,
-      "fps": 50,
-      "caspar": {
-        "bus": "pgm"
-      },
-      "edidLabel": "",
-      "inheritsProjectFps": false,
-      "stream": {
-        "type": "rtmp",
-        "source": "program_1",
-        "url": "",
-        "key": "",
-        "quality": "medium"
-      },
-      "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
-      "autoLaunch": true
-    },
-    {
-      "id": "dst_mrunnh8x_1",
-      "label": "PGM/PRV 2",
-      "mainScreenIndex": 0,
-      "mode": "pgm_prv",
-      "audioLayout": "8ch",
       "videoMode": "custom",
-      "width": 3072,
-      "height": 1728,
-      "fps": 50,
-      "caspar": {
-        "bus": "pgm"
-      },
-      "edidLabel": "",
-      "inheritsProjectFps": false,
-      "stream": {
-        "type": "rtmp",
-        "source": "program_1",
-        "url": "",
-        "key": "",
-        "quality": "medium"
-      }
-    },
-    {
-      "id": "dst_mruno18x_1",
-      "label": "PGM 3",
-      "mainScreenIndex": 1,
-      "mode": "pgm_only",
-      "audioLayout": "stereo",
-      "videoMode": "1080p5000",
       "width": 1920,
       "height": 1080,
       "fps": 50,
@@ -64,6 +16,32 @@
       },
       "edidLabel": "",
       "inheritsProjectFps": true,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      },
+      "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
+      "autoLaunch": true,
+      "headless": false
+    },
+    {
+      "id": "dst_mrzeocxh_1",
+      "label": "PGM/PRV 1",
+      "mainScreenIndex": 0,
+      "mode": "pgm_prv",
+      "audioLayout": "stereo",
+      "videoMode": "custom",
+      "width": 2560,
+      "height": 896,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": false,
       "stream": {
         "type": "rtmp",
         "source": "program_1",

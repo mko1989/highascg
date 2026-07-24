@@ -1,7 +1,7 @@
 {
-  "enabled": true,
+  "enabled": false,
   "videoMode": "",
-  "videoSource": "program_2",
+  "videoSource": "program_1",
   "audioSource": "follow_video",
   "audioSourcePair": "all",
   "casparChannel": null,
@@ -10,6 +10,5 @@
   "streamKey": "",
   "rtmpQuality": "medium",
   "contentLayer": 10,
-  "decklinkDevice": 0,
-  "quality": "medium"
+  "decklinkDevice": 0
 }

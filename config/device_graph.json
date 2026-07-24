@@ -37,104 +37,6 @@
       "externalRef": "stream_1"
     },
     {
-      "id": "rec_1",
-      "deviceId": "caspar_host",
-      "kind": "record_out",
-      "index": 0,
-      "label": "Rec1",
-      "caspar": {
-        "name": "Rec1",
-        "source": "program_2",
-        "crf": 18,
-        "videoCodec": "h264",
-        "videoBitrateKbps": 4500,
-        "encoderPreset": "veryfast",
-        "audioCodec": "aac",
-        "audioBitrateKbps": 128
-      },
-      "externalRef": "record_1"
-    },
-    {
-      "id": "audio_1",
-      "deviceId": "caspar_host",
-      "kind": "audio_out",
-      "label": "Audio 1",
-      "externalRef": "hw:2,0"
-    },
-    {
-      "id": "dst_in_dst_mrumipa8_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "Operator GUI",
-      "externalRef": "dst_mrumipa8_1"
-    },
-    {
-      "id": "dlsdi_1",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 0,
-      "label": "DeckLink 1",
-      "caspar": {
-        "ioDirection": "unassigned"
-      },
-      "externalRef": "1"
-    },
-    {
-      "id": "dlsdi_2",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 1,
-      "label": "DeckLink 2",
-      "caspar": {
-        "ioDirection": "unassigned",
-        "bus": "pgm",
-        "mainIndex": 1
-      },
-      "externalRef": "2"
-    },
-    {
-      "id": "dlsdi_3",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 2,
-      "label": "DeckLink 3",
-      "caspar": {
-        "ioDirection": "out",
-        "bus": "pgm",
-        "mainIndex": 2,
-        "outputBinding": {
-          "type": "screen",
-          "index": 3
-        }
-      },
-      "externalRef": "3"
-    },
-    {
-      "id": "dlsdi_4",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 3,
-      "label": "DeckLink 4",
-      "caspar": {
-        "ioDirection": "in"
-      },
-      "externalRef": "4"
-    },
-    {
-      "id": "dst_in_dst_mrunnh8x_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM/PRV 2",
-      "externalRef": "dst_mrunnh8x_1"
-    },
-    {
-      "id": "dst_in_dst_mruno18x_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM 3",
-      "externalRef": "dst_mruno18x_1"
-    },
-    {
       "id": "str_2",
       "deviceId": "caspar_host",
       "kind": "stream_out",
@@ -158,16 +60,87 @@
       "externalRef": "stream_2"
     },
     {
-      "id": "dst_in_host_decklink_input_4",
+      "id": "rec_1",
+      "deviceId": "caspar_host",
+      "kind": "record_out",
+      "index": 0,
+      "label": "Rec1",
+      "caspar": {
+        "name": "Rec1",
+        "source": "program_1",
+        "crf": 26,
+        "videoCodec": "h264",
+        "videoBitrateKbps": 4500,
+        "encoderPreset": "veryfast",
+        "audioCodec": "aac",
+        "audioBitrateKbps": 128
+      },
+      "externalRef": "record_1"
+    },
+    {
+      "id": "audio_1",
+      "deviceId": "caspar_host",
+      "kind": "audio_out",
+      "label": "Audio 1",
+      "externalRef": "hw:0,0"
+    },
+    {
+      "id": "dst_in_dst_mrzemj1s_1",
       "deviceId": "destinations",
       "kind": "destination_in",
+      "label": "Operator GUI",
+      "externalRef": "dst_mrzemj1s_1"
+    },
+    {
+      "id": "dlsdi_1",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 0,
+      "label": "DeckLink 1",
+      "caspar": {
+        "ioDirection": "unassigned"
+      },
+      "externalRef": "1"
+    },
+    {
+      "id": "dlsdi_2",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 1,
+      "label": "DeckLink 2",
+      "caspar": {
+        "ioDirection": "unassigned"
+      },
+      "externalRef": "2"
+    },
+    {
+      "id": "dlsdi_3",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 2,
+      "label": "DeckLink 3",
+      "caspar": {
+        "ioDirection": "unassigned"
+      },
+      "externalRef": "3"
+    },
+    {
+      "id": "dlsdi_4",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 3,
       "label": "DeckLink 4",
       "caspar": {
-        "hostRole": "decklink_input",
-        "hostChannel": 5,
-        "slot": 4
+        "ioDirection": "unassigned"
       },
-      "externalRef": "host_decklink_input_4"
+      "externalRef": "4"
+    },
+    {
+      "id": "dst_in_dst_mrzeocxh_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM/PRV 1",
+      "externalRef": "dst_mrzeocxh_1"
     },
     {
       "id": "gpu_p0",
@@ -176,7 +149,7 @@
       "label": "P0",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 0
+        "mainIndex": 1
       },
       "externalRef": "DP-0"
     },
@@ -198,9 +171,9 @@
       "label": "P2",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 1
+        "mainIndex": 0
       },
-      "externalRef": "DP-4"
+      "externalRef": "DP-4/DP-5"
     },
     {
       "id": "gpu_p3",
@@ -211,45 +184,19 @@
         "bus": "pgm",
         "mainIndex": 0
       },
-      "externalRef": "DP-6/DP-7"
+      "externalRef": "DP-6"
     }
   ],
   "edges": [
     {
-      "id": "e_dst_in_dst_mrunnh8x_1_gpu_p0",
-      "sourceId": "dst_in_dst_mrunnh8x_1",
+      "id": "e_dst_in_dst_mrzemj1s_1_gpu_p0",
+      "sourceId": "dst_in_dst_mrzemj1s_1",
       "sinkId": "gpu_p0"
     },
     {
-      "id": "e_dst_in_dst_mruno18x_1_dlsdi_3",
-      "sourceId": "dst_in_dst_mruno18x_1",
-      "sinkId": "dlsdi_3"
-    },
-    {
-      "id": "e_dst_in_dst_mrunnh8x_1_audio_1",
-      "sourceId": "dst_in_dst_mrunnh8x_1",
-      "sinkId": "audio_1"
-    },
-    {
-      "id": "e_dst_in_dst_mruno18x_1_str_1",
-      "sourceId": "dst_in_dst_mruno18x_1",
-      "sinkId": "str_1"
-    },
-    {
-      "id": "e_dst_in_dst_mruno18x_1_str_2",
-      "sourceId": "dst_in_dst_mruno18x_1",
-      "sinkId": "str_2"
-    },
-    {
-      "id": "e_dst_in_dst_mruno18x_1_rec_1",
-      "sourceId": "dst_in_dst_mruno18x_1",
-      "sinkId": "rec_1"
-    },
-    {
-      "id": "e_dst_in_dst_mrumipa8_1_gpu_p2",
-      "sourceId": "dst_in_dst_mrumipa8_1",
-      "sinkId": "gpu_p2"
+      "id": "e_dst_in_dst_mrzeocxh_1_gpu_p3",
+      "sourceId": "dst_in_dst_mrzeocxh_1",
+      "sinkId": "gpu_p3"
     }
-  ],
-  "layout": {}
+  ]
 }

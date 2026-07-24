@@ -19,13 +19,12 @@
     "pointerConfine": "auto",
     "cefInteractiveBridge": true,
     "cefInteractiveLayer": 999,
-    "cefRemoteDebuggingPort": 9222,
-    "cefEnableGpu": true
+    "cefRemoteDebuggingPort": 9222
   },
   "local_template_path": "",
   "composePreview": {
-    "mode": "canvas",
-    "fps": 30,
+    "mode": "ffmpeg_jpeg",
+    "fps": 25,
     "resolutionScale": "half",
     "jpegQuality": 10,
     "basenamePrefix": "highascg_preview",
@@ -34,7 +33,7 @@
     "embedConsumersInCasparConfig": true,
     "attachViaAmcp": true,
     "pauseConsumerWhenIdle": false,
-    "companionThumbEnabled": false,
+    "companionThumbEnabled": true,
     "companionThumbSize": 144,
     "companionThumbIntervalMs": 1000
   },
@@ -97,25 +96,8 @@
       "dns": []
     }
   },
-  "extraLiveSources": [
-    {
-      "type": "route",
-      "routeType": "decklink",
-      "value": "route://5-4",
-      "label": "DeckLink 4",
-      "decklinkSlot": 4,
-      "inputsChannel": 5,
-      "inputsLayer": 4,
-      "decklinkDevice": 4,
-      "connectorId": "dlsdi_4",
-      "resolution": "1920×1080",
-      "fps": "50",
-      "thumbnailChannel": 5,
-      "thumbnailLayer": 4
-    }
-  ],
-  "gpuPhysicalTopologyOperatorSaved": false,
-  "screen_count": 2,
+  "screen_count": 1,
+  "configVersion": 1,
   "streaming": {
     "enabled": false,
     "protocol": "UDP",
@@ -134,9 +116,15 @@
     "drmDevice": "/dev/dri/card0",
     "autoRelocateBasePort": true
   },
-  "configVersion": 1,
   "periodic_sync_interval_sec": null,
   "periodic_sync_interval_sec_osc": null,
+  "screen_3_system_id": "DP-4",
+  "screen_3_os_mode": "1280x768",
+  "screen_3_os_backend": "xrandr",
+  "screen_3_os_rate": 50,
+  "screen_3_os_timing_source": "cvt",
+  "screen_3_os_mode_source": "edid",
+  "extraLiveSources": [],
   "screen_1_system_id": "",
   "screen_2_system_id": "",
   "screen_4_system_id": "",
@@ -147,7 +135,5 @@
   "screen_2_os_backend": "xrandr",
   "screen_4_os_backend": "xrandr",
   "multiview_os_backend": "xrandr",
-  "screen_3_system_id": "",
-  "screen_3_os_mode": "",
-  "screen_3_os_backend": "xrandr"
+  "gpuPhysicalTopologyOperatorSaved": false
 }
