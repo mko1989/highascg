@@ -456,6 +456,9 @@ function findOperatorGuiDestination(config) {
 function shouldAutoLaunchOperatorGui(config, opts = {}) {
 	const dest = findOperatorGuiDestination(config)
 	if (!dest) return { launch: false, reason: 'no_operator_gui_destination' }
+	// WO-325: a headless operator GUI exists only to feed the remote NVENC stream — never spawn the
+	// Firefox kiosk on a physical monitor for it (the generator also omits its <screen> consumer).
+	if (dest.headless === true) return { launch: false, reason: 'headless' }
 	if (dest.autoLaunch === false) return { launch: false, reason: 'auto_launch_disabled' }
 	if (Number.isFinite(dest.physicalPort)) return { launch: true, reason: 'explicit_port' }
 	const resolveMonitorPort =

@@ -18,6 +18,10 @@ const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session
  * @returns {number|null} 1-based physical GPU port, or null when nothing resolves
  */
 function resolveOperatorGuiPort(config, dest) {
+	// WO-325: a headless operator GUI drives no physical monitor — never resolve a port for it (and
+	// in particular never fall through to the multiview jack below, which is what put the operator
+	// GUI screen consumer on the multiview's monitor).
+	if (dest?.headless === true) return null
 	const explicitPort = Number.isFinite(Number(dest?.physicalPort)) && Number(dest.physicalPort) >= 1 && Number(dest.physicalPort) <= 4
 		? Number(dest.physicalPort)
 		: null
@@ -93,6 +97,24 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const label = escapeXml(String(dest?.label || 'Operator GUI'))
+
+	// WO-325: headless / stream-only — emit the channel (raster + audio-osc, which the route layers
+	// 10-49 and the runtime NVENC gui-stream consumer depend on) but NO physical <screen> consumer.
+	// The channel still renders, so the runtime STREAM consumer keeps feeding the remote client; the
+	// operator monitor is left entirely to the multiview.
+	if (dest?.headless === true) {
+		return `${channelXmlComment(
+			`Caspar channel ${ch}: Operator GUI channel "${label}" — HEADLESS (stream-only, no physical screen consumer); routed preview layers (10-49) + runtime NVENC gui-stream feed remote clients only`,
+		)}        <channel>
+            <video-mode>${dims.modeId}</video-mode>
+            <consumers>
+            </consumers>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
+        </channel>`
+	}
+
 	return `${channelXmlComment(
 		`Caspar channel ${ch}: Operator GUI channel "${label}" — routed preview layers (10-49) shown through HOLES punched in the fullscreen Firefox GUI above it (WO-263); consumer stacks below Firefox on ${rect ? `port ${resolvedPort}` : 'default position (no monitor resolved yet)'}`,
 	)}        <channel>

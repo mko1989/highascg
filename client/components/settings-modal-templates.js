@@ -89,7 +89,10 @@ export function getMainModalHtml() {
 							<select id="set-compose-preview-mode">
 								<option value="canvas">Canvas thumbnails</option>
 								<option value="ffmpeg_jpeg">Caspar JPEG — ffmpeg writes file</option>
+								<option value="stream">Live stream (hardware encoded) — needs operator GUI channel</option>
 							</select>
+							<p class="settings-note">Live stream shows the composed output as a low-latency, hardware-encoded video (NVENC → WebCodecs) instead of the thumbnails. It requires the operator GUI stream channel to be enabled on the box and a browser with WebCodecs; where either is missing the client automatically falls back to Canvas thumbnails.</p>
+							<p class="settings-note" id="set-compose-preview-stream-warning" style="display:none;color:#f59e0b"></p>
 						</div>
 						<div id="set-compose-preview-ffmpeg-fields">
 							<p class="settings-note">JPEG mode embeds a low-cost ffmpeg consumer in Caspar config. Apply Caspar config after changing FPS or resolution.</p>

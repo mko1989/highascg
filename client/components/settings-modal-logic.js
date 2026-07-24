@@ -49,6 +49,20 @@ export function syncComposePreviewModeVisibility(modal) {
 	const mode = modal.querySelector('#set-compose-preview-mode')?.value || 'canvas'
 	const ffmpegFields = modal.querySelector('#set-compose-preview-ffmpeg-fields')
 	if (ffmpegFields) ffmpegFields.style.display = mode === 'ffmpeg_jpeg' ? '' : 'none'
+	// WO-325: Live stream needs WebCodecs, which browsers expose ONLY in a secure context. A client on
+	// a plain http://<box-ip>:4200 LAN origin has no VideoDecoder, so selecting stream there silently
+	// does nothing. Surface that instead of failing silently, with the HTTPS URL to use.
+	const warn = modal.querySelector('#set-compose-preview-stream-warning')
+	if (warn) {
+		const noWebCodecs = typeof VideoDecoder === 'undefined'
+		if (mode === 'stream' && noWebCodecs) {
+			const host = (typeof location !== 'undefined' && location.hostname) || '<box-ip>'
+			warn.textContent = `This browser can’t decode the live stream on an insecure connection — open the GUI at https://${host}:4443 (accept the certificate once) and select Live stream there. Until then this client shows Canvas thumbnails.`
+			warn.style.display = ''
+		} else {
+			warn.style.display = 'none'
+		}
+	}
 }
 
 export function buildSettingsPayload(modal) {
@@ -177,7 +191,7 @@ export function hydrateSettings(modal, cfg) {
 	const cp = cfg.composePreview || {}
 	const cpMode = modal.querySelector('#set-compose-preview-mode')
 	if (cpMode) {
-		const m = cp.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : 'canvas'
+		const m = cp.mode === 'ffmpeg_jpeg' ? 'ffmpeg_jpeg' : cp.mode === 'stream' ? 'stream' : 'canvas'
 		cpMode.value = m
 	}
 	syncComposePreviewModeVisibility(modal)

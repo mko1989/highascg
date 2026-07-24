@@ -142,6 +142,12 @@ function normalizeDestination(d) {
 		if (Number.isFinite(pp) && pp >= 1 && pp <= 4) base.physicalPort = pp
 		// WO-264: auto-launch the Firefox GUI at boot (default true; only an explicit false disables).
 		base.autoLaunch = d.autoLaunch !== false
+		// WO-325: headless / stream-only operator GUI. When true the destination exists ONLY to feed
+		// the remote NVENC gui-stream — the generator emits its Caspar channel WITHOUT a physical
+		// <screen> consumer, port resolution short-circuits to null (never borrows the multiview's
+		// port), and the boot launcher does not spawn the Firefox kiosk. Default false = today's
+		// physical-output behaviour.
+		base.headless = d.headless === true
 	}
 	return base
 }
