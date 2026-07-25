@@ -103,7 +103,7 @@ describe('WO-326 follow-up: unlocked layer stretches to its rect on air', () => 
 	 * layer payload without aspectLocked, so only the nudge contain-fit while the full push
 	 * stretched — two racing writers, last one wins, hence intermittent. */
 	it('the mixer-nudge payload and its dedup key both carry aspectLocked', () => {
-		const src = read('client/components/scenes-preview-runtime.js')
+		const src = read('client/components/scenes-preview-runtime.js') + read('client/components/scenes-preview-runtime-mixer-nudge.js')
 		const payloadFn = src.slice(src.indexOf('function nudgeLayerPayload'), src.indexOf('function nudgeTargetMainIdxs'))
 		assert.match(payloadFn, /aspectLocked: l\.aspectLocked/, 'nudge payload must carry the lock state to the server fill resolver')
 		const keyFn = src.slice(src.indexOf('function nudgeGeometryKeyForLayer'), src.indexOf('function nudgeLayerPayload'))

@@ -37,6 +37,22 @@ const {
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
 
+/**
+ * operator-compose-tiles.js was split (line-count refactor) into operator-compose-tiles.js plus
+ * sibling operator-compose-tiles-*.js modules it imports from. Source-grep assertions below check
+ * behavior that now lives in one of those siblings — read the whole split family concatenated so
+ * this keeps working regardless of which file a given piece of logic ended up in (same pattern as
+ * tools/smoke/smoke-decklink-input-retry.test.js's multi-file `src`).
+ */
+const readOperatorComposeTiles = () => {
+	const dir = path.join(__dirname, '../../client/components')
+	const files = fs
+		.readdirSync(dir)
+		.filter((f) => f === 'operator-compose-tiles.js' || f.startsWith('operator-compose-tiles-'))
+		.sort()
+	return files.map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n')
+}
+
 describe('WO-256 T256.1: default-layout math (N screens -> expected tile rects)', () => {
 	it('1 screen, PRV+PGM -> single row, two columns, PRV left / PGM right, full height', () => {
 		const defs = [
@@ -332,7 +348,7 @@ describe('todos19.07.26: hole is aspect-locked, border sits just outside it (nev
 	})
 
 	it('layoutTileDom positions the BODY from tileHoleRectFromOuter + resolveTileAspect (the reported bodyEl IS the hole)', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /const hole = tileHoleRectFromOuter\(\s*\{ left: 0, top: 0, width: outer\.width, height: outer\.height \},\s*resolveTileAspect\(t\.def, getCm\(\)\),?\s*\)/)
 		assert.match(src, /t\.bodyEl\.style\.left = `\$\{hole\.left\}px`/)
 	})
@@ -445,7 +461,7 @@ describe('WO-256 T256.2: preview-canvas-panel.js hard-gates the tile canvas on o
 
 describe('WO-256 T256.4: rect reporting reuses the existing merged-report path unchanged, suppression covers the tile canvas', () => {
 	it('operator-compose-tiles.js reports the SAME cell shape ({ id, role, mainIndex, rect }) preview-canvas-panel.js already emitted for the canvas-pair', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		// WO-323 extended the report with srcCh for user source tiles; the base shape is unchanged.
 		assert.match(src, /const cell = \{ id: t\.def\.id, role: t\.def\.role, mainIndex: t\.def\.mainIndex, rect \}/)
 		assert.match(src, /if \(t\.def\.role === 'mvcell'\) cell\.srcCh = t\.def\.srcCh/)
@@ -453,13 +469,13 @@ describe('WO-256 T256.4: rect reporting reuses the existing merged-report path u
 	})
 
 	it('rects report on drag/resize release, not on every pointermove (matches the suppression contract)', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /function onDragEnd\(\)[\s\S]{0,500}reportRectsNow\(\)/)
 		assert.doesNotMatch(src.match(/function onDragMove[\s\S]*?\n\t\}/)[0], /reportRectsNow/, 'no mid-drag rect spam')
 	})
 
 	it('reuses pickTopLayerStateForPlayback by IMPORTING mountPgmTopLayerPlaybackTimer, never re-implements bank/stale logic', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /import \{ mountPgmTopLayerPlaybackTimer \} from '\.\/playback-timer\.js'/)
 		assert.doesNotMatch(src, /function pickTopLayerStateForPlayback/, 'must not copy the picker')
 		assert.doesNotMatch(src, /TIMER_BAND_MIN|BORDER_LAYER/, 'must not re-implement the excluded-layer constants either')
@@ -473,12 +489,12 @@ describe('WO-256 T256.4: rect reporting reuses the existing merged-report path u
 	it('WO-263: tile drags do NOT suppress (holes track the box live) — tile surface excluded from the suppressor; onDragMove reports live', () => {
 		const suppress = read('client/lib/operator-gui-interaction-suppress.js')
 		assert.doesNotMatch(suppress, /PREVIEW_SURFACE_SELECTOR\s*=\s*'[^']*\.operator-compose-tiles[^']*'/, 'tile surface must NOT suppress — it reports live instead')
-		const tiles = read('client/components/operator-compose-tiles.js')
+		const tiles = readOperatorComposeTiles()
 		assert.match(tiles, /onDragMove[\s\S]*?scheduleReport\(\)/, 'onDragMove reports live so the Firefox hole follows the resize')
 	})
 
 	it('screen-label.js (WO-222) is reused for the header label, not re-implemented', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /import \{ screenLabel \} from '\.\.\/lib\/screen-label\.js'/)
 		assert.doesNotMatch(src, /function screenLabel/)
 	})
@@ -545,7 +561,7 @@ describe('2026-07-19 fix: a pure POSITION change (looks list <-> looks editor sh
 	})
 
 	it('operator-compose-tiles.js wires the watcher: root position watched, re-hugged after every report, torn down on destroy', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /import \{ watchElementPosition \} from '\.\.\/lib\/element-position-watch\.js'/)
 		assert.match(src, /const posWatch = watchElementPosition\(root, \(\) => scheduleReport\(\)\)/)
 		assert.match(src, /onCellRects\(cellRects[^)]*\)\s*\n[\s\S]{0,200}posWatch\.update\(\)/, 're-hug happens after each rect report')
@@ -553,13 +569,13 @@ describe('2026-07-19 fix: a pure POSITION change (looks list <-> looks editor sh
 	})
 
 	it('workspace tab switches re-layout + re-report deterministically (and the listener is removed on destroy)', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /window\.addEventListener\('highascg-workspace-tab-activated', onTabActivated\)/)
 		assert.match(src, /window\.removeEventListener\('highascg-workspace-tab-activated', onTabActivated\)/)
 	})
 
 	it('no idle polling snuck in: the tiles module has no setInterval and no free-running rAF loop', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.doesNotMatch(src, /setInterval/, 'position watching must be observer-driven, not polled')
 	})
 })
@@ -753,30 +769,30 @@ describe('todos19.07.26 (resize fix): canvas resize preserves tile pixel sizes (
 	})
 
 	it('operator-compose-tiles.js now tracks px/pxDesired in the tile object', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /const t = \{ def, frac, px: null, pxDesired: null,/, 'tile now has px and pxDesired fields')
 	})
 
 	it('layoutTileDom derives px from frac on first layout, then preserves px on subsequent calls', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /if \(!t\.px\) \{[\s\S]{0,200}t\.px = \{.*frac\.x.*cw.*\}/, 'derives px from frac if not set')
 		assert.match(src, /const outer = \{ left: t\.px\.x, top: t\.px\.y, width: t\.px\.w, height: t\.px\.h \}/, 'uses px (not frac) for layout')
 	})
 
 	it('onDragMove and onDragEnd update both px and pxDesired when user resizes', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /t\.px = clamped[\s\S]{0,100}t\.pxDesired = \{ \.\.\.clamped \}/, 'both px and pxDesired updated on drag')
 	})
 
 	it('ResizeObserver calls onCanvasResize which preserves px and updates fractions', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /const ro = typeof ResizeObserver[\s\S]{0,50}new ResizeObserver\(onCanvasResize\)/, 'ResizeObserver uses onCanvasResize')
 		assert.match(src, /function onCanvasResize\(\)[\s\S]{0,500}clampTileRect\(t\.pxDesired/, 'onCanvasResize preserves pxDesired, clamps to new size')
 		assert.match(src, /newSize\.w.*newSize\.h.*minOuter\.width/, 'onCanvasResize receives new canvas size and clamps with minimum')
 	})
 
 	it('resetLayout clears px/pxDesired so they are re-derived from fresh fractions', () => {
-		const src = read('client/components/operator-compose-tiles.js')
+		const src = readOperatorComposeTiles()
 		assert.match(src, /function resetLayout\(\)[\s\S]{0,400}t\.px = null[\s\S]{0,100}t\.pxDesired = null/, 'reset clears px and pxDesired')
 	})
 })
@@ -1030,13 +1046,15 @@ describe('2026-07-19 fix: a provisional (pre-state) render must never report rec
 
 describe('2026-07-19 fix: recovery re-sends never assert an EMPTY layout (boot DELETE clobber)', () => {
 	it('operator-gui-mode.js resendMergedNow bails when no surface has reported yet', () => {
-		const src = read('client/lib/operator-gui-mode.js')
+		// WO-255 T255.3 split: resendMergedNow now lives in operator-gui-mode-report.js, re-exported
+		// from operator-gui-mode.js — read the split pair concatenated.
+		const src = read('client/lib/operator-gui-mode.js') + read('client/lib/operator-gui-mode-report.js')
 		const fn = src.match(/function resendMergedNow\(\)[\s\S]*?\n\}/)[0]
 		assert.match(fn, /if \(!_bySurface\.size\) return/, 'reconnect/nudge/heartbeat must not DELETE the server-restored layout at boot')
 	})
 
 	it('genuine withdrawals still go through their own immediate paths (not via resendMergedNow)', () => {
-		const src = read('client/lib/operator-gui-mode.js')
+		const src = read('client/lib/operator-gui-mode.js') + read('client/lib/operator-gui-mode-report.js')
 		assert.match(src, /function reportSurfaceCells\([\s\S]{0,300}_bySurface\.delete\(surface\)[\s\S]{0,80}scheduleReport\(\)/)
 		assert.match(src, /_suppressed = true[\s\S]{0,200}void sendLayout\(\[\]\)/, 'popup suppression still sends empty immediately')
 	})
