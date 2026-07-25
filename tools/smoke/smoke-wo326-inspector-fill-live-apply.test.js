@@ -122,3 +122,25 @@ describe('WO-326 follow-up: unlocked layer stretches to its rect on air', () => 
 		assert.equal(client.mapContentFitToStretch({}), 'fit')
 	})
 })
+
+/*
+ * Third follow-up (todos25): with air stretching correctly, the LOOKS EDITOR canvas was the
+ * last holdout — it contain-fit unlocked layers and painted the uncovered rect black. The
+ * editor's forceStretch predicate now honours aspectLocked === false on both layer draw
+ * sites (media thumb + template thumb); the timeline-clip site is deliberately untouched
+ * (clips default to unlocked and keep their own fill semantics).
+ */
+describe('WO-326d: editor canvas draws unlocked layers stretched', () => {
+	it('both layer draw sites include aspectLocked in forceStretch', () => {
+		const src = read('client/components/preview-canvas-draw-stacks.js')
+		const m = src.match(/const forceStretch = cf === 'stretch' \|\| layer\.fillNativeAspect === false \|\| layer\.aspectLocked === false/g) || []
+		assert.equal(m.length, 2, 'media-thumb and template-thumb sites both honour the unlock')
+	})
+
+	it('the timeline-clip draw site keeps its own semantics (no aspectLocked)', () => {
+		const src = read('client/components/preview-canvas-draw-stacks.js')
+		const clipSite = src.slice(src.indexOf("const cf = clip.contentFit || 'native'"))
+		assert.match(clipSite, /if \(cf === 'stretch'\) \{/, 'clip site keeps the inline stretch check')
+		assert.doesNotMatch(clipSite.slice(0, 400), /aspectLocked/, 'clips must not inherit the layer unlock rule')
+	})
+})

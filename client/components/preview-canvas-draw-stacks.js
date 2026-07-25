@@ -140,7 +140,9 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					ctx.rect(vis.x, vis.y, vis.w, vis.h)
 					ctx.clip()
 					const cf = layer.contentFit || 'native'
-					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false
+					/* WO-326d: an UNLOCKED layer stretches to its rect on air (WO-326b) — the editor must
+					 * draw the same, not contain-fit with black bars. */
+					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
 					if (forceStretch) {
 						ctx.drawImage(img, px, py, pw, ph)
 					} else if (cf === 'horizontal' || cf === 'vertical') {
@@ -165,7 +167,9 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					ctx.rect(vis.x, vis.y, vis.w, vis.h)
 					ctx.clip()
 					const cf = layer.contentFit || 'native'
-					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false
+					/* WO-326d: an UNLOCKED layer stretches to its rect on air (WO-326b) — the editor must
+					 * draw the same, not contain-fit with black bars. */
+					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
 					if (forceStretch) {
 						ctx.drawImage(thumbImg, px, py, pw, ph)
 					} else if (cf === 'horizontal' || cf === 'vertical') {
