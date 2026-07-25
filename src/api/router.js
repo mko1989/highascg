@@ -135,6 +135,8 @@ routes.get('/api/system/network', ({ path, ctx }) => routesSystemHardware.hardwa
 routes.get('/api/system/operator-display', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/hardware', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/operator-helper-window', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
+// WO-317: the taskbar handlers shipped in routes-system-hardware without this registration — every call 404'd.
+routes.get('/api/system/operator-helper-taskbar', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/time', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/v4l2-devices', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/v4l2-inputs', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })
@@ -146,6 +148,7 @@ routes.post('/api/system/gpu-nvidia/apply', ({ path, body, ctx }) => routesSyste
 routes.post('/api/system/gui-launch', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/pointer-confine', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/operator-helper-window', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/system/operator-helper-taskbar', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gpu-ports-reset', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/xrandr-layout/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/network/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })

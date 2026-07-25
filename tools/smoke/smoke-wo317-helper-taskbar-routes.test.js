@@ -70,3 +70,11 @@ test('POST taskbar requires an id when the feature is on', async () => {
 	assert.match(JSON.parse(r.body).error, /id required/)
 	_resetHelperCoordinator()
 })
+
+test('router.js registers GET+POST /api/system/operator-helper-taskbar (the WO-317 routes shipped without this and 404d)', () => {
+	const fs = require('fs')
+	const path = require('path')
+	const src = fs.readFileSync(path.join(__dirname, '../../src/api/router.js'), 'utf8')
+	assert.match(src, /routes\.get\('\/api\/system\/operator-helper-taskbar'/)
+	assert.match(src, /routes\.post\('\/api\/system\/operator-helper-taskbar'/)
+})
