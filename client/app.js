@@ -20,7 +20,6 @@ import { markLocalProjectSaved } from './lib/project-remote-sync.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { initTimerControlPanel, getScreenTimersSnapshot } from './components/timer-control-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
-import { mountPgmTopLayerPlaybackTimer } from './components/playback-timer.js'
 import { programOutputState } from './lib/program-output-state.js'
 import { applySettingsFromServer, settingsState } from './lib/settings-state.js'
 import { streamState, applyBrowserMonitorFromSettings } from './lib/stream-state.js'
@@ -30,6 +29,9 @@ import { showLogsModal } from './components/logs-modal.js'
 import { multiviewState } from './lib/multiview-state.js'
 import { dmxState } from './lib/dmx-state.js'
 import { initPixelMapEditor } from './components/pixel-map-editor.js'
+import { initTabs } from './lib/app-tabs.js'
+import { initPgmHeaderTimer } from './lib/app-pgm-header-timer.js'
+import { initRangeInputDblclickReset } from './lib/app-range-dblclick.js'
 
 import { getVariableStore } from './lib/variable-state.js'
 import { projectState } from './lib/project-state.js'
@@ -122,60 +124,6 @@ const appLogic = {
 }
 Object.assign(serverSyncDeps.appLogic, appLogic)
 
-function initTabs() {
-	const tabStorageKey = 'highascg_active_tab'
-	const activateTab = (target) => {
-		document.querySelectorAll('.workspace__tabs .tab').forEach((t) => t.classList.remove('active'))
-		document.querySelectorAll('.workspace__content .tab-pane').forEach((p) => {
-			p.classList.toggle('active', p.id === `tab-${target}`)
-		})
-		const tab = document.querySelector(`.workspace__tabs .tab[data-tab="${target}"]`)
-		if (tab) tab.classList.add('active')
-		try { localStorage.setItem(tabStorageKey, target) } catch { /* ignore */ }
-		if (target !== 'pixelmap') {
-			window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: false } }))
-		}
-		if (['scenes', 'multiview', 'pixelmap', 'timeline'].includes(target)) requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(`${target === 'pixelmap' ? 'px' : (target === 'multiview' ? 'mv' : target)}-tab-activated`)))
-		if (target === 'device-view') {
-			initDeviceView(document.getElementById('tab-device-view'))
-			onDeviceViewTabActivated()
-		}
-		if (target === 'audio-mixer-view') initAudioMixerView(document.getElementById('tab-audio-mixer-view'), stateStore)
-		window.dispatchEvent(new CustomEvent('highascg-workspace-tab-activated', { detail: { tab: target } }))
-	}
-	window.highascgActivateWorkspaceTab = activateTab
-	const tabBar = document.querySelector('.workspace__tabs')
-	if (tabBar) {
-		tabBar.addEventListener('click', (e) => {
-			const tab = e.target.closest('.tab')
-			if (!tab?.dataset?.tab) return
-			activateTab(tab.dataset.tab)
-		})
-	}
-	
-	window.addEventListener('highascg-open-pixel-mapping', (ev) => {
-		const nodeId = ev.detail?.nodeId
-		activateTab('device-view')
-		window.dispatchEvent(new CustomEvent('highascg-mapping-browser-visibility', { detail: { visible: true, activate: true, nodeId } }))
-		// Also trigger the editor component
-		window.dispatchEvent(new CustomEvent('highascg-pixel-mapping-open', { detail: { nodeId } }))
-	})
-
-	window.addEventListener('highascg-device-view-select-device', (ev) => {
-		const deviceId = ev.detail?.deviceId
-		activateTab('device-view')
-		window.dispatchEvent(new CustomEvent('highascg-device-view-focus-device', { detail: { deviceId } }))
-	})
-
-	let initial = ''
-	try { initial = localStorage.getItem(tabStorageKey) || '' } catch { /* ignore */ }
-	if (!initial || !document.querySelector(`.tab[data-tab="${initial}"]`)) {
-		const firstTab = document.querySelector('.workspace__tabs .tab')
-		initial = document.querySelector('.workspace__tabs .tab.active')?.dataset.tab || firstTab?.dataset.tab || ''
-	}
-	if (initial) activateTab(initial)
-}
-
 async function init() {
 	const eyeContainer = document.getElementById('connection-eye-container')
 	if (eyeContainer) {
@@ -187,7 +135,7 @@ async function init() {
 		if (!(e.ctrlKey || e.metaKey) || e.key !== ',' || e.target.closest('input, textarea, select, [contenteditable="true"]')) return
 		e.preventDefault(); showSettingsModal()
 	})
-	initTabs(); initWorkspaceLayout()
+	initTabs(stateStore); initWorkspaceLayout()
 	initReplicationUiState(ws)
 	void initOptionalModules({ stateStore, ws, api, sceneState, settingsState, streamState }).then(() => initCgStudioTab())
 	_oscClient = new OscClient({ wsClient: ws })
@@ -344,77 +292,7 @@ async function init() {
 	const header = document.querySelector('.header'); const statusEl = document.querySelector('.header__status')
 	if (header && statusEl) initHeaderBar(header, statusEl, stateStore)
 
-	let pgmHeaderTimerDestroy = null
-	let selectedPlaybackChannel = null
-	const playbackChannelStorageKey = 'highascg_header_playback_channel'
-	try {
-		const saved = parseInt(String(localStorage.getItem(playbackChannelStorageKey) || ''), 10)
-		if (Number.isFinite(saved) && saved > 0) selectedPlaybackChannel = saved
-	} catch {
-		// ignore storage failures
-	}
-	const getProgramChannels = () => {
-		const cm = stateStore.getState()?.channelMap || {}
-		const list = cm.playbackChannels || cm.programChannels
-		return Array.isArray(list) && list.length ? list.map((v) => parseInt(String(v), 10)).filter((v) => Number.isFinite(v) && v > 0) : [1]
-	}
-	const ensureSelectedPlaybackChannel = () => {
-		const list = getProgramChannels()
-		if (!list.includes(selectedPlaybackChannel)) selectedPlaybackChannel = list[0] ?? 1
-		return selectedPlaybackChannel
-	}
-	const persistSelectedPlaybackChannel = () => {
-		try { localStorage.setItem(playbackChannelStorageKey, String(selectedPlaybackChannel || '')) } catch { /* ignore */ }
-	}
-	const renderPlaybackChannelChips = () => {
-		const slot = document.getElementById('header-pgm-timer')
-		if (!slot) return
-		const chips = slot.querySelector('.header-pgm-timer-chips')
-		if (!chips) return
-		ensureSelectedPlaybackChannel()
-		const list = getProgramChannels()
-		chips.innerHTML = ''
-		list.forEach((ch, idx) => {
-			const b = document.createElement('button')
-			b.type = 'button'
-			b.className = 'header-pgm-timer-chip' + (ch === selectedPlaybackChannel ? ' header-pgm-timer-chip--active' : '')
-			b.textContent = `P${idx + 1}`
-			b.title = `Show playback timer for channel ${ch}`
-			b.addEventListener('click', () => {
-				selectedPlaybackChannel = ch
-				persistSelectedPlaybackChannel()
-				renderPlaybackChannelChips()
-				pgmHeaderTimerDestroy?.refresh()
-			})
-			chips.appendChild(b)
-		})
-	}
-	const mountTimer = () => {
-		if (!statusEl || !_oscClient) return
-		let slot = document.getElementById('header-pgm-timer') || document.createElement('div')
-		if (!slot.id) { slot.id = 'header-pgm-timer'; slot.className = 'header-pgm-timer-wrap'; statusEl.insertBefore(slot, statusEl.firstChild) }
-		let chips = slot.querySelector('.header-pgm-timer-chips')
-		let timerHost = slot.querySelector('.header-pgm-timer-host')
-		if (!chips || !timerHost) {
-			slot.innerHTML = ''
-			chips = document.createElement('div')
-			chips.className = 'header-pgm-timer-chips'
-			timerHost = document.createElement('div')
-			timerHost.className = 'header-pgm-timer-host'
-			slot.append(chips, timerHost)
-		}
-		if (pgmHeaderTimerDestroy) pgmHeaderTimerDestroy.destroy()
-		pgmHeaderTimerDestroy = mountPgmTopLayerPlaybackTimer(timerHost, {
-			oscClient: _oscClient, getState: () => stateStore.getState(),
-			getChannel: () => ensureSelectedPlaybackChannel(),
-		})
-		renderPlaybackChannelChips()
-	}
-	mountTimer(); sceneState.on('screenChange', () => pgmHeaderTimerDestroy?.refresh())
-	stateStore.on('*', (path) => {
-		if (path === 'channelMap') renderPlaybackChannelChips()
-		if (['channelMap', 'channels', null].includes(path)) pgmHeaderTimerDestroy?.refresh()
-	})
+	initPgmHeaderTimer({ stateStore, sceneState, statusEl, getOscClient: () => _oscClient })
 
 	initSourcesPanel(document.querySelector('#panel-sources .panel__body'), stateStore, { wsClient: ws })
 	/** Live tab: POST /api/device-view can return before WS change is applied; bridge for instant list updates. */
@@ -481,27 +359,4 @@ async function init() {
 export function getOscClient() { return _oscClient }
 init()
 
-document.addEventListener('dblclick', (ev) => {
-	const target = ev.target
-	if (target && target.tagName === 'INPUT' && target.type === 'range') {
-		ev.preventDefault()
-		ev.stopPropagation()
-		const attrVal = target.getAttribute('value')
-		const defVal = attrVal !== null ? attrVal : (target.defaultValue !== undefined ? target.defaultValue : '')
-		let val = defVal
-		if (val === '') {
-			if (target.id === 'cable-messiness') {
-				val = '0'
-			} else if (target.min === '0.5' && target.max === '3') {
-				val = '1'
-			} else {
-				const min = parseFloat(target.min) || 0
-				const max = parseFloat(target.max) || 100
-				val = String(min + (max - min) / 2)
-			}
-		}
-		target.value = val
-		target.dispatchEvent(new Event('input', { bubbles: true }))
-		target.dispatchEvent(new Event('change', { bubbles: true }))
-	}
-})
+initRangeInputDblclickReset()

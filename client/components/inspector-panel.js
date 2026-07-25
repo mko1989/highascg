@@ -22,27 +22,8 @@ import { renderV4l2InputInspector } from './inspector-v4l2-input.js'
 import { renderScreenTimerInspector } from './inspector-screen-timer.js'
 import { renderPreservingFocus } from './device-view-ui-utils.js'
 import { attachInspectorLiveSourceSelectionEvents } from './inspector-panel-live-source-events.js'
-
-const INSPECTOR_MODE_STORAGE = 'hacg_inspector_panel_mode'
-const INSPECTOR_MODES = new Set(['inspector', 'layerPresets', 'lookPresets'])
-
-function readInspectorPanelMode() {
-	try {
-		const m = sessionStorage.getItem(INSPECTOR_MODE_STORAGE)
-		if (m && INSPECTOR_MODES.has(m)) return m
-	} catch {
-		/* ignore */
-	}
-	return 'inspector'
-}
-
-function writeInspectorPanelMode(m) {
-	try {
-		sessionStorage.setItem(INSPECTOR_MODE_STORAGE, m)
-	} catch {
-		/* ignore */
-	}
-}
+import { readInspectorPanelMode, writeInspectorPanelMode } from './inspector-panel-mode-storage.js'
+import { inspectorSelectionKey } from './inspector-panel-selection-key.js'
 
 function isPixelMapTabActive() {
 	const t = document.querySelector('.workspace__tabs .tab[data-tab="pixelmap"]')
@@ -97,38 +78,6 @@ export function initInspectorPanel(root, stateStore) {
 			btn.classList.toggle('panel-inspector-mode--active', on)
 			btn.setAttribute('aria-selected', on ? 'true' : 'false')
 		})
-	}
-
-	function inspectorSelectionKey(data) {
-		if (!data) return ''
-		switch (data.type) {
-			case 'timelineClip':
-				return `timelineClip:${data.timelineId}:${data.clipId}`
-			case 'timelineLayer':
-				return `timelineLayer:${data.timelineId}:${data.layerIdx}`
-			case 'timelineFlag':
-				return `timelineFlag:${data.timelineId}:${data.flagId}`
-			case 'sceneLayer':
-				return `sceneLayer:${data.sceneId}:${data.layerIndex}`
-			case 'scene':
-				return `scene:${data.sceneId}`
-			case 'multiview':
-				return `multiview:${data.cellId}`
-			case 'globalBorder':
-				return `globalBorder:${data.screenIndex}`
-			case 'screenTimer':
-				return `screenTimer:${data.screenIndex}`
-			case 'liveAudioInput':
-				return `liveAudioInput:${data.slot}`
-			case 'webpageHost':
-				return `webpageHost:${data.sourceId || data.value || data.hostChannel || ''}`
-			case 'ndiHost':
-				return `ndiHost:${data.sourceId || data.value || data.hostChannel || ''}`
-			case 'v4l2Input':
-				return `v4l2Input:${data.slot}`
-			default:
-				return String(data.type || '')
-		}
 	}
 
 	let _lastInspectorSelectionKey = ''

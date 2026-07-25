@@ -40,6 +40,7 @@ import {
 } from './timeline-editor-handlers.js'
 import { createTimelinePlaybackRuntime } from './timeline-editor-playback.js'
 import { reportTimelineCellRects } from '../lib/operator-gui-mode.js'
+import { initTimelinePreviewSplit, bindTimelinePreviewSplitDrag } from './timeline-editor-split.js'
 
 export function initTimelineEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -77,48 +78,8 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 	const transportEl = root.querySelector('#tl-transport')
 	const bodyEl = root.querySelector('#tl-body')
 
-	const TL_SPLIT_LS = 'casparcg_timeline_preview_split_px'
-	let tlSplitPx = 220
-	try {
-		const n = parseInt(localStorage.getItem(TL_SPLIT_LS) || '', 10)
-		if (!Number.isNaN(n) && n >= 120 && n <= 1200) tlSplitPx = n
-	} catch {
-		/* ignore */
-	}
-	previewHost.style.flex = `0 0 ${tlSplitPx}px`
-	previewHost.style.minHeight = '0'
-
-	if (tlSplitHandle) {
-		tlSplitHandle.addEventListener('mousedown', (e) => {
-			if (e.button !== 0) return
-			e.preventDefault()
-			const startY = e.clientY
-			const startH = previewHost.getBoundingClientRect().height
-			const onMove = (ev) => {
-				const dy = ev.clientY - startY
-				const nh = Math.max(120, Math.min(1000, startH + dy))
-				previewHost.style.flex = `0 0 ${nh}px`
-				previewPanel?.scheduleDraw?.()
-			}
-			const onUp = () => {
-				document.removeEventListener('mousemove', onMove)
-				document.removeEventListener('mouseup', onUp)
-				document.body.style.cursor = ''
-				document.body.style.userSelect = ''
-				const h = previewHost.getBoundingClientRect().height
-				tlSplitPx = Math.round(h)
-				try {
-					localStorage.setItem(TL_SPLIT_LS, String(tlSplitPx))
-				} catch {
-					/* ignore */
-				}
-			}
-			document.body.style.cursor = 'row-resize'
-			document.body.style.userSelect = 'none'
-			document.addEventListener('mousemove', onMove)
-			document.addEventListener('mouseup', onUp)
-		})
-	}
+	const tlSplitPx = initTimelinePreviewSplit(previewHost)
+	bindTimelinePreviewSplitDrag(tlSplitHandle, previewHost, tlSplitPx, () => previewPanel)
 
 	bodyEl.tabIndex = -1
 	bodyEl.addEventListener('mousedown', () => bodyEl.focus())
@@ -273,7 +234,7 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 			if (isCollapsed) {
 				previewHost.style.flex = '0 0 auto'
 			} else {
-				previewHost.style.flex = `0 0 ${tlSplitPx}px`
+				previewHost.style.flex = `0 0 ${tlSplitPx.current}px`
 			}
 		},
 		/* WO-327 follow-up (todos25): use the scenes-editor's canonical chain instead of trusting
