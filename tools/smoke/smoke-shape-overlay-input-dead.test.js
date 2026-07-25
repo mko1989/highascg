@@ -28,7 +28,11 @@ const { execFileSync } = require('child_process')
 
 const { REPO_ROOT } = require('../../src/repo-paths')
 const PY_PATH = path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py')
-const pySrc = fs.readFileSync(PY_PATH, 'utf8')
+const PY_LIB_PATH = path.join(REPO_ROOT, 'tools/runtime/operator_shape_overlay_lib.py')
+// WO-255 split: the window-matching/shaping/stacking functions this file locks down now live in
+// operator_shape_overlay_lib.py, imported from operator-shape-overlay.py — read the split pair
+// concatenated.
+const pySrc = fs.readFileSync(PY_PATH, 'utf8') + fs.readFileSync(PY_LIB_PATH, 'utf8')
 
 describe('shape helper: consumer input-dead + BELOW, firefox CLIENT above, watchdog (grep locks)', () => {
 	it('apply_holes locks the firefox CLIENT above — never the WM frame (Openbox silently drops frame-targeted EWMH)', () => {

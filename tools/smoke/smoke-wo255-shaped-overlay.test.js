@@ -204,7 +204,11 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 		execFileSync('python3', ['-m', 'py_compile', script], { stdio: 'pipe' })
 	})
 	it('operator-shape-overlay.py: WO-262 window-match strategy — targets FIREFOX by WM_CLASS (inverted from Caspar), geometry on the monitor rect', () => {
-		const src = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
+		// WO-255 split: window matching now lives in operator_shape_overlay_lib.py, imported by
+		// operator-shape-overlay.py — read the split pair concatenated.
+		const src =
+			fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8') +
+			fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator_shape_overlay_lib.py'), 'utf8')
 		assert.match(src, /def is_operator_firefox/, 'matches the operator kiosk Firefox (WO-262 inversion)')
 		assert.match(src, /navigator/i, 'matches on WM_CLASS "Navigator"/firefox (now a POSITIVE signal)')
 		assert.match(src, /def find_firefox_window/, 'window finder targets Firefox, not the Caspar consumer')
@@ -213,7 +217,11 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 	})
 	it('WO-263 URL guard: the title marker is required in the match and kept in sync across all three sites', () => {
 		const MARKER = 'HIGHASCG-OPERATOR-GUI'
-		const py = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
+		// WO-255 split: OPERATOR_TITLE_MARKER + the title-marker match now live in
+		// operator_shape_overlay_lib.py — read the split pair concatenated.
+		const py =
+			fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8') +
+			fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator_shape_overlay_lib.py'), 'utf8')
 		const js = fs.readFileSync(path.join(REPO_ROOT, 'src/system/operator-shape-overlay.js'), 'utf8')
 		const client = fs.readFileSync(path.join(REPO_ROOT, 'client/lib/operator-gui-mode.js'), 'utf8')
 		assert.ok(py.includes(MARKER), 'helper carries the marker constant')
@@ -257,7 +265,11 @@ describe('WO-255 T255.1: shape helper (python-xlib) + server-side monitor-px con
 // first (empty => invisible) payload, and the stdin path logged nothing. Fix: os.read(fd) into our
 // own newline buffer, drain EVERY complete line each wakeup, + a heartbeat log per line.
 describe('WO-262: shape helper stdin drain + heartbeat (fixes lost 2nd-payload-after-spawn)', () => {
-	const pySrc = fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8')
+	// WO-255 split: apply_holes lives in operator_shape_overlay_lib.py, the stdin drain loop stays
+	// in operator-shape-overlay.py — read the split pair concatenated.
+	const pySrc =
+		fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py'), 'utf8') +
+		fs.readFileSync(path.join(REPO_ROOT, 'tools/runtime/operator_shape_overlay_lib.py'), 'utf8')
 
 	it('py: py_compile still passes with the os.read drain in place', () => {
 		execFileSync('python3', ['-m', 'py_compile', path.join(REPO_ROOT, 'tools/runtime/operator-shape-overlay.py')], { stdio: 'pipe' })
