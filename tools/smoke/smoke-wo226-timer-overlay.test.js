@@ -126,7 +126,9 @@ test('T226.2: deck-drop handler routes countdown/timerId payloads to /api/timers
 })
 
 test('T226.3: scene-list-column renders a per-screen timer icon next to FTB, listens for refresh', () => {
-	const src = read('client/components/scene-list-column.js')
+	// The timer-cache helpers moved out into scene-list-column-timers.js during a line-count
+	// split; read the pair concatenated so the source-shape assertion still holds.
+	const src = read('client/components/scene-list-column.js') + read('client/components/scene-list-column-timers.js')
 	assert(src.includes("scenes-btn--timer"), 'should render the timer icon button')
 	assert(src.includes('scenes-deck-col__timer-btn'), 'icon should be queryable for cache refresh')
 	assert(src.includes("addEventListener('screen-timers-changed'"), 'should listen for the lightweight refresh event')
@@ -190,7 +192,8 @@ test('CSS: WO-226 classes exist in their stylesheets', () => {
 	assert(inspectorCss.includes('.inspector-screen-timer'), 'screen-timer inspector layout class')
 	assert(inspectorCss.includes('.inspector-screen-timer__opacity'), 'opacity slider row class')
 
-	const audioCss = read('client/styles/07b-audio-mixer-modal-shell.css')
+	// Read both files concatenated (split for line-count reduction)
+	const audioCss = read('client/styles/07b-audio-mixer-modal-shell.css') + read('client/styles/07b3-audio-mixer-modal-shell-controls.css')
 	assert(audioCss.includes('.audio-mixer__timers-compact'), 'compact transport cluster class')
 	assert(audioCss.includes('.audio-mixer__timer-compact-btn'), 'compact transport button class')
 })

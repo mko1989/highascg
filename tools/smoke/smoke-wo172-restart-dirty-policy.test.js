@@ -66,14 +66,20 @@ describe('WO-172 T172.3: isStreamingDedicatedOutputChannel', () => {
 describe('WO-172 T172.3: WO-81 regression fix — device-view-cable.js source text', () => {
 	it('removeStreamOutputConnector no longer unconditionally sets the restart-dirty flag', () => {
 		const fs = require('fs')
-		const src = fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable.js'), 'utf8')
+		// WO-172's target functions moved out of device-view-cable.js into device-view-cable-outputs.js
+		// during a line-count split; read the pair concatenated so the source-shape assertion still holds.
+		const src =
+			fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable.js'), 'utf8') +
+			fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable-outputs.js'), 'utf8')
 		const fnBody = src.slice(src.indexOf('ctx.removeStreamOutputConnector'), src.indexOf('ctx.removeRecordOutputConnector'))
 		assert.match(fnBody, /isStreamingDedicatedOutputChannel\(state\.currentSettings\)/)
 	})
 
 	it('removeRecordOutputConnector never calls setCasparRestartDirty', () => {
 		const fs = require('fs')
-		const src = fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable.js'), 'utf8')
+		const src =
+			fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable.js'), 'utf8') +
+			fs.readFileSync(require('path').join(__dirname, '../../client/components/device-view-cable-outputs.js'), 'utf8')
 		const start = src.indexOf('ctx.removeRecordOutputConnector')
 		const fnBody = src.slice(start, src.indexOf('ctx.removeAudioOutputConnector', start))
 		assert.doesNotMatch(fnBody, /setCasparRestartDirty/)
