@@ -157,3 +157,26 @@ fail pre-fix). Gate 1510/2, no new lint.
 *** SERVER change — NOT LIVE until next node restart. That restart also
 completes the original 322 §BLOCKER check; expected after it: look1 takes
 always show, media→look1 mixes. Revert candidates baf8211 + 2d35446. ***
+
+--------------------------------------------------------------------------------
+2026-07-25 (later) — WO-333: REAL AUDIO REACTIVITY FOR SHADERS (aae22a1)
+--------------------------------------------------------------------------------
+Owner asked how to feed audio into the shaders; most probable source = line-in
+or USB capture. Built the full pipe: arecord (ALSA) → 1024-pt Blackman FFT with
+AnalyserNode byte semantics → 30Hz {freq,wave} frames → WS 'audio_fft' →
+player.js writes them into the ShaderToy audio texture (OSC loudness synth
+stays as the <1.5s-stale fallback; getUserMedia tier A untouched).
+- New: src/audio/fft.js, src/audio/audio-capture-fft.js,
+  src/bootstrap/audio-capture-lifecycle.js; config key audioCapture →
+  config/audio_capture.json (device-local, never replicated).
+- USB hotplug: deviceMatch substring re-resolved against arecord -l on every
+  retry (2s→30s backoff). Stale PCM → one zero frame (decay to silence).
+- Verified live on the box against plughw:0,0 (ALC1220): frames flow, waveform
+  centered, noise floor sane. Gate 1521/2, smoke-wo333 (11) added.
+TO ACTIVATE (owner): put {"enabled":true,"deviceMatch":"usb"} (or a device
+string like "plughw:0,2" for the line-in) in config/audio_capture.json, then
+the SAME node restart that's already owed for 322b/329B. Shader templates pick
+up the new player.js on their next CG ADD — no build, no kiosk reload.
+Note: don't point it at a card a live-audio bridge slot uses (hw single-open;
+lifecycle warns). Follow-up candidate if that's ever needed: tee PCM out of
+the slot's ffmpeg bridge instead of a second open.
