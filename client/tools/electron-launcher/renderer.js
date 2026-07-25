@@ -23,6 +23,7 @@ const initRendererStick = require('./renderer-stick.js')
 const initRendererSim = require('./renderer-sim.js')
 const initRendererOptionalModules = require('./renderer-optional-modules.js')
 const initRendererGuides = require('./renderer-guides.js')
+const { injectLauncherPartials } = require('./renderer-partials.js')
 
 const ctx = {
   WEBUI_PORT: loadWebuiPort(),
@@ -31,6 +32,7 @@ const ctx = {
   usbPollTimer: null,
 }
 
+injectLauncherPartials()
 initRendererNav(ctx)
 initRendererStick(ctx)
 initRendererSim(ctx)
