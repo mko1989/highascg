@@ -76,3 +76,11 @@ STILL BLOCKED ON OWNER (unchanged from todos24):
         getResolutionForScreen chain instead of raw programResolutions.
 BOTH need the node restart + kiosk reload to go live (same restart as WO-322 +
 WO-329B — one maintenance moment covers all four, with the WO-322 visual check).
+
+2026-07-25 (even later) — 326c: "aspect lock works, but not consistently" on
+PRV corner drags. The throttled mixer nudge sent a minimal layer payload
+WITHOUT aspectLocked → only the nudge contain-fit while the full push
+stretched; two writers raced at throttle boundaries, so the layer
+intermittently "jumped back to locked". Payload + nudge dedup key now carry
+the lock state (5a947f4). Client-only — kiosk reload. Owner confirmed 327b
+(compose-preview aspect) landed after the earlier restart/reload.
