@@ -107,3 +107,83 @@ describe('WO-322 (c): teardown source wiring', () => {
 		assert.match(pgm, /isShader \? job\.pLayer : job\.layer\.layerNumber/)
 	})
 })
+
+describe('WO-322 (d): shader-only look crossfade — the ramps must not ride a nonexistent PLAY batch', () => {
+	// Regression (owner report 2026-07-25): a look whose ONLY job is a shader has playPlan=null on
+	// every job, so sendStaggeredTakePlays had no source PLAY lines and silently dropped the
+	// crossfade suffix — the incoming bank stayed pre-hidden at OPACITY 0 (shader invisible on one
+	// bank parity → "hit or miss whether it plays") and the outgoing media never got its fade-to-0
+	// (hard cut at teardown instead of a mix).
+	it('media → shader-only take sends the incoming OPACITY ramp after a flushing COMMIT, then the CG ADD', async () => {
+		const { runSceneTakeLbgAmcpPipeline } = require('../../src/engine/scene-take-lbg-amcp-pipeline.js')
+		const sent = []
+		const amcp = {
+			_context: {},
+			batchSendChunked: async (lines) => { sent.push(...lines) },
+			mixerCommit: async (ch) => { sent.push(`MIXER ${ch} COMMIT`) },
+			mixerClear: async () => {},
+			_send: async (line) => { sent.push(line); return {} },
+		}
+		const job = {
+			layer: { layerNumber: 10 },
+			pLayer: 110, // bank-B take: incoming above outgoing bank A
+			clip: 'shaders/sh-x',
+			playPlan: null,
+			loadPlan: null,
+			templateCg: { cgName: 'shaders/sh-x', data: '{}' },
+			browserCgUrl: null,
+			mixerLines: ['MIXER 1-110 FILL 0 0 1 1 0', 'MIXER 1-110 OPACITY 0 0 DEFER'],
+			prePlayOpacityZeroLine: null,
+			prePlayOpacityFullLine: null,
+			pipOverlays: [],
+			isMerge: false,
+			useLoadAuto: false,
+			hasLoadTransition: false,
+			incomingStartsHidden: true,
+			incomingIsAboveOutgoing: true,
+			targetOpacity: 1,
+			f: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
+		}
+		const currentMap = new Map([
+			[10, { layerNumber: 10, source: { type: 'media', value: 'some-clip' } }],
+		])
+		const fadeClockRef = { start: null }
+		let notified = 0
+		await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
+			self: { log: () => {} },
+			channel: 1,
+			incomingGb: null,
+			incomingGbEnabled: false,
+			sameGbTemplateType: false,
+			incomingGbLayer: 998,
+			gbWillFadeIn: false,
+			takeJobs: [job],
+			mergeMixerExtras: [],
+			currentSceneLayers: [],
+			currentMap,
+			shouldRunBankCrossfade: true,
+			isMergeTransition: false,
+			fadeDur: 25,
+			fadeTw: null,
+			phys: (n, bank) => (bank === 'b' ? Number(n) + 100 : Number(n)),
+			activeBank: 'a',
+			inactiveBank: 'b',
+			exitMedia: [],
+			gbWillFadeOut: false,
+			currentGbLayer: 998,
+			framerate: 50,
+			fadeWatcher: null,
+			notifyProgramTransitionStarted: () => { notified++ },
+			incoming: { layers: [{ layerNumber: 10, source: { type: 'template', value: 'shaders/sh-x' } }] },
+			timelineFadeInPhys: [],
+		})
+
+		const rampIdx = sent.findIndex((l) => l === 'MIXER 1-110 OPACITY 1 25')
+		assert.ok(rampIdx >= 0, `incoming crossfade ramp was sent: ${JSON.stringify(sent)}`)
+		const commitBeforeRamp = sent.slice(0, rampIdx).includes('MIXER 1 COMMIT')
+		assert.ok(commitBeforeRamp, 'a MIXER COMMIT flushes the deferred pre-hide before the ramp starts')
+		assert.ok(sent.some((l) => /^CG 1-110 ADD/.test(l)), `shader CG ADD landed on the bank-mapped layer: ${JSON.stringify(sent)}`)
+		assert.ok(fadeClockRef.start != null, 'fade clock started (teardown waits for the mix window)')
+		assert.equal(notified, 1, 'program-transition-started notified exactly once')
+	})
+})

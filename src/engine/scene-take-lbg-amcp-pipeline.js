@@ -371,6 +371,19 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				await amcp.mixerCommit(channel)
 				fadeClockRef.start = Date.now()
 				notifyProgramTransitionStarted()
+			} else if (crossfadeLines.length > 0 && !takeJobs.some((j) => j.playPlan)) {
+				// WO-322 follow-up: a look whose jobs are all CG-hosted (shader-only look — playPlan
+				// is null on template jobs) hits the same suffix drop as above, but with Phase A
+				// deferred lines pending: the incoming bank was pre-hidden at OPACITY 0 and the ramp
+				// to target rode in the dropped suffix, so the shader stayed invisible on one bank
+				// parity and the outgoing media hard-cut at teardown instead of mixing. Leading
+				// COMMIT first (flushes the deferred pre-hide, exactly like the staggered path's
+				// leadingCommit before its PLAY batch), then the crossfade ramps.
+				await amcp.mixerCommit(channel)
+				await amcp.batchSendChunked(crossfadeLines, { skipMixerPreCommit: true })
+				await amcp.mixerCommit(channel)
+				fadeClockRef.start = Date.now()
+				notifyProgramTransitionStarted()
 			} else if (crossfadeLines.length > 0) {
 				const crossfadeFadeCtx = { fadeDur, fadeTw }
 				const suffixAfterSources = crossfadeSuffixLinesForStaggeredRoutes(crossfadeLines, takeJobs)
