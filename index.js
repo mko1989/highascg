@@ -504,6 +504,11 @@ function main() {
 		const { startOscSubsystem, stopOscSubsystem, restartOscSubsystem, getOscReceiverStats } = createOscLifecycle({ appCtx, config, cli, logger, normalizeOscConfig, OscState, OscListener, applyOscSnapshotToVariables, clearOscVariables, startOscPlaybackInfoSupplement })
 		startOscSubsystem(); appCtx.restartOscSubsystem = restartOscSubsystem; appCtx.getOscReceiverStats = getOscReceiverStats
 
+		// WO-333: line-in/USB capture → FFT frames on WS for shader audio reactivity (opt-in).
+		const { createAudioCaptureLifecycle } = require('./src/bootstrap/audio-capture-lifecycle')
+		appCtx._audioCaptureLifecycle = createAudioCaptureLifecycle({ appCtx, config, logger })
+		appCtx._audioCaptureLifecycle.startAudioCapture()
+
 		const shutdown = Shutdown.createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSubsystem, stopOscSubsystem, wsHandle, httpServer, persistence })
 		process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown)
 	} catch (e) {

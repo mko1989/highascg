@@ -15,6 +15,7 @@ const SHOW_ROUTING_HARDWARE_SLICES = [
 
 /** Top-level config keys that are device-local and must never replicate. */
 const DEVICE_TOP_LEVEL_KEYS = new Set([
+	'audioCapture',
 	'caspar',
 	'casparServer',
 	'deviceGraph',

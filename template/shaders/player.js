@@ -9,10 +9,13 @@
  * Audio tiers (auto-selected):
  *  A) getUserMedia + AnalyserNode — real spectrum. Works in the WO-258 browser_display Firefox
  *     (pick an ALSA monitor/loopback device; `?audioDev=<substring|deviceId>` overrides).
- *  B) WS OSC levels — Caspar CEF has no media streams; connect to the playout WS (`type:'osc'`
- *     snapshots, per-channel dBFS from src/osc/osc-state.js) and synthesize a coarse spectrum.
- *     `?ch=<caspar channel>` picks the meter source (default 1), `?api=` overrides the API base
- *     (default: same origin, or http://127.0.0.1:4200 when loaded from file://).
+ *  B) WS frames — connect to the playout WS. Two message kinds, freshest wins:
+ *     - `type:'audio_fft'` (WO-333): REAL 512-bin spectrum + waveform from the node's line-in/
+ *       USB capture (config.audioCapture, src/audio/audio-capture-fft.js). Used verbatim.
+ *     - `type:'osc'` snapshots (per-channel dBFS from src/osc/osc-state.js): coarse synthesized
+ *       spectrum, only while no audio_fft frame arrived in the last 1.5s.
+ *     `?ch=<caspar channel>` picks the OSC meter source (default 1), `?api=` overrides the API
+ *     base (default: same origin, or http://127.0.0.1:4200 when loaded from file://).
  *  C) silence — shader still renders, texture stays zeroed.
  *
  * Caspar template contract (docs/wiki/api/cg.md): window.update/play/stop/next. Autoplays on
@@ -173,13 +176,22 @@
 		}
 	}
 
-	// --- tier B: coarse level from the playout OSC snapshot over WS --------------------------
+	// --- tier B: playout WS — real audio_fft frames (WO-333), OSC levels as fallback ---------
 	let wsLevel = 0 // 0..1 linear from dBFS
 	let wsPhase = 0
+	let lastFftAt = 0 // ms epoch of the last real audio_fft frame
+	const FFT_FRESH_MS = 1500
 
 	function dbfsToUnit(dbfs) {
 		const v = (Number(dbfs) + 60) / 60 // -60 dBFS floor → 0, 0 dBFS → 1
 		return Math.max(0, Math.min(1, v))
+	}
+
+	function b64ToBytes(b64, out) {
+		const bin = atob(b64)
+		const n = Math.min(bin.length, out.length)
+		for (let i = 0; i < n; i++) out[i] = bin.charCodeAt(i)
+		return n
 	}
 
 	function initTierB() {
@@ -197,6 +209,14 @@
 			ws.onmessage = (ev) => {
 				try {
 					const msg = JSON.parse(ev.data)
+					if (msg.type === 'audio_fft' && msg.data && msg.data.freq) {
+						// Real spectrum from the node's ALSA capture — write straight into the
+						// texture rows (same AnalyserNode byte semantics as tier A).
+						b64ToBytes(msg.data.freq, freqBytes)
+						if (msg.data.wave) b64ToBytes(msg.data.wave, waveBytes)
+						lastFftAt = Date.now()
+						return
+					}
 					if (msg.type !== 'osc' || !msg.data) return
 					const ch = msg.data.channels?.[casparCh] || msg.data.channels?.[Number(casparCh)]
 					const levels = ch?.audio?.levels
@@ -217,8 +237,11 @@
 	}
 
 	function sampleTierB() {
-		// Synthesize a plausible falling spectrum + a level-scaled sine waveform from one RMS
-		// value. Coarse by design — real FFT needs tier A (browser_display path).
+		// Real audio_fft frames own the texture while fresh — freqBytes/waveBytes were already
+		// filled by the WS handler, nothing to synthesize.
+		if (Date.now() - lastFftAt < FFT_FRESH_MS) return
+		// Fallback: synthesize a plausible falling spectrum + a level-scaled sine waveform from
+		// one RMS value. Coarse by design — real FFT needs audio_fft or tier A.
 		wsPhase += 0.35
 		const amp = wsLevel
 		for (let i = 0; i < AUDIO_W; i++) {

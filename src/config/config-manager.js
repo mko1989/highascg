@@ -48,6 +48,7 @@ const MODULAR_KEYS = [
 	'caspar',
 	'server',
 	'osc',
+	'audioCapture',
 	'ui',
 	'editorDefaults',
 	'audioRouting',

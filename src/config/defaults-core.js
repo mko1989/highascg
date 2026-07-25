@@ -73,6 +73,20 @@ function coreDefaults() {
 			emitIntervalMs: 50,
 			staleTimeoutMs: 5000,
 		},
+		/**
+		 * WO-333: line-in/USB ALSA capture → FFT frames broadcast on WS (`type:'audio_fft'`)
+		 * for shader audio reactivity. Normalized in src/audio/audio-capture-fft.js;
+		 * `deviceMatch` (substring vs `arecord -l`) beats `device` and survives USB re-enumeration.
+		 */
+		audioCapture: {
+			enabled: false,
+			device: 'plughw:0,0',
+			deviceMatch: '',
+			sampleRate: 48000,
+			channels: 2,
+			gain: 1,
+			emitHz: 30,
+		},
 		ui: {
 			oscFooterVu: true,
 			rundownPlaybackTimer: true,
