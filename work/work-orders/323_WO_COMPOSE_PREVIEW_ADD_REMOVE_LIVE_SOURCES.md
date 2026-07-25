@@ -1,5 +1,11 @@
 # WO-323 — Compose preview: add/remove live sources (Decklink, NDI, …) as tiles
 
+> **IMPLEMENTED 2026-07-25 (commit f8cc0ce) — client-only per the de-risked plan below;
+> dist-web rebuilt, NEEDS KIOSK RELOAD to appear.** Drop from the Live tab → movable mvcell tile
+> (separate localStorage store, WO-271 channel heal, footer ✕ remove, WO-156 + compose-channel
+> self-route guards). smoke-wo323 (16 tests) in the curated gate. Still owed: the on-box drop
+> verification (drop a decklink/NDI → tile shows it; remove; persists across reload).
+
 > **VERIFICATION 2026-07-24 — NOT IMPLEMENTED. The todos22 "V2 IMPLEMENTED … APPLIED LIVE"
 > note is FALSE.** Independent source audit: `operator-compose-tiles.js` has NO drag/drop
 > code at all (no `parseSourceDropPayload`, no dataTransfer handlers, no `✕` remove, no

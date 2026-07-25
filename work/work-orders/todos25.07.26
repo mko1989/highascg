@@ -1,0 +1,55 @@
+================================================================================
+2026-07-25 — CONTINUATION OF todos24 OPEN ITEMS
+================================================================================
+Box state at session start (verified, read-only): show ACTIVE (Caspar 145% CPU,
+live MIXER traffic) — playout untouched all session. Kiosk Firefox relaunched
+2026-07-24 21:35:06, ~4s AFTER the dist-web build + node restart, so the evening
+client fixes (326/327/331) ARE live on the operator GUI — the "needs kiosk
+reload" note in todos24 was already satisfied.
+
+✅ 323  Live sources onto the compose preview — IMPLEMENTED (f8cc0ce), the
+        reopened false-claim WO now has real code. Client-only per the de-risked
+        plan (server mvcell routing already existed): drag anything from the
+        Live tab onto the operator compose canvas → movable/resizable tile;
+        footer ✕ removes; own localStorage store (never wiped by the pgm/prv
+        re-default rule); channel re-healed per rebuild (WO-271); rejects
+        non-route payloads, multiview outputs (WO-156) and the compose channel
+        itself. parseRouteValue moved to client/lib/input-channels.js
+        (scenes-shared re-exports). smoke-wo323: 16 tests in the gate.
+        dist-web REBUILT — NEEDS KIOSK RELOAD to appear (safe any time; only
+        the operator GUI page, playout unaffected). On-box drop verify owed.
+
+✅ 322  Shaders composite on media band — IMPLEMENTED (baf8211), the other
+        reopened false claim. Full (a)+(b)+(c) per the refined plan: routing
+        (isShaderCgName → look-band layer), take pipelines (CG ADD on bank-
+        mapped job.pLayer, no continuity/clearOther/cgFade, tracked hosts
+        guarded to 700+), teardown (CG CLEAR before every physical exit STOP,
+        shaders out of the 700+ loops and incomingTemplateHostLayers).
+        smoke-wo322: 10 tests in the gate.
+        *** NOT LIVE — activates on next node restart. §BLOCKER stands: verify
+        visually at that restart (shader-in-look take both directions + bank
+        crossfade), ready to git revert baf8211 + restart. Do NOT restart the
+        node casually until you're ready to do that check. ***
+
+Also: committed the untracked owner shader template/shaders/sh-audio.html
+(17b967f) — was sitting uncommitted since 2026-07-24 21:16.
+
+Gate: 1489 pass / 2 fail — the same pre-existing WO-315 box-geometry canvas
+tests documented in todos24. No new eslint warnings.
+
+--------------------------------------------------------------------------------
+STILL BLOCKED ON OWNER (unchanged from todos24):
+  332  Power button — fix committed, needs your sudo to activate:
+         sudo install -m 755 ~/highascg/tools/runtime/highascg-power-button-listen.sh \
+           /usr/local/lib/highascg/highascg-power-button-listen.sh
+         sudo systemctl restart highascg-power-button.service
+  330  Companion 1.0.3 — needs your sudo (drops the desk ~30s):
+         sudo systemctl stop companion \
+           && ~/highascg/tools/eggs/companion/install-companion-module.sh \
+           && sudo systemctl start companion
+  328  Media continuity between looks — needs the 15-min live repro with you
+       (5 ranked suspects in the WO).
+  329B Two clients editing = last-write-wins — needs your Option 1 (edit lock)
+       vs Option 2 (per-section merge) decision, see WO-329.
+  326  Note in todos24 still open: in NORMAL editing mode PGM only updates on
+       take (by design) — say if you want live-on-air apply outside edit-on-PGM.
