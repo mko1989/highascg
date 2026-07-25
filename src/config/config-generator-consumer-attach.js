@@ -1,19 +1,13 @@
 'use strict'
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
-const { STANDARD_VIDEO_MODES, resolveLiveAudioInputChannelMode } = require('./config-modes')
+const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { effectiveStandardVideoModeId } = require('./config-generator-mode-helpers')
 const {
 	parseOptionalPixel,
-	buildComposePreviewFfmpegConsumerXml,
-	buildScreenFfmpegConsumersXml,
-	buildExtraAudioFfmpegConsumersXml,
 	channelLayoutElementXml,
 	buildProgramSystemAudioXml,
-	buildPreviewSystemAudioXml,
-	buildProgramScreenConsumerInnerXml,
 	buildMultiviewScreenConsumerInnerXml,
-	escapeXml,
 	buildPortAudioConsumerXml,
 	buildMonitorChannelXml,
 } = require('./config-generator-builders')
@@ -24,208 +18,20 @@ const {
 	readDecklinkKeyFillSettings,
 	readDecklinkConsumerSettings,
 	parseDecklinkDeviceIndex,
-	resolveDecklinkConsumerKeyer,
-	decklinkPixelFormatXml,
 } = require('./decklink-key-fill')
 const {
 	resolveDecklinkVideoModeForTarget,
 	channelVideoModeForDecklinkConsumer,
-	pickDecklinkParentVideoMode,
 } = require('./decklink-output-resolve')
-const { computeArtnetUniverseSpill } = require('./artnet-pixelmap-universe')
-const { clampedInt } = require('./screen-destinations')
 const { channelCountFromLayout } = require('./audio-channel-layouts')
-
-/**
- * One DeckLink consumer spanning a wide channel: parent global `<video-mode>` + primary SDI
- * (first tile on `<decklink>`) + synced `<ports>` for additional tiles.
- * Caspar cannot use the channel custom mode (e.g. 5120×1024) for DeckLink format — parent video-mode is required.
- * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
- * @param {{ videoMode?: string, keyer?: string, lowLatency?: boolean }} [opts]
- */
-function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
-	if (!Array.isArray(tiles) || tiles.length === 0) return ''
-	const globalVideoMode = escapeXml(String(opts.videoMode || tiles[0]?.videoMode || '1080p5000'))
-	const pixelFormatXml = decklinkPixelFormatXml(String(opts.videoMode || tiles[0]?.videoMode || ''))
-	const lowLatencyXml = opts.lowLatency ? '\n                     <latency>low</latency>' : ''
-	const keyerXml = `\n                     <keyer>${escapeXml(
-		resolveDecklinkConsumerKeyer({
-			fillDevice: tiles[0]?.device,
-			keyDevice: opts.keyDevice,
-			keyer: opts.keyer,
-		}),
-	)}</keyer>`
-	const subBlock = (t, indent) =>
-		`${indent}<subregion>\n${indent}    <src-x>${t.srcX}</src-x>\n${indent}    <src-y>${t.srcY}</src-y>\n${indent}    <dest-x>${t.destX}</dest-x>\n${indent}    <dest-y>${t.destY}</dest-y>\n${indent}    <width>${t.width}</width>\n${indent}    <height>${t.height}</height>\n${indent}</subregion>`
-	const portBody = (t, indent) =>
-		`\n${indent}<device>${t.device}</device>\n${indent}    <key-only>false</key-only>\n${indent}     <buffer-depth>3</buffer-depth>\n${indent}     <video-mode>${escapeXml(t.videoMode)}</video-mode>\n${subBlock(t, indent)}`
-	const primary = tiles[0]
-	const secondaries = tiles.slice(1)
-	const primaryXml = portBody(primary, '                    ')
-	const portsXml =
-		secondaries.length > 0
-			? `\n                <ports>${secondaries
-					.map((t) => `\n                   <port>${portBody(t, '                        ')}\n                     </port>`)
-					.join('')}\n                </ports>`
-			: ''
-	return `\n                <decklink>
-                     <video-mode>${globalVideoMode}</video-mode>${pixelFormatXml}${lowLatencyXml}${keyerXml}${primaryXml}${portsXml}
-                 </decklink>`
-}
-
-/**
- * @param {Record<string, unknown>} config
- * @param {ReturnType<import('./routing').getChannelMap>} routeMap
- * @param {{ n: number, dims: any, cumulativeX: number, nextDevice: number }} ctx
- */
-function buildScreenPairChannels(config, routeMap, ctx) {
-	const n = ctx.n
-	const dims = ctx.dims
-	const stretch = ['none', 'fill', 'uniform', 'uniform_to_fill'].includes(String(config[`screen_${n}_stretch`] || 'none'))
-		? String(config[`screen_${n}_stretch`])
-		: 'none'
-	const windowed = casparBoolEnabled(config[`screen_${n}_windowed`], true)
-	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], true)
-	// PGM default is on: an unset key must agree with casparScreenDefaults() and with the
-	// Device View checkbox, which also renders unset as on.
-	const alwaysOnTop = casparBoolEnabled(config[`screen_${n}_always_on_top`], true)
-	const borderless = casparBoolEnabled(config[`screen_${n}_borderless`], true)
-
-	const posX = parseOptionalPixel(config[`screen_${n}_x`], ctx.cumulativeX)
-	const posY = parseOptionalPixel(config[`screen_${n}_y`], 0)
-	const screenInner = buildProgramScreenConsumerInnerXml(config, n, {
-		nextDevice: ctx.nextDevice,
-		posX,
-		posY,
-		dims,
-		stretch,
-		windowed,
-		vsync,
-		alwaysOnTop,
-		borderless,
-	})
-	const audioLayoutId = String(config[`screen_${n}_audio_layout`] || 'default')
-	const layoutXml = channelLayoutElementXml(audioLayoutId)
-	const ffmpegXml = buildScreenFfmpegConsumersXml(config, n)
-	const screenSystemAudioXml = buildProgramSystemAudioXml(config, n)
-	const portAudioXml = buildPortAudioConsumerXml(config, n)
-
-	const tilesRaw = config[`screen_${n}_decklink_tiles`]
-	const tiles = Array.isArray(tilesRaw) ? tilesRaw : []
-	const decklinkDevice = parseInt(String(config[`screen_${n}_decklink_device`] || '0'), 10)
-	const decklinkReplaceScreen =
-		(config[`screen_${n}_decklink_replace_screen`] === true || config[`screen_${n}_decklink_replace_screen`] === 'true') &&
-		(decklinkDevice > 0 || tiles.length > 0) &&
-		(!dims.isCustom || tiles.length > 0)
-
-	let profConsumersXml = ''
-	if (tiles.length > 0) {
-		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
-		const consumerSettings = readDecklinkConsumerSettings(config, `screen_${n}_`)
-		profConsumersXml += buildDecklinkTiledConsumersXml(tiles, {
-			videoMode: pickDecklinkParentVideoMode(tiles),
-			keyer: keyFill.keyer,
-			keyDevice: keyFill.keyDevice,
-			keyFillEnabled: keyFill.keyFillEnabled,
-			lowLatency: consumerSettings.lowLatency,
-		})
-	} else if (decklinkDevice > 0) {
-		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)
-		const decklinkVideoMode = resolveDecklinkVideoModeForTarget(config, 'screen', n)
-		const consumerSettings = readDecklinkConsumerSettings(config, `screen_${n}_`)
-		if (decklinkVideoMode) {
-			profConsumersXml += buildDecklinkKeyFillConsumersXml({
-				fillDevice: decklinkDevice,
-				keyDevice: keyFill.keyDevice,
-				keyer: keyFill.keyer,
-				videoMode: decklinkVideoMode,
-				consumerSettings,
-				lowLatency: consumerSettings.lowLatency,
-			})
-		}
-	}
-	const ndiEnabled = config[`screen_${n}_ndi_enabled`] === true || config[`screen_${n}_ndi_enabled`] === 'true'
-	if (ndiEnabled) {
-		const ndiName = escapeXml(config[`screen_${n}_ndi_name`] || `HighAsCG-CH${n}`)
-		profConsumersXml += `\n                <ndi>
-                    <name>${ndiName}</name>
-                </ndi>`
-	}
-	// NDI STREAM OUTPUTS cabled from this screen's destination (applyNdiStreamOutputsToScreens):
-	// owner spec — treated like an SDI out, always on, config-time consumer, no Start button. One
-	// <ndi> per output; a name colliding with the per-screen block above is skipped, since two NDI
-	// senders with one name on one host is an on-air conflict, not redundancy.
-	const ndiStreamNames = Array.isArray(config[`screen_${n}_ndi_stream_names`])
-		? config[`screen_${n}_ndi_stream_names`]
-		: []
-	for (const rawName of ndiStreamNames) {
-		const name = String(rawName || '').trim()
-		if (!name) continue
-		if (ndiEnabled && name === String(config[`screen_${n}_ndi_name`] || `HighAsCG-CH${n}`)) continue
-		profConsumersXml += `\n                <ndi>
-                    <name>${escapeXml(name)}</name>
-                </ndi>`
-	}
-
-	const pgmChNum = routeMap.programCh(n)
-	const composePgmXml = buildComposePreviewFfmpegConsumerXml(config, pgmChNum)
-	const rtmpPgmXml = buildRtmpFfmpegConsumersForChannel(config, pgmChNum)
-	const screenConsumerEnabled = config[`screen_${n}_screen_consumer`] !== false && config[`screen_${n}_screen_consumer`] !== 'false'
-	const decklinkVideoModeForScreen =
-		decklinkDevice > 0 ? resolveDecklinkVideoModeForTarget(config, 'screen', n) : null
-	const pgmChannelModeId = channelVideoModeForDecklinkConsumer({
-		channelModeId: dims.modeId,
-		isChannelCustom: dims.isCustom,
-		decklinkVideoMode: decklinkVideoModeForScreen,
-		hasScreenConsumer: screenConsumerEnabled && !decklinkReplaceScreen,
-		decklinkReplaceScreen,
-	})
-	const screenConsumerXml = (decklinkReplaceScreen || !screenConsumerEnabled)
-		? ''
-		: `
-                <screen>
-                    ${screenInner}
-                </screen>`
-
-	const pgmXml = `${channelXmlComment(`Caspar channel ${pgmChNum}: Screen ${n} program output (PGM)`)}        <channel>
-            <video-mode>${pgmChannelModeId}</video-mode>${layoutXml}
-            <consumers>${screenConsumerXml}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${profConsumersXml}${rtmpPgmXml}
-            </consumers>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-
-	const prvSystemAudioXml = buildPreviewSystemAudioXml(config, n)
-	const prvChNum = routeMap.previewCh(n)
-	const composePrvXml = buildComposePreviewFfmpegConsumerXml(config, prvChNum)
-	const rtmpPrvXml = buildRtmpFfmpegConsumersForChannel(config, prvChNum)
-	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)`)}        <channel>
-            <video-mode>${dims.modeId}</video-mode>
-            <consumers>${composePrvXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-	const bus2Num = routeMap.switcherBusChannels?.[n - 1]
-	const bus2Xml =
-		bus2Num != null && Number.isFinite(Number(bus2Num))
-			? `${channelXmlComment(`Caspar channel ${bus2Num}: Screen ${n} switcher bus 2 (legacy)`)}        <channel>
-            <video-mode>${dims.modeId}</video-mode>
-            <consumers/>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-			: ''
-
-	return {
-		pgmXml,
-		prvXml,
-		bus2Xml,
-		hasScreenConsumer: !decklinkReplaceScreen && screenConsumerEnabled,
-	}
-}
+const { buildDecklinkTiledConsumersXml, buildScreenPairChannels } = require('./config-generator-consumer-attach-screen')
+const {
+	buildInputsHostChannel,
+	buildExtraAudioChannel,
+	buildPixelmapChannel,
+	buildInputChannel,
+	buildHostLiveChannel,
+} = require('./config-generator-consumer-attach-misc-channels')
 
 /**
  * @param {Record<string, unknown>} config
@@ -347,172 +153,6 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 		xml,
 		usedScreenConsumer: includeScreen,
 	}
-}
-
-/**
- * @param {Record<string, unknown>} config
- * @param {number} decklinkCount
- * @param {number} liveAudioCount
- * @param {boolean} inputsHostChannelEnabled
- * @param {boolean} inputsOnMvr
- * @param {number|null|undefined} casparChannelNum - channel index for comment
- */
-function buildInputsHostChannel(config, decklinkCount, liveAudioCount, inputsHostChannelEnabled, inputsOnMvr, casparChannelNum) {
-	if (inputsOnMvr) return ''
-	const hostCh = decklinkCount > 0 || liveAudioCount > 0 || inputsHostChannelEnabled === true
-	if (!hostCh) return ''
-	const modeId = effectiveStandardVideoModeId(
-		resolveLiveAudioInputChannelMode(config) || config.inputs_channel_mode,
-	)
-	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
-	return `${channelXmlComment(`Caspar channel ${ch}: Live INPUT host (DeckLink PLAY … DECKLINK; ALSA PLAY … alsa:// on layers 10+). Empty consumers is normal.`)}        <channel>
-            <video-mode>${modeId}</video-mode>
-            <consumers/>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-}
-
-/**
- * @param {Record<string, unknown>} config
- * @param {number} i
- * @param {any} dims
- * @param {number|null|undefined} casparChannelNum
- */
-function buildExtraAudioChannel(config, i, dims, casparChannelNum) {
-	const layoutXml = channelLayoutElementXml(String(config[`extra_audio_${i}_audio_layout`] || 'default'))
-	const ffmpegXml = buildExtraAudioFfmpegConsumersXml(config, i)
-	const consumersBlock = ffmpegXml
-		? `<consumers>${ffmpegXml}
-            </consumers>`
-		: `<consumers/>`
-	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
-	return `${channelXmlComment(`Caspar channel ${ch}: Extra audio-only output ${i}`)}        <channel>
-            <video-mode>${dims.modeId}</video-mode>${layoutXml}
-            ${consumersBlock}
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-}
-
-/**
- * WO-242: dedicated Caspar channel for a native `pixelmap` screen destination — a custom video-mode
- * raster feeding one native `<artnet>` consumer fixture group. XML shape is strictly the schema
- * documented (with `artnet_consumer.cpp` line cites) in docs/WALKTHROUGH_ARTNET_LED_WALL.md — the
- * whole channel raster is sampled by one `<fixture>` (center box == full frame, matching the
- * walkthrough's 8x4-wall example), `fixture-count` = `<cols>x<rows>` (row-major grid).
- * PGM-only: no `<screen>`/DeckLink/NDI/RTMP consumers — this channel exists to drive the wall.
- * @param {Record<string, unknown>} config
- * @param {ReturnType<import('./screen-destinations').normalizeDestination>} dest
- * @param {any} dims - `{ width, height, fps, modeId, isCustom }` from `getModeDimensions`
- * @param {number|null|undefined} casparChannelNum
- */
-function buildPixelmapChannel(config, dest, dims, casparChannelNum) {
-	const art = dest && typeof dest.artnet === 'object' && dest.artnet ? dest.artnet : {}
-	const ip = escapeXml(String(art.ip || ''))
-	const port = clampedInt(art.port, 6454, 1, 65535)
-	const startUniverse = clampedInt(art.startUniverse, 0, 0, 32767)
-	const startAddress = clampedInt(art.startAddress, 1, 1, 512)
-	const colorOrder = String(art.colorOrder || 'RGB').toUpperCase() === 'RGBW' ? 'RGBW' : 'RGB'
-	const rows = clampedInt(art.rows, 1, 1, 4096)
-	const cols = clampedInt(art.cols, 1, 1, 4096)
-	const refreshRateHz = clampedInt(art.refreshRateHz, 10, 1, 1000)
-	const channelsPerFixture = colorOrder === 'RGBW' ? 4 : 3
-	const width = Math.max(64, parseInt(String(dims?.width ?? 1920), 10) || 1920)
-	const height = Math.max(64, parseInt(String(dims?.height ?? 1080), 10) || 1080)
-
-	const spill = computeArtnetUniverseSpill({ rows, cols, channelsPerFixture, startAddress, startUniverse })
-
-	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
-	const label = escapeXml(String(dest?.label || 'Pixel Map'))
-	const universeNote =
-		spill.universesUsed > 1
-			? `universes ${spill.startUniverse}-${spill.endUniverse} (${spill.universesUsed} universes, auto-spill)`
-			: `universe ${spill.startUniverse}`
-	const fixturesXml = `
-                    <fixtures>
-                        <fixture>
-                            <type>${colorOrder}</type>
-                            <start-address>${startAddress}</start-address>
-                            <fixture-count>${cols}x${rows}</fixture-count>
-                            <fixture-channels>${channelsPerFixture}</fixture-channels>
-                            <host>${ip}</host>
-                            <port>${port}</port>
-                            <universe>${startUniverse}</universe>
-                            <x>${Math.round(width / 2)}</x>
-                            <y>${Math.round(height / 2)}</y>
-                            <width>${width}</width>
-                            <height>${height}</height>
-                            <brightness>1.0</brightness>
-                        </fixture>
-                    </fixtures>`
-	return `${channelXmlComment(
-		`Caspar channel ${ch}: Pixel-map screen "${label}" — native <artnet> wall ${cols}x${rows} ${colorOrder} @ ${art.ip || '(no host set)'}, ${universeNote}`,
-	)}        <channel>
-            <video-mode>${dims.modeId}</video-mode>
-            <consumers>
-                <artnet>
-                    <refresh-rate>${refreshRateHz}</refresh-rate>${fixturesXml}
-                </artnet>
-            </consumers>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-}
-
-/**
- * WO-53: one dedicated channel per live input. The producer (DeckLink/ALSA) is PLAYed here over AMCP,
- * so the channel-level OSC meter is isolated to that single input. DeckLink uses a full-quality mode
- * (`inputs_channel_mode`); audio-only ALSA uses the cheap lowest standard mode. No config consumers.
- * @param {Record<string, unknown>} config
- * @param {{ kind: string, slot: number, channel: number, layer: number, mode: string, label: string }} entry
- */
-function buildInputChannel(config, entry) {
-	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
-	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
-	const composeXml = Number.isFinite(Number(entry?.channel)) ? buildComposePreviewFfmpegConsumerXml(config, entry.channel) : ''
-	const role =
-		entry?.kind === 'live_audio'
-			? `Live audio input ${entry?.slot} (ALSA PLAY … alsa:// on layer ${entry?.layer}; cheap channel, isolated VU)`
-			: entry?.kind === 'v4l2'
-				? `V4L2 / USB video input ${entry?.slot} (PLAY ${ch}-${entry?.layer} udp://…; dedicated channel)`
-				: `DeckLink input ${entry?.slot} (PLAY ${ch}-${entry?.layer} DECKLINK <device>; dedicated channel, isolated VU)`
-	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
-            <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
-            <consumers>${composeXml}
-            </consumers>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
-}
-
-/**
- * WO-88: dedicated host channel for webpage / NDI live sources (no consumers; producer via AMCP).
- * @param {Record<string, unknown>} config
- * @param {{ kind: string, channel: number, layer: number, mode: string, label?: string, sourceId?: string }} entry
- */
-function buildHostLiveChannel(config, entry) {
-	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
-	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
-	const composeXml = Number.isFinite(Number(entry?.channel)) ? buildComposePreviewFfmpegConsumerXml(config, entry.channel) : ''
-	const role =
-		entry?.kind === 'ndi_host'
-			? `NDI host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} NDI …; route:// for on-air)`
-			: entry?.kind === 'browser_display'
-				? `Browser display host ${entry?.label || entry?.sourceId || ''} (WO-258: real Firefox on an off-screen :0 region, x11grab -> PLAY ${ch}-${entry?.layer} udp://127.0.0.1:…; route:// for on-air)`
-				: `Webpage host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} [HTML] … LOOP; route:// for on-air)`
-	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
-            <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
-            <consumers>${composeXml}
-            </consumers>
-            <mixer>
-                <audio-osc>true</audio-osc>
-            </mixer>
-        </channel>`
 }
 
 /**

@@ -101,7 +101,9 @@ test('infoResponseToXml handles both the array and string forms of an AMCP respo
 test('wiring: the retry path checks before playing and re-checks after a failure', () => {
 	const fs = require('fs')
 	const path = require('path')
-	const src = fs.readFileSync(path.join(__dirname, '../../src/config/routing-setup.js'), 'utf8')
+	const src =
+		fs.readFileSync(path.join(__dirname, '../../src/config/routing-setup.js'), 'utf8') +
+		fs.readFileSync(path.join(__dirname, '../../src/config/routing-setup-decklink-inputs.js'), 'utf8')
 
 	assert.match(src, /isDecklinkProducerForDevice\(before, device\)/, 'must check BEFORE playing')
 	assert.match(src, /isDecklinkProducerForDevice\(after, device\)/, 'must re-check after a failed PLAY')

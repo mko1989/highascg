@@ -13,10 +13,12 @@
 const test = require('node:test')
 const assert = require('node:assert')
 
-const src = require('fs').readFileSync(
-	require('path').join(__dirname, '../../src/config/routing-setup.js'),
-	'utf8',
-)
+const src =
+	require('fs').readFileSync(require('path').join(__dirname, '../../src/config/routing-setup.js'), 'utf8') +
+	require('fs').readFileSync(
+		require('path').join(__dirname, '../../src/config/routing-setup-decklink-inputs.js'),
+		'utf8',
+	)
 
 test('404 PLAY FAILED is no longer swallowed as success', () => {
 	assert.ok(
