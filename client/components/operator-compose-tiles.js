@@ -32,6 +32,7 @@
  *    relationship live during drags/resizes too (WO-263).
  */
 import { screenLabel } from '../lib/screen-label.js'
+import { parseRouteValue, resolveMvCellSourceChannel } from '../lib/input-channels.js'
 import { holeRectFromOuter, chromeInsets } from '../lib/hole-rect.js'
 import { watchElementPosition } from '../lib/element-position-watch.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
@@ -298,9 +299,110 @@ export function saveTileLayout(storage, key, layoutMap) {
 	}
 }
 
-function resolveTileChannel(d, cm) {
+export function resolveTileChannel(d, cm) {
+	// WO-323 user source tile: explicit channel, resolved from the tile's route value at def-build
+	// time (resolveSourceTileChannel) — never mainIndex-addressable.
+	if (d.role === 'mvcell') {
+		const ch = Number(d.srcCh)
+		return Number.isFinite(ch) && ch > 0 ? Math.floor(ch) : null
+	}
 	if (d.role === 'prv') return cm.previewChannels?.[d.mainIndex] ?? null
 	return cm.playbackChannels?.[d.mainIndex] ?? cm.programChannels?.[d.mainIndex] ?? null
+}
+
+/*
+ * WO-323 — user-added live-source tiles (Decklink/NDI/… from the Sources panel Live tab, dropped
+ * onto this canvas like the multiview editor). Persisted SEPARATELY from the pgm/prv layout map so
+ * {@link resolveTileLayout}'s "re-default wholesale on role-set change" rule never wipes them.
+ * Each stored tile keeps its original drag payload identity ({ type, value, label }) so the
+ * channel is re-resolved against the CURRENT channel map on every rebuild (WO-271 route-heal via
+ * resolveMvCellSourceChannel — a channel-map shift must not leave the tile on a stale number).
+ */
+
+/** localStorage key for the user source tiles (shared across screen counts — they are user content). */
+export function sourceTilesStorageKey(storageKeyPrefix) {
+	return `${storageKeyPrefix || 'casparcg_preview'}_operator_source_tiles`
+}
+
+/** @returns {Array<{ id: string, type: string, value: string, label: string, frac: object }>} */
+export function loadSourceTiles(storage, key) {
+	try {
+		const raw = storage?.getItem?.(key)
+		if (!raw) return []
+		const parsed = JSON.parse(raw)
+		if (!Array.isArray(parsed)) return []
+		return parsed.filter((t) => t && typeof t === 'object' && typeof t.value === 'string' && t.id)
+	} catch (_) {
+		return []
+	}
+}
+
+export function saveSourceTiles(storage, key, list) {
+	try {
+		storage?.setItem?.(key, JSON.stringify(Array.isArray(list) ? list : []))
+	} catch (_) {
+		// Best-effort — a full/unavailable localStorage must not break the canvas.
+	}
+}
+
+/**
+ * Normalize a Sources-panel drag payload (sources-panel-helpers.js makeDraggable: single
+ * `{ type, value, label, … }` or `{ type: 'multi', items: [...] }`) to a flat item list.
+ * @returns {Array<{ type: string, value: string, label: string }>}
+ */
+export function normalizeSourceDropItems(data) {
+	if (!data || typeof data !== 'object') return []
+	const items = data.type === 'multi' && Array.isArray(data.items) ? data.items : [data]
+	return items
+		.filter((it) => it && typeof it.value === 'string' && it.value)
+		.map((it) => ({ type: String(it.type || ''), value: it.value, label: String(it.label || it.value), resolution: it.resolution }))
+}
+
+/**
+ * Rejection message for dropping a source onto the compose tiles, or null when allowed.
+ * Blocks: non-route values (a source with no Caspar channel cannot be composed — e.g. direct NDI
+ * without a host channel), the multiview outputs (WO-156 — routing a multiview into a cell wedges
+ * it) and the operator-GUI compose channel itself (self-route would wedge the compose mosaic the
+ * same way).
+ * @param {string} value - drag payload value
+ * @param {object} cm - state.channelMap
+ * @returns {string|null}
+ */
+export function sourceTileRejection(value, cm) {
+	const parsed = parseRouteValue(value)
+	if (!parsed) {
+		return `"${value}" has no playout channel to compose — only route:// live sources (configured inputs) can be added.`
+	}
+	const map = cm || {}
+	const mvChs = Array.isArray(map.multiviewChannels) && map.multiviewChannels.length
+		? map.multiviewChannels.map(Number)
+		: (map.multiviewCh != null ? [Number(map.multiviewCh)] : [])
+	if (mvChs.includes(parsed.channel)) {
+		return `Cannot compose route://${parsed.channel} — channel ${parsed.channel} is a multiview output (routing it into a cell would freeze it).`
+	}
+	if (map.operatorGuiCh != null && parsed.channel === Number(map.operatorGuiCh)) {
+		return `Cannot compose route://${parsed.channel} — channel ${parsed.channel} is the compose output itself.`
+	}
+	return null
+}
+
+/**
+ * Resolve a stored source tile's CURRENT channel: identity-first heal against the live channel
+ * map (WO-271, same resolver the multiview editor uses), so a Decklink tile follows its slot
+ * across channel-map shifts. Null when the route is stale and unresolvable.
+ * @param {{ id?: string, type?: string, value?: string, label?: string }} tile
+ * @param {object} cm - state.channelMap
+ * @returns {number|null}
+ */
+export function resolveSourceTileChannel(tile, cm) {
+	const parsed = parseRouteValue(tile?.value)
+	if (!parsed) return null
+	return resolveMvCellSourceChannel({ id: tile.id, type: tile.type, label: tile.label }, parsed, cm)
+}
+
+/** seedFromCells identity: source tiles are keyed by their routed channel, never mainIndex (all 0). */
+export function tileSeedKey(c) {
+	return c.role === 'mvcell' ? `mvcell:${c.srcCh}` : `${c.role}:${c.mainIndex}`
 }
 
 /**
@@ -407,14 +509,45 @@ export function initOperatorComposeTiles(container, options) {
 	 * every later report (drag, resize, position watch) is completely unaffected. */
 	let stateReady = false
 
-	function currentDefs() {
+	// WO-323 — user-dropped live-source tiles, persisted separately from the pgm/prv layout map
+	// (their own store; the wholesale re-default rule must never wipe them).
+	const sourceStoreKey = sourceTilesStorageKey(storageKeyPrefix)
+	let sourceTiles = loadSourceTiles(storage, sourceStoreKey)
+
+	/** pgm/prv defs from the caller — the role-set the layout store is keyed on. */
+	function baseDefs() {
 		return Array.isArray(getComposeCellDefs?.()) ? getComposeCellDefs() : []
+	}
+
+	/** base defs + the user source tiles as mvcell defs (channel re-healed on every call). */
+	function currentDefs() {
+		const cm = getCm()
+		const srcDefs = sourceTiles.map((st) => ({
+			id: st.id,
+			role: 'mvcell',
+			srcCh: resolveSourceTileChannel(st, cm),
+			mainIndex: 0,
+			label: st.label || st.value,
+			sourceTile: st,
+		}))
+		return [...baseDefs(), ...srcDefs]
 	}
 
 	function persist() {
 		const map = {}
-		for (const [id, t] of tiles) map[id] = t.frac
+		let sourceChanged = false
+		for (const [id, t] of tiles) {
+			if (t.def.role === 'mvcell' && t.def.sourceTile) {
+				if (JSON.stringify(t.def.sourceTile.frac) !== JSON.stringify(t.frac)) {
+					t.def.sourceTile.frac = { ...t.frac }
+					sourceChanged = true
+				}
+			} else {
+				map[id] = t.frac
+			}
+		}
 		saveTileLayout(storage, storageKey, map)
+		if (sourceChanged) saveSourceTiles(storage, sourceStoreKey, sourceTiles)
 	}
 
 	function canvasSize() {
@@ -467,7 +600,12 @@ export function initOperatorComposeTiles(container, options) {
 			const rect = composeAreaBasis
 				? { left: b.left - rootRect.left, top: b.top - rootRect.top, width: b.width, height: b.height }
 				: b
-			cellRects.push({ id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect })
+			// WO-323: an unresolved source tile (stale route after a map shift) reports nothing —
+			// a hole with no routable channel would just show the raw consumer behind it.
+			if (t.def.role === 'mvcell' && resolveTileChannel(t.def, getCm()) == null) continue
+			const cell = { id: t.def.id, role: t.def.role, mainIndex: t.def.mainIndex, rect }
+			if (t.def.role === 'mvcell') cell.srcCh = t.def.srcCh
+			cellRects.push(cell)
 		}
 		onCellRects(cellRects, composeAreaBasis ? { width: rootRect.width, height: rootRect.height } : undefined)
 		// Re-hug the freshest canvas position so the next pure MOVE (no resize/scroll) re-reports.
@@ -528,11 +666,13 @@ export function initOperatorComposeTiles(container, options) {
 	// @param {{ positions?: boolean }} [opts] positions:true only for the initial seed.
 	function seedFromCells(cells, opts = {}) {
 		if (!isClient) return
-		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [`${c.role}:${c.mainIndex}`, c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		// WO-323: source tiles all carry mainIndex 0 — key them by their routed channel instead
+		// (tileSeedKey), so two source tiles never collide with each other or with PGM/PRV cells.
+		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
 		if (!byKey.size) return
 		// (1) Crop source — always.
 		for (const t of tiles.values()) {
-			const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+			const fill = byKey.get(tileSeedKey(t.def))
 			if (fill) t.fill = { x: fill.x, y: fill.y, w: fill.w, h: fill.h }
 		}
 		// (2) Display position — once, first run only.
@@ -543,7 +683,7 @@ export function initOperatorComposeTiles(container, options) {
 			let changed = false
 			for (const t of tiles.values()) {
 				if (drag && drag.t === t) continue
-				const fill = byKey.get(`${t.def.role}:${t.def.mainIndex}`)
+				const fill = byKey.get(tileSeedKey(t.def))
 				if (!fill) continue
 				const outer = {
 					x: (fill.x * cw - borderW) / cw,
@@ -611,9 +751,24 @@ export function initOperatorComposeTiles(container, options) {
 		labelRowEl.className = 'operator-tile__labelrow'
 		const labelEl = document.createElement('div')
 		labelEl.className = 'operator-tile__label'
-		labelEl.textContent = `${def.role.toUpperCase()} ${def.mainIndex + 1} / ${screenLabel(getCm(), def.mainIndex)}`
+		labelEl.textContent = tileLabelText(def, getCm())
 		labelRowEl.appendChild(labelEl)
 		if (def.role === 'pgm') labelRowEl.appendChild(buildPgmTileActions(def.mainIndex))
+		// WO-323 source tile: ✕ remove — real chrome in the footer row (hole body is click-dead by
+		// design, X SHAPE input∩bounding).
+		if (def.role === 'mvcell') {
+			const removeBtn = document.createElement('button')
+			removeBtn.type = 'button'
+			removeBtn.className = 'operator-tile__btn operator-tile__btn--remove'
+			removeBtn.textContent = '✕'
+			removeBtn.title = `Remove ${def.label} from the compose preview`
+			removeBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
+			removeBtn.addEventListener('click', (e) => {
+				e.stopPropagation()
+				removeSourceTile(def.id)
+			})
+			labelRowEl.appendChild(removeBtn)
+		}
 		footerEl.appendChild(labelRowEl)
 
 		const resizeEl = document.createElement('div')
@@ -627,7 +782,9 @@ export function initOperatorComposeTiles(container, options) {
 		footerEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'move'))
 		resizeEl.addEventListener('pointerdown', (e) => startDrag(e, t, 'resize'))
 
-		const osc = typeof getOscClient === 'function' ? getOscClient() : null
+		// Source tiles are live inputs — no clip playback timer (the timer scans look layers by
+		// mainIndex, meaningless for an input channel).
+		const osc = def.role !== 'mvcell' && typeof getOscClient === 'function' ? getOscClient() : null
 		if (osc) {
 			// mountPgmTopLayerPlaybackTimer replaces its container's className wholesale
 			// ('playback-timer ...') — mount into an inner child so footerEl keeps its own
@@ -644,7 +801,23 @@ export function initOperatorComposeTiles(container, options) {
 	}
 
 	function relabel(t) {
-		t.labelEl.textContent = `${t.def.role.toUpperCase()} ${t.def.mainIndex + 1} / ${screenLabel(getCm(), t.def.mainIndex)}`
+		t.labelEl.textContent = tileLabelText(t.def, getCm())
+	}
+
+	function tileLabelText(def, cm) {
+		if (def.role === 'mvcell') {
+			const ch = resolveTileChannel(def, cm)
+			return ch != null ? `LIVE ch${ch} / ${def.label}` : `LIVE (source unavailable) / ${def.label}`
+		}
+		return `${def.role.toUpperCase()} ${def.mainIndex + 1} / ${screenLabel(cm, def.mainIndex)}`
+	}
+
+	function removeSourceTile(id) {
+		const before = sourceTiles.length
+		sourceTiles = sourceTiles.filter((st) => st.id !== id)
+		if (sourceTiles.length === before) return
+		saveSourceTiles(storage, sourceStoreKey, sourceTiles)
+		rebuild()
 	}
 
 	function startDrag(e, t, mode) {
@@ -704,8 +877,13 @@ export function initOperatorComposeTiles(container, options) {
 		// full-state subscription below — flips the gate as soon as real state is visible.
 		if (!stateReady && hasResolvedChannelState(getCm())) stateReady = true
 		const defs = currentDefs()
-		const key = JSON.stringify(defs.map((d) => ({ id: d.id, role: d.role, mainIndex: d.mainIndex })))
-		const screenCount = new Set(defs.map((d) => d.mainIndex)).size || 1
+		// srcCh is part of the identity: a route-heal (channel-map shift) must rebuild the tile so
+		// its reported cell and hole aspect follow the new channel.
+		const key = JSON.stringify(defs.map((d) => ({ id: d.id, role: d.role, mainIndex: d.mainIndex, srcCh: d.srcCh ?? null })))
+		// Layout store stays keyed on the pgm/prv role set only — source tiles are user content
+		// with their own store and must not shift the storage key.
+		const base = defs.filter((d) => d.role !== 'mvcell')
+		const screenCount = new Set(base.map((d) => d.mainIndex)).size || 1
 		storageKey = layoutStorageKey(storageKeyPrefix, screenCount)
 		// Same defs: labels AND hole aspects may still have changed (INFO-derived
 		// channelResolutionsByChannel arrives after the first channelMap snapshot) — re-layout so
@@ -716,8 +894,13 @@ export function initOperatorComposeTiles(container, options) {
 		tiles.clear()
 		lastCanvasSize = { w: 0, h: 0 }
 		const stored = loadTileLayout(storage, storageKey)
-		const resolved = resolveTileLayout(defs, stored)
-		for (const d of defs) tiles.set(d.id, buildTile(d, resolved[d.id]))
+		const resolved = resolveTileLayout(base, stored)
+		for (const d of defs) {
+			const frac = d.role === 'mvcell'
+				? (d.sourceTile?.frac || { x: 0.6, y: 0.6, w: 0.3, h: 0.3 })
+				: resolved[d.id]
+			tiles.set(d.id, buildTile(d, frac))
+		}
 		layoutAll()
 	}
 
@@ -738,6 +921,63 @@ export function initOperatorComposeTiles(container, options) {
 		layoutAll()
 	}
 	resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetLayout() })
+
+	// WO-323 — accept Sources-panel Live-tab drags (same payload the multiview editor consumes).
+	// The drop must land on real DOM (canvas background / tile chrome) — hole bodies are input-dead
+	// on the host kiosk by design (X SHAPE input∩bounding), which is fine: the canvas background
+	// between tiles is the natural drop target.
+	function addSourceTileFromDrop(item, dropFrac) {
+		const cm = getCm()
+		const rejection = sourceTileRejection(item.value, cm)
+		if (rejection) { showAppToast(rejection, 'warn'); return }
+		const id = `src_${String(item.value).replace(/[^a-z0-9]+/gi, '_')}`
+		if (sourceTiles.some((st) => st.id === id)) {
+			showAppToast(`${item.label} is already on the compose preview.`, 'info')
+			return
+		}
+		// Default size: ~30% of the canvas wide, height from the source aspect + footer chrome.
+		const { w: cw, h: ch } = canvasSize()
+		const minOuter = minOuterSize()
+		let aspect = DEFAULT_TILE_ASPECT
+		const m = String(item.resolution || '').match(/(\d+)[×x](\d+)/i)
+		if (m && Number(m[2]) > 0) aspect = Number(m[1]) / Number(m[2])
+		const w = Math.max(minOuter.width, Math.round(cw * 0.3))
+		const h = Math.max(minOuter.height, Math.round((w - TILE_CHROME.borderW * 2) / aspect) + TILE_CHROME.borderW * 2 + TILE_CHROME.footerH)
+		const px = clampTileRect({ x: dropFrac.x * cw - w / 2, y: dropFrac.y * ch - h / 2, w, h }, cw, ch, minOuter.width, minOuter.height)
+		sourceTiles.push({
+			id,
+			type: item.type,
+			value: item.value,
+			label: item.label,
+			frac: { x: px.x / cw, y: px.y / ch, w: px.w / cw, h: px.h / ch },
+		})
+		saveSourceTiles(storage, sourceStoreKey, sourceTiles)
+		rebuild()
+		showAppToast(`${item.label} added to the compose preview.`, 'success')
+	}
+
+	root.addEventListener('dragover', (e) => {
+		e.preventDefault()
+		root.classList.add('operator-compose-tiles--drophover')
+	})
+	root.addEventListener('dragleave', () => root.classList.remove('operator-compose-tiles--drophover'))
+	root.addEventListener('drop', (e) => {
+		e.preventDefault()
+		root.classList.remove('operator-compose-tiles--drophover')
+		let data = null
+		try { data = JSON.parse(e.dataTransfer.getData('application/json')) } catch (_) {
+			const v = e.dataTransfer.getData('text/plain')
+			if (v) data = { type: 'route', value: v.split('\n')[0], label: v.split('\n')[0] }
+		}
+		const items = normalizeSourceDropItems(data)
+		if (!items.length) return
+		const r = root.getBoundingClientRect()
+		const dropFrac = {
+			x: Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width))),
+			y: Math.max(0, Math.min(1, (e.clientY - r.top) / Math.max(1, r.height))),
+		}
+		for (const item of items) addSourceTileFromDrop(item, dropFrac)
+	})
 
 	const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onCanvasResize) : null
 	ro?.observe(root)

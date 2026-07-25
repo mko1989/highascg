@@ -195,3 +195,13 @@
 	cursor: nwse-resize;
 	background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.7) 50%);
 }
+
+/* WO-323 — user-added live-source tiles */
+.operator-tile__btn--remove {
+	padding: 0 6px;
+	color: #e07070;
+}
+.operator-compose-tiles--drophover {
+	outline: 2px dashed rgba(120, 180, 255, 0.7);
+	outline-offset: -2px;
+}

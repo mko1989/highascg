@@ -6,6 +6,23 @@
 export const LIVE_AUDIO_INPUT_LAYER = 10
 
 /**
+ * Parse any route value: `route://N` (whole channel, layer = null) or `route://N-L`.
+ * Moved here from scenes-shared.js (WO-323) — that module's import chain is not plain-node
+ * require-safe and operator-compose-tiles.js (smoke-tested under node) needs this; scenes-shared
+ * re-exports it for its existing importers.
+ * @param {unknown} value
+ * @returns {{ channel: number, layer: number | null } | null}
+ */
+export function parseRouteValue(value) {
+	const m = String(value || '').trim().match(/^route:\/\/(\d+)(?:-(\d+))?$/i)
+	if (!m) return null
+	const channel = parseInt(m[1], 10)
+	if (!Number.isFinite(channel) || channel < 1) return null
+	const layer = m[2] != null ? parseInt(m[2], 10) : null
+	return { channel, layer: Number.isFinite(layer) && layer >= 1 ? layer : null }
+}
+
+/**
  * @param {object | null | undefined} cm — state.channelMap
  * @param {number} slot — 1-based DeckLink slot
  */

@@ -446,7 +446,9 @@ describe('WO-256 T256.2: preview-canvas-panel.js hard-gates the tile canvas on o
 describe('WO-256 T256.4: rect reporting reuses the existing merged-report path unchanged, suppression covers the tile canvas', () => {
 	it('operator-compose-tiles.js reports the SAME cell shape ({ id, role, mainIndex, rect }) preview-canvas-panel.js already emitted for the canvas-pair', () => {
 		const src = read('client/components/operator-compose-tiles.js')
-		assert.match(src, /cellRects\.push\(\{ id: t\.def\.id, role: t\.def\.role, mainIndex: t\.def\.mainIndex, rect \}\)/)
+		// WO-323 extended the report with srcCh for user source tiles; the base shape is unchanged.
+		assert.match(src, /const cell = \{ id: t\.def\.id, role: t\.def\.role, mainIndex: t\.def\.mainIndex, rect \}/)
+		assert.match(src, /if \(t\.def\.role === 'mvcell'\) cell\.srcCh = t\.def\.srcCh/)
 		assert.match(src, /getBoundingClientRect\(\)/, 'reports real viewport-space DOM rects, same as the old compose cells')
 	})
 

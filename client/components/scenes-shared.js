@@ -12,6 +12,7 @@ import {
 	playSeekFramesForRelativeToPrevious,
 } from '../lib/layer-playhead-resolve.js'
 import { isLowerThirdSource, resolveLayerLowerThirdCgData, resolveLayerLowerThirdConfig, buildLowerThirdCasparCgData } from '../lib/lower-third-cg-data.js'
+import { parseRouteValue } from '../lib/input-channels.js'
 
 export function amcpParam(str) {
 	if (str == null || str === '') return ''
@@ -417,19 +418,10 @@ export function parseRouteChannelLayer(value) {
 	return { channel, layer }
 }
 
-/**
- * Parse any route value: `route://N` (whole channel, layer = null) or `route://N-L`.
- * @param {unknown} value
- * @returns {{ channel: number, layer: number | null } | null}
- */
-export function parseRouteValue(value) {
-	const m = String(value || '').trim().match(/^route:\/\/(\d+)(?:-(\d+))?$/i)
-	if (!m) return null
-	const channel = parseInt(m[1], 10)
-	if (!Number.isFinite(channel) || channel < 1) return null
-	const layer = m[2] != null ? parseInt(m[2], 10) : null
-	return { channel, layer: Number.isFinite(layer) && layer >= 1 ? layer : null }
-}
+// parseRouteValue lives in input-channels.js (WO-323: operator-compose-tiles needs it without
+// this module's import chain, which is not plain-node require-safe); re-exported here for the
+// many existing importers. Imported (not `export … from`) because this module also uses it.
+export { parseRouteValue }
 
 /**
  * WO-156: rejection message for assigning a route source to a look, or null when allowed.
