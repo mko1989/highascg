@@ -20,6 +20,7 @@ const {
 	getTrackedTemplateHosts,
 	untrackTemplateHosts,
 } = require('./scene-template-cg')
+const { isShaderCgName } = require('./cg-routing')
 /**
  * @param {object} ctx
  * @param {object} ctx.amcp
@@ -78,6 +79,10 @@ async function runSceneTakeLbgTeardown(ctx) {
 		const fadeOutLines = []
 		for (const layer of exitMedia) {
 			if (!isSceneTemplateLayer(layer, layer.source?.value, self)) continue
+			// WO-322: shaders live on the look band and ride the bank crossfade like media — the
+			// 700+ overlay fade-out here would hit the wrong (logical, not bank-mapped) layer and
+			// double the mix. Their exit is the physical STOP/CLEAR path below.
+			if (isShaderCgName(layer.source?.value)) continue
 			const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, layer.source?.value)
 			if (incomingTemplateHostLayers.has(hostLayer)) continue // replaced by the incoming look — not exiting
 			fadeOutLines.push(`MIXER ${channel}-${hostLayer} OPACITY 0 ${fadeOutFrames}`)
@@ -107,7 +112,10 @@ async function runSceneTakeLbgTeardown(ctx) {
 				if (stale !== onAir) {
 					const clg = `${channel}-${stale}`
 					if (!isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, stale)) {
-						teardownLines.push(`STOP ${clg}`, `MIXER ${clg} CLEAR`)
+						// WO-322: CG CLEAR first removes an exiting shader's CG producer on this
+						// bank-mapped layer (harmless no-op on a media layer). Without it, MIXER
+						// CLEAR resets opacity to 1 and a replaced shader stays as a ghost.
+						teardownLines.push(`CG ${clg} CLEAR`, `STOP ${clg}`, `MIXER ${clg} CLEAR`)
 						try {
 							playbackTracker.recordStop(self, channel, stale)
 						} catch (_) {}
@@ -119,7 +127,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 				const physLn = phys(ln, bank)
 				if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, physLn)) continue
 				const cl = `${channel}-${physLn}`
-				teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+				teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 				try {
 					const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
 					const pipN = pipOverlaysFromLayer(layer).length
@@ -135,7 +143,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
 			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
 			const cl = `${channel}-${pOut}`
-			teardownLines.push(`STOP ${cl}`, `MIXER ${cl} CLEAR`)
+			teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 			try {
 				const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
 				const pipN = pipOverlaysFromLayer(layer).length
@@ -154,6 +162,10 @@ async function runSceneTakeLbgTeardown(ctx) {
 	const hostsToUntrack = new Set()
 	for (const layer of exitMedia) {
 		if (!isSceneTemplateLayer(layer, layer.source?.value, self)) continue
+		// WO-322: shader exits were already handled by the physical STOP/CLEAR path above (their
+		// host resolves to the LOGICAL layer here, not the bank-mapped one — clearing that would
+		// miss the real host and touch a live layer of the other bank).
+		if (isShaderCgName(layer.source?.value)) continue
 		const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, layer.source?.value)
 		if (incomingTemplateHostLayers.has(hostLayer)) continue
 		// This layer is exiting and will not be replaced by the incoming look.

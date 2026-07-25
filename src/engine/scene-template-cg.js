@@ -8,7 +8,7 @@
 
 const { param } = require('../caspar/amcp-utils')
 const { isTemplateClip } = require('../state/playback-tracker-media')
-const { resolveTemplateCgHostLayer, channelMapFromCtx } = require('./cg-routing')
+const { resolveTemplateCgHostLayer, channelMapFromCtx, TEMPLATE_CG_OVERLAY_LAYER_BASE } = require('./cg-routing')
 
 /**
  * WO-207: Track per-channel Sets of added template CG host layers.
@@ -128,8 +128,10 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec, opts =
 		typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
 	const playOnLoad = spec?.playOnLoad !== false ? 1 : 0
 	const tpl = cgName.includes('/') ? `"${cgName}"` : cgName
-	// WO-207 T207.2: record this host as added (tracked removal on teardown or on take without the template)
-	recordTemplateHostAdded(channel, hostLayer)
+	// WO-207 T207.2: record this host as added (tracked removal on teardown or on take without the
+	// template). WO-322: overlay-band (700+) hosts only — a shader's look-band layer must never
+	// pollute the tracked-host set (its cleanup rides the look-layer teardown, not the 700+ sweep).
+	if (hostLayer >= TEMPLATE_CG_OVERLAY_LAYER_BASE) recordTemplateHostAdded(channel, hostLayer)
 	const fadeDur = Number(opts?.fadeDurFrames)
 	if (Number.isFinite(fadeDur) && fadeDur > 0) {
 		const tw = opts?.fadeTween ? ` ${param(opts.fadeTween)}` : ''

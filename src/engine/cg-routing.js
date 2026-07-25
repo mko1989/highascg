@@ -15,6 +15,17 @@ function isLowerThirdCgName(cgName) {
 }
 
 /**
+ * WO-322: shader templates (shader-store.js exports every shader to `template/shaders/<id>.html`,
+ * Caspar path `shaders/<id>`). These composite on the LOOK band like media — the owner must be
+ * able to stack look layers on top — so they are the one template-CG kind that does NOT go to the
+ * 700+ overlay.
+ * @param {string} [cgName]
+ */
+function isShaderCgName(cgName) {
+	return String(cgName || '').trim().toLowerCase().startsWith('shaders/')
+}
+
+/**
  * Map a look's logical layer number to a dedicated high CG host layer (700+).
  * @param {number|string} logicalLayerNumber — scene layerNumber (e.g. 20, 30)
  * @param {string} [cgName] — when omitted, always maps look-range layers to overlay stack
@@ -24,7 +35,10 @@ function resolveTemplateCgHostLayer(logicalLayerNumber, cgName) {
 	const n = parseInt(logicalLayerNumber, 10)
 	if (!Number.isFinite(n)) return TEMPLATE_CG_OVERLAY_LAYER_BASE
 	if (n >= TEMPLATE_CG_OVERLAY_LAYER_BASE && n <= TEMPLATE_CG_OVERLAY_LAYER_MAX) return n
-	const useOverlay = !cgName || isLowerThirdCgName(cgName) || isSceneTemplateCgName(cgName)
+	// WO-322: shaders stay on their look-band layer (composite like media); lower thirds and
+	// every other template CG keep the 700+ overlay (above the bank A/B crossfade, WO-196
+	// continuity relies on the fixed host).
+	const useOverlay = !cgName || ((isLowerThirdCgName(cgName) || isSceneTemplateCgName(cgName)) && !isShaderCgName(cgName))
 	if (!useOverlay) return n
 	if (n >= LOOK_LAYER_MIN && n <= 199) {
 		const logical = n >= 110 ? n - 100 : n
@@ -108,6 +122,7 @@ module.exports = {
 	TEMPLATE_CG_OVERLAY_LAYER_BASE,
 	TEMPLATE_CG_OVERLAY_LAYER_MAX,
 	isLowerThirdCgName,
+	isShaderCgName,
 	isSceneTemplateCgName,
 	resolveTemplateCgHostLayer,
 	resolveCgRequestChannel,

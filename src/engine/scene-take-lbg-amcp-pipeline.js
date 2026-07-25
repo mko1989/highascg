@@ -27,6 +27,7 @@ const {
 	recordTemplateHostAdded,
 	resolveTemplateCgHostLayer,
 } = require('./scene-template-cg')
+const { isShaderCgName } = require('./cg-routing')
 const { serializeClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { cropAdjustedFillForLayer } = require('./layer-crop')
 const { logPlannedCommand } = require('./scene-take-lbg-merge')
@@ -427,6 +428,25 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			}
 			for (const job of takeJobs) {
 				if (!job.templateCg) continue
+
+				// WO-322: a shader composites on the LOOK band like media — CG ADD on the job's
+				// bank-mapped physical layer (job.pLayer, NOT logical n: a bank-B take must land on
+				// n+100). No continuity/UPDATE-only path (shaders are stateless graphics, not
+				// timers), no clear-on-other-channels (mirrored looks legitimately run the same
+				// shader per channel, exactly like media), no cgFade (the job's own mixerLines
+				// OPACITY in the crossfade batch owns the fade — a CG-level ramp would double it),
+				// and no tracked-host record (buildSceneTemplateCgAmcpLines guards that to 700+).
+				if (isShaderCgName(job.templateCg.cgName)) {
+					const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg, {})
+					if (lines.length > 0) {
+						self.log?.(
+							'info',
+							`[scene-take-lbg] shader layer ${job.layer.layerNumber} → ${job.templateCg.cgName} on look-band layer ${job.pLayer} (WO-322)`,
+						)
+						await sendPipOverlayLinesSerial(amcp, lines)
+					}
+					continue
+				}
 
 				// WO-196 T196.2: detect continuity — same template on same host layer preserves timer state.
 				// Check if the current scene already has this template on the same layer.

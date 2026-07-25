@@ -35,6 +35,7 @@ const {
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { cropAdjustedFillForLayer } = require('./layer-crop')
 const { buildSceneTemplateCgSpec, buildSceneTemplateCgAmcpLines, buildClearTemplateCgOnOtherProgramChannelsLines } = require('./scene-template-cg')
+const { isShaderCgName } = require('./cg-routing')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { isPgmAudioTrackPhysicalLayerOnChannel } = require('./look-layer-ranges')
 const { remapIntraLookRoutesForTakeChannel, sendStaggeredTakePlays } = require('./scene-route-deps')
@@ -328,17 +329,25 @@ async function runSceneTakePgmOnly(amcp, opts) {
 	for (const job of takeJobs) {
 		if (!job.templateCg) continue
 		try {
-			const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
-				channel,
-				job.layer.layerNumber,
-				job.templateCg,
-				self,
-			)
-			if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
+			// WO-322: shaders composite on the look band — CG ADD on the bank-mapped physical
+			// layer, no clear-on-other-channels (mirrored looks run the same shader per channel,
+			// like media). Other template CG keeps the 700+ overlay path unchanged.
+			const isShader = isShaderCgName(job.templateCg.cgName)
+			if (!isShader) {
+				const clearOther = buildClearTemplateCgOnOtherProgramChannelsLines(
+					channel,
+					job.layer.layerNumber,
+					job.templateCg,
+					self,
+				)
+				if (clearOther.length > 0) await sendPipOverlayLinesSerial(amcp, clearOther)
+			}
 			// Animate take → crossfade the template in on its host layer instead of cutting (matches
 			// the media Animate/MIX). fadeDur is 0 unless isAnimate, so a cut take is unchanged.
-			const cgFade = fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
-			const lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg, cgFade)
+			// WO-322: never for shaders — buildPgmOnlyMixerLines already emits FILL/OPACITY on
+			// job.pLayer (the shader's host now), so a CG-level ramp would double the fade.
+			const cgFade = !isShader && fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
+			const lines = buildSceneTemplateCgAmcpLines(channel, isShader ? job.pLayer : job.layer.layerNumber, job.templateCg, cgFade)
 			if (lines.length > 0) {
 				self.log?.(
 					'info',

@@ -358,11 +358,15 @@ async function runSceneTakeLbg(amcp, opts) {
 	// This enables continuity: if a template layer carries the same identity on the next look,
 	// we keep it on air without a CG CLEAR.
 	const { buildSceneTemplateCgSpec, resolveTemplateCgHostLayer } = require('./scene-template-cg')
+	const { isShaderCgName } = require('./cg-routing')
 	const incomingTemplateHostLayers = new Set()
 	for (const layer of incoming.layers) {
 		if (!layerHasContent(layer)) continue
 		const spec = buildSceneTemplateCgSpec(layer, layer.source?.value, self)
-		if (spec) {
+		// WO-322: 700+ overlay hosts only — shaders live on the look band with no continuity
+		// semantics; adding their logical layer here would wrongly shield an unrelated exiting
+		// 700-band host (and shader exits are the physical teardown path anyway).
+		if (spec && !isShaderCgName(spec.cgName)) {
 			const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, spec.cgName)
 			incomingTemplateHostLayers.add(hostLayer)
 		}

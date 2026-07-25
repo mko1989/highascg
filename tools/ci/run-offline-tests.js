@@ -139,6 +139,7 @@ const FILES = [
 	'tools/smoke/smoke-wo266-shader-fx.test.js',
 	'tools/smoke/smoke-wo267-studio-canvas-play.test.js',
 	'tools/smoke/smoke-wo268-shader-cef-continuity.test.js',
+	'tools/smoke/smoke-wo322-shader-look-band-routing.test.js',
 	'tools/smoke/smoke-wo269-shape-log-dedupe.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
