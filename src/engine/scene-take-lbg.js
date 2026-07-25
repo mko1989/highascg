@@ -22,19 +22,13 @@
 
 'use strict'
 
-const { param } = require('../caspar/amcp-utils')
-const {
-	buildPipOverlayOpacityFadeDeferLines,
-	nextPipContentLayerInScene,
-	pipOverlaysFromLayer,
-} = require('./pip-overlay')
-
 const { buildTakeJobs } = require('./scene-take-lbg-jobs')
 const { PGM_BANK_B_OFFSET } = require('./scene-transition')
 const { resolveGlobalBorderPhysicalLayer, buildMergeMixerExtrasForTake } = require('./scene-take-lbg-merge')
 const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
+const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
 const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
 
@@ -205,70 +199,25 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	const currentSceneLayers = opts.currentScene?.layers
 
-	const timelineFadeLines = []
-	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
-		const tl = self.timelineEngine.timelines.get(activeTimelineIdToFadeOut)
-		if (tl) {
-			const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
-			const { param } = require('../caspar/amcp-utils')
-			let tail = `0 ${fadeDur}`
-			if (fadeTw) tail += ` ${param(fadeTw)}`
-			for (let li = 0; li < tl.layers.length; li++) {
-				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
-				timelineFadeLines.push(`MIXER ${cl} OPACITY ${tail} DEFER`)
-			}
-		}
-	}
-
-	if (
-		(exitMedia.length > 0 || timelineFadeLines.length > 0 || (timelineFadeInPhys?.length || 0) > 0) &&
-		fadeDur > 0 &&
-		!shouldRunBankCrossfade &&
-		!isMergeTransition
-	) {
-		const fadeLines = [...timelineFadeLines]
-		// Incoming timeline layers were preset to 0 before PLAY (WO-152 B152.1) — fade them
-		// in with the same batch/commit so they enter with the transition, not as a pop.
-		for (const L of timelineFadeInPhys || []) {
-			let p = `1 ${fadeDur}`
-			if (fadeTw) p += ` ${require('../caspar/amcp-utils').param(fadeTw)}`
-			fadeLines.push(`MIXER ${channel}-${L} OPACITY ${p}`)
-		}
-		for (const layer of exitMedia) {
-			const pOut = phys(Number(layer.layerNumber), activeBank)
-			if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
-			const cl = `${channel}-${pOut}`
-			let p = `0 ${fadeDur}`
-			if (fadeTw) p += ` ${require('../caspar/amcp-utils').param(fadeTw)}`
-			fadeLines.push(`MIXER ${cl} OPACITY ${p}`)
-			try {
-				const nextL = require('./pip-overlay').nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
-				const pipN = require('./pip-overlay').pipOverlaysFromLayer(layer).length
-				if (pipN > 0) {
-					fadeLines.push(...require('./pip-overlay').buildPipOverlayOpacityFadeDeferLines(channel, pOut, p, nextL, pipN))
-				}
-			} catch (_) {}
-		}
-		try {
-			await amcp.batchSendChunked(fadeLines, { skipMixerPreCommit: true })
-			await amcp.mixerCommit(channel)
-		} catch (_) {}
-		fadeClockStart = Date.now()
-		notifyProgramTransitionStarted()
-	} else if (exitMedia.length > 0) {
-		for (const layer of exitMedia) {
-			const ln = Number(layer.layerNumber)
-			if (isMergeTransition && Number.isFinite(ln)) {
-				if (fadeWatcher) {
-					fadeWatcher.cancel(channel, phys(ln, activeBank))
-					fadeWatcher.cancel(channel, phys(ln, inactiveBank))
-				}
-			} else {
-				const pOut = phys(Number(layer.layerNumber), activeBank)
-				if (fadeWatcher) fadeWatcher.cancel(channel, pOut)
-			}
-		}
-	}
+	fadeClockStart = await sendExitAndTimelineFadeLines(amcp, {
+		self,
+		channel,
+		activeTimelineIdToFadeOut,
+		fadeDur,
+		forceCut,
+		fadeTw,
+		exitMedia,
+		timelineFadeInPhys,
+		shouldRunBankCrossfade,
+		isMergeTransition,
+		phys,
+		activeBank,
+		inactiveBank,
+		currentSceneLayers,
+		fadeWatcher,
+		notifyProgramTransitionStarted,
+		fadeClockStart,
+	})
 
 	// Global border (layer 998) lifecycle is computed before takeJobs so the teardown
 	// block can also act when only the border changes (no media swap). See WO-09.
