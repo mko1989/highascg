@@ -180,3 +180,23 @@ up the new player.js on their next CG ADD — no build, no kiosk reload.
 Note: don't point it at a card a live-audio bridge slot uses (hw single-open;
 lifecycle warns). Follow-up candidate if that's ever needed: tee PCM out of
 the slot's ffmpeg bridge instead of a second open.
+
+2026-07-25 (later) — WO-333b (85bfb40): owner rejected the standalone-device
+workflow ("we already have an audio capture channel host that i need to be
+able to route as a source for fft") — implemented exactly that tee follow-up:
+- Routed slot's bridge ffmpeg gains a 2nd output: raw s16le/48k/stereo →
+  udp://127.0.0.1:5222N (unconnected sendto — can't error the on-air ingest;
+  format pinned by its own -af, so S32-only cards like the DM3 still work).
+- FFT engine got source:'slot' (dgram listener → same analyser path); caspar
+  setting audio_fft_source_slot; /live-inputs/apply restarts the FFT listener
+  BEFORE the bridges so routing applies live.
+- UI: "Shader FFT source" checkbox in the live-audio input inspector
+  (single-select, shows current holder), saves+applies like the device select.
+  dist-web rebuilt; kiosk NOT reloaded yet (toggle is inert until the node
+  restart anyway — reload together with the restart).
+- Verified live: real bridge args ran ffmpeg on plughw:0,0 (scratch ports),
+  engine locked onto the tee, frames flowed. Gate 1526/2; smoke-wo333 now 16
+  incl. a behavioral UDP PCM→frame test.
+OWNER ACTIVATION (one maintenance moment, same restart owed for 322b/329B):
+restart node + kiosk reload, then in the live-audio input's inspector tick
+"Shader FFT source". Shaders pick the feed up on their next CG ADD/take.
