@@ -137,3 +137,23 @@ STILL OWED WITH OWNER: 322 §BLOCKER visual check (shader-in-look take both
 directions + bank crossfade; revert candidate baf8211), 329B two-browser
 verify, 328 live repro, 326 design question (live-on-air apply outside
 edit-on-PGM?). Push of main (4 commits with this log) also left to owner.
+
+--------------------------------------------------------------------------------
+2026-07-25 (later) — 322b: OWNER DESK-QA ON 3 LOOKS, ROOT-CAUSED + FIXED (2d35446)
+--------------------------------------------------------------------------------
+Owner: look1 shader-only "hit or miss whether it plays at all"; media → look1
+"does not perform mix transition"; look2 (shader+media) ↔ look3 (media) great.
+ONE root cause, confirmed in journal + amcp-last50 at 14:04-14:05: the
+crossfade OPACITY ramps ride sendStaggeredTakePlays as suffixAfterSources,
+gated on sourceLines.length > 0 — template jobs have playPlan=null, so a
+shader-ONLY look emits zero PLAY lines and the whole crossfade batch is
+silently dropped (Phase A pre-hides incoming bank at OPACITY 0, ramp never
+arrives → invisible on the above-outgoing bank parity = hit-or-miss; the
+outgoing media's fade-to-0 is in the same dropped batch → hard cut at
+teardown). Fix: new pipeline branch sends the crossfade batch directly when no
+job emits PLAY lines, leading COMMIT first to flush the deferred pre-hide.
+smoke-wo322 grew a behavioral (d) test (stub-AMCP pipeline drive; verified to
+fail pre-fix). Gate 1510/2, no new lint.
+*** SERVER change — NOT LIVE until next node restart. That restart also
+completes the original 322 §BLOCKER check; expected after it: look1 takes
+always show, media→look1 mixes. Revert candidates baf8211 + 2d35446. ***
