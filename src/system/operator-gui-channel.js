@@ -163,6 +163,23 @@ function resolveOperatorGuiChannelDims(config) {
  */
 function resolveCellSourceDims(cell, config) {
 	const idx = Math.max(0, parseInt(String(cell?.mainIndex ?? 0), 10) || 0)
+	/* WO-327 follow-up (todos25): destinations are the modern config surface — a custom-res
+	 * screen carries videoMode 'custom' + explicit width/height on its screenDestinations entry,
+	 * and the legacy `screen_N_mode` keys may not exist AT ALL on such a box. Falling straight
+	 * through to them resolved the 1080p default, so every custom-res screen's source was
+	 * aspect-fit as 16:9 inside its compose hole ("compose preview doesn't show the correct
+	 * aspect ratio when a screen is custom res"). Screen dest first, legacy keys as fallback.
+	 * operator_gui/multiview/stream dests are not screen rasters — skip them (the operator_gui
+	 * dest shares mainScreenIndex 0 and would otherwise shadow the real PGM screen). */
+	const dest = destinationsFromConfig(config).find((d) => {
+		const mode = String(d?.mode || '')
+		if (mode === 'operator_gui' || mode === 'multiview' || mode === 'stream') return false
+		return Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0) === idx
+	})
+	if (dest) {
+		const dd = operatorGuiModeDimensions(dest)
+		if (dd && dd.width > 0 && dd.height > 0) return { width: dd.width, height: dd.height }
+	}
 	const dims = getModeDimensions(screenModeString(config, idx + 1), config, idx + 1)
 	return dims && dims.width > 0 && dims.height > 0 ? { width: dims.width, height: dims.height } : null
 }

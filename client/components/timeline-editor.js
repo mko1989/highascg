@@ -10,6 +10,7 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { coerceTimelineSendTo, defaultTimelineSendTo } from '../lib/timeline-state-model.js'
 import { sceneState } from '../lib/scene-state.js'
+import { getResolutionForScreen } from './scenes-editor-logic.js'
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { initTimelineCanvas } from './timeline-canvas.js'
@@ -275,14 +276,11 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 				previewHost.style.flex = `0 0 ${tlSplitPx}px`
 			}
 		},
-		getOutputResolution: () => {
-			const s = view.sendTo.screenIdx ?? 0
-			const pr = stateStore.getState()?.channelMap?.programResolutions?.[s]
-			if (pr?.w > 0 && pr?.h > 0) return pr
-			const cv = sceneState.getCanvasForScreen(s)
-			if (cv.width > 0 && cv.height > 0) return { w: cv.width, h: cv.height }
-			return { w: 1920, h: 1080 }
-		},
+		/* WO-327 follow-up (todos25): use the scenes-editor's canonical chain instead of trusting
+		 * programResolutions blindly — before Caspar INFO lands those are 1080p PLACEHOLDERS
+		 * (channel-map-from-ctx pickRes default) and this inline version never consulted the
+		 * screenDestinations custom width/height, so a custom-res screen previewed as 16:9. */
+		getOutputResolution: () => getResolutionForScreen(view.sendTo.screenIdx ?? 0, sceneState, stateStore),
 		stateStore,
 		// Per-tile playback progress bars on the operator-GUI free-tile canvas (same as the
 		// main compose preview) — no-op on the normal draw path.
