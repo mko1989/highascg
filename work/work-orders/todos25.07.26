@@ -84,3 +84,9 @@ stretched; two writers raced at throttle boundaries, so the layer
 intermittently "jumped back to locked". Payload + nudge dedup key now carry
 the lock state (5a947f4). Client-only — kiosk reload. Owner confirmed 327b
 (compose-preview aspect) landed after the earlier restart/reload.
+
+326d: with air stretching right, the LOOKS EDITOR canvas was the last holdout —
+its draw contain-fit unlocked layers and painted the uncovered rect black. Both
+layer draw sites now treat aspectLocked===false as stretch (54bc1e1).
+Client-only — kiosk reload. Full unlock chain now consistent end to end:
+inspector → nudge → take → editor draw.
