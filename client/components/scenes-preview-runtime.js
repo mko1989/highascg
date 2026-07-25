@@ -419,6 +419,9 @@ export function createScenesPreviewRuntime(opts) {
 			rotation: l.rotation ?? 0,
 			opacity: l.opacity ?? 1,
 			crop: nudgeCropParams(l),
+			/* Lock state changes the resolved FILL (unlock → stretch, WO-326b) — toggling it with
+			 * an unchanged rect must still re-nudge, so it is part of the dedup identity. */
+			aspectLocked: l.aspectLocked !== false,
 		})
 	}
 
@@ -432,6 +435,11 @@ export function createScenesPreviewRuntime(opts) {
 			opacity: l.opacity ?? 1,
 			contentFit: l.contentFit,
 			fillNativeAspect: l.fillNativeAspect,
+			/* WO-326b: the server's mapContentFitToStretch branches on aspectLocked === false.
+			 * Omitting it here made only the NUDGE contain-fit while the full push stretched —
+			 * the two writers raced at throttle boundaries and the layer "sometimes jumped back
+			 * to locked" mid-drag on PRV. */
+			aspectLocked: l.aspectLocked,
 			source: l.source ? { type: l.source.type, value: l.source.value } : null,
 			effects: crop ? [{ type: 'crop', params: crop }] : [],
 		}

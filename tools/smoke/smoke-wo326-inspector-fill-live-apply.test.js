@@ -98,6 +98,23 @@ describe('WO-326 follow-up: unlocked layer stretches to its rect on air', () => 
 		assert.match(srv, /if \(layer\.aspectLocked === false\) return 'stretch'/)
 	})
 
+	/* Second follow-up (todos25, same day): "aspect lock works, but not consistently — dragging a
+	 * corner on PRV sometimes jumps back to locked." The throttled mixer nudge sent a MINIMAL
+	 * layer payload without aspectLocked, so only the nudge contain-fit while the full push
+	 * stretched — two racing writers, last one wins, hence intermittent. */
+	it('the mixer-nudge payload and its dedup key both carry aspectLocked', () => {
+		const src = read('client/components/scenes-preview-runtime.js')
+		const payloadFn = src.slice(src.indexOf('function nudgeLayerPayload'), src.indexOf('function nudgeTargetMainIdxs'))
+		assert.match(payloadFn, /aspectLocked: l\.aspectLocked/, 'nudge payload must carry the lock state to the server fill resolver')
+		const keyFn = src.slice(src.indexOf('function nudgeGeometryKeyForLayer'), src.indexOf('function nudgeLayerPayload'))
+		assert.match(keyFn, /aspectLocked/, 'lock toggle with unchanged rect must not be deduped away')
+	})
+
+	it('the full take payload carries aspectLocked (unchanged)', () => {
+		const src = read('client/components/scenes-shared.js')
+		assert.match(src, /aspectLocked: l\.aspectLocked !== false/)
+	})
+
 	it('locked layers keep the existing contentFit mapping (no regression)', () => {
 		assert.equal(client.mapContentFitToStretch({ contentFit: 'native' }), 'none')
 		assert.equal(client.mapContentFitToStretch({ contentFit: 'fill-canvas' }), 'fit')
