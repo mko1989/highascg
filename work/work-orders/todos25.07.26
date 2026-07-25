@@ -59,3 +59,20 @@ STILL BLOCKED ON OWNER (unchanged from todos24):
        rebuilt (kiosk reload). Verify with two browsers at that restart.
   326  Note in todos24 still open: in NORMAL editing mode PGM only updates on
        take (by design) — say if you want live-on-air apply outside edit-on-PGM.
+
+--------------------------------------------------------------------------------
+2026-07-25 (later) — OWNER-REPORTED FOLLOW-UPS ON 326/327, BOTH ROOT-CAUSED + FIXED
+--------------------------------------------------------------------------------
+✅ 326b "aspect still locked on pgm though editor is correct" (0b327ac):
+        mapContentFitToStretch ignored aspectLocked — every non-stretch content
+        fit contain-fits media at its OWN aspect inside the rect, so take/nudge
+        FILL undid the unlocked rect. Unlock now → stretch (rect wins), both
+        server + client mirrors. Relock restores contentFit rules.
+✅ 327b "compose preview wrong aspect with custom-res screen" (bad33b3):
+        server resolveCellSourceDims read legacy screen_N_mode keys (absent on
+        this destinations-configured box) → 1080p default → 2560x896 PGM fitted
+        16:9 inside every compose hole. Now screenDestinations first (verified
+        against live channelMap). Also timeline-editor now uses the canonical
+        getResolutionForScreen chain instead of raw programResolutions.
+BOTH need the node restart + kiosk reload to go live (same restart as WO-322 +
+WO-329B — one maintenance moment covers all four, with the WO-322 visual check).
