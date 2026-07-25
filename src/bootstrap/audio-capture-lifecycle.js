@@ -42,11 +42,31 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 
 	function startAudioCapture() {
 		const cfg = normalizeAudioCaptureConfig(config)
+		// WO-333b: a live-audio slot routed as the FFT source (inspector toggle →
+		// caspar setting audio_fft_source_slot) wins over the standalone-device mode —
+		// the slot's bridge ffmpeg tees raw PCM to us, so the capture host stays the
+		// device's only opener. The tee output format is pinned s16le/48k/stereo.
+		let fftSlot = 0
+		try {
+			const { resolveAudioFftSourceSlot } = require('../config/live-audio-input')
+			fftSlot = resolveAudioFftSourceSlot(config)
+		} catch {
+			/* live-audio config unavailable — device mode only */
+		}
+		if (fftSlot >= 1) {
+			const { audioFftPcmUdpPort } = require('../audio/live-audio-bridge')
+			cfg.enabled = true
+			cfg.source = 'slot'
+			cfg.udpPort = audioFftPcmUdpPort(fftSlot)
+			cfg.sampleRate = 48000
+			cfg.channels = 2
+			logger.info(`[AudioFFT] source: live-audio slot ${fftSlot} bridge tee`)
+		}
 		if (!cfg.enabled) {
-			logger.info('[AudioFFT] disabled (config.audioCapture.enabled=false) — shaders fall back to OSC-level reactivity')
+			logger.info('[AudioFFT] no source routed (live-audio inspector) and config.audioCapture disabled — shaders fall back to OSC-level reactivity')
 			return
 		}
-		warnOnLiveAudioClash(cfg)
+		if (cfg.source !== 'slot') warnOnLiveAudioClash(cfg)
 		engine = createAudioCaptureFft({
 			config: cfg,
 			log: (level, msg) => (level === 'warn' ? logger.warn(msg) : logger.info(msg)),
@@ -69,7 +89,15 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		engine = null
 	}
 
-	return { startAudioCapture, stopAudioCapture, onShutdown: stopAudioCapture }
+	/** Re-read config and rebind — called after /api/audio/live-inputs/apply so routing the
+	 * FFT source in the inspector takes effect immediately, no node restart. Runs BEFORE the
+	 * bridges restart so the UDP listener is bound when the tee starts sending. */
+	function restartAudioCapture() {
+		stopAudioCapture()
+		startAudioCapture()
+	}
+
+	return { startAudioCapture, stopAudioCapture, restartAudioCapture, onShutdown: stopAudioCapture }
 }
 
 module.exports = { createAudioCaptureLifecycle }

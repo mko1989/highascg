@@ -343,9 +343,22 @@ function listLiveAudioPgmProtectedLayers(cfg) {
 	return out
 }
 
+/**
+ * WO-333b: which live-audio slot feeds the shader-FFT tee (caspar setting
+ * `audio_fft_source_slot`, set from the slot's inspector). 0 = none.
+ * @param {object} cfg
+ * @returns {number} 1–8, or 0 when unset/invalid
+ */
+function resolveAudioFftSourceSlot(cfg) {
+	const raw = readCasparSetting(cfg, 'audio_fft_source_slot')
+	const n = parseInt(String(raw ?? ''), 10)
+	return Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0
+}
+
 module.exports = {
 	LIVE_AUDIO_LAYER_BASE,
 	LOOK_LAYER_MIN,
+	resolveAudioFftSourceSlot,
 	PGM_AUDIO_TRACK_LAYER_MAX,
 	normalizeAlsaCaptureUri,
 	parseAlsaHwIdentity,

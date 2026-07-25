@@ -157,3 +157,94 @@ describe('WO-333 (d): wiring', () => {
 		assert.ok(player.includes("type !== 'osc'"), 'OSC level fallback stays intact')
 	})
 })
+
+describe('WO-333b: live-audio slot routed as the FFT source (bridge PCM tee)', () => {
+	const { buildLiveAudioBridgeFfmpegArgs, audioFftPcmUdpPort } = require('../../src/audio/live-audio-bridge.js')
+	const { resolveAudioFftSourceSlot } = require('../../src/config/live-audio-input.js')
+
+	it('resolveAudioFftSourceSlot: 1–8 pass, junk/0/out-of-range → 0', () => {
+		assert.equal(resolveAudioFftSourceSlot({ casparServer: { audio_fft_source_slot: 3 } }), 3)
+		assert.equal(resolveAudioFftSourceSlot({ casparServer: { audio_fft_source_slot: '2' } }), 2)
+		assert.equal(resolveAudioFftSourceSlot({ casparServer: { audio_fft_source_slot: 0 } }), 0)
+		assert.equal(resolveAudioFftSourceSlot({ casparServer: { audio_fft_source_slot: 9 } }), 0)
+		assert.equal(resolveAudioFftSourceSlot({ casparServer: { audio_fft_source_slot: 'x' } }), 0)
+		assert.equal(resolveAudioFftSourceSlot({}), 0)
+	})
+
+	it('bridge args grow the s16le tee ONLY for the routed slot', () => {
+		const cfg = { casparServer: { audio_fft_source_slot: 3 } }
+		const teed = buildLiveAudioBridgeFfmpegArgs(cfg, 3, 'hw:1,0')
+		const teeUrl = `udp://127.0.0.1:${audioFftPcmUdpPort(3)}?pkt_size=1316`
+		assert.ok(teed.includes('s16le'), 'routed slot carries the raw PCM output')
+		assert.ok(teed.includes(teeUrl), `tee targets ${teeUrl}`)
+		assert.ok(teed.indexOf('mpegts') < teed.indexOf('s16le'), 'Caspar ingest output stays first')
+
+		const plain = buildLiveAudioBridgeFfmpegArgs(cfg, 2, 'hw:2,0')
+		assert.ok(!plain.includes('s16le'), 'other slots keep the exact pre-WO-333b outputs')
+		const off = buildLiveAudioBridgeFfmpegArgs({}, 3, 'hw:1,0')
+		assert.ok(!off.includes('s16le'), 'no tee when no slot is routed')
+	})
+
+	it('tee port range stays clear of the MPEG-TS ingest ports', () => {
+		const { LIVE_AUDIO_BRIDGE_UDP_PORT_BASE, AUDIO_FFT_PCM_UDP_PORT_BASE } = require('../../src/audio/live-audio-bridge.js')
+		assert.ok(AUDIO_FFT_PCM_UDP_PORT_BASE >= LIVE_AUDIO_BRIDGE_UDP_PORT_BASE + 9, 'ingest uses base+1..8')
+	})
+
+	it('engine in slot mode: UDP PCM in → analyser frames out (behavioral)', async () => {
+		const dgram = require('node:dgram')
+		const { createAudioCaptureFft, normalizeAudioCaptureConfig } = require('../../src/audio/audio-capture-fft.js')
+		const port = 53977
+		const cfg = normalizeAudioCaptureConfig({ audioCapture: { enabled: true } })
+		cfg.source = 'slot'
+		cfg.udpPort = port
+		cfg.channels = 2
+		const frames = []
+		const eng = createAudioCaptureFft({ config: cfg, log: () => {}, onFrame: (f) => frames.push(f) })
+		eng.start()
+		const tx = dgram.createSocket('udp4')
+		// 2048 stereo frames of a bin-32 sine (relative to the 1024-pt FFT window @48k)
+		const pcm = Buffer.alloc(2048 * 4)
+		for (let i = 0; i < 2048; i++) {
+			const v = Math.round(32000 * Math.sin((2 * Math.PI * 32 * i) / 1024))
+			pcm.writeInt16LE(v, i * 4)
+			pcm.writeInt16LE(v, i * 4 + 2)
+		}
+		const send = setInterval(() => tx.send(pcm, port, '127.0.0.1'), 25)
+		try {
+			await new Promise((resolve, reject) => {
+				const t0 = Date.now()
+				const poll = setInterval(() => {
+					if (frames.some((f) => f.rms > 0.1)) {
+						clearInterval(poll)
+						resolve()
+					} else if (Date.now() - t0 > 4000) {
+						clearInterval(poll)
+						reject(new Error(`no live frame in 4s (${frames.length} frames)`))
+					}
+				}, 20)
+			})
+		} finally {
+			clearInterval(send)
+			tx.close()
+			eng.stop()
+		}
+		const live = frames.find((f) => f.rms > 0.1)
+		assert.ok(live.freq[32] > 150, `bin 32 hot, got ${live.freq[32]}`)
+		assert.ok(live.freq[300] < 40, `far bin cold, got ${live.freq[300]}`)
+		assert.equal(live.device, `udp:${port}`)
+	})
+
+	it('API + lifecycle + inspector wiring', () => {
+		const routes = src('src/api/routes-audio.js')
+		assert.match(routes, /audio_fft_source_slot != null/)
+		assert.match(routes, /_audioCaptureLifecycle\?\.restartAudioCapture\?\.\(\)/)
+		const lc = src('src/bootstrap/audio-capture-lifecycle.js')
+		assert.match(lc, /resolveAudioFftSourceSlot\(config\)/)
+		assert.match(lc, /cfg\.source = 'slot'/)
+		assert.match(lc, /restartAudioCapture/)
+		const insp = src('client/components/inspector-live-audio-input.js')
+		assert.match(insp, /data-live-audio-fft-source/)
+		assert.match(insp, /audio_fft_source_slot: on \? slot : 0/)
+		assert.match(insp, /\/api\/audio\/live-inputs\/apply/)
+	})
+})

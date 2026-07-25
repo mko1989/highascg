@@ -27,6 +27,8 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 	const cs = settingsState.getSettings()?.casparServer || {}
 	const ui = readLiveAudioCasparSettings(cs)
 	const device = String(ui.slots?.[slot - 1] || '').trim()
+	// WO-333b: which slot currently feeds the shader-FFT tee (0 = none, single-select).
+	const fftSourceSlot = parseInt(String(cs.audio_fft_source_slot ?? 0), 10) || 0
 	const ch = entry?.channel
 	const ln = entry?.layer
 	const status = stateStore.getState()?.liveAudioInputsStatus
@@ -66,6 +68,15 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 					<option value="${escapeHtml(device)}" selected>${device ? escapeHtml(device) : '— loading —'}</option>
 				</select>
 			</div>
+			<div class="inspector-field">
+				<div class="inspector-field__label">Shader FFT source</div>
+				<div class="inspector-field__value">
+					<label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+						<input type="checkbox" data-live-audio-fft-source ${fftSourceSlot === slot ? 'checked' : ''}>
+						<span>Feed audio-reactive shaders${fftSourceSlot > 0 && fftSourceSlot !== slot ? ` (now: slot ${fftSourceSlot})` : ''}</span>
+					</label>
+				</div>
+			</div>
 			<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
 				<button type="button" class="btn btn--secondary" data-live-audio-refresh-devices>Refresh devices</button>
 				<button type="button" class="btn btn--primary" data-live-audio-start ${ch == null || ln == null ? 'disabled' : ''}>Start</button>
@@ -85,6 +96,28 @@ export function renderLiveAudioInputInspector(root, stateStore, selection, deps)
 	const startBtn = root.querySelector('[data-live-audio-start]')
 	const stopBtn = root.querySelector('[data-live-audio-stop]')
 	const rmBtn = root.querySelector('[data-live-audio-remove]')
+	const fftToggle = root.querySelector('[data-live-audio-fft-source]')
+
+	// WO-333b: route THIS slot's capture as the shader-FFT source (or clear it). The server
+	// restarts the FFT listener and this slot's bridge (with the PCM tee) on apply — live
+	// immediately, single-select across slots by design.
+	if (fftToggle) {
+		fftToggle.addEventListener('change', async () => {
+			const on = fftToggle.checked
+			fftToggle.disabled = true
+			try {
+				await api.post('/api/audio/live-inputs/config', { audio_fft_source_slot: on ? slot : 0 })
+				await api.post('/api/audio/live-inputs/apply', {})
+				showAppToast(on ? `Shaders now react to slot ${slot} audio.` : 'Shader FFT source cleared.', 'success')
+				await settingsState.load()
+			} catch (e) {
+				showAppToast(e?.message || String(e), 'error')
+				fftToggle.checked = !on
+			} finally {
+				fftToggle.disabled = false
+			}
+		})
+	}
 
 	// Load devices asynchronously and populate the select
 	;(async () => {

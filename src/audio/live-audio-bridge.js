@@ -9,6 +9,8 @@ const { readCasparSetting } = require('../config/routing-map')
 
 /** MPEG-TS ingest per live-audio slot (HighAsCG ffmpeg → Caspar PLAY udp://). */
 const LIVE_AUDIO_BRIDGE_UDP_PORT_BASE = 52200
+/** WO-333b: raw PCM tee per slot (bridge ffmpeg → shader-FFT engine, s16le 48k stereo). */
+const AUDIO_FFT_PCM_UDP_PORT_BASE = 52220
 /** Warmup after bridge (re)start — allow first IDR + SPS/PPS before Caspar PLAY. */
 const BRIDGE_WARMUP_MS = 700
 
@@ -44,6 +46,14 @@ function ffmpegBinary(config) {
  */
 function liveAudioBridgeUdpPort(slot) {
 	return LIVE_AUDIO_BRIDGE_UDP_PORT_BASE + parseInt(String(slot), 10)
+}
+
+/**
+ * @param {number} slot 1–8
+ * @returns {number}
+ */
+function audioFftPcmUdpPort(slot) {
+	return AUDIO_FFT_PCM_UDP_PORT_BASE + parseInt(String(slot), 10)
 }
 
 /**
@@ -106,7 +116,7 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
 	const queue = Number.isFinite(buf) && buf > 0 ? Math.max(512, Math.min(buf, 1048576)) : 131072
 	// Caspar ffmpeg producer needs a video track in MPEG-TS to advance time; audio-only TS stays at 0/0.
 	// GOP=1 + repeat-headers so each Caspar PLAY/reconnect starts on a decodable IDR (avoids PPS errors).
-	return [
+	const args = [
 		'-hide_banner',
 		'-loglevel',
 		'warning',
@@ -161,6 +171,25 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
 		'mpegts',
 		`udp://127.0.0.1:${port}?pkt_size=1316`,
 	]
+	// WO-333b: when this slot is the shader-FFT source, tee the SAME capture as raw PCM to the
+	// FFT engine — the capture host stays the single opener of the ALSA device. Unconnected UDP
+	// sendto: a missing listener can never error the on-air ingest output above. Format is pinned
+	// (s16le / 48k / stereo) by this output's own -af, independent of the card's native format.
+	const { resolveAudioFftSourceSlot } = require('../config/live-audio-input')
+	if (resolveAudioFftSourceSlot(cfg) === parseInt(String(slot), 10)) {
+		args.push(
+			'-map',
+			'0:a',
+			'-af',
+			'aresample=async=1:first_pts=0,aformat=channel_layouts=stereo:sample_rates=48000',
+			'-c:a',
+			'pcm_s16le',
+			'-f',
+			's16le',
+			`udp://127.0.0.1:${audioFftPcmUdpPort(slot)}?pkt_size=1316`,
+		)
+	}
+	return args
 }
 
 /**
@@ -297,8 +326,10 @@ function liveAudioBridgeStatus(slot) {
 
 module.exports = {
 	LIVE_AUDIO_BRIDGE_UDP_PORT_BASE,
+	AUDIO_FFT_PCM_UDP_PORT_BASE,
 	isLiveAudioBridgeEnabled,
 	liveAudioBridgeUdpPort,
+	audioFftPcmUdpPort,
 	liveAudioBridgePlayClip,
 	resolveFfmpegAlsaInputDevice,
 	plugFallbackDevice,

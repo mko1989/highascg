@@ -345,6 +345,14 @@ async function handlePost(path, body, ctx) {
 		}
 		const { setupLiveAudioInputs, setupLiveAudioPgmRoutes } = require('../config/routing-setup')
 		try {
+			// WO-333b: rebind the shader-FFT engine FIRST so its UDP listener is up before the
+			// bridges (re)start their PCM tee — routing the source in the inspector is then live
+			// with no node restart.
+			try {
+				ctx._audioCaptureLifecycle?.restartAudioCapture?.()
+			} catch (e) {
+				apiLog(ctx, 'warn', `[AudioFFT] restart on live-inputs apply: ${e?.message || e}`)
+			}
 			await setupLiveAudioInputs(ctx)
 			await setupLiveAudioPgmRoutes(ctx)
 			return {
@@ -402,6 +410,11 @@ async function handlePost(path, body, ctx) {
 			if (b[key] != null) cs[key] = normalizeAlsaCaptureUri(String(b[key]))
 		}
 		if (b.live_audio_pgm_always_on != null) cs.live_audio_pgm_always_on = b.live_audio_pgm_always_on
+		// WO-333b: which slot feeds the shader-FFT tee (0/'' = none). Single-select by design.
+		if (b.audio_fft_source_slot != null) {
+			const n = parseInt(String(b.audio_fft_source_slot), 10)
+			cs.audio_fft_source_slot = Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0
+		}
 		ctx.config.casparServer = { ...defaults.casparServer, ...cs }
 		if (ctx.configManager) {
 			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })

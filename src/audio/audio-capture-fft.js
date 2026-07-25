@@ -3,11 +3,18 @@
 /**
  * WO-333 — line-in / USB audio capture → FFT frames for shader reactivity.
  *
- * Spawns `arecord` on a configured ALSA capture device, keeps a rolling fftSize-sample mono
- * ring, and emits AnalyserNode-shaped frames (512 freq bytes + 512 waveform bytes, see
- * src/audio/fft.js) at `emitHz`. The bootstrap lifecycle broadcasts each frame on the playout
- * WS as `type:'audio_fft'`; template/shaders/player.js prefers those frames over the coarse
- * OSC-level synthesis.
+ * Keeps a rolling fftSize-sample mono ring and emits AnalyserNode-shaped frames (512 freq
+ * bytes + 512 waveform bytes, see src/audio/fft.js) at `emitHz`. The bootstrap lifecycle
+ * broadcasts each frame on the playout WS as `type:'audio_fft'`; template/shaders/player.js
+ * prefers those frames over the coarse OSC-level synthesis.
+ *
+ * PCM sources (config.source):
+ *  - 'slot' (WO-333b, the production path): listen on a loopback UDP port for the raw s16le
+ *    48k stereo tee that the slot's live-audio bridge ffmpeg emits
+ *    (src/audio/live-audio-bridge.js buildLiveAudioBridgeFfmpegArgs) — the existing capture
+ *    host stays the only opener of the ALSA device, and the FFT source is just routed in the
+ *    live-audio inspector. Bridge down → frames go stale → one zeroed frame (silence decay).
+ *  - 'device': spawn `arecord` on a dedicated ALSA capture device (a card nothing else uses).
  *
  * Device selection: `device` is an exact ALSA string (`plughw:1,0`, `hw:CARD=Device`, …).
  * `deviceMatch` instead resolves a substring against `arecord -l` card/device names at every
@@ -21,6 +28,7 @@
  */
 
 const { spawn, execFileSync } = require('child_process')
+const dgram = require('dgram')
 const { pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf } = require('./fft')
 
 const ARECORD_BINS = ['arecord', '/usr/bin/arecord']
@@ -39,6 +47,10 @@ function normalizeAudioCaptureConfig(cfg) {
 		o.enabled === true || env.HIGHASCG_AUDIO_FFT === '1' || env.HIGHASCG_AUDIO_FFT === 'true'
 	return {
 		enabled,
+		/** 'slot' = UDP PCM tee from a live-audio bridge; 'device' = own arecord capture. */
+		source: 'device',
+		/** Loopback UDP port for source:'slot' (set by the lifecycle from the routed slot). */
+		udpPort: 0,
 		/** Exact ALSA capture device. */
 		device: String(env.HIGHASCG_AUDIO_FFT_DEVICE || o.device || 'plughw:0,0'),
 		/** Substring resolved against `arecord -l` at spawn time; wins over `device` when it hits. */
@@ -171,7 +183,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		log('warn', `[AudioFFT] capture on ${activeDevice} ${why} — retrying in ${Math.round(retryMs / 1000)}s`)
 		retryTimer = setTimeout(() => {
 			retryTimer = null
-			spawnCapture()
+			startSource()
 		}, retryMs)
 		if (retryTimer.unref) retryTimer.unref()
 		retryMs = Math.min(30000, retryMs * 2)
@@ -214,10 +226,38 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		}, 10000).unref?.()
 	}
 
+	/** @type {import('dgram').Socket|null} */
+	let udpSock = null
+
+	function startUdpSource() {
+		activeDevice = `udp:${cfg.udpPort}`
+		const sock = dgram.createSocket('udp4')
+		udpSock = sock
+		sock.on('message', onPcm)
+		sock.on('error', (e) => {
+			log('warn', `[AudioFFT] UDP PCM listener :${cfg.udpPort} error: ${e?.message || e}`)
+			try {
+				sock.close()
+			} catch {
+				/* already closed */
+			}
+			if (udpSock === sock) udpSock = null
+			scheduleRetry('udp listener died')
+		})
+		sock.bind(cfg.udpPort, '127.0.0.1', () => {
+			log('info', `[AudioFFT] listening for bridge PCM tee on udp://127.0.0.1:${cfg.udpPort} (${cfg.emitHz}Hz frames)`)
+		})
+	}
+
+	function startSource() {
+		if (cfg.source === 'slot' && cfg.udpPort > 0) startUdpSource()
+		else spawnCapture()
+	}
+
 	return {
 		start() {
 			stopped = false
-			spawnCapture()
+			startSource()
 			emitTimer = setInterval(emitFrame, Math.round(1000 / cfg.emitHz))
 			if (emitTimer.unref) emitTimer.unref()
 		},
@@ -235,11 +275,20 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				}
 				proc = null
 			}
+			if (udpSock) {
+				try {
+					udpSock.close()
+				} catch {
+					/* already closed */
+				}
+				udpSock = null
+			}
 		},
 		getStatus() {
 			return {
+				source: cfg.source,
 				device: activeDevice,
-				capturing: !!proc,
+				capturing: !!(proc || udpSock),
 				pcmFresh: Date.now() - lastPcmAt < cfg.staleMs,
 			}
 		},
