@@ -39,26 +39,12 @@ const { onSceneLiveBroadcast } = require('./src/companion-bridge/look-air-frames
 const Args = require('./src/bootstrap/args'); const Config = require('./src/bootstrap/config'); const Modules = require('./src/bootstrap/modules'); const Shutdown = require('./src/bootstrap/shutdown')
 const { REPO_ROOT, resolveWebDir } = require('./src/repo-paths')
 const { isHeadlessMode } = require('./src/server/headless-mode')
+const { loadRepoDotEnv } = require('./src/bootstrap/dotenv')
+const { createOnAfterInfoConfigReady } = require('./src/bootstrap/caspar-info-ready')
+const { setupOperatorGuiStream } = require('./src/bootstrap/operator-gui-stream')
+const { startSafeMode } = require('./src/bootstrap/safe-mode')
 
-/** Load repo `.env` when vars are unset (deploy / dev convenience; no dependency). */
-function loadRepoDotEnv() {
-	const envPath = path.join(REPO_ROOT, '.env')
-	if (!fs.existsSync(envPath)) return
-	for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
-		const trimmed = line.trim()
-		if (!trimmed || trimmed.startsWith('#')) continue
-		const eq = trimmed.indexOf('=')
-		if (eq <= 0) continue
-		const key = trimmed.slice(0, eq).trim()
-		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || process.env[key] != null) continue
-		let val = trimmed.slice(eq + 1).trim()
-		if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-			val = val.slice(1, -1)
-		}
-		process.env[key] = val
-	}
-}
-loadRepoDotEnv()
+loadRepoDotEnv(REPO_ROOT)
 
 const WEB_DIR = resolveWebDir(REPO_ROOT)
 
@@ -239,75 +225,7 @@ function main() {
 		const fetchInfo = createFetchServerInfoConfigAndBroadcast({
 			appCtx,
 			config,
-			onAfterInfoConfigReady: () => {
-				handleCasparConnected()
-				void setupAllRouting(appCtx).catch((e) => {
-					appCtx.log('warn', 'Routing setup: ' + (e?.message || e))
-				})
-				// WO-209 T209.4: normalize preview channel pointers to 'a' (bank-less mode).
-				// A stale 'b' pointer from previous session must not survive into the playlist path.
-				try {
-					const map = getChannelMap(config || {})
-					const previews = (map.previewChannels || []).map((p) => Number(p)).filter((n) => Number.isFinite(n) && n > 0)
-					if (appCtx.liveDeck && previews.length > 0) {
-						appCtx.liveDeck.normalizePreviewChannelBanksToA(previews)
-					}
-				} catch (e) {
-					appCtx.log('debug', `[WO-209] preview channel normalization: ${e?.message || e}`)
-				}
-				// Restart fix (todos19.07.26): after the reconcile settles, re-stage the persisted
-				// preview look on each PRV bus (a surviving Caspar otherwise keeps showing the
-				// previous run's staged content) and warm the look-deck thumbnail cache so deck
-				// thumbs render without a first look play. Sequenced, fire-and-forget — mirrors
-				// the Multiview re-apply pattern above (runs on boot AND every Caspar reconnect).
-				void reconcileAfterInfoGather(appCtx)
-					.catch((e) => {
-						appCtx.log('debug', 'Live scene reconcile: ' + (e?.message || e))
-					})
-					.then(async () => {
-						const Setup = require('./src/config/routing-setup')
-						await Setup.restagePersistedPreviewLooks(appCtx).catch((e) => {
-							appCtx.log('warn', 'Preview re-stage: ' + (e?.message || e))
-						})
-						await Setup.warmLookDeckThumbnails(appCtx).catch((e) => {
-							appCtx.log('warn', 'Look thumb warm: ' + (e?.message || e))
-						})
-					})
-				// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts (band 700-789)
-				// WO-210 T210.4: restore screen timers (band 980-989)
-				void (async () => {
-					try {
-						const { sweepTemplateCgOrphansOnCasparConnected } = require('./src/engine/template-cg-orphan-sweep')
-						const liveSceneState = require('./src/state/live-scene-state')
-						const map = getChannelMap(config || {})
-						const programChannels = []
-						for (let i = 0; i < map.screenCount; i++) {
-							programChannels.push(map.programCh(i + 1))
-						}
-						await sweepTemplateCgOrphansOnCasparConnected({
-							amcp: appCtx.amcp,
-							liveState: liveSceneState.getAll(),
-							channels: programChannels,
-							log: (level, msg) => appCtx.log(level, msg),
-						})
-					} catch (e) {
-						appCtx.log('debug', `[template-cg-orphan-sweep] startup: ${e?.message || e}`)
-					}
-
-					// WO-210 T210.4: restore registered screen timers on startup/reconnect
-					try {
-						const screenTimers = require('./src/engine/screen-timers')
-						screenTimers.loadRegistry()
-						const reAddLines = screenTimers.linesForReAdd()
-						if (reAddLines.length > 0 && appCtx.amcp && typeof appCtx.amcp.batchSendChunked === 'function') {
-							await appCtx.amcp.batchSendChunked(reAddLines, { skipMixerPreCommit: true })
-							appCtx.log('info', `[screen-timers] restored ${reAddLines.length / 2} timer(s) from registry`)
-						}
-					} catch (e) {
-						appCtx.log('debug', `[screen-timers] startup restore: ${e?.message || e}`)
-					}
-				})()
-			},
+			onAfterInfoConfigReady: createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCasparConnected, setupAllRouting, reconcileAfterInfoGather }),
 		})
 		if (!config.streaming.enabled) void enqueueStreaming(async () => await stopStreamingSubsystem())
 
@@ -387,37 +305,7 @@ function main() {
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
 		appCtx._getWsLogLineStats = typeof wsHandle.getLogLineStats === 'function' ? () => wsHandle.getLogLineStats() : null
 
-		// WO-319: GUI live stream — the operator-GUI channel NVENC-encoded once, relayed to browser
-		// WebCodecs clients over a dedicated binary WS. Fully idle (0 NVENC sessions, no UDP hop)
-		// until a browser actually opens the live preview; see src/preview/gui-stream-ingest.js.
-		try {
-			const { resolveOperatorGuiChannel, resolveOperatorGuiChannelDims } = require('./src/system/operator-gui-channel')
-			const { createGuiStreamIngest } = require('./src/preview/gui-stream-ingest')
-			const { attachGuiStreamRelay } = require('./src/preview/gui-stream-ws-relay')
-			const { DEFAULT_FPS, DEFAULT_GOP } = require('./src/preview/gui-stream-nvenc-args')
-			const guiCh = resolveOperatorGuiChannel(config)
-			if (guiCh) {
-				const dims = resolveOperatorGuiChannelDims(config)
-				// Downscale anything above 1080p before encode; -2 keeps aspect at an even height.
-				const scale = dims && dims.width > 1920 ? '1920:-2' : null
-				const glog = (lvl, m) => (lvl === 'warn' ? logger.warn(m) : logger.info(m))
-				// Lazy AMCP wrapper: Caspar may (re)connect after this point; resolve at call time.
-				const lazyAmcp = { raw: (cmd) => {
-					if (!appCtx.amcp) return Promise.reject(new Error('Caspar not connected'))
-					return appCtx.amcp.raw(cmd)
-				} }
-				const ingest = createGuiStreamIngest({ amcp: lazyAmcp, channel: guiCh.ch, scale, log: glog })
-				ingest.cleanupStaleConsumer().catch(() => {})
-				appCtx._guiStreamIngest = ingest
-				appCtx._guiStreamRelay = attachGuiStreamRelay(httpServer, appCtx, { ingest, channel: guiCh.ch, fps: DEFAULT_FPS, gop: DEFAULT_GOP, log: glog })
-				appCtx._guiStreamLifecycle = { onShutdown: () => void ingest.stop() }
-				logger.info(`[GUI stream] relay at /ws/gui-stream → channel ${guiCh.ch}${scale ? ` (scale ${scale})` : ''}`)
-			} else {
-				logger.info('[GUI stream] not attached — no operator_gui destination configured')
-			}
-		} catch (e) {
-			logger.warn(`[GUI stream] setup failed: ${e?.message || e}`)
-		}
+		setupOperatorGuiStream({ config, appCtx, httpServer, logger })
 		startReplicationService(appCtx, {
 			clients: wsHandle.clients,
 			getOperatorWsCount: () => wsHandle.clients.size,
@@ -515,28 +403,7 @@ function main() {
 		logger.error(`[Main] CRITICAL STARTUP ERROR: ${e.message}\n${e.stack}`)
 		logger.info('[Main] Attempting to start minimal Safe Mode UI...')
 		try {
-			// Minimal Context for UI
-			const safeCtx = { config, log: (l, m) => logger.info(`[SafeMode] ${m}`), configManager }
-			const httpServer = startHttpServer({ 
-				port: config.server.httpPort, 
-				bindAddress: config.server.bindAddress, 
-				webDir: WEB_DIR,
-				templatesDir: path.join(REPO_ROOT, 'template'), 
-				vendorDirs: [], 
-				routeApi: (m, p, b, r) => routeRequest(m, p, b, safeCtx, r),
-				log: m => logger.info(`[SafeMode HTTP] ${m}`) 
-			})
-			const safeShutdown = () => {
-				try {
-					persistence.flushSync()
-				} catch (e) {
-					logger.warn(`[SafeMode] persistence flush: ${e?.message || e}`)
-				}
-				stopHttpServer(httpServer, () => process.exit(0))
-			}
-			process.on('SIGINT', safeShutdown)
-			process.on('SIGTERM', safeShutdown)
-			logger.info(`[SafeMode] UI active on port ${config.server.httpPort}. Use the web interface to fix configuration.`)
+			startSafeMode({ config, configManager, WEB_DIR, REPO_ROOT, routeRequest, persistence, logger, startHttpServer, stopHttpServer })
 		} catch (inner) {
 			logger.error(`[Main] Safe Mode fallback also failed: ${inner.message}. Exiting.`)
 			process.exit(1)

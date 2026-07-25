@@ -1,0 +1,72 @@
+const MODULE_DESCRIPTIONS = {
+    'api': 'API Router & Routes — REST API, request dispatch, settings, device-view CRUD',
+    'server': 'HTTP server (:4200), WebSocket server, CORS, AMCP dispatch, catalog handlers',
+    'caspar': 'TCP connection to CasparCG :5250, AMCP command builders, batch operations, query parsing',
+    'engine': 'Scene take (LBG/PGM-only), transitions, timeline playback, multiview, PiP overlay, global border, project store',
+    'state': 'Channel state from INFO/CLS, playback tracker, live scene reconciliation',
+    'osc': 'UDP OSC from CasparCG — audio meters, playback position, profiler telemetry',
+    'audio': 'ALSA mixer control, audio device enumeration, metering, live audio health',
+    'media': 'Local media scan (ffmpeg probe), thumbnails, project media root, USB drive copy, CG look thumbnails',
+    'replication': 'Leader/follower sync, AMCP fanout, playhead sync, media rsync, project push, failover',
+    'streaming': 'FFmpeg streaming setup, NDI resolve, streaming channel status, UDP port management',
+    'artnet': 'ArtNet DMX receiver, DMX-driven border effects, sACN/Art-Net output',
+    'companion': 'Satellite preview client, button preview cache, companion config',
+    'companion-bridge': 'Look-air frame contract, registry for Companion module communication',
+    'preview': 'FFmpeg JPEG snapshot pipeline — activity tracking, cache, dirty detection, consumer management',
+    'config': 'Config load/save, schema validation, reload signaling',
+    'system': 'exFAT sync, network inventory, private volume sync, server update, operator snap',
+    'utils': 'OS config (xrandr, nvidia), GPU topology (DRM, xrandr), DeckLink enum, persistence, logging, periodic sync, caspar restart',
+    'sampling': 'DMX sampling ingress, output, worker for lighting fixture data',
+    'plugins': 'Dynamic plugin loading system',
+    'support': 'Diagnostic ZIP export — GPU snapshot, settings redaction, log collection',
+    'bootstrap': 'Startup sequence — args, config, modules, shutdown, watchdogs, LED test pattern',
+    'previs': 'Optional module — 3D model routes, scene registration',
+    'tracking': 'Optional module — person detection registration stub',
+    'autofollow': 'Optional module — stage auto-follow camera registration stub',
+    'cg-studio': 'Template editor — HTTP server on :4300, GrapesJS, template scan, export',
+    'share': 'Reserved for future shared code'
+};
+
+const COMPONENT_GROUPS = [
+    { prefix: 'device-view-inspector-', label: 'Device View Inspectors', description: 'Per-connector-type inspector panels in Device View' },
+    { prefix: 'device-view-caspar-render-', label: 'Device View Caspar Render', description: 'Rear panel rendering — backplane SVG, markers, simple mode' },
+    { prefix: 'device-view-', label: 'Device View', description: 'Back-of-rack device graph — cables, destinations, mappings, snapshots' },
+    { prefix: 'inspector-global-border-', label: 'Global Border Inspector', description: 'Global border effect editor sub-panels — effect, ArtNet, slices' },
+    { prefix: 'inspector-', label: 'Inspector Panel', description: 'Main inspector panel and content editor sub-panels' },
+    { prefix: 'scenes-', label: 'Scenes Editor', description: 'Scene editing, compose preview, preview runtime' },
+    { prefix: 'scene-', label: 'Scene Components', description: 'Scene-specific UI components — layer row' },
+    { prefix: 'timeline-', label: 'Timeline Editor', description: 'Timeline canvas, editor, transport, clip rendering, handlers' },
+    { prefix: 'preview-', label: 'Preview Canvas', description: 'PGM/PRV preview rendering, draw routines, compose snapshots' },
+    { prefix: 'audio-mixer-', label: 'Audio Mixer', description: 'Audio mixer faders, VU meters, console view, sync' },
+    { prefix: 'multiview-', label: 'Multiview Editor', description: 'Multiview layout canvas, editor, interaction' },
+    { prefix: 'pixel-map-', label: 'Pixel Map Editor', description: 'LED pixel map editor and canvas' },
+    { prefix: 'previs-', label: '3D Previs', description: '3D preview, model loader, UV editor, texture mapping' },
+    { prefix: 'settings-', label: 'Settings Modal', description: 'Settings tabs — hardware, ALSA mixer, live audio, templates, updates' },
+    { prefix: 'sources-', label: 'Sources Panel', description: 'Media browser, live sources, effects, ingest, templates' },
+    { prefix: 'header-bar-', label: 'Header Bar', description: 'Top toolbar — audio, streaming, replication, LED test, config strip' }
+];
+
+const LIB_GROUPS = [
+    { prefix: 'device-view-gpu-port-', label: 'GPU Port Logic', description: 'GPU port discovery, merging, layout, topology' },
+    { prefix: 'device-view-', label: 'Device View Logic', description: 'Cable resolve, host channels, refresh, GPU source inherit' },
+    { prefix: 'audio-mixer-', label: 'Audio Mixer Logic', description: 'Meter loops, peaks, state, bus meters, fader bind' },
+    { prefix: 'live-audio-', label: 'Live Audio Logic', description: 'Audio inputs, routing, play targets, state' },
+    { prefix: 'previs-', label: 'Previs Logic', description: 'Scene, model loader, UV mapper, texture, state' },
+    { prefix: 'scene-state-', label: 'Scene State', description: 'Scene state helpers, look logic, layer logic, persistence' },
+    { prefix: 'scenes-preview-', label: 'Scenes Preview', description: 'Preview global border, look stack, push scene, snapshot' },
+    { prefix: 'project-', label: 'Project Logic', description: 'Files, hardware, media, import, load, state' },
+    { prefix: 'replication-', label: 'Replication UI', description: 'Media spread, status banner, UI state' },
+    { prefix: 'timeline-', label: 'Timeline Logic', description: 'State, clip interp, clip layout, track heights' },
+    { prefix: 'pip-overlay-', label: 'PiP Overlay', description: 'AMCP commands, registry' },
+    { prefix: 'optional-modules-', label: 'Optional Modules', description: 'Client manifest, meta, registry' },
+    { prefix: 'lower-third-', label: 'Lower Thirds', description: 'CG data, roster import' },
+    { prefix: 'streaming-', label: 'Streaming Logic', description: 'Channel state' },
+    { prefix: 'companion-', label: 'Companion Logic', description: 'Button preview, location parse' },
+    { prefix: 'compose-preview-', label: 'Compose Preview', description: 'URL builder' },
+    { prefix: 'global-border-', label: 'Global Border', description: 'ArtNet map, WebSocket' },
+    { prefix: 'mapping-', label: 'Mapping Logic', description: 'Node service, state' },
+    { prefix: 'app-', label: 'App Core', description: 'Runtime, status, toast, scene deck, multiview sync, WS handlers' },
+    { prefix: 'audio-', label: 'Audio Utils', description: 'Channel layouts, routes, volume scale' }
+];
+
+module.exports = { MODULE_DESCRIPTIONS, COMPONENT_GROUPS, LIB_GROUPS };
