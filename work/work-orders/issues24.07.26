@@ -5,3 +5,72 @@ FIXED 2026-07-24 (commit f3c8f61): not stacked copies - one test pattern instanc
 same mode in three fields (resolution line "WxH · mode", Output line "... · mode", GPU badge
 sub). Badge sub now only shows an OS mode that differs; Output line drops the duplicate mode.
 Applies automatically the next time the pattern is played.
+
+
+
+companion module
+26.07.25 13:11:08 Instance/Connection/pixelhue: Initialization failed: Failed to discover devices at 192.168.50.34: RequestError: connect ETIMEDOUT 192.168.50.34:19998
+26.07.25 13:17:57 Instance/Connection/pixelhue: Initialization failed: Failed to discover devices at 192.168.50.34: RequestError: connect ETIMEDOUT 192.168.50.34:19998
+26.07.25 13:24:47 Instance/Connection/pixelhue: Initialization failed: Failed to discover devices at 192.168.50.34: RequestError: connect ETIMEDOUT 192.168.50.34:19998
+26.07.25 13:31:02 Instance/Connection/HighAsCG/PresetDefinitionsManager: The following layered preset definitions contain invalid elements: Preview ch1 · Bottom-right · PGM, Preview ch2 · Bottom-right · PRV
+26.07.25 13:31:02 Instance/Connection/HighAsCG/HostContext: Some preset references could not be found in the preset definitions: preview_ch1_quad_br, preview_ch2_quad_br
+26.07.25 13:31:36 Instance/Connection/pixelhue: Initialization failed: Failed to discover devices at 192.168.50.34: RequestError: connect ETIMEDOUT 192.168.50.34:19998
+26.07.25 13:39:46 Instance/Connection/HighAsCG: Failed to parse action options for action look_take: {"target":"Value is not in the list of choices"}
+26.07.25 13:39:46 Instance/Connection/HighAsCG: Error executing action: Error: Failed to parse action options. One or more options were invalid
+Action: Take / cue look - Location: Button 1/0/1 - Errors: {"target":"Value is not in the list of choices"}, Error: Failed to parse action options. One or more options were invalid
+Action: Take / cue look - Location: Button 1/0/1 - Errors: {"target":"Value is not in the list of choices"}
+    at YU.actionRun (file:///home/casparcg/companion/resources/main.js:869:5098)
+    at #o (file:///home/casparcg/companion/resources/main.js:846:64895)
+    at k9.runMultipleActions (file:///home/casparcg/companion/resources/main.js:846:65998)
+    at a1.runActions (file:///home/casparcg/companion/resources/main.js:846:66544)
+    at m (file:///home/casparcg/companion/resources/main.js:846:144864)
+    at t.pressControl (file:///home/casparcg/companion/resources/main.js:846:145223)
+    at AY.pressControl (file:///home/casparcg/companion/resources/main.js:847:85677)
+    at mY.pressControl (file:///home/casparcg/companion/resources/main.js:847:78769)
+    at file:///home/casparcg/companion/resources/main.js:846:79005
+    at mE.middlewares (file:///home/casparcg/companion/resources/main.js:754:61832)
+26.07.25 13:39:57 Instance/Connection/HighAsCG: Failed to parse action options for action look_take: {"target":"Value is not in the list of choices"}
+26.07.25 13:39:57 Instance/Connection/HighAsCG: Error executing action: Error: Failed to parse action options. One or more options were invalid
+Action: Take / cue look - Location: Button 1/0/1 - Errors: {"target":"Value is not in the list of choices"}, Error: Failed to parse action options. One or more options were invalid
+Action: Take / cue look - Location: Button 1/0/1 - Errors: {"target":"Value is not in the list of choices"}
+    at YU.actionRun (file:///home/casparcg/companion/resources/main.js:869:5098)
+    at #o (file:///home/casparcg/companion/resources/main.js:846:64895)
+    at k9.runMultipleActions (file:///home/casparcg/companion/resources/main.js:846:65998)
+    at a1.runActions (file:///home/casparcg/companion/resources/main.js:846:66544)
+    at m (file:///home/casparcg/companion/resources/main.js:846:144864)
+    at t.pressControl (file:///home/casparcg/companion/resources/main.js:846:145223)
+    at AY.pressControl (file:///home/casparcg/companion/resources/main.js:847:85677)
+    at mY.pressControl (file:///home/casparcg/companion/resources/main.js:847:78769)
+    at file:///home/casparcg/companion/resources/main.js:846:79005
+    at mE.middlewares (file:///home/casparcg/companion/resources/main.js:754:61832)
+
+    also there are some wake on lan options in the config which i did not sign off on. they also seem to block ability to save the config.
+
+================================================================================
+2026-07-25 — ALL THREE HighAsCG-MODULE ISSUES ROOT-CAUSED + FIXED IN v1.0.4
+(companion-module-dev commit b209e09; packaged highpass-highascg-1.0.4.tgz)
+================================================================================
+Context: the box runs module 1.0.3 since this morning's install (~11:04) — that
+install is what surfaced the WoL section (added in 1.0.3, WO-216).
+
+1. WoL options + can't save config → WoL REMOVED ENTIRELY (owner decision).
+   The regex-validated WoL fields also blocked saving while EMPTY — Companion 5
+   validates `regex` even on optional empty textinputs, so the form was
+   permanently invalid out of the box.
+2. "layered preset definitions contain invalid elements: Preview chN ·
+   Bottom-right" → the BR screen badge used x:-20; Companion 5's element schema
+   bounds x/y/w/h to 0..100 and rejects the whole preset. Re-expressed in-range
+   (x:0 w:80 halign right). Only BR quads used a negative x — matches the log.
+3. look_take "Value is not in the list of choices" (button 1/0/1) → verified in
+   Companion's DB: the stored buttons have NO `target` option (saved before the
+   Bus dropdown existed); Companion 5 hard-fails strict dropdowns on missing
+   values BEFORE the callback. target is now allowCustom; callback defaults to
+   program. (Alternative: delete + re-add the button from the preset.)
+
+NOT ours: pixelhue discovery timeouts to 192.168.50.34:19998 — third-party
+module; the device is unreachable on the network (powered off / wrong IP).
+
+TO DEPLOY 1.0.4 (drops the desk ~30s):
+  sudo systemctl stop companion \
+    && ~/highascg/tools/eggs/companion/install-companion-module.sh \
+    && sudo systemctl start companion
