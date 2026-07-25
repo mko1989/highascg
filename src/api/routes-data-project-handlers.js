@@ -461,10 +461,15 @@ async function handleProject(path, body, ctx) {
 					ctx.log('warn', '[replication] autosave schedule push: ' + (e?.message || e))
 				}
 			}
+			/* WO-329B (owner: last-write-wins + reliable push): client edits reach the server almost
+			 * exclusively via autosave, and this path never broadcast — the other client only
+			 * converged on an explicit Save. Broadcast the STAMPED project on every CHANGED
+			 * autosave; unchanged echoes stay silent (no rev bump happened, nothing to push). */
+			if (result.unchanged !== true) scheduleProjectSyncBroadcast(ctx, result.project)
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, slug: result.slug, activeSlug: result.slug, rev: result.rev }),
+				body: jsonBody({ ok: true, slug: result.slug, activeSlug: result.slug, rev: result.rev, changed: result.unchanged !== true }),
 			}
 		} catch (e) {
 			if (typeof ctx.log === 'function') {

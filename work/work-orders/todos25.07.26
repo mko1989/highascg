@@ -49,7 +49,13 @@ STILL BLOCKED ON OWNER (unchanged from todos24):
            && sudo systemctl start companion
   328  Media continuity between looks — needs the 15-min live repro with you
        (5 ranked suspects in the WO).
-  329B Two clients editing = last-write-wins — needs your Option 1 (edit lock)
-       vs Option 2 (per-section merge) decision, see WO-329.
+  329B DECIDED + IMPLEMENTED later on 2026-07-25 (owner: "last write wins, but
+       the last write must be pushed to the other client; changes weren't
+       updated between clients"). Root cause: autosave never broadcast
+       project_sync (only explicit Save did), and a stale-rev client 409'd
+       log-only forever. Fixed: changed autosaves broadcast; unchanged persists
+       are no-ops (no rev churn); stale_rev → adopt server rev + re-push
+       (bounded, LWW). SERVER part activates on next node restart; client
+       rebuilt (kiosk reload). Verify with two browsers at that restart.
   326  Note in todos24 still open: in NORMAL editing mode PGM only updates on
        take (by design) — say if you want live-on-air apply outside edit-on-PGM.

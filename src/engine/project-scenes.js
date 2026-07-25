@@ -193,6 +193,27 @@ function applyStreamCredentialMigration(ctx, project) {
  * @param {{ writeAutosave?: boolean, pushVolumes?: boolean, authoritativeCredentials?: boolean, bumpRev?: boolean }} [opts]
  * @returns {{ ok: true, slug: string, rev: number | null, project: object }}
  */
+/**
+ * WO-329B: content equality minus volatile metadata (`rev`, `savedAt` — the client re-stamps
+ * savedAt on every export). Both sides come out of the same normalize/stamp pipeline, so key
+ * order is deterministic for identical content; any mismatch just means "changed" (safe fallback
+ * to a normal persist).
+ */
+function projectContentEquals(a, b) {
+	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+	const strip = (p) => {
+		const { rev, savedAt, ...rest } = p
+		void rev
+		void savedAt
+		return rest
+	}
+	try {
+		return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+	} catch (_) {
+		return false
+	}
+}
+
 function persistProject(ctx, project, opts = {}) {
 	if (!ctx || !project || typeof project !== 'object') {
 		throw new Error('Invalid project persist payload')
@@ -206,7 +227,21 @@ function persistProject(ctx, project, opts = {}) {
 	applyStreamCredentialMigration(ctx, project)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
-	const storedRev = projectRevOf(projectStore.readProjectFile(slug)) || 0
+	const storedProject = projectStore.readProjectFile(slug)
+	/* WO-329B (owner decision: last-write-wins + reliable push): an unchanged-content persist is a
+	 * full no-op — no rev bump, no disk write, and the caller skips the project_sync broadcast
+	 * (`unchanged: true`). Without this, every idle autosave echo would bump the rev (409ing the
+	 * other client's next write for nothing) and re-broadcast, stomping the other client's
+	 * in-flight edits with identical content. Only when this slug is already active — switching
+	 * projects must still run the activeSlug/deck side effects below. */
+	if (
+		storedProject &&
+		projectStore.getActiveSlug(persistence) === slug &&
+		projectContentEquals(stamped, storedProject)
+	) {
+		return { ok: true, slug, rev: projectRevOf(storedProject), project: storedProject, unchanged: true }
+	}
+	const storedRev = projectRevOf(storedProject) || 0
 	if (opts.bumpRev !== false) {
 		stamped.rev = Math.max(storedRev, projectRevOf(stamped) || 0) + 1
 	} else if (projectRevOf(stamped) == null && storedRev > 0) {
@@ -314,6 +349,7 @@ module.exports = {
 	enrichProjectScenesFromLiveDeck,
 	sceneIdSet,
 	persistProject,
+	projectContentEquals,
 	mergeDeckSyncIntoProject,
 	applyLiveSceneDeckToCtx,
 	flushDeckSyncPersist,

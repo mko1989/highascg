@@ -50,6 +50,8 @@ export async function apiGet(path) {
 		const err = new Error(`HTTP ${res.status}: ${detail}`)
 		err.status = res.status
 		if (parsed?.reason) err.reason = parsed.reason
+		/* WO-329B: surface the server rev on stale_rev 409s so autosave can adopt + re-push (LWW). */
+		if (parsed?.storedRev != null) err.storedRev = parsed.storedRev
 		throw err
 	}
 	const ct = res.headers.get('content-type') || ''
@@ -93,6 +95,8 @@ export async function apiPost(path, body = {}) {
 		const err = new Error(`HTTP ${res.status}: ${detail}`)
 		err.status = res.status
 		if (parsed?.reason) err.reason = parsed.reason
+		/* WO-329B: surface the server rev on stale_rev 409s so autosave can adopt + re-push (LWW). */
+		if (parsed?.storedRev != null) err.storedRev = parsed.storedRev
 		throw err
 	}
 	const ct = res.headers.get('content-type') || ''
@@ -130,6 +134,8 @@ export async function apiPut(path, body = {}) {
 		const err = new Error(`HTTP ${res.status}: ${detail}`)
 		err.status = res.status
 		if (parsed?.reason) err.reason = parsed.reason
+		/* WO-329B: surface the server rev on stale_rev 409s so autosave can adopt + re-push (LWW). */
+		if (parsed?.storedRev != null) err.storedRev = parsed.storedRev
 		throw err
 	}
 	const ct = res.headers.get('content-type') || ''

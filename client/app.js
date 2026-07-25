@@ -16,6 +16,7 @@ import { initMultiviewEditor } from './components/multiview-editor.js'
 import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
+import { markLocalProjectSaved } from './lib/project-remote-sync.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { initTimerControlPanel, getScreenTimersSnapshot } from './components/timer-control-panel.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
@@ -202,6 +203,9 @@ async function init() {
 	let autosaveTimeout = null
 	let autosaveInFlight = null
 	let autosavePending = false
+	/* WO-329B: consecutive stale_rev retries. Bounded so two clients hammering each other can't
+	 * ping-pong forever; reset on any successful autosave. */
+	let autosaveStaleRetries = 0
 
 	async function triggerAutosave() {
 		if (!canPushProjectToServer()) return
@@ -217,6 +221,11 @@ async function init() {
 				if (res?.slug && projectState.setProjectSlug) projectState.setProjectSlug(res.slug)
 				/* WO-329: adopt the server-issued rev — the next save must echo it or be seen as stale. */
 				if (res?.rev != null) projectState.setRev(res.rev)
+				autosaveStaleRetries = 0
+				/* WO-329B: a CHANGED autosave triggers a project_sync broadcast that includes this
+				 * client — latch to skip our own echo (same latch the explicit Save uses). Unchanged
+				 * autosaves broadcast nothing; latching then would eat a future real remote sync. */
+				if (res?.changed) markLocalProjectSaved()
 				const d = new Date()
 				const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 				document.dispatchEvent(new CustomEvent('project-autosaved', { detail: { time: timeStr } }))
@@ -234,6 +243,18 @@ async function init() {
 							detail: { reason: 'project_gone', message: e?.message || '' },
 						}),
 					)
+				} else if (e?.status === 409 && e?.reason === 'stale_rev' && e?.storedRev != null && autosaveStaleRetries < 3) {
+					/* WO-329B (owner decision: last write wins): another client bumped the rev.
+					 * Adopting the server rev + re-pushing our CURRENT state once makes this client
+					 * the last writer instead of stranding it in log-only 409s forever (the exact
+					 * "changes just weren't updated" failure). The re-push broadcasts, so the other
+					 * client converges to us. Bounded at 3 consecutive conflicts; other 409 reasons
+					 * (empty_over_nonempty, unrelated_scene_set) keep the warn-only path — those
+					 * mean OUR copy is the wrong one to push. */
+					autosaveStaleRetries++
+					projectState.setRev(e.storedRev)
+					console.warn(`[HighAsCG] Auto-save rev conflict (stored rev ${e.storedRev}) — re-pushing local state, last write wins (attempt ${autosaveStaleRetries}/3)`)
+					autosavePending = true
 				} else {
 					console.warn('[HighAsCG] Auto-save failed:', reason)
 					document.dispatchEvent(

@@ -1,8 +1,20 @@
 # WO-329 — Project loading/saving robustness + two clients editing the same project
 
 **Source:** todos24.07.26 — "Loading saving projects." / "Projects running on two clients."
-**Status: OPEN (not started).** Written 2026-07-24 from a read-only code survey; verify the
-line numbers at pickup, the files move.
+
+> **Part A DONE 2026-07-24 (ff3e5f9 + 21f0fdf, verified live).** Server-issued monotonic rev.
+>
+> **Part B DONE 2026-07-25 — OWNER DECISION: neither Option 1 nor 2. "We need last write wins,
+> but we also need the last write to be pushed to the other client."** Root cause of "changes
+> just weren't updated from one client to the other" found and fixed: the AUTOSAVE path (where
+> nearly all edits travel) never broadcast `project_sync` — only explicit Save/Load did — and a
+> client whose rev went stale got log-only 409s forever (its edits never persisted again).
+> Shipped: changed autosaves broadcast the stamped project; unchanged persists are full no-ops
+> (no rev churn, no broadcast — `projectContentEquals`); on `stale_rev` the client adopts the
+> server rev from the 409 body and re-pushes its current state (bounded at 3 consecutive
+> conflicts) so the last writer truly wins; self-echo latch on changed autosaves; remote-sync
+> toast throttled to 10 s. SERVER change — active on next node restart; client rebuilt (kiosk
+> reload). Two-browser live verification still owed at that restart.
 
 ## Verified current state (2026-07-24, source read)
 

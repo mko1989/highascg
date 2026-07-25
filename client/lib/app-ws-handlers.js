@@ -28,6 +28,8 @@ import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
 
 /** WO-213: Track previous sceneId per channel to detect PRV rewrites. */
 let prevLiveSceneIdByChannel = {}
+/* WO-329B: last "remote sync" toast — imports apply every time, the toast is rate-limited. */
+let lastProjectSyncToastAt = 0
 
 /**
  * WO-213: When any PRV channel's live sceneId changes, the server has rewritten that PRV channel.
@@ -185,7 +187,13 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		try {
 			projectState.importProject(project, sceneState, timelineState, multiviewState, programOutputState, { silent: true })
 			window.dispatchEvent(new Event('project-loaded'))
-			showAppToast('Show file updated from server (remote sync)', 'warn')
+			/* WO-329B: autosaves now broadcast too, so during active remote editing this fires
+			 * every ~3s — throttle the toast (the import itself always applies). */
+			const now = Date.now()
+			if (now - lastProjectSyncToastAt > 10000) {
+				lastProjectSyncToastAt = now
+				showAppToast('Show file updated from server (remote sync)', 'warn')
+			}
 		} catch (e) {
 			console.warn('[HighAsCG] project_sync failed:', e.message)
 		}

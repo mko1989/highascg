@@ -22,6 +22,7 @@ const {
 	projectRevOf,
 	isProjectSaveNewerOrEqual,
 	validateIncomingProject,
+	projectContentEquals,
 } = require('../../src/engine/project-scenes')
 
 const scenes = (ids) => ({ scenes: ids.map((id) => ({ id })) })
@@ -121,5 +122,67 @@ describe('WO-329 wiring source guards', () => {
 
 	it('save broadcasts the STAMPED project so other clients learn the new rev', () => {
 		assert.match(read('src/api/routes-data-project-handlers.js'), /scheduleProjectSyncBroadcast\(ctx, persisted\.project\)/)
+	})
+})
+
+/*
+ * WO-329 Part B (2026-07-25, owner decision): last-write-wins + RELIABLE push. The found bug:
+ * autosave (the path nearly all edits travel) never broadcast project_sync, so the other client
+ * only converged on an explicit Save — and once the rev bumped, the other client's autosaves
+ * 409'd log-only forever ("changes just weren't updated from one client to the other", both
+ * directions). Now: changed autosaves broadcast; unchanged persists are full no-ops (no rev
+ * churn); a stale_rev client adopts the server rev and re-pushes once (bounded) so the LAST
+ * writer wins instead of stranding.
+ */
+describe('WO-329B: projectContentEquals (no-op persist gate)', () => {
+	const proj = (over = {}) => ({
+		version: 2, name: 'show', scenes: [{ id: 'a', layers: [{ n: 1 }] }], rev: 5,
+		savedAt: '2026-07-25T10:00:00.000Z', ...over,
+	})
+
+	it('identical content differing only in rev/savedAt is equal', () => {
+		assert.equal(projectContentEquals(proj(), proj({ rev: 9, savedAt: '2026-07-25T11:11:11.000Z' })), true)
+	})
+
+	it('any content difference breaks equality', () => {
+		assert.equal(projectContentEquals(proj(), proj({ name: 'other' })), false)
+		assert.equal(projectContentEquals(proj(), proj({ scenes: [{ id: 'a', layers: [{ n: 2 }] }] })), false)
+	})
+
+	it('null/garbage never equal (safe fallback = treat as changed)', () => {
+		assert.equal(projectContentEquals(null, proj()), false)
+		assert.equal(projectContentEquals(proj(), undefined), false)
+	})
+})
+
+describe('WO-329B wiring source guards', () => {
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+
+	it('persistProject short-circuits unchanged content without bumping the rev', () => {
+		const src = read('src/engine/project-scenes.js')
+		assert.match(src, /projectContentEquals\(stamped, storedProject\)/)
+		assert.match(src, /unchanged: true/)
+	})
+
+	it('CHANGED autosaves broadcast project_sync; unchanged echoes stay silent', () => {
+		const handlers = read('src/api/routes-data-project-handlers.js')
+		assert.match(handlers, /if \(result\.unchanged !== true\) scheduleProjectSyncBroadcast\(ctx, result\.project\)/)
+		assert.match(handlers, /changed: result\.unchanged !== true/)
+	})
+
+	it('client adopts the server rev on stale_rev and re-pushes (bounded) — last write wins', () => {
+		const app = read('client/app.js')
+		assert.match(app, /e\?\.reason === 'stale_rev' && e\?\.storedRev != null && autosaveStaleRetries < 3/)
+		assert.match(app, /projectState\.setRev\(e\.storedRev\)/)
+		assert.match(app, /autosavePending = true/)
+	})
+
+	it('api-client surfaces storedRev on 409 errors (all three builders)', () => {
+		const m = read('client/lib/api-client.js').match(/err\.storedRev = parsed\.storedRev/g) || []
+		assert.equal(m.length, 3)
+	})
+
+	it('client latches the self-echo skip only for CHANGED autosaves', () => {
+		assert.match(read('client/app.js'), /if \(res\?\.changed\) markLocalProjectSaved\(\)/)
 	})
 })
