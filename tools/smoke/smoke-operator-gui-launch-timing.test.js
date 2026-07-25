@@ -44,9 +44,10 @@ describe('first rect report probe (routes-operator-gui.js)', () => {
 })
 
 describe('launcher probes (operator-gui-launcher.js) — source level', () => {
-	const launcher = src('src/system/operator-gui-launcher.js')
+	const launcher = src('src/system/operator-gui-launcher.js') + src('src/system/operator-gui-launcher-placement.js')
 	it('records t0 at kiosk spawn and probes each phase with ms-since-spawn', () => {
-		assert.match(launcher, /launchSpawnAt = Date\.now\(\)\s*\n\s*probeLaunchPhase\(ctx\.log, 'kiosk spawned'/)
+		assert.match(launcher, /launchSpawnAt = Date\.now\(\)/)
+		assert.match(launcher, /markLaunchSpawn\(\)\s*\n\s*probeLaunchPhase\(ctx\.log, 'kiosk spawned'/)
 		assert.match(launcher, /probeLaunchPhase\(log, 'kiosk window found'/)
 		assert.match(launcher, /probeLaunchPhase\(log, 'kiosk window positioned'\)/)
 		assert.match(launcher, /timing: \$\{phase\} t=\$\{now\} \+\$\{dt\}ms/)

@@ -327,7 +327,7 @@ describe('WO-255 T255.2: launcher + routes registered + generator always-on-top'
 		assert.match(src, /routes\.post\('\/api\/operator-gui\/raise'/)
 	})
 	it('operator-gui-launcher.js: firefox-esr --kiosk with a dedicated .operator-firefox-profile, xdotool positioning', () => {
-		const src = read('src/system/operator-gui-launcher.js')
+		const src = read('src/system/operator-gui-launcher.js') + read('src/system/operator-gui-launcher-placement.js')
 		assert.match(src, /--kiosk/)
 		assert.match(src, /--new-instance/)
 		assert.match(src, /\.operator-firefox-profile/)

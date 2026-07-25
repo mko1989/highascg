@@ -566,7 +566,7 @@ describe('2026-07-19 fix: a pure POSITION change (looks list <-> looks editor sh
 
 describe('WO-256: server needs no changes — operator-gui-channel.js already accepts arbitrary role/mainIndex/rect cells', () => {
 	it('resolveCellSourceChannel branches only on role + mainIndex, not on rect position/size/count (grep-level, source unchanged by this WO)', () => {
-		const src = read('src/system/operator-gui-channel.js')
+		const src = read('src/system/operator-gui-channel.js') + read('src/system/operator-gui-channel-geometry.js')
 		assert.match(src, /function resolveCellSourceChannel/)
 		assert.doesNotMatch(src, /WO-256/, 'confirms this WO made no server-side edits')
 	})
