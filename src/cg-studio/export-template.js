@@ -16,6 +16,7 @@ function fixStudioAssetPaths(html) {
 	return html
 		.replace(/src="vendor\//g, 'src="../lower-thirds/vendor/')
 		.replace(/src="lt-engine\.js"/g, 'src="../lower-thirds/lt-engine.js"')
+		.replace(/src="lt-engine-controls\.js"/g, 'src="../lower-thirds/lt-engine-controls.js"')
 }
 
 function bakeDefaults(html, payload) {

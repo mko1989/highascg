@@ -13,18 +13,19 @@
  *   - Optional HTTP polling for API-driven content updates
  */
 
-const LTEngine = (function () {
-    let state = 0;           // 0 = empty, 1 = loaded/playable, 2 = playing
-    let activeStep = 0;
-    let currentStep = 0;
-    let data = [];
-    let style = {};
+(function () {
+    const CORE = window.__LTEngineCore = window.__LTEngineCore || {
+        state: 0,           // 0 = empty, 1 = loaded/playable, 2 = playing
+        activeStep: 0,
+        currentStep: 0,
+        data: [],
+        style: {},
+        cfg: {},             // variant-supplied config — selectors + animate callbacks
+    };
+
     const animationQueue = [];
     const animationThreshold = 3;
     let displayTimer = null;
-
-    /** Variant-supplied config — selectors + animate callbacks */
-    let cfg = {};
 
     const STYLE_KEYS = new Set([
         'primaryColor', 'textColor', 'panelColor', 'gradientMid', 'gradientEnd',
@@ -50,11 +51,11 @@ const LTEngine = (function () {
     }
 
     function syncStyleFromActiveData() {
-        const step = data[activeStep];
+        const step = CORE.data[CORE.activeStep];
         if (!step || typeof step !== 'object') return;
         STYLE_KEYS.forEach((key) => {
             if (step[key] != null && step[key] !== '') {
-                style[key] = step[key];
+                CORE.style[key] = step[key];
             }
         });
     }
@@ -96,7 +97,7 @@ const LTEngine = (function () {
 
     function readDisplayDurationSec() {
         syncStyleFromActiveData();
-        const raw = style.displayDurationSec;
+        const raw = CORE.style.displayDurationSec;
         if (raw === 0 || raw === '0') return 0;
         const n = parseFloat(raw);
         if (!Number.isFinite(n)) return 10;
@@ -110,7 +111,7 @@ const LTEngine = (function () {
         if (durationSec <= 0) return;
         displayTimer = setTimeout(() => {
             displayTimer = null;
-            if (state === 2) stop();
+            if (CORE.state === 2) CORE.stop();
         }, durationSec * 1000);
     }
 
@@ -148,18 +149,18 @@ const LTEngine = (function () {
     /* ── data / style ────────────────────────────────────────── */
 
     function applyData() {
-        if (typeof cfg.applyData === 'function') {
-            cfg.applyData(data[activeStep]);
+        if (typeof CORE.cfg.applyData === 'function') {
+            CORE.cfg.applyData(CORE.data[CORE.activeStep]);
             return;
         }
-        const container = document.querySelector(cfg.containerSel);
-        const title = container.querySelector(cfg.titleSel || 'h1');
-        const subtitle = container.querySelector(cfg.subtitleSel || 'p');
-        
-        const stepData = data[activeStep] || {};
+        const container = document.querySelector(CORE.cfg.containerSel);
+        const title = container.querySelector(CORE.cfg.titleSel || 'h1');
+        const subtitle = container.querySelector(CORE.cfg.subtitleSel || 'p');
+
+        const stepData = CORE.data[CORE.activeStep] || {};
         let primaryText = '';
         let secondaryText = '';
-        
+
         if (stepData.f0 !== undefined) {
             primaryText = stepData.f0;
         } else if (stepData.name !== undefined) {
@@ -169,7 +170,7 @@ const LTEngine = (function () {
         } else {
             primaryText = stepData.title || '';
         }
-        
+
         if (stepData.f1 !== undefined) {
             secondaryText = stepData.f1;
         } else if (stepData.subtitle !== undefined) {
@@ -181,13 +182,13 @@ const LTEngine = (function () {
         } else if (stepData.description !== undefined) {
             secondaryText = stepData.description;
         }
-        
+
         if (title) title.textContent = primaryText || '';
         if (subtitle) subtitle.textContent = secondaryText || '';
     }
 
     function applyStyles() {
-        if (style.customFont) {
+        if (CORE.style.customFont) {
             let styleEl = document.getElementById('lt-custom-font-style');
             if (!styleEl) {
                 styleEl = document.createElement('style');
@@ -197,7 +198,7 @@ const LTEngine = (function () {
             // Add a timestamp or encode URI to handle paths
             styleEl.innerHTML = `@font-face {
                 font-family: 'LTCustomFont';
-                src: url('../fonts/${style.customFont}');
+                src: url('../fonts/${CORE.style.customFont}');
             }`;
             // Apply it to the body or container
             document.body.style.fontFamily = "'LTCustomFont', 'Arial', sans-serif";
@@ -210,12 +211,12 @@ const LTEngine = (function () {
 
         // Apply global animation speed if gsap is available
         if (window.gsap && window.gsap.globalTimeline) {
-            gsap.globalTimeline.timeScale(style.speed ? Number(style.speed) : 1);
+            gsap.globalTimeline.timeScale(CORE.style.speed ? Number(CORE.style.speed) : 1);
         }
 
         // Apply position positioning on the main container
-        if (cfg.containerSel) {
-            const container = document.querySelector(cfg.containerSel);
+        if (CORE.cfg.containerSel) {
+            const container = document.querySelector(CORE.cfg.containerSel);
             if (container) {
                 // Reset inline margins to prevent accumulation
                 container.style.marginLeft = '';
@@ -224,7 +225,7 @@ const LTEngine = (function () {
                 container.style.marginBottom = '';
                 container.style.margin = '';
 
-                const pos = (style.position || 'left').toLowerCase();
+                const pos = (CORE.style.position || 'left').toLowerCase();
                 if (pos === 'center') {
                     container.style.marginLeft = 'auto';
                     container.style.marginRight = 'auto';
@@ -234,9 +235,9 @@ const LTEngine = (function () {
                     // Default to left
                     container.style.marginRight = 'auto';
                 }
-                if (style.marginX != null || style.marginY != null) {
-                    const mx = style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77;
-                    const my = style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43;
+                if (CORE.style.marginX != null || CORE.style.marginY != null) {
+                    const mx = CORE.style.marginX != null && CORE.style.marginX !== '' ? Number(CORE.style.marginX) : 77;
+                    const my = CORE.style.marginY != null && CORE.style.marginY !== '' ? Number(CORE.style.marginY) : 43;
                     if (Number.isFinite(mx) && Number.isFinite(my)) {
                         // WO-267: individual margins — the old `margin` shorthand stomped the
                         // auto margins that anchor position center/right.
@@ -245,8 +246,8 @@ const LTEngine = (function () {
                         else if (pos !== 'center') container.style.marginLeft = mx + 'px';
                     }
                 }
-                if (style.opacity != null && style.opacity !== '') {
-                    const op = Number(style.opacity);
+                if (CORE.style.opacity != null && CORE.style.opacity !== '') {
+                    const op = Number(CORE.style.opacity);
                     if (Number.isFinite(op)) container.style.opacity = String(Math.max(0, Math.min(1, op)));
                 }
             }
@@ -256,32 +257,32 @@ const LTEngine = (function () {
         applyBoxSizeOverride();
         applyBlurOverride();
 
-        if (typeof cfg.applyStyles === 'function') {
-            cfg.applyStyles(style);
+        if (typeof CORE.cfg.applyStyles === 'function') {
+            CORE.cfg.applyStyles(CORE.style);
             return;
         }
     }
 
     function applyTypographyOverrides() {
-        const titleSel = cfg.titleSel || 'h1';
-        const subtitleSel = cfg.subtitleSel || 'p';
+        const titleSel = CORE.cfg.titleSel || 'h1';
+        const subtitleSel = CORE.cfg.subtitleSel || 'p';
         const rules = [];
-        if (style.titleFontSize != null && style.titleFontSize !== '') {
-            rules.push(titleSel + ' { font-size: ' + Number(style.titleFontSize) + 'px !important; }');
+        if (CORE.style.titleFontSize != null && CORE.style.titleFontSize !== '') {
+            rules.push(titleSel + ' { font-size: ' + Number(CORE.style.titleFontSize) + 'px !important; }');
         }
-        if (style.subtitleFontSize != null && style.subtitleFontSize !== '') {
-            rules.push(subtitleSel + ' { font-size: ' + Number(style.subtitleFontSize) + 'px !important; }');
+        if (CORE.style.subtitleFontSize != null && CORE.style.subtitleFontSize !== '') {
+            rules.push(subtitleSel + ' { font-size: ' + Number(CORE.style.subtitleFontSize) + 'px !important; }');
         }
-        if (style.titleFontWeight != null && style.titleFontWeight !== '') {
-            rules.push(titleSel + ' { font-weight: ' + style.titleFontWeight + ' !important; }');
+        if (CORE.style.titleFontWeight != null && CORE.style.titleFontWeight !== '') {
+            rules.push(titleSel + ' { font-weight: ' + CORE.style.titleFontWeight + ' !important; }');
         }
-        if (style.letterSpacing != null && style.letterSpacing !== '') {
-            rules.push(titleSel + ' { letter-spacing: ' + style.letterSpacing + ' !important; }');
-            rules.push(subtitleSel + ' { letter-spacing: ' + style.letterSpacing + ' !important; }');
+        if (CORE.style.letterSpacing != null && CORE.style.letterSpacing !== '') {
+            rules.push(titleSel + ' { letter-spacing: ' + CORE.style.letterSpacing + ' !important; }');
+            rules.push(subtitleSel + ' { letter-spacing: ' + CORE.style.letterSpacing + ' !important; }');
         }
-        if (style.textTransform) {
-            rules.push(titleSel + ' { text-transform: ' + style.textTransform + ' !important; }');
-            rules.push(subtitleSel + ' { text-transform: ' + style.textTransform + ' !important; }');
+        if (CORE.style.textTransform) {
+            rules.push(titleSel + ' { text-transform: ' + CORE.style.textTransform + ' !important; }');
+            rules.push(subtitleSel + ' { text-transform: ' + CORE.style.textTransform + ' !important; }');
         }
         let el = document.getElementById('lt-studio-typography');
         if (!rules.length) {
@@ -302,10 +303,10 @@ const LTEngine = (function () {
      * A variant may name it explicitly via cfg.boxSel.
      */
     function boxElement() {
-        if (!cfg.containerSel) return null;
-        if (cfg.boxSel) return document.querySelector(cfg.boxSel);
-        return document.querySelector(cfg.containerSel + ' .graphic')
-            || document.querySelector(cfg.containerSel);
+        if (!CORE.cfg.containerSel) return null;
+        if (CORE.cfg.boxSel) return document.querySelector(CORE.cfg.boxSel);
+        return document.querySelector(CORE.cfg.containerSel + ' .graphic')
+            || document.querySelector(CORE.cfg.containerSel);
     }
 
     function numericOverride(raw, min) {
@@ -323,8 +324,8 @@ const LTEngine = (function () {
     function applyBoxSizeOverride() {
         const box = boxElement();
         if (box) {
-            const w = numericOverride(style.boxWidth, 1);
-            const h = numericOverride(style.boxHeight, 1);
+            const w = numericOverride(CORE.style.boxWidth, 1);
+            const h = numericOverride(CORE.style.boxHeight, 1);
             if (w != null || h != null) {
                 if (w != null) {
                     // the template .graphic panels carry min-/max-width clamps that would silently
@@ -348,12 +349,12 @@ const LTEngine = (function () {
             }
         }
 
-        const container = cfg.containerSel ? document.querySelector(cfg.containerSel) : null;
+        const container = CORE.cfg.containerSel ? document.querySelector(CORE.cfg.containerSel) : null;
         if (!container) return;
-        const scale = numericOverride(style.boxScale, 0.01);
+        const scale = numericOverride(CORE.style.boxScale, 0.01);
         if (scale != null && scale !== 1) {
             // Scale about the anchored corner so the marginX/marginY the operator set stays put.
-            const pos = (style.position || 'left').toLowerCase();
+            const pos = (CORE.style.position || 'left').toLowerCase();
             const originX = pos === 'right' ? 'right' : pos === 'center' ? 'center' : 'left';
             container.style.transformOrigin = originX + ' bottom';
             container.style.transform = 'scale(' + scale + ')';
@@ -366,9 +367,9 @@ const LTEngine = (function () {
     }
 
     function applyBlurOverride() {
-        if (style.blurAmount == null || style.blurAmount === '' || !cfg.containerSel) return;
-        const panel = document.querySelector(cfg.containerSel + ' .glass-panel');
-        if (panel) panel.style.backdropFilter = 'blur(' + Number(style.blurAmount) + 'px)';
+        if (CORE.style.blurAmount == null || CORE.style.blurAmount === '' || !CORE.cfg.containerSel) return;
+        const panel = document.querySelector(CORE.cfg.containerSel + ' .glass-panel');
+        if (panel) panel.style.backdropFilter = 'blur(' + Number(CORE.style.blurAmount) + 'px)';
     }
 
     function parseCasparXML(xml) {
@@ -378,10 +379,10 @@ const LTEngine = (function () {
         while ((match = parser.exec(xml)) !== null) {
             dataObj[match[1]] = match[2].trim();
         }
-        
+
         let title = '';
         let subtitle = '';
-        
+
         if (dataObj.f0 !== undefined) {
             title = dataObj.f0;
         } else if (dataObj.name !== undefined) {
@@ -391,7 +392,7 @@ const LTEngine = (function () {
         } else {
             title = dataObj.title || '';
         }
-        
+
         if (dataObj.f1 !== undefined) {
             subtitle = dataObj.f1;
         } else if (dataObj.subtitle !== undefined) {
@@ -403,7 +404,7 @@ const LTEngine = (function () {
         } else if (dataObj.description !== undefined) {
             subtitle = dataObj.description;
         }
-        
+
         const styleObj = {};
         if (dataObj.primaryColor) styleObj.primaryColor = dataObj.primaryColor;
         if (dataObj.textColor) styleObj.textColor = dataObj.textColor;
@@ -411,315 +412,27 @@ const LTEngine = (function () {
         if (dataObj.speed) styleObj.speed = dataObj.speed;
         if (dataObj.customFont) styleObj.customFont = dataObj.customFont;
         if (dataObj.displayDurationSec != null) styleObj.displayDurationSec = dataObj.displayDurationSec;
-        
+
         return {
             data: { ...dataObj, title, subtitle },
             style: styleObj
         };
     }
 
-
-    function studioHoldIn() {
-        ensurePlayableDefaults();
-        syncStyleFromActiveData();
-        applyData();
-        applyStyles();
-        const prevScale = window.gsap && gsap.globalTimeline ? gsap.globalTimeline.timeScale() : 1;
-        if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(1000);
-        return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
-            if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(prevScale);
-            state = 2;
-            clearDisplayTimer();
-        }).catch(handleError);
-    }
-
-    /* ── WO-267 studio-only helpers (never exported outside ?studio=1) ── */
-
-    /** Replay the intro at normal speed. `play()` no-ops at state 2 (by design for CG), so the
-     * studio Play button uses this: animateIn's opening .set() calls make it self-resetting. */
-    function studioReplay() {
-        try {
-            ensurePlayableDefaults();
-        } catch (error) {
-            handleError(error);
-            return Promise.resolve();
-        }
-        syncStyleFromActiveData();
-        applyData();
-        applyStyles();
-        return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
-            state = 2;
-            clearDisplayTimer();
-        }).catch(handleError);
-    }
-
-    /** Current graphic placement for the studio drag overlay. */
-    function studioGetPlacement() {
-        const container = cfg.containerSel ? document.querySelector(cfg.containerSel) : null;
-        if (!container) return null;
-        return {
-            rect: container.getBoundingClientRect(),
-            position: (style.position || 'left').toLowerCase(),
-            marginX: style.marginX != null && style.marginX !== '' ? Number(style.marginX) : 77,
-            marginY: style.marginY != null && style.marginY !== '' ? Number(style.marginY) : 43,
-        };
-    }
-
-    /** Live-apply a placement from the studio drag overlay (merged into style). */
-    function studioSetPlacement(p) {
-        if (!p || typeof p !== 'object') return;
-        if (p.position) style.position = String(p.position);
-        if (p.marginX != null) style.marginX = Number(p.marginX);
-        if (p.marginY != null) style.marginY = Number(p.marginY);
-        applyStyles();
-    }
-
-    /** Computed font sizes for the studio wheel-resize. */
-    function studioGetFontSizes() {
-        const out = { titleFontSize: null, subtitleFontSize: null };
-        try {
-            const t = document.querySelector(cfg.titleSel || 'h1');
-            if (t) out.titleFontSize = parseFloat(window.getComputedStyle(t).fontSize);
-            const s = document.querySelector(cfg.subtitleSel || 'p');
-            if (s) out.subtitleFontSize = parseFloat(window.getComputedStyle(s).fontSize);
-        } catch (_) { /* fall through with nulls */ }
-        return out;
-    }
-
-    /* ── CasparCG interface ──────────────────────────────────── */
-
-    const DEFAULT_DATA = { title: 'Name', subtitle: 'Title' };
-
-    function ensurePlayableDefaults() {
-        if (!data.length) {
-            data = [{ ...DEFAULT_DATA }];
-            activeStep = 0;
-            currentStep = 0;
-        }
-        applyData();
-        applyStyles();
-        if (state === 0) state = 1;
-    }
-
-    function update(raw) {
-        const parsed = normalizeUpdatePayload(raw);
-        if (!parsed) return;
-
-        const hasStyle = parsed.style && Object.keys(parsed.style).length > 0;
-        if (!parsed.data && !hasStyle) {
-            if (state === 0) {
-                try {
-                    ensurePlayableDefaults();
-                } catch (error) {
-                    handleError(error);
-                }
-            }
-            return;
-        }
-
-        if (parsed.data) {
-            data = parsed.data;
-            activeStep = Math.min(activeStep, data.length - 1);
-            currentStep = activeStep;
-        }
-        if (hasStyle) {
-            style = { ...style, ...parsed.style };
-        }
-        syncStyleFromActiveData();
-
-        try {
-            applyData();
-            applyStyles();
-            if (state === 0) {
-                state = 1;
-            }
-            if (state === 2) {
-                scheduleDisplayStop();
-            }
-        } catch (error) {
-            handleError(error);
-        }
-    }
-
-    function play() {
-        if (state === 0) {
-            try {
-                ensurePlayableDefaults();
-            } catch (error) {
-                handleError(error);
-                return;
-            }
-        }
-        if (state === 1) {
-            syncStyleFromActiveData();
-            addPlayOutCommand(() =>
-                Promise.resolve(cfg.animateIn(data[activeStep], style)).then(() => {
-                    scheduleDisplayStop();
-                })
-            );
-            state = 2;
-        }
-    }
-
-    function next() {
-        if (state === 1) {
-            play();
-        } else if (state === 2) {
-            if (data.length > currentStep + 1) {
-                clearDisplayTimer();
-                currentStep++;
-                const animation = () =>
-                    cfg.animateOut(data[activeStep], style).then(() => {
-                        activeStep++;
-                        syncStyleFromActiveData();
-                        applyData();
-                        applyStyles();
-                    }).then(() => cfg.animateIn(data[activeStep], style)).then(() => {
-                        scheduleDisplayStop();
-                    });
-                addPlayOutCommand(animation);
-            } else {
-                handleError('Graphic is out of titles to display');
-            }
-        } else {
-            handleError('Graphic cannot be advanced while in state ' + state);
-        }
-    }
-
-    function stop() {
-        if (state === 2) {
-            clearDisplayTimer();
-            addPlayOutCommand(() => cfg.animateOut(data[activeStep], style));
-            state = 1;
-        }
-    }
-
-    function reset() {
-        if (currentStep === 0) {
-            handleError('The graphic is already on its first item.');
-            return;
-        }
-        let animation;
-        if (state === 1) {
-            currentStep = 0;
-            animation = () => new Promise(resolve => { activeStep = 0; applyData(); resolve(); });
-        } else if (state === 2) {
-            currentStep = -1;
-            animation = () => new Promise(resolve => { activeStep = -1; resolve(); }).then(next);
-        } else {
-            handleError('Cannot reset a graphic that has not been loaded.');
-            return;
-        }
-        addPlayOutCommand(animation);
-    }
-
-    function previous() {
-        if (currentStep > 0) {
-            let animation;
-            if (state === 2) {
-                currentStep -= 2;
-                animation = () => new Promise(resolve => { activeStep -= 2; resolve(); }).then(next);
-            } else if (state === 1) {
-                currentStep -= 1;
-                animation = () => new Promise(resolve => { activeStep -= 1; applyData(); resolve(); });
-            } else {
-                handleError('Graphic can not go back one title in the current state.');
-                return;
-            }
-            addPlayOutCommand(animation);
-        } else {
-            handleError('There is no graphic to go backwards to.');
-        }
-    }
-
-    async function remove() {
-        clearDisplayTimer();
-        if (state === 2) await cfg.animateOut(data[activeStep], style);
-    }
-
     function handleError(e) { console.error('[LT]', e); }
     function handleWarning(w) { console.warn('[LT]', w); }
 
-    /* ── HTTP polling for API-driven updates ──────────────────── */
-
-    let pollTimer = null;
-
-    function startPolling(baseUrl, intervalMs) {
-        if (pollTimer) clearInterval(pollTimer);
-        const url = baseUrl || '';
-        const ms = intervalMs || 1000;
-
-        async function tick() {
-            try {
-                const res = await fetch(url);
-                if (!res.ok) return;
-                const payload = await res.json();
-                if (payload && payload.data) {
-                    data = Array.isArray(payload.data) ? payload.data : [payload.data];
-                    if (payload.style) style = payload.style;
-                    if (data.length) {
-                        activeStep = Math.min(activeStep, data.length - 1);
-                        currentStep = activeStep;
-                        applyData();
-                        applyStyles();
-                    }
-                }
-            } catch (_) { /* silent */ }
-        }
-
-        tick();
-        pollTimer = setInterval(tick, ms);
-    }
-
-    function stopPolling() {
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    }
-
-    /* ── init ─────────────────────────────────────────────────── */
-
-    function init(variantConfig) {
-        cfg = variantConfig;
-        // WO-321: CG-studio exports bake their full configured style into window.__LT_INITIAL_STYLE__
-        // so the exported template renders the studio look — typography/layout/box/timing, not just
-        // colors. Seed the style store before first render. GUARDED: absent on hand-written templates,
-        // so this is a complete no-op for them. Colors still come from the CSS vars baked in the export
-        // (the engine's applyStyles never touches color).
-        try {
-            var seed = (typeof window !== 'undefined') ? window.__LT_INITIAL_STYLE__ : null;
-            if (seed && typeof seed === 'object') {
-                STYLE_KEYS.forEach(function (k) {
-                    if (seed[k] != null && seed[k] !== '') style[k] = seed[k];
-                });
-            }
-        } catch (_) { /* seed is best-effort; a bad global must not break init */ }
-        window['update'] = raw => update(raw);
-        window['play'] = play;
-        window['next'] = next;
-        window['stop'] = stop;
-        window['reset'] = reset;
-        window['previous'] = previous;
-        window['remove'] = remove;
-
-        // Check for API poll params in URL  ?poll=<url>&interval=<ms>
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('poll')) {
-            startPolling(params.get('poll'), parseInt(params.get('interval') || '1000', 10));
-        }
-        if (isStudioMode()) {
-            window['studioHoldIn'] = studioHoldIn;
-            window['studioReplay'] = studioReplay;
-            window['studioGetPlacement'] = studioGetPlacement;
-            window['studioSetPlacement'] = studioSetPlacement;
-            window['studioGetFontSizes'] = studioGetFontSizes;
-        }
-    }
-
-    return {
-        init,
+    Object.assign(CORE, {
+        STYLE_KEYS,
+        isStudioMode,
+        clearDisplayTimer,
+        syncStyleFromActiveData,
+        normalizeUpdatePayload,
+        scheduleDisplayStop,
         getComputedStyle,
-        startPolling,
-        stopPolling,
-        get state() { return state; },
-        set state(v) { state = v; },
-    };
+        addPlayOutCommand,
+        applyData,
+        applyStyles,
+        handleError,
+    });
 })();

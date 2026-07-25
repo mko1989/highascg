@@ -156,9 +156,10 @@ describe('WO-250 T250.3 — osc-state duration fallback from frameTotal/fps', ()
 })
 
 describe('WO-250 T250.2 — MV master/overlay progress-bar template parity', () => {
-	const masterFile = path.join(repoRoot, 'template/multiview_master.html')
 	const overlayFile = path.join(repoRoot, 'template/multiview_overlay.js')
-	const masterContent = fs.readFileSync(masterFile, 'utf8')
+	const masterContent =
+		fs.readFileSync(path.join(repoRoot, 'template/multiview_master.js'), 'utf8') +
+		fs.readFileSync(path.join(repoRoot, 'template/multiview_master-labels.js'), 'utf8')
 	const overlayContent = fs.readFileSync(overlayFile, 'utf8')
 
 	it('both templates gate the progress bar on the identical hasRuntime condition', () => {

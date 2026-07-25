@@ -5,10 +5,16 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../../');
 
+function masterScriptSource() {
+	return (
+		fs.readFileSync(path.join(repoRoot, 'template/multiview_master.js'), 'utf8') +
+		fs.readFileSync(path.join(repoRoot, 'template/multiview_master-labels.js'), 'utf8')
+	);
+}
+
 test('WO-223: Multiview route-label friendly names smoke tests', async (t) => {
 	await t.test('T223.1a: Master template contains friendlyRouteLabel function', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
-		const content = fs.readFileSync(masterFile, 'utf8');
+		const content = masterScriptSource();
 
 		// Must contain the function definition
 		assert.match(content, /function friendlyRouteLabel\(sourceValue, channelMap\)/, 'Master should have friendlyRouteLabel function');
@@ -29,10 +35,9 @@ test('WO-223: Multiview route-label friendly names smoke tests', async (t) => {
 	});
 
 	await t.test('T223.2a: Parity check - friendlyRouteLabel function bodies match', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
 		const overlayFile = path.join(repoRoot, 'template/multiview_overlay.js');
 
-		const masterContent = fs.readFileSync(masterFile, 'utf8');
+		const masterContent = masterScriptSource();
 		const overlayContent = fs.readFileSync(overlayFile, 'utf8');
 
 		// Extract friendlyRouteLabel functions from both files
@@ -49,10 +54,9 @@ test('WO-223: Multiview route-label friendly names smoke tests', async (t) => {
 	});
 
 	await t.test('T223.2b: Parity check - buildPlaylistRowLabel calls use friendlyRouteLabel', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
 		const overlayFile = path.join(repoRoot, 'template/multiview_overlay.js');
 
-		const masterContent = fs.readFileSync(masterFile, 'utf8');
+		const masterContent = masterScriptSource();
 		const overlayContent = fs.readFileSync(overlayFile, 'utf8');
 
 		// Check that both have updated buildPlaylistRowLabel signature
@@ -65,14 +69,8 @@ test('WO-223: Multiview route-label friendly names smoke tests', async (t) => {
 	});
 
 	await t.test('T223.3: friendlyRouteLabel function logic - unit tests', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
-		const masterContent = fs.readFileSync(masterFile, 'utf8');
+		const scriptContent = masterScriptSource();
 
-		// Extract the function from the template script tag
-		const scriptMatch = masterContent.match(/<script>([\s\S]*?)<\/script>/);
-		assert(scriptMatch && scriptMatch[1], 'Master template should have a <script> tag');
-
-		const scriptContent = scriptMatch[1];
 		const funcMatch = scriptContent.match(/function friendlyRouteLabel\(sourceValue, channelMap\)\s*\{[\s\S]*?\n\t\t\}/);
 		assert(funcMatch && funcMatch[0], 'Function should be extractable from master template');
 
@@ -138,16 +136,11 @@ return friendlyRouteLabel;
 	});
 
 	await t.test('T223.4: Master template script syntax check', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
-		const content = fs.readFileSync(masterFile, 'utf8');
-
-		// Extract script content
-		const scriptMatch = content.match(/<script>([\s\S]*?)<\/script>/);
-		assert(scriptMatch && scriptMatch[1], 'Master template should have a <script> tag');
+		const scriptContent = masterScriptSource();
 
 		// Write to temp file for syntax checking
 		const tempFile = path.join(require('os').tmpdir(), 'master_script_check.js');
-		fs.writeFileSync(tempFile, scriptMatch[1]);
+		fs.writeFileSync(tempFile, scriptContent);
 
 		try {
 			const { execSync } = require('child_process');

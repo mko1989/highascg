@@ -18,8 +18,9 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 	});
 
 	await t.test('T212.2a: Master template contains playlist-aware label branch', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
-		const content = fs.readFileSync(masterFile, 'utf8');
+		const content =
+			fs.readFileSync(path.join(repoRoot, 'template/multiview_master.js'), 'utf8') +
+			fs.readFileSync(path.join(repoRoot, 'template/multiview_master-labels.js'), 'utf8');
 
 		// Must have playlistAdvance check and arrow operator
 		assert.match(content, /playlistAdvance/, 'Master template should check playlistAdvance');
@@ -42,14 +43,10 @@ test('WO-212: Multiview playlist labels smoke tests', async (t) => {
 	});
 
 	await t.test('T212.3: buildPlaylistRowLabel function logic', async () => {
-		const masterFile = path.join(repoRoot, 'template/multiview_master.html');
-		const masterContent = fs.readFileSync(masterFile, 'utf8');
+		const scriptContent =
+			fs.readFileSync(path.join(repoRoot, 'template/multiview_master.js'), 'utf8') +
+			fs.readFileSync(path.join(repoRoot, 'template/multiview_master-labels.js'), 'utf8');
 
-		// Extract the function from the template script tag
-		const scriptMatch = masterContent.match(/<script>([\s\S]*?)<\/script>/);
-		assert(scriptMatch && scriptMatch[1], 'Master template should have a <script> tag');
-
-		const scriptContent = scriptMatch[1];
 		const funcMatch = scriptContent.match(/function buildPlaylistRowLabel\([\s\S]*?\n\t\t\}/);
 		assert(funcMatch && funcMatch[0], 'Function should be extractable from master template');
 

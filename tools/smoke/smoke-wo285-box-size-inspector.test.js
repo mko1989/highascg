@@ -145,7 +145,10 @@ function applyStyleVia(rel, style) {
 		})
 		S.applyStyles()
 	} else {
-		vm.runInContext(src(rel) + '\n;globalThis.__LTEngine = LTEngine;', context, { filename: rel })
+		const combined = rel.endsWith('lt-engine.js')
+			? src(rel) + src('template/lower-thirds/lt-engine-controls.js')
+			: src(rel)
+		vm.runInContext(combined + '\n;globalThis.__LTEngine = LTEngine;', context, { filename: rel })
 		const engine = context.__LTEngine
 		assert.ok(engine, 'LTEngine must be exported')
 		engine.init(cfg)

@@ -53,14 +53,17 @@ describe('WO-267 T267.4: placement math (pure)', () => {
 
 describe('WO-267 T267.1/T267.2: engine repairs (source asserts, both engines)', () => {
 	for (const rel of ENGINES) {
-		const engine = src(rel)
+		const engine = rel.endsWith('lt-engine.js')
+			? src(rel) + src('template/lower-thirds/lt-engine-controls.js')
+			: src(rel)
 		const name = path.basename(rel)
+		const gateLiteral = rel.endsWith('lt-engine.js') ? 'if (CORE.isStudioMode()) {' : 'if (isStudioMode()) {'
 
 		it(`${name}: studio helpers registered under isStudioMode only`, () => {
 			for (const fn of ['studioReplay', 'studioGetPlacement', 'studioSetPlacement', 'studioGetFontSizes']) {
 				assert.match(engine, new RegExp(`window\\['${fn}'\\] = ${fn}`))
 			}
-			const gate = engine.indexOf('if (isStudioMode()) {')
+			const gate = engine.indexOf(gateLiteral)
 			assert.ok(gate > 0 && engine.indexOf("window['studioReplay']") > gate, 'registration must sit inside the studio gate')
 		})
 
