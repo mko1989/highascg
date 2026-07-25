@@ -211,6 +211,10 @@ export async function fetchMediaContentResolution(source, stateStore, screenIdx,
  * @returns {'none' | 'fit' | 'fill-h' | 'fill-v' | 'stretch'}
  */
 export function mapContentFitToStretch(layer) {
+	/* WO-326 follow-up (todos25): explicit aspect UNLOCK → the W/H rect wins, content stretches
+	 * to it (otherwise PGM contain-fits the media and the layer "shows up locked on pgm" even
+	 * though the editor rect is stretched). KEEP IN SYNC with src/engine/scene-native-fill.js. */
+	if (layer.aspectLocked === false) return 'stretch'
 	const cf = layer.contentFit
 	if (cf === 'native') return 'none'
 	if (cf === 'horizontal') return 'fill-h'

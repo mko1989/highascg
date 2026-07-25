@@ -50,3 +50,58 @@ describe('WO-326 aspect lock honesty', () => {
 		assert.match(fn, /L\.aspectLocked !== false/, 'lock check must use the fresh layer')
 	})
 })
+
+/*
+ * WO-326 follow-up (todos25.07.26): "the aspect ratio is still locked on a layer even when
+ * unlocked. it acts correctly in the editor but then shows up locked on pgm."
+ * Root cause: mapContentFitToStretch ignored aspectLocked — every non-stretch content fit
+ * contain-fits the media at its OWN aspect inside the layer rect (calcMixerFill 'none'/'fit'
+ * both use Math.min fit-scale), so the take/nudge FILL rendered unstretched content no matter
+ * what rect the unlocked inspector produced. The editor canvas draws the raw rect, hence
+ * "correct in the editor". Fix: explicit unlock → 'stretch' (rect wins), BOTH mirrors.
+ */
+describe('WO-326 follow-up: unlocked layer stretches to its rect on air', () => {
+	const server = require('../../src/engine/scene-native-fill.js')
+	// client/lib/mixer-fill.js is plain-node require-safe ESM (import chain: fill-math,
+	// api-client, input-channels, layer-crop — no top-level DOM access).
+	const client = require('../../client/lib/mixer-fill.js')
+
+	it('server: aspectLocked:false resolves the RAW rect even with known media resolution', () => {
+		const layer = {
+			source: { type: 'media', value: 'clip' },
+			aspectLocked: false,
+			contentFit: 'native',
+			fill: { x: 0.1, y: 0.1, scaleX: 0.5, scaleY: 0.8 },
+		}
+		const out = server.resolveSceneLayerFill(layer, 1920, 1080, 1920, 1080, { w: 1920, h: 1080 })
+		assert.deepEqual(out, { x: 0.1, y: 0.1, scaleX: 0.5, scaleY: 0.8 }, 'rect must not be contain-fit')
+	})
+
+	it('server: the same layer LOCKED contain-fits (16:9 media in a 0.5x0.8 rect shrinks height)', () => {
+		const layer = {
+			source: { type: 'media', value: 'clip' },
+			contentFit: 'fill-canvas',
+			fill: { x: 0.1, y: 0.1, scaleX: 0.5, scaleY: 0.8 },
+		}
+		const out = server.resolveSceneLayerFill(layer, 1920, 1080, 1920, 1080, { w: 1920, h: 1080 })
+		assert.ok(Math.abs(out.scaleY - 0.5) < 1e-9, `contain-fit must shrink scaleY to 0.5, got ${out.scaleY}`)
+	})
+
+	it('both mirrors: aspectLocked:false → stretch, wins over every contentFit', () => {
+		for (const impl of [client.mapContentFitToStretch]) {
+			for (const cf of ['native', 'horizontal', 'vertical', 'fill-canvas', undefined]) {
+				assert.equal(impl({ aspectLocked: false, contentFit: cf }), 'stretch', `client cf=${cf}`)
+			}
+		}
+		// Server mapContentFitToStretch is module-private — assert via source (same text in both).
+		const srv = read('src/engine/scene-native-fill.js')
+		assert.match(srv, /if \(layer\.aspectLocked === false\) return 'stretch'/)
+	})
+
+	it('locked layers keep the existing contentFit mapping (no regression)', () => {
+		assert.equal(client.mapContentFitToStretch({ contentFit: 'native' }), 'none')
+		assert.equal(client.mapContentFitToStretch({ contentFit: 'fill-canvas' }), 'fit')
+		assert.equal(client.mapContentFitToStretch({ aspectLocked: true, contentFit: 'native' }), 'none')
+		assert.equal(client.mapContentFitToStretch({}), 'fit')
+	})
+})

@@ -274,6 +274,13 @@ function clipPath(layer) {
 
 /** Same mapping as web/lib/mixer-fill.js mapContentFitToStretch */
 function mapContentFitToStretch(layer) {
+	/* WO-326 follow-up (todos25): an explicitly UNLOCKED layer means "my W/H rect wins" — the
+	 * content must stretch to the rect. Without this, every non-stretch content fit contain-fits
+	 * the media at its own aspect INSIDE the rect, so the editor showed the stretched rect but
+	 * PGM rendered the content still aspect-locked. Checked first: the unlock is the operator's
+	 * most direct statement of intent; relocking restores the contentFit rules below.
+	 * KEEP IN SYNC with client/lib/mixer-fill.js mapContentFitToStretch. */
+	if (layer.aspectLocked === false) return 'stretch'
 	const cf = layer.contentFit
 	if (cf === 'native') return 'none'
 	if (cf === 'horizontal') return 'fill-h'
