@@ -113,3 +113,27 @@ and finished the apply:
   verify likewise owed.
 - Branch is 2 commits ahead of origin (now 3 with this log) — push left to
   owner per convention.
+
+--------------------------------------------------------------------------------
+2026-07-25 13:35 — POST-DISCONNECT SESSION: 332 + 330 UNBLOCKED BY OWNER, VERIFIED
+--------------------------------------------------------------------------------
+No new source work found pending (tree clean at c40de68, only runtime/profile
+files newer than the log). News since 12:24: bash history shows the owner ran
+BOTH sudo maintenance items — verified from here:
+✅ 332 Power button LIVE: installed script md5-matches the repo copy, installed
+       11:04:14 with the service stop/start in the same second — the running
+       evtest listener (pid 811713) is the fixed script.
+✅ 330 Companion LIVE: packaged module 1.0.4 installed 12:04 in
+       ~/.config/companion/modules/highpass-highascg, instance 'HighAsCG'
+       repinned to 1.0.4 in the v5.0 db, and the 12:04:26 companion restart
+       loaded it cleanly ("Connection: highpass-highascg@1.0.4"), no errors.
+Both drop off the blocked list above. Node untouched (still pid start 12:04:54);
+no highascg errors in journal since 13:00.
+
+329B scripted verify considered and REJECTED as unsafe: project_sync goes out
+via the global ctx._wsBroadcast and the /api/project save path repoints
+activeSlug — any test write would target/steal the live kiosk's active project.
+STILL OWED WITH OWNER: 322 §BLOCKER visual check (shader-in-look take both
+directions + bank crossfade; revert candidate baf8211), 329B two-browser
+verify, 328 live repro, 326 design question (live-on-air apply outside
+edit-on-PGM?). Push of main (4 commits with this log) also left to owner.
