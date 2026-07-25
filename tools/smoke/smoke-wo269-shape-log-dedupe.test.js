@@ -19,7 +19,9 @@ function src(rel) {
 }
 
 describe('WO-269 T269.1: client sendLayout dedupe', () => {
-	const lib = src('client/lib/operator-gui-mode.js')
+	// WO-255 T255.3 split: sendLayout + its dedupe cache now live in operator-gui-mode-report.js,
+	// re-exported from operator-gui-mode.js — read the split pair concatenated.
+	const lib = src('client/lib/operator-gui-mode.js') + src('client/lib/operator-gui-mode-report.js')
 
 	it('skips identical payloads unless forced', () => {
 		assert.match(lib, /if \(!force && json === _lastSentJson\) return/)

@@ -76,13 +76,21 @@ describe('WO-255 T255.3: client operator-gui-mode pure logic (no jsdom required)
 		assert.equal(cells.length, 1, 'zero-width cell is dropped')
 		assert.deepEqual(cells[0].rect, { x: 0.5, y: 0, w: 0.5, h: 1 })
 
-		const src = fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode.js'), 'utf8')
+		// WO-255 T255.3 split: cellRectsToLayoutCells now lives in operator-gui-mode-rects.js,
+		// imported/re-exported from operator-gui-mode.js — read the split pair concatenated.
+		const src =
+			fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode.js'), 'utf8') +
+			fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode-rects.js'), 'utf8')
 		assert.match(src, /function cellRectsToLayoutCells/, 'the real module still exports this exact function name')
 		assert.match(src, /role === 'multiview'/, "WO-255: multiview role passthrough for the mv-edit surface")
 	})
 
 	it('WO-255: reportComposeCellRects / reportTimelineCellRects / reportMultiviewEditRect / setInteractionSuppressed are all exported', () => {
-		const src = fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode.js'), 'utf8')
+		// WO-255 T255.3 split: these now live in operator-gui-mode-report.js, re-exported from
+		// operator-gui-mode.js — read the split pair concatenated.
+		const src =
+			fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode.js'), 'utf8') +
+			fs.readFileSync(path.join(__dirname, '../../client/lib/operator-gui-mode-report.js'), 'utf8')
 		for (const name of ['reportComposeCellRects', 'reportTimelineCellRects', 'reportMultiviewEditRect', 'setInteractionSuppressed', 'initOperatorGuiRectReporting']) {
 			assert.match(src, new RegExp(`export function ${name}`), `${name} exported`)
 		}

@@ -137,7 +137,9 @@ describe('WO-265 T265.3/T265.4: workspace tab + video latch (source asserts)', (
 	})
 
 	it('operator-gui-mode.js gates every send on the tab latch', () => {
-		const src = clientSrc('client/lib/operator-gui-mode.js')
+		// WO-255 T255.3 split: the tab latch + effectiveCells() now live in operator-gui-mode-report.js,
+		// re-exported from operator-gui-mode.js — read the split pair concatenated.
+		const src = clientSrc('client/lib/operator-gui-mode.js') + clientSrc('client/lib/operator-gui-mode-report.js')
 		assert.match(src, /export function setForegroundTabBlocksVideo/)
 		assert.match(src, /export function registerVideoBlockingTab/)
 		assert.match(src, /_videoBlockingTabs\.has\(tab\)/, 'central listener computes the latch from the registered set')
