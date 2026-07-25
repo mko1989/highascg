@@ -24,6 +24,7 @@ const FORMERLY_BROKEN = [
 	'src/network/tailscale-service.js',
 	'src/api/system-hardware-gui.js',
 	'src/utils/x-display-session-runtime.js',
+	'src/utils/x-display-session-runtime-env.js',
 ]
 
 describe('executable lookup', () => {

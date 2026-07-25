@@ -466,7 +466,7 @@ describe('WO-243 follow-up: operator_gui never claims a program-screen layout sl
 		assert.match(src, /dMode !== 'stream' && dMode !== 'multiview' && dMode !== 'operator_gui'/, 'legacy mainIndex fallback excludes operator_gui')
 	})
 	it('resolveLayoutRectForOperatorPort resolves operator_gui-bound ports to the multiview rect', () => {
-		const src = read('src/utils/x-display-session-layout.js')
+		const src = read('src/utils/x-display-session-layout.js') + read('src/utils/x-display-session-layout-resolve.js')
 		assert.match(src, /mode === 'multiview' \|\| mode === 'operator_gui'/, 'wiring loop treats operator_gui like multiview')
 		assert.match(src, /buildGpuPhysicalMap\(/, 'gpu-map xrandr fallback strategy present')
 	})
