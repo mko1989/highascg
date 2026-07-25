@@ -90,3 +90,26 @@ its draw contain-fit unlocked layers and painted the uncovered rect black. Both
 layer draw sites now treat aspectLocked===false as stretch (54bc1e1).
 Client-only — kiosk reload. Full unlock chain now consistent end to end:
 inspector → nudge → take → editor draw.
+
+--------------------------------------------------------------------------------
+2026-07-25 12:23 — POST-DISCONNECT SESSION: 326c/326d NOW LIVE ON THE KIOSK
+--------------------------------------------------------------------------------
+Session dropped after committing 54bc1e1/a7aa392; this session verified state
+and finished the apply:
+- Gate re-run: 1509 pass / 2 fail — same WO-315 canvas pair, nothing new; the
+  two no-unused-vars lint warnings in the changed files pre-exist at 5c77cd4.
+- dist-web bundle CONFIRMED current: the 12:08:49 build (25s before the 326d
+  commit) was made from the already-edited tree — both minified draw sites
+  carry `||l.aspectLocked===!1` → stretch. (Note for future greps: plain grep
+  silently fails on scenes-*.js's 38K-char lines — use grep -a or perl.)
+- Kiosk reloaded 12:23:55 via windowactivate + XTEST F5 (XSendEvent F5 is
+  dropped by Firefox) — journal shows fresh /api/ws connect + shape re-POST.
+  Full 326 unlock chain (inspector → nudge → take → editor draw) now live.
+- Node (pid start 12:04:54) postdates baf8211 (11:00) and 243da0c (11:19), so
+  WO-322 shaders-in-look and the WO-329B server sync fix ARE LIVE since the
+  owner's ~12:05 restart. The §BLOCKER visual check for WO-322 (shader-in-look
+  take both directions + bank crossfade) is OWED unless the owner already did
+  it at that restart — revert candidate remains baf8211. 329B two-browser
+  verify likewise owed.
+- Branch is 2 commits ahead of origin (now 3 with this log) — push left to
+  owner per convention.
