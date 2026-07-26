@@ -123,4 +123,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | WO-340 | Shader modal: auto-detect tweakable GLSL variables (#define floats, const vec3 colors, @slider/@color annotations) → color pickers + sliders that rewrite the source literals; v1 zero runtime changes, v2 (follow-up) true live uniforms via CG UPDATE | [WO-340](./work-orders/340_WO_SHADER_PARAMS_UI.md) | 🟡 Implemented v1 (3256730 — owner: open shader modal, tweak) |
 
+| WO-341 | Client sync redesign: server state is the single truth, clients converge (never drop), ONLY user interaction writes — echo-loop kill list, scene.deck ingestion, seq-gap detection, autosave rev-race | [WO-341](./work-orders/341_WO_CLIENT_SYNC_SERVER_TRUTH.md) | 🟡 Top defects fixed 2026-07-26 (stale-by-one broadcasts, echo loops #1-3, converge-on-import); structural items open |
+
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)
