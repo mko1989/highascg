@@ -298,6 +298,24 @@ function copyIfSrcNewer(src, dst) {
 	return true
 }
 
+/* WO-334: during a save storm the per-save push log line floods the journal (observed at
+ * ~6 lines/s). Coalesce per slug+target: log the first push, swallow repeats for 5 s, and
+ * surface the swallowed count on the next logged line. */
+const PUSH_LOG_COALESCE_MS = 5000
+const _pushLogMemo = new Map()
+function logPushCoalesced(log, slug, target, msg) {
+	const key = `${slug} ${target}`
+	const now = Date.now()
+	const memo = _pushLogMemo.get(key)
+	if (memo && now - memo.at < PUSH_LOG_COALESCE_MS) {
+		memo.suppressed++
+		return
+	}
+	const extra = memo?.suppressed ? ` (+${memo.suppressed} more pushes in the previous ${Math.round(PUSH_LOG_COALESCE_MS / 1000)}s)` : ''
+	_pushLogMemo.set(key, { at: now, suppressed: 0 })
+	log('info', msg + extra)
+}
+
 /**
  * Push one saved project (and its autosave) to mounted USB and/or bridge.
  * Never bulk-copies the whole projects/ tree — only the slug being saved.
@@ -321,14 +339,14 @@ function pushProjectSlugToVolumes(slug, opts = {}) {
 		const usbDir = volumeProjectsDir(roots.usb)
 		if (copyIfExists(localFile, path.join(usbDir, `${s}.json`))) usb = true
 		if (copyIfExists(localAutosave, path.join(usbDir, AUTOSAVE_SUBDIR, `${s}.json`))) usb = true
-		if (usb) log('info', `[project] pushed ${s}.json → USB (${roots.usb}/projects/)`)
+		if (usb) logPushCoalesced(log, s, 'usb', `[project] pushed ${s}.json → USB (${roots.usb}/projects/)`)
 	}
 
 	if (roots.bridge && isVolumeMountedSync(roots.bridge)) {
 		const bridgeDir = volumeProjectsDir(roots.bridge)
 		if (copyIfExists(localFile, path.join(bridgeDir, `${s}.json`))) bridge = true
 		if (copyIfExists(localAutosave, path.join(bridgeDir, AUTOSAVE_SUBDIR, `${s}.json`))) bridge = true
-		if (bridge) log('info', `[project] pushed ${s}.json → bridge (${roots.bridge}/projects/)`)
+		if (bridge) logPushCoalesced(log, s, 'bridge', `[project] pushed ${s}.json → bridge (${roots.bridge}/projects/)`)
 	}
 
 	return { usb, bridge }

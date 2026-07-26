@@ -382,6 +382,14 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					}
 					ws.send(safeStringify({ type: 'device_view_unsubscribe_ok', id: msg.id }))
 				} else if (msg.type === 'scene_deck_sync' && msg.data) {
+					// WO-334: a payload identical to this client's previous one is an echo (deck
+					// ping-pong storm — two clients re-sending unchanged decks at broadcast speed).
+					// Drop it before the merge/persist/broadcast chain; real edits always differ.
+					const rawDeck = JSON.stringify(msg.data)
+					if (ws._lastDeckSyncJson === rawDeck) {
+						return
+					}
+					ws._lastDeckSyncJson = rawDeck
 					const { mergeDeckSyncIntoProject, buildSceneDeckForApi } = require('../engine/project-scenes')
 					const merged = mergeDeckSyncIntoProject(ctx, msg.data)
 					if (merged) {

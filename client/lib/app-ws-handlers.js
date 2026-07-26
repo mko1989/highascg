@@ -2,6 +2,7 @@
  * WebSocket event handlers for the main app.
  */
 import { consumeSkipRemoteProjectSync } from './project-remote-sync.js'
+import { resetSceneDeckSyncMemo } from './app-scene-deck.js'
 import { loadDeferredCatalogOverWs } from './deferred-catalog-ws.js'
 import { applyRemoteGlobalBordersArray } from './scene-state-global-border.js'
 import {
@@ -106,6 +107,9 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	})
 
 	ws.on('state', (data) => {
+		// WO-334: full state arrives once per (re)connect — a restarted server lost its in-memory
+		// deck, so the next deck sync must not be suppressed by the content memo.
+		resetSceneDeckSyncMemo()
 		stateStore.setState(data)
 		applyWsStateSideEffects(data, { sceneState, programOutputState, appLogic })
 		if (data?.channelMap) {

@@ -18,13 +18,31 @@ export function buildSceneDeckPayload(sceneState) {
 	}
 }
 
+/* WO-334: content memo — a deck payload identical to the last one sent is an echo (typically
+ * a reaction to a server broadcast that originated from our own sync, or a two-client
+ * ping-pong) and re-sending it feeds the storm. Cleared on (re)connect so a restarted server
+ * still gets the deck. flushSceneDeckSync stays unconditional (pre-take correctness beats
+ * a duplicate frame). */
+let lastSentDeckJson = null
+export function resetSceneDeckSyncMemo() {
+	lastSentDeckJson = null
+}
+
+function sendSceneDeckSync(ws, sceneState, { force } = {}) {
+	const data = buildSceneDeckPayload(sceneState)
+	const json = JSON.stringify(data)
+	if (!force && json === lastSentDeckJson) return
+	lastSentDeckJson = json
+	try { ws.send({ type: 'scene_deck_sync', data }) } catch {}
+}
+
 let sceneDeckSyncTimer = null
 export function scheduleSceneDeckSync(ws, sceneState) {
 	if (!canPushProjectToServer()) return
 	if (sceneDeckSyncTimer) clearTimeout(sceneDeckSyncTimer)
 	sceneDeckSyncTimer = setTimeout(() => {
 		sceneDeckSyncTimer = null
-		try { ws.send({ type: 'scene_deck_sync', data: buildSceneDeckPayload(sceneState) }) } catch {}
+		sendSceneDeckSync(ws, sceneState)
 	}, 100)
 }
 
@@ -35,5 +53,5 @@ export function flushSceneDeckSync(ws, sceneState) {
 		clearTimeout(sceneDeckSyncTimer)
 		sceneDeckSyncTimer = null
 	}
-	try { ws.send({ type: 'scene_deck_sync', data: buildSceneDeckPayload(sceneState) }) } catch {}
+	sendSceneDeckSync(ws, sceneState, { force: true })
 }
