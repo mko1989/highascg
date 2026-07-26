@@ -37,6 +37,16 @@ it back to its parked position (toggle, like a normal taskbar).
 
 **Recommendation: build the taskbar INTO the operator GUI (a client strip fed by
 `GET /api/system/operator-helper-window` state, actions via POST), not a system taskbar.**
+Owner styling note (2026-07-26): the taskbar entries should be small buttons "with the same
+style as rec and stream indicators" — reuse `.header-stream-indicator` /
+`.header-stream-indicator.active` (`client/components/header-bar-streaming.js:48-92`,
+`client/styles/01a2-header-bar.css`), with `.active` meaning "helper currently raised".
+Also note (2026-07-26): the WO-283 raise path had a latent `SEARCH_TIMEOUT_MS` ReferenceError
+in `raiseOperatorGuiBrowser` (fixed with WO-338 batch) — retest raise before building on it.
+Stacking baseline changed 2026-07-26: the consumer now rides the ABOVE layer directly under
+the kiosk (adjacency watchdog in `operator_shape_overlay_lib.py`) — "park UNDER the Caspar
+consumer" (§3) must account for the consumer no longer being in the normal/below layer:
+parked helpers in the normal layer are automatically under it now, which SIMPLIFIES §3.
 Reasons, from the WO-283 measurements: the kiosk is `_NET_WM_STATE_FULLSCREEN` + `ABOVE` and
 covers the whole monitor — a real panel (tint2 etc.) reserves space via struts, and struts are
 ignored for fullscreen windows, so the panel would be invisible behind the kiosk (or require
