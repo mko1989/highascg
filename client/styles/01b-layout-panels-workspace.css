@@ -160,15 +160,16 @@
 
 .panel__collapse-btn {
 	flex-shrink: 0;
-	width: 28px;
-	height: 28px;
+	/* Owner 2026-07-26 (minimalism): 28px block read too heavy next to the compact tabs. */
+	width: 20px;
+	height: 20px;
 	padding: 0;
 	border: 1px solid var(--border);
-	border-radius: 4px;
-	background: var(--bg-elevated);
+	border-radius: 3px;
+	background: transparent;
 	color: var(--text-muted);
 	cursor: pointer;
-	font-size: 14px;
+	font-size: 11px;
 	line-height: 1;
 }
 
@@ -184,8 +185,11 @@
 
 .panel__header h2 {
 	margin: 0;
-	font-size: 0.9rem;
+	/* Owner 2026-07-26 (minimalism): panel badges shrink with the rest of the chrome. */
+	font-size: 0.72rem;
 	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
 	color: var(--text-muted);
 }
 

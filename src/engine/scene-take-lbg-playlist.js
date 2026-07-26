@@ -8,6 +8,20 @@ const { pathsMatch, normPath } = require('../state/live-scene-reconcile')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-transition')
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
 
+/* Owner request 2026-07-26: templates/shaders/graphics in a playlist never advanced — advance was
+ * OSC file/time-driven (media only) with a wall-clock timer for IMAGES only. "Timeless" now means
+ * anything without a timed-media extension (images, CG templates, shaders, html graphics): those
+ * advance by their item.duration timer (default 5s), exactly like images always did. */
+const TIMED_MEDIA_EXT_RE = /\.(mp4|mov|mkv|avi|webm|mxf|m2ts?|ts|mpg|mpeg|m4v|mp3|wav|m4a|aac|flac|ogg)$/i
+function isTimelessPlaylistItem(item) {
+	if (!item) return false
+	const t = String(item.type || '')
+	if (t === 'image' || t === 'template' || t === 'shader' || t === 'graphic') return true
+	const v = String(item.value || '')
+	if (/\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(v)) return true
+	return !TIMED_MEDIA_EXT_RE.test(v)
+}
+
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	// Register the global OSC playlist handler on self.oscState exactly once!
 	if (self.oscState && !self._playlistOscBound) {
@@ -35,9 +49,7 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 				
 				if (layer.playlist.length > 1) {
 					const firstItem = layer.playlist[0]
-					const isImg = firstItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(firstItem.value)
-					
-					if (isImg) {
+					if (isTimelessPlaylistItem(firstItem)) {
 						schedulePlaylistImageTimer(self, channel, job.pLayer, incoming, layer, 0)
 					} else {
 						// Video: preload the second item as LOADBG AUTO
@@ -117,7 +129,11 @@ function handlePlaylistOscUpdate(self, snapshot) {
 						// Check current file in OSC snapshot
 						const chOsc = snapshot.channels && snapshot.channels[chKey]
 						const layerOsc = chOsc && chOsc.layers && chOsc.layers[pLayer]
-						const playingFile = layerOsc && layerOsc.file && (layerOsc.file.name || layerOsc.file.path)
+						const playingFile =
+							(layerOsc && layerOsc.file && (layerOsc.file.name || layerOsc.file.path)) ||
+							/* CG/shader producers report template.path, never file.* */
+							(layerOsc && layerOsc.template && String(layerOsc.template.path || '').replace(/\.html?$/i, '')) ||
+							null
 						/* OSC layer time lives on the file object (osc-state.js: f.elapsed / f.duration) */
 						const elapsed = layerOsc?.file?.elapsed ?? undefined
 						const duration = layerOsc?.file?.duration ?? undefined
@@ -132,6 +148,17 @@ function handlePlaylistOscUpdate(self, snapshot) {
 							self.playlistOscPrevPlayingPath[pKey] = playingFile
 
 							if (itemIdx >= 0) {
+								const pTimerKey = `${scene.id}-${layer.layerNumber}`
+								if (
+									isTimelessPlaylistItem(layer.playlist[itemIdx]) &&
+									layer.playlist.length > 1 &&
+									!(self.playlistImageTimers && self.playlistImageTimers[pTimerKey])
+								) {
+									// Timeless item on air with no timer armed (AUTO-promoted after a
+									// video, or node restarted mid-playlist) — arm its duration timer.
+									self.playlistActiveIndices[pKey] = itemIdx
+									schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx)
+								}
 								if (itemIdx !== lastIdx) {
 									// Advanced to the next item!
 									self.playlistActiveIndices[pKey] = itemIdx
@@ -143,9 +170,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 									clearPlaylistImageTimer(self, pKey)
 
 									const currentItem = layer.playlist[itemIdx]
-									const isImg = currentItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(currentItem.value)
-
-									if (isImg) {
+									if (isTimelessPlaylistItem(currentItem)) {
 										schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx)
 									} else {
 										// Video: preload the next item (with loop wrapping)
@@ -317,8 +342,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 			self.playlistActiveIndices[pKey] = nextIdx
 
 			// Setup next advancement
-			const isImg = nextItem.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(nextItem.value)
-			if (isImg) {
+			if (isTimelessPlaylistItem(nextItem)) {
 				schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
 			} else {
 				let nextNextIdx = nextIdx + 1

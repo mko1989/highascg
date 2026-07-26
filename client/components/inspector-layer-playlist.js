@@ -281,7 +281,45 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 					<input type="number" class="inspector-field__input" id="playlist-trans-frames" value="${layer.playlistTransition?.duration ?? 12}" min="0" max="250" style="max-width: 100%;"/>
 				</div>
 			</div>
+
+			<div class="inspector-row" style="margin-top: 8px;">
+				<div class="inspector-field" style="flex: 1;">
+					<label class="inspector-field__label" style="cursor: default;" title="Graphics, templates and shaders have no intrinsic length — they advance after this many seconds">Timeless items (s)</label>
+					<input type="number" class="inspector-field__input" id="playlist-timeless-secs" value="20" min="1" max="86400" step="1" style="max-width: 100%;"/>
+				</div>
+				<button type="button" class="inspector-btn inspector-btn-sm" id="playlist-timeless-apply" style="margin-top: 18px;"
+					title="Set the duration of every image/template/shader item in this playlist">Apply to all</button>
+			</div>
 		`
+
+		// Owner request 2026-07-26: bulk-set the duration of every TIMELESS item (graphics,
+		// templates, shaders — anything the server advances by wall-clock timer, mirror of
+		// isTimelessPlaylistItem in src/engine/scene-take-lbg-playlist.js).
+		const timelessApply = settingsBlock.querySelector('#playlist-timeless-apply')
+		const timelessSecs = settingsBlock.querySelector('#playlist-timeless-secs')
+		if (timelessApply && timelessSecs) {
+			const TIMED_EXT_RE = /\.(mp4|mov|mkv|avi|webm|mxf|m2ts?|ts|mpg|mpeg|m4v|mp3|wav|m4a|aac|flac|ogg)$/i
+			const isTimeless = (it) => {
+				const t = String(it?.type || '')
+				if (t === 'image' || t === 'template' || t === 'shader' || t === 'graphic') return true
+				const v = String(it?.value || '')
+				return /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(v) || !TIMED_EXT_RE.test(v)
+			}
+			timelessApply.addEventListener('click', () => {
+				const secs = Math.max(1, Math.min(86400, parseFloat(timelessSecs.value) || 0))
+				if (!secs) return
+				let touched = 0
+				const nextList = (layer.playlist || []).map((it) => {
+					if (!isTimeless(it)) return it
+					touched++
+					return { ...it, duration: secs }
+				})
+				if (!touched) return
+				sceneState.patchLayer(sceneId, layerIndex, { playlist: nextList })
+				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+				rerenderSceneLayer(sel)
+			})
+		}
 
 		// Attach settings events
 		const advSel = settingsBlock.querySelector('#playlist-advance')
