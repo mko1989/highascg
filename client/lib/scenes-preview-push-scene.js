@@ -294,6 +294,21 @@ export async function pushSceneToPreviewImpl(opts) {
 				const contentUnchanged =
 					prevContent && curMeta && JSON.stringify(prevContent) === JSON.stringify(previewContentCompareKey(curMeta))
 
+				/* Owner report 2026-07-26: template layers (shader FX, lower thirds) are CG
+				 * producers — `PLAY <template-path>` is not a media clip: it failed AND stopped
+				 * whatever CG producer the server-side recall had running, so shader looks went
+				 * black the moment the editor pushed. Mirror the server's CG ADD (playOnLoad=1);
+				 * data precedence mirrors scene-template-cg.js extractTemplateCgData. */
+				const isTemplateLayer =
+					layer.source.type === 'template' && !browserCgUrl && !String(clipRaw || '').startsWith('route://')
+				const templateCgLines = (() => {
+					if (!isTemplateLayer) return null
+					const raw =
+						layer?.cgData ?? layer?.templateData ?? layer?.source?.data ?? layer?.source?.cgData ?? layer?.params
+					const data = raw == null || raw === '' ? '{}' : typeof raw === 'string' ? raw : JSON.stringify(raw)
+					return [`CG ${cl} ADD 0 ${amcpParam(String(clipRaw).trim().toLowerCase())} 1 ${amcpParam(data)}`]
+				})()
+
 				if (geometryOnly || contentUnchanged) {
 					layerLines.push(...mixerPart)
 				} else {
@@ -308,7 +323,7 @@ export async function pushSceneToPreviewImpl(opts) {
 						)
 					}
 					layerLines.push(
-						playCmd,
+						...(templateCgLines || [playCmd]),
 						...sceneLayerRotationMixerLines(cl, rot, { deferRotation: true }),
 						`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 1 DEFER`,
 						`MIXER ${cl} OPACITY ${layer.opacity ?? 1} 0 DEFER`,
