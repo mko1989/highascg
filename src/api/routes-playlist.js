@@ -13,11 +13,95 @@ const { normalizeProgramLayerBank, physicalProgramLayer } = require('../engine/s
 const { triggerPlaylistAdvance } = require('../engine/scene-take-lbg-playlist')
 
 /**
+ * Owner request 2026-07-26 — Playlists footer panel: enumerate every playlist layer currently
+ * live on any channel, with items and the active index, so the panel can render dropdowns.
+ * @param {object} ctx
+ */
+function handleStateGet(ctx) {
+	const all = liveSceneState.getAll()
+	const playlists = []
+	for (const chKey of Object.keys(all || {})) {
+		const entry = all[chKey]
+		const scene = entry?.scene
+		if (!scene || !Array.isArray(scene.layers)) continue
+		for (const layer of scene.layers) {
+			if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) continue
+			const pKey = `${scene.id}-${layer.layerNumber}`
+			playlists.push({
+				channel: parseInt(chKey, 10),
+				sceneId: scene.id,
+				sceneName: scene.name || scene.id,
+				layerNumber: Number(layer.layerNumber),
+				advance: layer.playlistAdvance || 'auto',
+				loop: layer.playlistLoop !== false,
+				activeIndex: (ctx.playlistActiveIndices || {})[pKey] ?? 0,
+				items: layer.playlist.map((it) => ({
+					label: it.label || it.value,
+					value: it.value,
+					duration: it.duration ?? null,
+					type: it.type || 'media',
+				})),
+			})
+		}
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, playlists }) }
+}
+
+/**
+ * Mode-agnostic transport: { channel, layerNumber, action: 'next'|'prev'|'goto', index? }.
+ * Unlike the legacy /next (manual-mode only), this drives auto playlists too — a jump simply
+ * restages that item; the engine re-arms timers / preloads onward from there.
+ */
+async function handleControlPost(body, ctx) {
+	const b = parseBody(body) || {}
+	const channel = parseInt(b.channel, 10)
+	const layerNumber = parseInt(b.layerNumber, 10)
+	const action = String(b.action || 'next')
+	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layerNumber)) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'channel and layerNumber required' }) }
+	}
+	const liveEntry = liveSceneState.getChannel(channel)
+	const scene = liveEntry?.scene
+	const layer = scene?.layers?.find((l) => Number(l.layerNumber) === layerNumber)
+	if (!layer || layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'No live playlist on that channel/layer' }) }
+	}
+	const pKey = `${scene.id}-${layerNumber}`
+	ctx.playlistActiveIndices = ctx.playlistActiveIndices || {}
+	const currentIdx = ctx.playlistActiveIndices[pKey] ?? 0
+	const len = layer.playlist.length
+	let nextIdx
+	if (action === 'goto') {
+		nextIdx = parseInt(b.index, 10)
+		if (!Number.isFinite(nextIdx) || nextIdx < 0 || nextIdx >= len) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'index out of range' }) }
+		}
+	} else if (action === 'prev') {
+		nextIdx = (currentIdx - 1 + len) % len
+	} else {
+		nextIdx = (currentIdx + 1) % len
+	}
+	const activeBank = (ctx?.programLayerBankByChannel && ctx.programLayerBankByChannel[String(channel)]) || 'a'
+	const pLayer = physicalProgramLayer(layerNumber, activeBank === 'b' ? 'b' : 'a')
+	try {
+		await triggerPlaylistAdvance(ctx, channel, pLayer, scene, layer, nextIdx)
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: true, channel, layerNumber, currentIndex: currentIdx, nextIndex: nextIdx }),
+		}
+	} catch (err) {
+		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: err?.message || String(err) }) }
+	}
+}
+
+/**
  * @param {string} p
  * @param {string|object} body
  * @param {object} ctx
  */
 async function handlePost(p, body, ctx) {
+	if (p === '/api/playlist/control') return handleControlPost(body, ctx)
 	if (p !== '/api/playlist/next') return null
 
 	const b = parseBody(body)
@@ -131,4 +215,4 @@ async function handlePost(p, body, ctx) {
 	}
 }
 
-module.exports = { handlePost }
+module.exports = { handlePost, handleStateGet }

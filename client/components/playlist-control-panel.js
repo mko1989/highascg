@@ -1,0 +1,140 @@
+/**
+ * Playlist control panel — collapsible inspector-footer section (owner request 2026-07-26,
+ * "similar to timers and audio mixer compact"). A dropdown of every playlist currently LIVE on
+ * any channel (GET /api/playlist/state, polled while open), a dropdown of that playlist's items
+ * (selecting one = goto), and Prev / Play / Next transport via POST /api/playlist/control —
+ * mode-agnostic (drives auto playlists too; the engine re-arms timers/preloads after a jump).
+ */
+
+import { api } from '../lib/api-client.js'
+import { escapeHtml } from '../lib/dom-escape.js'
+
+const LS_COLLAPSED = 'highascg_playlist_panel_collapsed'
+const POLL_MS = 2000
+
+export function initPlaylistControlPanel(mountEl) {
+	if (!mountEl) return
+	mountEl.innerHTML = `
+		<div class="timer-control-panel playlist-control-panel">
+			<button type="button" class="timer-control-panel__toggle" id="plp-toggle" aria-expanded="false">
+				<span class="timer-control-panel__chevron">▶</span>
+				<span class="timer-control-panel__label">Playlists</span>
+				<span class="playlist-control-panel__count" id="plp-count"></span>
+			</button>
+			<div class="timer-control-panel__content" id="plp-content" hidden>
+				<div class="playlist-control-panel__row">
+					<select id="plp-list" class="inspector-field__select" title="Live playlists (look · layer · channel)"></select>
+				</div>
+				<div class="playlist-control-panel__row">
+					<select id="plp-item" class="inspector-field__select" title="Items — selecting one jumps to it"></select>
+				</div>
+				<div class="playlist-control-panel__row playlist-control-panel__transport">
+					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item">⏮</button>
+					<button type="button" class="btn" id="plp-play" title="Restage the selected item">▶</button>
+					<button type="button" class="btn btn--secondary" id="plp-next" title="Next item">⏭</button>
+				</div>
+			</div>
+		</div>`
+
+	const el = (id) => mountEl.querySelector(`#${id}`)
+	const toggle = el('plp-toggle')
+	const content = el('plp-content')
+	const chevron = toggle.querySelector('.timer-control-panel__chevron')
+	const listSel = el('plp-list')
+	const itemSel = el('plp-item')
+
+	/** @type {Array<object>} */
+	let playlists = []
+	let selectedKey = null
+	let pollTimer = null
+
+	const keyOf = (p) => `${p.channel}:${p.layerNumber}:${p.sceneId}`
+	const selected = () => playlists.find((p) => keyOf(p) === selectedKey) || null
+
+	function renderLists() {
+		el('plp-count').textContent = playlists.length ? String(playlists.length) : ''
+		if (!playlists.length) {
+			listSel.innerHTML = '<option value="">— no live playlists —</option>'
+			itemSel.innerHTML = ''
+			return
+		}
+		if (!playlists.some((p) => keyOf(p) === selectedKey)) selectedKey = keyOf(playlists[0])
+		listSel.innerHTML = playlists
+			.map((p) => {
+				const k = keyOf(p)
+				const label = `${p.sceneName} · L${p.layerNumber} · ch${p.channel}`
+				return `<option value="${escapeHtml(k)}"${k === selectedKey ? ' selected' : ''}>${escapeHtml(label)}</option>`
+			})
+			.join('')
+		const p = selected()
+		itemSel.innerHTML = (p?.items || [])
+			.map((it, i) => {
+				const active = i === p.activeIndex ? '● ' : ''
+				const dur = it.duration != null ? ` (${it.duration}s)` : ''
+				return `<option value="${i}"${i === p.activeIndex ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${it.label}${dur}`)}</option>`
+			})
+			.join('')
+	}
+
+	async function refresh() {
+		try {
+			const r = await api.get('/api/playlist/state')
+			playlists = Array.isArray(r?.playlists) ? r.playlists : []
+		} catch {
+			playlists = []
+		}
+		renderLists()
+	}
+
+	async function control(action, index) {
+		const p = selected()
+		if (!p) return
+		try {
+			await api.post('/api/playlist/control', {
+				channel: p.channel,
+				layerNumber: p.layerNumber,
+				action,
+				...(index != null ? { index } : {}),
+			})
+		} catch (e) {
+			console.warn('[playlist panel]', action, 'failed:', e?.message || e)
+		}
+		void refresh()
+	}
+
+	listSel.addEventListener('change', () => {
+		selectedKey = listSel.value
+		renderLists()
+	})
+	itemSel.addEventListener('change', () => void control('goto', parseInt(itemSel.value, 10)))
+	el('plp-prev').addEventListener('click', () => void control('prev'))
+	el('plp-next').addEventListener('click', () => void control('next'))
+	el('plp-play').addEventListener('click', () => {
+		const idx = parseInt(itemSel.value, 10)
+		void control('goto', Number.isFinite(idx) ? idx : selected()?.activeIndex ?? 0)
+	})
+
+	function setOpen(open) {
+		content.hidden = !open
+		toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+		chevron.textContent = open ? '▼' : '▶'
+		try {
+			localStorage.setItem(LS_COLLAPSED, open ? '0' : '1')
+		} catch { /* best-effort */ }
+		if (pollTimer) {
+			clearInterval(pollTimer)
+			pollTimer = null
+		}
+		if (open) {
+			void refresh()
+			pollTimer = setInterval(() => void refresh(), POLL_MS)
+		}
+	}
+
+	toggle.addEventListener('click', () => setOpen(content.hidden))
+	let startOpen = false
+	try {
+		startOpen = localStorage.getItem(LS_COLLAPSED) === '0'
+	} catch { /* default collapsed */ }
+	setOpen(startOpen)
+}

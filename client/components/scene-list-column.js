@@ -233,11 +233,12 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			deleteBtn.dataset.action = 'delete'
 			deleteBtn.title = 'Delete look'
 			deleteBtn.setAttribute('aria-label', 'Delete look')
-			// Inline SVG for the same reason as duplicateBtn: '🗑' needs a color-emoji font (absent here).
+			// Owner 2026-07-26: minimal red ✕ (SVG cross, not a glyph — font-coverage rule as above),
+			// stacked ABOVE the copy icon in the card's top-right corner (see header-actions CSS).
 			deleteBtn.innerHTML =
-				'<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5h11M6.5 4.5v-2h3v2M4 4.5l.8 9a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-9M6.5 7.5v4M9.5 7.5v4"/></svg>'
-			headerActions.appendChild(duplicateBtn)
+				'<svg viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>'
 			headerActions.appendChild(deleteBtn)
+			headerActions.appendChild(duplicateBtn)
 			header.appendChild(nameInput)
 			header.appendChild(headerActions)
 			const thumbBtn = document.createElement('button')

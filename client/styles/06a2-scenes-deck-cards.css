@@ -146,12 +146,15 @@
 .scenes-card__header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 4px 5px;
+	gap: 2px;
+	/* Owner 2026-07-26 (minimalism): name starts at the card edge; the right padding reserves
+	 * room for the absolute ✕/copy column so text never runs under it. */
+	padding: 3px 20px 3px 2px;
 	background: var(--bg-elevated);
 	border-bottom: 1px solid var(--border);
 	min-height: 2.25rem;
 	flex-wrap: wrap;
+	position: relative;
 }
 
 .scenes-card__name-input {
@@ -184,26 +187,36 @@
 }
 
 .scenes-card__header-actions {
+	/* Owner 2026-07-26: tiny vertical stack pinned top-right — red ✕ above the copy icon. */
+	position: absolute;
+	top: 2px;
+	right: 2px;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	gap: 2px;
+	gap: 3px;
 	flex-shrink: 0;
 }
 
 .scenes-card__icon-btn {
-	width: 28px;
-	height: 28px;
+	width: 15px;
+	height: 15px;
 	padding: 0;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 0.95rem;
+	font-size: 0.7rem;
 	line-height: 1;
 	background: transparent;
 	border: 1px solid transparent;
-	border-radius: var(--radius);
+	border-radius: 2px;
 	color: var(--text-muted);
 	cursor: pointer;
+}
+
+.scenes-card__icon-btn svg {
+	width: 9px;
+	height: 9px;
 }
 
 .scenes-card__icon-btn:hover {

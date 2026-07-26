@@ -354,8 +354,10 @@ routes.get('/api/countdown', ({ path, ctx, query }) => routesCountdown.handleGet
 routes.post('/api/countdown/*', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/countdown', ({ path, body, ctx }) => routesCountdown.handlePost(path, body, ctx), { requireCaspar: false })
 
-// Playlist (WO-224)
+// Playlist (WO-224; control/state 2026-07-26 for the Playlists footer panel)
 routes.post('/api/playlist/next', ({ path, body, ctx }) => routesPlaylist.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/playlist/control', ({ path, body, ctx }) => routesPlaylist.handlePost(path, body, ctx), { requireCaspar: true })
+routes.get('/api/playlist/state', ({ ctx }) => routesPlaylist.handleStateGet(ctx), { requireCaspar: false })
 
 // Screen timers (WO-210) — panel-owned timer assignments, persistent across restarts
 routes.get('/api/timers/list', ({ path, ctx }) => routesScreenTimers.handleGet(path, ctx), { requireCaspar: false })

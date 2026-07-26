@@ -400,3 +400,32 @@
 	opacity: 0.5;
 	cursor: not-allowed;
 }
+
+/* Playlists footer panel (owner request 2026-07-26) — shares the timer panel shell classes. */
+.playlist-control-panel__row {
+	display: flex;
+	gap: 6px;
+	padding: 4px 8px;
+}
+
+.playlist-control-panel__row .inspector-field__select {
+	flex: 1;
+	min-width: 0;
+	font-size: 0.72rem;
+}
+
+.playlist-control-panel__transport .btn {
+	flex: 1;
+	padding: 3px 0;
+	font-size: 0.8rem;
+	line-height: 1.2;
+}
+
+.playlist-control-panel__count {
+	margin-left: auto;
+	font-size: 0.62rem;
+	color: var(--text-muted);
+	background: var(--bg-elevated);
+	border-radius: 8px;
+	padding: 1px 6px;
+}
