@@ -2,7 +2,16 @@
 
 **Source:** owner report 2026-07-26 — "i need a good look at apply caspar config button. the whole process seems to take longer than it should."
 
-**Status: investigated and measured, not fixed.** Six apply cycles measured from the journal; typical apply = **~18 s** to HTTP response (~19 s to system ready). Caspar's actual shutdown+boot is only ~4 s — the rest is fixed sleeps, a duplicated call timing out, and redundant work.
+**Status: top-5 fixes implemented 2026-07-26** (commits e70fc01, 387149f, e51c7ed, 83f01b1):
+(1) toolbar button busy state + `[Full apply] Step N` streaming; (2) duplicate
+`applyOperatorDisplaySession` eliminated via `skipOperatorSession` (~5s); (3) operator-restart
+marker `/tmp/caspar-operator-restart` skips run.sh's 5s + 2×2s damping (activates at the next
+casparcg-server service restart); (4) 1s settle-poll before the fast-kill (~2s); (5)
+skip-if-unchanged gate — **live-verified 79 ms** response with `step:no_changes`, Caspar PID
+untouched. Remaining: NVIDIA dedupe/fire-and-forget, nodm stable-wait shrink, CINF ordering,
+template-copy mtime compare, async xrandr exec. Original investigation below.
+
+**Status (original): investigated and measured, not fixed.** Six apply cycles measured from the journal; typical apply = **~18 s** to HTTP response (~19 s to system ready). Caspar's actual shutdown+boot is only ~4 s — the rest is fixed sleeps, a duplicated call timing out, and redundant work.
 
 ## Measured breakdown (most recent apply, 2026-07-26 16:25)
 

@@ -12,6 +12,15 @@
 
 Non-hot-path timers (fine as-is): restore debounce 300 ms, heartbeat 60 s, boot guard 10 s, shape reconcile poll 2 s.
 
+## Status update 2026-07-26
+
+Items 1+2 implemented (commit 13462b1): client report is now an immediate-leading-edge 150 ms
+throttle; server apply debounce 50 ms. Item 3 not needed for now (holes ride the same call, ahead
+of the AMCP loop). Item 4 (batch per-cell AMCP) evaluated and SKIPPED: the per-command
+route-liveness cache (`operator-gui-channel.js:203-205`) needs per-line success granularity a
+batch loses, and the awaited round-trips are local-TCP-fast — the latency was in the debounces.
+Item 5 corrected below (EOF exit already exists).
+
 ## Fix direction
 
 1. **Leading-edge + interval emission for the tile drag path:** replace the trailing-edge 200 ms client debounce with throttle-style emission (emit immediately, then at most every ~150 ms during motion) in `operator-gui-mode-report.js:62-68`; holes then track the drag instead of jumping at drag-end. The dedupe on `_lastSentJson` already prevents redundant wire traffic.
