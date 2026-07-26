@@ -237,6 +237,15 @@ async function restagePersistedPreviewLooks(self) {
 		const pgmCh = map.programChannels?.[i] ?? map.programCh?.(i + 1)
 		const prvCh = map.switcherBus1Channels?.[i] ?? map.previewChannels?.[i]
 		if (pgmCh == null || prvCh == null || Number(prvCh) <= 0 || Number(prvCh) === Number(pgmCh)) continue
+		// WO-339 boot sweep: a crashed client can leave editing chrome CG'd on the bus — strip it
+		// before restaging so outlines never survive into normal viewing. Best-effort.
+		try {
+			const { EDIT_CHROME_LAYER } = require('../engine/look-layer-ranges')
+			await self.amcp.cgClear(prvCh, EDIT_CHROME_LAYER)
+			await self.amcp.mixerClear(prvCh, EDIT_CHROME_LAYER)
+		} catch {
+			/* chrome sweep is advisory */
+		}
 		const candidates = [
 			byMain[i],
 			i === activeIdx ? envelope?.previewSceneId : null,

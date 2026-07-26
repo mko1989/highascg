@@ -11,6 +11,7 @@
  * | Look layers, bank B           | 110–199   | logical + 100
  * | Timelines                     | 210–259   |
  * | PIP overlays                  | 260–979   | 4 slots per content layer, both banks
+ * | Editing chrome (WO-339)       | 980–995   | PRV-only, non-persisted; single CG layer 990 today
  * | Global border                 | 996 / 998 |
  * | Hard ceiling                  | < 1000    | Caspar has 999 layers per channel
  */
@@ -41,6 +42,12 @@ const PIP_OVERLAY_MAX_STACK = 4
 
 /** Last layer the PIP band can emit: 260 + 179 * 4 + 3. */
 const PIP_OVERLAY_BAND_MAX = 979
+
+/** WO-339 — editing-chrome band (980–995): non-persisted PRV-only decorations while a look is
+ * being edited (layer outlines/labels, template/edit_chrome.html). One CG layer today; the band
+ * is reserved so PIP overlays (≤979) and the global border (996/998) can never collide with it.
+ * Client mirror: client/lib/scenes-preview-edit-chrome.js. */
+const EDIT_CHROME_LAYER = 990
 
 /** Caspar allows layers 0–999 per channel — nothing may allocate above this. */
 const HARD_MAX_PHYSICAL_LAYER = 999
@@ -159,6 +166,7 @@ module.exports = {
 	PIP_OVERLAY_BAND_BASE,
 	PIP_OVERLAY_MAX_STACK,
 	PIP_OVERLAY_BAND_MAX,
+	EDIT_CHROME_LAYER,
 	HARD_MAX_PHYSICAL_LAYER,
 	assertPhysicalLayerBelowCeiling,
 	isPgmAudioTrackPhysicalLayer,

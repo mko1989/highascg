@@ -37,6 +37,7 @@ import { createDeckThumbPainter } from './scenes-editor-deck-thumb.js'
 import { createPreviewActions } from './scenes-editor-preview-actions.js'
 import { ingestDeckDroppedFiles } from './scenes-editor-deck-ingest.js'
 import { createGlobalPreviewTakeCut } from './scenes-editor-global-preview-take.js'
+import { clearAllEditChrome } from '../lib/scenes-preview-edit-chrome.js'
 
 export function initScenesEditor(root, stateStore, opts = {}) {
 	const getOscClient = opts.getOscClient || (() => null)
@@ -94,6 +95,9 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		// anything on PRV, so registering the look as PRV-live on exit would be a lie.
 		const wasEditOnPgm = sceneState.editOnPgm === true
 		await previewRuntime.waitForPreviewPushComplete()
+		// WO-339: strip editing chrome from every PRV bus before the exit sync — the outlines
+		// must never survive into normal preview/take viewing.
+		await clearAllEditChrome()
 		if (id) {
 			const scene = sceneState.getScene(id)
 			if (scene) {
@@ -200,6 +204,10 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 	sceneState.on('editingChange', applyRundownTimer); sceneState.on('screenChange', () => rundownTimerDestroy?.refresh()); applyRundownTimer()
 
+	// WO-339: while a look is edited the real PRV video (with on-channel editing chrome) must stay
+	// visible through the holes — this class exempts the panel from the pointerdown hole-suppression
+	// (see operator-gui-interaction-suppress.js).
+	previewHost.classList.add('preview-panel--edit-live')
 	const previewPanel = initPreviewPanel(previewHost, {
 		title: 'Compose preview', storageKeyPrefix: 'casparcg_preview_scenes', getOutputResolution: getResolution, stateStore, streamName: 'prv_1', composePrvPgmLayoutToggle: true, fillParentHeight: true, hideInnerResize: true, getProgramChannel,
 		getDualStreamNames: getComposeStreamNames,

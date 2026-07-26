@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<!-- WO-339 — editing chrome: layer outlines + labels drawn ON the PRV channel while a look is
+     being edited. CG UPDATE payload: { rects: [{ x,y,w,h, rot, label, sel }] } — x/y/w/h are
+     fractions of the channel canvas; rot in degrees, applied around the rect's own center (same
+     anchor convention as the look push's MIXER FILL rotation). Never part of a saved look —
+     cleared on editor exit, on non-edit pushes to the bus, and by the server boot sweep. -->
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Edit Chrome</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body { width: 100%; height: 100%; background: transparent !important; overflow: hidden; }
+		#root { position: absolute; inset: 0; pointer-events: none; }
+		.ec-rect {
+			position: absolute;
+			border: 3px solid rgba(88, 166, 255, 0.85);
+			box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+		}
+		.ec-rect.sel {
+			border-color: #58a6ff;
+			border-width: 5px;
+			box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.65), 0 0 18px rgba(88, 166, 255, 0.8);
+		}
+		.ec-label {
+			position: absolute;
+			left: -3px;
+			top: 0;
+			transform: translateY(-100%);
+			background: rgba(13, 17, 23, 0.85);
+			color: #e6edf3;
+			font: 600 24px/1.5 system-ui, sans-serif;
+			padding: 0 10px;
+			border-radius: 3px 3px 0 0;
+			white-space: nowrap;
+		}
+		.ec-rect.sel .ec-label { background: #1f6feb; }
+	</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+	'use strict'
+	var root = document.getElementById('root')
+
+	function esc(s) {
+		return String(s).replace(/[<>&]/g, function (c) {
+			return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'
+		})
+	}
+
+	function render(data) {
+		var rects = data && Array.isArray(data.rects) ? data.rects : []
+		var html = ''
+		for (var i = 0; i < rects.length; i++) {
+			var r = rects[i]
+			if (!r || !(r.w > 0) || !(r.h > 0)) continue
+			var style =
+				'left:' + r.x * 100 + '%;top:' + r.y * 100 + '%;width:' + r.w * 100 + '%;height:' + r.h * 100 + '%;'
+			if (r.rot) style += 'transform:rotate(' + Number(r.rot) + 'deg);'
+			html += '<div class="ec-rect' + (r.sel ? ' sel' : '') + '" style="' + style + '">'
+			if (r.label) html += '<div class="ec-label">' + esc(r.label) + '</div>'
+			html += '</div>'
+		}
+		root.innerHTML = html
+	}
+
+	window.update = function (raw) {
+		try {
+			render(typeof raw === 'string' ? JSON.parse(raw) : raw || {})
+		} catch (e) {
+			/* malformed payload ignored — chrome is advisory */
+		}
+	}
+	window.play = function () { document.body.style.opacity = '1' }
+	window.stop = function () { document.body.style.opacity = '0' }
+	window.next = function () {}
+})()
+</script>
+</body>
+</html>

@@ -26,6 +26,7 @@ import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot, previewContentCompareKey } from './scenes-preview-snapshot.js'
 import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
 import { syncPreviewLiveToServer } from './scene-live-sync.js'
+import { editChromeLinesForPush } from './scenes-preview-edit-chrome.js'
 import {
 	lookLogicalLayerNumbers,
 	orderPreviewLayerBlocks,
@@ -408,6 +409,18 @@ export async function pushSceneToPreviewImpl(opts) {
 					sceneState.borderJustEnabled[mIdx] = false
 				}
 			}
+
+			/* WO-339: editing chrome (layer outlines + labels) rides the same batch. Active only
+			 * for the look actually being edited and NEVER on an edit-on-PGM session — inactive
+			 * pushes auto-clear any chrome a previous edit left on this bus. */
+			queue.push(
+				...editChromeLinesForPush({
+					active: sceneState.editingSceneId === sceneId && sceneState.editOnPgm !== true,
+					previewCh,
+					scene,
+					computedFills,
+				}),
+			)
 
 			queue.push(`MIXER ${previewCh} COMMIT`)
 			commandsByChannel.set(previewCh, queue)
