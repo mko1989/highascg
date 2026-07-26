@@ -60,10 +60,12 @@
 
 .source-item__label {
 	flex: 1;
-	min-width: 0; /* allow shrink for ellipsis */
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	min-width: 0;
+	/* Owner request 2026-07-26: show the FULL name — wrap instead of ellipsizing. */
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 }
 
 .source-item__meta {
@@ -200,9 +202,11 @@
 .source-item--media-detailed .source-item__label {
 	font-size: 0.78rem;
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* Owner request 2026-07-26: full name always visible — wrap instead of trimming. */
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 	flex: 1;
 }
 .sources-media-list .source-item + .source-item { margin-top: 0; }

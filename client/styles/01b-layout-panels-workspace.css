@@ -124,26 +124,29 @@
 	display: flex;
 	gap: 0;
 	flex-wrap: nowrap;
-	align-items: center;
+	align-items: flex-end;
 	border-bottom: 1px solid var(--border);
-	overflow: hidden;
+	/* Owner request 2026-07-26: tab labels never truncate — angled single line instead. */
+	overflow: visible;
+	padding-top: 14px;
 }
 .panel-inspector-mode {
 	border: none;
 	border-bottom: 2px solid transparent;
 	background: none;
 	color: var(--text-muted);
-	font-size: 0.8rem;
+	font-size: 0.68rem;
 	font-weight: 500;
-	padding: 8px 10px;
+	padding: 4px 2px 8px;
 	cursor: pointer;
-	line-height: 1.2;
+	line-height: 1.1;
 	white-space: nowrap;
 	flex: 1 1 0;
-	text-align: center;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	text-align: left;
+	overflow: visible;
 	min-width: 0;
+	transform: rotate(-18deg);
+	transform-origin: 20% 100%;
 }
 .panel-inspector-mode:hover {
 	color: var(--text);

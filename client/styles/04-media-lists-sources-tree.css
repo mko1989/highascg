@@ -77,9 +77,11 @@
 }
 
 .media-list__name {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* Owner request 2026-07-26: full name always visible — wrap instead of trimming. */
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 	font-weight: 500;
 	color: var(--text);
 }
@@ -106,17 +108,20 @@
 .media-list--compact .media-list__line {
 	min-width: 0;
 	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* Owner request 2026-07-26: full name always visible — wrap instead of trimming. */
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 	color: var(--text);
 }
 .media-list--compact .media-list__name {
 	flex: 1;
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 }
 .media-list--compact .media-list__meta {
 	flex-shrink: 0;
@@ -201,9 +206,11 @@
 .media-card__label {
 	padding: 4px 6px;
 	font-size: 0.7rem;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* Owner request 2026-07-26: full name always visible — wrap instead of trimming. */
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.15;
 }
 
 .media-card__meta {
