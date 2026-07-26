@@ -128,16 +128,16 @@
 	border-bottom: 1px solid var(--border);
 	/* Owner request 2026-07-26: tab labels never truncate — angled single line instead. */
 	overflow: visible;
-	padding-top: 46px;
+	padding-top: 30px;
 }
 .panel-inspector-mode {
 	border: none;
 	border-bottom: 2px solid transparent;
 	background: none;
 	color: var(--text-muted);
-	font-size: 0.68rem;
+	font-size: 0.78rem;
 	font-weight: 500;
-	padding: 4px 2px 8px;
+	padding: 2px 2px 6px;
 	cursor: pointer;
 	line-height: 1.1;
 	white-space: nowrap;
@@ -145,7 +145,7 @@
 	text-align: left;
 	overflow: visible;
 	min-width: 0;
-	transform: rotate(-45deg);
+	transform: rotate(-30deg);
 	transform-origin: 8% 100%;
 	border-bottom: none;
 }
