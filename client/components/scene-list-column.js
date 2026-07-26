@@ -60,6 +60,21 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 		head.style.display = 'flex'
 		head.style.justifyContent = 'space-between'
 		head.style.alignItems = 'center'
+		// WO-342: clicking the header's EMPTY space clears this screen's PRV. Only direct hits on
+		// the bar / its left+title wrappers count — the FTB/timer/border controls keep their own
+		// clicks — and an active edit session on this screen is never yanked out from under.
+		head.title = 'Click empty space to clear this screen’s preview'
+		head.addEventListener('click', (e) => {
+			const t = e.target
+			const isEmptySpace =
+				t === head ||
+				(t instanceof HTMLElement &&
+					(t.classList.contains('scenes-deck-col__head-left') || t.classList.contains('scenes-deck-col__title')))
+			if (!isEmptySpace) return
+			if (sceneState.editingSceneId) return
+			sceneState.setPreviewSceneId(null, col)
+			void clearPreviewBusForMain?.(col)
+		})
 
 		const headLeft = document.createElement('div')
 		headLeft.className = 'scenes-deck-col__head-left'

@@ -255,6 +255,60 @@ async function captureCgThumbPng(page) {
 	return page.screenshot({ omitBackground: true })
 }
 
+/* WO-344: shader templates are one full-viewport canvas, so the DOM-rect targeting above always
+ * lands on 'viewport' — but the actual CONTENT often covers a fraction of it (borders + alpha
+ * void in the deck thumb). Detect the pixel-content box (ffmpeg cropdetect on the flattened
+ * frame) and crop with 4% padding. Full-ish frames (≥85%) and degenerate detections pass
+ * through untouched; any failure returns the original PNG. */
+const SHADER_TEMPLATE_RE = /(^|\/|\\)shaders\//i
+function isShaderThumbReq(req) {
+	return SHADER_TEMPLATE_RE.test(String(req?.sourceValue || req?.templateId || ''))
+}
+
+async function contentCropPng(png) {
+	const os = require('os')
+	const fsn = require('fs')
+	const pathn = require('path')
+	const { execFile } = require('child_process')
+	const run = (args) =>
+		new Promise((resolve, reject) =>
+			execFile('ffmpeg', args, { timeout: 15000 }, (e, so, se) => (e ? reject(new Error(se || e.message)) : resolve(se || so))),
+		)
+	const dir = fsn.mkdtempSync(pathn.join(os.tmpdir(), 'cgthumb-'))
+	const inP = pathn.join(dir, 'in.png')
+	const outP = pathn.join(dir, 'out.png')
+	try {
+		fsn.writeFileSync(inP, png)
+		// -loop + 3 frames: cropdetect emits nothing on a single still frame.
+		const det = await run(['-hide_banner', '-loop', '1', '-i', inP, '-vf', 'cropdetect=limit=24:round=2:reset=0', '-frames:v', '3', '-f', 'null', '-'])
+		const m = [...det.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)].pop()
+		const dm = det.match(/, (\d+)x(\d+)[, ]/)
+		if (!m || !dm) return png
+		let [w, h, x, y] = m.slice(1).map(Number)
+		const FW = Number(dm[1])
+		const FH = Number(dm[2])
+		if (!FW || !FH || !w || !h) return png
+		if (w < 64 || h < 36) return png // likely a black/empty frame — keep the original
+		if (w * h >= FW * FH * 0.85) return png
+		const padX = Math.round(w * 0.04)
+		const padY = Math.round(h * 0.04)
+		x = Math.max(0, x - padX)
+		y = Math.max(0, y - padY)
+		w = Math.min(FW - x, w + 2 * padX)
+		h = Math.min(FH - y, h + 2 * padY)
+		await run(['-hide_banner', '-y', '-i', inP, '-vf', `crop=${w}:${h}:${x}:${y}`, outP])
+		return fsn.readFileSync(outP)
+	} catch {
+		return png
+	} finally {
+		try {
+			fsn.rmSync(dir, { recursive: true, force: true })
+		} catch {
+			/* tmp cleanup best-effort */
+		}
+	}
+}
+
 /**
  * @param {{ templateId?: string, sourceValue?: string, cgData?: object, width?: number, height?: number }} req
  * @returns {Promise<Buffer>}
@@ -275,7 +329,15 @@ async function renderCgLookThumbPng(req) {
 	const chrome = await getChrome()
 	const page = await openPage(chrome.httpPort, { width: VIEWPORT_W, height: VIEWPORT_H, deviceScaleFactor: 1 })
 	try {
-		await page.navigate(`file://${htmlPath}`, { timeoutMs: 30000 })
+		/* WO-344: shader templates render via the SERVER url — the file:// route produced black
+		 * frames in this pipeline while the http route captures reliably (proven path); it also
+		 * gives the page same-origin access to the live audio_fft WS feed, so audio-reactive
+		 * shaders thumb with real content. */
+		const shaderReq = isShaderThumbReq(req)
+		const navUrl = shaderReq
+			? `http://127.0.0.1:4200/templates/shaders/${String(req?.sourceValue || req?.templateId || '').replace(/^.*shaders\//i, '').replace(/\.html?$/i, '').toLowerCase()}.html`
+			: `file://${htmlPath}`
+		await page.navigate(navUrl, { timeoutMs: 30000 })
 
 		await page.evaluate((payload) => {
 			if (typeof window.update === 'function') {
@@ -290,6 +352,13 @@ async function renderCgLookThumbPng(req) {
 		const speed = Number.isFinite(Number(speedRaw)) && Number(speedRaw) > 0 ? Number(speedRaw) : 1
 		await waitForCgThumbSettle(page, speed)
 
+		if (shaderReq) {
+			// WO-344: full-viewport capture with default background (the omit-background +
+			// DOM-target path is meaningless for a single fullscreen canvas), then
+			// pixel-content crop (borders + alpha void otherwise).
+			const png = await page.screenshot({})
+			return contentCropPng(png)
+		}
 		return await captureCgThumbPng(page)
 	} finally {
 		await page.close().catch(() => {})
