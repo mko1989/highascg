@@ -11,6 +11,7 @@
 import { api } from '../lib/api-client.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
 import { escapeHtml } from './sources-panel-helpers.js'
+import { mountShaderParamsPanel } from './shader-fx-params.js'
 
 const PASSES = [
 	{ key: 'image', label: 'Image (required)' },
@@ -118,6 +119,7 @@ export function showShaderFxModal(opts = {}) {
 		el('shaderfx-delete').disabled = !currentId
 		el('shaderfx-preview').src = currentId ? resolveApiUrl(`/templates/shaders/${currentId}.html?_=${Date.now()}`) : 'about:blank'
 		setStatus(currentId ? `Editing ${currentId}` : 'New shader')
+		paramsPanel.rescan()
 	}
 
 	function collectForm() {
@@ -165,12 +167,26 @@ export function showShaderFxModal(opts = {}) {
 		}
 	}
 
-	el('shaderfx-close').addEventListener('click', () => modal.remove())
-	modal.addEventListener('click', (e) => {
-		if (e.target === modal) modal.remove()
+	// WO-340: detected-parameters panel — color pickers/sliders that rewrite the GLSL literals
+	// in the textareas and apply through the normal save path (preview reloads once per change).
+	const sourceTextarea = (passKey) =>
+		passKey === 'common' ? el('shaderfx-common') : modal.querySelector(`textarea[data-pass-src="${passKey}"]`)
+	const paramsPanel = mountShaderParamsPanel(modal, {
+		getSource: (passKey) => sourceTextarea(passKey)?.value || '',
+		setSource: (passKey, src) => {
+			const ta = sourceTextarea(passKey)
+			if (ta) ta.value = src
+		},
+		applyChange: () => doSave(),
 	})
-	el('shaderfx-new').addEventListener('click', () => fillForm(null))
-	el('shaderfx-save').addEventListener('click', async () => {
+	modal.addEventListener('input', (e) => {
+		const t = e.target
+		if (t instanceof HTMLTextAreaElement && (t.id === 'shaderfx-common' || t.dataset.passSrc != null)) {
+			paramsPanel.scheduleRescan()
+		}
+	})
+
+	async function doSave() {
 		setStatus('Saving…')
 		try {
 			const r = await api.post('/api/shaders', collectForm())
@@ -183,7 +199,14 @@ export function showShaderFxModal(opts = {}) {
 		} catch (e) {
 			setStatus(String(e?.message || e), 'err')
 		}
+	}
+
+	el('shaderfx-close').addEventListener('click', () => modal.remove())
+	modal.addEventListener('click', (e) => {
+		if (e.target === modal) modal.remove()
 	})
+	el('shaderfx-new').addEventListener('click', () => fillForm(null))
+	el('shaderfx-save').addEventListener('click', () => void doSave())
 	el('shaderfx-delete').addEventListener('click', async () => {
 		if (!currentId) return
 		try {

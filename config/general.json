@@ -20,7 +20,8 @@
     "cefInteractiveBridge": true,
     "cefInteractiveLayer": 999,
     "cefRemoteDebuggingPort": 9222,
-    "cefEnableGpu": true
+    "cefEnableGpu": true,
+    "multiHelperTaskbar": true
   },
   "local_template_path": "",
   "composePreview": {

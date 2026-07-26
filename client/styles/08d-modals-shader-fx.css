@@ -147,3 +147,58 @@
 	border: 0;
 	display: block;
 }
+
+/* WO-340 — detected-parameters panel (color pickers / sliders over GLSL literals) */
+.shaderfx-params {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 10px;
+	border: 1px solid var(--border-color, #333);
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.03);
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.shaderfx-param__title {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	opacity: 0.7;
+}
+
+.shaderfx-param {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.shaderfx-param__name {
+	flex: 0 0 130px;
+	font-family: var(--mono-font, monospace);
+	font-size: 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shaderfx-param input[type='range'] {
+	flex: 1 1 auto;
+	min-width: 60px;
+}
+
+.shaderfx-param input[type='number'] {
+	flex: 0 0 76px;
+	width: 76px;
+}
+
+.shaderfx-param input[type='color'] {
+	flex: 0 0 44px;
+	width: 44px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid var(--border-color, #333);
+	border-radius: 3px;
+	background: transparent;
+}

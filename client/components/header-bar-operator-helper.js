@@ -153,13 +153,14 @@ export function initHeaderBarOperatorHelper(container) {
 			if (h.state !== 'open' && h.state !== 'launching') continue
 			const chip = document.createElement('button')
 			chip.type = 'button'
-			chip.className = 'header-btn header-operator-taskbar__chip'
+			// Owner styling (WO-317 note 2026-07-26): same look as the rec/stream indicator pills —
+			// `.active` (red) = helper currently raised over the GUI, idle gray = parked/hidden.
+			chip.className = `header-stream-indicator header-operator-taskbar__chip${h.parked || h.state === 'launching' ? '' : ' active'}`
 			const label = labelFor(h.info?.action || h.id)
 			// A parked helper is behind the video; a raised one is on top. The chip shows which and
 			// clicking toggles it — click a parked chip to bring it forward, a raised one to send it back.
-			chip.textContent = h.state === 'launching' ? `${label}…` : h.parked ? `▸ ${label}` : `▾ ${label}`
+			chip.textContent = h.state === 'launching' ? `${label}…` : label
 			chip.title = h.parked ? `Bring ${label} to front` : `Send ${label} behind the GUI`
-			chip.style.opacity = h.parked ? '0.6' : '1'
 			chip.disabled = h.state === 'launching'
 			chip.addEventListener('click', async (e) => {
 				e.preventDefault()
