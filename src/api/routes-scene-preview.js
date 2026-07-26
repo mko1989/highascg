@@ -15,7 +15,7 @@ const {
 /**
  * POST /api/scene/live/preview — register PRV look on server live map (no AMCP).
  */
-function handlePreviewLiveRegister(body, ctx) {
+async function handlePreviewLiveRegister(body, ctx) {
 	const b = parseBody(body)
 	const sceneIdRaw = b.sceneId ?? b.lookId ?? b.incomingSceneId
 	if (sceneIdRaw == null || !String(sceneIdRaw).trim()) {
@@ -57,7 +57,8 @@ function handlePreviewLiveRegister(body, ctx) {
 	}
 
 	const sceneId = String(scene.id || sceneIdRaw)
-	liveSceneState.setChannel(previewCh, { sceneId, scene: stripEphemeralTakeFields(scene) })
+	/* WO-341: awaited — see routes-scene-take.js; un-awaited, the broadcast reads stale state. */
+	await liveSceneState.setChannel(previewCh, { sceneId, scene: stripEphemeralTakeFields(scene) })
 	liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
 	return {
 		status: 200,

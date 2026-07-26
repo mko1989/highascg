@@ -184,7 +184,10 @@ async function handleSceneTake(body, ctx) {
 				banklessTake: true,
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
-				liveSceneState.setChannel(bus1, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
+				/* WO-341: MUST be awaited — setChannel serializes its write into a later microtask;
+				 * an un-awaited call made the broadcast below read the PREVIOUS map (every other
+				 * client deterministically one take behind: "web uis lagging behind"). */
+				await liveSceneState.setChannel(bus1, { sceneId: String(inc.id), scene: stripEphemeralTakeFields(inc) })
 			}
 			liveSceneState.broadcastSceneLive(ctx)
 			return
@@ -241,7 +244,7 @@ async function handleSceneTake(body, ctx) {
 					banklessTake: true,
 				})
 				if (inc && typeof inc === 'object' && inc.id) {
-					liveSceneState.setChannel(bus1, {
+					await liveSceneState.setChannel(bus1, {
 						sceneId: String(inc.id),
 						scene: stripEphemeralTakeFields(inc),
 					})
@@ -294,7 +297,7 @@ async function handleSceneTake(body, ctx) {
 							banklessTake: true,
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
-						liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
+						await liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
 						if (typeof ctx.log === 'function') {
 							ctx.log('info', `[scene-take] pgm->prv exchange done prvCh=${bus1}`)
 						}
@@ -322,7 +325,7 @@ async function handleSceneTake(body, ctx) {
 			if (previewExchange) startPreviewExchange()
 			await pgmTakePromise
 			if (inc && typeof inc === 'object' && inc.id) {
-				liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
+				await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 			}
 
 			if (previewExchangePromise) await previewExchangePromise
@@ -342,7 +345,7 @@ async function handleSceneTake(body, ctx) {
 		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
 		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly })
 		if (inc && typeof inc === 'object' && inc.id) {
-			liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
+			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}
 		liveSceneState.broadcastSceneLive(ctx)
 	}
