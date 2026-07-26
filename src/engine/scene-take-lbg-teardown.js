@@ -101,6 +101,13 @@ async function runSceneTakeLbgTeardown(ctx) {
 	}
 
 	const takeJobLogicalNums = new Set(takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite))
+	/* 2026-07-26: physical layers the incoming take just staged content on. On the bank-less
+	 * preview bus phys(n, active) === phys(n, inactive), so an exiting layer's STOP/CLEAR below
+	 * would land on the SAME slot the pipeline just PLAYed / CG ADDed into — sent after it, it
+	 * killed the fresh producer (shader→shader preview recalls went black; media fills wiped).
+	 * The incoming job owns that slot: its PLAY/CG ADD already replaced the old content. Banked
+	 * PGM takes never collide here (active ≠ inactive), so this changes nothing for them. */
+	const incomingJobPhys = new Set(takeJobs.map((j) => Number(j.pLayer)).filter(Number.isFinite))
 
 	const teardownLines = []
 	for (const layer of exitMedia) {
@@ -142,6 +149,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 		} else {
 			const pOut = phys(Number(layer.layerNumber), activeBank)
 			if (isPgmAudioTrackPhysicalLayerOnChannel(self?.config, channel, pOut)) continue
+			if (incomingJobPhys.has(pOut)) continue // replaced in place — see incomingJobPhys above
 			const cl = `${channel}-${pOut}`
 			teardownLines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
 			try {
