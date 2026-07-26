@@ -11,7 +11,7 @@ import { isOperatorGuiModeActive, isRemoteOperatorView } from './operator-gui-mo
 import { cellRectsToLayoutCells, defaultViewport } from './operator-gui-mode-rects.js'
 
 const LAYOUT_ENDPOINT = '/api/operator-gui/layout'
-const REPORT_DEBOUNCE_MS = 200
+const REPORT_DEBOUNCE_MS = 150 // WO-338: throttle interval (was a 200 ms trailing debounce)
 /** WO-255 T255.3: debounced restore after an interaction ends — a flurry of rapid modal
  * open/close or drag start/stop must not thrash Caspar with MIXER FILL calls. Suppression itself
  * is never debounced (see {@link setInteractionSuppressed}) — a popup covered by video for even
@@ -59,12 +59,28 @@ function effectiveCells() {
 	return _suppressed || _tabBlocked ? [] : mergedCells()
 }
 
+/* WO-338: throttle, not trailing-edge debounce — the old pure debounce meant a continuous tile
+ * drag emitted NOTHING until motion paused ~200 ms, so the punch holes only jumped at drag-end.
+ * Now the first report in a quiet period goes out immediately and further ones at most every
+ * REPORT_DEBOUNCE_MS, with a trailing send so the final rect always lands. The `_lastSentJson`
+ * dedupe in sendLayout keeps redundant emissions off the wire. */
+let _lastReportAt = 0
 function scheduleReport() {
-	if (_debounceTimer) clearTimeout(_debounceTimer)
-	_debounceTimer = setTimeout(() => {
-		_debounceTimer = null
+	const now = Date.now()
+	if (now - _lastReportAt >= REPORT_DEBOUNCE_MS && !_debounceTimer) {
+		_lastReportAt = now
 		void sendLayout(effectiveCells())
-	}, REPORT_DEBOUNCE_MS)
+		return
+	}
+	if (_debounceTimer) return
+	_debounceTimer = setTimeout(
+		() => {
+			_debounceTimer = null
+			_lastReportAt = Date.now()
+			void sendLayout(effectiveCells())
+		},
+		Math.max(16, REPORT_DEBOUNCE_MS - (now - _lastReportAt)),
+	)
 }
 
 /**

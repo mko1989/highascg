@@ -38,7 +38,9 @@ const {
 	computeOperatorGuiCellPlan,
 } = require('./operator-gui-channel-geometry')
 
-const APPLY_DEBOUNCE_MS = 150
+// WO-338: 150 → 50 ms — the per-channel promise chain already serializes overlapping applies,
+// so the long debounce mostly added edit-to-hole latency (client now throttles at 150 ms).
+const APPLY_DEBOUNCE_MS = 50
 
 /** Per-channel last-applied route by layer, so unchanged PLAYs are skipped. Module state (mirrors
  * multiview-apply.js's per-channel serialization convention). */

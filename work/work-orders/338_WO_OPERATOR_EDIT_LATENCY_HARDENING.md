@@ -18,7 +18,7 @@ Non-hot-path timers (fine as-is): restore debounce 300 ms, heartbeat 60 s, boot 
 2. **Server apply debounce 150 → ~50 ms** (`operator-gui-channel.js:41`): the per-channel promise chain already serializes overlapping applies; the long debounce mostly adds latency.
 3. **Split hole update from AMCP work:** in `_doApplyOperatorGuiLayout` (`operator-gui-channel.js:166-219`) the shape feed already happens before the AMCP loop — good; consider feeding holes from the raw POST *before* the debounce window when only rects changed (routes unchanged), so hole tracking is limited by network + SHAPE only (~a frame).
 4. **Batch the per-cell AMCP:** PLAY + MIXER FILL are awaited per cell; use `amcp.batchSendChunked` (pattern at `src/bootstrap/caspar-info-ready.js:74`) to send all cell commands + COMMIT in one write.
-5. Hygiene found during the survey: the shape helper does not exit on stdin EOF — an orphaned helper from a killed node keeps polling and double-asserting until manually killed (observed 2026-07-26 with two live helpers). Exit when stdin closes.
+5. Hygiene (corrected 2026-07-26): the helper DOES exit on stdin EOF (`operator-shape-overlay.py` "stdin EOF — exiting"); the two-helpers observation was a transient spawner race after a manual pkill + rapid rects updates. If it recurs, guard `ensureSpawned` in `src/system/operator-shape-overlay.js` against double-spawn instead.
 
 ## Acceptance
 
