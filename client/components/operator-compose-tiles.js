@@ -379,16 +379,18 @@ export function initOperatorComposeTiles(container, options) {
 			})
 		} catch { /* no window */ }
 	} else {
-		// Owner request 2026-07-26 — HOST: the compose placement is project state. Seed once from
-		// the server's persisted/project layout at init (fixes "every restart defaults the compose
-		// preview": after a localStorage wholesale re-default the host used to report the defaults
-		// and overwrite the saved layout), and follow authoritative 'project_load' broadcasts so
-		// loading a show restores its arrangement. Ordinary 'report' echoes never move host tiles.
+		// Owner request 2026-07-26 — HOST: the compose placement is project state. Follow
+		// authoritative 'project_load' broadcasts so loading a show restores its arrangement, and
+		// seed ONCE from the server at init — but ONLY when this browser has no stored layout of
+		// its own (the wholesale re-default case that caused "every restart defaults the compose
+		// preview"). Regression fix 2026-07-26 evening: the ungated version stomped positions on
+		// EVERY refresh, shrinking tiles to whatever transient rects the server had persisted.
 		unsubShared = subscribeSharedLayout((cells, meta) => {
 			if (meta?.source === 'project_load') seedHostLayoutFromCells(cells)
 		})
 		void (async () => {
 			try {
+				if (hasStoredLayout()) return
 				const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
 				if (res.ok) {
 					const j = await res.json()

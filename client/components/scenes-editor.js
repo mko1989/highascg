@@ -204,10 +204,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	}
 	sceneState.on('editingChange', applyRundownTimer); sceneState.on('screenChange', () => rundownTimerDestroy?.refresh()); applyRundownTimer()
 
-	// WO-339: while a look is edited the real PRV video (with on-channel editing chrome) must stay
-	// visible through the holes — this class exempts the panel from the pointerdown hole-suppression
-	// (see operator-gui-interaction-suppress.js).
-	previewHost.classList.add('preview-panel--edit-live')
 	const previewPanel = initPreviewPanel(previewHost, {
 		title: 'Compose preview', storageKeyPrefix: 'casparcg_preview_scenes', getOutputResolution: getResolution, stateStore, streamName: 'prv_1', composePrvPgmLayoutToggle: true, fillParentHeight: true, hideInnerResize: true, getProgramChannel,
 		getDualStreamNames: getComposeStreamNames,

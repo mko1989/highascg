@@ -45,10 +45,6 @@ function onPointerDown(e) {
 	onPointerActivity() // touch taps reach here without a preceding pointermove
 	if (!e.target || typeof e.target.closest !== 'function') return
 	if (!e.target.closest(PREVIEW_SURFACE_SELECTOR)) return
-	// WO-339: the looks editor's compose panel is exempt for the same reason as the operator
-	// tiles above — a layer drag there is now decorated ON the PRV channel (edit_chrome), so the
-	// hole must stay open and show the real video the operator is editing, not the canvas.
-	if (e.target.closest('.preview-panel--edit-live')) return
 	_pointerDown = true
 	recompute()
 }

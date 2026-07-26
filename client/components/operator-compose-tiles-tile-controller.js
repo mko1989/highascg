@@ -255,10 +255,19 @@ export function createOperatorComposeTileController(env) {
 	 * layoutAll() re-reports the seeded rects — the report dedupe makes that echo a no-op. */
 	function seedHostLayoutFromCells(cells) {
 		if (isClient) return
-		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		// Degenerate guard (regression 2026-07-26): transient shrunken reports can end up
+		// persisted — seeding from cells below ~3% of the canvas would shrink every tile to
+		// "smallest possible". Such cells are noise, never an intentional layout.
+		const byKey = new Map(
+			(Array.isArray(cells) ? cells : [])
+				.map((c) => [tileSeedKey(c), c.rect])
+				.filter(([, r]) => r && r.w > 0.03 && r.h > 0.03),
+		)
 		if (!byKey.size) return
 		const { w: cw, h: ch } = canvasSize()
-		if (!(cw > 0 && ch > 0)) return
+		// A mid-boot canvas (not laid out yet) produces garbage outer rects — skip, the next
+		// authoritative broadcast re-seeds once the canvas is real.
+		if (!(cw > 200 && ch > 120)) return
 		const { borderW, footerH } = TILE_CHROME
 		let changed = false
 		for (const t of tiles.values()) {
