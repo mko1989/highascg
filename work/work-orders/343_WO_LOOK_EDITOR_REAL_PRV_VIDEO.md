@@ -4,7 +4,16 @@
 actual preview channel on the casparcg screen consumer while editing layers on a look. i mean in
 the look editor not only in the compose preview."
 
-**Status: OPEN — this is the WO-339 v2 visibility design.** The naive version (hold the punch-hole
+**Status: IMPLEMENTED 2026-07-26 late — owner's own design won:** reuse the SAME screen consumer
+under the kiosk. A 'PRV' toggle in the edit bar punches a hole over the edit canvas routed to that
+main's preview channel (new 'lookedit' surface, role prv+mainIndex); the WO-339 edit_chrome ON the
+channel is the "transparent overlay" (Firefox cannot draw over a hole). WATCH mode by design:
+layer strip / inspector / toolbar stay clickable (Firefox pixels), toggle off to mouse-drag inside
+the frame — the X SHAPE input contract makes in-hole clicks impossible, documented on the button.
+Withdrawn on toggle-off / editor exit; re-reported on resize/tab switch. Owner validates on the
+real display.**
+
+**Status (original): OPEN — this is the WO-339 v2 visibility design.** The naive version (hold the punch-hole
 open during editor interaction) shipped and was REVERTED same night (9cc305a): X SHAPE input =
 input∩bounding, so every click inside an open hole falls through to the input-dead consumer —
 "not every gui click registers" ([[operator-gui-holes-click-dead]]).

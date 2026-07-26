@@ -7,6 +7,16 @@ import { appendLayerPresetBar, appendSceneLayerStripRows } from './scene-layer-r
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { escapeHtml } from './scenes-editor-support.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
+import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { reportLookEditPrvRect } from '../lib/operator-gui-mode-report.js'
+
+/* WO-343: live-PRV watch-mode state — survives re-renders of the edit view; `report` is the
+ * current view's re-report hook (used by resize/tab listeners and the exit withdrawal). */
+export const livePrvViewRef = { on: false, report: null }
+if (typeof window !== 'undefined') {
+	window.addEventListener('resize', () => livePrvViewRef.report?.())
+	window.addEventListener('highascg-workspace-tab-activated', () => livePrvViewRef.report?.())
+}
 
 function commitEditLookName(input, sceneId, sceneState) {
 	if (!(input instanceof HTMLInputElement) || !sceneId) return
@@ -162,6 +172,40 @@ export function renderEdit(ctx) {
 	appendLayerPresetBar(layerStrip, { scene, render: renderFn, showToast: showScenesToast, schedulePreviewPush, selectedLayerIndexRef, sceneState })
 
 	mainRow.appendChild(layerStrip); mainRow.appendChild(renderCompose(scene))
+
+	/* WO-343 (owner design 2026-07-26): 'PRV' toggle — punch a hole over the edit canvas routed
+	 * to this main's preview channel on the consumer already under the kiosk; the WO-339
+	 * edit_chrome ON the channel provides the layer outlines through the hole. Clicks INSIDE an
+	 * open hole never reach Firefox (X SHAPE contract), so this is a WATCH mode: layer strip,
+	 * inspector and toolbar keep working (their pixels are Firefox's); toggle off to drag inside
+	 * the frame. Never offered on edit-on-PGM sessions. */
+	if (isOperatorGuiModeActive() && sceneState.editOnPgm !== true) {
+		const prvBtn = document.createElement('button')
+		prvBtn.type = 'button'
+		prvBtn.id = 'scenes-live-prv'
+		prvBtn.className = 'scenes-btn scenes-btn--sm'
+		prvBtn.textContent = 'PRV'
+		prvBtn.title = 'Show the real preview channel through this canvas (watch mode — toggle off to drag layers with the mouse)'
+		bar.appendChild(prvBtn)
+		const mIdx = resolveMainIndexForScene(scene, sceneState)
+		const doReport = () => {
+			const el = mainHost.querySelector('.scenes-compose')
+			if (livePrvViewRef.on && sceneState.editingSceneId && el) {
+				reportLookEditPrvRect(el.getBoundingClientRect(), mIdx)
+			} else {
+				reportLookEditPrvRect(null, mIdx)
+			}
+		}
+		const syncBtn = () => prvBtn.classList.toggle('scenes-btn--take', livePrvViewRef.on)
+		syncBtn()
+		prvBtn.addEventListener('click', () => {
+			livePrvViewRef.on = !livePrvViewRef.on
+			syncBtn()
+			doReport()
+		})
+		livePrvViewRef.report = doReport
+		setTimeout(doReport, 60) // after layout settles
+	}
 	const editMainIdx = mainIdxForScene(scene, sceneState)
 	const editPgmOnly = !isPreviewBusAvailable(getChannelMap(), editMainIdx)
 	mountLookTransitionControls(

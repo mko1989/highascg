@@ -130,6 +130,29 @@ export function reportTimelineCellRects(cellRects, viewport) {
  * @param {{left: number, top: number, width: number, height: number}|null} rect - `getBoundingClientRect()`-shaped, or null/empty to withdraw
  * @param {{width: number, height: number}} [viewport]
  */
+/**
+ * Surface 4 — look-editor live PRV view (owner design 2026-07-26, WO-343): ONE rect over the
+ * edit canvas, role 'prv' + mainIndex, so the server routes that main's preview channel into the
+ * hole on the SAME screen consumer already under the kiosk. The layer outlines arrive through
+ * the hole via the WO-339 edit_chrome rendered ON the channel — Firefox cannot draw over a hole
+ * (X SHAPE removes those pixels), the channel itself is the "transparent overlay".
+ * @param {{left:number,top:number,width:number,height:number}|null} rect - null/empty withdraws
+ * @param {number} mainIndex
+ * @param {{width:number,height:number}} [viewport]
+ */
+export function reportLookEditPrvRect(rect, mainIndex, viewport) {
+	if (!isOperatorGuiModeActive()) return
+	if (!rect || !(Number(rect.width) > 0) || !(Number(rect.height) > 0)) {
+		reportSurfaceCells('lookedit', [])
+		return
+	}
+	const cells = cellRectsToLayoutCells(
+		[{ id: 'look-edit-prv', role: 'prv', mainIndex: Number(mainIndex) || 0, rect }],
+		defaultViewport(viewport),
+	).map((c) => ({ ...c, surface: 'lookedit' }))
+	reportSurfaceCells('lookedit', cells)
+}
+
 export function reportMultiviewEditRect(rect, viewport) {
 	if (!isOperatorGuiModeActive()) return
 	if (!rect || !(Number(rect.width) > 0) || !(Number(rect.height) > 0)) {

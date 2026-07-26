@@ -24,7 +24,7 @@ import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { SCENE_THUMB_MAX_W, showScenesToast, appendScenesEditorShell, bindScenesPreviewSplitDrag, createTakeSceneToProgram } from './scenes-editor-support.js'
 import { LOOK_PRESET_RECALL_PGM, LOOK_PRESET_RECALL_PRV } from '../lib/look-preset-events.js'
 import * as Logic from './scenes-editor-logic.js'
-import { renderEdit } from './scenes-editor-edit.js'
+import { renderEdit, livePrvViewRef } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
@@ -122,6 +122,10 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		selectedLayerIndexRef.current = null
 		dispatchLayerSelect(null)
 		previewRuntime.clearLastPreviewLayers()
+		// WO-343: withdraw the live-PRV hole when leaving the editor (report() sees
+		// editingSceneId === null and sends the empty surface).
+		livePrvViewRef.report?.()
+		livePrvViewRef.report = null
 	}
 
 	window.addEventListener('highascg-border-preset-recall', (ev) => {
