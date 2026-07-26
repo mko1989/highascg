@@ -152,7 +152,10 @@ describe('WO-333 (d): wiring', () => {
 		const player = src('template/shaders/player.js')
 		assert.match(player, /msg\.type === 'audio_fft'/)
 		assert.match(player, /b64ToBytes\(msg\.data\.freq, freqBytes\)/)
-		assert.match(player, /Date\.now\(\) - lastFftAt < FFT_FRESH_MS\) return/)
+		// WO-335: fresh WS frames outrank the analyser per frame in updateAudio (CEF file://
+		// getUserMedia auto-grant must not shadow the WS feed); both tiers always init.
+		assert.match(player, /if \(Date\.now\(\) - lastFftAt < FFT_FRESH_MS\) \{/)
+		assert.match(player, /initTierB\(\)\s*\n\s*void initTierA\(\)/)
 		// The WO-266 OSC fallback must survive as the stale path.
 		assert.ok(player.includes("type !== 'osc'"), 'OSC level fallback stays intact')
 	})

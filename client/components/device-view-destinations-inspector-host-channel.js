@@ -12,6 +12,7 @@ import {
 import { removeDecklinkInputSlot } from '../lib/decklink-add-input.js'
 import { removeExtraLiveHostSource } from '../lib/extra-live-source-remove.js'
 import { removeLiveAudioInputSlot } from '../lib/live-audio-remove-input.js'
+import { mountLiveAudioSlotControls } from './inspector-live-audio-input.js'
 import { removeV4l2InputSlot } from '../lib/v4l2-remove-input.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 
@@ -258,6 +259,14 @@ export function renderHostChannelDestinationInspector({
 	} else if (role === 'live_audio_input') {
 		const slot = liveAudioSlotFromHostDestination(d)
 		if (slot != null) {
+			// WO-336: full per-slot controls (device change, shader-FFT source, Start/Stop) live
+			// HERE — the owner reaches inputs through the device view, not the mixer inspector.
+			mountLiveAudioSlotControls(host, {
+				slot,
+				channel: ch ?? null,
+				layer: inputEntry?.layer ?? null,
+				route: inputEntry?.route || null,
+			})
 			const rmBtn = document.createElement('button')
 			rmBtn.type = 'button'
 			rmBtn.className = 'header-btn'
