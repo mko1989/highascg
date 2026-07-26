@@ -402,6 +402,15 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 
 	let mainRunning = await isCasparMainProcessRunning(ctx)
 	let portUp = await isAmcpPortListening()
+	/* WO-337: after a clean AMCP RESTART the process is usually mid-exit here — pgrep/ss can
+	 * still see it for a few hundred ms, and invoking the kill script then burns its fixed
+	 * TERM/KILL sleeps (measured 2.15s) against an already-dead process. Give it a short settle
+	 * poll before deciding it is actually stuck. */
+	for (let i = 0; (mainRunning || portUp) && i < 5; i++) {
+		await new Promise((r) => setTimeout(r, 200))
+		mainRunning = await isCasparMainProcessRunning(ctx)
+		portUp = await isAmcpPortListening()
+	}
 	if (mainRunning || portUp) {
 		log('info', '[Caspar restart] Apply: caspar still up — fast kill so run.sh relaunches with new config')
 		await killStuckCasparMainProcess(ctx)
