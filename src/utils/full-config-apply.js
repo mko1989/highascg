@@ -10,7 +10,7 @@ const {
 	killStuckCasparMainProcess,
 	waitForAmcpDisconnect,
 } = require('./caspar-restart')
-const { needsNodmRestartForLayout } = require('./xrandr-layout-verify')
+const { needsNodmRestartForLayout, verifyXrandrMatchesLayout } = require('./xrandr-layout-verify')
 
 /**
  * Full server apply:
@@ -115,6 +115,27 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			'info',
 			`[Full apply] Planned layout fits current desktop canvas (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height}, current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — skipping nodm restart`,
 		)
+	}
+
+	/* WO-337 #5: nothing to do — the on-disk XML already matches the generated config, no canvas
+	 * change is needed, and the live xrandr layout verifies. Skip the restart entirely (~18s →
+	 * <1s for the "did I already apply?" click). The config-editor one-shot XML path and an
+	 * explicit body {force:true} bypass this gate. */
+	if (writeResult.changed === false && !needsNodm && opts.force !== true) {
+		const verify = (() => {
+			try {
+				return verifyXrandrMatchesLayout(calculateLayoutPositions(ctx.config))
+			} catch (e) {
+				log('warn', `[Full apply] unchanged-gate xrandr verify failed (${e?.message || e}) — proceeding with full apply`)
+				return null
+			}
+		})()
+		if (verify?.ok) {
+			out.step = 'no_changes'
+			out.message = 'No config changes — Caspar left running (config and display layout already match).'
+			log('info', '[Full apply] Config unchanged + layout verified — skipping Caspar restart (WO-337 gate)')
+			return out
+		}
 	}
 
 	const layoutRes = applyX11Layout(ctx.config, { live: false, persist: true })

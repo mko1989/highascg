@@ -124,12 +124,25 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 			'[Caspar config] Using manual XML override (casparServer.casparConfigOverride) — generator DeckLink/keyer fixes are bypassed; clear override in Settings to use generated XML',
 		)
 	}
+	// WO-337 #5: identical XML → skip the write and tell the caller, so a "did I already
+	// apply?" click can short-circuit the whole restart. Settings still persist below.
+	let changed = true
+	try {
+		const existing = await fs.readFile(filePath, 'utf8')
+		if (existing === xml) changed = false
+	} catch {
+		/* missing/unreadable file → treat as changed */
+	}
 	const dir = path.dirname(filePath)
 	try {
-		await fs.mkdir(dir, { recursive: true })
-		// WO-161 T161.1: tmp + rename so a crash mid-write never leaves a torn casparcg.config.
-		await atomicWriteFile(filePath, xml, 'utf8')
-		apiLog(ctx, 'info', `[Caspar config] Saved ${filePath} (${xml.length} bytes)`)
+		if (changed) {
+			await fs.mkdir(dir, { recursive: true })
+			// WO-161 T161.1: tmp + rename so a crash mid-write never leaves a torn casparcg.config.
+			await atomicWriteFile(filePath, xml, 'utf8')
+			apiLog(ctx, 'info', `[Caspar config] Saved ${filePath} (${xml.length} bytes)`)
+		} else {
+			apiLog(ctx, 'info', `[Caspar config] Unchanged — ${filePath} already matches generated XML (${xml.length} bytes)`)
+		}
 	} catch (e) {
 		const code = e && e.code
 		const msg = e instanceof Error ? e.message : String(e)
@@ -153,7 +166,7 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 			)
 		} catch (_) {}
 	}
-	return { ok: true, path: filePath }
+	return { ok: true, path: filePath, changed }
 }
 
 /**
@@ -174,6 +187,8 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 			log: (level, msg) => apiLog(ctx, level, msg),
 			writeCasparConfig: writeHook,
 			skipCasparRestart: opts.skipCasparRestart,
+			// WO-337 #5: editor one-shot XML is an explicit "apply THIS" — never gate it away.
+			force: opts.force === true || !!oneShotXml,
 		})
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e)
@@ -302,7 +317,8 @@ async function handlePost(p, body, ctx) {
 			b.skipDisplayRestart === true ||
 			b.skipDisplayRestart === 'true'
 		const xml = typeof b.xml === 'string' ? b.xml : ''
-		return applyCasparConfigToDiskAndRestart(ctx, { skipCasparRestart, xml })
+		const force = b.force === true || b.force === 'true'
+		return applyCasparConfigToDiskAndRestart(ctx, { skipCasparRestart, xml, force })
 	}
 
 	if (p === '/api/caspar-config/override') {
