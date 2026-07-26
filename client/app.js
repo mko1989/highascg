@@ -256,14 +256,21 @@ async function init() {
 			}
 		})
 	})
-	sceneState.on('imported', () => {
+	/* WO-341 (owner sync principle 2026-07-26): server-originated events (`remote: true` — a ws
+	 * project_sync import or a scene.live broadcast) must NEVER write shared state back. Emitting
+	 * a deck sync + autosave in reaction to an incoming sync was the primary client↔client echo
+	 * loop ("sync errors between clients"). Only actual user interaction writes. */
+	sceneState.on('imported', (meta) => {
+		if (meta?.remote === true) return
 		appLogic.scheduleSceneDeckSync()
 		void flushAutosave()
 	})
-	sceneState.on('previewScene', () => {
+	sceneState.on('previewScene', (meta) => {
+		if (meta?.remote === true) return
 		appLogic.scheduleSceneDeckSync()
 	})
-	sceneState.on('softChange', () => {
+	sceneState.on('softChange', (meta) => {
+		if (meta?.remote === true) return
 		appLogic.scheduleSceneDeckSync()
 	})
 	sceneState.on('editingChange', (id) => {

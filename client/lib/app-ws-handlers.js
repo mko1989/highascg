@@ -250,7 +250,8 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 				}
 			}
 
-			sceneState._emit('softChange')
+			/* WO-341: ws-originated — write-back listeners (deck sync) must not react. */
+			sceneState._emit('softChange', { remote: true })
 			document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 		}
 	})

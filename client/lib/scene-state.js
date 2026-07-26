@@ -184,10 +184,10 @@ export class SceneState {
 		this._emit('change')
 	}
 
-	_softSave() {
+	_softSave(meta) {
 		// Debounce persistence for high-frequency updates (drag/resize)
 		this._persist()
-		this._emit('softChange')
+		this._emit('softChange', meta)
 	}
 
 	on(key, fn) {
@@ -343,8 +343,9 @@ export class SceneState {
 				this.liveSceneSnapshotsByMain[m] = null
 			}
 		}
-		this._softSave()
-		if (previewChanged) this._emit('previewScene')
+		this._softSave({ remote: true })
+		/* WO-341: server-originated (ws scene.live) — write-back listeners must not react. */
+		if (previewChanged) this._emit('previewScene', { remote: true })
 	}
 
 	getScene(id) { return id ? this.scenes.find((s) => String(s.id) === String(id)) || null : null }
@@ -397,7 +398,11 @@ export class SceneState {
 		} else {
 			this._save()
 		}
-		this._emit('imported')
+		/* WO-341 (owner sync principle, 2026-07-26): `remote` marks a SERVER-originated import
+		 * (ws project_sync → importProject({silent})). Listeners that WRITE shared state back
+		 * (deck sync, autosave flush) must skip remote imports — emitting unmarked here made
+		 * every incoming sync echo a write, the primary client↔client sync loop. */
+		this._emit('imported', { remote: opts.silent === true })
 	}
 }
 
