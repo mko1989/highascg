@@ -167,7 +167,7 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('compose.preview', (data) => ingestComposePreviewWs(data))
 
 	// WO-319: the shared operator compose layout changed (any client moved a window) — re-sync tiles.
-	ws.on('operatorGuiLayout', (data) => applySharedLayoutBroadcast(data?.cells))
+	ws.on('operatorGuiLayout', (data) => applySharedLayoutBroadcast(data?.cells, { source: data?.source }))
 
 	ws.on('companion.buttonPreview', (data) => {
 		invalidateCompanionFlagThumbs()

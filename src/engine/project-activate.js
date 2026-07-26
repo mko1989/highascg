@@ -149,6 +149,19 @@ function scheduleLiveRestage(ctx) {
 	} catch {
 		/* optional */
 	}
+	try {
+		// Owner request 2026-07-26: the project carries the operator compose placement — re-apply
+		// it (routes + FILLs + holes + broadcast) so every client's tiles restore with the show.
+		// The just-activated project is already on disk here, so read it back rather than thread
+		// it through (this helper is also reached from restage paths without the envelope).
+		const { applyProjectComposeLayout } = require('../system/operator-gui-channel')
+		const { loadFullProject } = require('./project-scenes-load')
+		void Promise.resolve()
+			.then(() => applyProjectComposeLayout(ctx, loadFullProject()))
+			.catch((e) => warn(`[project] Compose layout re-apply after load: ${e?.message || e}`))
+	} catch {
+		/* optional */
+	}
 }
 
 /**

@@ -249,6 +249,38 @@ export function createOperatorComposeTileController(env) {
 		drawLiveCrops()
 	}
 
+	/* Owner request 2026-07-26 — HOST: restore the project/persisted compose layout (boot GET or a
+	 * 'project_load' broadcast). Same outer-rect math as seedFromCells, but it writes the REAL
+	 * hole tiles' fracs and persists them locally so the localStorage copy tracks the project.
+	 * layoutAll() re-reports the seeded rects — the report dedupe makes that echo a no-op. */
+	function seedHostLayoutFromCells(cells) {
+		if (isClient) return
+		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		if (!byKey.size) return
+		const { w: cw, h: ch } = canvasSize()
+		if (!(cw > 0 && ch > 0)) return
+		const { borderW, footerH } = TILE_CHROME
+		let changed = false
+		for (const t of tiles.values()) {
+			if (drag && drag.t === t) continue
+			const fill = byKey.get(tileSeedKey(t.def))
+			if (!fill) continue
+			t.frac = {
+				x: (fill.x * cw - borderW) / cw,
+				y: (fill.y * ch - borderW) / ch,
+				w: (fill.w * cw + borderW * 2) / cw,
+				h: (fill.h * ch + borderW * 2 + footerH) / ch,
+			}
+			t.px = null
+			t.pxDesired = null
+			changed = true
+		}
+		if (changed) {
+			onPersist?.()
+			layoutAll()
+		}
+	}
+
 	function layoutAll() {
 		for (const t of tiles.values()) layoutTileDom(t)
 		scheduleReport()
@@ -427,6 +459,7 @@ export function createOperatorComposeTileController(env) {
 		onCanvasResize,
 		scheduleReport,
 		seedFromCells,
+		seedHostLayoutFromCells,
 		drawLiveCrops,
 		hasStoredLayout,
 		canvasSize,

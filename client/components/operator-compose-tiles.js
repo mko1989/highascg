@@ -202,7 +202,7 @@ export function initOperatorComposeTiles(container, options) {
 		isClient,
 	})
 	const {
-		buildTile, relabel, layoutAll, onCanvasResize, scheduleReport, seedFromCells, drawLiveCrops,
+		buildTile, relabel, layoutAll, onCanvasResize, scheduleReport, seedFromCells, seedHostLayoutFromCells, drawLiveCrops,
 		hasStoredLayout, canvasSize, resetCanvasSize, cancelScheduledReport, getPositionsSeeded,
 	} = tileController
 
@@ -378,6 +378,24 @@ export function initOperatorComposeTiles(container, options) {
 				})),
 			})
 		} catch { /* no window */ }
+	} else {
+		// Owner request 2026-07-26 — HOST: the compose placement is project state. Seed once from
+		// the server's persisted/project layout at init (fixes "every restart defaults the compose
+		// preview": after a localStorage wholesale re-default the host used to report the defaults
+		// and overwrite the saved layout), and follow authoritative 'project_load' broadcasts so
+		// loading a show restores its arrangement. Ordinary 'report' echoes never move host tiles.
+		unsubShared = subscribeSharedLayout((cells, meta) => {
+			if (meta?.source === 'project_load') seedHostLayoutFromCells(cells)
+		})
+		void (async () => {
+			try {
+				const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
+				if (res.ok) {
+					const j = await res.json()
+					if (Array.isArray(j?.cells) && j.cells.length) seedHostLayoutFromCells(j.cells)
+				}
+			} catch { /* keep local/default */ }
+		})()
 	}
 
 	return {

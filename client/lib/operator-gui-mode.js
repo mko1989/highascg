@@ -83,18 +83,23 @@ export function isRemoteOperatorView(search) {
 // moved a window. Fed from the WS dispatch in app-ws-handlers.js.
 const _sharedLayoutSubs = new Set()
 
-/** @param {(cells: Array<object>) => void} fn @returns {() => void} */
+/** @param {(cells: Array<object>, meta?: { source?: string }) => void} fn @returns {() => void} */
 export function subscribeSharedLayout(fn) {
 	_sharedLayoutSubs.add(fn)
 	return () => _sharedLayoutSubs.delete(fn)
 }
 
-/** Called by the WS handler on an 'operatorGuiLayout' broadcast. @param {Array<object>} cells */
-export function applySharedLayoutBroadcast(cells) {
+/**
+ * Called by the WS handler on an 'operatorGuiLayout' broadcast. `meta.source` is 'project_load'
+ * for an authoritative restore (project load / boot re-apply) vs 'report' for an ordinary echo —
+ * the HOST only moves its tiles for the former.
+ * @param {Array<object>} cells @param {{ source?: string }} [meta]
+ */
+export function applySharedLayoutBroadcast(cells, meta) {
 	if (!Array.isArray(cells)) return
 	for (const fn of _sharedLayoutSubs) {
 		try {
-			fn(cells)
+			fn(cells, meta || {})
 		} catch {
 			/* a bad subscriber must not break sync */
 		}

@@ -234,6 +234,9 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 		if (list.length > 0) {
 			const persistence = ctx.persistence || require('../utils/persistence')
 			persistence.set('operatorGuiLayout', { cells: list, savedAt: Date.now() })
+			// Owner request 2026-07-26: the compose placement is part of the SHOW — mirror it into
+			// the active project (debounced) so loading the project restores the arrangement.
+			scheduleComposeLayoutProjectPersist(ctx, list)
 		}
 	} catch (_) {
 		/* persistence optional (tests/headless) */
@@ -242,12 +245,65 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	// tiles to it — the compose preview matches on all clients no matter who moved a window.
 	try {
 		if (typeof ctx._wsBroadcast === 'function') {
-			ctx._wsBroadcast('operatorGuiLayout', { channel: ch, cells: Array.isArray(cells) ? cells : [] })
+			// `source` lets the HOST kiosk distinguish an authoritative restore (project load /
+			// boot) — which SHOULD move its tiles — from an ordinary report echo, which must not.
+			ctx._wsBroadcast('operatorGuiLayout', {
+				channel: ch,
+				cells: Array.isArray(cells) ? cells : [],
+				source: opts.source || 'report',
+			})
 		}
 	} catch (_) {
 		/* broadcast optional */
 	}
 	return { ch, plan }
+}
+
+/* Owner request 2026-07-26 (compose placement is project state): debounced merge of the applied
+ * cell set into the active project file. bumpRev:false + pushVolumes:false like deck-sync merges —
+ * this must never outrun a client's rev echo or spam the volume push. Content-equal merges no-op
+ * both here and in persistProject. */
+const COMPOSE_PROJECT_PERSIST_DEBOUNCE_MS = 2000
+let _composeProjectPersistTimer = null
+let _composeProjectPersistPending = null
+function scheduleComposeLayoutProjectPersist(ctx, cells) {
+	_composeProjectPersistPending = { ctx, cells }
+	if (_composeProjectPersistTimer) clearTimeout(_composeProjectPersistTimer)
+	_composeProjectPersistTimer = setTimeout(() => {
+		_composeProjectPersistTimer = null
+		const pending = _composeProjectPersistPending
+		_composeProjectPersistPending = null
+		if (!pending?.ctx || !Array.isArray(pending.cells) || !pending.cells.length) return
+		try {
+			const { loadFullProject } = require('../engine/project-scenes-load')
+			const { persistProject } = require('../engine/project-scenes')
+			const existing = loadFullProject()
+			if (!existing) return
+			if (JSON.stringify(existing.operatorCompose?.cells || []) === JSON.stringify(pending.cells)) return
+			const project = {
+				...existing,
+				operatorCompose: { cells: pending.cells, savedAt: new Date().toISOString() },
+			}
+			void persistProject(pending.ctx, project, { writeAutosave: true, pushVolumes: false, bumpRev: false })
+		} catch (e) {
+			pending.ctx.log?.('warn', `[operator-gui] compose layout project persist: ${e?.message || e}`)
+		}
+	}, COMPOSE_PROJECT_PERSIST_DEBOUNCE_MS)
+	if (_composeProjectPersistTimer.unref) _composeProjectPersistTimer.unref()
+}
+
+/**
+ * Apply the compose layout carried by a project (project load / activate). No-op when the project
+ * has none — the device-persisted layout (if any) stays in effect.
+ * @param {{ amcp: object, config: object, log?: Function }} ctx
+ * @param {object} project
+ */
+function applyProjectComposeLayout(ctx, project) {
+	const cells = project?.operatorCompose?.cells
+	if (!Array.isArray(cells) || !cells.length) {
+		return Promise.resolve({ skipped: true, reason: 'no compose layout in project' })
+	}
+	return applyOperatorGuiLayout(ctx, cells, { source: 'project_load' })
 }
 
 /**
@@ -357,8 +413,24 @@ async function ensureOperatorGuiChannel(ctx) {
 	// back up. Without this the compose-preview holes show the stale pre-restart layout
 	// until the first client report (or first look-take) after the restart.
 	try {
-		const persistence = ctx.persistence || require('../utils/persistence')
-		const saved = persistence.get('operatorGuiLayout')
+		// Owner request 2026-07-26: the ACTIVE PROJECT's compose layout outranks the device-
+		// persisted one at boot — the arrangement belongs to the show, not the box.
+		let saved = null
+		let savedSource = 'report'
+		try {
+			const { loadFullProject } = require('../engine/project-scenes-load')
+			const proj = loadFullProject()
+			if (Array.isArray(proj?.operatorCompose?.cells) && proj.operatorCompose.cells.length) {
+				saved = { cells: proj.operatorCompose.cells }
+				savedSource = 'project_load'
+			}
+		} catch {
+			/* project store unavailable — device persistence below */
+		}
+		if (!saved) {
+			const persistence = ctx.persistence || require('../utils/persistence')
+			saved = persistence.get('operatorGuiLayout')
+		}
 		if (saved && Array.isArray(saved.cells)) {
 			// 2026-07-20: never re-assert holes over a tab that shows no preview — see
 			// {@link lastClientIntentByChannel}. The saved record itself is left intact, so
@@ -374,7 +446,7 @@ async function ensureOperatorGuiChannel(ctx) {
 				bootShrinkGuard = saved.cells.length > 1 ? { ch, until: Date.now() + BOOT_GUARD_MS, cells: saved.cells.length } : null
 				// Not awaited: a client POST inside the apply debounce window supersedes this call's
 				// promise (its timer is cleared, so it never settles) — and boot must not block on it.
-				applyOperatorGuiLayout(ctx, saved.cells).then(
+				applyOperatorGuiLayout(ctx, saved.cells, { source: savedSource }).then(
 					() => ctx.log?.('info', `Operator GUI re-apply: ${saved.cells.length} cell(s) applied (ch ${ch})`),
 					(e) => ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`),
 				)
@@ -409,6 +481,7 @@ module.exports = {
 	APPLY_DEBOUNCE_MS,
 	BOOT_GUARD_MS,
 	operatorGuiDestination,
+	applyProjectComposeLayout,
 	resolveOperatorGuiChannel,
 	resolveOperatorGuiMonitorRect,
 	fractionRectToMonitorPx,
