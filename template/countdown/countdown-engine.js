@@ -43,6 +43,8 @@ const CountdownEngine = (function () {
 		amberThresholdSec: 60,
 		redThresholdSec: 15,
 		position: 'center',
+		posX: '',              // WO-320A: px X override ('' = use position preset)
+		posY: '',              // WO-320A: px Y override
 		hideTimer: false,        // true → show the middle aux line where the timer would sit
 		timerFontSize: 15,       // vw
 		auxFontSize: 5,          // vw
@@ -148,6 +150,16 @@ const CountdownEngine = (function () {
 	function applyPositionClass() {
 		if (!dom.root) return;
 		POSITIONS.forEach((p) => dom.root.classList.remove('countdown-pos-' + p));
+		// WO-320A: numeric posX/posY (px, canvas coordinates) override the preset — the content
+		// block's top-left corner anchors at exactly (posX, posY). Empty/non-numeric = preset.
+		const px = Number(config.posX);
+		const py = Number(config.posY);
+		if (Number.isFinite(px) && Number.isFinite(py) && String(config.posX) !== '' && String(config.posY) !== '') {
+			dom.root.classList.add('countdown-pos-top-left');
+			dom.root.style.padding = py + 'px 0 0 ' + px + 'px';
+			return;
+		}
+		dom.root.style.padding = '';
 		const pos = POSITIONS.indexOf(config.position) >= 0 ? config.position : 'top-left';
 		dom.root.classList.add('countdown-pos-' + pos);
 	}

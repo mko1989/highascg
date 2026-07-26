@@ -1,6 +1,6 @@
 # WO-320 — Countdown timer needs pixel-precise position; compact-timer eye icon should fade
 
-**Status (2026-07-26 audit): PARTIAL — Part B (eye-icon fade) landed in b168f25; Part A (pixel-precise timer position) has no trace in timer settings UI — still open.**
+**Status: DONE — Part B landed b168f25; Part A implemented 2026-07-26 late: posX/posY px override in countdown-engine (padding-anchor, empty = preset fallback, headless-verified both modes), inputs in the panel settings form AND the standalone countdown inspector; server untouched (opaque config passthrough).**
 
 **Source:** todos22.07.26 — "the countdown timer needs precise position in pixels and in the small
 compact timer the eye icon should perform fade in/out."

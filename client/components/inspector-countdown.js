@@ -251,6 +251,29 @@ export function appendCountdownGroup(root, { sceneId, layerIndex, layer, stateSt
 	grp.appendChild(posField)
 	posField.querySelector('#cd-position').addEventListener('change', (e) => onFieldChange({ position: e.target.value }))
 
+	/* WO-320A: pixel-precise override — both set anchors content top-left at (X, Y); empty = preset. */
+	const pxField = document.createElement('div')
+	pxField.className = 'inspector-field'
+	pxField.innerHTML = `
+		<label class="inspector-field__label">Position px (X / Y — empty = preset)
+			<span style="display:flex;gap:4px">
+				<input type="number" class="inspector-field__input" id="cd-pos-x" placeholder="X px" value="${cfg.posX ?? ''}" style="width:50%">
+				<input type="number" class="inspector-field__input" id="cd-pos-y" placeholder="Y px" value="${cfg.posY ?? ''}" style="width:50%">
+			</span>
+		</label>
+	`
+	const emitPx = () => {
+		const xv = pxField.querySelector('#cd-pos-x').value.trim()
+		const yv = pxField.querySelector('#cd-pos-y').value.trim()
+		onFieldChange({
+			posX: xv === '' ? '' : Math.round(Number(xv)),
+			posY: yv === '' ? '' : Math.round(Number(yv)),
+		})
+	}
+	pxField.querySelector('#cd-pos-x').addEventListener('change', emitPx)
+	pxField.querySelector('#cd-pos-y').addEventListener('change', emitPx)
+	grp.appendChild(pxField)
+
 	/* ── hide timer (show 3rd aux line instead) ──────────────────── */
 	const hideField = document.createElement('div')
 	hideField.className = 'inspector-field'

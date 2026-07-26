@@ -107,6 +107,26 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	positionSelect.value = config.position || 'center'
 	containerEl.appendChild(positionSelect)
 
+	// WO-320A: pixel-precise override — both set → anchors content top-left at (X, Y); empty = preset.
+	const pxRow = document.createElement('div')
+	pxRow.style.cssText = 'display:flex;gap:4px;margin-top:4px'
+	const posXInput = document.createElement('input')
+	posXInput.type = 'number'
+	posXInput.className = 'timer-control-panel__settings-input'
+	posXInput.placeholder = 'X px'
+	posXInput.title = 'Pixel X (empty = use preset)'
+	posXInput.style.cssText = 'width:50%;padding:2px 4px'
+	posXInput.value = config.posX ?? ''
+	const posYInput = document.createElement('input')
+	posYInput.type = 'number'
+	posYInput.className = 'timer-control-panel__settings-input'
+	posYInput.placeholder = 'Y px'
+	posYInput.title = 'Pixel Y (empty = use preset)'
+	posYInput.style.cssText = 'width:50%;padding:2px 4px'
+	posYInput.value = config.posY ?? ''
+	pxRow.append(posXInput, posYInput)
+	containerEl.appendChild(pxRow)
+
 	// Mode change handler to show/hide targetTime
 	modeSelect.addEventListener('change', () => {
 		const isClock = modeSelect.value === 'clock'
@@ -143,6 +163,8 @@ export function buildTimerSettings(containerEl, timer, deps) {
 			mode: modeSelect.value,
 			targetTime: targetTimeInput.value,
 			position: positionSelect.value,
+			posX: posXInput.value.trim() === '' ? '' : Math.round(Number(posXInput.value)),
+			posY: posYInput.value.trim() === '' ? '' : Math.round(Number(posYInput.value)),
 			timerFontSize: Math.max(1, Math.min(100, parseInt(sizeInput.value, 10) || DEFAULT_TIMER_CONFIG.timerFontSize)),
 		}
 
