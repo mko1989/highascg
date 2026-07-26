@@ -100,6 +100,9 @@ function applyWsStateSideEffects(data, { sceneState, programOutputState, appLogi
 }
 
 export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore, appLogic }) {
+	/** Last server scene.live payload — re-applied after deck/project catches up (see below). */
+	let _lastSceneLive = null
+
 	ws.on('variable_update', (changed) => {
 		if (!changed || typeof changed !== 'object') return
 		const cur = stateStore.getState()?.variables
@@ -134,6 +137,12 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		ingestStreamingChannelChange(data.path, data.value)
 		if (data.path === 'scene.live' && data.value) {
 			maybeInvalidatePreviewOnLiveChange(data.value, stateStore.getState()?.channelMap)
+			// Owner principle 2026-07-26 (server state IS the truth): applyServerLiveChannels
+			// drops ids its local deck doesn't know yet (take broadcast racing the deck sync) —
+			// remember the payload and RE-APPLY once the deck catches up (project-loaded below),
+			// so the preview/live highlight always converges instead of staying stale until the
+			// next take ("web uis are lagging behind, sometimes doesn't show up").
+			_lastSceneLive = data.value
 			sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
 		}
 		if (data.path === 'scene.globalBorders' && Array.isArray(data.value)) {
@@ -191,6 +200,14 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		try {
 			projectState.importProject(project, sceneState, timelineState, multiviewState, programOutputState, { silent: true })
 			window.dispatchEvent(new Event('project-loaded'))
+			// Owner principle 2026-07-26: the deck just caught up — re-apply the last server
+			// scene.live so a preview/live announcement that raced ahead of this project data
+			// (and was dropped by the unknown-id guard) converges now instead of never.
+			if (_lastSceneLive) {
+				try {
+					sceneState.applyServerLiveChannels(_lastSceneLive, stateStore.getState()?.channelMap)
+				} catch { /* advisory re-apply */ }
+			}
 			/* WO-329B: autosaves now broadcast too, so during active remote editing this fires
 			 * every ~3s — throttle the toast (the import itself always applies). */
 			const now = Date.now()
