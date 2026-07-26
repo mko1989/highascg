@@ -1,4 +1,5 @@
 import { connectorIdFromEvent, setStatus } from './device-view-ui-utils.js'
+import { getAppWs } from '../lib/app-runtime.js'
 import { renderCableOverlay } from './device-view-cables.js'
 import { CASPAR_HOST } from './device-view-helpers.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
@@ -56,13 +57,44 @@ export function attachDeviceViewEvents(ctx) {
 		})
 	refreshBtn.onclick = () => ctx.load({ forceRefresh: true })
 	resetBtn.onclick = () => ctx.resetCabling()
-	applyCasparBtn.onclick = () =>
+	// WO-337: the apply takes ~10-20s — the button must show busy state and stream the server's
+	// `[Full apply] Step N` progress (already broadcast as log_line) instead of sitting inert.
+	applyCasparBtn.onclick = () => {
+		if (applyCasparBtn.dataset.busy === '1') return
+		applyCasparBtn.dataset.busy = '1'
+		applyCasparBtn.disabled = true
+		const originalText = applyCasparBtn.textContent
+		applyCasparBtn.textContent = 'Applying…'
+		setStatus(statusEl, 'Applying Caspar config — restarting Caspar…', true)
+		let unsubLog = null
+		try {
+			const ws = getAppWs()
+			unsubLog = ws?.on?.('log_line', (payload) => {
+				const line = String(payload?.line || payload || '')
+				const m = line.match(/\[Full apply\]\s+(.{0,80})/)
+				if (m) setStatus(statusEl, `Applying: ${m[1]}`, true)
+			})
+		} catch {
+			/* progress stream optional */
+		}
+		const done = () => {
+			applyCasparBtn.dataset.busy = '0'
+			applyCasparBtn.disabled = false
+			applyCasparBtn.textContent = originalText
+			try {
+				unsubLog?.()
+			} catch {
+				/* noop */
+			}
+		}
 		Actions.applyCasparConfig()
 			.then((r) => {
 				ctx.setCasparRestartDirty(false)
 				setStatus(statusEl, r.message || 'Caspar config applied', true)
 			})
 			.catch((e) => setStatus(statusEl, e?.message || String(e), false))
+			.finally(done)
+	}
 	editCasparBtn.onclick = () =>
 		showCasparConfigModal({
 			onApplied: () => {

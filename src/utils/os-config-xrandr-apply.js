@@ -324,16 +324,22 @@ function applyX11Layout(config, opts = {}) {
 			} else {
 				logger.info('[OS-Config] xrandr verify OK — live layout matches plan')
 			}
-			applyOperatorDisplaySession(config, {
-				layout,
-				log: (level, msg) => {
-					if (level === 'error') logger.error(msg)
-					else if (level === 'warn') logger.warn(msg)
-					else logger.info(msg)
-				},
-			}).catch((e) => {
-				logger.warn(`[OS-Config] Operator display session failed: ${e?.message || e}`)
-			})
+			/* WO-337: full-config-apply awaits its own applyOperatorDisplaySession right after this
+			 * call — running a second one here concurrently made two `xdotool mousemove --sync`
+			 * race, and the loser ate its full 5s timeout on every apply (measured). Callers that
+			 * handle the session themselves pass skipOperatorSession. */
+			if (opts.skipOperatorSession !== true) {
+				applyOperatorDisplaySession(config, {
+					layout,
+					log: (level, msg) => {
+						if (level === 'error') logger.error(msg)
+						else if (level === 'warn') logger.warn(msg)
+						else logger.info(msg)
+					},
+				}).catch((e) => {
+					logger.warn(`[OS-Config] Operator display session failed: ${e?.message || e}`)
+				})
+			}
 		} else if (lastErr) {
 			logger.error(`[OS-Config] xrandr apply failed after ${maxAttempts} attempts: ${lastErr.message}`)
 		}
