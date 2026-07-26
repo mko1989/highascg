@@ -122,6 +122,11 @@ while :; do
 	caspar_wait_amcp_port_free
 
 	_grace="${CASPAR_RESTART_GRACE_SEC:-2}"
+	# WO-337 #3: consume the one-shot operator fast-relaunch flag (set at the marker check below).
+	if [ "${CASPAR_SKIP_GRACE_ONCE:-}" = "1" ]; then
+		_grace=0
+		CASPAR_SKIP_GRACE_ONCE=""
+	fi
 	if [ -n "$_grace" ] && [ "$_grace" != "0" ]; then
 		sleep "$_grace"
 	fi
@@ -147,6 +152,17 @@ while :; do
 	_restarts=$((_restarts + 1))
 
 	_sleep="${CASPAR_RESTART_SLEEP:-5}"
+	# WO-337 #3: an operator-initiated apply (node writes the marker just before its kill/RESTART)
+	# gets a fast relaunch — the 5s sleep + the two 2s graces exist for crash-loop damping, which
+	# caspar_crash_loop_backoff still provides for real crashes. Stale markers (>120s) are ignored.
+	_marker="/tmp/caspar-operator-restart"
+	CASPAR_SKIP_GRACE_ONCE=""
+	if [ -f "$_marker" ] && [ $(($(date +%s) - $(stat -c %Y "$_marker" 2>/dev/null || echo 0))) -le 120 ]; then
+		rm -f "$_marker"
+		_sleep=1
+		CASPAR_SKIP_GRACE_ONCE=1
+		caspar_supervisor_log "[run.sh] operator restart marker — fast relaunch (sleep ${_sleep}s, grace skipped)"
+	fi
 	if [ "$_restarts" -ge 6 ]; then
 		_sleep=$((_sleep * 2))
 		[ "$_sleep" -gt 60 ] && _sleep=60

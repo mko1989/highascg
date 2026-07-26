@@ -253,6 +253,11 @@ caspar_wait_amcp_port_free() {
 		sleep 1
 	done
 	_grace="${CASPAR_RESTART_GRACE_SEC:-2}"
+	# WO-337 #3: operator fast-relaunch (marker consumed in run.sh) skips this grace too;
+	# the flag itself is cleared at run.sh's own grace site so the skip is strictly one-shot.
+	if [ "${CASPAR_SKIP_GRACE_ONCE:-}" = "1" ]; then
+		_grace=0
+	fi
 	if [ -n "$_grace" ] && [ "$_grace" != "0" ]; then
 		sleep "$_grace"
 	fi

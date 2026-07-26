@@ -386,6 +386,14 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 	let restartSent = false
 	const skipRestartCommand = opts.skipRestartCommand === true
 
+	/* WO-337 #3: tell run.sh this exit is operator-initiated — it consumes the marker and skips
+	 * its crash-loop damping sleeps (5s relaunch + 2×2s grace) for exactly this one relaunch. */
+	try {
+		require('fs').writeFileSync('/tmp/caspar-operator-restart', String(Date.now()))
+	} catch {
+		/* marker is best-effort — without it the relaunch just keeps the damping sleeps */
+	}
+
 	if (!skipRestartCommand && isAmcpTcpConnected(ctx) && ctx.amcp.query?.restart) {
 		log('info', '[Caspar restart] Apply: sending AMCP RESTART…')
 		try {
