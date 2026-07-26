@@ -2,7 +2,7 @@
 
 **Source:** owner request 2026-07-26 — "in the shader modal id like some sort of script that would catch variables (colors, speed, others) and allow users to change those easily (color pickers, sliders, etc)."
 
-**Status: not started.** Written 2026-07-26 from a fresh survey of the shader-FX stack (WO-266/335/339 family).
+**Status: v1 IMPLEMENTED 2026-07-26 (commit 3256730)** — shader-param-scan.js (21-test smoke, independently verified) + params panel in the modal (color pickers/sliders, span-rewrite apply, one preview reload per change). Remaining: v2 live uniforms via CG UPDATE (design in this WO).
 
 ## Verified current state (2026-07-26)
 

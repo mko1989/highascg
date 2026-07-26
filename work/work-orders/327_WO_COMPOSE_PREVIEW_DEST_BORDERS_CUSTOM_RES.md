@@ -2,7 +2,7 @@
 
 **Source:** todos24.07.26 — "The borders around screen dests in compose preview don't act
 well with custom res."
-**Status: OPEN.** Written 2026-07-24 from a read-only code survey (claims spot-checked).
+**Status: DONE — implemented 2026-07-24 (commit d47388b: resolveDestinationDims honours custom resolutions; smoke 5/5). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Verified current state (2026-07-24, source read)
 

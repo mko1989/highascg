@@ -1,5 +1,7 @@
 # WO-319 — GUI live stream: one composed channel → NVENC → WebSocket → WebCodecs
 
+**Status (2026-07-26 audit): DONE-BUT-NOT-MARKED — shipped across e3bb16a/4e0a998/7faee72 (+WO-323/325 follow-ons); operator live canvas + shared layout sync are in production use.**
+
 **Source:** todos21.07.26 follow-ups — design chosen by the owner in
 `work/CASPAR_OUTPUT_TO_BROWSER.md` §4b: do NOT stream N channels; add ONE dedicated Caspar
 channel that composites everything the GUI needs (route:// cells + MIXER FILL, the multiview

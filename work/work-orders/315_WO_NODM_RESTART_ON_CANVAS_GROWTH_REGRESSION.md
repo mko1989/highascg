@@ -1,5 +1,7 @@
 # WO-315 — VERY IMPORTANT: nodm restart on desktop-canvas growth stopped firing
 
+**Status (2026-07-26 audit): DONE — the decision inputs were root-caused and fixed 2026-07-21 per this WO; canvas-growth nodm path observed working in the WO-337 measurements (2026-07-24 apply). Verify on the next real canvas-growth apply.**
+
 **Source:** todos21.07.26 — "VERY IMPORTANT — when total resolution of the planned gpu outputs
 desktop xrandr is bigger than current the restart needs a nodm restart too. this was already
 coded in but either got deleted or stopped working."

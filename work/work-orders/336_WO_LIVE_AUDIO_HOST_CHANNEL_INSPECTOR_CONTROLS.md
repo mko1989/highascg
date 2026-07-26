@@ -2,7 +2,7 @@
 
 **Source:** owner report 2026-07-26 — "in the inspector of live audio input host channel i only have labels and remove button. whatever it is it should be in here … there should also be a way to change, restart the audio input etc." Also: the Sources tab does not bring up an inspector, **nor should it**.
 
-**Status: not started.** Written 2026-07-26.
+**Status: DONE 2026-07-26 (commit fd2f99f)** — mountLiveAudioSlotControls extracted and mounted in the host-channel inspector (device select, shader-FFT toggle, Refresh/Start/Stop, async status); mixer-strip mount points kept (reachable via live-audio-input-select). Owner sign-off on the real display pending.
 
 ## Verified current state
 

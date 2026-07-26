@@ -1,6 +1,6 @@
 # WO-312 — Reassert live-input audio-only routes after Caspar restart
 
-**Status: OPEN** (gap noted while landing 2d2e294)
+**Status: DONE — implemented 2026-07-21 (commit 8c4bc88: live-input audio routes matrix-replayed in setupAllRouting on reconnect). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Context
 The audio route matrix for DeckLink/v4l2 is now config-persisted

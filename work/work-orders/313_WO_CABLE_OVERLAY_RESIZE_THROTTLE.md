@@ -1,6 +1,6 @@
 # WO-313 — rAF-throttle the cable overlay resize handler (small)
 
-**Status: OPEN** (flagged by the 2026-07-21 device-view audit; unmeasured, low confidence)
+**Status: DONE — implemented 2026-07-21 (commit e14909d: cable overlay resize rAF-throttled (raf-throttle.js)). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Context
 device-view-events.js:71 `window.onresize = () => renderCableOverlay(ctx.getCOCtx())` is

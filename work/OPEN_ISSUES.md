@@ -125,4 +125,9 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | WO-341 | Client sync redesign: server state is the single truth, clients converge (never drop), ONLY user interaction writes — echo-loop kill list, scene.deck ingestion, seq-gap detection, autosave rev-race | [WO-341](./work-orders/341_WO_CLIENT_SYNC_SERVER_TRUTH.md) | 🟡 Top defects fixed 2026-07-26 (stale-by-one broadcasts, echo loops #1-3, converge-on-import); structural items open |
 
+| WO-342 | Deck header empty-space click clears that screen PRV | [WO-342](./work-orders/342_WO_DECK_HEADER_CLICK_CLEARS_PRV.md) | 🔴 Open |
+| WO-343 | Look editor shows REAL PRV video on the screen consumer while editing (WO-339 v2; X SHAPE input contract applies) | [WO-343](./work-orders/343_WO_LOOK_EDITOR_REAL_PRV_VIDEO.md) | 🔴 Open |
+| WO-344 | Shader look thumbnails: content-aware crop, synthetic audio, fill compositing | [WO-344](./work-orders/344_WO_SHADER_LOOK_THUMBNAILS.md) | 🔴 Open |
+| WO-AUDIT | Last-week WO audit + compiled todo list | [todos26.07.26_wo_audit.md](./todos26.07.26_wo_audit.md) | ✅ 2026-07-26 |
+
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

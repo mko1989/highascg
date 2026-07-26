@@ -2,7 +2,7 @@
 
 **Source:** owner request 2026-07-26 — "implement editing looks on actual prv channel from caspar with layer borderers and overlays for editing."
 
-**Status: surveyed 2026-07-26; core staging EXISTS, editing chrome to build.**
+**Status: v1 IMPLEMENTED 2026-07-26 (c6e90b2), hole-exemption REVERTED same night (9cc305a)** — edit_chrome template + layer 990 band + push splice + exit/boot sweeps are live; item 5 (hole stays open while editing) violated the X SHAPE input contract (clicks fell through to the input-dead consumer) and is reverted — v2 needs a different mechanism. Remaining: nudge-driven chrome updates, optional preview_screen_consumer wiring, the v2 visibility design.
 
 ## What already exists (do not rebuild)
 

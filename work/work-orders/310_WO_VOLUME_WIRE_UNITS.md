@@ -1,6 +1,6 @@
 # WO-310 — One unit on the volume wire (kill the dB/linear double-send)
 
-**Status: OPEN** (documented residue of f343e5e)
+**Status: DONE — implemented 2026-07-21 (commit bbd940d: one unit on the volume wire — single MIXER VOLUME writer, linear only). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Context — observed on the live box
 Every fader/mute action sends TWO MIXER VOLUME commands ~20ms apart to the same target:
