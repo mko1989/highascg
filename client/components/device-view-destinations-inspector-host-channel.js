@@ -91,11 +91,14 @@ export function renderHostChannelDestinationInspector({
 			},
 		})
 	}
-	if (role === 'decklink_input' && liveSource) {
-		const slot = decklinkSlotFromHostDestination(d) || liveSource.decklinkSlot
+	if (role === 'decklink_input') {
+		// Owner request 2026-07-26: dedicated DeckLink slots (no extraLiveSources entry →
+		// liveSource null) must still get the device switcher — the server path stops the host
+		// channel and PLAYs the newly selected DECKLINK device.
+		const slot = decklinkSlotFromHostDestination(d) || liveSource?.decklinkSlot
 		if (slot) {
 			mountDecklinkHostSourceControls(host, {
-				source: liveSource,
+				source: liveSource || null,
 				slot,
 				lastPayload,
 				currentSettings,

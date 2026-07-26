@@ -47,10 +47,13 @@ function buildDeviceOptions(lastPayload, slot, activeDevice) {
  * @param {{ source: object, slot: number, lastPayload?: object, currentSettings?: object, onApplied?: (r: object) => void }} opts
  */
 export function mountDecklinkHostSourceControls(container, { source, slot, lastPayload, currentSettings, onApplied }) {
-	if (!source || slot < 1) return
+	// Owner request 2026-07-26: dedicated DeckLink input slots have NO extraLiveSources entry, so
+	// `source` is null for them — the device switcher must still mount (the server's slot-only
+	// update path stops the host channel and PLAYs the new DECKLINK device).
+	if (slot < 1) return
 
 	const activeDevice =
-		parseInt(String(source.decklinkDevice ?? 0), 10) ||
+		parseInt(String(source?.decklinkDevice ?? 0), 10) ||
 		currentDecklinkDeviceForSlot(currentSettings, slot, slot)
 	const options = buildDeviceOptions(lastPayload, slot, activeDevice)
 
@@ -100,10 +103,10 @@ export function mountDecklinkHostSourceControls(container, { source, slot, lastP
 			const r = await changeDecklinkInputDevice(null, {
 				slot,
 				device: nextDevice,
-				connectorId: source.connectorId,
-				value: source.value,
+				connectorId: source?.connectorId,
+				value: source?.value,
 			})
-			if (r?.source) source.decklinkDevice = r.source.decklinkDevice
+			if (r?.source && source) source.decklinkDevice = r.source.decklinkDevice
 			onApplied?.(r)
 			showAppToast(r?.message || 'DeckLink source updated', 'info')
 		} catch (err) {
@@ -121,8 +124,8 @@ export function mountDecklinkHostSourceControls(container, { source, slot, lastP
 		try {
 			const r = await reloadDecklinkInputDevice({
 				slot,
-				connectorId: source.connectorId,
-				value: source.value,
+				connectorId: source?.connectorId,
+				value: source?.value,
 			})
 			onApplied?.(r)
 			showAppToast(r?.message || 'DeckLink reloaded', 'info')
