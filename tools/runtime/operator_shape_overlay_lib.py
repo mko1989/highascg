@@ -32,6 +32,7 @@ _ATOM_UTF8_STRING = None
 _ATOM_NET_WM_STATE = None
 _ATOM_NET_WM_STATE_ABOVE = None
 _ATOM_NET_WM_STATE_BELOW = None
+_LAST_GAP_LOGGED = False
 _ATOM_NET_ACTIVE_WINDOW = None
 _DISPLAY = None
 _ROOT = None
@@ -296,25 +297,31 @@ def activate_window(win):
         log(f"activate_window failed: {e}")
 
 
-def stacking_inverted(root, caspar_top_id, firefox_top_id):
-    """True when the caspar toplevel is stacked ABOVE the firefox toplevel (root children are
-    bottom->top). Unknown ids -> False (nothing to fix)."""
+def stacking_gap(root, caspar_top_id, firefox_top_id):
+    """Owner request 2026-07-26: firefox must sit DIRECTLY above the consumer. Root children are
+    bottom->top, so adjacency means fi == ci + 1. Returns 'inverted' (caspar above firefox),
+    'gap' (window(s) between them), 'ok', or None when either id is unknown (nothing to fix)."""
     try:
         order = [w.id for w in root.query_tree().children]
         ci = order.index(caspar_top_id)
         fi = order.index(firefox_top_id)
-        return ci > fi
+        if ci > fi:
+            return 'inverted'
+        if fi != ci + 1:
+            return 'gap'
+        return 'ok'
     except Exception:
-        return False
+        return None
 
 
 def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
-    """Keep the operator_gui Caspar consumer under Firefox, permanently:
-      - EWMH: strip ABOVE (stale always-on-top config), add BELOW;
+    """Keep the operator_gui Caspar consumer DIRECTLY under Firefox, permanently:
+      - EWMH: strip BELOW, add ABOVE — the consumer rides the kiosk's layer so no normal-layer
+        window can ever sit between them (owner request 2026-07-26);
       - SHAPE: input region EMPTY on frame+client (see set_input_empty — clicks in the bounding
         holes otherwise reach the consumer and Openbox raises it);
-      - watchdog: if the consumer toplevel is nonetheless stacked above Firefox's, re-activate
-        Firefox (_NET_ACTIVE_WINDOW re-raises it per layer policy and returns focus to the GUI).
+      - watchdog: 'inverted' (consumer above Firefox) → re-activate Firefox; 'gap' (anything
+        between them) → restack the consumer as Firefox's direct below-sibling.
     Re-run every poll tick — a restarted Caspar spawns a fresh window with none of this state.
     Returns the (toplevel, client) pair found, or None."""
     if channel is None:
@@ -325,18 +332,43 @@ def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
     top, client = pair
     is_new = client.id != prev_caspar_id
     if _ATOM_NET_WM_STATE_BELOW is not None:
-        set_net_wm_state(client, _ATOM_NET_WM_STATE_ABOVE, add=False)
-        set_net_wm_state(client, _ATOM_NET_WM_STATE_BELOW, add=True)
+        # Owner request 2026-07-26: nothing may land BETWEEN the kiosk and the consumer and hide
+        # the previews. BELOW-layer pinning made that structurally impossible to guarantee (every
+        # normal-layer window stacks above the below layer), so the consumer now rides the ABOVE
+        # layer — same layer as the kiosk — restacked directly under Firefox by the watchdog.
+        # Input-dead + never activated, so it still can't steal clicks or focus.
+        set_net_wm_state(client, _ATOM_NET_WM_STATE_BELOW, add=False)
+        set_net_wm_state(client, _ATOM_NET_WM_STATE_ABOVE, add=True)
     set_input_empty(pair)
     if is_new:
-        log(f"caspar consumer window {client.id} (ch {channel}): pinned BELOW + input-dead")
-    if firefox_pair is not None and stacking_inverted(root, top.id, firefox_pair[0].id):
-        log("stacking inverted (caspar above firefox) — re-activating firefox")
-        activate_window(firefox_pair[1])
-        try:
-            firefox_pair[0].configure(stack_mode=X.Above)
-        except Exception:
-            pass
+        log(f"caspar consumer window {client.id} (ch {channel}): pinned under kiosk (ABOVE layer) + input-dead")
+    if firefox_pair is not None:
+        gap = stacking_gap(root, top.id, firefox_pair[0].id)
+        if gap == 'inverted':
+            log("stacking inverted (caspar above firefox) — re-activating firefox")
+            activate_window(firefox_pair[1])
+            try:
+                firefox_pair[0].configure(stack_mode=X.Above)
+            except Exception:
+                pass
+        elif gap == 'gap':
+            # Raise the consumer to the top of its layer, then the kiosk straight back over it —
+            # layer-agnostic adjacency assert (Openbox clamps sibling restacks, but plain raises
+            # are honored; this is the same configure the kiosk top-assert already relies on).
+            global _LAST_GAP_LOGGED
+            if not _LAST_GAP_LOGGED:
+                log("window(s) between kiosk and consumer — raising consumer+kiosk pair")
+                _LAST_GAP_LOGGED = True
+            try:
+                top.configure(stack_mode=X.Above)
+                firefox_pair[0].configure(stack_mode=X.Above)
+                if _DISPLAY is not None:
+                    _DISPLAY.flush()
+            except Exception as e:
+                log(f"adjacency restack failed: {e}")
+        elif gap == 'ok' and _LAST_GAP_LOGGED:
+            _LAST_GAP_LOGGED = False
+            log("kiosk/consumer adjacency restored")
     return pair
 
 

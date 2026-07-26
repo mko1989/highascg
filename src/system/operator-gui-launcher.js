@@ -101,7 +101,9 @@ async function raiseOperatorGuiBrowser(ctx) {
 	if (!ids.length) return { ok: false, reason: 'not_running' }
 	const wid = ids[ids.length - 1]
 	try {
-		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: SEARCH_TIMEOUT_MS })
+		// SEARCH_TIMEOUT_MS is module-local to operator-gui-launcher-placement.js and was never
+		// in scope here — the ReferenceError made every raise return xdotool_failed (found 2026-07-26).
+		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: 5000 })
 		return { ok: true }
 	} catch (e) {
 		ctx?.log?.('warn', `[Operator GUI] raise failed: ${e?.message || e}`)
