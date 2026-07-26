@@ -145,8 +145,8 @@
   "decklink_input_7_device": 0,
   "decklink_input_8_device": 0,
   "inputs_channel_mode": "1080p5000",
-  "live_audio_input_count": 0,
-  "live_audio_input_1_device": "",
+  "live_audio_input_count": 1,
+  "live_audio_input_1_device": "alsa://hw:2,0",
   "live_audio_input_2_device": "",
   "live_audio_input_3_device": "",
   "live_audio_input_4_device": "",
@@ -240,5 +240,6 @@
   "screen_1_custom_width": 2560,
   "screen_1_custom_height": 896,
   "screen_1_custom_fps": 50,
-  "screen_1_operator_monitor": true
+  "screen_1_operator_monitor": true,
+  "audio_fft_source_slot": 1
 }

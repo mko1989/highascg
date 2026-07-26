@@ -6,14 +6,14 @@
  * shader full-window and drives a Shadertoy-style audio texture (512×2, row 0 = FFT bytes,
  * row 1 = waveform bytes, sample `.x`/`.r`) bound to any pass channel wired to `'audio'`.
  *
- * Audio tiers (auto-selected):
- *  A) getUserMedia + AnalyserNode — real spectrum. Works in the WO-258 browser_display Firefox
- *     (pick an ALSA monitor/loopback device; `?audioDev=<substring|deviceId>` overrides).
- *  B) WS frames — connect to the playout WS. Two message kinds, freshest wins:
- *     - `type:'audio_fft'` (WO-333): REAL 512-bin spectrum + waveform from the node's line-in/
- *       USB capture (config.audioCapture, src/audio/audio-capture-fft.js). Used verbatim.
- *     - `type:'osc'` snapshots (per-channel dBFS from src/osc/osc-state.js): coarse synthesized
- *       spectrum, only while no audio_fft frame arrived in the last 1.5s.
+ * Audio tiers (all initialized; priority per frame, freshest real data wins):
+ *  B) WS `audio_fft` frames — ALWAYS preferred while fresh (< 1.5s). In Caspar's CEF a
+ *     file:// page is a secure context, so getUserMedia auto-grants on the silent default
+ *     mic — tier A must never shadow the WS feed (WO-333c).
+ *  A) getUserMedia + AnalyserNode — fallback real spectrum. Works in the WO-258
+ *     browser_display Firefox (pick an ALSA monitor/loopback device; `?audioDev=` overrides).
+ *  B') WS OSC levels (`type:'osc'`, per-channel dBFS from src/osc/osc-state.js) — coarse
+ *     synthesized spectrum when neither real source is live.
  *     `?ch=<caspar channel>` picks the OSC meter source (default 1), `?api=` overrides the API
  *     base (default: same origin, or http://127.0.0.1:4200 when loaded from file://).
  *  C) silence — shader still renders, texture stays zeroed.
@@ -237,11 +237,8 @@
 	}
 
 	function sampleTierB() {
-		// Real audio_fft frames own the texture while fresh — freqBytes/waveBytes were already
-		// filled by the WS handler, nothing to synthesize.
-		if (Date.now() - lastFftAt < FFT_FRESH_MS) return
-		// Fallback: synthesize a plausible falling spectrum + a level-scaled sine waveform from
-		// one RMS value. Coarse by design — real FFT needs audio_fft or tier A.
+		// Synthesize a plausible falling spectrum + a level-scaled sine waveform from one RMS
+		// value. Coarse by design — real FFT comes from fresh audio_fft frames or tier A.
 		wsPhase += 0.35
 		const amp = wsLevel
 		for (let i = 0; i < AUDIO_W; i++) {
@@ -252,9 +249,15 @@
 	}
 
 	function updateAudio() {
-		if (audioMode === 'analyser') sampleTierA()
-		else if (audioMode === 'ws-levels') sampleTierB()
-		else return
+		if (Date.now() - lastFftAt < FFT_FRESH_MS) {
+			// freqBytes/waveBytes already hold the latest WS audio_fft frame — use verbatim.
+		} else if (analyser) {
+			sampleTierA()
+		} else if (audioMode === 'ws-levels') {
+			sampleTierB()
+		} else {
+			return
+		}
 		uploadAudioTexture()
 	}
 
@@ -276,8 +279,10 @@
 		if (config.audio && config.audio.enabled && usesAudioChannel()) {
 			audioTexture = createAudioTexture()
 			toy.addTexture(audioTexture, 'audio')
-			const okA = await initTierA()
-			if (!okA) initTierB()
+			// WS tier is always on and outranks the analyser while frames are fresh; tier A
+			// runs in the background as the fallback (don't block first paint on getUserMedia).
+			initTierB()
+			void initTierA()
 		}
 		if (config.common) toy.setCommon(config.common)
 		const p = config.passes || {}
