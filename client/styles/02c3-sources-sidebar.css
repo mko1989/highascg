@@ -9,7 +9,7 @@
 	margin-bottom: 8px;
 	min-width: 0;
 	overflow: visible;
-	padding-top: 14px;
+	padding-top: 46px;
 }
 
 .sources-tab {
@@ -26,9 +26,10 @@
 	overflow: visible;
 	/* Single line at an angle — the word extends diagonally instead of breaking or trimming. */
 	white-space: nowrap;
-	transform: rotate(-18deg);
-	transform-origin: 20% 100%;
+	transform: rotate(-45deg);
+	transform-origin: 8% 100%;
 	text-align: left;
+	border-bottom: none;
 }
 
 .sources-tab:hover {
@@ -37,7 +38,10 @@
 
 .sources-tab.active {
 	color: var(--accent);
-	border-bottom-color: var(--accent);
+	/* Underline hugs the text (rotates with it) — a border spans the whole slot and crosses
+	 * the neighbouring labels at this angle. */
+	text-decoration: underline 2px var(--accent);
+	text-underline-offset: 4px;
 }
 
 .sources-search {

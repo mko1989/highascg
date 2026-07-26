@@ -39,6 +39,18 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 	const titleEl = headerEl.querySelector('.header__title')
 	if (!titleEl) return
 
+	// Owner request 2026-07-26: when GPU is enabled in CEF templates the tiny header mascot wears
+	// shades (bunny_glasses). Re-evaluated on every settings sync so toggling the option flips it.
+	const applyHeaderLogo = () => {
+		const img = document.querySelector('img.header__logo')
+		if (!img) return
+		const gpuOn = settingsState.getSettings()?.operatorTools?.cefEnableGpu === true
+		const want = gpuOn ? 'assets/bunny_glasses.webp' : 'assets/logo.webp'
+		if (img.getAttribute('src') !== want) img.setAttribute('src', want)
+	}
+	applyHeaderLogo()
+	settingsState.subscribe(applyHeaderLogo)
+
 	// Project name (editable)
 	const nameWrap = document.createElement('div')
 	nameWrap.className = 'header-project'

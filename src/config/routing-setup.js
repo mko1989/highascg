@@ -64,14 +64,32 @@ async function setupMultiview(self, layout) {
 }
 
 function syncAllTemplatesToDestination(self, destDir, label) {
-	if (!destDir || !fs.existsSync(destDir)) return 0
-	const srcRoot = path.join(REPO_ROOT, 'template'); if (!fs.existsSync(srcRoot)) return 0
-	let n = 0; for (const ent of fs.readdirSync(srcRoot, { withFileTypes: true })) {
+	if (!destDir || !fs.existsSync(destDir)) return { copied: 0, skipped: 0 }
+	const srcRoot = path.join(REPO_ROOT, 'template'); if (!fs.existsSync(srcRoot)) return { copied: 0, skipped: 0 }
+	let copied = 0, skipped = 0; for (const ent of fs.readdirSync(srcRoot, { withFileTypes: true })) {
 		if (!ent.isFile() || ent.name.startsWith('.')) continue
-		try { fs.copyFileSync(path.join(srcRoot, ent.name), path.join(destDir, ent.name)); n++ } catch {}
+		const srcPath = path.join(srcRoot, ent.name)
+		const destPath = path.join(destDir, ent.name)
+		try {
+			let shouldCopy = true
+			try {
+				const srcStat = fs.statSync(srcPath)
+				const destStat = fs.statSync(destPath)
+				if (destStat.size === srcStat.size && destStat.mtime >= srcStat.mtime) {
+					shouldCopy = false
+					skipped++
+				}
+			} catch {
+				// If stat fails, attempt copy anyway
+			}
+			if (shouldCopy) {
+				fs.copyFileSync(srcPath, destPath)
+				copied++
+			}
+		} catch {}
 	}
-	if (n > 0) self.log('info', `Template sync: ${n} file(s) → ${destDir} (${label})`)
-	return n
+	if (copied > 0 || skipped > 0) self.log('info', `Template sync: ${copied} copied, ${skipped} unchanged → ${destDir} (${label})`)
+	return { copied, skipped }
 }
 
 async function setupAllRouting(self) {

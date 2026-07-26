@@ -238,23 +238,30 @@ async function applyFullServerConfig(ctx, opts = {}) {
 
 	if (out.layout.preApplied || out.layout.postApplied) {
 		const nvidiaStep = needsNodm ? 7 : 5
-		log('info', `[Full apply] Step ${nvidiaStep} — NVIDIA Force Composition Pipeline (all outputs)`)
-		out.nvidiaDisplay.applied = true
-		try {
-			const env = displaySessionEnv()
-			let nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
-			if (!nvidiaRes.ok) {
-				log('info', '[Full apply] NVIDIA display policy retry in 6s (MetaMode may lag Caspar restart)')
-				await new Promise((r) => setTimeout(r, 6000))
-				nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
+		log('info', `[Full apply] Step ${nvidiaStep} — NVIDIA Force Composition Pipeline (deferred)`)
+		out.nvidiaDisplay = { applied: true, ok: null, deferred: true }
+
+		// Fire-and-forget: run the NVIDIA policy update without blocking HTTP response
+		void (async () => {
+			try {
+				const env = displaySessionEnv()
+				let nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
+				if (!nvidiaRes.ok) {
+					log('info', '[Full apply] NVIDIA display policy retry in 6s (MetaMode may lag Caspar restart)')
+					await new Promise((r) => setTimeout(r, 6000))
+					nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
+				}
+				if (nvidiaRes.ok) {
+					log('info', '[Full apply] NVIDIA display policy applied (deferred)')
+				} else {
+					log('warn', `[Full apply] NVIDIA display policy failed: ${nvidiaRes.reason || 'unknown'}`)
+				}
+			} catch (e) {
+				log('warn', `[Full apply] NVIDIA display policy (deferred): ${e?.message || e}`)
 			}
-			out.nvidiaDisplay.ok = !!nvidiaRes.ok
-			if (nvidiaRes.reason) out.nvidiaDisplay.reason = nvidiaRes.reason
-		} catch (e) {
-			log('warn', `[Full apply] NVIDIA display policy: ${e?.message || e}`)
-			out.nvidiaDisplay.ok = false
-			out.nvidiaDisplay.error = e instanceof Error ? e.message : String(e)
-		}
+		})().catch((e) => {
+			log('error', `[Full apply] NVIDIA display policy promise rejected: ${e?.message || e}`)
+		})
 	}
 
 	if (needsNodm) {

@@ -17,9 +17,9 @@ function parsePositiveInt(name, fallback) {
  * @returns {Promise<{ ok: boolean, displays?: number, reason?: string }>}
  */
 async function waitForDisplayStable(opts = {}) {
-	const settleMs = opts.settleMs ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_SETTLE_MS', 4000)
-	const pollMs = opts.pollMs ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_POLL_MS', 1500)
-	const maxAttempts = opts.maxAttempts ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_MAX_ATTEMPTS', 12)
+	const settleMs = opts.settleMs ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_SETTLE_MS', 1500)
+	const pollMs = opts.pollMs ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_POLL_MS', 400)
+	const maxAttempts = opts.maxAttempts ?? parsePositiveInt('HIGHASCG_OS_LAYOUT_MAX_ATTEMPTS', 46)
 	const log = typeof opts.log === 'function' ? opts.log : () => {}
 
 	let attempts = 0

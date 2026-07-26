@@ -128,7 +128,7 @@
 	border-bottom: 1px solid var(--border);
 	/* Owner request 2026-07-26: tab labels never truncate — angled single line instead. */
 	overflow: visible;
-	padding-top: 14px;
+	padding-top: 46px;
 }
 .panel-inspector-mode {
 	border: none;
@@ -145,15 +145,17 @@
 	text-align: left;
 	overflow: visible;
 	min-width: 0;
-	transform: rotate(-18deg);
-	transform-origin: 20% 100%;
+	transform: rotate(-45deg);
+	transform-origin: 8% 100%;
+	border-bottom: none;
 }
 .panel-inspector-mode:hover {
 	color: var(--text);
 }
 .panel-inspector-mode--active {
 	color: var(--accent);
-	border-bottom-color: var(--accent);
+	text-decoration: underline 2px var(--accent);
+	text-underline-offset: 4px;
 }
 
 .panel__collapse-btn {
