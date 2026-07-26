@@ -37,30 +37,25 @@ Standard Shadertoy entry point `mainImage(out vec4 fragColor, in vec2 fragCoord)
 
 **Audio texture** (channel wired to `audio`): 512×2, same layout as Shadertoy's audio input — row 0 = FFT spectrum, row 1 = waveform; sample the `.x`/`.r` component (e.g. `texture(iChannel0, vec2(f, 0.25)).x` for spectrum, `y ≈ 0.75` for waveform).
 
-**Audio reactivity by playback path** (auto-selected):
+**Audio reactivity by source** (per frame, freshest real data wins — WO-333b/335):
 
-| Path | Audio quality |
-|------|---------------|
-| browser_display source | **Real FFT** via getUserMedia — but only if a capture device actually exists, see the warning below; `?audioDev=<substring>` selects one |
-| Caspar CG / CEF template | **Coarse** — level from the playout OSC meters, synthesized into a plausible spectrum; `?ch=<caspar channel>` picks the meter source (default 1) |
+| Source | Audio quality |
+|--------|---------------|
+| **Shader FFT source** (a live-audio input slot routed in the device-view inspector) | **Real FFT** on every path incl. Caspar CG/CEF — the slot's bridge ffmpeg tees raw PCM to the node, which broadcasts 512-bin `audio_fft` frames on the app WebSocket |
+| getUserMedia (browser_display Firefox) | **Real FFT**, but only when a `monitor`/`loopback` device exists or `?audioDev=<substring>` names one — otherwise the player refuses the default (silent) mic and skips this tier |
+| Playout OSC meters | **Coarse** — single level synthesized into a plausible spectrum; automatic fallback when neither real source is live; `?ch=<caspar channel>` picks the meter (default 1) |
 | No audio available | Shader still renders; audio texture stays silent |
 
-> **Audio-reactive shaders need a capture device that does not exist by default.** A stock HighAsCG
-> box runs raw ALSA with no sound server (no PulseAudio, no PipeWire) — so there is no "monitor" or
-> "loopback" device to pick up what Caspar is playing. `arecord -l` on such a box lists only the
-> physical motherboard analog inputs. Consequences:
+> **The primary path is the "Shader FFT source" toggle** (WO-333b/336): select a live audio input's
+> host channel in the **device view** and tick **"Feed audio-reactive shaders"** in its inspector.
+> The slot's capture (e.g. a USB mixer) then drives every audio-reactive shader on every playback
+> path, no Caspar restart needed. Single-select: one slot feeds all shaders.
 >
-> - The player's automatic pick looks for a device whose label matches `monitor|loopback`. With no
->   such device it silently falls through to the default input, which is usually a mic jack with
->   nothing plugged in — the shader renders, the audio texture stays near silent.
-> - To react to **program audio** you must first create a loopback: the `snd-aloop` kernel module
->   ships with the installed kernel (no extra package), and Caspar then needs a second audio
->   consumer pointed at its playback side. That is a Caspar restart and a boot-time module load.
-> - To react to a **live input**, patch a real source into a motherboard line-in and select it with
->   `?audioDev=`.
->
-> See `work/work-orders/282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md` for the measured state
-> of the box and the staged plan.
+> Without a routed slot, real FFT needs a capture device a stock box does not have (raw ALSA, no
+> sound server — no `monitor`/`loopback` device). To react to **program audio** without a routed
+> slot you must load `snd-aloop` and point a second Caspar audio consumer at it (boot-time module
+> + Caspar restart). See `work/work-orders/282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md`
+> and `335_WO_SHADER_AUDIO_PROGRAM_PATH_WS_TIER_PRIORITY.md`.
 
 **Not supported** (v1): Shadertoy texture/video/cubemap/keyboard/webcam channel assets (channels are buffers + audio only), sound shaders, VR, mouse interaction. CG `UPDATE` accepts `{ "paused": true|false }` only — everything else is baked in at export.
 
@@ -78,7 +73,7 @@ Standard Shadertoy entry point `mainImage(out vec4 fragColor, in vec2 fragCoord)
 |---------|--------|
 | Layer black on air | CEF GPU disabled — enable + Apply Caspar config + restart, or play via browser_display |
 | Shader missing from Templates | **Refresh** the Templates tab (Caspar TLS) |
-| No audio reaction | First check a capture device exists at all (`arecord -l`) — see the audio warning above; then that a channel is wired to **audio** with **audio reactive** ticked. CG path gives coarse levels only |
+| No audio reaction | Check a **Shader FFT source** slot is routed (device-view inspector) — then that a channel is wired to **audio**, **audio reactive** is ticked, and the GLSL actually samples that iChannel. `sh-fft-test` in the library is a known-good test card |
 | Save fails | Missing name, empty Image pass, or a pass over 256 KB — the status line shows the reason |
 | Preview blank in the modal | Shader compile error — check the browser console for the GLSL error |
 

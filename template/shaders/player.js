@@ -148,8 +148,12 @@
 		if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') return false
 		try {
 			const deviceId = await pickAudioDevice()
+			// WO-335: no monitor/loopback match and no explicit ?audioDev → don't open a default
+			// device at all. It's a silent mic on this box (CEF file:// auto-grants), and a dead
+			// analyser would still outrank the OSC synth fallback when the WS feed is down.
+			if (!deviceId) return false
 			const stream = await navigator.mediaDevices.getUserMedia({
-				audio: deviceId ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+				audio: { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
 			})
 			const ac = new (window.AudioContext || window.webkitAudioContext)()
 			const src = ac.createMediaStreamSource(stream)
@@ -278,7 +282,7 @@
 	async function start() {
 		if (config.audio && config.audio.enabled && usesAudioChannel()) {
 			audioTexture = createAudioTexture()
-			toy.addTexture(audioTexture, 'audio')
+			toy.addTexture(audioTexture, 'audio', AUDIO_W, 2)
 			// WS tier is always on and outranks the analyser while frames are fresh; tier A
 			// runs in the background as the fallback (don't block first paint on getUserMedia).
 			initTierB()

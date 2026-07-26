@@ -101,6 +101,7 @@ function ShaderToyLite(canvasId) {
     var ichannels = {}; // texture inputs
     var atexture = {};  // front texture (input/output)
     var btexture = {};  // back texture  (input/output)
+    var textureSize = {}; // WO-335 patch: [w, h] per custom addTexture() key
     var aframebuf = {}; // front buffer (output)
     var bframebuf = {}; // back buffer (output)
     var program = {};   // webgl program
@@ -305,12 +306,22 @@ function ShaderToyLite(canvasId) {
                 }
     
                 // textures
+                // WO-335 patch: channels backed by a custom addTexture() report their true
+                // resolution; buffer channels keep the canvas size from iChannelResolutions.
+                var chres = iChannelResolutions;
                 for (let i = 0; i < 4; i++) {
                     var chkey = ichannels[key][i];
                     if (chkey) {
                         var input = flip[chkey] ? atexture[chkey] : btexture[chkey];
                         gl.activeTexture(gl[`TEXTURE${i}`]);
                         gl.bindTexture(gl.TEXTURE_2D, input);
+                        var sz = textureSize[chkey];
+                        if (sz) {
+                            if (chres === iChannelResolutions) chres = new Float32Array(iChannelResolutions);
+                            chres[i * 3] = sz[0];
+                            chres[i * 3 + 1] = sz[1];
+                            chres[i * 3 + 2] = 1;
+                        }
                     }
                 }
     
@@ -324,7 +335,7 @@ function ShaderToyLite(canvasId) {
                 gl.uniform1f( location[key]["iFrameRate"], 60);
                 gl.uniform1i( location[key]["iFrame"], iFrame);
                 gl.uniform1fv(location[key]["iChannelTime"], iChannelTimes);
-                gl.uniform3fv(location[key]["iChannelResolution"], iChannelResolutions);
+                gl.uniform3fv(location[key]["iChannelResolution"], chres);
                 gl.uniform1i( location[key]["iChannel0"], 0);
                 gl.uniform1i( location[key]["iChannel1"], 1);
                 gl.uniform1i( location[key]["iChannel2"], 2);
@@ -398,10 +409,15 @@ function ShaderToyLite(canvasId) {
         onDrawCallback = callback;
     }
 
-    this.addTexture = (texture, key) => {
+    // WO-335 patch: optional width/height so custom textures (e.g. the 512×2 audio texture)
+    // report their true iChannelResolution instead of the canvas size.
+    this.addTexture = (texture, key, width, height) => {
         atexture[key] = texture;
         btexture[key] = texture;
         flip[key] = false;
+        if (width > 0 && height > 0) {
+            textureSize[key] = [width, height];
+        }
     }
     
     this.time = () => {
