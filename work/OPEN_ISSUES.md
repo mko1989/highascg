@@ -130,4 +130,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-344 | Shader look thumbnails: content-aware crop, synthetic audio, fill compositing | [WO-344](./work-orders/344_WO_SHADER_LOOK_THUMBNAILS.md) | 🔴 Open |
 | WO-AUDIT | Last-week WO audit + compiled todo list | [todos26.07.26_wo_audit.md](./todos26.07.26_wo_audit.md) | ✅ 2026-07-26 |
 
+| WO-345 | Shader Live workflow: shades-bunny toggles live-shader editor; params ride the RUNNING producer via CG UPDATE hot-recompile | [WO-345](./work-orders/345_WO_SHADER_LIVE_WORKFLOW.md) | 🔴 Open (implementing) |
+
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)
