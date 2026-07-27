@@ -202,6 +202,53 @@ export function appendSceneLayerFillGroup(root, opts) {
 	fillGrp.appendChild(wInp.wrap)
 	fillGrp.appendChild(hInp.wrap)
 
+	/* Scale % control: multiplies layer rect around its center via existing patchFillPx path */
+	const scaleRow = document.createElement('div')
+	scaleRow.className = 'inspector-field inspector-row'
+	const scaleLabel = document.createElement('label')
+	scaleLabel.className = 'inspector-field__label'
+	scaleLabel.textContent = 'Scale %'
+	const scaleInput = document.createElement('input')
+	scaleInput.type = 'number'
+	scaleInput.className = 'inspector-field__input'
+	scaleInput.min = '10'
+	scaleInput.max = '1000'
+	scaleInput.step = '5'
+	scaleInput.value = '100'
+
+	function applyScale() {
+		const pct = Math.max(10, Math.min(1000, parseFloat(scaleInput.value) || 100))
+		const sc = sceneState.getScene(sceneId)
+		const L = sc?.layers?.[layerIndex]
+		if (!L) return
+		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		const fill = L.fill || fullFill()
+		const pxRectStored = fillToPixelRect(fill, canvas)
+		const disp = displayPositionFromStoredPx(pxRectStored, canvas)
+		const newW = disp.w * (pct / 100)
+		const newH = disp.h * (pct / 100)
+		const newX = disp.x + (disp.w - newW) / 2
+		const newY = disp.y + (disp.h - newH) / 2
+		patchFillPx({ x: newX, y: newY, w: newW, h: newH })
+		scaleInput.value = '100'
+	}
+
+	scaleInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			applyScale()
+		}
+	})
+	const applyBtn = document.createElement('button')
+	applyBtn.type = 'button'
+	applyBtn.className = 'scenes-btn scenes-btn--sm'
+	applyBtn.textContent = 'Apply'
+	applyBtn.addEventListener('click', applyScale)
+	scaleRow.appendChild(scaleLabel)
+	scaleRow.appendChild(scaleInput)
+	scaleRow.appendChild(applyBtn)
+	fillGrp.appendChild(scaleRow)
+
 	const lockWrap = document.createElement('div')
 	lockWrap.className = 'inspector-field inspector-row'
 	const lockCb = document.createElement('input')
