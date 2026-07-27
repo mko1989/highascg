@@ -167,3 +167,10 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       in Sources → Templates. In shaders mode, clicking any shader row there loads it onto
       preview and into the dropdown; outside shaders mode the click does nothing.
       >
+
+- [ ] **32. Shader params: decode + wiggle + take** (WO-356 follow-ups)
+      Each auto param shows a plain-language line ("size/radius of the shape", "wave speed"…).
+      ≋ wiggles the value on PREVIEW only (~1.2s) then restores — PGM never moves.
+      ▶ in the editor bar takes PRV→PGM with the deck's transition. ↺ per-param reset
+      visibly snaps the row back now.
+      >

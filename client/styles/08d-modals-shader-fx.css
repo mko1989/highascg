@@ -378,3 +378,22 @@
 	text-overflow: ellipsis;
 	margin: -1px 0 3px 20px;
 }
+
+/* todos27 — ≋ wiggle button + editor take button */
+.shader-live__wiggle {
+	flex: none;
+	padding: 0 3px;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 0.75rem;
+}
+
+.shader-live__wiggle:hover { color: var(--text); }
+.shader-live__wiggle:disabled { opacity: 0.4; cursor: default; }
+
+.shader-live__take {
+	padding: 2px 14px;
+	font-weight: 700;
+}

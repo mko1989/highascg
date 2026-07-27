@@ -15,6 +15,8 @@ import { escapeHtml } from '../lib/dom-escape.js'
 import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
 import { sceneState } from '../lib/scene-state.js'
 import { liveShaderInstances } from '../lib/shader-live-instances.js'
+import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
+import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml, toHex } from './shader-live-rows.js'
 import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function initShaderLiveEditor(stateStore) {
@@ -52,8 +54,16 @@ export function initShaderLiveEditor(stateStore) {
 			void loadSelected()
 		})
 		overlay.querySelector('#shl-save').addEventListener('click', () => void saveToLibrary())
+		/* todos27: PRV→PGM from inside the editor — fires the deck's global take (hidden while
+		 * shaders mode is open, but its handler and transition semantics stay the source of truth). */
+		overlay.querySelector('#shl-take').addEventListener('click', () => {
+			const takeBtn = document.querySelector('#scenes-global-take')
+			if (takeBtn) takeBtn.click()
+			else window.showToast?.('Take unavailable — deck not mounted', 'error')
+		})
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
 		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
+		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamWiggle(e))
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamRename(e))
 		/* todos27: wheel over a slider = one step per notch — small precise changes. */
 		overlay.querySelector('#shl-params').addEventListener(
@@ -147,36 +157,11 @@ export function initShaderLiveEditor(stateStore) {
 		return out
 	}
 
-	function toHex(v) {
-		const c = (x) => Math.max(0, Math.min(255, Math.round((Number(x) || 0) * 255))).toString(16).padStart(2, '0')
-		return `#${c(v[0])}${c(v[1])}${c(v[2])}`
-	}
-
-	/* Universal Caspar-mixer rides — available for EVERY shader (no GLSL literals needed). */
-	const MIXER_ROWS = [
-		{ cmd: 'OPACITY', label: 'opacity', min: 0, max: 1, step: 0.01, def: 1 },
-		{ cmd: 'BRIGHTNESS', label: 'brightness', min: 0, max: 3, step: 0.01, def: 1 },
-		{ cmd: 'SATURATION', label: 'saturation', min: 0, max: 3, step: 0.01, def: 1 },
-		{ cmd: 'CONTRAST', label: 'contrast', min: 0, max: 3, step: 0.01, def: 1 },
-	]
-	function mixerRowsHtml() {
-		return MIXER_ROWS.map(
-			(r, i) => `<div class="shader-live__param"><span class="shader-live__pname">${r.label}</span>
-				<input type="range" data-mixer="${i}" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}">
-				<input type="number" data-mixer="${i}" data-num min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}"></div>`,
-		).join('')
-	}
-
-	/* todos27: each category renders as a bordered rect (title + 2-col grid of rows). */
-	function groupHtml(title, rowsHtml) {
-		if (!rowsHtml) return ''
-		return `<div class="shader-live__group"><div class="shader-live__group-title">${escapeHtml(title)}</div><div class="shader-live__group-grid">${rowsHtml}</div></div>`
-	}
 
 	function renderParams() {
 		params = scanCfg()
 		const host = overlay.querySelector('#shl-params')
-		const row = (p, idx) => paramRowHtml(p, idx)
+		const row = (p, idx) => paramRowHtml(p, idx, shaderCfg?.paramLabels?.[labelKeyOf(p)])
 		const namedHtml = params.map((p, i) => (p.deep ? '' : row(p, i))).join('')
 		/* todos27: deep params render as human-named rows grouped into CATEGORIES (Colors,
 		 * Speed & time, …) instead of one bucket of code snippets. */
@@ -218,26 +203,6 @@ export function initShaderLiveEditor(stateStore) {
 		return `${p.passKey}:${p.deep ? `deep:${p.context || p.name}` : p.name}`
 	}
 
-	function paramRowHtml(p, idx) {
-		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
-		/* todos27: the calculation the value lives in — tiny, so the user can guess the effect. */
-		const exprHtml = p.deep && p.expr ? `<div class="shader-live__expr" title="${escapeHtml(p.expr)}">${escapeHtml(p.expr)}</div>` : ''
-		const custom = shaderCfg?.paramLabels?.[labelKeyOf(p)]
-		/* Tooltip = the decode: pass + auto name + the raw ◆ code context. */
-		const tip = `${p.passKey} — ${p.name}${p.context ? `\n${p.context}` : ''}`
-		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
-		if (p.kind === 'color') {
-			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
-			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}${exprHtml}</div>`
-		}
-		const sliders = p.values
-			.map(
-				(v, ci) => `<input type="range" data-p="${idx}" data-c="${ci}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">
-				<input type="number" data-p="${idx}" data-c="${ci}" data-num min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">`,
-			)
-			.join('')
-		return `<div class="${cls}">${name}${sliders}${exprHtml}</div>`
-	}
 
 	function sourceOf(passKey) {
 		return passKey === 'common' ? shaderCfg?.common || '' : shaderCfg?.passes?.[passKey]?.source || ''
@@ -301,29 +266,37 @@ export function initShaderLiveEditor(stateStore) {
 			passKey === 'common'
 				? { common: shaderCfg.common }
 				: { passes: { [passKey]: { source: shaderCfg.passes[passKey].source } } }
-		/* AMCP quoted-string escaping: BACKSLASHES FIRST, then quotes — multi-line GLSL serializes
-		 * with \n escapes, and without doubling them Caspar unescapes \n to a REAL newline inside a
-		 * JSON string literal = invalid JSON = silent no-op (the owner's 'live edits do not work').*/
-		const json = JSON.stringify(payload).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 		const targets = instances().filter((i) => i.shaderId === inst.shaderId)
-		for (const t of targets) {
-			try {
-				/* /api/raw answers HTTP 200 even when Caspar refuses — the error rides the body. */
-				const r = await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
-				if (!r?.error) continue
-				/* todos27: playlist hops with a MIX transition PLAY plain html producers (that is
-				 * what makes shader-to-shader mixing work) — CG UPDATE 403s on those. Re-host via
-				 * CG ADD once (one visible restart, only at edit time) and retry. */
-				if (/403/.test(String(r.error)) && t.cgName) {
-					await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} ADD 0 "${t.cgName}" 1 "{}"` })
-					const r2 = await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
-					if (r2?.error) console.warn('[shader-live] re-host retry failed:', r2.error)
-				} else {
-					console.warn('[shader-live] CG UPDATE failed:', r.error)
-				}
-			} catch (e) {
-				console.warn('[shader-live] CG UPDATE failed:', e?.message || e)
+		for (const { target: t, error } of await pushCgUpdateTo(api, targets, payload)) {
+			/* todos27: playlist hops with a MIX transition PLAY plain html producers — CG UPDATE
+			 * 403s on those. Re-host via CG ADD once (one visible restart, only at edit time). */
+			if (/403/.test(error) && t.cgName) {
+				await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} ADD 0 "${t.cgName}" 1 "{}"` }).catch(() => {})
+				const again = await pushCgUpdateTo(api, [t], payload)
+				if (again.length) console.warn('[shader-live] re-host retry failed:', again[0].error)
+			} else {
+				console.warn('[shader-live] CG UPDATE failed:', error)
 			}
+		}
+	}
+
+	/* todos27: SHOW what a value does — wiggle it briefly on the PREVIEW instances, restore. */
+	async function onParamWiggle(e) {
+		const t = e.target
+		if (!(t instanceof HTMLElement) || t.dataset.wiggle == null) return
+		const p = params[Number(t.dataset.wiggle)]
+		const inst = selected()
+		if (!p || !inst || !shaderCfg || t.disabled) return
+		const prvTargets = instances().filter((i) => i.shaderId === inst.shaderId && i.isPrv)
+		if (!prvTargets.length) {
+			window.showToast?.('Load this shader on preview first (click it in Templates while in Shader Live)', 'info')
+			return
+		}
+		t.disabled = true
+		try {
+			await wiggleParamOnPreview({ api, param: p, source: sourceOf(p.passKey), passKey: p.passKey, prvTargets, rewrite: rewriteParamValues })
+		} finally {
+			t.disabled = false
 		}
 	}
 

@@ -33,6 +33,26 @@ dropdown picks the auditioned shader up (pre-selected). The Edit button still op
 
 `liveShaderInstances` split out to `client/lib/shader-live-instances.js` (500-line gate).
 
+## Follow-ups (same day) — v3b/c/d
+
+- **Per-param ↺ looked dead** — it landed on air but never re-rendered the row; fixed.
+- **Colors category narrowed** to values whose LABEL is the color target (statement-wide match
+  had flooded the Colors rect with every col-math slider).
+- **Dense grids**: auto-fill minmax(215px) columns — 4-up on the operator display.
+- **Clustering**: same-base labels ("freq", "freq #2") sort adjacent within each category.
+- **Idiom DECODE (shader-param-describe.js)**: each auto param carries a sentence about what it
+  will do — `length(p)-◆` → "size/radius of the shape", `mix(..,◆)` → "blend amount",
+  `exp(-◆d)` → "falloff — tighter glow", `sin(iTime*◆)` → "wave speed", loop bound →
+  "iteration count — more = finer detail, slower render"… falls back to the raw calculation
+  line; the code always stays in the tooltip.
+- **≋ WIGGLE preview (shader-cg-update.js)**: per-param button briefly oscillates the value on
+  the PREVIEW instances only (~1.2s, clamped ±12% of range, scratch source — shaderCfg and PGM
+  untouched), then restores: the operator SEES what a value does before committing.
+- **▶ take in the editor bar**: PRV→PGM from inside shaders mode — fires the deck's global-take
+  button (hidden but mounted), so transition semantics stay identical.
+- pushLive refactored onto shared `pushCgUpdateTo`; row builders split to
+  shader-live-rows.js (500-line gate).
+
 ## Verification
 
 wo340 smoke 23/23, test:ci 1555/0, lint 0, gate 0; client built + kiosk reloaded. Owner checks:
