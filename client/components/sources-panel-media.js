@@ -111,7 +111,7 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 				<span class="source-item__expand-arrow">${isCollapsed ? '▶' : '▼'}</span>
 				<span class="source-item__icon">📁</span>
 				<span class="source-item__label">${escapeHtml(name)}</span>
-				<span class="source-item__delete-folder" title="Delete folder">🗑</span>
+				<span class="source-item__delete-folder" title="Delete folder">✕</span>
 			`
 			el.onclick = (e) => { e.stopPropagation(); onToggle?.(folder.path) }
 			

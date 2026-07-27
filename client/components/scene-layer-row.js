@@ -62,7 +62,7 @@ export function appendSceneLayerStripRows(layerStrip, opts) {
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-paste-style="${realIdx}" title="Paste copied settings" aria-label="Paste layer settings" ${canPaste ? '' : 'disabled'}>📋→</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-save-preset="${realIdx}" title="Save as layer style preset" aria-label="Save as layer style preset">💾</button>
 						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon" data-add-layer-route="${realIdx}" title="Add a route to this layer as a new layer in this look (↗ default = PGM; Shift+↗ = edit bus; Ctrl+↗ = PRV)" aria-label="Add route to this layer as a new layer in this look" ${canAddLayerRoute ? '' : 'disabled'}>↗</button>
-						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">🗑</button>
+						<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove="${realIdx}" title="Remove layer" aria-label="Remove layer">✕</button>
 					</div>
 				</div>
 			`
@@ -358,7 +358,7 @@ export function mountLayerPresetControls(parent, opts) {
 			<option value="">${has ? '— choose preset —' : '— no presets yet —'}</option>
 		</select>
 		<button type="button" class="scenes-btn scenes-btn--sm" data-apply-preset ${has ? '' : 'disabled'}></button>
-		<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove-preset title="Delete selected preset" aria-label="Delete preset" ${has ? '' : 'disabled'}>🗑</button>
+		<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--icon scenes-btn--danger" data-remove-preset title="Delete selected preset" aria-label="Delete preset" ${has ? '' : 'disabled'}>✕</button>
 	`
 	const sel = row.querySelector('.scenes-layer-presets__sel')
 	if (sel && has) {

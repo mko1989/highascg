@@ -141,7 +141,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			itemRow.style.background = 'var(--bg-elevated, #21262d)'
 			itemRow.style.border = '1px solid var(--border, #30363d)'
 			itemRow.style.borderRadius = '4px'
-			itemRow.style.padding = '4px 8px'
+			itemRow.style.padding = '2px 4px'
 			itemRow.style.transition = 'all 0.15s ease'
 			
 			const isImg = item.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(item.value)
@@ -149,19 +149,19 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 				(item.type === 'media' || item.type === 'file' || !item.type) && item.value
 					? getThumbnailUrl(item.value, 80, 2)
 					: null
+			/* todos27.07.26 minimalism: tiny grab dots, thumb ONLY when a real thumbnail exists
+			 * (the bordered placeholder box was pure noise), the NAME gets the row, compact
+			 * seconds box, ✕ instead of a trashcan. */
 			const thumbHtml = thumbUrl
-				? `<img src="${escapeAttr(thumbUrl)}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2224%22><rect width=%22100%%22 height=%22100%%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2210%22>${isImg ? '🖼️' : '🎬'}</text></svg>'" style="width: 32px; height: 20px; object-fit: cover; border-radius: 2px; border: 1px solid var(--border); margin-right: 8px;"/>`
-				: `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:20px;margin-right:8px;border-radius:2px;border:1px solid var(--border);background:var(--bg-elevated,#21262d);font-size:10px;color:var(--text-muted,#8b949e);">•</span>`
+				? `<img src="${escapeAttr(thumbUrl)}" onerror="this.remove()" style="width: 24px; height: 14px; object-fit: cover; border-radius: 2px; margin-right: 4px; flex: none;"/>`
+				: ''
 			const itemLabel = item.label || item.value || ''
 			itemRow.innerHTML = `
-				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 8px; user-select: none;">⋮⋮</span>
+				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 4px; font-size: 0.6rem; line-height: 1; user-select: none; flex: none;">⋮⋮</span>
 				${thumbHtml}
-				<span class="playlist-item-name" title="${escapeAttr(itemLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${escapeHtml(itemLabel)}</span>
-				<div style="display: flex; align-items: center; gap: 4px; margin-right: 8px;" title="Duration in seconds (used for static images, or to limit video playback)">
-					<input type="number" class="playlist-item-duration" value="${item.duration ?? 5}" min="1" max="3600" style="width: 42px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.75rem; text-align: center; padding: 1px;"/>
-					<span style="font-size: 0.7rem; color: var(--text-muted);">s</span>
-				</div>
-				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" style="padding: 1px 6px; font-size: 0.75rem; line-height: 1;">🗑</button>
+				<span class="playlist-item-name" title="${escapeAttr(itemLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(itemLabel)}</span>
+				<input type="number" class="playlist-item-duration" title="Duration in seconds (static images / timeless items, or to limit video playback)" value="${item.duration ?? 5}" min="1" max="3600" style="width: 34px; flex: none; margin: 0 4px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.7rem; text-align: center; padding: 1px 0;"/>
+				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" title="Remove item" style="padding: 0 4px; font-size: 0.75rem; line-height: 1.3; flex: none;">✕</button>
 			`
 
 			// Setup drag & drop reordering

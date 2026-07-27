@@ -26,3 +26,10 @@ the mix duration type takes the full wdith it has when it should be small adjust
 
 
 the screen that displays after reboot to choose operator monitor is too bright and colorfull. black bg and white text in the middle. also when the monitor is chosen this way it needs to be cabled correctly in the devices tab already.
+
+
+the taskbar in the top bar of operator gui, uses apps system icons inside the cirlce.
+when i click back to gui, the browser hides under the casparcg screen, but after around 2s. but then i cant recall to the front the browser again.
+
+ the playlist workflow the items in the list have teribble spacing. the move dots are huge, then there is some rectangle, 4characters of the item name, big box for seconds. and big trashcan. minimalizm is the key. the most importnat part is the name. change trashcans to xs. check if they appear anywhere else like layer list.
+ 
