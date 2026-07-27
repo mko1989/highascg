@@ -138,15 +138,35 @@ export function initShaderLiveEditor(stateStore) {
 		return `#${c(v[0])}${c(v[1])}${c(v[2])}`
 	}
 
+	/* Universal Caspar-mixer rides — available for EVERY shader (no GLSL literals needed). */
+	const MIXER_ROWS = [
+		{ cmd: 'OPACITY', label: 'opacity', min: 0, max: 1, step: 0.01, def: 1 },
+		{ cmd: 'BRIGHTNESS', label: 'brightness', min: 0, max: 3, step: 0.01, def: 1 },
+		{ cmd: 'SATURATION', label: 'saturation', min: 0, max: 3, step: 0.01, def: 1 },
+		{ cmd: 'CONTRAST', label: 'contrast', min: 0, max: 3, step: 0.01, def: 1 },
+	]
+	function mixerRowsHtml() {
+		return (
+			'<div class="shader-live__section">Layer (Caspar mixer)</div>' +
+			MIXER_ROWS.map(
+				(r, i) => `<div class="shader-live__param"><span class="shader-live__pname">${r.label}</span>
+					<input type="range" data-mixer="${i}" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}">
+					<input type="number" data-mixer="${i}" data-num min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}"></div>`,
+			).join('')
+		)
+	}
+
 	function renderParams() {
 		params = scanCfg()
 		const host = overlay.querySelector('#shl-params')
 		if (!params.length) {
 			host.innerHTML =
-				'<p class="settings-note">No tweakable parameters detected. Pull values into top-level <code>#define</code> / <code>const</code> literals (or annotate with <code>// @slider(min,max)</code> / <code>// @color</code>) and Save from the shader modal.</p>'
+				mixerRowsHtml() +
+				'<div class="shader-live__section">Shader parameters</div>' +
+				'<p class="settings-note">None detected in this shader — values are inline in the GLSL. Pull them into top-level <code>#define</code> / <code>const</code> literals (or annotate with <code>// @slider(min,max)</code> / <code>// @color</code>) via the shader modal and they appear here.</p>'
 			return
 		}
-		host.innerHTML = params
+		host.innerHTML = mixerRowsHtml() + '<div class="shader-live__section">Shader parameters</div>' + params
 			.map((p, idx) => {
 				const name = `<span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
 				if (p.kind === 'color') {
@@ -174,7 +194,14 @@ export function initShaderLiveEditor(stateStore) {
 
 	function onControlInputMirror(e) {
 		const t = e.target
-		if (!(t instanceof HTMLInputElement) || t.dataset.p == null || t.dataset.color != null) return
+		if (!(t instanceof HTMLInputElement) || t.dataset.color != null) return
+		if (t.dataset.mixer != null) {
+			for (const twin of overlay.querySelectorAll(`[data-mixer="${t.dataset.mixer}"]`)) {
+				if (twin !== t) twin.value = t.value
+			}
+			return
+		}
+		if (t.dataset.p == null) return
 		for (const twin of overlay.querySelectorAll(`[data-p="${t.dataset.p}"][data-c="${t.dataset.c}"]`)) {
 			if (twin !== t) twin.value = t.value
 		}
@@ -182,7 +209,16 @@ export function initShaderLiveEditor(stateStore) {
 
 	function onControlChange(e) {
 		const t = e.target
-		if (!(t instanceof HTMLInputElement) || t.dataset.p == null) return
+		if (!(t instanceof HTMLInputElement)) return
+		if (t.dataset.mixer != null) {
+			const row = MIXER_ROWS[Number(t.dataset.mixer)]
+			const inst = selected()
+			const v = Number(t.value)
+			if (!row || !inst || !Number.isFinite(v)) return
+			void api.post('/api/raw', { cmd: `MIXER ${inst.channel}-${inst.pLayer} ${row.cmd} ${v}` }).catch(() => {})
+			return
+		}
+		if (t.dataset.p == null) return
 		const p = params[Number(t.dataset.p)]
 		if (!p || !shaderCfg) return
 		let next

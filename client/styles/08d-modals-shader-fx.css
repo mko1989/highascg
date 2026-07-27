@@ -262,3 +262,14 @@
 .shader-live__param input[type='range'] { flex: 1 1 auto; }
 .shader-live__param input[type='number'] { flex: 0 0 84px; width: 84px; }
 .shader-live__param input[type='color'] { flex: 0 0 52px; width: 52px; height: 28px; padding: 0; }
+
+/* hidden must win over the class's display:flex (regression: could not leave Shader Live) */
+.shader-live[hidden] { display: none; }
+
+.shader-live__section {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	margin-top: 6px;
+}
