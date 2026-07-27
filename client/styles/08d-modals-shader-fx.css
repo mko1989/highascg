@@ -273,3 +273,18 @@
 	color: var(--text-muted);
 	margin-top: 6px;
 }
+
+/* Inline variant: lives inside .scenes-split below the compose preview, not fixed. */
+.shader-live--inline {
+	position: relative;
+	top: auto; left: auto; right: auto; bottom: auto;
+	flex: 1 1 0;
+	min-height: 0;
+	z-index: auto;
+}
+
+.shader-live__param--deep .shader-live__pname {
+	flex-basis: 260px;
+	font-size: 0.72rem;
+	opacity: 0.85;
+}

@@ -12,7 +12,7 @@
 import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
-import { scanShaderParams, rewriteParamValues } from '../lib/shader-param-scan.js'
+import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
 
 const SHADER_VALUE_RE = /(^|\/)shaders\/(sh-[a-z0-9-]+)/i
 
@@ -61,7 +61,7 @@ export function initShaderLiveEditor(stateStore) {
 		if (overlay) return overlay
 		overlay = document.createElement('div')
 		overlay.id = 'shader-live-overlay'
-		overlay.className = 'shader-live'
+		overlay.className = 'shader-live shader-live--inline'
 		overlay.innerHTML = `
 			<div class="shader-live__bar">
 				<span class="shader-live__title">🕶 Shader Live</span>
@@ -71,7 +71,8 @@ export function initShaderLiveEditor(stateStore) {
 				<button type="button" class="btn btn--secondary" id="shl-close" title="Back to looks">✕</button>
 			</div>
 			<div class="shader-live__params" id="shl-params"><p class="settings-note">No shader live — take a shader look to PGM or PRV.</p></div>`
-		document.body.appendChild(overlay)
+		/* Owner 2026-07-27: the compose preview must stay exactly where it is — the panel replaces
+		 * only the looks area BELOW it (.scenes-main inside .scenes-split). */
 		overlay.querySelector('#shl-close').addEventListener('click', () => setOpen(false))
 		overlay.querySelector('#shl-instance').addEventListener('change', (e) => {
 			selectedKey = e.target.value
@@ -124,7 +125,15 @@ export function initShaderLiveEditor(stateStore) {
 	function scanCfg() {
 		const out = []
 		const push = (passKey, source) => {
-			for (const p of scanShaderParams(source || '')) out.push({ ...p, passKey })
+			const named = scanShaderParams(source || '')
+			for (const p of named) out.push({ ...p, passKey })
+			// Owner 2026-07-27: auto-extracted body literals — no code interaction needed. Drop
+			// any that overlap a named param's spans (const literals appear in both scans).
+			const taken = named.flatMap((p) => p.spans)
+			for (const d of scanShaderDeepParams(source || '')) {
+				const hits = d.spans.some((ds) => taken.some((ts) => ds.start < ts.end && ts.start < ds.end))
+				if (!hits) out.push({ ...d, passKey })
+			}
 		}
 		push('common', shaderCfg?.common)
 		for (const key of ['image', 'bufferA', 'bufferB', 'bufferC', 'bufferD']) {
@@ -159,29 +168,32 @@ export function initShaderLiveEditor(stateStore) {
 	function renderParams() {
 		params = scanCfg()
 		const host = overlay.querySelector('#shl-params')
-		if (!params.length) {
-			host.innerHTML =
-				mixerRowsHtml() +
-				'<div class="shader-live__section">Shader parameters</div>' +
-				'<p class="settings-note">None detected in this shader — values are inline in the GLSL. Pull them into top-level <code>#define</code> / <code>const</code> literals (or annotate with <code>// @slider(min,max)</code> / <code>// @color</code>) via the shader modal and they appear here.</p>'
-			return
+		const row = (p, idx) => paramRowHtml(p, idx)
+		const namedHtml = params.map((p, i) => (p.deep ? '' : row(p, i))).join('')
+		const deepHtml = params.map((p, i) => (p.deep ? row(p, i) : '')).join('')
+		host.innerHTML =
+			mixerRowsHtml() +
+			(namedHtml ? '<div class="shader-live__section">Shader parameters</div>' + namedHtml : '') +
+			(deepHtml ? '<div class="shader-live__section">Auto — from the code (each ◆ is that value)</div>' + deepHtml : '') +
+			(!namedHtml && !deepHtml
+				? '<p class="settings-note">Nothing tweakable found in this shader source.</p>'
+				: '')
+	}
+
+	function paramRowHtml(p, idx) {
+		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
+		const name = `<span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
+		if (p.kind === 'color') {
+			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
+			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}</div>`
 		}
-		host.innerHTML = mixerRowsHtml() + '<div class="shader-live__section">Shader parameters</div>' + params
-			.map((p, idx) => {
-				const name = `<span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
-				if (p.kind === 'color') {
-					const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
-					return `<div class="shader-live__param">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}</div>`
-				}
-				const sliders = p.values
-					.map(
-						(v, ci) => `<input type="range" data-p="${idx}" data-c="${ci}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">
-						<input type="number" data-p="${idx}" data-c="${ci}" data-num min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">`,
-					)
-					.join('')
-				return `<div class="shader-live__param">${name}${sliders}</div>`
-			})
+		const sliders = p.values
+			.map(
+				(v, ci) => `<input type="range" data-p="${idx}" data-c="${ci}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">
+				<input type="number" data-p="${idx}" data-c="${ci}" data-num min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">`,
+			)
 			.join('')
+		return `<div class="${cls}">${name}${sliders}</div>`
 	}
 
 	function sourceOf(passKey) {
@@ -294,6 +306,14 @@ export function initShaderLiveEditor(stateStore) {
 
 	function setOpen(open) {
 		ensureOverlay()
+		const mainEl = document.querySelector('.scenes-main')
+		if (open && mainEl) {
+			mainEl.style.display = 'none'
+			mainEl.parentNode.insertBefore(overlay, mainEl.nextSibling)
+		} else if (mainEl) {
+			mainEl.style.display = ''
+			if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
+		}
 		overlay.hidden = !open
 		document.body.classList.toggle('shader-live-open', open)
 		if (unsub) {

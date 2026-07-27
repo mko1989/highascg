@@ -272,3 +272,109 @@ export function scanAllPassSources(passes, common) {
 
 	return allParams
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * WO-345 follow-up (owner 2026-07-27): AUTO-extract tweakables from the shader
+ * BODY — no code changes by the user. GLSL discriminator: float literals always
+ * carry a decimal point; integers (loop bounds, indices, swizzle math) do not —
+ * so every decimal literal outside comments/defines is a safe ride candidate.
+ * vec3(a,b,c) with all components in [0,1] groups into a color picker.
+ * Same Param shape as scanShaderParams → rewriteParamValues works unchanged.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const DEEP_PARAM_CAP = 48
+
+/** Mask comments and preprocessor lines with spaces (offsets preserved). */
+function maskNonCode(source) {
+	let s = String(source)
+	s = s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+	s = s.replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length))
+	s = s.replace(/^[ \t]*#[^\n]*/gm, (m) => ' '.repeat(m.length))
+	return s
+}
+
+function deepRange(v) {
+	const av = Math.abs(v)
+	if (av === 0) return { min: -1, max: 1, step: 0.01 }
+	const span = av * 4
+	const step = Math.max(0.0001, Math.min(1, Math.pow(10, Math.floor(Math.log10(av)) - 2)))
+	return { min: v < 0 ? -span : 0, max: v < 0 ? span / 4 : span, step }
+}
+
+function contextLabel(source, start, end, idx) {
+	const pre = source.slice(Math.max(0, start - 14), start).replace(/\s+/g, ' ')
+	const post = source.slice(end, end + 10).replace(/\s+/g, ' ')
+	return `#${idx + 1} ${pre}◆${post}`.trim()
+}
+
+/**
+ * Scan a shader source for ALL tweakable decimal literals in the code body.
+ * @param {string} source
+ * @returns {Array<{name:string,kind:'color'|'slider',values:number[],spans:Array<{start:number,end:number}>,min:number,max:number,step:number,vec:1|3,deep:true}>}
+ */
+export function scanShaderDeepParams(source) {
+	const src = String(source || '')
+	const masked = maskNonCode(src)
+	const lits = []
+	const re = /(\d+\.\d*|\.\d+)/g
+	let m
+	while ((m = re.exec(masked)) !== null) {
+		const start = m.index
+		const end = start + m[0].length
+		// Not part of an identifier / swizzle chain (e.g. `foo.5` cannot occur; guard anyway).
+		const before = masked[start - 1]
+		if (before && /[\w.]/.test(before)) continue
+		if (/[\w.]/.test(masked[end] || '')) continue
+		lits.push({ start, end, value: parseFloat(m[0]) })
+		if (lits.length > DEEP_PARAM_CAP * 4) break
+	}
+
+	const out = []
+	const used = new Set()
+	// Pass 1: vec3(lit, lit, lit) with all comps in [0,1] → color.
+	const vecRe = /vec3\s*\(/g
+	let vm
+	while ((vm = vecRe.exec(masked)) !== null) {
+		const openIdx = vm.index + vm[0].length - 1
+		const comps = lits.filter((l) => l.start > openIdx && l.start < openIdx + 60 && !used.has(l.start))
+		if (comps.length < 3) continue
+		const three = comps.slice(0, 3)
+		const closeIdx = masked.indexOf(')', openIdx)
+		if (closeIdx < 0 || three[2].end > closeIdx) continue
+		const between = masked.slice(openIdx + 1, closeIdx)
+		// Only pure literal args (commas + whitespace + the literals themselves).
+		if (/[a-zA-Z_]/.test(between)) continue
+		if (!three.every((l) => l.value >= 0 && l.value <= 1)) continue
+		three.forEach((l) => used.add(l.start))
+		out.push({
+			name: contextLabel(src, vm.index, closeIdx + 1, out.length),
+			kind: 'color',
+			values: three.map((l) => l.value),
+			spans: three.map((l) => ({ start: l.start, end: l.end })),
+			min: 0,
+			max: 1,
+			step: 0.01,
+			vec: 3,
+			deep: true,
+		})
+		if (out.length >= DEEP_PARAM_CAP) return out
+	}
+	// Pass 2: remaining literals → individual sliders.
+	for (const l of lits) {
+		if (used.has(l.start)) continue
+		const r = deepRange(l.value)
+		out.push({
+			name: contextLabel(src, l.start, l.end, out.length),
+			kind: 'slider',
+			values: [l.value],
+			spans: [{ start: l.start, end: l.end }],
+			min: r.min,
+			max: r.max,
+			step: r.step,
+			vec: 1,
+			deep: true,
+		})
+		if (out.length >= DEEP_PARAM_CAP) break
+	}
+	return out
+}
