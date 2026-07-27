@@ -4,7 +4,6 @@
 import { initLiveView, initDualComposeLiveView } from './live-view.js'
 import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
-import { api } from '../lib/api-client.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
 import { isOperatorGuiModeActive, setOperatorStreamViewActive } from '../lib/operator-gui-mode.js'

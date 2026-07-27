@@ -1,5 +1,5 @@
 import { setStatus } from './device-view-ui-utils.js'
-import { cableSinkAffectsCasparRestart, isStreamingDedicatedOutputChannel } from '../lib/caspar-restart-dirty-policy.js'
+import { isStreamingDedicatedOutputChannel } from '../lib/caspar-restart-dirty-policy.js'
 import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
 import * as Actions from './device-view-actions.js'
 

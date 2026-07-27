@@ -16,7 +16,7 @@ import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../l
 import { sceneState } from '../lib/scene-state.js'
 import { liveShaderInstances } from '../lib/shader-live-instances.js'
 import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
-import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml, toHex } from './shader-live-rows.js'
+import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml } from './shader-live-rows.js'
 import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function initShaderLiveEditor(stateStore) {

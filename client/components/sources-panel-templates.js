@@ -1,5 +1,4 @@
 import { escapeHtml, truncate, makeDraggable } from './sources-panel-helpers.js'
-import { sceneState } from '../lib/scene-state.js'
 import { showShaderFxModal } from './shader-fx-modal.js'
 
 /**

@@ -23,7 +23,6 @@
  */
 
 import { api } from '../lib/api-client.js'
-import { sceneState } from '../lib/scene-state.js'
 import { escapeAttr } from '../lib/dom-escape.js'
 import { screenLabel } from '../lib/screen-label.js'
 import { DEFAULT_TIMER_CONFIG, computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'

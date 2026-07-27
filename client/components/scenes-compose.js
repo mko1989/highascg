@@ -10,7 +10,6 @@
 import { pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api } from '../lib/api-client.js'
-import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
 import { showScenesToast } from './scenes-editor-support.js'

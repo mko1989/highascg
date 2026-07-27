@@ -10,7 +10,6 @@
 
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { showScenesToast } from './scenes-editor-support.js'
-import { nextLayerNumber } from '../lib/scene-state-helpers.js'
 import { screenLabel } from '../lib/screen-label.js'
 import { createTimerForScreen, newTimerId } from '../lib/screen-timer-create.js'
 
