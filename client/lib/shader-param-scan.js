@@ -301,6 +301,8 @@ function deepRange(v) {
 	return { min: v < 0 ? -span : 0, max: v < 0 ? span / 4 : span, step }
 }
 
+import { nameDeepParam, dedupeLabels } from './shader-param-naming.js'
+
 function contextLabel(source, start, end, idx) {
 	const pre = source.slice(Math.max(0, start - 14), start).replace(/\s+/g, ' ')
 	const post = source.slice(end, end + 10).replace(/\s+/g, ' ')
@@ -346,8 +348,13 @@ export function scanShaderDeepParams(source) {
 		if (/[a-zA-Z_]/.test(between)) continue
 		if (!three.every((l) => l.value >= 0 && l.value <= 1)) continue
 		three.forEach((l) => used.add(l.start))
+		/* todos27: human name + category from the code context; the raw context stays on
+		 * p.context for the decode tooltip and as the stable label-store key. */
+		const named = nameDeepParam(masked, vm.index, closeIdx + 1, 'color')
 		out.push({
-			name: contextLabel(src, vm.index, closeIdx + 1, out.length),
+			name: named.label,
+			category: named.category,
+			context: contextLabel(src, vm.index, closeIdx + 1, out.length),
 			kind: 'color',
 			values: three.map((l) => l.value),
 			spans: three.map((l) => ({ start: l.start, end: l.end })),
@@ -357,14 +364,17 @@ export function scanShaderDeepParams(source) {
 			vec: 3,
 			deep: true,
 		})
-		if (out.length >= DEEP_PARAM_CAP) return out
+		if (out.length >= DEEP_PARAM_CAP) return dedupeLabels(out)
 	}
 	// Pass 2: remaining literals → individual sliders.
 	for (const l of lits) {
 		if (used.has(l.start)) continue
 		const r = deepRange(l.value)
+		const named = nameDeepParam(masked, l.start, l.end, 'slider')
 		out.push({
-			name: contextLabel(src, l.start, l.end, out.length),
+			name: named.label,
+			category: named.category,
+			context: contextLabel(src, l.start, l.end, out.length),
 			kind: 'slider',
 			values: [l.value],
 			spans: [{ start: l.start, end: l.end }],
@@ -376,5 +386,5 @@ export function scanShaderDeepParams(source) {
 		})
 		if (out.length >= DEEP_PARAM_CAP) break
 	}
-	return out
+	return dedupeLabels(out)
 }

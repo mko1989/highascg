@@ -275,3 +275,35 @@ test('line comment does not remove annotation', async () => {
 	assert.equal(params[0].min, 0)
 	assert.equal(params[0].max, 10)
 })
+
+/* todos27.07.26 — deep params carry HUMAN names + categories decoded from the code context
+ * (owner: "human readable parameters in cattegories", not "parts of code"). */
+test('deep params: human names + categories from code context', async () => {
+	const { scanShaderDeepParams } = await scannerPromise
+	const source = `float speed = 0.5;
+void main(){
+  vec3 tint = vec3(0.9, 0.2, 0.1);
+  vec2 z = uv * 3.5;
+  float w = sin(iTime * 2.0);
+  float b = mix(a, c, 0.35);
+  for (int i = 0; i < 24.0; i++) {}
+}`
+	const params = scanShaderDeepParams(source)
+	const byName = Object.fromEntries(params.map((p) => [p.name, p]))
+	assert.equal(byName['speed'].category, 'Speed & time')
+	assert.equal(byName['tint'].kind, 'color')
+	assert.equal(byName['tint'].category, 'Colors')
+	assert.equal(byName['z scale'].category, 'Scale & shape')
+	assert.equal(byName['w speed'].category, 'Speed & time')
+	assert.equal(byName['b mix amount'].category, 'Intensity')
+	assert.equal(byName['iterations'].category, 'Detail')
+	// raw context preserved for the decode tooltip / stable label keys
+	assert.ok(String(byName['speed'].context || '').includes('◆'))
+})
+
+test('deep params: duplicate labels get ordinals', async () => {
+	const { scanShaderDeepParams } = await scannerPromise
+	const params = scanShaderDeepParams('void main(){ float a1 = fract(x + 0.1); float a2 = fract(y + 0.2); }')
+	const names = params.map((p) => p.name)
+	assert.equal(new Set(names).size, names.length, 'no duplicate display names')
+})

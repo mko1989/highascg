@@ -153,3 +153,9 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
 - [ ] **29. Wall clock** (WO-355)
       Small HH:MM:SS ticking at the right end of the progress-bar row.
       >
+
+- [ ] **30. Shader params decoded + categorized** (WO-355 follow-up)
+      Deep params show human names ("speed", "uv scale", "mix amount", "iterations"…) grouped
+      under Colors / Speed & time / Scale & shape / Intensity / Detail — no more code snippets
+      as names (those now live in the hover tooltip). ✎ still renames anything.
+      >

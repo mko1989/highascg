@@ -13,6 +13,7 @@ import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
+import { DEEP_CATEGORY_ORDER } from '../lib/shader-param-naming.js'
 
 const SHADER_VALUE_RE = /(^|\/)shaders\/(sh-[a-z0-9-]+)/i
 
@@ -193,11 +194,24 @@ export function initShaderLiveEditor(stateStore) {
 		const host = overlay.querySelector('#shl-params')
 		const row = (p, idx) => paramRowHtml(p, idx)
 		const namedHtml = params.map((p, i) => (p.deep ? '' : row(p, i))).join('')
-		const deepHtml = params.map((p, i) => (p.deep ? row(p, i) : '')).join('')
+		/* todos27: deep params render as human-named rows grouped into CATEGORIES (Colors,
+		 * Speed & time, …) instead of one bucket of code snippets. */
+		const byCat = new Map()
+		params.forEach((p, i) => {
+			if (!p.deep) return
+			const cat = p.category || 'Other values'
+			if (!byCat.has(cat)) byCat.set(cat, [])
+			byCat.get(cat).push(row(p, i))
+		})
+		const order = [...DEEP_CATEGORY_ORDER, ...[...byCat.keys()].filter((c) => !DEEP_CATEGORY_ORDER.includes(c))]
+		const deepHtml = order
+			.filter((c) => byCat.has(c))
+			.map((c) => `<div class="shader-live__section">${escapeHtml(c)}</div>` + byCat.get(c).join(''))
+			.join('')
 		host.innerHTML =
 			mixerRowsHtml() +
 			(namedHtml ? '<div class="shader-live__section">Shader parameters</div>' + namedHtml : '') +
-			(deepHtml ? '<div class="shader-live__section">Auto — from the code (each ◆ is that value)</div>' + deepHtml : '') +
+			deepHtml +
 			(!namedHtml && !deepHtml
 				? '<p class="settings-note">Nothing tweakable found in this shader source.</p>'
 				: '')
@@ -206,14 +220,17 @@ export function initShaderLiveEditor(stateStore) {
 	/* todos27: stable identity for operator-given labels (survives reloads; deep keys embed the
 	 * ordinal + code context so they follow the same literal until the source itself changes). */
 	function labelKeyOf(p) {
-		return `${p.passKey}:${p.deep ? 'deep:' : ''}${p.name}`
+		/* Deep keys ride the raw code context (stable while the source is unchanged) — the
+		 * human name from the auto-decoder may improve between versions and must not orphan
+		 * stored labels. */
+		return `${p.passKey}:${p.deep ? `deep:${p.context || p.name}` : p.name}`
 	}
 
 	function paramRowHtml(p, idx) {
 		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
 		const custom = shaderCfg?.paramLabels?.[labelKeyOf(p)]
-		/* Tooltip = the decode: pass + the raw name (deep names carry the ◆ code context). */
-		const tip = `${p.passKey} — ${p.name}`
+		/* Tooltip = the decode: pass + auto name + the raw ◆ code context. */
+		const tip = `${p.passKey} — ${p.name}${p.context ? `\n${p.context}` : ''}`
 		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
 		if (p.kind === 'color') {
 			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''

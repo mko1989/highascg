@@ -34,6 +34,20 @@ Timers were only cleared when the SAME look restaged (pKey match). Two guards:
   Label keys: `pass:name` / `pass:deep:name` — deep labels follow their literal until the
   source itself is edited.
 
+## 3b. Follow-up (same day) — auto-decoded HUMAN parameter names in categories
+
+Owner: "i cant belive the simple shader code cant be decoded to be human readable parameters in
+cattegories… it regressed to displaying parts of code." New `client/lib/shader-param-naming.js`
+decodes each literal's role from its code context — declaration/assignment targets
+(`float speed = ◆` → "speed"), known-function argument roles (`mix(a,b,◆)` → "mix amount",
+`pow(c,◆)` → "exponent"), multiplier semantics (`iTime * ◆` → "speed", `uv * ◆` → "scale"),
+loop bounds (`i < ◆` → "iterations") — and buckets rows into fixed categories: Colors,
+Speed & time, Scale & shape, Intensity, Detail, Other values. The editor renders one section
+per category (no more "Auto — from the code" bucket of snippets); duplicate names get ordinals;
+the raw `#N …◆…` context moves to the tooltip and remains the stable key for ✎ labels.
+smoke-wo340 extended (23 subtests) AND added to the curated test:ci list — it was never
+registered there (now 1555 CI tests).
+
 ## 4. Wall clock
 
 Small HH:MM:SS (24h, tabular numerals, muted) rides the right end of the rundown/progress row
