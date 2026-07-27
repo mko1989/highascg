@@ -113,8 +113,9 @@
 
 /* Scenes rundown playback timer (T5.2) */
 .scenes-rundown-playback {
-	padding: 8px 0 4px;
-	min-height: 2.5rem;
+	/* todos27: too much air above the compose top bar */
+	padding: 2px 0 2px;
+	min-height: 1.5rem;
 }
 .scenes-rundown-playback[hidden] {
 	display: none !important;

@@ -124,7 +124,8 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: var(--text-muted);
-	padding: 0 4px 4px 4px;
+	/* todos27: head was too tall */
+	padding: 0 4px 2px 4px;
 }
 
 .scenes-deck-col__head-left {

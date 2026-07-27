@@ -8,6 +8,8 @@
 
 import { api } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
+import { sceneState } from '../lib/scene-state.js'
+import { isTimelessItem, timelessSecsOf } from '../lib/playlist-timeless.js'
 
 const LS_COLLAPSED = 'highascg_playlist_panel_collapsed'
 const POLL_MS = 2000
@@ -28,6 +30,11 @@ export function initPlaylistControlPanel(mountEl) {
 				<div class="playlist-control-panel__row">
 					<select id="plp-item" class="inspector-field__select" title="Items — selecting one jumps to it"></select>
 				</div>
+				<div class="playlist-control-panel__row playlist-control-panel__timeless">
+					<label for="plp-timeless" title="Graphics, templates and shaders have no intrinsic length — they advance after this many seconds">Timeless (s)</label>
+					<input type="number" id="plp-timeless" min="1" max="86400" step="1" />
+					<button type="button" class="btn btn--secondary" id="plp-timeless-apply" title="Set the duration of every image/template/shader item in this playlist">Set all</button>
+				</div>
 				<div class="playlist-control-panel__row playlist-control-panel__transport">
 					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item">⏮</button>
 					<button type="button" class="btn" id="plp-play" title="Restage the selected item">▶</button>
@@ -42,9 +49,12 @@ export function initPlaylistControlPanel(mountEl) {
 	const chevron = toggle.querySelector('.timer-control-panel__chevron')
 	const listSel = el('plp-list')
 	const itemSel = el('plp-item')
+	const timelessInp = el('plp-timeless')
 
 	/** @type {Array<object>} */
 	let playlists = []
+	/** @type {Map<string, number>} */
+	const appliedSecs = new Map()
 	let selectedKey = null
 	let pollTimer = null
 
@@ -79,6 +89,16 @@ export function initPlaylistControlPanel(mountEl) {
 		for (const id of ['plp-prev', 'plp-play', 'plp-next']) {
 			const b = el(id)
 			if (b) b.disabled = !p?.live
+		}
+		/* todos27: show the duration ALREADY set on the playlist's timeless items, not a
+		 * hard default — and never clobber the field while the operator is typing in it.
+		 * appliedSecs bridges the poll gap for LIVE playlists (the engine keeps playing the
+		 * old durations until the next take, so the server still reports the old value). */
+		if (timelessInp && document.activeElement !== timelessInp) {
+			const applied = p ? appliedSecs.get(keyOf(p)) : null
+			const serverSecs = p ? timelessSecsOf(p.items) : 20
+			if (applied != null && applied === serverSecs) appliedSecs.delete(keyOf(p))
+			timelessInp.value = String(applied ?? serverSecs)
 		}
 	}
 
@@ -125,6 +145,29 @@ export function initPlaylistControlPanel(mountEl) {
 				.then(() => refresh())
 				.catch((e) => console.warn('[playlist panel] set_start failed:', e?.message || e))
 		}
+	})
+	el('plp-timeless-apply').addEventListener('click', () => {
+		const p = selected()
+		const secs = Math.max(1, Math.min(86400, parseFloat(timelessInp?.value) || 0))
+		if (!p || !secs) return
+		const scene = sceneState.scenes.find((sc) => sc && sc.id === p.sceneId)
+		const layerIndex = scene?.layers?.findIndex((l) => Number(l.layerNumber) === Number(p.layerNumber)) ?? -1
+		const layer = layerIndex >= 0 ? scene.layers[layerIndex] : null
+		if (!layer || !Array.isArray(layer.playlist)) {
+			console.warn('[playlist panel] set-all: playlist layer not found in project state')
+			return
+		}
+		let touched = 0
+		const nextList = layer.playlist.map((it) => {
+			if (!isTimelessItem(it)) return it
+			touched++
+			return { ...it, duration: secs }
+		})
+		if (!touched) return
+		sceneState.patchLayer(p.sceneId, layerIndex, { playlist: nextList })
+		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+		appliedSecs.set(keyOf(p), secs)
+		void refresh()
 	})
 	el('plp-prev').addEventListener('click', () => void control('prev'))
 	el('plp-next').addEventListener('click', () => void control('next'))

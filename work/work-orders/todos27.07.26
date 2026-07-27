@@ -20,3 +20,9 @@ Node.js 20 is deprecated. The following actions target Node.js 20 but are being 
 on that note id like to implement some actual github actions that do some real checks wheter everything works. especialy when there will be others contributing.
 
 the compose preview top bar change to half the current height.
+on top of this bar there is a progress bar. it has too much spacing on the top.
+the top bar of the screen's looks list is also to high.
+the mix duration type takes the full wdith it has when it should be small adjusted to right.
+
+
+the screen that displays after reboot to choose operator monitor is too bright and colorfull. black bg and white text in the middle. also when the monitor is chosen this way it needs to be cabled correctly in the devices tab already.

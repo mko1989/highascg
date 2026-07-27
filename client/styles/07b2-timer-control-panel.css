@@ -429,3 +429,32 @@
 	border-radius: 8px;
 	padding: 1px 6px;
 }
+
+/* todos27 — Playlists compact: timeless-duration bulk setter */
+.playlist-control-panel__timeless {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.playlist-control-panel__timeless label {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.playlist-control-panel__timeless input {
+	width: 56px;
+	padding: 2px 4px;
+	font-size: 0.75rem;
+	background: var(--bg-panel);
+	color: var(--text);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+.playlist-control-panel__timeless .btn {
+	margin-left: auto;
+	padding: 2px 8px;
+	font-size: 0.7rem;
+}

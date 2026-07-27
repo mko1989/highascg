@@ -54,20 +54,27 @@
 
 /* Single-row toolbar: screen tabs, +, take/cut, default transition + apply */
 .scenes-toolbar__transition-group {
+	/* todos27: don't stretch — sit small on the right */
+	margin-left: auto;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
-	flex: 1 1 280px;
+	flex: 0 1 auto;
 	min-width: 0;
 }
 
 .scenes-toolbar .scenes-look-transition {
 	width: auto;
 	max-width: 100%;
-	flex: 1 1 220px;
+	flex: 0 1 auto;
 	margin: 0;
-	padding: 6px 10px;
+	padding: 4px 8px;
+}
+
+/* The hint's flex-grow was what ate the rest of the toolbar row; it adds nothing here. */
+.scenes-toolbar .scenes-look-transition__hint {
+	display: none;
 }
 
 .scenes-toolbar__apply-all-looks {

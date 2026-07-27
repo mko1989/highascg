@@ -14,23 +14,40 @@
 .preview-panel__header {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding: 6px 10px;
+	gap: 6px;
+	/* todos27: half the previous height (was 6px pad + 28px buttons ≈ 41px) */
+	padding: 2px 8px;
 	background: var(--bg-elevated, #21262d);
 	border-bottom: 1px solid var(--border);
 }
 
 .preview-panel__toggle {
-	width: 28px;
-	height: 28px;
+	width: 18px;
+	height: 18px;
 	padding: 0;
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	background: var(--bg-panel);
 	color: var(--text);
 	cursor: pointer;
-	font-size: 12px;
+	font-size: 10px;
 	line-height: 1;
+}
+
+/* The Reset button had no rule at all — browser-default metrics made it the tallest child. */
+.preview-panel__grab {
+	padding: 1px 6px;
+	font-size: 10px;
+	line-height: 1.4;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg-panel);
+	color: var(--text);
+	cursor: pointer;
+}
+
+.preview-panel__grab:hover {
+	background: var(--border);
 }
 
 .preview-panel__toggle:hover {
@@ -44,7 +61,7 @@
 }
 
 .preview-panel__compose-layout {
-	padding: 4px 8px;
+	padding: 2px 6px;
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	background: var(--bg-panel);
