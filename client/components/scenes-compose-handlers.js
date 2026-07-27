@@ -150,6 +150,14 @@ function snapValue(val, candidates, threshold) {
 	return bestCandidate
 }
 
+/* Owner bug 27.07: pointerdown on the canvas is preventDefault'd, so a focused inspector
+ * input never blurs — and the inspector's while-typing guard then skips every refresh, leaving
+ * stale position values. Starting a canvas interaction IS the end of typing: blur it. */
+function blurFormFocus() {
+	const a = document.activeElement
+	if (a instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) a.blur()
+}
+
 /**
  * @param {object} sceneState
  * @param {() => void} schedulePreviewPush
@@ -161,6 +169,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		const startFill = { ...(layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }) }
 		const sx = e.clientX
 		const sy = e.clientY
+		blurFormFocus()
 		sceneState.isInteracting = true
 
 		function onMove(ev) {
@@ -245,6 +254,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		const cy = rect.top + pr.y + pr.h / 2
 		const startAngle = layer.rotation || 0
 		const a0 = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+		blurFormFocus()
 		sceneState.isInteracting = true
 
 		function onMove(ev) {
@@ -281,6 +291,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		const cx = (startFill.x + startFill.scaleX / 2) * rw + rect.left
 		const cy = (startFill.y + startFill.scaleY / 2) * rh + rect.top
 		const r0 = Math.hypot(e.clientX - cx, e.clientY - cy)
+		blurFormFocus()
 		sceneState.isInteracting = true
 
 		function onMove(ev) {
@@ -337,6 +348,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		const sx0 = e.clientX
 		const sy0 = e.clientY
 		const minS = 0.02
+		blurFormFocus()
 		sceneState.isInteracting = true
 
 		function onMove(ev) {
@@ -409,6 +421,7 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 		const startCrop = normalizeCrop(existingCropFx?.params)
 		const sx0 = e.clientX
 		const sy0 = e.clientY
+		blurFormFocus()
 		sceneState.isInteracting = true
 
 		function onMove(ev) {
