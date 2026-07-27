@@ -5,7 +5,7 @@ import { clipPixelRectAtLocalTime } from '../lib/timeline-clip-interp.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
 import { sceneState } from '../lib/scene-state.js'
 import { getResolutionForScreen } from './scenes-editor-logic.js'
-import { getCachedTemplateThumbUrl, getCachedTemplateThumbImage, isTemplateSourceType } from '../lib/template-thumb.js'
+import { getCachedTemplateThumbImage, isTemplateSourceType } from '../lib/template-thumb.js'
 import {
 	COMPOSE_DUAL_PREVIEW_BG,
 	drawComposePrvPgmCellEdgeBar,
@@ -87,10 +87,10 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		const fill = layer.fill || { x: 0, y: 0, scaleX: 1, scaleY: 1 }
 		/** Unclamped program rect in preview pixels — native/wide layers may extend past canvas (center crop like PGM). */
 		const pr = fillToPixelRect(fill, { width: W, height: H })
-		const px = pr.x
-		const py = pr.y
-		const pw = Math.max(1, pr.w)
-		const ph = Math.max(1, pr.h)
+		let px = pr.x
+		let py = pr.y
+		let pw = Math.max(1, pr.w)
+		let ph = Math.max(1, pr.h)
 		/**
 		 * MIXER CROP crops the layer's source in place — the fill rect is unchanged, the
 		 * cropped-away band just turns transparent. So the visible region = fill rect
@@ -101,6 +101,15 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 		const crop = cropFromLayer(layer)
 		const visRaw = crop ? cropAdjustedRect({ x: px, y: py, w: pw, h: ph }, crop) : { x: px, y: py, w: pw, h: ph }
 		const vis = { x: visRaw.x, y: visRaw.y, w: Math.max(1, visRaw.w), h: Math.max(1, visRaw.h) }
+		/* WO-326B contentZoom: inflate the DRAW rect around its center; the clip stays on the
+		 * original rect (vis) — same pan-scan the air path gets from FILL×z + CLIP. */
+		const zm = Number(layer.contentZoom)
+		if (Number.isFinite(zm) && zm > 1) {
+			px -= (pw * (zm - 1)) / 2
+			py -= (ph * (zm - 1)) / 2
+			pw *= zm
+			ph *= zm
+		}
 		const realIdx = scene.layers.indexOf(layer)
 		const color = PREVIEW_LAYER_COLORS[realIdx % PREVIEW_LAYER_COLORS.length]
 		const op = layer.opacity != null ? layer.opacity : 1
@@ -313,6 +322,15 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		const crop = cropFromLayer(clip)
 		const visRaw = crop ? cropAdjustedRect({ x, y, w, h }, crop) : { x, y, w, h }
 		const vis = { x: visRaw.x, y: visRaw.y, w: Math.max(1, visRaw.w), h: Math.max(1, visRaw.h) }
+		/* WO-326B contentZoom: inflate the DRAW rect around its center; the clip stays on the
+		 * original rect (vis) — same pan-scan the air path gets from FILL×z + CLIP. */
+		const zm = Number(layer.contentZoom)
+		if (Number.isFinite(zm) && zm > 1) {
+			px -= (pw * (zm - 1)) / 2
+			py -= (ph * (zm - 1)) / 2
+			pw *= zm
+			ph *= zm
+		}
 		const color = PREVIEW_LAYER_COLORS[li % PREVIEW_LAYER_COLORS.length]
 
 		const drawFn = () => {

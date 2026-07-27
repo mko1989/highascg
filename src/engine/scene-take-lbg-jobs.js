@@ -252,7 +252,24 @@ async function buildTakeJobs(opts) {
 		// "identity" no-op but leaves the previous clip's MIXER FILL on the layer until something else overwrites it.
 		const rot = layer.rotation ?? 0
 		const casparFill = fillForSceneLayerRotationAnchor(f, rot)
-		mixerLines.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} ${fillTail}`)
+		/* WO-326B contentZoom: zoom the CONTENT inside an unchanged layer rect — FILL scaled by z
+		 * around the rect center + CLIP viewport pinned to the original rect (both fractions of
+		 * canvas). z<=1 (or absent) emits an identity CLIP reset so a previously zoomed layer
+		 * cannot leave a stale viewport behind. */
+		const zoom = Number(layer.contentZoom)
+		if (Number.isFinite(zoom) && zoom > 1) {
+			const zf = {
+				x: casparFill.x - (casparFill.scaleX * (zoom - 1)) / 2,
+				y: casparFill.y - (casparFill.scaleY * (zoom - 1)) / 2,
+				scaleX: casparFill.scaleX * zoom,
+				scaleY: casparFill.scaleY * zoom,
+			}
+			mixerLines.push(`MIXER ${cl} FILL ${zf.x} ${zf.y} ${zf.scaleX} ${zf.scaleY} ${fillTail}`)
+			mixerLines.push(`MIXER ${cl} CLIP ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} 0`)
+		} else {
+			mixerLines.push(`MIXER ${cl} FILL ${casparFill.x} ${casparFill.y} ${casparFill.scaleX} ${casparFill.scaleY} ${fillTail}`)
+			mixerLines.push(`MIXER ${cl} CLIP 0 0 1 1 0`)
+		}
 		mixerLines.push(...sceneLayerRotationMixerLines(cl, rot))
 		const targetOpacity = layer.opacity != null ? Number(layer.opacity) : 1
 		// WO-217 T217.2: Defensive opacity reset — always emit OPACITY (not just when != 1) so stale 0s from prior bugs cannot hide fresh content.

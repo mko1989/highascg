@@ -249,6 +249,32 @@ export function appendSceneLayerFillGroup(root, opts) {
 	scaleRow.appendChild(applyBtn)
 	fillGrp.appendChild(scaleRow)
 
+	/* WO-326B: content ZOOM inside the unchanged rect (pan-scan) — stored on the layer,
+	 * rendered on air as FILL×z + CLIP viewport (scene-take-lbg-jobs). 100 = off. */
+	const zoomRow = document.createElement('div')
+	zoomRow.className = 'inspector-field inspector-row'
+	const zoomLabel = document.createElement('label')
+	zoomLabel.className = 'inspector-field__label'
+	zoomLabel.textContent = 'Zoom %'
+	zoomLabel.title = 'Zooms the CONTENT inside the layer rect (the rect itself stays put)'
+	const zoomInput = document.createElement('input')
+	zoomInput.type = 'number'
+	zoomInput.className = 'inspector-field__input'
+	zoomInput.min = '100'
+	zoomInput.max = '400'
+	zoomInput.step = '5'
+	const currentZoom = Number(sceneState.getScene(sceneId)?.layers?.[layerIndex]?.contentZoom)
+	zoomInput.value = String(Number.isFinite(currentZoom) && currentZoom > 1 ? Math.round(currentZoom * 100) : 100)
+	zoomInput.addEventListener('change', () => {
+		const pct = Math.max(100, Math.min(400, parseFloat(zoomInput.value) || 100))
+		zoomInput.value = String(pct)
+		sceneState.patchLayer(sceneId, layerIndex, { contentZoom: pct / 100 })
+		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+	})
+	zoomRow.appendChild(zoomLabel)
+	zoomRow.appendChild(zoomInput)
+	fillGrp.appendChild(zoomRow)
+
 	const lockWrap = document.createElement('div')
 	lockWrap.className = 'inspector-field inspector-row'
 	const lockCb = document.createElement('input')

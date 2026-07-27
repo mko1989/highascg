@@ -1,7 +1,7 @@
 # WO-326 — Custom scaling of layers in looks
 
 **Source:** todos24.07.26 — "No custom scaling of layers in looks."
-**Status: OPEN.** Written 2026-07-24 from a read-only code survey. The one-line todo is
+**Status: DONE 2026-07-27 — Part A (Scale % around center, existing fill path) + Part B (contentZoom: FILL×z + CLIP viewport on take, matching editor-preview pan-scan draw, Zoom % input 100–400). Identity CLIP reset emitted when zoom is off so stale viewports can't linger.** Written 2026-07-24 from a read-only code survey. The one-line todo is
 ambiguous — the FIRST task at pickup is a 10-minute live check with the owner (below).
 
 ## Verified current state (2026-07-24, source read)
