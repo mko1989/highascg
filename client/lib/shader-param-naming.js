@@ -100,7 +100,10 @@ export function nameDeepParam(masked, start, end, kind) {
 	const mulId = multipliedIdent(masked, start, end)
 
 	if (call && FN_ARGS[call.fn]) {
-		const role = FN_ARGS[call.fn][call.argIndex]
+		let role = FN_ARGS[call.fn][call.argIndex]
+		/* vec3(1.8) broadcasts ONE value to all channels — that's a level/gain, not ".x"
+		 * (owner: params "called col" looked like a color channel but were sliders). */
+		if (/^vec[234]$/.test(call.fn) && call.argIndex === 0 && /^\s*\)/.test(masked.slice(end))) role = 'level'
 		if (role) label = target ? `${target} ${role}` : role
 	}
 	if (!label && mulId) {
@@ -120,6 +123,9 @@ export function nameDeepParam(masked, start, end, kind) {
 function categorize(label, mulId, kind, stmt) {
 	if (kind === 'color') return 'Colors'
 	const hay = `${label} ${mulId} ${stmt.text.slice(-48)}`.toLowerCase()
+	/* Color-NAMED scalars (col gain, tint level, speccol …) belong in the Colors rect even as
+	 * sliders — a single value can't be a picker, but it is color work. */
+	if (/\b(col|color|tint|rgb|hue|spec)/.test(hay)) return 'Colors'
 	if (/speed|time|rate|freq|phase|itime/.test(hay)) return 'Speed & time'
 	if (/scale|zoom|size|radius|width|height|dist|uv|coord|offset|pos\b/.test(hay)) return 'Scale & shape'
 	if (/iter|steps|octav|count|loop|detail/.test(hay)) return 'Detail'

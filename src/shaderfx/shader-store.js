@@ -94,6 +94,12 @@ function normalizeShaderConfig(input) {
 		if (Object.keys(paramLabels).length >= 96) break
 	}
 
+	/* todos27.07.26: child shaders — every Shader Live save is a NEW config pointing at the
+	 * shader it was derived from. One level: children attach to the root parent. */
+	const parentId = payload.parentId && isValidShaderId(String(payload.parentId)) && String(payload.parentId) !== id
+		? String(payload.parentId)
+		: null
+
 	return {
 		id,
 		name,
@@ -102,6 +108,7 @@ function normalizeShaderConfig(input) {
 		audio: { enabled: payload.audio?.enabled !== false },
 		opts: { alpha: payload.opts?.alpha === true },
 		...(Object.keys(paramLabels).length ? { paramLabels } : {}),
+		...(parentId ? { parentId } : {}),
 	}
 }
 

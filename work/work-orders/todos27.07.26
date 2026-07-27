@@ -53,5 +53,9 @@ the playlist continues even though its look was taken from the pgm......
 i want to expand the shaders live editor. first the drop down which to edit is acting out by blinking.
 the right side of the parameters is truncated.
 there needs to be a way to decode what each of the parameters do and label them. also the color pickers are gone. right now its all giberish.
+better. compact the parameters and their sliders. the sliders need to react to mouse wheel over them so users can make small changes easily.
+the categories need to be grougped in rects. every edit that is saved should be saved as a "child" of the used shader.
+there needs to be an easy way to browse and load into preview shaders and their children, can be done by choosing/clicking from the templates sources browser.
+this only should happen when in the shaders mode.
 
  current time with seconds small between eyes on the right and the small progress bar.

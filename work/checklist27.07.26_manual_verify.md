@@ -159,3 +159,11 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       under Colors / Speed & time / Scale & shape / Intensity / Detail — no more code snippets
       as names (those now live in the hover tooltip). ✎ still renames anything.
       >
+
+- [ ] **31. Shader Live v3** (WO-356)
+      Categories in bordered boxes, compact rows; mouse wheel over any slider steps it;
+      "col"-named values sit in the Colors box (broadcast vec3(1.8) reads "… level").
+      Save to library → creates "<shader>-c2" child (source shader untouched); the child shows
+      in Sources → Templates. In shaders mode, clicking any shader row there loads it onto
+      preview and into the dropdown; outside shaders mode the click does nothing.
+      >

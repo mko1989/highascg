@@ -62,13 +62,21 @@ export function renderTemplatesBrowser(container, templates, filter) {
 		} else if (shaderMatch) {
 			el.innerHTML = `
 				<span class="source-item__kind-pill source-item__kind-pill--shader" title="Shader FX template">FX</span>
-				<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 36))}</span>
+				<span class="source-item__label" title="${escapeHtml(label)} — in Shader Live mode, click to load into preview">${escapeHtml(truncate(label, 36))}</span>
 				<button type="button" class="source-item__edit-template-btn" title="Edit in Shader FX">Edit</button>
 			`
 			el.querySelector('.source-item__edit-template-btn').addEventListener('click', (e) => {
 				e.preventDefault()
 				e.stopPropagation()
 				showShaderFxModal({ editId: shaderMatch[1] })
+			})
+			/* todos27: in shaders mode ONLY, clicking the row auditions the shader (or child) on
+			 * the preview bus. The Shader Live editor owns the handler — it knows whether it is
+			 * open and holds the state store; outside shaders mode the event just fizzles. */
+			el.addEventListener('click', () => {
+				document.dispatchEvent(
+					new CustomEvent('shader-audition-request', { detail: { id, label } }),
+				)
 			})
 		} else {
 			el.innerHTML = `

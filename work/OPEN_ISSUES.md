@@ -142,5 +142,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-353 | Playlist item rows minimal + all trashcans → ✕ | [WO-353](./work-orders/353_WO_playlist_rows_minimal_trashcans_x.md) | ✅ Done 27.07 |
 | WO-354 | Channel-scoped playlist state; shader MIX hops + thumb eligibility; 2 UI fixes | [WO-354](./work-orders/354_WO_playlist_channel_state_shader_mix_thumbs_ui.md) | ✅ Done 27.07 |
 | WO-355 | Playlists PGM-only + stop on take-out; Shader Live expand (labels, blink, clip); clock | [WO-355](./work-orders/355_WO_playlists_pgm_only_shader_editor_expand_clock.md) | ✅ Done 27.07 |
+| WO-356 | Shader Live v3: rect groups, wheel steps, child saves, audition (shaders mode) | [WO-356](./work-orders/356_WO_shader_live_v3_children_audition_wheel.md) | ✅ Done 27.07 |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

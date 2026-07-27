@@ -13,42 +13,9 @@ import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
+import { sceneState } from '../lib/scene-state.js'
+import { liveShaderInstances } from '../lib/shader-live-instances.js'
 import { DEEP_CATEGORY_ORDER } from '../lib/shader-param-naming.js'
-
-const SHADER_VALUE_RE = /(^|\/)shaders\/(sh-[a-z0-9-]+)/i
-
-function liveShaderInstances(stateStore) {
-	const st = stateStore.getState() || {}
-	const live = st.scene?.live || st['scene.live'] || {}
-	const banks = st.scene?.programLayerBankByChannel || {}
-	const cm = st.channelMap || {}
-	const prvSet = new Set((cm.previewChannels || []).map(Number))
-	const out = []
-	for (const chKey of Object.keys(live)) {
-		const scene = live[chKey]?.scene
-		if (!scene || !Array.isArray(scene.layers)) continue
-		for (const layer of scene.layers) {
-			const m = SHADER_VALUE_RE.exec(String(layer?.source?.value || ''))
-			if (!m) continue
-			const ch = parseInt(chKey, 10)
-			const logical = Number(layer.layerNumber)
-			const bank = prvSet.has(ch) ? 'a' : String(banks[chKey] || 'a')
-			const pLayer = bank === 'b' ? logical + 100 : logical
-			out.push({
-				shaderId: m[2].toLowerCase(),
-				/* Full template path for the CG ADD re-host fallback (same string the engine plays). */
-				cgName: String(layer.source.value).trim().toLowerCase(),
-				channel: ch,
-				pLayer,
-				isPrv: prvSet.has(ch),
-				sceneName: scene.name || scene.id,
-			})
-		}
-	}
-	// PGM instances first so auto-select lands on air.
-	out.sort((a, b) => Number(a.isPrv) - Number(b.isPrv) || a.channel - b.channel)
-	return out
-}
 
 export function initShaderLiveEditor(stateStore) {
 	let overlay = null
@@ -88,6 +55,22 @@ export function initShaderLiveEditor(stateStore) {
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
 		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamRename(e))
+		/* todos27: wheel over a slider = one step per notch — small precise changes. */
+		overlay.querySelector('#shl-params').addEventListener(
+			'wheel',
+			(e) => {
+				const t = e.target
+				if (!(t instanceof HTMLInputElement) || t.type !== 'range') return
+				e.preventDefault()
+				const step = parseFloat(t.step) || 0.01
+				const lo = parseFloat(t.min)
+				const hi = parseFloat(t.max)
+				const next = Math.min(hi, Math.max(lo, (parseFloat(t.value) || 0) + (e.deltaY < 0 ? step : -step)))
+				t.value = String(next)
+				t.dispatchEvent(new Event('input', { bubbles: true }))
+			},
+			{ passive: false },
+		)
 		overlay.querySelector('#shl-params').addEventListener('change', onControlChange)
 		overlay.querySelector('#shl-params').addEventListener('input', onControlInputMirror)
 		return overlay
@@ -179,14 +162,17 @@ export function initShaderLiveEditor(stateStore) {
 		{ cmd: 'CONTRAST', label: 'contrast', min: 0, max: 3, step: 0.01, def: 1 },
 	]
 	function mixerRowsHtml() {
-		return (
-			'<div class="shader-live__section">Layer (Caspar mixer)</div>' +
-			MIXER_ROWS.map(
-				(r, i) => `<div class="shader-live__param"><span class="shader-live__pname">${r.label}</span>
-					<input type="range" data-mixer="${i}" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}">
-					<input type="number" data-mixer="${i}" data-num min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}"></div>`,
-			).join('')
-		)
+		return MIXER_ROWS.map(
+			(r, i) => `<div class="shader-live__param"><span class="shader-live__pname">${r.label}</span>
+				<input type="range" data-mixer="${i}" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}">
+				<input type="number" data-mixer="${i}" data-num min="${r.min}" max="${r.max}" step="${r.step}" value="${r.def}"></div>`,
+		).join('')
+	}
+
+	/* todos27: each category renders as a bordered rect (title + 2-col grid of rows). */
+	function groupHtml(title, rowsHtml) {
+		if (!rowsHtml) return ''
+		return `<div class="shader-live__group"><div class="shader-live__group-title">${escapeHtml(title)}</div><div class="shader-live__group-grid">${rowsHtml}</div></div>`
 	}
 
 	function renderParams() {
@@ -206,11 +192,11 @@ export function initShaderLiveEditor(stateStore) {
 		const order = [...DEEP_CATEGORY_ORDER, ...[...byCat.keys()].filter((c) => !DEEP_CATEGORY_ORDER.includes(c))]
 		const deepHtml = order
 			.filter((c) => byCat.has(c))
-			.map((c) => `<div class="shader-live__section">${escapeHtml(c)}</div>` + byCat.get(c).join(''))
+			.map((c) => groupHtml(c, byCat.get(c).join('')))
 			.join('')
 		host.innerHTML =
-			mixerRowsHtml() +
-			(namedHtml ? '<div class="shader-live__section">Shader parameters</div>' + namedHtml : '') +
+			groupHtml('Layer (Caspar mixer)', mixerRowsHtml()) +
+			groupHtml('Shader parameters', namedHtml) +
 			deepHtml +
 			(!namedHtml && !deepHtml
 				? '<p class="settings-note">Nothing tweakable found in this shader source.</p>'
@@ -400,15 +386,27 @@ export function initShaderLiveEditor(stateStore) {
 		}
 	}
 
+	/* todos27: a save never overwrites the source shader — it lands as a CHILD (parentId =
+	 * the root shader), exported to template/shaders/<child>.html so it shows up in the
+	 * templates browser next to its parent. */
 	async function saveToLibrary() {
 		if (!shaderCfg) return
 		try {
-			const r = await api.post('/api/shaders', shaderCfg)
+			const rootId = shaderCfg.parentId || shaderCfg.id
+			const listed = await api.get('/api/shaders')
+			const ids = new Set((listed?.shaders || []).map((x) => x.id))
+			let n = 2
+			while (ids.has(`${rootId}-c${n}`)) n++
+			const baseName = String(shaderCfg.name || rootId).replace(/ c\d+$/, '')
+			const child = { ...shaderCfg, id: `${rootId}-c${n}`, name: `${baseName} c${n}`, parentId: rootId }
+			const r = await api.post('/api/shaders', child)
 			if (!r?.ok) throw new Error(r?.error || 'save failed')
 			dirty = false
 			syncDirty()
+			window.showToast?.(`Saved as ${child.id} (child of ${rootId})`, 'success')
 		} catch (e) {
 			console.warn('[shader-live] save failed:', e?.message || e)
+			window.showToast?.(`Save failed: ${e?.message || e}`, 'error')
 		}
 	}
 
@@ -444,6 +442,39 @@ export function initShaderLiveEditor(stateStore) {
 			unsub = stateStore.on?.('*', () => onLiveChanged()) || null
 		}
 	}
+
+	/* todos27: templates-browser shader rows dispatch this on click. Only ACT while shaders
+	 * mode is open — outside it the event fizzles and the browser behaves as before. Stages an
+	 * ephemeral one-layer look on the active main's preview bus via the normal take pipeline,
+	 * so scene.live updates and the instance dropdown picks it up. */
+	document.addEventListener('shader-audition-request', (e) => {
+		if (!overlay || overlay.hidden) return
+		const id = String(e?.detail?.id || '')
+		const label = String(e?.detail?.label || id)
+		if (!id) return
+		void (async () => {
+			try {
+				const cm = stateStore.getState()?.channelMap || {}
+				const mIdx = Math.max(0, Number(sceneState.activeScreenIndex) || 0)
+				const programCh = cm.programChannels?.[mIdx]
+				if (!programCh) throw new Error('no program channel for the active main')
+				const incomingScene = {
+					id: `shader-audition-${mIdx}`,
+					name: `Audition ${label}`,
+					layers: [
+						{ layerNumber: 10, source: { type: 'template', value: id }, opacity: 1, fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } },
+					],
+				}
+				await api.post('/api/scene/take', { channel: programCh, target: 'preview', forceCut: true, useServerLive: true, incomingScene })
+				const sid = (id.toLowerCase().match(/sh-[a-z0-9-]+$/) || [])[0]
+				const prvCh = cm.previewChannels?.[mIdx]
+				if (sid && prvCh) selectedKey = `${sid}@${prvCh}-10`
+				window.showToast?.(`${label} → preview`, 'info')
+			} catch (err) {
+				window.showToast?.(`Audition failed: ${err?.message || err}`, 'error')
+			}
+		})()
+	})
 
 	// Trigger: the mascot — only while it wears the shades (GPU CEF on).
 	const logo = document.querySelector('img.header__logo')
