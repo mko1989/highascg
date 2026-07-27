@@ -132,4 +132,8 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | WO-345 | Shader Live workflow: shades-bunny toggles live-shader editor; params ride the RUNNING producer via CG UPDATE hot-recompile | [WO-345](./work-orders/345_WO_SHADER_LIVE_WORKFLOW.md) | 🔴 Open (implementing) |
 
+| WO-346 | Compose toolbar: Reset replaces PRT PGM; per-tile PRT capture | [WO-346](./work-orders/346_WO_COMPOSE_TOOLBAR_RESET_AND_TILE_PRT.md) | 🔴 Open |
+| WO-347 | Playlists panel: all project playlists + set start item pre-playout | [WO-347](./work-orders/347_WO_PLAYLISTS_PANEL_PROJECT_WIDE.md) | 🔴 Open |
+| WO-348 | Shader Live: per-param revert, reset-all, 2-column layout | [WO-348](./work-orders/348_WO_SHADER_LIVE_PARAM_RESET_LAYOUT.md) | 🔴 Open |
+
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

@@ -1,0 +1,7 @@
+in the compose preview top bar, there is a prt pgm button that needs to be removed and replaced by the reset button for reset the compose prv windows.
+all live sources inside the compose preview need to have a prt/capture button.
+
+playlists panel in bottom rigth needs to show all playlists that are created in looks. as an operator i need to be able to set an item of the playlist before playout.
+
+i messed with some parameters and now it stopped displaying at all. it needs a revert back to default next to each parameter. 
+list the parameters in two columns, the sliders dont have to be this long.
