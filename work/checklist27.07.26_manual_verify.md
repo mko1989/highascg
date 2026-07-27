@@ -1,0 +1,110 @@
+# Manual verification checklist — compiled 27.07.26
+
+Owner walk-through of everything implemented but not yet signed off.
+Tick, and drop notes under any item (that's what the `>` lines are for).
+
+## A. Operator kiosk GUI
+
+- [ ] **1. Compose top bar — Reset button** (WO-346)
+      PRT PGM is gone; **Reset** is there. Click it → all compose tiles snap back to the default layout.
+      >
+
+- [ ] **2. Tile PRT buttons** (WO-346 + todos27 follow-up, deployed ~10:00 today)
+      Non-PGM tiles (PRV, mv cells, live sources) have a **PRT** styled like the other tile buttons.
+      **PGM tiles show CAPTURE only** — no duplicate PRT.
+      Click PRT on a live-source tile → toast + PNG lands in the Caspar media folder.
+      >
+
+- [ ] **3. Playlists panel, bottom right** (WO-347)
+      Shows **every** playlist defined in the project's looks, not just live ones.
+      Non-live entries say "not live"; live ones have 🔴 + channel.
+      Select an item on a *non-live* playlist → take that look to PGM → playout starts at that item.
+      Transport ⏮ ▶ ⏭ works on the live one.
+      >
+
+- [ ] **4. Playlist auto-advance of timeless items**
+      Two shaders in a playlist at 20 s: they hop, repeatedly, and after a manual jump the timer re-arms.
+      >
+
+- [ ] **5. Shader Live editor** (WO-339/340/348 — glasses-bunny click)
+      Compose preview stays in place; params in **two columns** below.
+      Per-param **↺** reverts just that one; **Reset all** restores the pristine shader.
+      Edits land live on PGM. Deliberately break a value, then revert — the shader must come back
+      (the "stopped displaying" case).
+      >
+
+- [ ] **6. Deck cards**
+      Shaders: **red** border on PGM (not violet), thumbs fill the square.
+      Footer buttons small + centered; ✕ top-right red, copy below it; names start from the edge;
+      angled 45° panel labels with tight underline.
+      >
+
+- [ ] **7. Two-client drill** (WO-329)
+      Laptop browser + kiosk side by side — takes, preview recalls, look edits from each.
+      Both converge, nothing blocked, no sync-error toasts.
+      >
+
+- [ ] **8. Taskbar** (WO-317)
+      Open via the small indicator-style button, launch two helpers, toggle chips.
+      >
+
+- [ ] **9. Live-audio host channel** (WO-336)
+      Device-view host-channel inspector: device swap + FFT source toggle.
+      Shader reacts on the Caspar program with music from the DM3.
+      >
+
+- [ ] **10. Shader on look band + compose source tiles** (WO-322/323)
+      Bank crossfade with a shader on the look band looks right.
+      Compose live-source tiles survive drop / remove / restart.
+      >
+
+## B. Needs privileges / hardware / a decision
+
+- [ ] **11. Power button root install** (WO-332) — needs a sudo run.
+      >
+
+- [ ] **12. Companion deploy** (WO-330) — run the one deploy command in the WO, then desk QA.
+      >
+
+- [ ] **13. Headless-GUI flag** (WO-325 Part A) — regenerate Caspar config + restart to take effect.
+      >
+
+- [ ] **14. nodm on canvas growth** (WO-315) — on the next real canvas-growth apply, confirm the
+      restart decision fires correctly (test suite now green + hermetic).
+      >
+
+- [ ] **15. Brightness decay trigger pattern** (3d-meters worst)
+      Next time it dims, note: **gradual while idle** or **step per take**? That answer unblocks
+      the investigation.
+      >
+
+- [ ] **16. Uncommitted runtime diffs** — `config/*.json` + `template/shaders/`
+      (modified sh-audio/balatro/…, deleted sh-ext + sh-ios, 7 new untracked shaders).
+      Decide: commit as-is, or restore the deletions if unintended.
+      >
+
+## C. GitHub (passive)
+
+- [ ] **17. No more failure emails** — CI + Pages both green since this morning (WO-349);
+      the Pages site serves the project map again. Just notice the absence of mail.
+      >
+
+## D. Added mid-day 27.07 (WO-350 / WO-351)
+
+- [ ] **18. Bar heights** (WO-350)
+      Compose preview top bar is ~half its old height; the progress bar above it sits tight;
+      the looks-list column head is lower; the mix/duration/tween group is small and
+      right-adjusted in the deck toolbar (no more full-width stretch).
+      >
+
+- [ ] **19. Playlists compact — Timeless (s) + Set all** (WO-350)
+      The footer Playlists panel has a "Timeless (s)" input + **Set all**. After applying,
+      the input keeps showing the value you set (not 20) — both here and in the layer
+      inspector's "Timeless items (s)".
+      >
+
+- [ ] **20. Monitor picker** (WO-351 — needs a fresh-boot pick to see)
+      Prompt is black with white centered text and a subtle gray frame.
+      After clicking a monitor, the devices tab shows the Operator GUI destination cabled
+      to that GPU port (any old cable on that jack replaced).
+      >
