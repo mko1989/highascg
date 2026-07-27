@@ -19,6 +19,10 @@ const SKIP_DIRS = new Set([
 	'__pycache__',
 ])
 
+/* Legacy grandfather list — files that predate the limit and live outside the operator
+ * service (Pages-only map viewer, WO-163). New code must NOT be added here; split instead. */
+const EXEMPT = new Set(['client/components/map-explorer.js', 'client/styles/map-explorer.css'])
+
 const warnOnly = process.argv.includes('--warn-only')
 const asJson = process.argv.includes('--json')
 
@@ -45,8 +49,9 @@ function walk(dir) {
 		const buf = fs.readFileSync(abs, 'utf8')
 		/* Don't count the empty tail after a final newline as a line. */
 		const lines = buf === '' ? 0 : buf.split('\n').length - (buf.endsWith('\n') ? 1 : 0)
-		if (lines > MAX) {
-			violations.push({ lines, rel: path.relative(repoRoot, abs).replace(/\\/g, '/') })
+		const rel = path.relative(repoRoot, abs).replace(/\\/g, '/')
+		if (lines > MAX && !EXEMPT.has(rel)) {
+			violations.push({ lines, rel })
 		}
 	}
 }

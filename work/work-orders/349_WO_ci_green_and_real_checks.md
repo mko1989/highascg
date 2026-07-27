@@ -43,6 +43,21 @@ The `verify` job had been red since e0e66cf (July 21). Root causes, all fixed:
 Local run of every CI step: integrity 0, boot 0, lint 0 (737 warnings), format 0,
 test:ci 1530 tests / 0 fail (2 Xvfb-skips), max-file-lines 0, build:client 0 + 28 MB bundle.
 
+## Follow-up (same day) — first live run caught two more real breaks
+
+- **build-client failed on GitHub**: `data/default-empty-project.json` was imported by the client
+  but invisible locally — `data/` was a *directory* ignore, which makes every `!data/<file>`
+  negation dead per gitignore semantics (the existing exceptions had been force-added). Changed
+  to `data/*` and committed the template. The new job caught a real repo gap on run one.
+- **Deploy GitHub Pages red since d0a6c73** (the *other* failure-email source): the WO-155..187
+  sweep deleted the map viewer files (client/map.html, map-explorer.js/.css) that WO-163 had
+  explicitly said to keep for the Pages-only map. Restored all three (Pages pipeline only — the
+  operator service stays map-free per WO-163), grandfathered the two legacy >500-line viewer
+  files in check-max-file-lines (EXEMPT set), and fixed the Pages step to `npm run build:map`
+  (the raw vite command never generated map-data.json, so the map shipped empty).
+- checkout/setup-node bumped to v5 majors in both workflows (Node 24 runtimes — kills the
+  deprecation annotation).
+
 ## Left open
 
 - 737 lint warnings — ratchet later, not a gate yet.

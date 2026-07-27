@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/configure-pages@v5
 
@@ -28,10 +28,17 @@ jobs:
           source: ./docs
           destination: ./_site
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      # build:map = generate map-data.json (gitignored) + vite build the viewer —
+      # the raw vite command alone shipped an empty map (WO-349).
       - name: Build and inject Project Map
         run: |
           npm ci
-          npx vite build -c vite.map.config.js
+          npm run build:map
           mkdir -p _site/map
           cp -r dist-map/* _site/map/
 

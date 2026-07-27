@@ -44,8 +44,9 @@ bin/
 /media/
 /lib/
 _media/
-data/
+data/*
 !data/nvidia-driver-guide.json
+!data/default-empty-project.json
 !data/known-gpus.json
 
 # CasparCG daily logs (runtime; can grow to hundreds of MB)
