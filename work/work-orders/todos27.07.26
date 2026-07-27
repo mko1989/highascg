@@ -32,4 +32,15 @@ the taskbar in the top bar of operator gui, uses apps system icons inside the ci
 when i click back to gui, the browser hides under the casparcg screen, but after around 2s. but then i cant recall to the front the browser again.
 
  the playlist workflow the items in the list have teribble spacing. the move dots are huge, then there is some rectangle, 4characters of the item name, big box for seconds. and big trashcan. minimalizm is the key. the most importnat part is the name. change trashcans to xs. check if they appear anywhere else like layer list.
+
+
+ ****
+ the font of current item under a screen window inside compose preview should have bigger font.
+ the play and cut buttons should be adjusted to left.
+ the shaders thumbnail only worked for one of my looks.
+ i did changes in a playlist of look 6 and after it played the list was correct, but when it went back to preview it played the old version.
+ also a while ago when i had shaders in the playlist mixing between them worked and now it cuts.
+
+
+ in the compact playlist the next prev buttons have blue bg under icons, i dont want it.
  

@@ -94,6 +94,18 @@ function layerHasContent(layer) {
 }
 
 /**
+ * todos27.07.26: the "shaders are media" reclassification (red border, filled thumbs) must NOT
+ * cost them the server-rendered CG thumb — a shader is still RENDERED like a template. This is
+ * the thumb-eligibility predicate; isCgTemplateLayer stays the styling/border predicate.
+ * @param {object} layer
+ * @returns {boolean}
+ */
+export function isCgRenderableLayer(layer) {
+	if (isCgTemplateLayer(layer)) return true
+	return /(^|\/)shaders\//i.test(String(layer?.source?.value || ''))
+}
+
+/**
  * @param {object} layer
  * @returns {boolean}
  */
@@ -102,7 +114,7 @@ function playlistDisqualifiesCgOnly(layer) {
 	const list = Array.isArray(layer.playlist) ? layer.playlist : []
 	for (const item of list) {
 		const fakeLayer = { source: item?.source || item, template: item?.template }
-		if (layerHasContent(fakeLayer) && !isCgTemplateLayer(fakeLayer)) return true
+		if (layerHasContent(fakeLayer) && !isCgRenderableLayer(fakeLayer)) return true
 	}
 	return false
 }
@@ -119,7 +131,7 @@ export function isCgOnlyLook(scene) {
 		if (playlistDisqualifiesCgOnly(layer)) return false
 		if (!layerHasContent(layer)) continue
 		hasContent = true
-		if (!isCgTemplateLayer(layer)) return false
+		if (!isCgRenderableLayer(layer)) return false
 	}
 	return hasContent
 }

@@ -141,8 +141,9 @@
 }
 .operator-tile__btn:hover { background: rgba(0, 0, 0, 0.55); }
 .operator-tile__btn:disabled { opacity: 0.5; cursor: default; }
-.operator-tile__footer .playback-timer { min-width: 0; font-size: 9px; padding: 0 6px; }
-.operator-tile__footer .playback-timer__row { font-size: 9px; }
+ /* todos27: the current-item name under each screen window must be readable */
+.operator-tile__footer .playback-timer { min-width: 0; font-size: 12px; padding: 0 6px; }
+.operator-tile__footer .playback-timer__row { font-size: 12px; }
 
 .operator-tile__resize {
 	position: absolute;

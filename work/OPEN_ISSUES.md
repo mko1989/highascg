@@ -140,5 +140,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-351 | Monitor picker: black/white prompt + pick wires the devices-tab cable | [WO-351](./work-orders/351_WO_monitor_picker_calm_colors_and_graph_cable.md) | ✅ Done 27.07 |
 | WO-352 | Taskbar: system-icon circle chips + raise/recall bug (3 root causes) | [WO-352](./work-orders/352_WO_taskbar_icons_and_raise_fix.md) | ✅ Done 27.07 |
 | WO-353 | Playlist item rows minimal + all trashcans → ✕ | [WO-353](./work-orders/353_WO_playlist_rows_minimal_trashcans_x.md) | ✅ Done 27.07 |
+| WO-354 | Channel-scoped playlist state; shader MIX hops + thumb eligibility; 2 UI fixes | [WO-354](./work-orders/354_WO_playlist_channel_state_shader_mix_thumbs_ui.md) | ✅ Done 27.07 |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

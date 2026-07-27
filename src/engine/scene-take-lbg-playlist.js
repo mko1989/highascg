@@ -22,6 +22,15 @@ function isTimelessPlaylistItem(item) {
 	return !TIMED_MEDIA_EXT_RE.test(v)
 }
 
+/* todos27.07.26 ROOT CAUSE of "preview played the old version": every piece of playlist runtime
+ * state was keyed `${sceneId}-${layerNumber}` with NO channel — the same look live on PGM and
+ * recalled on PRV shared one timer/index/prev-path slot, so the stale PRV entry's OSC pass stole
+ * the hop timer and re-armed it with ITS (pre-edit) scene closure. Runtime state is now keyed by
+ * channel too. (playlistStartIndices stays channel-less: it is set pre-playout, WO-347.) */
+function playlistRuntimeKey(channel, sceneId, layerNumber) {
+	return `${channel}:${sceneId}-${layerNumber}`
+}
+
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	// Register the global OSC playlist handler on self.oscState exactly once!
 	if (self.oscState && !self._playlistOscBound) {
@@ -34,14 +43,14 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	for (const job of takeJobs) {
 		const layer = job.layer
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
-			const pKey = `${incoming.id}-${layer.layerNumber}`
+			const pKey = playlistRuntimeKey(channel, incoming.id, layer.layerNumber)
 			
 			// Initialize the active index to 0 for auto advance
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			
 			/* WO-347: operator pre-selected a start item (Playlists panel, action:set_start) —
 			 * stage it right after the take lands. Sticky until changed in the panel. */
-			const startIdx = (self.playlistStartIndices || {})[pKey]
+			const startIdx = (self.playlistStartIndices || {})[`${incoming.id}-${layer.layerNumber}`]
 			if (Number.isFinite(startIdx) && startIdx > 0 && Array.isArray(layer.playlist) && startIdx < layer.playlist.length) {
 				setTimeout(() => {
 					try {
@@ -151,7 +160,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 						const duration = layerOsc?.file?.duration ?? undefined
 
 						if (playingFile) {
-							const pKey = `${scene.id}-${layer.layerNumber}`
+							const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 							self.playlistOscPrevPlayingPath = self.playlistOscPrevPlayingPath || {}
 							const prevPlaying = self.playlistOscPrevPlayingPath[pKey]
 							self.playlistActiveIndices = self.playlistActiveIndices || {}
@@ -160,7 +169,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 							self.playlistOscPrevPlayingPath[pKey] = playingFile
 
 							if (itemIdx >= 0) {
-								const pTimerKey = `${scene.id}-${layer.layerNumber}`
+								const pTimerKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 								if (
 									isTimelessPlaylistItem(layer.playlist[itemIdx]) &&
 									layer.playlist.length > 1 &&
@@ -293,7 +302,7 @@ function queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx) {
 }
 
 function schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx) {
-	const pKey = `${scene.id}-${layer.layerNumber}`
+	const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 	clearPlaylistImageTimer(self, pKey)
 
 	const item = layer.playlist[itemIdx]
@@ -344,12 +353,17 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 
 	void (async () => {
 		try {
-			/* Owner 2026-07-27: SHADER items must stay CG-hosted — LOADBG/PLAY of the html file
-			 * creates a plain html producer and Shader Live's CG UPDATE rides then 403. CG ADD
-			 * (playOnLoad) keeps the template host alive across playlist hops. Trade-off: no MIX
-			 * transition on shader hops (CG has no bg-transition path). */
-			if (/(^|\/)shaders\//i.test(String(nextItem.value || ''))) {
+			/* Owner 2026-07-27 (two rounds): shader hops must MIX like any media (CG has no
+			 * bg-transition path, so a non-CUT transition goes LOADBG/PLAY on the html file);
+			 * only a CUT-configured playlist keeps the CG ADD host. The Shader Live editor
+			 * compensates for the resulting plain html producer by re-hosting via CG ADD on the
+			 * first 403'd UPDATE (one visible restart at edit time, mixing preserved on air). */
+			const isShaderItem = /(^|\/)shaders\//i.test(String(nextItem.value || ''))
+			if (isShaderItem && !loadOpts.transition) {
 				await self.amcp.cgAdd(channel, pLayer, 0, String(nextItem.value).trim().toLowerCase(), 1, '{}')
+			} else if (isShaderItem) {
+				await self.amcp.loadbg(channel, pLayer, String(nextItem.value).trim().toLowerCase(), loadOpts)
+				await self.amcp.play(channel, pLayer)
 			} else {
 				const clip = resolveSceneClipForAmcp(nextItem.value, self)
 				await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
@@ -357,7 +371,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 			}
 
 			// Update index state immediately so that it triggers correctly on next update
-			const pKey = `${scene.id}-${layer.layerNumber}`
+			const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			self.playlistActiveIndices[pKey] = nextIdx
 
@@ -410,4 +424,5 @@ function shouldForceAdvance(state) {
 	return nearEnd
 }
 
-module.exports = { setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }
+module.exports = {
+	playlistRuntimeKey, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }

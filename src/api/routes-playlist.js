@@ -10,7 +10,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('../engine/scene-transition')
-const { triggerPlaylistAdvance } = require('../engine/scene-take-lbg-playlist')
+const { triggerPlaylistAdvance, playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
 
 /**
  * Owner request 2026-07-26 — Playlists footer panel: enumerate every playlist layer currently
@@ -25,6 +25,8 @@ function handleStateGet(ctx) {
 		const pKey = `${scene.id}-${layer.layerNumber}`
 		if (seen.has(pKey)) return
 		seen.add(pKey)
+		/* Runtime indices are channel-scoped (todos27); start indices stay pre-playout/channel-less. */
+		const rtKey = channel != null ? playlistRuntimeKey(channel, scene.id, layer.layerNumber) : null
 		playlists.push({
 			live: channel != null,
 			channel: channel != null ? channel : null,
@@ -33,7 +35,7 @@ function handleStateGet(ctx) {
 			layerNumber: Number(layer.layerNumber),
 			advance: layer.playlistAdvance || 'auto',
 			loop: layer.playlistLoop !== false,
-			activeIndex: (ctx.playlistActiveIndices || {})[pKey] ?? (ctx.playlistStartIndices || {})[pKey] ?? 0,
+			activeIndex: (rtKey != null ? (ctx.playlistActiveIndices || {})[rtKey] : undefined) ?? (ctx.playlistStartIndices || {})[pKey] ?? 0,
 			startIndex: (ctx.playlistStartIndices || {})[pKey] ?? 0,
 			items: layer.playlist.map((it) => ({
 				label: it.label || it.value,
@@ -98,7 +100,7 @@ async function handleControlPost(body, ctx) {
 	if (!layer || layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'No live playlist on that channel/layer' }) }
 	}
-	const pKey = `${scene.id}-${layerNumber}`
+	const pKey = playlistRuntimeKey(channel, scene.id, layerNumber)
 	ctx.playlistActiveIndices = ctx.playlistActiveIndices || {}
 	const currentIdx = ctx.playlistActiveIndices[pKey] ?? 0
 	const len = layer.playlist.length
@@ -195,7 +197,7 @@ async function handlePost(p, body, ctx) {
 	}
 
 	// Get the current active index
-	const pKey = `${scene.id}-${layerNumber}`
+	const pKey = playlistRuntimeKey(channel, scene.id, layerNumber)
 	const self = ctx  // The handler context may have state if needed
 	self.playlistActiveIndices = self.playlistActiveIndices || {}
 	const currentIdx = self.playlistActiveIndices[pKey] ?? 0

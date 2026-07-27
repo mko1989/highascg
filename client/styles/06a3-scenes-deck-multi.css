@@ -86,7 +86,9 @@
 }
 
 .scenes-toolbar__global-take--right {
-	margin-left: auto;
+	/* todos27: play/cut sit LEFT (right after the screen pills); the transition group is
+	 * what lives on the right edge now (06a1 margin-left:auto). */
+	margin-left: 0;
 }
 
 .scenes-deck-row {

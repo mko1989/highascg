@@ -119,3 +119,23 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       Playlist items: tiny drag dots, name gets the space, small seconds box, ✕ delete.
       Trashcans are ✕ everywhere (layer list, preset delete, sources folder too).
       >
+
+- [ ] **23. Playlist edit → preview** (WO-354)
+      Edit a playlist, take the look to PGM (new list plays), recall it to preview —
+      preview must play the NEW list too (the old-version replay is fixed at the root:
+      playlist timers were shared between PGM and PRV).
+      >
+
+- [ ] **24. Shader playlist mixing** (WO-354)
+      Shaders in a playlist with a MIX transition crossfade again. Editing one of those
+      shaders in Shader Live restarts it once (at the first slider move), then edits land live.
+      >
+
+- [ ] **25. Shader thumbs on ALL looks** (WO-354)
+      Every pure-shader look renders a real thumbnail on its deck card, not just one.
+      >
+
+- [ ] **26. Compose footer font + take buttons** (WO-354)
+      Current-item name under each screen window is readable (12px); ▶/CUT sit on the LEFT
+      of the deck toolbar next to the screen pills.
+      >

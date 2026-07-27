@@ -35,6 +35,8 @@ function liveShaderInstances(stateStore) {
 			const pLayer = bank === 'b' ? logical + 100 : logical
 			out.push({
 				shaderId: m[2].toLowerCase(),
+				/* Full template path for the CG ADD re-host fallback (same string the engine plays). */
+				cgName: String(layer.source.value).trim().toLowerCase(),
 				channel: ch,
 				pLayer,
 				isPrv: prvSet.has(ch),
@@ -279,7 +281,19 @@ export function initShaderLiveEditor(stateStore) {
 		const targets = instances().filter((i) => i.shaderId === inst.shaderId)
 		for (const t of targets) {
 			try {
-				await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
+				/* /api/raw answers HTTP 200 even when Caspar refuses — the error rides the body. */
+				const r = await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
+				if (!r?.error) continue
+				/* todos27: playlist hops with a MIX transition PLAY plain html producers (that is
+				 * what makes shader-to-shader mixing work) — CG UPDATE 403s on those. Re-host via
+				 * CG ADD once (one visible restart, only at edit time) and retry. */
+				if (/403/.test(String(r.error)) && t.cgName) {
+					await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} ADD 0 "${t.cgName}" 1 "{}"` })
+					const r2 = await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
+					if (r2?.error) console.warn('[shader-live] re-host retry failed:', r2.error)
+				} else {
+					console.warn('[shader-live] CG UPDATE failed:', r.error)
+				}
 			} catch (e) {
 				console.warn('[shader-live] CG UPDATE failed:', e?.message || e)
 			}

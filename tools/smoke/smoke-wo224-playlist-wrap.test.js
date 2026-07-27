@@ -85,7 +85,8 @@ test('T224.1: 3-item auto playlist with playlistLoop=true wraps and preloads ite
 	}
 
 	// Initialize state as if setupLayerPlaylists was called and we've been through a few items
-	const pKey = `${sceneId}-${layerNumber}`
+	/* todos27: runtime playlist state is channel-scoped (PGM/PRV of one look must not share). */
+	const pKey = `1:${sceneId}-${layerNumber}`
 	self.playlistActiveIndices[pKey] = 1  // Start at item1 (as if item1 just started playing)
 	self.playlistOscPrevPlayingPath[pKey] = 'item1.mov'
 
@@ -251,7 +252,7 @@ test('T224.2/3: POST /api/playlist/next validates inputs and resolves layer', as
 
 	const ctxAtEnd = {
 		programLayerBankByChannel: { '1': 'a' },
-		playlistActiveIndices: { [`${mockSceneId}-${mockLayerNum}`]: 1 },  // At last item
+		playlistActiveIndices: { [`1:${mockSceneId}-${mockLayerNum}`]: 1 },  // At last item (channel-scoped key)
 		amcp: { loadbg: async () => {}, play: async () => {} },
 		log: () => {},
 	}
@@ -327,7 +328,8 @@ test('T224.1: 2-item auto playlist with playlistLoop=true wraps correctly', asyn
 	}
 
 	// Initialize as if we're already at item1
-	const pKey = `${sceneId}-${layerNumber}`
+	/* todos27: runtime playlist state is channel-scoped (PGM/PRV of one look must not share). */
+	const pKey = `1:${sceneId}-${layerNumber}`
 	self.playlistActiveIndices[pKey] = 1
 	self.playlistOscPrevPlayingPath[pKey] = 'item1.mov'
 

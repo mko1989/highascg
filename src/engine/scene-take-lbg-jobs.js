@@ -82,7 +82,9 @@ async function buildTakeJobs(opts) {
 		let pendingManualPlaylistAdvance = null
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
-			const pKey = `${incoming.id}-${layer.layerNumber}`
+			/* todos27: runtime playlist state is channel-scoped (PGM + PRV of one look must not share). */
+			const { playlistRuntimeKey } = require('./scene-take-lbg-playlist')
+			const pKey = playlistRuntimeKey(channel, incoming.id, layer.layerNumber)
 			if (layer.playlistAdvance === 'manual') {
 				let idx = self.playlistActiveIndices[pKey] || 0
 				if (idx < 0 || idx >= layer.playlist.length) idx = 0
