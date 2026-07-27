@@ -144,5 +144,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-355 | Playlists PGM-only + stop on take-out; Shader Live expand (labels, blink, clip); clock | [WO-355](./work-orders/355_WO_playlists_pgm_only_shader_editor_expand_clock.md) | ✅ Done 27.07 |
 | WO-356 | Shader Live v3: rect groups, wheel steps, child saves, audition (shaders mode) | [WO-356](./work-orders/356_WO_shader_live_v3_children_audition_wheel.md) | ✅ Done 27.07 |
 | WO-357 | Shader Live: ▶ take fixed + PGM layer stack (exchange L10 / stack 11-20, MIX) | [WO-357](./work-orders/357_WO_shader_live_take_and_pgm_stack.md) | ✅ Done 27.07 |
+| WO-358 | Global border: area rect + glow secondary color cycle + pulse to 0 | [WO-358](./work-orders/358_WO_global_border_area_color2_pulse0.md) | ✅ Done 27.07 |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

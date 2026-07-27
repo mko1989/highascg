@@ -30,18 +30,31 @@
 		/* WO-220 H1: invisible background forces CEF to composite this element + its box-shadow (glow effect) */
 		background: rgba(0, 0, 0, 0.002);
 	}
+	/* Shadow color rides currentColor so the secondary-color cycle can animate `color`. */
 	.pip-frame.side-outside {
-		box-shadow: 0 0 var(--i) var(--w) var(--c);
+		box-shadow: 0 0 var(--i) var(--w) currentColor;
 	}
 	.pip-frame.side-inside {
-		box-shadow: inset 0 0 var(--i) var(--w) var(--c);
+		box-shadow: inset 0 0 var(--i) var(--w) currentColor;
 	}
 	.pip-frame.pulse {
 		animation: glow-pulse var(--ps, 2s) ease-in-out infinite alternate;
 	}
+	.pip-frame.cycle {
+		animation: glow-cycle var(--cs, 3s) ease-in-out infinite alternate;
+	}
+	.pip-frame.pulse.cycle {
+		animation:
+			glow-pulse var(--ps, 2s) ease-in-out infinite alternate,
+			glow-cycle var(--cs, 3s) ease-in-out infinite alternate;
+	}
 	@keyframes glow-pulse {
 		0% { opacity: var(--min-o, 0.4); }
 		100% { opacity: 1; }
+	}
+	@keyframes glow-cycle {
+		0% { color: var(--c); }
+		100% { color: var(--c2, var(--c)); }
 	}
 </style>
 </head>
@@ -57,6 +70,9 @@
 		pulse: true,
 		pulseSpeed: 2,
 		minOpacity: 0.4,
+		color2Enabled: false,
+		color2: '#0aa5e5',
+		colorCycleSec: 3,
 		radius: 0,
 		side: 'outside',
 		opacity: 1,
@@ -112,12 +128,17 @@
 		frame.style.setProperty('--i', state.intensity + 'px')
 		frame.style.setProperty('--w', (state.width || 0) + 'px')
 		frame.style.setProperty('--c', state.color)
+		frame.style.setProperty('--c2', state.color2)
+		frame.style.setProperty('--cs', (state.colorCycleSec > 0 ? state.colorCycleSec : 3) + 's')
+		frame.style.color = state.color
 		frame.style.setProperty('--ps', state.pulseSpeed + 's')
 		frame.style.setProperty('--min-o', String(state.minOpacity))
 		frame.style.setProperty('--r', (state.radius || 0) + 'px')
 
 		frame.className = 'pip-frame side-' + (state.side || 'outside')
-		if (state.pulse) frame.classList.add('pulse')
+		/* pulseSpeed 0 = pulse effectively off (a 0s animation would strobe). */
+		if (state.pulse && state.pulseSpeed > 0) frame.classList.add('pulse')
+		if (state.color2Enabled && state.color2) frame.classList.add('cycle')
 
 		if (state.segmentation > 0) {
 			var s = state.segmentation * 4
@@ -172,7 +193,10 @@
 		if (d.color != null) state.color = String(d.color)
 		if (d.intensity != null) state.intensity = parseFloat(d.intensity) || 15
 		if (d.pulse != null) state.pulse = !!d.pulse
-		if (d.pulseSpeed != null) state.pulseSpeed = parseFloat(d.pulseSpeed) || 2
+		if (d.pulseSpeed != null) { var psv = parseFloat(d.pulseSpeed); state.pulseSpeed = isFinite(psv) ? psv : 2 }
+		if (d.color2Enabled != null) state.color2Enabled = !!d.color2Enabled
+		if (d.color2 != null) state.color2 = String(d.color2)
+		if (d.colorCycleSec != null) { var ccs = parseFloat(d.colorCycleSec); state.colorCycleSec = isFinite(ccs) && ccs > 0 ? ccs : 3 }
 		if (d.minOpacity != null) state.minOpacity = parseFloat(d.minOpacity)
 		if (d.radius != null) state.radius = parseFloat(d.radius) || 0
 		if (d.side != null) state.side = String(d.side)

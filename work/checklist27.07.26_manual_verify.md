@@ -189,3 +189,10 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       (MIX), clicking an empty 11–20 fades the shader onto that layer — stacking works, the
       row lights up, and editing the landed shader restarts it once then rides live.
       >
+
+- [ ] **37. Global border: area / secondary color / pulse 0** (WO-358)
+      Effect inspector has "Area %" X/Y/W/H — border draws inside that rect (slices still
+      override with their own rects). "Enable secondary color" reveals the second color +
+      transition-time slider; the glow breathes between the two. Pulse speed and min-opacity
+      sliders reach 0 (speed 0 = pulse off).
+      >

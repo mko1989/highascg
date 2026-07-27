@@ -101,6 +101,8 @@ export function appendGlobalBorderEffectSections(
 		paramsBlock.className = 'inspector-effect-card__params'
 		for (const schema of def.schema) {
 			if (schema.key === 'side') continue
+			/* Owner 27.07: secondary color + its transition time hide under the enable toggle. */
+			if ((schema.key === 'color2' || schema.key === 'colorCycleSec') && gb.params?.color2Enabled !== true) continue
 			const curVal = gb.params?.[schema.key] ?? schema.default
 			renderParamEditor(paramsBlock, schema, curVal, (newVal) => {
 				const cur = gbNow()
@@ -108,10 +110,46 @@ export function appendGlobalBorderEffectSections(
 				patchGlobalBorder({
 					params: { ...cur.params, [schema.key]: newVal, side: 'inside' },
 				})
+				if (schema.key === 'color2Enabled') rerender()
 			})
 		}
 		borderGrp.appendChild(paramsBlock)
 	}
+
+	/* Owner 27.07: the border AREA — x/y/w/h in % of canvas; the border draws INSIDE this rect.
+	 * Slices (below) override the area when any are defined. */
+	const areaWrap = document.createElement('div')
+	areaWrap.className = 'inspector-field'
+	const areaLab = document.createElement('label')
+	areaLab.className = 'inspector-field__label'
+	areaLab.textContent = 'Area % (X / Y / W / H — slices override)'
+	const areaRow = document.createElement('div')
+	areaRow.style.cssText = 'display:flex;gap:6px;align-items:center'
+	const innerNow = gb.inner || { l: 0, t: 0, w: 1, h: 1 }
+	const areaInputs = ['l', 't', 'w', 'h'].map((k) => {
+		const inp = document.createElement('input')
+		inp.type = 'number'
+		inp.className = 'inspector-field__input'
+		inp.style.width = '58px'
+		inp.min = 0
+		inp.max = 100
+		inp.step = 1
+		inp.value = String(Math.round((Number(innerNow[k]) || (k === 'w' || k === 'h' ? 1 : 0)) * 100))
+		inp.dataset.k = k
+		inp.addEventListener('change', () => {
+			const val = {}
+			for (const el2 of areaInputs) {
+				val[el2.dataset.k] = Math.max(0, Math.min(100, parseFloat(el2.value) || 0)) / 100
+			}
+			patchGlobalBorder({ inner: val })
+		})
+		attachMathInput(inp, { decimals: 0 })
+		areaRow.appendChild(inp)
+		return inp
+	})
+	areaLab.appendChild(areaRow)
+	areaWrap.appendChild(areaLab)
+	borderGrp.appendChild(areaWrap)
 	root.appendChild(borderGrp)
 
 	const screenActions = document.createElement('div')

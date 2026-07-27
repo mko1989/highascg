@@ -59,6 +59,11 @@ function buildGlobalBorderCgJson(overlay, opts = {}) {
 		// use the first slice as the "inner" rect.
 		const s0 = ov.slices[0]
 		out.inner = { l: s0.x ?? 0, t: s0.y ?? 0, w: s0.w ?? 1, h: s0.h ?? 1 }
+	} else if (ov.inner && Number(ov.inner.w) > 0 && Number(ov.inner.h) > 0) {
+		/* Owner 27.07: the border AREA — display inside its set width/height (fractions). */
+		const c01 = (v) => Math.max(0, Math.min(1, Number(v) || 0))
+		out.inner = { l: c01(ov.inner.l), t: c01(ov.inner.t), w: c01(ov.inner.w), h: c01(ov.inner.h) }
+		out.slices = []
 	} else {
 		out.inner = { l: 0, t: 0, w: 1, h: 1 }
 		out.slices = []
