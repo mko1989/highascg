@@ -80,6 +80,20 @@ function normalizeShaderConfig(input) {
 	}
 	if (!passes.image) throw new Error('image pass source is required')
 
+	/* todos27.07.26: operator-given display names for Shader Live parameters ("decode what each
+	 * parameter does"). Keyed by the editor's stable param key; bounded so a hostile payload
+	 * cannot bloat the config file. */
+	const rawLabels = payload.paramLabels && typeof payload.paramLabels === 'object' ? payload.paramLabels : {}
+	/** @type {Record<string, string>} */
+	const paramLabels = {}
+	for (const [k, v] of Object.entries(rawLabels)) {
+		const key = String(k).trim().slice(0, 140)
+		const val = String(v).trim().slice(0, 60)
+		if (!key || !val) continue
+		paramLabels[key] = val
+		if (Object.keys(paramLabels).length >= 96) break
+	}
+
 	return {
 		id,
 		name,
@@ -87,6 +101,7 @@ function normalizeShaderConfig(input) {
 		passes,
 		audio: { enabled: payload.audio?.enabled !== false },
 		opts: { alpha: payload.opts?.alpha === true },
+		...(Object.keys(paramLabels).length ? { paramLabels } : {}),
 	}
 }
 

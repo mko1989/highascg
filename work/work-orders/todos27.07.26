@@ -44,4 +44,14 @@ when i click back to gui, the browser hides under the casparcg screen, but after
 
  in the compact playlist the next prev buttons have blue bg under icons, i dont want it.
  the shaders thumbs are back to not filling the screen even though the layer they are on is set to screen's dimmensions.
- 
+
+
+
+ the playlist workflow of shaders now uses preview channel. why? everything can be done inside the pgm channel only.
+the playlist continues even though its look was taken from the pgm......
+
+i want to expand the shaders live editor. first the drop down which to edit is acting out by blinking.
+the right side of the parameters is truncated.
+there needs to be a way to decode what each of the parameters do and label them. also the color pickers are gone. right now its all giberish.
+
+ current time with seconds small between eyes on the right and the small progress bar.

@@ -265,3 +265,23 @@
 	font-size: 0.85rem;
 }
 
+
+/* todos27 — rundown row hosts the playback progress (left) + wall clock (right) */
+.scenes-rundown-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.scenes-rundown-row .scenes-rundown-playback {
+	flex: 1;
+	min-width: 0;
+}
+
+.scenes-wall-clock {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	white-space: nowrap;
+	padding-right: 8px;
+}

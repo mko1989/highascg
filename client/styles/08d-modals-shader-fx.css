@@ -248,11 +248,16 @@
 .shader-live__param {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 6px;
+	/* todos27: rows overflowed their grid column — the right side (numbers, color pickers)
+	 * was clipped. Let rows shrink and wrap instead of bleeding out. */
+	min-width: 0;
+	flex-wrap: wrap;
 }
 
 .shader-live__pname {
-	flex: 0 0 160px;
+	flex: 0 1 140px;
+	min-width: 70px;
 	font-family: var(--mono-font, monospace);
 	font-size: 0.82rem;
 	overflow: hidden;
@@ -260,7 +265,7 @@
 }
 
 .shader-live__param input[type='range'] { flex: 1 1 auto; }
-.shader-live__param input[type='number'] { flex: 0 0 84px; width: 84px; }
+.shader-live__param input[type='number'] { flex: 0 0 62px; width: 62px; }
 .shader-live__param input[type='color'] { flex: 0 0 52px; width: 52px; height: 28px; padding: 0; }
 
 /* hidden must win over the class's display:flex (regression: could not leave Shader Live) */
@@ -322,3 +327,21 @@
 	cursor: pointer;
 }
 .shader-live__reset:hover { color: var(--accent); border-color: var(--accent); }
+
+/* todos27 — ✎ label button; custom-labeled params read as prose, not code */
+.shader-live__rename {
+	flex: none;
+	padding: 0 3px;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 0.75rem;
+}
+
+.shader-live__rename:hover { color: var(--text); }
+
+.shader-live__pname--custom {
+	font-family: inherit;
+	font-weight: 600;
+}

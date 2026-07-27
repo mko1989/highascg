@@ -139,3 +139,17 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       Current-item name under each screen window is readable (12px); ▶/CUT sit on the LEFT
       of the deck toolbar next to the screen pills.
       >
+
+- [ ] **27. Playlists are PGM-only + stop on take-out** (WO-355)
+      Recall a playlist look to preview: it shows one item and sits still. Take a different
+      look to PGM: the old look's playlist stops hopping immediately.
+      >
+
+- [ ] **28. Shader Live editor** (WO-355)
+      Dropdown no longer blinks; params fully visible in both columns (color pickers included);
+      ✎ next to any param names it (persists across reload; tooltip shows the raw code context).
+      >
+
+- [ ] **29. Wall clock** (WO-355)
+      Small HH:MM:SS ticking at the right end of the progress-bar row.
+      >

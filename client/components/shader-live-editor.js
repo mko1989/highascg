@@ -86,6 +86,7 @@ export function initShaderLiveEditor(stateStore) {
 		overlay.querySelector('#shl-save').addEventListener('click', () => void saveToLibrary())
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
 		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
+		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamRename(e))
 		overlay.querySelector('#shl-params').addEventListener('change', onControlChange)
 		overlay.querySelector('#shl-params').addEventListener('input', onControlInputMirror)
 		return overlay
@@ -105,13 +106,19 @@ export function initShaderLiveEditor(stateStore) {
 			return false
 		}
 		if (!list.some((i) => keyOf(i) === selectedKey)) selectedKey = keyOf(list[0])
-		sel.innerHTML = list
+		const html = list
 			.map((i) => {
 				const k = keyOf(i)
 				const where = `${i.isPrv ? 'PRV' : 'PGM'} ch${i.channel} L${i.pLayer}`
 				return `<option value="${escapeHtml(k)}"${k === selectedKey ? ' selected' : ''}>${escapeHtml(`${i.shaderId} — ${where} (${i.sceneName})`)}</option>`
 			})
 			.join('')
+		/* todos27: the state store fires every second — rewriting identical options made the
+		 * dropdown blink (and killed an open picker). Only touch the DOM on a real change. */
+		if (sel.dataset.optionsHtml !== html) {
+			sel.dataset.optionsHtml = html
+			sel.innerHTML = html
+		}
 		return true
 	}
 
@@ -196,9 +203,18 @@ export function initShaderLiveEditor(stateStore) {
 				: '')
 	}
 
+	/* todos27: stable identity for operator-given labels (survives reloads; deep keys embed the
+	 * ordinal + code context so they follow the same literal until the source itself changes). */
+	function labelKeyOf(p) {
+		return `${p.passKey}:${p.deep ? 'deep:' : ''}${p.name}`
+	}
+
 	function paramRowHtml(p, idx) {
 		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
-		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
+		const custom = shaderCfg?.paramLabels?.[labelKeyOf(p)]
+		/* Tooltip = the decode: pass + the raw name (deep names carry the ◆ code context). */
+		const tip = `${p.passKey} — ${p.name}`
+		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
 		if (p.kind === 'color') {
 			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
 			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}</div>`
@@ -298,6 +314,30 @@ export function initShaderLiveEditor(stateStore) {
 				console.warn('[shader-live] CG UPDATE failed:', e?.message || e)
 			}
 		}
+	}
+
+	async function onParamRename(e) {
+		const t = e.target
+		if (!(t instanceof HTMLElement) || t.dataset.rename == null) return
+		const p = params[Number(t.dataset.rename)]
+		if (!p || !shaderCfg) return
+		const key = labelKeyOf(p)
+		const cur = shaderCfg.paramLabels?.[key] || ''
+		const next = window.prompt(`Label for this parameter\n(${p.passKey} — ${p.name})\nEmpty clears the label.`, cur)
+		if (next == null) return
+		shaderCfg.paramLabels = shaderCfg.paramLabels || {}
+		if (String(next).trim()) shaderCfg.paramLabels[key] = String(next).trim()
+		else delete shaderCfg.paramLabels[key]
+		try {
+			await api.post('/api/shaders', shaderCfg)
+		} catch (err) {
+			console.warn('[shader-live] label save failed:', err?.message || err)
+		}
+		const keep = params.map((x) => ({ values: [...x.values] }))
+		renderParams()
+		params.forEach((x, i) => {
+			if (keep[i] && keep[i].values.length === x.values.length) x.values = keep[i].values
+		})
 	}
 
 	function onParamReset(e) {

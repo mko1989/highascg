@@ -31,7 +31,36 @@ function playlistRuntimeKey(channel, sceneId, layerNumber) {
 	return `${channel}:${sceneId}-${layerNumber}`
 }
 
+/* todos27.07.26 (owner): playlists RUN on program only. A preview recall shows the staged item
+ * statically — no timers, no OSC-driven hops, no preloads on a PRV bus. */
+function isPlaylistChannelEligible(self, channel) {
+	try {
+		const { isPreviewCasparChannel } = require('./caspar-channel-clear')
+		return !isPreviewCasparChannel(self.config, channel)
+	} catch {
+		return true
+	}
+}
+
+/* todos27.07.26 (owner): "the playlist continues even though its look was taken from the pgm" —
+ * timers were only cleared when the SAME look restaged. Every take now wipes the channel's whole
+ * playlist runtime state first, killing the outgoing look's timers. */
+function clearChannelPlaylistState(self, channel) {
+	const prefix = `${channel}:`
+	for (const key of Object.keys(self.playlistImageTimers || {})) {
+		if (key.startsWith(prefix)) clearPlaylistImageTimer(self, key)
+	}
+	for (const bag of [self.playlistActiveIndices, self.playlistOscPrevPlayingPath]) {
+		if (!bag) continue
+		for (const key of Object.keys(bag)) {
+			if (key.startsWith(prefix)) delete bag[key]
+		}
+	}
+}
+
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
+	clearChannelPlaylistState(self, channel)
+	if (!isPlaylistChannelEligible(self, channel)) return
 	// Register the global OSC playlist handler on self.oscState exactly once!
 	if (self.oscState && !self._playlistOscBound) {
 		self._playlistOscBound = true
@@ -139,6 +168,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 			const channel = parseInt(chKey, 10)
 			const liveEntry = activeScenes[chKey]
 			if (!liveEntry || !liveEntry.scene) continue
+			if (!isPlaylistChannelEligible(self, channel)) continue
 			const scene = liveEntry.scene
 			const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel?.[chKey])
 
@@ -316,6 +346,15 @@ function schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx
 	self.playlistImageTimers[pKey] = setTimeout(() => {
 		delete self.playlistImageTimers[pKey]
 
+		/* Defensive: the look may have left this channel between arm and fire — never hop a
+		 * playlist whose scene is no longer live here (todos27 "playlist continues after take"). */
+		try {
+			const liveNow = require('../state/live-scene-state').getChannel(channel)
+			if (!liveNow?.scene || String(liveNow.scene.id) !== String(scene.id)) return
+		} catch {
+			/* state unavailable — fire as before */
+		}
+
 		// Advance to next
 		let nextIdx = itemIdx + 1
 		if (layer.playlistLoop !== false) {
@@ -425,4 +464,5 @@ function shouldForceAdvance(state) {
 }
 
 module.exports = {
-	playlistRuntimeKey, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }
+	playlistRuntimeKey,
+	clearChannelPlaylistState, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }
