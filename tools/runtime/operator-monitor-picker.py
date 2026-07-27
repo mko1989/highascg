@@ -42,10 +42,11 @@ PID_PATH = os.path.expanduser("~/.highascg/run/operator-monitor-picker.pid")
 DEFAULT_TIMEOUT_MS = 120_000
 LOOP_SLEEP_SEC = 0.05
 
-# Deep blue panel, white text, hot border — must read as "system prompt", not as content.
-COLOR_BG = "#10284b"
+# Owner (todos27.07.26): the boot prompt was too bright/colorful — plain black panel,
+# white text centered, muted gray frame. Still unmistakably a system prompt, just calm.
+COLOR_BG = "#000000"
 COLOR_FG = "#ffffff"
-COLOR_ACCENT = "#ff9d2e"
+COLOR_ACCENT = "#4a4a4a"
 
 HEADLINE = "CLICK HERE"
 SUBLINE = "to make this your operator screen"

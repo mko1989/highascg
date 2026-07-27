@@ -219,6 +219,37 @@ describe('WO-290 persistence shape', () => {
 		assert.throws(() => applyOperatorMonitorChoice({}, 0), /out of range/)
 		assert.throws(() => applyOperatorMonitorChoice({}, 9), /out of range/)
 	})
+
+	/* todos27.07.26: the pick must also land as a devices-tab cable. */
+	it('wires dst_in_<operator_gui dest> -> gpu_p<port-1> in the device graph, replacing prior cables on either endpoint', () => {
+		const before = {
+			screenDestinations: { destinations: [{ id: 'dst_op_1', mode: 'operator_gui' }, { id: 'dst_pgm_1', mode: 'pgm_prv' }] },
+			deviceGraph: {
+				connectors: [{ id: 'dst_in_dst_op_1' }, { id: 'dst_in_dst_pgm_1' }, { id: 'gpu_p0' }, { id: 'gpu_p1' }],
+				edges: [
+					{ id: 'stale1', sourceId: 'dst_in_dst_op_1', sinkId: 'gpu_p0' },
+					{ id: 'stale2', sourceId: 'dst_in_dst_pgm_1', sinkId: 'gpu_p1' },
+				],
+			},
+		}
+		const after = applyOperatorMonitorChoice(before, 2)
+		const edges = after.deviceGraph.edges
+		assert.deepEqual(edges, [{ id: 'e_dst_in_dst_op_1_gpu_p1', sourceId: 'dst_in_dst_op_1', sinkId: 'gpu_p1' }])
+		// input untouched
+		assert.equal(before.deviceGraph.edges.length, 2)
+	})
+
+	it('missing connectors or no operator_gui destination: flag persists, graph untouched', () => {
+		const g = { connectors: [{ id: 'gpu_p1' }], edges: [{ id: 'keep', sourceId: 'x', sinkId: 'y' }] }
+		const noDest = applyOperatorMonitorChoice({ deviceGraph: g }, 2)
+		assert.deepEqual(noDest.deviceGraph.edges, g.edges)
+		const noConn = applyOperatorMonitorChoice(
+			{ screenDestinations: { destinations: [{ id: 'dst_op_1', mode: 'operator_gui' }] }, deviceGraph: g },
+			2,
+		)
+		assert.deepEqual(noConn.deviceGraph.edges, g.edges)
+		assert.equal(noConn.casparServer.screen_2_operator_monitor, true)
+	})
 })
 
 describe('WO-290 full run — shortcut, selection and every abandon path', () => {

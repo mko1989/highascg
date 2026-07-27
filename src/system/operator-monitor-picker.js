@@ -271,7 +271,40 @@ function applyOperatorMonitorChoice(config, port) {
 		delete next.casparServer[`screen_${i}_operator_monitor`]
 	}
 	next.casparServer[`screen_${n}_operator_monitor`] = true
-	return next
+	return wireOperatorGuiGraphEdge(next, n)
+}
+
+/**
+ * PURE. Owner (todos27.07.26): a picker choice must ALSO show as a cable in the devices tab.
+ * Wires the operator_gui destination's input connector (`dst_in_<destId>`) to the picked GPU
+ * jack (`gpu_p<port-1>` — flag port is 1-based, jack ids are slotOrder) in config.deviceGraph.
+ * Any prior cable on either endpoint is replaced (one monitor, one jack — mirrors the physical
+ * reality of the click). Never invents connectors: if either endpoint is missing from the graph
+ * (fresh box before the boot hardware sync), the flag alone still drives the launcher and this
+ * returns the config unchanged.
+ * @param {object} config
+ * @param {number} port 1-based GPU port index
+ * @returns {object}
+ */
+function wireOperatorGuiGraphEdge(config, port) {
+	const dests = config?.screenDestinations?.destinations
+	const dest = Array.isArray(dests)
+		? dests.find((d) => String(d?.mode || '').toLowerCase() === 'operator_gui')
+		: null
+	const graph = config?.deviceGraph
+	if (!dest?.id || !graph || typeof graph !== 'object') return config
+	const srcId = `dst_in_${dest.id}`
+	const gpuId = `gpu_p${port - 1}`
+	const connectors = Array.isArray(graph.connectors) ? graph.connectors : []
+	const hasSrc = connectors.some((c) => String(c?.id || '') === srcId)
+	const hasGpu = connectors.some((c) => String(c?.id || '') === gpuId)
+	if (!hasSrc || !hasGpu) return config
+	const edges = Array.isArray(graph.edges) ? graph.edges : []
+	const nextEdges = edges.filter(
+		(e) => String(e?.sourceId || '') !== srcId && String(e?.sinkId || '') !== gpuId,
+	)
+	nextEdges.push({ id: `e_${srcId}_${gpuId}`, sourceId: srcId, sinkId: gpuId })
+	return { ...config, deviceGraph: { ...graph, edges: nextEdges } }
 }
 
 /**

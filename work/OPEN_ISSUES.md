@@ -137,5 +137,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-348 | Shader Live: per-param revert, reset-all, 2-column layout | [WO-348](./work-orders/348_WO_SHADER_LIVE_PARAM_RESET_LAYOUT.md) | ✅ Done 27.07 |
 | WO-349 | CI: verify job green again + real checks (500-line gate, client build) | [WO-349](./work-orders/349_WO_ci_green_and_real_checks.md) | ✅ Done 27.07 |
 | WO-350 | UI polish (bar heights, transition group right) + timeless secs in Playlists compact | [WO-350](./work-orders/350_WO_ui_polish_and_playlist_timeless_compact.md) | ✅ Done 27.07 |
+| WO-351 | Monitor picker: black/white prompt + pick wires the devices-tab cable | [WO-351](./work-orders/351_WO_monitor_picker_calm_colors_and_graph_cable.md) | ✅ Done 27.07 |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)
