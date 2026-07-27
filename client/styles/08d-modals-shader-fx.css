@@ -397,3 +397,69 @@
 	padding: 2px 14px;
 	font-weight: 700;
 }
+
+/* todos27 — Shader Live PGM layer stack (right column) */
+.shader-live__body {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.shader-live__body .shader-live__params {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-y: visible;
+}
+
+.shader-live__stack {
+	flex: 0 0 168px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 6px 8px 8px;
+	background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+	position: sticky;
+	top: 0;
+}
+
+.shader-live__stack-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 6px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	text-align: left;
+	font-size: 0.72rem;
+}
+
+.shader-live__stack-row:hover {
+	border-color: var(--border);
+	color: var(--text);
+}
+
+.shader-live__stack-row--live {
+	color: var(--text);
+	border-color: color-mix(in srgb, #e5484d 45%, transparent);
+}
+
+.shader-live__stack-n {
+	flex: none;
+	font-family: var(--mono-font, monospace);
+	font-size: 0.68rem;
+	width: 18px;
+}
+
+.shader-live__stack-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}

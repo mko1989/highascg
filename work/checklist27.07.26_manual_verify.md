@@ -182,3 +182,10 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       deleted shaders STAY deleted. NOTE: add the same two .stignore lines
       (/template/shaders, /data/shaders) on the MacBook's copy — stignore doesn't sync itself.
       >
+
+- [ ] **36. Shader Live ▶ + PGM stack** (WO-357)
+      ▶ next to the instance dropdown takes PRV→PGM (deck transition). Right column lists PGM
+      layers 10–20: with a PRV shader selected, clicking L10 exchanges it with what's on air
+      (MIX), clicking an empty 11–20 fades the shader onto that layer — stacking works, the
+      row lights up, and editing the landed shader restarts it once then rides live.
+      >

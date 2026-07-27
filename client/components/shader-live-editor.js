@@ -17,6 +17,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { liveShaderInstances } from '../lib/shader-live-instances.js'
 import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
 import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml } from './shader-live-rows.js'
+import { createShaderLiveStack } from './shader-live-stack.js'
 import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function initShaderLiveEditor(stateStore) {
@@ -28,6 +29,7 @@ export function initShaderLiveEditor(stateStore) {
 	let pristine = null
 	let pristineParams = null
 	let unsub = null
+	let _stack = null
 
 	const isGlassesLogo = () => settingsState.getSettings()?.operatorTools?.cefEnableGpu === true
 
@@ -40,12 +42,16 @@ export function initShaderLiveEditor(stateStore) {
 			<div class="shader-live__bar">
 				<span class="shader-live__title">🕶 Shader Live</span>
 				<select class="inspector-field__select" id="shl-instance" style="max-width:340px"></select>
+				<button type="button" class="btn scenes-btn--take shader-live__take" id="shl-take" title="Take preview to program (same transition as the deck ▶)">▶</button>
 				<span class="shader-live__dirty" id="shl-dirty" hidden>● live edits not saved</span>
 				<button type="button" class="btn btn--secondary" id="shl-reset-all" title="Restore every parameter to the library values (recovery for a broken shader)">Reset all</button>
 				<button type="button" class="btn" id="shl-save" disabled>Save to library</button>
 				<button type="button" class="btn btn--secondary" id="shl-close" title="Back to looks">✕</button>
 			</div>
-			<div class="shader-live__params" id="shl-params"><p class="settings-note">No shader live — take a shader look to PGM or PRV.</p></div>`
+			<div class="shader-live__body">
+				<div class="shader-live__params" id="shl-params"><p class="settings-note">No shader live — take a shader look to PGM or PRV.</p></div>
+				<div class="shader-live__stack" id="shl-stack"></div>
+			</div>`
 		/* Owner 2026-07-27: the compose preview must stay exactly where it is — the panel replaces
 		 * only the looks area BELOW it (.scenes-main inside .scenes-split). */
 		overlay.querySelector('#shl-close').addEventListener('click', () => setOpen(false))
@@ -62,6 +68,8 @@ export function initShaderLiveEditor(stateStore) {
 			else window.showToast?.('Take unavailable — deck not mounted', 'error')
 		})
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
+		_stack = createShaderLiveStack({ stateStore, getSelected: selected })
+		_stack.mount(overlay.querySelector('#shl-stack'))
 		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamWiggle(e))
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamRename(e))
@@ -403,6 +411,7 @@ export function initShaderLiveEditor(stateStore) {
 		if (!overlay || overlay.hidden) return
 		const had = selectedKey
 		if (renderInstanceList() && selectedKey !== had) void loadSelected()
+		_stack?.render()
 	}
 
 	function setOpen(open) {
