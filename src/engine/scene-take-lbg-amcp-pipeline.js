@@ -245,7 +245,17 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		const needsIncomingFadePreroll =
 			(shouldRunBankCrossfade && takeJobs.some((j) => j.incomingStartsHidden)) ||
 			(isMergeTransition && fadeDur > 0 && takeJobs.some((j) => j.isMerge && j.loadPlan))
-		const prebufferMs = needsIncomingFadePreroll ? 180 : 80
+		/* Owner 27.07 ("all shaders doesnt mix well, even look to look"): a shader template's CEF
+		 * page needs several hundred ms to compile WebGL and render its first frame — a 180ms
+		 * preroll ramped a BLANK layer up and the shader popped in mid-fade. Give shader-bearing
+		 * takes a real warm-up before the crossfade starts. */
+		const hasShaderJob = takeJobs.some((j) => j.templateCg && isShaderCgName(j.templateCg.cgName))
+		const shaderWarmupMs = Math.max(0, Math.min(3000, parseInt(process.env.HIGHASCG_SHADER_WARMUP_MS || '600', 10) || 600))
+		const prebufferMs = hasShaderJob
+			? Math.max(needsIncomingFadePreroll ? 180 : 80, shaderWarmupMs)
+			: needsIncomingFadePreroll
+				? 180
+				: 80
 		await new Promise((r) => setTimeout(r, prebufferMs))
 
 		try {

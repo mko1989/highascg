@@ -402,6 +402,10 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 				await self.amcp.cgAdd(channel, pLayer, 0, String(nextItem.value).trim().toLowerCase(), 1, '{}')
 			} else if (isShaderItem) {
 				await self.amcp.loadbg(channel, pLayer, String(nextItem.value).trim().toLowerCase(), loadOpts)
+				/* Owner 27.07: let the CEF shader render its first frame in the background before
+				 * the MIX promotes it — playing immediately mixed to a blank page. */
+				const warm = Math.max(0, Math.min(3000, parseInt(process.env.HIGHASCG_SHADER_WARMUP_MS || '600', 10) || 600))
+				await new Promise((r) => setTimeout(r, warm))
 				await self.amcp.play(channel, pLayer)
 			} else {
 				const clip = resolveSceneClipForAmcp(nextItem.value, self)
