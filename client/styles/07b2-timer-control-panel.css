@@ -458,3 +458,14 @@
 	padding: 2px 8px;
 	font-size: 0.7rem;
 }
+
+/* Transport SVGs center in their buttons. */
+.playlist-control-panel__transport .btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.playlist-control-panel__transport .btn svg {
+	display: block;
+}

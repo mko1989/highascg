@@ -36,9 +36,9 @@ export function initPlaylistControlPanel(mountEl) {
 					<button type="button" class="btn btn--secondary" id="plp-timeless-apply" title="Set the duration of every image/template/shader item in this playlist">Set all</button>
 				</div>
 				<div class="playlist-control-panel__row playlist-control-panel__transport">
-					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item">◄◄</button>
-					<button type="button" class="btn btn--secondary" id="plp-play" title="Restage the selected item">►</button>
-					<button type="button" class="btn btn--secondary" id="plp-next" title="Next item">►►</button>
+					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10"/><path d="M14 3v10L6 8z"/></svg></button>
+					<button type="button" class="btn btn--secondary" id="plp-play" title="Restage the selected item"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2v12l10-6z"/></svg></button>
+					<button type="button" class="btn btn--secondary" id="plp-next" title="Next item"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 3v10l8-5z"/><rect x="12" y="3" width="2" height="10"/></svg></button>
 				</div>
 			</div>
 		</div>`
