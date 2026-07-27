@@ -3,7 +3,7 @@
 **Source:** todos27.07.26 — "playlists panel needs to show all playlists that are created in
 looks. as an operator i need to be able to set an item of the playlist before playout."
 
-**Status: OPEN → implementing.**
+**Status: DONE 2026-07-27: /api/playlist/state lists project-defined playlists (live:false, verified: Look 6 listed while not live); set_start action + take-time consumption (400ms post-stage advance); panel shows all with 🔴 live badge, start-item select for non-live, transport disabled until live.**
 
 ## Fix
 1. `GET /api/playlist/state`: additionally enumerate playlist layers from the PROJECT envelope

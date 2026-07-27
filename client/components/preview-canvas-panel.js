@@ -36,7 +36,7 @@ export function initPreviewPanel(host, options) {
 	const titleEl = document.createElement('span'); titleEl.className = 'preview-panel__title'; titleEl.textContent = title
 	const composeLayoutBtn = document.createElement('button'); composeLayoutBtn.className = 'preview-panel__compose-layout'; composeLayoutBtn.hidden = true
 	const resEl = document.createElement('span'); resEl.className = 'preview-panel__res'
-	const grabBtn = document.createElement('button'); grabBtn.className = 'preview-panel__grab'; grabBtn.textContent = 'PRT PGM'
+	const grabBtn = document.createElement('button'); grabBtn.className = 'preview-panel__grab'; grabBtn.textContent = 'Reset'; grabBtn.title = 'Reset compose preview windows to default layout'
 	headerEl.append(toggleBtn, titleEl, composeLayoutBtn, resEl, grabBtn)
 	const bodyEl = document.createElement('div'); bodyEl.className = bodyCls; if (!fillParentHeight) bodyEl.style.height = `${bodyH}px`
 	const resizeEl = document.createElement('div'); resizeEl.className = 'preview-panel__resize'
@@ -383,7 +383,7 @@ export function initPreviewPanel(host, options) {
 	}
 
 	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); if (c && typeof onComposeCellRects === 'function') onComposeCellRects([]); updateLive() }
-	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = async () => { try { grabBtnEl.classList.add('busy'); await api.post('/api/amcp/print', { channel: options.getProgramChannel?.() || 1 }); grabBtnEl.classList.remove('busy'); grabBtnEl.classList.add('ok'); setTimeout(() => grabBtnEl.classList.remove('ok'), 1000) } catch { grabBtnEl.classList.add('err'); setTimeout(() => grabBtnEl.classList.remove('err'), 2000) } }
+	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = () => { window.dispatchEvent(new CustomEvent('operator-tiles-reset-request')) }
 	if (composePrvPgmLayoutToggle && !operatorTilesActive) {
 		// WO-256: the Stack/Side toggle only affects the legacy canvas-pair's flex direction — the
 		// free-tile canvas has no such single-axis layout, so the control would otherwise be dead.

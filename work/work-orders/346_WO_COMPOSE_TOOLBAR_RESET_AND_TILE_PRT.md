@@ -4,7 +4,7 @@
 for reset the compose prv windows. all live sources inside the compose preview need to have a
 prt/capture button."
 
-**Status: OPEN → implementing (Haiku).**
+**Status: DONE 2026-07-27 (Haiku implementation, spot-verified): header Reset dispatches operator-tiles-reset-request → resetLayout(); per-tile PRT buttons POST /api/amcp/print with the tile channel.**
 
 ## Facts
 - PRT PGM: `client/components/preview-canvas-panel.js:39` (grabBtn) + handler :386 —

@@ -39,6 +39,18 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 			// Initialize the active index to 0 for auto advance
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			
+			/* WO-347: operator pre-selected a start item (Playlists panel, action:set_start) —
+			 * stage it right after the take lands. Sticky until changed in the panel. */
+			const startIdx = (self.playlistStartIndices || {})[pKey]
+			if (Number.isFinite(startIdx) && startIdx > 0 && Array.isArray(layer.playlist) && startIdx < layer.playlist.length) {
+				setTimeout(() => {
+					try {
+						triggerPlaylistAdvance(self, channel, job.pLayer, incoming, layer, startIdx)
+					} catch {
+						/* advisory */
+					}
+				}, 400)
+			}
 			if (layer.playlistAdvance === 'auto') {
 				self.playlistActiveIndices[pKey] = 0
 				self.playlistOscPrevPlayingPath = self.playlistOscPrevPlayingPath || {}

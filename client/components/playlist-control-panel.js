@@ -48,7 +48,7 @@ export function initPlaylistControlPanel(mountEl) {
 	let selectedKey = null
 	let pollTimer = null
 
-	const keyOf = (p) => `${p.channel}:${p.layerNumber}:${p.sceneId}`
+	const keyOf = (p) => `${p.sceneId}:${p.layerNumber}`
 	const selected = () => playlists.find((p) => keyOf(p) === selectedKey) || null
 
 	function renderLists() {
@@ -62,18 +62,24 @@ export function initPlaylistControlPanel(mountEl) {
 		listSel.innerHTML = playlists
 			.map((p) => {
 				const k = keyOf(p)
-				const label = `${p.sceneName} · L${p.layerNumber} · ch${p.channel}`
+				/* WO-347: every playlist defined in the looks; live ones carry the channel. */
+				const label = `${p.live ? '🔴 ' : ''}${p.sceneName} · L${p.layerNumber}${p.live ? ` · ch${p.channel}` : ' · not live'}`
 				return `<option value="${escapeHtml(k)}"${k === selectedKey ? ' selected' : ''}>${escapeHtml(label)}</option>`
 			})
 			.join('')
 		const p = selected()
+		const cur = p?.live ? p.activeIndex : (p?.startIndex ?? 0)
 		itemSel.innerHTML = (p?.items || [])
 			.map((it, i) => {
-				const active = i === p.activeIndex ? '● ' : ''
+				const active = i === cur ? (p.live ? '● ' : '▸ ') : ''
 				const dur = it.duration != null ? ` (${it.duration}s)` : ''
-				return `<option value="${i}"${i === p.activeIndex ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${it.label}${dur}`)}</option>`
+				return `<option value="${i}"${i === cur ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${it.label}${dur}`)}</option>`
 			})
 			.join('')
+		for (const id of ['plp-prev', 'plp-play', 'plp-next']) {
+			const b = el(id)
+			if (b) b.disabled = !p?.live
+		}
 	}
 
 	async function refresh() {
@@ -106,7 +112,20 @@ export function initPlaylistControlPanel(mountEl) {
 		selectedKey = listSel.value
 		renderLists()
 	})
-	itemSel.addEventListener('change', () => void control('goto', parseInt(itemSel.value, 10)))
+	itemSel.addEventListener('change', () => {
+		const p = selected()
+		const idx = parseInt(itemSel.value, 10)
+		if (!p || !Number.isFinite(idx)) return
+		if (p.live) {
+			void control('goto', idx)
+		} else {
+			/* WO-347: pre-playout start item — playout of this look starts here. */
+			void api
+				.post('/api/playlist/control', { action: 'set_start', sceneId: p.sceneId, layerNumber: p.layerNumber, index: idx })
+				.then(() => refresh())
+				.catch((e) => console.warn('[playlist panel] set_start failed:', e?.message || e))
+		}
+	})
 	el('plp-prev').addEventListener('click', () => void control('prev'))
 	el('plp-next').addEventListener('click', () => void control('next'))
 	el('plp-play').addEventListener('click', () => {

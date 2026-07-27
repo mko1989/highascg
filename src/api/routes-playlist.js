@@ -20,29 +20,49 @@ const { triggerPlaylistAdvance } = require('../engine/scene-take-lbg-playlist')
 function handleStateGet(ctx) {
 	const all = liveSceneState.getAll()
 	const playlists = []
+	const seen = new Set()
+	const pushEntry = (scene, layer, channel) => {
+		const pKey = `${scene.id}-${layer.layerNumber}`
+		if (seen.has(pKey)) return
+		seen.add(pKey)
+		playlists.push({
+			live: channel != null,
+			channel: channel != null ? channel : null,
+			sceneId: scene.id,
+			sceneName: scene.name || scene.id,
+			layerNumber: Number(layer.layerNumber),
+			advance: layer.playlistAdvance || 'auto',
+			loop: layer.playlistLoop !== false,
+			activeIndex: (ctx.playlistActiveIndices || {})[pKey] ?? (ctx.playlistStartIndices || {})[pKey] ?? 0,
+			startIndex: (ctx.playlistStartIndices || {})[pKey] ?? 0,
+			items: layer.playlist.map((it) => ({
+				label: it.label || it.value,
+				value: it.value,
+				duration: it.duration ?? null,
+				type: it.type || 'media',
+			})),
+		})
+	}
 	for (const chKey of Object.keys(all || {})) {
-		const entry = all[chKey]
-		const scene = entry?.scene
+		const scene = all[chKey]?.scene
 		if (!scene || !Array.isArray(scene.layers)) continue
 		for (const layer of scene.layers) {
 			if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) continue
-			const pKey = `${scene.id}-${layer.layerNumber}`
-			playlists.push({
-				channel: parseInt(chKey, 10),
-				sceneId: scene.id,
-				sceneName: scene.name || scene.id,
-				layerNumber: Number(layer.layerNumber),
-				advance: layer.playlistAdvance || 'auto',
-				loop: layer.playlistLoop !== false,
-				activeIndex: (ctx.playlistActiveIndices || {})[pKey] ?? 0,
-				items: layer.playlist.map((it) => ({
-					label: it.label || it.value,
-					value: it.value,
-					duration: it.duration ?? null,
-					type: it.type || 'media',
-				})),
-			})
+			pushEntry(scene, layer, parseInt(chKey, 10))
 		}
+	}
+	/* WO-347: also every playlist DEFINED in the project's looks (not live yet) — the operator
+	 * sets the start item before playout via action:'set_start'. */
+	try {
+		const envelope = require('../engine/project-scenes-load').loadProjectScenes()
+		for (const scene of envelope?.scenes || []) {
+			for (const layer of scene?.layers || []) {
+				if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) continue
+				pushEntry(scene, layer, null)
+			}
+		}
+	} catch {
+		/* project store unavailable — live-only listing */
 	}
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, playlists }) }
 }
@@ -57,6 +77,18 @@ async function handleControlPost(body, ctx) {
 	const channel = parseInt(b.channel, 10)
 	const layerNumber = parseInt(b.layerNumber, 10)
 	const action = String(b.action || 'next')
+	/* WO-347: pre-playout start item for a NOT-live playlist — keyed by sceneId, consumed by
+	 * setupLayerPlaylists at the next take of that look. Sticky until changed. */
+	if (action === 'set_start') {
+		const sceneId = String(b.sceneId || '').trim()
+		const idx = parseInt(b.index, 10)
+		if (!sceneId || !Number.isFinite(layerNumber) || !Number.isFinite(idx) || idx < 0) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'sceneId, layerNumber, index required' }) }
+		}
+		ctx.playlistStartIndices = ctx.playlistStartIndices || {}
+		ctx.playlistStartIndices[`${sceneId}-${layerNumber}`] = idx
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: idx }) }
+	}
 	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layerNumber)) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'channel and layerNumber required' }) }
 	}

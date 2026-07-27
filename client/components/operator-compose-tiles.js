@@ -321,9 +321,11 @@ export function initOperatorComposeTiles(container, options) {
 	// Workspace tab switches reflow the whole page — re-layout + re-report deterministically
 	// (belt-and-suspenders next to posWatch; also covers environments without IntersectionObserver).
 	const onTabActivated = () => layoutAll()
+	const onResetRequest = () => resetLayout()
 	window.addEventListener('resize', onWinResize)
 	window.addEventListener('scroll', onWinScroll, true)
 	window.addEventListener('highascg-workspace-tab-activated', onTabActivated)
+	window.addEventListener('operator-tiles-reset-request', onResetRequest)
 	const unsubCm = stateStore?.on?.('channelMap', () => rebuild())
 	// The WS full-`state` message goes through StateStore.setState(), which emits ONLY '*' — it
 	// never emits 'channelMap' (client/lib/state-store.js) — so the subscription above alone can
@@ -408,6 +410,7 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('resize', onWinResize)
 			window.removeEventListener('scroll', onWinScroll, true)
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
+			window.removeEventListener('operator-tiles-reset-request', onResetRequest)
 			unsubCm?.()
 			unsubAnyState?.()
 			unsubLiveFrame?.()

@@ -288,3 +288,37 @@
 	font-size: 0.72rem;
 	opacity: 0.85;
 }
+
+/* WO-348 — two-column params, short sliders, per-param revert */
+.shader-live__params {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4px 18px;
+	max-width: 1100px;
+	align-content: start;
+}
+
+.shader-live__params .shader-live__section,
+.shader-live__params .settings-note {
+	grid-column: 1 / -1;
+}
+
+.shader-live__param input[type='range'] {
+	flex: 1 1 auto;
+	max-width: 160px;
+}
+
+.shader-live__reset {
+	flex: 0 0 18px;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	font-size: 0.7rem;
+	line-height: 1;
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 2px;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.shader-live__reset:hover { color: var(--accent); border-color: var(--accent); }

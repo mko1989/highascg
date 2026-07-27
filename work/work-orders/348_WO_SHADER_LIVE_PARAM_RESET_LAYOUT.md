@@ -4,7 +4,7 @@
 it needs a revert back to default next to each parameter. list the parameters in two columns,
 the sliders dont have to be this long."
 
-**Status: OPEN → implementing.**
+**Status: DONE 2026-07-27: pristine-copy per-param ↺ revert + Reset all (wholesale source restore, CG UPDATE every pass — the broken-shader recovery), two-column grid, sliders capped 160px.**
 
 ## Fix
 1. On shader load keep a PRISTINE copy of every pass source. Each param row gets a ↺ button

@@ -5,3 +5,16 @@ playlists panel in bottom rigth needs to show all playlists that are created in 
 
 i messed with some parameters and now it stopped displaying at all. it needs a revert back to default next to each parameter. 
 list the parameters in two columns, the sliders dont have to be this long.
+
+each time i do git push origin main i get mail from github that some action failed.
+
+
+Annotations
+1 error and 1 warning
+verify
+Process completed with exit code 1.
+verify
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+
+on that note id like to implement some actual github actions that do some real checks wheter everything works. especialy when there will be others contributing.
+

@@ -343,6 +343,29 @@ export function createOperatorComposeTileController(env) {
 		labelEl.textContent = tileLabelText(def, getCm())
 		labelRowEl.appendChild(labelEl)
 		if (def.role === 'pgm') labelRowEl.appendChild(buildPgmTileActions(def.mainIndex))
+		// WO-346: PRT button per tile — capture this tile's channel via AMCP PRINT
+		const prtBtn = document.createElement('button')
+		prtBtn.type = 'button'
+		prtBtn.className = 'operator-tile__prt-btn'
+		prtBtn.textContent = 'PRT'
+		prtBtn.title = 'Capture this channel (Caspar PRINT)'
+		prtBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
+		prtBtn.addEventListener('click', async (e) => {
+			e.stopPropagation()
+			const ch = resolveTileChannel(def, getCm())
+			if (ch == null) return
+			if (prtBtn.disabled) return
+			prtBtn.disabled = true
+			try {
+				await api.post('/api/amcp/print', { channel: ch })
+				showAppToast(`Channel ${ch} captured (PNG in Caspar media folder)`, 'success')
+			} catch (err) {
+				showAppToast(`Capture failed: ${err?.message || err}`, 'error')
+			} finally {
+				prtBtn.disabled = false
+			}
+		})
+		labelRowEl.appendChild(prtBtn)
 		// WO-323 source tile: ✕ remove — real chrome in the footer row (hole body is click-dead by
 		// design, X SHAPE input∩bounding).
 		if (def.role === 'mvcell') {

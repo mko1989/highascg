@@ -196,6 +196,17 @@
 	background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.7) 50%);
 }
 
+/* WO-346 — PRT button per tile for AMCP PRINT capture */
+.operator-tile__prt-btn {
+	font-size: 0.6rem;
+	padding: 1px 4px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: 2px;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
 /* WO-323 — user-added live-source tiles */
 .operator-tile__btn--remove {
 	padding: 0 6px;

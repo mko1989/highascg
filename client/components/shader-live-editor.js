@@ -53,6 +53,8 @@ export function initShaderLiveEditor(stateStore) {
 	let shaderCfg = null // { id, name, common, passes } — working copy with live edits applied
 	let dirty = false
 	let params = []
+	let pristine = null
+	let pristineParams = null
 	let unsub = null
 
 	const isGlassesLogo = () => settingsState.getSettings()?.operatorTools?.cefEnableGpu === true
@@ -67,6 +69,7 @@ export function initShaderLiveEditor(stateStore) {
 				<span class="shader-live__title">🕶 Shader Live</span>
 				<select class="inspector-field__select" id="shl-instance" style="max-width:340px"></select>
 				<span class="shader-live__dirty" id="shl-dirty" hidden>● live edits not saved</span>
+				<button type="button" class="btn btn--secondary" id="shl-reset-all" title="Restore every parameter to the library values (recovery for a broken shader)">Reset all</button>
 				<button type="button" class="btn" id="shl-save" disabled>Save to library</button>
 				<button type="button" class="btn btn--secondary" id="shl-close" title="Back to looks">✕</button>
 			</div>
@@ -79,6 +82,8 @@ export function initShaderLiveEditor(stateStore) {
 			void loadSelected()
 		})
 		overlay.querySelector('#shl-save').addEventListener('click', () => void saveToLibrary())
+		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
+		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
 		overlay.querySelector('#shl-params').addEventListener('change', onControlChange)
 		overlay.querySelector('#shl-params').addEventListener('input', onControlInputMirror)
 		return overlay
@@ -118,8 +123,17 @@ export function initShaderLiveEditor(stateStore) {
 			return
 		}
 		dirty = false
+		/* WO-348: pristine copy for per-param revert + Reset all (recovery from broken values). */
+		pristine = {
+			common: shaderCfg?.common || '',
+			passes: Object.fromEntries(
+				Object.entries(shaderCfg?.passes || {}).map(([k, v]) => [k, v ? { source: v.source } : null]),
+			),
+		}
+		pristineParams = null
 		syncDirty()
 		renderParams()
+		pristineParams = params.map((p) => ({ values: [...p.values] }))
 	}
 
 	function scanCfg() {
@@ -182,7 +196,7 @@ export function initShaderLiveEditor(stateStore) {
 
 	function paramRowHtml(p, idx) {
 		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
-		const name = `<span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
+		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><span class="shader-live__pname" title="${escapeHtml(p.passKey)}">${escapeHtml(p.name)}</span>`
 		if (p.kind === 'color') {
 			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
 			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}</div>`
@@ -247,19 +261,7 @@ export function initShaderLiveEditor(stateStore) {
 			next = [...p.values]
 			next[Number(t.dataset.c) || 0] = v
 		}
-		let rewritten
-		try {
-			rewritten = rewriteParamValues(sourceOf(p.passKey), p, next)
-		} catch {
-			renderParams() // source drifted — rescan rather than corrupt
-			return
-		}
-		setSource(p.passKey, rewritten)
-		p.values = next
-		params = scanCfg() // refresh spans after splice
-		dirty = true
-		syncDirty()
-		void pushLive(p.passKey)
+		applyParamValues(p, next)
 	}
 
 	/** CG UPDATE the rewritten pass onto EVERY live instance of the selected shader. */
@@ -281,6 +283,49 @@ export function initShaderLiveEditor(stateStore) {
 			} catch (e) {
 				console.warn('[shader-live] CG UPDATE failed:', e?.message || e)
 			}
+		}
+	}
+
+	function onParamReset(e) {
+		const t = e.target
+		if (!(t instanceof HTMLElement) || t.dataset.reset == null) return
+		const idx = Number(t.dataset.reset)
+		const p = params[idx]
+		const orig = pristineParams?.[idx]
+		if (!p || !orig || orig.values.length !== p.values.length) return
+		applyParamValues(p, [...orig.values])
+	}
+
+	function applyParamValues(p, next) {
+		let rewritten
+		try {
+			rewritten = rewriteParamValues(sourceOf(p.passKey), p, next)
+		} catch {
+			renderParams()
+			return
+		}
+		setSource(p.passKey, rewritten)
+		p.values = next
+		params = scanCfg()
+		dirty = true
+		syncDirty()
+		void pushLive(p.passKey)
+	}
+
+	async function resetAll() {
+		if (!shaderCfg || !pristine) return
+		shaderCfg.common = pristine.common
+		for (const [k, v] of Object.entries(pristine.passes)) {
+			if (v && shaderCfg.passes?.[k]) shaderCfg.passes[k].source = v.source
+		}
+		renderParams()
+		pristineParams = params.map((p) => ({ values: [...p.values] }))
+		dirty = false
+		syncDirty()
+		// Push every pass (and common) back onto the live producer(s).
+		await pushLive('common')
+		for (const k of ['image', 'bufferA', 'bufferB', 'bufferC', 'bufferD']) {
+			if (shaderCfg.passes?.[k]?.source) await pushLive(k)
 		}
 	}
 
