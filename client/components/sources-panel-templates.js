@@ -1,4 +1,5 @@
 import { escapeHtml, truncate, makeDraggable } from './sources-panel-helpers.js'
+import { api } from '../lib/api-client.js'
 import { showShaderFxModal } from './shader-fx-modal.js'
 
 /**
@@ -8,7 +9,31 @@ import { showShaderFxModal } from './shader-fx-modal.js'
  * @param {Array<{ id?: string, label?: string }>} templates
  * @param {string} filter
  */
+/* Owner bug 27.07.26: shader renames only changed the library NAME — the browser labeled rows
+ * with the Caspar TLS file id, so new names never appeared here. Map sh-<id> → library name. */
+let _shaderNames = new Map()
+let _shaderNamesAt = 0
+let _shaderNamesLoading = false
+function refreshShaderNames(onDone) {
+	if (_shaderNamesLoading || Date.now() - _shaderNamesAt < 15000) return
+	_shaderNamesLoading = true
+	api.get('/api/shaders')
+		.then((r) => {
+			_shaderNames = new Map((r?.shaders || []).map((x) => [String(x.id).toLowerCase(), x.name || x.id]))
+			_shaderNamesAt = Date.now()
+			onDone?.()
+		})
+		.catch(() => {})
+		.finally(() => {
+			_shaderNamesLoading = false
+		})
+}
+
 export function renderTemplatesBrowser(container, templates, filter) {
+	refreshShaderNames(() => {
+		container._lastRenderKey = null
+		renderTemplatesBrowser(container, templates, filter)
+	})
 	const filtered = filter
 		? (templates || []).filter((i) =>
 				(i.label || i.id || '').toLowerCase().includes(filter.toLowerCase()),
@@ -59,9 +84,10 @@ export function renderTemplatesBrowser(container, templates, filter) {
 				}
 			})
 		} else if (shaderMatch) {
+			const displayName = _shaderNames.get(shaderMatch[1]) || label
 			el.innerHTML = `
 				<span class="source-item__kind-pill source-item__kind-pill--shader" title="Shader FX template">FX</span>
-				<span class="source-item__label" title="${escapeHtml(label)} — in Shader Live mode, click to load into preview">${escapeHtml(truncate(label, 36))}</span>
+				<span class="source-item__label" title="${escapeHtml(`${displayName} (${label}) — in Shader Live mode, click to load into preview`)}">${escapeHtml(truncate(displayName, 36))}</span>
 				<button type="button" class="source-item__edit-template-btn" title="Edit in Shader FX">Edit</button>
 			`
 			el.querySelector('.source-item__edit-template-btn').addEventListener('click', (e) => {
