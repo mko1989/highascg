@@ -161,7 +161,11 @@ function needsNodmRestartForLayout(config, opts = {}) {
 	const { getGpuConnectorInventory } = require('./hardware-info')
 	const layout = opts.layout ?? calculateLayoutPositions(config)
 	const inventory = opts.inventory ?? getGpuConnectorInventory()
-	const planned = plannedHeadsFromLayout(layout, { inventory, config })
+	/* WO-315 testability gap (found via CI 2026-07-27): injected xrDetailed.displays must reach
+	 * the sysId resolver too — otherwise resolution consults the LIVE box's xrandr and a mocked
+	 * head that isn't physically present collapses into a live sibling (test red since e0e66cf;
+	 * production behavior unchanged: without opts.xrDetailed this stays undefined → live). */
+	const planned = plannedHeadsFromLayout(layout, { inventory, config, displays: opts.xrDetailed?.displays })
 	const plannedCanvas = boundingBoxFromHeads(planned)
 	if (plannedCanvas.width <= 0 || plannedCanvas.height <= 0) {
 		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_planned_heads', warn: true }

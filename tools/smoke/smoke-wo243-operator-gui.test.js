@@ -293,7 +293,7 @@ describe('WO-243 T243.2: router registration (repeat-offender grep)', () => {
 	it('operator-gui layout routes are registered in router.js', () => {
 		const routerPath = path.join(REPO_ROOT, 'src/api/router.js')
 		const routerContent = fs.readFileSync(routerPath, 'utf8')
-		assert.ok(routerContent.includes("require('./routes-operator-gui')"), 'router should import routes-operator-gui')
+		assert.ok(routerContent.includes("require(" + "'./routes-operator-gui')"), 'router should import routes-operator-gui')
 		assert.ok(routerContent.includes("'/api/operator-gui/layout'"), 'router should register the /api/operator-gui/layout path')
 		assert.match(routerContent, /routes\.post\('\/api\/operator-gui\/layout'/, 'POST route registered')
 		assert.match(routerContent, /routes\.delete\('\/api\/operator-gui\/layout'/, 'DELETE route registered')

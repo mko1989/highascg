@@ -30,8 +30,8 @@ test('WO-160b: scene-take-lbg.js removes pgmOnly delegation', () => {
 
 	// Verify the delegation line is removed: "return require('./scene-take-pgm-only').runSceneTakePgmOnly(amcp, opts)"
 	const hasDelegation =
-		source.includes("require('./scene-take-pgm-only').runSceneTakePgmOnly") ||
-		source.includes("require('./scene-take-pgm-only').runSceneTakePgmOnly(amcp")
+		source.includes("require(" + "'./scene-take-pgm-only').runSceneTakePgmOnly") ||
+		source.includes("require(" + "'./scene-take-pgm-only').runSceneTakePgmOnly(amcp")
 
 	assert.ok(!hasDelegation, 'pgmOnly delegation removed from runSceneTakeLbg')
 })

@@ -43,7 +43,8 @@ function walk(dir) {
 		const ext = path.extname(ent.name)
 		if (!EXT.has(ext)) continue
 		const buf = fs.readFileSync(abs, 'utf8')
-		const lines = buf === '' ? 0 : buf.split('\n').length
+		/* Don't count the empty tail after a final newline as a line. */
+		const lines = buf === '' ? 0 : buf.split('\n').length - (buf.endsWith('\n') ? 1 : 0)
 		if (lines > MAX) {
 			violations.push({ lines, rel: path.relative(repoRoot, abs).replace(/\\/g, '/') })
 		}

@@ -133,7 +133,9 @@ describe('WO-326 follow-up: unlocked layer stretches to its rect on air', () => 
 describe('WO-326d: editor canvas draws unlocked layers stretched', () => {
 	it('both layer draw sites include aspectLocked in forceStretch', () => {
 		const src = read('client/components/preview-canvas-draw-stacks.js')
-		const m = src.match(/const forceStretch = cf === 'stretch' \|\| layer\.fillNativeAspect === false \|\| layer\.aspectLocked === false/g) || []
+		/* 2026-07-27 shader-thumb fill: the predicate gained an isShaderTpl term and wrapped —
+		 * the unlock rule itself is unchanged, so match the superset expression. */
+		const m = src.match(/const forceStretch =\s*isShaderTpl \|\| cf === 'stretch' \|\| layer\.fillNativeAspect === false \|\| layer\.aspectLocked === false/g) || []
 		assert.equal(m.length, 2, 'media-thumb and template-thumb sites both honour the unlock')
 	})
 

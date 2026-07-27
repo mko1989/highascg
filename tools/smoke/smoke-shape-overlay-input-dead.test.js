@@ -39,19 +39,21 @@ describe('shape helper: consumer input-dead + BELOW, firefox CLIENT above, watch
 		assert.match(pySrc, /lock_window_above\(client\)/, 'ABOVE goes to the client')
 		assert.doesNotMatch(pySrc, /lock_window_above\(toplevel\)/, 'the 4c3c83c frame-targeted regression must not come back')
 	})
-	it('enforce_caspar_under: strips ABOVE, pins BELOW, and makes the consumer INPUT-DEAD (frame+client)', () => {
+	it('enforce_caspar_under: consumer rides the kiosk layer (ABOVE) + INPUT-DEAD (frame+client)', () => {
 		assert.match(pySrc, /def enforce_caspar_under/, 'the enforcement fn exists')
-		assert.match(pySrc, /set_net_wm_state\(client, _ATOM_NET_WM_STATE_ABOVE, add=False\)/, 'stale always-on-top stripped')
-		assert.match(pySrc, /set_net_wm_state\(client, _ATOM_NET_WM_STATE_BELOW, add=True\)/, 'BELOW pinned on the CLIENT')
+		/* Owner adjacency request 2026-07-26 (commit 809a809): BELOW-layer pinning inverted to
+		 * ABOVE — nothing may land between kiosk and consumer. Input-dead contract unchanged. */
+		assert.match(pySrc, /set_net_wm_state\(client, _ATOM_NET_WM_STATE_BELOW, add=False\)/, 'BELOW stripped')
+		assert.match(pySrc, /set_net_wm_state\(client, _ATOM_NET_WM_STATE_ABOVE, add=True\)/, 'ABOVE pinned on the CLIENT (kiosk layer)')
 		assert.match(pySrc, /def set_input_empty/, 'input-dead helper exists')
 		assert.match(pySrc, /shape\.SO\.Set, shape\.SK\.Input, 0, 0, 0, \[\]\)/, 'input shape SET to the EMPTY region — the only click-proofing that works (input is intersected with bounding)')
 		assert.match(pySrc, /set_input_empty\(pair\)/, 'enforcement actually calls it')
 	})
-	it('stacking watchdog: inversion detected against the firefox toplevel and healed via _NET_ACTIVE_WINDOW', () => {
-		assert.match(pySrc, /def stacking_inverted/, 'inversion check exists')
+	it('stacking watchdog: adjacency (gap OR inversion) detected against the firefox toplevel and healed', () => {
+		assert.match(pySrc, /def stacking_gap/, 'adjacency check exists (809a809: fi == ci + 1, not just order)')
 		assert.match(pySrc, /_NET_ACTIVE_WINDOW/, 'reactivation atom interned')
 		assert.match(pySrc, /def activate_window/, 'reactivation fn exists')
-		assert.match(pySrc, /stacking_inverted\(root, top\.id, firefox_pair\[0\]\.id\)/, 'watchdog compares toplevels (what the X server stacks)')
+		assert.match(pySrc, /stacking_gap\(root, top\.id, firefox_pair\[0\]\.id\)/, 'watchdog compares toplevels (what the X server stacks)')
 	})
 	it('enforce_caspar_under runs on EVERY poll tick (a restarted consumer must be re-neutralized <=2s) and input is restored on exit', () => {
 		assert.match(pySrc, /caspar_pair = enforce_caspar_under\(/, 'poll loop re-asserts the lock')

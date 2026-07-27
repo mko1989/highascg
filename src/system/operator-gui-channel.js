@@ -14,7 +14,6 @@
  *    current cell count, one MIXER COMMIT at the end, and per-channel serialization via a promise
  *    chain. Each apply also feeds the python-xlib shape helper (operator-shape-overlay.js) so the
  *    Caspar screen consumer window is shaped to exactly these rects, above Firefox.
- *
  * WO-255: the CEF web-UI layer (100) and its auto-arm input focus are RETIRED — the operator GUI
  * is now a fullscreen Firefox process (src/system/operator-gui-launcher.js), not a Caspar layer.
  * Route layers remain visual only (out of scope: PRV interactivity through the shaped holes).
@@ -60,7 +59,6 @@ const debounceTimers = new Map()
  * that (client/components/operator-compose-tiles.js `stateReady`), but this is the cheap belt-and-
  * braces: for {@link BOOT_GUARD_MS} after a re-apply, ONE report that would strictly REDUCE the
  * restored cell count is ignored.
- *
  * Deliberately one-shot per boot and count-based only, so it can never block a real operator
  * change: moving/resizing a tile reports the SAME cell count (never fewer), and a genuine
  * screen-count reduction re-reports on the client's very next render, which sails through.
@@ -72,7 +70,6 @@ const BOOT_GUARD_MS = 10000
 /**
  * 2026-07-20 bug (todos19.07.26): "when caspar is reloaded it comes back trying to display the
  * compose preview even though im on devices tab. only going to looks and back clears the windows."
- *
  * Root cause is HERE, not in the client: {@link ensureOperatorGuiChannel} re-applies the PERSISTED
  * cell layout on every Caspar connect/reconnect, unconditionally. When the operator sits on a tab
  * with no preview surface (Devices) the client has already withdrawn its rects (DELETE

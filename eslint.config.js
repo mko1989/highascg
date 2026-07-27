@@ -5,6 +5,8 @@ const globals = require('globals')
 
 const IGNORES = [
 	'**/node_modules/**',
+	// Runtime-generated Firefox kiosk profile (prefs.js/user.js are not our code)
+	'.operator-firefox-profile/**',
 	'dist-web/**',
 	'dist/**',
 	'dist-map/**',

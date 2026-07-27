@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# A force-push or rapid follow-up commit obsoletes the older run — kill it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -14,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install dependencies
@@ -22,6 +27,9 @@ jobs:
 
       - name: Repo integrity
         run: npm run verify:repo-integrity
+
+      - name: File size limit (500 lines)
+        run: node tools/ci/check-max-file-lines.js
 
       - name: Boot check (no-http)
         run: node index.js --no-http
@@ -37,3 +45,30 @@ jobs:
 
       - name: npm audit
         run: node tools/ci/npm-audit-ci.js
+
+  # dist-web/ is untracked — the served UI only exists if `vite build` succeeds, so a
+  # contributor's client/ change must prove it still builds (and that every module the
+  # bundle imports actually resolves).
+  build-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Client build
+        run: npm run build:client
+
+      - name: Bundle exists and is non-trivial
+        run: |
+          test -f dist-web/index.html
+          size=$(du -sk dist-web | cut -f1)
+          echo "dist-web: ${size} KB"
+          test "$size" -ge 100

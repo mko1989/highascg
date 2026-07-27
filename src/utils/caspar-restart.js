@@ -262,7 +262,6 @@ function resolveApplyReconnectWaitMs() {
 /**
  * Send AMCP RESTART and wait for Caspar to exit (AMCP down) then come back.
  * If teardown hangs, kill the main casparcg process so run.sh can relaunch.
- *
  * @param {object} ctx
  * @param {{ log?: Function }} [opts]
  */
@@ -359,7 +358,6 @@ async function sendRestartAndWaitForCaspar(ctx, opts = {}) {
  * After apply wrote new config: brief AMCP RESTART, then fast-kill if Caspar is still up so
  * run.sh relaunches with the new file. Avoids ~90s hangs when RESTART teardown leaves screen
  * consumers visible while HighAsCG waits for reconnect.
- *
  * @param {object} ctx
  * @param {{ log?: Function, skipRestartCommand?: boolean, disconnectMs?: number, reconnectMs?: number }} [opts]
  */

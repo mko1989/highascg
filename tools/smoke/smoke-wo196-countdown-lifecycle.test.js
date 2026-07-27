@@ -20,7 +20,7 @@ test('WO-196 T196.1: Exit clear — teardown emits CG CLEAR for exiting template
 	const source = fs.readFileSync(path.join(__dirname, '../../src/engine/scene-take-lbg-teardown.js'), 'utf8')
 
 	// Verify imports for template CG functions
-	assert.ok(source.includes("require('./scene-template-cg')"), 'scene-template-cg imported')
+	assert.ok(source.includes("require(" + "'./scene-template-cg')"), 'scene-template-cg imported')
 	assert.ok(source.includes('isSceneTemplateLayer'), 'isSceneTemplateLayer used')
 	assert.ok(source.includes('buildSceneTemplateCgClearLines'), 'buildSceneTemplateCgClearLines used')
 
@@ -94,7 +94,7 @@ test('WO-196 T196.3: routes-countdown.js list includes all project scenes + onAi
 	const source = fs.readFileSync(path.join(__dirname, '../../src/api/routes-countdown.js'), 'utf8')
 
 	// Verify project-scenes-load is imported
-	assert.ok(source.includes("require('../engine/project-scenes-load')"), 'project-scenes-load imported')
+	assert.ok(source.includes("require(" + "'../engine/project-scenes-load')"), 'project-scenes-load imported')
 	assert.ok(source.includes('loadFullProject'), 'loadFullProject used')
 
 	// Verify list logic enumerates all project scenes

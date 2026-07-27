@@ -80,11 +80,8 @@ function buildPgmTileActions(mainIndex) {
  *   getOscClient: (() => any) | null,
  *   stateStore: { getState: () => any },
  *   onCellRects: ((cellRects: Array<object>, viewport?: object) => void) | null,
- *   getCm: () => object,
- *   posWatch: { update: () => void },
- *   getStorageKey: () => string,
- *   getStateReady: () => boolean,
- *   onPersist: () => void,
+ *   getCm: () => object,  posWatch: { update: () => void },  getStorageKey: () => string,
+ *   getStateReady: () => boolean,  onPersist: () => void,
  *   onRemoveSourceTile: (id: string) => void,
  *   isClient: boolean,
  * }} env

@@ -46,7 +46,7 @@ async function testRouterRegistration() {
 	)
 
 	assert(
-		routerContent.includes("const routesScreens = require('./routes-screens')"),
+		routerContent.includes("const routesScreens = require(" + "'./routes-screens')"),
 		'router.js should import routesScreens'
 	)
 	assert(

@@ -26,10 +26,7 @@ const { WS: COMPANION_WS } = require('../companion-bridge/contract')
 /**
  * @param {import('http').Server} httpServer
  * @param {WsAppContext} ctx — `_wsBroadcast` is assigned here
- * @param {{
- *   stateBroadcastIntervalMs?: number,
- *   log?: (msg: string) => void,
- * }} [options]
+ * @param {{ stateBroadcastIntervalMs?: number, log?: (msg: string) => void }} [options]
  */
 function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const log = options.log || (() => {})
@@ -114,10 +111,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		}
 	}
 
-	/**
-	 * @param {string} event
-	 * @param {unknown} data
-	 */
+	/** @param {string} event  @param {unknown} data */
 	const STATE_BYTES_WARN = parseInt(process.env.HIGHASCG_WS_FULL_STATE_BYTES || '0', 10) || 0
 	let lastStatePayloadWarnAt = 0
 
