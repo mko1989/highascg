@@ -208,6 +208,13 @@
 	overflow: hidden;
 	padding: 0;
 }
+/* Owner 27.07: full-width sliders turned the whole panel into a wheel trap (Firefox adjusts
+ * an unfocused range on wheel-over instead of scrolling). Cap them — and the JS side
+ * (inspector-panel.js) converts wheel-over-unfocused-slider back into panel scroll. */
+#panel-inspector .panel-inspector__scroll input[type='range'] {
+	max-width: 150px;
+}
+
 #panel-inspector .panel-inspector__scroll {
 	flex: 1 1 0;
 	min-height: 0;

@@ -39,6 +39,20 @@ function redrawDmxCanvas() {
  * @param {object} stateStore
  */
 export function initInspectorPanel(root, stateStore) {
+	/* Owner 27.07: wheel over an UNFOCUSED slider must scroll the panel, not tweak the value
+	 * (Firefox default steals the scroll). preventDefault kills both, so scroll manually.
+	 * A clicked (focused) slider still wheel-adjusts — deliberate interaction. */
+	root.addEventListener(
+		'wheel',
+		(e) => {
+			const t = e.target
+			if (t instanceof HTMLInputElement && t.type === 'range' && document.activeElement !== t) {
+				e.preventDefault()
+				root.scrollTop += e.deltaY
+			}
+		},
+		{ passive: false },
+	)
 	let selection = null
 	let panelMode = readInspectorPanelMode()
 	let _timelinePlaybackPos = 0
