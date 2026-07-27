@@ -58,6 +58,27 @@ test:ci 1530 tests / 0 fail (2 Xvfb-skips), max-file-lines 0, build:client 0 + 2
 - checkout/setup-node bumped to v5 majors in both workflows (Node 24 runtimes — kills the
   deprecation annotation).
 
+## Rounds 3–4 (same day) — first fully green runs
+
+- **unclutter spawn crash (real service bug)**: pointer-confine's `spawn('unclutter', ...)` ENOENT
+  arrives as an async 'error' event the surrounding try/catch never sees — an uncaughtException
+  that would kill the whole service on any box without unclutter (it crashed wo249/wo308 as
+  collateral on CI). Guarded with `child.on('error', ...)`.
+- **tools/dev** is an empty dir (git can't track it) → absent on fresh checkouts, failing the
+  WO-273 eggs-exclude smoke — added `.gitkeep`.
+- **CI now runs X for real**: verify installs `xvfb x11-xserver-utils python3-xlib` and runs
+  `xvfb-run -a npm run test:ci`, so the shape-overlay behavioral harness and the xrandr probes
+  exercise a real X server on CI instead of skipping. Test-side skips added for environments
+  without xrandr / python3-xlib (other dev machines).
+- **wo309 tick proof made duration-aware**: under Xvfb, xrandr answers in <4ms — faster than one
+  proof-timer period, so a sub-8ms call can't prove blocking either way; the ≥1-tick assertion
+  now applies only when the call was long enough (box: ~170ms, fully asserted).
+- **npm audit**: brace-expansion ReDoS (high) — `npm audit fix`, lockfile-only.
+- **Pages green** (first time): `_site` is root-owned by the Jekyll Docker container → `sudo` for
+  the map injection step.
+
+Final state: **CI (verify + build-client) and Deploy GitHub Pages both green** on push 2da4743.
+
 ## Left open
 
 - 737 lint warnings — ratchet later, not a gate yet.
