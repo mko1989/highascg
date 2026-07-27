@@ -67,7 +67,13 @@ describe('shape helper: consumer input-dead + BELOW, firefox CLIENT above, watch
 
 describe('shape helper: behavioral run on Xvfb (real helper, real SHAPE regions, real stacking)', () => {
 	const hasXvfb = fs.existsSync('/usr/bin/Xvfb')
-	it('holes punched + consumer input-dead + inverted stacking healed + full restore on SIGTERM', { skip: !hasXvfb && 'Xvfb not installed' }, () => {
+	let hasXlib = false
+	try {
+		execFileSync('python3', ['-c', 'import Xlib'], { stdio: 'pipe' })
+		hasXlib = true
+	} catch { /* python3-xlib not installed — the harness cannot run */ }
+	const skip = (!hasXvfb && 'Xvfb not installed') || (!hasXlib && 'python3-xlib not installed')
+	it('holes punched + consumer input-dead + inverted stacking healed + full restore on SIGTERM', { skip }, () => {
 		const out = execFileSync('python3', [path.join(__dirname, 'xvfb-shape-overlay-harness.py')], {
 			stdio: ['ignore', 'pipe', 'pipe'],
 			timeout: 30000,

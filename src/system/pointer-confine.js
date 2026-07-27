@@ -147,6 +147,9 @@ async function ensureUnclutterRunning(env, log) {
 			detached: true,
 			stdio: 'ignore',
 		})
+		/* spawn ENOENT arrives as an async 'error' event the try/catch can NOT see —
+		 * unhandled it is an uncaughtException that kills the whole service. */
+		child.on('error', (e) => log?.('warn', `[Pointer confine] unclutter unavailable: ${e?.message || e}`))
 		child.unref()
 		log?.('info', `[Pointer confine] unclutter -idle ${UNCLUTTER_IDLE_SEC} started`)
 		return true

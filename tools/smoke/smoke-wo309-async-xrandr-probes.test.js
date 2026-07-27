@@ -28,7 +28,10 @@ test('async probes produce byte-identical output to their sync siblings', async 
 	assert.deepEqual(asyncInv, syncInv, 'getGpuConnectorInventoryAsync must match getGpuConnectorInventory exactly')
 })
 
-test('the async xrandr-query probe does not block the event loop', async () => {
+/* The tick proof needs a real xrandr exec taking >4ms; with the binary absent the spawn
+ * ENOENT resolves in under one timer tick — skip rather than flake (bare CI runners). */
+const hasXrandr = require('node:fs').existsSync('/usr/bin/xrandr')
+test('the async xrandr-query probe does not block the event loop', { skip: !hasXrandr && 'xrandr not installed' }, async () => {
 	const mod = freshModule()
 	const prevTtl = process.env.HIGHASCG_XRANDR_CACHE_TTL_MS
 	process.env.HIGHASCG_XRANDR_CACHE_TTL_MS = '0' // force a real exec, not a cache hit

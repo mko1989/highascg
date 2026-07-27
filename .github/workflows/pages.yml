@@ -39,8 +39,8 @@ jobs:
         run: |
           npm ci
           npm run build:map
-          mkdir -p _site/map
-          cp -r dist-map/* _site/map/
+          sudo mkdir -p _site/map
+          sudo cp -r dist-map/* _site/map/
 
       - uses: actions/upload-pages-artifact@v3
 

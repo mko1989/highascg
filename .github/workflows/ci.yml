@@ -25,6 +25,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The box is an X machine — give tests a real (virtual) X server, xrandr, and the
+      # python3 Xlib the shape-overlay behavioral harness needs, so those paths run for
+      # real on CI instead of skipping.
+      - name: X test dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends xvfb x11-xserver-utils python3-xlib
+
       - name: Repo integrity
         run: npm run verify:repo-integrity
 
@@ -41,7 +49,7 @@ jobs:
         run: npm run format:check
 
       - name: Offline tests
-        run: npm run test:ci
+        run: xvfb-run -a npm run test:ci
 
       - name: npm audit
         run: node tools/ci/npm-audit-ci.js
