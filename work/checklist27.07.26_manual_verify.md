@@ -108,3 +108,14 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       After clicking a monitor, the devices tab shows the Operator GUI destination cabled
       to that GPU port (any old cable on that jack replaced).
       >
+
+- [ ] **21. Taskbar** (WO-352 — live-verified by automation, worth an eyeball)
+      Chips are circles with the real app icons (red ring = raised, gray = parked, pulsing =
+      launching). Open the browser, park it, raise it again — it must come back and STAY
+      (the old ~2s steal is fixed). "Back to GUI" then one chip click brings it forward.
+      >
+
+- [ ] **22. Playlist rows + ✕** (WO-353)
+      Playlist items: tiny drag dots, name gets the space, small seconds box, ✕ delete.
+      Trashcans are ✕ everywhere (layer list, preset delete, sources folder too).
+      >
