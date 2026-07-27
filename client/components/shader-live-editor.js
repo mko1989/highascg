@@ -351,6 +351,9 @@ export function initShaderLiveEditor(stateStore) {
 		const orig = pristineParams?.[idx]
 		if (!p || !orig || orig.values.length !== p.values.length) return
 		applyParamValues(p, [...orig.values])
+		/* todos27: without a re-render the row kept showing the edited value — the reset DID
+		 * land on air but looked dead. Re-render from the rewritten source. */
+		renderParams()
 	}
 
 	function applyParamValues(p, next) {

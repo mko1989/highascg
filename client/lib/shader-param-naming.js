@@ -123,9 +123,10 @@ export function nameDeepParam(masked, start, end, kind) {
 function categorize(label, mulId, kind, stmt) {
 	if (kind === 'color') return 'Colors'
 	const hay = `${label} ${mulId} ${stmt.text.slice(-48)}`.toLowerCase()
-	/* Color-NAMED scalars (col gain, tint level, speccol …) belong in the Colors rect even as
-	 * sliders — a single value can't be a picker, but it is color work. */
-	if (/\b(col|color|tint|rgb|hue|spec)/.test(hay)) return 'Colors'
+	/* Color-NAMED scalars belong in the Colors rect ONLY when the value IS the color target
+	 * (plain ident or its broadcast level) — matching the whole statement flooded Colors with
+	 * every slider from col-math ("col scale", "col mix amount" keep their real category). */
+	if (/^\w*(col|color|tint|rgb|hue)\w*( level)?( #\d+)?$/.test(label.toLowerCase())) return 'Colors'
 	if (/speed|time|rate|freq|phase|itime/.test(hay)) return 'Speed & time'
 	if (/scale|zoom|size|radius|width|height|dist|uv|coord|offset|pos\b/.test(hay)) return 'Scale & shape'
 	if (/iter|steps|octav|count|loop|detail/.test(hay)) return 'Detail'

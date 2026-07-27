@@ -256,8 +256,9 @@
 }
 
 .shader-live__pname {
-	flex: 0 1 120px;
-	min-width: 64px;
+	flex: 0 1 auto;
+	min-width: 48px;
+	max-width: 110px;
 	font-family: var(--mono-font, monospace);
 	font-size: 0.75rem;
 	overflow: hidden;
@@ -265,7 +266,7 @@
 }
 
 .shader-live__param input[type='range'] { flex: 1 1 auto; }
-.shader-live__param input[type='number'] { flex: 0 0 62px; width: 62px; }
+.shader-live__param input[type='number'] { flex: 0 0 54px; width: 54px; }
 .shader-live__param input[type='color'] { flex: 0 0 52px; width: 52px; height: 28px; padding: 0; }
 
 /* hidden must win over the class's display:flex (regression: could not leave Shader Live) */
@@ -320,14 +321,15 @@
 
 .shader-live__group-grid {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 2px 16px;
+	/* todos27: rows are compact — pack as many columns as fit (4 on the operator display). */
+	grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+	gap: 2px 14px;
 	align-content: start;
 }
 
 .shader-live__param input[type='range'] {
-	flex: 1 1 auto;
-	max-width: 160px;
+	flex: 1 1 40px;
+	min-width: 40px;
 }
 
 .shader-live__reset {
